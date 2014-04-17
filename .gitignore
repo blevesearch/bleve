@@ -1,0 +1,10 @@
+#*
+*.sublime-*
+*~
+.#*
+.project
+.settings
+.DS_Store
+/examples/bleve_index_json/bleve_index_json
+/examples/bleve_query/bleve_query
+/utils/bleve_dump/bleve_dump
