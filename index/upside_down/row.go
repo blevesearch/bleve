@@ -13,6 +13,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 )
 
 const BYTE_SEPARATOR byte = 0xff
@@ -50,10 +51,7 @@ func (v *VersionRow) Key() []byte {
 
 func (v *VersionRow) Value() []byte {
 	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.LittleEndian, v.version)
-	if err != nil {
-		panic(fmt.Sprintf("binary.Write failed: %v", err))
-	}
+	buf.WriteByte(byte(v.version))
 	return buf.Bytes()
 }
 
@@ -86,27 +84,17 @@ type FieldRow struct {
 
 func (f *FieldRow) Key() []byte {
 	buf := new(bytes.Buffer)
-	err := buf.WriteByte('f')
-	if err != nil {
-		panic(fmt.Sprintf("Buffer.WriteByte failed: %v", err))
-	}
-	err = binary.Write(buf, binary.LittleEndian, f.index)
-	if err != nil {
-		panic(fmt.Sprintf("binary.Write failed: %v", err))
-	}
+	buf.WriteByte('f')
+	indexbuf := make([]byte, 2)
+	binary.LittleEndian.PutUint16(indexbuf, f.index)
+	buf.Write(indexbuf)
 	return buf.Bytes()
 }
 
 func (f *FieldRow) Value() []byte {
 	buf := new(bytes.Buffer)
-	_, err := buf.WriteString(f.name)
-	if err != nil {
-		panic(fmt.Sprintf("Buffer.WriteString failed: %v", err))
-	}
-	err = buf.WriteByte(BYTE_SEPARATOR)
-	if err != nil {
-		panic(fmt.Sprintf("Buffer.WriteByte failed: %v", err))
-	}
+	buf.WriteString(f.name)
+	buf.WriteByte(BYTE_SEPARATOR)
 	return buf.Bytes()
 }
 
@@ -165,56 +153,41 @@ type TermFrequencyRow struct {
 
 func (tfr *TermFrequencyRow) Key() []byte {
 	buf := new(bytes.Buffer)
-	err := buf.WriteByte('t')
-	if err != nil {
-		panic(fmt.Sprintf("Buffer.WriteByte failed: %v", err))
-	}
-	_, err = buf.Write(tfr.term)
-	if err != nil {
-		panic(fmt.Sprintf("Buffer.Write failed: %v", err))
-	}
-	err = buf.WriteByte(BYTE_SEPARATOR)
-	if err != nil {
-		panic(fmt.Sprintf("Buffer.WriteByte failed: %v", err))
-	}
-	err = binary.Write(buf, binary.LittleEndian, tfr.field)
-	if err != nil {
-		panic(fmt.Sprintf("binary.Write failed: %v", err))
-	}
-	_, err = buf.Write(tfr.doc)
-	if err != nil {
-		panic(fmt.Sprintf("Buffer.Write failed: %v", err))
-	}
+	buf.WriteByte('t')
+	buf.Write(tfr.term)
+	buf.WriteByte(BYTE_SEPARATOR)
+	fieldbuf := make([]byte, 2)
+	binary.LittleEndian.PutUint16(fieldbuf, tfr.field)
+	buf.Write(fieldbuf)
+	buf.Write(tfr.doc)
 	return buf.Bytes()
 }
 
 func (tfr *TermFrequencyRow) Value() []byte {
 	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.LittleEndian, tfr.freq)
-	if err != nil {
-		panic(fmt.Sprintf("binary.Write failed: %v", err))
-	}
-	err = binary.Write(buf, binary.LittleEndian, tfr.norm)
-	if err != nil {
-		panic(fmt.Sprintf("binary.Write failed: %v", err))
-	}
+
+	freqbuf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(freqbuf, tfr.freq)
+	buf.Write(freqbuf)
+
+	normuint32 := math.Float32bits(tfr.norm)
+	normbuf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(normbuf, normuint32)
+	buf.Write(normbuf)
+
 	for _, vector := range tfr.vectors {
-		err = binary.Write(buf, binary.LittleEndian, vector.field)
-		if err != nil {
-			panic(fmt.Sprintf("binary.Write failed: %v", err))
-		}
-		err = binary.Write(buf, binary.LittleEndian, vector.pos)
-		if err != nil {
-			panic(fmt.Sprintf("binary.Write failed: %v", err))
-		}
-		err = binary.Write(buf, binary.LittleEndian, vector.start)
-		if err != nil {
-			panic(fmt.Sprintf("binary.Write failed: %v", err))
-		}
-		err = binary.Write(buf, binary.LittleEndian, vector.end)
-		if err != nil {
-			panic(fmt.Sprintf("binary.Write failed: %v", err))
-		}
+		fieldbuf := make([]byte, 2)
+		binary.LittleEndian.PutUint16(fieldbuf, vector.field)
+		buf.Write(fieldbuf)
+		posbuf := make([]byte, 8)
+		binary.LittleEndian.PutUint64(posbuf, vector.pos)
+		buf.Write(posbuf)
+		startbuf := make([]byte, 8)
+		binary.LittleEndian.PutUint64(startbuf, vector.start)
+		buf.Write(startbuf)
+		endbuf := make([]byte, 8)
+		binary.LittleEndian.PutUint64(endbuf, vector.end)
+		buf.Write(endbuf)
 	}
 	return buf.Bytes()
 }
@@ -331,32 +304,19 @@ type BackIndexRow struct {
 
 func (br *BackIndexRow) Key() []byte {
 	buf := new(bytes.Buffer)
-	err := buf.WriteByte('b')
-	if err != nil {
-		panic(fmt.Sprintf("Buffer.WriteByte failed: %v", err))
-	}
-	err = binary.Write(buf, binary.LittleEndian, br.doc)
-	if err != nil {
-		panic(fmt.Sprintf("binary.Write failed: %v", err))
-	}
+	buf.WriteByte('b')
+	buf.Write(br.doc)
 	return buf.Bytes()
 }
 
 func (br *BackIndexRow) Value() []byte {
 	buf := new(bytes.Buffer)
 	for _, e := range br.entries {
-		_, err := buf.Write(e.term)
-		if err != nil {
-			panic(fmt.Sprintf("Buffer.Write failed: %v", err))
-		}
-		err = buf.WriteByte(BYTE_SEPARATOR)
-		if err != nil {
-			panic(fmt.Sprintf("Buffer.WriteByte failed: %v", err))
-		}
-		err = binary.Write(buf, binary.LittleEndian, e.field)
-		if err != nil {
-			panic(fmt.Sprintf("binary.Write failed: %v", err))
-		}
+		buf.Write(e.term)
+		buf.WriteByte(BYTE_SEPARATOR)
+		fieldbuf := make([]byte, 2)
+		binary.LittleEndian.PutUint16(fieldbuf, e.field)
+		buf.Write(fieldbuf)
 	}
 	return buf.Bytes()
 }
