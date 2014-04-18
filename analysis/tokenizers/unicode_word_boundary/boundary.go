@@ -8,7 +8,7 @@
 //  and limitations under the License.
 package unicode_word_boundary
 
-// #cgo pkg-config: icu-uc
+// #cgo LDFLAGS: -licuuc -licudata
 // #include <stdio.h>
 // #include <stdlib.h>
 // #include "unicode/utypes.h"
