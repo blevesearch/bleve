@@ -99,26 +99,50 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 		if ok {
 			// need to increment counter
 			tr := NewTermFrequencyRow(tfr.term, tfr.field, "", 0, 0)
-			val, err := udc.db.Get(ro, tr.Key())
+			trkey, err := tr.Key()
+			if err != nil {
+				return err
+			}
+			val, err := udc.db.Get(ro, trkey)
 			if err != nil {
 				return err
 			}
 			if val != nil {
-				tr = ParseFromKeyValue(tr.Key(), val).(*TermFrequencyRow)
+				tr = ParseFromKeyValue(trkey, val).(*TermFrequencyRow)
 				tr.freq += 1 // incr
 			} else {
 				tr = NewTermFrequencyRow(tfr.term, tfr.field, "", 1, 0)
 			}
 
 			// now add this to the batch
-			wb.Put(tr.Key(), tr.Value())
+			trval, err := tr.Value()
+			if err != nil {
+				return err
+			}
+			wb.Put(trkey, trval)
 		}
-		wb.Put(row.Key(), row.Value())
+		rowkey, err := row.Key()
+		if err != nil {
+			return err
+		}
+		rowval, err := row.Value()
+		if err != nil {
+			return err
+		}
+		wb.Put(rowkey, rowval)
 	}
 
 	// update
 	for _, row := range updateRows {
-		wb.Put(row.Key(), row.Value())
+		rowkey, err := row.Key()
+		if err != nil {
+			return err
+		}
+		rowval, err := row.Value()
+		if err != nil {
+			return err
+		}
+		wb.Put(rowkey, rowval)
 	}
 
 	// delete
@@ -127,26 +151,38 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 		if ok {
 			// need to decrement counter
 			tr := NewTermFrequencyRow(tfr.term, tfr.field, "", 0, 0)
-			val, err := udc.db.Get(ro, tr.Key())
+			trkey, err := tr.Key()
+			if err != nil {
+				return err
+			}
+			val, err := udc.db.Get(ro, trkey)
 			if err != nil {
 				return err
 			}
 			if val != nil {
-				tr = ParseFromKeyValue(tr.Key(), val).(*TermFrequencyRow)
+				tr = ParseFromKeyValue(trkey, val).(*TermFrequencyRow)
 				tr.freq -= 1 // incr
 			} else {
-				log.Panic(fmt.Sprintf("unexpected missing row, deleting term, expected count row to exit: %v", tr.Key()))
+				return fmt.Errorf("unexpected missing row, deleting term, expected count row to exit: %v", trkey)
 			}
 
 			if tr.freq == 0 {
-				wb.Delete(tr.Key())
+				wb.Delete(trkey)
 			} else {
 				// now add this to the batch
-				wb.Put(tr.Key(), tr.Value())
+				trval, err := tr.Value()
+				if err != nil {
+					return err
+				}
+				wb.Put(trkey, trval)
 			}
 
 		}
-		wb.Delete(row.Key())
+		rowkey, err := row.Key()
+		if err != nil {
+			return err
+		}
+		wb.Delete(rowkey)
 	}
 
 	// write out the batch
@@ -367,7 +403,10 @@ func (udc *UpsideDownCouch) backIndexRowForDoc(docId string) (*BackIndexRow, err
 	tempRow := &BackIndexRow{
 		doc: []byte(docId),
 	}
-	key := tempRow.Key()
+	key, err := tempRow.Key()
+	if err != nil {
+		return nil, err
+	}
 	value, err := udc.db.Get(ro, key)
 	if err != nil {
 		return nil, err

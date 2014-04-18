@@ -68,11 +68,17 @@ func TestRows(t *testing.T) {
 
 	// test going from struct to k/v bytes
 	for _, test := range tests {
-		rk := test.input.Key()
+		rk, err := test.input.Key()
+		if err != nil {
+			t.Error(err)
+		}
 		if !reflect.DeepEqual(rk, test.outKey) {
 			t.Errorf("Expected key to be %v got: %v", test.outKey, rk)
 		}
-		rv := test.input.Value()
+		rv, err := test.input.Value()
+		if err != nil {
+			t.Error(err)
+		}
 		if !reflect.DeepEqual(rv, test.outVal) {
 			t.Errorf("Expected value to be %v got: %v", test.outVal, rv)
 		}
