@@ -15,9 +15,9 @@ import (
 
 func NewKeywordAnalyzer() (*analysis.Analyzer, error) {
 	keyword := analysis.Analyzer{
-		CharFilters: []analysis.CharFilter{},
-		Tokenizer:   single_token.NewSingleTokenTokenizer(),
-		Filters:     []analysis.TokenFilter{},
+		CharFilters:  []analysis.CharFilter{},
+		Tokenizer:    single_token.NewSingleTokenTokenizer(),
+		TokenFilters: []analysis.TokenFilter{},
 	}
 
 	return &keyword, nil
