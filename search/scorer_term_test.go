@@ -171,6 +171,12 @@ func TestTermScorerWithQueryNorm(t *testing.T) {
 
 	scorer.SetQueryNorm(2.0)
 
+	expectedQueryWeight := 3 * idf * 3 * idf
+	actualQueryWeight := scorer.Weight()
+	if expectedQueryWeight != actualQueryWeight {
+		t.Errorf("expected query weight %f, got %f", expectedQueryWeight, actualQueryWeight)
+	}
+
 	tests := []struct {
 		termMatch *index.TermFieldDoc
 		result    *DocumentMatch
