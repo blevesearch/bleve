@@ -36,7 +36,7 @@ func ParseFromKeyValue(key, value []byte) (UpsideDownCouchRow, error) {
 	case 'b':
 		return NewBackIndexRowKV(key, value)
 	}
-	return nil, fmt.Errorf("Unknown field type '%s'", key[0])
+	return nil, fmt.Errorf("Unknown field type '%s'", string(key[0]))
 }
 
 // VERSION
