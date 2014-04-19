@@ -25,7 +25,7 @@ type UpsideDownCouchRow interface {
 	Value() []byte
 }
 
-func ParseFromKeyValue(key, value []byte) UpsideDownCouchRow {
+func ParseFromKeyValue(key, value []byte) (UpsideDownCouchRow, error) {
 	switch key[0] {
 	case 'v':
 		return NewVersionRowKV(key, value)
@@ -36,7 +36,7 @@ func ParseFromKeyValue(key, value []byte) UpsideDownCouchRow {
 	case 'b':
 		return NewBackIndexRowKV(key, value)
 	}
-	return nil
+	return nil, fmt.Errorf("Unknown field type '%s'", key[0])
 }
 
 // VERSION
@@ -65,14 +65,14 @@ func NewVersionRow(version uint8) *VersionRow {
 	}
 }
 
-func NewVersionRowKV(key, value []byte) *VersionRow {
+func NewVersionRowKV(key, value []byte) (*VersionRow, error) {
 	rv := VersionRow{}
 	buf := bytes.NewBuffer(value)
 	err := binary.Read(buf, binary.LittleEndian, &rv.version)
 	if err != nil {
-		panic(fmt.Sprintf("binary.Read failed: %v", err))
+		return nil, err
 	}
-	return &rv
+	return &rv, nil
 }
 
 // FIELD definition
@@ -109,24 +109,24 @@ func NewFieldRow(index uint16, name string) *FieldRow {
 	}
 }
 
-func NewFieldRowKV(key, value []byte) *FieldRow {
+func NewFieldRowKV(key, value []byte) (*FieldRow, error) {
 	rv := FieldRow{}
 
 	buf := bytes.NewBuffer(key)
 	buf.ReadByte() // type
 	err := binary.Read(buf, binary.LittleEndian, &rv.index)
 	if err != nil {
-		panic(fmt.Sprintf("binary.Read failed: %v", err))
+		return nil, err
 	}
 
 	buf = bytes.NewBuffer(value)
 	rv.name, err = buf.ReadString(BYTE_SEPARATOR)
 	if err != nil {
-		panic(fmt.Sprintf("Buffer.ReadString failed: %v", err))
+		return nil, err
 	}
 	rv.name = rv.name[:len(rv.name)-1] // trim off separator byte
 
-	return &rv
+	return &rv, nil
 }
 
 // TERM FIELD FREQUENCY
@@ -217,7 +217,7 @@ func NewTermFrequencyRowWithTermVectors(term []byte, field uint16, doc string, f
 	}
 }
 
-func NewTermFrequencyRowKV(key, value []byte) *TermFrequencyRow {
+func NewTermFrequencyRowKV(key, value []byte) (*TermFrequencyRow, error) {
 	rv := TermFrequencyRow{
 		doc: []byte(""),
 	}
@@ -227,18 +227,18 @@ func NewTermFrequencyRowKV(key, value []byte) *TermFrequencyRow {
 	var err error
 	rv.term, err = buf.ReadBytes(BYTE_SEPARATOR)
 	if err != nil {
-		panic(fmt.Sprintf("Buffer.ReadString failed: %v", err))
+		return nil, err
 	}
 	rv.term = rv.term[:len(rv.term)-1] // trim off separator byte
 
 	err = binary.Read(buf, binary.LittleEndian, &rv.field)
 	if err != nil {
-		panic(fmt.Sprintf("binary.Read failed: %v", err))
+		return nil, err
 	}
 
 	doc, err := buf.ReadBytes(BYTE_SEPARATOR)
 	if err != io.EOF {
-		panic(fmt.Sprintf("expected binary.ReadString to end in EOF: %v", err))
+		return nil, err
 	}
 	if doc != nil {
 		rv.doc = doc
@@ -247,17 +247,17 @@ func NewTermFrequencyRowKV(key, value []byte) *TermFrequencyRow {
 	buf = bytes.NewBuffer((value))
 	err = binary.Read(buf, binary.LittleEndian, &rv.freq)
 	if err != nil {
-		panic(fmt.Sprintf("binary.Read failed: %v", err))
+		return nil, err
 	}
 	err = binary.Read(buf, binary.LittleEndian, &rv.norm)
 	if err != nil {
-		panic(fmt.Sprintf("binary.Read failed: %v", err))
+		return nil, err
 	}
 
 	var field uint16
 	err = binary.Read(buf, binary.LittleEndian, &field)
 	if err != nil && err != io.EOF {
-		panic(fmt.Sprintf("binary.Read failed: %v", err))
+		return nil, err
 	}
 	for err != io.EOF {
 		tv := TermVector{}
@@ -269,22 +269,22 @@ func NewTermFrequencyRowKV(key, value []byte) *TermFrequencyRow {
 
 		err = binary.Read(buf, binary.LittleEndian, &tv.pos)
 		if err != nil {
-			panic(fmt.Sprintf("binary.Read failed: %v", err))
+			return nil, err
 		}
 		err = binary.Read(buf, binary.LittleEndian, &tv.start)
 		if err != nil {
-			panic(fmt.Sprintf("binary.Read failed: %v", err))
+			return nil, err
 		}
 		err = binary.Read(buf, binary.LittleEndian, &tv.end)
 		if err != nil {
-			panic(fmt.Sprintf("binary.Read failed: %v", err))
+			return nil, err
 		}
 		rv.vectors = append(rv.vectors, &tv)
 		// try to read next record (may not exist)
 		err = binary.Read(buf, binary.LittleEndian, &field)
 	}
 
-	return &rv
+	return &rv, nil
 
 }
 
@@ -332,7 +332,7 @@ func NewBackIndexRow(doc string, entries []*BackIndexEntry) *BackIndexRow {
 	}
 }
 
-func NewBackIndexRowKV(key, value []byte) *BackIndexRow {
+func NewBackIndexRowKV(key, value []byte) (*BackIndexRow, error) {
 	rv := BackIndexRow{}
 
 	buf := bytes.NewBuffer(key)
@@ -341,7 +341,7 @@ func NewBackIndexRowKV(key, value []byte) *BackIndexRow {
 	var err error
 	rv.doc, err = buf.ReadBytes(BYTE_SEPARATOR)
 	if err != io.EOF {
-		panic(fmt.Sprintf("expected binary.ReadString to end in EOF: %v", err))
+		return nil, err
 	}
 
 	buf = bytes.NewBuffer(value)
@@ -350,7 +350,7 @@ func NewBackIndexRowKV(key, value []byte) *BackIndexRow {
 	var term []byte
 	term, err = buf.ReadBytes(BYTE_SEPARATOR)
 	if err != nil && err != io.EOF {
-		panic(fmt.Sprintf("Buffer.ReadString failed: %v", err))
+		return nil, err
 	}
 	for err != io.EOF {
 		ent := BackIndexEntry{}
@@ -358,15 +358,15 @@ func NewBackIndexRowKV(key, value []byte) *BackIndexRow {
 
 		err = binary.Read(buf, binary.LittleEndian, &ent.field)
 		if err != nil {
-			panic(fmt.Sprintf("binary.Read failed: %v", err))
+			return nil, err
 		}
 		rv.entries = append(rv.entries, &ent)
 
 		term, err = buf.ReadBytes(BYTE_SEPARATOR)
 		if err != nil && err != io.EOF {
-			panic(fmt.Sprintf("Buffer.ReadString failed: %v", err))
+			return nil, err
 		}
 	}
 
-	return &rv
+	return &rv, nil
 }

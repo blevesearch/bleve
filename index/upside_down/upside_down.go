@@ -73,7 +73,10 @@ func (udc *UpsideDownCouch) loadSchema() (err error) {
 		if !bytes.HasPrefix(it.Key(), keyPrefix) {
 			break
 		}
-		fieldRow := NewFieldRowKV(it.Key(), it.Value())
+		fieldRow, err := NewFieldRowKV(it.Key(), it.Value())
+		if err != nil {
+			return err
+		}
 		udc.fieldIndexes[fieldRow.name] = fieldRow.index
 		if int(fieldRow.index) > udc.lastFieldIndex {
 			udc.lastFieldIndex = int(fieldRow.index)
@@ -104,7 +107,10 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 				return err
 			}
 			if val != nil {
-				tr = ParseFromKeyValue(tr.Key(), val).(*TermFrequencyRow)
+				tr, err = NewTermFrequencyRowKV(tr.Key(), val)
+				if err != nil {
+					return err
+				}
 				tr.freq += 1 // incr
 			} else {
 				tr = NewTermFrequencyRow(tfr.term, tfr.field, "", 1, 0)
@@ -132,7 +138,10 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 				return err
 			}
 			if val != nil {
-				tr = ParseFromKeyValue(tr.Key(), val).(*TermFrequencyRow)
+				tr, err = NewTermFrequencyRowKV(tr.Key(), val)
+				if err != nil {
+					return err
+				}
 				tr.freq -= 1 // incr
 			} else {
 				log.Panic(fmt.Sprintf("unexpected missing row, deleting term, expected count row to exit: %v", tr.Key()))
@@ -375,7 +384,10 @@ func (udc *UpsideDownCouch) backIndexRowForDoc(docId string) (*BackIndexRow, err
 	if value == nil {
 		return nil, nil
 	}
-	backIndexRow := ParseFromKeyValue(key, value).(*BackIndexRow)
+	backIndexRow, err := NewBackIndexRowKV(key, value)
+	if err != nil {
+		return nil, err
+	}
 	return backIndexRow, nil
 }
 
@@ -387,7 +399,11 @@ func (udc *UpsideDownCouch) Dump() {
 	it.SeekToFirst()
 	for it = it; it.Valid(); it.Next() {
 		//fmt.Printf("Key: `%v`               Value: `%v`\n", string(it.Key()), string(it.Value()))
-		row := ParseFromKeyValue(it.Key(), it.Value())
+		row, err := ParseFromKeyValue(it.Key(), it.Value())
+		if err != nil {
+			fmt.Printf("error parsing key/value: %v", err)
+			return
+		}
 		if row != nil {
 			fmt.Printf("%v\n", row)
 			fmt.Printf("Key:   % -100x\nValue: % -100x\n\n", it.Key(), it.Value())

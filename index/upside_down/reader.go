@@ -34,10 +34,12 @@ func newUpsideDownCouchTermFieldReader(index *UpsideDownCouch, term []byte, fiel
 	var count uint64 = 0
 	if it.Valid() {
 		if bytes.Equal(it.Key(), tfr.Key()) {
-			tfr = ParseFromKeyValue(it.Key(), it.Value()).(*TermFrequencyRow)
+			tfr, err := NewTermFrequencyRowKV(it.Key(), it.Value())
+			if err != nil {
+				return nil, err
+			}
 			count = tfr.freq
 		}
-
 	} else {
 		return nil, it.GetError()
 	}
@@ -58,12 +60,15 @@ func (r *UpsideDownCouchTermFieldReader) Count() uint64 {
 func (r *UpsideDownCouchTermFieldReader) Next() (*index.TermFieldDoc, error) {
 	r.iterator.Next()
 	if r.iterator.Valid() {
-		tfr := NewTermFrequencyRow(r.term, r.field, "", 0, 0)
-		if !bytes.HasPrefix(r.iterator.Key(), tfr.Key()) {
+		testfr := NewTermFrequencyRow(r.term, r.field, "", 0, 0)
+		if !bytes.HasPrefix(r.iterator.Key(), testfr.Key()) {
 			// end of the line
 			return nil, nil
 		}
-		tfr = ParseFromKeyValue(r.iterator.Key(), r.iterator.Value()).(*TermFrequencyRow)
+		tfr, err := NewTermFrequencyRowKV(r.iterator.Key(), r.iterator.Value())
+		if err != nil {
+			return nil, err
+		}
 		return &index.TermFieldDoc{
 			ID:      string(tfr.doc),
 			Freq:    tfr.freq,
@@ -79,12 +84,15 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docId string) (*index.TermField
 	tfr := NewTermFrequencyRow(r.term, r.field, docId, 0, 0)
 	r.iterator.Seek(tfr.Key())
 	if r.iterator.Valid() {
-		tfr := NewTermFrequencyRow(r.term, r.field, "", 0, 0)
-		if !bytes.HasPrefix(r.iterator.Key(), tfr.Key()) {
+		testfr := NewTermFrequencyRow(r.term, r.field, "", 0, 0)
+		if !bytes.HasPrefix(r.iterator.Key(), testfr.Key()) {
 			// end of the line
 			return nil, nil
 		}
-		tfr = ParseFromKeyValue(r.iterator.Key(), r.iterator.Value()).(*TermFrequencyRow)
+		tfr, err := NewTermFrequencyRowKV(r.iterator.Key(), r.iterator.Value())
+		if err != nil {
+			return nil, err
+		}
 		return &index.TermFieldDoc{
 			ID:      string(tfr.doc),
 			Freq:    tfr.freq,

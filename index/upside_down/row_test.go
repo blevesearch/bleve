@@ -80,7 +80,10 @@ func TestRows(t *testing.T) {
 
 	// now test going back from k/v bytes to struct
 	for _, test := range tests {
-		row := ParseFromKeyValue(test.outKey, test.outVal)
+		row, err := ParseFromKeyValue(test.outKey, test.outVal)
+		if err != nil {
+			t.Error(err)
+		}
 		if !reflect.DeepEqual(row, test.input) {
 			t.Fatalf("Expected: %#v got: %#v", test.input, row)
 		}
