@@ -27,7 +27,7 @@ func TestTermScorer(t *testing.T) {
 
 	var docTotal uint64 = 100
 	var docTerm uint64 = 9
-	scorer := NewTermQueryScorer(&query, docTotal, docTerm, false)
+	scorer := NewTermQueryScorer(&query, docTotal, docTerm, true)
 	idf := 1.0 + math.Log(float64(docTotal)/float64(docTerm+1.0))
 
 	tests := []struct {
@@ -44,6 +44,24 @@ func TestTermScorer(t *testing.T) {
 			result: &DocumentMatch{
 				ID:    "one",
 				Score: math.Sqrt(1.0) * idf,
+				Expl: &Explanation{
+					Value:   math.Sqrt(1.0) * idf,
+					Message: "fieldWeight(desc:beer in one), product of:",
+					Children: []*Explanation{
+						&Explanation{
+							Value:   1,
+							Message: "tf(termFreq(desc:beer)=1",
+						},
+						&Explanation{
+							Value:   1,
+							Message: "fieldNorm(field=desc, doc=one)",
+						},
+						&Explanation{
+							Value:   idf,
+							Message: "idf(docFreq=9, maxDocs=100)",
+						},
+					},
+				},
 			},
 		},
 		// test the same thing again (score should be cached this time)
@@ -56,6 +74,24 @@ func TestTermScorer(t *testing.T) {
 			result: &DocumentMatch{
 				ID:    "one",
 				Score: math.Sqrt(1.0) * idf,
+				Expl: &Explanation{
+					Value:   math.Sqrt(1.0) * idf,
+					Message: "fieldWeight(desc:beer in one), product of:",
+					Children: []*Explanation{
+						&Explanation{
+							Value:   1,
+							Message: "tf(termFreq(desc:beer)=1",
+						},
+						&Explanation{
+							Value:   1,
+							Message: "fieldNorm(field=desc, doc=one)",
+						},
+						&Explanation{
+							Value:   idf,
+							Message: "idf(docFreq=9, maxDocs=100)",
+						},
+					},
+				},
 			},
 		},
 		// test a case where the sqrt isn't precalculated
@@ -68,6 +104,24 @@ func TestTermScorer(t *testing.T) {
 			result: &DocumentMatch{
 				ID:    "one",
 				Score: math.Sqrt(65) * idf,
+				Expl: &Explanation{
+					Value:   math.Sqrt(65) * idf,
+					Message: "fieldWeight(desc:beer in one), product of:",
+					Children: []*Explanation{
+						&Explanation{
+							Value:   math.Sqrt(65),
+							Message: "tf(termFreq(desc:beer)=65",
+						},
+						&Explanation{
+							Value:   1,
+							Message: "fieldNorm(field=desc, doc=one)",
+						},
+						&Explanation{
+							Value:   idf,
+							Message: "idf(docFreq=9, maxDocs=100)",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -77,6 +131,7 @@ func TestTermScorer(t *testing.T) {
 
 		if !reflect.DeepEqual(actual, test.result) {
 			t.Errorf("expected %#v got %#v for %#v", test.result, actual, test.termMatch)
+			t.Logf("expl: %s", actual.Expl)
 		}
 	}
 
