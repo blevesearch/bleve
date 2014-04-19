@@ -90,3 +90,103 @@ func TestRows(t *testing.T) {
 	}
 
 }
+
+func TestInvalidRows(t *testing.T) {
+	tests := []struct {
+		key []byte
+		val []byte
+	}{
+		// empty key
+		{
+			[]byte{},
+			[]byte{},
+		},
+		// no such type q
+		{
+			[]byte{'q'},
+			[]byte{},
+		},
+		// type v, invalid empty value
+		{
+			[]byte{'v'},
+			[]byte{},
+		},
+		// type f, invalid key
+		{
+			[]byte{'f'},
+			[]byte{},
+		},
+		// type f, valid key, invalid value
+		{
+			[]byte{'f', 0, 0},
+			[]byte{},
+		},
+		// type t, invalid key (missing term)
+		{
+			[]byte{'t'},
+			[]byte{},
+		},
+		// type t, invalid key (missing field)
+		{
+			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR},
+			[]byte{},
+		},
+		// type t, invalid key (missing id)
+		{
+			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0},
+			[]byte{},
+		},
+		// type t, invalid val (misisng freq)
+		{
+			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{},
+		},
+		// type t, invalid val (missing norm)
+		{
+			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{3, 0, 0, 0, 0, 0, 0, 0},
+		},
+		// type t, invalid val (half missing tv field, full missing is valid (no term vectors))
+		{
+			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0},
+		},
+		// type t, invalid val (missing tv pos)
+		{
+			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0},
+		},
+		// type t, invalid val (missing tv start)
+		{
+			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0},
+		},
+		// type t, invalid val (missing tv end)
+		{
+			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0},
+		},
+		// type b, invalid key (missing id)
+		{
+			[]byte{'b'},
+			[]byte{'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0},
+		},
+		// type b, invalid val (missing term)
+		{
+			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{},
+		},
+		// type b, invalid val (missing field)
+		{
+			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'b', 'e', 'e', 'r', BYTE_SEPARATOR},
+		},
+	}
+
+	for _, test := range tests {
+		_, err := ParseFromKeyValue(test.key, test.val)
+		if err == nil {
+			t.Errorf("expected error, got nil")
+		}
+	}
+}

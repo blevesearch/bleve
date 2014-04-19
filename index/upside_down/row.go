@@ -26,17 +26,20 @@ type UpsideDownCouchRow interface {
 }
 
 func ParseFromKeyValue(key, value []byte) (UpsideDownCouchRow, error) {
-	switch key[0] {
-	case 'v':
-		return NewVersionRowKV(key, value)
-	case 'f':
-		return NewFieldRowKV(key, value)
-	case 't':
-		return NewTermFrequencyRowKV(key, value)
-	case 'b':
-		return NewBackIndexRowKV(key, value)
+	if len(key) > 0 {
+		switch key[0] {
+		case 'v':
+			return NewVersionRowKV(key, value)
+		case 'f':
+			return NewFieldRowKV(key, value)
+		case 't':
+			return NewTermFrequencyRowKV(key, value)
+		case 'b':
+			return NewBackIndexRowKV(key, value)
+		}
+		return nil, fmt.Errorf("Unknown field type '%s'", string(key[0]))
 	}
-	return nil, fmt.Errorf("Unknown field type '%s'", string(key[0]))
+	return nil, fmt.Errorf("Invalid empty key")
 }
 
 // VERSION
@@ -340,6 +343,9 @@ func NewBackIndexRowKV(key, value []byte) (*BackIndexRow, error) {
 
 	var err error
 	rv.doc, err = buf.ReadBytes(BYTE_SEPARATOR)
+	if err == io.EOF && len(rv.doc) < 1 {
+		err = fmt.Errorf("invalid doc length 0")
+	}
 	if err != io.EOF {
 		return nil, err
 	}
@@ -349,6 +355,9 @@ func NewBackIndexRowKV(key, value []byte) (*BackIndexRow, error) {
 
 	var term []byte
 	term, err = buf.ReadBytes(BYTE_SEPARATOR)
+	if err == io.EOF && len(term) < 1 {
+		err = fmt.Errorf("invalid term length 0")
+	}
 	if err != nil && err != io.EOF {
 		return nil, err
 	}
