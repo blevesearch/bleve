@@ -40,6 +40,14 @@ func TestTermScorer(t *testing.T) {
 				ID:   "one",
 				Freq: 1,
 				Norm: 1.0,
+				Vectors: []*index.TermFieldVector{
+					&index.TermFieldVector{
+						Field: "desc",
+						Pos:   1,
+						Start: 0,
+						End:   4,
+					},
+				},
 			},
 			result: &DocumentMatch{
 				ID:    "one",
@@ -59,6 +67,17 @@ func TestTermScorer(t *testing.T) {
 						&Explanation{
 							Value:   idf,
 							Message: "idf(docFreq=9, maxDocs=100)",
+						},
+					},
+				},
+				Locations: FieldTermLocationMap{
+					"desc": TermLocationMap{
+						"beer": Locations{
+							&Location{
+								Pos:   1,
+								Start: 0,
+								End:   4,
+							},
 						},
 					},
 				},
@@ -131,7 +150,6 @@ func TestTermScorer(t *testing.T) {
 
 		if !reflect.DeepEqual(actual, test.result) {
 			t.Errorf("expected %#v got %#v for %#v", test.result, actual, test.termMatch)
-			t.Logf("expl: %s", actual.Expl)
 		}
 	}
 
