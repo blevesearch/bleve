@@ -9,11 +9,9 @@
 package search
 
 import (
-	// "math"
-	// "reflect"
+	"math"
 	"testing"
 
-	// "github.com/couchbaselabs/bleve/index"
 	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index/mock"
 )
@@ -23,7 +21,7 @@ func TestTermSearcher(t *testing.T) {
 	query := TermQuery{
 		Term:     "beer",
 		Field:    "desc",
-		BoostVal: 1.0,
+		BoostVal: 3.0,
 		Explain:  true,
 	}
 
@@ -46,14 +44,64 @@ func TestTermSearcher(t *testing.T) {
 			document.NewTextField("desc", []byte("beer")),
 		},
 	})
+	i.Update(&document.Document{
+		ID: "d",
+		Fields: []*document.Field{
+			document.NewTextField("desc", []byte("beer")),
+		},
+	})
+	i.Update(&document.Document{
+		ID: "e",
+		Fields: []*document.Field{
+			document.NewTextField("desc", []byte("beer")),
+		},
+	})
+	i.Update(&document.Document{
+		ID: "f",
+		Fields: []*document.Field{
+			document.NewTextField("desc", []byte("beer")),
+		},
+	})
+	i.Update(&document.Document{
+		ID: "g",
+		Fields: []*document.Field{
+			document.NewTextField("desc", []byte("beer")),
+		},
+	})
+	i.Update(&document.Document{
+		ID: "h",
+		Fields: []*document.Field{
+			document.NewTextField("desc", []byte("beer")),
+		},
+	})
+	i.Update(&document.Document{
+		ID: "i",
+		Fields: []*document.Field{
+			document.NewTextField("desc", []byte("beer")),
+		},
+	})
+	i.Update(&document.Document{
+		ID: "j",
+		Fields: []*document.Field{
+			document.NewTextField("title", []byte("cat")),
+		},
+	})
 
 	searcher, err := NewTermSearcher(i, &query)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer searcher.Close()
 
-	if searcher.Count() != 3 {
-		t.Errorf("expected count of 3, got %d", searcher.Count())
+	searcher.SetQueryNorm(2.0)
+	idf := 1.0 + math.Log(float64(i.DocCount())/float64(searcher.Count()+1.0))
+	expectedQueryWeight := 3 * idf * 3 * idf
+	if expectedQueryWeight != searcher.Weight() {
+		t.Errorf("expected weight %v got %v", expectedQueryWeight, searcher.Weight())
+	}
+
+	if searcher.Count() != 9 {
+		t.Errorf("expected count of 9, got %d", searcher.Count())
 	}
 
 	docMatch, err := searcher.Next()
@@ -72,7 +120,7 @@ func TestTermSearcher(t *testing.T) {
 	}
 
 	// try advancing past end
-	docMatch, err = searcher.Advance("f")
+	docMatch, err = searcher.Advance("z")
 	if err != nil {
 		t.Fatal(err)
 	}
