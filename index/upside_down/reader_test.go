@@ -62,7 +62,6 @@ func TestIndexReader(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
-	defer reader.Close()
 
 	expectedCount = 2
 	count = reader.Count()
@@ -108,4 +107,28 @@ func TestIndexReader(t *testing.T) {
 	if !reflect.DeepEqual(expectedMatch, match) {
 		t.Errorf("got %#v, expected %#v", match, expectedMatch)
 	}
+	reader.Close()
+
+	// now test usage of advance
+	reader, err = idx.TermFieldReader([]byte("test"), "name")
+	if err != nil {
+		t.Errorf("Error accessing term field reader: %v", err)
+	}
+
+	match, err = reader.Advance("2")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if match.ID != "2" {
+		t.Errorf("Expected ID '2', got '%s'", match.ID)
+	}
+	match, err = reader.Advance("3")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if match != nil {
+		t.Errorf("expected nil, got %v", match)
+	}
+	reader.Close()
+
 }
