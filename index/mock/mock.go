@@ -192,7 +192,7 @@ func (reader *mockTermFieldReader) Advance(ID string) (*index.TermFieldDoc, erro
 		currTermID = reader.sortedDocIds[reader.curr]
 	}
 
-	if reader.curr < len(reader.sortedDocIds) {
+	if reader.curr < len(reader.sortedDocIds) && reader.sortedDocIds[reader.curr] >= ID {
 		nextTermKey := reader.sortedDocIds[reader.curr]
 		nextTerm := reader.index[nextTermKey]
 		return &index.TermFieldDoc{ID: nextTermKey, Freq: nextTerm.freq, Norm: nextTerm.norm, Vectors: nextTerm.vectors}, nil
