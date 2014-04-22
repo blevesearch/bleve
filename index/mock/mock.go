@@ -182,6 +182,8 @@ func (reader *mockTermFieldReader) Next() (*index.TermFieldDoc, error) {
 }
 
 func (reader *mockTermFieldReader) Advance(ID string) (*index.TermFieldDoc, error) {
+
+	reader.curr += 1
 	if reader.curr >= len(reader.sortedDocIds) {
 		return nil, nil
 	}
