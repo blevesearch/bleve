@@ -18,12 +18,21 @@ import (
 )
 
 func TestCRUD(t *testing.T) {
-	i := NewMockIndex()
-
-	// create doc, assert doc count goes up
+	// create a document to seed this mock index with
 	doc1 := document.NewDocument("1")
 	doc1.AddField(document.NewTextField("name", []byte("marty")))
-	i.Update(doc1)
+
+	i := NewMockIndexWithDocs([]*document.Document{
+		doc1,
+	})
+
+	// open it
+	err := i.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// assert doc count is 1
 	count := i.DocCount()
 	if count != 1 {
 		t.Errorf("expected document count to be 1, was: %d", count)
@@ -62,6 +71,7 @@ func TestCRUD(t *testing.T) {
 	if nomatch != nil {
 		t.Errorf("expected nil after last match")
 	}
+	tfr.Close()
 
 	// update doc, assert doc count doesn't go up
 	doc1 = document.NewDocument("1")
@@ -86,6 +96,7 @@ func TestCRUD(t *testing.T) {
 		t.Errorf("expected no matches, found one")
 		t.Logf("%v", i)
 	}
+	tfr.Close()
 
 	// delete a doc, ensure the count is 1
 	err = i.Delete("2")
@@ -121,4 +132,47 @@ func TestCRUD(t *testing.T) {
 	if !reflect.DeepEqual(expectedMatch, match) {
 		t.Errorf("got %#v, expected %#v", match, expectedMatch)
 	}
+	tfr.Close()
+
+	// now test usage of advance
+	// add another doc,
+	doc5 := document.NewDocument("5")
+	doc5.AddField(document.NewTextField("name", []byte("salad")))
+	i.Update(doc5)
+	tfr, err = i.TermFieldReader([]byte("salad"), "name")
+	if err != nil {
+		t.Errorf("Error accessing term field reader: %v", err)
+	}
+
+	readerCount := tfr.Count()
+	if readerCount != 2 {
+		t.Errorf("expected 2 docs in reader, got %d", readerCount)
+	}
+
+	match, err = tfr.Advance("1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if match.ID != "1" {
+		t.Errorf("Expected ID '1', got '%s'", match.ID)
+	}
+	match, err = tfr.Advance("7")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if match != nil {
+		t.Errorf("expected nil, got %v", match)
+	}
+	// try to do it again
+	match, err = tfr.Advance("7")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if match != nil {
+		t.Errorf("expected nil, got %v", match)
+	}
+	tfr.Close()
+
+	// close it
+	i.Close()
 }
