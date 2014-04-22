@@ -131,4 +131,28 @@ func TestIndexReader(t *testing.T) {
 	}
 	reader.Close()
 
+	// now test creating a reader for a field that doesn't exist
+	reader, err = idx.TermFieldReader([]byte("water"), "doesnotexist")
+	if err != nil {
+		t.Errorf("Error accessing term field reader: %v", err)
+	}
+	count = reader.Count()
+	if count != 0 {
+		t.Errorf("expected count 0 for reader of non-existant field")
+	}
+	match, err = reader.Next()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if match != nil {
+		t.Errorf("expected nil, got %v", match)
+	}
+	match, err = reader.Advance("anywhere")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if match != nil {
+		t.Errorf("expected nil, got %v", match)
+	}
+
 }

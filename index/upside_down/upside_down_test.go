@@ -114,12 +114,31 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	expectedCount += 1
 
+	doc2 := document.NewDocument("2")
+	doc2.AddField(document.NewTextField("name", []byte("test")))
+	err = idx.Update(doc2)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+	expectedCount += 1
+
 	docCount = idx.DocCount()
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
 
 	err = idx.Delete("1")
+	if err != nil {
+		t.Errorf("Error deleting entry from index: %v", err)
+	}
+	expectedCount -= 1
+
+	docCount = idx.DocCount()
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+
+	err = idx.Delete("2")
 	if err != nil {
 		t.Errorf("Error deleting entry from index: %v", err)
 	}
@@ -196,7 +215,8 @@ func TestIndexInsertMultiple(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+
+	var expectedCount uint64 = 0
 
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextField("name", []byte("test")))
@@ -204,6 +224,7 @@ func TestIndexInsertMultiple(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
+	expectedCount++
 
 	doc = document.NewDocument("2")
 	doc.AddField(document.NewTextField("name", []byte("test")))
@@ -211,11 +232,34 @@ func TestIndexInsertMultiple(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
+	expectedCount++
 
 	// should have 4 rows (1 for version, 1 for schema field, and 2 for single term, and 1 for the term count,  and 2 for the back index entries)
 	expectedLength := uint64(1 + 1 + 2 + 1 + 2)
 	rowCount := idx.rowCount()
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
+	}
+
+	// close and reopen and and one more to testing counting works correctly
+	idx.Close()
+	idx = NewUpsideDownCouch("test")
+
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+
+	doc = document.NewDocument("3")
+	doc.AddField(document.NewTextField("name", []byte("test")))
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+	expectedCount++
+
+	docCount := idx.DocCount()
+	if docCount != expectedCount {
+		t.Errorf("expected doc count: %d, got %d", expectedCount, docCount)
 	}
 }

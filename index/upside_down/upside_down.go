@@ -11,7 +11,6 @@ package upside_down
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"math"
 
 	"github.com/couchbaselabs/bleve/analysis"
@@ -144,7 +143,7 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 				}
 				tr.freq -= 1 // incr
 			} else {
-				log.Panic(fmt.Sprintf("unexpected missing row, deleting term, expected count row to exit: %v", tr.Key()))
+				return fmt.Errorf("unexpected missing row, deleting term, expected count row to exist: %v", tr.Key())
 			}
 
 			if tr.freq == 0 {
@@ -420,8 +419,7 @@ func (udc *UpsideDownCouch) TermFieldReader(term []byte, fieldName string) (inde
 	if fieldExists {
 		return newUpsideDownCouchTermFieldReader(udc, term, uint16(fieldIndex))
 	}
-	log.Printf("fields: %v", udc.fieldIndexes)
-	return nil, fmt.Errorf("No field named `%s` in the schema", fieldName)
+	return newUpsideDownCouchTermFieldReader(udc, []byte{BYTE_SEPARATOR}, 0)
 }
 
 func defaultWriteOptions() *levigo.WriteOptions {
