@@ -94,6 +94,62 @@ func TestTermConjunctionSearch(t *testing.T) {
 			},
 			results: []*DocumentMatch{},
 		},
+		{
+			index: twoDocIndex,
+			query: &TermConjunctionQuery{
+				Terms: []Query{
+					&TermQuery{
+						Term:     "beer",
+						Field:    "desc",
+						BoostVal: 1.0,
+						Explain:  true,
+					},
+					&TermQuery{
+						Term:     "mister",
+						Field:    "title",
+						BoostVal: 5.0,
+						Explain:  true,
+					},
+				},
+				Explain: true,
+			},
+			results: []*DocumentMatch{
+				&DocumentMatch{
+					ID:    "2",
+					Score: 1.2877980334016337,
+				},
+				&DocumentMatch{
+					ID:    "3",
+					Score: 1.2877980334016337,
+				},
+			},
+		},
+		{
+			index: twoDocIndex,
+			query: &TermConjunctionQuery{
+				Terms: []Query{
+					&TermQuery{
+						Term:     "couchbase",
+						Field:    "street",
+						BoostVal: 1.0,
+						Explain:  true,
+					},
+					&TermQuery{
+						Term:     "mister",
+						Field:    "title",
+						BoostVal: 5.0,
+						Explain:  true,
+					},
+				},
+				Explain: true,
+			},
+			results: []*DocumentMatch{
+				&DocumentMatch{
+					ID:    "2",
+					Score: 1.4436599157093672,
+				},
+			},
+		},
 	}
 
 	for testIndex, test := range tests {

@@ -83,6 +83,7 @@ func (s *TermConjunctionSearcher) initSearchers() error {
 			s.currentId = ""
 		}
 	}
+
 	return nil
 }
 
@@ -117,16 +118,9 @@ OUTER:
 					continue OUTER
 				}
 				if s.currs[i].ID != s.currentId {
-					// if it still doesn't have the currentId, next and start over
-					s.currs[i], err = termSearcher.Next()
-					if err != nil {
-						return nil, err
-					}
-					if s.currs[i] == nil {
-						s.currentId = ""
-					} else {
-						s.currentId = s.currs[i].ID
-					}
+					// we just advanced, so it doesn't match, it must be greater
+					// no need to call next
+					s.currentId = s.currs[i].ID
 					continue OUTER
 				}
 			}

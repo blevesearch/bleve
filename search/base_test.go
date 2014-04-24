@@ -19,15 +19,19 @@ var twoDocIndexDocs = []*document.Document{
 	// must have 4/4 beer
 	document.NewDocument("1").
 		AddField(document.NewTextField("name", []byte("marty"))).
-		AddField(document.NewTextField("desc", []byte("beer beer beer beer"))),
+		AddField(document.NewTextField("desc", []byte("beer beer beer beer"))).
+		AddField(document.NewTextField("street", []byte("couchbase way"))),
 	// must have 1/4 beer
 	document.NewDocument("2").
 		AddField(document.NewTextField("name", []byte("steve"))).
-		AddField(document.NewTextField("desc", []byte("angst beer couch database"))),
+		AddField(document.NewTextField("desc", []byte("angst beer couch database"))).
+		AddField(document.NewTextField("street", []byte("couchbase way"))).
+		AddField(document.NewTextField("title", []byte("mister"))),
 	// must have 1/4 beer
 	document.NewDocument("3").
 		AddField(document.NewTextField("name", []byte("dustin"))).
-		AddField(document.NewTextField("desc", []byte("apple beer column dank"))),
+		AddField(document.NewTextField("desc", []byte("apple beer column dank"))).
+		AddField(document.NewTextField("title", []byte("mister"))),
 	// must have 65/65 beer
 	document.NewDocument("4").
 		AddField(document.NewTextField("name", []byte("ravi"))).
@@ -35,7 +39,8 @@ var twoDocIndexDocs = []*document.Document{
 	// must have 0/x beer
 	document.NewDocument("5").
 		AddField(document.NewTextField("name", []byte("bobert"))).
-		AddField(document.NewTextField("desc", []byte("water"))),
+		AddField(document.NewTextField("desc", []byte("water"))).
+		AddField(document.NewTextField("title", []byte("mister"))),
 }
 
 var twoDocIndex *mock.MockIndex = mock.NewMockIndexWithDocs(twoDocIndexDocs)
