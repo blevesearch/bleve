@@ -6,30 +6,20 @@
 //  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
-package document
+package search
 
-import (
-	"encoding/json"
-)
+type OrderedSearcherList []Searcher
 
-type Document struct {
-	ID     string   `json:"id"`
-	Fields []*Field `json:"fields"`
+// sort.Interface
+
+func (otrl OrderedSearcherList) Len() int {
+	return len(otrl)
 }
 
-func NewDocument(id string) *Document {
-	return &Document{
-		ID:     id,
-		Fields: make([]*Field, 0),
-	}
+func (otrl OrderedSearcherList) Less(i, j int) bool {
+	return otrl[i].Count() < otrl[j].Count()
 }
 
-func (d *Document) AddField(f *Field) *Document {
-	d.Fields = append(d.Fields, f)
-	return d
-}
-
-func (d *Document) String() string {
-	bytes, _ := json.MarshalIndent(d, "", "    ")
-	return string(bytes)
+func (otrl OrderedSearcherList) Swap(i, j int) {
+	otrl[i], otrl[j] = otrl[j], otrl[i]
 }

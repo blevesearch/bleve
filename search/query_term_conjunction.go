@@ -6,30 +6,26 @@
 //  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
-package document
+package search
 
 import (
-	"encoding/json"
+	"github.com/couchbaselabs/bleve/index"
 )
 
-type Document struct {
-	ID     string   `json:"id"`
-	Fields []*Field `json:"fields"`
+type TermConjunctionQuery struct {
+	Terms    []Query `json:"terms"`
+	BoostVal float64 `json:"boost"`
+	Explain  bool    `json:"explain"`
 }
 
-func NewDocument(id string) *Document {
-	return &Document{
-		ID:     id,
-		Fields: make([]*Field, 0),
-	}
+func (q *TermConjunctionQuery) Boost() float64 {
+	return q.BoostVal
 }
 
-func (d *Document) AddField(f *Field) *Document {
-	d.Fields = append(d.Fields, f)
-	return d
+func (q *TermConjunctionQuery) Searcher(index index.Index) (Searcher, error) {
+	return NewTermConjunctionSearcher(index, q)
 }
 
-func (d *Document) String() string {
-	bytes, _ := json.MarshalIndent(d, "", "    ")
-	return string(bytes)
+func (q *TermConjunctionQuery) Validate() error {
+	return nil
 }
