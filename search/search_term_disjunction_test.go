@@ -52,6 +52,54 @@ func TestTermDisjunctionSearch(t *testing.T) {
 				},
 			},
 		},
+		// test a nested disjunction
+		{
+			index: twoDocIndex,
+			query: &TermDisjunctionQuery{
+				Terms: []Query{
+					&TermQuery{
+						Term:     "ravi",
+						Field:    "name",
+						BoostVal: 1.0,
+						Explain:  true,
+					},
+					&TermDisjunctionQuery{
+						Terms: []Query{
+							&TermQuery{
+								Term:     "marty",
+								Field:    "name",
+								BoostVal: 1.0,
+								Explain:  true,
+							},
+							&TermQuery{
+								Term:     "dustin",
+								Field:    "name",
+								BoostVal: 1.0,
+								Explain:  true,
+							},
+						},
+						Explain: true,
+						Min:     0,
+					},
+				},
+				Explain: true,
+				Min:     0,
+			},
+			results: []*DocumentMatch{
+				&DocumentMatch{
+					ID:    "1",
+					Score: 0.33875554280828685,
+				},
+				&DocumentMatch{
+					ID:    "3",
+					Score: 0.33875554280828685,
+				},
+				&DocumentMatch{
+					ID:    "4",
+					Score: 0.5531854849465642,
+				},
+			},
+		},
 	}
 
 	for testIndex, test := range tests {
