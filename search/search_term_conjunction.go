@@ -107,7 +107,7 @@ func (s *TermConjunctionSearcher) Next() (*DocumentMatch, error) {
 OUTER:
 	for s.currentId != "" {
 		for i, termSearcher := range s.searchers {
-			if s.currs[i].ID != s.currentId {
+			if s.currs[i] != nil && s.currs[i].ID != s.currentId {
 				// this reader doesn't have the currentId, try to advance
 				s.currs[i], err = termSearcher.Advance(s.currentId)
 				if err != nil {
@@ -123,6 +123,9 @@ OUTER:
 					s.currentId = s.currs[i].ID
 					continue OUTER
 				}
+			} else if s.currs[i] == nil {
+				s.currentId = ""
+				continue OUTER
 			}
 		}
 		// if we get here, a doc matched all readers, sum the score and add it
@@ -145,6 +148,13 @@ OUTER:
 }
 
 func (s *TermConjunctionSearcher) Advance(ID string) (*DocumentMatch, error) {
+	var err error
+	for i, searcher := range s.searchers {
+		s.currs[i], err = searcher.Advance(ID)
+		if err != nil {
+			return nil, err
+		}
+	}
 	s.currentId = ID
 	return s.Next()
 }

@@ -154,22 +154,11 @@ func TestTermConjunctionSearch(t *testing.T) {
 			index: twoDocIndex,
 			query: &TermConjunctionQuery{
 				Terms: []Query{
-					&TermConjunctionQuery{
-						Terms: []Query{
-							&TermQuery{
-								Term:     "beer",
-								Field:    "desc",
-								BoostVal: 1.0,
-								Explain:  true,
-							},
-							&TermQuery{
-								Term:     "mister",
-								Field:    "title",
-								BoostVal: 5.0,
-								Explain:  true,
-							},
-						},
-						Explain: true,
+					&TermQuery{
+						Term:     "beer",
+						Field:    "desc",
+						BoostVal: 5.0,
+						Explain:  true,
 					},
 					&TermConjunctionQuery{
 						Terms: []Query{
@@ -194,7 +183,7 @@ func TestTermConjunctionSearch(t *testing.T) {
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "2",
-					Score: 2.7073553504667243,
+					Score: 1.754501824953384,
 				},
 			},
 		},
