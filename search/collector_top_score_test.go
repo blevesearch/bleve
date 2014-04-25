@@ -80,6 +80,17 @@ func TestTop10Scores(t *testing.T) {
 
 	collector := NewTopScorerCollector(10)
 	collector.Collect(searcher)
+
+	maxScore := collector.MaxScore()
+	if maxScore != 99.0 {
+		t.Errorf("expected max score 99.0, got %f", maxScore)
+	}
+
+	total := collector.Total()
+	if total != 14 {
+		t.Errorf("expected 14 total results, got %d", total)
+	}
+
 	results := collector.Results()
 
 	if len(results) != 10 {
