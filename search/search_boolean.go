@@ -153,15 +153,23 @@ func (s *TermBooleanSearcher) advanceNextMust() error {
 
 func (s *TermBooleanSearcher) Weight() float64 {
 	var rv float64
-	rv += s.mustSearcher.Weight()
-	rv += s.shouldSearcher.Weight()
+	if s.mustSearcher != nil {
+		rv += s.mustSearcher.Weight()
+	}
+	if s.shouldSearcher != nil {
+		rv += s.shouldSearcher.Weight()
+	}
 
 	return rv
 }
 
 func (s *TermBooleanSearcher) SetQueryNorm(qnorm float64) {
-	s.mustSearcher.SetQueryNorm(qnorm)
-	s.shouldSearcher.SetQueryNorm(qnorm)
+	if s.mustSearcher != nil {
+		s.mustSearcher.SetQueryNorm(qnorm)
+	}
+	if s.shouldSearcher != nil {
+		s.shouldSearcher.SetQueryNorm(qnorm)
+	}
 }
 
 func (s *TermBooleanSearcher) Next() (*DocumentMatch, error) {
@@ -232,6 +240,26 @@ func (s *TermBooleanSearcher) Next() (*DocumentMatch, error) {
 }
 
 func (s *TermBooleanSearcher) Advance(ID string) (*DocumentMatch, error) {
+	var err error
+	if s.mustSearcher != nil {
+		s.currMust, err = s.mustSearcher.Advance(ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if s.shouldSearcher != nil {
+		s.currShould, err = s.shouldSearcher.Advance(ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if s.mustNotSearcher != nil {
+		s.currMustNot, err = s.mustNotSearcher.Advance(ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	s.currentId = ID
 	return s.Next()
 }
@@ -239,8 +267,12 @@ func (s *TermBooleanSearcher) Advance(ID string) (*DocumentMatch, error) {
 func (s *TermBooleanSearcher) Count() uint64 {
 	// for now return a worst case
 	var sum uint64 = 0
-	sum += s.mustSearcher.Count()
-	sum += s.shouldSearcher.Count()
+	if s.mustSearcher != nil {
+		sum += s.mustSearcher.Count()
+	}
+	if s.shouldSearcher != nil {
+		sum += s.shouldSearcher.Count()
+	}
 	return sum
 }
 
