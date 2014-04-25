@@ -82,6 +82,72 @@ func TestTermBooleanSearch(t *testing.T) {
 				},
 			},
 		},
+		{
+			index: twoDocIndex,
+			query: &TermBooleanQuery{
+				Should: &TermDisjunctionQuery{
+					Terms: []Query{
+						&TermQuery{
+							Term:     "marty",
+							Field:    "name",
+							BoostVal: 1.0,
+							Explain:  true,
+						},
+						&TermQuery{
+							Term:     "dustin",
+							Field:    "name",
+							BoostVal: 1.0,
+							Explain:  true,
+						},
+					},
+					Explain: true,
+					Min:     0,
+				},
+				MustNot: &TermDisjunctionQuery{
+					Terms: []Query{
+						&TermQuery{
+							Term:     "steve",
+							Field:    "name",
+							BoostVal: 1.0,
+							Explain:  true,
+						},
+					},
+					Explain: true,
+					Min:     0,
+				},
+				Explain: true,
+			},
+			results: []*DocumentMatch{
+				&DocumentMatch{
+					ID:    "1",
+					Score: 0.6775110856165737,
+				},
+				&DocumentMatch{
+					ID:    "3",
+					Score: 0.6775110856165737,
+				},
+			},
+		},
+		// no MUST or SHOULD clauses yields no results
+		{
+			index: twoDocIndex,
+			query: &TermBooleanQuery{
+				MustNot: &TermDisjunctionQuery{
+					Terms: []Query{
+						&TermQuery{
+							Term:     "steve",
+							Field:    "name",
+							BoostVal: 1.0,
+							Explain:  true,
+						},
+					},
+					Explain: true,
+					Min:     0,
+				},
+				Explain: true,
+			},
+			results: []*DocumentMatch{},
+		},
 	}
 
 	for testIndex, test := range tests {
