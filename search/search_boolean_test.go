@@ -148,6 +148,130 @@ func TestTermBooleanSearch(t *testing.T) {
 			},
 			results: []*DocumentMatch{},
 		},
+		{
+			index: twoDocIndex,
+			query: &TermBooleanQuery{
+				Must: &TermConjunctionQuery{
+					Terms: []Query{
+						&TermQuery{
+							Term:     "beer",
+							Field:    "desc",
+							BoostVal: 1.0,
+							Explain:  true,
+						},
+					},
+					Explain: true,
+				},
+				MustNot: &TermDisjunctionQuery{
+					Terms: []Query{
+						&TermQuery{
+							Term:     "steve",
+							Field:    "name",
+							BoostVal: 1.0,
+							Explain:  true,
+						},
+					},
+					Explain: true,
+					Min:     0,
+				},
+				Explain: true,
+			},
+			results: []*DocumentMatch{
+				&DocumentMatch{
+					ID:    "1",
+					Score: 1.0,
+				},
+				&DocumentMatch{
+					ID:    "3",
+					Score: 0.5,
+				},
+				&DocumentMatch{
+					ID:    "4",
+					Score: 1.0,
+				},
+			},
+		},
+		{
+			index: twoDocIndex,
+			query: &TermBooleanQuery{
+				Must: &TermConjunctionQuery{
+					Terms: []Query{
+						&TermQuery{
+							Term:     "beer",
+							Field:    "desc",
+							BoostVal: 1.0,
+							Explain:  true,
+						},
+					},
+					Explain: true,
+				},
+				MustNot: &TermDisjunctionQuery{
+					Terms: []Query{
+						&TermQuery{
+							Term:     "steve",
+							Field:    "name",
+							BoostVal: 1.0,
+							Explain:  true,
+						},
+						&TermQuery{
+							Term:     "marty",
+							Field:    "name",
+							BoostVal: 1.0,
+							Explain:  true,
+						},
+					},
+					Explain: true,
+					Min:     0,
+				},
+				Explain: true,
+			},
+			results: []*DocumentMatch{
+				&DocumentMatch{
+					ID:    "3",
+					Score: 0.5,
+				},
+				&DocumentMatch{
+					ID:    "4",
+					Score: 1.0,
+				},
+			},
+		},
+		{
+			index: twoDocIndex,
+			query: &TermBooleanQuery{
+				Must: &TermConjunctionQuery{
+					Terms: []Query{
+						&TermQuery{
+							Term:     "beer",
+							Field:    "desc",
+							BoostVal: 1.0,
+							Explain:  true,
+						},
+					},
+					Explain: true,
+				},
+				Should: &TermDisjunctionQuery{
+					Terms: []Query{
+						&TermQuery{
+							Term:     "marty",
+							Field:    "name",
+							BoostVal: 1.0,
+							Explain:  true,
+						},
+						&TermQuery{
+							Term:     "dustin",
+							Field:    "name",
+							BoostVal: 1.0,
+							Explain:  true,
+						},
+					},
+					Explain: true,
+					Min:     2,
+				},
+				Explain: true,
+			},
+			results: []*DocumentMatch{},
+		},
 	}
 
 	for testIndex, test := range tests {
