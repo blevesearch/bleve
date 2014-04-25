@@ -341,6 +341,18 @@ func TestTermBooleanSearch(t *testing.T) {
 							Explain: true,
 							Min:     0,
 						},
+						MustNot: &TermDisjunctionQuery{
+							Terms: []Query{
+								&TermQuery{
+									Term:     "steve",
+									Field:    "name",
+									BoostVal: 1.0,
+									Explain:  true,
+								},
+							},
+							Explain: true,
+							Min:     0,
+						},
 						Explain: true,
 					},
 					&TermQuery{
