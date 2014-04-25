@@ -344,7 +344,7 @@ func TestTermBooleanSearch(t *testing.T) {
 						Explain: true,
 					},
 					&TermQuery{
-						Term:     "marty",
+						Term:     "dustin",
 						Field:    "name",
 						BoostVal: 5.0,
 						Explain:  true,
@@ -354,8 +354,8 @@ func TestTermBooleanSearch(t *testing.T) {
 			},
 			results: []*DocumentMatch{
 				&DocumentMatch{
-					ID:    "1",
-					Score: 3.5122335272516327,
+					ID:    "3",
+					Score: 2.6853243330509997,
 				},
 			},
 		},
