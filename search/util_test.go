@@ -38,6 +38,18 @@ func TestMergeLocations(t *testing.T) {
 		},
 	}
 
+	flm3 := FieldTermLocationMap{
+		"josh": TermLocationMap{
+			"description": {
+				&Location{
+					Pos:   5,
+					Start: 20,
+					End:   25,
+				},
+			},
+		},
+	}
+
 	expectedMerge := FieldTermLocationMap{
 		"marty": TermLocationMap{
 			"description": {
@@ -55,9 +67,18 @@ func TestMergeLocations(t *testing.T) {
 				},
 			},
 		},
+		"josh": TermLocationMap{
+			"description": {
+				&Location{
+					Pos:   5,
+					Start: 20,
+					End:   25,
+				},
+			},
+		},
 	}
 
-	mergedLocations := mergeLocations([]FieldTermLocationMap{flm1, flm2})
+	mergedLocations := mergeLocations([]FieldTermLocationMap{flm1, flm2, flm3})
 	if !reflect.DeepEqual(expectedMerge, mergedLocations) {
 		t.Errorf("expected %v, got %v", expectedMerge, mergedLocations)
 	}
