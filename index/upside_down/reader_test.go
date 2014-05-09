@@ -16,14 +16,15 @@ import (
 	_ "github.com/couchbaselabs/bleve/analysis/analyzers/standard_analyzer"
 	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index"
+	"github.com/couchbaselabs/bleve/index/store/gouchstore"
 )
 
 func TestIndexReader(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	idx := NewUpsideDownCouch("test")
-
-	err := idx.Open()
+	store, err := gouchstore.Open("test")
+	idx := NewUpsideDownCouch(store)
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -118,6 +119,9 @@ func TestIndexReader(t *testing.T) {
 	match, err = reader.Advance("2")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if match == nil {
+		t.Fatalf("Expected match, got nil")
 	}
 	if match.ID != "2" {
 		t.Errorf("Expected ID '2', got '%s'", match.ID)

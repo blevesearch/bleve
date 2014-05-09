@@ -14,10 +14,10 @@ import (
 	"math"
 
 	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/jmhodges/levigo"
 
 	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index"
+	"github.com/couchbaselabs/bleve/index/store"
 )
 
 var VERSION_KEY []byte = []byte{'v'}
@@ -27,24 +27,19 @@ const VERSION uint8 = 1
 type UpsideDownCouch struct {
 	version        uint8
 	path           string
-	opts           *levigo.Options
-	db             *levigo.DB
+	store          store.KVStore
 	fieldIndexes   map[string]uint16
 	lastFieldIndex int
 	analyzer       map[string]*analysis.Analyzer
 	docCount       uint64
 }
 
-func NewUpsideDownCouch(path string) *UpsideDownCouch {
-	opts := levigo.NewOptions()
-	opts.SetCreateIfMissing(true)
-
+func NewUpsideDownCouch(s store.KVStore) *UpsideDownCouch {
 	return &UpsideDownCouch{
 		version:      VERSION,
-		path:         path,
-		opts:         opts,
 		analyzer:     make(map[string]*analysis.Analyzer),
 		fieldIndexes: make(map[string]uint16),
+		store:        s,
 	}
 }
 
@@ -59,20 +54,20 @@ func (udc *UpsideDownCouch) init() (err error) {
 }
 
 func (udc *UpsideDownCouch) loadSchema() (err error) {
-	// schema := make([]*index.Field, 0)
-
-	ro := defaultReadOptions()
-	it := udc.db.NewIterator(ro)
-	defer it.Close()
 
 	keyPrefix := []byte{'f'}
+	it := udc.store.Iterator(keyPrefix)
+	defer it.Close()
+
 	it.Seek(keyPrefix)
-	for it = it; it.Valid(); it.Next() {
+	key, val, valid := it.Current()
+	for valid {
+
 		// stop when
-		if !bytes.HasPrefix(it.Key(), keyPrefix) {
+		if !bytes.HasPrefix(key, keyPrefix) {
 			break
 		}
-		fieldRow, err := NewFieldRowKV(it.Key(), it.Value())
+		fieldRow, err := NewFieldRowKV(key, val)
 		if err != nil {
 			return err
 		}
@@ -80,20 +75,17 @@ func (udc *UpsideDownCouch) loadSchema() (err error) {
 		if int(fieldRow.index) > udc.lastFieldIndex {
 			udc.lastFieldIndex = int(fieldRow.index)
 		}
-	}
-	err = it.GetError()
-	if err != nil {
-		return
+
+		it.Next()
+		key, val, valid = it.Current()
 	}
 
 	return
 }
 
 func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows []UpsideDownCouchRow, deleteRows []UpsideDownCouchRow) (err error) {
-	ro := defaultReadOptions()
-
 	// prepare batch
-	wb := levigo.NewWriteBatch()
+	wb := udc.store.NewBatch()
 
 	// add
 	for _, row := range addRows {
@@ -101,7 +93,7 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 		if ok {
 			// need to increment counter
 			tr := NewTermFrequencyRow(tfr.term, tfr.field, "", 0, 0)
-			val, err := udc.db.Get(ro, tr.Key())
+			val, err := udc.store.Get(tr.Key())
 			if err != nil {
 				return err
 			}
@@ -116,14 +108,14 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 			}
 
 			// now add this to the batch
-			wb.Put(tr.Key(), tr.Value())
+			wb.Set(tr.Key(), tr.Value())
 		}
-		wb.Put(row.Key(), row.Value())
+		wb.Set(row.Key(), row.Value())
 	}
 
 	// update
 	for _, row := range updateRows {
-		wb.Put(row.Key(), row.Value())
+		wb.Set(row.Key(), row.Value())
 	}
 
 	// delete
@@ -132,7 +124,7 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 		if ok {
 			// need to decrement counter
 			tr := NewTermFrequencyRow(tfr.term, tfr.field, "", 0, 0)
-			val, err := udc.db.Get(ro, tr.Key())
+			val, err := udc.store.Get(tr.Key())
 			if err != nil {
 				return err
 			}
@@ -150,7 +142,7 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 				wb.Delete(tr.Key())
 			} else {
 				// now add this to the batch
-				wb.Put(tr.Key(), tr.Value())
+				wb.Set(tr.Key(), tr.Value())
 			}
 
 		}
@@ -158,8 +150,11 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 	}
 
 	// write out the batch
-	wo := defaultWriteOptions()
-	err = udc.db.Write(wo, wb)
+	err = wb.Execute()
+	if err != nil {
+		return
+	}
+	err = udc.store.Commit()
 	return
 }
 
@@ -168,14 +163,8 @@ func (udc *UpsideDownCouch) DocCount() uint64 {
 }
 
 func (udc *UpsideDownCouch) Open() (err error) {
-	udc.db, err = levigo.Open(udc.path, udc.opts)
-	if err != nil {
-		return
-	}
-
-	ro := defaultReadOptions()
 	var value []byte
-	value, err = udc.db.Get(ro, VERSION_KEY)
+	value, err = udc.store.Get(VERSION_KEY)
 	if err != nil {
 		return
 	}
@@ -198,41 +187,40 @@ func (udc *UpsideDownCouch) Open() (err error) {
 }
 
 func (udc *UpsideDownCouch) countDocs() uint64 {
-	ro := defaultReadOptions()
-	ro.SetFillCache(false) // dont fill the cache with this
-	it := udc.db.NewIterator(ro)
+	it := udc.store.Iterator([]byte{'b'})
 	defer it.Close()
 
-	// begining of back index
-	it.Seek([]byte{'b'})
-
 	var rv uint64 = 0
-	for it = it; it.Valid(); it.Next() {
-		if !bytes.HasPrefix(it.Key(), []byte{'b'}) {
+	key, _, valid := it.Current()
+	for valid {
+		if !bytes.HasPrefix(key, []byte{'b'}) {
 			break
 		}
 		rv += 1
+		it.Next()
+		key, _, valid = it.Current()
 	}
+
 	return rv
 }
 
 func (udc *UpsideDownCouch) rowCount() uint64 {
-	ro := defaultReadOptions()
-	ro.SetFillCache(false) // dont fill the cache with this
-	it := udc.db.NewIterator(ro)
+	it := udc.store.Iterator([]byte{0})
 	defer it.Close()
 
-	it.Seek([]byte{0})
-
 	var rv uint64 = 0
-	for it = it; it.Valid(); it.Next() {
+	_, _, valid := it.Current()
+	for valid {
 		rv += 1
+		it.Next()
+		_, _, valid = it.Current()
 	}
+
 	return rv
 }
 
 func (udc *UpsideDownCouch) Close() {
-	udc.db.Close()
+	udc.store.Close()
 }
 
 func (udc *UpsideDownCouch) Update(doc *document.Document) error {
@@ -369,14 +357,12 @@ func (udc *UpsideDownCouch) Delete(id string) error {
 }
 
 func (udc *UpsideDownCouch) backIndexRowForDoc(docId string) (*BackIndexRow, error) {
-	ro := defaultReadOptions()
-
 	// use a temporary row structure to build key
 	tempRow := &BackIndexRow{
 		doc: []byte(docId),
 	}
 	key := tempRow.Key()
-	value, err := udc.db.Get(ro, key)
+	value, err := udc.store.Get(key)
 	if err != nil {
 		return nil, err
 	}
@@ -391,26 +377,23 @@ func (udc *UpsideDownCouch) backIndexRowForDoc(docId string) (*BackIndexRow, err
 }
 
 func (udc *UpsideDownCouch) Dump() {
-	ro := defaultReadOptions()
-	ro.SetFillCache(false)
-	it := udc.db.NewIterator(ro)
+	it := udc.store.Iterator([]byte{0})
 	defer it.Close()
-	it.SeekToFirst()
-	for it = it; it.Valid(); it.Next() {
-		//fmt.Printf("Key: `%v`               Value: `%v`\n", string(it.Key()), string(it.Value()))
-		row, err := ParseFromKeyValue(it.Key(), it.Value())
+	key, val, valid := it.Current()
+	for valid {
+
+		row, err := ParseFromKeyValue(key, val)
 		if err != nil {
 			fmt.Printf("error parsing key/value: %v", err)
 			return
 		}
 		if row != nil {
 			fmt.Printf("%v\n", row)
-			fmt.Printf("Key:   % -100x\nValue: % -100x\n\n", it.Key(), it.Value())
+			fmt.Printf("Key:   % -100x\nValue: % -100x\n\n", key, val)
 		}
-	}
-	err := it.GetError()
-	if err != nil {
-		fmt.Printf("Error reading iterator: %v", err)
+
+		it.Next()
+		key, val, valid = it.Current()
 	}
 }
 
@@ -420,18 +403,6 @@ func (udc *UpsideDownCouch) TermFieldReader(term []byte, fieldName string) (inde
 		return newUpsideDownCouchTermFieldReader(udc, term, uint16(fieldIndex))
 	}
 	return newUpsideDownCouchTermFieldReader(udc, []byte{BYTE_SEPARATOR}, 0)
-}
-
-func defaultWriteOptions() *levigo.WriteOptions {
-	wo := levigo.NewWriteOptions()
-	// request fsync on write for safety
-	wo.SetSync(true)
-	return wo
-}
-
-func defaultReadOptions() *levigo.ReadOptions {
-	ro := levigo.NewReadOptions()
-	return ro
 }
 
 func frequencyFromTokenFreq(tf *analysis.TokenFreq) int {

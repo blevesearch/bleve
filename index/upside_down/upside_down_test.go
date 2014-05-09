@@ -14,13 +14,15 @@ import (
 
 	_ "github.com/couchbaselabs/bleve/analysis/analyzers/standard_analyzer"
 	"github.com/couchbaselabs/bleve/document"
+	"github.com/couchbaselabs/bleve/index/store/gouchstore"
 )
 
 func TestIndexOpenReopen(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	idx := NewUpsideDownCouch("test")
-	err := idx.Open()
+	store, err := gouchstore.Open("test")
+	idx := NewUpsideDownCouch(store)
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -41,7 +43,8 @@ func TestIndexOpenReopen(t *testing.T) {
 	// now close it
 	idx.Close()
 
-	idx = NewUpsideDownCouch("test")
+	store, err = gouchstore.Open("test")
+	idx = NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -54,9 +57,9 @@ func TestIndexOpenReopen(t *testing.T) {
 func TestIndexInsert(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	idx := NewUpsideDownCouch("test")
-
-	err := idx.Open()
+	store, err := gouchstore.Open("test")
+	idx := NewUpsideDownCouch(store)
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -92,9 +95,9 @@ func TestIndexInsert(t *testing.T) {
 func TestIndexInsertThenDelete(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	idx := NewUpsideDownCouch("test")
-
-	err := idx.Open()
+	store, err := gouchstore.Open("test")
+	idx := NewUpsideDownCouch(store)
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -160,9 +163,9 @@ func TestIndexInsertThenDelete(t *testing.T) {
 func TestIndexInsertThenUpdate(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	idx := NewUpsideDownCouch("test")
-
-	err := idx.Open()
+	store, err := gouchstore.Open("test")
+	idx := NewUpsideDownCouch(store)
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -209,9 +212,9 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 func TestIndexInsertMultiple(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	idx := NewUpsideDownCouch("test")
-
-	err := idx.Open()
+	store, err := gouchstore.Open("test")
+	idx := NewUpsideDownCouch(store)
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -243,8 +246,8 @@ func TestIndexInsertMultiple(t *testing.T) {
 
 	// close and reopen and and one more to testing counting works correctly
 	idx.Close()
-	idx = NewUpsideDownCouch("test")
-
+	store, err = gouchstore.Open("test")
+	idx = NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)

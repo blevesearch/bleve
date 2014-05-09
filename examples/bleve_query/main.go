@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/couchbaselabs/bleve/index/store/leveldb"
 	"github.com/couchbaselabs/bleve/index/upside_down"
 	"github.com/couchbaselabs/bleve/search"
 )
@@ -30,8 +31,12 @@ func main() {
 	}
 
 	// open index
-	index := upside_down.NewUpsideDownCouch(*indexDir)
-	err := index.Open()
+	store, err := leveldb.Open(*indexDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	index := upside_down.NewUpsideDownCouch(store)
+	err = index.Open()
 	if err != nil {
 		log.Fatal(err)
 	}
