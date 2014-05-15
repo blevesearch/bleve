@@ -1,3 +1,5 @@
+// +build forestdb
+
 package goforestdb
 
 import (
