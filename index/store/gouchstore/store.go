@@ -25,12 +25,17 @@ func Open(path string) (*GouchstoreStore, error) {
 }
 
 func (gs *GouchstoreStore) Get(key []byte) ([]byte, error) {
-	docInfo, err := gs.db.DocumentInfoById(string(key))
+	var docInfo gouchstore.DocumentInfo
+	err := gs.db.DocumentInfoByIdNoAlloc(string(key), &docInfo)
 	if err != nil && err.Error() != "document not found" {
 		return nil, err
 	}
-	if docInfo != nil && !docInfo.Deleted {
-		doc, err := gs.db.DocumentById(string(key))
+	if err != nil && err.Error() == "document not found" {
+		return nil, nil
+	}
+	var doc gouchstore.Document
+	if !docInfo.Deleted {
+		err := gs.db.DocumentByIdNoAlloc(string(key), &doc)
 		if err != nil {
 			return nil, err
 		}

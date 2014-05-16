@@ -18,12 +18,15 @@ func newGouchstoreBatch(store *GouchstoreStore) *GouchstoreBatch {
 }
 
 func (gb *GouchstoreBatch) Set(key, val []byte) {
-	doc, docInfo := kvToDocDocInfo(key, val)
+	id := string(key)
+	doc := &gouchstore.Document{ID: id, Body: val}
+	docInfo := &gouchstore.DocumentInfo{ID: id, ContentMeta: gouchstore.DOC_IS_COMPRESSED}
 	gb.bulk.Set(docInfo, doc)
 }
 
 func (gb *GouchstoreBatch) Delete(key []byte) {
-	_, docInfo := kvToDocDocInfo(key, nil)
+	id := string(key)
+	docInfo := &gouchstore.DocumentInfo{ID: id, ContentMeta: gouchstore.DOC_IS_COMPRESSED}
 	gb.bulk.Delete(docInfo)
 }
 
