@@ -27,7 +27,11 @@ func Open(path string) (*ForestDBStore, error) {
 }
 
 func (f *ForestDBStore) Get(key []byte) ([]byte, error) {
-	return f.db.GetKV(key)
+	res, err := f.db.GetKV(key)
+	if err != nil && err != forestdb.RESULT_KEY_NOT_FOUND {
+		return nil, err
+	}
+	return res, nil
 }
 
 func (f *ForestDBStore) Set(key, val []byte) error {
