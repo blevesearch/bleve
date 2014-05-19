@@ -155,44 +155,32 @@ type TermFrequencyRow struct {
 }
 
 func (tfr *TermFrequencyRow) Key() []byte {
-	buf := new(bytes.Buffer)
-	buf.WriteByte('t')
-	buf.Write(tfr.term)
-	buf.WriteByte(BYTE_SEPARATOR)
-	fieldbuf := make([]byte, 2)
-	binary.LittleEndian.PutUint16(fieldbuf, tfr.field)
-	buf.Write(fieldbuf)
-	buf.Write(tfr.doc)
-	return buf.Bytes()
+	buf := make([]byte, 1+len(tfr.term)+1+2+len(tfr.doc))
+	buf[0] = 't'
+	termLen := copy(buf[1:], tfr.term)
+	buf[1+termLen] = BYTE_SEPARATOR
+	binary.LittleEndian.PutUint16(buf[1+termLen+1:1+termLen+1+2], tfr.field)
+	copy(buf[1+termLen+1+2:], tfr.doc)
+	return buf
 }
 
 func (tfr *TermFrequencyRow) Value() []byte {
-	buf := new(bytes.Buffer)
+	buf := make([]byte, 8+4+(len(tfr.vectors)*(2+8+8+8)))
 
-	freqbuf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(freqbuf, tfr.freq)
-	buf.Write(freqbuf)
+	binary.LittleEndian.PutUint64(buf[0:8], tfr.freq)
 
 	normuint32 := math.Float32bits(tfr.norm)
-	normbuf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(normbuf, normuint32)
-	buf.Write(normbuf)
+	binary.LittleEndian.PutUint32(buf[8:12], normuint32)
 
+	offset := 12
 	for _, vector := range tfr.vectors {
-		fieldbuf := make([]byte, 2)
-		binary.LittleEndian.PutUint16(fieldbuf, vector.field)
-		buf.Write(fieldbuf)
-		posbuf := make([]byte, 8)
-		binary.LittleEndian.PutUint64(posbuf, vector.pos)
-		buf.Write(posbuf)
-		startbuf := make([]byte, 8)
-		binary.LittleEndian.PutUint64(startbuf, vector.start)
-		buf.Write(startbuf)
-		endbuf := make([]byte, 8)
-		binary.LittleEndian.PutUint64(endbuf, vector.end)
-		buf.Write(endbuf)
+		binary.LittleEndian.PutUint16(buf[offset:offset+2], vector.field)
+		binary.LittleEndian.PutUint64(buf[offset+2:offset+10], vector.pos)
+		binary.LittleEndian.PutUint64(buf[offset+10:offset+18], vector.start)
+		binary.LittleEndian.PutUint64(buf[offset+18:offset+26], vector.end)
+		offset += 26
 	}
-	return buf.Bytes()
+	return buf
 }
 
 func (tfr *TermFrequencyRow) String() string {
