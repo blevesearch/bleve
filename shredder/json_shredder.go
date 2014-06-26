@@ -20,10 +20,19 @@ import (
 // Any strings found in the JSON are added as text fields
 
 type AutoJsonShredder struct {
+	options document.IndexingOptions
 }
 
 func NewAutoJsonShredder() *AutoJsonShredder {
-	return &AutoJsonShredder{}
+	return &AutoJsonShredder{
+		options: document.INDEX_FIELD,
+	}
+}
+
+func NewAutoJsonShredderWithOptions(options document.IndexingOptions) *AutoJsonShredder {
+	return &AutoJsonShredder{
+		options: options,
+	}
 }
 
 func (s *AutoJsonShredder) Shred(id string, body []byte) (*document.Document, error) {
@@ -35,12 +44,12 @@ func (s *AutoJsonShredder) Shred(id string, body []byte) (*document.Document, er
 		return nil, err
 	}
 
-	shredSection(rv, section, "")
+	s.shredSection(rv, section, "")
 
 	return rv, nil
 }
 
-func shredSection(doc *document.Document, section interface{}, parent string) {
+func (s *AutoJsonShredder) shredSection(doc *document.Document, section interface{}, parent string) {
 	nextParent := parent
 	if nextParent != "" {
 		nextParent = nextParent + "."
@@ -48,17 +57,17 @@ func shredSection(doc *document.Document, section interface{}, parent string) {
 	switch section := section.(type) {
 
 	case string:
-		f := document.NewTextField(parent, []byte(section))
+		f := document.NewTextFieldWithIndexingOptions(parent, []byte(section), s.options)
 		doc.AddField(f)
 
 	case []interface{}:
 		for i, sub := range section {
-			shredSection(doc, sub, nextParent+strconv.Itoa(i))
+			s.shredSection(doc, sub, nextParent+strconv.Itoa(i))
 		}
 
 	case map[string]interface{}:
 		for k, sub := range section {
-			shredSection(doc, sub, nextParent+k)
+			s.shredSection(doc, sub, nextParent+k)
 		}
 	}
 }

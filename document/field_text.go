@@ -31,11 +31,11 @@ func NewTextField(name string, value []byte) *Field {
 	return NewTextFieldWithIndexingOptions(name, value, DEFAULT_TEXT_INDEXING_OPTIONS)
 }
 
-func NewTextFieldWithIndexingOptions(name string, value []byte, indexingOptions int) *Field {
+func NewTextFieldWithIndexingOptions(name string, value []byte, options IndexingOptions) *Field {
 	return &Field{
-		Name:            name,
-		IndexingOptions: indexingOptions,
-		Analyzer:        standardAnalyzer,
-		Value:           value,
+		Name:     name,
+		Options:  options,
+		Analyzer: standardAnalyzer,
+		Value:    value,
 	}
 }

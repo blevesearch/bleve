@@ -21,6 +21,7 @@ import (
 var field = flag.String("field", "description", "field to query")
 var indexDir = flag.String("indexDir", "index", "index directory")
 var limit = flag.Int("limit", 10, "limit to first N results")
+var includeHighlights = flag.Bool("highlight", false, "highlight matches")
 
 func main() {
 
@@ -70,6 +71,26 @@ func main() {
 		fmt.Printf("%d matches, showing %d through %d\n", searcher.Count(), 1, last)
 		for i, result := range results {
 			fmt.Printf("%2d. %s (%f)\n", i+1, result.ID, result.Score)
+			if *includeHighlights {
+				highlighter := search.NewSimpleHighlighter()
+
+				doc, err := index.Document(result.ID)
+				if err != nil {
+					fmt.Print(err)
+					return
+				}
+
+				fragments := highlighter.BestFragmentsInField(result, doc, *field, 5)
+				for _, fragment := range fragments {
+					fmt.Printf("\t%s\n", fragment)
+				}
+				if len(fragments) == 0 {
+					for _, f := range doc.Fields {
+						fmt.Printf("\tfield: %s\n", f)
+					}
+				}
+
+			}
 		}
 	}
 }

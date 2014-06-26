@@ -55,14 +55,24 @@ func TestRows(t *testing.T) {
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0},
 		},
 		{
-			NewBackIndexRow("budweiser", []*BackIndexEntry{&BackIndexEntry{[]byte{'b', 'e', 'e', 'r'}, 0}}),
+			NewBackIndexRow("budweiser", []*BackIndexEntry{&BackIndexEntry{[]byte{'b', 'e', 'e', 'r'}, 0}}, []uint16{}),
 			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0},
 		},
 		{
-			NewBackIndexRow("budweiser", []*BackIndexEntry{&BackIndexEntry{[]byte{'b', 'e', 'e', 'r'}, 0}, &BackIndexEntry{[]byte{'b', 'e', 'a', 't'}, 1}}),
+			NewBackIndexRow("budweiser", []*BackIndexEntry{&BackIndexEntry{[]byte{'b', 'e', 'e', 'r'}, 0}, &BackIndexEntry{[]byte{'b', 'e', 'a', 't'}, 1}}, []uint16{}),
 			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'e', 'a', 't', BYTE_SEPARATOR, 1, 0},
+		},
+		{
+			NewBackIndexRow("budweiser", []*BackIndexEntry{&BackIndexEntry{[]byte{'b', 'e', 'e', 'r'}, 0}, &BackIndexEntry{[]byte{'b', 'e', 'a', 't'}, 1}}, []uint16{3, 4, 5}),
+			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'e', 'a', 't', BYTE_SEPARATOR, 1, 0, BYTE_SEPARATOR, 3, 0, BYTE_SEPARATOR, 4, 0, BYTE_SEPARATOR, 5, 0},
+		},
+		{
+			NewStoredRow("budweiser", 0, []byte("an american beer")),
+			[]byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', BYTE_SEPARATOR, 0, 0},
+			[]byte{'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
 		},
 	}
 
@@ -180,6 +190,16 @@ func TestInvalidRows(t *testing.T) {
 		{
 			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{'b', 'e', 'e', 'r', BYTE_SEPARATOR},
+		},
+		// type s, invalid key (missing id)
+		{
+			[]byte{'s'},
+			[]byte{'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
+		},
+		// type b, invalid val (missing field)
+		{
+			[]byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', BYTE_SEPARATOR},
+			[]byte{'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
 		},
 	}
 

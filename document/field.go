@@ -13,17 +13,17 @@ import (
 )
 
 type Field struct {
-	Name            string
-	IndexingOptions int
-	Analyzer        *analysis.Analyzer
-	Value           []byte
+	Name     string
+	Options  IndexingOptions
+	Analyzer *analysis.Analyzer
+	Value    []byte
 }
 
-func NewField(name string, value []byte, indexingOptions int, analyzer *analysis.Analyzer) *Field {
+func NewField(name string, value []byte, options IndexingOptions, analyzer *analysis.Analyzer) *Field {
 	return &Field{
-		Name:            name,
-		IndexingOptions: indexingOptions,
-		Analyzer:        analyzer,
-		Value:           value,
+		Name:     name,
+		Options:  options,
+		Analyzer: analyzer,
+		Value:    value,
 	}
 }

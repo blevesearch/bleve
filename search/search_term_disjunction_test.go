@@ -113,7 +113,7 @@ func TestTermDisjunctionSearch(t *testing.T) {
 				if next.ID != test.results[i].ID {
 					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].ID, next.ID, testIndex)
 				}
-				if next.Score != test.results[i].Score {
+				if !scoresCloseEnough(next.Score, test.results[i].Score) {
 					t.Errorf("expected result %d to have score %v got  %v for test %d", i, test.results[i].Score, next.Score, testIndex)
 					t.Logf("scoring explanation: %s", next.Expl)
 				}

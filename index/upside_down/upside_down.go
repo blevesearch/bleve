@@ -246,6 +246,12 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 			existingTermFieldMap[string(entry.term)] = true
 		}
 	}
+	existingStoredFieldMap := make(map[uint16]bool)
+	if backIndexRow != nil {
+		for _, sf := range backIndexRow.storedFields {
+			existingStoredFieldMap[sf] = true
+		}
+	}
 
 	// prepare a list of rows
 	updateRows := make([]UpsideDownCouchRow, 0)
@@ -253,6 +259,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 
 	// track our back index entries
 	backIndexEntries := make([]*BackIndexEntry, 0)
+	backIndexStoredFields := make([]uint16, 0)
 
 	for _, field := range doc.Fields {
 		fieldIndex, fieldExists := udc.fieldIndexes[field.Name]
@@ -268,47 +275,63 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 
 		existingTermFieldMap := existingTermFieldMaps[fieldIndex]
 
-		analyzer := field.Analyzer
-		tokens := analyzer.Analyze(field.Value)
-		fieldLength := len(tokens) // number of tokens in this doc field
-		fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
-		tokenFreqs := analysis.TokenFrequency(tokens)
-		for _, tf := range tokenFreqs {
-			var termFreqRow *TermFrequencyRow
-			if document.IncludeTermVectors(field.IndexingOptions) {
-				tv := termVectorsFromTokenFreq(uint16(fieldIndex), tf)
-				termFreqRow = NewTermFrequencyRowWithTermVectors(tf.Term, uint16(fieldIndex), doc.ID, uint64(frequencyFromTokenFreq(tf)), fieldNorm, tv)
-			} else {
-				termFreqRow = NewTermFrequencyRow(tf.Term, uint16(fieldIndex), doc.ID, uint64(frequencyFromTokenFreq(tf)), fieldNorm)
-			}
+		if field.Options.IsIndexed() {
 
-			// record the back index entry
-			backIndexEntry := BackIndexEntry{tf.Term, uint16(fieldIndex)}
-			backIndexEntries = append(backIndexEntries, &backIndexEntry)
+			analyzer := field.Analyzer
+			tokens := analyzer.Analyze(field.Value)
+			fieldLength := len(tokens) // number of tokens in this doc field
+			fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
+			tokenFreqs := analysis.TokenFrequency(tokens)
+			for _, tf := range tokenFreqs {
+				var termFreqRow *TermFrequencyRow
+				if field.Options.IncludeTermVectors() {
+					tv := termVectorsFromTokenFreq(uint16(fieldIndex), tf)
+					termFreqRow = NewTermFrequencyRowWithTermVectors(tf.Term, uint16(fieldIndex), doc.ID, uint64(frequencyFromTokenFreq(tf)), fieldNorm, tv)
+				} else {
+					termFreqRow = NewTermFrequencyRow(tf.Term, uint16(fieldIndex), doc.ID, uint64(frequencyFromTokenFreq(tf)), fieldNorm)
+				}
 
-			// remove the entry from the map of existing term fields if it exists
-			if existingTermFieldMap != nil {
-				termString := string(tf.Term)
-				_, ok := existingTermFieldMap[termString]
-				if ok {
-					// this is an update
-					updateRows = append(updateRows, termFreqRow)
-					// this term existed last time, delete it from that map
-					delete(existingTermFieldMap, termString)
+				// record the back index entry
+				backIndexEntry := BackIndexEntry{tf.Term, uint16(fieldIndex)}
+				backIndexEntries = append(backIndexEntries, &backIndexEntry)
+
+				// remove the entry from the map of existing term fields if it exists
+				if existingTermFieldMap != nil {
+					termString := string(tf.Term)
+					_, ok := existingTermFieldMap[termString]
+					if ok {
+						// this is an update
+						updateRows = append(updateRows, termFreqRow)
+						// this term existed last time, delete it from that map
+						delete(existingTermFieldMap, termString)
+					} else {
+						// this is an add
+						addRows = append(addRows, termFreqRow)
+					}
 				} else {
 					// this is an add
 					addRows = append(addRows, termFreqRow)
 				}
+			}
+		}
+
+		if field.Options.IsStored() {
+			storedRow := NewStoredRow(doc.ID, uint16(fieldIndex), field.Value)
+			_, ok := existingStoredFieldMap[uint16(fieldIndex)]
+			if ok {
+				// this is an update
+				updateRows = append(updateRows, storedRow)
+				// this field was stored last time, delete it from that map
+				delete(existingStoredFieldMap, uint16(fieldIndex))
 			} else {
-				// this is an add
-				addRows = append(addRows, termFreqRow)
+				addRows = append(addRows, storedRow)
 			}
 		}
 
 	}
 
 	// build the back index row
-	backIndexRow = NewBackIndexRow(doc.ID, backIndexEntries)
+	backIndexRow = NewBackIndexRow(doc.ID, backIndexEntries, backIndexStoredFields)
 	updateRows = append(updateRows, backIndexRow)
 
 	// any of the existing rows that weren't updated need to be deleted
@@ -320,6 +343,11 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 				deleteRows = append(deleteRows, termFreqRow)
 			}
 		}
+	}
+	// any of the existing stored fields that weren't updated need to be deleted
+	for storedFieldIndex, _ := range existingStoredFieldMap {
+		storedRow := NewStoredRow(doc.ID, storedFieldIndex, nil)
+		deleteRows = append(deleteRows, storedRow)
 	}
 
 	err = udc.batchRows(addRows, updateRows, deleteRows)
@@ -344,6 +372,10 @@ func (udc *UpsideDownCouch) Delete(id string) error {
 	for _, backIndexEntry := range backIndexRow.entries {
 		tfr := NewTermFrequencyRow(backIndexEntry.term, backIndexEntry.field, id, 0, 0)
 		rows = append(rows, tfr)
+	}
+	for _, sf := range backIndexRow.storedFields {
+		sf := NewStoredRow(id, sf, nil)
+		rows = append(rows, sf)
 	}
 
 	// also delete the back entry itself
@@ -403,6 +435,33 @@ func (udc *UpsideDownCouch) TermFieldReader(term []byte, fieldName string) (inde
 		return newUpsideDownCouchTermFieldReader(udc, term, uint16(fieldIndex))
 	}
 	return newUpsideDownCouchTermFieldReader(udc, []byte{BYTE_SEPARATOR}, 0)
+}
+
+func (udc *UpsideDownCouch) Document(id string) (*document.Document, error) {
+	rv := document.NewDocument(id)
+	storedRow := NewStoredRow(id, 0, nil)
+	storedRowScanPrefix := storedRow.ScanPrefixForDoc()
+	it := udc.store.Iterator(storedRowScanPrefix)
+	key, val, valid := it.Current()
+	for valid {
+		if !bytes.HasPrefix(key, storedRowScanPrefix) {
+			break
+		}
+		row, err := NewStoredRowKV(key, val)
+		if err != nil {
+			return nil, err
+		}
+		if row != nil {
+			rv.AddField(&document.Field{
+				Name:  udc.fieldIndexToName(row.field),
+				Value: row.Value(),
+			})
+		}
+
+		it.Next()
+		key, val, valid = it.Current()
+	}
+	return rv, nil
 }
 
 func frequencyFromTokenFreq(tf *analysis.TokenFreq) int {

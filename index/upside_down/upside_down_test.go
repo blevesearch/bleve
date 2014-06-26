@@ -266,3 +266,53 @@ func TestIndexInsertMultiple(t *testing.T) {
 		t.Errorf("expected doc count: %d, got %d", expectedCount, docCount)
 	}
 }
+
+func TestIndexInsertWithStore(t *testing.T) {
+	defer os.RemoveAll("test")
+
+	store, err := gouchstore.Open("test")
+	idx := NewUpsideDownCouch(store)
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+	defer idx.Close()
+
+	var expectedCount uint64 = 0
+	docCount := idx.DocCount()
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+
+	doc := document.NewDocument("1")
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+	expectedCount += 1
+
+	docCount = idx.DocCount()
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+
+	// should have 6 rows (1 for version, 1 for schema field, and 1 for single term, and 1 for the stored field and 1 for the term count,  and 1 for the back index entry)
+	expectedLength := uint64(1 + 1 + 1 + 1 + 1 + 1)
+	rowCount := idx.rowCount()
+	if rowCount != expectedLength {
+		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
+	}
+
+	storedDoc, err := idx.Document("1")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(storedDoc.Fields) != 1 {
+		t.Errorf("expected 1 stored field, got %d", len(storedDoc.Fields))
+	}
+	if string(storedDoc.Fields[0].Value) != "test" {
+		t.Errorf("expected field content 'test', got '%s'", string(storedDoc.Fields[0].Value))
+	}
+}

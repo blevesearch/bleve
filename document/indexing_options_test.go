@@ -14,37 +14,37 @@ import (
 
 func TestIndexingOptions(t *testing.T) {
 	tests := []struct {
-		indexingOptions    int
+		options            IndexingOptions
 		isIndexed          bool
 		isStored           bool
 		includeTermVectors bool
 	}{
 		{
-			indexingOptions:    INDEX_FIELD | STORE_FIELD | INCLUDE_TERM_VECTORS,
+			options:            INDEX_FIELD | STORE_FIELD | INCLUDE_TERM_VECTORS,
 			isIndexed:          true,
 			isStored:           true,
 			includeTermVectors: true,
 		},
 		{
-			indexingOptions:    INDEX_FIELD | INCLUDE_TERM_VECTORS,
+			options:            INDEX_FIELD | INCLUDE_TERM_VECTORS,
 			isIndexed:          true,
 			isStored:           false,
 			includeTermVectors: true,
 		},
 		{
-			indexingOptions:    STORE_FIELD | INCLUDE_TERM_VECTORS,
+			options:            STORE_FIELD | INCLUDE_TERM_VECTORS,
 			isIndexed:          false,
 			isStored:           true,
 			includeTermVectors: true,
 		},
 		{
-			indexingOptions:    INDEX_FIELD,
+			options:            INDEX_FIELD,
 			isIndexed:          true,
 			isStored:           false,
 			includeTermVectors: false,
 		},
 		{
-			indexingOptions:    STORE_FIELD,
+			options:            STORE_FIELD,
 			isIndexed:          false,
 			isStored:           true,
 			includeTermVectors: false,
@@ -52,17 +52,17 @@ func TestIndexingOptions(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actuallyIndexed := IsIndexedField(test.indexingOptions)
+		actuallyIndexed := test.options.IsIndexed()
 		if actuallyIndexed != test.isIndexed {
-			t.Errorf("expected indexed to be %v, got %v for %d", test.isIndexed, actuallyIndexed, test.indexingOptions)
+			t.Errorf("expected indexed to be %v, got %v for %d", test.isIndexed, actuallyIndexed, test.options)
 		}
-		actuallyStored := IsStoredField(test.indexingOptions)
+		actuallyStored := test.options.IsStored()
 		if actuallyStored != test.isStored {
-			t.Errorf("expected stored to be %v, got %v for %d", test.isStored, actuallyStored, test.indexingOptions)
+			t.Errorf("expected stored to be %v, got %v for %d", test.isStored, actuallyStored, test.options)
 		}
-		actuallyIncludeTermVectors := IncludeTermVectors(test.indexingOptions)
+		actuallyIncludeTermVectors := test.options.IncludeTermVectors()
 		if actuallyIncludeTermVectors != test.includeTermVectors {
-			t.Errorf("expected includeTermVectors to be %v, got %v for %d", test.includeTermVectors, actuallyIncludeTermVectors, test.indexingOptions)
+			t.Errorf("expected includeTermVectors to be %v, got %v for %d", test.includeTermVectors, actuallyIncludeTermVectors, test.options)
 		}
 	}
 }

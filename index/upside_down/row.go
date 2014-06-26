@@ -36,6 +36,8 @@ func ParseFromKeyValue(key, value []byte) (UpsideDownCouchRow, error) {
 			return NewTermFrequencyRowKV(key, value)
 		case 'b':
 			return NewBackIndexRowKV(key, value)
+		case 's':
+			return NewStoredRowKV(key, value)
 		}
 		return nil, fmt.Errorf("Unknown field type '%s'", string(key[0]))
 	}
@@ -53,9 +55,7 @@ func (v *VersionRow) Key() []byte {
 }
 
 func (v *VersionRow) Value() []byte {
-	buf := new(bytes.Buffer)
-	buf.WriteByte(byte(v.version))
-	return buf.Bytes()
+	return []byte{byte(v.version)}
 }
 
 func (v *VersionRow) String() string {
@@ -86,19 +86,14 @@ type FieldRow struct {
 }
 
 func (f *FieldRow) Key() []byte {
-	buf := new(bytes.Buffer)
-	buf.WriteByte('f')
-	indexbuf := make([]byte, 2)
-	binary.LittleEndian.PutUint16(indexbuf, f.index)
-	buf.Write(indexbuf)
-	return buf.Bytes()
+	buf := make([]byte, 3)
+	buf[0] = 'f'
+	binary.LittleEndian.PutUint16(buf[1:3], f.index)
+	return buf
 }
 
 func (f *FieldRow) Value() []byte {
-	buf := new(bytes.Buffer)
-	buf.WriteString(f.name)
-	buf.WriteByte(BYTE_SEPARATOR)
-	return buf.Bytes()
+	return append([]byte(f.name), BYTE_SEPARATOR)
 }
 
 func (f *FieldRow) String() string {
@@ -289,8 +284,9 @@ func (bie *BackIndexEntry) String() string {
 }
 
 type BackIndexRow struct {
-	doc     []byte
-	entries []*BackIndexEntry
+	doc          []byte
+	entries      []*BackIndexEntry
+	storedFields []uint16
 }
 
 func (br *BackIndexRow) Key() []byte {
@@ -309,17 +305,24 @@ func (br *BackIndexRow) Value() []byte {
 		binary.LittleEndian.PutUint16(fieldbuf, e.field)
 		buf.Write(fieldbuf)
 	}
+	for _, sf := range br.storedFields {
+		buf.WriteByte(BYTE_SEPARATOR)
+		fieldbuf := make([]byte, 2)
+		binary.LittleEndian.PutUint16(fieldbuf, sf)
+		buf.Write(fieldbuf)
+	}
 	return buf.Bytes()
 }
 
 func (br *BackIndexRow) String() string {
-	return fmt.Sprintf("Backindex DocId: `%s` Entries: %v", string(br.doc), br.entries)
+	return fmt.Sprintf("Backindex DocId: `%s` Entries: %v, Stored Fields: %v", string(br.doc), br.entries, br.storedFields)
 }
 
-func NewBackIndexRow(doc string, entries []*BackIndexEntry) *BackIndexRow {
+func NewBackIndexRow(doc string, entries []*BackIndexEntry, storedFields []uint16) *BackIndexRow {
 	return &BackIndexRow{
-		doc:     []byte(doc),
-		entries: entries,
+		doc:          []byte(doc),
+		entries:      entries,
+		storedFields: storedFields,
 	}
 }
 
@@ -340,6 +343,7 @@ func NewBackIndexRowKV(key, value []byte) (*BackIndexRow, error) {
 
 	buf = bytes.NewBuffer(value)
 	rv.entries = make([]*BackIndexEntry, 0)
+	rv.storedFields = make([]uint16, 0)
 
 	var term []byte
 	term, err = buf.ReadBytes(BYTE_SEPARATOR)
@@ -350,20 +354,98 @@ func NewBackIndexRowKV(key, value []byte) (*BackIndexRow, error) {
 		return nil, err
 	}
 	for err != io.EOF {
-		ent := BackIndexEntry{}
-		ent.term = term[:len(term)-1] // trim off separator byte
+		if len(term) > 2 {
+			// this is a back index entry
+			ent := BackIndexEntry{}
+			ent.term = term[:len(term)-1] // trim off separator byte
 
-		err = binary.Read(buf, binary.LittleEndian, &ent.field)
-		if err != nil {
-			return nil, err
+			err = binary.Read(buf, binary.LittleEndian, &ent.field)
+			if err != nil {
+				return nil, err
+			}
+			rv.entries = append(rv.entries, &ent)
+		} else {
+			// this is a stored field entry
+			var sf uint16
+			err = binary.Read(buf, binary.LittleEndian, &sf)
+			if err != nil {
+				return nil, err
+			}
+			rv.storedFields = append(rv.storedFields, sf)
 		}
-		rv.entries = append(rv.entries, &ent)
 
 		term, err = buf.ReadBytes(BYTE_SEPARATOR)
 		if err != nil && err != io.EOF {
 			return nil, err
 		}
 	}
+
+	return &rv, nil
+}
+
+// STORED
+
+type StoredRow struct {
+	doc   []byte
+	field uint16
+	value []byte
+}
+
+func (s *StoredRow) Key() []byte {
+	buf := new(bytes.Buffer)
+	buf.WriteByte('s')
+	buf.Write(s.doc)
+	buf.WriteByte(BYTE_SEPARATOR)
+	fieldbuf := make([]byte, 2)
+	binary.LittleEndian.PutUint16(fieldbuf, s.field)
+	buf.Write(fieldbuf)
+	return buf.Bytes()
+}
+
+func (s *StoredRow) Value() []byte {
+	return s.value
+}
+
+func (s *StoredRow) String() string {
+	return fmt.Sprintf("")
+}
+
+func (s *StoredRow) ScanPrefixForDoc() []byte {
+	buf := new(bytes.Buffer)
+	buf.WriteByte('s')
+	buf.Write(s.doc)
+	return buf.Bytes()
+}
+
+func NewStoredRow(doc string, field uint16, value []byte) *StoredRow {
+	return &StoredRow{
+		doc:   []byte(doc),
+		field: field,
+		value: value,
+	}
+}
+
+func NewStoredRowKV(key, value []byte) (*StoredRow, error) {
+	rv := StoredRow{}
+
+	buf := bytes.NewBuffer(key)
+	buf.ReadByte() // type
+
+	var err error
+	rv.doc, err = buf.ReadBytes(BYTE_SEPARATOR)
+	if len(rv.doc) < 2 { // 1 for min doc id length, 1 for separator
+		err = fmt.Errorf("invalid doc length 0")
+		return nil, err
+	}
+
+	rv.doc = rv.doc[:len(rv.doc)-1] // trim off separator byte
+
+	err = binary.Read(buf, binary.LittleEndian, &rv.field)
+	if err != nil {
+		return nil, err
+	}
+
+	rv.value = value
 
 	return &rv, nil
 }

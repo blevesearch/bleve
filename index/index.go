@@ -23,6 +23,8 @@ type Index interface {
 
 	DocCount() uint64
 
+	Document(id string) (*document.Document, error)
+
 	Dump()
 }
 

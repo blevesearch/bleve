@@ -1,10 +1,7 @@
 package inmem
 
 import (
-	//"bytes"
-
 	"github.com/couchbaselabs/bleve/index/store"
-
 	"github.com/ryszard/goskiplist/skiplist"
 )
 
@@ -14,19 +11,19 @@ type InMemStore struct {
 
 func Open() (*InMemStore, error) {
 	rv := InMemStore{
-		//list: skiplist.NewCustomMap(byteArrayLessThan),
 		list: skiplist.NewStringMap(),
 	}
 
 	return &rv, nil
 }
 
-// func byteArrayLessThan(l, r interface{}) bool {
-// 	if bytes.Compare(l.([]byte), r.([]byte)) < 0 {
-// 		return true
-// 	}
-// 	return false
-// }
+func MustOpen() *InMemStore {
+	rv := InMemStore{
+		list: skiplist.NewStringMap(),
+	}
+
+	return &rv
+}
 
 func (i *InMemStore) Get(key []byte) ([]byte, error) {
 	val, ok := i.list.Get(string(key))

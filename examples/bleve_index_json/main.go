@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"log"
 
+	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index/store/leveldb"
 	"github.com/couchbaselabs/bleve/index/upside_down"
 	"github.com/couchbaselabs/bleve/shredder"
@@ -20,13 +21,23 @@ import (
 
 var jsonDir = flag.String("jsonDir", "json", "json directory")
 var indexDir = flag.String("indexDir", "index", "index directory")
+var storeFields = flag.Bool("storeFields", false, "store field data")
+var includeTermVectors = flag.Bool("includeTermVectors", false, "include term vectors")
 
 func main() {
 
 	flag.Parse()
 
+	indexOptions := document.INDEX_FIELD
+	if *storeFields {
+		indexOptions |= document.STORE_FIELD
+	}
+	if *includeTermVectors {
+		indexOptions |= document.INCLUDE_TERM_VECTORS
+	}
+
 	// create a automatic JSON document shredder
-	jsonShredder := shredder.NewAutoJsonShredder()
+	jsonShredder := shredder.NewAutoJsonShredderWithOptions(indexOptions)
 
 	// create a new index
 	store, err := leveldb.Open(*indexDir)

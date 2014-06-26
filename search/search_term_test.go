@@ -13,7 +13,8 @@ import (
 	"testing"
 
 	"github.com/couchbaselabs/bleve/document"
-	"github.com/couchbaselabs/bleve/index/mock"
+	"github.com/couchbaselabs/bleve/index/store/inmem"
+	"github.com/couchbaselabs/bleve/index/upside_down"
 )
 
 func TestTermSearcher(t *testing.T) {
@@ -25,7 +26,8 @@ func TestTermSearcher(t *testing.T) {
 		Explain:  true,
 	}
 
-	i := mock.NewMockIndex()
+	inMemStore, _ := inmem.Open()
+	i := upside_down.NewUpsideDownCouch(inMemStore)
 	i.Update(&document.Document{
 		ID: "a",
 		Fields: []*document.Field{

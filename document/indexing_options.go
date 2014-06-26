@@ -8,20 +8,22 @@
 //  and limitations under the License.
 package document
 
+type IndexingOptions int
+
 const (
-	INDEX_FIELD = 1 << iota
+	INDEX_FIELD IndexingOptions = 1 << iota
 	STORE_FIELD
 	INCLUDE_TERM_VECTORS
 )
 
-func IsIndexedField(arg int) bool {
-	return arg&INDEX_FIELD != 0
+func (o IndexingOptions) IsIndexed() bool {
+	return o&INDEX_FIELD != 0
 }
 
-func IsStoredField(arg int) bool {
-	return arg&STORE_FIELD != 0
+func (o IndexingOptions) IsStored() bool {
+	return o&STORE_FIELD != 0
 }
 
-func IncludeTermVectors(arg int) bool {
-	return arg&INCLUDE_TERM_VECTORS != 0
+func (o IndexingOptions) IncludeTermVectors() bool {
+	return o&INCLUDE_TERM_VECTORS != 0
 }

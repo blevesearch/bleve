@@ -9,9 +9,23 @@
 package search
 
 import (
+	"math"
+
 	"github.com/couchbaselabs/bleve/document"
-	"github.com/couchbaselabs/bleve/index/mock"
+	"github.com/couchbaselabs/bleve/index"
+	"github.com/couchbaselabs/bleve/index/store/inmem"
+	"github.com/couchbaselabs/bleve/index/upside_down"
 )
+
+var twoDocIndex index.Index //= upside_down.NewUpsideDownCouch(inmem.MustOpen())
+
+func init() {
+	inMemStore, _ := inmem.Open()
+	twoDocIndex = upside_down.NewUpsideDownCouch(inMemStore)
+	for _, doc := range twoDocIndexDocs {
+		twoDocIndex.Update(doc)
+	}
+}
 
 // sets up some mock data used in many tests in this package
 
@@ -43,4 +57,6 @@ var twoDocIndexDocs = []*document.Document{
 		AddField(document.NewTextField("title", []byte("mister"))),
 }
 
-var twoDocIndex *mock.MockIndex = mock.NewMockIndexWithDocs(twoDocIndexDocs)
+func scoresCloseEnough(a, b float64) bool {
+	return math.Abs(a-b) < 0.001
+}
