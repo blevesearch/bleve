@@ -407,13 +407,14 @@ func (s *StoredRow) Value() []byte {
 }
 
 func (s *StoredRow) String() string {
-	return fmt.Sprintf("")
+	return fmt.Sprintf("Document: %s Field %d, Value: %s", s.doc, s.field, s.value)
 }
 
 func (s *StoredRow) ScanPrefixForDoc() []byte {
 	buf := new(bytes.Buffer)
 	buf.WriteByte('s')
 	buf.Write(s.doc)
+	buf.WriteByte(BYTE_SEPARATOR)
 	return buf.Bytes()
 }
 
