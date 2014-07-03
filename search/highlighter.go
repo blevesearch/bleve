@@ -1,6 +1,8 @@
 package search
 
 import (
+	"log"
+
 	"github.com/couchbaselabs/bleve/document"
 )
 
@@ -14,6 +16,8 @@ type Fragment struct {
 
 func (f *Fragment) Overlaps(other *Fragment) bool {
 	if other.start >= f.start && other.start < f.end {
+		return true
+	} else if f.start >= other.start && f.start < other.end {
 		return true
 	}
 	return false
