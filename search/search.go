@@ -18,13 +18,28 @@ type Locations []*Location
 
 type TermLocationMap map[string]Locations
 
+func (t TermLocationMap) AddLocation(term string, location *Location) {
+	existingLocations, exists := t[term]
+	if exists {
+		existingLocations = append(existingLocations, location)
+		t[term] = existingLocations
+	} else {
+		locations := make(Locations, 1)
+		locations[0] = location
+		t[term] = locations
+	}
+}
+
 type FieldTermLocationMap map[string]TermLocationMap
+
+type FieldFragmentMap map[string][]string
 
 type DocumentMatch struct {
 	ID        string               `json:"id"`
 	Score     float64              `json:"score"`
 	Expl      *Explanation         `json:"explanation,omitempty"`
 	Locations FieldTermLocationMap `json:"locations,omitempty"`
+	Fragments FieldFragmentMap     `json:"fragments,omitempty"`
 }
 
 type DocumentMatchCollection []*DocumentMatch

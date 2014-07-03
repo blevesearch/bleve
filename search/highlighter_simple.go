@@ -106,6 +106,11 @@ OUTER:
 		formattedFragments[i] = s.sep + s.formatter.Format(fragment, dm.Locations[field]) + s.sep
 	}
 
+	if dm.Fragments == nil {
+		dm.Fragments = make(FieldFragmentMap, 0)
+	}
+	dm.Fragments[field] = formattedFragments
+
 	return formattedFragments
 }
 
