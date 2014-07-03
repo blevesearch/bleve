@@ -129,9 +129,9 @@ Etiam vel augue vel nisl commodo suscipit et ac nisl. Quisque eros diam, porttit
 	expectedFragments := []string{
 		"…eros, in iaculis ante laoreet at. Sed " + DEFAULT_ANSI_HIGHLIGHT + "venenatis" + reset + " " + DEFAULT_ANSI_HIGHLIGHT + "interdum" + reset + " " + DEFAULT_ANSI_HIGHLIGHT + "metus" + reset + ", egestas scelerisque orci laoreet ut.…",
 		"… eros sed " + DEFAULT_ANSI_HIGHLIGHT + "metus" + reset + " aliquet convallis ac eget " + DEFAULT_ANSI_HIGHLIGHT + "metus" + reset + ". Donec eget feugiat sem. Quisque " + DEFAULT_ANSI_HIGHLIGHT + "venenatis" + reset + ", augue et…",
-		"…llis ac eget " + DEFAULT_ANSI_HIGHLIGHT + "metus" + reset + ". Donec eget feugiat sem. Quisque " + DEFAULT_ANSI_HIGHLIGHT + "venenatis" + reset + ", augue et blandit vulputate, velit odi…",
-		"…" + DEFAULT_ANSI_HIGHLIGHT + "interdum" + reset + " " + DEFAULT_ANSI_HIGHLIGHT + "metus" + reset + ", egestas scelerisque orci laoreet ut. Donec fermentum enim eget nibh blandit laoreet.…",
 		"… odio. Maecenas condimentum felis vitae nibh " + DEFAULT_ANSI_HIGHLIGHT + "venenatis" + reset + ", ut feugiat risus vehicula. Suspendisse non s…",
+		"… id feugiat lacus egestas. Integer et eleifend " + DEFAULT_ANSI_HIGHLIGHT + "metus" + reset + ". Duis neque tellus, vulputate nec dui eu, euism…",
+		"… accumsan. Vivamus eros felis, rhoncus vel " + DEFAULT_ANSI_HIGHLIGHT + "interdum" + reset + " bibendum, imperdiet nec diam. Etiam sed eros sed…",
 	}
 
 	highlighter := NewSimpleHighlighter()
