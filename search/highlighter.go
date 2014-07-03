@@ -1,8 +1,6 @@
 package search
 
 import (
-	"log"
-
 	"github.com/couchbaselabs/bleve/document"
 )
 
