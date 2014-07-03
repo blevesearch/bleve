@@ -9,6 +9,9 @@
 package search
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/couchbaselabs/bleve/index"
 )
 
@@ -16,4 +19,42 @@ type Query interface {
 	Boost() float64
 	Searcher(index index.Index) (Searcher, error)
 	Validate() error
+}
+
+func ParseQuery(input []byte) (Query, error) {
+	var tmp map[string]interface{}
+	err := json.Unmarshal(input, &tmp)
+	if err != nil {
+		return nil, err
+	}
+	_, isTermQuery := tmp["term"]
+	if isTermQuery {
+		var rv *TermQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return rv, nil
+	}
+	_, hasMust := tmp["must"]
+	_, hasShould := tmp["should"]
+	_, hasMustNot := tmp["must_not"]
+	if hasMust || hasShould || hasMustNot {
+		var rv *TermBooleanQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return rv, nil
+	}
+	_, hasTerms := tmp["terms"]
+	if hasTerms {
+		var rv *PhraseQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return rv, nil
+	}
+	return nil, fmt.Errorf("Unrecognized query")
 }

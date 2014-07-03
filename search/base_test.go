@@ -28,32 +28,33 @@ func init() {
 }
 
 // sets up some mock data used in many tests in this package
+var twoDocIndexDescIndexingOptions = document.DEFAULT_TEXT_INDEXING_OPTIONS | document.INCLUDE_TERM_VECTORS
 
 var twoDocIndexDocs = []*document.Document{
 	// must have 4/4 beer
 	document.NewDocument("1").
 		AddField(document.NewTextField("name", []byte("marty"))).
-		AddField(document.NewTextField("desc", []byte("beer beer beer beer"))).
+		AddField(document.NewTextFieldWithIndexingOptions("desc", []byte("beer beer beer beer"), twoDocIndexDescIndexingOptions)).
 		AddField(document.NewTextField("street", []byte("couchbase way"))),
 	// must have 1/4 beer
 	document.NewDocument("2").
 		AddField(document.NewTextField("name", []byte("steve"))).
-		AddField(document.NewTextField("desc", []byte("angst beer couch database"))).
+		AddField(document.NewTextFieldWithIndexingOptions("desc", []byte("angst beer couch database"), twoDocIndexDescIndexingOptions)).
 		AddField(document.NewTextField("street", []byte("couchbase way"))).
 		AddField(document.NewTextField("title", []byte("mister"))),
 	// must have 1/4 beer
 	document.NewDocument("3").
 		AddField(document.NewTextField("name", []byte("dustin"))).
-		AddField(document.NewTextField("desc", []byte("apple beer column dank"))).
+		AddField(document.NewTextFieldWithIndexingOptions("desc", []byte("apple beer column dank"), twoDocIndexDescIndexingOptions)).
 		AddField(document.NewTextField("title", []byte("mister"))),
 	// must have 65/65 beer
 	document.NewDocument("4").
 		AddField(document.NewTextField("name", []byte("ravi"))).
-		AddField(document.NewTextField("desc", []byte("beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer"))),
+		AddField(document.NewTextFieldWithIndexingOptions("desc", []byte("beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer"), twoDocIndexDescIndexingOptions)),
 	// must have 0/x beer
 	document.NewDocument("5").
 		AddField(document.NewTextField("name", []byte("bobert"))).
-		AddField(document.NewTextField("desc", []byte("water"))).
+		AddField(document.NewTextFieldWithIndexingOptions("desc", []byte("water"), twoDocIndexDescIndexingOptions)).
 		AddField(document.NewTextField("title", []byte("mister"))),
 }
 
