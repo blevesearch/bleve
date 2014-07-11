@@ -75,29 +75,31 @@ func (s *SimpleHighlighter) BestFragmentsInField(dm *DocumentMatch, doc *documen
 
 	// now find the N best non-overlapping fragments
 	bestFragments := make([]*Fragment, 0)
-	candidate := heap.Pop(&fq)
-OUTER:
-	for candidate != nil && len(bestFragments) < num {
-		// see if this overlaps with any of the best already identified
-		if len(bestFragments) > 0 {
-			for _, frag := range bestFragments {
-				if candidate.(*Fragment).Overlaps(frag) {
-					if len(fq) < 1 {
-						break OUTER
+	if len(fq) > 0 {
+		candidate := heap.Pop(&fq)
+	OUTER:
+		for candidate != nil && len(bestFragments) < num {
+			// see if this overlaps with any of the best already identified
+			if len(bestFragments) > 0 {
+				for _, frag := range bestFragments {
+					if candidate.(*Fragment).Overlaps(frag) {
+						if len(fq) < 1 {
+							break OUTER
+						}
+						candidate = heap.Pop(&fq)
+						continue OUTER
 					}
-					candidate = heap.Pop(&fq)
-					continue OUTER
 				}
+				bestFragments = append(bestFragments, candidate.(*Fragment))
+			} else {
+				bestFragments = append(bestFragments, candidate.(*Fragment))
 			}
-			bestFragments = append(bestFragments, candidate.(*Fragment))
-		} else {
-			bestFragments = append(bestFragments, candidate.(*Fragment))
-		}
 
-		if len(fq) < 1 {
-			break
+			if len(fq) < 1 {
+				break
+			}
+			candidate = heap.Pop(&fq)
 		}
-		candidate = heap.Pop(&fq)
 	}
 
 	// now that we have the best fragments, we can format them
