@@ -104,3 +104,72 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docId string) (*index.TermField
 func (r *UpsideDownCouchTermFieldReader) Close() {
 	r.iterator.Close()
 }
+
+type UpsideDownCouchDocIdReader struct {
+	index    *UpsideDownCouch
+	iterator store.KVIterator
+	start    string
+	end      string
+}
+
+func newUpsideDownCouchDocIdReader(index *UpsideDownCouch, start, end string) (*UpsideDownCouchDocIdReader, error) {
+	if start == "" {
+		start = string([]byte{0x0})
+	}
+	if end == "" {
+		end = string([]byte{0xff})
+	}
+	bisr := NewBackIndexRow(start, nil, nil)
+	it := index.store.Iterator(bisr.Key())
+
+	return &UpsideDownCouchDocIdReader{
+		index:    index,
+		iterator: it,
+		start:    start,
+		end:      end,
+	}, nil
+}
+
+func (r *UpsideDownCouchDocIdReader) Next() (string, error) {
+	key, val, valid := r.iterator.Current()
+	if valid {
+		bier := NewBackIndexRow(r.end, nil, nil)
+		if bytes.Compare(key, bier.Key()) > 0 {
+			// end of the line
+			return "", nil
+		}
+		br, err := NewBackIndexRowKV(key, val)
+		if err != nil {
+			return "", err
+		}
+		r.iterator.Next()
+		return string(br.doc), nil
+	} else {
+		return "", nil
+	}
+}
+
+func (r *UpsideDownCouchDocIdReader) Advance(docId string) (string, error) {
+	bir := NewBackIndexRow(docId, nil, nil)
+	r.iterator.Seek(bir.Key())
+	key, val, valid := r.iterator.Current()
+	if valid {
+		bier := NewBackIndexRow(r.end, nil, nil)
+		if bytes.Compare(key, bier.Key()) < 0 {
+			// end of the line
+			return "", nil
+		}
+		br, err := NewBackIndexRowKV(key, val)
+		if err != nil {
+			return "", err
+		}
+		r.iterator.Next()
+		return string(br.doc), nil
+	} else {
+		return "", nil
+	}
+}
+
+func (r *UpsideDownCouchDocIdReader) Close() {
+	r.iterator.Close()
+}

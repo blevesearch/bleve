@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"sort"
 
 	"github.com/couchbaselabs/bleve/analysis"
 
@@ -223,6 +224,9 @@ func (udc *UpsideDownCouch) Close() {
 	udc.store.Close()
 }
 
+type termMap map[string]bool
+type fieldTermMap map[int]termMap
+
 func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 	// first we lookup the backindex row for the doc id if it exists
 	// lookup the back index row
@@ -233,17 +237,16 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 
 	var isAdd = true
 	// a map for each field, map key is term (string) bool true for existence
-	// FIMXE hard-coded to max of 256 fields
-	existingTermFieldMaps := make([]map[string]bool, 256)
+	existingTermFieldMaps := make(fieldTermMap, 0)
 	if backIndexRow != nil {
 		isAdd = false
 		for _, entry := range backIndexRow.entries {
-			existingTermFieldMap := existingTermFieldMaps[entry.field]
-			if existingTermFieldMap == nil {
-				existingTermFieldMap = make(map[string]bool, 0)
-				existingTermFieldMaps[entry.field] = existingTermFieldMap
+			existingTermMap, fieldExists := existingTermFieldMaps[int(entry.field)]
+			if !fieldExists {
+				existingTermMap = make(termMap, 0)
+				existingTermFieldMaps[int(entry.field)] = existingTermMap
 			}
-			existingTermFieldMap[string(entry.term)] = true
+			existingTermMap[string(entry.term)] = true
 		}
 	}
 	existingStoredFieldMap := make(map[uint16]bool)
@@ -273,7 +276,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 			udc.lastFieldIndex = int(fieldIndex)
 		}
 
-		existingTermFieldMap := existingTermFieldMaps[fieldIndex]
+		existingTermMap, fieldExistedInDoc := existingTermFieldMaps[int(fieldIndex)]
 
 		if field.Options.IsIndexed() {
 
@@ -296,14 +299,14 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 				backIndexEntries = append(backIndexEntries, &backIndexEntry)
 
 				// remove the entry from the map of existing term fields if it exists
-				if existingTermFieldMap != nil {
+				if fieldExistedInDoc {
 					termString := string(tf.Term)
-					_, ok := existingTermFieldMap[termString]
+					_, ok := existingTermMap[termString]
 					if ok {
 						// this is an update
 						updateRows = append(updateRows, termFreqRow)
 						// this term existed last time, delete it from that map
-						delete(existingTermFieldMap, termString)
+						delete(existingTermMap, termString)
 					} else {
 						// this is an add
 						addRows = append(addRows, termFreqRow)
@@ -317,6 +320,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 
 		if field.Options.IsStored() {
 			storedRow := NewStoredRow(doc.ID, uint16(fieldIndex), field.Value)
+			backIndexStoredFields = append(backIndexStoredFields, fieldIndex)
 			_, ok := existingStoredFieldMap[uint16(fieldIndex)]
 			if ok {
 				// this is an update
@@ -429,12 +433,58 @@ func (udc *UpsideDownCouch) Dump() {
 	}
 }
 
+type keyset [][]byte
+
+func (k keyset) Len() int           { return len(k) }
+func (k keyset) Swap(i, j int)      { k[i], k[j] = k[j], k[i] }
+func (k keyset) Less(i, j int) bool { return bytes.Compare(k[i], k[j]) < 0 }
+
+// DumpDoc returns all rows in the index related to this doc id
+func (udc *UpsideDownCouch) DumpDoc(id string) ([]interface{}, error) {
+	rv := make([]interface{}, 0)
+	back, err := udc.backIndexRowForDoc(id)
+	if err != nil {
+		return nil, err
+	}
+	keys := make(keyset, 0)
+	for _, stored := range back.storedFields {
+		sr := NewStoredRow(id, stored, []byte{})
+		key := sr.Key()
+		keys = append(keys, key)
+	}
+	for _, entry := range back.entries {
+		//log.Printf("term: `%s`, field: %d", entry.term, entry.field)
+		tfr := NewTermFrequencyRow(entry.term, entry.field, id, 0, 0)
+		key := tfr.Key()
+		keys = append(keys, key)
+	}
+	sort.Sort(keys)
+
+	for _, key := range keys {
+		value, err := udc.store.Get(key)
+		if err != nil {
+			return nil, err
+		}
+		row, err := ParseFromKeyValue(key, value)
+		if err != nil {
+			return nil, err
+		}
+		rv = append(rv, row)
+	}
+
+	return rv, nil
+}
+
 func (udc *UpsideDownCouch) TermFieldReader(term []byte, fieldName string) (index.TermFieldReader, error) {
 	fieldIndex, fieldExists := udc.fieldIndexes[fieldName]
 	if fieldExists {
 		return newUpsideDownCouchTermFieldReader(udc, term, uint16(fieldIndex))
 	}
 	return newUpsideDownCouchTermFieldReader(udc, []byte{BYTE_SEPARATOR}, 0)
+}
+
+func (udc *UpsideDownCouch) DocIdReader(start, end string) (index.DocIdReader, error) {
+	return newUpsideDownCouchDocIdReader(udc, start, end)
 }
 
 func (udc *UpsideDownCouch) Document(id string) (*document.Document, error) {

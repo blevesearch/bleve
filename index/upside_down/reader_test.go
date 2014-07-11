@@ -160,3 +160,49 @@ func TestIndexReader(t *testing.T) {
 	}
 
 }
+
+func TestIndexDocIdReader(t *testing.T) {
+	defer os.RemoveAll("test")
+
+	store, err := gouchstore.Open("test")
+	idx := NewUpsideDownCouch(store)
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+	defer idx.Close()
+
+	var expectedCount uint64 = 0
+	doc := document.NewDocument("1")
+	doc.AddField(document.NewTextField("name", []byte("test")))
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+	expectedCount += 1
+
+	doc = document.NewDocument("2")
+	doc.AddField(document.NewTextField("name", []byte("test test test")))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("desc", []byte("eat more rice"), document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS))
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+	expectedCount += 1
+
+	// first get all doc ids
+	reader, err := idx.DocIdReader("", "")
+	if err != nil {
+		t.Errorf("Error accessing doc id reader: %v", err)
+	}
+
+	id, err := reader.Next()
+	count := uint64(0)
+	for id != "" {
+		count++
+		id, err = reader.Next()
+	}
+	if count != expectedCount {
+		t.Errorf("expected %d, got %d", expectedCount, count)
+	}
+}

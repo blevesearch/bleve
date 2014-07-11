@@ -20,12 +20,14 @@ type Index interface {
 	Delete(id string) error
 
 	TermFieldReader(term []byte, field string) (TermFieldReader, error)
+	DocIdReader(start, end string) (DocIdReader, error)
 
 	DocCount() uint64
 
 	Document(id string) (*document.Document, error)
 
 	Dump()
+	DumpDoc(id string) ([]interface{}, error)
 }
 
 type TermFieldVector struct {
@@ -46,5 +48,11 @@ type TermFieldReader interface {
 	Next() (*TermFieldDoc, error)
 	Advance(ID string) (*TermFieldDoc, error)
 	Count() uint64
+	Close()
+}
+
+type DocIdReader interface {
+	Next() (string, error)
+	Advance(ID string) (string, error)
 	Close()
 }
