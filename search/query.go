@@ -11,7 +11,9 @@ package search
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 
+	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index"
 )
 
@@ -21,7 +23,7 @@ type Query interface {
 	Validate() error
 }
 
-func ParseQuery(input []byte) (Query, error) {
+func ParseQuery(input []byte, mapping document.Mapping) (Query, error) {
 	var tmp map[string]interface{}
 	err := json.Unmarshal(input, &tmp)
 	if err != nil {
@@ -29,32 +31,65 @@ func ParseQuery(input []byte) (Query, error) {
 	}
 	_, isTermQuery := tmp["term"]
 	if isTermQuery {
-		var rv *TermQuery
+		var rv TermQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
 		}
-		return rv, nil
+		return &rv, nil
+	}
+	_, isMatchQuery := tmp["match"]
+	if isMatchQuery {
+		log.Printf("detected match query")
+		var rv MatchQuery
+		rv.mapping = mapping
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	_, isMatchPhraseQuery := tmp["match_phrase"]
+	if isMatchPhraseQuery {
+		log.Printf("detected match phrase query")
+		var rv MatchPhraseQuery
+		rv.mapping = mapping
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
 	}
 	_, hasMust := tmp["must"]
 	_, hasShould := tmp["should"]
 	_, hasMustNot := tmp["must_not"]
 	if hasMust || hasShould || hasMustNot {
-		var rv *TermBooleanQuery
+		var rv TermBooleanQuery
+		rv.mapping = mapping
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
 		}
-		return rv, nil
+		return &rv, nil
 	}
 	_, hasTerms := tmp["terms"]
 	if hasTerms {
-		var rv *PhraseQuery
+		var rv PhraseQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
 		}
-		return rv, nil
+		return &rv, nil
+	}
+	_, hasSyntaxQuery := tmp["query"]
+	if hasSyntaxQuery {
+		var rv SyntaxQuery
+		rv.mapping = mapping
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
 	}
 	return nil, fmt.Errorf("Unrecognized query")
 }

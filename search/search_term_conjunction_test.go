@@ -183,7 +183,7 @@ func TestTermConjunctionSearch(t *testing.T) {
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "2",
-					Score: 1.754501824953384,
+					Score: 1.441614953806971,
 				},
 			},
 		},

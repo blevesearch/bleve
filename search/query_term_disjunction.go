@@ -9,8 +9,10 @@
 package search
 
 import (
+	"encoding/json"
 	"fmt"
 
+	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index"
 )
 
@@ -19,6 +21,7 @@ type TermDisjunctionQuery struct {
 	BoostVal float64 `json:"boost"`
 	Explain  bool    `json:"explain"`
 	Min      float64 `json:"min"`
+	mapping  document.Mapping
 }
 
 func (q *TermDisjunctionQuery) Boost() float64 {
@@ -33,5 +36,30 @@ func (q *TermDisjunctionQuery) Validate() error {
 	if int(q.Min) > len(q.Terms) {
 		return fmt.Errorf("Minimum clauses in disjunction exceeds total number of clauses")
 	}
+	return nil
+}
+
+func (q *TermDisjunctionQuery) UnmarshalJSON(data []byte) error {
+	tmp := struct {
+		Terms    []json.RawMessage `json:"terms"`
+		BoostVal float64           `json:"boost"`
+		Explain  bool              `json:"explain"`
+		Min      float64           `json:"min"`
+	}{}
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
+	}
+	q.Terms = make([]Query, len(tmp.Terms))
+	for i, term := range tmp.Terms {
+		query, err := ParseQuery(term, q.mapping)
+		if err != nil {
+			return err
+		}
+		q.Terms[i] = query
+	}
+	q.BoostVal = tmp.BoostVal
+	q.Explain = tmp.Explain
+	q.Min = tmp.Min
 	return nil
 }

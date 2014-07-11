@@ -7,10 +7,9 @@ import (
 )
 
 type PhraseQuery struct {
-	Terms           []*TermQuery       `json:"terms,omitempty"`
-	PhrasePositions map[string]float64 `json:"phrase_positions,omitempty"`
-	BoostVal        float64            `json:"boost,omitempty"`
-	Explain         bool               `json:"explain,omitempty"`
+	Terms    []*TermQuery `json:"terms,omitempty"`
+	BoostVal float64      `json:"boost,omitempty"`
+	Explain  bool         `json:"explain,omitempty"`
 }
 
 func (q *PhraseQuery) Boost() float64 {

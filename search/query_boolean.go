@@ -9,8 +9,10 @@
 package search
 
 import (
+	"encoding/json"
 	"fmt"
 
+	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index"
 )
 
@@ -20,6 +22,7 @@ type TermBooleanQuery struct {
 	Should   *TermDisjunctionQuery `json:"should,omitempty"`
 	BoostVal float64               `json:"boost,omitempty"`
 	Explain  bool                  `json:"explain,omitempty"`
+	mapping  document.Mapping
 }
 
 func (q *TermBooleanQuery) Boost() float64 {
@@ -36,6 +39,52 @@ func (q *TermBooleanQuery) Validate() error {
 	}
 	if q.Must != nil && len(q.Must.Terms) == 0 && q.Should != nil && len(q.Should.Terms) == 0 {
 		return fmt.Errorf("Boolean query must contain at least one MUST or SHOULD clause")
+	}
+	return nil
+}
+
+func (q *TermBooleanQuery) UnmarshalJSON(data []byte) error {
+	tmp := struct {
+		Must     json.RawMessage `json:"must,omitempty"`
+		MustNot  json.RawMessage `json:"must_not,omitempty"`
+		Should   json.RawMessage `json:"should,omitempty"`
+		BoostVal float64         `json:"boost,omitempty"`
+		Explain  bool            `json:"explain,omitempty"`
+	}{}
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
+	}
+
+	q.BoostVal = tmp.BoostVal
+	q.Explain = tmp.Explain
+
+	var must TermConjunctionQuery
+	if len(tmp.Must) > 0 {
+		must.mapping = q.mapping
+		err = json.Unmarshal(tmp.Must, &must)
+		if err != nil {
+			return err
+		}
+		q.Must = &must
+	}
+	var mustNot TermDisjunctionQuery
+	if len(tmp.MustNot) > 0 {
+		mustNot.mapping = q.mapping
+		err = json.Unmarshal(tmp.MustNot, &mustNot)
+		if err != nil {
+			return err
+		}
+		q.MustNot = &mustNot
+	}
+	var should TermDisjunctionQuery
+	if len(tmp.Should) > 0 {
+		must.mapping = q.mapping
+		err = json.Unmarshal(tmp.Should, &should)
+		if err != nil {
+			return err
+		}
+		q.Should = &should
 	}
 	return nil
 }

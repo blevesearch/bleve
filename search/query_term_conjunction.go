@@ -9,6 +9,9 @@
 package search
 
 import (
+	"encoding/json"
+
+	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index"
 )
 
@@ -16,6 +19,7 @@ type TermConjunctionQuery struct {
 	Terms    []Query `json:"terms"`
 	BoostVal float64 `json:"boost"`
 	Explain  bool    `json:"explain"`
+	mapping  document.Mapping
 }
 
 func (q *TermConjunctionQuery) Boost() float64 {
@@ -27,5 +31,28 @@ func (q *TermConjunctionQuery) Searcher(index index.Index) (Searcher, error) {
 }
 
 func (q *TermConjunctionQuery) Validate() error {
+	return nil
+}
+
+func (q *TermConjunctionQuery) UnmarshalJSON(data []byte) error {
+	tmp := struct {
+		Terms    []json.RawMessage `json:"terms"`
+		BoostVal float64           `json:"boost"`
+		Explain  bool              `json:"explain"`
+	}{}
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
+	}
+	q.Terms = make([]Query, len(tmp.Terms))
+	for i, term := range tmp.Terms {
+		query, err := ParseQuery(term, q.mapping)
+		if err != nil {
+			return err
+		}
+		q.Terms[i] = query
+	}
+	q.BoostVal = tmp.BoostVal
+	q.Explain = tmp.Explain
 	return nil
 }

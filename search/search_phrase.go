@@ -19,10 +19,13 @@ func NewPhraseSearcher(index index.Index, query *PhraseQuery) (*PhraseSearcher, 
 	// build the downstream searchres
 	var err error
 	var mustSearcher *TermConjunctionSearcher
+
 	if query.Terms != nil {
-		qterms := make([]Query, len(query.Terms))
-		for i, qt := range query.Terms {
-			qterms[i] = qt
+		qterms := make([]Query, 0, len(query.Terms))
+		for _, qt := range query.Terms {
+			if qt != nil {
+				qterms = append(qterms, qt)
+			}
 		}
 		tcq := TermConjunctionQuery{
 			Terms:    qterms,
