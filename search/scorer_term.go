@@ -24,8 +24,6 @@ type TermQueryScorer struct {
 	idf                    float64
 	explain                bool
 	idfExplanation         *Explanation
-	scoreCache             map[int]float64
-	scoreExplanationCache  map[int]*Explanation
 	queryNorm              float64
 	queryWeight            float64
 	queryWeightExplanation *Explanation
@@ -33,14 +31,12 @@ type TermQueryScorer struct {
 
 func NewTermQueryScorer(query *TermQuery, docTotal, docTerm uint64, explain bool) *TermQueryScorer {
 	rv := TermQueryScorer{
-		query:                 query,
-		docTerm:               docTerm,
-		docTotal:              docTotal,
-		idf:                   1.0 + math.Log(float64(docTotal)/float64(docTerm+1.0)),
-		explain:               explain,
-		scoreCache:            make(map[int]float64, MAX_SCORE_CACHE),
-		scoreExplanationCache: make(map[int]*Explanation, MAX_SCORE_CACHE),
-		queryWeight:           1.0,
+		query:       query,
+		docTerm:     docTerm,
+		docTotal:    docTotal,
+		idf:         1.0 + math.Log(float64(docTotal)/float64(docTerm+1.0)),
+		explain:     explain,
+		queryWeight: 1.0,
 	}
 
 	if explain {
@@ -84,64 +80,48 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 }
 
 func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc) *DocumentMatch {
-
 	var scoreExplanation *Explanation
-	// see if the score was cached
-	score, ok := s.scoreCache[int(termMatch.Freq)]
-	if !ok {
-		// need to compute score
-		var tf float64
-		if termMatch.Freq < MAX_SQRT_CACHE {
-			tf = SQRT_CACHE[int(termMatch.Freq)]
-		} else {
-			tf = math.Sqrt(float64(termMatch.Freq))
+
+	// need to compute score
+	var tf float64
+	if termMatch.Freq < MAX_SQRT_CACHE {
+		tf = SQRT_CACHE[int(termMatch.Freq)]
+	} else {
+		tf = math.Sqrt(float64(termMatch.Freq))
+	}
+	score := tf * termMatch.Norm * s.idf
+
+	if s.explain {
+		childrenExplanations := make([]*Explanation, 3)
+		childrenExplanations[0] = &Explanation{
+			Value:   tf,
+			Message: fmt.Sprintf("tf(termFreq(%s:%s)=%d", s.query.Field, string(s.query.Term), termMatch.Freq),
 		}
-
-		score = tf * termMatch.Norm * s.idf
-
-		if s.explain {
-			childrenExplanations := make([]*Explanation, 3)
-			childrenExplanations[0] = &Explanation{
-				Value:   tf,
-				Message: fmt.Sprintf("tf(termFreq(%s:%s)=%d", s.query.Field, string(s.query.Term), termMatch.Freq),
-			}
-			childrenExplanations[1] = &Explanation{
-				Value:   termMatch.Norm,
-				Message: fmt.Sprintf("fieldNorm(field=%s, doc=%s)", s.query.Field, termMatch.ID),
-			}
-			childrenExplanations[2] = s.idfExplanation
-			scoreExplanation = &Explanation{
-				Value:    score,
-				Message:  fmt.Sprintf("fieldWeight(%s:%s in %s), product of:", s.query.Field, string(s.query.Term), termMatch.ID),
-				Children: childrenExplanations,
-			}
+		childrenExplanations[1] = &Explanation{
+			Value:   termMatch.Norm,
+			Message: fmt.Sprintf("fieldNorm(field=%s, doc=%s)", s.query.Field, termMatch.ID),
 		}
-
-		// if the query weight isn't 1, multiply
-		if s.queryWeight != 1.0 {
-			score = score * s.queryWeight
-			if s.explain {
-				childExplanations := make([]*Explanation, 2)
-				childExplanations[0] = s.queryWeightExplanation
-				childExplanations[1] = scoreExplanation
-				scoreExplanation = &Explanation{
-					Value:    score,
-					Message:  fmt.Sprintf("weight(%s:%s^%f in %s), product of:", s.query.Field, string(s.query.Term), s.query.Boost(), termMatch.ID),
-					Children: childExplanations,
-				}
-			}
-		}
-
-		if termMatch.Freq < MAX_SCORE_CACHE {
-			s.scoreCache[int(termMatch.Freq)] = score
-			if s.explain {
-				s.scoreExplanationCache[int(termMatch.Freq)] = scoreExplanation
-			}
+		childrenExplanations[2] = s.idfExplanation
+		scoreExplanation = &Explanation{
+			Value:    score,
+			Message:  fmt.Sprintf("fieldWeight(%s:%s in %s), product of:", s.query.Field, string(s.query.Term), termMatch.ID),
+			Children: childrenExplanations,
 		}
 	}
 
-	if ok && s.explain {
-		scoreExplanation = s.scoreExplanationCache[int(termMatch.Freq)]
+	// if the query weight isn't 1, multiply
+	if s.queryWeight != 1.0 {
+		score = score * s.queryWeight
+		if s.explain {
+			childExplanations := make([]*Explanation, 2)
+			childExplanations[0] = s.queryWeightExplanation
+			childExplanations[1] = scoreExplanation
+			scoreExplanation = &Explanation{
+				Value:    score,
+				Message:  fmt.Sprintf("weight(%s:%s^%f in %s), product of:", s.query.Field, string(s.query.Term), s.query.Boost(), termMatch.ID),
+				Children: childExplanations,
+			}
+		}
 	}
 
 	rv := DocumentMatch{
