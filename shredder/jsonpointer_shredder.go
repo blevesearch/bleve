@@ -9,7 +9,11 @@
 package shredder
 
 import (
+	"bytes"
+
+	"github.com/couchbaselabs/bleve/analysis"
 	"github.com/couchbaselabs/bleve/document"
+
 	"github.com/dustin/go-jsonpointer"
 )
 
@@ -19,12 +23,16 @@ import (
 type JsonPointerShredder struct {
 	fieldPaths map[string]string
 	paths      []string
+	analyzers  map[string]*analysis.Analyzer
+	options    map[string]document.IndexingOptions
 }
 
 func NewJsonPointerShredder() *JsonPointerShredder {
 	return &JsonPointerShredder{
 		fieldPaths: make(map[string]string),
 		paths:      make([]string, 0),
+		analyzers:  make(map[string]*analysis.Analyzer),
+		options:    make(map[string]document.IndexingOptions),
 	}
 }
 
@@ -33,8 +41,10 @@ func (s *JsonPointerShredder) AddTextField(name string, path string) {
 	s.paths = append(s.paths, path)
 }
 
-func (s *JsonPointerShredder) AddField(name string, path string) {
+func (s *JsonPointerShredder) AddFieldCustom(name string, path string, options document.IndexingOptions, analyzer *analysis.Analyzer) {
 	s.fieldPaths[name] = path
+	s.analyzers[name] = analyzer
+	s.options[name] = options
 	s.paths = append(s.paths, path)
 }
 
@@ -47,8 +57,22 @@ func (s *JsonPointerShredder) Shred(id string, body []byte) (*document.Document,
 	}
 
 	for fieldName, fieldPath := range s.fieldPaths {
-		field := document.NewTextField(fieldName, values[fieldPath])
-		rv.AddField(field)
+		fieldValue := bytes.TrimSpace(values[fieldPath])
+		if bytes.HasPrefix(fieldValue, []byte{'"'}) {
+			fieldValue = fieldValue[1:]
+		}
+		if bytes.HasSuffix(fieldValue, []byte{'"'}) {
+			fieldValue = fieldValue[:len(fieldValue)-1]
+		}
+		analyzer, custom := s.analyzers[fieldName]
+		if custom {
+			options := s.options[fieldName]
+			field := document.NewField(fieldName, fieldValue, options, analyzer)
+			rv.AddField(field)
+		} else {
+			field := document.NewTextField(fieldName, fieldValue)
+			rv.AddField(field)
+		}
 	}
 
 	return rv, nil
