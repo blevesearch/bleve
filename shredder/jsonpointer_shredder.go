@@ -67,7 +67,7 @@ func (s *JsonPointerShredder) Shred(id string, body []byte) (*document.Document,
 		analyzer, custom := s.analyzers[fieldName]
 		if custom {
 			options := s.options[fieldName]
-			field := document.NewField(fieldName, fieldValue, options, analyzer)
+			field := document.NewTextFieldCustom(fieldName, fieldValue, options, analyzer)
 			rv.AddField(field)
 		} else {
 			field := document.NewTextField(fieldName, fieldValue)

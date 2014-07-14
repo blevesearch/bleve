@@ -30,61 +30,61 @@ func TestTermSearcher(t *testing.T) {
 	i := upside_down.NewUpsideDownCouch(inMemStore)
 	i.Update(&document.Document{
 		ID: "a",
-		Fields: []*document.Field{
+		Fields: []document.Field{
 			document.NewTextField("desc", []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "b",
-		Fields: []*document.Field{
+		Fields: []document.Field{
 			document.NewTextField("desc", []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "c",
-		Fields: []*document.Field{
+		Fields: []document.Field{
 			document.NewTextField("desc", []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "d",
-		Fields: []*document.Field{
+		Fields: []document.Field{
 			document.NewTextField("desc", []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "e",
-		Fields: []*document.Field{
+		Fields: []document.Field{
 			document.NewTextField("desc", []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "f",
-		Fields: []*document.Field{
+		Fields: []document.Field{
 			document.NewTextField("desc", []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "g",
-		Fields: []*document.Field{
+		Fields: []document.Field{
 			document.NewTextField("desc", []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "h",
-		Fields: []*document.Field{
+		Fields: []document.Field{
 			document.NewTextField("desc", []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "i",
-		Fields: []*document.Field{
+		Fields: []document.Field{
 			document.NewTextField("desc", []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "j",
-		Fields: []*document.Field{
+		Fields: []document.Field{
 			document.NewTextField("title", []byte("cat")),
 		},
 	})

@@ -265,29 +265,29 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 	backIndexStoredFields := make([]uint16, 0)
 
 	for _, field := range doc.Fields {
-		fieldIndex, fieldExists := udc.fieldIndexes[field.Name]
+		fieldIndex, fieldExists := udc.fieldIndexes[field.Name()]
 		if !fieldExists {
 			// assign next field id
 			fieldIndex = uint16(udc.lastFieldIndex + 1)
-			udc.fieldIndexes[field.Name] = fieldIndex
+			udc.fieldIndexes[field.Name()] = fieldIndex
 			// ensure this batch adds a row for this field
-			row := NewFieldRow(uint16(fieldIndex), field.Name)
+			row := NewFieldRow(uint16(fieldIndex), field.Name())
 			updateRows = append(updateRows, row)
 			udc.lastFieldIndex = int(fieldIndex)
 		}
 
 		existingTermMap, fieldExistedInDoc := existingTermFieldMaps[int(fieldIndex)]
 
-		if field.Options.IsIndexed() {
+		if field.Options().IsIndexed() {
 
-			analyzer := field.Analyzer
-			tokens := analyzer.Analyze(field.Value)
+			analyzer := field.Analyzer()
+			tokens := analyzer.Analyze(field.Value())
 			fieldLength := len(tokens) // number of tokens in this doc field
 			fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
 			tokenFreqs := analysis.TokenFrequency(tokens)
 			for _, tf := range tokenFreqs {
 				var termFreqRow *TermFrequencyRow
-				if field.Options.IncludeTermVectors() {
+				if field.Options().IncludeTermVectors() {
 					tv := termVectorsFromTokenFreq(uint16(fieldIndex), tf)
 					termFreqRow = NewTermFrequencyRowWithTermVectors(tf.Term, uint16(fieldIndex), doc.ID, uint64(frequencyFromTokenFreq(tf)), fieldNorm, tv)
 				} else {
@@ -318,8 +318,8 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 			}
 		}
 
-		if field.Options.IsStored() {
-			storedRow := NewStoredRow(doc.ID, uint16(fieldIndex), field.Value)
+		if field.Options().IsStored() {
+			storedRow := NewStoredRow(doc.ID, uint16(fieldIndex), field.Value())
 			backIndexStoredFields = append(backIndexStoredFields, fieldIndex)
 			_, ok := existingStoredFieldMap[uint16(fieldIndex)]
 			if ok {
@@ -502,10 +502,7 @@ func (udc *UpsideDownCouch) Document(id string) (*document.Document, error) {
 			return nil, err
 		}
 		if row != nil {
-			rv.AddField(&document.Field{
-				Name:  udc.fieldIndexToName(row.field),
-				Value: row.Value(),
-			})
+			rv.AddField(document.NewTextField(udc.fieldIndexToName(row.field), row.Value()))
 		}
 
 		it.Next()

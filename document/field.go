@@ -12,18 +12,9 @@ import (
 	"github.com/couchbaselabs/bleve/analysis"
 )
 
-type Field struct {
-	Name     string
-	Options  IndexingOptions
-	Analyzer *analysis.Analyzer
-	Value    []byte
-}
-
-func NewField(name string, value []byte, options IndexingOptions, analyzer *analysis.Analyzer) *Field {
-	return &Field{
-		Name:     name,
-		Options:  options,
-		Analyzer: analyzer,
-		Value:    value,
-	}
+type Field interface {
+	Name() string
+	Options() IndexingOptions
+	Analyzer() *analysis.Analyzer
+	Value() []byte
 }

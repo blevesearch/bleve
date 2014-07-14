@@ -63,8 +63,8 @@ func (s *SimpleHighlighter) BestFragmentsInField(dm *DocumentMatch, doc *documen
 	fq := make(FragmentQueue, 0)
 	heap.Init(&fq)
 	for _, f := range doc.Fields {
-		if f.Name == field {
-			fieldData := f.Value
+		if f.Name() == field {
+			fieldData := f.Value()
 			fragments := s.fragmenter.Fragment(fieldData, orderedTermLocations)
 			for _, fragment := range fragments {
 				scorer.Score(fragment)

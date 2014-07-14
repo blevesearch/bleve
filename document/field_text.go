@@ -27,15 +27,47 @@ func init() {
 
 const DEFAULT_TEXT_INDEXING_OPTIONS = INDEX_FIELD
 
-func NewTextField(name string, value []byte) *Field {
+type TextField struct {
+	name     string
+	options  IndexingOptions
+	analyzer *analysis.Analyzer
+	value    []byte
+}
+
+func (t *TextField) Name() string {
+	return t.name
+}
+
+func (t *TextField) Options() IndexingOptions {
+	return t.options
+}
+
+func (t *TextField) Analyzer() *analysis.Analyzer {
+	return t.analyzer
+}
+
+func (t *TextField) Value() []byte {
+	return t.value
+}
+
+func NewTextField(name string, value []byte) *TextField {
 	return NewTextFieldWithIndexingOptions(name, value, DEFAULT_TEXT_INDEXING_OPTIONS)
 }
 
-func NewTextFieldWithIndexingOptions(name string, value []byte, options IndexingOptions) *Field {
-	return &Field{
-		Name:     name,
-		Options:  options,
-		Analyzer: standardAnalyzer,
-		Value:    value,
+func NewTextFieldWithIndexingOptions(name string, value []byte, options IndexingOptions) *TextField {
+	return &TextField{
+		name:     name,
+		options:  options,
+		analyzer: standardAnalyzer,
+		value:    value,
+	}
+}
+
+func NewTextFieldCustom(name string, value []byte, options IndexingOptions, analyzer *analysis.Analyzer) *TextField {
+	return &TextField{
+		name:     name,
+		options:  options,
+		analyzer: analyzer,
+		value:    value,
 	}
 }
