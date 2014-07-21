@@ -109,11 +109,11 @@ func (s *PhraseSearcher) SetQueryNorm(qnorm float64) {
 func (s *PhraseSearcher) Next() (*DocumentMatch, error) {
 	var rv *DocumentMatch
 	for s.currMust != nil {
-		rvtlm := make(TermLocationMap, 0)
+		rvftlm := make(FieldTermLocationMap, 0)
 		freq := 0
 		firstTerm := s.query.Terms[0]
-		termLocMap, ok := s.currMust.Locations[firstTerm.Field]
-		if ok {
+		for field, termLocMap := range s.currMust.Locations {
+			rvtlm := make(TermLocationMap, 0)
 			locations, ok := termLocMap[firstTerm.Term]
 			if ok {
 			OUTER:
@@ -136,12 +136,15 @@ func (s *PhraseSearcher) Next() (*DocumentMatch, error) {
 								}
 								// if we got here we didnt find location match for this term
 								continue OUTER
+							} else {
+								continue OUTER
 							}
 						}
 					}
 					// if we got here all the terms matched
 					freq += 1
 					mergeTermLocationMaps(rvtlm, crvtlm)
+					rvftlm[field] = rvtlm
 				}
 			}
 		}
@@ -149,9 +152,7 @@ func (s *PhraseSearcher) Next() (*DocumentMatch, error) {
 		if freq > 0 {
 			// return match
 			rv = s.currMust
-			rv.Locations = FieldTermLocationMap{
-				firstTerm.Field: rvtlm,
-			}
+			rv.Locations = rvftlm
 			s.advanceNextMust()
 			return rv, nil
 		}
