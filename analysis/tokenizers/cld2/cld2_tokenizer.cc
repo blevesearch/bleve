@@ -1,5 +1,7 @@
 #include "cld2_tokenizer.h"
 #include "cld2-read-only/public/compact_lang_det.h"
+#include <cstddef>
+#include <string.h>
 
 const char* DetectLang(const char *buffer) {
 
