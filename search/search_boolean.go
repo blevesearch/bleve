@@ -260,7 +260,14 @@ func (s *TermBooleanSearcher) Advance(ID string) (*DocumentMatch, error) {
 		}
 	}
 
-	s.currentId = ID
+	if s.mustSearcher != nil && s.currMust != nil {
+		s.currentId = s.currMust.ID
+	} else if s.mustSearcher == nil && s.currShould != nil {
+		s.currentId = s.currShould.ID
+	} else {
+		s.currentId = ""
+	}
+
 	return s.Next()
 }
 
