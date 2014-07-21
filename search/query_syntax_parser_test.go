@@ -205,7 +205,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 	}
 	parsingDefaultField = "_all"
 	for _, test := range tests {
-		q, err := ParseQuerySyntax(test.input, test.mapping)
+		q, err := ParseQuerySyntax(test.input, test.mapping, parsingDefaultField)
 		if err != nil {
 			t.Error(err)
 		}
@@ -227,7 +227,7 @@ func TestQuerySyntaxParserInvalid(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_, err := ParseQuerySyntax(test.input, document.Mapping{})
+		_, err := ParseQuerySyntax(test.input, document.Mapping{}, "_all")
 		if err == nil {
 			t.Errorf("expected error, got nil for `%s`", test.input)
 		}
