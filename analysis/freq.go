@@ -8,7 +8,10 @@
 //  and limitations under the License.
 package analysis
 
+import ()
+
 type TokenLocation struct {
+	Field    string
 	Start    int
 	End      int
 	Position int
@@ -19,7 +22,38 @@ type TokenFreq struct {
 	Locations []*TokenLocation
 }
 
-func TokenFrequency(tokens TokenStream) []*TokenFreq {
+type TokenFrequencies []*TokenFreq
+
+func (tfs TokenFrequencies) MergeAll(remoteField string, other TokenFrequencies) TokenFrequencies {
+	// put existing tokens into a map
+	index := make(map[string]*TokenFreq)
+	for _, tf := range tfs {
+		index[string(tf.Term)] = tf
+	}
+	// walk the new token frequencies
+	for _, tf := range other {
+		// set the remoteField value in incoming token freqs
+		for _, l := range tf.Locations {
+			l.Field = remoteField
+		}
+		existingTf, exists := index[string(tf.Term)]
+		if exists {
+			existingTf.Locations = append(existingTf.Locations, tf.Locations...)
+		} else {
+			index[string(tf.Term)] = tf
+		}
+	}
+	// flatten map back to array
+	rv := make(TokenFrequencies, len(index))
+	i := 0
+	for _, tf := range index {
+		rv[i] = tf
+		i += 1
+	}
+	return rv
+}
+
+func TokenFrequency(tokens TokenStream) TokenFrequencies {
 	index := make(map[string]*TokenFreq)
 
 	for _, token := range tokens {
@@ -44,7 +78,7 @@ func TokenFrequency(tokens TokenStream) []*TokenFreq {
 		}
 	}
 
-	rv := make([]*TokenFreq, len(index))
+	rv := make(TokenFrequencies, len(index))
 	i := 0
 	for _, tf := range index {
 		rv[i] = tf

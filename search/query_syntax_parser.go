@@ -21,11 +21,12 @@ var parsingMustNotList *TermDisjunctionQuery
 var parsingShouldList *TermDisjunctionQuery
 var parsingMapping document.Mapping
 
-func ParseQuerySyntax(query string, mapping document.Mapping) (rq Query, err error) {
+func ParseQuerySyntax(query string, mapping document.Mapping, defaultField string) (rq Query, err error) {
 	parserMutex.Lock()
 	defer parserMutex.Unlock()
 
 	parsingMapping = mapping
+	parsingDefaultField = defaultField
 
 	parsingMustList = &TermConjunctionQuery{
 		Terms:    make([]Query, 0),

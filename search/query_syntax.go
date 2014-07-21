@@ -14,10 +14,11 @@ import (
 )
 
 type SyntaxQuery struct {
-	Query    string  `json:"query"`
-	BoostVal float64 `json:"boost,omitempty"`
-	Explain  bool    `json:"explain,omitempty"`
-	mapping  document.Mapping
+	Query        string  `json:"query"`
+	BoostVal     float64 `json:"boost,omitempty"`
+	Explain      bool    `json:"explain,omitempty"`
+	DefaultField string  `json:"default_field,omitemtpy"`
+	mapping      document.Mapping
 }
 
 func (q *SyntaxQuery) Boost() float64 {
@@ -25,7 +26,7 @@ func (q *SyntaxQuery) Boost() float64 {
 }
 
 func (q *SyntaxQuery) Searcher(index index.Index) (Searcher, error) {
-	newQuery, err := ParseQuerySyntax(q.Query, q.mapping)
+	newQuery, err := ParseQuerySyntax(q.Query, q.mapping, q.DefaultField)
 	if err != nil {
 		return nil, err
 	}

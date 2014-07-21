@@ -42,8 +42,11 @@ func (t *TextField) Options() IndexingOptions {
 	return t.options
 }
 
-func (t *TextField) Analyzer() *analysis.Analyzer {
-	return t.analyzer
+func (t *TextField) Analyze() (int, analysis.TokenFrequencies) {
+	tokens := t.analyzer.Analyze(t.Value())
+	fieldLength := len(tokens) // number of tokens in this doc field
+	tokenFreqs := analysis.TokenFrequency(tokens)
+	return fieldLength, tokenFreqs
 }
 
 func (t *TextField) Value() []byte {

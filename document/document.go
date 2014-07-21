@@ -13,19 +13,26 @@ import (
 )
 
 type Document struct {
-	ID     string  `json:"id"`
-	Fields []Field `json:"fields"`
+	ID              string  `json:"id"`
+	Fields          []Field `json:"fields"`
+	CompositeFields []*CompositeField
 }
 
 func NewDocument(id string) *Document {
 	return &Document{
-		ID:     id,
-		Fields: make([]Field, 0),
+		ID:              id,
+		Fields:          make([]Field, 0),
+		CompositeFields: make([]*CompositeField, 0),
 	}
 }
 
 func (d *Document) AddField(f Field) *Document {
-	d.Fields = append(d.Fields, f)
+	switch f := f.(type) {
+	case *CompositeField:
+		d.CompositeFields = append(d.CompositeFields, f)
+	default:
+		d.Fields = append(d.Fields, f)
+	}
 	return d
 }
 

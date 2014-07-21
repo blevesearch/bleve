@@ -15,6 +15,6 @@ import (
 type Field interface {
 	Name() string
 	Options() IndexingOptions
-	Analyzer() *analysis.Analyzer
+	Analyze() (int, analysis.TokenFrequencies)
 	Value() []byte
 }

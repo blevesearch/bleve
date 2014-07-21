@@ -133,19 +133,32 @@ func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc) *DocumentMatch {
 	}
 
 	if termMatch.Vectors != nil && len(termMatch.Vectors) > 0 {
-		locations := make(Locations, len(termMatch.Vectors))
-		for i, v := range termMatch.Vectors {
+
+		rv.Locations = make(FieldTermLocationMap)
+		for _, v := range termMatch.Vectors {
+			tlm := rv.Locations[v.Field]
+			if tlm == nil {
+				tlm = make(TermLocationMap)
+			}
+
 			loc := Location{
 				Pos:   float64(v.Pos),
 				Start: float64(v.Start),
 				End:   float64(v.End),
 			}
-			locations[i] = &loc
+
+			locations := tlm[s.query.Term]
+			if locations == nil {
+				locations = make(Locations, 1)
+				locations[0] = &loc
+			} else {
+				locations = append(locations, &loc)
+			}
+			tlm[s.query.Term] = locations
+
+			rv.Locations[v.Field] = tlm
 		}
-		tlm := make(TermLocationMap)
-		tlm[s.query.Term] = locations
-		rv.Locations = make(FieldTermLocationMap)
-		rv.Locations[s.query.Field] = tlm
+
 	}
 
 	return &rv
