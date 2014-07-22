@@ -36,6 +36,27 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			},
 		},
 		{
+			input:   `"test phrase 1"`,
+			mapping: document.Mapping{},
+			result: &TermBooleanQuery{
+				Should: &TermDisjunctionQuery{
+					Terms: []Query{
+						&MatchPhraseQuery{
+							MatchPhrase: "test phrase 1",
+							Field:       "_all",
+							BoostVal:    1.0,
+							Explain:     true,
+						},
+					},
+					BoostVal: 1.0,
+					Explain:  true,
+					Min:      1.0,
+				},
+				BoostVal: 1.0,
+				Explain:  true,
+			},
+		},
+		{
 			input:   "field:test",
 			mapping: document.Mapping{},
 			result: &TermBooleanQuery{
