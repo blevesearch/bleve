@@ -128,7 +128,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 		if req.Highlight.Style != nil {
 			highlighter = config.Highlight.Highlighters[*req.Highlight.Style]
 			if highlighter == nil {
-				return nil, fmt.Errorf("no highlighter named `%s` registered", req.Highlight.Style)
+				return nil, fmt.Errorf("no highlighter named `%s` registered", *req.Highlight.Style)
 			}
 		}
 
