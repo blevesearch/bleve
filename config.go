@@ -40,14 +40,15 @@ type HighlightConfig struct {
 	Highlighters map[string]search.Highlighter
 }
 
-type Config struct {
+type Configuration struct {
 	Analysis           *AnalysisConfig
 	DefaultAnalyzer    *string
 	Highlight          *HighlightConfig
 	DefaultHighlighter *string
+	CreateIfMissing    bool
 }
 
-func (c *Config) BuildNewAnalyzer(charFilterNames []string, tokenizerName string, tokenFilterNames []string) (*analysis.Analyzer, error) {
+func (c *Configuration) BuildNewAnalyzer(charFilterNames []string, tokenizerName string, tokenFilterNames []string) (*analysis.Analyzer, error) {
 	rv := analysis.Analyzer{}
 	if len(charFilterNames) > 0 {
 		rv.CharFilters = make([]analysis.CharFilter, len(charFilterNames))
@@ -76,7 +77,7 @@ func (c *Config) BuildNewAnalyzer(charFilterNames []string, tokenizerName string
 	return &rv, nil
 }
 
-func (c *Config) MustBuildNewAnalyzer(charFilterNames []string, tokenizerName string, tokenFilterNames []string) *analysis.Analyzer {
+func (c *Configuration) MustBuildNewAnalyzer(charFilterNames []string, tokenizerName string, tokenFilterNames []string) *analysis.Analyzer {
 	analyzer, err := c.BuildNewAnalyzer(charFilterNames, tokenizerName, tokenFilterNames)
 	if err != nil {
 		panic(err)
@@ -84,8 +85,8 @@ func (c *Config) MustBuildNewAnalyzer(charFilterNames []string, tokenizerName st
 	return analyzer
 }
 
-func NewConfig() *Config {
-	return &Config{
+func NewConfiguration() *Configuration {
+	return &Configuration{
 		Analysis: &AnalysisConfig{
 			CharFilters:  make(map[string]analysis.CharFilter),
 			Tokenizers:   make(map[string]analysis.Tokenizer),
@@ -98,75 +99,77 @@ func NewConfig() *Config {
 	}
 }
 
-var config *Config
+var Config *Configuration
 
 func init() {
 
 	// build the default configuration
-	config = NewConfig()
+	Config = NewConfiguration()
 
 	// register char filters
 	htmlCharFilterRegexp := regexp.MustCompile(`</?[!\w]+((\s+\w+(\s*=\s*(?:".*?"|'.*?'|[^'">\s]+))?)+\s*|\s*)/?>`)
 	htmlCharFilter := regexp_char_filter.NewRegexpCharFilter(htmlCharFilterRegexp, []byte{' '})
-	config.Analysis.CharFilters["html"] = htmlCharFilter
+	Config.Analysis.CharFilters["html"] = htmlCharFilter
 
 	// register tokenizers
 	whitespaceTokenizerRegexp := regexp.MustCompile(`\w+`)
-	config.Analysis.Tokenizers["single"] = single_token.NewSingleTokenTokenizer()
-	config.Analysis.Tokenizers["unicode"] = unicode_word_boundary.NewUnicodeWordBoundaryTokenizer()
-	config.Analysis.Tokenizers["unicode_th"] = unicode_word_boundary.NewUnicodeWordBoundaryCustomLocaleTokenizer("th_TH")
-	config.Analysis.Tokenizers["whitespace"] = regexp_tokenizer.NewRegexpTokenizer(whitespaceTokenizerRegexp)
+	Config.Analysis.Tokenizers["single"] = single_token.NewSingleTokenTokenizer()
+	Config.Analysis.Tokenizers["unicode"] = unicode_word_boundary.NewUnicodeWordBoundaryTokenizer()
+	Config.Analysis.Tokenizers["unicode_th"] = unicode_word_boundary.NewUnicodeWordBoundaryCustomLocaleTokenizer("th_TH")
+	Config.Analysis.Tokenizers["whitespace"] = regexp_tokenizer.NewRegexpTokenizer(whitespaceTokenizerRegexp)
 
 	// register token filters
-	config.Analysis.TokenFilters["detect_lang"] = cld2.NewCld2Filter()
-	config.Analysis.TokenFilters["short"] = length_filter.NewLengthFilter(3, -1)
-	config.Analysis.TokenFilters["long"] = length_filter.NewLengthFilter(-1, 255)
-	config.Analysis.TokenFilters["to_lower"] = lower_case_filter.NewLowerCaseFilter()
-	config.Analysis.TokenFilters["stemmer_da"] = stemmer_filter.MustNewStemmerFilter("danish")
-	config.Analysis.TokenFilters["stemmer_nl"] = stemmer_filter.MustNewStemmerFilter("dutch")
-	config.Analysis.TokenFilters["stemmer_en"] = stemmer_filter.MustNewStemmerFilter("english")
-	config.Analysis.TokenFilters["stemmer_fi"] = stemmer_filter.MustNewStemmerFilter("finnish")
-	config.Analysis.TokenFilters["stemmer_fr"] = stemmer_filter.MustNewStemmerFilter("french")
-	config.Analysis.TokenFilters["stemmer_de"] = stemmer_filter.MustNewStemmerFilter("german")
-	config.Analysis.TokenFilters["stemmer_hu"] = stemmer_filter.MustNewStemmerFilter("hungarian")
-	config.Analysis.TokenFilters["stemmer_it"] = stemmer_filter.MustNewStemmerFilter("italian")
-	config.Analysis.TokenFilters["stemmer_no"] = stemmer_filter.MustNewStemmerFilter("norwegian")
-	config.Analysis.TokenFilters["stemmer_porter"] = stemmer_filter.MustNewStemmerFilter("porter")
-	config.Analysis.TokenFilters["stemmer_pt"] = stemmer_filter.MustNewStemmerFilter("portuguese")
-	config.Analysis.TokenFilters["stemmer_ro"] = stemmer_filter.MustNewStemmerFilter("romanian")
-	config.Analysis.TokenFilters["stemmer_ru"] = stemmer_filter.MustNewStemmerFilter("russian")
-	config.Analysis.TokenFilters["stemmer_es"] = stemmer_filter.MustNewStemmerFilter("spanish")
-	config.Analysis.TokenFilters["stemmer_sv"] = stemmer_filter.MustNewStemmerFilter("swedish")
-	config.Analysis.TokenFilters["stemmer_tr"] = stemmer_filter.MustNewStemmerFilter("turkish")
-	config.Analysis.TokenFilters["stop_token"] = stop_words_filter.NewStopWordsFilter()
+	Config.Analysis.TokenFilters["detect_lang"] = cld2.NewCld2Filter()
+	Config.Analysis.TokenFilters["short"] = length_filter.NewLengthFilter(3, -1)
+	Config.Analysis.TokenFilters["long"] = length_filter.NewLengthFilter(-1, 255)
+	Config.Analysis.TokenFilters["to_lower"] = lower_case_filter.NewLowerCaseFilter()
+	Config.Analysis.TokenFilters["stemmer_da"] = stemmer_filter.MustNewStemmerFilter("danish")
+	Config.Analysis.TokenFilters["stemmer_nl"] = stemmer_filter.MustNewStemmerFilter("dutch")
+	Config.Analysis.TokenFilters["stemmer_en"] = stemmer_filter.MustNewStemmerFilter("english")
+	Config.Analysis.TokenFilters["stemmer_fi"] = stemmer_filter.MustNewStemmerFilter("finnish")
+	Config.Analysis.TokenFilters["stemmer_fr"] = stemmer_filter.MustNewStemmerFilter("french")
+	Config.Analysis.TokenFilters["stemmer_de"] = stemmer_filter.MustNewStemmerFilter("german")
+	Config.Analysis.TokenFilters["stemmer_hu"] = stemmer_filter.MustNewStemmerFilter("hungarian")
+	Config.Analysis.TokenFilters["stemmer_it"] = stemmer_filter.MustNewStemmerFilter("italian")
+	Config.Analysis.TokenFilters["stemmer_no"] = stemmer_filter.MustNewStemmerFilter("norwegian")
+	Config.Analysis.TokenFilters["stemmer_porter"] = stemmer_filter.MustNewStemmerFilter("porter")
+	Config.Analysis.TokenFilters["stemmer_pt"] = stemmer_filter.MustNewStemmerFilter("portuguese")
+	Config.Analysis.TokenFilters["stemmer_ro"] = stemmer_filter.MustNewStemmerFilter("romanian")
+	Config.Analysis.TokenFilters["stemmer_ru"] = stemmer_filter.MustNewStemmerFilter("russian")
+	Config.Analysis.TokenFilters["stemmer_es"] = stemmer_filter.MustNewStemmerFilter("spanish")
+	Config.Analysis.TokenFilters["stemmer_sv"] = stemmer_filter.MustNewStemmerFilter("swedish")
+	Config.Analysis.TokenFilters["stemmer_tr"] = stemmer_filter.MustNewStemmerFilter("turkish")
+	Config.Analysis.TokenFilters["stop_token"] = stop_words_filter.NewStopWordsFilter()
 
 	// register analyzers
-	keywordAnalyzer := config.MustBuildNewAnalyzer([]string{}, "single", []string{})
-	config.Analysis.Analyzers["keyword"] = keywordAnalyzer
-	simpleAnalyzer := config.MustBuildNewAnalyzer([]string{}, "whitespace", []string{"to_lower"})
-	config.Analysis.Analyzers["simple"] = simpleAnalyzer
-	standardAnalyzer := config.MustBuildNewAnalyzer([]string{}, "whitespace", []string{"to_lower", "stop_token"})
-	config.Analysis.Analyzers["standard"] = standardAnalyzer
-	englishAnalyzer := config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"to_lower", "stemmer_en", "stop_token"})
-	config.Analysis.Analyzers["english"] = englishAnalyzer
-	detectLangAnalyzer := config.MustBuildNewAnalyzer([]string{}, "single", []string{"to_lower", "detect_lang"})
-	config.Analysis.Analyzers["detect_lang"] = detectLangAnalyzer
+	keywordAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "single", []string{})
+	Config.Analysis.Analyzers["keyword"] = keywordAnalyzer
+	simpleAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "whitespace", []string{"to_lower"})
+	Config.Analysis.Analyzers["simple"] = simpleAnalyzer
+	standardAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "whitespace", []string{"to_lower", "stop_token"})
+	Config.Analysis.Analyzers["standard"] = standardAnalyzer
+	englishAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"to_lower", "stemmer_en", "stop_token"})
+	Config.Analysis.Analyzers["english"] = englishAnalyzer
+	detectLangAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "single", []string{"to_lower", "detect_lang"})
+	Config.Analysis.Analyzers["detect_lang"] = detectLangAnalyzer
 
 	// register ansi highlighter
-	config.Highlight.Highlighters["ansi"] = search.NewSimpleHighlighter()
+	Config.Highlight.Highlighters["ansi"] = search.NewSimpleHighlighter()
 
 	// register html highlighter
 	htmlFormatter := search.NewHTMLFragmentFormatterCustom(`<span class="highlight">`, `</span>`)
 	htmlHighlighter := search.NewSimpleHighlighter()
 	htmlHighlighter.SetFragmentFormatter(htmlFormatter)
-	config.Highlight.Highlighters["html"] = htmlHighlighter
+	Config.Highlight.Highlighters["html"] = htmlHighlighter
 
 	// set the default analyzer
 	simpleAnalyzerName := "simple"
-	config.DefaultAnalyzer = &simpleAnalyzerName
+	Config.DefaultAnalyzer = &simpleAnalyzerName
 
 	// set the default highlighter
 	htmlHighlighterName := "html"
-	config.DefaultHighlighter = &htmlHighlighterName
+	Config.DefaultHighlighter = &htmlHighlighterName
 
+	// default CreateIfMissing to true
+	Config.CreateIfMissing = true
 }

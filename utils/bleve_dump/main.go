@@ -12,8 +12,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/couchbaselabs/bleve/index/store/leveldb"
-	"github.com/couchbaselabs/bleve/index/upside_down"
+	"github.com/couchbaselabs/bleve"
 )
 
 var indexDir = flag.String("indexDir", "index", "index directory")
@@ -23,12 +22,8 @@ var fieldsOnly = flag.Bool("fields", false, "fields only")
 func main() {
 	flag.Parse()
 
-	store, err := leveldb.Open(*indexDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-	index := upside_down.NewUpsideDownCouch(store)
-	err = index.Open()
+	bleve.Config.CreateIfMissing = false
+	index, err := bleve.Open(*indexDir, bleve.NewIndexMapping())
 	if err != nil {
 		log.Fatal(err)
 	}

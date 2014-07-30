@@ -247,7 +247,7 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 						fieldName = parentName + *fieldMapping.Name
 					}
 					options := fieldMapping.Options()
-					analyzer := config.Analysis.Analyzers[*fieldMapping.Analyzer]
+					analyzer := Config.Analysis.Analyzers[*fieldMapping.Analyzer]
 					if analyzer != nil {
 						field := document.NewTextFieldCustom(fieldName, []byte(propertyValueString), options, analyzer)
 						context.doc.AddField(field)
@@ -276,9 +276,9 @@ func (im *IndexMapping) defaultAnalyzer(dm *DocumentMapping, path []string) *ana
 	rv := dm.defaultAnalyzer(path)
 	if rv == nil {
 		if im.DefaultAnalyzer != nil {
-			rv = config.Analysis.Analyzers[*im.DefaultAnalyzer]
-		} else if config.DefaultAnalyzer != nil {
-			rv = config.Analysis.Analyzers[*config.DefaultAnalyzer]
+			rv = Config.Analysis.Analyzers[*im.DefaultAnalyzer]
+		} else if Config.DefaultAnalyzer != nil {
+			rv = Config.Analysis.Analyzers[*Config.DefaultAnalyzer]
 		}
 	}
 	return rv
@@ -297,7 +297,7 @@ func (im *IndexMapping) analyzerForPath(path string) *analysis.Analyzer {
 		if pathMapping != nil {
 			if len(pathMapping.Fields) > 0 {
 				if pathMapping.Fields[0].Analyzer != nil {
-					return config.Analysis.Analyzers[*pathMapping.Fields[0].Analyzer]
+					return Config.Analysis.Analyzers[*pathMapping.Fields[0].Analyzer]
 				}
 			}
 		}
@@ -312,5 +312,5 @@ func (im *IndexMapping) analyzerForPath(path string) *analysis.Analyzer {
 	}
 
 	// finally just return the system-wide default analyzer
-	return config.Analysis.Analyzers[*config.DefaultAnalyzer]
+	return Config.Analysis.Analyzers[*Config.DefaultAnalyzer]
 }

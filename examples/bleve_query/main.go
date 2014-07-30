@@ -32,6 +32,9 @@ func main() {
 		log.Fatal("Specify search query")
 	}
 
+	// don't create an index if it doesn't exist
+	bleve.Config.CreateIfMissing = false
+
 	// create a new default mapping
 	mapping := bleve.NewIndexMapping()
 

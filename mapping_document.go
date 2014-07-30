@@ -124,7 +124,7 @@ func (dm *DocumentMapping) defaultAnalyzer(path []string) *analysis.Analyzer {
 			break
 		}
 		if current.DefaultAnalyzer != nil {
-			rv = config.Analysis.Analyzers[*current.DefaultAnalyzer]
+			rv = Config.Analysis.Analyzers[*current.DefaultAnalyzer]
 		}
 	}
 	return rv

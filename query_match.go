@@ -51,7 +51,7 @@ func (q *MatchQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, erro
 
 	var analyzer *analysis.Analyzer
 	if q.Analyzer != "" {
-		analyzer = config.Analysis.Analyzers[q.Analyzer]
+		analyzer = Config.Analysis.Analyzers[q.Analyzer]
 	} else {
 		analyzer = i.m.analyzerForPath(q.FieldVal)
 	}

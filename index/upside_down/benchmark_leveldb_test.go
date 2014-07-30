@@ -16,7 +16,7 @@ import (
 )
 
 func BenchmarkLevelDBIndexing(b *testing.B) {
-	s, err := leveldb.Open("test")
+	s, err := leveldb.Open("test", true)
 	if err != nil {
 		b.Fatal(err)
 	}

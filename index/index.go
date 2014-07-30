@@ -28,6 +28,7 @@ type Index interface {
 
 	Dump()
 	DumpDoc(id string) ([]interface{}, error)
+	DumpFields()
 }
 
 type TermFieldVector struct {

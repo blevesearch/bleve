@@ -19,13 +19,13 @@ type LevelDBStore struct {
 	db   *levigo.DB
 }
 
-func Open(path string) (*LevelDBStore, error) {
+func Open(path string, createIfMissing bool) (*LevelDBStore, error) {
 	rv := LevelDBStore{
 		path: path,
 	}
 
 	opts := levigo.NewOptions()
-	opts.SetCreateIfMissing(true)
+	opts.SetCreateIfMissing(createIfMissing)
 	rv.opts = opts
 
 	var err error

@@ -27,7 +27,7 @@ type indexImpl struct {
 }
 
 func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
-	store, err := leveldb.Open(path)
+	store, err := leveldb.Open(path, Config.CreateIfMissing)
 	if err != nil {
 		return nil, err
 	}
@@ -124,9 +124,9 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 
 	if req.Highlight != nil {
 		// get the right highlighter
-		highlighter := config.Highlight.Highlighters[*config.DefaultHighlighter]
+		highlighter := Config.Highlight.Highlighters[*Config.DefaultHighlighter]
 		if req.Highlight.Style != nil {
-			highlighter = config.Highlight.Highlighters[*req.Highlight.Style]
+			highlighter = Config.Highlight.Highlighters[*req.Highlight.Style]
 			if highlighter == nil {
 				return nil, fmt.Errorf("no highlighter named `%s` registered", *req.Highlight.Style)
 			}
@@ -158,6 +158,14 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 		MaxScore: collector.MaxScore(),
 		Took:     collector.Took(),
 	}, nil
+}
+
+func (i *indexImpl) Dump() {
+	i.i.Dump()
+}
+
+func (i *indexImpl) DumpFields() {
+	i.i.DumpFields()
 }
 
 func (i *indexImpl) DumpDoc(id string) ([]interface{}, error) {
