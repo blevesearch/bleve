@@ -28,41 +28,17 @@ type TermBooleanSearcher struct {
 	scorer          *TermConjunctionQueryScorer
 }
 
-func NewTermBooleanSearcher(index index.Index, query *TermBooleanQuery) (*TermBooleanSearcher, error) {
-	// build the downstream searchres
-	var err error
-	var mustSearcher *TermConjunctionSearcher
-	if query.Must != nil {
-		mustSearcher, err = NewTermConjunctionSearcher(index, query.Must)
-		if err != nil {
-			return nil, err
-		}
-	}
-	var shouldSearcher *TermDisjunctionSearcher
-	if query.Should != nil {
-		shouldSearcher, err = NewTermDisjunctionSearcher(index, query.Should)
-		if err != nil {
-			return nil, err
-		}
-	}
-	var mustNotSearcher *TermDisjunctionSearcher
-	if query.MustNot != nil {
-		mustNotSearcher, err = NewTermDisjunctionSearcher(index, query.MustNot)
-		if err != nil {
-			return nil, err
-		}
-	}
-
+func NewTermBooleanSearcher(index index.Index, mustSearcher *TermConjunctionSearcher, shouldSearcher *TermDisjunctionSearcher, mustNotSearcher *TermDisjunctionSearcher, explain bool) (*TermBooleanSearcher, error) {
 	// build our searcher
 	rv := TermBooleanSearcher{
 		index:           index,
 		mustSearcher:    mustSearcher,
 		shouldSearcher:  shouldSearcher,
 		mustNotSearcher: mustNotSearcher,
-		scorer:          NewTermConjunctionQueryScorer(query.Explain),
+		scorer:          NewTermConjunctionQueryScorer(explain),
 	}
 	rv.computeQueryNorm()
-	err = rv.initSearchers()
+	err := rv.initSearchers()
 	if err != nil {
 		return nil, err
 	}

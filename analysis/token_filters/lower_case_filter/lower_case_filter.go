@@ -17,8 +17,8 @@ import (
 type LowerCaseFilter struct {
 }
 
-func NewLowerCaseFilter() (*LowerCaseFilter, error) {
-	return &LowerCaseFilter{}, nil
+func NewLowerCaseFilter() *LowerCaseFilter {
+	return &LowerCaseFilter{}
 }
 
 func (f *LowerCaseFilter) Filter(input analysis.TokenStream) analysis.TokenStream {

@@ -1,3 +1,11 @@
+//  Copyright (c) 2014 Couchbase, Inc.
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//    http://www.apache.org/licenses/LICENSE-2.0
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 package search
 
 import (
@@ -7,46 +15,24 @@ import (
 )
 
 type PhraseSearcher struct {
-	query        *PhraseQuery
 	index        index.Index
 	mustSearcher *TermConjunctionSearcher
 	queryNorm    float64
 	currMust     *DocumentMatch
 	slop         int
+	terms        []string
 }
 
-func NewPhraseSearcher(index index.Index, query *PhraseQuery) (*PhraseSearcher, error) {
-	// build the downstream searchres
-	var err error
-	var mustSearcher *TermConjunctionSearcher
-
-	if query.Terms != nil {
-		qterms := make([]Query, 0, len(query.Terms))
-		for _, qt := range query.Terms {
-			if qt != nil {
-				qterms = append(qterms, qt)
-			}
-		}
-		tcq := TermConjunctionQuery{
-			Terms:    qterms,
-			BoostVal: 1.0,
-			Explain:  query.Explain,
-		}
-
-		mustSearcher, err = NewTermConjunctionSearcher(index, &tcq)
-		if err != nil {
-			return nil, err
-		}
-	}
+func NewPhraseSearcher(index index.Index, mustSearcher *TermConjunctionSearcher, terms []string) (*PhraseSearcher, error) {
 
 	// build our searcher
 	rv := PhraseSearcher{
 		index:        index,
-		query:        query,
 		mustSearcher: mustSearcher,
+		terms:        terms,
 	}
 	rv.computeQueryNorm()
-	err = rv.initSearchers()
+	err := rv.initSearchers()
 	if err != nil {
 		return nil, err
 	}
@@ -111,26 +97,26 @@ func (s *PhraseSearcher) Next() (*DocumentMatch, error) {
 	for s.currMust != nil {
 		rvftlm := make(FieldTermLocationMap, 0)
 		freq := 0
-		firstTerm := s.query.Terms[0]
+		firstTerm := s.terms[0]
 		for field, termLocMap := range s.currMust.Locations {
 			rvtlm := make(TermLocationMap, 0)
-			locations, ok := termLocMap[firstTerm.Term]
+			locations, ok := termLocMap[firstTerm]
 			if ok {
 			OUTER:
 				for _, location := range locations {
 					crvtlm := make(TermLocationMap, 0)
 				INNER:
-					for i := 0; i < len(s.query.Terms); i++ {
-						nextTerm := s.query.Terms[i]
-						if nextTerm != nil {
+					for i := 0; i < len(s.mustSearcher.searchers); i++ {
+						nextTerm := s.terms[i]
+						if nextTerm != "" {
 							// look through all this terms locations
 							// to try and find the correct offsets
-							nextLocations, ok := termLocMap[nextTerm.Term]
+							nextLocations, ok := termLocMap[nextTerm]
 							if ok {
 								for _, nextLocation := range nextLocations {
 									if nextLocation.Pos == location.Pos+float64(i) {
 										// found a location match for this term
-										crvtlm.AddLocation(nextTerm.Term, nextLocation)
+										crvtlm.AddLocation(nextTerm, nextLocation)
 										continue INNER
 									}
 								}

@@ -18,7 +18,9 @@ import (
 const MAX_SCORE_CACHE = 64
 
 type TermQueryScorer struct {
-	query                  *TermQuery
+	queryTerm              string
+	queryField             string
+	queryBoost             float64
 	docTerm                uint64
 	docTotal               uint64
 	idf                    float64
@@ -29,9 +31,11 @@ type TermQueryScorer struct {
 	queryWeightExplanation *Explanation
 }
 
-func NewTermQueryScorer(query *TermQuery, docTotal, docTerm uint64, explain bool) *TermQueryScorer {
+func NewTermQueryScorer(queryTerm string, queryField string, queryBoost float64, docTotal, docTerm uint64, explain bool) *TermQueryScorer {
 	rv := TermQueryScorer{
-		query:       query,
+		queryTerm:   queryTerm,
+		queryField:  queryField,
+		queryBoost:  queryBoost,
 		docTerm:     docTerm,
 		docTotal:    docTotal,
 		idf:         1.0 + math.Log(float64(docTotal)/float64(docTerm+1.0)),
@@ -50,7 +54,7 @@ func NewTermQueryScorer(query *TermQuery, docTotal, docTerm uint64, explain bool
 }
 
 func (s *TermQueryScorer) Weight() float64 {
-	sum := s.query.Boost() * s.idf
+	sum := s.queryBoost * s.idf
 	return sum * sum
 }
 
@@ -58,12 +62,12 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 	s.queryNorm = qnorm
 
 	// update the query weight
-	s.queryWeight = s.query.Boost() * s.idf * s.queryNorm
+	s.queryWeight = s.queryBoost * s.idf * s.queryNorm
 
 	if s.explain {
 		childrenExplanations := make([]*Explanation, 3)
 		childrenExplanations[0] = &Explanation{
-			Value:   s.query.Boost(),
+			Value:   s.queryBoost,
 			Message: "boost",
 		}
 		childrenExplanations[1] = s.idfExplanation
@@ -73,7 +77,7 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 		}
 		s.queryWeightExplanation = &Explanation{
 			Value:    s.queryWeight,
-			Message:  fmt.Sprintf("queryWeight(%s:%s^%f), product of:", s.query.Field, string(s.query.Term), s.query.Boost()),
+			Message:  fmt.Sprintf("queryWeight(%s:%s^%f), product of:", s.queryField, string(s.queryTerm), s.queryBoost),
 			Children: childrenExplanations,
 		}
 	}
@@ -95,16 +99,16 @@ func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc) *DocumentMatch {
 		childrenExplanations := make([]*Explanation, 3)
 		childrenExplanations[0] = &Explanation{
 			Value:   tf,
-			Message: fmt.Sprintf("tf(termFreq(%s:%s)=%d", s.query.Field, string(s.query.Term), termMatch.Freq),
+			Message: fmt.Sprintf("tf(termFreq(%s:%s)=%d", s.queryField, string(s.queryTerm), termMatch.Freq),
 		}
 		childrenExplanations[1] = &Explanation{
 			Value:   termMatch.Norm,
-			Message: fmt.Sprintf("fieldNorm(field=%s, doc=%s)", s.query.Field, termMatch.ID),
+			Message: fmt.Sprintf("fieldNorm(field=%s, doc=%s)", s.queryField, termMatch.ID),
 		}
 		childrenExplanations[2] = s.idfExplanation
 		scoreExplanation = &Explanation{
 			Value:    score,
-			Message:  fmt.Sprintf("fieldWeight(%s:%s in %s), product of:", s.query.Field, string(s.query.Term), termMatch.ID),
+			Message:  fmt.Sprintf("fieldWeight(%s:%s in %s), product of:", s.queryField, string(s.queryTerm), termMatch.ID),
 			Children: childrenExplanations,
 		}
 	}
@@ -118,7 +122,7 @@ func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc) *DocumentMatch {
 			childExplanations[1] = scoreExplanation
 			scoreExplanation = &Explanation{
 				Value:    score,
-				Message:  fmt.Sprintf("weight(%s:%s^%f in %s), product of:", s.query.Field, string(s.query.Term), s.query.Boost(), termMatch.ID),
+				Message:  fmt.Sprintf("weight(%s:%s^%f in %s), product of:", s.queryField, string(s.queryTerm), s.queryBoost, termMatch.ID),
 				Children: childExplanations,
 			}
 		}
@@ -147,14 +151,14 @@ func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc) *DocumentMatch {
 				End:   float64(v.End),
 			}
 
-			locations := tlm[s.query.Term]
+			locations := tlm[s.queryTerm]
 			if locations == nil {
 				locations = make(Locations, 1)
 				locations[0] = &loc
 			} else {
 				locations = append(locations, &loc)
 			}
-			tlm[s.query.Term] = locations
+			tlm[s.queryTerm] = locations
 
 			rv.Locations[v.Field] = tlm
 		}

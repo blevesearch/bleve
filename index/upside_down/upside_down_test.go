@@ -10,12 +10,18 @@ package upside_down
 
 import (
 	"os"
+	"regexp"
 	"testing"
 
-	_ "github.com/couchbaselabs/bleve/analysis/analyzers/standard_analyzer"
+	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/analysis/tokenizers/regexp_tokenizer"
 	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index/store/gouchstore"
 )
+
+var testAnalyzer = &analysis.Analyzer{
+	Tokenizer: regexp_tokenizer.NewRegexpTokenizer(regexp.MustCompile(`\w+`)),
+}
 
 func TestIndexOpenReopen(t *testing.T) {
 	defer os.RemoveAll("test")
@@ -180,7 +186,7 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 
 	// this update should overwrite one term, and introduce one new one
 	doc = document.NewDocument("1")
-	doc.AddField(document.NewTextField("name", []byte("test fail")))
+	doc.AddField(document.NewTextFieldWithAnalyzer("name", []byte("test fail"), testAnalyzer))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error deleting entry from index: %v", err)

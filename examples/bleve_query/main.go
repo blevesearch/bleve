@@ -12,85 +12,50 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"strings"
 
-	"github.com/couchbaselabs/bleve/index/store/leveldb"
-	"github.com/couchbaselabs/bleve/index/upside_down"
-	"github.com/couchbaselabs/bleve/search"
+	"github.com/couchbaselabs/bleve"
 )
 
-var field = flag.String("field", "description", "field to query")
+var field = flag.String("field", "_all", "field to query")
 var indexDir = flag.String("indexDir", "index", "index directory")
 var limit = flag.Int("limit", 10, "limit to first N results")
-var includeHighlights = flag.Bool("highlight", false, "highlight matches")
+var skip = flag.Int("skip", 0, "skip the first N results")
+var explain = flag.Bool("explain", false, "explain scores")
+var includeHighlights = flag.Bool("highlight", true, "highlight matches")
 
 func main() {
 
 	flag.Parse()
 
 	if flag.NArg() < 1 {
-		log.Fatal("Specify search term")
+		log.Fatal("Specify search query")
 	}
 
+	// create a new default mapping
+	mapping := bleve.NewIndexMapping()
+
 	// open index
-	store, err := leveldb.Open(*indexDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-	index := upside_down.NewUpsideDownCouch(store)
-	err = index.Open()
+	index, err := bleve.Open(*indexDir, mapping)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer index.Close()
 
-	tq := search.TermQuery{
-		Term:     flag.Arg(0),
-		Field:    *field,
-		BoostVal: 1.0,
-		Explain:  true,
+	// build a search with the provided parameters
+	queryString := strings.Join(flag.Args(), " ")
+	query := bleve.NewSyntaxQuery(queryString)
+	searchRequest := bleve.NewSearchRequest(query, *limit, *skip, *explain)
+
+	// enable highlights if requested
+	if *includeHighlights {
+		searchRequest.Highlight = bleve.NewHighlightWithStyle("ansi")
 	}
-	collector := search.NewTopScorerCollector(*limit)
-	searcher, err := tq.Searcher(index)
-	if err != nil {
-		log.Fatalf("searcher error: %v", err)
-		return
-	}
-	err = collector.Collect(searcher)
+
+	// execute the search
+	searchResult, err := index.Search(searchRequest)
 	if err != nil {
 		log.Fatalf("search error: %v", err)
-		return
 	}
-	results := collector.Results()
-	if len(results) == 0 {
-		fmt.Printf("No matches\n")
-	} else {
-		last := uint64(*limit)
-		if searcher.Count() < last {
-			last = searcher.Count()
-		}
-		fmt.Printf("%d matches, showing %d through %d\n", searcher.Count(), 1, last)
-		for i, result := range results {
-			fmt.Printf("%2d. %s (%f)\n", i+1, result.ID, result.Score)
-			if *includeHighlights {
-				highlighter := search.NewSimpleHighlighter()
-
-				doc, err := index.Document(result.ID)
-				if err != nil {
-					fmt.Print(err)
-					return
-				}
-
-				fragments := highlighter.BestFragmentsInField(result, doc, *field, 5)
-				for _, fragment := range fragments {
-					fmt.Printf("\t%s\n", fragment)
-				}
-				if len(fragments) == 0 {
-					for _, f := range doc.Fields {
-						fmt.Printf("\tfield: %s\n", f)
-					}
-				}
-
-			}
-		}
-	}
+	fmt.Println(searchResult)
 }

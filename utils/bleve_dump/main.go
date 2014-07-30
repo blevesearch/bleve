@@ -34,5 +34,9 @@ func main() {
 	}
 	defer index.Close()
 
-	index.Dump()
+	if !*fieldsOnly {
+		index.Dump()
+	} else {
+		index.DumpFields()
+	}
 }

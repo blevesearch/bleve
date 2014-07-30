@@ -29,6 +29,14 @@ func NewStemmerFilter(lang string) (*StemmerFilter, error) {
 	}, nil
 }
 
+func MustNewStemmerFilter(lang string) *StemmerFilter {
+	sf, err := NewStemmerFilter(lang)
+	if err != nil {
+		panic(err)
+	}
+	return sf
+}
+
 func (s *StemmerFilter) List() []string {
 	return snowball.LangList()
 }

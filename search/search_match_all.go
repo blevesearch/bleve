@@ -14,20 +14,18 @@ import (
 
 type MatchAllSearcher struct {
 	index  index.Index
-	query  *MatchAllQuery
 	reader index.DocIdReader
 	scorer *ConstantScorer
 }
 
-func NewMatchAllSearcher(index index.Index, query *MatchAllQuery) (*MatchAllSearcher, error) {
+func NewMatchAllSearcher(index index.Index, boost float64, explain bool) (*MatchAllSearcher, error) {
 	reader, err := index.DocIdReader("", "")
 	if err != nil {
 		return nil, err
 	}
-	scorer := NewConstantScorer(query, 1.0, query.Explain)
+	scorer := NewConstantScorer(1.0, boost, explain)
 	return &MatchAllSearcher{
 		index:  index,
-		query:  query,
 		reader: reader,
 		scorer: scorer,
 	}, nil

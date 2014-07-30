@@ -5,8 +5,9 @@
 .project
 .settings
 .DS_Store
-/analysis/tokenizers/cld2/cld2-read-only
+/analysis/token_filters/cld2/cld2-read-only
 /examples/bleve_index_json/bleve_index_json
 /examples/bleve_index_json/index/
 /examples/bleve_query/bleve_query
 /utils/bleve_dump/bleve_dump
+/y.output

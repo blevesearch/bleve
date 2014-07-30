@@ -25,14 +25,10 @@ type TermDisjunctionSearcher struct {
 	min       float64
 }
 
-func NewTermDisjunctionSearcher(index index.Index, query *TermDisjunctionQuery) (*TermDisjunctionSearcher, error) {
+func NewTermDisjunctionSearcher(index index.Index, qsearchers []Searcher, min float64, explain bool) (*TermDisjunctionSearcher, error) {
 	// build the downstream searchres
-	searchers := make(OrderedSearcherList, len(query.Terms))
-	for i, termQuery := range query.Terms {
-		searcher, err := termQuery.Searcher(index)
-		if err != nil {
-			return nil, err
-		}
+	searchers := make(OrderedSearcherList, len(qsearchers))
+	for i, searcher := range qsearchers {
 		searchers[i] = searcher
 	}
 	// sort the searchers
@@ -42,8 +38,8 @@ func NewTermDisjunctionSearcher(index index.Index, query *TermDisjunctionQuery) 
 		index:     index,
 		searchers: searchers,
 		currs:     make([]*DocumentMatch, len(searchers)),
-		scorer:    NewTermDisjunctionQueryScorer(query.Explain),
-		min:       query.Min,
+		scorer:    NewTermDisjunctionQueryScorer(explain),
+		min:       min,
 	}
 	rv.computeQueryNorm()
 	err := rv.initSearchers()

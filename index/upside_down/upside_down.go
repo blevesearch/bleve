@@ -486,6 +486,30 @@ func (udc *UpsideDownCouch) Dump() {
 	}
 }
 
+func (udc *UpsideDownCouch) DumpFields() {
+	it := udc.store.Iterator([]byte{'f'})
+	defer it.Close()
+	key, val, valid := it.Current()
+	for valid {
+		if !bytes.HasPrefix(key, []byte{'f'}) {
+			break
+		}
+
+		row, err := ParseFromKeyValue(key, val)
+		if err != nil {
+			fmt.Printf("error parsing key/value: %v", err)
+			return
+		}
+		if row != nil {
+			fmt.Printf("%v\n", row)
+			fmt.Printf("Key:   % -100x\nValue: % -100x\n\n", key, val)
+		}
+
+		it.Next()
+		key, val, valid = it.Current()
+	}
+}
+
 type keyset [][]byte
 
 func (k keyset) Len() int           { return len(k) }

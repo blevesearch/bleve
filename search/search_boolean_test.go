@@ -10,63 +10,225 @@ package search
 
 import (
 	"testing"
-
-	"github.com/couchbaselabs/bleve/index"
 )
 
 func TestTermBooleanSearch(t *testing.T) {
 
+	// test 0
+	beerTermSearcher, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustSearcher, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	martyTermSearcher, err := NewTermSearcher(twoDocIndex, "marty", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dustinTermSearcher, err := NewTermSearcher(twoDocIndex, "dustin", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shouldSearcher, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher, dustinTermSearcher}, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	steveTermSearcher, err := NewTermSearcher(twoDocIndex, "steve", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustNotSearcher, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher}, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	booleanSearcher, err := NewTermBooleanSearcher(twoDocIndex, mustSearcher, shouldSearcher, mustNotSearcher, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// test 1
+	martyTermSearcher2, err := NewTermSearcher(twoDocIndex, "marty", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dustinTermSearcher2, err := NewTermSearcher(twoDocIndex, "dustin", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shouldSearcher2, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher2, dustinTermSearcher2}, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	steveTermSearcher2, err := NewTermSearcher(twoDocIndex, "steve", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustNotSearcher2, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher2}, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	booleanSearcher2, err := NewTermBooleanSearcher(twoDocIndex, nil, shouldSearcher2, mustNotSearcher2, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// test 2
+	steveTermSearcher3, err := NewTermSearcher(twoDocIndex, "steve", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustNotSearcher3, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher3}, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	booleanSearcher3, err := NewTermBooleanSearcher(twoDocIndex, nil, nil, mustNotSearcher3, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// test 3
+	beerTermSearcher4, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustSearcher4, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher4}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	steveTermSearcher4, err := NewTermSearcher(twoDocIndex, "steve", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustNotSearcher4, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher4}, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	booleanSearcher4, err := NewTermBooleanSearcher(twoDocIndex, mustSearcher4, nil, mustNotSearcher4, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// test 4
+	beerTermSearcher5, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustSearcher5, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher5}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	steveTermSearcher5, err := NewTermSearcher(twoDocIndex, "steve", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	martyTermSearcher5, err := NewTermSearcher(twoDocIndex, "marty", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustNotSearcher5, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher5, martyTermSearcher5}, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	booleanSearcher5, err := NewTermBooleanSearcher(twoDocIndex, mustSearcher5, nil, mustNotSearcher5, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// test 5
+	beerTermSearcher6, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustSearcher6, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher6}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	martyTermSearcher6, err := NewTermSearcher(twoDocIndex, "marty", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dustinTermSearcher6, err := NewTermSearcher(twoDocIndex, "dustin", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shouldSearcher6, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher6, dustinTermSearcher6}, 2, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	booleanSearcher6, err := NewTermBooleanSearcher(twoDocIndex, mustSearcher6, shouldSearcher6, nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// test 6
+	beerTermSearcher7, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustSearcher7, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher7}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	booleanSearcher7, err := NewTermBooleanSearcher(twoDocIndex, mustSearcher7, nil, nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	martyTermSearcher7, err := NewTermSearcher(twoDocIndex, "marty", "name", 5.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conjunctionSearcher7, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher7, booleanSearcher7}, true)
+
+	// test 7
+	beerTermSearcher8, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustSearcher8, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher8}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	martyTermSearcher8, err := NewTermSearcher(twoDocIndex, "marty", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dustinTermSearcher8, err := NewTermSearcher(twoDocIndex, "dustin", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shouldSearcher8, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher8, dustinTermSearcher8}, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	steveTermSearcher8, err := NewTermSearcher(twoDocIndex, "steve", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustNotSearcher8, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher8}, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	booleanSearcher8, err := NewTermBooleanSearcher(twoDocIndex, mustSearcher8, shouldSearcher8, mustNotSearcher8, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dustinTermSearcher8a, err := NewTermSearcher(twoDocIndex, "dustin", "name", 5.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conjunctionSearcher8, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{booleanSearcher8, dustinTermSearcher8a}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	tests := []struct {
-		index   index.Index
-		query   Query
-		results []*DocumentMatch
+		searcher Searcher
+		results  []*DocumentMatch
 	}{
 		{
-			index: twoDocIndex,
-			query: &TermBooleanQuery{
-				Must: &TermConjunctionQuery{
-					Terms: []Query{
-						&TermQuery{
-							Term:     "beer",
-							Field:    "desc",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-					},
-					Explain: true,
-				},
-				Should: &TermDisjunctionQuery{
-					Terms: []Query{
-						&TermQuery{
-							Term:     "marty",
-							Field:    "name",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-						&TermQuery{
-							Term:     "dustin",
-							Field:    "name",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-					},
-					Explain: true,
-					Min:     0,
-				},
-				MustNot: &TermDisjunctionQuery{
-					Terms: []Query{
-						&TermQuery{
-							Term:     "steve",
-							Field:    "name",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-					},
-					Explain: true,
-					Min:     0,
-				},
-				Explain: true,
-			},
+			searcher: booleanSearcher,
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "1",
@@ -83,40 +245,7 @@ func TestTermBooleanSearch(t *testing.T) {
 			},
 		},
 		{
-			index: twoDocIndex,
-			query: &TermBooleanQuery{
-				Should: &TermDisjunctionQuery{
-					Terms: []Query{
-						&TermQuery{
-							Term:     "marty",
-							Field:    "name",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-						&TermQuery{
-							Term:     "dustin",
-							Field:    "name",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-					},
-					Explain: true,
-					Min:     0,
-				},
-				MustNot: &TermDisjunctionQuery{
-					Terms: []Query{
-						&TermQuery{
-							Term:     "steve",
-							Field:    "name",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-					},
-					Explain: true,
-					Min:     0,
-				},
-				Explain: true,
-			},
+			searcher: booleanSearcher2,
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "1",
@@ -130,52 +259,11 @@ func TestTermBooleanSearch(t *testing.T) {
 		},
 		// no MUST or SHOULD clauses yields no results
 		{
-			index: twoDocIndex,
-			query: &TermBooleanQuery{
-				MustNot: &TermDisjunctionQuery{
-					Terms: []Query{
-						&TermQuery{
-							Term:     "steve",
-							Field:    "name",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-					},
-					Explain: true,
-					Min:     0,
-				},
-				Explain: true,
-			},
-			results: []*DocumentMatch{},
+			searcher: booleanSearcher3,
+			results:  []*DocumentMatch{},
 		},
 		{
-			index: twoDocIndex,
-			query: &TermBooleanQuery{
-				Must: &TermConjunctionQuery{
-					Terms: []Query{
-						&TermQuery{
-							Term:     "beer",
-							Field:    "desc",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-					},
-					Explain: true,
-				},
-				MustNot: &TermDisjunctionQuery{
-					Terms: []Query{
-						&TermQuery{
-							Term:     "steve",
-							Field:    "name",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-					},
-					Explain: true,
-					Min:     0,
-				},
-				Explain: true,
-			},
+			searcher: booleanSearcher4,
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "1",
@@ -192,39 +280,7 @@ func TestTermBooleanSearch(t *testing.T) {
 			},
 		},
 		{
-			index: twoDocIndex,
-			query: &TermBooleanQuery{
-				Must: &TermConjunctionQuery{
-					Terms: []Query{
-						&TermQuery{
-							Term:     "beer",
-							Field:    "desc",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-					},
-					Explain: true,
-				},
-				MustNot: &TermDisjunctionQuery{
-					Terms: []Query{
-						&TermQuery{
-							Term:     "steve",
-							Field:    "name",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-						&TermQuery{
-							Term:     "marty",
-							Field:    "name",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-					},
-					Explain: true,
-					Min:     0,
-				},
-				Explain: true,
-			},
+			searcher: booleanSearcher5,
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "3",
@@ -237,69 +293,12 @@ func TestTermBooleanSearch(t *testing.T) {
 			},
 		},
 		{
-			index: twoDocIndex,
-			query: &TermBooleanQuery{
-				Must: &TermConjunctionQuery{
-					Terms: []Query{
-						&TermQuery{
-							Term:     "beer",
-							Field:    "desc",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-					},
-					Explain: true,
-				},
-				Should: &TermDisjunctionQuery{
-					Terms: []Query{
-						&TermQuery{
-							Term:     "marty",
-							Field:    "name",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-						&TermQuery{
-							Term:     "dustin",
-							Field:    "name",
-							BoostVal: 1.0,
-							Explain:  true,
-						},
-					},
-					Explain: true,
-					Min:     2,
-				},
-				Explain: true,
-			},
-			results: []*DocumentMatch{},
+			searcher: booleanSearcher6,
+			results:  []*DocumentMatch{},
 		},
 		// test a conjunction query with a nested boolean
 		{
-			index: twoDocIndex,
-			query: &TermConjunctionQuery{
-				Terms: []Query{
-					&TermBooleanQuery{
-						Must: &TermConjunctionQuery{
-							Terms: []Query{
-								&TermQuery{
-									Term:     "beer",
-									Field:    "desc",
-									BoostVal: 1.0,
-									Explain:  true,
-								},
-							},
-							Explain: true,
-						},
-						Explain: true,
-					},
-					&TermQuery{
-						Term:     "marty",
-						Field:    "name",
-						BoostVal: 5.0,
-						Explain:  true,
-					},
-				},
-				Explain: true,
-			},
+			searcher: conjunctionSearcher7,
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "1",
@@ -308,62 +307,7 @@ func TestTermBooleanSearch(t *testing.T) {
 			},
 		},
 		{
-			index: twoDocIndex,
-			query: &TermConjunctionQuery{
-				Terms: []Query{
-					&TermBooleanQuery{
-						Must: &TermConjunctionQuery{
-							Terms: []Query{
-								&TermQuery{
-									Term:     "beer",
-									Field:    "desc",
-									BoostVal: 1.0,
-									Explain:  true,
-								},
-							},
-							Explain: true,
-						},
-						Should: &TermDisjunctionQuery{
-							Terms: []Query{
-								&TermQuery{
-									Term:     "marty",
-									Field:    "name",
-									BoostVal: 1.0,
-									Explain:  true,
-								},
-								&TermQuery{
-									Term:     "dustin",
-									Field:    "name",
-									BoostVal: 1.0,
-									Explain:  true,
-								},
-							},
-							Explain: true,
-							Min:     0,
-						},
-						MustNot: &TermDisjunctionQuery{
-							Terms: []Query{
-								&TermQuery{
-									Term:     "steve",
-									Field:    "name",
-									BoostVal: 1.0,
-									Explain:  true,
-								},
-							},
-							Explain: true,
-							Min:     0,
-						},
-						Explain: true,
-					},
-					&TermQuery{
-						Term:     "dustin",
-						Field:    "name",
-						BoostVal: 5.0,
-						Explain:  true,
-					},
-				},
-				Explain: true,
-			},
+			searcher: conjunctionSearcher8,
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "3",
@@ -374,10 +318,9 @@ func TestTermBooleanSearch(t *testing.T) {
 	}
 
 	for testIndex, test := range tests {
-		searcher, err := test.query.Searcher(test.index)
-		defer searcher.Close()
+		defer test.searcher.Close()
 
-		next, err := searcher.Next()
+		next, err := test.searcher.Next()
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
@@ -389,7 +332,7 @@ func TestTermBooleanSearch(t *testing.T) {
 					t.Logf("scoring explanation: %s", next.Expl)
 				}
 			}
-			next, err = searcher.Next()
+			next, err = test.searcher.Next()
 			i++
 		}
 		if err != nil {

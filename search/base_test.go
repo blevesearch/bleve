@@ -10,7 +10,10 @@ package search
 
 import (
 	"math"
+	"regexp"
 
+	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/analysis/tokenizers/regexp_tokenizer"
 	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index"
 	"github.com/couchbaselabs/bleve/index/store/inmem"
@@ -27,6 +30,11 @@ func init() {
 	}
 }
 
+// create a simpler analyzer which will support these tests
+var testAnalyzer = &analysis.Analyzer{
+	Tokenizer: regexp_tokenizer.NewRegexpTokenizer(regexp.MustCompile(`\w+`)),
+}
+
 // sets up some mock data used in many tests in this package
 var twoDocIndexDescIndexingOptions = document.DEFAULT_TEXT_INDEXING_OPTIONS | document.INCLUDE_TERM_VECTORS
 
@@ -34,28 +42,28 @@ var twoDocIndexDocs = []*document.Document{
 	// must have 4/4 beer
 	document.NewDocument("1").
 		AddField(document.NewTextField("name", []byte("marty"))).
-		AddField(document.NewTextFieldWithIndexingOptions("desc", []byte("beer beer beer beer"), twoDocIndexDescIndexingOptions)).
-		AddField(document.NewTextField("street", []byte("couchbase way"))),
+		AddField(document.NewTextFieldCustom("desc", []byte("beer beer beer beer"), twoDocIndexDescIndexingOptions, testAnalyzer)).
+		AddField(document.NewTextFieldWithAnalyzer("street", []byte("couchbase way"), testAnalyzer)),
 	// must have 1/4 beer
 	document.NewDocument("2").
 		AddField(document.NewTextField("name", []byte("steve"))).
-		AddField(document.NewTextFieldWithIndexingOptions("desc", []byte("angst beer couch database"), twoDocIndexDescIndexingOptions)).
-		AddField(document.NewTextField("street", []byte("couchbase way"))).
-		AddField(document.NewTextField("title", []byte("mister"))),
+		AddField(document.NewTextFieldCustom("desc", []byte("angst beer couch database"), twoDocIndexDescIndexingOptions, testAnalyzer)).
+		AddField(document.NewTextFieldWithAnalyzer("street", []byte("couchbase way"), testAnalyzer)).
+		AddField(document.NewTextFieldWithAnalyzer("title", []byte("mister"), testAnalyzer)),
 	// must have 1/4 beer
 	document.NewDocument("3").
 		AddField(document.NewTextField("name", []byte("dustin"))).
-		AddField(document.NewTextFieldWithIndexingOptions("desc", []byte("apple beer column dank"), twoDocIndexDescIndexingOptions)).
-		AddField(document.NewTextField("title", []byte("mister"))),
+		AddField(document.NewTextFieldCustom("desc", []byte("apple beer column dank"), twoDocIndexDescIndexingOptions, testAnalyzer)).
+		AddField(document.NewTextFieldWithAnalyzer("title", []byte("mister"), testAnalyzer)),
 	// must have 65/65 beer
 	document.NewDocument("4").
 		AddField(document.NewTextField("name", []byte("ravi"))).
-		AddField(document.NewTextFieldWithIndexingOptions("desc", []byte("beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer"), twoDocIndexDescIndexingOptions)),
+		AddField(document.NewTextFieldCustom("desc", []byte("beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer"), twoDocIndexDescIndexingOptions, testAnalyzer)),
 	// must have 0/x beer
 	document.NewDocument("5").
 		AddField(document.NewTextField("name", []byte("bobert"))).
-		AddField(document.NewTextFieldWithIndexingOptions("desc", []byte("water"), twoDocIndexDescIndexingOptions)).
-		AddField(document.NewTextField("title", []byte("mister"))),
+		AddField(document.NewTextFieldCustom("desc", []byte("water"), twoDocIndexDescIndexingOptions, testAnalyzer)).
+		AddField(document.NewTextFieldWithAnalyzer("title", []byte("mister"), testAnalyzer)),
 }
 
 func scoresCloseEnough(a, b float64) bool {

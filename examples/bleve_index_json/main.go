@@ -13,67 +13,64 @@ import (
 	"io/ioutil"
 	"log"
 
-	"github.com/couchbaselabs/bleve/document"
-	"github.com/couchbaselabs/bleve/index/store/leveldb"
-	"github.com/couchbaselabs/bleve/index/upside_down"
-	"github.com/couchbaselabs/bleve/shredder"
+	"github.com/couchbaselabs/bleve"
 )
 
 var jsonDir = flag.String("jsonDir", "json", "json directory")
 var indexDir = flag.String("indexDir", "index", "index directory")
-var storeFields = flag.Bool("storeFields", false, "store field data")
-var includeTermVectors = flag.Bool("includeTermVectors", false, "include term vectors")
 
 func main() {
 
 	flag.Parse()
 
-	indexOptions := document.INDEX_FIELD
-	if *storeFields {
-		indexOptions |= document.STORE_FIELD
-	}
-	if *includeTermVectors {
-		indexOptions |= document.INCLUDE_TERM_VECTORS
-	}
+	// create a new default mapping
+	mapping := bleve.NewIndexMapping()
 
-	// create a automatic JSON document shredder
-	jsonShredder := shredder.NewAutoJsonShredderWithOptions(indexOptions)
-
-	// create a new index
-	store, err := leveldb.Open(*indexDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-	index := upside_down.NewUpsideDownCouch(store)
-	err = index.Open()
+	// open the index
+	index, err := bleve.Open(*indexDir, mapping)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer index.Close()
 
-	// open the directory
-	dirEntries, err := ioutil.ReadDir(*jsonDir)
-	if err != nil {
-		log.Fatal(err)
+	for jsonFile := range walkDirectory(*jsonDir) {
+		// index the json files
+		err = index.IndexJSONID(jsonFile.filename, jsonFile.contents)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
+}
 
-	// walk the directory entries
-	for _, dirEntry := range dirEntries {
-		// read the bytes
-		jsonBytes, err := ioutil.ReadFile(*jsonDir + "/" + dirEntry.Name())
+type jsonFile struct {
+	filename string
+	contents []byte
+}
+
+func walkDirectory(dir string) chan jsonFile {
+	rv := make(chan jsonFile)
+	go func() {
+		defer close(rv)
+
+		// open the directory
+		dirEntries, err := ioutil.ReadDir(*jsonDir)
 		if err != nil {
 			log.Fatal(err)
 		}
-		// shred them into a document
-		doc, err := jsonShredder.Shred(dirEntry.Name(), jsonBytes)
-		if err != nil {
-			log.Fatal(err)
+
+		// walk the directory entries
+		for _, dirEntry := range dirEntries {
+			// read the bytes
+			jsonBytes, err := ioutil.ReadFile(*jsonDir + "/" + dirEntry.Name())
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			rv <- jsonFile{
+				filename: dirEntry.Name(),
+				contents: jsonBytes,
+			}
 		}
-		//log.Printf("%+v", doc)
-		// update the index
-		err = index.Update(doc)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
+	}()
+	return rv
 }

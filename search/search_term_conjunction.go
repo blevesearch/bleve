@@ -18,20 +18,17 @@ import (
 type TermConjunctionSearcher struct {
 	index     index.Index
 	searchers OrderedSearcherList
+	explain   bool
 	queryNorm float64
 	currs     []*DocumentMatch
 	currentId string
 	scorer    *TermConjunctionQueryScorer
 }
 
-func NewTermConjunctionSearcher(index index.Index, query *TermConjunctionQuery) (*TermConjunctionSearcher, error) {
+func NewTermConjunctionSearcher(index index.Index, qsearchers []Searcher, explain bool) (*TermConjunctionSearcher, error) {
 	// build the downstream searchres
-	searchers := make(OrderedSearcherList, len(query.Terms))
-	for i, termQuery := range query.Terms {
-		searcher, err := termQuery.Searcher(index)
-		if err != nil {
-			return nil, err
-		}
+	searchers := make(OrderedSearcherList, len(qsearchers))
+	for i, searcher := range qsearchers {
 		searchers[i] = searcher
 	}
 	// sort the searchers
@@ -39,9 +36,10 @@ func NewTermConjunctionSearcher(index index.Index, query *TermConjunctionQuery) 
 	// build our searcher
 	rv := TermConjunctionSearcher{
 		index:     index,
+		explain:   explain,
 		searchers: searchers,
 		currs:     make([]*DocumentMatch, len(searchers)),
-		scorer:    NewTermConjunctionQueryScorer(query.Explain),
+		scorer:    NewTermConjunctionQueryScorer(explain),
 	}
 	rv.computeQueryNorm()
 	err := rv.initSearchers()

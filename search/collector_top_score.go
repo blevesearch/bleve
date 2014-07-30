@@ -15,6 +15,7 @@ import (
 
 type TopScoreCollector struct {
 	k        int
+	skip     int
 	results  *list.List
 	took     time.Duration
 	maxScore float64
@@ -24,6 +25,15 @@ type TopScoreCollector struct {
 func NewTopScorerCollector(k int) *TopScoreCollector {
 	return &TopScoreCollector{
 		k:       k,
+		skip:    0,
+		results: list.New(),
+	}
+}
+
+func NewTopScorerSkipCollector(k, skip int) *TopScoreCollector {
+	return &TopScoreCollector{
+		k:       k,
+		skip:    skip,
 		results: list.New(),
 	}
 }
@@ -70,7 +80,7 @@ func (tksc *TopScoreCollector) collectSingle(dm *DocumentMatch) {
 
 			tksc.results.InsertBefore(dm, e)
 			// if we just made the list too long
-			if tksc.results.Len() > tksc.k {
+			if tksc.results.Len() > (tksc.k + tksc.skip) {
 				// remove the head
 				tksc.results.Remove(tksc.results.Front())
 			}
@@ -79,18 +89,26 @@ func (tksc *TopScoreCollector) collectSingle(dm *DocumentMatch) {
 	}
 	// if we got to the end, we still have to add it
 	tksc.results.PushBack(dm)
-	if tksc.results.Len() > tksc.k {
+	if tksc.results.Len() > (tksc.k + tksc.skip) {
 		// remove the head
 		tksc.results.Remove(tksc.results.Front())
 	}
 }
 
 func (tksc *TopScoreCollector) Results() DocumentMatchCollection {
-	rv := make(DocumentMatchCollection, tksc.results.Len())
-	i := 0
-	for e := tksc.results.Back(); e != nil; e = e.Prev() {
-		rv[i] = e.Value.(*DocumentMatch)
-		i++
+	if tksc.results.Len()-tksc.skip > 0 {
+		rv := make(DocumentMatchCollection, tksc.results.Len()-tksc.skip)
+		i := 0
+		skipped := 0
+		for e := tksc.results.Back(); e != nil; e = e.Prev() {
+			if skipped < tksc.skip {
+				skipped++
+				continue
+			}
+			rv[i] = e.Value.(*DocumentMatch)
+			i++
+		}
+		return rv
 	}
-	return rv
+	return DocumentMatchCollection{}
 }

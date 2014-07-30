@@ -10,37 +10,51 @@ package search
 
 import (
 	"testing"
-
-	"github.com/couchbaselabs/bleve/index"
 )
 
 func TestTermDisjunctionSearch(t *testing.T) {
 
+	martyTermSearcher, err := NewTermSearcher(twoDocIndex, "marty", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dustinTermSearcher, err := NewTermSearcher(twoDocIndex, "dustin", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	martyOrDustinSearcher, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher, dustinTermSearcher}, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	martyTermSearcher2, err := NewTermSearcher(twoDocIndex, "marty", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dustinTermSearcher2, err := NewTermSearcher(twoDocIndex, "dustin", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	martyOrDustinSearcher2, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher2, dustinTermSearcher2}, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	raviTermSearcher, err := NewTermSearcher(twoDocIndex, "ravi", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nestedRaviOrMartyOrDustinSearcher, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{raviTermSearcher, martyOrDustinSearcher2}, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	tests := []struct {
-		index   index.Index
-		query   Query
-		results []*DocumentMatch
+		searcher Searcher
+		results  []*DocumentMatch
 	}{
 		{
-			index: twoDocIndex,
-			query: &TermDisjunctionQuery{
-				Terms: []Query{
-					&TermQuery{
-						Term:     "marty",
-						Field:    "name",
-						BoostVal: 1.0,
-						Explain:  true,
-					},
-					&TermQuery{
-						Term:     "dustin",
-						Field:    "name",
-						BoostVal: 1.0,
-						Explain:  true,
-					},
-				},
-				Explain: true,
-				Min:     0,
-			},
+			searcher: martyOrDustinSearcher,
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "1",
@@ -54,37 +68,7 @@ func TestTermDisjunctionSearch(t *testing.T) {
 		},
 		// test a nested disjunction
 		{
-			index: twoDocIndex,
-			query: &TermDisjunctionQuery{
-				Terms: []Query{
-					&TermQuery{
-						Term:     "ravi",
-						Field:    "name",
-						BoostVal: 1.0,
-						Explain:  true,
-					},
-					&TermDisjunctionQuery{
-						Terms: []Query{
-							&TermQuery{
-								Term:     "marty",
-								Field:    "name",
-								BoostVal: 1.0,
-								Explain:  true,
-							},
-							&TermQuery{
-								Term:     "dustin",
-								Field:    "name",
-								BoostVal: 1.0,
-								Explain:  true,
-							},
-						},
-						Explain: true,
-						Min:     0,
-					},
-				},
-				Explain: true,
-				Min:     0,
-			},
+			searcher: nestedRaviOrMartyOrDustinSearcher,
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "1",
@@ -103,10 +87,10 @@ func TestTermDisjunctionSearch(t *testing.T) {
 	}
 
 	for testIndex, test := range tests {
-		searcher, err := test.query.Searcher(test.index)
-		defer searcher.Close()
 
-		next, err := searcher.Next()
+		defer test.searcher.Close()
+
+		next, err := test.searcher.Next()
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
@@ -118,7 +102,7 @@ func TestTermDisjunctionSearch(t *testing.T) {
 					t.Logf("scoring explanation: %s", next.Expl)
 				}
 			}
-			next, err = searcher.Next()
+			next, err = test.searcher.Next()
 			i++
 		}
 		if err != nil {
@@ -131,27 +115,21 @@ func TestTermDisjunctionSearch(t *testing.T) {
 }
 
 func TestDisjunctionAdvance(t *testing.T) {
-	query := &TermDisjunctionQuery{
-		Terms: []Query{
-			&TermQuery{
-				Term:     "marty",
-				Field:    "name",
-				BoostVal: 1.0,
-				Explain:  true,
-			},
-			&TermQuery{
-				Term:     "dustin",
-				Field:    "name",
-				BoostVal: 1.0,
-				Explain:  true,
-			},
-		},
-		Explain: true,
-		Min:     0,
+
+	martyTermSearcher, err := NewTermSearcher(twoDocIndex, "marty", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dustinTermSearcher, err := NewTermSearcher(twoDocIndex, "dustin", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	martyOrDustinSearcher, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher, dustinTermSearcher}, 0, true)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	searcher, err := query.Searcher(twoDocIndex)
-	match, err := searcher.Advance("3")
+	match, err := martyOrDustinSearcher.Advance("3")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

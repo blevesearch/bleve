@@ -9,7 +9,8 @@
 package document
 
 import (
-	"encoding/json"
+	"fmt"
+	"log"
 )
 
 type Document struct {
@@ -36,7 +37,21 @@ func (d *Document) AddField(f Field) *Document {
 	return d
 }
 
-func (d *Document) String() string {
-	bytes, _ := json.MarshalIndent(d, "", "    ")
-	return string(bytes)
+func (d *Document) GoString() string {
+	fields := ""
+	for i, field := range d.Fields {
+		if i != 0 {
+			fields += ", "
+		}
+		fields += fmt.Sprintf("%#v", field)
+	}
+	compositeFields := ""
+	for i, field := range d.CompositeFields {
+		log.Printf("see composite field")
+		if i != 0 {
+			compositeFields += ", "
+		}
+		compositeFields += fmt.Sprintf("%#v", field)
+	}
+	return fmt.Sprintf("&document.Document{ID:%s, Fields: %s, CompositeFields: %s}", d.ID, fields, compositeFields)
 }

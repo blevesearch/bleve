@@ -27,3 +27,23 @@ func (o IndexingOptions) IsStored() bool {
 func (o IndexingOptions) IncludeTermVectors() bool {
 	return o&INCLUDE_TERM_VECTORS != 0
 }
+
+func (o IndexingOptions) String() string {
+	rv := ""
+	if o.IsIndexed() {
+		rv += "INDEXED"
+	}
+	if o.IsStored() {
+		if rv != "" {
+			rv += ", "
+		}
+		rv += "STORE"
+	}
+	if o.IncludeTermVectors() {
+		if rv != "" {
+			rv += ", "
+		}
+		rv += "TV"
+	}
+	return rv
+}

@@ -19,11 +19,11 @@ type LengthFilter struct {
 	max int
 }
 
-func NewLengthFilter(min, max int) (*LengthFilter, error) {
+func NewLengthFilter(min, max int) *LengthFilter {
 	return &LengthFilter{
 		min: min,
 		max: max,
-	}, nil
+	}
 }
 
 func (f *LengthFilter) Filter(input analysis.TokenStream) analysis.TokenStream {

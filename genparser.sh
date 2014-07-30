@@ -1,0 +1,6 @@
+#! /bin/sh
+
+echo Running nex...
+nex query_syntax.nex
+echo Running goyacc...
+go tool yacc query_syntax.y

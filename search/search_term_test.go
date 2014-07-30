@@ -19,12 +19,10 @@ import (
 
 func TestTermSearcher(t *testing.T) {
 
-	query := TermQuery{
-		Term:     "beer",
-		Field:    "desc",
-		BoostVal: 3.0,
-		Explain:  true,
-	}
+	var queryTerm = "beer"
+	var queryField = "desc"
+	var queryBoost = 3.0
+	var queryExplain = true
 
 	inMemStore, _ := inmem.Open()
 	i := upside_down.NewUpsideDownCouch(inMemStore)
@@ -89,7 +87,7 @@ func TestTermSearcher(t *testing.T) {
 		},
 	})
 
-	searcher, err := NewTermSearcher(i, &query)
+	searcher, err := NewTermSearcher(i, queryTerm, queryField, queryBoost, queryExplain)
 	if err != nil {
 		t.Fatal(err)
 	}

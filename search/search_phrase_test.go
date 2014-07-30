@@ -10,36 +10,33 @@ package search
 
 import (
 	"testing"
-
-	"github.com/couchbaselabs/bleve/index"
 )
 
 func TestPhraseSearch(t *testing.T) {
 
+	angstTermSearcher, err := NewTermSearcher(twoDocIndex, "angst", "desc", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beerTermSearcher, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustSearcher, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{angstTermSearcher, beerTermSearcher}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	phraseSearcher, err := NewPhraseSearcher(twoDocIndex, mustSearcher, []string{"angst", "beer"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	tests := []struct {
-		index   index.Index
-		query   Query
-		results []*DocumentMatch
+		searcher Searcher
+		results  []*DocumentMatch
 	}{
 		{
-			index: twoDocIndex,
-			query: &PhraseQuery{
-				Terms: []*TermQuery{
-					&TermQuery{
-						Term:     "angst",
-						Field:    "desc",
-						BoostVal: 1.0,
-						Explain:  true,
-					},
-					&TermQuery{
-						Term:     "beer",
-						Field:    "desc",
-						BoostVal: 1.0,
-						Explain:  true,
-					},
-				},
-				Explain: true,
-			},
+			searcher: phraseSearcher,
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "2",
@@ -50,10 +47,9 @@ func TestPhraseSearch(t *testing.T) {
 	}
 
 	for testIndex, test := range tests {
-		searcher, err := test.query.Searcher(test.index)
-		defer searcher.Close()
+		defer test.searcher.Close()
 
-		next, err := searcher.Next()
+		next, err := test.searcher.Next()
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
@@ -65,7 +61,7 @@ func TestPhraseSearch(t *testing.T) {
 					t.Logf("scoring explanation: %s", next.Expl)
 				}
 			}
-			next, err = searcher.Next()
+			next, err = test.searcher.Next()
 			i++
 		}
 		if err != nil {

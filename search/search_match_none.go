@@ -14,13 +14,11 @@ import (
 
 type MatchNoneSearcher struct {
 	index index.Index
-	query *MatchNoneQuery
 }
 
-func NewMatchNoneSearcher(index index.Index, query *MatchNoneQuery) (*MatchNoneSearcher, error) {
+func NewMatchNoneSearcher(index index.Index) (*MatchNoneSearcher, error) {
 	return &MatchNoneSearcher{
 		index: index,
-		query: query,
 	}, nil
 }
 

@@ -18,16 +18,12 @@ import (
 
 func TestTermScorer(t *testing.T) {
 
-	query := TermQuery{
-		Term:     "beer",
-		Field:    "desc",
-		BoostVal: 1.0,
-		Explain:  true,
-	}
-
 	var docTotal uint64 = 100
 	var docTerm uint64 = 9
-	scorer := NewTermQueryScorer(&query, docTotal, docTerm, true)
+	var queryTerm = "beer"
+	var queryField = "desc"
+	var queryBoost = 1.0
+	scorer := NewTermQueryScorer(queryTerm, queryField, queryBoost, docTotal, docTerm, true)
 	idf := 1.0 + math.Log(float64(docTotal)/float64(docTerm+1.0))
 
 	tests := []struct {
@@ -157,16 +153,12 @@ func TestTermScorer(t *testing.T) {
 
 func TestTermScorerWithQueryNorm(t *testing.T) {
 
-	query := TermQuery{
-		Term:     "beer",
-		Field:    "desc",
-		BoostVal: 3.0,
-		Explain:  true,
-	}
-
 	var docTotal uint64 = 100
 	var docTerm uint64 = 9
-	scorer := NewTermQueryScorer(&query, docTotal, docTerm, true)
+	var queryTerm = "beer"
+	var queryField = "desc"
+	var queryBoost = 3.0
+	scorer := NewTermQueryScorer(queryTerm, queryField, queryBoost, docTotal, docTerm, true)
 	idf := 1.0 + math.Log(float64(docTotal)/float64(docTerm+1.0))
 
 	scorer.SetQueryNorm(2.0)

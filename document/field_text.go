@@ -9,21 +9,10 @@
 package document
 
 import (
-	"log"
+	"fmt"
 
 	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/analysis/analyzers/standard_analyzer"
 )
-
-var standardAnalyzer *analysis.Analyzer
-
-func init() {
-	var err error
-	standardAnalyzer, err = standard_analyzer.NewStandardAnalyzer()
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 
 const DEFAULT_TEXT_INDEXING_OPTIONS = INDEX_FIELD
 
@@ -43,7 +32,19 @@ func (t *TextField) Options() IndexingOptions {
 }
 
 func (t *TextField) Analyze() (int, analysis.TokenFrequencies) {
-	tokens := t.analyzer.Analyze(t.Value())
+	var tokens analysis.TokenStream
+	if t.analyzer != nil {
+		tokens = t.analyzer.Analyze(t.Value())
+	} else {
+		tokens = analysis.TokenStream{
+			&analysis.Token{
+				Start:    0,
+				End:      len(t.value),
+				Term:     t.value,
+				Position: 1,
+			},
+		}
+	}
 	fieldLength := len(tokens) // number of tokens in this doc field
 	tokenFreqs := analysis.TokenFrequency(tokens)
 	return fieldLength, tokenFreqs
@@ -53,15 +54,27 @@ func (t *TextField) Value() []byte {
 	return t.value
 }
 
+func (t *TextField) GoString() string {
+	return fmt.Sprintf("&document.TextField{Name:%s, Options: %s, Analyzer: %s, Value: %s}", t.name, t.options, t.analyzer, t.value)
+}
+
 func NewTextField(name string, value []byte) *TextField {
 	return NewTextFieldWithIndexingOptions(name, value, DEFAULT_TEXT_INDEXING_OPTIONS)
 }
 
 func NewTextFieldWithIndexingOptions(name string, value []byte, options IndexingOptions) *TextField {
 	return &TextField{
+		name:    name,
+		options: options,
+		value:   value,
+	}
+}
+
+func NewTextFieldWithAnalyzer(name string, value []byte, analyzer *analysis.Analyzer) *TextField {
+	return &TextField{
 		name:     name,
-		options:  options,
-		analyzer: standardAnalyzer,
+		options:  DEFAULT_TEXT_INDEXING_OPTIONS,
+		analyzer: analyzer,
 		value:    value,
 	}
 }

@@ -10,24 +10,27 @@ package search
 
 import (
 	"testing"
-
-	"github.com/couchbaselabs/bleve/index"
 )
 
 func TestMatchAllSearch(t *testing.T) {
 
+	allSearcher, err := NewMatchAllSearcher(twoDocIndex, 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	allSearcher2, err := NewMatchAllSearcher(twoDocIndex, 1.2, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	tests := []struct {
-		index     index.Index
-		query     Query
+		searcher  Searcher
 		queryNorm float64
 		results   []*DocumentMatch
 	}{
 		{
-			index: twoDocIndex,
-			query: &MatchAllQuery{
-				BoostVal: 1.0,
-				Explain:  true,
-			},
+			searcher:  allSearcher,
 			queryNorm: 1.0,
 			results: []*DocumentMatch{
 				&DocumentMatch{
@@ -53,11 +56,7 @@ func TestMatchAllSearch(t *testing.T) {
 			},
 		},
 		{
-			index: twoDocIndex,
-			query: &MatchAllQuery{
-				BoostVal: 1.2,
-				Explain:  true,
-			},
+			searcher:  allSearcher2,
 			queryNorm: 0.8333333,
 			results: []*DocumentMatch{
 				&DocumentMatch{
@@ -85,13 +84,13 @@ func TestMatchAllSearch(t *testing.T) {
 	}
 
 	for testIndex, test := range tests {
-		searcher, err := test.query.Searcher(test.index)
-		if test.queryNorm != 1.0 {
-			searcher.SetQueryNorm(test.queryNorm)
-		}
-		defer searcher.Close()
 
-		next, err := searcher.Next()
+		if test.queryNorm != 1.0 {
+			test.searcher.SetQueryNorm(test.queryNorm)
+		}
+		defer test.searcher.Close()
+
+		next, err := test.searcher.Next()
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
@@ -103,7 +102,7 @@ func TestMatchAllSearch(t *testing.T) {
 					t.Logf("scoring explanation: %s", next.Expl)
 				}
 			}
-			next, err = searcher.Next()
+			next, err = test.searcher.Next()
 			i++
 		}
 		if err != nil {

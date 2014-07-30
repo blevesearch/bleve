@@ -13,23 +13,27 @@ import (
 )
 
 type TermSearcher struct {
-	index  index.Index
-	query  *TermQuery
-	reader index.TermFieldReader
-	scorer *TermQueryScorer
+	index   index.Index
+	term    string
+	field   string
+	explain bool
+	reader  index.TermFieldReader
+	scorer  *TermQueryScorer
 }
 
-func NewTermSearcher(index index.Index, query *TermQuery) (*TermSearcher, error) {
-	reader, err := index.TermFieldReader([]byte(query.Term), query.Field)
+func NewTermSearcher(index index.Index, term string, field string, boost float64, explain bool) (*TermSearcher, error) {
+	reader, err := index.TermFieldReader([]byte(term), field)
 	if err != nil {
 		return nil, err
 	}
-	scorer := NewTermQueryScorer(query, index.DocCount(), reader.Count(), query.Explain)
+	scorer := NewTermQueryScorer(term, field, boost, index.DocCount(), reader.Count(), explain)
 	return &TermSearcher{
-		index:  index,
-		query:  query,
-		reader: reader,
-		scorer: scorer,
+		index:   index,
+		term:    term,
+		field:   field,
+		explain: explain,
+		reader:  reader,
+		scorer:  scorer,
 	}, nil
 }
 

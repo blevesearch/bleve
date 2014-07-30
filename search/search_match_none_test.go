@@ -10,31 +10,29 @@ package search
 
 import (
 	"testing"
-
-	"github.com/couchbaselabs/bleve/index"
 )
 
 func TestMatchNoneSearch(t *testing.T) {
 
+	noneSearcher, err := NewMatchNoneSearcher(twoDocIndex)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	tests := []struct {
-		index   index.Index
-		query   Query
-		results []*DocumentMatch
+		searcher Searcher
+		results  []*DocumentMatch
 	}{
 		{
-			index: twoDocIndex,
-			query: &MatchNoneQuery{
-				Explain: true,
-			},
-			results: []*DocumentMatch{},
+			searcher: noneSearcher,
+			results:  []*DocumentMatch{},
 		},
 	}
 
 	for testIndex, test := range tests {
-		searcher, err := test.query.Searcher(test.index)
-		defer searcher.Close()
+		defer test.searcher.Close()
 
-		next, err := searcher.Next()
+		next, err := test.searcher.Next()
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
@@ -46,7 +44,7 @@ func TestMatchNoneSearch(t *testing.T) {
 					t.Logf("scoring explanation: %s", next.Expl)
 				}
 			}
-			next, err = searcher.Next()
+			next, err = test.searcher.Next()
 			i++
 		}
 		if err != nil {

@@ -14,26 +14,26 @@ import (
 
 type ConstantScorer struct {
 	constant               float64
-	query                  Query
+	boost                  float64
 	explain                bool
 	queryNorm              float64
 	queryWeight            float64
 	queryWeightExplanation *Explanation
 }
 
-func NewConstantScorer(query Query, constant float64, explain bool) *ConstantScorer {
+func NewConstantScorer(constant float64, boost float64, explain bool) *ConstantScorer {
 	rv := ConstantScorer{
-		query:       query,
 		explain:     explain,
 		queryWeight: 1.0,
 		constant:    constant,
+		boost:       boost,
 	}
 
 	return &rv
 }
 
 func (s *ConstantScorer) Weight() float64 {
-	sum := s.query.Boost()
+	sum := s.boost
 	return sum * sum
 }
 
@@ -41,12 +41,12 @@ func (s *ConstantScorer) SetQueryNorm(qnorm float64) {
 	s.queryNorm = qnorm
 
 	// update the query weight
-	s.queryWeight = s.query.Boost() * s.queryNorm
+	s.queryWeight = s.boost * s.queryNorm
 
 	if s.explain {
 		childrenExplanations := make([]*Explanation, 2)
 		childrenExplanations[0] = &Explanation{
-			Value:   s.query.Boost(),
+			Value:   s.boost,
 			Message: "boost",
 		}
 		childrenExplanations[1] = &Explanation{
@@ -55,7 +55,7 @@ func (s *ConstantScorer) SetQueryNorm(qnorm float64) {
 		}
 		s.queryWeightExplanation = &Explanation{
 			Value:    s.queryWeight,
-			Message:  fmt.Sprintf("ConstantScore()^%f, product of:", s.query.Boost()),
+			Message:  fmt.Sprintf("ConstantScore()^%f, product of:", s.boost),
 			Children: childrenExplanations,
 		}
 	}
@@ -82,7 +82,7 @@ func (s *ConstantScorer) Score(id string) *DocumentMatch {
 			childExplanations[1] = scoreExplanation
 			scoreExplanation = &Explanation{
 				Value:    score,
-				Message:  fmt.Sprintf("weight(^%f), product of:", s.query.Boost()),
+				Message:  fmt.Sprintf("weight(^%f), product of:", s.boost),
 				Children: childExplanations,
 			}
 		}

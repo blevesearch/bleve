@@ -41,10 +41,7 @@ func TestLowerCaseFilter(t *testing.T) {
 		},
 	}
 
-	filter, err := NewLowerCaseFilter()
-	if err != nil {
-		t.Fatal(err)
-	}
+	filter := NewLowerCaseFilter()
 	ouputTokenStream := filter.Filter(inputTokenStream)
 	if !reflect.DeepEqual(ouputTokenStream, expectedTokenStream) {
 		t.Errorf("expected %#v got %#v", expectedTokenStream, ouputTokenStream)

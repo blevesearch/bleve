@@ -24,10 +24,10 @@ type StopWordsFilter struct {
 	stopWords map[string]bool
 }
 
-func NewStopWordsFilter() (*StopWordsFilter, error) {
+func NewStopWordsFilter() *StopWordsFilter {
 	return &StopWordsFilter{
 		stopWords: buildStopWordMap(DEFAULT_STOP_WORDS),
-	}, nil
+	}
 }
 
 func (f *StopWordsFilter) Filter(input analysis.TokenStream) analysis.TokenStream {

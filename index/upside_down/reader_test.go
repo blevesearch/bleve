@@ -13,7 +13,6 @@ import (
 	"reflect"
 	"testing"
 
-	_ "github.com/couchbaselabs/bleve/analysis/analyzers/standard_analyzer"
 	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index"
 	"github.com/couchbaselabs/bleve/index/store/gouchstore"
@@ -40,8 +39,8 @@ func TestIndexReader(t *testing.T) {
 	expectedCount += 1
 
 	doc = document.NewDocument("2")
-	doc.AddField(document.NewTextField("name", []byte("test test test")))
-	doc.AddField(document.NewTextFieldWithIndexingOptions("desc", []byte("eat more rice"), document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS))
+	doc.AddField(document.NewTextFieldWithAnalyzer("name", []byte("test test test"), testAnalyzer))
+	doc.AddField(document.NewTextFieldCustom("desc", []byte("eat more rice"), document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS, testAnalyzer))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)

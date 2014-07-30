@@ -28,10 +28,7 @@ func TestLengthFilter(t *testing.T) {
 		},
 	}
 
-	lengthFilter, err := NewLengthFilter(3, 4)
-	if err != nil {
-		t.Fatal(err)
-	}
+	lengthFilter := NewLengthFilter(3, 4)
 	ouputTokenStream := lengthFilter.Filter(inputTokenStream)
 	if len(ouputTokenStream) != 1 {
 		t.Fatalf("expected 1 output token")
@@ -55,10 +52,7 @@ func TestLengthFilterNoMax(t *testing.T) {
 		},
 	}
 
-	lengthFilter, err := NewLengthFilter(3, -1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	lengthFilter := NewLengthFilter(3, -1)
 	ouputTokenStream := lengthFilter.Filter(inputTokenStream)
 	if len(ouputTokenStream) != 2 {
 		t.Fatalf("expected 2 output token")
@@ -85,10 +79,7 @@ func TestLengthFilterNoMin(t *testing.T) {
 		},
 	}
 
-	lengthFilter, err := NewLengthFilter(-1, 4)
-	if err != nil {
-		t.Fatal(err)
-	}
+	lengthFilter := NewLengthFilter(-1, 4)
 	ouputTokenStream := lengthFilter.Filter(inputTokenStream)
 	if len(ouputTokenStream) != 2 {
 		t.Fatalf("expected 2 output token")
