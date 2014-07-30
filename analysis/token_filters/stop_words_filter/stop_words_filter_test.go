@@ -44,7 +44,12 @@ func TestStopWordsFilter(t *testing.T) {
 		},
 	}
 
-	filter := NewStopWordsFilter()
+	stopWordsMap := NewStopWordsMap()
+	err := stopWordsMap.LoadBytes(EnglishStopWords)
+	if err != nil {
+		t.Fatal(err)
+	}
+	filter := NewStopWordsFilter(stopWordsMap)
 	ouputTokenStream := filter.Filter(inputTokenStream)
 	if !reflect.DeepEqual(ouputTokenStream, expectedTokenStream) {
 		t.Errorf("expected %#v got %#v", expectedTokenStream, ouputTokenStream)

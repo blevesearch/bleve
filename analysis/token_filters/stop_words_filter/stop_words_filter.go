@@ -12,21 +12,21 @@ import (
 	"github.com/couchbaselabs/bleve/analysis"
 )
 
-var DEFAULT_STOP_WORDS []string = []string{
-	"a", "an", "and", "are", "as", "at", "be", "but", "by",
-	"for", "if", "in", "into", "is", "it",
-	"no", "not", "of", "on", "or", "such",
-	"that", "the", "their", "then", "there", "these",
-	"they", "this", "to", "was", "will", "with",
-}
+// var DEFAULT_STOP_WORDS []string = []string{
+// 	"a", "an", "and", "are", "as", "at", "be", "but", "by",
+// 	"for", "if", "in", "into", "is", "it",
+// 	"no", "not", "of", "on", "or", "such",
+// 	"that", "the", "their", "then", "there", "these",
+// 	"they", "this", "to", "was", "will", "with",
+// }
 
 type StopWordsFilter struct {
-	stopWords map[string]bool
+	stopWords StopWordsMap
 }
 
-func NewStopWordsFilter() *StopWordsFilter {
+func NewStopWordsFilter(stopWordsMap StopWordsMap) *StopWordsFilter {
 	return &StopWordsFilter{
-		stopWords: buildStopWordMap(DEFAULT_STOP_WORDS),
+		stopWords: stopWordsMap,
 	}
 }
 
@@ -44,10 +44,10 @@ func (f *StopWordsFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
 	return rv
 }
 
-func buildStopWordMap(words []string) map[string]bool {
-	rv := make(map[string]bool, len(words))
-	for _, word := range words {
-		rv[word] = true
-	}
-	return rv
-}
+// func buildStopWordMap(words []string) map[string]bool {
+// 	rv := make(map[string]bool, len(words))
+// 	for _, word := range words {
+// 		rv[word] = true
+// 	}
+// 	return rv
+// }
