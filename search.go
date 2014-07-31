@@ -73,7 +73,11 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 
 }
 
-func NewSearchRequest(q Query, size, from int, explain bool) *SearchRequest {
+func NewSearchRequest(q Query) *SearchRequest {
+	return NewSearchRequestOptions(q, 10, 0, false)
+}
+
+func NewSearchRequestOptions(q Query, size, from int, explain bool) *SearchRequest {
 	return &SearchRequest{
 		Query:   q,
 		Size:    size,

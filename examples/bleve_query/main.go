@@ -48,7 +48,7 @@ func main() {
 	// build a search with the provided parameters
 	queryString := strings.Join(flag.Args(), " ")
 	query := bleve.NewSyntaxQuery(queryString)
-	searchRequest := bleve.NewSearchRequest(query, *limit, *skip, *explain)
+	searchRequest := bleve.NewSearchRequestOptions(query, *limit, *skip, *explain)
 
 	// enable highlights if requested
 	if *includeHighlights {
