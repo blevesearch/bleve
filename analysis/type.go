@@ -16,11 +16,19 @@ type CharFilter interface {
 	Filter([]byte) []byte
 }
 
+type TokenType int
+
+const (
+	AlphaNumeric TokenType = iota
+	Numeric
+)
+
 type Token struct {
 	Start    int
 	End      int
 	Term     []byte
 	Position int
+	Type     TokenType
 }
 
 func (t *Token) String() string {

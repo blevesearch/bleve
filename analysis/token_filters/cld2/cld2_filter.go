@@ -38,6 +38,7 @@ func (f *Cld2Filter) Filter(input analysis.TokenStream) analysis.TokenStream {
 		}
 		token.Start = offset
 		token.End = token.Start + len(token.Term)
+		token.Type = analysis.AlphaNumeric
 		rv = append(rv, token)
 		offset = token.End + 1
 	}

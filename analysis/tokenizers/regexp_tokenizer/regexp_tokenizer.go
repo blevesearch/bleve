@@ -33,6 +33,7 @@ func (rt *RegexpTokenizer) Tokenize(input []byte) analysis.TokenStream {
 			Start:    match[0],
 			End:      match[1],
 			Position: i + 1,
+			Type:     analysis.AlphaNumeric,
 		}
 		rv[i] = &token
 	}

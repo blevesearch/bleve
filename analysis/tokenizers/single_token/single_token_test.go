@@ -25,10 +25,11 @@ func TestSingleTokenTokenizer(t *testing.T) {
 			[]byte("Hello World"),
 			analysis.TokenStream{
 				{
-					0,
-					11,
-					[]byte("Hello World"),
-					1,
+					Start:    0,
+					End:      11,
+					Term:     []byte("Hello World"),
+					Position: 1,
+					Type:     analysis.AlphaNumeric,
 				},
 			},
 		},
@@ -36,10 +37,11 @@ func TestSingleTokenTokenizer(t *testing.T) {
 			[]byte("こんにちは世界"),
 			analysis.TokenStream{
 				{
-					0,
-					21,
-					[]byte("こんにちは世界"),
-					1,
+					Start:    0,
+					End:      21,
+					Term:     []byte("こんにちは世界"),
+					Position: 1,
+					Type:     analysis.AlphaNumeric,
 				},
 			},
 		},
@@ -47,10 +49,11 @@ func TestSingleTokenTokenizer(t *testing.T) {
 			[]byte("แยกคำภาษาไทยก็ทำได้นะจ้ะ"),
 			analysis.TokenStream{
 				{
-					0,
-					72,
-					[]byte("แยกคำภาษาไทยก็ทำได้นะจ้ะ"),
-					1,
+					Start:    0,
+					End:      72,
+					Term:     []byte("แยกคำภาษาไทยก็ทำได้นะจ้ะ"),
+					Position: 1,
+					Type:     analysis.AlphaNumeric,
 				},
 			},
 		},

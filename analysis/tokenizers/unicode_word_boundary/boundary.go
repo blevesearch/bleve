@@ -103,6 +103,7 @@ func (t *UnicodeWordBoundaryTokenizer) Tokenize(input []byte) analysis.TokenStre
 				End:      int(indexB),
 				Term:     input[indexA:indexB],
 				Position: position,
+				Type:     analysis.AlphaNumeric,
 			}
 			rv = append(rv, &token)
 		}

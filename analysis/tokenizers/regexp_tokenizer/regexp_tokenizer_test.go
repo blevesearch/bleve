@@ -6,16 +6,19 @@
 //  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
-package simple_word_boundary
+package regexp_tokenizer
 
 import (
 	"reflect"
+	"regexp"
 	"testing"
 
 	"github.com/couchbaselabs/bleve/analysis"
 )
 
 func TestBoundary(t *testing.T) {
+
+	wordRegex := regexp.MustCompile(`\w+`)
 
 	tests := []struct {
 		input  []byte
@@ -25,23 +28,25 @@ func TestBoundary(t *testing.T) {
 			[]byte("Hello World."),
 			analysis.TokenStream{
 				{
-					0,
-					5,
-					[]byte("Hello"),
-					1,
+					Start:    0,
+					End:      5,
+					Term:     []byte("Hello"),
+					Position: 1,
+					Type:     analysis.AlphaNumeric,
 				},
 				{
-					6,
-					11,
-					[]byte("World"),
-					2,
+					Start:    6,
+					End:      11,
+					Term:     []byte("World"),
+					Position: 2,
+					Type:     analysis.AlphaNumeric,
 				},
 			},
 		},
 	}
 
 	for _, test := range tests {
-		tokenizer := NewSimpleWordBoundaryTokenizer()
+		tokenizer := NewRegexpTokenizer(wordRegex)
 		actual := tokenizer.Tokenize(test.input)
 
 		if !reflect.DeepEqual(actual, test.output) {

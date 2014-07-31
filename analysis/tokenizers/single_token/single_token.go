@@ -26,6 +26,7 @@ func (t *SingleTokenTokenizer) Tokenize(input []byte) analysis.TokenStream {
 			Position: 1,
 			Start:    0,
 			End:      len(input),
+			Type:     analysis.AlphaNumeric,
 		},
 	}
 }

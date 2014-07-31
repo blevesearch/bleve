@@ -27,6 +27,7 @@ func TestCld2Filter(t *testing.T) {
 					Start:    0,
 					End:      19,
 					Position: 1,
+					Type:     analysis.AlphaNumeric,
 				},
 			},
 			output: analysis.TokenStream{
@@ -35,6 +36,7 @@ func TestCld2Filter(t *testing.T) {
 					Start:    0,
 					End:      2,
 					Position: 1,
+					Type:     analysis.AlphaNumeric,
 				},
 			},
 		},
@@ -45,6 +47,7 @@ func TestCld2Filter(t *testing.T) {
 					Start:    0,
 					End:      21,
 					Position: 1,
+					Type:     analysis.AlphaNumeric,
 				},
 			},
 			output: analysis.TokenStream{
@@ -53,6 +56,7 @@ func TestCld2Filter(t *testing.T) {
 					Start:    0,
 					End:      2,
 					Position: 1,
+					Type:     analysis.AlphaNumeric,
 				},
 			},
 		},
@@ -63,6 +67,7 @@ func TestCld2Filter(t *testing.T) {
 					Start:    0,
 					End:      72,
 					Position: 1,
+					Type:     analysis.AlphaNumeric,
 				},
 			},
 			output: analysis.TokenStream{
@@ -71,6 +76,7 @@ func TestCld2Filter(t *testing.T) {
 					Start:    0,
 					End:      2,
 					Position: 1,
+					Type:     analysis.AlphaNumeric,
 				},
 			},
 		},
@@ -81,6 +87,7 @@ func TestCld2Filter(t *testing.T) {
 					Start:    0,
 					End:      26,
 					Position: 1,
+					Type:     analysis.AlphaNumeric,
 				},
 			},
 			output: analysis.TokenStream{
@@ -89,6 +96,7 @@ func TestCld2Filter(t *testing.T) {
 					Start:    0,
 					End:      2,
 					Position: 1,
+					Type:     analysis.AlphaNumeric,
 				},
 			},
 		},
