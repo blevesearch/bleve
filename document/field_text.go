@@ -42,6 +42,7 @@ func (t *TextField) Analyze() (int, analysis.TokenFrequencies) {
 				End:      len(t.value),
 				Term:     t.value,
 				Position: 1,
+				Type:     analysis.AlphaNumeric,
 			},
 		}
 	}
