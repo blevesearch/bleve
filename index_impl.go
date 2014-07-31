@@ -164,6 +164,10 @@ func (i *indexImpl) Dump() {
 	i.i.Dump()
 }
 
+func (i *indexImpl) Fields() ([]string, error) {
+	return i.i.Fields()
+}
+
 func (i *indexImpl) DumpFields() {
 	i.i.DumpFields()
 }

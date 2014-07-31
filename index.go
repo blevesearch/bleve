@@ -35,6 +35,8 @@ type Index interface {
 
 	Search(req *SearchRequest) (*SearchResult, error)
 
+	Fields() ([]string, error)
+
 	Dump()
 	DumpDoc(id string) ([]interface{}, error)
 	DumpFields()

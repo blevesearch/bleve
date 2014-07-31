@@ -26,6 +26,8 @@ type Index interface {
 
 	Document(id string) (*document.Document, error)
 
+	Fields() ([]string, error)
+
 	Dump()
 	DumpDoc(id string) ([]interface{}, error)
 	DumpFields()

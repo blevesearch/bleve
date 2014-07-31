@@ -486,6 +486,32 @@ func (udc *UpsideDownCouch) Dump() {
 	}
 }
 
+func (udc *UpsideDownCouch) Fields() ([]string, error) {
+	rv := make([]string, 0)
+	it := udc.store.Iterator([]byte{'f'})
+	defer it.Close()
+	key, val, valid := it.Current()
+	for valid {
+		if !bytes.HasPrefix(key, []byte{'f'}) {
+			break
+		}
+		row, err := ParseFromKeyValue(key, val)
+		if err != nil {
+			return nil, err
+		}
+		if row != nil {
+			fieldRow, ok := row.(*FieldRow)
+			if ok {
+				rv = append(rv, fieldRow.name)
+			}
+		}
+
+		it.Next()
+		key, val, valid = it.Current()
+	}
+	return rv, nil
+}
+
 func (udc *UpsideDownCouch) DumpFields() {
 	it := udc.store.Iterator([]byte{'f'})
 	defer it.Close()
