@@ -1,0 +1,25 @@
+<h1 class="page-header">Match Phrase Search</h1>
+
+<form class="form-horizontal" role="form">
+        <div class="form-group">
+                <label for="inputField" class="col-sm-2 control-label">Field</label>
+                <div class="col-sm-10">
+                    <select ng-model="field" id="inputField" class="form-control">
+                            <option ng-repeat="fn in fieldNames">{{fn}}</option>
+                    </select>
+                </div>
+        </div>
+        <div class="form-group">
+                <label for="inputName" class="col-sm-2 control-label">Match Phrase</label>
+                <div class="col-sm-10">
+                        <input ng-model="matchphrase" type="text" class="form-control" id="searchTerm" placeholder="Term">
+                </div>
+        </div>
+        <div class="form-group">
+                <div class="col-sm-offset-2 col-sm-10">
+                        <button type="submit" class="btn btn-primary" ng-click="searchMatchPhrase()">Search</button>
+                </div>
+        </div>
+</form>
+
+<div ng-show="results" ng-include src="'/static/partials/search/results.html'">

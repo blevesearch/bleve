@@ -1,0 +1,54 @@
+<h1 class="page-header">Overview</h1>
+
+<p>A sample application showing how the <a href="https://github.com/couchbaselabs/bleve">bleve</a> text indexing library can be used to add search capabilities to the beer-sample dataset.  The dataset contains JSON records describing beers and breweries.  A sample beer and brewery are shown below:</p>
+
+<h5>Beer</h5>
+<pre>
+<code class="language-javascript">
+{
+  "category": "Belgian and French Ale",
+  "style": "Belgian-Style White",
+  "description": "Shock Top is an unfiltered Belgian-style wheat ale (also known as a “White” or “Wit” beer due to its appearance) that is naturally cloudy with a billowy white foam head, light golden hue and slight taste of orange citrus peel and coriander.",
+  "name": "Shock Top",
+  "abv": 5.2,
+  "ibu": 0,
+  "srm": 0,
+  "upc": 0,
+  "type": "beer",
+  "brewery_id": "anheuser_busch",
+  "updated": "2010-07-22 20:00:20"
+}
+</code>
+</pre>
+
+<h5>Brewery</h5>
+<pre>
+<code class="language-javascript">
+{
+  "geo": {
+    "lon": -90.209,
+    "lat": 38.5983,
+    "accuracy": "RANGE_INTERPOLATED"
+  },
+  "address": [
+    "One Busch Place"
+  ],
+  "description": "Anheuser-Busch operates 12 breweries in the United States, 14 in China and one in the United Kingdom. Anheuser-Busch's operations and resources are focused on adding to life's enjoyment not only through the responsible consumption of beer by adults, but through theme park entertainment and packaging.  In the United States, the company holds a 48.5 percent share of U.S. beer sales. Worldwide, Anheuser-Busch's beer sales volume was 128.4 million barrels in 2007.  The St. Louis-based company's subsidiaries include one of the largest U.S. manufacturers of aluminum beverage containers and one of the world's largest recyclers of aluminum beverage cans. Anheuser-Busch also has interests in malt production, rice milling, real estate development, turf farming, metalized and paper label printing, bottle production and transportation services.",
+  "updated": "2010-07-22 20:00:20",
+  "name": "Anheuser-Busch",
+  "city": "Saint Louis",
+  "state": "Missouri",
+  "code": "63118",
+  "country": "United States",
+  "phone": "1-800-342-5283",
+  "website": "http://www.anheuser-busch.com/",
+  "type": "brewery"
+}
+</code>
+</pre>
+
+<script>
+Prism.highlightAll();
+</script>
+
+

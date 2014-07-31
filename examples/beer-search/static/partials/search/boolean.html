@@ -1,0 +1,80 @@
+<h1 class="page-header">Boolean Search</h1>
+
+ <div ng-show="errorMessage" class="alert alert-danger">
+	<span class="label label-danger">Error</span> {{errorMessage}}
+</div>
+
+<form class="form-horizontal" role="form">
+        <div class="form-group">
+                <label for="inputSize" class="col-sm-2 control-label">Size</label>
+                <div class="col-sm-10">
+                        <select ng-model="size" id="inputSize" class="form-control">
+                                <option>10</option>
+                                <option>20</option>
+                                <option>50</option>
+                                <option>100</option>
+                                <option>500</option>
+                                <option>1000</option>
+                        </select>
+                </div>
+        </div>
+        <div class="form-group">
+                <label for="inputMinShould" class="col-sm-2 control-label">Minimum SHOULD</label>
+                <div class="col-sm-10">
+                        <select ng-model="minShould" id="inputMinShould" class="form-control">
+                                <option ng-repeat="count in minShouldOptions">{{count}}</option>
+                        </select>
+                </div>
+        </div>
+        <div class="form-group">
+                <label for="inputNone" class="col-sm-2 control-label">Clauses</label>
+                <div class="col-sm-10">
+                        <table class="table">
+                                <thead>
+                                        <tr>
+                                                <th style="width: 15%">Occur</th>
+                                                <th style="width: 50%">Term</th>
+                                                <th style="width: 25%">Field</th>
+                                                <th style="width: 10%">Boost</th>
+                                                <th></th>
+                                        </tr>
+                                </thead>
+                                <tbody>
+                                        <tr ng-repeat="clause in clauses">
+                                                <td>{{clause.occur}}</td>
+                                                <td>{{clause.term}}</td>
+                                                <td>{{clause.field}}</td>
+                                                <td>{{clause.boost}}</td>
+                                                <td><button type="button" class="btn btn-default pull-right" ng-click="removeClause($index)"><span class="glyphicon glyphicon-remove"></span></button></td>
+                                        </tr>
+                                        <tr>
+                                                <td>
+                                                        <select ng-model="clauseOccur" id="inputClauseOccur" class="form-control">
+                                                                <option value="MUST">MUST</option>
+                                                                <option value="SHOULD">SHOULD</option>
+                                                                <option value="MUST NOT">MUST NOT</option>
+                                                        </select>
+                                                </td>
+                                                <td>
+                                                        <input ng-model="clauseTerm" type="text" class="form-control" id="searchTerm" placeholder="Term">
+                                                </td>
+                                                <td>
+                                                        <select ng-model="clauseField" id="inputClauseField" class="form-control">
+                                                                <option ng-repeat="fn in fieldNames">{{fn}}</option>
+                                                        </select>
+                                                </td>
+                                                <td><input ng-model="clauseBoost" type="text" id="inputClauseBoost" class="form-control" placeholder="1.0"></td>
+                                                <td><button type="button" class="btn btn-default pull-right" ng-click="addClause()">Add Clause</button></td>
+                                        </tr>
+                                </tbody>
+                        </table>
+                </div>
+        </div>
+        <div class="form-group">
+                <div class="col-sm-offset-2 col-sm-10">
+                        <button type="submit" class="btn btn-primary" ng-click="searchBoolean()">Search</button>
+                </div>
+        </div>
+</form>
+
+<div ng-show="results" ng-include src="'/static/partials/search/results.html'">

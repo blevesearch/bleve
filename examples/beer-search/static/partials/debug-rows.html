@@ -1,0 +1,20 @@
+<h3>Rows</h3>
+
+<table border="0" class="debug">
+        <tr>
+                <th colspan="{{maxKLen}}">Key</th>
+                <!--<th colspan="{{maxVLen}}">Value</th>-->
+        </tr>
+        <tr ng-repeat="row in results">
+        	<td>
+	        	<table border="1">
+	        		<tr>
+	                	<td width="50px" ng-repeat="ch in klentimes track by $index">{{row.k[$index]}}</td>
+	            	</tr>
+	            	<tr>
+	                	<td width="50px" ng-repeat="ch in klentimes track by $index">{{row.ki[$index]}}</td>
+	            	</tr>
+	            </table>
+			</td>
+        </tr>
+</table>

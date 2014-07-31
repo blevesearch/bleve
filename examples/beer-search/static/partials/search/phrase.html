@@ -1,0 +1,61 @@
+<h1 class="page-header">Phrase Search</h1>
+
+<div ng-show="errorMessage" class="alert alert-danger">
+        <span class="label label-danger">Error</span> {{errorMessage}}
+</div>
+
+<form class="form-horizontal" role="form">
+        <div class="form-group">
+                <label for="inputSize" class="col-sm-2 control-label">Size</label>
+                <div class="col-sm-10">
+                        <select ng-model="size" id="inputSize" class="form-control">
+                                <option>10</option>
+                                <option>20</option>
+                                <option>50</option>
+                                <option>100</option>
+                                <option>500</option>
+                                <option>1000</option>
+                        </select>
+                </div>
+        </div>
+        <div class="form-group">
+                <label for="inputPhraseField" class="col-sm-2 control-label">Field</label>
+                <div class="col-sm-10">
+                                                        <select ng-model="phraseField" id="inputPhraseField" class="form-control">
+                                                                <option ng-repeat="fn in fieldNames">{{fn}}</option>
+                                                        </select>
+                </div>
+        </div>
+        <div class="form-group">
+                <label for="inputNone" class="col-sm-2 control-label">Terms</label>
+                <div class="col-sm-10">
+                        <table class="table">
+                                <thead>
+                                        <tr>
+                                                <th style="width: 50%">Term</th>
+                                                <th></th>
+                                        </tr>
+                                </thead>
+                                <tbody>
+                                        <tr ng-repeat="term in phraseTerms track by $index">
+                                                <td>{{term}}</td>
+                                                <td><button type="button" class="btn btn-default pull-right" ng-click="removePhraseTerm($index)"><span class="glyphicon glyphicon-remove"></span></button></td>
+                                        </tr>
+                                        <tr>
+                                                <td>    
+                                                        <input ng-model="phraseTerm" type="text" class="form-control" id="phraseTerm" placeholder="Term">
+                                                </td>
+                                                <td><button type="button" class="btn btn-default pull-right" ng-click="addPhraseTerm()">Add Clause</button></td>
+                                        </tr>
+                                </tbody>
+                        </table>
+                </div>
+        </div>
+        <div class="form-group">
+                <div class="col-sm-offset-2 col-sm-10">
+                        <button type="submit" class="btn btn-primary" ng-click="searchPhrase()">Search</button>
+                </div>
+        </div>
+</form>
+
+<div ng-show="results" ng-include src="'/static/partials/search/results.html'">
