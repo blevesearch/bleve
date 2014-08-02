@@ -52,7 +52,7 @@ func TestSortabledFloat64ToInt64(t *testing.T) {
 		convertedBack := Int64ToFloat64(actual)
 		// assert that we got back what we started with
 		if convertedBack != test.input {
-			t.Errorf("expected %d, got %d", test.input, convertedBack)
+			t.Errorf("expected %f, got %f", test.input, convertedBack)
 		}
 	}
 }
