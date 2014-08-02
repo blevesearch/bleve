@@ -53,6 +53,25 @@ function SearchCtrl($scope, $http, $routeParams, $log, $sce) {
         });
     };
 
+    $scope.searchNumericRange = function() {
+        $http.post('/api/search', {
+            "size": 10,
+            "explain": true,
+            "highlight":{},
+            "query": {
+                "min": parseFloat($scope.min),
+                "max": parseFloat($scope.max),
+                "field": $scope.field,
+            }
+        }).
+        success(function(data) {
+            $scope.processResults(data);
+        }).
+        error(function(data, code) {
+
+        });
+    };
+
     $scope.searchMatch = function() {
         $http.post('/api/search', {
             "size": 10,

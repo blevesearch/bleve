@@ -17,6 +17,7 @@ config(['$routeProvider', '$locationProvider', function($routeProvider, $locatio
   $routeProvider.when('/search/match_phrase/', {templateUrl: '/static/partials/search/match_phrase.html', controller: 'SearchCtrl'});
   $routeProvider.when('/search/boolean/', {templateUrl: '/static/partials/search/boolean.html', controller: 'SearchCtrl'});
   $routeProvider.when('/search/syntax/', {templateUrl: '/static/partials/search/syntax.html', controller: 'SearchCtrl'});
+  $routeProvider.when('/search/numeric_range/', {templateUrl: '/static/partials/search/numeric_range.html', controller: 'SearchCtrl'});
   $routeProvider.when('/search/debug/', {templateUrl: '/static/partials/debug.html', controller: 'DebugCtrl'});
   $routeProvider.otherwise({redirectTo: '/overview'});
   $locationProvider.html5Mode(true);
