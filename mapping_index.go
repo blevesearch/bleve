@@ -266,6 +266,31 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 			field := document.NewTextFieldCustom(pathString, []byte(propertyValueString), options, analyzer)
 			context.doc.AddField(field)
 		}
+	case reflect.Float64:
+		propertyValFloat := propertyValue.Float()
+		if subDocMapping != nil {
+			// index by explicit mapping
+			for _, fieldMapping := range subDocMapping.Fields {
+				if *fieldMapping.Type == "number" {
+					fieldName := pathString
+					if fieldMapping.Name != nil && *fieldMapping.Name != "" {
+						parentName := ""
+						if len(path) > 1 {
+							parentName = encodePath(path[:len(path)-1]) + PATH_SEPARATOR
+						}
+						fieldName = parentName + *fieldMapping.Name
+					}
+					options := fieldMapping.Options()
+					field := document.NewNumericFieldWithIndexingOptions(fieldName, propertyValFloat, options)
+					context.doc.AddField(field)
+				}
+			}
+		} else {
+			// automatic indexing behavior
+			field := document.NewNumericField(pathString, propertyValFloat)
+			context.doc.AddField(field)
+		}
+
 	default:
 		im.walkDocument(property, path, context)
 	}

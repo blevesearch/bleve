@@ -86,5 +86,15 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
+	_, hasMin := tmp["min"]
+	_, hasMax := tmp["max"]
+	if hasMin || hasMax {
+		var rv NumericRangeQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
 	return nil, fmt.Errorf("Unrecognized query")
 }
