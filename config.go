@@ -24,6 +24,7 @@ import (
 	"github.com/couchbaselabs/bleve/analysis/tokenizers/unicode_word_boundary"
 
 	"github.com/couchbaselabs/bleve/analysis/token_filters/cld2"
+	"github.com/couchbaselabs/bleve/analysis/token_filters/elision_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/length_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/lower_case_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/stemmer_filter"
@@ -153,6 +154,12 @@ func init() {
 	Config.Analysis.TokenMaps["ckb_stop"] = Config.MustLoadStopWords(stop_words_filter.SoraniStopWords)
 	Config.Analysis.TokenMaps["th_stop"] = Config.MustLoadStopWords(stop_words_filter.ThaiStopWords)
 
+	// register article token maps for elision filters
+	Config.Analysis.TokenMaps["fr_articles"] = Config.MustLoadStopWords(elision_filter.FrenchArticles)
+	Config.Analysis.TokenMaps["it_articles"] = Config.MustLoadStopWords(elision_filter.ItalianArticles)
+	Config.Analysis.TokenMaps["ca_articles"] = Config.MustLoadStopWords(elision_filter.CatalanArticles)
+	Config.Analysis.TokenMaps["ga_articles"] = Config.MustLoadStopWords(elision_filter.IrishArticles)
+
 	// register char filters
 	htmlCharFilterRegexp := regexp.MustCompile(`</?[!\w]+((\s+\w+(\s*=\s*(?:".*?"|'.*?'|[^'">\s]+))?)+\s*|\s*)/?>`)
 	htmlCharFilter := regexp_char_filter.NewRegexpCharFilter(htmlCharFilterRegexp, []byte{' '})
@@ -187,6 +194,7 @@ func init() {
 	Config.Analysis.TokenFilters["stemmer_sv"] = stemmer_filter.MustNewStemmerFilter("swedish")
 	Config.Analysis.TokenFilters["stemmer_tr"] = stemmer_filter.MustNewStemmerFilter("turkish")
 
+	// register stop token filters
 	Config.Analysis.TokenFilters["stop_token_da"] = stop_words_filter.NewStopWordsFilter(
 		Config.Analysis.TokenMaps["da_stop"])
 	Config.Analysis.TokenFilters["stop_token_nl"] = stop_words_filter.NewStopWordsFilter(
@@ -244,6 +252,16 @@ func init() {
 	Config.Analysis.TokenFilters["stop_token_th"] = stop_words_filter.NewStopWordsFilter(
 		Config.Analysis.TokenMaps["th_stop"])
 
+	// register elision filters
+	Config.Analysis.TokenFilters["elision_fr"] = elision_filter.NewElisionFilter(
+		Config.Analysis.TokenMaps["fr_articles"])
+	Config.Analysis.TokenFilters["elision_it"] = elision_filter.NewElisionFilter(
+		Config.Analysis.TokenMaps["it_articles"])
+	Config.Analysis.TokenFilters["elision_ca"] = elision_filter.NewElisionFilter(
+		Config.Analysis.TokenMaps["ca_articles"])
+	Config.Analysis.TokenFilters["elision_ga"] = elision_filter.NewElisionFilter(
+		Config.Analysis.TokenMaps["ga_articles"])
+
 	// register analyzers
 	keywordAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "single", []string{})
 	Config.Analysis.Analyzers["keyword"] = keywordAnalyzer
@@ -263,13 +281,13 @@ func init() {
 	Config.Analysis.Analyzers["en"] = englishAnalyzer
 	finnishAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"to_lower", "stop_token_fi", "stemmer_fi"})
 	Config.Analysis.Analyzers["fi"] = finnishAnalyzer
-	frenchAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"to_lower", "stop_token_fr", "stemmer_fr"})
+	frenchAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"elision_fr", "to_lower", "stop_token_fr", "stemmer_fr"})
 	Config.Analysis.Analyzers["fr"] = frenchAnalyzer
 	germanAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"to_lower", "stop_token_de", "stemmer_de"})
 	Config.Analysis.Analyzers["de"] = germanAnalyzer
 	hungarianAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"to_lower", "stop_token_hu", "stemmer_hu"})
 	Config.Analysis.Analyzers["hu"] = hungarianAnalyzer
-	italianAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"to_lower", "stop_token_it", "stemmer_it"})
+	italianAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"elision_it", "to_lower", "stop_token_it", "stemmer_it"})
 	Config.Analysis.Analyzers["it"] = italianAnalyzer
 	norwegianAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"to_lower", "stop_token_no", "stemmer_no"})
 	Config.Analysis.Analyzers["no"] = norwegianAnalyzer
