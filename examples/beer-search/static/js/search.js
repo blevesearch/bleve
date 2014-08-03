@@ -72,6 +72,25 @@ function SearchCtrl($scope, $http, $routeParams, $log, $sce) {
         });
     };
 
+    $scope.searchDateRange = function() {
+        $http.post('/api/search', {
+            "size": 10,
+            "explain": true,
+            "highlight":{},
+            "query": {
+                "start": $scope.startDate,
+                "end": $scope.endDate,
+                "field": $scope.field,
+            }
+        }).
+        success(function(data) {
+            $scope.processResults(data);
+        }).
+        error(function(data, code) {
+
+        });
+    };
+
     $scope.searchMatch = function() {
         $http.post('/api/search', {
             "size": 10,
