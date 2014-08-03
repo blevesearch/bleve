@@ -96,5 +96,15 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
+	_, hasStart := tmp["start"]
+	_, hasEnd := tmp["end"]
+	if hasStart || hasEnd {
+		var rv DateRangeQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
 	return nil, fmt.Errorf("Unrecognized query")
 }

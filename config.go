@@ -11,8 +11,11 @@ package bleve
 import (
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/couchbaselabs/bleve/analysis"
+
+	"github.com/couchbaselabs/bleve/analysis/datetime_parsers/flexible_go"
 
 	"github.com/couchbaselabs/bleve/analysis/char_filters/regexp_char_filter"
 
@@ -30,11 +33,12 @@ import (
 )
 
 type AnalysisConfig struct {
-	StopTokenMaps map[string]stop_words_filter.StopWordsMap
-	CharFilters   map[string]analysis.CharFilter
-	Tokenizers    map[string]analysis.Tokenizer
-	TokenFilters  map[string]analysis.TokenFilter
-	Analyzers     map[string]*analysis.Analyzer
+	StopTokenMaps   map[string]stop_words_filter.StopWordsMap
+	CharFilters     map[string]analysis.CharFilter
+	Tokenizers      map[string]analysis.Tokenizer
+	TokenFilters    map[string]analysis.TokenFilter
+	Analyzers       map[string]*analysis.Analyzer
+	DateTimeParsers map[string]analysis.DateTimeParser
 }
 
 type HighlightConfig struct {
@@ -42,11 +46,12 @@ type HighlightConfig struct {
 }
 
 type Configuration struct {
-	Analysis           *AnalysisConfig
-	DefaultAnalyzer    *string
-	Highlight          *HighlightConfig
-	DefaultHighlighter *string
-	CreateIfMissing    bool
+	Analysis              *AnalysisConfig
+	DefaultAnalyzer       *string
+	Highlight             *HighlightConfig
+	DefaultHighlighter    *string
+	CreateIfMissing       bool
+	DefaultDateTimeFormat *string
 }
 
 func (c *Configuration) BuildNewAnalyzer(charFilterNames []string, tokenizerName string, tokenFilterNames []string) (*analysis.Analyzer, error) {
@@ -98,11 +103,12 @@ func (c *Configuration) MustLoadStopWords(stopWordsBytes []byte) stop_words_filt
 func NewConfiguration() *Configuration {
 	return &Configuration{
 		Analysis: &AnalysisConfig{
-			StopTokenMaps: make(map[string]stop_words_filter.StopWordsMap),
-			CharFilters:   make(map[string]analysis.CharFilter),
-			Tokenizers:    make(map[string]analysis.Tokenizer),
-			TokenFilters:  make(map[string]analysis.TokenFilter),
-			Analyzers:     make(map[string]*analysis.Analyzer),
+			StopTokenMaps:   make(map[string]stop_words_filter.StopWordsMap),
+			CharFilters:     make(map[string]analysis.CharFilter),
+			Tokenizers:      make(map[string]analysis.Tokenizer),
+			TokenFilters:    make(map[string]analysis.TokenFilter),
+			Analyzers:       make(map[string]*analysis.Analyzer),
+			DateTimeParsers: make(map[string]analysis.DateTimeParser),
 		},
 		Highlight: &HighlightConfig{
 			Highlighters: make(map[string]search.Highlighter),
@@ -301,4 +307,21 @@ func init() {
 
 	// default CreateIfMissing to true
 	Config.CreateIfMissing = true
+
+	// set up the built-in date time formats
+
+	rfc3339NoTimezone := "2006-01-02T15:04:05"
+	rfc3339NoTimezoneNoT := "2006-01-02 15:04:05"
+	rfc3339NoTime := "2006-01-02"
+
+	Config.Analysis.DateTimeParsers["dateTimeOptional"] = flexible_go.NewFlexibleGoDateTimeParser(
+		[]string{
+			time.RFC3339Nano,
+			time.RFC3339,
+			rfc3339NoTimezone,
+			rfc3339NoTimezoneNoT,
+			rfc3339NoTime,
+		})
+	dateTimeOptionalName := "dateTimeOptional"
+	Config.DefaultDateTimeFormat = &dateTimeOptionalName
 }

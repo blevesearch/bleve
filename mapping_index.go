@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/couchbaselabs/bleve/analysis"
 	"github.com/couchbaselabs/bleve/document"
@@ -236,16 +237,8 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 			// index by explicit mapping
 
 			for _, fieldMapping := range subDocMapping.Fields {
+				fieldName := getFieldName(pathString, path, fieldMapping)
 				if *fieldMapping.Type == "text" {
-
-					fieldName := pathString
-					if fieldMapping.Name != nil && *fieldMapping.Name != "" {
-						parentName := ""
-						if len(path) > 1 {
-							parentName = encodePath(path[:len(path)-1]) + PATH_SEPARATOR
-						}
-						fieldName = parentName + *fieldMapping.Name
-					}
 					options := fieldMapping.Options()
 					analyzer := Config.Analysis.Analyzers[*fieldMapping.Analyzer]
 					if analyzer != nil {
@@ -256,30 +249,46 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 							context.excludedFromAll = append(context.excludedFromAll, fieldName)
 						}
 					}
-
+				} else if *fieldMapping.Type == "datetime" {
+					options := fieldMapping.Options()
+					dateTimeFormat := *Config.DefaultDateTimeFormat
+					if fieldMapping.DateFormat != nil {
+						dateTimeFormat = *fieldMapping.DateFormat
+					}
+					dateTimeParser := Config.Analysis.DateTimeParsers[dateTimeFormat]
+					parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
+					if err != nil {
+						field := document.NewDateTimeFieldWithIndexingOptions(fieldName, parsedDateTime, options)
+						context.doc.AddField(field)
+					}
 				}
 			}
 		} else {
 			// automatic indexing behavior
-			options := document.STORE_FIELD | document.INDEX_FIELD | document.INCLUDE_TERM_VECTORS
-			analyzer := im.defaultAnalyzer(context.dm, path)
-			field := document.NewTextFieldCustom(pathString, []byte(propertyValueString), options, analyzer)
-			context.doc.AddField(field)
+
+			// first see if it can be parsed by the default date parser
+			// FIXME add support for index mapping overriding defaults
+			dateTimeParser := Config.Analysis.DateTimeParsers[*Config.DefaultDateTimeFormat]
+			parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
+			if err != nil {
+				// index as plain text
+				options := document.STORE_FIELD | document.INDEX_FIELD | document.INCLUDE_TERM_VECTORS
+				analyzer := im.defaultAnalyzer(context.dm, path)
+				field := document.NewTextFieldCustom(pathString, []byte(propertyValueString), options, analyzer)
+				context.doc.AddField(field)
+			} else {
+				// index as datetime
+				field := document.NewDateTimeField(pathString, parsedDateTime)
+				context.doc.AddField(field)
+			}
 		}
 	case reflect.Float64:
 		propertyValFloat := propertyValue.Float()
 		if subDocMapping != nil {
 			// index by explicit mapping
 			for _, fieldMapping := range subDocMapping.Fields {
+				fieldName := getFieldName(pathString, path, fieldMapping)
 				if *fieldMapping.Type == "number" {
-					fieldName := pathString
-					if fieldMapping.Name != nil && *fieldMapping.Name != "" {
-						parentName := ""
-						if len(path) > 1 {
-							parentName = encodePath(path[:len(path)-1]) + PATH_SEPARATOR
-						}
-						fieldName = parentName + *fieldMapping.Name
-					}
 					options := fieldMapping.Options()
 					field := document.NewNumericFieldWithIndexingOptions(fieldName, propertyValFloat, options)
 					context.doc.AddField(field)
@@ -290,7 +299,29 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 			field := document.NewNumericField(pathString, propertyValFloat)
 			context.doc.AddField(field)
 		}
+	case reflect.Struct:
+		switch property := property.(type) {
+		case time.Time:
+			// don't descend into the time struct
+			if subDocMapping != nil {
+				// index by explicit mapping
+				for _, fieldMapping := range subDocMapping.Fields {
+					fieldName := getFieldName(pathString, path, fieldMapping)
+					if *fieldMapping.Type == "datetime" {
+						options := fieldMapping.Options()
+						field := document.NewDateTimeFieldWithIndexingOptions(fieldName, property, options)
+						context.doc.AddField(field)
+					}
+				}
+			} else {
+				// automatic indexing behavior
+				field := document.NewDateTimeField(pathString, property)
+				context.doc.AddField(field)
+			}
 
+		default:
+			im.walkDocument(property, path, context)
+		}
 	default:
 		im.walkDocument(property, path, context)
 	}
@@ -338,4 +369,37 @@ func (im *IndexMapping) analyzerForPath(path string) *analysis.Analyzer {
 
 	// finally just return the system-wide default analyzer
 	return Config.Analysis.Analyzers[*Config.DefaultAnalyzer]
+}
+
+func (im *IndexMapping) datetimeParserForPath(path string) analysis.DateTimeParser {
+
+	// first we look for explicit mapping on the field
+	for _, docMapping := range im.TypeMapping {
+		pathMapping := docMapping.DocumentMappingForPath(path)
+		if pathMapping != nil {
+			if len(pathMapping.Fields) > 0 {
+				if pathMapping.Fields[0].Analyzer != nil {
+					return Config.Analysis.DateTimeParsers[*pathMapping.Fields[0].DateFormat]
+				}
+			}
+		}
+	}
+
+	// next we will try default analyzers for the path
+	// FIXME introduce default date time parsers at mapping leves
+
+	// finally just return the system-wide default analyzer
+	return Config.Analysis.DateTimeParsers[*Config.DefaultDateTimeFormat]
+}
+
+func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) string {
+	fieldName := pathString
+	if fieldMapping.Name != nil && *fieldMapping.Name != "" {
+		parentName := ""
+		if len(path) > 1 {
+			parentName = encodePath(path[:len(path)-1]) + PATH_SEPARATOR
+		}
+		fieldName = parentName + *fieldMapping.Name
+	}
+	return fieldName
 }

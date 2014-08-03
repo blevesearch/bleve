@@ -10,6 +10,7 @@ package analysis
 
 import (
 	"fmt"
+	"time"
 )
 
 type CharFilter interface {
@@ -21,6 +22,7 @@ type TokenType int
 const (
 	AlphaNumeric TokenType = iota
 	Numeric
+	DateTime
 )
 
 type Token struct {
@@ -64,4 +66,10 @@ func (a *Analyzer) Analyze(input []byte) TokenStream {
 		}
 	}
 	return tokens
+}
+
+var INVALID_DATETIME = fmt.Errorf("unable to parse datetime with any of the layouts")
+
+type DateTimeParser interface {
+	ParseDateTime(string) (time.Time, error)
 }
