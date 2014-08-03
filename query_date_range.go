@@ -60,7 +60,7 @@ func (q *DateRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, 
 		dateTimeParser = i.m.datetimeParserForPath(q.FieldVal)
 	}
 	if dateTimeParser == nil {
-		return nil, fmt.Errorf("no datetime parser named '%s' registered", q.DateTimeParser)
+		return nil, fmt.Errorf("no datetime parser named '%s' registered", *q.DateTimeParser)
 	}
 
 	// now parse the endpoints

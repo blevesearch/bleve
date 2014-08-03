@@ -22,7 +22,7 @@ type FieldMapping struct {
 	Index              *bool   `json:"index"`
 	IncludeTermVectors *bool   `json:"include_term_vectors"`
 	IncludeInAll       *bool   `json:"include_in_all"`
-	DateFormat         *string `json:date_format"`
+	DateFormat         *string `json:"date_format"`
 }
 
 func NewFieldMapping(name, typ, analyzer string, store, index bool, includeTermVectors bool, includeInAll bool) *FieldMapping {
