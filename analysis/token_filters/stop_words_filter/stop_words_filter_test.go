@@ -44,7 +44,7 @@ func TestStopWordsFilter(t *testing.T) {
 		},
 	}
 
-	stopWordsMap := NewStopWordsMap()
+	stopWordsMap := analysis.NewWordMap()
 	err := stopWordsMap.LoadBytes(EnglishStopWords)
 	if err != nil {
 		t.Fatal(err)

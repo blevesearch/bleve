@@ -13,12 +13,12 @@ import (
 )
 
 type StopWordsFilter struct {
-	stopWords StopWordsMap
+	stopWords analysis.WordMap
 }
 
-func NewStopWordsFilter(stopWordsMap StopWordsMap) *StopWordsFilter {
+func NewStopWordsFilter(stopWords analysis.WordMap) *StopWordsFilter {
 	return &StopWordsFilter{
-		stopWords: stopWordsMap,
+		stopWords: stopWords,
 	}
 }
 

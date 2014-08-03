@@ -33,7 +33,7 @@ import (
 )
 
 type AnalysisConfig struct {
-	StopTokenMaps   map[string]stop_words_filter.StopWordsMap
+	TokenMaps       map[string]analysis.WordMap
 	CharFilters     map[string]analysis.CharFilter
 	Tokenizers      map[string]analysis.Tokenizer
 	TokenFilters    map[string]analysis.TokenFilter
@@ -91,8 +91,8 @@ func (c *Configuration) MustBuildNewAnalyzer(charFilterNames []string, tokenizer
 	return analyzer
 }
 
-func (c *Configuration) MustLoadStopWords(stopWordsBytes []byte) stop_words_filter.StopWordsMap {
-	rv := stop_words_filter.NewStopWordsMap()
+func (c *Configuration) MustLoadStopWords(stopWordsBytes []byte) analysis.WordMap {
+	rv := analysis.NewWordMap()
 	err := rv.LoadBytes(stopWordsBytes)
 	if err != nil {
 		panic(err)
@@ -103,7 +103,7 @@ func (c *Configuration) MustLoadStopWords(stopWordsBytes []byte) stop_words_filt
 func NewConfiguration() *Configuration {
 	return &Configuration{
 		Analysis: &AnalysisConfig{
-			StopTokenMaps:   make(map[string]stop_words_filter.StopWordsMap),
+			TokenMaps:       make(map[string]analysis.WordMap),
 			CharFilters:     make(map[string]analysis.CharFilter),
 			Tokenizers:      make(map[string]analysis.Tokenizer),
 			TokenFilters:    make(map[string]analysis.TokenFilter),
@@ -124,34 +124,34 @@ func init() {
 	Config = NewConfiguration()
 
 	// register stop token maps
-	Config.Analysis.StopTokenMaps["da"] = Config.MustLoadStopWords(stop_words_filter.DanishStopWords)
-	Config.Analysis.StopTokenMaps["nl"] = Config.MustLoadStopWords(stop_words_filter.DutchStopWords)
-	Config.Analysis.StopTokenMaps["en"] = Config.MustLoadStopWords(stop_words_filter.EnglishStopWords)
-	Config.Analysis.StopTokenMaps["fi"] = Config.MustLoadStopWords(stop_words_filter.FinnishStopWords)
-	Config.Analysis.StopTokenMaps["fr"] = Config.MustLoadStopWords(stop_words_filter.FrenchStopWords)
-	Config.Analysis.StopTokenMaps["de"] = Config.MustLoadStopWords(stop_words_filter.GermanStopWords)
-	Config.Analysis.StopTokenMaps["hu"] = Config.MustLoadStopWords(stop_words_filter.HungarianStopWords)
-	Config.Analysis.StopTokenMaps["it"] = Config.MustLoadStopWords(stop_words_filter.ItalianStopWords)
-	Config.Analysis.StopTokenMaps["no"] = Config.MustLoadStopWords(stop_words_filter.NorwegianStopWords)
-	Config.Analysis.StopTokenMaps["pt"] = Config.MustLoadStopWords(stop_words_filter.PortugueseStopWords)
-	Config.Analysis.StopTokenMaps["ro"] = Config.MustLoadStopWords(stop_words_filter.RomanianStopWords)
-	Config.Analysis.StopTokenMaps["ru"] = Config.MustLoadStopWords(stop_words_filter.RussianStopWords)
-	Config.Analysis.StopTokenMaps["es"] = Config.MustLoadStopWords(stop_words_filter.SpanishStopWords)
-	Config.Analysis.StopTokenMaps["sv"] = Config.MustLoadStopWords(stop_words_filter.SwedishStopWords)
-	Config.Analysis.StopTokenMaps["tr"] = Config.MustLoadStopWords(stop_words_filter.TurkishStopWords)
-	Config.Analysis.StopTokenMaps["ar"] = Config.MustLoadStopWords(stop_words_filter.ArabicStopWords)
-	Config.Analysis.StopTokenMaps["hy"] = Config.MustLoadStopWords(stop_words_filter.ArmenianStopWords)
-	Config.Analysis.StopTokenMaps["eu"] = Config.MustLoadStopWords(stop_words_filter.BasqueStopWords)
-	Config.Analysis.StopTokenMaps["bg"] = Config.MustLoadStopWords(stop_words_filter.BulgarianStopWords)
-	Config.Analysis.StopTokenMaps["ca"] = Config.MustLoadStopWords(stop_words_filter.CatalanStopWords)
-	Config.Analysis.StopTokenMaps["gl"] = Config.MustLoadStopWords(stop_words_filter.GalicianStopWords)
-	Config.Analysis.StopTokenMaps["el"] = Config.MustLoadStopWords(stop_words_filter.GreekStopWords)
-	Config.Analysis.StopTokenMaps["hi"] = Config.MustLoadStopWords(stop_words_filter.HindiStopWords)
-	Config.Analysis.StopTokenMaps["id"] = Config.MustLoadStopWords(stop_words_filter.IndonesianStopWords)
-	Config.Analysis.StopTokenMaps["ga"] = Config.MustLoadStopWords(stop_words_filter.IrishStopWords)
-	Config.Analysis.StopTokenMaps["fa"] = Config.MustLoadStopWords(stop_words_filter.PersianStopWords)
-	Config.Analysis.StopTokenMaps["ckb"] = Config.MustLoadStopWords(stop_words_filter.SoraniStopWords)
-	Config.Analysis.StopTokenMaps["th"] = Config.MustLoadStopWords(stop_words_filter.ThaiStopWords)
+	Config.Analysis.TokenMaps["da_stop"] = Config.MustLoadStopWords(stop_words_filter.DanishStopWords)
+	Config.Analysis.TokenMaps["nl_stop"] = Config.MustLoadStopWords(stop_words_filter.DutchStopWords)
+	Config.Analysis.TokenMaps["en_stop"] = Config.MustLoadStopWords(stop_words_filter.EnglishStopWords)
+	Config.Analysis.TokenMaps["fi_stop"] = Config.MustLoadStopWords(stop_words_filter.FinnishStopWords)
+	Config.Analysis.TokenMaps["fr_stop"] = Config.MustLoadStopWords(stop_words_filter.FrenchStopWords)
+	Config.Analysis.TokenMaps["de_stop"] = Config.MustLoadStopWords(stop_words_filter.GermanStopWords)
+	Config.Analysis.TokenMaps["hu_stop"] = Config.MustLoadStopWords(stop_words_filter.HungarianStopWords)
+	Config.Analysis.TokenMaps["it_stop"] = Config.MustLoadStopWords(stop_words_filter.ItalianStopWords)
+	Config.Analysis.TokenMaps["no_stop"] = Config.MustLoadStopWords(stop_words_filter.NorwegianStopWords)
+	Config.Analysis.TokenMaps["pt_stop"] = Config.MustLoadStopWords(stop_words_filter.PortugueseStopWords)
+	Config.Analysis.TokenMaps["ro_stop"] = Config.MustLoadStopWords(stop_words_filter.RomanianStopWords)
+	Config.Analysis.TokenMaps["ru_stop"] = Config.MustLoadStopWords(stop_words_filter.RussianStopWords)
+	Config.Analysis.TokenMaps["es_stop"] = Config.MustLoadStopWords(stop_words_filter.SpanishStopWords)
+	Config.Analysis.TokenMaps["sv_stop"] = Config.MustLoadStopWords(stop_words_filter.SwedishStopWords)
+	Config.Analysis.TokenMaps["tr_stop"] = Config.MustLoadStopWords(stop_words_filter.TurkishStopWords)
+	Config.Analysis.TokenMaps["ar_stop"] = Config.MustLoadStopWords(stop_words_filter.ArabicStopWords)
+	Config.Analysis.TokenMaps["hy_stop"] = Config.MustLoadStopWords(stop_words_filter.ArmenianStopWords)
+	Config.Analysis.TokenMaps["eu_stop"] = Config.MustLoadStopWords(stop_words_filter.BasqueStopWords)
+	Config.Analysis.TokenMaps["bg_stop"] = Config.MustLoadStopWords(stop_words_filter.BulgarianStopWords)
+	Config.Analysis.TokenMaps["ca_stop"] = Config.MustLoadStopWords(stop_words_filter.CatalanStopWords)
+	Config.Analysis.TokenMaps["gl_stop"] = Config.MustLoadStopWords(stop_words_filter.GalicianStopWords)
+	Config.Analysis.TokenMaps["el_stop"] = Config.MustLoadStopWords(stop_words_filter.GreekStopWords)
+	Config.Analysis.TokenMaps["hi_stop"] = Config.MustLoadStopWords(stop_words_filter.HindiStopWords)
+	Config.Analysis.TokenMaps["id_stop"] = Config.MustLoadStopWords(stop_words_filter.IndonesianStopWords)
+	Config.Analysis.TokenMaps["ga_stop"] = Config.MustLoadStopWords(stop_words_filter.IrishStopWords)
+	Config.Analysis.TokenMaps["fa_stop"] = Config.MustLoadStopWords(stop_words_filter.PersianStopWords)
+	Config.Analysis.TokenMaps["ckb_stop"] = Config.MustLoadStopWords(stop_words_filter.SoraniStopWords)
+	Config.Analysis.TokenMaps["th_stop"] = Config.MustLoadStopWords(stop_words_filter.ThaiStopWords)
 
 	// register char filters
 	htmlCharFilterRegexp := regexp.MustCompile(`</?[!\w]+((\s+\w+(\s*=\s*(?:".*?"|'.*?'|[^'">\s]+))?)+\s*|\s*)/?>`)
@@ -188,61 +188,61 @@ func init() {
 	Config.Analysis.TokenFilters["stemmer_tr"] = stemmer_filter.MustNewStemmerFilter("turkish")
 
 	Config.Analysis.TokenFilters["stop_token_da"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["da"])
+		Config.Analysis.TokenMaps["da_stop"])
 	Config.Analysis.TokenFilters["stop_token_nl"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["nl"])
+		Config.Analysis.TokenMaps["nl_stop"])
 	Config.Analysis.TokenFilters["stop_token_en"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["en"])
+		Config.Analysis.TokenMaps["en_stop"])
 	Config.Analysis.TokenFilters["stop_token_fi"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["fi"])
+		Config.Analysis.TokenMaps["fi_stop"])
 	Config.Analysis.TokenFilters["stop_token_fr"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["fr"])
+		Config.Analysis.TokenMaps["fr_stop"])
 	Config.Analysis.TokenFilters["stop_token_de"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["de"])
+		Config.Analysis.TokenMaps["de_stop"])
 	Config.Analysis.TokenFilters["stop_token_hu"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["hu"])
+		Config.Analysis.TokenMaps["hu_stop"])
 	Config.Analysis.TokenFilters["stop_token_it"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["it"])
+		Config.Analysis.TokenMaps["it_stop"])
 	Config.Analysis.TokenFilters["stop_token_no"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["no"])
+		Config.Analysis.TokenMaps["no_stop"])
 	Config.Analysis.TokenFilters["stop_token_pt"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["pt"])
+		Config.Analysis.TokenMaps["pt_stop"])
 	Config.Analysis.TokenFilters["stop_token_ro"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["ro"])
+		Config.Analysis.TokenMaps["ro_stop"])
 	Config.Analysis.TokenFilters["stop_token_ru"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["ru"])
+		Config.Analysis.TokenMaps["ru_stop"])
 	Config.Analysis.TokenFilters["stop_token_es"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["es"])
+		Config.Analysis.TokenMaps["es_stop"])
 	Config.Analysis.TokenFilters["stop_token_sv"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["sv"])
+		Config.Analysis.TokenMaps["sv_stop"])
 	Config.Analysis.TokenFilters["stop_token_tr"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["tr"])
+		Config.Analysis.TokenMaps["tr_stop_stop"])
 	Config.Analysis.TokenFilters["stop_token_ar"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["ar"])
+		Config.Analysis.TokenMaps["ar_stop"])
 	Config.Analysis.TokenFilters["stop_token_hy"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["hy"])
+		Config.Analysis.TokenMaps["hy_stop"])
 	Config.Analysis.TokenFilters["stop_token_eu"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["eu"])
+		Config.Analysis.TokenMaps["eu_stop"])
 	Config.Analysis.TokenFilters["stop_token_bg"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["bg"])
+		Config.Analysis.TokenMaps["bg_stop"])
 	Config.Analysis.TokenFilters["stop_token_ca"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["ca"])
+		Config.Analysis.TokenMaps["ca_stop"])
 	Config.Analysis.TokenFilters["stop_token_gl"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["gl"])
+		Config.Analysis.TokenMaps["gl_stop"])
 	Config.Analysis.TokenFilters["stop_token_el"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["el"])
+		Config.Analysis.TokenMaps["el_stop"])
 	Config.Analysis.TokenFilters["stop_token_hi"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["hi"])
+		Config.Analysis.TokenMaps["hi_stop"])
 	Config.Analysis.TokenFilters["stop_token_id"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["id"])
+		Config.Analysis.TokenMaps["id_stop"])
 	Config.Analysis.TokenFilters["stop_token_ga"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["ga"])
+		Config.Analysis.TokenMaps["ga_stop"])
 	Config.Analysis.TokenFilters["stop_token_fa"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["fa"])
+		Config.Analysis.TokenMaps["fa_stop"])
 	Config.Analysis.TokenFilters["stop_token_ckb"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["ckb"])
+		Config.Analysis.TokenMaps["ckb_stop"])
 	Config.Analysis.TokenFilters["stop_token_th"] = stop_words_filter.NewStopWordsFilter(
-		Config.Analysis.StopTokenMaps["th"])
+		Config.Analysis.TokenMaps["th_stop"])
 
 	// register analyzers
 	keywordAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "single", []string{})

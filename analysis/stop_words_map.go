@@ -1,4 +1,4 @@
-package stop_words_filter
+package analysis
 
 import (
 	"bufio"
@@ -8,13 +8,13 @@ import (
 	"strings"
 )
 
-type StopWordsMap map[string]bool
+type WordMap map[string]bool
 
-func NewStopWordsMap() StopWordsMap {
-	return make(StopWordsMap, 0)
+func NewWordMap() WordMap {
+	return make(WordMap, 0)
 }
 
-func (s StopWordsMap) LoadFile(filename string) error {
+func (s WordMap) LoadFile(filename string) error {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return err
@@ -22,7 +22,7 @@ func (s StopWordsMap) LoadFile(filename string) error {
 	return s.LoadBytes(data)
 }
 
-func (s StopWordsMap) LoadBytes(data []byte) error {
+func (s WordMap) LoadBytes(data []byte) error {
 	bytesReader := bytes.NewReader(data)
 	bufioReader := bufio.NewReader(bytesReader)
 	line, err := bufioReader.ReadString('\n')
@@ -38,20 +38,20 @@ func (s StopWordsMap) LoadBytes(data []byte) error {
 	return err
 }
 
-func (s StopWordsMap) LoadLine(line string) error {
+func (s WordMap) LoadLine(line string) error {
 	// find the start of comment, if any
 	startComment := strings.IndexAny(line, "#|")
 	if startComment >= 0 {
 		line = line[:startComment]
 	}
 
-	stopWords := strings.Fields(line)
-	for _, stopWord := range stopWords {
-		s.AddWord(stopWord)
+	words := strings.Fields(line)
+	for _, word := range words {
+		s.AddWord(word)
 	}
 	return nil
 }
 
-func (s StopWordsMap) AddWord(word string) {
+func (s WordMap) AddWord(word string) {
 	s[word] = true
 }
