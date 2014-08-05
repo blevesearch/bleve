@@ -29,6 +29,7 @@ import (
 	"github.com/couchbaselabs/bleve/analysis/token_filters/lower_case_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/stemmer_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/stop_words_filter"
+	"github.com/couchbaselabs/bleve/analysis/token_filters/unicode_normalize"
 
 	"github.com/couchbaselabs/bleve/search"
 )
@@ -261,6 +262,12 @@ func init() {
 		Config.Analysis.TokenMaps["ca_articles"])
 	Config.Analysis.TokenFilters["elision_ga"] = elision_filter.NewElisionFilter(
 		Config.Analysis.TokenMaps["ga_articles"])
+
+	// register unicode normalizers
+	Config.Analysis.TokenFilters["normalize_nfc"] = unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFC)
+	Config.Analysis.TokenFilters["normalize_nfd"] = unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFD)
+	Config.Analysis.TokenFilters["normalize_nfkc"] = unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFKC)
+	Config.Analysis.TokenFilters["normalize_nfkd"] = unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFKD)
 
 	// register analyzers
 	keywordAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "single", []string{})
