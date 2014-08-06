@@ -119,6 +119,7 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 		im.DefaultAnalyzer = tmp.DefaultAnalyzer
 	}
 
+	im.DefaultField = &DEFAULT_FIELD
 	if tmp.DefaultField != nil {
 		im.DefaultField = tmp.DefaultField
 	}
