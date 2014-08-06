@@ -23,6 +23,7 @@ import (
 	"github.com/couchbaselabs/bleve/analysis/tokenizers/single_token"
 	"github.com/couchbaselabs/bleve/analysis/tokenizers/unicode_word_boundary"
 
+	"github.com/couchbaselabs/bleve/analysis/token_filters/apostrophe_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/cld2"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/elision_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/length_filter"
@@ -179,6 +180,9 @@ func init() {
 	Config.Analysis.TokenFilters["short"] = length_filter.NewLengthFilter(3, -1)
 	Config.Analysis.TokenFilters["long"] = length_filter.NewLengthFilter(-1, 255)
 	Config.Analysis.TokenFilters["to_lower"] = lower_case_filter.NewLowerCaseFilter()
+	Config.Analysis.TokenFilters["apostrophe"] = apostrophe_filter.NewApostropheFilter()
+
+	// register stemmer filters
 	Config.Analysis.TokenFilters["stemmer_da"] = stemmer_filter.MustNewStemmerFilter("danish")
 	Config.Analysis.TokenFilters["stemmer_nl"] = stemmer_filter.MustNewStemmerFilter("dutch")
 	Config.Analysis.TokenFilters["stemmer_en"] = stemmer_filter.MustNewStemmerFilter("english")
@@ -309,7 +313,7 @@ func init() {
 	Config.Analysis.Analyzers["es"] = spanishAnalyzer
 	swedishAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"to_lower", "stop_token_sv", "stemmer_sv"})
 	Config.Analysis.Analyzers["sv"] = swedishAnalyzer
-	turkishAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"to_lower", "stop_token_tr", "stemmer_tr"})
+	turkishAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"apostrophe", "to_lower", "stop_token_tr", "stemmer_tr"})
 	Config.Analysis.Analyzers["tr"] = turkishAnalyzer
 	thaiAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode_th", []string{"to_lower", "stop_token_th"})
 	Config.Analysis.Analyzers["th"] = thaiAnalyzer
