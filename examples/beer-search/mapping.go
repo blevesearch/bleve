@@ -29,9 +29,30 @@ func buildIndexMapping() *bleve.IndexMapping {
 		bleve.NewFieldMapping("descriptionLang", "text", "detect_lang",
 			false, true, false, false))
 
+	typeMapping := bleve.NewDocumentMapping().
+		AddFieldMapping(
+		bleve.NewFieldMapping(
+			"", "text", "keyword",
+			true, true, true, true))
+
+	styleMapping := bleve.NewDocumentMapping().
+		AddFieldMapping(
+		bleve.NewFieldMapping(
+			"", "text", "keyword",
+			true, true, true, true))
+
+	categoryMapping := bleve.NewDocumentMapping().
+		AddFieldMapping(
+		bleve.NewFieldMapping(
+			"", "text", "keyword",
+			true, true, true, true))
+
 	beerMapping := bleve.NewDocumentMapping().
 		AddSubDocumentMapping("name", nameMapping).
-		AddSubDocumentMapping("description", descMapping)
+		AddSubDocumentMapping("description", descMapping).
+		AddSubDocumentMapping("type", typeMapping).
+		AddSubDocumentMapping("style", styleMapping).
+		AddSubDocumentMapping("category", categoryMapping)
 
 	breweryMapping := bleve.NewDocumentMapping().
 		AddSubDocumentMapping("name", nameMapping).
