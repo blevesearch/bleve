@@ -15,7 +15,7 @@ import (
 	"github.com/couchbaselabs/bleve/numeric_util"
 )
 
-const DEFAULT_NUMERIC_INDEXING_OPTIONS = INDEX_FIELD
+const DEFAULT_NUMERIC_INDEXING_OPTIONS = STORE_FIELD | INDEX_FIELD
 
 const DEFAULT_PRECISION_STEP uint = 4
 
@@ -73,8 +73,24 @@ func (n *NumericField) Value() []byte {
 	return n.value
 }
 
+func (n *NumericField) Number() (float64, error) {
+	i64, err := n.value.Int64()
+	if err != nil {
+		return 0.0, err
+	}
+	return numeric_util.Int64ToFloat64(i64), nil
+}
+
 func (n *NumericField) GoString() string {
 	return fmt.Sprintf("&document.NumericField{Name:%s, Options: %s, Value: %s}", n.name, n.options, n.value)
+}
+
+func NewNumericFieldFromBytes(name string, value []byte) *NumericField {
+	return &NumericField{
+		name:    name,
+		value:   value,
+		options: DEFAULT_NUMERIC_INDEXING_OPTIONS,
+	}
 }
 
 func NewNumericField(name string, number float64) *NumericField {

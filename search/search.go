@@ -35,11 +35,19 @@ type FieldTermLocationMap map[string]TermLocationMap
 type FieldFragmentMap map[string][]string
 
 type DocumentMatch struct {
-	ID        string               `json:"id"`
-	Score     float64              `json:"score"`
-	Expl      *Explanation         `json:"explanation,omitempty"`
-	Locations FieldTermLocationMap `json:"locations,omitempty"`
-	Fragments FieldFragmentMap     `json:"fragments,omitempty"`
+	ID        string                 `json:"id"`
+	Score     float64                `json:"score"`
+	Expl      *Explanation           `json:"explanation,omitempty"`
+	Locations FieldTermLocationMap   `json:"locations,omitempty"`
+	Fragments FieldFragmentMap       `json:"fragments,omitempty"`
+	Fields    map[string]interface{} `json:"fields,omitempty"`
+}
+
+func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
+	if dm.Fields == nil {
+		dm.Fields = make(map[string]interface{})
+	}
+	dm.Fields[name] = value
 }
 
 type DocumentMatchCollection []*DocumentMatch

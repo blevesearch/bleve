@@ -70,9 +70,9 @@ func TestRows(t *testing.T) {
 			[]byte{'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'e', 'a', 't', BYTE_SEPARATOR, 1, 0, BYTE_SEPARATOR, 3, 0, BYTE_SEPARATOR, 4, 0, BYTE_SEPARATOR, 5, 0},
 		},
 		{
-			NewStoredRow("budweiser", 0, []byte("an american beer")),
+			NewStoredRow("budweiser", 0, byte('t'), []byte("an american beer")),
 			[]byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', BYTE_SEPARATOR, 0, 0},
-			[]byte{'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
+			[]byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
 		},
 	}
 
@@ -194,12 +194,12 @@ func TestInvalidRows(t *testing.T) {
 		// type s, invalid key (missing id)
 		{
 			[]byte{'s'},
-			[]byte{'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
+			[]byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
 		},
 		// type b, invalid val (missing field)
 		{
 			[]byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', BYTE_SEPARATOR},
-			[]byte{'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
+			[]byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
 		},
 	}
 

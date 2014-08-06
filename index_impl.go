@@ -11,6 +11,7 @@ package bleve
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index"
@@ -146,6 +147,40 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 
 				for _, hf := range highlightFields {
 					highlighter.BestFragmentsInField(hit, doc, hf, 3)
+				}
+			}
+		}
+	}
+
+	if len(req.Fields) > 0 {
+		for _, hit := range hits {
+			// FIXME avoid loading doc second time
+			// if we already loaded it for highlighting
+			doc, err := i.Document(hit.ID)
+			if err == nil {
+				for _, f := range req.Fields {
+					for _, docF := range doc.Fields {
+						if docF.Name() == f {
+							var value interface{}
+							switch docF := docF.(type) {
+							case *document.TextField:
+								value = string(docF.Value())
+							case *document.NumericField:
+								num, err := docF.Number()
+								if err == nil {
+									value = num
+								}
+							case *document.DateTimeField:
+								datetime, err := docF.DateTime()
+								if err == nil {
+									value = datetime.Format(time.RFC3339)
+								}
+							}
+							if value != nil {
+								hit.AddFieldValue(f, value)
+							}
+						}
+					}
 				}
 			}
 		}

@@ -318,7 +318,11 @@ func TestIndexInsertWithStore(t *testing.T) {
 	if len(storedDoc.Fields) != 1 {
 		t.Errorf("expected 1 stored field, got %d", len(storedDoc.Fields))
 	}
-	if string(storedDoc.Fields[0].Value()) != "test" {
-		t.Errorf("expected field content 'test', got '%s'", string(storedDoc.Fields[0].Value()))
+	textField, ok := storedDoc.Fields[0].(*document.TextField)
+	if !ok {
+		t.Errorf("expected text field")
+	}
+	if string(textField.Value()) != "test" {
+		t.Errorf("expected field content 'test', got '%s'", string(textField.Value()))
 	}
 }

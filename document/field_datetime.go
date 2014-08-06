@@ -16,7 +16,7 @@ import (
 	"github.com/couchbaselabs/bleve/numeric_util"
 )
 
-const DEFAULT_DATETIME_INDEXING_OPTIONS = INDEX_FIELD
+const DEFAULT_DATETIME_INDEXING_OPTIONS = STORE_FIELD | INDEX_FIELD
 
 const DEFAULT_DATETIME_PRECISION_STEP uint = 4
 
@@ -74,12 +74,28 @@ func (n *DateTimeField) Value() []byte {
 	return n.value
 }
 
+func (n *DateTimeField) DateTime() (time.Time, error) {
+	i64, err := n.value.Int64()
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(0, i64), nil
+}
+
 func (n *DateTimeField) GoString() string {
 	return fmt.Sprintf("&document.DateField{Name:%s, Options: %s, Value: %s}", n.name, n.options, n.value)
 }
 
+func NewDateTimeFieldFromBytes(name string, value []byte) *DateTimeField {
+	return &DateTimeField{
+		name:    name,
+		value:   value,
+		options: DEFAULT_DATETIME_INDEXING_OPTIONS,
+	}
+}
+
 func NewDateTimeField(name string, dt time.Time) *DateTimeField {
-	return NewDateTimeFieldWithIndexingOptions(name, dt, DEFAULT_NUMERIC_INDEXING_OPTIONS)
+	return NewDateTimeFieldWithIndexingOptions(name, dt, DEFAULT_DATETIME_INDEXING_OPTIONS)
 }
 
 func NewDateTimeFieldWithIndexingOptions(name string, dt time.Time, options IndexingOptions) *DateTimeField {

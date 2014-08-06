@@ -36,6 +36,7 @@ type SearchRequest struct {
 	Size      int               `json:"size"`
 	From      int               `json:"from"`
 	Highlight *HighlightRequest `json:"highlight"`
+	Fields    []string          `json:"fields"`
 	Explain   bool              `json:"explain"`
 }
 
@@ -45,6 +46,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Size      int               `json:"size"`
 		From      int               `json:"from"`
 		Highlight *HighlightRequest `json:"highlight"`
+		Fields    []string          `json:"fields"`
 		Explain   bool              `json:"explain"`
 	}
 
@@ -57,6 +59,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.From = temp.From
 	r.Explain = temp.Explain
 	r.Highlight = temp.Highlight
+	r.Fields = temp.Fields
 	r.Query, err = ParseQuery(temp.Q)
 	if err != nil {
 		return err

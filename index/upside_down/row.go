@@ -388,6 +388,7 @@ func NewBackIndexRowKV(key, value []byte) (*BackIndexRow, error) {
 type StoredRow struct {
 	doc   []byte
 	field uint16
+	typ   byte
 	value []byte
 }
 
@@ -403,11 +404,14 @@ func (s *StoredRow) Key() []byte {
 }
 
 func (s *StoredRow) Value() []byte {
-	return s.value
+	rv := make([]byte, len(s.value)+1)
+	rv[0] = s.typ
+	copy(rv[1:], s.value)
+	return rv
 }
 
 func (s *StoredRow) String() string {
-	return fmt.Sprintf("Document: %s Field %d, Value: %s", s.doc, s.field, s.value)
+	return fmt.Sprintf("Document: %s Field %d, Type: %s Value: %s", s.doc, s.field, string(s.typ), s.value)
 }
 
 func (s *StoredRow) ScanPrefixForDoc() []byte {
@@ -418,10 +422,11 @@ func (s *StoredRow) ScanPrefixForDoc() []byte {
 	return buf.Bytes()
 }
 
-func NewStoredRow(doc string, field uint16, value []byte) *StoredRow {
+func NewStoredRow(doc string, field uint16, typ byte, value []byte) *StoredRow {
 	return &StoredRow{
 		doc:   []byte(doc),
 		field: field,
+		typ:   typ,
 		value: value,
 	}
 }
@@ -446,7 +451,9 @@ func NewStoredRowKV(key, value []byte) (*StoredRow, error) {
 		return nil, err
 	}
 
-	rv.value = value
+	rv.typ = value[0]
+
+	rv.value = value[1:]
 
 	return &rv, nil
 }

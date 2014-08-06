@@ -330,7 +330,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 	}
 	// any of the existing stored fields that weren't updated need to be deleted
 	for storedFieldIndex, _ := range existingStoredFieldMap {
-		storedRow := NewStoredRow(doc.ID, storedFieldIndex, nil)
+		storedRow := NewStoredRow(doc.ID, storedFieldIndex, 'x', nil)
 		deleteRows = append(deleteRows, storedRow)
 	}
 
@@ -344,7 +344,8 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 func (udc *UpsideDownCouch) storeField(docId string, field document.Field, fieldIndex uint16, existingStoredFieldMap map[uint16]bool) ([]UpsideDownCouchRow, []UpsideDownCouchRow) {
 	updateRows := make([]UpsideDownCouchRow, 0)
 	addRows := make([]UpsideDownCouchRow, 0)
-	storedRow := NewStoredRow(docId, fieldIndex, field.Value())
+	fieldType := encodeFieldType(field)
+	storedRow := NewStoredRow(docId, fieldIndex, fieldType, field.Value())
 	_, ok := existingStoredFieldMap[fieldIndex]
 	if ok {
 		// this is an update
@@ -355,6 +356,21 @@ func (udc *UpsideDownCouch) storeField(docId string, field document.Field, field
 		addRows = append(addRows, storedRow)
 	}
 	return addRows, updateRows
+}
+
+func encodeFieldType(f document.Field) byte {
+	fieldType := byte('x')
+	switch f.(type) {
+	case *document.TextField:
+		fieldType = 't'
+	case *document.NumericField:
+		fieldType = 'n'
+	case *document.DateTimeField:
+		fieldType = 'd'
+	case *document.CompositeField:
+		fieldType = 'c'
+	}
+	return fieldType
 }
 
 func (udc *UpsideDownCouch) indexField(docId string, field document.Field, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies, existingTermMap termMap) ([]UpsideDownCouchRow, []UpsideDownCouchRow, []*BackIndexEntry) {
@@ -431,7 +447,7 @@ func (udc *UpsideDownCouch) Delete(id string) error {
 		rows = append(rows, tfr)
 	}
 	for _, sf := range backIndexRow.storedFields {
-		sf := NewStoredRow(id, sf, nil)
+		sf := NewStoredRow(id, sf, 'x', nil)
 		rows = append(rows, sf)
 	}
 
@@ -551,7 +567,7 @@ func (udc *UpsideDownCouch) DumpDoc(id string) ([]interface{}, error) {
 	}
 	keys := make(keyset, 0)
 	for _, stored := range back.storedFields {
-		sr := NewStoredRow(id, stored, []byte{})
+		sr := NewStoredRow(id, stored, 'x', []byte{})
 		key := sr.Key()
 		keys = append(keys, key)
 	}
@@ -591,7 +607,7 @@ func (udc *UpsideDownCouch) DocIdReader(start, end string) (index.DocIdReader, e
 
 func (udc *UpsideDownCouch) Document(id string) (*document.Document, error) {
 	rv := document.NewDocument(id)
-	storedRow := NewStoredRow(id, 0, nil)
+	storedRow := NewStoredRow(id, 0, 'x', nil)
 	storedRowScanPrefix := storedRow.ScanPrefixForDoc()
 	it := udc.store.Iterator(storedRowScanPrefix)
 	key, val, valid := it.Current()
@@ -604,13 +620,29 @@ func (udc *UpsideDownCouch) Document(id string) (*document.Document, error) {
 			return nil, err
 		}
 		if row != nil {
-			rv.AddField(document.NewTextField(udc.fieldIndexToName(row.field), row.Value()))
+			fieldName := udc.fieldIndexToName(row.field)
+			field := decodeFieldType(row.typ, fieldName, row.value)
+			if field != nil {
+				rv.AddField(field)
+			}
 		}
 
 		it.Next()
 		key, val, valid = it.Current()
 	}
 	return rv, nil
+}
+
+func decodeFieldType(typ byte, name string, value []byte) document.Field {
+	switch typ {
+	case 't':
+		return document.NewTextField(name, value)
+	case 'n':
+		return document.NewNumericFieldFromBytes(name, value)
+	case 'd':
+		return document.NewDateTimeFieldFromBytes(name, value)
+	}
+	return nil
 }
 
 func frequencyFromTokenFreq(tf *analysis.TokenFreq) int {
