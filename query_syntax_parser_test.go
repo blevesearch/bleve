@@ -1,0 +1,179 @@
+//  Copyright (c) 2014 Couchbase, Inc.
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//    http://www.apache.org/licenses/LICENSE-2.0
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
+package bleve
+
+import (
+	"reflect"
+	"testing"
+)
+
+func TestQuerySyntaxParserValid(t *testing.T) {
+
+	tests := []struct {
+		input   string
+		result  Query
+		mapping *IndexMapping
+	}{
+		{
+			input:   "test",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				NewDisjunctionQuery(
+					[]Query{
+						NewMatchQuery("test"),
+					}),
+				nil),
+		},
+		{
+			input:   `"test phrase 1"`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				NewDisjunctionQuery(
+					[]Query{
+						NewMatchPhraseQuery("test phrase 1"),
+					}),
+				nil),
+		},
+		{
+			input:   "field:test",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				NewDisjunctionQuery(
+					[]Query{
+						NewMatchQuery("test").SetField("field"),
+					}),
+				nil),
+		},
+		{
+			input:   "+field1:test1",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				NewConjunctionQuery(
+					[]Query{
+						NewMatchQuery("test1").SetField("field1"),
+					}),
+				nil,
+				nil),
+		},
+		{
+			input:   "-field2:test2",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				nil,
+				NewDisjunctionQuery(
+					[]Query{
+						NewMatchQuery("test2").SetField("field2"),
+					})),
+		},
+		{
+			input:   `field3:"test phrase 2"`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				NewDisjunctionQuery(
+					[]Query{
+						NewMatchPhraseQuery("test phrase 2").SetField("field3"),
+					}),
+				nil),
+		},
+		{
+			input:   `+field4:"test phrase 1"`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				NewConjunctionQuery(
+					[]Query{
+						NewMatchPhraseQuery("test phrase 1").SetField("field4"),
+					}),
+				nil,
+				nil),
+		},
+		{
+			input:   `-field5:"test phrase 2"`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				nil,
+				NewDisjunctionQuery(
+					[]Query{
+						NewMatchPhraseQuery("test phrase 2").SetField("field5"),
+					})),
+		},
+		{
+			input:   `+field6:test3 -field7:test4 field8:test5`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				NewConjunctionQuery(
+					[]Query{
+						NewMatchQuery("test3").SetField("field6"),
+					}),
+				NewDisjunctionQuery(
+					[]Query{
+						NewMatchQuery("test5").SetField("field8"),
+					}),
+				NewDisjunctionQuery(
+					[]Query{
+						NewMatchQuery("test4").SetField("field7"),
+					})),
+		},
+		{
+			input:   "test^3",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				NewDisjunctionQuery(
+					[]Query{
+						NewMatchQuery("test").SetBoost(3.0),
+					}),
+				nil),
+		},
+		{
+			input:   "test^3 other^6",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				NewDisjunctionQuery(
+					[]Query{
+						NewMatchQuery("test").SetBoost(3.0),
+						NewMatchQuery("other").SetBoost(6.0),
+					}),
+				nil),
+		},
+	}
+
+	for _, test := range tests {
+
+		q, err := ParseQuerySyntax(test.input, test.mapping)
+		if err != nil {
+			t.Error(err)
+		}
+		if !reflect.DeepEqual(q, test.result) {
+			t.Errorf("Expected %#v, got %#v: for %s", test.result, q, test.input)
+		}
+	}
+}
+
+func TestQuerySyntaxParserInvalid(t *testing.T) {
+	tests := []struct {
+		input string
+	}{
+		{"^"},
+		{"^5"},
+	}
+
+	for _, test := range tests {
+		_, err := ParseQuerySyntax(test.input, NewIndexMapping())
+		if err == nil {
+			t.Errorf("expected error, got nil for `%s`", test.input)
+		}
+	}
+}

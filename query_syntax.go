@@ -13,9 +13,8 @@ import (
 )
 
 type SyntaxQuery struct {
-	Query           string  `json:"query"`
-	DefaultFieldVal string  `json:"default_field,omitempty"`
-	BoostVal        float64 `json:"boost,omitempty"`
+	Query    string  `json:"query"`
+	BoostVal float64 `json:"boost,omitempty"`
 }
 
 func NewSyntaxQuery(query string) *SyntaxQuery {
@@ -34,21 +33,8 @@ func (q *SyntaxQuery) SetBoost(b float64) *SyntaxQuery {
 	return q
 }
 
-func (q *SyntaxQuery) DefaultField() string {
-	return q.DefaultFieldVal
-}
-
-func (q *SyntaxQuery) SetField(f string) *SyntaxQuery {
-	q.DefaultFieldVal = f
-	return q
-}
-
 func (q *SyntaxQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
-	defaultField := q.DefaultFieldVal
-	if q.DefaultFieldVal == "" {
-		defaultField = i.m.defaultField()
-	}
-	newQuery, err := ParseQuerySyntax(q.Query, i.m, defaultField)
+	newQuery, err := ParseQuerySyntax(q.Query, i.m)
 	if err != nil {
 		return nil, err
 	}

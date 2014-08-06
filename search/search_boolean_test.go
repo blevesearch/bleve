@@ -232,7 +232,7 @@ func TestTermBooleanSearch(t *testing.T) {
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "1",
-					Score: 1.6775110856165738,
+					Score: 0.9818005051949021,
 				},
 				&DocumentMatch{
 					ID:    "3",
@@ -302,7 +302,7 @@ func TestTermBooleanSearch(t *testing.T) {
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "1",
-					Score: 2.905938399789078,
+					Score: 2.0097428702814377,
 				},
 			},
 		},

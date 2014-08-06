@@ -15,6 +15,7 @@ import (
 )
 
 type PhraseSearcher struct {
+	initialized  bool
 	index        index.Index
 	mustSearcher *TermConjunctionSearcher
 	queryNorm    float64
@@ -32,11 +33,6 @@ func NewPhraseSearcher(index index.Index, mustSearcher *TermConjunctionSearcher,
 		terms:        terms,
 	}
 	rv.computeQueryNorm()
-	err := rv.initSearchers()
-	if err != nil {
-		return nil, err
-	}
-
 	return &rv, nil
 }
 
@@ -65,6 +61,7 @@ func (s *PhraseSearcher) initSearchers() error {
 		}
 	}
 
+	s.initialized = true
 	return nil
 }
 
@@ -93,6 +90,13 @@ func (s *PhraseSearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *PhraseSearcher) Next() (*DocumentMatch, error) {
+	if !s.initialized {
+		err := s.initSearchers()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	var rv *DocumentMatch
 	for s.currMust != nil {
 		rvftlm := make(FieldTermLocationMap, 0)
@@ -150,6 +154,12 @@ func (s *PhraseSearcher) Next() (*DocumentMatch, error) {
 }
 
 func (s *PhraseSearcher) Advance(ID string) (*DocumentMatch, error) {
+	if !s.initialized {
+		err := s.initSearchers()
+		if err != nil {
+			return nil, err
+		}
+	}
 	s.mustSearcher.Advance(ID)
 	return s.Next()
 }

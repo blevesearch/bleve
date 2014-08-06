@@ -72,11 +72,11 @@ func TestTermDisjunctionSearch(t *testing.T) {
 			results: []*DocumentMatch{
 				&DocumentMatch{
 					ID:    "1",
-					Score: 0.33875554280828685,
+					Score: 0.2765927424732821,
 				},
 				&DocumentMatch{
 					ID:    "3",
-					Score: 0.33875554280828685,
+					Score: 0.2765927424732821,
 				},
 				&DocumentMatch{
 					ID:    "4",

@@ -16,13 +16,14 @@ import (
 )
 
 type TermDisjunctionSearcher struct {
-	index     index.Index
-	searchers OrderedSearcherList
-	queryNorm float64
-	currs     []*DocumentMatch
-	currentId string
-	scorer    *TermDisjunctionQueryScorer
-	min       float64
+	initialized bool
+	index       index.Index
+	searchers   OrderedSearcherList
+	queryNorm   float64
+	currs       []*DocumentMatch
+	currentId   string
+	scorer      *TermDisjunctionQueryScorer
+	min         float64
 }
 
 func NewTermDisjunctionSearcher(index index.Index, qsearchers []Searcher, min float64, explain bool) (*TermDisjunctionSearcher, error) {
@@ -42,11 +43,6 @@ func NewTermDisjunctionSearcher(index index.Index, qsearchers []Searcher, min fl
 		min:       min,
 	}
 	rv.computeQueryNorm()
-	err := rv.initSearchers()
-	if err != nil {
-		return nil, err
-	}
-
 	return &rv, nil
 }
 
@@ -75,6 +71,7 @@ func (s *TermDisjunctionSearcher) initSearchers() error {
 	}
 
 	s.currentId = s.nextSmallestId()
+	s.initialized = true
 	return nil
 }
 
@@ -103,6 +100,12 @@ func (s *TermDisjunctionSearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *TermDisjunctionSearcher) Next() (*DocumentMatch, error) {
+	if !s.initialized {
+		err := s.initSearchers()
+		if err != nil {
+			return nil, err
+		}
+	}
 	var err error
 	var rv *DocumentMatch
 	matching := make([]*DocumentMatch, 0)
@@ -139,7 +142,12 @@ func (s *TermDisjunctionSearcher) Next() (*DocumentMatch, error) {
 }
 
 func (s *TermDisjunctionSearcher) Advance(ID string) (*DocumentMatch, error) {
-
+	if !s.initialized {
+		err := s.initSearchers()
+		if err != nil {
+			return nil, err
+		}
+	}
 	// get all searchers pointing at their first match
 	var err error
 	for i, termSearcher := range s.searchers {

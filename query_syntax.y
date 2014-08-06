@@ -62,7 +62,7 @@ searchBase:
 STRING {
 	str := $1.s
 	logDebugGrammar("STRING - %s", str)
-	q := NewMatchQuery(str).SetField(parsingDefaultField)
+	q := NewMatchQuery(str)
 	if parsingMust {
 		parsingMustList.AddQuery(q)
 		parsingMust = false
@@ -72,12 +72,13 @@ STRING {
 	} else {
 		parsingShouldList.AddQuery(q)
 	}
+	parsingLastQuery = q
 }
 |
 PHRASE {
 	phrase := $1.s
 	logDebugGrammar("PHRASE - %s", phrase)
-	q := NewMatchPhraseQuery(phrase).SetField(parsingDefaultField)
+	q := NewMatchPhraseQuery(phrase)
 	if parsingMust {
 		parsingMustList.AddQuery(q)
 		parsingMust = false
@@ -87,6 +88,7 @@ PHRASE {
 	} else {
 		parsingShouldList.AddQuery(q)
 	}
+	parsingLastQuery = q
 }
 |
 STRING COLON STRING {
@@ -103,6 +105,7 @@ STRING COLON STRING {
 	} else {
 		parsingShouldList.AddQuery(q)
 	}
+	parsingLastQuery = q
 }
 |
 STRING COLON PHRASE {
@@ -119,14 +122,23 @@ STRING COLON PHRASE {
 	} else {
 		parsingShouldList.AddQuery(q)
 	}
+	parsingLastQuery = q
 };
 
 
 searchBoost:
 BOOST INT {
-	boost := $1.n
+	boost := $2.n
+	if parsingLastQuery != nil {
+		switch parsingLastQuery := parsingLastQuery.(type) {
+		case *MatchQuery:
+			parsingLastQuery.SetBoost(float64(boost))
+		case *MatchPhraseQuery:
+			parsingLastQuery.SetBoost(float64(boost))
+		}
+	}
 	logDebugGrammar("BOOST %d", boost)
-}
+};
 
 searchSuffix:
 /* empty */ {

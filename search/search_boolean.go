@@ -15,6 +15,7 @@ import (
 )
 
 type TermBooleanSearcher struct {
+	initialized     bool
 	index           index.Index
 	mustSearcher    *TermConjunctionSearcher
 	shouldSearcher  *TermDisjunctionSearcher
@@ -38,11 +39,6 @@ func NewTermBooleanSearcher(index index.Index, mustSearcher *TermConjunctionSear
 		scorer:          NewTermConjunctionQueryScorer(explain),
 	}
 	rv.computeQueryNorm()
-	err := rv.initSearchers()
-	if err != nil {
-		return nil, err
-	}
-
 	return &rv, nil
 }
 
@@ -99,6 +95,7 @@ func (s *TermBooleanSearcher) initSearchers() error {
 		s.currentId = ""
 	}
 
+	s.initialized = true
 	return nil
 }
 
@@ -150,6 +147,13 @@ func (s *TermBooleanSearcher) SetQueryNorm(qnorm float64) {
 
 func (s *TermBooleanSearcher) Next() (*DocumentMatch, error) {
 
+	if !s.initialized {
+		err := s.initSearchers()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	var err error
 	var rv *DocumentMatch
 
@@ -172,7 +176,7 @@ func (s *TermBooleanSearcher) Next() (*DocumentMatch, error) {
 		}
 
 		if s.currShould != nil && s.currShould.ID < s.currentId {
-			// advance shoudl searcher to our candidate entry
+			// advance should searcher to our candidate entry
 			s.currShould, err = s.shouldSearcher.Advance(s.currentId)
 			if err != nil {
 				return nil, err
@@ -216,6 +220,14 @@ func (s *TermBooleanSearcher) Next() (*DocumentMatch, error) {
 }
 
 func (s *TermBooleanSearcher) Advance(ID string) (*DocumentMatch, error) {
+
+	if !s.initialized {
+		err := s.initSearchers()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	var err error
 	if s.mustSearcher != nil {
 		s.currMust, err = s.mustSearcher.Advance(ID)
@@ -248,6 +260,7 @@ func (s *TermBooleanSearcher) Advance(ID string) (*DocumentMatch, error) {
 }
 
 func (s *TermBooleanSearcher) Count() uint64 {
+
 	// for now return a worst case
 	var sum uint64 = 0
 	if s.mustSearcher != nil {

@@ -16,23 +16,22 @@ import (
 
 var crashHard = false
 var parserMutex sync.Mutex
-var parsingDefaultField string
 var parsingMust bool
 var parsingMustNot bool
 var debugParser bool
 var debugLexer bool
 
+var parsingLastQuery Query
 var parsingMustList *ConjunctionQuery
 var parsingMustNotList *DisjunctionQuery
 var parsingShouldList *DisjunctionQuery
 var parsingIndexMapping *IndexMapping
 
-func ParseQuerySyntax(query string, mapping *IndexMapping, defaultField string) (rq Query, err error) {
+func ParseQuerySyntax(query string, mapping *IndexMapping) (rq Query, err error) {
 	parserMutex.Lock()
 	defer parserMutex.Unlock()
 
 	parsingIndexMapping = mapping
-	parsingDefaultField = defaultField
 	parsingMustList = NewConjunctionQuery([]Query{})
 	parsingMustNotList = NewDisjunctionQuery([]Query{})
 	parsingShouldList = NewDisjunctionQuery([]Query{})

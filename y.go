@@ -383,7 +383,7 @@ yydefault:
 		{
 			str := yyS[yypt-0].s
 			logDebugGrammar("STRING - %s", str)
-			q := NewMatchQuery(str).SetField(parsingDefaultField)
+			q := NewMatchQuery(str)
 			if parsingMust {
 				parsingMustList.AddQuery(q)
 				parsingMust = false
@@ -393,13 +393,14 @@ yydefault:
 			} else {
 				parsingShouldList.AddQuery(q)
 			}
+			parsingLastQuery = q
 		}
 	case 10:
-		//line query_syntax.y:77
+		//line query_syntax.y:78
 		{
 			phrase := yyS[yypt-0].s
 			logDebugGrammar("PHRASE - %s", phrase)
-			q := NewMatchPhraseQuery(phrase).SetField(parsingDefaultField)
+			q := NewMatchPhraseQuery(phrase)
 			if parsingMust {
 				parsingMustList.AddQuery(q)
 				parsingMust = false
@@ -409,9 +410,10 @@ yydefault:
 			} else {
 				parsingShouldList.AddQuery(q)
 			}
+			parsingLastQuery = q
 		}
 	case 11:
-		//line query_syntax.y:92
+		//line query_syntax.y:94
 		{
 			field := yyS[yypt-2].s
 			str := yyS[yypt-0].s
@@ -426,9 +428,10 @@ yydefault:
 			} else {
 				parsingShouldList.AddQuery(q)
 			}
+			parsingLastQuery = q
 		}
 	case 12:
-		//line query_syntax.y:108
+		//line query_syntax.y:111
 		{
 			field := yyS[yypt-2].s
 			phrase := yyS[yypt-0].s
@@ -443,20 +446,29 @@ yydefault:
 			} else {
 				parsingShouldList.AddQuery(q)
 			}
+			parsingLastQuery = q
 		}
 	case 13:
-		//line query_syntax.y:126
+		//line query_syntax.y:130
 		{
-			boost := yyS[yypt-1].n
+			boost := yyS[yypt-0].n
+			if parsingLastQuery != nil {
+				switch parsingLastQuery := parsingLastQuery.(type) {
+				case *MatchQuery:
+					parsingLastQuery.SetBoost(float64(boost))
+				case *MatchPhraseQuery:
+					parsingLastQuery.SetBoost(float64(boost))
+				}
+			}
 			logDebugGrammar("BOOST %d", boost)
 		}
 	case 14:
-		//line query_syntax.y:132
+		//line query_syntax.y:144
 		{
 
 		}
 	case 15:
-		//line query_syntax.y:136
+		//line query_syntax.y:148
 		{
 
 		}

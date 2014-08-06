@@ -16,13 +16,14 @@ import (
 )
 
 type TermConjunctionSearcher struct {
-	index     index.Index
-	searchers OrderedSearcherList
-	explain   bool
-	queryNorm float64
-	currs     []*DocumentMatch
-	currentId string
-	scorer    *TermConjunctionQueryScorer
+	initialized bool
+	index       index.Index
+	searchers   OrderedSearcherList
+	explain     bool
+	queryNorm   float64
+	currs       []*DocumentMatch
+	currentId   string
+	scorer      *TermConjunctionQueryScorer
 }
 
 func NewTermConjunctionSearcher(index index.Index, qsearchers []Searcher, explain bool) (*TermConjunctionSearcher, error) {
@@ -42,11 +43,6 @@ func NewTermConjunctionSearcher(index index.Index, qsearchers []Searcher, explai
 		scorer:    NewTermConjunctionQueryScorer(explain),
 	}
 	rv.computeQueryNorm()
-	err := rv.initSearchers()
-	if err != nil {
-		return nil, err
-	}
-
 	return &rv, nil
 }
 
@@ -82,6 +78,7 @@ func (s *TermConjunctionSearcher) initSearchers() error {
 		}
 	}
 
+	s.initialized = true
 	return nil
 }
 
@@ -100,6 +97,12 @@ func (s *TermConjunctionSearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *TermConjunctionSearcher) Next() (*DocumentMatch, error) {
+	if !s.initialized {
+		err := s.initSearchers()
+		if err != nil {
+			return nil, err
+		}
+	}
 	var rv *DocumentMatch
 	var err error
 OUTER:
@@ -146,6 +149,12 @@ OUTER:
 }
 
 func (s *TermConjunctionSearcher) Advance(ID string) (*DocumentMatch, error) {
+	if !s.initialized {
+		err := s.initSearchers()
+		if err != nil {
+			return nil, err
+		}
+	}
 	var err error
 	for i, searcher := range s.searchers {
 		s.currs[i], err = searcher.Advance(ID)
