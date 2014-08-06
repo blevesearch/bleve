@@ -25,6 +25,7 @@ var fALSE = false
 var DEFAULT_ID_FIELD = "_id"
 var DEFAULT_TYPE_FIELD = "_type"
 var DEFAULT_TYPE = "_default"
+var DEFAULT_FIELD = "_all"
 
 type IndexMapping struct {
 	TypeMapping     map[string]*DocumentMapping `json:"types"`
@@ -33,6 +34,7 @@ type IndexMapping struct {
 	TypeField       *string                     `json:"type_field"`
 	DefaultType     *string                     `json:"default_type"`
 	DefaultAnalyzer *string                     `json:"default_analyzer"`
+	DefaultField    *string                     `json:"default_field"`
 }
 
 func (im *IndexMapping) GoString() string {
@@ -46,6 +48,7 @@ func NewIndexMapping() *IndexMapping {
 		IdField:        &DEFAULT_ID_FIELD,
 		TypeField:      &DEFAULT_TYPE_FIELD,
 		DefaultType:    &DEFAULT_TYPE,
+		DefaultField:   &DEFAULT_FIELD,
 	}
 }
 
@@ -61,6 +64,11 @@ func (im *IndexMapping) SetTypeField(typeField string) *IndexMapping {
 
 func (im *IndexMapping) SetDefaultAnalyzer(analyzer string) *IndexMapping {
 	im.DefaultAnalyzer = &analyzer
+	return im
+}
+
+func (im *IndexMapping) SetDefaultField(field string) *IndexMapping {
+	im.DefaultField = &field
 	return im
 }
 
@@ -80,6 +88,7 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 		TypeField       *string                     `json:"type_field"`
 		DefaultType     *string                     `json:"default_type"`
 		DefaultAnalyzer *string                     `json:"default_analyzer"`
+		DefaultField    *string                     `json:"default_field"`
 	}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
@@ -108,6 +117,10 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 
 	if tmp.DefaultAnalyzer != nil {
 		im.DefaultAnalyzer = tmp.DefaultAnalyzer
+	}
+
+	if tmp.DefaultField != nil {
+		im.DefaultField = tmp.DefaultField
 	}
 
 	im.TypeMapping = make(map[string]*DocumentMapping, len(tmp.TypeMapping))
@@ -235,7 +248,6 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 		propertyValueString := propertyValue.String()
 		if subDocMapping != nil {
 			// index by explicit mapping
-
 			for _, fieldMapping := range subDocMapping.Fields {
 				fieldName := getFieldName(pathString, path, fieldMapping)
 				if *fieldMapping.Type == "text" {
@@ -390,6 +402,15 @@ func (im *IndexMapping) datetimeParserForPath(path string) analysis.DateTimePars
 
 	// finally just return the system-wide default analyzer
 	return Config.Analysis.DateTimeParsers[*Config.DefaultDateTimeFormat]
+}
+
+func (im *IndexMapping) defaultField() string {
+	if im.DefaultField != nil {
+		return *im.DefaultField
+	} else if Config.DefaultField != nil {
+		return *Config.DefaultField
+	}
+	return ""
 }
 
 func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) string {

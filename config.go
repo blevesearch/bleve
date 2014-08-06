@@ -54,6 +54,7 @@ type Configuration struct {
 	DefaultHighlighter    *string
 	CreateIfMissing       bool
 	DefaultDateTimeFormat *string
+	DefaultField          *string
 }
 
 func (c *Configuration) BuildNewAnalyzer(charFilterNames []string, tokenizerName string, tokenFilterNames []string) (*analysis.Analyzer, error) {
@@ -349,4 +350,7 @@ func init() {
 		})
 	dateTimeOptionalName := "dateTimeOptional"
 	Config.DefaultDateTimeFormat = &dateTimeOptionalName
+
+	defaultField := "_all"
+	Config.DefaultField = &defaultField
 }

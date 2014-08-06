@@ -48,7 +48,11 @@ func (q *NumericRangeQuery) SetField(f string) *NumericRangeQuery {
 }
 
 func (q *NumericRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
-	return search.NewNumericRangeSearcher(i.i, q.Min, q.Max, q.FieldVal, q.BoostVal, explain)
+	field := q.FieldVal
+	if q.FieldVal == "" {
+		field = i.m.defaultField()
+	}
+	return search.NewNumericRangeSearcher(i.i, q.Min, q.Max, field, q.BoostVal, explain)
 }
 
 func (q *NumericRangeQuery) Validate() error {

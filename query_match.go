@@ -59,13 +59,18 @@ func (q *MatchQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, erro
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
 	}
 
+	field := q.FieldVal
+	if q.FieldVal == "" {
+		field = i.m.defaultField()
+	}
+
 	tokens := analyzer.Analyze([]byte(q.Match))
 	if len(tokens) > 0 {
 
 		tqs := make([]Query, len(tokens))
 		for i, token := range tokens {
 			tqs[i] = NewTermQuery(string(token.Term)).
-				SetField(q.FieldVal).
+				SetField(field).
 				SetBoost(q.BoostVal)
 		}
 

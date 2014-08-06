@@ -63,6 +63,11 @@ func (q *DateRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, 
 		return nil, fmt.Errorf("no datetime parser named '%s' registered", *q.DateTimeParser)
 	}
 
+	field := q.FieldVal
+	if q.FieldVal == "" {
+		field = i.m.defaultField()
+	}
+
 	// now parse the endpoints
 	min := math.Inf(-1)
 	max := math.Inf(1)
@@ -81,7 +86,7 @@ func (q *DateRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, 
 		max = numeric_util.Int64ToFloat64(endTime.UnixNano())
 	}
 
-	return search.NewNumericRangeSearcher(i.i, &min, &max, q.FieldVal, q.BoostVal, explain)
+	return search.NewNumericRangeSearcher(i.i, &min, &max, field, q.BoostVal, explain)
 }
 
 func (q *DateRangeQuery) Validate() error {

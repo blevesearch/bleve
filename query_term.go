@@ -44,7 +44,11 @@ func (q *TermQuery) SetField(f string) *TermQuery {
 }
 
 func (q *TermQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
-	return search.NewTermSearcher(i.i, q.Term, q.FieldVal, q.BoostVal, explain)
+	field := q.FieldVal
+	if q.FieldVal == "" {
+		field = i.m.defaultField()
+	}
+	return search.NewTermSearcher(i.i, q.Term, field, q.BoostVal, explain)
 }
 
 func (q *TermQuery) Validate() error {

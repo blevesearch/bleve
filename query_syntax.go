@@ -44,7 +44,11 @@ func (q *SyntaxQuery) SetField(f string) *SyntaxQuery {
 }
 
 func (q *SyntaxQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
-	newQuery, err := ParseQuerySyntax(q.Query, i.m, q.DefaultFieldVal)
+	defaultField := q.DefaultFieldVal
+	if q.DefaultFieldVal == "" {
+		defaultField = i.m.defaultField()
+	}
+	newQuery, err := ParseQuerySyntax(q.Query, i.m, defaultField)
 	if err != nil {
 		return nil, err
 	}
