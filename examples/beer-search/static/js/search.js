@@ -135,7 +135,6 @@ function SearchCtrl($scope, $http, $routeParams, $log, $sce) {
             "explain": true,
             "highlight":{},
             "query": {
-                "default_field": "_all",
                 "boost": 1.0,
                 "query": $scope.syntax,
             }
@@ -164,15 +163,14 @@ function SearchCtrl($scope, $http, $routeParams, $log, $sce) {
     };
 
     $scope.roundTook = function(took) {
-		roundTook = Math.round(took*1000)/1000;
-		if (roundTook === 0) {
-			return "less than 1ms";
-		} else if (roundTook < 1) {
-			roundTookMs = roundTook * 1000;
-			return "" + roundTookMs + "ms";
-		} else {
-			return "" + roundTook + "s";
-		}
+        if (took < 1000 * 1000) {
+            return "less than 1ms";
+        } else if (took < 1000 * 1000 * 1000) {
+            return "" + Math.round(took / (1000*1000)) + "ms";
+        } else {
+            roundMs = Math.round(took / (1000*1000));
+            return "" + roundMs/1000 + "s";
+        }
 	};
 
     $scope.removePhraseTerm = function(index) {
