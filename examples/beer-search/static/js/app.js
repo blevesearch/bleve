@@ -19,6 +19,7 @@ config(['$routeProvider', '$locationProvider', function($routeProvider, $locatio
   $routeProvider.when('/search/syntax/', {templateUrl: '/static/partials/search/syntax.html', controller: 'SearchCtrl'});
   $routeProvider.when('/search/numeric_range/', {templateUrl: '/static/partials/search/numeric_range.html', controller: 'SearchCtrl'});
   $routeProvider.when('/search/date_range/', {templateUrl: '/static/partials/search/date_range.html', controller: 'SearchCtrl'});
+  $routeProvider.when('/search/prefix/', {templateUrl: '/static/partials/search/prefix.html', controller: 'SearchCtrl'});
   $routeProvider.when('/search/debug/', {templateUrl: '/static/partials/debug.html', controller: 'DebugCtrl'});
   $routeProvider.otherwise({redirectTo: '/overview'});
   $locationProvider.html5Mode(true);

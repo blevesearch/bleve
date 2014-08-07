@@ -53,6 +53,24 @@ function SearchCtrl($scope, $http, $routeParams, $log, $sce) {
         });
     };
 
+    $scope.searchPrefix = function() {
+        $http.post('/api/search', {
+            "size": 10,
+            "explain": true,
+            "highlight":{},
+            "query": {
+                "prefix": $scope.prefix,
+                "field": $scope.field,
+            }
+        }).
+        success(function(data) {
+            $scope.processResults(data);
+        }).
+        error(function(data, code) {
+
+        });
+    };
+
     $scope.searchNumericRange = function() {
         $http.post('/api/search', {
             "size": 10,
