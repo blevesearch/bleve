@@ -150,12 +150,12 @@ type TermFrequencyRow struct {
 }
 
 func (tfr *TermFrequencyRow) Key() []byte {
-	buf := make([]byte, 1+len(tfr.term)+1+2+len(tfr.doc))
+	buf := make([]byte, 3+len(tfr.term)+1+len(tfr.doc))
 	buf[0] = 't'
-	termLen := copy(buf[1:], tfr.term)
-	buf[1+termLen] = BYTE_SEPARATOR
-	binary.LittleEndian.PutUint16(buf[1+termLen+1:1+termLen+1+2], tfr.field)
-	copy(buf[1+termLen+1+2:], tfr.doc)
+	binary.LittleEndian.PutUint16(buf[1:3], tfr.field)
+	termLen := copy(buf[3:], tfr.term)
+	buf[3+termLen] = BYTE_SEPARATOR
+	copy(buf[3+termLen+1:], tfr.doc)
 	return buf
 }
 
@@ -211,16 +211,16 @@ func NewTermFrequencyRowKV(key, value []byte) (*TermFrequencyRow, error) {
 	buf.ReadByte() // type
 
 	var err error
+	err = binary.Read(buf, binary.LittleEndian, &rv.field)
+	if err != nil {
+		return nil, err
+	}
+
 	rv.term, err = buf.ReadBytes(BYTE_SEPARATOR)
 	if err != nil {
 		return nil, err
 	}
 	rv.term = rv.term[:len(rv.term)-1] // trim off separator byte
-
-	err = binary.Read(buf, binary.LittleEndian, &rv.field)
-	if err != nil {
-		return nil, err
-	}
 
 	doc, err := buf.ReadBytes(BYTE_SEPARATOR)
 	if err != io.EOF {

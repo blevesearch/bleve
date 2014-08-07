@@ -41,17 +41,17 @@ func TestRows(t *testing.T) {
 		},
 		{
 			NewTermFrequencyRow([]byte{'b', 'e', 'e', 'r'}, 0, "", 3, 3.14),
-			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64},
 		},
 		{
 			NewTermFrequencyRow([]byte{'b', 'e', 'e', 'r'}, 0, "budweiser", 3, 3.14),
-			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64},
 		},
 		{
 			NewTermFrequencyRowWithTermVectors([]byte{'b', 'e', 'e', 'r'}, 0, "budweiser", 3, 3.14, []*TermVector{&TermVector{field: 0, pos: 1, start: 3, end: 11}, &TermVector{field: 0, pos: 2, start: 23, end: 31}, &TermVector{field: 0, pos: 3, start: 43, end: 51}}),
-			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0},
 		},
 		{
@@ -131,49 +131,49 @@ func TestInvalidRows(t *testing.T) {
 			[]byte{'f', 0, 0},
 			[]byte{},
 		},
-		// type t, invalid key (missing term)
+		// type t, invalid key (missing field)
 		{
 			[]byte{'t'},
 			[]byte{},
 		},
-		// type t, invalid key (missing field)
+		// type t, invalid key (missing term)
 		{
-			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR},
+			[]byte{'t', 0, 0},
 			[]byte{},
 		},
 		// type t, invalid key (missing id)
 		{
-			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR},
 			[]byte{},
 		},
 		// type t, invalid val (misisng freq)
 		{
-			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{},
 		},
 		// type t, invalid val (missing norm)
 		{
-			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0},
 		},
 		// type t, invalid val (half missing tv field, full missing is valid (no term vectors))
 		{
-			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0},
 		},
 		// type t, invalid val (missing tv pos)
 		{
-			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0},
 		},
 		// type t, invalid val (missing tv start)
 		{
-			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0},
 		},
 		// type t, invalid val (missing tv end)
 		{
-			[]byte{'t', 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0},
 		},
 		// type b, invalid key (missing id)
