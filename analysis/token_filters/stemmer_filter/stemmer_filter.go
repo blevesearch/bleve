@@ -45,8 +45,11 @@ func (s *StemmerFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 	rv := make(analysis.TokenStream, 0)
 
 	for _, token := range input {
-		stemmed := s.stemmer.Stem(string(token.Term))
-		token.Term = []byte(stemmed)
+		// if not protected keyword, stem it
+		if !token.KeyWord {
+			stemmed := s.stemmer.Stem(string(token.Term))
+			token.Term = []byte(stemmed)
+		}
 		rv = append(rv, token)
 	}
 

@@ -31,6 +31,7 @@ type Token struct {
 	Term     []byte
 	Position int
 	Type     TokenType
+	KeyWord  bool
 }
 
 func (t *Token) String() string {

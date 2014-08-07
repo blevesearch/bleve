@@ -6,7 +6,7 @@
 //  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
-package stemmer_filter
+package keyword_filter
 
 import (
 	"reflect"
@@ -15,46 +15,53 @@ import (
 	"github.com/couchbaselabs/bleve/analysis"
 )
 
-func TestStemmerFilter(t *testing.T) {
+func TestKeyWordMarkerFilter(t *testing.T) {
 
 	inputTokenStream := analysis.TokenStream{
 		&analysis.Token{
-			Term: []byte("walking"),
+			Term: []byte("a"),
 		},
 		&analysis.Token{
-			Term: []byte("talked"),
+			Term: []byte("walk"),
 		},
 		&analysis.Token{
-			Term: []byte("business"),
+			Term: []byte("in"),
 		},
 		&analysis.Token{
-			Term:    []byte("protected"),
-			KeyWord: true,
+			Term: []byte("the"),
+		},
+		&analysis.Token{
+			Term: []byte("park"),
 		},
 	}
 
 	expectedTokenStream := analysis.TokenStream{
 		&analysis.Token{
-			Term: []byte("walk"),
+			Term: []byte("a"),
 		},
 		&analysis.Token{
-			Term: []byte("talk"),
+			Term:    []byte("walk"),
+			KeyWord: true,
 		},
 		&analysis.Token{
-			Term: []byte("busi"),
+			Term: []byte("in"),
 		},
 		&analysis.Token{
-			Term:    []byte("protected"),
+			Term: []byte("the"),
+		},
+		&analysis.Token{
+			Term:    []byte("park"),
 			KeyWord: true,
 		},
 	}
 
-	filter, err := NewStemmerFilter("english")
-	if err != nil {
-		t.Fatal(err)
-	}
+	keyWordsMap := analysis.NewWordMap()
+	keyWordsMap.AddWord("walk")
+	keyWordsMap.AddWord("park")
+
+	filter := NewKeyWordMarkerFilter(keyWordsMap)
 	ouputTokenStream := filter.Filter(inputTokenStream)
 	if !reflect.DeepEqual(ouputTokenStream, expectedTokenStream) {
-		t.Errorf("expected %#v got %#v", expectedTokenStream[3], ouputTokenStream[3])
+		t.Errorf("expected %#v got %#v", expectedTokenStream[0].KeyWord, ouputTokenStream[0].KeyWord)
 	}
 }
