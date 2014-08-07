@@ -22,7 +22,7 @@ func TestPhraseSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{angstTermSearcher, beerTermSearcher}, true)
+	mustSearcher, err := NewConjunctionSearcher(twoDocIndex, []Searcher{angstTermSearcher, beerTermSearcher}, true)
 	if err != nil {
 		t.Fatal(err)
 	}

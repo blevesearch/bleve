@@ -14,35 +14,35 @@ import (
 	"github.com/couchbaselabs/bleve/index"
 )
 
-type TermBooleanSearcher struct {
+type BooleanSearcher struct {
 	initialized     bool
 	index           index.Index
-	mustSearcher    *TermConjunctionSearcher
-	shouldSearcher  *TermDisjunctionSearcher
-	mustNotSearcher *TermDisjunctionSearcher
+	mustSearcher    *ConjunctionSearcher
+	shouldSearcher  *DisjunctionSearcher
+	mustNotSearcher *DisjunctionSearcher
 	queryNorm       float64
 	currMust        *DocumentMatch
 	currShould      *DocumentMatch
 	currMustNot     *DocumentMatch
 	currentId       string
 	min             uint64
-	scorer          *TermConjunctionQueryScorer
+	scorer          *ConjunctionQueryScorer
 }
 
-func NewTermBooleanSearcher(index index.Index, mustSearcher *TermConjunctionSearcher, shouldSearcher *TermDisjunctionSearcher, mustNotSearcher *TermDisjunctionSearcher, explain bool) (*TermBooleanSearcher, error) {
+func NewBooleanSearcher(index index.Index, mustSearcher *ConjunctionSearcher, shouldSearcher *DisjunctionSearcher, mustNotSearcher *DisjunctionSearcher, explain bool) (*BooleanSearcher, error) {
 	// build our searcher
-	rv := TermBooleanSearcher{
+	rv := BooleanSearcher{
 		index:           index,
 		mustSearcher:    mustSearcher,
 		shouldSearcher:  shouldSearcher,
 		mustNotSearcher: mustNotSearcher,
-		scorer:          NewTermConjunctionQueryScorer(explain),
+		scorer:          NewConjunctionQueryScorer(explain),
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
 }
 
-func (s *TermBooleanSearcher) computeQueryNorm() {
+func (s *BooleanSearcher) computeQueryNorm() {
 	// first calculate sum of squared weights
 	sumOfSquaredWeights := 0.0
 	if s.mustSearcher != nil {
@@ -63,7 +63,7 @@ func (s *TermBooleanSearcher) computeQueryNorm() {
 	}
 }
 
-func (s *TermBooleanSearcher) initSearchers() error {
+func (s *BooleanSearcher) initSearchers() error {
 	var err error
 	// get all searchers pointing at their first match
 	if s.mustSearcher != nil {
@@ -99,7 +99,7 @@ func (s *TermBooleanSearcher) initSearchers() error {
 	return nil
 }
 
-func (s *TermBooleanSearcher) advanceNextMust() error {
+func (s *BooleanSearcher) advanceNextMust() error {
 	var err error
 
 	if s.mustSearcher != nil {
@@ -124,7 +124,7 @@ func (s *TermBooleanSearcher) advanceNextMust() error {
 	return nil
 }
 
-func (s *TermBooleanSearcher) Weight() float64 {
+func (s *BooleanSearcher) Weight() float64 {
 	var rv float64
 	if s.mustSearcher != nil {
 		rv += s.mustSearcher.Weight()
@@ -136,7 +136,7 @@ func (s *TermBooleanSearcher) Weight() float64 {
 	return rv
 }
 
-func (s *TermBooleanSearcher) SetQueryNorm(qnorm float64) {
+func (s *BooleanSearcher) SetQueryNorm(qnorm float64) {
 	if s.mustSearcher != nil {
 		s.mustSearcher.SetQueryNorm(qnorm)
 	}
@@ -145,7 +145,7 @@ func (s *TermBooleanSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *TermBooleanSearcher) Next() (*DocumentMatch, error) {
+func (s *BooleanSearcher) Next() (*DocumentMatch, error) {
 
 	if !s.initialized {
 		err := s.initSearchers()
@@ -219,7 +219,7 @@ func (s *TermBooleanSearcher) Next() (*DocumentMatch, error) {
 	return rv, nil
 }
 
-func (s *TermBooleanSearcher) Advance(ID string) (*DocumentMatch, error) {
+func (s *BooleanSearcher) Advance(ID string) (*DocumentMatch, error) {
 
 	if !s.initialized {
 		err := s.initSearchers()
@@ -259,7 +259,7 @@ func (s *TermBooleanSearcher) Advance(ID string) (*DocumentMatch, error) {
 	return s.Next()
 }
 
-func (s *TermBooleanSearcher) Count() uint64 {
+func (s *BooleanSearcher) Count() uint64 {
 
 	// for now return a worst case
 	var sum uint64 = 0
@@ -272,7 +272,7 @@ func (s *TermBooleanSearcher) Count() uint64 {
 	return sum
 }
 
-func (s *TermBooleanSearcher) Close() {
+func (s *BooleanSearcher) Close() {
 	if s.mustSearcher != nil {
 		s.mustSearcher.Close()
 	}

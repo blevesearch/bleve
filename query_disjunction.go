@@ -51,7 +51,7 @@ func (q *DisjunctionQuery) SetMin(m float64) *DisjunctionQuery {
 	return q
 }
 
-func (q *DisjunctionQuery) Searcher(i *indexImpl, explain bool) (*search.TermDisjunctionSearcher, error) {
+func (q *DisjunctionQuery) Searcher(i *indexImpl, explain bool) (*search.DisjunctionSearcher, error) {
 	searchers := make([]search.Searcher, len(q.Disjuncts))
 	for in, disjunct := range q.Disjuncts {
 		var err error
@@ -60,7 +60,7 @@ func (q *DisjunctionQuery) Searcher(i *indexImpl, explain bool) (*search.TermDis
 			return nil, err
 		}
 	}
-	return search.NewTermDisjunctionSearcher(i.i, searchers, q.MinVal, explain)
+	return search.NewDisjunctionSearcher(i.i, searchers, q.MinVal, explain)
 }
 
 func (q *DisjunctionQuery) Validate() error {

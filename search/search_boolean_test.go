@@ -12,14 +12,14 @@ import (
 	"testing"
 )
 
-func TestTermBooleanSearch(t *testing.T) {
+func TestBooleanSearch(t *testing.T) {
 
 	// test 0
 	beerTermSearcher, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher}, true)
+	mustSearcher, err := NewConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +31,7 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	shouldSearcher, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher, dustinTermSearcher}, 0, true)
+	shouldSearcher, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher, dustinTermSearcher}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,11 +39,11 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustNotSearcher, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher}, 0, true)
+	mustNotSearcher, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher, err := NewTermBooleanSearcher(twoDocIndex, mustSearcher, shouldSearcher, mustNotSearcher, true)
+	booleanSearcher, err := NewBooleanSearcher(twoDocIndex, mustSearcher, shouldSearcher, mustNotSearcher, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	shouldSearcher2, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher2, dustinTermSearcher2}, 0, true)
+	shouldSearcher2, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher2, dustinTermSearcher2}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,11 +65,11 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustNotSearcher2, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher2}, 0, true)
+	mustNotSearcher2, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher2}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher2, err := NewTermBooleanSearcher(twoDocIndex, nil, shouldSearcher2, mustNotSearcher2, true)
+	booleanSearcher2, err := NewBooleanSearcher(twoDocIndex, nil, shouldSearcher2, mustNotSearcher2, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,11 +79,11 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustNotSearcher3, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher3}, 0, true)
+	mustNotSearcher3, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher3}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher3, err := NewTermBooleanSearcher(twoDocIndex, nil, nil, mustNotSearcher3, true)
+	booleanSearcher3, err := NewBooleanSearcher(twoDocIndex, nil, nil, mustNotSearcher3, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher4, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher4}, true)
+	mustSearcher4, err := NewConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher4}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,11 +101,11 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustNotSearcher4, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher4}, 0, true)
+	mustNotSearcher4, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher4}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher4, err := NewTermBooleanSearcher(twoDocIndex, mustSearcher4, nil, mustNotSearcher4, true)
+	booleanSearcher4, err := NewBooleanSearcher(twoDocIndex, mustSearcher4, nil, mustNotSearcher4, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher5, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher5}, true)
+	mustSearcher5, err := NewConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher5}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,11 +127,11 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustNotSearcher5, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher5, martyTermSearcher5}, 0, true)
+	mustNotSearcher5, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher5, martyTermSearcher5}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher5, err := NewTermBooleanSearcher(twoDocIndex, mustSearcher5, nil, mustNotSearcher5, true)
+	booleanSearcher5, err := NewBooleanSearcher(twoDocIndex, mustSearcher5, nil, mustNotSearcher5, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher6, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher6}, true)
+	mustSearcher6, err := NewConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher6}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,11 +153,11 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	shouldSearcher6, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher6, dustinTermSearcher6}, 2, true)
+	shouldSearcher6, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher6, dustinTermSearcher6}, 2, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher6, err := NewTermBooleanSearcher(twoDocIndex, mustSearcher6, shouldSearcher6, nil, true)
+	booleanSearcher6, err := NewBooleanSearcher(twoDocIndex, mustSearcher6, shouldSearcher6, nil, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,11 +167,11 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher7, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher7}, true)
+	mustSearcher7, err := NewConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher7}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher7, err := NewTermBooleanSearcher(twoDocIndex, mustSearcher7, nil, nil, true)
+	booleanSearcher7, err := NewBooleanSearcher(twoDocIndex, mustSearcher7, nil, nil, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,14 +179,14 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	conjunctionSearcher7, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher7, booleanSearcher7}, true)
+	conjunctionSearcher7, err := NewConjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher7, booleanSearcher7}, true)
 
 	// test 7
 	beerTermSearcher8, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher8, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher8}, true)
+	mustSearcher8, err := NewConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher8}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	shouldSearcher8, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher8, dustinTermSearcher8}, 0, true)
+	shouldSearcher8, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher8, dustinTermSearcher8}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,11 +206,11 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustNotSearcher8, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher8}, 0, true)
+	mustNotSearcher8, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{steveTermSearcher8}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher8, err := NewTermBooleanSearcher(twoDocIndex, mustSearcher8, shouldSearcher8, mustNotSearcher8, true)
+	booleanSearcher8, err := NewBooleanSearcher(twoDocIndex, mustSearcher8, shouldSearcher8, mustNotSearcher8, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestTermBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	conjunctionSearcher8, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{booleanSearcher8, dustinTermSearcher8a}, true)
+	conjunctionSearcher8, err := NewConjunctionSearcher(twoDocIndex, []Searcher{booleanSearcher8, dustinTermSearcher8a}, true)
 	if err != nil {
 		t.Fatal(err)
 	}

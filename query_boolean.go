@@ -42,7 +42,7 @@ func (q *BooleanQuery) SetBoost(b float64) *BooleanQuery {
 func (q *BooleanQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 
 	var err error
-	var mustSearcher *search.TermConjunctionSearcher
+	var mustSearcher *search.ConjunctionSearcher
 	if q.Must != nil {
 		mustSearcher, err = q.Must.Searcher(i, explain)
 		if err != nil {
@@ -50,7 +50,7 @@ func (q *BooleanQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, er
 		}
 	}
 
-	var shouldSearcher *search.TermDisjunctionSearcher
+	var shouldSearcher *search.DisjunctionSearcher
 	if q.Should != nil {
 		shouldSearcher, err = q.Should.Searcher(i, explain)
 		if err != nil {
@@ -58,7 +58,7 @@ func (q *BooleanQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, er
 		}
 	}
 
-	var mustNotSearcher *search.TermDisjunctionSearcher
+	var mustNotSearcher *search.DisjunctionSearcher
 	if q.MustNot != nil {
 		mustNotSearcher, err = q.MustNot.Searcher(i, explain)
 		if err != nil {
@@ -66,7 +66,7 @@ func (q *BooleanQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, er
 		}
 	}
 
-	return search.NewTermBooleanSearcher(i.i, mustSearcher, shouldSearcher, mustNotSearcher, explain)
+	return search.NewBooleanSearcher(i.i, mustSearcher, shouldSearcher, mustNotSearcher, explain)
 }
 
 func (q *BooleanQuery) Validate() error {

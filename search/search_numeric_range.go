@@ -22,7 +22,7 @@ type NumericRangeSearcher struct {
 	max      *float64
 	field    string
 	explain  bool
-	searcher *TermDisjunctionSearcher
+	searcher *DisjunctionSearcher
 }
 
 func NewNumericRangeSearcher(index index.Index, min *float64, max *float64, field string, boost float64, explain bool) (*NumericRangeSearcher, error) {
@@ -51,7 +51,7 @@ func NewNumericRangeSearcher(index index.Index, min *float64, max *float64, fiel
 		}
 	}
 	// build disjunction searcher of these ranges
-	searcher, err := NewTermDisjunctionSearcher(index, qsearchers, 0, explain)
+	searcher, err := NewDisjunctionSearcher(index, qsearchers, 0, explain)
 	if err != nil {
 		return nil, err
 	}

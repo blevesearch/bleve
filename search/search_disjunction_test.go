@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-func TestTermDisjunctionSearch(t *testing.T) {
+func TestDisjunctionSearch(t *testing.T) {
 
 	martyTermSearcher, err := NewTermSearcher(twoDocIndex, "marty", "name", 1.0, true)
 	if err != nil {
@@ -22,7 +22,7 @@ func TestTermDisjunctionSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyOrDustinSearcher, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher, dustinTermSearcher}, 0, true)
+	martyOrDustinSearcher, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher, dustinTermSearcher}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func TestTermDisjunctionSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyOrDustinSearcher2, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher2, dustinTermSearcher2}, 0, true)
+	martyOrDustinSearcher2, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher2, dustinTermSearcher2}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestTermDisjunctionSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	nestedRaviOrMartyOrDustinSearcher, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{raviTermSearcher, martyOrDustinSearcher2}, 0, true)
+	nestedRaviOrMartyOrDustinSearcher, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{raviTermSearcher, martyOrDustinSearcher2}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestDisjunctionAdvance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyOrDustinSearcher, err := NewTermDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher, dustinTermSearcher}, 0, true)
+	martyOrDustinSearcher, err := NewDisjunctionSearcher(twoDocIndex, []Searcher{martyTermSearcher, dustinTermSearcher}, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}

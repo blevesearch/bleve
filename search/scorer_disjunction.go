@@ -8,19 +8,21 @@
 //  and limitations under the License.
 package search
 
-import ()
+import (
+	"fmt"
+)
 
-type TermConjunctionQueryScorer struct {
+type DisjunctionQueryScorer struct {
 	explain bool
 }
 
-func NewTermConjunctionQueryScorer(explain bool) *TermConjunctionQueryScorer {
-	return &TermConjunctionQueryScorer{
+func NewDisjunctionQueryScorer(explain bool) *DisjunctionQueryScorer {
+	return &DisjunctionQueryScorer{
 		explain: explain,
 	}
 }
 
-func (s *TermConjunctionQueryScorer) Score(constituents []*DocumentMatch) *DocumentMatch {
+func (s *DisjunctionQueryScorer) Score(constituents []*DocumentMatch, countMatch, countTotal int) *DocumentMatch {
 	rv := DocumentMatch{
 		ID: constituents[0].ID,
 	}
@@ -41,9 +43,19 @@ func (s *TermConjunctionQueryScorer) Score(constituents []*DocumentMatch) *Docum
 			locations = append(locations, docMatch.Locations)
 		}
 	}
-	rv.Score = sum
+
+	var rawExpl *Explanation
 	if s.explain {
-		rv.Expl = &Explanation{Value: sum, Message: "sum of:", Children: childrenExplanations}
+		rawExpl = &Explanation{Value: sum, Message: "sum of:", Children: childrenExplanations}
+	}
+
+	coord := float64(countMatch) / float64(countTotal)
+	rv.Score = sum * coord
+	if s.explain {
+		ce := make([]*Explanation, 2)
+		ce[0] = rawExpl
+		ce[1] = &Explanation{Value: coord, Message: fmt.Sprintf("coord(%d/%d)", countMatch, countTotal)}
+		rv.Expl = &Explanation{Value: rv.Score, Message: "product of:", Children: ce}
 	}
 
 	if len(locations) == 1 {

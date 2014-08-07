@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-func TestTermConjunctionSearch(t *testing.T) {
+func TestConjunctionSearch(t *testing.T) {
 
 	// test 0
 	beerTermSearcher, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
@@ -23,7 +23,7 @@ func TestTermConjunctionSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerAndMartySearcher, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher, martyTermSearcher}, true)
+	beerAndMartySearcher, err := NewConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher, martyTermSearcher}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestTermConjunctionSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	angstAndBeerSearcher, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{angstTermSearcher, beerTermSearcher2}, true)
+	angstAndBeerSearcher, err := NewConjunctionSearcher(twoDocIndex, []Searcher{angstTermSearcher, beerTermSearcher2}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func TestTermConjunctionSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerAndJackSearcher, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher3, jackTermSearcher}, true)
+	beerAndJackSearcher, err := NewConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher3, jackTermSearcher}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestTermConjunctionSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerAndMisterSearcher, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher4, misterTermSearcher}, true)
+	beerAndMisterSearcher, err := NewConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher4, misterTermSearcher}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestTermConjunctionSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	couchbaseAndMisterSearcher, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{couchbaseTermSearcher, misterTermSearcher2}, true)
+	couchbaseAndMisterSearcher, err := NewConjunctionSearcher(twoDocIndex, []Searcher{couchbaseTermSearcher, misterTermSearcher2}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,11 +97,11 @@ func TestTermConjunctionSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	couchbaseAndMisterSearcher2, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{couchbaseTermSearcher2, misterTermSearcher3}, true)
+	couchbaseAndMisterSearcher2, err := NewConjunctionSearcher(twoDocIndex, []Searcher{couchbaseTermSearcher2, misterTermSearcher3}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerAndCouchbaseAndMisterSearcher, err := NewTermConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher5, couchbaseAndMisterSearcher2}, true)
+	beerAndCouchbaseAndMisterSearcher, err := NewConjunctionSearcher(twoDocIndex, []Searcher{beerTermSearcher5, couchbaseAndMisterSearcher2}, true)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -15,7 +15,7 @@ import (
 	"github.com/couchbaselabs/bleve/index"
 )
 
-type TermConjunctionSearcher struct {
+type ConjunctionSearcher struct {
 	initialized bool
 	index       index.Index
 	searchers   OrderedSearcherList
@@ -23,10 +23,10 @@ type TermConjunctionSearcher struct {
 	queryNorm   float64
 	currs       []*DocumentMatch
 	currentId   string
-	scorer      *TermConjunctionQueryScorer
+	scorer      *ConjunctionQueryScorer
 }
 
-func NewTermConjunctionSearcher(index index.Index, qsearchers []Searcher, explain bool) (*TermConjunctionSearcher, error) {
+func NewConjunctionSearcher(index index.Index, qsearchers []Searcher, explain bool) (*ConjunctionSearcher, error) {
 	// build the downstream searchres
 	searchers := make(OrderedSearcherList, len(qsearchers))
 	for i, searcher := range qsearchers {
@@ -35,18 +35,18 @@ func NewTermConjunctionSearcher(index index.Index, qsearchers []Searcher, explai
 	// sort the searchers
 	sort.Sort(searchers)
 	// build our searcher
-	rv := TermConjunctionSearcher{
+	rv := ConjunctionSearcher{
 		index:     index,
 		explain:   explain,
 		searchers: searchers,
 		currs:     make([]*DocumentMatch, len(searchers)),
-		scorer:    NewTermConjunctionQueryScorer(explain),
+		scorer:    NewConjunctionQueryScorer(explain),
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
 }
 
-func (s *TermConjunctionSearcher) computeQueryNorm() {
+func (s *ConjunctionSearcher) computeQueryNorm() {
 	// first calculate sum of squared weights
 	sumOfSquaredWeights := 0.0
 	for _, termSearcher := range s.searchers {
@@ -60,7 +60,7 @@ func (s *TermConjunctionSearcher) computeQueryNorm() {
 	}
 }
 
-func (s *TermConjunctionSearcher) initSearchers() error {
+func (s *ConjunctionSearcher) initSearchers() error {
 	var err error
 	// get all searchers pointing at their first match
 	for i, termSearcher := range s.searchers {
@@ -82,7 +82,7 @@ func (s *TermConjunctionSearcher) initSearchers() error {
 	return nil
 }
 
-func (s *TermConjunctionSearcher) Weight() float64 {
+func (s *ConjunctionSearcher) Weight() float64 {
 	var rv float64
 	for _, searcher := range s.searchers {
 		rv += searcher.Weight()
@@ -90,13 +90,13 @@ func (s *TermConjunctionSearcher) Weight() float64 {
 	return rv
 }
 
-func (s *TermConjunctionSearcher) SetQueryNorm(qnorm float64) {
+func (s *ConjunctionSearcher) SetQueryNorm(qnorm float64) {
 	for _, searcher := range s.searchers {
 		searcher.SetQueryNorm(qnorm)
 	}
 }
 
-func (s *TermConjunctionSearcher) Next() (*DocumentMatch, error) {
+func (s *ConjunctionSearcher) Next() (*DocumentMatch, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {
@@ -148,7 +148,7 @@ OUTER:
 	return rv, nil
 }
 
-func (s *TermConjunctionSearcher) Advance(ID string) (*DocumentMatch, error) {
+func (s *ConjunctionSearcher) Advance(ID string) (*DocumentMatch, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {
@@ -166,7 +166,7 @@ func (s *TermConjunctionSearcher) Advance(ID string) (*DocumentMatch, error) {
 	return s.Next()
 }
 
-func (s *TermConjunctionSearcher) Count() uint64 {
+func (s *ConjunctionSearcher) Count() uint64 {
 	// for now return a worst case
 	var sum uint64 = 0
 	for _, searcher := range s.searchers {
@@ -175,7 +175,7 @@ func (s *TermConjunctionSearcher) Count() uint64 {
 	return sum
 }
 
-func (s *TermConjunctionSearcher) Close() {
+func (s *ConjunctionSearcher) Close() {
 	for _, searcher := range s.searchers {
 		searcher.Close()
 	}

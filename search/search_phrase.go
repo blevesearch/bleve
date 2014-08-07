@@ -17,14 +17,14 @@ import (
 type PhraseSearcher struct {
 	initialized  bool
 	index        index.Index
-	mustSearcher *TermConjunctionSearcher
+	mustSearcher *ConjunctionSearcher
 	queryNorm    float64
 	currMust     *DocumentMatch
 	slop         int
 	terms        []string
 }
 
-func NewPhraseSearcher(index index.Index, mustSearcher *TermConjunctionSearcher, terms []string) (*PhraseSearcher, error) {
+func NewPhraseSearcher(index index.Index, mustSearcher *ConjunctionSearcher, terms []string) (*PhraseSearcher, error) {
 
 	// build our searcher
 	rv := PhraseSearcher{
