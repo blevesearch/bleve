@@ -1,0 +1,47 @@
+//  Copyright (c) 2014 Couchbase, Inc.
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//    http://www.apache.org/licenses/LICENSE-2.0
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
+package truncate_token_filter
+
+import (
+	"bytes"
+	"unicode/utf8"
+
+	"github.com/couchbaselabs/bleve/analysis"
+)
+
+type TruncateTokenFilter struct {
+	length int
+}
+
+func NewTruncateTokenFilter(length int) *TruncateTokenFilter {
+	return &TruncateTokenFilter{
+		length: length,
+	}
+}
+
+func (s *TruncateTokenFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
+	rv := make(analysis.TokenStream, 0)
+
+	for _, token := range input {
+		wordLen := utf8.RuneCount(token.Term)
+		if wordLen > s.length {
+			runes := bytes.Runes(token.Term)[0:s.length]
+			newterm := make([]byte, 0, s.length*4)
+			for _, r := range runes {
+				runeBytes := make([]byte, utf8.RuneLen(r))
+				utf8.EncodeRune(runeBytes, r)
+				newterm = append(newterm, runeBytes...)
+			}
+			token.Term = newterm
+		}
+		rv = append(rv, token)
+	}
+
+	return rv
+}

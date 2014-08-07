@@ -30,6 +30,7 @@ import (
 	"github.com/couchbaselabs/bleve/analysis/token_filters/lower_case_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/stemmer_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/stop_words_filter"
+	"github.com/couchbaselabs/bleve/analysis/token_filters/truncate_token_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/unicode_normalize"
 
 	"github.com/couchbaselabs/bleve/search"
@@ -181,6 +182,7 @@ func init() {
 	Config.Analysis.TokenFilters["long"] = length_filter.NewLengthFilter(-1, 255)
 	Config.Analysis.TokenFilters["to_lower"] = lower_case_filter.NewLowerCaseFilter()
 	Config.Analysis.TokenFilters["apostrophe"] = apostrophe_filter.NewApostropheFilter()
+	Config.Analysis.TokenFilters["truncate_token"] = truncate_token_filter.NewTruncateTokenFilter(25)
 
 	// register stemmer filters
 	Config.Analysis.TokenFilters["stemmer_da"] = stemmer_filter.MustNewStemmerFilter("danish")
