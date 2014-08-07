@@ -106,5 +106,14 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
+	_, hasPrefix := tmp["prefix"]
+	if hasPrefix {
+		var rv PrefixQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
 	return nil, fmt.Errorf("Unrecognized query")
 }

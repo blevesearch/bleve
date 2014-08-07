@@ -22,6 +22,8 @@ type Index interface {
 	TermFieldReader(term []byte, field string) (TermFieldReader, error)
 	DocIdReader(start, end string) (DocIdReader, error)
 
+	FieldReader(field string, startTerm []byte, endTerm []byte) (FieldReader, error)
+
 	DocCount() uint64
 
 	Document(id string) (*document.Document, error)
@@ -41,6 +43,7 @@ type TermFieldVector struct {
 }
 
 type TermFieldDoc struct {
+	Term    string
 	ID      string
 	Freq    uint64
 	Norm    float64
@@ -51,6 +54,11 @@ type TermFieldReader interface {
 	Next() (*TermFieldDoc, error)
 	Advance(ID string) (*TermFieldDoc, error)
 	Count() uint64
+	Close()
+}
+
+type FieldReader interface {
+	Next() (*TermFieldDoc, error)
 	Close()
 }
 

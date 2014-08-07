@@ -149,6 +149,30 @@ type TermFrequencyRow struct {
 	vectors []*TermVector
 }
 
+func (tfr *TermFrequencyRow) ScanPrefixForField() []byte {
+	buf := make([]byte, 3)
+	buf[0] = 't'
+	binary.LittleEndian.PutUint16(buf[1:3], tfr.field)
+	return buf
+}
+
+func (tfr *TermFrequencyRow) ScanPrefixForFieldTermPrefix() []byte {
+	buf := make([]byte, 3+len(tfr.term))
+	buf[0] = 't'
+	binary.LittleEndian.PutUint16(buf[1:3], tfr.field)
+	copy(buf[3:], tfr.term)
+	return buf
+}
+
+func (tfr *TermFrequencyRow) ScanPrefixForFieldTerm() []byte {
+	buf := make([]byte, 3+len(tfr.term)+1)
+	buf[0] = 't'
+	binary.LittleEndian.PutUint16(buf[1:3], tfr.field)
+	termLen := copy(buf[3:], tfr.term)
+	buf[3+termLen] = BYTE_SEPARATOR
+	return buf
+}
+
 func (tfr *TermFrequencyRow) Key() []byte {
 	buf := make([]byte, 3+len(tfr.term)+1+len(tfr.doc))
 	buf[0] = 't'

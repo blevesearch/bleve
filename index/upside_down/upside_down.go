@@ -598,7 +598,15 @@ func (udc *UpsideDownCouch) TermFieldReader(term []byte, fieldName string) (inde
 	if fieldExists {
 		return newUpsideDownCouchTermFieldReader(udc, term, uint16(fieldIndex))
 	}
-	return newUpsideDownCouchTermFieldReader(udc, []byte{BYTE_SEPARATOR}, 0)
+	return newUpsideDownCouchTermFieldReader(udc, []byte{BYTE_SEPARATOR}, ^uint16(0))
+}
+
+func (udc *UpsideDownCouch) FieldReader(fieldName string, startTerm []byte, endTerm []byte) (index.FieldReader, error) {
+	fieldIndex, fieldExists := udc.fieldIndexes[fieldName]
+	if fieldExists {
+		return newUpsideDownCouchFieldReader(udc, uint16(fieldIndex), startTerm, endTerm)
+	}
+	return newUpsideDownCouchTermFieldReader(udc, []byte{BYTE_SEPARATOR}, ^uint16(0))
 }
 
 func (udc *UpsideDownCouch) DocIdReader(start, end string) (index.DocIdReader, error) {
