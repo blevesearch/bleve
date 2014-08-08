@@ -28,6 +28,8 @@ import (
 	"github.com/couchbaselabs/bleve/analysis/token_filters/elision_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/length_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/lower_case_filter"
+	"github.com/couchbaselabs/bleve/analysis/token_filters/sorani_normalize"
+	"github.com/couchbaselabs/bleve/analysis/token_filters/sorani_stemmer_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/stemmer_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/stop_words_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/truncate_token_filter"
@@ -202,6 +204,7 @@ func init() {
 	Config.Analysis.TokenFilters["stemmer_es"] = stemmer_filter.MustNewStemmerFilter("spanish")
 	Config.Analysis.TokenFilters["stemmer_sv"] = stemmer_filter.MustNewStemmerFilter("swedish")
 	Config.Analysis.TokenFilters["stemmer_tr"] = stemmer_filter.MustNewStemmerFilter("turkish")
+	Config.Analysis.TokenFilters["stemmer_ckb"] = sorani_stemmer_filter.NewSoraniStemmerFilter()
 
 	// register stop token filters
 	Config.Analysis.TokenFilters["stop_token_da"] = stop_words_filter.NewStopWordsFilter(
@@ -278,6 +281,7 @@ func init() {
 	Config.Analysis.TokenFilters["normalize_nfd"] = unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFD)
 	Config.Analysis.TokenFilters["normalize_nfkc"] = unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFKC)
 	Config.Analysis.TokenFilters["normalize_nfkd"] = unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFKD)
+	Config.Analysis.TokenFilters["normalize_ckb"] = sorani_normalize.NewSoraniNormalizeFilter()
 
 	// register analyzers
 	keywordAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "single", []string{})
@@ -322,6 +326,8 @@ func init() {
 	Config.Analysis.Analyzers["tr"] = turkishAnalyzer
 	thaiAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode_th", []string{"to_lower", "stop_token_th"})
 	Config.Analysis.Analyzers["th"] = thaiAnalyzer
+	soraniAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"normalize_ckb", "to_lower", "stop_token_ckb", "stemmer_ckb"})
+	Config.Analysis.Analyzers["ckb"] = soraniAnalyzer
 
 	// register ansi highlighter
 	Config.Highlight.Highlighters["ansi"] = search.NewSimpleHighlighter()
