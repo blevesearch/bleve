@@ -157,6 +157,7 @@ func init() {
 	Config.Analysis.TokenMaps["fa_stop"] = Config.MustLoadStopWords(stop_words_filter.PersianStopWords)
 	Config.Analysis.TokenMaps["ckb_stop"] = Config.MustLoadStopWords(stop_words_filter.SoraniStopWords)
 	Config.Analysis.TokenMaps["th_stop"] = Config.MustLoadStopWords(stop_words_filter.ThaiStopWords)
+	Config.Analysis.TokenMaps["cs_stop"] = Config.MustLoadStopWords(stop_words_filter.CzechStopWords)
 
 	// register article token maps for elision filters
 	Config.Analysis.TokenMaps["fr_articles"] = Config.MustLoadStopWords(elision_filter.FrenchArticles)
@@ -259,6 +260,8 @@ func init() {
 		Config.Analysis.TokenMaps["ckb_stop"])
 	Config.Analysis.TokenFilters["stop_token_th"] = stop_words_filter.NewStopWordsFilter(
 		Config.Analysis.TokenMaps["th_stop"])
+	Config.Analysis.TokenFilters["stop_token_cs"] = stop_words_filter.NewStopWordsFilter(
+		Config.Analysis.TokenMaps["cs_stop"])
 
 	// register elision filters
 	Config.Analysis.TokenFilters["elision_fr"] = elision_filter.NewElisionFilter(
