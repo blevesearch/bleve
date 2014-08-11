@@ -26,15 +26,17 @@ var DEFAULT_ID_FIELD = "_id"
 var DEFAULT_TYPE_FIELD = "_type"
 var DEFAULT_TYPE = "_default"
 var DEFAULT_FIELD = "_all"
+var DEFAULT_TOP_LEVEL_BYTE_ARRAY_CONVERTER = "json"
 
 type IndexMapping struct {
-	TypeMapping     map[string]*DocumentMapping `json:"types"`
-	DefaultMapping  *DocumentMapping            `json:"default_mapping"`
-	IdField         *string                     `json:"id_field"`
-	TypeField       *string                     `json:"type_field"`
-	DefaultType     *string                     `json:"default_type"`
-	DefaultAnalyzer *string                     `json:"default_analyzer"`
-	DefaultField    *string                     `json:"default_field"`
+	TypeMapping        map[string]*DocumentMapping `json:"types"`
+	DefaultMapping     *DocumentMapping            `json:"default_mapping"`
+	IdField            *string                     `json:"id_field"`
+	TypeField          *string                     `json:"type_field"`
+	DefaultType        *string                     `json:"default_type"`
+	DefaultAnalyzer    *string                     `json:"default_analyzer"`
+	DefaultField       *string                     `json:"default_field"`
+	ByteArrayConverter *string                     `json:"byte_array_converter"`
 }
 
 func (im *IndexMapping) GoString() string {
@@ -43,12 +45,13 @@ func (im *IndexMapping) GoString() string {
 
 func NewIndexMapping() *IndexMapping {
 	return &IndexMapping{
-		TypeMapping:    make(map[string]*DocumentMapping),
-		DefaultMapping: NewDocumentMapping(),
-		IdField:        &DEFAULT_ID_FIELD,
-		TypeField:      &DEFAULT_TYPE_FIELD,
-		DefaultType:    &DEFAULT_TYPE,
-		DefaultField:   &DEFAULT_FIELD,
+		TypeMapping:        make(map[string]*DocumentMapping),
+		DefaultMapping:     NewDocumentMapping(),
+		IdField:            &DEFAULT_ID_FIELD,
+		TypeField:          &DEFAULT_TYPE_FIELD,
+		DefaultType:        &DEFAULT_TYPE,
+		DefaultField:       &DEFAULT_FIELD,
+		ByteArrayConverter: &DEFAULT_TOP_LEVEL_BYTE_ARRAY_CONVERTER,
 	}
 }
 
@@ -82,13 +85,14 @@ func (im *IndexMapping) MappingForType(docType string) *DocumentMapping {
 
 func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 	var tmp struct {
-		TypeMapping     map[string]*DocumentMapping `json:"types"`
-		DefaultMapping  *DocumentMapping            `json:"default_mapping"`
-		IdField         *string                     `json:"id_field"`
-		TypeField       *string                     `json:"type_field"`
-		DefaultType     *string                     `json:"default_type"`
-		DefaultAnalyzer *string                     `json:"default_analyzer"`
-		DefaultField    *string                     `json:"default_field"`
+		TypeMapping        map[string]*DocumentMapping `json:"types"`
+		DefaultMapping     *DocumentMapping            `json:"default_mapping"`
+		IdField            *string                     `json:"id_field"`
+		TypeField          *string                     `json:"type_field"`
+		DefaultType        *string                     `json:"default_type"`
+		DefaultAnalyzer    *string                     `json:"default_analyzer"`
+		DefaultField       *string                     `json:"default_field"`
+		ByteArrayConverter *string                     `json:"byte_array_converter"`
 	}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
@@ -123,6 +127,10 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 	if tmp.DefaultField != nil {
 		im.DefaultField = tmp.DefaultField
 	}
+	im.ByteArrayConverter = &DEFAULT_TOP_LEVEL_BYTE_ARRAY_CONVERTER
+	if tmp.ByteArrayConverter != nil {
+		im.ByteArrayConverter = tmp.ByteArrayConverter
+	}
 
 	im.TypeMapping = make(map[string]*DocumentMapping, len(tmp.TypeMapping))
 	for typeName, typeDocMapping := range tmp.TypeMapping {
@@ -155,6 +163,19 @@ func (im *IndexMapping) determineType(data interface{}) (string, bool) {
 }
 
 func (im *IndexMapping) MapDocument(doc *document.Document, data interface{}) error {
+	// see if the top level object is a byte array, and possibly run through conveter
+	byteArrayData, ok := data.([]byte)
+	if ok && im.ByteArrayConverter != nil {
+		byteArrayConverter, valid := Config.ByteArrayConverters[*im.ByteArrayConverter]
+		if valid {
+			convertedData, err := byteArrayConverter.Convert(byteArrayData)
+			if err != nil {
+				return err
+			}
+			data = convertedData
+		}
+	}
+
 	docType, ok := im.determineType(data)
 	if !ok {
 		return ERROR_NO_TYPE

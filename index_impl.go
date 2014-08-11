@@ -9,7 +9,6 @@
 package bleve
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -44,17 +43,7 @@ func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
 	}, nil
 }
 
-// Index the provided data.
-func (i *indexImpl) Index(data interface{}) error {
-	id, ok := i.determineID(data)
-	if ok {
-		return i.IndexID(id, data)
-	}
-
-	return ERROR_NO_ID
-}
-
-func (i *indexImpl) IndexID(id string, data interface{}) error {
+func (i *indexImpl) Index(id string, data interface{}) error {
 	doc := document.NewDocument(id)
 	err := i.m.MapDocument(doc, data)
 	if err != nil {
@@ -67,34 +56,7 @@ func (i *indexImpl) IndexID(id string, data interface{}) error {
 	return nil
 }
 
-func (i *indexImpl) IndexJSON(data []byte) error {
-	var obj interface{}
-	err := json.Unmarshal(data, &obj)
-	if err != nil {
-		return err
-	}
-	return i.Index(obj)
-}
-
-func (i *indexImpl) IndexJSONID(id string, data []byte) error {
-	var obj interface{}
-	err := json.Unmarshal(data, &obj)
-	if err != nil {
-		return err
-	}
-	return i.IndexID(id, obj)
-}
-
-func (i *indexImpl) Delete(data interface{}) error {
-	id, ok := i.determineID(data)
-	if ok {
-		return i.DeleteID(id)
-	}
-
-	return ERROR_NO_ID
-}
-
-func (i *indexImpl) DeleteID(id string) error {
+func (i *indexImpl) Delete(id string) error {
 	err := i.i.Delete(id)
 	if err != nil {
 		return err
@@ -241,22 +203,4 @@ func (i *indexImpl) DumpDoc(id string) ([]interface{}, error) {
 
 func (i *indexImpl) Close() {
 	i.i.Close()
-}
-
-func (i *indexImpl) determineID(data interface{}) (string, bool) {
-	// first see if the object implements Identifier
-	identifier, ok := data.(Identifier)
-	if ok {
-		return identifier.ID(), true
-	}
-
-	// now see if we can find an ID using the mapping
-	if i.m.IdField != nil {
-		id, ok := mustString(lookupPropertyPath(data, *i.m.IdField))
-		if ok {
-			return id, true
-		}
-	}
-
-	return "", false
 }

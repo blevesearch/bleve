@@ -28,10 +28,6 @@ type Person struct {
 	Tags       []string   `json:"tags"`
 }
 
-func (p *Person) ID() string {
-	return p.Identifier
-}
-
 func (p *Person) Type() string {
 	return "person"
 }
@@ -83,7 +79,7 @@ func TestIndex(t *testing.T) {
 		Tags: []string{"amped", "bogus", "gnarley", "tubed"},
 	}
 
-	err = index.Index(&obj)
+	err = index.Index(obj.Identifier, &obj)
 	if err != nil {
 		t.Error(err)
 	}

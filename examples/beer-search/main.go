@@ -83,7 +83,7 @@ func indexBeer(i bleve.Index) error {
 		// // shred them into a document
 		ext := filepath.Ext(filename)
 		docId := filename[:(len(filename) - len(ext))]
-		err = i.IndexJSONID(docId, jsonBytes)
+		err = i.Index(docId, jsonBytes)
 		if err != nil {
 			return err
 		}

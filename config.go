@@ -59,6 +59,7 @@ type Configuration struct {
 	CreateIfMissing       bool
 	DefaultDateTimeFormat *string
 	DefaultField          *string
+	ByteArrayConverters   map[string]ByteArrayConverter
 }
 
 func (c *Configuration) BuildNewAnalyzer(charFilterNames []string, tokenizerName string, tokenFilterNames []string) (*analysis.Analyzer, error) {
@@ -120,6 +121,7 @@ func NewConfiguration() *Configuration {
 		Highlight: &HighlightConfig{
 			Highlighters: make(map[string]search.Highlighter),
 		},
+		ByteArrayConverters: make(map[string]ByteArrayConverter),
 	}
 }
 
@@ -129,6 +131,11 @@ func init() {
 
 	// build the default configuration
 	Config = NewConfiguration()
+
+	// register byte array converters
+	Config.ByteArrayConverters["string"] = NewStringByteArrayConverter()
+	Config.ByteArrayConverters["json"] = NewJSONByteArrayConverter()
+	Config.ByteArrayConverters["ignore"] = NewIgnoreByteArrayConverter()
 
 	// register stop token maps
 	Config.Analysis.TokenMaps["da_stop"] = Config.MustLoadStopWords(stop_words_filter.DanishStopWords)

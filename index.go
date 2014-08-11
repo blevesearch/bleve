@@ -12,23 +12,14 @@ import (
 	"github.com/couchbaselabs/bleve/document"
 )
 
-type Identifier interface {
-	ID() string
-}
-
 type Classifier interface {
 	Type() string
 }
 
 type Index interface {
-	Index(data interface{}) error
-	IndexID(id string, data interface{}) error
+	Index(id string, data interface{}) error
 
-	IndexJSON(data []byte) error
-	IndexJSONID(id string, data []byte) error
-
-	Delete(data interface{}) error
-	DeleteID(id string) error
+	Delete(id string) error
 
 	Document(id string) (*document.Document, error)
 	DocCount() uint64

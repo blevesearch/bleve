@@ -35,7 +35,7 @@ func main() {
 
 	for jsonFile := range walkDirectory(*jsonDir) {
 		// index the json files
-		err = index.IndexJSONID(jsonFile.filename, jsonFile.contents)
+		err = index.Index(jsonFile.filename, jsonFile.contents)
 		if err != nil {
 			log.Fatal(err)
 		}
