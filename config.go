@@ -24,6 +24,7 @@ import (
 	"github.com/couchbaselabs/bleve/analysis/tokenizers/unicode_word_boundary"
 
 	"github.com/couchbaselabs/bleve/analysis/token_filters/apostrophe_filter"
+	"github.com/couchbaselabs/bleve/analysis/token_filters/arabic_normalize"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/cld2"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/elision_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/length_filter"
@@ -291,6 +292,7 @@ func init() {
 	Config.Analysis.TokenFilters["normalize_nfkd"] = unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFKD)
 	Config.Analysis.TokenFilters["normalize_ckb"] = sorani_normalize.NewSoraniNormalizeFilter()
 	Config.Analysis.TokenFilters["normalize_fa"] = persian_normalize.NewPersianNormalizeFilter()
+	Config.Analysis.TokenFilters["normalize_ar"] = arabic_normalize.NewArabicNormalizeFilter()
 
 	// register analyzers
 	keywordAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "single", []string{})
