@@ -55,3 +55,27 @@ func TestRegexpCharFilter(t *testing.T) {
 		}
 	}
 }
+
+func TestZeroWidthNonJoinerCharFilter(t *testing.T) {
+
+	zeroWidthNonJoinerPattern := `\x{200C}`
+	zeroWidthNonJoinerRegex := regexp.MustCompile(zeroWidthNonJoinerPattern)
+
+	tests := []struct {
+		input  []byte
+		output []byte
+	}{
+		{
+			input:  []byte("water\u200Cunder\u200Cthe\u200Cbridge"),
+			output: []byte("water   under   the   bridge"),
+		},
+	}
+
+	for _, test := range tests {
+		filter := NewRegexpCharFilter(zeroWidthNonJoinerRegex, []byte{' '})
+		output := filter.Filter(test.input)
+		if !reflect.DeepEqual(output, test.output) {
+			t.Errorf("Expected:\n`%s`\ngot:\n`%s`\nfor:\n`%s`\n", string(test.output), string(output), string(test.input))
+		}
+	}
+}

@@ -180,6 +180,9 @@ func init() {
 	htmlCharFilterRegexp := regexp.MustCompile(`</?[!\w]+((\s+\w+(\s*=\s*(?:".*?"|'.*?'|[^'">\s]+))?)+\s*|\s*)/?>`)
 	htmlCharFilter := regexp_char_filter.NewRegexpCharFilter(htmlCharFilterRegexp, []byte{' '})
 	Config.Analysis.CharFilters["html"] = htmlCharFilter
+	zeroWidthNonJoinerRegexp := regexp.MustCompile(`\x{200C}`)
+	zeroWidthNonJoinerCharFilter := regexp_char_filter.NewRegexpCharFilter(zeroWidthNonJoinerRegexp, []byte{' '})
+	Config.Analysis.CharFilters["zero_width_spaces"] = zeroWidthNonJoinerCharFilter
 
 	// register tokenizers
 	whitespaceTokenizerRegexp := regexp.MustCompile(`\w+`)
@@ -339,6 +342,8 @@ func init() {
 	Config.Analysis.Analyzers["th"] = thaiAnalyzer
 	soraniAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"normalize_ckb", "to_lower", "stop_token_ckb", "stemmer_ckb"})
 	Config.Analysis.Analyzers["ckb"] = soraniAnalyzer
+	persianAnalyzer := Config.MustBuildNewAnalyzer([]string{"zero_width_spaces"}, "unicode", []string{"to_lower", "normalize_ar", "normalize_fa", "stop_token_fa"})
+	Config.Analysis.Analyzers["fa"] = persianAnalyzer
 
 	// register ansi highlighter
 	Config.Highlight.Highlighters["ansi"] = search.NewSimpleHighlighter()
