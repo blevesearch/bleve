@@ -11,7 +11,6 @@ package sorani_normalize
 import (
 	"bytes"
 	"unicode"
-	"unicode/utf8"
 
 	"github.com/couchbaselabs/bleve/analysis"
 )
@@ -76,7 +75,7 @@ func normalize(input []byte) []byte {
 			if i > 0 && runes[i-1] == HEH {
 				runes[i-1] = AE
 			}
-			runes = deleteRune(runes, i)
+			runes = analysis.DeleteRune(runes, i)
 			i--
 		case HEH:
 			if i == len(runes)-1 {
@@ -93,32 +92,14 @@ func normalize(input []byte) []byte {
 		case RREH_ABOVE:
 			runes[i] = RREH
 		case TATWEEL, KASRATAN, DAMMATAN, FATHATAN, FATHA, DAMMA, KASRA, SHADDA, SUKUN:
-			runes = deleteRune(runes, i)
+			runes = analysis.DeleteRune(runes, i)
 			i--
 		default:
 			if unicode.In(runes[i], unicode.Cf) {
-				runes = deleteRune(runes, i)
+				runes = analysis.DeleteRune(runes, i)
 				i--
 			}
 		}
 	}
-	return buildTermFromRunes(runes)
-}
-
-func deleteRune(in []rune, pos int) []rune {
-	if pos >= len(in) {
-		return in
-	}
-	copy(in[pos:], in[pos+1:])
-	return in[:len(in)-1]
-}
-
-func buildTermFromRunes(runes []rune) []byte {
-	rv := make([]byte, 0, len(runes)*4)
-	for _, r := range runes {
-		runeBytes := make([]byte, utf8.RuneLen(r))
-		utf8.EncodeRune(runeBytes, r)
-		rv = append(rv, runeBytes...)
-	}
-	return rv
+	return analysis.BuildTermFromRunes(runes)
 }

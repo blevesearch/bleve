@@ -28,6 +28,7 @@ import (
 	"github.com/couchbaselabs/bleve/analysis/token_filters/elision_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/length_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/lower_case_filter"
+	"github.com/couchbaselabs/bleve/analysis/token_filters/persian_normalize"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/sorani_normalize"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/sorani_stemmer_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/stemmer_filter"
@@ -289,6 +290,7 @@ func init() {
 	Config.Analysis.TokenFilters["normalize_nfkc"] = unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFKC)
 	Config.Analysis.TokenFilters["normalize_nfkd"] = unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFKD)
 	Config.Analysis.TokenFilters["normalize_ckb"] = sorani_normalize.NewSoraniNormalizeFilter()
+	Config.Analysis.TokenFilters["normalize_fa"] = persian_normalize.NewPersianNormalizeFilter()
 
 	// register analyzers
 	keywordAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "single", []string{})

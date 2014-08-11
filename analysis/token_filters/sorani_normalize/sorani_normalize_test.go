@@ -15,27 +15,6 @@ import (
 	"github.com/couchbaselabs/bleve/analysis"
 )
 
-func TestDeleteRune(t *testing.T) {
-	tests := []struct {
-		in     []rune
-		delPos int
-		out    []rune
-	}{
-		{
-			in:     []rune{'a', 'b', 'c'},
-			delPos: 1,
-			out:    []rune{'a', 'c'},
-		},
-	}
-
-	for _, test := range tests {
-		actual := deleteRune(test.in, test.delPos)
-		if !reflect.DeepEqual(actual, test.out) {
-			t.Errorf("expected %#v, got %#v", test.out, actual)
-		}
-	}
-}
-
 func TestSoraniStemmerFilter(t *testing.T) {
 	tests := []struct {
 		input  analysis.TokenStream
