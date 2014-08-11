@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/couchbaselabs/bleve"
 	bleveHttp "github.com/couchbaselabs/bleve/http"
@@ -38,11 +39,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// index data
-	err = indexBeer(beerIndex)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// index data in the background
+	go func() {
+		err = indexBeer(beerIndex)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	// create a router to serve static files
 	router := staticFileRouter()
@@ -71,8 +74,10 @@ func indexBeer(i bleve.Index) error {
 		return err
 	}
 
-	// walk the directory entries
+	// walk the directory entries for indexing
+	log.Printf("Indexing...")
 	count := 0
+	startTime := time.Now()
 	for _, dirEntry := range dirEntries {
 		filename := dirEntry.Name()
 		// read the bytes
@@ -88,7 +93,16 @@ func indexBeer(i bleve.Index) error {
 			return err
 		}
 		count++
+		if count%1000 == 0 {
+			indexDuration := time.Since(startTime)
+			indexDurationSeconds := float64(indexDuration) / float64(time.Second)
+			timePerDoc := float64(indexDuration) / float64(count)
+			log.Printf("Indexed %d documents, in %.2fs (average %.2fms/doc)", count, indexDurationSeconds, timePerDoc/float64(time.Millisecond))
+		}
 	}
-	log.Printf("Indexed %d documents", count)
+	indexDuration := time.Since(startTime)
+	indexDurationSeconds := float64(indexDuration) / float64(time.Second)
+	timePerDoc := float64(indexDuration) / float64(count)
+	log.Printf("Indexed %d documents, in %.2fs (average %.2fms/doc)", count, indexDurationSeconds, timePerDoc/float64(time.Millisecond))
 	return nil
 }
