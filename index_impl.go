@@ -116,6 +116,33 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if req.Facets != nil {
+		facetsBuilder := search.NewFacetsBuilder(i.i)
+		for facetName, facetRequest := range req.Facets {
+			if facetRequest.NumericRanges != nil {
+				// build numeric range facet
+				facetBuilder := search.NewNumericFacetBuilder(facetRequest.Field, facetRequest.Size)
+				for _, nr := range facetRequest.NumericRanges {
+					facetBuilder.AddRange(nr.Name, nr.Min, nr.Max)
+				}
+				facetsBuilder.Add(facetName, facetBuilder)
+			} else if facetRequest.DateTimeRanges != nil {
+				// build date range facet
+				facetBuilder := search.NewDateTimeFacetBuilder(facetRequest.Field, facetRequest.Size)
+				for _, dr := range facetRequest.DateTimeRanges {
+					facetBuilder.AddRange(dr.Name, dr.Start, dr.End)
+				}
+				facetsBuilder.Add(facetName, facetBuilder)
+			} else {
+				// build terms facet
+				facetBuilder := search.NewTermsFacetBuilder(facetRequest.Field, facetRequest.Size)
+				facetsBuilder.Add(facetName, facetBuilder)
+			}
+		}
+		collector.SetFacetsBuilder(facetsBuilder)
+	}
+
 	err = collector.Collect(searcher)
 	if err != nil {
 		return nil, err
@@ -192,6 +219,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 		Total:    collector.Total(),
 		MaxScore: collector.MaxScore(),
 		Took:     collector.Took(),
+		Facets:   collector.FacetResults(),
 	}, nil
 }
 

@@ -14,12 +14,13 @@ import (
 )
 
 type TopScoreCollector struct {
-	k        int
-	skip     int
-	results  *list.List
-	took     time.Duration
-	maxScore float64
-	total    uint64
+	k             int
+	skip          int
+	results       *list.List
+	took          time.Duration
+	maxScore      float64
+	total         uint64
+	facetsBuilder *FacetsBuilder
 }
 
 func NewTopScorerCollector(k int) *TopScoreCollector {
@@ -55,6 +56,9 @@ func (tksc *TopScoreCollector) Collect(searcher Searcher) error {
 	next, err := searcher.Next()
 	for err == nil && next != nil {
 		tksc.collectSingle(next)
+		if tksc.facetsBuilder != nil {
+			tksc.facetsBuilder.Update(next)
+		}
 		next, err = searcher.Next()
 	}
 	// compute search duration
@@ -111,4 +115,16 @@ func (tksc *TopScoreCollector) Results() DocumentMatchCollection {
 		return rv
 	}
 	return DocumentMatchCollection{}
+}
+
+func (tksc *TopScoreCollector) SetFacetsBuilder(facetsBuilder *FacetsBuilder) {
+	tksc.facetsBuilder = facetsBuilder
+}
+
+func (tksc *TopScoreCollector) FacetResults() FacetResults {
+	if tksc.facetsBuilder != nil {
+		return tksc.facetsBuilder.Results()
+	} else {
+		return FacetResults{}
+	}
 }

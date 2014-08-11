@@ -641,6 +641,24 @@ func (udc *UpsideDownCouch) Document(id string) (*document.Document, error) {
 	return rv, nil
 }
 
+func (udc *UpsideDownCouch) DocumentFieldTerms(id string) (index.FieldTerms, error) {
+	back, err := udc.backIndexRowForDoc(id)
+	if err != nil {
+		return nil, err
+	}
+	rv := make(index.FieldTerms, len(back.entries))
+	for _, entry := range back.entries {
+		fieldName := udc.fieldIndexToName(entry.field)
+		terms, ok := rv[fieldName]
+		if !ok {
+			terms = make([]string, 0)
+		}
+		terms = append(terms, string(entry.term))
+		rv[fieldName] = terms
+	}
+	return rv, nil
+}
+
 func decodeFieldType(typ byte, name string, value []byte) document.Field {
 	switch typ {
 	case 't':

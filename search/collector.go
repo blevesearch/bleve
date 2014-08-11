@@ -18,4 +18,6 @@ type Collector interface {
 	Total() uint64
 	MaxScore() float64
 	Took() time.Duration
+	SetFacetsBuilder(facetsBuilder *FacetsBuilder)
+	FacetResults() FacetResults
 }

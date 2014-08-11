@@ -16,6 +16,80 @@ import (
 	"github.com/couchbaselabs/bleve/search"
 )
 
+type NumericRange struct {
+	Name string   `json:"name,omitempty"`
+	Min  *float64 `json:"min,omitempty"`
+	Max  *float64 `json:"max,omitempty"`
+}
+
+type DateTimeRange struct {
+	Name  string    `json:"name,omitempty"`
+	Start time.Time `json:"start,omitempty"`
+	End   time.Time `json:"end,omitempty"`
+}
+
+func (dr *DateTimeRange) UnmarshalJSON(input []byte) error {
+	var temp struct {
+		Name  string  `json:"name,omitempty"`
+		Start *string `json:"start,omitempty"`
+		End   *string `json:"end,omitempty"`
+	}
+
+	err := json.Unmarshal(input, &temp)
+	if err != nil {
+		return err
+	}
+
+	// FIXME allow alternate date parsers
+	dateTimeParser := Config.Analysis.DateTimeParsers[*Config.DefaultDateTimeFormat]
+
+	dr.Name = temp.Name
+	if temp.Start != nil {
+		start, err := dateTimeParser.ParseDateTime(*temp.Start)
+		if err == nil {
+			dr.Start = start
+		}
+	}
+	if temp.End != nil {
+		end, err := dateTimeParser.ParseDateTime(*temp.End)
+		if err == nil {
+			dr.End = end
+		}
+	}
+
+	return nil
+}
+
+type FacetRequest struct {
+	Size           int
+	Field          string
+	NumericRanges  []*NumericRange  `json:"numeric_ranges,omitempty"`
+	DateTimeRanges []*DateTimeRange `json:"date_ranges,omitempty"`
+}
+
+func NewFacetRequest(field string, size int) *FacetRequest {
+	return &FacetRequest{
+		Field: field,
+		Size:  size,
+	}
+}
+
+func (fr *FacetRequest) AddDateTimeRange(name string, start, end time.Time) {
+	if fr.DateTimeRanges == nil {
+		fr.DateTimeRanges = make([]*DateTimeRange, 0, 1)
+	}
+	fr.DateTimeRanges = append(fr.DateTimeRanges, &DateTimeRange{Name: name, Start: start, End: end})
+}
+
+func (fr *FacetRequest) AddNumericRange(name string, min, max *float64) {
+	if fr.NumericRanges == nil {
+		fr.NumericRanges = make([]*NumericRange, 0, 1)
+	}
+	fr.NumericRanges = append(fr.NumericRanges, &NumericRange{Name: name, Min: min, Max: max})
+}
+
+type FacetsRequest map[string]*FacetRequest
+
 type HighlightRequest struct {
 	Style  *string  `json:"style"`
 	Fields []string `json:"fields"`
@@ -37,7 +111,15 @@ type SearchRequest struct {
 	From      int               `json:"from"`
 	Highlight *HighlightRequest `json:"highlight"`
 	Fields    []string          `json:"fields"`
+	Facets    FacetsRequest     `json:"facets"`
 	Explain   bool              `json:"explain"`
+}
+
+func (r *SearchRequest) AddFacet(facetName string, f *FacetRequest) {
+	if r.Facets == nil {
+		r.Facets = make(FacetsRequest, 1)
+	}
+	r.Facets[facetName] = f
 }
 
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
@@ -47,6 +129,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		From      int               `json:"from"`
 		Highlight *HighlightRequest `json:"highlight"`
 		Fields    []string          `json:"fields"`
+		Facets    FacetsRequest     `json:"facets"`
 		Explain   bool              `json:"explain"`
 	}
 
@@ -60,6 +143,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Explain = temp.Explain
 	r.Highlight = temp.Highlight
 	r.Fields = temp.Fields
+	r.Facets = temp.Facets
 	r.Query, err = ParseQuery(temp.Q)
 	if err != nil {
 		return err
@@ -95,6 +179,7 @@ type SearchResult struct {
 	Total    uint64                         `json:"total_hits"`
 	MaxScore float64                        `json:"max_score"`
 	Took     time.Duration                  `json:"took"`
+	Facets   search.FacetResults            `json:"facets"`
 }
 
 func (sr *SearchResult) String() string {

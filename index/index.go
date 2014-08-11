@@ -27,6 +27,7 @@ type Index interface {
 	DocCount() uint64
 
 	Document(id string) (*document.Document, error)
+	DocumentFieldTerms(id string) (FieldTerms, error)
 
 	Fields() ([]string, error)
 
@@ -34,6 +35,8 @@ type Index interface {
 	DumpDoc(id string) ([]interface{}, error)
 	DumpFields()
 }
+
+type FieldTerms map[string][]string
 
 type TermFieldVector struct {
 	Field string
