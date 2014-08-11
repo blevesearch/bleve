@@ -28,6 +28,7 @@ import (
 	"github.com/couchbaselabs/bleve/analysis/token_filters/cld2"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/elision_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/german_normalize"
+	"github.com/couchbaselabs/bleve/analysis/token_filters/hindi_normalize"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/length_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/lower_case_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/persian_normalize"
@@ -298,6 +299,7 @@ func init() {
 	Config.Analysis.TokenFilters["normalize_fa"] = persian_normalize.NewPersianNormalizeFilter()
 	Config.Analysis.TokenFilters["normalize_ar"] = arabic_normalize.NewArabicNormalizeFilter()
 	Config.Analysis.TokenFilters["normalize_de"] = german_normalize.NewGermanNormalizeFilter()
+	Config.Analysis.TokenFilters["normalize_hi"] = hindi_normalize.NewHindiNormalizeFilter()
 
 	// register analyzers
 	keywordAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "single", []string{})
