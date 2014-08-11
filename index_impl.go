@@ -64,6 +64,23 @@ func (i *indexImpl) Delete(id string) error {
 	return nil
 }
 
+func (i *indexImpl) Batch(b Batch) error {
+	ib := make(index.Batch, len(b))
+	for bk, bd := range b {
+		if bd == nil {
+			ib.Delete(bk)
+		} else {
+			doc := document.NewDocument(bk)
+			err := i.m.MapDocument(doc, bd)
+			if err != nil {
+				return err
+			}
+			ib.Index(bk, doc)
+		}
+	}
+	return i.i.Batch(ib)
+}
+
 func (i *indexImpl) Document(id string) (*document.Document, error) {
 	return i.i.Document(id)
 }

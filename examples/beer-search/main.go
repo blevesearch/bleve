@@ -20,6 +20,7 @@ import (
 	bleveHttp "github.com/couchbaselabs/bleve/http"
 )
 
+var batchSize = flag.Int("batchSize", 100, "batch size for indexing")
 var bindAddr = flag.String("addr", ":8094", "http listen address")
 var jsonDir = flag.String("jsonDir", "../../samples/beer-sample/", "json directory")
 var indexDir = flag.String("indexDir", "beer-search.bleve", "index directory")
@@ -78,6 +79,8 @@ func indexBeer(i bleve.Index) error {
 	log.Printf("Indexing...")
 	count := 0
 	startTime := time.Now()
+	batch := bleve.NewBatch()
+	batchCount := 0
 	for _, dirEntry := range dirEntries {
 		filename := dirEntry.Name()
 		// read the bytes
@@ -88,9 +91,16 @@ func indexBeer(i bleve.Index) error {
 		// // shred them into a document
 		ext := filepath.Ext(filename)
 		docId := filename[:(len(filename) - len(ext))]
-		err = i.Index(docId, jsonBytes)
-		if err != nil {
-			return err
+		batch.Index(docId, jsonBytes)
+		batchCount++
+
+		if batchCount >= *batchSize {
+			err = i.Batch(batch)
+			if err != nil {
+				return err
+			}
+			batch = bleve.NewBatch()
+			batchCount = 0
 		}
 		count++
 		if count%1000 == 0 {

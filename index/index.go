@@ -18,6 +18,7 @@ type Index interface {
 
 	Update(doc *document.Document) error
 	Delete(id string) error
+	Batch(batch Batch) error
 
 	TermFieldReader(term []byte, field string) (TermFieldReader, error)
 	DocIdReader(start, end string) (DocIdReader, error)
@@ -69,4 +70,14 @@ type DocIdReader interface {
 	Next() (string, error)
 	Advance(ID string) (string, error)
 	Close()
+}
+
+type Batch map[string]*document.Document
+
+func (b Batch) Index(id string, doc *document.Document) {
+	b[id] = doc
+}
+
+func (b Batch) Delete(id string) {
+	b[id] = nil
 }

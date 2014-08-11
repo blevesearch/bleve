@@ -12,14 +12,25 @@ import (
 	"github.com/couchbaselabs/bleve/document"
 )
 
-type Classifier interface {
-	Type() string
+type Batch map[string]interface{}
+
+func NewBatch() Batch {
+	return make(Batch, 0)
+}
+
+func (b Batch) Index(id string, data interface{}) {
+	b[id] = data
+}
+
+func (b Batch) Delete(id string) {
+	b[id] = nil
 }
 
 type Index interface {
 	Index(id string, data interface{}) error
-
 	Delete(id string) error
+
+	Batch(b Batch) error
 
 	Document(id string) (*document.Document, error)
 	DocCount() uint64
@@ -33,6 +44,10 @@ type Index interface {
 	DumpFields()
 
 	Close()
+}
+
+type Classifier interface {
+	Type() string
 }
 
 // Open the index at the specified path, and create it if it does not exist.

@@ -85,6 +85,7 @@ func (udc *UpsideDownCouch) loadSchema() (err error) {
 }
 
 func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows []UpsideDownCouchRow, deleteRows []UpsideDownCouchRow) (err error) {
+
 	// prepare batch
 	wb := udc.store.NewBatch()
 
@@ -235,11 +236,25 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 		return err
 	}
 
-	var isAdd = true
+	// prepare a list of rows
+	addRows := make([]UpsideDownCouchRow, 0)
+	updateRows := make([]UpsideDownCouchRow, 0)
+	deleteRows := make([]UpsideDownCouchRow, 0)
+
+	addRows, updateRows, deleteRows = udc.updateSingle(doc, backIndexRow, addRows, updateRows, deleteRows)
+
+	err = udc.batchRows(addRows, updateRows, deleteRows)
+	if err == nil && backIndexRow == nil {
+		udc.docCount += 1
+	}
+	return err
+}
+
+func (udc *UpsideDownCouch) updateSingle(doc *document.Document, backIndexRow *BackIndexRow, addRows, updateRows, deleteRows []UpsideDownCouchRow) ([]UpsideDownCouchRow, []UpsideDownCouchRow, []UpsideDownCouchRow) {
+
 	// a map for each field, map key is term (string) bool true for existence
 	existingTermFieldMaps := make(fieldTermMap, 0)
 	if backIndexRow != nil {
-		isAdd = false
 		for _, entry := range backIndexRow.entries {
 			existingTermMap, fieldExists := existingTermFieldMaps[entry.field]
 			if !fieldExists {
@@ -255,10 +270,6 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 			existingStoredFieldMap[sf] = true
 		}
 	}
-
-	// prepare a list of rows
-	updateRows := make([]UpsideDownCouchRow, 0)
-	addRows := make([]UpsideDownCouchRow, 0)
 
 	// track our back index entries
 	backIndexEntries := make([]*BackIndexEntry, 0)
@@ -319,7 +330,6 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 	updateRows = append(updateRows, backIndexRow)
 
 	// any of the existing rows that weren't updated need to be deleted
-	deleteRows := make([]UpsideDownCouchRow, 0)
 	for fieldIndex, existingTermFieldMap := range existingTermFieldMaps {
 		if existingTermFieldMap != nil {
 			for termString, _ := range existingTermFieldMap {
@@ -334,11 +344,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 		deleteRows = append(deleteRows, storedRow)
 	}
 
-	err = udc.batchRows(addRows, updateRows, deleteRows)
-	if err == nil && isAdd {
-		udc.docCount += 1
-	}
-	return err
+	return addRows, updateRows, deleteRows
 }
 
 func (udc *UpsideDownCouch) storeField(docId string, field document.Field, fieldIndex uint16, existingStoredFieldMap map[uint16]bool) ([]UpsideDownCouchRow, []UpsideDownCouchRow) {
@@ -440,25 +446,30 @@ func (udc *UpsideDownCouch) Delete(id string) error {
 		return nil
 	}
 
-	// prepare a list of rows to delete
-	rows := make([]UpsideDownCouchRow, 0)
-	for _, backIndexEntry := range backIndexRow.entries {
-		tfr := NewTermFrequencyRow(backIndexEntry.term, backIndexEntry.field, id, 0, 0)
-		rows = append(rows, tfr)
-	}
-	for _, sf := range backIndexRow.storedFields {
-		sf := NewStoredRow(id, sf, 'x', nil)
-		rows = append(rows, sf)
-	}
+	deleteRows := make([]UpsideDownCouchRow, 0)
+	deleteRows = udc.deleteSingle(id, backIndexRow, deleteRows)
 
-	// also delete the back entry itself
-	rows = append(rows, backIndexRow)
-
-	err = udc.batchRows(nil, nil, rows)
+	err = udc.batchRows(nil, nil, deleteRows)
 	if err == nil {
 		udc.docCount -= 1
 	}
 	return err
+}
+
+func (udc *UpsideDownCouch) deleteSingle(id string, backIndexRow *BackIndexRow, deleteRows []UpsideDownCouchRow) []UpsideDownCouchRow {
+
+	for _, backIndexEntry := range backIndexRow.entries {
+		tfr := NewTermFrequencyRow(backIndexEntry.term, backIndexEntry.field, id, 0, 0)
+		deleteRows = append(deleteRows, tfr)
+	}
+	for _, sf := range backIndexRow.storedFields {
+		sf := NewStoredRow(id, sf, 'x', nil)
+		deleteRows = append(deleteRows, sf)
+	}
+
+	// also delete the back entry itself
+	deleteRows = append(deleteRows, backIndexRow)
+	return deleteRows
 }
 
 func (udc *UpsideDownCouch) backIndexRowForDoc(docId string) (*BackIndexRow, error) {
@@ -479,6 +490,20 @@ func (udc *UpsideDownCouch) backIndexRowForDoc(docId string) (*BackIndexRow, err
 		return nil, err
 	}
 	return backIndexRow, nil
+}
+
+func (udc *UpsideDownCouch) backIndexRowsForBatch(batch index.Batch) (map[string]*BackIndexRow, error) {
+	// FIXME faster to order the ids and scan sequentially
+	// for now just get it working
+	rv := make(map[string]*BackIndexRow, 0)
+	for docId, _ := range batch {
+		backIndexRow, err := udc.backIndexRowForDoc(docId)
+		if err != nil {
+			return nil, err
+		}
+		rv[docId] = backIndexRow
+	}
+	return rv, nil
 }
 
 func (udc *UpsideDownCouch) Dump() {
@@ -724,4 +749,40 @@ func (udc *UpsideDownCouch) fieldIndexToName(i uint16) string {
 		}
 	}
 	return ""
+}
+
+func (udc *UpsideDownCouch) Batch(batch index.Batch) error {
+	// first lookup all the back index rows
+	backIndexRows, err := udc.backIndexRowsForBatch(batch)
+	if err != nil {
+		return err
+	}
+
+	// prepare a list of rows
+	addRows := make([]UpsideDownCouchRow, 0)
+	updateRows := make([]UpsideDownCouchRow, 0)
+	deleteRows := make([]UpsideDownCouchRow, 0)
+
+	docsAdded := uint64(0)
+	docsDeleted := uint64(0)
+	for docId, doc := range batch {
+		backIndexRow := backIndexRows[docId]
+		if doc == nil && backIndexRow != nil {
+			//delete
+			deleteRows = udc.deleteSingle(docId, backIndexRow, deleteRows)
+			docsDeleted++
+		} else if doc != nil {
+			addRows, updateRows, deleteRows = udc.updateSingle(doc, backIndexRow, addRows, updateRows, deleteRows)
+			if backIndexRow == nil {
+				docsAdded++
+			}
+		}
+	}
+
+	err = udc.batchRows(addRows, updateRows, deleteRows)
+	if err == nil {
+		udc.docCount += docsAdded
+		udc.docCount -= docsDeleted
+	}
+	return err
 }
