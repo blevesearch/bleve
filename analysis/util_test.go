@@ -33,3 +33,38 @@ func TestDeleteRune(t *testing.T) {
 		}
 	}
 }
+
+func TestInsertRune(t *testing.T) {
+	tests := []struct {
+		in      []rune
+		insPos  int
+		insRune rune
+		out     []rune
+	}{
+		{
+			in:      []rune{'a', 'b', 'c'},
+			insPos:  1,
+			insRune: 'x',
+			out:     []rune{'a', 'x', 'b', 'c'},
+		},
+		{
+			in:      []rune{'a', 'b', 'c'},
+			insPos:  0,
+			insRune: 'x',
+			out:     []rune{'x', 'a', 'b', 'c'},
+		},
+		{
+			in:      []rune{'a', 'b', 'c'},
+			insPos:  3,
+			insRune: 'x',
+			out:     []rune{'a', 'b', 'c', 'x'},
+		},
+	}
+
+	for _, test := range tests {
+		actual := InsertRune(test.in, test.insPos, test.insRune)
+		if !reflect.DeepEqual(actual, test.out) {
+			t.Errorf("expected %#v, got %#v", test.out, actual)
+		}
+	}
+}

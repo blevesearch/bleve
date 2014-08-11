@@ -27,6 +27,7 @@ import (
 	"github.com/couchbaselabs/bleve/analysis/token_filters/arabic_normalize"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/cld2"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/elision_filter"
+	"github.com/couchbaselabs/bleve/analysis/token_filters/german_normalize"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/length_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/lower_case_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/persian_normalize"
@@ -296,6 +297,7 @@ func init() {
 	Config.Analysis.TokenFilters["normalize_ckb"] = sorani_normalize.NewSoraniNormalizeFilter()
 	Config.Analysis.TokenFilters["normalize_fa"] = persian_normalize.NewPersianNormalizeFilter()
 	Config.Analysis.TokenFilters["normalize_ar"] = arabic_normalize.NewArabicNormalizeFilter()
+	Config.Analysis.TokenFilters["normalize_de"] = german_normalize.NewGermanNormalizeFilter()
 
 	// register analyzers
 	keywordAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "single", []string{})
@@ -318,7 +320,7 @@ func init() {
 	Config.Analysis.Analyzers["fi"] = finnishAnalyzer
 	frenchAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"elision_fr", "to_lower", "stop_token_fr", "stemmer_fr"})
 	Config.Analysis.Analyzers["fr"] = frenchAnalyzer
-	germanAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"to_lower", "stop_token_de", "stemmer_de"})
+	germanAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"to_lower", "stop_token_de", "normalize_de", "stemmer_de"})
 	Config.Analysis.Analyzers["de"] = germanAnalyzer
 	hungarianAnalyzer := Config.MustBuildNewAnalyzer([]string{}, "unicode", []string{"to_lower", "stop_token_hu", "stemmer_hu"})
 	Config.Analysis.Analyzers["hu"] = hungarianAnalyzer

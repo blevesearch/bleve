@@ -20,6 +20,18 @@ func DeleteRune(in []rune, pos int) []rune {
 	return in[:len(in)-1]
 }
 
+func InsertRune(in []rune, pos int, r rune) []rune {
+	// create a new slice 1 rune larger
+	rv := make([]rune, len(in)+1)
+	// copy the characters before the insert pos
+	copy(rv[0:pos], in[0:pos])
+	// set the inserted rune
+	rv[pos] = r
+	// copy the characters after the insert pos
+	copy(rv[pos+1:], in[pos:])
+	return rv
+}
+
 func BuildTermFromRunes(runes []rune) []byte {
 	rv := make([]byte, 0, len(runes)*4)
 	for _, r := range runes {
