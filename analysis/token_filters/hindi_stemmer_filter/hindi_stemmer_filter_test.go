@@ -6,7 +6,7 @@
 //  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
-package sorani_normalize
+package hindi_stemmer_filter
 
 import (
 	"reflect"
@@ -15,279 +15,264 @@ import (
 	"github.com/couchbaselabs/bleve/analysis"
 )
 
-func TestSoraniNormalizeFilter(t *testing.T) {
+func TestHindiStemmerFilter(t *testing.T) {
 	tests := []struct {
 		input  analysis.TokenStream
 		output analysis.TokenStream
 	}{
-		// test Y
+		// masc noun inflections
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u064A"),
+					Term: []byte("लडका"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u06CC"),
+					Term: []byte("लडक"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u0649"),
+					Term: []byte("लडके"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u06CC"),
+					Term: []byte("लडक"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u06CC"),
+					Term: []byte("लडकों"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u06CC"),
-				},
-			},
-		},
-		// test K
-		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("\u0643"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("\u06A9"),
+					Term: []byte("लडक"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u06A9"),
+					Term: []byte("गुरु"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u06A9"),
-				},
-			},
-		},
-		// test H
-		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("\u0647\u200C"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("\u06D5"),
+					Term: []byte("गुर"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u0647\u200C\u06A9"),
+					Term: []byte("गुरुओं"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u06D5\u06A9"),
+					Term: []byte("गुर"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u06BE"),
+					Term: []byte("दोस्त"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u0647"),
+					Term: []byte("दोस्त"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u0629"),
+					Term: []byte("दोस्तों"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u06D5"),
+					Term: []byte("दोस्त"),
 				},
 			},
 		},
-		// test final H
+		// feminine noun inflections
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u0647\u0647\u0647"),
+					Term: []byte("लडकी"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u0647\u0647\u06D5"),
-				},
-			},
-		},
-		// test RR
-		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("\u0692"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("\u0695"),
-				},
-			},
-		},
-		// test initial RR
-		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("\u0631\u0631\u0631"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("\u0695\u0631\u0631"),
-				},
-			},
-		},
-		// test remove
-		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("\u0640"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte(""),
+					Term: []byte("लडक"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u064B"),
+					Term: []byte("लडकियों"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte(""),
+					Term: []byte("लडक"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u064C"),
+					Term: []byte("किताब"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte(""),
+					Term: []byte("किताब"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u064D"),
+					Term: []byte("किताबें"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte(""),
+					Term: []byte("किताब"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u064E"),
+					Term: []byte("किताबों"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte(""),
+					Term: []byte("किताब"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u064F"),
+					Term: []byte("आध्यापीका"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte(""),
+					Term: []byte("आध्यापीक"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u0650"),
+					Term: []byte("आध्यापीकाएं"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte(""),
+					Term: []byte("आध्यापीक"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u0651"),
+					Term: []byte("आध्यापीकाओं"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte(""),
+					Term: []byte("आध्यापीक"),
+				},
+			},
+		},
+		// some verb forms
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("खाना"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("खा"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u0652"),
+					Term: []byte("खाता"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte(""),
+					Term: []byte("खा"),
 				},
 			},
 		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("\u200C"),
+					Term: []byte("खाती"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte(""),
+					Term: []byte("खा"),
+				},
+			},
+		},
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("खा"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("खा"),
+				},
+			},
+		},
+		// exceptions
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("कठिनाइयां"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("कठिन"),
+				},
+			},
+		},
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("कठिन"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("कठिन"),
 				},
 			},
 		},
@@ -306,9 +291,9 @@ func TestSoraniNormalizeFilter(t *testing.T) {
 		},
 	}
 
-	soraniNormalizeFilter := NewSoraniNormalizeFilter()
+	hindiStemmerFilter := NewHindiStemmerFilter()
 	for _, test := range tests {
-		actual := soraniNormalizeFilter.Filter(test.input)
+		actual := hindiStemmerFilter.Filter(test.input)
 		if !reflect.DeepEqual(actual, test.output) {
 			t.Errorf("expected %#v, got %#v", test.output, actual)
 			t.Errorf("expected % x, got % x", test.output[0].Term, actual[0].Term)

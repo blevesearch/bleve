@@ -29,6 +29,7 @@ import (
 	"github.com/couchbaselabs/bleve/analysis/token_filters/elision_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/german_normalize"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/hindi_normalize"
+	"github.com/couchbaselabs/bleve/analysis/token_filters/hindi_stemmer_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/length_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/lower_case_filter"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/persian_normalize"
@@ -219,6 +220,7 @@ func init() {
 	Config.Analysis.TokenFilters["stemmer_sv"] = stemmer_filter.MustNewStemmerFilter("swedish")
 	Config.Analysis.TokenFilters["stemmer_tr"] = stemmer_filter.MustNewStemmerFilter("turkish")
 	Config.Analysis.TokenFilters["stemmer_ckb"] = sorani_stemmer_filter.NewSoraniStemmerFilter()
+	Config.Analysis.TokenFilters["stemmer_hi"] = hindi_stemmer_filter.NewHindiStemmerFilter()
 
 	// register stop token filters
 	Config.Analysis.TokenFilters["stop_token_da"] = stop_words_filter.NewStopWordsFilter(

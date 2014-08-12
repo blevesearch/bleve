@@ -9,6 +9,7 @@
 package analysis
 
 import (
+	"bytes"
 	"unicode/utf8"
 )
 
@@ -40,4 +41,11 @@ func BuildTermFromRunes(runes []rune) []byte {
 		rv = append(rv, runeBytes...)
 	}
 	return rv
+}
+
+func TruncateRunes(input []byte, num int) []byte {
+	runes := bytes.Runes(input)
+	runes = runes[:len(runes)-num]
+	out := BuildTermFromRunes(runes)
+	return out
 }
