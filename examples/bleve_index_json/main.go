@@ -53,7 +53,7 @@ func walkDirectory(dir string) chan jsonFile {
 		defer close(rv)
 
 		// open the directory
-		dirEntries, err := ioutil.ReadDir(*jsonDir)
+		dirEntries, err := ioutil.ReadDir(dir)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -61,7 +61,7 @@ func walkDirectory(dir string) chan jsonFile {
 		// walk the directory entries
 		for _, dirEntry := range dirEntries {
 			// read the bytes
-			jsonBytes, err := ioutil.ReadFile(*jsonDir + "/" + dirEntry.Name())
+			jsonBytes, err := ioutil.ReadFile(dir + "/" + dirEntry.Name())
 			if err != nil {
 				log.Fatal(err)
 			}
