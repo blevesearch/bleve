@@ -43,6 +43,19 @@ func TestBoundary(t *testing.T) {
 			},
 		},
 		{
+			[]byte("steven's"),
+			"en_US",
+			analysis.TokenStream{
+				{
+					Start:    0,
+					End:      8,
+					Term:     []byte("steven's"),
+					Position: 1,
+					Type:     analysis.AlphaNumeric,
+				},
+			},
+		},
+		{
 			[]byte("こんにちは世界"),
 			"en_US",
 			analysis.TokenStream{

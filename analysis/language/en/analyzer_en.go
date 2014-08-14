@@ -23,6 +23,10 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	if err != nil {
 		return nil, err
 	}
+	possEnFilter, err := cache.TokenFilterNamed(PossessiveName)
+	if err != nil {
+		return nil, err
+	}
 	toLowerFilter, err := cache.TokenFilterNamed(lower_case_filter.Name)
 	if err != nil {
 		return nil, err
@@ -38,6 +42,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	rv := analysis.Analyzer{
 		Tokenizer: unicodeTokenizer,
 		TokenFilters: []analysis.TokenFilter{
+			possEnFilter,
 			toLowerFilter,
 			stopEnFilter,
 			stemmerEnFilter,

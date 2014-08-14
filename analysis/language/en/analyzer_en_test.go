@@ -16,54 +16,84 @@ import (
 	"github.com/couchbaselabs/bleve/registry"
 )
 
-func TestEnglishStemmer(t *testing.T) {
+func TestEnglishAnalyzer(t *testing.T) {
 	tests := []struct {
-		input  analysis.TokenStream
+		input  []byte
 		output analysis.TokenStream
 	}{
+		// stemming
 		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("walking"),
-				},
-				&analysis.Token{
-					Term: []byte("talked"),
-				},
-				&analysis.Token{
-					Term: []byte("business"),
-				},
-				&analysis.Token{
-					Term:    []byte("protected"),
-					KeyWord: true,
-				},
-			},
+			input: []byte("books"),
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("walk"),
+					Term:     []byte("book"),
+					Position: 1,
+					Start:    0,
+					End:      5,
 				},
+			},
+		},
+		{
+			input: []byte("book"),
+			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("talk"),
+					Term:     []byte("book"),
+					Position: 1,
+					Start:    0,
+					End:      4,
 				},
+			},
+		},
+		// stop word removal
+		{
+			input:  []byte("the"),
+			output: analysis.TokenStream{},
+		},
+		// possessive removal
+		{
+			input: []byte("steven's"),
+			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("busi"),
+					Term:     []byte("steven"),
+					Position: 1,
+					Start:    0,
+					End:      8,
 				},
+			},
+		},
+		{
+			input: []byte("steven\u2019s"),
+			output: analysis.TokenStream{
 				&analysis.Token{
-					Term:    []byte("protected"),
-					KeyWord: true,
+					Term:     []byte("steven"),
+					Position: 1,
+					Start:    0,
+					End:      10,
+				},
+			},
+		},
+		{
+			input: []byte("steven\uFF07s"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term:     []byte("steven"),
+					Position: 1,
+					Start:    0,
+					End:      10,
 				},
 			},
 		},
 	}
 
 	cache := registry.NewCache()
-	stemmerFilter, err := cache.TokenFilterNamed(StemmerName)
+	analyzer, err := cache.AnalyzerNamed(AnalyzerName)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, test := range tests {
-		actual := stemmerFilter.Filter(test.input)
+		actual := analyzer.Analyze(test.input)
 		if !reflect.DeepEqual(actual, test.output) {
-			t.Errorf("expected %s, got %s", test.output, actual)
+			t.Errorf("expected %v, got %v", test.output, actual)
 		}
 	}
 }

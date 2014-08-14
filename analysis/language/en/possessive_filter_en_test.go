@@ -16,7 +16,7 @@ import (
 	"github.com/couchbaselabs/bleve/registry"
 )
 
-func TestEnglishStemmer(t *testing.T) {
+func TestEnglishPossessiveFilter(t *testing.T) {
 	tests := []struct {
 		input  analysis.TokenStream
 		output analysis.TokenStream
@@ -24,39 +24,55 @@ func TestEnglishStemmer(t *testing.T) {
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("walking"),
+					Term: []byte("marty's"),
 				},
 				&analysis.Token{
-					Term: []byte("talked"),
+					Term: []byte("MARTY'S"),
 				},
 				&analysis.Token{
-					Term: []byte("business"),
+					Term: []byte("marty’s"),
 				},
 				&analysis.Token{
-					Term:    []byte("protected"),
-					KeyWord: true,
+					Term: []byte("MARTY’S"),
+				},
+				&analysis.Token{
+					Term: []byte("marty＇s"),
+				},
+				&analysis.Token{
+					Term: []byte("MARTY＇S"),
+				},
+				&analysis.Token{
+					Term: []byte("m"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("walk"),
+					Term: []byte("marty"),
 				},
 				&analysis.Token{
-					Term: []byte("talk"),
+					Term: []byte("MARTY"),
 				},
 				&analysis.Token{
-					Term: []byte("busi"),
+					Term: []byte("marty"),
 				},
 				&analysis.Token{
-					Term:    []byte("protected"),
-					KeyWord: true,
+					Term: []byte("MARTY"),
+				},
+				&analysis.Token{
+					Term: []byte("marty"),
+				},
+				&analysis.Token{
+					Term: []byte("MARTY"),
+				},
+				&analysis.Token{
+					Term: []byte("m"),
 				},
 			},
 		},
 	}
 
 	cache := registry.NewCache()
-	stemmerFilter, err := cache.TokenFilterNamed(StemmerName)
+	stemmerFilter, err := cache.TokenFilterNamed(PossessiveName)
 	if err != nil {
 		t.Fatal(err)
 	}

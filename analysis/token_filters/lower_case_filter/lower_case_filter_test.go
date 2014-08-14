@@ -27,6 +27,9 @@ func TestLowerCaseFilter(t *testing.T) {
 		&analysis.Token{
 			Term: []byte("ThReE"),
 		},
+		&analysis.Token{
+			Term: []byte("steven's"),
+		},
 	}
 
 	expectedTokenStream := analysis.TokenStream{
@@ -38,6 +41,9 @@ func TestLowerCaseFilter(t *testing.T) {
 		},
 		&analysis.Token{
 			Term: []byte("three"),
+		},
+		&analysis.Token{
+			Term: []byte("steven's"),
 		},
 	}
 
