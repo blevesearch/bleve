@@ -12,7 +12,10 @@ import (
 	"strings"
 
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
+
+const Name = "to_lower"
 
 type LowerCaseFilter struct {
 }
@@ -32,4 +35,12 @@ func (f *LowerCaseFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
 	}
 
 	return rv
+}
+
+func LowerCaseFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
+	return NewLowerCaseFilter(), nil
+}
+
+func init() {
+	registry.RegisterTokenFilter(Name, LowerCaseFilterConstructor)
 }

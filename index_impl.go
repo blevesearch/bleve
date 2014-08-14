@@ -27,6 +27,12 @@ type indexImpl struct {
 }
 
 func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
+	// start by validating the index mapping
+	err := mapping.Validate()
+	if err != nil {
+		return nil, err
+	}
+
 	store, err := leveldb.Open(path, Config.CreateIfMissing)
 	if err != nil {
 		return nil, err
@@ -109,7 +115,9 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 			} else if facetRequest.DateTimeRanges != nil {
 				// build date range facet
 				facetBuilder := search.NewDateTimeFacetBuilder(facetRequest.Field, facetRequest.Size)
+				dateTimeParser := i.m.DateTimeParserNamed(i.m.DefaultDateTimeParser)
 				for _, dr := range facetRequest.DateTimeRanges {
+					dr.ParseDates(dateTimeParser)
 					facetBuilder.AddRange(dr.Name, dr.Start, dr.End)
 				}
 				facetsBuilder.Add(facetName, facetBuilder)

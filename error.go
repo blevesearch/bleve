@@ -9,8 +9,8 @@
 package bleve
 
 const (
-	ERROR_NO_ID Error = iota
-	ERROR_NO_TYPE
+	ERROR_INDEX_EXISTS Error = iota
+	ERROR_INDEX_DOES_NOT_EXIST
 )
 
 type Error int
@@ -20,5 +20,6 @@ func (e Error) Error() string {
 }
 
 var errorMessages = map[int]string{
-	0: "unable to determine document id",
+	int(ERROR_INDEX_EXISTS):         "cannot create new index, it already exists",
+	int(ERROR_INDEX_DOES_NOT_EXIST): "cannot open index, it does not exist",
 }

@@ -74,6 +74,11 @@ func TestRows(t *testing.T) {
 			[]byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', BYTE_SEPARATOR, 0, 0},
 			[]byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
 		},
+		{
+			NewInternalRow([]byte("mapping"), []byte(`{"mapping":"json content"}`)),
+			[]byte{'i', 'm', 'a', 'p', 'p', 'i', 'n', 'g'},
+			[]byte{'{', '"', 'm', 'a', 'p', 'p', 'i', 'n', 'g', '"', ':', '"', 'j', 's', 'o', 'n', ' ', 'c', 'o', 'n', 't', 'e', 'n', 't', '"', '}'},
+		},
 	}
 
 	// test going from struct to k/v bytes

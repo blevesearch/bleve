@@ -10,9 +10,13 @@ package elision_filter
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
+
+const Name = "elision"
 
 const RIGHT_SINGLE_QUOTATION_MARK = "’"
 const APOSTROPHE = "'"
@@ -20,10 +24,10 @@ const APOSTROPHE = "'"
 const APOSTROPHES = APOSTROPHE + RIGHT_SINGLE_QUOTATION_MARK
 
 type ElisionFilter struct {
-	articles analysis.WordMap
+	articles analysis.TokenMap
 }
 
-func NewElisionFilter(articles analysis.WordMap) *ElisionFilter {
+func NewElisionFilter(articles analysis.TokenMap) *ElisionFilter {
 	return &ElisionFilter{
 		articles: articles,
 	}
@@ -47,4 +51,20 @@ func (s *ElisionFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 	}
 
 	return rv
+}
+
+func ElisionFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
+	articlesTokenMapName, ok := config["articles_token_map"].(string)
+	if !ok {
+		return nil, fmt.Errorf("must specify articles_token_map")
+	}
+	articlesTokenMap, err := cache.TokenMapNamed(articlesTokenMapName)
+	if err != nil {
+		return nil, fmt.Errorf("error building elision filter: %v", err)
+	}
+	return NewElisionFilter(articlesTokenMap), nil
+}
+
+func init() {
+	registry.RegisterTokenFilter(Name, ElisionFilterConstructor)
 }

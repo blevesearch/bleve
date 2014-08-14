@@ -13,7 +13,10 @@ import (
 	"unicode/utf8"
 
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
+
+const Name = "edge_ngram"
 
 type Side bool
 
@@ -88,4 +91,28 @@ func buildTermFromRunes(runes []rune) []byte {
 		rv = append(rv, runeBytes...)
 	}
 	return rv
+}
+
+func EdgeNgramFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
+	side := FRONT
+	back, ok := config["back"].(bool)
+	if ok && back {
+		side = BACK
+	}
+	min := 1
+	minVal, ok := config["min"].(float64)
+	if ok {
+		min = int(minVal)
+	}
+	max := 2
+	maxVal, ok := config["max"].(float64)
+	if ok {
+		max = int(maxVal)
+	}
+
+	return NewEdgeNgramFilter(side, min, max), nil
+}
+
+func init() {
+	registry.RegisterTokenFilter(Name, EdgeNgramFilterConstructor)
 }

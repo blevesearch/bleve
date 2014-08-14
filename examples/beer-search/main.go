@@ -9,17 +9,22 @@
 package main
 
 import (
+	_ "expvar"
 	"flag"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"time"
 
 	"github.com/couchbaselabs/bleve"
 	bleveHttp "github.com/couchbaselabs/bleve/http"
 )
 
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+var memprofile = flag.String("memprofile", "", "write mem profile to file")
 var batchSize = flag.Int("batchSize", 100, "batch size for indexing")
 var bindAddr = flag.String("addr", ":8094", "http listen address")
 var jsonDir = flag.String("jsonDir", "../../samples/beer-sample/", "json directory")
@@ -30,6 +35,15 @@ var staticPath = flag.String("static", "static/", "Path to the static content")
 func main() {
 
 	flag.Parse()
+
+	// create cpu profile if requested
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+	}
 
 	// create a mapping
 	indexMapping := buildIndexMapping()
@@ -45,6 +59,18 @@ func main() {
 		err = indexBeer(beerIndex)
 		if err != nil {
 			log.Fatal(err)
+		}
+		if *cpuprofile != "" {
+			pprof.StopCPUProfile()
+			log.Printf("closing cpu profile")
+		}
+		if *memprofile != "" {
+			f, err := os.Create(*memprofile)
+			if err != nil {
+				log.Fatal(err)
+			}
+			pprof.WriteHeapProfile(f)
+			log.Printf("mem profile written")
 		}
 	}()
 

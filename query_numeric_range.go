@@ -50,7 +50,7 @@ func (q *NumericRangeQuery) SetField(f string) *NumericRangeQuery {
 func (q *NumericRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
-		field = i.m.defaultField()
+		field = i.m.DefaultField
 	}
 	return search.NewNumericRangeSearcher(i.i, q.Min, q.Max, field, q.BoostVal, explain)
 }

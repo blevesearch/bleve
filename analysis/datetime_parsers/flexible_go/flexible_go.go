@@ -9,10 +9,14 @@
 package flexible_go
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
+
+const Name = "flexiblego"
 
 type FlexibleGoDateTimeParser struct {
 	layouts []string
@@ -32,4 +36,23 @@ func (p *FlexibleGoDateTimeParser) ParseDateTime(input string) (time.Time, error
 		}
 	}
 	return time.Time{}, analysis.INVALID_DATETIME
+}
+
+func FlexibleGoDateTimeParserConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.DateTimeParser, error) {
+	layouts, ok := config["layouts"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("must specify layouts")
+	}
+	layoutStrs := make([]string, 0)
+	for _, layout := range layouts {
+		layoutStr, ok := layout.(string)
+		if ok {
+			layoutStrs = append(layoutStrs, layoutStr)
+		}
+	}
+	return NewFlexibleGoDateTimeParser(layoutStrs), nil
+}
+
+func init() {
+	registry.RegisterDateTimeParser(Name, FlexibleGoDateTimeParserConstructor)
 }

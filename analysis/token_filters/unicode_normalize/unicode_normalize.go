@@ -13,7 +13,10 @@ import (
 
 	"code.google.com/p/go.text/unicode/norm"
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
+
+const Name = "normalize_unicode"
 
 const NFC = "nfc"
 const NFD = "nfd"
@@ -58,4 +61,17 @@ func (s *UnicodeNormalizeFilter) Filter(input analysis.TokenStream) analysis.Tok
 	}
 
 	return rv
+}
+
+func UnicodeNormalizeFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
+	form := NFKC
+	formVal, ok := config["form"].(string)
+	if ok {
+		form = formVal
+	}
+	return NewUnicodeNormalizeFilter(form)
+}
+
+func init() {
+	registry.RegisterTokenFilter(Name, UnicodeNormalizeFilterConstructor)
 }

@@ -55,9 +55,9 @@ func TestKeyWordMarkerFilter(t *testing.T) {
 		},
 	}
 
-	keyWordsMap := analysis.NewWordMap()
-	keyWordsMap.AddWord("walk")
-	keyWordsMap.AddWord("park")
+	keyWordsMap := analysis.NewTokenMap()
+	keyWordsMap.AddToken("walk")
+	keyWordsMap.AddToken("park")
 
 	filter := NewKeyWordMarkerFilter(keyWordsMap)
 	ouputTokenStream := filter.Filter(inputTokenStream)

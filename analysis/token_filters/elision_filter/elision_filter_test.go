@@ -13,101 +13,50 @@ import (
 	"testing"
 
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/analysis/token_map"
+	"github.com/couchbaselabs/bleve/registry"
 )
 
 func TestElisionFilter(t *testing.T) {
 
-	frenchArticlesMap := analysis.NewWordMap()
-	err := frenchArticlesMap.LoadBytes(FrenchArticles)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	italianArticlesMap := analysis.NewWordMap()
-	err = italianArticlesMap.LoadBytes(ItalianArticles)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	catalanArticlesMap := analysis.NewWordMap()
-	err = catalanArticlesMap.LoadBytes(CatalanArticles)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	irishArticlesMap := analysis.NewWordMap()
-	err = irishArticlesMap.LoadBytes(IrishArticles)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	tests := []struct {
-		articleMap analysis.WordMap
-		input      analysis.TokenStream
-		output     analysis.TokenStream
+		input  analysis.TokenStream
+		output analysis.TokenStream
 	}{
 		{
-			articleMap: frenchArticlesMap,
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("l'avion"),
+					Term: []byte("ar'word"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("avion"),
+					Term: []byte("word"),
 				},
 			},
 		},
-		{
-			articleMap: italianArticlesMap,
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("dell'Italia"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("Italia"),
-				},
-			},
-		},
-		{
-			articleMap: catalanArticlesMap,
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("l'Institut"),
-				},
-				&analysis.Token{
-					Term: []byte("d'Estudis"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("Institut"),
-				},
-				&analysis.Token{
-					Term: []byte("Estudis"),
-				},
-			},
-		},
-		{
-			articleMap: irishArticlesMap,
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("b'fhearr"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("fhearr"),
-				},
-			},
-		},
+	}
+
+	cache := registry.NewCache()
+
+	articleListConfig := map[string]interface{}{
+		"tokens": []interface{}{"ar"},
+	}
+	_, err := cache.DefineTokenMap("articles_test", token_map.Name, articleListConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	elisionConfig := map[string]interface{}{
+		"articles_token_map": "articles_test",
+	}
+	elisionFilter, err := cache.DefineTokenFilter("elision_test", "elision", elisionConfig)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	for _, test := range tests {
-		elisionFilter := NewElisionFilter(test.articleMap)
+
 		actual := elisionFilter.Filter(test.input)
 		if !reflect.DeepEqual(actual, test.output) {
 			t.Errorf("expected %s, got %s", test.output[0].Term, actual[0].Term)

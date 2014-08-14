@@ -9,14 +9,19 @@
 package keyword_filter
 
 import (
+	"fmt"
+
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
 
+const Name = "keyword_marker"
+
 type KeyWordMarkerFilter struct {
-	keyWords analysis.WordMap
+	keyWords analysis.TokenMap
 }
 
-func NewKeyWordMarkerFilter(keyWords analysis.WordMap) *KeyWordMarkerFilter {
+func NewKeyWordMarkerFilter(keyWords analysis.TokenMap) *KeyWordMarkerFilter {
 	return &KeyWordMarkerFilter{
 		keyWords: keyWords,
 	}
@@ -33,4 +38,20 @@ func (f *KeyWordMarkerFilter) Filter(input analysis.TokenStream) analysis.TokenS
 	}
 
 	return input
+}
+
+func KeyWordMarkerFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
+	keywordsTokenMapName, ok := config["keywords_token_map"].(string)
+	if !ok {
+		return nil, fmt.Errorf("must specify keywords_token_map")
+	}
+	keywordsTokenMap, err := cache.TokenMapNamed(keywordsTokenMapName)
+	if err != nil {
+		return nil, fmt.Errorf("error building keyword marker filter: %v", err)
+	}
+	return NewKeyWordMarkerFilter(keywordsTokenMap), nil
+}
+
+func init() {
+	registry.RegisterTokenFilter(Name, KeyWordMarkerFilterConstructor)
 }

@@ -10,7 +10,10 @@ package single_token
 
 import (
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
+
+const Name = "single"
 
 type SingleTokenTokenizer struct {
 }
@@ -29,4 +32,12 @@ func (t *SingleTokenTokenizer) Tokenize(input []byte) analysis.TokenStream {
 			Type:     analysis.AlphaNumeric,
 		},
 	}
+}
+
+func SingleTokenTokenizerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.Tokenizer, error) {
+	return NewSingleTokenTokenizer(), nil
+}
+
+func init() {
+	registry.RegisterTokenizer(Name, SingleTokenTokenizerConstructor)
 }

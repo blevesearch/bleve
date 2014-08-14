@@ -13,7 +13,10 @@ import (
 	"unicode/utf8"
 
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
+
+const Name = "truncate_token"
 
 type TruncateTokenFilter struct {
 	length int
@@ -44,4 +47,19 @@ func (s *TruncateTokenFilter) Filter(input analysis.TokenStream) analysis.TokenS
 	}
 
 	return rv
+}
+
+func TruncateTokenFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
+	length := 25
+
+	lenVal, ok := config["length"].(float64)
+	if ok {
+		length = int(lenVal)
+	}
+
+	return NewTruncateTokenFilter(length), nil
+}
+
+func init() {
+	registry.RegisterTokenFilter(Name, TruncateTokenFilterConstructor)
 }

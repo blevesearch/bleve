@@ -12,7 +12,10 @@ import (
 	"bytes"
 
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
+
+const Name = "apostrophe"
 
 const RIGHT_SINGLE_QUOTATION_MARK = "’"
 const APOSTROPHE = "'"
@@ -38,4 +41,12 @@ func (s *ApostropheFilter) Filter(input analysis.TokenStream) analysis.TokenStre
 	}
 
 	return rv
+}
+
+func ApostropheFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
+	return NewApostropheFilter(), nil
+}
+
+func init() {
+	registry.RegisterTokenFilter(Name, ApostropheFilterConstructor)
 }

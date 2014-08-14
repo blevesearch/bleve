@@ -32,6 +32,10 @@ type Index interface {
 
 	Fields() ([]string, error)
 
+	SetInternal(key, val []byte) error
+	GetInternal(key []byte) ([]byte, error)
+	DeleteInternal(key []byte) error
+
 	Dump()
 	DumpDoc(id string) ([]interface{}, error)
 	DumpFields()

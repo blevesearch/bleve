@@ -12,19 +12,57 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
 
 type DocumentMapping struct {
-	Enabled         *bool                       `json:"enabled"`
-	Dynamic         *bool                       `json:"dynamic"`
+	Enabled         bool                        `json:"enabled"`
+	Dynamic         bool                        `json:"dynamic"`
 	Properties      map[string]*DocumentMapping `json:"properties"`
 	Fields          []*FieldMapping             `json:"fields"`
-	DefaultAnalyzer *string                     `json:"default_analyzer"`
+	DefaultAnalyzer string                      `json:"default_analyzer"`
+}
+
+func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
+	var err error
+	if dm.DefaultAnalyzer != "" {
+		_, err := cache.AnalyzerNamed(dm.DefaultAnalyzer)
+		if err != nil {
+			return err
+		}
+	}
+	for _, property := range dm.Properties {
+		err = property.Validate(cache)
+		if err != nil {
+			return err
+		}
+	}
+	for _, field := range dm.Fields {
+		if field.Analyzer != nil {
+			_, err = cache.AnalyzerNamed(*field.Analyzer)
+			if err != nil {
+				return err
+			}
+		}
+		if field.DateFormat != nil {
+			_, err = cache.DateTimeParserNamed(*field.DateFormat)
+			if err != nil {
+				return err
+			}
+		}
+		if field.Type != nil {
+			switch *field.Type {
+			case "text", "datetime", "number":
+			default:
+				return fmt.Errorf("unknown field type: '%s'", *field.Type)
+			}
+		}
+	}
+	return nil
 }
 
 func (dm *DocumentMapping) GoString() string {
-	return fmt.Sprintf(" &bleve.DocumentMapping{Enabled:%t, Dynamic:%t, Properties:%#v, Fields:%#v}", *dm.Enabled, *dm.Dynamic, dm.Properties, dm.Fields)
+	return fmt.Sprintf(" &bleve.DocumentMapping{Enabled:%t, Dynamic:%t, Properties:%#v, Fields:%#v}", dm.Enabled, dm.Dynamic, dm.Properties, dm.Fields)
 }
 
 func (dm *DocumentMapping) DocumentMappingForPath(path string) *DocumentMapping {
@@ -42,22 +80,19 @@ func (dm *DocumentMapping) DocumentMappingForPath(path string) *DocumentMapping 
 
 func NewDocumentMapping() *DocumentMapping {
 	return &DocumentMapping{
-		Enabled: &tRUE,
-		Dynamic: &tRUE,
+		Enabled: true,
+		Dynamic: true,
 	}
 }
 
 func NewDocumentStaticMapping() *DocumentMapping {
 	return &DocumentMapping{
-		Enabled: &tRUE,
-		Dynamic: &fALSE,
+		Enabled: true,
 	}
 }
 
 func NewDocumentDisabledMapping() *DocumentMapping {
-	return &DocumentMapping{
-		Enabled: &fALSE,
-	}
+	return &DocumentMapping{}
 }
 
 func (dm *DocumentMapping) AddSubDocumentMapping(property string, sdm *DocumentMapping) *DocumentMapping {
@@ -82,23 +117,25 @@ func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 		Dynamic         *bool                       `json:"dynamic"`
 		Properties      map[string]*DocumentMapping `json:"properties"`
 		Fields          []*FieldMapping             `json:"fields"`
-		DefaultAnalyzer *string                     `json:"default_analyzer"`
+		DefaultAnalyzer string                      `json:"default_analyzer"`
 	}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
-	dm.Enabled = &tRUE
+
+	dm.Enabled = true
 	if tmp.Enabled != nil {
-		dm.Enabled = tmp.Enabled
+		dm.Enabled = *tmp.Enabled
 	}
-	dm.Dynamic = &tRUE
+
+	dm.Dynamic = true
 	if tmp.Dynamic != nil {
-		dm.Dynamic = tmp.Dynamic
+		dm.Dynamic = *tmp.Dynamic
 	}
-	if tmp.DefaultAnalyzer != nil {
-		dm.DefaultAnalyzer = tmp.DefaultAnalyzer
-	}
+
+	dm.DefaultAnalyzer = tmp.DefaultAnalyzer
+
 	if tmp.Properties != nil {
 		dm.Properties = make(map[string]*DocumentMapping, len(tmp.Properties))
 	}
@@ -114,8 +151,8 @@ func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (dm *DocumentMapping) defaultAnalyzer(path []string) *analysis.Analyzer {
-	var rv *analysis.Analyzer
+func (dm *DocumentMapping) defaultAnalyzerName(path []string) string {
+	rv := ""
 	current := dm
 	for _, pathElement := range path {
 		var ok bool
@@ -123,8 +160,8 @@ func (dm *DocumentMapping) defaultAnalyzer(path []string) *analysis.Analyzer {
 		if !ok {
 			break
 		}
-		if current.DefaultAnalyzer != nil {
-			rv = Config.Analysis.Analyzers[*current.DefaultAnalyzer]
+		if current.DefaultAnalyzer != "" {
+			rv = current.DefaultAnalyzer
 		}
 	}
 	return rv

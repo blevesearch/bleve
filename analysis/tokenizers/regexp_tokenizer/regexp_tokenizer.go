@@ -9,10 +9,14 @@
 package regexp_tokenizer
 
 import (
+	"fmt"
 	"regexp"
 
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
+
+const Name = "regexp"
 
 type RegexpTokenizer struct {
 	r *regexp.Regexp
@@ -38,4 +42,20 @@ func (rt *RegexpTokenizer) Tokenize(input []byte) analysis.TokenStream {
 		rv[i] = &token
 	}
 	return rv
+}
+
+func RegexpTokenizerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.Tokenizer, error) {
+	rval, ok := config["regexp"].(string)
+	if !ok {
+		return nil, fmt.Errorf("must specify regexp")
+	}
+	r, err := regexp.Compile(rval)
+	if err != nil {
+		return nil, fmt.Errorf("unable to build regexp tokenizer: %v", err)
+	}
+	return NewRegexpTokenizer(r), nil
+}
+
+func init() {
+	registry.RegisterTokenizer(Name, RegexpTokenizerConstructor)
 }

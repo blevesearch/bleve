@@ -17,7 +17,10 @@ import (
 	"unsafe"
 
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
+
+const Name = "detect_lang"
 
 type Cld2Filter struct {
 }
@@ -50,4 +53,12 @@ func (f *Cld2Filter) detectLanguage(input []byte) ([]byte, error) {
 	cstr := C.CString(string(input))
 	res := C.DetectLang(cstr)
 	return C.GoBytes(unsafe.Pointer(res), C.int(C.strlen(res))), nil
+}
+
+func Cld2FilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
+	return NewCld2Filter(), nil
+}
+
+func init() {
+	registry.RegisterTokenFilter(Name, Cld2FilterConstructor)
 }

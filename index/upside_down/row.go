@@ -38,6 +38,8 @@ func ParseFromKeyValue(key, value []byte) (UpsideDownCouchRow, error) {
 			return NewBackIndexRowKV(key, value)
 		case 's':
 			return NewStoredRowKV(key, value)
+		case 'i':
+			return NewInternalRowKV(key, value)
 		}
 		return nil, fmt.Errorf("Unknown field type '%s'", string(key[0]))
 	}
@@ -75,6 +77,42 @@ func NewVersionRowKV(key, value []byte) (*VersionRow, error) {
 	if err != nil {
 		return nil, err
 	}
+	return &rv, nil
+}
+
+// INTERNAL STORAGE
+
+type InternalRow struct {
+	key []byte
+	val []byte
+}
+
+func (i *InternalRow) Key() []byte {
+	buf := make([]byte, len(i.key)+1)
+	buf[0] = 'i'
+	copy(buf[1:], i.key)
+	return buf
+}
+
+func (i *InternalRow) Value() []byte {
+	return i.val
+}
+
+func (i *InternalRow) String() string {
+	return fmt.Sprintf("InternalStore - Key: %s (% x) Val: %s (% x)", i.key, i.key, i.val, i.val)
+}
+
+func NewInternalRow(key, val []byte) *InternalRow {
+	return &InternalRow{
+		key: key,
+		val: val,
+	}
+}
+
+func NewInternalRowKV(key, value []byte) (*InternalRow, error) {
+	rv := InternalRow{}
+	rv.key = key[1:]
+	rv.val = value
 	return &rv, nil
 }
 

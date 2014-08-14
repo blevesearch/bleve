@@ -11,7 +11,10 @@ package stemmer_filter
 import (
 	"bitbucket.org/tebeka/snowball"
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
+
+const Name = "stem"
 
 type StemmerFilter struct {
 	lang    string
@@ -54,4 +57,17 @@ func (s *StemmerFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 	}
 
 	return rv
+}
+
+func StemmerFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
+	lang := "en"
+	langVal, ok := config["lang"].(string)
+	if ok {
+		lang = langVal
+	}
+	return NewStemmerFilter(lang)
+}
+
+func init() {
+	registry.RegisterTokenFilter(Name, StemmerFilterConstructor)
 }

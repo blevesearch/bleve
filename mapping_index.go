@@ -11,48 +11,80 @@ package bleve
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"reflect"
 	"time"
 
 	"github.com/couchbaselabs/bleve/analysis"
 	"github.com/couchbaselabs/bleve/document"
+	"github.com/couchbaselabs/bleve/registry"
 )
 
 var tRUE = true
 
 var fALSE = false
 
-var DEFAULT_ID_FIELD = "_id"
-var DEFAULT_TYPE_FIELD = "_type"
-var DEFAULT_TYPE = "_default"
-var DEFAULT_FIELD = "_all"
-var DEFAULT_TOP_LEVEL_BYTE_ARRAY_CONVERTER = "json"
+const DefaultTypeField = "_type"
+const DefaultType = "_default"
+const DefaultField = "_all"
+const DefaultAnalyzer = "standard"
+const DefaultDateTimeParser = "dateTimeOptional"
+const DefaultByteArrayConverter = "json"
 
 type IndexMapping struct {
-	TypeMapping        map[string]*DocumentMapping `json:"types"`
-	DefaultMapping     *DocumentMapping            `json:"default_mapping"`
-	IdField            *string                     `json:"id_field"`
-	TypeField          *string                     `json:"type_field"`
-	DefaultType        *string                     `json:"default_type"`
-	DefaultAnalyzer    *string                     `json:"default_analyzer"`
-	DefaultField       *string                     `json:"default_field"`
-	ByteArrayConverter *string                     `json:"byte_array_converter"`
+	TypeMapping           map[string]*DocumentMapping `json:"types"`
+	DefaultMapping        *DocumentMapping            `json:"default_mapping"`
+	TypeField             string                      `json:"type_field"`
+	DefaultType           string                      `json:"default_type"`
+	DefaultAnalyzer       string                      `json:"default_analyzer"`
+	DefaultDateTimeParser string                      `json:"default_datetime_parser"`
+	DefaultField          string                      `json:"default_field"`
+	ByteArrayConverter    string                      `json:"byte_array_converter"`
+	cache                 *registry.Cache             `json:"_"`
 }
 
 func (im *IndexMapping) GoString() string {
-	return fmt.Sprintf("&bleve.IndexMapping{TypeMapping:%#v, TypeField:%s, DefaultType:%s}", im.TypeMapping, *im.TypeField, *im.DefaultType)
+	return fmt.Sprintf("&bleve.IndexMapping{TypeMapping:%#v, TypeField:%s, DefaultType:%s}", im.TypeMapping, im.TypeField, im.DefaultType)
 }
 
 func NewIndexMapping() *IndexMapping {
 	return &IndexMapping{
-		TypeMapping:        make(map[string]*DocumentMapping),
-		DefaultMapping:     NewDocumentMapping(),
-		IdField:            &DEFAULT_ID_FIELD,
-		TypeField:          &DEFAULT_TYPE_FIELD,
-		DefaultType:        &DEFAULT_TYPE,
-		DefaultField:       &DEFAULT_FIELD,
-		ByteArrayConverter: &DEFAULT_TOP_LEVEL_BYTE_ARRAY_CONVERTER,
+		TypeMapping:           make(map[string]*DocumentMapping),
+		DefaultMapping:        NewDocumentMapping(),
+		TypeField:             DefaultTypeField,
+		DefaultType:           DefaultType,
+		DefaultAnalyzer:       DefaultAnalyzer,
+		DefaultDateTimeParser: DefaultDateTimeParser,
+		DefaultField:          DefaultField,
+		ByteArrayConverter:    DefaultByteArrayConverter,
+		cache:                 registry.NewCache(),
 	}
+}
+
+// Validate will walk the entire structure ensuring the following
+// explicitly named and default analyzers can be built
+// explicitly named and default date parsers can be built
+// field type names are valid
+func (im *IndexMapping) Validate() error {
+	_, err := im.cache.AnalyzerNamed(im.DefaultAnalyzer)
+	if err != nil {
+		return err
+	}
+	_, err = im.cache.DateTimeParserNamed(im.DefaultDateTimeParser)
+	if err != nil {
+		return err
+	}
+	err = im.DefaultMapping.Validate(im.cache)
+	if err != nil {
+		return err
+	}
+	for _, docMapping := range im.TypeMapping {
+		err = docMapping.Validate(im.cache)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (im *IndexMapping) AddDocumentMapping(doctype string, dm *DocumentMapping) *IndexMapping {
@@ -60,18 +92,33 @@ func (im *IndexMapping) AddDocumentMapping(doctype string, dm *DocumentMapping) 
 	return im
 }
 
+func (im *IndexMapping) SetDefaultMapping(defaultMapping *DocumentMapping) *IndexMapping {
+	im.DefaultMapping = defaultMapping
+	return im
+}
+
 func (im *IndexMapping) SetTypeField(typeField string) *IndexMapping {
-	im.TypeField = &typeField
+	im.TypeField = typeField
+	return im
+}
+
+func (im *IndexMapping) SetDefaultType(defaultType string) *IndexMapping {
+	im.DefaultType = defaultType
 	return im
 }
 
 func (im *IndexMapping) SetDefaultAnalyzer(analyzer string) *IndexMapping {
-	im.DefaultAnalyzer = &analyzer
+	im.DefaultAnalyzer = analyzer
 	return im
 }
 
 func (im *IndexMapping) SetDefaultField(field string) *IndexMapping {
-	im.DefaultField = &field
+	im.DefaultField = field
+	return im
+}
+
+func (im *IndexMapping) SetByteArrayConverter(byteArrayConverter string) *IndexMapping {
+	im.ByteArrayConverter = byteArrayConverter
 	return im
 }
 
@@ -85,51 +132,55 @@ func (im *IndexMapping) MappingForType(docType string) *DocumentMapping {
 
 func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 	var tmp struct {
-		TypeMapping        map[string]*DocumentMapping `json:"types"`
-		DefaultMapping     *DocumentMapping            `json:"default_mapping"`
-		IdField            *string                     `json:"id_field"`
-		TypeField          *string                     `json:"type_field"`
-		DefaultType        *string                     `json:"default_type"`
-		DefaultAnalyzer    *string                     `json:"default_analyzer"`
-		DefaultField       *string                     `json:"default_field"`
-		ByteArrayConverter *string                     `json:"byte_array_converter"`
+		TypeMapping           map[string]*DocumentMapping `json:"types"`
+		DefaultMapping        *DocumentMapping            `json:"default_mapping"`
+		TypeField             string                      `json:"type_field"`
+		DefaultType           string                      `json:"default_type"`
+		DefaultAnalyzer       string                      `json:"default_analyzer"`
+		DefaultDateTimeParser string                      `json:"default_datetime_parser"`
+		DefaultField          string                      `json:"default_field"`
+		ByteArrayConverter    string                      `json:"byte_array_converter"`
 	}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
 
-	im.IdField = &DEFAULT_ID_FIELD
-	if tmp.IdField != nil {
-		im.IdField = tmp.IdField
-	}
+	im.cache = registry.NewCache()
 
-	im.TypeField = &DEFAULT_TYPE_FIELD
-	if tmp.TypeField != nil {
+	im.TypeField = DefaultTypeField
+	if tmp.TypeField != "" {
 		im.TypeField = tmp.TypeField
 	}
 
-	im.DefaultType = &DEFAULT_TYPE
-	if tmp.DefaultType != nil {
+	im.DefaultType = DefaultType
+	if tmp.DefaultType != "" {
 		im.DefaultType = tmp.DefaultType
+	}
+
+	im.DefaultAnalyzer = DefaultAnalyzer
+	if tmp.DefaultAnalyzer != "" {
+		im.DefaultAnalyzer = tmp.DefaultAnalyzer
+	}
+
+	im.DefaultDateTimeParser = DefaultDateTimeParser
+	if tmp.DefaultDateTimeParser != "" {
+		im.DefaultDateTimeParser = tmp.DefaultDateTimeParser
+	}
+
+	im.DefaultField = DefaultField
+	if tmp.DefaultField != "" {
+		im.DefaultField = tmp.DefaultField
+	}
+
+	im.ByteArrayConverter = DefaultByteArrayConverter
+	if tmp.ByteArrayConverter != "" {
+		im.ByteArrayConverter = tmp.ByteArrayConverter
 	}
 
 	im.DefaultMapping = NewDocumentMapping()
 	if tmp.DefaultMapping != nil {
 		im.DefaultMapping = tmp.DefaultMapping
-	}
-
-	if tmp.DefaultAnalyzer != nil {
-		im.DefaultAnalyzer = tmp.DefaultAnalyzer
-	}
-
-	im.DefaultField = &DEFAULT_FIELD
-	if tmp.DefaultField != nil {
-		im.DefaultField = tmp.DefaultField
-	}
-	im.ByteArrayConverter = &DEFAULT_TOP_LEVEL_BYTE_ARRAY_CONVERTER
-	if tmp.ByteArrayConverter != nil {
-		im.ByteArrayConverter = tmp.ByteArrayConverter
 	}
 
 	im.TypeMapping = make(map[string]*DocumentMapping, len(tmp.TypeMapping))
@@ -139,34 +190,27 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (im *IndexMapping) determineType(data interface{}) (string, bool) {
+func (im *IndexMapping) determineType(data interface{}) string {
 	// first see if the object implements Identifier
 	classifier, ok := data.(Classifier)
 	if ok {
-		return classifier.Type(), true
+		return classifier.Type()
 	}
 
 	// now see if we can find type using the mapping
-	if im.TypeField != nil {
-		typ, ok := mustString(lookupPropertyPath(data, *im.TypeField))
-		if ok {
-			return typ, true
-		}
+	typ, ok := mustString(lookupPropertyPath(data, im.TypeField))
+	if ok {
+		return typ
 	}
 
-	// fall back to default type if there was one
-	if im.DefaultType != nil {
-		return *im.DefaultType, true
-	}
-
-	return "", false
+	return im.DefaultType
 }
 
 func (im *IndexMapping) MapDocument(doc *document.Document, data interface{}) error {
 	// see if the top level object is a byte array, and possibly run through conveter
 	byteArrayData, ok := data.([]byte)
-	if ok && im.ByteArrayConverter != nil {
-		byteArrayConverter, valid := Config.ByteArrayConverters[*im.ByteArrayConverter]
+	if ok {
+		byteArrayConverter, valid := Config.ByteArrayConverters[im.ByteArrayConverter]
 		if valid {
 			convertedData, err := byteArrayConverter.Convert(byteArrayData)
 			if err != nil {
@@ -176,17 +220,14 @@ func (im *IndexMapping) MapDocument(doc *document.Document, data interface{}) er
 		}
 	}
 
-	docType, ok := im.determineType(data)
-	if !ok {
-		return ERROR_NO_TYPE
-	}
+	docType := im.determineType(data)
 	docMapping := im.MappingForType(docType)
 	walkContext := newWalkContext(doc, docMapping)
 	im.walkDocument(data, []string{}, walkContext)
 
 	// see if the _all field was disabled
 	allMapping := docMapping.DocumentMappingForPath("_all")
-	if allMapping == nil || (allMapping.Enabled != nil && *allMapping.Enabled != false) {
+	if allMapping == nil || (allMapping.Enabled != false) {
 		field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS)
 		doc.AddField(field)
 	}
@@ -259,7 +300,7 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 	subDocMapping := context.dm.DocumentMappingForPath(pathString)
 
 	// check tos see if we even need to do further processing
-	if subDocMapping != nil && subDocMapping.Enabled != nil && !*subDocMapping.Enabled {
+	if subDocMapping != nil && !subDocMapping.Enabled {
 		return
 	}
 
@@ -272,28 +313,27 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 			// index by explicit mapping
 			for _, fieldMapping := range subDocMapping.Fields {
 				fieldName := getFieldName(pathString, path, fieldMapping)
+				options := fieldMapping.Options()
 				if *fieldMapping.Type == "text" {
-					options := fieldMapping.Options()
-					analyzer := Config.Analysis.Analyzers[*fieldMapping.Analyzer]
-					if analyzer != nil {
-						field := document.NewTextFieldCustom(fieldName, []byte(propertyValueString), options, analyzer)
-						context.doc.AddField(field)
+					analyzer := im.AnalyzerNamed(*fieldMapping.Analyzer)
+					field := document.NewTextFieldCustom(fieldName, []byte(propertyValueString), options, analyzer)
+					context.doc.AddField(field)
 
-						if fieldMapping.IncludeInAll != nil && !*fieldMapping.IncludeInAll {
-							context.excludedFromAll = append(context.excludedFromAll, fieldName)
-						}
+					if fieldMapping.IncludeInAll != nil && !*fieldMapping.IncludeInAll {
+						context.excludedFromAll = append(context.excludedFromAll, fieldName)
 					}
 				} else if *fieldMapping.Type == "datetime" {
-					options := fieldMapping.Options()
-					dateTimeFormat := *Config.DefaultDateTimeFormat
+					dateTimeFormat := im.DefaultDateTimeParser
 					if fieldMapping.DateFormat != nil {
 						dateTimeFormat = *fieldMapping.DateFormat
 					}
-					dateTimeParser := Config.Analysis.DateTimeParsers[dateTimeFormat]
-					parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
-					if err != nil {
-						field := document.NewDateTimeFieldWithIndexingOptions(fieldName, parsedDateTime, options)
-						context.doc.AddField(field)
+					dateTimeParser := im.DateTimeParserNamed(dateTimeFormat)
+					if dateTimeParser != nil {
+						parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
+						if err != nil {
+							field := document.NewDateTimeFieldWithIndexingOptions(fieldName, parsedDateTime, options)
+							context.doc.AddField(field)
+						}
 					}
 				}
 			}
@@ -301,19 +341,24 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 			// automatic indexing behavior
 
 			// first see if it can be parsed by the default date parser
-			// FIXME add support for index mapping overriding defaults
-			dateTimeParser := Config.Analysis.DateTimeParsers[*Config.DefaultDateTimeFormat]
-			parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
-			if err != nil {
-				// index as plain text
-				options := document.STORE_FIELD | document.INDEX_FIELD | document.INCLUDE_TERM_VECTORS
-				analyzer := im.defaultAnalyzer(context.dm, path)
-				field := document.NewTextFieldCustom(pathString, []byte(propertyValueString), options, analyzer)
-				context.doc.AddField(field)
-			} else {
-				// index as datetime
-				field := document.NewDateTimeField(pathString, parsedDateTime)
-				context.doc.AddField(field)
+			dateTimeParser := im.DateTimeParserNamed(im.DefaultDateTimeParser)
+			if dateTimeParser != nil {
+				parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
+				if err != nil {
+					// index as plain text
+					options := document.STORE_FIELD | document.INDEX_FIELD | document.INCLUDE_TERM_VECTORS
+					analyzerName := context.dm.defaultAnalyzerName(path)
+					if analyzerName == "" {
+						analyzerName = im.DefaultAnalyzer
+					}
+					analyzer := im.AnalyzerNamed(analyzerName)
+					field := document.NewTextFieldCustom(pathString, []byte(propertyValueString), options, analyzer)
+					context.doc.AddField(field)
+				} else {
+					// index as datetime
+					field := document.NewDateTimeField(pathString, parsedDateTime)
+					context.doc.AddField(field)
+				}
 			}
 		}
 	case reflect.Float64:
@@ -361,25 +406,12 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 	}
 }
 
-func (im *IndexMapping) defaultAnalyzer(dm *DocumentMapping, path []string) *analysis.Analyzer {
-	// first see if the document mapping has an analyzer
-	rv := dm.defaultAnalyzer(path)
-	if rv == nil {
-		if im.DefaultAnalyzer != nil {
-			rv = Config.Analysis.Analyzers[*im.DefaultAnalyzer]
-		} else if Config.DefaultAnalyzer != nil {
-			rv = Config.Analysis.Analyzers[*Config.DefaultAnalyzer]
-		}
-	}
-	return rv
-}
-
 // attempts to find the best analyzer to use with only a field name
 // will walk all the document types, look for field mappings at the
 // provided path, if one exists and it has an explicit analyzer
 // that is returned
 // nil should be an acceptable return value meaning we don't know
-func (im *IndexMapping) analyzerForPath(path string) *analysis.Analyzer {
+func (im *IndexMapping) analyzerNameForPath(path string) string {
 
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
@@ -387,25 +419,43 @@ func (im *IndexMapping) analyzerForPath(path string) *analysis.Analyzer {
 		if pathMapping != nil {
 			if len(pathMapping.Fields) > 0 {
 				if pathMapping.Fields[0].Analyzer != nil {
-					return Config.Analysis.Analyzers[*pathMapping.Fields[0].Analyzer]
+					return *pathMapping.Fields[0].Analyzer
 				}
 			}
 		}
 	}
 
 	// next we will try default analyzers for the path
+	pathDecoded := decodePath(path)
 	for _, docMapping := range im.TypeMapping {
-		rv := im.defaultAnalyzer(docMapping, decodePath(path))
-		if rv != nil {
+		rv := docMapping.defaultAnalyzerName(pathDecoded)
+		if rv != "" {
 			return rv
 		}
 	}
 
-	// finally just return the system-wide default analyzer
-	return Config.Analysis.Analyzers[*Config.DefaultAnalyzer]
+	return im.DefaultAnalyzer
 }
 
-func (im *IndexMapping) datetimeParserForPath(path string) analysis.DateTimeParser {
+func (im *IndexMapping) AnalyzerNamed(name string) *analysis.Analyzer {
+	analyzer, err := im.cache.AnalyzerNamed(name)
+	if err != nil {
+		log.Printf("error using analyzer named: %s", name)
+		return nil
+	}
+	return analyzer
+}
+
+func (im *IndexMapping) DateTimeParserNamed(name string) analysis.DateTimeParser {
+	dateTimeParser, err := im.cache.DateTimeParserNamed(name)
+	if err != nil {
+		log.Printf("error using datetime parser named: %s", name)
+		return nil
+	}
+	return dateTimeParser
+}
+
+func (im *IndexMapping) datetimeParserNameForPath(path string) string {
 
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
@@ -413,26 +463,13 @@ func (im *IndexMapping) datetimeParserForPath(path string) analysis.DateTimePars
 		if pathMapping != nil {
 			if len(pathMapping.Fields) > 0 {
 				if pathMapping.Fields[0].Analyzer != nil {
-					return Config.Analysis.DateTimeParsers[*pathMapping.Fields[0].DateFormat]
+					return *pathMapping.Fields[0].Analyzer
 				}
 			}
 		}
 	}
 
-	// next we will try default analyzers for the path
-	// FIXME introduce default date time parsers at mapping leves
-
-	// finally just return the system-wide default analyzer
-	return Config.Analysis.DateTimeParsers[*Config.DefaultDateTimeFormat]
-}
-
-func (im *IndexMapping) defaultField() string {
-	if im.DefaultField != nil {
-		return *im.DefaultField
-	} else if Config.DefaultField != nil {
-		return *Config.DefaultField
-	}
-	return ""
+	return im.DefaultDateTimeParser
 }
 
 func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) string {

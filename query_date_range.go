@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/couchbaselabs/bleve/analysis"
 	"github.com/couchbaselabs/bleve/numeric_util"
 	"github.com/couchbaselabs/bleve/search"
 )
@@ -53,19 +52,20 @@ func (q *DateRangeQuery) SetField(f string) *DateRangeQuery {
 
 func (q *DateRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 
-	var dateTimeParser analysis.DateTimeParser
+	dateTimeParserName := ""
 	if q.DateTimeParser != nil {
-		dateTimeParser = Config.Analysis.DateTimeParsers[*q.DateTimeParser]
+		dateTimeParserName = *q.DateTimeParser
 	} else {
-		dateTimeParser = i.m.datetimeParserForPath(q.FieldVal)
+		dateTimeParserName = i.m.datetimeParserNameForPath(q.FieldVal)
 	}
+	dateTimeParser := i.m.DateTimeParserNamed(dateTimeParserName)
 	if dateTimeParser == nil {
 		return nil, fmt.Errorf("no datetime parser named '%s' registered", *q.DateTimeParser)
 	}
 
 	field := q.FieldVal
 	if q.FieldVal == "" {
-		field = i.m.defaultField()
+		field = i.m.DefaultField
 	}
 
 	// now parse the endpoints

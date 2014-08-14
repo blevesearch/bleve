@@ -12,7 +12,10 @@ import (
 	"unicode/utf8"
 
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
+
+const Name = "length"
 
 type LengthFilter struct {
 	min int
@@ -41,4 +44,24 @@ func (f *LengthFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 	}
 
 	return rv
+}
+
+func LengthFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
+	min := 0
+	max := 0
+
+	minVal, ok := config["min"].(float64)
+	if ok {
+		min = int(minVal)
+	}
+	maxVal, ok := config["max"].(float64)
+	if ok {
+		max = int(maxVal)
+	}
+
+	return NewLengthFilter(min, max), nil
+}
+
+func init() {
+	registry.RegisterTokenFilter(Name, LengthFilterConstructor)
 }

@@ -17,9 +17,15 @@ package unicode_word_boundary
 // #include "unicode/ustring.h"
 import "C"
 
-import "log"
-import "unsafe"
-import "github.com/couchbaselabs/bleve/analysis"
+import (
+	"log"
+	"unsafe"
+
+	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
+)
+
+const Name = "unicode"
 
 type UnicodeWordBoundaryTokenizer struct {
 	locale *C.char
@@ -36,9 +42,7 @@ func NewUnicodeWordBoundaryCustomLocaleTokenizer(locale string) *UnicodeWordBoun
 }
 
 func (t *UnicodeWordBoundaryTokenizer) Tokenize(input []byte) analysis.TokenStream {
-	// var bi *C.UBreakIterator
 	rv := make(analysis.TokenStream, 0)
-	defer C.free(unsafe.Pointer(t.locale))
 
 	if len(input) < 1 {
 		return rv
@@ -51,12 +55,9 @@ func (t *UnicodeWordBoundaryTokenizer) Tokenize(input []byte) analysis.TokenStre
 	var inlen C.int32_t = C.int32_t(len(input))
 	var buflen C.int32_t = C.int32_t(2*len(input) + 1) // worse case each byte becomes 2
 	var stringToExamine []C.UChar = make([]C.UChar, buflen)
-	//log.Printf("new buff is: %v", stringToExamine)
 	var myUnsafePointerToExamine = unsafe.Pointer(&(stringToExamine[0]))
 	var myUCharPointer *C.UChar = (*C.UChar)(myUnsafePointerToExamine)
 	C.u_uastrncpy(myUCharPointer, myCCharPointer, inlen)
-
-	//log.Printf("after copy new buff is: %v", stringToExamine)
 
 	var err C.UErrorCode = C.U_ZERO_ERROR
 	bi := C.ubrk_open(C.UBRK_WORD, t.locale, myUCharPointer, -1, &err)
@@ -112,4 +113,21 @@ func (t *UnicodeWordBoundaryTokenizer) Tokenize(input []byte) analysis.TokenStre
 	}
 
 	return rv
+}
+
+func UnicodeWordBoundaryTokenizerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.Tokenizer, error) {
+	locale := ""
+	localeVal, ok := config["locale"].(string)
+	if ok {
+		locale = localeVal
+	}
+	if locale == "" {
+		return NewUnicodeWordBoundaryTokenizer(), nil
+	} else {
+		return NewUnicodeWordBoundaryCustomLocaleTokenizer(locale), nil
+	}
+}
+
+func init() {
+	registry.RegisterTokenizer(Name, UnicodeWordBoundaryTokenizerConstructor)
 }

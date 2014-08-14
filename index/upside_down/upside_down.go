@@ -786,3 +786,24 @@ func (udc *UpsideDownCouch) Batch(batch index.Batch) error {
 	}
 	return err
 }
+
+func (udc *UpsideDownCouch) SetInternal(key, val []byte) error {
+	internalRow := NewInternalRow(key, val)
+	return udc.store.Set(internalRow.Key(), internalRow.Value())
+}
+
+func (udc *UpsideDownCouch) GetInternal(key []byte) ([]byte, error) {
+	internalRow, err := NewInternalRowKV(key, nil)
+	if err != nil {
+		return nil, err
+	}
+	return udc.store.Get(internalRow.Key())
+}
+
+func (udc *UpsideDownCouch) DeleteInternal(key []byte) error {
+	internalRow, err := NewInternalRowKV(key, nil)
+	if err != nil {
+		return err
+	}
+	return udc.store.Delete(internalRow.Key())
+}

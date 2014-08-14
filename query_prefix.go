@@ -46,7 +46,7 @@ func (q *PrefixQuery) SetField(f string) *PrefixQuery {
 func (q *PrefixQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
-		field = i.m.defaultField()
+		field = i.m.DefaultField
 	}
 	return search.NewTermPrefixSearcher(i.i, q.Prefix, field, q.BoostVal, explain)
 }

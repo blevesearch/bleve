@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/couchbaselabs/bleve/analysis"
 	"github.com/couchbaselabs/bleve/search"
 )
 
@@ -23,9 +24,26 @@ type NumericRange struct {
 }
 
 type DateTimeRange struct {
-	Name  string    `json:"name,omitempty"`
-	Start time.Time `json:"start,omitempty"`
-	End   time.Time `json:"end,omitempty"`
+	Name        string    `json:"name,omitempty"`
+	Start       time.Time `json:"start,omitempty"`
+	End         time.Time `json:"end,omitempty"`
+	startString *string
+	endString   *string
+}
+
+func (dr *DateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) {
+	if dr.Start.IsZero() && dr.startString != nil {
+		start, err := dateTimeParser.ParseDateTime(*dr.startString)
+		if err == nil {
+			dr.Start = start
+		}
+	}
+	if dr.End.IsZero() && dr.endString != nil {
+		end, err := dateTimeParser.ParseDateTime(*dr.endString)
+		if err == nil {
+			dr.End = end
+		}
+	}
 }
 
 func (dr *DateTimeRange) UnmarshalJSON(input []byte) error {
@@ -40,21 +58,12 @@ func (dr *DateTimeRange) UnmarshalJSON(input []byte) error {
 		return err
 	}
 
-	// FIXME allow alternate date parsers
-	dateTimeParser := Config.Analysis.DateTimeParsers[*Config.DefaultDateTimeFormat]
-
 	dr.Name = temp.Name
 	if temp.Start != nil {
-		start, err := dateTimeParser.ParseDateTime(*temp.Start)
-		if err == nil {
-			dr.Start = start
-		}
+		dr.startString = temp.Start
 	}
 	if temp.End != nil {
-		end, err := dateTimeParser.ParseDateTime(*temp.End)
-		if err == nil {
-			dr.End = end
-		}
+		dr.endString = temp.End
 	}
 
 	return nil

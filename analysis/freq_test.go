@@ -162,6 +162,5 @@ func TestTokenFrequenciesMergeAllLeftEmpty(t *testing.T) {
 	result := tf1.MergeAll("tf2", tf2)
 	if !reflect.DeepEqual(result, expectedResult) {
 		t.Errorf("expected %#v, got %#v", expectedResult, result)
-		//t.Logf("%#v", tf1[0])
 	}
 }

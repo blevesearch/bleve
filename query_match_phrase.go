@@ -11,7 +11,6 @@ package bleve
 import (
 	"fmt"
 
-	"github.com/couchbaselabs/bleve/analysis"
 	"github.com/couchbaselabs/bleve/search"
 )
 
@@ -49,19 +48,20 @@ func (q *MatchPhraseQuery) SetField(f string) *MatchPhraseQuery {
 
 func (q *MatchPhraseQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 
-	var analyzer *analysis.Analyzer
+	analyzerName := ""
 	if q.Analyzer != "" {
-		analyzer = Config.Analysis.Analyzers[q.Analyzer]
+		analyzerName = q.Analyzer
 	} else {
-		analyzer = i.m.analyzerForPath(q.FieldVal)
+		analyzerName = i.m.analyzerNameForPath(q.FieldVal)
 	}
+	analyzer := i.m.AnalyzerNamed(analyzerName)
 	if analyzer == nil {
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
 	}
 
 	field := q.FieldVal
 	if q.FieldVal == "" {
-		field = i.m.defaultField()
+		field = i.m.DefaultField
 	}
 
 	tokens := analyzer.Analyze([]byte(q.MatchPhrase))

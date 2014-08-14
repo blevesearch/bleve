@@ -10,8 +10,14 @@ package regexp_char_filter
 
 import (
 	"bytes"
+	"fmt"
 	"regexp"
+
+	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/registry"
 )
+
+const Name = "regexp"
 
 type RegexpCharFilter struct {
 	r           *regexp.Regexp
@@ -27,4 +33,25 @@ func NewRegexpCharFilter(r *regexp.Regexp, replacement []byte) *RegexpCharFilter
 
 func (s *RegexpCharFilter) Filter(input []byte) []byte {
 	return s.r.ReplaceAllFunc(input, func(in []byte) []byte { return bytes.Repeat(s.replacement, len(in)) })
+}
+
+func RegexpCharFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.CharFilter, error) {
+	regexpStr, ok := config["regexp"].(string)
+	if !ok {
+		return nil, fmt.Errorf("must specify regexp")
+	}
+	r, err := regexp.Compile(regexpStr)
+	if err != nil {
+		return nil, fmt.Errorf("unable to build regexp char filter: %v", err)
+	}
+	replaceBytes := []byte(" ")
+	replaceStr, ok := config["replace"].(string)
+	if ok {
+		replaceBytes = []byte(replaceStr)
+	}
+	return NewRegexpCharFilter(r, replaceBytes), nil
+}
+
+func init() {
+	registry.RegisterCharFilter(Name, RegexpCharFilterConstructor)
 }

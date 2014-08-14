@@ -49,7 +49,7 @@ func TestStemmerFilter(t *testing.T) {
 		},
 	}
 
-	filter, err := NewStemmerFilter("english")
+	filter, err := NewStemmerFilter("en")
 	if err != nil {
 		t.Fatal(err)
 	}
