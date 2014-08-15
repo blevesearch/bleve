@@ -10,8 +10,6 @@ package bleve
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
 
 	"github.com/couchbaselabs/bleve/search"
 )
@@ -35,25 +33,32 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
 		return &rv, nil
 	}
 	_, isMatchQuery := tmp["match"]
 	if isMatchQuery {
-		log.Printf("detected match query")
 		var rv MatchQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
 		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
 		return &rv, nil
 	}
 	_, isMatchPhraseQuery := tmp["match_phrase"]
 	if isMatchPhraseQuery {
-		log.Printf("detected match phrase query")
 		var rv MatchPhraseQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
+		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
 		}
 		return &rv, nil
 	}
@@ -66,6 +71,9 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
 		return &rv, nil
 	}
 	_, hasTerms := tmp["terms"]
@@ -75,6 +83,14 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
+		for _, tq := range rv.Terms {
+			if tq.Boost() == 0 {
+				tq.SetBoost(1)
+			}
+		}
 		return &rv, nil
 	}
 	_, hasSyntaxQuery := tmp["query"]
@@ -83,6 +99,9 @@ func ParseQuery(input []byte) (Query, error) {
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
+		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
 		}
 		return &rv, nil
 	}
@@ -94,6 +113,9 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
 		return &rv, nil
 	}
 	_, hasStart := tmp["start"]
@@ -104,6 +126,9 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
 		return &rv, nil
 	}
 	_, hasPrefix := tmp["prefix"]
@@ -113,7 +138,10 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
 		return &rv, nil
 	}
-	return nil, fmt.Errorf("Unrecognized query")
+	return nil, ERROR_UNKNOWN_QUERY_TYPE
 }

@@ -9,8 +9,6 @@
 package bleve
 
 import (
-	"fmt"
-
 	"github.com/couchbaselabs/bleve/search"
 )
 
@@ -53,8 +51,8 @@ func (q *PhraseQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, err
 }
 
 func (q *PhraseQuery) Validate() error {
-	if q.Terms == nil {
-		return fmt.Errorf("Phrase query must contain at least one term")
+	if len(q.Terms) < 1 {
+		return ERROR_PHRASE_QUERY_NO_TERMS
 	}
 	return nil
 }

@@ -10,7 +10,6 @@ package bleve
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/couchbaselabs/bleve/search"
 )
@@ -65,7 +64,7 @@ func (q *DisjunctionQuery) Searcher(i *indexImpl, explain bool) (*search.Disjunc
 
 func (q *DisjunctionQuery) Validate() error {
 	if int(q.MinVal) > len(q.Disjuncts) {
-		return fmt.Errorf("Minimum clauses in disjunction exceeds total number of clauses")
+		return ERROR_DISJUNCTION_FEWER_THAN_MIN_CLAUSES
 	}
 	return nil
 }
@@ -89,6 +88,9 @@ func (q *DisjunctionQuery) UnmarshalJSON(data []byte) error {
 		q.Disjuncts[i] = query
 	}
 	q.BoostVal = tmp.BoostVal
+	if q.BoostVal == 0 {
+		q.BoostVal = 1
+	}
 	q.MinVal = tmp.MinVal
 	return nil
 }

@@ -74,5 +74,8 @@ func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 		q.Conjuncts[i] = query
 	}
 	q.BoostVal = tmp.BoostVal
+	if q.BoostVal == 0 {
+		q.BoostVal = 1
+	}
 	return nil
 }

@@ -9,8 +9,6 @@
 package bleve
 
 import (
-	"fmt"
-
 	"github.com/couchbaselabs/bleve/search"
 )
 
@@ -70,11 +68,29 @@ func (q *BooleanQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, er
 }
 
 func (q *BooleanQuery) Validate() error {
+	if q.Must != nil {
+		err := q.Must.Validate()
+		if err != nil {
+			return err
+		}
+	}
+	if q.Should != nil {
+		err := q.Should.Validate()
+		if err != nil {
+			return err
+		}
+	}
+	if q.MustNot != nil {
+		err := q.MustNot.Validate()
+		if err != nil {
+			return err
+		}
+	}
 	if q.Must == nil && q.Should == nil {
-		return fmt.Errorf("Boolean query must contain at least one MUST or SHOULD clause")
+		return ERROR_BOOLEAN_QUERY_NEEDS_MUST_OR_SHOULD
 	}
 	if q.Must != nil && len(q.Must.Conjuncts) == 0 && q.Should != nil && len(q.Should.Disjuncts) == 0 {
-		return fmt.Errorf("Boolean query must contain at least one MUST or SHOULD clause")
+		return ERROR_BOOLEAN_QUERY_NEEDS_MUST_OR_SHOULD
 	}
 	return nil
 }

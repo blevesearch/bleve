@@ -9,8 +9,6 @@
 package bleve
 
 import (
-	"fmt"
-
 	"github.com/couchbaselabs/bleve/search"
 )
 
@@ -57,7 +55,7 @@ func (q *NumericRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searche
 
 func (q *NumericRangeQuery) Validate() error {
 	if q.Min == nil && q.Min == q.Max {
-		return fmt.Errorf("must specify min or max")
+		return ERROR_NUMERIC_QUERY_NO_BOUNDS
 	}
 	return nil
 }
