@@ -40,9 +40,9 @@ var mappingSource = []byte(`{
     "default_type": "_default"
 }`)
 
-var nameField = NewFieldMapping("name", "text", "standard", true, true, true, true)
-var nameMapping = NewDocumentMapping().AddFieldMapping(nameField)
-var beerMapping = NewDocumentMapping().AddSubDocumentMapping("name", nameMapping)
+var beerNameField = NewFieldMapping("name", "text", "standard", true, true, true, true)
+var beerNameMapping = NewDocumentMapping().AddFieldMapping(beerNameField)
+var beerMapping = NewDocumentMapping().AddSubDocumentMapping("name", beerNameMapping)
 var breweryMapping = NewDocumentMapping()
 var mappingObject = NewIndexMapping().
 	AddDocumentMapping("beer", beerMapping).

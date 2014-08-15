@@ -11,6 +11,7 @@ package bleve
 import (
 	"os"
 	"testing"
+	"time"
 )
 
 type Address struct {
@@ -23,6 +24,9 @@ type Address struct {
 type Person struct {
 	Identifier string     `json:"id"`
 	Name       string     `json:"name"`
+	Age        float64    `json:"age"`
+	Title      string     `json:"title"`
+	Birthday   time.Time  `json:"birthday"`
 	Address    *Address   `json:"address"`
 	Hideouts   []*Address `json:"hideouts"`
 	Tags       []string   `json:"tags"`
@@ -32,55 +36,190 @@ func (p *Person) Type() string {
 	return "person"
 }
 
+var nameMapping = NewDocumentMapping().
+	AddFieldMapping(NewFieldMapping("", "text", "en", true, true, true, true))
+
+var tagsMapping = NewDocumentMapping().
+	AddFieldMapping(NewFieldMapping("", "text", "standard", true, true, true, false))
+var personMapping = NewDocumentMapping().
+	AddSubDocumentMapping("name", nameMapping).
+	AddSubDocumentMapping("id", NewDocumentDisabledMapping()).
+	AddSubDocumentMapping("tags", tagsMapping)
+
+var mapping = NewIndexMapping().
+	AddDocumentMapping("person", personMapping)
+
+var people = []*Person{
+	&Person{
+		Identifier: "a",
+		Name:       "marty",
+		Age:        19,
+		Birthday:   time.Unix(1000000000, 0),
+		Title:      "mista",
+	},
+	&Person{
+		Identifier: "b",
+		Name:       "steve has a long name",
+		Age:        27,
+		Birthday:   time.Unix(1000000000, 0),
+		Title:      "missess",
+	},
+	&Person{
+		Identifier: "c",
+		Name:       "bob walks home",
+		Age:        64,
+		Birthday:   time.Unix(1400000000, 0),
+		Title:      "masta",
+	},
+	&Person{
+		Identifier: "d",
+		Name:       "bobbleheaded wings top the phone",
+		Age:        72,
+		Birthday:   time.Unix(1400000000, 0),
+		Title:      "mizz",
+	},
+}
+
 // FIXME needs more assertions
 func TestIndex(t *testing.T) {
 	defer os.RemoveAll("testidx")
 
-	nameMapping := NewDocumentMapping().
-		AddFieldMapping(NewFieldMapping("", "text", "standard", true, true, true, true))
-
-	tagsMapping := NewDocumentMapping().
-		AddFieldMapping(NewFieldMapping("", "text", "standard", true, true, true, false))
-	personMapping := NewDocumentMapping().
-		AddSubDocumentMapping("name", nameMapping).
-		AddSubDocumentMapping("id", NewDocumentDisabledMapping()).
-		AddSubDocumentMapping("tags", tagsMapping)
-
-	mapping := NewIndexMapping().
-		AddDocumentMapping("person", personMapping)
 	index, err := Open("testidx", mapping)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	obj := Person{
-		Identifier: "a",
-		Name:       "marty",
-		Address: &Address{
-			Street: "123 Sesame St.",
-			City:   "Garden",
-			State:  "MIND",
-			Zip:    "12345",
-		},
-		Hideouts: []*Address{
-			&Address{
-				Street: "999 Gopher St.",
-				City:   "Denver",
-				State:  "CO",
-				Zip:    "86753",
-			},
-			&Address{
-				Street: "88 Rusty Ln.",
-				City:   "Amsterdam",
-				State:  "CA",
-				Zip:    "09090",
-			},
-		},
-		Tags: []string{"amped", "bogus", "gnarley", "tubed"},
+	// index all the people
+	for _, person := range people {
+		err = index.Index(person.Identifier, person)
+		if err != nil {
+			t.Error(err)
+		}
 	}
 
-	err = index.Index(obj.Identifier, &obj)
+	termQuery := NewTermQuery("marti").SetField("name")
+	searchRequest := NewSearchRequest(termQuery)
+	searchResult, err := index.Search(searchRequest)
 	if err != nil {
 		t.Error(err)
+	}
+	if searchResult.Total != uint64(1) {
+		t.Errorf("expected 1 total hit for term query, got %d", searchResult.Total)
+	} else {
+		if searchResult.Hits[0].ID != "a" {
+			t.Errorf("expected top hit id 'a', got '%s'", searchResult.Hits[0].ID)
+		}
+	}
+
+	termQuery = NewTermQuery("noone").SetField("name")
+	searchRequest = NewSearchRequest(termQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	if searchResult.Total != uint64(0) {
+		t.Errorf("expected 0 total hits")
+	}
+
+	matchPhraseQuery := NewMatchPhraseQuery("long name")
+	searchRequest = NewSearchRequest(matchPhraseQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	if searchResult.Total != uint64(1) {
+		t.Errorf("expected 1 total hit for phrase query, got %d", searchResult.Total)
+	} else {
+		if searchResult.Hits[0].ID != "b" {
+			t.Errorf("expected top hit id 'b', got '%s'", searchResult.Hits[0].ID)
+		}
+	}
+
+	termQuery = NewTermQuery("walking").SetField("name")
+	searchRequest = NewSearchRequest(termQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	if searchResult.Total != uint64(0) {
+		t.Errorf("expected 0 total hits")
+	}
+
+	matchQuery := NewMatchQuery("walking").SetField("name")
+	searchRequest = NewSearchRequest(matchQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	if searchResult.Total != uint64(1) {
+		t.Errorf("expected 1 total hit for match query, got %d", searchResult.Total)
+	} else {
+		if searchResult.Hits[0].ID != "c" {
+			t.Errorf("expected top hit id 'c', got '%s'", searchResult.Hits[0].ID)
+		}
+	}
+
+	prefixQuery := NewPrefixQuery("bobble").SetField("name")
+	searchRequest = NewSearchRequest(prefixQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	if searchResult.Total != uint64(1) {
+		t.Errorf("expected 1 total hit for prefix query, got %d", searchResult.Total)
+	} else {
+		if searchResult.Hits[0].ID != "d" {
+			t.Errorf("expected top hit id 'd', got '%s'", searchResult.Hits[0].ID)
+		}
+	}
+
+	syntaxQuery := NewSyntaxQuery("+name:phone")
+	searchRequest = NewSearchRequest(syntaxQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	if searchResult.Total != uint64(1) {
+		t.Errorf("expected 1 total hit for syntax query, got %d", searchResult.Total)
+	} else {
+		if searchResult.Hits[0].ID != "d" {
+			t.Errorf("expected top hit id 'd', got '%s'", searchResult.Hits[0].ID)
+		}
+	}
+
+	maxAge := 30.0
+	numericRangeQuery := NewNumericRangeQuery(nil, &maxAge).SetField("age")
+	searchRequest = NewSearchRequest(numericRangeQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	if searchResult.Total != uint64(2) {
+		t.Errorf("expected 2 total hits for numeric range query, got %d", searchResult.Total)
+	} else {
+		if searchResult.Hits[0].ID != "b" {
+			t.Errorf("expected top hit id 'b', got '%s'", searchResult.Hits[0].ID)
+		}
+		if searchResult.Hits[1].ID != "a" {
+			t.Errorf("expected next hit id 'a', got '%s'", searchResult.Hits[1].ID)
+		}
+	}
+
+	startDate = "2010-01-01"
+	dateRangeQuery := NewDateRangeQuery(&startDate, nil).SetField("birthday")
+	searchRequest = NewSearchRequest(dateRangeQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	if searchResult.Total != uint64(2) {
+		t.Errorf("expected 2 total hits for numeric range query, got %d", searchResult.Total)
+	} else {
+		if searchResult.Hits[0].ID != "d" {
+			t.Errorf("expected top hit id 'd', got '%s'", searchResult.Hits[0].ID)
+		}
+		if searchResult.Hits[1].ID != "c" {
+			t.Errorf("expected next hit id 'c', got '%s'", searchResult.Hits[1].ID)
+		}
 	}
 }

@@ -288,7 +288,7 @@ func (im *IndexMapping) walkDocument(data interface{}, path []string, context *w
 		}
 	case reflect.Ptr:
 		ptrElem := val.Elem()
-		if ptrElem.CanInterface() {
+		if ptrElem.IsValid() && ptrElem.CanInterface() {
 			im.walkDocument(ptrElem.Interface(), path, context)
 		}
 	}
