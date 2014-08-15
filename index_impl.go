@@ -210,19 +210,19 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 	}, nil
 }
 
-func (i *indexImpl) Dump() {
-	i.i.Dump()
+func (i *indexImpl) DumpAll() chan interface{} {
+	return i.i.DumpAll()
 }
 
 func (i *indexImpl) Fields() ([]string, error) {
 	return i.i.Fields()
 }
 
-func (i *indexImpl) DumpFields() {
-	i.i.DumpFields()
+func (i *indexImpl) DumpFields() chan interface{} {
+	return i.i.DumpFields()
 }
 
-func (i *indexImpl) DumpDoc(id string) ([]interface{}, error) {
+func (i *indexImpl) DumpDoc(id string) chan interface{} {
 	return i.i.DumpDoc(id)
 }
 

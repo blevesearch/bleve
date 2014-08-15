@@ -44,21 +44,21 @@ func (h *DebugDocumentHandler) ServeHTTP(w http.ResponseWriter, req *http.Reques
 
 	// find the docID
 	docID := mux.Vars(req)["docID"]
-	rows, err := index.DumpDoc(docID)
-	if err != nil {
-		showError(w, req, fmt.Sprintf("error debugging document: %v", err), 500)
-		return
-	}
+
 	rv := make([]interface{}, 0)
-	for _, row := range rows {
-		udcRow, ok := row.(upside_down.UpsideDownCouchRow)
-		if ok {
+	rowChan := index.DumpDoc(docID)
+	for row := range rowChan {
+		switch row := row.(type) {
+		case error:
+			showError(w, req, fmt.Sprintf("error debugging document: %v", row), 500)
+			return
+		case upside_down.UpsideDownCouchRow:
 			tmp := struct {
 				Key []byte `json:"key"`
 				Val []byte `json:"val"`
 			}{
-				Key: udcRow.Key(),
-				Val: udcRow.Value(),
+				Key: row.Key(),
+				Val: row.Value(),
 			}
 			rv = append(rv, tmp)
 		}

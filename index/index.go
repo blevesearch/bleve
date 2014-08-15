@@ -36,9 +36,9 @@ type Index interface {
 	GetInternal(key []byte) ([]byte, error)
 	DeleteInternal(key []byte) error
 
-	Dump()
-	DumpDoc(id string) ([]interface{}, error)
-	DumpFields()
+	DumpAll() chan interface{}
+	DumpDoc(id string) chan interface{}
+	DumpFields() chan interface{}
 }
 
 type FieldTerms map[string][]string

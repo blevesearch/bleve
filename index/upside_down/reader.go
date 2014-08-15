@@ -155,7 +155,7 @@ func (r *UpsideDownCouchDocIdReader) Advance(docId string) (string, error) {
 	key, val, valid := r.iterator.Current()
 	if valid {
 		bier := NewBackIndexRow(r.end, nil, nil)
-		if bytes.Compare(key, bier.Key()) < 0 {
+		if bytes.Compare(key, bier.Key()) > 0 {
 			// end of the line
 			return "", nil
 		}

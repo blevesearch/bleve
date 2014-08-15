@@ -804,7 +804,6 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []byte("test"), document.INDEX_FIELD|document.STORE_FIELD|document.INCLUDE_TERM_VECTORS))
 	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []byte("mister"), document.INDEX_FIELD|document.STORE_FIELD|document.INCLUDE_TERM_VECTORS))
-	doc.AddField(document.NewCompositeFieldWithIndexingOptions("_all", true, nil, nil, document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -817,7 +816,6 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 	expectedFieldTerms := index.FieldTerms{
 		"name":  []string{"test"},
 		"title": []string{"mister"},
-		"_all":  []string{"test", "mister"},
 	}
 	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
 		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)

@@ -39,9 +39,9 @@ type Index interface {
 
 	Fields() ([]string, error)
 
-	Dump()
-	DumpDoc(id string) ([]interface{}, error)
-	DumpFields()
+	DumpAll() chan interface{}
+	DumpDoc(id string) chan interface{}
+	DumpFields() chan interface{}
 
 	Close()
 }

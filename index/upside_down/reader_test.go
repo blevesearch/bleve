@@ -194,6 +194,7 @@ func TestIndexDocIdReader(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error accessing doc id reader: %v", err)
 	}
+	defer reader.Close()
 
 	id, err := reader.Next()
 	count := uint64(0)
@@ -203,5 +204,28 @@ func TestIndexDocIdReader(t *testing.T) {
 	}
 	if count != expectedCount {
 		t.Errorf("expected %d, got %d", expectedCount, count)
+	}
+
+	// try it again, but jump to the second doc this time
+	reader, err = idx.DocIdReader("", "")
+	if err != nil {
+		t.Errorf("Error accessing doc id reader: %v", err)
+	}
+	defer reader.Close()
+
+	id, err = reader.Advance("2")
+	if err != nil {
+		t.Error(err)
+	}
+	if id != "2" {
+		t.Errorf("expected to find id '2', got '%s'", id)
+	}
+
+	id, err = reader.Advance("3")
+	if err != nil {
+		t.Error(err)
+	}
+	if id != "" {
+		t.Errorf("expected to find id '', got '%s'", id)
 	}
 }

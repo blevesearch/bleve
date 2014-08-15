@@ -10,14 +10,17 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 
 	"github.com/couchbaselabs/bleve"
+	"github.com/couchbaselabs/bleve/index/upside_down"
 )
 
 var indexDir = flag.String("indexDir", "index", "index directory")
 
 var fieldsOnly = flag.Bool("fields", false, "fields only")
+var docId = flag.String("docId", "", "docId to dump")
 
 func main() {
 	flag.Parse()
@@ -29,9 +32,22 @@ func main() {
 	}
 	defer index.Close()
 
-	if !*fieldsOnly {
-		index.Dump()
+	var dumpChan chan interface{}
+	if *docId != "" {
+		dumpChan = index.DumpDoc(*docId)
+	} else if *fieldsOnly {
+		dumpChan = index.DumpFields()
 	} else {
-		index.DumpFields()
+		dumpChan = index.DumpAll()
+	}
+
+	for rowOrErr := range dumpChan {
+		switch rowOrErr := rowOrErr.(type) {
+		case error:
+			log.Printf("error dumping: %v", rowOrErr)
+		case upside_down.UpsideDownCouchRow:
+			fmt.Printf("%v\n", rowOrErr)
+			fmt.Printf("Key:   % -100x\nValue: % -100x\n\n", rowOrErr.Key(), rowOrErr.Value())
+		}
 	}
 }

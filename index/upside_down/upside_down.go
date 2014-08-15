@@ -12,10 +12,8 @@ import (
 	"bytes"
 	"fmt"
 	"math"
-	"sort"
 
 	"github.com/couchbaselabs/bleve/analysis"
-
 	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index"
 	"github.com/couchbaselabs/bleve/index/store"
@@ -714,90 +712,4 @@ func (udc *UpsideDownCouch) GetInternal(key []byte) ([]byte, error) {
 func (udc *UpsideDownCouch) DeleteInternal(key []byte) error {
 	internalRow := NewInternalRow(key, nil)
 	return udc.store.Delete(internalRow.Key())
-}
-
-func (udc *UpsideDownCouch) Dump() {
-	it := udc.store.Iterator([]byte{0})
-	defer it.Close()
-	key, val, valid := it.Current()
-	for valid {
-
-		row, err := ParseFromKeyValue(key, val)
-		if err != nil {
-			fmt.Printf("error parsing key/value: %v", err)
-			return
-		}
-		if row != nil {
-			fmt.Printf("%v\n", row)
-			fmt.Printf("Key:   % -100x\nValue: % -100x\n\n", key, val)
-		}
-
-		it.Next()
-		key, val, valid = it.Current()
-	}
-}
-
-func (udc *UpsideDownCouch) DumpFields() {
-	it := udc.store.Iterator([]byte{'f'})
-	defer it.Close()
-	key, val, valid := it.Current()
-	for valid {
-		if !bytes.HasPrefix(key, []byte{'f'}) {
-			break
-		}
-
-		row, err := ParseFromKeyValue(key, val)
-		if err != nil {
-			fmt.Printf("error parsing key/value: %v", err)
-			return
-		}
-		if row != nil {
-			fmt.Printf("%v\n", row)
-			fmt.Printf("Key:   % -100x\nValue: % -100x\n\n", key, val)
-		}
-
-		it.Next()
-		key, val, valid = it.Current()
-	}
-}
-
-type keyset [][]byte
-
-func (k keyset) Len() int           { return len(k) }
-func (k keyset) Swap(i, j int)      { k[i], k[j] = k[j], k[i] }
-func (k keyset) Less(i, j int) bool { return bytes.Compare(k[i], k[j]) < 0 }
-
-// DumpDoc returns all rows in the index related to this doc id
-func (udc *UpsideDownCouch) DumpDoc(id string) ([]interface{}, error) {
-	rv := make([]interface{}, 0)
-	back, err := udc.backIndexRowForDoc(id)
-	if err != nil {
-		return nil, err
-	}
-	keys := make(keyset, 0)
-	for _, stored := range back.storedFields {
-		sr := NewStoredRow(id, stored, 'x', []byte{})
-		key := sr.Key()
-		keys = append(keys, key)
-	}
-	for _, entry := range back.entries {
-		tfr := NewTermFrequencyRow(entry.term, entry.field, id, 0, 0)
-		key := tfr.Key()
-		keys = append(keys, key)
-	}
-	sort.Sort(keys)
-
-	for _, key := range keys {
-		value, err := udc.store.Get(key)
-		if err != nil {
-			return nil, err
-		}
-		row, err := ParseFromKeyValue(key, value)
-		if err != nil {
-			return nil, err
-		}
-		rv = append(rv, row)
-	}
-
-	return rv, nil
 }
