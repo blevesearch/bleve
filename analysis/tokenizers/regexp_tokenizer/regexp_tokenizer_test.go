@@ -43,6 +43,10 @@ func TestBoundary(t *testing.T) {
 				},
 			},
 		},
+		{
+			[]byte(""),
+			analysis.TokenStream{},
+		},
 	}
 
 	for _, test := range tests {
