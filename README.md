@@ -6,10 +6,11 @@ modern text indexing in go
 * Index any go data structure (including JSON)
 * Intelligent defaults backed up by powerful configuration
 * Supported field types:
-    * Text
+    * Text, Numeric, Date
 * Supported query types:
     * Term, Phrase, Match, Match Phrase
     * Conjunction, Disjunction, Boolean
+    * Numeric Range, Date Range
     * Simple query syntax for human entry
 * Search result match highlighting
 
@@ -22,7 +23,7 @@ modern text indexing in go
 
 		mapping := bleve.NewIndexMapping()
 		index, _ := bleve.Open("example.bleve", mapping)
-		index.IndexId(message)
+		index.Index(message)
 
 ## Querying
 
