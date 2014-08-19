@@ -54,9 +54,9 @@ var people = []*Person{
 		Identifier: "a",
 		Name:       "marty",
 		Age:        19,
-		Birthday:   time.Unix(1000000000, 0),
-		Title:      "mista",
-		Tags:       []string{"gopher", "belieber"},
+		// has no birthday set to test handling of zero time
+		Title: "mista",
+		Tags:  []string{"gopher", "belieber"},
 	},
 	&Person{
 		Identifier: "b",
@@ -221,6 +221,22 @@ func TestIndex(t *testing.T) {
 		}
 		if searchResult.Hits[1].ID != "c" {
 			t.Errorf("expected next hit id 'c', got '%s'", searchResult.Hits[1].ID)
+		}
+	}
+
+	// test that 0 time doesn't get indexed
+	endDate = "2010-01-01"
+	dateRangeQuery = NewDateRangeQuery(nil, &endDate).SetField("birthday")
+	searchRequest = NewSearchRequest(dateRangeQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	if searchResult.Total != uint64(1) {
+		t.Errorf("expected 1 total hit for numeric range query, got %d", searchResult.Total)
+	} else {
+		if searchResult.Hits[0].ID != "b" {
+			t.Errorf("expected top hit id 'b', got '%s'", searchResult.Hits[0].ID)
 		}
 	}
 

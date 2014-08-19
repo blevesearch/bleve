@@ -331,8 +331,12 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, ind
 					if dateTimeParser != nil {
 						parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
 						if err != nil {
-							field := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, parsedDateTime, options)
-							context.doc.AddField(field)
+							field, err := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, parsedDateTime, options)
+							if err == nil {
+								context.doc.AddField(field)
+							} else {
+								log.Printf("could not build date %v", err)
+							}
 						}
 					}
 				}
@@ -356,8 +360,12 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, ind
 					context.doc.AddField(field)
 				} else {
 					// index as datetime
-					field := document.NewDateTimeField(pathString, indexes, parsedDateTime)
-					context.doc.AddField(field)
+					field, err := document.NewDateTimeField(pathString, indexes, parsedDateTime)
+					if err == nil {
+						context.doc.AddField(field)
+					} else {
+						log.Printf("could not build date %v", err)
+					}
 				}
 			}
 		}
@@ -388,16 +396,23 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, ind
 					fieldName := getFieldName(pathString, path, fieldMapping)
 					if *fieldMapping.Type == "datetime" {
 						options := fieldMapping.Options()
-						field := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, property, options)
-						context.doc.AddField(field)
+						field, err := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, property, options)
+						if err == nil {
+							context.doc.AddField(field)
+						} else {
+							log.Printf("could not build date %v", err)
+						}
 					}
 				}
 			} else {
 				// automatic indexing behavior
-				field := document.NewDateTimeField(pathString, indexes, property)
-				context.doc.AddField(field)
+				field, err := document.NewDateTimeField(pathString, indexes, property)
+				if err == nil {
+					context.doc.AddField(field)
+				} else {
+					log.Printf("could not build date %v", err)
+				}
 			}
-
 		default:
 			im.walkDocument(property, path, indexes, context)
 		}

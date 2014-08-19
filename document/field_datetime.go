@@ -10,6 +10,7 @@ package document
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/couchbaselabs/bleve/analysis"
@@ -17,8 +18,10 @@ import (
 )
 
 const DEFAULT_DATETIME_INDEXING_OPTIONS = STORE_FIELD | INDEX_FIELD
-
 const DEFAULT_DATETIME_PRECISION_STEP uint = 4
+
+var MinTimeRepresentable = time.Unix(0, math.MinInt64)
+var MaxTimeRepresentable = time.Unix(0, math.MaxInt64)
 
 type DateTimeField struct {
 	name           string
@@ -100,17 +103,27 @@ func NewDateTimeFieldFromBytes(name string, arrayPositions []uint64, value []byt
 	}
 }
 
-func NewDateTimeField(name string, arrayPositions []uint64, dt time.Time) *DateTimeField {
+func NewDateTimeField(name string, arrayPositions []uint64, dt time.Time) (*DateTimeField, error) {
 	return NewDateTimeFieldWithIndexingOptions(name, arrayPositions, dt, DEFAULT_DATETIME_INDEXING_OPTIONS)
 }
 
-func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, dt time.Time, options IndexingOptions) *DateTimeField {
-	dtInt64 := dt.UnixNano()
-	prefixCoded := numeric_util.MustNewPrefixCodedInt64(dtInt64, 0)
-	return &DateTimeField{
-		name:           name,
-		arrayPositions: arrayPositions,
-		value:          prefixCoded,
-		options:        options,
+func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, dt time.Time, options IndexingOptions) (*DateTimeField, error) {
+	if canRepresent(dt) {
+		dtInt64 := dt.UnixNano()
+		prefixCoded := numeric_util.MustNewPrefixCodedInt64(dtInt64, 0)
+		return &DateTimeField{
+			name:           name,
+			arrayPositions: arrayPositions,
+			value:          prefixCoded,
+			options:        options,
+		}, nil
 	}
+	return nil, fmt.Errorf("cannot represent %s in this type", dt)
+}
+
+func canRepresent(dt time.Time) bool {
+	if dt.Before(MinTimeRepresentable) || dt.After(MaxTimeRepresentable) {
+		return false
+	}
+	return true
 }
