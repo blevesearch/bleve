@@ -223,7 +223,7 @@ func (im *IndexMapping) MapDocument(doc *document.Document, data interface{}) er
 	docType := im.determineType(data)
 	docMapping := im.MappingForType(docType)
 	walkContext := newWalkContext(doc, docMapping)
-	im.walkDocument(data, []string{}, walkContext)
+	im.walkDocument(data, []string{}, []uint64{}, walkContext)
 
 	// see if the _all field was disabled
 	allMapping := docMapping.DocumentMappingForPath("_all")
@@ -249,7 +249,7 @@ func newWalkContext(doc *document.Document, dm *DocumentMapping) *walkContext {
 	}
 }
 
-func (im *IndexMapping) walkDocument(data interface{}, path []string, context *walkContext) {
+func (im *IndexMapping) walkDocument(data interface{}, path []string, indexes []uint64, context *walkContext) {
 	val := reflect.ValueOf(data)
 	typ := val.Type()
 	switch typ.Kind() {
@@ -259,7 +259,7 @@ func (im *IndexMapping) walkDocument(data interface{}, path []string, context *w
 			for _, key := range val.MapKeys() {
 				fieldName := key.String()
 				fieldVal := val.MapIndex(key).Interface()
-				im.processProperty(fieldVal, append(path, fieldName), context)
+				im.processProperty(fieldVal, append(path, fieldName), indexes, context)
 			}
 		}
 	case reflect.Struct:
@@ -276,25 +276,25 @@ func (im *IndexMapping) walkDocument(data interface{}, path []string, context *w
 
 			if val.Field(i).CanInterface() {
 				fieldVal := val.Field(i).Interface()
-				im.processProperty(fieldVal, append(path, fieldName), context)
+				im.processProperty(fieldVal, append(path, fieldName), indexes, context)
 			}
 		}
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < val.Len(); i++ {
 			if val.Index(i).CanInterface() {
 				fieldVal := val.Index(i).Interface()
-				im.processProperty(fieldVal, path, context)
+				im.processProperty(fieldVal, path, append(indexes, uint64(i)), context)
 			}
 		}
 	case reflect.Ptr:
 		ptrElem := val.Elem()
 		if ptrElem.IsValid() && ptrElem.CanInterface() {
-			im.walkDocument(ptrElem.Interface(), path, context)
+			im.walkDocument(ptrElem.Interface(), path, indexes, context)
 		}
 	}
 }
 
-func (im *IndexMapping) processProperty(property interface{}, path []string, context *walkContext) {
+func (im *IndexMapping) processProperty(property interface{}, path []string, indexes []uint64, context *walkContext) {
 	pathString := encodePath(path)
 	// look to see if there is a mapping for this field
 	subDocMapping := context.dm.DocumentMappingForPath(pathString)
@@ -316,7 +316,7 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 				options := fieldMapping.Options()
 				if *fieldMapping.Type == "text" {
 					analyzer := im.AnalyzerNamed(*fieldMapping.Analyzer)
-					field := document.NewTextFieldCustom(fieldName, []byte(propertyValueString), options, analyzer)
+					field := document.NewTextFieldCustom(fieldName, indexes, []byte(propertyValueString), options, analyzer)
 					context.doc.AddField(field)
 
 					if fieldMapping.IncludeInAll != nil && !*fieldMapping.IncludeInAll {
@@ -331,7 +331,7 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 					if dateTimeParser != nil {
 						parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
 						if err != nil {
-							field := document.NewDateTimeFieldWithIndexingOptions(fieldName, parsedDateTime, options)
+							field := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, parsedDateTime, options)
 							context.doc.AddField(field)
 						}
 					}
@@ -352,11 +352,11 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 						analyzerName = im.DefaultAnalyzer
 					}
 					analyzer := im.AnalyzerNamed(analyzerName)
-					field := document.NewTextFieldCustom(pathString, []byte(propertyValueString), options, analyzer)
+					field := document.NewTextFieldCustom(pathString, indexes, []byte(propertyValueString), options, analyzer)
 					context.doc.AddField(field)
 				} else {
 					// index as datetime
-					field := document.NewDateTimeField(pathString, parsedDateTime)
+					field := document.NewDateTimeField(pathString, indexes, parsedDateTime)
 					context.doc.AddField(field)
 				}
 			}
@@ -369,13 +369,13 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 				fieldName := getFieldName(pathString, path, fieldMapping)
 				if *fieldMapping.Type == "number" {
 					options := fieldMapping.Options()
-					field := document.NewNumericFieldWithIndexingOptions(fieldName, propertyValFloat, options)
+					field := document.NewNumericFieldWithIndexingOptions(fieldName, indexes, propertyValFloat, options)
 					context.doc.AddField(field)
 				}
 			}
 		} else {
 			// automatic indexing behavior
-			field := document.NewNumericField(pathString, propertyValFloat)
+			field := document.NewNumericField(pathString, indexes, propertyValFloat)
 			context.doc.AddField(field)
 		}
 	case reflect.Struct:
@@ -388,21 +388,21 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, con
 					fieldName := getFieldName(pathString, path, fieldMapping)
 					if *fieldMapping.Type == "datetime" {
 						options := fieldMapping.Options()
-						field := document.NewDateTimeFieldWithIndexingOptions(fieldName, property, options)
+						field := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, property, options)
 						context.doc.AddField(field)
 					}
 				}
 			} else {
 				// automatic indexing behavior
-				field := document.NewDateTimeField(pathString, property)
+				field := document.NewDateTimeField(pathString, indexes, property)
 				context.doc.AddField(field)
 			}
 
 		default:
-			im.walkDocument(property, path, context)
+			im.walkDocument(property, path, indexes, context)
 		}
 	default:
-		im.walkDocument(property, path, context)
+		im.walkDocument(property, path, indexes, context)
 	}
 }
 

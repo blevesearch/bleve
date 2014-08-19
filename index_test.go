@@ -56,6 +56,7 @@ var people = []*Person{
 		Age:        19,
 		Birthday:   time.Unix(1000000000, 0),
 		Title:      "mista",
+		Tags:       []string{"gopher", "belieber"},
 	},
 	&Person{
 		Identifier: "b",
@@ -221,5 +222,64 @@ func TestIndex(t *testing.T) {
 		if searchResult.Hits[1].ID != "c" {
 			t.Errorf("expected next hit id 'c', got '%s'", searchResult.Hits[1].ID)
 		}
+	}
+
+	// test behavior of arrays
+	// make sure we can successfully find by all elements in array
+	termQuery = NewTermQuery("gopher").SetField("tags")
+	searchRequest = NewSearchRequest(termQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	} else {
+		if searchResult.Total != uint64(1) {
+			t.Errorf("expected 1 total hit for term query, got %d", searchResult.Total)
+		} else {
+			if searchResult.Hits[0].ID != "a" {
+				t.Errorf("expected top hit id 'a', got '%s'", searchResult.Hits[0].ID)
+			}
+		}
+	}
+
+	termQuery = NewTermQuery("belieber").SetField("tags")
+	searchRequest = NewSearchRequest(termQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	} else {
+		if searchResult.Total != uint64(1) {
+			t.Errorf("expected 1 total hit for term query, got %d", searchResult.Total)
+		} else {
+			if searchResult.Hits[0].ID != "a" {
+				t.Errorf("expected top hit id 'a', got '%s'", searchResult.Hits[0].ID)
+			}
+		}
+	}
+
+	termQuery = NewTermQuery("notintagsarray").SetField("tags")
+	searchRequest = NewSearchRequest(termQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	if searchResult.Total != uint64(0) {
+		t.Errorf("expected 0 total hits")
+	}
+
+	// lookup document a
+	// expect to find 2 values for field "tags"
+	tagsCount := 0
+	doc, err := index.Document("a")
+	if err != nil {
+		t.Error(err)
+	} else {
+		for _, f := range doc.Fields {
+			if f.Name() == "tags" {
+				tagsCount++
+			}
+		}
+	}
+	if tagsCount != 2 {
+		t.Errorf("expected to find 2 values for tags")
 	}
 }

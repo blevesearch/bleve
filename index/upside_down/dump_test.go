@@ -38,18 +38,18 @@ func TestDump(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", 35.99, document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewDateTimeFieldWithIndexingOptions("unixEpoch", time.Unix(0, 0), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), document.INDEX_FIELD|document.STORE_FIELD))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
 
 	doc = document.NewDocument("2")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []byte("test2"), document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", 35.99, document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewDateTimeFieldWithIndexingOptions("unixEpoch", time.Unix(0, 0), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test2"), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), document.INDEX_FIELD|document.STORE_FIELD))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)

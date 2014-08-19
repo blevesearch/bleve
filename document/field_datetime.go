@@ -21,13 +21,18 @@ const DEFAULT_DATETIME_INDEXING_OPTIONS = STORE_FIELD | INDEX_FIELD
 const DEFAULT_DATETIME_PRECISION_STEP uint = 4
 
 type DateTimeField struct {
-	name    string
-	options IndexingOptions
-	value   numeric_util.PrefixCoded
+	name           string
+	arrayPositions []uint64
+	options        IndexingOptions
+	value          numeric_util.PrefixCoded
 }
 
 func (n *DateTimeField) Name() string {
 	return n.name
+}
+
+func (n *DateTimeField) ArrayPositions() []uint64 {
+	return n.arrayPositions
 }
 
 func (n *DateTimeField) Options() IndexingOptions {
@@ -86,24 +91,26 @@ func (n *DateTimeField) GoString() string {
 	return fmt.Sprintf("&document.DateField{Name:%s, Options: %s, Value: %s}", n.name, n.options, n.value)
 }
 
-func NewDateTimeFieldFromBytes(name string, value []byte) *DateTimeField {
+func NewDateTimeFieldFromBytes(name string, arrayPositions []uint64, value []byte) *DateTimeField {
 	return &DateTimeField{
-		name:    name,
-		value:   value,
-		options: DEFAULT_DATETIME_INDEXING_OPTIONS,
+		name:           name,
+		arrayPositions: arrayPositions,
+		value:          value,
+		options:        DEFAULT_DATETIME_INDEXING_OPTIONS,
 	}
 }
 
-func NewDateTimeField(name string, dt time.Time) *DateTimeField {
-	return NewDateTimeFieldWithIndexingOptions(name, dt, DEFAULT_DATETIME_INDEXING_OPTIONS)
+func NewDateTimeField(name string, arrayPositions []uint64, dt time.Time) *DateTimeField {
+	return NewDateTimeFieldWithIndexingOptions(name, arrayPositions, dt, DEFAULT_DATETIME_INDEXING_OPTIONS)
 }
 
-func NewDateTimeFieldWithIndexingOptions(name string, dt time.Time, options IndexingOptions) *DateTimeField {
+func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, dt time.Time, options IndexingOptions) *DateTimeField {
 	dtInt64 := dt.UnixNano()
 	prefixCoded := numeric_util.MustNewPrefixCodedInt64(dtInt64, 0)
 	return &DateTimeField{
-		name:    name,
-		value:   prefixCoded,
-		options: options,
+		name:           name,
+		arrayPositions: arrayPositions,
+		value:          prefixCoded,
+		options:        options,
 	}
 }

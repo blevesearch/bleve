@@ -21,7 +21,7 @@ func CommonBenchmarkIndex(b *testing.B, s store.KVStore) {
 	index := NewUpsideDownCouch(s)
 
 	indexDocument := document.NewDocument("").
-		AddField(document.NewTextField("body", []byte("A boiling liquid expanding vapor explosion (BLEVE, /ˈblɛviː/ blev-ee) is an explosion caused by the rupture of a vessel containing a pressurized liquid above its boiling point.")))
+		AddField(document.NewTextField("body", []uint64{}, []byte("A boiling liquid expanding vapor explosion (BLEVE, /ˈblɛviː/ blev-ee) is an explosion caused by the rupture of a vessel containing a pressurized liquid above its boiling point.")))
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -81,7 +81,7 @@ func TestIndexInsert(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextField("name", []byte("test")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -119,7 +119,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextField("name", []byte("test")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -127,7 +127,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	expectedCount += 1
 
 	doc2 := document.NewDocument("2")
-	doc2.AddField(document.NewTextField("name", []byte("test")))
+	doc2.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	err = idx.Update(doc2)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -181,7 +181,7 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 	defer idx.Close()
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextField("name", []byte("test")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -189,7 +189,7 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 
 	// this update should overwrite one term, and introduce one new one
 	doc = document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithAnalyzer("name", []byte("test fail"), testAnalyzer))
+	doc.AddField(document.NewTextFieldWithAnalyzer("name", []uint64{}, []byte("test fail"), testAnalyzer))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error deleting entry from index: %v", err)
@@ -204,7 +204,7 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 
 	// now do another update that should remove one of term
 	doc = document.NewDocument("1")
-	doc.AddField(document.NewTextField("name", []byte("fail")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("fail")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error deleting entry from index: %v", err)
@@ -231,7 +231,7 @@ func TestIndexInsertMultiple(t *testing.T) {
 	var expectedCount uint64 = 0
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextField("name", []byte("test")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -239,7 +239,7 @@ func TestIndexInsertMultiple(t *testing.T) {
 	expectedCount++
 
 	doc = document.NewDocument("2")
-	doc.AddField(document.NewTextField("name", []byte("test")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -264,7 +264,7 @@ func TestIndexInsertMultiple(t *testing.T) {
 	defer idx.Close()
 
 	doc = document.NewDocument("3")
-	doc.AddField(document.NewTextField("name", []byte("test")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -298,7 +298,7 @@ func TestIndexInsertWithStore(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -400,7 +400,7 @@ func TestIndexBatch(t *testing.T) {
 
 	// first create 2 docs the old fashioned way
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextField("name", []byte("test")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -408,7 +408,7 @@ func TestIndexBatch(t *testing.T) {
 	expectedCount += 1
 
 	doc = document.NewDocument("2")
-	doc.AddField(document.NewTextField("name", []byte("test2")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -423,10 +423,10 @@ func TestIndexBatch(t *testing.T) {
 
 	batch := make(index.Batch, 0)
 	doc = document.NewDocument("3")
-	doc.AddField(document.NewTextField("name", []byte("test3")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test3")))
 	batch["3"] = doc
 	doc = document.NewDocument("2")
-	doc.AddField(document.NewTextField("name", []byte("test2updated")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2updated")))
 	batch["2"] = doc
 	batch["1"] = nil
 
@@ -480,9 +480,9 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", 35.99, document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewDateTimeFieldWithIndexingOptions("unixEpoch", time.Unix(0, 0), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), document.INDEX_FIELD|document.STORE_FIELD))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -553,8 +553,8 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 
 	// now update the document, but omit one of the fields
 	doc = document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []byte("testup"), document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", 36.99, document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("testup"), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 36.99, document.INDEX_FIELD|document.STORE_FIELD))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -621,9 +621,9 @@ func TestIndexInsertFields(t *testing.T) {
 	defer idx.Close()
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", 35.99, document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewDateTimeFieldWithIndexingOptions("unixEpoch", time.Unix(0, 0), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), document.INDEX_FIELD|document.STORE_FIELD))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -656,8 +656,8 @@ func TestIndexUpdateComposites(t *testing.T) {
 	defer idx.Close()
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []byte("mister"), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("mister"), document.INDEX_FIELD|document.STORE_FIELD))
 	doc.AddField(document.NewCompositeFieldWithIndexingOptions("_all", true, nil, nil, document.INDEX_FIELD))
 	err = idx.Update(doc)
 	if err != nil {
@@ -679,8 +679,8 @@ func TestIndexUpdateComposites(t *testing.T) {
 
 	// now lets update it
 	doc = document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []byte("testupdated"), document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []byte("misterupdated"), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("testupdated"), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("misterupdated"), document.INDEX_FIELD|document.STORE_FIELD))
 	doc.AddField(document.NewCompositeFieldWithIndexingOptions("_all", true, nil, nil, document.INDEX_FIELD))
 	err = idx.Update(doc)
 	if err != nil {
@@ -725,8 +725,8 @@ func TestIndexFieldsMisc(t *testing.T) {
 	defer idx.Close()
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []byte("mister"), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("mister"), document.INDEX_FIELD|document.STORE_FIELD))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -762,8 +762,8 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 	defer idx.Close()
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []byte("test"), document.INDEX_FIELD|document.STORE_FIELD|document.INCLUDE_TERM_VECTORS))
-	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []byte("mister"), document.INDEX_FIELD|document.STORE_FIELD|document.INCLUDE_TERM_VECTORS))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.INDEX_FIELD|document.STORE_FIELD|document.INCLUDE_TERM_VECTORS))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("mister"), document.INDEX_FIELD|document.STORE_FIELD|document.INCLUDE_TERM_VECTORS))
 	doc.AddField(document.NewCompositeFieldWithIndexingOptions("_all", true, nil, nil, document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS))
 	err = idx.Update(doc)
 	if err != nil {
@@ -802,8 +802,8 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 	defer idx.Close()
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []byte("test"), document.INDEX_FIELD|document.STORE_FIELD|document.INCLUDE_TERM_VECTORS))
-	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []byte("mister"), document.INDEX_FIELD|document.STORE_FIELD|document.INCLUDE_TERM_VECTORS))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.INDEX_FIELD|document.STORE_FIELD|document.INCLUDE_TERM_VECTORS))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("mister"), document.INDEX_FIELD|document.STORE_FIELD|document.INCLUDE_TERM_VECTORS))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)

@@ -17,6 +17,8 @@ import (
 	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index"
 	"github.com/couchbaselabs/bleve/index/store"
+
+	"code.google.com/p/goprotobuf/proto"
 )
 
 var VERSION_KEY []byte = []byte{'v'}
@@ -223,9 +225,6 @@ func (udc *UpsideDownCouch) Close() {
 	udc.store.Close()
 }
 
-type termMap map[string]bool
-type fieldTermMap map[uint16]termMap
-
 func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 	// first we lookup the backindex row for the doc id if it exists
 	// lookup the back index row
@@ -250,35 +249,25 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 
 func (udc *UpsideDownCouch) updateSingle(doc *document.Document, backIndexRow *BackIndexRow, addRows, updateRows, deleteRows []UpsideDownCouchRow) ([]UpsideDownCouchRow, []UpsideDownCouchRow, []UpsideDownCouchRow) {
 
-	// a map for each field, map key is term (string) bool true for existence
-	existingTermFieldMaps := make(fieldTermMap, 0)
-	if backIndexRow != nil {
-		for _, entry := range backIndexRow.entries {
-			existingTermMap, fieldExists := existingTermFieldMaps[entry.field]
-			if !fieldExists {
-				existingTermMap = make(termMap, 0)
-				existingTermFieldMaps[entry.field] = existingTermMap
-			}
-			existingTermMap[string(entry.term)] = true
-		}
+	existingTermKeys := make(map[string]bool)
+	for _, key := range backIndexRow.AllTermKeys() {
+		existingTermKeys[string(key)] = true
 	}
-	existingStoredFieldMap := make(map[uint16]bool)
-	if backIndexRow != nil {
-		for _, sf := range backIndexRow.storedFields {
-			existingStoredFieldMap[sf] = true
-		}
+
+	existingStoredKeys := make(map[string]bool)
+	for _, key := range backIndexRow.AllStoredKeys() {
+		existingStoredKeys[string(key)] = true
 	}
 
 	// track our back index entries
-	backIndexEntries := make([]*BackIndexEntry, 0)
-	backIndexStoredFields := make([]uint16, 0)
+	backIndexTermEntries := make([]*BackIndexTermEntry, 0)
+	backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
 
 	for _, field := range doc.Fields {
 		fieldIndex, newFieldRow := udc.fieldNameToFieldIndex(field.Name())
 		if newFieldRow != nil {
 			updateRows = append(updateRows, newFieldRow)
 		}
-		existingTermMap := existingTermFieldMaps[fieldIndex]
 
 		if field.Options().IsIndexed() {
 
@@ -290,17 +279,17 @@ func (udc *UpsideDownCouch) updateSingle(doc *document.Document, backIndexRow *B
 			}
 
 			// encode this field
-			indexAddRows, indexUpdateRows, indexBackIndexEntries := udc.indexField(doc.ID, field, fieldIndex, fieldLength, tokenFreqs, existingTermMap)
+			indexAddRows, indexUpdateRows, indexBackIndexTermEntries := udc.indexField(doc.ID, field, fieldIndex, fieldLength, tokenFreqs, existingTermKeys)
 			addRows = append(addRows, indexAddRows...)
 			updateRows = append(updateRows, indexUpdateRows...)
-			backIndexEntries = append(backIndexEntries, indexBackIndexEntries...)
+			backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
 		}
 
 		if field.Options().IsStored() {
-			storeAddRows, storeUpdateRows := udc.storeField(doc.ID, field, fieldIndex, existingStoredFieldMap)
+			storeAddRows, storeUpdateRows, indexBackIndexStoreEntries := udc.storeField(doc.ID, field, fieldIndex, existingStoredKeys)
 			addRows = append(addRows, storeAddRows...)
 			updateRows = append(updateRows, storeUpdateRows...)
-			backIndexStoredFields = append(backIndexStoredFields, fieldIndex)
+			backIndexStoredEntries = append(backIndexStoredEntries, indexBackIndexStoreEntries...)
 		}
 
 	}
@@ -311,55 +300,62 @@ func (udc *UpsideDownCouch) updateSingle(doc *document.Document, backIndexRow *B
 		if newFieldRow != nil {
 			updateRows = append(updateRows, newFieldRow)
 		}
-		existingTermMap := existingTermFieldMaps[fieldIndex]
 		if compositeField.Options().IsIndexed() {
 
 			fieldLength, tokenFreqs := compositeField.Analyze()
 			// encode this field
-			indexAddRows, indexUpdateRows, indexBackIndexEntries := udc.indexField(doc.ID, compositeField, fieldIndex, fieldLength, tokenFreqs, existingTermMap)
+			indexAddRows, indexUpdateRows, indexBackIndexTermEntries := udc.indexField(doc.ID, compositeField, fieldIndex, fieldLength, tokenFreqs, existingTermKeys)
 			addRows = append(addRows, indexAddRows...)
 			updateRows = append(updateRows, indexUpdateRows...)
-			backIndexEntries = append(backIndexEntries, indexBackIndexEntries...)
+			backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
 		}
 	}
 
 	// build the back index row
-	backIndexRow = NewBackIndexRow(doc.ID, backIndexEntries, backIndexStoredFields)
+	backIndexRow = NewBackIndexRow(doc.ID, backIndexTermEntries, backIndexStoredEntries)
 	updateRows = append(updateRows, backIndexRow)
 
 	// any of the existing rows that weren't updated need to be deleted
-	for fieldIndex, existingTermFieldMap := range existingTermFieldMaps {
-		if existingTermFieldMap != nil {
-			for termString, _ := range existingTermFieldMap {
-				termFreqRow := NewTermFrequencyRow([]byte(termString), uint16(fieldIndex), doc.ID, 0, 0)
-				deleteRows = append(deleteRows, termFreqRow)
-			}
+	for existingTermKey, _ := range existingTermKeys {
+		termFreqRow, err := NewTermFrequencyRowK([]byte(existingTermKey))
+		if err == nil {
+			deleteRows = append(deleteRows, termFreqRow)
 		}
 	}
+
 	// any of the existing stored fields that weren't updated need to be deleted
-	for storedFieldIndex, _ := range existingStoredFieldMap {
-		storedRow := NewStoredRow(doc.ID, storedFieldIndex, 'x', nil)
-		deleteRows = append(deleteRows, storedRow)
+	for existingStoredKey, _ := range existingStoredKeys {
+		storedRow, err := NewStoredRowK([]byte(existingStoredKey))
+		if err == nil {
+			deleteRows = append(deleteRows, storedRow)
+		}
 	}
 
 	return addRows, updateRows, deleteRows
 }
 
-func (udc *UpsideDownCouch) storeField(docId string, field document.Field, fieldIndex uint16, existingStoredFieldMap map[uint16]bool) ([]UpsideDownCouchRow, []UpsideDownCouchRow) {
+func (udc *UpsideDownCouch) storeField(docId string, field document.Field, fieldIndex uint16, existingKeys map[string]bool) ([]UpsideDownCouchRow, []UpsideDownCouchRow, []*BackIndexStoreEntry) {
 	updateRows := make([]UpsideDownCouchRow, 0)
 	addRows := make([]UpsideDownCouchRow, 0)
+	backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
 	fieldType := encodeFieldType(field)
-	storedRow := NewStoredRow(docId, fieldIndex, fieldType, field.Value())
-	_, ok := existingStoredFieldMap[fieldIndex]
-	if ok {
+	storedRow := NewStoredRow(docId, fieldIndex, field.ArrayPositions(), fieldType, field.Value())
+
+	// record the back index entry
+	backIndexStoredEntry := BackIndexStoreEntry{Field: proto.Uint32(uint32(fieldIndex)), ArrayPositions: field.ArrayPositions()}
+	backIndexStoredEntries = append(backIndexStoredEntries, &backIndexStoredEntry)
+
+	storedRowKey := string(storedRow.Key())
+	_, existed := existingKeys[storedRowKey]
+	if existed {
 		// this is an update
 		updateRows = append(updateRows, storedRow)
 		// this field was stored last time, delete it from that map
-		delete(existingStoredFieldMap, fieldIndex)
+		delete(existingKeys, storedRowKey)
 	} else {
 		addRows = append(addRows, storedRow)
 	}
-	return addRows, updateRows
+	return addRows, updateRows, backIndexStoredEntries
 }
 
 func encodeFieldType(f document.Field) byte {
@@ -377,11 +373,11 @@ func encodeFieldType(f document.Field) byte {
 	return fieldType
 }
 
-func (udc *UpsideDownCouch) indexField(docId string, field document.Field, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies, existingTermMap termMap) ([]UpsideDownCouchRow, []UpsideDownCouchRow, []*BackIndexEntry) {
+func (udc *UpsideDownCouch) indexField(docId string, field document.Field, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies, existingKeys map[string]bool) ([]UpsideDownCouchRow, []UpsideDownCouchRow, []*BackIndexTermEntry) {
 
 	updateRows := make([]UpsideDownCouchRow, 0)
 	addRows := make([]UpsideDownCouchRow, 0)
-	backIndexEntries := make([]*BackIndexEntry, 0)
+	backIndexTermEntries := make([]*BackIndexTermEntry, 0)
 	fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
 
 	for _, tf := range tokenFreqs {
@@ -395,29 +391,23 @@ func (udc *UpsideDownCouch) indexField(docId string, field document.Field, field
 		}
 
 		// record the back index entry
-		backIndexEntry := BackIndexEntry{tf.Term, fieldIndex}
-		backIndexEntries = append(backIndexEntries, &backIndexEntry)
+		backIndexTermEntry := BackIndexTermEntry{Term: proto.String(string(tf.Term)), Field: proto.Uint32(uint32(fieldIndex))}
+		backIndexTermEntries = append(backIndexTermEntries, &backIndexTermEntry)
 
-		// remove the entry from the map of existing term fields if it exists
-		if existingTermMap != nil {
-			termString := string(tf.Term)
-			_, ok := existingTermMap[termString]
-			if ok {
-				// this is an update
-				updateRows = append(updateRows, termFreqRow)
-				// this term existed last time, delete it from that map
-				delete(existingTermMap, termString)
-			} else {
-				// this is an add
-				addRows = append(addRows, termFreqRow)
-			}
+		tfrKeyString := string(termFreqRow.Key())
+		_, existed := existingKeys[tfrKeyString]
+		if existed {
+			// this is an update
+			updateRows = append(updateRows, termFreqRow)
+			// this term existed last time, delete it from that map
+			delete(existingKeys, tfrKeyString)
 		} else {
 			// this is an add
 			addRows = append(addRows, termFreqRow)
 		}
 	}
 
-	return addRows, updateRows, backIndexEntries
+	return addRows, updateRows, backIndexTermEntries
 }
 
 func (udc *UpsideDownCouch) fieldNameToFieldIndex(fieldName string) (uint16, *FieldRow) {
@@ -456,12 +446,12 @@ func (udc *UpsideDownCouch) Delete(id string) error {
 
 func (udc *UpsideDownCouch) deleteSingle(id string, backIndexRow *BackIndexRow, deleteRows []UpsideDownCouchRow) []UpsideDownCouchRow {
 
-	for _, backIndexEntry := range backIndexRow.entries {
-		tfr := NewTermFrequencyRow(backIndexEntry.term, backIndexEntry.field, id, 0, 0)
+	for _, backIndexEntry := range backIndexRow.termEntries {
+		tfr := NewTermFrequencyRow([]byte(*backIndexEntry.Term), uint16(*backIndexEntry.Field), id, 0, 0)
 		deleteRows = append(deleteRows, tfr)
 	}
-	for _, sf := range backIndexRow.storedFields {
-		sf := NewStoredRow(id, sf, 'x', nil)
+	for _, se := range backIndexRow.storedEntries {
+		sf := NewStoredRow(id, uint16(*se.Field), se.ArrayPositions, 'x', nil)
 		deleteRows = append(deleteRows, sf)
 	}
 
@@ -552,7 +542,7 @@ func (udc *UpsideDownCouch) DocIdReader(start, end string) (index.DocIdReader, e
 
 func (udc *UpsideDownCouch) Document(id string) (*document.Document, error) {
 	rv := document.NewDocument(id)
-	storedRow := NewStoredRow(id, 0, 'x', nil)
+	storedRow := NewStoredRow(id, 0, []uint64{}, 'x', nil)
 	storedRowScanPrefix := storedRow.ScanPrefixForDoc()
 	it := udc.store.Iterator(storedRowScanPrefix)
 	key, val, valid := it.Current()
@@ -583,14 +573,14 @@ func (udc *UpsideDownCouch) DocumentFieldTerms(id string) (index.FieldTerms, err
 	if err != nil {
 		return nil, err
 	}
-	rv := make(index.FieldTerms, len(back.entries))
-	for _, entry := range back.entries {
-		fieldName := udc.fieldIndexToName(entry.field)
+	rv := make(index.FieldTerms, len(back.termEntries))
+	for _, entry := range back.termEntries {
+		fieldName := udc.fieldIndexToName(uint16(*entry.Field))
 		terms, ok := rv[fieldName]
 		if !ok {
 			terms = make([]string, 0)
 		}
-		terms = append(terms, string(entry.term))
+		terms = append(terms, *entry.Term)
 		rv[fieldName] = terms
 	}
 	return rv, nil
@@ -599,11 +589,11 @@ func (udc *UpsideDownCouch) DocumentFieldTerms(id string) (index.FieldTerms, err
 func decodeFieldType(typ byte, name string, value []byte) document.Field {
 	switch typ {
 	case 't':
-		return document.NewTextField(name, value)
+		return document.NewTextField(name, []uint64{}, value)
 	case 'n':
-		return document.NewNumericFieldFromBytes(name, value)
+		return document.NewNumericFieldFromBytes(name, []uint64{}, value)
 	case 'd':
-		return document.NewDateTimeFieldFromBytes(name, value)
+		return document.NewDateTimeFieldFromBytes(name, []uint64{}, value)
 	}
 	return nil
 }

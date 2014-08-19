@@ -29,61 +29,61 @@ func TestTermSearcher(t *testing.T) {
 	i.Update(&document.Document{
 		ID: "a",
 		Fields: []document.Field{
-			document.NewTextField("desc", []byte("beer")),
+			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "b",
 		Fields: []document.Field{
-			document.NewTextField("desc", []byte("beer")),
+			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "c",
 		Fields: []document.Field{
-			document.NewTextField("desc", []byte("beer")),
+			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "d",
 		Fields: []document.Field{
-			document.NewTextField("desc", []byte("beer")),
+			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "e",
 		Fields: []document.Field{
-			document.NewTextField("desc", []byte("beer")),
+			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "f",
 		Fields: []document.Field{
-			document.NewTextField("desc", []byte("beer")),
+			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "g",
 		Fields: []document.Field{
-			document.NewTextField("desc", []byte("beer")),
+			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "h",
 		Fields: []document.Field{
-			document.NewTextField("desc", []byte("beer")),
+			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "i",
 		Fields: []document.Field{
-			document.NewTextField("desc", []byte("beer")),
+			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
 	i.Update(&document.Document{
 		ID: "j",
 		Fields: []document.Field{
-			document.NewTextField("title", []byte("cat")),
+			document.NewTextField("title", []uint64{}, []byte("cat")),
 		},
 	})
 

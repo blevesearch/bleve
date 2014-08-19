@@ -51,6 +51,10 @@ func (c *CompositeField) Name() string {
 	return c.name
 }
 
+func (c *CompositeField) ArrayPositions() []uint64 {
+	return []uint64{}
+}
+
 func (c *CompositeField) Options() IndexingOptions {
 	return c.options
 }

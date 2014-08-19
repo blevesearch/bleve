@@ -41,29 +41,29 @@ var twoDocIndexDescIndexingOptions = document.DEFAULT_TEXT_INDEXING_OPTIONS | do
 var twoDocIndexDocs = []*document.Document{
 	// must have 4/4 beer
 	document.NewDocument("1").
-		AddField(document.NewTextField("name", []byte("marty"))).
-		AddField(document.NewTextFieldCustom("desc", []byte("beer beer beer beer"), twoDocIndexDescIndexingOptions, testAnalyzer)).
-		AddField(document.NewTextFieldWithAnalyzer("street", []byte("couchbase way"), testAnalyzer)),
+		AddField(document.NewTextField("name", []uint64{}, []byte("marty"))).
+		AddField(document.NewTextFieldCustom("desc", []uint64{}, []byte("beer beer beer beer"), twoDocIndexDescIndexingOptions, testAnalyzer)).
+		AddField(document.NewTextFieldWithAnalyzer("street", []uint64{}, []byte("couchbase way"), testAnalyzer)),
 	// must have 1/4 beer
 	document.NewDocument("2").
-		AddField(document.NewTextField("name", []byte("steve"))).
-		AddField(document.NewTextFieldCustom("desc", []byte("angst beer couch database"), twoDocIndexDescIndexingOptions, testAnalyzer)).
-		AddField(document.NewTextFieldWithAnalyzer("street", []byte("couchbase way"), testAnalyzer)).
-		AddField(document.NewTextFieldWithAnalyzer("title", []byte("mister"), testAnalyzer)),
+		AddField(document.NewTextField("name", []uint64{}, []byte("steve"))).
+		AddField(document.NewTextFieldCustom("desc", []uint64{}, []byte("angst beer couch database"), twoDocIndexDescIndexingOptions, testAnalyzer)).
+		AddField(document.NewTextFieldWithAnalyzer("street", []uint64{}, []byte("couchbase way"), testAnalyzer)).
+		AddField(document.NewTextFieldWithAnalyzer("title", []uint64{}, []byte("mister"), testAnalyzer)),
 	// must have 1/4 beer
 	document.NewDocument("3").
-		AddField(document.NewTextField("name", []byte("dustin"))).
-		AddField(document.NewTextFieldCustom("desc", []byte("apple beer column dank"), twoDocIndexDescIndexingOptions, testAnalyzer)).
-		AddField(document.NewTextFieldWithAnalyzer("title", []byte("mister"), testAnalyzer)),
+		AddField(document.NewTextField("name", []uint64{}, []byte("dustin"))).
+		AddField(document.NewTextFieldCustom("desc", []uint64{}, []byte("apple beer column dank"), twoDocIndexDescIndexingOptions, testAnalyzer)).
+		AddField(document.NewTextFieldWithAnalyzer("title", []uint64{}, []byte("mister"), testAnalyzer)),
 	// must have 65/65 beer
 	document.NewDocument("4").
-		AddField(document.NewTextField("name", []byte("ravi"))).
-		AddField(document.NewTextFieldCustom("desc", []byte("beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer"), twoDocIndexDescIndexingOptions, testAnalyzer)),
+		AddField(document.NewTextField("name", []uint64{}, []byte("ravi"))).
+		AddField(document.NewTextFieldCustom("desc", []uint64{}, []byte("beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer beer"), twoDocIndexDescIndexingOptions, testAnalyzer)),
 	// must have 0/x beer
 	document.NewDocument("5").
-		AddField(document.NewTextField("name", []byte("bobert"))).
-		AddField(document.NewTextFieldCustom("desc", []byte("water"), twoDocIndexDescIndexingOptions, testAnalyzer)).
-		AddField(document.NewTextFieldWithAnalyzer("title", []byte("mister"), testAnalyzer)),
+		AddField(document.NewTextField("name", []uint64{}, []byte("bobert"))).
+		AddField(document.NewTextFieldCustom("desc", []uint64{}, []byte("water"), twoDocIndexDescIndexingOptions, testAnalyzer)).
+		AddField(document.NewTextFieldWithAnalyzer("title", []uint64{}, []byte("mister"), testAnalyzer)),
 }
 
 func scoresCloseEnough(a, b float64) bool {

@@ -31,7 +31,7 @@ func TestIndexReader(t *testing.T) {
 
 	var expectedCount uint64 = 0
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextField("name", []byte("test")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -39,8 +39,8 @@ func TestIndexReader(t *testing.T) {
 	expectedCount += 1
 
 	doc = document.NewDocument("2")
-	doc.AddField(document.NewTextFieldWithAnalyzer("name", []byte("test test test"), testAnalyzer))
-	doc.AddField(document.NewTextFieldCustom("desc", []byte("eat more rice"), document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS, testAnalyzer))
+	doc.AddField(document.NewTextFieldWithAnalyzer("name", []uint64{}, []byte("test test test"), testAnalyzer))
+	doc.AddField(document.NewTextFieldCustom("desc", []uint64{}, []byte("eat more rice"), document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS, testAnalyzer))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -173,7 +173,7 @@ func TestIndexDocIdReader(t *testing.T) {
 
 	var expectedCount uint64 = 0
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextField("name", []byte("test")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -181,8 +181,8 @@ func TestIndexDocIdReader(t *testing.T) {
 	expectedCount += 1
 
 	doc = document.NewDocument("2")
-	doc.AddField(document.NewTextField("name", []byte("test test test")))
-	doc.AddField(document.NewTextFieldWithIndexingOptions("desc", []byte("eat more rice"), document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test test test")))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("desc", []uint64{}, []byte("eat more rice"), document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)

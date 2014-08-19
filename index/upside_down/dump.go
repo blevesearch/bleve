@@ -87,15 +87,15 @@ func (udc *UpsideDownCouch) DumpDoc(id string) chan interface{} {
 		}
 		// build sorted list of term keys
 		keys := make(keyset, 0)
-		for _, entry := range back.entries {
-			tfr := NewTermFrequencyRow(entry.term, entry.field, id, 0, 0)
+		for _, entry := range back.termEntries {
+			tfr := NewTermFrequencyRow([]byte(*entry.Term), uint16(*entry.Field), id, 0, 0)
 			key := tfr.Key()
 			keys = append(keys, key)
 		}
 		sort.Sort(keys)
 
 		// first add all the stored rows
-		storedRowPrefix := NewStoredRow(id, 0, 'x', []byte{}).ScanPrefixForDoc()
+		storedRowPrefix := NewStoredRow(id, 0, []uint64{}, 'x', []byte{}).ScanPrefixForDoc()
 		udc.dumpPrefix(rv, storedRowPrefix)
 
 		// now walk term keys in order and add them as well

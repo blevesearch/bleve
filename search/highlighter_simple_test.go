@@ -43,7 +43,7 @@ func TestSimpleHighlighter(t *testing.T) {
 	}
 
 	expectedFragment := DEFAULT_SEPARATOR + "the " + DEFAULT_ANSI_HIGHLIGHT + "quick" + reset + " brown " + DEFAULT_ANSI_HIGHLIGHT + "fox" + reset + " jumps over the lazy dog" + DEFAULT_SEPARATOR
-	doc := document.NewDocument("a").AddField(document.NewTextField("desc", []byte("the quick brown fox jumps over the lazy dog")))
+	doc := document.NewDocument("a").AddField(document.NewTextField("desc", []uint64{}, []byte("the quick brown fox jumps over the lazy dog")))
 
 	fragment := highlighter.BestFragmentInField(&docMatch, doc, "desc")
 	if fragment != expectedFragment {
@@ -63,7 +63,7 @@ Fusce viverra eleifend iaculis. Maecenas tempor dictum cursus. Mauris faucibus, 
 
 Etiam vel augue vel nisl commodo suscipit et ac nisl. Quisque eros diam, porttitor et aliquet sed, vulputate in odio. Aenean feugiat est quis neque vehicula, eget vulputate nunc tempor. Donec quis nulla ut quam feugiat consectetur ut et justo. Nulla congue, metus auctor facilisis scelerisque, nunc risus vulputate urna, in blandit urna nibh et neque. Etiam quis tortor ut nulla dignissim dictum non sed ligula. Vivamus accumsan ligula eget ipsum ultrices, a tincidunt urna blandit. In hac habitasse platea dictumst.`)
 
-	doc := document.NewDocument("a").AddField(document.NewTextField("full", fieldBytes))
+	doc := document.NewDocument("a").AddField(document.NewTextField("full", []uint64{}, fieldBytes))
 	docMatch := DocumentMatch{
 		ID:    "a",
 		Score: 1.0,

@@ -11,6 +11,8 @@ package upside_down
 import (
 	"reflect"
 	"testing"
+
+	"code.google.com/p/goprotobuf/proto"
 )
 
 func TestRows(t *testing.T) {
@@ -55,22 +57,22 @@ func TestRows(t *testing.T) {
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0},
 		},
 		{
-			NewBackIndexRow("budweiser", []*BackIndexEntry{&BackIndexEntry{[]byte{'b', 'e', 'e', 'r'}, 0}}, []uint16{}),
+			NewBackIndexRow("budweiser", []*BackIndexTermEntry{&BackIndexTermEntry{Term: proto.String("beer"), Field: proto.Uint32(0)}}, nil),
 			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
-			[]byte{'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0},
+			[]byte{10, 8, 10, 4, 'b', 'e', 'e', 'r', 16, 0},
 		},
 		{
-			NewBackIndexRow("budweiser", []*BackIndexEntry{&BackIndexEntry{[]byte{'b', 'e', 'e', 'r'}, 0}, &BackIndexEntry{[]byte{'b', 'e', 'a', 't'}, 1}}, []uint16{}),
+			NewBackIndexRow("budweiser", []*BackIndexTermEntry{&BackIndexTermEntry{Term: proto.String("beer"), Field: proto.Uint32(0)}, &BackIndexTermEntry{Term: proto.String("beat"), Field: proto.Uint32(1)}}, nil),
 			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
-			[]byte{'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'e', 'a', 't', BYTE_SEPARATOR, 1, 0},
+			[]byte{10, 8, 10, 4, 'b', 'e', 'e', 'r', 16, 0, 10, 8, 10, 4, 'b', 'e', 'a', 't', 16, 1},
 		},
 		{
-			NewBackIndexRow("budweiser", []*BackIndexEntry{&BackIndexEntry{[]byte{'b', 'e', 'e', 'r'}, 0}, &BackIndexEntry{[]byte{'b', 'e', 'a', 't'}, 1}}, []uint16{3, 4, 5}),
+			NewBackIndexRow("budweiser", []*BackIndexTermEntry{&BackIndexTermEntry{Term: proto.String("beer"), Field: proto.Uint32(0)}, &BackIndexTermEntry{Term: proto.String("beat"), Field: proto.Uint32(1)}}, []*BackIndexStoreEntry{&BackIndexStoreEntry{Field: proto.Uint32(3)}, &BackIndexStoreEntry{Field: proto.Uint32(4)}, &BackIndexStoreEntry{Field: proto.Uint32(5)}}),
 			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
-			[]byte{'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0, 'b', 'e', 'a', 't', BYTE_SEPARATOR, 1, 0, BYTE_SEPARATOR, 3, 0, BYTE_SEPARATOR, 4, 0, BYTE_SEPARATOR, 5, 0},
+			[]byte{10, 8, 10, 4, 'b', 'e', 'e', 'r', 16, 0, 10, 8, 10, 4, 'b', 'e', 'a', 't', 16, 1, 18, 2, 8, 3, 18, 2, 8, 4, 18, 2, 8, 5},
 		},
 		{
-			NewStoredRow("budweiser", 0, byte('t'), []byte("an american beer")),
+			NewStoredRow("budweiser", 0, []uint64{}, byte('t'), []byte("an american beer")),
 			[]byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', BYTE_SEPARATOR, 0, 0},
 			[]byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
 		},
@@ -94,13 +96,13 @@ func TestRows(t *testing.T) {
 	}
 
 	// now test going back from k/v bytes to struct
-	for _, test := range tests {
+	for i, test := range tests {
 		row, err := ParseFromKeyValue(test.outKey, test.outVal)
 		if err != nil {
 			t.Error(err)
 		}
 		if !reflect.DeepEqual(row, test.input) {
-			t.Fatalf("Expected: %#v got: %#v", test.input, row)
+			t.Errorf("Expected: %#v got: %#v for %d", test.input, row, i)
 		}
 	}
 
@@ -186,15 +188,10 @@ func TestInvalidRows(t *testing.T) {
 			[]byte{'b'},
 			[]byte{'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0},
 		},
-		// type b, invalid val (missing term)
-		{
-			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
-			[]byte{},
-		},
 		// type b, invalid val (missing field)
 		{
 			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
-			[]byte{'b', 'e', 'e', 'r', BYTE_SEPARATOR},
+			[]byte{'g', 'a', 'r', 'b', 'a', 'g', 'e'},
 		},
 		// type s, invalid key (missing id)
 		{

@@ -14,6 +14,7 @@ import (
 
 type Field interface {
 	Name() string
+	ArrayPositions() []uint64
 	Options() IndexingOptions
 	Analyze() (int, analysis.TokenFrequencies)
 	Value() []byte

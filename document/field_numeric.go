@@ -20,13 +20,18 @@ const DEFAULT_NUMERIC_INDEXING_OPTIONS = STORE_FIELD | INDEX_FIELD
 const DEFAULT_PRECISION_STEP uint = 4
 
 type NumericField struct {
-	name    string
-	options IndexingOptions
-	value   numeric_util.PrefixCoded
+	name           string
+	arrayPositions []uint64
+	options        IndexingOptions
+	value          numeric_util.PrefixCoded
 }
 
 func (n *NumericField) Name() string {
 	return n.name
+}
+
+func (n *NumericField) ArrayPositions() []uint64 {
+	return n.arrayPositions
 }
 
 func (n *NumericField) Options() IndexingOptions {
@@ -85,24 +90,26 @@ func (n *NumericField) GoString() string {
 	return fmt.Sprintf("&document.NumericField{Name:%s, Options: %s, Value: %s}", n.name, n.options, n.value)
 }
 
-func NewNumericFieldFromBytes(name string, value []byte) *NumericField {
+func NewNumericFieldFromBytes(name string, arrayPositions []uint64, value []byte) *NumericField {
 	return &NumericField{
-		name:    name,
-		value:   value,
-		options: DEFAULT_NUMERIC_INDEXING_OPTIONS,
+		name:           name,
+		arrayPositions: arrayPositions,
+		value:          value,
+		options:        DEFAULT_NUMERIC_INDEXING_OPTIONS,
 	}
 }
 
-func NewNumericField(name string, number float64) *NumericField {
-	return NewNumericFieldWithIndexingOptions(name, number, DEFAULT_NUMERIC_INDEXING_OPTIONS)
+func NewNumericField(name string, arrayPositions []uint64, number float64) *NumericField {
+	return NewNumericFieldWithIndexingOptions(name, arrayPositions, number, DEFAULT_NUMERIC_INDEXING_OPTIONS)
 }
 
-func NewNumericFieldWithIndexingOptions(name string, number float64, options IndexingOptions) *NumericField {
+func NewNumericFieldWithIndexingOptions(name string, arrayPositions []uint64, number float64, options IndexingOptions) *NumericField {
 	numberInt64 := numeric_util.Float64ToInt64(number)
 	prefixCoded := numeric_util.MustNewPrefixCodedInt64(numberInt64, 0)
 	return &NumericField{
-		name:    name,
-		value:   prefixCoded,
-		options: options,
+		name:           name,
+		arrayPositions: arrayPositions,
+		value:          prefixCoded,
+		options:        options,
 	}
 }
