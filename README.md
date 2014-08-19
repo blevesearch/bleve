@@ -1,6 +1,6 @@
 # ![bleve](docs/bleve.png) bleve
 
-modern text indexing in go
+modern text indexing in go - [blevesearch.com](http://www.blevesearch.com/)
 
 ## Features
 * Index any go data structure (including JSON)
@@ -13,6 +13,10 @@ modern text indexing in go
     * Numeric Range, Date Range
     * Simple query syntax for human entry
 * Search result match highlighting
+
+## Discussion
+
+Discuss usage and development of bleve in the [google group](https://groups.google.com/forum/#!forum/bleve).
 
 ## Indexing
 
