@@ -16,7 +16,7 @@ import (
 )
 
 func TestLevelDBStore(t *testing.T) {
-	s, err := Open("test", true)
+	s, err := Open("test", true, true)
 	if err != nil {
 		t.Fatal(err)
 	}

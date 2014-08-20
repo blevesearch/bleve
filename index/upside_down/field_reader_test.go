@@ -20,7 +20,7 @@ import (
 func TestIndexFieldReader(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	idx := NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {

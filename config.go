@@ -80,6 +80,10 @@ import (
 	_ "github.com/couchbaselabs/bleve/analysis/language/sv"
 	_ "github.com/couchbaselabs/bleve/analysis/language/th"
 	_ "github.com/couchbaselabs/bleve/analysis/language/tr"
+
+	// kv stores
+	_ "github.com/couchbaselabs/bleve/index/store/inmem"
+	_ "github.com/couchbaselabs/bleve/index/store/leveldb"
 )
 
 var bleveExpVar = expvar.NewMap("bleve")
@@ -89,13 +93,10 @@ type HighlightConfig struct {
 }
 
 type Configuration struct {
-	DefaultAnalyzer       *string
-	Highlight             *HighlightConfig
-	DefaultHighlighter    *string
-	CreateIfMissing       bool
-	DefaultDateTimeFormat *string
-	DefaultField          *string
-	ByteArrayConverters   map[string]ByteArrayConverter
+	Highlight           *HighlightConfig
+	DefaultHighlighter  *string
+	ByteArrayConverters map[string]ByteArrayConverter
+	DefaultKVStore      string
 }
 
 func NewConfiguration() *Configuration {
@@ -133,8 +134,8 @@ func init() {
 	htmlHighlighterName := "html"
 	Config.DefaultHighlighter = &htmlHighlighterName
 
-	// default CreateIfMissing to true
-	Config.CreateIfMissing = true
+	// default kv store
+	Config.DefaultKVStore = "leveldb"
 
 	bootDuration := time.Since(bootStart)
 	bleveExpVar.Add("bootDuration", int64(bootDuration))

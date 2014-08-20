@@ -29,7 +29,7 @@ var testAnalyzer = &analysis.Analyzer{
 func TestIndexOpenReopen(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	idx := NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {
@@ -52,7 +52,10 @@ func TestIndexOpenReopen(t *testing.T) {
 	// now close it
 	idx.Close()
 
-	store, err = leveldb.Open("test", true)
+	store, err = leveldb.Open("test", true, false)
+	if err != nil {
+		t.Fatalf("error opening store: %v", err)
+	}
 	idx = NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {
@@ -66,7 +69,7 @@ func TestIndexOpenReopen(t *testing.T) {
 func TestIndexInsert(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	idx := NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {
@@ -104,7 +107,7 @@ func TestIndexInsert(t *testing.T) {
 func TestIndexInsertThenDelete(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	idx := NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {
@@ -172,7 +175,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 func TestIndexInsertThenUpdate(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	idx := NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {
@@ -221,7 +224,7 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 func TestIndexInsertMultiple(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	idx := NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {
@@ -255,7 +258,7 @@ func TestIndexInsertMultiple(t *testing.T) {
 
 	// close and reopen and and one more to testing counting works correctly
 	idx.Close()
-	store, err = leveldb.Open("test", true)
+	store, err = leveldb.Open("test", true, false)
 	idx = NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {
@@ -280,7 +283,7 @@ func TestIndexInsertMultiple(t *testing.T) {
 func TestIndexInsertWithStore(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -337,7 +340,7 @@ func TestIndexInsertWithStore(t *testing.T) {
 func TestIndexInternalCRUD(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	idx := NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {
@@ -388,7 +391,7 @@ func TestIndexInternalCRUD(t *testing.T) {
 func TestIndexBatch(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	idx := NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {
@@ -462,7 +465,7 @@ func TestIndexBatch(t *testing.T) {
 func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -613,7 +616,7 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 func TestIndexInsertFields(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -652,7 +655,7 @@ func TestIndexInsertFields(t *testing.T) {
 func TestIndexUpdateComposites(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -721,7 +724,7 @@ func TestIndexUpdateComposites(t *testing.T) {
 func TestIndexFieldsMisc(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -758,7 +761,7 @@ func TestIndexFieldsMisc(t *testing.T) {
 func TestIndexTermReaderCompositeFields(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -798,7 +801,7 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 func TestIndexDocumentFieldTerms(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	if err != nil {
 		t.Error(err)
 	}

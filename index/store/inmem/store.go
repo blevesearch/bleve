@@ -10,8 +10,11 @@ package inmem
 
 import (
 	"github.com/couchbaselabs/bleve/index/store"
+	"github.com/couchbaselabs/bleve/registry"
 	"github.com/ryszard/goskiplist/skiplist"
 )
+
+const Name = "mem"
 
 type InMemStore struct {
 	list *skiplist.SkipList
@@ -67,4 +70,12 @@ func (i *InMemStore) Iterator(key []byte) store.KVIterator {
 
 func (i *InMemStore) NewBatch() store.KVBatch {
 	return newInMemBatch(i)
+}
+
+func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
+	return Open()
+}
+
+func init() {
+	registry.RegisterKVStore(Name, StoreConstructor)
 }

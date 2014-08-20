@@ -50,8 +50,14 @@ type Classifier interface {
 	Type() string
 }
 
-// Open the index at the specified path, and create it if it does not exist.
+// New index at the specified path, must not exist.
 // The provided mapping will be used for all Index/Search operations.
-func Open(path string, mapping *IndexMapping) (Index, error) {
+func New(path string, mapping *IndexMapping) (Index, error) {
 	return newIndex(path, mapping)
+}
+
+// Open index at the specified path, must exist.
+// The mapping used when it was created will be used for all Index/Search operations.
+func Open(path string) (Index, error) {
+	return openIndex(path)
 }

@@ -9,44 +9,183 @@
 package bleve
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/couchbaselabs/bleve/document"
 	"github.com/couchbaselabs/bleve/index"
 	"github.com/couchbaselabs/bleve/index/store"
-	"github.com/couchbaselabs/bleve/index/store/leveldb"
 	"github.com/couchbaselabs/bleve/index/upside_down"
+	"github.com/couchbaselabs/bleve/registry"
 	"github.com/couchbaselabs/bleve/search"
 )
 
 type indexImpl struct {
-	s store.KVStore
-	i index.Index
-	m *IndexMapping
+	path string
+	meta *indexMeta
+	s    store.KVStore
+	i    index.Index
+	m    *IndexMapping
+}
+
+const storePath = "store"
+
+var mappingInternalKey = []byte("_mapping")
+
+func indexStorePath(path string) string {
+	return path + string(os.PathSeparator) + storePath
+}
+
+func newMemIndex(mapping *IndexMapping) (*indexImpl, error) {
+	rv := indexImpl{
+		path: "",
+		m:    mapping,
+		meta: NewIndexMeta("mem"),
+	}
+
+	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
+	if storeConstructor == nil {
+		return nil, ERROR_UNKNOWN_STORAGE_TYPE
+	}
+	// now open the store
+	var err error
+	rv.s, err = storeConstructor(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// open open the index
+	rv.i = upside_down.NewUpsideDownCouch(rv.s)
+	err = rv.i.Open()
+	if err != nil {
+		return nil, err
+	}
+
+	// now persist the mapping
+	mappingBytes, err := json.Marshal(mapping)
+	if err != nil {
+		return nil, err
+	}
+	err = rv.i.SetInternal(mappingInternalKey, mappingBytes)
+	if err != nil {
+		return nil, err
+	}
+	return &rv, nil
 }
 
 func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
-	// start by validating the index mapping
+	// first validate the mapping
 	err := mapping.Validate()
 	if err != nil {
 		return nil, err
 	}
 
-	store, err := leveldb.Open(path, Config.CreateIfMissing)
+	if path == "" {
+		return newMemIndex(mapping)
+	}
+
+	rv := indexImpl{
+		path: path,
+		m:    mapping,
+		meta: NewIndexMeta(Config.DefaultKVStore),
+	}
+	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
+	if storeConstructor == nil {
+		return nil, ERROR_UNKNOWN_STORAGE_TYPE
+	}
+	// at this point there hope we can be successful, so save index meta
+	err = rv.meta.Save(path)
 	if err != nil {
 		return nil, err
 	}
-	idx := upside_down.NewUpsideDownCouch(store)
-	err = idx.Open()
+	storeConfig := map[string]interface{}{
+		"path":              indexStorePath(path),
+		"create_if_missing": true,
+		"error_if_exists":   true,
+	}
+
+	// now open the store
+	rv.s, err = storeConstructor(storeConfig)
 	if err != nil {
 		return nil, err
 	}
-	return &indexImpl{
-		s: store,
-		i: idx,
-		m: mapping,
-	}, nil
+
+	// open open the index
+	rv.i = upside_down.NewUpsideDownCouch(rv.s)
+	err = rv.i.Open()
+	if err != nil {
+		return nil, err
+	}
+
+	// now persist the mapping
+	mappingBytes, err := json.Marshal(mapping)
+	if err != nil {
+		return nil, err
+	}
+	err = rv.i.SetInternal(mappingInternalKey, mappingBytes)
+	if err != nil {
+		return nil, err
+	}
+	return &rv, nil
+}
+
+func openIndex(path string) (*indexImpl, error) {
+
+	rv := indexImpl{
+		path: path,
+	}
+	var err error
+	rv.meta, err = OpenIndexMeta(path)
+	if err != nil {
+		return nil, err
+	}
+
+	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
+	if storeConstructor == nil {
+		return nil, ERROR_UNKNOWN_STORAGE_TYPE
+	}
+
+	storeConfig := map[string]interface{}{
+		"path":              indexStorePath(path),
+		"create_if_missing": false,
+		"error_if_exists":   false,
+	}
+
+	// now open the store
+	rv.s, err = storeConstructor(storeConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	// open open the index
+	rv.i = upside_down.NewUpsideDownCouch(rv.s)
+	err = rv.i.Open()
+	if err != nil {
+		return nil, err
+	}
+
+	// now load the mapping
+	mappingBytes, err := rv.i.GetInternal(mappingInternalKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var im IndexMapping
+	err = json.Unmarshal(mappingBytes, &im)
+	if err != nil {
+		return nil, err
+	}
+
+	// validate the mapping
+	err = im.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	rv.m = &im
+	return &rv, nil
 }
 
 func (i *indexImpl) Index(id string, data interface{}) error {

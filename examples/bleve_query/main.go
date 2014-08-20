@@ -18,7 +18,7 @@ import (
 )
 
 var field = flag.String("field", "_all", "field to query")
-var indexDir = flag.String("indexDir", "index", "index directory")
+var indexPath = flag.String("index", "", "index path")
 var limit = flag.Int("limit", 10, "limit to first N results")
 var skip = flag.Int("skip", 0, "skip the first N results")
 var explain = flag.Bool("explain", false, "explain scores")
@@ -28,18 +28,16 @@ func main() {
 
 	flag.Parse()
 
+	if *indexPath == "" {
+		log.Fatal("specify index to query")
+	}
+
 	if flag.NArg() < 1 {
 		log.Fatal("Specify search query")
 	}
 
-	// don't create an index if it doesn't exist
-	bleve.Config.CreateIfMissing = false
-
-	// create a new default mapping
-	mapping := bleve.NewIndexMapping()
-
 	// open index
-	index, err := bleve.Open(*indexDir, mapping)
+	index, err := bleve.Open(*indexPath)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -9,9 +9,14 @@
 package leveldb
 
 import (
+	"fmt"
+
 	"github.com/couchbaselabs/bleve/index/store"
+	"github.com/couchbaselabs/bleve/registry"
 	"github.com/jmhodges/levigo"
 )
+
+const Name = "leveldb"
 
 type LevelDBStore struct {
 	path string
@@ -19,13 +24,14 @@ type LevelDBStore struct {
 	db   *levigo.DB
 }
 
-func Open(path string, createIfMissing bool) (*LevelDBStore, error) {
+func Open(path string, createIfMissing bool, errorIfExists bool) (*LevelDBStore, error) {
 	rv := LevelDBStore{
 		path: path,
 	}
 
 	opts := levigo.NewOptions()
 	opts.SetCreateIfMissing(createIfMissing)
+	opts.SetErrorIfExists(errorIfExists)
 	rv.opts = opts
 
 	var err error
@@ -66,4 +72,26 @@ func (ldbs *LevelDBStore) Iterator(key []byte) store.KVIterator {
 
 func (ldbs *LevelDBStore) NewBatch() store.KVBatch {
 	return newLevelDBBatch(ldbs)
+}
+
+func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
+	path, ok := config["path"].(string)
+	if !ok {
+		return nil, fmt.Errorf("must specify path")
+	}
+	createIfMissing := false
+	cim, ok := config["create_if_missing"].(bool)
+	if ok {
+		createIfMissing = cim
+	}
+	errorIfExists := true
+	eie, ok := config["error_if_exists"].(bool)
+	if ok {
+		errorIfExists = eie
+	}
+	return Open(path, createIfMissing, errorIfExists)
+}
+
+func init() {
+	registry.RegisterKVStore(Name, StoreConstructor)
 }

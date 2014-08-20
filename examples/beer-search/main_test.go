@@ -13,7 +13,7 @@ func TestBeerSearchAll(t *testing.T) {
 	defer os.RemoveAll("beer-search-test.bleve")
 
 	mapping := buildIndexMapping()
-	index, err := bleve.Open("beer-search-test.bleve", mapping)
+	index, err := bleve.New("beer-search-test.bleve", mapping)
 	if err != nil {
 		t.Fatal(err)
 	}

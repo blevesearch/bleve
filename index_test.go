@@ -9,6 +9,7 @@
 package bleve
 
 import (
+	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -85,10 +86,11 @@ var people = []*Person{
 func TestIndex(t *testing.T) {
 	defer os.RemoveAll("testidx")
 
-	index, err := Open("testidx", mapping)
+	index, err := New("testidx", mapping)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer index.Close()
 
 	// index all the people
 	for _, person := range people {
@@ -297,5 +299,52 @@ func TestIndex(t *testing.T) {
 	}
 	if tagsCount != 2 {
 		t.Errorf("expected to find 2 values for tags")
+	}
+}
+
+func TestIndexCreateNewOverExisting(t *testing.T) {
+	defer os.RemoveAll("testidx")
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	index.Close()
+	index, err = New("testidx", NewIndexMapping())
+	if err != ERROR_INDEX_PATH_EXISTS {
+		t.Fatalf("expected error index path exists, got %v", err)
+	}
+}
+
+func TestIndexOpenNonExisting(t *testing.T) {
+	_, err := Open("doesnotexist")
+	if err != ERROR_INDEX_PATH_DOES_NOT_EXIST {
+		t.Fatalf("expected error index path does not exist, got %v", err)
+	}
+}
+
+func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
+	defer os.RemoveAll("testidx")
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	index.Close()
+
+	// now intentionally corrupt the metadata
+	ioutil.WriteFile("testidx/index_meta.json", []byte("corrupted"), 0666)
+
+	index, err = Open("testidx")
+	if err != ERROR_INDEX_META_CORRUPT {
+		t.Fatalf("expected error index metadata corrupted, got %v", err)
+	}
+
+	// no intentionally remove the metadata
+	os.Remove("testidx/index_meta.json")
+
+	index, err = Open("testidx")
+	if err != ERROR_INDEX_META_MISSING {
+		t.Fatalf("expected error index metadata missing, got %v", err)
 	}
 }

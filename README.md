@@ -26,13 +26,12 @@ Discuss usage and development of bleve in the [google group](https://groups.goog
 		}
 
 		mapping := bleve.NewIndexMapping()
-		index, _ := bleve.Open("example.bleve", mapping)
+		index, _ := bleve.New("example.bleve", mapping)
 		index.Index(message)
 
 ## Querying
 
-		mapping := bleve.NewIndexMapping()
-		index, _ := bleve.Open("example.bleve", mapping)
+		index, _ := bleve.Open("example.bleve")
 		query := bleve.NewSyntaxQuery("bleve")
 		searchRequest := bleve.NewSearchRequest(query)
 		searchResult, _ := index.Search(searchRequest)

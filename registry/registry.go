@@ -15,6 +15,9 @@ import (
 	"github.com/couchbaselabs/bleve/analysis"
 )
 
+var stores = make(KVStoreRegistry, 0)
+
+// analysis
 var charFilters = make(CharFilterRegistry, 0)
 var tokenizers = make(TokenizerRegistry, 0)
 var tokenMaps = make(TokenMapRegistry, 0)
@@ -152,6 +155,17 @@ func PrintRegistry() {
 	}
 	sorted.Sort()
 	fmt.Printf("DateTime Parsers:\n")
+	for _, name := range sorted {
+		fmt.Printf("\t%s\n", name)
+	}
+	fmt.Println()
+
+	sorted = make(sort.StringSlice, 0, len(stores))
+	for name, _ := range stores {
+		sorted = append(sorted, name)
+	}
+	sorted.Sort()
+	fmt.Printf("KV Stores:\n")
 	for _, name := range sorted {
 		fmt.Printf("\t%s\n", name)
 	}

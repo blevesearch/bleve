@@ -17,7 +17,7 @@ import (
 )
 
 var jsonDir = flag.String("jsonDir", "json", "json directory")
-var indexDir = flag.String("indexDir", "index", "index directory")
+var indexPath = flag.String("index", "index.bleve", "index path")
 
 func main() {
 
@@ -27,7 +27,7 @@ func main() {
 	mapping := bleve.NewIndexMapping()
 
 	// open the index
-	index, err := bleve.Open(*indexDir, mapping)
+	index, err := bleve.New(*indexPath, mapping)
 	if err != nil {
 		log.Fatal(err)
 	}

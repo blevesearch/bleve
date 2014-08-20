@@ -6,22 +6,25 @@
 //  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
-package upside_down
+package registry
 
 import (
-	"os"
-	"testing"
+	"fmt"
 
-	"github.com/couchbaselabs/bleve/index/store/leveldb"
+	"github.com/couchbaselabs/bleve/index/store"
 )
 
-func BenchmarkLevelDBIndexing(b *testing.B) {
-	s, err := leveldb.Open("test", true, true)
-	if err != nil {
-		b.Fatal(err)
+func RegisterKVStore(name string, constructor KVStoreConstructor) {
+	_, exists := stores[name]
+	if exists {
+		panic(fmt.Errorf("attempted to register duplicate store named '%s'", name))
 	}
-	defer os.RemoveAll("test")
-	defer s.Close()
+	stores[name] = constructor
+}
 
-	CommonBenchmarkIndex(b, s)
+type KVStoreConstructor func(config map[string]interface{}) (store.KVStore, error)
+type KVStoreRegistry map[string]KVStoreConstructor
+
+func KVStoreConstructorByName(name string) KVStoreConstructor {
+	return stores[name]
 }

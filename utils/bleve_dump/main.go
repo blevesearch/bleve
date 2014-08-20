@@ -17,16 +17,18 @@ import (
 	"github.com/couchbaselabs/bleve/index/upside_down"
 )
 
-var indexDir = flag.String("indexDir", "index", "index directory")
+var indexPath = flag.String("index", "", "index path")
 
 var fieldsOnly = flag.Bool("fields", false, "fields only")
 var docId = flag.String("docId", "", "docId to dump")
 
 func main() {
 	flag.Parse()
+	if *indexPath == "" {
+		log.Fatal("specify index to dump")
+	}
 
-	bleve.Config.CreateIfMissing = false
-	index, err := bleve.Open(*indexDir, bleve.NewIndexMapping())
+	index, err := bleve.Open(*indexPath)
 	if err != nil {
 		log.Fatal(err)
 	}

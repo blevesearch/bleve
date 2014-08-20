@@ -14,21 +14,17 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
-	"runtime/pprof"
 	"time"
 
 	"github.com/couchbaselabs/bleve"
 	bleveHttp "github.com/couchbaselabs/bleve/http"
 )
 
-var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
-var memprofile = flag.String("memprofile", "", "write mem profile to file")
 var batchSize = flag.Int("batchSize", 100, "batch size for indexing")
 var bindAddr = flag.String("addr", ":8094", "http listen address")
 var jsonDir = flag.String("jsonDir", "../../samples/beer-sample/", "json directory")
-var indexDir = flag.String("indexDir", "beer-search.bleve", "index directory")
+var indexPath = flag.String("index", "beer-search.bleve", "index path")
 var staticEtag = flag.String("staticEtag", "", "A static etag value.")
 var staticPath = flag.String("static", "static/", "Path to the static content")
 
@@ -36,43 +32,26 @@ func main() {
 
 	flag.Parse()
 
-	// create cpu profile if requested
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			log.Fatal(err)
-		}
-		pprof.StartCPUProfile(f)
-	}
-
-	// create a mapping
-	indexMapping := buildIndexMapping()
-
 	// open the index
-	beerIndex, err := bleve.Open(*indexDir, indexMapping)
-	if err != nil {
-		log.Fatal(err)
-	}
+	beerIndex, err := bleve.Open(*indexPath)
+	if err == bleve.ERROR_INDEX_PATH_DOES_NOT_EXIST {
+		log.Printf("Creating new index...")
+		// create a mapping
+		indexMapping := buildIndexMapping()
+		beerIndex, err = bleve.New(*indexPath, indexMapping)
 
-	// index data in the background
-	go func() {
-		err = indexBeer(beerIndex)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if *cpuprofile != "" {
-			pprof.StopCPUProfile()
-			log.Printf("closing cpu profile")
-		}
-		if *memprofile != "" {
-			f, err := os.Create(*memprofile)
+		// index data in the background
+		go func() {
+			err = indexBeer(beerIndex)
 			if err != nil {
 				log.Fatal(err)
 			}
-			pprof.WriteHeapProfile(f)
-			log.Printf("mem profile written")
-		}
-	}()
+		}()
+	} else if err != nil {
+		log.Fatal(err)
+	} else {
+		log.Printf("Opening existing index...")
+	}
 
 	// create a router to serve static files
 	router := staticFileRouter()

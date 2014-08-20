@@ -20,7 +20,7 @@ import (
 func TestDump(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true)
+	store, err := leveldb.Open("test", true, true)
 	if err != nil {
 		t.Error(err)
 	}
