@@ -32,7 +32,7 @@ const DefaultDateTimeParser = "dateTimeOptional"
 const DefaultByteArrayConverter = "json"
 
 type IndexMapping struct {
-	TypeMapping           map[string]*DocumentMapping `json:"types"`
+	TypeMapping           map[string]*DocumentMapping `json:"types,omitempty"`
 	DefaultMapping        *DocumentMapping            `json:"default_mapping"`
 	TypeField             string                      `json:"type_field"`
 	DefaultType           string                      `json:"default_type"`

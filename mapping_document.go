@@ -18,8 +18,8 @@ import (
 type DocumentMapping struct {
 	Enabled         bool                        `json:"enabled"`
 	Dynamic         bool                        `json:"dynamic"`
-	Properties      map[string]*DocumentMapping `json:"properties"`
-	Fields          []*FieldMapping             `json:"fields"`
+	Properties      map[string]*DocumentMapping `json:"properties,omitempty"`
+	Fields          []*FieldMapping             `json:"fields,omitempty"`
 	DefaultAnalyzer string                      `json:"default_analyzer"`
 }
 

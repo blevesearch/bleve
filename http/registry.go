@@ -27,9 +27,36 @@ func RegisterIndexName(name string, index bleve.Index) {
 	indexNameMapping[name] = index
 }
 
+func UnregisterIndexByName(name string) bleve.Index {
+	indexNameMappingLock.Lock()
+	defer indexNameMappingLock.Unlock()
+
+	if indexNameMapping == nil {
+		return nil
+	}
+	rv := indexNameMapping[name]
+	if rv != nil {
+		delete(indexNameMapping, name)
+	}
+	return rv
+}
+
 func IndexByName(name string) bleve.Index {
 	indexNameMappingLock.RLock()
 	defer indexNameMappingLock.RUnlock()
 
 	return indexNameMapping[name]
+}
+
+func IndexNames() []string {
+	indexNameMappingLock.RLock()
+	defer indexNameMappingLock.RUnlock()
+
+	rv := make([]string, len(indexNameMapping))
+	count := 0
+	for k, _ := range indexNameMapping {
+		rv[count] = k
+		count++
+	}
+	return rv
 }
