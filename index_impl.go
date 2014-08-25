@@ -305,6 +305,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer searcher.Close()
 
 	if req.Facets != nil {
 		facetsBuilder := search.NewFacetsBuilder(i.i)

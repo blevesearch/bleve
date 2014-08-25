@@ -553,6 +553,7 @@ func (udc *UpsideDownCouch) Document(id string) (*document.Document, error) {
 	storedRow := NewStoredRow(id, 0, []uint64{}, 'x', nil)
 	storedRowScanPrefix := storedRow.ScanPrefixForDoc()
 	it := udc.store.Iterator(storedRowScanPrefix)
+	defer it.Close()
 	key, val, valid := it.Current()
 	for valid {
 		if !bytes.HasPrefix(key, storedRowScanPrefix) {
