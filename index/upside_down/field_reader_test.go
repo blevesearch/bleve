@@ -14,13 +14,13 @@ import (
 	"testing"
 
 	"github.com/couchbaselabs/bleve/document"
-	"github.com/couchbaselabs/bleve/index/store/leveldb"
+	"github.com/couchbaselabs/bleve/index/store/boltdb"
 )
 
 func TestIndexFieldReader(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true, true)
+	store, err := boltdb.Open("test", "bleve")
 	idx := NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {

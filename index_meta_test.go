@@ -24,7 +24,7 @@ func TestIndexMeta(t *testing.T) {
 	}
 
 	// create meta
-	im := &indexMeta{Storage: "leveldb"}
+	im := &indexMeta{Storage: "boltdb"}
 	err = im.Save(testIndexPath)
 	if err != nil {
 		t.Error(err)
@@ -36,8 +36,8 @@ func TestIndexMeta(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if im.Storage != "leveldb" {
-		t.Errorf("expected storage 'leveldb', got '%s'", im.Storage)
+	if im.Storage != "boltdb" {
+		t.Errorf("expected storage 'boltdb', got '%s'", im.Storage)
 	}
 
 	// save a meta that already exists

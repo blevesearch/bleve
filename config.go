@@ -77,8 +77,8 @@ import (
 	_ "github.com/couchbaselabs/bleve/analysis/language/tr"
 
 	// kv stores
+	_ "github.com/couchbaselabs/bleve/index/store/boltdb"
 	_ "github.com/couchbaselabs/bleve/index/store/inmem"
-	_ "github.com/couchbaselabs/bleve/index/store/leveldb"
 )
 
 var bleveExpVar = expvar.NewMap("bleve")
@@ -130,7 +130,7 @@ func init() {
 	Config.DefaultHighlighter = &htmlHighlighterName
 
 	// default kv store
-	Config.DefaultKVStore = "leveldb"
+	Config.DefaultKVStore = "boltdb"
 
 	bootDuration := time.Since(bootStart)
 	bleveExpVar.Add("bootDuration", int64(bootDuration))

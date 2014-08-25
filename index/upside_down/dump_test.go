@@ -9,7 +9,7 @@
 package upside_down
 
 import (
-	"github.com/couchbaselabs/bleve/index/store/leveldb"
+	"github.com/couchbaselabs/bleve/index/store/boltdb"
 	"os"
 	"testing"
 	"time"
@@ -20,7 +20,7 @@ import (
 func TestDump(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := leveldb.Open("test", true, true)
+	store, err := boltdb.Open("test", "bleve")
 	if err != nil {
 		t.Error(err)
 	}
