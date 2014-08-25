@@ -25,7 +25,7 @@ type NumericRangeSearcher struct {
 	searcher *DisjunctionSearcher
 }
 
-func NewNumericRangeSearcher(index index.Index, min *float64, max *float64, field string, boost float64, explain bool) (*NumericRangeSearcher, error) {
+func NewNumericRangeSearcher(index index.Index, min *float64, max *float64, inclusiveMin, inclusiveMax *bool, field string, boost float64, explain bool) (*NumericRangeSearcher, error) {
 	// account for unbounded edges
 	if min == nil {
 		negInf := math.Inf(-1)
@@ -35,9 +35,23 @@ func NewNumericRangeSearcher(index index.Index, min *float64, max *float64, fiel
 		Inf := math.Inf(1)
 		max = &Inf
 	}
+	if inclusiveMin == nil {
+		defaultInclusiveMin := true
+		inclusiveMin = &defaultInclusiveMin
+	}
+	if inclusiveMax == nil {
+		defaultInclusiveMax := false
+		inclusiveMax = &defaultInclusiveMax
+	}
 	// find all the ranges
 	minInt64 := numeric_util.Float64ToInt64(*min)
+	if !*inclusiveMin && minInt64 != math.MaxInt64 {
+		minInt64 += 1
+	}
 	maxInt64 := numeric_util.Float64ToInt64(*max)
+	if !*inclusiveMax && maxInt64 != math.MinInt64 {
+		maxInt64 -= 1
+	}
 	// FIXME hard-coded precion, should match field declaration
 	termRanges := splitInt64Range(minInt64, maxInt64, 4)
 	terms := termRanges.Enumerate()

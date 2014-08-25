@@ -13,17 +13,25 @@ import (
 )
 
 type NumericRangeQuery struct {
-	Min      *float64 `json:"min,omitempty"`
-	Max      *float64 `json:"max,omitempty"`
-	FieldVal string   `json:"field,omitempty"`
-	BoostVal float64  `json:"boost,omitempty"`
+	Min          *float64 `json:"min,omitempty"`
+	Max          *float64 `json:"max,omitempty"`
+	InclusiveMin *bool    `json:"inclusive_min,omitempty"`
+	InclusiveMax *bool    `json:"inclusive_max,omitempty"`
+	FieldVal     string   `json:"field,omitempty"`
+	BoostVal     float64  `json:"boost,omitempty"`
 }
 
 func NewNumericRangeQuery(min, max *float64) *NumericRangeQuery {
+	return NewNumericRangeInclusiveQuery(min, max, nil, nil)
+}
+
+func NewNumericRangeInclusiveQuery(min, max *float64, minInclusive, maxInclusive *bool) *NumericRangeQuery {
 	return &NumericRangeQuery{
-		Min:      min,
-		Max:      max,
-		BoostVal: 1.0,
+		Min:          min,
+		Max:          max,
+		InclusiveMin: minInclusive,
+		InclusiveMax: maxInclusive,
+		BoostVal:     1.0,
 	}
 }
 
@@ -50,7 +58,7 @@ func (q *NumericRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searche
 	if q.FieldVal == "" {
 		field = i.m.DefaultField
 	}
-	return search.NewNumericRangeSearcher(i.i, q.Min, q.Max, field, q.BoostVal, explain)
+	return search.NewNumericRangeSearcher(i.i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.BoostVal, explain)
 }
 
 func (q *NumericRangeQuery) Validate() error {

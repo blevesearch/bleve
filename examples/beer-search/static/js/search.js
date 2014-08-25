@@ -1,5 +1,9 @@
 function SearchCtrl($scope, $http, $routeParams, $log, $sce) {
 
+    $scope.inclusiveMin = true;
+    $scope.inclusiveMax = false;
+    $scope.inclusiveStart = true;
+    $scope.inclusiveEnd = false;
     $scope.fieldNames = [];
 
     $scope.minShouldOptions = [];
@@ -79,6 +83,8 @@ function SearchCtrl($scope, $http, $routeParams, $log, $sce) {
             "query": {
                 "min": parseFloat($scope.min),
                 "max": parseFloat($scope.max),
+                "inclusive_min": $scope.inclusiveMin,
+                "inclusive_max": $scope.inclusiveMax,
                 "field": $scope.field,
             }
         }).
@@ -98,6 +104,8 @@ function SearchCtrl($scope, $http, $routeParams, $log, $sce) {
             "query": {
                 "start": $scope.startDate,
                 "end": $scope.endDate,
+                "inclusive_start": $scope.inclusiveStart,
+                "inclusive_end": $scope.inclusiveEnd,
                 "field": $scope.field,
             }
         }).

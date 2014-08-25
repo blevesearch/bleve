@@ -19,16 +19,24 @@ import (
 type DateRangeQuery struct {
 	Start          *string `json:"start,omitempty"`
 	End            *string `json:"end,omitempty"`
+	InclusiveStart *bool   `json:"inclusive_start,omitempty"`
+	InclusiveEnd   *bool   `json:"inclusive_end,omitempty"`
 	FieldVal       string  `json:"field,omitempty"`
 	BoostVal       float64 `json:"boost,omitempty"`
 	DateTimeParser *string `json:"datetime_parser,omitempty"`
 }
 
 func NewDateRangeQuery(start, end *string) *DateRangeQuery {
+	return NewDateRangeInclusiveQuery(start, end, nil, nil)
+}
+
+func NewDateRangeInclusiveQuery(start, end *string, startInclusive, endInclusive *bool) *DateRangeQuery {
 	return &DateRangeQuery{
-		Start:    start,
-		End:      end,
-		BoostVal: 1.0,
+		Start:          start,
+		End:            end,
+		InclusiveStart: startInclusive,
+		InclusiveEnd:   endInclusive,
+		BoostVal:       1.0,
 	}
 }
 
@@ -86,7 +94,7 @@ func (q *DateRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, 
 		max = numeric_util.Int64ToFloat64(endTime.UnixNano())
 	}
 
-	return search.NewNumericRangeSearcher(i.i, &min, &max, field, q.BoostVal, explain)
+	return search.NewNumericRangeSearcher(i.i, &min, &max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal, explain)
 }
 
 func (q *DateRangeQuery) Validate() error {
