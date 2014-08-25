@@ -10,15 +10,21 @@ In normal usage, you use this with the "single" tokenizer, so there is only one 
 
         $ svn checkout -r 167 http://cld2.googlecode.com/svn/trunk/ cld2-read-only
 
-2.  Build cld2
+2.  Build cld2 
 
-	$ ./compile_cld2.sh
+	As dynamic library
 
-3.  Put the resulting libraries somewhere your linker can find.
+		$ cd cld2-read-only/internal/
+		$ ./compile_libs.sh
+		$ cp *.so /usr/local/lib
+		$ cd ../..
 
-        $ cp *.a /usr/local/lib
+	Or static library
 
-4.  Run the unit tests
+		$ ./compile_cld2.sh
+		$ cp *.a /usr/local/lib
+
+3.  Run the unit tests
 
         $ go test -v
         === RUN TestCld2Filter
