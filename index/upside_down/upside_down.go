@@ -541,6 +541,14 @@ func (udc *UpsideDownCouch) DocIdReader(start, end string) (index.DocIdReader, e
 }
 
 func (udc *UpsideDownCouch) Document(id string) (*document.Document, error) {
+	// first hit the back index to confirm doc exists
+	backIndexRow, err := udc.backIndexRowForDoc(id)
+	if err != nil {
+		return nil, err
+	}
+	if backIndexRow == nil {
+		return nil, nil
+	}
 	rv := document.NewDocument(id)
 	storedRow := NewStoredRow(id, 0, []uint64{}, 'x', nil)
 	storedRowScanPrefix := storedRow.ScanPrefixForDoc()
