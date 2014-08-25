@@ -44,6 +44,8 @@ type Index interface {
 	DumpFields() chan interface{}
 
 	Close()
+
+	Mapping() *IndexMapping
 }
 
 type Classifier interface {

@@ -19,6 +19,7 @@ const (
 	ERROR_PHRASE_QUERY_NO_TERMS
 	ERROR_UNKNOWN_QUERY_TYPE
 	ERROR_UNKNOWN_STORAGE_TYPE
+	ERROR_INDEX_CLOSED
 )
 
 type Error int
@@ -38,4 +39,5 @@ var errorMessages = map[int]string{
 	int(ERROR_PHRASE_QUERY_NO_TERMS):              "phrase query must contain at least one term",
 	int(ERROR_UNKNOWN_QUERY_TYPE):                 "unknown query type",
 	int(ERROR_UNKNOWN_STORAGE_TYPE):               "unkown storage type",
+	int(ERROR_INDEX_CLOSED):                       "index is closed",
 }
