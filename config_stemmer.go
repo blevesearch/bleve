@@ -9,20 +9,10 @@
 
 // +build libstemmer full
 
-package ro
+package bleve
 
 import (
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/analysis/token_filters/stemmer_filter"
-	"github.com/couchbaselabs/bleve/registry"
+	_ "github.com/couchbaselabs/bleve/analysis/token_filters/stemmer_filter"
+
+	_ "github.com/couchbaselabs/bleve/analysis/language/porter"
 )
-
-const StemmerName = "stemmer_ro"
-
-func StemmerFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
-	return stemmer_filter.NewStemmerFilter("ro")
-}
-
-func init() {
-	registry.RegisterTokenFilter(StemmerName, StemmerFilterConstructor)
-}
