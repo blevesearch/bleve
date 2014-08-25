@@ -16,7 +16,7 @@ import (
 )
 
 func TestBoltDBStore(t *testing.T) {
-	s, err := Open("test")
+	s, err := Open("test", "bleve")
 	if err != nil {
 		t.Fatal(err)
 	}
