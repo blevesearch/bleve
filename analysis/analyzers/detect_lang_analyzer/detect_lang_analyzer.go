@@ -6,18 +6,23 @@
 //  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
+
+// +build cld2
+
 package detect_lang_analyzer
 
 import (
 	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/couchbaselabs/bleve/analysis/token_filters/cld2"
 	"github.com/couchbaselabs/bleve/analysis/token_filters/lower_case_filter"
+	"github.com/couchbaselabs/bleve/analysis/tokenizers/single_token"
 	"github.com/couchbaselabs/bleve/registry"
 )
 
 const Name = "detect_lang"
 
 func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
-	keywordTokenizer, err := cache.TokenizerNamed("single")
+	keywordTokenizer, err := cache.TokenizerNamed(single_token.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -25,7 +30,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	if err != nil {
 		return nil, err
 	}
-	detectLangFilter, err := cache.TokenFilterNamed("detect_lang")
+	detectLangFilter, err := cache.TokenFilterNamed(cld2.Name)
 	if err != nil {
 		return nil, err
 	}

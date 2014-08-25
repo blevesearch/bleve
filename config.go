@@ -20,14 +20,12 @@ import (
 	_ "github.com/couchbaselabs/bleve/analysis/char_filters/zero_width_non_joiner"
 
 	// analyzers
-	_ "github.com/couchbaselabs/bleve/analysis/analyzers/detect_lang_analyzer"
 	_ "github.com/couchbaselabs/bleve/analysis/analyzers/keyword_analyzer"
 	_ "github.com/couchbaselabs/bleve/analysis/analyzers/simple_analyzer"
 	_ "github.com/couchbaselabs/bleve/analysis/analyzers/standard_analyzer"
 
 	// token filters
 	_ "github.com/couchbaselabs/bleve/analysis/token_filters/apostrophe_filter"
-	_ "github.com/couchbaselabs/bleve/analysis/token_filters/cld2"
 	_ "github.com/couchbaselabs/bleve/analysis/token_filters/edge_ngram_filter"
 	_ "github.com/couchbaselabs/bleve/analysis/token_filters/elision_filter"
 	_ "github.com/couchbaselabs/bleve/analysis/token_filters/keyword_marker_filter"
