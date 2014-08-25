@@ -98,7 +98,7 @@ func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
 
 	bucket, ok := config["bucket"].(string)
 	if !ok {
-		bucket = "index"
+		bucket = "bleve"
 	}
 
 	return Open(path, bucket)
