@@ -9,20 +9,8 @@
 
 // +build icu full
 
-package th
+package bleve
 
 import (
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/analysis/tokenizers/unicode_word_boundary"
-	"github.com/couchbaselabs/bleve/registry"
+	_ "github.com/couchbaselabs/bleve/analysis/tokenizers/unicode_word_boundary"
 )
-
-const TokenizerName = "unicode_th"
-
-func TokenizerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.Tokenizer, error) {
-	return unicode_word_boundary.NewUnicodeWordBoundaryCustomLocaleTokenizer("th_TH"), nil
-}
-
-func init() {
-	registry.RegisterTokenizer(TokenizerName, TokenizerConstructor)
-}

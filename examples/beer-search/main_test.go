@@ -8,6 +8,8 @@
 //  and limitations under the License.
 
 // +build cld2 full
+// +build libstemmer full
+// +build icu full
 
 package main
 

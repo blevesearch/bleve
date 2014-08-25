@@ -8,6 +8,7 @@
 //  and limitations under the License.
 
 // +build libstemmer full
+// +build icu full
 
 package fi
 

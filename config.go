@@ -39,7 +39,6 @@ import (
 	// tokenizers
 	_ "github.com/couchbaselabs/bleve/analysis/tokenizers/regexp_tokenizer"
 	_ "github.com/couchbaselabs/bleve/analysis/tokenizers/single_token"
-	_ "github.com/couchbaselabs/bleve/analysis/tokenizers/unicode_word_boundary"
 	_ "github.com/couchbaselabs/bleve/analysis/tokenizers/whitespace_tokenizer"
 
 	// date time parsers
