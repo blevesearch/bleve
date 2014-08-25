@@ -39,6 +39,9 @@ func main() {
 		// create a mapping
 		indexMapping := buildIndexMapping()
 		beerIndex, err = bleve.New(*indexPath, indexMapping)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		// index data in the background
 		go func() {
