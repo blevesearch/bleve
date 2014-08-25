@@ -12,18 +12,20 @@ import (
 	"github.com/couchbaselabs/bleve"
 )
 
+const textFieldAnalyzer = "en"
+
 func buildIndexMapping() *bleve.IndexMapping {
 
 	nameMapping := bleve.NewDocumentMapping().
 		AddFieldMapping(
 		bleve.NewFieldMapping(
-			"", "text", "en",
+			"", "text", textFieldAnalyzer,
 			true, true, true, true))
 
 	descMapping := bleve.NewDocumentMapping().
 		AddFieldMapping(
 		bleve.NewFieldMapping(
-			"", "text", "en",
+			"", "text", textFieldAnalyzer,
 			true, true, true, true)).
 		AddFieldMapping(
 		bleve.NewFieldMapping("descriptionLang", "text", "detect_lang",
@@ -62,7 +64,7 @@ func buildIndexMapping() *bleve.IndexMapping {
 		AddDocumentMapping("beer", beerMapping).
 		AddDocumentMapping("brewery", breweryMapping).
 		SetTypeField("type").
-		SetDefaultAnalyzer("en")
+		SetDefaultAnalyzer(textFieldAnalyzer)
 
 	return indexMapping
 }
