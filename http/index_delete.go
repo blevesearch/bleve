@@ -30,7 +30,7 @@ func (h *DeleteIndexHandler) ServeHTTP(w http.ResponseWriter, req *http.Request)
 	// find the name of the index to delete
 	indexName := mux.Vars(req)["indexName"]
 	if indexName == "" {
-		showError(w, req, fmt.Sprintf("index name is required", indexName), 400)
+		showError(w, req, "index name is required", 400)
 		return
 	}
 
