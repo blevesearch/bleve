@@ -68,5 +68,5 @@ func (i *BoltDBIterator) Valid() bool {
 }
 
 func (i *BoltDBIterator) Close() {
-	i.tx.Commit()
+	i.tx.Rollback()
 }
