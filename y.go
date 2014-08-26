@@ -29,6 +29,9 @@ const BOOST = 57351
 const LPAREN = 57352
 const RPAREN = 57353
 const NUMBER = 57354
+const GREATER = 57355
+const LESS = 57356
+const EQUAL = 57357
 
 var yyToknames = []string{
 	"STRING",
@@ -40,6 +43,9 @@ var yyToknames = []string{
 	"LPAREN",
 	"RPAREN",
 	"NUMBER",
+	"GREATER",
+	"LESS",
+	"EQUAL",
 }
 var yyStatenames = []string{}
 
@@ -57,47 +63,51 @@ var yyExca = []int{
 	-2, 5,
 }
 
-const yyNprod = 16
+const yyNprod = 20
 const yyPrivate = 57344
 
 var yyTokenNames []string
 var yyStates []string
 
-const yyLast = 18
+const yyLast = 26
 
 var yyAct = []int{
 
-	16, 14, 15, 6, 7, 17, 18, 10, 11, 2,
-	13, 5, 12, 8, 9, 4, 3, 1,
+	17, 18, 23, 21, 26, 24, 22, 25, 15, 19,
+	20, 16, 14, 6, 7, 10, 11, 2, 13, 5,
+	12, 8, 9, 4, 3, 1,
 }
 var yyPact = []int{
 
-	-3, -1000, -1000, -3, 3, -1000, -1000, -1000, -1000, -8,
-	-6, -1000, -1000, -1000, -12, 1, -1000, -1000, -1000,
+	7, -1000, -1000, 7, 11, -1000, -1000, -1000, -1000, 3,
+	0, -1000, -1000, -1000, -1, -4, -1000, -1000, -1000, -9,
+	-10, -1000, -5, -1000, -8, -1000, -1000,
 }
 var yyPgo = []int{
 
-	0, 17, 9, 16, 15, 14, 12, 11, 10,
+	0, 25, 17, 24, 23, 22, 20, 19, 18,
 }
 var yyR1 = []int{
 
 	0, 1, 2, 2, 3, 4, 4, 7, 7, 5,
-	5, 5, 5, 8, 6, 6,
+	5, 5, 5, 5, 5, 5, 5, 8, 6, 6,
 }
 var yyR2 = []int{
 
 	0, 1, 2, 1, 3, 0, 1, 1, 1, 1,
-	1, 3, 3, 2, 0, 1,
+	1, 3, 3, 4, 5, 4, 5, 2, 0, 1,
 }
 var yyChk = []int{
 
 	-1000, -1, -2, -3, -4, -7, 6, 7, -2, -5,
-	4, 5, -6, -8, 9, 8, 12, 4, 5,
+	4, 5, -6, -8, 9, 8, 12, 4, 5, 13,
+	14, 12, 15, 12, 15, 12, 12,
 }
 var yyDef = []int{
 
-	5, -2, 1, -2, 0, 6, 7, 8, 2, 14,
-	9, 10, 4, 15, 0, 0, 13, 11, 12,
+	5, -2, 1, -2, 0, 6, 7, 8, 2, 18,
+	9, 10, 4, 19, 0, 0, 17, 11, 12, 0,
+	0, 13, 0, 15, 0, 14, 16,
 }
 var yyTok1 = []int{
 
@@ -106,7 +116,7 @@ var yyTok1 = []int{
 var yyTok2 = []int{
 
 	2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-	12,
+	12, 13, 14, 15,
 }
 var yyTok3 = []int{
 	0,
@@ -449,7 +459,83 @@ yydefault:
 			parsingLastQuery = q
 		}
 	case 13:
-		//line query_syntax.y:130
+		//line query_syntax.y:128
+		{
+			field := yyS[yypt-3].s
+			min := yyS[yypt-0].f
+			minInclusive := false
+			logDebugGrammar("FIELD - GREATER THAN %f", min)
+			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
+			if parsingMust {
+				parsingMustList.AddQuery(q)
+				parsingMust = false
+			} else if parsingMustNot {
+				parsingMustNotList.AddQuery(q)
+				parsingMustNot = false
+			} else {
+				parsingShouldList.AddQuery(q)
+			}
+			parsingLastQuery = q
+		}
+	case 14:
+		//line query_syntax.y:146
+		{
+			field := yyS[yypt-4].s
+			min := yyS[yypt-0].f
+			minInclusive := true
+			logDebugGrammar("FIELD - GREATER THAN OR EQUAL %f", min)
+			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
+			if parsingMust {
+				parsingMustList.AddQuery(q)
+				parsingMust = false
+			} else if parsingMustNot {
+				parsingMustNotList.AddQuery(q)
+				parsingMustNot = false
+			} else {
+				parsingShouldList.AddQuery(q)
+			}
+			parsingLastQuery = q
+		}
+	case 15:
+		//line query_syntax.y:164
+		{
+			field := yyS[yypt-3].s
+			max := yyS[yypt-0].f
+			maxInclusive := false
+			logDebugGrammar("FIELD - LESS THAN %f", max)
+			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
+			if parsingMust {
+				parsingMustList.AddQuery(q)
+				parsingMust = false
+			} else if parsingMustNot {
+				parsingMustNotList.AddQuery(q)
+				parsingMustNot = false
+			} else {
+				parsingShouldList.AddQuery(q)
+			}
+			parsingLastQuery = q
+		}
+	case 16:
+		//line query_syntax.y:182
+		{
+			field := yyS[yypt-4].s
+			max := yyS[yypt-0].f
+			maxInclusive := true
+			logDebugGrammar("FIELD - LESS THAN OR EQUAL %f", max)
+			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
+			if parsingMust {
+				parsingMustList.AddQuery(q)
+				parsingMust = false
+			} else if parsingMustNot {
+				parsingMustNotList.AddQuery(q)
+				parsingMustNot = false
+			} else {
+				parsingShouldList.AddQuery(q)
+			}
+			parsingLastQuery = q
+		}
+	case 17:
+		//line query_syntax.y:202
 		{
 			boost := yyS[yypt-0].f
 			if parsingLastQuery != nil {
@@ -462,13 +548,13 @@ yydefault:
 			}
 			logDebugGrammar("BOOST %f", boost)
 		}
-	case 14:
-		//line query_syntax.y:144
+	case 18:
+		//line query_syntax.y:216
 		{
 
 		}
-	case 15:
-		//line query_syntax.y:148
+	case 19:
+		//line query_syntax.y:220
 		{
 
 		}

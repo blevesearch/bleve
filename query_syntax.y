@@ -14,7 +14,7 @@ s string
 n int
 f float64}
 
-%token STRING PHRASE PLUS MINUS COLON BOOST LPAREN RPAREN NUMBER STRING
+%token STRING PHRASE PLUS MINUS COLON BOOST LPAREN RPAREN NUMBER STRING GREATER LESS EQUAL
 
 %%
 
@@ -113,6 +113,78 @@ STRING COLON PHRASE {
 	phrase := $3.s
 	logDebugGrammar("FIELD - %s PHRASE - %s", field, phrase)
 	q := NewMatchPhraseQuery(phrase).SetField(field)
+	if parsingMust {
+		parsingMustList.AddQuery(q)
+		parsingMust = false
+	} else if parsingMustNot {
+		parsingMustNotList.AddQuery(q)
+		parsingMustNot = false
+	} else {
+		parsingShouldList.AddQuery(q)
+	}
+	parsingLastQuery = q
+}
+|
+STRING COLON GREATER NUMBER {
+	field := $1.s
+	min := $4.f
+	minInclusive := false
+	logDebugGrammar("FIELD - GREATER THAN %f", min)
+	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
+	if parsingMust {
+		parsingMustList.AddQuery(q)
+		parsingMust = false
+	} else if parsingMustNot {
+		parsingMustNotList.AddQuery(q)
+		parsingMustNot = false
+	} else {
+		parsingShouldList.AddQuery(q)
+	}
+	parsingLastQuery = q
+}
+|
+STRING COLON GREATER EQUAL NUMBER {
+	field := $1.s
+	min := $5.f
+	minInclusive := true
+	logDebugGrammar("FIELD - GREATER THAN OR EQUAL %f", min)
+	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
+	if parsingMust {
+		parsingMustList.AddQuery(q)
+		parsingMust = false
+	} else if parsingMustNot {
+		parsingMustNotList.AddQuery(q)
+		parsingMustNot = false
+	} else {
+		parsingShouldList.AddQuery(q)
+	}
+	parsingLastQuery = q
+}
+|
+STRING COLON LESS NUMBER {
+	field := $1.s
+	max := $4.f
+	maxInclusive := false
+	logDebugGrammar("FIELD - LESS THAN %f", max)
+	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
+	if parsingMust {
+		parsingMustList.AddQuery(q)
+		parsingMust = false
+	} else if parsingMustNot {
+		parsingMustNotList.AddQuery(q)
+		parsingMustNot = false
+	} else {
+		parsingShouldList.AddQuery(q)
+	}
+	parsingLastQuery = q
+}
+|
+STRING COLON LESS EQUAL NUMBER {
+	field := $1.s
+	max := $5.f
+	maxInclusive := true
+	logDebugGrammar("FIELD - LESS THAN OR EQUAL %f", max)
+	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
 	if parsingMust {
 		parsingMustList.AddQuery(q)
 		parsingMust = false

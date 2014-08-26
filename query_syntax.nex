@@ -9,6 +9,9 @@
 /^/               { logDebugTokens("BOOST"); return BOOST }
 /\(/              { logDebugTokens("LPAREN"); return LPAREN }
 /\)/              { logDebugTokens("RPAREN"); return RPAREN }
+/>/              { logDebugTokens("GREATER"); return GREATER }
+/</              { logDebugTokens("LESS"); return LESS }
+/=/              { logDebugTokens("EQUAL"); return EQUAL }
 /-?([0-9]|[1-9][0-9]*)(\.[0-9][0-9]*)?/
                   { 
                     lval.f,_ = strconv.ParseFloat(yylex.Text(), 64);
@@ -16,7 +19,7 @@
                     return NUMBER
                   }
 /[ \t\n]+/        { logDebugTokens("WHITESPACE (count=%d)", len(yylex.Text())) /* eat up whitespace */ }
-/[^\t\n\f\r :^\+\-]+/           { 
+/[^\t\n\f\r :^\+\-><=]+/           {
                     lval.s = yylex.Text()
                     logDebugTokens("STRING - %s", lval.s);
                     return STRING 
