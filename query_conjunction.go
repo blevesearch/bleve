@@ -40,7 +40,7 @@ func (q *ConjunctionQuery) AddQuery(aq Query) *ConjunctionQuery {
 	return q
 }
 
-func (q *ConjunctionQuery) Searcher(i *indexImpl, explain bool) (*search.ConjunctionSearcher, error) {
+func (q *ConjunctionQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 	searchers := make([]search.Searcher, len(q.Conjuncts))
 	for in, conjunct := range q.Conjuncts {
 		var err error
