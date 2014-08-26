@@ -50,7 +50,7 @@ func (q *DisjunctionQuery) SetMin(m float64) *DisjunctionQuery {
 	return q
 }
 
-func (q *DisjunctionQuery) Searcher(i *indexImpl, explain bool) (*search.DisjunctionSearcher, error) {
+func (q *DisjunctionQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 	searchers := make([]search.Searcher, len(q.Disjuncts))
 	for in, disjunct := range q.Disjuncts {
 		var err error
