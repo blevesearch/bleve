@@ -9,11 +9,11 @@
 /^/               { logDebugTokens("BOOST"); return BOOST }
 /\(/              { logDebugTokens("LPAREN"); return LPAREN }
 /\)/              { logDebugTokens("RPAREN"); return RPAREN }
-/-?[0-9]|[1-9][0-9]*/
+/-?([0-9]|[1-9][0-9]*)(\.[0-9][0-9]*)?/
                   { 
-                    lval.n,_ = strconv.Atoi(yylex.Text());
-                    logDebugTokens("INT - %d", lval.n);
-                    return INT 
+                    lval.f,_ = strconv.ParseFloat(yylex.Text(), 64);
+                    logDebugTokens("NUMBER - %f", lval.f);
+                    return NUMBER
                   }
 /[ \t\n]+/        { logDebugTokens("WHITESPACE (count=%d)", len(yylex.Text())) /* eat up whitespace */ }
 /[^\t\n\f\r :^\+\-]+/           { 

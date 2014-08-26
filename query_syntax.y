@@ -14,7 +14,7 @@ s string
 n int
 f float64}
 
-%token STRING PHRASE PLUS MINUS COLON BOOST LPAREN RPAREN INT STRING
+%token STRING PHRASE PLUS MINUS COLON BOOST LPAREN RPAREN NUMBER STRING
 
 %%
 
@@ -127,17 +127,17 @@ STRING COLON PHRASE {
 
 
 searchBoost:
-BOOST INT {
-	boost := $2.n
+BOOST NUMBER {
+	boost := $2.f
 	if parsingLastQuery != nil {
 		switch parsingLastQuery := parsingLastQuery.(type) {
 		case *MatchQuery:
-			parsingLastQuery.SetBoost(float64(boost))
+			parsingLastQuery.SetBoost(boost)
 		case *MatchPhraseQuery:
-			parsingLastQuery.SetBoost(float64(boost))
+			parsingLastQuery.SetBoost(boost)
 		}
 	}
-	logDebugGrammar("BOOST %d", boost)
+	logDebugGrammar("BOOST %f", boost)
 };
 
 searchSuffix:

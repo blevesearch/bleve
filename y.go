@@ -28,7 +28,7 @@ const COLON = 57350
 const BOOST = 57351
 const LPAREN = 57352
 const RPAREN = 57353
-const INT = 57354
+const NUMBER = 57354
 
 var yyToknames = []string{
 	"STRING",
@@ -39,7 +39,7 @@ var yyToknames = []string{
 	"BOOST",
 	"LPAREN",
 	"RPAREN",
-	"INT",
+	"NUMBER",
 }
 var yyStatenames = []string{}
 
@@ -451,16 +451,16 @@ yydefault:
 	case 13:
 		//line query_syntax.y:130
 		{
-			boost := yyS[yypt-0].n
+			boost := yyS[yypt-0].f
 			if parsingLastQuery != nil {
 				switch parsingLastQuery := parsingLastQuery.(type) {
 				case *MatchQuery:
-					parsingLastQuery.SetBoost(float64(boost))
+					parsingLastQuery.SetBoost(boost)
 				case *MatchPhraseQuery:
-					parsingLastQuery.SetBoost(float64(boost))
+					parsingLastQuery.SetBoost(boost)
 				}
 			}
-			logDebugGrammar("BOOST %d", boost)
+			logDebugGrammar("BOOST %f", boost)
 		}
 	case 14:
 		//line query_syntax.y:144
