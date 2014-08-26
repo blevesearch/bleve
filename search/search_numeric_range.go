@@ -93,11 +93,10 @@ func (s *NumericRangeSearcher) SetQueryNorm(qnorm float64) {
 
 func (s *NumericRangeSearcher) Next() (*DocumentMatch, error) {
 	return s.searcher.Next()
-
 }
 
 func (s *NumericRangeSearcher) Advance(ID string) (*DocumentMatch, error) {
-	return s.searcher.Next()
+	return s.searcher.Advance(ID)
 }
 
 func (s *NumericRangeSearcher) Close() {
