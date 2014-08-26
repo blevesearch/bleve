@@ -212,6 +212,40 @@ func TestIndex(t *testing.T) {
 		}
 	}
 
+	// test a numeric range with both endpoints
+	minAge := 20.0
+	numericRangeQuery = NewNumericRangeQuery(&minAge, &maxAge).SetField("age")
+	searchRequest = NewSearchRequest(numericRangeQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	if searchResult.Total != uint64(1) {
+		t.Errorf("expected 1 total hits for numeric range query, got %d", searchResult.Total)
+	} else {
+		if searchResult.Hits[0].ID != "b" {
+			t.Errorf("expected top hit id 'b', got '%s'", searchResult.Hits[0].ID)
+		}
+	}
+
+	// test the same query done as two
+	// individual range queries and'd together
+	q1 := NewNumericRangeQuery(&minAge, nil).SetField("age")
+	q2 := NewNumericRangeQuery(nil, &maxAge).SetField("age")
+	conQuery := NewConjunctionQuery([]Query{q1, q2})
+	searchRequest = NewSearchRequest(conQuery)
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	if searchResult.Total != uint64(1) {
+		t.Errorf("expected 1 total hits for numeric range query, got %d", searchResult.Total)
+	} else {
+		if searchResult.Hits[0].ID != "b" {
+			t.Errorf("expected top hit id 'b', got '%s'", searchResult.Hits[0].ID)
+		}
+	}
+
 	startDate = "2010-01-01"
 	dateRangeQuery := NewDateRangeQuery(&startDate, nil).SetField("birthday")
 	searchRequest = NewSearchRequest(dateRangeQuery)
