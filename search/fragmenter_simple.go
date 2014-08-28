@@ -10,7 +10,7 @@ package search
 
 import ()
 
-const DEFAULT_FRAGMENT_SIZE = 100
+const DEFAULT_FRAGMENT_SIZE = 200
 
 type SimpleFragmenter struct {
 	fragmentSize int
@@ -70,6 +70,16 @@ func (s *SimpleFragmenter) Fragment(orig []byte, ot termLocations) []*Fragment {
 		// so that next one won't back up to include it
 		maxbegin = termLocation.End
 
+	}
+	if len(ot) == 0 {
+		// if there were no terms to highlight
+		// produce a single fragment from the beginning
+		start := 0
+		end := start + s.fragmentSize
+		if end > len(orig) {
+			end = len(orig)
+		}
+		rv = append(rv, &Fragment{orig: orig, start: start, end: end})
 	}
 
 	return rv
