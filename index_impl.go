@@ -365,7 +365,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 				}
 
 				for _, hf := range highlightFields {
-					highlighter.BestFragmentsInField(hit, doc, hf, 3)
+					highlighter.BestFragmentsInField(hit, doc, hf, 1)
 				}
 			}
 		}
