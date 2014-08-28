@@ -42,7 +42,7 @@ func TestSimpleHighlighter(t *testing.T) {
 		},
 	}
 
-	expectedFragment := DEFAULT_SEPARATOR + "the " + DEFAULT_ANSI_HIGHLIGHT + "quick" + reset + " brown " + DEFAULT_ANSI_HIGHLIGHT + "fox" + reset + " jumps over the lazy dog" + DEFAULT_SEPARATOR
+	expectedFragment := "the " + DEFAULT_ANSI_HIGHLIGHT + "quick" + reset + " brown " + DEFAULT_ANSI_HIGHLIGHT + "fox" + reset + " jumps over the lazy dog"
 	doc := document.NewDocument("a").AddField(document.NewTextField("desc", []uint64{}, []byte("the quick brown fox jumps over the lazy dog")))
 
 	fragment := highlighter.BestFragmentInField(&docMatch, doc, "desc")
@@ -143,6 +143,7 @@ Etiam vel augue vel nisl commodo suscipit et ac nisl. Quisque eros diam, porttit
 	}
 
 	highlighter := NewSimpleHighlighter()
+	highlighter.SetFragmenter(NewSimpleFragmenterWithSize(100))
 	fragments := highlighter.BestFragmentsInField(&docMatch, doc, "full", 5)
 
 	if !reflect.DeepEqual(fragments, expectedFragments) {

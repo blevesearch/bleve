@@ -116,7 +116,14 @@ func (s *SimpleHighlighter) BestFragmentsInField(dm *DocumentMatch, doc *documen
 	// now that we have the best fragments, we can format them
 	formattedFragments := make([]string, len(bestFragments))
 	for i, fragment := range bestFragments {
-		formattedFragments[i] = s.sep + s.formatter.Format(fragment, dm.Locations[field]) + s.sep
+		formattedFragments[i] = ""
+		if fragment.start != 0 {
+			formattedFragments[i] += s.sep
+		}
+		formattedFragments[i] += s.formatter.Format(fragment, dm.Locations[field])
+		if fragment.end != len(fragment.orig) {
+			formattedFragments[i] += s.sep
+		}
 	}
 
 	if dm.Fragments == nil {
