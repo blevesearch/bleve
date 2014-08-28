@@ -39,5 +39,5 @@ Discuss usage and development of bleve in the [google group](https://groups.goog
 
 ## Status
 
-[![Build Status](https://drone.io/github.com/couchbaselabs/bleve/status.png)](https://drone.io/github.com/couchbaselabs/bleve/latest)
+[![Build Status](https://drone.io/github.com/blevesearch/bleve/status.png)](https://drone.io/github.com/blevesearch/bleve/latest)
 [![Coverage Status](https://coveralls.io/repos/couchbaselabs/bleve/badge.png?branch=master)](https://coveralls.io/r/couchbaselabs/bleve?branch=master)
