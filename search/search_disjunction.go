@@ -12,7 +12,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/couchbaselabs/bleve/index"
+	"github.com/blevesearch/bleve/index"
 )
 
 type DisjunctionSearcher struct {

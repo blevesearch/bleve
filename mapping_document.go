@@ -12,7 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/registry"
 )
 
 type DocumentMapping struct {

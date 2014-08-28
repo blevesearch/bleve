@@ -12,8 +12,8 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/couchbaselabs/bleve/index"
-	"github.com/couchbaselabs/bleve/index/store"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/store"
 )
 
 type UpsideDownCouchFieldReader struct {

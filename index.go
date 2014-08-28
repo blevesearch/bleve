@@ -9,7 +9,7 @@
 package bleve
 
 import (
-	"github.com/couchbaselabs/bleve/document"
+	"github.com/blevesearch/bleve/document"
 )
 
 type Batch map[string]interface{}

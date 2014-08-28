@@ -15,7 +15,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/couchbaselabs/bleve/index/store/leveldb"
+	"github.com/blevesearch/bleve/index/store/leveldb"
 )
 
 func BenchmarkLevelDBIndexing(b *testing.B) {

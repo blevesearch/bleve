@@ -11,7 +11,7 @@ package search
 import (
 	"container/list"
 
-	"github.com/couchbaselabs/bleve/index"
+	"github.com/blevesearch/bleve/index"
 )
 
 type TermsFacetBuilder struct {

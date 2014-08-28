@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/search"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/search"
 )
 
 type NumericRange struct {

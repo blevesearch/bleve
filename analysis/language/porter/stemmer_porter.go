@@ -12,9 +12,9 @@
 package porter
 
 import (
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/analysis/token_filters/stemmer_filter"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/token_filters/stemmer_filter"
+	"github.com/blevesearch/bleve/registry"
 )
 
 const StemmerName = "stemmer_porter"

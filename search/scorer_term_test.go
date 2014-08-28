@@ -13,7 +13,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/couchbaselabs/bleve/index"
+	"github.com/blevesearch/bleve/index"
 )
 
 func TestTermScorer(t *testing.T) {

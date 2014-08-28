@@ -12,11 +12,11 @@
 package detect_lang_analyzer
 
 import (
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/analysis/token_filters/cld2"
-	"github.com/couchbaselabs/bleve/analysis/token_filters/lower_case_filter"
-	"github.com/couchbaselabs/bleve/analysis/tokenizers/single_token"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/token_filters/cld2"
+	"github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
+	"github.com/blevesearch/bleve/analysis/tokenizers/single_token"
+	"github.com/blevesearch/bleve/registry"
 )
 
 const Name = "detect_lang"

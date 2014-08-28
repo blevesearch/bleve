@@ -9,7 +9,7 @@
 package search
 
 import (
-	"github.com/couchbaselabs/bleve/document"
+	"github.com/blevesearch/bleve/document"
 )
 
 type Fragment struct {

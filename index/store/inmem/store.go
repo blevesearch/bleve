@@ -9,8 +9,8 @@
 package inmem
 
 import (
-	"github.com/couchbaselabs/bleve/index/store"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve/registry"
 	"github.com/ryszard/goskiplist/skiplist"
 )
 

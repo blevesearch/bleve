@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/couchbaselabs/bleve"
+	"github.com/blevesearch/bleve"
 )
 
 func TestBeerSearchAll(t *testing.T) {

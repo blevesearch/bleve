@@ -15,7 +15,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/couchbaselabs/bleve"
+	"github.com/blevesearch/bleve"
 
 	"github.com/gorilla/mux"
 )

@@ -9,9 +9,9 @@
 package keyword_analyzer
 
 import (
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/analysis/tokenizers/single_token"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/tokenizers/single_token"
+	"github.com/blevesearch/bleve/registry"
 )
 
 const Name = "keyword"

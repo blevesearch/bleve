@@ -12,7 +12,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis"
 )
 
 func TestGermanNormalizeFilter(t *testing.T) {

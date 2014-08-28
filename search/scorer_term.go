@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/couchbaselabs/bleve/index"
+	"github.com/blevesearch/bleve/index"
 )
 
 const MAX_SCORE_CACHE = 64

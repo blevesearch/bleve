@@ -13,9 +13,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/couchbaselabs/bleve/document"
-	"github.com/couchbaselabs/bleve/index"
-	"github.com/couchbaselabs/bleve/index/store/gouchstore"
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/store/gouchstore"
 )
 
 func TestIndexReader(t *testing.T) {

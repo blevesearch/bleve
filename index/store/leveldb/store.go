@@ -14,8 +14,8 @@ package leveldb
 import (
 	"fmt"
 
-	"github.com/couchbaselabs/bleve/index/store"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve/registry"
 	"github.com/jmhodges/levigo"
 )
 

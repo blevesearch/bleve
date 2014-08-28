@@ -11,7 +11,7 @@ package bleve
 import (
 	"encoding/json"
 
-	"github.com/couchbaselabs/bleve/search"
+	"github.com/blevesearch/bleve/search"
 )
 
 type ConjunctionQuery struct {

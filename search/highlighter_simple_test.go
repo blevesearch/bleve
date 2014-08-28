@@ -12,7 +12,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/couchbaselabs/bleve/document"
+	"github.com/blevesearch/bleve/document"
 )
 
 func TestSimpleHighlighter(t *testing.T) {

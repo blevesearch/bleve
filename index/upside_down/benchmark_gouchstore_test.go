@@ -12,7 +12,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/couchbaselabs/bleve/index/store/gouchstore"
+	"github.com/blevesearch/bleve/index/store/gouchstore"
 )
 
 func BenchmarkGouchstoreIndexing(b *testing.B) {

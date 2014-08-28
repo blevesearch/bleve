@@ -15,12 +15,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/couchbaselabs/bleve/document"
-	"github.com/couchbaselabs/bleve/index"
-	"github.com/couchbaselabs/bleve/index/store"
-	"github.com/couchbaselabs/bleve/index/upside_down"
-	"github.com/couchbaselabs/bleve/registry"
-	"github.com/couchbaselabs/bleve/search"
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/registry"
+	"github.com/blevesearch/bleve/search"
 )
 
 type indexImpl struct {

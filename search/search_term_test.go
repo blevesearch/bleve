@@ -12,9 +12,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/couchbaselabs/bleve/document"
-	"github.com/couchbaselabs/bleve/index/store/inmem"
-	"github.com/couchbaselabs/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/upside_down"
 )
 
 func TestTermSearcher(t *testing.T) {

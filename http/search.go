@@ -17,7 +17,7 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/couchbaselabs/bleve"
+	"github.com/blevesearch/bleve"
 )
 
 // SearchHandler can handle search requests sent over HTTP

@@ -9,7 +9,7 @@
 package main
 
 import (
-	"github.com/couchbaselabs/bleve"
+	"github.com/blevesearch/bleve"
 )
 
 const textFieldAnalyzer = "en"

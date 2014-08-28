@@ -13,8 +13,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/numeric_util"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/numeric_util"
 )
 
 const DEFAULT_DATETIME_INDEXING_OPTIONS = STORE_FIELD | INDEX_FIELD

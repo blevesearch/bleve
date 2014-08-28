@@ -12,8 +12,8 @@ import (
 	"container/list"
 	"time"
 
-	"github.com/couchbaselabs/bleve/index"
-	"github.com/couchbaselabs/bleve/numeric_util"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/numeric_util"
 )
 
 type dateTimeRange struct {

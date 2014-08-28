@@ -12,8 +12,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/couchbaselabs/bleve/numeric_util"
-	"github.com/couchbaselabs/bleve/search"
+	"github.com/blevesearch/bleve/numeric_util"
+	"github.com/blevesearch/bleve/search"
 )
 
 type DateRangeQuery struct {

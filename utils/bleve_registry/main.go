@@ -11,8 +11,8 @@ package main
 import (
 	"fmt"
 
-	_ "github.com/couchbaselabs/bleve"
-	"github.com/couchbaselabs/bleve/registry"
+	_ "github.com/blevesearch/bleve"
+	"github.com/blevesearch/bleve/registry"
 )
 
 func main() {

@@ -9,7 +9,7 @@
 package index
 
 import (
-	"github.com/couchbaselabs/bleve/document"
+	"github.com/blevesearch/bleve/document"
 )
 
 type Index interface {

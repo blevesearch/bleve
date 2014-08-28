@@ -13,12 +13,12 @@
 package tr
 
 import (
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/registry"
 
-	"github.com/couchbaselabs/bleve/analysis/token_filters/apostrophe_filter"
-	"github.com/couchbaselabs/bleve/analysis/token_filters/lower_case_filter"
-	"github.com/couchbaselabs/bleve/analysis/tokenizers/unicode_word_boundary"
+	"github.com/blevesearch/bleve/analysis/token_filters/apostrophe_filter"
+	"github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
+	"github.com/blevesearch/bleve/analysis/tokenizers/unicode_word_boundary"
 )
 
 const AnalyzerName = "tr"

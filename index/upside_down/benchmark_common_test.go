@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/couchbaselabs/bleve/document"
-	"github.com/couchbaselabs/bleve/index/store"
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index/store"
 )
 
 func CommonBenchmarkIndex(b *testing.B, s store.KVStore) {

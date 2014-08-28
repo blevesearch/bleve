@@ -12,5 +12,5 @@
 package bleve
 
 import (
-	_ "github.com/couchbaselabs/bleve/analysis/tokenizers/unicode_word_boundary"
+	_ "github.com/blevesearch/bleve/analysis/tokenizers/unicode_word_boundary"
 )

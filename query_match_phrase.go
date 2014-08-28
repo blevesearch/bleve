@@ -11,7 +11,7 @@ package bleve
 import (
 	"fmt"
 
-	"github.com/couchbaselabs/bleve/search"
+	"github.com/blevesearch/bleve/search"
 )
 
 type MatchPhraseQuery struct {

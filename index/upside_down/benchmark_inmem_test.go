@@ -11,7 +11,7 @@ package upside_down
 import (
 	"testing"
 
-	"github.com/couchbaselabs/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/store/inmem"
 )
 
 func BenchmarkInMemIndexing(b *testing.B) {

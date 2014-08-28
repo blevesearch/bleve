@@ -11,7 +11,7 @@ package http
 import (
 	"sync"
 
-	"github.com/couchbaselabs/bleve"
+	"github.com/blevesearch/bleve"
 )
 
 var indexNameMapping map[string]bleve.Index

@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/couchbaselabs/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index/upside_down"
 	"github.com/gorilla/mux"
 )
 

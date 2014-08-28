@@ -11,7 +11,7 @@ package store_test
 import (
 	"testing"
 
-	"github.com/couchbaselabs/bleve/index/store"
+	"github.com/blevesearch/bleve/index/store"
 )
 
 func CommonTestKVStore(t *testing.T, s store.KVStore) {

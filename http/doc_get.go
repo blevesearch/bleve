@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/couchbaselabs/bleve/document"
+	"github.com/blevesearch/bleve/document"
 
 	"github.com/gorilla/mux"
 )

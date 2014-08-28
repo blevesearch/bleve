@@ -9,7 +9,7 @@
 package document
 
 import (
-	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis"
 )
 
 const DEFAULT_COMPOSITE_INDEXING_OPTIONS = INDEX_FIELD

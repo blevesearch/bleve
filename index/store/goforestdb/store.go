@@ -12,7 +12,7 @@
 package goforestdb
 
 import (
-	"github.com/couchbaselabs/bleve/index/store"
+	"github.com/blevesearch/bleve/index/store"
 	"github.com/couchbaselabs/goforestdb"
 )
 

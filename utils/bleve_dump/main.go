@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/couchbaselabs/bleve"
-	"github.com/couchbaselabs/bleve/index/upside_down"
+	"github.com/blevesearch/bleve"
+	"github.com/blevesearch/bleve/index/upside_down"
 )
 
 var indexPath = flag.String("index", "", "index path")

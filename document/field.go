@@ -9,7 +9,7 @@
 package document
 
 import (
-	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis"
 )
 
 type Field interface {

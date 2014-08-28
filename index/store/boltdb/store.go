@@ -11,9 +11,9 @@ package boltdb
 import (
 	"fmt"
 
+	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve/registry"
 	"github.com/boltdb/bolt"
-	"github.com/couchbaselabs/bleve/index/store"
-	"github.com/couchbaselabs/bleve/registry"
 )
 
 const Name = "boltdb"

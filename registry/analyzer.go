@@ -11,7 +11,7 @@ package registry
 import (
 	"fmt"
 
-	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis"
 )
 
 func RegisterAnalyzer(name string, constructor AnalyzerConstructor) {

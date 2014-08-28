@@ -15,7 +15,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/couchbaselabs/bleve/index/store/goforestdb"
+	"github.com/blevesearch/bleve/index/store/goforestdb"
 )
 
 func BenchmarkForestDBIndexing(b *testing.B) {

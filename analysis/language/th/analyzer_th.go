@@ -12,10 +12,10 @@
 package th
 
 import (
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/registry"
 
-	"github.com/couchbaselabs/bleve/analysis/token_filters/lower_case_filter"
+	"github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
 )
 
 const AnalyzerName = "th"

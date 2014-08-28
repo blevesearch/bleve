@@ -9,9 +9,9 @@
 package gl
 
 import (
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/analysis/token_filters/stop_tokens_filter"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/token_filters/stop_tokens_filter"
+	"github.com/blevesearch/bleve/registry"
 )
 
 func StopTokenFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {

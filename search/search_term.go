@@ -9,7 +9,7 @@
 package search
 
 import (
-	"github.com/couchbaselabs/bleve/index"
+	"github.com/blevesearch/bleve/index"
 )
 
 type TermSearcher struct {

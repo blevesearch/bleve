@@ -9,7 +9,7 @@
 package bleve
 
 import (
-	"github.com/couchbaselabs/bleve/search"
+	"github.com/blevesearch/bleve/search"
 )
 
 type BooleanQuery struct {

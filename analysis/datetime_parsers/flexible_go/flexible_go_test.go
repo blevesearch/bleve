@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis"
 )
 
 func TestFlexibleDateTimeParser(t *testing.T) {

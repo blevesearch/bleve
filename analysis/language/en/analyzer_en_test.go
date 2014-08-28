@@ -16,8 +16,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/registry"
 )
 
 func TestEnglishAnalyzer(t *testing.T) {

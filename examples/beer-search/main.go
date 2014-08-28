@@ -17,8 +17,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/couchbaselabs/bleve"
-	bleveHttp "github.com/couchbaselabs/bleve/http"
+	"github.com/blevesearch/bleve"
+	bleveHttp "github.com/blevesearch/bleve/http"
 )
 
 var batchSize = flag.Int("batchSize", 100, "batch size for indexing")

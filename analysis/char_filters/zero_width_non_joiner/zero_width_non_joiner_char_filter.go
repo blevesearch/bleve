@@ -11,9 +11,9 @@ package zero_width_non_joiner
 import (
 	"regexp"
 
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/analysis/char_filters/regexp_char_filter"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/char_filters/regexp_char_filter"
+	"github.com/blevesearch/bleve/registry"
 )
 
 const Name = "zero_width_spaces"

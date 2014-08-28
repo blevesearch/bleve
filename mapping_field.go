@@ -11,7 +11,7 @@ package bleve
 import (
 	"fmt"
 
-	"github.com/couchbaselabs/bleve/document"
+	"github.com/blevesearch/bleve/document"
 )
 
 type FieldMapping struct {

@@ -15,7 +15,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/couchbaselabs/bleve/index/store/test"
+	"github.com/blevesearch/bleve/index/store/test"
 )
 
 func TestLevelDBStore(t *testing.T) {

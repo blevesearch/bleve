@@ -24,8 +24,8 @@ import (
 	"log"
 	"unsafe"
 
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/registry"
 )
 
 const Name = "unicode"

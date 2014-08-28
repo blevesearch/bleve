@@ -11,7 +11,7 @@ package search
 import (
 	"math"
 
-	"github.com/couchbaselabs/bleve/index"
+	"github.com/blevesearch/bleve/index"
 )
 
 type BooleanSearcher struct {

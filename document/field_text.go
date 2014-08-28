@@ -11,7 +11,7 @@ package document
 import (
 	"fmt"
 
-	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis"
 )
 
 const DEFAULT_TEXT_INDEXING_OPTIONS = INDEX_FIELD

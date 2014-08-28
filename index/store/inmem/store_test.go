@@ -11,7 +11,7 @@ package inmem
 import (
 	"testing"
 
-	"github.com/couchbaselabs/bleve/index/store/test"
+	"github.com/blevesearch/bleve/index/store/test"
 )
 
 func TestInMemStore(t *testing.T) {

@@ -11,8 +11,8 @@ package lower_case_filter
 import (
 	"strings"
 
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/registry"
 )
 
 const Name = "to_lower"

@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/couchbaselabs/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis"
 )
 
 var stores = make(KVStoreRegistry, 0)

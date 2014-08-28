@@ -15,8 +15,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/registry"
 )
 
 // tried to adapt these from the lucene tests, most of which either

@@ -13,8 +13,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/couchbaselabs/bleve/document"
-	"github.com/couchbaselabs/bleve/index/store/boltdb"
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index/store/boltdb"
 )
 
 func TestIndexFieldReader(t *testing.T) {

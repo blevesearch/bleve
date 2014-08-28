@@ -11,7 +11,7 @@ package search
 import (
 	"container/heap"
 
-	"github.com/couchbaselabs/bleve/document"
+	"github.com/blevesearch/bleve/document"
 )
 
 const DEFAULT_SEPARATOR = "…"

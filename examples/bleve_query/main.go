@@ -14,7 +14,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/couchbaselabs/bleve"
+	"github.com/blevesearch/bleve"
 )
 
 var field = flag.String("field", "_all", "field to query")

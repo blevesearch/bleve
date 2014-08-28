@@ -15,11 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/analysis/tokenizers/regexp_tokenizer"
-	"github.com/couchbaselabs/bleve/document"
-	"github.com/couchbaselabs/bleve/index"
-	"github.com/couchbaselabs/bleve/index/store/boltdb"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/tokenizers/regexp_tokenizer"
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/store/boltdb"
 )
 
 var testAnalyzer = &analysis.Analyzer{

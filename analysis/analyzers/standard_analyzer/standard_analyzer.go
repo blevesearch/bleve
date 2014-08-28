@@ -9,11 +9,11 @@
 package standard_analyzer
 
 import (
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/analysis/language/en"
-	"github.com/couchbaselabs/bleve/analysis/token_filters/lower_case_filter"
-	"github.com/couchbaselabs/bleve/analysis/tokenizers/whitespace_tokenizer"
-	"github.com/couchbaselabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/language/en"
+	"github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
+	"github.com/blevesearch/bleve/analysis/tokenizers/whitespace_tokenizer"
+	"github.com/blevesearch/bleve/registry"
 )
 
 const Name = "standard"

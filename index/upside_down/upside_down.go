@@ -13,10 +13,10 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/couchbaselabs/bleve/analysis"
-	"github.com/couchbaselabs/bleve/document"
-	"github.com/couchbaselabs/bleve/index"
-	"github.com/couchbaselabs/bleve/index/store"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/store"
 
 	"code.google.com/p/goprotobuf/proto"
 )
