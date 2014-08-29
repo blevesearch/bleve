@@ -7,25 +7,14 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package json_byte_array_converter
 
 import (
 	"encoding/json"
+
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/registry"
 )
-
-type ByteArrayConverter interface {
-	Convert([]byte) (interface{}, error)
-}
-
-type StringByteArrayConverter struct{}
-
-func NewStringByteArrayConverter() *StringByteArrayConverter {
-	return &StringByteArrayConverter{}
-}
-
-func (c *StringByteArrayConverter) Convert(in []byte) (interface{}, error) {
-	return string(in), nil
-}
 
 type JSONByteArrayConverter struct{}
 
@@ -42,12 +31,10 @@ func (c *JSONByteArrayConverter) Convert(in []byte) (interface{}, error) {
 	return rv, nil
 }
 
-type IgnoreByteArrayConverter struct{}
-
-func NewIgnoreByteArrayConverter() *IgnoreByteArrayConverter {
-	return &IgnoreByteArrayConverter{}
+func Constructor(config map[string]interface{}, cache *registry.Cache) (analysis.ByteArrayConverter, error) {
+	return NewJSONByteArrayConverter(), nil
 }
 
-func (c *IgnoreByteArrayConverter) Convert(in []byte) (interface{}, error) {
-	return nil, nil
+func init() {
+	registry.RegisterByteArrayConverter("json", Constructor)
 }

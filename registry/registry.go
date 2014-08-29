@@ -17,6 +17,8 @@ import (
 
 var stores = make(KVStoreRegistry, 0)
 
+var byteArrayConverters = make(ByteArrayConverterRegistry, 0)
+
 // analysis
 var charFilters = make(CharFilterRegistry, 0)
 var tokenizers = make(TokenizerRegistry, 0)
@@ -166,6 +168,17 @@ func PrintRegistry() {
 	}
 	sorted.Sort()
 	fmt.Printf("KV Stores:\n")
+	for _, name := range sorted {
+		fmt.Printf("\t%s\n", name)
+	}
+	fmt.Println()
+
+	sorted = make(sort.StringSlice, 0, len(byteArrayConverters))
+	for name, _ := range byteArrayConverters {
+		sorted = append(sorted, name)
+	}
+	sorted.Sort()
+	fmt.Printf("Byte Array Converters:\n")
 	for _, name := range sorted {
 		fmt.Printf("\t%s\n", name)
 	}

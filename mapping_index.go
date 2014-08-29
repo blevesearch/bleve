@@ -211,13 +211,20 @@ func (im *IndexMapping) MapDocument(doc *document.Document, data interface{}) er
 	// see if the top level object is a byte array, and possibly run through conveter
 	byteArrayData, ok := data.([]byte)
 	if ok {
-		byteArrayConverter, valid := Config.ByteArrayConverters[im.ByteArrayConverter]
-		if valid {
-			convertedData, err := byteArrayConverter.Convert(byteArrayData)
-			if err != nil {
-				return err
+		byteArrayConverterConstructor := registry.ByteArrayConverterByName(im.ByteArrayConverter)
+		if byteArrayConverterConstructor != nil {
+			byteArrayConverter, err := byteArrayConverterConstructor(nil, nil)
+			if err == nil {
+				convertedData, err := byteArrayConverter.Convert(byteArrayData)
+				if err != nil {
+					return err
+				}
+				data = convertedData
+			} else {
+				log.Printf("error creating byte array converter: %v", err)
 			}
-			data = convertedData
+		} else {
+			log.Printf("no byte array converter named: %s", im.ByteArrayConverter)
 		}
 	}
 

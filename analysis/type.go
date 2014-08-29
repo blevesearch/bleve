@@ -74,3 +74,7 @@ var INVALID_DATETIME = fmt.Errorf("unable to parse datetime with any of the layo
 type DateTimeParser interface {
 	ParseDateTime(string) (time.Time, error)
 }
+
+type ByteArrayConverter interface {
+	Convert([]byte) (interface{}, error)
+}

@@ -80,6 +80,11 @@ import (
 	// kv stores
 	_ "github.com/blevesearch/bleve/index/store/boltdb"
 	_ "github.com/blevesearch/bleve/index/store/inmem"
+
+	// byte array converters
+	_ "github.com/blevesearch/bleve/analysis/byte_array_converters/ignore"
+	_ "github.com/blevesearch/bleve/analysis/byte_array_converters/json"
+	_ "github.com/blevesearch/bleve/analysis/byte_array_converters/string"
 )
 
 var bleveExpVar = expvar.NewMap("bleve")
@@ -89,10 +94,9 @@ type HighlightConfig struct {
 }
 
 type configuration struct {
-	Highlight           *HighlightConfig
-	DefaultHighlighter  *string
-	ByteArrayConverters map[string]ByteArrayConverter
-	DefaultKVStore      string
+	Highlight          *HighlightConfig
+	DefaultHighlighter *string
+	DefaultKVStore     string
 }
 
 func newConfiguration() *configuration {
@@ -100,7 +104,6 @@ func newConfiguration() *configuration {
 		Highlight: &HighlightConfig{
 			Highlighters: make(map[string]search.Highlighter),
 		},
-		ByteArrayConverters: make(map[string]ByteArrayConverter),
 	}
 }
 
@@ -111,11 +114,6 @@ func init() {
 
 	// build the default configuration
 	Config = newConfiguration()
-
-	// register byte array converters
-	Config.ByteArrayConverters["string"] = NewStringByteArrayConverter()
-	Config.ByteArrayConverters["json"] = NewJSONByteArrayConverter()
-	Config.ByteArrayConverters["ignore"] = NewIgnoreByteArrayConverter()
 
 	// register ansi highlighter
 	Config.Highlight.Highlighters["ansi"] = search.NewSimpleHighlighter()
