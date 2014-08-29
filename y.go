@@ -1,4 +1,3 @@
-//line query_syntax.y:2
 package bleve
 
 import __yyfmt__ "fmt"
