@@ -14,7 +14,7 @@ s string
 n int
 f float64}
 
-%token STRING PHRASE PLUS MINUS COLON BOOST LPAREN RPAREN NUMBER STRING GREATER LESS EQUAL
+%token tSTRING tPHRASE tPLUS tMINUS tCOLON tBOOST tLPAREN tRPAREN tNUMBER tSTRING tGREATER tLESS tEQUAL
 
 %%
 
@@ -48,18 +48,18 @@ searchMustMustNot {
 ;
 
 searchMustMustNot:
-PLUS {
+tPLUS {
 	logDebugGrammar("PLUS")
 	parsingMust = true
 }
 |
-MINUS {
+tMINUS {
 	logDebugGrammar("MINUS")
 	parsingMustNot = true
 };
 
 searchBase:
-STRING {
+tSTRING {
 	str := $1.s
 	logDebugGrammar("STRING - %s", str)
 	q := NewMatchQuery(str)
@@ -75,7 +75,7 @@ STRING {
 	parsingLastQuery = q
 }
 |
-PHRASE {
+tPHRASE {
 	phrase := $1.s
 	logDebugGrammar("PHRASE - %s", phrase)
 	q := NewMatchPhraseQuery(phrase)
@@ -91,7 +91,7 @@ PHRASE {
 	parsingLastQuery = q
 }
 |
-STRING COLON STRING {
+tSTRING tCOLON tSTRING {
 	field := $1.s
 	str := $3.s
 	logDebugGrammar("FIELD - %s STRING - %s", field, str)
@@ -108,7 +108,7 @@ STRING COLON STRING {
 	parsingLastQuery = q
 }
 |
-STRING COLON PHRASE {
+tSTRING tCOLON tPHRASE {
 	field := $1.s
 	phrase := $3.s
 	logDebugGrammar("FIELD - %s PHRASE - %s", field, phrase)
@@ -125,7 +125,7 @@ STRING COLON PHRASE {
 	parsingLastQuery = q
 }
 |
-STRING COLON GREATER NUMBER {
+tSTRING tCOLON tGREATER tNUMBER {
 	field := $1.s
 	min := $4.f
 	minInclusive := false
@@ -143,7 +143,7 @@ STRING COLON GREATER NUMBER {
 	parsingLastQuery = q
 }
 |
-STRING COLON GREATER EQUAL NUMBER {
+tSTRING tCOLON tGREATER tEQUAL tNUMBER {
 	field := $1.s
 	min := $5.f
 	minInclusive := true
@@ -161,7 +161,7 @@ STRING COLON GREATER EQUAL NUMBER {
 	parsingLastQuery = q
 }
 |
-STRING COLON LESS NUMBER {
+tSTRING tCOLON tLESS tNUMBER {
 	field := $1.s
 	max := $4.f
 	maxInclusive := false
@@ -179,7 +179,7 @@ STRING COLON LESS NUMBER {
 	parsingLastQuery = q
 }
 |
-STRING COLON LESS EQUAL NUMBER {
+tSTRING tCOLON tLESS tEQUAL tNUMBER {
 	field := $1.s
 	max := $5.f
 	maxInclusive := true
@@ -199,7 +199,7 @@ STRING COLON LESS EQUAL NUMBER {
 
 
 searchBoost:
-BOOST NUMBER {
+tBOOST tNUMBER {
 	boost := $2.f
 	if parsingLastQuery != nil {
 		switch parsingLastQuery := parsingLastQuery.(type) {

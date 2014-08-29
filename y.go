@@ -19,32 +19,32 @@ type yySymType struct {
 	f   float64
 }
 
-const STRING = 57346
-const PHRASE = 57347
-const PLUS = 57348
-const MINUS = 57349
-const COLON = 57350
-const BOOST = 57351
-const LPAREN = 57352
-const RPAREN = 57353
-const NUMBER = 57354
-const GREATER = 57355
-const LESS = 57356
-const EQUAL = 57357
+const tSTRING = 57346
+const tPHRASE = 57347
+const tPLUS = 57348
+const tMINUS = 57349
+const tCOLON = 57350
+const tBOOST = 57351
+const tLPAREN = 57352
+const tRPAREN = 57353
+const tNUMBER = 57354
+const tGREATER = 57355
+const tLESS = 57356
+const tEQUAL = 57357
 
 var yyToknames = []string{
-	"STRING",
-	"PHRASE",
-	"PLUS",
-	"MINUS",
-	"COLON",
-	"BOOST",
-	"LPAREN",
-	"RPAREN",
-	"NUMBER",
-	"GREATER",
-	"LESS",
-	"EQUAL",
+	"tSTRING",
+	"tPHRASE",
+	"tPLUS",
+	"tMINUS",
+	"tCOLON",
+	"tBOOST",
+	"tLPAREN",
+	"tRPAREN",
+	"tNUMBER",
+	"tGREATER",
+	"tLESS",
+	"tEQUAL",
 }
 var yyStatenames = []string{}
 

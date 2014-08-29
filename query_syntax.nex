@@ -1,28 +1,28 @@
 /\"((\\\")|(\\\\)|(\\\/)|(\\b)|(\\f)|(\\n)|(\\r)|(\\t)|(\\u[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F])|[^\"])*\"/     { 
                     lval.s = yylex.Text()[1:len(yylex.Text())-1]
                     logDebugTokens("PHRASE - %s", lval.s);
-                    return PHRASE 
+                    return tPHRASE 
               }
-/\+/              { logDebugTokens("PLUS"); return PLUS }
-/-/               { logDebugTokens("MINUS"); return MINUS }
-/:/               { logDebugTokens("COLON"); return COLON }
-/^/               { logDebugTokens("BOOST"); return BOOST }
-/\(/              { logDebugTokens("LPAREN"); return LPAREN }
-/\)/              { logDebugTokens("RPAREN"); return RPAREN }
-/>/              { logDebugTokens("GREATER"); return GREATER }
-/</              { logDebugTokens("LESS"); return LESS }
-/=/              { logDebugTokens("EQUAL"); return EQUAL }
+/\+/              { logDebugTokens("PLUS"); return tPLUS }
+/-/               { logDebugTokens("MINUS"); return tMINUS }
+/:/               { logDebugTokens("COLON"); return tCOLON }
+/^/               { logDebugTokens("BOOST"); return tBOOST }
+/\(/              { logDebugTokens("LPAREN"); return tLPAREN }
+/\)/              { logDebugTokens("RPAREN"); return tRPAREN }
+/>/              { logDebugTokens("GREATER"); return tGREATER }
+/</              { logDebugTokens("LESS"); return tLESS }
+/=/              { logDebugTokens("EQUAL"); return tEQUAL }
 /-?([0-9]|[1-9][0-9]*)(\.[0-9][0-9]*)?/
                   { 
                     lval.f,_ = strconv.ParseFloat(yylex.Text(), 64);
                     logDebugTokens("NUMBER - %f", lval.f);
-                    return NUMBER
+                    return tNUMBER
                   }
 /[ \t\n]+/        { logDebugTokens("WHITESPACE (count=%d)", len(yylex.Text())) /* eat up whitespace */ }
 /[^\t\n\f\r :^\+\-><=]+/           {
                     lval.s = yylex.Text()
                     logDebugTokens("STRING - %s", lval.s);
-                    return STRING 
+                    return tSTRING 
                   }
 //
 package bleve
