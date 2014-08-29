@@ -35,7 +35,10 @@ Discuss usage and development of bleve in the [google group](https://groups.goog
 		query := bleve.NewSyntaxQuery("bleve")
 		searchRequest := bleve.NewSearchRequest(query)
 		searchResult, _ := index.Search(searchRequest)
+		
+## License
 
+Apache License Version 2.0
 
 ## Status
 
