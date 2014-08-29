@@ -52,7 +52,7 @@ func TestParseQuery(t *testing.T) {
 		},
 		{
 			input:  []byte(`{"query":"+beer \"light beer\" -devon"}`),
-			output: NewSyntaxQuery(`+beer "light beer" -devon`),
+			output: NewQueryStringQuery(`+beer "light beer" -devon`),
 		},
 		{
 			input:  []byte(`{"min":5.1,"max":7.1,"field":"desc"}`),
@@ -185,7 +185,7 @@ func TestQueryValidate(t *testing.T) {
 			err:   nil,
 		},
 		{
-			query: NewSyntaxQuery(`+beer "light beer" -devon`),
+			query: NewQueryStringQuery(`+beer "light beer" -devon`),
 			err:   nil,
 		},
 		{

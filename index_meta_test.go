@@ -19,7 +19,7 @@ func TestIndexMeta(t *testing.T) {
 	defer os.RemoveAll(testIndexPath)
 
 	// open non-existant meta should error
-	_, err := OpenIndexMeta(testIndexPath)
+	_, err := openIndexMeta(testIndexPath)
 	if err == nil {
 		t.Errorf("expected error, got nil")
 	}
@@ -33,7 +33,7 @@ func TestIndexMeta(t *testing.T) {
 	im = nil
 
 	// open a meta that exists
-	im, err = OpenIndexMeta(testIndexPath)
+	im, err = openIndexMeta(testIndexPath)
 	if err != nil {
 		t.Error(err)
 	}

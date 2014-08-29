@@ -2,7 +2,7 @@ package bleve
 
 import __yyfmt__ "fmt"
 
-//line query_syntax.y:2
+//line query_string.y:2
 import "log"
 
 func logDebugGrammar(format string, v ...interface{}) {
@@ -11,7 +11,7 @@ func logDebugGrammar(format string, v ...interface{}) {
 	}
 }
 
-//line query_syntax.y:12
+//line query_string.y:12
 type yySymType struct {
 	yys int
 	s   string
@@ -347,48 +347,48 @@ yydefault:
 	switch yynt {
 
 	case 1:
-		//line query_syntax.y:22
+		//line query_string.y:22
 		{
 			logDebugGrammar("INPUT")
 		}
 	case 2:
-		//line query_syntax.y:27
+		//line query_string.y:27
 		{
 			logDebugGrammar("SEARCH PARTS")
 		}
 	case 3:
-		//line query_syntax.y:31
+		//line query_string.y:31
 		{
 			logDebugGrammar("SEARCH PART")
 		}
 	case 4:
-		//line query_syntax.y:36
+		//line query_string.y:36
 		{
 
 		}
 	case 5:
-		//line query_syntax.y:42
+		//line query_string.y:42
 		{
 		}
 	case 6:
-		//line query_syntax.y:45
+		//line query_string.y:45
 		{
 
 		}
 	case 7:
-		//line query_syntax.y:51
+		//line query_string.y:51
 		{
 			logDebugGrammar("PLUS")
 			parsingMust = true
 		}
 	case 8:
-		//line query_syntax.y:56
+		//line query_string.y:56
 		{
 			logDebugGrammar("MINUS")
 			parsingMustNot = true
 		}
 	case 9:
-		//line query_syntax.y:62
+		//line query_string.y:62
 		{
 			str := yyS[yypt-0].s
 			logDebugGrammar("STRING - %s", str)
@@ -405,7 +405,7 @@ yydefault:
 			parsingLastQuery = q
 		}
 	case 10:
-		//line query_syntax.y:78
+		//line query_string.y:78
 		{
 			phrase := yyS[yypt-0].s
 			logDebugGrammar("PHRASE - %s", phrase)
@@ -422,7 +422,7 @@ yydefault:
 			parsingLastQuery = q
 		}
 	case 11:
-		//line query_syntax.y:94
+		//line query_string.y:94
 		{
 			field := yyS[yypt-2].s
 			str := yyS[yypt-0].s
@@ -440,7 +440,7 @@ yydefault:
 			parsingLastQuery = q
 		}
 	case 12:
-		//line query_syntax.y:111
+		//line query_string.y:111
 		{
 			field := yyS[yypt-2].s
 			phrase := yyS[yypt-0].s
@@ -458,7 +458,7 @@ yydefault:
 			parsingLastQuery = q
 		}
 	case 13:
-		//line query_syntax.y:128
+		//line query_string.y:128
 		{
 			field := yyS[yypt-3].s
 			min := yyS[yypt-0].f
@@ -477,7 +477,7 @@ yydefault:
 			parsingLastQuery = q
 		}
 	case 14:
-		//line query_syntax.y:146
+		//line query_string.y:146
 		{
 			field := yyS[yypt-4].s
 			min := yyS[yypt-0].f
@@ -496,7 +496,7 @@ yydefault:
 			parsingLastQuery = q
 		}
 	case 15:
-		//line query_syntax.y:164
+		//line query_string.y:164
 		{
 			field := yyS[yypt-3].s
 			max := yyS[yypt-0].f
@@ -515,7 +515,7 @@ yydefault:
 			parsingLastQuery = q
 		}
 	case 16:
-		//line query_syntax.y:182
+		//line query_string.y:182
 		{
 			field := yyS[yypt-4].s
 			max := yyS[yypt-0].f
@@ -534,7 +534,7 @@ yydefault:
 			parsingLastQuery = q
 		}
 	case 17:
-		//line query_syntax.y:202
+		//line query_string.y:202
 		{
 			boost := yyS[yypt-0].f
 			if parsingLastQuery != nil {
@@ -548,12 +548,12 @@ yydefault:
 			logDebugGrammar("BOOST %f", boost)
 		}
 	case 18:
-		//line query_syntax.y:216
+		//line query_string.y:216
 		{
 
 		}
 	case 19:
-		//line query_syntax.y:220
+		//line query_string.y:220
 		{
 
 		}

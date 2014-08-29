@@ -21,11 +21,11 @@ type indexMeta struct {
 	Storage string `json:"storage"`
 }
 
-func NewIndexMeta(storage string) *indexMeta {
+func newIndexMeta(storage string) *indexMeta {
 	return &indexMeta{Storage: storage}
 }
 
-func OpenIndexMeta(path string) (*indexMeta, error) {
+func openIndexMeta(path string) (*indexMeta, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil, ERROR_INDEX_PATH_DOES_NOT_EXIST
 	}

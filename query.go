@@ -96,7 +96,7 @@ func ParseQuery(input []byte) (Query, error) {
 	}
 	_, hasSyntaxQuery := tmp["query"]
 	if hasSyntaxQuery {
-		var rv SyntaxQuery
+		var rv QueryStringQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err

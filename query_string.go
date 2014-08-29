@@ -13,28 +13,28 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type SyntaxQuery struct {
+type QueryStringQuery struct {
 	Query    string  `json:"query"`
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
-func NewSyntaxQuery(query string) *SyntaxQuery {
-	return &SyntaxQuery{
+func NewQueryStringQuery(query string) *QueryStringQuery {
+	return &QueryStringQuery{
 		Query:    query,
 		BoostVal: 1.0,
 	}
 }
 
-func (q *SyntaxQuery) Boost() float64 {
+func (q *QueryStringQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *SyntaxQuery) SetBoost(b float64) *SyntaxQuery {
+func (q *QueryStringQuery) SetBoost(b float64) *QueryStringQuery {
 	q.BoostVal = b
 	return q
 }
 
-func (q *SyntaxQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *QueryStringQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 	newQuery, err := ParseQuerySyntax(q.Query, i.m)
 	if err != nil {
 		return nil, err
@@ -42,6 +42,6 @@ func (q *SyntaxQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, err
 	return newQuery.Searcher(i, explain)
 }
 
-func (q *SyntaxQuery) Validate() error {
+func (q *QueryStringQuery) Validate() error {
 	return nil
 }

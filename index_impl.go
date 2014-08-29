@@ -46,7 +46,7 @@ func newMemIndex(mapping *IndexMapping) (*indexImpl, error) {
 	rv := indexImpl{
 		path: "",
 		m:    mapping,
-		meta: NewIndexMeta("mem"),
+		meta: newIndexMeta("mem"),
 	}
 
 	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
@@ -98,7 +98,7 @@ func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
 	rv := indexImpl{
 		path: path,
 		m:    mapping,
-		meta: NewIndexMeta(Config.DefaultKVStore),
+		meta: newIndexMeta(Config.DefaultKVStore),
 	}
 	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
 	if storeConstructor == nil {
@@ -151,7 +151,7 @@ func openIndex(path string) (*indexImpl, error) {
 		path: path,
 	}
 	var err error
-	rv.meta, err = OpenIndexMeta(path)
+	rv.meta, err = openIndexMeta(path)
 	if err != nil {
 		return nil, err
 	}

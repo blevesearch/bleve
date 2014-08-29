@@ -81,7 +81,7 @@ func TestBeerSearchAll(t *testing.T) {
 	}
 
 	// run a syntax query
-	syntaxQuery := bleve.NewSyntaxQuery("+name:light +description:water -description:barley")
+	syntaxQuery := bleve.NewQueryStringQuery("+name:light +description:water -description:barley")
 	syntaxSearchRequest := bleve.NewSearchRequest(syntaxQuery)
 	syntaxSearchResult, err := index.Search(syntaxSearchRequest)
 	if err != nil {
