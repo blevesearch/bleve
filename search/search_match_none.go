@@ -44,3 +44,7 @@ func (s *MatchNoneSearcher) Advance(ID string) (*DocumentMatch, error) {
 
 func (s *MatchNoneSearcher) Close() {
 }
+
+func (s *MatchNoneSearcher) Min() int {
+	return 0
+}

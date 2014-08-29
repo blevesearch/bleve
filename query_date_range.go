@@ -17,7 +17,7 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type DateRangeQuery struct {
+type dateRangeQuery struct {
 	Start          *string `json:"start,omitempty"`
 	End            *string `json:"end,omitempty"`
 	InclusiveStart *bool   `json:"inclusive_start,omitempty"`
@@ -27,12 +27,12 @@ type DateRangeQuery struct {
 	DateTimeParser *string `json:"datetime_parser,omitempty"`
 }
 
-func NewDateRangeQuery(start, end *string) *DateRangeQuery {
+func NewDateRangeQuery(start, end *string) *dateRangeQuery {
 	return NewDateRangeInclusiveQuery(start, end, nil, nil)
 }
 
-func NewDateRangeInclusiveQuery(start, end *string, startInclusive, endInclusive *bool) *DateRangeQuery {
-	return &DateRangeQuery{
+func NewDateRangeInclusiveQuery(start, end *string, startInclusive, endInclusive *bool) *dateRangeQuery {
+	return &dateRangeQuery{
 		Start:          start,
 		End:            end,
 		InclusiveStart: startInclusive,
@@ -41,25 +41,25 @@ func NewDateRangeInclusiveQuery(start, end *string, startInclusive, endInclusive
 	}
 }
 
-func (q *DateRangeQuery) Boost() float64 {
+func (q *dateRangeQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *DateRangeQuery) SetBoost(b float64) *DateRangeQuery {
+func (q *dateRangeQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *DateRangeQuery) Field() string {
+func (q *dateRangeQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *DateRangeQuery) SetField(f string) *DateRangeQuery {
+func (q *dateRangeQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *DateRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *dateRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 
 	dateTimeParserName := ""
 	if q.DateTimeParser != nil {
@@ -98,7 +98,7 @@ func (q *DateRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, 
 	return search.NewNumericRangeSearcher(i.i, &min, &max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal, explain)
 }
 
-func (q *DateRangeQuery) Validate() error {
+func (q *dateRangeQuery) Validate() error {
 	if q.Start == nil && q.Start == q.End {
 		return fmt.Errorf("must specify start or end")
 	}

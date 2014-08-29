@@ -176,3 +176,7 @@ func (s *DisjunctionSearcher) Close() {
 		searcher.Close()
 	}
 }
+
+func (s *DisjunctionSearcher) Min() int {
+	return int(s.min) // FIXME just make this an int
+}

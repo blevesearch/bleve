@@ -17,6 +17,9 @@ import (
 
 type Query interface {
 	Boost() float64
+	SetBoost(b float64) Query
+	Field() string
+	SetField(f string) Query
 	Searcher(i *indexImpl, explain bool) (search.Searcher, error)
 	Validate() error
 }
@@ -29,7 +32,7 @@ func ParseQuery(input []byte) (Query, error) {
 	}
 	_, isTermQuery := tmp["term"]
 	if isTermQuery {
-		var rv TermQuery
+		var rv termQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
@@ -41,7 +44,7 @@ func ParseQuery(input []byte) (Query, error) {
 	}
 	_, isMatchQuery := tmp["match"]
 	if isMatchQuery {
-		var rv MatchQuery
+		var rv matchQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
@@ -53,7 +56,7 @@ func ParseQuery(input []byte) (Query, error) {
 	}
 	_, isMatchPhraseQuery := tmp["match_phrase"]
 	if isMatchPhraseQuery {
-		var rv MatchPhraseQuery
+		var rv matchPhraseQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
@@ -67,7 +70,7 @@ func ParseQuery(input []byte) (Query, error) {
 	_, hasShould := tmp["should"]
 	_, hasMustNot := tmp["must_not"]
 	if hasMust || hasShould || hasMustNot {
-		var rv BooleanQuery
+		var rv booleanQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
@@ -79,7 +82,7 @@ func ParseQuery(input []byte) (Query, error) {
 	}
 	_, hasTerms := tmp["terms"]
 	if hasTerms {
-		var rv PhraseQuery
+		var rv phraseQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
@@ -94,9 +97,34 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
+	_, hasConjuncts := tmp["conjuncts"]
+	if hasConjuncts {
+		var rv conjunctionQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
+		return &rv, nil
+	}
+	_, hasDisjuncts := tmp["disjuncts"]
+	if hasDisjuncts {
+		var rv disjunctionQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
+		return &rv, nil
+	}
+
 	_, hasSyntaxQuery := tmp["query"]
 	if hasSyntaxQuery {
-		var rv QueryStringQuery
+		var rv queryStringQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
@@ -109,7 +137,7 @@ func ParseQuery(input []byte) (Query, error) {
 	_, hasMin := tmp["min"]
 	_, hasMax := tmp["max"]
 	if hasMin || hasMax {
-		var rv NumericRangeQuery
+		var rv numericRangeQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
@@ -122,7 +150,7 @@ func ParseQuery(input []byte) (Query, error) {
 	_, hasStart := tmp["start"]
 	_, hasEnd := tmp["end"]
 	if hasStart || hasEnd {
-		var rv DateRangeQuery
+		var rv dateRangeQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
@@ -134,7 +162,7 @@ func ParseQuery(input []byte) (Query, error) {
 	}
 	_, hasPrefix := tmp["prefix"]
 	if hasPrefix {
-		var rv PrefixQuery
+		var rv prefixQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err

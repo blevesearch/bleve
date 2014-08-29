@@ -13,29 +13,37 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type MatchAllQuery struct {
+type matchAllQuery struct {
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
-func NewMatchAllQuery() *MatchAllQuery {
-	return &MatchAllQuery{
+func NewMatchAllQuery() *matchAllQuery {
+	return &matchAllQuery{
 		BoostVal: 1.0,
 	}
 }
 
-func (q *MatchAllQuery) Boost() float64 {
+func (q *matchAllQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *MatchAllQuery) SetBoost(b float64) *MatchAllQuery {
+func (q *matchAllQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *MatchAllQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *matchAllQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 	return search.NewMatchAllSearcher(i.i, q.BoostVal, explain)
 }
 
-func (q *MatchAllQuery) Validate() error {
+func (q *matchAllQuery) Validate() error {
 	return nil
+}
+
+func (q *matchAllQuery) Field() string {
+	return ""
+}
+
+func (q *matchAllQuery) SetField(f string) Query {
+	return q
 }

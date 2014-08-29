@@ -13,38 +13,38 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type PrefixQuery struct {
+type prefixQuery struct {
 	Prefix   string  `json:"prefix"`
 	FieldVal string  `json:"field,omitempty"`
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
-func NewPrefixQuery(prefix string) *PrefixQuery {
-	return &PrefixQuery{
+func NewPrefixQuery(prefix string) *prefixQuery {
+	return &prefixQuery{
 		Prefix:   prefix,
 		BoostVal: 1.0,
 	}
 }
 
-func (q *PrefixQuery) Boost() float64 {
+func (q *prefixQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *PrefixQuery) SetBoost(b float64) *PrefixQuery {
+func (q *prefixQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *PrefixQuery) Field() string {
+func (q *prefixQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *PrefixQuery) SetField(f string) *PrefixQuery {
+func (q *prefixQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *PrefixQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *prefixQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = i.m.DefaultField
@@ -52,6 +52,6 @@ func (q *PrefixQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, err
 	return search.NewTermPrefixSearcher(i.i, q.Prefix, field, q.BoostVal, explain)
 }
 
-func (q *PrefixQuery) Validate() error {
+func (q *prefixQuery) Validate() error {
 	return nil
 }

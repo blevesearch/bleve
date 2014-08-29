@@ -466,22 +466,17 @@ yydefault:
 		{
 			boost := yyS[yypt-0].f
 			if parsingLastQuery != nil {
-				switch parsingLastQuery := parsingLastQuery.(type) {
-				case *MatchQuery:
-					parsingLastQuery.SetBoost(boost)
-				case *MatchPhraseQuery:
-					parsingLastQuery.SetBoost(boost)
-				}
+				parsingLastQuery.SetBoost(boost)
 			}
 			logDebugGrammar("BOOST %f", boost)
 		}
 	case 18:
-		//line query_string.y:144
+		//line query_string.y:139
 		{
 
 		}
 	case 19:
-		//line query_string.y:148
+		//line query_string.y:143
 		{
 
 		}

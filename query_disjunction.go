@@ -15,57 +15,54 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type DisjunctionQuery struct {
-	Disjuncts []Query `json:"terms"`
+type disjunctionQuery struct {
+	Disjuncts []Query `json:"disjuncts"`
 	BoostVal  float64 `json:"boost,omitempty"`
 	MinVal    float64 `json:"min"`
 }
 
-func NewDisjunctionQuery(disjuncts []Query) *DisjunctionQuery {
-	if len(disjuncts) == 0 {
-		return nil
-	}
-	return &DisjunctionQuery{
+func NewDisjunctionQuery(disjuncts []Query) *disjunctionQuery {
+	return &disjunctionQuery{
 		Disjuncts: disjuncts,
 		BoostVal:  1.0,
 	}
 }
 
-func NewDisjunctionQueryMin(disjuncts []Query, min float64) *DisjunctionQuery {
+func NewDisjunctionQueryMin(disjuncts []Query, min float64) *disjunctionQuery {
 	if len(disjuncts) == 0 {
 		return nil
 	}
-	return &DisjunctionQuery{
+	return &disjunctionQuery{
 		Disjuncts: disjuncts,
 		BoostVal:  1.0,
 		MinVal:    min,
 	}
 }
 
-func (q *DisjunctionQuery) Boost() float64 {
+func (q *disjunctionQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *DisjunctionQuery) SetBoost(b float64) *DisjunctionQuery {
+func (q *disjunctionQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *DisjunctionQuery) AddQuery(aq Query) *DisjunctionQuery {
+func (q *disjunctionQuery) AddQuery(aq Query) Query {
 	q.Disjuncts = append(q.Disjuncts, aq)
 	return q
 }
 
-func (q *DisjunctionQuery) Min() float64 {
+func (q *disjunctionQuery) Min() float64 {
 	return q.MinVal
 }
 
-func (q *DisjunctionQuery) SetMin(m float64) *DisjunctionQuery {
+func (q *disjunctionQuery) SetMin(m float64) Query {
 	q.MinVal = m
 	return q
 }
 
-func (q *DisjunctionQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *disjunctionQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 	searchers := make([]search.Searcher, len(q.Disjuncts))
 	for in, disjunct := range q.Disjuncts {
 		var err error
@@ -77,16 +74,16 @@ func (q *DisjunctionQuery) Searcher(i *indexImpl, explain bool) (search.Searcher
 	return search.NewDisjunctionSearcher(i.i, searchers, q.MinVal, explain)
 }
 
-func (q *DisjunctionQuery) Validate() error {
+func (q *disjunctionQuery) Validate() error {
 	if int(q.MinVal) > len(q.Disjuncts) {
 		return ERROR_DISJUNCTION_FEWER_THAN_MIN_CLAUSES
 	}
 	return nil
 }
 
-func (q *DisjunctionQuery) UnmarshalJSON(data []byte) error {
+func (q *disjunctionQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
-		Disjuncts []json.RawMessage `json:"terms"`
+		Disjuncts []json.RawMessage `json:"disjuncts"`
 		BoostVal  float64           `json:"boost,omitempty"`
 		MinVal    float64           `json:"min"`
 	}{}
@@ -108,4 +105,12 @@ func (q *DisjunctionQuery) UnmarshalJSON(data []byte) error {
 	}
 	q.MinVal = tmp.MinVal
 	return nil
+}
+
+func (q *disjunctionQuery) Field() string {
+	return ""
+}
+
+func (q *disjunctionQuery) SetField(f string) Query {
+	return q
 }

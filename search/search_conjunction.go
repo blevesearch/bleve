@@ -180,3 +180,7 @@ func (s *ConjunctionSearcher) Close() {
 		searcher.Close()
 	}
 }
+
+func (s *ConjunctionSearcher) Min() int {
+	return 0
+}

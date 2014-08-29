@@ -329,16 +329,16 @@ function SearchCtrl($scope, $http, $routeParams, $log, $sce) {
         var requestBody = {
                 "query": {
                         "must": {
-                                "terms":[],
+                                "conjuncts":[],
                                 "boost": 1.0,
                         },
                         "should":{
-                                "terms":[],
+                                "disjuncts":[],
                                 "boost": 1.0,
                                 "min": parseInt($scope.minShould, 10)
                         },
                         "must_not": {
-                                "terms": [],
+                                "disjuncts": [],
                                 "boost": 1.0,
                         },
                         "boost": 1.0,
@@ -353,27 +353,26 @@ function SearchCtrl($scope, $http, $routeParams, $log, $sce) {
                         "term": clause.term,
                         "field": clause.field,
                         "boost": parseFloat(clause.boost),
-                        "explain": true
                 };
                 switch(clause.occur) {
                         case "MUST":
-                        requestBody.query.must.terms.push(termQuery);
+                        requestBody.query.must.conjuncts.push(termQuery);
                         break;
                         case "SHOULD":
-                        requestBody.query.should.terms.push(termQuery);
+                        requestBody.query.should.disjuncts.push(termQuery);
                         break;
                         case "MUST NOT":
-                        requestBody.query.must_not.terms.push(termQuery);
+                        requestBody.query.must_not.disjuncts.push(termQuery);
                         break;
                 }
         }
-        if (requestBody.query.must.terms.length === 0) {
+        if (requestBody.query.must.conjuncts.length === 0) {
                 delete requestBody.query.must;
         }
-        if (requestBody.query.should.terms.length === 0) {
+        if (requestBody.query.should.disjuncts.length === 0) {
                 delete requestBody.query.should;
         }
-        if (requestBody.query.must_not.terms.length === 0) {
+        if (requestBody.query.must_not.disjuncts.length === 0) {
                 delete requestBody.query.must_not;
         }
 

@@ -10,17 +10,20 @@
 package bleve
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/blevesearch/bleve/search"
 )
 
-type BooleanQuery struct {
-	Must     *ConjunctionQuery `json:"must,omitempty"`
-	Should   *DisjunctionQuery `json:"should,omitempty"`
-	MustNot  *DisjunctionQuery `json:"must_not,omitempty"`
-	BoostVal float64           `json:"boost,omitempty"`
+type booleanQuery struct {
+	Must     Query   `json:"must,omitempty"`
+	Should   Query   `json:"should,omitempty"`
+	MustNot  Query   `json:"must_not,omitempty"`
+	BoostVal float64 `json:"boost,omitempty"`
 }
 
-func NewBooleanQuery(must []Query, should []Query, mustNot []Query) *BooleanQuery {
+func NewBooleanQuery(must []Query, should []Query, mustNot []Query) *booleanQuery {
 	min := 0.0
 	if len(should) > 0 {
 		min = 1.0
@@ -28,63 +31,64 @@ func NewBooleanQuery(must []Query, should []Query, mustNot []Query) *BooleanQuer
 	return NewBooleanQueryMinShould(must, should, mustNot, min)
 }
 
-func NewBooleanQueryMinShould(must []Query, should []Query, mustNot []Query, minShould float64) *BooleanQuery {
-	return &BooleanQuery{
-		Must:     NewConjunctionQuery(must),
-		Should:   NewDisjunctionQueryMin(should, minShould),
-		MustNot:  NewDisjunctionQuery(mustNot),
+func NewBooleanQueryMinShould(must []Query, should []Query, mustNot []Query, minShould float64) *booleanQuery {
+
+	rv := booleanQuery{
 		BoostVal: 1.0,
 	}
+	if len(must) > 0 {
+		rv.Must = NewConjunctionQuery(must)
+	}
+	if len(should) > 0 {
+		rv.Should = NewDisjunctionQueryMin(should, minShould)
+	}
+	if len(mustNot) > 0 {
+		rv.MustNot = NewDisjunctionQuery(mustNot)
+	}
+
+	return &rv
 }
 
-func (q *BooleanQuery) Boost() float64 {
+func (q *booleanQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *BooleanQuery) SetBoost(b float64) *BooleanQuery {
+func (q *booleanQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *BooleanQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *booleanQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+	var err error
 
-	var mustSearcher *search.ConjunctionSearcher
+	var mustSearcher search.Searcher
 	if q.Must != nil {
-		ms, err := q.Must.Searcher(i, explain)
+		mustSearcher, err = q.Must.Searcher(i, explain)
 		if err != nil {
 			return nil, err
 		}
-		if ms != nil {
-			mustSearcher = ms.(*search.ConjunctionSearcher)
-		}
 	}
 
-	var shouldSearcher *search.DisjunctionSearcher
+	var shouldSearcher search.Searcher
 	if q.Should != nil {
-		ss, err := q.Should.Searcher(i, explain)
+		shouldSearcher, err = q.Should.Searcher(i, explain)
 		if err != nil {
 			return nil, err
-		}
-		if ss != nil {
-			shouldSearcher = ss.(*search.DisjunctionSearcher)
 		}
 	}
 
-	var mustNotSearcher *search.DisjunctionSearcher
+	var mustNotSearcher search.Searcher
 	if q.MustNot != nil {
-		mns, err := q.MustNot.Searcher(i, explain)
+		mustNotSearcher, err = q.MustNot.Searcher(i, explain)
 		if err != nil {
 			return nil, err
-		}
-		if mns != nil {
-			mustNotSearcher = mns.(*search.DisjunctionSearcher)
 		}
 	}
 
 	return search.NewBooleanSearcher(i.i, mustSearcher, shouldSearcher, mustNotSearcher, explain)
 }
 
-func (q *BooleanQuery) Validate() error {
+func (q *booleanQuery) Validate() error {
 	if q.Must != nil {
 		err := q.Must.Validate()
 		if err != nil {
@@ -106,8 +110,65 @@ func (q *BooleanQuery) Validate() error {
 	if q.Must == nil && q.Should == nil {
 		return ERROR_BOOLEAN_QUERY_NEEDS_MUST_OR_SHOULD
 	}
-	if q.Must != nil && len(q.Must.Conjuncts) == 0 && q.Should != nil && len(q.Should.Disjuncts) == 0 {
-		return ERROR_BOOLEAN_QUERY_NEEDS_MUST_OR_SHOULD
+	return nil
+}
+
+func (q *booleanQuery) UnmarshalJSON(data []byte) error {
+	tmp := struct {
+		Must     json.RawMessage `json:"must,omitempty"`
+		Should   json.RawMessage `json:"should,omitempty"`
+		MustNot  json.RawMessage `json:"must_not,omitempty"`
+		BoostVal float64         `json:"boost,omitempty"`
+	}{}
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
+	}
+
+	if tmp.Must != nil {
+		q.Must, err = ParseQuery(tmp.Must)
+		if err != nil {
+			return err
+		}
+		_, isConjunctionQuery := q.Must.(*conjunctionQuery)
+		if !isConjunctionQuery {
+			return fmt.Errorf("must clause must be conjunction")
+		}
+	}
+
+	if tmp.Should != nil {
+		q.Should, err = ParseQuery(tmp.Should)
+		if err != nil {
+			return err
+		}
+		_, isDisjunctionQuery := q.Should.(*disjunctionQuery)
+		if !isDisjunctionQuery {
+			return fmt.Errorf("should clause must be disjunction")
+		}
+	}
+
+	if tmp.MustNot != nil {
+		q.MustNot, err = ParseQuery(tmp.MustNot)
+		if err != nil {
+			return err
+		}
+		_, isDisjunctionQuery := q.MustNot.(*disjunctionQuery)
+		if !isDisjunctionQuery {
+			return fmt.Errorf("must not clause must be disjunction")
+		}
+	}
+
+	q.BoostVal = tmp.BoostVal
+	if q.BoostVal == 0 {
+		q.BoostVal = 1
 	}
 	return nil
+}
+
+func (q *booleanQuery) Field() string {
+	return ""
+}
+
+func (q *booleanQuery) SetField(f string) Query {
+	return q
 }

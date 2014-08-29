@@ -15,39 +15,39 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type MatchPhraseQuery struct {
+type matchPhraseQuery struct {
 	MatchPhrase string  `json:"match_phrase"`
 	FieldVal    string  `json:"field,omitempty"`
 	Analyzer    string  `json:"analyzer,omitempty"`
 	BoostVal    float64 `json:"boost,omitempty"`
 }
 
-func NewMatchPhraseQuery(matchPhrase string) *MatchPhraseQuery {
-	return &MatchPhraseQuery{
+func NewMatchPhraseQuery(matchPhrase string) *matchPhraseQuery {
+	return &matchPhraseQuery{
 		MatchPhrase: matchPhrase,
 		BoostVal:    1.0,
 	}
 }
 
-func (q *MatchPhraseQuery) Boost() float64 {
+func (q *matchPhraseQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *MatchPhraseQuery) SetBoost(b float64) *MatchPhraseQuery {
+func (q *matchPhraseQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *MatchPhraseQuery) Field() string {
+func (q *matchPhraseQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *MatchPhraseQuery) SetField(f string) *MatchPhraseQuery {
+func (q *matchPhraseQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *MatchPhraseQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *matchPhraseQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 
 	analyzerName := ""
 	if q.Analyzer != "" {
@@ -67,14 +67,12 @@ func (q *MatchPhraseQuery) Searcher(i *indexImpl, explain bool) (search.Searcher
 
 	tokens := analyzer.Analyze([]byte(q.MatchPhrase))
 	if len(tokens) > 0 {
-		tqs := make([]*TermQuery, len(tokens))
+		ts := make([]string, len(tokens))
 		for i, token := range tokens {
-			tqs[i] = NewTermQuery(string(token.Term)).
-				SetField(field).
-				SetBoost(q.BoostVal)
+			ts[i] = string(token.Term)
 		}
 
-		phraseQuery := NewPhraseQuery(tqs)
+		phraseQuery := NewPhraseQuery(ts, field).SetBoost(q.BoostVal)
 
 		return phraseQuery.Searcher(i, explain)
 	} else {
@@ -83,6 +81,6 @@ func (q *MatchPhraseQuery) Searcher(i *indexImpl, explain bool) (search.Searcher
 	}
 }
 
-func (q *MatchPhraseQuery) Validate() error {
+func (q *matchPhraseQuery) Validate() error {
 	return nil
 }

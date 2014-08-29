@@ -13,28 +13,28 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type QueryStringQuery struct {
+type queryStringQuery struct {
 	Query    string  `json:"query"`
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
-func NewQueryStringQuery(query string) *QueryStringQuery {
-	return &QueryStringQuery{
+func NewQueryStringQuery(query string) *queryStringQuery {
+	return &queryStringQuery{
 		Query:    query,
 		BoostVal: 1.0,
 	}
 }
 
-func (q *QueryStringQuery) Boost() float64 {
+func (q *queryStringQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *QueryStringQuery) SetBoost(b float64) *QueryStringQuery {
+func (q *queryStringQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *QueryStringQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *queryStringQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 	newQuery, err := ParseQuerySyntax(q.Query, i.m)
 	if err != nil {
 		return nil, err
@@ -42,6 +42,14 @@ func (q *QueryStringQuery) Searcher(i *indexImpl, explain bool) (search.Searcher
 	return newQuery.Searcher(i, explain)
 }
 
-func (q *QueryStringQuery) Validate() error {
+func (q *queryStringQuery) Validate() error {
 	return nil
+}
+
+func (q *queryStringQuery) Field() string {
+	return ""
+}
+
+func (q *queryStringQuery) SetField(f string) Query {
+	return q
 }

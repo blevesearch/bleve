@@ -13,38 +13,38 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type TermQuery struct {
+type termQuery struct {
 	Term     string  `json:"term"`
 	FieldVal string  `json:"field,omitempty"`
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
-func NewTermQuery(term string) *TermQuery {
-	return &TermQuery{
+func NewTermQuery(term string) *termQuery {
+	return &termQuery{
 		Term:     term,
 		BoostVal: 1.0,
 	}
 }
 
-func (q *TermQuery) Boost() float64 {
+func (q *termQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *TermQuery) SetBoost(b float64) *TermQuery {
+func (q *termQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *TermQuery) Field() string {
+func (q *termQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *TermQuery) SetField(f string) *TermQuery {
+func (q *termQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *TermQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *termQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = i.m.DefaultField
@@ -52,6 +52,6 @@ func (q *TermQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error
 	return search.NewTermSearcher(i.i, q.Term, field, q.BoostVal, explain)
 }
 
-func (q *TermQuery) Validate() error {
+func (q *termQuery) Validate() error {
 	return nil
 }

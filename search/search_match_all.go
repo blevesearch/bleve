@@ -80,3 +80,7 @@ func (s *MatchAllSearcher) Advance(ID string) (*DocumentMatch, error) {
 func (s *MatchAllSearcher) Close() {
 	s.reader.Close()
 }
+
+func (s *MatchAllSearcher) Min() int {
+	return 0
+}

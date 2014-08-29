@@ -17,9 +17,9 @@ import (
 type BooleanSearcher struct {
 	initialized     bool
 	index           index.Index
-	mustSearcher    *ConjunctionSearcher
-	shouldSearcher  *DisjunctionSearcher
-	mustNotSearcher *DisjunctionSearcher
+	mustSearcher    Searcher
+	shouldSearcher  Searcher
+	mustNotSearcher Searcher
 	queryNorm       float64
 	currMust        *DocumentMatch
 	currShould      *DocumentMatch
@@ -29,7 +29,7 @@ type BooleanSearcher struct {
 	scorer          *ConjunctionQueryScorer
 }
 
-func NewBooleanSearcher(index index.Index, mustSearcher *ConjunctionSearcher, shouldSearcher *DisjunctionSearcher, mustNotSearcher *DisjunctionSearcher, explain bool) (*BooleanSearcher, error) {
+func NewBooleanSearcher(index index.Index, mustSearcher Searcher, shouldSearcher Searcher, mustNotSearcher Searcher, explain bool) (*BooleanSearcher, error) {
 	// build our searcher
 	rv := BooleanSearcher{
 		index:           index,
@@ -191,7 +191,7 @@ func (s *BooleanSearcher) Next() (*DocumentMatch, error) {
 				rv = s.scorer.Score(cons)
 				s.advanceNextMust()
 				break
-			} else if s.shouldSearcher.min == 0 {
+			} else if s.shouldSearcher.Min() == 0 {
 				// match is OK anyway
 				rv = s.scorer.Score([]*DocumentMatch{s.currMust})
 				s.advanceNextMust()
@@ -207,7 +207,7 @@ func (s *BooleanSearcher) Next() (*DocumentMatch, error) {
 			rv = s.scorer.Score(cons)
 			s.advanceNextMust()
 			break
-		} else if s.shouldSearcher == nil || s.shouldSearcher.min == 0 {
+		} else if s.shouldSearcher == nil || s.shouldSearcher.Min() == 0 {
 			// match is OK anyway
 			rv = s.scorer.Score([]*DocumentMatch{s.currMust})
 			s.advanceNextMust()
@@ -282,4 +282,8 @@ func (s *BooleanSearcher) Close() {
 	if s.mustNotSearcher != nil {
 		s.mustNotSearcher.Close()
 	}
+}
+
+func (s *BooleanSearcher) Min() int {
+	return 0
 }

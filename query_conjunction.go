@@ -15,36 +15,33 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type ConjunctionQuery struct {
-	Conjuncts []Query `json:"terms"`
+type conjunctionQuery struct {
+	Conjuncts []Query `json:"conjuncts"`
 	BoostVal  float64 `json:"boost,omitempty"`
 }
 
-func NewConjunctionQuery(conjuncts []Query) *ConjunctionQuery {
-	if len(conjuncts) == 0 {
-		return nil
-	}
-	return &ConjunctionQuery{
+func NewConjunctionQuery(conjuncts []Query) *conjunctionQuery {
+	return &conjunctionQuery{
 		Conjuncts: conjuncts,
 		BoostVal:  1.0,
 	}
 }
 
-func (q *ConjunctionQuery) Boost() float64 {
+func (q *conjunctionQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *ConjunctionQuery) SetBoost(b float64) *ConjunctionQuery {
+func (q *conjunctionQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *ConjunctionQuery) AddQuery(aq Query) *ConjunctionQuery {
+func (q *conjunctionQuery) AddQuery(aq Query) *conjunctionQuery {
 	q.Conjuncts = append(q.Conjuncts, aq)
 	return q
 }
 
-func (q *ConjunctionQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *conjunctionQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 	searchers := make([]search.Searcher, len(q.Conjuncts))
 	for in, conjunct := range q.Conjuncts {
 		var err error
@@ -56,13 +53,13 @@ func (q *ConjunctionQuery) Searcher(i *indexImpl, explain bool) (search.Searcher
 	return search.NewConjunctionSearcher(i.i, searchers, explain)
 }
 
-func (q *ConjunctionQuery) Validate() error {
+func (q *conjunctionQuery) Validate() error {
 	return nil
 }
 
-func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
+func (q *conjunctionQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
-		Conjuncts []json.RawMessage `json:"terms"`
+		Conjuncts []json.RawMessage `json:"conjuncts"`
 		BoostVal  float64           `json:"boost,omitempty"`
 	}{}
 	err := json.Unmarshal(data, &tmp)
@@ -82,4 +79,12 @@ func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 		q.BoostVal = 1
 	}
 	return nil
+}
+
+func (q *conjunctionQuery) Field() string {
+	return ""
+}
+
+func (q *conjunctionQuery) SetField(f string) Query {
+	return q
 }

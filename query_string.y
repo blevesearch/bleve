@@ -130,12 +130,7 @@ searchBoost:
 tBOOST tNUMBER {
 	boost := $2.f
 	if parsingLastQuery != nil {
-		switch parsingLastQuery := parsingLastQuery.(type) {
-		case *MatchQuery:
-			parsingLastQuery.SetBoost(boost)
-		case *MatchPhraseQuery:
-			parsingLastQuery.SetBoost(boost)
-		}
+		parsingLastQuery.SetBoost(boost)
 	}
 	logDebugGrammar("BOOST %f", boost)
 };

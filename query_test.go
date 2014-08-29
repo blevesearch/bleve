@@ -38,17 +38,15 @@ func TestParseQuery(t *testing.T) {
 			output: NewMatchPhraseQuery("light beer").SetField("desc"),
 		},
 		{
-			input: []byte(`{"must":{"terms": [{"match":"beer","field":"desc"}]},"should":{"terms": [{"match":"water","field":"desc"}],"min":1.0},"must_not":{"terms": [{"match":"devon","field":"desc"}]}}`),
+			input: []byte(`{"must":{"conjuncts": [{"match":"beer","field":"desc"}]},"should":{"disjuncts": [{"match":"water","field":"desc"}],"min":1.0},"must_not":{"disjuncts": [{"match":"devon","field":"desc"}]}}`),
 			output: NewBooleanQuery(
 				[]Query{NewMatchQuery("beer").SetField("desc")},
 				[]Query{NewMatchQuery("water").SetField("desc")},
 				[]Query{NewMatchQuery("devon").SetField("desc")}),
 		},
 		{
-			input: []byte(`{"terms":[{"term":"watered","field":"desc"},{"term":"down","field":"desc"}]}`),
-			output: NewPhraseQuery([]*TermQuery{
-				NewTermQuery("watered").SetField("desc"),
-				NewTermQuery("down").SetField("desc")}),
+			input:  []byte(`{"terms":[{"term":"watered","field":"desc"},{"term":"down","field":"desc"}]}`),
+			output: NewPhraseQuery([]string{"watered", "down"}, "desc"),
 		},
 		{
 			input:  []byte(`{"query":"+beer \"light beer\" -devon"}`),
@@ -73,10 +71,10 @@ func TestParseQuery(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		actual, err := ParseQuery(test.input)
 		if err != nil && test.err == nil {
-			t.Error(err)
+			t.Errorf("error %v for %d", err, i)
 		} else if test.err != nil {
 			if !reflect.DeepEqual(err, test.err) {
 				t.Errorf("expected error: %#v, got: %#v", test.err, err)
@@ -122,31 +120,9 @@ func TestSetGetField(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		switch query := test.query.(type) {
-		case *TermQuery:
-			if query.Field() != test.field {
-				t.Errorf("expected field '%s', got '%s'", test.field, query.Field())
-			}
-		case *MatchQuery:
-			if query.Field() != test.field {
-				t.Errorf("expected field '%s', got '%s'", test.field, query.Field())
-			}
-		case *MatchPhraseQuery:
-			if query.Field() != test.field {
-				t.Errorf("expected field '%s', got '%s'", test.field, query.Field())
-			}
-		case *NumericRangeQuery:
-			if query.Field() != test.field {
-				t.Errorf("expected field '%s', got '%s'", test.field, query.Field())
-			}
-		case *DateRangeQuery:
-			if query.Field() != test.field {
-				t.Errorf("expected field '%s', got '%s'", test.field, query.Field())
-			}
-		case *PrefixQuery:
-			if query.Field() != test.field {
-				t.Errorf("expected field '%s', got '%s'", test.field, query.Field())
-			}
+		query := test.query
+		if query.Field() != test.field {
+			t.Errorf("expected field '%s', got '%s'", test.field, query.Field())
 		}
 	}
 }
@@ -189,13 +165,11 @@ func TestQueryValidate(t *testing.T) {
 			err:   nil,
 		},
 		{
-			query: NewPhraseQuery([]*TermQuery{
-				NewTermQuery("watered").SetField("desc"),
-				NewTermQuery("down").SetField("desc")}),
-			err: nil,
+			query: NewPhraseQuery([]string{"watered", "down"}, "desc"),
+			err:   nil,
 		},
 		{
-			query: NewPhraseQuery([]*TermQuery{}),
+			query: NewPhraseQuery([]string{}, "field"),
 			err:   ERROR_PHRASE_QUERY_NO_TERMS,
 		},
 		{

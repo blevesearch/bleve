@@ -206,3 +206,7 @@ func newRangeBytes(minBytes, maxBytes []byte) *termRange {
 		endTerm:   maxBytes,
 	}
 }
+
+func (s *NumericRangeSearcher) Min() int {
+	return 0
+}

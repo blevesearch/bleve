@@ -15,39 +15,39 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type MatchQuery struct {
+type matchQuery struct {
 	Match    string  `json:"match"`
 	FieldVal string  `json:"field,omitempty"`
 	Analyzer string  `json:"analyzer,omitempty"`
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
-func NewMatchQuery(match string) *MatchQuery {
-	return &MatchQuery{
+func NewMatchQuery(match string) *matchQuery {
+	return &matchQuery{
 		Match:    match,
 		BoostVal: 1.0,
 	}
 }
 
-func (q *MatchQuery) Boost() float64 {
+func (q *matchQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *MatchQuery) SetBoost(b float64) *MatchQuery {
+func (q *matchQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *MatchQuery) Field() string {
+func (q *matchQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *MatchQuery) SetField(f string) *MatchQuery {
+func (q *matchQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *MatchQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *matchQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 
 	analyzerName := ""
 	if q.Analyzer != "" {
@@ -76,9 +76,8 @@ func (q *MatchQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, erro
 				SetBoost(q.BoostVal)
 		}
 
-		shouldQuery := NewDisjunctionQuery(tqs).
-			SetBoost(q.BoostVal).
-			SetMin(1)
+		shouldQuery := NewDisjunctionQueryMin(tqs, 1).
+			SetBoost(q.BoostVal)
 
 		return shouldQuery.Searcher(i, explain)
 	} else {
@@ -87,6 +86,6 @@ func (q *MatchQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, erro
 	}
 }
 
-func (q *MatchQuery) Validate() error {
+func (q *matchQuery) Validate() error {
 	return nil
 }

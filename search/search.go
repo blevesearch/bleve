@@ -59,4 +59,5 @@ type Searcher interface {
 	Weight() float64
 	SetQueryNorm(float64)
 	Count() uint64
+	Min() int
 }

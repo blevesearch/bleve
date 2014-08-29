@@ -176,3 +176,7 @@ func (s *PhraseSearcher) Close() {
 		s.mustSearcher.Close()
 	}
 }
+
+func (s *PhraseSearcher) Min() int {
+	return 0
+}

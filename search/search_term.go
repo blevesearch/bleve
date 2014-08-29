@@ -86,3 +86,7 @@ func (s *TermSearcher) Advance(ID string) (*DocumentMatch, error) {
 func (s *TermSearcher) Close() {
 	s.reader.Close()
 }
+
+func (s *TermSearcher) Min() int {
+	return 0
+}

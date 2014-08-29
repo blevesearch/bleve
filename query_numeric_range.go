@@ -13,7 +13,7 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type NumericRangeQuery struct {
+type numericRangeQuery struct {
 	Min          *float64 `json:"min,omitempty"`
 	Max          *float64 `json:"max,omitempty"`
 	InclusiveMin *bool    `json:"inclusive_min,omitempty"`
@@ -22,12 +22,12 @@ type NumericRangeQuery struct {
 	BoostVal     float64  `json:"boost,omitempty"`
 }
 
-func NewNumericRangeQuery(min, max *float64) *NumericRangeQuery {
+func NewNumericRangeQuery(min, max *float64) *numericRangeQuery {
 	return NewNumericRangeInclusiveQuery(min, max, nil, nil)
 }
 
-func NewNumericRangeInclusiveQuery(min, max *float64, minInclusive, maxInclusive *bool) *NumericRangeQuery {
-	return &NumericRangeQuery{
+func NewNumericRangeInclusiveQuery(min, max *float64, minInclusive, maxInclusive *bool) *numericRangeQuery {
+	return &numericRangeQuery{
 		Min:          min,
 		Max:          max,
 		InclusiveMin: minInclusive,
@@ -36,25 +36,25 @@ func NewNumericRangeInclusiveQuery(min, max *float64, minInclusive, maxInclusive
 	}
 }
 
-func (q *NumericRangeQuery) Boost() float64 {
+func (q *numericRangeQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *NumericRangeQuery) SetBoost(b float64) *NumericRangeQuery {
+func (q *numericRangeQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *NumericRangeQuery) Field() string {
+func (q *numericRangeQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *NumericRangeQuery) SetField(f string) *NumericRangeQuery {
+func (q *numericRangeQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *NumericRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *numericRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = i.m.DefaultField
@@ -62,7 +62,7 @@ func (q *NumericRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searche
 	return search.NewNumericRangeSearcher(i.i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.BoostVal, explain)
 }
 
-func (q *NumericRangeQuery) Validate() error {
+func (q *numericRangeQuery) Validate() error {
 	if q.Min == nil && q.Min == q.Max {
 		return ERROR_NUMERIC_QUERY_NO_BOUNDS
 	}

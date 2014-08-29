@@ -13,29 +13,37 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type MatchNoneQuery struct {
+type matchNoneQuery struct {
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
-func NewMatchNoneQuery() *MatchNoneQuery {
-	return &MatchNoneQuery{
+func NewMatchNoneQuery() *matchNoneQuery {
+	return &matchNoneQuery{
 		BoostVal: 1.0,
 	}
 }
 
-func (q *MatchNoneQuery) Boost() float64 {
+func (q *matchNoneQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *MatchNoneQuery) SetBoost(b float64) *MatchNoneQuery {
+func (q *matchNoneQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *MatchNoneQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *matchNoneQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 	return search.NewMatchNoneSearcher(i.i)
 }
 
-func (q *MatchNoneQuery) Validate() error {
+func (q *matchNoneQuery) Validate() error {
 	return nil
+}
+
+func (q *matchNoneQuery) Field() string {
+	return ""
+}
+
+func (q *matchNoneQuery) SetField(f string) Query {
+	return q
 }
