@@ -50,14 +50,14 @@ func lookupProptyPathPart(data interface{}, part string) interface{} {
 	return nil
 }
 
-const PATH_SEPARATOR = "."
+const pATH_SEPARATOR = "."
 
 func decodePath(path string) []string {
-	return strings.Split(path, PATH_SEPARATOR)
+	return strings.Split(path, pATH_SEPARATOR)
 }
 
 func encodePath(pathElements []string) string {
-	return strings.Join(pathElements, PATH_SEPARATOR)
+	return strings.Join(pathElements, pATH_SEPARATOR)
 }
 
 func mustString(data interface{}) (string, bool) {

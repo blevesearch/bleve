@@ -25,12 +25,12 @@ var tRUE = true
 
 var fALSE = false
 
-const DefaultTypeField = "_type"
-const DefaultType = "_default"
-const DefaultField = "_all"
-const DefaultAnalyzer = "standard"
-const DefaultDateTimeParser = "dateTimeOptional"
-const DefaultByteArrayConverter = "json"
+const defaultTypeField = "_type"
+const defaultType = "_default"
+const defaultField = "_all"
+const defaultAnalyzer = "standard"
+const defaultDateTimeParser = "dateTimeOptional"
+const defaultByteArrayConverter = "json"
 
 type IndexMapping struct {
 	TypeMapping           map[string]*DocumentMapping `json:"types,omitempty"`
@@ -52,12 +52,12 @@ func NewIndexMapping() *IndexMapping {
 	return &IndexMapping{
 		TypeMapping:           make(map[string]*DocumentMapping),
 		DefaultMapping:        NewDocumentMapping(),
-		TypeField:             DefaultTypeField,
-		DefaultType:           DefaultType,
-		DefaultAnalyzer:       DefaultAnalyzer,
-		DefaultDateTimeParser: DefaultDateTimeParser,
-		DefaultField:          DefaultField,
-		ByteArrayConverter:    DefaultByteArrayConverter,
+		TypeField:             defaultTypeField,
+		DefaultType:           defaultType,
+		DefaultAnalyzer:       defaultAnalyzer,
+		DefaultDateTimeParser: defaultDateTimeParser,
+		DefaultField:          defaultField,
+		ByteArrayConverter:    defaultByteArrayConverter,
 		cache:                 registry.NewCache(),
 	}
 }
@@ -149,32 +149,32 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 
 	im.cache = registry.NewCache()
 
-	im.TypeField = DefaultTypeField
+	im.TypeField = defaultTypeField
 	if tmp.TypeField != "" {
 		im.TypeField = tmp.TypeField
 	}
 
-	im.DefaultType = DefaultType
+	im.DefaultType = defaultType
 	if tmp.DefaultType != "" {
 		im.DefaultType = tmp.DefaultType
 	}
 
-	im.DefaultAnalyzer = DefaultAnalyzer
+	im.DefaultAnalyzer = defaultAnalyzer
 	if tmp.DefaultAnalyzer != "" {
 		im.DefaultAnalyzer = tmp.DefaultAnalyzer
 	}
 
-	im.DefaultDateTimeParser = DefaultDateTimeParser
+	im.DefaultDateTimeParser = defaultDateTimeParser
 	if tmp.DefaultDateTimeParser != "" {
 		im.DefaultDateTimeParser = tmp.DefaultDateTimeParser
 	}
 
-	im.DefaultField = DefaultField
+	im.DefaultField = defaultField
 	if tmp.DefaultField != "" {
 		im.DefaultField = tmp.DefaultField
 	}
 
-	im.ByteArrayConverter = DefaultByteArrayConverter
+	im.ByteArrayConverter = defaultByteArrayConverter
 	if tmp.ByteArrayConverter != "" {
 		im.ByteArrayConverter = tmp.ByteArrayConverter
 	}
@@ -493,7 +493,7 @@ func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) 
 	if fieldMapping.Name != nil && *fieldMapping.Name != "" {
 		parentName := ""
 		if len(path) > 1 {
-			parentName = encodePath(path[:len(path)-1]) + PATH_SEPARATOR
+			parentName = encodePath(path[:len(path)-1]) + pATH_SEPARATOR
 		}
 		fieldName = parentName + *fieldMapping.Name
 	}
