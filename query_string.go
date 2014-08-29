@@ -35,7 +35,7 @@ func (q *queryStringQuery) SetBoost(b float64) Query {
 }
 
 func (q *queryStringQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
-	newQuery, err := ParseQuerySyntax(q.Query, i.m)
+	newQuery, err := parseQuerySyntax(q.Query, i.m)
 	if err != nil {
 		return nil, err
 	}

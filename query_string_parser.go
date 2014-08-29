@@ -28,7 +28,7 @@ var parsingMustNotList []Query
 var parsingShouldList []Query
 var parsingIndexMapping *IndexMapping
 
-func ParseQuerySyntax(query string, mapping *IndexMapping) (rq Query, err error) {
+func parseQuerySyntax(query string, mapping *IndexMapping) (rq Query, err error) {
 	parserMutex.Lock()
 	defer parserMutex.Unlock()
 

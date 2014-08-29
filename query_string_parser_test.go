@@ -140,7 +140,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 
 	for _, test := range tests {
 
-		q, err := ParseQuerySyntax(test.input, test.mapping)
+		q, err := parseQuerySyntax(test.input, test.mapping)
 		if err != nil {
 			t.Error(err)
 		}
@@ -159,7 +159,7 @@ func TestQuerySyntaxParserInvalid(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_, err := ParseQuerySyntax(test.input, NewIndexMapping())
+		_, err := parseQuerySyntax(test.input, NewIndexMapping())
 		if err == nil {
 			t.Errorf("expected error, got nil for `%s`", test.input)
 		}
