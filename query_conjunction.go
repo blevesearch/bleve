@@ -21,6 +21,9 @@ type ConjunctionQuery struct {
 }
 
 func NewConjunctionQuery(conjuncts []Query) *ConjunctionQuery {
+	if len(conjuncts) == 0 {
+		return nil
+	}
 	return &ConjunctionQuery{
 		Conjuncts: conjuncts,
 		BoostVal:  1.0,

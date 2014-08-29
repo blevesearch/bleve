@@ -20,11 +20,19 @@ type BooleanQuery struct {
 	BoostVal float64           `json:"boost,omitempty"`
 }
 
-func NewBooleanQuery(must *ConjunctionQuery, should *DisjunctionQuery, mustNot *DisjunctionQuery) *BooleanQuery {
+func NewBooleanQuery(must []Query, should []Query, mustNot []Query) *BooleanQuery {
+	min := 0.0
+	if len(should) > 0 {
+		min = 1.0
+	}
+	return NewBooleanQueryMinShould(must, should, mustNot, min)
+}
+
+func NewBooleanQueryMinShould(must []Query, should []Query, mustNot []Query, minShould float64) *BooleanQuery {
 	return &BooleanQuery{
-		Must:     must,
-		Should:   should,
-		MustNot:  mustNot,
+		Must:     NewConjunctionQuery(must),
+		Should:   NewDisjunctionQueryMin(should, minShould),
+		MustNot:  NewDisjunctionQuery(mustNot),
 		BoostVal: 1.0,
 	}
 }

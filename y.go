@@ -393,148 +393,76 @@ yydefault:
 			str := yyS[yypt-0].s
 			logDebugGrammar("STRING - %s", str)
 			q := NewMatchQuery(str)
-			if parsingMust {
-				parsingMustList.AddQuery(q)
-				parsingMust = false
-			} else if parsingMustNot {
-				parsingMustNotList.AddQuery(q)
-				parsingMustNot = false
-			} else {
-				parsingShouldList.AddQuery(q)
-			}
-			parsingLastQuery = q
+			addQueryToList(q)
 		}
 	case 10:
-		//line query_string.y:78
+		//line query_string.y:69
 		{
 			phrase := yyS[yypt-0].s
 			logDebugGrammar("PHRASE - %s", phrase)
 			q := NewMatchPhraseQuery(phrase)
-			if parsingMust {
-				parsingMustList.AddQuery(q)
-				parsingMust = false
-			} else if parsingMustNot {
-				parsingMustNotList.AddQuery(q)
-				parsingMustNot = false
-			} else {
-				parsingShouldList.AddQuery(q)
-			}
-			parsingLastQuery = q
+			addQueryToList(q)
 		}
 	case 11:
-		//line query_string.y:94
+		//line query_string.y:76
 		{
 			field := yyS[yypt-2].s
 			str := yyS[yypt-0].s
 			logDebugGrammar("FIELD - %s STRING - %s", field, str)
 			q := NewMatchQuery(str).SetField(field)
-			if parsingMust {
-				parsingMustList.AddQuery(q)
-				parsingMust = false
-			} else if parsingMustNot {
-				parsingMustNotList.AddQuery(q)
-				parsingMustNot = false
-			} else {
-				parsingShouldList.AddQuery(q)
-			}
-			parsingLastQuery = q
+			addQueryToList(q)
 		}
 	case 12:
-		//line query_string.y:111
+		//line query_string.y:84
 		{
 			field := yyS[yypt-2].s
 			phrase := yyS[yypt-0].s
 			logDebugGrammar("FIELD - %s PHRASE - %s", field, phrase)
 			q := NewMatchPhraseQuery(phrase).SetField(field)
-			if parsingMust {
-				parsingMustList.AddQuery(q)
-				parsingMust = false
-			} else if parsingMustNot {
-				parsingMustNotList.AddQuery(q)
-				parsingMustNot = false
-			} else {
-				parsingShouldList.AddQuery(q)
-			}
-			parsingLastQuery = q
+			addQueryToList(q)
 		}
 	case 13:
-		//line query_string.y:128
+		//line query_string.y:92
 		{
 			field := yyS[yypt-3].s
 			min := yyS[yypt-0].f
 			minInclusive := false
 			logDebugGrammar("FIELD - GREATER THAN %f", min)
 			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
-			if parsingMust {
-				parsingMustList.AddQuery(q)
-				parsingMust = false
-			} else if parsingMustNot {
-				parsingMustNotList.AddQuery(q)
-				parsingMustNot = false
-			} else {
-				parsingShouldList.AddQuery(q)
-			}
-			parsingLastQuery = q
+			addQueryToList(q)
 		}
 	case 14:
-		//line query_string.y:146
+		//line query_string.y:101
 		{
 			field := yyS[yypt-4].s
 			min := yyS[yypt-0].f
 			minInclusive := true
 			logDebugGrammar("FIELD - GREATER THAN OR EQUAL %f", min)
 			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
-			if parsingMust {
-				parsingMustList.AddQuery(q)
-				parsingMust = false
-			} else if parsingMustNot {
-				parsingMustNotList.AddQuery(q)
-				parsingMustNot = false
-			} else {
-				parsingShouldList.AddQuery(q)
-			}
-			parsingLastQuery = q
+			addQueryToList(q)
 		}
 	case 15:
-		//line query_string.y:164
+		//line query_string.y:110
 		{
 			field := yyS[yypt-3].s
 			max := yyS[yypt-0].f
 			maxInclusive := false
 			logDebugGrammar("FIELD - LESS THAN %f", max)
 			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
-			if parsingMust {
-				parsingMustList.AddQuery(q)
-				parsingMust = false
-			} else if parsingMustNot {
-				parsingMustNotList.AddQuery(q)
-				parsingMustNot = false
-			} else {
-				parsingShouldList.AddQuery(q)
-			}
-			parsingLastQuery = q
+			addQueryToList(q)
 		}
 	case 16:
-		//line query_string.y:182
+		//line query_string.y:119
 		{
 			field := yyS[yypt-4].s
 			max := yyS[yypt-0].f
 			maxInclusive := true
 			logDebugGrammar("FIELD - LESS THAN OR EQUAL %f", max)
 			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
-			if parsingMust {
-				parsingMustList.AddQuery(q)
-				parsingMust = false
-			} else if parsingMustNot {
-				parsingMustNotList.AddQuery(q)
-				parsingMustNot = false
-			} else {
-				parsingShouldList.AddQuery(q)
-			}
-			parsingLastQuery = q
+			addQueryToList(q)
 		}
 	case 17:
-		//line query_string.y:202
+		//line query_string.y:130
 		{
 			boost := yyS[yypt-0].f
 			if parsingLastQuery != nil {
@@ -548,12 +476,12 @@ yydefault:
 			logDebugGrammar("BOOST %f", boost)
 		}
 	case 18:
-		//line query_string.y:216
+		//line query_string.y:144
 		{
 
 		}
 	case 19:
-		//line query_string.y:220
+		//line query_string.y:148
 		{
 
 		}

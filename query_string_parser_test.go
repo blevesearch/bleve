@@ -26,10 +26,9 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			mapping: NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
-				NewDisjunctionQuery(
-					[]Query{
-						NewMatchQuery("test"),
-					}),
+				[]Query{
+					NewMatchQuery("test"),
+				},
 				nil),
 		},
 		{
@@ -37,10 +36,9 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			mapping: NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
-				NewDisjunctionQuery(
-					[]Query{
-						NewMatchPhraseQuery("test phrase 1"),
-					}),
+				[]Query{
+					NewMatchPhraseQuery("test phrase 1"),
+				},
 				nil),
 		},
 		{
@@ -48,20 +46,18 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			mapping: NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
-				NewDisjunctionQuery(
-					[]Query{
-						NewMatchQuery("test").SetField("field"),
-					}),
+				[]Query{
+					NewMatchQuery("test").SetField("field"),
+				},
 				nil),
 		},
 		{
 			input:   "+field1:test1",
 			mapping: NewIndexMapping(),
 			result: NewBooleanQuery(
-				NewConjunctionQuery(
-					[]Query{
-						NewMatchQuery("test1").SetField("field1"),
-					}),
+				[]Query{
+					NewMatchQuery("test1").SetField("field1"),
+				},
 				nil,
 				nil),
 		},
@@ -71,30 +67,27 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				nil,
-				NewDisjunctionQuery(
-					[]Query{
-						NewMatchQuery("test2").SetField("field2"),
-					})),
+				[]Query{
+					NewMatchQuery("test2").SetField("field2"),
+				}),
 		},
 		{
 			input:   `field3:"test phrase 2"`,
 			mapping: NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
-				NewDisjunctionQuery(
-					[]Query{
-						NewMatchPhraseQuery("test phrase 2").SetField("field3"),
-					}),
+				[]Query{
+					NewMatchPhraseQuery("test phrase 2").SetField("field3"),
+				},
 				nil),
 		},
 		{
 			input:   `+field4:"test phrase 1"`,
 			mapping: NewIndexMapping(),
 			result: NewBooleanQuery(
-				NewConjunctionQuery(
-					[]Query{
-						NewMatchPhraseQuery("test phrase 1").SetField("field4"),
-					}),
+				[]Query{
+					NewMatchPhraseQuery("test phrase 1").SetField("field4"),
+				},
 				nil,
 				nil),
 		},
@@ -104,37 +97,32 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				nil,
-				NewDisjunctionQuery(
-					[]Query{
-						NewMatchPhraseQuery("test phrase 2").SetField("field5"),
-					})),
+				[]Query{
+					NewMatchPhraseQuery("test phrase 2").SetField("field5"),
+				}),
 		},
 		{
 			input:   `+field6:test3 -field7:test4 field8:test5`,
 			mapping: NewIndexMapping(),
 			result: NewBooleanQuery(
-				NewConjunctionQuery(
-					[]Query{
-						NewMatchQuery("test3").SetField("field6"),
-					}),
-				NewDisjunctionQuery(
-					[]Query{
-						NewMatchQuery("test5").SetField("field8"),
-					}),
-				NewDisjunctionQuery(
-					[]Query{
-						NewMatchQuery("test4").SetField("field7"),
-					})),
+				[]Query{
+					NewMatchQuery("test3").SetField("field6"),
+				},
+				[]Query{
+					NewMatchQuery("test5").SetField("field8"),
+				},
+				[]Query{
+					NewMatchQuery("test4").SetField("field7"),
+				}),
 		},
 		{
 			input:   "test^3",
 			mapping: NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
-				NewDisjunctionQuery(
-					[]Query{
-						NewMatchQuery("test").SetBoost(3.0),
-					}),
+				[]Query{
+					NewMatchQuery("test").SetBoost(3.0),
+				},
 				nil),
 		},
 		{
@@ -142,11 +130,10 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			mapping: NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
-				NewDisjunctionQuery(
-					[]Query{
-						NewMatchQuery("test").SetBoost(3.0),
-						NewMatchQuery("other").SetBoost(6.0),
-					}),
+				[]Query{
+					NewMatchQuery("test").SetBoost(3.0),
+					NewMatchQuery("other").SetBoost(6.0),
+				},
 				nil),
 		},
 	}

@@ -22,9 +22,23 @@ type DisjunctionQuery struct {
 }
 
 func NewDisjunctionQuery(disjuncts []Query) *DisjunctionQuery {
+	if len(disjuncts) == 0 {
+		return nil
+	}
 	return &DisjunctionQuery{
 		Disjuncts: disjuncts,
 		BoostVal:  1.0,
+	}
+}
+
+func NewDisjunctionQueryMin(disjuncts []Query, min float64) *DisjunctionQuery {
+	if len(disjuncts) == 0 {
+		return nil
+	}
+	return &DisjunctionQuery{
+		Disjuncts: disjuncts,
+		BoostVal:  1.0,
+		MinVal:    min,
 	}
 }
 

@@ -63,32 +63,14 @@ tSTRING {
 	str := $1.s
 	logDebugGrammar("STRING - %s", str)
 	q := NewMatchQuery(str)
-	if parsingMust {
-		parsingMustList.AddQuery(q)
-		parsingMust = false
-	} else if parsingMustNot {
-		parsingMustNotList.AddQuery(q)
-		parsingMustNot = false
-	} else {
-		parsingShouldList.AddQuery(q)
-	}
-	parsingLastQuery = q
+	addQueryToList(q)
 }
 |
 tPHRASE {
 	phrase := $1.s
 	logDebugGrammar("PHRASE - %s", phrase)
 	q := NewMatchPhraseQuery(phrase)
-	if parsingMust {
-		parsingMustList.AddQuery(q)
-		parsingMust = false
-	} else if parsingMustNot {
-		parsingMustNotList.AddQuery(q)
-		parsingMustNot = false
-	} else {
-		parsingShouldList.AddQuery(q)
-	}
-	parsingLastQuery = q
+	addQueryToList(q)
 }
 |
 tSTRING tCOLON tSTRING {
@@ -96,16 +78,7 @@ tSTRING tCOLON tSTRING {
 	str := $3.s
 	logDebugGrammar("FIELD - %s STRING - %s", field, str)
 	q := NewMatchQuery(str).SetField(field)
-	if parsingMust {
-		parsingMustList.AddQuery(q)
-		parsingMust = false
-	} else if parsingMustNot {
-		parsingMustNotList.AddQuery(q)
-		parsingMustNot = false
-	} else {
-		parsingShouldList.AddQuery(q)
-	}
-	parsingLastQuery = q
+	addQueryToList(q)
 }
 |
 tSTRING tCOLON tPHRASE {
@@ -113,16 +86,7 @@ tSTRING tCOLON tPHRASE {
 	phrase := $3.s
 	logDebugGrammar("FIELD - %s PHRASE - %s", field, phrase)
 	q := NewMatchPhraseQuery(phrase).SetField(field)
-	if parsingMust {
-		parsingMustList.AddQuery(q)
-		parsingMust = false
-	} else if parsingMustNot {
-		parsingMustNotList.AddQuery(q)
-		parsingMustNot = false
-	} else {
-		parsingShouldList.AddQuery(q)
-	}
-	parsingLastQuery = q
+	addQueryToList(q)
 }
 |
 tSTRING tCOLON tGREATER tNUMBER {
@@ -131,16 +95,7 @@ tSTRING tCOLON tGREATER tNUMBER {
 	minInclusive := false
 	logDebugGrammar("FIELD - GREATER THAN %f", min)
 	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
-	if parsingMust {
-		parsingMustList.AddQuery(q)
-		parsingMust = false
-	} else if parsingMustNot {
-		parsingMustNotList.AddQuery(q)
-		parsingMustNot = false
-	} else {
-		parsingShouldList.AddQuery(q)
-	}
-	parsingLastQuery = q
+	addQueryToList(q)
 }
 |
 tSTRING tCOLON tGREATER tEQUAL tNUMBER {
@@ -149,16 +104,7 @@ tSTRING tCOLON tGREATER tEQUAL tNUMBER {
 	minInclusive := true
 	logDebugGrammar("FIELD - GREATER THAN OR EQUAL %f", min)
 	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
-	if parsingMust {
-		parsingMustList.AddQuery(q)
-		parsingMust = false
-	} else if parsingMustNot {
-		parsingMustNotList.AddQuery(q)
-		parsingMustNot = false
-	} else {
-		parsingShouldList.AddQuery(q)
-	}
-	parsingLastQuery = q
+	addQueryToList(q)
 }
 |
 tSTRING tCOLON tLESS tNUMBER {
@@ -167,16 +113,7 @@ tSTRING tCOLON tLESS tNUMBER {
 	maxInclusive := false
 	logDebugGrammar("FIELD - LESS THAN %f", max)
 	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
-	if parsingMust {
-		parsingMustList.AddQuery(q)
-		parsingMust = false
-	} else if parsingMustNot {
-		parsingMustNotList.AddQuery(q)
-		parsingMustNot = false
-	} else {
-		parsingShouldList.AddQuery(q)
-	}
-	parsingLastQuery = q
+	addQueryToList(q)
 }
 |
 tSTRING tCOLON tLESS tEQUAL tNUMBER {
@@ -185,16 +122,7 @@ tSTRING tCOLON tLESS tEQUAL tNUMBER {
 	maxInclusive := true
 	logDebugGrammar("FIELD - LESS THAN OR EQUAL %f", max)
 	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
-	if parsingMust {
-		parsingMustList.AddQuery(q)
-		parsingMust = false
-	} else if parsingMustNot {
-		parsingMustNotList.AddQuery(q)
-		parsingMustNot = false
-	} else {
-		parsingShouldList.AddQuery(q)
-	}
-	parsingLastQuery = q
+	addQueryToList(q)
 };
 
 

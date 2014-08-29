@@ -38,11 +38,11 @@ func TestParseQuery(t *testing.T) {
 			output: NewMatchPhraseQuery("light beer").SetField("desc"),
 		},
 		{
-			input: []byte(`{"must":{"terms": [{"match":"beer","field":"desc"}]},"should":{"terms": [{"match":"water","field":"desc"}]},"must_not":{"terms": [{"match":"devon","field":"desc"}]}}`),
+			input: []byte(`{"must":{"terms": [{"match":"beer","field":"desc"}]},"should":{"terms": [{"match":"water","field":"desc"}],"min":1.0},"must_not":{"terms": [{"match":"devon","field":"desc"}]}}`),
 			output: NewBooleanQuery(
-				NewConjunctionQuery([]Query{NewMatchQuery("beer").SetField("desc")}),
-				NewDisjunctionQuery([]Query{NewMatchQuery("water").SetField("desc")}).SetMin(0),
-				NewDisjunctionQuery([]Query{NewMatchQuery("devon").SetField("desc")}).SetMin(0)),
+				[]Query{NewMatchQuery("beer").SetField("desc")},
+				[]Query{NewMatchQuery("water").SetField("desc")},
+				[]Query{NewMatchQuery("devon").SetField("desc")}),
 		},
 		{
 			input: []byte(`{"terms":[{"term":"watered","field":"desc"},{"term":"down","field":"desc"}]}`),
@@ -208,30 +208,31 @@ func TestQueryValidate(t *testing.T) {
 		},
 		{
 			query: NewBooleanQuery(
-				NewConjunctionQuery([]Query{NewMatchQuery("beer").SetField("desc")}),
-				NewDisjunctionQuery([]Query{NewMatchQuery("water").SetField("desc")}).SetMin(0),
-				NewDisjunctionQuery([]Query{NewMatchQuery("devon").SetField("desc")}).SetMin(0)),
+				[]Query{NewMatchQuery("beer").SetField("desc")},
+				[]Query{NewMatchQuery("water").SetField("desc")},
+				[]Query{NewMatchQuery("devon").SetField("desc")}),
 			err: nil,
 		},
 		{
 			query: NewBooleanQuery(
 				nil,
 				nil,
-				NewDisjunctionQuery([]Query{NewMatchQuery("devon").SetField("desc")}).SetMin(0)),
+				[]Query{NewMatchQuery("devon").SetField("desc")}),
 			err: ERROR_BOOLEAN_QUERY_NEEDS_MUST_OR_SHOULD,
 		},
 		{
 			query: NewBooleanQuery(
-				NewConjunctionQuery([]Query{}),
-				NewDisjunctionQuery([]Query{}).SetMin(0),
-				NewDisjunctionQuery([]Query{NewMatchQuery("devon").SetField("desc")}).SetMin(0)),
+				[]Query{},
+				[]Query{},
+				[]Query{NewMatchQuery("devon").SetField("desc")}),
 			err: ERROR_BOOLEAN_QUERY_NEEDS_MUST_OR_SHOULD,
 		},
 		{
-			query: NewBooleanQuery(
-				NewConjunctionQuery([]Query{NewMatchQuery("beer").SetField("desc")}),
-				NewDisjunctionQuery([]Query{NewMatchQuery("water").SetField("desc")}).SetMin(2),
-				NewDisjunctionQuery([]Query{NewMatchQuery("devon").SetField("desc")}).SetMin(0)),
+			query: NewBooleanQueryMinShould(
+				[]Query{NewMatchQuery("beer").SetField("desc")},
+				[]Query{NewMatchQuery("water").SetField("desc")},
+				[]Query{NewMatchQuery("devon").SetField("desc")},
+				2.0),
 			err: ERROR_DISJUNCTION_FEWER_THAN_MIN_CLAUSES,
 		},
 	}

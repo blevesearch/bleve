@@ -23,9 +23,9 @@ var debugParser bool
 var debugLexer bool
 
 var parsingLastQuery Query
-var parsingMustList *ConjunctionQuery
-var parsingMustNotList *DisjunctionQuery
-var parsingShouldList *DisjunctionQuery
+var parsingMustList []Query
+var parsingMustNotList []Query
+var parsingShouldList []Query
 var parsingIndexMapping *IndexMapping
 
 func ParseQuerySyntax(query string, mapping *IndexMapping) (rq Query, err error) {
@@ -33,9 +33,9 @@ func ParseQuerySyntax(query string, mapping *IndexMapping) (rq Query, err error)
 	defer parserMutex.Unlock()
 
 	parsingIndexMapping = mapping
-	parsingMustList = NewConjunctionQuery([]Query{})
-	parsingMustNotList = NewDisjunctionQuery([]Query{})
-	parsingShouldList = NewDisjunctionQuery([]Query{})
+	parsingMustList = make([]Query, 0)
+	parsingMustNotList = make([]Query, 0)
+	parsingShouldList = make([]Query, 0)
 
 	defer func() {
 		r := recover()
@@ -53,16 +53,19 @@ func ParseQuerySyntax(query string, mapping *IndexMapping) (rq Query, err error)
 	}()
 
 	yyParse(NewLexer(strings.NewReader(query)))
-	parsingQuery := NewBooleanQuery(nil, nil, nil)
-	if len(parsingMustList.Conjuncts) > 0 {
-		parsingQuery.Must = parsingMustList
-	}
-	if len(parsingMustNotList.Disjuncts) > 0 {
-		parsingQuery.MustNot = parsingMustNotList
-	}
-	if len(parsingShouldList.Disjuncts) > 0 {
-		parsingQuery.Should = parsingShouldList
-	}
-	rq = parsingQuery
+	rq = NewBooleanQuery(parsingMustList, parsingShouldList, parsingMustNotList)
 	return rq, err
+}
+
+func addQueryToList(q Query) {
+	if parsingMust {
+		parsingMustList = append(parsingMustList, q)
+		parsingMust = false
+	} else if parsingMustNot {
+		parsingMustNotList = append(parsingMustNotList, q)
+		parsingMustNot = false
+	} else {
+		parsingShouldList = append(parsingShouldList, q)
+	}
+	parsingLastQuery = q
 }
