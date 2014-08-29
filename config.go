@@ -88,15 +88,15 @@ type HighlightConfig struct {
 	Highlighters map[string]search.Highlighter
 }
 
-type Configuration struct {
+type configuration struct {
 	Highlight           *HighlightConfig
 	DefaultHighlighter  *string
 	ByteArrayConverters map[string]ByteArrayConverter
 	DefaultKVStore      string
 }
 
-func NewConfiguration() *Configuration {
-	return &Configuration{
+func newConfiguration() *configuration {
+	return &configuration{
 		Highlight: &HighlightConfig{
 			Highlighters: make(map[string]search.Highlighter),
 		},
@@ -104,13 +104,13 @@ func NewConfiguration() *Configuration {
 	}
 }
 
-var Config *Configuration
+var Config *configuration
 
 func init() {
 	bootStart := time.Now()
 
 	// build the default configuration
-	Config = NewConfiguration()
+	Config = newConfiguration()
 
 	// register byte array converters
 	Config.ByteArrayConverters["string"] = NewStringByteArrayConverter()

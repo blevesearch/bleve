@@ -180,7 +180,7 @@ func TestIndex(t *testing.T) {
 		}
 	}
 
-	syntaxQuery := NewSyntaxQuery("+name:phone")
+	syntaxQuery := NewQueryStringQuery("+name:phone")
 	searchRequest = NewSearchRequest(syntaxQuery)
 	searchResult, err = index.Search(searchRequest)
 	if err != nil {
