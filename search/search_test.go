@@ -48,3 +48,7 @@ func (ss *stubSearcher) SetQueryNorm(float64) {
 func (ss *stubSearcher) Count() uint64 {
 	return uint64(len(ss.matches))
 }
+
+func (ss *stubSearcher) Min() int {
+	return 0
+}
