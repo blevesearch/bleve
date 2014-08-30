@@ -70,12 +70,12 @@ func (im *IndexMapping) validate() error {
 	if err != nil {
 		return err
 	}
-	err = im.DefaultMapping.Validate(im.cache)
+	err = im.DefaultMapping.validate(im.cache)
 	if err != nil {
 		return err
 	}
 	for _, docMapping := range im.TypeMapping {
-		err = docMapping.Validate(im.cache)
+		err = docMapping.validate(im.cache)
 		if err != nil {
 			return err
 		}
@@ -199,7 +199,7 @@ func (im *IndexMapping) mapDocument(doc *document.Document, data interface{}) er
 	im.walkDocument(data, []string{}, []uint64{}, walkContext)
 
 	// see if the _all field was disabled
-	allMapping := docMapping.DocumentMappingForPath("_all")
+	allMapping := docMapping.documentMappingForPath("_all")
 	if allMapping == nil || (allMapping.Enabled != false) {
 		field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS)
 		doc.AddField(field)
@@ -270,7 +270,7 @@ func (im *IndexMapping) walkDocument(data interface{}, path []string, indexes []
 func (im *IndexMapping) processProperty(property interface{}, path []string, indexes []uint64, context *walkContext) {
 	pathString := encodePath(path)
 	// look to see if there is a mapping for this field
-	subDocMapping := context.dm.DocumentMappingForPath(pathString)
+	subDocMapping := context.dm.documentMappingForPath(pathString)
 
 	// check tos see if we even need to do further processing
 	if subDocMapping != nil && !subDocMapping.Enabled {
@@ -403,7 +403,7 @@ func (im *IndexMapping) analyzerNameForPath(path string) string {
 
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
-		pathMapping := docMapping.DocumentMappingForPath(path)
+		pathMapping := docMapping.documentMappingForPath(path)
 		if pathMapping != nil {
 			if len(pathMapping.Fields) > 0 {
 				if pathMapping.Fields[0].Analyzer != nil {
@@ -447,7 +447,7 @@ func (im *IndexMapping) datetimeParserNameForPath(path string) string {
 
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
-		pathMapping := docMapping.DocumentMappingForPath(path)
+		pathMapping := docMapping.documentMappingForPath(path)
 		if pathMapping != nil {
 			if len(pathMapping.Fields) > 0 {
 				if pathMapping.Fields[0].Analyzer != nil {

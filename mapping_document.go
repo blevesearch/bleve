@@ -24,7 +24,7 @@ type DocumentMapping struct {
 	DefaultAnalyzer string                      `json:"default_analyzer"`
 }
 
-func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
+func (dm *DocumentMapping) validate(cache *registry.Cache) error {
 	var err error
 	if dm.DefaultAnalyzer != "" {
 		_, err := cache.AnalyzerNamed(dm.DefaultAnalyzer)
@@ -33,7 +33,7 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 		}
 	}
 	for _, property := range dm.Properties {
-		err = property.Validate(cache)
+		err = property.validate(cache)
 		if err != nil {
 			return err
 		}
@@ -62,11 +62,7 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 	return nil
 }
 
-func (dm *DocumentMapping) GoString() string {
-	return fmt.Sprintf(" &bleve.DocumentMapping{Enabled:%t, Dynamic:%t, Properties:%#v, Fields:%#v}", dm.Enabled, dm.Dynamic, dm.Properties, dm.Fields)
-}
-
-func (dm *DocumentMapping) DocumentMappingForPath(path string) *DocumentMapping {
+func (dm *DocumentMapping) documentMappingForPath(path string) *DocumentMapping {
 	pathElements := decodePath(path)
 	current := dm
 	for _, pathElement := range pathElements {

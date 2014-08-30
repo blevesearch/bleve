@@ -10,8 +10,6 @@
 package bleve
 
 import (
-	"fmt"
-
 	"github.com/blevesearch/bleve/document"
 )
 
@@ -50,8 +48,4 @@ func (fm *FieldMapping) Options() document.IndexingOptions {
 		rv |= document.INCLUDE_TERM_VECTORS
 	}
 	return rv
-}
-
-func (fm *FieldMapping) GoString() string {
-	return fmt.Sprintf("&bleve.FieldMapping{Name:%s, Type:%s, Analyzer:%s, Store:%t, Index:%t}", *fm.Name, *fm.Type, *fm.Analyzer, *fm.Store, *fm.Index)
 }
