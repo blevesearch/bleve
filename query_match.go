@@ -55,7 +55,7 @@ func (q *matchQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, erro
 	} else {
 		analyzerName = i.m.analyzerNameForPath(q.FieldVal)
 	}
-	analyzer := i.m.AnalyzerNamed(analyzerName)
+	analyzer := i.m.analyzerNamed(analyzerName)
 
 	if analyzer == nil {
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)

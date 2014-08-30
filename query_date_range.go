@@ -67,7 +67,7 @@ func (q *dateRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, 
 	} else {
 		dateTimeParserName = i.m.datetimeParserNameForPath(q.FieldVal)
 	}
-	dateTimeParser := i.m.DateTimeParserNamed(dateTimeParserName)
+	dateTimeParser := i.m.dateTimeParserNamed(dateTimeParserName)
 	if dateTimeParser == nil {
 		return nil, fmt.Errorf("no datetime parser named '%s' registered", *q.DateTimeParser)
 	}

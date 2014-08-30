@@ -321,7 +321,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 			} else if facetRequest.DateTimeRanges != nil {
 				// build date range facet
 				facetBuilder := search.NewDateTimeFacetBuilder(facetRequest.Field, facetRequest.Size)
-				dateTimeParser := i.m.DateTimeParserNamed(i.m.DefaultDateTimeParser)
+				dateTimeParser := i.m.dateTimeParserNamed(i.m.DefaultDateTimeParser)
 				for _, dr := range facetRequest.DateTimeRanges {
 					dr.ParseDates(dateTimeParser)
 					facetBuilder.AddRange(dr.Name, dr.Start, dr.End)

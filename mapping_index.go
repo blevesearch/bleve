@@ -123,7 +123,7 @@ func (im *IndexMapping) SetByteArrayConverter(byteArrayConverter string) *IndexM
 	return im
 }
 
-func (im *IndexMapping) MappingForType(docType string) *DocumentMapping {
+func (im *IndexMapping) mappingForType(docType string) *DocumentMapping {
 	docMapping := im.TypeMapping[docType]
 	if docMapping == nil {
 		docMapping = im.DefaultMapping
@@ -229,7 +229,7 @@ func (im *IndexMapping) MapDocument(doc *document.Document, data interface{}) er
 	}
 
 	docType := im.determineType(data)
-	docMapping := im.MappingForType(docType)
+	docMapping := im.mappingForType(docType)
 	walkContext := newWalkContext(doc, docMapping)
 	im.walkDocument(data, []string{}, []uint64{}, walkContext)
 
@@ -323,7 +323,7 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, ind
 				fieldName := getFieldName(pathString, path, fieldMapping)
 				options := fieldMapping.Options()
 				if *fieldMapping.Type == "text" {
-					analyzer := im.AnalyzerNamed(*fieldMapping.Analyzer)
+					analyzer := im.analyzerNamed(*fieldMapping.Analyzer)
 					field := document.NewTextFieldCustom(fieldName, indexes, []byte(propertyValueString), options, analyzer)
 					context.doc.AddField(field)
 
@@ -335,7 +335,7 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, ind
 					if fieldMapping.DateFormat != nil {
 						dateTimeFormat = *fieldMapping.DateFormat
 					}
-					dateTimeParser := im.DateTimeParserNamed(dateTimeFormat)
+					dateTimeParser := im.dateTimeParserNamed(dateTimeFormat)
 					if dateTimeParser != nil {
 						parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
 						if err != nil {
@@ -353,7 +353,7 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, ind
 			// automatic indexing behavior
 
 			// first see if it can be parsed by the default date parser
-			dateTimeParser := im.DateTimeParserNamed(im.DefaultDateTimeParser)
+			dateTimeParser := im.dateTimeParserNamed(im.DefaultDateTimeParser)
 			if dateTimeParser != nil {
 				parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
 				if err != nil {
@@ -363,7 +363,7 @@ func (im *IndexMapping) processProperty(property interface{}, path []string, ind
 					if analyzerName == "" {
 						analyzerName = im.DefaultAnalyzer
 					}
-					analyzer := im.AnalyzerNamed(analyzerName)
+					analyzer := im.analyzerNamed(analyzerName)
 					field := document.NewTextFieldCustom(pathString, indexes, []byte(propertyValueString), options, analyzer)
 					context.doc.AddField(field)
 				} else {
@@ -460,7 +460,7 @@ func (im *IndexMapping) analyzerNameForPath(path string) string {
 	return im.DefaultAnalyzer
 }
 
-func (im *IndexMapping) AnalyzerNamed(name string) *analysis.Analyzer {
+func (im *IndexMapping) analyzerNamed(name string) *analysis.Analyzer {
 	analyzer, err := im.cache.AnalyzerNamed(name)
 	if err != nil {
 		log.Printf("error using analyzer named: %s", name)
@@ -469,7 +469,7 @@ func (im *IndexMapping) AnalyzerNamed(name string) *analysis.Analyzer {
 	return analyzer
 }
 
-func (im *IndexMapping) DateTimeParserNamed(name string) analysis.DateTimeParser {
+func (im *IndexMapping) dateTimeParserNamed(name string) analysis.DateTimeParser {
 	dateTimeParser, err := im.cache.DateTimeParserNamed(name)
 	if err != nil {
 		log.Printf("error using datetime parser named: %s", name)
