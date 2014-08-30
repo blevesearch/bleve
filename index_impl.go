@@ -354,7 +354,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 		}
 
 		for _, hit := range hits {
-			doc, err := i.Document(hit.ID)
+			doc, err := i.i.Document(hit.ID)
 			if err == nil {
 				highlightFields := req.Highlight.Fields
 				if highlightFields == nil {
@@ -376,7 +376,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 		for _, hit := range hits {
 			// FIXME avoid loading doc second time
 			// if we already loaded it for highlighting
-			doc, err := i.Document(hit.ID)
+			doc, err := i.i.Document(hit.ID)
 			if err == nil {
 				for _, f := range req.Fields {
 					for _, docF := range doc.Fields {
