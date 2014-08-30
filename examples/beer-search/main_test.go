@@ -17,7 +17,9 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve"
 )
@@ -182,4 +184,46 @@ func walkDirectory(dir string, t *testing.T) chan jsonFile {
 		}
 	}()
 	return rv
+}
+
+// this test reproduces bug #87
+// https://github.com/blevesearch/bleve/issues/87
+// because of which, it will deadlock
+func TestBeerSearchBug87(t *testing.T) {
+	defer os.RemoveAll("beer-search-test.bleve")
+
+	mapping := buildIndexMapping()
+	index, err := bleve.New("beer-search-test.bleve", mapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer index.Close()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	// start indexing documents in the background
+	go func() {
+		for jf := range walkDirectory("../../samples/beer-sample/", t) {
+			docId := jf.filename[0:strings.LastIndex(jf.filename, ".")]
+			err = index.Index(docId, jf.contents)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+		wg.Done()
+	}()
+
+	for i := 0; i < 50; i++ {
+		time.Sleep(1 * time.Second)
+		termQuery := bleve.NewTermQuery("shock").SetField("name")
+		termSearchRequest := bleve.NewSearchRequest(termQuery)
+		// termSearchRequest.AddFacet("styles", bleve.NewFacetRequest("style", 3))
+		termSearchRequest.Fields = []string{"abv"}
+		_, err := index.Search(termSearchRequest)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
+	wg.Wait()
 }
