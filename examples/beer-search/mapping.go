@@ -62,9 +62,10 @@ func buildIndexMapping() *bleve.IndexMapping {
 
 	indexMapping := bleve.NewIndexMapping().
 		AddDocumentMapping("beer", beerMapping).
-		AddDocumentMapping("brewery", breweryMapping).
-		SetTypeField("type").
-		SetDefaultAnalyzer(textFieldAnalyzer)
+		AddDocumentMapping("brewery", breweryMapping)
+
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = textFieldAnalyzer
 
 	return indexMapping
 }

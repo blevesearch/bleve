@@ -11,7 +11,6 @@ package bleve
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"reflect"
 	"time"
@@ -44,10 +43,6 @@ type IndexMapping struct {
 	cache                 *registry.Cache             `json:"_"`
 }
 
-func (im *IndexMapping) GoString() string {
-	return fmt.Sprintf("&bleve.IndexMapping{TypeMapping:%#v, TypeField:%s, DefaultType:%s}", im.TypeMapping, im.TypeField, im.DefaultType)
-}
-
 func NewIndexMapping() *IndexMapping {
 	return &IndexMapping{
 		TypeMapping:           make(map[string]*DocumentMapping),
@@ -66,7 +61,7 @@ func NewIndexMapping() *IndexMapping {
 // explicitly named and default analyzers can be built
 // explicitly named and default date parsers can be built
 // field type names are valid
-func (im *IndexMapping) Validate() error {
+func (im *IndexMapping) validate() error {
 	_, err := im.cache.AnalyzerNamed(im.DefaultAnalyzer)
 	if err != nil {
 		return err
@@ -90,36 +85,6 @@ func (im *IndexMapping) Validate() error {
 
 func (im *IndexMapping) AddDocumentMapping(doctype string, dm *DocumentMapping) *IndexMapping {
 	im.TypeMapping[doctype] = dm
-	return im
-}
-
-func (im *IndexMapping) SetDefaultMapping(defaultMapping *DocumentMapping) *IndexMapping {
-	im.DefaultMapping = defaultMapping
-	return im
-}
-
-func (im *IndexMapping) SetTypeField(typeField string) *IndexMapping {
-	im.TypeField = typeField
-	return im
-}
-
-func (im *IndexMapping) SetDefaultType(defaultType string) *IndexMapping {
-	im.DefaultType = defaultType
-	return im
-}
-
-func (im *IndexMapping) SetDefaultAnalyzer(analyzer string) *IndexMapping {
-	im.DefaultAnalyzer = analyzer
-	return im
-}
-
-func (im *IndexMapping) SetDefaultField(field string) *IndexMapping {
-	im.DefaultField = field
-	return im
-}
-
-func (im *IndexMapping) SetByteArrayConverter(byteArrayConverter string) *IndexMapping {
-	im.ByteArrayConverter = byteArrayConverter
 	return im
 }
 
@@ -207,7 +172,7 @@ func (im *IndexMapping) determineType(data interface{}) string {
 	return im.DefaultType
 }
 
-func (im *IndexMapping) MapDocument(doc *document.Document, data interface{}) error {
+func (im *IndexMapping) mapDocument(doc *document.Document, data interface{}) error {
 	// see if the top level object is a byte array, and possibly run through conveter
 	byteArrayData, ok := data.([]byte)
 	if ok {

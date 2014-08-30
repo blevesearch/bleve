@@ -86,7 +86,7 @@ func newMemIndex(mapping *IndexMapping) (*indexImpl, error) {
 
 func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
 	// first validate the mapping
-	err := mapping.Validate()
+	err := mapping.validate()
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func openIndex(path string) (*indexImpl, error) {
 	rv.open = true
 
 	// validate the mapping
-	err = im.Validate()
+	err = im.validate()
 	if err != nil {
 		// note even if the mapping is invalid
 		// we still return an open usable index
@@ -222,7 +222,7 @@ func (i *indexImpl) Index(id string, data interface{}) error {
 	}
 
 	doc := document.NewDocument(id)
-	err := i.m.MapDocument(doc, data)
+	err := i.m.mapDocument(doc, data)
 	if err != nil {
 		return err
 	}
@@ -262,7 +262,7 @@ func (i *indexImpl) Batch(b Batch) error {
 			ib.Delete(bk)
 		} else {
 			doc := document.NewDocument(bk)
-			err := i.m.MapDocument(doc, bd)
+			err := i.m.mapDocument(doc, bd)
 			if err != nil {
 				return err
 			}
