@@ -18,13 +18,13 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type NumericRange struct {
+type numericRange struct {
 	Name string   `json:"name,omitempty"`
 	Min  *float64 `json:"min,omitempty"`
 	Max  *float64 `json:"max,omitempty"`
 }
 
-type DateTimeRange struct {
+type dateTimeRange struct {
 	Name        string    `json:"name,omitempty"`
 	Start       time.Time `json:"start,omitempty"`
 	End         time.Time `json:"end,omitempty"`
@@ -32,7 +32,7 @@ type DateTimeRange struct {
 	endString   *string
 }
 
-func (dr *DateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) {
+func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) {
 	if dr.Start.IsZero() && dr.startString != nil {
 		start, err := dateTimeParser.ParseDateTime(*dr.startString)
 		if err == nil {
@@ -47,7 +47,7 @@ func (dr *DateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) {
 	}
 }
 
-func (dr *DateTimeRange) UnmarshalJSON(input []byte) error {
+func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
 	var temp struct {
 		Name  string  `json:"name,omitempty"`
 		Start *string `json:"start,omitempty"`
@@ -73,8 +73,8 @@ func (dr *DateTimeRange) UnmarshalJSON(input []byte) error {
 type FacetRequest struct {
 	Size           int
 	Field          string
-	NumericRanges  []*NumericRange  `json:"numeric_ranges,omitempty"`
-	DateTimeRanges []*DateTimeRange `json:"date_ranges,omitempty"`
+	NumericRanges  []*numericRange  `json:"numeric_ranges,omitempty"`
+	DateTimeRanges []*dateTimeRange `json:"date_ranges,omitempty"`
 }
 
 func NewFacetRequest(field string, size int) *FacetRequest {
@@ -86,16 +86,16 @@ func NewFacetRequest(field string, size int) *FacetRequest {
 
 func (fr *FacetRequest) AddDateTimeRange(name string, start, end time.Time) {
 	if fr.DateTimeRanges == nil {
-		fr.DateTimeRanges = make([]*DateTimeRange, 0, 1)
+		fr.DateTimeRanges = make([]*dateTimeRange, 0, 1)
 	}
-	fr.DateTimeRanges = append(fr.DateTimeRanges, &DateTimeRange{Name: name, Start: start, End: end})
+	fr.DateTimeRanges = append(fr.DateTimeRanges, &dateTimeRange{Name: name, Start: start, End: end})
 }
 
 func (fr *FacetRequest) AddNumericRange(name string, min, max *float64) {
 	if fr.NumericRanges == nil {
-		fr.NumericRanges = make([]*NumericRange, 0, 1)
+		fr.NumericRanges = make([]*numericRange, 0, 1)
 	}
-	fr.NumericRanges = append(fr.NumericRanges, &NumericRange{Name: name, Min: min, Max: max})
+	fr.NumericRanges = append(fr.NumericRanges, &numericRange{Name: name, Min: min, Max: max})
 }
 
 type FacetsRequest map[string]*FacetRequest
