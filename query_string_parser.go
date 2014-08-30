@@ -52,7 +52,7 @@ func parseQuerySyntax(query string, mapping *IndexMapping) (rq Query, err error)
 		}
 	}()
 
-	yyParse(NewLexer(strings.NewReader(query)))
+	yyParse(newLexer(strings.NewReader(query)))
 	rq = NewBooleanQuery(parsingMustList, parsingShouldList, parsingMustNotList)
 	return rq, err
 }
