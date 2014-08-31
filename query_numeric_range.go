@@ -22,10 +22,19 @@ type numericRangeQuery struct {
 	BoostVal     float64  `json:"boost,omitempty"`
 }
 
+// NewNumericRangeQuery creates a new Query for ranges
+// of date values.
+// Either, but not both endpoints can be nil.
+// The minimum value is inclusive.
+// The maximum value is exclusive.
 func NewNumericRangeQuery(min, max *float64) *numericRangeQuery {
 	return NewNumericRangeInclusiveQuery(min, max, nil, nil)
 }
 
+// NewNumericRangeQuery creates a new Query for ranges
+// of date values.
+// Either, but not both endpoints can be nil.
+// Control endpoint inclusion with inclusiveMin, inclusiveMax.
 func NewNumericRangeInclusiveQuery(min, max *float64, minInclusive, maxInclusive *bool) *numericRangeQuery {
 	return &numericRangeQuery{
 		Min:          min,

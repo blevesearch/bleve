@@ -21,6 +21,11 @@ type phraseQuery struct {
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
+// NewPhraseQuery creates a new Query for finding
+// exact term phrases in the index.
+// The provided terms must exist in the correct
+// order, at the correct index offsets, in the
+// specified field.
 func NewPhraseQuery(terms []string, field string) *phraseQuery {
 	termQueries := make([]Query, len(terms))
 	for i, term := range terms {

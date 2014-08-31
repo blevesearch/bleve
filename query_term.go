@@ -19,6 +19,8 @@ type termQuery struct {
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
+// NewTermQuery creates a new Query for finding an
+// exact term match in the index.
 func NewTermQuery(term string) *termQuery {
 	return &termQuery{
 		Term:     term,

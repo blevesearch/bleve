@@ -20,6 +20,8 @@ type conjunctionQuery struct {
 	BoostVal  float64 `json:"boost,omitempty"`
 }
 
+// NewConjunctionQuery creates a new compound Query.
+// Result documents must satisfy all of the queries.
 func NewConjunctionQuery(conjuncts []Query) *conjunctionQuery {
 	return &conjunctionQuery{
 		Conjuncts: conjuncts,

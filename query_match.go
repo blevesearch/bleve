@@ -22,6 +22,12 @@ type matchQuery struct {
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
+// NewMatchQuery creates a Query for matching text.
+// An Analyzer is chosed based on the field.
+// Input text is analyzed using this analyzer.
+// Token terms resulting from this analysis are
+// used to perform term searches.  Result documents
+// must satisfy at least one of these term searches.
 func NewMatchQuery(match string) *matchQuery {
 	return &matchQuery{
 		Match:    match,

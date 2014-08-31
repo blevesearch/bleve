@@ -21,6 +21,8 @@ type disjunctionQuery struct {
 	MinVal    float64 `json:"min"`
 }
 
+// NewDisjunctionQuery creates a new compound Query.
+// Result documents satisfy at least one Query.
 func NewDisjunctionQuery(disjuncts []Query) *disjunctionQuery {
 	return &disjunctionQuery{
 		Disjuncts: disjuncts,
@@ -28,10 +30,9 @@ func NewDisjunctionQuery(disjuncts []Query) *disjunctionQuery {
 	}
 }
 
+// NewDisjunctionQueryMin creates a new compound Query.
+// Result documents satisfy at least min Queries.
 func NewDisjunctionQueryMin(disjuncts []Query, min float64) *disjunctionQuery {
-	if len(disjuncts) == 0 {
-		return nil
-	}
 	return &disjunctionQuery{
 		Disjuncts: disjuncts,
 		BoostVal:  1.0,

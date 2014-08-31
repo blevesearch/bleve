@@ -13,6 +13,8 @@ import (
 	"github.com/blevesearch/bleve/document"
 )
 
+// A FieldMapping describes how a specific item
+// should be put into the index.
 type FieldMapping struct {
 	Name               *string `json:"name"`
 	Type               *string `json:"type"`
@@ -24,6 +26,8 @@ type FieldMapping struct {
 	DateFormat         *string `json:"date_format"`
 }
 
+// NewFieldMapping returns a FieldMapping with the
+// specified behavior.
 func NewFieldMapping(name, typ, analyzer string, store, index bool, includeTermVectors bool, includeInAll bool) *FieldMapping {
 	return &FieldMapping{
 		Name:               &name,
@@ -36,6 +40,7 @@ func NewFieldMapping(name, typ, analyzer string, store, index bool, includeTermV
 	}
 }
 
+// Options returns the indexing options for this field.
 func (fm *FieldMapping) Options() document.IndexingOptions {
 	var rv document.IndexingOptions
 	if *fm.Store {

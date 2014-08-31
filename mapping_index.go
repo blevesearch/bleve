@@ -31,6 +31,13 @@ const defaultAnalyzer = "standard"
 const defaultDateTimeParser = "dateTimeOptional"
 const defaultByteArrayConverter = "json"
 
+// An IndexMapping controls how objects are place
+// into an index.
+// First the type of the object is deteremined.
+// Once the type is know, the appropriate/
+// DocumentMapping is selected by the type.
+// If no mapping was described for that type,
+// a DefaultMapping will be used.
 type IndexMapping struct {
 	TypeMapping           map[string]*DocumentMapping `json:"types,omitempty"`
 	DefaultMapping        *DocumentMapping            `json:"default_mapping"`

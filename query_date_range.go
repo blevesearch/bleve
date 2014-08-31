@@ -27,6 +27,10 @@ type dateRangeQuery struct {
 	DateTimeParser *string `json:"datetime_parser,omitempty"`
 }
 
+// NewDateRangeQuery creates a new Query for ranges
+// of date values.
+// A DateTimeParser is chosed based on the field.
+// Either, but not both endpoints can be nil.
 func NewDateRangeQuery(start, end *string) *dateRangeQuery {
 	return NewDateRangeInclusiveQuery(start, end, nil, nil)
 }

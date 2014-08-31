@@ -70,6 +70,9 @@ func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
+// A FacetRequest describes an facet or aggregation
+// of the result document set you would like to be
+// built.
 type FacetRequest struct {
 	Size           int
 	Field          string
@@ -77,6 +80,9 @@ type FacetRequest struct {
 	DateTimeRanges []*dateTimeRange `json:"date_ranges,omitempty"`
 }
 
+// NewFacetRequest creates a facet on the specified
+// field that limits the number of entries to the
+// specified size.
 func NewFacetRequest(field string, size int) *FacetRequest {
 	return &FacetRequest{
 		Field: field,
@@ -84,6 +90,10 @@ func NewFacetRequest(field string, size int) *FacetRequest {
 	}
 }
 
+// AddDateTimeRange adds a bucket to a field
+// containing date values.  Documents with a
+// date value falling into this range are tabulated
+// as part of this bucket/range.
 func (fr *FacetRequest) AddDateTimeRange(name string, start, end time.Time) {
 	if fr.DateTimeRanges == nil {
 		fr.DateTimeRanges = make([]*dateTimeRange, 0, 1)
@@ -91,6 +101,10 @@ func (fr *FacetRequest) AddDateTimeRange(name string, start, end time.Time) {
 	fr.DateTimeRanges = append(fr.DateTimeRanges, &dateTimeRange{Name: name, Start: start, End: end})
 }
 
+// AddNumericRange adds a bucket to a field
+// containing numeric values.  Documents with a
+// numeric value falling into this range are
+// tabulated as part of this bucket/range.
 func (fr *FacetRequest) AddNumericRange(name string, min, max *float64) {
 	if fr.NumericRanges == nil {
 		fr.NumericRanges = make([]*numericRange, 0, 1)
@@ -98,23 +112,43 @@ func (fr *FacetRequest) AddNumericRange(name string, min, max *float64) {
 	fr.NumericRanges = append(fr.NumericRanges, &numericRange{Name: name, Min: min, Max: max})
 }
 
+// FacetsRequests groups together all the
+// FacetRequest objects for a single query.
 type FacetsRequest map[string]*FacetRequest
 
+// HighlighRequest describes how field matches
+// should be highlighted.
 type HighlightRequest struct {
 	Style  *string  `json:"style"`
 	Fields []string `json:"fields"`
 }
 
+// NewHighlight creates a default
+// HighlightRequest.
 func NewHighlight() *HighlightRequest {
 	return &HighlightRequest{}
 }
 
+// NewHighlightWithStyle creates a HighlightRequest
+// with an alternate style.
 func NewHighlightWithStyle(style string) *HighlightRequest {
 	return &HighlightRequest{
 		Style: &style,
 	}
 }
 
+// A SearchRequest describes all the parameters
+// needed to search the index.
+// Query is required.
+// Size/From describe how much and which part of the
+// result set to return.
+// Highlight describes optional search result
+// highlighting.
+// Fields desribed a list of field values whcih
+// should be retrieved for result documents.
+// Facets describe the set of facets to be computed.
+// Explain triggers inclusion of additional search
+// result score explanations.
 type SearchRequest struct {
 	Query     Query             `json:"query"`
 	Size      int               `json:"size"`
@@ -125,6 +159,7 @@ type SearchRequest struct {
 	Explain   bool              `json:"explain"`
 }
 
+// AddFacet adds a FacetRequest to this SearchRequest
 func (r *SearchRequest) AddFacet(facetName string, f *FacetRequest) {
 	if r.Facets == nil {
 		r.Facets = make(FacetsRequest, 1)
@@ -132,6 +167,8 @@ func (r *SearchRequest) AddFacet(facetName string, f *FacetRequest) {
 	r.Facets[facetName] = f
 }
 
+// UnmarshalJSON deserializes a JSON representation of
+// a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	var temp struct {
 		Q         json.RawMessage   `json:"query"`
@@ -170,10 +207,16 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 
 }
 
+// NewSearchRequest creates a new SearchRequest
+// for the Query, using default values for all
+// other search parameters.
 func NewSearchRequest(q Query) *SearchRequest {
 	return NewSearchRequestOptions(q, 10, 0, false)
 }
 
+// NewSearchRequestOptions creates a new SearchRequest
+// for the Query, with the requested size, from
+// and explanation search parameters.
 func NewSearchRequestOptions(q Query, size, from int, explain bool) *SearchRequest {
 	return &SearchRequest{
 		Query:   q,
@@ -183,6 +226,8 @@ func NewSearchRequestOptions(q Query, size, from int, explain bool) *SearchReque
 	}
 }
 
+// A SearchResult describes the results of executing
+// a SearchRequest.
 type SearchResult struct {
 	Request  *SearchRequest                 `json:"request"`
 	Hits     search.DocumentMatchCollection `json:"hits"`

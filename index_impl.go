@@ -209,10 +209,15 @@ func openIndex(path string) (*indexImpl, error) {
 	return &rv, nil
 }
 
+// Mapping returns the IndexMapping in use by this
+// Index.
 func (i *indexImpl) Mapping() *IndexMapping {
 	return i.m
 }
 
+// Index the object with the specified identifier.
+// The IndexMapping for this index will determine
+// how the object is indexed.
 func (i *indexImpl) Index(id string, data interface{}) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
@@ -233,6 +238,8 @@ func (i *indexImpl) Index(id string, data interface{}) error {
 	return nil
 }
 
+// Delete entries for the specified identifier from
+// the index.
 func (i *indexImpl) Delete(id string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
@@ -248,6 +255,10 @@ func (i *indexImpl) Delete(id string) error {
 	return nil
 }
 
+// Batch executes multiple Index and Delete
+// operations at the same time.  There are often
+// significant performance benefits when performing
+// operations in a batch.
 func (i *indexImpl) Batch(b Batch) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
@@ -272,6 +283,10 @@ func (i *indexImpl) Batch(b Batch) error {
 	return i.i.Batch(ib)
 }
 
+// Document is used to find the values of all the
+// stored fields for a document in the index.  These
+// stored fields are put back into a Document object
+// and returned.
 func (i *indexImpl) Document(id string) (*document.Document, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -282,6 +297,8 @@ func (i *indexImpl) Document(id string) (*document.Document, error) {
 	return i.i.Document(id)
 }
 
+// DocCount returns the number of documents in the
+// index.
 func (i *indexImpl) DocCount() uint64 {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -293,6 +310,8 @@ func (i *indexImpl) DocCount() uint64 {
 	return i.i.DocCount()
 }
 
+// Search executes a search request operation.
+// Returns a SearchResult object or an error.
 func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -416,6 +435,21 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 	}, nil
 }
 
+// Fields returns the name of all the fields this
+// Index has operated on.
+func (i *indexImpl) Fields() ([]string, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ERROR_INDEX_CLOSED
+	}
+	return i.i.Fields()
+}
+
+// DumpAll writes all index rows to a channel.
+// INTERNAL: do not rely on this function, it is
+// only intended to be used by the debug utilties
 func (i *indexImpl) DumpAll() chan interface{} {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -427,16 +461,10 @@ func (i *indexImpl) DumpAll() chan interface{} {
 	return i.i.DumpAll()
 }
 
-func (i *indexImpl) Fields() ([]string, error) {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-
-	if !i.open {
-		return nil, ERROR_INDEX_CLOSED
-	}
-	return i.i.Fields()
-}
-
+// DumpFields writes all field rows in the index
+// to a channel.
+// INTERNAL: do not rely on this function, it is
+// only intended to be used by the debug utilties
 func (i *indexImpl) DumpFields() chan interface{} {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -447,6 +475,10 @@ func (i *indexImpl) DumpFields() chan interface{} {
 	return i.i.DumpFields()
 }
 
+// DumpDoc writes all rows in the index associated
+// with the specified identifier to a channel.
+// INTERNAL: do not rely on this function, it is
+// only intended to be used by the debug utilties
 func (i *indexImpl) DumpDoc(id string) chan interface{} {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()

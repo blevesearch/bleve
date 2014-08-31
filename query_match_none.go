@@ -17,6 +17,8 @@ type matchNoneQuery struct {
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
+// NewMatchNoneQuery creates a Query which will not
+// match any documents in the index.
 func NewMatchNoneQuery() *matchNoneQuery {
 	return &matchNoneQuery{
 		BoostVal: 1.0,

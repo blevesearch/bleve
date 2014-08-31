@@ -19,6 +19,9 @@ type prefixQuery struct {
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
+// NewPrefixQuery creates a new Query which finds
+// documents containing terms that start with the
+// specified prefix.
 func NewPrefixQuery(prefix string) *prefixQuery {
 	return &prefixQuery{
 		Prefix:   prefix,

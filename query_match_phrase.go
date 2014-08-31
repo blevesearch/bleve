@@ -22,6 +22,13 @@ type matchPhraseQuery struct {
 	BoostVal    float64 `json:"boost,omitempty"`
 }
 
+// NewMatchPhraseQuery creates a new Query object
+// for matching phrases in the index.
+// An Analyzer is chosed based on the field.
+// Input text is analyzed using this analyzer.
+// Token terms resulting from this analysis are
+// used to build a search phrase.  Result documents
+// must match this phrase.
 func NewMatchPhraseQuery(matchPhrase string) *matchPhraseQuery {
 	return &matchPhraseQuery{
 		MatchPhrase: matchPhrase,

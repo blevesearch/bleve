@@ -16,6 +16,19 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
+// A DocumentMapping describes how a type of document
+// should be indexed.
+// As documents can be hierarchical, named sub-sections
+// of documents are mapped using the same structure in
+// the Properties field.
+// Each value inside a document can be index 0 or more
+// ways.  These index entries are called fields and
+// are stored in the Fields field.
+// Entire sections of a document can be ignored or
+// excluded by setting Enabled to false.
+// If not explicitly mapped, default mapping operations
+// are used.  To disable this automatic handling, set
+// Dynamic to false.
 type DocumentMapping struct {
 	Enabled         bool                        `json:"enabled"`
 	Dynamic         bool                        `json:"dynamic"`
@@ -75,6 +88,8 @@ func (dm *DocumentMapping) documentMappingForPath(path string) *DocumentMapping 
 	return current
 }
 
+// NewDocumentMapping returns a new document mapping
+// with all the default values.
 func NewDocumentMapping() *DocumentMapping {
 	return &DocumentMapping{
 		Enabled: true,
@@ -82,16 +97,23 @@ func NewDocumentMapping() *DocumentMapping {
 	}
 }
 
+// NewDocumentStaticMapping returns a new document
+// mapping that will not automatically index parts
+// of a document without an explicit mapping.
 func NewDocumentStaticMapping() *DocumentMapping {
 	return &DocumentMapping{
 		Enabled: true,
 	}
 }
 
+// NewDocumentDisabledMapping returns a new document
+// mapping that will not perform any indexing.
 func NewDocumentDisabledMapping() *DocumentMapping {
 	return &DocumentMapping{}
 }
 
+// Adds the provided DocumentMapping as a sub-mapping
+// for the specified named subsection.
 func (dm *DocumentMapping) AddSubDocumentMapping(property string, sdm *DocumentMapping) *DocumentMapping {
 	if dm.Properties == nil {
 		dm.Properties = make(map[string]*DocumentMapping)
@@ -100,6 +122,8 @@ func (dm *DocumentMapping) AddSubDocumentMapping(property string, sdm *DocumentM
 	return dm
 }
 
+// Adds the provided FieldMapping for this section
+// of the document.
 func (dm *DocumentMapping) AddFieldMapping(fm *FieldMapping) *DocumentMapping {
 	if dm.Fields == nil {
 		dm.Fields = make([]*FieldMapping, 0)
@@ -108,6 +132,8 @@ func (dm *DocumentMapping) AddFieldMapping(fm *FieldMapping) *DocumentMapping {
 	return dm
 }
 
+// UnmarshalJSON deserializes a JSON representation
+// of the DocumentMapping.
 func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 	var tmp struct {
 		Enabled         *bool                       `json:"enabled"`

@@ -18,6 +18,9 @@ type queryStringQuery struct {
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
+// NewQueryStringQuery creates a new Query used for
+// finding documents that satisfy a query string.  The
+// query string is a small query language for humans.
 func NewQueryStringQuery(query string) *queryStringQuery {
 	return &queryStringQuery{
 		Query:    query,

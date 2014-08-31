@@ -107,6 +107,7 @@ func newConfiguration() *configuration {
 	}
 }
 
+// Config contains library level configuration
 var Config *configuration
 
 func init() {

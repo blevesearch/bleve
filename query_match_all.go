@@ -17,6 +17,8 @@ type matchAllQuery struct {
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
+// NewMatchAllQuery creates a Query which will
+// match all documents in the index.
 func NewMatchAllQuery() *matchAllQuery {
 	return &matchAllQuery{
 		BoostVal: 1.0,

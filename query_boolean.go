@@ -23,6 +23,14 @@ type booleanQuery struct {
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
+// NewBooleanQuery creates a compound Query composed
+// of several other Query objects.
+// Result documents must satisify ALL of the
+// must Queries.
+// Result documents must satsify NONE of the must not
+// Queries.
+// If there are any should queries, result documents
+// must satisfy at least one of them.
 func NewBooleanQuery(must []Query, should []Query, mustNot []Query) *booleanQuery {
 	min := 0.0
 	if len(should) > 0 {
@@ -31,6 +39,10 @@ func NewBooleanQuery(must []Query, should []Query, mustNot []Query) *booleanQuer
 	return NewBooleanQueryMinShould(must, should, mustNot, min)
 }
 
+// NewBooleanQueryMinShould is the same as
+// NewBooleanQuery, only it offers control of the
+// minimum number of should queries that must be
+// satisfied.
 func NewBooleanQueryMinShould(must []Query, should []Query, mustNot []Query, minShould float64) *booleanQuery {
 
 	rv := booleanQuery{

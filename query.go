@@ -15,6 +15,8 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
+// A Query represents a description of the type
+// and parameters for a query into the index.
 type Query interface {
 	Boost() float64
 	SetBoost(b float64) Query
@@ -24,6 +26,8 @@ type Query interface {
 	Validate() error
 }
 
+// ParseQuery deserializes a JSON representation of
+// a Query object.
 func ParseQuery(input []byte) (Query, error) {
 	var tmp map[string]interface{}
 	err := json.Unmarshal(input, &tmp)

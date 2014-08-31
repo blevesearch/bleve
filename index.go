@@ -13,20 +13,33 @@ import (
 	"github.com/blevesearch/bleve/document"
 )
 
+// A Batch groups together multiple Index and Delete
+// operations you would like performed at the same
+// time.
 type Batch map[string]interface{}
 
+// NewBatch creates a new empty batch.
 func NewBatch() Batch {
 	return make(Batch, 0)
 }
 
+// Index adds the specified index operation to the
+// batch.  NOTE: the bleve Index is not updated
+// until the batch is executed.
 func (b Batch) Index(id string, data interface{}) {
 	b[id] = data
 }
 
+// Delete adds the specified delete operation to the
+// batch.  NOTE: the bleve Index is not updated until
+// the batch is executed.
 func (b Batch) Delete(id string) {
 	b[id] = nil
 }
 
+// An Index implements all the indexing and searching
+// capabilities of bleve.  An Index can be created
+// using the New() and Open() methods.
 type Index interface {
 	Index(id string, data interface{}) error
 	Delete(id string) error
@@ -49,12 +62,15 @@ type Index interface {
 	Mapping() *IndexMapping
 }
 
+// A Classifier is an interface describing any object
+// which knows how to identify its own type.
 type Classifier interface {
 	Type() string
 }
 
 // New index at the specified path, must not exist.
-// The provided mapping will be used for all Index/Search operations.
+// The provided mapping will be used for all
+// Index/Search operations.
 func New(path string, mapping *IndexMapping) (Index, error) {
 	return newIndex(path, mapping)
 }
