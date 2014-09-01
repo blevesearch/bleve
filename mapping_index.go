@@ -240,8 +240,25 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 	im.cache = registry.NewCache()
 
 	im.CustomAnalysis = newCustomAnalysis()
-	if im.CustomAnalysis != nil {
-		im.CustomAnalysis = tmp.CustomAnalysis
+	if tmp.CustomAnalysis != nil {
+		if tmp.CustomAnalysis.CharFilters != nil {
+			im.CustomAnalysis.CharFilters = tmp.CustomAnalysis.CharFilters
+		}
+		if tmp.CustomAnalysis.Tokenizers != nil {
+			im.CustomAnalysis.Tokenizers = tmp.CustomAnalysis.Tokenizers
+		}
+		if tmp.CustomAnalysis.TokenMaps != nil {
+			im.CustomAnalysis.TokenMaps = tmp.CustomAnalysis.TokenMaps
+		}
+		if tmp.CustomAnalysis.TokenFilters != nil {
+			im.CustomAnalysis.TokenFilters = tmp.CustomAnalysis.TokenFilters
+		}
+		if tmp.CustomAnalysis.Analyzers != nil {
+			im.CustomAnalysis.Analyzers = tmp.CustomAnalysis.Analyzers
+		}
+		if tmp.CustomAnalysis.DateTimeParsers != nil {
+			im.CustomAnalysis.DateTimeParsers = tmp.CustomAnalysis.DateTimeParsers
+		}
 	}
 
 	im.TypeField = defaultTypeField
