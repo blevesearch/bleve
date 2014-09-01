@@ -48,17 +48,19 @@ func TestStopWordsFilter(t *testing.T) {
 
 	cache := registry.NewCache()
 	stopListConfig := map[string]interface{}{
+		"type":   token_map.Name,
 		"tokens": []interface{}{"a", "in", "the"},
 	}
-	_, err := cache.DefineTokenMap("stop_test", token_map.Name, stopListConfig)
+	_, err := cache.DefineTokenMap("stop_test", stopListConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	stopConfig := map[string]interface{}{
+		"type":           "stop_tokens",
 		"stop_token_map": "stop_test",
 	}
-	stopFilter, err := cache.DefineTokenFilter("stop_test", "stop_tokens", stopConfig)
+	stopFilter, err := cache.DefineTokenFilter("stop_test", stopConfig)
 	if err != nil {
 		t.Fatal(err)
 	}

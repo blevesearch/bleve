@@ -31,6 +31,27 @@ const defaultAnalyzer = "standard"
 const defaultDateTimeParser = "dateTimeOptional"
 const defaultByteArrayConverter = "json"
 
+type customAnalysis struct {
+	CharFilters     map[string]interface{} `json:"char_filters"`
+	Tokenizers      map[string]interface{} `json:"tokenizers"`
+	TokenMaps       map[string]interface{} `json:"token_maps"`
+	TokenFilters    map[string]interface{} `json:"token_filters"`
+	Analyzers       map[string]interface{} `json:"analyzers"`
+	DateTimeParsers map[string]interface{} `json:"date_time_parsers"`
+}
+
+func newCustomAnalysis() *customAnalysis {
+	rv := customAnalysis{
+		CharFilters:     make(map[string]interface{}),
+		Tokenizers:      make(map[string]interface{}),
+		TokenMaps:       make(map[string]interface{}),
+		TokenFilters:    make(map[string]interface{}),
+		Analyzers:       make(map[string]interface{}),
+		DateTimeParsers: make(map[string]interface{}),
+	}
+	return &rv
+}
+
 // An IndexMapping controls how objects are place
 // into an index.
 // First the type of the object is deteremined.
@@ -47,7 +68,62 @@ type IndexMapping struct {
 	DefaultDateTimeParser string                      `json:"default_datetime_parser"`
 	DefaultField          string                      `json:"default_field"`
 	ByteArrayConverter    string                      `json:"byte_array_converter"`
+	CustomAnalysis        *customAnalysis             `json:"analysis"`
 	cache                 *registry.Cache             `json:"_"`
+}
+
+func (i *IndexMapping) AddCustomCharFilter(name string, config map[string]interface{}) error {
+	_, err := i.cache.DefineCharFilter(name, config)
+	if err != nil {
+		return err
+	}
+	i.CustomAnalysis.CharFilters[name] = config
+	return nil
+}
+
+func (i *IndexMapping) AddCustomTokenizer(name string, config map[string]interface{}) error {
+	_, err := i.cache.DefineTokenizer(name, config)
+	if err != nil {
+		return err
+	}
+	i.CustomAnalysis.Tokenizers[name] = config
+	return nil
+}
+
+func (i *IndexMapping) AddCustomTokenMap(name string, config map[string]interface{}) error {
+	_, err := i.cache.DefineTokenMap(name, config)
+	if err != nil {
+		return err
+	}
+	i.CustomAnalysis.TokenMaps[name] = config
+	return nil
+}
+
+func (i *IndexMapping) AddCustomTokenFilter(name string, config map[string]interface{}) error {
+	_, err := i.cache.DefineTokenFilter(name, config)
+	if err != nil {
+		return err
+	}
+	i.CustomAnalysis.TokenFilters[name] = config
+	return nil
+}
+
+func (i *IndexMapping) AddCustomAnalyzer(name string, config map[string]interface{}) error {
+	_, err := i.cache.DefineAnalyzer(name, config)
+	if err != nil {
+		return err
+	}
+	i.CustomAnalysis.Analyzers[name] = config
+	return nil
+}
+
+func (i *IndexMapping) AddCustomDateTimeParser(name string, config map[string]interface{}) error {
+	_, err := i.cache.DefineDateTimeParser(name, config)
+	if err != nil {
+		return err
+	}
+	i.CustomAnalysis.DateTimeParsers[name] = config
+	return nil
 }
 
 func NewIndexMapping() *IndexMapping {
@@ -60,6 +136,7 @@ func NewIndexMapping() *IndexMapping {
 		DefaultDateTimeParser: defaultDateTimeParser,
 		DefaultField:          defaultField,
 		ByteArrayConverter:    defaultByteArrayConverter,
+		CustomAnalysis:        newCustomAnalysis(),
 		cache:                 registry.NewCache(),
 	}
 }
@@ -104,6 +181,7 @@ func (im *IndexMapping) mappingForType(docType string) *DocumentMapping {
 }
 
 func (im *IndexMapping) UnmarshalJSON(data []byte) error {
+	im.CustomAnalysis = newCustomAnalysis()
 	var tmp struct {
 		TypeMapping           map[string]*DocumentMapping `json:"types"`
 		DefaultMapping        *DocumentMapping            `json:"default_mapping"`

@@ -40,17 +40,19 @@ func TestElisionFilter(t *testing.T) {
 	cache := registry.NewCache()
 
 	articleListConfig := map[string]interface{}{
+		"type":   token_map.Name,
 		"tokens": []interface{}{"ar"},
 	}
-	_, err := cache.DefineTokenMap("articles_test", token_map.Name, articleListConfig)
+	_, err := cache.DefineTokenMap("articles_test", articleListConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	elisionConfig := map[string]interface{}{
+		"type":               "elision",
 		"articles_token_map": "articles_test",
 	}
-	elisionFilter, err := cache.DefineTokenFilter("elision_test", "elision", elisionConfig)
+	elisionFilter, err := cache.DefineTokenFilter("elision_test", elisionConfig)
 	if err != nil {
 		t.Fatal(err)
 	}

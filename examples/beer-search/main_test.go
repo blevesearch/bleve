@@ -27,7 +27,10 @@ import (
 func TestBeerSearchAll(t *testing.T) {
 	defer os.RemoveAll("beer-search-test.bleve")
 
-	mapping := buildIndexMapping()
+	mapping, err := buildIndexMapping()
+	if err != nil {
+		t.Fatal(err)
+	}
 	index, err := bleve.New("beer-search-test.bleve", mapping)
 	if err != nil {
 		t.Fatal(err)
@@ -192,7 +195,10 @@ func walkDirectory(dir string, t *testing.T) chan jsonFile {
 func TestBeerSearchBug87(t *testing.T) {
 	defer os.RemoveAll("beer-search-test.bleve")
 
-	mapping := buildIndexMapping()
+	mapping, err := buildIndexMapping()
+	if err != nil {
+		t.Fatal(err)
+	}
 	index, err := bleve.New("beer-search-test.bleve", mapping)
 	if err != nil {
 		t.Fatal(err)

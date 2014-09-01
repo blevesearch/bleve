@@ -30,6 +30,7 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/char_filters/zero_width_non_joiner"
 
 	// analyzers
+	_ "github.com/blevesearch/bleve/analysis/analyzers/custom_analyzer"
 	_ "github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
 	_ "github.com/blevesearch/bleve/analysis/analyzers/simple_analyzer"
 	_ "github.com/blevesearch/bleve/analysis/analyzers/standard_analyzer"
@@ -119,20 +120,23 @@ func init() {
 	// build the default configuration
 	Config = newConfiguration()
 
-	Config.Cache.DefineFragmentFormatter("highlightSpanHTML", "html",
+	Config.Cache.DefineFragmentFormatter("highlightSpanHTML",
 		map[string]interface{}{
+			"type":   "html",
 			"before": `<span class="highlight">`,
 			"after":  `</span>`,
 		})
 
-	Config.Cache.DefineHighlighter("html", "simple",
+	Config.Cache.DefineHighlighter("html",
 		map[string]interface{}{
+			"type":       "simple",
 			"fragmenter": "simple",
 			"formatter":  "highlightSpanHTML",
 		})
 
-	Config.Cache.DefineHighlighter("ansi", "simple",
+	Config.Cache.DefineHighlighter("ansi",
 		map[string]interface{}{
+			"type":       "simple",
 			"fragmenter": "simple",
 			"formatter":  "ansi",
 		})

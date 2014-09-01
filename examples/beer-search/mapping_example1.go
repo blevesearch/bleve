@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-// +build !example1
+// +build example1
 
 package main
 
@@ -28,7 +28,7 @@ func buildIndexMapping() (*bleve.IndexMapping, error) {
 	descMapping := bleve.NewDocumentMapping().
 		AddFieldMapping(
 		bleve.NewFieldMapping(
-			"", "text", textFieldAnalyzer,
+			"", "text", "enNotTooLong",
 			true, true, true, true)).
 		AddFieldMapping(
 		bleve.NewFieldMapping("descriptionLang", "text", "detect_lang",
@@ -69,6 +69,31 @@ func buildIndexMapping() (*bleve.IndexMapping, error) {
 
 	indexMapping.TypeField = "type"
 	indexMapping.DefaultAnalyzer = textFieldAnalyzer
+
+	err := indexMapping.AddCustomTokenFilter("notTooLong",
+		map[string]interface{}{
+			"type":   "truncate_token",
+			"length": 5.0,
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	err = indexMapping.AddCustomAnalyzer("enNotTooLong",
+		map[string]interface{}{
+			"type":      "custom",
+			"tokenizer": "unicode",
+			"token_filters": []string{
+				"notTooLong",
+				"possessive_en",
+				"to_lower",
+				"stop_en",
+				"stemmer_en",
+			},
+		})
+	if err != nil {
+		return nil, err
+	}
 
 	return indexMapping, nil
 }

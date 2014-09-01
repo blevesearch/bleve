@@ -59,11 +59,23 @@ func NewCache() *Cache {
 	}
 }
 
+func typeFromConfig(config map[string]interface{}) (string, error) {
+	typ, ok := config["type"].(string)
+	if ok {
+		return typ, nil
+	}
+	return "", fmt.Errorf("unable to determine type")
+}
+
 func (c *Cache) CharFilterNamed(name string) (analysis.CharFilter, error) {
 	return c.CharFilters.CharFilterNamed(name, c)
 }
 
-func (c *Cache) DefineCharFilter(name string, typ string, config map[string]interface{}) (analysis.CharFilter, error) {
+func (c *Cache) DefineCharFilter(name string, config map[string]interface{}) (analysis.CharFilter, error) {
+	typ, err := typeFromConfig(config)
+	if err != nil {
+		return nil, err
+	}
 	return c.CharFilters.DefineCharFilter(name, typ, config, c)
 }
 
@@ -71,7 +83,11 @@ func (c *Cache) TokenizerNamed(name string) (analysis.Tokenizer, error) {
 	return c.Tokenizers.TokenizerNamed(name, c)
 }
 
-func (c *Cache) DefineTokenizer(name string, typ string, config map[string]interface{}) (analysis.Tokenizer, error) {
+func (c *Cache) DefineTokenizer(name string, config map[string]interface{}) (analysis.Tokenizer, error) {
+	typ, err := typeFromConfig(config)
+	if err != nil {
+		return nil, err
+	}
 	return c.Tokenizers.DefineTokenizer(name, typ, config, c)
 }
 
@@ -79,7 +95,11 @@ func (c *Cache) TokenMapNamed(name string) (analysis.TokenMap, error) {
 	return c.TokenMaps.TokenMapNamed(name, c)
 }
 
-func (c *Cache) DefineTokenMap(name string, typ string, config map[string]interface{}) (analysis.TokenMap, error) {
+func (c *Cache) DefineTokenMap(name string, config map[string]interface{}) (analysis.TokenMap, error) {
+	typ, err := typeFromConfig(config)
+	if err != nil {
+		return nil, err
+	}
 	return c.TokenMaps.DefineTokenMap(name, typ, config, c)
 }
 
@@ -87,7 +107,11 @@ func (c *Cache) TokenFilterNamed(name string) (analysis.TokenFilter, error) {
 	return c.TokenFilters.TokenFilterNamed(name, c)
 }
 
-func (c *Cache) DefineTokenFilter(name string, typ string, config map[string]interface{}) (analysis.TokenFilter, error) {
+func (c *Cache) DefineTokenFilter(name string, config map[string]interface{}) (analysis.TokenFilter, error) {
+	typ, err := typeFromConfig(config)
+	if err != nil {
+		return nil, err
+	}
 	return c.TokenFilters.DefineTokenFilter(name, typ, config, c)
 }
 
@@ -95,7 +119,11 @@ func (c *Cache) AnalyzerNamed(name string) (*analysis.Analyzer, error) {
 	return c.Analyzers.AnalyzerNamed(name, c)
 }
 
-func (c *Cache) DefineAnalyzer(name string, typ string, config map[string]interface{}) (*analysis.Analyzer, error) {
+func (c *Cache) DefineAnalyzer(name string, config map[string]interface{}) (*analysis.Analyzer, error) {
+	typ, err := typeFromConfig(config)
+	if err != nil {
+		return nil, err
+	}
 	return c.Analyzers.DefineAnalyzer(name, typ, config, c)
 }
 
@@ -103,7 +131,11 @@ func (c *Cache) DateTimeParserNamed(name string) (analysis.DateTimeParser, error
 	return c.DateTimeParsers.DateTimeParserNamed(name, c)
 }
 
-func (c *Cache) DefineDateTimeParser(name string, typ string, config map[string]interface{}) (analysis.DateTimeParser, error) {
+func (c *Cache) DefineDateTimeParser(name string, config map[string]interface{}) (analysis.DateTimeParser, error) {
+	typ, err := typeFromConfig(config)
+	if err != nil {
+		return nil, err
+	}
 	return c.DateTimeParsers.DefineDateTimeParser(name, typ, config, c)
 }
 
@@ -111,7 +143,11 @@ func (c *Cache) FragmentFormatterNamed(name string) (highlight.FragmentFormatter
 	return c.FragmentFormatters.FragmentFormatterNamed(name, c)
 }
 
-func (c *Cache) DefineFragmentFormatter(name string, typ string, config map[string]interface{}) (highlight.FragmentFormatter, error) {
+func (c *Cache) DefineFragmentFormatter(name string, config map[string]interface{}) (highlight.FragmentFormatter, error) {
+	typ, err := typeFromConfig(config)
+	if err != nil {
+		return nil, err
+	}
 	return c.FragmentFormatters.DefineFragmentFormatter(name, typ, config, c)
 }
 
@@ -119,7 +155,11 @@ func (c *Cache) FragmenterNamed(name string) (highlight.Fragmenter, error) {
 	return c.Fragmenters.FragmenterNamed(name, c)
 }
 
-func (c *Cache) DefineFragmenter(name string, typ string, config map[string]interface{}) (highlight.Fragmenter, error) {
+func (c *Cache) DefineFragmenter(name string, config map[string]interface{}) (highlight.Fragmenter, error) {
+	typ, err := typeFromConfig(config)
+	if err != nil {
+		return nil, err
+	}
 	return c.Fragmenters.DefineFragmenter(name, typ, config, c)
 }
 
@@ -127,7 +167,11 @@ func (c *Cache) HighlighterNamed(name string) (highlight.Highlighter, error) {
 	return c.Highlighters.HighlighterNamed(name, c)
 }
 
-func (c *Cache) DefineHighlighter(name string, typ string, config map[string]interface{}) (highlight.Highlighter, error) {
+func (c *Cache) DefineHighlighter(name string, config map[string]interface{}) (highlight.Highlighter, error) {
+	typ, err := typeFromConfig(config)
+	if err != nil {
+		return nil, err
+	}
 	return c.Highlighters.DefineHighlighter(name, typ, config, c)
 }
 
