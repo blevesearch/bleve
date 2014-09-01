@@ -9,6 +9,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -21,6 +22,7 @@ var indexPath = flag.String("index", "", "index path")
 
 var fieldsOnly = flag.Bool("fields", false, "fields only")
 var docId = flag.String("docId", "", "docId to dump")
+var mappingOnly = flag.Bool("mapping", false, "print mapping")
 
 func main() {
 	flag.Parse()
@@ -33,6 +35,16 @@ func main() {
 		log.Fatal(err)
 	}
 	defer index.Close()
+
+	if *mappingOnly {
+		mapping := index.Mapping()
+		jsonBytes, err := json.MarshalIndent(mapping, "", "  ")
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("%s\n", jsonBytes)
+		return
+	}
 
 	var dumpChan chan interface{}
 	if *docId != "" {
