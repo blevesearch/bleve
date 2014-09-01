@@ -10,8 +10,6 @@
 /examples/bleve_index_json/bleve_index_json
 /examples/bleve_index_json/index.bleve/
 /examples/bleve_query/bleve_query
-/examples/beer-search/beer-search
-/examples/beer-search/beer-search.bleve
 /utils/bleve_dump/bleve_dump
 /utils/bleve_registry/bleve_registry
 /y.output
