@@ -7,10 +7,10 @@
 .DS_Store
 /analysis/token_filters/cld2/cld2-read-only
 /analysis/token_filters/cld2/libcld2_full.a
-/examples/bleve_index_json/bleve_index_json
-/examples/bleve_index_json/index.bleve/
 /utils/bleve_create/bleve_create
 /utils/bleve_dump/bleve_dump
+/utils/bleve_index/bleve_index
+/utils/bleve_index/index.bleve/
 /utils/bleve_query/bleve_query
 /utils/bleve_registry/bleve_registry
 /y.output
