@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/searchers"
 )
 
 type conjunctionQuery struct {
@@ -44,15 +45,15 @@ func (q *conjunctionQuery) AddQuery(aq Query) *conjunctionQuery {
 }
 
 func (q *conjunctionQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
-	searchers := make([]search.Searcher, len(q.Conjuncts))
+	ss := make([]search.Searcher, len(q.Conjuncts))
 	for in, conjunct := range q.Conjuncts {
 		var err error
-		searchers[in], err = conjunct.Searcher(i, explain)
+		ss[in], err = conjunct.Searcher(i, explain)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return search.NewConjunctionSearcher(i.i, searchers, explain)
+	return searchers.NewConjunctionSearcher(i.i, ss, explain)
 }
 
 func (q *conjunctionQuery) Validate() error {

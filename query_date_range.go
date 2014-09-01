@@ -15,6 +15,7 @@ import (
 
 	"github.com/blevesearch/bleve/numeric_util"
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/searchers"
 )
 
 type dateRangeQuery struct {
@@ -99,7 +100,7 @@ func (q *dateRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, 
 		max = numeric_util.Int64ToFloat64(endTime.UnixNano())
 	}
 
-	return search.NewNumericRangeSearcher(i.i, &min, &max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal, explain)
+	return searchers.NewNumericRangeSearcher(i.i, &min, &max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal, explain)
 }
 
 func (q *dateRangeQuery) Validate() error {

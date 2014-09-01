@@ -11,9 +11,18 @@ package bleve
 
 import (
 	"expvar"
+	"github.com/blevesearch/bleve/registry"
 	"time"
 
-	"github.com/blevesearch/bleve/search"
+	// fragment formatters
+	_ "github.com/blevesearch/bleve/search/highlight/fragment_formatters/ansi"
+	_ "github.com/blevesearch/bleve/search/highlight/fragment_formatters/html"
+
+	// fragmenters
+	_ "github.com/blevesearch/bleve/search/highlight/fragmenters/simple"
+
+	// highlighters
+	_ "github.com/blevesearch/bleve/search/highlight/highlighters/simple"
 
 	// char filters
 	_ "github.com/blevesearch/bleve/analysis/char_filters/html_char_filter"
@@ -89,21 +98,15 @@ import (
 
 var bleveExpVar = expvar.NewMap("bleve")
 
-type HighlightConfig struct {
-	Highlighters map[string]search.Highlighter
-}
-
 type configuration struct {
-	Highlight          *HighlightConfig
-	DefaultHighlighter *string
+	Cache              *registry.Cache
+	DefaultHighlighter string
 	DefaultKVStore     string
 }
 
 func newConfiguration() *configuration {
 	return &configuration{
-		Highlight: &HighlightConfig{
-			Highlighters: make(map[string]search.Highlighter),
-		},
+		Cache: registry.NewCache(),
 	}
 }
 
@@ -116,18 +119,26 @@ func init() {
 	// build the default configuration
 	Config = newConfiguration()
 
-	// register ansi highlighter
-	Config.Highlight.Highlighters["ansi"] = search.NewSimpleHighlighter()
+	Config.Cache.DefineFragmentFormatter("highlightSpanHTML", "html",
+		map[string]interface{}{
+			"before": `<span class="highlight">`,
+			"after":  `</span>`,
+		})
 
-	// register html highlighter
-	htmlFormatter := search.NewHTMLFragmentFormatterCustom(`<span class="highlight">`, `</span>`)
-	htmlHighlighter := search.NewSimpleHighlighter()
-	htmlHighlighter.SetFragmentFormatter(htmlFormatter)
-	Config.Highlight.Highlighters["html"] = htmlHighlighter
+	Config.Cache.DefineHighlighter("html", "simple",
+		map[string]interface{}{
+			"fragmenter": "simple",
+			"formatter":  "highlightSpanHTML",
+		})
+
+	Config.Cache.DefineHighlighter("ansi", "simple",
+		map[string]interface{}{
+			"fragmenter": "simple",
+			"formatter":  "ansi",
+		})
 
 	// set the default highlighter
-	htmlHighlighterName := "html"
-	Config.DefaultHighlighter = &htmlHighlighterName
+	Config.DefaultHighlighter = "html"
 
 	// default kv store
 	Config.DefaultKVStore = "boltdb"

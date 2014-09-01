@@ -14,6 +14,7 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/searchers"
 )
 
 type booleanQuery struct {
@@ -97,7 +98,7 @@ func (q *booleanQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, er
 		}
 	}
 
-	return search.NewBooleanSearcher(i.i, mustSearcher, shouldSearcher, mustNotSearcher, explain)
+	return searchers.NewBooleanSearcher(i.i, mustSearcher, shouldSearcher, mustNotSearcher, explain)
 }
 
 func (q *booleanQuery) Validate() error {

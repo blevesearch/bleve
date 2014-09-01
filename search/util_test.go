@@ -78,7 +78,7 @@ func TestMergeLocations(t *testing.T) {
 		},
 	}
 
-	mergedLocations := mergeLocations([]FieldTermLocationMap{flm1, flm2, flm3})
+	mergedLocations := MergeLocations([]FieldTermLocationMap{flm1, flm2, flm3})
 	if !reflect.DeepEqual(expectedMerge, mergedLocations) {
 		t.Errorf("expected %v, got %v", expectedMerge, mergedLocations)
 	}

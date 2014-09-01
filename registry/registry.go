@@ -13,11 +13,17 @@ import (
 	"sort"
 
 	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/search/highlight"
 )
 
 var stores = make(KVStoreRegistry, 0)
 
 var byteArrayConverters = make(ByteArrayConverterRegistry, 0)
+
+// highlight
+var fragmentFormatters = make(FragmentFormatterRegistry, 0)
+var fragmenters = make(FragmenterRegistry, 0)
+var highlighters = make(HighlighterRegistry, 0)
 
 // analysis
 var charFilters = make(CharFilterRegistry, 0)
@@ -28,22 +34,28 @@ var analyzers = make(AnalyzerRegistry, 0)
 var dateTimeParsers = make(DateTimeParserRegistry, 0)
 
 type Cache struct {
-	CharFilters     CharFilterCache
-	Tokenizers      TokenizerCache
-	TokenMaps       TokenMapCache
-	TokenFilters    TokenFilterCache
-	Analyzers       AnalyzerCache
-	DateTimeParsers DateTimeParserCache
+	CharFilters        CharFilterCache
+	Tokenizers         TokenizerCache
+	TokenMaps          TokenMapCache
+	TokenFilters       TokenFilterCache
+	Analyzers          AnalyzerCache
+	DateTimeParsers    DateTimeParserCache
+	FragmentFormatters FragmentFormatterCache
+	Fragmenters        FragmenterCache
+	Highlighters       HighlighterCache
 }
 
 func NewCache() *Cache {
 	return &Cache{
-		CharFilters:     make(CharFilterCache, 0),
-		Tokenizers:      make(TokenizerCache, 0),
-		TokenMaps:       make(TokenMapCache, 0),
-		TokenFilters:    make(TokenFilterCache, 0),
-		Analyzers:       make(AnalyzerCache, 0),
-		DateTimeParsers: make(DateTimeParserCache, 0),
+		CharFilters:        make(CharFilterCache, 0),
+		Tokenizers:         make(TokenizerCache, 0),
+		TokenMaps:          make(TokenMapCache, 0),
+		TokenFilters:       make(TokenFilterCache, 0),
+		Analyzers:          make(AnalyzerCache, 0),
+		DateTimeParsers:    make(DateTimeParserCache, 0),
+		FragmentFormatters: make(FragmentFormatterCache, 0),
+		Fragmenters:        make(FragmenterCache, 0),
+		Highlighters:       make(HighlighterCache, 0),
 	}
 }
 
@@ -93,6 +105,30 @@ func (c *Cache) DateTimeParserNamed(name string) (analysis.DateTimeParser, error
 
 func (c *Cache) DefineDateTimeParser(name string, typ string, config map[string]interface{}) (analysis.DateTimeParser, error) {
 	return c.DateTimeParsers.DefineDateTimeParser(name, typ, config, c)
+}
+
+func (c *Cache) FragmentFormatterNamed(name string) (highlight.FragmentFormatter, error) {
+	return c.FragmentFormatters.FragmentFormatterNamed(name, c)
+}
+
+func (c *Cache) DefineFragmentFormatter(name string, typ string, config map[string]interface{}) (highlight.FragmentFormatter, error) {
+	return c.FragmentFormatters.DefineFragmentFormatter(name, typ, config, c)
+}
+
+func (c *Cache) FragmenterNamed(name string) (highlight.Fragmenter, error) {
+	return c.Fragmenters.FragmenterNamed(name, c)
+}
+
+func (c *Cache) DefineFragmenter(name string, typ string, config map[string]interface{}) (highlight.Fragmenter, error) {
+	return c.Fragmenters.DefineFragmenter(name, typ, config, c)
+}
+
+func (c *Cache) HighlighterNamed(name string) (highlight.Highlighter, error) {
+	return c.Highlighters.HighlighterNamed(name, c)
+}
+
+func (c *Cache) DefineHighlighter(name string, typ string, config map[string]interface{}) (highlight.Highlighter, error) {
+	return c.Highlighters.DefineHighlighter(name, typ, config, c)
 }
 
 func PrintRegistry() {
@@ -179,6 +215,39 @@ func PrintRegistry() {
 	}
 	sorted.Sort()
 	fmt.Printf("Byte Array Converters:\n")
+	for _, name := range sorted {
+		fmt.Printf("\t%s\n", name)
+	}
+	fmt.Println()
+
+	sorted = make(sort.StringSlice, 0, len(fragmentFormatters))
+	for name, _ := range fragmentFormatters {
+		sorted = append(sorted, name)
+	}
+	sorted.Sort()
+	fmt.Printf("Fragment Formatters:\n")
+	for _, name := range sorted {
+		fmt.Printf("\t%s\n", name)
+	}
+	fmt.Println()
+
+	sorted = make(sort.StringSlice, 0, len(fragmenters))
+	for name, _ := range fragmenters {
+		sorted = append(sorted, name)
+	}
+	sorted.Sort()
+	fmt.Printf("Fragmenters:\n")
+	for _, name := range sorted {
+		fmt.Printf("\t%s\n", name)
+	}
+	fmt.Println()
+
+	sorted = make(sort.StringSlice, 0, len(highlighters))
+	for name, _ := range highlighters {
+		sorted = append(sorted, name)
+	}
+	sorted.Sort()
+	fmt.Printf("Highlighters:\n")
 	for _, name := range sorted {
 		fmt.Printf("\t%s\n", name)
 	}

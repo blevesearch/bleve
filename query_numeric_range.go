@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/searchers"
 )
 
 type numericRangeQuery struct {
@@ -68,7 +69,7 @@ func (q *numericRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searche
 	if q.FieldVal == "" {
 		field = i.m.DefaultField
 	}
-	return search.NewNumericRangeSearcher(i.i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.BoostVal, explain)
+	return searchers.NewNumericRangeSearcher(i.i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.BoostVal, explain)
 }
 
 func (q *numericRangeQuery) Validate() error {

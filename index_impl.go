@@ -22,6 +22,8 @@ import (
 	"github.com/blevesearch/bleve/index/upside_down"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/collectors"
+	"github.com/blevesearch/bleve/search/facets"
 )
 
 type indexImpl struct {
@@ -320,7 +322,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 		return nil, ERROR_INDEX_CLOSED
 	}
 
-	collector := search.NewTopScorerSkipCollector(req.Size, req.From)
+	collector := collectors.NewTopScorerSkipCollector(req.Size, req.From)
 	searcher, err := req.Query.Searcher(i, req.Explain)
 	if err != nil {
 		return nil, err
@@ -332,14 +334,14 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 		for facetName, facetRequest := range req.Facets {
 			if facetRequest.NumericRanges != nil {
 				// build numeric range facet
-				facetBuilder := search.NewNumericFacetBuilder(facetRequest.Field, facetRequest.Size)
+				facetBuilder := facets.NewNumericFacetBuilder(facetRequest.Field, facetRequest.Size)
 				for _, nr := range facetRequest.NumericRanges {
 					facetBuilder.AddRange(nr.Name, nr.Min, nr.Max)
 				}
 				facetsBuilder.Add(facetName, facetBuilder)
 			} else if facetRequest.DateTimeRanges != nil {
 				// build date range facet
-				facetBuilder := search.NewDateTimeFacetBuilder(facetRequest.Field, facetRequest.Size)
+				facetBuilder := facets.NewDateTimeFacetBuilder(facetRequest.Field, facetRequest.Size)
 				dateTimeParser := i.m.dateTimeParserNamed(i.m.DefaultDateTimeParser)
 				for _, dr := range facetRequest.DateTimeRanges {
 					dr.ParseDates(dateTimeParser)
@@ -348,7 +350,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 				facetsBuilder.Add(facetName, facetBuilder)
 			} else {
 				// build terms facet
-				facetBuilder := search.NewTermsFacetBuilder(facetRequest.Field, facetRequest.Size)
+				facetBuilder := facets.NewTermsFacetBuilder(facetRequest.Field, facetRequest.Size)
 				facetsBuilder.Add(facetName, facetBuilder)
 			}
 		}
@@ -364,12 +366,18 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 
 	if req.Highlight != nil {
 		// get the right highlighter
-		highlighter := Config.Highlight.Highlighters[*Config.DefaultHighlighter]
+		highlighter, err := Config.Cache.HighlighterNamed(Config.DefaultHighlighter)
+		if err != nil {
+			return nil, err
+		}
 		if req.Highlight.Style != nil {
-			highlighter = Config.Highlight.Highlighters[*req.Highlight.Style]
-			if highlighter == nil {
-				return nil, fmt.Errorf("no highlighter named `%s` registered", *req.Highlight.Style)
+			highlighter, err = Config.Cache.HighlighterNamed(*req.Highlight.Style)
+			if err != nil {
+				return nil, err
 			}
+		}
+		if highlighter == nil {
+			return nil, fmt.Errorf("no highlighter named `%s` registered", *req.Highlight.Style)
 		}
 
 		for _, hit := range hits {

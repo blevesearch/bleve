@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/searchers"
 )
 
 type matchAllQuery struct {
@@ -35,7 +36,7 @@ func (q *matchAllQuery) SetBoost(b float64) Query {
 }
 
 func (q *matchAllQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
-	return search.NewMatchAllSearcher(i.i, q.BoostVal, explain)
+	return searchers.NewMatchAllSearcher(i.i, q.BoostVal, explain)
 }
 
 func (q *matchAllQuery) Validate() error {

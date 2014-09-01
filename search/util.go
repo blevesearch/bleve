@@ -8,7 +8,7 @@
 //  and limitations under the License.
 package search
 
-func mergeLocations(locations []FieldTermLocationMap) FieldTermLocationMap {
+func MergeLocations(locations []FieldTermLocationMap) FieldTermLocationMap {
 	rv := locations[0]
 
 	for i := 1; i < len(locations); i++ {
@@ -16,7 +16,7 @@ func mergeLocations(locations []FieldTermLocationMap) FieldTermLocationMap {
 		for field, termLocationMap := range nextLocations {
 			rvTermLocationMap, rvHasField := rv[field]
 			if rvHasField {
-				rv[field] = mergeTermLocationMaps(rvTermLocationMap, termLocationMap)
+				rv[field] = MergeTermLocationMaps(rvTermLocationMap, termLocationMap)
 			} else {
 				rv[field] = termLocationMap
 			}
@@ -26,7 +26,7 @@ func mergeLocations(locations []FieldTermLocationMap) FieldTermLocationMap {
 	return rv
 }
 
-func mergeTermLocationMaps(rv, other TermLocationMap) TermLocationMap {
+func MergeTermLocationMaps(rv, other TermLocationMap) TermLocationMap {
 	for term, locationMap := range other {
 		// for a given term/document there cannot be different locations
 		// if they can back from different clauses, overwrite is ok

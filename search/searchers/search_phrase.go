@@ -1,0 +1,183 @@
+//  Copyright (c) 2014 Couchbase, Inc.
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//    http://www.apache.org/licenses/LICENSE-2.0
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
+package searchers
+
+import (
+	"math"
+
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/search"
+)
+
+type PhraseSearcher struct {
+	initialized  bool
+	index        index.Index
+	mustSearcher *ConjunctionSearcher
+	queryNorm    float64
+	currMust     *search.DocumentMatch
+	slop         int
+	terms        []string
+}
+
+func NewPhraseSearcher(index index.Index, mustSearcher *ConjunctionSearcher, terms []string) (*PhraseSearcher, error) {
+
+	// build our searcher
+	rv := PhraseSearcher{
+		index:        index,
+		mustSearcher: mustSearcher,
+		terms:        terms,
+	}
+	rv.computeQueryNorm()
+	return &rv, nil
+}
+
+func (s *PhraseSearcher) computeQueryNorm() {
+	// first calculate sum of squared weights
+	sumOfSquaredWeights := 0.0
+	if s.mustSearcher != nil {
+		sumOfSquaredWeights += s.mustSearcher.Weight()
+	}
+
+	// now compute query norm from this
+	s.queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
+	// finally tell all the downsteam searchers the norm
+	if s.mustSearcher != nil {
+		s.mustSearcher.SetQueryNorm(s.queryNorm)
+	}
+}
+
+func (s *PhraseSearcher) initSearchers() error {
+	var err error
+	// get all searchers pointing at their first match
+	if s.mustSearcher != nil {
+		s.currMust, err = s.mustSearcher.Next()
+		if err != nil {
+			return err
+		}
+	}
+
+	s.initialized = true
+	return nil
+}
+
+func (s *PhraseSearcher) advanceNextMust() error {
+	var err error
+
+	if s.mustSearcher != nil {
+		s.currMust, err = s.mustSearcher.Next()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *PhraseSearcher) Weight() float64 {
+	var rv float64
+	rv += s.mustSearcher.Weight()
+
+	return rv
+}
+
+func (s *PhraseSearcher) SetQueryNorm(qnorm float64) {
+	s.mustSearcher.SetQueryNorm(qnorm)
+}
+
+func (s *PhraseSearcher) Next() (*search.DocumentMatch, error) {
+	if !s.initialized {
+		err := s.initSearchers()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var rv *search.DocumentMatch
+	for s.currMust != nil {
+		rvftlm := make(search.FieldTermLocationMap, 0)
+		freq := 0
+		firstTerm := s.terms[0]
+		for field, termLocMap := range s.currMust.Locations {
+			rvtlm := make(search.TermLocationMap, 0)
+			locations, ok := termLocMap[firstTerm]
+			if ok {
+			OUTER:
+				for _, location := range locations {
+					crvtlm := make(search.TermLocationMap, 0)
+				INNER:
+					for i := 0; i < len(s.mustSearcher.searchers); i++ {
+						nextTerm := s.terms[i]
+						if nextTerm != "" {
+							// look through all this terms locations
+							// to try and find the correct offsets
+							nextLocations, ok := termLocMap[nextTerm]
+							if ok {
+								for _, nextLocation := range nextLocations {
+									if nextLocation.Pos == location.Pos+float64(i) {
+										// found a location match for this term
+										crvtlm.AddLocation(nextTerm, nextLocation)
+										continue INNER
+									}
+								}
+								// if we got here we didnt find location match for this term
+								continue OUTER
+							} else {
+								continue OUTER
+							}
+						}
+					}
+					// if we got here all the terms matched
+					freq += 1
+					search.MergeTermLocationMaps(rvtlm, crvtlm)
+					rvftlm[field] = rvtlm
+				}
+			}
+		}
+
+		if freq > 0 {
+			// return match
+			rv = s.currMust
+			rv.Locations = rvftlm
+			s.advanceNextMust()
+			return rv, nil
+		}
+
+		s.advanceNextMust()
+	}
+
+	return nil, nil
+}
+
+func (s *PhraseSearcher) Advance(ID string) (*search.DocumentMatch, error) {
+	if !s.initialized {
+		err := s.initSearchers()
+		if err != nil {
+			return nil, err
+		}
+	}
+	s.mustSearcher.Advance(ID)
+	return s.Next()
+}
+
+func (s *PhraseSearcher) Count() uint64 {
+	// for now return a worst case
+	var sum uint64 = 0
+	sum += s.mustSearcher.Count()
+	return sum
+}
+
+func (s *PhraseSearcher) Close() {
+	if s.mustSearcher != nil {
+		s.mustSearcher.Close()
+	}
+}
+
+func (s *PhraseSearcher) Min() int {
+	return 0
+}

@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/searchers"
 )
 
 type disjunctionQuery struct {
@@ -64,15 +65,15 @@ func (q *disjunctionQuery) SetMin(m float64) Query {
 }
 
 func (q *disjunctionQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
-	searchers := make([]search.Searcher, len(q.Disjuncts))
+	ss := make([]search.Searcher, len(q.Disjuncts))
 	for in, disjunct := range q.Disjuncts {
 		var err error
-		searchers[in], err = disjunct.Searcher(i, explain)
+		ss[in], err = disjunct.Searcher(i, explain)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return search.NewDisjunctionSearcher(i.i, searchers, q.MinVal, explain)
+	return searchers.NewDisjunctionSearcher(i.i, ss, q.MinVal, explain)
 }
 
 func (q *disjunctionQuery) Validate() error {

@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/searchers"
 )
 
 type matchNoneQuery struct {
@@ -35,7 +36,7 @@ func (q *matchNoneQuery) SetBoost(b float64) Query {
 }
 
 func (q *matchNoneQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
-	return search.NewMatchNoneSearcher(i.i)
+	return searchers.NewMatchNoneSearcher(i.i)
 }
 
 func (q *matchNoneQuery) Validate() error {

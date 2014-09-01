@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/searchers"
 )
 
 type prefixQuery struct {
@@ -52,7 +53,7 @@ func (q *prefixQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, err
 	if q.FieldVal == "" {
 		field = i.m.DefaultField
 	}
-	return search.NewTermPrefixSearcher(i.i, q.Prefix, field, q.BoostVal, explain)
+	return searchers.NewTermPrefixSearcher(i.i, q.Prefix, field, q.BoostVal, explain)
 }
 
 func (q *prefixQuery) Validate() error {

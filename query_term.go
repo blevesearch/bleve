@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/searchers"
 )
 
 type termQuery struct {
@@ -51,7 +52,7 @@ func (q *termQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error
 	if q.FieldVal == "" {
 		field = i.m.DefaultField
 	}
-	return search.NewTermSearcher(i.i, q.Term, field, q.BoostVal, explain)
+	return searchers.NewTermSearcher(i.i, q.Term, field, q.BoostVal, explain)
 }
 
 func (q *termQuery) Validate() error {

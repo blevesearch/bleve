@@ -14,6 +14,7 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/searchers"
 )
 
 type phraseQuery struct {
@@ -58,7 +59,7 @@ func (q *phraseQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, err
 	if err != nil {
 		return nil, err
 	}
-	return search.NewPhraseSearcher(i.i, conjunctionSearcher.(*search.ConjunctionSearcher), terms)
+	return searchers.NewPhraseSearcher(i.i, conjunctionSearcher.(*searchers.ConjunctionSearcher), terms)
 }
 
 func (q *phraseQuery) Validate() error {
