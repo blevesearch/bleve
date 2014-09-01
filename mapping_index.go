@@ -32,22 +32,62 @@ const defaultDateTimeParser = "dateTimeOptional"
 const defaultByteArrayConverter = "json"
 
 type customAnalysis struct {
-	CharFilters     map[string]interface{} `json:"char_filters"`
-	Tokenizers      map[string]interface{} `json:"tokenizers"`
-	TokenMaps       map[string]interface{} `json:"token_maps"`
-	TokenFilters    map[string]interface{} `json:"token_filters"`
-	Analyzers       map[string]interface{} `json:"analyzers"`
-	DateTimeParsers map[string]interface{} `json:"date_time_parsers"`
+	CharFilters     map[string]map[string]interface{} `json:"char_filters,omitempty"`
+	Tokenizers      map[string]map[string]interface{} `json:"tokenizers,omitempty"`
+	TokenMaps       map[string]map[string]interface{} `json:"token_maps,omitempty"`
+	TokenFilters    map[string]map[string]interface{} `json:"token_filters,omitempty"`
+	Analyzers       map[string]map[string]interface{} `json:"analyzers,omitempty"`
+	DateTimeParsers map[string]map[string]interface{} `json:"date_time_parsers,omitempty"`
+}
+
+func (c *customAnalysis) registerAll(i *IndexMapping) error {
+	for name, config := range c.CharFilters {
+		_, err := i.cache.DefineCharFilter(name, config)
+		if err != nil {
+			return err
+		}
+	}
+	for name, config := range c.Tokenizers {
+		_, err := i.cache.DefineTokenizer(name, config)
+		if err != nil {
+			return err
+		}
+	}
+	for name, config := range c.TokenMaps {
+		_, err := i.cache.DefineTokenMap(name, config)
+		if err != nil {
+			return err
+		}
+	}
+	for name, config := range c.TokenFilters {
+		_, err := i.cache.DefineTokenFilter(name, config)
+		if err != nil {
+			return err
+		}
+	}
+	for name, config := range c.Analyzers {
+		_, err := i.cache.DefineAnalyzer(name, config)
+		if err != nil {
+			return err
+		}
+	}
+	for name, config := range c.DateTimeParsers {
+		_, err := i.cache.DefineDateTimeParser(name, config)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func newCustomAnalysis() *customAnalysis {
 	rv := customAnalysis{
-		CharFilters:     make(map[string]interface{}),
-		Tokenizers:      make(map[string]interface{}),
-		TokenMaps:       make(map[string]interface{}),
-		TokenFilters:    make(map[string]interface{}),
-		Analyzers:       make(map[string]interface{}),
-		DateTimeParsers: make(map[string]interface{}),
+		CharFilters:     make(map[string]map[string]interface{}),
+		Tokenizers:      make(map[string]map[string]interface{}),
+		TokenMaps:       make(map[string]map[string]interface{}),
+		TokenFilters:    make(map[string]map[string]interface{}),
+		Analyzers:       make(map[string]map[string]interface{}),
+		DateTimeParsers: make(map[string]map[string]interface{}),
 	}
 	return &rv
 }
@@ -68,7 +108,7 @@ type IndexMapping struct {
 	DefaultDateTimeParser string                      `json:"default_datetime_parser"`
 	DefaultField          string                      `json:"default_field"`
 	ByteArrayConverter    string                      `json:"byte_array_converter"`
-	CustomAnalysis        *customAnalysis             `json:"analysis"`
+	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
 	cache                 *registry.Cache             `json:"_"`
 }
 
@@ -181,7 +221,6 @@ func (im *IndexMapping) mappingForType(docType string) *DocumentMapping {
 }
 
 func (im *IndexMapping) UnmarshalJSON(data []byte) error {
-	im.CustomAnalysis = newCustomAnalysis()
 	var tmp struct {
 		TypeMapping           map[string]*DocumentMapping `json:"types"`
 		DefaultMapping        *DocumentMapping            `json:"default_mapping"`
@@ -191,6 +230,7 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 		DefaultDateTimeParser string                      `json:"default_datetime_parser"`
 		DefaultField          string                      `json:"default_field"`
 		ByteArrayConverter    string                      `json:"byte_array_converter"`
+		CustomAnalysis        *customAnalysis             `json:"analysis"`
 	}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
@@ -198,6 +238,11 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 	}
 
 	im.cache = registry.NewCache()
+
+	im.CustomAnalysis = newCustomAnalysis()
+	if im.CustomAnalysis != nil {
+		im.CustomAnalysis = tmp.CustomAnalysis
+	}
 
 	im.TypeField = defaultTypeField
 	if tmp.TypeField != "" {
@@ -238,6 +283,12 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 	for typeName, typeDocMapping := range tmp.TypeMapping {
 		im.TypeMapping[typeName] = typeDocMapping
 	}
+
+	err = im.CustomAnalysis.registerAll(im)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
