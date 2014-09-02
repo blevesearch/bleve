@@ -17,7 +17,6 @@ import (
 	"github.com/blevesearch/bleve"
 )
 
-var field = flag.String("field", "_all", "field to query")
 var indexPath = flag.String("index", "", "index path")
 var limit = flag.Int("limit", 10, "limit to first N results")
 var skip = flag.Int("skip", 0, "skip the first N results")
