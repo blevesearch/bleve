@@ -121,7 +121,7 @@ func (q *booleanQuery) Validate() error {
 		}
 	}
 	if q.Must == nil && q.Should == nil {
-		return ERROR_BOOLEAN_QUERY_NEEDS_MUST_OR_SHOULD
+		return ErrorBooleanQueryNeedsMustOrShould
 	}
 	return nil
 }

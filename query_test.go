@@ -67,7 +67,7 @@ func TestParseQuery(t *testing.T) {
 		{
 			input:  []byte(`{"madeitup":"queryhere"}`),
 			output: nil,
-			err:    ERROR_UNKNOWN_QUERY_TYPE,
+			err:    ErrorUnknownQueryType,
 		},
 	}
 
@@ -150,7 +150,7 @@ func TestQueryValidate(t *testing.T) {
 		},
 		{
 			query: NewNumericRangeQuery(nil, nil).SetField("desc"),
-			err:   ERROR_NUMERIC_QUERY_NO_BOUNDS,
+			err:   ErrorNumericQueryNoBounds,
 		},
 		{
 			query: NewDateRangeQuery(&startDate, &endDate).SetField("desc"),
@@ -170,7 +170,7 @@ func TestQueryValidate(t *testing.T) {
 		},
 		{
 			query: NewPhraseQuery([]string{}, "field"),
-			err:   ERROR_PHRASE_QUERY_NO_TERMS,
+			err:   ErrorPhraseQueryNoTerms,
 		},
 		{
 			query: NewMatchNoneQuery().SetBoost(25),
@@ -192,14 +192,14 @@ func TestQueryValidate(t *testing.T) {
 				nil,
 				nil,
 				[]Query{NewMatchQuery("devon").SetField("desc")}),
-			err: ERROR_BOOLEAN_QUERY_NEEDS_MUST_OR_SHOULD,
+			err: ErrorBooleanQueryNeedsMustOrShould,
 		},
 		{
 			query: NewBooleanQuery(
 				[]Query{},
 				[]Query{},
 				[]Query{NewMatchQuery("devon").SetField("desc")}),
-			err: ERROR_BOOLEAN_QUERY_NEEDS_MUST_OR_SHOULD,
+			err: ErrorBooleanQueryNeedsMustOrShould,
 		},
 		{
 			query: NewBooleanQueryMinShould(
@@ -207,7 +207,7 @@ func TestQueryValidate(t *testing.T) {
 				[]Query{NewMatchQuery("water").SetField("desc")},
 				[]Query{NewMatchQuery("devon").SetField("desc")},
 				2.0),
-			err: ERROR_DISJUNCTION_FEWER_THAN_MIN_CLAUSES,
+			err: ErrorDisjunctionFewerThanMinClauses,
 		},
 	}
 

@@ -53,7 +53,7 @@ func newMemIndex(mapping *IndexMapping) (*indexImpl, error) {
 
 	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
 	if storeConstructor == nil {
-		return nil, ERROR_UNKNOWN_STORAGE_TYPE
+		return nil, ErrorUnknownStorageType
 	}
 	// now open the store
 	var err error
@@ -104,7 +104,7 @@ func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
 	}
 	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
 	if storeConstructor == nil {
-		return nil, ERROR_UNKNOWN_STORAGE_TYPE
+		return nil, ErrorUnknownStorageType
 	}
 	// at this point there hope we can be successful, so save index meta
 	err = rv.meta.Save(path)
@@ -160,7 +160,7 @@ func openIndex(path string) (*indexImpl, error) {
 
 	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
 	if storeConstructor == nil {
-		return nil, ERROR_UNKNOWN_STORAGE_TYPE
+		return nil, ErrorUnknownStorageType
 	}
 
 	storeConfig := map[string]interface{}{
@@ -225,7 +225,7 @@ func (i *indexImpl) Index(id string, data interface{}) error {
 	defer i.mutex.Unlock()
 
 	if !i.open {
-		return ERROR_INDEX_CLOSED
+		return ErrorIndexClosed
 	}
 
 	doc := document.NewDocument(id)
@@ -247,7 +247,7 @@ func (i *indexImpl) Delete(id string) error {
 	defer i.mutex.Unlock()
 
 	if !i.open {
-		return ERROR_INDEX_CLOSED
+		return ErrorIndexClosed
 	}
 
 	err := i.i.Delete(id)
@@ -266,7 +266,7 @@ func (i *indexImpl) Batch(b Batch) error {
 	defer i.mutex.Unlock()
 
 	if !i.open {
-		return ERROR_INDEX_CLOSED
+		return ErrorIndexClosed
 	}
 
 	ib := make(index.Batch, len(b))
@@ -294,7 +294,7 @@ func (i *indexImpl) Document(id string) (*document.Document, error) {
 	defer i.mutex.RUnlock()
 
 	if !i.open {
-		return nil, ERROR_INDEX_CLOSED
+		return nil, ErrorIndexClosed
 	}
 	return i.i.Document(id)
 }
@@ -319,7 +319,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 	defer i.mutex.RUnlock()
 
 	if !i.open {
-		return nil, ERROR_INDEX_CLOSED
+		return nil, ErrorIndexClosed
 	}
 
 	collector := collectors.NewTopScorerSkipCollector(req.Size, req.From)
@@ -450,7 +450,7 @@ func (i *indexImpl) Fields() ([]string, error) {
 	defer i.mutex.RUnlock()
 
 	if !i.open {
-		return nil, ERROR_INDEX_CLOSED
+		return nil, ErrorIndexClosed
 	}
 	return i.i.Fields()
 }

@@ -78,7 +78,7 @@ func (q *disjunctionQuery) Searcher(i *indexImpl, explain bool) (search.Searcher
 
 func (q *disjunctionQuery) Validate() error {
 	if int(q.MinVal) > len(q.Disjuncts) {
-		return ERROR_DISJUNCTION_FEWER_THAN_MIN_CLAUSES
+		return ErrorDisjunctionFewerThanMinClauses
 	}
 	return nil
 }

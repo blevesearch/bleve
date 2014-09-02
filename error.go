@@ -10,17 +10,17 @@
 package bleve
 
 const (
-	ERROR_INDEX_PATH_EXISTS Error = iota
-	ERROR_INDEX_PATH_DOES_NOT_EXIST
-	ERROR_INDEX_META_MISSING
-	ERROR_INDEX_META_CORRUPT
-	ERROR_DISJUNCTION_FEWER_THAN_MIN_CLAUSES
-	ERROR_BOOLEAN_QUERY_NEEDS_MUST_OR_SHOULD
-	ERROR_NUMERIC_QUERY_NO_BOUNDS
-	ERROR_PHRASE_QUERY_NO_TERMS
-	ERROR_UNKNOWN_QUERY_TYPE
-	ERROR_UNKNOWN_STORAGE_TYPE
-	ERROR_INDEX_CLOSED
+	ErrorIndexPathExists Error = iota
+	ErrorIndexPathDoesNotExist
+	ErrorIndexMetaMissing
+	ErrorIndexMetaCorrupt
+	ErrorDisjunctionFewerThanMinClauses
+	ErrorBooleanQueryNeedsMustOrShould
+	ErrorNumericQueryNoBounds
+	ErrorPhraseQueryNoTerms
+	ErrorUnknownQueryType
+	ErrorUnknownStorageType
+	ErrorIndexClosed
 )
 
 type Error int
@@ -30,15 +30,15 @@ func (e Error) Error() string {
 }
 
 var errorMessages = map[int]string{
-	int(ERROR_INDEX_PATH_EXISTS):                  "cannot create new index, path already exists",
-	int(ERROR_INDEX_PATH_DOES_NOT_EXIST):          "cannot open index, path does not exist",
-	int(ERROR_INDEX_META_MISSING):                 "cannot open index, metadata missing",
-	int(ERROR_INDEX_META_CORRUPT):                 "cannot open index, metadata corrupt",
-	int(ERROR_DISJUNCTION_FEWER_THAN_MIN_CLAUSES): "disjunction query has fewer than the minimum number of clauses to satisfy",
-	int(ERROR_BOOLEAN_QUERY_NEEDS_MUST_OR_SHOULD): "boolean query must contain at least one must or should clause",
-	int(ERROR_NUMERIC_QUERY_NO_BOUNDS):            "numeric range query must specify min or max",
-	int(ERROR_PHRASE_QUERY_NO_TERMS):              "phrase query must contain at least one term",
-	int(ERROR_UNKNOWN_QUERY_TYPE):                 "unknown query type",
-	int(ERROR_UNKNOWN_STORAGE_TYPE):               "unkown storage type",
-	int(ERROR_INDEX_CLOSED):                       "index is closed",
+	int(ErrorIndexPathExists):                "cannot create new index, path already exists",
+	int(ErrorIndexPathDoesNotExist):          "cannot open index, path does not exist",
+	int(ErrorIndexMetaMissing):               "cannot open index, metadata missing",
+	int(ErrorIndexMetaCorrupt):               "cannot open index, metadata corrupt",
+	int(ErrorDisjunctionFewerThanMinClauses): "disjunction query has fewer than the minimum number of clauses to satisfy",
+	int(ErrorBooleanQueryNeedsMustOrShould):  "boolean query must contain at least one must or should clause",
+	int(ErrorNumericQueryNoBounds):           "numeric range query must specify min or max",
+	int(ErrorPhraseQueryNoTerms):             "phrase query must contain at least one term",
+	int(ErrorUnknownQueryType):               "unknown query type",
+	int(ErrorUnknownStorageType):             "unkown storage type",
+	int(ErrorIndexClosed):                    "index is closed",
 }

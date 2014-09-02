@@ -74,7 +74,7 @@ func (q *numericRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searche
 
 func (q *numericRangeQuery) Validate() error {
 	if q.Min == nil && q.Min == q.Max {
-		return ERROR_NUMERIC_QUERY_NO_BOUNDS
+		return ErrorNumericQueryNoBounds
 	}
 	return nil
 }

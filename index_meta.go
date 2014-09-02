@@ -27,17 +27,17 @@ func newIndexMeta(storage string) *indexMeta {
 
 func openIndexMeta(path string) (*indexMeta, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, ERROR_INDEX_PATH_DOES_NOT_EXIST
+		return nil, ErrorIndexPathDoesNotExist
 	}
 	indexMetaPath := indexMetaPath(path)
 	metaBytes, err := ioutil.ReadFile(indexMetaPath)
 	if err != nil {
-		return nil, ERROR_INDEX_META_MISSING
+		return nil, ErrorIndexMetaMissing
 	}
 	var im indexMeta
 	err = json.Unmarshal(metaBytes, &im)
 	if err != nil {
-		return nil, ERROR_INDEX_META_CORRUPT
+		return nil, ErrorIndexMetaCorrupt
 	}
 	return &im, nil
 }
@@ -47,7 +47,7 @@ func (i *indexMeta) Save(path string) error {
 	// ensure any necessary parent directories exist
 	err := os.Mkdir(path, 0700)
 	if err != nil {
-		return ERROR_INDEX_PATH_EXISTS
+		return ErrorIndexPathExists
 	}
 	metaBytes, err := json.Marshal(i)
 	if err != nil {
@@ -56,7 +56,7 @@ func (i *indexMeta) Save(path string) error {
 	indexMetaFile, err := os.OpenFile(indexMetaPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		if os.IsExist(err) {
-			return ERROR_INDEX_PATH_EXISTS
+			return ErrorIndexPathExists
 		} else {
 			return err
 		}

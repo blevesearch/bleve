@@ -349,14 +349,14 @@ func TestIndexCreateNewOverExisting(t *testing.T) {
 	}
 	index.Close()
 	index, err = New("testidx", NewIndexMapping())
-	if err != ERROR_INDEX_PATH_EXISTS {
+	if err != ErrorIndexPathExists {
 		t.Fatalf("expected error index path exists, got %v", err)
 	}
 }
 
 func TestIndexOpenNonExisting(t *testing.T) {
 	_, err := Open("doesnotexist")
-	if err != ERROR_INDEX_PATH_DOES_NOT_EXIST {
+	if err != ErrorIndexPathDoesNotExist {
 		t.Fatalf("expected error index path does not exist, got %v", err)
 	}
 }
@@ -374,7 +374,7 @@ func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
 	ioutil.WriteFile("testidx/index_meta.json", []byte("corrupted"), 0666)
 
 	index, err = Open("testidx")
-	if err != ERROR_INDEX_META_CORRUPT {
+	if err != ErrorIndexMetaCorrupt {
 		t.Fatalf("expected error index metadata corrupted, got %v", err)
 	}
 
@@ -382,7 +382,7 @@ func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
 	os.Remove("testidx/index_meta.json")
 
 	index, err = Open("testidx")
-	if err != ERROR_INDEX_META_MISSING {
+	if err != ErrorIndexMetaMissing {
 		t.Fatalf("expected error index metadata missing, got %v", err)
 	}
 }

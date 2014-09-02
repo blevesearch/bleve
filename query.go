@@ -176,5 +176,5 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
-	return nil, ERROR_UNKNOWN_QUERY_TYPE
+	return nil, ErrorUnknownQueryType
 }

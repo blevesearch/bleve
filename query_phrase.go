@@ -64,7 +64,7 @@ func (q *phraseQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, err
 
 func (q *phraseQuery) Validate() error {
 	if len(q.Terms) < 1 {
-		return ERROR_PHRASE_QUERY_NO_TERMS
+		return ErrorPhraseQueryNoTerms
 	}
 	return nil
 }
