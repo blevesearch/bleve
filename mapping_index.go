@@ -20,10 +20,6 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
-var tRUE = true
-
-var fALSE = false
-
 const defaultTypeField = "_type"
 const defaultType = "_default"
 const defaultField = "_all"
