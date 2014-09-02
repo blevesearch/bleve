@@ -82,10 +82,9 @@ func (q *matchPhraseQuery) Searcher(i *indexImpl, explain bool) (search.Searcher
 		phraseQuery := NewPhraseQuery(ts, field).SetBoost(q.BoostVal)
 
 		return phraseQuery.Searcher(i, explain)
-	} else {
-		noneQuery := NewMatchNoneQuery()
-		return noneQuery.Searcher(i, explain)
 	}
+	noneQuery := NewMatchNoneQuery()
+	return noneQuery.Searcher(i, explain)
 }
 
 func (q *matchPhraseQuery) Validate() error {

@@ -387,7 +387,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 				if highlightFields == nil {
 					// add all fields with matches
 					highlightFields = make([]string, 0, len(hit.Locations))
-					for k, _ := range hit.Locations {
+					for k := range hit.Locations {
 						highlightFields = append(highlightFields, k)
 					}
 				}

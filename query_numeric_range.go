@@ -32,7 +32,7 @@ func NewNumericRangeQuery(min, max *float64) *numericRangeQuery {
 	return NewNumericRangeInclusiveQuery(min, max, nil, nil)
 }
 
-// NewNumericRangeQuery creates a new Query for ranges
+// NewNumericRangeInclusiveQuery creates a new Query for ranges
 // of date values.
 // Either, but not both endpoints can be nil.
 // Control endpoint inclusion with inclusiveMin, inclusiveMax.

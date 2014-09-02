@@ -108,60 +108,67 @@ type IndexMapping struct {
 	cache                 *registry.Cache             `json:"_"`
 }
 
-func (i *IndexMapping) AddCustomCharFilter(name string, config map[string]interface{}) error {
-	_, err := i.cache.DefineCharFilter(name, config)
+// AddCustomCharFilter defines a custom char fitler for use in this mapping
+func (im *IndexMapping) AddCustomCharFilter(name string, config map[string]interface{}) error {
+	_, err := im.cache.DefineCharFilter(name, config)
 	if err != nil {
 		return err
 	}
-	i.CustomAnalysis.CharFilters[name] = config
+	im.CustomAnalysis.CharFilters[name] = config
 	return nil
 }
 
-func (i *IndexMapping) AddCustomTokenizer(name string, config map[string]interface{}) error {
-	_, err := i.cache.DefineTokenizer(name, config)
+// AddCustomTokenizer defines a custom tokenizer for use in this mapping
+func (im *IndexMapping) AddCustomTokenizer(name string, config map[string]interface{}) error {
+	_, err := im.cache.DefineTokenizer(name, config)
 	if err != nil {
 		return err
 	}
-	i.CustomAnalysis.Tokenizers[name] = config
+	im.CustomAnalysis.Tokenizers[name] = config
 	return nil
 }
 
-func (i *IndexMapping) AddCustomTokenMap(name string, config map[string]interface{}) error {
-	_, err := i.cache.DefineTokenMap(name, config)
+// AddCustomTokenMap defines a custom token map for use in this mapping
+func (im *IndexMapping) AddCustomTokenMap(name string, config map[string]interface{}) error {
+	_, err := im.cache.DefineTokenMap(name, config)
 	if err != nil {
 		return err
 	}
-	i.CustomAnalysis.TokenMaps[name] = config
+	im.CustomAnalysis.TokenMaps[name] = config
 	return nil
 }
 
-func (i *IndexMapping) AddCustomTokenFilter(name string, config map[string]interface{}) error {
-	_, err := i.cache.DefineTokenFilter(name, config)
+// AddCustomTokenFilter defines a custom token filter for use in this mapping
+func (im *IndexMapping) AddCustomTokenFilter(name string, config map[string]interface{}) error {
+	_, err := im.cache.DefineTokenFilter(name, config)
 	if err != nil {
 		return err
 	}
-	i.CustomAnalysis.TokenFilters[name] = config
+	im.CustomAnalysis.TokenFilters[name] = config
 	return nil
 }
 
-func (i *IndexMapping) AddCustomAnalyzer(name string, config map[string]interface{}) error {
-	_, err := i.cache.DefineAnalyzer(name, config)
+// AddCustomAnalyzer defines a custom analyzer for use in this mapping
+func (im *IndexMapping) AddCustomAnalyzer(name string, config map[string]interface{}) error {
+	_, err := im.cache.DefineAnalyzer(name, config)
 	if err != nil {
 		return err
 	}
-	i.CustomAnalysis.Analyzers[name] = config
+	im.CustomAnalysis.Analyzers[name] = config
 	return nil
 }
 
-func (i *IndexMapping) AddCustomDateTimeParser(name string, config map[string]interface{}) error {
-	_, err := i.cache.DefineDateTimeParser(name, config)
+// AddCustomDateTimeParser defines a custom date time parser for use in this mapping
+func (im *IndexMapping) AddCustomDateTimeParser(name string, config map[string]interface{}) error {
+	_, err := im.cache.DefineDateTimeParser(name, config)
 	if err != nil {
 		return err
 	}
-	i.CustomAnalysis.DateTimeParsers[name] = config
+	im.CustomAnalysis.DateTimeParsers[name] = config
 	return nil
 }
 
+// NewIndexMapping creates a new IndexMapping that will use all the default indexing rules
 func NewIndexMapping() *IndexMapping {
 	return &IndexMapping{
 		TypeMapping:           make(map[string]*DocumentMapping),
@@ -203,6 +210,7 @@ func (im *IndexMapping) validate() error {
 	return nil
 }
 
+// AddDocumentMapping sets a custom document mapping for the specified type
 func (im *IndexMapping) AddDocumentMapping(doctype string, dm *DocumentMapping) *IndexMapping {
 	im.TypeMapping[doctype] = dm
 	return im
@@ -216,6 +224,7 @@ func (im *IndexMapping) mappingForType(docType string) *DocumentMapping {
 	return docMapping
 }
 
+// UnmarshalJSON deserializes a JSON representation of the IndexMapping
 func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 	var tmp struct {
 		TypeMapping           map[string]*DocumentMapping `json:"types"`

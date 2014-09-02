@@ -36,6 +36,11 @@ func NewDateRangeQuery(start, end *string) *dateRangeQuery {
 	return NewDateRangeInclusiveQuery(start, end, nil, nil)
 }
 
+// NewDateRangeInclusiveQuery creates a new Query for ranges
+// of date values.
+// A DateTimeParser is chosed based on the field.
+// Either, but not both endpoints can be nil.
+// startInclusive and endInclusive control inclusion of the endpoints.
 func NewDateRangeInclusiveQuery(start, end *string, startInclusive, endInclusive *bool) *dateRangeQuery {
 	return &dateRangeQuery{
 		Start:          start,

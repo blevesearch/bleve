@@ -112,7 +112,7 @@ func NewDocumentDisabledMapping() *DocumentMapping {
 	return &DocumentMapping{}
 }
 
-// Adds the provided DocumentMapping as a sub-mapping
+// AddSubDocumentMapping adds the provided DocumentMapping as a sub-mapping
 // for the specified named subsection.
 func (dm *DocumentMapping) AddSubDocumentMapping(property string, sdm *DocumentMapping) *DocumentMapping {
 	if dm.Properties == nil {
@@ -122,7 +122,7 @@ func (dm *DocumentMapping) AddSubDocumentMapping(property string, sdm *DocumentM
 	return dm
 }
 
-// Adds the provided FieldMapping for this section
+// AddFieldMapping adds the provided FieldMapping for this section
 // of the document.
 func (dm *DocumentMapping) AddFieldMapping(fm *FieldMapping) *DocumentMapping {
 	if dm.Fields == nil {

@@ -57,9 +57,8 @@ func (i *indexMeta) Save(path string) error {
 	if err != nil {
 		if os.IsExist(err) {
 			return ErrorIndexPathExists
-		} else {
-			return err
 		}
+		return err
 	}
 	defer indexMetaFile.Close()
 	_, err = indexMetaFile.Write(metaBytes)

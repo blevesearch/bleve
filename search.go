@@ -112,11 +112,11 @@ func (fr *FacetRequest) AddNumericRange(name string, min, max *float64) {
 	fr.NumericRanges = append(fr.NumericRanges, &numericRange{Name: name, Min: min, Max: max})
 }
 
-// FacetsRequests groups together all the
+// FacetsRequest groups together all the
 // FacetRequest objects for a single query.
 type FacetsRequest map[string]*FacetRequest
 
-// HighlighRequest describes how field matches
+// HighlightRequest describes how field matches
 // should be highlighted.
 type HighlightRequest struct {
 	Style  *string  `json:"style"`

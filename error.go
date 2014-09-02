@@ -9,6 +9,7 @@
 
 package bleve
 
+// Constant Error values which can be compared to determine the type of error
 const (
 	ErrorIndexPathExists Error = iota
 	ErrorIndexPathDoesNotExist
@@ -23,6 +24,8 @@ const (
 	ErrorIndexClosed
 )
 
+// Error represents a more strongly typed bleve error for detecting
+// and handling specific types of errors.
 type Error int
 
 func (e Error) Error() string {

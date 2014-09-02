@@ -86,10 +86,9 @@ func (q *matchQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, erro
 			SetBoost(q.BoostVal)
 
 		return shouldQuery.Searcher(i, explain)
-	} else {
-		noneQuery := NewMatchNoneQuery()
-		return noneQuery.Searcher(i, explain)
 	}
+	noneQuery := NewMatchNoneQuery()
+	return noneQuery.Searcher(i, explain)
 }
 
 func (q *matchQuery) Validate() error {
