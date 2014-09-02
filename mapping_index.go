@@ -614,7 +614,7 @@ func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) 
 	if fieldMapping.Name != nil && *fieldMapping.Name != "" {
 		parentName := ""
 		if len(path) > 1 {
-			parentName = encodePath(path[:len(path)-1]) + pATH_SEPARATOR
+			parentName = encodePath(path[:len(path)-1]) + pathSeparator
 		}
 		fieldName = parentName + *fieldMapping.Name
 	}
