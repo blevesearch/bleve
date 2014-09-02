@@ -16,13 +16,13 @@ import (
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/gouchstore"
+	"github.com/blevesearch/bleve/index/store/boltdb"
 )
 
 func TestIndexReader(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := gouchstore.Open("test")
+	store, err := boltdb.Open("test", "bleve")
 	idx := NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {
@@ -164,7 +164,7 @@ func TestIndexReader(t *testing.T) {
 func TestIndexDocIdReader(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	store, err := gouchstore.Open("test")
+	store, err := boltdb.Open("test", "bleve")
 	idx := NewUpsideDownCouch(store)
 	err = idx.Open()
 	if err != nil {
