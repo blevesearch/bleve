@@ -19,17 +19,17 @@ const Name = "ansi"
 
 const DefaultAnsiHighlight = bgYellow
 
-type ANSIFragmentFormatter struct {
+type FragmentFormatter struct {
 	color string
 }
 
-func NewANSIFragmentFormatter() *ANSIFragmentFormatter {
-	return &ANSIFragmentFormatter{
+func NewFragmentFormatter() *FragmentFormatter {
+	return &FragmentFormatter{
 		color: DefaultAnsiHighlight,
 	}
 }
 
-func (a *ANSIFragmentFormatter) Format(f *highlight.Fragment, tlm search.TermLocationMap) string {
+func (a *FragmentFormatter) Format(f *highlight.Fragment, tlm search.TermLocationMap) string {
 	orderedTermLocations := highlight.OrderTermLocations(tlm)
 	rv := ""
 	curr := f.Start
@@ -86,7 +86,7 @@ const (
 )
 
 func Constructor(config map[string]interface{}, cache *registry.Cache) (highlight.FragmentFormatter, error) {
-	return NewANSIFragmentFormatter(), nil
+	return NewFragmentFormatter(), nil
 }
 
 func init() {

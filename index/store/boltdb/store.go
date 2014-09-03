@@ -19,14 +19,14 @@ import (
 
 const Name = "boltdb"
 
-type BoltDBStore struct {
+type Store struct {
 	path   string
 	bucket string
 	db     *bolt.DB
 }
 
-func Open(path string, bucket string) (*BoltDBStore, error) {
-	rv := BoltDBStore{
+func Open(path string, bucket string) (*Store, error) {
+	rv := Store{
 		path:   path,
 		bucket: bucket,
 	}
@@ -49,7 +49,7 @@ func Open(path string, bucket string) (*BoltDBStore, error) {
 	return &rv, nil
 }
 
-func (bs *BoltDBStore) Get(key []byte) ([]byte, error) {
+func (bs *Store) Get(key []byte) ([]byte, error) {
 	var rv []byte
 
 	err := bs.db.View(func(tx *bolt.Tx) error {
@@ -61,34 +61,34 @@ func (bs *BoltDBStore) Get(key []byte) ([]byte, error) {
 	return rv, err
 }
 
-func (bs *BoltDBStore) Set(key, val []byte) error {
+func (bs *Store) Set(key, val []byte) error {
 	return bs.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte(bs.bucket)).Put(key, val)
 	})
 }
 
-func (bs *BoltDBStore) Delete(key []byte) error {
+func (bs *Store) Delete(key []byte) error {
 	return bs.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte(bs.bucket)).Delete(key)
 	})
 }
 
-func (bs *BoltDBStore) Commit() error {
+func (bs *Store) Commit() error {
 	return nil
 }
 
-func (bs *BoltDBStore) Close() error {
+func (bs *Store) Close() error {
 	return bs.db.Close()
 }
 
-func (bs *BoltDBStore) Iterator(key []byte) store.KVIterator {
-	rv := newBoltDBIterator(bs)
+func (bs *Store) Iterator(key []byte) store.KVIterator {
+	rv := newIterator(bs)
 	rv.Seek(key)
 	return rv
 }
 
-func (bs *BoltDBStore) NewBatch() store.KVBatch {
-	return newBoltDBBatch(bs)
+func (bs *Store) NewBatch() store.KVBatch {
+	return newBatch(bs)
 }
 
 func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {

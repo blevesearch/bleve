@@ -41,7 +41,7 @@ func TestHTMLFragmentFormatter1(t *testing.T) {
 		},
 	}
 
-	emHTMLFormatter := NewHTMLFragmentFormatter("<b>", "</b>")
+	emHTMLFormatter := NewFragmentFormatter("<b>", "</b>")
 	for _, test := range tests {
 		result := emHTMLFormatter.Format(test.fragment, test.tlm)
 		if result != test.output {
@@ -75,7 +75,7 @@ func TestHTMLFragmentFormatter2(t *testing.T) {
 		},
 	}
 
-	emHTMLFormatter := NewHTMLFragmentFormatter("<em>", "</em>")
+	emHTMLFormatter := NewFragmentFormatter("<em>", "</em>")
 	for _, test := range tests {
 		result := emHTMLFormatter.Format(test.fragment, test.tlm)
 		if result != test.output {

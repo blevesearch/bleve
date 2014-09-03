@@ -16,7 +16,7 @@ import (
 	"github.com/blevesearch/bleve/index/store/test"
 )
 
-func TestBoltDBStore(t *testing.T) {
+func TestStore(t *testing.T) {
 	s, err := Open("test", "bleve")
 	if err != nil {
 		t.Fatal(err)

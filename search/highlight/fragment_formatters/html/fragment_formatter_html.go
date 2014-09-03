@@ -20,19 +20,19 @@ const Name = "html"
 const defaultHTMLHighlightBefore = "<b>"
 const defaultHTMLHighlightAfter = "</b>"
 
-type HTMLFragmentFormatter struct {
+type FragmentFormatter struct {
 	before string
 	after  string
 }
 
-func NewHTMLFragmentFormatter(before, after string) *HTMLFragmentFormatter {
-	return &HTMLFragmentFormatter{
+func NewFragmentFormatter(before, after string) *FragmentFormatter {
+	return &FragmentFormatter{
 		before: before,
 		after:  after,
 	}
 }
 
-func (a *HTMLFragmentFormatter) Format(f *highlight.Fragment, tlm search.TermLocationMap) string {
+func (a *FragmentFormatter) Format(f *highlight.Fragment, tlm search.TermLocationMap) string {
 	orderedTermLocations := highlight.OrderTermLocations(tlm)
 	rv := ""
 	curr := f.Start
@@ -71,7 +71,7 @@ func Constructor(config map[string]interface{}, cache *registry.Cache) (highligh
 	if ok {
 		after = afterVal
 	}
-	return NewHTMLFragmentFormatter(before, after), nil
+	return NewFragmentFormatter(before, after), nil
 }
 
 func init() {

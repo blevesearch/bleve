@@ -13,8 +13,8 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-type BoltDBIterator struct {
-	store  *BoltDBStore
+type Iterator struct {
+	store  *Store
 	tx     *bolt.Tx
 	cursor *bolt.Cursor
 	valid  bool
@@ -22,52 +22,52 @@ type BoltDBIterator struct {
 	val    []byte
 }
 
-func newBoltDBIterator(store *BoltDBStore) *BoltDBIterator {
+func newIterator(store *Store) *Iterator {
 	tx, _ := store.db.Begin(false)
 	b := tx.Bucket([]byte(store.bucket))
 	cursor := b.Cursor()
 
-	return &BoltDBIterator{
+	return &Iterator{
 		store:  store,
 		tx:     tx,
 		cursor: cursor,
 	}
 }
 
-func (i *BoltDBIterator) SeekFirst() {
+func (i *Iterator) SeekFirst() {
 	i.key, i.val = i.cursor.First()
 
 	i.valid = (i.key != nil)
 }
 
-func (i *BoltDBIterator) Seek(k []byte) {
+func (i *Iterator) Seek(k []byte) {
 	i.key, i.val = i.cursor.Seek(k)
 
 	i.valid = (i.key != nil)
 }
 
-func (i *BoltDBIterator) Next() {
+func (i *Iterator) Next() {
 	i.key, i.val = i.cursor.Next()
 
 	i.valid = (i.key != nil)
 }
 
-func (i *BoltDBIterator) Current() ([]byte, []byte, bool) {
+func (i *Iterator) Current() ([]byte, []byte, bool) {
 	return i.key, i.val, i.valid
 }
 
-func (i *BoltDBIterator) Key() []byte {
+func (i *Iterator) Key() []byte {
 	return i.key
 }
 
-func (i *BoltDBIterator) Value() []byte {
+func (i *Iterator) Value() []byte {
 	return i.val
 }
 
-func (i *BoltDBIterator) Valid() bool {
+func (i *Iterator) Valid() bool {
 	return i.valid
 }
 
-func (i *BoltDBIterator) Close() {
+func (i *Iterator) Close() {
 	i.tx.Rollback()
 }

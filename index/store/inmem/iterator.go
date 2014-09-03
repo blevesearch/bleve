@@ -13,57 +13,57 @@ import (
 	"github.com/ryszard/goskiplist/skiplist"
 )
 
-type InMemIterator struct {
-	store    *InMemStore
+type Iterator struct {
+	store    *Store
 	iterator skiplist.Iterator
 	valid    bool
 }
 
-func newInMemIterator(store *InMemStore) *InMemIterator {
-	rv := InMemIterator{
+func newIterator(store *Store) *Iterator {
+	rv := Iterator{
 		store:    store,
 		iterator: store.list.Iterator(),
 	}
 	return &rv
 }
 
-func (i *InMemIterator) SeekFirst() {
+func (i *Iterator) SeekFirst() {
 	i.Seek([]byte{0})
 }
 
-func (i *InMemIterator) Seek(k []byte) {
+func (i *Iterator) Seek(k []byte) {
 	i.valid = i.iterator.Seek(string(k))
 }
 
-func (i *InMemIterator) Next() {
+func (i *Iterator) Next() {
 	i.valid = i.iterator.Next()
 }
 
-func (i *InMemIterator) Current() ([]byte, []byte, bool) {
+func (i *Iterator) Current() ([]byte, []byte, bool) {
 	if i.valid {
 		return []byte(i.Key()), []byte(i.Value()), true
 	}
 	return nil, nil, false
 }
 
-func (i *InMemIterator) Key() []byte {
+func (i *Iterator) Key() []byte {
 	if i.valid {
 		return []byte(i.iterator.Key().(string))
 	}
 	return nil
 }
 
-func (i *InMemIterator) Value() []byte {
+func (i *Iterator) Value() []byte {
 	if i.valid {
 		return []byte(i.iterator.Value().(string))
 	}
 	return nil
 }
 
-func (i *InMemIterator) Valid() bool {
+func (i *Iterator) Valid() bool {
 	return i.valid
 }
 
-func (i *InMemIterator) Close() {
+func (i *Iterator) Close() {
 	i.iterator.Close()
 }

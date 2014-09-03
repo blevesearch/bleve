@@ -14,20 +14,20 @@ import (
 	"github.com/blevesearch/bleve/search/highlight"
 )
 
-// SimpleFragmentScorer will score fragments by how many
+// FragmentScorer will score fragments by how many
 // unique terms occur in the fragment with no regard for
 // any boost values used in the original query
-type SimpleFragmentScorer struct {
+type FragmentScorer struct {
 	tlm search.TermLocationMap
 }
 
-func NewSimpleFragmentScorer(tlm search.TermLocationMap) *SimpleFragmentScorer {
-	return &SimpleFragmentScorer{
+func NewFragmentScorer(tlm search.TermLocationMap) *FragmentScorer {
+	return &FragmentScorer{
 		tlm: tlm,
 	}
 }
 
-func (s *SimpleFragmentScorer) Score(f *highlight.Fragment) {
+func (s *FragmentScorer) Score(f *highlight.Fragment) {
 	score := 0.0
 OUTER:
 	for _, locations := range s.tlm {

@@ -15,7 +15,7 @@ import (
 	"github.com/blevesearch/bleve/index/store/test"
 )
 
-func TestInMemStore(t *testing.T) {
+func TestStore(t *testing.T) {
 	s, err := Open()
 	if err != nil {
 		t.Fatal(err)

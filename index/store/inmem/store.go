@@ -17,27 +17,27 @@ import (
 
 const Name = "mem"
 
-type InMemStore struct {
+type Store struct {
 	list *skiplist.SkipList
 }
 
-func Open() (*InMemStore, error) {
-	rv := InMemStore{
+func Open() (*Store, error) {
+	rv := Store{
 		list: skiplist.NewStringMap(),
 	}
 
 	return &rv, nil
 }
 
-func MustOpen() *InMemStore {
-	rv := InMemStore{
+func MustOpen() *Store {
+	rv := Store{
 		list: skiplist.NewStringMap(),
 	}
 
 	return &rv
 }
 
-func (i *InMemStore) Get(key []byte) ([]byte, error) {
+func (i *Store) Get(key []byte) ([]byte, error) {
 	val, ok := i.list.Get(string(key))
 	if ok {
 		return []byte(val.(string)), nil
@@ -45,32 +45,32 @@ func (i *InMemStore) Get(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (i *InMemStore) Set(key, val []byte) error {
+func (i *Store) Set(key, val []byte) error {
 	i.list.Set(string(key), string(val))
 	return nil
 }
 
-func (i *InMemStore) Delete(key []byte) error {
+func (i *Store) Delete(key []byte) error {
 	i.list.Delete(string(key))
 	return nil
 }
 
-func (i *InMemStore) Commit() error {
+func (i *Store) Commit() error {
 	return nil
 }
 
-func (i *InMemStore) Close() error {
+func (i *Store) Close() error {
 	return nil
 }
 
-func (i *InMemStore) Iterator(key []byte) store.KVIterator {
-	rv := newInMemIterator(i)
+func (i *Store) Iterator(key []byte) store.KVIterator {
+	rv := newIterator(i)
 	rv.Seek(key)
 	return rv
 }
 
-func (i *InMemStore) NewBatch() store.KVBatch {
-	return newInMemBatch(i)
+func (i *Store) NewBatch() store.KVBatch {
+	return newBatch(i)
 }
 
 func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {

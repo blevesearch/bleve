@@ -178,7 +178,7 @@ func TestSimpleFragmenter(t *testing.T) {
 		},
 	}
 
-	fragmenter := NewSimpleFragmenter(100)
+	fragmenter := NewFragmenter(100)
 	for _, test := range tests {
 		fragments := fragmenter.Fragment(test.orig, test.ot)
 		if !reflect.DeepEqual(fragments, test.fragments) {
@@ -228,7 +228,7 @@ func TestSimpleFragmenterWithSize(t *testing.T) {
 		},
 	}
 
-	fragmenter := NewSimpleFragmenter(5)
+	fragmenter := NewFragmenter(5)
 	for _, test := range tests {
 		fragments := fragmenter.Fragment(test.orig, test.ot)
 		if !reflect.DeepEqual(fragments, test.fragments) {

@@ -18,28 +18,28 @@ type op struct {
 	v []byte
 }
 
-type BoltDBBatch struct {
-	store *BoltDBStore
+type Batch struct {
+	store *Store
 	ops   []op
 }
 
-func newBoltDBBatch(store *BoltDBStore) *BoltDBBatch {
-	rv := BoltDBBatch{
+func newBatch(store *Store) *Batch {
+	rv := Batch{
 		store: store,
 		ops:   make([]op, 0),
 	}
 	return &rv
 }
 
-func (i *BoltDBBatch) Set(key, val []byte) {
+func (i *Batch) Set(key, val []byte) {
 	i.ops = append(i.ops, op{key, val})
 }
 
-func (i *BoltDBBatch) Delete(key []byte) {
+func (i *Batch) Delete(key []byte) {
 	i.ops = append(i.ops, op{key, nil})
 }
 
-func (i *BoltDBBatch) Execute() error {
+func (i *Batch) Execute() error {
 	return i.store.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(i.store.bucket))
 
@@ -59,6 +59,6 @@ func (i *BoltDBBatch) Execute() error {
 	})
 }
 
-func (i *BoltDBBatch) Close() error {
+func (i *Batch) Close() error {
 	return nil
 }

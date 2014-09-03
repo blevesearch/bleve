@@ -25,9 +25,9 @@ const (
 )
 
 func TestSimpleHighlighter(t *testing.T) {
-	fragmenter := sfrag.NewSimpleFragmenter(100)
-	formatter := ansi.NewANSIFragmentFormatter()
-	highlighter := NewSimpleHighlighter(fragmenter, formatter, defaultSeparator)
+	fragmenter := sfrag.NewFragmenter(100)
+	formatter := ansi.NewFragmentFormatter()
+	highlighter := NewHighlighter(fragmenter, formatter, defaultSeparator)
 
 	docMatch := search.DocumentMatch{
 		ID:    "a",
@@ -152,9 +152,9 @@ Etiam vel augue vel nisl commodo suscipit et ac nisl. Quisque eros diam, porttit
 		"… accumsan. Vivamus eros felis, rhoncus vel " + DefaultAnsiHighlight + "interdum" + reset + " bibendum, imperdiet nec diam. Etiam sed eros sed…",
 	}
 
-	fragmenter := sfrag.NewSimpleFragmenter(100)
-	formatter := ansi.NewANSIFragmentFormatter()
-	highlighter := NewSimpleHighlighter(fragmenter, formatter, defaultSeparator)
+	fragmenter := sfrag.NewFragmenter(100)
+	formatter := ansi.NewFragmentFormatter()
+	highlighter := NewHighlighter(fragmenter, formatter, defaultSeparator)
 	fragments := highlighter.BestFragmentsInField(&docMatch, doc, "full", 5)
 
 	if !reflect.DeepEqual(fragments, expectedFragments) {

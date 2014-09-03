@@ -18,17 +18,17 @@ const Name = "simple"
 
 const defaultFragmentSize = 200
 
-type SimpleFragmenter struct {
+type Fragmenter struct {
 	fragmentSize int
 }
 
-func NewSimpleFragmenter(fragmentSize int) *SimpleFragmenter {
-	return &SimpleFragmenter{
+func NewFragmenter(fragmentSize int) *Fragmenter {
+	return &Fragmenter{
 		fragmentSize: fragmentSize,
 	}
 }
 
-func (s *SimpleFragmenter) Fragment(orig []byte, ot highlight.TermLocations) []*highlight.Fragment {
+func (s *Fragmenter) Fragment(orig []byte, ot highlight.TermLocations) []*highlight.Fragment {
 	rv := make([]*highlight.Fragment, 0)
 
 	maxbegin := 0
@@ -91,7 +91,7 @@ func Constructor(config map[string]interface{}, cache *registry.Cache) (highligh
 	if ok {
 		size = int(sizeVal)
 	}
-	return NewSimpleFragmenter(size), nil
+	return NewFragmenter(size), nil
 }
 
 func init() {

@@ -22,45 +22,45 @@ import (
 const Name = "simple"
 const defaultSeparator = "…"
 
-type SimpleHighlighter struct {
+type Highlighter struct {
 	fragmenter highlight.Fragmenter
 	formatter  highlight.FragmentFormatter
 	sep        string
 }
 
-func NewSimpleHighlighter(fragmenter highlight.Fragmenter, formatter highlight.FragmentFormatter, separator string) *SimpleHighlighter {
-	return &SimpleHighlighter{
+func NewHighlighter(fragmenter highlight.Fragmenter, formatter highlight.FragmentFormatter, separator string) *Highlighter {
+	return &Highlighter{
 		fragmenter: fragmenter,
 		formatter:  formatter,
 		sep:        separator,
 	}
 }
 
-func (s *SimpleHighlighter) Fragmenter() highlight.Fragmenter {
+func (s *Highlighter) Fragmenter() highlight.Fragmenter {
 	return s.fragmenter
 }
 
-func (s *SimpleHighlighter) SetFragmenter(f highlight.Fragmenter) {
+func (s *Highlighter) SetFragmenter(f highlight.Fragmenter) {
 	s.fragmenter = f
 }
 
-func (s *SimpleHighlighter) FragmentFormatter() highlight.FragmentFormatter {
+func (s *Highlighter) FragmentFormatter() highlight.FragmentFormatter {
 	return s.formatter
 }
 
-func (s *SimpleHighlighter) SetFragmentFormatter(f highlight.FragmentFormatter) {
+func (s *Highlighter) SetFragmentFormatter(f highlight.FragmentFormatter) {
 	s.formatter = f
 }
 
-func (s *SimpleHighlighter) Separator() string {
+func (s *Highlighter) Separator() string {
 	return s.sep
 }
 
-func (s *SimpleHighlighter) SetSeparator(sep string) {
+func (s *Highlighter) SetSeparator(sep string) {
 	s.sep = sep
 }
 
-func (s *SimpleHighlighter) BestFragmentInField(dm *search.DocumentMatch, doc *document.Document, field string) string {
+func (s *Highlighter) BestFragmentInField(dm *search.DocumentMatch, doc *document.Document, field string) string {
 	fragments := s.BestFragmentsInField(dm, doc, field, 1)
 	if len(fragments) > 0 {
 		return fragments[0]
@@ -68,10 +68,10 @@ func (s *SimpleHighlighter) BestFragmentInField(dm *search.DocumentMatch, doc *d
 	return ""
 }
 
-func (s *SimpleHighlighter) BestFragmentsInField(dm *search.DocumentMatch, doc *document.Document, field string, num int) []string {
+func (s *Highlighter) BestFragmentsInField(dm *search.DocumentMatch, doc *document.Document, field string, num int) []string {
 	tlm := dm.Locations[field]
 	orderedTermLocations := highlight.OrderTermLocations(tlm)
-	scorer := NewSimpleFragmentScorer(dm.Locations[field])
+	scorer := NewFragmentScorer(dm.Locations[field])
 
 	// score the fragments and put them into a priority queue ordered by score
 	fq := make(FragmentQueue, 0)
@@ -197,7 +197,7 @@ func Constructor(config map[string]interface{}, cache *registry.Cache) (highligh
 		return nil, fmt.Errorf("error building fragment formatter: %v", err)
 	}
 
-	return NewSimpleHighlighter(fragmenter, formatter, separator), nil
+	return NewHighlighter(fragmenter, formatter, separator), nil
 }
 
 func init() {

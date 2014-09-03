@@ -9,14 +9,14 @@
 
 package inmem
 
-type InMemBatch struct {
-	store *InMemStore
+type Batch struct {
+	store *Store
 	keys  [][]byte
 	vals  [][]byte
 }
 
-func newInMemBatch(store *InMemStore) *InMemBatch {
-	rv := InMemBatch{
+func newBatch(store *Store) *Batch {
+	rv := Batch{
 		store: store,
 		keys:  make([][]byte, 0),
 		vals:  make([][]byte, 0),
@@ -24,17 +24,17 @@ func newInMemBatch(store *InMemStore) *InMemBatch {
 	return &rv
 }
 
-func (i *InMemBatch) Set(key, val []byte) {
+func (i *Batch) Set(key, val []byte) {
 	i.keys = append(i.keys, key)
 	i.vals = append(i.vals, val)
 }
 
-func (i *InMemBatch) Delete(key []byte) {
+func (i *Batch) Delete(key []byte) {
 	i.keys = append(i.keys, key)
 	i.vals = append(i.vals, nil)
 }
 
-func (i *InMemBatch) Execute() error {
+func (i *Batch) Execute() error {
 	for index, key := range i.keys {
 		val := i.vals[index]
 		if val == nil {
@@ -46,6 +46,6 @@ func (i *InMemBatch) Execute() error {
 	return nil
 }
 
-func (i *InMemBatch) Close() error {
+func (i *Batch) Close() error {
 	return nil
 }

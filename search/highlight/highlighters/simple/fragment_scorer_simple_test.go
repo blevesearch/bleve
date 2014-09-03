@@ -67,7 +67,7 @@ func TestSimpleFragmentScorer(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		scorer := NewSimpleFragmentScorer(test.tlm)
+		scorer := NewFragmentScorer(test.tlm)
 		scorer.Score(test.fragment)
 		if test.fragment.Score != test.score {
 			t.Errorf("expected score %f, got %f", test.score, test.fragment.Score)
