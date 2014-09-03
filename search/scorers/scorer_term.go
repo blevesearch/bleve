@@ -17,8 +17,6 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-const MAX_SCORE_CACHE = 64
-
 type TermQueryScorer struct {
 	queryTerm              string
 	queryField             string
@@ -90,8 +88,8 @@ func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc) *search.DocumentM
 
 	// need to compute score
 	var tf float64
-	if termMatch.Freq < MAX_SQRT_CACHE {
-		tf = SQRT_CACHE[int(termMatch.Freq)]
+	if termMatch.Freq < MaxSqrtCache {
+		tf = SqrtCache[int(termMatch.Freq)]
 	} else {
 		tf = math.Sqrt(float64(termMatch.Freq))
 	}

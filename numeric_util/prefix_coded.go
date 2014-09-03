@@ -13,7 +13,7 @@ import (
 	"fmt"
 )
 
-const SHIFT_START_INT64 byte = 0x20
+const ShiftStartInt64 byte = 0x20
 
 // PrefixCoded is a byte array encoding of
 // 64-bit numeric values shifted by 0-63 bits
@@ -26,7 +26,7 @@ func NewPrefixCodedInt64(in int64, shift uint) (PrefixCoded, error) {
 
 	nChars := (((63 - shift) * 37) >> 8) + 1
 	rv := make(PrefixCoded, nChars+1)
-	rv[0] = SHIFT_START_INT64 + byte(shift)
+	rv[0] = ShiftStartInt64 + byte(shift)
 
 	sortableBits := int64(uint64(in) ^ 0x8000000000000000)
 	sortableBits = int64(uint64(sortableBits) >> shift)
@@ -52,7 +52,7 @@ func MustNewPrefixCodedInt64(in int64, shift uint) PrefixCoded {
 // returns 0 if in uninitialized state
 func (p PrefixCoded) Shift() (uint, error) {
 	if len(p) > 0 {
-		shift := p[0] - SHIFT_START_INT64
+		shift := p[0] - ShiftStartInt64
 		if shift < 0 || shift < 63 {
 			return uint(shift), nil
 		}

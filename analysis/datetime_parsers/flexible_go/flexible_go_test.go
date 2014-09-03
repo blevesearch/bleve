@@ -53,7 +53,7 @@ func TestFlexibleDateTimeParser(t *testing.T) {
 		{
 			input:         "not a date time",
 			expectedTime:  time.Time{},
-			expectedError: analysis.INVALID_DATETIME,
+			expectedError: analysis.InvalidDateTime,
 		},
 	}
 

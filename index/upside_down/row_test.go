@@ -30,31 +30,31 @@ func TestRows(t *testing.T) {
 		{
 			NewFieldRow(0, "name"),
 			[]byte{'f', 0, 0},
-			[]byte{'n', 'a', 'm', 'e', BYTE_SEPARATOR},
+			[]byte{'n', 'a', 'm', 'e', ByteSeparator},
 		},
 		{
 			NewFieldRow(1, "desc"),
 			[]byte{'f', 1, 0},
-			[]byte{'d', 'e', 's', 'c', BYTE_SEPARATOR},
+			[]byte{'d', 'e', 's', 'c', ByteSeparator},
 		},
 		{
 			NewFieldRow(513, "style"),
 			[]byte{'f', 1, 2},
-			[]byte{'s', 't', 'y', 'l', 'e', BYTE_SEPARATOR},
+			[]byte{'s', 't', 'y', 'l', 'e', ByteSeparator},
 		},
 		{
 			NewTermFrequencyRow([]byte{'b', 'e', 'e', 'r'}, 0, "", 3, 3.14),
-			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64},
 		},
 		{
 			NewTermFrequencyRow([]byte{'b', 'e', 'e', 'r'}, 0, "budweiser", 3, 3.14),
-			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64},
 		},
 		{
 			NewTermFrequencyRowWithTermVectors([]byte{'b', 'e', 'e', 'r'}, 0, "budweiser", 3, 3.14, []*TermVector{&TermVector{field: 0, pos: 1, start: 3, end: 11}, &TermVector{field: 0, pos: 2, start: 23, end: 31}, &TermVector{field: 0, pos: 3, start: 43, end: 51}}),
-			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0},
 		},
 		{
@@ -74,7 +74,7 @@ func TestRows(t *testing.T) {
 		},
 		{
 			NewStoredRow("budweiser", 0, []uint64{}, byte('t'), []byte("an american beer")),
-			[]byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', BYTE_SEPARATOR, 0, 0},
+			[]byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', ByteSeparator, 0, 0},
 			[]byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
 		},
 		{
@@ -151,43 +151,43 @@ func TestInvalidRows(t *testing.T) {
 		},
 		// type t, invalid key (missing id)
 		{
-			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator},
 			[]byte{},
 		},
 		// type t, invalid val (misisng freq)
 		{
-			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{},
 		},
 		// type t, invalid val (missing norm)
 		{
-			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0},
 		},
 		// type t, invalid val (half missing tv field, full missing is valid (no term vectors))
 		{
-			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0},
 		},
 		// type t, invalid val (missing tv pos)
 		{
-			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0},
 		},
 		// type t, invalid val (missing tv start)
 		{
-			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0},
 		},
 		// type t, invalid val (missing tv end)
 		{
-			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', BYTE_SEPARATOR, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0},
 		},
 		// type b, invalid key (missing id)
 		{
 			[]byte{'b'},
-			[]byte{'b', 'e', 'e', 'r', BYTE_SEPARATOR, 0, 0},
+			[]byte{'b', 'e', 'e', 'r', ByteSeparator, 0, 0},
 		},
 		// type b, invalid val (missing field)
 		{
@@ -201,7 +201,7 @@ func TestInvalidRows(t *testing.T) {
 		},
 		// type b, invalid val (missing field)
 		{
-			[]byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', BYTE_SEPARATOR},
+			[]byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', ByteSeparator},
 			[]byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
 		},
 	}

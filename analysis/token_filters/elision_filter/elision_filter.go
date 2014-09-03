@@ -19,10 +19,10 @@ import (
 
 const Name = "elision"
 
-const RIGHT_SINGLE_QUOTATION_MARK = "’"
-const APOSTROPHE = "'"
+const RightSingleQoutationMark = "’"
+const Apostrophe = "'"
 
-const APOSTROPHES = APOSTROPHE + RIGHT_SINGLE_QUOTATION_MARK
+const Apostrophes = Apostrophe + RightSingleQoutationMark
 
 type ElisionFilter struct {
 	articles analysis.TokenMap
@@ -38,7 +38,7 @@ func (s *ElisionFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 	rv := make(analysis.TokenStream, 0)
 
 	for _, token := range input {
-		firstApostrophe := bytes.IndexAny(token.Term, APOSTROPHES)
+		firstApostrophe := bytes.IndexAny(token.Term, Apostrophes)
 		if firstApostrophe >= 0 {
 			// found an apostrophe
 			prefix := token.Term[0:firstApostrophe]

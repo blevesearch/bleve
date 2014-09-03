@@ -20,32 +20,32 @@ import (
 const NormalizeName = "normalize_ckb"
 
 const (
-	YEH         = '\u064A'
-	DOTLESS_YEH = '\u0649'
-	FARSI_YEH   = '\u06CC'
+	Yeh        = '\u064A'
+	DotlessYeh = '\u0649'
+	FarsiYeh   = '\u06CC'
 
-	KAF   = '\u0643'
-	KEHEH = '\u06A9'
+	Kaf   = '\u0643'
+	Keheh = '\u06A9'
 
-	HEH             = '\u0647'
-	AE              = '\u06D5'
-	ZWNJ            = '\u200C'
-	HEH_DOACHASHMEE = '\u06BE'
-	TEH_MARBUTA     = '\u0629'
+	Heh            = '\u0647'
+	Ae             = '\u06D5'
+	Zwnj           = '\u200C'
+	HehDoachashmee = '\u06BE'
+	TehMarbuta     = '\u0629'
 
-	REH        = '\u0631'
-	RREH       = '\u0695'
-	RREH_ABOVE = '\u0692'
+	Reh       = '\u0631'
+	Rreh      = '\u0695'
+	RrehAbove = '\u0692'
 
-	TATWEEL  = '\u0640'
-	FATHATAN = '\u064B'
-	DAMMATAN = '\u064C'
-	KASRATAN = '\u064D'
-	FATHA    = '\u064E'
-	DAMMA    = '\u064F'
-	KASRA    = '\u0650'
-	SHADDA   = '\u0651'
-	SUKUN    = '\u0652'
+	Tatweel  = '\u0640'
+	Fathatan = '\u064B'
+	Dammatan = '\u064C'
+	Kasratan = '\u064D'
+	Fatha    = '\u064E'
+	Damma    = '\u064F'
+	Kasra    = '\u0650'
+	Shadda   = '\u0651'
+	Sukun    = '\u0652'
 )
 
 type SoraniNormalizeFilter struct {
@@ -71,31 +71,31 @@ func normalize(input []byte) []byte {
 	runes := bytes.Runes(input)
 	for i := 0; i < len(runes); i++ {
 		switch runes[i] {
-		case YEH, DOTLESS_YEH:
-			runes[i] = FARSI_YEH
-		case KAF:
-			runes[i] = KEHEH
-		case ZWNJ:
-			if i > 0 && runes[i-1] == HEH {
-				runes[i-1] = AE
+		case Yeh, DotlessYeh:
+			runes[i] = FarsiYeh
+		case Kaf:
+			runes[i] = Keheh
+		case Zwnj:
+			if i > 0 && runes[i-1] == Heh {
+				runes[i-1] = Ae
 			}
 			runes = analysis.DeleteRune(runes, i)
 			i--
-		case HEH:
+		case Heh:
 			if i == len(runes)-1 {
-				runes[i] = AE
+				runes[i] = Ae
 			}
-		case TEH_MARBUTA:
-			runes[i] = AE
-		case HEH_DOACHASHMEE:
-			runes[i] = HEH
-		case REH:
+		case TehMarbuta:
+			runes[i] = Ae
+		case HehDoachashmee:
+			runes[i] = Heh
+		case Reh:
 			if i == 0 {
-				runes[i] = RREH
+				runes[i] = Rreh
 			}
-		case RREH_ABOVE:
-			runes[i] = RREH
-		case TATWEEL, KASRATAN, DAMMATAN, FATHATAN, FATHA, DAMMA, KASRA, SHADDA, SUKUN:
+		case RrehAbove:
+			runes[i] = Rreh
+		case Tatweel, Kasratan, Dammatan, Fathatan, Fatha, Damma, Kasra, Shadda, Sukun:
 			runes = analysis.DeleteRune(runes, i)
 			i--
 		default:

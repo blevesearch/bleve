@@ -19,15 +19,15 @@ import (
 const NormalizeName = "normalize_fa"
 
 const (
-	YEH         = '\u064A'
-	FARSI_YEH   = '\u06CC'
-	YEH_BARREE  = '\u06D2'
-	KEHEH       = '\u06A9'
-	KAF         = '\u0643'
-	HAMZA_ABOVE = '\u0654'
-	HEH_YEH     = '\u06C0'
-	HEH_GOAL    = '\u06C1'
-	HEH         = '\u0647'
+	Yeh        = '\u064A'
+	FarsiYeh   = '\u06CC'
+	YehBarree  = '\u06D2'
+	Keheh      = '\u06A9'
+	Kaf        = '\u0643'
+	HamzaAbove = '\u0654'
+	HehYeh     = '\u06C0'
+	HehGoal    = '\u06C1'
+	Heh        = '\u0647'
 )
 
 type PersianNormalizeFilter struct {
@@ -53,13 +53,13 @@ func normalize(input []byte) []byte {
 	runes := bytes.Runes(input)
 	for i := 0; i < len(runes); i++ {
 		switch runes[i] {
-		case FARSI_YEH, YEH_BARREE:
-			runes[i] = YEH
-		case KEHEH:
-			runes[i] = KAF
-		case HEH_YEH, HEH_GOAL:
-			runes[i] = HEH
-		case HAMZA_ABOVE: // necessary for HEH + HAMZA
+		case FarsiYeh, YehBarree:
+			runes[i] = Yeh
+		case Keheh:
+			runes[i] = Kaf
+		case HehYeh, HehGoal:
+			runes[i] = Heh
+		case HamzaAbove: // necessary for HEH + HAMZA
 			runes = analysis.DeleteRune(runes, i)
 			i--
 		}

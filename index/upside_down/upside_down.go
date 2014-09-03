@@ -22,9 +22,9 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 )
 
-var VERSION_KEY []byte = []byte{'v'}
+var VersionKey []byte = []byte{'v'}
 
-const VERSION uint8 = 1
+const Version uint8 = 1
 
 type UpsideDownCouch struct {
 	version        uint8
@@ -38,7 +38,7 @@ type UpsideDownCouch struct {
 
 func NewUpsideDownCouch(s store.KVStore) *UpsideDownCouch {
 	return &UpsideDownCouch{
-		version:      VERSION,
+		version:      Version,
 		analyzer:     make(map[string]*analysis.Analyzer),
 		fieldIndexes: make(map[string]uint16),
 		store:        s,
@@ -167,7 +167,7 @@ func (udc *UpsideDownCouch) DocCount() uint64 {
 
 func (udc *UpsideDownCouch) Open() (err error) {
 	var value []byte
-	value, err = udc.store.Get(VERSION_KEY)
+	value, err = udc.store.Get(VersionKey)
 	if err != nil {
 		return
 	}
@@ -526,7 +526,7 @@ func (udc *UpsideDownCouch) TermFieldReader(term []byte, fieldName string) (inde
 	if fieldExists {
 		return newUpsideDownCouchTermFieldReader(udc, term, uint16(fieldIndex))
 	}
-	return newUpsideDownCouchTermFieldReader(udc, []byte{BYTE_SEPARATOR}, ^uint16(0))
+	return newUpsideDownCouchTermFieldReader(udc, []byte{ByteSeparator}, ^uint16(0))
 }
 
 func (udc *UpsideDownCouch) FieldReader(fieldName string, startTerm []byte, endTerm []byte) (index.FieldReader, error) {
@@ -534,7 +534,7 @@ func (udc *UpsideDownCouch) FieldReader(fieldName string, startTerm []byte, endT
 	if fieldExists {
 		return newUpsideDownCouchFieldReader(udc, uint16(fieldIndex), startTerm, endTerm)
 	}
-	return newUpsideDownCouchTermFieldReader(udc, []byte{BYTE_SEPARATOR}, ^uint16(0))
+	return newUpsideDownCouchTermFieldReader(udc, []byte{ByteSeparator}, ^uint16(0))
 }
 
 func (udc *UpsideDownCouch) DocIdReader(start, end string) (index.DocIdReader, error) {

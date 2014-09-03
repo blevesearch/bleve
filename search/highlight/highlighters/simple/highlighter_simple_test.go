@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	reset                  = "\x1b[0m"
-	DEFAULT_ANSI_HIGHLIGHT = "\x1b[43m"
+	reset                = "\x1b[0m"
+	DefaultAnsiHighlight = "\x1b[43m"
 )
 
 func TestSimpleHighlighter(t *testing.T) {
@@ -52,7 +52,7 @@ func TestSimpleHighlighter(t *testing.T) {
 		},
 	}
 
-	expectedFragment := "the " + DEFAULT_ANSI_HIGHLIGHT + "quick" + reset + " brown " + DEFAULT_ANSI_HIGHLIGHT + "fox" + reset + " jumps over the lazy dog"
+	expectedFragment := "the " + DefaultAnsiHighlight + "quick" + reset + " brown " + DefaultAnsiHighlight + "fox" + reset + " jumps over the lazy dog"
 	doc := document.NewDocument("a").AddField(document.NewTextField("desc", []uint64{}, []byte("the quick brown fox jumps over the lazy dog")))
 
 	fragment := highlighter.BestFragmentInField(&docMatch, doc, "desc")
@@ -145,11 +145,11 @@ Etiam vel augue vel nisl commodo suscipit et ac nisl. Quisque eros diam, porttit
 	}
 
 	expectedFragments := []string{
-		"…eros, in iaculis ante laoreet at. Sed " + DEFAULT_ANSI_HIGHLIGHT + "venenatis" + reset + " " + DEFAULT_ANSI_HIGHLIGHT + "interdum" + reset + " " + DEFAULT_ANSI_HIGHLIGHT + "metus" + reset + ", egestas scelerisque orci laoreet ut.…",
-		"… eros sed " + DEFAULT_ANSI_HIGHLIGHT + "metus" + reset + " aliquet convallis ac eget " + DEFAULT_ANSI_HIGHLIGHT + "metus" + reset + ". Donec eget feugiat sem. Quisque " + DEFAULT_ANSI_HIGHLIGHT + "venenatis" + reset + ", augue et…",
-		"… odio. Maecenas condimentum felis vitae nibh " + DEFAULT_ANSI_HIGHLIGHT + "venenatis" + reset + ", ut feugiat risus vehicula. Suspendisse non s…",
-		"… id feugiat lacus egestas. Integer et eleifend " + DEFAULT_ANSI_HIGHLIGHT + "metus" + reset + ". Duis neque tellus, vulputate nec dui eu, euism…",
-		"… accumsan. Vivamus eros felis, rhoncus vel " + DEFAULT_ANSI_HIGHLIGHT + "interdum" + reset + " bibendum, imperdiet nec diam. Etiam sed eros sed…",
+		"…eros, in iaculis ante laoreet at. Sed " + DefaultAnsiHighlight + "venenatis" + reset + " " + DefaultAnsiHighlight + "interdum" + reset + " " + DefaultAnsiHighlight + "metus" + reset + ", egestas scelerisque orci laoreet ut.…",
+		"… eros sed " + DefaultAnsiHighlight + "metus" + reset + " aliquet convallis ac eget " + DefaultAnsiHighlight + "metus" + reset + ". Donec eget feugiat sem. Quisque " + DefaultAnsiHighlight + "venenatis" + reset + ", augue et…",
+		"… odio. Maecenas condimentum felis vitae nibh " + DefaultAnsiHighlight + "venenatis" + reset + ", ut feugiat risus vehicula. Suspendisse non s…",
+		"… id feugiat lacus egestas. Integer et eleifend " + DefaultAnsiHighlight + "metus" + reset + ". Duis neque tellus, vulputate nec dui eu, euism…",
+		"… accumsan. Vivamus eros felis, rhoncus vel " + DefaultAnsiHighlight + "interdum" + reset + " bibendum, imperdiet nec diam. Etiam sed eros sed…",
 	}
 
 	fragmenter := sfrag.NewSimpleFragmenter(100)

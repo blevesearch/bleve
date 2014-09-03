@@ -18,10 +18,9 @@ import (
 
 const Name = "apostrophe"
 
-const RIGHT_SINGLE_QUOTATION_MARK = "’"
-const APOSTROPHE = "'"
-
-const APOSTROPHES = APOSTROPHE + RIGHT_SINGLE_QUOTATION_MARK
+const RightSingleQoutationMark = "’"
+const Apostrophe = "'"
+const Apostrophes = Apostrophe + RightSingleQoutationMark
 
 type ApostropheFilter struct{}
 
@@ -33,7 +32,7 @@ func (s *ApostropheFilter) Filter(input analysis.TokenStream) analysis.TokenStre
 	rv := make(analysis.TokenStream, 0)
 
 	for _, token := range input {
-		firstApostrophe := bytes.IndexAny(token.Term, APOSTROPHES)
+		firstApostrophe := bytes.IndexAny(token.Term, Apostrophes)
 		if firstApostrophe >= 0 {
 			// found an apostrophe
 			token.Term = token.Term[0:firstApostrophe]

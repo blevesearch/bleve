@@ -17,7 +17,7 @@ import (
 
 const Name = "ansi"
 
-const DEFAULT_ANSI_HIGHLIGHT = bgYellow
+const DefaultAnsiHighlight = bgYellow
 
 type ANSIFragmentFormatter struct {
 	color string
@@ -25,7 +25,7 @@ type ANSIFragmentFormatter struct {
 
 func NewANSIFragmentFormatter() *ANSIFragmentFormatter {
 	return &ANSIFragmentFormatter{
-		color: DEFAULT_ANSI_HIGHLIGHT,
+		color: DefaultAnsiHighlight,
 	}
 }
 

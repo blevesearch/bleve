@@ -36,7 +36,7 @@ func (p *FlexibleGoDateTimeParser) ParseDateTime(input string) (time.Time, error
 			return rv, nil
 		}
 	}
-	return time.Time{}, analysis.INVALID_DATETIME
+	return time.Time{}, analysis.InvalidDateTime
 }
 
 func FlexibleGoDateTimeParserConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.DateTimeParser, error) {

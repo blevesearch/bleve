@@ -13,13 +13,13 @@ import (
 	"math"
 )
 
-var SQRT_CACHE map[int]float64
+var SqrtCache map[int]float64
 
-const MAX_SQRT_CACHE = 64
+const MaxSqrtCache = 64
 
 func init() {
-	SQRT_CACHE = make(map[int]float64, MAX_SQRT_CACHE)
-	for i := 0; i < MAX_SQRT_CACHE; i++ {
-		SQRT_CACHE[i] = math.Sqrt(float64(i))
+	SqrtCache = make(map[int]float64, MaxSqrtCache)
+	for i := 0; i < MaxSqrtCache; i++ {
+		SqrtCache[i] = math.Sqrt(float64(i))
 	}
 }

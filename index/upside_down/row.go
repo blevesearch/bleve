@@ -19,7 +19,7 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 )
 
-const BYTE_SEPARATOR byte = 0xff
+const ByteSeparator byte = 0xff
 
 type UpsideDownCouchRowStream chan UpsideDownCouchRow
 
@@ -134,7 +134,7 @@ func (f *FieldRow) Key() []byte {
 }
 
 func (f *FieldRow) Value() []byte {
-	return append([]byte(f.name), BYTE_SEPARATOR)
+	return append([]byte(f.name), ByteSeparator)
 }
 
 func (f *FieldRow) String() string {
@@ -159,7 +159,7 @@ func NewFieldRowKV(key, value []byte) (*FieldRow, error) {
 	}
 
 	buf = bytes.NewBuffer(value)
-	rv.name, err = buf.ReadString(BYTE_SEPARATOR)
+	rv.name, err = buf.ReadString(ByteSeparator)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (tfr *TermFrequencyRow) ScanPrefixForFieldTerm() []byte {
 	buf[0] = 't'
 	binary.LittleEndian.PutUint16(buf[1:3], tfr.field)
 	termLen := copy(buf[3:], tfr.term)
-	buf[3+termLen] = BYTE_SEPARATOR
+	buf[3+termLen] = ByteSeparator
 	return buf
 }
 
@@ -219,7 +219,7 @@ func (tfr *TermFrequencyRow) Key() []byte {
 	buf[0] = 't'
 	binary.LittleEndian.PutUint16(buf[1:3], tfr.field)
 	termLen := copy(buf[3:], tfr.term)
-	buf[3+termLen] = BYTE_SEPARATOR
+	buf[3+termLen] = ByteSeparator
 	copy(buf[3+termLen+1:], tfr.doc)
 	return buf
 }
@@ -281,13 +281,13 @@ func NewTermFrequencyRowK(key []byte) (*TermFrequencyRow, error) {
 		return nil, err
 	}
 
-	rv.term, err = buf.ReadBytes(BYTE_SEPARATOR)
+	rv.term, err = buf.ReadBytes(ByteSeparator)
 	if err != nil {
 		return nil, err
 	}
 	rv.term = rv.term[:len(rv.term)-1] // trim off separator byte
 
-	doc, err := buf.ReadBytes(BYTE_SEPARATOR)
+	doc, err := buf.ReadBytes(ByteSeparator)
 	if err != io.EOF {
 		return nil, err
 	}
@@ -413,7 +413,7 @@ func NewBackIndexRowKV(key, value []byte) (*BackIndexRow, error) {
 	buf.ReadByte() // type
 
 	var err error
-	rv.doc, err = buf.ReadBytes(BYTE_SEPARATOR)
+	rv.doc, err = buf.ReadBytes(ByteSeparator)
 	if err == io.EOF && len(rv.doc) < 1 {
 		err = fmt.Errorf("invalid doc length 0")
 	}
@@ -446,7 +446,7 @@ func (s *StoredRow) Key() []byte {
 	buf := new(bytes.Buffer)
 	buf.WriteByte('s')
 	buf.Write(s.doc)
-	buf.WriteByte(BYTE_SEPARATOR)
+	buf.WriteByte(ByteSeparator)
 	fieldbuf := make([]byte, 2)
 	binary.LittleEndian.PutUint16(fieldbuf, s.field)
 	buf.Write(fieldbuf)
@@ -473,7 +473,7 @@ func (s *StoredRow) ScanPrefixForDoc() []byte {
 	buf := new(bytes.Buffer)
 	buf.WriteByte('s')
 	buf.Write(s.doc)
-	buf.WriteByte(BYTE_SEPARATOR)
+	buf.WriteByte(ByteSeparator)
 	return buf.Bytes()
 }
 
@@ -494,7 +494,7 @@ func NewStoredRowK(key []byte) (*StoredRow, error) {
 	buf.ReadByte() // type
 
 	var err error
-	rv.doc, err = buf.ReadBytes(BYTE_SEPARATOR)
+	rv.doc, err = buf.ReadBytes(ByteSeparator)
 	if len(rv.doc) < 2 { // 1 for min doc id length, 1 for separator
 		err = fmt.Errorf("invalid doc length 0")
 		return nil, err

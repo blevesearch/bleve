@@ -121,6 +121,15 @@ func (dm *DocumentMapping) AddSubDocumentMapping(property string, sdm *DocumentM
 	dm.Properties[property] = sdm
 }
 
+// AddFieldMappingsAt adds one or more FieldMappings
+// at the named sub-document.  If the named sub-document
+// doesn't yet exist it is created for you.
+// This is a convenience function to make most common
+// mappings more concise.
+// Otherwise, you would:
+//     subMapping := NewDocumentMapping()
+//     subMapping.AddFieldMapping(fieldMapping)
+//     parentMapping.AddSubDocumentMapping(property, subMapping)
 func (dm *DocumentMapping) AddFieldMappingsAt(property string, fms ...*FieldMapping) {
 	if dm.Properties == nil {
 		dm.Properties = make(map[string]*DocumentMapping)
