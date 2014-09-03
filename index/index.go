@@ -22,7 +22,7 @@ type Index interface {
 	Batch(batch Batch) error
 
 	TermFieldReader(term []byte, field string) (TermFieldReader, error)
-	DocIdReader(start, end string) (DocIdReader, error)
+	DocIDReader(start, end string) (DocIDReader, error)
 
 	FieldReader(field string, startTerm []byte, endTerm []byte) (FieldReader, error)
 
@@ -71,7 +71,7 @@ type FieldReader interface {
 	Close()
 }
 
-type DocIdReader interface {
+type DocIDReader interface {
 	Next() (string, error)
 	Advance(ID string) (string, error)
 	Close()

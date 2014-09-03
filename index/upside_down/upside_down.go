@@ -335,12 +335,12 @@ func (udc *UpsideDownCouch) updateSingle(doc *document.Document, backIndexRow *B
 	return addRows, updateRows, deleteRows
 }
 
-func (udc *UpsideDownCouch) storeField(docId string, field document.Field, fieldIndex uint16, existingKeys map[string]bool) ([]UpsideDownCouchRow, []UpsideDownCouchRow, []*BackIndexStoreEntry) {
+func (udc *UpsideDownCouch) storeField(docID string, field document.Field, fieldIndex uint16, existingKeys map[string]bool) ([]UpsideDownCouchRow, []UpsideDownCouchRow, []*BackIndexStoreEntry) {
 	updateRows := make([]UpsideDownCouchRow, 0)
 	addRows := make([]UpsideDownCouchRow, 0)
 	backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
 	fieldType := encodeFieldType(field)
-	storedRow := NewStoredRow(docId, fieldIndex, field.ArrayPositions(), fieldType, field.Value())
+	storedRow := NewStoredRow(docID, fieldIndex, field.ArrayPositions(), fieldType, field.Value())
 
 	// record the back index entry
 	backIndexStoredEntry := BackIndexStoreEntry{Field: proto.Uint32(uint32(fieldIndex)), ArrayPositions: field.ArrayPositions()}
@@ -374,7 +374,7 @@ func encodeFieldType(f document.Field) byte {
 	return fieldType
 }
 
-func (udc *UpsideDownCouch) indexField(docId string, field document.Field, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies, existingKeys map[string]bool) ([]UpsideDownCouchRow, []UpsideDownCouchRow, []*BackIndexTermEntry) {
+func (udc *UpsideDownCouch) indexField(docID string, field document.Field, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies, existingKeys map[string]bool) ([]UpsideDownCouchRow, []UpsideDownCouchRow, []*BackIndexTermEntry) {
 
 	updateRows := make([]UpsideDownCouchRow, 0)
 	addRows := make([]UpsideDownCouchRow, 0)
@@ -386,9 +386,9 @@ func (udc *UpsideDownCouch) indexField(docId string, field document.Field, field
 		if field.Options().IncludeTermVectors() {
 			tv, newFieldRows := udc.termVectorsFromTokenFreq(fieldIndex, tf)
 			updateRows = append(updateRows, newFieldRows...)
-			termFreqRow = NewTermFrequencyRowWithTermVectors(tf.Term, fieldIndex, docId, uint64(frequencyFromTokenFreq(tf)), fieldNorm, tv)
+			termFreqRow = NewTermFrequencyRowWithTermVectors(tf.Term, fieldIndex, docID, uint64(frequencyFromTokenFreq(tf)), fieldNorm, tv)
 		} else {
-			termFreqRow = NewTermFrequencyRow(tf.Term, fieldIndex, docId, uint64(frequencyFromTokenFreq(tf)), fieldNorm)
+			termFreqRow = NewTermFrequencyRow(tf.Term, fieldIndex, docID, uint64(frequencyFromTokenFreq(tf)), fieldNorm)
 		}
 
 		// record the back index entry
@@ -461,10 +461,10 @@ func (udc *UpsideDownCouch) deleteSingle(id string, backIndexRow *BackIndexRow, 
 	return deleteRows
 }
 
-func (udc *UpsideDownCouch) backIndexRowForDoc(docId string) (*BackIndexRow, error) {
+func (udc *UpsideDownCouch) backIndexRowForDoc(docID string) (*BackIndexRow, error) {
 	// use a temporary row structure to build key
 	tempRow := &BackIndexRow{
-		doc: []byte(docId),
+		doc: []byte(docID),
 	}
 	key := tempRow.Key()
 	value, err := udc.store.Get(key)
@@ -485,12 +485,12 @@ func (udc *UpsideDownCouch) backIndexRowsForBatch(batch index.Batch) (map[string
 	// FIXME faster to order the ids and scan sequentially
 	// for now just get it working
 	rv := make(map[string]*BackIndexRow, 0)
-	for docId := range batch {
-		backIndexRow, err := udc.backIndexRowForDoc(docId)
+	for docID := range batch {
+		backIndexRow, err := udc.backIndexRowForDoc(docID)
 		if err != nil {
 			return nil, err
 		}
-		rv[docId] = backIndexRow
+		rv[docID] = backIndexRow
 	}
 	return rv, nil
 }
@@ -537,8 +537,8 @@ func (udc *UpsideDownCouch) FieldReader(fieldName string, startTerm []byte, endT
 	return newUpsideDownCouchTermFieldReader(udc, []byte{ByteSeparator}, ^uint16(0))
 }
 
-func (udc *UpsideDownCouch) DocIdReader(start, end string) (index.DocIdReader, error) {
-	return newUpsideDownCouchDocIdReader(udc, start, end)
+func (udc *UpsideDownCouch) DocIDReader(start, end string) (index.DocIDReader, error) {
+	return newUpsideDownCouchDocIDReader(udc, start, end)
 }
 
 func (udc *UpsideDownCouch) Document(id string) (*document.Document, error) {
@@ -677,11 +677,11 @@ func (udc *UpsideDownCouch) Batch(batch index.Batch) error {
 
 	docsAdded := uint64(0)
 	docsDeleted := uint64(0)
-	for docId, doc := range batch {
-		backIndexRow := backIndexRows[docId]
+	for docID, doc := range batch {
+		backIndexRow := backIndexRows[docID]
 		if doc == nil && backIndexRow != nil {
 			//delete
-			deleteRows = udc.deleteSingle(docId, backIndexRow, deleteRows)
+			deleteRows = udc.deleteSingle(docID, backIndexRow, deleteRows)
 			docsDeleted++
 		} else if doc != nil {
 			addRows, updateRows, deleteRows = udc.updateSingle(doc, backIndexRow, addRows, updateRows, deleteRows)

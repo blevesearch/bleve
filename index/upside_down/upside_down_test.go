@@ -444,15 +444,15 @@ func TestIndexBatch(t *testing.T) {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
 
-	docIdReader, err := idx.DocIdReader("", "")
+	docIDReader, err := idx.DocIDReader("", "")
 	if err != nil {
 		t.Error(err)
 	}
 	docIds := make([]string, 0)
-	docId, err := docIdReader.Next()
-	for docId != "" && err == nil {
-		docIds = append(docIds, docId)
-		docId, err = docIdReader.Next()
+	docID, err := docIDReader.Next()
+	for docID != "" && err == nil {
+		docIds = append(docIds, docID)
+		docID, err = docIDReader.Next()
 	}
 	if err != nil {
 		t.Error(err)

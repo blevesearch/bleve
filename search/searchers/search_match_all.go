@@ -17,12 +17,12 @@ import (
 
 type MatchAllSearcher struct {
 	index  index.Index
-	reader index.DocIdReader
+	reader index.DocIDReader
 	scorer *scorers.ConstantScorer
 }
 
 func NewMatchAllSearcher(index index.Index, boost float64, explain bool) (*MatchAllSearcher, error) {
-	reader, err := index.DocIdReader("", "")
+	reader, err := index.DocIDReader("", "")
 	if err != nil {
 		return nil, err
 	}

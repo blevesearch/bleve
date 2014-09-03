@@ -76,8 +76,8 @@ func (r *UpsideDownCouchTermFieldReader) Next() (*index.TermFieldDoc, error) {
 	return nil, nil
 }
 
-func (r *UpsideDownCouchTermFieldReader) Advance(docId string) (*index.TermFieldDoc, error) {
-	tfr := NewTermFrequencyRow(r.term, r.field, docId, 0, 0)
+func (r *UpsideDownCouchTermFieldReader) Advance(docID string) (*index.TermFieldDoc, error) {
+	tfr := NewTermFrequencyRow(r.term, r.field, docID, 0, 0)
 	r.iterator.Seek(tfr.Key())
 	key, val, valid := r.iterator.Current()
 	if valid {
@@ -104,14 +104,14 @@ func (r *UpsideDownCouchTermFieldReader) Close() {
 	r.iterator.Close()
 }
 
-type UpsideDownCouchDocIdReader struct {
+type UpsideDownCouchDocIDReader struct {
 	index    *UpsideDownCouch
 	iterator store.KVIterator
 	start    string
 	end      string
 }
 
-func newUpsideDownCouchDocIdReader(index *UpsideDownCouch, start, end string) (*UpsideDownCouchDocIdReader, error) {
+func newUpsideDownCouchDocIDReader(index *UpsideDownCouch, start, end string) (*UpsideDownCouchDocIDReader, error) {
 	if start == "" {
 		start = string([]byte{0x0})
 	}
@@ -121,7 +121,7 @@ func newUpsideDownCouchDocIdReader(index *UpsideDownCouch, start, end string) (*
 	bisr := NewBackIndexRow(start, nil, nil)
 	it := index.store.Iterator(bisr.Key())
 
-	return &UpsideDownCouchDocIdReader{
+	return &UpsideDownCouchDocIDReader{
 		index:    index,
 		iterator: it,
 		start:    start,
@@ -129,7 +129,7 @@ func newUpsideDownCouchDocIdReader(index *UpsideDownCouch, start, end string) (*
 	}, nil
 }
 
-func (r *UpsideDownCouchDocIdReader) Next() (string, error) {
+func (r *UpsideDownCouchDocIDReader) Next() (string, error) {
 	key, val, valid := r.iterator.Current()
 	if valid {
 		bier := NewBackIndexRow(r.end, nil, nil)
@@ -147,8 +147,8 @@ func (r *UpsideDownCouchDocIdReader) Next() (string, error) {
 	return "", nil
 }
 
-func (r *UpsideDownCouchDocIdReader) Advance(docId string) (string, error) {
-	bir := NewBackIndexRow(docId, nil, nil)
+func (r *UpsideDownCouchDocIDReader) Advance(docID string) (string, error) {
+	bir := NewBackIndexRow(docID, nil, nil)
 	r.iterator.Seek(bir.Key())
 	key, val, valid := r.iterator.Current()
 	if valid {
@@ -167,6 +167,6 @@ func (r *UpsideDownCouchDocIdReader) Advance(docId string) (string, error) {
 	return "", nil
 }
 
-func (r *UpsideDownCouchDocIdReader) Close() {
+func (r *UpsideDownCouchDocIDReader) Close() {
 	r.iterator.Close()
 }
