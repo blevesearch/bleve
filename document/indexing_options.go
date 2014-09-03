@@ -12,21 +12,21 @@ package document
 type IndexingOptions int
 
 const (
-	INDEX_FIELD IndexingOptions = 1 << iota
-	STORE_FIELD
-	INCLUDE_TERM_VECTORS
+	IndexField IndexingOptions = 1 << iota
+	StoreField
+	IncludeTermVectors
 )
 
 func (o IndexingOptions) IsIndexed() bool {
-	return o&INDEX_FIELD != 0
+	return o&IndexField != 0
 }
 
 func (o IndexingOptions) IsStored() bool {
-	return o&STORE_FIELD != 0
+	return o&StoreField != 0
 }
 
 func (o IndexingOptions) IncludeTermVectors() bool {
-	return o&INCLUDE_TERM_VECTORS != 0
+	return o&IncludeTermVectors != 0
 }
 
 func (o IndexingOptions) String() string {

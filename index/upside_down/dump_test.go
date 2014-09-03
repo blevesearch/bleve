@@ -39,9 +39,9 @@ func TestDump(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, document.INDEX_FIELD|document.STORE_FIELD))
-	dateField, err := document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), document.INDEX_FIELD|document.STORE_FIELD)
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.IndexField|document.StoreField))
+	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, document.IndexField|document.StoreField))
+	dateField, err := document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), document.IndexField|document.StoreField)
 	if err != nil {
 		t.Error(err)
 	}
@@ -52,9 +52,9 @@ func TestDump(t *testing.T) {
 	}
 
 	doc = document.NewDocument("2")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test2"), document.INDEX_FIELD|document.STORE_FIELD))
-	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, document.INDEX_FIELD|document.STORE_FIELD))
-	dateField, err = document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), document.INDEX_FIELD|document.STORE_FIELD)
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test2"), document.IndexField|document.StoreField))
+	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, document.IndexField|document.StoreField))
+	dateField, err = document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), document.IndexField|document.StoreField)
 	if err != nil {
 		t.Error(err)
 	}
@@ -77,7 +77,7 @@ func TestDump(t *testing.T) {
 	// 16 numeric terms
 	// 16 date terms
 	// 3 stored fields
-	expectedDocRowCount := int(1 + (2 * (64 / document.DEFAULT_PRECISION_STEP)) + 3)
+	expectedDocRowCount := int(1 + (2 * (64 / document.DefaultPrecisionStep)) + 3)
 	docRowCount := 0
 	docRows := idx.DumpDoc("1")
 	for _ = range docRows {
@@ -103,7 +103,7 @@ func TestDump(t *testing.T) {
 	// 2 text term row count (2 different text terms)
 	// 16 numeric term row counts (shared for both docs, same numeric value)
 	// 16 date term row counts (shared for both docs, same date value)
-	expectedAllRowCount := int(1 + fieldsCount + (2 * expectedDocRowCount) + 2 + 2 + int((2 * (64 / document.DEFAULT_PRECISION_STEP))))
+	expectedAllRowCount := int(1 + fieldsCount + (2 * expectedDocRowCount) + 2 + 2 + int((2 * (64 / document.DefaultPrecisionStep))))
 	allRowCount := 0
 	allRows := idx.DumpAll()
 	for _ = range allRows {

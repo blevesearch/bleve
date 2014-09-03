@@ -351,13 +351,13 @@ func (im *IndexMapping) mapDocument(doc *document.Document, data interface{}) er
 
 	docType := im.determineType(data)
 	docMapping := im.mappingForType(docType)
-	walkContext := im.newWalkContext(doc)
+	walkContext := im.newWalkContext(doc, docMapping)
 	docMapping.walkDocument(data, []string{}, []uint64{}, walkContext)
 
 	// see if the _all field was disabled
 	allMapping := docMapping.documentMappingForPath("_all")
 	if allMapping == nil || (allMapping.Enabled != false) {
-		field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS)
+		field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, document.IndexField|document.IncludeTermVectors)
 		doc.AddField(field)
 	}
 
@@ -367,13 +367,15 @@ func (im *IndexMapping) mapDocument(doc *document.Document, data interface{}) er
 type walkContext struct {
 	doc             *document.Document
 	im              *IndexMapping
+	dm              *DocumentMapping
 	excludedFromAll []string
 }
 
-func (im *IndexMapping) newWalkContext(doc *document.Document) *walkContext {
+func (im *IndexMapping) newWalkContext(doc *document.Document, dm *DocumentMapping) *walkContext {
 	return &walkContext{
 		doc:             doc,
 		im:              im,
+		dm:              dm,
 		excludedFromAll: []string{},
 	}
 }
@@ -442,16 +444,4 @@ func (im *IndexMapping) datetimeParserNameForPath(path string) string {
 	}
 
 	return im.DefaultDateTimeParser
-}
-
-func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) string {
-	fieldName := pathString
-	if fieldMapping.Name != nil && *fieldMapping.Name != "" {
-		parentName := ""
-		if len(path) > 1 {
-			parentName = encodePath(path[:len(path)-1]) + pathSeparator
-		}
-		fieldName = parentName + *fieldMapping.Name
-	}
-	return fieldName
 }

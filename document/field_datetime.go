@@ -18,8 +18,8 @@ import (
 	"github.com/blevesearch/bleve/numeric_util"
 )
 
-const DEFAULT_DATETIME_INDEXING_OPTIONS = STORE_FIELD | INDEX_FIELD
-const DEFAULT_DATETIME_PRECISION_STEP uint = 4
+const DefaultDateTimeIndexingOptions = StoreField | IndexField
+const DefaultDateTimePrecisionStep uint = 4
 
 var MinTimeRepresentable = time.Unix(0, math.MinInt64)
 var MaxTimeRepresentable = time.Unix(0, math.MaxInt64)
@@ -56,7 +56,7 @@ func (n *DateTimeField) Analyze() (int, analysis.TokenFrequencies) {
 	original, err := n.value.Int64()
 	if err == nil {
 
-		shift := DEFAULT_PRECISION_STEP
+		shift := DefaultDateTimePrecisionStep
 		for shift < 64 {
 			shiftEncoded, err := numeric_util.NewPrefixCodedInt64(original, shift)
 			if err != nil {
@@ -70,7 +70,7 @@ func (n *DateTimeField) Analyze() (int, analysis.TokenFrequencies) {
 				Type:     analysis.DateTime,
 			}
 			tokens = append(tokens, &token)
-			shift += DEFAULT_PRECISION_STEP
+			shift += DefaultDateTimePrecisionStep
 		}
 	}
 
@@ -100,12 +100,12 @@ func NewDateTimeFieldFromBytes(name string, arrayPositions []uint64, value []byt
 		name:           name,
 		arrayPositions: arrayPositions,
 		value:          value,
-		options:        DEFAULT_DATETIME_INDEXING_OPTIONS,
+		options:        DefaultDateTimeIndexingOptions,
 	}
 }
 
 func NewDateTimeField(name string, arrayPositions []uint64, dt time.Time) (*DateTimeField, error) {
-	return NewDateTimeFieldWithIndexingOptions(name, arrayPositions, dt, DEFAULT_DATETIME_INDEXING_OPTIONS)
+	return NewDateTimeFieldWithIndexingOptions(name, arrayPositions, dt, DefaultDateTimeIndexingOptions)
 }
 
 func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, dt time.Time, options IndexingOptions) (*DateTimeField, error) {

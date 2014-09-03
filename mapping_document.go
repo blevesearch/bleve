@@ -12,11 +12,9 @@ package bleve
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"reflect"
 	"time"
 
-	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/registry"
 )
 
@@ -257,34 +255,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		if subDocMapping != nil {
 			// index by explicit mapping
 			for _, fieldMapping := range subDocMapping.Fields {
-				fieldName := getFieldName(pathString, path, fieldMapping)
-				options := fieldMapping.Options()
-				if *fieldMapping.Type == "text" {
-					analyzer := context.im.analyzerNamed(*fieldMapping.Analyzer)
-					field := document.NewTextFieldCustom(fieldName, indexes, []byte(propertyValueString), options, analyzer)
-					context.doc.AddField(field)
-
-					if fieldMapping.IncludeInAll != nil && !*fieldMapping.IncludeInAll {
-						context.excludedFromAll = append(context.excludedFromAll, fieldName)
-					}
-				} else if *fieldMapping.Type == "datetime" {
-					dateTimeFormat := context.im.DefaultDateTimeParser
-					if fieldMapping.DateFormat != nil {
-						dateTimeFormat = *fieldMapping.DateFormat
-					}
-					dateTimeParser := context.im.dateTimeParserNamed(dateTimeFormat)
-					if dateTimeParser != nil {
-						parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
-						if err != nil {
-							field, err := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, parsedDateTime, options)
-							if err == nil {
-								context.doc.AddField(field)
-							} else {
-								log.Printf("could not build date %v", err)
-							}
-						}
-					}
-				}
+				fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
 			}
 		} else {
 			// automatic indexing behavior
@@ -294,23 +265,13 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			if dateTimeParser != nil {
 				parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
 				if err != nil {
-					// index as plain text
-					options := document.STORE_FIELD | document.INDEX_FIELD | document.INCLUDE_TERM_VECTORS
-					analyzerName := dm.defaultAnalyzerName(path)
-					if analyzerName == "" {
-						analyzerName = context.im.DefaultAnalyzer
-					}
-					analyzer := context.im.analyzerNamed(analyzerName)
-					field := document.NewTextFieldCustom(pathString, indexes, []byte(propertyValueString), options, analyzer)
-					context.doc.AddField(field)
+					// index as text
+					fieldMapping := defaultTextFieldMapping()
+					fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
 				} else {
 					// index as datetime
-					field, err := document.NewDateTimeField(pathString, indexes, parsedDateTime)
-					if err == nil {
-						context.doc.AddField(field)
-					} else {
-						log.Printf("could not build date %v", err)
-					}
+					fieldMapping := defaultDateTimeFieldMapping()
+					fieldMapping.processTime(parsedDateTime, pathString, path, indexes, context)
 				}
 			}
 		}
@@ -319,17 +280,12 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		if subDocMapping != nil {
 			// index by explicit mapping
 			for _, fieldMapping := range subDocMapping.Fields {
-				fieldName := getFieldName(pathString, path, fieldMapping)
-				if *fieldMapping.Type == "number" {
-					options := fieldMapping.Options()
-					field := document.NewNumericFieldWithIndexingOptions(fieldName, indexes, propertyValFloat, options)
-					context.doc.AddField(field)
-				}
+				fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
 			}
 		} else {
 			// automatic indexing behavior
-			field := document.NewNumericField(pathString, indexes, propertyValFloat)
-			context.doc.AddField(field)
+			fieldMapping := defaultNumericFieldMapping()
+			fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
 		}
 	case reflect.Struct:
 		switch property := property.(type) {
@@ -338,25 +294,11 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			if subDocMapping != nil {
 				// index by explicit mapping
 				for _, fieldMapping := range subDocMapping.Fields {
-					fieldName := getFieldName(pathString, path, fieldMapping)
-					if *fieldMapping.Type == "datetime" {
-						options := fieldMapping.Options()
-						field, err := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, property, options)
-						if err == nil {
-							context.doc.AddField(field)
-						} else {
-							log.Printf("could not build date %v", err)
-						}
-					}
+					fieldMapping.processTime(property, pathString, path, indexes, context)
 				}
 			} else {
-				// automatic indexing behavior
-				field, err := document.NewDateTimeField(pathString, indexes, property)
-				if err == nil {
-					context.doc.AddField(field)
-				} else {
-					log.Printf("could not build date %v", err)
-				}
+				fieldMapping := defaultDateTimeFieldMapping()
+				fieldMapping.processTime(property, pathString, path, indexes, context)
 			}
 		default:
 			dm.walkDocument(property, path, indexes, context)

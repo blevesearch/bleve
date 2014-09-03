@@ -13,7 +13,7 @@ import (
 	"github.com/blevesearch/bleve/analysis"
 )
 
-const DEFAULT_COMPOSITE_INDEXING_OPTIONS = INDEX_FIELD
+const DefaultCompositeIndexingOptions = IndexField
 
 type CompositeField struct {
 	name                 string
@@ -26,7 +26,7 @@ type CompositeField struct {
 }
 
 func NewCompositeField(name string, defaultInclude bool, include []string, exclude []string) *CompositeField {
-	return NewCompositeFieldWithIndexingOptions(name, defaultInclude, include, exclude, DEFAULT_COMPOSITE_INDEXING_OPTIONS)
+	return NewCompositeFieldWithIndexingOptions(name, defaultInclude, include, exclude, DefaultCompositeIndexingOptions)
 }
 
 func NewCompositeFieldWithIndexingOptions(name string, defaultInclude bool, include []string, exclude []string, options IndexingOptions) *CompositeField {

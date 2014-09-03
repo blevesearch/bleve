@@ -16,9 +16,9 @@ import (
 	"github.com/blevesearch/bleve/numeric_util"
 )
 
-const DEFAULT_NUMERIC_INDEXING_OPTIONS = STORE_FIELD | INDEX_FIELD
+const DefaultNumericIndexingOptions = StoreField | IndexField
 
-const DEFAULT_PRECISION_STEP uint = 4
+const DefaultPrecisionStep uint = 4
 
 type NumericField struct {
 	name           string
@@ -52,7 +52,7 @@ func (n *NumericField) Analyze() (int, analysis.TokenFrequencies) {
 	original, err := n.value.Int64()
 	if err == nil {
 
-		shift := DEFAULT_PRECISION_STEP
+		shift := DefaultPrecisionStep
 		for shift < 64 {
 			shiftEncoded, err := numeric_util.NewPrefixCodedInt64(original, shift)
 			if err != nil {
@@ -66,7 +66,7 @@ func (n *NumericField) Analyze() (int, analysis.TokenFrequencies) {
 				Type:     analysis.Numeric,
 			}
 			tokens = append(tokens, &token)
-			shift += DEFAULT_PRECISION_STEP
+			shift += DefaultPrecisionStep
 		}
 	}
 
@@ -96,12 +96,12 @@ func NewNumericFieldFromBytes(name string, arrayPositions []uint64, value []byte
 		name:           name,
 		arrayPositions: arrayPositions,
 		value:          value,
-		options:        DEFAULT_NUMERIC_INDEXING_OPTIONS,
+		options:        DefaultNumericIndexingOptions,
 	}
 }
 
 func NewNumericField(name string, arrayPositions []uint64, number float64) *NumericField {
-	return NewNumericFieldWithIndexingOptions(name, arrayPositions, number, DEFAULT_NUMERIC_INDEXING_OPTIONS)
+	return NewNumericFieldWithIndexingOptions(name, arrayPositions, number, DefaultNumericIndexingOptions)
 }
 
 func NewNumericFieldWithIndexingOptions(name string, arrayPositions []uint64, number float64, options IndexingOptions) *NumericField {

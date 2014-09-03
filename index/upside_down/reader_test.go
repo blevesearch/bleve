@@ -41,7 +41,7 @@ func TestIndexReader(t *testing.T) {
 
 	doc = document.NewDocument("2")
 	doc.AddField(document.NewTextFieldWithAnalyzer("name", []uint64{}, []byte("test test test"), testAnalyzer))
-	doc.AddField(document.NewTextFieldCustom("desc", []uint64{}, []byte("eat more rice"), document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS, testAnalyzer))
+	doc.AddField(document.NewTextFieldCustom("desc", []uint64{}, []byte("eat more rice"), document.IndexField|document.IncludeTermVectors, testAnalyzer))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -183,7 +183,7 @@ func TestIndexDocIdReader(t *testing.T) {
 
 	doc = document.NewDocument("2")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test test test")))
-	doc.AddField(document.NewTextFieldWithIndexingOptions("desc", []uint64{}, []byte("eat more rice"), document.INDEX_FIELD|document.INCLUDE_TERM_VECTORS))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("desc", []uint64{}, []byte("eat more rice"), document.IndexField|document.IncludeTermVectors))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)

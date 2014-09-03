@@ -15,7 +15,7 @@ import (
 	"github.com/blevesearch/bleve/analysis"
 )
 
-const DEFAULT_TEXT_INDEXING_OPTIONS = INDEX_FIELD
+const DefaultTextIndexingOptions = IndexField
 
 type TextField struct {
 	name           string
@@ -66,7 +66,7 @@ func (t *TextField) GoString() string {
 }
 
 func NewTextField(name string, arrayPositions []uint64, value []byte) *TextField {
-	return NewTextFieldWithIndexingOptions(name, arrayPositions, value, DEFAULT_TEXT_INDEXING_OPTIONS)
+	return NewTextFieldWithIndexingOptions(name, arrayPositions, value, DefaultTextIndexingOptions)
 }
 
 func NewTextFieldWithIndexingOptions(name string, arrayPositions []uint64, value []byte, options IndexingOptions) *TextField {
@@ -82,7 +82,7 @@ func NewTextFieldWithAnalyzer(name string, arrayPositions []uint64, value []byte
 	return &TextField{
 		name:           name,
 		arrayPositions: arrayPositions,
-		options:        DEFAULT_TEXT_INDEXING_OPTIONS,
+		options:        DefaultTextIndexingOptions,
 		analyzer:       analyzer,
 		value:          value,
 	}

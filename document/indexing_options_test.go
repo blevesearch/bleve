@@ -21,31 +21,31 @@ func TestIndexingOptions(t *testing.T) {
 		includeTermVectors bool
 	}{
 		{
-			options:            INDEX_FIELD | STORE_FIELD | INCLUDE_TERM_VECTORS,
+			options:            IndexField | StoreField | IncludeTermVectors,
 			isIndexed:          true,
 			isStored:           true,
 			includeTermVectors: true,
 		},
 		{
-			options:            INDEX_FIELD | INCLUDE_TERM_VECTORS,
+			options:            IndexField | IncludeTermVectors,
 			isIndexed:          true,
 			isStored:           false,
 			includeTermVectors: true,
 		},
 		{
-			options:            STORE_FIELD | INCLUDE_TERM_VECTORS,
+			options:            StoreField | IncludeTermVectors,
 			isIndexed:          false,
 			isStored:           true,
 			includeTermVectors: true,
 		},
 		{
-			options:            INDEX_FIELD,
+			options:            IndexField,
 			isIndexed:          true,
 			isStored:           false,
 			includeTermVectors: false,
 		},
 		{
-			options:            STORE_FIELD,
+			options:            StoreField,
 			isIndexed:          false,
 			isStored:           true,
 			includeTermVectors: false,
