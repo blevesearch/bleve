@@ -56,20 +56,20 @@ func (q *matchPhraseQuery) SetField(f string) Query {
 
 func (q *matchPhraseQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
 
+	field := q.FieldVal
+	if q.FieldVal == "" {
+		field = i.m.DefaultField
+	}
+
 	analyzerName := ""
 	if q.Analyzer != "" {
 		analyzerName = q.Analyzer
 	} else {
-		analyzerName = i.m.analyzerNameForPath(q.FieldVal)
+		analyzerName = i.m.analyzerNameForPath(field)
 	}
 	analyzer := i.m.analyzerNamed(analyzerName)
 	if analyzer == nil {
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
-	}
-
-	field := q.FieldVal
-	if q.FieldVal == "" {
-		field = i.m.DefaultField
 	}
 
 	tokens := analyzer.Analyze([]byte(q.MatchPhrase))
@@ -80,7 +80,6 @@ func (q *matchPhraseQuery) Searcher(i *indexImpl, explain bool) (search.Searcher
 		}
 
 		phraseQuery := NewPhraseQuery(ts, field).SetBoost(q.BoostVal)
-
 		return phraseQuery.Searcher(i, explain)
 	}
 	noneQuery := NewMatchNoneQuery()
