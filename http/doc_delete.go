@@ -40,15 +40,15 @@ func (h *DocDeleteHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// find the doc id
-	docId := mux.Vars(req)["docId"]
-	if docId == "" {
+	docID := mux.Vars(req)["docID"]
+	if docID == "" {
 		showError(w, req, "document id cannot be empty", 400)
 		return
 	}
 
-	err := index.Delete(docId)
+	err := index.Delete(docID)
 	if err != nil {
-		showError(w, req, fmt.Sprintf("error deleting document '%s': %v", docId, err), 500)
+		showError(w, req, fmt.Sprintf("error deleting document '%s': %v", docID, err), 500)
 		return
 	}
 

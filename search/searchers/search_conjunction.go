@@ -25,7 +25,7 @@ type ConjunctionSearcher struct {
 	explain     bool
 	queryNorm   float64
 	currs       []*search.DocumentMatch
-	currentId   string
+	currentID   string
 	scorer      *scorers.ConjunctionQueryScorer
 }
 
@@ -75,9 +75,9 @@ func (s *ConjunctionSearcher) initSearchers() error {
 
 	if len(s.currs) > 0 {
 		if s.currs[0] != nil {
-			s.currentId = s.currs[0].ID
+			s.currentID = s.currs[0].ID
 		} else {
-			s.currentId = ""
+			s.currentID = ""
 		}
 	}
 
@@ -109,26 +109,26 @@ func (s *ConjunctionSearcher) Next() (*search.DocumentMatch, error) {
 	var rv *search.DocumentMatch
 	var err error
 OUTER:
-	for s.currentId != "" {
+	for s.currentID != "" {
 		for i, termSearcher := range s.searchers {
-			if s.currs[i] != nil && s.currs[i].ID != s.currentId {
-				// this reader doesn't have the currentId, try to advance
-				s.currs[i], err = termSearcher.Advance(s.currentId)
+			if s.currs[i] != nil && s.currs[i].ID != s.currentID {
+				// this reader doesn't have the currentID, try to advance
+				s.currs[i], err = termSearcher.Advance(s.currentID)
 				if err != nil {
 					return nil, err
 				}
 				if s.currs[i] == nil {
-					s.currentId = ""
+					s.currentID = ""
 					continue OUTER
 				}
-				if s.currs[i].ID != s.currentId {
+				if s.currs[i].ID != s.currentID {
 					// we just advanced, so it doesn't match, it must be greater
 					// no need to call next
-					s.currentId = s.currs[i].ID
+					s.currentID = s.currs[i].ID
 					continue OUTER
 				}
 			} else if s.currs[i] == nil {
-				s.currentId = ""
+				s.currentID = ""
 				continue OUTER
 			}
 		}
@@ -141,9 +141,9 @@ OUTER:
 			return nil, err
 		}
 		if s.currs[0] == nil {
-			s.currentId = ""
+			s.currentID = ""
 		} else {
-			s.currentId = s.currs[0].ID
+			s.currentID = s.currs[0].ID
 		}
 		// don't continue now, wait for next call the Next()
 		break
@@ -165,7 +165,7 @@ func (s *ConjunctionSearcher) Advance(ID string) (*search.DocumentMatch, error) 
 			return nil, err
 		}
 	}
-	s.currentId = ID
+	s.currentID = ID
 	return s.Next()
 }
 

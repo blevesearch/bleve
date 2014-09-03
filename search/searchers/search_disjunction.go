@@ -24,7 +24,7 @@ type DisjunctionSearcher struct {
 	searchers   OrderedSearcherList
 	queryNorm   float64
 	currs       []*search.DocumentMatch
-	currentId   string
+	currentID   string
 	scorer      *scorers.DisjunctionQueryScorer
 	min         float64
 }
@@ -73,12 +73,12 @@ func (s *DisjunctionSearcher) initSearchers() error {
 		}
 	}
 
-	s.currentId = s.nextSmallestId()
+	s.currentID = s.nextSmallestID()
 	s.initialized = true
 	return nil
 }
 
-func (s *DisjunctionSearcher) nextSmallestId() string {
+func (s *DisjunctionSearcher) nextSmallestID() string {
 	rv := ""
 	for _, curr := range s.currs {
 		if curr != nil && (curr.ID < rv || rv == "") {
@@ -114,9 +114,9 @@ func (s *DisjunctionSearcher) Next() (*search.DocumentMatch, error) {
 	matching := make([]*search.DocumentMatch, 0)
 
 	found := false
-	for !found && s.currentId != "" {
+	for !found && s.currentID != "" {
 		for _, curr := range s.currs {
-			if curr != nil && curr.ID == s.currentId {
+			if curr != nil && curr.ID == s.currentID {
 				matching = append(matching, curr)
 			}
 		}
@@ -131,7 +131,7 @@ func (s *DisjunctionSearcher) Next() (*search.DocumentMatch, error) {
 		matching = make([]*search.DocumentMatch, 0)
 		// invoke next on all the matching searchers
 		for i, curr := range s.currs {
-			if curr != nil && curr.ID == s.currentId {
+			if curr != nil && curr.ID == s.currentID {
 				searcher := s.searchers[i]
 				s.currs[i], err = searcher.Next()
 				if err != nil {
@@ -139,7 +139,7 @@ func (s *DisjunctionSearcher) Next() (*search.DocumentMatch, error) {
 				}
 			}
 		}
-		s.currentId = s.nextSmallestId()
+		s.currentID = s.nextSmallestID()
 	}
 	return rv, nil
 }
@@ -160,7 +160,7 @@ func (s *DisjunctionSearcher) Advance(ID string) (*search.DocumentMatch, error) 
 		}
 	}
 
-	s.currentId = s.nextSmallestId()
+	s.currentID = s.nextSmallestID()
 
 	return s.Next()
 }

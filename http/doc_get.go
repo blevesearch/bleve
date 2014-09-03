@@ -42,19 +42,19 @@ func (h *DocGetHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// find the doc id
-	docId := mux.Vars(req)["docId"]
-	if docId == "" {
+	docID := mux.Vars(req)["docID"]
+	if docID == "" {
 		showError(w, req, "document id cannot be empty", 400)
 		return
 	}
 
-	doc, err := index.Document(docId)
+	doc, err := index.Document(docID)
 	if err != nil {
-		showError(w, req, fmt.Sprintf("error deleting document '%s': %v", docId, err), 500)
+		showError(w, req, fmt.Sprintf("error deleting document '%s': %v", docID, err), 500)
 		return
 	}
 	if doc == nil {
-		showError(w, req, fmt.Sprintf("no such document '%s'", docId), 404)
+		showError(w, req, fmt.Sprintf("no such document '%s'", docID), 404)
 		return
 	}
 
@@ -62,7 +62,7 @@ func (h *DocGetHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		ID     string                 `json:"id"`
 		Fields map[string]interface{} `json:"fields"`
 	}{
-		ID:     docId,
+		ID:     docID,
 		Fields: map[string]interface{}{},
 	}
 	for _, field := range doc.Fields {

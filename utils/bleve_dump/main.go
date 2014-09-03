@@ -22,7 +22,7 @@ import (
 var indexPath = flag.String("index", "", "index path")
 
 var fieldsOnly = flag.Bool("fields", false, "fields only")
-var docId = flag.String("docId", "", "docId to dump")
+var docID = flag.String("docID", "", "docID to dump")
 var mappingOnly = flag.Bool("mapping", false, "print mapping")
 
 func main() {
@@ -48,8 +48,8 @@ func main() {
 	}
 
 	var dumpChan chan interface{}
-	if *docId != "" {
-		dumpChan = index.DumpDoc(*docId)
+	if *docID != "" {
+		dumpChan = index.DumpDoc(*docID)
 	} else if *fieldsOnly {
 		dumpChan = index.DumpFields()
 	} else {

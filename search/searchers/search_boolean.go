@@ -27,7 +27,7 @@ type BooleanSearcher struct {
 	currMust        *search.DocumentMatch
 	currShould      *search.DocumentMatch
 	currMustNot     *search.DocumentMatch
-	currentId       string
+	currentID       string
 	min             uint64
 	scorer          *scorers.ConjunctionQueryScorer
 }
@@ -91,11 +91,11 @@ func (s *BooleanSearcher) initSearchers() error {
 	}
 
 	if s.mustSearcher != nil && s.currMust != nil {
-		s.currentId = s.currMust.ID
+		s.currentID = s.currMust.ID
 	} else if s.mustSearcher == nil && s.currShould != nil {
-		s.currentId = s.currShould.ID
+		s.currentID = s.currShould.ID
 	} else {
-		s.currentId = ""
+		s.currentID = ""
 	}
 
 	s.initialized = true
@@ -118,11 +118,11 @@ func (s *BooleanSearcher) advanceNextMust() error {
 	}
 
 	if s.mustSearcher != nil && s.currMust != nil {
-		s.currentId = s.currMust.ID
+		s.currentID = s.currMust.ID
 	} else if s.mustSearcher == nil && s.currShould != nil {
-		s.currentId = s.currShould.ID
+		s.currentID = s.currShould.ID
 	} else {
-		s.currentId = ""
+		s.currentID = ""
 	}
 	return nil
 }
@@ -160,31 +160,31 @@ func (s *BooleanSearcher) Next() (*search.DocumentMatch, error) {
 	var err error
 	var rv *search.DocumentMatch
 
-	for s.currentId != "" {
-		if s.currMustNot != nil && s.currMustNot.ID < s.currentId {
+	for s.currentID != "" {
+		if s.currMustNot != nil && s.currMustNot.ID < s.currentID {
 			// advance must not searcher to our candidate entry
-			s.currMustNot, err = s.mustNotSearcher.Advance(s.currentId)
+			s.currMustNot, err = s.mustNotSearcher.Advance(s.currentID)
 			if err != nil {
 				return nil, err
 			}
-			if s.currMustNot != nil && s.currMustNot.ID == s.currentId {
+			if s.currMustNot != nil && s.currMustNot.ID == s.currentID {
 				// the candidate is excluded
 				s.advanceNextMust()
 				continue
 			}
-		} else if s.currMustNot != nil && s.currMustNot.ID == s.currentId {
+		} else if s.currMustNot != nil && s.currMustNot.ID == s.currentID {
 			// the candidate is excluded
 			s.advanceNextMust()
 			continue
 		}
 
-		if s.currShould != nil && s.currShould.ID < s.currentId {
+		if s.currShould != nil && s.currShould.ID < s.currentID {
 			// advance should searcher to our candidate entry
-			s.currShould, err = s.shouldSearcher.Advance(s.currentId)
+			s.currShould, err = s.shouldSearcher.Advance(s.currentID)
 			if err != nil {
 				return nil, err
 			}
-			if s.currShould != nil && s.currShould.ID == s.currentId {
+			if s.currShould != nil && s.currShould.ID == s.currentID {
 				// score bonus matches should
 				cons := []*search.DocumentMatch{}
 				if s.currMust != nil {
@@ -200,7 +200,7 @@ func (s *BooleanSearcher) Next() (*search.DocumentMatch, error) {
 				s.advanceNextMust()
 				break
 			}
-		} else if s.currShould != nil && s.currShould.ID == s.currentId {
+		} else if s.currShould != nil && s.currShould.ID == s.currentID {
 			// score bonus matches should
 			cons := []*search.DocumentMatch{}
 			if s.currMust != nil {
@@ -252,11 +252,11 @@ func (s *BooleanSearcher) Advance(ID string) (*search.DocumentMatch, error) {
 	}
 
 	if s.mustSearcher != nil && s.currMust != nil {
-		s.currentId = s.currMust.ID
+		s.currentID = s.currMust.ID
 	} else if s.mustSearcher == nil && s.currShould != nil {
-		s.currentId = s.currShould.ID
+		s.currentID = s.currShould.ID
 	} else {
-		s.currentId = ""
+		s.currentID = ""
 	}
 
 	return s.Next()
