@@ -20,75 +20,57 @@ import (
 // A FieldMapping describes how a specific item
 // should be put into the index.
 type FieldMapping struct {
-	Name               *string `json:"name"`
-	Type               *string `json:"type"`
-	Analyzer           *string `json:"analyzer"`
-	Store              *bool   `json:"store"`
-	Index              *bool   `json:"index"`
-	IncludeTermVectors *bool   `json:"include_term_vectors"`
-	IncludeInAll       *bool   `json:"include_in_all"`
-	DateFormat         *string `json:"date_format"`
+	Name               string `json:"name,omitempty"`
+	Type               string `json:"type,omitempty"`
+	Analyzer           string `json:"analyzer,omitempty"`
+	Store              bool   `json:"store,omitempty"`
+	Index              bool   `json:"index,omitempty"`
+	IncludeTermVectors bool   `json:"include_term_vectors,omitempty"`
+	IncludeInAll       bool   `json:"include_in_all,omitempty"`
+	DateFormat         string `json:"date_format,omitempty"`
 }
 
-// NewFieldMapping returns a FieldMapping with the
-// specified behavior.
-func NewFieldMapping(name, typ, analyzer string, store, index bool, includeTermVectors bool, includeInAll bool) *FieldMapping {
+// NewTextFieldMapping returns a default field mapping for text
+func NewTextFieldMapping() *FieldMapping {
 	return &FieldMapping{
-		Name:               &name,
-		Type:               &typ,
-		Analyzer:           &analyzer,
-		Store:              &store,
-		Index:              &index,
-		IncludeTermVectors: &includeTermVectors,
-		IncludeInAll:       &includeInAll,
+		Type:               "text",
+		Store:              true,
+		Index:              true,
+		IncludeTermVectors: true,
+		IncludeInAll:       true,
 	}
 }
 
-func defaultNumericFieldMapping() *FieldMapping {
-	typ := "number"
-	store := true
-	index := true
+// NewNumericFieldMapping returns a default field mapping for numbers
+func NewNumericFieldMapping() *FieldMapping {
 	return &FieldMapping{
-		Type:  &typ,
-		Store: &store,
-		Index: &index,
+		Type:         "number",
+		Store:        true,
+		Index:        true,
+		IncludeInAll: true,
 	}
 }
 
-func defaultDateTimeFieldMapping() *FieldMapping {
-	typ := "datetime"
-	store := true
-	index := true
+// NewDateTimeFieldMapping returns a default field mapping for dates
+func NewDateTimeFieldMapping() *FieldMapping {
 	return &FieldMapping{
-		Type:  &typ,
-		Store: &store,
-		Index: &index,
-	}
-}
-
-func defaultTextFieldMapping() *FieldMapping {
-	typ := "text"
-	store := true
-	index := true
-	include := true
-	return &FieldMapping{
-		Type:               &typ,
-		Store:              &store,
-		Index:              &index,
-		IncludeTermVectors: &include,
+		Type:         "datetime",
+		Store:        true,
+		Index:        true,
+		IncludeInAll: true,
 	}
 }
 
 // Options returns the indexing options for this field.
 func (fm *FieldMapping) Options() document.IndexingOptions {
 	var rv document.IndexingOptions
-	if fm.Store != nil && *fm.Store {
+	if fm.Store {
 		rv |= document.StoreField
 	}
-	if fm.Index != nil && *fm.Index {
+	if fm.Index {
 		rv |= document.IndexField
 	}
-	if fm.IncludeTermVectors != nil && *fm.IncludeTermVectors {
+	if fm.IncludeTermVectors {
 		rv |= document.IncludeTermVectors
 	}
 	return rv
@@ -97,29 +79,24 @@ func (fm *FieldMapping) Options() document.IndexingOptions {
 func (fm *FieldMapping) processString(propertyValueString string, pathString string, path []string, indexes []uint64, context *walkContext) {
 	fieldName := getFieldName(pathString, path, fm)
 	options := fm.Options()
-	if *fm.Type == "text" {
+	if fm.Type == "text" {
 		analyzer := fm.analyzerForField(path, context)
 		field := document.NewTextFieldCustom(fieldName, indexes, []byte(propertyValueString), options, analyzer)
 		context.doc.AddField(field)
 
-		if fm.IncludeInAll != nil && !*fm.IncludeInAll {
+		if !fm.IncludeInAll {
 			context.excludedFromAll = append(context.excludedFromAll, fieldName)
 		}
-	} else if *fm.Type == "datetime" {
+	} else if fm.Type == "datetime" {
 		dateTimeFormat := context.im.DefaultDateTimeParser
-		if fm.DateFormat != nil {
-			dateTimeFormat = *fm.DateFormat
+		if fm.DateFormat != "" {
+			dateTimeFormat = fm.DateFormat
 		}
 		dateTimeParser := context.im.dateTimeParserNamed(dateTimeFormat)
 		if dateTimeParser != nil {
 			parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
 			if err != nil {
-				field, err := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, parsedDateTime, options)
-				if err == nil {
-					context.doc.AddField(field)
-				} else {
-					log.Printf("could not build date %v", err)
-				}
+				fm.processTime(parsedDateTime, pathString, path, indexes, context)
 			}
 		}
 	}
@@ -127,22 +104,30 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 
 func (fm *FieldMapping) processFloat64(propertyValFloat float64, pathString string, path []string, indexes []uint64, context *walkContext) {
 	fieldName := getFieldName(pathString, path, fm)
-	if *fm.Type == "number" {
+	if fm.Type == "number" {
 		options := fm.Options()
 		field := document.NewNumericFieldWithIndexingOptions(fieldName, indexes, propertyValFloat, options)
 		context.doc.AddField(field)
+
+		if !fm.IncludeInAll {
+			context.excludedFromAll = append(context.excludedFromAll, fieldName)
+		}
 	}
 }
 
 func (fm *FieldMapping) processTime(propertyValueTime time.Time, pathString string, path []string, indexes []uint64, context *walkContext) {
 	fieldName := getFieldName(pathString, path, fm)
-	if *fm.Type == "datetime" {
+	if fm.Type == "datetime" {
 		options := fm.Options()
 		field, err := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, propertyValueTime, options)
 		if err == nil {
 			context.doc.AddField(field)
 		} else {
 			log.Printf("could not build date %v", err)
+		}
+
+		if !fm.IncludeInAll {
+			context.excludedFromAll = append(context.excludedFromAll, fieldName)
 		}
 	}
 }
@@ -152,20 +137,20 @@ func (fm *FieldMapping) analyzerForField(path []string, context *walkContext) *a
 	if analyzerName == "" {
 		analyzerName = context.im.DefaultAnalyzer
 	}
-	if fm.Analyzer != nil && *fm.Analyzer != "" {
-		analyzerName = *fm.Analyzer
+	if fm.Analyzer != "" {
+		analyzerName = fm.Analyzer
 	}
 	return context.im.analyzerNamed(analyzerName)
 }
 
 func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) string {
 	fieldName := pathString
-	if fieldMapping.Name != nil && *fieldMapping.Name != "" {
+	if fieldMapping.Name != "" {
 		parentName := ""
 		if len(path) > 1 {
 			parentName = encodePath(path[:len(path)-1]) + pathSeparator
 		}
-		fieldName = parentName + *fieldMapping.Name
+		fieldName = parentName + fieldMapping.Name
 	}
 	return fieldName
 }

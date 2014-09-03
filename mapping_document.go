@@ -54,24 +54,22 @@ func (dm *DocumentMapping) validate(cache *registry.Cache) error {
 		}
 	}
 	for _, field := range dm.Fields {
-		if field.Analyzer != nil {
-			_, err = cache.AnalyzerNamed(*field.Analyzer)
+		if field.Analyzer != "" {
+			_, err = cache.AnalyzerNamed(field.Analyzer)
 			if err != nil {
 				return err
 			}
 		}
-		if field.DateFormat != nil {
-			_, err = cache.DateTimeParserNamed(*field.DateFormat)
+		if field.DateFormat != "" {
+			_, err = cache.DateTimeParserNamed(field.DateFormat)
 			if err != nil {
 				return err
 			}
 		}
-		if field.Type != nil {
-			switch *field.Type {
-			case "text", "datetime", "number":
-			default:
-				return fmt.Errorf("unknown field type: '%s'", *field.Type)
-			}
+		switch field.Type {
+		case "text", "datetime", "number":
+		default:
+			return fmt.Errorf("unknown field type: '%s'", field.Type)
 		}
 	}
 	return nil
@@ -116,22 +114,34 @@ func NewDocumentDisabledMapping() *DocumentMapping {
 
 // AddSubDocumentMapping adds the provided DocumentMapping as a sub-mapping
 // for the specified named subsection.
-func (dm *DocumentMapping) AddSubDocumentMapping(property string, sdm *DocumentMapping) *DocumentMapping {
+func (dm *DocumentMapping) AddSubDocumentMapping(property string, sdm *DocumentMapping) {
 	if dm.Properties == nil {
 		dm.Properties = make(map[string]*DocumentMapping)
 	}
 	dm.Properties[property] = sdm
-	return dm
+}
+
+func (dm *DocumentMapping) AddFieldMappingsAt(property string, fms ...*FieldMapping) {
+	if dm.Properties == nil {
+		dm.Properties = make(map[string]*DocumentMapping)
+	}
+	sdm, ok := dm.Properties[property]
+	if !ok {
+		sdm = NewDocumentMapping()
+	}
+	for _, fm := range fms {
+		sdm.AddFieldMapping(fm)
+	}
+	dm.Properties[property] = sdm
 }
 
 // AddFieldMapping adds the provided FieldMapping for this section
 // of the document.
-func (dm *DocumentMapping) AddFieldMapping(fm *FieldMapping) *DocumentMapping {
+func (dm *DocumentMapping) AddFieldMapping(fm *FieldMapping) {
 	if dm.Fields == nil {
 		dm.Fields = make([]*FieldMapping, 0)
 	}
 	dm.Fields = append(dm.Fields, fm)
-	return dm
 }
 
 // UnmarshalJSON deserializes a JSON representation
@@ -266,11 +276,11 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
 				if err != nil {
 					// index as text
-					fieldMapping := defaultTextFieldMapping()
+					fieldMapping := NewTextFieldMapping()
 					fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
 				} else {
 					// index as datetime
-					fieldMapping := defaultDateTimeFieldMapping()
+					fieldMapping := NewDateTimeFieldMapping()
 					fieldMapping.processTime(parsedDateTime, pathString, path, indexes, context)
 				}
 			}
@@ -284,7 +294,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			}
 		} else {
 			// automatic indexing behavior
-			fieldMapping := defaultNumericFieldMapping()
+			fieldMapping := NewNumericFieldMapping()
 			fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
 		}
 	case reflect.Struct:
@@ -297,7 +307,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 					fieldMapping.processTime(property, pathString, path, indexes, context)
 				}
 			} else {
-				fieldMapping := defaultDateTimeFieldMapping()
+				fieldMapping := NewDateTimeFieldMapping()
 				fieldMapping.processTime(property, pathString, path, indexes, context)
 			}
 		default:

@@ -41,18 +41,23 @@ func (p *Person) Type() string {
 	return "person"
 }
 
-var nameMapping = NewDocumentMapping().
-	AddFieldMapping(NewFieldMapping("", "text", "en", true, true, true, true))
+func buildTestMapping() *IndexMapping {
 
-var tagsMapping = NewDocumentMapping().
-	AddFieldMapping(NewFieldMapping("", "text", "standard", true, true, true, false))
-var personMapping = NewDocumentMapping().
-	AddSubDocumentMapping("name", nameMapping).
-	AddSubDocumentMapping("id", NewDocumentDisabledMapping()).
-	AddSubDocumentMapping("tags", tagsMapping)
+	enTextMapping := NewTextFieldMapping()
+	enTextMapping.Analyzer = "en"
 
-var mapping = NewIndexMapping().
-	AddDocumentMapping("person", personMapping)
+	standardTextMapping := NewTextFieldMapping()
+	standardTextMapping.Analyzer = "standard"
+
+	personMapping := NewDocumentMapping()
+	personMapping.AddFieldMappingsAt("name", enTextMapping)
+	personMapping.AddSubDocumentMapping("id", NewDocumentDisabledMapping())
+	personMapping.AddFieldMappingsAt("tags", standardTextMapping)
+
+	mapping := NewIndexMapping()
+	mapping.AddDocumentMapping("person", personMapping)
+	return mapping
+}
 
 var people = []*Person{
 	&Person{
@@ -89,6 +94,8 @@ var people = []*Person{
 // FIXME needs more assertions
 func TestIndex(t *testing.T) {
 	defer os.RemoveAll("testidx")
+
+	mapping := buildTestMapping()
 
 	index, err := New("testidx", mapping)
 	if err != nil {

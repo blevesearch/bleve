@@ -41,21 +41,32 @@ var mappingSource = []byte(`{
     "default_type": "_default"
 }`)
 
-var beerNameField = NewFieldMapping("name", "text", "standard", true, true, true, true)
-var beerNameMapping = NewDocumentMapping().AddFieldMapping(beerNameField)
-var beerMapping = NewDocumentMapping().AddSubDocumentMapping("name", beerNameMapping)
-var breweryMapping = NewDocumentMapping()
-var mappingObject = NewIndexMapping().
-	AddDocumentMapping("beer", beerMapping).
-	AddDocumentMapping("brewery", breweryMapping)
+func buildMapping() *IndexMapping {
+	nameFieldMapping := NewTextFieldMapping()
+	nameFieldMapping.Name = "name"
+	nameFieldMapping.Analyzer = "standard"
+
+	beerMapping := NewDocumentMapping()
+	beerMapping.AddFieldMappingsAt("name", nameFieldMapping)
+
+	breweryMapping := NewDocumentMapping()
+
+	mapping := NewIndexMapping()
+	mapping.AddDocumentMapping("beer", beerMapping)
+	mapping.AddDocumentMapping("brewery", breweryMapping)
+
+	return mapping
+}
 
 func TestUnmarshalMappingJSON(t *testing.T) {
+	mapping := buildMapping()
+
 	var indexMapping IndexMapping
 	err := json.Unmarshal(mappingSource, &indexMapping)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(&indexMapping, mappingObject) {
-		t.Errorf("expected %#v,\n got %#v", mappingObject, &indexMapping)
+	if !reflect.DeepEqual(&indexMapping, mapping) {
+		t.Errorf("expected %#v,\n got %#v", mapping, &indexMapping)
 	}
 }

@@ -209,9 +209,8 @@ func (im *IndexMapping) validate() error {
 }
 
 // AddDocumentMapping sets a custom document mapping for the specified type
-func (im *IndexMapping) AddDocumentMapping(doctype string, dm *DocumentMapping) *IndexMapping {
+func (im *IndexMapping) AddDocumentMapping(doctype string, dm *DocumentMapping) {
 	im.TypeMapping[doctype] = dm
-	return im
 }
 
 func (im *IndexMapping) mappingForType(docType string) *DocumentMapping {
@@ -386,14 +385,13 @@ func (im *IndexMapping) newWalkContext(doc *document.Document, dm *DocumentMappi
 // that is returned
 // nil should be an acceptable return value meaning we don't know
 func (im *IndexMapping) analyzerNameForPath(path string) string {
-
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
 		pathMapping := docMapping.documentMappingForPath(path)
 		if pathMapping != nil {
 			if len(pathMapping.Fields) > 0 {
-				if pathMapping.Fields[0].Analyzer != nil {
-					return *pathMapping.Fields[0].Analyzer
+				if pathMapping.Fields[0].Analyzer != "" {
+					return pathMapping.Fields[0].Analyzer
 				}
 			}
 		}
@@ -436,8 +434,8 @@ func (im *IndexMapping) datetimeParserNameForPath(path string) string {
 		pathMapping := docMapping.documentMappingForPath(path)
 		if pathMapping != nil {
 			if len(pathMapping.Fields) > 0 {
-				if pathMapping.Fields[0].Analyzer != nil {
-					return *pathMapping.Fields[0].Analyzer
+				if pathMapping.Fields[0].Analyzer != "" {
+					return pathMapping.Fields[0].Analyzer
 				}
 			}
 		}
