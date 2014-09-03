@@ -140,7 +140,7 @@ func (s *SimpleHighlighter) BestFragmentsInField(dm *search.DocumentMatch, doc *
 	return formattedFragments
 }
 
-// A PriorityQueue implements heap.Interface and holds Items.
+// FragmentQueue implements heap.Interface and holds Items.
 type FragmentQueue []*highlight.Fragment
 
 func (fq FragmentQueue) Len() int { return len(fq) }

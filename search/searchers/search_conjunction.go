@@ -171,7 +171,7 @@ func (s *ConjunctionSearcher) Advance(ID string) (*search.DocumentMatch, error) 
 
 func (s *ConjunctionSearcher) Count() uint64 {
 	// for now return a worst case
-	var sum uint64 = 0
+	var sum uint64
 	for _, searcher := range s.searchers {
 		sum += searcher.Count()
 	}

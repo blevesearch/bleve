@@ -41,9 +41,9 @@ func TestHTMLFragmentFormatter1(t *testing.T) {
 		},
 	}
 
-	emHtmlFormatter := NewHTMLFragmentFormatter("<b>", "</b>")
+	emHTMLFormatter := NewHTMLFragmentFormatter("<b>", "</b>")
 	for _, test := range tests {
-		result := emHtmlFormatter.Format(test.fragment, test.tlm)
+		result := emHTMLFormatter.Format(test.fragment, test.tlm)
 		if result != test.output {
 			t.Errorf("expected `%s`, got `%s`", test.output, result)
 		}
@@ -75,9 +75,9 @@ func TestHTMLFragmentFormatter2(t *testing.T) {
 		},
 	}
 
-	emHtmlFormatter := NewHTMLFragmentFormatter("<em>", "</em>")
+	emHTMLFormatter := NewHTMLFragmentFormatter("<em>", "</em>")
 	for _, test := range tests {
-		result := emHtmlFormatter.Format(test.fragment, test.tlm)
+		result := emHTMLFormatter.Format(test.fragment, test.tlm)
 		if result != test.output {
 			t.Errorf("expected `%s`, got `%s`", test.output, result)
 		}

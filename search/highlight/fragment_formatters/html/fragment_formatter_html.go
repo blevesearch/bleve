@@ -17,8 +17,8 @@ import (
 
 const Name = "html"
 
-const defaultHtmlHighlightBefore = "<b>"
-const defaultHtmlHighlightAfter = "</b>"
+const defaultHTMLHighlightBefore = "<b>"
+const defaultHTMLHighlightAfter = "</b>"
 
 type HTMLFragmentFormatter struct {
 	before string
@@ -61,12 +61,12 @@ func (a *HTMLFragmentFormatter) Format(f *highlight.Fragment, tlm search.TermLoc
 }
 
 func Constructor(config map[string]interface{}, cache *registry.Cache) (highlight.FragmentFormatter, error) {
-	before := defaultHtmlHighlightBefore
+	before := defaultHTMLHighlightBefore
 	beforeVal, ok := config["before"].(string)
 	if ok {
 		before = beforeVal
 	}
-	after := defaultHtmlHighlightAfter
+	after := defaultHTMLHighlightAfter
 	afterVal, ok := config["after"].(string)
 	if ok {
 		after = afterVal

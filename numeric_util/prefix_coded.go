@@ -65,7 +65,7 @@ func (p PrefixCoded) Int64() (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	var sortableBits int64 = 0
+	var sortableBits int64
 	for _, inbyte := range p[1:] {
 		sortableBits <<= 7
 		sortableBits |= int64(inbyte)

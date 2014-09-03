@@ -74,7 +74,7 @@ func (tksc *TopScoreCollector) Collect(searcher search.Searcher) error {
 
 func (tksc *TopScoreCollector) collectSingle(dm *search.DocumentMatch) {
 	// increment total hits
-	tksc.total += 1
+	tksc.total++
 
 	// update max score
 	if dm.Score > tksc.maxScore {
@@ -127,7 +127,6 @@ func (tksc *TopScoreCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuil
 func (tksc *TopScoreCollector) FacetResults() search.FacetResults {
 	if tksc.facetsBuilder != nil {
 		return tksc.facetsBuilder.Results()
-	} else {
-		return search.FacetResults{}
 	}
+	return search.FacetResults{}
 }

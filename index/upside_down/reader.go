@@ -28,7 +28,7 @@ func newUpsideDownCouchTermFieldReader(index *UpsideDownCouch, term []byte, fiel
 	tfr := NewTermFrequencyRow(term, field, "", 0, 0)
 	it := index.store.Iterator(tfr.Key())
 
-	var count uint64 = 0
+	var count uint64
 	key, val, valid := it.Current()
 	if valid {
 		if bytes.Equal(key, tfr.Key()) {
@@ -72,9 +72,8 @@ func (r *UpsideDownCouchTermFieldReader) Next() (*index.TermFieldDoc, error) {
 			Norm:    float64(tfr.norm),
 			Vectors: r.index.termFieldVectorsFromTermVectors(tfr.vectors),
 		}, nil
-	} else {
-		return nil, nil
 	}
+	return nil, nil
 }
 
 func (r *UpsideDownCouchTermFieldReader) Advance(docId string) (*index.TermFieldDoc, error) {
@@ -97,9 +96,8 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docId string) (*index.TermField
 			Norm:    float64(tfr.norm),
 			Vectors: r.index.termFieldVectorsFromTermVectors(tfr.vectors),
 		}, nil
-	} else {
-		return nil, nil
 	}
+	return nil, nil
 }
 
 func (r *UpsideDownCouchTermFieldReader) Close() {
@@ -145,9 +143,8 @@ func (r *UpsideDownCouchDocIdReader) Next() (string, error) {
 		}
 		r.iterator.Next()
 		return string(br.doc), nil
-	} else {
-		return "", nil
 	}
+	return "", nil
 }
 
 func (r *UpsideDownCouchDocIdReader) Advance(docId string) (string, error) {
@@ -166,9 +163,8 @@ func (r *UpsideDownCouchDocIdReader) Advance(docId string) (string, error) {
 		}
 		r.iterator.Next()
 		return string(br.doc), nil
-	} else {
-		return "", nil
 	}
+	return "", nil
 }
 
 func (r *UpsideDownCouchDocIdReader) Close() {

@@ -55,7 +55,7 @@ func IndexNames() []string {
 
 	rv := make([]string, len(indexNameMapping))
 	count := 0
-	for k, _ := range indexNameMapping {
+	for k := range indexNameMapping {
 		rv[count] = k
 		count++
 	}

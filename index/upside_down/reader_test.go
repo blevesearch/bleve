@@ -30,14 +30,14 @@ func TestIndexReader(t *testing.T) {
 	}
 	defer idx.Close()
 
-	var expectedCount uint64 = 0
+	var expectedCount uint64
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount += 1
+	expectedCount++
 
 	doc = document.NewDocument("2")
 	doc.AddField(document.NewTextFieldWithAnalyzer("name", []uint64{}, []byte("test test test"), testAnalyzer))
@@ -46,7 +46,7 @@ func TestIndexReader(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount += 1
+	expectedCount++
 
 	// first look for a term that doesnt exist
 	reader, err := idx.TermFieldReader([]byte("nope"), "name")
@@ -78,7 +78,7 @@ func TestIndexReader(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error reading next")
 		}
-		actualCount += 1
+		actualCount++
 	}
 	if actualCount != count {
 		t.Errorf("count was 2, but only saw %d", actualCount)
@@ -172,14 +172,14 @@ func TestIndexDocIdReader(t *testing.T) {
 	}
 	defer idx.Close()
 
-	var expectedCount uint64 = 0
+	var expectedCount uint64
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount += 1
+	expectedCount++
 
 	doc = document.NewDocument("2")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test test test")))
@@ -188,7 +188,7 @@ func TestIndexDocIdReader(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount += 1
+	expectedCount++
 
 	// first get all doc ids
 	reader, err := idx.DocIdReader("", "")

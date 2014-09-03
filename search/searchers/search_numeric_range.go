@@ -48,11 +48,11 @@ func NewNumericRangeSearcher(index index.Index, min *float64, max *float64, incl
 	// find all the ranges
 	minInt64 := numeric_util.Float64ToInt64(*min)
 	if !*inclusiveMin && minInt64 != math.MaxInt64 {
-		minInt64 += 1
+		minInt64++
 	}
 	maxInt64 := numeric_util.Float64ToInt64(*max)
 	if !*inclusiveMax && maxInt64 != math.MinInt64 {
-		maxInt64 -= 1
+		maxInt64--
 	}
 	// FIXME hard-coded precion, should match field declaration
 	termRanges := splitInt64Range(minInt64, maxInt64, 4)

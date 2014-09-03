@@ -178,7 +178,7 @@ func (c *Cache) DefineHighlighter(name string, config map[string]interface{}) (h
 
 func PrintRegistry() {
 	sorted := make(sort.StringSlice, 0, len(charFilters))
-	for name, _ := range charFilters {
+	for name := range charFilters {
 		sorted = append(sorted, name)
 	}
 	sorted.Sort()
@@ -189,7 +189,7 @@ func PrintRegistry() {
 	fmt.Println()
 
 	sorted = make(sort.StringSlice, 0, len(tokenizers))
-	for name, _ := range tokenizers {
+	for name := range tokenizers {
 		sorted = append(sorted, name)
 	}
 	sorted.Sort()
@@ -200,7 +200,7 @@ func PrintRegistry() {
 	fmt.Println()
 
 	sorted = make(sort.StringSlice, 0, len(tokenMaps))
-	for name, _ := range tokenMaps {
+	for name := range tokenMaps {
 		sorted = append(sorted, name)
 	}
 	sorted.Sort()
@@ -211,7 +211,7 @@ func PrintRegistry() {
 	fmt.Println()
 
 	sorted = make(sort.StringSlice, 0, len(tokenFilters))
-	for name, _ := range tokenFilters {
+	for name := range tokenFilters {
 		sorted = append(sorted, name)
 	}
 	sorted.Sort()
@@ -222,7 +222,7 @@ func PrintRegistry() {
 	fmt.Println()
 
 	sorted = make(sort.StringSlice, 0, len(analyzers))
-	for name, _ := range analyzers {
+	for name := range analyzers {
 		sorted = append(sorted, name)
 	}
 	sorted.Sort()
@@ -233,7 +233,7 @@ func PrintRegistry() {
 	fmt.Println()
 
 	sorted = make(sort.StringSlice, 0, len(dateTimeParsers))
-	for name, _ := range dateTimeParsers {
+	for name := range dateTimeParsers {
 		sorted = append(sorted, name)
 	}
 	sorted.Sort()
@@ -244,7 +244,7 @@ func PrintRegistry() {
 	fmt.Println()
 
 	sorted = make(sort.StringSlice, 0, len(stores))
-	for name, _ := range stores {
+	for name := range stores {
 		sorted = append(sorted, name)
 	}
 	sorted.Sort()
@@ -255,7 +255,7 @@ func PrintRegistry() {
 	fmt.Println()
 
 	sorted = make(sort.StringSlice, 0, len(byteArrayConverters))
-	for name, _ := range byteArrayConverters {
+	for name := range byteArrayConverters {
 		sorted = append(sorted, name)
 	}
 	sorted.Sort()
@@ -266,7 +266,7 @@ func PrintRegistry() {
 	fmt.Println()
 
 	sorted = make(sort.StringSlice, 0, len(fragmentFormatters))
-	for name, _ := range fragmentFormatters {
+	for name := range fragmentFormatters {
 		sorted = append(sorted, name)
 	}
 	sorted.Sort()
@@ -277,7 +277,7 @@ func PrintRegistry() {
 	fmt.Println()
 
 	sorted = make(sort.StringSlice, 0, len(fragmenters))
-	for name, _ := range fragmenters {
+	for name := range fragmenters {
 		sorted = append(sorted, name)
 	}
 	sorted.Sort()
@@ -288,7 +288,7 @@ func PrintRegistry() {
 	fmt.Println()
 
 	sorted = make(sort.StringSlice, 0, len(highlighters))
-	for name, _ := range highlighters {
+	for name := range highlighters {
 		sorted = append(sorted, name)
 	}
 	sorted.Sort()

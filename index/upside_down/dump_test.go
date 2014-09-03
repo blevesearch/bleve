@@ -32,7 +32,7 @@ func TestDump(t *testing.T) {
 	}
 	defer idx.Close()
 
-	var expectedCount uint64 = 0
+	var expectedCount uint64
 	docCount := idx.DocCount()
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)

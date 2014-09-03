@@ -265,7 +265,7 @@ func (s *BooleanSearcher) Advance(ID string) (*search.DocumentMatch, error) {
 func (s *BooleanSearcher) Count() uint64 {
 
 	// for now return a worst case
-	var sum uint64 = 0
+	var sum uint64
 	if s.mustSearcher != nil {
 		sum += s.mustSearcher.Count()
 	}

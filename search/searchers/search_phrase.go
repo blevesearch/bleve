@@ -134,7 +134,7 @@ func (s *PhraseSearcher) Next() (*search.DocumentMatch, error) {
 						}
 					}
 					// if we got here all the terms matched
-					freq += 1
+					freq++
 					search.MergeTermLocationMaps(rvtlm, crvtlm)
 					rvftlm[field] = rvtlm
 				}
@@ -168,7 +168,7 @@ func (s *PhraseSearcher) Advance(ID string) (*search.DocumentMatch, error) {
 
 func (s *PhraseSearcher) Count() uint64 {
 	// for now return a worst case
-	var sum uint64 = 0
+	var sum uint64
 	sum += s.mustSearcher.Count()
 	return sum
 }

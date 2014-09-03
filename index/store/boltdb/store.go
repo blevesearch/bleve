@@ -50,7 +50,7 @@ func Open(path string, bucket string) (*BoltDBStore, error) {
 }
 
 func (bs *BoltDBStore) Get(key []byte) ([]byte, error) {
-	var rv []byte = nil
+	var rv []byte
 
 	err := bs.db.View(func(tx *bolt.Tx) error {
 		rv = tx.Bucket([]byte(bs.bucket)).Get(key)
