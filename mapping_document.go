@@ -12,7 +12,11 @@ package bleve
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"reflect"
+	"time"
 
+	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/registry"
 )
 
@@ -188,4 +192,176 @@ func (dm *DocumentMapping) defaultAnalyzerName(path []string) string {
 		}
 	}
 	return rv
+}
+
+func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes []uint64, context *walkContext) {
+	val := reflect.ValueOf(data)
+	typ := val.Type()
+	switch typ.Kind() {
+	case reflect.Map:
+		// FIXME can add support for other map keys in the future
+		if typ.Key().Kind() == reflect.String {
+			for _, key := range val.MapKeys() {
+				fieldName := key.String()
+				fieldVal := val.MapIndex(key).Interface()
+				dm.processProperty(fieldVal, append(path, fieldName), indexes, context)
+			}
+		}
+	case reflect.Struct:
+		for i := 0; i < val.NumField(); i++ {
+			field := typ.Field(i)
+			fieldName := field.Name
+
+			// if the field has a JSON name, prefer that
+			jsonTag := field.Tag.Get("json")
+			jsonFieldName := parseJSONTagName(jsonTag)
+			if jsonFieldName != "" {
+				fieldName = jsonFieldName
+			}
+
+			if val.Field(i).CanInterface() {
+				fieldVal := val.Field(i).Interface()
+				dm.processProperty(fieldVal, append(path, fieldName), indexes, context)
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < val.Len(); i++ {
+			if val.Index(i).CanInterface() {
+				fieldVal := val.Index(i).Interface()
+				dm.processProperty(fieldVal, path, append(indexes, uint64(i)), context)
+			}
+		}
+	case reflect.Ptr:
+		ptrElem := val.Elem()
+		if ptrElem.IsValid() && ptrElem.CanInterface() {
+			dm.walkDocument(ptrElem.Interface(), path, indexes, context)
+		}
+	}
+}
+
+func (dm *DocumentMapping) processProperty(property interface{}, path []string, indexes []uint64, context *walkContext) {
+	pathString := encodePath(path)
+	// look to see if there is a mapping for this field
+	subDocMapping := dm.documentMappingForPath(pathString)
+
+	// check tos see if we even need to do further processing
+	if subDocMapping != nil && !subDocMapping.Enabled {
+		return
+	}
+
+	propertyValue := reflect.ValueOf(property)
+	propertyType := propertyValue.Type()
+	switch propertyType.Kind() {
+	case reflect.String:
+		propertyValueString := propertyValue.String()
+		if subDocMapping != nil {
+			// index by explicit mapping
+			for _, fieldMapping := range subDocMapping.Fields {
+				fieldName := getFieldName(pathString, path, fieldMapping)
+				options := fieldMapping.Options()
+				if *fieldMapping.Type == "text" {
+					analyzer := context.im.analyzerNamed(*fieldMapping.Analyzer)
+					field := document.NewTextFieldCustom(fieldName, indexes, []byte(propertyValueString), options, analyzer)
+					context.doc.AddField(field)
+
+					if fieldMapping.IncludeInAll != nil && !*fieldMapping.IncludeInAll {
+						context.excludedFromAll = append(context.excludedFromAll, fieldName)
+					}
+				} else if *fieldMapping.Type == "datetime" {
+					dateTimeFormat := context.im.DefaultDateTimeParser
+					if fieldMapping.DateFormat != nil {
+						dateTimeFormat = *fieldMapping.DateFormat
+					}
+					dateTimeParser := context.im.dateTimeParserNamed(dateTimeFormat)
+					if dateTimeParser != nil {
+						parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
+						if err != nil {
+							field, err := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, parsedDateTime, options)
+							if err == nil {
+								context.doc.AddField(field)
+							} else {
+								log.Printf("could not build date %v", err)
+							}
+						}
+					}
+				}
+			}
+		} else {
+			// automatic indexing behavior
+
+			// first see if it can be parsed by the default date parser
+			dateTimeParser := context.im.dateTimeParserNamed(context.im.DefaultDateTimeParser)
+			if dateTimeParser != nil {
+				parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
+				if err != nil {
+					// index as plain text
+					options := document.STORE_FIELD | document.INDEX_FIELD | document.INCLUDE_TERM_VECTORS
+					analyzerName := dm.defaultAnalyzerName(path)
+					if analyzerName == "" {
+						analyzerName = context.im.DefaultAnalyzer
+					}
+					analyzer := context.im.analyzerNamed(analyzerName)
+					field := document.NewTextFieldCustom(pathString, indexes, []byte(propertyValueString), options, analyzer)
+					context.doc.AddField(field)
+				} else {
+					// index as datetime
+					field, err := document.NewDateTimeField(pathString, indexes, parsedDateTime)
+					if err == nil {
+						context.doc.AddField(field)
+					} else {
+						log.Printf("could not build date %v", err)
+					}
+				}
+			}
+		}
+	case reflect.Float64:
+		propertyValFloat := propertyValue.Float()
+		if subDocMapping != nil {
+			// index by explicit mapping
+			for _, fieldMapping := range subDocMapping.Fields {
+				fieldName := getFieldName(pathString, path, fieldMapping)
+				if *fieldMapping.Type == "number" {
+					options := fieldMapping.Options()
+					field := document.NewNumericFieldWithIndexingOptions(fieldName, indexes, propertyValFloat, options)
+					context.doc.AddField(field)
+				}
+			}
+		} else {
+			// automatic indexing behavior
+			field := document.NewNumericField(pathString, indexes, propertyValFloat)
+			context.doc.AddField(field)
+		}
+	case reflect.Struct:
+		switch property := property.(type) {
+		case time.Time:
+			// don't descend into the time struct
+			if subDocMapping != nil {
+				// index by explicit mapping
+				for _, fieldMapping := range subDocMapping.Fields {
+					fieldName := getFieldName(pathString, path, fieldMapping)
+					if *fieldMapping.Type == "datetime" {
+						options := fieldMapping.Options()
+						field, err := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, property, options)
+						if err == nil {
+							context.doc.AddField(field)
+						} else {
+							log.Printf("could not build date %v", err)
+						}
+					}
+				}
+			} else {
+				// automatic indexing behavior
+				field, err := document.NewDateTimeField(pathString, indexes, property)
+				if err == nil {
+					context.doc.AddField(field)
+				} else {
+					log.Printf("could not build date %v", err)
+				}
+			}
+		default:
+			dm.walkDocument(property, path, indexes, context)
+		}
+	default:
+		dm.walkDocument(property, path, indexes, context)
+	}
 }

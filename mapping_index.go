@@ -12,8 +12,6 @@ package bleve
 import (
 	"encoding/json"
 	"log"
-	"reflect"
-	"time"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/document"
@@ -353,8 +351,8 @@ func (im *IndexMapping) mapDocument(doc *document.Document, data interface{}) er
 
 	docType := im.determineType(data)
 	docMapping := im.mappingForType(docType)
-	walkContext := newWalkContext(doc, docMapping)
-	im.walkDocument(data, []string{}, []uint64{}, walkContext)
+	walkContext := im.newWalkContext(doc)
+	docMapping.walkDocument(data, []string{}, []uint64{}, walkContext)
 
 	// see if the _all field was disabled
 	allMapping := docMapping.documentMappingForPath("_all")
@@ -368,187 +366,15 @@ func (im *IndexMapping) mapDocument(doc *document.Document, data interface{}) er
 
 type walkContext struct {
 	doc             *document.Document
-	dm              *DocumentMapping
+	im              *IndexMapping
 	excludedFromAll []string
 }
 
-func newWalkContext(doc *document.Document, dm *DocumentMapping) *walkContext {
+func (im *IndexMapping) newWalkContext(doc *document.Document) *walkContext {
 	return &walkContext{
 		doc:             doc,
-		dm:              dm,
+		im:              im,
 		excludedFromAll: []string{},
-	}
-}
-
-func (im *IndexMapping) walkDocument(data interface{}, path []string, indexes []uint64, context *walkContext) {
-	val := reflect.ValueOf(data)
-	typ := val.Type()
-	switch typ.Kind() {
-	case reflect.Map:
-		// FIXME can add support for other map keys in the future
-		if typ.Key().Kind() == reflect.String {
-			for _, key := range val.MapKeys() {
-				fieldName := key.String()
-				fieldVal := val.MapIndex(key).Interface()
-				im.processProperty(fieldVal, append(path, fieldName), indexes, context)
-			}
-		}
-	case reflect.Struct:
-		for i := 0; i < val.NumField(); i++ {
-			field := typ.Field(i)
-			fieldName := field.Name
-
-			// if the field has a JSON name, prefer that
-			jsonTag := field.Tag.Get("json")
-			jsonFieldName := parseJSONTagName(jsonTag)
-			if jsonFieldName != "" {
-				fieldName = jsonFieldName
-			}
-
-			if val.Field(i).CanInterface() {
-				fieldVal := val.Field(i).Interface()
-				im.processProperty(fieldVal, append(path, fieldName), indexes, context)
-			}
-		}
-	case reflect.Slice, reflect.Array:
-		for i := 0; i < val.Len(); i++ {
-			if val.Index(i).CanInterface() {
-				fieldVal := val.Index(i).Interface()
-				im.processProperty(fieldVal, path, append(indexes, uint64(i)), context)
-			}
-		}
-	case reflect.Ptr:
-		ptrElem := val.Elem()
-		if ptrElem.IsValid() && ptrElem.CanInterface() {
-			im.walkDocument(ptrElem.Interface(), path, indexes, context)
-		}
-	}
-}
-
-func (im *IndexMapping) processProperty(property interface{}, path []string, indexes []uint64, context *walkContext) {
-	pathString := encodePath(path)
-	// look to see if there is a mapping for this field
-	subDocMapping := context.dm.documentMappingForPath(pathString)
-
-	// check tos see if we even need to do further processing
-	if subDocMapping != nil && !subDocMapping.Enabled {
-		return
-	}
-
-	propertyValue := reflect.ValueOf(property)
-	propertyType := propertyValue.Type()
-	switch propertyType.Kind() {
-	case reflect.String:
-		propertyValueString := propertyValue.String()
-		if subDocMapping != nil {
-			// index by explicit mapping
-			for _, fieldMapping := range subDocMapping.Fields {
-				fieldName := getFieldName(pathString, path, fieldMapping)
-				options := fieldMapping.Options()
-				if *fieldMapping.Type == "text" {
-					analyzer := im.analyzerNamed(*fieldMapping.Analyzer)
-					field := document.NewTextFieldCustom(fieldName, indexes, []byte(propertyValueString), options, analyzer)
-					context.doc.AddField(field)
-
-					if fieldMapping.IncludeInAll != nil && !*fieldMapping.IncludeInAll {
-						context.excludedFromAll = append(context.excludedFromAll, fieldName)
-					}
-				} else if *fieldMapping.Type == "datetime" {
-					dateTimeFormat := im.DefaultDateTimeParser
-					if fieldMapping.DateFormat != nil {
-						dateTimeFormat = *fieldMapping.DateFormat
-					}
-					dateTimeParser := im.dateTimeParserNamed(dateTimeFormat)
-					if dateTimeParser != nil {
-						parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
-						if err != nil {
-							field, err := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, parsedDateTime, options)
-							if err == nil {
-								context.doc.AddField(field)
-							} else {
-								log.Printf("could not build date %v", err)
-							}
-						}
-					}
-				}
-			}
-		} else {
-			// automatic indexing behavior
-
-			// first see if it can be parsed by the default date parser
-			dateTimeParser := im.dateTimeParserNamed(im.DefaultDateTimeParser)
-			if dateTimeParser != nil {
-				parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
-				if err != nil {
-					// index as plain text
-					options := document.STORE_FIELD | document.INDEX_FIELD | document.INCLUDE_TERM_VECTORS
-					analyzerName := context.dm.defaultAnalyzerName(path)
-					if analyzerName == "" {
-						analyzerName = im.DefaultAnalyzer
-					}
-					analyzer := im.analyzerNamed(analyzerName)
-					field := document.NewTextFieldCustom(pathString, indexes, []byte(propertyValueString), options, analyzer)
-					context.doc.AddField(field)
-				} else {
-					// index as datetime
-					field, err := document.NewDateTimeField(pathString, indexes, parsedDateTime)
-					if err == nil {
-						context.doc.AddField(field)
-					} else {
-						log.Printf("could not build date %v", err)
-					}
-				}
-			}
-		}
-	case reflect.Float64:
-		propertyValFloat := propertyValue.Float()
-		if subDocMapping != nil {
-			// index by explicit mapping
-			for _, fieldMapping := range subDocMapping.Fields {
-				fieldName := getFieldName(pathString, path, fieldMapping)
-				if *fieldMapping.Type == "number" {
-					options := fieldMapping.Options()
-					field := document.NewNumericFieldWithIndexingOptions(fieldName, indexes, propertyValFloat, options)
-					context.doc.AddField(field)
-				}
-			}
-		} else {
-			// automatic indexing behavior
-			field := document.NewNumericField(pathString, indexes, propertyValFloat)
-			context.doc.AddField(field)
-		}
-	case reflect.Struct:
-		switch property := property.(type) {
-		case time.Time:
-			// don't descend into the time struct
-			if subDocMapping != nil {
-				// index by explicit mapping
-				for _, fieldMapping := range subDocMapping.Fields {
-					fieldName := getFieldName(pathString, path, fieldMapping)
-					if *fieldMapping.Type == "datetime" {
-						options := fieldMapping.Options()
-						field, err := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, property, options)
-						if err == nil {
-							context.doc.AddField(field)
-						} else {
-							log.Printf("could not build date %v", err)
-						}
-					}
-				}
-			} else {
-				// automatic indexing behavior
-				field, err := document.NewDateTimeField(pathString, indexes, property)
-				if err == nil {
-					context.doc.AddField(field)
-				} else {
-					log.Printf("could not build date %v", err)
-				}
-			}
-		default:
-			im.walkDocument(property, path, indexes, context)
-		}
-	default:
-		im.walkDocument(property, path, indexes, context)
 	}
 }
 
