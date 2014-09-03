@@ -37,7 +37,7 @@ func TestIndexOpenReopen(t *testing.T) {
 		t.Errorf("error opening index: %v", err)
 	}
 
-	var expectedCount uint64 = 0
+	var expectedCount uint64
 	docCount := idx.DocCount()
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
@@ -78,7 +78,7 @@ func TestIndexInsert(t *testing.T) {
 	}
 	defer idx.Close()
 
-	var expectedCount uint64 = 0
+	var expectedCount uint64
 	docCount := idx.DocCount()
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
@@ -90,7 +90,7 @@ func TestIndexInsert(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount += 1
+	expectedCount++
 
 	docCount = idx.DocCount()
 	if docCount != expectedCount {
@@ -116,7 +116,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	defer idx.Close()
 
-	var expectedCount uint64 = 0
+	var expectedCount uint64
 	docCount := idx.DocCount()
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
@@ -128,7 +128,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount += 1
+	expectedCount++
 
 	doc2 := document.NewDocument("2")
 	doc2.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
@@ -136,7 +136,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount += 1
+	expectedCount++
 
 	docCount = idx.DocCount()
 	if docCount != expectedCount {
@@ -147,7 +147,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error deleting entry from index: %v", err)
 	}
-	expectedCount -= 1
+	expectedCount--
 
 	docCount = idx.DocCount()
 	if docCount != expectedCount {
@@ -158,7 +158,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error deleting entry from index: %v", err)
 	}
-	expectedCount -= 1
+	expectedCount--
 
 	docCount = idx.DocCount()
 	if docCount != expectedCount {
@@ -232,7 +232,7 @@ func TestIndexInsertMultiple(t *testing.T) {
 		t.Errorf("error opening index: %v", err)
 	}
 
-	var expectedCount uint64 = 0
+	var expectedCount uint64
 
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
@@ -295,7 +295,7 @@ func TestIndexInsertWithStore(t *testing.T) {
 	}
 	defer idx.Close()
 
-	var expectedCount uint64 = 0
+	var expectedCount uint64
 	docCount := idx.DocCount()
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
@@ -307,7 +307,7 @@ func TestIndexInsertWithStore(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount += 1
+	expectedCount++
 
 	docCount = idx.DocCount()
 	if docCount != expectedCount {
@@ -400,7 +400,7 @@ func TestIndexBatch(t *testing.T) {
 	}
 	defer idx.Close()
 
-	var expectedCount uint64 = 0
+	var expectedCount uint64
 
 	// first create 2 docs the old fashioned way
 	doc := document.NewDocument("1")
@@ -409,7 +409,7 @@ func TestIndexBatch(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount += 1
+	expectedCount++
 
 	doc = document.NewDocument("2")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
@@ -417,7 +417,7 @@ func TestIndexBatch(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount += 1
+	expectedCount++
 
 	// now create a batch which does 3 things
 	// insert new doc
@@ -477,7 +477,7 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	}
 	defer idx.Close()
 
-	var expectedCount uint64 = 0
+	var expectedCount uint64
 	docCount := idx.DocCount()
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
@@ -495,7 +495,7 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount += 1
+	expectedCount++
 
 	docCount = idx.DocCount()
 	if docCount != expectedCount {

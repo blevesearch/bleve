@@ -22,7 +22,7 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 )
 
-var VersionKey []byte = []byte{'v'}
+var VersionKey = []byte{'v'}
 
 const Version uint8 = 1
 
@@ -105,7 +105,7 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 				if err != nil {
 					return err
 				}
-				tr.freq += 1 // incr
+				tr.freq++ // incr
 			} else {
 				tr = NewTermFrequencyRow(tfr.term, tfr.field, "", 1, 0)
 			}
@@ -136,7 +136,7 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 				if err != nil {
 					return err
 				}
-				tr.freq -= 1 // incr
+				tr.freq-- // incr
 			} else {
 				return fmt.Errorf("unexpected missing row, deleting term, expected count row to exist: %v", tr.Key())
 			}
@@ -193,13 +193,13 @@ func (udc *UpsideDownCouch) countDocs() uint64 {
 	it := udc.store.Iterator([]byte{'b'})
 	defer it.Close()
 
-	var rv uint64 = 0
+	var rv uint64
 	key, _, valid := it.Current()
 	for valid {
 		if !bytes.HasPrefix(key, []byte{'b'}) {
 			break
 		}
-		rv += 1
+		rv++
 		it.Next()
 		key, _, valid = it.Current()
 	}
@@ -211,10 +211,10 @@ func (udc *UpsideDownCouch) rowCount() uint64 {
 	it := udc.store.Iterator([]byte{0})
 	defer it.Close()
 
-	var rv uint64 = 0
+	var rv uint64
 	_, _, valid := it.Current()
 	for valid {
-		rv += 1
+		rv++
 		it.Next()
 		_, _, valid = it.Current()
 	}
@@ -243,7 +243,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 
 	err = udc.batchRows(addRows, updateRows, deleteRows)
 	if err == nil && backIndexRow == nil {
-		udc.docCount += 1
+		udc.docCount++
 	}
 	return err
 }
@@ -317,7 +317,7 @@ func (udc *UpsideDownCouch) updateSingle(doc *document.Document, backIndexRow *B
 	updateRows = append(updateRows, backIndexRow)
 
 	// any of the existing rows that weren't updated need to be deleted
-	for existingTermKey, _ := range existingTermKeys {
+	for existingTermKey := range existingTermKeys {
 		termFreqRow, err := NewTermFrequencyRowK([]byte(existingTermKey))
 		if err == nil {
 			deleteRows = append(deleteRows, termFreqRow)
@@ -325,7 +325,7 @@ func (udc *UpsideDownCouch) updateSingle(doc *document.Document, backIndexRow *B
 	}
 
 	// any of the existing stored fields that weren't updated need to be deleted
-	for existingStoredKey, _ := range existingStoredKeys {
+	for existingStoredKey := range existingStoredKeys {
 		storedRow, err := NewStoredRowK([]byte(existingStoredKey))
 		if err == nil {
 			deleteRows = append(deleteRows, storedRow)
@@ -440,7 +440,7 @@ func (udc *UpsideDownCouch) Delete(id string) error {
 
 	err = udc.batchRows(nil, nil, deleteRows)
 	if err == nil {
-		udc.docCount -= 1
+		udc.docCount--
 	}
 	return err
 }
@@ -485,7 +485,7 @@ func (udc *UpsideDownCouch) backIndexRowsForBatch(batch index.Batch) (map[string
 	// FIXME faster to order the ids and scan sequentially
 	// for now just get it working
 	rv := make(map[string]*BackIndexRow, 0)
-	for docId, _ := range batch {
+	for docId := range batch {
 		backIndexRow, err := udc.backIndexRowForDoc(docId)
 		if err != nil {
 			return nil, err

@@ -49,7 +49,7 @@ func (tfs TokenFrequencies) MergeAll(remoteField string, other TokenFrequencies)
 	i := 0
 	for _, tf := range index {
 		rv[i] = tf
-		i += 1
+		i++
 	}
 	return rv
 }
@@ -83,7 +83,7 @@ func TokenFrequency(tokens TokenStream) TokenFrequencies {
 	i := 0
 	for _, tf := range index {
 		rv[i] = tf
-		i += 1
+		i++
 	}
 
 	return rv

@@ -23,12 +23,12 @@ func NewTokenMap() TokenMap {
 	return make(TokenMap, 0)
 }
 
-func (s TokenMap) LoadFile(filename string) error {
+func (t TokenMap) LoadFile(filename string) error {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return err
 	}
-	return s.LoadBytes(data)
+	return t.LoadBytes(data)
 }
 
 func (t TokenMap) LoadBytes(data []byte) error {
