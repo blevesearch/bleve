@@ -137,6 +137,13 @@ func NewHighlightWithStyle(style string) *HighlightRequest {
 	}
 }
 
+func (h *HighlightRequest) AddField(field string) {
+	if h.Fields == nil {
+		h.Fields = make([]string, 0, 1)
+	}
+	h.Fields = append(h.Fields, field)
+}
+
 // A SearchRequest describes all the parameters
 // needed to search the index.
 // Query is required.
