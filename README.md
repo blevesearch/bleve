@@ -12,7 +12,12 @@ modern text indexing in go - [blevesearch.com](http://www.blevesearch.com/)
     * Conjunction, Disjunction, Boolean
     * Numeric Range, Date Range
     * Simple query syntax for human entry
+* tf-idf Scoring
 * Search result match highlighting
+* Supports Aggregating Facets:
+    * Terms Facet
+    * Numeric Range Facet
+    * Date Range Facet
 
 ## Discussion
 
