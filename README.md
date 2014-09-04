@@ -10,10 +10,10 @@ Try out bleve live by [searching our wiki](http://wikisearch.blevesearch.com/sea
 * Supported field types:
     * Text, Numeric, Date
 * Supported query types:
-    * Term, Phrase, Match, Match Phrase
+    * Term, Phrase, Match, Match Phrase, Prefix
     * Conjunction, Disjunction, Boolean
     * Numeric Range, Date Range
-    * Simple query syntax for human entry
+    * Simple query [syntax](https://github.com/blevesearch/bleve/wiki/Query-String-Query) for human entry
 * tf-idf Scoring
 * Search result match highlighting
 * Supports Aggregating Facets:
