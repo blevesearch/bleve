@@ -2,6 +2,8 @@
 
 modern text indexing in go - [blevesearch.com](http://www.blevesearch.com/)
 
+Try out bleve live by [searching our wiki](http://wikisearch.blevesearch.com/search/).
+
 ## Features
 * Index any go data structure (including JSON)
 * Intelligent defaults backed up by powerful configuration
