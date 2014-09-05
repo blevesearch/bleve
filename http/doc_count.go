@@ -41,7 +41,7 @@ func (h *DocCountHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	docCount := index.DocCount()
 	rv := struct {
 		Status string `json:"status"`
-		Count  uint64
+		Count  uint64 `json:"count"`
 	}{
 		Status: "ok",
 		Count:  docCount,
