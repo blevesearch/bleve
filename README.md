@@ -28,18 +28,19 @@ Discuss usage and development of bleve in the [google group](https://groups.goog
 ## Indexing
 
 		message := struct{
+			Id:   "example",
 			From: "marty.schoch@gmail.com",
 			Body: "bleve indexing is easy",
 		}
 
 		mapping := bleve.NewIndexMapping()
 		index, _ := bleve.New("example.bleve", mapping)
-		index.Index(message)
+		index.Index(message.Id, message)
 
 ## Querying
 
 		index, _ := bleve.Open("example.bleve")
-		query := bleve.NewSyntaxQuery("bleve")
+		query := bleve.NewQueryStringQuery("bleve")
 		searchRequest := bleve.NewSearchRequest(query)
 		searchResult, _ := index.Search(searchRequest)
 		
