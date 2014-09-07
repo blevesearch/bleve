@@ -22,6 +22,7 @@ type TokenType int
 
 const (
 	AlphaNumeric TokenType = iota
+	Ideographic
 	Numeric
 	DateTime
 )

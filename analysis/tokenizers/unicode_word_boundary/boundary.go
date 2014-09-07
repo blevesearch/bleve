@@ -109,6 +109,12 @@ func (t *UnicodeWordBoundaryTokenizer) Tokenize(input []byte) analysis.TokenStre
 				Position: position,
 				Type:     analysis.AlphaNumeric,
 			}
+			if q == 100 {
+				token.Type = analysis.Numeric
+			}
+			if q == 400 {
+				token.Type = analysis.Ideographic
+			}
 			rv = append(rv, &token)
 		}
 		prev = p
