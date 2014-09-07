@@ -12,12 +12,15 @@ package regexp_tokenizer
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
 )
 
 const Name = "regexp"
+
+var IdeographRegexp = regexp.MustCompile(`\p{Han}|\p{Hangul}|\p{Hiragana}|\p{Katakana}`)
 
 type RegexpTokenizer struct {
 	r *regexp.Regexp
@@ -33,12 +36,13 @@ func (rt *RegexpTokenizer) Tokenize(input []byte) analysis.TokenStream {
 	matches := rt.r.FindAllIndex(input, -1)
 	rv := make(analysis.TokenStream, len(matches))
 	for i, match := range matches {
+		matchBytes := input[match[0]:match[1]]
 		token := analysis.Token{
-			Term:     input[match[0]:match[1]],
+			Term:     matchBytes,
 			Start:    match[0],
 			End:      match[1],
 			Position: i + 1,
-			Type:     analysis.AlphaNumeric,
+			Type:     detectTokenType(matchBytes),
 		}
 		rv[i] = &token
 	}
@@ -59,4 +63,15 @@ func RegexpTokenizerConstructor(config map[string]interface{}, cache *registry.C
 
 func init() {
 	registry.RegisterTokenizer(Name, RegexpTokenizerConstructor)
+}
+
+func detectTokenType(termBytes []byte) analysis.TokenType {
+	if IdeographRegexp.Match(termBytes) {
+		return analysis.Ideographic
+	}
+	_, err := strconv.ParseFloat(string(termBytes), 64)
+	if err == nil {
+		return analysis.Numeric
+	}
+	return analysis.AlphaNumeric
 }

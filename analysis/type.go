@@ -37,7 +37,7 @@ type Token struct {
 }
 
 func (t *Token) String() string {
-	return fmt.Sprintf("Start: %d  End: %d  Position: %d  Token: %s", t.Start, t.End, t.Position, string(t.Term))
+	return fmt.Sprintf("Start: %d  End: %d  Position: %d  Token: %s  Type: %d", t.Start, t.End, t.Position, string(t.Term), t.Type)
 }
 
 type TokenStream []*Token

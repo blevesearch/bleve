@@ -19,7 +19,7 @@ import (
 
 func TestBoundary(t *testing.T) {
 
-	wordRegex := regexp.MustCompile(`\w+`)
+	wordRegex := regexp.MustCompile(`\p{Han}|\p{Hangul}|\p{Hiragana}|\p{Katakana}|\w+`)
 
 	tests := []struct {
 		input  []byte
@@ -41,6 +41,60 @@ func TestBoundary(t *testing.T) {
 					Term:     []byte("World"),
 					Position: 2,
 					Type:     analysis.AlphaNumeric,
+				},
+			},
+		},
+		{
+			[]byte("こんにちは世界"),
+			analysis.TokenStream{
+				{
+					Start:    0,
+					End:      3,
+					Term:     []byte("こ"),
+					Position: 1,
+					Type:     analysis.Ideographic,
+				},
+				{
+					Start:    3,
+					End:      6,
+					Term:     []byte("ん"),
+					Position: 2,
+					Type:     analysis.Ideographic,
+				},
+				{
+					Start:    6,
+					End:      9,
+					Term:     []byte("に"),
+					Position: 3,
+					Type:     analysis.Ideographic,
+				},
+				{
+					Start:    9,
+					End:      12,
+					Term:     []byte("ち"),
+					Position: 4,
+					Type:     analysis.Ideographic,
+				},
+				{
+					Start:    12,
+					End:      15,
+					Term:     []byte("は"),
+					Position: 5,
+					Type:     analysis.Ideographic,
+				},
+				{
+					Start:    15,
+					End:      18,
+					Term:     []byte("世"),
+					Position: 6,
+					Type:     analysis.Ideographic,
+				},
+				{
+					Start:    18,
+					End:      21,
+					Term:     []byte("界"),
+					Position: 7,
+					Type:     analysis.Ideographic,
 				},
 			},
 		},
