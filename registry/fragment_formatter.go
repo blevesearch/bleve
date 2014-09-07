@@ -60,3 +60,19 @@ func (c FragmentFormatterCache) DefineFragmentFormatter(name string, typ string,
 	c[name] = fragmentFormatter
 	return fragmentFormatter, nil
 }
+
+func FragmentFormatterTypesAndInstances() ([]string, []string) {
+	emptyConfig := map[string]interface{}{}
+	emptyCache := NewCache()
+	types := make([]string, 0)
+	instances := make([]string, 0)
+	for name, cons := range fragmentFormatters {
+		_, err := cons(emptyConfig, emptyCache)
+		if err == nil {
+			instances = append(instances, name)
+		} else {
+			types = append(types, name)
+		}
+	}
+	return types, instances
+}

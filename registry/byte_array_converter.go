@@ -29,3 +29,19 @@ type ByteArrayConverterRegistry map[string]ByteArrayConverterConstructor
 func ByteArrayConverterByName(name string) ByteArrayConverterConstructor {
 	return byteArrayConverters[name]
 }
+
+func ByteArrayConverterTypesAndInstances() ([]string, []string) {
+	emptyConfig := map[string]interface{}{}
+	emptyCache := NewCache()
+	types := make([]string, 0)
+	instances := make([]string, 0)
+	for name, cons := range byteArrayConverters {
+		_, err := cons(emptyConfig, emptyCache)
+		if err == nil {
+			instances = append(instances, name)
+		} else {
+			types = append(types, name)
+		}
+	}
+	return types, instances
+}

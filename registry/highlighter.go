@@ -60,3 +60,19 @@ func (c HighlighterCache) DefineHighlighter(name string, typ string, config map[
 	c[name] = highlighter
 	return highlighter, nil
 }
+
+func HighlighterTypesAndInstances() ([]string, []string) {
+	emptyConfig := map[string]interface{}{}
+	emptyCache := NewCache()
+	types := make([]string, 0)
+	instances := make([]string, 0)
+	for name, cons := range highlighters {
+		_, err := cons(emptyConfig, emptyCache)
+		if err == nil {
+			instances = append(instances, name)
+		} else {
+			types = append(types, name)
+		}
+	}
+	return types, instances
+}

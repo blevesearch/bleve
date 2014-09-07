@@ -60,3 +60,19 @@ func (c TokenizerCache) DefineTokenizer(name string, typ string, config map[stri
 	c[name] = tokenizer
 	return tokenizer, nil
 }
+
+func TokenizerTypesAndInstances() ([]string, []string) {
+	emptyConfig := map[string]interface{}{}
+	emptyCache := NewCache()
+	types := make([]string, 0)
+	instances := make([]string, 0)
+	for name, cons := range tokenizers {
+		_, err := cons(emptyConfig, emptyCache)
+		if err == nil {
+			instances = append(instances, name)
+		} else {
+			types = append(types, name)
+		}
+	}
+	return types, instances
+}

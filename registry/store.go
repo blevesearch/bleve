@@ -29,3 +29,18 @@ type KVStoreRegistry map[string]KVStoreConstructor
 func KVStoreConstructorByName(name string) KVStoreConstructor {
 	return stores[name]
 }
+
+func KVStoreTypesAndInstances() ([]string, []string) {
+	emptyConfig := map[string]interface{}{}
+	types := make([]string, 0)
+	instances := make([]string, 0)
+	for name, cons := range stores {
+		_, err := cons(emptyConfig)
+		if err == nil {
+			instances = append(instances, name)
+		} else {
+			types = append(types, name)
+		}
+	}
+	return types, instances
+}

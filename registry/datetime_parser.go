@@ -60,3 +60,19 @@ func (c DateTimeParserCache) DefineDateTimeParser(name string, typ string, confi
 	c[name] = dateTimeParser
 	return dateTimeParser, nil
 }
+
+func DateTimeParserTypesAndInstances() ([]string, []string) {
+	emptyConfig := map[string]interface{}{}
+	emptyCache := NewCache()
+	types := make([]string, 0)
+	instances := make([]string, 0)
+	for name, cons := range dateTimeParsers {
+		_, err := cons(emptyConfig, emptyCache)
+		if err == nil {
+			instances = append(instances, name)
+		} else {
+			types = append(types, name)
+		}
+	}
+	return types, instances
+}

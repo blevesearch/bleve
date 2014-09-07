@@ -60,3 +60,19 @@ func (c AnalyzerCache) DefineAnalyzer(name string, typ string, config map[string
 	c[name] = analyzer
 	return analyzer, nil
 }
+
+func AnalyzerTypesAndInstances() ([]string, []string) {
+	emptyConfig := map[string]interface{}{}
+	emptyCache := NewCache()
+	types := make([]string, 0)
+	instances := make([]string, 0)
+	for name, cons := range analyzers {
+		_, err := cons(emptyConfig, emptyCache)
+		if err == nil {
+			instances = append(instances, name)
+		} else {
+			types = append(types, name)
+		}
+	}
+	return types, instances
+}

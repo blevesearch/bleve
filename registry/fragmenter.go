@@ -60,3 +60,19 @@ func (c FragmenterCache) DefineFragmenter(name string, typ string, config map[st
 	c[name] = fragmenter
 	return fragmenter, nil
 }
+
+func FragmenterTypesAndInstances() ([]string, []string) {
+	emptyConfig := map[string]interface{}{}
+	emptyCache := NewCache()
+	types := make([]string, 0)
+	instances := make([]string, 0)
+	for name, cons := range fragmenters {
+		_, err := cons(emptyConfig, emptyCache)
+		if err == nil {
+			instances = append(instances, name)
+		} else {
+			types = append(types, name)
+		}
+	}
+	return types, instances
+}

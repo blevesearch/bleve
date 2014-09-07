@@ -60,3 +60,19 @@ func (c TokenFilterCache) DefineTokenFilter(name string, typ string, config map[
 	c[name] = tokenFilter
 	return tokenFilter, nil
 }
+
+func TokenFilterTypesAndInstances() ([]string, []string) {
+	emptyConfig := map[string]interface{}{}
+	emptyCache := NewCache()
+	types := make([]string, 0)
+	instances := make([]string, 0)
+	for name, cons := range tokenFilters {
+		_, err := cons(emptyConfig, emptyCache)
+		if err == nil {
+			instances = append(instances, name)
+		} else {
+			types = append(types, name)
+		}
+	}
+	return types, instances
+}

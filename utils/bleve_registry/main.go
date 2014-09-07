@@ -11,6 +11,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 
 	_ "github.com/blevesearch/bleve"
 	"github.com/blevesearch/bleve/registry"
@@ -18,5 +19,64 @@ import (
 
 func main() {
 	fmt.Printf("Bleve Registry:\n")
-	registry.PrintRegistry()
+	printRegistry()
+}
+
+func printRegistry() {
+	types, instances := registry.CharFilterTypesAndInstances()
+	printType("Char Filter", types, instances)
+
+	types, instances = registry.TokenizerTypesAndInstances()
+	printType("Tokenizer", types, instances)
+
+	types, instances = registry.TokenMapTypesAndInstances()
+	printType("Token Map", types, instances)
+
+	types, instances = registry.TokenFilterTypesAndInstances()
+	printType("Token Filter", types, instances)
+
+	types, instances = registry.AnalyzerTypesAndInstances()
+	printType("Analyzer", types, instances)
+
+	types, instances = registry.DateTimeParserTypesAndInstances()
+	printType("Date Time Parser", types, instances)
+
+	types, instances = registry.KVStoreTypesAndInstances()
+	printType("KV Store", types, instances)
+
+	types, instances = registry.ByteArrayConverterTypesAndInstances()
+	printType("ByteArrayConverter", types, instances)
+
+	types, instances = registry.FragmentFormatterTypesAndInstances()
+	printType("Fragment Formatter", types, instances)
+
+	types, instances = registry.FragmenterTypesAndInstances()
+	printType("Fragmenter", types, instances)
+
+	types, instances = registry.HighlighterTypesAndInstances()
+	printType("Highlighter", types, instances)
+}
+
+func sortStrings(in []string) []string {
+	sortedStrings := make(sort.StringSlice, 0, len(in))
+	for _, str := range in {
+		sortedStrings = append(sortedStrings, str)
+	}
+	sortedStrings.Sort()
+	return sortedStrings
+}
+
+func printType(label string, types, instances []string) {
+	sortedTypes := sortStrings(types)
+	sortedInstances := sortStrings(instances)
+	fmt.Printf(label + " Types:\n")
+	for _, name := range sortedTypes {
+		fmt.Printf("\t%s\n", name)
+	}
+	fmt.Println()
+	fmt.Printf(label + " Instances:\n")
+	for _, name := range sortedInstances {
+		fmt.Printf("\t%s\n", name)
+	}
+	fmt.Println()
 }
