@@ -11,7 +11,6 @@ package registry
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/search/highlight"
