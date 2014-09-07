@@ -16,7 +16,7 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
-const Name = "standard"
+const Name = "custom"
 
 func GenericTokenMapConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenMap, error) {
 	rv := analysis.NewTokenMap()

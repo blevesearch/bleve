@@ -14,6 +14,9 @@ import (
 	"github.com/blevesearch/bleve/registry"
 	"time"
 
+	// token maps
+	_ "github.com/blevesearch/bleve/analysis/token_map"
+
 	// fragment formatters
 	_ "github.com/blevesearch/bleve/search/highlight/fragment_formatters/ansi"
 	_ "github.com/blevesearch/bleve/search/highlight/fragment_formatters/html"
