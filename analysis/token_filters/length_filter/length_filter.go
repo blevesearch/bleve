@@ -10,6 +10,7 @@
 package length_filter
 
 import (
+	"fmt"
 	"unicode/utf8"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -58,6 +59,9 @@ func LengthFilterConstructor(config map[string]interface{}, cache *registry.Cach
 	maxVal, ok := config["max"].(float64)
 	if ok {
 		max = int(maxVal)
+	}
+	if min == max && max == 0 {
+		return nil, fmt.Errorf("either min or max must be non-zero")
 	}
 
 	return NewLengthFilter(min, max), nil

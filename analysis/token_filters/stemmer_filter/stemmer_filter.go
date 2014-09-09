@@ -12,6 +12,8 @@
 package stemmer_filter
 
 import (
+	"fmt"
+
 	"bitbucket.org/tebeka/snowball"
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
@@ -63,11 +65,11 @@ func (s *StemmerFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 }
 
 func StemmerFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
-	lang := "en"
 	langVal, ok := config["lang"].(string)
-	if ok {
-		lang = langVal
+	if !ok {
+		return nil, fmt.Errorf("must specify stemmer language")
 	}
+	lang := langVal
 	return NewStemmerFilter(lang)
 }
 

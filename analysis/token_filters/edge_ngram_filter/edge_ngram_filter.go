@@ -11,6 +11,7 @@ package edge_ngram_filter
 
 import (
 	"bytes"
+	"fmt"
 	"unicode/utf8"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -100,16 +101,16 @@ func EdgeNgramFilterConstructor(config map[string]interface{}, cache *registry.C
 	if ok && back {
 		side = BACK
 	}
-	min := 1
 	minVal, ok := config["min"].(float64)
-	if ok {
-		min = int(minVal)
+	if !ok {
+		return nil, fmt.Errorf("must specify min")
 	}
-	max := 2
+	min := int(minVal)
 	maxVal, ok := config["max"].(float64)
-	if ok {
-		max = int(maxVal)
+	if !ok {
+		return nil, fmt.Errorf("must specify max")
 	}
+	max := int(maxVal)
 
 	return NewEdgeNgramFilter(side, min, max), nil
 }

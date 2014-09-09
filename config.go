@@ -46,6 +46,7 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/token_filters/length_filter"
 	_ "github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
 	_ "github.com/blevesearch/bleve/analysis/token_filters/ngram_filter"
+	_ "github.com/blevesearch/bleve/analysis/token_filters/shingle"
 	_ "github.com/blevesearch/bleve/analysis/token_filters/stop_tokens_filter"
 	_ "github.com/blevesearch/bleve/analysis/token_filters/truncate_token_filter"
 	_ "github.com/blevesearch/bleve/analysis/token_filters/unicode_normalize"

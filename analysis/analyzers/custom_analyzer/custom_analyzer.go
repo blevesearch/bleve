@@ -21,15 +21,20 @@ const Name = "custom"
 func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
 
 	var charFilters []analysis.CharFilter
-	charFilterNames, ok := config["char_filters"].([]string)
+	charFilterNames, ok := config["char_filters"].([]interface{})
 	if ok {
 		charFilters = make([]analysis.CharFilter, len(charFilterNames))
 		for i, charFilterName := range charFilterNames {
-			charFilter, err := cache.CharFilterNamed(charFilterName)
-			if err != nil {
-				return nil, err
+			charFilterNameString, ok := charFilterName.(string)
+			if ok {
+				charFilter, err := cache.CharFilterNamed(charFilterNameString)
+				if err != nil {
+					return nil, err
+				}
+				charFilters[i] = charFilter
+			} else {
+				return nil, fmt.Errorf("char filter name must be a string")
 			}
-			charFilters[i] = charFilter
 		}
 	}
 
@@ -44,15 +49,20 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	}
 
 	var tokenFilters []analysis.TokenFilter
-	tokenFilterNames, ok := config["token_filters"].([]string)
+	tokenFilterNames, ok := config["token_filters"].([]interface{})
 	if ok {
 		tokenFilters = make([]analysis.TokenFilter, len(tokenFilterNames))
 		for i, tokenFilterName := range tokenFilterNames {
-			tokenFilter, err := cache.TokenFilterNamed(tokenFilterName)
-			if err != nil {
-				return nil, err
+			tokenFilterNameString, ok := tokenFilterName.(string)
+			if ok {
+				tokenFilter, err := cache.TokenFilterNamed(tokenFilterNameString)
+				if err != nil {
+					return nil, err
+				}
+				tokenFilters[i] = tokenFilter
+			} else {
+				return nil, fmt.Errorf("token filter name must be a string")
 			}
-			tokenFilters[i] = tokenFilter
 		}
 	}
 

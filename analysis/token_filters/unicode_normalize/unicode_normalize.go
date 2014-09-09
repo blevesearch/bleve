@@ -65,11 +65,11 @@ func (s *UnicodeNormalizeFilter) Filter(input analysis.TokenStream) analysis.Tok
 }
 
 func UnicodeNormalizeFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
-	form := NFKC
 	formVal, ok := config["form"].(string)
-	if ok {
-		form = formVal
+	if !ok {
+		return nil, fmt.Errorf("must specify form")
 	}
+	form := formVal
 	return NewUnicodeNormalizeFilter(form)
 }
 

@@ -25,15 +25,16 @@ const (
 	Ideographic
 	Numeric
 	DateTime
+	Shingle
 )
 
 type Token struct {
-	Start    int
-	End      int
-	Term     []byte
-	Position int
-	Type     TokenType
-	KeyWord  bool
+	Start    int       `json:"start"`
+	End      int       `json:"end"`
+	Term     []byte    `json:"term"`
+	Position int       `json:"position"`
+	Type     TokenType `json:"type"`
+	KeyWord  bool      `json:"keyword"`
 }
 
 func (t *Token) String() string {

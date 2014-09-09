@@ -11,6 +11,7 @@ package truncate_token_filter
 
 import (
 	"bytes"
+	"fmt"
 	"unicode/utf8"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -51,12 +52,11 @@ func (s *TruncateTokenFilter) Filter(input analysis.TokenStream) analysis.TokenS
 }
 
 func TruncateTokenFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
-	length := 25
-
 	lenVal, ok := config["length"].(float64)
-	if ok {
-		length = int(lenVal)
+	if !ok {
+		return nil, fmt.Errorf("must specify length")
 	}
+	length := int(lenVal)
 
 	return NewTruncateTokenFilter(length), nil
 }

@@ -443,3 +443,11 @@ func (im *IndexMapping) datetimeParserNameForPath(path string) string {
 
 	return im.DefaultDateTimeParser
 }
+
+func (im *IndexMapping) AnalyzeText(analyzerName string, text []byte) (analysis.TokenStream, error) {
+	analyzer, err := im.cache.AnalyzerNamed(analyzerName)
+	if err != nil {
+		return nil, err
+	}
+	return analyzer.Analyze(text), nil
+}
