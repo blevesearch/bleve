@@ -26,6 +26,8 @@ const (
 	Numeric
 	DateTime
 	Shingle
+	Single
+	Double
 )
 
 type Token struct {
