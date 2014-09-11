@@ -19,7 +19,7 @@ import (
 
 const Name = "whitespace"
 
-var whitespaceTokenizerRegexp = regexp.MustCompile(`\p{Han}|\p{Hangul}|\p{Hiragana}|\p{Katakana}|[^\p{Z}\p{P}\p{C}]+`)
+var whitespaceTokenizerRegexp = regexp.MustCompile(`\p{Han}|\p{Hangul}|\p{Hiragana}|\p{Katakana}|[^\p{Z}\p{P}\p{C}\p{Han}\p{Hangul}\p{Hiragana}\p{Katakana}]+`)
 
 func TokenizerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.Tokenizer, error) {
 	return regexp_tokenizer.NewRegexpTokenizer(whitespaceTokenizerRegexp), nil
