@@ -64,6 +64,7 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/language/ar"
 	_ "github.com/blevesearch/bleve/analysis/language/bg"
 	_ "github.com/blevesearch/bleve/analysis/language/ca"
+	_ "github.com/blevesearch/bleve/analysis/language/cjk"
 	_ "github.com/blevesearch/bleve/analysis/language/ckb"
 	_ "github.com/blevesearch/bleve/analysis/language/cs"
 	_ "github.com/blevesearch/bleve/analysis/language/da"
