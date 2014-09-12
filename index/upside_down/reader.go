@@ -17,16 +17,16 @@ import (
 )
 
 type UpsideDownCouchTermFieldReader struct {
-	index    *UpsideDownCouch
-	iterator store.KVIterator
-	count    uint64
-	term     []byte
-	field    uint16
+	indexReader *IndexReader
+	iterator    store.KVIterator
+	count       uint64
+	term        []byte
+	field       uint16
 }
 
-func newUpsideDownCouchTermFieldReader(index *UpsideDownCouch, term []byte, field uint16) (*UpsideDownCouchTermFieldReader, error) {
+func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, field uint16) (*UpsideDownCouchTermFieldReader, error) {
 	tfr := NewTermFrequencyRow(term, field, "", 0, 0)
-	it := index.store.Iterator(tfr.Key())
+	it := indexReader.kvreader.Iterator(tfr.Key())
 
 	var count uint64
 	key, val, valid := it.Current()
@@ -41,11 +41,11 @@ func newUpsideDownCouchTermFieldReader(index *UpsideDownCouch, term []byte, fiel
 	}
 
 	return &UpsideDownCouchTermFieldReader{
-		index:    index,
-		iterator: it,
-		count:    count,
-		term:     term,
-		field:    field,
+		indexReader: indexReader,
+		iterator:    it,
+		count:       count,
+		term:        term,
+		field:       field,
 	}, nil
 }
 
@@ -70,7 +70,7 @@ func (r *UpsideDownCouchTermFieldReader) Next() (*index.TermFieldDoc, error) {
 			ID:      string(tfr.doc),
 			Freq:    tfr.freq,
 			Norm:    float64(tfr.norm),
-			Vectors: r.index.termFieldVectorsFromTermVectors(tfr.vectors),
+			Vectors: r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors),
 		}, nil
 	}
 	return nil, nil
@@ -94,7 +94,7 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docID string) (*index.TermField
 			ID:      string(tfr.doc),
 			Freq:    tfr.freq,
 			Norm:    float64(tfr.norm),
-			Vectors: r.index.termFieldVectorsFromTermVectors(tfr.vectors),
+			Vectors: r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors),
 		}, nil
 	}
 	return nil, nil
@@ -105,13 +105,13 @@ func (r *UpsideDownCouchTermFieldReader) Close() {
 }
 
 type UpsideDownCouchDocIDReader struct {
-	index    *UpsideDownCouch
-	iterator store.KVIterator
-	start    string
-	end      string
+	indexReader *IndexReader
+	iterator    store.KVIterator
+	start       string
+	end         string
 }
 
-func newUpsideDownCouchDocIDReader(index *UpsideDownCouch, start, end string) (*UpsideDownCouchDocIDReader, error) {
+func newUpsideDownCouchDocIDReader(indexReader *IndexReader, start, end string) (*UpsideDownCouchDocIDReader, error) {
 	if start == "" {
 		start = string([]byte{0x0})
 	}
@@ -119,13 +119,13 @@ func newUpsideDownCouchDocIDReader(index *UpsideDownCouch, start, end string) (*
 		end = string([]byte{0xff})
 	}
 	bisr := NewBackIndexRow(start, nil, nil)
-	it := index.store.Iterator(bisr.Key())
+	it := indexReader.kvreader.Iterator(bisr.Key())
 
 	return &UpsideDownCouchDocIDReader{
-		index:    index,
-		iterator: it,
-		start:    start,
-		end:      end,
+		indexReader: indexReader,
+		iterator:    it,
+		start:       start,
+		end:         end,
 	}, nil
 }
 

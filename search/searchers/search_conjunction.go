@@ -20,7 +20,7 @@ import (
 
 type ConjunctionSearcher struct {
 	initialized bool
-	index       index.Index
+	indexReader index.IndexReader
 	searchers   OrderedSearcherList
 	explain     bool
 	queryNorm   float64
@@ -29,7 +29,7 @@ type ConjunctionSearcher struct {
 	scorer      *scorers.ConjunctionQueryScorer
 }
 
-func NewConjunctionSearcher(index index.Index, qsearchers []search.Searcher, explain bool) (*ConjunctionSearcher, error) {
+func NewConjunctionSearcher(indexReader index.IndexReader, qsearchers []search.Searcher, explain bool) (*ConjunctionSearcher, error) {
 	// build the downstream searchres
 	searchers := make(OrderedSearcherList, len(qsearchers))
 	for i, searcher := range qsearchers {
@@ -39,11 +39,11 @@ func NewConjunctionSearcher(index index.Index, qsearchers []search.Searcher, exp
 	sort.Sort(searchers)
 	// build our searcher
 	rv := ConjunctionSearcher{
-		index:     index,
-		explain:   explain,
-		searchers: searchers,
-		currs:     make([]*search.DocumentMatch, len(searchers)),
-		scorer:    scorers.NewConjunctionQueryScorer(explain),
+		indexReader: indexReader,
+		explain:     explain,
+		searchers:   searchers,
+		currs:       make([]*search.DocumentMatch, len(searchers)),
+		scorer:      scorers.NewConjunctionQueryScorer(explain),
 	}
 	rv.computeQueryNorm()
 	return &rv, nil

@@ -19,15 +19,15 @@ import (
 )
 
 type NumericRangeSearcher struct {
-	index    index.Index
-	min      *float64
-	max      *float64
-	field    string
-	explain  bool
-	searcher *DisjunctionSearcher
+	indexReader index.IndexReader
+	min         *float64
+	max         *float64
+	field       string
+	explain     bool
+	searcher    *DisjunctionSearcher
 }
 
-func NewNumericRangeSearcher(index index.Index, min *float64, max *float64, inclusiveMin, inclusiveMax *bool, field string, boost float64, explain bool) (*NumericRangeSearcher, error) {
+func NewNumericRangeSearcher(indexReader index.IndexReader, min *float64, max *float64, inclusiveMin, inclusiveMax *bool, field string, boost float64, explain bool) (*NumericRangeSearcher, error) {
 	// account for unbounded edges
 	if min == nil {
 		negInf := math.Inf(-1)
@@ -61,23 +61,23 @@ func NewNumericRangeSearcher(index index.Index, min *float64, max *float64, incl
 	qsearchers := make([]search.Searcher, len(terms))
 	for i, term := range terms {
 		var err error
-		qsearchers[i], err = NewTermSearcher(index, string(term), field, 1.0, explain)
+		qsearchers[i], err = NewTermSearcher(indexReader, string(term), field, 1.0, explain)
 		if err != nil {
 			return nil, err
 		}
 	}
 	// build disjunction searcher of these ranges
-	searcher, err := NewDisjunctionSearcher(index, qsearchers, 0, explain)
+	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, explain)
 	if err != nil {
 		return nil, err
 	}
 	return &NumericRangeSearcher{
-		index:    index,
-		min:      min,
-		max:      max,
-		field:    field,
-		explain:  explain,
-		searcher: searcher,
+		indexReader: indexReader,
+		min:         min,
+		max:         max,
+		field:       field,
+		explain:     explain,
+		searcher:    searcher,
 	}, nil
 }
 

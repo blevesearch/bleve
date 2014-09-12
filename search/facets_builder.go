@@ -19,14 +19,14 @@ type FacetBuilder interface {
 }
 
 type FacetsBuilder struct {
-	index  index.Index
-	facets map[string]FacetBuilder
+	indexReader index.IndexReader
+	facets      map[string]FacetBuilder
 }
 
-func NewFacetsBuilder(index index.Index) *FacetsBuilder {
+func NewFacetsBuilder(indexReader index.IndexReader) *FacetsBuilder {
 	return &FacetsBuilder{
-		index:  index,
-		facets: make(map[string]FacetBuilder, 0),
+		indexReader: indexReader,
+		facets:      make(map[string]FacetBuilder, 0),
 	}
 }
 
@@ -35,7 +35,7 @@ func (fb *FacetsBuilder) Add(name string, facetBuilder FacetBuilder) {
 }
 
 func (fb *FacetsBuilder) Update(docMatch *DocumentMatch) error {
-	fieldTerms, err := fb.index.DocumentFieldTerms(docMatch.ID)
+	fieldTerms, err := fb.indexReader.DocumentFieldTerms(docMatch.ID)
 	if err != nil {
 		return err
 	}

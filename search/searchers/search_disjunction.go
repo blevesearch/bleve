@@ -20,7 +20,7 @@ import (
 
 type DisjunctionSearcher struct {
 	initialized bool
-	index       index.Index
+	indexReader index.IndexReader
 	searchers   OrderedSearcherList
 	queryNorm   float64
 	currs       []*search.DocumentMatch
@@ -29,7 +29,7 @@ type DisjunctionSearcher struct {
 	min         float64
 }
 
-func NewDisjunctionSearcher(index index.Index, qsearchers []search.Searcher, min float64, explain bool) (*DisjunctionSearcher, error) {
+func NewDisjunctionSearcher(indexReader index.IndexReader, qsearchers []search.Searcher, min float64, explain bool) (*DisjunctionSearcher, error) {
 	// build the downstream searchres
 	searchers := make(OrderedSearcherList, len(qsearchers))
 	for i, searcher := range qsearchers {
@@ -39,11 +39,11 @@ func NewDisjunctionSearcher(index index.Index, qsearchers []search.Searcher, min
 	sort.Sort(sort.Reverse(searchers))
 	// build our searcher
 	rv := DisjunctionSearcher{
-		index:     index,
-		searchers: searchers,
-		currs:     make([]*search.DocumentMatch, len(searchers)),
-		scorer:    scorers.NewDisjunctionQueryScorer(explain),
-		min:       min,
+		indexReader: indexReader,
+		searchers:   searchers,
+		currs:       make([]*search.DocumentMatch, len(searchers)),
+		scorer:      scorers.NewDisjunctionQueryScorer(explain),
+		min:         min,
 	}
 	rv.computeQueryNorm()
 	return &rv, nil

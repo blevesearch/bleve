@@ -13,6 +13,7 @@ package leveldb
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
@@ -21,14 +22,15 @@ import (
 
 const Name = "leveldb"
 
-type LevelDBStore struct {
-	path string
-	opts *levigo.Options
-	db   *levigo.DB
+type Store struct {
+	path   string
+	opts   *levigo.Options
+	db     *levigo.DB
+	writer sync.Mutex
 }
 
-func Open(path string, createIfMissing bool, errorIfExists bool) (*LevelDBStore, error) {
-	rv := LevelDBStore{
+func Open(path string, createIfMissing bool, errorIfExists bool) (*Store, error) {
+	rv := Store{
 		path: path,
 	}
 
@@ -46,35 +48,57 @@ func Open(path string, createIfMissing bool, errorIfExists bool) (*LevelDBStore,
 	return &rv, nil
 }
 
-func (ldbs *LevelDBStore) Get(key []byte) ([]byte, error) {
+func (ldbs *Store) get(key []byte) ([]byte, error) {
 	return ldbs.db.Get(defaultReadOptions(), key)
 }
 
-func (ldbs *LevelDBStore) Set(key, val []byte) error {
+func (ldbs *Store) getWithSnapshot(key []byte, snapshot *levigo.Snapshot) ([]byte, error) {
+	options := defaultReadOptions()
+	options.SetSnapshot(snapshot)
+	return ldbs.db.Get(options, key)
+}
+
+func (ldbs *Store) set(key, val []byte) error {
+	ldbs.writer.Lock()
+	defer ldbs.writer.Unlock()
+	return ldbs.setlocked(key, val)
+}
+
+func (ldbs *Store) setlocked(key, val []byte) error {
 	return ldbs.db.Put(defaultWriteOptions(), key, val)
 }
 
-func (ldbs *LevelDBStore) Delete(key []byte) error {
+func (ldbs *Store) delete(key []byte) error {
+	ldbs.writer.Lock()
+	defer ldbs.writer.Unlock()
+	return ldbs.deletelocked(key)
+}
+
+func (ldbs *Store) deletelocked(key []byte) error {
 	return ldbs.db.Delete(defaultWriteOptions(), key)
 }
 
-func (ldbs *LevelDBStore) Commit() error {
-	return nil
-}
-
-func (ldbs *LevelDBStore) Close() error {
+func (ldbs *Store) Close() error {
 	ldbs.db.Close()
 	return nil
 }
 
-func (ldbs *LevelDBStore) Iterator(key []byte) store.KVIterator {
-	rv := newLevelDBIterator(ldbs)
+func (ldbs *Store) iterator(key []byte) store.KVIterator {
+	rv := newIterator(ldbs)
 	rv.Seek(key)
 	return rv
 }
 
-func (ldbs *LevelDBStore) NewBatch() store.KVBatch {
-	return newLevelDBBatch(ldbs)
+func (ldbs *Store) Reader() store.KVReader {
+	return newReader(ldbs)
+}
+
+func (ldbs *Store) Writer() store.KVWriter {
+	return newWriter(ldbs)
+}
+
+func (ldbs *Store) newBatch() store.KVBatch {
+	return newBatch(ldbs)
 }
 
 func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {

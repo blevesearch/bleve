@@ -18,7 +18,7 @@ import (
 
 type PhraseSearcher struct {
 	initialized  bool
-	index        index.Index
+	indexReader  index.IndexReader
 	mustSearcher *ConjunctionSearcher
 	queryNorm    float64
 	currMust     *search.DocumentMatch
@@ -26,11 +26,11 @@ type PhraseSearcher struct {
 	terms        []string
 }
 
-func NewPhraseSearcher(index index.Index, mustSearcher *ConjunctionSearcher, terms []string) (*PhraseSearcher, error) {
+func NewPhraseSearcher(indexReader index.IndexReader, mustSearcher *ConjunctionSearcher, terms []string) (*PhraseSearcher, error) {
 
 	// build our searcher
 	rv := PhraseSearcher{
-		index:        index,
+		indexReader:  indexReader,
 		mustSearcher: mustSearcher,
 		terms:        terms,
 	}

@@ -12,6 +12,7 @@ package bleve
 import (
 	"fmt"
 
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -53,20 +54,20 @@ func (q *matchQuery) SetField(f string) Query {
 	return q
 }
 
-func (q *matchQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *matchQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 
 	field := q.FieldVal
 	if q.FieldVal == "" {
-		field = i.m.DefaultField
+		field = m.DefaultField
 	}
 
 	analyzerName := ""
 	if q.Analyzer != "" {
 		analyzerName = q.Analyzer
 	} else {
-		analyzerName = i.m.analyzerNameForPath(field)
+		analyzerName = m.analyzerNameForPath(field)
 	}
-	analyzer := i.m.analyzerNamed(analyzerName)
+	analyzer := m.analyzerNamed(analyzerName)
 
 	if analyzer == nil {
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
@@ -85,10 +86,10 @@ func (q *matchQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, erro
 		shouldQuery := NewDisjunctionQueryMin(tqs, 1).
 			SetBoost(q.BoostVal)
 
-		return shouldQuery.Searcher(i, explain)
+		return shouldQuery.Searcher(i, m, explain)
 	}
 	noneQuery := NewMatchNoneQuery()
-	return noneQuery.Searcher(i, explain)
+	return noneQuery.Searcher(i, m, explain)
 }
 
 func (q *matchQuery) Validate() error {

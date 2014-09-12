@@ -10,6 +10,8 @@
 package inmem
 
 import (
+	"sync"
+
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/ryszard/goskiplist/skiplist"
@@ -18,7 +20,8 @@ import (
 const Name = "mem"
 
 type Store struct {
-	list *skiplist.SkipList
+	list   *skiplist.SkipList
+	writer sync.Mutex
 }
 
 func Open() (*Store, error) {
@@ -37,7 +40,7 @@ func MustOpen() *Store {
 	return &rv
 }
 
-func (i *Store) Get(key []byte) ([]byte, error) {
+func (i *Store) get(key []byte) ([]byte, error) {
 	val, ok := i.list.Get(string(key))
 	if ok {
 		return []byte(val.(string)), nil
@@ -45,17 +48,25 @@ func (i *Store) Get(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (i *Store) Set(key, val []byte) error {
+func (i *Store) set(key, val []byte) error {
+	i.writer.Lock()
+	defer i.writer.Unlock()
+	return i.setlocked(key, val)
+}
+
+func (i *Store) setlocked(key, val []byte) error {
 	i.list.Set(string(key), string(val))
 	return nil
 }
 
-func (i *Store) Delete(key []byte) error {
-	i.list.Delete(string(key))
-	return nil
+func (i *Store) delete(key []byte) error {
+	i.writer.Lock()
+	defer i.writer.Unlock()
+	return i.deletelocked(key)
 }
 
-func (i *Store) Commit() error {
+func (i *Store) deletelocked(key []byte) error {
+	i.list.Delete(string(key))
 	return nil
 }
 
@@ -63,13 +74,21 @@ func (i *Store) Close() error {
 	return nil
 }
 
-func (i *Store) Iterator(key []byte) store.KVIterator {
+func (i *Store) iterator(key []byte) store.KVIterator {
 	rv := newIterator(i)
 	rv.Seek(key)
 	return rv
 }
 
-func (i *Store) NewBatch() store.KVBatch {
+func (i *Store) Reader() store.KVReader {
+	return newReader(i)
+}
+
+func (i *Store) Writer() store.KVWriter {
+	return newWriter(i)
+}
+
+func (i *Store) newBatch() store.KVBatch {
 	return newBatch(i)
 }
 

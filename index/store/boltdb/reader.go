@@ -10,28 +10,34 @@
 package boltdb
 
 import (
-	"os"
-	"testing"
-
-	"github.com/blevesearch/bleve/index/store/test"
+	"github.com/blevesearch/bleve/index/store"
+	"github.com/boltdb/bolt"
 )
 
-func TestStore(t *testing.T) {
-	s, err := Open("test", "bleve")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll("test")
-
-	store_test.CommonTestKVStore(t, s)
+type Reader struct {
+	store *Store
+	tx    *bolt.Tx
 }
 
-func TestReaderIsolation(t *testing.T) {
-	s, err := Open("test", "bleve")
-	if err != nil {
-		t.Fatal(err)
+func newReader(store *Store) *Reader {
+	tx, _ := store.db.Begin(false)
+	return &Reader{
+		store: store,
+		tx:    tx,
 	}
-	defer os.RemoveAll("test")
+}
 
-	store_test.CommonTestReaderIsolation(t, s)
+func (r *Reader) Get(key []byte) ([]byte, error) {
+	rv := r.tx.Bucket([]byte(r.store.bucket)).Get(key)
+	return rv, nil
+}
+
+func (r *Reader) Iterator(key []byte) store.KVIterator {
+	rv := newIteratorExistingTx(r.store, r.tx)
+	rv.Seek(key)
+	return rv
+}
+
+func (r *Reader) Close() error {
+	return r.tx.Rollback()
 }

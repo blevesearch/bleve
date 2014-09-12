@@ -9,9 +9,12 @@
 
 package store
 
+import ()
+
 type KVBatch interface {
 	Set(key, val []byte)
 	Delete(key []byte)
+	Merge(key []byte, oper AssociativeMerge)
 	Execute() error
 	Close() error
 }
@@ -30,12 +33,38 @@ type KVIterator interface {
 }
 
 type KVStore interface {
-	Get(key []byte) ([]byte, error)
+	Writer() KVWriter
+	Reader() KVReader
+	Close() error
+}
+
+type KVWriter interface {
+	KVReader
 	Set(key, val []byte) error
 	Delete(key []byte) error
-	Commit() error
-	Close() error
-
-	Iterator(key []byte) KVIterator
 	NewBatch() KVBatch
+}
+
+type KVReader interface {
+	Get(key []byte) ([]byte, error)
+	Iterator(key []byte) KVIterator
+	Close() error
+}
+
+type AssociativeMerge interface {
+	Merge(key, existing []byte) ([]byte, error)
+}
+
+type AssociativeMergeChain []AssociativeMerge
+
+func (a AssociativeMergeChain) Merge(key, orig []byte) ([]byte, error) {
+	curr := orig
+	for _, m := range a {
+		var err error
+		curr, err = m.Merge(key, curr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return curr, nil
 }

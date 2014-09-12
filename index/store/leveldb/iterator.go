@@ -15,50 +15,60 @@ import (
 	"github.com/jmhodges/levigo"
 )
 
-type LevelDBIterator struct {
-	store    *LevelDBStore
+type Iterator struct {
+	store    *Store
 	iterator *levigo.Iterator
 }
 
-func newLevelDBIterator(store *LevelDBStore) *LevelDBIterator {
-	rv := LevelDBIterator{
+func newIterator(store *Store) *Iterator {
+	rv := Iterator{
 		store:    store,
 		iterator: store.db.NewIterator(defaultReadOptions()),
 	}
 	return &rv
 }
 
-func (ldi *LevelDBIterator) SeekFirst() {
+func newIteratorWithSnapshot(store *Store, snapshot *levigo.Snapshot) *Iterator {
+	options := defaultReadOptions()
+	options.SetSnapshot(snapshot)
+	rv := Iterator{
+		store:    store,
+		iterator: store.db.NewIterator(options),
+	}
+	return &rv
+}
+
+func (ldi *Iterator) SeekFirst() {
 	ldi.iterator.SeekToFirst()
 }
 
-func (ldi *LevelDBIterator) Seek(key []byte) {
+func (ldi *Iterator) Seek(key []byte) {
 	ldi.iterator.Seek(key)
 }
 
-func (ldi *LevelDBIterator) Next() {
+func (ldi *Iterator) Next() {
 	ldi.iterator.Next()
 }
 
-func (ldi *LevelDBIterator) Current() ([]byte, []byte, bool) {
+func (ldi *Iterator) Current() ([]byte, []byte, bool) {
 	if ldi.Valid() {
 		return ldi.Key(), ldi.Value(), true
 	}
 	return nil, nil, false
 }
 
-func (ldi *LevelDBIterator) Key() []byte {
+func (ldi *Iterator) Key() []byte {
 	return ldi.iterator.Key()
 }
 
-func (ldi *LevelDBIterator) Value() []byte {
+func (ldi *Iterator) Value() []byte {
 	return ldi.iterator.Value()
 }
 
-func (ldi *LevelDBIterator) Valid() bool {
+func (ldi *Iterator) Valid() bool {
 	return ldi.iterator.Valid()
 }
 
-func (ldi *LevelDBIterator) Close() {
+func (ldi *Iterator) Close() {
 	ldi.iterator.Close()
 }

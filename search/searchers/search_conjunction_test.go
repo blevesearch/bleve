@@ -17,94 +17,97 @@ import (
 
 func TestConjunctionSearch(t *testing.T) {
 
+	twoDocIndexReader := twoDocIndex.Reader()
+	defer twoDocIndexReader.Close()
+
 	// test 0
-	beerTermSearcher, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
+	beerTermSearcher, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyTermSearcher, err := NewTermSearcher(twoDocIndex, "marty", "name", 5.0, true)
+	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 5.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerAndMartySearcher, err := NewConjunctionSearcher(twoDocIndex, []search.Searcher{beerTermSearcher, martyTermSearcher}, true)
+	beerAndMartySearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher, martyTermSearcher}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 1
-	angstTermSearcher, err := NewTermSearcher(twoDocIndex, "angst", "desc", 1.0, true)
+	angstTermSearcher, err := NewTermSearcher(twoDocIndexReader, "angst", "desc", 1.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerTermSearcher2, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
+	beerTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	angstAndBeerSearcher, err := NewConjunctionSearcher(twoDocIndex, []search.Searcher{angstTermSearcher, beerTermSearcher2}, true)
+	angstAndBeerSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{angstTermSearcher, beerTermSearcher2}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 2
-	beerTermSearcher3, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
+	beerTermSearcher3, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	jackTermSearcher, err := NewTermSearcher(twoDocIndex, "jack", "name", 5.0, true)
+	jackTermSearcher, err := NewTermSearcher(twoDocIndexReader, "jack", "name", 5.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerAndJackSearcher, err := NewConjunctionSearcher(twoDocIndex, []search.Searcher{beerTermSearcher3, jackTermSearcher}, true)
+	beerAndJackSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher3, jackTermSearcher}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 3
-	beerTermSearcher4, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
+	beerTermSearcher4, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	misterTermSearcher, err := NewTermSearcher(twoDocIndex, "mister", "title", 5.0, true)
+	misterTermSearcher, err := NewTermSearcher(twoDocIndexReader, "mister", "title", 5.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerAndMisterSearcher, err := NewConjunctionSearcher(twoDocIndex, []search.Searcher{beerTermSearcher4, misterTermSearcher}, true)
+	beerAndMisterSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher4, misterTermSearcher}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 4
-	couchbaseTermSearcher, err := NewTermSearcher(twoDocIndex, "couchbase", "street", 1.0, true)
+	couchbaseTermSearcher, err := NewTermSearcher(twoDocIndexReader, "couchbase", "street", 1.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	misterTermSearcher2, err := NewTermSearcher(twoDocIndex, "mister", "title", 5.0, true)
+	misterTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "mister", "title", 5.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	couchbaseAndMisterSearcher, err := NewConjunctionSearcher(twoDocIndex, []search.Searcher{couchbaseTermSearcher, misterTermSearcher2}, true)
+	couchbaseAndMisterSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{couchbaseTermSearcher, misterTermSearcher2}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 5
-	beerTermSearcher5, err := NewTermSearcher(twoDocIndex, "beer", "desc", 5.0, true)
+	beerTermSearcher5, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 5.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	couchbaseTermSearcher2, err := NewTermSearcher(twoDocIndex, "couchbase", "street", 1.0, true)
+	couchbaseTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "couchbase", "street", 1.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	misterTermSearcher3, err := NewTermSearcher(twoDocIndex, "mister", "title", 5.0, true)
+	misterTermSearcher3, err := NewTermSearcher(twoDocIndexReader, "mister", "title", 5.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	couchbaseAndMisterSearcher2, err := NewConjunctionSearcher(twoDocIndex, []search.Searcher{couchbaseTermSearcher2, misterTermSearcher3}, true)
+	couchbaseAndMisterSearcher2, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{couchbaseTermSearcher2, misterTermSearcher3}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerAndCouchbaseAndMisterSearcher, err := NewConjunctionSearcher(twoDocIndex, []search.Searcher{beerTermSearcher5, couchbaseAndMisterSearcher2}, true)
+	beerAndCouchbaseAndMisterSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher5, couchbaseAndMisterSearcher2}, true)
 	if err != nil {
 		t.Fatal(err)
 	}

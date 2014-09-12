@@ -10,6 +10,7 @@
 package bleve
 
 import (
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
 )
@@ -47,12 +48,12 @@ func (q *termQuery) SetField(f string) Query {
 	return q
 }
 
-func (q *termQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *termQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
-		field = i.m.DefaultField
+		field = m.DefaultField
 	}
-	return searchers.NewTermSearcher(i.i, q.Term, field, q.BoostVal, explain)
+	return searchers.NewTermSearcher(i, q.Term, field, q.BoostVal, explain)
 }
 
 func (q *termQuery) Validate() error {

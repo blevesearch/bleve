@@ -48,7 +48,9 @@ func TestIndexFieldReader(t *testing.T) {
 	}
 	expectedCount++
 
-	reader, err := idx.FieldReader("name", nil, nil)
+	indexReader := idx.Reader()
+	defer indexReader.Close()
+	reader, err := indexReader.FieldReader("name", nil, nil)
 	if err != nil {
 		t.Errorf("error creating reader: %v", err)
 	}
@@ -67,7 +69,7 @@ func TestIndexFieldReader(t *testing.T) {
 		t.Errorf("expected 1 term for this field, got %d", termCount)
 	}
 
-	reader, err = idx.FieldReader("desc", nil, nil)
+	reader, err = indexReader.FieldReader("desc", nil, nil)
 	if err != nil {
 		t.Errorf("error creating reader: %v", err)
 	}
@@ -90,7 +92,7 @@ func TestIndexFieldReader(t *testing.T) {
 	}
 
 	// test use case for prefix
-	reader, err = idx.FieldReader("prefix", []byte("cat"), []byte("cat"))
+	reader, err = indexReader.FieldReader("prefix", []byte("cat"), []byte("cat"))
 	if err != nil {
 		t.Errorf("error creating reader: %v", err)
 	}

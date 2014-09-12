@@ -10,6 +10,7 @@
 package boltdb
 
 import (
+	indexStore "github.com/blevesearch/bleve/index/store"
 	"github.com/boltdb/bolt"
 )
 
@@ -19,14 +20,27 @@ type op struct {
 }
 
 type Batch struct {
-	store *Store
-	ops   []op
+	store         *Store
+	alreadyLocked bool
+	ops           []op
+	merges        map[string]indexStore.AssociativeMergeChain
 }
 
 func newBatch(store *Store) *Batch {
 	rv := Batch{
-		store: store,
-		ops:   make([]op, 0),
+		store:  store,
+		ops:    make([]op, 0),
+		merges: make(map[string]indexStore.AssociativeMergeChain),
+	}
+	return &rv
+}
+
+func newBatchAlreadyLocked(store *Store) *Batch {
+	rv := Batch{
+		store:         store,
+		alreadyLocked: true,
+		ops:           make([]op, 0),
+		merges:        make(map[string]indexStore.AssociativeMergeChain),
 	}
 	return &rv
 }
@@ -39,10 +53,45 @@ func (i *Batch) Delete(key []byte) {
 	i.ops = append(i.ops, op{key, nil})
 }
 
+func (i *Batch) Merge(key []byte, oper indexStore.AssociativeMerge) {
+	opers, ok := i.merges[string(key)]
+	if !ok {
+		opers = make(indexStore.AssociativeMergeChain, 0, 1)
+	}
+	opers = append(opers, oper)
+	i.merges[string(key)] = opers
+}
+
 func (i *Batch) Execute() error {
+	if !i.alreadyLocked {
+		i.store.writer.Lock()
+		defer i.store.writer.Unlock()
+	}
 	return i.store.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(i.store.bucket))
 
+		// first processed the merges
+		for k, mc := range i.merges {
+			val := b.Get([]byte(k))
+			var err error
+			val, err = mc.Merge([]byte(k), val)
+			if err != nil {
+				return err
+			}
+			if val == nil {
+				err := b.Delete([]byte(k))
+				if err != nil {
+					return err
+				}
+			} else {
+				err := b.Put([]byte(k), val)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// now process the regular get/set ops
 		for _, o := range i.ops {
 			if o.v == nil {
 				if err := b.Delete(o.k); err != nil {

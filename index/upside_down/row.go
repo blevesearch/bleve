@@ -224,6 +224,15 @@ func (tfr *TermFrequencyRow) Key() []byte {
 	return buf
 }
 
+func (tfr *TermFrequencyRow) SummaryKey() []byte {
+	buf := make([]byte, 3+len(tfr.term)+1)
+	buf[0] = 't'
+	binary.LittleEndian.PutUint16(buf[1:3], tfr.field)
+	termLen := copy(buf[3:], tfr.term)
+	buf[3+termLen] = ByteSeparator
+	return buf
+}
+
 func (tfr *TermFrequencyRow) Value() []byte {
 	buf := make([]byte, 8+4+(len(tfr.vectors)*(2+8+8+8)))
 
@@ -298,52 +307,59 @@ func NewTermFrequencyRowK(key []byte) (*TermFrequencyRow, error) {
 	return &rv, nil
 }
 
+func (tfr *TermFrequencyRow) parseV(value []byte) error {
+	buf := bytes.NewBuffer((value))
+	err := binary.Read(buf, binary.LittleEndian, &tfr.freq)
+	if err != nil {
+		return err
+	}
+	err = binary.Read(buf, binary.LittleEndian, &tfr.norm)
+	if err != nil {
+		return err
+	}
+
+	var field uint16
+	err = binary.Read(buf, binary.LittleEndian, &field)
+	if err != nil && err != io.EOF {
+		return err
+	}
+	for err != io.EOF {
+		tv := TermVector{}
+		tv.field = field
+		// at this point we expect at least one term vector
+		if tfr.vectors == nil {
+			tfr.vectors = make([]*TermVector, 0)
+		}
+
+		err = binary.Read(buf, binary.LittleEndian, &tv.pos)
+		if err != nil {
+			return err
+		}
+		err = binary.Read(buf, binary.LittleEndian, &tv.start)
+		if err != nil {
+			return err
+		}
+		err = binary.Read(buf, binary.LittleEndian, &tv.end)
+		if err != nil {
+			return err
+		}
+		tfr.vectors = append(tfr.vectors, &tv)
+		// try to read next record (may not exist)
+		err = binary.Read(buf, binary.LittleEndian, &field)
+	}
+	return nil
+}
+
 func NewTermFrequencyRowKV(key, value []byte) (*TermFrequencyRow, error) {
 	rv, err := NewTermFrequencyRowK(key)
 	if err != nil {
 		return nil, err
 	}
 
-	buf := bytes.NewBuffer((value))
-	err = binary.Read(buf, binary.LittleEndian, &rv.freq)
+	err = rv.parseV(value)
 	if err != nil {
 		return nil, err
 	}
-	err = binary.Read(buf, binary.LittleEndian, &rv.norm)
-	if err != nil {
-		return nil, err
-	}
-
-	var field uint16
-	err = binary.Read(buf, binary.LittleEndian, &field)
-	if err != nil && err != io.EOF {
-		return nil, err
-	}
-	for err != io.EOF {
-		tv := TermVector{}
-		tv.field = field
-		// at this point we expect at least one term vector
-		if rv.vectors == nil {
-			rv.vectors = make([]*TermVector, 0)
-		}
-
-		err = binary.Read(buf, binary.LittleEndian, &tv.pos)
-		if err != nil {
-			return nil, err
-		}
-		err = binary.Read(buf, binary.LittleEndian, &tv.start)
-		if err != nil {
-			return nil, err
-		}
-		err = binary.Read(buf, binary.LittleEndian, &tv.end)
-		if err != nil {
-			return nil, err
-		}
-		rv.vectors = append(rv.vectors, &tv)
-		// try to read next record (may not exist)
-		err = binary.Read(buf, binary.LittleEndian, &field)
-	}
-
 	return rv, nil
 
 }

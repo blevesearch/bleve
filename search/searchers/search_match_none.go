@@ -15,12 +15,12 @@ import (
 )
 
 type MatchNoneSearcher struct {
-	index index.Index
+	indexReader index.IndexReader
 }
 
-func NewMatchNoneSearcher(index index.Index) (*MatchNoneSearcher, error) {
+func NewMatchNoneSearcher(indexReader index.IndexReader) (*MatchNoneSearcher, error) {
 	return &MatchNoneSearcher{
-		index: index,
+		indexReader: indexReader,
 	}, nil
 }
 

@@ -10,6 +10,7 @@
 package bleve
 
 import (
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -37,12 +38,12 @@ func (q *queryStringQuery) SetBoost(b float64) Query {
 	return q
 }
 
-func (q *queryStringQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
-	newQuery, err := parseQuerySyntax(q.Query, i.m)
+func (q *queryStringQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
+	newQuery, err := parseQuerySyntax(q.Query, m)
 	if err != nil {
 		return nil, err
 	}
-	return newQuery.Searcher(i, explain)
+	return newQuery.Searcher(i, m, explain)
 }
 
 func (q *queryStringQuery) Validate() error {

@@ -15,22 +15,22 @@ import (
 )
 
 type TermPrefixSearcher struct {
-	index    index.Index
-	prefix   string
-	field    string
-	explain  bool
-	searcher *DisjunctionSearcher
+	indexReader index.IndexReader
+	prefix      string
+	field       string
+	explain     bool
+	searcher    *DisjunctionSearcher
 }
 
-func NewTermPrefixSearcher(index index.Index, prefix string, field string, boost float64, explain bool) (*TermPrefixSearcher, error) {
+func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string, field string, boost float64, explain bool) (*TermPrefixSearcher, error) {
 	// find the terms with this prefix
-	fieldReader, err := index.FieldReader(field, []byte(prefix), []byte(prefix))
+	fieldReader, err := indexReader.FieldReader(field, []byte(prefix), []byte(prefix))
 
 	// enumerate all the terms in the range
 	qsearchers := make([]search.Searcher, 0, 25)
 	tfd, err := fieldReader.Next()
 	for err == nil && tfd != nil {
-		qsearcher, err := NewTermSearcher(index, string(tfd.Term), field, 1.0, explain)
+		qsearcher, err := NewTermSearcher(indexReader, string(tfd.Term), field, 1.0, explain)
 		if err != nil {
 			return nil, err
 		}
@@ -38,17 +38,17 @@ func NewTermPrefixSearcher(index index.Index, prefix string, field string, boost
 		tfd, err = fieldReader.Next()
 	}
 	// build disjunction searcher of these ranges
-	searcher, err := NewDisjunctionSearcher(index, qsearchers, 0, explain)
+	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, explain)
 	if err != nil {
 		return nil, err
 	}
 
 	return &TermPrefixSearcher{
-		index:    index,
-		prefix:   prefix,
-		field:    field,
-		explain:  explain,
-		searcher: searcher,
+		indexReader: indexReader,
+		prefix:      prefix,
+		field:       field,
+		explain:     explain,
+		searcher:    searcher,
 	}, nil
 }
 func (s *TermPrefixSearcher) Count() uint64 {

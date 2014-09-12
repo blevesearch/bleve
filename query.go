@@ -12,6 +12,7 @@ package bleve
 import (
 	"encoding/json"
 
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -22,7 +23,7 @@ type Query interface {
 	SetBoost(b float64) Query
 	Field() string
 	SetField(f string) Query
-	Searcher(i *indexImpl, explain bool) (search.Searcher, error)
+	Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error)
 	Validate() error
 }
 

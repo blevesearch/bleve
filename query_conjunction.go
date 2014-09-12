@@ -12,6 +12,7 @@ package bleve
 import (
 	"encoding/json"
 
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
 )
@@ -44,16 +45,16 @@ func (q *conjunctionQuery) AddQuery(aq Query) *conjunctionQuery {
 	return q
 }
 
-func (q *conjunctionQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *conjunctionQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 	ss := make([]search.Searcher, len(q.Conjuncts))
 	for in, conjunct := range q.Conjuncts {
 		var err error
-		ss[in], err = conjunct.Searcher(i, explain)
+		ss[in], err = conjunct.Searcher(i, m, explain)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return searchers.NewConjunctionSearcher(i.i, ss, explain)
+	return searchers.NewConjunctionSearcher(i, ss, explain)
 }
 
 func (q *conjunctionQuery) Validate() error {

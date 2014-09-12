@@ -10,6 +10,7 @@
 package bleve
 
 import (
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
 )
@@ -48,12 +49,12 @@ func (q *prefixQuery) SetField(f string) Query {
 	return q
 }
 
-func (q *prefixQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *prefixQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
-		field = i.m.DefaultField
+		field = m.DefaultField
 	}
-	return searchers.NewTermPrefixSearcher(i.i, q.Prefix, field, q.BoostVal, explain)
+	return searchers.NewTermPrefixSearcher(i, q.Prefix, field, q.BoostVal, explain)
 }
 
 func (q *prefixQuery) Validate() error {

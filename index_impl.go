@@ -183,7 +183,9 @@ func openIndex(path string) (*indexImpl, error) {
 	}
 
 	// now load the mapping
-	mappingBytes, err := rv.i.GetInternal(mappingInternalKey)
+	indexReader := rv.i.Reader()
+	defer indexReader.Close()
+	mappingBytes, err := indexReader.GetInternal(mappingInternalKey)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +298,9 @@ func (i *indexImpl) Document(id string) (*document.Document, error) {
 	if !i.open {
 		return nil, ErrorIndexClosed
 	}
-	return i.i.Document(id)
+	indexReader := i.i.Reader()
+	defer indexReader.Close()
+	return indexReader.Document(id)
 }
 
 // DocCount returns the number of documents in the
@@ -323,14 +327,19 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 	}
 
 	collector := collectors.NewTopScorerSkipCollector(req.Size, req.From)
-	searcher, err := req.Query.Searcher(i, req.Explain)
+
+	// open a reader for this search
+	indexReader := i.i.Reader()
+	defer indexReader.Close()
+
+	searcher, err := req.Query.Searcher(indexReader, i.m, req.Explain)
 	if err != nil {
 		return nil, err
 	}
 	defer searcher.Close()
 
 	if req.Facets != nil {
-		facetsBuilder := search.NewFacetsBuilder(i.i)
+		facetsBuilder := search.NewFacetsBuilder(indexReader)
 		for facetName, facetRequest := range req.Facets {
 			if facetRequest.NumericRanges != nil {
 				// build numeric range facet
@@ -381,7 +390,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 		}
 
 		for _, hit := range hits {
-			doc, err := i.i.Document(hit.ID)
+			doc, err := indexReader.Document(hit.ID)
 			if err == nil {
 				highlightFields := req.Highlight.Fields
 				if highlightFields == nil {
@@ -403,7 +412,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 		for _, hit := range hits {
 			// FIXME avoid loading doc second time
 			// if we already loaded it for highlighting
-			doc, err := i.i.Document(hit.ID)
+			doc, err := indexReader.Document(hit.ID)
 			if err == nil {
 				for _, f := range req.Fields {
 					for _, docF := range doc.Fields {
@@ -452,7 +461,10 @@ func (i *indexImpl) Fields() ([]string, error) {
 	if !i.open {
 		return nil, ErrorIndexClosed
 	}
-	return i.i.Fields()
+
+	indexReader := i.i.Reader()
+	defer indexReader.Close()
+	return indexReader.Fields()
 }
 
 // DumpAll writes all index rows to a channel.

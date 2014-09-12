@@ -18,26 +18,26 @@ import (
 )
 
 type UpsideDownCouchFieldReader struct {
-	index    *UpsideDownCouch
-	iterator store.KVIterator
-	endKey   []byte
-	field    uint16
+	indexReader *IndexReader
+	iterator    store.KVIterator
+	endKey      []byte
+	field       uint16
 }
 
-func newUpsideDownCouchFieldReader(index *UpsideDownCouch, field uint16, startTerm, endTerm []byte) (*UpsideDownCouchFieldReader, error) {
+func newUpsideDownCouchFieldReader(indexReader *IndexReader, field uint16, startTerm, endTerm []byte) (*UpsideDownCouchFieldReader, error) {
 
 	startRow := NewTermFrequencyRow(startTerm, field, "", 0, 0)
 	startKey := startRow.ScanPrefixForFieldTermPrefix()
 
 	endKey := NewTermFrequencyRow(endTerm, field, "", 0, 0).Key()
 
-	it := index.store.Iterator(startKey)
+	it := indexReader.kvreader.Iterator(startKey)
 
 	return &UpsideDownCouchFieldReader{
-		index:    index,
-		iterator: it,
-		field:    field,
-		endKey:   endKey,
+		indexReader: indexReader,
+		iterator:    it,
+		field:       field,
+		endKey:      endKey,
 	}, nil
 
 }

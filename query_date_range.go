@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/numeric_util"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
@@ -69,22 +70,22 @@ func (q *dateRangeQuery) SetField(f string) Query {
 	return q
 }
 
-func (q *dateRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *dateRangeQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 
 	dateTimeParserName := ""
 	if q.DateTimeParser != nil {
 		dateTimeParserName = *q.DateTimeParser
 	} else {
-		dateTimeParserName = i.m.datetimeParserNameForPath(q.FieldVal)
+		dateTimeParserName = m.datetimeParserNameForPath(q.FieldVal)
 	}
-	dateTimeParser := i.m.dateTimeParserNamed(dateTimeParserName)
+	dateTimeParser := m.dateTimeParserNamed(dateTimeParserName)
 	if dateTimeParser == nil {
 		return nil, fmt.Errorf("no datetime parser named '%s' registered", *q.DateTimeParser)
 	}
 
 	field := q.FieldVal
 	if q.FieldVal == "" {
-		field = i.m.DefaultField
+		field = m.DefaultField
 	}
 
 	// now parse the endpoints
@@ -105,7 +106,7 @@ func (q *dateRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, 
 		max = numeric_util.Int64ToFloat64(endTime.UnixNano())
 	}
 
-	return searchers.NewNumericRangeSearcher(i.i, &min, &max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal, explain)
+	return searchers.NewNumericRangeSearcher(i, &min, &max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal, explain)
 }
 
 func (q *dateRangeQuery) Validate() error {

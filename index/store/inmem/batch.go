@@ -9,17 +9,35 @@
 
 package inmem
 
+import (
+	indexStore "github.com/blevesearch/bleve/index/store"
+)
+
 type Batch struct {
-	store *Store
-	keys  [][]byte
-	vals  [][]byte
+	store         *Store
+	keys          [][]byte
+	vals          [][]byte
+	alreadyLocked bool
+	merges        map[string]indexStore.AssociativeMergeChain
 }
 
 func newBatch(store *Store) *Batch {
 	rv := Batch{
-		store: store,
-		keys:  make([][]byte, 0),
-		vals:  make([][]byte, 0),
+		store:  store,
+		keys:   make([][]byte, 0),
+		vals:   make([][]byte, 0),
+		merges: make(map[string]indexStore.AssociativeMergeChain),
+	}
+	return &rv
+}
+
+func newBatchAlreadyLocked(store *Store) *Batch {
+	rv := Batch{
+		store:         store,
+		keys:          make([][]byte, 0),
+		vals:          make([][]byte, 0),
+		alreadyLocked: true,
+		merges:        make(map[string]indexStore.AssociativeMergeChain),
 	}
 	return &rv
 }
@@ -34,13 +52,56 @@ func (i *Batch) Delete(key []byte) {
 	i.vals = append(i.vals, nil)
 }
 
+func (i *Batch) Merge(key []byte, oper indexStore.AssociativeMerge) {
+	opers, ok := i.merges[string(key)]
+	if !ok {
+		opers = make(indexStore.AssociativeMergeChain, 0, 1)
+	}
+	opers = append(opers, oper)
+	i.merges[string(key)] = opers
+}
+
 func (i *Batch) Execute() error {
+	if !i.alreadyLocked {
+		i.store.writer.Lock()
+		defer i.store.writer.Unlock()
+	}
+
+	// first processed the merges
+	for k, mc := range i.merges {
+		val, err := i.store.get([]byte(k))
+		if err != nil {
+			return err
+		}
+		val, err = mc.Merge([]byte(k), val)
+		if err != nil {
+			return err
+		}
+		if val == nil {
+			err := i.store.deletelocked([]byte(k))
+			if err != nil {
+				return err
+			}
+		} else {
+			err := i.store.setlocked([]byte(k), val)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	for index, key := range i.keys {
 		val := i.vals[index]
 		if val == nil {
-			i.store.list.Delete(string(key))
+			err := i.store.deletelocked(key)
+			if err != nil {
+				return err
+			}
 		} else {
-			i.store.Set(key, val)
+			err := i.store.setlocked(key, val)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

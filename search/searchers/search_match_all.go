@@ -16,26 +16,26 @@ import (
 )
 
 type MatchAllSearcher struct {
-	index  index.Index
-	reader index.DocIDReader
-	scorer *scorers.ConstantScorer
+	indexReader index.IndexReader
+	reader      index.DocIDReader
+	scorer      *scorers.ConstantScorer
 }
 
-func NewMatchAllSearcher(index index.Index, boost float64, explain bool) (*MatchAllSearcher, error) {
-	reader, err := index.DocIDReader("", "")
+func NewMatchAllSearcher(indexReader index.IndexReader, boost float64, explain bool) (*MatchAllSearcher, error) {
+	reader, err := indexReader.DocIDReader("", "")
 	if err != nil {
 		return nil, err
 	}
 	scorer := scorers.NewConstantScorer(1.0, boost, explain)
 	return &MatchAllSearcher{
-		index:  index,
-		reader: reader,
-		scorer: scorer,
+		indexReader: indexReader,
+		reader:      reader,
+		scorer:      scorer,
 	}, nil
 }
 
 func (s *MatchAllSearcher) Count() uint64 {
-	return s.index.DocCount()
+	return s.indexReader.DocCount()
 }
 
 func (s *MatchAllSearcher) Weight() float64 {

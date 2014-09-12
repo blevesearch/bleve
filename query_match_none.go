@@ -10,6 +10,7 @@
 package bleve
 
 import (
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
 )
@@ -35,8 +36,8 @@ func (q *matchNoneQuery) SetBoost(b float64) Query {
 	return q
 }
 
-func (q *matchNoneQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
-	return searchers.NewMatchNoneSearcher(i.i)
+func (q *matchNoneQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
+	return searchers.NewMatchNoneSearcher(i)
 }
 
 func (q *matchNoneQuery) Validate() error {

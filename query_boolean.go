@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
 )
@@ -71,12 +72,12 @@ func (q *booleanQuery) SetBoost(b float64) Query {
 	return q
 }
 
-func (q *booleanQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *booleanQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 	var err error
 
 	var mustSearcher search.Searcher
 	if q.Must != nil {
-		mustSearcher, err = q.Must.Searcher(i, explain)
+		mustSearcher, err = q.Must.Searcher(i, m, explain)
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +85,7 @@ func (q *booleanQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, er
 
 	var shouldSearcher search.Searcher
 	if q.Should != nil {
-		shouldSearcher, err = q.Should.Searcher(i, explain)
+		shouldSearcher, err = q.Should.Searcher(i, m, explain)
 		if err != nil {
 			return nil, err
 		}
@@ -92,13 +93,13 @@ func (q *booleanQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, er
 
 	var mustNotSearcher search.Searcher
 	if q.MustNot != nil {
-		mustNotSearcher, err = q.MustNot.Searcher(i, explain)
+		mustNotSearcher, err = q.MustNot.Searcher(i, m, explain)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return searchers.NewBooleanSearcher(i.i, mustSearcher, shouldSearcher, mustNotSearcher, explain)
+	return searchers.NewBooleanSearcher(i, mustSearcher, shouldSearcher, mustNotSearcher, explain)
 }
 
 func (q *booleanQuery) Validate() error {

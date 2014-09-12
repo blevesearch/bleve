@@ -12,6 +12,8 @@ package upside_down
 import (
 	"bytes"
 	"sort"
+
+	"github.com/blevesearch/bleve/index/store"
 )
 
 // the functions in this file are only intended to be used by
@@ -19,12 +21,12 @@ import (
 // if your application relies on the, you're doing something wrong
 // they may change or be removed at any time
 
-func (udc *UpsideDownCouch) dumpPrefix(rv chan interface{}, prefix []byte) {
+func (udc *UpsideDownCouch) dumpPrefix(kvreader store.KVReader, rv chan interface{}, prefix []byte) {
 	start := prefix
 	if start == nil {
 		start = []byte{0}
 	}
-	it := udc.store.Iterator(start)
+	it := kvreader.Iterator(start)
 	defer it.Close()
 	key, val, valid := it.Current()
 	for valid {
@@ -49,7 +51,12 @@ func (udc *UpsideDownCouch) DumpAll() chan interface{} {
 	rv := make(chan interface{})
 	go func() {
 		defer close(rv)
-		udc.dumpPrefix(rv, nil)
+
+		// start an isolated reader for use during the dump
+		kvreader := udc.store.Reader()
+		defer kvreader.Close()
+
+		udc.dumpPrefix(kvreader, rv, nil)
 	}()
 	return rv
 }
@@ -58,7 +65,12 @@ func (udc *UpsideDownCouch) DumpFields() chan interface{} {
 	rv := make(chan interface{})
 	go func() {
 		defer close(rv)
-		udc.dumpPrefix(rv, []byte{'f'})
+
+		// start an isolated reader for use during the dump
+		kvreader := udc.store.Reader()
+		defer kvreader.Close()
+
+		udc.dumpPrefix(kvreader, rv, []byte{'f'})
 	}()
 	return rv
 }
@@ -76,7 +88,11 @@ func (udc *UpsideDownCouch) DumpDoc(id string) chan interface{} {
 	go func() {
 		defer close(rv)
 
-		back, err := udc.backIndexRowForDoc(id)
+		// start an isolated reader for use during the dump
+		kvreader := udc.store.Reader()
+		defer kvreader.Close()
+
+		back, err := udc.backIndexRowForDoc(kvreader, id)
 		if err != nil {
 			rv <- err
 			return
@@ -97,11 +113,11 @@ func (udc *UpsideDownCouch) DumpDoc(id string) chan interface{} {
 
 		// first add all the stored rows
 		storedRowPrefix := NewStoredRow(id, 0, []uint64{}, 'x', []byte{}).ScanPrefixForDoc()
-		udc.dumpPrefix(rv, storedRowPrefix)
+		udc.dumpPrefix(kvreader, rv, storedRowPrefix)
 
 		// now walk term keys in order and add them as well
 		if len(keys) > 0 {
-			it := udc.store.Iterator(keys[0])
+			it := kvreader.Iterator(keys[0])
 			defer it.Close()
 
 			for _, key := range keys {

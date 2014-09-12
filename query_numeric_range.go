@@ -10,6 +10,7 @@
 package bleve
 
 import (
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
 )
@@ -64,12 +65,12 @@ func (q *numericRangeQuery) SetField(f string) Query {
 	return q
 }
 
-func (q *numericRangeQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *numericRangeQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
-		field = i.m.DefaultField
+		field = m.DefaultField
 	}
-	return searchers.NewNumericRangeSearcher(i.i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.BoostVal, explain)
+	return searchers.NewNumericRangeSearcher(i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.BoostVal, explain)
 }
 
 func (q *numericRangeQuery) Validate() error {

@@ -48,8 +48,11 @@ func TestIndexReader(t *testing.T) {
 	}
 	expectedCount++
 
+	indexReader := idx.Reader()
+	defer indexReader.Close()
+
 	// first look for a term that doesnt exist
-	reader, err := idx.TermFieldReader([]byte("nope"), "name")
+	reader, err := indexReader.TermFieldReader([]byte("nope"), "name")
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
@@ -59,7 +62,7 @@ func TestIndexReader(t *testing.T) {
 	}
 	reader.Close()
 
-	reader, err = idx.TermFieldReader([]byte("test"), "name")
+	reader, err = indexReader.TermFieldReader([]byte("test"), "name")
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
@@ -97,7 +100,7 @@ func TestIndexReader(t *testing.T) {
 			},
 		},
 	}
-	tfr, err := idx.TermFieldReader([]byte("rice"), "desc")
+	tfr, err := indexReader.TermFieldReader([]byte("rice"), "desc")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -111,7 +114,7 @@ func TestIndexReader(t *testing.T) {
 	reader.Close()
 
 	// now test usage of advance
-	reader, err = idx.TermFieldReader([]byte("test"), "name")
+	reader, err = indexReader.TermFieldReader([]byte("test"), "name")
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
@@ -136,7 +139,7 @@ func TestIndexReader(t *testing.T) {
 	reader.Close()
 
 	// now test creating a reader for a field that doesn't exist
-	reader, err = idx.TermFieldReader([]byte("water"), "doesnotexist")
+	reader, err = indexReader.TermFieldReader([]byte("water"), "doesnotexist")
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
@@ -190,8 +193,11 @@ func TestIndexDocIdReader(t *testing.T) {
 	}
 	expectedCount++
 
+	indexReader := idx.Reader()
+	defer indexReader.Close()
+
 	// first get all doc ids
-	reader, err := idx.DocIDReader("", "")
+	reader, err := indexReader.DocIDReader("", "")
 	if err != nil {
 		t.Errorf("Error accessing doc id reader: %v", err)
 	}
@@ -208,7 +214,7 @@ func TestIndexDocIdReader(t *testing.T) {
 	}
 
 	// try it again, but jump to the second doc this time
-	reader, err = idx.DocIDReader("", "")
+	reader, err = indexReader.DocIDReader("", "")
 	if err != nil {
 		t.Errorf("Error accessing doc id reader: %v", err)
 	}

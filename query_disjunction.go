@@ -12,6 +12,7 @@ package bleve
 import (
 	"encoding/json"
 
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
 )
@@ -64,16 +65,16 @@ func (q *disjunctionQuery) SetMin(m float64) Query {
 	return q
 }
 
-func (q *disjunctionQuery) Searcher(i *indexImpl, explain bool) (search.Searcher, error) {
+func (q *disjunctionQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 	ss := make([]search.Searcher, len(q.Disjuncts))
 	for in, disjunct := range q.Disjuncts {
 		var err error
-		ss[in], err = disjunct.Searcher(i, explain)
+		ss[in], err = disjunct.Searcher(i, m, explain)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return searchers.NewDisjunctionSearcher(i.i, ss, q.MinVal, explain)
+	return searchers.NewDisjunctionSearcher(i, ss, q.MinVal, explain)
 }
 
 func (q *disjunctionQuery) Validate() error {

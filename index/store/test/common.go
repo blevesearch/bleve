@@ -10,6 +10,7 @@
 package store_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/blevesearch/bleve/index/store"
@@ -17,20 +18,21 @@ import (
 
 func CommonTestKVStore(t *testing.T, s store.KVStore) {
 
-	err := s.Set([]byte("a"), []byte("val-a"))
+	writer := s.Writer()
+	err := writer.Set([]byte("a"), []byte("val-a"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = s.Set([]byte("z"), []byte("val-z"))
+	err = writer.Set([]byte("z"), []byte("val-z"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = s.Delete([]byte("z"))
+	err = writer.Delete([]byte("z"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	batch := s.NewBatch()
+	batch := writer.NewBatch()
 	batch.Set([]byte("b"), []byte("val-b"))
 	batch.Set([]byte("c"), []byte("val-c"))
 	batch.Set([]byte("d"), []byte("val-d"))
@@ -45,8 +47,11 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	writer.Close()
 
-	it := s.Iterator([]byte("b"))
+	reader := s.Reader()
+	defer reader.Close()
+	it := reader.Iterator([]byte("b"))
 	key, val, valid := it.Current()
 	if !valid {
 		t.Fatalf("valid false, expected true")
@@ -83,4 +88,92 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 	}
 
 	it.Close()
+}
+
+func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
+	// insert a kv pair
+	writer := s.Writer()
+	err := writer.Set([]byte("a"), []byte("val-a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer.Close()
+
+	// create an isoalted reader
+	reader := s.Reader()
+	defer reader.Close()
+
+	// verify we see the value already inserted
+	val, err := reader.Get([]byte("a"))
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(val, []byte("val-a")) {
+		t.Errorf("expected val-a, got nil")
+	}
+
+	// verify that an iterator sees it
+	count := 0
+	it := reader.Iterator([]byte{0})
+	defer it.Close()
+	for it.Valid() {
+		it.Next()
+		count++
+	}
+	if count != 1 {
+		t.Errorf("expected iterator to see 1, saw %d", count)
+	}
+
+	// add something after the reader was created
+	writer = s.Writer()
+	err = writer.Set([]byte("b"), []byte("val-b"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer.Close()
+
+	// ensure that a newer reader sees it
+	newReader := s.Reader()
+	defer newReader.Close()
+	val, err = newReader.Get([]byte("b"))
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(val, []byte("val-b")) {
+		t.Errorf("expected val-b, got nil")
+	}
+
+	// ensure director iterator sees it
+	count = 0
+	it = newReader.Iterator([]byte{0})
+	defer it.Close()
+	for it.Valid() {
+		it.Next()
+		count++
+	}
+	if count != 2 {
+		t.Errorf("expected iterator to see 2, saw %d", count)
+	}
+
+	// but that the isolated reader does not
+	val, err = reader.Get([]byte("b"))
+	if err != nil {
+		t.Error(err)
+	}
+	if val != nil {
+		t.Errorf("expected nil, got %v", val)
+	}
+
+	// and ensure that the iterator on the isolated reader also does not
+	count = 0
+	it = reader.Iterator([]byte{0})
+	defer it.Close()
+	for it.Valid() {
+		it.Next()
+		count++
+	}
+	if count != 1 {
+		t.Errorf("expected iterator to see 1, saw %d", count)
+	}
+
 }

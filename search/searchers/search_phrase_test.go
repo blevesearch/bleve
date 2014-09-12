@@ -17,19 +17,22 @@ import (
 
 func TestPhraseSearch(t *testing.T) {
 
-	angstTermSearcher, err := NewTermSearcher(twoDocIndex, "angst", "desc", 1.0, true)
+	twoDocIndexReader := twoDocIndex.Reader()
+	defer twoDocIndexReader.Close()
+
+	angstTermSearcher, err := NewTermSearcher(twoDocIndexReader, "angst", "desc", 1.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerTermSearcher, err := NewTermSearcher(twoDocIndex, "beer", "desc", 1.0, true)
+	beerTermSearcher, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher, err := NewConjunctionSearcher(twoDocIndex, []search.Searcher{angstTermSearcher, beerTermSearcher}, true)
+	mustSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{angstTermSearcher, beerTermSearcher}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	phraseSearcher, err := NewPhraseSearcher(twoDocIndex, mustSearcher, []string{"angst", "beer"})
+	phraseSearcher, err := NewPhraseSearcher(twoDocIndexReader, mustSearcher, []string{"angst", "beer"})
 	if err != nil {
 		t.Fatal(err)
 	}

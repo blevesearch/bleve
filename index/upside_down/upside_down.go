@@ -11,7 +11,6 @@ package upside_down
 
 import (
 	"bytes"
-	"fmt"
 	"math"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -45,20 +44,20 @@ func NewUpsideDownCouch(s store.KVStore) *UpsideDownCouch {
 	}
 }
 
-func (udc *UpsideDownCouch) init() (err error) {
+func (udc *UpsideDownCouch) init(kvwriter store.KVWriter) (err error) {
 	// prepare a list of rows
 	rows := make([]UpsideDownCouchRow, 0)
 
 	// version marker
 	rows = append(rows, NewVersionRow(udc.version))
 
-	return udc.batchRows(nil, rows, nil)
+	return udc.batchRows(kvwriter, nil, rows, nil)
 }
 
-func (udc *UpsideDownCouch) loadSchema() (err error) {
+func (udc *UpsideDownCouch) loadSchema(kvreader store.KVReader) (err error) {
 
 	keyPrefix := []byte{'f'}
-	it := udc.store.Iterator(keyPrefix)
+	it := kvreader.Iterator(keyPrefix)
 	defer it.Close()
 
 	it.Seek(keyPrefix)
@@ -85,33 +84,18 @@ func (udc *UpsideDownCouch) loadSchema() (err error) {
 	return
 }
 
-func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows []UpsideDownCouchRow, deleteRows []UpsideDownCouchRow) (err error) {
+func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDownCouchRow, updateRows []UpsideDownCouchRow, deleteRows []UpsideDownCouchRow) (err error) {
 
 	// prepare batch
-	wb := udc.store.NewBatch()
+	wb := writer.NewBatch()
 
 	// add
 	for _, row := range addRows {
 		tfr, ok := row.(*TermFrequencyRow)
 		if ok {
 			// need to increment counter
-			tr := NewTermFrequencyRow(tfr.term, tfr.field, "", 0, 0)
-			val, err := udc.store.Get(tr.Key())
-			if err != nil {
-				return err
-			}
-			if val != nil {
-				tr, err = NewTermFrequencyRowKV(tr.Key(), val)
-				if err != nil {
-					return err
-				}
-				tr.freq++ // incr
-			} else {
-				tr = NewTermFrequencyRow(tfr.term, tfr.field, "", 1, 0)
-			}
-
-			// now add this to the batch
-			wb.Set(tr.Key(), tr.Value())
+			summaryKey := tfr.SummaryKey()
+			wb.Merge(summaryKey, newTermSummaryIncr())
 		}
 		wb.Set(row.Key(), row.Value())
 	}
@@ -126,28 +110,8 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 		tfr, ok := row.(*TermFrequencyRow)
 		if ok {
 			// need to decrement counter
-			tr := NewTermFrequencyRow(tfr.term, tfr.field, "", 0, 0)
-			val, err := udc.store.Get(tr.Key())
-			if err != nil {
-				return err
-			}
-			if val != nil {
-				tr, err = NewTermFrequencyRowKV(tr.Key(), val)
-				if err != nil {
-					return err
-				}
-				tr.freq-- // incr
-			} else {
-				return fmt.Errorf("unexpected missing row, deleting term, expected count row to exist: %v", tr.Key())
-			}
-
-			if tr.freq == 0 {
-				wb.Delete(tr.Key())
-			} else {
-				// now add this to the batch
-				wb.Set(tr.Key(), tr.Value())
-			}
-
+			summaryKey := tfr.SummaryKey()
+			wb.Merge(summaryKey, newTermSummaryDecr())
 		}
 		wb.Delete(row.Key())
 	}
@@ -157,7 +121,6 @@ func (udc *UpsideDownCouch) batchRows(addRows []UpsideDownCouchRow, updateRows [
 	if err != nil {
 		return
 	}
-	err = udc.store.Commit()
 	return
 }
 
@@ -165,32 +128,35 @@ func (udc *UpsideDownCouch) DocCount() uint64 {
 	return udc.docCount
 }
 
-func (udc *UpsideDownCouch) Open() (err error) {
-	var value []byte
-	value, err = udc.store.Get(VersionKey)
+func (udc *UpsideDownCouch) Open() error {
+	// start a writer for the open process
+	kvwriter := udc.store.Writer()
+	defer kvwriter.Close()
+
+	value, err := kvwriter.Get(VersionKey)
 	if err != nil {
-		return
+		return err
 	}
 
 	// init new index OR load schema
 	if value == nil {
-		err = udc.init()
+		err = udc.init(kvwriter)
 		if err != nil {
-			return
+			return err
 		}
 	} else {
-		err = udc.loadSchema()
+		err = udc.loadSchema(kvwriter)
 		if err != nil {
-			return
+			return err
 		}
 	}
 	// set doc count
-	udc.docCount = udc.countDocs()
-	return
+	udc.docCount = udc.countDocs(kvwriter)
+	return nil
 }
 
-func (udc *UpsideDownCouch) countDocs() uint64 {
-	it := udc.store.Iterator([]byte{'b'})
+func (udc *UpsideDownCouch) countDocs(kvreader store.KVReader) uint64 {
+	it := kvreader.Iterator([]byte{'b'})
 	defer it.Close()
 
 	var rv uint64
@@ -208,7 +174,10 @@ func (udc *UpsideDownCouch) countDocs() uint64 {
 }
 
 func (udc *UpsideDownCouch) rowCount() uint64 {
-	it := udc.store.Iterator([]byte{0})
+	// start an isolated reader for use during the rowcount
+	kvreader := udc.store.Reader()
+	defer kvreader.Close()
+	it := kvreader.Iterator([]byte{0})
 	defer it.Close()
 
 	var rv uint64
@@ -227,9 +196,13 @@ func (udc *UpsideDownCouch) Close() {
 }
 
 func (udc *UpsideDownCouch) Update(doc *document.Document) error {
+	// start a writer for this update
+	kvwriter := udc.store.Writer()
+	defer kvwriter.Close()
+
 	// first we lookup the backindex row for the doc id if it exists
 	// lookup the back index row
-	backIndexRow, err := udc.backIndexRowForDoc(doc.ID)
+	backIndexRow, err := udc.backIndexRowForDoc(kvwriter, doc.ID)
 	if err != nil {
 		return err
 	}
@@ -241,7 +214,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 
 	addRows, updateRows, deleteRows = udc.updateSingle(doc, backIndexRow, addRows, updateRows, deleteRows)
 
-	err = udc.batchRows(addRows, updateRows, deleteRows)
+	err = udc.batchRows(kvwriter, addRows, updateRows, deleteRows)
 	if err == nil && backIndexRow == nil {
 		udc.docCount++
 	}
@@ -426,8 +399,12 @@ func (udc *UpsideDownCouch) fieldNameToFieldIndex(fieldName string) (uint16, *Fi
 }
 
 func (udc *UpsideDownCouch) Delete(id string) error {
+	// start a writer for this delete
+	kvwriter := udc.store.Writer()
+	defer kvwriter.Close()
+
 	// lookup the back index row
-	backIndexRow, err := udc.backIndexRowForDoc(id)
+	backIndexRow, err := udc.backIndexRowForDoc(kvwriter, id)
 	if err != nil {
 		return err
 	}
@@ -438,7 +415,7 @@ func (udc *UpsideDownCouch) Delete(id string) error {
 	deleteRows := make([]UpsideDownCouchRow, 0)
 	deleteRows = udc.deleteSingle(id, backIndexRow, deleteRows)
 
-	err = udc.batchRows(nil, nil, deleteRows)
+	err = udc.batchRows(kvwriter, nil, nil, deleteRows)
 	if err == nil {
 		udc.docCount--
 	}
@@ -461,13 +438,13 @@ func (udc *UpsideDownCouch) deleteSingle(id string, backIndexRow *BackIndexRow, 
 	return deleteRows
 }
 
-func (udc *UpsideDownCouch) backIndexRowForDoc(docID string) (*BackIndexRow, error) {
+func (udc *UpsideDownCouch) backIndexRowForDoc(kvreader store.KVReader, docID string) (*BackIndexRow, error) {
 	// use a temporary row structure to build key
 	tempRow := &BackIndexRow{
 		doc: []byte(docID),
 	}
 	key := tempRow.Key()
-	value, err := udc.store.Get(key)
+	value, err := kvreader.Get(key)
 	if err != nil {
 		return nil, err
 	}
@@ -481,117 +458,16 @@ func (udc *UpsideDownCouch) backIndexRowForDoc(docID string) (*BackIndexRow, err
 	return backIndexRow, nil
 }
 
-func (udc *UpsideDownCouch) backIndexRowsForBatch(batch index.Batch) (map[string]*BackIndexRow, error) {
+func (udc *UpsideDownCouch) backIndexRowsForBatch(kvreader store.KVReader, batch index.Batch) (map[string]*BackIndexRow, error) {
 	// FIXME faster to order the ids and scan sequentially
 	// for now just get it working
 	rv := make(map[string]*BackIndexRow, 0)
 	for docID := range batch {
-		backIndexRow, err := udc.backIndexRowForDoc(docID)
+		backIndexRow, err := udc.backIndexRowForDoc(kvreader, docID)
 		if err != nil {
 			return nil, err
 		}
 		rv[docID] = backIndexRow
-	}
-	return rv, nil
-}
-
-func (udc *UpsideDownCouch) Fields() ([]string, error) {
-	rv := make([]string, 0)
-	it := udc.store.Iterator([]byte{'f'})
-	defer it.Close()
-	key, val, valid := it.Current()
-	for valid {
-		if !bytes.HasPrefix(key, []byte{'f'}) {
-			break
-		}
-		row, err := ParseFromKeyValue(key, val)
-		if err != nil {
-			return nil, err
-		}
-		if row != nil {
-			fieldRow, ok := row.(*FieldRow)
-			if ok {
-				rv = append(rv, fieldRow.name)
-			}
-		}
-
-		it.Next()
-		key, val, valid = it.Current()
-	}
-	return rv, nil
-}
-
-func (udc *UpsideDownCouch) TermFieldReader(term []byte, fieldName string) (index.TermFieldReader, error) {
-	fieldIndex, fieldExists := udc.fieldIndexes[fieldName]
-	if fieldExists {
-		return newUpsideDownCouchTermFieldReader(udc, term, uint16(fieldIndex))
-	}
-	return newUpsideDownCouchTermFieldReader(udc, []byte{ByteSeparator}, ^uint16(0))
-}
-
-func (udc *UpsideDownCouch) FieldReader(fieldName string, startTerm []byte, endTerm []byte) (index.FieldReader, error) {
-	fieldIndex, fieldExists := udc.fieldIndexes[fieldName]
-	if fieldExists {
-		return newUpsideDownCouchFieldReader(udc, uint16(fieldIndex), startTerm, endTerm)
-	}
-	return newUpsideDownCouchTermFieldReader(udc, []byte{ByteSeparator}, ^uint16(0))
-}
-
-func (udc *UpsideDownCouch) DocIDReader(start, end string) (index.DocIDReader, error) {
-	return newUpsideDownCouchDocIDReader(udc, start, end)
-}
-
-func (udc *UpsideDownCouch) Document(id string) (*document.Document, error) {
-	// first hit the back index to confirm doc exists
-	backIndexRow, err := udc.backIndexRowForDoc(id)
-	if err != nil {
-		return nil, err
-	}
-	if backIndexRow == nil {
-		return nil, nil
-	}
-	rv := document.NewDocument(id)
-	storedRow := NewStoredRow(id, 0, []uint64{}, 'x', nil)
-	storedRowScanPrefix := storedRow.ScanPrefixForDoc()
-	it := udc.store.Iterator(storedRowScanPrefix)
-	defer it.Close()
-	key, val, valid := it.Current()
-	for valid {
-		if !bytes.HasPrefix(key, storedRowScanPrefix) {
-			break
-		}
-		row, err := NewStoredRowKV(key, val)
-		if err != nil {
-			return nil, err
-		}
-		if row != nil {
-			fieldName := udc.fieldIndexToName(row.field)
-			field := decodeFieldType(row.typ, fieldName, row.value)
-			if field != nil {
-				rv.AddField(field)
-			}
-		}
-
-		it.Next()
-		key, val, valid = it.Current()
-	}
-	return rv, nil
-}
-
-func (udc *UpsideDownCouch) DocumentFieldTerms(id string) (index.FieldTerms, error) {
-	back, err := udc.backIndexRowForDoc(id)
-	if err != nil {
-		return nil, err
-	}
-	rv := make(index.FieldTerms, len(back.termEntries))
-	for _, entry := range back.termEntries {
-		fieldName := udc.fieldIndexToName(uint16(*entry.Field))
-		terms, ok := rv[fieldName]
-		if !ok {
-			terms = make([]string, 0)
-		}
-		terms = append(terms, *entry.Term)
-		rv[fieldName] = terms
 	}
 	return rv, nil
 }
@@ -664,8 +540,12 @@ func (udc *UpsideDownCouch) fieldIndexToName(i uint16) string {
 }
 
 func (udc *UpsideDownCouch) Batch(batch index.Batch) error {
+	// start a writer for this batch
+	kvwriter := udc.store.Writer()
+	defer kvwriter.Close()
+
 	// first lookup all the back index rows
-	backIndexRows, err := udc.backIndexRowsForBatch(batch)
+	backIndexRows, err := udc.backIndexRowsForBatch(kvwriter, batch)
 	if err != nil {
 		return err
 	}
@@ -691,7 +571,7 @@ func (udc *UpsideDownCouch) Batch(batch index.Batch) error {
 		}
 	}
 
-	err = udc.batchRows(addRows, updateRows, deleteRows)
+	err = udc.batchRows(kvwriter, addRows, updateRows, deleteRows)
 	if err == nil {
 		udc.docCount += docsAdded
 		udc.docCount -= docsDeleted
@@ -701,15 +581,22 @@ func (udc *UpsideDownCouch) Batch(batch index.Batch) error {
 
 func (udc *UpsideDownCouch) SetInternal(key, val []byte) error {
 	internalRow := NewInternalRow(key, val)
-	return udc.store.Set(internalRow.Key(), internalRow.Value())
-}
-
-func (udc *UpsideDownCouch) GetInternal(key []byte) ([]byte, error) {
-	internalRow := NewInternalRow(key, nil)
-	return udc.store.Get(internalRow.Key())
+	writer := udc.store.Writer()
+	defer writer.Close()
+	return writer.Set(internalRow.Key(), internalRow.Value())
 }
 
 func (udc *UpsideDownCouch) DeleteInternal(key []byte) error {
 	internalRow := NewInternalRow(key, nil)
-	return udc.store.Delete(internalRow.Key())
+	writer := udc.store.Writer()
+	defer writer.Close()
+	return writer.Delete(internalRow.Key())
+}
+
+func (udc *UpsideDownCouch) Reader() index.IndexReader {
+	return &IndexReader{
+		index:    udc,
+		kvreader: udc.store.Reader(),
+		docCount: udc.docCount,
+	}
 }

@@ -11,6 +11,7 @@ package boltdb
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
@@ -23,6 +24,7 @@ type Store struct {
 	path   string
 	bucket string
 	db     *bolt.DB
+	writer sync.Mutex
 }
 
 func Open(path string, bucket string) (*Store, error) {
@@ -49,7 +51,7 @@ func Open(path string, bucket string) (*Store, error) {
 	return &rv, nil
 }
 
-func (bs *Store) Get(key []byte) ([]byte, error) {
+func (bs *Store) get(key []byte) ([]byte, error) {
 	var rv []byte
 
 	err := bs.db.View(func(tx *bolt.Tx) error {
@@ -61,33 +63,49 @@ func (bs *Store) Get(key []byte) ([]byte, error) {
 	return rv, err
 }
 
-func (bs *Store) Set(key, val []byte) error {
+func (bs *Store) set(key, val []byte) error {
+	bs.writer.Lock()
+	defer bs.writer.Unlock()
+	return bs.setlocked(key, val)
+}
+
+func (bs *Store) setlocked(key, val []byte) error {
 	return bs.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte(bs.bucket)).Put(key, val)
 	})
 }
 
-func (bs *Store) Delete(key []byte) error {
+func (bs *Store) delete(key []byte) error {
+	bs.writer.Lock()
+	defer bs.writer.Unlock()
+	return bs.deletelocked(key)
+}
+
+func (bs *Store) deletelocked(key []byte) error {
 	return bs.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte(bs.bucket)).Delete(key)
 	})
-}
-
-func (bs *Store) Commit() error {
-	return nil
 }
 
 func (bs *Store) Close() error {
 	return bs.db.Close()
 }
 
-func (bs *Store) Iterator(key []byte) store.KVIterator {
+func (bs *Store) iterator(key []byte) store.KVIterator {
 	rv := newIterator(bs)
 	rv.Seek(key)
 	return rv
 }
 
-func (bs *Store) NewBatch() store.KVBatch {
+func (bs *Store) Reader() store.KVReader {
+	return newReader(bs)
+}
+
+func (bs *Store) Writer() store.KVWriter {
+	return newWriter(bs)
+}
+
+func (bs *Store) newBatch() store.KVBatch {
 	return newBatch(bs)
 }
 

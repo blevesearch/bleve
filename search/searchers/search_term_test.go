@@ -88,7 +88,10 @@ func TestTermSearcher(t *testing.T) {
 		},
 	})
 
-	searcher, err := NewTermSearcher(i, queryTerm, queryField, queryBoost, queryExplain)
+	indexReader := i.Reader()
+	defer indexReader.Close()
+
+	searcher, err := NewTermSearcher(indexReader, queryTerm, queryField, queryBoost, queryExplain)
 	if err != nil {
 		t.Fatal(err)
 	}

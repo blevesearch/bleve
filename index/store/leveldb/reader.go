@@ -12,32 +12,33 @@
 package leveldb
 
 import (
-	"os"
-	"testing"
-
-	"github.com/blevesearch/bleve/index/store/test"
+	"github.com/blevesearch/bleve/index/store"
+	"github.com/jmhodges/levigo"
 )
 
-func TestLevelDBStore(t *testing.T) {
-	defer os.RemoveAll("test")
-
-	s, err := Open("test", true, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
-
-	store_test.CommonTestKVStore(t, s)
+type Reader struct {
+	store    *Store
+	snapshot *levigo.Snapshot
 }
 
-func TestReaderIsolation(t *testing.T) {
-	defer os.RemoveAll("test")
-
-	s, err := Open("test", true, true)
-	if err != nil {
-		t.Fatal(err)
+func newReader(store *Store) *Reader {
+	return &Reader{
+		store:    store,
+		snapshot: store.db.NewSnapshot(),
 	}
-	defer s.Close()
+}
 
-	store_test.CommonTestReaderIsolation(t, s)
+func (r *Reader) Get(key []byte) ([]byte, error) {
+	return r.store.getWithSnapshot(key, r.snapshot)
+}
+
+func (r *Reader) Iterator(key []byte) store.KVIterator {
+	rv := newIteratorWithSnapshot(r.store, r.snapshot)
+	rv.Seek(key)
+	return rv
+}
+
+func (r *Reader) Close() error {
+	r.store.db.ReleaseSnapshot(r.snapshot)
+	return nil
 }

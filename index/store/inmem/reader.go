@@ -7,31 +7,30 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package boltdb
+package inmem
 
 import (
-	"os"
-	"testing"
-
-	"github.com/blevesearch/bleve/index/store/test"
+	"github.com/blevesearch/bleve/index/store"
 )
 
-func TestStore(t *testing.T) {
-	s, err := Open("test", "bleve")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll("test")
-
-	store_test.CommonTestKVStore(t, s)
+type Reader struct {
+	store *Store
 }
 
-func TestReaderIsolation(t *testing.T) {
-	s, err := Open("test", "bleve")
-	if err != nil {
-		t.Fatal(err)
+func newReader(store *Store) *Reader {
+	return &Reader{
+		store: store,
 	}
-	defer os.RemoveAll("test")
+}
 
-	store_test.CommonTestReaderIsolation(t, s)
+func (r *Reader) Get(key []byte) ([]byte, error) {
+	return r.store.get(key)
+}
+
+func (r *Reader) Iterator(key []byte) store.KVIterator {
+	return r.store.iterator(key)
+}
+
+func (r *Reader) Close() error {
+	return nil
 }

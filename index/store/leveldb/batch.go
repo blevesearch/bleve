@@ -12,35 +12,96 @@
 package leveldb
 
 import (
+	indexStore "github.com/blevesearch/bleve/index/store"
 	"github.com/jmhodges/levigo"
 )
 
-type LevelDBBatch struct {
-	store *LevelDBStore
-	batch *levigo.WriteBatch
+type op struct {
+	k []byte
+	v []byte
 }
 
-func newLevelDBBatch(store *LevelDBStore) *LevelDBBatch {
-	rv := LevelDBBatch{
-		store: store,
-		batch: levigo.NewWriteBatch(),
+type Batch struct {
+	store         *Store
+	ops           []op
+	alreadyLocked bool
+	merges        map[string]indexStore.AssociativeMergeChain
+}
+
+func newBatch(store *Store) *Batch {
+	rv := Batch{
+		store:  store,
+		ops:    make([]op, 0),
+		merges: make(map[string]indexStore.AssociativeMergeChain),
 	}
 	return &rv
 }
 
-func (ldb *LevelDBBatch) Set(key, val []byte) {
-	ldb.batch.Put(key, val)
+func newBatchAlreadyLocked(store *Store) *Batch {
+	rv := Batch{
+		store:         store,
+		ops:           make([]op, 0),
+		alreadyLocked: true,
+		merges:        make(map[string]indexStore.AssociativeMergeChain),
+	}
+	return &rv
 }
 
-func (ldb *LevelDBBatch) Delete(key []byte) {
-	ldb.batch.Delete(key)
+func (ldb *Batch) Set(key, val []byte) {
+	ldb.ops = append(ldb.ops, op{key, val})
 }
 
-func (ldb *LevelDBBatch) Execute() error {
-	return ldb.store.db.Write(defaultWriteOptions(), ldb.batch)
+func (ldb *Batch) Delete(key []byte) {
+	ldb.ops = append(ldb.ops, op{key, nil})
 }
 
-func (ldb *LevelDBBatch) Close() error {
-	ldb.batch.Close()
+func (ldb *Batch) Merge(key []byte, oper indexStore.AssociativeMerge) {
+	opers, ok := ldb.merges[string(key)]
+	if !ok {
+		opers = make(indexStore.AssociativeMergeChain, 0, 1)
+	}
+	opers = append(opers, oper)
+	ldb.merges[string(key)] = opers
+}
+
+func (ldb *Batch) Execute() error {
+	if !ldb.alreadyLocked {
+		ldb.store.writer.Lock()
+		defer ldb.store.writer.Unlock()
+	}
+
+	batch := levigo.NewWriteBatch()
+	defer batch.Close()
+
+	// first processed the merges
+	for k, mc := range ldb.merges {
+		val, err := ldb.store.get([]byte(k))
+		if err != nil {
+			return err
+		}
+		val, err = mc.Merge([]byte(k), val)
+		if err != nil {
+			return err
+		}
+		if val == nil {
+			batch.Delete([]byte(k))
+		} else {
+			batch.Put([]byte(k), val)
+		}
+	}
+
+	// now add all the other ops to the batch
+	for _, op := range ldb.ops {
+		if op.v == nil {
+			batch.Delete(op.k)
+		} else {
+			batch.Put(op.k, op.v)
+		}
+	}
+
+	return ldb.store.db.Write(defaultWriteOptions(), batch)
+}
+
+func (ldb *Batch) Close() error {
 	return nil
 }

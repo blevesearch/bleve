@@ -19,7 +19,7 @@ import (
 
 type BooleanSearcher struct {
 	initialized     bool
-	index           index.Index
+	indexReader     index.IndexReader
 	mustSearcher    search.Searcher
 	shouldSearcher  search.Searcher
 	mustNotSearcher search.Searcher
@@ -32,10 +32,10 @@ type BooleanSearcher struct {
 	scorer          *scorers.ConjunctionQueryScorer
 }
 
-func NewBooleanSearcher(index index.Index, mustSearcher search.Searcher, shouldSearcher search.Searcher, mustNotSearcher search.Searcher, explain bool) (*BooleanSearcher, error) {
+func NewBooleanSearcher(indexReader index.IndexReader, mustSearcher search.Searcher, shouldSearcher search.Searcher, mustNotSearcher search.Searcher, explain bool) (*BooleanSearcher, error) {
 	// build our searcher
 	rv := BooleanSearcher{
-		index:           index,
+		indexReader:     indexReader,
 		mustSearcher:    mustSearcher,
 		shouldSearcher:  shouldSearcher,
 		mustNotSearcher: mustNotSearcher,

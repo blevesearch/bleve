@@ -17,29 +17,38 @@ type Index interface {
 	Open() error
 	Close()
 
+	DocCount() uint64
+
 	Update(doc *document.Document) error
 	Delete(id string) error
 	Batch(batch Batch) error
 
+	SetInternal(key, val []byte) error
+	DeleteInternal(key []byte) error
+
+	DumpAll() chan interface{}
+	DumpDoc(id string) chan interface{}
+	DumpFields() chan interface{}
+
+	Reader() IndexReader
+}
+
+type IndexReader interface {
 	TermFieldReader(term []byte, field string) (TermFieldReader, error)
 	DocIDReader(start, end string) (DocIDReader, error)
 
 	FieldReader(field string, startTerm []byte, endTerm []byte) (FieldReader, error)
-
-	DocCount() uint64
 
 	Document(id string) (*document.Document, error)
 	DocumentFieldTerms(id string) (FieldTerms, error)
 
 	Fields() ([]string, error)
 
-	SetInternal(key, val []byte) error
 	GetInternal(key []byte) ([]byte, error)
-	DeleteInternal(key []byte) error
 
-	DumpAll() chan interface{}
-	DumpDoc(id string) chan interface{}
-	DumpFields() chan interface{}
+	DocCount() uint64
+
+	Close()
 }
 
 type FieldTerms map[string][]string
