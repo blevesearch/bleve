@@ -40,8 +40,11 @@ func NewKagomeMorphTokenizerWithUserDic(userdic *dic.UserDic) *KagomeMorphTokeni
 }
 
 func (t *KagomeMorphTokenizer) Tokenize(input []byte) analysis.TokenStream {
-	var morphs []tokenizer.Morph
-	var err error
+	var (
+		morphs    []tokenizer.Morph
+		err       error
+		prevstart int
+	)
 
 	rv := make(analysis.TokenStream, 0)
 	if len(input) < 1 {
@@ -58,13 +61,16 @@ func (t *KagomeMorphTokenizer) Tokenize(input []byte) analysis.TokenStream {
 			continue
 		}
 
+		surfacelen := len(m.Surface)
 		token := &analysis.Token{
 			Term:     []byte(m.Surface),
 			Position: i + 1,
-			Start:    m.Start,
-			End:      m.End,
+			Start:    prevstart,
+			End:      prevstart + surfacelen,
 			Type:     analysis.Ideographic,
 		}
+
+		prevstart = prevstart + surfacelen
 		rv = append(rv, token)
 	}
 

@@ -29,14 +29,14 @@ func TestKagome(t *testing.T) {
 			analysis.TokenStream{
 				{
 					Start:    0,
-					End:      5,
+					End:      15,
 					Term:     []byte("こんにちは"),
 					Position: 1,
 					Type:     analysis.Ideographic,
 				},
 				{
-					Start:    5,
-					End:      7,
+					Start:    15,
+					End:      21,
 					Term:     []byte("世界"),
 					Position: 2,
 					Type:     analysis.Ideographic,
