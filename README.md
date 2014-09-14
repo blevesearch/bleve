@@ -28,6 +28,10 @@ Discuss usage and development of bleve in the [google group](https://groups.goog
 ## Indexing
 
 		message := struct{
+			Id   string,
+			From string,
+			Body string,
+		}{
 			Id:   "example",
 			From: "marty.schoch@gmail.com",
 			Body: "bleve indexing is easy",
