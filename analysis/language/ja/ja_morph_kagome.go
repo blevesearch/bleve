@@ -9,7 +9,7 @@
 
 // +build kagome full
 
-package ja_morph_kagome
+package ja
 
 import (
 	"github.com/blevesearch/bleve/analysis"
@@ -19,7 +19,7 @@ import (
 	"github.com/ikawaha/kagome/tokenizer"
 )
 
-const Name = "kagome"
+const TokenizerName = "kagome"
 
 type KagomeMorphTokenizer struct {
 	tok *tokenizer.Tokenizer
@@ -82,5 +82,5 @@ func KagomeMorphTokenizerConstructor(config map[string]interface{}, cache *regis
 }
 
 func init() {
-	registry.RegisterTokenizer(Name, KagomeMorphTokenizerConstructor)
+	registry.RegisterTokenizer(TokenizerName, KagomeMorphTokenizerConstructor)
 }

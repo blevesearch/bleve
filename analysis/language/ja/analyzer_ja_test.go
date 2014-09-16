@@ -7,50 +7,63 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-// +build kagome full
-
-package ja_morph_kagome
+package ja
 
 import (
 	"reflect"
 	"testing"
 
 	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/registry"
 )
 
-func TestKagome(t *testing.T) {
-
+func TestJaAnalyzer(t *testing.T) {
 	tests := []struct {
 		input  []byte
 		output analysis.TokenStream
 	}{
 		{
-			[]byte("こんにちは世界"),
-			analysis.TokenStream{
-				{
+			input: []byte("こんにちは世界"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term:     []byte("こんにちは"),
+					Type:     analysis.Ideographic,
+					Position: 1,
 					Start:    0,
 					End:      15,
-					Term:     []byte("こんにちは"),
-					Position: 1,
-					Type:     analysis.Ideographic,
 				},
-				{
+				&analysis.Token{
+					Term:     []byte("世界"),
+					Type:     analysis.Ideographic,
+					Position: 2,
 					Start:    15,
 					End:      21,
-					Term:     []byte("世界"),
-					Position: 2,
+				},
+			},
+		},
+		{
+			input: []byte("ｶﾀｶﾅ"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term:     []byte("カタカナ"),
 					Type:     analysis.Ideographic,
+					Position: 1,
+					Start:    0,
+					End:      12,
 				},
 			},
 		},
 	}
 
-	tokenizer := NewKagomeMorphTokenizer()
+	cache := registry.NewCache()
 	for _, test := range tests {
-		actuals := tokenizer.Tokenize(test.input)
-
-		if !reflect.DeepEqual(actuals, test.output) {
-			t.Errorf("Expected %v, got %v for %s", test.output, actuals, string(test.input))
+		analyzer, err := cache.AnalyzerNamed(AnalyzerName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actual := analyzer.Analyze(test.input)
+		if !reflect.DeepEqual(actual, test.output) {
+			t.Errorf("expected %v, got %v", test.output, actual)
 		}
 	}
 }
