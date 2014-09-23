@@ -27,18 +27,14 @@ func NewSoraniStemmerFilter() *SoraniStemmerFilter {
 }
 
 func (s *SoraniStemmerFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
-	rv := make(analysis.TokenStream, 0)
-
 	for _, token := range input {
 		// if not protected keyword, stem it
 		if !token.KeyWord {
 			stemmed := stem(token.Term)
 			token.Term = stemmed
 		}
-		rv = append(rv, token)
 	}
-
-	return rv
+	return input
 }
 
 func stem(input []byte) []byte {

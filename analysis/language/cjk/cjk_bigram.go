@@ -32,7 +32,7 @@ func (s *CJKBigramFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
 	r := ring.New(2)
 	itemsInRing := 0
 
-	rv := make(analysis.TokenStream, 0)
+	rv := make(analysis.TokenStream, 0, len(input))
 
 	for _, token := range input {
 		if token.Type == analysis.Ideographic {

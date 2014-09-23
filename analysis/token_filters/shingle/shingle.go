@@ -32,7 +32,7 @@ func NewShingleFilter(min, max int, outputOriginal bool, sep, fill string) *Shin
 }
 
 func (s *ShingleFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
-	rv := make(analysis.TokenStream, 0)
+	rv := make(analysis.TokenStream, 0, len(input))
 
 	currentPosition := 0
 	for _, token := range input {

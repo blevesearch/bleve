@@ -31,8 +31,6 @@ func NewTruncateTokenFilter(length int) *TruncateTokenFilter {
 }
 
 func (s *TruncateTokenFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
-	rv := make(analysis.TokenStream, 0)
-
 	for _, token := range input {
 		wordLen := utf8.RuneCount(token.Term)
 		if wordLen > s.length {
@@ -45,10 +43,8 @@ func (s *TruncateTokenFilter) Filter(input analysis.TokenStream) analysis.TokenS
 			}
 			token.Term = newterm
 		}
-		rv = append(rv, token)
 	}
-
-	return rv
+	return input
 }
 
 func TruncateTokenFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {

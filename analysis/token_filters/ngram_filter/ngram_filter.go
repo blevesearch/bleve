@@ -33,7 +33,7 @@ func NewNgramFilter(minLength, maxLength int) *NgramFilter {
 }
 
 func (s *NgramFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
-	rv := make(analysis.TokenStream, 0)
+	rv := make(analysis.TokenStream, 0, len(input))
 
 	for _, token := range input {
 		runeCount := utf8.RuneCount(token.Term)

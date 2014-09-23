@@ -32,7 +32,6 @@ func NewPossessiveFilter() *PossessiveFilter {
 }
 
 func (s *PossessiveFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
-
 	for _, token := range input {
 		runes := bytes.Runes(token.Term)
 		if len(runes) >= 2 {
@@ -46,7 +45,6 @@ func (s *PossessiveFilter) Filter(input analysis.TokenStream) analysis.TokenStre
 			}
 		}
 	}
-
 	return input
 }
 

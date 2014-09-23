@@ -35,8 +35,6 @@ func NewElisionFilter(articles analysis.TokenMap) *ElisionFilter {
 }
 
 func (s *ElisionFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
-	rv := make(analysis.TokenStream, 0)
-
 	for _, token := range input {
 		firstApostrophe := bytes.IndexAny(token.Term, Apostrophes)
 		if firstApostrophe >= 0 {
@@ -48,10 +46,8 @@ func (s *ElisionFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 				token.Term = token.Term[firstApostrophe+1:]
 			}
 		}
-		rv = append(rv, token)
 	}
-
-	return rv
+	return input
 }
 
 func ElisionFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {

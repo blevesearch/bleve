@@ -33,7 +33,7 @@ func NewCld2Filter() *Cld2Filter {
 }
 
 func (f *Cld2Filter) Filter(input analysis.TokenStream) analysis.TokenStream {
-	rv := make(analysis.TokenStream, 0)
+	rv := make(analysis.TokenStream, 0, len(input))
 
 	offset := 0
 	for _, token := range input {

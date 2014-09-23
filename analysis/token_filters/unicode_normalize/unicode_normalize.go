@@ -54,14 +54,10 @@ func MustNewUnicodeNormalizeFilter(formName string) *UnicodeNormalizeFilter {
 }
 
 func (s *UnicodeNormalizeFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
-	rv := make(analysis.TokenStream, 0)
-
 	for _, token := range input {
 		token.Term = s.form.Bytes(token.Term)
-		rv = append(rv, token)
 	}
-
-	return rv
+	return input
 }
 
 func UnicodeNormalizeFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {

@@ -32,7 +32,7 @@ func NewLengthFilter(min, max int) *LengthFilter {
 }
 
 func (f *LengthFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
-	rv := make(analysis.TokenStream, 0)
+	rv := make(analysis.TokenStream, 0, len(input))
 
 	for _, token := range input {
 		wordLen := utf8.RuneCount(token.Term)

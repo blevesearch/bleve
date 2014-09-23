@@ -46,7 +46,7 @@ func (t *KagomeMorphTokenizer) Tokenize(input []byte) analysis.TokenStream {
 		prevstart int
 	)
 
-	rv := make(analysis.TokenStream, 0)
+	rv := make(analysis.TokenStream, 0, len(input))
 	if len(input) < 1 {
 		return rv
 	}

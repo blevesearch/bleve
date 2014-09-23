@@ -16,7 +16,7 @@ import (
 	"github.com/blevesearch/bleve/analysis"
 )
 
-func TestNgramFilter(t *testing.T) {
+func TestShingleFilter(t *testing.T) {
 
 	tests := []struct {
 		min            int

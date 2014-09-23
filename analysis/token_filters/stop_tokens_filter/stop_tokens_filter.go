@@ -29,7 +29,7 @@ func NewStopTokensFilter(stopTokens analysis.TokenMap) *StopTokensFilter {
 }
 
 func (f *StopTokensFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
-	rv := make(analysis.TokenStream, 0)
+	rv := make(analysis.TokenStream, 0, len(input))
 
 	for _, token := range input {
 		tokenTerm := string(token.Term)

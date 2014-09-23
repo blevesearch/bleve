@@ -26,16 +26,12 @@ func NewLowerCaseFilter() *LowerCaseFilter {
 }
 
 func (f *LowerCaseFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
-	rv := make(analysis.TokenStream, 0)
-
 	for _, token := range input {
 		word := string(token.Term)
 		wordLowerCase := strings.ToLower(word)
 		token.Term = []byte(wordLowerCase)
-		rv = append(rv, token)
 	}
-
-	return rv
+	return input
 }
 
 func LowerCaseFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {

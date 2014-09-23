@@ -22,18 +22,22 @@ import (
 const Name = "stem"
 
 type StemmerFilter struct {
-	lang    string
-	stemmer *snowball.Stemmer
+	lang        string
+	stemmerPool chan *snowball.Stemmer
 }
 
 func NewStemmerFilter(lang string) (*StemmerFilter, error) {
-	stemmer, err := snowball.New(lang)
-	if err != nil {
-		return nil, err
+	stemmerPool := make(chan *snowball.Stemmer, 4)
+	for i := 0; i < 4; i++ {
+		stemmer, err := snowball.New(lang)
+		if err != nil {
+			return nil, err
+		}
+		stemmerPool <- stemmer
 	}
 	return &StemmerFilter{
-		lang:    lang,
-		stemmer: stemmer,
+		lang:        lang,
+		stemmerPool: stemmerPool,
 	}, nil
 }
 
@@ -50,18 +54,16 @@ func (s *StemmerFilter) List() []string {
 }
 
 func (s *StemmerFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
-	rv := make(analysis.TokenStream, 0)
-
 	for _, token := range input {
 		// if not protected keyword, stem it
 		if !token.KeyWord {
-			stemmed := s.stemmer.Stem(string(token.Term))
+			stemmer := <-s.stemmerPool
+			stemmed := stemmer.Stem(string(token.Term))
+			s.stemmerPool <- stemmer
 			token.Term = []byte(stemmed)
 		}
-		rv = append(rv, token)
 	}
-
-	return rv
+	return input
 }
 
 func StemmerFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {

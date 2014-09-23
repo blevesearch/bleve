@@ -56,15 +56,11 @@ func NewSoraniNormalizeFilter() *SoraniNormalizeFilter {
 }
 
 func (s *SoraniNormalizeFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
-	rv := make(analysis.TokenStream, 0)
-
 	for _, token := range input {
 		term := normalize(token.Term)
 		token.Term = term
-		rv = append(rv, token)
 	}
-
-	return rv
+	return input
 }
 
 func normalize(input []byte) []byte {
