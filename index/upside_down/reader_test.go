@@ -23,7 +23,8 @@ func TestIndexReader(t *testing.T) {
 	defer os.RemoveAll("test")
 
 	store, err := boltdb.Open("test", "bleve")
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -168,7 +169,8 @@ func TestIndexDocIdReader(t *testing.T) {
 	defer os.RemoveAll("test")
 
 	store, err := boltdb.Open("test", "bleve")
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)

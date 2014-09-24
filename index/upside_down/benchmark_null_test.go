@@ -12,11 +12,11 @@ package upside_down
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/store/null"
 )
 
-func BenchmarkInMemIndexing1Workers(b *testing.B) {
-	s, err := inmem.Open()
+func BenchmarkNullIndexing1Workers(b *testing.B) {
+	s, err := null.Open()
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -25,8 +25,8 @@ func BenchmarkInMemIndexing1Workers(b *testing.B) {
 	CommonBenchmarkIndex(b, s, 1)
 }
 
-func BenchmarkInMemIndexing2Workers(b *testing.B) {
-	s, err := inmem.Open()
+func BenchmarkNullIndexing2Workers(b *testing.B) {
+	s, err := null.Open()
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -35,8 +35,8 @@ func BenchmarkInMemIndexing2Workers(b *testing.B) {
 	CommonBenchmarkIndex(b, s, 2)
 }
 
-func BenchmarkInMemIndexing4Workers(b *testing.B) {
-	s, err := inmem.Open()
+func BenchmarkNullIndexing4Workers(b *testing.B) {
+	s, err := null.Open()
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -47,8 +47,8 @@ func BenchmarkInMemIndexing4Workers(b *testing.B) {
 
 // batches
 
-func BenchmarkInMemIndexing1Workers10Batch(b *testing.B) {
-	s, err := inmem.Open()
+func BenchmarkNullIndexing1Workers10Batch(b *testing.B) {
+	s, err := null.Open()
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -57,8 +57,8 @@ func BenchmarkInMemIndexing1Workers10Batch(b *testing.B) {
 	CommonBenchmarkIndexBatch(b, s, 1, 10)
 }
 
-func BenchmarkInMemIndexing2Workers10Batch(b *testing.B) {
-	s, err := inmem.Open()
+func BenchmarkNullIndexing2Workers10Batch(b *testing.B) {
+	s, err := null.Open()
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -67,8 +67,8 @@ func BenchmarkInMemIndexing2Workers10Batch(b *testing.B) {
 	CommonBenchmarkIndexBatch(b, s, 2, 10)
 }
 
-func BenchmarkInMemIndexing4Workers10Batch(b *testing.B) {
-	s, err := inmem.Open()
+func BenchmarkNullIndexing4Workers10Batch(b *testing.B) {
+	s, err := null.Open()
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -77,8 +77,8 @@ func BenchmarkInMemIndexing4Workers10Batch(b *testing.B) {
 	CommonBenchmarkIndexBatch(b, s, 4, 10)
 }
 
-func BenchmarkInMemIndexing1Workers100Batch(b *testing.B) {
-	s, err := inmem.Open()
+func BenchmarkNullIndexing1Workers100Batch(b *testing.B) {
+	s, err := null.Open()
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -87,8 +87,8 @@ func BenchmarkInMemIndexing1Workers100Batch(b *testing.B) {
 	CommonBenchmarkIndexBatch(b, s, 1, 100)
 }
 
-func BenchmarkInMemIndexing2Workers100Batch(b *testing.B) {
-	s, err := inmem.Open()
+func BenchmarkNullIndexing2Workers100Batch(b *testing.B) {
+	s, err := null.Open()
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -97,8 +97,8 @@ func BenchmarkInMemIndexing2Workers100Batch(b *testing.B) {
 	CommonBenchmarkIndexBatch(b, s, 2, 100)
 }
 
-func BenchmarkInMemIndexing4Workers100Batch(b *testing.B) {
-	s, err := inmem.Open()
+func BenchmarkNullIndexing4Workers100Batch(b *testing.B) {
+	s, err := null.Open()
 	if err != nil {
 		b.Fatal(err)
 	}

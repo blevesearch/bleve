@@ -31,7 +31,8 @@ func TestIndexOpenReopen(t *testing.T) {
 	defer os.RemoveAll("test")
 
 	store, err := boltdb.Open("test", "bleve")
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -57,7 +58,7 @@ func TestIndexOpenReopen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error opening store: %v", err)
 	}
-	idx = NewUpsideDownCouch(store)
+	idx = NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -71,7 +72,8 @@ func TestIndexInsert(t *testing.T) {
 	defer os.RemoveAll("test")
 
 	store, err := boltdb.Open("test", "bleve")
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -109,7 +111,8 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	defer os.RemoveAll("test")
 
 	store, err := boltdb.Open("test", "bleve")
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -177,7 +180,8 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 	defer os.RemoveAll("test")
 
 	store, err := boltdb.Open("test", "bleve")
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -226,7 +230,8 @@ func TestIndexInsertMultiple(t *testing.T) {
 	defer os.RemoveAll("test")
 
 	store, err := boltdb.Open("test", "bleve")
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -260,7 +265,7 @@ func TestIndexInsertMultiple(t *testing.T) {
 	// close and reopen and and one more to testing counting works correctly
 	idx.Close()
 	store, err = boltdb.Open("test", "bleve")
-	idx = NewUpsideDownCouch(store)
+	idx = NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -288,7 +293,8 @@ func TestIndexInsertWithStore(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -345,7 +351,8 @@ func TestIndexInternalCRUD(t *testing.T) {
 	defer os.RemoveAll("test")
 
 	store, err := boltdb.Open("test", "bleve")
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -405,7 +412,8 @@ func TestIndexBatch(t *testing.T) {
 	defer os.RemoveAll("test")
 
 	store, err := boltdb.Open("test", "bleve")
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -485,7 +493,8 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -642,7 +651,8 @@ func TestIndexInsertFields(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -684,7 +694,8 @@ func TestIndexUpdateComposites(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -756,7 +767,8 @@ func TestIndexFieldsMisc(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -771,15 +783,15 @@ func TestIndexFieldsMisc(t *testing.T) {
 		t.Errorf("Error updating index: %v", err)
 	}
 
-	fieldName1 := idx.fieldIndexToName(1)
+	fieldName1 := idx.fieldIndexCache.FieldName(1)
 	if fieldName1 != "name" {
 		t.Errorf("expected field named 'name', got '%s'", fieldName1)
 	}
-	fieldName2 := idx.fieldIndexToName(2)
+	fieldName2 := idx.fieldIndexCache.FieldName(2)
 	if fieldName2 != "title" {
 		t.Errorf("expected field named 'title', got '%s'", fieldName2)
 	}
-	fieldName3 := idx.fieldIndexToName(3)
+	fieldName3 := idx.fieldIndexCache.FieldName(3)
 	if fieldName3 != "" {
 		t.Errorf("expected field named '', got '%s'", fieldName3)
 	}
@@ -793,7 +805,8 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -836,7 +849,8 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)

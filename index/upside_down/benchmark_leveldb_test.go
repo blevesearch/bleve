@@ -18,7 +18,7 @@ import (
 	"github.com/blevesearch/bleve/index/store/leveldb"
 )
 
-func BenchmarkLevelDBIndexing(b *testing.B) {
+func BenchmarkLevelDBIndexing1Workers(b *testing.B) {
 	s, err := leveldb.Open("test", true, true)
 	if err != nil {
 		b.Fatal(err)
@@ -26,5 +26,95 @@ func BenchmarkLevelDBIndexing(b *testing.B) {
 	defer os.RemoveAll("test")
 	defer s.Close()
 
-	CommonBenchmarkIndex(b, s)
+	CommonBenchmarkIndex(b, s, 1)
+}
+
+func BenchmarkLevelDBIndexing2Workers(b *testing.B) {
+	s, err := leveldb.Open("test", true, true)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll("test")
+	defer s.Close()
+
+	CommonBenchmarkIndex(b, s, 2)
+}
+
+func BenchmarkLevelDBIndexing4Workers(b *testing.B) {
+	s, err := leveldb.Open("test", true, true)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll("test")
+	defer s.Close()
+
+	CommonBenchmarkIndex(b, s, 4)
+}
+
+// batches
+
+func BenchmarkLevelDBIndexing1Workers10Batch(b *testing.B) {
+	s, err := leveldb.Open("test", true, true)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll("test")
+	defer s.Close()
+
+	CommonBenchmarkIndexBatch(b, s, 1, 10)
+}
+
+func BenchmarkLevelDBIndexing2Workers10Batch(b *testing.B) {
+	s, err := leveldb.Open("test", true, true)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll("test")
+	defer s.Close()
+
+	CommonBenchmarkIndexBatch(b, s, 2, 10)
+}
+
+func BenchmarkLevelDBIndexing4Workers10Batch(b *testing.B) {
+	s, err := leveldb.Open("test", true, true)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll("test")
+	defer s.Close()
+
+	CommonBenchmarkIndexBatch(b, s, 4, 10)
+}
+
+func BenchmarkLevelDBIndexing1Workers100Batch(b *testing.B) {
+	s, err := leveldb.Open("test", true, true)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll("test")
+	defer s.Close()
+
+	CommonBenchmarkIndexBatch(b, s, 1, 100)
+}
+
+func BenchmarkLevelDBIndexing2Workers100Batch(b *testing.B) {
+	s, err := leveldb.Open("test", true, true)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll("test")
+	defer s.Close()
+
+	CommonBenchmarkIndexBatch(b, s, 2, 100)
+}
+
+func BenchmarkLevelDBIndexing4Workers100Batch(b *testing.B) {
+	s, err := leveldb.Open("test", true, true)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll("test")
+	defer s.Close()
+
+	CommonBenchmarkIndexBatch(b, s, 4, 100)
 }

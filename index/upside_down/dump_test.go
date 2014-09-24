@@ -25,7 +25,8 @@ func TestDump(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	idx := NewUpsideDownCouch(store)
+	analysisQueue := NewAnalysisQueue(1)
+	idx := NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)

@@ -26,7 +26,8 @@ func TestTermSearcher(t *testing.T) {
 	var queryExplain = true
 
 	inMemStore, _ := inmem.Open()
-	i := upside_down.NewUpsideDownCouch(inMemStore)
+	analysisQueue := upside_down.NewAnalysisQueue(1)
+	i := upside_down.NewUpsideDownCouch(inMemStore, analysisQueue)
 	i.Update(&document.Document{
 		ID: "a",
 		Fields: []document.Field{

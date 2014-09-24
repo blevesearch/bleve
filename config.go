@@ -11,8 +11,10 @@ package bleve
 
 import (
 	"expvar"
-	"github.com/blevesearch/bleve/registry"
 	"time"
+
+	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/registry"
 
 	// token maps
 	_ "github.com/blevesearch/bleve/analysis/token_map"
@@ -108,11 +110,13 @@ type configuration struct {
 	Cache              *registry.Cache
 	DefaultHighlighter string
 	DefaultKVStore     string
+	analysisQueue      upside_down.AnalysisQueue
 }
 
 func newConfiguration() *configuration {
 	return &configuration{
-		Cache: registry.NewCache(),
+		Cache:         registry.NewCache(),
+		analysisQueue: upside_down.NewAnalysisQueue(4),
 	}
 }
 

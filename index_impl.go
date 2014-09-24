@@ -63,7 +63,7 @@ func newMemIndex(mapping *IndexMapping) (*indexImpl, error) {
 	}
 
 	// open open the index
-	rv.i = upside_down.NewUpsideDownCouch(rv.s)
+	rv.i = upside_down.NewUpsideDownCouch(rv.s, Config.analysisQueue)
 	err = rv.i.Open()
 	if err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
 	}
 
 	// open open the index
-	rv.i = upside_down.NewUpsideDownCouch(rv.s)
+	rv.i = upside_down.NewUpsideDownCouch(rv.s, Config.analysisQueue)
 	err = rv.i.Open()
 	if err != nil {
 		return nil, err
@@ -176,7 +176,7 @@ func openIndex(path string) (*indexImpl, error) {
 	}
 
 	// open open the index
-	rv.i = upside_down.NewUpsideDownCouch(rv.s)
+	rv.i = upside_down.NewUpsideDownCouch(rv.s, Config.analysisQueue)
 	err = rv.i.Open()
 	if err != nil {
 		return nil, err
@@ -223,8 +223,8 @@ func (i *indexImpl) Mapping() *IndexMapping {
 // The IndexMapping for this index will determine
 // how the object is indexed.
 func (i *indexImpl) Index(id string, data interface{}) error {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
 
 	if !i.open {
 		return ErrorIndexClosed
@@ -245,8 +245,8 @@ func (i *indexImpl) Index(id string, data interface{}) error {
 // Delete entries for the specified identifier from
 // the index.
 func (i *indexImpl) Delete(id string) error {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
 
 	if !i.open {
 		return ErrorIndexClosed
@@ -264,8 +264,8 @@ func (i *indexImpl) Delete(id string) error {
 // significant performance benefits when performing
 // operations in a batch.
 func (i *indexImpl) Batch(b Batch) error {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
 
 	if !i.open {
 		return ErrorIndexClosed
