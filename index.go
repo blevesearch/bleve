@@ -60,6 +60,8 @@ type Index interface {
 	Close()
 
 	Mapping() *IndexMapping
+
+	Stats() *IndexStat
 }
 
 // A Classifier is an interface describing any object

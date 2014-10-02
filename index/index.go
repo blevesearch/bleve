@@ -10,6 +10,8 @@
 package index
 
 import (
+	"encoding/json"
+
 	"github.com/blevesearch/bleve/document"
 )
 
@@ -31,6 +33,8 @@ type Index interface {
 	DumpFields() chan interface{}
 
 	Reader() IndexReader
+
+	Stats() json.Marshaler
 }
 
 type IndexReader interface {

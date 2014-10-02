@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/blevesearch/bleve/document"
@@ -34,6 +35,7 @@ type indexImpl struct {
 	m     *IndexMapping
 	mutex sync.RWMutex
 	open  bool
+	stats *IndexStat
 }
 
 const storePath = "store"
@@ -46,9 +48,10 @@ func indexStorePath(path string) string {
 
 func newMemIndex(mapping *IndexMapping) (*indexImpl, error) {
 	rv := indexImpl{
-		path: "",
-		m:    mapping,
-		meta: newIndexMeta("mem"),
+		path:  "",
+		m:     mapping,
+		meta:  newIndexMeta("mem"),
+		stats: &IndexStat{},
 	}
 
 	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
@@ -68,6 +71,7 @@ func newMemIndex(mapping *IndexMapping) (*indexImpl, error) {
 	if err != nil {
 		return nil, err
 	}
+	rv.stats.indexStat = rv.i.Stats()
 
 	// now persist the mapping
 	mappingBytes, err := json.Marshal(mapping)
@@ -98,9 +102,10 @@ func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
 	}
 
 	rv := indexImpl{
-		path: path,
-		m:    mapping,
-		meta: newIndexMeta(Config.DefaultKVStore),
+		path:  path,
+		m:     mapping,
+		meta:  newIndexMeta(Config.DefaultKVStore),
+		stats: &IndexStat{},
 	}
 	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
 	if storeConstructor == nil {
@@ -129,6 +134,7 @@ func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
 	if err != nil {
 		return nil, err
 	}
+	rv.stats.indexStat = rv.i.Stats()
 
 	// now persist the mapping
 	mappingBytes, err := json.Marshal(mapping)
@@ -150,7 +156,8 @@ func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
 func openIndex(path string) (*indexImpl, error) {
 
 	rv := indexImpl{
-		path: path,
+		path:  path,
+		stats: &IndexStat{},
 	}
 	var err error
 	rv.meta, err = openIndexMeta(path)
@@ -181,6 +188,7 @@ func openIndex(path string) (*indexImpl, error) {
 	if err != nil {
 		return nil, err
 	}
+	rv.stats.indexStat = rv.i.Stats()
 
 	// now load the mapping
 	indexReader := rv.i.Reader()
@@ -322,6 +330,8 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
+	searchStart := time.Now()
+
 	if !i.open {
 		return nil, ErrorIndexClosed
 	}
@@ -442,6 +452,9 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 		}
 	}
 
+	atomic.AddUint64(&i.stats.searches, 1)
+	atomic.AddUint64(&i.stats.searchTime, uint64(time.Since(searchStart)))
+
 	return &SearchResult{
 		Request:  req,
 		Hits:     hits,
@@ -515,4 +528,8 @@ func (i *indexImpl) Close() {
 
 	i.open = false
 	i.i.Close()
+}
+
+func (i *indexImpl) Stats() *IndexStat {
+	return i.stats
 }

@@ -17,15 +17,17 @@ import (
 
 var indexNameMapping map[string]bleve.Index
 var indexNameMappingLock sync.RWMutex
+var indexStats = bleve.IndexStats{}
 
-func RegisterIndexName(name string, index bleve.Index) {
+func RegisterIndexName(name string, idx bleve.Index) {
 	indexNameMappingLock.Lock()
 	defer indexNameMappingLock.Unlock()
 
 	if indexNameMapping == nil {
 		indexNameMapping = make(map[string]bleve.Index)
 	}
-	indexNameMapping[name] = index
+	indexNameMapping[name] = idx
+	indexStats[name] = idx.Stats()
 }
 
 func UnregisterIndexByName(name string) bleve.Index {
@@ -39,6 +41,7 @@ func UnregisterIndexByName(name string) bleve.Index {
 	if rv != nil {
 		delete(indexNameMapping, name)
 	}
+	delete(indexStats, name)
 	return rv
 }
 
@@ -60,4 +63,8 @@ func IndexNames() []string {
 		count++
 	}
 	return rv
+}
+
+func IndexStats() bleve.IndexStats {
+	return indexStats
 }

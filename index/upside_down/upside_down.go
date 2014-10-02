@@ -11,7 +11,10 @@ package upside_down
 
 import (
 	"bytes"
+	"encoding/json"
 	"math"
+	"sync/atomic"
+	"time"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/document"
@@ -32,6 +35,7 @@ type UpsideDownCouch struct {
 	fieldIndexCache *FieldIndexCache
 	docCount        uint64
 	analysisQueue   AnalysisQueue
+	stats           *indexStat
 }
 
 func NewUpsideDownCouch(s store.KVStore, analysisQueue AnalysisQueue) *UpsideDownCouch {
@@ -40,6 +44,7 @@ func NewUpsideDownCouch(s store.KVStore, analysisQueue AnalysisQueue) *UpsideDow
 		fieldIndexCache: NewFieldIndexCache(),
 		store:           s,
 		analysisQueue:   analysisQueue,
+		stats:           &indexStat{},
 	}
 }
 
@@ -193,6 +198,7 @@ func (udc *UpsideDownCouch) Close() {
 
 func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 	// do analysis before acquiring write lock
+	analysisStart := time.Now()
 	resultChan := make(chan *AnalysisResult)
 	aw := AnalysisWork{
 		udc: udc,
@@ -207,8 +213,10 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 	// wait for the result
 	result := <-resultChan
 	close(resultChan)
+	atomic.AddUint64(&udc.stats.analysisTime, uint64(time.Since(analysisStart)))
 
 	// start a writer for this update
+	indexStart := time.Now()
 	kvwriter := udc.store.Writer()
 	defer kvwriter.Close()
 
@@ -216,6 +224,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 	// lookup the back index row
 	backIndexRow, err := udc.backIndexRowForDoc(kvwriter, doc.ID)
 	if err != nil {
+		atomic.AddUint64(&udc.stats.errors, 1)
 		return err
 	}
 
@@ -229,6 +238,12 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) error {
 	err = udc.batchRows(kvwriter, addRows, updateRows, deleteRows)
 	if err == nil && backIndexRow == nil {
 		udc.docCount++
+	}
+	atomic.AddUint64(&udc.stats.indexTime, uint64(time.Since(indexStart)))
+	if err == nil {
+		atomic.AddUint64(&udc.stats.updates, 1)
+	} else {
+		atomic.AddUint64(&udc.stats.errors, 1)
 	}
 	return err
 }
@@ -343,6 +358,7 @@ func (udc *UpsideDownCouch) indexField(docID string, field document.Field, field
 }
 
 func (udc *UpsideDownCouch) Delete(id string) error {
+	indexStart := time.Now()
 	// start a writer for this delete
 	kvwriter := udc.store.Writer()
 	defer kvwriter.Close()
@@ -350,9 +366,11 @@ func (udc *UpsideDownCouch) Delete(id string) error {
 	// lookup the back index row
 	backIndexRow, err := udc.backIndexRowForDoc(kvwriter, id)
 	if err != nil {
+		atomic.AddUint64(&udc.stats.errors, 1)
 		return err
 	}
 	if backIndexRow == nil {
+		atomic.AddUint64(&udc.stats.deletes, 1)
 		return nil
 	}
 
@@ -362,6 +380,12 @@ func (udc *UpsideDownCouch) Delete(id string) error {
 	err = udc.batchRows(kvwriter, nil, nil, deleteRows)
 	if err == nil {
 		udc.docCount--
+	}
+	atomic.AddUint64(&udc.stats.indexTime, uint64(time.Since(indexStart)))
+	if err == nil {
+		atomic.AddUint64(&udc.stats.deletes, 1)
+	} else {
+		atomic.AddUint64(&udc.stats.errors, 1)
 	}
 	return err
 }
@@ -475,9 +499,10 @@ func (udc *UpsideDownCouch) termFieldVectorsFromTermVectors(in []*TermVector) []
 }
 
 func (udc *UpsideDownCouch) Batch(batch index.Batch) error {
+	analysisStart := time.Now()
 	resultChan := make(chan *AnalysisResult)
 
-	numUpdates := 0
+	var numUpdates uint64
 	for _, doc := range batch {
 		if doc != nil {
 			numUpdates++
@@ -500,7 +525,7 @@ func (udc *UpsideDownCouch) Batch(batch index.Batch) error {
 
 	newRowsMap := make(map[string][]UpsideDownCouchRow)
 	// wait for the result
-	itemsDeQueued := 0
+	var itemsDeQueued uint64
 	for itemsDeQueued < numUpdates {
 		result := <-resultChan
 		newRowsMap[result.docID] = result.rows
@@ -508,6 +533,9 @@ func (udc *UpsideDownCouch) Batch(batch index.Batch) error {
 	}
 	close(resultChan)
 
+	atomic.AddUint64(&udc.stats.analysisTime, uint64(time.Since(analysisStart)))
+
+	indexStart := time.Now()
 	// start a writer for this batch
 	kvwriter := udc.store.Writer()
 	defer kvwriter.Close()
@@ -540,9 +568,15 @@ func (udc *UpsideDownCouch) Batch(batch index.Batch) error {
 	}
 
 	err = udc.batchRows(kvwriter, addRows, updateRows, deleteRows)
+	atomic.AddUint64(&udc.stats.indexTime, uint64(time.Since(indexStart)))
 	if err == nil {
 		udc.docCount += docsAdded
 		udc.docCount -= docsDeleted
+		atomic.AddUint64(&udc.stats.updates, numUpdates)
+		atomic.AddUint64(&udc.stats.deletes, docsDeleted)
+		atomic.AddUint64(&udc.stats.batches, 1)
+	} else {
+		atomic.AddUint64(&udc.stats.errors, 1)
 	}
 	return err
 }
@@ -567,4 +601,8 @@ func (udc *UpsideDownCouch) Reader() index.IndexReader {
 		kvreader: udc.store.Reader(),
 		docCount: udc.docCount,
 	}
+}
+
+func (udc *UpsideDownCouch) Stats() json.Marshaler {
+	return udc.stats
 }
