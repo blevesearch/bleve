@@ -20,7 +20,7 @@
                     return tNUMBER
                   }
 /[ \t\n]+/        { logDebugTokens("WHITESPACE (count=%d)", len(yylex.Text())) /* eat up whitespace */ }
-/[^\t\n\f\r :^\+\-><=]+/           {
+/[^\t\n\f\r :^\+\-><=][^\t\n\f\r :^]*/           {
                     lval.s = yylex.Text()
                     logDebugTokens("STRING - %s", lval.s);
                     return tSTRING 

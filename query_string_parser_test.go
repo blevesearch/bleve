@@ -155,6 +155,16 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				},
 				nil),
 		},
+		{
+			input:   "cat-dog",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("cat-dog"),
+				},
+				nil),
+		},
 	}
 
 	for _, test := range tests {
