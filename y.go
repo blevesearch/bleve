@@ -62,51 +62,53 @@ var yyExca = []int{
 	-2, 5,
 }
 
-const yyNprod = 20
+const yyNprod = 22
 const yyPrivate = 57344
 
 var yyTokenNames []string
 var yyStates []string
 
-const yyLast = 26
+const yyLast = 28
 
 var yyAct = []int{
 
-	17, 18, 23, 21, 26, 24, 22, 25, 15, 19,
-	20, 16, 14, 6, 7, 10, 11, 2, 13, 5,
-	12, 8, 9, 4, 3, 1,
+	18, 20, 25, 23, 28, 26, 24, 27, 19, 21,
+	22, 10, 12, 17, 15, 14, 16, 6, 7, 11,
+	2, 5, 13, 9, 8, 4, 3, 1,
 }
 var yyPact = []int{
 
-	7, -1000, -1000, 7, 11, -1000, -1000, -1000, -1000, 3,
-	0, -1000, -1000, -1000, -1, -4, -1000, -1000, -1000, -9,
-	-10, -1000, -5, -1000, -8, -1000, -1000,
+	11, -1000, -1000, 11, 7, -1000, -1000, -1000, -1000, 5,
+	8, -1000, -1000, -1000, -1000, 1, -4, -1000, -1000, -1000,
+	-1000, -9, -10, -1000, -5, -1000, -8, -1000, -1000,
 }
 var yyPgo = []int{
 
-	0, 25, 17, 24, 23, 22, 20, 19, 18,
+	0, 27, 20, 26, 25, 23, 22, 21, 15,
 }
 var yyR1 = []int{
 
 	0, 1, 2, 2, 3, 4, 4, 7, 7, 5,
-	5, 5, 5, 5, 5, 5, 5, 8, 6, 6,
+	5, 5, 5, 5, 5, 5, 5, 5, 5, 8,
+	6, 6,
 }
 var yyR2 = []int{
 
 	0, 1, 2, 1, 3, 0, 1, 1, 1, 1,
-	1, 3, 3, 4, 5, 4, 5, 2, 0, 1,
+	1, 1, 3, 3, 3, 4, 5, 4, 5, 2,
+	0, 1,
 }
 var yyChk = []int{
 
 	-1000, -1, -2, -3, -4, -7, 6, 7, -2, -5,
-	4, 5, -6, -8, 9, 8, 12, 4, 5, 13,
-	14, 12, 15, 12, 15, 12, 12,
+	4, 12, 5, -6, -8, 9, 8, 12, 4, 12,
+	5, 13, 14, 12, 15, 12, 15, 12, 12,
 }
 var yyDef = []int{
 
-	5, -2, 1, -2, 0, 6, 7, 8, 2, 18,
-	9, 10, 4, 19, 0, 0, 17, 11, 12, 0,
-	0, 13, 0, 15, 0, 14, 16,
+	5, -2, 1, -2, 0, 6, 7, 8, 2, 20,
+	9, 10, 11, 4, 21, 0, 0, 19, 12, 13,
+	14, 0, 0, 15, 0, 17, 0, 16, 18,
 }
 var yyTok1 = []int{
 
@@ -398,13 +400,21 @@ yydefault:
 	case 10:
 		//line query_string.y:69
 		{
+			str := yyS[yypt-0].s
+			logDebugGrammar("STRING - %s", str)
+			q := NewMatchQuery(str)
+			addQueryToList(q)
+		}
+	case 11:
+		//line query_string.y:76
+		{
 			phrase := yyS[yypt-0].s
 			logDebugGrammar("PHRASE - %s", phrase)
 			q := NewMatchPhraseQuery(phrase)
 			addQueryToList(q)
 		}
-	case 11:
-		//line query_string.y:76
+	case 12:
+		//line query_string.y:83
 		{
 			field := yyS[yypt-2].s
 			str := yyS[yypt-0].s
@@ -412,8 +422,17 @@ yydefault:
 			q := NewMatchQuery(str).SetField(field)
 			addQueryToList(q)
 		}
-	case 12:
-		//line query_string.y:84
+	case 13:
+		//line query_string.y:91
+		{
+			field := yyS[yypt-2].s
+			str := yyS[yypt-0].s
+			logDebugGrammar("FIELD - %s STRING - %s", field, str)
+			q := NewMatchQuery(str).SetField(field)
+			addQueryToList(q)
+		}
+	case 14:
+		//line query_string.y:99
 		{
 			field := yyS[yypt-2].s
 			phrase := yyS[yypt-0].s
@@ -421,8 +440,8 @@ yydefault:
 			q := NewMatchPhraseQuery(phrase).SetField(field)
 			addQueryToList(q)
 		}
-	case 13:
-		//line query_string.y:92
+	case 15:
+		//line query_string.y:107
 		{
 			field := yyS[yypt-3].s
 			min := yyS[yypt-0].f
@@ -431,8 +450,8 @@ yydefault:
 			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
 			addQueryToList(q)
 		}
-	case 14:
-		//line query_string.y:101
+	case 16:
+		//line query_string.y:116
 		{
 			field := yyS[yypt-4].s
 			min := yyS[yypt-0].f
@@ -441,8 +460,8 @@ yydefault:
 			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
 			addQueryToList(q)
 		}
-	case 15:
-		//line query_string.y:110
+	case 17:
+		//line query_string.y:125
 		{
 			field := yyS[yypt-3].s
 			max := yyS[yypt-0].f
@@ -451,8 +470,8 @@ yydefault:
 			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
 			addQueryToList(q)
 		}
-	case 16:
-		//line query_string.y:119
+	case 18:
+		//line query_string.y:134
 		{
 			field := yyS[yypt-4].s
 			max := yyS[yypt-0].f
@@ -461,8 +480,8 @@ yydefault:
 			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
 			addQueryToList(q)
 		}
-	case 17:
-		//line query_string.y:130
+	case 19:
+		//line query_string.y:145
 		{
 			boost := yyS[yypt-0].f
 			if parsingLastQuery != nil {
@@ -470,13 +489,13 @@ yydefault:
 			}
 			logDebugGrammar("BOOST %f", boost)
 		}
-	case 18:
-		//line query_string.y:139
+	case 20:
+		//line query_string.y:154
 		{
 
 		}
-	case 19:
-		//line query_string.y:143
+	case 21:
+		//line query_string.y:158
 		{
 
 		}

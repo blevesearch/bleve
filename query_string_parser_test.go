@@ -15,7 +15,6 @@ import (
 )
 
 func TestQuerySyntaxParserValid(t *testing.T) {
-
 	tests := []struct {
 		input   string
 		result  Query
@@ -133,6 +132,26 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				[]Query{
 					NewMatchQuery("test").SetBoost(3.0),
 					NewMatchQuery("other").SetBoost(6.0),
+				},
+				nil),
+		},
+		{
+			input:   "33",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("33"),
+				},
+				nil),
+		},
+		{
+			input:   "field:33",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("33").SetField("field"),
 				},
 				nil),
 		},

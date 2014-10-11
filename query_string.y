@@ -66,6 +66,13 @@ tSTRING {
 	addQueryToList(q)
 }
 |
+tNUMBER {
+	str := $1.s
+	logDebugGrammar("STRING - %s", str)
+	q := NewMatchQuery(str)
+	addQueryToList(q)
+}
+|
 tPHRASE {
 	phrase := $1.s
 	logDebugGrammar("PHRASE - %s", phrase)
@@ -74,6 +81,14 @@ tPHRASE {
 }
 |
 tSTRING tCOLON tSTRING {
+	field := $1.s
+	str := $3.s
+	logDebugGrammar("FIELD - %s STRING - %s", field, str)
+	q := NewMatchQuery(str).SetField(field)
+	addQueryToList(q)
+}
+|
+tSTRING tCOLON tNUMBER {
 	field := $1.s
 	str := $3.s
 	logDebugGrammar("FIELD - %s STRING - %s", field, str)
