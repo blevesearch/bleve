@@ -15,6 +15,7 @@ package bleve
 import (
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -344,6 +345,19 @@ func TestIndex(t *testing.T) {
 	}
 	if tagsCount != 2 {
 		t.Errorf("expected to find 2 values for tags")
+	}
+
+	termQuery = NewTermQuery("marti").SetField("name")
+	searchRequest = NewSearchRequest(termQuery)
+	searchRequest.Size = 0
+	searchResult, err = index.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	srstring := searchResult.String()
+	if !strings.HasPrefix(srstring, "1 matches") {
+		t.Errorf("expected prefix '1 matches', got %s", srstring)
 	}
 }
 
