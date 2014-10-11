@@ -15,34 +15,32 @@ import (
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
 
-	"github.com/ikawaha/kagome/dic"
-	"github.com/ikawaha/kagome/tokenizer"
+	"github.com/ikawaha/kagome"
 )
 
 const TokenizerName = "kagome"
 
 type KagomeMorphTokenizer struct {
-	tok *tokenizer.Tokenizer
+	tok *kagome.Tokenizer
 }
 
 func NewKagomeMorphTokenizer() *KagomeMorphTokenizer {
 	return &KagomeMorphTokenizer{
-		tok: tokenizer.NewTokenizer(),
+		tok: kagome.NewTokenizer(),
 	}
 }
 
-func NewKagomeMorphTokenizerWithUserDic(userdic *dic.UserDic) *KagomeMorphTokenizer {
-	kagome := tokenizer.NewTokenizer()
-	kagome.SetUserDic(userdic)
+func NewKagomeMorphTokenizerWithUserDic(userdic *kagome.UserDic) *KagomeMorphTokenizer {
+	k := kagome.NewTokenizer()
+	k.SetUserDic(userdic)
 	return &KagomeMorphTokenizer{
-		tok: kagome,
+		tok: k,
 	}
 }
 
 func (t *KagomeMorphTokenizer) Tokenize(input []byte) analysis.TokenStream {
 	var (
-		morphs    []tokenizer.Morph
-		err       error
+		morphs    []kagome.Token
 		prevstart int
 	)
 
@@ -51,20 +49,17 @@ func (t *KagomeMorphTokenizer) Tokenize(input []byte) analysis.TokenStream {
 		return rv
 	}
 
-	morphs, err = t.tok.Tokenize(string(input))
-	if err != nil {
-		return rv
-	}
+	morphs = t.tok.Tokenize(string(input))
 
 	for i, m := range morphs {
-		if m.Surface == "EOS" {
+		if m.Surface == "EOS" || m.Surface == "BOS" {
 			continue
 		}
 
 		surfacelen := len(m.Surface)
 		token := &analysis.Token{
 			Term:     []byte(m.Surface),
-			Position: i + 1,
+			Position: i,
 			Start:    prevstart,
 			End:      prevstart + surfacelen,
 			Type:     analysis.Ideographic,
