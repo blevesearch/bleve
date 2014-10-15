@@ -426,7 +426,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 			if err == nil {
 				for _, f := range req.Fields {
 					for _, docF := range doc.Fields {
-						if docF.Name() == f {
+						if f == "*" || docF.Name() == f {
 							var value interface{}
 							switch docF := docF.(type) {
 							case *document.TextField:
@@ -443,7 +443,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 								}
 							}
 							if value != nil {
-								hit.AddFieldValue(f, value)
+								hit.AddFieldValue(docF.Name(), value)
 							}
 						}
 					}
