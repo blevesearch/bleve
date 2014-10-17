@@ -56,6 +56,7 @@ import (
 	// tokenizers
 	_ "github.com/blevesearch/bleve/analysis/tokenizers/regexp_tokenizer"
 	_ "github.com/blevesearch/bleve/analysis/tokenizers/single_token"
+	_ "github.com/blevesearch/bleve/analysis/tokenizers/unicode"
 	_ "github.com/blevesearch/bleve/analysis/tokenizers/whitespace_tokenizer"
 
 	// date time parsers
