@@ -13,14 +13,14 @@ package th
 
 import (
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/tokenizers/unicode_word_boundary"
+	"github.com/blevesearch/bleve/analysis/tokenizers/icu"
 	"github.com/blevesearch/bleve/registry"
 )
 
-const TokenizerName = "unicode_th"
+const TokenizerName = "icu_th"
 
 func TokenizerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.Tokenizer, error) {
-	return unicode_word_boundary.NewUnicodeWordBoundaryCustomLocaleTokenizer("th_TH"), nil
+	return icu.NewUnicodeWordBoundaryCustomLocaleTokenizer("th_TH"), nil
 }
 
 func init() {

@@ -9,7 +9,7 @@
 
 // +build icu full
 
-package unicode_word_boundary
+package icu
 
 import (
 	"reflect"

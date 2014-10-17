@@ -18,7 +18,7 @@ import (
 	"github.com/blevesearch/bleve/analysis/char_filters/zero_width_non_joiner"
 	"github.com/blevesearch/bleve/analysis/language/ar"
 	"github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
-	"github.com/blevesearch/bleve/analysis/tokenizers/unicode_word_boundary"
+	"github.com/blevesearch/bleve/analysis/tokenizers/icu"
 )
 
 const AnalyzerName = "fa"
@@ -28,7 +28,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	if err != nil {
 		return nil, err
 	}
-	unicodeTokenizer, err := cache.TokenizerNamed(unicode_word_boundary.Name)
+	icuTokenizer, err := cache.TokenizerNamed(icu.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 		CharFilters: []analysis.CharFilter{
 			zFilter,
 		},
-		Tokenizer: unicodeTokenizer,
+		Tokenizer: icuTokenizer,
 		TokenFilters: []analysis.TokenFilter{
 			toLowerFilter,
 			normArFilter,

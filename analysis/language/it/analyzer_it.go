@@ -17,13 +17,13 @@ import (
 	"github.com/blevesearch/bleve/registry"
 
 	"github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
-	"github.com/blevesearch/bleve/analysis/tokenizers/unicode_word_boundary"
+	"github.com/blevesearch/bleve/analysis/tokenizers/icu"
 )
 
 const AnalyzerName = "it"
 
 func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
-	unicodeTokenizer, err := cache.TokenizerNamed(unicode_word_boundary.Name)
+	icuTokenizer, err := cache.TokenizerNamed(icu.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 		return nil, err
 	}
 	rv := analysis.Analyzer{
-		Tokenizer: unicodeTokenizer,
+		Tokenizer: icuTokenizer,
 		TokenFilters: []analysis.TokenFilter{
 			elisionFilter,
 			toLowerFilter,

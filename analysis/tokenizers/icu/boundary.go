@@ -9,7 +9,7 @@
 
 // +build icu full
 
-package unicode_word_boundary
+package icu
 
 // #cgo LDFLAGS: -licuuc -licudata
 // #include <stdio.h>
@@ -28,7 +28,7 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
-const Name = "unicode"
+const Name = "icu"
 
 type UnicodeWordBoundaryTokenizer struct {
 	locale *C.char
