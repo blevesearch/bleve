@@ -7,22 +7,39 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-// +build libstemmer full
-
 package porter
 
 import (
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/token_filters/stemmer_filter"
 	"github.com/blevesearch/bleve/registry"
+
+	"github.com/blevesearch/go-porterstemmer"
 )
 
-const StemmerName = "stemmer_porter_classic"
+const Name = "stemmer_porter"
 
-func StemmerFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
-	return stemmer_filter.NewStemmerFilter("porter")
+type PorterStemmer struct {
+}
+
+func NewPorterStemmer() *PorterStemmer {
+	return &PorterStemmer{}
+}
+
+func (s *PorterStemmer) Filter(input analysis.TokenStream) analysis.TokenStream {
+	for _, token := range input {
+		// if not protected keyword, stem it
+		if !token.KeyWord {
+			stemmed := porterstemmer.StemString(string(token.Term))
+			token.Term = []byte(stemmed)
+		}
+	}
+	return input
+}
+
+func PorterStemmerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
+	return NewPorterStemmer(), nil
 }
 
 func init() {
-	registry.RegisterTokenFilter(StemmerName, StemmerFilterConstructor)
+	registry.RegisterTokenFilter(Name, PorterStemmerConstructor)
 }
