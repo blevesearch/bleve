@@ -533,3 +533,27 @@ func (i *indexImpl) Close() {
 func (i *indexImpl) Stats() *IndexStat {
 	return i.stats
 }
+
+func (i *indexImpl) GetInternal(key []byte) ([]byte, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	reader := i.i.Reader()
+	defer reader.Close()
+
+	return reader.GetInternal(key)
+}
+
+func (i *indexImpl) SetInternal(key, val []byte) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	return i.i.SetInternal(key, val)
+}
+
+func (i *indexImpl) DeleteInternal(key []byte) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	return i.i.DeleteInternal(key)
+}

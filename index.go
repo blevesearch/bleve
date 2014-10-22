@@ -62,6 +62,10 @@ type Index interface {
 	Mapping() *IndexMapping
 
 	Stats() *IndexStat
+
+	GetInternal(key []byte) ([]byte, error)
+	SetInternal(key, val []byte) error
+	DeleteInternal(key []byte) error
 }
 
 // A Classifier is an interface describing any object
