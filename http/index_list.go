@@ -15,7 +15,7 @@ import (
 
 type ListIndexesHandler struct{}
 
-func NewListIndexesHander() *ListIndexesHandler {
+func NewListIndexesHandler() *ListIndexesHandler {
 	return &ListIndexesHandler{}
 }
 

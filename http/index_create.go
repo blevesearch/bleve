@@ -25,7 +25,7 @@ type CreateIndexHandler struct {
 	basePath string
 }
 
-func NewCreateIndexHander(basePath string) *CreateIndexHandler {
+func NewCreateIndexHandler(basePath string) *CreateIndexHandler {
 	return &CreateIndexHandler{
 		basePath: basePath,
 	}
