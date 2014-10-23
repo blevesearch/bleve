@@ -12,60 +12,57 @@ package bleve
 import (
 	"fmt"
 	"strings"
-	"sync"
 )
 
-var crashHard = false
-var parserMutex sync.Mutex
-var parsingMust bool
-var parsingMustNot bool
 var debugParser bool
 var debugLexer bool
 
-var parsingLastQuery Query
-var parsingMustList []Query
-var parsingMustNotList []Query
-var parsingShouldList []Query
-var parsingIndexMapping *IndexMapping
-
 func parseQuerySyntax(query string, mapping *IndexMapping) (rq Query, err error) {
-	parserMutex.Lock()
-	defer parserMutex.Unlock()
+	lex := newLexerWrapper(newLexer(strings.NewReader(query)))
+	doParse(lex)
 
-	parsingIndexMapping = mapping
-	parsingMustList = make([]Query, 0)
-	parsingMustNotList = make([]Query, 0)
-	parsingShouldList = make([]Query, 0)
+	if len(lex.errs) > 0 {
+		return nil, fmt.Errorf(strings.Join(lex.errs, "\n"))
+	} else {
+		return lex.query, nil
+	}
+}
 
+func doParse(lex *lexerWrapper) {
 	defer func() {
 		r := recover()
-		if r != nil && r == "syntax error" {
-			// if we're panicing over a syntax error, chill
-			err = fmt.Errorf("Parse Error - %v", r)
-		} else if r != nil {
-			// otherise continue to panic
-			if crashHard {
-				panic(r)
-			} else {
-				err = fmt.Errorf("Other Error - %v", r)
-			}
+		if r != nil {
+			lex.Error("Errors while parsing.")
 		}
 	}()
 
-	yyParse(newLexer(strings.NewReader(query)))
-	rq = NewBooleanQuery(parsingMustList, parsingShouldList, parsingMustNotList)
-	return rq, err
+	yyParse(lex)
 }
 
-func addQueryToList(q Query) {
-	if parsingMust {
-		parsingMustList = append(parsingMustList, q)
-		parsingMust = false
-	} else if parsingMustNot {
-		parsingMustNotList = append(parsingMustNotList, q)
-		parsingMustNot = false
-	} else {
-		parsingShouldList = append(parsingShouldList, q)
+const (
+	queryShould = iota
+	queryMust
+	queryMustNot
+)
+
+type lexerWrapper struct {
+	nex   yyLexer
+	errs  []string
+	query *booleanQuery
+}
+
+func newLexerWrapper(nex yyLexer) *lexerWrapper {
+	return &lexerWrapper{
+		nex:   nex,
+		errs:  []string{},
+		query: NewBooleanQuery(nil, nil, nil),
 	}
-	parsingLastQuery = q
+}
+
+func (this *lexerWrapper) Lex(lval *yySymType) int {
+	return this.nex.Lex(lval)
+}
+
+func (this *lexerWrapper) Error(s string) {
+	this.errs = append(this.errs, s)
 }

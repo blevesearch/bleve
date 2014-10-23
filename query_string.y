@@ -1,6 +1,7 @@
 %{
 package bleve
 import "log"
+import "strconv"
 
 func logDebugGrammar(format string, v ...interface{}) {
 	if debugParser {
@@ -12,9 +13,19 @@ func logDebugGrammar(format string, v ...interface{}) {
 %union { 
 s string 
 n int
-f float64}
+f float64
+q Query}
 
 %token tSTRING tPHRASE tPLUS tMINUS tCOLON tBOOST tLPAREN tRPAREN tNUMBER tSTRING tGREATER tLESS tEQUAL
+
+%type <s>                tSTRING
+%type <s>                tPHRASE
+%type <s>                tNUMBER
+%type <q>                searchBase
+%type <f>                searchSuffix
+%type <n>                searchPrefix
+%type <n>                searchMustMustNot
+%type <f>                searchBoost
 
 %%
 
@@ -34,125 +45,133 @@ searchPart {
 
 searchPart:
 searchPrefix searchBase searchSuffix {
-	
+	query := $2
+	query.SetBoost($3)
+	switch($1) {
+		case queryShould:
+			yylex.(*lexerWrapper).query.AddShould(query)
+		case queryMust:
+			yylex.(*lexerWrapper).query.AddMust(query)
+		case queryMustNot:
+			yylex.(*lexerWrapper).query.AddMustNot(query)
+	}
 };
 
 
 searchPrefix:
 /* empty */ {
+	$$ = queryShould
 }
 |
 searchMustMustNot {
-	
+	$$ = $1
 }
 ;
 
 searchMustMustNot:
 tPLUS {
 	logDebugGrammar("PLUS")
-	parsingMust = true
+	$$ = queryMust
 }
 |
 tMINUS {
 	logDebugGrammar("MINUS")
-	parsingMustNot = true
+	$$ = queryMustNot
 };
 
 searchBase:
 tSTRING {
-	str := $1.s
+	str := $1
 	logDebugGrammar("STRING - %s", str)
 	q := NewMatchQuery(str)
-	addQueryToList(q)
+	$$ = q
 }
 |
 tNUMBER {
-	str := $1.s
+	str := $1
 	logDebugGrammar("STRING - %s", str)
 	q := NewMatchQuery(str)
-	addQueryToList(q)
+	$$ = q
 }
 |
 tPHRASE {
-	phrase := $1.s
+	phrase := $1
 	logDebugGrammar("PHRASE - %s", phrase)
 	q := NewMatchPhraseQuery(phrase)
-	addQueryToList(q)
+	$$ = q
 }
 |
 tSTRING tCOLON tSTRING {
-	field := $1.s
-	str := $3.s
+	field := $1
+	str := $3
 	logDebugGrammar("FIELD - %s STRING - %s", field, str)
 	q := NewMatchQuery(str).SetField(field)
-	addQueryToList(q)
+	$$ = q
 }
 |
 tSTRING tCOLON tNUMBER {
-	field := $1.s
-	str := $3.s
+	field := $1
+	str := $3
 	logDebugGrammar("FIELD - %s STRING - %s", field, str)
 	q := NewMatchQuery(str).SetField(field)
-	addQueryToList(q)
+	$$ = q
 }
 |
 tSTRING tCOLON tPHRASE {
-	field := $1.s
-	phrase := $3.s
+	field := $1
+	phrase := $3
 	logDebugGrammar("FIELD - %s PHRASE - %s", field, phrase)
 	q := NewMatchPhraseQuery(phrase).SetField(field)
-	addQueryToList(q)
+	$$ = q
 }
 |
 tSTRING tCOLON tGREATER tNUMBER {
-	field := $1.s
-	min := $4.f
+	field := $1
+	min, _ := strconv.ParseFloat($4, 64)
 	minInclusive := false
 	logDebugGrammar("FIELD - GREATER THAN %f", min)
 	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
-	addQueryToList(q)
+	$$ = q
 }
 |
 tSTRING tCOLON tGREATER tEQUAL tNUMBER {
-	field := $1.s
-	min := $5.f
+	field := $1
+	min, _ := strconv.ParseFloat($5, 64)
 	minInclusive := true
 	logDebugGrammar("FIELD - GREATER THAN OR EQUAL %f", min)
 	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
-	addQueryToList(q)
+	$$ = q
 }
 |
 tSTRING tCOLON tLESS tNUMBER {
-	field := $1.s
-	max := $4.f
+	field := $1
+	max, _ := strconv.ParseFloat($4, 64)
 	maxInclusive := false
 	logDebugGrammar("FIELD - LESS THAN %f", max)
 	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
-	addQueryToList(q)
+	$$ = q
 }
 |
 tSTRING tCOLON tLESS tEQUAL tNUMBER {
-	field := $1.s
-	max := $5.f
+	field := $1
+	max, _ := strconv.ParseFloat($5, 64)
 	maxInclusive := true
 	logDebugGrammar("FIELD - LESS THAN OR EQUAL %f", max)
 	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
-	addQueryToList(q)
+	$$ = q
 };
 
 
 searchBoost:
 tBOOST tNUMBER {
-	boost := $2.f
-	if parsingLastQuery != nil {
-		parsingLastQuery.SetBoost(boost)
-	}
+	boost, _ := strconv.ParseFloat($2, 64)
+	$$ = boost
 	logDebugGrammar("BOOST %f", boost)
 };
 
 searchSuffix:
 /* empty */ {
-	
+	$$ = 1.0
 }
 |
 searchBoost {

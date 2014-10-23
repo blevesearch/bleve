@@ -63,6 +63,28 @@ func NewBooleanQueryMinShould(must []Query, should []Query, mustNot []Query, min
 	return &rv
 }
 
+func (q *booleanQuery) AddMust(m Query) {
+	if q.Must == nil {
+		q.Must = NewConjunctionQuery([]Query{})
+	}
+	q.Must.(*conjunctionQuery).AddQuery(m)
+}
+
+func (q *booleanQuery) AddShould(m Query) {
+	if q.Should == nil {
+		q.Should = NewDisjunctionQuery([]Query{})
+	}
+	q.Should.(*disjunctionQuery).AddQuery(m)
+	q.Should.(*disjunctionQuery).SetMin(1)
+}
+
+func (q *booleanQuery) AddMustNot(m Query) {
+	if q.MustNot == nil {
+		q.MustNot = NewDisjunctionQuery([]Query{})
+	}
+	q.MustNot.(*disjunctionQuery).AddQuery(m)
+}
+
 func (q *booleanQuery) Boost() float64 {
 	return q.BoostVal
 }

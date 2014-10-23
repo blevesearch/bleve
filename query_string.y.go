@@ -4,6 +4,7 @@ import __yyfmt__ "fmt"
 
 //line query_string.y:2
 import "log"
+import "strconv"
 
 func logDebugGrammar(format string, v ...interface{}) {
 	if debugParser {
@@ -11,12 +12,13 @@ func logDebugGrammar(format string, v ...interface{}) {
 	}
 }
 
-//line query_string.y:12
+//line query_string.y:13
 type yySymType struct {
 	yys int
 	s   string
 	n   int
 	f   float64
+	q   Query
 }
 
 const tSTRING = 57346
@@ -73,8 +75,8 @@ const yyLast = 28
 var yyAct = []int{
 
 	18, 20, 25, 23, 28, 26, 24, 27, 19, 21,
-	22, 10, 12, 17, 15, 14, 16, 6, 7, 11,
-	2, 5, 13, 9, 8, 4, 3, 1,
+	22, 10, 12, 17, 15, 3, 16, 6, 7, 11,
+	2, 1, 14, 5, 8, 4, 13, 9,
 }
 var yyPact = []int{
 
@@ -84,13 +86,13 @@ var yyPact = []int{
 }
 var yyPgo = []int{
 
-	0, 27, 20, 26, 25, 23, 22, 21, 15,
+	0, 27, 26, 25, 23, 22, 21, 20, 15,
 }
 var yyR1 = []int{
 
-	0, 1, 2, 2, 3, 4, 4, 7, 7, 5,
-	5, 5, 5, 5, 5, 5, 5, 5, 5, 8,
-	6, 6,
+	0, 6, 7, 7, 8, 3, 3, 4, 4, 1,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 5,
+	2, 2,
 }
 var yyR2 = []int{
 
@@ -100,8 +102,8 @@ var yyR2 = []int{
 }
 var yyChk = []int{
 
-	-1000, -1, -2, -3, -4, -7, 6, 7, -2, -5,
-	4, 12, 5, -6, -8, 9, 8, 12, 4, 12,
+	-1000, -6, -7, -8, -3, -4, 6, 7, -7, -1,
+	4, 12, 5, -2, -5, 9, 8, 12, 4, 12,
 	5, 13, 14, 12, 15, 12, 15, 12, 12,
 }
 var yyDef = []int{
@@ -349,153 +351,161 @@ yydefault:
 	switch yynt {
 
 	case 1:
-		//line query_string.y:22
+		//line query_string.y:33
 		{
 			logDebugGrammar("INPUT")
 		}
 	case 2:
-		//line query_string.y:27
+		//line query_string.y:38
 		{
 			logDebugGrammar("SEARCH PARTS")
 		}
 	case 3:
-		//line query_string.y:31
+		//line query_string.y:42
 		{
 			logDebugGrammar("SEARCH PART")
 		}
 	case 4:
-		//line query_string.y:36
+		//line query_string.y:47
 		{
-
+			query := yyS[yypt-1].q
+			query.SetBoost(yyS[yypt-0].f)
+			switch yyS[yypt-2].n {
+			case queryShould:
+				yylex.(*lexerWrapper).query.AddShould(query)
+			case queryMust:
+				yylex.(*lexerWrapper).query.AddMust(query)
+			case queryMustNot:
+				yylex.(*lexerWrapper).query.AddMustNot(query)
+			}
 		}
 	case 5:
-		//line query_string.y:42
-		{
-		}
-	case 6:
-		//line query_string.y:45
-		{
-
-		}
-	case 7:
-		//line query_string.y:51
-		{
-			logDebugGrammar("PLUS")
-			parsingMust = true
-		}
-	case 8:
-		//line query_string.y:56
-		{
-			logDebugGrammar("MINUS")
-			parsingMustNot = true
-		}
-	case 9:
 		//line query_string.y:62
 		{
-			str := yyS[yypt-0].s
-			logDebugGrammar("STRING - %s", str)
-			q := NewMatchQuery(str)
-			addQueryToList(q)
+			yyVAL.n = queryShould
 		}
-	case 10:
-		//line query_string.y:69
+	case 6:
+		//line query_string.y:66
+		{
+			yyVAL.n = yyS[yypt-0].n
+		}
+	case 7:
+		//line query_string.y:72
+		{
+			logDebugGrammar("PLUS")
+			yyVAL.n = queryMust
+		}
+	case 8:
+		//line query_string.y:77
+		{
+			logDebugGrammar("MINUS")
+			yyVAL.n = queryMustNot
+		}
+	case 9:
+		//line query_string.y:83
 		{
 			str := yyS[yypt-0].s
 			logDebugGrammar("STRING - %s", str)
 			q := NewMatchQuery(str)
-			addQueryToList(q)
+			yyVAL.q = q
+		}
+	case 10:
+		//line query_string.y:90
+		{
+			str := yyS[yypt-0].s
+			logDebugGrammar("STRING - %s", str)
+			q := NewMatchQuery(str)
+			yyVAL.q = q
 		}
 	case 11:
-		//line query_string.y:76
+		//line query_string.y:97
 		{
 			phrase := yyS[yypt-0].s
 			logDebugGrammar("PHRASE - %s", phrase)
 			q := NewMatchPhraseQuery(phrase)
-			addQueryToList(q)
+			yyVAL.q = q
 		}
 	case 12:
-		//line query_string.y:83
+		//line query_string.y:104
 		{
 			field := yyS[yypt-2].s
 			str := yyS[yypt-0].s
 			logDebugGrammar("FIELD - %s STRING - %s", field, str)
 			q := NewMatchQuery(str).SetField(field)
-			addQueryToList(q)
+			yyVAL.q = q
 		}
 	case 13:
-		//line query_string.y:91
+		//line query_string.y:112
 		{
 			field := yyS[yypt-2].s
 			str := yyS[yypt-0].s
 			logDebugGrammar("FIELD - %s STRING - %s", field, str)
 			q := NewMatchQuery(str).SetField(field)
-			addQueryToList(q)
+			yyVAL.q = q
 		}
 	case 14:
-		//line query_string.y:99
+		//line query_string.y:120
 		{
 			field := yyS[yypt-2].s
 			phrase := yyS[yypt-0].s
 			logDebugGrammar("FIELD - %s PHRASE - %s", field, phrase)
 			q := NewMatchPhraseQuery(phrase).SetField(field)
-			addQueryToList(q)
+			yyVAL.q = q
 		}
 	case 15:
-		//line query_string.y:107
+		//line query_string.y:128
 		{
 			field := yyS[yypt-3].s
-			min := yyS[yypt-0].f
+			min, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
 			minInclusive := false
 			logDebugGrammar("FIELD - GREATER THAN %f", min)
 			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
-			addQueryToList(q)
+			yyVAL.q = q
 		}
 	case 16:
-		//line query_string.y:116
+		//line query_string.y:137
 		{
 			field := yyS[yypt-4].s
-			min := yyS[yypt-0].f
+			min, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
 			minInclusive := true
 			logDebugGrammar("FIELD - GREATER THAN OR EQUAL %f", min)
 			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
-			addQueryToList(q)
+			yyVAL.q = q
 		}
 	case 17:
-		//line query_string.y:125
+		//line query_string.y:146
 		{
 			field := yyS[yypt-3].s
-			max := yyS[yypt-0].f
+			max, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
 			maxInclusive := false
 			logDebugGrammar("FIELD - LESS THAN %f", max)
 			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
-			addQueryToList(q)
+			yyVAL.q = q
 		}
 	case 18:
-		//line query_string.y:134
+		//line query_string.y:155
 		{
 			field := yyS[yypt-4].s
-			max := yyS[yypt-0].f
+			max, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
 			maxInclusive := true
 			logDebugGrammar("FIELD - LESS THAN OR EQUAL %f", max)
 			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
-			addQueryToList(q)
+			yyVAL.q = q
 		}
 	case 19:
-		//line query_string.y:145
+		//line query_string.y:166
 		{
-			boost := yyS[yypt-0].f
-			if parsingLastQuery != nil {
-				parsingLastQuery.SetBoost(boost)
-			}
+			boost, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
+			yyVAL.f = boost
 			logDebugGrammar("BOOST %f", boost)
 		}
 	case 20:
-		//line query_string.y:154
+		//line query_string.y:173
 		{
-
+			yyVAL.f = 1.0
 		}
 	case 21:
-		//line query_string.y:158
+		//line query_string.y:177
 		{
 
 		}

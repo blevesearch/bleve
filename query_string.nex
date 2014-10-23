@@ -15,8 +15,7 @@
 /-?([0-9]|[1-9][0-9]*)(\.[0-9][0-9]*)?/
                   { 
                     lval.s = yylex.Text()
-                    lval.f,_ = strconv.ParseFloat(yylex.Text(), 64);
-                    logDebugTokens("NUMBER - %f", lval.f);
+                    logDebugTokens("NUMBER - %s", lval.s);
                     return tNUMBER
                   }
 /[ \t\n]+/        { logDebugTokens("WHITESPACE (count=%d)", len(yylex.Text())) /* eat up whitespace */ }
@@ -29,7 +28,6 @@
 package bleve
 
 import("log")
-import("strconv")
 
 func logDebugTokens(format string, v ...interface{}) {
     if debugLexer {
