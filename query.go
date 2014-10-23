@@ -35,6 +35,18 @@ func ParseQuery(input []byte) (Query, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, hasFuzziness := tmp["fuzziness"]
+	if hasFuzziness {
+		var rv fuzzyQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
+		return &rv, nil
+	}
 	_, isTermQuery := tmp["term"]
 	if isTermQuery {
 		var rv termQuery
