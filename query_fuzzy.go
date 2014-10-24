@@ -16,11 +16,11 @@ import (
 )
 
 type fuzzyQuery struct {
-	Term      string  `json:"term"`
-	Prefix    int     `json:"prefix_length"`
-	Fuzziness int     `json:"fuzziness"`
-	FieldVal  string  `json:"field,omitempty"`
-	BoostVal  float64 `json:"boost,omitempty"`
+	Term         string  `json:"term"`
+	PrefixVal    int     `json:"prefix_length"`
+	FuzzinessVal int     `json:"fuzziness"`
+	FieldVal     string  `json:"field,omitempty"`
+	BoostVal     float64 `json:"boost,omitempty"`
 }
 
 // NewPrefixQuery creates a new Query which finds
@@ -28,10 +28,10 @@ type fuzzyQuery struct {
 // specified prefix.
 func NewFuzzyQuery(term string) *fuzzyQuery {
 	return &fuzzyQuery{
-		Term:      term,
-		Prefix:    0,
-		Fuzziness: 1,
-		BoostVal:  1.0,
+		Term:         term,
+		PrefixVal:    0,
+		FuzzinessVal: 1,
+		BoostVal:     1.0,
 	}
 }
 
@@ -53,12 +53,30 @@ func (q *fuzzyQuery) SetField(f string) Query {
 	return q
 }
 
+func (q *fuzzyQuery) Fuzziness() int {
+	return q.FuzzinessVal
+}
+
+func (q *fuzzyQuery) SetFuzziness(f int) Query {
+	q.FuzzinessVal = f
+	return q
+}
+
+func (q *fuzzyQuery) Prefix() int {
+	return q.PrefixVal
+}
+
+func (q *fuzzyQuery) SetPrefix(p int) Query {
+	q.PrefixVal = p
+	return q
+}
+
 func (q *fuzzyQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultField
 	}
-	return searchers.NewFuzzySearcher(i, q.Term, q.Prefix, q.Fuzziness, field, q.BoostVal, explain)
+	return searchers.NewFuzzySearcher(i, q.Term, q.PrefixVal, q.FuzzinessVal, field, q.BoostVal, explain)
 }
 
 func (q *fuzzyQuery) Validate() error {

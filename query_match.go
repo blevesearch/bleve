@@ -11,16 +11,19 @@ package bleve
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
 type matchQuery struct {
-	Match    string  `json:"match"`
-	FieldVal string  `json:"field,omitempty"`
-	Analyzer string  `json:"analyzer,omitempty"`
-	BoostVal float64 `json:"boost,omitempty"`
+	Match        string  `json:"match"`
+	FieldVal     string  `json:"field,omitempty"`
+	Analyzer     string  `json:"analyzer,omitempty"`
+	BoostVal     float64 `json:"boost,omitempty"`
+	PrefixVal    int     `json:"prefix_length"`
+	FuzzinessVal int     `json:"fuzziness"`
 }
 
 // NewMatchQuery creates a Query for matching text.
@@ -54,6 +57,24 @@ func (q *matchQuery) SetField(f string) Query {
 	return q
 }
 
+func (q *matchQuery) Fuzziness() int {
+	return q.FuzzinessVal
+}
+
+func (q *matchQuery) SetFuzziness(f int) Query {
+	q.FuzzinessVal = f
+	return q
+}
+
+func (q *matchQuery) Prefix() int {
+	return q.PrefixVal
+}
+
+func (q *matchQuery) SetPrefix(p int) Query {
+	q.PrefixVal = p
+	return q
+}
+
 func (q *matchQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 
 	field := q.FieldVal
@@ -77,10 +98,22 @@ func (q *matchQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool
 	if len(tokens) > 0 {
 
 		tqs := make([]Query, len(tokens))
-		for i, token := range tokens {
-			tqs[i] = NewTermQuery(string(token.Term)).
-				SetField(field).
-				SetBoost(q.BoostVal)
+		if q.FuzzinessVal != 0 {
+			log.Printf("fuzziness is %d", q.FuzzinessVal)
+			for i, token := range tokens {
+				query := NewFuzzyQuery(string(token.Term))
+				query.SetFuzziness(q.FuzzinessVal)
+				query.SetPrefix(q.PrefixVal)
+				query.SetField(field)
+				query.SetBoost(q.BoostVal)
+				tqs[i] = query
+			}
+		} else {
+			for i, token := range tokens {
+				tqs[i] = NewTermQuery(string(token.Term)).
+					SetField(field).
+					SetBoost(q.BoostVal)
+			}
 		}
 
 		shouldQuery := NewDisjunctionQueryMin(tqs, 1).

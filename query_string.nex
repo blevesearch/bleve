@@ -12,6 +12,13 @@
 />/              { logDebugTokens("GREATER"); return tGREATER }
 /</              { logDebugTokens("LESS"); return tLESS }
 /=/              { logDebugTokens("EQUAL"); return tEQUAL }
+/~([0-9]|[1-9][0-9]*)/
+                  {
+                    lval.s = yylex.Text()[1:]
+                    logDebugTokens("TILDENUMBER - %s", lval.s);
+                    return tTILDENUMBER
+                  }
+/~/              { logDebugTokens("TILDE"); return tTILDE }
 /-?([0-9]|[1-9][0-9]*)(\.[0-9][0-9]*)?/
                   { 
                     lval.s = yylex.Text()
@@ -19,7 +26,7 @@
                     return tNUMBER
                   }
 /[ \t\n]+/        { logDebugTokens("WHITESPACE (count=%d)", len(yylex.Text())) /* eat up whitespace */ }
-/[^\t\n\f\r :^\+\-><=][^\t\n\f\r :^]*/           {
+/[^\t\n\f\r :^\+\-><=~][^\t\n\f\r :^~]*/           {
                     lval.s = yylex.Text()
                     logDebugTokens("STRING - %s", lval.s);
                     return tSTRING 

@@ -35,8 +35,9 @@ func ParseQuery(input []byte) (Query, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, isMatchQuery := tmp["match"]
 	_, hasFuzziness := tmp["fuzziness"]
-	if hasFuzziness {
+	if hasFuzziness && !isMatchQuery {
 		var rv fuzzyQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
@@ -59,7 +60,6 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
-	_, isMatchQuery := tmp["match"]
 	if isMatchQuery {
 		var rv matchQuery
 		err := json.Unmarshal(input, &rv)

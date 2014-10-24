@@ -16,11 +16,13 @@ n int
 f float64
 q Query}
 
-%token tSTRING tPHRASE tPLUS tMINUS tCOLON tBOOST tLPAREN tRPAREN tNUMBER tSTRING tGREATER tLESS tEQUAL
+%token tSTRING tPHRASE tPLUS tMINUS tCOLON tBOOST tLPAREN tRPAREN tNUMBER tSTRING tGREATER tLESS
+tEQUAL tTILDE tTILDENUMBER
 
 %type <s>                tSTRING
 %type <s>                tPHRASE
 %type <s>                tNUMBER
+%type <s>                tTILDENUMBER
 %type <q>                searchBase
 %type <f>                searchSuffix
 %type <n>                searchPrefix
@@ -84,6 +86,23 @@ tSTRING {
 	str := $1
 	logDebugGrammar("STRING - %s", str)
 	q := NewMatchQuery(str)
+	$$ = q
+}
+|
+tSTRING tTILDE {
+	str := $1
+	logDebugGrammar("STRING - %s", str)
+	q := NewMatchQuery(str)
+	q.SetFuzziness(1)
+	$$ = q
+}
+|
+tSTRING tTILDENUMBER {
+	str := $1
+	fuzziness, _ := strconv.ParseFloat($2, 64)
+	logDebugGrammar("STRING - %s", str)
+	q := NewMatchQuery(str)
+	q.SetFuzziness(int(fuzziness))
 	$$ = q
 }
 |
@@ -160,7 +179,6 @@ tSTRING tCOLON tLESS tEQUAL tNUMBER {
 	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
 	$$ = q
 };
-
 
 searchBoost:
 tBOOST tNUMBER {
