@@ -14,8 +14,6 @@ import (
 	"net/http"
 
 	"github.com/blevesearch/bleve"
-
-	"github.com/gorilla/mux"
 )
 
 type GetIndexHandler struct{}
@@ -26,7 +24,7 @@ func NewGetIndexHandler() *GetIndexHandler {
 
 func (h *GetIndexHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// find the name of the index to create
-	indexName := mux.Vars(req)["indexName"]
+	indexName := req.Form.Get("indexName")
 	if indexName == "" {
 		showError(w, req, "index name is required", 400)
 		return
