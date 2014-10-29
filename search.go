@@ -266,3 +266,13 @@ func (sr *SearchResult) String() string {
 	}
 	return rv
 }
+
+func (sr *SearchResult) Merge(other *SearchResult) {
+	sr.Hits = append(sr.Hits, other.Hits...)
+	sr.Total += other.Total
+	sr.Took += other.Took
+	if other.MaxScore > sr.MaxScore {
+		sr.MaxScore = other.MaxScore
+	}
+	sr.Facets.Merge(other.Facets)
+}

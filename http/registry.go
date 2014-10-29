@@ -10,6 +10,7 @@
 package http
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/blevesearch/bleve"
@@ -67,4 +68,53 @@ func IndexNames() []string {
 
 func IndexStats() bleve.IndexStats {
 	return indexStats
+}
+
+func UpdateAlias(alias string, add, remove []string) error {
+	indexNameMappingLock.Lock()
+	defer indexNameMappingLock.Unlock()
+
+	index, exists := indexNameMapping[alias]
+	if !exists {
+		// new alias
+		if len(remove) > 0 {
+			return fmt.Errorf("cannot remove indexes from a new alias")
+		}
+		indexes := make([]bleve.Index, len(add))
+		for i, addIndexName := range add {
+			addIndex, indexExists := indexNameMapping[addIndexName]
+			if !indexExists {
+				return fmt.Errorf("index named '%s' does not exist", addIndexName)
+			}
+			indexes[i] = addIndex
+		}
+		indexAlias := bleve.NewIndexAlias(indexes...)
+		indexNameMapping[alias] = indexAlias
+	} else {
+		// something with this name already exists
+		indexAlias, isAlias := index.(bleve.IndexAlias)
+		if !isAlias {
+			return fmt.Errorf("'%s' is not an alias")
+		}
+		// build list of add indexes
+		addIndexes := make([]bleve.Index, len(add))
+		for i, addIndexName := range add {
+			addIndex, indexExists := indexNameMapping[addIndexName]
+			if !indexExists {
+				return fmt.Errorf("index named '%s' does not exist", addIndexName)
+			}
+			addIndexes[i] = addIndex
+		}
+		// build list of remove indexes
+		removeIndexes := make([]bleve.Index, len(add))
+		for i, removeIndexName := range add {
+			removeIndex, indexExists := indexNameMapping[removeIndexName]
+			if !indexExists {
+				return fmt.Errorf("index named '%s' does not exist", removeIndexName)
+			}
+			removeIndexes[i] = removeIndex
+		}
+		indexAlias.Swap(addIndexes, removeIndexes)
+	}
+	return nil
 }

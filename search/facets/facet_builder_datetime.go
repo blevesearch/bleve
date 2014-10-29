@@ -83,7 +83,7 @@ func (fb *DateTimeFacetBuilder) Update(ft index.FieldTerms) {
 	}
 }
 
-func (fb *DateTimeFacetBuilder) Result() search.FacetResult {
+func (fb *DateTimeFacetBuilder) Result() *search.FacetResult {
 	rv := search.FacetResult{
 		Field:   fb.field,
 		Total:   fb.total,
@@ -143,5 +143,5 @@ OUTER:
 	}
 	rv.Other = fb.total - notOther
 
-	return rv
+	return &rv
 }

@@ -22,6 +22,8 @@ const (
 	ErrorUnknownQueryType
 	ErrorUnknownStorageType
 	ErrorIndexClosed
+	ErrorAliasMulti
+	ErrorAliasEmpty
 )
 
 // Error represents a more strongly typed bleve error for detecting
@@ -44,4 +46,6 @@ var errorMessages = map[int]string{
 	int(ErrorUnknownQueryType):               "unknown query type",
 	int(ErrorUnknownStorageType):             "unkown storage type",
 	int(ErrorIndexClosed):                    "index is closed",
+	int(ErrorAliasMulti):                     "cannot perform single index operation on multiple index alias",
+	int(ErrorAliasEmpty):                     "cannot perform operation on empty alias",
 }

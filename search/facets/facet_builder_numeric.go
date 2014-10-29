@@ -82,7 +82,7 @@ func (fb *NumericFacetBuilder) Update(ft index.FieldTerms) {
 	}
 }
 
-func (fb *NumericFacetBuilder) Result() search.FacetResult {
+func (fb *NumericFacetBuilder) Result() *search.FacetResult {
 	rv := search.FacetResult{
 		Field:   fb.field,
 		Total:   fb.total,
@@ -136,5 +136,5 @@ OUTER:
 	}
 	rv.Other = fb.total - notOther
 
-	return rv
+	return &rv
 }
