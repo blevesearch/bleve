@@ -103,7 +103,7 @@ type IndexMapping struct {
 	DefaultField          string                      `json:"default_field"`
 	ByteArrayConverter    string                      `json:"byte_array_converter"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
-	cache                 *registry.Cache             `json:"_"`
+	cache                 *registry.Cache
 }
 
 // AddCustomCharFilter defines a custom char fitler for use in this mapping

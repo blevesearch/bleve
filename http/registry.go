@@ -94,7 +94,7 @@ func UpdateAlias(alias string, add, remove []string) error {
 		// something with this name already exists
 		indexAlias, isAlias := index.(bleve.IndexAlias)
 		if !isAlias {
-			return fmt.Errorf("'%s' is not an alias")
+			return fmt.Errorf("'%s' is not an alias", alias)
 		}
 		// build list of add indexes
 		addIndexes := make([]bleve.Index, len(add))
