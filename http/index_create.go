@@ -17,12 +17,11 @@ import (
 	"os"
 
 	"github.com/blevesearch/bleve"
-
-	"github.com/gorilla/mux"
 )
 
 type CreateIndexHandler struct {
-	basePath string
+	basePath        string
+	IndexNameLookup varLookupFunc
 }
 
 func NewCreateIndexHandler(basePath string) *CreateIndexHandler {
@@ -33,7 +32,10 @@ func NewCreateIndexHandler(basePath string) *CreateIndexHandler {
 
 func (h *CreateIndexHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// find the name of the index to create
-	indexName := mux.Vars(req)["indexName"]
+	var indexName string
+	if h.IndexNameLookup != nil {
+		indexName = h.IndexNameLookup(req)
+	}
 	if indexName == "" {
 		showError(w, req, "index name is required", 400)
 		return

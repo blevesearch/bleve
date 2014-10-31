@@ -12,12 +12,12 @@ package http
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/gorilla/mux"
 )
 
 type DocDeleteHandler struct {
 	defaultIndexName string
+	IndexNameLookup  varLookupFunc
+	DocIDLookup      varLookupFunc
 }
 
 func NewDocDeleteHandler(defaultIndexName string) *DocDeleteHandler {
@@ -29,7 +29,10 @@ func NewDocDeleteHandler(defaultIndexName string) *DocDeleteHandler {
 func (h *DocDeleteHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// find the index to operate on
-	indexName := mux.Vars(req)["indexName"]
+	var indexName string
+	if h.IndexNameLookup != nil {
+		indexName = h.IndexNameLookup(req)
+	}
 	if indexName == "" {
 		indexName = h.defaultIndexName
 	}
@@ -40,7 +43,10 @@ func (h *DocDeleteHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// find the doc id
-	docID := mux.Vars(req)["docID"]
+	var docID string
+	if h.DocIDLookup != nil {
+		docID = h.DocIDLookup(req)
+	}
 	if docID == "" {
 		showError(w, req, "document id cannot be empty", 400)
 		return

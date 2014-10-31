@@ -33,3 +33,5 @@ func mustEncode(w io.Writer, i interface{}) {
 		panic(err)
 	}
 }
+
+type varLookupFunc func(req *http.Request) string

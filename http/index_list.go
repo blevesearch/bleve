@@ -13,7 +13,8 @@ import (
 	"net/http"
 )
 
-type ListIndexesHandler struct{}
+type ListIndexesHandler struct {
+}
 
 func NewListIndexesHandler() *ListIndexesHandler {
 	return &ListIndexesHandler{}

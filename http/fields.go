@@ -12,12 +12,11 @@ package http
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/gorilla/mux"
 )
 
 type ListFieldsHandler struct {
 	defaultIndexName string
+	IndexNameLookup  varLookupFunc
 }
 
 func NewListFieldsHandler(defaultIndexName string) *ListFieldsHandler {
@@ -29,7 +28,10 @@ func NewListFieldsHandler(defaultIndexName string) *ListFieldsHandler {
 func (h *ListFieldsHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// find the index to operate on
-	indexName := mux.Vars(req)["indexName"]
+	var indexName string
+	if h.IndexNameLookup != nil {
+		indexName = h.IndexNameLookup(req)
+	}
 	if indexName == "" {
 		indexName = h.defaultIndexName
 	}

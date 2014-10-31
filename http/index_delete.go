@@ -13,12 +13,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-
-	"github.com/gorilla/mux"
 )
 
 type DeleteIndexHandler struct {
-	basePath string
+	basePath        string
+	IndexNameLookup varLookupFunc
 }
 
 func NewDeleteIndexHandler(basePath string) *DeleteIndexHandler {
@@ -29,7 +28,10 @@ func NewDeleteIndexHandler(basePath string) *DeleteIndexHandler {
 
 func (h *DeleteIndexHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// find the name of the index to delete
-	indexName := mux.Vars(req)["indexName"]
+	var indexName string
+	if h.IndexNameLookup != nil {
+		indexName = h.IndexNameLookup(req)
+	}
 	if indexName == "" {
 		showError(w, req, "index name is required", 400)
 		return

@@ -16,17 +16,13 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gorilla/mux"
-
 	"github.com/blevesearch/bleve"
 )
 
 // SearchHandler can handle search requests sent over HTTP
-// the index name can be selected in the URL by mapping a
-// gorilla mux var, or it can be set manually with by
-// setting the defaultIndex value
 type SearchHandler struct {
 	defaultIndexName string
+	IndexNameLookup  varLookupFunc
 }
 
 func NewSearchHandler(defaultIndexName string) *SearchHandler {
@@ -38,7 +34,10 @@ func NewSearchHandler(defaultIndexName string) *SearchHandler {
 func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// find the index to operate on
-	indexName := mux.Vars(req)["indexName"]
+	var indexName string
+	if h.IndexNameLookup != nil {
+		indexName = h.IndexNameLookup(req)
+	}
 	if indexName == "" {
 		indexName = h.defaultIndexName
 	}

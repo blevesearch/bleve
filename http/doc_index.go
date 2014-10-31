@@ -13,12 +13,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-
-	"github.com/gorilla/mux"
 )
 
 type DocIndexHandler struct {
 	defaultIndexName string
+	IndexNameLookup  varLookupFunc
+	DocIDLookup      varLookupFunc
 }
 
 func NewDocIndexHandler(defaultIndexName string) *DocIndexHandler {
@@ -30,7 +30,10 @@ func NewDocIndexHandler(defaultIndexName string) *DocIndexHandler {
 func (h *DocIndexHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// find the index to operate on
-	indexName := mux.Vars(req)["indexName"]
+	var indexName string
+	if h.IndexNameLookup != nil {
+		indexName = h.IndexNameLookup(req)
+	}
 	if indexName == "" {
 		indexName = h.defaultIndexName
 	}
@@ -41,7 +44,10 @@ func (h *DocIndexHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// find the doc id
-	docID := mux.Vars(req)["docID"]
+	var docID string
+	if h.DocIDLookup != nil {
+		docID = h.DocIDLookup(req)
+	}
 	if docID == "" {
 		showError(w, req, "document id cannot be empty", 400)
 		return

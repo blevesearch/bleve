@@ -14,14 +14,14 @@ import (
 	"net/http"
 
 	"github.com/blevesearch/bleve/index/upside_down"
-	"github.com/gorilla/mux"
 )
 
 // DebugDocumentHandler allows you to debug the index content
-// for a given document id.  the document ID should be mapped
-// to the mux router URL with name "docId"
+// for a given document id.
 type DebugDocumentHandler struct {
 	defaultIndexName string
+	IndexNameLookup  varLookupFunc
+	DocIDLookup      varLookupFunc
 }
 
 func NewDebugDocumentHandler(defaultIndexName string) *DebugDocumentHandler {
@@ -33,7 +33,10 @@ func NewDebugDocumentHandler(defaultIndexName string) *DebugDocumentHandler {
 func (h *DebugDocumentHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// find the index to operate on
-	indexName := mux.Vars(req)["indexName"]
+	var indexName string
+	if h.IndexNameLookup != nil {
+		indexName = h.IndexNameLookup(req)
+	}
 	if indexName == "" {
 		indexName = h.defaultIndexName
 	}
@@ -44,7 +47,10 @@ func (h *DebugDocumentHandler) ServeHTTP(w http.ResponseWriter, req *http.Reques
 	}
 
 	// find the docID
-	docID := mux.Vars(req)["docID"]
+	var docID string
+	if h.DocIDLookup != nil {
+		docID = h.DocIDLookup(req)
+	}
 
 	rv := make([]interface{}, 0)
 	rowChan := index.DumpDoc(docID)
