@@ -15,8 +15,6 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/document"
-
-	"github.com/gorilla/mux"
 )
 
 type DocGetHandler struct {
@@ -31,7 +29,7 @@ func NewDocGetHandler(defaultIndexName string) *DocGetHandler {
 
 func (h *DocGetHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// find the index to operate on
-	indexName := mux.Vars(req)["indexName"]
+	indexName := req.Form.Get("indexName")
 	if indexName == "" {
 		indexName = h.defaultIndexName
 	}
@@ -42,7 +40,7 @@ func (h *DocGetHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// find the doc id
-	docID := mux.Vars(req)["docID"]
+	docID := req.Form.Get("docID")
 	if docID == "" {
 		showError(w, req, "document id cannot be empty", 400)
 		return

@@ -12,8 +12,6 @@ package http
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/gorilla/mux"
 )
 
 type DocCountHandler struct {
@@ -28,7 +26,7 @@ func NewDocCountHandler(defaultIndexName string) *DocCountHandler {
 
 func (h *DocCountHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// find the index to operate on
-	indexName := mux.Vars(req)["indexName"]
+	indexName := req.Form.Get("indexName")
 	if indexName == "" {
 		indexName = h.defaultIndexName
 	}
