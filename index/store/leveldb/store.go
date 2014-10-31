@@ -89,11 +89,11 @@ func (ldbs *Store) iterator(key []byte) store.KVIterator {
 	return rv
 }
 
-func (ldbs *Store) Reader() store.KVReader {
+func (ldbs *Store) Reader() (store.KVReader, error) {
 	return newReader(ldbs)
 }
 
-func (ldbs *Store) Writer() store.KVWriter {
+func (ldbs *Store) Writer() (store.KVWriter, error) {
 	return newWriter(ldbs)
 }
 

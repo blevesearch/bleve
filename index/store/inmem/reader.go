@@ -17,10 +17,10 @@ type Reader struct {
 	store *Store
 }
 
-func newReader(store *Store) *Reader {
+func newReader(store *Store) (*Reader, error) {
 	return &Reader{
 		store: store,
-	}
+	}, nil
 }
 
 func (r *Reader) Get(key []byte) ([]byte, error) {

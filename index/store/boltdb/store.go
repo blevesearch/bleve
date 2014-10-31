@@ -97,11 +97,11 @@ func (bs *Store) iterator(key []byte) store.KVIterator {
 	return rv
 }
 
-func (bs *Store) Reader() store.KVReader {
+func (bs *Store) Reader() (store.KVReader, error) {
 	return newReader(bs)
 }
 
-func (bs *Store) Writer() store.KVWriter {
+func (bs *Store) Writer() (store.KVWriter, error) {
 	return newWriter(bs)
 }
 

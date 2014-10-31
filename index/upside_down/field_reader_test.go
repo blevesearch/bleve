@@ -49,7 +49,10 @@ func TestIndexFieldReader(t *testing.T) {
 	}
 	expectedCount++
 
-	indexReader := idx.Reader()
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 	reader, err := indexReader.FieldReader("name", nil, nil)
 	if err != nil {

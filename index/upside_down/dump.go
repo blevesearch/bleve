@@ -53,7 +53,11 @@ func (udc *UpsideDownCouch) DumpAll() chan interface{} {
 		defer close(rv)
 
 		// start an isolated reader for use during the dump
-		kvreader := udc.store.Reader()
+		kvreader, err := udc.store.Reader()
+		if err != nil {
+			rv <- err
+			return
+		}
 		defer kvreader.Close()
 
 		udc.dumpPrefix(kvreader, rv, nil)
@@ -67,7 +71,11 @@ func (udc *UpsideDownCouch) DumpFields() chan interface{} {
 		defer close(rv)
 
 		// start an isolated reader for use during the dump
-		kvreader := udc.store.Reader()
+		kvreader, err := udc.store.Reader()
+		if err != nil {
+			rv <- err
+			return
+		}
 		defer kvreader.Close()
 
 		udc.dumpPrefix(kvreader, rv, []byte{'f'})
@@ -89,7 +97,11 @@ func (udc *UpsideDownCouch) DumpDoc(id string) chan interface{} {
 		defer close(rv)
 
 		// start an isolated reader for use during the dump
-		kvreader := udc.store.Reader()
+		kvreader, err := udc.store.Reader()
+		if err != nil {
+			rv <- err
+			return
+		}
 		defer kvreader.Close()
 
 		back, err := udc.backIndexRowForDoc(kvreader, id)

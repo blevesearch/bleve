@@ -69,6 +69,7 @@ func (ldi *Iterator) Valid() bool {
 	return ldi.iterator.Valid()
 }
 
-func (ldi *Iterator) Close() {
+func (ldi *Iterator) Close() error {
 	ldi.iterator.Close()
+	return nil
 }

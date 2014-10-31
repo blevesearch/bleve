@@ -38,7 +38,11 @@ func (h *DocCountHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	docCount := index.DocCount()
+	docCount, err := index.DocCount()
+	if err != nil {
+		showError(w, req, fmt.Sprintf("error counting docs: %v", err), 500)
+		return
+	}
 	rv := struct {
 		Status string `json:"status"`
 		Count  uint64 `json:"count"`

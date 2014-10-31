@@ -21,11 +21,11 @@ type Reader struct {
 	snapshot *levigo.Snapshot
 }
 
-func newReader(store *Store) *Reader {
+func newReader(store *Store) (*Reader, error) {
 	return &Reader{
 		store:    store,
 		snapshot: store.db.NewSnapshot(),
-	}
+	}, nil
 }
 
 func (r *Reader) Get(key []byte) ([]byte, error) {

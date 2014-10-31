@@ -17,13 +17,13 @@ import (
 
 type Index interface {
 	Open() error
-	Close()
+	Close() error
 
-	DocCount() uint64
+	DocCount() (uint64, error)
 
 	Update(doc *document.Document) error
 	Delete(id string) error
-	Batch(batch Batch) error
+	Batch(batch *Batch) error
 
 	SetInternal(key, val []byte) error
 	DeleteInternal(key []byte) error
@@ -32,7 +32,7 @@ type Index interface {
 	DumpDoc(id string) chan interface{}
 	DumpFields() chan interface{}
 
-	Reader() IndexReader
+	Reader() (IndexReader, error)
 
 	Stats() json.Marshaler
 }
@@ -90,12 +90,30 @@ type DocIDReader interface {
 	Close()
 }
 
-type Batch map[string]*document.Document
+type Batch struct {
+	IndexOps    map[string]*document.Document
+	InternalOps map[string][]byte
+}
 
-func (b Batch) Index(id string, doc *document.Document) {
-	b[id] = doc
+func NewBatch() *Batch {
+	return &Batch{
+		IndexOps:    make(map[string]*document.Document),
+		InternalOps: make(map[string][]byte),
+	}
+}
+
+func (b Batch) Update(doc *document.Document) {
+	b.IndexOps[doc.ID] = doc
 }
 
 func (b Batch) Delete(id string) {
-	b[id] = nil
+	b.IndexOps[id] = nil
+}
+
+func (b Batch) SetInternal(key, val []byte) {
+	b.InternalOps[string(key)] = val
+}
+
+func (b Batch) DeleteInternal(key []byte) {
+	b.InternalOps[string(key)] = nil
 }

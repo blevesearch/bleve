@@ -64,6 +64,7 @@ func (i *Iterator) Valid() bool {
 	return i.valid
 }
 
-func (i *Iterator) Close() {
+func (i *Iterator) Close() error {
 	i.iterator.Close()
+	return nil
 }

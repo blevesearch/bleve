@@ -39,7 +39,10 @@ func TestIndexOpenReopen(t *testing.T) {
 	}
 
 	var expectedCount uint64
-	docCount := idx.DocCount()
+	docCount, err := idx.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
@@ -81,7 +84,10 @@ func TestIndexInsert(t *testing.T) {
 	defer idx.Close()
 
 	var expectedCount uint64
-	docCount := idx.DocCount()
+	docCount, err := idx.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
@@ -94,7 +100,10 @@ func TestIndexInsert(t *testing.T) {
 	}
 	expectedCount++
 
-	docCount = idx.DocCount()
+	docCount, err = idx.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
@@ -120,7 +129,10 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	defer idx.Close()
 
 	var expectedCount uint64
-	docCount := idx.DocCount()
+	docCount, err := idx.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
@@ -141,7 +153,10 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	expectedCount++
 
-	docCount = idx.DocCount()
+	docCount, err = idx.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
@@ -152,7 +167,10 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	expectedCount--
 
-	docCount = idx.DocCount()
+	docCount, err = idx.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
@@ -163,7 +181,10 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	expectedCount--
 
-	docCount = idx.DocCount()
+	docCount, err = idx.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
@@ -280,7 +301,10 @@ func TestIndexInsertMultiple(t *testing.T) {
 	}
 	expectedCount++
 
-	docCount := idx.DocCount()
+	docCount, err := idx.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if docCount != expectedCount {
 		t.Errorf("expected doc count: %d, got %d", expectedCount, docCount)
 	}
@@ -302,7 +326,10 @@ func TestIndexInsertWithStore(t *testing.T) {
 	defer idx.Close()
 
 	var expectedCount uint64
-	docCount := idx.DocCount()
+	docCount, err := idx.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
@@ -315,7 +342,10 @@ func TestIndexInsertWithStore(t *testing.T) {
 	}
 	expectedCount++
 
-	docCount = idx.DocCount()
+	docCount, err = idx.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
@@ -327,7 +357,10 @@ func TestIndexInsertWithStore(t *testing.T) {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
 
-	indexReader := idx.Reader()
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	storedDoc, err := indexReader.Document("1")
@@ -359,7 +392,10 @@ func TestIndexInternalCRUD(t *testing.T) {
 	}
 	defer idx.Close()
 
-	indexReader := idx.Reader()
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	// get something that doesnt exist yet
@@ -377,7 +413,10 @@ func TestIndexInternalCRUD(t *testing.T) {
 		t.Error(err)
 	}
 
-	indexReader = idx.Reader()
+	indexReader, err = idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	// get
@@ -395,7 +434,10 @@ func TestIndexInternalCRUD(t *testing.T) {
 		t.Error(err)
 	}
 
-	indexReader = idx.Reader()
+	indexReader, err = idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	// get again
@@ -445,21 +487,24 @@ func TestIndexBatch(t *testing.T) {
 	// delete existing doc
 	// net document count change 0
 
-	batch := make(index.Batch, 0)
+	batch := index.NewBatch()
 	doc = document.NewDocument("3")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test3")))
-	batch["3"] = doc
+	batch.Update(doc)
 	doc = document.NewDocument("2")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2updated")))
-	batch["2"] = doc
-	batch["1"] = nil
+	batch.Update(doc)
+	batch.Delete("1")
 
 	err = idx.Batch(batch)
 	if err != nil {
 		t.Error(err)
 	}
 
-	indexReader := idx.Reader()
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	docCount := indexReader.DocCount()
@@ -502,7 +547,10 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	defer idx.Close()
 
 	var expectedCount uint64
-	docCount := idx.DocCount()
+	docCount, err := idx.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
@@ -521,7 +569,10 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	}
 	expectedCount++
 
-	docCount = idx.DocCount()
+	docCount, err = idx.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
@@ -543,7 +594,10 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
 
-	indexReader := idx.Reader()
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	storedDoc, err := indexReader.Document("1")
@@ -595,7 +649,10 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		t.Errorf("Error updating index: %v", err)
 	}
 
-	indexReader = idx.Reader()
+	indexReader, err = idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	// expected doc count shouldn't have changed
@@ -638,7 +695,10 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	expectedCount--
 
 	// expected doc count shouldn't have changed
-	docCount = idx.DocCount()
+	docCount, err = idx.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
@@ -672,7 +732,10 @@ func TestIndexInsertFields(t *testing.T) {
 		t.Errorf("Error updating index: %v", err)
 	}
 
-	indexReader := idx.Reader()
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	fields, err := indexReader.Fields()
@@ -734,7 +797,10 @@ func TestIndexUpdateComposites(t *testing.T) {
 		t.Errorf("Error updating index: %v", err)
 	}
 
-	indexReader := idx.Reader()
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	// make sure new values are in index
@@ -822,7 +888,10 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 		t.Errorf("Error updating index: %v", err)
 	}
 
-	indexReader := idx.Reader()
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	termFieldReader, err := indexReader.TermFieldReader([]byte("mister"), "_all")
@@ -865,7 +934,10 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 		t.Errorf("Error updating index: %v", err)
 	}
 
-	indexReader := idx.Reader()
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	fieldTerms, err := indexReader.DocumentFieldTerms("1")

@@ -89,7 +89,10 @@ func TestTermSearcher(t *testing.T) {
 		},
 	})
 
-	indexReader := i.Reader()
+	indexReader, err := i.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	searcher, err := NewTermSearcher(indexReader, queryTerm, queryField, queryBoost, queryExplain)
@@ -99,7 +102,11 @@ func TestTermSearcher(t *testing.T) {
 	defer searcher.Close()
 
 	searcher.SetQueryNorm(2.0)
-	idf := 1.0 + math.Log(float64(i.DocCount())/float64(searcher.Count()+1.0))
+	docCount, err := i.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	idf := 1.0 + math.Log(float64(docCount)/float64(searcher.Count()+1.0))
 	expectedQueryWeight := 3 * idf * 3 * idf
 	if expectedQueryWeight != searcher.Weight() {
 		t.Errorf("expected weight %v got %v", expectedQueryWeight, searcher.Weight())

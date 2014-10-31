@@ -17,7 +17,10 @@ import (
 
 func TestMatchNoneSearch(t *testing.T) {
 
-	twoDocIndexReader := twoDocIndex.Reader()
+	twoDocIndexReader, err := twoDocIndex.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer twoDocIndexReader.Close()
 
 	noneSearcher, err := NewMatchNoneSearcher(twoDocIndexReader)

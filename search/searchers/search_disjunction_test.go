@@ -17,7 +17,10 @@ import (
 
 func TestDisjunctionSearch(t *testing.T) {
 
-	twoDocIndexReader := twoDocIndex.Reader()
+	twoDocIndexReader, err := twoDocIndex.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer twoDocIndexReader.Close()
 
 	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)
@@ -122,7 +125,10 @@ func TestDisjunctionSearch(t *testing.T) {
 
 func TestDisjunctionAdvance(t *testing.T) {
 
-	twoDocIndexReader := twoDocIndex.Reader()
+	twoDocIndexReader, err := twoDocIndex.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer twoDocIndexReader.Close()
 
 	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)

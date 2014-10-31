@@ -29,12 +29,12 @@ type KVIterator interface {
 	Value() []byte
 	Valid() bool
 
-	Close()
+	Close() error
 }
 
 type KVStore interface {
-	Writer() KVWriter
-	Reader() KVReader
+	Writer() (KVWriter, error)
+	Reader() (KVReader, error)
 	Close() error
 }
 

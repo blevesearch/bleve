@@ -17,7 +17,10 @@ import (
 
 func TestMatchAllSearch(t *testing.T) {
 
-	twoDocIndexReader := twoDocIndex.Reader()
+	twoDocIndexReader, err := twoDocIndex.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer twoDocIndexReader.Close()
 
 	allSearcher, err := NewMatchAllSearcher(twoDocIndexReader, 1.0, true)

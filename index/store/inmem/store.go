@@ -80,11 +80,11 @@ func (i *Store) iterator(key []byte) store.KVIterator {
 	return rv
 }
 
-func (i *Store) Reader() store.KVReader {
+func (i *Store) Reader() (store.KVReader, error) {
 	return newReader(i)
 }
 
-func (i *Store) Writer() store.KVWriter {
+func (i *Store) Writer() (store.KVWriter, error) {
 	return newWriter(i)
 }
 

@@ -29,11 +29,11 @@ func (i *Store) iterator(key []byte) store.KVIterator {
 	return rv
 }
 
-func (i *Store) Reader() store.KVReader {
+func (i *Store) Reader() (store.KVReader, error) {
 	return newReader(i)
 }
 
-func (i *Store) Writer() store.KVWriter {
+func (i *Store) Writer() (store.KVWriter, error) {
 	return newWriter(i)
 }
 
@@ -45,10 +45,10 @@ type Reader struct {
 	store *Store
 }
 
-func newReader(store *Store) *Reader {
+func newReader(store *Store) (*Reader, error) {
 	return &Reader{
 		store: store,
-	}
+	}, nil
 }
 
 func (r *Reader) Get(key []byte) ([]byte, error) {
@@ -96,7 +96,8 @@ func (i *Iterator) Valid() bool {
 	return false
 }
 
-func (i *Iterator) Close() {
+func (i *Iterator) Close() error {
+	return nil
 }
 
 type Batch struct {
@@ -147,10 +148,10 @@ type Writer struct {
 	store *Store
 }
 
-func newWriter(store *Store) *Writer {
+func newWriter(store *Store) (*Writer, error) {
 	return &Writer{
 		store: store,
-	}
+	}, nil
 }
 
 func (w *Writer) Set(key, val []byte) error {

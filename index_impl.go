@@ -191,7 +191,10 @@ func openIndex(path string) (*indexImpl, error) {
 	rv.stats.indexStat = rv.i.Stats()
 
 	// now load the mapping
-	indexReader := rv.i.Reader()
+	indexReader, err := rv.i.Reader()
+	if err != nil {
+		return nil, err
+	}
 	defer indexReader.Close()
 	mappingBytes, err := indexReader.GetInternal(mappingInternalKey)
 	if err != nil {
@@ -271,7 +274,7 @@ func (i *indexImpl) Delete(id string) error {
 // operations at the same time.  There are often
 // significant performance benefits when performing
 // operations in a batch.
-func (i *indexImpl) Batch(b Batch) error {
+func (i *indexImpl) Batch(b *Batch) error {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -279,8 +282,8 @@ func (i *indexImpl) Batch(b Batch) error {
 		return ErrorIndexClosed
 	}
 
-	ib := make(index.Batch, len(b))
-	for bk, bd := range b {
+	ib := index.NewBatch()
+	for bk, bd := range b.IndexOps {
 		if bd == nil {
 			ib.Delete(bk)
 		} else {
@@ -289,7 +292,14 @@ func (i *indexImpl) Batch(b Batch) error {
 			if err != nil {
 				return err
 			}
-			ib.Index(bk, doc)
+			ib.Update(doc)
+		}
+	}
+	for ik, iv := range b.InternalOps {
+		if iv == nil {
+			ib.DeleteInternal([]byte(ik))
+		} else {
+			ib.SetInternal([]byte(ik), iv)
 		}
 	}
 	return i.i.Batch(ib)
@@ -306,19 +316,22 @@ func (i *indexImpl) Document(id string) (*document.Document, error) {
 	if !i.open {
 		return nil, ErrorIndexClosed
 	}
-	indexReader := i.i.Reader()
+	indexReader, err := i.i.Reader()
+	if err != nil {
+		return nil, err
+	}
 	defer indexReader.Close()
 	return indexReader.Document(id)
 }
 
 // DocCount returns the number of documents in the
 // index.
-func (i *indexImpl) DocCount() uint64 {
+func (i *indexImpl) DocCount() (uint64, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
 	if !i.open {
-		return 0
+		return 0, ErrorIndexClosed
 	}
 
 	return i.i.DocCount()
@@ -339,7 +352,10 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 	collector := collectors.NewTopScorerSkipCollector(req.Size, req.From)
 
 	// open a reader for this search
-	indexReader := i.i.Reader()
+	indexReader, err := i.i.Reader()
+	if err != nil {
+		return nil, err
+	}
 	defer indexReader.Close()
 
 	searcher, err := req.Query.Searcher(indexReader, i.m, req.Explain)
@@ -475,7 +491,10 @@ func (i *indexImpl) Fields() ([]string, error) {
 		return nil, ErrorIndexClosed
 	}
 
-	indexReader := i.i.Reader()
+	indexReader, err := i.i.Reader()
+	if err != nil {
+		return nil, err
+	}
 	defer indexReader.Close()
 	return indexReader.Fields()
 }
@@ -522,12 +541,12 @@ func (i *indexImpl) DumpDoc(id string) chan interface{} {
 	return i.i.DumpDoc(id)
 }
 
-func (i *indexImpl) Close() {
+func (i *indexImpl) Close() error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
 	i.open = false
-	i.i.Close()
+	return i.i.Close()
 }
 
 func (i *indexImpl) Stats() *IndexStat {
@@ -538,7 +557,10 @@ func (i *indexImpl) GetInternal(key []byte) ([]byte, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
-	reader := i.i.Reader()
+	reader, err := i.i.Reader()
+	if err != nil {
+		return nil, err
+	}
 	defer reader.Close()
 
 	return reader.GetInternal(key)

@@ -17,7 +17,10 @@ import (
 
 func TestPhraseSearch(t *testing.T) {
 
-	twoDocIndexReader := twoDocIndex.Reader()
+	twoDocIndexReader, err := twoDocIndex.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer twoDocIndexReader.Close()
 
 	angstTermSearcher, err := NewTermSearcher(twoDocIndexReader, "angst", "desc", 1.0, true)

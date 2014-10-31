@@ -19,12 +19,15 @@ type Reader struct {
 	tx    *bolt.Tx
 }
 
-func newReader(store *Store) *Reader {
-	tx, _ := store.db.Begin(false)
+func newReader(store *Store) (*Reader, error) {
+	tx, err := store.db.Begin(false)
+	if err != nil {
+		return nil, err
+	}
 	return &Reader{
 		store: store,
 		tx:    tx,
-	}
+	}, nil
 }
 
 func (r *Reader) Get(key []byte) ([]byte, error) {

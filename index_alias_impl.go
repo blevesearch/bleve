@@ -73,7 +73,7 @@ func (i *indexAliasImpl) Delete(id string) error {
 	return i.indexes[0].Delete(id)
 }
 
-func (i *indexAliasImpl) Batch(b Batch) error {
+func (i *indexAliasImpl) Batch(b *Batch) error {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -105,23 +105,34 @@ func (i *indexAliasImpl) Document(id string) (*document.Document, error) {
 	return i.indexes[0].Document(id)
 }
 
-func (i *indexAliasImpl) DocCount() uint64 {
+func (i *indexAliasImpl) DocCount() (uint64, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
 	rv := uint64(0)
 
 	if !i.open {
-		return 0
+		return 0, ErrorIndexClosed
 	}
 
 	for _, index := range i.indexes {
-		rv += index.DocCount()
+		otherCount, err := index.DocCount()
+		if err != nil {
+			return 0, err
+		}
+		rv += otherCount
 	}
 
-	return rv
+	return rv, nil
 }
 
 func (i *indexAliasImpl) Search(req *SearchRequest) (*SearchResult, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
 
 	if len(i.indexes) < 1 {
 		return nil, ErrorAliasEmpty
@@ -199,11 +210,12 @@ func (i *indexAliasImpl) DumpFields() chan interface{} {
 	return i.indexes[0].DumpFields()
 }
 
-func (i *indexAliasImpl) Close() {
+func (i *indexAliasImpl) Close() error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
 	i.open = false
+	return nil
 }
 
 func (i *indexAliasImpl) Mapping() *IndexMapping {

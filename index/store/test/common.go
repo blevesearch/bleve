@@ -18,8 +18,11 @@ import (
 
 func CommonTestKVStore(t *testing.T, s store.KVStore) {
 
-	writer := s.Writer()
-	err := writer.Set([]byte("a"), []byte("val-a"))
+	writer, err := s.Writer()
+	if err != nil {
+		t.Error(err)
+	}
+	err = writer.Set([]byte("a"), []byte("val-a"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +52,10 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 	}
 	writer.Close()
 
-	reader := s.Reader()
+	reader, err := s.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer reader.Close()
 	it := reader.Iterator([]byte("b"))
 	key, val, valid := it.Current()
@@ -92,15 +98,21 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 
 func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	// insert a kv pair
-	writer := s.Writer()
-	err := writer.Set([]byte("a"), []byte("val-a"))
+	writer, err := s.Writer()
+	if err != nil {
+		t.Error(err)
+	}
+	err = writer.Set([]byte("a"), []byte("val-a"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	writer.Close()
 
 	// create an isoalted reader
-	reader := s.Reader()
+	reader, err := s.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer reader.Close()
 
 	// verify we see the value already inserted
@@ -125,7 +137,10 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	}
 
 	// add something after the reader was created
-	writer = s.Writer()
+	writer, err = s.Writer()
+	if err != nil {
+		t.Error(err)
+	}
 	err = writer.Set([]byte("b"), []byte("val-b"))
 	if err != nil {
 		t.Fatal(err)
@@ -133,7 +148,10 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	writer.Close()
 
 	// ensure that a newer reader sees it
-	newReader := s.Reader()
+	newReader, err := s.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer newReader.Close()
 	val, err = newReader.Get([]byte("b"))
 	if err != nil {

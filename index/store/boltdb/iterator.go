@@ -81,9 +81,10 @@ func (i *Iterator) Valid() bool {
 	return i.valid
 }
 
-func (i *Iterator) Close() {
+func (i *Iterator) Close() error {
 	// only close the transaction if we opened it
 	if i.ownTx {
-		i.tx.Rollback()
+		return i.tx.Rollback()
 	}
+	return nil
 }

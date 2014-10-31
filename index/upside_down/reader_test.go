@@ -49,7 +49,10 @@ func TestIndexReader(t *testing.T) {
 	}
 	expectedCount++
 
-	indexReader := idx.Reader()
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	// first look for a term that doesnt exist
@@ -195,7 +198,10 @@ func TestIndexDocIdReader(t *testing.T) {
 	}
 	expectedCount++
 
-	indexReader := idx.Reader()
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
 	defer indexReader.Close()
 
 	// first get all doc ids

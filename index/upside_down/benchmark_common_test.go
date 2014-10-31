@@ -69,24 +69,24 @@ func CommonBenchmarkIndexBatch(b *testing.B, s store.KVStore, analysisWorkers, b
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 
-		var batch index.Batch
+		batch := index.NewBatch()
 		for j := 0; j < 1000; j++ {
 			if j%batchSize == 0 {
-				if len(batch) > 0 {
+				if len(batch.IndexOps) > 0 {
 					err := idx.Batch(batch)
 					if err != nil {
 						b.Fatal(err)
 					}
 				}
-				batch = make(index.Batch)
+				batch = index.NewBatch()
 			}
 			indexDocument := document.NewDocument("").
 				AddField(document.NewTextFieldWithAnalyzer("body", []uint64{}, []byte(benchmarkDocBodies[j%10]), analyzer))
 			indexDocument.ID = strconv.Itoa(i) + "-" + strconv.Itoa(j)
-			batch[indexDocument.ID] = indexDocument
+			batch.Update(indexDocument)
 		}
 		// close last batch
-		if len(batch) > 0 {
+		if len(batch.IndexOps) > 0 {
 			err := idx.Batch(batch)
 			if err != nil {
 				b.Fatal(err)

@@ -17,11 +17,11 @@ type Writer struct {
 	store *Store
 }
 
-func newWriter(store *Store) *Writer {
+func newWriter(store *Store) (*Writer, error) {
 	store.writer.Lock()
 	return &Writer{
 		store: store,
-	}
+	}, nil
 }
 
 func (w *Writer) Set(key, val []byte) error {
