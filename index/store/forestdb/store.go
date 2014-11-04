@@ -12,6 +12,8 @@
 package forestdb
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"sync"
 
@@ -102,12 +104,49 @@ func (ldbs *Store) newBatch() store.KVBatch {
 	return newBatch(ldbs)
 }
 
-func (s *Store) newSnapshot() (*forestdb.Database, error) {
+func (s *Store) getSeqNum() (forestdb.SeqNum, error) {
 	dbinfo, err := s.db.DbInfo()
+	if err != nil {
+		return 0, err
+	}
+	return dbinfo.LastSeqNum(), nil
+}
+
+func (s *Store) newSnapshot() (*forestdb.Database, error) {
+	seqNum, err := s.getSeqNum()
 	if err != nil {
 		return nil, err
 	}
-	return s.db.SnapshotOpen(dbinfo.LastSeqNum())
+	return s.db.SnapshotOpen(seqNum)
+}
+
+func (s *Store) getRollbackID() ([]byte, error) {
+	seqNum, err := s.getSeqNum()
+	if err != nil {
+		return nil, err
+	}
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.LittleEndian, seqNum)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (s *Store) rollbackTo(rollbackId []byte) error {
+	s.writer.Lock()
+	defer s.writer.Unlock()
+	buf := bytes.NewReader(rollbackId)
+	var seqNum forestdb.SeqNum
+	err := binary.Read(buf, binary.LittleEndian, &seqNum)
+	if err != nil {
+		return err
+	}
+	err = s.db.Rollback(seqNum)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
