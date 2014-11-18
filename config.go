@@ -42,6 +42,7 @@ import (
 
 	// token filters
 	_ "github.com/blevesearch/bleve/analysis/token_filters/apostrophe_filter"
+	_ "github.com/blevesearch/bleve/analysis/token_filters/compound"
 	_ "github.com/blevesearch/bleve/analysis/token_filters/edge_ngram_filter"
 	_ "github.com/blevesearch/bleve/analysis/token_filters/elision_filter"
 	_ "github.com/blevesearch/bleve/analysis/token_filters/keyword_marker_filter"
