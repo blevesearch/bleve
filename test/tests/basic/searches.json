@@ -1,0 +1,315 @@
+[
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "name",
+				"term": "marti"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "a"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "name",
+				"term": "noone"
+			}
+		},
+		"result": {
+			"total_hits": 0,
+			"hits": []
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"match_phrase": "long name"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "b"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "name",
+				"term": "walking"
+			}
+		},
+		"result": {
+			"total_hits": 0,
+			"hits": []
+		} 
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"fuzziness": 0,
+				"prefix_length": 0,
+				"field": "name",
+				"match": "walking"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "c"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "name",
+				"prefix": "bobble"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "d"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"query": "+name:phone"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "d"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "age",
+				"max": 30
+			}
+		},
+		"result": {
+			"total_hits": 2,
+			"hits": [
+				{
+					"id": "b"
+				},
+				{
+					"id": "a"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "age",
+				"max": 30,
+				"min": 20
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "b"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"conjuncts": [
+					{
+						"boost": 1,
+						"field": "age",
+						"min": 20
+					},
+					{
+						"boost": 1,
+						"field": "age",
+						"max": 30
+					}
+				]
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "b"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "birthday",
+				"start": "2010-01-01"
+			}
+		},
+		"result": {
+			"total_hits": 2,
+			"hits": [
+				{
+					"id": "d"
+				},
+				{
+					"id": "c"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "birthday",
+				"end": "2010-01-01"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "b"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "tags",
+				"term": "gopher"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "a"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "tags",
+				"term": "belieber"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "a"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "tags",
+				"term": "notintagsarray"
+			}
+		},
+		"result": {
+			"total_hits": 0,
+			"hits": []
+		}
+	},
+	{
+		"comment": "with size 0, total should be 1, but hits empty",
+		"search": {
+			"from": 0,
+			"size": 0,
+			"query": {
+				"field": "name",
+				"term": "marti"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": []
+		}
+	},
+	{
+		"comment": "a search for doc a that includes tags field, verifies both values come back",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"fields": ["tags"],
+			"query": {
+				"field": "name",
+				"term": "marti"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "a",
+					"fields": {
+						"tags": ["gopher", "belieber"]
+					}
+				}
+			]
+		}
+	}
+]

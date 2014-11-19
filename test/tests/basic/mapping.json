@@ -1,0 +1,26 @@
+{
+  "types": {
+    "person": {
+      "properties": {
+        "name": {
+          "fields": [
+            {
+              "include_in_all": true,
+              "index": true,
+              "store": true,
+              "analyzer": "en",
+              "type": "text"
+            }
+          ],
+          "dynamic": true,
+          "enabled": true
+        },
+        "id": {
+          "dynamic": false,
+          "enabled": false
+        }
+      }
+    }
+  },
+  "default_type": "person"
+}
