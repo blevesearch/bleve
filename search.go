@@ -203,10 +203,10 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		return err
 	}
 
-	if r.Size <= 0 {
+	if r.Size < 0 {
 		r.Size = 10
 	}
-	if r.From <= 0 {
+	if r.From < 0 {
 		r.From = 0
 	}
 
