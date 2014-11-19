@@ -26,7 +26,7 @@ const (
 
 func TestSimpleHighlighter(t *testing.T) {
 	fragmenter := sfrag.NewFragmenter(100)
-	formatter := ansi.NewFragmentFormatter()
+	formatter := ansi.NewFragmentFormatter(ansi.DefaultAnsiHighlight)
 	highlighter := NewHighlighter(fragmenter, formatter, defaultSeparator)
 
 	docMatch := search.DocumentMatch{
@@ -153,7 +153,7 @@ Etiam vel augue vel nisl commodo suscipit et ac nisl. Quisque eros diam, porttit
 	}
 
 	fragmenter := sfrag.NewFragmenter(100)
-	formatter := ansi.NewFragmentFormatter()
+	formatter := ansi.NewFragmentFormatter(ansi.DefaultAnsiHighlight)
 	highlighter := NewHighlighter(fragmenter, formatter, defaultSeparator)
 	fragments := highlighter.BestFragmentsInField(&docMatch, doc, "full", 5)
 

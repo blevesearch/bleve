@@ -17,15 +17,15 @@ import (
 
 const Name = "ansi"
 
-const DefaultAnsiHighlight = bgYellow
+const DefaultAnsiHighlight = BgYellow
 
 type FragmentFormatter struct {
 	color string
 }
 
-func NewFragmentFormatter() *FragmentFormatter {
+func NewFragmentFormatter(color string) *FragmentFormatter {
 	return &FragmentFormatter{
-		color: DefaultAnsiHighlight,
+		color: color,
 	}
 }
 
@@ -47,7 +47,7 @@ func (a *FragmentFormatter) Format(f *highlight.Fragment, tlm search.TermLocatio
 		// add the term itself
 		rv += string(f.Orig[termLocation.Start:termLocation.End])
 		// reset the color
-		rv += reset
+		rv += Reset
 		// update current
 		curr = termLocation.End
 	}
@@ -60,33 +60,38 @@ func (a *FragmentFormatter) Format(f *highlight.Fragment, tlm search.TermLocatio
 // ANSI color control escape sequences.
 // Shamelessly copied from https://github.com/sqp/godock/blob/master/libs/log/colors.go
 const (
-	reset      = "\x1b[0m"
-	bright     = "\x1b[1m"
-	dim        = "\x1b[2m"
-	underscore = "\x1b[4m"
-	blink      = "\x1b[5m"
-	reverse    = "\x1b[7m"
-	hidden     = "\x1b[8m"
-	fgBlack    = "\x1b[30m"
-	fgRed      = "\x1b[31m"
-	fgGreen    = "\x1b[32m"
-	fgYellow   = "\x1b[33m"
-	fgBlue     = "\x1b[34m"
-	fgMagenta  = "\x1b[35m"
-	fgCyan     = "\x1b[36m"
-	fgWhite    = "\x1b[37m"
-	bgBlack    = "\x1b[40m"
-	bgRed      = "\x1b[41m"
-	bgGreen    = "\x1b[42m"
-	bgYellow   = "\x1b[43m"
-	bgBlue     = "\x1b[44m"
-	bgMagenta  = "\x1b[45m"
-	bgCyan     = "\x1b[46m"
-	bgWhite    = "\x1b[47m"
+	Reset      = "\x1b[0m"
+	Bright     = "\x1b[1m"
+	Dim        = "\x1b[2m"
+	Underscore = "\x1b[4m"
+	Blink      = "\x1b[5m"
+	Reverse    = "\x1b[7m"
+	Hidden     = "\x1b[8m"
+	FgBlack    = "\x1b[30m"
+	FgRed      = "\x1b[31m"
+	FgGreen    = "\x1b[32m"
+	FgYellow   = "\x1b[33m"
+	FgBlue     = "\x1b[34m"
+	FgMagenta  = "\x1b[35m"
+	FgCyan     = "\x1b[36m"
+	FgWhite    = "\x1b[37m"
+	BgBlack    = "\x1b[40m"
+	BgRed      = "\x1b[41m"
+	BgGreen    = "\x1b[42m"
+	BgYellow   = "\x1b[43m"
+	BgBlue     = "\x1b[44m"
+	BgMagenta  = "\x1b[45m"
+	BgCyan     = "\x1b[46m"
+	BgWhite    = "\x1b[47m"
 )
 
 func Constructor(config map[string]interface{}, cache *registry.Cache) (highlight.FragmentFormatter, error) {
-	return NewFragmentFormatter(), nil
+	color := DefaultAnsiHighlight
+	colorVal, ok := config["color"].(string)
+	if ok {
+		color = colorVal
+	}
+	return NewFragmentFormatter(color), nil
 }
 
 func init() {
