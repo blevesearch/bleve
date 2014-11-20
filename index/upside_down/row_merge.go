@@ -48,10 +48,7 @@ func (t *termSummaryDecr) Merge(key, existing []byte) ([]byte, error) {
 		tfr.freq--
 		if tfr.freq > 0 {
 			return tfr.Value(), nil
-		} else {
-			return nil, nil
 		}
-	} else {
-		return nil, nil
 	}
+	return nil, nil
 }
