@@ -311,5 +311,24 @@
 				}
 			]
 		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "name",
+				"term": "msrti",
+				"fuzziness": 1
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "a"
+				}
+			]
+		}
 	}
 ]
