@@ -45,6 +45,14 @@ func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
 	}
 	index.Close()
 
+	// now intentionally change the storage type
+	ioutil.WriteFile("testidx/index_meta.json", []byte(`{"storage":"mystery"}`), 0666)
+
+	index, err = Open("testidx")
+	if err != ErrorUnknownStorageType {
+		t.Fatalf("expected error unkown storage type, got %v", err)
+	}
+
 	// now intentionally corrupt the metadata
 	ioutil.WriteFile("testidx/index_meta.json", []byte("corrupted"), 0666)
 
@@ -59,5 +67,58 @@ func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
 	index, err = Open("testidx")
 	if err != ErrorIndexMetaMissing {
 		t.Fatalf("expected error index metadata missing, got %v", err)
+	}
+}
+
+func TestInMemIndex(t *testing.T) {
+
+	index, err := New("", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	index.Close()
+}
+
+func TestClosedIndex(t *testing.T) {
+	index, err := New("", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	index.Close()
+
+	err = index.Index("test", "test")
+	if err != ErrorIndexClosed {
+		t.Errorf("expected error index closed, got %v", err)
+	}
+
+	err = index.Delete("test")
+	if err != ErrorIndexClosed {
+		t.Errorf("expected error index closed, got %v", err)
+	}
+
+	b := NewBatch()
+	err = index.Batch(b)
+	if err != ErrorIndexClosed {
+		t.Errorf("expected error index closed, got %v", err)
+	}
+
+	_, err = index.Document("test")
+	if err != ErrorIndexClosed {
+		t.Errorf("expected error index closed, got %v", err)
+	}
+
+	_, err = index.DocCount()
+	if err != ErrorIndexClosed {
+		t.Errorf("expected error index closed, got %v", err)
+	}
+
+	_, err = index.Search(NewSearchRequest(NewTermQuery("test")))
+	if err != ErrorIndexClosed {
+		t.Errorf("expected error index closed, got %v", err)
+	}
+
+	_, err = index.Fields()
+	if err != ErrorIndexClosed {
+		t.Errorf("expected error index closed, got %v", err)
 	}
 }
