@@ -10,24 +10,111 @@
 package bleve
 
 import (
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve/search"
 )
 
 func TestSearchResultString(t *testing.T) {
 
-	searchResult := &SearchResult{
-		Request: &SearchRequest{
-			Size: 0,
+	tests := []struct {
+		result *SearchResult
+		str    string
+	}{
+		{
+			result: &SearchResult{
+				Request: &SearchRequest{
+					Size: 10,
+				},
+				Total: 5,
+				Took:  1 * time.Second,
+				Hits: search.DocumentMatchCollection{
+					&search.DocumentMatch{},
+					&search.DocumentMatch{},
+					&search.DocumentMatch{},
+					&search.DocumentMatch{},
+					&search.DocumentMatch{},
+				},
+			},
+			str: "5 matches, showing 1 through 5, took 1s",
 		},
-		Total: 5,
-		Hits:  search.DocumentMatchCollection{},
+		{
+			result: &SearchResult{
+				Request: &SearchRequest{
+					Size: 0,
+				},
+				Total: 5,
+				Hits:  search.DocumentMatchCollection{},
+			},
+			str: "5 matches",
+		},
+		{
+			result: &SearchResult{
+				Request: &SearchRequest{
+					Size: 10,
+				},
+				Total: 0,
+				Hits:  search.DocumentMatchCollection{},
+			},
+			str: "No matches",
+		},
 	}
 
-	srstring := searchResult.String()
-	if !strings.HasPrefix(srstring, "5 matches") {
-		t.Errorf("expected prefix '5 matches', got %s", srstring)
+	for _, test := range tests {
+		srstring := test.result.String()
+		if !strings.HasPrefix(srstring, test.str) {
+			t.Errorf("expected to start %s, got %s", test.str, srstring)
+		}
+	}
+}
+
+func TestSearchResultMerge(t *testing.T) {
+	l := &SearchResult{
+		Total:    1,
+		Took:     1 * time.Second,
+		MaxScore: 1,
+		Hits: search.DocumentMatchCollection{
+			&search.DocumentMatch{
+				ID:    "a",
+				Score: 1,
+			},
+		},
+	}
+
+	r := &SearchResult{
+		Total:    1,
+		Took:     2 * time.Second,
+		MaxScore: 2,
+		Hits: search.DocumentMatchCollection{
+			&search.DocumentMatch{
+				ID:    "b",
+				Score: 2,
+			},
+		},
+	}
+
+	expected := &SearchResult{
+		Total:    2,
+		Took:     3 * time.Second,
+		MaxScore: 2,
+		Hits: search.DocumentMatchCollection{
+			&search.DocumentMatch{
+				ID:    "a",
+				Score: 1,
+			},
+			&search.DocumentMatch{
+				ID:    "b",
+				Score: 2,
+			},
+		},
+	}
+
+	l.Merge(r)
+
+	if !reflect.DeepEqual(l, expected) {
+		t.Errorf("expected %#v, got %#v", expected, l)
 	}
 }
