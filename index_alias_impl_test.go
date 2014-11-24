@@ -11,7 +11,7 @@ import (
 // reproduces https://github.com/blevesearch/bleve/issues/126
 func TestMultiSearchAllError(t *testing.T) {
 	ei1 := &errIndex{err: fmt.Errorf("deliberate error")}
-	ei2 := &errIndex{err: fmt.Errorf("deliberate errro")}
+	ei2 := &errIndex{err: fmt.Errorf("deliberate error")}
 	sr := NewSearchRequest(NewTermQuery("test"))
 	_, err := MultiSearch(sr, ei1, ei2)
 	if err == nil {
