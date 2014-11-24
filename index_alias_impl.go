@@ -401,6 +401,12 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 		}
 	}
 
+	// for now stop on any error
+	// FIXME offer other behaviors
+	if err != nil {
+		return nil, err
+	}
+
 	// merge just concatenated all the hits
 	// now lets clean it up
 
@@ -424,12 +430,6 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	// fix up facets
 	for name, fr := range req.Facets {
 		sr.Facets.Fixup(name, fr.Size)
-	}
-
-	// for now stop on any error
-	// FIXME offer other behaviors
-	if err != nil {
-		return nil, err
 	}
 
 	return sr, nil
