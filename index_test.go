@@ -15,6 +15,108 @@ import (
 	"testing"
 )
 
+func TestCrud(t *testing.T) {
+	defer os.RemoveAll("testidx")
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doca := map[string]interface{}{
+		"name": "marty",
+		"desc": "gophercon india",
+	}
+	err = index.Index("a", doca)
+	if err != nil {
+		t.Error(err)
+	}
+
+	docy := map[string]interface{}{
+		"name": "jasper",
+		"desc": "clojure",
+	}
+	err = index.Index("y", docy)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = index.Delete("y")
+	if err != nil {
+		t.Error(err)
+	}
+
+	docx := map[string]interface{}{
+		"name": "rose",
+		"desc": "googler",
+	}
+	err = index.Index("x", docx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = index.SetInternal([]byte("status"), []byte("pending"))
+	if err != nil {
+		t.Error(err)
+	}
+
+	docb := map[string]interface{}{
+		"name": "steve",
+		"desc": "cbft master",
+	}
+	batch := NewBatch()
+	batch.Index("b", docb)
+	batch.Delete("x")
+	batch.SetInternal([]byte("batchi"), []byte("batchv"))
+	batch.DeleteInternal([]byte("status"))
+	err = index.Batch(batch)
+	if err != nil {
+		t.Error(err)
+	}
+	val, err := index.GetInternal([]byte("batchi"))
+	if err != nil {
+		t.Error(err)
+	}
+	if string(val) != "batchv" {
+		t.Errorf("expected 'batchv', got '%s'", val)
+	}
+	val, err = index.GetInternal([]byte("status"))
+	if err != nil {
+		t.Error(err)
+	}
+	if val != nil {
+		t.Errorf("expected nil, got '%s'", val)
+	}
+
+	err = index.SetInternal([]byte("seqno"), []byte("7"))
+	if err != nil {
+		t.Error(err)
+	}
+	err = index.SetInternal([]byte("status"), []byte("ready"))
+	if err != nil {
+		t.Error(err)
+	}
+	err = index.DeleteInternal([]byte("status"))
+	if err != nil {
+		t.Error(err)
+	}
+	val, err = index.GetInternal([]byte("status"))
+	if err != nil {
+		t.Error(err)
+	}
+	if val != nil {
+		t.Errorf("expected nil, got '%s'", val)
+	}
+
+	val, err = index.GetInternal([]byte("seqno"))
+	if err != nil {
+		t.Error(err)
+	}
+	if string(val) != "7" {
+		t.Errorf("expected '7', got '%s'", val)
+	}
+}
+
 func TestIndexCreateNewOverExisting(t *testing.T) {
 	defer os.RemoveAll("testidx")
 
