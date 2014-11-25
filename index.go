@@ -17,15 +17,15 @@ import (
 // operations you would like performed at the same
 // time.
 type Batch struct {
-	IndexOps    map[string]interface{}
-	InternalOps map[string][]byte
+	indexOps    map[string]interface{}
+	internalOps map[string][]byte
 }
 
 // NewBatch creates a new empty batch.
 func NewBatch() *Batch {
 	return &Batch{
-		IndexOps:    make(map[string]interface{}),
-		InternalOps: make(map[string][]byte),
+		indexOps:    make(map[string]interface{}),
+		internalOps: make(map[string][]byte),
 	}
 }
 
@@ -33,28 +33,32 @@ func NewBatch() *Batch {
 // batch.  NOTE: the bleve Index is not updated
 // until the batch is executed.
 func (b Batch) Index(id string, data interface{}) {
-	b.IndexOps[id] = data
+	b.indexOps[id] = data
 }
 
 // Delete adds the specified delete operation to the
 // batch.  NOTE: the bleve Index is not updated until
 // the batch is executed.
 func (b Batch) Delete(id string) {
-	b.IndexOps[id] = nil
+	b.indexOps[id] = nil
 }
 
 // SetInternal adds the specified set internal
 // operation to the batch. NOTE: the bleve Index is
 // not updated until the batch is executed.
 func (b Batch) SetInternal(key, val []byte) {
-	b.InternalOps[string(key)] = val
+	b.internalOps[string(key)] = val
 }
 
 // SetInternal adds the specified delete internal
 // operation to the batch. NOTE: the bleve Index is
 // not updated until the batch is executed.
 func (b Batch) DeleteInternal(key []byte) {
-	b.InternalOps[string(key)] = nil
+	b.internalOps[string(key)] = nil
+}
+
+func (b Batch) Size() int {
+	return len(b.indexOps) + len(b.internalOps)
 }
 
 // An Index implements all the indexing and searching

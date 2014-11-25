@@ -283,7 +283,7 @@ func (i *indexImpl) Batch(b *Batch) error {
 	}
 
 	ib := index.NewBatch()
-	for bk, bd := range b.IndexOps {
+	for bk, bd := range b.indexOps {
 		if bd == nil {
 			ib.Delete(bk)
 		} else {
@@ -295,7 +295,7 @@ func (i *indexImpl) Batch(b *Batch) error {
 			ib.Update(doc)
 		}
 	}
-	for ik, iv := range b.InternalOps {
+	for ik, iv := range b.internalOps {
 		if iv == nil {
 			ib.DeleteInternal([]byte(ik))
 		} else {
