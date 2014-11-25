@@ -10,6 +10,424 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
+func TestIndexAliasSingle(t *testing.T) {
+	expectedError := fmt.Errorf("expected")
+	ei1 := &stubIndex{
+		err: expectedError,
+	}
+
+	alias := NewIndexAlias(ei1)
+
+	err := alias.Index("a", "a")
+	if err != expectedError {
+		t.Errorf("expected %v, got %v", expectedError, err)
+	}
+
+	err = alias.Delete("a")
+	if err != expectedError {
+		t.Errorf("expected %v, got %v", expectedError, err)
+	}
+
+	err = alias.Batch(NewBatch())
+	if err != expectedError {
+		t.Errorf("expected %v, got %v", expectedError, err)
+	}
+
+	_, err = alias.Document("a")
+	if err != expectedError {
+		t.Errorf("expected %v, got %v", expectedError, err)
+	}
+
+	_, err = alias.Fields()
+	if err != expectedError {
+		t.Errorf("expected %v, got %v", expectedError, err)
+	}
+
+	_, err = alias.GetInternal([]byte("a"))
+	if err != expectedError {
+		t.Errorf("expected %v, got %v", expectedError, err)
+	}
+
+	err = alias.SetInternal([]byte("a"), []byte("a"))
+	if err != expectedError {
+		t.Errorf("expected %v, got %v", expectedError, err)
+	}
+
+	err = alias.DeleteInternal([]byte("a"))
+	if err != expectedError {
+		t.Errorf("expected %v, got %v", expectedError, err)
+	}
+
+	res := alias.DumpAll()
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	res = alias.DumpDoc("a")
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	res = alias.DumpFields()
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	mapping := alias.Mapping()
+	if mapping != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	indexStat := alias.Stats()
+	if indexStat != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	// now a few things that should work
+	sr := NewSearchRequest(NewTermQuery("test"))
+	_, err = alias.Search(sr)
+	if err != expectedError {
+		t.Errorf("expected %v, got %v", expectedError, err)
+	}
+
+	_, err = alias.DocCount()
+	if err != expectedError {
+		t.Errorf("expected %v, got %v", expectedError, err)
+	}
+
+	// now change the def using add/remove
+	expectedError2 := fmt.Errorf("expected2")
+	ei2 := &stubIndex{
+		err: expectedError2,
+	}
+
+	alias.Add(ei2)
+	alias.Remove(ei1)
+
+	err = alias.Index("a", "a")
+	if err != expectedError2 {
+		t.Errorf("expected %v, got %v", expectedError2, err)
+	}
+
+	err = alias.Delete("a")
+	if err != expectedError2 {
+		t.Errorf("expected %v, got %v", expectedError2, err)
+	}
+
+	err = alias.Batch(NewBatch())
+	if err != expectedError2 {
+		t.Errorf("expected %v, got %v", expectedError2, err)
+	}
+
+	_, err = alias.Document("a")
+	if err != expectedError2 {
+		t.Errorf("expected %v, got %v", expectedError2, err)
+	}
+
+	_, err = alias.Fields()
+	if err != expectedError2 {
+		t.Errorf("expected %v, got %v", expectedError2, err)
+	}
+
+	_, err = alias.GetInternal([]byte("a"))
+	if err != expectedError2 {
+		t.Errorf("expected %v, got %v", expectedError2, err)
+	}
+
+	err = alias.SetInternal([]byte("a"), []byte("a"))
+	if err != expectedError2 {
+		t.Errorf("expected %v, got %v", expectedError2, err)
+	}
+
+	err = alias.DeleteInternal([]byte("a"))
+	if err != expectedError2 {
+		t.Errorf("expected %v, got %v", expectedError2, err)
+	}
+
+	res = alias.DumpAll()
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	res = alias.DumpDoc("a")
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	res = alias.DumpFields()
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	mapping = alias.Mapping()
+	if mapping != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	indexStat = alias.Stats()
+	if indexStat != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	// now a few things that should work
+	_, err = alias.Search(sr)
+	if err != expectedError2 {
+		t.Errorf("expected %v, got %v", expectedError2, err)
+	}
+
+	_, err = alias.DocCount()
+	if err != expectedError2 {
+		t.Errorf("expected %v, got %v", expectedError2, err)
+	}
+
+	// now change the def using swap
+	expectedError3 := fmt.Errorf("expected3")
+	ei3 := &stubIndex{
+		err: expectedError3,
+	}
+
+	alias.Swap([]Index{ei3}, []Index{ei2})
+
+	err = alias.Index("a", "a")
+	if err != expectedError3 {
+		t.Errorf("expected %v, got %v", expectedError3, err)
+	}
+
+	err = alias.Delete("a")
+	if err != expectedError3 {
+		t.Errorf("expected %v, got %v", expectedError3, err)
+	}
+
+	err = alias.Batch(NewBatch())
+	if err != expectedError3 {
+		t.Errorf("expected %v, got %v", expectedError3, err)
+	}
+
+	_, err = alias.Document("a")
+	if err != expectedError3 {
+		t.Errorf("expected %v, got %v", expectedError3, err)
+	}
+
+	_, err = alias.Fields()
+	if err != expectedError3 {
+		t.Errorf("expected %v, got %v", expectedError3, err)
+	}
+
+	_, err = alias.GetInternal([]byte("a"))
+	if err != expectedError3 {
+		t.Errorf("expected %v, got %v", expectedError3, err)
+	}
+
+	err = alias.SetInternal([]byte("a"), []byte("a"))
+	if err != expectedError3 {
+		t.Errorf("expected %v, got %v", expectedError3, err)
+	}
+
+	err = alias.DeleteInternal([]byte("a"))
+	if err != expectedError3 {
+		t.Errorf("expected %v, got %v", expectedError3, err)
+	}
+
+	res = alias.DumpAll()
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	res = alias.DumpDoc("a")
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	res = alias.DumpFields()
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	mapping = alias.Mapping()
+	if mapping != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	indexStat = alias.Stats()
+	if indexStat != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	// now a few things that should work
+	_, err = alias.Search(sr)
+	if err != expectedError3 {
+		t.Errorf("expected %v, got %v", expectedError3, err)
+	}
+
+	_, err = alias.DocCount()
+	if err != expectedError3 {
+		t.Errorf("expected %v, got %v", expectedError3, err)
+	}
+}
+
+func TestIndexAliasClosed(t *testing.T) {
+	alias := NewIndexAlias()
+	alias.Close()
+
+	err := alias.Index("a", "a")
+	if err != ErrorIndexClosed {
+		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
+	}
+
+	err = alias.Delete("a")
+	if err != ErrorIndexClosed {
+		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
+	}
+
+	err = alias.Batch(NewBatch())
+	if err != ErrorIndexClosed {
+		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
+	}
+
+	_, err = alias.Document("a")
+	if err != ErrorIndexClosed {
+		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
+	}
+
+	_, err = alias.Fields()
+	if err != ErrorIndexClosed {
+		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
+	}
+
+	_, err = alias.GetInternal([]byte("a"))
+	if err != ErrorIndexClosed {
+		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
+	}
+
+	err = alias.SetInternal([]byte("a"), []byte("a"))
+	if err != ErrorIndexClosed {
+		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
+	}
+
+	err = alias.DeleteInternal([]byte("a"))
+	if err != ErrorIndexClosed {
+		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
+	}
+
+	res := alias.DumpAll()
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	res = alias.DumpDoc("a")
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	res = alias.DumpFields()
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	mapping := alias.Mapping()
+	if mapping != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	indexStat := alias.Stats()
+	if indexStat != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	// now a few things that should work
+	sr := NewSearchRequest(NewTermQuery("test"))
+	_, err = alias.Search(sr)
+	if err != ErrorIndexClosed {
+		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
+	}
+
+	_, err = alias.DocCount()
+	if err != ErrorIndexClosed {
+		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
+	}
+}
+
+func TestIndexAliasEmpty(t *testing.T) {
+	alias := NewIndexAlias()
+
+	err := alias.Index("a", "a")
+	if err != ErrorAliasEmpty {
+		t.Errorf("expected %v, got %v", ErrorAliasEmpty, err)
+	}
+
+	err = alias.Delete("a")
+	if err != ErrorAliasEmpty {
+		t.Errorf("expected %v, got %v", ErrorAliasEmpty, err)
+	}
+
+	err = alias.Batch(NewBatch())
+	if err != ErrorAliasEmpty {
+		t.Errorf("expected %v, got %v", ErrorAliasEmpty, err)
+	}
+
+	_, err = alias.Document("a")
+	if err != ErrorAliasEmpty {
+		t.Errorf("expected %v, got %v", ErrorAliasEmpty, err)
+	}
+
+	_, err = alias.Fields()
+	if err != ErrorAliasEmpty {
+		t.Errorf("expected %v, got %v", ErrorAliasEmpty, err)
+	}
+
+	_, err = alias.GetInternal([]byte("a"))
+	if err != ErrorAliasEmpty {
+		t.Errorf("expected %v, got %v", ErrorAliasEmpty, err)
+	}
+
+	err = alias.SetInternal([]byte("a"), []byte("a"))
+	if err != ErrorAliasEmpty {
+		t.Errorf("expected %v, got %v", ErrorAliasEmpty, err)
+	}
+
+	err = alias.DeleteInternal([]byte("a"))
+	if err != ErrorAliasEmpty {
+		t.Errorf("expected %v, got %v", ErrorAliasEmpty, err)
+	}
+
+	res := alias.DumpAll()
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	res = alias.DumpDoc("a")
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	res = alias.DumpFields()
+	if res != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	mapping := alias.Mapping()
+	if mapping != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	indexStat := alias.Stats()
+	if indexStat != nil {
+		t.Errorf("expected nil, got %v", res)
+	}
+
+	// now a few things that should work
+	sr := NewSearchRequest(NewTermQuery("test"))
+	_, err = alias.Search(sr)
+	if err != ErrorAliasEmpty {
+		t.Errorf("expected %v, got %v", ErrorAliasEmpty, err)
+	}
+
+	count, err := alias.DocCount()
+	if count != 0 {
+		t.Errorf("expected %d, got %d", 0, count)
+	}
+}
+
 func TestIndexAliasMulti(t *testing.T) {
 	ei1Count := uint64(7)
 	ei1 := &stubIndex{
