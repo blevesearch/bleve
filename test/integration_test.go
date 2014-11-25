@@ -139,5 +139,10 @@ func runTestDir(t *testing.T, dir string) {
 				}
 			}
 		}
+		if search.Result.Facets != nil {
+			if !reflect.DeepEqual(search.Result.Facets, res.Facets) {
+				t.Errorf("expected facets: %#v got %#v", search.Result.Facets, res.Facets)
+			}
+		}
 	}
 }
