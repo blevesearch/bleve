@@ -398,13 +398,12 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 				}
 			}
 		case err, ok = <-errs:
+			// for now stop on any error
+			// FIXME offer other behaviors
+			if err != nil {
+				return nil, err
+			}
 		}
-	}
-
-	// for now stop on any error
-	// FIXME offer other behaviors
-	if err != nil {
-		return nil, err
 	}
 
 	// merge just concatenated all the hits
