@@ -11,22 +11,43 @@ package test
 
 import (
 	"encoding/json"
+	"flag"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"testing"
 
 	"github.com/blevesearch/bleve"
 )
 
+var dataset = flag.String("dataset", "", "only test datasets matching this regex")
+var keepIndex = flag.Bool("keepIndex", false, "keep the index after testing")
+
 func TestIntegration(t *testing.T) {
+
+	flag.Parse()
+
+	var err error
+	var datasetRegexp *regexp.Regexp
+	if *dataset != "" {
+		datasetRegexp, err = regexp.Compile(*dataset)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	fis, err := ioutil.ReadDir("tests")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, fi := range fis {
+		if datasetRegexp != nil {
+			if !datasetRegexp.MatchString(fi.Name()) {
+				continue
+			}
+		}
 		if fi.IsDir() {
 			t.Logf("Running test: %s", fi.Name())
 			runTestDir(t, "tests"+string(filepath.Separator)+fi.Name())
@@ -49,7 +70,9 @@ func runTestDir(t *testing.T, dir string) {
 	}
 
 	// open new index
-	defer os.RemoveAll("test.bleve")
+	if !*keepIndex {
+		defer os.RemoveAll("test.bleve")
+	}
 	index, err := bleve.New("test.bleve", &mapping)
 	if err != nil {
 		t.Errorf("error creating new index: %v", err)

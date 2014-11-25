@@ -12,6 +12,7 @@ package bleve
 import (
 	"fmt"
 
+	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
@@ -56,7 +57,6 @@ func (q *matchPhraseQuery) SetField(f string) Query {
 }
 
 func (q *matchPhraseQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
-
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultField
@@ -75,16 +75,38 @@ func (q *matchPhraseQuery) Searcher(i index.IndexReader, m *IndexMapping, explai
 
 	tokens := analyzer.Analyze([]byte(q.MatchPhrase))
 	if len(tokens) > 0 {
-		ts := make([]string, len(tokens))
-		for i, token := range tokens {
-			ts[i] = string(token.Term)
-		}
-
-		phraseQuery := NewPhraseQuery(ts, field).SetBoost(q.BoostVal)
+		phrase := tokenStreamToPhrase(tokens)
+		phraseQuery := NewPhraseQuery(phrase, field).SetBoost(q.BoostVal)
 		return phraseQuery.Searcher(i, m, explain)
 	}
 	noneQuery := NewMatchNoneQuery()
 	return noneQuery.Searcher(i, m, explain)
+}
+
+func tokenStreamToPhrase(tokens analysis.TokenStream) []string {
+	firstPosition := int(^uint(0) >> 1)
+	lastPosition := 0
+	for _, token := range tokens {
+		if token.Position < firstPosition {
+			firstPosition = token.Position
+		}
+		if token.Position > lastPosition {
+			lastPosition = token.Position
+		}
+	}
+	phraseLen := lastPosition - firstPosition + 1
+	if phraseLen > 0 {
+		rv := make([]string, phraseLen)
+		for i := 0; i < phraseLen; i++ {
+			rv[i] = ""
+		}
+		for _, token := range tokens {
+			pos := token.Position - firstPosition
+			rv[pos] = string(token.Term)
+		}
+		return rv
+	}
+	return nil
 }
 
 func (q *matchPhraseQuery) Validate() error {

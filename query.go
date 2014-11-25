@@ -107,7 +107,7 @@ func ParseQuery(input []byte) (Query, error) {
 		if rv.Boost() == 0 {
 			rv.SetBoost(1)
 		}
-		for _, tq := range rv.Terms {
+		for _, tq := range rv.TermQueries {
 			if tq.Boost() == 0 {
 				tq.SetBoost(1)
 			}

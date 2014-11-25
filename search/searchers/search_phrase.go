@@ -27,7 +27,6 @@ type PhraseSearcher struct {
 }
 
 func NewPhraseSearcher(indexReader index.IndexReader, mustSearcher *ConjunctionSearcher, terms []string) (*PhraseSearcher, error) {
-
 	// build our searcher
 	rv := PhraseSearcher{
 		indexReader:  indexReader,
@@ -112,7 +111,7 @@ func (s *PhraseSearcher) Next() (*search.DocumentMatch, error) {
 				for _, location := range locations {
 					crvtlm := make(search.TermLocationMap, 0)
 				INNER:
-					for i := 0; i < len(s.mustSearcher.searchers); i++ {
+					for i := 0; i < len(s.terms); i++ {
 						nextTerm := s.terms[i]
 						if nextTerm != "" {
 							// look through all this terms locations

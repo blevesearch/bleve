@@ -19,8 +19,9 @@ import (
 )
 
 type phraseQuery struct {
-	Terms    []Query `json:"terms"`
-	BoostVal float64 `json:"boost,omitempty"`
+	TermQueries []Query `json:"terms"`
+	BoostVal    float64 `json:"boost,omitempty"`
+	terms       []string
 }
 
 // NewPhraseQuery creates a new Query for finding
@@ -29,13 +30,16 @@ type phraseQuery struct {
 // order, at the correct index offsets, in the
 // specified field.
 func NewPhraseQuery(terms []string, field string) *phraseQuery {
-	termQueries := make([]Query, len(terms))
-	for i, term := range terms {
-		termQueries[i] = NewTermQuery(term).SetField(field)
+	termQueries := make([]Query, 0)
+	for _, term := range terms {
+		if term != "" {
+			termQueries = append(termQueries, NewTermQuery(term).SetField(field))
+		}
 	}
 	return &phraseQuery{
-		Terms:    termQueries,
-		BoostVal: 1.0,
+		TermQueries: termQueries,
+		BoostVal:    1.0,
+		terms:       terms,
 	}
 }
 
@@ -50,21 +54,16 @@ func (q *phraseQuery) SetBoost(b float64) Query {
 
 func (q *phraseQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 
-	terms := make([]string, len(q.Terms))
-	for i, term := range q.Terms {
-		terms[i] = term.(*termQuery).Term
-	}
-
-	conjunctionQuery := NewConjunctionQuery(q.Terms)
+	conjunctionQuery := NewConjunctionQuery(q.TermQueries)
 	conjunctionSearcher, err := conjunctionQuery.Searcher(i, m, explain)
 	if err != nil {
 		return nil, err
 	}
-	return searchers.NewPhraseSearcher(i, conjunctionSearcher.(*searchers.ConjunctionSearcher), terms)
+	return searchers.NewPhraseSearcher(i, conjunctionSearcher.(*searchers.ConjunctionSearcher), q.terms)
 }
 
 func (q *phraseQuery) Validate() error {
-	if len(q.Terms) < 1 {
+	if len(q.TermQueries) < 1 {
 		return ErrorPhraseQueryNoTerms
 	}
 	return nil
@@ -79,17 +78,19 @@ func (q *phraseQuery) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	q.Terms = make([]Query, len(tmp.Terms))
+	q.TermQueries = make([]Query, len(tmp.Terms))
+	q.terms = make([]string, 0)
 	for i, term := range tmp.Terms {
 		query, err := ParseQuery(term)
 		if err != nil {
 			return err
 		}
-		q.Terms[i] = query
-		_, isTermQuery := query.(*termQuery)
+		q.TermQueries[i] = query
+		tq, isTermQuery := query.(*termQuery)
 		if !isTermQuery {
 			return fmt.Errorf("phrase query can only contain term queries")
 		}
+		q.terms = append(q.terms, tq.Term)
 	}
 	q.BoostVal = tmp.BoostVal
 	if q.BoostVal == 0 {
