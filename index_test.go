@@ -115,6 +115,39 @@ func TestCrud(t *testing.T) {
 	if string(val) != "7" {
 		t.Errorf("expected '7', got '%s'", val)
 	}
+
+	// close the index, open it again, and try some more things
+	index.Close()
+
+	index, err = Open("testidx")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := index.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Errorf("expected doc count 2, got %d", count)
+	}
+
+	doc, err := index.Document("a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc == nil {
+		t.Errorf("expected doc not nil, got nil")
+	}
+	foundNameField := false
+	for _, field := range doc.Fields {
+		if field.Name() == "name" && string(field.Value()) == "marty" {
+			foundNameField = true
+		}
+	}
+	if !foundNameField {
+		t.Errorf("expected to find field named 'name' with value 'marty'")
+	}
 }
 
 func TestIndexCreateNewOverExisting(t *testing.T) {

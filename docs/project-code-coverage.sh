@@ -38,6 +38,11 @@ cat acc.out integration-acc.out | go run docs/merge-coverprofile.go > merged.out
 if [ -n "$COVERALLS" ]
 then
 	goveralls -service drone.io -coverprofile=merged.out -repotoken $COVERALLS
+fi
+
+if [ -n "$COVERHTML" ]
+then
+    go tool cover -html=merged.out
 fi	
 
 rm -rf ./profile.out
