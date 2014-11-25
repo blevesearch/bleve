@@ -2,16 +2,79 @@ package bleve
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/search"
 )
 
-// TestMultiSearchAllError
-// reproduces https://github.com/blevesearch/bleve/issues/126
-func TestMultiSearchAllError(t *testing.T) {
-	ei1 := &errIndex{err: fmt.Errorf("deliberate error")}
-	ei2 := &errIndex{err: fmt.Errorf("deliberate error")}
+// TestMultiSearchNoError
+func TestMultiSearchNoError(t *testing.T) {
+	ei1 := &stubIndex{err: nil, searchResult: &SearchResult{
+		Total: 1,
+		Hits: search.DocumentMatchCollection{
+			&search.DocumentMatch{
+				ID:    "a",
+				Score: 1.0,
+			},
+		},
+		Took:     1 * time.Second,
+		MaxScore: 1.0,
+	}}
+	ei2 := &stubIndex{err: nil, searchResult: &SearchResult{
+		Total: 1,
+		Hits: search.DocumentMatchCollection{
+			&search.DocumentMatch{
+				ID:    "b",
+				Score: 2.0,
+			},
+		},
+		Took:     2 * time.Second,
+		MaxScore: 2.0,
+	}}
+
+	expected := &SearchResult{
+		Total: 2,
+		Hits: search.DocumentMatchCollection{
+			&search.DocumentMatch{
+				ID:    "b",
+				Score: 2.0,
+			},
+			&search.DocumentMatch{
+				ID:    "a",
+				Score: 1.0,
+			},
+		},
+		Took:     3 * time.Second,
+		MaxScore: 2.0,
+	}
+
+	sr := NewSearchRequest(NewTermQuery("test"))
+	results, err := MultiSearch(sr, ei1, ei2)
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(results, expected) {
+		t.Errorf("expected %#v, got %#v", expected, results)
+	}
+}
+
+// TestMultiSearchSomeError
+func TestMultiSearchSomeError(t *testing.T) {
+	ei1 := &stubIndex{err: nil, searchResult: &SearchResult{
+		Total: 1,
+		Hits: search.DocumentMatchCollection{
+			&search.DocumentMatch{
+				ID:    "a",
+				Score: 1.0,
+			},
+		},
+		Took:     1 * time.Second,
+		MaxScore: 1.0,
+	}}
+	ei2 := &stubIndex{err: fmt.Errorf("deliberate error")}
 	sr := NewSearchRequest(NewTermQuery("test"))
 	_, err := MultiSearch(sr, ei1, ei2)
 	if err == nil {
@@ -19,72 +82,94 @@ func TestMultiSearchAllError(t *testing.T) {
 	}
 }
 
-// errIndex is an Index impl for which all operations
-// return the configured error value
-type errIndex struct {
-	err error
+// TestMultiSearchAllError
+// reproduces https://github.com/blevesearch/bleve/issues/126
+func TestMultiSearchAllError(t *testing.T) {
+	ei1 := &stubIndex{err: fmt.Errorf("deliberate error")}
+	ei2 := &stubIndex{err: fmt.Errorf("deliberate error")}
+	sr := NewSearchRequest(NewTermQuery("test"))
+	_, err := MultiSearch(sr, ei1, ei2)
+	if err == nil {
+		t.Errorf("expected error, got %v", err)
+	}
 }
 
-func (i *errIndex) Index(id string, data interface{}) error {
+// stubIndex is an Index impl for which all operations
+// return the configured error value, unless the
+// corresponding operation result value has been
+// set, in which case that is returned instead
+type stubIndex struct {
+	err            error
+	searchResult   *SearchResult
+	documentResult *document.Document
+}
+
+func (i *stubIndex) Index(id string, data interface{}) error {
 	return i.err
 }
 
-func (i *errIndex) Delete(id string) error {
+func (i *stubIndex) Delete(id string) error {
 	return i.err
 }
 
-func (i *errIndex) Batch(b *Batch) error {
+func (i *stubIndex) Batch(b *Batch) error {
 	return i.err
 }
 
-func (i *errIndex) Document(id string) (*document.Document, error) {
+func (i *stubIndex) Document(id string) (*document.Document, error) {
+	if i.documentResult != nil {
+		return i.documentResult, nil
+	}
 	return nil, i.err
 }
 
-func (i *errIndex) DocCount() (uint64, error) {
+func (i *stubIndex) DocCount() (uint64, error) {
 	return 0, i.err
 }
 
-func (i *errIndex) Search(req *SearchRequest) (*SearchResult, error) {
+func (i *stubIndex) Search(req *SearchRequest) (*SearchResult, error) {
+	if i.searchResult != nil {
+		return i.searchResult, nil
+	}
 	return nil, i.err
 }
 
-func (i *errIndex) Fields() ([]string, error) {
+func (i *stubIndex) Fields() ([]string, error) {
 	return nil, i.err
 }
 
-func (i *errIndex) DumpAll() chan interface{} {
+func (i *stubIndex) DumpAll() chan interface{} {
 	return nil
 }
 
-func (i *errIndex) DumpDoc(id string) chan interface{} {
+func (i *stubIndex) DumpDoc(id string) chan interface{} {
 	return nil
 }
 
-func (i *errIndex) DumpFields() chan interface{} {
+func (i *stubIndex) DumpFields() chan interface{} {
 	return nil
 }
 
-func (i *errIndex) Close() error {
+func (i *stubIndex) Close() error {
 	return i.err
 }
 
-func (i *errIndex) Mapping() *IndexMapping {
+func (i *stubIndex) Mapping() *IndexMapping {
 	return nil
 }
 
-func (i *errIndex) Stats() *IndexStat {
+func (i *stubIndex) Stats() *IndexStat {
 	return nil
 }
 
-func (i *errIndex) GetInternal(key []byte) ([]byte, error) {
+func (i *stubIndex) GetInternal(key []byte) ([]byte, error) {
 	return nil, i.err
 }
 
-func (i *errIndex) SetInternal(key, val []byte) error {
+func (i *stubIndex) SetInternal(key, val []byte) error {
 	return i.err
 }
 
-func (i *errIndex) DeleteInternal(key []byte) error {
+func (i *stubIndex) DeleteInternal(key []byte) error {
 	return i.err
 }
