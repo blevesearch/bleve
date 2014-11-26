@@ -106,8 +106,8 @@ func UpdateAlias(alias string, add, remove []string) error {
 			addIndexes[i] = addIndex
 		}
 		// build list of remove indexes
-		removeIndexes := make([]bleve.Index, len(add))
-		for i, removeIndexName := range add {
+		removeIndexes := make([]bleve.Index, len(remove))
+		for i, removeIndexName := range remove {
 			removeIndex, indexExists := indexNameMapping[removeIndexName]
 			if !indexExists {
 				return fmt.Errorf("index named '%s' does not exist", removeIndexName)

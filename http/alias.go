@@ -38,7 +38,7 @@ func (h *AliasHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	var aliasAction AliasAction
-	// interpret request body as index mapping
+	// interpret request body as alias actions
 	if len(requestBody) > 0 {
 		err := json.Unmarshal(requestBody, &aliasAction)
 		if err != nil {
@@ -52,7 +52,7 @@ func (h *AliasHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	err = UpdateAlias(aliasAction.Alias, aliasAction.AddIndexes, aliasAction.RemoveIndexes)
 	if err != nil {
-		showError(w, req, fmt.Sprintf("error updating alia: %v", err), 400)
+		showError(w, req, fmt.Sprintf("error updating alias: %v", err), 400)
 		return
 	}
 
