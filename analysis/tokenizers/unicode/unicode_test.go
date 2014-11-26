@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/segment"
 )
 
 func TestUnicode(t *testing.T) {
@@ -126,6 +127,18 @@ func TestUnicode(t *testing.T) {
 				},
 			},
 		},
+		{
+			[]byte("カ"),
+			analysis.TokenStream{
+				{
+					Start:    0,
+					End:      3,
+					Term:     []byte("カ"),
+					Position: 1,
+					Type:     analysis.Ideographic,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -154,4 +167,31 @@ func BenchmarkTokenizeEnglishText(b *testing.B) {
 		tokenizer.Tokenize(sampleLargeInput)
 	}
 
+}
+
+func TestConvertType(t *testing.T) {
+	tests := []struct {
+		in  int
+		out analysis.TokenType
+	}{
+		{
+			segment.Ideo, analysis.Ideographic,
+		},
+		{
+			segment.Kana, analysis.Ideographic,
+		},
+		{
+			segment.Number, analysis.Numeric,
+		},
+		{
+			segment.Letter, analysis.AlphaNumeric,
+		},
+	}
+
+	for _, test := range tests {
+		actual := convertType(test.in)
+		if actual != test.out {
+			t.Errorf("expected %d, got %d for %d", test.out, actual, test.in)
+		}
+	}
 }
