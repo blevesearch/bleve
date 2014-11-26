@@ -88,7 +88,7 @@ func (n *DateTimeField) DateTime() (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-	return time.Unix(0, i64), nil
+	return time.Unix(0, i64).UTC(), nil
 }
 
 func (n *DateTimeField) GoString() string {

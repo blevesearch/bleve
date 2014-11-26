@@ -635,7 +635,7 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	} else {
-		if dateFieldDate != time.Unix(0, 0) {
+		if dateFieldDate != time.Unix(0, 0).UTC() {
 			t.Errorf("expected date value unix epoch, got %v", dateFieldDate)
 		}
 	}
