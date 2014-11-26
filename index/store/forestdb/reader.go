@@ -18,7 +18,7 @@ import (
 
 type Reader struct {
 	store    *Store
-	snapshot *forestdb.Database
+	snapshot *forestdb.KVStore
 }
 
 func newReader(store *Store) (*Reader, error) {

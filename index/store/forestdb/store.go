@@ -25,24 +25,32 @@ import (
 const Name = "leveldb"
 
 type Store struct {
-	path   string
-	config *forestdb.Config
-	db     *forestdb.Database
-	writer sync.Mutex
+	path     string
+	config   *forestdb.Config
+	kvconfig *forestdb.KVStoreConfig
+	dbfile   *forestdb.File
+	dbkv     *forestdb.KVStore
+	writer   sync.Mutex
 }
 
 func Open(path string, createIfMissing bool) (*Store, error) {
 	rv := Store{
-		path:   path,
-		config: forestdb.DefaultConfig(),
+		path:     path,
+		config:   forestdb.DefaultConfig(),
+		kvconfig: forestdb.DefaultKVStoreConfig(),
 	}
 
 	if createIfMissing {
-		rv.config.SetOpenFlags(forestdb.OPEN_FLAG_CREATE)
+		rv.kvconfig.SetCreateIfMissing(true)
 	}
 
 	var err error
-	rv.db, err = forestdb.Open(rv.path, rv.config)
+	rv.dbfile, err = forestdb.Open(rv.path, rv.config)
+	if err != nil {
+		return nil, err
+	}
+
+	rv.dbkv, err = rv.dbfile.OpenKVStoreDefault(rv.kvconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +59,7 @@ func Open(path string, createIfMissing bool) (*Store, error) {
 }
 
 func (s *Store) get(key []byte) ([]byte, error) {
-	res, err := s.db.GetKV(key)
+	res, err := s.dbkv.GetKV(key)
 	if err != nil && err != forestdb.RESULT_KEY_NOT_FOUND {
 		return nil, err
 	}
@@ -65,7 +73,7 @@ func (s *Store) set(key, val []byte) error {
 }
 
 func (s *Store) setlocked(key, val []byte) error {
-	return s.db.SetKV(key, val)
+	return s.dbkv.SetKV(key, val)
 }
 
 func (s *Store) delete(key []byte) error {
@@ -75,15 +83,20 @@ func (s *Store) delete(key []byte) error {
 }
 
 func (s *Store) deletelocked(key []byte) error {
-	return s.db.DeleteKV(key)
+	return s.dbkv.DeleteKV(key)
 }
 
 func (s *Store) commit() error {
-	return s.db.Commit(forestdb.COMMIT_NORMAL)
+	return s.dbfile.Commit(forestdb.COMMIT_NORMAL)
 }
 
 func (s *Store) Close() error {
-	return s.db.Close()
+	err := s.dbkv.Close()
+	if err != nil {
+		return err
+	}
+	return s.dbfile.Close()
+
 }
 
 func (ldbs *Store) iterator(key []byte) store.KVIterator {
@@ -105,19 +118,19 @@ func (ldbs *Store) newBatch() store.KVBatch {
 }
 
 func (s *Store) getSeqNum() (forestdb.SeqNum, error) {
-	dbinfo, err := s.db.DbInfo()
+	dbinfo, err := s.dbkv.Info()
 	if err != nil {
 		return 0, err
 	}
 	return dbinfo.LastSeqNum(), nil
 }
 
-func (s *Store) newSnapshot() (*forestdb.Database, error) {
+func (s *Store) newSnapshot() (*forestdb.KVStore, error) {
 	seqNum, err := s.getSeqNum()
 	if err != nil {
 		return nil, err
 	}
-	return s.db.SnapshotOpen(seqNum)
+	return s.dbkv.SnapshotOpen(seqNum)
 }
 
 func (s *Store) getRollbackID() ([]byte, error) {
@@ -142,7 +155,7 @@ func (s *Store) rollbackTo(rollbackId []byte) error {
 	if err != nil {
 		return err
 	}
-	err = s.db.Rollback(seqNum)
+	err = s.dbkv.Rollback(seqNum)
 	if err != nil {
 		return err
 	}

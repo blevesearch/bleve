@@ -17,14 +17,14 @@ import (
 
 type Iterator struct {
 	store    *Store
-	snapshot *forestdb.Database
+	snapshot *forestdb.KVStore
 	iterator *forestdb.Iterator
 	curr     *forestdb.Doc
 	valid    bool
 }
 
 func newIterator(store *Store) *Iterator {
-	itr, err := store.db.IteratorInit([]byte{}, nil, forestdb.ITR_NONE)
+	itr, err := store.dbkv.IteratorInit([]byte{}, nil, forestdb.ITR_NONE)
 	rv := Iterator{
 		store:    store,
 		iterator: itr,
@@ -33,7 +33,7 @@ func newIterator(store *Store) *Iterator {
 	return &rv
 }
 
-func newIteratorWithSnapshot(store *Store, snapshot *forestdb.Database) *Iterator {
+func newIteratorWithSnapshot(store *Store, snapshot *forestdb.KVStore) *Iterator {
 	itr, err := snapshot.IteratorInit([]byte{}, nil, forestdb.ITR_NONE)
 	rv := Iterator{
 		store:    store,
