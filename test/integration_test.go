@@ -138,6 +138,11 @@ func runTestDir(t *testing.T, dir string) {
 					t.Errorf("expected hit %d to have fields %#v got %#v", hi, hit.Fields, res.Hits[hi].Fields)
 				}
 			}
+			if hit.Fragments != nil {
+				if !reflect.DeepEqual(hit.Fragments, res.Hits[hi].Fragments) {
+					t.Errorf("expected hit %d to have fragments %#v got %#v", hi, hit.Fragments, res.Hits[hi].Fragments)
+				}
+			}
 		}
 		if search.Result.Facets != nil {
 			if !reflect.DeepEqual(search.Result.Facets, res.Facets) {

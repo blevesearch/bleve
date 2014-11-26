@@ -5,6 +5,7 @@
         "name": {
           "fields": [
             {
+              "include_term_vectors": true,
               "include_in_all": true,
               "index": true,
               "store": true,

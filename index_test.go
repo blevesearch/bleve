@@ -148,6 +148,27 @@ func TestCrud(t *testing.T) {
 	if !foundNameField {
 		t.Errorf("expected to find field named 'name' with value 'marty'")
 	}
+
+	fields, err := index.Fields()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedFields := map[string]bool{
+		"_all": false,
+		"name": false,
+		"desc": false,
+	}
+	if len(fields) != len(expectedFields) {
+		t.Fatalf("expected %d fields got %d", len(expectedFields), len(fields))
+	}
+	for _, f := range fields {
+		expectedFields[f] = true
+	}
+	for ef, efp := range expectedFields {
+		if !efp {
+			t.Errorf("field %s is missing", ef)
+		}
+	}
 }
 
 func TestIndexCreateNewOverExisting(t *testing.T) {

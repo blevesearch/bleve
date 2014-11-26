@@ -330,5 +330,77 @@
 				}
 			]
 		}
+	},
+	{
+		"comment": "highlight results",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "name",
+				"match": "long"
+			},
+			"highlight": {
+				"fields": ["name"]
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "b",
+					"fragments": {
+						"name": ["steve has a <span class=\"highlight\">long</span> name"]
+					}
+				}
+			]
+		}
+	},
+	{
+		"comment": "highlight results without specifying fields",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "name",
+				"match": "long"
+			},
+			"highlight": {}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "b",
+					"fragments": {
+						"name": ["steve has a <span class=\"highlight\">long</span> name"]
+					}
+				}
+			]
+		}
+	},
+	{
+		"comment": "request fields",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"fields": ["age","birthday"],
+			"query": {
+				"field": "name",
+				"match": "long"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "b",
+					"fields": {
+						"age": 27,
+						"birthday": "2001-09-09T01:46:40Z"
+					}
+				}
+			]
+		}
 	}
 ]
