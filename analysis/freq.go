@@ -9,8 +9,6 @@
 
 package analysis
 
-import ()
-
 type TokenLocation struct {
 	Field    string
 	Start    int
