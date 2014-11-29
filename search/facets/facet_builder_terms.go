@@ -10,7 +10,7 @@
 package facets
 
 import (
-	"container/list"
+	"sort"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
@@ -56,47 +56,25 @@ func (fb *TermsFacetBuilder) Result() *search.FacetResult {
 		Missing: fb.missing,
 	}
 
-	// FIXME better implementation needed here this is quick and dirty
-	topN := list.New()
+	rv.Terms = make([]*search.TermFacet, len(fb.termsCount))
 
-	// walk entries and find top N
-OUTER:
 	for term, count := range fb.termsCount {
 		tf := &search.TermFacet{
 			Term:  term,
 			Count: count,
 		}
 
-		for e := topN.Front(); e != nil; e = e.Next() {
-			curr := e.Value.(*search.TermFacet)
-			if tf.Count < curr.Count {
-
-				topN.InsertBefore(tf, e)
-				// if we just made the list too long
-				if topN.Len() > fb.size {
-					// remove the head
-					topN.Remove(topN.Front())
-				}
-				continue OUTER
-			}
-		}
-		// if we got to the end, we still have to add it
-		topN.PushBack(tf)
-		if topN.Len() > fb.size {
-			// remove the head
-			topN.Remove(topN.Front())
-		}
-
+		rv.Terms = append(rv.Terms, tf)
 	}
 
+	sort.Sort(rv.Terms)
+
 	// we now have the list of the top N facets
-	rv.Terms = make([]*search.TermFacet, topN.Len())
-	i := 0
+	rv.Terms = rv.Terms[:fb.size]
+
 	notOther := 0
-	for e := topN.Back(); e != nil; e = e.Prev() {
-		rv.Terms[i] = e.Value.(*search.TermFacet)
-		i++
-		notOther += e.Value.(*search.TermFacet).Count
+	for _, tf := range rv.Terms {
+		notOther += tf.Count
 	}
 	rv.Other = fb.total - notOther
 
