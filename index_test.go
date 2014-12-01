@@ -123,6 +123,7 @@ func TestCrud(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer index.Close()
 
 	count, err := index.DocCount()
 	if err != nil {
