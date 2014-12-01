@@ -56,7 +56,7 @@ func (fb *TermsFacetBuilder) Result() *search.FacetResult {
 		Missing: fb.missing,
 	}
 
-	rv.Terms = make([]*search.TermFacet, len(fb.termsCount))
+	rv.Terms = make([]*search.TermFacet, 0, len(fb.termsCount))
 
 	for term, count := range fb.termsCount {
 		tf := &search.TermFacet{
