@@ -9,8 +9,6 @@
 
 package store
 
-import ()
-
 type KVBatch interface {
 	Set(key, val []byte)
 	Delete(key []byte)
