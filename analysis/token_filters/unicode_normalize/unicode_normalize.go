@@ -12,7 +12,7 @@ package unicode_normalize
 import (
 	"fmt"
 
-	"code.google.com/p/go.text/unicode/norm"
+	"golang.org/x/text/unicode/norm"
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
 )

@@ -16,7 +16,7 @@ import (
 	"io"
 	"math"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 )
 
 const ByteSeparator byte = 0xff
