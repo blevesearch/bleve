@@ -66,7 +66,7 @@ func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	log.Printf("parsed request %#v", searchRequest)
 
-	// varlidate the query
+	// validate the query
 	err = searchRequest.Query.Validate()
 	if err != nil {
 		showError(w, req, fmt.Sprintf("error validating query: %v", err), 400)
