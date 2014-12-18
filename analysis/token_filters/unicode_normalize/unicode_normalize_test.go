@@ -18,7 +18,7 @@ import (
 
 // the following tests come from the lucene
 // test cases for CJK width filter
-// which is our bases for using this
+// which is our basis for using this
 // as a substitute for that
 func TestUnicodeNormalization(t *testing.T) {
 

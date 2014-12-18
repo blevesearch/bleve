@@ -33,7 +33,7 @@ func (s *Fragmenter) Fragment(orig []byte, ot highlight.TermLocations) []*highli
 
 	maxbegin := 0
 	for currTermIndex, termLocation := range ot {
-		// start with with this
+		// start with this
 		// it should be the highest scoring fragment with this term first
 		start := termLocation.Start
 		end := start + s.fragmentSize

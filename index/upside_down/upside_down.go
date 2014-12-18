@@ -571,7 +571,7 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) error {
 	for docID, doc := range batch.IndexOps {
 		backIndexRow := backIndexRows[docID]
 		if doc == nil && backIndexRow != nil {
-			//delete
+			// delete
 			deleteRows = udc.deleteSingle(docID, backIndexRow, deleteRows)
 			docsDeleted++
 		} else if doc != nil {

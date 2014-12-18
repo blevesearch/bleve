@@ -154,7 +154,7 @@ func TestInvalidRows(t *testing.T) {
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator},
 			[]byte{},
 		},
-		// type t, invalid val (misisng freq)
+		// type t, invalid val (missing freq)
 		{
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{},

@@ -69,7 +69,7 @@ func (b *Batch) Execute() error {
 		defer b.store.writer.Unlock()
 	}
 
-	// first processed the merges
+	// first process the merges
 	for k, mc := range b.merges {
 		val, err := b.store.get([]byte(k))
 		if err != nil {

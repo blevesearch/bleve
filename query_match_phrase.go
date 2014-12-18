@@ -26,7 +26,7 @@ type matchPhraseQuery struct {
 
 // NewMatchPhraseQuery creates a new Query object
 // for matching phrases in the index.
-// An Analyzer is chosed based on the field.
+// An Analyzer is chosen based on the field.
 // Input text is analyzed using this analyzer.
 // Token terms resulting from this analysis are
 // used to build a search phrase.  Result documents

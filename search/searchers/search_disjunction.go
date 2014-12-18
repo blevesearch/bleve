@@ -30,7 +30,7 @@ type DisjunctionSearcher struct {
 }
 
 func NewDisjunctionSearcher(indexReader index.IndexReader, qsearchers []search.Searcher, min float64, explain bool) (*DisjunctionSearcher, error) {
-	// build the downstream searchres
+	// build the downstream searchers
 	searchers := make(OrderedSearcherList, len(qsearchers))
 	for i, searcher := range qsearchers {
 		searchers[i] = searcher
@@ -57,7 +57,7 @@ func (s *DisjunctionSearcher) computeQueryNorm() {
 	}
 	// now compute query norm from this
 	s.queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
-	// finally tell all the downsteam searchers the norm
+	// finally tell all the downstream searchers the norm
 	for _, termSearcher := range s.searchers {
 		termSearcher.SetQueryNorm(s.queryNorm)
 	}

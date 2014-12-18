@@ -30,7 +30,7 @@ func MergeLocations(locations []FieldTermLocationMap) FieldTermLocationMap {
 func MergeTermLocationMaps(rv, other TermLocationMap) TermLocationMap {
 	for term, locationMap := range other {
 		// for a given term/document there cannot be different locations
-		// if they can back from different clauses, overwrite is ok
+		// if they came back from different clauses, overwrite is ok
 		rv[term] = locationMap
 	}
 	return rv

@@ -86,12 +86,12 @@ func newCustomAnalysis() *customAnalysis {
 	return &rv
 }
 
-// An IndexMapping controls how objects are place
+// An IndexMapping controls how objects are placed
 // into an index.
-// First the type of the object is deteremined.
-// Once the type is know, the appropriate/
+// First the type of the object is determined.
+// Once the type is know, the appropriate
 // DocumentMapping is selected by the type.
-// If no mapping was described for that type,
+// If no mapping was determined for that type,
 // a DefaultMapping will be used.
 type IndexMapping struct {
 	TypeMapping           map[string]*DocumentMapping `json:"types,omitempty"`
@@ -106,7 +106,7 @@ type IndexMapping struct {
 	cache                 *registry.Cache
 }
 
-// AddCustomCharFilter defines a custom char fitler for use in this mapping
+// AddCustomCharFilter defines a custom char filter for use in this mapping
 func (im *IndexMapping) AddCustomCharFilter(name string, config map[string]interface{}) error {
 	_, err := im.cache.DefineCharFilter(name, config)
 	if err != nil {
@@ -184,8 +184,6 @@ func NewIndexMapping() *IndexMapping {
 
 // Validate will walk the entire structure ensuring the following
 // explicitly named and default analyzers can be built
-// explicitly named and default date parsers can be built
-// field type names are valid
 func (im *IndexMapping) validate() error {
 	_, err := im.cache.AnalyzerNamed(im.DefaultAnalyzer)
 	if err != nil {
@@ -318,7 +316,7 @@ func (im *IndexMapping) determineType(data interface{}) string {
 		return classifier.Type()
 	}
 
-	// now see if we can find type using the mapping
+	// now see if we can find a type using the mapping
 	typ, ok := mustString(lookupPropertyPath(data, im.TypeField))
 	if ok {
 		return typ
@@ -328,7 +326,7 @@ func (im *IndexMapping) determineType(data interface{}) string {
 }
 
 func (im *IndexMapping) mapDocument(doc *document.Document, data interface{}) error {
-	// see if the top level object is a byte array, and possibly run through conveter
+	// see if the top level object is a byte array, and possibly run through a converter
 	byteArrayData, ok := data.([]byte)
 	if ok {
 		byteArrayConverterConstructor := registry.ByteArrayConverterByName(im.ByteArrayConverter)

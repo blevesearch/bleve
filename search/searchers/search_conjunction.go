@@ -30,7 +30,7 @@ type ConjunctionSearcher struct {
 }
 
 func NewConjunctionSearcher(indexReader index.IndexReader, qsearchers []search.Searcher, explain bool) (*ConjunctionSearcher, error) {
-	// build the downstream searchres
+	// build the downstream searchers
 	searchers := make(OrderedSearcherList, len(qsearchers))
 	for i, searcher := range qsearchers {
 		searchers[i] = searcher
@@ -57,7 +57,7 @@ func (s *ConjunctionSearcher) computeQueryNorm() {
 	}
 	// now compute query norm from this
 	s.queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
-	// finally tell all the downsteam searchers the norm
+	// finally tell all the downstream searchers the norm
 	for _, termSearcher := range s.searchers {
 		termSearcher.SetQueryNorm(s.queryNorm)
 	}
@@ -145,7 +145,7 @@ OUTER:
 		} else {
 			s.currentID = s.currs[0].ID
 		}
-		// don't continue now, wait for next call the Next()
+		// don't continue now, wait for the next call to Next()
 		break
 	}
 	return rv, nil

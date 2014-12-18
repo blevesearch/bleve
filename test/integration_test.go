@@ -80,7 +80,7 @@ func runTestDir(t *testing.T, dir string) {
 	}
 	defer index.Close()
 
-	//index data
+	// index data
 	fis, err := ioutil.ReadDir(dir + string(filepath.Separator) + "data")
 	if err != nil {
 		t.Errorf("error reading data dir: %v", err)

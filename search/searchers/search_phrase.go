@@ -46,7 +46,7 @@ func (s *PhraseSearcher) computeQueryNorm() {
 
 	// now compute query norm from this
 	s.queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
-	// finally tell all the downsteam searchers the norm
+	// finally tell all the downstream searchers the norm
 	if s.mustSearcher != nil {
 		s.mustSearcher.SetQueryNorm(s.queryNorm)
 	}
@@ -114,7 +114,7 @@ func (s *PhraseSearcher) Next() (*search.DocumentMatch, error) {
 					for i := 0; i < len(s.terms); i++ {
 						nextTerm := s.terms[i]
 						if nextTerm != "" {
-							// look through all this terms locations
+							// look through all these term locations
 							// to try and find the correct offsets
 							nextLocations, ok := termLocMap[nextTerm]
 							if ok {
@@ -125,7 +125,7 @@ func (s *PhraseSearcher) Next() (*search.DocumentMatch, error) {
 										continue INNER
 									}
 								}
-								// if we got here we didnt find location match for this term
+								// if we got here we didn't find a location match for this term
 								continue OUTER
 							} else {
 								continue OUTER

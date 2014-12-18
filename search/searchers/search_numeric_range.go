@@ -54,7 +54,7 @@ func NewNumericRangeSearcher(indexReader index.IndexReader, min *float64, max *f
 	if !*inclusiveMax && maxInt64 != math.MinInt64 {
 		maxInt64--
 	}
-	// FIXME hard-coded precion, should match field declaration
+	// FIXME hard-coded precision, should match field declaration
 	termRanges := splitInt64Range(minInt64, maxInt64, 4)
 	terms := termRanges.Enumerate()
 	// enumerate all the terms in the range

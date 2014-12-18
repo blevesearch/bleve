@@ -14,7 +14,7 @@ import (
 )
 
 // test that the float/sortable int operations work both ways
-// and that the the corresponding integers sort the same as
+// and that the corresponding integers sort the same as
 // the original floats would have
 func TestSortabledFloat64ToInt64(t *testing.T) {
 	tests := []struct {
