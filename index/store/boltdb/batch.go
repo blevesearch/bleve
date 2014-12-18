@@ -70,7 +70,7 @@ func (i *Batch) Execute() error {
 	return i.store.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(i.store.bucket))
 
-		// first processed the merges
+		// first process the merges
 		for k, mc := range i.merges {
 			val := b.Get([]byte(k))
 			var err error

@@ -21,13 +21,13 @@ const Name = "custom"
 func GenericTokenMapConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenMap, error) {
 	rv := analysis.NewTokenMap()
 
-	// first try to load by filename
+	// first: try to load by filename
 	filename, ok := config["filename"].(string)
 	if ok {
 		err := rv.LoadFile(filename)
 		return rv, err
 	}
-	// next look for an inline word list
+	// next: look for an inline word list
 	tokens, ok := config["tokens"].([]interface{})
 	if ok {
 		for _, token := range tokens {

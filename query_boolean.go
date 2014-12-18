@@ -27,9 +27,9 @@ type booleanQuery struct {
 
 // NewBooleanQuery creates a compound Query composed
 // of several other Query objects.
-// Result documents must satisify ALL of the
+// Result documents must satisfy ALL of the
 // must Queries.
-// Result documents must satsify NONE of the must not
+// Result documents must satisfy NONE of the must not
 // Queries.
 // If there are any should queries, result documents
 // must satisfy at least one of them.

@@ -27,7 +27,7 @@ type matchQuery struct {
 }
 
 // NewMatchQuery creates a Query for matching text.
-// An Analyzer is chosed based on the field.
+// An Analyzer is chosen based on the field.
 // Input text is analyzed using this analyzer.
 // Token terms resulting from this analysis are
 // used to perform term searches.  Result documents

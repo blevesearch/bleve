@@ -23,7 +23,7 @@ import (
 // As documents can be hierarchical, named sub-sections
 // of documents are mapped using the same structure in
 // the Properties field.
-// Each value inside a document can be index 0 or more
+// Each value inside a document can be indexed 0 or more
 // ways.  These index entries are called fields and
 // are stored in the Fields field.
 // Entire sections of a document can be ignored or
@@ -261,7 +261,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 	// look to see if there is a mapping for this field
 	subDocMapping := dm.documentMappingForPath(pathString)
 
-	// check tos see if we even need to do further processing
+	// check to see if we even need to do further processing
 	if subDocMapping != nil && !subDocMapping.Enabled {
 		return
 	}

@@ -57,7 +57,7 @@ func (s *BooleanSearcher) computeQueryNorm() {
 
 	// now compute query norm from this
 	s.queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
-	// finally tell all the downsteam searchers the norm
+	// finally tell all the downstream searchers the norm
 	if s.mustSearcher != nil {
 		s.mustSearcher.SetQueryNorm(s.queryNorm)
 	}

@@ -146,7 +146,7 @@ type FragmentQueue []*highlight.Fragment
 func (fq FragmentQueue) Len() int { return len(fq) }
 
 func (fq FragmentQueue) Less(i, j int) bool {
-	// We want Pop to give us the highest, not lowest, priority so we use greater than here.
+	// We want Pop to give us the highest, not lowest, priority so we use greater-than here.
 	return fq[i].Score > fq[j].Score
 }
 

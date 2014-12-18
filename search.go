@@ -70,7 +70,7 @@ func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-// A FacetRequest describes an facet or aggregation
+// A FacetRequest describes a facet or aggregation
 // of the result document set you would like to be
 // built.
 type FacetRequest struct {
@@ -151,7 +151,7 @@ func (h *HighlightRequest) AddField(field string) {
 // result set to return.
 // Highlight describes optional search result
 // highlighting.
-// Fields desribed a list of field values whcih
+// Fields describes a list of field values which
 // should be retrieved for result documents.
 // Facets describe the set of facets to be computed.
 // Explain triggers inclusion of additional search

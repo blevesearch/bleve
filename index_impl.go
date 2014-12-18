@@ -65,7 +65,7 @@ func newMemIndex(mapping *IndexMapping) (*indexImpl, error) {
 		return nil, err
 	}
 
-	// open open the index
+	// open the index
 	rv.i = upside_down.NewUpsideDownCouch(rv.s, Config.analysisQueue)
 	err = rv.i.Open()
 	if err != nil {
@@ -111,7 +111,7 @@ func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
 	if storeConstructor == nil {
 		return nil, ErrorUnknownStorageType
 	}
-	// at this point there hope we can be successful, so save index meta
+	// at this point there is hope that we can be successful, so save index meta
 	err = rv.meta.Save(path)
 	if err != nil {
 		return nil, err
@@ -128,7 +128,7 @@ func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
 		return nil, err
 	}
 
-	// open open the index
+	// open the index
 	rv.i = upside_down.NewUpsideDownCouch(rv.s, Config.analysisQueue)
 	err = rv.i.Open()
 	if err != nil {
@@ -182,7 +182,7 @@ func openIndex(path string) (*indexImpl, error) {
 		return nil, err
 	}
 
-	// open open the index
+	// open the index
 	rv.i = upside_down.NewUpsideDownCouch(rv.s, Config.analysisQueue)
 	err = rv.i.Open()
 	if err != nil {
@@ -501,7 +501,7 @@ func (i *indexImpl) Fields() ([]string, error) {
 
 // DumpAll writes all index rows to a channel.
 // INTERNAL: do not rely on this function, it is
-// only intended to be used by the debug utilties
+// only intended to be used by the debug utilities
 func (i *indexImpl) DumpAll() chan interface{} {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -516,7 +516,7 @@ func (i *indexImpl) DumpAll() chan interface{} {
 // DumpFields writes all field rows in the index
 // to a channel.
 // INTERNAL: do not rely on this function, it is
-// only intended to be used by the debug utilties
+// only intended to be used by the debug utilities
 func (i *indexImpl) DumpFields() chan interface{} {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -530,7 +530,7 @@ func (i *indexImpl) DumpFields() chan interface{} {
 // DumpDoc writes all rows in the index associated
 // with the specified identifier to a channel.
 // INTERNAL: do not rely on this function, it is
-// only intended to be used by the debug utilties
+// only intended to be used by the debug utilities
 func (i *indexImpl) DumpDoc(id string) chan interface{} {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()

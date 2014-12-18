@@ -18,7 +18,7 @@ import (
 
 // the functions in this file are only intended to be used by
 // the bleve_dump utility and the debug http handlers
-// if your application relies on the, you're doing something wrong
+// if your application relies on them, you're doing something wrong
 // they may change or be removed at any time
 
 func (udc *UpsideDownCouch) dumpPrefix(kvreader store.KVReader, rv chan interface{}, prefix []byte) {

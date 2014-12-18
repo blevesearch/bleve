@@ -23,7 +23,7 @@ type Explanation struct {
 func (expl *Explanation) String() string {
 	js, err := json.MarshalIndent(expl, "", "  ")
 	if err != nil {
-		return fmt.Sprintf("error serializing explation to json: %v", err)
+		return fmt.Sprintf("error serializing explanation to json: %v", err)
 	}
 	return string(js)
 }

@@ -27,7 +27,7 @@ func NewPorterStemmer() *PorterStemmer {
 
 func (s *PorterStemmer) Filter(input analysis.TokenStream) analysis.TokenStream {
 	for _, token := range input {
-		// if not protected keyword, stem it
+		// if it is not a protected keyword, stem it
 		if !token.KeyWord {
 			stemmed := porterstemmer.StemString(string(token.Term))
 			token.Term = []byte(stemmed)

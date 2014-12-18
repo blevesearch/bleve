@@ -60,7 +60,7 @@ func TestRollbackSameHandle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// create 2 docs a and b
+	// create 2 docs, a and b
 	err = writer.Set([]byte("a"), []byte("val-a"))
 	if err != nil {
 		t.Error(err)
@@ -124,7 +124,7 @@ func TestRollbackSameHandle(t *testing.T) {
 }
 
 // TestRollbackNewHandle tries to rollback the
-// database, then open a new handle, and ensure
+// database, then opens a new handle, and ensures
 // that the rollback is reflected there as well
 func TestRollbackNewHandle(t *testing.T) {
 	defer os.RemoveAll("test")
@@ -140,7 +140,7 @@ func TestRollbackNewHandle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// create 2 docs a and b
+	// create 2 docs, a and b
 	err = writer.Set([]byte("a"), []byte("val-a"))
 	if err != nil {
 		t.Error(err)
@@ -211,7 +211,7 @@ func TestRollbackNewHandle(t *testing.T) {
 }
 
 // TestRollbackOtherHandle tries to create 2 handles
-// at the begining, then rollback one of them
+// at the beginning, then rollback one of them
 // and ensure it affects the other
 func TestRollbackOtherHandle(t *testing.T) {
 	defer os.RemoveAll("test")
@@ -234,7 +234,7 @@ func TestRollbackOtherHandle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// create 2 docs a and b
+	// create 2 docs, a and b
 	err = writer.Set([]byte("a"), []byte("val-a"))
 	if err != nil {
 		t.Error(err)
@@ -344,7 +344,7 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 		t.Fatalf("valid false, expected true")
 	}
 	if string(key) != "b" {
-		t.Fatalf("exepcted key b, got %s", key)
+		t.Fatalf("expected key b, got %s", key)
 	}
 	if string(val) != "val-b" {
 		t.Fatalf("expected value val-b, got %s", val)
@@ -356,7 +356,7 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 		t.Fatalf("valid false, expected true")
 	}
 	if string(key) != "c" {
-		t.Fatalf("exepcted key c, got %s", key)
+		t.Fatalf("expected key c, got %s", key)
 	}
 	if string(val) != "val-c" {
 		t.Fatalf("expected value val-c, got %s", val)
@@ -368,7 +368,7 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 		t.Fatalf("valid false, expected true")
 	}
 	if string(key) != "i" {
-		t.Fatalf("exepcted key i, got %s", key)
+		t.Fatalf("expected key i, got %s", key)
 	}
 	if string(val) != "val-i" {
 		t.Fatalf("expected value val-i, got %s", val)
@@ -389,7 +389,7 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	}
 	writer.Close()
 
-	// create an isoalted reader
+	// create an isolated reader
 	reader, err := s.Reader()
 	if err != nil {
 		t.Error(err)
@@ -442,7 +442,7 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 		t.Errorf("expected val-b, got nil")
 	}
 
-	// ensure director iterator sees it
+	// ensure that the director iterator sees it
 	count = 0
 	it = newReader.Iterator([]byte{0})
 	defer it.Close()

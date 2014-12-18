@@ -55,7 +55,7 @@ func (s *StemmerFilter) List() []string {
 
 func (s *StemmerFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 	for _, token := range input {
-		// if not protected keyword, stem it
+		// if it is not a protected keyword, stem it
 		if !token.KeyWord {
 			stemmer := <-s.stemmerPool
 			stemmed := stemmer.Stem(string(token.Term))

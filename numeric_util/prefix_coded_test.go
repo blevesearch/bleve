@@ -15,7 +15,7 @@ import (
 )
 
 // these array encoding values have been verified manually
-// against the lucene imlementation
+// against the lucene implementation
 func TestPrefixCoded(t *testing.T) {
 	tests := []struct {
 		input  int64

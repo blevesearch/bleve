@@ -64,7 +64,7 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 		t.Fatalf("valid true, expected false")
 	}
 	if key != nil {
-		t.Fatalf("exepcted key nil, got %s", key)
+		t.Fatalf("expected key nil, got %s", key)
 	}
 	if val != nil {
 		t.Fatalf("expected value nil, got %s", val)

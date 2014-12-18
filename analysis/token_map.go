@@ -39,7 +39,7 @@ func (t TokenMap) LoadBytes(data []byte) error {
 		t.LoadLine(line)
 		line, err = bufioReader.ReadString('\n')
 	}
-	// if the err was EOF still need to process last value
+	// if the err was EOF we still need to process the last value
 	if err == io.EOF {
 		t.LoadLine(line)
 		return nil
@@ -48,7 +48,7 @@ func (t TokenMap) LoadBytes(data []byte) error {
 }
 
 func (t TokenMap) LoadLine(line string) error {
-	// find the start of comment, if any
+	// find the start of a comment, if any
 	startComment := strings.IndexAny(line, "#|")
 	if startComment >= 0 {
 		line = line[:startComment]

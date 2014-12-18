@@ -218,7 +218,7 @@ func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
 		t.Fatalf("expected error index metadata corrupted, got %v", err)
 	}
 
-	// no intentionally remove the metadata
+	// now intentionally remove the metadata
 	os.Remove("testidx/index_meta.json")
 
 	index, err = Open("testidx")

@@ -18,7 +18,7 @@ func TestIndexMeta(t *testing.T) {
 	var testIndexPath = "doesnotexit.bleve"
 	defer os.RemoveAll(testIndexPath)
 
-	// open non-existant meta should error
+	// open non-existent meta should give an error
 	_, err := openIndexMeta(testIndexPath)
 	if err == nil {
 		t.Errorf("expected error, got nil")

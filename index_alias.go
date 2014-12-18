@@ -15,7 +15,7 @@ package bleve
 // 1.  When it points to a single index, ALL index
 // operations are valid and will be passed through
 // to the underlying index.
-// 2.  When it points to more than index, the only
+// 2.  When it points to more than one index, the only
 // valid operation is Search.  In this case the
 // search will be performed across all the
 // underlying indexes and the results merged.

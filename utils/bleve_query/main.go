@@ -29,7 +29,7 @@ func main() {
 	flag.Parse()
 
 	if *indexPath == "" {
-		log.Fatal("specify index to query")
+		log.Fatal("Specify index to query")
 	}
 
 	if flag.NArg() < 1 {

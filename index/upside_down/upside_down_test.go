@@ -47,7 +47,7 @@ func TestIndexOpenReopen(t *testing.T) {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
 
-	// opening database should have inserted version
+	// opening the database should have inserted a version
 	expectedLength := uint64(1)
 	rowCount := idx.rowCount()
 	if rowCount != expectedLength {
@@ -108,7 +108,7 @@ func TestIndexInsert(t *testing.T) {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
 
-	// should have 4 rows (1 for version, 1 for schema field, and 1 for single term, and 1 for the term count,  and 1 for the back index entry)
+	// should have 4 rows (1 for version, 1 for schema field, and 1 for single term, and 1 for the term count, and 1 for the back index entry)
 	expectedLength := uint64(1 + 1 + 1 + 1 + 1)
 	rowCount := idx.rowCount()
 	if rowCount != expectedLength {
@@ -189,7 +189,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
 
-	// should have 2 row (1 for version, 1 for schema field)
+	// should have 2 rows (1 for version, 1 for schema field)
 	expectedLength := uint64(1 + 1)
 	rowCount := idx.rowCount()
 	if rowCount != expectedLength {
@@ -224,14 +224,14 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 		t.Errorf("Error deleting entry from index: %v", err)
 	}
 
-	// should have 2 row (1 for version, 1 for schema field, and 2 for the two term, and 2 for the term counts, and 1 for the back index entry)
+	// should have 2 rows (1 for version, 1 for schema field, and 2 for the two term, and 2 for the term counts, and 1 for the back index entry)
 	expectedLength := uint64(1 + 1 + 2 + 2 + 1)
 	rowCount := idx.rowCount()
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
 
-	// now do another update that should remove one of term
+	// now do another update that should remove one of the terms
 	doc = document.NewDocument("1")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("fail")))
 	err = idx.Update(doc)
@@ -239,7 +239,7 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 		t.Errorf("Error deleting entry from index: %v", err)
 	}
 
-	// should have 2 row (1 for version, 1 for schema field, and 1 for the remaining term, and 1 for the term count, and 1 for the back index entry)
+	// should have 2 rows (1 for version, 1 for schema field, and 1 for the remaining term, and 1 for the term count, and 1 for the back index entry)
 	expectedLength = uint64(1 + 1 + 1 + 1 + 1)
 	rowCount = idx.rowCount()
 	if rowCount != expectedLength {
@@ -276,14 +276,14 @@ func TestIndexInsertMultiple(t *testing.T) {
 	}
 	expectedCount++
 
-	// should have 4 rows (1 for version, 1 for schema field, and 2 for single term, and 1 for the term count,  and 2 for the back index entries)
+	// should have 4 rows (1 for version, 1 for schema field, and 2 for single term, and 1 for the term count, and 2 for the back index entries)
 	expectedLength := uint64(1 + 1 + 2 + 1 + 2)
 	rowCount := idx.rowCount()
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
 
-	// close and reopen and and one more to testing counting works correctly
+	// close, reopen and add one more to test that counting works correctly
 	idx.Close()
 	store, err = boltdb.Open("test", "bleve")
 	idx = NewUpsideDownCouch(store, analysisQueue)
@@ -350,7 +350,7 @@ func TestIndexInsertWithStore(t *testing.T) {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
 
-	// should have 6 rows (1 for version, 1 for schema field, and 1 for single term, and 1 for the stored field and 1 for the term count,  and 1 for the back index entry)
+	// should have 6 rows (1 for version, 1 for schema field, and 1 for single term, and 1 for the stored field and 1 for the term count, and 1 for the back index entry)
 	expectedLength := uint64(1 + 1 + 1 + 1 + 1 + 1)
 	rowCount := idx.rowCount()
 	if rowCount != expectedLength {
@@ -398,7 +398,7 @@ func TestIndexInternalCRUD(t *testing.T) {
 	}
 	defer indexReader.Close()
 
-	// get something that doesnt exist yet
+	// get something that doesn't exist yet
 	val, err := indexReader.GetInternal([]byte("key"))
 	if err != nil {
 		t.Error(err)

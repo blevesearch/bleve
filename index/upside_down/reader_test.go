@@ -55,7 +55,7 @@ func TestIndexReader(t *testing.T) {
 	}
 	defer indexReader.Close()
 
-	// first look for a term that doesnt exist
+	// first look for a term that doesn't exist
 	reader, err := indexReader.TermFieldReader([]byte("nope"), "name")
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
