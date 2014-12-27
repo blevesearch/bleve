@@ -44,18 +44,37 @@ func newIteratorWithSnapshot(store *Store, snapshot *forestdb.KVStore) *Iterator
 }
 
 func (i *Iterator) SeekFirst() {
-	i.iterator.Seek([]byte{})
-	i.Next()
+	err := i.iterator.SeekMin()
+	if err != nil {
+		i.valid = false
+		return
+	}
+	i.curr, err = i.iterator.Get()
+	if err != nil {
+		i.valid = false
+	}
 }
 
 func (i *Iterator) Seek(key []byte) {
-	i.iterator.Seek(key)
-	i.Next()
+	err := i.iterator.Seek(key, forestdb.FDB_ITR_SEEK_HIGHER)
+	if err != nil {
+		i.valid = false
+		return
+	}
+	i.curr, err = i.iterator.Get()
+	if err != nil {
+		i.valid = false
+		return
+	}
 }
 
 func (i *Iterator) Next() {
-	var err error
-	i.curr, err = i.iterator.Next()
+	err := i.iterator.Next()
+	if err != nil {
+		i.valid = false
+		return
+	}
+	i.curr, err = i.iterator.Get()
 	if err != nil {
 		i.valid = false
 	}
