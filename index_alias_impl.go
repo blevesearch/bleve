@@ -14,6 +14,8 @@ import (
 	"sync"
 
 	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -296,6 +298,22 @@ func (i *indexAliasImpl) DeleteInternal(key []byte) error {
 	}
 
 	return i.indexes[0].DeleteInternal(key)
+}
+
+func (i *indexAliasImpl) Advanced() (index.Index, store.KVStore, error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil, nil, ErrorIndexClosed
+	}
+
+	err := i.isAliasToSingleIndex()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return i.indexes[0].Advanced()
 }
 
 func (i *indexAliasImpl) Add(indexes ...Index) {

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -724,4 +726,8 @@ func (i *stubIndex) SetInternal(key, val []byte) error {
 
 func (i *stubIndex) DeleteInternal(key []byte) error {
 	return i.err
+}
+
+func (i *stubIndex) Advanced() (index.Index, store.KVStore, error) {
+	return nil, nil, nil
 }

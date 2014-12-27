@@ -90,7 +90,7 @@ func newMemIndex(mapping *IndexMapping) (*indexImpl, error) {
 	return &rv, nil
 }
 
-func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
+func newIndexUsing(path string, mapping *IndexMapping, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
 	// first validate the mapping
 	err := mapping.validate()
 	if err != nil {
@@ -104,7 +104,7 @@ func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
 	rv := indexImpl{
 		path:  path,
 		m:     mapping,
-		meta:  newIndexMeta(Config.DefaultKVStore),
+		meta:  newIndexMeta(kvstore),
 		stats: &IndexStat{},
 	}
 	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
@@ -116,14 +116,13 @@ func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
 	if err != nil {
 		return nil, err
 	}
-	storeConfig := map[string]interface{}{
-		"path":              indexStorePath(path),
-		"create_if_missing": true,
-		"error_if_exists":   true,
+	if kvconfig == nil {
+		kvconfig = map[string]interface{}{}
 	}
+	kvconfig["path"] = indexStorePath(path)
 
 	// now open the store
-	rv.s, err = storeConstructor(storeConfig)
+	rv.s, err = storeConstructor(kvconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -151,6 +150,14 @@ func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
 	defer rv.mutex.Unlock()
 	rv.open = true
 	return &rv, nil
+}
+
+func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
+	defaultKVConfig := map[string]interface{}{
+		"create_if_missing": true,
+		"error_if_exists":   true,
+	}
+	return newIndexUsing(path, mapping, Config.DefaultKVStore, defaultKVConfig)
 }
 
 func openIndex(path string) (*indexImpl, error) {
@@ -222,6 +229,12 @@ func openIndex(path string) (*indexImpl, error) {
 
 	rv.m = &im
 	return &rv, nil
+}
+
+// Advanced returns implementation internals
+// necessary ONLY for advanced usage.
+func (i *indexImpl) Advanced() (index.Index, store.KVStore, error) {
+	return i.i, i.s, nil
 }
 
 // Mapping returns the IndexMapping in use by this
