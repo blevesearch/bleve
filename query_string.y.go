@@ -3,16 +3,15 @@ package bleve
 import __yyfmt__ "fmt"
 
 //line query_string.y:2
-import "log"
 import "strconv"
 
 func logDebugGrammar(format string, v ...interface{}) {
 	if debugParser {
-		log.Printf(format, v...)
+		logger.Printf(format, v...)
 	}
 }
 
-//line query_string.y:13
+//line query_string.y:12
 type yySymType struct {
 	yys int
 	s   string
@@ -358,22 +357,22 @@ yydefault:
 	switch yynt {
 
 	case 1:
-		//line query_string.y:35
+		//line query_string.y:34
 		{
 			logDebugGrammar("INPUT")
 		}
 	case 2:
-		//line query_string.y:40
+		//line query_string.y:39
 		{
 			logDebugGrammar("SEARCH PARTS")
 		}
 	case 3:
-		//line query_string.y:44
+		//line query_string.y:43
 		{
 			logDebugGrammar("SEARCH PART")
 		}
 	case 4:
-		//line query_string.y:49
+		//line query_string.y:48
 		{
 			query := yyS[yypt-1].q
 			query.SetBoost(yyS[yypt-0].f)
@@ -387,29 +386,29 @@ yydefault:
 			}
 		}
 	case 5:
-		//line query_string.y:64
+		//line query_string.y:63
 		{
 			yyVAL.n = queryShould
 		}
 	case 6:
-		//line query_string.y:68
+		//line query_string.y:67
 		{
 			yyVAL.n = yyS[yypt-0].n
 		}
 	case 7:
-		//line query_string.y:74
+		//line query_string.y:73
 		{
 			logDebugGrammar("PLUS")
 			yyVAL.n = queryMust
 		}
 	case 8:
-		//line query_string.y:79
+		//line query_string.y:78
 		{
 			logDebugGrammar("MINUS")
 			yyVAL.n = queryMustNot
 		}
 	case 9:
-		//line query_string.y:85
+		//line query_string.y:84
 		{
 			str := yyS[yypt-0].s
 			logDebugGrammar("STRING - %s", str)
@@ -417,7 +416,7 @@ yydefault:
 			yyVAL.q = q
 		}
 	case 10:
-		//line query_string.y:92
+		//line query_string.y:91
 		{
 			str := yyS[yypt-1].s
 			logDebugGrammar("STRING - %s", str)
@@ -426,7 +425,7 @@ yydefault:
 			yyVAL.q = q
 		}
 	case 11:
-		//line query_string.y:100
+		//line query_string.y:99
 		{
 			str := yyS[yypt-1].s
 			fuzziness, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
@@ -436,7 +435,7 @@ yydefault:
 			yyVAL.q = q
 		}
 	case 12:
-		//line query_string.y:109
+		//line query_string.y:108
 		{
 			str := yyS[yypt-0].s
 			logDebugGrammar("STRING - %s", str)
@@ -444,7 +443,7 @@ yydefault:
 			yyVAL.q = q
 		}
 	case 13:
-		//line query_string.y:116
+		//line query_string.y:115
 		{
 			phrase := yyS[yypt-0].s
 			logDebugGrammar("PHRASE - %s", phrase)
@@ -452,7 +451,7 @@ yydefault:
 			yyVAL.q = q
 		}
 	case 14:
-		//line query_string.y:123
+		//line query_string.y:122
 		{
 			field := yyS[yypt-2].s
 			str := yyS[yypt-0].s
@@ -461,7 +460,7 @@ yydefault:
 			yyVAL.q = q
 		}
 	case 15:
-		//line query_string.y:131
+		//line query_string.y:130
 		{
 			field := yyS[yypt-2].s
 			str := yyS[yypt-0].s
@@ -470,7 +469,7 @@ yydefault:
 			yyVAL.q = q
 		}
 	case 16:
-		//line query_string.y:139
+		//line query_string.y:138
 		{
 			field := yyS[yypt-2].s
 			phrase := yyS[yypt-0].s
@@ -479,7 +478,7 @@ yydefault:
 			yyVAL.q = q
 		}
 	case 17:
-		//line query_string.y:147
+		//line query_string.y:146
 		{
 			field := yyS[yypt-3].s
 			min, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
@@ -489,7 +488,7 @@ yydefault:
 			yyVAL.q = q
 		}
 	case 18:
-		//line query_string.y:156
+		//line query_string.y:155
 		{
 			field := yyS[yypt-4].s
 			min, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
@@ -499,7 +498,7 @@ yydefault:
 			yyVAL.q = q
 		}
 	case 19:
-		//line query_string.y:165
+		//line query_string.y:164
 		{
 			field := yyS[yypt-3].s
 			max, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
@@ -509,7 +508,7 @@ yydefault:
 			yyVAL.q = q
 		}
 	case 20:
-		//line query_string.y:174
+		//line query_string.y:173
 		{
 			field := yyS[yypt-4].s
 			max, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
@@ -519,19 +518,19 @@ yydefault:
 			yyVAL.q = q
 		}
 	case 21:
-		//line query_string.y:184
+		//line query_string.y:183
 		{
 			boost, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
 			yyVAL.f = boost
 			logDebugGrammar("BOOST %f", boost)
 		}
 	case 22:
-		//line query_string.y:191
+		//line query_string.y:190
 		{
 			yyVAL.f = 1.0
 		}
 	case 23:
-		//line query_string.y:195
+		//line query_string.y:194
 		{
 
 		}

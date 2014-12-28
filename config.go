@@ -11,6 +11,8 @@ package bleve
 
 import (
 	"expvar"
+	"io/ioutil"
+	"log"
 	"time"
 
 	"github.com/blevesearch/bleve/index/upside_down"
@@ -160,4 +162,12 @@ func init() {
 
 	bootDuration := time.Since(bootStart)
 	bleveExpVar.Add("bootDuration", int64(bootDuration))
+}
+
+var logger = log.New(ioutil.Discard, "bleve", log.LstdFlags)
+
+// SetLog sets the logger used for logging
+// by default log messages are sent to ioutil.Discard
+func SetLog(logger *log.Logger) {
+	logger = logger
 }

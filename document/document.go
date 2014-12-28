@@ -11,7 +11,6 @@ package document
 
 import (
 	"fmt"
-	"log"
 )
 
 type Document struct {
@@ -48,7 +47,6 @@ func (d *Document) GoString() string {
 	}
 	compositeFields := ""
 	for i, field := range d.CompositeFields {
-		log.Printf("see composite field")
 		if i != 0 {
 			compositeFields += ", "
 		}

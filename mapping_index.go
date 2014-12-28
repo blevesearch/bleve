@@ -11,7 +11,6 @@ package bleve
 
 import (
 	"encoding/json"
-	"log"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/document"
@@ -339,10 +338,10 @@ func (im *IndexMapping) mapDocument(doc *document.Document, data interface{}) er
 				}
 				data = convertedData
 			} else {
-				log.Printf("error creating byte array converter: %v", err)
+				logger.Printf("error creating byte array converter: %v", err)
 			}
 		} else {
-			log.Printf("no byte array converter named: %s", im.ByteArrayConverter)
+			logger.Printf("no byte array converter named: %s", im.ByteArrayConverter)
 		}
 	}
 
@@ -410,7 +409,7 @@ func (im *IndexMapping) analyzerNameForPath(path string) string {
 func (im *IndexMapping) analyzerNamed(name string) *analysis.Analyzer {
 	analyzer, err := im.cache.AnalyzerNamed(name)
 	if err != nil {
-		log.Printf("error using analyzer named: %s", name)
+		logger.Printf("error using analyzer named: %s", name)
 		return nil
 	}
 	return analyzer
@@ -419,7 +418,7 @@ func (im *IndexMapping) analyzerNamed(name string) *analysis.Analyzer {
 func (im *IndexMapping) dateTimeParserNamed(name string) analysis.DateTimeParser {
 	dateTimeParser, err := im.cache.DateTimeParserNamed(name)
 	if err != nil {
-		log.Printf("error using datetime parser named: %s", name)
+		logger.Printf("error using datetime parser named: %s", name)
 		return nil
 	}
 	return dateTimeParser

@@ -10,7 +10,6 @@
 package bleve
 
 import (
-	"log"
 	"time"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -123,7 +122,7 @@ func (fm *FieldMapping) processTime(propertyValueTime time.Time, pathString stri
 		if err == nil {
 			context.doc.AddField(field)
 		} else {
-			log.Printf("could not build date %v", err)
+			logger.Printf("could not build date %v", err)
 		}
 
 		if !fm.IncludeInAll {

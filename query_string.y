@@ -1,11 +1,10 @@
 %{
 package bleve
-import "log"
 import "strconv"
 
 func logDebugGrammar(format string, v ...interface{}) {
 	if debugParser {
-    	log.Printf(format, v...)
+    	logger.Printf(format, v...)
     }
 }
 %}

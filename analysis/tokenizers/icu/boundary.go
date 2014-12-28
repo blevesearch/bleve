@@ -21,7 +21,6 @@ package icu
 import "C"
 
 import (
-	"log"
 	"unsafe"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -66,7 +65,6 @@ func (t *UnicodeWordBoundaryTokenizer) Tokenize(input []byte) analysis.TokenStre
 	bi := C.ubrk_open(C.UBRK_WORD, t.locale, myUCharPointer, -1, &err)
 
 	if err > C.U_ZERO_ERROR {
-		log.Printf("error opening boundary iterator")
 		return rv
 	}
 
@@ -85,7 +83,6 @@ func (t *UnicodeWordBoundaryTokenizer) Tokenize(input []byte) analysis.TokenStre
 
 		C.u_strToUTF8(nilCString, 0, &indexA, myUCharPointer, prev, &err)
 		if err > C.U_ZERO_ERROR && err != C.U_BUFFER_OVERFLOW_ERROR {
-			log.Printf("error converting boundary %d", err)
 			return rv
 		} else {
 			err = C.U_ZERO_ERROR
@@ -94,7 +91,6 @@ func (t *UnicodeWordBoundaryTokenizer) Tokenize(input []byte) analysis.TokenStre
 		var indexB C.int32_t
 		C.u_strToUTF8(nilCString, 0, &indexB, myUCharPointer, p, &err)
 		if err > C.U_ZERO_ERROR && err != C.U_BUFFER_OVERFLOW_ERROR {
-			log.Printf("error converting boundary %d", err)
 			return rv
 		} else {
 			err = C.U_ZERO_ERROR

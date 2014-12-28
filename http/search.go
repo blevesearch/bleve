@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 
 	"github.com/blevesearch/bleve"
@@ -54,7 +53,7 @@ func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	log.Printf("request body: %s", requestBody)
+	logger.Printf("request body: %s", requestBody)
 
 	// parse the request
 	var searchRequest bleve.SearchRequest
@@ -64,7 +63,7 @@ func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	log.Printf("parsed request %#v", searchRequest)
+	logger.Printf("parsed request %#v", searchRequest)
 
 	// validate the query
 	err = searchRequest.Query.Validate()

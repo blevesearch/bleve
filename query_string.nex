@@ -34,10 +34,8 @@
 //
 package bleve
 
-import("log")
-
 func logDebugTokens(format string, v ...interface{}) {
     if debugLexer {
-        log.Printf(format, v...)
+        logger.Printf(format, v...)
     }
 }
