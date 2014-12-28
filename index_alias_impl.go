@@ -354,23 +354,32 @@ func (i *indexAliasImpl) Swap(in, out []Index) {
 	}
 }
 
+// createChildSearchRequest creates a separate
+// request from the original
+// For now, avoid data race on req structure.
+// TODO disable highligh/field load on child
+// requests, and add code to do this only on
+// the actual final results.
+// Perhaps that part needs to be optional,
+// could be slower in remote usages.
+func createChildSearchRequest(req *SearchRequest) *SearchRequest {
+	rv := SearchRequest{
+		Query:     req.Query,
+		Size:      req.Size,
+		From:      0,
+		Highlight: req.Highlight,
+		Fields:    req.Fields,
+		Facets:    req.Facets,
+		Explain:   req.Explain,
+	}
+	return &rv
+}
+
 // MultiSearch executes a SearchRequest across multiple
 // Index objects, then merges the results.
 func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	results := make(chan *SearchResult)
 	errs := make(chan error)
-
-	// remember the original from and size
-	size := req.Size
-	req.Size += req.From
-	from := req.From
-	req.From = 0
-
-	// FIXME should create new request for
-	// child queries, disable highlighting
-	// and field loading
-	// then, perform these steps only on
-	// the final results
 
 	// run search on each index in separate go routine
 	var waitGroup sync.WaitGroup
@@ -378,7 +387,8 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	var searchChildIndex = func(waitGroup *sync.WaitGroup, in Index, results chan *SearchResult, errs chan error) {
 		go func() {
 			defer waitGroup.Done()
-			searchResult, err := in.Search(req)
+			childReq := createChildSearchRequest(req)
+			searchResult, err := in.Search(childReq)
 			if err != nil {
 				errs <- err
 			} else {
@@ -431,7 +441,6 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	sort.Sort(sr.Hits)
 
 	// now skip over the correct From
-	req.From = from
 	if req.From > 0 && len(sr.Hits) > req.From {
 		sr.Hits = sr.Hits[req.From:]
 	} else if req.From > 0 {
@@ -439,7 +448,6 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	}
 
 	// now trim to the correct size
-	req.Size = size
 	if req.Size > 0 && len(sr.Hits) > req.Size {
 		sr.Hits = sr.Hits[0:req.Size]
 	}
