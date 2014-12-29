@@ -486,7 +486,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 	atomic.AddUint64(&i.stats.searchTime, uint64(searchDuration))
 
 	if searchDuration > Config.SlowSearchLogThreshold {
-		logger.Printf("slow search took %s - %s", searchDuration, req)
+		logger.Printf("slow search took %s - %v", searchDuration, req)
 	}
 
 	return &SearchResult{
