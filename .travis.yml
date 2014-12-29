@@ -3,10 +3,14 @@ language: go
 go:
  - 1.4
 
+secure: "JIU4vOghdgCYD0tGNvChdJ5q8yjfmkjpzxoLwR8B71lRHrX1fMMU5tYYbwky\nlg7XogTlz/K6ENtNkb7m3Z6BKF33NLl2bu8NBwpbg+xPmnyJMHRMaECzUEXO\nQ6NIU9p7s6QGXW9/k7mch6ud9Hy395u+1EzWvNx/HqUJAZZ/lUg="
+
 script:
   - go get golang.org/x/tools/cmd/vet
+  - go get github.com/mattn/goveralls
   - go test -v ./...
   - go vet ./...
+  - docs/project-code-coverage.sh
 
 notifications:
   email:
