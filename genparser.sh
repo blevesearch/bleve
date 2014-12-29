@@ -2,6 +2,8 @@
 
 echo Running nex...
 nex query_string.nex
+grep -v 'panic("unreachable")' query_string.nn.go > query_string.nn.go.new
+mv query_string.nn.go.new query_string.nn.go
 echo Running goyacc...
 go tool yacc -o query_string.y.go query_string.y
 # remove first line which pollutes godocs
