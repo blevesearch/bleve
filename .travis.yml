@@ -14,7 +14,3 @@ script:
 notifications:
   email:
     - marty.schoch@gmail.com
-
-env:
-  global:
-    - secure: eRoIqZv1Hm1l3W47o0HvL/RORe3Ch7YEznrluH8/lQ2swqleP0kFIwEXHUFWbNFiaV+FXgZFgGh6cB40SyssyqdB1FU9xfhbzkpPoZ7km57IGt4dvCJch62WcozGpDvGODKxdSp8Upz0BVJEZLtpOmEBZynEknzBojI7NIhLl+g=
