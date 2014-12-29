@@ -41,6 +41,6 @@ var logger = log.New(ioutil.Discard, "bleve.http", log.LstdFlags)
 
 // SetLog sets the logger used for logging
 // by default log messages are sent to ioutil.Discard
-func SetLog(logger *log.Logger) {
-	logger = logger
+func SetLog(l *log.Logger) {
+	logger = l
 }
