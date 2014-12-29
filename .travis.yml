@@ -1,0 +1,13 @@
+language: go
+
+go:
+ - 1.4
+
+script:
+  - go get code.google.com/p/go.tools/cmd/vet
+  - go test -v ./...
+  - go vet ./...
+
+notifications:
+  email:
+    - marty.schoch@gmail.com
