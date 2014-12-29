@@ -11,8 +11,10 @@ package bleve
 
 import (
 	"io/ioutil"
+	"log"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestCrud(t *testing.T) {
@@ -278,4 +280,48 @@ func TestClosedIndex(t *testing.T) {
 	if err != ErrorIndexClosed {
 		t.Errorf("expected error index closed, got %v", err)
 	}
+}
+
+func TestSlowSearch(t *testing.T) {
+	defer os.RemoveAll("testidx")
+
+	defer func() {
+		// reset logger back to normal
+		SetLog(log.New(ioutil.Discard, "bleve", log.LstdFlags))
+	}()
+	// set custom logger
+	var sdw sawDataWriter
+	SetLog(log.New(&sdw, "bleve", log.LstdFlags))
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer index.Close()
+
+	Config.SlowSearchLogThreshold = 1 * time.Minute
+
+	query := NewTermQuery("water")
+	req := NewSearchRequest(query)
+	index.Search(req)
+
+	if sdw.sawData {
+		t.Errorf("expected to not see slow query logged, but did")
+	}
+
+	Config.SlowSearchLogThreshold = 1 * time.Microsecond
+	index.Search(req)
+
+	if !sdw.sawData {
+		t.Errorf("expected to see slow query logged, but didn't")
+	}
+}
+
+type sawDataWriter struct {
+	sawData bool
+}
+
+func (s *sawDataWriter) Write(p []byte) (n int, err error) {
+	s.sawData = true
+	return len(p), nil
 }

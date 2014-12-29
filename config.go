@@ -111,10 +111,11 @@ import (
 var bleveExpVar = expvar.NewMap("bleve")
 
 type configuration struct {
-	Cache              *registry.Cache
-	DefaultHighlighter string
-	DefaultKVStore     string
-	analysisQueue      upside_down.AnalysisQueue
+	Cache                  *registry.Cache
+	DefaultHighlighter     string
+	DefaultKVStore         string
+	SlowSearchLogThreshold time.Duration
+	analysisQueue          upside_down.AnalysisQueue
 }
 
 func newConfiguration() *configuration {
@@ -168,6 +169,6 @@ var logger = log.New(ioutil.Discard, "bleve", log.LstdFlags)
 
 // SetLog sets the logger used for logging
 // by default log messages are sent to ioutil.Discard
-func SetLog(logger *log.Logger) {
-	logger = logger
+func SetLog(l *log.Logger) {
+	logger = l
 }
