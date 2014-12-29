@@ -54,5 +54,5 @@ Apache License Version 2.0
 
 ## Status
 
-[![Build Status](https://drone.io/github.com/blevesearch/bleve/status.png)](https://drone.io/github.com/blevesearch/bleve/latest)
+[![Build Status](https://travis-ci.org/blevesearch/bleve.svg?branch=master)](https://travis-ci.org/blevesearch/bleve)
 [![Coverage Status](https://coveralls.io/repos/blevesearch/bleve/badge.png?branch=master)](https://coveralls.io/r/blevesearch/bleve?branch=master)
