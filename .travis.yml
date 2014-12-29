@@ -10,6 +10,7 @@ script:
   - go test -v ./...
   - go vet ./...
   - docs/project-code-coverage.sh
+  - docs/build_children.sh
 
 notifications:
   email:
