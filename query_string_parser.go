@@ -7,6 +7,13 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
+//go:generate nex query_string.nex
+//go:generate sed -i "" -e s/Lexer/lexer/g query_string.nn.go
+//go:generate sed -i "" -e s/Newlexer/newLexer/g query_string.nn.go
+//go:generate sed -i "" -e s/debuglexer/debugLexer/g query_string.nn.go
+//go:generate go tool yacc -o query_string.y.go query_string.y
+//go:generate sed -i "" -e 1d query_string.y.go
+
 package bleve
 
 import (

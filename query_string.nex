@@ -6,7 +6,7 @@
 /\+/              { logDebugTokens("PLUS"); return tPLUS }
 /-/               { logDebugTokens("MINUS"); return tMINUS }
 /:/               { logDebugTokens("COLON"); return tCOLON }
-/^/               { logDebugTokens("BOOST"); return tBOOST }
+/\^/               { logDebugTokens("BOOST"); return tBOOST }
 /\(/              { logDebugTokens("LPAREN"); return tLPAREN }
 /\)/              { logDebugTokens("RPAREN"); return tRPAREN }
 />/              { logDebugTokens("GREATER"); return tGREATER }
