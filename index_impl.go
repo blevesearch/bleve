@@ -50,7 +50,7 @@ func newMemIndex(mapping *IndexMapping) (*indexImpl, error) {
 	rv := indexImpl{
 		path:  "",
 		m:     mapping,
-		meta:  newIndexMeta("mem"),
+		meta:  newIndexMeta("mem", nil),
 		stats: &IndexStat{},
 	}
 
@@ -101,10 +101,14 @@ func newIndexUsing(path string, mapping *IndexMapping, kvstore string, kvconfig 
 		return newMemIndex(mapping)
 	}
 
+	if kvconfig == nil {
+		kvconfig = map[string]interface{}{}
+	}
+
 	rv := indexImpl{
 		path:  path,
 		m:     mapping,
-		meta:  newIndexMeta(kvstore),
+		meta:  newIndexMeta(kvstore, kvconfig),
 		stats: &IndexStat{},
 	}
 	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
@@ -116,9 +120,8 @@ func newIndexUsing(path string, mapping *IndexMapping, kvstore string, kvconfig 
 	if err != nil {
 		return nil, err
 	}
-	if kvconfig == nil {
-		kvconfig = map[string]interface{}{}
-	}
+	kvconfig["create_if_missing"] = true
+	kvconfig["error_if_exists"] = true
 	kvconfig["path"] = indexStorePath(path)
 
 	// now open the store
@@ -152,15 +155,7 @@ func newIndexUsing(path string, mapping *IndexMapping, kvstore string, kvconfig 
 	return &rv, nil
 }
 
-func newIndex(path string, mapping *IndexMapping) (*indexImpl, error) {
-	defaultKVConfig := map[string]interface{}{
-		"create_if_missing": true,
-		"error_if_exists":   true,
-	}
-	return newIndexUsing(path, mapping, Config.DefaultKVStore, defaultKVConfig)
-}
-
-func openIndex(path string) (*indexImpl, error) {
+func openIndexUsing(path string, runtimeConfig map[string]interface{}) (*indexImpl, error) {
 
 	rv := indexImpl{
 		path:  path,
@@ -177,10 +172,16 @@ func openIndex(path string) (*indexImpl, error) {
 		return nil, ErrorUnknownStorageType
 	}
 
-	storeConfig := map[string]interface{}{
-		"path":              indexStorePath(path),
-		"create_if_missing": false,
-		"error_if_exists":   false,
+	storeConfig := rv.meta.Config
+	if storeConfig == nil {
+		storeConfig = map[string]interface{}{}
+	}
+
+	storeConfig["path"] = indexStorePath(path)
+	storeConfig["create_if_missing"] = false
+	storeConfig["error_if_exists"] = false
+	for rck, rcv := range runtimeConfig {
+		storeConfig[rck] = rcv
 	}
 
 	// now open the store

@@ -18,11 +18,15 @@ import (
 const metaFilename = "index_meta.json"
 
 type indexMeta struct {
-	Storage string `json:"storage"`
+	Storage string                 `json:"storage"`
+	Config  map[string]interface{} `json:"config,omitempty"`
 }
 
-func newIndexMeta(storage string) *indexMeta {
-	return &indexMeta{Storage: storage}
+func newIndexMeta(storage string, config map[string]interface{}) *indexMeta {
+	return &indexMeta{
+		Storage: storage,
+		Config:  config,
+	}
 }
 
 func openIndexMeta(path string) (*indexMeta, error) {
