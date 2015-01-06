@@ -209,7 +209,7 @@ func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
 
 	index, err = Open("testidx")
 	if err != ErrorUnknownStorageType {
-		t.Fatalf("expected error unkown storage type, got %v", err)
+		t.Fatalf("expected error unknown storage type, got %v", err)
 	}
 
 	// now intentionally corrupt the metadata

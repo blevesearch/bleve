@@ -44,7 +44,7 @@ var errorMessages = map[int]string{
 	int(ErrorNumericQueryNoBounds):           "numeric range query must specify min or max",
 	int(ErrorPhraseQueryNoTerms):             "phrase query must contain at least one term",
 	int(ErrorUnknownQueryType):               "unknown query type",
-	int(ErrorUnknownStorageType):             "unkown storage type",
+	int(ErrorUnknownStorageType):             "unknown storage type",
 	int(ErrorIndexClosed):                    "index is closed",
 	int(ErrorAliasMulti):                     "cannot perform single index operation on multiple index alias",
 	int(ErrorAliasEmpty):                     "cannot perform operation on empty alias",
