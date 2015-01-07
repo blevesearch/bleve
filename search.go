@@ -156,6 +156,8 @@ func (h *HighlightRequest) AddField(field string) {
 // Facets describe the set of facets to be computed.
 // Explain triggers inclusion of additional search
 // result score explanations.
+//
+// A special field named "*" can be used to return all fields.
 type SearchRequest struct {
 	Query     Query             `json:"query"`
 	Size      int               `json:"size"`
