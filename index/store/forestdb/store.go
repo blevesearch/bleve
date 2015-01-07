@@ -22,7 +22,7 @@ import (
 	"github.com/couchbaselabs/goforestdb"
 )
 
-const Name = "leveldb"
+const Name = "forestdb"
 
 type Store struct {
 	path     string
