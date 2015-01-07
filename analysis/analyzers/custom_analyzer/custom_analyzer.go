@@ -11,7 +11,6 @@ package standard_analyzer
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
@@ -23,16 +22,23 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 
 	var err error
 	var charFilters []analysis.CharFilter
-	if reflect.TypeOf(config["char_filters"]).String() == "[]string" {
-		charFilters, err = getCharFilters(config["char_filters"].([]string), cache)
-	} else if reflect.TypeOf(config["char_filters"]).String() == "[]interface{}" {
-		charFiltersNames, err := convertInterfaceSliceToStringSlice(config["char_filters"].([]interface{}), "char filter")
-		if err != nil {
-			return nil, err
-		}
+	charFiltersNames, ok := config["char_filters"].([]string)
+	if ok {
 		charFilters, err = getCharFilters(charFiltersNames, cache)
 		if err != nil {
 			return nil, err
+		}
+	} else {
+		charFiltersNamesInterfaceSlice, ok := config["char_filters"].([]interface{})
+		if ok {
+			charFiltersNames, err := convertInterfaceSliceToStringSlice(charFiltersNamesInterfaceSlice, "char filter")
+			if err != nil {
+				return nil, err
+			}
+			charFilters, err = getCharFilters(charFiltersNames, cache)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -47,16 +53,23 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	}
 
 	var tokenFilters []analysis.TokenFilter
-	if reflect.TypeOf(config["token_filters"]).String() == "[]string" {
-		tokenFilters, err = getTokenFilters(config["token_filters"].([]string), cache)
-	} else if reflect.TypeOf(config["token_filters"]).String() == "[]interface{}" {
-		tokenFiltersNames, err := convertInterfaceSliceToStringSlice(config["token_filters"].([]interface{}), "token filter")
-		if err != nil {
-			return nil, err
-		}
+	tokenFiltersNames, ok := config["token_filters"].([]string)
+	if ok {
 		tokenFilters, err = getTokenFilters(tokenFiltersNames, cache)
 		if err != nil {
 			return nil, err
+		}
+	} else {
+		tokenFiltersNamesInterfaceSlice, ok := config["token_filters"].([]interface{})
+		if ok {
+			tokenFiltersNames, err := convertInterfaceSliceToStringSlice(tokenFiltersNamesInterfaceSlice, "token filter")
+			if err != nil {
+				return nil, err
+			}
+			tokenFilters, err = getTokenFilters(tokenFiltersNames, cache)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
