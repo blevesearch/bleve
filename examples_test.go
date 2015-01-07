@@ -77,6 +77,8 @@ func ExampleIndex_indexing() {
 	// 2
 }
 
+// Examples for query related functions
+
 func ExampleNewMatchQuery() {
 	// finds documents with fields fully matching the given query text
 	query := NewMatchQuery("named one")
@@ -433,4 +435,48 @@ func ExampleNewDisjunctionQueryMin() {
 	fmt.Println(len(searchResults.Hits))
 	// Output:
 	// 0
+}
+
+// Examples for Mapping related functions
+
+func ExampleDocumentMapping_AddSubDocumentMapping() {
+	// adds a document mapping for a property in a document
+	// useful for mapping nested documents
+	documentMapping := NewDocumentMapping()
+	subDocumentMapping := NewDocumentMapping()
+	documentMapping.AddSubDocumentMapping("Property", subDocumentMapping)
+
+	fmt.Println(len(documentMapping.Properties))
+	// Output:
+	// 1
+}
+
+func ExampleDocumentMapping_AddFieldMapping() {
+	// you can only add field mapping to those properties which already have a document mapping
+	documentMapping := NewDocumentMapping()
+	subDocumentMapping := NewDocumentMapping()
+	documentMapping.AddSubDocumentMapping("Property", subDocumentMapping)
+
+	fieldMapping := NewTextFieldMapping()
+	fieldMapping.Analyzer = "en"
+	subDocumentMapping.AddFieldMapping(fieldMapping)
+
+	fmt.Println(len(documentMapping.Properties["Property"].Fields))
+	// Output:
+	// 1
+}
+
+func ExampleDocumentMapping_AddFieldMappingsAt() {
+	// you can only add field mapping to those properties which already have a document mapping
+	documentMapping := NewDocumentMapping()
+	subDocumentMapping := NewDocumentMapping()
+	documentMapping.AddSubDocumentMapping("NestedProperty", subDocumentMapping)
+
+	fieldMapping := NewTextFieldMapping()
+	fieldMapping.Analyzer = "en"
+	documentMapping.AddFieldMappingsAt("NestedProperty", fieldMapping)
+
+	fmt.Println(len(documentMapping.Properties["NestedProperty"].Fields))
+	// Output:
+	// 1
 }
