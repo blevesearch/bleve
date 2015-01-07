@@ -133,7 +133,7 @@ func (s *Store) newSnapshot() (*forestdb.KVStore, error) {
 	return s.dbkv.SnapshotOpen(seqNum)
 }
 
-func (s *Store) getRollbackID() ([]byte, error) {
+func (s *Store) GetRollbackID() ([]byte, error) {
 	seqNum, err := s.getSeqNum()
 	if err != nil {
 		return nil, err
@@ -146,7 +146,7 @@ func (s *Store) getRollbackID() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (s *Store) rollbackTo(rollbackId []byte) error {
+func (s *Store) RollbackTo(rollbackId []byte) error {
 	s.writer.Lock()
 	defer s.writer.Unlock()
 	buf := bytes.NewReader(rollbackId)

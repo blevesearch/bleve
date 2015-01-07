@@ -72,7 +72,7 @@ func TestRollbackSameHandle(t *testing.T) {
 	}
 
 	// get the rollback id
-	rollbackId, err := s.getRollbackID()
+	rollbackId, err := s.GetRollbackID()
 	if err != nil {
 		t.Error(err)
 	}
@@ -103,7 +103,7 @@ func TestRollbackSameHandle(t *testing.T) {
 	reader.Close()
 
 	// now rollback
-	err = s.rollbackTo(rollbackId)
+	err = s.RollbackTo(rollbackId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestRollbackNewHandle(t *testing.T) {
 	}
 
 	// get the rollback id
-	rollbackId, err := s.getRollbackID()
+	rollbackId, err := s.GetRollbackID()
 	if err != nil {
 		t.Error(err)
 	}
@@ -183,7 +183,7 @@ func TestRollbackNewHandle(t *testing.T) {
 	reader.Close()
 
 	// now rollback
-	err = s.rollbackTo(rollbackId)
+	err = s.RollbackTo(rollbackId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func TestRollbackOtherHandle(t *testing.T) {
 	}
 
 	// get the rollback id
-	rollbackId, err := s.getRollbackID()
+	rollbackId, err := s.GetRollbackID()
 	if err != nil {
 		t.Error(err)
 	}
@@ -277,7 +277,7 @@ func TestRollbackOtherHandle(t *testing.T) {
 	reader.Close()
 
 	// now rollback
-	err = s.rollbackTo(rollbackId)
+	err = s.RollbackTo(rollbackId)
 	if err != nil {
 		t.Fatal(err)
 	}
