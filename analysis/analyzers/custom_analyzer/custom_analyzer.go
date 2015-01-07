@@ -11,6 +11,7 @@ package standard_analyzer
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
@@ -21,20 +22,16 @@ const Name = "custom"
 func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
 
 	var charFilters []analysis.CharFilter
-	charFilterNames, ok := config["char_filters"].([]interface{})
-	if ok {
-		charFilters = make([]analysis.CharFilter, len(charFilterNames))
-		for i, charFilterName := range charFilterNames {
-			charFilterNameString, ok := charFilterName.(string)
-			if ok {
-				charFilter, err := cache.CharFilterNamed(charFilterNameString)
-				if err != nil {
-					return nil, err
-				}
-				charFilters[i] = charFilter
-			} else {
-				return nil, fmt.Errorf("char filter name must be a string")
-			}
+	if reflect.TypeOf(config["char_filters"]).String() == "[]string" {
+		charFilters, err := getCharFilters(config["char_filters"])
+	} else if reflect.TypeOf(config["char_filters"]).String == "[]interface{}" {
+		charFiltersNames, err := convertInterfaceSliceToStringSlice(config["char_filters"], "char filter")
+		if err != nil {
+			return nil, err
+		}
+		charFilters, err = getCharFilters(charFiltersNames)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -49,20 +46,16 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	}
 
 	var tokenFilters []analysis.TokenFilter
-	tokenFilterNames, ok := config["token_filters"].([]interface{})
-	if ok {
-		tokenFilters = make([]analysis.TokenFilter, len(tokenFilterNames))
-		for i, tokenFilterName := range tokenFilterNames {
-			tokenFilterNameString, ok := tokenFilterName.(string)
-			if ok {
-				tokenFilter, err := cache.TokenFilterNamed(tokenFilterNameString)
-				if err != nil {
-					return nil, err
-				}
-				tokenFilters[i] = tokenFilter
-			} else {
-				return nil, fmt.Errorf("token filter name must be a string")
-			}
+	if reflect.TypeOf(config["token_filters"]).String() == "[]string" {
+		tokenFilters, err := getTokenFilters(config["token_filters"])
+	} else if reflect.TypeOf(config["token_filters"]).String == "[]interface{}" {
+		tokenFiltersNames, err := convertInterfaceSliceToStringSlice(config["token_filters"], "token filter")
+		if err != nil {
+			return nil, err
+		}
+		tokenFilters, err = getTokenFilters(charFiltersNames)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -80,4 +73,44 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 
 func init() {
 	registry.RegisterAnalyzer(Name, AnalyzerConstructor)
+}
+
+func getCharFilters(charFilterNames []string) ([]analysis.CharFilter, error) {
+	charFilters = make([]analysis.CharFilter, len(charFilterNames))
+	for i, charFilterName := range charFilterNames {
+		charFilter, err := cache.CharFilterNamed(charFilterName)
+		if err != nil {
+			return nil, err
+		}
+		charFilters[i] = charFilter
+	}
+
+	return charFilters, nil
+}
+
+func getTokenFilters(tokenFilterNames []string) ([]analysis.TokenFilter, error) {
+	tokenFilters = make([]analysis.TokenFilter, len(tokenFilterNames))
+	for i, tokenFilterName := range tokenFilterNames {
+		tokenFilter, err := cache.TokenFilterNamed(tokenFilterName)
+		if err != nil {
+			return nil, err
+		}
+		tokenFilters[i] = tokenFilter
+	}
+
+	return tokenFilters, nil
+}
+
+func convertInterfaceSliceToStringSlice(interfaceSlice []interface{}, objType string) []string {
+	stringSlice := make([]string, len(interfaceSlice))
+	for i, interfaceObj := range interfaceSlice {
+		stringObj, ok := interfaceObj.(string)
+		if ok {
+			stringSlice[i] = stringObj
+		} else {
+			return nil, fmt.Errorf(objType + " name must be a string")
+		}
+	}
+
+	return stringSlice, nil
 }
