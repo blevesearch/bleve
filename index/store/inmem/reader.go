@@ -13,24 +13,56 @@ import (
 	"github.com/blevesearch/bleve/index/store"
 )
 
+// "newentry" marks a key which was previously empty, but was populated after the creation of the Reader.
+// If the value stored at the key has changed, the value at the time of creation of the Reader is stored in value.
+type readerValue struct {
+	value    []byte
+	newentry bool
+	deleted  bool
+}
+
+// This is the readers copy of the data which has changed after the Reader has been created.
+type readerData struct {
+	valueMap        map[string]*readerValue
+	deletedKeysList []string
+}
+
 type Reader struct {
-	store *Store
+	store      *Store
+	readerData *readerData
 }
 
 func newReader(store *Store) (*Reader, error) {
+	readerData := readerData{
+		valueMap:        make(map[string]*readerValue),
+		deletedKeysList: make([]string, 0),
+	}
+	store.readersData[&readerData] = &readerData
+
 	return &Reader{
-		store: store,
+		store:      store,
+		readerData: &readerData,
 	}, nil
 }
 
 func (r *Reader) Get(key []byte) ([]byte, error) {
-	return r.store.get(key)
+	stringkey := string(key)
+	if r.readerData.valueMap[stringkey] != nil {
+		if r.readerData.valueMap[stringkey].newentry {
+			return nil, nil
+		} else {
+			return r.readerData.valueMap[stringkey].value, nil
+		}
+	} else {
+		return r.store.get(key)
+	}
 }
 
 func (r *Reader) Iterator(key []byte) store.KVIterator {
-	return r.store.iterator(key)
+	return r.store.readerIterator(key, r)
 }
 
 func (r *Reader) Close() error {
+	delete(r.store.readersData, r.readerData)
 	return nil
 }

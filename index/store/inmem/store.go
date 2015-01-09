@@ -19,14 +19,17 @@ import (
 
 const Name = "mem"
 
+// Data is tored for readers in case of changes
 type Store struct {
-	list   *skiplist.SkipList
-	writer sync.Mutex
+	list        *skiplist.SkipList
+	writer      sync.Mutex
+	readersData map[*readerData]*readerData
 }
 
 func Open() (*Store, error) {
 	rv := Store{
-		list: skiplist.NewStringMap(),
+		list:        skiplist.NewStringMap(),
+		readersData: make(map[*readerData]*readerData),
 	}
 
 	return &rv, nil
@@ -34,7 +37,8 @@ func Open() (*Store, error) {
 
 func MustOpen() *Store {
 	rv := Store{
-		list: skiplist.NewStringMap(),
+		list:        skiplist.NewStringMap(),
+		readersData: make(map[*readerData]*readerData),
 	}
 
 	return &rv
@@ -54,7 +58,40 @@ func (i *Store) set(key, val []byte) error {
 	return i.setlocked(key, val)
 }
 
+// Updates storage of Readers created before the function is called with the values of keys at the time of their creation.
+func (i *Store) updateReadersData(bytekey []byte, deleted bool) {
+	var newentry bool
+	var byteval []byte
+	key := string(bytekey)
+
+	val, ok := i.list.Get(key)
+	if ok {
+		newentry = false
+		byteval = []byte(val.(string))
+	} else {
+		newentry = true
+		byteval = nil
+	}
+
+	for _, v := range i.readersData {
+		if v.valueMap[key] == nil {
+			v.valueMap[key] = &readerValue{
+				value:    byteval,
+				newentry: newentry,
+				deleted:  deleted,
+			}
+			if deleted {
+				v.deletedKeysList = append(v.deletedKeysList, key)
+			}
+		} else if deleted && !v.valueMap[key].deleted {
+			v.deletedKeysList = append(v.deletedKeysList, key)
+			v.valueMap[key].deleted = deleted
+		}
+	}
+}
+
 func (i *Store) setlocked(key, val []byte) error {
+	i.updateReadersData(key, false)
 	i.list.Set(string(key), string(val))
 	return nil
 }
@@ -66,6 +103,7 @@ func (i *Store) delete(key []byte) error {
 }
 
 func (i *Store) deletelocked(key []byte) error {
+	i.updateReadersData(key, true)
 	i.list.Delete(string(key))
 	return nil
 }
@@ -76,6 +114,12 @@ func (i *Store) Close() error {
 
 func (i *Store) iterator(key []byte) store.KVIterator {
 	rv := newIterator(i)
+	rv.Seek(key)
+	return rv
+}
+
+func (i *Store) readerIterator(key []byte, reader *Reader) store.KVIterator {
+	rv := newReaderIterator(i, reader)
 	rv.Seek(key)
 	return rv
 }

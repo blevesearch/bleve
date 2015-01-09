@@ -26,6 +26,16 @@ func TestStore(t *testing.T) {
 	CommonTestKVStore(t, s)
 }
 
+func TestReaderIsolation(t *testing.T) {
+	s, err := Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	CommonTestReaderIsolation(t, s)
+}
+
 func CommonTestKVStore(t *testing.T, s store.KVStore) {
 
 	writer, err := s.Writer()
