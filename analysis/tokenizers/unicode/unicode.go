@@ -10,8 +10,6 @@
 package unicode
 
 import (
-	"bytes"
-
 	"github.com/blevesearch/segment"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -31,7 +29,7 @@ func (rt *UnicodeTokenizer) Tokenize(input []byte) analysis.TokenStream {
 
 	rv := make(analysis.TokenStream, 0)
 
-	segmenter := segment.NewWordSegmenter(bytes.NewReader(input))
+	segmenter := segment.NewWordSegmenterDirect(input)
 	start := 0
 	pos := 1
 	for segmenter.Segment() {
