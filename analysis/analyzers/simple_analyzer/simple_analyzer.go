@@ -12,14 +12,14 @@ package simple_analyzer
 import (
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
-	"github.com/blevesearch/bleve/analysis/tokenizers/whitespace_tokenizer"
+	"github.com/blevesearch/bleve/analysis/tokenizers/unicode"
 	"github.com/blevesearch/bleve/registry"
 )
 
 const Name = "simple"
 
 func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
-	keywordTokenizer, err := cache.TokenizerNamed(whitespace_tokenizer.Name)
+	tokenizer, err := cache.TokenizerNamed(unicode.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +28,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 		return nil, err
 	}
 	rv := analysis.Analyzer{
-		Tokenizer: keywordTokenizer,
+		Tokenizer: tokenizer,
 		TokenFilters: []analysis.TokenFilter{
 			toLowerFilter,
 		},
