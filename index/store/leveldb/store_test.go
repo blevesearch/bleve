@@ -19,10 +19,14 @@ import (
 	"github.com/blevesearch/bleve/index/store"
 )
 
+var leveldbTestOptions = map[string]interface{}{
+	"create_if_missing": true,
+}
+
 func TestLevelDBStore(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	s, err := Open("test", true, true)
+	s, err := Open("test", leveldbTestOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +38,7 @@ func TestLevelDBStore(t *testing.T) {
 func TestReaderIsolation(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	s, err := Open("test", true, true)
+	s, err := Open("test", leveldbTestOptions)
 	if err != nil {
 		t.Fatal(err)
 	}

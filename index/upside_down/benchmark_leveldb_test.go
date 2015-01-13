@@ -18,8 +18,12 @@ import (
 	"github.com/blevesearch/bleve/index/store/leveldb"
 )
 
+var leveldbTestOptions = map[string]interface{}{
+	"create_if_missing": true,
+}
+
 func BenchmarkLevelDBIndexing1Workers(b *testing.B) {
-	s, err := leveldb.Open("test", true, true)
+	s, err := leveldb.Open("test", leveldbTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -30,7 +34,7 @@ func BenchmarkLevelDBIndexing1Workers(b *testing.B) {
 }
 
 func BenchmarkLevelDBIndexing2Workers(b *testing.B) {
-	s, err := leveldb.Open("test", true, true)
+	s, err := leveldb.Open("test", leveldbTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -41,7 +45,7 @@ func BenchmarkLevelDBIndexing2Workers(b *testing.B) {
 }
 
 func BenchmarkLevelDBIndexing4Workers(b *testing.B) {
-	s, err := leveldb.Open("test", true, true)
+	s, err := leveldb.Open("test", leveldbTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -54,7 +58,7 @@ func BenchmarkLevelDBIndexing4Workers(b *testing.B) {
 // batches
 
 func BenchmarkLevelDBIndexing1Workers10Batch(b *testing.B) {
-	s, err := leveldb.Open("test", true, true)
+	s, err := leveldb.Open("test", leveldbTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -65,7 +69,7 @@ func BenchmarkLevelDBIndexing1Workers10Batch(b *testing.B) {
 }
 
 func BenchmarkLevelDBIndexing2Workers10Batch(b *testing.B) {
-	s, err := leveldb.Open("test", true, true)
+	s, err := leveldb.Open("test", leveldbTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -76,7 +80,7 @@ func BenchmarkLevelDBIndexing2Workers10Batch(b *testing.B) {
 }
 
 func BenchmarkLevelDBIndexing4Workers10Batch(b *testing.B) {
-	s, err := leveldb.Open("test", true, true)
+	s, err := leveldb.Open("test", leveldbTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -87,7 +91,7 @@ func BenchmarkLevelDBIndexing4Workers10Batch(b *testing.B) {
 }
 
 func BenchmarkLevelDBIndexing1Workers100Batch(b *testing.B) {
-	s, err := leveldb.Open("test", true, true)
+	s, err := leveldb.Open("test", leveldbTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -98,7 +102,7 @@ func BenchmarkLevelDBIndexing1Workers100Batch(b *testing.B) {
 }
 
 func BenchmarkLevelDBIndexing2Workers100Batch(b *testing.B) {
-	s, err := leveldb.Open("test", true, true)
+	s, err := leveldb.Open("test", leveldbTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -109,7 +113,7 @@ func BenchmarkLevelDBIndexing2Workers100Batch(b *testing.B) {
 }
 
 func BenchmarkLevelDBIndexing4Workers100Batch(b *testing.B) {
-	s, err := leveldb.Open("test", true, true)
+	s, err := leveldb.Open("test", leveldbTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
