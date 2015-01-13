@@ -34,6 +34,7 @@ func TestReaderIsolation(t *testing.T) {
 	defer s.Close()
 
 	CommonTestReaderIsolation(t, s)
+	CommonTestReaderIsolationIteratorNext(t, s)
 }
 
 func CommonTestKVStore(t *testing.T, s store.KVStore) {
@@ -214,4 +215,89 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 		t.Errorf("expected iterator to see 1, saw %d", count)
 	}
 
+}
+
+func CommonTestReaderIsolationIteratorNext(t *testing.T, s store.KVStore) {
+	// store already has keys a and b
+
+	// add key c
+	writer, err := s.Writer()
+	if err != nil {
+		t.Error(err)
+	}
+	err = writer.Set([]byte("c"), []byte("val-c"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer.Close()
+
+	// create an isolated reader
+	reader, err := s.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer reader.Close()
+
+	// delete keys c then b
+	writer, err = s.Writer()
+	if err != nil {
+		t.Error(err)
+	}
+	err = writer.Delete([]byte("c"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer.Delete([]byte("b"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer.Set([]byte("c"), []byte("val-c"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer.Close()
+
+	// get iterator from reader
+	iter := reader.Iterator([]byte(""))
+	// seek to a
+	iter.Seek([]byte("a"))
+	k, v, valid := iter.Current()
+	if !valid {
+		t.Errorf("expected iterator valid, got invalid")
+	}
+	if string(k) != "a" {
+		t.Errorf("expected key 'a', got '%s'", k)
+	}
+	if string(v) != "val-a" {
+		t.Errorf("expected value 'val-a', got '%s'", v)
+	}
+
+	// now call next
+	iter.Next()
+
+	// now check where we are
+	k, v, valid = iter.Current()
+	if !valid {
+		t.Errorf("expected iterator valid, got invalid")
+	}
+	if string(k) != "b" {
+		t.Errorf("expected key 'b', got '%s'", k)
+	}
+	if string(v) != "val-b" {
+		t.Errorf("expected value 'val-b', got '%s'", v)
+	}
+
+	// now call next
+	iter.Next()
+
+	k, v, valid = iter.Current()
+	if !valid {
+		t.Errorf("expected iterator valid, got invalid")
+	}
+	if string(k) != "c" {
+		t.Errorf("expected key 'c', got '%s'", k)
+	}
+	if string(v) != "val-c" {
+		t.Errorf("expected value 'val-c', got '%s'", v)
+	}
 }

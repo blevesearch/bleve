@@ -62,6 +62,8 @@ func (i *Store) set(key, val []byte) error {
 func (i *Store) updateReadersData(bytekey []byte, deleted bool) {
 	var newentry bool
 	var byteval []byte
+	var prev string
+	var firstValue bool
 	key := string(bytekey)
 
 	val, ok := i.list.Get(key)
@@ -73,19 +75,37 @@ func (i *Store) updateReadersData(bytekey []byte, deleted bool) {
 		byteval = nil
 	}
 
+	if deleted {
+		iterator := i.list.Seek(key)
+		ok = iterator.Previous()
+		if ok {
+			prev = iterator.Key().(string)
+		} else {
+			firstValue = true
+		}
+	}
+
 	for _, v := range i.readersData {
 		if v.valueMap[key] == nil {
 			v.valueMap[key] = &readerValue{
-				value:    byteval,
-				newentry: newentry,
-				deleted:  deleted,
+				value:      byteval,
+				newentry:   newentry,
+				deleted:    deleted,
+				firstValue: firstValue,
+				prevKey:    prev,
 			}
 			if deleted {
-				v.deletedKeysList = append(v.deletedKeysList, key)
+				if !firstValue {
+					v.prevValuesOfDeletedKeys.Set(prev, key)
+				}
 			}
 		} else if deleted && !v.valueMap[key].deleted {
-			v.deletedKeysList = append(v.deletedKeysList, key)
 			v.valueMap[key].deleted = deleted
+			v.valueMap[key].firstValue = firstValue
+			v.valueMap[key].prevKey = prev
+			if !firstValue {
+				v.prevValuesOfDeletedKeys.Set(prev, key)
+			}
 		}
 	}
 }

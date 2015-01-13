@@ -21,7 +21,6 @@ type ReaderIterator struct {
 	valid             bool
 	fromReaderStorage bool
 	currentKey        string
-	posOnDeletedList  int
 }
 
 func newReaderIterator(store *Store, reader *Reader) *ReaderIterator {
@@ -43,12 +42,22 @@ func (i *ReaderIterator) Seek(k []byte) {
 		if i.reader.readerData.valueMap[stringkey].newentry {
 			i.valid = false
 			i.fromReaderStorage = false
+		} else if i.reader.readerData.valueMap[stringkey].firstValue {
+			i.valid = true
+			i.fromReaderStorage = true
+			i.currentKey = stringkey
+			i.SeekFirst()
+		} else if i.reader.readerData.valueMap[stringkey].deleted {
+			i.valid = true
+			i.fromReaderStorage = true
+			i.currentKey = stringkey
+			i.iterator.Seek(i.reader.readerData.valueMap[stringkey].prevKey)
 		} else {
 			i.valid = true
 			i.fromReaderStorage = true
 			i.currentKey = stringkey
+			i.iterator.Seek(stringkey)
 		}
-		i.iterator.Seek(stringkey)
 	} else {
 		i.valid = i.iterator.Seek(stringkey)
 		i.fromReaderStorage = false
@@ -56,28 +65,37 @@ func (i *ReaderIterator) Seek(k []byte) {
 }
 
 func (i *ReaderIterator) Next() {
-	hasNextValue := i.iterator.Next()
-	if hasNextValue {
-		key := i.iterator.Key().(string)
-		if i.reader.readerData.valueMap[key] != nil {
-			if i.reader.readerData.valueMap[key].newentry {
-				i.Next()
-			} else {
-				i.valid = true
-				i.fromReaderStorage = true
-				i.currentKey = key
-			}
-		} else {
-			i.valid = true
-			i.fromReaderStorage = false
-		}
-	} else if i.posOnDeletedList < len(i.reader.readerData.deletedKeysList) {
+	var key string
+	if i.fromReaderStorage {
+		key = i.currentKey
+	} else {
+		key = i.iterator.Key().(string)
+	}
+
+	nextKey, ok := i.reader.readerData.prevValuesOfDeletedKeys.Get(key)
+	if ok {
+		i.currentKey = nextKey.(string)
 		i.valid = true
 		i.fromReaderStorage = true
-		i.currentKey = i.reader.readerData.deletedKeysList[i.posOnDeletedList]
-		i.posOnDeletedList++
 	} else {
-		i.valid = false
+		hasNextValue := i.iterator.Next()
+		if hasNextValue {
+			key = i.iterator.Key().(string)
+			if i.reader.readerData.valueMap[key] != nil {
+				if i.reader.readerData.valueMap[key].newentry || i.reader.readerData.valueMap[key].deleted {
+					i.Next()
+				} else {
+					i.valid = true
+					i.fromReaderStorage = true
+					i.currentKey = key
+				}
+			} else {
+				i.valid = true
+				i.fromReaderStorage = false
+			}
+		} else {
+			i.valid = false
+		}
 	}
 }
 
