@@ -80,6 +80,7 @@ func (ldbs *Store) deletelocked(key []byte) error {
 
 func (ldbs *Store) Close() error {
 	ldbs.db.Close()
+	ldbs.opts.Close()
 	return nil
 }
 
