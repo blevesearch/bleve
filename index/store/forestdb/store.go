@@ -14,6 +14,7 @@ package forestdb
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -21,6 +22,25 @@ import (
 	"github.com/blevesearch/bleve/registry"
 	"github.com/couchbaselabs/goforestdb"
 )
+
+type ForestDBConfig struct {
+	BlockSize                 uint32
+	BufferCacheSize           uint64
+	ChunkSize                 uint16
+	CleanupCacheOnClose       bool
+	CompactionBufferSizeMax   uint32
+	CompactionMinimumFilesize uint64
+	CompactionMode            forestdb.CompactOpt
+	CompactionThreshold       uint8
+	CompactorSleepDuration    uint64
+	CompressDocumentBody      bool
+	DurabilityOpt             forestdb.DurabilityOpt
+	OpenFlags                 forestdb.OpenFlags
+	PurgingInterval           uint32
+	SeqTreeOpt                forestdb.SeqTreeOpt
+	WalFlushBeforeCommit      bool
+	WalThreshold              uint64
+}
 
 const Name = "forestdb"
 
@@ -39,9 +59,14 @@ func Open(path string, createIfMissing bool,
 		config = map[string]interface{}{}
 	}
 
+	forestDBConfig, err := applyConfig(forestdb.DefaultConfig(), config)
+	if err != nil {
+		return nil, err
+	}
+
 	rv := Store{
 		path:     path,
-		config:   applyConfig(forestdb.DefaultConfig(), config),
+		config:   forestDBConfig,
 		kvconfig: forestdb.DefaultKVStoreConfig(),
 	}
 
@@ -49,7 +74,6 @@ func Open(path string, createIfMissing bool,
 		rv.kvconfig.SetCreateIfMissing(true)
 	}
 
-	var err error
 	rv.dbfile, err = forestdb.Open(rv.path, rv.config)
 	if err != nil {
 		return nil, err
@@ -184,8 +208,74 @@ func init() {
 	registry.RegisterKVStore(Name, StoreConstructor)
 }
 
-func applyConfig(c *forestdb.Config,
-	config map[string]interface{}) *forestdb.Config {
-	// TODO.
-	return c
+func applyConfig(c *forestdb.Config, config map[string]interface{}) (
+	*forestdb.Config, error) {
+	v, exists := config["forestDBConfig"]
+	if !exists || v == nil {
+		return c, nil
+	}
+	m, ok := v.(map[string]interface{})
+	if !ok {
+		return c, nil
+	}
+	// These extra steps of json.Marshal()/Unmarshal() help to convert
+	// to the types that we need for the setter calls.
+	b, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+	var f ForestDBConfig
+	err = json.Unmarshal(b, &f)
+	if err != nil {
+		return nil, err
+	}
+	if _, exists := m["blockSize"]; exists {
+		c.SetBlockSize(f.BlockSize)
+	}
+	if _, exists := m["bufferCacheSize"]; exists {
+		c.SetBufferCacheSize(f.BufferCacheSize)
+	}
+	if _, exists := m["chunkSize"]; exists {
+		c.SetChunkSize(f.ChunkSize)
+	}
+	if _, exists := m["cleanupCacheOnClose"]; exists {
+		c.SetCleanupCacheOnClose(f.CleanupCacheOnClose)
+	}
+	if _, exists := m["compactionBufferSizeMax"]; exists {
+		c.SetCompactionBufferSizeMax(f.CompactionBufferSizeMax)
+	}
+	if _, exists := m["compactionMinimumFilesize"]; exists {
+		c.SetCompactionMinimumFilesize(f.CompactionMinimumFilesize)
+	}
+	if _, exists := m["compactionMode"]; exists {
+		c.SetCompactionMode(f.CompactionMode)
+	}
+	if _, exists := m["compactionThreshold"]; exists {
+		c.SetCompactionThreshold(f.CompactionThreshold)
+	}
+	if _, exists := m["compactorSleepDuration"]; exists {
+		c.SetCompactorSleepDuration(f.CompactorSleepDuration)
+	}
+	if _, exists := m["compressDocumentBody"]; exists {
+		c.SetCompressDocumentBody(f.CompressDocumentBody)
+	}
+	if _, exists := m["durabilityOpt"]; exists {
+		c.SetDurabilityOpt(f.DurabilityOpt)
+	}
+	if _, exists := m["openFlags"]; exists {
+		c.SetOpenFlags(f.OpenFlags)
+	}
+	if _, exists := m["purgingInterval"]; exists {
+		c.SetPurgingInterval(f.PurgingInterval)
+	}
+	if _, exists := m["seqTreeOpt"]; exists {
+		c.SetSeqTreeOpt(f.SeqTreeOpt)
+	}
+	if _, exists := m["walFlushBeforeCommit"]; exists {
+		c.SetWalFlushBeforeCommit(f.WalFlushBeforeCommit)
+	}
+	if _, exists := m["walThreshold"]; exists {
+		c.SetWalThreshold(f.WalThreshold)
+	}
+	return c, nil
 }
