@@ -99,7 +99,10 @@ func (ldb *Batch) Execute() error {
 		}
 	}
 
-	return ldb.store.db.Write(defaultWriteOptions(), batch)
+	wopts := defaultWriteOptions()
+	err := ldb.store.db.Write(wopts, batch)
+	wopts.Close()
+	return err
 }
 
 func (ldb *Batch) Close() error {

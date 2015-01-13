@@ -21,10 +21,12 @@ type Iterator struct {
 }
 
 func newIterator(store *Store) *Iterator {
+	ropts := defaultReadOptions()
 	rv := Iterator{
 		store:    store,
-		iterator: store.db.NewIterator(defaultReadOptions()),
+		iterator: store.db.NewIterator(ropts),
 	}
+	ropts.Close()
 	return &rv
 }
 
@@ -35,6 +37,7 @@ func newIteratorWithSnapshot(store *Store, snapshot *levigo.Snapshot) *Iterator 
 		store:    store,
 		iterator: store.db.NewIterator(options),
 	}
+	options.Close()
 	return &rv
 }
 

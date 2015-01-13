@@ -49,13 +49,18 @@ func Open(path string, createIfMissing bool, errorIfExists bool) (*Store, error)
 }
 
 func (ldbs *Store) get(key []byte) ([]byte, error) {
-	return ldbs.db.Get(defaultReadOptions(), key)
+	options := defaultReadOptions()
+	b, err := ldbs.db.Get(options, key)
+	options.Close()
+	return b, err
 }
 
 func (ldbs *Store) getWithSnapshot(key []byte, snapshot *levigo.Snapshot) ([]byte, error) {
 	options := defaultReadOptions()
 	options.SetSnapshot(snapshot)
-	return ldbs.db.Get(options, key)
+	b, err := ldbs.db.Get(options, key)
+	options.Close()
+	return b, err
 }
 
 func (ldbs *Store) set(key, val []byte) error {
@@ -65,7 +70,10 @@ func (ldbs *Store) set(key, val []byte) error {
 }
 
 func (ldbs *Store) setlocked(key, val []byte) error {
-	return ldbs.db.Put(defaultWriteOptions(), key, val)
+	options := defaultWriteOptions()
+	err := ldbs.db.Put(options, key, val)
+	options.Close()
+	return err
 }
 
 func (ldbs *Store) delete(key []byte) error {
@@ -75,7 +83,10 @@ func (ldbs *Store) delete(key []byte) error {
 }
 
 func (ldbs *Store) deletelocked(key []byte) error {
-	return ldbs.db.Delete(defaultWriteOptions(), key)
+	options := defaultWriteOptions()
+	err := ldbs.db.Delete(options, key)
+	options.Close()
+	return err
 }
 
 func (ldbs *Store) Close() error {
