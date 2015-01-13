@@ -100,8 +100,8 @@ import (
 
 	// kv stores
 	_ "github.com/blevesearch/bleve/index/store/boltdb"
-	_ "github.com/blevesearch/bleve/index/store/inmem"
 	_ "github.com/blevesearch/bleve/index/store/gtreap"
+	_ "github.com/blevesearch/bleve/index/store/inmem"
 
 	// byte array converters
 	_ "github.com/blevesearch/bleve/analysis/byte_array_converters/ignore"

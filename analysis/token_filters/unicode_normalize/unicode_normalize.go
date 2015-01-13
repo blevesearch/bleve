@@ -12,9 +12,9 @@ package unicode_normalize
 import (
 	"fmt"
 
-	"golang.org/x/text/unicode/norm"
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
+	"golang.org/x/text/unicode/norm"
 )
 
 const Name = "normalize_unicode"
