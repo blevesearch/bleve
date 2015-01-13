@@ -33,10 +33,15 @@ type Store struct {
 	writer   sync.Mutex
 }
 
-func Open(path string, createIfMissing bool) (*Store, error) {
+func Open(path string, createIfMissing bool,
+	config map[string]interface{}) (*Store, error) {
+	if config == nil {
+		config = map[string]interface{}{}
+	}
+
 	rv := Store{
 		path:     path,
-		config:   forestdb.DefaultConfig(),
+		config:   applyConfig(forestdb.DefaultConfig(), config),
 		kvconfig: forestdb.DefaultKVStoreConfig(),
 	}
 
@@ -172,9 +177,15 @@ func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
 	if ok {
 		createIfMissing = cim
 	}
-	return Open(path, createIfMissing)
+	return Open(path, createIfMissing, config)
 }
 
 func init() {
 	registry.RegisterKVStore(Name, StoreConstructor)
+}
+
+func applyConfig(c *forestdb.Config,
+	config map[string]interface{}) *forestdb.Config {
+	// TODO.
+	return c
 }

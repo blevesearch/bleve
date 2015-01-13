@@ -22,7 +22,7 @@ import (
 func TestLevelDBStore(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	s, err := Open("test", true)
+	s, err := Open("test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestLevelDBStore(t *testing.T) {
 func TestReaderIsolation(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	s, err := Open("test", true)
+	s, err := Open("test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestReaderIsolation(t *testing.T) {
 func TestRollbackSameHandle(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	s, err := Open("test", true)
+	s, err := Open("test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestRollbackSameHandle(t *testing.T) {
 func TestRollbackNewHandle(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	s, err := Open("test", true)
+	s, err := Open("test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func TestRollbackNewHandle(t *testing.T) {
 	}
 
 	// now lets open another handle
-	s2, err := Open("test", true)
+	s2, err := Open("test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,14 +216,14 @@ func TestRollbackNewHandle(t *testing.T) {
 func TestRollbackOtherHandle(t *testing.T) {
 	defer os.RemoveAll("test")
 
-	s, err := Open("test", true)
+	s, err := Open("test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer s.Close()
 
 	// open another handle at the same time
-	s2, err := Open("test", true)
+	s2, err := Open("test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
