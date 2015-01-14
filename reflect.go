@@ -72,6 +72,9 @@ func mustString(data interface{}) (string, bool) {
 
 // parseJSONTagName extracts the JSON field name from a struct tag
 func parseJSONTagName(tag string) string {
+	if tag == "-" {
+		return ""
+	}
 	if idx := strings.Index(tag, ","); idx != -1 {
 		return tag[:idx]
 	}
