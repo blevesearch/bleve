@@ -10,7 +10,7 @@
 package lower_case_filter
 
 import (
-	"strings"
+	"bytes"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
@@ -27,9 +27,7 @@ func NewLowerCaseFilter() *LowerCaseFilter {
 
 func (f *LowerCaseFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 	for _, token := range input {
-		word := string(token.Term)
-		wordLowerCase := strings.ToLower(word)
-		token.Term = []byte(wordLowerCase)
+		token.Term = bytes.ToLower(token.Term)
 	}
 	return input
 }
