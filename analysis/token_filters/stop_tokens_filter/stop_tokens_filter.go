@@ -32,8 +32,7 @@ func (f *StopTokensFilter) Filter(input analysis.TokenStream) analysis.TokenStre
 	rv := make(analysis.TokenStream, 0, len(input))
 
 	for _, token := range input {
-		tokenTerm := string(token.Term)
-		_, isStopToken := f.stopTokens[tokenTerm]
+		_, isStopToken := f.stopTokens[string(token.Term)]
 		if !isStopToken {
 			rv = append(rv, token)
 		}
