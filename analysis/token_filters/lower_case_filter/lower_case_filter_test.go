@@ -31,6 +31,18 @@ func TestLowerCaseFilter(t *testing.T) {
 		&analysis.Token{
 			Term: []byte("steven's"),
 		},
+		// these characters are chosen in particular
+		// because the utf-8 encoding of the lower-case
+		// version has a different length
+		// Rune İ(304) width 2 - Lower i(105) width 1
+		// Rune Ⱥ(570) width 2 - Lower ⱥ(11365) width 3
+		// Rune Ⱦ(574) width 2 - Lower ⱦ(11366) width 3
+		&analysis.Token{
+			Term: []byte("İȺȾCAT"),
+		},
+		&analysis.Token{
+			Term: []byte("ȺȾCAT"),
+		},
 	}
 
 	expectedTokenStream := analysis.TokenStream{
@@ -46,12 +58,19 @@ func TestLowerCaseFilter(t *testing.T) {
 		&analysis.Token{
 			Term: []byte("steven's"),
 		},
+		&analysis.Token{
+			Term: []byte("iⱥⱦcat"),
+		},
+		&analysis.Token{
+			Term: []byte("ⱥⱦcat"),
+		},
 	}
 
 	filter := NewLowerCaseFilter()
 	ouputTokenStream := filter.Filter(inputTokenStream)
 	if !reflect.DeepEqual(ouputTokenStream, expectedTokenStream) {
 		t.Errorf("expected %#v got %#v", expectedTokenStream, ouputTokenStream)
+		t.Errorf("expected %s got %s", expectedTokenStream[0].Term, ouputTokenStream[0].Term)
 	}
 }
 
@@ -119,6 +138,12 @@ func BenchmarkLowerCaseFilter(b *testing.B) {
 		},
 		&analysis.Token{
 			Term: []byte("point"),
+		},
+		&analysis.Token{
+			Term: []byte("İȺȾCAT"),
+		},
+		&analysis.Token{
+			Term: []byte("ȺȾCAT"),
 		},
 	}
 	filter := NewLowerCaseFilter()

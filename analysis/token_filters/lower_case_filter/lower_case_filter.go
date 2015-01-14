@@ -11,6 +11,8 @@ package lower_case_filter
 
 import (
 	"bytes"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
@@ -27,7 +29,7 @@ func NewLowerCaseFilter() *LowerCaseFilter {
 
 func (f *LowerCaseFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 	for _, token := range input {
-		token.Term = bytes.ToLower(token.Term)
+		token.Term = toLowerDeferredCopy(token.Term)
 	}
 	return input
 }
@@ -38,4 +40,41 @@ func LowerCaseFilterConstructor(config map[string]interface{}, cache *registry.C
 
 func init() {
 	registry.RegisterTokenFilter(Name, LowerCaseFilterConstructor)
+}
+
+// toLowerDeferredCopy will function exactly like
+// bytes.ToLower() only it will reuse (overwrite)
+// the original byte array when possible
+// NOTE: because its possible that the lower-case
+// form of a rune has a different utf-8 encoded
+// length, in these cases a new byte array is allocated
+func toLowerDeferredCopy(s []byte) []byte {
+	j := 0
+	for i := 0; i < len(s); {
+		wid := 1
+		r := rune(s[i])
+		if r >= utf8.RuneSelf {
+			r, wid = utf8.DecodeRune(s[i:])
+		}
+		l := unicode.ToLower(r)
+		lwid := utf8.RuneLen(l)
+		if lwid > wid {
+			// utf-8 encoded replacement is wider
+			// for now, punt and defer
+			// to bytes.ToLower() for the remainder
+			// only known to happen with chars
+			//   Rune Ⱥ(570) width 2 - Lower ⱥ(11365) width 3
+			//   Rune Ⱦ(574) width 2 - Lower ⱦ(11366) width 3
+			rest := bytes.ToLower(s[i:])
+			rv := make([]byte, j+len(rest))
+			copy(rv[:j], s[:j])
+			copy(rv[j:], rest)
+			return rv
+		} else {
+			utf8.EncodeRune(s[j:], l)
+		}
+		i += wid
+		j += lwid
+	}
+	return s[:j]
 }
