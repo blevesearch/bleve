@@ -54,3 +54,77 @@ func TestLowerCaseFilter(t *testing.T) {
 		t.Errorf("expected %#v got %#v", expectedTokenStream, ouputTokenStream)
 	}
 }
+
+func BenchmarkLowerCaseFilter(b *testing.B) {
+	input := analysis.TokenStream{
+		&analysis.Token{
+			Term: []byte("A"),
+		},
+		&analysis.Token{
+			Term: []byte("boiling"),
+		},
+		&analysis.Token{
+			Term: []byte("liquid"),
+		},
+		&analysis.Token{
+			Term: []byte("expanding"),
+		},
+		&analysis.Token{
+			Term: []byte("vapor"),
+		},
+		&analysis.Token{
+			Term: []byte("explosion"),
+		},
+		&analysis.Token{
+			Term: []byte("caused"),
+		},
+		&analysis.Token{
+			Term: []byte("by"),
+		},
+		&analysis.Token{
+			Term: []byte("the"),
+		},
+		&analysis.Token{
+			Term: []byte("rupture"),
+		},
+		&analysis.Token{
+			Term: []byte("of"),
+		},
+		&analysis.Token{
+			Term: []byte("a"),
+		},
+		&analysis.Token{
+			Term: []byte("vessel"),
+		},
+		&analysis.Token{
+			Term: []byte("containing"),
+		},
+		&analysis.Token{
+			Term: []byte("a"),
+		},
+		&analysis.Token{
+			Term: []byte("pressurized"),
+		},
+		&analysis.Token{
+			Term: []byte("liquid"),
+		},
+		&analysis.Token{
+			Term: []byte("above"),
+		},
+		&analysis.Token{
+			Term: []byte("its"),
+		},
+		&analysis.Token{
+			Term: []byte("boiling"),
+		},
+		&analysis.Token{
+			Term: []byte("point"),
+		},
+	}
+	filter := NewLowerCaseFilter()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		filter.Filter(input)
+	}
+}
