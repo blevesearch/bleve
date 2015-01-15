@@ -9,6 +9,8 @@
 //  express or implied. See the License for the specific language
 //  governing permissions and limitations under the License.
 
+// +build go1.4
+
 // Package cznicb provides an in-memory implementation of the KVStore
 // interfaces using the cznic/b in-memory btree.  Of note: this
 // implementation does not have reader isolation.
