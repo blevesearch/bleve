@@ -62,7 +62,8 @@ func (i *Store) set(key, val []byte) error {
 func (i *Store) updateReadersData(bytekey []byte, deleted bool) {
 	var newentry bool
 	var byteval []byte
-	var prev string
+	var prevKey string
+	var nextKey string
 	var firstValue bool
 	key := string(bytekey)
 
@@ -70,41 +71,67 @@ func (i *Store) updateReadersData(bytekey []byte, deleted bool) {
 	if ok {
 		newentry = false
 		byteval = []byte(val.(string))
+	} else if deleted {
+		// return if a deleted value is being deleted again
+		return
 	} else {
+		// a new values is being inserted in the list
 		newentry = true
 		byteval = nil
 	}
 
 	if deleted {
+		// locate keys located before and after the deleted key
 		iterator := i.list.Seek(key)
 		ok = iterator.Previous()
 		if ok {
-			prev = iterator.Key().(string)
+			prevKey = iterator.Key().(string)
 		} else {
 			firstValue = true
+		}
+		iterator.Next()
+		ok = iterator.Next()
+		if ok {
+			nextKey = iterator.Key().(string)
 		}
 	}
 
 	for _, v := range i.readersData {
+		if deleted {
+			// locate keys located before and after the deleted key if they were deleted
+			tempPrevKey, ok := v.nextKeysOfDeletedKeys[key]
+			if ok {
+				prevKey = tempPrevKey
+			}
+			tempNextKey, ok := v.prevKeysOfDeletedKeys[key]
+			if ok {
+				nextKey = tempNextKey
+			}
+		}
+
 		if v.valueMap[key] == nil {
+			// do this if this is the first time this key is being modified after creation of the reader
 			v.valueMap[key] = &readerValue{
 				value:      byteval,
 				newentry:   newentry,
 				deleted:    deleted,
 				firstValue: firstValue,
-				prevKey:    prev,
+				prevKey:    prevKey,
 			}
 			if deleted {
 				if !firstValue {
-					v.prevValuesOfDeletedKeys.Set(prev, key)
+					v.prevKeysOfDeletedKeys[prevKey] = key
+					v.nextKeysOfDeletedKeys[nextKey] = key
 				}
 			}
 		} else if deleted && !v.valueMap[key].deleted {
+			// do this if this key is being deleted after it was previously modified
 			v.valueMap[key].deleted = deleted
 			v.valueMap[key].firstValue = firstValue
-			v.valueMap[key].prevKey = prev
+			v.valueMap[key].prevKey = prevKey
 			if !firstValue {
-				v.prevValuesOfDeletedKeys.Set(prev, key)
+				v.prevKeysOfDeletedKeys[prevKey] = key
+				v.nextKeysOfDeletedKeys[nextKey] = key
 			}
 		}
 	}

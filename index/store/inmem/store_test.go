@@ -35,6 +35,7 @@ func TestReaderIsolation(t *testing.T) {
 
 	CommonTestReaderIsolation(t, s)
 	CommonTestReaderIsolationIteratorNext(t, s)
+	CommonTestReaderIsolationSeek(t, s)
 }
 
 func CommonTestKVStore(t *testing.T, s store.KVStore) {
@@ -229,6 +230,10 @@ func CommonTestReaderIsolationIteratorNext(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = writer.Set([]byte("d"), []byte("val-d"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	writer.Close()
 
 	// create an isolated reader
@@ -251,7 +256,7 @@ func CommonTestReaderIsolationIteratorNext(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = writer.Set([]byte("c"), []byte("val-c"))
+	err = writer.Set([]byte("c"), []byte("val-c2"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,5 +304,118 @@ func CommonTestReaderIsolationIteratorNext(t *testing.T, s store.KVStore) {
 	}
 	if string(v) != "val-c" {
 		t.Errorf("expected value 'val-c', got '%s'", v)
+	}
+
+	writer, err = s.Writer()
+	if err != nil {
+		t.Error(err)
+	}
+	err = writer.Delete([]byte("d"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer.Close()
+
+	// now call next
+	iter.Next()
+
+	k, v, valid = iter.Current()
+	if !valid {
+		t.Errorf("expected iterator valid, got invalid")
+	}
+	if string(k) != "d" {
+		t.Errorf("expected key 'd', got '%s'", k)
+	}
+	if string(v) != "val-d" {
+		t.Errorf("expected value 'val-d', got '%s'", v)
+	}
+
+	// now call next
+	iter.Next()
+
+	k, v, valid = iter.Current()
+	if valid {
+		t.Errorf("expected iterator invalid, got valid")
+	}
+}
+
+func CommonTestReaderIsolationSeek(t *testing.T, s store.KVStore) {
+	// store already has keys a and c
+
+	// add key c
+	writer, err := s.Writer()
+	if err != nil {
+		t.Error(err)
+	}
+	err = writer.Set([]byte("c"), []byte("val-c"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer.Set([]byte("d"), []byte("val-d"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer.Set([]byte("b"), []byte("val-b"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer.Close()
+
+	// now order becomes a, c, d, b
+
+	// create an isolated reader
+	reader, err := s.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer reader.Close()
+
+	// delete keys c then d
+	writer, err = s.Writer()
+	if err != nil {
+		t.Error(err)
+	}
+	err = writer.Delete([]byte("c"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer.Delete([]byte("d"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer.Set([]byte("c"), []byte("val-c2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer.Close()
+
+	// get iterator from reader
+	iter := reader.Iterator([]byte(""))
+	// seek to a
+	iter.Seek([]byte("c"))
+
+	k, v, valid := iter.Current()
+	if !valid {
+		t.Errorf("expected iterator valid, got invalid")
+	}
+	if string(k) != "c" {
+		t.Errorf("expected key 'c', got '%s'", k)
+	}
+	if string(v) != "val-c" {
+		t.Errorf("expected value 'val-c', got '%s'", v)
+	}
+
+	// now call next
+	iter.Next()
+
+	k, v, valid = iter.Current()
+	if !valid {
+		t.Errorf("expected iterator valid, got invalid")
+	}
+	if string(k) != "d" {
+		t.Errorf("expected key 'd', got '%s'", k)
+	}
+	if string(v) != "val-d" {
+		t.Errorf("expected value 'val-d', got '%s'", v)
 	}
 }

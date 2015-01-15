@@ -11,23 +11,23 @@ package inmem
 
 import (
 	"github.com/blevesearch/bleve/index/store"
-	"github.com/ryszard/goskiplist/skiplist"
 )
 
 // "newentry" marks a key which was previously empty, but was populated after the creation of the Reader.
 // If the value stored at the key has changed, the value at the time of creation of the Reader is stored in value.
 type readerValue struct {
 	value      []byte
-	newentry   bool
-	deleted    bool
-	firstValue bool
-	prevKey    string
+	newentry   bool   // was there a new entry on same key in the actual list
+	deleted    bool   // was the original key deleted from the actual list
+	firstValue bool   // was this the first value in the list
+	prevKey    string // the key located before the key of this value in the actual list
 }
 
 // This is the readers copy of the data which has changed after the Reader has been created.
 type readerData struct {
-	valueMap                map[string]*readerValue
-	prevValuesOfDeletedKeys *skiplist.SkipList
+	valueMap              map[string]*readerValue
+	prevKeysOfDeletedKeys map[string]string // contains keys located before the key deleted in the actual list mapped to the keys deleted
+	nextKeysOfDeletedKeys map[string]string // contains keys located sfter the key deleted in the actual list mapped to the keys deleted
 }
 
 type Reader struct {
@@ -37,8 +37,9 @@ type Reader struct {
 
 func newReader(store *Store) (*Reader, error) {
 	readerData := readerData{
-		valueMap:                make(map[string]*readerValue),
-		prevValuesOfDeletedKeys: skiplist.NewStringMap(),
+		valueMap:              make(map[string]*readerValue),
+		prevKeysOfDeletedKeys: make(map[string]string),
+		nextKeysOfDeletedKeys: make(map[string]string),
 	}
 	store.readersData[&readerData] = &readerData
 

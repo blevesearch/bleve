@@ -40,19 +40,35 @@ func (i *ReaderIterator) Seek(k []byte) {
 	stringkey := string(k)
 	if i.reader.readerData.valueMap[stringkey] != nil {
 		if i.reader.readerData.valueMap[stringkey].newentry {
+			// can't seek to key created after the creation of the reader
 			i.valid = false
 			i.fromReaderStorage = false
 		} else if i.reader.readerData.valueMap[stringkey].firstValue {
+			// do this if we need to seek to the first key and it was deleted
 			i.valid = true
 			i.fromReaderStorage = true
 			i.currentKey = stringkey
-			i.SeekFirst()
+			i.iterator.Seek("")
 		} else if i.reader.readerData.valueMap[stringkey].deleted {
+			// do this if the key was deleted
 			i.valid = true
 			i.fromReaderStorage = true
 			i.currentKey = stringkey
-			i.iterator.Seek(i.reader.readerData.valueMap[stringkey].prevKey)
+
+			// logic to seek to a key before this key in the actual list
+			prevKey := i.reader.readerData.valueMap[stringkey].prevKey
+			var prevKeyToSeek string
+			for prevKey != "" {
+				prevKeyToSeek = prevKey
+				if i.reader.readerData.valueMap[prevKey] != nil {
+					prevKey = i.reader.readerData.valueMap[prevKey].prevKey
+				} else {
+					prevKey = ""
+				}
+			}
+			i.iterator.Seek(prevKeyToSeek)
 		} else {
+			// do this if the value was just changed
 			i.valid = true
 			i.fromReaderStorage = true
 			i.currentKey = stringkey
@@ -72,9 +88,9 @@ func (i *ReaderIterator) Next() {
 		key = i.iterator.Key().(string)
 	}
 
-	nextKey, ok := i.reader.readerData.prevValuesOfDeletedKeys.Get(key)
+	nextKey, ok := i.reader.readerData.prevKeysOfDeletedKeys[key]
 	if ok {
-		i.currentKey = nextKey.(string)
+		i.currentKey = nextKey
 		i.valid = true
 		i.fromReaderStorage = true
 	} else {
@@ -83,6 +99,7 @@ func (i *ReaderIterator) Next() {
 			key = i.iterator.Key().(string)
 			if i.reader.readerData.valueMap[key] != nil {
 				if i.reader.readerData.valueMap[key].newentry || i.reader.readerData.valueMap[key].deleted {
+					// skip new entries and deleted keys are already dealt with
 					i.Next()
 				} else {
 					i.valid = true
@@ -90,6 +107,7 @@ func (i *ReaderIterator) Next() {
 					i.currentKey = key
 				}
 			} else {
+				// the value was not modified after the creation of the reader
 				i.valid = true
 				i.fromReaderStorage = false
 			}
