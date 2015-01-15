@@ -59,6 +59,18 @@ func TestMetricsStore(t *testing.T) {
 	if len(m) <= 0 {
 		t.Errorf("expected some entries")
 	}
+
+	b = bytes.NewBuffer(nil)
+	s.(*Store).WriteCSVHeader(b)
+	if b.Len() <= 0 {
+		t.Errorf("expected some output from WriteCSVHeader")
+	}
+
+	b = bytes.NewBuffer(nil)
+	s.(*Store).WriteCSV(b)
+	if b.Len() <= 0 {
+		t.Errorf("expected some output from WriteCSV")
+	}
 }
 
 func TestReaderIsolation(t *testing.T) {

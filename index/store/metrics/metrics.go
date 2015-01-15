@@ -132,32 +132,6 @@ func (s *Store) Writer() (store.KVWriter, error) {
 	return &Writer{s: s, o: o}, nil
 }
 
-func (s *Store) WriteJSON(w io.Writer) {
-	w.Write([]byte(`{"TimerReaderGet":`))
-	WriteTimerJSON(w, s.TimerReaderGet)
-	w.Write([]byte(`,"TimerReaderIterator":`))
-	WriteTimerJSON(w, s.TimerReaderIterator)
-	w.Write([]byte(`,"TimerWriterGet":`))
-	WriteTimerJSON(w, s.TimerWriterGet)
-	w.Write([]byte(`,"TimerWriterIterator":`))
-	WriteTimerJSON(w, s.TimerWriterIterator)
-	w.Write([]byte(`,"TimerWriterSet":`))
-	WriteTimerJSON(w, s.TimerWriterSet)
-	w.Write([]byte(`,"TimerWriterDelete":`))
-	WriteTimerJSON(w, s.TimerWriterDelete)
-	w.Write([]byte(`,"TimerIteratorSeekFirst":`))
-	WriteTimerJSON(w, s.TimerIteratorSeekFirst)
-	w.Write([]byte(`,"TimerIteratorSeek":`))
-	WriteTimerJSON(w, s.TimerIteratorSeek)
-	w.Write([]byte(`,"TimerIteratorNext":`))
-	WriteTimerJSON(w, s.TimerIteratorNext)
-	w.Write([]byte(`,"TimerBatchMerge":`))
-	WriteTimerJSON(w, s.TimerBatchMerge)
-	w.Write([]byte(`,"TimerBatchExecute":`))
-	WriteTimerJSON(w, s.TimerBatchExecute)
-	w.Write([]byte(`}`))
-}
-
 func (s *Store) Actual() store.KVStore {
 	return s.o
 }
@@ -281,6 +255,62 @@ func (w *Batch) Close() error {
 
 // --------------------------------------------------------
 
+func (s *Store) WriteJSON(w io.Writer) {
+	w.Write([]byte(`{"TimerReaderGet":`))
+	WriteTimerJSON(w, s.TimerReaderGet)
+	w.Write([]byte(`,"TimerReaderIterator":`))
+	WriteTimerJSON(w, s.TimerReaderIterator)
+	w.Write([]byte(`,"TimerWriterGet":`))
+	WriteTimerJSON(w, s.TimerWriterGet)
+	w.Write([]byte(`,"TimerWriterIterator":`))
+	WriteTimerJSON(w, s.TimerWriterIterator)
+	w.Write([]byte(`,"TimerWriterSet":`))
+	WriteTimerJSON(w, s.TimerWriterSet)
+	w.Write([]byte(`,"TimerWriterDelete":`))
+	WriteTimerJSON(w, s.TimerWriterDelete)
+	w.Write([]byte(`,"TimerIteratorSeekFirst":`))
+	WriteTimerJSON(w, s.TimerIteratorSeekFirst)
+	w.Write([]byte(`,"TimerIteratorSeek":`))
+	WriteTimerJSON(w, s.TimerIteratorSeek)
+	w.Write([]byte(`,"TimerIteratorNext":`))
+	WriteTimerJSON(w, s.TimerIteratorNext)
+	w.Write([]byte(`,"TimerBatchMerge":`))
+	WriteTimerJSON(w, s.TimerBatchMerge)
+	w.Write([]byte(`,"TimerBatchExecute":`))
+	WriteTimerJSON(w, s.TimerBatchExecute)
+	w.Write([]byte(`}`))
+}
+
+func (s *Store) WriteCSVHeader(w io.Writer) {
+	WriteTimerCSVHeader(w, "TimerReaderGet")
+	WriteTimerCSVHeader(w, "TimerReaderIterator")
+	WriteTimerCSVHeader(w, "TimerWriterGet")
+	WriteTimerCSVHeader(w, "TimerWriterIterator")
+	WriteTimerCSVHeader(w, "TimerWriterSet")
+	WriteTimerCSVHeader(w, "TimerWriterDelete")
+	WriteTimerCSVHeader(w, "TimerIteratorSeekFirst")
+	WriteTimerCSVHeader(w, "TimerIteratorSeek")
+	WriteTimerCSVHeader(w, "TimerIteratorNext")
+	WriteTimerCSVHeader(w, "TimerBatchMerge")
+	WriteTimerCSVHeader(w, "TimerBatchExecute")
+}
+
+func (s *Store) WriteCSV(w io.Writer) {
+	WriteTimerCSV(w, s.TimerReaderGet)
+	WriteTimerCSV(w, s.TimerReaderIterator)
+	WriteTimerCSV(w, s.TimerWriterGet)
+	WriteTimerCSV(w, s.TimerWriterIterator)
+	WriteTimerCSV(w, s.TimerWriterSet)
+	WriteTimerCSV(w, s.TimerWriterDelete)
+	WriteTimerCSV(w, s.TimerIteratorSeekFirst)
+	WriteTimerCSV(w, s.TimerIteratorSeek)
+	WriteTimerCSV(w, s.TimerIteratorNext)
+	WriteTimerCSV(w, s.TimerBatchMerge)
+	WriteTimerCSV(w, s.TimerBatchExecute)
+}
+
+// --------------------------------------------------------
+
 // NOTE: This is copy & pasted from cbft as otherwise there
 // would be an import cycle.
 
@@ -306,4 +336,41 @@ func WriteTimerJSON(w io.Writer, timer metrics.Timer) {
 	fmt.Fprintf(w, `"5-min":%12.2f,`, t.Rate5())
 	fmt.Fprintf(w, `"15-min":%12.2f,`, t.Rate15())
 	fmt.Fprintf(w, `"mean":%12.2f}}`, t.RateMean())
+}
+
+func WriteTimerCSVHeader(w io.Writer, prefix string) {
+	fmt.Fprintf(w, "%s-count,", prefix)
+	fmt.Fprintf(w, "%s-min,", prefix)
+	fmt.Fprintf(w, "%s-max,", prefix)
+	fmt.Fprintf(w, "%s-mean,", prefix)
+	fmt.Fprintf(w, "%s-stddev,", prefix)
+	fmt.Fprintf(w, "%s-percentile-50%%,", prefix)
+	fmt.Fprintf(w, "%s-percentile-75%%,", prefix)
+	fmt.Fprintf(w, "%s-percentile-95%%,", prefix)
+	fmt.Fprintf(w, "%s-percentile-99%%,", prefix)
+	fmt.Fprintf(w, "%s-percentile-99.9%%,", prefix)
+	fmt.Fprintf(w, "%s-rate-1-min,", prefix)
+	fmt.Fprintf(w, "%s-rate-5-min,", prefix)
+	fmt.Fprintf(w, "%s-rate-15-min,", prefix)
+	fmt.Fprintf(w, "%s-rate-mean", prefix)
+}
+
+func WriteTimerCSV(w io.Writer, timer metrics.Timer) {
+	t := timer.Snapshot()
+	p := t.Percentiles(timerPercentiles)
+
+	fmt.Fprintf(w, `%9d,`, t.Count())
+	fmt.Fprintf(w, `%9d,`, t.Min())
+	fmt.Fprintf(w, `%9d,`, t.Max())
+	fmt.Fprintf(w, `%12.2f,`, t.Mean())
+	fmt.Fprintf(w, `%12.2f,`, t.StdDev())
+	fmt.Fprintf(w, `%12.2f,`, p[0])
+	fmt.Fprintf(w, `%12.2f,`, p[1])
+	fmt.Fprintf(w, `%12.2f,`, p[2])
+	fmt.Fprintf(w, `%12.2f,`, p[3])
+	fmt.Fprintf(w, `%12.2f},`, p[4])
+	fmt.Fprintf(w, `%12.2f,`, t.Rate1())
+	fmt.Fprintf(w, `%12.2f,`, t.Rate5())
+	fmt.Fprintf(w, `%12.2f,`, t.Rate15())
+	fmt.Fprintf(w, `%12.2f`, t.RateMean())
 }
