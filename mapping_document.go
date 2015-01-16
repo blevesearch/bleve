@@ -254,7 +254,7 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 	case reflect.Ptr:
 		ptrElem := val.Elem()
 		if ptrElem.IsValid() && ptrElem.CanInterface() {
-			dm.walkDocument(ptrElem.Interface(), path, indexes, context)
+			dm.processProperty(ptrElem.Interface(), path, indexes, context)
 		}
 	}
 }
