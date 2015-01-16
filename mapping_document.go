@@ -232,6 +232,9 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 			// if the field has a JSON name, prefer that
 			jsonTag := field.Tag.Get("json")
 			jsonFieldName := parseJSONTagName(jsonTag)
+			if jsonFieldName == "-" {
+				continue
+			}
 			if jsonFieldName != "" {
 				fieldName = jsonFieldName
 			}
