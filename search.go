@@ -259,6 +259,12 @@ func (sr *SearchResult) String() string {
 						rv += fmt.Sprintf("\t\t%s\n", fragment)
 					}
 				}
+				for otherFieldName, otherFieldValue := range hit.Fields {
+					if _, ok := hit.Fragments[otherFieldName]; !ok {
+						rv += fmt.Sprintf("\t%s\n", otherFieldName)
+						rv += fmt.Sprintf("\t\t%s\n", otherFieldValue)
+					}
+				}
 			}
 		} else {
 			rv = fmt.Sprintf("%d matches, took %s\n", sr.Total, sr.Took)
