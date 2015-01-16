@@ -150,3 +150,36 @@ func TestMappingStructWithJSONTagsOneDisabled(t *testing.T) {
 		t.Errorf("expected to find 2 find, found %d", count)
 	}
 }
+
+func TestMappingStructWithPointerToString(t *testing.T) {
+
+	mapping := buildMapping()
+
+	name := "marty"
+
+	x := struct {
+		Name *string
+	}{
+		Name: &name,
+	}
+
+	doc := document.NewDocument("1")
+	err := mapping.mapDocument(doc, x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	count := 0
+	for _, f := range doc.Fields {
+		if f.Name() == "Name" {
+			found = true
+		}
+		count++
+	}
+	if !found {
+		t.Errorf("expected to find field named 'Name'")
+	}
+	if count != 1 {
+		t.Errorf("expected to find 1 find, found %d", count)
+	}
+}
