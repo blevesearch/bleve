@@ -12,6 +12,8 @@
 package forestdb
 
 import (
+	"fmt"
+
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/couchbaselabs/goforestdb"
 )
@@ -24,7 +26,7 @@ type Reader struct {
 func newReader(store *Store) (*Reader, error) {
 	snapshot, err := store.newSnapshot()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error opening snapshot: %v", err)
 	}
 	return &Reader{
 		store:    store,

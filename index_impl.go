@@ -368,7 +368,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 	// open a reader for this search
 	indexReader, err := i.i.Reader()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error opening index reader %v", err)
 	}
 	defer indexReader.Close()
 

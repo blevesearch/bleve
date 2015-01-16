@@ -12,6 +12,7 @@ package upside_down
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"math"
 	"sync/atomic"
 	"time"
@@ -631,7 +632,7 @@ func (udc *UpsideDownCouch) DeleteInternal(key []byte) error {
 func (udc *UpsideDownCouch) Reader() (index.IndexReader, error) {
 	kvr, err := udc.store.Reader()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error opening store reader: %v", err)
 	}
 	return &IndexReader{
 		index:    udc,

@@ -159,7 +159,7 @@ func (s *Store) getSeqNum() (forestdb.SeqNum, error) {
 func (s *Store) newSnapshot() (*forestdb.KVStore, error) {
 	seqNum, err := s.getSeqNum()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting snapshot seqnum %v", err)
 	}
 	return s.dbkv.SnapshotOpen(seqNum)
 }
