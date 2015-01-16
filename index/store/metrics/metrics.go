@@ -9,6 +9,8 @@
 //  express or implied. See the License for the specific language
 //  governing permissions and limitations under the License.
 
+// +build debug
+
 // Package metrics provides a bleve.store.KVStore implementation that
 // wraps another, real KVStore implementation, and uses go-metrics to
 // track runtime performance metrics.
