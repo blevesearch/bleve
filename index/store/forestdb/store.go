@@ -159,9 +159,17 @@ func (s *Store) getSeqNum() (forestdb.SeqNum, error) {
 func (s *Store) newSnapshot() (*forestdb.KVStore, error) {
 	seqNum, err := s.getSeqNum()
 	if err != nil {
-		return nil, fmt.Errorf("error getting snapshot seqnum %v", err)
+		return nil, fmt.Errorf("error getting snapshot seqnum: %v", err)
 	}
-	return s.dbkv.SnapshotOpen(seqNum)
+	snapshot, err := s.dbkv.SnapshotOpen(seqNum)
+	if err == forestdb.RESULT_NO_DB_INSTANCE {
+		checkAgainSeqNum, err := s.getSeqNum()
+		if err != nil {
+			return nil, fmt.Errorf("error getting snapshot seqnum again: %v", err)
+		}
+		return nil, fmt.Errorf("cannot open snapshot %v, checked again its %v, error: %v", seqNum, checkAgainSeqNum, err)
+	}
+	return snapshot, err
 }
 
 func (s *Store) GetRollbackID() ([]byte, error) {
