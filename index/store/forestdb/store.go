@@ -59,7 +59,9 @@ func Open(path string, createIfMissing bool,
 		config = map[string]interface{}{}
 	}
 
-	forestDBConfig, err := applyConfig(forestdb.DefaultConfig(), config)
+	forestDBDefaultConfig := forestdb.DefaultConfig()
+	forestDBDefaultConfig.SetCompactionMode(forestdb.COMPACT_AUTO)
+	forestDBConfig, err := applyConfig(forestDBDefaultConfig, config)
 	if err != nil {
 		return nil, err
 	}

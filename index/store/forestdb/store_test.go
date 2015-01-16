@@ -20,9 +20,10 @@ import (
 )
 
 func TestLevelDBStore(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer os.RemoveAll("testdir")
 
-	s, err := Open("test", true, nil)
+	os.MkdirAll("testdir", 0700)
+	s, err := Open("testdir/test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,9 +33,10 @@ func TestLevelDBStore(t *testing.T) {
 }
 
 func TestReaderIsolation(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer os.RemoveAll("testdir")
 
-	s, err := Open("test", true, nil)
+	os.MkdirAll("testdir", 0700)
+	s, err := Open("testdir/test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,9 +49,10 @@ func TestReaderIsolation(t *testing.T) {
 // and ensure that subsequent reads from it also
 // reflect the rollback
 func TestRollbackSameHandle(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer os.RemoveAll("testdir")
 
-	s, err := Open("test", true, nil)
+	os.MkdirAll("testdir", 0700)
+	s, err := Open("testdir/test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,9 +130,10 @@ func TestRollbackSameHandle(t *testing.T) {
 // database, then opens a new handle, and ensures
 // that the rollback is reflected there as well
 func TestRollbackNewHandle(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer os.RemoveAll("testdir")
 
-	s, err := Open("test", true, nil)
+	os.MkdirAll("testdir", 0700)
+	s, err := Open("testdir/test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +193,7 @@ func TestRollbackNewHandle(t *testing.T) {
 	}
 
 	// now lets open another handle
-	s2, err := Open("test", true, nil)
+	s2, err := Open("testdir/test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,16 +218,17 @@ func TestRollbackNewHandle(t *testing.T) {
 // at the beginning, then rollback one of them
 // and ensure it affects the other
 func TestRollbackOtherHandle(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer os.RemoveAll("testdir")
 
-	s, err := Open("test", true, nil)
+	os.MkdirAll("testdir", 0700)
+	s, err := Open("testdir/test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer s.Close()
 
 	// open another handle at the same time
-	s2, err := Open("test", true, nil)
+	s2, err := Open("testdir/test", true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
