@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"encoding/json"
+	"github.com/blevesearch/bleve/document"
 	"reflect"
 	"testing"
 )
@@ -68,5 +69,84 @@ func TestUnmarshalMappingJSON(t *testing.T) {
 	}
 	if !reflect.DeepEqual(&indexMapping, mapping) {
 		t.Errorf("expected %#v,\n got %#v", mapping, &indexMapping)
+	}
+}
+
+func TestMappingStructWithJSONTags(t *testing.T) {
+
+	mapping := buildMapping()
+
+	x := struct {
+		NoJSONTag string
+		Name      string `json:"name"`
+	}{
+		Name: "marty",
+	}
+
+	doc := document.NewDocument("1")
+	err := mapping.mapDocument(doc, x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundJSONName := false
+	foundNoJSONName := false
+	count := 0
+	for _, f := range doc.Fields {
+		if f.Name() == "name" {
+			foundJSONName = true
+		}
+		if f.Name() == "NoJSONTag" {
+			foundNoJSONName = true
+		}
+		count++
+	}
+	if !foundJSONName {
+		t.Errorf("expected to find field named 'name'")
+	}
+	if !foundNoJSONName {
+		t.Errorf("expected to find field named 'NoJSONTag'")
+	}
+	if count != 2 {
+		t.Errorf("expected to find 2 find, found %d", count)
+	}
+}
+
+func TestMappingStructWithJSONTagsOneDisabled(t *testing.T) {
+
+	mapping := buildMapping()
+
+	x := struct {
+		Name      string `json:"name"`
+		Title     string `json:"-"`
+		NoJSONTag string
+	}{
+		Name: "marty",
+	}
+
+	doc := document.NewDocument("1")
+	err := mapping.mapDocument(doc, x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundJSONName := false
+	foundNoJSONName := false
+	count := 0
+	for _, f := range doc.Fields {
+		if f.Name() == "name" {
+			foundJSONName = true
+		}
+		if f.Name() == "NoJSONTag" {
+			foundNoJSONName = true
+		}
+		count++
+	}
+	if !foundJSONName {
+		t.Errorf("expected to find field named 'name'")
+	}
+	if !foundNoJSONName {
+		t.Errorf("expected to find field named 'NoJSONTag'")
+	}
+	if count != 2 {
+		t.Errorf("expected to find 2 find, found %d", count)
 	}
 }
