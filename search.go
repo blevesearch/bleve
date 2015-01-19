@@ -262,7 +262,7 @@ func (sr *SearchResult) String() string {
 				for otherFieldName, otherFieldValue := range hit.Fields {
 					if _, ok := hit.Fragments[otherFieldName]; !ok {
 						rv += fmt.Sprintf("\t%s\n", otherFieldName)
-						rv += fmt.Sprintf("\t\t%s\n", otherFieldValue)
+						rv += fmt.Sprintf("\t\t%v\n", otherFieldValue)
 					}
 				}
 			}
