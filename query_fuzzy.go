@@ -30,7 +30,7 @@ func NewFuzzyQuery(term string) *fuzzyQuery {
 	return &fuzzyQuery{
 		Term:         term,
 		PrefixVal:    0,
-		FuzzinessVal: 1,
+		FuzzinessVal: 2,
 		BoostVal:     1.0,
 	}
 }
