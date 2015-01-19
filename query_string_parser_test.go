@@ -196,6 +196,26 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				},
 				nil),
 		},
+		{
+			input:   "field:watex~",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("watex").SetFuzziness(1).SetField("field"),
+				},
+				nil),
+		},
+		{
+			input:   "field:watex~2",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("watex").SetFuzziness(2).SetField("field"),
+				},
+				nil),
+		},
 	}
 
 	for _, test := range tests {

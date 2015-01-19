@@ -90,18 +90,39 @@ tSTRING {
 |
 tSTRING tTILDE {
 	str := $1
-	logDebugGrammar("STRING - %s", str)
+	logDebugGrammar("FUZZY STRING - %s", str)
 	q := NewMatchQuery(str)
 	q.SetFuzziness(1)
+	$$ = q
+}
+|
+tSTRING tCOLON tSTRING tTILDE {
+	field := $1
+	str := $3
+	logDebugGrammar("FIELD - %s FUZZY STRING - %s", field, str)
+	q := NewMatchQuery(str)
+	q.SetFuzziness(1)
+	q.SetField(field)
 	$$ = q
 }
 |
 tSTRING tTILDENUMBER {
 	str := $1
 	fuzziness, _ := strconv.ParseFloat($2, 64)
-	logDebugGrammar("STRING - %s", str)
+	logDebugGrammar("FUZZY STRING - %s", str)
 	q := NewMatchQuery(str)
 	q.SetFuzziness(int(fuzziness))
+	$$ = q
+}
+|
+tSTRING tCOLON tSTRING tTILDENUMBER {
+	field := $1
+	str := $3
+	fuzziness, _ := strconv.ParseFloat($4, 64)
+	logDebugGrammar("FIELD - %s FUZZY-%f STRING - %s", field, fuzziness, str)
+	q := NewMatchQuery(str)
+	q.SetFuzziness(int(fuzziness))
+	q.SetField(field)
 	$$ = q
 }
 |

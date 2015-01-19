@@ -67,56 +67,57 @@ var yyExca = []int{
 	-2, 5,
 }
 
-const yyNprod = 24
+const yyNprod = 26
 const yyPrivate = 57344
 
 var yyTokenNames []string
 var yyStates []string
 
-const yyLast = 30
+const yyLast = 32
 
 var yyAct = []int{
 
-	18, 27, 20, 22, 28, 30, 10, 12, 16, 17,
-	21, 23, 24, 25, 11, 29, 26, 19, 15, 6,
-	7, 2, 3, 1, 14, 8, 5, 4, 13, 9,
+	17, 25, 26, 20, 22, 32, 31, 29, 16, 18,
+	30, 21, 23, 24, 27, 10, 12, 28, 19, 15,
+	6, 7, 2, 11, 3, 1, 8, 14, 5, 4,
+	13, 9,
 }
 var yyPact = []int{
 
-	13, -1000, -1000, 13, 2, -1000, -1000, -1000, -1000, 9,
-	-8, -1000, -1000, -1000, -1000, 5, -1000, -1000, -2, -1000,
-	-1000, -1000, -1000, 1, -11, -1000, 3, -1000, -7, -1000,
-	-1000,
+	14, -1000, -1000, 14, 11, -1000, -1000, -1000, -1000, 10,
+	-8, -1000, -1000, -1000, -1000, 6, -1000, -1, -1000, -1000,
+	-15, -1000, -1000, 2, -5, -1000, -1000, -1000, -6, -1000,
+	-7, -1000, -1000,
 }
 var yyPgo = []int{
 
-	0, 29, 28, 27, 26, 24, 23, 21, 22,
+	0, 31, 30, 29, 28, 27, 25, 22, 24,
 }
 var yyR1 = []int{
 
 	0, 6, 7, 7, 8, 3, 3, 4, 4, 1,
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 5, 2, 2,
+	1, 1, 1, 5, 2, 2,
 }
 var yyR2 = []int{
 
 	0, 1, 2, 1, 3, 0, 1, 1, 1, 1,
-	2, 2, 1, 1, 3, 3, 3, 4, 5, 4,
-	5, 2, 0, 1,
+	2, 4, 2, 4, 1, 1, 3, 3, 3, 4,
+	5, 4, 5, 2, 0, 1,
 }
 var yyChk = []int{
 
 	-1000, -6, -7, -8, -3, -4, 6, 7, -7, -1,
-	4, 12, 5, -2, -5, 9, 16, 17, 8, 12,
-	4, 12, 5, 13, 14, 12, 15, 12, 15, 12,
-	12,
+	4, 12, 5, -2, -5, 9, 16, 8, 17, 12,
+	4, 12, 5, 13, 14, 16, 17, 12, 15, 12,
+	15, 12, 12,
 }
 var yyDef = []int{
 
-	5, -2, 1, -2, 0, 6, 7, 8, 2, 22,
-	9, 12, 13, 4, 23, 0, 10, 11, 0, 21,
-	14, 15, 16, 0, 0, 17, 0, 19, 0, 18,
-	20,
+	5, -2, 1, -2, 0, 6, 7, 8, 2, 24,
+	9, 14, 15, 4, 25, 0, 10, 0, 12, 23,
+	16, 17, 18, 0, 0, 11, 13, 19, 0, 21,
+	0, 20, 22,
 }
 var yyTok1 = []int{
 
@@ -419,7 +420,7 @@ yydefault:
 		//line query_string.y:91
 		{
 			str := yyS[yypt-1].s
-			logDebugGrammar("STRING - %s", str)
+			logDebugGrammar("FUZZY STRING - %s", str)
 			q := NewMatchQuery(str)
 			q.SetFuzziness(1)
 			yyVAL.q = q
@@ -427,49 +428,72 @@ yydefault:
 	case 11:
 		//line query_string.y:99
 		{
+			field := yyS[yypt-3].s
+			str := yyS[yypt-1].s
+			logDebugGrammar("FIELD - %s FUZZY STRING - %s", field, str)
+			q := NewMatchQuery(str)
+			q.SetFuzziness(1)
+			q.SetField(field)
+			yyVAL.q = q
+		}
+	case 12:
+		//line query_string.y:109
+		{
 			str := yyS[yypt-1].s
 			fuzziness, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
-			logDebugGrammar("STRING - %s", str)
+			logDebugGrammar("FUZZY STRING - %s", str)
 			q := NewMatchQuery(str)
 			q.SetFuzziness(int(fuzziness))
 			yyVAL.q = q
 		}
-	case 12:
-		//line query_string.y:108
+	case 13:
+		//line query_string.y:118
+		{
+			field := yyS[yypt-3].s
+			str := yyS[yypt-1].s
+			fuzziness, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
+			logDebugGrammar("FIELD - %s FUZZY-%f STRING - %s", field, fuzziness, str)
+			q := NewMatchQuery(str)
+			q.SetFuzziness(int(fuzziness))
+			q.SetField(field)
+			yyVAL.q = q
+		}
+	case 14:
+		//line query_string.y:129
 		{
 			str := yyS[yypt-0].s
 			logDebugGrammar("STRING - %s", str)
 			q := NewMatchQuery(str)
 			yyVAL.q = q
 		}
-	case 13:
-		//line query_string.y:115
+	case 15:
+		//line query_string.y:136
 		{
 			phrase := yyS[yypt-0].s
 			logDebugGrammar("PHRASE - %s", phrase)
 			q := NewMatchPhraseQuery(phrase)
 			yyVAL.q = q
 		}
-	case 14:
-		//line query_string.y:122
-		{
-			field := yyS[yypt-2].s
-			str := yyS[yypt-0].s
-			logDebugGrammar("FIELD - %s STRING - %s", field, str)
-			q := NewMatchQuery(str).SetField(field)
-			yyVAL.q = q
-		}
-	case 15:
-		//line query_string.y:130
-		{
-			field := yyS[yypt-2].s
-			str := yyS[yypt-0].s
-			logDebugGrammar("FIELD - %s STRING - %s", field, str)
-			q := NewMatchQuery(str).SetField(field)
-			yyVAL.q = q
-		}
 	case 16:
-		//line query_string.y:138
+		//line query_string.y:143
+		{
+			field := yyS[yypt-2].s
+			str := yyS[yypt-0].s
+			logDebugGrammar("FIELD - %s STRING - %s", field, str)
+			q := NewMatchQuery(str).SetField(field)
+			yyVAL.q = q
+		}
+	case 17:
+		//line query_string.y:151
+		{
+			field := yyS[yypt-2].s
+			str := yyS[yypt-0].s
+			logDebugGrammar("FIELD - %s STRING - %s", field, str)
+			q := NewMatchQuery(str).SetField(field)
+			yyVAL.q = q
+		}
+	case 18:
+		//line query_string.y:159
 		{
 			field := yyS[yypt-2].s
 			phrase := yyS[yypt-0].s
@@ -477,8 +501,8 @@ yydefault:
 			q := NewMatchPhraseQuery(phrase).SetField(field)
 			yyVAL.q = q
 		}
-	case 17:
-		//line query_string.y:146
+	case 19:
+		//line query_string.y:167
 		{
 			field := yyS[yypt-3].s
 			min, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
@@ -487,8 +511,8 @@ yydefault:
 			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
 			yyVAL.q = q
 		}
-	case 18:
-		//line query_string.y:155
+	case 20:
+		//line query_string.y:176
 		{
 			field := yyS[yypt-4].s
 			min, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
@@ -497,8 +521,8 @@ yydefault:
 			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
 			yyVAL.q = q
 		}
-	case 19:
-		//line query_string.y:164
+	case 21:
+		//line query_string.y:185
 		{
 			field := yyS[yypt-3].s
 			max, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
@@ -507,8 +531,8 @@ yydefault:
 			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
 			yyVAL.q = q
 		}
-	case 20:
-		//line query_string.y:173
+	case 22:
+		//line query_string.y:194
 		{
 			field := yyS[yypt-4].s
 			max, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
@@ -517,20 +541,20 @@ yydefault:
 			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
 			yyVAL.q = q
 		}
-	case 21:
-		//line query_string.y:183
+	case 23:
+		//line query_string.y:204
 		{
 			boost, _ := strconv.ParseFloat(yyS[yypt-0].s, 64)
 			yyVAL.f = boost
 			logDebugGrammar("BOOST %f", boost)
 		}
-	case 22:
-		//line query_string.y:190
+	case 24:
+		//line query_string.y:211
 		{
 			yyVAL.f = 1.0
 		}
-	case 23:
-		//line query_string.y:194
+	case 25:
+		//line query_string.y:215
 		{
 
 		}
