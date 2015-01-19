@@ -352,7 +352,7 @@ func TestStoredFieldPreserved(t *testing.T) {
 	}
 
 	if len(res.Hits) != 1 {
-		t.Error("expected 1 hit, got %d", len(res.Hits))
+		t.Errorf("expected 1 hit, got %d", len(res.Hits))
 	}
 
 	if res.Hits[0].Fields["name"] != "Marty" {
