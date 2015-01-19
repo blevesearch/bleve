@@ -40,7 +40,14 @@ func (t *TextField) Options() IndexingOptions {
 func (t *TextField) Analyze() (int, analysis.TokenFrequencies) {
 	var tokens analysis.TokenStream
 	if t.analyzer != nil {
-		tokens = t.analyzer.Analyze(t.Value())
+		bytesToAnalyze := t.Value()
+		if t.options.IsStored() {
+			// need to copy
+			bytesCopied := make([]byte, len(bytesToAnalyze))
+			copy(bytesCopied, bytesToAnalyze)
+			bytesToAnalyze = bytesCopied
+		}
+		tokens = t.analyzer.Analyze(bytesToAnalyze)
 	} else {
 		tokens = analysis.TokenStream{
 			&analysis.Token{

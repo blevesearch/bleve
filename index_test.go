@@ -325,3 +325,41 @@ func (s *sawDataWriter) Write(p []byte) (n int, err error) {
 	s.sawData = true
 	return len(p), nil
 }
+
+func TestStoredFieldPreserved(t *testing.T) {
+	defer os.RemoveAll("testidx")
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doca := map[string]interface{}{
+		"name": "Marty",
+		"desc": "GopherCON India",
+	}
+	err = index.Index("a", doca)
+	if err != nil {
+		t.Error(err)
+	}
+
+	q := NewTermQuery("marty")
+	req := NewSearchRequest(q)
+	req.Fields = []string{"name", "desc"}
+	res, err := index.Search(req)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(res.Hits) != 1 {
+		t.Error("expected 1 hit, got %d", len(res.Hits))
+	}
+
+	if res.Hits[0].Fields["name"] != "Marty" {
+		t.Errorf("expected 'Marty' got '%s'", res.Hits[0].Fields["name"])
+	}
+	if res.Hits[0].Fields["desc"] != "GopherCON India" {
+		t.Errorf("expected 'GopherCON India' got '%s'", res.Hits[0].Fields["desc"])
+	}
+
+}
