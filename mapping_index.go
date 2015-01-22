@@ -393,6 +393,15 @@ func (im *IndexMapping) analyzerNameForPath(path string) string {
 			}
 		}
 	}
+	// now try the default mapping
+	pathMapping := im.DefaultMapping.documentMappingForPath(path)
+	if pathMapping != nil {
+		if len(pathMapping.Fields) > 0 {
+			if pathMapping.Fields[0].Analyzer != "" {
+				return pathMapping.Fields[0].Analyzer
+			}
+		}
+	}
 
 	// next we will try default analyzers for the path
 	pathDecoded := decodePath(path)
