@@ -74,8 +74,8 @@ func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
 // of the result document set you would like to be
 // built.
 type FacetRequest struct {
-	Size           int
-	Field          string
+	Size           int              `json:"size"`
+	Field          string           `json:"field"`
 	NumericRanges  []*numericRange  `json:"numeric_ranges,omitempty"`
 	DateTimeRanges []*dateTimeRange `json:"date_ranges,omitempty"`
 }
@@ -271,6 +271,18 @@ func (sr *SearchResult) String() string {
 		}
 	} else {
 		rv = "No matches"
+	}
+	if len(sr.Facets) > 0 {
+		rv += fmt.Sprintf("Facets:\n")
+		for fn, f := range sr.Facets {
+			rv += fmt.Sprintf("%s(%d)\n", fn, f.Total)
+			for _, t := range f.Terms {
+				rv += fmt.Sprintf("\t%s(%d)\n", t.Term, t.Count)
+			}
+			if f.Other != 0 {
+				rv += fmt.Sprintf("\tOther(%d)\n", f.Other)
+			}
+		}
 	}
 	return rv
 }
