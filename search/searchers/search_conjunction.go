@@ -112,6 +112,10 @@ OUTER:
 	for s.currentID != "" {
 		for i, termSearcher := range s.searchers {
 			if s.currs[i] != nil && s.currs[i].ID != s.currentID {
+				if s.currentID < s.currs[i].ID {
+					s.currentID = s.currs[i].ID
+					continue OUTER
+				}
 				// this reader doesn't have the currentID, try to advance
 				s.currs[i], err = termSearcher.Advance(s.currentID)
 				if err != nil {
