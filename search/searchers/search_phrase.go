@@ -161,7 +161,11 @@ func (s *PhraseSearcher) Advance(ID string) (*search.DocumentMatch, error) {
 			return nil, err
 		}
 	}
-	s.mustSearcher.Advance(ID)
+	var err error
+	s.currMust, err = s.mustSearcher.Advance(ID)
+	if err != nil {
+		return nil, err
+	}
 	return s.Next()
 }
 
