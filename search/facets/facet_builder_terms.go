@@ -70,7 +70,11 @@ func (fb *TermsFacetBuilder) Result() *search.FacetResult {
 	sort.Sort(rv.Terms)
 
 	// we now have the list of the top N facets
-	rv.Terms = rv.Terms[:fb.size]
+	trimTopN := fb.size
+	if trimTopN > len(rv.Terms) {
+		trimTopN = len(rv.Terms)
+	}
+	rv.Terms = rv.Terms[:trimTopN]
 
 	notOther := 0
 	for _, tf := range rv.Terms {
