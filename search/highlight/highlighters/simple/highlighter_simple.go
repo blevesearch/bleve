@@ -135,7 +135,9 @@ func (s *Highlighter) BestFragmentsInField(dm *search.DocumentMatch, doc *docume
 	if dm.Fragments == nil {
 		dm.Fragments = make(search.FieldFragmentMap, 0)
 	}
-	dm.Fragments[field] = formattedFragments
+	if len(formattedFragments) > 0 {
+		dm.Fragments[field] = formattedFragments
+	}
 
 	return formattedFragments
 }
