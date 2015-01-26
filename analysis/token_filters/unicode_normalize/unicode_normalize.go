@@ -28,7 +28,7 @@ var forms = map[string]norm.Form{
 	NFC:  norm.NFC,
 	NFD:  norm.NFD,
 	NFKC: norm.NFKC,
-	NFKD: norm.NFKC,
+	NFKD: norm.NFKD,
 }
 
 type UnicodeNormalizeFilter struct {

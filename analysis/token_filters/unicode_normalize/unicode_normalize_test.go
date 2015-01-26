@@ -67,7 +67,7 @@ func TestUnicodeNormalization(t *testing.T) {
 			},
 		},
 		{
-			formName: NFKD,
+			formName: NFKC,
 			input: analysis.TokenStream{
 				&analysis.Token{
 					Term: []byte("ｳﾞｨｯﾂ"),
@@ -80,7 +80,7 @@ func TestUnicodeNormalization(t *testing.T) {
 			},
 		},
 		{
-			formName: NFKD,
+			formName: NFKC,
 			input: analysis.TokenStream{
 				&analysis.Token{
 					Term: []byte("ﾊﾟﾅｿﾆｯｸ"),
