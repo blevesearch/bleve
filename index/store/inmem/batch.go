@@ -13,10 +13,14 @@ import (
 	indexStore "github.com/blevesearch/bleve/index/store"
 )
 
+type op struct {
+	k []byte
+	v []byte
+}
+
 type Batch struct {
 	store         *Store
-	keys          [][]byte
-	vals          [][]byte
+	ops           []op
 	alreadyLocked bool
 	merges        map[string]indexStore.AssociativeMergeChain
 }
@@ -24,8 +28,7 @@ type Batch struct {
 func newBatch(store *Store) *Batch {
 	rv := Batch{
 		store:  store,
-		keys:   make([][]byte, 0),
-		vals:   make([][]byte, 0),
+		ops:    make([]op, 0, 100),
 		merges: make(map[string]indexStore.AssociativeMergeChain),
 	}
 	return &rv
@@ -34,8 +37,7 @@ func newBatch(store *Store) *Batch {
 func newBatchAlreadyLocked(store *Store) *Batch {
 	rv := Batch{
 		store:         store,
-		keys:          make([][]byte, 0),
-		vals:          make([][]byte, 0),
+		ops:           make([]op, 0, 100),
 		alreadyLocked: true,
 		merges:        make(map[string]indexStore.AssociativeMergeChain),
 	}
@@ -43,13 +45,11 @@ func newBatchAlreadyLocked(store *Store) *Batch {
 }
 
 func (i *Batch) Set(key, val []byte) {
-	i.keys = append(i.keys, key)
-	i.vals = append(i.vals, val)
+	i.ops = append(i.ops, op{key, val})
 }
 
 func (i *Batch) Delete(key []byte) {
-	i.keys = append(i.keys, key)
-	i.vals = append(i.vals, nil)
+	i.ops = append(i.ops, op{key, nil})
 }
 
 func (i *Batch) Merge(key []byte, oper indexStore.AssociativeMerge) {
@@ -90,15 +90,14 @@ func (i *Batch) Execute() error {
 		}
 	}
 
-	for index, key := range i.keys {
-		val := i.vals[index]
-		if val == nil {
-			err := i.store.deletelocked(key)
+	for _, op := range i.ops {
+		if op.v == nil {
+			err := i.store.deletelocked(op.k)
 			if err != nil {
 				return err
 			}
 		} else {
-			err := i.store.setlocked(key, val)
+			err := i.store.setlocked(op.k, op.v)
 			if err != nil {
 				return err
 			}
