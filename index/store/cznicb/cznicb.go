@@ -220,20 +220,17 @@ func (w *Batch) Execute() (err error) {
 	t := w.s.t
 	for key, mc := range w.ms {
 		k := []byte(key)
-		b := []byte(nil)
-		v, ok := t.Get(k)
-		if ok && v != nil {
-			b = v.([]byte)
-		}
-		b, err := mc.Merge(k, b)
-		if err != nil {
-			return err
-		}
-		if b != nil {
-			t.Set(k, b)
-		} else {
-			t.Delete(k)
-		}
+		t.Put(k, func(oldV interface{}, exists bool) (newV interface{}, write bool) {
+			b := []byte(nil)
+			if exists && oldV != nil {
+				b = oldV.([]byte)
+			}
+			b, err := mc.Merge(k, b)
+			if err != nil {
+				return nil, false
+			}
+			return b, b != nil
+		})
 	}
 
 	for _, op := range w.ops {
