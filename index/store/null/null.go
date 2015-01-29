@@ -63,15 +63,10 @@ func (r *Reader) Close() error {
 	return nil
 }
 
-type Iterator struct {
-	store *Store
-}
+type Iterator struct{}
 
 func newIterator(store *Store) *Iterator {
-	rv := Iterator{
-		store: store,
-	}
-	return &rv
+	return &Iterator{}
 }
 
 func (i *Iterator) SeekFirst() {}
@@ -100,40 +95,20 @@ func (i *Iterator) Close() error {
 	return nil
 }
 
-type Batch struct {
-	store  *Store
-	keys   [][]byte
-	vals   [][]byte
-	merges map[string]store.AssociativeMergeChain
-}
+type Batch struct{}
 
 func newBatch(s *Store) *Batch {
-	rv := Batch{
-		store:  s,
-		keys:   make([][]byte, 0),
-		vals:   make([][]byte, 0),
-		merges: make(map[string]store.AssociativeMergeChain),
-	}
+	rv := Batch{}
 	return &rv
 }
 
 func (i *Batch) Set(key, val []byte) {
-	i.keys = append(i.keys, key)
-	i.vals = append(i.vals, val)
 }
 
 func (i *Batch) Delete(key []byte) {
-	i.keys = append(i.keys, key)
-	i.vals = append(i.vals, nil)
 }
 
 func (i *Batch) Merge(key []byte, oper store.AssociativeMerge) {
-	opers, ok := i.merges[string(key)]
-	if !ok {
-		opers = make(store.AssociativeMergeChain, 0, 1)
-	}
-	opers = append(opers, oper)
-	i.merges[string(key)] = opers
 }
 
 func (i *Batch) Execute() error {
