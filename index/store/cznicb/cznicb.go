@@ -58,13 +58,15 @@ type Iterator struct { // Assuming that iterators are used single-threaded.
 	currErr error
 }
 
-type Batch struct {
-	s *Store
+type op struct {
+	k []byte
+	v []byte
+}
 
-	m  sync.Mutex
-	ks [][]byte
-	vs [][]byte
-	ms map[string]store.AssociativeMergeChain
+type Batch struct {
+	s   *Store
+	ops []op
+	ms  map[string]store.AssociativeMergeChain
 }
 
 func (s *Store) Close() error {
@@ -110,7 +112,11 @@ func (s *Store) Delete(k []byte) (err error) {
 }
 
 func (s *Store) NewBatch() store.KVBatch {
-	return &Batch{s: s, ms: map[string]store.AssociativeMergeChain{}}
+	return &Batch{
+		s:   s,
+		ops: make([]op, 0, 100),
+		ms:  map[string]store.AssociativeMergeChain{},
+	}
 }
 
 func (w *Iterator) SeekFirst() {
@@ -196,41 +202,23 @@ func (w *Iterator) Close() error {
 }
 
 func (w *Batch) Set(k, v []byte) {
-	w.m.Lock()
-	w.ks = append(w.ks, k)
-	w.vs = append(w.vs, v)
-	w.m.Unlock()
+	w.ops = append(w.ops, op{k, v})
 }
 
 func (w *Batch) Delete(k []byte) {
-	w.m.Lock()
-	w.ks = append(w.ks, k)
-	w.vs = append(w.vs, nil)
-	w.m.Unlock()
+	w.ops = append(w.ops, op{k, nil})
 }
 
 func (w *Batch) Merge(k []byte, oper store.AssociativeMerge) {
-	key := string(k)
-	w.m.Lock()
-	w.ms[key] = append(w.ms[key], oper)
-	w.m.Unlock()
+	w.ms[string(k)] = append(w.ms[string(k)], oper)
 }
 
 func (w *Batch) Execute() (err error) {
-	w.m.Lock()
-	ks := w.ks
-	w.ks = nil
-	vs := w.vs
-	w.vs = nil
-	ms := w.ms
-	w.ms = map[string]store.AssociativeMergeChain{}
-	w.m.Unlock()
-
 	w.s.m.Lock()
 	defer w.s.m.Unlock()
 
 	t := w.s.t
-	for key, mc := range ms {
+	for key, mc := range w.ms {
 		k := []byte(key)
 		b := []byte(nil)
 		v, ok := t.Get(k)
@@ -248,12 +236,11 @@ func (w *Batch) Execute() (err error) {
 		}
 	}
 
-	for i, k := range ks {
-		v := vs[i]
-		if v != nil {
-			t.Set(k, v)
+	for _, op := range w.ops {
+		if op.v != nil {
+			t.Set(op.k, op.v)
 		} else {
-			t.Delete(k)
+			t.Delete(op.k)
 		}
 	}
 
@@ -261,10 +248,5 @@ func (w *Batch) Execute() (err error) {
 }
 
 func (w *Batch) Close() error {
-	w.m.Lock()
-	w.ks = nil
-	w.vs = nil
-	w.ms = nil
-	w.m.Unlock()
 	return nil
 }
