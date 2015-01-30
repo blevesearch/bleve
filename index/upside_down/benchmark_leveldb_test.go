@@ -122,3 +122,36 @@ func BenchmarkLevelDBIndexing4Workers100Batch(b *testing.B) {
 
 	CommonBenchmarkIndexBatch(b, s, 4, 100)
 }
+
+func BenchmarkLevelDBIndexing1Workers1000Batch(b *testing.B) {
+	s, err := leveldb.Open("test", leveldbTestOptions)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll("test")
+	defer s.Close()
+
+	CommonBenchmarkIndexBatch(b, s, 1, 1000)
+}
+
+func BenchmarkLevelDBIndexing2Workers1000Batch(b *testing.B) {
+	s, err := leveldb.Open("test", leveldbTestOptions)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll("test")
+	defer s.Close()
+
+	CommonBenchmarkIndexBatch(b, s, 2, 1000)
+}
+
+func BenchmarkLevelDBIndexing4Workers1000Batch(b *testing.B) {
+	s, err := leveldb.Open("test", leveldbTestOptions)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll("test")
+	defer s.Close()
+
+	CommonBenchmarkIndexBatch(b, s, 4, 1000)
+}

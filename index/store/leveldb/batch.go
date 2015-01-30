@@ -31,7 +31,7 @@ type Batch struct {
 func newBatch(store *Store) *Batch {
 	rv := Batch{
 		store:  store,
-		ops:    make([]op, 0, 100),
+		ops:    make([]op, 0, 1000),
 		merges: make(map[string]indexStore.AssociativeMergeChain),
 	}
 	return &rv
@@ -40,7 +40,7 @@ func newBatch(store *Store) *Batch {
 func newBatchAlreadyLocked(store *Store) *Batch {
 	rv := Batch{
 		store:         store,
-		ops:           make([]op, 0, 100),
+		ops:           make([]op, 0, 1000),
 		alreadyLocked: true,
 		merges:        make(map[string]indexStore.AssociativeMergeChain),
 	}

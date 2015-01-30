@@ -114,7 +114,7 @@ func (s *Store) Delete(k []byte) (err error) {
 func (s *Store) NewBatch() store.KVBatch {
 	return &Batch{
 		s:   s,
-		ops: make([]op, 0, 100),
+		ops: make([]op, 0, 1000),
 		ms:  map[string]store.AssociativeMergeChain{},
 	}
 }

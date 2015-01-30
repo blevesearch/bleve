@@ -106,3 +106,33 @@ func BenchmarkCznicBIndexing4Workers100Batch(b *testing.B) {
 
 	CommonBenchmarkIndexBatch(b, s, 4, 100)
 }
+
+func BenchmarkCznicBIndexing1Workers1000Batch(b *testing.B) {
+	s, err := cznicb.StoreConstructor(nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer s.Close()
+
+	CommonBenchmarkIndexBatch(b, s, 1, 1000)
+}
+
+func BenchmarkCznicBIndexing2Workers1000Batch(b *testing.B) {
+	s, err := cznicb.StoreConstructor(nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer s.Close()
+
+	CommonBenchmarkIndexBatch(b, s, 2, 1000)
+}
+
+func BenchmarkCznicBIndexing4Workers1000Batch(b *testing.B) {
+	s, err := cznicb.StoreConstructor(nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer s.Close()
+
+	CommonBenchmarkIndexBatch(b, s, 4, 1000)
+}
