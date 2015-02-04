@@ -88,6 +88,7 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/language/hu"
 	_ "github.com/blevesearch/bleve/analysis/language/hy"
 	_ "github.com/blevesearch/bleve/analysis/language/id"
+	_ "github.com/blevesearch/bleve/analysis/language/in"
 	_ "github.com/blevesearch/bleve/analysis/language/it"
 	_ "github.com/blevesearch/bleve/analysis/language/nl"
 	_ "github.com/blevesearch/bleve/analysis/language/no"
