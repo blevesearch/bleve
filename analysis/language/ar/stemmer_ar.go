@@ -29,16 +29,16 @@ var prefixes = [][]byte{
 	[]byte("و"),
 }
 var suffixes = [][]byte{
-	[]byte("ه"),
-	[]byte("ة"),
+	[]byte("ها"),
+	[]byte("ان"),
+	[]byte("ات"),
+	[]byte("ون"),
+	[]byte("ين"),
 	[]byte("يه"),
 	[]byte("ية"),
-	[]byte("ها"),
+	[]byte("ه"),
+	[]byte("ة"),
 	[]byte("ي"),
-	[]byte("ان"),
-	[]byte("ين"),
-	[]byte("ون"),
-	[]byte("ات"),
 }
 
 type ArabicStemmerFilter struct{}
@@ -56,16 +56,17 @@ func (s *ArabicStemmerFilter) Filter(input analysis.TokenStream) analysis.TokenS
 }
 
 func stem(input []byte) []byte {
+	// Strip a single prefix.
 	for _, p := range prefixes {
 		if bytes.HasPrefix(input, p) {
 			input = input[len(p):]
 			break
 		}
 	}
+	// Strip off multiple suffixes, in their order in the suffixes array.
 	for _, s := range suffixes {
 		if bytes.HasSuffix(input, s) {
 			input = input[:len(input)-len(s)]
-			break
 		}
 	}
 	return input
