@@ -69,18 +69,17 @@ func TestArabicAnalyzer(t *testing.T) {
 			},
 		},
 		// plural -in
-		// currently fails
-		// {
-		// 	input: []byte("أمريكيين"),
-		// 	output: analysis.TokenStream{
-		// 		&analysis.Token{
-		// 			Term:     []byte("امريك"),
-		// 			Position: 1,
-		// 			Start:    0,
-		// 			End:      16,
-		// 		},
-		// 	},
-		// },
+		{
+			input: []byte("أمريكيين"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term:     []byte("امريك"),
+					Position: 1,
+					Start:    0,
+					End:      16,
+				},
+			},
+		},
 		// singular with bare alif
 		{
 			input: []byte("امريكي"),
