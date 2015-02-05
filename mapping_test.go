@@ -183,3 +183,35 @@ func TestMappingStructWithPointerToString(t *testing.T) {
 		t.Errorf("expected to find 1 find, found %d", count)
 	}
 }
+
+func TestMappingJSONWithNull(t *testing.T) {
+
+	mapping := NewIndexMapping()
+
+	jsonbytes := []byte(`{"name":"marty", "age": null}`)
+	var jsondoc interface{}
+	err := json.Unmarshal(jsonbytes, &jsondoc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc := document.NewDocument("1")
+	err = mapping.mapDocument(doc, jsondoc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	count := 0
+	for _, f := range doc.Fields {
+		if f.Name() == "name" {
+			found = true
+		}
+		count++
+	}
+	if !found {
+		t.Errorf("expected to find field named 'name'")
+	}
+	if count != 1 {
+		t.Errorf("expected to find 1 find, found %d", count)
+	}
+}

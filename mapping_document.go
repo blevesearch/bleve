@@ -270,6 +270,10 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 	}
 
 	propertyValue := reflect.ValueOf(property)
+	if !propertyValue.IsValid() {
+		// cannot do anything with the zero value
+		return
+	}
 	propertyType := propertyValue.Type()
 	switch propertyType.Kind() {
 	case reflect.String:
