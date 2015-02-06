@@ -22,6 +22,7 @@ func TestSimpleFragmenter(t *testing.T) {
 		orig      []byte
 		fragments []*highlight.Fragment
 		ot        highlight.TermLocations
+		size      int
 	}{
 		{
 			orig: []byte("this is a test"),
@@ -40,6 +41,7 @@ func TestSimpleFragmenter(t *testing.T) {
 					End:   14,
 				},
 			},
+			size: 100,
 		},
 		{
 			orig: []byte("0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"),
@@ -58,6 +60,7 @@ func TestSimpleFragmenter(t *testing.T) {
 					End:   100,
 				},
 			},
+			size: 100,
 		},
 		{
 			orig: []byte("01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
@@ -175,16 +178,37 @@ func TestSimpleFragmenter(t *testing.T) {
 					End:   100,
 				},
 			},
+			size: 100,
+		},
+		{
+			orig: []byte("[[पानी का स्वाद]] [[नीलेश रघुवंशी]] का कविता संग्रह हैं। इस कृति के लिए उन्हें २००४ में [[केदार सम्मान]] से सम्मानित किया गया है।{{केदार सम्मान से सम्मानित कृतियाँ}}"),
+			fragments: []*highlight.Fragment{
+				&highlight.Fragment{
+					Orig:  []byte("[[पानी का स्वाद]] [[नीलेश रघुवंशी]] का कविता संग्रह हैं। इस कृति के लिए उन्हें २००४ में [[केदार सम्मान]] से सम्मानित किया गया है।{{केदार सम्मान से सम्मानित कृतियाँ}}"),
+					Start: 0,
+					End:   411,
+				},
+			},
+			ot: highlight.TermLocations{
+				&highlight.TermLocation{
+					Term:  "पानी",
+					Pos:   1,
+					Start: 2,
+					End:   14,
+				},
+			},
+			size: 200,
 		},
 	}
 
-	fragmenter := NewFragmenter(100)
 	for _, test := range tests {
+		fragmenter := NewFragmenter(test.size)
 		fragments := fragmenter.Fragment(test.orig, test.ot)
 		if !reflect.DeepEqual(fragments, test.fragments) {
 			t.Errorf("expected %#v, got %#v", test.fragments, fragments)
 			for _, fragment := range fragments {
-				t.Logf("frag: %#v", fragment)
+				t.Logf("frag: %s", fragment.Orig[fragment.Start:fragment.End])
+				t.Logf("frag: %d - %d", fragment.Start, fragment.End)
 			}
 		}
 	}

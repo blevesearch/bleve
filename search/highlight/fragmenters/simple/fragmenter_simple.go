@@ -10,6 +10,8 @@
 package simple
 
 import (
+	"unicode/utf8"
+
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search/highlight"
 )
@@ -32,21 +34,38 @@ func (s *Fragmenter) Fragment(orig []byte, ot highlight.TermLocations) []*highli
 	rv := make([]*highlight.Fragment, 0)
 
 	maxbegin := 0
+OUTER:
 	for currTermIndex, termLocation := range ot {
 		// start with this
 		// it should be the highest scoring fragment with this term first
 		start := termLocation.Start
-		end := start + s.fragmentSize
-		if end > len(orig) {
-			end = len(orig)
-			// we hit end, so push back as far as we can without crossing maxbegin
-			extra := s.fragmentSize - (end - start)
-			if start-extra >= maxbegin {
-				start -= extra
+		end := start
+		used := 0
+		for end < len(orig) && used < s.fragmentSize {
+			r, size := utf8.DecodeRune(orig[end:])
+			if r == utf8.RuneError {
+				continue OUTER // bail
+			}
+			end += size
+			used += 1
+		}
+
+		// if we still have more characters available to us
+		// push back towards begining
+		// without cross maxbegin
+		for start > 0 && used < s.fragmentSize {
+			r, size := utf8.DecodeLastRune(orig[0:start])
+			if r == utf8.RuneError {
+				continue OUTER // bail
+			}
+			if start-size >= maxbegin {
+				start -= size
+				used += 1
 			} else {
-				start = maxbegin
+				break
 			}
 		}
+
 		// however, we'd rather have the tokens centered more in the frag
 		// lets try to do that as best we can, without affecting the score
 		// find the end of the last term in this fragment
@@ -59,12 +78,29 @@ func (s *Fragmenter) Fragment(orig []byte, ot highlight.TermLocations) []*highli
 		}
 
 		// find the smaller of the two rooms to move
-		roomToMove := end - minend
-		if start-maxbegin < roomToMove {
-			roomToMove = start - maxbegin
+		roomToMove := utf8.RuneCount(orig[minend:end])
+		roomToMoveStart := utf8.RuneCount(orig[maxbegin:start])
+		if roomToMoveStart < roomToMove {
+			roomToMove = roomToMoveStart
 		}
 
 		offset := roomToMove / 2
+
+		for offset > 0 {
+			r, size := utf8.DecodeLastRune(orig[0:start])
+			if r == utf8.RuneError {
+				continue OUTER // bail
+			}
+			start -= size
+
+			r, size = utf8.DecodeLastRune(orig[0:end])
+			if r == utf8.RuneError {
+				continue OUTER // bail
+			}
+			end -= size
+			offset--
+		}
+
 		rv = append(rv, &highlight.Fragment{Orig: orig, Start: start - offset, End: end - offset})
 		// set maxbegin to the end of the current term location
 		// so that next one won't back up to include it
