@@ -21,6 +21,279 @@ func TestArabicStemmerFilter(t *testing.T) {
 		input  analysis.TokenStream
 		output analysis.TokenStream
 	}{
+		// AlPrefix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("الحسن"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("حسن"),
+				},
+			},
+		},
+		// WalPrefix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("والحسن"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("حسن"),
+				},
+			},
+		},
+		// BalPrefix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("بالحسن"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("حسن"),
+				},
+			},
+		},
+		// KalPrefix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("كالحسن"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("حسن"),
+				},
+			},
+		},
+		// FalPrefix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("فالحسن"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("حسن"),
+				},
+			},
+		},
+		// LlPrefix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("للاخر"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("اخر"),
+				},
+			},
+		},
+		// WaPrefix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("وحسن"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("حسن"),
+				},
+			},
+		},
+		// AhSuffix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("زوجها"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("زوج"),
+				},
+			},
+		},
+		// AnSuffix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهدان"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهد"),
+				},
+			},
+		},
+		// AtSuffix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهدات"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهد"),
+				},
+			},
+		},
+		// WnSuffix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهدون"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهد"),
+				},
+			},
+		},
+		// YnSuffix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهدين"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهد"),
+				},
+			},
+		},
+		// YhSuffix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهديه"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهد"),
+				},
+			},
+		},
+		// YpSuffix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهدية"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهد"),
+				},
+			},
+		},
+		// HSuffix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهده"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهد"),
+				},
+			},
+		},
+		// PSuffix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهدة"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهد"),
+				},
+			},
+		},
+		// YSuffix
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهدي"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهد"),
+				},
+			},
+		},
+		// ComboPrefSuf
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("وساهدون"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهد"),
+				},
+			},
+		},
+		// ComboSuf
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهدهات"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ساهد"),
+				},
+			},
+		},
+		// ShouldntStem
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("الو"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("الو"),
+				},
+			},
+		},
+		// NonArabic
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("English"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("English"),
+				},
+			},
+		},
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
@@ -93,7 +366,7 @@ func TestArabicStemmerFilter(t *testing.T) {
 				},
 			},
 		},
-		// empty
+		// Empty
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
