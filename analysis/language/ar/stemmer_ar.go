@@ -19,26 +19,26 @@ import (
 const StemmerName = "stemmer_ar"
 
 // These were obtained from org.apache.lucene.analysis.ar.ArabicStemmer
-var prefixes = [][]byte{
-	[]byte("ال"),
-	[]byte("وال"),
-	[]byte("بال"),
-	[]byte("كال"),
-	[]byte("فال"),
-	[]byte("لل"),
-	[]byte("و"),
+var prefixes = [][]rune{
+	[]rune("ال"),
+	[]rune("وال"),
+	[]rune("بال"),
+	[]rune("كال"),
+	[]rune("فال"),
+	[]rune("لل"),
+	[]rune("و"),
 }
-var suffixes = [][]byte{
-	[]byte("ها"),
-	[]byte("ان"),
-	[]byte("ات"),
-	[]byte("ون"),
-	[]byte("ين"),
-	[]byte("يه"),
-	[]byte("ية"),
-	[]byte("ه"),
-	[]byte("ة"),
-	[]byte("ي"),
+var suffixes = [][]rune{
+	[]rune("ها"),
+	[]rune("ان"),
+	[]rune("ات"),
+	[]rune("ون"),
+	[]rune("ين"),
+	[]rune("يه"),
+	[]rune("ية"),
+	[]rune("ه"),
+	[]rune("ة"),
+	[]rune("ي"),
 }
 
 type ArabicStemmerFilter struct{}
@@ -55,21 +55,53 @@ func (s *ArabicStemmerFilter) Filter(input analysis.TokenStream) analysis.TokenS
 	return input
 }
 
+func canStemPrefix(input, prefix []rune) bool {
+	// Wa- prefix requires at least 3 characters.
+	if len(prefix) == 1 && len(input) < 4 {
+		return false
+	}
+	// Other prefixes require only 2.
+	if len(input)-len(prefix) < 2 {
+		return false
+	}
+	for i := range prefix {
+		if prefix[i] != input[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func canStemSuffix(input, suffix []rune) bool {
+	// All suffixes require at least 2 characters after stemming.
+	if len(input)-len(suffix) < 2 {
+		return false
+	}
+	stemEnd := len(input) - len(suffix)
+	for i := range suffix {
+		if suffix[i] != input[stemEnd+i] {
+			return false
+		}
+	}
+	return true
+}
+
 func stem(input []byte) []byte {
+	runes := bytes.Runes(input)
 	// Strip a single prefix.
 	for _, p := range prefixes {
-		if bytes.HasPrefix(input, p) {
-			input = input[len(p):]
+		if canStemPrefix(runes, p) {
+			runes = runes[len(p):]
 			break
 		}
 	}
 	// Strip off multiple suffixes, in their order in the suffixes array.
 	for _, s := range suffixes {
-		if bytes.HasSuffix(input, s) {
-			input = input[:len(input)-len(s)]
+		if canStemSuffix(runes, s) {
+			runes = runes[:len(runes)-len(s)]
 		}
 	}
-	return input
+	return analysis.BuildTermFromRunes(runes)
 }
 
 func StemmerFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
