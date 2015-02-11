@@ -14,6 +14,7 @@ import (
 	"github.com/blevesearch/bleve/registry"
 
 	"github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
+	"github.com/blevesearch/bleve/analysis/token_filters/unicode_normalize"
 	"github.com/blevesearch/bleve/analysis/tokenizers/unicode"
 )
 
@@ -28,6 +29,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	if err != nil {
 		return nil, err
 	}
+	normalizeFilter := unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFKC)
 	stopArFilter, err := cache.TokenFilterNamed(StopName)
 	if err != nil {
 		return nil, err
@@ -44,6 +46,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 		Tokenizer: tokenizer,
 		TokenFilters: []analysis.TokenFilter{
 			toLowerFilter,
+			normalizeFilter,
 			stopArFilter,
 			normalizeArFilter,
 			stemmerArFilter,

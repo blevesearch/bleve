@@ -150,6 +150,18 @@ func TestArabicAnalyzer(t *testing.T) {
 				},
 			},
 		},
+		// presentation form normalization
+		{
+			input: []byte("ﺍﻟﺴﻼﻢ"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term:     []byte("سلام"),
+					Position: 1,
+					Start:    0,
+					End:      15,
+				},
+			},
+		},
 	}
 
 	cache := registry.NewCache()
