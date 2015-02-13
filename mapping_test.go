@@ -215,3 +215,32 @@ func TestMappingJSONWithNull(t *testing.T) {
 		t.Errorf("expected to find 1 find, found %d", count)
 	}
 }
+
+func TestMappingForPath(t *testing.T) {
+
+	enFieldMapping := NewTextFieldMapping()
+	enFieldMapping.Analyzer = "en"
+
+	docMappingA := NewDocumentMapping()
+	docMappingA.AddFieldMappingsAt("name", enFieldMapping)
+
+	customMapping := NewTextFieldMapping()
+	customMapping.Analyzer = "xyz"
+	customMapping.Name = "nameCustom"
+
+	docMappingA.AddFieldMappingsAt("author", enFieldMapping, customMapping)
+
+	mapping := NewIndexMapping()
+	mapping.AddDocumentMapping("a", docMappingA)
+
+	analyzerName := mapping.analyzerNameForPath("name")
+	if analyzerName != enFieldMapping.Analyzer {
+		t.Errorf("expected '%s' got '%s'", enFieldMapping.Analyzer, analyzerName)
+	}
+
+	analyzerName = mapping.analyzerNameForPath("nameCustom")
+	if analyzerName != customMapping.Analyzer {
+		t.Errorf("expected '%s' got '%s'", customMapping.Analyzer, analyzerName)
+	}
+
+}

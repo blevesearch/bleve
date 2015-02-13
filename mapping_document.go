@@ -75,15 +75,54 @@ func (dm *DocumentMapping) validate(cache *registry.Cache) error {
 	return nil
 }
 
+func (dm *DocumentMapping) analyzerNameForPath(path string) string {
+	pathElements := decodePath(path)
+	last := false
+	current := dm
+OUTER:
+	for i, pathElement := range pathElements {
+		if i == len(pathElements)-1 {
+			last = true
+		}
+		for name, subDocMapping := range current.Properties {
+			for _, field := range subDocMapping.Fields {
+				if field.Name == "" && name == pathElement {
+					if last {
+						return field.Analyzer
+					}
+					current = subDocMapping
+					continue OUTER
+				} else if field.Name == pathElement {
+					if last {
+						return field.Analyzer
+					}
+					current = subDocMapping
+					continue OUTER
+				}
+			}
+		}
+		return ""
+	}
+	return ""
+}
+
 func (dm *DocumentMapping) documentMappingForPath(path string) *DocumentMapping {
 	pathElements := decodePath(path)
 	current := dm
+OUTER:
 	for _, pathElement := range pathElements {
-		var ok bool
-		current, ok = current.Properties[pathElement]
-		if !ok {
-			return nil
+		for name, subDocMapping := range current.Properties {
+			for _, field := range subDocMapping.Fields {
+				if field.Name == "" && name == pathElement {
+					current = subDocMapping
+					continue OUTER
+				} else if field.Name == pathElement {
+					current = subDocMapping
+					continue OUTER
+				}
+			}
 		}
+		return nil
 	}
 	return current
 }

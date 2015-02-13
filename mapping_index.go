@@ -384,13 +384,9 @@ func (im *IndexMapping) newWalkContext(doc *document.Document, dm *DocumentMappi
 func (im *IndexMapping) analyzerNameForPath(path string) string {
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
-		pathMapping := docMapping.documentMappingForPath(path)
-		if pathMapping != nil {
-			if len(pathMapping.Fields) > 0 {
-				if pathMapping.Fields[0].Analyzer != "" {
-					return pathMapping.Fields[0].Analyzer
-				}
-			}
+		analyzerName := docMapping.analyzerNameForPath(path)
+		if analyzerName != "" {
+			return analyzerName
 		}
 	}
 	// now try the default mapping
