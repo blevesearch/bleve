@@ -27,7 +27,9 @@ import (
 
 var VersionKey = []byte{'v'}
 
-const Version uint8 = 1
+const Version uint8 = 2
+
+var IncompatibleVersion = fmt.Errorf("incompatible version, %d is supported", Version)
 
 type UpsideDownCouch struct {
 	version         uint8
@@ -81,6 +83,19 @@ func (udc *UpsideDownCouch) loadSchema(kvreader store.KVReader) (err error) {
 
 		it.Next()
 		key, val, valid = it.Current()
+	}
+
+	keyPrefix = []byte{'v'}
+	val, err = kvreader.Get(keyPrefix)
+	if err != nil {
+		return err
+	}
+	vr, err := NewVersionRowKV(keyPrefix, val)
+	if err != nil {
+		return err
+	}
+	if vr.version != Version {
+		return IncompatibleVersion
 	}
 
 	return
