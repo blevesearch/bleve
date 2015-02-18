@@ -532,7 +532,8 @@ func TestIndexAliasMulti(t *testing.T) {
 	// now a few things that should work
 	sr := NewSearchRequest(NewTermQuery("test"))
 	expected := &SearchResult{
-		Total: 2,
+		Request: sr,
+		Total:   2,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{
 				ID:    "b",
@@ -585,8 +586,10 @@ func TestMultiSearchNoError(t *testing.T) {
 		MaxScore: 2.0,
 	}}
 
+	sr := NewSearchRequest(NewTermQuery("test"))
 	expected := &SearchResult{
-		Total: 2,
+		Request: sr,
+		Total:   2,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{
 				ID:    "b",
@@ -601,7 +604,6 @@ func TestMultiSearchNoError(t *testing.T) {
 		MaxScore: 2.0,
 	}
 
-	sr := NewSearchRequest(NewTermQuery("test"))
 	results, err := MultiSearch(sr, ei1, ei2)
 	if err != nil {
 		t.Error(err)
@@ -644,6 +646,33 @@ func TestMultiSearchAllError(t *testing.T) {
 	}
 }
 
+func TestMultiSearchSecondPage(t *testing.T) {
+	checkRequest := func(sr *SearchRequest) error {
+		if sr.From != 0 {
+			return fmt.Errorf("child request from should be 0")
+		}
+		if sr.Size != 20 {
+			return fmt.Errorf("child request size should be 20")
+		}
+		return nil
+	}
+
+	ei1 := &stubIndex{
+		searchResult: &SearchResult{},
+		checkRequest: checkRequest,
+	}
+	ei2 := &stubIndex{
+		searchResult: &SearchResult{},
+		checkRequest: checkRequest,
+	}
+	sr := NewSearchRequestOptions(NewTermQuery("test"), 10, 10, false)
+	_, err := MultiSearch(sr, ei1, ei2)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+
+}
+
 // stubIndex is an Index impl for which all operations
 // return the configured error value, unless the
 // corresponding operation result value has been
@@ -653,6 +682,7 @@ type stubIndex struct {
 	searchResult   *SearchResult
 	documentResult *document.Document
 	docCountResult *uint64
+	checkRequest   func(*SearchRequest) error
 }
 
 func (i *stubIndex) Index(id string, data interface{}) error {
@@ -682,6 +712,12 @@ func (i *stubIndex) DocCount() (uint64, error) {
 }
 
 func (i *stubIndex) Search(req *SearchRequest) (*SearchResult, error) {
+	if i.checkRequest != nil {
+		err := i.checkRequest(req)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if i.searchResult != nil {
 		return i.searchResult, nil
 	}

@@ -365,7 +365,7 @@ func (i *indexAliasImpl) Swap(in, out []Index) {
 func createChildSearchRequest(req *SearchRequest) *SearchRequest {
 	rv := SearchRequest{
 		Query:     req.Query,
-		Size:      req.Size,
+		Size:      req.Size + req.From,
 		From:      0,
 		Highlight: req.Highlight,
 		Fields:    req.Fields,
@@ -456,6 +456,9 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	for name, fr := range req.Facets {
 		sr.Facets.Fixup(name, fr.Size)
 	}
+
+	// fix up original request
+	sr.Request = req
 
 	return sr, nil
 }
