@@ -74,7 +74,6 @@ func TestSearchResultString(t *testing.T) {
 func TestSearchResultMerge(t *testing.T) {
 	l := &SearchResult{
 		Total:    1,
-		Took:     1 * time.Second,
 		MaxScore: 1,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{
@@ -86,7 +85,6 @@ func TestSearchResultMerge(t *testing.T) {
 
 	r := &SearchResult{
 		Total:    1,
-		Took:     2 * time.Second,
 		MaxScore: 2,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{
@@ -98,7 +96,6 @@ func TestSearchResultMerge(t *testing.T) {
 
 	expected := &SearchResult{
 		Total:    2,
-		Took:     3 * time.Second,
 		MaxScore: 2,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{

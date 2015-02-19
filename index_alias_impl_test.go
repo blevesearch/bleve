@@ -443,7 +443,6 @@ func TestIndexAliasMulti(t *testing.T) {
 					Score: 1.0,
 				},
 			},
-			Took:     1 * time.Second,
 			MaxScore: 1.0,
 		}}
 	ei2Count := uint64(8)
@@ -458,7 +457,6 @@ func TestIndexAliasMulti(t *testing.T) {
 					Score: 2.0,
 				},
 			},
-			Took:     2 * time.Second,
 			MaxScore: 2.0,
 		}}
 
@@ -544,13 +542,14 @@ func TestIndexAliasMulti(t *testing.T) {
 				Score: 1.0,
 			},
 		},
-		Took:     3 * time.Second,
 		MaxScore: 2.0,
 	}
 	results, err := alias.Search(sr)
 	if err != nil {
 		t.Error(err)
 	}
+	// cheat and ensure that Took field matches since it invovles time
+	expected.Took = results.Took
 	if !reflect.DeepEqual(results, expected) {
 		t.Errorf("expected %#v, got %#v", expected, results)
 	}
@@ -571,7 +570,6 @@ func TestMultiSearchNoError(t *testing.T) {
 				Score: 1.0,
 			},
 		},
-		Took:     1 * time.Second,
 		MaxScore: 1.0,
 	}}
 	ei2 := &stubIndex{err: nil, searchResult: &SearchResult{
@@ -582,7 +580,6 @@ func TestMultiSearchNoError(t *testing.T) {
 				Score: 2.0,
 			},
 		},
-		Took:     2 * time.Second,
 		MaxScore: 2.0,
 	}}
 
@@ -600,7 +597,6 @@ func TestMultiSearchNoError(t *testing.T) {
 				Score: 1.0,
 			},
 		},
-		Took:     3 * time.Second,
 		MaxScore: 2.0,
 	}
 
@@ -608,6 +604,8 @@ func TestMultiSearchNoError(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	// cheat and ensure that Took field matches since it invovles time
+	expected.Took = results.Took
 	if !reflect.DeepEqual(results, expected) {
 		t.Errorf("expected %#v, got %#v", expected, results)
 	}

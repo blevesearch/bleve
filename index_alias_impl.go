@@ -12,6 +12,7 @@ package bleve
 import (
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
@@ -378,6 +379,7 @@ func createChildSearchRequest(req *SearchRequest) *SearchRequest {
 // MultiSearch executes a SearchRequest across multiple
 // Index objects, then merges the results.
 func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
+	searchStart := time.Now()
 	results := make(chan *SearchResult)
 	errs := make(chan error)
 
@@ -459,6 +461,8 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 
 	// fix up original request
 	sr.Request = req
+	searchDuration := time.Since(searchStart)
+	sr.Took = searchDuration
 
 	return sr, nil
 }

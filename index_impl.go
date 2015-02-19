@@ -495,7 +495,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 		Hits:     hits,
 		Total:    collector.Total(),
 		MaxScore: collector.MaxScore(),
-		Took:     collector.Took(),
+		Took:     searchDuration,
 		Facets:   collector.FacetResults(),
 	}, nil
 }
