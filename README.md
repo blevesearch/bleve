@@ -1,5 +1,7 @@
 # ![bleve](docs/bleve.png) bleve
 
+[![Join the chat at https://gitter.im/blevesearch/bleve](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/blevesearch/bleve?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 modern text indexing in go - [blevesearch.com](http://www.blevesearch.com/)
 
 Try out bleve live by [searching our wiki](http://wikisearch.blevesearch.com/search/).
