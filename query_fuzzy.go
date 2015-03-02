@@ -23,9 +23,13 @@ type fuzzyQuery struct {
 	BoostVal     float64 `json:"boost,omitempty"`
 }
 
-// NewPrefixQuery creates a new Query which finds
-// documents containing terms that start with the
-// specified prefix.
+// NewFuzzyQuery creates a new Query which finds
+// documents containing terms within a specific
+// fuzziness of the specified term.
+// The default fuzziness is 2.
+//
+// The current implementation uses Leveshtein edit
+// distance as the fuzziness metric.
 func NewFuzzyQuery(term string) *fuzzyQuery {
 	return &fuzzyQuery{
 		Term:         term,
