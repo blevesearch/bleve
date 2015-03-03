@@ -30,7 +30,8 @@ func TestIndexAliasSingle(t *testing.T) {
 		t.Errorf("expected %v, got %v", expectedError, err)
 	}
 
-	err = alias.Batch(NewBatch())
+	batch := alias.NewBatch()
+	err = alias.Batch(batch)
 	if err != expectedError {
 		t.Errorf("expected %v, got %v", expectedError, err)
 	}
@@ -116,7 +117,7 @@ func TestIndexAliasSingle(t *testing.T) {
 		t.Errorf("expected %v, got %v", expectedError2, err)
 	}
 
-	err = alias.Batch(NewBatch())
+	err = alias.Batch(batch)
 	if err != expectedError2 {
 		t.Errorf("expected %v, got %v", expectedError2, err)
 	}
@@ -200,7 +201,7 @@ func TestIndexAliasSingle(t *testing.T) {
 		t.Errorf("expected %v, got %v", expectedError3, err)
 	}
 
-	err = alias.Batch(NewBatch())
+	err = alias.Batch(batch)
 	if err != expectedError3 {
 		t.Errorf("expected %v, got %v", expectedError3, err)
 	}
@@ -281,7 +282,8 @@ func TestIndexAliasClosed(t *testing.T) {
 		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
 	}
 
-	err = alias.Batch(NewBatch())
+	batch := alias.NewBatch()
+	err = alias.Batch(batch)
 	if err != ErrorIndexClosed {
 		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
 	}
@@ -362,7 +364,8 @@ func TestIndexAliasEmpty(t *testing.T) {
 		t.Errorf("expected %v, got %v", ErrorAliasEmpty, err)
 	}
 
-	err = alias.Batch(NewBatch())
+	batch := alias.NewBatch()
+	err = alias.Batch(batch)
 	if err != ErrorAliasEmpty {
 		t.Errorf("expected %v, got %v", ErrorAliasEmpty, err)
 	}
@@ -472,7 +475,8 @@ func TestIndexAliasMulti(t *testing.T) {
 		t.Errorf("expected %v, got %v", ErrorAliasMulti, err)
 	}
 
-	err = alias.Batch(NewBatch())
+	batch := alias.NewBatch()
+	err = alias.Batch(batch)
 	if err != ErrorAliasMulti {
 		t.Errorf("expected %v, got %v", ErrorAliasMulti, err)
 	}
@@ -764,4 +768,8 @@ func (i *stubIndex) DeleteInternal(key []byte) error {
 
 func (i *stubIndex) Advanced() (index.Index, store.KVStore, error) {
 	return nil, nil, nil
+}
+
+func (i *stubIndex) NewBatch() *Batch {
+	return &Batch{}
 }

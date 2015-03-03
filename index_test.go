@@ -66,7 +66,7 @@ func TestCrud(t *testing.T) {
 		"name": "steve",
 		"desc": "cbft master",
 	}
-	batch := NewBatch()
+	batch := index.NewBatch()
 	batch.Index("b", docb)
 	batch.Delete("x")
 	batch.SetInternal([]byte("batchi"), []byte("batchv"))
@@ -255,7 +255,7 @@ func TestClosedIndex(t *testing.T) {
 		t.Errorf("expected error index closed, got %v", err)
 	}
 
-	b := NewBatch()
+	b := index.NewBatch()
 	err = index.Batch(b)
 	if err != ErrorIndexClosed {
 		t.Errorf("expected error index closed, got %v", err)

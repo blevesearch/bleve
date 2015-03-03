@@ -466,3 +466,19 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 
 	return sr, nil
 }
+
+func (i *indexAliasImpl) NewBatch() *Batch {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil
+	}
+
+	err := i.isAliasToSingleIndex()
+	if err != nil {
+		return nil
+	}
+
+	return i.indexes[0].NewBatch()
+}

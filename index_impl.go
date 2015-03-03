@@ -296,27 +296,7 @@ func (i *indexImpl) Batch(b *Batch) error {
 		return ErrorIndexClosed
 	}
 
-	ib := index.NewBatch()
-	for bk, bd := range b.indexOps {
-		if bd == nil {
-			ib.Delete(bk)
-		} else {
-			doc := document.NewDocument(bk)
-			err := i.m.mapDocument(doc, bd)
-			if err != nil {
-				return err
-			}
-			ib.Update(doc)
-		}
-	}
-	for ik, iv := range b.internalOps {
-		if iv == nil {
-			ib.DeleteInternal([]byte(ik))
-		} else {
-			ib.SetInternal([]byte(ik), iv)
-		}
-	}
-	return i.i.Batch(ib)
+	return i.i.Batch(b.internal)
 }
 
 // Document is used to find the values of all the
@@ -597,4 +577,12 @@ func (i *indexImpl) DeleteInternal(key []byte) error {
 	defer i.mutex.RUnlock()
 
 	return i.i.DeleteInternal(key)
+}
+
+// NewBatch creates a new empty batch.
+func (i *indexImpl) NewBatch() *Batch {
+	return &Batch{
+		index:    i,
+		internal: index.NewBatch(),
+	}
 }
