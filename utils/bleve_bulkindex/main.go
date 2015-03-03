@@ -42,7 +42,7 @@ func main() {
 	}
 
 	i := 0
-	batch := bleve.NewBatch()
+	batch := index.NewBatch()
 
 	for _, file := range flag.Args() {
 
@@ -62,7 +62,7 @@ func main() {
 				if err != nil {
 					log.Fatal(err)
 				}
-				batch = bleve.NewBatch()
+				batch = index.NewBatch()
 			}
 
 			b, _ := r.ReadBytes('\n')
