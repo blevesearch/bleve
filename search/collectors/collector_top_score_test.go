@@ -10,6 +10,8 @@
 package collectors
 
 import (
+	"math/rand"
+	"strconv"
 	"testing"
 
 	"github.com/blevesearch/bleve/search"
@@ -211,5 +213,28 @@ func TestTop10ScoresSkip10(t *testing.T) {
 
 	if results[0].Score != 9.5 {
 		t.Errorf("expected highest score to be 9.5ß, got %f", results[0].Score)
+	}
+}
+
+func BenchmarkTop10of100000Scores(b *testing.B) {
+
+	matches := make(search.DocumentMatchCollection, 0, 100000)
+	for i := 0; i < 100000; i++ {
+		matches = append(matches, &search.DocumentMatch{
+			ID:    strconv.Itoa(i),
+			Score: rand.Float64(),
+		})
+	}
+	searcher := &stubSearcher{
+		matches: matches,
+	}
+
+	collector := NewTopScorerCollector(10)
+	b.ResetTimer()
+
+	collector.Collect(searcher)
+	res := collector.Results()
+	for _, dm := range res {
+		b.Logf("%s - %f\n", dm.ID, dm.Score)
 	}
 }
