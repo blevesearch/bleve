@@ -10,7 +10,7 @@
 package facets
 
 import (
-	"container/list"
+	"sort"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/numeric_util"
@@ -89,11 +89,8 @@ func (fb *NumericFacetBuilder) Result() *search.FacetResult {
 		Missing: fb.missing,
 	}
 
-	// FIXME better implementation needed here this is quick and dirty
-	topN := list.New()
+	rv.NumericRanges = make([]*search.NumericRangeFacet, 0, len(fb.termsCount))
 
-	// walk entries and find top N
-OUTER:
 	for term, count := range fb.termsCount {
 		numericRange := fb.ranges[term]
 		tf := &search.NumericRangeFacet{
@@ -103,36 +100,19 @@ OUTER:
 			Max:   numericRange.max,
 		}
 
-		for e := topN.Front(); e != nil; e = e.Next() {
-			curr := e.Value.(*search.NumericRangeFacet)
-			if tf.Count < curr.Count {
-
-				topN.InsertBefore(tf, e)
-				// if we just made the list too long
-				if topN.Len() > fb.size {
-					// remove the head
-					topN.Remove(topN.Front())
-				}
-				continue OUTER
-			}
-		}
-		// if we got to the end, we still have to add it
-		topN.PushBack(tf)
-		if topN.Len() > fb.size {
-			// remove the head
-			topN.Remove(topN.Front())
-		}
-
+		rv.NumericRanges = append(rv.NumericRanges, tf)
 	}
 
+	sort.Sort(rv.NumericRanges)
+
 	// we now have the list of the top N facets
-	rv.NumericRanges = make([]*search.NumericRangeFacet, topN.Len())
-	i := 0
+	if fb.size < len(rv.NumericRanges) {
+		rv.NumericRanges = rv.NumericRanges[:fb.size]
+	}
+
 	notOther := 0
-	for e := topN.Back(); e != nil; e = e.Prev() {
-		rv.NumericRanges[i] = e.Value.(*search.NumericRangeFacet)
-		i++
-		notOther += e.Value.(*search.NumericRangeFacet).Count
+	for _, nr := range rv.NumericRanges {
+		notOther += nr.Count
 	}
 	rv.Other = fb.total - notOther
 
