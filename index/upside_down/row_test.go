@@ -45,17 +45,23 @@ func TestRows(t *testing.T) {
 		{
 			NewTermFrequencyRow([]byte{'b', 'e', 'e', 'r'}, 0, "", 3, 3.14),
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator},
-			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64},
+			[]byte{3, 195, 235, 163, 130, 4},
 		},
 		{
 			NewTermFrequencyRow([]byte{'b', 'e', 'e', 'r'}, 0, "budweiser", 3, 3.14),
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
-			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64},
+			[]byte{3, 195, 235, 163, 130, 4},
 		},
 		{
 			NewTermFrequencyRowWithTermVectors([]byte{'b', 'e', 'e', 'r'}, 0, "budweiser", 3, 3.14, []*TermVector{&TermVector{field: 0, pos: 1, start: 3, end: 11}, &TermVector{field: 0, pos: 2, start: 23, end: 31}, &TermVector{field: 0, pos: 3, start: 43, end: 51}}),
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
-			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0},
+			[]byte{3, 195, 235, 163, 130, 4, 0, 1, 3, 11, 0, 2, 23, 31, 0, 3, 43, 51},
+		},
+		// test larger varints
+		{
+			NewTermFrequencyRowWithTermVectors([]byte{'b', 'e', 'e', 'r'}, 0, "budweiser", 25896, 3.14, []*TermVector{&TermVector{field: 255, pos: 1, start: 3, end: 11}, &TermVector{field: 0, pos: 2198, start: 23, end: 31}, &TermVector{field: 0, pos: 3, start: 43, end: 51}}),
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
+			[]byte{168, 202, 1, 195, 235, 163, 130, 4, 255, 1, 1, 3, 11, 0, 150, 17, 23, 31, 0, 3, 43, 51},
 		},
 		{
 			NewBackIndexRow("budweiser", []*BackIndexTermEntry{&BackIndexTermEntry{Term: proto.String("beer"), Field: proto.Uint32(0)}}, nil),
@@ -85,14 +91,14 @@ func TestRows(t *testing.T) {
 	}
 
 	// test going from struct to k/v bytes
-	for _, test := range tests {
+	for i, test := range tests {
 		rk := test.input.Key()
 		if !reflect.DeepEqual(rk, test.outKey) {
 			t.Errorf("Expected key to be %v got: %v", test.outKey, rk)
 		}
 		rv := test.input.Value()
 		if !reflect.DeepEqual(rv, test.outVal) {
-			t.Errorf("Expected value to be %v got: %v", test.outVal, rv)
+			t.Errorf("Expected value to be %v got: %v for %d", test.outVal, rv, i)
 		}
 	}
 
@@ -100,7 +106,7 @@ func TestRows(t *testing.T) {
 	for i, test := range tests {
 		row, err := ParseFromKeyValue(test.outKey, test.outVal)
 		if err != nil {
-			t.Error(err)
+			t.Errorf("error parsking key/value: %v", err)
 		}
 		if !reflect.DeepEqual(row, test.input) {
 			t.Errorf("Expected: %#v got: %#v for %d", test.input, row, i)
@@ -211,5 +217,47 @@ func TestInvalidRows(t *testing.T) {
 		if err == nil {
 			t.Errorf("expected error, got nil")
 		}
+	}
+}
+
+func BenchmarkTermFrequencyRowEncode(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		row := NewTermFrequencyRowWithTermVectors(
+			[]byte{'b', 'e', 'e', 'r'},
+			0,
+			"budweiser",
+			3,
+			3.14,
+			[]*TermVector{
+				&TermVector{
+					field: 0,
+					pos:   1,
+					start: 3,
+					end:   11,
+				},
+				&TermVector{
+					field: 0,
+					pos:   2,
+					start: 23,
+					end:   31,
+				},
+				&TermVector{
+					field: 0,
+					pos:   3,
+					start: 43,
+					end:   51,
+				},
+			})
+
+		row.Key()
+		row.Value()
+	}
+}
+
+func BenchmarkTermFrequencyRowDecode(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		k := []byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'}
+		v := []byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0}
+		NewTermFrequencyRowKV(k, v)
 	}
 }

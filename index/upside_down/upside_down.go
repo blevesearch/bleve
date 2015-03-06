@@ -27,7 +27,7 @@ import (
 
 var VersionKey = []byte{'v'}
 
-const Version uint8 = 2
+const Version uint8 = 3
 
 var IncompatibleVersion = fmt.Errorf("incompatible version, %d is supported", Version)
 

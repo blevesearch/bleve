@@ -234,22 +234,22 @@ func (tfr *TermFrequencyRow) SummaryKey() []byte {
 }
 
 func (tfr *TermFrequencyRow) Value() []byte {
-	buf := make([]byte, 8+4+(len(tfr.vectors)*(2+8+8+8)))
+	used := 0
+	buf := make([]byte, 8+8+(len(tfr.vectors)*(8+8+8+8)))
 
-	binary.LittleEndian.PutUint64(buf[0:8], tfr.freq)
+	used += binary.PutUvarint(buf[used:used+8], tfr.freq)
 
 	normuint32 := math.Float32bits(tfr.norm)
-	binary.LittleEndian.PutUint32(buf[8:12], normuint32)
+	newbuf := buf[used : used+8]
+	used += binary.PutUvarint(newbuf, uint64(normuint32))
 
-	offset := 12
 	for _, vector := range tfr.vectors {
-		binary.LittleEndian.PutUint16(buf[offset:offset+2], vector.field)
-		binary.LittleEndian.PutUint64(buf[offset+2:offset+10], vector.pos)
-		binary.LittleEndian.PutUint64(buf[offset+10:offset+18], vector.start)
-		binary.LittleEndian.PutUint64(buf[offset+18:offset+26], vector.end)
-		offset += 26
+		used += binary.PutUvarint(buf[used:used+8], uint64(vector.field))
+		used += binary.PutUvarint(buf[used:used+8], vector.pos)
+		used += binary.PutUvarint(buf[used:used+8], vector.start)
+		used += binary.PutUvarint(buf[used:used+8], vector.end)
 	}
-	return buf
+	return buf[0:used]
 }
 
 func (tfr *TermFrequencyRow) String() string {
@@ -309,43 +309,56 @@ func NewTermFrequencyRowK(key []byte) (*TermFrequencyRow, error) {
 
 func (tfr *TermFrequencyRow) parseV(value []byte) error {
 	buf := bytes.NewBuffer((value))
-	err := binary.Read(buf, binary.LittleEndian, &tfr.freq)
+
+	freq, err := binary.ReadUvarint(buf)
 	if err != nil {
 		return err
 	}
-	err = binary.Read(buf, binary.LittleEndian, &tfr.norm)
+	tfr.freq = freq
+
+	norm, err := binary.ReadUvarint(buf)
 	if err != nil {
 		return err
 	}
 
-	var field uint16
-	err = binary.Read(buf, binary.LittleEndian, &field)
+	tfr.norm = math.Float32frombits(uint32(norm))
+
+	field, err := binary.ReadUvarint(buf)
 	if err != nil && err != io.EOF {
 		return err
 	}
 	for err != io.EOF {
 		tv := TermVector{}
-		tv.field = field
+		tv.field = uint16(field)
 		// at this point we expect at least one term vector
 		if tfr.vectors == nil {
 			tfr.vectors = make([]*TermVector, 0)
 		}
 
-		err = binary.Read(buf, binary.LittleEndian, &tv.pos)
+		var pos uint64
+		pos, err = binary.ReadUvarint(buf)
 		if err != nil {
 			return err
 		}
-		err = binary.Read(buf, binary.LittleEndian, &tv.start)
+		tv.pos = pos
+
+		var start uint64
+		start, err = binary.ReadUvarint(buf)
 		if err != nil {
 			return err
 		}
-		err = binary.Read(buf, binary.LittleEndian, &tv.end)
+		tv.start = start
+
+		var end uint64
+		end, err = binary.ReadUvarint(buf)
 		if err != nil {
 			return err
 		}
+		tv.end = end
+
 		tfr.vectors = append(tfr.vectors, &tv)
 		// try to read next record (may not exist)
-		err = binary.Read(buf, binary.LittleEndian, &field)
+		field, err = binary.ReadUvarint(buf)
 	}
 	return nil
 }
