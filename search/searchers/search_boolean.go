@@ -169,12 +169,18 @@ func (s *BooleanSearcher) Next() (*search.DocumentMatch, error) {
 			}
 			if s.currMustNot != nil && s.currMustNot.ID == s.currentID {
 				// the candidate is excluded
-				s.advanceNextMust()
+				err = s.advanceNextMust()
+				if err != nil {
+					return nil, err
+				}
 				continue
 			}
 		} else if s.currMustNot != nil && s.currMustNot.ID == s.currentID {
 			// the candidate is excluded
-			s.advanceNextMust()
+			err = s.advanceNextMust()
+			if err != nil {
+				return nil, err
+			}
 			continue
 		}
 
@@ -192,12 +198,18 @@ func (s *BooleanSearcher) Next() (*search.DocumentMatch, error) {
 				}
 				cons = append(cons, s.currShould)
 				rv = s.scorer.Score(cons)
-				s.advanceNextMust()
+				err = s.advanceNextMust()
+				if err != nil {
+					return nil, err
+				}
 				break
 			} else if s.shouldSearcher.Min() == 0 {
 				// match is OK anyway
 				rv = s.scorer.Score([]*search.DocumentMatch{s.currMust})
-				s.advanceNextMust()
+				err = s.advanceNextMust()
+				if err != nil {
+					return nil, err
+				}
 				break
 			}
 		} else if s.currShould != nil && s.currShould.ID == s.currentID {
@@ -208,16 +220,25 @@ func (s *BooleanSearcher) Next() (*search.DocumentMatch, error) {
 			}
 			cons = append(cons, s.currShould)
 			rv = s.scorer.Score(cons)
-			s.advanceNextMust()
+			err = s.advanceNextMust()
+			if err != nil {
+				return nil, err
+			}
 			break
 		} else if s.shouldSearcher == nil || s.shouldSearcher.Min() == 0 {
 			// match is OK anyway
 			rv = s.scorer.Score([]*search.DocumentMatch{s.currMust})
-			s.advanceNextMust()
+			err = s.advanceNextMust()
+			if err != nil {
+				return nil, err
+			}
 			break
 		}
 
-		s.advanceNextMust()
+		err = s.advanceNextMust()
+		if err != nil {
+			return nil, err
+		}
 	}
 	return rv, nil
 }
@@ -275,16 +296,26 @@ func (s *BooleanSearcher) Count() uint64 {
 	return sum
 }
 
-func (s *BooleanSearcher) Close() {
+func (s *BooleanSearcher) Close() error {
 	if s.mustSearcher != nil {
-		s.mustSearcher.Close()
+		err := s.mustSearcher.Close()
+		if err != nil {
+			return err
+		}
 	}
 	if s.shouldSearcher != nil {
-		s.shouldSearcher.Close()
+		err := s.shouldSearcher.Close()
+		if err != nil {
+			return err
+		}
 	}
 	if s.mustNotSearcher != nil {
-		s.mustNotSearcher.Close()
+		err := s.mustNotSearcher.Close()
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (s *BooleanSearcher) Min() int {

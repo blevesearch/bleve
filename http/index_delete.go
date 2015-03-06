@@ -44,10 +44,14 @@ func (h *DeleteIndexHandler) ServeHTTP(w http.ResponseWriter, req *http.Request)
 	}
 
 	// close the index
-	indexToDelete.Close()
+	err := indexToDelete.Close()
+	if err != nil {
+		showError(w, req, fmt.Sprintf("error closing index: %v", err), 500)
+		return
+	}
 
 	// now delete it
-	err := os.RemoveAll(h.indexPath(indexName))
+	err = os.RemoveAll(h.indexPath(indexName))
 	if err != nil {
 		showError(w, req, fmt.Sprintf("error deleting index: %v", err), 500)
 		return

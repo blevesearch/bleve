@@ -40,7 +40,8 @@ func (ss *stubSearcher) Advance(ID string) (*search.DocumentMatch, error) {
 	return nil, nil
 }
 
-func (ss *stubSearcher) Close() {
+func (ss *stubSearcher) Close() error {
+	return nil
 }
 
 func (ss *stubSearcher) Weight() float64 {

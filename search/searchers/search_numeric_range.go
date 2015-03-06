@@ -101,8 +101,8 @@ func (s *NumericRangeSearcher) Advance(ID string) (*search.DocumentMatch, error)
 	return s.searcher.Advance(ID)
 }
 
-func (s *NumericRangeSearcher) Close() {
-	s.searcher.Close()
+func (s *NumericRangeSearcher) Close() error {
+	return s.searcher.Close()
 }
 
 type termRange struct {

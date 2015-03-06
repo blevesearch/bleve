@@ -100,8 +100,8 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docID string) (*index.TermField
 	return nil, nil
 }
 
-func (r *UpsideDownCouchTermFieldReader) Close() {
-	r.iterator.Close()
+func (r *UpsideDownCouchTermFieldReader) Close() error {
+	return r.iterator.Close()
 }
 
 type UpsideDownCouchDocIDReader struct {
@@ -167,6 +167,6 @@ func (r *UpsideDownCouchDocIDReader) Advance(docID string) (string, error) {
 	return "", nil
 }
 
-func (r *UpsideDownCouchDocIDReader) Close() {
-	r.iterator.Close()
+func (r *UpsideDownCouchDocIDReader) Close() error {
+	return r.iterator.Close()
 }

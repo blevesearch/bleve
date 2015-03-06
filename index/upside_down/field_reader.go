@@ -70,8 +70,8 @@ func (r *UpsideDownCouchFieldReader) Next() (*index.TermFieldDoc, error) {
 
 }
 
-func (r *UpsideDownCouchFieldReader) Close() {
-	r.iterator.Close()
+func (r *UpsideDownCouchFieldReader) Close() error {
+	return r.iterator.Close()
 }
 
 func incrementBytes(in []byte) []byte {

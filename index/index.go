@@ -52,7 +52,7 @@ type IndexReader interface {
 
 	DocCount() uint64
 
-	Close()
+	Close() error
 }
 
 type FieldTerms map[string][]string
@@ -76,18 +76,18 @@ type TermFieldReader interface {
 	Next() (*TermFieldDoc, error)
 	Advance(ID string) (*TermFieldDoc, error)
 	Count() uint64
-	Close()
+	Close() error
 }
 
 type FieldReader interface {
 	Next() (*TermFieldDoc, error)
-	Close()
+	Close() error
 }
 
 type DocIDReader interface {
 	Next() (string, error)
 	Advance(ID string) (string, error)
-	Close()
+	Close() error
 }
 
 type Batch struct {

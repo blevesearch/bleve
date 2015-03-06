@@ -60,7 +60,10 @@ func (tksc *TopScoreCollector) Collect(searcher search.Searcher) error {
 	for err == nil && next != nil {
 		tksc.collectSingle(next)
 		if tksc.facetsBuilder != nil {
-			tksc.facetsBuilder.Update(next)
+			err = tksc.facetsBuilder.Update(next)
+			if err != nil {
+				break
+			}
 		}
 		next, err = searcher.Next()
 	}

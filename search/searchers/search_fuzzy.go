@@ -94,8 +94,8 @@ func (s *FuzzySearcher) Advance(ID string) (*search.DocumentMatch, error) {
 	return s.searcher.Next()
 }
 
-func (s *FuzzySearcher) Close() {
-	s.searcher.Close()
+func (s *FuzzySearcher) Close() error {
+	return s.searcher.Close()
 }
 
 func (s *FuzzySearcher) Min() int {

@@ -144,11 +144,17 @@ func (s *PhraseSearcher) Next() (*search.DocumentMatch, error) {
 			// return match
 			rv = s.currMust
 			rv.Locations = rvftlm
-			s.advanceNextMust()
+			err := s.advanceNextMust()
+			if err != nil {
+				return nil, err
+			}
 			return rv, nil
 		}
 
-		s.advanceNextMust()
+		err := s.advanceNextMust()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return nil, nil
@@ -176,10 +182,14 @@ func (s *PhraseSearcher) Count() uint64 {
 	return sum
 }
 
-func (s *PhraseSearcher) Close() {
+func (s *PhraseSearcher) Close() error {
 	if s.mustSearcher != nil {
-		s.mustSearcher.Close()
+		err := s.mustSearcher.Close()
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (s *PhraseSearcher) Min() int {

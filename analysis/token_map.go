@@ -47,7 +47,7 @@ func (t TokenMap) LoadBytes(data []byte) error {
 	return err
 }
 
-func (t TokenMap) LoadLine(line string) error {
+func (t TokenMap) LoadLine(line string) {
 	// find the start of a comment, if any
 	startComment := strings.IndexAny(line, "#|")
 	if startComment >= 0 {
@@ -58,7 +58,6 @@ func (t TokenMap) LoadLine(line string) error {
 	for _, token := range tokens {
 		t.AddToken(token)
 	}
-	return nil
 }
 
 func (t TokenMap) AddToken(token string) {

@@ -136,26 +136,35 @@ func init() {
 	// build the default configuration
 	Config = newConfiguration()
 
-	Config.Cache.DefineFragmentFormatter("highlightSpanHTML",
+	_, err := Config.Cache.DefineFragmentFormatter("highlightSpanHTML",
 		map[string]interface{}{
 			"type":   "html",
 			"before": `<span class="highlight">`,
 			"after":  `</span>`,
 		})
+	if err != nil {
+		panic(err)
+	}
 
-	Config.Cache.DefineHighlighter("html",
+	_, err = Config.Cache.DefineHighlighter("html",
 		map[string]interface{}{
 			"type":       "simple",
 			"fragmenter": "simple",
 			"formatter":  "highlightSpanHTML",
 		})
+	if err != nil {
+		panic(err)
+	}
 
-	Config.Cache.DefineHighlighter("ansi",
+	_, err = Config.Cache.DefineHighlighter("ansi",
 		map[string]interface{}{
 			"type":       "simple",
 			"fragmenter": "simple",
 			"formatter":  "ansi",
 		})
+	if err != nil {
+		panic(err)
+	}
 
 	// set the default highlighter
 	Config.DefaultHighlighter = "html"

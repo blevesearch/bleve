@@ -133,6 +133,6 @@ func (i *IndexReader) DocCount() uint64 {
 	return i.docCount
 }
 
-func (i *IndexReader) Close() {
-	i.kvreader.Close()
+func (i *IndexReader) Close() error {
+	return i.kvreader.Close()
 }

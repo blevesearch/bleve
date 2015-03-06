@@ -152,8 +152,11 @@ func NewFieldRowKV(key, value []byte) (*FieldRow, error) {
 	rv := FieldRow{}
 
 	buf := bytes.NewBuffer(key)
-	buf.ReadByte() // type
-	err := binary.Read(buf, binary.LittleEndian, &rv.index)
+	_, err := buf.ReadByte() // type
+	if err != nil {
+		return nil, err
+	}
+	err = binary.Read(buf, binary.LittleEndian, &rv.index)
 	if err != nil {
 		return nil, err
 	}
@@ -282,9 +285,11 @@ func NewTermFrequencyRowK(key []byte) (*TermFrequencyRow, error) {
 		doc: []byte(""),
 	}
 	buf := bytes.NewBuffer(key)
-	buf.ReadByte() // type
+	_, err := buf.ReadByte() // type
+	if err != nil {
+		return nil, err
+	}
 
-	var err error
 	err = binary.Read(buf, binary.LittleEndian, &rv.field)
 	if err != nil {
 		return nil, err
@@ -439,9 +444,11 @@ func NewBackIndexRowKV(key, value []byte) (*BackIndexRow, error) {
 	rv := BackIndexRow{}
 
 	buf := bytes.NewBuffer(key)
-	buf.ReadByte() // type
+	_, err := buf.ReadByte() // type
+	if err != nil {
+		return nil, err
+	}
 
-	var err error
 	rv.doc, err = buf.ReadBytes(ByteSeparator)
 	if err == io.EOF && len(rv.doc) < 1 {
 		err = fmt.Errorf("invalid doc length 0")
@@ -520,9 +527,11 @@ func NewStoredRowK(key []byte) (*StoredRow, error) {
 	rv := StoredRow{}
 
 	buf := bytes.NewBuffer(key)
-	buf.ReadByte() // type
+	_, err := buf.ReadByte() // type
+	if err != nil {
+		return nil, err
+	}
 
-	var err error
 	rv.doc, err = buf.ReadBytes(ByteSeparator)
 	if len(rv.doc) < 2 { // 1 for min doc id length, 1 for separator
 		err = fmt.Errorf("invalid doc length 0")

@@ -174,10 +174,14 @@ func (s *DisjunctionSearcher) Count() uint64 {
 	return sum
 }
 
-func (s *DisjunctionSearcher) Close() {
+func (s *DisjunctionSearcher) Close() error {
 	for _, searcher := range s.searchers {
-		searcher.Close()
+		err := searcher.Close()
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (s *DisjunctionSearcher) Min() int {
