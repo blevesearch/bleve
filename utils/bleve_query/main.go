@@ -13,6 +13,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"runtime/pprof"
 	"strings"
 
 	"github.com/blevesearch/bleve"
@@ -23,10 +25,21 @@ var limit = flag.Int("limit", 10, "limit to first N results")
 var skip = flag.Int("skip", 0, "skip the first N results")
 var explain = flag.Bool("explain", false, "explain scores")
 var includeHighlights = flag.Bool("highlight", true, "highlight matches")
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+var repeat = flag.Int("repeat", 1, "repeat query n times")
 
 func main() {
 
 	flag.Parse()
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 
 	if *indexPath == "" {
 		log.Fatal("Specify index to query")
@@ -43,20 +56,22 @@ func main() {
 	}
 	defer index.Close()
 
-	// build a search with the provided parameters
-	queryString := strings.Join(flag.Args(), " ")
-	query := bleve.NewQueryStringQuery(queryString)
-	searchRequest := bleve.NewSearchRequestOptions(query, *limit, *skip, *explain)
+	for i := 0; i < *repeat; i++ {
+		// build a search with the provided parameters
+		queryString := strings.Join(flag.Args(), " ")
+		query := bleve.NewQueryStringQuery(queryString)
+		searchRequest := bleve.NewSearchRequestOptions(query, *limit, *skip, *explain)
 
-	// enable highlights if requested
-	if *includeHighlights {
-		searchRequest.Highlight = bleve.NewHighlightWithStyle("ansi")
-	}
+		// enable highlights if requested
+		if *includeHighlights {
+			searchRequest.Highlight = bleve.NewHighlightWithStyle("ansi")
+		}
 
-	// execute the search
-	searchResult, err := index.Search(searchRequest)
-	if err != nil {
-		log.Fatalf("search error: %v", err)
+		// execute the search
+		searchResult, err := index.Search(searchRequest)
+		if err != nil {
+			log.Fatalf("search error: %v", err)
+		}
+		fmt.Println(searchResult)
 	}
-	fmt.Println(searchResult)
 }
