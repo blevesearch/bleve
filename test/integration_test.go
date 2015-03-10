@@ -116,37 +116,37 @@ func runTestDir(t *testing.T, dir string) {
 	}
 
 	// run the searches
-	for _, search := range searches {
+	for testNum, search := range searches {
 		res, err := index.Search(search.Search)
 		if err != nil {
 			t.Errorf("error running search: %v", err)
 		}
 		if res.Total != search.Result.Total {
-			t.Errorf("expected total: %d got %d", search.Result.Total, res.Total)
+			t.Errorf("test %d - expected total: %d got %d", testNum, search.Result.Total, res.Total)
 			continue
 		}
 		if len(res.Hits) != len(search.Result.Hits) {
-			t.Errorf("expected hits len: %d got %d", len(search.Result.Hits), len(res.Hits))
+			t.Errorf("test %d - expected hits len: %d got %d", testNum, len(search.Result.Hits), len(res.Hits))
 			continue
 		}
 		for hi, hit := range search.Result.Hits {
 			if hit.ID != res.Hits[hi].ID {
-				t.Errorf("expected hit %d to have ID %s got %s", hi, hit.ID, res.Hits[hi].ID)
+				t.Errorf("test %d - expected hit %d to have ID %s got %s", testNum, hi, hit.ID, res.Hits[hi].ID)
 			}
 			if hit.Fields != nil {
 				if !reflect.DeepEqual(hit.Fields, res.Hits[hi].Fields) {
-					t.Errorf("expected hit %d to have fields %#v got %#v", hi, hit.Fields, res.Hits[hi].Fields)
+					t.Errorf("test  %d - expected hit %d to have fields %#v got %#v", testNum, hi, hit.Fields, res.Hits[hi].Fields)
 				}
 			}
 			if hit.Fragments != nil {
 				if !reflect.DeepEqual(hit.Fragments, res.Hits[hi].Fragments) {
-					t.Errorf("expected hit %d to have fragments %#v got %#v", hi, hit.Fragments, res.Hits[hi].Fragments)
+					t.Errorf("test %d - expected hit %d to have fragments %#v got %#v", testNum, hi, hit.Fragments, res.Hits[hi].Fragments)
 				}
 			}
 		}
 		if search.Result.Facets != nil {
 			if !reflect.DeepEqual(search.Result.Facets, res.Facets) {
-				t.Errorf("expected facets: %#v got %#v", search.Result.Facets, res.Facets)
+				t.Errorf("test %d - expected facets: %#v got %#v", testNum, search.Result.Facets, res.Facets)
 			}
 		}
 	}
