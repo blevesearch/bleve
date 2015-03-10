@@ -498,6 +498,87 @@ func (i *indexImpl) Fields() ([]string, error) {
 	return indexReader.Fields()
 }
 
+func (i *indexImpl) FieldDict(field string) (index.FieldDict, error) {
+	i.mutex.RLock()
+
+	if !i.open {
+		i.mutex.RUnlock()
+		return nil, ErrorIndexClosed
+	}
+
+	indexReader, err := i.i.Reader()
+	if err != nil {
+		i.mutex.RUnlock()
+		return nil, err
+	}
+
+	fieldDict, err := indexReader.FieldDict(field)
+	if err != nil {
+		i.mutex.RUnlock()
+		return nil, err
+	}
+
+	return &indexImplFieldDict{
+		index:       i,
+		indexReader: indexReader,
+		fieldDict:   fieldDict,
+	}, nil
+}
+
+func (i *indexImpl) FieldDictRange(field string, startTerm []byte, endTerm []byte) (index.FieldDict, error) {
+	i.mutex.RLock()
+
+	if !i.open {
+		i.mutex.RUnlock()
+		return nil, ErrorIndexClosed
+	}
+
+	indexReader, err := i.i.Reader()
+	if err != nil {
+		i.mutex.RUnlock()
+		return nil, err
+	}
+
+	fieldDict, err := indexReader.FieldDictRange(field, startTerm, endTerm)
+	if err != nil {
+		i.mutex.RUnlock()
+		return nil, err
+	}
+
+	return &indexImplFieldDict{
+		index:       i,
+		indexReader: indexReader,
+		fieldDict:   fieldDict,
+	}, nil
+}
+
+func (i *indexImpl) FieldDictPrefix(field string, termPrefix []byte) (index.FieldDict, error) {
+	i.mutex.RLock()
+
+	if !i.open {
+		i.mutex.RUnlock()
+		return nil, ErrorIndexClosed
+	}
+
+	indexReader, err := i.i.Reader()
+	if err != nil {
+		i.mutex.RUnlock()
+		return nil, err
+	}
+
+	fieldDict, err := indexReader.FieldDictPrefix(field, termPrefix)
+	if err != nil {
+		i.mutex.RUnlock()
+		return nil, err
+	}
+
+	return &indexImplFieldDict{
+		index:       i,
+		indexReader: indexReader,
+		fieldDict:   fieldDict,
+	}, nil
+}
+
 // DumpAll writes all index rows to a channel.
 // INTERNAL: do not rely on this function, it is
 // only intended to be used by the debug utilities
@@ -585,4 +666,23 @@ func (i *indexImpl) NewBatch() *Batch {
 		index:    i,
 		internal: index.NewBatch(),
 	}
+}
+
+type indexImplFieldDict struct {
+	index       *indexImpl
+	indexReader index.IndexReader
+	fieldDict   index.FieldDict
+}
+
+func (f *indexImplFieldDict) Next() (*index.DictEntry, error) {
+	return f.fieldDict.Next()
+}
+
+func (f *indexImplFieldDict) Close() error {
+	defer f.index.mutex.RUnlock()
+	err := f.fieldDict.Close()
+	if err != nil {
+		return err
+	}
+	return f.indexReader.Close()
 }

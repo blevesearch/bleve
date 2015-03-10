@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -362,4 +363,67 @@ func TestStoredFieldPreserved(t *testing.T) {
 		t.Errorf("expected 'GopherCON India' got '%s'", res.Hits[0].Fields["desc"])
 	}
 
+}
+
+func TestDict(t *testing.T) {
+	defer os.RemoveAll("testidx")
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doca := map[string]interface{}{
+		"name": "marty",
+		"desc": "gophercon india",
+	}
+	err = index.Index("a", doca)
+	if err != nil {
+		t.Error(err)
+	}
+
+	docy := map[string]interface{}{
+		"name": "jasper",
+		"desc": "clojure",
+	}
+	err = index.Index("y", docy)
+	if err != nil {
+		t.Error(err)
+	}
+
+	docx := map[string]interface{}{
+		"name": "rose",
+		"desc": "googler",
+	}
+	err = index.Index("x", docx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	dict, err := index.FieldDict("name")
+	if err != nil {
+		t.Error(err)
+	}
+
+	terms := []string{}
+	de, err := dict.Next()
+	for err == nil && de != nil {
+		terms = append(terms, string(de.Term))
+		de, err = dict.Next()
+	}
+
+	expectedTerms := []string{"jasper", "marty", "rose"}
+	if !reflect.DeepEqual(terms, expectedTerms) {
+		t.Errorf("expected %v, got %v", expectedTerms, terms)
+	}
+
+	err = dict.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }

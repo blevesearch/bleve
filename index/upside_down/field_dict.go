@@ -17,23 +17,24 @@ import (
 	"github.com/blevesearch/bleve/index/store"
 )
 
-type UpsideDownCouchFieldReader struct {
+type UpsideDownCouchFieldDict struct {
 	indexReader *IndexReader
 	iterator    store.KVIterator
 	endKey      []byte
 	field       uint16
 }
 
-func newUpsideDownCouchFieldReader(indexReader *IndexReader, field uint16, startTerm, endTerm []byte) (*UpsideDownCouchFieldReader, error) {
+func newUpsideDownCouchFieldDict(indexReader *IndexReader, field uint16, startTerm, endTerm []byte) (*UpsideDownCouchFieldDict, error) {
 
-	startRow := NewTermFrequencyRow(startTerm, field, "", 0, 0)
-	startKey := startRow.ScanPrefixForFieldTermPrefix()
-
-	endKey := NewTermFrequencyRow(endTerm, field, "", 0, 0).Key()
+	startKey := NewDictionaryRow(startTerm, field, 0).Key()
+	if endTerm == nil {
+		endTerm = []byte{ByteSeparator}
+	}
+	endKey := NewDictionaryRow(endTerm, field, 0).Key()
 
 	it := indexReader.kvreader.Iterator(startKey)
 
-	return &UpsideDownCouchFieldReader{
+	return &UpsideDownCouchFieldDict{
 		indexReader: indexReader,
 		iterator:    it,
 		field:       field,
@@ -42,7 +43,7 @@ func newUpsideDownCouchFieldReader(indexReader *IndexReader, field uint16, start
 
 }
 
-func (r *UpsideDownCouchFieldReader) Next() (*index.TermFieldDoc, error) {
+func (r *UpsideDownCouchFieldDict) Next() (*index.DictEntry, error) {
 	key, val, valid := r.iterator.Current()
 	if !valid {
 		return nil, nil
@@ -53,24 +54,21 @@ func (r *UpsideDownCouchFieldReader) Next() (*index.TermFieldDoc, error) {
 		return nil, nil
 	}
 
-	currRow, err := NewTermFrequencyRowKV(key, val)
+	currRow, err := NewDictionaryRowKV(key, val)
 	if err != nil {
-		return nil, fmt.Errorf("unexpected error parsing term freq row kv: %v", err)
+		return nil, fmt.Errorf("unexpected error parsing dictionary row kv: %v", err)
 	}
-	rv := index.TermFieldDoc{
-		Term: string(currRow.term),
-		Freq: currRow.freq,
+	rv := index.DictEntry{
+		Term:  string(currRow.term),
+		Count: currRow.count,
 	}
 	// advance the iterator to the next term
-	// by using invalid doc id (higher sorting)
-	nextTerm := incrementBytes(currRow.term)
-	nextRow := NewTermFrequencyRow(nextTerm, r.field, "", 0, 0)
-	r.iterator.Seek(nextRow.ScanPrefixForFieldTermPrefix())
+	r.iterator.Next()
 	return &rv, nil
 
 }
 
-func (r *UpsideDownCouchFieldReader) Close() error {
+func (r *UpsideDownCouchFieldDict) Close() error {
 	return r.iterator.Close()
 }
 

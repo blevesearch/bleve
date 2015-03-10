@@ -35,6 +35,8 @@ func ParseFromKeyValue(key, value []byte) (UpsideDownCouchRow, error) {
 			return NewVersionRowKV(key, value)
 		case 'f':
 			return NewFieldRowKV(key, value)
+		case 'd':
+			return NewDictionaryRowKV(key, value)
 		case 't':
 			return NewTermFrequencyRowKV(key, value)
 		case 'b':
@@ -171,6 +173,91 @@ func NewFieldRowKV(key, value []byte) (*FieldRow, error) {
 	return &rv, nil
 }
 
+// DICTIONARY
+
+type DictionaryRow struct {
+	field uint16
+	term  []byte
+	count uint64
+}
+
+func (dr *DictionaryRow) Key() []byte {
+	buf := make([]byte, 3+len(dr.term))
+	buf[0] = 'd'
+	binary.LittleEndian.PutUint16(buf[1:3], dr.field)
+	copy(buf[3:], dr.term)
+	return buf
+}
+
+func (dr *DictionaryRow) Value() []byte {
+	used := 0
+	buf := make([]byte, 8)
+
+	used += binary.PutUvarint(buf[used:used+8], dr.count)
+
+	return buf[0:used]
+}
+
+func (dr *DictionaryRow) String() string {
+	return fmt.Sprintf("Dictionary Term: `%s` Field: %d Count: %d ", string(dr.term), dr.field, dr.count)
+}
+
+func NewDictionaryRow(term []byte, field uint16, count uint64) *DictionaryRow {
+	return &DictionaryRow{
+		term:  term,
+		field: field,
+		count: count,
+	}
+}
+
+func NewDictionaryRowKV(key, value []byte) (*DictionaryRow, error) {
+	rv, err := NewDictionaryRowK(key)
+	if err != nil {
+		return nil, err
+	}
+
+	err = rv.parseDictionaryV(value)
+	if err != nil {
+		return nil, err
+	}
+	return rv, nil
+
+}
+
+func NewDictionaryRowK(key []byte) (*DictionaryRow, error) {
+	rv := DictionaryRow{}
+	buf := bytes.NewBuffer(key)
+	_, err := buf.ReadByte() // type
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(buf, binary.LittleEndian, &rv.field)
+	if err != nil {
+		return nil, err
+	}
+
+	rv.term, err = buf.ReadBytes(ByteSeparator)
+	// there is no separator expected here, should get EOF
+	if err != io.EOF {
+		return nil, err
+	}
+
+	return &rv, nil
+}
+
+func (dr *DictionaryRow) parseDictionaryV(value []byte) error {
+	buf := bytes.NewBuffer((value))
+
+	count, err := binary.ReadUvarint(buf)
+	if err != nil {
+		return err
+	}
+	dr.count = count
+
+	return nil
+}
+
 // TERM FIELD FREQUENCY
 
 type TermVector struct {
@@ -227,13 +314,9 @@ func (tfr *TermFrequencyRow) Key() []byte {
 	return buf
 }
 
-func (tfr *TermFrequencyRow) SummaryKey() []byte {
-	buf := make([]byte, 3+len(tfr.term)+1)
-	buf[0] = 't'
-	binary.LittleEndian.PutUint16(buf[1:3], tfr.field)
-	termLen := copy(buf[3:], tfr.term)
-	buf[3+termLen] = ByteSeparator
-	return buf
+func (tfr *TermFrequencyRow) DictionaryRowKey() []byte {
+	dr := NewDictionaryRow(tfr.term, tfr.field, 0)
+	return dr.Key()
 }
 
 func (tfr *TermFrequencyRow) Value() []byte {

@@ -27,7 +27,7 @@ import (
 
 var VersionKey = []byte{'v'}
 
-const Version uint8 = 3
+const Version uint8 = 4
 
 var IncompatibleVersion = fmt.Errorf("incompatible version, %d is supported", Version)
 
@@ -111,8 +111,8 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 		tfr, ok := row.(*TermFrequencyRow)
 		if ok {
 			// need to increment counter
-			summaryKey := tfr.SummaryKey()
-			wb.Merge(summaryKey, newTermSummaryIncr())
+			dictionaryKey := tfr.DictionaryRowKey()
+			wb.Merge(dictionaryKey, newDictionaryTermIncr())
 		}
 		wb.Set(row.Key(), row.Value())
 	}
@@ -127,8 +127,8 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 		tfr, ok := row.(*TermFrequencyRow)
 		if ok {
 			// need to decrement counter
-			summaryKey := tfr.SummaryKey()
-			wb.Merge(summaryKey, newTermSummaryDecr())
+			dictionaryKey := tfr.DictionaryRowKey()
+			wb.Merge(dictionaryKey, newDictionaryTermDecr())
 		}
 		wb.Delete(row.Key())
 	}

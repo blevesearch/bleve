@@ -24,18 +24,18 @@ type TermPrefixSearcher struct {
 
 func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string, field string, boost float64, explain bool) (*TermPrefixSearcher, error) {
 	// find the terms with this prefix
-	fieldReader, err := indexReader.FieldReader(field, []byte(prefix), []byte(prefix))
+	fieldDict, err := indexReader.FieldDictPrefix(field, []byte(prefix))
 
 	// enumerate all the terms in the range
 	qsearchers := make([]search.Searcher, 0, 25)
-	tfd, err := fieldReader.Next()
+	tfd, err := fieldDict.Next()
 	for err == nil && tfd != nil {
 		qsearcher, err := NewTermSearcher(indexReader, string(tfd.Term), field, 1.0, explain)
 		if err != nil {
 			return nil, err
 		}
 		qsearchers = append(qsearchers, qsearcher)
-		tfd, err = fieldReader.Next()
+		tfd, err = fieldDict.Next()
 	}
 	// build disjunction searcher of these ranges
 	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, explain)

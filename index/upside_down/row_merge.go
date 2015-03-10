@@ -9,45 +9,45 @@
 
 package upside_down
 
-type termSummaryIncr struct{}
+type dictionaryTermIncr struct{}
 
-func newTermSummaryIncr() *termSummaryIncr {
-	return &termSummaryIncr{}
+func newDictionaryTermIncr() *dictionaryTermIncr {
+	return &dictionaryTermIncr{}
 }
 
-func (t *termSummaryIncr) Merge(key, existing []byte) ([]byte, error) {
+func (t *dictionaryTermIncr) Merge(key, existing []byte) ([]byte, error) {
 	if len(existing) > 0 {
-		tfr, err := NewTermFrequencyRowKV(key, existing)
+		dr, err := NewDictionaryRowKV(key, existing)
 		if err != nil {
 			return nil, err
 		}
-		tfr.freq++
-		return tfr.Value(), nil
+		dr.count++
+		return dr.Value(), nil
 	} else {
-		tfr, err := NewTermFrequencyRowK(key)
+		dr, err := NewDictionaryRowK(key)
 		if err != nil {
 			return nil, err
 		}
-		tfr.freq = 1
-		return tfr.Value(), nil
+		dr.count = 1
+		return dr.Value(), nil
 	}
 }
 
-type termSummaryDecr struct{}
+type dictionaryTermDecr struct{}
 
-func newTermSummaryDecr() *termSummaryDecr {
-	return &termSummaryDecr{}
+func newDictionaryTermDecr() *dictionaryTermDecr {
+	return &dictionaryTermDecr{}
 }
 
-func (t *termSummaryDecr) Merge(key, existing []byte) ([]byte, error) {
+func (t *dictionaryTermDecr) Merge(key, existing []byte) ([]byte, error) {
 	if len(existing) > 0 {
-		tfr, err := NewTermFrequencyRowKV(key, existing)
+		dr, err := NewDictionaryRowKV(key, existing)
 		if err != nil {
 			return nil, err
 		}
-		tfr.freq--
-		if tfr.freq > 0 {
-			return tfr.Value(), nil
+		dr.count--
+		if dr.count > 0 {
+			return dr.Value(), nil
 		}
 	}
 	return nil, nil

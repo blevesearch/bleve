@@ -78,6 +78,10 @@ type Index interface {
 
 	Fields() ([]string, error)
 
+	FieldDict(field string) (index.FieldDict, error)
+	FieldDictRange(field string, startTerm []byte, endTerm []byte) (index.FieldDict, error)
+	FieldDictPrefix(field string, termPrefix []byte) (index.FieldDict, error)
+
 	DumpAll() chan interface{}
 	DumpDoc(id string) chan interface{}
 	DumpFields() chan interface{}

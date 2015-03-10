@@ -25,25 +25,31 @@ type UpsideDownCouchTermFieldReader struct {
 }
 
 func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, field uint16) (*UpsideDownCouchTermFieldReader, error) {
+	dictionaryRow := NewDictionaryRow(term, field, 0)
+	val, err := indexReader.kvreader.Get(dictionaryRow.Key())
+	if err != nil {
+		return nil, err
+	}
+	if val == nil {
+		return &UpsideDownCouchTermFieldReader{
+			count: 0,
+			term:  term,
+			field: field,
+		}, nil
+	}
+
+	err = dictionaryRow.parseDictionaryV(val)
+	if err != nil {
+		return nil, err
+	}
+
 	tfr := NewTermFrequencyRow(term, field, "", 0, 0)
 	it := indexReader.kvreader.Iterator(tfr.Key())
-
-	var count uint64
-	key, val, valid := it.Current()
-	if valid {
-		if bytes.Equal(key, tfr.Key()) {
-			tfr, err := NewTermFrequencyRowKV(key, val)
-			if err != nil {
-				return nil, err
-			}
-			count = tfr.freq
-		}
-	}
 
 	return &UpsideDownCouchTermFieldReader{
 		indexReader: indexReader,
 		iterator:    it,
-		count:       count,
+		count:       dictionaryRow.count,
 		term:        term,
 		field:       field,
 	}, nil
@@ -54,54 +60,62 @@ func (r *UpsideDownCouchTermFieldReader) Count() uint64 {
 }
 
 func (r *UpsideDownCouchTermFieldReader) Next() (*index.TermFieldDoc, error) {
-	r.iterator.Next()
-	key, val, valid := r.iterator.Current()
-	if valid {
-		testfr := NewTermFrequencyRow(r.term, r.field, "", 0, 0)
-		if !bytes.HasPrefix(key, testfr.Key()) {
-			// end of the line
-			return nil, nil
+	if r.iterator != nil {
+		key, val, valid := r.iterator.Current()
+		if valid {
+			testfr := NewTermFrequencyRow(r.term, r.field, "", 0, 0)
+			if !bytes.HasPrefix(key, testfr.Key()) {
+				// end of the line
+				return nil, nil
+			}
+			tfr, err := NewTermFrequencyRowKV(key, val)
+			if err != nil {
+				return nil, err
+			}
+			r.iterator.Next()
+			return &index.TermFieldDoc{
+				ID:      string(tfr.doc),
+				Freq:    tfr.freq,
+				Norm:    float64(tfr.norm),
+				Vectors: r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors),
+			}, nil
 		}
-		tfr, err := NewTermFrequencyRowKV(key, val)
-		if err != nil {
-			return nil, err
-		}
-		return &index.TermFieldDoc{
-			ID:      string(tfr.doc),
-			Freq:    tfr.freq,
-			Norm:    float64(tfr.norm),
-			Vectors: r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors),
-		}, nil
 	}
 	return nil, nil
 }
 
 func (r *UpsideDownCouchTermFieldReader) Advance(docID string) (*index.TermFieldDoc, error) {
-	tfr := NewTermFrequencyRow(r.term, r.field, docID, 0, 0)
-	r.iterator.Seek(tfr.Key())
-	key, val, valid := r.iterator.Current()
-	if valid {
-		testfr := NewTermFrequencyRow(r.term, r.field, "", 0, 0)
-		if !bytes.HasPrefix(key, testfr.Key()) {
-			// end of the line
-			return nil, nil
+	if r.iterator != nil {
+		tfr := NewTermFrequencyRow(r.term, r.field, docID, 0, 0)
+		r.iterator.Seek(tfr.Key())
+		key, val, valid := r.iterator.Current()
+		if valid {
+			testfr := NewTermFrequencyRow(r.term, r.field, "", 0, 0)
+			if !bytes.HasPrefix(key, testfr.Key()) {
+				// end of the line
+				return nil, nil
+			}
+			tfr, err := NewTermFrequencyRowKV(key, val)
+			if err != nil {
+				return nil, err
+			}
+			r.iterator.Next()
+			return &index.TermFieldDoc{
+				ID:      string(tfr.doc),
+				Freq:    tfr.freq,
+				Norm:    float64(tfr.norm),
+				Vectors: r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors),
+			}, nil
 		}
-		tfr, err := NewTermFrequencyRowKV(key, val)
-		if err != nil {
-			return nil, err
-		}
-		return &index.TermFieldDoc{
-			ID:      string(tfr.doc),
-			Freq:    tfr.freq,
-			Norm:    float64(tfr.norm),
-			Vectors: r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors),
-		}, nil
 	}
 	return nil, nil
 }
 
 func (r *UpsideDownCouchTermFieldReader) Close() error {
-	return r.iterator.Close()
+	if r.iterator != nil {
+		return r.iterator.Close()
+	}
+	return nil
 }
 
 type UpsideDownCouchDocIDReader struct {

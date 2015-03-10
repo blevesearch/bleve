@@ -41,7 +41,9 @@ type IndexReader interface {
 	TermFieldReader(term []byte, field string) (TermFieldReader, error)
 	DocIDReader(start, end string) (DocIDReader, error)
 
-	FieldReader(field string, startTerm []byte, endTerm []byte) (FieldReader, error)
+	FieldDict(field string) (FieldDict, error)
+	FieldDictRange(field string, startTerm []byte, endTerm []byte) (FieldDict, error)
+	FieldDictPrefix(field string, termPrefix []byte) (FieldDict, error)
 
 	Document(id string) (*document.Document, error)
 	DocumentFieldTerms(id string) (FieldTerms, error)
@@ -79,8 +81,13 @@ type TermFieldReader interface {
 	Close() error
 }
 
-type FieldReader interface {
-	Next() (*TermFieldDoc, error)
+type DictEntry struct {
+	Term  string
+	Count uint64
+}
+
+type FieldDict interface {
+	Next() (*DictEntry, error)
 	Close() error
 }
 

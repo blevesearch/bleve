@@ -730,6 +730,18 @@ func (i *stubIndex) Fields() ([]string, error) {
 	return nil, i.err
 }
 
+func (i *stubIndex) FieldDict(field string) (index.FieldDict, error) {
+	return nil, i.err
+}
+
+func (i *stubIndex) FieldDictRange(field string, startTerm []byte, endTerm []byte) (index.FieldDict, error) {
+	return nil, i.err
+}
+
+func (i *stubIndex) FieldDictPrefix(field string, termPrefix []byte) (index.FieldDict, error) {
+	return nil, i.err
+}
+
 func (i *stubIndex) DumpAll() chan interface{} {
 	return nil
 }

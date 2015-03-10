@@ -165,6 +165,84 @@ func (i *indexAliasImpl) Fields() ([]string, error) {
 	return i.indexes[0].Fields()
 }
 
+func (i *indexAliasImpl) FieldDict(field string) (index.FieldDict, error) {
+	i.mutex.RLock()
+
+	if !i.open {
+		i.mutex.RUnlock()
+		return nil, ErrorIndexClosed
+	}
+
+	err := i.isAliasToSingleIndex()
+	if err != nil {
+		i.mutex.RUnlock()
+		return nil, err
+	}
+
+	fieldDict, err := i.indexes[0].FieldDict(field)
+	if err != nil {
+		i.mutex.RUnlock()
+		return nil, err
+	}
+
+	return &indexAliasImplFieldDict{
+		index:     i,
+		fieldDict: fieldDict,
+	}, nil
+}
+
+func (i *indexAliasImpl) FieldDictRange(field string, startTerm []byte, endTerm []byte) (index.FieldDict, error) {
+	i.mutex.RLock()
+
+	if !i.open {
+		i.mutex.RUnlock()
+		return nil, ErrorIndexClosed
+	}
+
+	err := i.isAliasToSingleIndex()
+	if err != nil {
+		i.mutex.RUnlock()
+		return nil, err
+	}
+
+	fieldDict, err := i.indexes[0].FieldDictRange(field, startTerm, endTerm)
+	if err != nil {
+		i.mutex.RUnlock()
+		return nil, err
+	}
+
+	return &indexAliasImplFieldDict{
+		index:     i,
+		fieldDict: fieldDict,
+	}, nil
+}
+
+func (i *indexAliasImpl) FieldDictPrefix(field string, termPrefix []byte) (index.FieldDict, error) {
+	i.mutex.RLock()
+
+	if !i.open {
+		i.mutex.RUnlock()
+		return nil, ErrorIndexClosed
+	}
+
+	err := i.isAliasToSingleIndex()
+	if err != nil {
+		i.mutex.RUnlock()
+		return nil, err
+	}
+
+	fieldDict, err := i.indexes[0].FieldDictPrefix(field, termPrefix)
+	if err != nil {
+		i.mutex.RUnlock()
+		return nil, err
+	}
+
+	return &indexAliasImplFieldDict{
+		index:     i,
+		fieldDict: fieldDict,
+	}, nil
+}
+
 func (i *indexAliasImpl) DumpAll() chan interface{} {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -481,4 +559,18 @@ func (i *indexAliasImpl) NewBatch() *Batch {
 	}
 
 	return i.indexes[0].NewBatch()
+}
+
+type indexAliasImplFieldDict struct {
+	index     *indexAliasImpl
+	fieldDict index.FieldDict
+}
+
+func (f *indexAliasImplFieldDict) Next() (*index.DictEntry, error) {
+	return f.fieldDict.Next()
+}
+
+func (f *indexAliasImplFieldDict) Close() error {
+	defer f.index.mutex.RUnlock()
+	return f.fieldDict.Close()
 }

@@ -31,12 +31,20 @@ func (i *IndexReader) TermFieldReader(term []byte, fieldName string) (index.Term
 	return newUpsideDownCouchTermFieldReader(i, []byte{ByteSeparator}, ^uint16(0))
 }
 
-func (i *IndexReader) FieldReader(fieldName string, startTerm []byte, endTerm []byte) (index.FieldReader, error) {
+func (i *IndexReader) FieldDict(fieldName string) (index.FieldDict, error) {
+	return i.FieldDictRange(fieldName, nil, nil)
+}
+
+func (i *IndexReader) FieldDictRange(fieldName string, startTerm []byte, endTerm []byte) (index.FieldDict, error) {
 	fieldIndex, fieldExists := i.index.fieldIndexCache.FieldExists(fieldName)
 	if fieldExists {
-		return newUpsideDownCouchFieldReader(i, uint16(fieldIndex), startTerm, endTerm)
+		return newUpsideDownCouchFieldDict(i, uint16(fieldIndex), startTerm, endTerm)
 	}
-	return newUpsideDownCouchTermFieldReader(i, []byte{ByteSeparator}, ^uint16(0))
+	return newUpsideDownCouchFieldDict(i, ^uint16(0), []byte{ByteSeparator}, []byte{})
+}
+
+func (i *IndexReader) FieldDictPrefix(fieldName string, termPrefix []byte) (index.FieldDict, error) {
+	return i.FieldDictRange(fieldName, termPrefix, incrementBytes(termPrefix))
 }
 
 func (i *IndexReader) DocIDReader(start, end string) (index.DocIDReader, error) {

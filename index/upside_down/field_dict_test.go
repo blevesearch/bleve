@@ -18,7 +18,7 @@ import (
 	"github.com/blevesearch/bleve/index/store/boltdb"
 )
 
-func TestIndexFieldReader(t *testing.T) {
+func TestIndexFieldDict(t *testing.T) {
 	defer os.RemoveAll("test")
 
 	store, err := boltdb.Open("test", "bleve")
@@ -54,38 +54,39 @@ func TestIndexFieldReader(t *testing.T) {
 		t.Error(err)
 	}
 	defer indexReader.Close()
-	reader, err := indexReader.FieldReader("name", nil, nil)
+
+	dict, err := indexReader.FieldDict("name")
 	if err != nil {
 		t.Errorf("error creating reader: %v", err)
 	}
-	defer reader.Close()
+	defer dict.Close()
 
 	termCount := 0
-	curr, err := reader.Next()
+	curr, err := dict.Next()
 	for err == nil && curr != nil {
 		termCount++
 		if curr.Term != "test" {
 			t.Errorf("expected term to be 'test', got '%s'", curr.Term)
 		}
-		curr, err = reader.Next()
+		curr, err = dict.Next()
 	}
 	if termCount != 1 {
 		t.Errorf("expected 1 term for this field, got %d", termCount)
 	}
 
-	reader, err = indexReader.FieldReader("desc", nil, nil)
+	dict, err = indexReader.FieldDict("desc")
 	if err != nil {
 		t.Errorf("error creating reader: %v", err)
 	}
-	defer reader.Close()
+	defer dict.Close()
 
 	termCount = 0
 	terms := make([]string, 0)
-	curr, err = reader.Next()
+	curr, err = dict.Next()
 	for err == nil && curr != nil {
 		termCount++
 		terms = append(terms, curr.Term)
-		curr, err = reader.Next()
+		curr, err = dict.Next()
 	}
 	if termCount != 3 {
 		t.Errorf("expected 3 term for this field, got %d", termCount)
@@ -95,25 +96,48 @@ func TestIndexFieldReader(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", expectedTerms, terms)
 	}
 
-	// test use case for prefix
-	reader, err = indexReader.FieldReader("prefix", []byte("cat"), []byte("cat"))
+	// test start and end range
+	dict, err = indexReader.FieldDictRange("desc", []byte("fun"), []byte("nice"))
 	if err != nil {
 		t.Errorf("error creating reader: %v", err)
 	}
-	defer reader.Close()
+	defer dict.Close()
 
 	termCount = 0
 	terms = make([]string, 0)
-	curr, err = reader.Next()
+	curr, err = dict.Next()
 	for err == nil && curr != nil {
 		termCount++
 		terms = append(terms, curr.Term)
-		curr, err = reader.Next()
+		curr, err = dict.Next()
+	}
+	if termCount != 1 {
+		t.Errorf("expected 1 term for this field, got %d", termCount)
+	}
+	expectedTerms = []string{"more"}
+	if !reflect.DeepEqual(expectedTerms, terms) {
+		t.Errorf("expected %#v, got %#v", expectedTerms, terms)
+	}
+
+	// test use case for prefix
+	dict, err = indexReader.FieldDictPrefix("prefix", []byte("cat"))
+	if err != nil {
+		t.Errorf("error creating reader: %v", err)
+	}
+	defer dict.Close()
+
+	termCount = 0
+	terms = make([]string, 0)
+	curr, err = dict.Next()
+	for err == nil && curr != nil {
+		termCount++
+		terms = append(terms, curr.Term)
+		curr, err = dict.Next()
 	}
 	if termCount != 3 {
 		t.Errorf("expected 3 term for this field, got %d", termCount)
 	}
-	expectedTerms = []string{"cats", "catting", "cat"}
+	expectedTerms = []string{"cat", "cats", "catting"}
 	if !reflect.DeepEqual(expectedTerms, terms) {
 		t.Errorf("expected %#v, got %#v", expectedTerms, terms)
 	}

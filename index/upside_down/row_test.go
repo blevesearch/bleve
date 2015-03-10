@@ -43,6 +43,11 @@ func TestRows(t *testing.T) {
 			[]byte{'s', 't', 'y', 'l', 'e', ByteSeparator},
 		},
 		{
+			NewDictionaryRow([]byte{'b', 'e', 'e', 'r'}, 0, 27),
+			[]byte{'d', 0, 0, 'b', 'e', 'e', 'r'},
+			[]byte{27},
+		},
+		{
 			NewTermFrequencyRow([]byte{'b', 'e', 'e', 'r'}, 0, "", 3, 3.14),
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator},
 			[]byte{3, 195, 235, 163, 130, 4},
