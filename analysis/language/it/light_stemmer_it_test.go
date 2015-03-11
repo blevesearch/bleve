@@ -1,4 +1,4 @@
-//  Copyright (c) 2014 Couchbase, Inc.
+//  Copyright (c) 2015 Couchbase, Inc.
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
 //    http://www.apache.org/licenses/LICENSE-2.0
@@ -17,66 +17,46 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
-func TestItalianAnalyzer(t *testing.T) {
+func TestItalianLightStemmer(t *testing.T) {
 	tests := []struct {
-		input  []byte
+		input  analysis.TokenStream
 		output analysis.TokenStream
 	}{
-		// stemming
 		{
-			input: []byte("abbandonata"),
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ragazzo"),
+				},
+			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("abbandonat"),
+					Term: []byte("ragazz"),
 				},
 			},
 		},
 		{
-			input: []byte("abbandonati"),
-			output: analysis.TokenStream{
+			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("abbandonat"),
+					Term: []byte("ragazzi"),
 				},
 			},
-		},
-		// stop word
-		{
-			input:  []byte("dallo"),
-			output: analysis.TokenStream{},
-		},
-		// contractions
-		{
-			input: []byte("dell'Italia"),
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("ital"),
-				},
-			},
-		},
-		{
-			input: []byte("l'Italiano"),
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("italian"),
+					Term: []byte("ragazz"),
 				},
 			},
 		},
 	}
 
 	cache := registry.NewCache()
-	analyzer, err := cache.AnalyzerNamed(AnalyzerName)
+	filter, err := cache.TokenFilterNamed(LightStemmerName)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, test := range tests {
-		actual := analyzer.Analyze(test.input)
-		if len(actual) != len(test.output) {
-			t.Fatalf("expected length: %d, got %d", len(test.output), len(actual))
-		}
-		for i, tok := range actual {
-			if !reflect.DeepEqual(tok.Term, test.output[i].Term) {
-				t.Errorf("expected term %s (% x) got %s (% x)", test.output[i].Term, test.output[i].Term, tok.Term, tok.Term)
-			}
+		actual := filter.Filter(test.input)
+		if !reflect.DeepEqual(actual, test.output) {
+			t.Errorf("expected %s, got %s", test.output[0].Term, actual[0].Term)
 		}
 	}
 }

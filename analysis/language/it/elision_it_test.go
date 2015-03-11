@@ -17,7 +17,7 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
-func TestFrenchElision(t *testing.T) {
+func TestItalianElision(t *testing.T) {
 	tests := []struct {
 		input  analysis.TokenStream
 		output analysis.TokenStream
