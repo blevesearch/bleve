@@ -51,6 +51,9 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string, prefix, fuzzin
 		}
 		tfd, err = fieldDict.Next()
 	}
+	if err != nil {
+		return nil, err
+	}
 
 	// enumerate all the terms in the range
 	qsearchers := make([]search.Searcher, 0, 25)
