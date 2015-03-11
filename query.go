@@ -189,5 +189,23 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
+	_, hasRegexp := tmp["regexp"]
+	if hasRegexp {
+		var rv regexpQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	_, hasWildcard := tmp["wildcard"]
+	if hasWildcard {
+		var rv wildcardQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
 	return nil, ErrorUnknownQueryType
 }
