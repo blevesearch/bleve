@@ -50,3 +50,20 @@ func TruncateRunes(input []byte, num int) []byte {
 	out := BuildTermFromRunes(runes)
 	return out
 }
+
+func RunesEndsWith(input []rune, suffix string) bool {
+	inputLen := len(input)
+	suffixRunes := []rune(suffix)
+	suffixLen := len(suffixRunes)
+	if suffixLen > inputLen {
+		return false
+	}
+
+	for i := suffixLen - 1; i >= 0; i-- {
+		if input[inputLen-(suffixLen-i)] != suffixRunes[i] {
+			return false
+		}
+	}
+
+	return true
+}

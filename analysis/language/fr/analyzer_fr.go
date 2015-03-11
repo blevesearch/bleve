@@ -39,7 +39,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	if err != nil {
 		return nil, err
 	}
-	stemmerFrFilter, err := cache.TokenFilterNamed(StemmerName)
+	stemmerFrFilter, err := cache.TokenFilterNamed(LightStemmerName)
 	if err != nil {
 		return nil, err
 	}

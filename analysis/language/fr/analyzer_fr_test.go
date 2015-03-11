@@ -79,31 +79,28 @@ func TestFrenchAnalyzer(t *testing.T) {
 				},
 			},
 		},
-		// fails
-		// {
-		// 	input: []byte("mot \"entreguillemet\""),
-		// 	output: analysis.TokenStream{
-		// 		&analysis.Token{
-		// 			Term: []byte("mot"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("entreguilemet"),
-		// 		},
-		// 	},
-		// },
-		// fails, lucene light stemmer normalizes ç to c
-		// need to invsetigate french stemmer
-		// {
-		// 	input: []byte("Jean-François"),
-		// 	output: analysis.TokenStream{
-		// 		&analysis.Token{
-		// 			Term: []byte("jean"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("francoi"),
-		// 		},
-		// 	},
-		// },
+		{
+			input: []byte("mot \"entreguillemet\""),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("mot"),
+				},
+				&analysis.Token{
+					Term: []byte("entreguilemet"),
+				},
+			},
+		},
+		{
+			input: []byte("Jean-François"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("jean"),
+				},
+				&analysis.Token{
+					Term: []byte("francoi"),
+				},
+			},
+		},
 		// stop words
 		{
 			input: []byte("le la chien les aux chat du des à cheval"),
@@ -120,70 +117,67 @@ func TestFrenchAnalyzer(t *testing.T) {
 			},
 		},
 		// nouns and adjectives
-		// fails, stemming difference on habitabl/habit and é to e normalization
-		// {
-		// 	input: []byte("lances chismes habitable chiste éléments captifs"),
-		// 	output: analysis.TokenStream{
-		// 		&analysis.Token{
-		// 			Term: []byte("lanc"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("chism"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("habitabl"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("chist"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("element"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("captif"),
-		// 		},
-		// 	},
-		// },
+		{
+			input: []byte("lances chismes habitable chiste éléments captifs"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("lanc"),
+				},
+				&analysis.Token{
+					Term: []byte("chism"),
+				},
+				&analysis.Token{
+					Term: []byte("habitabl"),
+				},
+				&analysis.Token{
+					Term: []byte("chist"),
+				},
+				&analysis.Token{
+					Term: []byte("element"),
+				},
+				&analysis.Token{
+					Term: []byte("captif"),
+				},
+			},
+		},
 		// verbs
-		// fails very different stemming results
-		// {
-		// 	input: []byte("finissions souffrirent rugissante"),
-		// 	output: analysis.TokenStream{
-		// 		&analysis.Token{
-		// 			Term: []byte("finision"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("soufrirent"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("rugisant"),
-		// 		},
-		// 	},
-		// },
-		// also fails, very different stemming results
-		// {
-		// 	input: []byte("C3PO aujourd'hui oeuf ïâöûàä anticonstitutionnellement Java++ "),
-		// 	output: analysis.TokenStream{
-		// 		&analysis.Token{
-		// 			Term: []byte("c3po"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("aujourd'hui"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("oeuf"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("ïaöuaä"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("anticonstitutionel'hui"),
-		// 		},
-		// 		&analysis.Token{
-		// 			Term: []byte("java"),
-		// 		},
-		// 	},
-		// },
+		{
+			input: []byte("finissions souffrirent rugissante"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("finision"),
+				},
+				&analysis.Token{
+					Term: []byte("soufrirent"),
+				},
+				&analysis.Token{
+					Term: []byte("rugisant"),
+				},
+			},
+		},
+		{
+			input: []byte("C3PO aujourd'hui oeuf ïâöûàä anticonstitutionnellement Java++ "),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("c3po"),
+				},
+				&analysis.Token{
+					Term: []byte("aujourd'hui"),
+				},
+				&analysis.Token{
+					Term: []byte("oeuf"),
+				},
+				&analysis.Token{
+					Term: []byte("ïaöuaä"),
+				},
+				&analysis.Token{
+					Term: []byte("anticonstitutionel'hui"),
+				},
+				&analysis.Token{
+					Term: []byte("java"),
+				},
+			},
+		},
 	}
 
 	cache := registry.NewCache()
