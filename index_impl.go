@@ -155,13 +155,13 @@ func newIndexUsing(path string, mapping *IndexMapping, kvstore string, kvconfig 
 	return &rv, nil
 }
 
-func openIndexUsing(path string, runtimeConfig map[string]interface{}) (*indexImpl, error) {
+func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *indexImpl, err error) {
 
-	rv := indexImpl{
+	rv = &indexImpl{
 		path:  path,
 		stats: &IndexStat{},
 	}
-	var err error
+
 	rv.meta, err = openIndexMeta(path)
 	if err != nil {
 		return nil, err
@@ -203,7 +203,12 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (*indexIm
 	if err != nil {
 		return nil, err
 	}
-	defer indexReader.Close()
+	defer func() {
+		if cerr := indexReader.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
+
 	mappingBytes, err := indexReader.GetInternal(mappingInternalKey)
 	if err != nil {
 		return nil, err
@@ -225,11 +230,11 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (*indexIm
 	if err != nil {
 		// note even if the mapping is invalid
 		// we still return an open usable index
-		return &rv, err
+		return rv, err
 	}
 
 	rv.m = &im
-	return &rv, nil
+	return rv, err
 }
 
 // Advanced returns implementation internals
@@ -303,7 +308,7 @@ func (i *indexImpl) Batch(b *Batch) error {
 // stored fields for a document in the index.  These
 // stored fields are put back into a Document object
 // and returned.
-func (i *indexImpl) Document(id string) (*document.Document, error) {
+func (i *indexImpl) Document(id string) (doc *document.Document, err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -314,8 +319,17 @@ func (i *indexImpl) Document(id string) (*document.Document, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer indexReader.Close()
-	return indexReader.Document(id)
+	defer func() {
+		if cerr := indexReader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	doc, err = indexReader.Document(id)
+	if err != nil {
+		return nil, err
+	}
+	return doc, nil
 }
 
 // DocCount returns the number of documents in the
@@ -333,7 +347,7 @@ func (i *indexImpl) DocCount() (uint64, error) {
 
 // Search executes a search request operation.
 // Returns a SearchResult object or an error.
-func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
+func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -350,13 +364,21 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error opening index reader %v", err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		if cerr := indexReader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
 
 	searcher, err := req.Query.Searcher(indexReader, i.m, req.Explain)
 	if err != nil {
 		return nil, err
 	}
-	defer searcher.Close()
+	defer func() {
+		if serr := searcher.Close(); err == nil && serr != nil {
+			err = serr
+		}
+	}()
 
 	if req.Facets != nil {
 		facetsBuilder := search.NewFacetsBuilder(indexReader)
@@ -482,7 +504,7 @@ func (i *indexImpl) Search(req *SearchRequest) (*SearchResult, error) {
 
 // Fields returns the name of all the fields this
 // Index has operated on.
-func (i *indexImpl) Fields() ([]string, error) {
+func (i *indexImpl) Fields() (fields []string, err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -494,8 +516,17 @@ func (i *indexImpl) Fields() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer indexReader.Close()
-	return indexReader.Fields()
+	defer func() {
+		if cerr := indexReader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	fields, err = indexReader.Fields()
+	if err != nil {
+		return nil, err
+	}
+	return fields, nil
 }
 
 func (i *indexImpl) FieldDict(field string) (index.FieldDict, error) {
@@ -633,7 +664,7 @@ func (i *indexImpl) Stats() *IndexStat {
 	return i.stats
 }
 
-func (i *indexImpl) GetInternal(key []byte) ([]byte, error) {
+func (i *indexImpl) GetInternal(key []byte) (val []byte, err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -641,9 +672,17 @@ func (i *indexImpl) GetInternal(key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer reader.Close()
+	defer func() {
+		if cerr := reader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
 
-	return reader.GetInternal(key)
+	val, err = reader.GetInternal(key)
+	if err != nil {
+		return nil, err
+	}
+	return val, nil
 }
 
 func (i *indexImpl) SetInternal(key, val []byte) error {

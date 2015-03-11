@@ -46,10 +46,10 @@ func openIndexMeta(path string) (*indexMeta, error) {
 	return &im, nil
 }
 
-func (i *indexMeta) Save(path string) error {
+func (i *indexMeta) Save(path string) (err error) {
 	indexMetaPath := indexMetaPath(path)
 	// ensure any necessary parent directories exist
-	err := os.Mkdir(path, 0700)
+	err = os.Mkdir(path, 0700)
 	if err != nil {
 		return ErrorIndexPathExists
 	}
@@ -64,7 +64,11 @@ func (i *indexMeta) Save(path string) error {
 		}
 		return err
 	}
-	defer indexMetaFile.Close()
+	defer func() {
+		if ierr := indexMetaFile.Close(); err == nil && ierr != nil {
+			err = ierr
+		}
+	}()
 	_, err = indexMetaFile.Write(metaBytes)
 	if err != nil {
 		return err
