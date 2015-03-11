@@ -7,9 +7,6 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-// +build libstemmer full
-// +build icu full
-
 package pt
 
 import (
@@ -17,13 +14,13 @@ import (
 	"github.com/blevesearch/bleve/registry"
 
 	"github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
-	"github.com/blevesearch/bleve/analysis/tokenizers/icu"
+	"github.com/blevesearch/bleve/analysis/tokenizers/unicode"
 )
 
 const AnalyzerName = "pt"
 
 func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
-	icuTokenizer, err := cache.TokenizerNamed(icu.Name)
+	tokenizer, err := cache.TokenizerNamed(unicode.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -35,12 +32,12 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	if err != nil {
 		return nil, err
 	}
-	stemmerPtFilter, err := cache.TokenFilterNamed(StemmerName)
+	stemmerPtFilter, err := cache.TokenFilterNamed(LightStemmerName)
 	if err != nil {
 		return nil, err
 	}
 	rv := analysis.Analyzer{
-		Tokenizer: icuTokenizer,
+		Tokenizer: tokenizer,
 		TokenFilters: []analysis.TokenFilter{
 			toLowerFilter,
 			stopPtFilter,

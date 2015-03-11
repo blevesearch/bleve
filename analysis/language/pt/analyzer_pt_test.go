@@ -7,9 +7,6 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-// +build libstemmer full
-// +build icu full
-
 package pt
 
 import (
@@ -26,24 +23,22 @@ func TestPortugueseAnalyzer(t *testing.T) {
 		output analysis.TokenStream
 	}{
 		// stemming
-		// fails due to stemming discrepencies
-		// got quilométr instead of quilometric
-		// {
-		// 	input: []byte("quilométricas"),
-		// 	output: analysis.TokenStream{
-		// 		&analysis.Token{
-		// 			Term: []byte("quilometric"),
-		// 		},
-		// 	},
-		// },
-		// {
-		// 	input: []byte("quilométricos"),
-		// 	output: analysis.TokenStream{
-		// 		&analysis.Token{
-		// 			Term: []byte("quilometric"),
-		// 		},
-		// 	},
-		// },
+		{
+			input: []byte("quilométricas"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("quilometric"),
+				},
+			},
+		},
+		{
+			input: []byte("quilométricos"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("quilometric"),
+				},
+			},
+		},
 		// stop word
 		{
 			input:  []byte("não"),
