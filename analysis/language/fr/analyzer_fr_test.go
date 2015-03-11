@@ -7,9 +7,6 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-// +build libstemmer full
-// +build icu full
-
 package fr
 
 import (
@@ -171,7 +168,7 @@ func TestFrenchAnalyzer(t *testing.T) {
 					Term: []byte("ïaöuaä"),
 				},
 				&analysis.Token{
-					Term: []byte("anticonstitutionel'hui"),
+					Term: []byte("anticonstitutionel"),
 				},
 				&analysis.Token{
 					Term: []byte("java"),
