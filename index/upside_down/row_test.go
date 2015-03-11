@@ -89,6 +89,11 @@ func TestRows(t *testing.T) {
 			[]byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
 		},
 		{
+			NewStoredRow("budweiser", 0, []uint64{2, 294, 3078}, byte('t'), []byte("an american beer")),
+			[]byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', ByteSeparator, 0, 0, 2, 166, 2, 134, 24},
+			[]byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
+		},
+		{
 			NewInternalRow([]byte("mapping"), []byte(`{"mapping":"json content"}`)),
 			[]byte{'i', 'm', 'a', 'p', 'p', 'i', 'n', 'g'},
 			[]byte{'{', '"', 'm', 'a', 'p', 'p', 'i', 'n', 'g', '"', ':', '"', 'j', 's', 'o', 'n', ' ', 'c', 'o', 'n', 't', 'e', 'n', 't', '"', '}'},
@@ -263,6 +268,53 @@ func BenchmarkTermFrequencyRowDecode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		k := []byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'}
 		v := []byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0}
+		NewTermFrequencyRowKV(k, v)
+	}
+}
+
+func BenchmarkBackIndexRowEncode(b *testing.B) {
+	field := uint32(1)
+	t1 := "term1"
+	for i := 0; i < b.N; i++ {
+		row := NewBackIndexRow("beername",
+			[]*BackIndexTermEntry{
+				&BackIndexTermEntry{
+					Term:  &t1,
+					Field: &field,
+				},
+			},
+			[]*BackIndexStoreEntry{
+				&BackIndexStoreEntry{
+					Field: &field,
+				},
+			})
+
+		row.Key()
+		row.Value()
+	}
+}
+
+func BenchmarkBackIndexRowDecode(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		k := []byte{0x62, 0x62, 0x65, 0x65, 0x72, 0x6e, 0x61, 0x6d, 0x65}
+		v := []byte{0x0a, 0x09, 0x0a, 0x05, 0x74, 0x65, 0x72, 0x6d, 0x31, 0x10, 0x01, 0x12, 0x02, 0x08, 0x01}
+		NewTermFrequencyRowKV(k, v)
+	}
+}
+
+func BenchmarkStoredRowEncode(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		row := NewStoredRow("budweiser", 0, []uint64{}, byte('t'), []byte("an american beer"))
+
+		row.Key()
+		row.Value()
+	}
+}
+
+func BenchmarkStoredRowDecode(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		k := []byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', ByteSeparator, 0, 0}
+		v := []byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'}
 		NewTermFrequencyRowKV(k, v)
 	}
 }

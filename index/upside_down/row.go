@@ -496,10 +496,10 @@ func (br *BackIndexRow) AllStoredKeys() [][]byte {
 }
 
 func (br *BackIndexRow) Key() []byte {
-	buf := new(bytes.Buffer)
-	buf.WriteByte('b')
-	buf.Write(br.doc)
-	return buf.Bytes()
+	buf := make([]byte, len(br.doc)+1)
+	buf[0] = 'b'
+	copy(buf[1:], br.doc)
+	return buf
 }
 
 func (br *BackIndexRow) Value() []byte {
@@ -562,19 +562,18 @@ type StoredRow struct {
 }
 
 func (s *StoredRow) Key() []byte {
-	buf := new(bytes.Buffer)
-	buf.WriteByte('s')
-	buf.Write(s.doc)
-	buf.WriteByte(ByteSeparator)
-	fieldbuf := make([]byte, 2)
-	binary.LittleEndian.PutUint16(fieldbuf, s.field)
-	buf.Write(fieldbuf)
+	docLen := len(s.doc)
+	buf := make([]byte, 1+docLen+1+2+(binary.MaxVarintLen64*len(s.arrayPositions)))
+	buf[0] = 's'
+	copy(buf[1:], s.doc)
+	buf[1+docLen] = ByteSeparator
+	binary.LittleEndian.PutUint16(buf[1+docLen+1:], s.field)
+	bytesUsed := 1 + docLen + 1 + 2
 	for _, arrayPosition := range s.arrayPositions {
-		arrayPositionBuffer := make([]byte, binary.MaxVarintLen64)
-		numBytes := binary.PutUvarint(arrayPositionBuffer, arrayPosition)
-		buf.Write(arrayPositionBuffer[0:numBytes])
+		varbytes := binary.PutUvarint(buf[bytesUsed:], arrayPosition)
+		bytesUsed += varbytes
 	}
-	return buf.Bytes()
+	return buf[0:bytesUsed]
 }
 
 func (s *StoredRow) Value() []byte {
@@ -589,11 +588,12 @@ func (s *StoredRow) String() string {
 }
 
 func (s *StoredRow) ScanPrefixForDoc() []byte {
-	buf := new(bytes.Buffer)
-	buf.WriteByte('s')
-	buf.Write(s.doc)
-	buf.WriteByte(ByteSeparator)
-	return buf.Bytes()
+	docLen := len(s.doc)
+	buf := make([]byte, 1+docLen+1)
+	buf[0] = 's'
+	copy(buf[1:], s.doc)
+	buf[1+docLen] = ByteSeparator
+	return buf
 }
 
 func NewStoredRow(doc string, field uint16, arrayPositions []uint64, typ byte, value []byte) *StoredRow {
