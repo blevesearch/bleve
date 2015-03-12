@@ -445,6 +445,32 @@ func TestDict(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	docz := map[string]interface{}{
+		"name": "prefix",
+		"desc": "bob cat cats catting dog doggy zoo",
+	}
+	err = index.Index("z", docz)
+	if err != nil {
+		t.Error(err)
+	}
+
+	dict, err = index.FieldDictPrefix("desc", []byte("cat"))
+	if err != nil {
+		t.Error(err)
+	}
+
+	terms = []string{}
+	de, err = dict.Next()
+	for err == nil && de != nil {
+		terms = append(terms, string(de.Term))
+		de, err = dict.Next()
+	}
+
+	expectedTerms = []string{"cat", "cats", "catting"}
+	if !reflect.DeepEqual(terms, expectedTerms) {
+		t.Errorf("expected %v, got %v", expectedTerms, terms)
+	}
+
 	err = dict.Close()
 	if err != nil {
 		t.Fatal(err)
