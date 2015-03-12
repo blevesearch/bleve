@@ -471,6 +471,11 @@ func TestDict(t *testing.T) {
 		t.Errorf("expected %v, got %v", expectedTerms, terms)
 	}
 
+	stats := index.Stats()
+	if stats == nil {
+		t.Errorf("expected IndexStat, got nil")
+	}
+
 	err = dict.Close()
 	if err != nil {
 		t.Fatal(err)
