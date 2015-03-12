@@ -422,6 +422,34 @@ func TestDict(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// test start and end range
+	dict, err = index.FieldDictRange("name", []byte("marty"), []byte("rose"))
+	if err != nil {
+		t.Error(err)
+	}
+
+	terms = []string{}
+	de, err = dict.Next()
+	for err == nil && de != nil {
+		terms = append(terms, string(de.Term))
+		de, err = dict.Next()
+	}
+
+	expectedTerms = []string{"marty", "rose"}
+	if !reflect.DeepEqual(terms, expectedTerms) {
+		t.Errorf("expected %v, got %v", expectedTerms, terms)
+	}
+
+	err = dict.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = dict.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	err = index.Close()
 	if err != nil {
 		t.Fatal(err)
