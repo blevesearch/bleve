@@ -79,7 +79,10 @@ OUTER:
 
 		// find the smaller of the two rooms to move
 		roomToMove := utf8.RuneCount(orig[minend:end])
-		roomToMoveStart := utf8.RuneCount(orig[maxbegin:start])
+		roomToMoveStart := 0
+		if start >= maxbegin {
+			roomToMoveStart = utf8.RuneCount(orig[maxbegin:start])
+		}
 		if roomToMoveStart < roomToMove {
 			roomToMove = roomToMoveStart
 		}

@@ -199,6 +199,36 @@ func TestSimpleFragmenter(t *testing.T) {
 			},
 			size: 200,
 		},
+		{
+			orig: []byte("交换机"),
+			fragments: []*highlight.Fragment{
+				&highlight.Fragment{
+					Orig:  []byte("交换机"),
+					Start: 0,
+					End:   9,
+				},
+				&highlight.Fragment{
+					Orig:  []byte("交换机"),
+					Start: 3,
+					End:   9,
+				},
+			},
+			ot: highlight.TermLocations{
+				&highlight.TermLocation{
+					Term:  "交换",
+					Pos:   1,
+					Start: 0,
+					End:   6,
+				},
+				&highlight.TermLocation{
+					Term:  "换机",
+					Pos:   2,
+					Start: 3,
+					End:   9,
+				},
+			},
+			size: 200,
+		},
 	}
 
 	for _, test := range tests {

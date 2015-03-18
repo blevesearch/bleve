@@ -43,7 +43,8 @@ func TestHTMLFragmentFormatter1(t *testing.T) {
 
 	emHTMLFormatter := NewFragmentFormatter("<b>", "</b>")
 	for _, test := range tests {
-		result := emHTMLFormatter.Format(test.fragment, test.tlm)
+		otl := highlight.OrderTermLocations(test.tlm)
+		result := emHTMLFormatter.Format(test.fragment, otl)
 		if result != test.output {
 			t.Errorf("expected `%s`, got `%s`", test.output, result)
 		}
@@ -77,7 +78,8 @@ func TestHTMLFragmentFormatter2(t *testing.T) {
 
 	emHTMLFormatter := NewFragmentFormatter("<em>", "</em>")
 	for _, test := range tests {
-		result := emHTMLFormatter.Format(test.fragment, test.tlm)
+		otl := highlight.OrderTermLocations(test.tlm)
+		result := emHTMLFormatter.Format(test.fragment, otl)
 		if result != test.output {
 			t.Errorf("expected `%s`, got `%s`", test.output, result)
 		}

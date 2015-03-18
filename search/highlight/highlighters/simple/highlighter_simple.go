@@ -71,7 +71,7 @@ func (s *Highlighter) BestFragmentInField(dm *search.DocumentMatch, doc *documen
 func (s *Highlighter) BestFragmentsInField(dm *search.DocumentMatch, doc *document.Document, field string, num int) []string {
 	tlm := dm.Locations[field]
 	orderedTermLocations := highlight.OrderTermLocations(tlm)
-	scorer := NewFragmentScorer(dm.Locations[field])
+	scorer := NewFragmentScorer(tlm)
 
 	// score the fragments and put them into a priority queue ordered by score
 	fq := make(FragmentQueue, 0)
@@ -120,13 +120,14 @@ func (s *Highlighter) BestFragmentsInField(dm *search.DocumentMatch, doc *docume
 	}
 
 	// now that we have the best fragments, we can format them
+	orderedTermLocations.MergeOverlapping()
 	formattedFragments := make([]string, len(bestFragments))
 	for i, fragment := range bestFragments {
 		formattedFragments[i] = ""
 		if fragment.Start != 0 {
 			formattedFragments[i] += s.sep
 		}
-		formattedFragments[i] += s.formatter.Format(fragment, dm.Locations[field])
+		formattedFragments[i] += s.formatter.Format(fragment, orderedTermLocations)
 		if fragment.End != len(fragment.Orig) {
 			formattedFragments[i] += s.sep
 		}

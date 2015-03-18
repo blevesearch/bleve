@@ -36,7 +36,7 @@ type Fragmenter interface {
 }
 
 type FragmentFormatter interface {
-	Format(f *Fragment, tlm search.TermLocationMap) string
+	Format(f *Fragment, orderedTermLocations TermLocations) string
 }
 
 type FragmentScorer interface {

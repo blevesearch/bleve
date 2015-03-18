@@ -22,11 +22,35 @@ type TermLocation struct {
 	End   int
 }
 
+func (tl *TermLocation) Overlaps(other *TermLocation) bool {
+	if other.Start >= tl.Start && other.Start < tl.End {
+		return true
+	} else if tl.Start >= other.Start && tl.Start < other.End {
+		return true
+	}
+	return false
+}
+
 type TermLocations []*TermLocation
 
 func (t TermLocations) Len() int           { return len(t) }
 func (t TermLocations) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
 func (t TermLocations) Less(i, j int) bool { return t[i].Start < t[j].Start }
+
+func (t TermLocations) MergeOverlapping() {
+	var lastTl *TermLocation
+	for i, tl := range t {
+		if lastTl == nil && tl != nil {
+			lastTl = tl
+		} else if lastTl != nil && tl != nil {
+			if lastTl.Overlaps(tl) {
+				// ok merge this with previous
+				lastTl.End = tl.End
+				t[i] = nil
+			}
+		}
+	}
+}
 
 func OrderTermLocations(tlm search.TermLocationMap) TermLocations {
 	rv := make(TermLocations, 0)

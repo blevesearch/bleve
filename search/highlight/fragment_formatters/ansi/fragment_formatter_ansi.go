@@ -11,7 +11,6 @@ package ansi
 
 import (
 	"github.com/blevesearch/bleve/registry"
-	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/highlight"
 )
 
@@ -29,11 +28,13 @@ func NewFragmentFormatter(color string) *FragmentFormatter {
 	}
 }
 
-func (a *FragmentFormatter) Format(f *highlight.Fragment, tlm search.TermLocationMap) string {
-	orderedTermLocations := highlight.OrderTermLocations(tlm)
+func (a *FragmentFormatter) Format(f *highlight.Fragment, orderedTermLocations highlight.TermLocations) string {
 	rv := ""
 	curr := f.Start
 	for _, termLocation := range orderedTermLocations {
+		if termLocation == nil {
+			continue
+		}
 		if termLocation.Start < curr {
 			continue
 		}
