@@ -165,6 +165,7 @@ type SearchRequest struct {
 	Highlight *HighlightRequest `json:"highlight"`
 	Fields    []string          `json:"fields"`
 	Facets    FacetsRequest     `json:"facets"`
+	Timeout   time.Duration     `json:"timeout"`
 	Explain   bool              `json:"explain"`
 }
 

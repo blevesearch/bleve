@@ -25,6 +25,7 @@ import (
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/collectors"
 	"github.com/blevesearch/bleve/search/facets"
+	"github.com/blevesearch/bleve/search/searchers"
 )
 
 type indexImpl struct {
@@ -374,6 +375,13 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if req.Timeout > 0 {
+		if searcher, err = searchers.NewTimeoutableSearcher(searcher, req.Timeout); err != nil {
+			return nil, err
+		}
+	}
+
 	defer func() {
 		if serr := searcher.Close(); err == nil && serr != nil {
 			err = serr
