@@ -17,6 +17,7 @@ package metrics
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -85,7 +86,6 @@ func TestReaderIsolation(t *testing.T) {
 }
 
 func CommonTestKVStore(t *testing.T, s store.KVStore) {
-
 	writer, err := s.Writer()
 	if err != nil {
 		t.Error(err)
@@ -261,5 +261,66 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	if count != 1 {
 		t.Errorf("expected iterator to see 1, saw %d", count)
 	}
+}
 
+func TestErrors(t *testing.T) {
+	s, err := StoreConstructor(map[string]interface{}{
+		"kvStoreName_actual": "gtreap",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x, ok := s.(*Store)
+	if !ok {
+		t.Errorf("expecting a Store")
+	}
+
+	x.AddError("foo", fmt.Errorf("Foo"), []byte("fooKey"))
+	x.AddError("bar", fmt.Errorf("Bar"), nil)
+	x.AddError("baz", fmt.Errorf("Baz"), []byte("bazKey"))
+
+	b := bytes.NewBuffer(nil)
+	x.WriteJSON(b)
+
+	var m map[string]interface{}
+	err = json.Unmarshal(b.Bytes(), &m)
+	if err != nil {
+		t.Errorf("expected unmarshallable writeJSON, err: %v, b: %s",
+			err, b.Bytes())
+	}
+
+	errorsi, ok := m["Errors"]
+	if !ok || errorsi == nil {
+		t.Errorf("expected errorsi")
+	}
+	errors, ok := errorsi.([]interface{})
+	if !ok || errors == nil {
+		t.Errorf("expected errorsi is array")
+	}
+	if len(errors) != 3 {
+		t.Errorf("expected errors len 3")
+	}
+
+	e := errors[0].(map[string]interface{})
+	if e["Op"].(string) != "foo" ||
+		e["Err"].(string) != "Foo" ||
+		len(e["Time"].(string)) < 10 ||
+		e["Key"].(string) != "fooKey" {
+		t.Errorf("expected foo, %#v", e)
+	}
+	e = errors[1].(map[string]interface{})
+	if e["Op"].(string) != "bar" ||
+		e["Err"].(string) != "Bar" ||
+		len(e["Time"].(string)) < 10 ||
+		e["Key"].(string) != "" {
+		t.Errorf("expected bar, %#v", e)
+	}
+	e = errors[2].(map[string]interface{})
+	if e["Op"].(string) != "baz" ||
+		e["Err"].(string) != "Baz" ||
+		len(e["Time"].(string)) < 10 ||
+		e["Key"].(string) != "bazKey" {
+		t.Errorf("expected baz, %#v", e)
+	}
 }
