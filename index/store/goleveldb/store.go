@@ -55,6 +55,9 @@ func (ldbs *Store) get(key []byte) ([]byte, error) {
 func (ldbs *Store) getWithSnapshot(key []byte, snapshot *leveldb.Snapshot) ([]byte, error) {
 	options := defaultReadOptions()
 	b, err := snapshot.Get(key, options)
+	if err == leveldb.ErrNotFound {
+		return nil, nil
+	}
 	return b, err
 }
 

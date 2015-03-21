@@ -204,7 +204,7 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 
 	// but that the isolated reader does not
 	val, err = reader.Get([]byte("b"))
-	if err != nil && err.Error() != "leveldb: not found" {
+	if err != nil {
 		t.Error(err)
 	}
 	if val != nil {
