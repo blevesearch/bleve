@@ -49,6 +49,9 @@ func Open(path string, config map[string]interface{}) (*Store, error) {
 func (ldbs *Store) get(key []byte) ([]byte, error) {
 	options := defaultReadOptions()
 	b, err := ldbs.db.Get(key, options)
+	if err == leveldb.ErrNotFound {
+		return nil, nil
+	}
 	return b, err
 }
 
