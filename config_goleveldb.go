@@ -13,7 +13,7 @@ import (
 	_ "github.com/blevesearch/bleve/index/store/goleveldb"
 )
 
-func init() {
-	// install goleveldb as the default kv store
-	Config.DefaultKVStore = "goleveldb"
-}
+// func init() {
+// 	// install goleveldb as the default kv store
+// 	Config.DefaultKVStore = "goleveldb"
+// }
