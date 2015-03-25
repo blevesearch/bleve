@@ -52,7 +52,9 @@ func (ldbs *Store) get(key []byte) ([]byte, error) {
 	if err == leveldb.ErrNotFound {
 		return nil, nil
 	}
-	return b, err
+	rv := make([]byte, len(b))
+	copy(rv, b)
+	return rv, err
 }
 
 func (ldbs *Store) getWithSnapshot(key []byte, snapshot *leveldb.Snapshot) ([]byte, error) {
@@ -61,7 +63,9 @@ func (ldbs *Store) getWithSnapshot(key []byte, snapshot *leveldb.Snapshot) ([]by
 	if err == leveldb.ErrNotFound {
 		return nil, nil
 	}
-	return b, err
+	rv := make([]byte, len(b))
+	copy(rv, b)
+	return rv, err
 }
 
 func (ldbs *Store) set(key, val []byte) error {

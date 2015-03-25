@@ -59,11 +59,17 @@ func (ldi *Iterator) Current() ([]byte, []byte, bool) {
 }
 
 func (ldi *Iterator) Key() []byte {
-	return ldi.iterator.Key()
+	k := ldi.iterator.Key()
+	rv := make([]byte, len(k))
+	copy(rv, k)
+	return rv
 }
 
 func (ldi *Iterator) Value() []byte {
-	return ldi.iterator.Value()
+	v := ldi.iterator.Value()
+	rv := make([]byte, len(v))
+	copy(rv, v)
+	return rv
 }
 
 func (ldi *Iterator) Valid() bool {
