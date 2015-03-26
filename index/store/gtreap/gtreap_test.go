@@ -38,7 +38,6 @@ func TestReaderIsolation(t *testing.T) {
 }
 
 func CommonTestKVStore(t *testing.T, s store.KVStore) {
-
 	writer, err := s.Writer()
 	if err != nil {
 		t.Error(err)
@@ -162,11 +161,13 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = writer.Set([]byte("b"), []byte("val-b"))
+	valB := []byte("val-b")
+	err = writer.Set([]byte("b"), valB)
 	if err != nil {
 		t.Fatal(err)
 	}
 	writer.Close()
+	valB[0] = 'X' // Modify the bytes so we check that writer got its own copy.
 
 	// ensure that a newer reader sees it
 	newReader, err := s.Reader()
@@ -214,5 +215,4 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	if count != 1 {
 		t.Errorf("expected iterator to see 1, saw %d", count)
 	}
-
 }

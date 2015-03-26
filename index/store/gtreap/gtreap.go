@@ -125,7 +125,7 @@ func (w *Store) Iterator(k []byte) store.KVIterator {
 
 func (w *Store) Set(k, v []byte) (err error) {
 	w.m.Lock()
-	w.t = w.t.Upsert(&Item{k: k, v: v}, rand.Int())
+	w.t = w.t.Upsert(&Item{k: k, v: append([]byte(nil), v...)}, rand.Int())
 	w.m.Unlock()
 	return nil
 }
@@ -243,7 +243,7 @@ func (w *Iterator) Close() error {
 }
 
 func (w *Batch) Set(k, v []byte) {
-	w.items = append(w.items, &Item{k, v})
+	w.items = append(w.items, &Item{k, append([]byte(nil), v...)})
 }
 
 func (w *Batch) Delete(k []byte) {
@@ -269,11 +269,14 @@ func (w *Batch) Execute() (err error) {
 			if itm != nil {
 				v = itm.(*Item).v
 			}
+			// NOTE: mc.Merge() doesn't modify its k or v params.
 			v, err := mc.Merge(k, v)
 			if err != nil {
 				return err
 			}
 			if v != nil {
+				// NOTE: We don't re-copy the result from mc.Merge(),
+				// as it'll return brand new unshared bytes.
 				t = t.Upsert(&Item{k: k, v: v}, rand.Int())
 			} else {
 				t = t.Delete(&Item{k: k})
