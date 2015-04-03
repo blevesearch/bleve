@@ -110,6 +110,10 @@ func (s *Store) Writer() (store.KVWriter, error) {
 	return &Writer{s: s}, nil
 }
 
+func (w *Reader) BytesSafeAfterClose() bool {
+	return false
+}
+
 func (w *Reader) Get(k []byte) (v []byte, err error) {
 	itm := w.t.Get(&Item{k: k})
 	if itm != nil {
@@ -124,6 +128,10 @@ func (w *Reader) Iterator(k []byte) store.KVIterator {
 
 func (w *Reader) Close() error {
 	return nil
+}
+
+func (w *Writer) BytesSafeAfterClose() bool {
+	return false
 }
 
 func (w *Writer) Get(k []byte) (v []byte, err error) {
@@ -338,4 +346,3 @@ func (w *Batch) Execute() (err error) {
 func (w *Batch) Close() error {
 	return nil
 }
-

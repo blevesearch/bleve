@@ -364,58 +364,50 @@ func NewTermFrequencyRowWithTermVectors(term []byte, field uint16, doc string, f
 }
 
 func NewTermFrequencyRowK(key []byte) (*TermFrequencyRow, error) {
-	rv := TermFrequencyRow{
-		doc: []byte(""),
+	rv := TermFrequencyRow{}
+	keyLen := len(key)
+	if keyLen < 3 {
+		return nil, fmt.Errorf("invalid term frequency key, no valid field")
 	}
-	buf := bytes.NewBuffer(key)
-	_, err := buf.ReadByte() // type
-	if err != nil {
-		return nil, err
-	}
+	rv.field = binary.LittleEndian.Uint16(key[1:3])
 
-	err = binary.Read(buf, binary.LittleEndian, &rv.field)
-	if err != nil {
-		return nil, err
+	termEndPos := bytes.IndexByte(key[3:], ByteSeparator)
+	if termEndPos < 0 {
+		return nil, fmt.Errorf("invalid term frequency key, no byte separator terminating term")
 	}
+	rv.term = key[3 : 3+termEndPos]
 
-	rv.term, err = buf.ReadBytes(ByteSeparator)
-	if err != nil {
-		return nil, err
+	docLen := len(key) - (3 + termEndPos + 1)
+	if docLen < 1 {
+		return nil, fmt.Errorf("invalid term frequency key, empty docid")
 	}
-	rv.term = rv.term[:len(rv.term)-1] // trim off separator byte
-
-	doc, err := buf.ReadBytes(ByteSeparator)
-	if err != io.EOF {
-		return nil, err
-	}
-	if doc != nil {
-		rv.doc = doc
-	}
+	rv.doc = key[3+termEndPos+1:]
 
 	return &rv, nil
 }
 
 func (tfr *TermFrequencyRow) parseV(value []byte) error {
-	buf := bytes.NewBuffer((value))
-
-	freq, err := binary.ReadUvarint(buf)
-	if err != nil {
-		return err
+	currOffset := 0
+	bytesRead := 0
+	tfr.freq, bytesRead = binary.Uvarint(value[currOffset:])
+	if bytesRead <= 0 {
+		return fmt.Errorf("invalid term frequency value, invalid frequency")
 	}
-	tfr.freq = freq
+	currOffset += bytesRead
 
-	norm, err := binary.ReadUvarint(buf)
-	if err != nil {
-		return err
+	var norm uint64
+	norm, bytesRead = binary.Uvarint(value[currOffset:])
+	if bytesRead <= 0 {
+		return fmt.Errorf("invalid term frequency value, no norm")
 	}
+	currOffset += bytesRead
 
 	tfr.norm = math.Float32frombits(uint32(norm))
 
-	field, err := binary.ReadUvarint(buf)
-	if err != nil && err != io.EOF {
-		return err
-	}
-	for err != io.EOF {
+	var field uint64
+	field, bytesRead = binary.Uvarint(value[currOffset:])
+	for bytesRead > 0 {
+		currOffset += bytesRead
 		tv := TermVector{}
 		tv.field = uint16(field)
 		// at this point we expect at least one term vector
@@ -423,31 +415,32 @@ func (tfr *TermFrequencyRow) parseV(value []byte) error {
 			tfr.vectors = make([]*TermVector, 0)
 		}
 
-		var pos uint64
-		pos, err = binary.ReadUvarint(buf)
-		if err != nil {
-			return err
+		tv.pos, bytesRead = binary.Uvarint(value[currOffset:])
+		if bytesRead <= 0 {
+			return fmt.Errorf("invalid term frequency value, vector contains no position")
 		}
-		tv.pos = pos
+		currOffset += bytesRead
 
-		var start uint64
-		start, err = binary.ReadUvarint(buf)
-		if err != nil {
-			return err
+		tv.start, bytesRead = binary.Uvarint(value[currOffset:])
+		if bytesRead <= 0 {
+			return fmt.Errorf("invalid term frequency value, vector contains no start")
 		}
-		tv.start = start
+		currOffset += bytesRead
 
-		var end uint64
-		end, err = binary.ReadUvarint(buf)
-		if err != nil {
-			return err
+		tv.end, bytesRead = binary.Uvarint(value[currOffset:])
+		if bytesRead <= 0 {
+			return fmt.Errorf("invalid term frequency value, vector contains no end")
 		}
-		tv.end = end
+		currOffset += bytesRead
 
 		tfr.vectors = append(tfr.vectors, &tv)
 		// try to read next record (may not exist)
-		field, err = binary.ReadUvarint(buf)
+		field, bytesRead = binary.Uvarint(value[currOffset:])
 	}
+	if len(value[currOffset:]) > 0 && bytesRead <= 0 {
+		return fmt.Errorf("invalid term frequency value, vector field invalid")
+	}
+
 	return nil
 }
 

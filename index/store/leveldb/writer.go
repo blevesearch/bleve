@@ -26,6 +26,10 @@ func newWriter(store *Store) (*Writer, error) {
 	}, nil
 }
 
+func (w *Writer) BytesSafeAfterClose() bool {
+	return true
+}
+
 func (w *Writer) Set(key, val []byte) error {
 	return w.store.setlocked(key, val)
 }

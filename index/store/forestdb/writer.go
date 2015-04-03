@@ -19,6 +19,10 @@ type Writer struct {
 	store *Store
 }
 
+func (w *Writer) BytesSafeAfterClose() bool {
+	return true
+}
+
 func newWriter(store *Store) (*Writer, error) {
 	store.writer.Lock()
 	return &Writer{

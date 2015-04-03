@@ -51,62 +51,37 @@ func Open(path string, bucket string) (*Store, error) {
 	return &rv, nil
 }
 
-func (bs *Store) get(key []byte) ([]byte, error) {
-	var rv []byte
-
-	err := bs.db.View(func(tx *bolt.Tx) error {
-		rv = tx.Bucket([]byte(bs.bucket)).Get(key)
-
-		return nil
-	})
-
-	return rv, err
-}
-
-func (bs *Store) set(key, val []byte) error {
-	bs.writer.Lock()
-	defer bs.writer.Unlock()
-	return bs.setlocked(key, val)
-}
-
-func (bs *Store) setlocked(key, val []byte) error {
-	return bs.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket([]byte(bs.bucket)).Put(key, val)
-	})
-}
-
-func (bs *Store) delete(key []byte) error {
-	bs.writer.Lock()
-	defer bs.writer.Unlock()
-	return bs.deletelocked(key)
-}
-
-func (bs *Store) deletelocked(key []byte) error {
-	return bs.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket([]byte(bs.bucket)).Delete(key)
-	})
-}
-
 func (bs *Store) Close() error {
 	return bs.db.Close()
 }
 
-func (bs *Store) iterator(key []byte) store.KVIterator {
-	rv := newIterator(bs)
-	rv.Seek(key)
-	return rv
-}
-
 func (bs *Store) Reader() (store.KVReader, error) {
-	return newReader(bs)
+	tx, err := bs.db.Begin(false)
+	if err != nil {
+		return nil, err
+	}
+	return &Reader{
+		store: bs,
+		tx:    tx,
+	}, nil
 }
 
 func (bs *Store) Writer() (store.KVWriter, error) {
-	return newWriter(bs)
-}
-
-func (bs *Store) newBatch() store.KVBatch {
-	return newBatch(bs)
+	bs.writer.Lock()
+	tx, err := bs.db.Begin(true)
+	if err != nil {
+		bs.writer.Unlock()
+		return nil, err
+	}
+	reader := &Reader{
+		store: bs,
+		tx:    tx,
+	}
+	return &Writer{
+		store:  bs,
+		tx:     tx,
+		reader: reader,
+	}, nil
 }
 
 func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {

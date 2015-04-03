@@ -17,11 +17,12 @@ import (
 )
 
 type UpsideDownCouchTermFieldReader struct {
-	indexReader *IndexReader
-	iterator    store.KVIterator
-	count       uint64
-	term        []byte
-	field       uint16
+	indexReader  *IndexReader
+	iterator     store.KVIterator
+	count        uint64
+	term         []byte
+	field        uint16
+	readerPrefix []byte
 }
 
 func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, field uint16) (*UpsideDownCouchTermFieldReader, error) {
@@ -44,14 +45,16 @@ func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 	}
 
 	tfr := NewTermFrequencyRow(term, field, "", 0, 0)
-	it := indexReader.kvreader.Iterator(tfr.Key())
+	readerPrefix := tfr.Key()
+	it := indexReader.kvreader.Iterator(readerPrefix)
 
 	return &UpsideDownCouchTermFieldReader{
-		indexReader: indexReader,
-		iterator:    it,
-		count:       dictionaryRow.count,
-		term:        term,
-		field:       field,
+		indexReader:  indexReader,
+		iterator:     it,
+		count:        dictionaryRow.count,
+		term:         term,
+		field:        field,
+		readerPrefix: readerPrefix,
 	}, nil
 }
 
@@ -63,8 +66,7 @@ func (r *UpsideDownCouchTermFieldReader) Next() (*index.TermFieldDoc, error) {
 	if r.iterator != nil {
 		key, val, valid := r.iterator.Current()
 		if valid {
-			testfr := NewTermFrequencyRow(r.term, r.field, "", 0, 0)
-			if !bytes.HasPrefix(key, testfr.Key()) {
+			if !bytes.HasPrefix(key, r.readerPrefix) {
 				// end of the line
 				return nil, nil
 			}
@@ -90,8 +92,7 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docID string) (*index.TermField
 		r.iterator.Seek(tfr.Key())
 		key, val, valid := r.iterator.Current()
 		if valid {
-			testfr := NewTermFrequencyRow(r.term, r.field, "", 0, 0)
-			if !bytes.HasPrefix(key, testfr.Key()) {
+			if !bytes.HasPrefix(key, r.readerPrefix) {
 				// end of the line
 				return nil, nil
 			}

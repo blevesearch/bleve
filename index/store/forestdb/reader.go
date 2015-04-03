@@ -23,6 +23,10 @@ type Reader struct {
 	snapshot *forestdb.KVStore
 }
 
+func (r *Reader) BytesSafeAfterClose() bool {
+	return true
+}
+
 func newReader(store *Store) (*Reader, error) {
 	snapshot, err := store.newSnapshot()
 	if err != nil {

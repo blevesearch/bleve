@@ -11,43 +11,45 @@ package boltdb
 
 import (
 	"github.com/blevesearch/bleve/index/store"
+	"github.com/boltdb/bolt"
 )
 
 type Writer struct {
-	store *Store
-}
-
-func newWriter(store *Store) (*Writer, error) {
-	store.writer.Lock()
-	return &Writer{
-		store: store,
-	}, nil
+	store  *Store
+	tx     *bolt.Tx
+	reader *Reader
 }
 
 func (w *Writer) Set(key, val []byte) error {
-	return w.store.setlocked(key, val)
+	return w.tx.Bucket([]byte(w.store.bucket)).Put(key, val)
 }
 
 func (w *Writer) Delete(key []byte) error {
-	return w.store.deletelocked(key)
+	return w.tx.Bucket([]byte(w.store.bucket)).Delete(key)
 }
 
 func (w *Writer) NewBatch() store.KVBatch {
-	return newBatchAlreadyLocked(w.store)
+	rv := Batch{
+		writer: w,
+		ops:    make([]op, 0),
+		merges: make(map[string]store.AssociativeMergeChain),
+	}
+	return &rv
 }
 
 func (w *Writer) Close() error {
 	w.store.writer.Unlock()
-	return nil
+	return w.tx.Commit()
 }
 
-// these two methods can safely read using the regular
-// methods without a read transaction, because we know
-// that no one else is writing but us
+func (w *Writer) BytesSafeAfterClose() bool {
+	return w.reader.BytesSafeAfterClose()
+}
+
 func (w *Writer) Get(key []byte) ([]byte, error) {
-	return w.store.get(key)
+	return w.reader.Get(key)
 }
 
 func (w *Writer) Iterator(key []byte) store.KVIterator {
-	return w.store.iterator(key)
+	return w.reader.Iterator(key)
 }

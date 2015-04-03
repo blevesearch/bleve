@@ -48,8 +48,8 @@ func TestRows(t *testing.T) {
 			[]byte{27},
 		},
 		{
-			NewTermFrequencyRow([]byte{'b', 'e', 'e', 'r'}, 0, "", 3, 3.14),
-			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator},
+			NewTermFrequencyRow([]byte{'b', 'e', 'e', 'r'}, 0, "catz", 3, 3.14),
+			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'c', 'a', 't', 'z'},
 			[]byte{3, 195, 235, 163, 130, 4},
 		},
 		{
@@ -178,27 +178,27 @@ func TestInvalidRows(t *testing.T) {
 		// type t, invalid val (missing norm)
 		{
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
-			[]byte{3, 0, 0, 0, 0, 0, 0, 0},
+			[]byte{3},
 		},
 		// type t, invalid val (half missing tv field, full missing is valid (no term vectors))
 		{
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
-			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0},
+			[]byte{3, 25, 255},
 		},
 		// type t, invalid val (missing tv pos)
 		{
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
-			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0},
+			[]byte{3, 25, 0},
 		},
 		// type t, invalid val (missing tv start)
 		{
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
-			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0},
+			[]byte{3, 25, 0, 0},
 		},
 		// type t, invalid val (missing tv end)
 		{
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
-			[]byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0},
+			[]byte{3, 25, 0, 0, 0},
 		},
 		// type b, invalid key (missing id)
 		{

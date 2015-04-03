@@ -19,15 +19,8 @@ type Reader struct {
 	tx    *bolt.Tx
 }
 
-func newReader(store *Store) (*Reader, error) {
-	tx, err := store.db.Begin(false)
-	if err != nil {
-		return nil, err
-	}
-	return &Reader{
-		store: store,
-		tx:    tx,
-	}, nil
+func (r *Reader) BytesSafeAfterClose() bool {
+	return false
 }
 
 func (r *Reader) Get(key []byte) ([]byte, error) {
@@ -36,7 +29,15 @@ func (r *Reader) Get(key []byte) ([]byte, error) {
 }
 
 func (r *Reader) Iterator(key []byte) store.KVIterator {
-	rv := newIteratorExistingTx(r.store, r.tx)
+	b := r.tx.Bucket([]byte(r.store.bucket))
+	cursor := b.Cursor()
+
+	rv := &Iterator{
+		store:  r.store,
+		tx:     r.tx,
+		cursor: cursor,
+	}
+
 	rv.Seek(key)
 	return rv
 }

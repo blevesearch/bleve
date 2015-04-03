@@ -44,6 +44,7 @@ type KVWriter interface {
 }
 
 type KVReader interface {
+	BytesSafeAfterClose() bool
 	Get(key []byte) ([]byte, error)
 	Iterator(key []byte) KVIterator
 	Close() error

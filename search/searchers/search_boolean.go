@@ -192,11 +192,17 @@ func (s *BooleanSearcher) Next() (*search.DocumentMatch, error) {
 			}
 			if s.currShould != nil && s.currShould.ID == s.currentID {
 				// score bonus matches should
-				cons := []*search.DocumentMatch{}
+				var cons []*search.DocumentMatch
 				if s.currMust != nil {
-					cons = append(cons, s.currMust)
+					cons = []*search.DocumentMatch{
+						s.currMust,
+						s.currShould,
+					}
+				} else {
+					cons = []*search.DocumentMatch{
+						s.currShould,
+					}
 				}
-				cons = append(cons, s.currShould)
 				rv = s.scorer.Score(cons)
 				err = s.advanceNextMust()
 				if err != nil {
@@ -214,11 +220,17 @@ func (s *BooleanSearcher) Next() (*search.DocumentMatch, error) {
 			}
 		} else if s.currShould != nil && s.currShould.ID == s.currentID {
 			// score bonus matches should
-			cons := []*search.DocumentMatch{}
+			var cons []*search.DocumentMatch
 			if s.currMust != nil {
-				cons = append(cons, s.currMust)
+				cons = []*search.DocumentMatch{
+					s.currMust,
+					s.currShould,
+				}
+			} else {
+				cons = []*search.DocumentMatch{
+					s.currShould,
+				}
 			}
-			cons = append(cons, s.currShould)
 			rv = s.scorer.Score(cons)
 			err = s.advanceNextMust()
 			if err != nil {

@@ -70,7 +70,12 @@ func (i *IndexReader) Document(id string) (*document.Document, error) {
 		if !bytes.HasPrefix(key, storedRowScanPrefix) {
 			break
 		}
-		row, err := NewStoredRowKV(key, val)
+		safeVal := val
+		if !i.kvreader.BytesSafeAfterClose() {
+			safeVal = make([]byte, len(val))
+			copy(safeVal, val)
+		}
+		row, err := NewStoredRowKV(key, safeVal)
 		if err != nil {
 			return nil, err
 		}

@@ -157,6 +157,10 @@ func (s *Store) Actual() store.KVStore {
 	return s.o
 }
 
+func (w *Reader) BytesSafeAfterClose() bool {
+	return w.BytesSafeAfterClose()
+}
+
 func (w *Reader) Get(key []byte) (v []byte, err error) {
 	w.s.TimerReaderGet.Time(func() {
 		v, err = w.o.Get(key)
@@ -180,6 +184,10 @@ func (w *Reader) Close() error {
 		w.s.AddError("Reader.Close", err, nil)
 	}
 	return err
+}
+
+func (w *Writer) BytesSafeAfterClose() bool {
+	return w.BytesSafeAfterClose()
 }
 
 func (w *Writer) Get(key []byte) (v []byte, err error) {

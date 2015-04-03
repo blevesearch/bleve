@@ -15,7 +15,6 @@ import (
 
 type Iterator struct {
 	store  *Store
-	ownTx  bool
 	tx     *bolt.Tx
 	cursor *bolt.Cursor
 	valid  bool
@@ -23,45 +22,18 @@ type Iterator struct {
 	val    []byte
 }
 
-func newIterator(store *Store) *Iterator {
-	tx, _ := store.db.Begin(false)
-	b := tx.Bucket([]byte(store.bucket))
-	cursor := b.Cursor()
-
-	return &Iterator{
-		store:  store,
-		tx:     tx,
-		ownTx:  true,
-		cursor: cursor,
-	}
-}
-
-func newIteratorExistingTx(store *Store, tx *bolt.Tx) *Iterator {
-	b := tx.Bucket([]byte(store.bucket))
-	cursor := b.Cursor()
-
-	return &Iterator{
-		store:  store,
-		tx:     tx,
-		cursor: cursor,
-	}
-}
-
 func (i *Iterator) SeekFirst() {
 	i.key, i.val = i.cursor.First()
-
 	i.valid = (i.key != nil)
 }
 
 func (i *Iterator) Seek(k []byte) {
 	i.key, i.val = i.cursor.Seek(k)
-
 	i.valid = (i.key != nil)
 }
 
 func (i *Iterator) Next() {
 	i.key, i.val = i.cursor.Next()
-
 	i.valid = (i.key != nil)
 }
 
@@ -82,9 +54,5 @@ func (i *Iterator) Valid() bool {
 }
 
 func (i *Iterator) Close() error {
-	// only close the transaction if we opened it
-	if i.ownTx {
-		return i.tx.Rollback()
-	}
 	return nil
 }

@@ -77,6 +77,10 @@ func (s *Store) Reader() (store.KVReader, error) {
 	return s, nil
 }
 
+func (s *Store) BytesSafeAfterClose() bool {
+	return false
+}
+
 func (s *Store) Writer() (store.KVWriter, error) {
 	return s, nil
 }

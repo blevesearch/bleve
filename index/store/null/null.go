@@ -51,6 +51,10 @@ func newReader(store *Store) (*Reader, error) {
 	}, nil
 }
 
+func (r *Reader) BytesSafeAfterClose() bool {
+	return true
+}
+
 func (r *Reader) Get(key []byte) ([]byte, error) {
 	return nil, nil
 }
@@ -127,6 +131,10 @@ func newWriter(store *Store) (*Writer, error) {
 	return &Writer{
 		store: store,
 	}, nil
+}
+
+func (w *Writer) BytesSafeAfterClose() bool {
+	return true
 }
 
 func (w *Writer) Set(key, val []byte) error {

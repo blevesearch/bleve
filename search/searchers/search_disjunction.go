@@ -111,7 +111,7 @@ func (s *DisjunctionSearcher) Next() (*search.DocumentMatch, error) {
 	}
 	var err error
 	var rv *search.DocumentMatch
-	matching := make([]*search.DocumentMatch, 0)
+	matching := make([]*search.DocumentMatch, 0, len(s.searchers))
 
 	found := false
 	for !found && s.currentID != "" {
