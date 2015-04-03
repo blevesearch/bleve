@@ -334,6 +334,7 @@ func TestStoredFieldPreserved(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer index.Close()
 
 	doca := map[string]interface{}{
 		"name": "Marty",
