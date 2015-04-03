@@ -668,6 +668,10 @@ func (i *indexImpl) GetInternal(key []byte) (val []byte, err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
+	if !i.open {
+		return nil, ErrorIndexClosed
+	}
+
 	reader, err := i.i.Reader()
 	if err != nil {
 		return nil, err
@@ -689,12 +693,20 @@ func (i *indexImpl) SetInternal(key, val []byte) error {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
 	return i.i.SetInternal(key, val)
 }
 
 func (i *indexImpl) DeleteInternal(key []byte) error {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
 
 	return i.i.DeleteInternal(key)
 }
