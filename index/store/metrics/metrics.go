@@ -158,7 +158,7 @@ func (s *Store) Actual() store.KVStore {
 }
 
 func (w *Reader) BytesSafeAfterClose() bool {
-	return w.BytesSafeAfterClose()
+	return w.o.BytesSafeAfterClose()
 }
 
 func (w *Reader) Get(key []byte) (v []byte, err error) {
