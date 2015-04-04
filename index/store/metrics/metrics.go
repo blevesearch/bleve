@@ -187,7 +187,7 @@ func (w *Reader) Close() error {
 }
 
 func (w *Writer) BytesSafeAfterClose() bool {
-	return w.BytesSafeAfterClose()
+	return w.o.BytesSafeAfterClose()
 }
 
 func (w *Writer) Get(key []byte) (v []byte, err error) {
