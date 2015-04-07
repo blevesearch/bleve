@@ -34,7 +34,12 @@ func BenchmarkForestDBIndexing1Workers(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndex(b, s, 1)
 }
@@ -55,7 +60,12 @@ func BenchmarkForestDBIndexing2Workers(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndex(b, s, 2)
 }
@@ -76,7 +86,12 @@ func BenchmarkForestDBIndexing4Workers(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndex(b, s, 4)
 }
@@ -99,7 +114,12 @@ func BenchmarkForestDBIndexing1Workers10Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 1, 10)
 }
@@ -120,7 +140,12 @@ func BenchmarkForestDBIndexing2Workers10Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 2, 10)
 }
@@ -141,7 +166,12 @@ func BenchmarkForestDBIndexing4Workers10Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 4, 10)
 }
@@ -162,7 +192,12 @@ func BenchmarkForestDBIndexing1Workers100Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 1, 100)
 }
@@ -183,7 +218,12 @@ func BenchmarkForestDBIndexing2Workers100Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 2, 100)
 }
@@ -204,7 +244,12 @@ func BenchmarkForestDBIndexing4Workers100Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 4, 100)
 }

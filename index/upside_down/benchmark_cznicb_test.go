@@ -20,7 +20,12 @@ func BenchmarkCznicBIndexing1Workers(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndex(b, s, 1)
 }
@@ -30,7 +35,12 @@ func BenchmarkCznicBIndexing2Workers(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndex(b, s, 2)
 }
@@ -40,7 +50,12 @@ func BenchmarkCznicBIndexing4Workers(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndex(b, s, 4)
 }
@@ -52,7 +67,12 @@ func BenchmarkCznicBIndexing1Workers10Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 1, 10)
 }
@@ -62,7 +82,12 @@ func BenchmarkCznicBIndexing2Workers10Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 2, 10)
 }
@@ -72,7 +97,12 @@ func BenchmarkCznicBIndexing4Workers10Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 4, 10)
 }
@@ -82,7 +112,12 @@ func BenchmarkCznicBIndexing1Workers100Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 1, 100)
 }
@@ -92,7 +127,12 @@ func BenchmarkCznicBIndexing2Workers100Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 2, 100)
 }
@@ -102,7 +142,12 @@ func BenchmarkCznicBIndexing4Workers100Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 4, 100)
 }
@@ -112,7 +157,12 @@ func BenchmarkCznicBIndexing1Workers1000Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 1, 1000)
 }
@@ -122,7 +172,12 @@ func BenchmarkCznicBIndexing2Workers1000Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 2, 1000)
 }
@@ -132,7 +187,12 @@ func BenchmarkCznicBIndexing4Workers1000Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 4, 1000)
 }

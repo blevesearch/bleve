@@ -27,7 +27,12 @@ func BenchmarkBoltDBIndexing1Workers(b *testing.B) {
 			b.Fatal(err)
 		}
 	}()
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndex(b, s, 1)
 }
@@ -43,7 +48,12 @@ func BenchmarkBoltDBIndexing2Workers(b *testing.B) {
 			b.Fatal(err)
 		}
 	}()
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndex(b, s, 2)
 }
@@ -59,7 +69,12 @@ func BenchmarkBoltDBIndexing4Workers(b *testing.B) {
 			b.Fatal(err)
 		}
 	}()
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndex(b, s, 4)
 }
@@ -77,7 +92,12 @@ func BenchmarkBoltDBIndexing1Workers10Batch(b *testing.B) {
 			b.Fatal(err)
 		}
 	}()
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 1, 10)
 }
@@ -93,7 +113,12 @@ func BenchmarkBoltDBIndexing2Workers10Batch(b *testing.B) {
 			b.Fatal(err)
 		}
 	}()
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 2, 10)
 }
@@ -109,7 +134,12 @@ func BenchmarkBoltDBIndexing4Workers10Batch(b *testing.B) {
 			b.Fatal(err)
 		}
 	}()
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 4, 10)
 }
@@ -125,7 +155,12 @@ func BenchmarkBoltDBIndexing1Workers100Batch(b *testing.B) {
 			b.Fatal(err)
 		}
 	}()
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 1, 100)
 }
@@ -141,7 +176,12 @@ func BenchmarkBoltDBIndexing2Workers100Batch(b *testing.B) {
 			b.Fatal(err)
 		}
 	}()
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 2, 100)
 }
@@ -157,7 +197,12 @@ func BenchmarkBoltDBIndexing4Workers100Batch(b *testing.B) {
 			b.Fatal(err)
 		}
 	}()
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
 	CommonBenchmarkIndexBatch(b, s, 4, 100)
 }
