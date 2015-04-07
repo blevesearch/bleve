@@ -21,7 +21,12 @@ func TestDisjunctionSearch(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer twoDocIndexReader.Close()
+	defer func() {
+		err := twoDocIndexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)
 	if err != nil {
@@ -96,8 +101,12 @@ func TestDisjunctionSearch(t *testing.T) {
 	}
 
 	for testIndex, test := range tests {
-
-		defer test.searcher.Close()
+		defer func() {
+			err := test.searcher.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
 
 		next, err := test.searcher.Next()
 		i := 0
@@ -129,7 +138,12 @@ func TestDisjunctionAdvance(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer twoDocIndexReader.Close()
+	defer func() {
+		err := twoDocIndexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)
 	if err != nil {

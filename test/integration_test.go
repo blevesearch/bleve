@@ -83,7 +83,12 @@ func runTestDir(t *testing.T, dir string) {
 		t.Errorf("error creating new index: %v", err)
 		return
 	}
-	defer index.Close()
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// index data
 	fis, err := ioutil.ReadDir(dir + string(filepath.Separator) + "data")

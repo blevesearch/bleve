@@ -21,7 +21,12 @@ func TestMatchAllSearch(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer twoDocIndexReader.Close()
+	defer func() {
+		err := twoDocIndexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	allSearcher, err := NewMatchAllSearcher(twoDocIndexReader, 1.0, true)
 	if err != nil {
@@ -97,7 +102,12 @@ func TestMatchAllSearch(t *testing.T) {
 		if test.queryNorm != 1.0 {
 			test.searcher.SetQueryNorm(test.queryNorm)
 		}
-		defer test.searcher.Close()
+		defer func() {
+			err := test.searcher.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
 
 		next, err := test.searcher.Next()
 		i := 0

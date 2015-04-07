@@ -21,7 +21,12 @@ func TestBooleanSearch(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer twoDocIndexReader.Close()
+	defer func() {
+		err := twoDocIndexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// test 0
 	beerTermSearcher, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, true)
@@ -327,7 +332,12 @@ func TestBooleanSearch(t *testing.T) {
 	}
 
 	for testIndex, test := range tests {
-		defer test.searcher.Close()
+		defer func() {
+			err := test.searcher.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
 
 		next, err := test.searcher.Next()
 		i := 0

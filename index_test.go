@@ -137,7 +137,12 @@ func TestCrud(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer index.Close()
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	count, err := index.DocCount()
 	if err != nil {
@@ -345,7 +350,12 @@ func TestSlowSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer index.Close()
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	Config.SlowSearchLogThreshold = 1 * time.Minute
 
@@ -392,7 +402,12 @@ func TestStoredFieldPreserved(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer index.Close()
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	doca := map[string]interface{}{
 		"name": "Marty",

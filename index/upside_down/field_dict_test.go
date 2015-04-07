@@ -33,7 +33,12 @@ func TestIndexFieldDict(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	var expectedCount uint64
 	doc := document.NewDocument("1")
@@ -58,13 +63,23 @@ func TestIndexFieldDict(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	dict, err := indexReader.FieldDict("name")
 	if err != nil {
 		t.Errorf("error creating reader: %v", err)
 	}
-	defer dict.Close()
+	defer func() {
+		err := dict.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	termCount := 0
 	curr, err := dict.Next()
@@ -79,19 +94,24 @@ func TestIndexFieldDict(t *testing.T) {
 		t.Errorf("expected 1 term for this field, got %d", termCount)
 	}
 
-	dict, err = indexReader.FieldDict("desc")
+	dict2, err := indexReader.FieldDict("desc")
 	if err != nil {
 		t.Errorf("error creating reader: %v", err)
 	}
-	defer dict.Close()
+	defer func() {
+		err := dict2.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	termCount = 0
 	terms := make([]string, 0)
-	curr, err = dict.Next()
+	curr, err = dict2.Next()
 	for err == nil && curr != nil {
 		termCount++
 		terms = append(terms, curr.Term)
-		curr, err = dict.Next()
+		curr, err = dict2.Next()
 	}
 	if termCount != 3 {
 		t.Errorf("expected 3 term for this field, got %d", termCount)
@@ -102,19 +122,24 @@ func TestIndexFieldDict(t *testing.T) {
 	}
 
 	// test start and end range
-	dict, err = indexReader.FieldDictRange("desc", []byte("fun"), []byte("nice"))
+	dict3, err := indexReader.FieldDictRange("desc", []byte("fun"), []byte("nice"))
 	if err != nil {
 		t.Errorf("error creating reader: %v", err)
 	}
-	defer dict.Close()
+	defer func() {
+		err := dict3.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	termCount = 0
 	terms = make([]string, 0)
-	curr, err = dict.Next()
+	curr, err = dict3.Next()
 	for err == nil && curr != nil {
 		termCount++
 		terms = append(terms, curr.Term)
-		curr, err = dict.Next()
+		curr, err = dict3.Next()
 	}
 	if termCount != 1 {
 		t.Errorf("expected 1 term for this field, got %d", termCount)
@@ -125,19 +150,24 @@ func TestIndexFieldDict(t *testing.T) {
 	}
 
 	// test use case for prefix
-	dict, err = indexReader.FieldDictPrefix("prefix", []byte("cat"))
+	dict4, err := indexReader.FieldDictPrefix("prefix", []byte("cat"))
 	if err != nil {
 		t.Errorf("error creating reader: %v", err)
 	}
-	defer dict.Close()
+	defer func() {
+		err := dict4.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	termCount = 0
 	terms = make([]string, 0)
-	curr, err = dict.Next()
+	curr, err = dict4.Next()
 	for err == nil && curr != nil {
 		termCount++
 		terms = append(terms, curr.Term)
-		curr, err = dict.Next()
+		curr, err = dict4.Next()
 	}
 	if termCount != 3 {
 		t.Errorf("expected 3 term for this field, got %d", termCount)

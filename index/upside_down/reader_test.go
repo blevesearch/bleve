@@ -34,7 +34,12 @@ func TestIndexReader(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	var expectedCount uint64
 	doc := document.NewDocument("1")
@@ -58,7 +63,12 @@ func TestIndexReader(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// first look for a term that doesn't exist
 	reader, err := indexReader.TermFieldReader([]byte("nope"), "name")
@@ -197,7 +207,12 @@ func TestIndexDocIdReader(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	var expectedCount uint64
 	doc := document.NewDocument("1")
@@ -221,14 +236,24 @@ func TestIndexDocIdReader(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// first get all doc ids
 	reader, err := indexReader.DocIDReader("", "")
 	if err != nil {
 		t.Errorf("Error accessing doc id reader: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	id, err := reader.Next()
 	count := uint64(0)
@@ -241,13 +266,18 @@ func TestIndexDocIdReader(t *testing.T) {
 	}
 
 	// try it again, but jump to the second doc this time
-	reader, err = indexReader.DocIDReader("", "")
+	reader2, err := indexReader.DocIDReader("", "")
 	if err != nil {
 		t.Errorf("Error accessing doc id reader: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		err := reader2.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
 
-	id, err = reader.Advance("2")
+	id, err = reader2.Advance("2")
 	if err != nil {
 		t.Error(err)
 	}
@@ -255,7 +285,7 @@ func TestIndexDocIdReader(t *testing.T) {
 		t.Errorf("expected to find id '2', got '%s'", id)
 	}
 
-	id, err = reader.Advance("3")
+	id, err = reader2.Advance("3")
 	if err != nil {
 		t.Error(err)
 	}

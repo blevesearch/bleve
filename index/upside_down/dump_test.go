@@ -36,7 +36,12 @@ func TestDump(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	var expectedCount uint64
 	docCount, err := idx.DocCount()

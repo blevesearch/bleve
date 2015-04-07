@@ -21,7 +21,12 @@ func TestPhraseSearch(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer twoDocIndexReader.Close()
+	defer func() {
+		err := twoDocIndexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	angstTermSearcher, err := NewTermSearcher(twoDocIndexReader, "angst", "desc", 1.0, true)
 	if err != nil {
@@ -56,7 +61,12 @@ func TestPhraseSearch(t *testing.T) {
 	}
 
 	for testIndex, test := range tests {
-		defer test.searcher.Close()
+		defer func() {
+			err := test.searcher.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
 
 		next, err := test.searcher.Next()
 		i := 0

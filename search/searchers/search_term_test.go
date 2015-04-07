@@ -123,13 +123,23 @@ func TestTermSearcher(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	searcher, err := NewTermSearcher(indexReader, queryTerm, queryField, queryBoost, queryExplain)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer searcher.Close()
+	defer func() {
+		err := searcher.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	searcher.SetQueryNorm(2.0)
 	docCount, err := i.DocCount()

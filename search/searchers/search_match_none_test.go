@@ -21,7 +21,12 @@ func TestMatchNoneSearch(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer twoDocIndexReader.Close()
+	defer func() {
+		err := twoDocIndexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	noneSearcher, err := NewMatchNoneSearcher(twoDocIndexReader)
 	if err != nil {
@@ -39,7 +44,12 @@ func TestMatchNoneSearch(t *testing.T) {
 	}
 
 	for testIndex, test := range tests {
-		defer test.searcher.Close()
+		defer func() {
+			err := test.searcher.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
 
 		next, err := test.searcher.Next()
 		i := 0

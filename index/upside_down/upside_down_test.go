@@ -100,7 +100,12 @@ func TestIndexInsert(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	var expectedCount uint64
 	docCount, err := idx.DocCount()
@@ -153,7 +158,12 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	var expectedCount uint64
 	docCount, err := idx.DocCount()
@@ -242,7 +252,12 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
@@ -344,7 +359,12 @@ func TestIndexInsertMultiple(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	doc = document.NewDocument("3")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
@@ -381,7 +401,12 @@ func TestIndexInsertWithStore(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	var expectedCount uint64
 	docCount, err := idx.DocCount()
@@ -422,7 +447,12 @@ func TestIndexInsertWithStore(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	storedDoc, err := indexReader.Document("1")
 	if err != nil {
@@ -456,13 +486,23 @@ func TestIndexInternalCRUD(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	indexReader, err := idx.Reader()
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// get something that doesn't exist yet
 	val, err := indexReader.GetInternal([]byte("key"))
@@ -479,14 +519,19 @@ func TestIndexInternalCRUD(t *testing.T) {
 		t.Error(err)
 	}
 
-	indexReader, err = idx.Reader()
+	indexReader2, err := idx.Reader()
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader2.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// get
-	val, err = indexReader.GetInternal([]byte("key"))
+	val, err = indexReader2.GetInternal([]byte("key"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -500,14 +545,19 @@ func TestIndexInternalCRUD(t *testing.T) {
 		t.Error(err)
 	}
 
-	indexReader, err = idx.Reader()
+	indexReader3, err := idx.Reader()
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader3.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// get again
-	val, err = indexReader.GetInternal([]byte("key"))
+	val, err = indexReader3.GetInternal([]byte("key"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -531,7 +581,12 @@ func TestIndexBatch(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	var expectedCount uint64
 
@@ -576,7 +631,12 @@ func TestIndexBatch(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	docCount := indexReader.DocCount()
 	if docCount != expectedCount {
@@ -620,7 +680,12 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	var expectedCount uint64
 	docCount, err := idx.DocCount()
@@ -677,7 +742,12 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
 
 	storedDoc, err := indexReader.Document("1")
 	if err != nil {
@@ -728,20 +798,25 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		t.Errorf("Error updating index: %v", err)
 	}
 
-	indexReader, err = idx.Reader()
+	indexReader2, err := idx.Reader()
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader2.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
 
 	// expected doc count shouldn't have changed
-	docCount = indexReader.DocCount()
+	docCount = indexReader2.DocCount()
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
 
 	// should only get 2 fields back now though
-	storedDoc, err = indexReader.Document("1")
+	storedDoc, err = indexReader2.Document("1")
 	if err != nil {
 		t.Error(err)
 	}
@@ -801,7 +876,12 @@ func TestIndexInsertFields(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.IndexField|document.StoreField))
@@ -820,7 +900,12 @@ func TestIndexInsertFields(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	fields, err := indexReader.Fields()
 	if err != nil {
@@ -852,7 +937,12 @@ func TestIndexUpdateComposites(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.IndexField|document.StoreField))
@@ -893,7 +983,12 @@ func TestIndexUpdateComposites(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// make sure new values are in index
 	storedDoc, err := indexReader.Document("1")
@@ -939,7 +1034,12 @@ func TestIndexFieldsMisc(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.IndexField|document.StoreField))
@@ -982,7 +1082,12 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.IndexField|document.StoreField|document.IncludeTermVectors))
@@ -997,7 +1102,12 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	termFieldReader, err := indexReader.TermFieldReader([]byte("mister"), "_all")
 	if err != nil {
@@ -1034,7 +1144,12 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
-	defer idx.Close()
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.IndexField|document.StoreField|document.IncludeTermVectors))
@@ -1048,7 +1163,12 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer indexReader.Close()
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	fieldTerms, err := indexReader.DocumentFieldTerms("1")
 	if err != nil {
