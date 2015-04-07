@@ -21,7 +21,7 @@ func main() {
 			suffix := line[lastSpace+1:]
 			count, err := strconv.Atoi(suffix)
 			if err != nil {
-				fmt.Errorf("error parsing count: %v", err)
+				fmt.Printf("error parsing count: %v", err)
 				continue
 			}
 			existingCount, exists := blocks[prefix]
