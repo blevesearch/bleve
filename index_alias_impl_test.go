@@ -270,9 +270,12 @@ func TestIndexAliasSingle(t *testing.T) {
 
 func TestIndexAliasClosed(t *testing.T) {
 	alias := NewIndexAlias()
-	alias.Close()
+	err := alias.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	err := alias.Index("a", "a")
+	err = alias.Index("a", "a")
 	if err != ErrorIndexClosed {
 		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
 	}

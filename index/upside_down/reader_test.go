@@ -64,7 +64,10 @@ func TestIndexReader(t *testing.T) {
 	if count != 0 {
 		t.Errorf("Expected doc count to be: %d got: %d", 0, count)
 	}
-	reader.Close()
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	reader, err = indexReader.TermFieldReader([]byte("test"), "name")
 	if err != nil {
@@ -115,7 +118,10 @@ func TestIndexReader(t *testing.T) {
 	if !reflect.DeepEqual(expectedMatch, match) {
 		t.Errorf("got %#v, expected %#v", match, expectedMatch)
 	}
-	reader.Close()
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// now test usage of advance
 	reader, err = indexReader.TermFieldReader([]byte("test"), "name")
@@ -140,7 +146,10 @@ func TestIndexReader(t *testing.T) {
 	if match != nil {
 		t.Errorf("expected nil, got %v", match)
 	}
-	reader.Close()
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// now test creating a reader for a field that doesn't exist
 	reader, err = indexReader.TermFieldReader([]byte("water"), "doesnotexist")

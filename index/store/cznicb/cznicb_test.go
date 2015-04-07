@@ -75,7 +75,10 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writer.Close()
+	err = writer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	reader, err := s.Reader()
 	if err != nil {
@@ -118,5 +121,8 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 		t.Fatalf("expected value val-i, got %s", val)
 	}
 
-	it.Close()
+	err = it.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }

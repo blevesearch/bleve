@@ -58,7 +58,10 @@ func TestIndexOpenReopen(t *testing.T) {
 	}
 
 	// now close it
-	idx.Close()
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	store, err = boltdb.Open("test", "bleve")
 	if err != nil {
@@ -71,7 +74,10 @@ func TestIndexOpenReopen(t *testing.T) {
 	}
 
 	// now close it
-	idx.Close()
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestIndexInsert(t *testing.T) {
@@ -302,7 +308,11 @@ func TestIndexInsertMultiple(t *testing.T) {
 	}
 
 	// close, reopen and add one more to test that counting works correctly
-	idx.Close()
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	store, err = boltdb.Open("test", "bleve")
 	idx = NewUpsideDownCouch(store, analysisQueue)
 	err = idx.Open()

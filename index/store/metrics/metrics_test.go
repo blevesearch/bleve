@@ -118,7 +118,10 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writer.Close()
+	err = writer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	reader, err := s.Reader()
 	if err != nil {
@@ -161,7 +164,10 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 		t.Fatalf("expected value val-i, got %s", val)
 	}
 
-	it.Close()
+	err = it.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
@@ -174,7 +180,10 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writer.Close()
+	err = writer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// create an isolated reader
 	reader, err := s.Reader()
@@ -213,7 +222,10 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writer.Close()
+	err = writer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// ensure that a newer reader sees it
 	newReader, err := s.Reader()

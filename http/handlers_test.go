@@ -22,7 +22,10 @@ func indexNameLookup(req *http.Request) string {
 func TestHandlers(t *testing.T) {
 
 	basePath := "testbase"
-	os.MkdirAll(basePath, 0700)
+	err := os.MkdirAll(basePath, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer os.RemoveAll(basePath)
 
 	createIndexHandler := NewCreateIndexHandler(basePath)

@@ -103,7 +103,10 @@ func TestRollbackSameHandle(t *testing.T) {
 	if string(val) != "val-c" {
 		t.Errorf("expected value 'val-c' got '%s'", val)
 	}
-	reader.Close()
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// now rollback
 	err = s.RollbackTo(rollbackId)
@@ -123,7 +126,10 @@ func TestRollbackSameHandle(t *testing.T) {
 	if val != nil {
 		t.Errorf("expected missing, got '%s'", val)
 	}
-	reader.Close()
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestRollbackNewHandle tries to rollback the
@@ -184,7 +190,10 @@ func TestRollbackNewHandle(t *testing.T) {
 	if string(val) != "val-c" {
 		t.Errorf("expected value 'val-c' got '%s'", val)
 	}
-	reader.Close()
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// now rollback
 	err = s.RollbackTo(rollbackId)
@@ -211,7 +220,10 @@ func TestRollbackNewHandle(t *testing.T) {
 	if val != nil {
 		t.Errorf("expected missing, got '%s'", val)
 	}
-	reader2.Close()
+	err = reader2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestRollbackOtherHandle tries to create 2 handles
@@ -279,7 +291,10 @@ func TestRollbackOtherHandle(t *testing.T) {
 	if string(val) != "val-c" {
 		t.Errorf("expected value 'val-c' got '%s'", val)
 	}
-	reader.Close()
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// now rollback
 	err = s.RollbackTo(rollbackId)
@@ -299,7 +314,10 @@ func TestRollbackOtherHandle(t *testing.T) {
 	if val != nil {
 		t.Errorf("expected missing, got '%s'", val)
 	}
-	reader2.Close()
+	err = reader2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func CommonTestKVStore(t *testing.T, s store.KVStore) {
@@ -336,7 +354,10 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writer.Close()
+	err = writer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	reader, err := s.Reader()
 	if err != nil {
@@ -379,7 +400,10 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 		t.Fatalf("expected value val-i, got %s", val)
 	}
 
-	it.Close()
+	err = it.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
@@ -392,7 +416,10 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writer.Close()
+	err = writer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// create an isolated reader
 	reader, err := s.Reader()
@@ -431,7 +458,10 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writer.Close()
+	err = writer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// ensure that a newer reader sees it
 	newReader, err := s.Reader()

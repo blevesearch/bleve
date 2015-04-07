@@ -16,7 +16,10 @@ import (
 
 func TestTokenMapLoadFile(t *testing.T) {
 	tokenMap := NewTokenMap()
-	tokenMap.LoadFile("test_words.txt")
+	err := tokenMap.LoadFile("test_words.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	expectedTokens := NewTokenMap()
 	expectedTokens.AddToken("marty")

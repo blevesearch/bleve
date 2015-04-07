@@ -267,8 +267,11 @@ func BenchmarkTermFrequencyRowEncode(b *testing.B) {
 func BenchmarkTermFrequencyRowDecode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		k := []byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'}
-		v := []byte{3, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0}
-		NewTermFrequencyRowKV(k, v)
+		v := []byte{3, 195, 235, 163, 130, 4, 0, 1, 3, 11, 0, 2, 23, 31, 0, 3, 43, 51}
+		_, err := NewTermFrequencyRowKV(k, v)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -298,7 +301,10 @@ func BenchmarkBackIndexRowDecode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		k := []byte{0x62, 0x62, 0x65, 0x65, 0x72, 0x6e, 0x61, 0x6d, 0x65}
 		v := []byte{0x0a, 0x09, 0x0a, 0x05, 0x74, 0x65, 0x72, 0x6d, 0x31, 0x10, 0x01, 0x12, 0x02, 0x08, 0x01}
-		NewTermFrequencyRowKV(k, v)
+		_, err := NewBackIndexRowKV(k, v)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -315,6 +321,9 @@ func BenchmarkStoredRowDecode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		k := []byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', ByteSeparator, 0, 0}
 		v := []byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'}
-		NewTermFrequencyRowKV(k, v)
+		_, err := NewStoredRowKV(k, v)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }

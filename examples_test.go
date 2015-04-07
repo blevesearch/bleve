@@ -26,7 +26,10 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	toRun := m.Run()
-	os.RemoveAll("path_to_index")
+	err = os.RemoveAll("path_to_index")
+	if err != nil {
+		panic(err)
+	}
 	os.Exit(toRun)
 }
 
