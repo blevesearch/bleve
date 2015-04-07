@@ -35,7 +35,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer index.Close()
+	defer func() {
+		cerr := index.Close()
+		if cerr != nil {
+			log.Fatalf("error closing index: %v", err)
+		}
+	}()
 
 	if flag.NArg() < 1 {
 		log.Fatal("must specify at least one path to index")
@@ -47,7 +52,12 @@ func main() {
 	for _, file := range flag.Args() {
 
 		file, err := os.Open(file)
-		defer file.Close()
+		defer func() {
+			cerr := file.Close()
+			if cerr != nil {
+				log.Fatalf("error closing file: %v", cerr)
+			}
+		}()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -70,7 +80,10 @@ func main() {
 				break
 			}
 			docID := randomString(5)
-			batch.Index(docID, b)
+			err := batch.Index(docID, b)
+			if err != nil {
+				log.Fatal(err)
+			}
 			i++
 		}
 		err = index.Batch(batch)
