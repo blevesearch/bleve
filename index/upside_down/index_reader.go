@@ -51,20 +51,25 @@ func (i *IndexReader) DocIDReader(start, end string) (index.DocIDReader, error) 
 	return newUpsideDownCouchDocIDReader(i, start, end)
 }
 
-func (i *IndexReader) Document(id string) (*document.Document, error) {
+func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 	// first hit the back index to confirm doc exists
-	backIndexRow, err := i.index.backIndexRowForDoc(i.kvreader, id)
+	var backIndexRow *BackIndexRow
+	backIndexRow, err = i.index.backIndexRowForDoc(i.kvreader, id)
 	if err != nil {
-		return nil, err
+		return
 	}
 	if backIndexRow == nil {
-		return nil, nil
+		return
 	}
-	rv := document.NewDocument(id)
+	doc = document.NewDocument(id)
 	storedRow := NewStoredRow(id, 0, []uint64{}, 'x', nil)
 	storedRowScanPrefix := storedRow.ScanPrefixForDoc()
 	it := i.kvreader.Iterator(storedRowScanPrefix)
-	defer it.Close()
+	defer func() {
+		if cerr := it.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
 	key, val, valid := it.Current()
 	for valid {
 		if !bytes.HasPrefix(key, storedRowScanPrefix) {
@@ -75,22 +80,24 @@ func (i *IndexReader) Document(id string) (*document.Document, error) {
 			safeVal = make([]byte, len(val))
 			copy(safeVal, val)
 		}
-		row, err := NewStoredRowKV(key, safeVal)
+		var row *StoredRow
+		row, err = NewStoredRowKV(key, safeVal)
 		if err != nil {
-			return nil, err
+			doc = nil
+			return
 		}
 		if row != nil {
 			fieldName := i.index.fieldIndexCache.FieldName(row.field)
 			field := decodeFieldType(row.typ, fieldName, row.value)
 			if field != nil {
-				rv.AddField(field)
+				doc.AddField(field)
 			}
 		}
 
 		it.Next()
 		key, val, valid = it.Current()
 	}
-	return rv, nil
+	return
 }
 
 func (i *IndexReader) DocumentFieldTerms(id string) (index.FieldTerms, error) {
@@ -111,30 +118,36 @@ func (i *IndexReader) DocumentFieldTerms(id string) (index.FieldTerms, error) {
 	return rv, nil
 }
 
-func (i *IndexReader) Fields() ([]string, error) {
-	rv := make([]string, 0)
+func (i *IndexReader) Fields() (fields []string, err error) {
+	fields = make([]string, 0)
 	it := i.kvreader.Iterator([]byte{'f'})
-	defer it.Close()
+	defer func() {
+		if cerr := it.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
 	key, val, valid := it.Current()
 	for valid {
 		if !bytes.HasPrefix(key, []byte{'f'}) {
 			break
 		}
-		row, err := ParseFromKeyValue(key, val)
+		var row UpsideDownCouchRow
+		row, err = ParseFromKeyValue(key, val)
 		if err != nil {
-			return nil, err
+			fields = nil
+			return
 		}
 		if row != nil {
 			fieldRow, ok := row.(*FieldRow)
 			if ok {
-				rv = append(rv, fieldRow.name)
+				fields = append(fields, fieldRow.name)
 			}
 		}
 
 		it.Next()
 		key, val, valid = it.Current()
 	}
-	return rv, nil
+	return
 }
 
 func (i *IndexReader) GetInternal(key []byte) ([]byte, error) {
