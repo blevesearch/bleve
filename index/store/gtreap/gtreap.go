@@ -163,7 +163,7 @@ func (w *Writer) Close() error {
 
 func (w *Writer) Set(k, v []byte) (err error) {
 	w.s.m.Lock()
-	w.s.t = w.s.t.Upsert(&Item{k: k, v: append([]byte(nil), v...)}, rand.Int())
+	w.s.t = w.s.t.Upsert(&Item{k: k, v: v}, rand.Int())
 	w.s.m.Unlock()
 
 	return nil
@@ -283,7 +283,7 @@ func (w *Iterator) Close() error {
 }
 
 func (w *Batch) Set(k, v []byte) {
-	w.items = append(w.items, &Item{k, append([]byte(nil), v...)})
+	w.items = append(w.items, &Item{k, v})
 }
 
 func (w *Batch) Delete(k []byte) {

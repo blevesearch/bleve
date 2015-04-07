@@ -167,7 +167,6 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 		t.Fatal(err)
 	}
 	writer.Close()
-	valB[0] = 'X' // Modify the bytes so we check that writer got its own copy.
 
 	// ensure that a newer reader sees it
 	newReader, err := s.Reader()
@@ -180,7 +179,7 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 		t.Error(err)
 	}
 	if !reflect.DeepEqual(val, []byte("val-b")) {
-		t.Errorf("expected val-b, got nil")
+		t.Errorf("expected val-b, got %s", val)
 	}
 
 	// ensure that the director iterator sees it
