@@ -26,7 +26,12 @@ func TestHandlers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(basePath)
+	defer func() {
+		err := os.RemoveAll(basePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	createIndexHandler := NewCreateIndexHandler(basePath)
 	createIndexHandler.IndexNameLookup = indexNameLookup

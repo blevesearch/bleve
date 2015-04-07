@@ -27,7 +27,12 @@ func BenchmarkLevelDBIndexing1Workers(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 	defer s.Close()
 
 	CommonBenchmarkIndex(b, s, 1)
@@ -38,7 +43,12 @@ func BenchmarkLevelDBIndexing2Workers(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 	defer s.Close()
 
 	CommonBenchmarkIndex(b, s, 2)
@@ -49,7 +59,12 @@ func BenchmarkLevelDBIndexing4Workers(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 	defer s.Close()
 
 	CommonBenchmarkIndex(b, s, 4)
@@ -62,7 +77,12 @@ func BenchmarkLevelDBIndexing1Workers10Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 	defer s.Close()
 
 	CommonBenchmarkIndexBatch(b, s, 1, 10)
@@ -73,7 +93,12 @@ func BenchmarkLevelDBIndexing2Workers10Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 	defer s.Close()
 
 	CommonBenchmarkIndexBatch(b, s, 2, 10)
@@ -84,7 +109,12 @@ func BenchmarkLevelDBIndexing4Workers10Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 	defer s.Close()
 
 	CommonBenchmarkIndexBatch(b, s, 4, 10)
@@ -95,7 +125,12 @@ func BenchmarkLevelDBIndexing1Workers100Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 	defer s.Close()
 
 	CommonBenchmarkIndexBatch(b, s, 1, 100)
@@ -106,7 +141,12 @@ func BenchmarkLevelDBIndexing2Workers100Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 	defer s.Close()
 
 	CommonBenchmarkIndexBatch(b, s, 2, 100)
@@ -117,7 +157,12 @@ func BenchmarkLevelDBIndexing4Workers100Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 	defer s.Close()
 
 	CommonBenchmarkIndexBatch(b, s, 4, 100)
@@ -128,7 +173,12 @@ func BenchmarkLevelDBIndexing1Workers1000Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 	defer s.Close()
 
 	CommonBenchmarkIndexBatch(b, s, 1, 1000)
@@ -139,7 +189,12 @@ func BenchmarkLevelDBIndexing2Workers1000Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 	defer s.Close()
 
 	CommonBenchmarkIndexBatch(b, s, 2, 1000)
@@ -150,7 +205,12 @@ func BenchmarkLevelDBIndexing4Workers1000Batch(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 	defer s.Close()
 
 	CommonBenchmarkIndexBatch(b, s, 4, 1000)

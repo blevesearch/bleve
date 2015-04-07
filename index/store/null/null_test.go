@@ -1,7 +1,6 @@
 package null
 
 import (
-	"os"
 	"testing"
 
 	"github.com/blevesearch/bleve/index/store"
@@ -12,7 +11,6 @@ func TestStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll("test")
 
 	CommonTestKVStore(t, s)
 }

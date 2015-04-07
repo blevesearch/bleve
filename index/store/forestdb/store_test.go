@@ -19,10 +19,18 @@ import (
 	"github.com/blevesearch/bleve/index/store"
 )
 
-func TestLevelDBStore(t *testing.T) {
-	defer os.RemoveAll("testdir")
+func TestForestDBStore(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
 	s, err := Open("testdir/test", true, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -33,9 +41,17 @@ func TestLevelDBStore(t *testing.T) {
 }
 
 func TestReaderIsolation(t *testing.T) {
-	defer os.RemoveAll("testdir")
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
 	s, err := Open("testdir/test", true, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -49,9 +65,17 @@ func TestReaderIsolation(t *testing.T) {
 // and ensure that subsequent reads from it also
 // reflect the rollback
 func TestRollbackSameHandle(t *testing.T) {
-	defer os.RemoveAll("testdir")
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
 	s, err := Open("testdir/test", true, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -136,9 +160,17 @@ func TestRollbackSameHandle(t *testing.T) {
 // database, then opens a new handle, and ensures
 // that the rollback is reflected there as well
 func TestRollbackNewHandle(t *testing.T) {
-	defer os.RemoveAll("testdir")
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
 	s, err := Open("testdir/test", true, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -230,9 +262,17 @@ func TestRollbackNewHandle(t *testing.T) {
 // at the beginning, then rollback one of them
 // and ensure it affects the other
 func TestRollbackOtherHandle(t *testing.T) {
-	defer os.RemoveAll("testdir")
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
 	s, err := Open("testdir/test", true, nil)
 	if err != nil {
 		t.Fatal(err)

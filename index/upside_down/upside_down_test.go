@@ -28,7 +28,12 @@ var testAnalyzer = &analysis.Analyzer{
 }
 
 func TestIndexOpenReopen(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	analysisQueue := NewAnalysisQueue(1)
@@ -81,7 +86,12 @@ func TestIndexOpenReopen(t *testing.T) {
 }
 
 func TestIndexInsert(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	analysisQueue := NewAnalysisQueue(1)
@@ -129,7 +139,12 @@ func TestIndexInsert(t *testing.T) {
 }
 
 func TestIndexInsertThenDelete(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	analysisQueue := NewAnalysisQueue(1)
@@ -213,7 +228,12 @@ func TestIndexInsertThenDelete(t *testing.T) {
 }
 
 func TestIndexInsertThenUpdate(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	analysisQueue := NewAnalysisQueue(1)
@@ -269,7 +289,12 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 }
 
 func TestIndexInsertMultiple(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	analysisQueue := NewAnalysisQueue(1)
@@ -339,7 +364,12 @@ func TestIndexInsertMultiple(t *testing.T) {
 }
 
 func TestIndexInsertWithStore(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	if err != nil {
@@ -412,7 +442,12 @@ func TestIndexInsertWithStore(t *testing.T) {
 }
 
 func TestIndexInternalCRUD(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	analysisQueue := NewAnalysisQueue(1)
@@ -482,7 +517,12 @@ func TestIndexInternalCRUD(t *testing.T) {
 }
 
 func TestIndexBatch(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	analysisQueue := NewAnalysisQueue(1)
@@ -563,7 +603,12 @@ func TestIndexBatch(t *testing.T) {
 }
 
 func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	if err != nil {
@@ -739,7 +784,12 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 }
 
 func TestIndexInsertFields(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	if err != nil {
@@ -785,7 +835,12 @@ func TestIndexInsertFields(t *testing.T) {
 }
 
 func TestIndexUpdateComposites(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	if err != nil {
@@ -867,7 +922,12 @@ func TestIndexUpdateComposites(t *testing.T) {
 }
 
 func TestIndexFieldsMisc(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	if err != nil {
@@ -905,7 +965,12 @@ func TestIndexFieldsMisc(t *testing.T) {
 }
 
 func TestIndexTermReaderCompositeFields(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	if err != nil {
@@ -952,7 +1017,12 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 }
 
 func TestIndexDocumentFieldTerms(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	if err != nil {

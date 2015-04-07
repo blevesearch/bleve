@@ -22,7 +22,12 @@ func TestStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	CommonTestKVStore(t, s)
 }
@@ -32,7 +37,12 @@ func TestReaderIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	CommonTestReaderIsolation(t, s)
 }

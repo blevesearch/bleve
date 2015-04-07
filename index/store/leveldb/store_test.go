@@ -24,7 +24,12 @@ var leveldbTestOptions = map[string]interface{}{
 }
 
 func TestLevelDBStore(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	s, err := Open("test", leveldbTestOptions)
 	if err != nil {
@@ -36,7 +41,12 @@ func TestLevelDBStore(t *testing.T) {
 }
 
 func TestReaderIsolation(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	s, err := Open("test", leveldbTestOptions)
 	if err != nil {

@@ -19,7 +19,12 @@ import (
 )
 
 func TestCrud(t *testing.T) {
-	defer os.RemoveAll("testidx")
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	index, err := New("testidx", NewIndexMapping())
 	if err != nil {
@@ -182,7 +187,12 @@ func TestCrud(t *testing.T) {
 }
 
 func TestIndexCreateNewOverExisting(t *testing.T) {
-	defer os.RemoveAll("testidx")
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	index, err := New("testidx", NewIndexMapping())
 	if err != nil {
@@ -206,7 +216,12 @@ func TestIndexOpenNonExisting(t *testing.T) {
 }
 
 func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
-	defer os.RemoveAll("testidx")
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	index, err := New("testidx", NewIndexMapping())
 	if err != nil {
@@ -311,7 +326,12 @@ func TestClosedIndex(t *testing.T) {
 }
 
 func TestSlowSearch(t *testing.T) {
-	defer os.RemoveAll("testidx")
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	defer func() {
 		// reset logger back to normal
@@ -361,7 +381,12 @@ func (s *sawDataWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestStoredFieldPreserved(t *testing.T) {
-	defer os.RemoveAll("testidx")
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	index, err := New("testidx", NewIndexMapping())
 	if err != nil {
@@ -400,7 +425,12 @@ func TestStoredFieldPreserved(t *testing.T) {
 }
 
 func TestDict(t *testing.T) {
-	defer os.RemoveAll("testidx")
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	index, err := New("testidx", NewIndexMapping())
 	if err != nil {

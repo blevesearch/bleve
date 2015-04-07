@@ -19,7 +19,12 @@ import (
 )
 
 func TestIndexFieldDict(t *testing.T) {
-	defer os.RemoveAll("test")
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	store, err := boltdb.Open("test", "bleve")
 	analysisQueue := NewAnalysisQueue(1)

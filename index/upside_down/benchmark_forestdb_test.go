@@ -19,9 +19,17 @@ import (
 )
 
 func BenchmarkForestDBIndexing1Workers(b *testing.B) {
-	defer os.RemoveAll("testdir")
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
 	s, err := forestdb.Open("testdir/test", true, nil)
 	if err != nil {
 		b.Fatal(err)
@@ -32,9 +40,17 @@ func BenchmarkForestDBIndexing1Workers(b *testing.B) {
 }
 
 func BenchmarkForestDBIndexing2Workers(b *testing.B) {
-	defer os.RemoveAll("testdir")
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
 	s, err := forestdb.Open("testdir/test", true, nil)
 	if err != nil {
 		b.Fatal(err)
@@ -45,9 +61,17 @@ func BenchmarkForestDBIndexing2Workers(b *testing.B) {
 }
 
 func BenchmarkForestDBIndexing4Workers(b *testing.B) {
-	defer os.RemoveAll("testdir")
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
 	s, err := forestdb.Open("testdir/test", true, nil)
 	if err != nil {
 		b.Fatal(err)
@@ -60,9 +84,17 @@ func BenchmarkForestDBIndexing4Workers(b *testing.B) {
 // batches
 
 func BenchmarkForestDBIndexing1Workers10Batch(b *testing.B) {
-	defer os.RemoveAll("testdir")
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
 	s, err := forestdb.Open("testdir/test", true, nil)
 	if err != nil {
 		b.Fatal(err)
@@ -73,9 +105,17 @@ func BenchmarkForestDBIndexing1Workers10Batch(b *testing.B) {
 }
 
 func BenchmarkForestDBIndexing2Workers10Batch(b *testing.B) {
-	defer os.RemoveAll("testdir")
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
 	s, err := forestdb.Open("testdir/test", true, nil)
 	if err != nil {
 		b.Fatal(err)
@@ -86,9 +126,17 @@ func BenchmarkForestDBIndexing2Workers10Batch(b *testing.B) {
 }
 
 func BenchmarkForestDBIndexing4Workers10Batch(b *testing.B) {
-	defer os.RemoveAll("testdir")
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
 	s, err := forestdb.Open("testdir/test", true, nil)
 	if err != nil {
 		b.Fatal(err)
@@ -99,9 +147,17 @@ func BenchmarkForestDBIndexing4Workers10Batch(b *testing.B) {
 }
 
 func BenchmarkForestDBIndexing1Workers100Batch(b *testing.B) {
-	defer os.RemoveAll("testdir")
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
 	s, err := forestdb.Open("testdir/test", true, nil)
 	if err != nil {
 		b.Fatal(err)
@@ -112,9 +168,17 @@ func BenchmarkForestDBIndexing1Workers100Batch(b *testing.B) {
 }
 
 func BenchmarkForestDBIndexing2Workers100Batch(b *testing.B) {
-	defer os.RemoveAll("testdir")
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
 	s, err := forestdb.Open("testdir/test", true, nil)
 	if err != nil {
 		b.Fatal(err)
@@ -125,9 +189,17 @@ func BenchmarkForestDBIndexing2Workers100Batch(b *testing.B) {
 }
 
 func BenchmarkForestDBIndexing4Workers100Batch(b *testing.B) {
-	defer os.RemoveAll("testdir")
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
 
-	os.MkdirAll("testdir", 0700)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
 	s, err := forestdb.Open("testdir/test", true, nil)
 	if err != nil {
 		b.Fatal(err)

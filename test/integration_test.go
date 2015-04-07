@@ -71,7 +71,12 @@ func runTestDir(t *testing.T, dir string) {
 
 	// open new index
 	if !*keepIndex {
-		defer os.RemoveAll("test.bleve")
+		defer func() {
+			err := os.RemoveAll("test.bleve")
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
 	}
 	index, err := bleve.New("test.bleve", &mapping)
 	if err != nil {
