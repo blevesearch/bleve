@@ -7,8 +7,10 @@ script:
   - go get golang.org/x/tools/cmd/vet
   - go get golang.org/x/tools/cmd/cover
   - go get github.com/mattn/goveralls
+  - go get github.com/kisielk/errcheck
   - go test -v ./...
   - go vet ./...
+  - errcheck ./...
   - docs/project-code-coverage.sh
   - docs/build_children.sh
 
