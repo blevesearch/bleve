@@ -21,7 +21,12 @@ func TestStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	CommonTestKVStore(t, s)
 }
@@ -69,7 +74,12 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer reader.Close()
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	it := reader.Iterator([]byte("b"))
 	key, val, valid := it.Current()
 	if !valid {
@@ -132,7 +142,12 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer reader.Close()
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// verify that we see the value already inserted
 	val, err := reader.Get([]byte("a"))
@@ -146,7 +161,12 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	// verify that an iterator sees it
 	count := 0
 	it := reader.Iterator([]byte{0})
-	defer it.Close()
+	defer func() {
+		err := it.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	for it.Valid() {
 		it.Next()
 		count++
@@ -174,7 +194,12 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer newReader.Close()
+	defer func() {
+		err := newReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	val, err = newReader.Get([]byte("b"))
 	if err != nil {
 		t.Error(err)
@@ -186,7 +211,12 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	// ensure that the director iterator sees it
 	count = 0
 	it = newReader.Iterator([]byte{0})
-	defer it.Close()
+	defer func() {
+		err := it.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	for it.Valid() {
 		it.Next()
 		count++
@@ -207,7 +237,12 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	// and ensure that the iterator on the isolated reader also does not
 	count = 0
 	it = reader.Iterator([]byte{0})
-	defer it.Close()
+	defer func() {
+		err := it.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	for it.Valid() {
 		it.Next()
 		count++

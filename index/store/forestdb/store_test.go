@@ -35,7 +35,12 @@ func TestForestDBStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	CommonTestKVStore(t, s)
 }
@@ -56,7 +61,12 @@ func TestReaderIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	CommonTestReaderIsolation(t, s)
 }
@@ -80,7 +90,12 @@ func TestRollbackSameHandle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	writer, err := s.Writer()
 	if err != nil {
@@ -175,7 +190,12 @@ func TestRollbackNewHandle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	writer, err := s.Writer()
 	if err != nil {
@@ -277,7 +297,12 @@ func TestRollbackOtherHandle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// open another handle at the same time
 	s2, err := Open("testdir/test", true, nil)
@@ -403,7 +428,12 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer reader.Close()
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	it := reader.Iterator([]byte("b"))
 	key, val, valid := it.Current()
 	if !valid {
@@ -466,7 +496,12 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer reader.Close()
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// verify we see the value already inserted
 	val, err := reader.Get([]byte("a"))
@@ -480,7 +515,12 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	// verify that an iterator sees it
 	count := 0
 	it := reader.Iterator([]byte{0})
-	defer it.Close()
+	defer func() {
+		err := it.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	for it.Valid() {
 		it.Next()
 		count++
@@ -508,7 +548,12 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer newReader.Close()
+	defer func() {
+		err := newReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	val, err = newReader.Get([]byte("b"))
 	if err != nil {
 		t.Error(err)
@@ -519,10 +564,15 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 
 	// ensure that the director iterator sees it
 	count = 0
-	it = newReader.Iterator([]byte{0})
-	defer it.Close()
-	for it.Valid() {
-		it.Next()
+	it2 := newReader.Iterator([]byte{0})
+	defer func() {
+		err := it2.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	for it2.Valid() {
+		it2.Next()
 		count++
 	}
 	if count != 2 {
@@ -540,10 +590,15 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 
 	// and ensure that the iterator on the isolated reader also does not
 	count = 0
-	it = reader.Iterator([]byte{0})
-	defer it.Close()
-	for it.Valid() {
-		it.Next()
+	it3 := reader.Iterator([]byte{0})
+	defer func() {
+		err := it3.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	for it3.Valid() {
+		it3.Next()
 		count++
 	}
 	if count != 1 {

@@ -84,7 +84,12 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer reader.Close()
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	it := reader.Iterator([]byte("b"))
 	key, val, valid := it.Current()
 	if !valid {
