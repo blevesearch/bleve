@@ -28,66 +28,96 @@ func TestTermSearcher(t *testing.T) {
 	inMemStore, _ := inmem.Open()
 	analysisQueue := upside_down.NewAnalysisQueue(1)
 	i := upside_down.NewUpsideDownCouch(inMemStore, analysisQueue)
-	i.Update(&document.Document{
+	err := i.Update(&document.Document{
 		ID: "a",
 		Fields: []document.Field{
 			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
-	i.Update(&document.Document{
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Update(&document.Document{
 		ID: "b",
 		Fields: []document.Field{
 			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
-	i.Update(&document.Document{
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Update(&document.Document{
 		ID: "c",
 		Fields: []document.Field{
 			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
-	i.Update(&document.Document{
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Update(&document.Document{
 		ID: "d",
 		Fields: []document.Field{
 			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
-	i.Update(&document.Document{
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Update(&document.Document{
 		ID: "e",
 		Fields: []document.Field{
 			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
-	i.Update(&document.Document{
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Update(&document.Document{
 		ID: "f",
 		Fields: []document.Field{
 			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
-	i.Update(&document.Document{
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Update(&document.Document{
 		ID: "g",
 		Fields: []document.Field{
 			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
-	i.Update(&document.Document{
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Update(&document.Document{
 		ID: "h",
 		Fields: []document.Field{
 			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
-	i.Update(&document.Document{
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Update(&document.Document{
 		ID: "i",
 		Fields: []document.Field{
 			document.NewTextField("desc", []uint64{}, []byte("beer")),
 		},
 	})
-	i.Update(&document.Document{
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Update(&document.Document{
 		ID: "j",
 		Fields: []document.Field{
 			document.NewTextField("title", []uint64{}, []byte("cat")),
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	indexReader, err := i.Reader()
 	if err != nil {

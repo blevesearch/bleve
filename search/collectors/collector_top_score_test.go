@@ -84,7 +84,10 @@ func TestTop10Scores(t *testing.T) {
 	}
 
 	collector := NewTopScorerCollector(10)
-	collector.Collect(searcher)
+	err := collector.Collect(searcher)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	maxScore := collector.MaxScore()
 	if maxScore != 99.0 {
@@ -189,7 +192,10 @@ func TestTop10ScoresSkip10(t *testing.T) {
 	}
 
 	collector := NewTopScorerSkipCollector(10, 10)
-	collector.Collect(searcher)
+	err := collector.Collect(searcher)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	maxScore := collector.MaxScore()
 	if maxScore != 99.0 {
@@ -232,7 +238,10 @@ func BenchmarkTop10of100000Scores(b *testing.B) {
 	collector := NewTopScorerCollector(10)
 	b.ResetTimer()
 
-	collector.Collect(searcher)
+	err := collector.Collect(searcher)
+	if err != nil {
+		b.Fatal(err)
+	}
 	res := collector.Results()
 	for _, dm := range res {
 		b.Logf("%s - %f\n", dm.ID, dm.Score)

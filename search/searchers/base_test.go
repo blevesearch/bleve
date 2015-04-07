@@ -28,7 +28,10 @@ func init() {
 	analysisQueue := upside_down.NewAnalysisQueue(1)
 	twoDocIndex = upside_down.NewUpsideDownCouch(inMemStore, analysisQueue)
 	for _, doc := range twoDocIndexDocs {
-		twoDocIndex.Update(doc)
+		err := twoDocIndex.Update(doc)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
