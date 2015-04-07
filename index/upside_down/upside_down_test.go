@@ -49,7 +49,10 @@ func TestIndexOpenReopen(t *testing.T) {
 
 	// opening the database should have inserted a version
 	expectedLength := uint64(1)
-	rowCount := idx.rowCount()
+	rowCount, err := idx.rowCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
@@ -110,7 +113,10 @@ func TestIndexInsert(t *testing.T) {
 
 	// should have 4 rows (1 for version, 1 for schema field, and 1 for single term, and 1 for the term count, and 1 for the back index entry)
 	expectedLength := uint64(1 + 1 + 1 + 1 + 1)
-	rowCount := idx.rowCount()
+	rowCount, err := idx.rowCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
@@ -191,7 +197,10 @@ func TestIndexInsertThenDelete(t *testing.T) {
 
 	// should have 2 rows (1 for version, 1 for schema field)
 	expectedLength := uint64(1 + 1)
-	rowCount := idx.rowCount()
+	rowCount, err := idx.rowCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
@@ -226,7 +235,10 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 
 	// should have 2 rows (1 for version, 1 for schema field, and 2 for the two term, and 2 for the term counts, and 1 for the back index entry)
 	expectedLength := uint64(1 + 1 + 2 + 2 + 1)
-	rowCount := idx.rowCount()
+	rowCount, err := idx.rowCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
@@ -241,7 +253,10 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 
 	// should have 2 rows (1 for version, 1 for schema field, and 1 for the remaining term, and 1 for the term count, and 1 for the back index entry)
 	expectedLength = uint64(1 + 1 + 1 + 1 + 1)
-	rowCount = idx.rowCount()
+	rowCount, err = idx.rowCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
@@ -278,7 +293,10 @@ func TestIndexInsertMultiple(t *testing.T) {
 
 	// should have 4 rows (1 for version, 1 for schema field, and 2 for single term, and 1 for the term count, and 2 for the back index entries)
 	expectedLength := uint64(1 + 1 + 2 + 1 + 2)
-	rowCount := idx.rowCount()
+	rowCount, err := idx.rowCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
@@ -352,7 +370,10 @@ func TestIndexInsertWithStore(t *testing.T) {
 
 	// should have 6 rows (1 for version, 1 for schema field, and 1 for single term, and 1 for the stored field and 1 for the term count, and 1 for the back index entry)
 	expectedLength := uint64(1 + 1 + 1 + 1 + 1 + 1)
-	rowCount := idx.rowCount()
+	rowCount, err := idx.rowCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
@@ -589,7 +610,10 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	// 16 for date term counts
 	// 1 for the back index entry
 	expectedLength := uint64(1 + 3 + 1 + (64 / document.DefaultPrecisionStep) + (64 / document.DefaultPrecisionStep) + 3 + 1 + (64 / document.DefaultPrecisionStep) + (64 / document.DefaultPrecisionStep) + 1)
-	rowCount := idx.rowCount()
+	rowCount, err := idx.rowCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
@@ -782,7 +806,10 @@ func TestIndexUpdateComposites(t *testing.T) {
 	// 4 for the text term count
 	// 1 for the back index entry
 	expectedLength := uint64(1 + 3 + 4 + 2 + 4 + 1)
-	rowCount := idx.rowCount()
+	rowCount, err := idx.rowCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
@@ -820,7 +847,10 @@ func TestIndexUpdateComposites(t *testing.T) {
 	}
 
 	// should have the same row count as before
-	rowCount = idx.rowCount()
+	rowCount, err = idx.rowCount()
+	if err != nil {
+		t.Error(err)
+	}
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
