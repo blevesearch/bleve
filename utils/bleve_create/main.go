@@ -47,7 +47,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer index.Close()
+	defer func() {
+		cerr := index.Close()
+		if cerr != nil {
+			log.Fatalf("error closing index: %v", err)
+		}
+	}()
 
 	log.Printf("Created bleve index at: %s", *indexPath)
 }

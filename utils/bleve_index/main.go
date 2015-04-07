@@ -36,7 +36,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer index.Close()
+	defer func() {
+		cerr := index.Close()
+		if cerr != nil {
+			log.Fatalf("error closing index: %v", err)
+		}
+	}()
 
 	if flag.NArg() < 1 {
 		log.Fatal("must specify at least one path to index")

@@ -57,7 +57,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer index.Close()
+	defer func() {
+		cerr := index.Close()
+		if cerr != nil {
+			log.Fatalf("error closing index: %v", err)
+		}
+	}()
 
 	for i := 0; i < *repeat; i++ {
 		// build a search with the provided parameters
