@@ -57,6 +57,7 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/token_filters/unicode_normalize"
 
 	// tokenizers
+	_ "github.com/blevesearch/bleve/analysis/tokenizers/exception"
 	_ "github.com/blevesearch/bleve/analysis/tokenizers/regexp_tokenizer"
 	_ "github.com/blevesearch/bleve/analysis/tokenizers/single_token"
 	_ "github.com/blevesearch/bleve/analysis/tokenizers/unicode"
