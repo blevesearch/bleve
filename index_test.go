@@ -14,6 +14,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -588,14 +589,21 @@ func TestBatchString(t *testing.T) {
 	batch.SetInternal([]byte("c"), []byte{})
 	batch.DeleteInternal([]byte("d"))
 
-	expectedBatchStr := `Batch (2 ops, 2 internal ops)
-	INDEX - 'a'
-	DELETE - 'b'
-	SET INTERNAL - 'c'
-	DELETE INTERNAL - 'd'
-`
 	batchStr := batch.String()
-	if batchStr != expectedBatchStr {
-		t.Errorf("expected: %s\ngot: %s", expectedBatchStr, batchStr)
+	if !strings.HasPrefix(batchStr, "Batch (2 ops, 2 internal ops)") {
+		t.Errorf("expected to start with Batch (2 ops, 2 internal ops), did not")
 	}
+	if !strings.Contains(batchStr, "INDEX - 'a'") {
+		t.Errorf("expected to contain INDEX - 'a', did not")
+	}
+	if !strings.Contains(batchStr, "DELETE - 'b'") {
+		t.Errorf("expected to contain DELETE - 'b', did not")
+	}
+	if !strings.Contains(batchStr, "SET INTERNAL - 'c'") {
+		t.Errorf("expected to contain SET INTERNAL - 'c', did not")
+	}
+	if !strings.Contains(batchStr, "DELETE INTERNAL - 'd'") {
+		t.Errorf("expected to contain DELETE INTERNAL - 'd', did not")
+	}
+
 }
