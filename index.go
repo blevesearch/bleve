@@ -26,7 +26,7 @@ type Batch struct {
 // Index adds the specified index operation to the
 // batch.  NOTE: the bleve Index is not updated
 // until the batch is executed.
-func (b Batch) Index(id string, data interface{}) error {
+func (b *Batch) Index(id string, data interface{}) error {
 	doc := document.NewDocument(id)
 	err := b.index.Mapping().mapDocument(doc, data)
 	if err != nil {
@@ -39,26 +39,34 @@ func (b Batch) Index(id string, data interface{}) error {
 // Delete adds the specified delete operation to the
 // batch.  NOTE: the bleve Index is not updated until
 // the batch is executed.
-func (b Batch) Delete(id string) {
+func (b *Batch) Delete(id string) {
 	b.internal.Delete(id)
 }
 
 // SetInternal adds the specified set internal
 // operation to the batch. NOTE: the bleve Index is
 // not updated until the batch is executed.
-func (b Batch) SetInternal(key, val []byte) {
+func (b *Batch) SetInternal(key, val []byte) {
 	b.internal.SetInternal(key, val)
 }
 
 // SetInternal adds the specified delete internal
 // operation to the batch. NOTE: the bleve Index is
 // not updated until the batch is executed.
-func (b Batch) DeleteInternal(key []byte) {
+func (b *Batch) DeleteInternal(key []byte) {
 	b.internal.DeleteInternal(key)
 }
 
-func (b Batch) Size() int {
+// Size returns the total number of operations inside the batch
+// including normal index operations and internal operations.
+func (b *Batch) Size() int {
 	return len(b.internal.IndexOps) + len(b.internal.InternalOps)
+}
+
+// String prints a user friendly string represenation of what
+// is inside this batch.
+func (b *Batch) String() string {
+	return b.internal.String()
 }
 
 // An Index implements all the indexing and searching

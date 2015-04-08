@@ -11,6 +11,7 @@ package index
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/blevesearch/bleve/document"
 )
@@ -109,18 +110,37 @@ func NewBatch() *Batch {
 	}
 }
 
-func (b Batch) Update(doc *document.Document) {
+func (b *Batch) Update(doc *document.Document) {
 	b.IndexOps[doc.ID] = doc
 }
 
-func (b Batch) Delete(id string) {
+func (b *Batch) Delete(id string) {
 	b.IndexOps[id] = nil
 }
 
-func (b Batch) SetInternal(key, val []byte) {
+func (b *Batch) SetInternal(key, val []byte) {
 	b.InternalOps[string(key)] = val
 }
 
-func (b Batch) DeleteInternal(key []byte) {
+func (b *Batch) DeleteInternal(key []byte) {
 	b.InternalOps[string(key)] = nil
+}
+
+func (b *Batch) String() string {
+	rv := fmt.Sprintf("Batch (%d ops, %d internal ops)\n", len(b.IndexOps), len(b.InternalOps))
+	for k, v := range b.IndexOps {
+		if v != nil {
+			rv += fmt.Sprintf("\tINDEX - '%s'\n", k)
+		} else {
+			rv += fmt.Sprintf("\tDELETE - '%s'\n", k)
+		}
+	}
+	for k, v := range b.InternalOps {
+		if v != nil {
+			rv += fmt.Sprintf("\tSET INTERNAL - '%s'\n", k)
+		} else {
+			rv += fmt.Sprintf("\tDELETE INTERNAL - '%s'\n", k)
+		}
+	}
+	return rv
 }

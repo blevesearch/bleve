@@ -565,3 +565,37 @@ func TestDict(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestBatchString(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	batch := index.NewBatch()
+	err = batch.Index("a", []byte("{}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch.Delete("b")
+	batch.SetInternal([]byte("c"), []byte{})
+	batch.DeleteInternal([]byte("d"))
+
+	expectedBatchStr := `Batch (2 ops, 2 internal ops)
+	INDEX - 'a'
+	DELETE - 'b'
+	SET INTERNAL - 'c'
+	DELETE INTERNAL - 'd'
+`
+	batchStr := batch.String()
+	if batchStr != expectedBatchStr {
+		t.Errorf("expected: %s\ngot: %s", expectedBatchStr, batchStr)
+	}
+}
