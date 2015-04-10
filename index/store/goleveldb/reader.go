@@ -28,7 +28,7 @@ func newReader(store *Store) (*Reader, error) {
 }
 
 func (r *Reader) BytesSafeAfterClose() bool {
-	return true
+	return false
 }
 
 func (r *Reader) Get(key []byte) ([]byte, error) {
