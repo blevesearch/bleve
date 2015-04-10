@@ -35,9 +35,11 @@ func Open(path string, config map[string]interface{}) (*Store, error) {
 		opts: &opt.Options{},
 	}
 
-	applyConfig(rv.opts, config)
+	_, err := applyConfig(rv.opts, config)
+	if err != nil {
+		return nil, err
+	}
 
-	var err error
 	rv.db, err = leveldb.OpenFile(rv.path, rv.opts)
 	if err != nil {
 		return nil, err
@@ -89,8 +91,7 @@ func (ldbs *Store) deletelocked(key []byte) error {
 }
 
 func (ldbs *Store) Close() error {
-	ldbs.db.Close()
-	return nil
+	return ldbs.db.Close()
 }
 
 func (ldbs *Store) iterator(key []byte) store.KVIterator {
