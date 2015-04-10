@@ -16,12 +16,12 @@ import (
 	"github.com/blevesearch/bleve/index/store/goleveldb"
 )
 
-var leveldbTestOptions = map[string]interface{}{
+var goLevelDBTestOptions = map[string]interface{}{
 	"create_if_missing": true,
 }
 
 func BenchmarkGoLevelDBIndexing1Workers(b *testing.B) {
-	s, err := goleveldb.Open("test", leveldbTestOptions)
+	s, err := goleveldb.Open("test", goLevelDBTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func BenchmarkGoLevelDBIndexing1Workers(b *testing.B) {
 }
 
 func BenchmarkGoLevelDBIndexing2Workers(b *testing.B) {
-	s, err := goleveldb.Open("test", leveldbTestOptions)
+	s, err := goleveldb.Open("test", goLevelDBTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func BenchmarkGoLevelDBIndexing2Workers(b *testing.B) {
 }
 
 func BenchmarkGoLevelDBIndexing4Workers(b *testing.B) {
-	s, err := goleveldb.Open("test", leveldbTestOptions)
+	s, err := goleveldb.Open("test", goLevelDBTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func BenchmarkGoLevelDBIndexing4Workers(b *testing.B) {
 // batches
 
 func BenchmarkGoLevelDBIndexing1Workers10Batch(b *testing.B) {
-	s, err := goleveldb.Open("test", leveldbTestOptions)
+	s, err := goleveldb.Open("test", goLevelDBTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func BenchmarkGoLevelDBIndexing1Workers10Batch(b *testing.B) {
 }
 
 func BenchmarkGoLevelDBIndexing2Workers10Batch(b *testing.B) {
-	s, err := goleveldb.Open("test", leveldbTestOptions)
+	s, err := goleveldb.Open("test", goLevelDBTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func BenchmarkGoLevelDBIndexing2Workers10Batch(b *testing.B) {
 }
 
 func BenchmarkGoLevelDBIndexing4Workers10Batch(b *testing.B) {
-	s, err := goleveldb.Open("test", leveldbTestOptions)
+	s, err := goleveldb.Open("test", goLevelDBTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func BenchmarkGoLevelDBIndexing4Workers10Batch(b *testing.B) {
 }
 
 func BenchmarkGoLevelDBIndexing1Workers100Batch(b *testing.B) {
-	s, err := goleveldb.Open("test", leveldbTestOptions)
+	s, err := goleveldb.Open("test", goLevelDBTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func BenchmarkGoLevelDBIndexing1Workers100Batch(b *testing.B) {
 }
 
 func BenchmarkGoLevelDBIndexing2Workers100Batch(b *testing.B) {
-	s, err := goleveldb.Open("test", leveldbTestOptions)
+	s, err := goleveldb.Open("test", goLevelDBTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func BenchmarkGoLevelDBIndexing2Workers100Batch(b *testing.B) {
 }
 
 func BenchmarkGoLevelDBIndexing4Workers100Batch(b *testing.B) {
-	s, err := goleveldb.Open("test", leveldbTestOptions)
+	s, err := goleveldb.Open("test", goLevelDBTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func BenchmarkGoLevelDBIndexing4Workers100Batch(b *testing.B) {
 }
 
 func BenchmarkGoLevelDBIndexing1Workers1000Batch(b *testing.B) {
-	s, err := goleveldb.Open("test", leveldbTestOptions)
+	s, err := goleveldb.Open("test", goLevelDBTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func BenchmarkGoLevelDBIndexing1Workers1000Batch(b *testing.B) {
 }
 
 func BenchmarkGoLevelDBIndexing2Workers1000Batch(b *testing.B) {
-	s, err := goleveldb.Open("test", leveldbTestOptions)
+	s, err := goleveldb.Open("test", goLevelDBTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -254,7 +254,7 @@ func BenchmarkGoLevelDBIndexing2Workers1000Batch(b *testing.B) {
 }
 
 func BenchmarkGoLevelDBIndexing4Workers1000Batch(b *testing.B) {
-	s, err := goleveldb.Open("test", leveldbTestOptions)
+	s, err := goleveldb.Open("test", goLevelDBTestOptions)
 	if err != nil {
 		b.Fatal(err)
 	}
