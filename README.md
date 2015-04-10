@@ -1,12 +1,13 @@
 # ![bleve](docs/bleve.png) bleve
 
-[![Join the chat at https://gitter.im/blevesearch/bleve](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/blevesearch/bleve?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Build Status](https://travis-ci.org/blevesearch/bleve.svg?branch=master)](https://travis-ci.org/blevesearch/bleve) [![Coverage Status](https://coveralls.io/repos/blevesearch/bleve/badge.png?branch=master)](https://coveralls.io/r/blevesearch/bleve?branch=master) [![GoDoc](https://godoc.org/github.com/blevesearch/bleve?status.svg)](https://godoc.org/github.com/blevesearch/bleve) [![Join the chat at https://gitter.im/blevesearch/bleve](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/blevesearch/bleve?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 modern text indexing in go - [blevesearch.com](http://www.blevesearch.com/)
 
 Try out bleve live by [searching our wiki](http://wikisearch.blevesearch.com/search/).
 
 ## Features
+
 * Index any go data structure (including JSON)
 * Intelligent defaults backed up by powerful configuration
 * Supported field types:
@@ -52,12 +53,9 @@ Discuss usage and development of bleve in the [google group](https://groups.goog
 		query := bleve.NewQueryStringQuery("bleve")
 		searchRequest := bleve.NewSearchRequest(query)
 		searchResult, _ := index.Search(searchRequest)
-		
+
 ## License
 
 Apache License Version 2.0
 
-## Status
 
-[![Build Status](https://travis-ci.org/blevesearch/bleve.svg?branch=master)](https://travis-ci.org/blevesearch/bleve)
-[![Coverage Status](https://coveralls.io/repos/blevesearch/bleve/badge.png?branch=master)](https://coveralls.io/r/blevesearch/bleve?branch=master)
