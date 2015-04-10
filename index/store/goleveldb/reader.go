@@ -27,6 +27,10 @@ func newReader(store *Store) (*Reader, error) {
 	}, nil
 }
 
+func (r *Reader) BytesSafeAfterClose() bool {
+	return true
+}
+
 func (r *Reader) Get(key []byte) ([]byte, error) {
 	return r.store.getWithSnapshot(key, r.snapshot)
 }
