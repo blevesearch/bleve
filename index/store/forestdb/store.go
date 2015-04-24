@@ -20,7 +20,7 @@ import (
 
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
-	"github.com/couchbaselabs/goforestdb"
+	"github.com/couchbase/goforestdb"
 )
 
 type ForestDBConfig struct {

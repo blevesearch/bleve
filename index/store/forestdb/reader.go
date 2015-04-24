@@ -15,7 +15,7 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/index/store"
-	"github.com/couchbaselabs/goforestdb"
+	"github.com/couchbase/goforestdb"
 )
 
 type Reader struct {

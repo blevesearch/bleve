@@ -12,7 +12,7 @@
 package forestdb
 
 import (
-	"github.com/couchbaselabs/goforestdb"
+	"github.com/couchbase/goforestdb"
 )
 
 type Iterator struct {
