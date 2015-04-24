@@ -7,65 +7,49 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-// +build forestdb
+// +build go1.4
 
-package forestdb
+package cznicb
 
 import (
 	"github.com/blevesearch/bleve/index/store"
 )
 
 type Writer struct {
-	store *Store
+	s *Store
+	r *Reader
 }
 
 func (w *Writer) BytesSafeAfterClose() bool {
-	return true
-}
-
-func newWriter(store *Store) (*Writer, error) {
-	store.writer.Lock()
-	return &Writer{
-		store: store,
-	}, nil
+	return false
 }
 
 func (w *Writer) Set(key, val []byte) error {
-	err := w.store.setlocked(key, val)
-	if err != nil {
-		return err
-	}
-	return w.store.commit()
+	return w.s.set(key, val)
 }
 
 func (w *Writer) Delete(key []byte) error {
-	err := w.store.deletelocked(key)
-	if err != nil {
-		return err
-	}
-	return w.store.commit()
+	return w.s.delete(key)
 }
 
 func (w *Writer) NewBatch() store.KVBatch {
 	return &Batch{
-		s:      w.store,
+		s:      w.s,
 		ops:    make([]op, 0, 1000),
 		merges: make(map[string][][]byte),
 	}
 }
 
 func (w *Writer) Close() error {
-	w.store.writer.Unlock()
+	w.s.availableWriters <- true
+	w.s = nil
 	return nil
 }
 
-// these two methods can safely read using the regular
-// methods without a read transaction, because we know
-// that no one else is writing but us
 func (w *Writer) Get(key []byte) ([]byte, error) {
-	return w.store.get(key)
+	return w.r.s.get(key)
 }
 
 func (w *Writer) Iterator(key []byte) store.KVIterator {
-	return w.store.iterator(key)
+	return w.r.s.iterator(key)
 }

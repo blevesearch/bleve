@@ -24,9 +24,13 @@ import (
 var twoDocIndex index.Index //= upside_down.NewUpsideDownCouch(inmem.MustOpen())
 
 func init() {
-	inMemStore, _ := inmem.Open()
+	inMemStore, _ := inmem.New()
 	analysisQueue := upside_down.NewAnalysisQueue(1)
 	twoDocIndex = upside_down.NewUpsideDownCouch(inMemStore, analysisQueue)
+	err := twoDocIndex.Open()
+	if err != nil {
+		panic(err)
+	}
 	for _, doc := range twoDocIndexDocs {
 		err := twoDocIndex.Update(doc)
 		if err != nil {

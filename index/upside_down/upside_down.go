@@ -37,11 +37,11 @@ type UpsideDownCouch struct {
 	store           store.KVStore
 	fieldIndexCache *FieldIndexCache
 	docCount        uint64
-	analysisQueue   AnalysisQueue
+	analysisQueue   *AnalysisQueue
 	stats           *indexStat
 }
 
-func NewUpsideDownCouch(s store.KVStore, analysisQueue AnalysisQueue) *UpsideDownCouch {
+func NewUpsideDownCouch(s store.KVStore, analysisQueue *AnalysisQueue) *UpsideDownCouch {
 	return &UpsideDownCouch{
 		version:         Version,
 		fieldIndexCache: NewFieldIndexCache(),
@@ -119,7 +119,7 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 		if ok {
 			// need to increment counter
 			dictionaryKey := tfr.DictionaryRowKey()
-			wb.Merge(dictionaryKey, newDictionaryTermIncr())
+			wb.Merge(dictionaryKey, dictionaryTermIncr)
 		}
 		wb.Set(row.Key(), row.Value())
 	}
@@ -135,7 +135,7 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 		if ok {
 			// need to decrement counter
 			dictionaryKey := tfr.DictionaryRowKey()
-			wb.Merge(dictionaryKey, newDictionaryTermDecr())
+			wb.Merge(dictionaryKey, dictionaryTermDecr)
 		}
 		wb.Delete(row.Key())
 	}
@@ -153,6 +153,15 @@ func (udc *UpsideDownCouch) DocCount() (uint64, error) {
 }
 
 func (udc *UpsideDownCouch) Open() (err error) {
+	// install the merge operator
+	udc.store.SetMergeOperator(&mergeOperator)
+
+	// now open the kv store
+	err = udc.store.Open()
+	if err != nil {
+		return
+	}
+
 	// start a writer for the open process
 	var kvwriter store.KVWriter
 	kvwriter, err = udc.store.Writer()
@@ -252,7 +261,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	}
 	// put the work on the queue
 	go func() {
-		udc.analysisQueue <- aw
+		udc.analysisQueue.Queue(&aw)
 	}()
 
 	// wait for the result
@@ -581,7 +590,7 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 					rc:  resultChan,
 				}
 				// put the work on the queue
-				udc.analysisQueue <- aw
+				udc.analysisQueue.Queue(&aw)
 			}
 		}
 	}()

@@ -12,142 +12,52 @@ package upside_down
 import (
 	"testing"
 
+	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/store/null"
 )
 
-func BenchmarkNullIndexing1Workers(b *testing.B) {
-	s, err := null.Open()
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
+func CreateNull() (store.KVStore, error) {
+	return null.New()
+}
 
-	CommonBenchmarkIndex(b, s, 1)
+func DestroyNull() error {
+	return nil
+}
+
+func BenchmarkNullIndexing1Workers(b *testing.B) {
+	CommonBenchmarkIndex(b, CreateNull, DestroyNull, 1)
 }
 
 func BenchmarkNullIndexing2Workers(b *testing.B) {
-	s, err := null.Open()
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndex(b, s, 2)
+	CommonBenchmarkIndex(b, CreateNull, DestroyNull, 2)
 }
 
 func BenchmarkNullIndexing4Workers(b *testing.B) {
-	s, err := null.Open()
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndex(b, s, 4)
+	CommonBenchmarkIndex(b, CreateNull, DestroyNull, 4)
 }
 
 // batches
 
 func BenchmarkNullIndexing1Workers10Batch(b *testing.B) {
-	s, err := null.Open()
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 1, 10)
+	CommonBenchmarkIndexBatch(b, CreateNull, DestroyNull, 1, 10)
 }
 
 func BenchmarkNullIndexing2Workers10Batch(b *testing.B) {
-	s, err := null.Open()
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 2, 10)
+	CommonBenchmarkIndexBatch(b, CreateNull, DestroyNull, 2, 10)
 }
 
 func BenchmarkNullIndexing4Workers10Batch(b *testing.B) {
-	s, err := null.Open()
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 4, 10)
+	CommonBenchmarkIndexBatch(b, CreateNull, DestroyNull, 4, 10)
 }
 
 func BenchmarkNullIndexing1Workers100Batch(b *testing.B) {
-	s, err := null.Open()
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 1, 100)
+	CommonBenchmarkIndexBatch(b, CreateNull, DestroyNull, 1, 100)
 }
 
 func BenchmarkNullIndexing2Workers100Batch(b *testing.B) {
-	s, err := null.Open()
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 2, 100)
+	CommonBenchmarkIndexBatch(b, CreateNull, DestroyNull, 2, 100)
 }
 
 func BenchmarkNullIndexing4Workers100Batch(b *testing.B) {
-	s, err := null.Open()
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 4, 100)
+	CommonBenchmarkIndexBatch(b, CreateNull, DestroyNull, 4, 100)
 }

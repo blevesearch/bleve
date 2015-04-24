@@ -51,9 +51,10 @@ type Store struct {
 	dbfile   *forestdb.File
 	dbkv     *forestdb.KVStore
 	writer   sync.Mutex
+	mo       store.MergeOperator
 }
 
-func Open(path string, createIfMissing bool,
+func New(path string, createIfMissing bool,
 	config map[string]interface{}) (*Store, error) {
 	if config == nil {
 		config = map[string]interface{}{}
@@ -76,17 +77,26 @@ func Open(path string, createIfMissing bool,
 		rv.kvconfig.SetCreateIfMissing(true)
 	}
 
-	rv.dbfile, err = forestdb.Open(rv.path, rv.config)
-	if err != nil {
-		return nil, err
-	}
-
-	rv.dbkv, err = rv.dbfile.OpenKVStoreDefault(rv.kvconfig)
-	if err != nil {
-		return nil, err
-	}
-
 	return &rv, nil
+}
+
+func (s *Store) Open() error {
+	var err error
+	s.dbfile, err = forestdb.Open(s.path, s.config)
+	if err != nil {
+		return err
+	}
+
+	s.dbkv, err = s.dbfile.OpenKVStoreDefault(s.kvconfig)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Store) SetMergeOperator(mo store.MergeOperator) {
+	s.mo = mo
 }
 
 func (s *Store) get(key []byte) ([]byte, error) {
@@ -142,10 +152,6 @@ func (s *Store) Reader() (store.KVReader, error) {
 
 func (ldbs *Store) Writer() (store.KVWriter, error) {
 	return newWriter(ldbs)
-}
-
-func (ldbs *Store) newBatch() store.KVBatch {
-	return newBatch(ldbs)
 }
 
 func (s *Store) getSeqNum() (forestdb.SeqNum, error) {
@@ -211,7 +217,7 @@ func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
 	if ok {
 		createIfMissing = cim
 	}
-	return Open(path, createIfMissing, config)
+	return New(path, createIfMissing, config)
 }
 
 func init() {

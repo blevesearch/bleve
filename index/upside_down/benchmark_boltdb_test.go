@@ -13,196 +13,53 @@ import (
 	"os"
 	"testing"
 
+	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/store/boltdb"
 )
 
-func BenchmarkBoltDBIndexing1Workers(b *testing.B) {
-	s, err := boltdb.Open("test", "bleve")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
+func CreateBoltDB() (store.KVStore, error) {
+	s := boltdb.New("test", "bleve")
+	return s, nil
+}
 
-	CommonBenchmarkIndex(b, s, 1)
+func DestroyBoltDB() error {
+	return os.RemoveAll("test")
+}
+
+func BenchmarkBoltDBIndexing1Workers(b *testing.B) {
+	CommonBenchmarkIndex(b, CreateBoltDB, DestroyBoltDB, 1)
 }
 
 func BenchmarkBoltDBIndexing2Workers(b *testing.B) {
-	s, err := boltdb.Open("test", "bleve")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndex(b, s, 2)
+	CommonBenchmarkIndex(b, CreateBoltDB, DestroyBoltDB, 2)
 }
 
 func BenchmarkBoltDBIndexing4Workers(b *testing.B) {
-	s, err := boltdb.Open("test", "bleve")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndex(b, s, 4)
+	CommonBenchmarkIndex(b, CreateBoltDB, DestroyBoltDB, 4)
 }
 
 // batches
 
 func BenchmarkBoltDBIndexing1Workers10Batch(b *testing.B) {
-	s, err := boltdb.Open("test", "bleve")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 1, 10)
+	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 1, 10)
 }
 
 func BenchmarkBoltDBIndexing2Workers10Batch(b *testing.B) {
-	s, err := boltdb.Open("test", "bleve")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 2, 10)
+	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 2, 10)
 }
 
 func BenchmarkBoltDBIndexing4Workers10Batch(b *testing.B) {
-	s, err := boltdb.Open("test", "bleve")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 4, 10)
+	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 4, 10)
 }
 
 func BenchmarkBoltDBIndexing1Workers100Batch(b *testing.B) {
-	s, err := boltdb.Open("test", "bleve")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 1, 100)
+	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 1, 100)
 }
 
 func BenchmarkBoltDBIndexing2Workers100Batch(b *testing.B) {
-	s, err := boltdb.Open("test", "bleve")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 2, 100)
+	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 2, 100)
 }
 
 func BenchmarkBoltDBIndexing4Workers100Batch(b *testing.B) {
-	s, err := boltdb.Open("test", "bleve")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 4, 100)
+	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 4, 100)
 }

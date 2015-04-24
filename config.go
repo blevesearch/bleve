@@ -118,7 +118,7 @@ type configuration struct {
 	DefaultHighlighter     string
 	DefaultKVStore         string
 	SlowSearchLogThreshold time.Duration
-	analysisQueue          upside_down.AnalysisQueue
+	analysisQueue          *upside_down.AnalysisQueue
 }
 
 func newConfiguration() *configuration {

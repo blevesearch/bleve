@@ -24,78 +24,98 @@ type AnalysisWork struct {
 	rc  chan *AnalysisResult
 }
 
-type AnalysisQueue chan AnalysisWork
+type AnalysisQueue struct {
+	queue chan *AnalysisWork
+	done  chan struct{}
+}
 
-func NewAnalysisQueue(numWorkers int) AnalysisQueue {
-	rv := make(AnalysisQueue)
+func (q *AnalysisQueue) Queue(work *AnalysisWork) {
+	q.queue <- work
+}
+
+func (q *AnalysisQueue) Close() {
+	close(q.done)
+}
+
+func NewAnalysisQueue(numWorkers int) *AnalysisQueue {
+	rv := AnalysisQueue{
+		queue: make(chan *AnalysisWork),
+		done:  make(chan struct{}),
+	}
 	for i := 0; i < numWorkers; i++ {
 		go AnalysisWorker(rv)
 	}
-	return rv
+	return &rv
 }
 
 func AnalysisWorker(q AnalysisQueue) {
 	// read work off the queue
 	for {
-		w := <-q
+		select {
+		case <-q.done:
+			return
+		case w := <-q.queue:
 
-		rv := &AnalysisResult{
-			docID: w.d.ID,
-			rows:  make([]UpsideDownCouchRow, 0, 100),
-		}
-
-		// track our back index entries
-		backIndexTermEntries := make([]*BackIndexTermEntry, 0)
-		backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
-
-		for _, field := range w.d.Fields {
-			fieldIndex, newFieldRow := w.udc.fieldIndexCache.FieldIndex(field.Name())
-			if newFieldRow != nil {
-				rv.rows = append(rv.rows, newFieldRow)
+			rv := &AnalysisResult{
+				docID: w.d.ID,
+				rows:  make([]UpsideDownCouchRow, 0, 100),
 			}
 
-			if field.Options().IsIndexed() {
+			// track our back index entries
+			backIndexTermEntries := make([]*BackIndexTermEntry, 0)
+			backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
 
-				fieldLength, tokenFreqs := field.Analyze()
-
-				// see if any of the composite fields need this
-				for _, compositeField := range w.d.CompositeFields {
-					compositeField.Compose(field.Name(), fieldLength, tokenFreqs)
+			for _, field := range w.d.Fields {
+				fieldIndex, newFieldRow := w.udc.fieldIndexCache.FieldIndex(field.Name())
+				if newFieldRow != nil {
+					rv.rows = append(rv.rows, newFieldRow)
 				}
 
-				// encode this field
-				indexRows, indexBackIndexTermEntries := w.udc.indexField(w.d.ID, field, fieldIndex, fieldLength, tokenFreqs)
-				rv.rows = append(rv.rows, indexRows...)
-				backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
+				if field.Options().IsIndexed() {
+
+					fieldLength, tokenFreqs := field.Analyze()
+
+					// see if any of the composite fields need this
+					for _, compositeField := range w.d.CompositeFields {
+						compositeField.Compose(field.Name(), fieldLength, tokenFreqs)
+					}
+
+					// encode this field
+					indexRows, indexBackIndexTermEntries := w.udc.indexField(w.d.ID, field, fieldIndex, fieldLength, tokenFreqs)
+					rv.rows = append(rv.rows, indexRows...)
+					backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
+				}
+
+				if field.Options().IsStored() {
+					storeRows, indexBackIndexStoreEntries := w.udc.storeField(w.d.ID, field, fieldIndex)
+					rv.rows = append(rv.rows, storeRows...)
+					backIndexStoredEntries = append(backIndexStoredEntries, indexBackIndexStoreEntries...)
+				}
+
 			}
 
-			if field.Options().IsStored() {
-				storeRows, indexBackIndexStoreEntries := w.udc.storeField(w.d.ID, field, fieldIndex)
-				rv.rows = append(rv.rows, storeRows...)
-				backIndexStoredEntries = append(backIndexStoredEntries, indexBackIndexStoreEntries...)
+			// now index the composite fields
+			for _, compositeField := range w.d.CompositeFields {
+				fieldIndex, newFieldRow := w.udc.fieldIndexCache.FieldIndex(compositeField.Name())
+				if newFieldRow != nil {
+					rv.rows = append(rv.rows, newFieldRow)
+				}
+				if compositeField.Options().IsIndexed() {
+					fieldLength, tokenFreqs := compositeField.Analyze()
+					// encode this field
+					indexRows, indexBackIndexTermEntries := w.udc.indexField(w.d.ID, compositeField, fieldIndex, fieldLength, tokenFreqs)
+					rv.rows = append(rv.rows, indexRows...)
+					backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
+				}
 			}
+
+			// build the back index row
+			backIndexRow := NewBackIndexRow(w.d.ID, backIndexTermEntries, backIndexStoredEntries)
+			rv.rows = append(rv.rows, backIndexRow)
+
+			w.rc <- rv
 
 		}
 
-		// now index the composite fields
-		for _, compositeField := range w.d.CompositeFields {
-			fieldIndex, newFieldRow := w.udc.fieldIndexCache.FieldIndex(compositeField.Name())
-			if newFieldRow != nil {
-				rv.rows = append(rv.rows, newFieldRow)
-			}
-			if compositeField.Options().IsIndexed() {
-				fieldLength, tokenFreqs := compositeField.Analyze()
-				// encode this field
-				indexRows, indexBackIndexTermEntries := w.udc.indexField(w.d.ID, compositeField, fieldIndex, fieldLength, tokenFreqs)
-				rv.rows = append(rv.rows, indexRows...)
-				backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
-			}
-		}
-
-		// build the back index row
-		backIndexRow := NewBackIndexRow(w.d.ID, backIndexTermEntries, backIndexStoredEntries)
-		rv.rows = append(rv.rows, backIndexRow)
-
-		w.rc <- rv
 	}
 }

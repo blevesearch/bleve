@@ -25,10 +25,14 @@ func TestTermSearcher(t *testing.T) {
 	var queryBoost = 3.0
 	var queryExplain = true
 
-	inMemStore, _ := inmem.Open()
+	inMemStore, _ := inmem.New()
 	analysisQueue := upside_down.NewAnalysisQueue(1)
 	i := upside_down.NewUpsideDownCouch(inMemStore, analysisQueue)
-	err := i.Update(&document.Document{
+	err := i.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Update(&document.Document{
 		ID: "a",
 		Fields: []document.Field{
 			document.NewTextField("desc", []uint64{}, []byte("beer")),

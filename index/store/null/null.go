@@ -15,9 +15,17 @@ import (
 
 type Store struct{}
 
-func Open() (*Store, error) {
+func New() (*Store, error) {
 	rv := Store{}
 	return &rv, nil
+}
+
+func (i *Store) Open() error {
+	return nil
+}
+
+func (i *Store) SetMergeOperator(mo store.MergeOperator) {
+
 }
 
 func (i *Store) Close() error {
@@ -112,7 +120,7 @@ func (i *Batch) Set(key, val []byte) {
 func (i *Batch) Delete(key []byte) {
 }
 
-func (i *Batch) Merge(key []byte, oper store.AssociativeMerge) {
+func (i *Batch) Merge(key, val []byte) {
 }
 
 func (i *Batch) Execute() error {

@@ -22,9 +22,10 @@ const Name = "mem"
 type Store struct {
 	list   *skiplist.SkipList
 	writer sync.Mutex
+	mo     store.MergeOperator
 }
 
-func Open() (*Store, error) {
+func New() (*Store, error) {
 	rv := Store{
 		list: skiplist.NewStringMap(),
 	}
@@ -38,6 +39,14 @@ func MustOpen() *Store {
 	}
 
 	return &rv
+}
+
+func (i *Store) Open() error {
+	return nil
+}
+
+func (i *Store) SetMergeOperator(mo store.MergeOperator) {
+	i.mo = mo
 }
 
 func (i *Store) get(key []byte) ([]byte, error) {
@@ -88,12 +97,8 @@ func (i *Store) Writer() (store.KVWriter, error) {
 	return newWriter(i)
 }
 
-func (i *Store) newBatch() store.KVBatch {
-	return newBatch(i)
-}
-
 func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
-	return Open()
+	return New()
 }
 
 func init() {

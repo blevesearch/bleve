@@ -25,30 +25,39 @@ type Store struct {
 	bucket string
 	db     *bolt.DB
 	writer sync.Mutex
+	mo     store.MergeOperator
 }
 
-func Open(path string, bucket string) (*Store, error) {
+func New(path string, bucket string) *Store {
 	rv := Store{
 		path:   path,
 		bucket: bucket,
 	}
+	return &rv
+}
+
+func (bs *Store) Open() error {
 
 	var err error
-	rv.db, err = bolt.Open(path, 0600, nil)
+	bs.db, err = bolt.Open(bs.path, 0600, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = rv.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(rv.bucket))
+	err = bs.db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(bs.bucket))
 
 		return err
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &rv, nil
+	return nil
+}
+
+func (bs *Store) SetMergeOperator(mo store.MergeOperator) {
+	bs.mo = mo
 }
 
 func (bs *Store) Close() error {
@@ -95,7 +104,7 @@ func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
 		bucket = "bleve"
 	}
 
-	return Open(path, bucket)
+	return New(path, bucket), nil
 }
 
 func init() {

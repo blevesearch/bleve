@@ -27,23 +27,34 @@ type Store struct {
 	opts   *levigo.Options
 	db     *levigo.DB
 	writer sync.Mutex
+	mo     store.MergeOperator
 }
 
-func Open(path string, config map[string]interface{}) (*Store, error) {
+func New(path string, config map[string]interface{}) (*Store, error) {
 	rv := Store{
 		path: path,
 		opts: levigo.NewOptions(),
 	}
 
-	applyConfig(rv.opts, config)
-
-	var err error
-	rv.db, err = levigo.Open(rv.path, rv.opts)
+	_, err := applyConfig(rv.opts, config)
 	if err != nil {
 		return nil, err
 	}
 
 	return &rv, nil
+}
+
+func (ldbs *Store) Open() error {
+	var err error
+	ldbs.db, err = levigo.Open(ldbs.path, ldbs.opts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ldbs *Store) SetMergeOperator(mo store.MergeOperator) {
+	ldbs.mo = mo
 }
 
 func (ldbs *Store) get(key []byte) ([]byte, error) {
@@ -107,16 +118,12 @@ func (ldbs *Store) Writer() (store.KVWriter, error) {
 	return newWriter(ldbs)
 }
 
-func (ldbs *Store) newBatch() store.KVBatch {
-	return newBatch(ldbs)
-}
-
 func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
 	path, ok := config["path"].(string)
 	if !ok {
 		return nil, fmt.Errorf("must specify path")
 	}
-	return Open(path, config)
+	return New(path, config)
 }
 
 func init() {

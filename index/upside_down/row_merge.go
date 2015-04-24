@@ -9,46 +9,62 @@
 
 package upside_down
 
-type dictionaryTermIncr struct{}
+import (
+	"encoding/binary"
+)
 
-func newDictionaryTermIncr() *dictionaryTermIncr {
-	return &dictionaryTermIncr{}
+var mergeOperator upsideDownMerge
+
+var dictionaryTermIncr []byte
+var dictionaryTermDecr []byte
+
+func init() {
+	dictionaryTermIncr = make([]byte, 8)
+	binary.LittleEndian.PutUint64(dictionaryTermIncr, uint64(1))
+	dictionaryTermDecr = make([]byte, 8)
+	var negOne = int64(-1)
+	binary.LittleEndian.PutUint64(dictionaryTermDecr, uint64(negOne))
 }
 
-func (t *dictionaryTermIncr) Merge(key, existing []byte) ([]byte, error) {
-	if len(existing) > 0 {
-		dr, err := NewDictionaryRowKV(key, existing)
-		if err != nil {
-			return nil, err
-		}
-		dr.count++
-		return dr.Value(), nil
-	} else {
-		dr, err := NewDictionaryRowK(key)
-		if err != nil {
-			return nil, err
-		}
-		dr.count = 1
-		return dr.Value(), nil
+type upsideDownMerge struct{}
+
+func (m *upsideDownMerge) FullMerge(key, existingValue []byte, operands [][]byte) ([]byte, bool) {
+	// set up record based on key
+	dr, err := NewDictionaryRowK(key)
+	if err != nil {
+		return nil, false
 	}
-}
-
-type dictionaryTermDecr struct{}
-
-func newDictionaryTermDecr() *dictionaryTermDecr {
-	return &dictionaryTermDecr{}
-}
-
-func (t *dictionaryTermDecr) Merge(key, existing []byte) ([]byte, error) {
-	if len(existing) > 0 {
-		dr, err := NewDictionaryRowKV(key, existing)
+	if len(existingValue) > 0 {
+		// if existing value, parse it
+		err = dr.parseDictionaryV(existingValue)
 		if err != nil {
-			return nil, err
-		}
-		dr.count--
-		if dr.count > 0 {
-			return dr.Value(), nil
+			return nil, false
 		}
 	}
-	return nil, nil
+
+	// now process operands
+	for _, operand := range operands {
+		next := int64(binary.LittleEndian.Uint64(operand))
+		if next < 0 && uint64(-next) > dr.count {
+			// subtracting next from existing would overflow
+			dr.count = 0
+		} else if next < 0 {
+			dr.count -= uint64(-next)
+		} else {
+			dr.count += uint64(next)
+		}
+	}
+
+	return dr.Value(), true
+}
+
+func (m *upsideDownMerge) PartialMerge(key, leftOperand, rightOperand []byte) ([]byte, bool) {
+	left := int64(binary.LittleEndian.Uint64(leftOperand))
+	right := int64(binary.LittleEndian.Uint64(rightOperand))
+	binary.LittleEndian.PutUint64(leftOperand, uint64(left+right))
+	return leftOperand, true
+}
+
+func (m *upsideDownMerge) Name() string {
+	return "upsideDownMerge"
 }

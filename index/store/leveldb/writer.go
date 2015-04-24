@@ -13,6 +13,7 @@ package leveldb
 
 import (
 	"github.com/blevesearch/bleve/index/store"
+	"github.com/jmhodges/levigo"
 )
 
 type Writer struct {
@@ -39,7 +40,12 @@ func (w *Writer) Delete(key []byte) error {
 }
 
 func (w *Writer) NewBatch() store.KVBatch {
-	return newBatchAlreadyLocked(w.store)
+	rv := Batch{
+		w:     w,
+		merge: store.NewEmulatedMerge(w.store.mo),
+		batch: levigo.NewWriteBatch(),
+	}
+	return &rv
 }
 
 func (w *Writer) Close() error {

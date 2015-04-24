@@ -124,7 +124,7 @@ func newIndexUsing(path string, mapping *IndexMapping, kvstore string, kvconfig 
 	kvconfig["error_if_exists"] = true
 	kvconfig["path"] = indexStorePath(path)
 
-	// now open the store
+	// now create the store
 	rv.s, err = storeConstructor(kvconfig)
 	if err != nil {
 		return nil, err

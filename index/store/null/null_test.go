@@ -7,7 +7,7 @@ import (
 )
 
 func TestStore(t *testing.T) {
-	s, err := Open()
+	s, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}

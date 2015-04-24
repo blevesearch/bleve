@@ -15,6 +15,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/store/leveldb"
 )
 
@@ -22,256 +23,60 @@ var leveldbTestOptions = map[string]interface{}{
 	"create_if_missing": true,
 }
 
-func BenchmarkLevelDBIndexing1Workers(b *testing.B) {
-	s, err := leveldb.Open("test", leveldbTestOptions)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
+func CreateLevelDB() (store.KVStore, error) {
+	return leveldb.New("test", leveldbTestOptions)
+}
 
-	CommonBenchmarkIndex(b, s, 1)
+func DestroyLevelDB() error {
+	return os.RemoveAll("test")
+}
+
+func BenchmarkLevelDBIndexing1Workers(b *testing.B) {
+	CommonBenchmarkIndex(b, CreateLevelDB, DestroyLevelDB, 1)
 }
 
 func BenchmarkLevelDBIndexing2Workers(b *testing.B) {
-	s, err := leveldb.Open("test", leveldbTestOptions)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndex(b, s, 2)
+	CommonBenchmarkIndex(b, CreateLevelDB, DestroyLevelDB, 2)
 }
 
 func BenchmarkLevelDBIndexing4Workers(b *testing.B) {
-	s, err := leveldb.Open("test", leveldbTestOptions)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndex(b, s, 4)
+	CommonBenchmarkIndex(b, CreateLevelDB, DestroyLevelDB, 4)
 }
 
 // batches
 
 func BenchmarkLevelDBIndexing1Workers10Batch(b *testing.B) {
-	s, err := leveldb.Open("test", leveldbTestOptions)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 1, 10)
+	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 1, 10)
 }
 
 func BenchmarkLevelDBIndexing2Workers10Batch(b *testing.B) {
-	s, err := leveldb.Open("test", leveldbTestOptions)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 2, 10)
+	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 2, 10)
 }
 
 func BenchmarkLevelDBIndexing4Workers10Batch(b *testing.B) {
-	s, err := leveldb.Open("test", leveldbTestOptions)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 4, 10)
+	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 4, 10)
 }
 
 func BenchmarkLevelDBIndexing1Workers100Batch(b *testing.B) {
-	s, err := leveldb.Open("test", leveldbTestOptions)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 1, 100)
+	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 1, 100)
 }
 
 func BenchmarkLevelDBIndexing2Workers100Batch(b *testing.B) {
-	s, err := leveldb.Open("test", leveldbTestOptions)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 2, 100)
+	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 2, 100)
 }
 
 func BenchmarkLevelDBIndexing4Workers100Batch(b *testing.B) {
-	s, err := leveldb.Open("test", leveldbTestOptions)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 4, 100)
+	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 4, 100)
 }
 
 func BenchmarkLevelDBIndexing1Workers1000Batch(b *testing.B) {
-	s, err := leveldb.Open("test", leveldbTestOptions)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 1, 1000)
+	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 1, 1000)
 }
 
 func BenchmarkLevelDBIndexing2Workers1000Batch(b *testing.B) {
-	s, err := leveldb.Open("test", leveldbTestOptions)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 2, 1000)
+	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 2, 1000)
 }
 
 func BenchmarkLevelDBIndexing4Workers1000Batch(b *testing.B) {
-	s, err := leveldb.Open("test", leveldbTestOptions)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 4, 1000)
+	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 4, 1000)
 }

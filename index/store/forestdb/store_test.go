@@ -31,7 +31,11 @@ func TestForestDBStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := Open("testdir/test", true, nil)
+	s, err := New("testdir/test", true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +61,11 @@ func TestReaderIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := Open("testdir/test", true, nil)
+	s, err := New("testdir/test", true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +94,11 @@ func TestRollbackSameHandle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := Open("testdir/test", true, nil)
+	s, err := New("testdir/test", true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +198,11 @@ func TestRollbackNewHandle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := Open("testdir/test", true, nil)
+	s, err := New("testdir/test", true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +270,11 @@ func TestRollbackNewHandle(t *testing.T) {
 	}
 
 	// now lets open another handle
-	s2, err := Open("testdir/test", true, nil)
+	s2, err := New("testdir/test", true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s2.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +313,11 @@ func TestRollbackOtherHandle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := Open("testdir/test", true, nil)
+	s, err := New("testdir/test", true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +329,11 @@ func TestRollbackOtherHandle(t *testing.T) {
 	}()
 
 	// open another handle at the same time
-	s2, err := Open("testdir/test", true, nil)
+	s2, err := New("testdir/test", true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s2.Open()
 	if err != nil {
 		t.Fatal(err)
 	}

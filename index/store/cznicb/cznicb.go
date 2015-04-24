@@ -18,7 +18,7 @@ package cznicb
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/blevesearch/bleve/index/store"
@@ -29,15 +29,21 @@ import (
 
 const Name = "cznicb"
 
-var iteratorDoneErr = errors.New("iteratorDoneErr") // A sentinel value.
+const MAX_CONCURRENT_WRITERS = 1
 
 func init() {
 	registry.RegisterKVStore(Name, StoreConstructor)
 }
 
-func StoreConstructor(config map[string]interface{}) (
-	store.KVStore, error) {
-	return &Store{t: b.TreeNew(itemCompare)}, nil
+func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
+	s := &Store{
+		t:                b.TreeNew(itemCompare),
+		availableWriters: make(chan bool, MAX_CONCURRENT_WRITERS),
+	}
+	for i := 0; i < MAX_CONCURRENT_WRITERS; i++ {
+		s.availableWriters <- true
+	}
+	return s, nil
 }
 
 func itemCompare(a, b interface{}) int {
@@ -45,209 +51,62 @@ func itemCompare(a, b interface{}) int {
 }
 
 type Store struct {
-	m sync.Mutex
-	t *b.Tree
+	availableWriters chan bool
+	m                sync.RWMutex
+	t                *b.Tree
+	mo               store.MergeOperator
 }
 
-type Iterator struct { // Assuming that iterators are used single-threaded.
-	s *Store
-	e *b.Enumerator
-
-	currK   interface{}
-	currV   interface{}
-	currErr error
+func (s *Store) Open() error {
+	return nil
 }
 
-type op struct {
-	k []byte
-	v []byte
+func (s *Store) SetMergeOperator(mo store.MergeOperator) {
+	s.mo = mo
 }
 
-type Batch struct {
-	s   *Store
-	ops []op
-	ms  map[string]store.AssociativeMergeChain
+func (s *Store) Reader() (store.KVReader, error) {
+	return &Reader{s: s}, nil
+}
+
+func (s *Store) Writer() (store.KVWriter, error) {
+	available, ok := <-s.availableWriters
+	if !ok || !available {
+		return nil, fmt.Errorf("no available writers")
+	}
+	return &Writer{s: s, r: &Reader{s: s}}, nil
 }
 
 func (s *Store) Close() error {
 	return nil
 }
 
-func (s *Store) Reader() (store.KVReader, error) {
-	return s, nil
-}
-
-func (s *Store) BytesSafeAfterClose() bool {
-	return false
-}
-
-func (s *Store) Writer() (store.KVWriter, error) {
-	return s, nil
-}
-
-func (s *Store) Get(k []byte) ([]byte, error) {
-	s.m.Lock()
+func (s *Store) get(k []byte) ([]byte, error) {
+	s.m.RLock()
+	defer s.m.RUnlock()
 	v, ok := s.t.Get(k)
-	s.m.Unlock()
 	if !ok || v == nil {
 		return nil, nil
 	}
 	return v.([]byte), nil
 }
 
-func (s *Store) Iterator(k []byte) store.KVIterator {
+func (s *Store) iterator(k []byte) store.KVIterator {
 	iter := &Iterator{s: s}
 	iter.Seek(k)
 	return iter
 }
 
-func (s *Store) Set(k, v []byte) (err error) {
+func (s *Store) set(k, v []byte) (err error) {
 	s.m.Lock()
+	defer s.m.Unlock()
 	s.t.Set(k, v)
-	s.m.Unlock()
 	return nil
 }
 
-func (s *Store) Delete(k []byte) (err error) {
+func (s *Store) delete(k []byte) (err error) {
 	s.m.Lock()
+	defer s.m.Unlock()
 	s.t.Delete(k)
-	s.m.Unlock()
-	return nil
-}
-
-func (s *Store) NewBatch() store.KVBatch {
-	return &Batch{
-		s:   s,
-		ops: make([]op, 0, 1000),
-		ms:  map[string]store.AssociativeMergeChain{},
-	}
-}
-
-func (w *Iterator) SeekFirst() {
-	w.currK = nil
-	w.currV = nil
-	w.currErr = nil
-
-	var err error
-	w.s.m.Lock()
-	w.e, err = w.s.t.SeekFirst()
-	w.s.m.Unlock()
-	if err != nil {
-		w.currK = nil
-		w.currV = nil
-		w.currErr = iteratorDoneErr
-	}
-
-	w.Next()
-}
-
-func (w *Iterator) Seek(k []byte) {
-	w.currK = nil
-	w.currV = nil
-	w.currErr = nil
-
-	w.s.m.Lock()
-	w.e, _ = w.s.t.Seek(k)
-	w.s.m.Unlock()
-
-	w.Next()
-}
-
-func (w *Iterator) Next() {
-	if w.currErr != nil {
-		w.currK = nil
-		w.currV = nil
-		w.currErr = iteratorDoneErr
-		return
-	}
-
-	w.s.m.Lock()
-	w.currK, w.currV, w.currErr = w.e.Next()
-	w.s.m.Unlock()
-}
-
-func (w *Iterator) Current() ([]byte, []byte, bool) {
-	if w.currErr == iteratorDoneErr ||
-		w.currK == nil ||
-		w.currV == nil {
-		return nil, nil, false
-	}
-
-	return w.currK.([]byte), w.currV.([]byte), true
-}
-
-func (w *Iterator) Key() []byte {
-	k, _, ok := w.Current()
-	if !ok {
-		return nil
-	}
-	return k
-}
-
-func (w *Iterator) Value() []byte {
-	_, v, ok := w.Current()
-	if !ok {
-		return nil
-	}
-	return v
-}
-
-func (w *Iterator) Valid() bool {
-	_, _, ok := w.Current()
-	return ok
-}
-
-func (w *Iterator) Close() error {
-	if w.e != nil {
-		w.e.Close()
-	}
-	w.e = nil
-	return nil
-}
-
-func (w *Batch) Set(k, v []byte) {
-	w.ops = append(w.ops, op{k, v})
-}
-
-func (w *Batch) Delete(k []byte) {
-	w.ops = append(w.ops, op{k, nil})
-}
-
-func (w *Batch) Merge(k []byte, oper store.AssociativeMerge) {
-	w.ms[string(k)] = append(w.ms[string(k)], oper)
-}
-
-func (w *Batch) Execute() (err error) {
-	w.s.m.Lock()
-	defer w.s.m.Unlock()
-
-	t := w.s.t
-	for key, mc := range w.ms {
-		k := []byte(key)
-		t.Put(k, func(oldV interface{}, exists bool) (newV interface{}, write bool) {
-			b := []byte(nil)
-			if exists && oldV != nil {
-				b = oldV.([]byte)
-			}
-			b, err := mc.Merge(k, b)
-			if err != nil {
-				return nil, false
-			}
-			return b, b != nil
-		})
-	}
-
-	for _, op := range w.ops {
-		if op.v != nil {
-			t.Set(op.k, op.v)
-		} else {
-			t.Delete(op.k)
-		}
-	}
-
-	return nil
-}
-
-func (w *Batch) Close() error {
 	return nil
 }

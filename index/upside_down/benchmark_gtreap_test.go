@@ -12,142 +12,52 @@ package upside_down
 import (
 	"testing"
 
+	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/store/gtreap"
 )
 
-func BenchmarkGTreapIndexing1Workers(b *testing.B) {
-	s, err := gtreap.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
+func CreateGTreap() (store.KVStore, error) {
+	return gtreap.StoreConstructor(nil)
+}
 
-	CommonBenchmarkIndex(b, s, 1)
+func DestroyGTreap() error {
+	return nil
+}
+
+func BenchmarkGTreapIndexing1Workers(b *testing.B) {
+	CommonBenchmarkIndex(b, CreateGTreap, DestroyGTreap, 1)
 }
 
 func BenchmarkGTreapIndexing2Workers(b *testing.B) {
-	s, err := gtreap.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndex(b, s, 2)
+	CommonBenchmarkIndex(b, CreateGTreap, DestroyGTreap, 2)
 }
 
 func BenchmarkGTreapIndexing4Workers(b *testing.B) {
-	s, err := gtreap.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndex(b, s, 4)
+	CommonBenchmarkIndex(b, CreateGTreap, DestroyGTreap, 4)
 }
 
 // batches
 
 func BenchmarkGTreapIndexing1Workers10Batch(b *testing.B) {
-	s, err := gtreap.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 1, 10)
+	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 1, 10)
 }
 
 func BenchmarkGTreapIndexing2Workers10Batch(b *testing.B) {
-	s, err := gtreap.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 2, 10)
+	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 2, 10)
 }
 
 func BenchmarkGTreapIndexing4Workers10Batch(b *testing.B) {
-	s, err := gtreap.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 4, 10)
+	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 4, 10)
 }
 
 func BenchmarkGTreapIndexing1Workers100Batch(b *testing.B) {
-	s, err := gtreap.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 1, 100)
+	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 1, 100)
 }
 
 func BenchmarkGTreapIndexing2Workers100Batch(b *testing.B) {
-	s, err := gtreap.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 2, 100)
+	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 2, 100)
 }
 
 func BenchmarkGTreapIndexing4Workers100Batch(b *testing.B) {
-	s, err := gtreap.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 4, 100)
+	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 4, 100)
 }

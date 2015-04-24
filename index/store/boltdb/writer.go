@@ -29,12 +29,7 @@ func (w *Writer) Delete(key []byte) error {
 }
 
 func (w *Writer) NewBatch() store.KVBatch {
-	rv := Batch{
-		writer: w,
-		ops:    make([]op, 0),
-		merges: make(map[string]store.AssociativeMergeChain),
-	}
-	return &rv
+	return store.NewEmulatedBatch(w, w.store.mo)
 }
 
 func (w *Writer) Close() error {

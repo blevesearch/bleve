@@ -12,187 +12,64 @@ package upside_down
 import (
 	"testing"
 
+	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/store/cznicb"
 )
 
-func BenchmarkCznicBIndexing1Workers(b *testing.B) {
-	s, err := cznicb.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
+func CreateCznicB() (store.KVStore, error) {
+	return cznicb.StoreConstructor(nil)
+}
 
-	CommonBenchmarkIndex(b, s, 1)
+func DestroyCznicB() error {
+	return nil
+}
+
+func BenchmarkCznicBIndexing1Workers(b *testing.B) {
+	CommonBenchmarkIndex(b, CreateCznicB, DestroyCznicB, 1)
 }
 
 func BenchmarkCznicBIndexing2Workers(b *testing.B) {
-	s, err := cznicb.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndex(b, s, 2)
+	CommonBenchmarkIndex(b, CreateCznicB, DestroyCznicB, 2)
 }
 
 func BenchmarkCznicBIndexing4Workers(b *testing.B) {
-	s, err := cznicb.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndex(b, s, 4)
+	CommonBenchmarkIndex(b, CreateCznicB, DestroyCznicB, 4)
 }
 
 // batches
 
 func BenchmarkCznicBIndexing1Workers10Batch(b *testing.B) {
-	s, err := cznicb.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 1, 10)
+	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 1, 10)
 }
 
 func BenchmarkCznicBIndexing2Workers10Batch(b *testing.B) {
-	s, err := cznicb.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 2, 10)
+	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 2, 10)
 }
 
 func BenchmarkCznicBIndexing4Workers10Batch(b *testing.B) {
-	s, err := cznicb.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 4, 10)
+	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 4, 10)
 }
 
 func BenchmarkCznicBIndexing1Workers100Batch(b *testing.B) {
-	s, err := cznicb.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 1, 100)
+	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 1, 100)
 }
 
 func BenchmarkCznicBIndexing2Workers100Batch(b *testing.B) {
-	s, err := cznicb.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 2, 100)
+	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 2, 100)
 }
 
 func BenchmarkCznicBIndexing4Workers100Batch(b *testing.B) {
-	s, err := cznicb.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 4, 100)
+	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 4, 100)
 }
 
 func BenchmarkCznicBIndexing1Workers1000Batch(b *testing.B) {
-	s, err := cznicb.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 1, 1000)
+	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 1, 1000)
 }
 
 func BenchmarkCznicBIndexing2Workers1000Batch(b *testing.B) {
-	s, err := cznicb.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 2, 1000)
+	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 2, 1000)
 }
 
 func BenchmarkCznicBIndexing4Workers1000Batch(b *testing.B) {
-	s, err := cznicb.StoreConstructor(nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		err := s.Close()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
-
-	CommonBenchmarkIndexBatch(b, s, 4, 1000)
+	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 4, 1000)
 }

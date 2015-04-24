@@ -18,7 +18,8 @@ import (
 )
 
 func TestStore(t *testing.T) {
-	s, err := Open("test", "bleve")
+	s := New("test", "bleve")
+	err := s.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +34,8 @@ func TestStore(t *testing.T) {
 }
 
 func TestReaderIsolation(t *testing.T) {
-	s, err := Open("test", "bleve")
+	s := New("test", "bleve")
+	err := s.Open()
 	if err != nil {
 		t.Fatal(err)
 	}

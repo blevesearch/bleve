@@ -27,9 +27,10 @@ type Store struct {
 	opts   *opt.Options
 	db     *leveldb.DB
 	writer sync.Mutex
+	mo     store.MergeOperator
 }
 
-func Open(path string, config map[string]interface{}) (*Store, error) {
+func New(path string, config map[string]interface{}) (*Store, error) {
 	rv := Store{
 		path: path,
 		opts: &opt.Options{},
@@ -40,12 +41,20 @@ func Open(path string, config map[string]interface{}) (*Store, error) {
 		return nil, err
 	}
 
-	rv.db, err = leveldb.OpenFile(rv.path, rv.opts)
-	if err != nil {
-		return nil, err
-	}
-
 	return &rv, nil
+}
+
+func (ldbs *Store) Open() error {
+	var err error
+	ldbs.db, err = leveldb.OpenFile(ldbs.path, ldbs.opts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ldbs *Store) SetMergeOperator(mo store.MergeOperator) {
+	ldbs.mo = mo
 }
 
 func (ldbs *Store) get(key []byte) ([]byte, error) {
@@ -108,16 +117,12 @@ func (ldbs *Store) Writer() (store.KVWriter, error) {
 	return newWriter(ldbs)
 }
 
-func (ldbs *Store) newBatch() store.KVBatch {
-	return newBatch(ldbs)
-}
-
 func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
 	path, ok := config["path"].(string)
 	if !ok {
 		return nil, fmt.Errorf("must specify path")
 	}
-	return Open(path, config)
+	return New(path, config)
 }
 
 func init() {

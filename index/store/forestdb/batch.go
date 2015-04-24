@@ -12,7 +12,7 @@
 package forestdb
 
 import (
-	indexStore "github.com/blevesearch/bleve/index/store"
+	"fmt"
 )
 
 type op struct {
@@ -21,81 +21,64 @@ type op struct {
 }
 
 type Batch struct {
-	store         *Store
-	ops           []op
-	alreadyLocked bool
-	merges        map[string]indexStore.AssociativeMergeChain
+	s      *Store
+	ops    []op
+	merges map[string][][]byte
 }
 
-func newBatch(store *Store) *Batch {
-	rv := Batch{
-		store:  store,
-		ops:    make([]op, 0),
-		merges: make(map[string]indexStore.AssociativeMergeChain),
-	}
-	return &rv
+func (b *Batch) Set(k, v []byte) {
+	b.ops = append(b.ops, op{k, v})
 }
 
-func newBatchAlreadyLocked(store *Store) *Batch {
-	rv := Batch{
-		store:         store,
-		ops:           make([]op, 0),
-		alreadyLocked: true,
-		merges:        make(map[string]indexStore.AssociativeMergeChain),
-	}
-	return &rv
+func (b *Batch) Delete(k []byte) {
+	b.ops = append(b.ops, op{k, nil})
 }
 
-func (b *Batch) Set(key, val []byte) {
-	b.ops = append(b.ops, op{key, val})
-}
-
-func (b *Batch) Delete(key []byte) {
-	b.ops = append(b.ops, op{key, nil})
-}
-
-func (b *Batch) Merge(key []byte, oper indexStore.AssociativeMerge) {
-	opers, ok := b.merges[string(key)]
-	if !ok {
-		opers = make(indexStore.AssociativeMergeChain, 0, 1)
-	}
-	opers = append(opers, oper)
-	b.merges[string(key)] = opers
-}
-
-func (b *Batch) Execute() error {
-	if !b.alreadyLocked {
-		b.store.writer.Lock()
-		defer b.store.writer.Unlock()
-	}
-
-	// first process the merges
-	for k, mc := range b.merges {
-		val, err := b.store.get([]byte(k))
-		if err != nil {
-			return err
-		}
-		val, err = mc.Merge([]byte(k), val)
-		if err != nil {
-			return err
-		}
-		if val == nil {
-			b.store.deletelocked([]byte(k))
+func (b *Batch) Merge(key, val []byte) {
+	ops, ok := b.merges[string(key)]
+	if ok && len(ops) > 0 {
+		last := ops[len(ops)-1]
+		mergedVal, partialMergeOk := b.s.mo.PartialMerge(key, last, val)
+		if partialMergeOk {
+			// replace last entry with the result of the merge
+			ops[len(ops)-1] = mergedVal
 		} else {
-			b.store.setlocked([]byte(k), val)
+			// could not partial merge, append this to the end
+			ops = append(ops, val)
+		}
+	} else {
+		ops = [][]byte{val}
+	}
+	b.merges[string(key)] = ops
+}
+
+func (b *Batch) Execute() (err error) {
+
+	for k, mergeOps := range b.merges {
+		kb := []byte(k)
+		existingVal, err := b.s.get(kb)
+		if err != nil {
+			return err
+		}
+		mergedVal, fullMergeOk := b.s.mo.FullMerge(kb, existingVal, mergeOps)
+		if !fullMergeOk {
+			return fmt.Errorf("merge operator returned failure")
+		}
+		err = b.s.setlocked(kb, mergedVal)
+		if err != nil {
+			return err
 		}
 	}
 
-	// now add all the other ops to the batch
 	for _, op := range b.ops {
-		if op.v == nil {
-			b.store.deletelocked(op.k)
+		if op.v != nil {
+			b.s.setlocked(op.k, op.v)
 		} else {
-			b.store.setlocked(op.k, op.v)
+			b.s.deletelocked(op.k)
 		}
 	}
 
-	return b.store.commit()
+	return b.s.commit()
 }
 
 func (b *Batch) Close() error {

@@ -33,9 +33,10 @@ var benchmarkDocBodies = []string{
 	"The expansion ratio of a liquefied and cryogenic substance is the volume of a given amount of that substance in liquid form compared to the volume of the same amount of substance in gaseous form, at room temperature and normal atmospheric pressure.",
 }
 
-func CommonBenchmarkIndex(b *testing.B, s store.KVStore, analysisWorkers int) {
-	analysisQueue := NewAnalysisQueue(analysisWorkers)
-	idx := NewUpsideDownCouch(s, analysisQueue)
+type KVStoreCreate func() (store.KVStore, error)
+type KVStoreDestroy func() error
+
+func CommonBenchmarkIndex(b *testing.B, create KVStoreCreate, destroy KVStoreDestroy, analysisWorkers int) {
 
 	cache := registry.NewCache()
 	analyzer, err := cache.AnalyzerNamed("standard")
@@ -47,18 +48,40 @@ func CommonBenchmarkIndex(b *testing.B, s store.KVStore, analysisWorkers int) {
 		AddField(document.NewTextFieldWithAnalyzer("body", []uint64{}, []byte(benchmarkDocBodies[0]), analyzer))
 
 	b.ResetTimer()
+	b.StopTimer()
 	for i := 0; i < b.N; i++ {
-		indexDocument.ID = strconv.Itoa(i)
-		err := idx.Update(indexDocument)
+		s, err := create()
 		if err != nil {
 			b.Fatal(err)
 		}
+		analysisQueue := NewAnalysisQueue(analysisWorkers)
+		idx := NewUpsideDownCouch(s, analysisQueue)
+
+		err = idx.Open()
+		if err != nil {
+			b.Fatal(err)
+		}
+		indexDocument.ID = strconv.Itoa(i)
+		// just time the indexing portion
+		b.StartTimer()
+		err = idx.Update(indexDocument)
+		if err != nil {
+			b.Fatal(err)
+		}
+		b.StopTimer()
+		err = idx.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+		err = destroy()
+		if err != nil {
+			b.Fatal(err)
+		}
+		analysisQueue.Close()
 	}
 }
 
-func CommonBenchmarkIndexBatch(b *testing.B, s store.KVStore, analysisWorkers, batchSize int) {
-	analysisQueue := NewAnalysisQueue(analysisWorkers)
-	idx := NewUpsideDownCouch(s, analysisQueue)
+func CommonBenchmarkIndexBatch(b *testing.B, create KVStoreCreate, destroy KVStoreDestroy, analysisWorkers, batchSize int) {
 
 	cache := registry.NewCache()
 	analyzer, err := cache.AnalyzerNamed("standard")
@@ -67,8 +90,22 @@ func CommonBenchmarkIndexBatch(b *testing.B, s store.KVStore, analysisWorkers, b
 	}
 
 	b.ResetTimer()
+	b.StopTimer()
 	for i := 0; i < b.N; i++ {
 
+		s, err := create()
+		if err != nil {
+			b.Fatal(err)
+		}
+		analysisQueue := NewAnalysisQueue(analysisWorkers)
+		idx := NewUpsideDownCouch(s, analysisQueue)
+
+		err = idx.Open()
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		b.StartTimer()
 		batch := index.NewBatch()
 		for j := 0; j < 1000; j++ {
 			if j%batchSize == 0 {
@@ -92,6 +129,15 @@ func CommonBenchmarkIndexBatch(b *testing.B, s store.KVStore, analysisWorkers, b
 				b.Fatal(err)
 			}
 		}
-
+		b.StopTimer()
+		err = idx.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+		err = destroy()
+		if err != nil {
+			b.Fatal(err)
+		}
+		analysisQueue.Close()
 	}
 }

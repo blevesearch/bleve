@@ -37,7 +37,7 @@ func (w *Writer) Delete(key []byte) error {
 }
 
 func (w *Writer) NewBatch() store.KVBatch {
-	return newBatchAlreadyLocked(w.store)
+	return store.NewEmulatedBatch(w, w.store.mo)
 }
 
 func (w *Writer) Close() error {

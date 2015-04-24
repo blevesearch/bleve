@@ -29,7 +29,11 @@ func TestLevelDBStore(t *testing.T) {
 		}
 	}()
 
-	s, err := Open("test", leveldbTestOptions)
+	s, err := New("test", leveldbTestOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +55,11 @@ func TestReaderIsolation(t *testing.T) {
 		}
 	}()
 
-	s, err := Open("test", leveldbTestOptions)
+	s, err := New("test", leveldbTestOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
