@@ -49,6 +49,9 @@ func (i *Iterator) SeekFirst() {
 		i.valid = false
 		return
 	}
+	if i.curr != nil {
+		i.curr.Close()
+	}
 	i.curr, err = i.iterator.Get()
 	if err != nil {
 		i.valid = false
@@ -60,6 +63,9 @@ func (i *Iterator) Seek(key []byte) {
 	if err != nil {
 		i.valid = false
 		return
+	}
+	if i.curr != nil {
+		i.curr.Close()
 	}
 	i.curr, err = i.iterator.Get()
 	if err != nil {
@@ -73,6 +79,9 @@ func (i *Iterator) Next() {
 	if err != nil {
 		i.valid = false
 		return
+	}
+	if i.curr != nil {
+		i.curr.Close()
 	}
 	i.curr, err = i.iterator.Get()
 	if err != nil {
@@ -101,5 +110,8 @@ func (i *Iterator) Valid() bool {
 
 func (i *Iterator) Close() error {
 	i.valid = false
+	if i.curr != nil {
+		i.curr.Close()
+	}
 	return i.iterator.Close()
 }
