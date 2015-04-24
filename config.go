@@ -102,6 +102,7 @@ import (
 
 	// kv stores
 	_ "github.com/blevesearch/bleve/index/store/boltdb"
+	_ "github.com/blevesearch/bleve/index/store/goleveldb"
 	_ "github.com/blevesearch/bleve/index/store/gtreap"
 	_ "github.com/blevesearch/bleve/index/store/inmem"
 
