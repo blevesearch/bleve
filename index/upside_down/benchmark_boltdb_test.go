@@ -63,3 +63,15 @@ func BenchmarkBoltDBIndexing2Workers100Batch(b *testing.B) {
 func BenchmarkBoltDBIndexing4Workers100Batch(b *testing.B) {
 	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 4, 100)
 }
+
+func BenchmarkBoltBIndexing1Workers1000Batch(b *testing.B) {
+	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 1, 1000)
+}
+
+func BenchmarkBoltBIndexing2Workers1000Batch(b *testing.B) {
+	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 2, 1000)
+}
+
+func BenchmarkBoltBIndexing4Workers1000Batch(b *testing.B) {
+	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 4, 1000)
+}

@@ -72,3 +72,15 @@ func BenchmarkForestDBIndexing2Workers100Batch(b *testing.B) {
 func BenchmarkForestDBIndexing4Workers100Batch(b *testing.B) {
 	CommonBenchmarkIndexBatch(b, CreateForestDB, DestroyForestDB, 4, 100)
 }
+
+func BenchmarkForestDBIndexing1Workers1000Batch(b *testing.B) {
+	CommonBenchmarkIndexBatch(b, CreateForestDB, DestroyForestDB, 1, 1000)
+}
+
+func BenchmarkForestDBIndexing2Workers1000Batch(b *testing.B) {
+	CommonBenchmarkIndexBatch(b, CreateForestDB, DestroyForestDB, 2, 1000)
+}
+
+func BenchmarkForestDBIndexing4Workers1000Batch(b *testing.B) {
+	CommonBenchmarkIndexBatch(b, CreateForestDB, DestroyForestDB, 4, 1000)
+}

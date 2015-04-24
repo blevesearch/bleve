@@ -61,3 +61,15 @@ func BenchmarkGTreapIndexing2Workers100Batch(b *testing.B) {
 func BenchmarkGTreapIndexing4Workers100Batch(b *testing.B) {
 	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 4, 100)
 }
+
+func BenchmarkGTreapIndexing1Workers1000Batch(b *testing.B) {
+	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 1, 1000)
+}
+
+func BenchmarkGTreapIndexing2Workers1000Batch(b *testing.B) {
+	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 2, 1000)
+}
+
+func BenchmarkGTreapIndexing4Workers1000Batch(b *testing.B) {
+	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 4, 1000)
+}

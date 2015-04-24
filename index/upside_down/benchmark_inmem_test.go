@@ -61,3 +61,15 @@ func BenchmarkInMemIndexing2Workers100Batch(b *testing.B) {
 func BenchmarkInMemIndexing4Workers100Batch(b *testing.B) {
 	CommonBenchmarkIndexBatch(b, CreateInMem, DestroyInMem, 4, 100)
 }
+
+func BenchmarkInMemIndexing1Workers1000Batch(b *testing.B) {
+	CommonBenchmarkIndexBatch(b, CreateInMem, DestroyInMem, 1, 1000)
+}
+
+func BenchmarkInMemIndexing2Workers1000Batch(b *testing.B) {
+	CommonBenchmarkIndexBatch(b, CreateInMem, DestroyInMem, 2, 1000)
+}
+
+func BenchmarkInMemIndexing4Workers1000Batch(b *testing.B) {
+	CommonBenchmarkIndexBatch(b, CreateInMem, DestroyInMem, 4, 1000)
+}
