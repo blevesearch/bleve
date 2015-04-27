@@ -14,4 +14,3 @@ package bleve
 import (
 	_ "github.com/blevesearch/bleve/index/store/metrics"
 )
-

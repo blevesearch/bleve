@@ -131,8 +131,16 @@ type Batch struct {
 	o store.KVBatch
 }
 
+func (s *Store) Open() error {
+	return s.o.Open()
+}
+
 func (s *Store) Close() error {
 	return s.o.Close()
+}
+
+func (s *Store) SetMergeOperator(mo store.MergeOperator) {
+	s.o.SetMergeOperator(mo)
 }
 
 func (s *Store) Reader() (store.KVReader, error) {
@@ -289,9 +297,9 @@ func (w *Batch) Delete(key []byte) {
 	w.o.Delete(key)
 }
 
-func (w *Batch) Merge(key []byte, oper store.AssociativeMerge) {
+func (w *Batch) Merge(key, val []byte) {
 	w.s.TimerBatchMerge.Time(func() {
-		w.o.Merge(key, oper)
+		w.o.Merge(key, val)
 	})
 }
 
