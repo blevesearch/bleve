@@ -61,8 +61,9 @@ func (m *upsideDownMerge) FullMerge(key, existingValue []byte, operands [][]byte
 func (m *upsideDownMerge) PartialMerge(key, leftOperand, rightOperand []byte) ([]byte, bool) {
 	left := int64(binary.LittleEndian.Uint64(leftOperand))
 	right := int64(binary.LittleEndian.Uint64(rightOperand))
-	binary.LittleEndian.PutUint64(leftOperand, uint64(left+right))
-	return leftOperand, true
+	rv := make([]byte, 8)
+	binary.LittleEndian.PutUint64(rv, uint64(left+right))
+	return rv, true
 }
 
 func (m *upsideDownMerge) Name() string {
