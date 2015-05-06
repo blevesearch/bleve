@@ -191,10 +191,8 @@ func (dr *DictionaryRow) Key() []byte {
 
 func (dr *DictionaryRow) Value() []byte {
 	used := 0
-	buf := make([]byte, 8)
-
-	used += binary.PutUvarint(buf[used:used+8], dr.count)
-
+	buf := make([]byte, binary.MaxVarintLen64)
+	used += binary.PutUvarint(buf, dr.count)
 	return buf[0:used]
 }
 

@@ -10,6 +10,7 @@
 package upside_down
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -228,6 +229,24 @@ func TestInvalidRows(t *testing.T) {
 			t.Errorf("expected error, got nil")
 		}
 	}
+}
+
+func TestDictionaryRowValueBug197(t *testing.T) {
+	// this was the smallest value that would trigger a crash
+	dr := &DictionaryRow{
+		field: 0,
+		term:  []byte("marty"),
+		count: 72057594037927936,
+	}
+	dr.Value()
+	// this is the maximum possible value
+	dr = &DictionaryRow{
+		field: 0,
+		term:  []byte("marty"),
+		count: math.MaxUint64,
+	}
+	dr.Value()
+	// neither of these should panic
 }
 
 func BenchmarkTermFrequencyRowEncode(b *testing.B) {
