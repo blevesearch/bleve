@@ -623,7 +623,10 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 
 	go func() {
 		for {
-			index.DocCount()
+			_, err := index.DocCount()
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
 	}()
 
