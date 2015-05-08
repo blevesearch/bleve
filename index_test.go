@@ -607,3 +607,36 @@ func TestBatchString(t *testing.T) {
 	}
 
 }
+
+func TestIndexMetadataRaceBug198(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		for {
+			index.DocCount()
+		}
+	}()
+
+	for i := 0; i < 100; i++ {
+		batch := index.NewBatch()
+		err = batch.Index("a", []byte("{}"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = index.Batch(batch)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+}
