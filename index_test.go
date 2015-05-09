@@ -10,11 +10,13 @@
 package bleve
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -642,4 +644,71 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 		}
 	}
 
+}
+
+func TestIndexCountMatchSearch(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			b := index.NewBatch()
+			for j := 0; j < 200; j++ {
+				id := fmt.Sprintf("%d", (i*200)+j)
+				doc := struct {
+					Body string
+				}{
+					Body: "match",
+				}
+				err := b.Index(id, doc)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := index.Batch(b)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	// search for something that should match all documents
+	sr, err := index.Search(NewSearchRequest(NewMatchQuery("match")))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get the index document count
+	dc, err := index.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make sure test is working correctly, doc count should 2000
+	if dc != 2000 {
+		t.Errorf("expected doc count 2000, got %d", dc)
+	}
+
+	// make sure our search found all the documents
+	if dc != sr.Total {
+		t.Errorf("expected search result total %d to match doc count %d", sr.Total, dc)
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
