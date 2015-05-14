@@ -244,3 +244,78 @@ func TestMappingForPath(t *testing.T) {
 	}
 
 }
+
+func TestMappingWithTokenizerDeps(t *testing.T) {
+
+	tokNoDeps := map[string]interface{}{
+		"type":   "regexp",
+		"regexp": "",
+	}
+
+	tokDepsL1 := map[string]interface{}{
+		"type":      "exception",
+		"tokenizer": "a",
+	}
+
+	// this tests a 1-level dependency
+	// it is run 100 times to increase the
+	// likelihood that it fails along time way
+	// (depends on key order iteration in map)
+	for i := 0; i < 100; i++ {
+
+		m := NewIndexMapping()
+		ca := customAnalysis{
+			Tokenizers: map[string]map[string]interface{}{
+				"a": tokNoDeps,
+				"b": tokDepsL1,
+			},
+		}
+		err := ca.registerAll(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tokDepsL2 := map[string]interface{}{
+		"type":      "exception",
+		"tokenizer": "b",
+	}
+
+	// now test a second-level dependency
+	for i := 0; i < 100; i++ {
+
+		m := NewIndexMapping()
+		ca := customAnalysis{
+			Tokenizers: map[string]map[string]interface{}{
+				"a": tokNoDeps,
+				"b": tokDepsL1,
+				"c": tokDepsL2,
+			},
+		}
+		err := ca.registerAll(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tokUnsatisfied := map[string]interface{}{
+		"type":      "exception",
+		"tokenizer": "e",
+	}
+
+	// now make sure an unsatisfied dep still
+	// results in an error
+	m := NewIndexMapping()
+	ca := customAnalysis{
+		Tokenizers: map[string]map[string]interface{}{
+			"a": tokNoDeps,
+			"b": tokDepsL1,
+			"c": tokDepsL2,
+			"d": tokUnsatisfied,
+		},
+	}
+	err := ca.registerAll(m)
+	if err == nil {
+		t.Fatal(err)
+	}
+}

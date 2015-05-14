@@ -40,10 +40,33 @@ func (c *customAnalysis) registerAll(i *IndexMapping) error {
 			return err
 		}
 	}
-	for name, config := range c.Tokenizers {
-		_, err := i.cache.DefineTokenizer(name, config)
-		if err != nil {
-			return err
+
+	if len(c.Tokenizers) > 0 {
+		// put all the names in map tracking work to do
+		todo := map[string]struct{}{}
+		for name, _ := range c.Tokenizers {
+			todo[name] = struct{}{}
+		}
+		registered := 1
+		errs := []error{}
+		// as long as we keep making progress, keep going
+		for len(todo) > 0 && registered > 0 {
+			registered = 0
+			errs = []error{}
+			for name, _ := range todo {
+				config := c.Tokenizers[name]
+				_, err := i.cache.DefineTokenizer(name, config)
+				if err != nil {
+					errs = append(errs, err)
+				} else {
+					delete(todo, name)
+					registered++
+				}
+			}
+		}
+
+		if len(errs) > 0 {
+			return errs[0]
 		}
 	}
 	for name, config := range c.TokenMaps {
