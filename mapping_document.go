@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/blevesearch/bleve/registry"
@@ -287,7 +288,7 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 		for i := 0; i < val.Len(); i++ {
 			if val.Index(i).CanInterface() {
 				fieldVal := val.Index(i).Interface()
-				dm.processProperty(fieldVal, path, append(indexes, uint64(i)), context)
+				dm.processProperty(fieldVal, append(path, "$"+strconv.Itoa(i)), append(indexes, uint64(i)), context)
 			}
 		}
 	case reflect.Ptr:
