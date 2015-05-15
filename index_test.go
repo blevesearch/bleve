@@ -755,3 +755,112 @@ func TestBatchReset(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDocumentFieldArrayPositions(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// index a document with an array of strings
+	err = index.Index("k", struct {
+		Messages []string
+	}{
+		Messages: []string{
+			"first",
+			"second",
+			"third",
+			"last",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// load the document
+	doc, err := index.Document("k")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, f := range doc.Fields {
+		if reflect.DeepEqual(f.Value(), []byte("first")) {
+			ap := f.ArrayPositions()
+			if len(ap) < 1 {
+				t.Errorf("expected an array position, got none")
+				continue
+			}
+			if ap[0] != 0 {
+				t.Errorf("expected 'first' in array position 0, got %d", ap[0])
+			}
+		}
+		if reflect.DeepEqual(f.Value(), []byte("second")) {
+			ap := f.ArrayPositions()
+			if len(ap) < 1 {
+				t.Errorf("expected an array position, got none")
+				continue
+			}
+			if ap[0] != 1 {
+				t.Errorf("expected 'second' in array position 1, got %d", ap[0])
+			}
+		}
+		if reflect.DeepEqual(f.Value(), []byte("third")) {
+			ap := f.ArrayPositions()
+			if len(ap) < 1 {
+				t.Errorf("expected an array position, got none")
+				continue
+			}
+			if ap[0] != 2 {
+				t.Errorf("expected 'third' in array position 2, got %d", ap[0])
+			}
+		}
+		if reflect.DeepEqual(f.Value(), []byte("last")) {
+			ap := f.ArrayPositions()
+			if len(ap) < 1 {
+				t.Errorf("expected an array position, got none")
+				continue
+			}
+			if ap[0] != 3 {
+				t.Errorf("expected 'last' in array position 3, got %d", ap[0])
+			}
+		}
+	}
+
+	// now index a document in the same field with a single string
+	err = index.Index("k2", struct {
+		Messages string
+	}{
+		Messages: "only",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// load the document
+	doc, err = index.Document("k2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, f := range doc.Fields {
+		if reflect.DeepEqual(f.Value(), []byte("only")) {
+			ap := f.ArrayPositions()
+			if len(ap) != 0 {
+				t.Errorf("expected no array positions, got %d", len(ap))
+				continue
+			}
+		}
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}

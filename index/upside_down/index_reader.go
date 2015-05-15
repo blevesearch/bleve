@@ -88,7 +88,7 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 		}
 		if row != nil {
 			fieldName := i.index.fieldIndexCache.FieldName(row.field)
-			field := decodeFieldType(row.typ, fieldName, row.value)
+			field := decodeFieldType(row.typ, fieldName, row.arrayPositions, row.value)
 			if field != nil {
 				doc.AddField(field)
 			}

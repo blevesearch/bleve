@@ -526,14 +526,14 @@ func (udc *UpsideDownCouch) backIndexRowsForBatch(kvreader store.KVReader, batch
 	return rv, nil
 }
 
-func decodeFieldType(typ byte, name string, value []byte) document.Field {
+func decodeFieldType(typ byte, name string, pos []uint64, value []byte) document.Field {
 	switch typ {
 	case 't':
-		return document.NewTextField(name, []uint64{}, value)
+		return document.NewTextField(name, pos, value)
 	case 'n':
-		return document.NewNumericFieldFromBytes(name, []uint64{}, value)
+		return document.NewNumericFieldFromBytes(name, pos, value)
 	case 'd':
-		return document.NewDateTimeFieldFromBytes(name, []uint64{}, value)
+		return document.NewDateTimeFieldFromBytes(name, pos, value)
 	}
 	return nil
 }
