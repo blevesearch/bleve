@@ -7,7 +7,8 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-// this file includes tests which intentionally create race conditions
+// this file includes tests which intentionally create race conditions,
+// so exclude them from running with the race detector
 
 // +build !race
 
@@ -37,11 +38,14 @@ func TestBatchCrashBug195(t *testing.T) {
 
 	b := index.NewBatch()
 	for i := 0; i < 200; i++ {
-		b.Index(fmt.Sprintf("%d", i), struct {
+		err := b.Index(fmt.Sprintf("%d", i), struct {
 			Value string
 		}{
 			Value: fmt.Sprintf("%d", i),
 		})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	var wg sync.WaitGroup
@@ -56,11 +60,14 @@ func TestBatchCrashBug195(t *testing.T) {
 
 	// now keep adding to the batch after we've started to execute it
 	for i := 200; i < 400; i++ {
-		b.Index(fmt.Sprintf("%d", i), struct {
+		err := b.Index(fmt.Sprintf("%d", i), struct {
 			Value string
 		}{
 			Value: fmt.Sprintf("%d", i),
 		})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	wg.Wait()
