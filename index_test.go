@@ -712,3 +712,46 @@ func TestIndexCountMatchSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestBatchReset(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	batch := index.NewBatch()
+	err = batch.Index("k1", struct {
+		Body string
+	}{
+		Body: "v1",
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	batch.Delete("k2")
+	batch.SetInternal([]byte("k3"), []byte("v3"))
+	batch.DeleteInternal([]byte("k4"))
+
+	if batch.Size() != 4 {
+		t.Logf("%v", batch)
+		t.Errorf("expected batch size 4, got %d", batch.Size())
+	}
+
+	batch.Reset()
+
+	if batch.Size() != 0 {
+		t.Errorf("expected batch size 0 after reset, got %d", batch.Size())
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}

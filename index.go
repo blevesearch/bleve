@@ -17,7 +17,10 @@ import (
 
 // A Batch groups together multiple Index and Delete
 // operations you would like performed at the same
-// time.
+// time.  The Batch structure is NOT thread-safe.
+// You should only perform operations on a batch
+// from a single thread at a time.  Once batch
+// execution has started, you may not modify it.
 type Batch struct {
 	index    Index
 	internal *index.Batch
@@ -67,6 +70,12 @@ func (b *Batch) Size() int {
 // is inside this batch.
 func (b *Batch) String() string {
 	return b.internal.String()
+}
+
+// Reset returns a Batch to the empty state so that it can
+// be re-used in the future.
+func (b *Batch) Reset() {
+	b.internal.Reset()
 }
 
 // An Index implements all the indexing and searching
