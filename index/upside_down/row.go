@@ -259,14 +259,15 @@ func (dr *DictionaryRow) parseDictionaryV(value []byte) error {
 // TERM FIELD FREQUENCY
 
 type TermVector struct {
-	field uint16
-	pos   uint64
-	start uint64
-	end   uint64
+	field          uint16
+	arrayPositions []uint64
+	pos            uint64
+	start          uint64
+	end            uint64
 }
 
 func (tv *TermVector) String() string {
-	return fmt.Sprintf("Field: %d Pos: %d Start: %d End %d", tv.field, tv.pos, tv.start, tv.end)
+	return fmt.Sprintf("Field: %d Pos: %d Start: %d End %d ArrayPositions: %#v", tv.field, tv.pos, tv.start, tv.end, tv.arrayPositions)
 }
 
 type TermFrequencyRow struct {
@@ -319,7 +320,11 @@ func (tfr *TermFrequencyRow) DictionaryRowKey() []byte {
 
 func (tfr *TermFrequencyRow) Value() []byte {
 	used := 0
-	buf := make([]byte, 8+8+(len(tfr.vectors)*(8+8+8+8)))
+	bufLen := 8 + 8
+	for _, vector := range tfr.vectors {
+		bufLen += 8 + 8 + 8 + 8 + (1+len(vector.arrayPositions))*8
+	}
+	buf := make([]byte, bufLen)
 
 	used += binary.PutUvarint(buf[used:used+8], tfr.freq)
 
@@ -332,6 +337,10 @@ func (tfr *TermFrequencyRow) Value() []byte {
 		used += binary.PutUvarint(buf[used:used+8], vector.pos)
 		used += binary.PutUvarint(buf[used:used+8], vector.start)
 		used += binary.PutUvarint(buf[used:used+8], vector.end)
+		used += binary.PutUvarint(buf[used:used+8], uint64(len(vector.arrayPositions)))
+		for _, arrayPosition := range vector.arrayPositions {
+			used += binary.PutUvarint(buf[used:used+8], arrayPosition)
+		}
 	}
 	return buf[0:used]
 }
@@ -430,6 +439,24 @@ func (tfr *TermFrequencyRow) parseV(value []byte) error {
 			return fmt.Errorf("invalid term frequency value, vector contains no end")
 		}
 		currOffset += bytesRead
+
+		var arrayPositionsLen uint64 = 0
+		arrayPositionsLen, bytesRead = binary.Uvarint(value[currOffset:])
+		if bytesRead <= 0 {
+			return fmt.Errorf("invalid term frequency value, vector contains no arrayPositionLen")
+		}
+		currOffset += bytesRead
+
+		if arrayPositionsLen > 0 {
+			tv.arrayPositions = make([]uint64, arrayPositionsLen)
+			for i := 0; uint64(i) < arrayPositionsLen; i++ {
+				tv.arrayPositions[i], bytesRead = binary.Uvarint(value[currOffset:])
+				if bytesRead <= 0 {
+					return fmt.Errorf("invalid term frequency value, vector contains no arrayPosition of index %d", i)
+				}
+				currOffset += bytesRead
+			}
+		}
 
 		tfr.vectors = append(tfr.vectors, &tv)
 		// try to read next record (may not exist)

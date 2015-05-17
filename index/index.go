@@ -61,10 +61,11 @@ type IndexReader interface {
 type FieldTerms map[string][]string
 
 type TermFieldVector struct {
-	Field string
-	Pos   uint64
-	Start uint64
-	End   uint64
+	Field          string
+	ArrayPositions []uint64
+	Pos            uint64
+	Start          uint64
+	End            uint64
 }
 
 type TermFieldDoc struct {
