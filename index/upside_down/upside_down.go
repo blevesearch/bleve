@@ -30,7 +30,7 @@ var VersionKey = []byte{'v'}
 
 var UnsafeBatchUseDetected = fmt.Errorf("bleve.Batch is NOT thread-safe, modification after execution detected")
 
-const Version uint8 = 4
+const Version uint8 = 5
 
 var IncompatibleVersion = fmt.Errorf("incompatible version, %d is supported", Version)
 
