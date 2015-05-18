@@ -1,0 +1,34 @@
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr ng-repeat="(aname,aval) in mapping.analysis.analyzers">
+      <td>{{aname}}</td>
+      <td>
+        <div class="btn-group btn-group-xs" role="group">
+          <button ng-click="editAnalyzer(aname, aval)" type="button" class="btn btn-default btn-xs">
+            <span class="glyphicon glyphicon-edit" aria-hidden="true"></span> Edit
+          </button>
+          <button ng-click="deleteAnalyzer(aname)" type="button" class="btn btn-default btn-xs">
+            <span class="glyphicon glyphicon-trash" aria-hidden="true"></span> Delete
+          </button>
+        </div>
+      </td>
+    </tr>
+    <tr ng-show="Utils.keys(mapping.analysis.analyzers).length < 1">
+      <td colspan="2">None</td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr>
+      <td colspan="2">
+        <button ng-click="newAnalyzer()" type="button" class="btn btn-sm btn-default pull-right">New Analyzer</button>
+      </td>
+    </tr>
+  </tfoot>
+</table>
+
