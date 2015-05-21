@@ -500,12 +500,6 @@ func TestIndexInternalCRUD(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer func() {
-		err := indexReader.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
 
 	// get something that doesn't exist yet
 	val, err := indexReader.GetInternal([]byte("key"))
@@ -514,6 +508,11 @@ func TestIndexInternalCRUD(t *testing.T) {
 	}
 	if val != nil {
 		t.Errorf("expected nil, got %s", val)
+	}
+
+	err = indexReader.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// set
@@ -526,12 +525,6 @@ func TestIndexInternalCRUD(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer func() {
-		err := indexReader2.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
 
 	// get
 	val, err = indexReader2.GetInternal([]byte("key"))
@@ -540,6 +533,11 @@ func TestIndexInternalCRUD(t *testing.T) {
 	}
 	if string(val) != "abc" {
 		t.Errorf("expected %s, got '%s'", "abc", val)
+	}
+
+	err = indexReader2.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// delete
@@ -552,12 +550,6 @@ func TestIndexInternalCRUD(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer func() {
-		err := indexReader3.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
 
 	// get again
 	val, err = indexReader3.GetInternal([]byte("key"))
@@ -566,6 +558,11 @@ func TestIndexInternalCRUD(t *testing.T) {
 	}
 	if val != nil {
 		t.Errorf("expected nil, got %s", val)
+	}
+
+	err = indexReader3.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -744,14 +741,13 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer func() {
-		err := indexReader.Close()
-		if err != nil {
-			t.Error(err)
-		}
-	}()
 
 	storedDoc, err := indexReader.Document("1")
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = indexReader.Close()
 	if err != nil {
 		t.Error(err)
 	}
@@ -804,12 +800,6 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer func() {
-		err := indexReader2.Close()
-		if err != nil {
-			t.Error(err)
-		}
-	}()
 
 	// expected doc count shouldn't have changed
 	docCount = indexReader2.DocCount()
@@ -819,6 +809,11 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 
 	// should only get 2 fields back now though
 	storedDoc, err = indexReader2.Document("1")
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = indexReader2.Close()
 	if err != nil {
 		t.Error(err)
 	}
