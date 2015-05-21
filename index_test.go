@@ -932,6 +932,31 @@ func TestKeywordSearchBug207(t *testing.T) {
 		t.Errorf("expecated id 'b', got '%s'", sres.Hits[0].ID)
 	}
 
+	// now do the same searches using query strings
+	sreq = NewSearchRequest(NewQueryStringQuery("Body:a555c3bb06f7a127cda000005"))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 result, got %d", sres.Total)
+	}
+	if sres.Hits[0].ID != "a" {
+		t.Errorf("expecated id 'a', got '%s'", sres.Hits[0].ID)
+	}
+
+	sreq = NewSearchRequest(NewQueryStringQuery(`Body:555c3bb06f7a127cda000005`))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 result, got %d", sres.Total)
+	}
+	if sres.Hits[0].ID != "b" {
+		t.Errorf("expecated id 'b', got '%s'", sres.Hits[0].ID)
+	}
+
 	err = index.Close()
 	if err != nil {
 		t.Fatal(err)

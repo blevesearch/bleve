@@ -15,6 +15,9 @@ import (
 )
 
 func TestQuerySyntaxParserValid(t *testing.T) {
+	fivePointOh := 5.0
+	theTruth := true
+	theFalsehood := false
 	tests := []struct {
 		input   string
 		result  Query
@@ -47,6 +50,61 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				nil,
 				[]Query{
 					NewMatchQuery("test").SetField("field"),
+				},
+				nil),
+		},
+		// - is allowed inside a term, just not the start
+		{
+			input:   "field:t-est",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("t-est").SetField("field"),
+				},
+				nil),
+		},
+		// + is allowed inside a term, just not the start
+		{
+			input:   "field:t+est",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("t+est").SetField("field"),
+				},
+				nil),
+		},
+		// > is allowed inside a term, just not the start
+		{
+			input:   "field:t>est",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("t>est").SetField("field"),
+				},
+				nil),
+		},
+		// < is allowed inside a term, just not the start
+		{
+			input:   "field:t<est",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("t<est").SetField("field"),
+				},
+				nil),
+		},
+		// = is allowed inside a term, just not the start
+		{
+			input:   "field:t=est",
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("t=est").SetField("field"),
 				},
 				nil),
 		},
@@ -216,7 +274,61 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				},
 				nil),
 		},
+		{
+			input:   `field:555c3bb06f7a127cda000005`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("555c3bb06f7a127cda000005").SetField("field"),
+				},
+				nil),
+		},
+		{
+			input:   `field:>5`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewNumericRangeInclusiveQuery(&fivePointOh, nil, &theFalsehood, nil).SetField("field"),
+				},
+				nil),
+		},
+		{
+			input:   `field:>=5`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewNumericRangeInclusiveQuery(&fivePointOh, nil, &theTruth, nil).SetField("field"),
+				},
+				nil),
+		},
+		{
+			input:   `field:<5`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewNumericRangeInclusiveQuery(nil, &fivePointOh, nil, &theFalsehood).SetField("field"),
+				},
+				nil),
+		},
+		{
+			input:   `field:<=5`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewNumericRangeInclusiveQuery(nil, &fivePointOh, nil, &theTruth).SetField("field"),
+				},
+				nil),
+		},
 	}
+
+	// turn on lexer debugging
+	// debugLexer = true
+	// logger = log.New(os.Stderr, "bleve", log.LstdFlags)
 
 	for _, test := range tests {
 
@@ -226,6 +338,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		}
 		if !reflect.DeepEqual(q, test.result) {
 			t.Errorf("Expected %#v, got %#v: for %s", test.result, q, test.input)
+			t.Errorf("Expected %#v, got %#v: for %s", test.result.(*booleanQuery).Should.(*disjunctionQuery).Disjuncts[0], q.(*booleanQuery).Should.(*disjunctionQuery).Disjuncts[0], test.input)
 		}
 	}
 }
@@ -236,7 +349,20 @@ func TestQuerySyntaxParserInvalid(t *testing.T) {
 	}{
 		{"^"},
 		{"^5"},
+		{"field:-text"},
+		{"field:+text"},
+		{"field:>text"},
+		{"field:>=text"},
+		{"field:<text"},
+		{"field:<=text"},
+		{"field:~text"},
+		{"field:^text"},
+		{"field::text"},
 	}
+
+	// turn on lexer debugging
+	// debugLexer = true
+	// logger = log.New(os.Stderr, "bleve", log.LstdFlags)
 
 	for _, test := range tests {
 		_, err := parseQuerySyntax(test.input, NewIndexMapping())
