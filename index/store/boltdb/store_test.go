@@ -10,6 +10,7 @@
 package boltdb
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -150,6 +151,31 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// **************************************************
+	// this is a hack to try to pre-emptively overflow
+	// boltdb writes *MAY* block a long reader
+	// in particular, if the write requires additional
+	// allocation, it must acquire the same lock as
+	// the reader, thus cannot continue until that
+	// reader is closed.
+	// in general this is not a problem for bleve
+	// (though it may affect performance in some cases)
+	// but it is a problem for this test which attemps
+	// to easily verify that readers are isolated
+	// this hack writes enough initial data such that
+	// the subsequent writes do not require additional
+	// space
+	hackSize := 1000
+	for i := 0; i < hackSize; i++ {
+		k := fmt.Sprintf("x%d", i)
+		err = writer.Set([]byte(k), []byte("filler"))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// **************************************************
+
 	err = writer.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -189,7 +215,7 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 		it.Next()
 		count++
 	}
-	if count != 1 {
+	if count != hackSize+1 {
 		t.Errorf("expected iterator to see 1, saw %d", count)
 	}
 
@@ -239,7 +265,7 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 		it2.Next()
 		count++
 	}
-	if count != 2 {
+	if count != hackSize+2 {
 		t.Errorf("expected iterator to see 2, saw %d", count)
 	}
 
@@ -265,7 +291,7 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 		it3.Next()
 		count++
 	}
-	if count != 1 {
+	if count != hackSize+1 {
 		t.Errorf("expected iterator to see 1, saw %d", count)
 	}
 
