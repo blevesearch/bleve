@@ -864,3 +864,76 @@ func TestDocumentFieldArrayPositions(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestKeywordSearchBug207(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	f := NewTextFieldMapping()
+	f.Analyzer = "keyword"
+
+	m := NewIndexMapping()
+	m.DefaultMapping = NewDocumentMapping()
+	m.DefaultMapping.AddFieldMappingsAt("Body", f)
+
+	index, err := New("testidx", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc1 := struct {
+		Body string
+	}{
+		Body: "a555c3bb06f7a127cda000005",
+	}
+
+	err = index.Index("a", doc1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc2 := struct {
+		Body string
+	}{
+		Body: "555c3bb06f7a127cda000005",
+	}
+
+	err = index.Index("b", doc2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// now search for these terms
+	sreq := NewSearchRequest(NewTermQuery("a555c3bb06f7a127cda000005"))
+	sres, err := index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 result, got %d", sres.Total)
+	}
+	if sres.Hits[0].ID != "a" {
+		t.Errorf("expecated id 'a', got '%s'", sres.Hits[0].ID)
+	}
+
+	sreq = NewSearchRequest(NewTermQuery("555c3bb06f7a127cda000005"))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 result, got %d", sres.Total)
+	}
+	if sres.Hits[0].ID != "b" {
+		t.Errorf("expecated id 'b', got '%s'", sres.Hits[0].ID)
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
