@@ -530,6 +530,7 @@ func NewBackIndexRowKV(key, value []byte) (*BackIndexRow, error) {
 	if err != nil && err != io.EOF {
 		return nil, err
 	}
+	rv.doc = rv.doc[:len(rv.doc)-1] // trim off separator byte
 
 	var birv BackIndexRowValue
 	err = proto.Unmarshal(value, &birv)
