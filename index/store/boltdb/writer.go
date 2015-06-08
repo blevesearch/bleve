@@ -33,7 +33,7 @@ func (w *Writer) NewBatch() store.KVBatch {
 }
 
 func (w *Writer) Close() error {
-	w.store.writer.Unlock()
+	defer w.store.writer.Unlock()
 	return w.tx.Commit()
 }
 

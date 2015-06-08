@@ -645,16 +645,12 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	if err != nil {
 		return
 	}
-	defer func() {
-		if cerr := kvwriter.Close(); err == nil && cerr != nil {
-			err = cerr
-		}
-	}()
 
 	// first lookup all the back index rows
 	var backIndexRows map[string]*BackIndexRow
 	backIndexRows, err = udc.backIndexRowsForBatch(kvwriter, batch)
 	if err != nil {
+		_ = kvwriter.Close()
 		return
 	}
 
@@ -692,7 +688,15 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	}
 
 	err = udc.batchRows(kvwriter, addRows, updateRows, deleteRows)
+	if err != nil {
+		_ = kvwriter.Close()
+		atomic.AddUint64(&udc.stats.errors, 1)
+		return
+	}
+
+	err = kvwriter.Close()
 	atomic.AddUint64(&udc.stats.indexTime, uint64(time.Since(indexStart)))
+
 	if err == nil {
 		udc.m.Lock()
 		udc.docCount += docsAdded
