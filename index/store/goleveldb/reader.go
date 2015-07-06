@@ -11,7 +11,7 @@ package goleveldb
 
 import (
 	"github.com/blevesearch/bleve/index/store"
-	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/mschoch/goleveldb/leveldb"
 )
 
 type Reader struct {

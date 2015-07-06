@@ -15,9 +15,9 @@ import (
 
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/filter"
-	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/mschoch/goleveldb/leveldb"
+	"github.com/mschoch/goleveldb/leveldb/filter"
+	"github.com/mschoch/goleveldb/leveldb/opt"
 )
 
 const Name = "goleveldb"
@@ -131,6 +131,11 @@ func init() {
 
 func applyConfig(o *opt.Options, config map[string]interface{}) (
 	*opt.Options, error) {
+
+	ro, ok := config["read_only"].(bool)
+	if ok {
+		o.ReadOnly = ro
+	}
 
 	cim, ok := config["create_if_missing"].(bool)
 	if ok {

@@ -47,6 +47,32 @@ func TestLevelDBStore(t *testing.T) {
 	CommonTestKVStore(t, s)
 }
 
+func TestLevelDBStoreIterator(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("test")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	s, err := New("test", leveldbTestOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	CommonTestKVStoreIterator(t, s)
+}
+
 func TestReaderIsolation(t *testing.T) {
 	defer func() {
 		err := os.RemoveAll("test")
@@ -293,4 +319,70 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 		t.Errorf("expected iterator to see 1, saw %d", count)
 	}
 
+}
+
+func CommonTestKVStoreIterator(t *testing.T, s store.KVStore) {
+
+	writer, err := s.Writer()
+	if err != nil {
+		t.Error(err)
+	}
+
+	data := []struct {
+		k []byte
+		v []byte
+	}{
+		{[]byte("t\x09\x00paint\xff/sponsor/gold/thumbtack/"), []byte("a")},
+		{[]byte("t\x09\x00party\xff/sponsor/gold/thumbtack/"), []byte("a")},
+		{[]byte("t\x09\x00personal\xff/sponsor/gold/thumbtack/"), []byte("a")},
+		{[]byte("t\x09\x00plan\xff/sponsor/gold/thumbtack/"), []byte("a")},
+	}
+
+	batch := writer.NewBatch()
+	for _, d := range data {
+		batch.Set(d.k, d.v)
+	}
+
+	err = batch.Execute()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reader, err := s.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	it := reader.Iterator([]byte("a"))
+	keys := make([][]byte, 0, len(data))
+	key, _, valid := it.Current()
+	for valid {
+		keys = append(keys, key)
+		it.Next()
+		key, _, valid = it.Current()
+	}
+
+	if len(keys) != len(data) {
+		t.Errorf("expected same number of keys, got %d != %d", len(keys), len(data))
+	}
+	for i, dk := range data {
+		if !reflect.DeepEqual(dk.k, keys[i]) {
+			t.Errorf("expected key %s got %s", dk.k, keys[i])
+		}
+
+	}
+
+	err = it.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }

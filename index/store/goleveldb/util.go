@@ -10,7 +10,7 @@
 package goleveldb
 
 import (
-	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/mschoch/goleveldb/leveldb/opt"
 )
 
 func defaultWriteOptions() *opt.WriteOptions {

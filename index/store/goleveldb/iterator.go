@@ -10,13 +10,15 @@
 package goleveldb
 
 import (
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/iterator"
+	"github.com/mschoch/goleveldb/leveldb"
+	"github.com/mschoch/goleveldb/leveldb/iterator"
 )
 
 type Iterator struct {
 	store    *Store
 	iterator iterator.Iterator
+	copyk    []byte
+	copyv    []byte
 }
 
 func newIterator(store *Store) *Iterator {
@@ -40,14 +42,20 @@ func newIteratorWithSnapshot(store *Store, snapshot *leveldb.Snapshot) *Iterator
 }
 
 func (ldi *Iterator) SeekFirst() {
+	ldi.copyk = nil
+	ldi.copyv = nil
 	ldi.iterator.First()
 }
 
 func (ldi *Iterator) Seek(key []byte) {
+	ldi.copyk = nil
+	ldi.copyv = nil
 	ldi.iterator.Seek(key)
 }
 
 func (ldi *Iterator) Next() {
+	ldi.copyk = nil
+	ldi.copyv = nil
 	ldi.iterator.Next()
 }
 
@@ -59,11 +67,21 @@ func (ldi *Iterator) Current() ([]byte, []byte, bool) {
 }
 
 func (ldi *Iterator) Key() []byte {
-	return ldi.iterator.Key()
+	k := ldi.iterator.Key()
+	if ldi.copyk == nil {
+		ldi.copyk = make([]byte, len(k))
+		copy(ldi.copyk, k)
+	}
+	return ldi.copyk
 }
 
 func (ldi *Iterator) Value() []byte {
-	return ldi.iterator.Value()
+	v := ldi.iterator.Value()
+	if ldi.copyv == nil {
+		ldi.copyv = make([]byte, len(v))
+		copy(ldi.copyv, v)
+	}
+	return ldi.copyv
 }
 
 func (ldi *Iterator) Valid() bool {
@@ -71,5 +89,7 @@ func (ldi *Iterator) Valid() bool {
 }
 
 func (ldi *Iterator) Close() error {
+	ldi.copyk = nil
+	ldi.copyv = nil
 	return nil
 }
