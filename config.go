@@ -141,8 +141,8 @@ func init() {
 	_, err := Config.Cache.DefineFragmentFormatter("highlightSpanHTML",
 		map[string]interface{}{
 			"type":   "html",
-			"before": `<span class="highlight">`,
-			"after":  `</span>`,
+			"before": `<mark>`,
+			"after":  `</mark>`,
 		})
 	if err != nil {
 		panic(err)
