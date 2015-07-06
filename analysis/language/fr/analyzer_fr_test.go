@@ -175,6 +175,14 @@ func TestFrenchAnalyzer(t *testing.T) {
 				},
 			},
 		},
+		{
+			input: []byte("propriétaire"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("proprietair"),
+				},
+			},
+		},
 	}
 
 	cache := registry.NewCache()

@@ -981,6 +981,19 @@ func TestFrenchLightStemmer(t *testing.T) {
 				},
 			},
 		},
+		// bug #214
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("propriétaire"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("proprietair"),
+				},
+			},
+		},
 	}
 
 	cache := registry.NewCache()
