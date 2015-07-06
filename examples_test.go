@@ -306,7 +306,7 @@ func ExampleNewHighlight() {
 
 	fmt.Println(searchResults.Hits[0].Fragments["Name"][0])
 	// Output:
-	// great <span class="highlight">nameless</span> one
+	// great <mark>nameless</mark> one
 }
 
 func ExampleNewHighlightWithStyle() {

@@ -350,7 +350,7 @@
 				{
 					"id": "b",
 					"fragments": {
-						"name": ["steve has a <span class=\"highlight\">long</span> name"]
+						"name": ["steve has a <mark>long</mark> name"]
 					}
 				}
 			]
@@ -373,7 +373,7 @@
 				{
 					"id": "b",
 					"fragments": {
-						"name": ["steve has a <span class=\"highlight\">long</span> name"]
+						"name": ["steve has a <mark>long</mark> name"]
 					}
 				}
 			]
