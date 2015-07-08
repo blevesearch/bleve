@@ -96,6 +96,16 @@ func (q *booleanQuery) SetBoost(b float64) Query {
 
 func (q *booleanQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 	var err error
+	var mustNotSearcher search.Searcher
+	if q.MustNot != nil {
+		mustNotSearcher, err = q.MustNot.Searcher(i, m, explain)
+		if err != nil {
+			return nil, err
+		}
+		if q.Must == nil && q.Should == nil {
+			q.Must = NewMatchAllQuery()
+		}
+	}
 
 	var mustSearcher search.Searcher
 	if q.Must != nil {
@@ -112,15 +122,6 @@ func (q *booleanQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bo
 			return nil, err
 		}
 	}
-
-	var mustNotSearcher search.Searcher
-	if q.MustNot != nil {
-		mustNotSearcher, err = q.MustNot.Searcher(i, m, explain)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	return searchers.NewBooleanSearcher(i, mustSearcher, shouldSearcher, mustNotSearcher, explain)
 }
 
@@ -143,8 +144,8 @@ func (q *booleanQuery) Validate() error {
 			return err
 		}
 	}
-	if q.Must == nil && q.Should == nil {
-		return ErrorBooleanQueryNeedsMustOrShould
+	if q.Must == nil && q.Should == nil && q.MustNot == nil {
+		return ErrorBooleanQueryNeedsMustOrShouldOrNotMust
 	}
 	return nil
 }
