@@ -10,8 +10,8 @@
 package goleveldb
 
 import (
-	"github.com/mschoch/goleveldb/leveldb"
-	"github.com/mschoch/goleveldb/leveldb/iterator"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 )
 
 type Iterator struct {

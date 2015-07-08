@@ -15,9 +15,9 @@ import (
 
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
-	"github.com/mschoch/goleveldb/leveldb"
-	"github.com/mschoch/goleveldb/leveldb/filter"
-	"github.com/mschoch/goleveldb/leveldb/opt"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/filter"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
 const Name = "goleveldb"
