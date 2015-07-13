@@ -192,14 +192,28 @@ func TestQueryValidate(t *testing.T) {
 				nil,
 				nil,
 				[]Query{NewMatchQuery("devon").SetField("desc")}),
-			err: ErrorBooleanQueryNeedsMustOrShould,
+			err: nil,
 		},
 		{
 			query: NewBooleanQuery(
 				[]Query{},
 				[]Query{},
 				[]Query{NewMatchQuery("devon").SetField("desc")}),
-			err: ErrorBooleanQueryNeedsMustOrShould,
+			err: nil,
+		},
+		{
+			query: NewBooleanQuery(
+				nil,
+				nil,
+				nil),
+			err: ErrorBooleanQueryNeedsMustOrShouldOrNotMust,
+		},
+		{
+			query: NewBooleanQuery(
+				[]Query{},
+				[]Query{},
+				[]Query{}),
+			err: ErrorBooleanQueryNeedsMustOrShouldOrNotMust,
 		},
 		{
 			query: NewBooleanQueryMinShould(
