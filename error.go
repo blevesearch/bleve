@@ -16,7 +16,7 @@ const (
 	ErrorIndexMetaMissing
 	ErrorIndexMetaCorrupt
 	ErrorDisjunctionFewerThanMinClauses
-	ErrorBooleanQueryNeedsMustOrShould
+	ErrorBooleanQueryNeedsMustOrShouldOrNotMust
 	ErrorNumericQueryNoBounds
 	ErrorPhraseQueryNoTerms
 	ErrorUnknownQueryType
@@ -35,17 +35,17 @@ func (e Error) Error() string {
 }
 
 var errorMessages = map[int]string{
-	int(ErrorIndexPathExists):                "cannot create new index, path already exists",
-	int(ErrorIndexPathDoesNotExist):          "cannot open index, path does not exist",
-	int(ErrorIndexMetaMissing):               "cannot open index, metadata missing",
-	int(ErrorIndexMetaCorrupt):               "cannot open index, metadata corrupt",
-	int(ErrorDisjunctionFewerThanMinClauses): "disjunction query has fewer than the minimum number of clauses to satisfy",
-	int(ErrorBooleanQueryNeedsMustOrShould):  "boolean query must contain at least one must or should clause",
-	int(ErrorNumericQueryNoBounds):           "numeric range query must specify min or max",
-	int(ErrorPhraseQueryNoTerms):             "phrase query must contain at least one term",
-	int(ErrorUnknownQueryType):               "unknown query type",
-	int(ErrorUnknownStorageType):             "unknown storage type",
-	int(ErrorIndexClosed):                    "index is closed",
-	int(ErrorAliasMulti):                     "cannot perform single index operation on multiple index alias",
-	int(ErrorAliasEmpty):                     "cannot perform operation on empty alias",
+	int(ErrorIndexPathExists):                        "cannot create new index, path already exists",
+	int(ErrorIndexPathDoesNotExist):                  "cannot open index, path does not exist",
+	int(ErrorIndexMetaMissing):                       "cannot open index, metadata missing",
+	int(ErrorIndexMetaCorrupt):                       "cannot open index, metadata corrupt",
+	int(ErrorDisjunctionFewerThanMinClauses):         "disjunction query has fewer than the minimum number of clauses to satisfy",
+	int(ErrorBooleanQueryNeedsMustOrShouldOrNotMust): "boolean query must contain at least one must or should or not must clause",
+	int(ErrorNumericQueryNoBounds):                   "numeric range query must specify min or max",
+	int(ErrorPhraseQueryNoTerms):                     "phrase query must contain at least one term",
+	int(ErrorUnknownQueryType):                       "unknown query type",
+	int(ErrorUnknownStorageType):                     "unknown storage type",
+	int(ErrorIndexClosed):                            "index is closed",
+	int(ErrorAliasMulti):                             "cannot perform single index operation on multiple index alias",
+	int(ErrorAliasEmpty):                             "cannot perform operation on empty alias",
 }
