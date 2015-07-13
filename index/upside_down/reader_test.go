@@ -295,3 +295,13 @@ func TestIndexDocIdReader(t *testing.T) {
 		t.Errorf("expected to find id '', got '%s'", id)
 	}
 }
+
+func TestCrashBadBackIndexRow(t *testing.T) {
+	br, err := NewBackIndexRowKV([]byte{byte('b'), byte('a'), ByteSeparator}, []byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(br.doc) != "a" {
+		t.Fatal(err)
+	}
+}
