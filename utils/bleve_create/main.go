@@ -20,6 +20,7 @@ import (
 
 var indexPath = flag.String("index", "", "index path")
 var mappingFile = flag.String("mapping", "", "mapping file")
+var storeType = flag.String("store", "", "store type")
 
 func main() {
 
@@ -43,7 +44,13 @@ func main() {
 	}
 
 	// create the index
-	index, err := bleve.New(*indexPath, mapping)
+	var index bleve.Index
+	var err error
+	if *storeType != "" {
+		index, err = bleve.NewUsing(*indexPath, mapping, *storeType, nil)
+	} else {
+		index, err = bleve.New(*indexPath, mapping)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
