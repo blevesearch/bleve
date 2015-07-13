@@ -402,5 +402,29 @@
 				}
 			]
 		}
+	},
+	{
+		"comment": "tests query string only containing MUST NOT clause, bug #193",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"query": "-title:mista"
+			}
+		},
+		"result": {
+			"total_hits": 3,
+			"hits": [
+				{
+					"id": "d"
+				},
+				{
+					"id": "c"
+				},
+				{
+					"id": "b"
+				}
+			]
+		}
 	}
 ]
