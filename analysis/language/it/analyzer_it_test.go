@@ -61,6 +61,15 @@ func TestItalianAnalyzer(t *testing.T) {
 				},
 			},
 		},
+		// test for bug #218
+		{
+			input: []byte("Nell'anfora"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("anfor"),
+				},
+			},
+		},
 	}
 
 	cache := registry.NewCache()

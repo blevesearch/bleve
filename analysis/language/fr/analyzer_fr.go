@@ -43,8 +43,8 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	rv := analysis.Analyzer{
 		Tokenizer: tokenizer,
 		TokenFilters: []analysis.TokenFilter{
-			elisionFilter,
 			toLowerFilter,
+			elisionFilter,
 			stopFrFilter,
 			stemmerFrFilter,
 		},
