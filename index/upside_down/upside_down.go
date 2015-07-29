@@ -30,7 +30,7 @@ var VersionKey = []byte{'v'}
 
 var UnsafeBatchUseDetected = fmt.Errorf("bleve.Batch is NOT thread-safe, modification after execution detected")
 
-const Version uint8 = 4
+const Version uint8 = 5
 
 var IncompatibleVersion = fmt.Errorf("incompatible version, %d is supported", Version)
 
@@ -415,7 +415,7 @@ func (udc *UpsideDownCouch) indexField(docID string, field document.Field, field
 	for _, tf := range tokenFreqs {
 		var termFreqRow *TermFrequencyRow
 		if field.Options().IncludeTermVectors() {
-			tv, newFieldRows := udc.termVectorsFromTokenFreq(fieldIndex, tf)
+			tv, newFieldRows := udc.termVectorsFromTokenFreq(fieldIndex, field.ArrayPositions(), tf)
 			rows = append(rows, newFieldRows...)
 			termFreqRow = NewTermFrequencyRowWithTermVectors(tf.Term, fieldIndex, docID, uint64(frequencyFromTokenFreq(tf)), fieldNorm, tv)
 		} else {
@@ -542,7 +542,7 @@ func frequencyFromTokenFreq(tf *analysis.TokenFreq) int {
 	return len(tf.Locations)
 }
 
-func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.TokenFreq) ([]*TermVector, []UpsideDownCouchRow) {
+func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, arrayPositions []uint64, tf *analysis.TokenFreq) ([]*TermVector, []UpsideDownCouchRow) {
 	rv := make([]*TermVector, len(tf.Locations))
 	newFieldRows := make([]UpsideDownCouchRow, 0)
 
@@ -557,10 +557,11 @@ func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.
 			}
 		}
 		tv := TermVector{
-			field: fieldIndex,
-			pos:   uint64(l.Position),
-			start: uint64(l.Start),
-			end:   uint64(l.End),
+			field:          fieldIndex,
+			arrayPositions: arrayPositions,
+			pos:            uint64(l.Position),
+			start:          uint64(l.Start),
+			end:            uint64(l.End),
 		}
 		rv[i] = &tv
 	}
@@ -574,10 +575,11 @@ func (udc *UpsideDownCouch) termFieldVectorsFromTermVectors(in []*TermVector) []
 	for i, tv := range in {
 		fieldName := udc.fieldIndexCache.FieldName(tv.field)
 		tfv := index.TermFieldVector{
-			Field: fieldName,
-			Pos:   tv.pos,
-			Start: tv.start,
-			End:   tv.end,
+			Field:          fieldName,
+			ArrayPositions: tv.arrayPositions,
+			Pos:            tv.pos,
+			Start:          tv.start,
+			End:            tv.end,
 		}
 		rv[i] = &tfv
 	}
