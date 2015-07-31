@@ -320,26 +320,26 @@ func (tfr *TermFrequencyRow) DictionaryRowKey() []byte {
 
 func (tfr *TermFrequencyRow) Value() []byte {
 	used := 0
-	bufLen := 8 + 8
+	bufLen := binary.MaxVarintLen64 + binary.MaxVarintLen64
 	for _, vector := range tfr.vectors {
-		bufLen += 8 + 8 + 8 + 8 + (1+len(vector.arrayPositions))*8
+		bufLen += (binary.MaxVarintLen64 * 4) + (1+len(vector.arrayPositions))*binary.MaxVarintLen64
 	}
 	buf := make([]byte, bufLen)
 
-	used += binary.PutUvarint(buf[used:used+8], tfr.freq)
+	used += binary.PutUvarint(buf[used:used+binary.MaxVarintLen64], tfr.freq)
 
 	normuint32 := math.Float32bits(tfr.norm)
-	newbuf := buf[used : used+8]
+	newbuf := buf[used : used+binary.MaxVarintLen64]
 	used += binary.PutUvarint(newbuf, uint64(normuint32))
 
 	for _, vector := range tfr.vectors {
-		used += binary.PutUvarint(buf[used:used+8], uint64(vector.field))
-		used += binary.PutUvarint(buf[used:used+8], vector.pos)
-		used += binary.PutUvarint(buf[used:used+8], vector.start)
-		used += binary.PutUvarint(buf[used:used+8], vector.end)
-		used += binary.PutUvarint(buf[used:used+8], uint64(len(vector.arrayPositions)))
+		used += binary.PutUvarint(buf[used:used+binary.MaxVarintLen64], uint64(vector.field))
+		used += binary.PutUvarint(buf[used:used+binary.MaxVarintLen64], vector.pos)
+		used += binary.PutUvarint(buf[used:used+binary.MaxVarintLen64], vector.start)
+		used += binary.PutUvarint(buf[used:used+binary.MaxVarintLen64], vector.end)
+		used += binary.PutUvarint(buf[used:used+binary.MaxVarintLen64], uint64(len(vector.arrayPositions)))
 		for _, arrayPosition := range vector.arrayPositions {
-			used += binary.PutUvarint(buf[used:used+8], arrayPosition)
+			used += binary.PutUvarint(buf[used:used+binary.MaxVarintLen64], arrayPosition)
 		}
 	}
 	return buf[0:used]
