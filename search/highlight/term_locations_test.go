@@ -3,6 +3,8 @@ package highlight
 import (
 	"reflect"
 	"testing"
+
+	"github.com/blevesearch/bleve/search"
 )
 
 func TestTermLocationOverlaps(t *testing.T) {
@@ -42,6 +44,59 @@ func TestTermLocationOverlaps(t *testing.T) {
 			right: &TermLocation{
 				Start: 7,
 				End:   11,
+			},
+			expected: false,
+		},
+		// with array positions
+		{
+			left: &TermLocation{
+				ArrayPositions: []float64{0},
+				Start:          0,
+				End:            5,
+			},
+			right: &TermLocation{
+				ArrayPositions: []float64{1},
+				Start:          7,
+				End:            11,
+			},
+			expected: false,
+		},
+		{
+			left: &TermLocation{
+				ArrayPositions: []float64{0},
+				Start:          0,
+				End:            5,
+			},
+			right: &TermLocation{
+				ArrayPositions: []float64{1},
+				Start:          3,
+				End:            11,
+			},
+			expected: false,
+		},
+		{
+			left: &TermLocation{
+				ArrayPositions: []float64{0},
+				Start:          0,
+				End:            5,
+			},
+			right: &TermLocation{
+				ArrayPositions: []float64{0},
+				Start:          3,
+				End:            11,
+			},
+			expected: true,
+		},
+		{
+			left: &TermLocation{
+				ArrayPositions: []float64{0},
+				Start:          0,
+				End:            5,
+			},
+			right: &TermLocation{
+				ArrayPositions: []float64{0},
+				Start:          7,
+				End:            11,
 			},
 			expected: false,
 		},
@@ -162,12 +217,282 @@ func TestTermLocationsMergeOverlapping(t *testing.T) {
 				},
 			},
 		},
+		// with array positions
+		{
+			input: TermLocations{
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Start:          0,
+					End:            5,
+				},
+				&TermLocation{
+					ArrayPositions: []float64{1},
+					Start:          7,
+					End:            11,
+				},
+			},
+			output: TermLocations{
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Start:          0,
+					End:            5,
+				},
+				&TermLocation{
+					ArrayPositions: []float64{1},
+					Start:          7,
+					End:            11,
+				},
+			},
+		},
+		{
+			input: TermLocations{
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Start:          0,
+					End:            5,
+				},
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Start:          7,
+					End:            11,
+				},
+			},
+			output: TermLocations{
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Start:          0,
+					End:            5,
+				},
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Start:          7,
+					End:            11,
+				},
+			},
+		},
+		{
+			input: TermLocations{
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Start:          0,
+					End:            5,
+				},
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Start:          3,
+					End:            11,
+				},
+			},
+			output: TermLocations{
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Start:          0,
+					End:            11,
+				},
+				nil,
+			},
+		},
+		{
+			input: TermLocations{
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Start:          0,
+					End:            5,
+				},
+				&TermLocation{
+					ArrayPositions: []float64{1},
+					Start:          3,
+					End:            11,
+				},
+			},
+			output: TermLocations{
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Start:          0,
+					End:            5,
+				},
+				&TermLocation{
+					ArrayPositions: []float64{1},
+					Start:          3,
+					End:            11,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
 		test.input.MergeOverlapping()
 		if !reflect.DeepEqual(test.input, test.output) {
 			t.Errorf("expected: %#v got %#v", test.output, test.input)
+		}
+	}
+}
+
+func TestTermLocationsOrder(t *testing.T) {
+
+	tests := []struct {
+		input  search.TermLocationMap
+		output TermLocations
+	}{
+		{
+			input:  search.TermLocationMap{},
+			output: TermLocations{},
+		},
+		{
+			input: search.TermLocationMap{
+				"term": search.Locations{
+					&search.Location{
+						Start: 0,
+					},
+					&search.Location{
+						Start: 5,
+					},
+				},
+			},
+			output: TermLocations{
+				&TermLocation{
+					Term:  "term",
+					Start: 0,
+				},
+				&TermLocation{
+					Term:  "term",
+					Start: 5,
+				},
+			},
+		},
+		{
+			input: search.TermLocationMap{
+				"term": search.Locations{
+					&search.Location{
+						Start: 5,
+					},
+					&search.Location{
+						Start: 0,
+					},
+				},
+			},
+			output: TermLocations{
+				&TermLocation{
+					Term:  "term",
+					Start: 0,
+				},
+				&TermLocation{
+					Term:  "term",
+					Start: 5,
+				},
+			},
+		},
+		// with array positions
+		{
+			input: search.TermLocationMap{
+				"term": search.Locations{
+					&search.Location{
+						ArrayPositions: []float64{0},
+						Start:          0,
+					},
+					&search.Location{
+						ArrayPositions: []float64{0},
+						Start:          5,
+					},
+				},
+			},
+			output: TermLocations{
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Term:           "term",
+					Start:          0,
+				},
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Term:           "term",
+					Start:          5,
+				},
+			},
+		},
+		{
+			input: search.TermLocationMap{
+				"term": search.Locations{
+					&search.Location{
+						ArrayPositions: []float64{0},
+						Start:          5,
+					},
+					&search.Location{
+						ArrayPositions: []float64{0},
+						Start:          0,
+					},
+				},
+			},
+			output: TermLocations{
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Term:           "term",
+					Start:          0,
+				},
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Term:           "term",
+					Start:          5,
+				},
+			},
+		},
+		{
+			input: search.TermLocationMap{
+				"term": search.Locations{
+					&search.Location{
+						ArrayPositions: []float64{0},
+						Start:          5,
+					},
+					&search.Location{
+						ArrayPositions: []float64{1},
+						Start:          0,
+					},
+				},
+			},
+			output: TermLocations{
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Term:           "term",
+					Start:          5,
+				},
+				&TermLocation{
+					ArrayPositions: []float64{1},
+					Term:           "term",
+					Start:          0,
+				},
+			},
+		},
+		{
+			input: search.TermLocationMap{
+				"term": search.Locations{
+					&search.Location{
+						ArrayPositions: []float64{0},
+						Start:          5,
+					},
+					&search.Location{
+						ArrayPositions: []float64{0, 1},
+						Start:          0,
+					},
+				},
+			},
+			output: TermLocations{
+				&TermLocation{
+					ArrayPositions: []float64{0},
+					Term:           "term",
+					Start:          5,
+				},
+				&TermLocation{
+					ArrayPositions: []float64{0, 1},
+					Term:           "term",
+					Start:          0,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		actual := OrderTermLocations(test.input)
+		if !reflect.DeepEqual(actual, test.output) {
+			t.Errorf("expected: %#v got %#v", test.output, actual)
 		}
 	}
 }

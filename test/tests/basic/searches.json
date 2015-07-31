@@ -426,5 +426,56 @@
 				}
 			]
 		}
+	},
+	{
+		"comment": "highlight results including non-matching field (which should be produced in its entirety, though unhighlighted)",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "name",
+				"match": "long"
+			},
+			"highlight": {
+				"fields": ["name", "title"]
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "b",
+					"fragments": {
+						"name": ["steve has a <mark>long</mark> name"],
+						"title": ["missess"]
+					}
+				}
+			]
+		}
+	},
+	{
+		"comment": "search and highlight an array field",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "tags",
+				"match": "gopher"
+			},
+			"highlight": {
+				"fields": ["tags"]
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "a",
+					"fragments": {
+						"tags": ["<mark>gopher</mark>"]
+					}
+				}
+			]
+		}
 	}
 ]

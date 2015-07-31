@@ -15,11 +15,12 @@ import (
 )
 
 type Fragment struct {
-	Orig  []byte
-	Start int
-	End   int
-	Score float64
-	Index int // used by heap
+	Orig           []byte
+	ArrayPositions []uint64
+	Start          int
+	End            int
+	Score          float64
+	Index          int // used by heap
 }
 
 func (f *Fragment) Overlaps(other *Fragment) bool {

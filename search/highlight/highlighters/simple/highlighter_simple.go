@@ -80,9 +80,18 @@ func (s *Highlighter) BestFragmentsInField(dm *search.DocumentMatch, doc *docume
 		if f.Name() == field {
 			_, ok := f.(*document.TextField)
 			if ok {
+
+				termLocationsSameArrayPosition := make(highlight.TermLocations, 0)
+				for _, otl := range orderedTermLocations {
+					if sameArrayPositions(f.ArrayPositions(), otl.ArrayPositions) {
+						termLocationsSameArrayPosition = append(termLocationsSameArrayPosition, otl)
+					}
+				}
+
 				fieldData := f.Value()
-				fragments := s.fragmenter.Fragment(fieldData, orderedTermLocations)
+				fragments := s.fragmenter.Fragment(fieldData, termLocationsSameArrayPosition)
 				for _, fragment := range fragments {
+					fragment.ArrayPositions = f.ArrayPositions()
 					scorer.Score(fragment)
 					heap.Push(&fq, fragment)
 				}
@@ -141,6 +150,18 @@ func (s *Highlighter) BestFragmentsInField(dm *search.DocumentMatch, doc *docume
 	}
 
 	return formattedFragments
+}
+
+func sameArrayPositions(fieldArrayPositions []uint64, termLocationArrayPositions []float64) bool {
+	if len(fieldArrayPositions) != len(termLocationArrayPositions) {
+		return false
+	}
+	for i := 0; i < len(fieldArrayPositions); i++ {
+		if fieldArrayPositions[i] != uint64(termLocationArrayPositions[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // FragmentQueue implements heap.Interface and holds Items.

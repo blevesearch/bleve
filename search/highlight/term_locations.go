@@ -10,32 +10,61 @@
 package highlight
 
 import (
+	"reflect"
 	"sort"
 
 	"github.com/blevesearch/bleve/search"
 )
 
 type TermLocation struct {
-	Term  string
-	Pos   int
-	Start int
-	End   int
+	Term           string
+	ArrayPositions []float64
+	Pos            int
+	Start          int
+	End            int
 }
 
 func (tl *TermLocation) Overlaps(other *TermLocation) bool {
-	if other.Start >= tl.Start && other.Start < tl.End {
-		return true
-	} else if tl.Start >= other.Start && tl.Start < other.End {
-		return true
+	if reflect.DeepEqual(tl.ArrayPositions, other.ArrayPositions) {
+		if other.Start >= tl.Start && other.Start < tl.End {
+			return true
+		} else if tl.Start >= other.Start && tl.Start < other.End {
+			return true
+		}
 	}
 	return false
 }
 
 type TermLocations []*TermLocation
 
-func (t TermLocations) Len() int           { return len(t) }
-func (t TermLocations) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
-func (t TermLocations) Less(i, j int) bool { return t[i].Start < t[j].Start }
+func (t TermLocations) Len() int      { return len(t) }
+func (t TermLocations) Swap(i, j int) { t[i], t[j] = t[j], t[i] }
+func (t TermLocations) Less(i, j int) bool {
+
+	shortestArrayPositions := len(t[i].ArrayPositions)
+	if len(t[j].ArrayPositions) < shortestArrayPositions {
+		shortestArrayPositions = len(t[j].ArrayPositions)
+	}
+
+	// compare all the common array positions
+	for api := 0; api < shortestArrayPositions; api++ {
+		if t[i].ArrayPositions[api] < t[j].ArrayPositions[api] {
+			return true
+		}
+		if t[i].ArrayPositions[api] > t[j].ArrayPositions[api] {
+			return false
+		}
+	}
+	// all the common array positions are the same
+	if len(t[i].ArrayPositions) < len(t[j].ArrayPositions) {
+		return true // j array positions, longer so greather
+	} else if len(t[i].ArrayPositions) > len(t[j].ArrayPositions) {
+		return false // j array positions, shorter so less
+	}
+
+	// array positions the same, compare starts
+	return t[i].Start < t[j].Start
+}
 
 func (t TermLocations) MergeOverlapping() {
 	var lastTl *TermLocation
@@ -57,10 +86,11 @@ func OrderTermLocations(tlm search.TermLocationMap) TermLocations {
 	for term, locations := range tlm {
 		for _, location := range locations {
 			tl := TermLocation{
-				Term:  term,
-				Pos:   int(location.Pos),
-				Start: int(location.Start),
-				End:   int(location.End),
+				Term:           term,
+				ArrayPositions: location.ArrayPositions,
+				Pos:            int(location.Pos),
+				Start:          int(location.Start),
+				End:            int(location.End),
 			}
 			rv = append(rv, &tl)
 		}
