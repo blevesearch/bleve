@@ -415,7 +415,7 @@ func (udc *UpsideDownCouch) indexField(docID string, field document.Field, field
 	for _, tf := range tokenFreqs {
 		var termFreqRow *TermFrequencyRow
 		if field.Options().IncludeTermVectors() {
-			tv, newFieldRows := udc.termVectorsFromTokenFreq(fieldIndex, field.ArrayPositions(), tf)
+			tv, newFieldRows := udc.termVectorsFromTokenFreq(fieldIndex, tf)
 			rows = append(rows, newFieldRows...)
 			termFreqRow = NewTermFrequencyRowWithTermVectors(tf.Term, fieldIndex, docID, uint64(frequencyFromTokenFreq(tf)), fieldNorm, tv)
 		} else {
@@ -542,7 +542,7 @@ func frequencyFromTokenFreq(tf *analysis.TokenFreq) int {
 	return len(tf.Locations)
 }
 
-func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, arrayPositions []uint64, tf *analysis.TokenFreq) ([]*TermVector, []UpsideDownCouchRow) {
+func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.TokenFreq) ([]*TermVector, []UpsideDownCouchRow) {
 	rv := make([]*TermVector, len(tf.Locations))
 	newFieldRows := make([]UpsideDownCouchRow, 0)
 
@@ -558,7 +558,7 @@ func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, arrayPosition
 		}
 		tv := TermVector{
 			field:          fieldIndex,
-			arrayPositions: arrayPositions,
+			arrayPositions: l.ArrayPositions,
 			pos:            uint64(l.Position),
 			start:          uint64(l.Start),
 			end:            uint64(l.End),

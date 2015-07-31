@@ -962,3 +962,77 @@ func TestKeywordSearchBug207(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTermVectorArrayPositions(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// index a document with an array of strings
+	err = index.Index("k", struct {
+		Messages []string
+	}{
+		Messages: []string{
+			"first",
+			"second",
+			"third",
+			"last",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// search for this document in all field
+	tq := NewTermQuery("second")
+	tsr := NewSearchRequest(tq)
+	results, err := index.Search(tsr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results.Total != 1 {
+		t.Fatalf("expected 1 result, got %d", results.Total)
+	}
+	if len(results.Hits[0].Locations["Messages"]["second"]) < 1 {
+		t.Fatalf("expected at least one location")
+	}
+	if len(results.Hits[0].Locations["Messages"]["second"][0].ArrayPositions) < 1 {
+		t.Fatalf("expected at least one location array position")
+	}
+	if results.Hits[0].Locations["Messages"]["second"][0].ArrayPositions[0] != 1 {
+		t.Fatalf("expected array position 1, got %f", results.Hits[0].Locations["Messages"]["second"][0].ArrayPositions[0])
+	}
+
+	// repeat search for this document in Messages field
+	tq2 := NewTermQuery("third").SetField("Messages")
+	tsr = NewSearchRequest(tq2)
+	results, err = index.Search(tsr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results.Total != 1 {
+		t.Fatalf("expected 1 result, got %d", results.Total)
+	}
+	if len(results.Hits[0].Locations["Messages"]["third"]) < 1 {
+		t.Fatalf("expected at least one location")
+	}
+	if len(results.Hits[0].Locations["Messages"]["third"][0].ArrayPositions) < 1 {
+		t.Fatalf("expected at least one location array position")
+	}
+	if results.Hits[0].Locations["Messages"]["third"][0].ArrayPositions[0] != 2 {
+		t.Fatalf("expected array position 2, got %f", results.Hits[0].Locations["Messages"]["third"][0].ArrayPositions[0])
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}

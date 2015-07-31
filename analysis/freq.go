@@ -10,10 +10,11 @@
 package analysis
 
 type TokenLocation struct {
-	Field    string
-	Start    int
-	End      int
-	Position int
+	Field          string
+	ArrayPositions []uint64
+	Start          int
+	End            int
+	Position       int
 }
 
 type TokenFreq struct {
@@ -52,25 +53,27 @@ func (tfs TokenFrequencies) MergeAll(remoteField string, other TokenFrequencies)
 	return rv
 }
 
-func TokenFrequency(tokens TokenStream) TokenFrequencies {
+func TokenFrequency(tokens TokenStream, arrayPositions []uint64) TokenFrequencies {
 	index := make(map[string]*TokenFreq)
 
 	for _, token := range tokens {
 		curr, ok := index[string(token.Term)]
 		if ok {
 			curr.Locations = append(curr.Locations, &TokenLocation{
-				Start:    token.Start,
-				End:      token.End,
-				Position: token.Position,
+				ArrayPositions: arrayPositions,
+				Start:          token.Start,
+				End:            token.End,
+				Position:       token.Position,
 			})
 		} else {
 			index[string(token.Term)] = &TokenFreq{
 				Term: token.Term,
 				Locations: []*TokenLocation{
 					&TokenLocation{
-						Start:    token.Start,
-						End:      token.End,
-						Position: token.Position,
+						ArrayPositions: arrayPositions,
+						Start:          token.Start,
+						End:            token.End,
+						Position:       token.Position,
 					},
 				},
 			}

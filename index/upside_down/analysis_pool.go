@@ -9,9 +9,7 @@
 
 package upside_down
 
-import (
-	"github.com/blevesearch/bleve/document"
-)
+import "github.com/blevesearch/bleve/document"
 
 type AnalysisResult struct {
 	docID string

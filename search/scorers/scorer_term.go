@@ -151,6 +151,13 @@ func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc) *search.DocumentM
 				End:   float64(v.End),
 			}
 
+			if len(v.ArrayPositions) > 0 {
+				loc.ArrayPositions = make([]float64, len(v.ArrayPositions))
+				for i, ap := range v.ArrayPositions {
+					loc.ArrayPositions[i] = float64(ap)
+				}
+			}
+
 			locations := tlm[s.queryTerm]
 			if locations == nil {
 				locations = make(search.Locations, 1)

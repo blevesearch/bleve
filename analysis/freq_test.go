@@ -46,7 +46,7 @@ func TestTokenFrequency(t *testing.T) {
 			},
 		},
 	}
-	result := TokenFrequency(tokens)
+	result := TokenFrequency(tokens, nil)
 	if !reflect.DeepEqual(result, expectedResult) {
 		t.Errorf("expected %#v, got %#v", expectedResult, result)
 	}

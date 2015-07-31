@@ -10,9 +10,10 @@
 package search
 
 type Location struct {
-	Pos   float64 `json:"pos"`
-	Start float64 `json:"start"`
-	End   float64 `json:"end"`
+	Pos            float64   `json:"pos"`
+	Start          float64   `json:"start"`
+	End            float64   `json:"end"`
+	ArrayPositions []float64 `json:"array_positions"`
 }
 
 type Locations []*Location
