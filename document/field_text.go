@@ -69,7 +69,7 @@ func (t *TextField) Value() []byte {
 }
 
 func (t *TextField) GoString() string {
-	return fmt.Sprintf("&document.TextField{Name:%s, Options: %s, Analyzer: %s, Value: %s, ArrayPositions: %v}", t.name, t.options, t.analyzer, t.value, t.arrayPositions)
+	return fmt.Sprintf("&document.TextField{Name:%s, Options: %s, Analyzer: %v, Value: %s, ArrayPositions: %v}", t.name, t.options, t.analyzer, t.value, t.arrayPositions)
 }
 
 func NewTextField(name string, arrayPositions []uint64, value []byte) *TextField {
