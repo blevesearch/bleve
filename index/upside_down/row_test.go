@@ -292,7 +292,7 @@ func BenchmarkTermFrequencyRowEncode(b *testing.B) {
 func BenchmarkTermFrequencyRowDecode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		k := []byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'}
-		v := []byte{3, 195, 235, 163, 130, 4, 0, 1, 3, 11, 0, 2, 23, 31, 0, 3, 43, 51}
+		v := []byte{3, 195, 235, 163, 130, 4, 0, 1, 3, 11, 0, 0, 2, 23, 31, 0, 0, 3, 43, 51, 0}
 		_, err := NewTermFrequencyRowKV(k, v)
 		if err != nil {
 			b.Fatal(err)
