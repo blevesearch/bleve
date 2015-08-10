@@ -8,12 +8,16 @@
 //  and limitations under the License.
 
 //go:generate nex query_string.nex
-//go:generate sed -i "" -e s/Lexer/lexer/g query_string.nn.go
-//go:generate sed -i "" -e s/Newlexer/newLexer/g query_string.nn.go
-//go:generate sed -i "" -e s/debuglexer/debugLexer/g query_string.nn.go
+//go:generate sed -i.tmp -e s/Lexer/lexer/g query_string.nn.go
+//go:generate sed -i.tmp -e s/Newlexer/newLexer/g query_string.nn.go
+//go:generate sed -i.tmp -e s/debuglexer/debugLexer/g query_string.nn.go
 //go:generate go fmt query_string.nn.go
 //go:generate go tool yacc -o query_string.y.go query_string.y
-//go:generate sed -i "" -e 1d query_string.y.go
+//go:generate sed -i.tmp -e 1d query_string.y.go
+
+// note: OSX sed and gnu sed handle the -i (in-place) option differently.
+// using -i.tmp works on both, at the expense of leaving a couple of
+// unsightly .tmp files littering the directory...
 
 package bleve
 

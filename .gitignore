@@ -5,6 +5,8 @@
 .project
 .settings
 .DS_Store
+query_string.nn.go.tmp
+query_string.y.go.tmp
 /analysis/token_filters/cld2/cld2-read-only
 /analysis/token_filters/cld2/libcld2_full.a
 /utils/bleve_create/bleve_create
