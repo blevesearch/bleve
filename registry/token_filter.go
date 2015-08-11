@@ -27,7 +27,7 @@ type TokenFilterConstructor func(config map[string]interface{}, cache *Cache) (a
 type TokenFilterRegistry map[string]TokenFilterConstructor
 type TokenFilterCache map[string]analysis.TokenFilter
 
-func (c TokenFilterCache) TokenFilterNamed(name string, cache *Cache) (analysis.TokenFilter, error) {
+func (c TokenFilterCache) TokenFilterNamed(name string, config map[string]interface{}, cache *Cache) (analysis.TokenFilter, error) {
 	tokenFilter, cached := c[name]
 	if cached {
 		return tokenFilter, nil
@@ -36,7 +36,7 @@ func (c TokenFilterCache) TokenFilterNamed(name string, cache *Cache) (analysis.
 	if !registered {
 		return nil, fmt.Errorf("no token filter with name or type '%s' registered", name)
 	}
-	tokenFilter, err := tokenFilterConstructor(nil, cache)
+	tokenFilter, err := tokenFilterConstructor(config, cache)
 	if err != nil {
 		return nil, fmt.Errorf("error building token filter: %v", err)
 	}

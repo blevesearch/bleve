@@ -26,11 +26,11 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 		return nil, err
 	}
 	normalizeFilter := unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFKD)
-	toLowerFilter, err := cache.TokenFilterNamed(lower_case_filter.Name)
+	toLowerFilter, err := cache.TokenFilterNamed(lower_case_filter.Name, nil)
 	if err != nil {
 		return nil, err
 	}
-	bigramFilter, err := cache.TokenFilterNamed(BigramName)
+	bigramFilter, err := cache.TokenFilterNamed(BigramName, nil)
 	if err != nil {
 		return nil, err
 	}

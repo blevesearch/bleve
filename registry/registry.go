@@ -103,8 +103,8 @@ func (c *Cache) DefineTokenMap(name string, config map[string]interface{}) (anal
 	return c.TokenMaps.DefineTokenMap(name, typ, config, c)
 }
 
-func (c *Cache) TokenFilterNamed(name string) (analysis.TokenFilter, error) {
-	return c.TokenFilters.TokenFilterNamed(name, c)
+func (c *Cache) TokenFilterNamed(name string, config map[string]interface{}) (analysis.TokenFilter, error) {
+	return c.TokenFilters.TokenFilterNamed(name, config, c)
 }
 
 func (c *Cache) DefineTokenFilter(name string, config map[string]interface{}) (analysis.TokenFilter, error) {
