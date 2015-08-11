@@ -25,19 +25,19 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	if err != nil {
 		return nil, err
 	}
-	possEnFilter, err := cache.TokenFilterNamed(PossessiveName)
+	possEnFilter, err := cache.TokenFilterNamed(PossessiveName, nil)
 	if err != nil {
 		return nil, err
 	}
-	toLowerFilter, err := cache.TokenFilterNamed(lower_case_filter.Name)
+	toLowerFilter, err := cache.TokenFilterNamed(lower_case_filter.Name, nil)
 	if err != nil {
 		return nil, err
 	}
-	stopEnFilter, err := cache.TokenFilterNamed(StopName)
+	stopEnFilter, err := cache.TokenFilterNamed(StopName, nil)
 	if err != nil {
 		return nil, err
 	}
-	stemmerEnFilter, err := cache.TokenFilterNamed(porter.Name)
+	stemmerEnFilter, err := cache.TokenFilterNamed(porter.Name, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -25,20 +25,20 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	if err != nil {
 		return nil, err
 	}
-	toLowerFilter, err := cache.TokenFilterNamed(lower_case_filter.Name)
+	toLowerFilter, err := cache.TokenFilterNamed(lower_case_filter.Name, nil)
 	if err != nil {
 		return nil, err
 	}
 	normalizeFilter := unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFKC)
-	stopArFilter, err := cache.TokenFilterNamed(StopName)
+	stopArFilter, err := cache.TokenFilterNamed(StopName, nil)
 	if err != nil {
 		return nil, err
 	}
-	normalizeArFilter, err := cache.TokenFilterNamed(NormalizeName)
+	normalizeArFilter, err := cache.TokenFilterNamed(NormalizeName, nil)
 	if err != nil {
 		return nil, err
 	}
-	stemmerArFilter, err := cache.TokenFilterNamed(StemmerName)
+	stemmerArFilter, err := cache.TokenFilterNamed(StemmerName, nil)
 	if err != nil {
 		return nil, err
 	}

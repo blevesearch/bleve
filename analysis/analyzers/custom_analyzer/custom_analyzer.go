@@ -52,25 +52,20 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 		return nil, err
 	}
 
-	var tokenFilters []analysis.TokenFilter
 	tokenFiltersNames, ok := config["token_filters"].([]string)
-	if ok {
-		tokenFilters, err = getTokenFilters(tokenFiltersNames, cache)
-		if err != nil {
-			return nil, err
-		}
-	} else {
+	if !ok {
 		tokenFiltersNamesInterfaceSlice, ok := config["token_filters"].([]interface{})
 		if ok {
-			tokenFiltersNames, err := convertInterfaceSliceToStringSlice(tokenFiltersNamesInterfaceSlice, "token filter")
-			if err != nil {
-				return nil, err
-			}
-			tokenFilters, err = getTokenFilters(tokenFiltersNames, cache)
+			tokenFiltersNames, err = convertInterfaceSliceToStringSlice(tokenFiltersNamesInterfaceSlice, "token filter")
 			if err != nil {
 				return nil, err
 			}
 		}
+	}
+	tokenFilterConfigs, _ := config["token_filter_configs"].(map[string]interface{})
+	tokenFilters, err := getTokenFilters(tokenFiltersNames, tokenFilterConfigs, cache)
+	if err != nil {
+		return nil, err
 	}
 
 	rv := analysis.Analyzer{
@@ -102,10 +97,12 @@ func getCharFilters(charFilterNames []string, cache *registry.Cache) ([]analysis
 	return charFilters, nil
 }
 
-func getTokenFilters(tokenFilterNames []string, cache *registry.Cache) ([]analysis.TokenFilter, error) {
+func getTokenFilters(tokenFilterNames []string, configs map[string]interface{}, cache *registry.Cache) ([]analysis.TokenFilter, error) {
 	tokenFilters := make([]analysis.TokenFilter, len(tokenFilterNames))
 	for i, tokenFilterName := range tokenFilterNames {
-		tokenFilter, err := cache.TokenFilterNamed(tokenFilterName)
+		config, _ := configs[tokenFilterName].(map[string]interface{})
+		fmt.Printf("%s, config: %#v\n", tokenFilterName, config)
+		tokenFilter, err := cache.TokenFilterNamed(tokenFilterName, config)
 		if err != nil {
 			return nil, err
 		}
