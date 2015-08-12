@@ -14,7 +14,6 @@ package forestdb
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -22,25 +21,6 @@ import (
 	"github.com/blevesearch/bleve/registry"
 	"github.com/couchbase/goforestdb"
 )
-
-type ForestDBConfig struct {
-	BlockSize                 uint32
-	BufferCacheSize           uint64
-	ChunkSize                 uint16
-	CleanupCacheOnClose       bool
-	CompactionBufferSizeMax   uint32
-	CompactionMinimumFilesize uint64
-	CompactionMode            forestdb.CompactOpt
-	CompactionThreshold       uint8
-	CompactorSleepDuration    uint64
-	CompressDocumentBody      bool
-	DurabilityOpt             forestdb.DurabilityOpt
-	OpenFlags                 forestdb.OpenFlags
-	PurgingInterval           uint32
-	SeqTreeOpt                forestdb.SeqTreeOpt
-	WalFlushBeforeCommit      bool
-	WalThreshold              uint64
-}
 
 const Name = "forestdb"
 
@@ -226,72 +206,83 @@ func init() {
 
 func applyConfig(c *forestdb.Config, config map[string]interface{}) (
 	*forestdb.Config, error) {
-	v, exists := config["forestDBConfig"]
-	if !exists || v == nil {
-		return c, nil
+
+	if v, exists := config["blockSize"].(float64); exists {
+		c.SetBlockSize(uint32(v))
 	}
-	m, ok := v.(map[string]interface{})
-	if !ok {
-		return c, nil
+	if v, exists := config["bufferCacheSize"].(float64); exists {
+		c.SetBufferCacheSize(uint64(v))
 	}
-	// These extra steps of json.Marshal()/Unmarshal() help to convert
-	// to the types that we need for the setter calls.
-	b, err := json.Marshal(m)
-	if err != nil {
-		return nil, err
+	if v, exists := config["chunkSize"].(float64); exists {
+		c.SetChunkSize(uint16(v))
 	}
-	var f ForestDBConfig
-	err = json.Unmarshal(b, &f)
-	if err != nil {
-		return nil, err
+	if v, exists := config["cleanupCacheOnClose"].(bool); exists {
+		c.SetCleanupCacheOnClose(v)
 	}
-	if _, exists := m["blockSize"]; exists {
-		c.SetBlockSize(f.BlockSize)
+	if v, exists := config["compactionBufferSizeMax"].(float64); exists {
+		c.SetCompactionBufferSizeMax(uint32(v))
 	}
-	if _, exists := m["bufferCacheSize"]; exists {
-		c.SetBufferCacheSize(f.BufferCacheSize)
+	if v, exists := config["compactionMinimumFilesize"].(float64); exists {
+		c.SetCompactionMinimumFilesize(uint64(v))
 	}
-	if _, exists := m["chunkSize"]; exists {
-		c.SetChunkSize(f.ChunkSize)
+	if v, exists := config["compactionMode"].(string); exists {
+		switch v {
+		case "manual":
+			c.SetCompactionMode(forestdb.COMPACT_MANUAL)
+		case "auto":
+			c.SetCompactionMode(forestdb.COMPACT_AUTO)
+		default:
+			return nil, fmt.Errorf("Unknown compaction mode: %s", v)
+		}
+
 	}
-	if _, exists := m["cleanupCacheOnClose"]; exists {
-		c.SetCleanupCacheOnClose(f.CleanupCacheOnClose)
+	if v, exists := config["compactionThreshold"].(float64); exists {
+		c.SetCompactionThreshold(uint8(v))
 	}
-	if _, exists := m["compactionBufferSizeMax"]; exists {
-		c.SetCompactionBufferSizeMax(f.CompactionBufferSizeMax)
+	if v, exists := config["compactorSleepDuration"].(float64); exists {
+		c.SetCompactorSleepDuration(uint64(v))
 	}
-	if _, exists := m["compactionMinimumFilesize"]; exists {
-		c.SetCompactionMinimumFilesize(f.CompactionMinimumFilesize)
+	if v, exists := config["compressDocumentBody"].(bool); exists {
+		c.SetCompressDocumentBody(v)
 	}
-	if _, exists := m["compactionMode"]; exists {
-		c.SetCompactionMode(f.CompactionMode)
+	if v, exists := config["durabilityOpt"].(string); exists {
+		switch v {
+		case "none":
+			c.SetDurabilityOpt(forestdb.DRB_NONE)
+		case "odirect":
+			c.SetDurabilityOpt(forestdb.DRB_ODIRECT)
+		case "async":
+			c.SetDurabilityOpt(forestdb.DRB_ASYNC)
+		case "async_odirect":
+			c.SetDurabilityOpt(forestdb.DRB_ODIRECT_ASYNC)
+		default:
+			return nil, fmt.Errorf("Unknown durability option: %s", v)
+		}
+
 	}
-	if _, exists := m["compactionThreshold"]; exists {
-		c.SetCompactionThreshold(f.CompactionThreshold)
+	if v, exists := config["openFlags"].(string); exists {
+		switch v {
+		case "create":
+			c.SetOpenFlags(forestdb.OPEN_FLAG_CREATE)
+		case "readonly":
+			c.SetOpenFlags(forestdb.OPEN_FLAG_RDONLY)
+		default:
+			return nil, fmt.Errorf("Unknown open flag: %s", v)
+		}
 	}
-	if _, exists := m["compactorSleepDuration"]; exists {
-		c.SetCompactorSleepDuration(f.CompactorSleepDuration)
+	if v, exists := config["purgingInterval"].(float64); exists {
+		c.SetPurgingInterval(uint32(v))
 	}
-	if _, exists := m["compressDocumentBody"]; exists {
-		c.SetCompressDocumentBody(f.CompressDocumentBody)
+	if v, exists := config["seqTreeOpt"].(bool); exists {
+		if !v {
+			c.SetSeqTreeOpt(forestdb.SEQTREE_NOT_USE)
+		}
 	}
-	if _, exists := m["durabilityOpt"]; exists {
-		c.SetDurabilityOpt(f.DurabilityOpt)
+	if v, exists := config["walFlushBeforeCommit"].(bool); exists {
+		c.SetWalFlushBeforeCommit(v)
 	}
-	if _, exists := m["openFlags"]; exists {
-		c.SetOpenFlags(f.OpenFlags)
-	}
-	if _, exists := m["purgingInterval"]; exists {
-		c.SetPurgingInterval(f.PurgingInterval)
-	}
-	if _, exists := m["seqTreeOpt"]; exists {
-		c.SetSeqTreeOpt(f.SeqTreeOpt)
-	}
-	if _, exists := m["walFlushBeforeCommit"]; exists {
-		c.SetWalFlushBeforeCommit(f.WalFlushBeforeCommit)
-	}
-	if _, exists := m["walThreshold"]; exists {
-		c.SetWalThreshold(f.WalThreshold)
+	if v, exists := config["walThreshold"].(float64); exists {
+		c.SetWalThreshold(uint64(v))
 	}
 	return c, nil
 }

@@ -142,5 +142,15 @@ func applyConfig(o *gorocksdb.Options, config map[string]interface{}) (
 		o.SetWriteBufferSize(int(wbs))
 	}
 
+	mof, ok := config["max_open_files"].(float64)
+	if ok {
+		o.SetMaxOpenFiles(int(mof))
+	}
+
+	tt, ok := config["total_threads"].(float64)
+	if ok {
+		o.IncreaseParallelism(int(tt))
+	}
+
 	return o, nil
 }
