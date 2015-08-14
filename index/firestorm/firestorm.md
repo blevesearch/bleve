@@ -84,16 +84,15 @@ The Dictionary becomes a best effort data element.  In kill-9 scenarios it could
 
 The following pseudo-structure will be used to explain changes to the internal state.  Keep in mind the datatypes shows represent the logical strcture required for correct behavior.  The actual implementation may be different to achieve performance goals.
 
-indexState {
-    docCount uint64
-    fieldCache map[string]uint16
-    nextDocNumber uint64
-
-    docIdNumberMutex sync.RWMutex // for protecting fields below
-    maxReadDocNumber uint64
-    inFlightDocIds map[string]uint64
-    deletedDocIdNumbers [][]byte
-}
+    indexState {
+        docCount uint64
+        fieldCache map[string]uint16
+        nextDocNumber uint64
+        docIdNumberMutex sync.RWMutex // for protecting fields below
+        maxReadDocNumber uint64
+        inFlightDocIds map[string]uint64
+        deletedDocIdNumbers [][]byte
+    }
 
 ### Operation
 
