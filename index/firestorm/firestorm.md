@@ -353,24 +353,32 @@ Internal rows are a reserved keyspace which the layer above can use for anything
 
 Let us consider 5 possible states:
 
-a.  Document X#1 is in the index, maxReadDocNumber=1, inFlightDocIds{}, deletedDocIdNumbers{}
-b.  Document X#1 and X#2 are in the index, maxReadDocNumber=1, inFlightDocIds{}, deletedDocIdNumbers{}
-c.  Document X#1 and X#2 are in the index, maxReadDocNumber=2, inFlightDocIds{X:2}, deletedDocIdNumbers{}
-d.  Document X#1 and X#2 are in the index, maxReadDocNumber=2, inFlightDocIds{}, deletedDocIdNumbers{X#1}
-e.  Document X#2 is in the index, maxReadDocNumber=2, inFlightDocIds{}, deletedDocIdNumbers{}
+  a.  Document X#1 is in the index, maxReadDocNumber=1, inFlightDocIds{}, deletedDocIdNumbers{}
+
+  b.  Document X#1 and X#2 are in the index, maxReadDocNumber=1, inFlightDocIds{}, deletedDocIdNumbers{}
+
+  c.  Document X#1 and X#2 are in the index, maxReadDocNumber=2, inFlightDocIds{X:2}, deletedDocIdNumbers{}
+
+  d.  Document X#1 and X#2 are in the index, maxReadDocNumber=2, inFlightDocIds{}, deletedDocIdNumbers{X#1}
+
+  e.  Document X#2 is in the index, maxReadDocNumber=2, inFlightDocIds{}, deletedDocIdNumbers{}
 
 In state a, we have a steady state where one document has been indexed with id X.
+
 In state b, we have executed the batch that writes the new rows corresponding to the new version of X, but we have not yet updated our in memory compensation data structures.  This is OK, because maxReadDocNumber is still 1, all readers will ignore the new rows we just wrote.  This is also OK because we are still inside the Index() method, so there is not yet any expectation to see the udpated document.
+
 In state c, we have updated both the maxReadDocNumber to 2 and added X:2 to the inFlightDocIds map.  This means that searchers could find rows corresponding to X#1 and X#2.  However, they are forced to disregard any row for X where the document number is not 2.
+
 In state d, we have completed the lookup for the old document numbers of X, and found 1.  Now deletedDocIdNumbers contains X#1.  Now readers that encounter this doc_id_number will ignore it.
+
 In state e, the garbage collector has removed all record of X#1.
 
 The Index method returns after it has transitioned to state C, which maintains the semantics we desire.
 
-2.  Wait, what happens if I kill -9 the process, won't you forget about the deleted documents?
+2\.  Wait, what happens if I kill -9 the process, won't you forget about the deleted documents?
 
 No, our proposal is for a warmup process to walk a subset of the keyspace (TermFreq{ where field_id=0 }).  This warmup process will identify all not-yet cleaned up document numbers, and seed the deletedDocIdNumbers state as well as the Garbage Collector Thread.
 
-3.  Wait, but what will happen to the inFlightDocIds in a kill -9 scenario?
+3\.  Wait, but what will happen to the inFlightDocIds in a kill -9 scenario?
 
 It turns out they actually don't matter.  That list was just an optimization to get us through the window of time while we hadn't yet looked up the old document numbers for a given document id.  But, during the warmup phase we still identify all those keys and they go directly onto deletedDocIdNumbers list.
