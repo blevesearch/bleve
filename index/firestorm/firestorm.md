@@ -241,7 +241,7 @@ Batch operations look largely just like the indexing/deleting operations.  Two o
 #### Term Field Iteration
 
 - Acquire indexState.docIdNumberMutex for reading:
-- Get copy of: (it is assumed some COW datastructure is used)
+- Get copy of: (it is assumed some COW datastructure is used, or MVCC is accomodated in some way by the impl)
     - maxReadDocNumber
     - inFlightDocIds
     - deletedDocIdNumbers
@@ -265,7 +265,7 @@ Any row satisfying the above conditions is a candidate document.
 ### Row Encoding
 
 All keys are manually encoded to ensure a precise row ordering.
-Stored and Internal values are opaque byte arrays.
+Internal Row values are opaque byte arrays.
 All other values are encoded using protobuf for a balance of efficiency and flexibility.  Dictionary and TermFrequency rows are the most likely to take advantage of this flexibility, but other rows are read/written infrequently enough that the flexibility outweighs any overhead.
 
 #### Version
@@ -300,9 +300,9 @@ Dictionary rows record which terms are used in a particular field.  The value ca
 |---------|------------|
 |```'d' <field id uint16> <term utf8>```|```<DictionaryValue protobuf>```|
 
-	message DictionaryValue {
-		uint64 count = 1; // number of documents using this term in this field
-	}
+    message DictionaryValue {
+        optional uint64 count = 1; // number of documents using this term in this field
+    }
 
 #### Term Frequency
 
@@ -314,18 +314,18 @@ Term Freqquency rows record which documents use a term in a particular field.  T
 
 
     message TermVectorEntry {
-    	uint16 field = 1; // field optional if redundant, required for composite fields
-    	uint64 pos = 2; // positional offset within the field
-    	uint64 start = 3; // start byte offset
-    	uint64 end = 4; // end byte offset
-    	repeated uint64 arrayPositions = 5; // array positions
+        optional uint32 field = 1; // field optional if redundant, required for composite fields
+        optional uint64 pos = 2; // positional offset within the field
+        optional uint64 start = 3; // start byte offset
+        optional uint64 end = 4; // end byte offset
+        repeated uint64 arrayPositions = 5; // array positions
     }
 
-	message DictionaryValue {
-		required uint64 freq = 1; // frequency of the term occurance within this field
-		float norm = 2; // normalization factor
-		repeated TermVectorEntry vectors = 3; // term vectors
-	}
+    message TermFrequencyValue {
+        required uint64 freq = 1; // frequency of the term occurance within this field
+        optional float norm = 2; // normalization factor
+        repeated TermVectorEntry vectors = 3; // term vectors
+    }
 
 #### Stored
 
@@ -336,7 +336,7 @@ Stored rows record the original values used to produce the index.  At the row en
 |```'s' <doc id utf8> 0xff <doc number uint64> <field id uint16>```|```<StoredValue protobuf>```|
 
     message StoredValue {
-        bytes raw = 1; // raw bytes
+        optional bytes raw = 1; // raw bytes
     }
 
 NOTE: we currently encode stored values as raw bytes, however we have other proposals in flight to do something better than this.  By using protobuf here as well, we can support existing functionality through the raw field, but allow for more strongly typed information in the future.
@@ -348,8 +348,6 @@ Internal rows are a reserved keyspace which the layer above can use for anything
 | Key                       | Value                   |
 |---------------------------|-------------------------|
 |```'i' <application key []byte>```|```<application value []byte>```|
-
-
 
 ### FAQ
 
