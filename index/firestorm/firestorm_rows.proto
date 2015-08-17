@@ -1,0 +1,11 @@
+message VersionValue {
+	required uint64 version = 1;
+}
+
+message FieldValue {
+	required string name = 1;
+}
+
+message DictionaryValue {
+	uint64 count = 1; // number of documents using this term in this field
+}

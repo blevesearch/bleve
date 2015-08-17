@@ -114,7 +114,6 @@ The following pseudo-structure will be used to explain changes to the internal s
             inFlightDocIds = {}
             deletedDocIdNumbers = {}
         }
-
 - Garbage Collector Thread is started
 - Old Doc Number Lookup Thread is started
 - Index marked open
@@ -334,7 +333,13 @@ Stored rows record the original values used to produce the index.  At the row en
 
 | Key                       | Value                   |
 |---------------------------|-------------------------|
-|```'s' <doc id utf8> 0xff <doc number uint64> <field id uint16>```|```<document value []byte>```|
+|```'s' <doc id utf8> 0xff <doc number uint64> <field id uint16>```|```<StoredValue protobuf>```|
+
+    message StoredValue {
+        bytes raw = 1; // raw bytes
+    }
+
+NOTE: we currently encode stored values as raw bytes, however we have other proposals in flight to do something better than this.  By using protobuf here as well, we can support existing functionality through the raw field, but allow for more strongly typed information in the future.
 
 #### Internal
 
