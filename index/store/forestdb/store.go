@@ -42,6 +42,7 @@ func New(path string, createIfMissing bool,
 
 	forestDBDefaultConfig := forestdb.DefaultConfig()
 	forestDBDefaultConfig.SetCompactionMode(forestdb.COMPACT_AUTO)
+	forestDBDefaultConfig.SetMultiKVInstances(false)
 	forestDBConfig, err := applyConfig(forestDBDefaultConfig, config)
 	if err != nil {
 		return nil, err
@@ -283,6 +284,9 @@ func applyConfig(c *forestdb.Config, config map[string]interface{}) (
 	}
 	if v, exists := config["walThreshold"].(float64); exists {
 		c.SetWalThreshold(uint64(v))
+	}
+	if v, exists := config["maxWriterLockProb"].(float64); exists {
+		c.SetMaxWriterLockProb(uint8(v))
 	}
 	return c, nil
 }

@@ -43,6 +43,16 @@ func newIteratorWithSnapshot(store *Store, snapshot *forestdb.KVStore) *Iterator
 	return &rv
 }
 
+func newIteratorWithSnapshotAndRange(store *Store, snapshot *forestdb.KVStore, start, end []byte) *Iterator {
+	itr, err := snapshot.IteratorInit(start, end, forestdb.ITR_NONE)
+	rv := Iterator{
+		store:    store,
+		iterator: itr,
+		valid:    err == nil,
+	}
+	return &rv
+}
+
 func (i *Iterator) SeekFirst() {
 	err := i.iterator.SeekMin()
 	if err != nil {
