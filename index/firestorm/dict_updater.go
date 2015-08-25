@@ -95,7 +95,7 @@ func (d *DictUpdater) update() {
 	writer, err := d.f.store.Writer()
 	if err != nil {
 		writer.Close()
-		logger.Printf("dict updater fatal: %v")
+		logger.Printf("dict updater fatal: %v", err)
 		return
 	}
 
@@ -111,7 +111,7 @@ func (d *DictUpdater) update() {
 	err = wb.Execute()
 	if err != nil {
 		writer.Close()
-		logger.Printf("dict updater fatal: %v")
+		logger.Printf("dict updater fatal: %v", err)
 		return
 	}
 

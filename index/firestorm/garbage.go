@@ -73,7 +73,7 @@ func (gc *GarbageCollector) run() {
 			garbageSize := gc.f.compensator.GarbageCount()
 			docSize, err := gc.f.DocCount()
 			if err != nil {
-				logger.Printf("garbage collector error getting doc count: %v")
+				logger.Printf("garbage collector error getting doc count: %v", err)
 				continue
 			}
 			garbageRatio := int(uint64(garbageSize) / docSize)
@@ -146,7 +146,7 @@ func (gc *GarbageCollector) cleanup() {
 		return true, nil
 	})
 	if err != nil {
-		logger.Printf("garbage collector fatal: %v")
+		logger.Printf("garbage collector fatal: %v", err)
 		return
 	}
 
@@ -164,7 +164,7 @@ func (gc *GarbageCollector) cleanup() {
 		return true, nil
 	})
 	if err != nil {
-		logger.Printf("garbage collector fatal: %v")
+		logger.Printf("garbage collector fatal: %v", err)
 		return
 	}
 
@@ -177,7 +177,7 @@ func (gc *GarbageCollector) cleanup() {
 		writer, err := gc.f.store.Writer()
 		if err != nil {
 			writer.Close()
-			logger.Printf("garbage collector fatal: %v")
+			logger.Printf("garbage collector fatal: %v", err)
 			return
 		}
 
@@ -191,7 +191,7 @@ func (gc *GarbageCollector) cleanup() {
 		err = wb.Execute()
 		if err != nil {
 			writer.Close()
-			logger.Printf("garbage collector fatal: %v")
+			logger.Printf("garbage collector fatal: %v", err)
 			return
 		}
 		logger.Printf("deleted %d keys", len(docKeys))
