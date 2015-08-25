@@ -25,7 +25,7 @@ var twoDocIndex index.Index //= upside_down.NewUpsideDownCouch(inmem.MustOpen())
 
 func init() {
 	inMemStore, _ := inmem.New()
-	analysisQueue := upside_down.NewAnalysisQueue(1)
+	analysisQueue := index.NewAnalysisQueue(1)
 	twoDocIndex = upside_down.NewUpsideDownCouch(inMemStore, analysisQueue)
 	err := twoDocIndex.Open()
 	if err != nil {

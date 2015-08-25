@@ -22,9 +22,12 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve/registry"
 
 	"github.com/golang/protobuf/proto"
 )
+
+const Name = "upside_down"
 
 var VersionKey = []byte{'v'}
 
@@ -35,25 +38,25 @@ const Version uint8 = 5
 var IncompatibleVersion = fmt.Errorf("incompatible version, %d is supported", Version)
 
 type UpsideDownCouch struct {
-	version         uint8
-	path            string
-	store           store.KVStore
-	fieldIndexCache *FieldIndexCache
-	analysisQueue   *AnalysisQueue
-	stats           *indexStat
+	version       uint8
+	path          string
+	store         store.KVStore
+	fieldCache    *index.FieldCache
+	analysisQueue *index.AnalysisQueue
+	stats         *indexStat
 
 	m sync.RWMutex
 	// fields protected by m
 	docCount uint64
 }
 
-func NewUpsideDownCouch(s store.KVStore, analysisQueue *AnalysisQueue) *UpsideDownCouch {
+func NewUpsideDownCouch(s store.KVStore, analysisQueue *index.AnalysisQueue) *UpsideDownCouch {
 	return &UpsideDownCouch{
-		version:         Version,
-		fieldIndexCache: NewFieldIndexCache(),
-		store:           s,
-		analysisQueue:   analysisQueue,
-		stats:           &indexStat{},
+		version:       Version,
+		fieldCache:    index.NewFieldCache(),
+		store:         s,
+		analysisQueue: analysisQueue,
+		stats:         &indexStat{},
 	}
 }
 
@@ -90,7 +93,7 @@ func (udc *UpsideDownCouch) loadSchema(kvreader store.KVReader) (err error) {
 		if err != nil {
 			return
 		}
-		udc.fieldIndexCache.AddExisting(fieldRow.name, fieldRow.index)
+		udc.fieldCache.AddExisting(fieldRow.name, fieldRow.index)
 
 		it.Next()
 		key, val, valid = it.Current()
@@ -263,15 +266,11 @@ func (udc *UpsideDownCouch) Close() error {
 func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	// do analysis before acquiring write lock
 	analysisStart := time.Now()
-	resultChan := make(chan *AnalysisResult)
-	aw := AnalysisWork{
-		udc: udc,
-		d:   doc,
-		rc:  resultChan,
-	}
+	resultChan := make(chan *index.AnalysisResult)
+	aw := index.NewAnalysisWork(udc, doc, resultChan)
 	// put the work on the queue
 	go func() {
-		udc.analysisQueue.Queue(&aw)
+		udc.analysisQueue.Queue(aw)
 	}()
 
 	// wait for the result
@@ -306,7 +305,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	updateRows := make([]UpsideDownCouchRow, 0)
 	deleteRows := make([]UpsideDownCouchRow, 0)
 
-	addRows, updateRows, deleteRows = udc.mergeOldAndNew(backIndexRow, result.rows, addRows, updateRows, deleteRows)
+	addRows, updateRows, deleteRows = udc.mergeOldAndNew(backIndexRow, result.Rows, addRows, updateRows, deleteRows)
 
 	err = udc.batchRows(kvwriter, addRows, updateRows, deleteRows)
 	if err == nil && backIndexRow == nil {
@@ -323,7 +322,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	return
 }
 
-func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows, addRows, updateRows, deleteRows []UpsideDownCouchRow) ([]UpsideDownCouchRow, []UpsideDownCouchRow, []UpsideDownCouchRow) {
+func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []index.IndexRow, addRows, updateRows, deleteRows []UpsideDownCouchRow) ([]UpsideDownCouchRow, []UpsideDownCouchRow, []UpsideDownCouchRow) {
 	existingTermKeys := make(map[string]bool)
 	for _, key := range backIndexRow.AllTermKeys() {
 		existingTermKeys[string(key)] = true
@@ -377,8 +376,8 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows, add
 	return addRows, updateRows, deleteRows
 }
 
-func (udc *UpsideDownCouch) storeField(docID string, field document.Field, fieldIndex uint16) ([]UpsideDownCouchRow, []*BackIndexStoreEntry) {
-	rows := make([]UpsideDownCouchRow, 0, 100)
+func (udc *UpsideDownCouch) storeField(docID string, field document.Field, fieldIndex uint16) ([]index.IndexRow, []*BackIndexStoreEntry) {
+	rows := make([]index.IndexRow, 0, 100)
 	backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
 	fieldType := encodeFieldType(field)
 	storedRow := NewStoredRow(docID, fieldIndex, field.ArrayPositions(), fieldType, field.Value())
@@ -406,9 +405,9 @@ func encodeFieldType(f document.Field) byte {
 	return fieldType
 }
 
-func (udc *UpsideDownCouch) indexField(docID string, field document.Field, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies) ([]UpsideDownCouchRow, []*BackIndexTermEntry) {
+func (udc *UpsideDownCouch) indexField(docID string, field document.Field, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies) ([]index.IndexRow, []*BackIndexTermEntry) {
 
-	rows := make([]UpsideDownCouchRow, 0, 100)
+	rows := make([]index.IndexRow, 0, 100)
 	backIndexTermEntries := make([]*BackIndexTermEntry, 0)
 	fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
 
@@ -542,16 +541,16 @@ func frequencyFromTokenFreq(tf *analysis.TokenFreq) int {
 	return len(tf.Locations)
 }
 
-func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.TokenFreq) ([]*TermVector, []UpsideDownCouchRow) {
+func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.TokenFreq) ([]*TermVector, []index.IndexRow) {
 	rv := make([]*TermVector, len(tf.Locations))
-	newFieldRows := make([]UpsideDownCouchRow, 0)
+	newFieldRows := make([]index.IndexRow, 0)
 
 	for i, l := range tf.Locations {
 		var newFieldRow *FieldRow
 		fieldIndex := field
 		if l.Field != "" {
 			// lookup correct field
-			fieldIndex, newFieldRow = udc.fieldIndexCache.FieldIndex(l.Field)
+			fieldIndex, newFieldRow = udc.fieldIndexOrNewRow(l.Field)
 			if newFieldRow != nil {
 				newFieldRows = append(newFieldRows, newFieldRow)
 			}
@@ -573,7 +572,7 @@ func (udc *UpsideDownCouch) termFieldVectorsFromTermVectors(in []*TermVector) []
 	rv := make([]*index.TermFieldVector, len(in))
 
 	for i, tv := range in {
-		fieldName := udc.fieldIndexCache.FieldName(tv.field)
+		fieldName := udc.fieldCache.FieldIndexed(tv.field)
 		tfv := index.TermFieldVector{
 			Field:          fieldName,
 			ArrayPositions: tv.arrayPositions,
@@ -588,7 +587,7 @@ func (udc *UpsideDownCouch) termFieldVectorsFromTermVectors(in []*TermVector) []
 
 func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	analysisStart := time.Now()
-	resultChan := make(chan *AnalysisResult)
+	resultChan := make(chan *index.AnalysisResult)
 
 	var numUpdates uint64
 	for _, doc := range batch.IndexOps {
@@ -611,23 +610,19 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 					detectedUnsafeMutex.Unlock()
 					return
 				}
-				aw := AnalysisWork{
-					udc: udc,
-					d:   doc,
-					rc:  resultChan,
-				}
+				aw := index.NewAnalysisWork(udc, doc, resultChan)
 				// put the work on the queue
-				udc.analysisQueue.Queue(&aw)
+				udc.analysisQueue.Queue(aw)
 			}
 		}
 	}()
 
-	newRowsMap := make(map[string][]UpsideDownCouchRow)
+	newRowsMap := make(map[string][]index.IndexRow)
 	// wait for the result
 	var itemsDeQueued uint64
 	for itemsDeQueued < numUpdates {
 		result := <-resultChan
-		newRowsMap[result.docID] = result.rows
+		newRowsMap[result.DocID] = result.Rows
 		itemsDeQueued++
 	}
 	close(resultChan)
@@ -759,4 +754,20 @@ func (udc *UpsideDownCouch) Reader() (index.IndexReader, error) {
 
 func (udc *UpsideDownCouch) Stats() json.Marshaler {
 	return udc.stats
+}
+
+func (udc *UpsideDownCouch) fieldIndexOrNewRow(name string) (uint16, *FieldRow) {
+	index, existed := udc.fieldCache.FieldNamed(name, true)
+	if !existed {
+		return index, NewFieldRow(uint16(index), name)
+	}
+	return index, nil
+}
+
+func IndexTypeConstructor(store store.KVStore, analysisQueue *index.AnalysisQueue) (index.Index, error) {
+	return NewUpsideDownCouch(store, analysisQueue), nil
+}
+
+func init() {
+	registry.RegisterIndexType(Name, IndexTypeConstructor)
 }

@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/boltdb"
 )
 
@@ -28,7 +29,7 @@ func TestIndexFieldDict(t *testing.T) {
 
 	s := boltdb.New("test", "bleve")
 	s.SetMergeOperator(&mergeOperator)
-	analysisQueue := NewAnalysisQueue(1)
+	analysisQueue := index.NewAnalysisQueue(1)
 	idx := NewUpsideDownCouch(s, analysisQueue)
 	err := idx.Open()
 	if err != nil {

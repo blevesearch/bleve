@@ -10,10 +10,12 @@
 package upside_down
 
 import (
-	"github.com/blevesearch/bleve/index/store/boltdb"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/store/boltdb"
 
 	"github.com/blevesearch/bleve/document"
 )
@@ -28,7 +30,7 @@ func TestDump(t *testing.T) {
 
 	s := boltdb.New("test", "bleve")
 	s.SetMergeOperator(&mergeOperator)
-	analysisQueue := NewAnalysisQueue(1)
+	analysisQueue := index.NewAnalysisQueue(1)
 	idx := NewUpsideDownCouch(s, analysisQueue)
 	err := idx.Open()
 	if err != nil {

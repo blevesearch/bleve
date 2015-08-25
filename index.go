@@ -126,7 +126,7 @@ type Classifier interface {
 // The provided mapping will be used for all
 // Index/Search operations.
 func New(path string, mapping *IndexMapping) (Index, error) {
-	return newIndexUsing(path, mapping, Config.DefaultKVStore, nil)
+	return newIndexUsing(path, mapping, Config.DefaultIndexType, Config.DefaultKVStore, nil)
 }
 
 // NewUsing creates index at the specified path,
@@ -136,8 +136,8 @@ func New(path string, mapping *IndexMapping) (Index, error) {
 // The specified kvstore implemenation will be used
 // and the provided kvconfig will be passed to its
 // constructor.
-func NewUsing(path string, mapping *IndexMapping, kvstore string, kvconfig map[string]interface{}) (Index, error) {
-	return newIndexUsing(path, mapping, kvstore, kvconfig)
+func NewUsing(path string, mapping *IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (Index, error) {
+	return newIndexUsing(path, mapping, indexType, kvstore, kvconfig)
 }
 
 // Open index at the specified path, must exist.

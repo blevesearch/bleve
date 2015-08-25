@@ -22,6 +22,10 @@ type TokenFreq struct {
 	Locations []*TokenLocation
 }
 
+func (tf *TokenFreq) Frequency() int {
+	return len(tf.Locations)
+}
+
 type TokenFrequencies []*TokenFreq
 
 func (tfs TokenFrequencies) MergeAll(remoteField string, other TokenFrequencies) TokenFrequencies {

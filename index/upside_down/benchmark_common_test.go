@@ -54,7 +54,7 @@ func CommonBenchmarkIndex(b *testing.B, create KVStoreCreate, destroy KVStoreDes
 		if err != nil {
 			b.Fatal(err)
 		}
-		analysisQueue := NewAnalysisQueue(analysisWorkers)
+		analysisQueue := index.NewAnalysisQueue(analysisWorkers)
 		idx := NewUpsideDownCouch(s, analysisQueue)
 
 		err = idx.Open()
@@ -97,7 +97,7 @@ func CommonBenchmarkIndexBatch(b *testing.B, create KVStoreCreate, destroy KVSto
 		if err != nil {
 			b.Fatal(err)
 		}
-		analysisQueue := NewAnalysisQueue(analysisWorkers)
+		analysisQueue := index.NewAnalysisQueue(analysisWorkers)
 		idx := NewUpsideDownCouch(s, analysisQueue)
 
 		err = idx.Open()

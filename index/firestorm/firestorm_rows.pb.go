@@ -3,7 +3,7 @@
 // DO NOT EDIT!
 
 /*
-	Package firestorm_rows is a generated protocol buffer package.
+	Package firestorm is a generated protocol buffer package.
 
 	It is generated from these files:
 		firestorm_rows.proto
@@ -12,11 +12,11 @@
 		VersionValue
 		FieldValue
 		DictionaryValue
-		TermVectorEntry
-		TermFrequencyValue
+		TermVector
+		TermFreqValue
 		StoredValue
 */
-package firestorm_rows
+package firestorm
 
 import proto "github.com/golang/protobuf/proto"
 import math "math"
@@ -77,7 +77,7 @@ func (m *DictionaryValue) GetCount() uint64 {
 	return 0
 }
 
-type TermVectorEntry struct {
+type TermVector struct {
 	Field            *uint32  `protobuf:"varint,1,opt,name=field" json:"field,omitempty"`
 	Pos              *uint64  `protobuf:"varint,2,opt,name=pos" json:"pos,omitempty"`
 	Start            *uint64  `protobuf:"varint,3,opt,name=start" json:"start,omitempty"`
@@ -86,71 +86,71 @@ type TermVectorEntry struct {
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *TermVectorEntry) Reset()         { *m = TermVectorEntry{} }
-func (m *TermVectorEntry) String() string { return proto.CompactTextString(m) }
-func (*TermVectorEntry) ProtoMessage()    {}
+func (m *TermVector) Reset()         { *m = TermVector{} }
+func (m *TermVector) String() string { return proto.CompactTextString(m) }
+func (*TermVector) ProtoMessage()    {}
 
-func (m *TermVectorEntry) GetField() uint32 {
+func (m *TermVector) GetField() uint32 {
 	if m != nil && m.Field != nil {
 		return *m.Field
 	}
 	return 0
 }
 
-func (m *TermVectorEntry) GetPos() uint64 {
+func (m *TermVector) GetPos() uint64 {
 	if m != nil && m.Pos != nil {
 		return *m.Pos
 	}
 	return 0
 }
 
-func (m *TermVectorEntry) GetStart() uint64 {
+func (m *TermVector) GetStart() uint64 {
 	if m != nil && m.Start != nil {
 		return *m.Start
 	}
 	return 0
 }
 
-func (m *TermVectorEntry) GetEnd() uint64 {
+func (m *TermVector) GetEnd() uint64 {
 	if m != nil && m.End != nil {
 		return *m.End
 	}
 	return 0
 }
 
-func (m *TermVectorEntry) GetArrayPositions() []uint64 {
+func (m *TermVector) GetArrayPositions() []uint64 {
 	if m != nil {
 		return m.ArrayPositions
 	}
 	return nil
 }
 
-type TermFrequencyValue struct {
-	Freq             *uint64            `protobuf:"varint,1,req,name=freq" json:"freq,omitempty"`
-	Norm             *float32           `protobuf:"fixed32,2,opt,name=norm" json:"norm,omitempty"`
-	Vectors          []*TermVectorEntry `protobuf:"bytes,3,rep,name=vectors" json:"vectors,omitempty"`
-	XXX_unrecognized []byte             `json:"-"`
+type TermFreqValue struct {
+	Freq             *uint64       `protobuf:"varint,1,req,name=freq" json:"freq,omitempty"`
+	Norm             *float32      `protobuf:"fixed32,2,opt,name=norm" json:"norm,omitempty"`
+	Vectors          []*TermVector `protobuf:"bytes,3,rep,name=vectors" json:"vectors,omitempty"`
+	XXX_unrecognized []byte        `json:"-"`
 }
 
-func (m *TermFrequencyValue) Reset()         { *m = TermFrequencyValue{} }
-func (m *TermFrequencyValue) String() string { return proto.CompactTextString(m) }
-func (*TermFrequencyValue) ProtoMessage()    {}
+func (m *TermFreqValue) Reset()         { *m = TermFreqValue{} }
+func (m *TermFreqValue) String() string { return proto.CompactTextString(m) }
+func (*TermFreqValue) ProtoMessage()    {}
 
-func (m *TermFrequencyValue) GetFreq() uint64 {
+func (m *TermFreqValue) GetFreq() uint64 {
 	if m != nil && m.Freq != nil {
 		return *m.Freq
 	}
 	return 0
 }
 
-func (m *TermFrequencyValue) GetNorm() float32 {
+func (m *TermFreqValue) GetNorm() float32 {
 	if m != nil && m.Norm != nil {
 		return *m.Norm
 	}
 	return 0
 }
 
-func (m *TermFrequencyValue) GetVectors() []*TermVectorEntry {
+func (m *TermFreqValue) GetVectors() []*TermVector {
 	if m != nil {
 		return m.Vectors
 	}
@@ -378,7 +378,7 @@ func (m *DictionaryValue) Unmarshal(data []byte) error {
 
 	return nil
 }
-func (m *TermVectorEntry) Unmarshal(data []byte) error {
+func (m *TermVector) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -509,7 +509,7 @@ func (m *TermVectorEntry) Unmarshal(data []byte) error {
 
 	return nil
 }
-func (m *TermFrequencyValue) Unmarshal(data []byte) error {
+func (m *TermFreqValue) Unmarshal(data []byte) error {
 	var hasFields [1]uint64
 	l := len(data)
 	iNdEx := 0
@@ -585,7 +585,7 @@ func (m *TermFrequencyValue) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Vectors = append(m.Vectors, &TermVectorEntry{})
+			m.Vectors = append(m.Vectors, &TermVector{})
 			if err := m.Vectors[len(m.Vectors)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -820,7 +820,7 @@ func (m *DictionaryValue) Size() (n int) {
 	return n
 }
 
-func (m *TermVectorEntry) Size() (n int) {
+func (m *TermVector) Size() (n int) {
 	var l int
 	_ = l
 	if m.Field != nil {
@@ -846,7 +846,7 @@ func (m *TermVectorEntry) Size() (n int) {
 	return n
 }
 
-func (m *TermFrequencyValue) Size() (n int) {
+func (m *TermFreqValue) Size() (n int) {
 	var l int
 	_ = l
 	if m.Freq != nil {
@@ -976,7 +976,7 @@ func (m *DictionaryValue) MarshalTo(data []byte) (n int, err error) {
 	return i, nil
 }
 
-func (m *TermVectorEntry) Marshal() (data []byte, err error) {
+func (m *TermVector) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -986,7 +986,7 @@ func (m *TermVectorEntry) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *TermVectorEntry) MarshalTo(data []byte) (n int, err error) {
+func (m *TermVector) MarshalTo(data []byte) (n int, err error) {
 	var i int
 	_ = i
 	var l int
@@ -1024,7 +1024,7 @@ func (m *TermVectorEntry) MarshalTo(data []byte) (n int, err error) {
 	return i, nil
 }
 
-func (m *TermFrequencyValue) Marshal() (data []byte, err error) {
+func (m *TermFreqValue) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -1034,7 +1034,7 @@ func (m *TermFrequencyValue) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *TermFrequencyValue) MarshalTo(data []byte) (n int, err error) {
+func (m *TermFreqValue) MarshalTo(data []byte) (n int, err error) {
 	var i int
 	_ = i
 	var l int

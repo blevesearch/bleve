@@ -20,7 +20,6 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
-	"github.com/blevesearch/bleve/index/upside_down"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/collectors"
@@ -46,11 +45,11 @@ func indexStorePath(path string) string {
 	return path + string(os.PathSeparator) + storePath
 }
 
-func newMemIndex(mapping *IndexMapping) (*indexImpl, error) {
+func newMemIndex(indexType string, mapping *IndexMapping) (*indexImpl, error) {
 	rv := indexImpl{
 		path:  "",
 		m:     mapping,
-		meta:  newIndexMeta("mem", nil),
+		meta:  newIndexMeta(indexType, "mem", nil),
 		stats: &IndexStat{},
 	}
 
@@ -66,7 +65,15 @@ func newMemIndex(mapping *IndexMapping) (*indexImpl, error) {
 	}
 
 	// open the index
-	rv.i = upside_down.NewUpsideDownCouch(rv.s, Config.analysisQueue)
+	indexTypeConstructor := registry.IndexTypeConstructorByName(rv.meta.IndexType)
+	if indexTypeConstructor == nil {
+		return nil, ErrorUnknownIndexType
+	}
+
+	rv.i, err = indexTypeConstructor(rv.s, Config.analysisQueue)
+	if err != nil {
+		return nil, err
+	}
 	err = rv.i.Open()
 	if err != nil {
 		return nil, err
@@ -90,7 +97,7 @@ func newMemIndex(mapping *IndexMapping) (*indexImpl, error) {
 	return &rv, nil
 }
 
-func newIndexUsing(path string, mapping *IndexMapping, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
+func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
 	// first validate the mapping
 	err := mapping.validate()
 	if err != nil {
@@ -98,7 +105,7 @@ func newIndexUsing(path string, mapping *IndexMapping, kvstore string, kvconfig 
 	}
 
 	if path == "" {
-		return newMemIndex(mapping)
+		return newMemIndex(indexType, mapping)
 	}
 
 	if kvconfig == nil {
@@ -108,7 +115,7 @@ func newIndexUsing(path string, mapping *IndexMapping, kvstore string, kvconfig 
 	rv := indexImpl{
 		path:  path,
 		m:     mapping,
-		meta:  newIndexMeta(kvstore, kvconfig),
+		meta:  newIndexMeta(indexType, kvstore, kvconfig),
 		stats: &IndexStat{},
 	}
 	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
@@ -131,7 +138,15 @@ func newIndexUsing(path string, mapping *IndexMapping, kvstore string, kvconfig 
 	}
 
 	// open the index
-	rv.i = upside_down.NewUpsideDownCouch(rv.s, Config.analysisQueue)
+	indexTypeConstructor := registry.IndexTypeConstructorByName(rv.meta.IndexType)
+	if indexTypeConstructor == nil {
+		return nil, ErrorUnknownIndexType
+	}
+
+	rv.i, err = indexTypeConstructor(rv.s, Config.analysisQueue)
+	if err != nil {
+		return nil, err
+	}
 	err = rv.i.Open()
 	if err != nil {
 		return nil, err
@@ -191,7 +206,15 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	}
 
 	// open the index
-	rv.i = upside_down.NewUpsideDownCouch(rv.s, Config.analysisQueue)
+	indexTypeConstructor := registry.IndexTypeConstructorByName(rv.meta.IndexType)
+	if indexTypeConstructor == nil {
+		return nil, ErrorUnknownIndexType
+	}
+
+	rv.i, err = indexTypeConstructor(rv.s, Config.analysisQueue)
+	if err != nil {
+		return nil, err
+	}
 	err = rv.i.Open()
 	if err != nil {
 		return nil, err

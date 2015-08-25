@@ -15,7 +15,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/registry"
 
 	// token maps
@@ -106,6 +106,10 @@ import (
 	_ "github.com/blevesearch/bleve/index/store/gtreap"
 	_ "github.com/blevesearch/bleve/index/store/inmem"
 
+	// index types
+	_ "github.com/blevesearch/bleve/index/firestorm"
+	_ "github.com/blevesearch/bleve/index/upside_down"
+
 	// byte array converters
 	_ "github.com/blevesearch/bleve/analysis/byte_array_converters/ignore"
 	_ "github.com/blevesearch/bleve/analysis/byte_array_converters/json"
@@ -118,14 +122,15 @@ type configuration struct {
 	Cache                  *registry.Cache
 	DefaultHighlighter     string
 	DefaultKVStore         string
+	DefaultIndexType       string
 	SlowSearchLogThreshold time.Duration
-	analysisQueue          *upside_down.AnalysisQueue
+	analysisQueue          *index.AnalysisQueue
 }
 
 func newConfiguration() *configuration {
 	return &configuration{
 		Cache:         registry.NewCache(),
-		analysisQueue: upside_down.NewAnalysisQueue(4),
+		analysisQueue: index.NewAnalysisQueue(4),
 	}
 }
 
@@ -173,6 +178,9 @@ func init() {
 
 	// default kv store
 	Config.DefaultKVStore = "boltdb"
+
+	// default index
+	Config.DefaultIndexType = "upside_down"
 
 	bootDuration := time.Since(bootStart)
 	bleveExpVar.Add("bootDuration", int64(bootDuration))
