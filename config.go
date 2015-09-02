@@ -122,6 +122,10 @@ type configuration struct {
 	analysisQueue          *upside_down.AnalysisQueue
 }
 
+func (c *configuration) SetAnalysisQueueSize(n int) {
+	c.analysisQueue = upside_down.NewAnalysisQueue(n)
+}
+
 func newConfiguration() *configuration {
 	return &configuration{
 		Cache:         registry.NewCache(),
