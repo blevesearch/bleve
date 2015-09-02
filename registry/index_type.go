@@ -1,0 +1,47 @@
+//  Copyright (c) 2015 Couchbase, Inc.
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//    http://www.apache.org/licenses/LICENSE-2.0
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
+
+package registry
+
+import (
+	"fmt"
+
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/store"
+)
+
+func RegisterIndexType(name string, constructor IndexTypeConstructor) {
+	_, exists := index_types[name]
+	if exists {
+		panic(fmt.Errorf("attempted to register duplicate index encoding named '%s'", name))
+	}
+	index_types[name] = constructor
+}
+
+type IndexTypeConstructor func(store.KVStore, *index.AnalysisQueue) (index.Index, error)
+type IndexTypeRegistry map[string]IndexTypeConstructor
+
+func IndexTypeConstructorByName(name string) IndexTypeConstructor {
+	return index_types[name]
+}
+
+func IndexTypesAndInstances() ([]string, []string) {
+	emptyConfig := map[string]interface{}{}
+	types := make([]string, 0)
+	instances := make([]string, 0)
+	for name, cons := range stores {
+		_, err := cons(emptyConfig)
+		if err == nil {
+			instances = append(instances, name)
+		} else {
+			types = append(types, name)
+		}
+	}
+	return types, instances
+}

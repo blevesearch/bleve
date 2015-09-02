@@ -24,7 +24,7 @@ type IndexReader struct {
 }
 
 func (i *IndexReader) TermFieldReader(term []byte, fieldName string) (index.TermFieldReader, error) {
-	fieldIndex, fieldExists := i.index.fieldIndexCache.FieldExists(fieldName)
+	fieldIndex, fieldExists := i.index.fieldCache.FieldNamed(fieldName, false)
 	if fieldExists {
 		return newUpsideDownCouchTermFieldReader(i, term, uint16(fieldIndex))
 	}
@@ -36,7 +36,7 @@ func (i *IndexReader) FieldDict(fieldName string) (index.FieldDict, error) {
 }
 
 func (i *IndexReader) FieldDictRange(fieldName string, startTerm []byte, endTerm []byte) (index.FieldDict, error) {
-	fieldIndex, fieldExists := i.index.fieldIndexCache.FieldExists(fieldName)
+	fieldIndex, fieldExists := i.index.fieldCache.FieldNamed(fieldName, false)
 	if fieldExists {
 		return newUpsideDownCouchFieldDict(i, uint16(fieldIndex), startTerm, endTerm)
 	}
@@ -87,7 +87,7 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 			return
 		}
 		if row != nil {
-			fieldName := i.index.fieldIndexCache.FieldName(row.field)
+			fieldName := i.index.fieldCache.FieldIndexed(row.field)
 			field := decodeFieldType(row.typ, fieldName, row.arrayPositions, row.value)
 			if field != nil {
 				doc.AddField(field)
@@ -107,7 +107,7 @@ func (i *IndexReader) DocumentFieldTerms(id string) (index.FieldTerms, error) {
 	}
 	rv := make(index.FieldTerms, len(back.termEntries))
 	for _, entry := range back.termEntries {
-		fieldName := i.index.fieldIndexCache.FieldName(uint16(*entry.Field))
+		fieldName := i.index.fieldCache.FieldIndexed(uint16(*entry.Field))
 		terms, ok := rv[fieldName]
 		if !ok {
 			terms = make([]string, 0)

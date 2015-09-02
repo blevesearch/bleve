@@ -18,14 +18,16 @@ import (
 const metaFilename = "index_meta.json"
 
 type indexMeta struct {
-	Storage string                 `json:"storage"`
-	Config  map[string]interface{} `json:"config,omitempty"`
+	Storage   string                 `json:"storage"`
+	IndexType string                 `json:"index_type"`
+	Config    map[string]interface{} `json:"config,omitempty"`
 }
 
-func newIndexMeta(storage string, config map[string]interface{}) *indexMeta {
+func newIndexMeta(indexType string, storage string, config map[string]interface{}) *indexMeta {
 	return &indexMeta{
-		Storage: storage,
-		Config:  config,
+		IndexType: indexType,
+		Storage:   storage,
+		Config:    config,
 	}
 }
 

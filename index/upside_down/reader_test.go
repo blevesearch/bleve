@@ -29,7 +29,7 @@ func TestIndexReader(t *testing.T) {
 
 	s := boltdb.New("test", "bleve")
 	s.SetMergeOperator(&mergeOperator)
-	analysisQueue := NewAnalysisQueue(1)
+	analysisQueue := index.NewAnalysisQueue(1)
 	idx := NewUpsideDownCouch(s, analysisQueue)
 	err := idx.Open()
 	if err != nil {
@@ -203,7 +203,7 @@ func TestIndexDocIdReader(t *testing.T) {
 
 	s := boltdb.New("test", "bleve")
 	s.SetMergeOperator(&mergeOperator)
-	analysisQueue := NewAnalysisQueue(1)
+	analysisQueue := index.NewAnalysisQueue(1)
 	idx := NewUpsideDownCouch(s, analysisQueue)
 	err := idx.Open()
 	if err != nil {

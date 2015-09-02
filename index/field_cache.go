@@ -1,4 +1,4 @@
-//  Copyright (c) 2014 Couchbase, Inc.
+//  Copyright (c) 2015 Couchbase, Inc.
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
 //    http://www.apache.org/licenses/LICENSE-2.0
@@ -7,25 +7,26 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package upside_down
+package index
 
 import (
 	"sync"
 )
 
-type FieldIndexCache struct {
+type FieldCache struct {
 	fieldIndexes   map[string]uint16
 	lastFieldIndex int
 	mutex          sync.RWMutex
 }
 
-func NewFieldIndexCache() *FieldIndexCache {
-	return &FieldIndexCache{
-		fieldIndexes: make(map[string]uint16),
+func NewFieldCache() *FieldCache {
+	return &FieldCache{
+		fieldIndexes:   make(map[string]uint16),
+		lastFieldIndex: -1,
 	}
 }
 
-func (f *FieldIndexCache) AddExisting(field string, index uint16) {
+func (f *FieldCache) AddExisting(field string, index uint16) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 	f.fieldIndexes[field] = index
@@ -34,30 +35,30 @@ func (f *FieldIndexCache) AddExisting(field string, index uint16) {
 	}
 }
 
-func (f *FieldIndexCache) FieldExists(field string) (uint16, bool) {
+// FieldNamed returns the index of the field, and whether or not it existed
+// before this call.  if createIfMissing is true, and new field index is assigned
+// but the second return value will still be false
+func (f *FieldCache) FieldNamed(field string, createIfMissing bool) (uint16, bool) {
 	f.mutex.RLock()
-	defer f.mutex.RUnlock()
 	if index, ok := f.fieldIndexes[field]; ok {
+		f.mutex.RUnlock()
 		return index, true
+	} else if !createIfMissing {
+		f.mutex.RUnlock()
+		return 0, false
 	}
-	return 0, false
-}
-
-func (f *FieldIndexCache) FieldIndex(field string) (uint16, *FieldRow) {
+	// trade read lock for write lock
+	f.mutex.RUnlock()
 	f.mutex.Lock()
-	defer f.mutex.Unlock()
-	index, exists := f.fieldIndexes[field]
-	if exists {
-		return index, nil
-	}
 	// assign next field id
-	index = uint16(f.lastFieldIndex + 1)
+	index := uint16(f.lastFieldIndex + 1)
 	f.fieldIndexes[field] = index
 	f.lastFieldIndex = int(index)
-	return index, NewFieldRow(uint16(index), field)
+	f.mutex.Unlock()
+	return index, false
 }
 
-func (f *FieldIndexCache) FieldName(index uint16) string {
+func (f *FieldCache) FieldIndexed(index uint16) string {
 	f.mutex.RLock()
 	defer f.mutex.RUnlock()
 	for fieldName, fieldIndex := range f.fieldIndexes {

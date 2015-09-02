@@ -17,6 +17,7 @@ import (
 )
 
 var stores = make(KVStoreRegistry, 0)
+var index_types = make(IndexTypeRegistry, 0)
 
 var byteArrayConverters = make(ByteArrayConverterRegistry, 0)
 

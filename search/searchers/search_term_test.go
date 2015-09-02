@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/inmem"
 	"github.com/blevesearch/bleve/index/upside_down"
 )
@@ -26,7 +27,7 @@ func TestTermSearcher(t *testing.T) {
 	var queryExplain = true
 
 	inMemStore, _ := inmem.New()
-	analysisQueue := upside_down.NewAnalysisQueue(1)
+	analysisQueue := index.NewAnalysisQueue(1)
 	i := upside_down.NewUpsideDownCouch(inMemStore, analysisQueue)
 	err := i.Open()
 	if err != nil {
