@@ -127,6 +127,10 @@ type configuration struct {
 	analysisQueue          *index.AnalysisQueue
 }
 
+func (c *configuration) SetAnalysisQueueSize(n int) {
+	c.analysisQueue = index.NewAnalysisQueue(n)
+}
+
 func newConfiguration() *configuration {
 	return &configuration{
 		Cache:         registry.NewCache(),

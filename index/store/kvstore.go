@@ -51,3 +51,8 @@ type KVReader interface {
 	Iterator(key []byte) KVIterator
 	Close() error
 }
+
+type RangeIterable interface {
+	// iterates keys >= start and < end
+	RangeIterator(start, end []byte) KVIterator
+}

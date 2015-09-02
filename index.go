@@ -133,6 +133,7 @@ func New(path string, mapping *IndexMapping) (Index, error) {
 // which must not already exist.
 // The provided mapping will be used for all
 // Index/Search operations.
+// The specified index type will be used
 // The specified kvstore implemenation will be used
 // and the provided kvconfig will be passed to its
 // constructor.

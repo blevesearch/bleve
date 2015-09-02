@@ -52,6 +52,12 @@ func (r *Reader) Iterator(key []byte) store.KVIterator {
 	return rv
 }
 
+func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
+	rv := newIteratorWithSnapshotAndRange(r.store, r.snapshot, start, end)
+	rv.Seek(start)
+	return rv
+}
+
 func (r *Reader) Close() error {
 	return r.snapshot.Close()
 }

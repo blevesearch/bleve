@@ -46,7 +46,16 @@ func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 
 	tfr := NewTermFrequencyRow(term, field, "", 0, 0)
 	readerPrefix := tfr.Key()
-	it := indexReader.kvreader.Iterator(readerPrefix)
+
+	var it store.KVIterator
+	switch kvreader := indexReader.kvreader.(type) {
+	case store.RangeIterable:
+		etfr := NewTermFrequencyRow(term[:len(term)-1], field, "", 0, 0)
+		nextTermPrefix := etfr.Key()
+		it = kvreader.RangeIterator(readerPrefix, nextTermPrefix)
+	default:
+		it = kvreader.Iterator(readerPrefix)
+	}
 
 	return &UpsideDownCouchTermFieldReader{
 		indexReader:  indexReader,
