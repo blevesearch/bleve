@@ -11,7 +11,10 @@ package null
 
 import (
 	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve/registry"
 )
+
+const Name = "null"
 
 type Store struct{}
 
@@ -170,4 +173,12 @@ func (w *Writer) Get(key []byte) ([]byte, error) {
 
 func (w *Writer) Iterator(key []byte) store.KVIterator {
 	return w.store.iterator(key)
+}
+
+func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
+	return New()
+}
+
+func init() {
+	registry.RegisterKVStore(Name, StoreConstructor)
 }
