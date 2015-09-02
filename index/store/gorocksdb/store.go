@@ -152,5 +152,23 @@ func applyConfig(o *gorocksdb.Options, config map[string]interface{}) (
 		o.IncreaseParallelism(int(tt))
 	}
 
+	// options in the block based table options object
+	bbto := gorocksdb.NewDefaultBlockBasedTableOptions()
+
+	lcc, ok := config["lru_cache_capacity"].(float64)
+	if ok {
+		c := gorocksdb.NewLRUCache(int(lcc))
+		bbto.SetBlockCache(c)
+	}
+
+	bfbpk, ok := config["bloom_filter_bits_per_key"].(float64)
+	if ok {
+		bf := gorocksdb.NewBloomFilter(int(bfbpk))
+		bbto.SetFilterPolicy(bf)
+	}
+
+	// set the block based table options
+	o.SetBlockBasedTableFactory(bbto)
+
 	return o, nil
 }
