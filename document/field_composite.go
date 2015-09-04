@@ -31,11 +31,12 @@ func NewCompositeField(name string, defaultInclude bool, include []string, exclu
 
 func NewCompositeFieldWithIndexingOptions(name string, defaultInclude bool, include []string, exclude []string, options IndexingOptions) *CompositeField {
 	rv := &CompositeField{
-		name:           name,
-		options:        options,
-		defaultInclude: defaultInclude,
-		includedFields: make(map[string]bool, len(include)),
-		excludedFields: make(map[string]bool, len(exclude)),
+		name:                 name,
+		options:              options,
+		defaultInclude:       defaultInclude,
+		includedFields:       make(map[string]bool, len(include)),
+		excludedFields:       make(map[string]bool, len(exclude)),
+		compositeFrequencies: make(analysis.TokenFrequencies),
 	}
 
 	for _, i := range include {
@@ -81,6 +82,6 @@ func (c *CompositeField) Compose(field string, length int, freq analysis.TokenFr
 
 	if shouldInclude {
 		c.totalLength += length
-		c.compositeFrequencies = c.compositeFrequencies.MergeAll(field, freq)
+		c.compositeFrequencies.MergeAll(field, freq)
 	}
 }

@@ -22,42 +22,29 @@ type TokenFreq struct {
 	Locations []*TokenLocation
 }
 
-type TokenFrequencies []*TokenFreq
+type TokenFrequencies map[string]*TokenFreq
 
-func (tfs TokenFrequencies) MergeAll(remoteField string, other TokenFrequencies) TokenFrequencies {
-	// put existing tokens into a map
-	index := make(map[string]*TokenFreq)
-	for _, tf := range tfs {
-		index[string(tf.Term)] = tf
-	}
+func (tfs TokenFrequencies) MergeAll(remoteField string, other TokenFrequencies) {
 	// walk the new token frequencies
-	for _, tf := range other {
+	for tfk, tf := range other {
 		// set the remoteField value in incoming token freqs
 		for _, l := range tf.Locations {
 			l.Field = remoteField
 		}
-		existingTf, exists := index[string(tf.Term)]
+		existingTf, exists := tfs[tfk]
 		if exists {
 			existingTf.Locations = append(existingTf.Locations, tf.Locations...)
 		} else {
-			index[string(tf.Term)] = tf
+			tfs[tfk] = tf
 		}
 	}
-	// flatten map back to array
-	rv := make(TokenFrequencies, len(index))
-	i := 0
-	for _, tf := range index {
-		rv[i] = tf
-		i++
-	}
-	return rv
 }
 
 func TokenFrequency(tokens TokenStream, arrayPositions []uint64) TokenFrequencies {
-	index := make(map[string]*TokenFreq)
+	rv := make(map[string]*TokenFreq, len(tokens))
 
 	for _, token := range tokens {
-		curr, ok := index[string(token.Term)]
+		curr, ok := rv[string(token.Term)]
 		if ok {
 			curr.Locations = append(curr.Locations, &TokenLocation{
 				ArrayPositions: arrayPositions,
@@ -66,7 +53,7 @@ func TokenFrequency(tokens TokenStream, arrayPositions []uint64) TokenFrequencie
 				Position:       token.Position,
 			})
 		} else {
-			index[string(token.Term)] = &TokenFreq{
+			rv[string(token.Term)] = &TokenFreq{
 				Term: token.Term,
 				Locations: []*TokenLocation{
 					&TokenLocation{
@@ -78,13 +65,6 @@ func TokenFrequency(tokens TokenStream, arrayPositions []uint64) TokenFrequencie
 				},
 			}
 		}
-	}
-
-	rv := make(TokenFrequencies, len(index))
-	i := 0
-	for _, tf := range index {
-		rv[i] = tf
-		i++
 	}
 
 	return rv

@@ -30,7 +30,7 @@ func TestTokenFrequency(t *testing.T) {
 		},
 	}
 	expectedResult := TokenFrequencies{
-		&TokenFreq{
+		"water": &TokenFreq{
 			Term: []byte("water"),
 			Locations: []*TokenLocation{
 				&TokenLocation{
@@ -54,7 +54,7 @@ func TestTokenFrequency(t *testing.T) {
 
 func TestTokenFrequenciesMergeAll(t *testing.T) {
 	tf1 := TokenFrequencies{
-		&TokenFreq{
+		"water": &TokenFreq{
 			Term: []byte("water"),
 			Locations: []*TokenLocation{
 				&TokenLocation{
@@ -71,7 +71,7 @@ func TestTokenFrequenciesMergeAll(t *testing.T) {
 		},
 	}
 	tf2 := TokenFrequencies{
-		&TokenFreq{
+		"water": &TokenFreq{
 			Term: []byte("water"),
 			Locations: []*TokenLocation{
 				&TokenLocation{
@@ -88,7 +88,7 @@ func TestTokenFrequenciesMergeAll(t *testing.T) {
 		},
 	}
 	expectedResult := TokenFrequencies{
-		&TokenFreq{
+		"water": &TokenFreq{
 			Term: []byte("water"),
 			Locations: []*TokenLocation{
 				&TokenLocation{
@@ -125,7 +125,7 @@ func TestTokenFrequenciesMergeAll(t *testing.T) {
 func TestTokenFrequenciesMergeAllLeftEmpty(t *testing.T) {
 	tf1 := TokenFrequencies{}
 	tf2 := TokenFrequencies{
-		&TokenFreq{
+		"water": &TokenFreq{
 			Term: []byte("water"),
 			Locations: []*TokenLocation{
 				&TokenLocation{
@@ -142,7 +142,7 @@ func TestTokenFrequenciesMergeAllLeftEmpty(t *testing.T) {
 		},
 	}
 	expectedResult := TokenFrequencies{
-		&TokenFreq{
+		"water": &TokenFreq{
 			Term: []byte("water"),
 			Locations: []*TokenLocation{
 				&TokenLocation{
@@ -160,8 +160,8 @@ func TestTokenFrequenciesMergeAllLeftEmpty(t *testing.T) {
 			},
 		},
 	}
-	result := tf1.MergeAll("tf2", tf2)
-	if !reflect.DeepEqual(result, expectedResult) {
-		t.Errorf("expected %#v, got %#v", expectedResult, result)
+	tf1.MergeAll("tf2", tf2)
+	if !reflect.DeepEqual(tf1, expectedResult) {
+		t.Errorf("expected %#v, got %#v", expectedResult, tf1)
 	}
 }
