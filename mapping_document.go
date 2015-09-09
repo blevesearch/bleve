@@ -112,14 +112,14 @@ func (dm *DocumentMapping) documentMappingForPath(path string) *DocumentMapping 
 OUTER:
 	for _, pathElement := range pathElements {
 		for name, subDocMapping := range current.Properties {
-			for _, field := range subDocMapping.Fields {
-				if field.Name == "" && name == pathElement {
-					current = subDocMapping
-					continue OUTER
-				} else if field.Name == pathElement {
-					current = subDocMapping
-					continue OUTER
-				}
+			if name == pathElement {
+				current = subDocMapping
+				continue OUTER
+			}
+		}
+		for _, field := range current.Fields {
+			if field.Name == pathElement {
+				continue OUTER
 			}
 		}
 		return nil
