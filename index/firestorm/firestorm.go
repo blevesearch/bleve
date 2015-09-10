@@ -248,12 +248,12 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 		}
 	}()
 
-	newRowsMap := make(map[string][]index.IndexRow)
+	allRows := make([]index.IndexRow, 0, 1000)
 	// wait for the result
 	var itemsDeQueued uint64
 	for itemsDeQueued < numUpdates {
 		result := <-resultChan
-		newRowsMap[result.DocID] = result.Rows
+		allRows = append(allRows, result.Rows...)
 		itemsDeQueued++
 	}
 	close(resultChan)
@@ -266,13 +266,7 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 
 	atomic.AddUint64(&f.stats.analysisTime, uint64(time.Since(analysisStart)))
 
-	allRows := make([]index.IndexRow, 0)
 	deleteKeys := make([][]byte, 0)
-
-	for docID := range batch.IndexOps {
-		allRows = append(allRows, newRowsMap[docID]...)
-	}
-
 	// add the internal ops
 	for internalKey, internalValue := range batch.InternalOps {
 		if internalValue == nil {
