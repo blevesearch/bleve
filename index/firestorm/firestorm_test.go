@@ -12,12 +12,16 @@ package firestorm
 import (
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/blevesearch/bleve/analysis/analyzers/standard_analyzer"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/boltdb"
+	"github.com/blevesearch/bleve/index/store/null"
+	"github.com/blevesearch/bleve/registry"
 )
 
 var lookupWaitDuration = 5 * time.Second
@@ -1086,5 +1090,42 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 	}
 	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
 		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	}
+}
+
+func BenchmarkBatch(b *testing.B) {
+
+	cache := registry.NewCache()
+	analyzer, err := cache.AnalyzerNamed(standard_analyzer.Name)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	s, err := null.New()
+	if err != nil {
+		b.Fatal(err)
+	}
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx := NewFirestorm(s, analysisQueue)
+	err = idx.Open()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	batch := index.NewBatch()
+	for i := 0; i < 100; i++ {
+		d := document.NewDocument(strconv.Itoa(i))
+		f := document.NewTextFieldWithAnalyzer("desc", nil, bleveWikiArticle1K, analyzer)
+		d.AddField(f)
+		batch.Update(d)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		err = idx.Batch(batch)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
