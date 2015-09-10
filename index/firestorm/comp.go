@@ -100,12 +100,14 @@ func (c *Compensator) Migrate(docID []byte, docNum uint64, oldDocNums []uint64) 
 	defer c.deletedMutex.Unlock()
 
 	// clone deleted doc numbers and mutate
-	newDeletedDocNumbers := c.deletedDocNumbers.Clone()
-	for _, oldDocNum := range oldDocNums {
-		newDeletedDocNumbers.Set(uint(oldDocNum))
+	if len(oldDocNums) > 0 {
+		newDeletedDocNumbers := c.deletedDocNumbers.Clone()
+		for _, oldDocNum := range oldDocNums {
+			newDeletedDocNumbers.Set(uint(oldDocNum))
+		}
+		// update pointer
+		c.deletedDocNumbers = newDeletedDocNumbers
 	}
-	// update pointer
-	c.deletedDocNumbers = newDeletedDocNumbers
 
 	// remove entry from in-flight if it still has same doc num
 	val := c.inFlight.Get(&InFlightItem{docID: docID})
