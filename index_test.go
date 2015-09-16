@@ -19,6 +19,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
 )
 
 func TestCrud(t *testing.T) {
@@ -874,7 +876,7 @@ func TestKeywordSearchBug207(t *testing.T) {
 	}()
 
 	f := NewTextFieldMapping()
-	f.Analyzer = "keyword"
+	f.Analyzer = keyword_analyzer.Name
 
 	m := NewIndexMapping()
 	m.DefaultMapping = NewDocumentMapping()

@@ -20,7 +20,7 @@ import (
 )
 
 const Name = "simple"
-const defaultSeparator = "…"
+const DefaultSeparator = "…"
 
 type Highlighter struct {
 	fragmenter highlight.Fragmenter
@@ -197,7 +197,7 @@ func (fq *FragmentQueue) Pop() interface{} {
 }
 
 func Constructor(config map[string]interface{}, cache *registry.Cache) (highlight.Highlighter, error) {
-	separator := defaultSeparator
+	separator := DefaultSeparator
 	separatorVal, ok := config["separator"].(string)
 	if ok {
 		separator = separatorVal

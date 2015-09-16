@@ -13,6 +13,9 @@ import (
 	"encoding/json"
 
 	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/analyzers/standard_analyzer"
+	"github.com/blevesearch/bleve/analysis/byte_array_converters/json"
+	"github.com/blevesearch/bleve/analysis/datetime_parsers/datetime_optional"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/registry"
 )
@@ -20,9 +23,9 @@ import (
 const defaultTypeField = "_type"
 const defaultType = "_default"
 const defaultField = "_all"
-const defaultAnalyzer = "standard"
-const defaultDateTimeParser = "dateTimeOptional"
-const defaultByteArrayConverter = "json"
+const defaultAnalyzer = standard_analyzer.Name
+const defaultDateTimeParser = datetime_optional.Name
+const defaultByteArrayConverter = json_byte_array_converter.Name
 
 type customAnalysis struct {
 	CharFilters     map[string]map[string]interface{} `json:"char_filters,omitempty"`

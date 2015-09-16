@@ -14,6 +14,8 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
+const Name = "string"
+
 type StringByteArrayConverter struct{}
 
 func NewStringByteArrayConverter() *StringByteArrayConverter {
@@ -29,5 +31,5 @@ func Constructor(config map[string]interface{}, cache *registry.Cache) (analysis
 }
 
 func init() {
-	registry.RegisterByteArrayConverter("string", Constructor)
+	registry.RegisterByteArrayConverter(Name, Constructor)
 }

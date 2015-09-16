@@ -16,8 +16,8 @@ import (
 
 const Name = "html"
 
-const defaultHTMLHighlightBefore = "<b>"
-const defaultHTMLHighlightAfter = "</b>"
+const defaultHTMLHighlightBefore = "<mark>"
+const defaultHTMLHighlightAfter = "</mark>"
 
 type FragmentFormatter struct {
 	before string

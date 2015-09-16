@@ -14,6 +14,8 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
+const Name = "ignore"
+
 type IgnoreByteArrayConverter struct{}
 
 func NewIgnoreByteArrayConverter() *IgnoreByteArrayConverter {
@@ -29,5 +31,5 @@ func Constructor(config map[string]interface{}, cache *registry.Cache) (analysis
 }
 
 func init() {
-	registry.RegisterByteArrayConverter("ignore", Constructor)
+	registry.RegisterByteArrayConverter(Name, Constructor)
 }

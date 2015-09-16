@@ -16,7 +16,7 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/index/store"
-	"github.com/blevesearch/bleve/index/store/gorocksdb"
+	"github.com/blevesearch/blevex/rocksdb"
 )
 
 var rocksdbTestOptions = map[string]interface{}{

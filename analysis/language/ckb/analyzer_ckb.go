@@ -7,21 +7,19 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-// +build icu full
-
 package ckb
 
 import (
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
-	"github.com/blevesearch/bleve/analysis/tokenizers/icu"
+	"github.com/blevesearch/bleve/analysis/tokenizers/unicode"
 	"github.com/blevesearch/bleve/registry"
 )
 
 const AnalyzerName = "ckb"
 
 func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
-	icuTokenizer, err := cache.TokenizerNamed(icu.Name)
+	unicodeTokenizer, err := cache.TokenizerNamed(unicode.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +40,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 		return nil, err
 	}
 	rv := analysis.Analyzer{
-		Tokenizer: icuTokenizer,
+		Tokenizer: unicodeTokenizer,
 		TokenFilters: []analysis.TokenFilter{
 			normCkbFilter,
 			toLowerFilter,

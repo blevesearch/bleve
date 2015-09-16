@@ -20,6 +20,9 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve"
+
+	// we must explicitly include any functionality we plan on testing
+	_ "github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
 )
 
 var dataset = flag.String("dataset", "", "only test datasets matching this regex")

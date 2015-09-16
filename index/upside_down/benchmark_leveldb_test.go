@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-// +build leveldb full
+// +build leveldb
 
 package upside_down
 
@@ -16,7 +16,7 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/index/store"
-	"github.com/blevesearch/bleve/index/store/leveldb"
+	"github.com/blevesearch/blevex/leveldb"
 )
 
 var leveldbTestOptions = map[string]interface{}{

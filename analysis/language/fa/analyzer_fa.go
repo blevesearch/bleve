@@ -7,8 +7,6 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-// +build icu full
-
 package fa
 
 import (
@@ -18,7 +16,7 @@ import (
 	"github.com/blevesearch/bleve/analysis/char_filters/zero_width_non_joiner"
 	"github.com/blevesearch/bleve/analysis/language/ar"
 	"github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
-	"github.com/blevesearch/bleve/analysis/tokenizers/icu"
+	"github.com/blevesearch/bleve/analysis/tokenizers/unicode"
 )
 
 const AnalyzerName = "fa"
@@ -28,7 +26,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	if err != nil {
 		return nil, err
 	}
-	icuTokenizer, err := cache.TokenizerNamed(icu.Name)
+	unicodeTokenizer, err := cache.TokenizerNamed(unicode.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +50,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 		CharFilters: []analysis.CharFilter{
 			zFilter,
 		},
-		Tokenizer: icuTokenizer,
+		Tokenizer: unicodeTokenizer,
 		TokenFilters: []analysis.TokenFilter{
 			toLowerFilter,
 			normArFilter,
