@@ -16,7 +16,7 @@ Try out bleve live by [searching our wiki](http://wikisearch.blevesearch.com/sea
     * Term, Phrase, Match, Match Phrase, Prefix
     * Conjunction, Disjunction, Boolean
     * Numeric Range, Date Range
-    * Simple query [syntax](https://github.com/blevesearch/bleve/wiki/Query-String-Query) for human entry
+    * Simple query [syntax](http://www.blevesearch.com/docs/Query-String-Query/) for human entry
 * tf-idf Scoring
 * Search result match highlighting
 * Supports Aggregating Facets:
