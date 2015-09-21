@@ -276,7 +276,7 @@ type TermFrequencyRow struct {
 	doc     []byte
 	freq    uint64
 	norm    float32
-	vectors []*TermVector
+	vectors []TermVector
 }
 
 func (tfr *TermFrequencyRow) ScanPrefixForField() []byte {
@@ -321,8 +321,9 @@ func (tfr *TermFrequencyRow) DictionaryRowKey() []byte {
 func (tfr *TermFrequencyRow) Value() []byte {
 	used := 0
 	bufLen := binary.MaxVarintLen64 + binary.MaxVarintLen64
-	for _, vector := range tfr.vectors {
-		bufLen += (binary.MaxVarintLen64 * 4) + (1+len(vector.arrayPositions))*binary.MaxVarintLen64
+	for i := range tfr.vectors {
+		l := len(tfr.vectors[i].arrayPositions)
+		bufLen += (binary.MaxVarintLen64 * 4) + (1+l)*binary.MaxVarintLen64
 	}
 	buf := make([]byte, bufLen)
 
@@ -332,7 +333,8 @@ func (tfr *TermFrequencyRow) Value() []byte {
 	newbuf := buf[used : used+binary.MaxVarintLen64]
 	used += binary.PutUvarint(newbuf, uint64(normuint32))
 
-	for _, vector := range tfr.vectors {
+	for i := range tfr.vectors {
+		vector := &tfr.vectors[i]
 		used += binary.PutUvarint(buf[used:used+binary.MaxVarintLen64], uint64(vector.field))
 		used += binary.PutUvarint(buf[used:used+binary.MaxVarintLen64], vector.pos)
 		used += binary.PutUvarint(buf[used:used+binary.MaxVarintLen64], vector.start)
@@ -359,7 +361,7 @@ func NewTermFrequencyRow(term []byte, field uint16, doc string, freq uint64, nor
 	}
 }
 
-func NewTermFrequencyRowWithTermVectors(term []byte, field uint16, doc string, freq uint64, norm float32, vectors []*TermVector) *TermFrequencyRow {
+func NewTermFrequencyRowWithTermVectors(term []byte, field uint16, doc string, freq uint64, norm float32, vectors []TermVector) *TermFrequencyRow {
 	return &TermFrequencyRow{
 		term:    term,
 		field:   field,
@@ -417,10 +419,6 @@ func (tfr *TermFrequencyRow) parseV(value []byte) error {
 		currOffset += bytesRead
 		tv := TermVector{}
 		tv.field = uint16(field)
-		// at this point we expect at least one term vector
-		if tfr.vectors == nil {
-			tfr.vectors = make([]*TermVector, 0)
-		}
 
 		tv.pos, bytesRead = binary.Uvarint(value[currOffset:])
 		if bytesRead <= 0 {
@@ -458,7 +456,7 @@ func (tfr *TermFrequencyRow) parseV(value []byte) error {
 			}
 		}
 
-		tfr.vectors = append(tfr.vectors, &tv)
+		tfr.vectors = append(tfr.vectors, tv)
 		// try to read next record (may not exist)
 		field, bytesRead = binary.Uvarint(value[currOffset:])
 	}

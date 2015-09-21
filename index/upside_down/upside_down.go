@@ -541,8 +541,8 @@ func frequencyFromTokenFreq(tf *analysis.TokenFreq) int {
 	return len(tf.Locations)
 }
 
-func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.TokenFreq) ([]*TermVector, []index.IndexRow) {
-	rv := make([]*TermVector, len(tf.Locations))
+func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.TokenFreq) ([]TermVector, []index.IndexRow) {
+	rv := make([]TermVector, len(tf.Locations))
 	newFieldRows := make([]index.IndexRow, 0)
 
 	for i, l := range tf.Locations {
@@ -555,20 +555,19 @@ func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.
 				newFieldRows = append(newFieldRows, newFieldRow)
 			}
 		}
-		tv := TermVector{
+		rv[i] = TermVector{
 			field:          fieldIndex,
 			arrayPositions: l.ArrayPositions,
 			pos:            uint64(l.Position),
 			start:          uint64(l.Start),
 			end:            uint64(l.End),
 		}
-		rv[i] = &tv
 	}
 
 	return rv, newFieldRows
 }
 
-func (udc *UpsideDownCouch) termFieldVectorsFromTermVectors(in []*TermVector) []*index.TermFieldVector {
+func (udc *UpsideDownCouch) termFieldVectorsFromTermVectors(in []TermVector) []*index.TermFieldVector {
 	rv := make([]*index.TermFieldVector, len(in))
 
 	for i, tv := range in {
