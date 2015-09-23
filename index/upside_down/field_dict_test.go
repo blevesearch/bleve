@@ -10,7 +10,6 @@
 package upside_down
 
 import (
-	"os"
 	"reflect"
 	"testing"
 
@@ -20,18 +19,14 @@ import (
 )
 
 func TestIndexFieldDict(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	defer DestroyTest()
 
-	s := boltdb.New("test", "bleve")
-	s.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewUpsideDownCouch(s, analysisQueue)
-	err := idx.Open()
+	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}

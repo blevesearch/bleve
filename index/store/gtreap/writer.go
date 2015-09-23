@@ -15,58 +15,55 @@
 package gtreap
 
 import (
+	"fmt"
 	"math/rand"
 
 	"github.com/blevesearch/bleve/index/store"
 )
 
-func (w *Writer) BytesSafeAfterClose() bool {
-	return false
-}
-
-func (w *Writer) Get(k []byte) (v []byte, err error) {
-	w.s.m.Lock()
-	t := w.s.t
-	w.s.m.Unlock()
-
-	itm := t.Get(&Item{k: k})
-	if itm != nil {
-		return itm.(*Item).v, nil
-	}
-	return nil, nil
-}
-
-func (w *Writer) Iterator(k []byte) store.KVIterator {
-	w.s.m.Lock()
-	t := w.s.t
-	w.s.m.Unlock()
-
-	return newIterator(t).restart(&Item{k: k})
-}
-
-func (w *Writer) Close() error {
-	w.s.availableWriters <- true
-	w.s = nil
-
-	return nil
-}
-
-func (w *Writer) Set(k, v []byte) (err error) {
-	w.s.m.Lock()
-	w.s.t = w.s.t.Upsert(&Item{k: k, v: v}, rand.Int())
-	w.s.m.Unlock()
-
-	return nil
-}
-
-func (w *Writer) Delete(k []byte) (err error) {
-	w.s.m.Lock()
-	w.s.t = w.s.t.Delete(&Item{k: k})
-	w.s.m.Unlock()
-
-	return nil
+type Writer struct {
+	s *Store
 }
 
 func (w *Writer) NewBatch() store.KVBatch {
-	return store.NewEmulatedBatch(w, w.s.mo)
+	return store.NewEmulatedBatch(w.s.mo)
+}
+
+func (w *Writer) ExecuteBatch(batch store.KVBatch) error {
+
+	emulatedBatch, ok := batch.(*store.EmulatedBatch)
+	if !ok {
+		return fmt.Errorf("wrong type of batch")
+	}
+
+	w.s.m.Lock()
+	for k, mergeOps := range emulatedBatch.Merger.Merges {
+		kb := []byte(k)
+		var existingVal []byte
+		existingItem := w.s.t.Get(&Item{k: kb})
+		if existingItem != nil {
+			existingVal = w.s.t.Get(&Item{k: kb}).(*Item).v
+		}
+		mergedVal, fullMergeOk := w.s.mo.FullMerge(kb, existingVal, mergeOps)
+		if !fullMergeOk {
+			return fmt.Errorf("merge operator returned failure")
+		}
+		w.s.t = w.s.t.Upsert(&Item{k: kb, v: mergedVal}, rand.Int())
+	}
+
+	for _, op := range emulatedBatch.Ops {
+		if op.V != nil {
+			w.s.t = w.s.t.Upsert(&Item{k: op.K, v: op.V}, rand.Int())
+		} else {
+			w.s.t = w.s.t.Delete(&Item{k: op.K})
+		}
+	}
+	w.s.m.Unlock()
+
+	return nil
+}
+
+func (w *Writer) Close() error {
+	w.s = nil
+	return nil
 }

@@ -10,68 +10,61 @@
 package upside_down
 
 import (
-	"os"
 	"testing"
 
-	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/store/boltdb"
 )
 
-func CreateBoltDB() (store.KVStore, error) {
-	s := boltdb.New("test", "bleve")
-	return s, nil
-}
-
-func DestroyBoltDB() error {
-	return os.RemoveAll("test")
+var boltTestConfig = map[string]interface{}{
+	"path": "test",
 }
 
 func BenchmarkBoltDBIndexing1Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateBoltDB, DestroyBoltDB, 1)
+	CommonBenchmarkIndex(b, boltdb.Name, boltTestConfig, DestroyTest, 1)
 }
 
 func BenchmarkBoltDBIndexing2Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateBoltDB, DestroyBoltDB, 2)
+	CommonBenchmarkIndex(b, boltdb.Name, boltTestConfig, DestroyTest, 2)
 }
 
 func BenchmarkBoltDBIndexing4Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateBoltDB, DestroyBoltDB, 4)
+	CommonBenchmarkIndex(b, boltdb.Name, boltTestConfig, DestroyTest, 4)
 }
 
 // batches
 
 func BenchmarkBoltDBIndexing1Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 1, 10)
+	CommonBenchmarkIndexBatch(b, boltdb.Name, boltTestConfig, DestroyTest, 1, 10)
 }
 
 func BenchmarkBoltDBIndexing2Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 2, 10)
+	CommonBenchmarkIndexBatch(b, boltdb.Name, boltTestConfig, DestroyTest, 2, 10)
 }
 
 func BenchmarkBoltDBIndexing4Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 4, 10)
+	CommonBenchmarkIndexBatch(b, boltdb.Name, boltTestConfig, DestroyTest, 4, 10)
 }
 
 func BenchmarkBoltDBIndexing1Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 1, 100)
+	CommonBenchmarkIndexBatch(b, boltdb.Name, boltTestConfig, DestroyTest, 1, 100)
 }
 
 func BenchmarkBoltDBIndexing2Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 2, 100)
+	CommonBenchmarkIndexBatch(b, boltdb.Name, boltTestConfig, DestroyTest, 2, 100)
 }
 
 func BenchmarkBoltDBIndexing4Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 4, 100)
+	CommonBenchmarkIndexBatch(b, boltdb.Name, boltTestConfig, DestroyTest, 4, 100)
 }
 
 func BenchmarkBoltBIndexing1Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 1, 1000)
+	CommonBenchmarkIndexBatch(b, boltdb.Name, boltTestConfig, DestroyTest, 1, 1000)
 }
 
 func BenchmarkBoltBIndexing2Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 2, 1000)
+	CommonBenchmarkIndexBatch(b, boltdb.Name, boltTestConfig, DestroyTest, 2, 1000)
 }
 
 func BenchmarkBoltBIndexing4Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateBoltDB, DestroyBoltDB, 4, 1000)
+	CommonBenchmarkIndexBatch(b, boltdb.Name, boltTestConfig, DestroyTest, 4, 1000)
 }

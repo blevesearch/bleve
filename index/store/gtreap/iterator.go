@@ -15,6 +15,7 @@
 package gtreap
 
 import (
+	"bytes"
 	"sync"
 
 	"github.com/steveyen/gtreap"
@@ -28,19 +29,9 @@ type Iterator struct {
 	nextCh   chan *Item
 	curr     *Item
 	currOk   bool
-}
 
-func newIterator(t *gtreap.Treap) *Iterator {
-	return &Iterator{t: t}
-}
-
-func (w *Iterator) SeekFirst() {
-	min := w.t.Min()
-	if min != nil {
-		w.restart(min.(*Item))
-	} else {
-		w.restart(nil)
-	}
+	prefix []byte
+	end    []byte
 }
 
 func (w *Iterator) Seek(k []byte) {
@@ -91,6 +82,11 @@ func (w *Iterator) Current() ([]byte, []byte, bool) {
 	w.m.Lock()
 	defer w.m.Unlock()
 	if !w.currOk || w.curr == nil {
+		return nil, nil, false
+	}
+	if w.prefix != nil && !bytes.HasPrefix(w.curr.k, w.prefix) {
+		return nil, nil, false
+	} else if w.end != nil && bytes.Compare(w.curr.k, w.end) >= 0 {
 		return nil, nil, false
 	}
 	return w.curr.k, w.curr.v, w.currOk

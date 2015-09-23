@@ -26,7 +26,7 @@ func (udc *UpsideDownCouch) dumpPrefix(kvreader store.KVReader, rv chan interfac
 	if start == nil {
 		start = []byte{0}
 	}
-	it := kvreader.Iterator(start)
+	it := kvreader.PrefixIterator(start)
 	defer func() {
 		cerr := it.Close()
 		if cerr != nil {
@@ -36,9 +36,28 @@ func (udc *UpsideDownCouch) dumpPrefix(kvreader store.KVReader, rv chan interfac
 	key, val, valid := it.Current()
 	for valid {
 
-		if prefix != nil && !bytes.HasPrefix(key, prefix) {
-			break
+		row, err := ParseFromKeyValue(key, val)
+		if err != nil {
+			rv <- err
+			return
 		}
+		rv <- row
+
+		it.Next()
+		key, val, valid = it.Current()
+	}
+}
+
+func (udc *UpsideDownCouch) dumpRange(kvreader store.KVReader, rv chan interface{}, start, end []byte) {
+	it := kvreader.RangeIterator(start, end)
+	defer func() {
+		cerr := it.Close()
+		if cerr != nil {
+			rv <- cerr
+		}
+	}()
+	key, val, valid := it.Current()
+	for valid {
 
 		row, err := ParseFromKeyValue(key, val)
 		if err != nil {
@@ -70,7 +89,7 @@ func (udc *UpsideDownCouch) DumpAll() chan interface{} {
 			}
 		}()
 
-		udc.dumpPrefix(kvreader, rv, nil)
+		udc.dumpRange(kvreader, rv, nil, nil)
 	}()
 	return rv
 }
@@ -149,7 +168,7 @@ func (udc *UpsideDownCouch) DumpDoc(id string) chan interface{} {
 
 		// now walk term keys in order and add them as well
 		if len(keys) > 0 {
-			it := kvreader.Iterator(keys[0])
+			it := kvreader.RangeIterator(keys[0], nil)
 			defer func() {
 				cerr := it.Close()
 				if cerr != nil {

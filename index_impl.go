@@ -20,7 +20,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
-	"github.com/blevesearch/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/store/gtreap"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/collectors"
@@ -50,19 +50,8 @@ func newMemIndex(indexType string, mapping *IndexMapping) (*indexImpl, error) {
 	rv := indexImpl{
 		path:  "",
 		m:     mapping,
-		meta:  newIndexMeta(indexType, inmem.Name, nil),
+		meta:  newIndexMeta(indexType, gtreap.Name, nil),
 		stats: &IndexStat{},
-	}
-
-	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
-	if storeConstructor == nil {
-		return nil, ErrorUnknownStorageType
-	}
-	// now open the store
-	var err error
-	rv.s, err = storeConstructor(nil)
-	if err != nil {
-		return nil, err
 	}
 
 	// open the index
@@ -71,7 +60,8 @@ func newMemIndex(indexType string, mapping *IndexMapping) (*indexImpl, error) {
 		return nil, ErrorUnknownIndexType
 	}
 
-	rv.i, err = indexTypeConstructor(rv.s, Config.analysisQueue)
+	var err error
+	rv.i, err = indexTypeConstructor(rv.meta.Storage, nil, Config.analysisQueue)
 	if err != nil {
 		return nil, err
 	}
@@ -119,10 +109,6 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 		meta:  newIndexMeta(indexType, kvstore, kvconfig),
 		stats: &IndexStat{},
 	}
-	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
-	if storeConstructor == nil {
-		return nil, ErrorUnknownStorageType
-	}
 	// at this point there is hope that we can be successful, so save index meta
 	err = rv.meta.Save(path)
 	if err != nil {
@@ -132,24 +118,21 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 	kvconfig["error_if_exists"] = true
 	kvconfig["path"] = indexStorePath(path)
 
-	// now create the store
-	rv.s, err = storeConstructor(kvconfig)
-	if err != nil {
-		return nil, err
-	}
-
 	// open the index
 	indexTypeConstructor := registry.IndexTypeConstructorByName(rv.meta.IndexType)
 	if indexTypeConstructor == nil {
 		return nil, ErrorUnknownIndexType
 	}
 
-	rv.i, err = indexTypeConstructor(rv.s, Config.analysisQueue)
+	rv.i, err = indexTypeConstructor(rv.meta.Storage, kvconfig, Config.analysisQueue)
 	if err != nil {
 		return nil, err
 	}
 	err = rv.i.Open()
 	if err != nil {
+		if err == index.ErrorUnknownStorageType {
+			return nil, ErrorUnknownStorageType
+		}
 		return nil, err
 	}
 	rv.stats.indexStat = rv.i.Stats()
@@ -172,7 +155,6 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 }
 
 func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *indexImpl, err error) {
-
 	rv = &indexImpl{
 		path:  path,
 		stats: &IndexStat{},
@@ -181,11 +163,6 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	rv.meta, err = openIndexMeta(path)
 	if err != nil {
 		return nil, err
-	}
-
-	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
-	if storeConstructor == nil {
-		return nil, ErrorUnknownStorageType
 	}
 
 	storeConfig := rv.meta.Config
@@ -200,24 +177,21 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		storeConfig[rck] = rcv
 	}
 
-	// now open the store
-	rv.s, err = storeConstructor(storeConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	// open the index
 	indexTypeConstructor := registry.IndexTypeConstructorByName(rv.meta.IndexType)
 	if indexTypeConstructor == nil {
 		return nil, ErrorUnknownIndexType
 	}
 
-	rv.i, err = indexTypeConstructor(rv.s, Config.analysisQueue)
+	rv.i, err = indexTypeConstructor(rv.meta.Storage, storeConfig, Config.analysisQueue)
 	if err != nil {
 		return nil, err
 	}
 	err = rv.i.Open()
 	if err != nil {
+		if err == index.ErrorUnknownStorageType {
+			return nil, ErrorUnknownStorageType
+		}
 		return nil, err
 	}
 	rv.stats.indexStat = rv.i.Stats()

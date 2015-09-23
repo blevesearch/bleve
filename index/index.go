@@ -16,6 +16,8 @@ import (
 	"github.com/blevesearch/bleve/document"
 )
 
+var ErrorUnknownStorageType = fmt.Errorf("unknown storage type")
+
 type Index interface {
 	Open() error
 	Close() error
@@ -45,6 +47,8 @@ type IndexReader interface {
 	DocIDReader(start, end string) (DocIDReader, error)
 
 	FieldDict(field string) (FieldDict, error)
+
+	// FieldDictRange is currently defined to include the start and end terms
 	FieldDictRange(field string, startTerm []byte, endTerm []byte) (FieldDict, error)
 	FieldDictPrefix(field string, termPrefix []byte) (FieldDict, error)
 
