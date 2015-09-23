@@ -20,6 +20,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve/index/store/inmem"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/collectors"
@@ -49,7 +50,7 @@ func newMemIndex(indexType string, mapping *IndexMapping) (*indexImpl, error) {
 	rv := indexImpl{
 		path:  "",
 		m:     mapping,
-		meta:  newIndexMeta(indexType, "mem", nil),
+		meta:  newIndexMeta(indexType, inmem.Name, nil),
 		stats: &IndexStat{},
 	}
 

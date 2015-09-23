@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/blevesearch/bleve"
+	_ "github.com/blevesearch/bleve/config"
 )
 
 var indexPath = flag.String("index", "", "index path")

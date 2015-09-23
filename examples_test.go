@@ -14,6 +14,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/blevesearch/bleve/search/highlight/highlighters/ansi"
 )
 
 var mapping *IndexMapping
@@ -312,7 +314,7 @@ func ExampleNewHighlight() {
 func ExampleNewHighlightWithStyle() {
 	query := NewMatchQuery("nameless")
 	searchRequest := NewSearchRequest(query)
-	searchRequest.Highlight = NewHighlightWithStyle("ansi")
+	searchRequest.Highlight = NewHighlightWithStyle(ansi.Name)
 	searchResults, err := example_index.Search(searchRequest)
 	if err != nil {
 		panic(err)

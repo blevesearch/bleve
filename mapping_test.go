@@ -11,9 +11,12 @@ package bleve
 
 import (
 	"encoding/json"
-	"github.com/blevesearch/bleve/document"
 	"reflect"
 	"testing"
+
+	"github.com/blevesearch/bleve/analysis/tokenizers/exception"
+	"github.com/blevesearch/bleve/analysis/tokenizers/regexp_tokenizer"
+	"github.com/blevesearch/bleve/document"
 )
 
 var mappingSource = []byte(`{
@@ -248,12 +251,12 @@ func TestMappingForPath(t *testing.T) {
 func TestMappingWithTokenizerDeps(t *testing.T) {
 
 	tokNoDeps := map[string]interface{}{
-		"type":   "regexp",
+		"type":   regexp_tokenizer.Name,
 		"regexp": "",
 	}
 
 	tokDepsL1 := map[string]interface{}{
-		"type":      "exception",
+		"type":      exception.Name,
 		"tokenizer": "a",
 	}
 

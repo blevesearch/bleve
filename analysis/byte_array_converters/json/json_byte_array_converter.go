@@ -16,6 +16,8 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
+const Name = "json"
+
 type JSONByteArrayConverter struct{}
 
 func NewJSONByteArrayConverter() *JSONByteArrayConverter {
@@ -36,5 +38,5 @@ func Constructor(config map[string]interface{}, cache *registry.Cache) (analysis
 }
 
 func init() {
-	registry.RegisterByteArrayConverter("json", Constructor)
+	registry.RegisterByteArrayConverter(Name, Constructor)
 }
