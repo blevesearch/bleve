@@ -21,6 +21,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/upside_down"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/collectors"
@@ -181,6 +182,11 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	rv.meta, err = openIndexMeta(path)
 	if err != nil {
 		return nil, err
+	}
+
+	// backwards compatability if index type is missing
+	if rv.meta.IndexType == "" {
+		rv.meta.IndexType = upside_down.Name
 	}
 
 	storeConstructor := registry.KVStoreConstructorByName(rv.meta.Storage)
