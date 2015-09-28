@@ -133,15 +133,15 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 
 	// ensure that the direct iterator sees it
 	count = 0
-	it = newReader.RangeIterator([]byte{0}, []byte{'x'})
+	it2 := newReader.RangeIterator([]byte{0}, []byte{'x'})
 	defer func() {
-		err := it.Close()
+		err := it2.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
-	for it.Valid() {
-		it.Next()
+	for it2.Valid() {
+		it2.Next()
 		count++
 	}
 	if count != 2 {
@@ -159,15 +159,15 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 
 	// and ensure that the iterator on the isolated reader also does not
 	count = 0
-	it = reader.RangeIterator([]byte{0}, []byte{'x'})
+	it3 := reader.RangeIterator([]byte{0}, []byte{'x'})
 	defer func() {
-		err := it.Close()
+		err := it3.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
-	for it.Valid() {
-		it.Next()
+	for it3.Valid() {
+		it3.Next()
 		count++
 	}
 	if count != 1 {

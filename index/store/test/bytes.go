@@ -106,12 +106,6 @@ func CommonTestReaderOwnsGetBytes(t *testing.T, s store.KVStore) {
 		t.Fatal(err)
 	}
 
-	// close the store
-	err = s.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// finally check that the value we mutated still has what we set it to
 	for i := range returnedVal {
 		if returnedVal[i] != '2' {
@@ -262,12 +256,6 @@ func CommonTestWriterOwnsBytes(t *testing.T, s store.KVStore) {
 
 	// close the reader
 	err = reader.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// close the store
-	err = s.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

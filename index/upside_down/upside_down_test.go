@@ -10,9 +10,11 @@
 package upside_down
 
 import (
+	"log"
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -1153,5 +1155,56 @@ func BenchmarkBatch(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestConcurrentUpdate(t *testing.T) {
+	defer DestroyTest()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// do some concurrent updates
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			doc := document.NewDocument("1")
+			doc.AddField(document.NewTextFieldWithIndexingOptions(strconv.Itoa(i), []uint64{}, []byte(strconv.Itoa(i)), document.StoreField))
+			err := idx.Update(doc)
+			if err != nil {
+				t.Errorf("Error updating index: %v", err)
+			}
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	// now load the name field and see what we get
+	r, err := idx.Reader()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	doc, err := r.Document("1")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if len(doc.Fields) > 1 {
+		t.Errorf("expected single field, found %d", len(doc.Fields))
 	}
 }

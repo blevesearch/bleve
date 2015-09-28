@@ -552,7 +552,7 @@ func NewBackIndexRowKV(key, value []byte) (*BackIndexRow, error) {
 
 	rv.doc, err = buf.ReadBytes(ByteSeparator)
 	if err == io.EOF && len(rv.doc) < 1 {
-		err = fmt.Errorf("invalid doc length 0")
+		err = fmt.Errorf("invalid doc length 0 - % x", key)
 	}
 	if err != nil && err != io.EOF {
 		return nil, err

@@ -56,7 +56,6 @@ func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, 
 		defaultWriteOptions: &opt.WriteOptions{},
 	}
 	rv.defaultWriteOptions.Sync = true
-
 	return &rv, nil
 }
 

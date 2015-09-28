@@ -12,10 +12,12 @@ func TestStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	CommonTestKVStore(t, s)
+	NullTestKVStore(t, s)
 }
 
-func CommonTestKVStore(t *testing.T, s store.KVStore) {
+// NullTestKVStore has very different expectations
+// compared to CommonTestKVStore
+func NullTestKVStore(t *testing.T, s store.KVStore) {
 
 	writer, err := s.Writer()
 	if err != nil {

@@ -13,118 +13,65 @@
 package gtreap
 
 import (
-	"os"
 	"testing"
 
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/store/test"
 )
 
-func open(mo store.MergeOperator) (store.KVStore, error) {
-	return New(mo, nil)
-}
-
-func TestGTreapKVCrud(t *testing.T) {
-	s, err := open(nil)
+func open(t *testing.T, mo store.MergeOperator) store.KVStore {
+	rv, err := New(mo, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	return rv
+}
 
+func cleanup(t *testing.T, s store.KVStore) {
+	err := s.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGTreapKVCrud(t *testing.T) {
+	s := open(t, nil)
+	defer cleanup(t, s)
 	test.CommonTestKVCrud(t, s)
 }
 
 func TestGTreapReaderIsolation(t *testing.T) {
-	s, err := open(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	s := open(t, nil)
+	defer cleanup(t, s)
 	test.CommonTestReaderIsolation(t, s)
 }
 
 func TestGTreapReaderOwnsGetBytes(t *testing.T) {
-	s, err := open(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	s := open(t, nil)
+	defer cleanup(t, s)
 	test.CommonTestReaderOwnsGetBytes(t, s)
 }
 
 func TestGTreapWriterOwnsBytes(t *testing.T) {
-	s, err := open(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	s := open(t, nil)
+	defer cleanup(t, s)
 	test.CommonTestWriterOwnsBytes(t, s)
 }
 
 func TestGTreapPrefixIterator(t *testing.T) {
-	s, err := open(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	s := open(t, nil)
+	defer cleanup(t, s)
 	test.CommonTestPrefixIterator(t, s)
 }
 
 func TestGTreapRangeIterator(t *testing.T) {
-	s, err := open(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	s := open(t, nil)
+	defer cleanup(t, s)
 	test.CommonTestRangeIterator(t, s)
 }
 
 func TestGTreapMerge(t *testing.T) {
-	s, err := open(&test.TestMergeCounter{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	s := open(t, &test.TestMergeCounter{})
+	defer cleanup(t, s)
 	test.CommonTestMerge(t, s)
 }

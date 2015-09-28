@@ -49,6 +49,8 @@ type UpsideDownCouch struct {
 	m sync.RWMutex
 	// fields protected by m
 	docCount uint64
+
+	writeMutex sync.Mutex
 }
 
 func NewUpsideDownCouch(storeName string, storeConfig map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error) {
@@ -159,6 +161,10 @@ func (udc *UpsideDownCouch) DocCount() (uint64, error) {
 }
 
 func (udc *UpsideDownCouch) Open() (err error) {
+	//acquire the write mutex for the duratin of Open()
+	udc.writeMutex.Lock()
+	defer udc.writeMutex.Unlock()
+
 	// open the kv store
 	storeConstructor := registry.KVStoreConstructorByName(udc.storeName)
 	if storeConstructor == nil {
@@ -217,7 +223,7 @@ func (udc *UpsideDownCouch) Open() (err error) {
 			}
 		}()
 
-		// init th eindex
+		// init the index
 		err = udc.init(kvwriter)
 	}
 
@@ -288,6 +294,9 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	result := <-resultChan
 	close(resultChan)
 	atomic.AddUint64(&udc.stats.analysisTime, uint64(time.Since(analysisStart)))
+
+	udc.writeMutex.Lock()
+	defer udc.writeMutex.Unlock()
 
 	// open a reader for backindex lookup
 	var kvreader store.KVReader
@@ -457,6 +466,9 @@ func (udc *UpsideDownCouch) indexField(docID string, field document.Field, field
 
 func (udc *UpsideDownCouch) Delete(id string) (err error) {
 	indexStart := time.Now()
+
+	udc.writeMutex.Lock()
+	defer udc.writeMutex.Unlock()
 
 	// open a reader for backindex lookup
 	var kvreader store.KVReader
@@ -677,6 +689,9 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 
 	indexStart := time.Now()
 
+	udc.writeMutex.Lock()
+	defer udc.writeMutex.Unlock()
+
 	// open a reader for backindex lookup
 	var kvreader store.KVReader
 	kvreader, err = udc.store.Reader()
@@ -763,6 +778,8 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 
 func (udc *UpsideDownCouch) SetInternal(key, val []byte) (err error) {
 	internalRow := NewInternalRow(key, val)
+	udc.writeMutex.Lock()
+	defer udc.writeMutex.Unlock()
 	var writer store.KVWriter
 	writer, err = udc.store.Writer()
 	if err != nil {
@@ -782,6 +799,8 @@ func (udc *UpsideDownCouch) SetInternal(key, val []byte) (err error) {
 
 func (udc *UpsideDownCouch) DeleteInternal(key []byte) (err error) {
 	internalRow := NewInternalRow(key, nil)
+	udc.writeMutex.Lock()
+	defer udc.writeMutex.Unlock()
 	var writer store.KVWriter
 	writer, err = udc.store.Writer()
 	if err != nil {

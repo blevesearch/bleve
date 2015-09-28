@@ -17,111 +17,63 @@ import (
 	"github.com/blevesearch/bleve/index/store/test"
 )
 
-func open(mo store.MergeOperator) (store.KVStore, error) {
-	return New(mo, map[string]interface{}{"path": "test"})
-}
-
-func TestBoltDBKVCrud(t *testing.T) {
-	s, err := open(nil)
+func open(t *testing.T, mo store.MergeOperator) store.KVStore {
+	rv, err := New(mo, map[string]interface{}{"path": "test"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	return rv
+}
 
+func cleanup(t *testing.T, s store.KVStore) {
+	err := s.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.RemoveAll("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBoltDBKVCrud(t *testing.T) {
+	s := open(t, nil)
+	defer cleanup(t, s)
 	test.CommonTestKVCrud(t, s)
 }
 
 func TestBoltDBReaderIsolation(t *testing.T) {
-	s, err := open(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	s := open(t, nil)
+	defer cleanup(t, s)
 	test.CommonTestReaderIsolation(t, s)
 }
 
 func TestBoltDBReaderOwnsGetBytes(t *testing.T) {
-	s, err := open(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	s := open(t, nil)
+	defer cleanup(t, s)
 	test.CommonTestReaderOwnsGetBytes(t, s)
 }
 
 func TestBoltDBWriterOwnsBytes(t *testing.T) {
-	s, err := open(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	s := open(t, nil)
+	defer cleanup(t, s)
 	test.CommonTestWriterOwnsBytes(t, s)
 }
 
 func TestBoltDBPrefixIterator(t *testing.T) {
-	s, err := open(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	s := open(t, nil)
+	defer cleanup(t, s)
 	test.CommonTestPrefixIterator(t, s)
 }
 
 func TestBoltDBRangeIterator(t *testing.T) {
-	s, err := open(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	s := open(t, nil)
+	defer cleanup(t, s)
 	test.CommonTestRangeIterator(t, s)
 }
 
 func TestBoltDBMerge(t *testing.T) {
-	s, err := open(&test.TestMergeCounter{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
+	s := open(t, &test.TestMergeCounter{})
+	defer cleanup(t, s)
 	test.CommonTestMerge(t, s)
 }

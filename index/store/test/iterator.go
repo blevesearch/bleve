@@ -118,12 +118,6 @@ func CommonTestPrefixIterator(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// close the store
-	err = s.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
 }
 
 func CommonTestRangeIterator(t *testing.T, s store.KVStore) {
@@ -277,12 +271,6 @@ func CommonTestRangeIterator(t *testing.T, s store.KVStore) {
 
 	// close the reader
 	err = reader.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// close the store
-	err = s.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
