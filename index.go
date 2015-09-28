@@ -30,6 +30,9 @@ type Batch struct {
 // batch.  NOTE: the bleve Index is not updated
 // until the batch is executed.
 func (b *Batch) Index(id string, data interface{}) error {
+	if id == "" {
+		return ErrorEmptyID
+	}
 	doc := document.NewDocument(id)
 	err := b.index.Mapping().mapDocument(doc, data)
 	if err != nil {
@@ -43,7 +46,9 @@ func (b *Batch) Index(id string, data interface{}) error {
 // batch.  NOTE: the bleve Index is not updated until
 // the batch is executed.
 func (b *Batch) Delete(id string) {
-	b.internal.Delete(id)
+	if id != "" {
+		b.internal.Delete(id)
+	}
 }
 
 // SetInternal adds the specified set internal

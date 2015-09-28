@@ -25,6 +25,7 @@ const (
 	ErrorAliasMulti
 	ErrorAliasEmpty
 	ErrorUnknownIndexType
+	ErrorEmptyID
 )
 
 // Error represents a more strongly typed bleve error for detecting
@@ -50,4 +51,5 @@ var errorMessages = map[int]string{
 	int(ErrorAliasMulti):                             "cannot perform single index operation on multiple index alias",
 	int(ErrorAliasEmpty):                             "cannot perform operation on empty alias",
 	int(ErrorUnknownIndexType):                       "unknown index type",
+	int(ErrorEmptyID):                                "document ID cannot be empty",
 }

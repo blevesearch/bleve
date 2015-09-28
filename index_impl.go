@@ -283,6 +283,10 @@ func (i *indexImpl) Mapping() *IndexMapping {
 // The IndexMapping for this index will determine
 // how the object is indexed.
 func (i *indexImpl) Index(id string, data interface{}) error {
+	if id == "" {
+		return ErrorEmptyID
+	}
+
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -305,6 +309,10 @@ func (i *indexImpl) Index(id string, data interface{}) error {
 // Delete entries for the specified identifier from
 // the index.
 func (i *indexImpl) Delete(id string) error {
+	if id == "" {
+		return ErrorEmptyID
+	}
+
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 

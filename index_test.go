@@ -1038,3 +1038,42 @@ func TestTermVectorArrayPositions(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestIndexEmptyDocId(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc := map[string]interface{}{
+		"body": "nodocid",
+	}
+
+	err = index.Index("", doc)
+	if err != ErrorEmptyID {
+		t.Errorf("expect index empty doc id to fail")
+	}
+
+	err = index.Delete("")
+	if err != ErrorEmptyID {
+		t.Errorf("expect delete empty doc id to fail")
+	}
+
+	batch := index.NewBatch()
+	err = batch.Index("", doc)
+	if err != ErrorEmptyID {
+		t.Errorf("expect index empty doc id in batch to fail")
+	}
+
+	batch.Delete("")
+	if batch.Size() > 0 {
+		t.Errorf("expect delete empty doc id in batch to be ignored")
+	}
+}
