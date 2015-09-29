@@ -322,7 +322,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			for _, fieldMapping := range subDocMapping.Fields {
 				fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
 			}
-		} else {
+		} else if dm.Dynamic {
 			// automatic indexing behavior
 
 			// first see if it can be parsed by the default date parser
@@ -347,7 +347,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			for _, fieldMapping := range subDocMapping.Fields {
 				fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
 			}
-		} else {
+		} else if dm.Dynamic {
 			// automatic indexing behavior
 			fieldMapping := NewNumericFieldMapping()
 			fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
@@ -361,7 +361,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				for _, fieldMapping := range subDocMapping.Fields {
 					fieldMapping.processTime(property, pathString, path, indexes, context)
 				}
-			} else {
+			} else if dm.Dynamic {
 				fieldMapping := NewDateTimeFieldMapping()
 				fieldMapping.processTime(property, pathString, path, indexes, context)
 			}

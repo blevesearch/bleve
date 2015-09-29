@@ -15,6 +15,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -1031,6 +1032,67 @@ func TestTermVectorArrayPositions(t *testing.T) {
 	}
 	if results.Hits[0].Locations["Messages"]["third"][0].ArrayPositions[0] != 2 {
 		t.Fatalf("expected array position 2, got %f", results.Hits[0].Locations["Messages"]["third"][0].ArrayPositions[0])
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDocumentStaticMapping(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	m := NewIndexMapping()
+	m.DefaultMapping = NewDocumentStaticMapping()
+	m.DefaultMapping.AddFieldMappingsAt("Text", NewTextFieldMapping())
+	m.DefaultMapping.AddFieldMappingsAt("Date", NewDateTimeFieldMapping())
+	m.DefaultMapping.AddFieldMappingsAt("Numeric", NewNumericFieldMapping())
+
+	index, err := New("testidx", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc1 := struct {
+		Text           string
+		IgnoredText    string
+		Numeric        float64
+		IgnoredNumeric float64
+		Date           time.Time
+		IgnoredDate    time.Time
+	}{
+		Text:           "valid text",
+		IgnoredText:    "ignored text",
+		Numeric:        10,
+		IgnoredNumeric: 20,
+		Date:           time.Unix(1, 0),
+		IgnoredDate:    time.Unix(2, 0),
+	}
+
+	err = index.Index("a", doc1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fields, err := index.Fields()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(fields)
+	expectedFields := []string{"Date", "Numeric", "Text", "_all"}
+	if len(fields) != len(expectedFields) {
+		t.Fatalf("invalid field count: %d", len(fields))
+	}
+	for i, expected := range expectedFields {
+		if expected != fields[i] {
+			t.Fatalf("unexpected field[%d]: %s", i, fields[i])
+		}
 	}
 
 	err = index.Close()
