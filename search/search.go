@@ -50,19 +50,20 @@ func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
 		dm.Fields = make(map[string]interface{})
 	}
 	existingVal, ok := dm.Fields[name]
-	if ok {
-		valSlice, ok := existingVal.([]interface{})
-		if ok {
-			// already a slice, append to it
-			valSlice = append(valSlice, value)
-		} else {
-			// create a slice
-			valSlice = []interface{}{existingVal, value}
-		}
-		dm.Fields[name] = valSlice
-	} else {
+	if !ok {
 		dm.Fields[name] = value
+		return
 	}
+
+	valSlice, ok := existingVal.([]interface{})
+	if ok {
+		// already a slice, append to it
+		valSlice = append(valSlice, value)
+	} else {
+		// create a slice
+		valSlice = []interface{}{existingVal, value}
+	}
+	dm.Fields[name] = valSlice
 }
 
 type DocumentMatchCollection []*DocumentMatch

@@ -282,7 +282,7 @@ func (i *indexImpl) Mapping() *IndexMapping {
 // Index the object with the specified identifier.
 // The IndexMapping for this index will determine
 // how the object is indexed.
-func (i *indexImpl) Index(id string, data interface{}) error {
+func (i *indexImpl) Index(id string, data interface{}) (err error) {
 	if id == "" {
 		return ErrorEmptyID
 	}
@@ -295,20 +295,17 @@ func (i *indexImpl) Index(id string, data interface{}) error {
 	}
 
 	doc := document.NewDocument(id)
-	err := i.m.mapDocument(doc, data)
+	err = i.m.mapDocument(doc, data)
 	if err != nil {
-		return err
+		return
 	}
 	err = i.i.Update(doc)
-	if err != nil {
-		return err
-	}
-	return nil
+	return
 }
 
 // Delete entries for the specified identifier from
 // the index.
-func (i *indexImpl) Delete(id string) error {
+func (i *indexImpl) Delete(id string) (err error) {
 	if id == "" {
 		return ErrorEmptyID
 	}
@@ -320,11 +317,8 @@ func (i *indexImpl) Delete(id string) error {
 		return ErrorIndexClosed
 	}
 
-	err := i.i.Delete(id)
-	if err != nil {
-		return err
-	}
-	return nil
+	err = i.i.Delete(id)
+	return
 }
 
 // Batch executes multiple Index and Delete
