@@ -86,7 +86,71 @@ func (b *Batch) Reset() {
 // An Index implements all the indexing and searching
 // capabilities of bleve.  An Index can be created
 // using the New() and Open() methods.
+//
+// Index() takes an input value, deduces a DocumentMapping for its type,
+// assigns string paths to its fields or values then applies field mappings on
+// them.
+//
+// If the value is a []byte, the indexer attempts to convert it to something
+// else using the ByteArrayConverter registered as
+// IndexMapping.ByteArrayConverter. By default, it interprets the value as a
+// JSON payload and unmarshals it to map[string]interface{}.
+//
+// The DocumentMapping used to index a value is deduced by the following rules:
+// 1) If value implements Classifier interface, resolve the mapping from Type().
+// 2) If value has a string field or value at IndexMapping.TypeField.
+// (defaulting to "_type"), use it to resolve the mapping. Fields addressing
+// is described below.
+// 3) If IndexMapping.DefaultType is registered, return it.
+// 4) Return IndexMapping.DefaultMapping.
+//
+// Each field or nested field of the value is identified by a string path, then
+// mapped to one or several FieldMappings which extract the result for analysis.
+//
+// Struct values fields are identified by their "json:" tag, or by their name.
+// Nested fields are identified by prefixing with their parent identifier,
+// separated by a dot.
+//
+// Map values entries are identified by their string key. Entries not indexed
+// by strings are ignored. Entry values are identified recursively like struct
+// fields.
+//
+// Slice and array values are identified by their field name. Their elements
+// are processed sequentially with the same FieldMapping.
+//
+// String, float64 and time.Time values are identified by their field name.
+// Other types are ignored.
+//
+// Each value identifier is decomposed in its parts and recursively address
+// SubDocumentMappings in the tree starting at the root DocumentMapping.  If a
+// mapping is found, all its FieldMappings are applied to the value. If no
+// mapping is found and the root DocumentMapping is dynamic, default mappings
+// are used based on value type and IndexMapping default configurations.
+//
+// Finally, mapped values are analyzed, indexed or stored. Examples:
+//
+//  type Date struct {
+//    Day string `json:"day"`
+//    Month string
+//    Year string
+//  }
+//
+//  type Person struct {
+//    FirstName string `json:"first_name"`
+//    LastName string
+//    BirthDate Date `json:"birth_date"`
+//  }
+//
+// A Person value FirstName is mapped by the SubDocumentMapping at
+// "first_name". Its LastName is mapped by the one at "LastName". The day of
+// BirthDate is mapped to the SubDocumentMapping "day" of the root
+// SubDocumentMapping "birth_date". It will appear as the "birth_date.day"
+// field in the index. The month is mapped to "birth_date.Month".
 type Index interface {
+	// Index analyzes, indexes or stores mapped data fields. Supplied
+	// identifier is bound to analyzed data and will be retrieved by search
+	// requests. See Index interface documentation for details about mapping
+	// rules.
 	Index(id string, data interface{}) error
 	Delete(id string) error
 
