@@ -33,23 +33,23 @@ const (
 type Error int
 
 func (e Error) Error() string {
-	return errorMessages[int(e)]
+	return errorMessages[e]
 }
 
-var errorMessages = map[int]string{
-	int(ErrorIndexPathExists):                        "cannot create new index, path already exists",
-	int(ErrorIndexPathDoesNotExist):                  "cannot open index, path does not exist",
-	int(ErrorIndexMetaMissing):                       "cannot open index, metadata missing",
-	int(ErrorIndexMetaCorrupt):                       "cannot open index, metadata corrupt",
-	int(ErrorDisjunctionFewerThanMinClauses):         "disjunction query has fewer than the minimum number of clauses to satisfy",
-	int(ErrorBooleanQueryNeedsMustOrShouldOrNotMust): "boolean query must contain at least one must or should or not must clause",
-	int(ErrorNumericQueryNoBounds):                   "numeric range query must specify min or max",
-	int(ErrorPhraseQueryNoTerms):                     "phrase query must contain at least one term",
-	int(ErrorUnknownQueryType):                       "unknown query type",
-	int(ErrorUnknownStorageType):                     "unknown storage type",
-	int(ErrorIndexClosed):                            "index is closed",
-	int(ErrorAliasMulti):                             "cannot perform single index operation on multiple index alias",
-	int(ErrorAliasEmpty):                             "cannot perform operation on empty alias",
-	int(ErrorUnknownIndexType):                       "unknown index type",
-	int(ErrorEmptyID):                                "document ID cannot be empty",
+var errorMessages = map[Error]string{
+	ErrorIndexPathExists:                        "cannot create new index, path already exists",
+	ErrorIndexPathDoesNotExist:                  "cannot open index, path does not exist",
+	ErrorIndexMetaMissing:                       "cannot open index, metadata missing",
+	ErrorIndexMetaCorrupt:                       "cannot open index, metadata corrupt",
+	ErrorDisjunctionFewerThanMinClauses:         "disjunction query has fewer than the minimum number of clauses to satisfy",
+	ErrorBooleanQueryNeedsMustOrShouldOrNotMust: "boolean query must contain at least one must or should or not must clause",
+	ErrorNumericQueryNoBounds:                   "numeric range query must specify min or max",
+	ErrorPhraseQueryNoTerms:                     "phrase query must contain at least one term",
+	ErrorUnknownQueryType:                       "unknown query type",
+	ErrorUnknownStorageType:                     "unknown storage type",
+	ErrorIndexClosed:                            "index is closed",
+	ErrorAliasMulti:                             "cannot perform single index operation on multiple index alias",
+	ErrorAliasEmpty:                             "cannot perform operation on empty alias",
+	ErrorUnknownIndexType:                       "unknown index type",
+	ErrorEmptyID:                                "document ID cannot be empty",
 }
