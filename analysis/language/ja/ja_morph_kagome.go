@@ -13,23 +13,27 @@ import (
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
 
-	"github.com/ikawaha/kagome"
+	"github.com/ikawaha/kagome/tokenizer"
 )
 
 const TokenizerName = "kagome"
 
 type KagomeMorphTokenizer struct {
-	tok *kagome.Tokenizer
+	tok tokenizer.Tokenizer
+}
+
+func init() {
+	_ = tokenizer.SysDic() // prepare system dictionary
 }
 
 func NewKagomeMorphTokenizer() *KagomeMorphTokenizer {
 	return &KagomeMorphTokenizer{
-		tok: kagome.NewTokenizer(),
+		tok: tokenizer.New(),
 	}
 }
 
-func NewKagomeMorphTokenizerWithUserDic(userdic *kagome.UserDic) *KagomeMorphTokenizer {
-	k := kagome.NewTokenizer()
+func NewKagomeMorphTokenizerWithUserDic(userdic tokenizer.UserDic) *KagomeMorphTokenizer {
+	k := tokenizer.New()
 	k.SetUserDic(userdic)
 	return &KagomeMorphTokenizer{
 		tok: k,
@@ -38,7 +42,7 @@ func NewKagomeMorphTokenizerWithUserDic(userdic *kagome.UserDic) *KagomeMorphTok
 
 func (t *KagomeMorphTokenizer) Tokenize(input []byte) analysis.TokenStream {
 	var (
-		morphs    []kagome.Token
+		morphs    []tokenizer.Token
 		prevstart int
 	)
 
@@ -47,7 +51,7 @@ func (t *KagomeMorphTokenizer) Tokenize(input []byte) analysis.TokenStream {
 		return rv
 	}
 
-	morphs = t.tok.Tokenize(string(input))
+	morphs = t.tok.Analyze(string(input), tokenizer.Search)
 
 	for i, m := range morphs {
 		if m.Surface == "EOS" || m.Surface == "BOS" {
