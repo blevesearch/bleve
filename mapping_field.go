@@ -19,9 +19,15 @@ import (
 // A FieldMapping describes how a specific item
 // should be put into the index.
 type FieldMapping struct {
-	Name               string `json:"name,omitempty"`
-	Type               string `json:"type,omitempty"`
-	Analyzer           string `json:"analyzer,omitempty"`
+	Name string `json:"name,omitempty"`
+	Type string `json:"type,omitempty"`
+
+	// Analyzer specifies the name of the analyzer to use for this field.  If
+	// Analyzer is empty, traverse the DocumentMapping tree toward the root and
+	// pick the first non-empty DefaultAnalyzer found. If there is none, use
+	// the IndexMapping.DefaultAnalyzer.
+	Analyzer string `json:"analyzer,omitempty"`
+
 	Store              bool   `json:"store,omitempty"`
 	Index              bool   `json:"index,omitempty"`
 	IncludeTermVectors bool   `json:"include_term_vectors,omitempty"`

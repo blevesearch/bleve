@@ -127,7 +127,10 @@ func (b *Batch) Reset() {
 // mapping is found and the root DocumentMapping is dynamic, default mappings
 // are used based on value type and IndexMapping default configurations.
 //
-// Finally, mapped values are analyzed, indexed or stored. Examples:
+// Finally, mapped values are analyzed, indexed or stored. See
+// FieldMapping.Analyzer to know how an analyzer is resolved for a given field.
+//
+// Examples:
 //
 //  type Date struct {
 //    Day string `json:"day"`
