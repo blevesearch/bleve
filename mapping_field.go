@@ -132,12 +132,12 @@ func (fm *FieldMapping) processTime(propertyValueTime time.Time, pathString stri
 }
 
 func (fm *FieldMapping) analyzerForField(path []string, context *walkContext) *analysis.Analyzer {
-	analyzerName := context.dm.defaultAnalyzerName(path)
+	analyzerName := fm.Analyzer
 	if analyzerName == "" {
-		analyzerName = context.im.DefaultAnalyzer
-	}
-	if fm.Analyzer != "" {
-		analyzerName = fm.Analyzer
+		analyzerName = context.dm.defaultAnalyzerName(path)
+		if analyzerName == "" {
+			analyzerName = context.im.DefaultAnalyzer
+		}
 	}
 	return context.im.analyzerNamed(analyzerName)
 }
