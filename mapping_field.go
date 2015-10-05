@@ -28,6 +28,8 @@ type FieldMapping struct {
 	// the IndexMapping.DefaultAnalyzer.
 	Analyzer string `json:"analyzer,omitempty"`
 
+	// Store indicates whether to store field values in the index. Stored
+	// values can be retrieved from search results using SearchRequest.Fields.
 	Store              bool   `json:"store,omitempty"`
 	Index              bool   `json:"index,omitempty"`
 	IncludeTermVectors bool   `json:"include_term_vectors,omitempty"`

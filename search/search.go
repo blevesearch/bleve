@@ -37,12 +37,16 @@ type FieldTermLocationMap map[string]TermLocationMap
 type FieldFragmentMap map[string][]string
 
 type DocumentMatch struct {
-	ID        string                 `json:"id"`
-	Score     float64                `json:"score"`
-	Expl      *Explanation           `json:"explanation,omitempty"`
-	Locations FieldTermLocationMap   `json:"locations,omitempty"`
-	Fragments FieldFragmentMap       `json:"fragments,omitempty"`
-	Fields    map[string]interface{} `json:"fields,omitempty"`
+	ID        string               `json:"id"`
+	Score     float64              `json:"score"`
+	Expl      *Explanation         `json:"explanation,omitempty"`
+	Locations FieldTermLocationMap `json:"locations,omitempty"`
+	Fragments FieldFragmentMap     `json:"fragments,omitempty"`
+
+	// Fields contains the values for document fields listed in
+	// SearchRequest.Fields. Text fields are returned as strings, numeric
+	// fields as float64s and date fields as time.RFC3339 formatted strings.
+	Fields map[string]interface{} `json:"fields,omitempty"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
