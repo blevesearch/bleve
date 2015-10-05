@@ -348,7 +348,7 @@ func TestIndexInsertMultiple(t *testing.T) {
 	}
 	err = idx.Open()
 	if err != nil {
-		t.Errorf("error opening index: %v", err)
+		t.Fatalf("error opening index: %v", err)
 	}
 	defer func() {
 		err := idx.Close()

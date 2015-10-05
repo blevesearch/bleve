@@ -114,6 +114,20 @@ func (udc *UpsideDownCouch) loadSchema(kvreader store.KVReader) (err error) {
 	return
 }
 
+var rowBufferPool sync.Pool
+
+func GetRowBuffer() []byte {
+	if rb, ok := rowBufferPool.Get().([]byte); ok {
+		return rb
+	} else {
+		return make([]byte, 2048)
+	}
+}
+
+func PutRowBuffer(buf []byte) {
+	rowBufferPool.Put(buf)
+}
+
 func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDownCouchRow, updateRows []UpsideDownCouchRow, deleteRows []UpsideDownCouchRow) (err error) {
 
 	// prepare batch
@@ -121,29 +135,88 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 
 	// add
 	for _, row := range addRows {
+		keyBuf := GetRowBuffer()
+		valBuf := GetRowBuffer()
 		tfr, ok := row.(*TermFrequencyRow)
 		if ok {
-			// need to increment counter
-			dictionaryKey := tfr.DictionaryRowKey()
-			wb.Merge(dictionaryKey, dictionaryTermIncr)
+			// need to increment term dictinoary counter
+			if tfr.DictionaryRowKeySize() > len(keyBuf) {
+				keyBuf = make([]byte, 2*tfr.DictionaryRowKeySize())
+			}
+			dictKeySize, err := tfr.DictionaryRowKeyTo(keyBuf)
+			if err != nil {
+				return err
+			}
+			wb.Merge(keyBuf[:dictKeySize], dictionaryTermIncr)
 		}
-		wb.Set(row.Key(), row.Value())
+		if row.KeySize() > len(keyBuf) {
+			// grow buffer
+			keyBuf = make([]byte, 2*row.KeySize())
+		}
+		keySize, err := row.KeyTo(keyBuf)
+		if err != nil {
+			return err
+		}
+		if row.ValueSize() > len(valBuf) {
+			// grow buffer
+			valBuf = make([]byte, 2*row.ValueSize())
+		}
+		valSize, err := row.ValueTo(valBuf)
+		wb.Set(keyBuf[:keySize], valBuf[:valSize])
+
+		PutRowBuffer(keyBuf)
+		PutRowBuffer(valBuf)
 	}
 
 	// update
 	for _, row := range updateRows {
-		wb.Set(row.Key(), row.Value())
+		keyBuf := GetRowBuffer()
+		valBuf := GetRowBuffer()
+		if row.KeySize() > len(keyBuf) {
+			// grow buffer
+			keyBuf = make([]byte, 2*row.KeySize())
+		}
+		keySize, err := row.KeyTo(keyBuf)
+		if err != nil {
+			return err
+		}
+		if row.ValueSize() > len(valBuf) {
+			// grow buffer
+			valBuf = make([]byte, 2*row.ValueSize())
+		}
+		valSize, err := row.ValueTo(valBuf)
+		wb.Set(keyBuf[:keySize], valBuf[:valSize])
+
+		PutRowBuffer(keyBuf)
+		PutRowBuffer(valBuf)
 	}
 
 	// delete
 	for _, row := range deleteRows {
+		keyBuf := GetRowBuffer()
 		tfr, ok := row.(*TermFrequencyRow)
 		if ok {
 			// need to decrement counter
-			dictionaryKey := tfr.DictionaryRowKey()
-			wb.Merge(dictionaryKey, dictionaryTermDecr)
+			if tfr.DictionaryRowKeySize() > len(keyBuf) {
+				keyBuf = make([]byte, 2*tfr.DictionaryRowKeySize())
+			}
+			dictKeySize, err := tfr.DictionaryRowKeyTo(keyBuf)
+			if err != nil {
+				return err
+			}
+			wb.Merge(keyBuf[:dictKeySize], dictionaryTermDecr)
 		}
-		wb.Delete(row.Key())
+		if row.KeySize() > len(keyBuf) {
+			// grow buffer
+			keyBuf = make([]byte, 2*row.KeySize())
+		}
+		keySize, err := row.KeyTo(keyBuf)
+		if err != nil {
+			return err
+		}
+		wb.Delete(keyBuf[:keySize])
+
+		PutRowBuffer(keyBuf)
 	}
 
 	// write out the batch
