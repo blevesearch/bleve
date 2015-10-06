@@ -120,7 +120,7 @@ func GetRowBuffer() []byte {
 	if rb, ok := rowBufferPool.Get().([]byte); ok {
 		return rb
 	} else {
-		return make([]byte, 2048)
+		return make([]byte, 4096)
 	}
 }
 
