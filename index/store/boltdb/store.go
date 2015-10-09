@@ -7,6 +7,14 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
+// Package boltdb implements a store.KVStore on top of BoltDB. It supports the
+// following options:
+//
+// "bucket" (string): the name of BoltDB bucket to use, defaults to "bleve".
+//
+// "nosync" (bool): if true, set boltdb.DB.NoSync to true. It speeds up index
+// operations in exchange of losing integrity guarantees if indexation aborts
+// without closing the index. Use it when rebuilding indexes from zero.
 package boltdb
 
 import (
@@ -23,6 +31,7 @@ type Store struct {
 	path   string
 	bucket string
 	db     *bolt.DB
+	noSync bool
 	mo     store.MergeOperator
 }
 
@@ -37,10 +46,13 @@ func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, 
 		bucket = "bleve"
 	}
 
+	noSync, _ := config["nosync"].(bool)
+
 	db, err := bolt.Open(path, 0600, nil)
 	if err != nil {
 		return nil, err
 	}
+	db.NoSync = noSync
 
 	err = db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(bucket))
@@ -56,6 +68,7 @@ func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, 
 		bucket: bucket,
 		db:     db,
 		mo:     mo,
+		noSync: noSync,
 	}
 	return &rv, nil
 }
