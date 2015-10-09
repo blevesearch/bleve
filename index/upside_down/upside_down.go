@@ -150,11 +150,7 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 	}
 
 	// write out the batch
-	err = wb.Execute()
-	if err != nil {
-		return
-	}
-	return
+	return wb.Execute()
 }
 
 func (udc *UpsideDownCouch) DocCount() (uint64, error) {
