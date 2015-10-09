@@ -9,6 +9,10 @@
 
 package analysis
 
+// TokenLocation represents one occurrence of a term at a particular location in
+// a field. Start, End and Position have the same meaning as in analysis.Token.
+// Field and ArrayPositions identify the field value in the source document.
+// See document.Field for details.
 type TokenLocation struct {
 	Field          string
 	ArrayPositions []uint64
@@ -17,11 +21,15 @@ type TokenLocation struct {
 	Position       int
 }
 
+// TokenFreq represents all the occurrences of a term in all fields of a
+// document.
 type TokenFreq struct {
 	Term      []byte
 	Locations []*TokenLocation
 }
 
+// TokenFrequencies maps document terms to their combined frequencies from all
+// fields.
 type TokenFrequencies map[string]*TokenFreq
 
 func (tfs TokenFrequencies) MergeAll(remoteField string, other TokenFrequencies) {

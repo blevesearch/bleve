@@ -253,7 +253,7 @@ func ExampleNewFacetRequest() {
 	fmt.Println(searchResults.Facets["facet name"].Total)
 	// numer of docs with no value for this field
 	fmt.Println(searchResults.Facets["facet name"].Missing)
-	// term with highest occurences in field name
+	// term with highest occurrences in field name
 	fmt.Println(searchResults.Facets["facet name"].Terms[0].Term)
 	// Output:
 	// 5
@@ -339,7 +339,7 @@ func ExampleSearchRequest_AddFacet() {
 	fmt.Println(searchResults.Facets["facet name"].Total)
 	// numer of docs with no value for this field
 	fmt.Println(searchResults.Facets["facet name"].Missing)
-	// term with highest occurences in field name
+	// term with highest occurrences in field name
 	fmt.Println(searchResults.Facets["facet name"].Terms[0].Term)
 	// Output:
 	// 5
