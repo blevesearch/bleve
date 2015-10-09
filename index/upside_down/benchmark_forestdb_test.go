@@ -15,72 +15,194 @@ import (
 	"os"
 	"testing"
 
-	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/blevex/forestdb"
 )
 
-func CreateForestDB() (store.KVStore, error) {
-	err := os.MkdirAll("testdir", 0700)
-	if err != nil {
-		return nil, err
-	}
-	s, err := forestdb.New("testdir/test", true, nil)
-	if err != nil {
-		return nil, err
-	}
-	return s, nil
+var forestDBTestOption = map[string]interface{}{
+	"path":              "testdir/test",
+	"create_if_missing": true,
 }
 
+// internally used to reset, so we also
+// re-make the testdir
 func DestroyForestDB() error {
-	return os.RemoveAll("testdir")
+	err := os.RemoveAll("testdir")
+	if err != nil {
+		return err
+	}
+	err = os.MkdirAll("testdir", 0700)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func BenchmarkForestDBIndexing1Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateForestDB, DestroyForestDB, 1)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+	CommonBenchmarkIndex(b, forestdb.Name, forestDBTestOption, DestroyForestDB, 1)
 }
 
 func BenchmarkForestDBIndexing2Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateForestDB, DestroyForestDB, 2)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+	CommonBenchmarkIndex(b, forestdb.Name, forestDBTestOption, DestroyForestDB, 2)
 }
 
 func BenchmarkForestDBIndexing4Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateForestDB, DestroyForestDB, 4)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+	CommonBenchmarkIndex(b, forestdb.Name, forestDBTestOption, DestroyForestDB, 4)
 }
 
 // batches
 
 func BenchmarkForestDBIndexing1Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateForestDB, DestroyForestDB, 1, 10)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+	CommonBenchmarkIndexBatch(b, forestdb.Name, forestDBTestOption, DestroyForestDB, 1, 10)
 }
 
 func BenchmarkForestDBIndexing2Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateForestDB, DestroyForestDB, 2, 10)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+	CommonBenchmarkIndexBatch(b, forestdb.Name, forestDBTestOption, DestroyForestDB, 2, 10)
 }
 
 func BenchmarkForestDBIndexing4Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateForestDB, DestroyForestDB, 4, 10)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+	CommonBenchmarkIndexBatch(b, forestdb.Name, forestDBTestOption, DestroyForestDB, 4, 10)
 }
 
 func BenchmarkForestDBIndexing1Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateForestDB, DestroyForestDB, 1, 100)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+	CommonBenchmarkIndexBatch(b, forestdb.Name, forestDBTestOption, DestroyForestDB, 1, 100)
 }
 
 func BenchmarkForestDBIndexing2Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateForestDB, DestroyForestDB, 2, 100)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+	CommonBenchmarkIndexBatch(b, forestdb.Name, forestDBTestOption, DestroyForestDB, 2, 100)
 }
 
 func BenchmarkForestDBIndexing4Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateForestDB, DestroyForestDB, 4, 100)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+	CommonBenchmarkIndexBatch(b, forestdb.Name, forestDBTestOption, DestroyForestDB, 4, 100)
 }
 
 func BenchmarkForestDBIndexing1Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateForestDB, DestroyForestDB, 1, 1000)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+	CommonBenchmarkIndexBatch(b, forestdb.Name, forestDBTestOption, DestroyForestDB, 1, 1000)
 }
 
 func BenchmarkForestDBIndexing2Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateForestDB, DestroyForestDB, 2, 1000)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+	CommonBenchmarkIndexBatch(b, forestdb.Name, forestDBTestOption, DestroyForestDB, 2, 1000)
 }
 
 func BenchmarkForestDBIndexing4Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateForestDB, DestroyForestDB, 4, 1000)
+	err := os.MkdirAll("testdir", 0700)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		err := os.RemoveAll("testdir")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+	CommonBenchmarkIndexBatch(b, forestdb.Name, forestDBTestOption, DestroyForestDB, 4, 1000)
 }
