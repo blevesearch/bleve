@@ -265,9 +265,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	resultChan := make(chan *index.AnalysisResult)
 	aw := index.NewAnalysisWork(udc, doc, resultChan)
 	// put the work on the queue
-	go func() {
-		udc.analysisQueue.Queue(aw)
-	}()
+	udc.analysisQueue.Queue(aw)
 
 	// wait for the result
 	result := <-resultChan
