@@ -438,18 +438,27 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []in
 	for _, row := range rows {
 		switch row := row.(type) {
 		case *TermFrequencyRow:
-			rowKey := string(row.Key())
-			if _, ok := existingTermKeys[rowKey]; ok {
+			keyBuf := GetRowBuffer()
+			if row.KeySize() > len(keyBuf) {
+				keyBuf = make([]byte, 2*row.KeySize())
+			}
+			keySize, _ := row.KeyTo(keyBuf)
+			if _, ok := existingTermKeys[string(keyBuf[:keySize])]; ok {
 				updateRows = append(updateRows, row)
-				delete(existingTermKeys, rowKey)
+				delete(existingTermKeys, string(keyBuf[:keySize]))
 			} else {
 				addRows = append(addRows, row)
 			}
+			PutRowBuffer(keyBuf)
 		case *StoredRow:
-			rowKey := string(row.Key())
-			if _, ok := existingStoredKeys[rowKey]; ok {
+			keyBuf := GetRowBuffer()
+			if row.KeySize() > len(keyBuf) {
+				keyBuf = make([]byte, 2*row.KeySize())
+			}
+			keySize, _ := row.KeyTo(keyBuf)
+			if _, ok := existingStoredKeys[string(keyBuf[:keySize])]; ok {
 				updateRows = append(updateRows, row)
-				delete(existingStoredKeys, rowKey)
+				delete(existingStoredKeys, string(keyBuf[:keySize]))
 			} else {
 				addRows = append(addRows, row)
 			}
@@ -617,15 +626,25 @@ func (udc *UpsideDownCouch) backIndexRowForDoc(kvreader store.KVReader, docID st
 	tempRow := &BackIndexRow{
 		doc: []byte(docID),
 	}
-	key := tempRow.Key()
-	value, err := kvreader.Get(key)
+
+	keyBuf := GetRowBuffer()
+	if tempRow.KeySize() > len(keyBuf) {
+		keyBuf = make([]byte, 2*tempRow.KeySize())
+	}
+	defer PutRowBuffer(keyBuf)
+	keySize, err := tempRow.KeyTo(keyBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	value, err := kvreader.Get(keyBuf[:keySize])
 	if err != nil {
 		return nil, err
 	}
 	if value == nil {
 		return nil, nil
 	}
-	backIndexRow, err := NewBackIndexRowKV(key, value)
+	backIndexRow, err := NewBackIndexRowKV(keyBuf[:keySize], value)
 	if err != nil {
 		return nil, err
 	}
