@@ -24,7 +24,7 @@ func NewPrefixCodedInt64(in int64, shift uint) (PrefixCoded, error) {
 		return nil, fmt.Errorf("cannot shift %d, must be between 0 and 63", shift)
 	}
 
-	nChars := (((63 - shift) * 37) >> 8) + 1
+	nChars := ((63 - shift) / 7) + 1
 	rv := make(PrefixCoded, nChars+1)
 	rv[0] = ShiftStartInt64 + byte(shift)
 
