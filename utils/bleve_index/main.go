@@ -20,9 +20,12 @@ import (
 	_ "github.com/blevesearch/bleve/config"
 )
 
-var indexPath = flag.String("index", "", "index path")
-var keepExt = flag.Bool("keepExt", false, "keep extension in doc id")
-var keepDir = flag.Bool("keepDir", false, "keep dir in doc id")
+var (
+	indexPath = flag.String("index", "", "index path")
+	keepExt   = flag.Bool("keepExt", false, "keep extension in doc id")
+	keepDir   = flag.Bool("keepDir", false, "keep dir in doc id")
+	rv        chan file
+)
 
 func main() {
 
@@ -72,12 +75,12 @@ type file struct {
 }
 
 func handleArgs(args []string) chan file {
-	rv := make(chan file)
+	rv = make(chan file)
 
 	go func() {
 		for _, arg := range args {
 			arg = filepath.Clean(arg)
-			handleArgRecursive(arg, rv)
+			filepath.Walk(arg, getallfiles)
 		}
 		close(rv)
 	}()
@@ -85,32 +88,23 @@ func handleArgs(args []string) chan file {
 	return rv
 }
 
-func handleArgRecursive(arg string, results chan file) {
-	stat, err := os.Stat(arg)
+func getallfiles(path string, finfo os.FileInfo, err error) error {
 	if err != nil {
 		log.Print(err)
-		return
+		return err
 	}
-	if stat.IsDir() {
-		// open the directory
-		dirEntries, err := ioutil.ReadDir(arg)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// walk the directory entries
-		for _, dirEntry := range dirEntries {
-			handleArgRecursive(arg+string(os.PathSeparator)+dirEntry.Name(), results)
-		}
-	} else {
-		bytes, err := ioutil.ReadFile(arg)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		results <- file{
-			filename: arg,
-			contents: bytes,
-		}
+	if finfo.IsDir() {
+		return nil
 	}
+
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	rv <- file{
+		filename: filepath.Base(path),
+		contents: bytes,
+	}
+
+	return nil
 }
