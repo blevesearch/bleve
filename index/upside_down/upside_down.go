@@ -120,7 +120,7 @@ func GetRowBuffer() []byte {
 	if rb, ok := rowBufferPool.Get().([]byte); ok {
 		return rb
 	} else {
-		return make([]byte, 4096)
+		return make([]byte, 4*1024)
 	}
 }
 
@@ -133,91 +133,59 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 	// prepare batch
 	wb := writer.NewBatch()
 
+	// buffer to work with
+	rowBuf := GetRowBuffer()
+
 	// add
 	for _, row := range addRows {
-		keyBuf := GetRowBuffer()
-		valBuf := GetRowBuffer()
 		tfr, ok := row.(*TermFrequencyRow)
 		if ok {
-			// need to increment term dictinoary counter
-			if tfr.DictionaryRowKeySize() > len(keyBuf) {
-				keyBuf = make([]byte, 2*tfr.DictionaryRowKeySize())
-			}
-			dictKeySize, err := tfr.DictionaryRowKeyTo(keyBuf)
+			dictKeySize, err := tfr.DictionaryRowKeyTo(rowBuf)
 			if err != nil {
 				return err
 			}
-			wb.Merge(keyBuf[:dictKeySize], dictionaryTermIncr)
+			wb.Merge(rowBuf[:dictKeySize], dictionaryTermIncr)
 		}
-		if row.KeySize() > len(keyBuf) {
-			// grow buffer
-			keyBuf = make([]byte, 2*row.KeySize())
-		}
-		keySize, err := row.KeyTo(keyBuf)
+		keySize, err := row.KeyTo(rowBuf)
 		if err != nil {
 			return err
 		}
-		if row.ValueSize() > len(valBuf) {
-			// grow buffer
-			valBuf = make([]byte, 2*row.ValueSize())
-		}
-		valSize, err := row.ValueTo(valBuf)
-		wb.Set(keyBuf[:keySize], valBuf[:valSize])
-
-		PutRowBuffer(keyBuf)
-		PutRowBuffer(valBuf)
+		valSize, err := row.ValueTo(rowBuf[keySize:])
+		wb.Set(rowBuf[:keySize], rowBuf[keySize:keySize+valSize])
 	}
 
 	// update
 	for _, row := range updateRows {
-		keyBuf := GetRowBuffer()
-		valBuf := GetRowBuffer()
-		if row.KeySize() > len(keyBuf) {
-			// grow buffer
-			keyBuf = make([]byte, 2*row.KeySize())
-		}
-		keySize, err := row.KeyTo(keyBuf)
+		keySize, err := row.KeyTo(rowBuf)
 		if err != nil {
 			return err
 		}
-		if row.ValueSize() > len(valBuf) {
-			// grow buffer
-			valBuf = make([]byte, 2*row.ValueSize())
+		valSize, err := row.ValueTo(rowBuf[keySize:])
+		if err != nil {
+			return err
 		}
-		valSize, err := row.ValueTo(valBuf)
-		wb.Set(keyBuf[:keySize], valBuf[:valSize])
-
-		PutRowBuffer(keyBuf)
-		PutRowBuffer(valBuf)
+		wb.Set(rowBuf[:keySize], rowBuf[keySize:keySize+valSize])
 	}
 
 	// delete
 	for _, row := range deleteRows {
-		keyBuf := GetRowBuffer()
 		tfr, ok := row.(*TermFrequencyRow)
 		if ok {
 			// need to decrement counter
-			if tfr.DictionaryRowKeySize() > len(keyBuf) {
-				keyBuf = make([]byte, 2*tfr.DictionaryRowKeySize())
-			}
-			dictKeySize, err := tfr.DictionaryRowKeyTo(keyBuf)
+			dictKeySize, err := tfr.DictionaryRowKeyTo(rowBuf)
 			if err != nil {
 				return err
 			}
-			wb.Merge(keyBuf[:dictKeySize], dictionaryTermDecr)
+			wb.Merge(rowBuf[:dictKeySize], dictionaryTermDecr)
 		}
-		if row.KeySize() > len(keyBuf) {
-			// grow buffer
-			keyBuf = make([]byte, 2*row.KeySize())
-		}
-		keySize, err := row.KeyTo(keyBuf)
+		keySize, err := row.KeyTo(rowBuf)
 		if err != nil {
 			return err
 		}
-		wb.Delete(keyBuf[:keySize])
-
-		PutRowBuffer(keyBuf)
+		wb.Delete(rowBuf[:keySize])
 	}
+
+	PutRowBuffer(rowBuf)
 
 	// write out the batch
 	return writer.ExecuteBatch(wb)
@@ -435,13 +403,10 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []in
 		existingStoredKeys[string(key)] = true
 	}
 
+	keyBuf := GetRowBuffer()
 	for _, row := range rows {
 		switch row := row.(type) {
 		case *TermFrequencyRow:
-			keyBuf := GetRowBuffer()
-			if row.KeySize() > len(keyBuf) {
-				keyBuf = make([]byte, 2*row.KeySize())
-			}
 			keySize, _ := row.KeyTo(keyBuf)
 			if _, ok := existingTermKeys[string(keyBuf[:keySize])]; ok {
 				updateRows = append(updateRows, row)
@@ -449,12 +414,7 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []in
 			} else {
 				addRows = append(addRows, row)
 			}
-			PutRowBuffer(keyBuf)
 		case *StoredRow:
-			keyBuf := GetRowBuffer()
-			if row.KeySize() > len(keyBuf) {
-				keyBuf = make([]byte, 2*row.KeySize())
-			}
 			keySize, _ := row.KeyTo(keyBuf)
 			if _, ok := existingStoredKeys[string(keyBuf[:keySize])]; ok {
 				updateRows = append(updateRows, row)
@@ -465,8 +425,8 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []in
 		default:
 			updateRows = append(updateRows, row)
 		}
-
 	}
+	PutRowBuffer(keyBuf)
 
 	// any of the existing rows that weren't updated need to be deleted
 	for existingTermKey := range existingTermKeys {
