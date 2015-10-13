@@ -18,6 +18,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 	fivePointOh := 5.0
 	theTruth := true
 	theFalsehood := false
+	theDate := "02 Jan 06 15:04 MST"
 	tests := []struct {
 		input   string
 		result  Query
@@ -324,6 +325,46 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				},
 				nil),
 		},
+		{
+			input:   `field:>"02 Jan 06 15:04 MST"`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewDateRangeInclusiveQuery(&theDate, nil, &theFalsehood, nil).SetField("field"),
+				},
+				nil),
+		},
+		{
+			input:   `field:>="02 Jan 06 15:04 MST"`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewDateRangeInclusiveQuery(&theDate, nil, &theTruth, nil).SetField("field"),
+				},
+				nil),
+		},
+		{
+			input:   `field:<"02 Jan 06 15:04 MST"`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewDateRangeInclusiveQuery(nil, &theDate, nil, &theFalsehood).SetField("field"),
+				},
+				nil),
+		},
+		{
+			input:   `field:<="02 Jan 06 15:04 MST"`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewDateRangeInclusiveQuery(nil, &theDate, nil, &theTruth).SetField("field"),
+				},
+				nil),
+		},
 	}
 
 	// turn on lexer debugging
@@ -358,6 +399,10 @@ func TestQuerySyntaxParserInvalid(t *testing.T) {
 		{"field:~text"},
 		{"field:^text"},
 		{"field::text"},
+		{`field:>"Random phrase"`},
+		{`field:>="Random phrase"`},
+		{`field:<"Random phrase"`},
+		{`field:<="Random phrase"`},
 	}
 
 	// turn on lexer debugging
