@@ -256,43 +256,44 @@ func TestDictionaryRowValueBug197(t *testing.T) {
 }
 
 func BenchmarkTermFrequencyRowEncode(b *testing.B) {
+	row := NewTermFrequencyRowWithTermVectors(
+		[]byte{'b', 'e', 'e', 'r'},
+		0,
+		"budweiser",
+		3,
+		3.14,
+		[]*TermVector{
+			&TermVector{
+				field: 0,
+				pos:   1,
+				start: 3,
+				end:   11,
+			},
+			&TermVector{
+				field: 0,
+				pos:   2,
+				start: 23,
+				end:   31,
+			},
+			&TermVector{
+				field: 0,
+				pos:   3,
+				start: 43,
+				end:   51,
+			},
+		})
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		row := NewTermFrequencyRowWithTermVectors(
-			[]byte{'b', 'e', 'e', 'r'},
-			0,
-			"budweiser",
-			3,
-			3.14,
-			[]*TermVector{
-				&TermVector{
-					field: 0,
-					pos:   1,
-					start: 3,
-					end:   11,
-				},
-				&TermVector{
-					field: 0,
-					pos:   2,
-					start: 23,
-					end:   31,
-				},
-				&TermVector{
-					field: 0,
-					pos:   3,
-					start: 43,
-					end:   51,
-				},
-			})
-
 		row.Key()
 		row.Value()
 	}
 }
 
 func BenchmarkTermFrequencyRowDecode(b *testing.B) {
+	k := []byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'}
+	v := []byte{3, 195, 235, 163, 130, 4, 0, 1, 3, 11, 0, 0, 2, 23, 31, 0, 0, 3, 43, 51, 0}
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		k := []byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'}
-		v := []byte{3, 195, 235, 163, 130, 4, 0, 1, 3, 11, 0, 0, 2, 23, 31, 0, 0, 3, 43, 51, 0}
 		_, err := NewTermFrequencyRowKV(k, v)
 		if err != nil {
 			b.Fatal(err)
@@ -303,29 +304,30 @@ func BenchmarkTermFrequencyRowDecode(b *testing.B) {
 func BenchmarkBackIndexRowEncode(b *testing.B) {
 	field := uint32(1)
 	t1 := "term1"
-	for i := 0; i < b.N; i++ {
-		row := NewBackIndexRow("beername",
-			[]*BackIndexTermEntry{
-				&BackIndexTermEntry{
-					Term:  &t1,
-					Field: &field,
-				},
+	row := NewBackIndexRow("beername",
+		[]*BackIndexTermEntry{
+			&BackIndexTermEntry{
+				Term:  &t1,
+				Field: &field,
 			},
-			[]*BackIndexStoreEntry{
-				&BackIndexStoreEntry{
-					Field: &field,
-				},
-			})
-
+		},
+		[]*BackIndexStoreEntry{
+			&BackIndexStoreEntry{
+				Field: &field,
+			},
+		})
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
 		row.Key()
 		row.Value()
 	}
 }
 
 func BenchmarkBackIndexRowDecode(b *testing.B) {
+	k := []byte{0x62, 0x62, 0x65, 0x65, 0x72, 0x6e, 0x61, 0x6d, 0x65}
+	v := []byte{0x0a, 0x09, 0x0a, 0x05, 0x74, 0x65, 0x72, 0x6d, 0x31, 0x10, 0x01, 0x12, 0x02, 0x08, 0x01}
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		k := []byte{0x62, 0x62, 0x65, 0x65, 0x72, 0x6e, 0x61, 0x6d, 0x65}
-		v := []byte{0x0a, 0x09, 0x0a, 0x05, 0x74, 0x65, 0x72, 0x6d, 0x31, 0x10, 0x01, 0x12, 0x02, 0x08, 0x01}
 		_, err := NewBackIndexRowKV(k, v)
 		if err != nil {
 			b.Fatal(err)
@@ -334,18 +336,19 @@ func BenchmarkBackIndexRowDecode(b *testing.B) {
 }
 
 func BenchmarkStoredRowEncode(b *testing.B) {
+	row := NewStoredRow("budweiser", 0, []uint64{}, byte('t'), []byte("an american beer"))
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		row := NewStoredRow("budweiser", 0, []uint64{}, byte('t'), []byte("an american beer"))
-
 		row.Key()
 		row.Value()
 	}
 }
 
 func BenchmarkStoredRowDecode(b *testing.B) {
+	k := []byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', ByteSeparator, 0, 0}
+	v := []byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'}
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		k := []byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', ByteSeparator, 0, 0}
-		v := []byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'}
 		_, err := NewStoredRowKV(k, v)
 		if err != nil {
 			b.Fatal(err)
