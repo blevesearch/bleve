@@ -17,6 +17,7 @@ import (
 
 	"github.com/blevesearch/bleve"
 	_ "github.com/blevesearch/bleve/config"
+	_ "github.com/blevesearch/bleve/index/store/metrics"
 	"github.com/blevesearch/bleve/index/upside_down"
 )
 
