@@ -24,7 +24,6 @@ var (
 	indexPath = flag.String("index", "", "index path")
 	keepExt   = flag.Bool("keepExt", false, "keep extension in doc id")
 	keepDir   = flag.Bool("keepDir", false, "keep dir in doc id")
-	rv        chan file
 )
 
 func main() {
@@ -75,36 +74,36 @@ type file struct {
 }
 
 func handleArgs(args []string) chan file {
-	rv = make(chan file)
-
-	go func() {
-		for _, arg := range args {
-			arg = filepath.Clean(arg)
-			filepath.Walk(arg, getallfiles)
-		}
-		close(rv)
-	}()
-
+	rv := make(chan file)
+	go getAllFiles(args, rv)
 	return rv
 }
 
-func getallfiles(path string, finfo os.FileInfo, err error) error {
-	if err != nil {
-		log.Print(err)
-		return err
-	}
-	if finfo.IsDir() {
-		return nil
-	}
+func getAllFiles(args []string, rv chan file) {
+	for _, arg := range args {
+		arg = filepath.Clean(arg)
+		err := filepath.Walk(arg, func(path string, finfo os.FileInfo, err error) error {
+			if err != nil {
+				log.Print(err)
+				return err
+			}
+			if finfo.IsDir() {
+				return nil
+			}
 
-	bytes, err := ioutil.ReadFile(path)
-	if err != nil {
-		log.Fatal(err)
+			bytes, err := ioutil.ReadFile(path)
+			if err != nil {
+				log.Fatal(err)
+			}
+			rv <- file{
+				filename: filepath.Base(path),
+				contents: bytes,
+			}
+			return nil
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
-	rv <- file{
-		filename: filepath.Base(path),
-		contents: bytes,
-	}
-
-	return nil
+	close(rv)
 }
