@@ -163,7 +163,7 @@ type Index interface {
 	// Document returns specified document or nil if the document is not
 	// indexed or stored.
 	Document(id string) (*document.Document, error)
-	// DocCount returns the number of indexed or stored documents.
+	// DocCount returns the number of documents in the index.
 	DocCount() (uint64, error)
 
 	Search(req *SearchRequest) (*SearchResult, error)
