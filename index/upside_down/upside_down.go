@@ -28,6 +28,13 @@ import (
 
 const Name = "upside_down"
 
+// RowBufferSize should ideally this is sized to be the smallest
+// size that can cotain an index row key and its corresponding
+// value.  It is not a limit, if need be a larger buffer is
+// allocated, but performance will be more optimal if *most*
+// rows fit this size.
+const RowBufferSize = 4 * 1024
+
 var VersionKey = []byte{'v'}
 
 var UnsafeBatchUseDetected = fmt.Errorf("bleve.Batch is NOT thread-safe, modification after execution detected")
@@ -120,7 +127,7 @@ func GetRowBuffer() []byte {
 	if rb, ok := rowBufferPool.Get().([]byte); ok {
 		return rb
 	} else {
-		return make([]byte, 4*1024)
+		return make([]byte, RowBufferSize)
 	}
 }
 
@@ -140,11 +147,17 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 	for _, row := range addRows {
 		tfr, ok := row.(*TermFrequencyRow)
 		if ok {
+			if tfr.DictionaryRowKeySize() > len(rowBuf) {
+				rowBuf = make([]byte, tfr.DictionaryRowKeySize())
+			}
 			dictKeySize, err := tfr.DictionaryRowKeyTo(rowBuf)
 			if err != nil {
 				return err
 			}
 			wb.Merge(rowBuf[:dictKeySize], dictionaryTermIncr)
+		}
+		if row.KeySize()+row.ValueSize() > len(rowBuf) {
+			rowBuf = make([]byte, row.KeySize()+row.ValueSize())
 		}
 		keySize, err := row.KeyTo(rowBuf)
 		if err != nil {
@@ -156,6 +169,9 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 
 	// update
 	for _, row := range updateRows {
+		if row.KeySize()+row.ValueSize() > len(rowBuf) {
+			rowBuf = make([]byte, row.KeySize()+row.ValueSize())
+		}
 		keySize, err := row.KeyTo(rowBuf)
 		if err != nil {
 			return err
@@ -172,11 +188,17 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 		tfr, ok := row.(*TermFrequencyRow)
 		if ok {
 			// need to decrement counter
+			if tfr.DictionaryRowKeySize() > len(rowBuf) {
+				rowBuf = make([]byte, tfr.DictionaryRowKeySize())
+			}
 			dictKeySize, err := tfr.DictionaryRowKeyTo(rowBuf)
 			if err != nil {
 				return err
 			}
 			wb.Merge(rowBuf[:dictKeySize], dictionaryTermDecr)
+		}
+		if row.KeySize()+row.ValueSize() > len(rowBuf) {
+			rowBuf = make([]byte, row.KeySize()+row.ValueSize())
 		}
 		keySize, err := row.KeyTo(rowBuf)
 		if err != nil {
