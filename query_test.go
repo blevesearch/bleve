@@ -12,12 +12,14 @@ package bleve
 import (
 	"reflect"
 	"testing"
+	"time"
 )
 
 var minNum = 5.1
 var maxNum = 7.1
-var startDate = "2011-01-01"
-var endDate = "2012-01-01"
+var startDate = time.Date(2011, 1, 1, 0, 0, 0, 0, time.UTC)
+var endDate = time.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)
+var noDate = time.Time{}
 
 func TestParseQuery(t *testing.T) {
 	tests := []struct {
@@ -57,8 +59,16 @@ func TestParseQuery(t *testing.T) {
 			output: NewNumericRangeQuery(&minNum, &maxNum).SetField("desc"),
 		},
 		{
-			input:  []byte(`{"start":"` + startDate + `","end":"` + endDate + `","field":"desc"}`),
-			output: NewDateRangeQuery(&startDate, &endDate).SetField("desc"),
+			input:  []byte(`{"start":"` + startDate.Format(time.RFC3339Nano) + `","end":"` + endDate.Format(time.RFC3339Nano) + `", "inclusive_start":true, "inclusive_end": false, "field":"desc"}`),
+			output: NewDateRangeQuery(startDate, endDate).SetField("desc"),
+		},
+		{
+			input:  []byte(`{"start":"` + startDate.Format(time.RFC3339Nano) + `", "inclusive_start":true, "field":"desc"}`),
+			output: NewDateRangeQuery(startDate, noDate).SetField("desc"),
+		},
+		{
+			input:  []byte(`{"end":"` + endDate.Format(time.RFC3339Nano) + `", "inclusive_end":false, "field":"desc"}`),
+			output: NewDateRangeQuery(noDate, endDate).SetField("desc"),
 		},
 		{
 			input:  []byte(`{"prefix":"budwei","field":"desc"}`),
@@ -110,7 +120,7 @@ func TestSetGetField(t *testing.T) {
 			field: "desc",
 		},
 		{
-			query: NewDateRangeQuery(&startDate, &endDate).SetField("desc"),
+			query: NewDateRangeQuery(startDate, endDate).SetField("desc"),
 			field: "desc",
 		},
 		{
@@ -153,7 +163,7 @@ func TestQueryValidate(t *testing.T) {
 			err:   ErrorNumericQueryNoBounds,
 		},
 		{
-			query: NewDateRangeQuery(&startDate, &endDate).SetField("desc"),
+			query: NewDateRangeQuery(startDate, endDate).SetField("desc"),
 			err:   nil,
 		},
 		{
