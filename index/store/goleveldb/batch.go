@@ -32,22 +32,6 @@ func (b *Batch) Merge(key, val []byte) {
 	b.merge.Merge(key, val)
 }
 
-// func (b *Batch) Execute() error {
-
-// 	// first process merges
-// 	ops, err := b.merge.ExecuteDeferred(b.w)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	for _, op := range ops {
-// 		b.batch.Put(op.K, op.V)
-// 	}
-
-// 	wopts := defaultWriteOptions()
-// 	err = b.w.store.db.Write(b.batch, wopts)
-// 	return err
-// }
-
 func (b *Batch) Reset() {
 	b.batch.Reset()
 	b.merge = store.NewEmulatedMerge(b.store.mo)

@@ -20,14 +20,6 @@ type Writer struct {
 	store *Store
 }
 
-func (w *Writer) Set(key, val []byte) error {
-	return w.store.db.Put(key, val, w.store.defaultWriteOptions)
-}
-
-func (w *Writer) Delete(key []byte) error {
-	return w.store.db.Delete(key, w.store.defaultWriteOptions)
-}
-
 func (w *Writer) NewBatch() store.KVBatch {
 	rv := Batch{
 		store: w.store,
