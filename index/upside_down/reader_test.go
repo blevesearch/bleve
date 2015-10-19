@@ -19,7 +19,12 @@ import (
 )
 
 func TestIndexReader(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -189,7 +194,12 @@ func TestIndexReader(t *testing.T) {
 }
 
 func TestIndexDocIdReader(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)

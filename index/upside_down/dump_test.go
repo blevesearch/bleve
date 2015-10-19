@@ -20,7 +20,12 @@ import (
 )
 
 func TestDump(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)

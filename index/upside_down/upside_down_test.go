@@ -33,7 +33,12 @@ var testAnalyzer = &analysis.Analyzer{
 }
 
 func TestIndexOpenReopen(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -87,7 +92,12 @@ func TestIndexOpenReopen(t *testing.T) {
 }
 
 func TestIndexInsert(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -142,7 +152,12 @@ func TestIndexInsert(t *testing.T) {
 }
 
 func TestIndexInsertThenDelete(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -233,7 +248,12 @@ func TestIndexInsertThenDelete(t *testing.T) {
 }
 
 func TestIndexInsertThenUpdate(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -296,7 +316,12 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 }
 
 func TestIndexInsertMultiple(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -375,7 +400,12 @@ func TestIndexInsertMultiple(t *testing.T) {
 }
 
 func TestIndexInsertWithStore(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -457,7 +487,12 @@ func TestIndexInsertWithStore(t *testing.T) {
 }
 
 func TestIndexInternalCRUD(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -546,7 +581,12 @@ func TestIndexInternalCRUD(t *testing.T) {
 }
 
 func TestIndexBatch(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -639,7 +679,12 @@ func TestIndexBatch(t *testing.T) {
 }
 
 func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -827,7 +872,12 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 }
 
 func TestIndexInsertFields(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -882,7 +932,12 @@ func TestIndexInsertFields(t *testing.T) {
 }
 
 func TestIndexUpdateComposites(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -974,7 +1029,12 @@ func TestIndexUpdateComposites(t *testing.T) {
 }
 
 func TestIndexFieldsMisc(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -1016,7 +1076,12 @@ func TestIndexFieldsMisc(t *testing.T) {
 }
 
 func TestIndexTermReaderCompositeFields(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -1072,7 +1137,12 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 }
 
 func TestIndexDocumentFieldTerms(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
@@ -1159,7 +1229,12 @@ func BenchmarkBatch(b *testing.B) {
 }
 
 func TestConcurrentUpdate(t *testing.T) {
-	defer DestroyTest()
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
