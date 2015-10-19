@@ -345,9 +345,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	resultChan := make(chan *index.AnalysisResult)
 	aw := index.NewAnalysisWork(udc, doc, resultChan)
 	// put the work on the queue
-	go func() {
-		udc.analysisQueue.Queue(aw)
-	}()
+	udc.analysisQueue.Queue(aw)
 
 	// wait for the result
 	result := <-resultChan
@@ -501,10 +499,10 @@ func encodeFieldType(f document.Field) byte {
 func (udc *UpsideDownCouch) indexField(docID string, field document.Field, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies) ([]index.IndexRow, []*BackIndexTermEntry) {
 
 	rows := make([]index.IndexRow, 0, 100)
-	backIndexTermEntries := make([]*BackIndexTermEntry, 0)
+	backIndexTermEntries := make([]*BackIndexTermEntry, 0, len(tokenFreqs))
 	fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
 
-	for _, tf := range tokenFreqs {
+	for k, tf := range tokenFreqs {
 		var termFreqRow *TermFrequencyRow
 		if field.Options().IncludeTermVectors() {
 			tv, newFieldRows := udc.termVectorsFromTokenFreq(fieldIndex, tf)
@@ -515,7 +513,7 @@ func (udc *UpsideDownCouch) indexField(docID string, field document.Field, field
 		}
 
 		// record the back index entry
-		backIndexTermEntry := BackIndexTermEntry{Term: proto.String(string(tf.Term)), Field: proto.Uint32(uint32(fieldIndex))}
+		backIndexTermEntry := BackIndexTermEntry{Term: proto.String(k), Field: proto.Uint32(uint32(fieldIndex))}
 		backIndexTermEntries = append(backIndexTermEntries, &backIndexTermEntry)
 
 		rows = append(rows, termFreqRow)
