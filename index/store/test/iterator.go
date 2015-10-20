@@ -11,12 +11,39 @@ import (
 
 // tests around the correct behavior of iterators
 
+type testRow struct {
+	key []byte
+	val []byte
+}
+
+func batchWriteRows(s store.KVStore, rows []testRow) error {
+	// open a writer
+	writer, err := s.Writer()
+	if err != nil {
+		return err
+	}
+
+	// write the data
+	batch := writer.NewBatch()
+	for _, row := range rows {
+		batch.Set(row.key, row.val)
+	}
+	err = writer.ExecuteBatch(batch)
+	if err != nil {
+		return err
+	}
+
+	// close the writer
+	err = writer.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func CommonTestPrefixIterator(t *testing.T, s store.KVStore) {
 
-	data := []struct {
-		key []byte
-		val []byte
-	}{
+	data := []testRow{
 		{[]byte("apple"), []byte("val")},
 		{[]byte("cat1"), []byte("val")},
 		{[]byte("cat2"), []byte("val")},
@@ -40,24 +67,7 @@ func CommonTestPrefixIterator(t *testing.T, s store.KVStore) {
 		[]byte("dog4"),
 	}
 
-	// open a writer
-	writer, err := s.Writer()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// write the data
-	batch := writer.NewBatch()
-	for _, row := range data {
-		batch.Set(row.key, row.val)
-	}
-	err = writer.ExecuteBatch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// close the writer
-	err = writer.Close()
+	err := batchWriteRows(s, data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,10 +133,7 @@ func CommonTestPrefixIterator(t *testing.T, s store.KVStore) {
 
 func CommonTestRangeIterator(t *testing.T, s store.KVStore) {
 
-	data := []struct {
-		key []byte
-		val []byte
-	}{
+	data := []testRow{
 		{[]byte("a1"), []byte("val")},
 		{[]byte("b1"), []byte("val")},
 		{[]byte("b2"), []byte("val")},
@@ -154,24 +161,7 @@ func CommonTestRangeIterator(t *testing.T, s store.KVStore) {
 		}
 	}
 
-	// open a writer
-	writer, err := s.Writer()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// write the data
-	batch := writer.NewBatch()
-	for _, row := range data {
-		batch.Set(row.key, row.val)
-	}
-	err = writer.ExecuteBatch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// close the writer
-	err = writer.Close()
+	err := batchWriteRows(s, data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,10 +269,7 @@ func CommonTestRangeIterator(t *testing.T, s store.KVStore) {
 
 func CommonTestRangeIteratorSeek(t *testing.T, s store.KVStore) {
 
-	data := []struct {
-		key []byte
-		val []byte
-	}{
+	data := []testRow{
 		{[]byte("a1"), []byte("val")},
 		{[]byte("b1"), []byte("val")},
 		{[]byte("c1"), []byte("val")},
@@ -290,24 +277,7 @@ func CommonTestRangeIteratorSeek(t *testing.T, s store.KVStore) {
 		{[]byte("e1"), []byte("val")},
 	}
 
-	// open a writer
-	writer, err := s.Writer()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// write the data
-	batch := writer.NewBatch()
-	for _, row := range data {
-		batch.Set(row.key, row.val)
-	}
-	err = writer.ExecuteBatch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// close the writer
-	err = writer.Close()
+	err := batchWriteRows(s, data)
 	if err != nil {
 		t.Fatal(err)
 	}
