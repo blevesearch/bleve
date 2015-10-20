@@ -17,6 +17,9 @@ import (
 
 func TestBooleanSearch(t *testing.T) {
 
+	if twoDocIndex == nil {
+		t.Fatal("its null")
+	}
 	twoDocIndexReader, err := twoDocIndex.Reader()
 	if err != nil {
 		t.Error(err)

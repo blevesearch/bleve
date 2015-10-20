@@ -12,71 +12,62 @@
 package upside_down
 
 import (
-	"os"
 	"testing"
 
-	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/blevex/rocksdb"
 )
 
 var rocksdbTestOptions = map[string]interface{}{
+	"path":              "test",
 	"create_if_missing": true,
 }
 
-func CreateGoRocksDB() (store.KVStore, error) {
-	return rocksdb.New("test", rocksdbTestOptions)
-}
-
-func DestroyGoRocksDB() error {
-	return os.RemoveAll("test")
-}
-
 func BenchmarkRocksDBIndexing1Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateGoRocksDB, DestroyGoRocksDB, 1)
+	CommonBenchmarkIndex(b, rocksdb.Name, rocksdbTestOptions, DestroyTest, 1)
 }
 
 func BenchmarkRocksDBIndexing2Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateGoRocksDB, DestroyGoRocksDB, 2)
+	CommonBenchmarkIndex(b, rocksdb.Name, rocksdbTestOptions, DestroyTest, 2)
 }
 
 func BenchmarkRocksDBIndexing4Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateGoRocksDB, DestroyGoRocksDB, 4)
+	CommonBenchmarkIndex(b, rocksdb.Name, rocksdbTestOptions, DestroyTest, 4)
 }
 
 // batches
 
 func BenchmarkRocksDBIndexing1Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoRocksDB, DestroyGoRocksDB, 1, 10)
+	CommonBenchmarkIndexBatch(b, rocksdb.Name, rocksdbTestOptions, DestroyTest, 1, 10)
 }
 
 func BenchmarkRocksDBIndexing2Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoRocksDB, DestroyGoRocksDB, 2, 10)
+	CommonBenchmarkIndexBatch(b, rocksdb.Name, rocksdbTestOptions, DestroyTest, 2, 10)
 }
 
 func BenchmarkRocksDBIndexing4Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoRocksDB, DestroyGoRocksDB, 4, 10)
+	CommonBenchmarkIndexBatch(b, rocksdb.Name, rocksdbTestOptions, DestroyTest, 4, 10)
 }
 
 func BenchmarkRocksDBIndexing1Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoRocksDB, DestroyGoRocksDB, 1, 100)
+	CommonBenchmarkIndexBatch(b, rocksdb.Name, rocksdbTestOptions, DestroyTest, 1, 100)
 }
 
 func BenchmarkRocksDBIndexing2Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoRocksDB, DestroyGoRocksDB, 2, 100)
+	CommonBenchmarkIndexBatch(b, rocksdb.Name, rocksdbTestOptions, DestroyTest, 2, 100)
 }
 
 func BenchmarkRocksDBIndexing4Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoRocksDB, DestroyGoRocksDB, 4, 100)
+	CommonBenchmarkIndexBatch(b, rocksdb.Name, rocksdbTestOptions, DestroyTest, 4, 100)
 }
 
 func BenchmarkRocksDBIndexing1Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoRocksDB, DestroyGoRocksDB, 1, 1000)
+	CommonBenchmarkIndexBatch(b, rocksdb.Name, rocksdbTestOptions, DestroyTest, 1, 1000)
 }
 
 func BenchmarkRocksDBIndexing2Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoRocksDB, DestroyGoRocksDB, 2, 1000)
+	CommonBenchmarkIndexBatch(b, rocksdb.Name, rocksdbTestOptions, DestroyTest, 2, 1000)
 }
 
 func BenchmarkRocksDBIndexing4Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoRocksDB, DestroyGoRocksDB, 4, 1000)
+	CommonBenchmarkIndexBatch(b, rocksdb.Name, rocksdbTestOptions, DestroyTest, 4, 1000)
 }

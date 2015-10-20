@@ -7,31 +7,21 @@ import (
 )
 
 func TestStore(t *testing.T) {
-	s, err := New()
+	s, err := New(nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	CommonTestKVStore(t, s)
+	NullTestKVStore(t, s)
 }
 
-func CommonTestKVStore(t *testing.T, s store.KVStore) {
+// NullTestKVStore has very different expectations
+// compared to CommonTestKVStore
+func NullTestKVStore(t *testing.T, s store.KVStore) {
 
 	writer, err := s.Writer()
 	if err != nil {
 		t.Error(err)
-	}
-	err = writer.Set([]byte("a"), []byte("val-a"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = writer.Set([]byte("z"), []byte("val-z"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = writer.Delete([]byte("z"))
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	batch := writer.NewBatch()
@@ -45,7 +35,7 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 	batch.Set([]byte("i"), []byte("val-i"))
 	batch.Set([]byte("j"), []byte("val-j"))
 
-	err = batch.Execute()
+	err = writer.ExecuteBatch(batch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +54,7 @@ func CommonTestKVStore(t *testing.T, s store.KVStore) {
 			t.Fatal(err)
 		}
 	}()
-	it := reader.Iterator([]byte("b"))
+	it := reader.RangeIterator([]byte("b"), nil)
 	key, val, valid := it.Current()
 	if valid {
 		t.Fatalf("valid true, expected false")

@@ -18,167 +18,87 @@ const Name = "null"
 
 type Store struct{}
 
-func New() (*Store, error) {
-	rv := Store{}
-	return &rv, nil
-}
-
-func (i *Store) Open() error {
-	return nil
-}
-
-func (i *Store) SetMergeOperator(mo store.MergeOperator) {
-
+func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, error) {
+	return &Store{}, nil
 }
 
 func (i *Store) Close() error {
 	return nil
 }
 
-func (i *Store) iterator(key []byte) store.KVIterator {
-	rv := newIterator(i)
-	return rv
-}
-
 func (i *Store) Reader() (store.KVReader, error) {
-	return newReader(i)
+	return &reader{}, nil
 }
 
 func (i *Store) Writer() (store.KVWriter, error) {
-	return newWriter(i)
+	return &writer{}, nil
 }
 
-func (i *Store) newBatch() store.KVBatch {
-	return newBatch(i)
-}
+type reader struct{}
 
-type Reader struct {
-	store *Store
-}
-
-func newReader(store *Store) (*Reader, error) {
-	return &Reader{
-		store: store,
-	}, nil
-}
-
-func (r *Reader) BytesSafeAfterClose() bool {
-	return true
-}
-
-func (r *Reader) Get(key []byte) ([]byte, error) {
+func (r *reader) Get(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (r *Reader) Iterator(key []byte) store.KVIterator {
-	return r.store.iterator(key)
+func (r *reader) PrefixIterator(prefix []byte) store.KVIterator {
+	return &iterator{}
 }
 
-func (r *Reader) Close() error {
+func (r *reader) RangeIterator(start, end []byte) store.KVIterator {
+	return &iterator{}
+}
+
+func (r *reader) Close() error {
 	return nil
 }
 
-type Iterator struct{}
+type iterator struct{}
 
-func newIterator(store *Store) *Iterator {
-	return &Iterator{}
-}
+func (i *iterator) SeekFirst()    {}
+func (i *iterator) Seek(k []byte) {}
+func (i *iterator) Next()         {}
 
-func (i *Iterator) SeekFirst() {}
-
-func (i *Iterator) Seek(k []byte) {}
-
-func (i *Iterator) Next() {}
-
-func (i *Iterator) Current() ([]byte, []byte, bool) {
+func (i *iterator) Current() ([]byte, []byte, bool) {
 	return nil, nil, false
 }
 
-func (i *Iterator) Key() []byte {
+func (i *iterator) Key() []byte {
 	return nil
 }
 
-func (i *Iterator) Value() []byte {
+func (i *iterator) Value() []byte {
 	return nil
 }
 
-func (i *Iterator) Valid() bool {
+func (i *iterator) Valid() bool {
 	return false
 }
 
-func (i *Iterator) Close() error {
+func (i *iterator) Close() error {
 	return nil
 }
 
-type Batch struct{}
+type batch struct{}
 
-func newBatch(s *Store) *Batch {
-	rv := Batch{}
-	return &rv
+func (i *batch) Set(key, val []byte)   {}
+func (i *batch) Delete(key []byte)     {}
+func (i *batch) Merge(key, val []byte) {}
+func (i *batch) Reset()                {}
+
+type writer struct{}
+
+func (w *writer) NewBatch() store.KVBatch {
+	return &batch{}
 }
 
-func (i *Batch) Set(key, val []byte) {
-}
-
-func (i *Batch) Delete(key []byte) {
-}
-
-func (i *Batch) Merge(key, val []byte) {
-}
-
-func (i *Batch) Execute() error {
+func (w *writer) ExecuteBatch(store.KVBatch) error {
 	return nil
 }
 
-func (i *Batch) Close() error {
+func (w *writer) Close() error {
 	return nil
-}
-
-type Writer struct {
-	store *Store
-}
-
-func newWriter(store *Store) (*Writer, error) {
-	return &Writer{
-		store: store,
-	}, nil
-}
-
-func (w *Writer) BytesSafeAfterClose() bool {
-	return true
-}
-
-func (w *Writer) Set(key, val []byte) error {
-	return nil
-}
-
-func (w *Writer) Delete(key []byte) error {
-	return nil
-}
-
-func (w *Writer) NewBatch() store.KVBatch {
-	return newBatch(w.store)
-}
-
-func (w *Writer) Close() error {
-	return nil
-}
-
-// these two methods can safely read using the regular
-// methods without a read transaction, because we know
-// that no one else is writing but us
-func (w *Writer) Get(key []byte) ([]byte, error) {
-	return nil, nil
-}
-
-func (w *Writer) Iterator(key []byte) store.KVIterator {
-	return w.store.iterator(key)
-}
-
-func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
-	return New()
 }
 
 func init() {
-	registry.RegisterKVStore(Name, StoreConstructor)
+	registry.RegisterKVStore(Name, New)
 }

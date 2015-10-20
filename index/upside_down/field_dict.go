@@ -10,7 +10,6 @@
 package upside_down
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/blevesearch/bleve/index"
@@ -20,7 +19,6 @@ import (
 type UpsideDownCouchFieldDict struct {
 	indexReader *IndexReader
 	iterator    store.KVIterator
-	endKey      []byte
 	field       uint16
 }
 
@@ -29,16 +27,17 @@ func newUpsideDownCouchFieldDict(indexReader *IndexReader, field uint16, startTe
 	startKey := NewDictionaryRow(startTerm, field, 0).Key()
 	if endTerm == nil {
 		endTerm = []byte{ByteSeparator}
+	} else {
+		endTerm = incrementBytes(endTerm)
 	}
 	endKey := NewDictionaryRow(endTerm, field, 0).Key()
 
-	it := indexReader.kvreader.Iterator(startKey)
+	it := indexReader.kvreader.RangeIterator(startKey, endKey)
 
 	return &UpsideDownCouchFieldDict{
 		indexReader: indexReader,
 		iterator:    it,
 		field:       field,
-		endKey:      endKey,
 	}, nil
 
 }
@@ -46,11 +45,6 @@ func newUpsideDownCouchFieldDict(indexReader *IndexReader, field uint16, startTe
 func (r *UpsideDownCouchFieldDict) Next() (*index.DictEntry, error) {
 	key, val, valid := r.iterator.Current()
 	if !valid {
-		return nil, nil
-	}
-
-	// past end term
-	if bytes.Compare(key, r.endKey) > 0 {
 		return nil, nil
 	}
 
@@ -70,17 +64,4 @@ func (r *UpsideDownCouchFieldDict) Next() (*index.DictEntry, error) {
 
 func (r *UpsideDownCouchFieldDict) Close() error {
 	return r.iterator.Close()
-}
-
-func incrementBytes(in []byte) []byte {
-	rv := make([]byte, len(in))
-	copy(rv, in)
-	for i := len(rv) - 1; i >= 0; i-- {
-		rv[i] = rv[i] + 1
-		if rv[i] != 0 {
-			// didn't overflow, so stop
-			break
-		}
-	}
-	return rv
 }

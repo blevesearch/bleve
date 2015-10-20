@@ -11,167 +11,72 @@ package goleveldb
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
 const Name = "goleveldb"
 
 type Store struct {
-	path   string
-	opts   *opt.Options
-	db     *leveldb.DB
-	writer sync.Mutex
-	mo     store.MergeOperator
+	path string
+	opts *opt.Options
+	db   *leveldb.DB
+	mo   store.MergeOperator
+
+	defaultWriteOptions *opt.WriteOptions
+	defaultReadOptions  *opt.ReadOptions
 }
 
-func New(path string, config map[string]interface{}) (*Store, error) {
-	rv := Store{
-		path: path,
-		opts: &opt.Options{},
+func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, error) {
+
+	path, ok := config["path"].(string)
+	if !ok {
+		return nil, fmt.Errorf("must specify path")
 	}
 
-	_, err := applyConfig(rv.opts, config)
+	opts, err := applyConfig(&opt.Options{}, config)
 	if err != nil {
 		return nil, err
 	}
 
-	return &rv, nil
-}
-
-func (ldbs *Store) Open() error {
-	var err error
-	ldbs.db, err = leveldb.OpenFile(ldbs.path, ldbs.opts)
+	db, err := leveldb.OpenFile(path, opts)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
-}
 
-func (ldbs *Store) SetMergeOperator(mo store.MergeOperator) {
-	ldbs.mo = mo
-}
-
-func (ldbs *Store) get(key []byte) ([]byte, error) {
-	options := defaultReadOptions()
-	b, err := ldbs.db.Get(key, options)
-	if err == leveldb.ErrNotFound {
-		return nil, nil
+	rv := Store{
+		path:                path,
+		opts:                opts,
+		db:                  db,
+		mo:                  mo,
+		defaultReadOptions:  &opt.ReadOptions{},
+		defaultWriteOptions: &opt.WriteOptions{},
 	}
-	return b, err
-}
-
-func (ldbs *Store) getWithSnapshot(key []byte, snapshot *leveldb.Snapshot) ([]byte, error) {
-	options := defaultReadOptions()
-	b, err := snapshot.Get(key, options)
-	if err == leveldb.ErrNotFound {
-		return nil, nil
-	}
-	return b, err
-}
-
-func (ldbs *Store) set(key, val []byte) error {
-	ldbs.writer.Lock()
-	defer ldbs.writer.Unlock()
-	return ldbs.setlocked(key, val)
-}
-
-func (ldbs *Store) setlocked(key, val []byte) error {
-	options := defaultWriteOptions()
-	err := ldbs.db.Put(key, val, options)
-	return err
-}
-
-func (ldbs *Store) delete(key []byte) error {
-	ldbs.writer.Lock()
-	defer ldbs.writer.Unlock()
-	return ldbs.deletelocked(key)
-}
-
-func (ldbs *Store) deletelocked(key []byte) error {
-	options := defaultWriteOptions()
-	err := ldbs.db.Delete(key, options)
-	return err
+	rv.defaultWriteOptions.Sync = true
+	return &rv, nil
 }
 
 func (ldbs *Store) Close() error {
 	return ldbs.db.Close()
 }
 
-func (ldbs *Store) iterator(key []byte) store.KVIterator {
-	rv := newIterator(ldbs)
-	rv.Seek(key)
-	return rv
-}
-
 func (ldbs *Store) Reader() (store.KVReader, error) {
-	return newReader(ldbs)
+	snapshot, _ := ldbs.db.GetSnapshot()
+	return &Reader{
+		store:    ldbs,
+		snapshot: snapshot,
+	}, nil
 }
 
 func (ldbs *Store) Writer() (store.KVWriter, error) {
-	return newWriter(ldbs)
-}
-
-func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
-	path, ok := config["path"].(string)
-	if !ok {
-		return nil, fmt.Errorf("must specify path")
-	}
-	return New(path, config)
+	return &Writer{
+		store: ldbs,
+	}, nil
 }
 
 func init() {
-	registry.RegisterKVStore(Name, StoreConstructor)
-}
-
-func applyConfig(o *opt.Options, config map[string]interface{}) (
-	*opt.Options, error) {
-
-	ro, ok := config["read_only"].(bool)
-	if ok {
-		o.ReadOnly = ro
-	}
-
-	cim, ok := config["create_if_missing"].(bool)
-	if ok {
-		o.ErrorIfMissing = !cim
-	}
-
-	eie, ok := config["error_if_exists"].(bool)
-	if ok {
-		o.ErrorIfExist = eie
-	}
-
-	wbs, ok := config["write_buffer_size"].(float64)
-	if ok {
-		o.WriteBuffer = int(wbs)
-	}
-
-	bs, ok := config["block_size"].(float64)
-	if ok {
-		o.BlockSize = int(bs)
-	}
-
-	bri, ok := config["block_restart_interval"].(float64)
-	if ok {
-		o.BlockRestartInterval = int(bri)
-	}
-
-	lcc, ok := config["lru_cache_capacity"].(float64)
-	if ok {
-		o.BlockCacheCapacity = int(lcc)
-	}
-
-	bfbpk, ok := config["bloom_filter_bits_per_key"].(float64)
-	if ok {
-		bf := filter.NewBloomFilter(int(bfbpk))
-		o.Filter = bf
-	}
-
-	return o, nil
+	registry.RegisterKVStore(Name, New)
 }

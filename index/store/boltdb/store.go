@@ -19,7 +19,6 @@ package boltdb
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
@@ -33,41 +32,45 @@ type Store struct {
 	bucket string
 	db     *bolt.DB
 	noSync bool
-	writer sync.Mutex
 	mo     store.MergeOperator
 }
 
-func New(path string, bucket string) *Store {
-	rv := Store{
-		path:   path,
-		bucket: bucket,
+func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, error) {
+	path, ok := config["path"].(string)
+	if !ok {
+		return nil, fmt.Errorf("must specify path")
 	}
-	return &rv
-}
 
-func (bs *Store) Open() error {
+	bucket, ok := config["bucket"].(string)
+	if !ok {
+		bucket = "bleve"
+	}
 
-	var err error
-	bs.db, err = bolt.Open(bs.path, 0600, nil)
+	noSync, _ := config["nosync"].(bool)
+
+	db, err := bolt.Open(path, 0600, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	bs.db.NoSync = bs.noSync
+	db.NoSync = noSync
 
-	err = bs.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(bs.bucket))
+	err = db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(bucket))
 
 		return err
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
-}
-
-func (bs *Store) SetMergeOperator(mo store.MergeOperator) {
-	bs.mo = mo
+	rv := Store{
+		path:   path,
+		bucket: bucket,
+		db:     db,
+		mo:     mo,
+		noSync: noSync,
+	}
+	return &rv, nil
 }
 
 func (bs *Store) Close() error {
@@ -86,41 +89,11 @@ func (bs *Store) Reader() (store.KVReader, error) {
 }
 
 func (bs *Store) Writer() (store.KVWriter, error) {
-	bs.writer.Lock()
-	tx, err := bs.db.Begin(true)
-	if err != nil {
-		bs.writer.Unlock()
-		return nil, err
-	}
-	reader := &Reader{
-		store: bs,
-		tx:    tx,
-	}
 	return &Writer{
-		store:  bs,
-		tx:     tx,
-		reader: reader,
+		store: bs,
 	}, nil
 }
 
-func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
-	path, ok := config["path"].(string)
-	if !ok {
-		return nil, fmt.Errorf("must specify path")
-	}
-
-	bucket, ok := config["bucket"].(string)
-	if !ok {
-		bucket = "bleve"
-	}
-
-	noSync, _ := config["nosync"].(bool)
-
-	store := New(path, bucket)
-	store.noSync = noSync
-	return store, nil
-}
-
 func init() {
-	registry.RegisterKVStore(Name, StoreConstructor)
+	registry.RegisterKVStore(Name, New)
 }

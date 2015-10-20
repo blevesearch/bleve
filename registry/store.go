@@ -23,7 +23,7 @@ func RegisterKVStore(name string, constructor KVStoreConstructor) {
 	stores[name] = constructor
 }
 
-type KVStoreConstructor func(config map[string]interface{}) (store.KVStore, error)
+type KVStoreConstructor func(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, error)
 type KVStoreRegistry map[string]KVStoreConstructor
 
 func KVStoreConstructorByName(name string) KVStoreConstructor {
@@ -31,16 +31,10 @@ func KVStoreConstructorByName(name string) KVStoreConstructor {
 }
 
 func KVStoreTypesAndInstances() ([]string, []string) {
-	emptyConfig := map[string]interface{}{}
 	types := make([]string, 0)
 	instances := make([]string, 0)
-	for name, cons := range stores {
-		_, err := cons(emptyConfig)
-		if err == nil {
-			instances = append(instances, name)
-		} else {
-			types = append(types, name)
-		}
+	for name, _ := range stores {
+		types = append(types, name)
 	}
 	return types, instances
 }

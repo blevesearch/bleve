@@ -10,6 +10,8 @@
 package goleveldb
 
 import (
+	"fmt"
+
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -18,46 +20,40 @@ type Writer struct {
 	store *Store
 }
 
-func newWriter(store *Store) (*Writer, error) {
-	store.writer.Lock()
-	return &Writer{
-		store: store,
-	}, nil
-}
-
-func (w *Writer) BytesSafeAfterClose() bool {
-	return false
-}
-
-func (w *Writer) Set(key, val []byte) error {
-	return w.store.setlocked(key, val)
-}
-
-func (w *Writer) Delete(key []byte) error {
-	return w.store.deletelocked(key)
-}
-
 func (w *Writer) NewBatch() store.KVBatch {
 	rv := Batch{
-		w:     w,
+		store: w.store,
 		merge: store.NewEmulatedMerge(w.store.mo),
 		batch: new(leveldb.Batch),
 	}
 	return &rv
 }
 
+func (w *Writer) ExecuteBatch(b store.KVBatch) error {
+	batch, ok := b.(*Batch)
+	if !ok {
+		return fmt.Errorf("wrong type of batch")
+	}
+
+	// first process merges
+	for k, mergeOps := range batch.merge.Merges {
+		kb := []byte(k)
+		existingVal, err := w.store.db.Get(kb, w.store.defaultReadOptions)
+		if err != nil && err != leveldb.ErrNotFound {
+			return err
+		}
+		mergedVal, fullMergeOk := w.store.mo.FullMerge(kb, existingVal, mergeOps)
+		if !fullMergeOk {
+			return fmt.Errorf("merge operator returned failure")
+		}
+		// add the final merge to this batch
+		batch.batch.Put(kb, mergedVal)
+	}
+
+	// now execute the batch
+	return w.store.db.Write(batch.batch, w.store.defaultWriteOptions)
+}
+
 func (w *Writer) Close() error {
-	w.store.writer.Unlock()
 	return nil
-}
-
-// these two methods can safely read using the regular
-// methods without a read transaction, because we know
-// that no one else is writing but us
-func (w *Writer) Get(key []byte) ([]byte, error) {
-	return w.store.get(key)
-}
-
-func (w *Writer) Iterator(key []byte) store.KVIterator {
-	return w.store.iterator(key)
 }

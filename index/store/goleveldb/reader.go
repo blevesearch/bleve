@@ -12,6 +12,7 @@ package goleveldb
 import (
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 type Reader struct {
@@ -19,26 +20,37 @@ type Reader struct {
 	snapshot *leveldb.Snapshot
 }
 
-func newReader(store *Store) (*Reader, error) {
-	snapshot, _ := store.db.GetSnapshot()
-	return &Reader{
-		store:    store,
-		snapshot: snapshot,
-	}, nil
-}
-
-func (r *Reader) BytesSafeAfterClose() bool {
-	return false
-}
-
 func (r *Reader) Get(key []byte) ([]byte, error) {
-	return r.store.getWithSnapshot(key, r.snapshot)
+	b, err := r.snapshot.Get(key, r.store.defaultReadOptions)
+	if err == leveldb.ErrNotFound {
+		return nil, nil
+	}
+	return b, err
 }
 
-func (r *Reader) Iterator(key []byte) store.KVIterator {
-	rv := newIteratorWithSnapshot(r.store, r.snapshot)
-	rv.Seek(key)
-	return rv
+func (r *Reader) PrefixIterator(prefix []byte) store.KVIterator {
+	byteRange := util.BytesPrefix(prefix)
+	iter := r.snapshot.NewIterator(byteRange, r.store.defaultReadOptions)
+	iter.First()
+	rv := Iterator{
+		store:    r.store,
+		iterator: iter,
+	}
+	return &rv
+}
+
+func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
+	byteRange := &util.Range{
+		Start: start,
+		Limit: end,
+	}
+	iter := r.snapshot.NewIterator(byteRange, r.store.defaultReadOptions)
+	iter.First()
+	rv := Iterator{
+		store:    r.store,
+		iterator: iter,
+	}
+	return &rv
 }
 
 func (r *Reader) Close() error {

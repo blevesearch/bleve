@@ -12,71 +12,62 @@
 package upside_down
 
 import (
-	"os"
 	"testing"
 
-	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/blevex/leveldb"
 )
 
 var leveldbTestOptions = map[string]interface{}{
+	"path":              "test",
 	"create_if_missing": true,
 }
 
-func CreateLevelDB() (store.KVStore, error) {
-	return leveldb.New("test", leveldbTestOptions)
-}
-
-func DestroyLevelDB() error {
-	return os.RemoveAll("test")
-}
-
 func BenchmarkLevelDBIndexing1Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateLevelDB, DestroyLevelDB, 1)
+	CommonBenchmarkIndex(b, leveldb.Name, leveldbTestOptions, DestroyTest, 1)
 }
 
 func BenchmarkLevelDBIndexing2Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateLevelDB, DestroyLevelDB, 2)
+	CommonBenchmarkIndex(b, leveldb.Name, leveldbTestOptions, DestroyTest, 2)
 }
 
 func BenchmarkLevelDBIndexing4Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateLevelDB, DestroyLevelDB, 4)
+	CommonBenchmarkIndex(b, leveldb.Name, leveldbTestOptions, DestroyTest, 4)
 }
 
 // batches
 
 func BenchmarkLevelDBIndexing1Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 1, 10)
+	CommonBenchmarkIndexBatch(b, leveldb.Name, leveldbTestOptions, DestroyTest, 1, 10)
 }
 
 func BenchmarkLevelDBIndexing2Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 2, 10)
+	CommonBenchmarkIndexBatch(b, leveldb.Name, leveldbTestOptions, DestroyTest, 2, 10)
 }
 
 func BenchmarkLevelDBIndexing4Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 4, 10)
+	CommonBenchmarkIndexBatch(b, leveldb.Name, leveldbTestOptions, DestroyTest, 4, 10)
 }
 
 func BenchmarkLevelDBIndexing1Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 1, 100)
+	CommonBenchmarkIndexBatch(b, leveldb.Name, leveldbTestOptions, DestroyTest, 1, 100)
 }
 
 func BenchmarkLevelDBIndexing2Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 2, 100)
+	CommonBenchmarkIndexBatch(b, leveldb.Name, leveldbTestOptions, DestroyTest, 2, 100)
 }
 
 func BenchmarkLevelDBIndexing4Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 4, 100)
+	CommonBenchmarkIndexBatch(b, leveldb.Name, leveldbTestOptions, DestroyTest, 4, 100)
 }
 
 func BenchmarkLevelDBIndexing1Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 1, 1000)
+	CommonBenchmarkIndexBatch(b, leveldb.Name, leveldbTestOptions, DestroyTest, 1, 1000)
 }
 
 func BenchmarkLevelDBIndexing2Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 2, 1000)
+	CommonBenchmarkIndexBatch(b, leveldb.Name, leveldbTestOptions, DestroyTest, 2, 1000)
 }
 
 func BenchmarkLevelDBIndexing4Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateLevelDB, DestroyLevelDB, 4, 1000)
+	CommonBenchmarkIndexBatch(b, leveldb.Name, leveldbTestOptions, DestroyTest, 4, 1000)
 }
