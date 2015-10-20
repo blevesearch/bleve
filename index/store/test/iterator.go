@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/blevesearch/bleve/index/store"
@@ -10,12 +11,39 @@ import (
 
 // tests around the correct behavior of iterators
 
+type testRow struct {
+	key []byte
+	val []byte
+}
+
+func batchWriteRows(s store.KVStore, rows []testRow) error {
+	// open a writer
+	writer, err := s.Writer()
+	if err != nil {
+		return err
+	}
+
+	// write the data
+	batch := writer.NewBatch()
+	for _, row := range rows {
+		batch.Set(row.key, row.val)
+	}
+	err = writer.ExecuteBatch(batch)
+	if err != nil {
+		return err
+	}
+
+	// close the writer
+	err = writer.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func CommonTestPrefixIterator(t *testing.T, s store.KVStore) {
 
-	data := []struct {
-		key []byte
-		val []byte
-	}{
+	data := []testRow{
 		{[]byte("apple"), []byte("val")},
 		{[]byte("cat1"), []byte("val")},
 		{[]byte("cat2"), []byte("val")},
@@ -39,24 +67,7 @@ func CommonTestPrefixIterator(t *testing.T, s store.KVStore) {
 		[]byte("dog4"),
 	}
 
-	// open a writer
-	writer, err := s.Writer()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// write the data
-	batch := writer.NewBatch()
-	for _, row := range data {
-		batch.Set(row.key, row.val)
-	}
-	err = writer.ExecuteBatch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// close the writer
-	err = writer.Close()
+	err := batchWriteRows(s, data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,10 +133,7 @@ func CommonTestPrefixIterator(t *testing.T, s store.KVStore) {
 
 func CommonTestRangeIterator(t *testing.T, s store.KVStore) {
 
-	data := []struct {
-		key []byte
-		val []byte
-	}{
+	data := []testRow{
 		{[]byte("a1"), []byte("val")},
 		{[]byte("b1"), []byte("val")},
 		{[]byte("b2"), []byte("val")},
@@ -153,24 +161,7 @@ func CommonTestRangeIterator(t *testing.T, s store.KVStore) {
 		}
 	}
 
-	// open a writer
-	writer, err := s.Writer()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// write the data
-	batch := writer.NewBatch()
-	for _, row := range data {
-		batch.Set(row.key, row.val)
-	}
-	err = writer.ExecuteBatch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// close the writer
-	err = writer.Close()
+	err := batchWriteRows(s, data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,6 +258,82 @@ func CommonTestRangeIterator(t *testing.T, s store.KVStore) {
 	// check that we found c to end
 	if !reflect.DeepEqual(cToEnd, expectedCToEnd) {
 		t.Fatalf("expected b-c %v, got %v", expectedCToEnd, cToEnd)
+	}
+
+	// close the reader
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func CommonTestRangeIteratorSeek(t *testing.T, s store.KVStore) {
+
+	data := []testRow{
+		{[]byte("a1"), []byte("val")},
+		{[]byte("b1"), []byte("val")},
+		{[]byte("c1"), []byte("val")},
+		{[]byte("d1"), []byte("val")},
+		{[]byte("e1"), []byte("val")},
+	}
+
+	err := batchWriteRows(s, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// open a reader
+	reader, err := s.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get an iterator on a central subset of the data
+	start := []byte("b1")
+	end := []byte("d1")
+	iter := reader.RangeIterator(start, end)
+
+	// seek before, at and after every possible key
+	targets := [][]byte{}
+	for _, row := range data {
+		prefix := string(row.key[:1])
+		targets = append(targets, []byte(prefix+"0"))
+		targets = append(targets, []byte(prefix+"1"))
+		targets = append(targets, []byte(prefix+"2"))
+	}
+	for _, target := range targets {
+		found := []string{}
+		for iter.Seek(target); iter.Valid(); iter.Next() {
+			found = append(found, string(iter.Key()))
+			if len(found) > len(data) {
+				t.Fatalf("enumerated more than data keys after seeking to %s",
+					string(target))
+			}
+		}
+		wanted := []string{}
+		for _, row := range data {
+			if bytes.Compare(row.key, start) < 0 ||
+				bytes.Compare(row.key, target) < 0 ||
+				bytes.Compare(row.key, end) >= 0 {
+				continue
+			}
+			wanted = append(wanted, string(row.key))
+		}
+		fs := strings.Join(found, ", ")
+		ws := strings.Join(wanted, ", ")
+		if fs != ws {
+			t.Fatalf("iterating from %s returned [%s] instead of [%s]",
+				string(target), fs, ws)
+		}
+	}
+
+	err = iter.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// close the reader

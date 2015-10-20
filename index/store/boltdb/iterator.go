@@ -29,14 +29,19 @@ type Iterator struct {
 
 func (i *Iterator) updateValid() {
 	i.valid = (i.key != nil)
-	if i.valid && i.prefix != nil {
-		i.valid = bytes.HasPrefix(i.key, i.prefix)
-	} else if i.end != nil {
-		i.valid = bytes.Compare(i.key, i.end) < 0
+	if i.valid {
+		if i.prefix != nil {
+			i.valid = bytes.HasPrefix(i.key, i.prefix)
+		} else if i.end != nil {
+			i.valid = bytes.Compare(i.key, i.end) < 0
+		}
 	}
 }
 
 func (i *Iterator) Seek(k []byte) {
+	if bytes.Compare(k, i.start) < 0 {
+		k = i.start
+	}
 	i.key, i.val = i.cursor.Seek(k)
 	i.updateValid()
 }
