@@ -59,6 +59,12 @@ func TestMetricsRangeIterator(t *testing.T) {
 	test.CommonTestRangeIterator(t, s)
 }
 
+func TestMetricsRangeIteratorSeek(t *testing.T) {
+	s := open(t, nil)
+	defer cleanup(t, s)
+	test.CommonTestRangeIteratorSeek(t, s)
+}
+
 func TestMetricsMerge(t *testing.T) {
 	s := open(t, &test.TestMergeCounter{})
 	defer cleanup(t, s)

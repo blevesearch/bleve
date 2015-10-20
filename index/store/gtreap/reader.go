@@ -46,8 +46,9 @@ func (w *Reader) PrefixIterator(k []byte) store.KVIterator {
 
 func (w *Reader) RangeIterator(start, end []byte) store.KVIterator {
 	rv := Iterator{
-		t:   w.t,
-		end: end,
+		t:     w.t,
+		start: start,
+		end:   end,
 	}
 	rv.restart(&Item{k: start})
 	return &rv

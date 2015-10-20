@@ -70,6 +70,12 @@ func TestGTreapRangeIterator(t *testing.T) {
 	test.CommonTestRangeIterator(t, s)
 }
 
+func TestGTreapRangeIteratorSeek(t *testing.T) {
+	s := open(t, nil)
+	defer cleanup(t, s)
+	test.CommonTestRangeIteratorSeek(t, s)
+}
+
 func TestGTreapMerge(t *testing.T) {
 	s := open(t, &test.TestMergeCounter{})
 	defer cleanup(t, s)

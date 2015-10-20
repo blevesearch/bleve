@@ -31,10 +31,14 @@ type Iterator struct {
 	currOk   bool
 
 	prefix []byte
+	start  []byte
 	end    []byte
 }
 
 func (w *Iterator) Seek(k []byte) {
+	if bytes.Compare(k, w.start) < 0 {
+		k = w.start
+	}
 	w.restart(&Item{k: k})
 }
 
