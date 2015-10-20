@@ -13,7 +13,6 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store"
 )
 
 func RegisterIndexType(name string, constructor IndexTypeConstructor) {
@@ -24,7 +23,7 @@ func RegisterIndexType(name string, constructor IndexTypeConstructor) {
 	index_types[name] = constructor
 }
 
-type IndexTypeConstructor func(store.KVStore, *index.AnalysisQueue) (index.Index, error)
+type IndexTypeConstructor func(storeName string, storeConfig map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error)
 type IndexTypeRegistry map[string]IndexTypeConstructor
 
 func IndexTypeConstructorByName(name string) IndexTypeConstructor {
@@ -32,16 +31,10 @@ func IndexTypeConstructorByName(name string) IndexTypeConstructor {
 }
 
 func IndexTypesAndInstances() ([]string, []string) {
-	emptyConfig := map[string]interface{}{}
 	types := make([]string, 0)
 	instances := make([]string, 0)
-	for name, cons := range stores {
-		_, err := cons(emptyConfig)
-		if err == nil {
-			instances = append(instances, name)
-		} else {
-			types = append(types, name)
-		}
+	for name, _ := range stores {
+		types = append(types, name)
 	}
 	return types, instances
 }

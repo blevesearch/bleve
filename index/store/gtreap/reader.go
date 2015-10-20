@@ -24,20 +24,34 @@ type Reader struct {
 	t *gtreap.Treap
 }
 
-func (w *Reader) BytesSafeAfterClose() bool {
-	return false
-}
-
 func (w *Reader) Get(k []byte) (v []byte, err error) {
+	var rv []byte
 	itm := w.t.Get(&Item{k: k})
 	if itm != nil {
-		return itm.(*Item).v, nil
+		rv = make([]byte, len(itm.(*Item).v))
+		copy(rv, itm.(*Item).v)
+		return rv, nil
 	}
 	return nil, nil
 }
 
-func (w *Reader) Iterator(k []byte) store.KVIterator {
-	return newIterator(w.t).restart(&Item{k: k})
+func (w *Reader) PrefixIterator(k []byte) store.KVIterator {
+	rv := Iterator{
+		t:      w.t,
+		prefix: k,
+	}
+	rv.restart(&Item{k: k})
+	return &rv
+}
+
+func (w *Reader) RangeIterator(start, end []byte) store.KVIterator {
+	rv := Iterator{
+		t:     w.t,
+		start: start,
+		end:   end,
+	}
+	rv.restart(&Item{k: start})
+	return &rv
 }
 
 func (w *Reader) Close() error {

@@ -15,7 +15,7 @@ import (
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/store/gtreap"
 	"github.com/blevesearch/bleve/index/upside_down"
 )
 
@@ -26,10 +26,12 @@ func TestTermSearcher(t *testing.T) {
 	var queryBoost = 3.0
 	var queryExplain = true
 
-	inMemStore, _ := inmem.New()
 	analysisQueue := index.NewAnalysisQueue(1)
-	i := upside_down.NewUpsideDownCouch(inMemStore, analysisQueue)
-	err := i.Open()
+	i, err := upside_down.NewUpsideDownCouch(gtreap.Name, nil, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Open()
 	if err != nil {
 		t.Fatal(err)
 	}

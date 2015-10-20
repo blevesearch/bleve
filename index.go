@@ -160,7 +160,10 @@ type Index interface {
 	NewBatch() *Batch
 	Batch(b *Batch) error
 
+	// Document returns specified document or nil if the document is not
+	// indexed or stored.
 	Document(id string) (*document.Document, error)
+	// DocCount returns the number of documents in the index.
 	DocCount() (uint64, error)
 
 	Search(req *SearchRequest) (*SearchResult, error)
@@ -185,6 +188,8 @@ type Index interface {
 	SetInternal(key, val []byte) error
 	DeleteInternal(key []byte) error
 
+	// Advanced returns the indexer and data store, exposing lower level
+	// methods to enumerate records and access data.
 	Advanced() (index.Index, store.KVStore, error)
 }
 
