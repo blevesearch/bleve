@@ -113,9 +113,9 @@ type DocIDReader interface {
 	Next() (string, error)
 
 	// Advance resets the iteration to the first identifier greater than or
-	// equal to ID. If ID is greater than or equal to the end of the range,
-	// Next() call will return io.EOF. If ID is smaller than the start of the
-	// range, the behaviour depends on the store implementation.
+	// equal to ID. If ID is smaller than the start of the range, the iteration
+	// will start there instead. If ID is greater than or equal to the end of
+	// the range, Next() call will return io.EOF.
 	Advance(ID string) (string, error)
 	Close() error
 }
