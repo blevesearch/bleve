@@ -1,3 +1,4 @@
+//line query_string.y:2
 package bleve
 
 import __yyfmt__ "fmt"
@@ -11,8 +12,8 @@ import (
 // Format 02-01-2015 is used for specifying date without any time. It's a
 // reference layout for DD-MM-YYYY date format.
 // See here for more: https://golang.org/pkg/time/#pkg-constants
-var dateFormats = []string{"02-01-2006", time.RFC822, time.UnixDate, time.RFC3339,
-	time.RFC3339Nano}
+var dateFormats = []string{"02-01-2006", "01-02-2006", time.RFC822,
+	time.UnixDate, time.RFC3339, time.RFC3339Nano}
 
 func logDebugGrammar(format string, v ...interface{}) {
 	if debugParser {
@@ -20,7 +21,7 @@ func logDebugGrammar(format string, v ...interface{}) {
 	}
 }
 
-//line query_string.y:21
+//line query_string.y:20
 type yySymType struct {
 	yys int
 	s   string
@@ -486,25 +487,25 @@ yydefault:
 
 	case 1:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:43
+		//line query_string.y:42
 		{
 			logDebugGrammar("INPUT")
 		}
 	case 2:
 		yyDollar = yyS[yypt-2 : yypt+1]
-		//line query_string.y:48
+		//line query_string.y:47
 		{
 			logDebugGrammar("SEARCH PARTS")
 		}
 	case 3:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:52
+		//line query_string.y:51
 		{
 			logDebugGrammar("SEARCH PART")
 		}
 	case 4:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:57
+		//line query_string.y:56
 		{
 			query := yyDollar[2].q
 			query.SetBoost(yyDollar[3].f)
@@ -519,33 +520,33 @@ yydefault:
 		}
 	case 5:
 		yyDollar = yyS[yypt-0 : yypt+1]
-		//line query_string.y:72
+		//line query_string.y:71
 		{
 			yyVAL.n = queryShould
 		}
 	case 6:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:76
+		//line query_string.y:75
 		{
 			yyVAL.n = yyDollar[1].n
 		}
 	case 7:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:82
+		//line query_string.y:81
 		{
 			logDebugGrammar("PLUS")
 			yyVAL.n = queryMust
 		}
 	case 8:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:87
+		//line query_string.y:86
 		{
 			logDebugGrammar("MINUS")
 			yyVAL.n = queryMustNot
 		}
 	case 9:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:93
+		//line query_string.y:92
 		{
 			str := yyDollar[1].s
 			logDebugGrammar("STRING - %s", str)
@@ -554,7 +555,7 @@ yydefault:
 		}
 	case 10:
 		yyDollar = yyS[yypt-2 : yypt+1]
-		//line query_string.y:100
+		//line query_string.y:99
 		{
 			str := yyDollar[1].s
 			logDebugGrammar("FUZZY STRING - %s", str)
@@ -564,7 +565,7 @@ yydefault:
 		}
 	case 11:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:108
+		//line query_string.y:107
 		{
 			field := yyDollar[1].s
 			str := yyDollar[3].s
@@ -576,7 +577,7 @@ yydefault:
 		}
 	case 12:
 		yyDollar = yyS[yypt-2 : yypt+1]
-		//line query_string.y:118
+		//line query_string.y:117
 		{
 			str := yyDollar[1].s
 			fuzziness, _ := strconv.ParseFloat(yyDollar[2].s, 64)
@@ -587,7 +588,7 @@ yydefault:
 		}
 	case 13:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:127
+		//line query_string.y:126
 		{
 			field := yyDollar[1].s
 			str := yyDollar[3].s
@@ -600,7 +601,7 @@ yydefault:
 		}
 	case 14:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:138
+		//line query_string.y:137
 		{
 			str := yyDollar[1].s
 			logDebugGrammar("STRING - %s", str)
@@ -609,7 +610,7 @@ yydefault:
 		}
 	case 15:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:145
+		//line query_string.y:144
 		{
 			phrase := yyDollar[1].s
 			logDebugGrammar("PHRASE - %s", phrase)
@@ -618,7 +619,7 @@ yydefault:
 		}
 	case 16:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:152
+		//line query_string.y:151
 		{
 			field := yyDollar[1].s
 			minInclusive := false
@@ -635,7 +636,7 @@ yydefault:
 		}
 	case 17:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:167
+		//line query_string.y:166
 		{
 			field := yyDollar[1].s
 			minInclusive := true
@@ -652,7 +653,7 @@ yydefault:
 		}
 	case 18:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:182
+		//line query_string.y:181
 		{
 			field := yyDollar[1].s
 			maxInclusive := false
@@ -669,7 +670,7 @@ yydefault:
 		}
 	case 19:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:197
+		//line query_string.y:196
 		{
 			field := yyDollar[1].s
 			maxInclusive := true
@@ -686,7 +687,7 @@ yydefault:
 		}
 	case 20:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:212
+		//line query_string.y:211
 		{
 			field := yyDollar[1].s
 			str := yyDollar[3].s
@@ -696,7 +697,7 @@ yydefault:
 		}
 	case 21:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:220
+		//line query_string.y:219
 		{
 			field := yyDollar[1].s
 			str := yyDollar[3].s
@@ -706,7 +707,7 @@ yydefault:
 		}
 	case 22:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:228
+		//line query_string.y:227
 		{
 			field := yyDollar[1].s
 			phrase := yyDollar[3].s
@@ -716,7 +717,7 @@ yydefault:
 		}
 	case 23:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:236
+		//line query_string.y:235
 		{
 			field := yyDollar[1].s
 			min, _ := strconv.ParseFloat(yyDollar[4].s, 64)
@@ -727,7 +728,7 @@ yydefault:
 		}
 	case 24:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:245
+		//line query_string.y:244
 		{
 			field := yyDollar[1].s
 			min, _ := strconv.ParseFloat(yyDollar[5].s, 64)
@@ -738,7 +739,7 @@ yydefault:
 		}
 	case 25:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:254
+		//line query_string.y:253
 		{
 			field := yyDollar[1].s
 			max, _ := strconv.ParseFloat(yyDollar[4].s, 64)
@@ -749,7 +750,7 @@ yydefault:
 		}
 	case 26:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:263
+		//line query_string.y:262
 		{
 			field := yyDollar[1].s
 			max, _ := strconv.ParseFloat(yyDollar[5].s, 64)
@@ -760,7 +761,7 @@ yydefault:
 		}
 	case 27:
 		yyDollar = yyS[yypt-2 : yypt+1]
-		//line query_string.y:273
+		//line query_string.y:272
 		{
 			boost, _ := strconv.ParseFloat(yyDollar[2].s, 64)
 			yyVAL.f = boost
@@ -768,13 +769,13 @@ yydefault:
 		}
 	case 28:
 		yyDollar = yyS[yypt-0 : yypt+1]
-		//line query_string.y:280
+		//line query_string.y:279
 		{
 			yyVAL.f = 1.0
 		}
 	case 29:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:284
+		//line query_string.y:283
 		{
 
 		}
