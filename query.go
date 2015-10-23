@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
@@ -208,4 +209,91 @@ func ParseQuery(input []byte) (Query, error) {
 		return &rv, nil
 	}
 	return nil, ErrorUnknownQueryType
+}
+
+// expandQuery traverses the input query tree and returns a new tree where
+// query string queries have been expanded into base queries. Returned tree may
+// reference queries from the input tree or new queries.
+func expandQuery(m *IndexMapping, query Query) (Query, error) {
+	var expand func(query Query) (Query, error)
+	var expandSlice func(queries []Query) ([]Query, error)
+
+	expandSlice = func(queries []Query) ([]Query, error) {
+		expanded := []Query{}
+		for _, q := range queries {
+			exp, err := expand(q)
+			if err != nil {
+				return nil, err
+			}
+			expanded = append(expanded, exp)
+		}
+		return expanded, nil
+	}
+
+	expand = func(query Query) (Query, error) {
+		switch query.(type) {
+		case *queryStringQuery:
+			q := query.(*queryStringQuery)
+			parsed, err := parseQuerySyntax(q.Query, m)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse '%s': %s", q.Query, err)
+			}
+			return expand(parsed)
+		case *conjunctionQuery:
+			q := *query.(*conjunctionQuery)
+			children, err := expandSlice(q.Conjuncts)
+			if err != nil {
+				return nil, err
+			}
+			q.Conjuncts = children
+			return &q, nil
+		case *disjunctionQuery:
+			q := *query.(*disjunctionQuery)
+			children, err := expandSlice(q.Disjuncts)
+			if err != nil {
+				return nil, err
+			}
+			q.Disjuncts = children
+			return &q, nil
+		case *booleanQuery:
+			q := *query.(*booleanQuery)
+			var err error
+			q.Must, err = expand(q.Must)
+			if err != nil {
+				return nil, err
+			}
+			q.Should, err = expand(q.Should)
+			if err != nil {
+				return nil, err
+			}
+			q.MustNot, err = expand(q.MustNot)
+			if err != nil {
+				return nil, err
+			}
+			return &q, nil
+		case *phraseQuery:
+			q := *query.(*phraseQuery)
+			children, err := expandSlice(q.TermQueries)
+			if err != nil {
+				return nil, err
+			}
+			q.TermQueries = children
+			return &q, nil
+		default:
+			return query, nil
+		}
+	}
+	return expand(query)
+}
+
+// DumpQuery returns a string representation of the query tree, where query
+// string queries have been expanded into base queries. The output format is
+// meant for debugging purpose and may change in the future.
+func DumpQuery(m *IndexMapping, query Query) (string, error) {
+	q, err := expandQuery(m, query)
+	if err != nil {
+		return "", err
+	}
+	data, err := json.MarshalIndent(q, "", "  ")
+	return string(data), err
 }
