@@ -48,8 +48,10 @@ type IndexReader interface {
 	TermFieldReader(term []byte, field string) (TermFieldReader, error)
 
 	// DocIDReader returns an iterator over documents which identifiers are
-	// greater than or equal to start and smaller than end. The caller must
-	// close returned instance to release associated resources.
+	// greater than or equal to start and smaller than end. Set start to the
+	// empty string to iterate from the first document, end to the empty string
+	// to iterate to the last one.
+	// The caller must close returned instance to release associated resources.
 	DocIDReader(start, end string) (DocIDReader, error)
 
 	FieldDict(field string) (FieldDict, error)
