@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -230,5 +231,56 @@ func TestQueryValidate(t *testing.T) {
 		if !reflect.DeepEqual(actual, test.err) {
 			t.Errorf("expected error: %#v got %#v", test.err, actual)
 		}
+	}
+}
+
+func TestDumpQuery(t *testing.T) {
+	mapping := &IndexMapping{}
+	q := NewQueryStringQuery("+water -light beer")
+	s, err := DumpQuery(mapping, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s = strings.TrimSpace(s)
+	wanted := strings.TrimSpace(`{
+  "must": {
+    "conjuncts": [
+      {
+        "match": "water",
+        "boost": 1,
+        "prefix_length": 0,
+        "fuzziness": 0
+      }
+    ],
+    "boost": 1
+  },
+  "should": {
+    "disjuncts": [
+      {
+        "match": "beer",
+        "boost": 1,
+        "prefix_length": 0,
+        "fuzziness": 0
+      }
+    ],
+    "boost": 1,
+    "min": 1
+  },
+  "must_not": {
+    "disjuncts": [
+      {
+        "match": "light",
+        "boost": 1,
+        "prefix_length": 0,
+        "fuzziness": 0
+      }
+    ],
+    "boost": 1,
+    "min": 0
+  },
+  "boost": 1
+}`)
+	if wanted != s {
+		t.Fatalf("query:\n%s\ndiffers from expected:\n%s", s, wanted)
 	}
 }
