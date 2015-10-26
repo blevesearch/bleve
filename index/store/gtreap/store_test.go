@@ -64,6 +64,12 @@ func TestGTreapPrefixIterator(t *testing.T) {
 	test.CommonTestPrefixIterator(t, s)
 }
 
+func TestGTreapPrefixIteratorSeek(t *testing.T) {
+	s := open(t, nil)
+	defer cleanup(t, s)
+	test.CommonTestPrefixIteratorSeek(t, s)
+}
+
 func TestGTreapRangeIterator(t *testing.T) {
 	s := open(t, nil)
 	defer cleanup(t, s)

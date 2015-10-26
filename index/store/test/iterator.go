@@ -131,6 +131,74 @@ func CommonTestPrefixIterator(t *testing.T, s store.KVStore) {
 	}
 }
 
+func CommonTestPrefixIteratorSeek(t *testing.T, s store.KVStore) {
+
+	data := []testRow{
+		{[]byte("a"), []byte("val")},
+		{[]byte("b1"), []byte("val")},
+		{[]byte("b2"), []byte("val")},
+		{[]byte("b3"), []byte("val")},
+		{[]byte("c"), []byte("val")},
+	}
+
+	err := batchWriteRows(s, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// open a reader
+	reader, err := s.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get an iterator on a central subset of the data
+	iter := reader.PrefixIterator([]byte("b"))
+
+	// check that all keys have prefix
+	found := []string{}
+	for ; iter.Valid(); iter.Next() {
+		found = append(found, string(iter.Key()))
+	}
+	for _, f := range found {
+		if !strings.HasPrefix(f, "b") {
+			t.Errorf("got key '%s' that doesn't have correct prefix")
+		}
+	}
+	if len(found) != 3 {
+		t.Errorf("expected 3 keys with prefix, got %d", len(found))
+	}
+
+	// now try to seek before the prefix and repeat
+	found = []string{}
+	for iter.Seek([]byte("a")); iter.Valid(); iter.Next() {
+		found = append(found, string(iter.Key()))
+	}
+	for _, f := range found {
+		if !strings.HasPrefix(f, "b") {
+			t.Errorf("got key '%s' that doesn't have correct prefix")
+		}
+	}
+	if len(found) != 3 {
+		t.Errorf("expected 3 keys with prefix, got %d", len(found))
+	}
+
+	// now try to seek after the prefix and repeat
+	found = []string{}
+	for iter.Seek([]byte("c")); iter.Valid(); iter.Next() {
+		found = append(found, string(iter.Key()))
+	}
+	for _, f := range found {
+		if !strings.HasPrefix(f, "b") {
+			t.Errorf("got key '%s' that doesn't have correct prefix")
+		}
+	}
+	if len(found) != 0 {
+		t.Errorf("expected 0 keys with prefix, got %d", len(found))
+	}
+
+}
+
 func CommonTestRangeIterator(t *testing.T, s store.KVStore) {
 
 	data := []testRow{

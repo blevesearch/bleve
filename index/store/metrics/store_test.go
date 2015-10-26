@@ -53,6 +53,12 @@ func TestMetricsPrefixIterator(t *testing.T) {
 	test.CommonTestPrefixIterator(t, s)
 }
 
+func TestMetricsPrefixIteratorSeek(t *testing.T) {
+	s := open(t, nil)
+	defer cleanup(t, s)
+	test.CommonTestPrefixIteratorSeek(t, s)
+}
+
 func TestMetricsRangeIterator(t *testing.T) {
 	s := open(t, nil)
 	defer cleanup(t, s)
