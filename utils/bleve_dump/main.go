@@ -14,6 +14,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/blevesearch/bleve"
 	_ "github.com/blevesearch/bleve/config"
@@ -23,12 +25,23 @@ import (
 
 var indexPath = flag.String("index", "", "index path")
 
-var fieldsOnly = flag.Bool("fields", false, "fields only")
-var docID = flag.String("docID", "", "docID to dump")
-var mappingOnly = flag.Bool("mapping", false, "print mapping")
+var fieldsOnly = flag.Bool("fields", false, "print only field definitions")
+var docID = flag.String("docID", "", "print only rows related to specified document")
+var mappingOnly = flag.Bool("mapping", false, "print only index mappings")
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, strings.TrimSpace(`
+bleve_dump prints the properties and binary representations of all rows in the
+index specified by -index.
+`)+"\n\n")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
+	if len(flag.Args()) > 0 {
+		log.Fatalf("unexpected argument '%s', use -help to see possible options",
+			flag.Args()[0])
+	}
 	if *indexPath == "" {
 		log.Fatal("specify index to dump")
 	}
@@ -45,6 +58,9 @@ func main() {
 	}()
 
 	if *mappingOnly {
+		if *docID != "" || *fieldsOnly {
+			log.Fatal("-mapping cannot be used with -docID or -fields")
+		}
 		mapping := index.Mapping()
 		jsonBytes, err := json.MarshalIndent(mapping, "", "  ")
 		if err != nil {
@@ -56,6 +72,9 @@ func main() {
 
 	var dumpChan chan interface{}
 	if *docID != "" {
+		if *fieldsOnly {
+			log.Fatal("-docID cannot be used with -fields")
+		}
 		dumpChan = index.DumpDoc(*docID)
 	} else if *fieldsOnly {
 		dumpChan = index.DumpFields()
