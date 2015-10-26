@@ -151,9 +151,21 @@ func CommonTestPrefixIteratorSeek(t *testing.T, s store.KVStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// get an iterator on a central subset of the data
 	iter := reader.PrefixIterator([]byte("b"))
+	defer func() {
+		err := iter.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// check that all keys have prefix
 	found := []string{}
@@ -162,7 +174,7 @@ func CommonTestPrefixIteratorSeek(t *testing.T, s store.KVStore) {
 	}
 	for _, f := range found {
 		if !strings.HasPrefix(f, "b") {
-			t.Errorf("got key '%s' that doesn't have correct prefix")
+			t.Errorf("got key '%s' that doesn't have correct prefix", f)
 		}
 	}
 	if len(found) != 3 {
@@ -176,7 +188,7 @@ func CommonTestPrefixIteratorSeek(t *testing.T, s store.KVStore) {
 	}
 	for _, f := range found {
 		if !strings.HasPrefix(f, "b") {
-			t.Errorf("got key '%s' that doesn't have correct prefix")
+			t.Errorf("got key '%s' that doesn't have correct prefix", f)
 		}
 	}
 	if len(found) != 3 {
@@ -190,7 +202,7 @@ func CommonTestPrefixIteratorSeek(t *testing.T, s store.KVStore) {
 	}
 	for _, f := range found {
 		if !strings.HasPrefix(f, "b") {
-			t.Errorf("got key '%s' that doesn't have correct prefix")
+			t.Errorf("got key '%s' that doesn't have correct prefix", f)
 		}
 	}
 	if len(found) != 0 {
