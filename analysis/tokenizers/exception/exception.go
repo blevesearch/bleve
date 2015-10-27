@@ -111,6 +111,9 @@ func ExceptionsTokenizerConstructor(config map[string]interface{}, cache *regist
 	if ok {
 		exceptions = append(exceptions, aexceptions...)
 	}
+	if len(exceptions) == 0 {
+		return nil, fmt.Errorf("no pattern found in 'exception' property")
+	}
 	exceptionPattern := strings.Join(exceptions, "|")
 	r, err := regexp.Compile(exceptionPattern)
 	if err != nil {
