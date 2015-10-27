@@ -7,6 +7,18 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
+// package exception implements a Tokenizer which extracts pieces matched by a
+// regular expression from the input data, delegates the rest to another
+// tokenizer, then insert back extracted parts in the token stream. Use it to
+// preserve sequences which a regular tokenizer would alter or remove.
+//
+// Its constructor takes the following arguments:
+//
+// "exceptions" ([]string): one or more Go regular expressions matching the
+// sequence to preserve. Multiple expressions are combined with "|".
+//
+// "tokenizer" (string): the name of the tokenizer processing the data not
+// matched by "exceptions".
 package exception
 
 import (
