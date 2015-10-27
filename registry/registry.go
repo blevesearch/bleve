@@ -61,11 +61,15 @@ func NewCache() *Cache {
 }
 
 func typeFromConfig(config map[string]interface{}) (string, error) {
-	typ, ok := config["type"].(string)
-	if ok {
-		return typ, nil
+	prop, ok := config["type"]
+	if !ok {
+		return "", fmt.Errorf("'type' property is not defined")
 	}
-	return "", fmt.Errorf("unable to determine type")
+	typ, ok := prop.(string)
+	if !ok {
+		return "", fmt.Errorf("'type' property must be a string, not %T", prop)
+	}
+	return typ, nil
 }
 
 func (c *Cache) CharFilterNamed(name string) (analysis.CharFilter, error) {
@@ -87,7 +91,7 @@ func (c *Cache) TokenizerNamed(name string) (analysis.Tokenizer, error) {
 func (c *Cache) DefineTokenizer(name string, config map[string]interface{}) (analysis.Tokenizer, error) {
 	typ, err := typeFromConfig(config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot resolve '%s' tokenizer type: %s", name, err)
 	}
 	return c.Tokenizers.DefineTokenizer(name, typ, config, c)
 }
