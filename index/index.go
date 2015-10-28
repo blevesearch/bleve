@@ -16,6 +16,8 @@ import (
 	"github.com/blevesearch/bleve/document"
 )
 
+var ErrorUnknownStorageType = fmt.Errorf("unknown storage type")
+
 type Index interface {
 	Open() error
 	Close() error
@@ -33,6 +35,8 @@ type Index interface {
 	DumpDoc(id string) chan interface{}
 	DumpFields() chan interface{}
 
+	// Reader returns a low-level accessor on the index data. Close it to
+	// release associated resources.
 	Reader() (IndexReader, error)
 
 	Stats() json.Marshaler
@@ -42,9 +46,15 @@ type Index interface {
 
 type IndexReader interface {
 	TermFieldReader(term []byte, field string) (TermFieldReader, error)
+
+	// DocIDReader returns an iterator over documents which identifiers are
+	// greater than or equal to start and smaller than end. The caller must
+	// close returned instance to release associated resources.
 	DocIDReader(start, end string) (DocIDReader, error)
 
 	FieldDict(field string) (FieldDict, error)
+
+	// FieldDictRange is currently defined to include the start and end terms
 	FieldDictRange(field string, startTerm []byte, endTerm []byte) (FieldDict, error)
 	FieldDictPrefix(field string, termPrefix []byte) (FieldDict, error)
 
@@ -95,8 +105,17 @@ type FieldDict interface {
 	Close() error
 }
 
+// DocIDReader is the interface exposing enumeration of documents identifiers.
+// Close the reader to release associated resources.
 type DocIDReader interface {
+	// Next returns the next document identifier in ascending lexicographic
+	// byte order, or io.EOF when the end of the sequence is reached.
 	Next() (string, error)
+
+	// Advance resets the iteration to the first identifier greater than or
+	// equal to ID. If ID is smaller than the start of the range, the iteration
+	// will start there instead. If ID is greater than or equal to the end of
+	// the range, Next() call will return io.EOF.
 	Advance(ID string) (string, error)
 	Close() error
 }

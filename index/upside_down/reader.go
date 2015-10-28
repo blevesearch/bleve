@@ -10,19 +10,16 @@
 package upside_down
 
 import (
-	"bytes"
-
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
 )
 
 type UpsideDownCouchTermFieldReader struct {
-	indexReader  *IndexReader
-	iterator     store.KVIterator
-	count        uint64
-	term         []byte
-	field        uint16
-	readerPrefix []byte
+	indexReader *IndexReader
+	iterator    store.KVIterator
+	count       uint64
+	term        []byte
+	field       uint16
 }
 
 func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, field uint16) (*UpsideDownCouchTermFieldReader, error) {
@@ -45,25 +42,14 @@ func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 	}
 
 	tfr := NewTermFrequencyRow(term, field, "", 0, 0)
-	readerPrefix := tfr.Key()
-
-	var it store.KVIterator
-	switch kvreader := indexReader.kvreader.(type) {
-	case store.RangeIterable:
-		etfr := NewTermFrequencyRow(term[:len(term)-1], field, "", 0, 0)
-		nextTermPrefix := etfr.Key()
-		it = kvreader.RangeIterator(readerPrefix, nextTermPrefix)
-	default:
-		it = kvreader.Iterator(readerPrefix)
-	}
+	it := indexReader.kvreader.PrefixIterator(tfr.Key())
 
 	return &UpsideDownCouchTermFieldReader{
-		indexReader:  indexReader,
-		iterator:     it,
-		count:        dictionaryRow.count,
-		term:         term,
-		field:        field,
-		readerPrefix: readerPrefix,
+		indexReader: indexReader,
+		iterator:    it,
+		count:       dictionaryRow.count,
+		term:        term,
+		field:       field,
 	}, nil
 }
 
@@ -75,10 +61,6 @@ func (r *UpsideDownCouchTermFieldReader) Next() (*index.TermFieldDoc, error) {
 	if r.iterator != nil {
 		key, val, valid := r.iterator.Current()
 		if valid {
-			if !bytes.HasPrefix(key, r.readerPrefix) {
-				// end of the line
-				return nil, nil
-			}
 			tfr, err := NewTermFrequencyRowKV(key, val)
 			if err != nil {
 				return nil, err
@@ -101,10 +83,6 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docID string) (*index.TermField
 		r.iterator.Seek(tfr.Key())
 		key, val, valid := r.iterator.Current()
 		if valid {
-			if !bytes.HasPrefix(key, r.readerPrefix) {
-				// end of the line
-				return nil, nil
-			}
 			tfr, err := NewTermFrequencyRowKV(key, val)
 			if err != nil {
 				return nil, err
@@ -131,8 +109,6 @@ func (r *UpsideDownCouchTermFieldReader) Close() error {
 type UpsideDownCouchDocIDReader struct {
 	indexReader *IndexReader
 	iterator    store.KVIterator
-	start       string
-	end         string
 }
 
 func newUpsideDownCouchDocIDReader(indexReader *IndexReader, start, end string) (*UpsideDownCouchDocIDReader, error) {
@@ -143,24 +119,18 @@ func newUpsideDownCouchDocIDReader(indexReader *IndexReader, start, end string) 
 		end = string([]byte{0xff})
 	}
 	bisr := NewBackIndexRow(start, nil, nil)
-	it := indexReader.kvreader.Iterator(bisr.Key())
+	bier := NewBackIndexRow(end, nil, nil)
+	it := indexReader.kvreader.RangeIterator(bisr.Key(), bier.Key())
 
 	return &UpsideDownCouchDocIDReader{
 		indexReader: indexReader,
 		iterator:    it,
-		start:       start,
-		end:         end,
 	}, nil
 }
 
 func (r *UpsideDownCouchDocIDReader) Next() (string, error) {
 	key, val, valid := r.iterator.Current()
 	if valid {
-		bier := NewBackIndexRow(r.end, nil, nil)
-		if bytes.Compare(key, bier.Key()) > 0 {
-			// end of the line
-			return "", nil
-		}
 		br, err := NewBackIndexRowKV(key, val)
 		if err != nil {
 			return "", err
@@ -176,11 +146,6 @@ func (r *UpsideDownCouchDocIDReader) Advance(docID string) (string, error) {
 	r.iterator.Seek(bir.Key())
 	key, val, valid := r.iterator.Current()
 	if valid {
-		bier := NewBackIndexRow(r.end, nil, nil)
-		if bytes.Compare(key, bier.Key()) > 0 {
-			// end of the line
-			return "", nil
-		}
 		br, err := NewBackIndexRowKV(key, val)
 		if err != nil {
 			return "", err

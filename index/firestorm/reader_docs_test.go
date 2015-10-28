@@ -15,25 +15,22 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/store/gtreap"
 )
 
 func TestDocIDReaderSomeGarbage(t *testing.T) {
-	kv, err := inmem.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	aq := index.NewAnalysisQueue(1)
-
-	f := NewFirestorm(kv, aq)
-
-	err = kv.Open()
+	f, err := NewFirestorm(gtreap.Name, nil, aq)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	kvwriter, err := f.store.Writer()
+	err = f.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvwriter, err := f.(*Firestorm).store.Writer()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,17 +61,34 @@ func TestDocIDReaderSomeGarbage(t *testing.T) {
 	}
 
 	for _, row := range rows {
-		err = kvwriter.Set(row.Key(), row.Value())
+		wb := kvwriter.NewBatch()
+		wb.Set(row.Key(), row.Value())
+		err = kvwriter.ExecuteBatch(wb)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	f.compensator.inFlight = f.compensator.inFlight.Upsert(&InFlightItem{docID: []byte("c"), docNum: 0}, rand.Int())
-	f.compensator.deletedDocNumbers.Set(4)
+	f.(*Firestorm).compensator.inFlight = f.(*Firestorm).compensator.inFlight.Upsert(&InFlightItem{docID: []byte("c"), docNum: 0}, rand.Int())
+	f.(*Firestorm).compensator.deletedDocNumbers.Set(4)
+
+	err = kvwriter.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvreader, err := f.(*Firestorm).store.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// warmup to load field cache and set maxRead correctly
-	f.warmup(kvwriter)
+	f.(*Firestorm).warmup(kvreader)
+
+	err = kvreader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	r, err := f.Reader()
 	if err != nil {

@@ -12,64 +12,59 @@ package firestorm
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/store/gtreap"
 )
-
-func CreateGTreap() (store.KVStore, error) {
-	return gtreap.StoreConstructor(nil)
-}
 
 func DestroyGTreap() error {
 	return nil
 }
 
 func BenchmarkGTreapIndexing1Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateGTreap, DestroyGTreap, 1)
+	CommonBenchmarkIndex(b, gtreap.Name, nil, DestroyGTreap, 1)
 }
 
 func BenchmarkGTreapIndexing2Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateGTreap, DestroyGTreap, 2)
+	CommonBenchmarkIndex(b, gtreap.Name, nil, DestroyGTreap, 2)
 }
 
 func BenchmarkGTreapIndexing4Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateGTreap, DestroyGTreap, 4)
+	CommonBenchmarkIndex(b, gtreap.Name, nil, DestroyGTreap, 4)
 }
 
 // batches
 
 func BenchmarkGTreapIndexing1Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 1, 10)
+	CommonBenchmarkIndexBatch(b, gtreap.Name, nil, DestroyGTreap, 1, 10)
 }
 
 func BenchmarkGTreapIndexing2Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 2, 10)
+	CommonBenchmarkIndexBatch(b, gtreap.Name, nil, DestroyGTreap, 2, 10)
 }
 
 func BenchmarkGTreapIndexing4Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 4, 10)
+	CommonBenchmarkIndexBatch(b, gtreap.Name, nil, DestroyGTreap, 4, 10)
 }
 
 func BenchmarkGTreapIndexing1Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 1, 100)
+	CommonBenchmarkIndexBatch(b, gtreap.Name, nil, DestroyGTreap, 1, 100)
 }
 
 func BenchmarkGTreapIndexing2Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 2, 100)
+	CommonBenchmarkIndexBatch(b, gtreap.Name, nil, DestroyGTreap, 2, 100)
 }
 
 func BenchmarkGTreapIndexing4Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 4, 100)
+	CommonBenchmarkIndexBatch(b, gtreap.Name, nil, DestroyGTreap, 4, 100)
 }
 
 func BenchmarkGTreapIndexing1Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 1, 1000)
+	CommonBenchmarkIndexBatch(b, gtreap.Name, nil, DestroyGTreap, 1, 1000)
 }
 
 func BenchmarkGTreapIndexing2Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 2, 1000)
+	CommonBenchmarkIndexBatch(b, gtreap.Name, nil, DestroyGTreap, 2, 1000)
 }
 
 func BenchmarkGTreapIndexing4Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGTreap, DestroyGTreap, 4, 1000)
+	CommonBenchmarkIndexBatch(b, gtreap.Name, nil, DestroyGTreap, 4, 1000)
 }

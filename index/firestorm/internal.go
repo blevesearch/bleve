@@ -31,11 +31,29 @@ func NewInternalRowKV(key, value []byte) (*InternalRow, error) {
 	return &rv, nil
 }
 
-func (ir *InternalRow) Key() []byte {
-	buf := make([]byte, len(ir.key)+1)
+func (ir *InternalRow) KeySize() int {
+	return 1 + len(ir.key)
+}
+
+func (ir *InternalRow) KeyTo(buf []byte) (int, error) {
 	buf[0] = 'i'
 	copy(buf[1:], ir.key)
-	return buf
+	return 1 + len(ir.key), nil
+}
+
+func (ir *InternalRow) Key() []byte {
+	buf := make([]byte, ir.KeySize())
+	n, _ := ir.KeyTo(buf)
+	return buf[:n]
+}
+
+func (ir *InternalRow) ValueSize() int {
+	return len(ir.val)
+}
+
+func (ir *InternalRow) ValueTo(buf []byte) (int, error) {
+	copy(buf, ir.val)
+	return len(ir.val), nil
 }
 
 func (ir *InternalRow) Value() []byte {

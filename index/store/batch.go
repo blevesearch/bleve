@@ -15,55 +15,39 @@ type op struct {
 }
 
 type EmulatedBatch struct {
-	w     KVWriter
-	ops   []*op
-	merge *EmulatedMerge
+	Ops    []*op
+	Merger *EmulatedMerge
 }
 
-func NewEmulatedBatch(w KVWriter, mo MergeOperator) *EmulatedBatch {
+func NewEmulatedBatch(mo MergeOperator) *EmulatedBatch {
 	return &EmulatedBatch{
-		w:     w,
-		ops:   make([]*op, 0, 1000),
-		merge: NewEmulatedMerge(mo),
+		Ops:    make([]*op, 0, 1000),
+		Merger: NewEmulatedMerge(mo),
 	}
 }
 
 func (b *EmulatedBatch) Set(key, val []byte) {
-	b.ops = append(b.ops, &op{key, val})
+	ck := make([]byte, len(key))
+	copy(ck, key)
+	cv := make([]byte, len(val))
+	copy(cv, val)
+	b.Ops = append(b.Ops, &op{ck, cv})
 }
 
 func (b *EmulatedBatch) Delete(key []byte) {
-	b.ops = append(b.ops, &op{key, nil})
+	ck := make([]byte, len(key))
+	copy(ck, key)
+	b.Ops = append(b.Ops, &op{ck, nil})
 }
 
 func (b *EmulatedBatch) Merge(key, val []byte) {
-	b.merge.Merge(key, val)
+	ck := make([]byte, len(key))
+	copy(ck, key)
+	cv := make([]byte, len(val))
+	copy(cv, val)
+	b.Merger.Merge(key, val)
 }
 
-func (b *EmulatedBatch) Execute() error {
-	// first process merges
-	err := b.merge.Execute(b.w)
-	if err != nil {
-		return err
-	}
-
-	// now apply all the ops
-	for _, op := range b.ops {
-		if op.V != nil {
-			err := b.w.Set(op.K, op.V)
-			if err != nil {
-				return err
-			}
-		} else {
-			err := b.w.Delete(op.K)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (b *EmulatedBatch) Close() error {
-	return nil
+func (b *EmulatedBatch) Reset() {
+	b.Ops = b.Ops[:0]
 }

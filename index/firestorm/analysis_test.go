@@ -16,38 +16,53 @@ import (
 	"github.com/blevesearch/bleve/analysis/analyzers/standard_analyzer"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/store/gtreap"
 	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/registry"
 )
 
 func TestAnalysis(t *testing.T) {
 
-	kv, err := inmem.New()
+	aq := index.NewAnalysisQueue(1)
+	f, err := NewFirestorm(gtreap.Name, nil, aq)
 	if err != nil {
 		t.Fatal(err)
 	}
-	aq := index.NewAnalysisQueue(1)
-	f := NewFirestorm(kv, aq)
+
+	err = f.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	rows := []index.IndexRow{
 		NewFieldRow(0, IDFieldName),
 	}
 
-	kvwriter, err := f.store.Writer()
+	kvwriter, err := f.(*Firestorm).store.Writer()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, row := range rows {
-		err := kvwriter.Set(row.Key(), row.Value())
+		wb := kvwriter.NewBatch()
+		wb.Set(row.Key(), row.Value())
+		err := kvwriter.ExecuteBatch(wb)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
+	err = kvwriter.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvreader, err := f.(*Firestorm).store.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// warmup to load field cache and set maxRead correctly
-	f.warmup(kvwriter)
+	f.(*Firestorm).warmup(kvreader)
 
 	tests := []struct {
 		d *document.Document
@@ -77,7 +92,7 @@ func TestAnalysis(t *testing.T) {
 		}
 	}
 
-	err = kvwriter.Close()
+	err = kvreader.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,12 +106,11 @@ func BenchmarkAnalyze(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	s, err := null.New()
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewFirestorm(null.Name, nil, analysisQueue)
 	if err != nil {
 		b.Fatal(err)
 	}
-	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(s, analysisQueue)
 
 	d := document.NewDocument("1")
 	f := document.NewTextFieldWithAnalyzer("desc", nil, bleveWikiArticle1K, analyzer)

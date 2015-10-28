@@ -12,64 +12,59 @@ package firestorm
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/index/store"
-	"github.com/blevesearch/bleve/index/store/cznicb"
+	"github.com/blevesearch/blevex/cznicb"
 )
-
-func CreateCznicB() (store.KVStore, error) {
-	return cznicb.StoreConstructor(nil)
-}
 
 func DestroyCznicB() error {
 	return nil
 }
 
 func BenchmarkCznicBIndexing1Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateCznicB, DestroyCznicB, 1)
+	CommonBenchmarkIndex(b, cznicb.Name, nil, DestroyCznicB, 1)
 }
 
 func BenchmarkCznicBIndexing2Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateCznicB, DestroyCznicB, 2)
+	CommonBenchmarkIndex(b, cznicb.Name, nil, DestroyCznicB, 2)
 }
 
 func BenchmarkCznicBIndexing4Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateCznicB, DestroyCznicB, 4)
+	CommonBenchmarkIndex(b, cznicb.Name, nil, DestroyCznicB, 4)
 }
 
 // batches
 
 func BenchmarkCznicBIndexing1Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 1, 10)
+	CommonBenchmarkIndexBatch(b, cznicb.Name, nil, DestroyCznicB, 1, 10)
 }
 
 func BenchmarkCznicBIndexing2Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 2, 10)
+	CommonBenchmarkIndexBatch(b, cznicb.Name, nil, DestroyCznicB, 2, 10)
 }
 
 func BenchmarkCznicBIndexing4Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 4, 10)
+	CommonBenchmarkIndexBatch(b, cznicb.Name, nil, DestroyCznicB, 4, 10)
 }
 
 func BenchmarkCznicBIndexing1Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 1, 100)
+	CommonBenchmarkIndexBatch(b, cznicb.Name, nil, DestroyCznicB, 1, 100)
 }
 
 func BenchmarkCznicBIndexing2Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 2, 100)
+	CommonBenchmarkIndexBatch(b, cznicb.Name, nil, DestroyCznicB, 2, 100)
 }
 
 func BenchmarkCznicBIndexing4Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 4, 100)
+	CommonBenchmarkIndexBatch(b, cznicb.Name, nil, DestroyCznicB, 4, 100)
 }
 
 func BenchmarkCznicBIndexing1Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 1, 1000)
+	CommonBenchmarkIndexBatch(b, cznicb.Name, nil, DestroyCznicB, 1, 1000)
 }
 
 func BenchmarkCznicBIndexing2Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 2, 1000)
+	CommonBenchmarkIndexBatch(b, cznicb.Name, nil, DestroyCznicB, 2, 1000)
 }
 
 func BenchmarkCznicBIndexing4Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateCznicB, DestroyCznicB, 4, 1000)
+	CommonBenchmarkIndexBatch(b, cznicb.Name, nil, DestroyCznicB, 4, 1000)
 }

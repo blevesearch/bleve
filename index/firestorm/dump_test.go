@@ -10,32 +10,25 @@
 package firestorm
 
 import (
-	"os"
 	"testing"
 	"time"
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/boltdb"
+	"github.com/blevesearch/bleve/index/store/gtreap"
 )
 
 var dictWaitDuration = 5 * time.Second
 
 func TestDump(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("test")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	s := boltdb.New("test", "bleve")
-	s.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(s, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(gtreap.Name, nil, analysisQueue)
 	if err != nil {
-		t.Errorf("error opening index: %v", err)
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Fatalf("error opening index: %v", err)
 	}
 	defer func() {
 		err := idx.Close()
@@ -112,7 +105,7 @@ func TestDump(t *testing.T) {
 		t.Errorf("expected %d rows for document, got %d", expectedDocRowCount, docRowCount)
 	}
 
-	idx.dictUpdater.waitTasksDone(dictWaitDuration)
+	idx.(*Firestorm).dictUpdater.waitTasksDone(dictWaitDuration)
 
 	// 1 version
 	// fieldsCount field rows

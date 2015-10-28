@@ -42,13 +42,31 @@ func NewVersionRowV(val []byte) (*VersionRow, error) {
 	return &rv, nil
 }
 
+func (vr *VersionRow) KeySize() int {
+	return 1
+}
+
+func (vr *VersionRow) KeyTo(buf []byte) (int, error) {
+	buf[0] = VersionKey[0]
+	return 1, nil
+}
+
 func (vr *VersionRow) Key() []byte {
 	return VersionKey
 }
 
+func (vr *VersionRow) ValueSize() int {
+	return vr.value.Size()
+}
+
+func (vr *VersionRow) ValueTo(buf []byte) (int, error) {
+	return vr.value.MarshalTo(buf)
+}
+
 func (vr *VersionRow) Value() []byte {
-	rv, _ := vr.value.Marshal()
-	return rv
+	buf := make([]byte, vr.ValueSize())
+	n, _ := vr.value.MarshalTo(buf)
+	return buf[:n]
 }
 
 func (vr *VersionRow) Version() uint64 {
@@ -83,6 +101,8 @@ func (f *Firestorm) checkVersion(reader store.KVReader) (newIndex bool, err erro
 
 func (f *Firestorm) storeVersion(writer store.KVWriter) error {
 	vr := NewVersionRow(Version)
-	err := writer.Set(vr.Key(), vr.Value())
+	wb := writer.NewBatch()
+	wb.Set(vr.Key(), vr.Value())
+	err := writer.ExecuteBatch(wb)
 	return err
 }

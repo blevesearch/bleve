@@ -13,26 +13,22 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/store/gtreap"
 )
 
 func TestLookups(t *testing.T) {
-
-	kv, err := inmem.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	aq := index.NewAnalysisQueue(1)
-
-	f := NewFirestorm(kv, aq)
-
-	err = kv.Open()
+	f, err := NewFirestorm(gtreap.Name, nil, aq)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	kvwriter, err := f.store.Writer()
+	err = f.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvwriter, err := f.(*Firestorm).store.Writer()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,21 +48,23 @@ func TestLookups(t *testing.T) {
 	}
 
 	for _, row := range rows {
-		err = kvwriter.Set(row.row.Key(), row.row.Value())
+		wb := kvwriter.NewBatch()
+		wb.Set(row.row.Key(), row.row.Value())
+		err = kvwriter.ExecuteBatch(wb)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// also see the compensator
 		if tfr, ok := row.row.(*TermFreqRow); ok {
-			f.compensator.Mutate(tfr.DocID(), tfr.DocNum())
+			f.(*Firestorm).compensator.Mutate(tfr.DocID(), tfr.DocNum())
 			// expect this mutation to be in the in-flight list
-			val := f.compensator.inFlight.Get(&InFlightItem{docID: tfr.DocID()})
+			val := f.(*Firestorm).compensator.inFlight.Get(&InFlightItem{docID: tfr.DocID()})
 			if val == nil {
 				t.Errorf("expected key: % x to be in the inflight list", tfr.DocID())
 			}
-			f.lookuper.lookup(&lookupTask{docID: tfr.DocID(), docNum: tfr.DocNum()})
+			f.(*Firestorm).lookuper.lookup(&lookupTask{docID: tfr.DocID(), docNum: tfr.DocNum()})
 			// now expect this mutation to NOT be in the in-flight list
-			val = f.compensator.inFlight.Get(&InFlightItem{docID: tfr.DocID()})
+			val = f.(*Firestorm).compensator.inFlight.Get(&InFlightItem{docID: tfr.DocID()})
 			if val != nil {
 				t.Errorf("expected key: % x to NOT be in the inflight list, got %v", tfr.DocID(), val)
 			}

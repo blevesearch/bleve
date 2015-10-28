@@ -13,21 +13,17 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/store/gtreap"
 )
 
 func TestDictUpdater(t *testing.T) {
-
-	kv, err := inmem.New()
+	aq := index.NewAnalysisQueue(1)
+	f, err := NewFirestorm(gtreap.Name, nil, aq)
 	if err != nil {
 		t.Fatal(err)
 	}
-	kv.SetMergeOperator(&mergeOperator)
-	aq := index.NewAnalysisQueue(1)
 
-	f := NewFirestorm(kv, aq)
-
-	err = kv.Open()
+	err = f.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,13 +35,13 @@ func TestDictUpdater(t *testing.T) {
 		string([]byte{'d', 1, 0, 'c', 'a', 't'}): 3,
 	}
 
-	f.dictUpdater.NotifyBatch(dictBatch)
+	f.(*Firestorm).dictUpdater.NotifyBatch(dictBatch)
 
 	// invoke updater manually
-	f.dictUpdater.update()
+	f.(*Firestorm).dictUpdater.update()
 
 	// assert that dictionary rows are correct
-	reader, err := f.store.Reader()
+	reader, err := f.(*Firestorm).store.Reader()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,13 +74,13 @@ func TestDictUpdater(t *testing.T) {
 		string([]byte{'d', 1, 0, 'c', 'a', 't'}): 4,
 	}
 
-	f.dictUpdater.NotifyBatch(dictBatch)
+	f.(*Firestorm).dictUpdater.NotifyBatch(dictBatch)
 
 	// invoke updater manually
-	f.dictUpdater.update()
+	f.(*Firestorm).dictUpdater.update()
 
 	// assert that dictionary rows are correct
-	reader, err = f.store.Reader()
+	reader, err = f.(*Firestorm).store.Reader()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,13 +113,13 @@ func TestDictUpdater(t *testing.T) {
 		string([]byte{'d', 1, 0, 'c', 'a', 't'}): 2,
 	}
 
-	f.dictUpdater.NotifyBatch(dictBatch)
+	f.(*Firestorm).dictUpdater.NotifyBatch(dictBatch)
 
 	// invoke updater manually
-	f.dictUpdater.update()
+	f.(*Firestorm).dictUpdater.update()
 
 	// assert that dictionary rows are correct
-	reader, err = f.store.Reader()
+	reader, err = f.(*Firestorm).store.Reader()
 	if err != nil {
 		t.Fatal(err)
 	}

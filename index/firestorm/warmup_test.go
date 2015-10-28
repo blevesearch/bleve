@@ -13,37 +13,23 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/store/gtreap"
 )
 
 func TestBootstrap(t *testing.T) {
-
-	kv, err := inmem.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	aq := index.NewAnalysisQueue(1)
-
-	f := NewFirestorm(kv, aq)
-
-	err = kv.Open()
+	f, err := NewFirestorm(gtreap.Name, nil, aq)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	kvwriter, err := f.store.Writer()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = f.bootstrap(kvwriter)
+	err = f.Open() // open calls bootstrap
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// assert that version is set
-	reader, err := kv.Reader()
+	reader, err := f.(*Firestorm).store.Reader()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +46,7 @@ func TestBootstrap(t *testing.T) {
 	}
 
 	// assert that field cache has _id
-	id, existed := f.fieldCache.FieldNamed(IDFieldName, false)
+	id, existed := f.(*Firestorm).fieldCache.FieldNamed(IDFieldName, false)
 	if !existed {
 		t.Errorf("expect '%s' in field cache", IDFieldName)
 	}
@@ -84,29 +70,25 @@ func TestBootstrap(t *testing.T) {
 	}
 
 	// assert that highDocNumber is 0
-	if f.highDocNumber != 0 {
-		t.Errorf("expected highDocNumber to be 0, got %d", f.highDocNumber)
+	if f.(*Firestorm).highDocNumber != 0 {
+		t.Errorf("expected highDocNumber to be 0, got %d", f.(*Firestorm).highDocNumber)
 	}
 
 }
 
 func TestWarmupNoGarbage(t *testing.T) {
-
-	kv, err := inmem.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	aq := index.NewAnalysisQueue(1)
-
-	f := NewFirestorm(kv, aq)
-
-	err = kv.Open()
+	f, err := NewFirestorm(gtreap.Name, nil, aq)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	kvwriter, err := f.store.Writer()
+	err = f.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvwriter, err := f.(*Firestorm).store.Writer()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,13 +103,30 @@ func TestWarmupNoGarbage(t *testing.T) {
 	expectedGarbage := uint64(0)
 
 	for _, row := range rows {
-		err = kvwriter.Set(row.Key(), row.Value())
+		wb := kvwriter.NewBatch()
+		wb.Set(row.Key(), row.Value())
+		err = kvwriter.ExecuteBatch(wb)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	err = f.warmup(kvwriter)
+	err = kvwriter.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvreader, err := f.(*Firestorm).store.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = f.(*Firestorm).warmup(kvreader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = kvreader.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,33 +141,29 @@ func TestWarmupNoGarbage(t *testing.T) {
 	}
 
 	// assert that deleted doc numbers size is 0
-	if f.compensator.GarbageCount() != expectedGarbage {
-		t.Errorf("expected 0 deleted doc numbers, got %d", f.compensator.GarbageCount())
+	if f.(*Firestorm).compensator.GarbageCount() != expectedGarbage {
+		t.Errorf("expected 0 deleted doc numbers, got %d", f.(*Firestorm).compensator.GarbageCount())
 	}
 
 	// assert that highDocNumber is 3
-	if f.highDocNumber != 3 {
-		t.Errorf("expected highDocNumber to be 3, got %d", f.highDocNumber)
+	if f.(*Firestorm).highDocNumber != 3 {
+		t.Errorf("expected highDocNumber to be 3, got %d", f.(*Firestorm).highDocNumber)
 	}
 }
 
 func TestWarmupSomeGarbage(t *testing.T) {
-
-	kv, err := inmem.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	aq := index.NewAnalysisQueue(1)
-
-	f := NewFirestorm(kv, aq)
-
-	err = kv.Open()
+	f, err := NewFirestorm(gtreap.Name, nil, aq)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	kvwriter, err := f.store.Writer()
+	err = f.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvwriter, err := f.(*Firestorm).store.Writer()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,13 +180,30 @@ func TestWarmupSomeGarbage(t *testing.T) {
 	expectedGarbage := uint64(2)
 
 	for _, row := range rows {
-		err = kvwriter.Set(row.Key(), row.Value())
+		wb := kvwriter.NewBatch()
+		wb.Set(row.Key(), row.Value())
+		err = kvwriter.ExecuteBatch(wb)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	err = f.warmup(kvwriter)
+	err = kvwriter.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvreader, err := f.(*Firestorm).store.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = f.(*Firestorm).warmup(kvreader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = kvreader.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,20 +218,20 @@ func TestWarmupSomeGarbage(t *testing.T) {
 	}
 
 	// assert that deleted doc numbers size is 0
-	if f.compensator.GarbageCount() != expectedGarbage {
-		t.Errorf("expected %d deleted doc numbers, got %d", expectedGarbage, f.compensator.GarbageCount())
+	if f.(*Firestorm).compensator.GarbageCount() != expectedGarbage {
+		t.Errorf("expected %d deleted doc numbers, got %d", expectedGarbage, f.(*Firestorm).compensator.GarbageCount())
 	}
 
 	// assert that doc numbers 1 and 4 are on the deleted list
-	if !f.compensator.deletedDocNumbers.Test(1) {
+	if !f.(*Firestorm).compensator.deletedDocNumbers.Test(1) {
 		t.Errorf("expected doc number 1 to be deleted")
 	}
-	if !f.compensator.deletedDocNumbers.Test(4) {
+	if !f.(*Firestorm).compensator.deletedDocNumbers.Test(4) {
 		t.Errorf("expected doc number 4 to be deleted")
 	}
 
 	// assert that highDocNumber is 5
-	if f.highDocNumber != 5 {
-		t.Errorf("expected highDocNumber to be 5, got %d", f.highDocNumber)
+	if f.(*Firestorm).highDocNumber != 5 {
+		t.Errorf("expected highDocNumber to be 5, got %d", f.(*Firestorm).highDocNumber)
 	}
 }

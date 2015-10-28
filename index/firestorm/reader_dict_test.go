@@ -17,7 +17,7 @@ import (
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/analysis/tokenizers/regexp_tokenizer"
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/store/gtreap"
 )
 
 var testAnalyzer = &analysis.Analyzer{
@@ -25,21 +25,18 @@ var testAnalyzer = &analysis.Analyzer{
 }
 
 func TestDictionaryReader(t *testing.T) {
-	kv, err := inmem.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	aq := index.NewAnalysisQueue(1)
-
-	f := NewFirestorm(kv, aq)
-
-	err = kv.Open()
+	f, err := NewFirestorm(gtreap.Name, nil, aq)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	kvwriter, err := f.store.Writer()
+	err = f.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvwriter, err := f.(*Firestorm).store.Writer()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,13 +49,35 @@ func TestDictionaryReader(t *testing.T) {
 	}
 
 	for _, row := range rows {
-		err = kvwriter.Set(row.Key(), row.Value())
+		wb := kvwriter.NewBatch()
+		wb.Set(row.Key(), row.Value())
+		err = kvwriter.ExecuteBatch(wb)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	f.warmup(kvwriter)
+	err = kvwriter.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvreader, err := f.(*Firestorm).store.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f.(*Firestorm).warmup(kvreader)
+
+	err = kvreader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvwriter, err = f.(*Firestorm).store.Writer()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	rows = []index.IndexRow{
 
@@ -79,7 +98,9 @@ func TestDictionaryReader(t *testing.T) {
 	}
 
 	for _, row := range rows {
-		err = kvwriter.Set(row.Key(), row.Value())
+		wb := kvwriter.NewBatch()
+		wb.Set(row.Key(), row.Value())
+		err = kvwriter.ExecuteBatch(wb)
 		if err != nil {
 			t.Fatal(err)
 		}

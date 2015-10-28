@@ -10,8 +10,6 @@
 package upside_down
 
 import (
-	"bytes"
-
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
@@ -64,7 +62,7 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 	doc = document.NewDocument(id)
 	storedRow := NewStoredRow(id, 0, []uint64{}, 'x', nil)
 	storedRowScanPrefix := storedRow.ScanPrefixForDoc()
-	it := i.kvreader.Iterator(storedRowScanPrefix)
+	it := i.kvreader.PrefixIterator(storedRowScanPrefix)
 	defer func() {
 		if cerr := it.Close(); err == nil && cerr != nil {
 			err = cerr
@@ -72,14 +70,8 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 	}()
 	key, val, valid := it.Current()
 	for valid {
-		if !bytes.HasPrefix(key, storedRowScanPrefix) {
-			break
-		}
-		safeVal := val
-		if !i.kvreader.BytesSafeAfterClose() {
-			safeVal = make([]byte, len(val))
-			copy(safeVal, val)
-		}
+		safeVal := make([]byte, len(val))
+		copy(safeVal, val)
 		var row *StoredRow
 		row, err = NewStoredRowKV(key, safeVal)
 		if err != nil {
@@ -120,7 +112,7 @@ func (i *IndexReader) DocumentFieldTerms(id string) (index.FieldTerms, error) {
 
 func (i *IndexReader) Fields() (fields []string, err error) {
 	fields = make([]string, 0)
-	it := i.kvreader.Iterator([]byte{'f'})
+	it := i.kvreader.PrefixIterator([]byte{'f'})
 	defer func() {
 		if cerr := it.Close(); err == nil && cerr != nil {
 			err = cerr
@@ -128,9 +120,6 @@ func (i *IndexReader) Fields() (fields []string, err error) {
 	}()
 	key, val, valid := it.Current()
 	for valid {
-		if !bytes.HasPrefix(key, []byte{'f'}) {
-			break
-		}
 		var row UpsideDownCouchRow
 		row, err = ParseFromKeyValue(key, val)
 		if err != nil {
@@ -161,4 +150,17 @@ func (i *IndexReader) DocCount() uint64 {
 
 func (i *IndexReader) Close() error {
 	return i.kvreader.Close()
+}
+
+func incrementBytes(in []byte) []byte {
+	rv := make([]byte, len(in))
+	copy(rv, in)
+	for i := len(rv) - 1; i >= 0; i-- {
+		rv[i] = rv[i] + 1
+		if rv[i] != 0 {
+			// didn't overflow, so stop
+			break
+		}
+	}
+	return rv
 }

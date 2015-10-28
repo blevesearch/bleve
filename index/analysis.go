@@ -12,7 +12,12 @@ package index
 import "github.com/blevesearch/bleve/document"
 
 type IndexRow interface {
+	KeySize() int
+	KeyTo([]byte) (int, error)
 	Key() []byte
+
+	ValueSize() int
+	ValueTo([]byte) (int, error)
 	Value() []byte
 }
 

@@ -20,7 +20,6 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/boltdb"
-	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/registry"
 )
 
@@ -34,11 +33,12 @@ func TestIndexOpenReopen(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -58,9 +58,10 @@ func TestIndexOpenReopen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store = boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
-	idx = NewFirestorm(store, analysisQueue)
+	idx, err = NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -81,11 +82,12 @@ func TestIndexInsert(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -113,7 +115,7 @@ func TestIndexInsert(t *testing.T) {
 	}
 	expectedCount++
 
-	idx.lookuper.waitTasksDone(lookupWaitDuration)
+	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
 
 	docCount, err = idx.DocCount()
 	if err != nil {
@@ -133,11 +135,12 @@ func TestIndexInsertThenDelete(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -165,7 +168,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	expectedCount++
 
-	idx.lookuper.waitTasksDone(lookupWaitDuration)
+	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
 
 	doc2 := document.NewDocument("2")
 	doc2.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
@@ -175,7 +178,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	expectedCount++
 
-	idx.lookuper.waitTasksDone(lookupWaitDuration)
+	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
 
 	docCount, err = idx.DocCount()
 	if err != nil {
@@ -191,7 +194,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	expectedCount--
 
-	idx.lookuper.waitTasksDone(lookupWaitDuration)
+	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
 
 	docCount, err = idx.DocCount()
 	if err != nil {
@@ -207,7 +210,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	expectedCount--
 
-	idx.lookuper.waitTasksDone(lookupWaitDuration)
+	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
 
 	docCount, err = idx.DocCount()
 	if err != nil {
@@ -226,11 +229,12 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -266,7 +270,7 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 		t.Errorf("Error deleting entry from index: %v", err)
 	}
 
-	idx.lookuper.waitTasksDone(lookupWaitDuration)
+	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
 
 	docCount, err := idx.DocCount()
 	if err != nil {
@@ -286,11 +290,12 @@ func TestIndexInsertMultiple(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -319,9 +324,10 @@ func TestIndexInsertMultiple(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store = boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
-	idx = NewFirestorm(store, analysisQueue)
+	idx, err = NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
@@ -341,7 +347,7 @@ func TestIndexInsertMultiple(t *testing.T) {
 	}
 	expectedCount++
 
-	idx.lookuper.waitTasksDone(lookupWaitDuration)
+	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
 
 	docCount, err := idx.DocCount()
 	if err != nil {
@@ -360,11 +366,12 @@ func TestIndexInsertWithStore(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -392,7 +399,7 @@ func TestIndexInsertWithStore(t *testing.T) {
 	}
 	expectedCount++
 
-	idx.lookuper.waitTasksDone(lookupWaitDuration)
+	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
 
 	docCount, err = idx.DocCount()
 	if err != nil {
@@ -438,11 +445,12 @@ func TestIndexInternalCRUD(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -531,11 +539,12 @@ func TestIndexBatch(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -596,7 +605,7 @@ func TestIndexBatch(t *testing.T) {
 		}
 	}()
 
-	idx.lookuper.waitTasksDone(lookupWaitDuration)
+	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
 
 	docCount := indexReader.DocCount()
 	if docCount != expectedCount {
@@ -635,11 +644,12 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -673,7 +683,7 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	}
 	expectedCount++
 
-	idx.lookuper.waitTasksDone(lookupWaitDuration)
+	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
 
 	docCount, err = idx.DocCount()
 	if err != nil {
@@ -791,7 +801,7 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	err = idx.Delete("1")
 	expectedCount--
 
-	idx.lookuper.waitTasksDone(lookupWaitDuration)
+	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
 
 	// expected doc count shouldn't have changed
 	docCount, err = idx.DocCount()
@@ -811,11 +821,12 @@ func TestIndexInsertFields(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -870,11 +881,12 @@ func TestIndexUpdateComposites(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -940,11 +952,12 @@ func TestIndexFieldsMisc(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -963,15 +976,15 @@ func TestIndexFieldsMisc(t *testing.T) {
 		t.Errorf("Error updating index: %v", err)
 	}
 
-	fieldName1 := idx.fieldCache.FieldIndexed(1)
+	fieldName1 := idx.(*Firestorm).fieldCache.FieldIndexed(1)
 	if fieldName1 != "name" {
 		t.Errorf("expected field named 'name', got '%s'", fieldName1)
 	}
-	fieldName2 := idx.fieldCache.FieldIndexed(2)
+	fieldName2 := idx.(*Firestorm).fieldCache.FieldIndexed(2)
 	if fieldName2 != "title" {
 		t.Errorf("expected field named 'title', got '%s'", fieldName2)
 	}
-	fieldName3 := idx.fieldCache.FieldIndexed(3)
+	fieldName3 := idx.(*Firestorm).fieldCache.FieldIndexed(3)
 	if fieldName3 != "" {
 		t.Errorf("expected field named '', got '%s'", fieldName3)
 	}
@@ -986,11 +999,12 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -1046,11 +1060,12 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 		}
 	}()
 
-	store := boltdb.New("test", "bleve")
-	store.SetMergeOperator(&mergeOperator)
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(store, analysisQueue)
-	err := idx.Open()
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
 	if err != nil {
 		t.Errorf("error opening index: %v", err)
 	}
@@ -1101,12 +1116,11 @@ func BenchmarkBatch(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	s, err := null.New()
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewFirestorm(boltdb.Name, boltTestConfig, analysisQueue)
 	if err != nil {
 		b.Fatal(err)
 	}
-	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewFirestorm(s, analysisQueue)
 	err = idx.Open()
 	if err != nil {
 		b.Fatal(err)

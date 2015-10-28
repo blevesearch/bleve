@@ -188,7 +188,7 @@ func (gc *GarbageCollector) cleanup() {
 			wb.Delete(k)
 		}
 
-		err = wb.Execute()
+		err = writer.ExecuteBatch(wb)
 		if err != nil {
 			writer.Close()
 			logger.Printf("garbage collector fatal: %v", err)
@@ -205,7 +205,13 @@ func (gc *GarbageCollector) cleanup() {
 		tfidrow := NewTermFreqRow(0, nil, docID, docNum, 0, 0, nil)
 		markerRowKey := tfidrow.Key()
 
-		writer.Delete(markerRowKey)
+		markerBatch := writer.NewBatch()
+		markerBatch.Delete(markerRowKey)
+		err = writer.ExecuteBatch(markerBatch)
+		if err != nil {
+			logger.Printf("garbage collector fatal: %v", err)
+			return
+		}
 		writer.Close()
 	}
 

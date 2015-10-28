@@ -18,12 +18,11 @@ func BenchmarkAnalyze(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	s, err := null.New()
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewUpsideDownCouch(null.Name, nil, analysisQueue)
 	if err != nil {
 		b.Fatal(err)
 	}
-	analysisQueue := index.NewAnalysisQueue(1)
-	idx := NewUpsideDownCouch(s, analysisQueue)
 
 	d := document.NewDocument("1")
 	f := document.NewTextFieldWithAnalyzer("desc", nil, bleveWikiArticle1K, analyzer)

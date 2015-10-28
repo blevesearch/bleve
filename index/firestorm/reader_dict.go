@@ -10,7 +10,6 @@
 package firestorm
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/blevesearch/bleve/index"
@@ -21,7 +20,6 @@ type firestormDictionaryReader struct {
 	r     *firestormReader
 	field uint16
 	start []byte
-	end   []byte
 	i     store.KVIterator
 }
 
@@ -33,12 +31,11 @@ func newFirestormDictionaryReader(r *firestormReader, field uint16, start, end [
 	}
 	endKey := DictionaryRowKey(field, end)
 	logger.Printf("end key '%s' - % x", endKey, endKey)
-	i := r.r.Iterator(startKey)
+	i := r.r.RangeIterator(startKey, endKey)
 	rv := firestormDictionaryReader{
 		r:     r,
 		field: field,
 		start: startKey,
-		end:   endKey,
 		i:     i,
 	}
 	return &rv, nil
@@ -51,11 +48,6 @@ func (r *firestormDictionaryReader) Next() (*index.DictEntry, error) {
 	}
 
 	logger.Printf("see key '%s' - % x", key, key)
-
-	// past end term
-	if bytes.Compare(key, r.end) > 0 {
-		return nil, nil
-	}
 
 	currRow, err := NewDictionaryRowKV(key, val)
 	if err != nil {

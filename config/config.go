@@ -86,7 +86,6 @@ import (
 	_ "github.com/blevesearch/bleve/index/store/boltdb"
 	_ "github.com/blevesearch/bleve/index/store/goleveldb"
 	_ "github.com/blevesearch/bleve/index/store/gtreap"
-	_ "github.com/blevesearch/bleve/index/store/inmem"
 
 	// index types
 	_ "github.com/blevesearch/bleve/index/firestorm"

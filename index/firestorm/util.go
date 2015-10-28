@@ -10,7 +10,6 @@
 package firestorm
 
 import (
-	"bytes"
 	"io/ioutil"
 	"log"
 
@@ -24,14 +23,14 @@ func visitPrefix(reader store.KVReader, prefix []byte, visitor KVVisitor) (err e
 	if start == nil {
 		start = []byte{0}
 	}
-	it := reader.Iterator(start)
+	it := reader.PrefixIterator(prefix)
 	defer func() {
 		if cerr := it.Close(); err == nil && cerr != nil {
 			err = cerr
 		}
 	}()
 	k, v, valid := it.Current()
-	for valid && bytes.HasPrefix(k, prefix) {
+	for valid {
 		var cont bool
 		cont, err = visitor(k, v)
 		if err != nil {
@@ -49,14 +48,14 @@ func visitPrefix(reader store.KVReader, prefix []byte, visitor KVVisitor) (err e
 }
 
 func visitRange(reader store.KVReader, start, end []byte, visitor KVVisitor) (err error) {
-	it := reader.Iterator(start)
+	it := reader.RangeIterator(start, end)
 	defer func() {
 		if cerr := it.Close(); err == nil && cerr != nil {
 			err = cerr
 		}
 	}()
 	k, v, valid := it.Current()
-	for valid && bytes.Compare(k, end) < 0 {
+	for valid {
 		var cont bool
 		cont, err = visitor(k, v)
 		if err != nil {

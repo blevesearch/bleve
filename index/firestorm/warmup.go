@@ -20,25 +20,39 @@ import (
 
 const IDFieldName = "_id"
 
-func (f *Firestorm) bootstrap(writer store.KVWriter) error {
-	// record version
-	err := f.storeVersion(writer)
+func (f *Firestorm) bootstrap() (err error) {
+
+	kvwriter, err := f.store.Writer()
 	if err != nil {
-		return err
+		return
+	}
+	defer func() {
+		if cerr := kvwriter.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	// record version
+	err = f.storeVersion(kvwriter)
+	if err != nil {
+		return
 	}
 	// define _id field
 	_, idFieldRow := f.fieldIndexOrNewRow(IDFieldName)
-	err = writer.Set(idFieldRow.Key(), idFieldRow.Value())
+
+	wb := kvwriter.NewBatch()
+	wb.Set(idFieldRow.Key(), idFieldRow.Value())
+	err = kvwriter.ExecuteBatch(wb)
 	if err != nil {
-		return err
+		return
 	}
 
-	return nil
+	return
 }
 
-func (f *Firestorm) warmup(writer store.KVWriter) error {
+func (f *Firestorm) warmup(reader store.KVReader) error {
 	// load all the existing fields
-	err := f.loadFields(writer)
+	err := f.loadFields(reader)
 	if err != nil {
 		return err
 	}
@@ -55,7 +69,7 @@ func (f *Firestorm) warmup(writer store.KVWriter) error {
 
 	var lastDocId []byte
 	lastDocNumbers := make(DocNumberList, 1)
-	err = visitPrefix(writer, tfkPrefix, func(key, val []byte) (bool, error) {
+	err = visitPrefix(reader, tfkPrefix, func(key, val []byte) (bool, error) {
 		tfk, err := NewTermFreqRowKV(key, val)
 		if err != nil {
 			return false, err

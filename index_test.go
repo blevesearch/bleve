@@ -15,6 +15,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -432,7 +433,7 @@ func TestStoredFieldPreserved(t *testing.T) {
 	}
 
 	if len(res.Hits) != 1 {
-		t.Errorf("expected 1 hit, got %d", len(res.Hits))
+		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
 	}
 
 	if res.Hits[0].Fields["name"] != "Marty" {
@@ -1036,5 +1037,105 @@ func TestTermVectorArrayPositions(t *testing.T) {
 	err = index.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDocumentStaticMapping(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	m := NewIndexMapping()
+	m.DefaultMapping = NewDocumentStaticMapping()
+	m.DefaultMapping.AddFieldMappingsAt("Text", NewTextFieldMapping())
+	m.DefaultMapping.AddFieldMappingsAt("Date", NewDateTimeFieldMapping())
+	m.DefaultMapping.AddFieldMappingsAt("Numeric", NewNumericFieldMapping())
+
+	index, err := New("testidx", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc1 := struct {
+		Text           string
+		IgnoredText    string
+		Numeric        float64
+		IgnoredNumeric float64
+		Date           time.Time
+		IgnoredDate    time.Time
+	}{
+		Text:           "valid text",
+		IgnoredText:    "ignored text",
+		Numeric:        10,
+		IgnoredNumeric: 20,
+		Date:           time.Unix(1, 0),
+		IgnoredDate:    time.Unix(2, 0),
+	}
+
+	err = index.Index("a", doc1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fields, err := index.Fields()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(fields)
+	expectedFields := []string{"Date", "Numeric", "Text", "_all"}
+	if len(fields) != len(expectedFields) {
+		t.Fatalf("invalid field count: %d", len(fields))
+	}
+	for i, expected := range expectedFields {
+		if expected != fields[i] {
+			t.Fatalf("unexpected field[%d]: %s", i, fields[i])
+		}
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestIndexEmptyDocId(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc := map[string]interface{}{
+		"body": "nodocid",
+	}
+
+	err = index.Index("", doc)
+	if err != ErrorEmptyID {
+		t.Errorf("expect index empty doc id to fail")
+	}
+
+	err = index.Delete("")
+	if err != ErrorEmptyID {
+		t.Errorf("expect delete empty doc id to fail")
+	}
+
+	batch := index.NewBatch()
+	err = batch.Index("", doc)
+	if err != ErrorEmptyID {
+		t.Errorf("expect index empty doc id in batch to fail")
+	}
+
+	batch.Delete("")
+	if batch.Size() > 0 {
+		t.Errorf("expect delete empty doc id in batch to be ignored")
 	}
 }

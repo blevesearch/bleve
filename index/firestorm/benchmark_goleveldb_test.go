@@ -10,71 +10,62 @@
 package firestorm
 
 import (
-	"os"
 	"testing"
 
-	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/store/goleveldb"
 )
 
 var goLevelDBTestOptions = map[string]interface{}{
 	"create_if_missing": true,
-}
-
-func CreateGoLevelDB() (store.KVStore, error) {
-	return goleveldb.New("test", goLevelDBTestOptions)
-}
-
-func DestroyGoLevelDB() error {
-	return os.RemoveAll("test")
+	"path":              "test",
 }
 
 func BenchmarkGoLevelDBIndexing1Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateGoLevelDB, DestroyGoLevelDB, 1)
+	CommonBenchmarkIndex(b, goleveldb.Name, goLevelDBTestOptions, DestroyTest, 1)
 }
 
 func BenchmarkGoLevelDBIndexing2Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateGoLevelDB, DestroyGoLevelDB, 2)
+	CommonBenchmarkIndex(b, goleveldb.Name, goLevelDBTestOptions, DestroyTest, 2)
 }
 
 func BenchmarkGoLevelDBIndexing4Workers(b *testing.B) {
-	CommonBenchmarkIndex(b, CreateGoLevelDB, DestroyGoLevelDB, 4)
+	CommonBenchmarkIndex(b, goleveldb.Name, goLevelDBTestOptions, DestroyTest, 4)
 }
 
 // batches
 
 func BenchmarkGoLevelDBIndexing1Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoLevelDB, DestroyGoLevelDB, 1, 10)
+	CommonBenchmarkIndexBatch(b, goleveldb.Name, goLevelDBTestOptions, DestroyTest, 1, 10)
 }
 
 func BenchmarkGoLevelDBIndexing2Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoLevelDB, DestroyGoLevelDB, 2, 10)
+	CommonBenchmarkIndexBatch(b, goleveldb.Name, goLevelDBTestOptions, DestroyTest, 2, 10)
 }
 
 func BenchmarkGoLevelDBIndexing4Workers10Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoLevelDB, DestroyGoLevelDB, 4, 10)
+	CommonBenchmarkIndexBatch(b, goleveldb.Name, goLevelDBTestOptions, DestroyTest, 4, 10)
 }
 
 func BenchmarkGoLevelDBIndexing1Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoLevelDB, DestroyGoLevelDB, 1, 100)
+	CommonBenchmarkIndexBatch(b, goleveldb.Name, goLevelDBTestOptions, DestroyTest, 1, 100)
 }
 
 func BenchmarkGoLevelDBIndexing2Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoLevelDB, DestroyGoLevelDB, 2, 100)
+	CommonBenchmarkIndexBatch(b, goleveldb.Name, goLevelDBTestOptions, DestroyTest, 2, 100)
 }
 
 func BenchmarkGoLevelDBIndexing4Workers100Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoLevelDB, DestroyGoLevelDB, 4, 100)
+	CommonBenchmarkIndexBatch(b, goleveldb.Name, goLevelDBTestOptions, DestroyTest, 4, 100)
 }
 
 func BenchmarkGoLevelDBIndexing1Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoLevelDB, DestroyGoLevelDB, 1, 1000)
+	CommonBenchmarkIndexBatch(b, goleveldb.Name, goLevelDBTestOptions, DestroyTest, 1, 1000)
 }
 
 func BenchmarkGoLevelDBIndexing2Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoLevelDB, DestroyGoLevelDB, 2, 1000)
+	CommonBenchmarkIndexBatch(b, goleveldb.Name, goLevelDBTestOptions, DestroyTest, 2, 1000)
 }
 
 func BenchmarkGoLevelDBIndexing4Workers1000Batch(b *testing.B) {
-	CommonBenchmarkIndexBatch(b, CreateGoLevelDB, DestroyGoLevelDB, 4, 1000)
+	CommonBenchmarkIndexBatch(b, goleveldb.Name, goLevelDBTestOptions, DestroyTest, 4, 1000)
 }

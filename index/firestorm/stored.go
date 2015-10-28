@@ -81,13 +81,15 @@ func NewStoredRowKV(key, value []byte) (*StoredRow, error) {
 	return &rv, nil
 }
 
-func (sr *StoredRow) Key() []byte {
-	docLen := len(sr.docID)
-	buf := make([]byte, 1+docLen+1+binary.MaxVarintLen64+2+(binary.MaxVarintLen64*len(sr.arrayPositions)))
+func (sr *StoredRow) KeySize() int {
+	return 1 + len(sr.docID) + 1 + binary.MaxVarintLen64 + 2 + (binary.MaxVarintLen64 * len(sr.arrayPositions))
+}
+
+func (sr *StoredRow) KeyTo(buf []byte) (int, error) {
 	buf[0] = 's'
 	copy(buf[1:], sr.docID)
-	buf[1+docLen] = ByteSeparator
-	bytesUsed := 1 + docLen + 1
+	buf[1+len(sr.docID)] = ByteSeparator
+	bytesUsed := 1 + len(sr.docID) + 1
 	bytesUsed += binary.PutUvarint(buf[bytesUsed:], sr.docNum)
 	binary.LittleEndian.PutUint16(buf[bytesUsed:], sr.field)
 	bytesUsed += 2
@@ -95,12 +97,28 @@ func (sr *StoredRow) Key() []byte {
 		varbytes := binary.PutUvarint(buf[bytesUsed:], arrayPosition)
 		bytesUsed += varbytes
 	}
-	return buf[0:bytesUsed]
+	return bytesUsed, nil
+}
+
+func (sr *StoredRow) Key() []byte {
+
+	buf := make([]byte, sr.KeySize())
+	n, _ := sr.KeyTo(buf)
+	return buf[:n]
+}
+
+func (sr *StoredRow) ValueSize() int {
+	return sr.value.Size()
+}
+
+func (sr *StoredRow) ValueTo(buf []byte) (int, error) {
+	return sr.value.MarshalTo(buf)
 }
 
 func (sr *StoredRow) Value() []byte {
-	rv, _ := sr.value.Marshal()
-	return rv
+	buf := make([]byte, sr.ValueSize())
+	n, _ := sr.ValueTo(buf)
+	return buf[:n]
 }
 
 func (sr *StoredRow) DocID() []byte {

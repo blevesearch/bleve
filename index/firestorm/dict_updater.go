@@ -108,7 +108,7 @@ func (d *DictUpdater) update() {
 		wb.Merge([]byte(term), dictionaryTermDelta)
 	}
 
-	err = wb.Execute()
+	err = writer.ExecuteBatch(wb)
 	if err != nil {
 		writer.Close()
 		logger.Printf("dict updater fatal: %v", err)

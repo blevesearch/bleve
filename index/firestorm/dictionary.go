@@ -88,17 +88,35 @@ func (dr *DictionaryRow) SetCount(count uint64) {
 	dr.value.Count = proto.Uint64(count)
 }
 
-func (dr *DictionaryRow) Key() []byte {
-	buf := make([]byte, 3+len(dr.term))
+func (dr *DictionaryRow) KeySize() int {
+	return 3 + len(dr.term)
+}
+
+func (dr *DictionaryRow) KeyTo(buf []byte) (int, error) {
 	copy(buf[0:], DictionaryKeyPrefix)
 	binary.LittleEndian.PutUint16(buf[1:3], dr.field)
 	copy(buf[3:], dr.term)
-	return buf
+	return 3 + len(dr.term), nil
+}
+
+func (dr *DictionaryRow) Key() []byte {
+	buf := make([]byte, dr.KeySize())
+	n, _ := dr.KeyTo(buf)
+	return buf[:n]
+}
+
+func (dr *DictionaryRow) ValueSize() int {
+	return dr.value.Size()
+}
+
+func (dr *DictionaryRow) ValueTo(buf []byte) (int, error) {
+	return dr.value.MarshalTo(buf)
 }
 
 func (dr *DictionaryRow) Value() []byte {
-	rv, _ := dr.value.Marshal()
-	return rv
+	buf := make([]byte, dr.ValueSize())
+	n, _ := dr.ValueTo(buf)
+	return buf[:n]
 }
 
 func DictionaryRowKey(field uint16, term []byte) []byte {

@@ -90,8 +90,11 @@ func NewTermFreqRowKV(key, value []byte) (*TermFreqRow, error) {
 	return &rv, nil
 }
 
-func (tfr *TermFreqRow) Key() []byte {
-	buf := make([]byte, 3+len(tfr.term)+1+len(tfr.docID)+1+binary.MaxVarintLen64)
+func (tfr *TermFreqRow) KeySize() int {
+	return 3 + len(tfr.term) + 1 + len(tfr.docID) + 1 + binary.MaxVarintLen64
+}
+
+func (tfr *TermFreqRow) KeyTo(buf []byte) (int, error) {
 	buf[0] = 't'
 	binary.LittleEndian.PutUint16(buf[1:3], tfr.field)
 	termLen := copy(buf[3:], tfr.term)
@@ -99,12 +102,27 @@ func (tfr *TermFreqRow) Key() []byte {
 	docLen := copy(buf[3+termLen+1:], tfr.docID)
 	buf[3+termLen+1+docLen] = ByteSeparator
 	used := binary.PutUvarint(buf[3+termLen+1+docLen+1:], tfr.docNum)
-	return buf[:3+termLen+1+docLen+1+used]
+	return 3 + termLen + 1 + docLen + 1 + used, nil
+}
+
+func (tfr *TermFreqRow) Key() []byte {
+	buf := make([]byte, tfr.KeySize())
+	n, _ := tfr.KeyTo(buf)
+	return buf[:n]
+}
+
+func (tfr *TermFreqRow) ValueSize() int {
+	return tfr.value.Size()
+}
+
+func (tfr *TermFreqRow) ValueTo(buf []byte) (int, error) {
+	return tfr.value.MarshalTo(buf)
 }
 
 func (tfr *TermFreqRow) Value() []byte {
-	rv, _ := tfr.value.Marshal()
-	return rv
+	buf := make([]byte, tfr.ValueSize())
+	n, _ := tfr.ValueTo(buf)
+	return buf[:n]
 }
 
 func (tfr *TermFreqRow) String() string {
@@ -147,6 +165,15 @@ func (tfr *TermFreqRow) Freq() uint64 {
 
 func (tfr *TermFreqRow) Vectors() []*TermVector {
 	return tfr.value.GetVectors()
+}
+
+func (tfr *TermFreqRow) DictionaryRowKeySize() int {
+	return 3 + len(tfr.term)
+}
+
+func (tfr *TermFreqRow) DictionaryRowKeyTo(buf []byte) (int, error) {
+	dr := NewDictionaryRow(tfr.field, tfr.term, 0)
+	return dr.KeyTo(buf)
 }
 
 func (tfr *TermFreqRow) DictionaryRowKey() []byte {

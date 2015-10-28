@@ -27,6 +27,8 @@ const Name = "firestorm"
 var UnsafeBatchUseDetected = fmt.Errorf("bleve.Batch is NOT thread-safe, modification after execution detected")
 
 type Firestorm struct {
+	storeName        string
+	storeConfig      map[string]interface{}
 	store            store.KVStore
 	compensator      *Compensator
 	analysisQueue    *index.AnalysisQueue
@@ -39,10 +41,11 @@ type Firestorm struct {
 	stats            *indexStat
 }
 
-func NewFirestorm(s store.KVStore, analysisQueue *index.AnalysisQueue) *Firestorm {
+func NewFirestorm(storeName string, storeConfig map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error) {
 	initialCount := uint64(0)
 	rv := Firestorm{
-		store:         s,
+		storeName:     storeName,
+		storeConfig:   storeConfig,
 		compensator:   NewCompensator(),
 		analysisQueue: analysisQueue,
 		fieldCache:    index.NewFieldCache(),
@@ -53,45 +56,51 @@ func NewFirestorm(s store.KVStore, analysisQueue *index.AnalysisQueue) *Firestor
 	rv.garbageCollector = NewGarbageCollector(&rv)
 	rv.lookuper = NewLookuper(&rv)
 	rv.dictUpdater = NewDictUpdater(&rv)
-	return &rv
+	return &rv, nil
 }
 
 func (f *Firestorm) Open() (err error) {
 
-	// install the merge operator
-	f.store.SetMergeOperator(&mergeOperator)
+	// open the kv store
+	storeConstructor := registry.KVStoreConstructorByName(f.storeName)
+	if storeConstructor == nil {
+		err = index.ErrorUnknownStorageType
+		return
+	}
 
-	// now open the kv store
-	err = f.store.Open()
+	// now open the store
+	f.store, err = storeConstructor(&mergeOperator, f.storeConfig)
 	if err != nil {
 		return
 	}
 
-	// start a writer for the open process
-	var kvwriter store.KVWriter
-	kvwriter, err = f.store.Writer()
+	// start a reader
+	var kvreader store.KVReader
+	kvreader, err = f.store.Reader()
 	if err != nil {
 		return
 	}
-	defer func() {
-		if cerr := kvwriter.Close(); err == nil && cerr != nil {
-			err = cerr
-		}
-	}()
 
 	// assert correct version, and find out if this is new index
 	var newIndex bool
-	newIndex, err = f.checkVersion(kvwriter)
+	newIndex, err = f.checkVersion(kvreader)
+	if err != nil {
+		return
+	}
+
+	if !newIndex {
+		// process existing index before opening
+		f.warmup(kvreader)
+	}
+
+	err = kvreader.Close()
 	if err != nil {
 		return
 	}
 
 	if newIndex {
 		// prepare a new index
-		f.bootstrap(kvwriter)
-	} else {
-		// process existing index before opening
-		f.warmup(kvwriter)
+		f.bootstrap()
 	}
 
 	// start the garbage collector
@@ -197,7 +206,7 @@ func (f *Firestorm) batchRows(writer store.KVWriter, rows []index.IndexRow, dele
 	}
 
 	// write out the batch
-	err := wb.Execute()
+	err := writer.ExecuteBatch(wb)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +340,11 @@ func (f *Firestorm) SetInternal(key, val []byte) (err error) {
 			err = cerr
 		}
 	}()
-	return writer.Set(internalRow.Key(), internalRow.Value())
+
+	wb := writer.NewBatch()
+	wb.Set(internalRow.Key(), internalRow.Value())
+
+	return writer.ExecuteBatch(wb)
 }
 
 func (f *Firestorm) DeleteInternal(key []byte) (err error) {
@@ -346,7 +359,11 @@ func (f *Firestorm) DeleteInternal(key []byte) (err error) {
 			err = cerr
 		}
 	}()
-	return writer.Delete(internalRow.Key())
+
+	wb := writer.NewBatch()
+	wb.Delete(internalRow.Key())
+
+	return writer.ExecuteBatch(wb)
 }
 
 func (f *Firestorm) DumpAll() chan interface{} {
@@ -427,10 +444,6 @@ func (f *Firestorm) Stats() json.Marshaler {
 
 }
 
-func IndexTypeConstructor(store store.KVStore, analysisQueue *index.AnalysisQueue) (index.Index, error) {
-	return NewFirestorm(store, analysisQueue), nil
-}
-
 func init() {
-	registry.RegisterIndexType(Name, IndexTypeConstructor)
+	registry.RegisterIndexType(Name, NewFirestorm)
 }

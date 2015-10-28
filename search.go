@@ -152,7 +152,8 @@ func (h *HighlightRequest) AddField(field string) {
 // Highlight describes optional search result
 // highlighting.
 // Fields describes a list of field values which
-// should be retrieved for result documents.
+// should be retrieved for result documents, provided they
+// were stored while indexing.
 // Facets describe the set of facets to be computed.
 // Explain triggers inclusion of additional search
 // result score explanations.

@@ -13,26 +13,22 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/store/gtreap"
 )
 
 func TestGarbageCleanup(t *testing.T) {
-
-	kv, err := inmem.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	aq := index.NewAnalysisQueue(1)
-
-	f := NewFirestorm(kv, aq)
-
-	err = kv.Open()
+	f, err := NewFirestorm(gtreap.Name, nil, aq)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	kvwriter, err := f.store.Writer()
+	err = f.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvwriter, err := f.(*Firestorm).store.Writer()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,16 +53,12 @@ func TestGarbageCleanup(t *testing.T) {
 	}
 
 	for _, row := range rows {
-		err = kvwriter.Set(row.row.Key(), row.row.Value())
+		wb := kvwriter.NewBatch()
+		wb.Set(row.row.Key(), row.row.Value())
+		err = kvwriter.ExecuteBatch(wb)
 		if err != nil {
 			t.Fatal(err)
 		}
-	}
-
-	// warmup ensures that deletedDocNums is seeded correctly
-	err = f.warmup(kvwriter)
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	err = kvwriter.Close()
@@ -74,11 +66,27 @@ func TestGarbageCleanup(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	kvreader, err := f.(*Firestorm).store.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// warmup ensures that deletedDocNums is seeded correctly
+	err = f.(*Firestorm).warmup(kvreader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = kvreader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// now invoke garbage collector cleanup manually
-	f.garbageCollector.cleanup()
+	f.(*Firestorm).garbageCollector.cleanup()
 
 	// assert that garbage rows are gone
-	reader, err := f.store.Reader()
+	reader, err := f.(*Firestorm).store.Reader()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,8 +110,8 @@ func TestGarbageCleanup(t *testing.T) {
 	}
 
 	// assert that deletedDocsNumbers size is 0
-	if f.compensator.GarbageCount() != 0 {
-		t.Errorf("expected deletedDocsNumbers size to be 0, got %d", f.compensator.GarbageCount())
+	if f.(*Firestorm).compensator.GarbageCount() != 0 {
+		t.Errorf("expected deletedDocsNumbers size to be 0, got %d", f.(*Firestorm).compensator.GarbageCount())
 	}
 
 }

@@ -17,17 +17,20 @@ import (
 	"github.com/blevesearch/bleve/analysis/tokenizers/regexp_tokenizer"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/inmem"
+	"github.com/blevesearch/bleve/index/store/gtreap"
 	"github.com/blevesearch/bleve/index/upside_down"
 )
 
 var twoDocIndex index.Index //= upside_down.NewUpsideDownCouch(inmem.MustOpen())
 
 func init() {
-	inMemStore, _ := inmem.New()
 	analysisQueue := index.NewAnalysisQueue(1)
-	twoDocIndex = upside_down.NewUpsideDownCouch(inMemStore, analysisQueue)
-	err := twoDocIndex.Open()
+	var err error
+	twoDocIndex, err = upside_down.NewUpsideDownCouch(gtreap.Name, nil, analysisQueue)
+	if err != nil {
+		panic(err)
+	}
+	err = twoDocIndex.Open()
 	if err != nil {
 		panic(err)
 	}

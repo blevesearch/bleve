@@ -18,7 +18,6 @@ import (
 type firestormDocIDReader struct {
 	r     *firestormReader
 	start []byte
-	end   []byte
 	i     store.KVIterator
 }
 
@@ -35,12 +34,11 @@ func newFirestormDocIDReader(r *firestormReader, start, end string) (*firestormD
 
 	logger.Printf("end key '%s' - % x", endKey, endKey)
 
-	i := r.r.Iterator(startKey)
+	i := r.r.RangeIterator(startKey, endKey)
 
 	rv := firestormDocIDReader{
 		r:     r,
 		start: startKey,
-		end:   endKey,
 		i:     i,
 	}
 
@@ -50,7 +48,7 @@ func newFirestormDocIDReader(r *firestormReader, start, end string) (*firestormD
 func (r *firestormDocIDReader) Next() (string, error) {
 	if r.i != nil {
 		key, val, valid := r.i.Current()
-		for valid && bytes.Compare(key, r.end) <= 0 {
+		for valid {
 			logger.Printf("see key: '%s' - % x", key, key)
 			tfrsByDocNum := make(map[uint64]*TermFreqRow)
 			tfr, err := NewTermFreqRowKV(key, val)

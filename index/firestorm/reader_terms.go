@@ -34,7 +34,7 @@ func newFirestormTermFieldReader(r *firestormReader, field uint16, term []byte) 
 
 	prefix := TermFreqIteratorStart(field, term)
 	logger.Printf("starting term freq iterator at: '%s' - % x", prefix, prefix)
-	i := r.r.Iterator(prefix)
+	i := r.r.PrefixIterator(prefix)
 	rv := firestormTermFieldReader{
 		r:      r,
 		field:  field,
@@ -61,7 +61,7 @@ func newFirestormTermFieldReader(r *firestormReader, field uint16, term []byte) 
 func (r *firestormTermFieldReader) Next() (*index.TermFieldDoc, error) {
 	if r.i != nil {
 		key, val, valid := r.i.Current()
-		for valid && bytes.HasPrefix(key, r.prefix) {
+		for valid {
 			logger.Printf("see key: '%s' - % x", key, key)
 			tfrsByDocNum := make(map[uint64]*TermFreqRow)
 			tfr, err := NewTermFreqRowKV(key, val)

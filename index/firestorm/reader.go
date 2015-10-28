@@ -83,11 +83,8 @@ func (r *firestormReader) Document(id string) (*document.Document, error) {
 	rv := document.NewDocument(id)
 	prefix := StoredPrefixDocIDNum(docID, docNum)
 	err = visitPrefix(r.r, prefix, func(key, val []byte) (bool, error) {
-		safeVal := val
-		if !r.r.BytesSafeAfterClose() {
-			safeVal = make([]byte, len(val))
-			copy(safeVal, val)
-		}
+		safeVal := make([]byte, len(val))
+		copy(safeVal, val)
 		row, err := NewStoredRowKV(key, safeVal)
 		if err != nil {
 			return false, err

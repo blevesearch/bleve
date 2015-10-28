@@ -76,16 +76,34 @@ func NewFieldRowKV(key, value []byte) (*FieldRow, error) {
 	return &rv, nil
 }
 
-func (fr *FieldRow) Key() []byte {
-	buf := make([]byte, 3)
+func (fr *FieldRow) KeySize() int {
+	return 3
+}
+
+func (fr *FieldRow) KeyTo(buf []byte) (int, error) {
 	buf[0] = 'f'
 	binary.LittleEndian.PutUint16(buf[1:3], fr.index)
-	return buf
+	return 3, nil
+}
+
+func (fr *FieldRow) Key() []byte {
+	buf := make([]byte, fr.KeySize())
+	n, _ := fr.KeyTo(buf)
+	return buf[:n]
+}
+
+func (fr *FieldRow) ValueSize() int {
+	return fr.value.Size()
+}
+
+func (fr *FieldRow) ValueTo(buf []byte) (int, error) {
+	return fr.value.MarshalTo(buf)
 }
 
 func (fr *FieldRow) Value() []byte {
-	rv, _ := fr.value.Marshal()
-	return rv
+	buf := make([]byte, fr.ValueSize())
+	n, _ := fr.ValueTo(buf)
+	return buf[:n]
 }
 
 func (fr *FieldRow) Index() uint16 {

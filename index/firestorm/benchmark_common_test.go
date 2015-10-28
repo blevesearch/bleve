@@ -10,13 +10,13 @@
 package firestorm
 
 import (
+	"os"
 	"strconv"
 	"testing"
 
 	_ "github.com/blevesearch/bleve/analysis/analyzers/standard_analyzer"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
 )
 
@@ -33,10 +33,13 @@ var benchmarkDocBodies = []string{
 	"The expansion ratio of a liquefied and cryogenic substance is the volume of a given amount of that substance in liquid form compared to the volume of the same amount of substance in gaseous form, at room temperature and normal atmospheric pressure.",
 }
 
-type KVStoreCreate func() (store.KVStore, error)
 type KVStoreDestroy func() error
 
-func CommonBenchmarkIndex(b *testing.B, create KVStoreCreate, destroy KVStoreDestroy, analysisWorkers int) {
+func DestroyTest() error {
+	return os.RemoveAll("test")
+}
+
+func CommonBenchmarkIndex(b *testing.B, storeName string, storeConfig map[string]interface{}, destroy KVStoreDestroy, analysisWorkers int) {
 
 	cache := registry.NewCache()
 	analyzer, err := cache.AnalyzerNamed("standard")
@@ -50,12 +53,11 @@ func CommonBenchmarkIndex(b *testing.B, create KVStoreCreate, destroy KVStoreDes
 	b.ResetTimer()
 	b.StopTimer()
 	for i := 0; i < b.N; i++ {
-		s, err := create()
+		analysisQueue := index.NewAnalysisQueue(analysisWorkers)
+		idx, err := NewFirestorm(storeName, storeConfig, analysisQueue)
 		if err != nil {
 			b.Fatal(err)
 		}
-		analysisQueue := index.NewAnalysisQueue(analysisWorkers)
-		idx := NewFirestorm(s, analysisQueue)
 
 		err = idx.Open()
 		if err != nil {
@@ -81,7 +83,7 @@ func CommonBenchmarkIndex(b *testing.B, create KVStoreCreate, destroy KVStoreDes
 	}
 }
 
-func CommonBenchmarkIndexBatch(b *testing.B, create KVStoreCreate, destroy KVStoreDestroy, analysisWorkers, batchSize int) {
+func CommonBenchmarkIndexBatch(b *testing.B, storeName string, storeConfig map[string]interface{}, destroy KVStoreDestroy, analysisWorkers, batchSize int) {
 
 	cache := registry.NewCache()
 	analyzer, err := cache.AnalyzerNamed("standard")
@@ -93,12 +95,11 @@ func CommonBenchmarkIndexBatch(b *testing.B, create KVStoreCreate, destroy KVSto
 	b.StopTimer()
 	for i := 0; i < b.N; i++ {
 
-		s, err := create()
+		analysisQueue := index.NewAnalysisQueue(analysisWorkers)
+		idx, err := NewFirestorm(storeName, storeConfig, analysisQueue)
 		if err != nil {
 			b.Fatal(err)
 		}
-		analysisQueue := index.NewAnalysisQueue(analysisWorkers)
-		idx := NewFirestorm(s, analysisQueue)
 
 		err = idx.Open()
 		if err != nil {

@@ -171,7 +171,35 @@ func (im *IndexMapping) AddCustomTokenFilter(name string, config map[string]inte
 	return nil
 }
 
-// AddCustomAnalyzer defines a custom analyzer for use in this mapping
+// AddCustomAnalyzer defines a custom analyzer for use in this mapping. The
+// config map must have a "type" string entry to resolve the analyzer
+// constructor. The constructor is invoked with the remaining entries and
+// returned analyzer is registered in the IndexMapping.
+//
+// bleve comes with predefined analyzers, like
+// github.com/blevesearch/bleve/analysis/analyzers/custom_analyzer. They are
+// available only if their package is imported by client code. To achieve this,
+// use their metadata to fill configuration entries:
+//
+//   import (
+//       "github.com/blevesearch/bleve/analysis/analyzers/custom_analyzer"
+//       "github.com/blevesearch/bleve/analysis/char_filters/html_char_filter"
+//       "github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
+//       "github.com/blevesearch/bleve/analysis/tokenizers/unicode"
+//   )
+//
+//   m := bleve.NewIndexMapping()
+//   err := m.AddCustomAnalyzer("html", map[string]interface{}{
+//       "type": custom_analyzer.Name,
+//       "char_filters": []string{
+//           html_char_filter.Name,
+//       },
+//       "tokenizer":     unicode.Name,
+//       "token_filters": []string{
+//           lower_case_filter.Name,
+//           ...
+//       },
+//   })
 func (im *IndexMapping) AddCustomAnalyzer(name string, config map[string]interface{}) error {
 	_, err := im.cache.DefineAnalyzer(name, config)
 	if err != nil {

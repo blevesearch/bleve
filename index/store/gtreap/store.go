@@ -12,36 +12,24 @@
 // Package gtreap provides an in-memory implementation of the
 // KVStore interfaces using the gtreap balanced-binary treap,
 // copy-on-write data structure.
+
 package gtreap
 
 import (
 	"bytes"
-	"fmt"
 	"sync"
 
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
-
 	"github.com/steveyen/gtreap"
 )
 
 const Name = "gtreap"
 
-func init() {
-	registry.RegisterKVStore(Name, StoreConstructor)
-}
-
-const MAX_CONCURRENT_WRITERS = 1
-
-func StoreConstructor(config map[string]interface{}) (store.KVStore, error) {
-	s := &Store{
-		availableWriters: make(chan bool, MAX_CONCURRENT_WRITERS),
-		t:                gtreap.NewTreap(itemCompare),
-	}
-	for i := 0; i < MAX_CONCURRENT_WRITERS; i++ {
-		s.availableWriters <- true
-	}
-	return s, nil
+type Store struct {
+	m  sync.Mutex
+	t  *gtreap.Treap
+	mo store.MergeOperator
 }
 
 type Item struct {
@@ -53,29 +41,15 @@ func itemCompare(a, b interface{}) int {
 	return bytes.Compare(a.(*Item).k, b.(*Item).k)
 }
 
-type Store struct {
-	availableWriters chan bool
-
-	m sync.Mutex
-	t *gtreap.Treap
-
-	mo store.MergeOperator
-}
-
-type Writer struct {
-	s *Store
-}
-
-func (s *Store) Open() error {
-	return nil
-}
-
-func (s *Store) SetMergeOperator(mo store.MergeOperator) {
-	s.mo = mo
+func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, error) {
+	rv := Store{
+		t:  gtreap.NewTreap(itemCompare),
+		mo: mo,
+	}
+	return &rv, nil
 }
 
 func (s *Store) Close() error {
-	close(s.availableWriters)
 	return nil
 }
 
@@ -87,10 +61,9 @@ func (s *Store) Reader() (store.KVReader, error) {
 }
 
 func (s *Store) Writer() (store.KVWriter, error) {
-	available, ok := <-s.availableWriters
-	if !ok || !available {
-		return nil, fmt.Errorf("no available writers")
-	}
-
 	return &Writer{s: s}, nil
+}
+
+func init() {
+	registry.RegisterKVStore(Name, New)
 }

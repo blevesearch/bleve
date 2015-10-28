@@ -9,50 +9,113 @@
 
 package store
 
-type KVBatch interface {
-	Set(key, val []byte)
-	Delete(key []byte)
-	Merge(key, val []byte)
-	Execute() error
+// KVStore is an abstraction for working with KV stores
+type KVStore interface {
+
+	// Writer returns a KVWriter which can be used to
+	// make changes to the KVStore.  If a writer cannot
+	// be obtained a non-nil error is returned.
+	Writer() (KVWriter, error)
+
+	// Reader returns a KVReader which can be used to
+	// read data from the KVStore.  If a reader cannot
+	// be obtained a non-nil error is returned.
+	Reader() (KVReader, error)
+
+	// Close closes the KVStore
 	Close() error
 }
 
+// KVReader is an abstraction of an **ISOLATED** reader
+// In this context isolated is defined to mean that
+// writes/deletes made after the KVReader is opened
+// are not observed.
+// Because there is usually a cost associated with
+// keeping isolated readers active, users should
+// close them as soon as they are no longer needed.
+type KVReader interface {
+
+	// Get returns the value associated with the key
+	// If the key does not exist, nil is returned.
+	// The caller owns the bytes returned.
+	Get(key []byte) ([]byte, error)
+
+	// PrefixIterator returns a KVIterator that will
+	// visit all K/V pairs with the provided prefix
+	PrefixIterator(prefix []byte) KVIterator
+
+	// RangeIterator returns a KVIterator that will
+	// visit all K/V pairs >= start AND < end
+	RangeIterator(start, end []byte) KVIterator
+
+	// Close closes the iterator
+	Close() error
+}
+
+// KVIterator is an abstraction around key iteration
 type KVIterator interface {
-	SeekFirst()
-	Seek([]byte)
+
+	// Seek will advance the iterator to the specified key
+	Seek(key []byte)
+
+	// Next will advance the iterator to the next key
 	Next()
 
-	Current() ([]byte, []byte, bool)
+	// Key returns the key pointed to by the iterator
+	// The bytes returned are **ONLY** valid until the next call to Seek/Next/Close
+	// Continued use after that requires that they be copied.
 	Key() []byte
+
+	// Value returns the value pointed to by the iterator
+	// The bytes returned are **ONLY** valid until the next call to Seek/Next/Close
+	// Continued use after that requires that they be copied.
 	Value() []byte
+
+	// Valid returns whether or not the iterator is in a valid state
 	Valid() bool
 
+	// Current returns Key(),Value(),Valid() in a single operation
+	Current() ([]byte, []byte, bool)
+
+	// Close closes the iterator
 	Close() error
 }
 
-type KVStore interface {
-	Open() error
-	SetMergeOperator(MergeOperator)
-	Writer() (KVWriter, error)
-	Reader() (KVReader, error)
-	Close() error
-}
-
+// KVWriter is an abstraction for mutating the KVStore
+// KVWriter does **NOT** enforce restrictions of a single writer
+// if the underlying KVStore allows concurrent writes, the
+// KVWriter interface should also do so, it is up to the caller
+// to do this in a way that is safe and makes sense
 type KVWriter interface {
-	KVReader
-	Set(key, val []byte) error
-	Delete(key []byte) error
-	NewBatch() KVBatch
-}
 
-type KVReader interface {
-	BytesSafeAfterClose() bool
-	Get(key []byte) ([]byte, error)
-	Iterator(key []byte) KVIterator
+	// NewBatch returns a KVBatch for performaing batch operations on this kvstore
+	NewBatch() KVBatch
+
+	// ExecuteBatch will execute the KVBatch, the provided KVBatch **MUST** have
+	// been created by the same KVStore (though not necessarily the same KVWriter)
+	// Batch execution is atomic, either all the operations or none will be performed
+	ExecuteBatch(batch KVBatch) error
+
+	// Close closes the writer
 	Close() error
 }
 
-type RangeIterable interface {
-	// iterates keys >= start and < end
-	RangeIterator(start, end []byte) KVIterator
+// KVBatch is an abstraction for making multiple KV mutations at once
+type KVBatch interface {
+
+	// Set updates the key with the specified value
+	// both key and value []byte may be reused as soon as this call returns
+	Set(key, val []byte)
+
+	// Delete removes the specified key
+	// the key []byte may be reused as soon as this call returns
+	Delete(key []byte)
+
+	// Merge merges old value with the new value at the specified key
+	// as prescribed by the KVStores merge operator
+	// both key and value []byte may be reused as soon as this call returns
+	Merge(key, val []byte)
+
+	// Reset frees resources for this batch and allows reuse
+	Reset()
 }
