@@ -65,13 +65,14 @@ func (r *UpsideDownCouchTermFieldReader) Next() (*index.TermFieldDoc, error) {
 			if err != nil {
 				return nil, err
 			}
-			r.iterator.Next()
-			return &index.TermFieldDoc{
+			rv := index.TermFieldDoc{
 				ID:      string(tfr.doc),
 				Freq:    tfr.freq,
 				Norm:    float64(tfr.norm),
 				Vectors: r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors),
-			}, nil
+			}
+			r.iterator.Next()
+			return &rv, nil
 		}
 	}
 	return nil, nil
@@ -87,13 +88,14 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docID string) (*index.TermField
 			if err != nil {
 				return nil, err
 			}
-			r.iterator.Next()
-			return &index.TermFieldDoc{
+			rv := index.TermFieldDoc{
 				ID:      string(tfr.doc),
 				Freq:    tfr.freq,
 				Norm:    float64(tfr.norm),
 				Vectors: r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors),
-			}, nil
+			}
+			r.iterator.Next()
+			return &rv, nil
 		}
 	}
 	return nil, nil
@@ -135,8 +137,9 @@ func (r *UpsideDownCouchDocIDReader) Next() (string, error) {
 		if err != nil {
 			return "", err
 		}
+		rv := string(br.doc)
 		r.iterator.Next()
-		return string(br.doc), nil
+		return rv, nil
 	}
 	return "", nil
 }
@@ -150,8 +153,9 @@ func (r *UpsideDownCouchDocIDReader) Advance(docID string) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		rv := string(br.doc)
 		r.iterator.Next()
-		return string(br.doc), nil
+		return rv, nil
 	}
 	return "", nil
 }
