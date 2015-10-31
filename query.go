@@ -108,11 +108,6 @@ func ParseQuery(input []byte) (Query, error) {
 		if rv.Boost() == 0 {
 			rv.SetBoost(1)
 		}
-		for _, tq := range rv.TermQueries {
-			if tq.Boost() == 0 {
-				tq.SetBoost(1)
-			}
-		}
 		return &rv, nil
 	}
 	_, hasConjuncts := tmp["conjuncts"]
@@ -273,11 +268,11 @@ func expandQuery(m *IndexMapping, query Query) (Query, error) {
 			return &q, nil
 		case *phraseQuery:
 			q := *query.(*phraseQuery)
-			children, err := expandSlice(q.TermQueries)
+			children, err := expandSlice(q.termQueries)
 			if err != nil {
 				return nil, err
 			}
-			q.TermQueries = children
+			q.termQueries = children
 			return &q, nil
 		default:
 			return query, nil
