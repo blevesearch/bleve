@@ -54,6 +54,8 @@ func (t *Token) String() string {
 
 type TokenStream []*Token
 
+// A Tokenizer splits an input string into tokens, the usual behaviour being to
+// map words to tokens.
 type Tokenizer interface {
 	Tokenize([]byte) TokenStream
 }
