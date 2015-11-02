@@ -46,7 +46,7 @@ func TestParseQuery(t *testing.T) {
 				[]Query{NewMatchQuery("devon").SetField("desc")}),
 		},
 		{
-			input:  []byte(`{"terms":[{"term":"watered","field":"desc"},{"term":"down","field":"desc"}]}`),
+			input:  []byte(`{"terms":["watered","down"],"field":"desc"}`),
 			output: NewPhraseQuery([]string{"watered", "down"}, "desc"),
 		},
 		{
