@@ -27,7 +27,19 @@ func TestElisionFilter(t *testing.T) {
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("ar'word"),
+					Term: []byte("ar" + string(Apostrophe) + "word"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("word"),
+				},
+			},
+		},
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ar" + string(RightSingleQuotationMark) + "word"),
 				},
 			},
 			output: analysis.TokenStream{

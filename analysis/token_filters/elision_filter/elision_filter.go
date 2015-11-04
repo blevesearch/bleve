@@ -10,8 +10,8 @@
 package elision_filter
 
 import (
-	"bytes"
 	"fmt"
+	"unicode/utf8"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
@@ -19,10 +19,8 @@ import (
 
 const Name = "elision"
 
-const RightSingleQuotationMark = "’"
-const Apostrophe = "'"
-
-const Apostrophes = Apostrophe + RightSingleQuotationMark
+const RightSingleQuotationMark = '’'
+const Apostrophe = '\''
 
 type ElisionFilter struct {
 	articles analysis.TokenMap
@@ -36,15 +34,19 @@ func NewElisionFilter(articles analysis.TokenMap) *ElisionFilter {
 
 func (s *ElisionFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 	for _, token := range input {
-		firstApostrophe := bytes.IndexAny(token.Term, Apostrophes)
-		if firstApostrophe >= 0 {
-			// found an apostrophe
-			prefix := token.Term[0:firstApostrophe]
-			// see if the prefix matches one of the articles
-			_, articleMatch := s.articles[string(prefix)]
-			if articleMatch {
-				token.Term = token.Term[firstApostrophe+1:]
+		term := token.Term
+		for i := 0; i < len(term); {
+			r, size := utf8.DecodeRune(term[i:])
+			if r == Apostrophe || r == RightSingleQuotationMark {
+				// see if the prefix matches one of the articles
+				prefix := term[0:i]
+				_, articleMatch := s.articles[string(prefix)]
+				if articleMatch {
+					token.Term = term[i+size:]
+					break
+				}
 			}
+			i += size
 		}
 	}
 	return input
