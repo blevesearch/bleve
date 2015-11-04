@@ -35,14 +35,16 @@ func (w *Writer) ExecuteBatch(batch store.KVBatch) error {
 		return err
 	}
 
+	bucket := tx.Bucket([]byte(w.store.bucket))
+
 	for k, mergeOps := range emulatedBatch.Merger.Merges {
 		kb := []byte(k)
-		existingVal := tx.Bucket([]byte(w.store.bucket)).Get(kb)
+		existingVal := bucket.Get(kb)
 		mergedVal, fullMergeOk := w.store.mo.FullMerge(kb, existingVal, mergeOps)
 		if !fullMergeOk {
 			return fmt.Errorf("merge operator returned failure")
 		}
-		err = tx.Bucket([]byte(w.store.bucket)).Put(kb, mergedVal)
+		err = bucket.Put(kb, mergedVal)
 		if err != nil {
 			return err
 		}
@@ -50,12 +52,12 @@ func (w *Writer) ExecuteBatch(batch store.KVBatch) error {
 
 	for _, op := range emulatedBatch.Ops {
 		if op.V != nil {
-			err := tx.Bucket([]byte(w.store.bucket)).Put(op.K, op.V)
+			err := bucket.Put(op.K, op.V)
 			if err != nil {
 				return err
 			}
 		} else {
-			err := tx.Bucket([]byte(w.store.bucket)).Delete(op.K)
+			err := bucket.Delete(op.K)
 			if err != nil {
 				return err
 			}

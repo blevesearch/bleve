@@ -15,13 +15,14 @@ import (
 )
 
 type Reader struct {
-	store *Store
-	tx    *bolt.Tx
+	store  *Store
+	tx     *bolt.Tx
+	bucket *bolt.Bucket
 }
 
 func (r *Reader) Get(key []byte) ([]byte, error) {
 	var rv []byte
-	v := r.tx.Bucket([]byte(r.store.bucket)).Get(key)
+	v := r.bucket.Get(key)
 	if v != nil {
 		rv = make([]byte, len(v))
 		copy(rv, v)
@@ -30,8 +31,7 @@ func (r *Reader) Get(key []byte) ([]byte, error) {
 }
 
 func (r *Reader) PrefixIterator(prefix []byte) store.KVIterator {
-	b := r.tx.Bucket([]byte(r.store.bucket))
-	cursor := b.Cursor()
+	cursor := r.bucket.Cursor()
 
 	rv := &Iterator{
 		store:  r.store,
@@ -45,8 +45,7 @@ func (r *Reader) PrefixIterator(prefix []byte) store.KVIterator {
 }
 
 func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
-	b := r.tx.Bucket([]byte(r.store.bucket))
-	cursor := b.Cursor()
+	cursor := r.bucket.Cursor()
 
 	rv := &Iterator{
 		store:  r.store,

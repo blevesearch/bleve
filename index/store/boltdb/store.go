@@ -83,8 +83,9 @@ func (bs *Store) Reader() (store.KVReader, error) {
 		return nil, err
 	}
 	return &Reader{
-		store: bs,
-		tx:    tx,
+		store:  bs,
+		tx:     tx,
+		bucket: tx.Bucket([]byte(bs.bucket)),
 	}, nil
 }
 
