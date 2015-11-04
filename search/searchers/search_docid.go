@@ -24,17 +24,24 @@ type DocIDSearcher struct {
 	scorer  *scorers.ConstantScorer
 }
 
-func NewDocIDSearcher(indexReader index.IndexReader, ids []string, boost float64, explain bool) (*DocIDSearcher, error) {
+func NewDocIDSearcher(indexReader index.IndexReader, ids []string, boost float64,
+	explain bool) (searcher *DocIDSearcher, err error) {
+
 	kept := make([]string, len(ids))
 	copy(kept, ids)
 	sort.Strings(kept)
 
 	if len(ids) > 0 {
-		idReader, err := indexReader.DocIDReader(kept[0], kept[len(kept)-1])
+		var idReader index.DocIDReader
+		idReader, err = indexReader.DocIDReader(kept[0], kept[len(kept)-1])
 		if err != nil {
 			return nil, err
 		}
-		defer idReader.Close()
+		defer func() {
+			if cerr := idReader.Close(); err == nil && cerr != nil {
+				err = cerr
+			}
+		}()
 		j := 0
 		for _, id := range kept {
 			doc, err := idReader.Advance(id)
