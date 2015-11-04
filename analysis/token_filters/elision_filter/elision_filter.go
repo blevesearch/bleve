@@ -19,10 +19,10 @@ import (
 
 const Name = "elision"
 
-const RightSingleQoutationMark = "’"
+const RightSingleQuotationMark = "’"
 const Apostrophe = "'"
 
-const Apostrophes = Apostrophe + RightSingleQoutationMark
+const Apostrophes = Apostrophe + RightSingleQuotationMark
 
 type ElisionFilter struct {
 	articles analysis.TokenMap
