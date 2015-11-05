@@ -7,6 +7,13 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
+// package stop_tokens_filter implements a TokenFilter removing tokens found in
+// a TokenMap.
+//
+// It constructor takes the following arguments:
+//
+// "stop_token_map" (string): the name of the token map identifying tokens to
+// remove.
 package stop_tokens_filter
 
 import (
