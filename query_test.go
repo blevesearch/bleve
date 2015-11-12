@@ -224,6 +224,10 @@ func TestQueryValidate(t *testing.T) {
 				2.0),
 			err: ErrorDisjunctionFewerThanMinClauses,
 		},
+		{
+			query: NewDocIDQuery(nil).SetBoost(25),
+			err:   nil,
+		},
 	}
 
 	for _, test := range tests {
