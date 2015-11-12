@@ -7,6 +7,17 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
+// package token_map implements a generic TokenMap, often used in conjunction
+// with filters to remove or process specific tokens.
+//
+// Its constructor takes the following arguments:
+//
+// "filename" (string): the path of a file listing the tokens. Each line may
+// contain one or more whitespace separated tokens, followed by an optional
+// comment starting with a "#" or "|" character.
+//
+// "tokens" ([]interface{}): if "filename" is not specified, tokens can be
+// passed directly as a sequence of strings wrapped in a []interface{}.
 package token_map
 
 import (

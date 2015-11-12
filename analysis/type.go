@@ -60,6 +60,7 @@ type Tokenizer interface {
 	Tokenize([]byte) TokenStream
 }
 
+// A TokenFilter adds, transforms or removes tokens from a token stream.
 type TokenFilter interface {
 	Filter(TokenStream) TokenStream
 }
