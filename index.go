@@ -177,11 +177,9 @@ type Index interface {
 	// DumpAll returns a channel receiving all index rows as
 	// UpsideDownCouchRow, in lexicographic byte order. If the enumeration
 	// fails, an error is sent. The channel is closed once the enumeration
-	// completes or an error is encountered. A read transaction is maintained
-	// for the duration of the enumeration, preventing concurrent write
-	// operations to proceed. The caller must consume all channel entries until
-	// the channel is closed to ensure the transaction and other resources
-	// associated with the enumeration are released.
+	// completes or an error is encountered. The caller must consume all
+	// channel entries until the channel is closed to ensure the transaction
+	// and other resources associated with the enumeration are released.
 	//
 	// DumpAll exists for debugging and tooling purpose and may change in the
 	// future.
