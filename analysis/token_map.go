@@ -23,6 +23,9 @@ func NewTokenMap() TokenMap {
 	return make(TokenMap, 0)
 }
 
+// LoadFile reads in a list of tokens from a text file,
+// one per line.
+// Comments are supported using `#` or `|`
 func (t TokenMap) LoadFile(filename string) error {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -31,6 +34,9 @@ func (t TokenMap) LoadFile(filename string) error {
 	return t.LoadBytes(data)
 }
 
+// LoadBytes reads in a list of tokens from memory,
+// one per line.
+// Comments are supported using `#` or `|`
 func (t TokenMap) LoadBytes(data []byte) error {
 	bytesReader := bytes.NewReader(data)
 	bufioReader := bufio.NewReader(bytesReader)
