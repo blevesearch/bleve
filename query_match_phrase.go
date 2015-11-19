@@ -30,7 +30,8 @@ type matchPhraseQuery struct {
 // Input text is analyzed using this analyzer.
 // Token terms resulting from this analysis are
 // used to build a search phrase.  Result documents
-// must match this phrase.
+// must match this phrase. Queried field must have been indexed with
+// IncludeTermVectors set to true.
 func NewMatchPhraseQuery(matchPhrase string) *matchPhraseQuery {
 	return &matchPhraseQuery{
 		MatchPhrase: matchPhrase,
