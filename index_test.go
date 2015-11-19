@@ -1139,3 +1139,100 @@ func TestIndexEmptyDocId(t *testing.T) {
 		t.Errorf("expect delete empty doc id in batch to be ignored")
 	}
 }
+
+func TestBoolIndexIssue109(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	f := NewTextFieldMapping()
+
+	m := NewIndexMapping()
+	m.DefaultMapping = NewDocumentMapping()
+	m.DefaultMapping.AddFieldMappingsAt("OK", f)
+
+	index, err := New("testidx", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc1 := struct {
+		OK bool
+	}{
+		OK: true,
+	}
+
+	err = index.Index("a", doc1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc2 := struct {
+		OK bool
+	}{
+		OK: false,
+	}
+
+	err = index.Index("b", doc2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// now search for these terms
+	sreq := NewSearchRequest(NewTermQuery("true"))
+	sres, err := index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 result, got %d", sres.Total)
+	}
+	if sres.Hits[0].ID != "a" {
+		t.Errorf("expecated id 'a', got '%s'", sres.Hits[0].ID)
+	}
+
+	sreq = NewSearchRequest(NewTermQuery("false"))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 result, got %d", sres.Total)
+	}
+	if sres.Hits[0].ID != "b" {
+		t.Errorf("expecated id 'b', got '%s'", sres.Hits[0].ID)
+	}
+
+	// now do the same searches using query strings
+	sreq = NewSearchRequest(NewQueryStringQuery("OK:true"))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 result, got %d", sres.Total)
+	}
+	if sres.Hits[0].ID != "a" {
+		t.Errorf("expecated id 'a', got '%s'", sres.Hits[0].ID)
+	}
+
+	sreq = NewSearchRequest(NewQueryStringQuery("OK:false"))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 result, got %d", sres.Total)
+	}
+	if sres.Hits[0].ID != "b" {
+		t.Errorf("expecated id 'b', got '%s'", sres.Hits[0].ID)
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}

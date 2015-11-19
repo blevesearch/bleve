@@ -16,3 +16,7 @@
 /utils/bleve_registry/bleve_registry
 /y.output
 *.test
+
+# IDE metadata
+**/.idea/
+**/*.iml

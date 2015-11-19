@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/blevesearch/bleve/registry"
@@ -315,6 +316,10 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 	}
 	propertyType := propertyValue.Type()
 	switch propertyType.Kind() {
+	case reflect.Bool:
+		// change propertyValue to string value of bool, fallthrough to handle as string
+		propertyValue = reflect.ValueOf(strconv.FormatBool(property.(bool)))
+		fallthrough
 	case reflect.String:
 		propertyValueString := propertyValue.String()
 		if subDocMapping != nil {
