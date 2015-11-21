@@ -107,7 +107,7 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 		dateTimeParser := context.im.dateTimeParserNamed(dateTimeFormat)
 		if dateTimeParser != nil {
 			parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
-			if err != nil {
+			if err == nil {
 				fm.processTime(parsedDateTime, pathString, path, indexes, context)
 			}
 		}
