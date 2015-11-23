@@ -1,6 +1,0 @@
-<span  class="list-item"ng-click="clickItem(pval,pname)" ng-class="{selected: pval==selectedItem}">&bull; {{pname}}</span>
-<ul class="list-custom">
-	<li ng-repeat="(pname,pval) in pval.properties" ng-init="parent = parent + '.' + pname">
-		<span class="list-item" ng-click="clickItem(pval,parent)" ng-class="{selected: pval==selectedItem}">&bull; {{pname}}</span>
-	</li>
-</ul>
