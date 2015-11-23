@@ -21,9 +21,9 @@ import (
 	"testing"
 	"time"
 
+	"encoding/json"
 	"github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
 	"strconv"
-	"encoding/json"
 )
 
 func TestCrud(t *testing.T) {
@@ -1169,7 +1169,7 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 
 	// 3hr ago to 1hr ago
 	for i := 0; i < 3; i++ {
-		d := doc{now.Add(time.Duration((i-3))*time.Hour)}
+		d := doc{now.Add(time.Duration((i - 3)) * time.Hour)}
 
 		docJson, err := json.Marshal(d)
 		if err != nil {
@@ -1183,7 +1183,7 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	}
 
 	// search range across all docs
-	start := now.Add(-4*time.Hour).Format(time.RFC3339)
+	start := now.Add(-4 * time.Hour).Format(time.RFC3339)
 	end := now.Format(time.RFC3339)
 	sreq := NewSearchRequest(NewDateRangeQuery(&start, &end))
 	sres, err := index.Search(sreq)
@@ -1195,8 +1195,8 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	}
 
 	// search range includes only oldest
-	start = now.Add(-4*time.Hour).Format(time.RFC3339)
-	end = now.Add(-121*time.Minute).Format(time.RFC3339)
+	start = now.Add(-4 * time.Hour).Format(time.RFC3339)
+	end = now.Add(-121 * time.Minute).Format(time.RFC3339)
 	sreq = NewSearchRequest(NewDateRangeQuery(&start, &end))
 	sres, err = index.Search(sreq)
 	if err != nil {
@@ -1210,7 +1210,7 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	}
 
 	// search range includes only newest
-	start = now.Add(-61*time.Minute).Format(time.RFC3339)
+	start = now.Add(-61 * time.Minute).Format(time.RFC3339)
 	end = now.Format(time.RFC3339)
 	sreq = NewSearchRequest(NewDateRangeQuery(&start, &end))
 	sres, err = index.Search(sreq)
