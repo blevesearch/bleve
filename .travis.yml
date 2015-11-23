@@ -10,7 +10,7 @@ script:
   - go get github.com/kisielk/errcheck
   - go test -v ./...
   - go vet ./...
-  - errcheck $(go list ./... | grep -v bleve/http/mapping | grep -v bleve/index/store/metrics)
+  - errcheck $(go list ./... | grep -v bleve/index/store/metrics)
   - docs/project-code-coverage.sh
   - docs/build_children.sh
 
