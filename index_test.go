@@ -1142,7 +1142,7 @@ func TestIndexEmptyDocId(t *testing.T) {
 	}
 }
 
-func TestDateTimeFieldMappingIssuexxx(t *testing.T) {
+func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	defer func() {
 		err := os.RemoveAll("testidx")
 		if err != nil {
