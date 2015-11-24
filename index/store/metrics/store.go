@@ -135,44 +135,83 @@ func (s *Store) AddError(op string, err error, key []byte) {
 	s.m.Unlock()
 }
 
-func (s *Store) WriteJSON(w io.Writer) {
-	w.Write([]byte(`{"TimerReaderGet":`))
+func (s *Store) WriteJSON(w io.Writer) (err error) {
+	_, err = w.Write([]byte(`{"TimerReaderGet":`))
+	if err != nil {
+		return
+	}
 	WriteTimerJSON(w, s.TimerReaderGet)
-	w.Write([]byte(`,"TimerReaderPrefixIterator":`))
+	_, err = w.Write([]byte(`,"TimerReaderPrefixIterator":`))
+	if err != nil {
+		return
+	}
 	WriteTimerJSON(w, s.TimerReaderPrefixIterator)
-	w.Write([]byte(`,"TimerReaderRangeIterator":`))
+	_, err = w.Write([]byte(`,"TimerReaderRangeIterator":`))
+	if err != nil {
+		return
+	}
 	WriteTimerJSON(w, s.TimerReaderRangeIterator)
-	w.Write([]byte(`,"TimerWriterExecuteBatch":`))
+	_, err = w.Write([]byte(`,"TimerWriterExecuteBatch":`))
+	if err != nil {
+		return
+	}
 	WriteTimerJSON(w, s.TimerWriterExecuteBatch)
-	w.Write([]byte(`,"TimerIteratorSeek":`))
+	_, err = w.Write([]byte(`,"TimerIteratorSeek":`))
+	if err != nil {
+		return
+	}
 	WriteTimerJSON(w, s.TimerIteratorSeek)
-	w.Write([]byte(`,"TimerIteratorNext":`))
+	_, err = w.Write([]byte(`,"TimerIteratorNext":`))
+	if err != nil {
+		return
+	}
 	WriteTimerJSON(w, s.TimerIteratorNext)
-	w.Write([]byte(`,"TimerBatchMerge":`))
+	_, err = w.Write([]byte(`,"TimerBatchMerge":`))
+	if err != nil {
+		return
+	}
 	WriteTimerJSON(w, s.TimerBatchMerge)
 
-	w.Write([]byte(`,"Errors":[`))
+	_, err = w.Write([]byte(`,"Errors":[`))
+	if err != nil {
+		return
+	}
 	s.m.Lock()
+	defer s.m.Unlock()
 	e := s.errors.Front()
 	i := 0
 	for e != nil {
 		se, ok := e.Value.(*StoreError)
 		if ok && se != nil {
 			if i > 0 {
-				w.Write([]byte(","))
+				_, err = w.Write([]byte(","))
+				if err != nil {
+					return
+				}
 			}
-			buf, err := json.Marshal(se)
+			var buf []byte
+			buf, err = json.Marshal(se)
 			if err == nil {
-				w.Write(buf)
+				_, err = w.Write(buf)
+				if err != nil {
+					return
+				}
 			}
 		}
 		e = e.Next()
 		i = i + 1
 	}
-	s.m.Unlock()
-	w.Write([]byte(`]`))
+	_, err = w.Write([]byte(`]`))
+	if err != nil {
+		return
+	}
 
-	w.Write([]byte(`}`))
+	_, err = w.Write([]byte(`}`))
+	if err != nil {
+		return
+	}
+
+	return
 }
 
 func (s *Store) WriteCSVHeader(w io.Writer) {
