@@ -42,7 +42,10 @@ func TestMetricsStore(t *testing.T) {
 	}
 
 	b := bytes.NewBuffer(nil)
-	s.(*Store).WriteJSON(b)
+	err = s.(*Store).WriteJSON(b)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if b.Len() <= 0 {
 		t.Errorf("expected some output from WriteJSON")
 	}
@@ -86,7 +89,10 @@ func TestErrors(t *testing.T) {
 	x.AddError("baz", fmt.Errorf("Baz"), []byte("bazKey"))
 
 	b := bytes.NewBuffer(nil)
-	x.WriteJSON(b)
+	err = x.WriteJSON(b)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var m map[string]interface{}
 	err = json.Unmarshal(b.Bytes(), &m)
