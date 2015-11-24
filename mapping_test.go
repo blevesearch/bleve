@@ -256,8 +256,9 @@ func TestMappingWithTokenizerDeps(t *testing.T) {
 	}
 
 	tokDepsL1 := map[string]interface{}{
-		"type":      exception.Name,
-		"tokenizer": "a",
+		"type":       exception.Name,
+		"tokenizer":  "a",
+		"exceptions": []string{".*"},
 	}
 
 	// this tests a 1-level dependency
@@ -280,8 +281,9 @@ func TestMappingWithTokenizerDeps(t *testing.T) {
 	}
 
 	tokDepsL2 := map[string]interface{}{
-		"type":      "exception",
-		"tokenizer": "b",
+		"type":       "exception",
+		"tokenizer":  "b",
+		"exceptions": []string{".*"},
 	}
 
 	// now test a second-level dependency

@@ -46,7 +46,7 @@ func TestParseQuery(t *testing.T) {
 				[]Query{NewMatchQuery("devon").SetField("desc")}),
 		},
 		{
-			input:  []byte(`{"terms":[{"term":"watered","field":"desc"},{"term":"down","field":"desc"}]}`),
+			input:  []byte(`{"terms":["watered","down"],"field":"desc"}`),
 			output: NewPhraseQuery([]string{"watered", "down"}, "desc"),
 		},
 		{
@@ -223,6 +223,10 @@ func TestQueryValidate(t *testing.T) {
 				[]Query{NewMatchQuery("devon").SetField("desc")},
 				2.0),
 			err: ErrorDisjunctionFewerThanMinClauses,
+		},
+		{
+			query: NewDocIDQuery(nil).SetBoost(25),
+			err:   nil,
 		},
 	}
 

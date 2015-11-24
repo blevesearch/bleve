@@ -21,7 +21,9 @@ import (
 	"testing"
 	"time"
 
+	"encoding/json"
 	"github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
+	"strconv"
 )
 
 func TestCrud(t *testing.T) {
@@ -1137,5 +1139,93 @@ func TestIndexEmptyDocId(t *testing.T) {
 	batch.Delete("")
 	if batch.Size() > 0 {
 		t.Errorf("expect delete empty doc id in batch to be ignored")
+	}
+}
+
+func TestDateTimeFieldMappingIssue287(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	f := NewDateTimeFieldMapping()
+
+	m := NewIndexMapping()
+	m.DefaultMapping = NewDocumentMapping()
+	m.DefaultMapping.AddFieldMappingsAt("Date", f)
+
+	index, err := New("testidx", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type doc struct {
+		Date time.Time
+	}
+
+	now := time.Now()
+
+	// 3hr ago to 1hr ago
+	for i := 0; i < 3; i++ {
+		d := doc{now.Add(time.Duration((i - 3)) * time.Hour)}
+
+		docJson, err := json.Marshal(d)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = index.Index(strconv.FormatInt(int64(i), 10), docJson)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// search range across all docs
+	start := now.Add(-4 * time.Hour).Format(time.RFC3339)
+	end := now.Format(time.RFC3339)
+	sreq := NewSearchRequest(NewDateRangeQuery(&start, &end))
+	sres, err := index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 3 {
+		t.Errorf("expected 3 results, got %d", sres.Total)
+	}
+
+	// search range includes only oldest
+	start = now.Add(-4 * time.Hour).Format(time.RFC3339)
+	end = now.Add(-121 * time.Minute).Format(time.RFC3339)
+	sreq = NewSearchRequest(NewDateRangeQuery(&start, &end))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 results, got %d", sres.Total)
+	}
+	if sres.Total > 0 && sres.Hits[0].ID != "0" {
+		t.Errorf("expecated id '0', got '%s'", sres.Hits[0].ID)
+	}
+
+	// search range includes only newest
+	start = now.Add(-61 * time.Minute).Format(time.RFC3339)
+	end = now.Format(time.RFC3339)
+	sreq = NewSearchRequest(NewDateRangeQuery(&start, &end))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 results, got %d", sres.Total)
+	}
+	if sres.Total > 0 && sres.Hits[0].ID != "2" {
+		t.Errorf("expecated id '2', got '%s'", sres.Hits[0].ID)
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

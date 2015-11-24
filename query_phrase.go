@@ -11,7 +11,6 @@ package bleve
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
@@ -19,16 +18,18 @@ import (
 )
 
 type phraseQuery struct {
-	TermQueries []Query `json:"terms"`
-	BoostVal    float64 `json:"boost,omitempty"`
-	terms       []string
+	Terms       []string `json:"terms"`
+	FieldVal    string   `json:"field,omitempty"`
+	BoostVal    float64  `json:"boost,omitempty"`
+	termQueries []Query
 }
 
 // NewPhraseQuery creates a new Query for finding
 // exact term phrases in the index.
 // The provided terms must exist in the correct
 // order, at the correct index offsets, in the
-// specified field.
+// specified field. Queried field must have been indexed with
+// IncludeTermVectors set to true.
 func NewPhraseQuery(terms []string, field string) *phraseQuery {
 	termQueries := make([]Query, 0)
 	for _, term := range terms {
@@ -37,9 +38,10 @@ func NewPhraseQuery(terms []string, field string) *phraseQuery {
 		}
 	}
 	return &phraseQuery{
-		TermQueries: termQueries,
+		Terms:       terms,
+		FieldVal:    field,
 		BoostVal:    1.0,
-		terms:       terms,
+		termQueries: termQueries,
 	}
 }
 
@@ -54,47 +56,37 @@ func (q *phraseQuery) SetBoost(b float64) Query {
 
 func (q *phraseQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 
-	conjunctionQuery := NewConjunctionQuery(q.TermQueries)
+	conjunctionQuery := NewConjunctionQuery(q.termQueries)
 	conjunctionSearcher, err := conjunctionQuery.Searcher(i, m, explain)
 	if err != nil {
 		return nil, err
 	}
-	return searchers.NewPhraseSearcher(i, conjunctionSearcher.(*searchers.ConjunctionSearcher), q.terms)
+	return searchers.NewPhraseSearcher(i, conjunctionSearcher.(*searchers.ConjunctionSearcher), q.Terms)
 }
 
 func (q *phraseQuery) Validate() error {
-	if len(q.TermQueries) < 1 {
+	if len(q.termQueries) < 1 {
 		return ErrorPhraseQueryNoTerms
 	}
 	return nil
 }
 
 func (q *phraseQuery) UnmarshalJSON(data []byte) error {
-	tmp := struct {
-		Terms    []json.RawMessage `json:"terms"`
-		BoostVal float64           `json:"boost,omitempty"`
-	}{}
+	type _phraseQuery phraseQuery
+	tmp := _phraseQuery{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
-	q.TermQueries = make([]Query, len(tmp.Terms))
-	q.terms = make([]string, 0)
-	for i, term := range tmp.Terms {
-		query, err := ParseQuery(term)
-		if err != nil {
-			return err
-		}
-		q.TermQueries[i] = query
-		tq, isTermQuery := query.(*termQuery)
-		if !isTermQuery {
-			return fmt.Errorf("phrase query can only contain term queries")
-		}
-		q.terms = append(q.terms, tq.Term)
-	}
+	q.Terms = tmp.Terms
+	q.FieldVal = tmp.FieldVal
 	q.BoostVal = tmp.BoostVal
 	if q.BoostVal == 0 {
 		q.BoostVal = 1
+	}
+	q.termQueries = make([]Query, len(q.Terms))
+	for i, term := range q.Terms {
+		q.termQueries[i] = &termQuery{Term: term, FieldVal: q.FieldVal, BoostVal: q.BoostVal}
 	}
 	return nil
 }

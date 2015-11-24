@@ -427,6 +427,9 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []in
 	for _, row := range rows {
 		switch row := row.(type) {
 		case *TermFrequencyRow:
+			if row.KeySize() > len(keyBuf) {
+				keyBuf = make([]byte, row.KeySize())
+			}
 			keySize, _ := row.KeyTo(keyBuf)
 			if _, ok := existingTermKeys[string(keyBuf[:keySize])]; ok {
 				updateRows = append(updateRows, row)
@@ -435,6 +438,9 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []in
 				addRows = append(addRows, row)
 			}
 		case *StoredRow:
+			if row.KeySize() > len(keyBuf) {
+				keyBuf = make([]byte, row.KeySize())
+			}
 			keySize, _ := row.KeyTo(keyBuf)
 			if _, ok := existingStoredKeys[string(keyBuf[:keySize])]; ok {
 				updateRows = append(updateRows, row)

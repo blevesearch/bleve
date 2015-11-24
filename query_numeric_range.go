@@ -25,7 +25,7 @@ type numericRangeQuery struct {
 }
 
 // NewNumericRangeQuery creates a new Query for ranges
-// of date values.
+// of numeric values.
 // Either, but not both endpoints can be nil.
 // The minimum value is inclusive.
 // The maximum value is exclusive.
@@ -34,7 +34,7 @@ func NewNumericRangeQuery(min, max *float64) *numericRangeQuery {
 }
 
 // NewNumericRangeInclusiveQuery creates a new Query for ranges
-// of date values.
+// of numeric values.
 // Either, but not both endpoints can be nil.
 // Control endpoint inclusion with inclusiveMin, inclusiveMax.
 func NewNumericRangeInclusiveQuery(min, max *float64, minInclusive, maxInclusive *bool) *numericRangeQuery {

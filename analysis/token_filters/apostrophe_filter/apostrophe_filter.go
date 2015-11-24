@@ -18,9 +18,9 @@ import (
 
 const Name = "apostrophe"
 
-const RightSingleQoutationMark = "’"
+const RightSingleQuotationMark = "’"
 const Apostrophe = "'"
-const Apostrophes = Apostrophe + RightSingleQoutationMark
+const Apostrophes = Apostrophe + RightSingleQuotationMark
 
 type ApostropheFilter struct{}
 

@@ -38,7 +38,7 @@ func (c TokenizerCache) TokenizerNamed(name string, cache *Cache) (analysis.Toke
 	}
 	tokenizer, err := tokenizerConstructor(nil, cache)
 	if err != nil {
-		return nil, fmt.Errorf("error building tokenizer: %v", err)
+		return nil, fmt.Errorf("error building tokenizer '%s': %v", name, err)
 	}
 	c[name] = tokenizer
 	return tokenizer, nil
@@ -55,7 +55,7 @@ func (c TokenizerCache) DefineTokenizer(name string, typ string, config map[stri
 	}
 	tokenizer, err := tokenizerConstructor(config, cache)
 	if err != nil {
-		return nil, fmt.Errorf("error building tokenizer: %v", err)
+		return nil, fmt.Errorf("error building tokenizer '%s': %v", name, err)
 	}
 	c[name] = tokenizer
 	return tokenizer, nil

@@ -35,8 +35,11 @@ func (udc *UpsideDownCouch) dumpPrefix(kvreader store.KVReader, rv chan interfac
 	}()
 	key, val, valid := it.Current()
 	for valid {
-
-		row, err := ParseFromKeyValue(key, val)
+		ck := make([]byte, len(key))
+		copy(ck, key)
+		cv := make([]byte, len(val))
+		copy(cv, val)
+		row, err := ParseFromKeyValue(ck, cv)
 		if err != nil {
 			rv <- err
 			return
@@ -58,8 +61,11 @@ func (udc *UpsideDownCouch) dumpRange(kvreader store.KVReader, rv chan interface
 	}()
 	key, val, valid := it.Current()
 	for valid {
-
-		row, err := ParseFromKeyValue(key, val)
+		ck := make([]byte, len(key))
+		copy(ck, key)
+		cv := make([]byte, len(val))
+		copy(cv, val)
+		row, err := ParseFromKeyValue(ck, cv)
 		if err != nil {
 			rv <- err
 			return
@@ -182,7 +188,11 @@ func (udc *UpsideDownCouch) DumpDoc(id string) chan interface{} {
 				if !valid {
 					break
 				}
-				row, err := ParseFromKeyValue(rkey, rval)
+				rck := make([]byte, len(rkey))
+				copy(rck, key)
+				rcv := make([]byte, len(rval))
+				copy(rcv, rval)
+				row, err := ParseFromKeyValue(rck, rcv)
 				if err != nil {
 					rv <- err
 					return

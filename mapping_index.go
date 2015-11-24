@@ -507,3 +507,8 @@ func (im *IndexMapping) AnalyzeText(analyzerName string, text []byte) (analysis.
 	}
 	return analyzer.Analyze(text), nil
 }
+
+// FieldAnalyzer returns the name of the analyzer used on a field.
+func (im *IndexMapping) FieldAnalyzer(field string) string {
+	return im.analyzerNameForPath(field)
+}

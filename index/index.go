@@ -48,8 +48,10 @@ type IndexReader interface {
 	TermFieldReader(term []byte, field string) (TermFieldReader, error)
 
 	// DocIDReader returns an iterator over documents which identifiers are
-	// greater than or equal to start and smaller than end. The caller must
-	// close returned instance to release associated resources.
+	// greater than or equal to start and smaller than end. Set start to the
+	// empty string to iterate from the first document, end to the empty string
+	// to iterate to the last one.
+	// The caller must close returned instance to release associated resources.
 	DocIDReader(start, end string) (DocIDReader, error)
 
 	FieldDict(field string) (FieldDict, error)
@@ -88,9 +90,19 @@ type TermFieldDoc struct {
 	Vectors []*TermFieldVector
 }
 
+// TermFieldReader is the interface exposing the enumeration of documents
+// containing a given term in a given field. Documents are returned in byte
+// lexicographic order over their identifiers.
 type TermFieldReader interface {
+	// Next returns the next document containing the term in this field, or nil
+	// when it reaches the end of the enumeration.
 	Next() (*TermFieldDoc, error)
+
+	// Advance resets the enumeration at specified document or its immediate
+	// follower.
 	Advance(ID string) (*TermFieldDoc, error)
+
+	// Count returns the number of documents contains the term in this field.
 	Count() uint64
 	Close() error
 }

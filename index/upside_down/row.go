@@ -355,6 +355,14 @@ type TermFrequencyRow struct {
 	vectors []*TermVector
 }
 
+func (tfr *TermFrequencyRow) Term() []byte {
+	return tfr.term
+}
+
+func (tfr *TermFrequencyRow) Freq() uint64 {
+	return tfr.freq
+}
+
 func (tfr *TermFrequencyRow) ScanPrefixForField() []byte {
 	buf := make([]byte, 3)
 	buf[0] = 't'

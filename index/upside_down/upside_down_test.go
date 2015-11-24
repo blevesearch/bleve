@@ -1283,3 +1283,43 @@ func TestConcurrentUpdate(t *testing.T) {
 		t.Errorf("expected single field, found %d", len(doc.Fields))
 	}
 }
+
+func TestLargeField(t *testing.T) {
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	largeFieldValue := make([]byte, 0)
+	for len(largeFieldValue) < RowBufferSize {
+		largeFieldValue = append(largeFieldValue, bleveWikiArticle1K...)
+	}
+	t.Logf("large field size: %d", len(largeFieldValue))
+
+	d := document.NewDocument("large")
+	f := document.NewTextFieldWithIndexingOptions("desc", nil, largeFieldValue, document.IndexField|document.StoreField)
+	d.AddField(f)
+
+	err = idx.Update(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

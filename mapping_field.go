@@ -30,8 +30,13 @@ type FieldMapping struct {
 
 	// Store indicates whether to store field values in the index. Stored
 	// values can be retrieved from search results using SearchRequest.Fields.
-	Store              bool   `json:"store,omitempty"`
-	Index              bool   `json:"index,omitempty"`
+	Store bool `json:"store,omitempty"`
+	Index bool `json:"index,omitempty"`
+
+	// IncludeTermVectors, if true, makes terms occurrences to be recorded for
+	// this field. It includes the term position within the terms sequence and
+	// the term offsets in the source document field. Term vectors are required
+	// to perform phrase queries or terms highlighting in source documents.
 	IncludeTermVectors bool   `json:"include_term_vectors,omitempty"`
 	IncludeInAll       bool   `json:"include_in_all,omitempty"`
 	DateFormat         string `json:"date_format,omitempty"`
@@ -102,7 +107,7 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 		dateTimeParser := context.im.dateTimeParserNamed(dateTimeFormat)
 		if dateTimeParser != nil {
 			parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
-			if err != nil {
+			if err == nil {
 				fm.processTime(parsedDateTime, pathString, path, indexes, context)
 			}
 		}
