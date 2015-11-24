@@ -22,8 +22,8 @@ import (
 // if your application relies on them, you're doing something wrong
 // they may change or be removed at any time
 
-func (f *Firestorm) dumpPrefix(kvreader store.KVReader, rv chan interface{}, prefix []byte) {
-	visitPrefix(kvreader, prefix, func(key, val []byte) (bool, error) {
+func (f *Firestorm) dumpPrefix(kvreader store.KVReader, rv chan interface{}, prefix []byte) error {
+	return visitPrefix(kvreader, prefix, func(key, val []byte) (bool, error) {
 		row, err := parseFromKeyValue(key, val)
 		if err != nil {
 			rv <- err
@@ -34,11 +34,11 @@ func (f *Firestorm) dumpPrefix(kvreader store.KVReader, rv chan interface{}, pre
 	})
 }
 
-func (f *Firestorm) dumpDoc(kvreader store.KVReader, rv chan interface{}, docID []byte) {
+func (f *Firestorm) dumpDoc(kvreader store.KVReader, rv chan interface{}, docID []byte) error {
 	// without a back index we have no choice but to walk the term freq and stored rows
 
 	// walk the term freqs
-	visitPrefix(kvreader, TermFreqKeyPrefix, func(key, val []byte) (bool, error) {
+	err := visitPrefix(kvreader, TermFreqKeyPrefix, func(key, val []byte) (bool, error) {
 		tfr, err := NewTermFreqRowKV(key, val)
 		if err != nil {
 			rv <- err
@@ -50,8 +50,12 @@ func (f *Firestorm) dumpDoc(kvreader store.KVReader, rv chan interface{}, docID 
 		return true, nil
 	})
 
+	if err != nil {
+		return err
+	}
+
 	// now walk the stored
-	visitPrefix(kvreader, StoredKeyPrefix, func(key, val []byte) (bool, error) {
+	err = visitPrefix(kvreader, StoredKeyPrefix, func(key, val []byte) (bool, error) {
 		sr, err := NewStoredRowKV(key, val)
 		if err != nil {
 			rv <- err
@@ -62,6 +66,8 @@ func (f *Firestorm) dumpDoc(kvreader store.KVReader, rv chan interface{}, docID 
 		}
 		return true, nil
 	})
+
+	return err
 }
 
 func parseFromKeyValue(key, value []byte) (index.IndexRow, error) {

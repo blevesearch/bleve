@@ -81,7 +81,11 @@ func (l *Lookuper) lookup(task *lookupTask) {
 		logger.Printf("lookuper fatal: %v", err)
 		return
 	}
-	defer reader.Close()
+	defer func() {
+		if cerr := reader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
 
 	prefix := TermFreqPrefixFieldTermDocId(0, nil, task.docID)
 	logger.Printf("lookuper prefix - % x", prefix)

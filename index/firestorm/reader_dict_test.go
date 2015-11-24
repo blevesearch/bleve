@@ -67,7 +67,10 @@ func TestDictionaryReader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.(*Firestorm).warmup(kvreader)
+	err = f.(*Firestorm).warmup(kvreader)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = kvreader.Close()
 	if err != nil {

@@ -62,7 +62,10 @@ func TestAnalysis(t *testing.T) {
 		t.Fatal(err)
 	}
 	// warmup to load field cache and set maxRead correctly
-	f.(*Firestorm).warmup(kvreader)
+	err = f.(*Firestorm).warmup(kvreader)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		d *document.Document

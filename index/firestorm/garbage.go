@@ -122,7 +122,11 @@ func (gc *GarbageCollector) cleanup() {
 		logger.Printf("garbage collector fatal: %v", err)
 		return
 	}
-	defer reader.Close()
+	defer func() {
+		if cerr := reader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
 
 	// walk all the term freq rows (where field > 0)
 	termFreqStart := TermFreqIteratorStart(0, []byte{ByteSeparator})
@@ -176,7 +180,7 @@ func (gc *GarbageCollector) cleanup() {
 		// open a writer
 		writer, err := gc.f.store.Writer()
 		if err != nil {
-			writer.Close()
+			_ = writer.Close()
 			logger.Printf("garbage collector fatal: %v", err)
 			return
 		}
@@ -190,7 +194,7 @@ func (gc *GarbageCollector) cleanup() {
 
 		err = writer.ExecuteBatch(wb)
 		if err != nil {
-			writer.Close()
+			_ = writer.Close()
 			logger.Printf("garbage collector fatal: %v", err)
 			return
 		}
@@ -212,7 +216,11 @@ func (gc *GarbageCollector) cleanup() {
 			logger.Printf("garbage collector fatal: %v", err)
 			return
 		}
-		writer.Close()
+		err = writer.Close()
+		if err != nil {
+			logger.Printf("garbage collector fatal: %v", err)
+			return
+		}
 	}
 
 	// updating dictionary in one batch

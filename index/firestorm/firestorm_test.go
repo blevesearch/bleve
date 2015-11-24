@@ -115,7 +115,10 @@ func TestIndexInsert(t *testing.T) {
 	}
 	expectedCount++
 
-	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	err = idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	docCount, err = idx.DocCount()
 	if err != nil {
@@ -168,7 +171,10 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	expectedCount++
 
-	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	err = idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	doc2 := document.NewDocument("2")
 	doc2.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
@@ -178,7 +184,10 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	expectedCount++
 
-	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	err = idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	docCount, err = idx.DocCount()
 	if err != nil {
@@ -194,7 +203,10 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	expectedCount--
 
-	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	err = idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	docCount, err = idx.DocCount()
 	if err != nil {
@@ -210,7 +222,10 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	expectedCount--
 
-	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	err = idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	docCount, err = idx.DocCount()
 	if err != nil {
@@ -270,7 +285,10 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 		t.Errorf("Error deleting entry from index: %v", err)
 	}
 
-	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	err = idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	docCount, err := idx.DocCount()
 	if err != nil {
@@ -347,7 +365,10 @@ func TestIndexInsertMultiple(t *testing.T) {
 	}
 	expectedCount++
 
-	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	err = idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	docCount, err := idx.DocCount()
 	if err != nil {
@@ -399,7 +420,10 @@ func TestIndexInsertWithStore(t *testing.T) {
 	}
 	expectedCount++
 
-	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	err = idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	docCount, err = idx.DocCount()
 	if err != nil {
@@ -605,7 +629,10 @@ func TestIndexBatch(t *testing.T) {
 		}
 	}()
 
-	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	err = idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	docCount := indexReader.DocCount()
 	if docCount != expectedCount {
@@ -683,7 +710,10 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	}
 	expectedCount++
 
-	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	err = idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	docCount, err = idx.DocCount()
 	if err != nil {
@@ -801,7 +831,10 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	err = idx.Delete("1")
 	expectedCount--
 
-	idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	err = idx.(*Firestorm).lookuper.waitTasksDone(lookupWaitDuration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// expected doc count shouldn't have changed
 	docCount, err = idx.DocCount()

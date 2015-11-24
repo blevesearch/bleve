@@ -105,7 +105,10 @@ func TestDump(t *testing.T) {
 		t.Errorf("expected %d rows for document, got %d", expectedDocRowCount, docRowCount)
 	}
 
-	idx.(*Firestorm).dictUpdater.waitTasksDone(dictWaitDuration)
+	err = idx.(*Firestorm).dictUpdater.waitTasksDone(dictWaitDuration)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// 1 version
 	// fieldsCount field rows

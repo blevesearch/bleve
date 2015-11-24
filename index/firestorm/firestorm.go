@@ -90,7 +90,10 @@ func (f *Firestorm) Open() (err error) {
 
 	if !newIndex {
 		// process existing index before opening
-		f.warmup(kvreader)
+		err = f.warmup(kvreader)
+		if err != nil {
+			return
+		}
 	}
 
 	err = kvreader.Close()
@@ -100,7 +103,10 @@ func (f *Firestorm) Open() (err error) {
 
 	if newIndex {
 		// prepare a new index
-		f.bootstrap()
+		err = f.bootstrap()
+		if err != nil {
+			return
+		}
 	}
 
 	// start the garbage collector
@@ -384,7 +390,11 @@ func (f *Firestorm) DumpAll() chan interface{} {
 			}
 		}()
 
-		f.dumpPrefix(kvreader, rv, nil)
+		err = f.dumpPrefix(kvreader, rv, nil)
+		if err != nil {
+			rv <- err
+			return
+		}
 	}()
 	return rv
 }
@@ -407,7 +417,11 @@ func (f *Firestorm) DumpDoc(docID string) chan interface{} {
 			}
 		}()
 
-		f.dumpDoc(kvreader, rv, []byte(docID))
+		err = f.dumpDoc(kvreader, rv, []byte(docID))
+		if err != nil {
+			rv <- err
+			return
+		}
 	}()
 	return rv
 }
@@ -430,7 +444,11 @@ func (f *Firestorm) DumpFields() chan interface{} {
 			}
 		}()
 
-		f.dumpPrefix(kvreader, rv, FieldKeyPrefix)
+		err = f.dumpPrefix(kvreader, rv, FieldKeyPrefix)
+		if err != nil {
+			rv <- err
+			return
+		}
 	}()
 	return rv
 }

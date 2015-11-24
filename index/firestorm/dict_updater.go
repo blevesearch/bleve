@@ -94,7 +94,7 @@ func (d *DictUpdater) update() {
 	// open a writer
 	writer, err := d.f.store.Writer()
 	if err != nil {
-		writer.Close()
+		_ = writer.Close()
 		logger.Printf("dict updater fatal: %v", err)
 		return
 	}
@@ -110,7 +110,7 @@ func (d *DictUpdater) update() {
 
 	err = writer.ExecuteBatch(wb)
 	if err != nil {
-		writer.Close()
+		_ = writer.Close()
 		logger.Printf("dict updater fatal: %v", err)
 		return
 	}
@@ -123,18 +123,19 @@ func (d *DictUpdater) update() {
 // this is not intended to be used publicly, only for unit tests
 // which depend on consistency we no longer provide
 func (d *DictUpdater) waitTasksDone(dur time.Duration) error {
+	initial := atomic.LoadUint64(&d.batchesStarted)
 	timeout := time.After(dur)
 	tick := time.Tick(100 * time.Millisecond)
 	for {
 		select {
 		// Got a timeout! fail with a timeout error
 		case <-timeout:
-			return fmt.Errorf("timeout")
+			flushed := atomic.LoadUint64(&d.batchesFlushed)
+			return fmt.Errorf("timeout, %d/%d", initial, flushed)
 		// Got a tick, we should check on doSomething()
 		case <-tick:
-			started := atomic.LoadUint64(&d.batchesStarted)
 			flushed := atomic.LoadUint64(&d.batchesFlushed)
-			if started == flushed {
+			if flushed > initial {
 				return nil
 			}
 		}

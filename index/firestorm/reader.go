@@ -150,7 +150,7 @@ func (r *firestormReader) DocumentFieldTerms(id string) (index.FieldTerms, error
 
 	rv := make(index.FieldTerms, 0)
 	// walk the term freqs
-	visitPrefix(r.r, TermFreqKeyPrefix, func(key, val []byte) (bool, error) {
+	err = visitPrefix(r.r, TermFreqKeyPrefix, func(key, val []byte) (bool, error) {
 		tfr, err := NewTermFreqRowKV(key, val)
 		if err != nil {
 			return false, err
@@ -166,6 +166,9 @@ func (r *firestormReader) DocumentFieldTerms(id string) (index.FieldTerms, error
 		}
 		return true, nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return rv, nil
 }

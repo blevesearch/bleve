@@ -83,7 +83,10 @@ func TestDocIDReaderSomeGarbage(t *testing.T) {
 	}
 
 	// warmup to load field cache and set maxRead correctly
-	f.(*Firestorm).warmup(kvreader)
+	err = f.(*Firestorm).warmup(kvreader)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = kvreader.Close()
 	if err != nil {
