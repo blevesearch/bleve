@@ -9,7 +9,9 @@
 
 package firestorm
 
-var InternalKeyPrefix = []byte{'d'}
+import "fmt"
+
+var InternalKeyPrefix = []byte{'i'}
 
 type InternalRow struct {
 	key []byte
@@ -58,4 +60,8 @@ func (ir *InternalRow) ValueTo(buf []byte) (int, error) {
 
 func (ir *InternalRow) Value() []byte {
 	return ir.val
+}
+
+func (ir *InternalRow) String() string {
+	return fmt.Sprintf("InternalStore - Key: %s (% x) Val: %s (% x)", ir.key, ir.key, ir.val, ir.val)
 }
