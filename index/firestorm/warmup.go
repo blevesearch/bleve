@@ -98,8 +98,10 @@ func (f *Firestorm) warmup(reader store.KVReader) error {
 				// reset size to 1
 				lastDocNumbers = make(DocNumberList, 1)
 			}
+			lastDocNumbers = lastDocNumbers[:1]
 			lastDocNumbers[0] = docNum
-			lastDocId = docID
+			lastDocId = make([]byte, len(docID))
+			copy(lastDocId, docID)
 		}
 		return true, nil
 	})
