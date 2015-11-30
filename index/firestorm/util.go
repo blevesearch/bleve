@@ -90,7 +90,7 @@ func (l DocNumberList) HighestValid(maxRead uint64) uint64 {
 	return 0
 }
 
-var logger = log.New(ioutil.Discard, "bleve.index.firestorm", 0)
+var logger = log.New(ioutil.Discard, "bleve.index.firestorm ", 0)
 
 // SetLog sets the logger used for logging
 // by default log messages are sent to ioutil.Discard
