@@ -20,6 +20,8 @@ import (
 	"github.com/blevesearch/bleve/index/upside_down"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search/highlight/highlighters/html"
+
+	_ "github.com/blevesearch/bleve/index/firestorm"
 )
 
 var bleveExpVar = expvar.NewMap("bleve")

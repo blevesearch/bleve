@@ -53,6 +53,7 @@ func NewFirestorm(storeName string, storeConfig map[string]interface{}, analysis
 		highDocNumber: 0,
 		stats:         &indexStat{},
 	}
+	rv.stats.f = &rv
 	rv.garbageCollector = NewGarbageCollector(&rv)
 	rv.lookuper = NewLookuper(&rv)
 	rv.dictUpdater = NewDictUpdater(&rv)
@@ -460,6 +461,10 @@ func (f *Firestorm) Reader() (index.IndexReader, error) {
 func (f *Firestorm) Stats() json.Marshaler {
 	return f.stats
 
+}
+
+func (f *Firestorm) Wait(timeout time.Duration) error {
+	return f.dictUpdater.waitTasksDone(timeout)
 }
 
 func init() {

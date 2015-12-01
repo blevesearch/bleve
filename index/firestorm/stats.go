@@ -15,6 +15,7 @@ import (
 )
 
 type indexStat struct {
+	f                                 *Firestorm
 	updates, deletes, batches, errors uint64
 	analysisTime, indexTime           uint64
 }
@@ -27,5 +28,6 @@ func (i *indexStat) MarshalJSON() ([]byte, error) {
 	m["errors"] = atomic.LoadUint64(&i.errors)
 	m["analysis_time"] = atomic.LoadUint64(&i.analysisTime)
 	m["index_time"] = atomic.LoadUint64(&i.indexTime)
+	m["lookup_queue_len"] = len(i.f.lookuper.workChan)
 	return json.Marshal(m)
 }

@@ -18,8 +18,10 @@ import (
 	"reflect"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve"
+	bleveIndex "github.com/blevesearch/bleve/index"
 
 	// we must explicitly include any functionality we plan on testing
 	_ "github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
@@ -28,9 +30,14 @@ import (
 var dataset = flag.String("dataset", "", "only test datasets matching this regex")
 var keepIndex = flag.Bool("keepIndex", false, "keep the index after testing")
 
+var indexType = flag.String("indexType", bleve.Config.DefaultIndexType, "index type to build")
+
 func TestIntegration(t *testing.T) {
 
 	flag.Parse()
+
+	bleve.Config.DefaultIndexType = *indexType
+	t.Logf("using index type %s", *indexType)
 
 	var err error
 	var datasetRegexp *regexp.Regexp
@@ -113,6 +120,19 @@ func runTestDir(t *testing.T, dir string) {
 			t.Errorf("error indexing data: %v", err)
 			return
 		}
+	}
+
+	indexInternal, _, err := index.Advanced()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if indexInternal, ok := indexInternal.(bleveIndex.AsyncIndex); ok {
+		start := time.Now()
+		err = indexInternal.Wait(5 * time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("we had to wait for %v", time.Since(start))
 	}
 
 	// read the searches
