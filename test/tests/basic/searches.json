@@ -477,5 +477,24 @@
 				}
 			]
 		}
+	},
+	{
+		"comment": "reproduce bug in prefix search",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "title",
+				"prefix": "miss"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "b"
+				}
+			]
+		}
 	}
 ]

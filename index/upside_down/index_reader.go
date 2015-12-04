@@ -42,7 +42,7 @@ func (i *IndexReader) FieldDictRange(fieldName string, startTerm []byte, endTerm
 }
 
 func (i *IndexReader) FieldDictPrefix(fieldName string, termPrefix []byte) (index.FieldDict, error) {
-	return i.FieldDictRange(fieldName, termPrefix, incrementBytes(termPrefix))
+	return i.FieldDictRange(fieldName, termPrefix, termPrefix)
 }
 
 func (i *IndexReader) DocIDReader(start, end string) (index.DocIDReader, error) {
