@@ -66,6 +66,8 @@ func init() {
 
 	bootDuration := time.Since(bootStart)
 	bleveExpVar.Add("bootDuration", int64(bootDuration))
+	indexStats = NewIndexStats()
+	bleveExpVar.Set("indexes", indexStats)
 }
 
 var logger = log.New(ioutil.Discard, "bleve", log.LstdFlags)

@@ -188,6 +188,11 @@ type Index interface {
 	SetInternal(key, val []byte) error
 	DeleteInternal(key []byte) error
 
+	// Name returns the name of the index (by deault this is the path)
+	Name() string
+	// SetName lets you assign your own logical name to this index
+	SetName(string)
+
 	// Advanced returns the indexer and data store, exposing lower level
 	// methods to enumerate records and access data.
 	Advanced() (index.Index, store.KVStore, error)

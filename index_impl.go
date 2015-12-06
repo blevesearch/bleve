@@ -30,6 +30,7 @@ import (
 
 type indexImpl struct {
 	path  string
+	name  string
 	meta  *indexMeta
 	s     store.KVStore
 	i     index.Index
@@ -50,6 +51,7 @@ func indexStorePath(path string) string {
 func newMemIndex(indexType string, mapping *IndexMapping) (*indexImpl, error) {
 	rv := indexImpl{
 		path:  "",
+		name:  "mem",
 		m:     mapping,
 		meta:  newIndexMeta(indexType, gtreap.Name, nil),
 		stats: &IndexStat{},
@@ -86,6 +88,7 @@ func newMemIndex(indexType string, mapping *IndexMapping) (*indexImpl, error) {
 	rv.mutex.Lock()
 	defer rv.mutex.Unlock()
 	rv.open = true
+	indexStats.Register(&rv)
 	return &rv, nil
 }
 
@@ -106,6 +109,7 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 
 	rv := indexImpl{
 		path:  path,
+		name:  path,
 		m:     mapping,
 		meta:  newIndexMeta(indexType, kvstore, kvconfig),
 		stats: &IndexStat{},
@@ -152,12 +156,14 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 	rv.mutex.Lock()
 	defer rv.mutex.Unlock()
 	rv.open = true
+	indexStats.Register(&rv)
 	return &rv, nil
 }
 
 func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *indexImpl, err error) {
 	rv = &indexImpl{
 		path:  path,
+		name:  path,
 		stats: &IndexStat{},
 	}
 
@@ -238,6 +244,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	}
 
 	rv.m = &im
+	indexStats.Register(rv)
 	return rv, err
 }
 
@@ -723,6 +730,16 @@ func (i *indexImpl) NewBatch() *Batch {
 		index:    i,
 		internal: index.NewBatch(),
 	}
+}
+
+func (i *indexImpl) Name() string {
+	return i.name
+}
+
+func (i *indexImpl) SetName(name string) {
+	indexStats.UnRegister(i)
+	i.name = name
+	indexStats.Register(i)
 }
 
 type indexImplFieldDict struct {

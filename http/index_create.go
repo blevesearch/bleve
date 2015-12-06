@@ -64,6 +64,7 @@ func (h *CreateIndexHandler) ServeHTTP(w http.ResponseWriter, req *http.Request)
 		showError(w, req, fmt.Sprintf("error creating index: %v", err), 500)
 		return
 	}
+	newIndex.SetName(indexName)
 	RegisterIndexName(indexName, newIndex)
 	rv := struct {
 		Status string `json:"status"`

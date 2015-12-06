@@ -21,6 +21,7 @@ import (
 )
 
 type indexAliasImpl struct {
+	name    string
 	indexes []Index
 	mutex   sync.RWMutex
 	open    bool
@@ -30,6 +31,7 @@ type indexAliasImpl struct {
 // Index objects.
 func NewIndexAlias(indexes ...Index) *indexAliasImpl {
 	return &indexAliasImpl{
+		name:    "alias",
 		indexes: indexes,
 		open:    true,
 	}
@@ -559,6 +561,14 @@ func (i *indexAliasImpl) NewBatch() *Batch {
 	}
 
 	return i.indexes[0].NewBatch()
+}
+
+func (i *indexAliasImpl) Name() string {
+	return i.name
+}
+
+func (i *indexAliasImpl) SetName(name string) {
+	i.name = name
 }
 
 type indexAliasImplFieldDict struct {
