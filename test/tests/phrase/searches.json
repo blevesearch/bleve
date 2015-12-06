@@ -322,5 +322,55 @@
 				}
 			]
 		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "body",
+				"match_phrase": "bad call"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "b"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "body",
+				"match_phrase": "defenseless receiver"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "b"
+				}
+			]
+		}
+	},
+	{
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "body",
+				"match_phrase": "bad receiver"
+			}
+		},
+		"result": {
+			"total_hits": 0,
+			"hits": []
+		}
 	}
 ]

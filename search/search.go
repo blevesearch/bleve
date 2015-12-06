@@ -16,6 +16,20 @@ type Location struct {
 	ArrayPositions []float64 `json:"array_positions"`
 }
 
+// SameArrayElement returns true if two locations are point to
+// the same array element
+func (l *Location) SameArrayElement(other *Location) bool {
+	if len(l.ArrayPositions) != len(other.ArrayPositions) {
+		return false
+	}
+	for i, elem := range l.ArrayPositions {
+		if other.ArrayPositions[i] != elem {
+			return false
+		}
+	}
+	return true
+}
+
 type Locations []*Location
 
 type TermLocationMap map[string]Locations
