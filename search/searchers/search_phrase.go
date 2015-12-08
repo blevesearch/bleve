@@ -119,7 +119,7 @@ func (s *PhraseSearcher) Next() (*search.DocumentMatch, error) {
 							nextLocations, ok := termLocMap[nextTerm]
 							if ok {
 								for _, nextLocation := range nextLocations {
-									if nextLocation.Pos == location.Pos+float64(i) {
+									if nextLocation.Pos == location.Pos+float64(i) && nextLocation.SameArrayElement(location) {
 										// found a location match for this term
 										crvtlm.AddLocation(nextTerm, nextLocation)
 										continue INNER
