@@ -51,6 +51,7 @@ type FieldTermLocationMap map[string]TermLocationMap
 type FieldFragmentMap map[string][]string
 
 type DocumentMatch struct {
+	Index     string               `json:"index,omitempty"`
 	ID        string               `json:"id"`
 	Score     float64              `json:"score"`
 	Expl      *Explanation         `json:"explanation,omitempty"`

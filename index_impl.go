@@ -497,6 +497,12 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 		}
 	}
 
+	for _, hit := range hits {
+		if i.name != "" {
+			hit.Index = i.name
+		}
+	}
+
 	atomic.AddUint64(&i.stats.searches, 1)
 	searchDuration := time.Since(searchStart)
 	atomic.AddUint64(&i.stats.searchTime, uint64(searchDuration))
