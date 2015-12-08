@@ -573,6 +573,7 @@ func TestMultiSearchNoError(t *testing.T) {
 		Total: 1,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{
+				Index: "1",
 				ID:    "a",
 				Score: 1.0,
 			},
@@ -583,6 +584,7 @@ func TestMultiSearchNoError(t *testing.T) {
 		Total: 1,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{
+				Index: "2",
 				ID:    "b",
 				Score: 2.0,
 			},
@@ -596,10 +598,12 @@ func TestMultiSearchNoError(t *testing.T) {
 		Total:   2,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{
+				Index: "2",
 				ID:    "b",
 				Score: 2.0,
 			},
 			&search.DocumentMatch{
+				Index: "1",
 				ID:    "a",
 				Score: 1.0,
 			},

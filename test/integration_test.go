@@ -60,12 +60,12 @@ func TestIntegration(t *testing.T) {
 		}
 		if fi.IsDir() {
 			t.Logf("Running test: %s", fi.Name())
-			runTestDir(t, "tests"+string(filepath.Separator)+fi.Name())
+			runTestDir(t, "tests"+string(filepath.Separator)+fi.Name(), fi.Name())
 		}
 	}
 }
 
-func runTestDir(t *testing.T, dir string) {
+func runTestDir(t *testing.T, dir, datasetName string) {
 	// read the mapping
 	mappingBytes, err := ioutil.ReadFile(dir + string(filepath.Separator) + "mapping.json")
 	if err != nil {
@@ -93,6 +93,8 @@ func runTestDir(t *testing.T, dir string) {
 		t.Errorf("error creating new index: %v", err)
 		return
 	}
+	// set a custom index name
+	index.SetName(datasetName)
 	defer func() {
 		err := index.Close()
 		if err != nil {
@@ -180,6 +182,13 @@ func runTestDir(t *testing.T, dir string) {
 		if search.Result.Facets != nil {
 			if !reflect.DeepEqual(search.Result.Facets, res.Facets) {
 				t.Errorf("test %d - expected facets: %#v got %#v", testNum, search.Result.Facets, res.Facets)
+			}
+		}
+		// check that custom index name is in results
+		for _, hit := range res.Hits {
+			if hit.Index != datasetName {
+				t.Fatalf("expected name: %s, got: %s", datasetName, hit.Index)
+
 			}
 		}
 	}
