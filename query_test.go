@@ -66,6 +66,18 @@ func TestParseQuery(t *testing.T) {
 			output: NewPrefixQuery("budwei").SetField("desc"),
 		},
 		{
+			input:  []byte(`{"match_all":{}}`),
+			output: NewMatchAllQuery(),
+		},
+		{
+			input:  []byte(`{"match_none":{}}`),
+			output: NewMatchNoneQuery(),
+		},
+		{
+			input:  []byte(`{"ids":["a","b","c"]}`),
+			output: NewDocIDQuery([]string{"a", "b", "c"}),
+		},
+		{
 			input:  []byte(`{"madeitup":"queryhere"}`),
 			output: nil,
 			err:    ErrorUnknownQueryType,

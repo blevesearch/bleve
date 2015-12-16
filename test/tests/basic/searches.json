@@ -496,5 +496,67 @@
 				}
 			]
 		}
+	},
+	{
+		"comment": "test match none",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"match_none": {}
+			}
+		},
+		"result": {
+			"total_hits": 0,
+			"hits": []
+		}
+	},
+	{
+		"comment": "test match all",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"match_all": {}
+			}
+		},
+		"result": {
+			"total_hits": 4,
+			"hits": [
+				{
+					"id": "d"
+				},
+				{
+					"id": "c"
+				},
+				{
+					"id": "b"
+				},
+				{
+					"id": "a"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test doc id query",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"ids": ["b", "c"]
+			}
+		},
+		"result": {
+			"total_hits": 2,
+			"hits": [
+				{
+					"id": "c"
+				},
+				{
+					"id": "b"
+				}
+			]
+		}
 	}
 ]

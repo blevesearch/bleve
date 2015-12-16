@@ -33,7 +33,8 @@ func NewDocIDSearcher(indexReader index.IndexReader, ids []string, boost float64
 
 	if len(ids) > 0 {
 		var idReader index.DocIDReader
-		idReader, err = indexReader.DocIDReader(kept[0], kept[len(kept)-1])
+		endTerm := string(incrementBytes([]byte(kept[len(kept)-1])))
+		idReader, err = indexReader.DocIDReader(kept[0], endTerm)
 		if err != nil {
 			return nil, err
 		}
