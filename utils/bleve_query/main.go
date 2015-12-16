@@ -27,6 +27,7 @@ var limit = flag.Int("limit", 10, "limit to first N results")
 var skip = flag.Int("skip", 0, "skip the first N results")
 var explain = flag.Bool("explain", false, "explain scores")
 var includeHighlights = flag.Bool("highlight", true, "highlight matches")
+var includeStoredFields = flag.Bool("fields", false, "return stored fields")
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 var repeat = flag.Int("repeat", 1, "repeat query n times")
 var qtype = flag.String("queryType", "query_string", "type of query to execute: query_string, prefix")
@@ -78,6 +79,12 @@ func main() {
 				pquery.SetField(*qfield)
 			}
 			query = pquery
+		case "term":
+			pquery := bleve.NewTermQuery(strings.Join(flag.Args(), " "))
+			if *qfield != "" {
+				pquery.SetField(*qfield)
+			}
+			query = pquery
 		default:
 			// build a search with the provided parameters
 			queryString := strings.Join(flag.Args(), " ")
@@ -89,6 +96,10 @@ func main() {
 		// enable highlights if requested
 		if *includeHighlights {
 			searchRequest.Highlight = bleve.NewHighlightWithStyle("ansi")
+		}
+
+		if *includeStoredFields {
+			searchRequest.Fields = []string{"*"}
 		}
 
 		// execute the search
