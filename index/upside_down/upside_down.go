@@ -502,7 +502,7 @@ func encodeFieldType(f document.Field) byte {
 	return fieldType
 }
 
-func (udc *UpsideDownCouch) indexField(docID string, field document.Field, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies) ([]index.IndexRow, []*BackIndexTermEntry) {
+func (udc *UpsideDownCouch) indexField(docID string, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies) ([]index.IndexRow, []*BackIndexTermEntry) {
 
 	rows := make([]index.IndexRow, 0, 100)
 	backIndexTermEntries := make([]*BackIndexTermEntry, 0, len(tokenFreqs))
@@ -510,7 +510,7 @@ func (udc *UpsideDownCouch) indexField(docID string, field document.Field, field
 
 	for k, tf := range tokenFreqs {
 		var termFreqRow *TermFrequencyRow
-		if field.Options().IncludeTermVectors() {
+		if includeTermVectors {
 			tv, newFieldRows := udc.termVectorsFromTokenFreq(fieldIndex, tf)
 			rows = append(rows, newFieldRows...)
 			termFreqRow = NewTermFrequencyRowWithTermVectors(tf.Term, fieldIndex, docID, uint64(frequencyFromTokenFreq(tf)), fieldNorm, tv)

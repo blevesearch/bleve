@@ -22,8 +22,9 @@ import (
 	"time"
 
 	"encoding/json"
-	"github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
 	"strconv"
+
+	"github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
 )
 
 func TestCrud(t *testing.T) {
@@ -1222,6 +1223,87 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	}
 	if sres.Total > 0 && sres.Hits[0].ID != "2" {
 		t.Errorf("expecated id '2', got '%s'", sres.Hits[0].ID)
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDocumentFieldArrayPositionsBug295(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// index a document with an array of strings
+	err = index.Index("k", struct {
+		Messages []string
+		Another  string
+		MoreData []string
+	}{
+		Messages: []string{
+			"bleve",
+			"bleve",
+		},
+		Another: "text",
+		MoreData: []string{
+			"a",
+			"b",
+			"c",
+			"bleve",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// search for it in the messages field
+	tq := NewTermQuery("bleve").SetField("Messages")
+	tsr := NewSearchRequest(tq)
+	results, err := index.Search(tsr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results.Total != 1 {
+		t.Fatalf("expected 1 result, got %d", results.Total)
+	}
+	if len(results.Hits[0].Locations["Messages"]["bleve"]) != 2 {
+		t.Fatalf("expected 2 locations of 'bleve', got %d", len(results.Hits[0].Locations["Messages"]["bleve"]))
+	}
+	if results.Hits[0].Locations["Messages"]["bleve"][0].ArrayPositions[0] != 0 {
+		t.Errorf("expected array position to be 0")
+	}
+	if results.Hits[0].Locations["Messages"]["bleve"][1].ArrayPositions[0] != 1 {
+		t.Errorf("expected array position to be 1")
+	}
+
+	// search for it in all
+	tq = NewTermQuery("bleve")
+	tsr = NewSearchRequest(tq)
+	results, err = index.Search(tsr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results.Total != 1 {
+		t.Fatalf("expected 1 result, got %d", results.Total)
+	}
+	if len(results.Hits[0].Locations["Messages"]["bleve"]) != 2 {
+		t.Fatalf("expected 2 locations of 'bleve', got %d", len(results.Hits[0].Locations["Messages"]["bleve"]))
+	}
+	if results.Hits[0].Locations["Messages"]["bleve"][0].ArrayPositions[0] != 0 {
+		t.Errorf("expected array position to be 0")
+	}
+	if results.Hits[0].Locations["Messages"]["bleve"][1].ArrayPositions[0] != 1 {
+		t.Errorf("expected array position to be 1")
 	}
 
 	err = index.Close()

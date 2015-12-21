@@ -10,6 +10,7 @@
 package upside_down
 
 import (
+	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 )
@@ -24,25 +25,34 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 	backIndexTermEntries := make([]*BackIndexTermEntry, 0)
 	backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
 
+	// information we collate as we merge fields with same name
+	fieldTermFreqs := make(map[uint16]analysis.TokenFrequencies)
+	fieldLengths := make(map[uint16]int)
+	fieldIncludeTermVectors := make(map[uint16]bool)
+	fieldNames := make(map[uint16]string)
+
+	// walk all the fields, record stored fields now
+	// place information about indexed fields into map
+	// this collates information across fields with
+	// same names (arrays)
 	for _, field := range d.Fields {
 		fieldIndex, newFieldRow := udc.fieldIndexOrNewRow(field.Name())
 		if newFieldRow != nil {
 			rv.Rows = append(rv.Rows, newFieldRow)
 		}
+		fieldNames[fieldIndex] = field.Name()
 
 		if field.Options().IsIndexed() {
-
 			fieldLength, tokenFreqs := field.Analyze()
-
-			// see if any of the composite fields need this
-			for _, compositeField := range d.CompositeFields {
-				compositeField.Compose(field.Name(), fieldLength, tokenFreqs)
+			existingFreqs := fieldTermFreqs[fieldIndex]
+			if existingFreqs == nil {
+				fieldTermFreqs[fieldIndex] = tokenFreqs
+			} else {
+				existingFreqs.MergeAll(field.Name(), tokenFreqs)
+				fieldTermFreqs[fieldIndex] = existingFreqs
 			}
-
-			// encode this field
-			indexRows, indexBackIndexTermEntries := udc.indexField(d.ID, field, fieldIndex, fieldLength, tokenFreqs)
-			rv.Rows = append(rv.Rows, indexRows...)
-			backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
+			fieldLengths[fieldIndex] += fieldLength
+			fieldIncludeTermVectors[fieldIndex] = field.Options().IncludeTermVectors()
 		}
 
 		if field.Options().IsStored() {
@@ -51,6 +61,23 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 			backIndexStoredEntries = append(backIndexStoredEntries, indexBackIndexStoreEntries...)
 		}
 
+	}
+
+	// walk through the collated information and proccess
+	// once for each indexed field (unique name)
+	for fieldIndex, tokenFreqs := range fieldTermFreqs {
+		fieldLength := fieldLengths[fieldIndex]
+		includeTermVectors := fieldIncludeTermVectors[fieldIndex]
+
+		// see if any of the composite fields need this
+		for _, compositeField := range d.CompositeFields {
+			compositeField.Compose(fieldNames[fieldIndex], fieldLength, tokenFreqs)
+		}
+
+		// encode this field
+		indexRows, indexBackIndexTermEntries := udc.indexField(d.ID, includeTermVectors, fieldIndex, fieldLength, tokenFreqs)
+		rv.Rows = append(rv.Rows, indexRows...)
+		backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
 	}
 
 	// now index the composite fields
@@ -62,7 +89,7 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		if compositeField.Options().IsIndexed() {
 			fieldLength, tokenFreqs := compositeField.Analyze()
 			// encode this field
-			indexRows, indexBackIndexTermEntries := udc.indexField(d.ID, compositeField, fieldIndex, fieldLength, tokenFreqs)
+			indexRows, indexBackIndexTermEntries := udc.indexField(d.ID, compositeField.Options().IncludeTermVectors(), fieldIndex, fieldLength, tokenFreqs)
 			rv.Rows = append(rv.Rows, indexRows...)
 			backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
 		}

@@ -80,8 +80,8 @@ func TestAnalysis(t *testing.T) {
 				Rows: []index.IndexRow{
 					NewFieldRow(1, "name"),
 					NewTermFreqRow(0, nil, []byte("a"), 1, 0, 0.0, nil),
-					NewTermFreqRow(1, []byte("test"), []byte("a"), 1, 1, 1.0, []*TermVector{NewTermVector(1, 1, 0, 4, nil)}),
 					NewStoredRow([]byte("a"), 1, 1, nil, []byte("ttest")),
+					NewTermFreqRow(1, []byte("test"), []byte("a"), 1, 1, 1.0, []*TermVector{NewTermVector(1, 1, 0, 4, nil)}),
 				},
 			},
 		},
