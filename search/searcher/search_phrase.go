@@ -104,37 +104,38 @@ func (s *PhraseSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch,
 		for field, termLocMap := range s.currMust.Locations {
 			rvtlm := make(search.TermLocationMap, 0)
 			locations, ok := termLocMap[firstTerm]
-			if ok {
-			OUTER:
-				for _, location := range locations {
-					crvtlm := make(search.TermLocationMap, 0)
-				INNER:
-					for i := 0; i < len(s.terms); i++ {
-						nextTerm := s.terms[i]
-						if nextTerm != "" {
-							// look through all these term locations
-							// to try and find the correct offsets
-							nextLocations, ok := termLocMap[nextTerm]
-							if ok {
-								for _, nextLocation := range nextLocations {
-									if nextLocation.Pos == location.Pos+float64(i) && nextLocation.SameArrayElement(location) {
-										// found a location match for this term
-										crvtlm.AddLocation(nextTerm, nextLocation)
-										continue INNER
-									}
-								}
-								// if we got here we didn't find a location match for this term
-								continue OUTER
-							} else {
-								continue OUTER
-							}
+			if !ok {
+				continue
+			}
+		OUTER:
+			for _, location := range locations {
+				crvtlm := make(search.TermLocationMap, 0)
+			INNER:
+				for i := 0; i < len(s.terms); i++ {
+					nextTerm := s.terms[i]
+					if nextTerm == "" {
+						continue
+					}
+					// look through all these term locations
+					// to try and find the correct offsets
+					nextLocations, ok := termLocMap[nextTerm]
+					if !ok {
+						continue OUTER
+					}
+					for _, nextLocation := range nextLocations {
+						if nextLocation.Pos == location.Pos+float64(i) && nextLocation.SameArrayElement(location) {
+							// found a location match for this term
+							crvtlm.AddLocation(nextTerm, nextLocation)
+							continue INNER
 						}
 					}
-					// if we got here all the terms matched
-					freq++
-					search.MergeTermLocationMaps(rvtlm, crvtlm)
-					rvftlm[field] = rvtlm
+					// if we got here we didn't find a location match for this term
+					continue OUTER
 				}
+				// if we got here all the terms matched
+				freq++
+				search.MergeTermLocationMaps(rvtlm, crvtlm)
+				rvftlm[field] = rvtlm
 			}
 		}
 
