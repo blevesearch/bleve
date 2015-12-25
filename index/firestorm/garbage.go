@@ -76,6 +76,9 @@ func (gc *GarbageCollector) run() {
 				logger.Printf("garbage collector error getting doc count: %v", err)
 				continue
 			}
+			if docSize == 0 {
+				continue
+			}
 			garbageRatio := int(uint64(garbageSize) / docSize)
 			if garbageRatio > gc.garbageThreshold {
 				gc.cleanup()
