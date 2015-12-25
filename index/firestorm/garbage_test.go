@@ -11,6 +11,7 @@ package firestorm
 
 import (
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/gtreap"
@@ -114,4 +115,18 @@ func TestGarbageCleanup(t *testing.T) {
 		t.Errorf("expected deletedDocsNumbers size to be 0, got %d", f.(*Firestorm).compensator.GarbageCount())
 	}
 
+}
+
+func TestGarbageDontPanicOnEmptyDocs(t *testing.T) {
+	idx, err := NewFirestorm("", nil, index.NewAnalysisQueue(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := idx.(*Firestorm)
+	gc := NewGarbageCollector(f)
+	gc.garbageSleep = 30 * time.Millisecond
+
+	gc.Start()
+	time.Sleep(40 * time.Millisecond)
+	gc.Stop()
 }
