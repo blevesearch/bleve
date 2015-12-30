@@ -24,6 +24,8 @@ func (f *Firestorm) Analyze(d *document.Document) *index.AnalysisResult {
 		Rows:  make([]index.IndexRow, 0, 100),
 	}
 
+	docIDBytes := []byte(d.ID)
+
 	// information we collate as we merge fields with same name
 	fieldTermFreqs := make(map[uint16]analysis.TokenFrequencies)
 	fieldLengths := make(map[uint16]int)
@@ -38,7 +40,7 @@ func (f *Firestorm) Analyze(d *document.Document) *index.AnalysisResult {
 		fieldNames[fieldIndex] = field.Name()
 
 		// add the _id row
-		rv.Rows = append(rv.Rows, NewTermFreqRow(0, nil, []byte(d.ID), d.Number, 0, 0, nil))
+		rv.Rows = append(rv.Rows, NewTermFreqRow(0, nil, docIDBytes, d.Number, 0, 0, nil))
 
 		if field.Options().IsIndexed() {
 			fieldLength, tokenFreqs := field.Analyze()
@@ -54,7 +56,7 @@ func (f *Firestorm) Analyze(d *document.Document) *index.AnalysisResult {
 		}
 
 		if field.Options().IsStored() {
-			storeRow := f.storeField(d.ID, d.Number, field, fieldIndex)
+			storeRow := f.storeField(docIDBytes, d.Number, field, fieldIndex)
 			rv.Rows = append(rv.Rows, storeRow)
 		}
 	}
@@ -71,7 +73,7 @@ func (f *Firestorm) Analyze(d *document.Document) *index.AnalysisResult {
 		}
 
 		// encode this field
-		indexRows := f.indexField(d.ID, d.Number, includeTermVectors, fieldIndex, fieldLength, tokenFreqs)
+		indexRows := f.indexField(docIDBytes, d.Number, includeTermVectors, fieldIndex, fieldLength, tokenFreqs)
 		rv.Rows = append(rv.Rows, indexRows...)
 	}
 
@@ -84,7 +86,7 @@ func (f *Firestorm) Analyze(d *document.Document) *index.AnalysisResult {
 		if compositeField.Options().IsIndexed() {
 			fieldLength, tokenFreqs := compositeField.Analyze()
 			// encode this field
-			indexRows := f.indexField(d.ID, d.Number, compositeField.Options().IncludeTermVectors(), fieldIndex, fieldLength, tokenFreqs)
+			indexRows := f.indexField(docIDBytes, d.Number, compositeField.Options().IncludeTermVectors(), fieldIndex, fieldLength, tokenFreqs)
 			rv.Rows = append(rv.Rows, indexRows...)
 		}
 	}
@@ -92,7 +94,7 @@ func (f *Firestorm) Analyze(d *document.Document) *index.AnalysisResult {
 	return rv
 }
 
-func (f *Firestorm) indexField(docID string, docNum uint64, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies) []index.IndexRow {
+func (f *Firestorm) indexField(docID []byte, docNum uint64, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies) []index.IndexRow {
 
 	rows := make([]index.IndexRow, 0, len(tokenFreqs))
 	fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
@@ -102,9 +104,9 @@ func (f *Firestorm) indexField(docID string, docNum uint64, includeTermVectors b
 		if includeTermVectors {
 			tv, newFieldRows := f.termVectorsFromTokenFreq(fieldIndex, tf)
 			rows = append(rows, newFieldRows...)
-			termFreqRow = NewTermFreqRow(fieldIndex, tf.Term, []byte(docID), docNum, uint64(tf.Frequency()), fieldNorm, tv)
+			termFreqRow = NewTermFreqRow(fieldIndex, tf.Term, docID, docNum, uint64(tf.Frequency()), fieldNorm, tv)
 		} else {
-			termFreqRow = NewTermFreqRow(fieldIndex, tf.Term, []byte(docID), docNum, uint64(tf.Frequency()), fieldNorm, nil)
+			termFreqRow = NewTermFreqRow(fieldIndex, tf.Term, docID, docNum, uint64(tf.Frequency()), fieldNorm, nil)
 		}
 
 		rows = append(rows, termFreqRow)
@@ -134,11 +136,11 @@ func (f *Firestorm) termVectorsFromTokenFreq(field uint16, tf *analysis.TokenFre
 	return rv, newFieldRows
 }
 
-func (f *Firestorm) storeField(docID string, docNum uint64, field document.Field, fieldIndex uint16) index.IndexRow {
+func (f *Firestorm) storeField(docID []byte, docNum uint64, field document.Field, fieldIndex uint16) index.IndexRow {
 	fieldValue := make([]byte, 1+len(field.Value()))
 	fieldValue[0] = encodeFieldType(field)
 	copy(fieldValue[1:], field.Value())
-	storedRow := NewStoredRow([]byte(docID), docNum, fieldIndex, field.ArrayPositions(), fieldValue)
+	storedRow := NewStoredRow(docID, docNum, fieldIndex, field.ArrayPositions(), fieldValue)
 	return storedRow
 }
 
