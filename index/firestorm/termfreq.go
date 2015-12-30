@@ -37,9 +37,7 @@ func NewTermVector(field uint16, pos uint64, start uint64, end uint64, arrayPos 
 
 	if len(arrayPos) > 0 {
 		rv.ArrayPositions = make([]uint64, len(arrayPos))
-		for i, apv := range arrayPos {
-			rv.ArrayPositions[i] = apv
-		}
+		copy(rv.ArrayPositions, arrayPos)
 	}
 
 	return &rv
