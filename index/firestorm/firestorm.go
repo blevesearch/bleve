@@ -195,16 +195,46 @@ func (f *Firestorm) batchRows(writer store.KVWriter, rows []index.IndexRow, dele
 	// prepare batch
 	wb := writer.NewBatch()
 
+	var kbuf []byte
+	var vbuf []byte
+
+	prepareBuf := func(buf []byte, sizeNeeded int) []byte {
+		if cap(buf) < sizeNeeded {
+			return make([]byte, sizeNeeded, sizeNeeded+128)
+		}
+		return buf[0:sizeNeeded]
+	}
+
 	dictionaryDeltas := make(map[string]int64)
 	for _, row := range rows {
 		tfr, ok := row.(*TermFreqRow)
 		if ok {
 			if tfr.Field() != 0 {
-				drk := tfr.DictionaryRowKey()
-				dictionaryDeltas[string(drk)] += 1
+				kbuf = prepareBuf(kbuf, tfr.DictionaryRowKeySize())
+				klen, err := tfr.DictionaryRowKeyTo(kbuf)
+				if err != nil {
+					return nil, err
+				}
+
+				dictionaryDeltas[string(kbuf[0:klen])] += 1
 			}
+
+			kbuf = prepareBuf(kbuf, tfr.KeySize())
+			klen, err := tfr.KeyTo(kbuf)
+			if err != nil {
+				return nil, err
+			}
+
+			vbuf = prepareBuf(vbuf, tfr.ValueSize())
+			vlen, err := tfr.ValueTo(vbuf)
+			if err != nil {
+				return nil, err
+			}
+
+			wb.Set(kbuf[0:klen], vbuf[0:vlen])
+		} else {
+			wb.Set(row.Key(), row.Value())
 		}
-		wb.Set(row.Key(), row.Value())
 	}
 
 	for _, dk := range deleteKeys {
