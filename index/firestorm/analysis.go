@@ -94,7 +94,7 @@ func (f *Firestorm) Analyze(d *document.Document) *index.AnalysisResult {
 
 func (f *Firestorm) indexField(docID string, docNum uint64, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies) []index.IndexRow {
 
-	rows := make([]index.IndexRow, 0, 100)
+	rows := make([]index.IndexRow, 0, len(tokenFreqs))
 	fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
 
 	for _, tf := range tokenFreqs {
