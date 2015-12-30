@@ -56,7 +56,8 @@ func TokenFrequency(tokens TokenStream, arrayPositions []uint64) TokenFrequencie
 	rv := make(map[string]*TokenFreq, len(tokens))
 
 	for _, token := range tokens {
-		curr, ok := rv[string(token.Term)]
+		term := string(token.Term)
+		curr, ok := rv[term]
 		if ok {
 			curr.Locations = append(curr.Locations, &TokenLocation{
 				ArrayPositions: arrayPositions,
@@ -65,7 +66,7 @@ func TokenFrequency(tokens TokenStream, arrayPositions []uint64) TokenFrequencie
 				Position:       token.Position,
 			})
 		} else {
-			rv[string(token.Term)] = &TokenFreq{
+			rv[term] = &TokenFreq{
 				Term: token.Term,
 				Locations: []*TokenLocation{
 					&TokenLocation{
