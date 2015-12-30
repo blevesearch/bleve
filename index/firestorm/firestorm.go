@@ -144,10 +144,9 @@ func (f *Firestorm) Update(doc *document.Document) (err error) {
 	analysisStart := time.Now()
 	resultChan := make(chan *index.AnalysisResult)
 	aw := index.NewAnalysisWork(f, doc, resultChan)
+
 	// put the work on the queue
-	go func() {
-		f.analysisQueue.Queue(aw)
-	}()
+	go f.analysisQueue.Queue(aw)
 
 	// wait for the result
 	result := <-resultChan
