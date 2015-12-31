@@ -96,26 +96,28 @@ func (f *Firestorm) Analyze(d *document.Document) *index.AnalysisResult {
 
 func (f *Firestorm) indexField(docID []byte, docNum uint64, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies) []index.IndexRow {
 
-	rows := make([]index.IndexRow, 0, len(tokenFreqs))
 	tfrs := make([]TermFreqRow, len(tokenFreqs))
 
 	fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
 
-	i := 0
-	for _, tf := range tokenFreqs {
-		var termFreqRow *TermFreqRow
-		if includeTermVectors {
-			tv, newFieldRows := f.termVectorsFromTokenFreq(fieldIndex, tf)
-			rows = append(rows, newFieldRows...)
-			termFreqRow = InitTermFreqRow(&tfrs[i], fieldIndex, tf.Term, docID, docNum, uint64(tf.Frequency()), fieldNorm, tv)
-		} else {
-			termFreqRow = InitTermFreqRow(&tfrs[i], fieldIndex, tf.Term, docID, docNum, uint64(tf.Frequency()), fieldNorm, nil)
+	if !includeTermVectors {
+		rows := make([]index.IndexRow, len(tokenFreqs))
+		i := 0
+		for _, tf := range tokenFreqs {
+			rows[i] = InitTermFreqRow(&tfrs[i], fieldIndex, tf.Term, docID, docNum, uint64(tf.Frequency()), fieldNorm, nil)
+			i++
 		}
-
-		rows = append(rows, termFreqRow)
-		i++
+		return rows
 	}
 
+	rows := make([]index.IndexRow, 0, len(tokenFreqs))
+	i := 0
+	for _, tf := range tokenFreqs {
+		tv, newFieldRows := f.termVectorsFromTokenFreq(fieldIndex, tf)
+		rows = append(rows, newFieldRows...)
+		rows = append(rows, InitTermFreqRow(&tfrs[i], fieldIndex, tf.Term, docID, docNum, uint64(tf.Frequency()), fieldNorm, tv))
+		i++
+	}
 	return rows
 }
 
