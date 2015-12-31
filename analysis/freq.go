@@ -69,6 +69,10 @@ func TokenFrequency(tokens TokenStream, arrayPositions []uint64) TokenFrequencie
 		term := string(token.Term)
 		curr, ok := rv[term]
 		if ok {
+			if len(curr.Locations) >= cap(curr.Locations) {
+				locs := make([]*TokenLocation, 0, len(curr.Locations)*3)
+				curr.Locations = append(locs, curr.Locations...)
+			}
 			curr.Locations = append(curr.Locations, &tls[tlNext])
 		} else {
 			rv[term] = &TokenFreq{
