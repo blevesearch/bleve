@@ -15,7 +15,6 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/blevesearch/bleve/document"
 	"github.com/steveyen/gtreap"
 	"github.com/willf/bitset"
 )
@@ -80,17 +79,13 @@ func (c *Compensator) Mutate(docID []byte, docNum uint64) {
 	}
 }
 
-func (c *Compensator) MutateBatch(docs map[string]*document.Document, docNum uint64) {
+func (c *Compensator) MutateBatch(inflightItems []*InFlightItem, lastDocNum uint64) {
 	c.inFlightMutex.Lock()
 	defer c.inFlightMutex.Unlock()
-	for docID, doc := range docs {
-		if doc != nil {
-			c.inFlight = c.inFlight.Upsert(&InFlightItem{docID: []byte(docID), docNum: doc.Number}, rand.Int())
-		} else {
-			c.inFlight = c.inFlight.Upsert(&InFlightItem{docID: []byte(docID), docNum: 0}, rand.Int())
-		}
+	for _, item := range inflightItems {
+		c.inFlight = c.inFlight.Upsert(item, rand.Int())
 	}
-	c.maxRead = docNum
+	c.maxRead = lastDocNum
 }
 
 func (c *Compensator) Migrate(docID []byte, docNum uint64, oldDocNums []uint64) {
