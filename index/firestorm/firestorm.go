@@ -218,23 +218,21 @@ func (f *Firestorm) batchRows(writer store.KVWriter, rows []index.IndexRow, dele
 
 				dictionaryDeltas[string(kbuf[0:klen])] += 1
 			}
-
-			kbuf = prepareBuf(kbuf, tfr.KeySize())
-			klen, err := tfr.KeyTo(kbuf)
-			if err != nil {
-				return nil, err
-			}
-
-			vbuf = prepareBuf(vbuf, tfr.ValueSize())
-			vlen, err := tfr.ValueTo(vbuf)
-			if err != nil {
-				return nil, err
-			}
-
-			wb.Set(kbuf[0:klen], vbuf[0:vlen])
-		} else {
-			wb.Set(row.Key(), row.Value())
 		}
+
+		kbuf = prepareBuf(kbuf, row.KeySize())
+		klen, err := row.KeyTo(kbuf)
+		if err != nil {
+			return nil, err
+		}
+
+		vbuf = prepareBuf(vbuf, row.ValueSize())
+		vlen, err := row.ValueTo(vbuf)
+		if err != nil {
+			return nil, err
+		}
+
+		wb.Set(kbuf[0:klen], vbuf[0:vlen])
 	}
 
 	for _, dk := range deleteKeys {
