@@ -258,13 +258,13 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 	analysisStart := time.Now()
 	resultChan := make(chan *index.AnalysisResult)
 
-	var numUpdates uint64
+	var docsUpdated uint64
 	var docsDeleted uint64
 	for _, doc := range batch.IndexOps {
 		if doc != nil {
 			doc.Number = firstDocNumber // actually assign doc numbers here
 			firstDocNumber++
-			numUpdates++
+			docsUpdated++
 		} else {
 			docsDeleted++
 		}
@@ -278,7 +278,7 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 		for _, doc := range batch.IndexOps {
 			if doc != nil {
 				sofar++
-				if sofar > numUpdates {
+				if sofar > docsUpdated {
 					detectedUnsafeMutex.Lock()
 					detectedUnsafe = true
 					detectedUnsafeMutex.Unlock()
@@ -294,7 +294,7 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 	allRows := make([]index.IndexRow, 0, 1000)
 	// wait for the result
 	var itemsDeQueued uint64
-	for itemsDeQueued < numUpdates {
+	for itemsDeQueued < docsUpdated {
 		result := <-resultChan
 		allRows = append(allRows, result.Rows...)
 		itemsDeQueued++
@@ -352,7 +352,7 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 	atomic.AddUint64(&f.stats.indexTime, uint64(time.Since(indexStart)))
 
 	if err == nil {
-		atomic.AddUint64(&f.stats.updates, numUpdates)
+		atomic.AddUint64(&f.stats.updates, docsUpdated)
 		atomic.AddUint64(&f.stats.deletes, docsDeleted)
 		atomic.AddUint64(&f.stats.batches, 1)
 	} else {
