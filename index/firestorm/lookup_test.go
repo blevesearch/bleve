@@ -62,7 +62,7 @@ func TestLookups(t *testing.T) {
 			if val == nil {
 				t.Errorf("expected key: % x to be in the inflight list", tfr.DocID())
 			}
-			f.(*Firestorm).lookuper.lookup(&lookupTask{docID: tfr.DocID(), docNum: tfr.DocNum()})
+			f.(*Firestorm).lookuper.lookup(&InFlightItem{docID: tfr.DocID(), docNum: tfr.DocNum()})
 			// now expect this mutation to NOT be in the in-flight list
 			val = f.(*Firestorm).compensator.inFlight.Get(&InFlightItem{docID: tfr.DocID()})
 			if val != nil {
