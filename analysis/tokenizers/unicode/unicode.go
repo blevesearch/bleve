@@ -26,6 +26,8 @@ func NewUnicodeTokenizer() *UnicodeTokenizer {
 }
 
 func (rt *UnicodeTokenizer) Tokenize(input []byte) analysis.TokenStream {
+	ta := []analysis.Token(nil)
+	taNext := 0
 
 	rv := make(analysis.TokenStream, 0)
 
@@ -36,18 +38,38 @@ func (rt *UnicodeTokenizer) Tokenize(input []byte) analysis.TokenStream {
 		segmentBytes := segmenter.Bytes()
 		end := start + len(segmentBytes)
 		if segmenter.Type() != segment.None {
-			token := analysis.Token{
-				Term:     segmentBytes,
-				Start:    start,
-				End:      end,
-				Position: pos,
-				Type:     convertType(segmenter.Type()),
+			if taNext >= len(ta) {
+				avgSegmentLen := end / (len(rv) + 1)
+				if avgSegmentLen < 1 {
+					avgSegmentLen = 1
+				}
+
+				remainingLen := len(input) - end
+				remainingSegments := remainingLen / avgSegmentLen
+				if remainingSegments > 1000 {
+					remainingSegments = 1000
+				}
+				if remainingSegments < 1 {
+					remainingSegments = 1
+				}
+
+				ta = make([]analysis.Token, remainingSegments)
+				taNext = 0
 			}
-			rv = append(rv, &token)
+
+			token := &ta[taNext]
+			taNext++
+
+			token.Term = segmentBytes
+			token.Start = start
+			token.End = end
+			token.Position = pos
+			token.Type = convertType(segmenter.Type())
+
+			rv = append(rv, token)
 			pos++
 		}
 		start = end
-
 	}
 	return rv
 }
