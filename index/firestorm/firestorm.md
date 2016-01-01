@@ -4,7 +4,7 @@ A new indexing scheme for Bleve.
 
 ## Background
 
-### Goals 
+### Goals
 
 - Avoid a single writer that must pause writing to perform computation
     - either by allowing multiple writers, if computation cannot be avoided
@@ -58,7 +58,6 @@ Once the Delete operation returns, the document should no longer be returned by 
 
 ## Details
 
-
 ### Terminology
 
 Document ID (`doc_id`)
@@ -74,15 +73,15 @@ DocIdNumber
 
 By including a new unique identifier as a part of every row generated, the index operation no longer concerns itself with updating existing values or deleting previous values.
 
-Removal of old rows is handled indepenently by a separate thread.
+Removal of old rows is handled indepenently by separate threads.
 
-Ensuring of correct semantics with respect to added/updated/deleted documents is maintained through synchronized in memory data structures, to compensate for the decoupling of these other operations.
+Ensuring of correct semantics with respect to added/updated/deleted documents is maintained through synchronized in-memory data structures, to compensate for the decoupling of these other operations.
 
 The Dictionary becomes a best effort data element.  In kill-9 scenarios it could become incorrect, but it is believed that this will generally only affect scoring not correctness, and we can pursue read-repair operations.
 
 ### Index State
 
-The following pseudo-structure will be used to explain changes to the internal state.  Keep in mind the datatypes shows represent the logical strcture required for correct behavior.  The actual implementation may be different to achieve performance goals.
+The following pseudo-structure will be used to explain changes to the internal state.  Keep in mind the datatypes shown represent the logical structure required for correct behavior.  The actual implementation may be different to achieve performance goals.
 
     indexState {
         docCount uint64
@@ -114,6 +113,7 @@ The following pseudo-structure will be used to explain changes to the internal s
             inFlightDocIds = {}
             deletedDocIdNumbers = {}
         }
+
 - Garbage Collector Thread is started
 - Old Doc Number Lookup Thread is started
 - Index marked open
@@ -124,7 +124,7 @@ The following pseudo-structure will be used to explain changes to the internal s
 - ITERATE all FieldRows{}
 - ITERATE all TermFrequencyRow{ where field_id = 0 }
   - Identify consecutive rows with same doc_id but different doc_number
-  - Lower document numbers get added to the deleted doc numbers list
+  - Lower document numbers are added to the deletedDocIdNumbers list
   - Count all non-duplicate rows, seed the docCount
   - Observe highest document number seen, seed nextDocNumber
 
@@ -148,7 +148,7 @@ The following pseudo-structure will be used to explain changes to the internal s
 
 #### Garbage Collector Thread
 
-The role of the Garbage Collector thread is to clean up rows referring to document numbers that are no longer relevant (document was deleted or updated).  
+The role of the Garbage Collector thread is to clean up rows referring to document numbers that are no longer relevant (document was deleted or updated).
 
 Currently, only two types of rows include document numbers:
 - Term Frequency Rows
@@ -156,12 +156,13 @@ Currently, only two types of rows include document numbers:
 
 The current thought is that the garbage collector thread will use a single iterator to iterate the following key spaces:
 
-TermFrequencyRow { where field_id > 0}
-StoredRow {all}
+- TermFrequencyRow { where field_id > 0}
+- StoredRow {all}
 
 For any row refering to a document number on the deletedDocNumbers list, that key will be DELETED.
 
 The garbage collector will track loop iterations or start key for each deletedDocNumber so that it knows when it has walked a full circle for a given doc number.  At point the following happen in order:
+
 - docNumber is removed from the deletecDocNumbers list
 - DELETE is issued on TermFreqRow{ field_id=0, term=doc_id, doc_id=doc_id_number }
 
@@ -201,35 +202,29 @@ It is notified via a channel of increased term usage (by index ops) and of decre
 
 #### Indexing a Document
 
-Perform all analysis on the document.
-
-new_doc_number = indexState.nextDocNumber++
-
-Create New Batch
-Batch will contain SET operations for:
-- any new Fields
-- Term Frequency Rows for indexed fields terms
-- Stored Rows for stored fields
-Execute Batch
-
-Acquire indexState.docIdNumberMutex for writing:
-set maxReadDocNumber new_doc_number
-set inFlightDocIds{ docId = new_doc_number }
-Release indexState.docIdNumberMutex
-
-Notify Term Frequency Updater thread of increased term usage.
-
-Notify Old Doc Number Lookup Thread of doc_id.
+- Perform all analysis on the document.
+- new_doc_number = indexState.nextDocNumber++
+- Create New Batch
+- Batch will contain SET operations for:
+    - any new Fields
+    - Term Frequency Rows for indexed fields terms
+    - Stored Rows for stored fields
+- Execute Batch
+- Acquire indexState.docIdNumberMutex for writing:
+- set maxReadDocNumber new_doc_number
+- set inFlightDocIds{ docId = new_doc_number }
+- Release indexState.docIdNumberMutex
+- Notify Term Frequency Updater thread of increased term usage.
+- Notify Old Doc Number Lookup Thread of doc_id.
 
 The key property is that a search matching the updated document *SHOULD* return the document once this method returns.  If the document was an update, it should return the previous document until this method returns.  There should be no period of time where neither document matches.
 
 #### Deleting a Document
 
-Acquire indexState.docIdNumberMutex for writing:
-set inFlightDocIds{ docId = 0 } // 0 is a doc number we never use, indicates pending deltion of docId
-Release indexState.docIdNumberMutex
-
-Notify Old Doc Number Lookup Thread of doc_id.
+- Acquire indexState.docIdNumberMutex for writing:
+- set inFlightDocIds{ docId = 0 } // 0 is a doc number we never use, indicates pending deltion of docId
+- Release indexState.docIdNumberMutex
+- Notify Old Doc Number Lookup Thread of doc_id.
 
 #### Batch Operations
 
@@ -241,12 +236,11 @@ Batch operations look largely just like the indexing/deleting operations.  Two o
 #### Term Field Iteration
 
 - Acquire indexState.docIdNumberMutex for reading:
-- Get copy of: (it is assumed some COW datastructure is used, or MVCC is accomodated in some way by the impl)
+- Get copy of: (it is assumed some COW data structure is used, or MVCC is accomodated in some way by the impl)
     - maxReadDocNumber
     - inFlightDocIds
     - deletedDocIdNumbers
 - Release indexState.docIdNumberMutex
-
 
 Term Field Iteration is used by the basic term search.  It produces the set of documents (and related info like term vectors) which used the specified term in the specified field.
 
@@ -256,16 +250,18 @@ Iterator starts at key:
 
 Iterator ends when the term does not match.
 
-Any row with doc_number > maxReadDocNumber MUST be ignored.
-Any row with doc_id_number on the deletedDocIdNumber list MUST be ignored.
-Any row with the same doc_id as an entry in the inFlightDocIds map, MUST have the same number.
+- Any row with doc_number > maxReadDocNumber MUST be ignored.
+- Any row with doc_id_number on the deletedDocIdNumber list MUST be ignored.
+- Any row with the same doc_id as an entry in the inFlightDocIds map, MUST have the same number.
 
 Any row satisfying the above conditions is a candidate document.
 
 ### Row Encoding
 
 All keys are manually encoded to ensure a precise row ordering.
+
 Internal Row values are opaque byte arrays.
+
 All other values are encoded using protobuf for a balance of efficiency and flexibility.  Dictionary and TermFrequency rows are the most likely to take advantage of this flexibility, but other rows are read/written infrequently enough that the flexibility outweighs any overhead.
 
 #### Version
@@ -282,7 +278,7 @@ There is a single version row which records which version of the firestorm index
 
 #### Field
 
-Field rows map field names to numeric values 
+Field rows map field names to numeric values
 
 | Key     | Value      |
 |---------|------------|
@@ -375,7 +371,7 @@ In state d, we have completed the lookup for the old document numbers of X, and 
 
 In state e, the garbage collector has removed all record of X#1.
 
-The Index method returns after it has transitioned to state C, which maintains the semantics we desire.
+The Index method returns after it has transitioned to state c, which maintains the semantics we desire.
 
 2\.  Wait, what happens if I kill -9 the process, won't you forget about the deleted documents?
 
