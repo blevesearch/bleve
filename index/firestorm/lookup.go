@@ -18,14 +18,9 @@ import (
 
 const channelBufferSize = 1000
 
-type lookupTask struct {
-	docID  []byte
-	docNum uint64
-}
-
 type Lookuper struct {
 	f         *Firestorm
-	workChan  chan *lookupTask
+	workChan  chan []*InFlightItem
 	quit      chan struct{}
 	closeWait sync.WaitGroup
 
@@ -36,15 +31,15 @@ type Lookuper struct {
 func NewLookuper(f *Firestorm) *Lookuper {
 	rv := Lookuper{
 		f:        f,
-		workChan: make(chan *lookupTask, channelBufferSize),
+		workChan: make(chan []*InFlightItem, channelBufferSize),
 		quit:     make(chan struct{}),
 	}
 	return &rv
 }
 
-func (l *Lookuper) Notify(docNum uint64, docID []byte) {
+func (l *Lookuper) NotifyBatch(items []*InFlightItem) {
 	atomic.AddUint64(&l.tasksQueued, 1)
-	l.workChan <- &lookupTask{docID: docID, docNum: docNum}
+	l.workChan <- items
 }
 
 func (l *Lookuper) Start() {
@@ -65,17 +60,24 @@ func (l *Lookuper) run() {
 			logger.Printf("lookuper asked to quit")
 			l.closeWait.Done()
 			return
-		case task, ok := <-l.workChan:
+		case items, ok := <-l.workChan:
 			if !ok {
 				logger.Printf("lookuper work channel closed unexpectedly, stopping")
 				return
 			}
-			l.lookup(task)
+			l.lookupItems(items)
 		}
 	}
 }
 
-func (l *Lookuper) lookup(task *lookupTask) {
+func (l *Lookuper) lookupItems(items []*InFlightItem) {
+	for _, item := range items {
+		l.lookup(item)
+	}
+	atomic.AddUint64(&l.tasksDone, 1)
+}
+
+func (l *Lookuper) lookup(item *InFlightItem) {
 	reader, err := l.f.store.Reader()
 	if err != nil {
 		logger.Printf("lookuper fatal: %v", err)
@@ -87,7 +89,7 @@ func (l *Lookuper) lookup(task *lookupTask) {
 		}
 	}()
 
-	prefix := TermFreqPrefixFieldTermDocId(0, nil, task.docID)
+	prefix := TermFreqPrefixFieldTermDocId(0, nil, item.docID)
 	logger.Printf("lookuper prefix - % x", prefix)
 	docNums := make(DocNumberList, 0)
 	err = visitPrefix(reader, prefix, func(key, val []byte) (bool, error) {
@@ -106,20 +108,19 @@ func (l *Lookuper) lookup(task *lookupTask) {
 	}
 	oldDocNums := make(DocNumberList, 0, len(docNums))
 	for _, docNum := range docNums {
-		if task.docNum == 0 || docNum < task.docNum {
+		if item.docNum == 0 || docNum < item.docNum {
 			oldDocNums = append(oldDocNums, docNum)
 		}
 	}
-	logger.Printf("lookup migrating '%s' - %d - oldDocNums: %v", task.docID, task.docNum, oldDocNums)
-	l.f.compensator.Migrate(task.docID, task.docNum, oldDocNums)
-	if len(oldDocNums) == 0 && task.docNum != 0 {
+	logger.Printf("lookup migrating '%s' - %d - oldDocNums: %v", item.docID, item.docNum, oldDocNums)
+	l.f.compensator.Migrate(item.docID, item.docNum, oldDocNums)
+	if len(oldDocNums) == 0 && item.docNum != 0 {
 		// this was an add, not an update
 		atomic.AddUint64(l.f.docCount, 1)
-	} else if len(oldDocNums) > 0 && task.docNum == 0 {
+	} else if len(oldDocNums) > 0 && item.docNum == 0 {
 		// this was a delete (and it previously existed)
 		atomic.AddUint64(l.f.docCount, ^uint64(0))
 	}
-	atomic.AddUint64(&l.tasksDone, 1)
 }
 
 // this is not intended to be used publicly, only for unit tests

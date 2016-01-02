@@ -144,10 +144,9 @@ func (f *Firestorm) Update(doc *document.Document) (err error) {
 	analysisStart := time.Now()
 	resultChan := make(chan *index.AnalysisResult)
 	aw := index.NewAnalysisWork(f, doc, resultChan)
+
 	// put the work on the queue
-	go func() {
-		f.analysisQueue.Queue(aw)
-	}()
+	go f.analysisQueue.Queue(aw)
 
 	// wait for the result
 	result := <-resultChan
@@ -176,7 +175,7 @@ func (f *Firestorm) Update(doc *document.Document) (err error) {
 	}
 
 	f.compensator.Mutate([]byte(doc.ID), doc.Number)
-	f.lookuper.Notify(doc.Number, []byte(doc.ID))
+	f.lookuper.NotifyBatch([]*InFlightItem{&InFlightItem{[]byte(doc.ID), doc.Number}})
 	f.dictUpdater.NotifyBatch(dictionaryDeltas)
 
 	atomic.AddUint64(&f.stats.indexTime, uint64(time.Since(indexStart)))
@@ -186,7 +185,7 @@ func (f *Firestorm) Update(doc *document.Document) (err error) {
 func (f *Firestorm) Delete(id string) error {
 	indexStart := time.Now()
 	f.compensator.Mutate([]byte(id), 0)
-	f.lookuper.Notify(0, []byte(id))
+	f.lookuper.NotifyBatch([]*InFlightItem{&InFlightItem{[]byte(id), 0}})
 	atomic.AddUint64(&f.stats.indexTime, uint64(time.Since(indexStart)))
 	return nil
 }
@@ -196,16 +195,44 @@ func (f *Firestorm) batchRows(writer store.KVWriter, rows []index.IndexRow, dele
 	// prepare batch
 	wb := writer.NewBatch()
 
+	var kbuf []byte
+	var vbuf []byte
+
+	prepareBuf := func(buf []byte, sizeNeeded int) []byte {
+		if cap(buf) < sizeNeeded {
+			return make([]byte, sizeNeeded, sizeNeeded+128)
+		}
+		return buf[0:sizeNeeded]
+	}
+
 	dictionaryDeltas := make(map[string]int64)
 	for _, row := range rows {
 		tfr, ok := row.(*TermFreqRow)
 		if ok {
 			if tfr.Field() != 0 {
-				drk := tfr.DictionaryRowKey()
-				dictionaryDeltas[string(drk)] += 1
+				kbuf = prepareBuf(kbuf, tfr.DictionaryRowKeySize())
+				klen, err := tfr.DictionaryRowKeyTo(kbuf)
+				if err != nil {
+					return nil, err
+				}
+
+				dictionaryDeltas[string(kbuf[0:klen])] += 1
 			}
 		}
-		wb.Set(row.Key(), row.Value())
+
+		kbuf = prepareBuf(kbuf, row.KeySize())
+		klen, err := row.KeyTo(kbuf)
+		if err != nil {
+			return nil, err
+		}
+
+		vbuf = prepareBuf(vbuf, row.ValueSize())
+		vlen, err := row.ValueTo(vbuf)
+		if err != nil {
+			return nil, err
+		}
+
+		wb.Set(kbuf[0:klen], vbuf[0:vlen])
 	}
 
 	for _, dk := range deleteKeys {
@@ -231,13 +258,13 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 	analysisStart := time.Now()
 	resultChan := make(chan *index.AnalysisResult)
 
-	var numUpdates uint64
+	var docsUpdated uint64
 	var docsDeleted uint64
 	for _, doc := range batch.IndexOps {
 		if doc != nil {
 			doc.Number = firstDocNumber // actually assign doc numbers here
 			firstDocNumber++
-			numUpdates++
+			docsUpdated++
 		} else {
 			docsDeleted++
 		}
@@ -251,7 +278,7 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 		for _, doc := range batch.IndexOps {
 			if doc != nil {
 				sofar++
-				if sofar > numUpdates {
+				if sofar > docsUpdated {
 					detectedUnsafeMutex.Lock()
 					detectedUnsafe = true
 					detectedUnsafeMutex.Unlock()
@@ -267,7 +294,7 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 	allRows := make([]index.IndexRow, 0, 1000)
 	// wait for the result
 	var itemsDeQueued uint64
-	for itemsDeQueued < numUpdates {
+	for itemsDeQueued < docsUpdated {
 		result := <-resultChan
 		allRows = append(allRows, result.Rows...)
 		itemsDeQueued++
@@ -295,6 +322,17 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 		}
 	}
 
+	inflightItems := make([]*InFlightItem, 0, len(batch.IndexOps))
+	for docID, doc := range batch.IndexOps {
+		if doc != nil {
+			inflightItems = append(inflightItems,
+				&InFlightItem{[]byte(docID), doc.Number})
+		} else {
+			inflightItems = append(inflightItems,
+				&InFlightItem{[]byte(docID), 0})
+		}
+	}
+
 	indexStart := time.Now()
 	// start a writer for this batch
 	var kvwriter store.KVWriter
@@ -311,21 +349,15 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 		return
 	}
 
-	f.compensator.MutateBatch(batch.IndexOps, lastDocNumber)
-	for docID, doc := range batch.IndexOps {
-		if doc != nil {
-			f.lookuper.Notify(doc.Number, []byte(doc.ID))
-		} else {
-			f.lookuper.Notify(0, []byte(docID))
-		}
-	}
+	f.compensator.MutateBatch(inflightItems, lastDocNumber)
+	f.lookuper.NotifyBatch(inflightItems)
 	f.dictUpdater.NotifyBatch(dictionaryDeltas)
 
 	err = kvwriter.Close()
 	atomic.AddUint64(&f.stats.indexTime, uint64(time.Since(indexStart)))
 
 	if err == nil {
-		atomic.AddUint64(&f.stats.updates, numUpdates)
+		atomic.AddUint64(&f.stats.updates, docsUpdated)
 		atomic.AddUint64(&f.stats.deletes, docsDeleted)
 		atomic.AddUint64(&f.stats.batches, 1)
 	} else {

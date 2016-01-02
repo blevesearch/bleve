@@ -55,28 +55,29 @@ func (tfs TokenFrequencies) MergeAll(remoteField string, other TokenFrequencies)
 func TokenFrequency(tokens TokenStream, arrayPositions []uint64) TokenFrequencies {
 	rv := make(map[string]*TokenFreq, len(tokens))
 
+	tls := make([]TokenLocation, len(tokens))
+	tlNext := 0
+
 	for _, token := range tokens {
-		curr, ok := rv[string(token.Term)]
+		tls[tlNext] = TokenLocation{
+			ArrayPositions: arrayPositions,
+			Start:          token.Start,
+			End:            token.End,
+			Position:       token.Position,
+		}
+
+		term := string(token.Term)
+		curr, ok := rv[term]
 		if ok {
-			curr.Locations = append(curr.Locations, &TokenLocation{
-				ArrayPositions: arrayPositions,
-				Start:          token.Start,
-				End:            token.End,
-				Position:       token.Position,
-			})
+			curr.Locations = append(curr.Locations, &tls[tlNext])
 		} else {
-			rv[string(token.Term)] = &TokenFreq{
-				Term: token.Term,
-				Locations: []*TokenLocation{
-					&TokenLocation{
-						ArrayPositions: arrayPositions,
-						Start:          token.Start,
-						End:            token.End,
-						Position:       token.Position,
-					},
-				},
+			rv[term] = &TokenFreq{
+				Term:      token.Term,
+				Locations: []*TokenLocation{&tls[tlNext]},
 			}
 		}
+
+		tlNext++
 	}
 
 	return rv

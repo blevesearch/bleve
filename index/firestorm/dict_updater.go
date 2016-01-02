@@ -25,6 +25,7 @@ type DictUpdater struct {
 	f               *Firestorm
 	dictUpdateSleep time.Duration
 	quit            chan struct{}
+	incoming        chan map[string]int64
 
 	mutex      sync.RWMutex
 	workingSet map[string]int64
@@ -41,6 +42,7 @@ func NewDictUpdater(f *Firestorm) *DictUpdater {
 		workingSet:      make(map[string]int64),
 		batchesStarted:  1,
 		quit:            make(chan struct{}),
+		incoming:        make(chan map[string]int64, 8),
 	}
 	return &rv
 }
@@ -52,21 +54,36 @@ func (d *DictUpdater) Notify(term string, usage int64) {
 }
 
 func (d *DictUpdater) NotifyBatch(termUsages map[string]int64) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-	for term, usage := range termUsages {
-		d.workingSet[term] += usage
-	}
+	d.incoming <- termUsages
 }
 
 func (d *DictUpdater) Start() {
 	d.closeWait.Add(1)
+    go d.runIncoming()
 	go d.run()
 }
 
 func (d *DictUpdater) Stop() {
 	close(d.quit)
 	d.closeWait.Wait()
+}
+
+func (d *DictUpdater) runIncoming() {
+	for {
+		select {
+		case <-d.quit:
+			return
+		case termUsages, ok := <-d.incoming:
+			if !ok {
+				return
+			}
+			d.mutex.Lock()
+			for term, usage := range termUsages {
+				d.workingSet[term] += usage
+			}
+			d.mutex.Unlock()
+		}
+	}
 }
 
 func (d *DictUpdater) run() {
