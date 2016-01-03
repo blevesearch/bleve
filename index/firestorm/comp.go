@@ -106,7 +106,7 @@ func (c *Compensator) Migrate(docID []byte, docNum uint64, oldDocNums []uint64) 
 
 	// remove entry from in-flight if it still has same doc num
 	val := c.inFlight.Get(&InFlightItem{docID: docID})
-	if val.(*InFlightItem).docNum == docNum {
+	if val != nil && val.(*InFlightItem).docNum == docNum {
 		c.inFlight = c.inFlight.Delete(&InFlightItem{docID: docID})
 	}
 }
