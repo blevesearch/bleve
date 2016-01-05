@@ -59,7 +59,7 @@ func (d *DictUpdater) NotifyBatch(termUsages map[string]int64) {
 
 func (d *DictUpdater) Start() {
 	d.closeWait.Add(1)
-    go d.runIncoming()
+	go d.runIncoming()
 	go d.run()
 }
 

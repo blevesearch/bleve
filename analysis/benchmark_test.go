@@ -18,7 +18,7 @@ func BenchmarkAnalysis(b *testing.B) {
 		}
 
 		ts := analyzer.Analyze(bleveWikiArticle)
-		freqs := analysis.TokenFrequency(ts, nil)
+		freqs := analysis.TokenFrequency(ts, nil, true)
 		if len(freqs) != 511 {
 			b.Errorf("expected %d freqs, got %d", 511, len(freqs))
 		}

@@ -75,7 +75,7 @@ func (n *DateTimeField) Analyze() (int, analysis.TokenFrequencies) {
 	}
 
 	fieldLength := len(tokens)
-	tokenFreqs := analysis.TokenFrequency(tokens, n.arrayPositions)
+	tokenFreqs := analysis.TokenFrequency(tokens, n.arrayPositions, n.options.IncludeTermVectors())
 	return fieldLength, tokenFreqs
 }
 
