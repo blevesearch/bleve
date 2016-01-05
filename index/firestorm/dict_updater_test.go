@@ -10,6 +10,7 @@
 package firestorm
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/blevesearch/bleve/index"
@@ -38,6 +39,9 @@ func TestDictUpdater(t *testing.T) {
 	f.(*Firestorm).dictUpdater.NotifyBatch(dictBatch)
 
 	// invoke updater manually
+	for len(f.(*Firestorm).dictUpdater.incoming) > 0 {
+		runtime.Gosched()
+	}
 	f.(*Firestorm).dictUpdater.update()
 
 	// assert that dictionary rows are correct
@@ -77,6 +81,9 @@ func TestDictUpdater(t *testing.T) {
 	f.(*Firestorm).dictUpdater.NotifyBatch(dictBatch)
 
 	// invoke updater manually
+	for len(f.(*Firestorm).dictUpdater.incoming) > 0 {
+		runtime.Gosched()
+	}
 	f.(*Firestorm).dictUpdater.update()
 
 	// assert that dictionary rows are correct
@@ -116,6 +123,9 @@ func TestDictUpdater(t *testing.T) {
 	f.(*Firestorm).dictUpdater.NotifyBatch(dictBatch)
 
 	// invoke updater manually
+	for len(f.(*Firestorm).dictUpdater.incoming) > 0 {
+		runtime.Gosched()
+	}
 	f.(*Firestorm).dictUpdater.update()
 
 	// assert that dictionary rows are correct

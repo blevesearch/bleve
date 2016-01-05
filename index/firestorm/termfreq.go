@@ -46,18 +46,18 @@ func NewTermVector(field uint16, pos uint64, start uint64, end uint64, arrayPos 
 }
 
 func NewTermFreqRow(field uint16, term []byte, docID []byte, docNum uint64, freq uint64, norm float32, termVectors []*TermVector) *TermFreqRow {
-	rv := TermFreqRow{
-		field:  field,
-		term:   term,
-		docID:  docID,
-		docNum: docNum,
-	}
+	return InitTermFreqRow(&TermFreqRow{}, field, term, docID, docNum, freq, norm, termVectors)
+}
 
-	rv.value.Freq = proto.Uint64(freq)
-	rv.value.Norm = proto.Float32(norm)
-	rv.value.Vectors = termVectors
-
-	return &rv
+func InitTermFreqRow(tfr *TermFreqRow, field uint16, term []byte, docID []byte, docNum uint64, freq uint64, norm float32, termVectors []*TermVector) *TermFreqRow {
+	tfr.field = field
+	tfr.term = term
+	tfr.docID = docID
+	tfr.docNum = docNum
+	tfr.value.Freq = proto.Uint64(freq)
+	tfr.value.Norm = proto.Float32(norm)
+	tfr.value.Vectors = termVectors
+	return tfr
 }
 
 func NewTermFreqRowKV(key, value []byte) (*TermFreqRow, error) {

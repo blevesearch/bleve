@@ -78,8 +78,8 @@ func TestAnalysis(t *testing.T) {
 			r: &index.AnalysisResult{
 				DocID: "a",
 				Rows: []index.IndexRow{
-					NewFieldRow(1, "name"),
 					NewTermFreqRow(0, nil, []byte("a"), 1, 0, 0.0, nil),
+					NewFieldRow(1, "name"),
 					NewStoredRow([]byte("a"), 1, 1, nil, []byte("ttest")),
 					NewTermFreqRow(1, []byte("test"), []byte("a"), 1, 1, 1.0, []*TermVector{NewTermVector(1, 1, 0, 4, nil)}),
 				},
