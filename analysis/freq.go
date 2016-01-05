@@ -26,10 +26,11 @@ type TokenLocation struct {
 type TokenFreq struct {
 	Term      []byte
 	Locations []*TokenLocation
+	frequency int
 }
 
 func (tf *TokenFreq) Frequency() int {
-	return len(tf.Locations)
+	return tf.frequency
 }
 
 // TokenFrequencies maps document terms to their combined frequencies from all
@@ -46,37 +47,54 @@ func (tfs TokenFrequencies) MergeAll(remoteField string, other TokenFrequencies)
 		existingTf, exists := tfs[tfk]
 		if exists {
 			existingTf.Locations = append(existingTf.Locations, tf.Locations...)
+			existingTf.frequency = existingTf.frequency + tf.frequency
 		} else {
 			tfs[tfk] = tf
 		}
 	}
 }
 
-func TokenFrequency(tokens TokenStream, arrayPositions []uint64) TokenFrequencies {
+func TokenFrequency(tokens TokenStream, arrayPositions []uint64, includeTermVectors bool) TokenFrequencies {
 	rv := make(map[string]*TokenFreq, len(tokens))
 
-	tls := make([]TokenLocation, len(tokens))
-	tlNext := 0
+	if includeTermVectors {
+		tls := make([]TokenLocation, len(tokens))
+		tlNext := 0
 
-	for _, token := range tokens {
-		tls[tlNext] = TokenLocation{
-			ArrayPositions: arrayPositions,
-			Start:          token.Start,
-			End:            token.End,
-			Position:       token.Position,
+		for _, token := range tokens {
+			tls[tlNext] = TokenLocation{
+				ArrayPositions: arrayPositions,
+				Start:          token.Start,
+				End:            token.End,
+				Position:       token.Position,
+			}
+
+			curr, ok := rv[string(token.Term)]
+			if ok {
+				curr.Locations = append(curr.Locations, &tls[tlNext])
+				curr.frequency++
+			} else {
+				rv[string(token.Term)] = &TokenFreq{
+					Term:      token.Term,
+					Locations: []*TokenLocation{&tls[tlNext]},
+					frequency: 1,
+				}
+			}
+
+			tlNext++
 		}
-
-		curr, ok := rv[string(token.Term)]
-		if ok {
-			curr.Locations = append(curr.Locations, &tls[tlNext])
-		} else {
-			rv[string(token.Term)] = &TokenFreq{
-				Term:      token.Term,
-				Locations: []*TokenLocation{&tls[tlNext]},
+	} else {
+		for _, token := range tokens {
+			curr, exists := rv[string(token.Term)]
+			if exists {
+				curr.frequency++
+			} else {
+				rv[string(token.Term)] = &TokenFreq{
+					Term:      token.Term,
+					frequency: 1,
+				}
 			}
 		}
-
-		tlNext++
 	}
 
 	return rv

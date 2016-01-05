@@ -664,7 +664,7 @@ func decodeFieldType(typ byte, name string, pos []uint64, value []byte) document
 }
 
 func frequencyFromTokenFreq(tf *analysis.TokenFreq) int {
-	return len(tf.Locations)
+	return tf.Frequency()
 }
 
 func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.TokenFreq) ([]*TermVector, []index.IndexRow) {
