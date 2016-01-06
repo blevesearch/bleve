@@ -41,44 +41,50 @@ func NewStoredRow(docID []byte, docNum uint64, field uint16, arrayPositions []ui
 
 func NewStoredRowKV(key, value []byte) (*StoredRow, error) {
 	rv := StoredRow{}
-
-	buf := bytes.NewBuffer(key)
-	_, err := buf.ReadByte() // type
+	err := rv.ParseKey(key)
 	if err != nil {
 		return nil, err
 	}
-
-	rv.docID, err = buf.ReadBytes(ByteSeparator)
-	if len(rv.docID) < 2 { // 1 for min doc id length, 1 for separator
-		err = fmt.Errorf("invalid doc length 0")
-		return nil, err
-	}
-
-	rv.docID = rv.docID[:len(rv.docID)-1] // trim off separator byte
-
-	rv.docNum, err = binary.ReadUvarint(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	err = binary.Read(buf, binary.LittleEndian, &rv.field)
-	if err != nil {
-		return nil, err
-	}
-
-	rv.arrayPositions = make([]uint64, 0)
-	nextArrayPos, err := binary.ReadUvarint(buf)
-	for err == nil {
-		rv.arrayPositions = append(rv.arrayPositions, nextArrayPos)
-		nextArrayPos, err = binary.ReadUvarint(buf)
-	}
-
 	err = rv.value.Unmarshal(value)
 	if err != nil {
 		return nil, err
 	}
-
 	return &rv, nil
+}
+
+func (sr *StoredRow) ParseKey(key []byte) error {
+	buf := bytes.NewBuffer(key)
+	_, err := buf.ReadByte() // type
+	if err != nil {
+		return err
+	}
+
+	sr.docID, err = buf.ReadBytes(ByteSeparator)
+	if len(sr.docID) < 2 { // 1 for min doc id length, 1 for separator
+		err = fmt.Errorf("invalid doc length 0")
+		return err
+	}
+
+	sr.docID = sr.docID[:len(sr.docID)-1] // trim off separator byte
+
+	sr.docNum, err = binary.ReadUvarint(buf)
+	if err != nil {
+		return err
+	}
+
+	err = binary.Read(buf, binary.LittleEndian, &sr.field)
+	if err != nil {
+		return err
+	}
+
+	sr.arrayPositions = make([]uint64, 0)
+	nextArrayPos, err := binary.ReadUvarint(buf)
+	for err == nil {
+		sr.arrayPositions = append(sr.arrayPositions, nextArrayPos)
+		nextArrayPos, err = binary.ReadUvarint(buf)
+	}
+
+	return nil
 }
 
 func (sr *StoredRow) KeySize() int {
