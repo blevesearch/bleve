@@ -55,6 +55,9 @@ func TestDictUpdater(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if v == nil {
+			t.Fatal("unexpected dictionary value missing")
+		}
 		dr, err := NewDictionaryRowKV([]byte(key), v)
 		if err != nil {
 			t.Fatal(err)
