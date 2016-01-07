@@ -505,8 +505,8 @@ func (udc *UpsideDownCouch) indexField(docID []byte, includeTermVectors bool, fi
 	for k, tf := range tokenFreqs {
 		var termFreqRow *TermFrequencyRow
 		if includeTermVectors {
-			tv, newFieldRows := udc.termVectorsFromTokenFreq(fieldIndex, tf)
-			rows = append(rows, newFieldRows...)
+			var tv []*TermVector
+			tv, rows = udc.termVectorsFromTokenFreq(fieldIndex, tf, rows)
 			termFreqRow = NewTermFrequencyRowWithTermVectors(tf.Term, fieldIndex, docID, uint64(frequencyFromTokenFreq(tf)), fieldNorm, tv)
 		} else {
 			termFreqRow = NewTermFrequencyRow(tf.Term, fieldIndex, docID, uint64(frequencyFromTokenFreq(tf)), fieldNorm)
@@ -662,9 +662,8 @@ func frequencyFromTokenFreq(tf *analysis.TokenFreq) int {
 	return tf.Frequency()
 }
 
-func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.TokenFreq) ([]*TermVector, []index.IndexRow) {
+func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.TokenFreq, rows []index.IndexRow) ([]*TermVector, []index.IndexRow) {
 	rv := make([]*TermVector, len(tf.Locations))
-	newFieldRows := make([]index.IndexRow, 0)
 
 	for i, l := range tf.Locations {
 		var newFieldRow *FieldRow
@@ -673,7 +672,7 @@ func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.
 			// lookup correct field
 			fieldIndex, newFieldRow = udc.fieldIndexOrNewRow(l.Field)
 			if newFieldRow != nil {
-				newFieldRows = append(newFieldRows, newFieldRow)
+				rows = append(rows, newFieldRow)
 			}
 		}
 		tv := TermVector{
@@ -686,7 +685,7 @@ func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.
 		rv[i] = &tv
 	}
 
-	return rv, newFieldRows
+	return rv, rows
 }
 
 func (udc *UpsideDownCouch) termFieldVectorsFromTermVectors(in []*TermVector) []*index.TermFieldVector {
