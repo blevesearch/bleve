@@ -24,7 +24,6 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 	docIDBytes := []byte(d.ID)
 
 	// track our back index entries
-	backIndexTermEntries := make([]*BackIndexTermEntry, 0)
 	backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
 
 	// information we collate as we merge fields with same name
@@ -82,8 +81,9 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		rowsCapNeeded += len(tokenFreqs)
 	}
 
-	rows := make([]index.IndexRow, 0, rowsCapNeeded)
-	rv.Rows = append(rows, rv.Rows...)
+	rv.Rows = append(make([]index.IndexRow, 0, rowsCapNeeded), rv.Rows...)
+
+	backIndexTermEntries := make([]*BackIndexTermEntry, 0, rowsCapNeeded)
 
 	// walk through the collated information and proccess
 	// once for each indexed field (unique name)
