@@ -12,6 +12,7 @@ package firestorm
 import (
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/gtreap"
@@ -42,7 +43,7 @@ func TestDictUpdater(t *testing.T) {
 	for len(f.(*Firestorm).dictUpdater.incoming) > 0 {
 		runtime.Gosched()
 	}
-	f.(*Firestorm).dictUpdater.update()
+	f.(*Firestorm).dictUpdater.waitTasksDone(5 * time.Second)
 
 	// assert that dictionary rows are correct
 	reader, err := f.(*Firestorm).store.Reader()
