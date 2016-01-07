@@ -473,7 +473,7 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []in
 	return addRows, updateRows, deleteRows
 }
 
-func (udc *UpsideDownCouch) storeField(docID string, field document.Field, fieldIndex uint16) ([]index.IndexRow, []*BackIndexStoreEntry) {
+func (udc *UpsideDownCouch) storeField(docID []byte, field document.Field, fieldIndex uint16) ([]index.IndexRow, []*BackIndexStoreEntry) {
 	rows := make([]index.IndexRow, 0, 100)
 	backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
 	fieldType := encodeFieldType(field)
@@ -502,7 +502,7 @@ func encodeFieldType(f document.Field) byte {
 	return fieldType
 }
 
-func (udc *UpsideDownCouch) indexField(docID string, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies) ([]index.IndexRow, []*BackIndexTermEntry) {
+func (udc *UpsideDownCouch) indexField(docID []byte, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies) ([]index.IndexRow, []*BackIndexTermEntry) {
 
 	rows := make([]index.IndexRow, 0, 100)
 	backIndexTermEntries := make([]*BackIndexTermEntry, 0, len(tokenFreqs))
@@ -592,13 +592,14 @@ func (udc *UpsideDownCouch) Delete(id string) (err error) {
 }
 
 func (udc *UpsideDownCouch) deleteSingle(id string, backIndexRow *BackIndexRow, deleteRows []UpsideDownCouchRow) []UpsideDownCouchRow {
+	idBytes := []byte(id)
 
 	for _, backIndexEntry := range backIndexRow.termEntries {
-		tfr := NewTermFrequencyRow([]byte(*backIndexEntry.Term), uint16(*backIndexEntry.Field), id, 0, 0)
+		tfr := NewTermFrequencyRow([]byte(*backIndexEntry.Term), uint16(*backIndexEntry.Field), idBytes, 0, 0)
 		deleteRows = append(deleteRows, tfr)
 	}
 	for _, se := range backIndexRow.storedEntries {
-		sf := NewStoredRow(id, uint16(*se.Field), se.ArrayPositions, 'x', nil)
+		sf := NewStoredRow(idBytes, uint16(*se.Field), se.ArrayPositions, 'x', nil)
 		deleteRows = append(deleteRows, sf)
 	}
 

@@ -41,7 +41,7 @@ func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 		return nil, err
 	}
 
-	tfr := NewTermFrequencyRow(term, field, "", 0, 0)
+	tfr := NewTermFrequencyRow(term, field, []byte{}, 0, 0)
 	it := indexReader.kvreader.PrefixIterator(tfr.Key())
 
 	return &UpsideDownCouchTermFieldReader{
@@ -80,7 +80,7 @@ func (r *UpsideDownCouchTermFieldReader) Next() (*index.TermFieldDoc, error) {
 
 func (r *UpsideDownCouchTermFieldReader) Advance(docID string) (*index.TermFieldDoc, error) {
 	if r.iterator != nil {
-		tfr := NewTermFrequencyRow(r.term, r.field, docID, 0, 0)
+		tfr := NewTermFrequencyRow(r.term, r.field, []byte(docID), 0, 0)
 		r.iterator.Seek(tfr.Key())
 		key, val, valid := r.iterator.Current()
 		if valid {
@@ -114,14 +114,16 @@ type UpsideDownCouchDocIDReader struct {
 }
 
 func newUpsideDownCouchDocIDReader(indexReader *IndexReader, start, end string) (*UpsideDownCouchDocIDReader, error) {
+	startBytes := []byte(start)
 	if start == "" {
-		start = string([]byte{0x0})
+		startBytes = []byte{0x0}
 	}
+	endBytes := []byte(end)
 	if end == "" {
-		end = string([]byte{0xff})
+		endBytes = []byte{0xff}
 	}
-	bisr := NewBackIndexRow(start, nil, nil)
-	bier := NewBackIndexRow(end, nil, nil)
+	bisr := NewBackIndexRow(startBytes, nil, nil)
+	bier := NewBackIndexRow(endBytes, nil, nil)
 	it := indexReader.kvreader.RangeIterator(bisr.Key(), bier.Key())
 
 	return &UpsideDownCouchDocIDReader{
@@ -145,7 +147,7 @@ func (r *UpsideDownCouchDocIDReader) Next() (string, error) {
 }
 
 func (r *UpsideDownCouchDocIDReader) Advance(docID string) (string, error) {
-	bir := NewBackIndexRow(docID, nil, nil)
+	bir := NewBackIndexRow([]byte(docID), nil, nil)
 	r.iterator.Seek(bir.Key())
 	key, val, valid := r.iterator.Current()
 	if valid {

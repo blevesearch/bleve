@@ -60,7 +60,7 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 		return
 	}
 	doc = document.NewDocument(id)
-	storedRow := NewStoredRow(id, 0, []uint64{}, 'x', nil)
+	storedRow := NewStoredRow([]byte(id), 0, []uint64{}, 'x', nil)
 	storedRowScanPrefix := storedRow.ScanPrefixForDoc()
 	it := i.kvreader.PrefixIterator(storedRowScanPrefix)
 	defer func() {

@@ -21,6 +21,8 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		Rows:  make([]index.IndexRow, 0, 100),
 	}
 
+	docIDBytes := []byte(d.ID)
+
 	// track our back index entries
 	backIndexTermEntries := make([]*BackIndexTermEntry, 0)
 	backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
@@ -56,7 +58,7 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		}
 
 		if field.Options().IsStored() {
-			storeRows, indexBackIndexStoreEntries := udc.storeField(d.ID, field, fieldIndex)
+			storeRows, indexBackIndexStoreEntries := udc.storeField(docIDBytes, field, fieldIndex)
 			rv.Rows = append(rv.Rows, storeRows...)
 			backIndexStoredEntries = append(backIndexStoredEntries, indexBackIndexStoreEntries...)
 		}
@@ -75,7 +77,7 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		}
 
 		// encode this field
-		indexRows, indexBackIndexTermEntries := udc.indexField(d.ID, includeTermVectors, fieldIndex, fieldLength, tokenFreqs)
+		indexRows, indexBackIndexTermEntries := udc.indexField(docIDBytes, includeTermVectors, fieldIndex, fieldLength, tokenFreqs)
 		rv.Rows = append(rv.Rows, indexRows...)
 		backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
 	}
@@ -89,14 +91,14 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		if compositeField.Options().IsIndexed() {
 			fieldLength, tokenFreqs := compositeField.Analyze()
 			// encode this field
-			indexRows, indexBackIndexTermEntries := udc.indexField(d.ID, compositeField.Options().IncludeTermVectors(), fieldIndex, fieldLength, tokenFreqs)
+			indexRows, indexBackIndexTermEntries := udc.indexField(docIDBytes, compositeField.Options().IncludeTermVectors(), fieldIndex, fieldLength, tokenFreqs)
 			rv.Rows = append(rv.Rows, indexRows...)
 			backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
 		}
 	}
 
 	// build the back index row
-	backIndexRow := NewBackIndexRow(d.ID, backIndexTermEntries, backIndexStoredEntries)
+	backIndexRow := NewBackIndexRow(docIDBytes, backIndexTermEntries, backIndexStoredEntries)
 	rv.Rows = append(rv.Rows, backIndexRow)
 
 	return rv
