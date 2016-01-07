@@ -44,9 +44,14 @@ type Snapshot struct {
 // returns which doc number is valid
 // if none, then 0
 func (s *Snapshot) Which(docID []byte, docNumList DocNumberList) uint64 {
-	sort.Sort(docNumList)
-	for _, docNum := range docNumList { // docNumList is sorted descending.
-		if docNum > 0 && s.Valid(docID, docNum) {
+	inFlightVal := s.inFlight.Get(&InFlightItem{docID: docID})
+
+	sort.Sort(docNumList) // Descending ordering.
+
+	for _, docNum := range docNumList {
+		if docNum > 0 && docNum <= s.maxRead &&
+			(inFlightVal == nil || inFlightVal.(*InFlightItem).docNum == docNum) &&
+			!s.deletedDocNumbers.Test(uint(docNum)) {
 			return docNum
 		}
 	}
