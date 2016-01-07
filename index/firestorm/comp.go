@@ -45,9 +45,10 @@ type Snapshot struct {
 // if none, then 0
 func (s *Snapshot) Which(docID []byte, docNumList DocNumberList) uint64 {
 	sort.Sort(docNumList)
-	highestValidDocNum := docNumList.HighestValid(s.maxRead)
-	if highestValidDocNum > 0 && s.Valid(docID, highestValidDocNum) {
-		return highestValidDocNum
+	for _, docNum := range docNumList { // docNumList is sorted descending.
+		if docNum > 0 && s.Valid(docID, docNum) {
+			return docNum
+		}
 	}
 	return 0
 }
