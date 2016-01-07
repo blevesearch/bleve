@@ -62,32 +62,39 @@ func InitTermFreqRow(tfr *TermFreqRow, field uint16, term []byte, docID []byte, 
 
 func NewTermFreqRowKV(key, value []byte) (*TermFreqRow, error) {
 	rv := TermFreqRow{}
+	err := rv.ParseKey(key)
+	if err != nil {
+		return nil, err
+	}
+	err = rv.value.Unmarshal(value)
+	if err != nil {
+		return nil, err
+	}
+	return &rv, nil
+}
+
+func (tfr *TermFreqRow) ParseKey(key []byte) error {
 	keyLen := len(key)
 	if keyLen < 3 {
-		return nil, fmt.Errorf("invalid term frequency key, no valid field")
+		return fmt.Errorf("invalid term frequency key, no valid field")
 	}
-	rv.field = binary.LittleEndian.Uint16(key[1:3])
+	tfr.field = binary.LittleEndian.Uint16(key[1:3])
 
 	termStartPos := 3
 	termEndPos := bytes.IndexByte(key[termStartPos:], ByteSeparator)
 	if termEndPos < 0 {
-		return nil, fmt.Errorf("invalid term frequency key, no byte separator terminating term")
+		return fmt.Errorf("invalid term frequency key, no byte separator terminating term")
 	}
-	rv.term = key[termStartPos : termStartPos+termEndPos]
+	tfr.term = key[termStartPos : termStartPos+termEndPos]
 
 	docStartPos := termStartPos + termEndPos + 1
 	docEndPos := bytes.IndexByte(key[docStartPos:], ByteSeparator)
-	rv.docID = key[docStartPos : docStartPos+docEndPos]
+	tfr.docID = key[docStartPos : docStartPos+docEndPos]
 
 	docNumPos := docStartPos + docEndPos + 1
-	rv.docNum, _ = binary.Uvarint(key[docNumPos:])
+	tfr.docNum, _ = binary.Uvarint(key[docNumPos:])
 
-	err := rv.value.Unmarshal(value)
-	if err != nil {
-		return nil, err
-	}
-
-	return &rv, nil
+	return nil
 }
 
 func (tfr *TermFreqRow) KeySize() int {

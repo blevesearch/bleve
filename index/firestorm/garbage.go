@@ -135,9 +135,10 @@ func (gc *GarbageCollector) cleanup() {
 	termFreqStart := TermFreqIteratorStart(0, []byte{ByteSeparator})
 	termFreqEnd := TermFreqIteratorStart(math.MaxUint16, []byte{ByteSeparator})
 
+	var tfr TermFreqRow
 	dictionaryDeltas := make(map[string]int64)
 	err = visitRange(reader, termFreqStart, termFreqEnd, func(key, val []byte) (bool, error) {
-		tfr, err := NewTermFreqRowKV(key, val)
+		err := tfr.ParseKey(key)
 		if err != nil {
 			return false, err
 		}
@@ -158,8 +159,9 @@ func (gc *GarbageCollector) cleanup() {
 	}
 
 	// walk all the stored rows
+	var sr StoredRow
 	err = visitPrefix(reader, StoredKeyPrefix, func(key, val []byte) (bool, error) {
-		sr, err := NewStoredRowKV(key, val)
+		err := sr.ParseKey(key)
 		if err != nil {
 			return false, err
 		}

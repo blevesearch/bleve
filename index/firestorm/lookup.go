@@ -91,10 +91,11 @@ func (l *Lookuper) lookup(item *InFlightItem) {
 
 	prefix := TermFreqPrefixFieldTermDocId(0, nil, item.docID)
 	logger.Printf("lookuper prefix - % x", prefix)
+	var tfk TermFreqRow
 	docNums := make(DocNumberList, 0)
 	err = visitPrefix(reader, prefix, func(key, val []byte) (bool, error) {
 		logger.Printf("lookuper sees key % x", key)
-		tfk, err := NewTermFreqRowKV(key, val)
+		err := tfk.ParseKey(key)
 		if err != nil {
 			return false, err
 		}

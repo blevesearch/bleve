@@ -67,10 +67,11 @@ func (f *Firestorm) warmup(reader store.KVReader) error {
 
 	tfkPrefix := TermFreqIteratorStart(idField, nil)
 
+	var tfk TermFreqRow
 	var lastDocId []byte
 	lastDocNumbers := make(DocNumberList, 1)
 	err = visitPrefix(reader, tfkPrefix, func(key, val []byte) (bool, error) {
-		tfk, err := NewTermFreqRowKV(key, val)
+		err := tfk.ParseKey(key)
 		if err != nil {
 			return false, err
 		}
