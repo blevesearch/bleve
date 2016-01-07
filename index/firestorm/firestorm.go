@@ -146,7 +146,7 @@ func (f *Firestorm) Update(doc *document.Document) (err error) {
 	aw := index.NewAnalysisWork(f, doc, resultChan)
 
 	// put the work on the queue
-	go f.analysisQueue.Queue(aw)
+	f.analysisQueue.Queue(aw)
 
 	// wait for the result
 	result := <-resultChan

@@ -29,7 +29,7 @@ import (
 const Name = "upside_down"
 
 // RowBufferSize should ideally this is sized to be the smallest
-// size that can cotain an index row key and its corresponding
+// size that can contain an index row key and its corresponding
 // value.  It is not a limit, if need be a larger buffer is
 // allocated, but performance will be more optimal if *most*
 // rows fit this size.
@@ -344,6 +344,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	analysisStart := time.Now()
 	resultChan := make(chan *index.AnalysisResult)
 	aw := index.NewAnalysisWork(udc, doc, resultChan)
+
 	// put the work on the queue
 	udc.analysisQueue.Queue(aw)
 
