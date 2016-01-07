@@ -54,9 +54,7 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		}
 
 		if storable && field.Options().IsStored() {
-			storeRows, indexBackIndexStoreEntries := udc.storeField(docIDBytes, field, fieldIndex)
-			rv.Rows = append(rv.Rows, storeRows...)
-			backIndexStoredEntries = append(backIndexStoredEntries, indexBackIndexStoreEntries...)
+			rv.Rows, backIndexStoredEntries = udc.storeField(docIDBytes, field, fieldIndex, rv.Rows, backIndexStoredEntries)
 		}
 	}
 
@@ -94,9 +92,7 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		includeTermVectors := fieldIncludeTermVectors[fieldIndex]
 
 		// encode this field
-		indexRows, indexBackIndexTermEntries := udc.indexField(docIDBytes, includeTermVectors, fieldIndex, fieldLength, tokenFreqs)
-		rv.Rows = append(rv.Rows, indexRows...)
-		backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
+		rv.Rows, backIndexTermEntries = udc.indexField(docIDBytes, includeTermVectors, fieldIndex, fieldLength, tokenFreqs, rv.Rows, backIndexTermEntries)
 	}
 
 	// build the back index row

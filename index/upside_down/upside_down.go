@@ -473,18 +473,14 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []in
 	return addRows, updateRows, deleteRows
 }
 
-func (udc *UpsideDownCouch) storeField(docID []byte, field document.Field, fieldIndex uint16) ([]index.IndexRow, []*BackIndexStoreEntry) {
-	rows := make([]index.IndexRow, 0, 100)
-	backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
+func (udc *UpsideDownCouch) storeField(docID []byte, field document.Field, fieldIndex uint16, rows []index.IndexRow, backIndexStoredEntries []*BackIndexStoreEntry) ([]index.IndexRow, []*BackIndexStoreEntry) {
 	fieldType := encodeFieldType(field)
 	storedRow := NewStoredRow(docID, fieldIndex, field.ArrayPositions(), fieldType, field.Value())
 
 	// record the back index entry
 	backIndexStoredEntry := BackIndexStoreEntry{Field: proto.Uint32(uint32(fieldIndex)), ArrayPositions: field.ArrayPositions()}
-	backIndexStoredEntries = append(backIndexStoredEntries, &backIndexStoredEntry)
 
-	rows = append(rows, storedRow)
-	return rows, backIndexStoredEntries
+	return append(rows, storedRow), append(backIndexStoredEntries, &backIndexStoredEntry)
 }
 
 func encodeFieldType(f document.Field) byte {
@@ -502,10 +498,7 @@ func encodeFieldType(f document.Field) byte {
 	return fieldType
 }
 
-func (udc *UpsideDownCouch) indexField(docID []byte, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies) ([]index.IndexRow, []*BackIndexTermEntry) {
-
-	rows := make([]index.IndexRow, 0, 100)
-	backIndexTermEntries := make([]*BackIndexTermEntry, 0, len(tokenFreqs))
+func (udc *UpsideDownCouch) indexField(docID []byte, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies, rows []index.IndexRow, backIndexTermEntries []*BackIndexTermEntry) ([]index.IndexRow, []*BackIndexTermEntry) {
 	fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
 
 	for k, tf := range tokenFreqs {
