@@ -49,54 +49,54 @@ func TestRows(t *testing.T) {
 			[]byte{27},
 		},
 		{
-			NewTermFrequencyRow([]byte{'b', 'e', 'e', 'r'}, 0, "catz", 3, 3.14),
+			NewTermFrequencyRow([]byte{'b', 'e', 'e', 'r'}, 0, []byte("catz"), 3, 3.14),
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'c', 'a', 't', 'z'},
 			[]byte{3, 195, 235, 163, 130, 4},
 		},
 		{
-			NewTermFrequencyRow([]byte{'b', 'e', 'e', 'r'}, 0, "budweiser", 3, 3.14),
+			NewTermFrequencyRow([]byte{'b', 'e', 'e', 'r'}, 0, []byte("budweiser"), 3, 3.14),
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 195, 235, 163, 130, 4},
 		},
 		{
-			NewTermFrequencyRowWithTermVectors([]byte{'b', 'e', 'e', 'r'}, 0, "budweiser", 3, 3.14, []*TermVector{&TermVector{field: 0, pos: 1, start: 3, end: 11}, &TermVector{field: 0, pos: 2, start: 23, end: 31}, &TermVector{field: 0, pos: 3, start: 43, end: 51}}),
+			NewTermFrequencyRowWithTermVectors([]byte{'b', 'e', 'e', 'r'}, 0, []byte("budweiser"), 3, 3.14, []*TermVector{&TermVector{field: 0, pos: 1, start: 3, end: 11}, &TermVector{field: 0, pos: 2, start: 23, end: 31}, &TermVector{field: 0, pos: 3, start: 43, end: 51}}),
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{3, 195, 235, 163, 130, 4, 0, 1, 3, 11, 0, 0, 2, 23, 31, 0, 0, 3, 43, 51, 0},
 		},
 		// test larger varints
 		{
-			NewTermFrequencyRowWithTermVectors([]byte{'b', 'e', 'e', 'r'}, 0, "budweiser", 25896, 3.14, []*TermVector{&TermVector{field: 255, pos: 1, start: 3, end: 11}, &TermVector{field: 0, pos: 2198, start: 23, end: 31}, &TermVector{field: 0, pos: 3, start: 43, end: 51}}),
+			NewTermFrequencyRowWithTermVectors([]byte{'b', 'e', 'e', 'r'}, 0, []byte("budweiser"), 25896, 3.14, []*TermVector{&TermVector{field: 255, pos: 1, start: 3, end: 11}, &TermVector{field: 0, pos: 2198, start: 23, end: 31}, &TermVector{field: 0, pos: 3, start: 43, end: 51}}),
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{168, 202, 1, 195, 235, 163, 130, 4, 255, 1, 1, 3, 11, 0, 0, 150, 17, 23, 31, 0, 0, 3, 43, 51, 0},
 		},
 		// test vectors with arrayPositions
 		{
-			NewTermFrequencyRowWithTermVectors([]byte{'b', 'e', 'e', 'r'}, 0, "budweiser", 25896, 3.14, []*TermVector{&TermVector{field: 255, pos: 1, start: 3, end: 11, arrayPositions: []uint64{0}}, &TermVector{field: 0, pos: 2198, start: 23, end: 31, arrayPositions: []uint64{1, 2}}, &TermVector{field: 0, pos: 3, start: 43, end: 51, arrayPositions: []uint64{3, 4, 5}}}),
+			NewTermFrequencyRowWithTermVectors([]byte{'b', 'e', 'e', 'r'}, 0, []byte("budweiser"), 25896, 3.14, []*TermVector{&TermVector{field: 255, pos: 1, start: 3, end: 11, arrayPositions: []uint64{0}}, &TermVector{field: 0, pos: 2198, start: 23, end: 31, arrayPositions: []uint64{1, 2}}, &TermVector{field: 0, pos: 3, start: 43, end: 51, arrayPositions: []uint64{3, 4, 5}}}),
 			[]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{168, 202, 1, 195, 235, 163, 130, 4, 255, 1, 1, 3, 11, 1, 0, 0, 150, 17, 23, 31, 2, 1, 2, 0, 3, 43, 51, 3, 3, 4, 5},
 		},
 		{
-			NewBackIndexRow("budweiser", []*BackIndexTermEntry{&BackIndexTermEntry{Term: proto.String("beer"), Field: proto.Uint32(0)}}, nil),
+			NewBackIndexRow([]byte("budweiser"), []*BackIndexTermEntry{&BackIndexTermEntry{Term: proto.String("beer"), Field: proto.Uint32(0)}}, nil),
 			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{10, 8, 10, 4, 'b', 'e', 'e', 'r', 16, 0},
 		},
 		{
-			NewBackIndexRow("budweiser", []*BackIndexTermEntry{&BackIndexTermEntry{Term: proto.String("beer"), Field: proto.Uint32(0)}, &BackIndexTermEntry{Term: proto.String("beat"), Field: proto.Uint32(1)}}, nil),
+			NewBackIndexRow([]byte("budweiser"), []*BackIndexTermEntry{&BackIndexTermEntry{Term: proto.String("beer"), Field: proto.Uint32(0)}, &BackIndexTermEntry{Term: proto.String("beat"), Field: proto.Uint32(1)}}, nil),
 			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{10, 8, 10, 4, 'b', 'e', 'e', 'r', 16, 0, 10, 8, 10, 4, 'b', 'e', 'a', 't', 16, 1},
 		},
 		{
-			NewBackIndexRow("budweiser", []*BackIndexTermEntry{&BackIndexTermEntry{Term: proto.String("beer"), Field: proto.Uint32(0)}, &BackIndexTermEntry{Term: proto.String("beat"), Field: proto.Uint32(1)}}, []*BackIndexStoreEntry{&BackIndexStoreEntry{Field: proto.Uint32(3)}, &BackIndexStoreEntry{Field: proto.Uint32(4)}, &BackIndexStoreEntry{Field: proto.Uint32(5)}}),
+			NewBackIndexRow([]byte("budweiser"), []*BackIndexTermEntry{&BackIndexTermEntry{Term: proto.String("beer"), Field: proto.Uint32(0)}, &BackIndexTermEntry{Term: proto.String("beat"), Field: proto.Uint32(1)}}, []*BackIndexStoreEntry{&BackIndexStoreEntry{Field: proto.Uint32(3)}, &BackIndexStoreEntry{Field: proto.Uint32(4)}, &BackIndexStoreEntry{Field: proto.Uint32(5)}}),
 			[]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'},
 			[]byte{10, 8, 10, 4, 'b', 'e', 'e', 'r', 16, 0, 10, 8, 10, 4, 'b', 'e', 'a', 't', 16, 1, 18, 2, 8, 3, 18, 2, 8, 4, 18, 2, 8, 5},
 		},
 		{
-			NewStoredRow("budweiser", 0, []uint64{}, byte('t'), []byte("an american beer")),
+			NewStoredRow([]byte("budweiser"), 0, []uint64{}, byte('t'), []byte("an american beer")),
 			[]byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', ByteSeparator, 0, 0},
 			[]byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
 		},
 		{
-			NewStoredRow("budweiser", 0, []uint64{2, 294, 3078}, byte('t'), []byte("an american beer")),
+			NewStoredRow([]byte("budweiser"), 0, []uint64{2, 294, 3078}, byte('t'), []byte("an american beer")),
 			[]byte{'s', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r', ByteSeparator, 0, 0, 2, 166, 2, 134, 24},
 			[]byte{'t', 'a', 'n', ' ', 'a', 'm', 'e', 'r', 'i', 'c', 'a', 'n', ' ', 'b', 'e', 'e', 'r'},
 		},
@@ -259,7 +259,7 @@ func BenchmarkTermFrequencyRowEncode(b *testing.B) {
 	row := NewTermFrequencyRowWithTermVectors(
 		[]byte{'b', 'e', 'e', 'r'},
 		0,
-		"budweiser",
+		[]byte("budweiser"),
 		3,
 		3.14,
 		[]*TermVector{
@@ -304,7 +304,7 @@ func BenchmarkTermFrequencyRowDecode(b *testing.B) {
 func BenchmarkBackIndexRowEncode(b *testing.B) {
 	field := uint32(1)
 	t1 := "term1"
-	row := NewBackIndexRow("beername",
+	row := NewBackIndexRow([]byte("beername"),
 		[]*BackIndexTermEntry{
 			&BackIndexTermEntry{
 				Term:  &t1,
@@ -336,7 +336,7 @@ func BenchmarkBackIndexRowDecode(b *testing.B) {
 }
 
 func BenchmarkStoredRowEncode(b *testing.B) {
-	row := NewStoredRow("budweiser", 0, []uint64{}, byte('t'), []byte("an american beer"))
+	row := NewStoredRow([]byte("budweiser"), 0, []uint64{}, byte('t'), []byte("an american beer"))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		row.Key()
