@@ -194,6 +194,9 @@ func (f *Firestorm) batchRows(writer store.KVWriter, rowsOfRows [][]index.IndexR
 
 	// prepare batch
 	wb := writer.NewBatch()
+	defer func() {
+		_ = wb.Close()
+	}()
 
 	var kbuf []byte
 	var vbuf []byte

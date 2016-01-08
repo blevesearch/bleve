@@ -84,6 +84,7 @@ func (i *batch) Set(key, val []byte)   {}
 func (i *batch) Delete(key []byte)     {}
 func (i *batch) Merge(key, val []byte) {}
 func (i *batch) Reset()                {}
+func (i *batch) Close() error          { return nil }
 
 type writer struct{}
 
