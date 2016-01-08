@@ -118,4 +118,7 @@ type KVBatch interface {
 
 	// Reset frees resources for this batch and allows reuse
 	Reset()
+
+	// Close frees resources
+	Close() error
 }

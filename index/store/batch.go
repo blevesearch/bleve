@@ -51,3 +51,7 @@ func (b *EmulatedBatch) Merge(key, val []byte) {
 func (b *EmulatedBatch) Reset() {
 	b.Ops = b.Ops[:0]
 }
+
+func (b *EmulatedBatch) Close() error {
+	return nil
+}
