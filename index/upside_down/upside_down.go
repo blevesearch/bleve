@@ -139,6 +139,9 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 
 	// prepare batch
 	wb := writer.NewBatch()
+	defer func() {
+		_ = wb.Close()
+	}()
 
 	// buffer to work with
 	rowBuf := GetRowBuffer()
