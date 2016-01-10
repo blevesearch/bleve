@@ -710,7 +710,7 @@ func (udc *UpsideDownCouch) termFieldVectorsFromTermVectors(in []*TermVector) []
 
 func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	analysisStart := time.Now()
-	resultChan := make(chan *index.AnalysisResult)
+	resultChan := make(chan *index.AnalysisResult, len(batch.IndexOps))
 
 	var numUpdates uint64
 	for _, doc := range batch.IndexOps {
@@ -740,8 +740,40 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 		}
 	}()
 
-	newRowsMap := make(map[string][]index.IndexRow)
+	udc.writeMutex.Lock()
+	defer udc.writeMutex.Unlock()
+
+	var backIndexRows map[string]*BackIndexRow
+	backindexReaderCh := make(chan error)
+
+	go func() {
+		defer close(backindexReaderCh)
+
+		// open a reader for backindex lookup
+		var kvreader store.KVReader
+		kvreader, err = udc.store.Reader()
+		if err != nil {
+			backindexReaderCh <- err
+			return
+		}
+
+		// first lookup all the back index rows
+		backIndexRows, err = udc.backIndexRowsForBatch(kvreader, batch)
+		if err != nil {
+			_ = kvreader.Close()
+			backindexReaderCh <- err
+			return
+		}
+
+		err = kvreader.Close()
+		if err != nil {
+			backindexReaderCh <- err
+			return
+		}
+	}()
+
 	// wait for the result
+	newRowsMap := make(map[string][]index.IndexRow)
 	var itemsDeQueued uint64
 	for itemsDeQueued < numUpdates {
 		result := <-resultChan
@@ -749,6 +781,11 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 		itemsDeQueued++
 	}
 	close(resultChan)
+
+	backindexReaderErr := <-backindexReaderCh
+	if backindexReaderErr != nil {
+		return backindexReaderErr
+	}
 
 	detectedUnsafeMutex.RLock()
 	defer detectedUnsafeMutex.RUnlock()
@@ -759,36 +796,6 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	atomic.AddUint64(&udc.stats.analysisTime, uint64(time.Since(analysisStart)))
 
 	indexStart := time.Now()
-
-	udc.writeMutex.Lock()
-	defer udc.writeMutex.Unlock()
-
-	// open a reader for backindex lookup
-	var kvreader store.KVReader
-	kvreader, err = udc.store.Reader()
-	if err != nil {
-		return
-	}
-
-	// first lookup all the back index rows
-	var backIndexRows map[string]*BackIndexRow
-	backIndexRows, err = udc.backIndexRowsForBatch(kvreader, batch)
-	if err != nil {
-		_ = kvreader.Close()
-		return
-	}
-
-	err = kvreader.Close()
-	if err != nil {
-		return
-	}
-
-	// start a writer for this batch
-	var kvwriter store.KVWriter
-	kvwriter, err = udc.store.Writer()
-	if err != nil {
-		return
-	}
 
 	// prepare a list of rows
 	addRows := make([]UpsideDownCouchRow, 0)
@@ -821,6 +828,13 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 			updateInternalRow := NewInternalRow([]byte(internalKey), internalValue)
 			updateRows = append(updateRows, updateInternalRow)
 		}
+	}
+
+	// start a writer for this batch
+	var kvwriter store.KVWriter
+	kvwriter, err = udc.store.Writer()
+	if err != nil {
+		return
 	}
 
 	err = udc.batchRows(kvwriter, addRows, updateRows, deleteRows)
