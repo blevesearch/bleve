@@ -346,6 +346,7 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 	}
 
 	indexStart := time.Now()
+
 	// start a writer for this batch
 	var kvwriter store.KVWriter
 	kvwriter, err = f.store.Writer()
@@ -362,10 +363,12 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 	}
 
 	f.compensator.MutateBatch(inflightItems, lastDocNumber)
+
+	err = kvwriter.Close()
+
 	f.lookuper.NotifyBatch(inflightItems)
 	f.dictUpdater.NotifyBatch(dictionaryDeltas)
 
-	err = kvwriter.Close()
 	atomic.AddUint64(&f.stats.indexTime, uint64(time.Since(indexStart)))
 
 	if err == nil {
