@@ -496,6 +496,8 @@ func encodeFieldType(f document.Field) byte {
 		fieldType = 'n'
 	case *document.DateTimeField:
 		fieldType = 'd'
+	case *document.BooleanField:
+		fieldType = 'b'
 	case *document.CompositeField:
 		fieldType = 'c'
 	}
@@ -657,6 +659,8 @@ func decodeFieldType(typ byte, name string, pos []uint64, value []byte) document
 		return document.NewNumericFieldFromBytes(name, pos, value)
 	case 'd':
 		return document.NewDateTimeFieldFromBytes(name, pos, value)
+	case 'b':
+		return document.NewBooleanFieldFromBytes(name, pos, value)
 	}
 	return nil
 }

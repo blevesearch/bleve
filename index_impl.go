@@ -486,6 +486,11 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 								if err == nil {
 									value = datetime.Format(time.RFC3339)
 								}
+							case *document.BooleanField:
+								boolean, err := docF.Boolean()
+								if err == nil {
+									value = boolean
+								}
 							}
 							if value != nil {
 								hit.AddFieldValue(docF.Name(), value)
