@@ -73,7 +73,7 @@ func NewDateTimeFieldMapping() *FieldMapping {
 	}
 }
 
-// NewBooleanFieldMapping returns a default field mapping for dates
+// NewBooleanFieldMapping returns a default field mapping for booleans
 func NewBooleanFieldMapping() *FieldMapping {
 	return &FieldMapping{
 		Type:         "boolean",
