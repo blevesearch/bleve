@@ -122,3 +122,23 @@ type KVBatch interface {
 	// Close frees resources
 	Close() error
 }
+
+// KVDirectStore is an abstraction that provides more advanced methods
+// which not every KVStore might implement.
+type KVDirectStore interface {
+
+	// ExecuteDirectBatch is an alternative to KVWriter.NewBatch()
+	// where a caller can use ExecuteDirectBatch to provide the sets,
+	// merges and deletes of a batch in one shot to the KVStore.  Some
+	// KVStore implementations may find this useful or higher
+	// performance as it might reduce the number of cgo traversals.
+	ExecuteDirectBatch(
+		sets []KVDirectKeyVal,
+		merges []KVDirectKeyVal,
+		deletes [][]byte) error
+}
+
+type KVDirectKeyVal struct {
+	Key []byte
+	Val []byte
+}
