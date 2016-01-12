@@ -31,14 +31,10 @@ type booleanQuery struct {
 // must Queries.
 // Result documents must satisfy NONE of the must not
 // Queries.
-// If there are any should queries, result documents
-// must satisfy at least one of them.
+// Result documents that ALSO satisfy any of the should
+// Queries will score higher.
 func NewBooleanQuery(must []Query, should []Query, mustNot []Query) *booleanQuery {
-	min := 0.0
-	if len(should) > 0 {
-		min = 1.0
-	}
-	return NewBooleanQueryMinShould(must, should, mustNot, min)
+	return NewBooleanQueryMinShould(must, should, mustNot, 0.0)
 }
 
 // NewBooleanQueryMinShould is the same as
@@ -63,6 +59,12 @@ func NewBooleanQueryMinShould(must []Query, should []Query, mustNot []Query, min
 	return &rv
 }
 
+// SetMinShould requires that at least minShould of the
+// should Queries must be satisfied.
+func (q *booleanQuery) SetMinShould(minShould float64) {
+	q.Should.(*disjunctionQuery).SetMin(minShould)
+}
+
 func (q *booleanQuery) AddMust(m Query) {
 	if q.Must == nil {
 		q.Must = NewConjunctionQuery([]Query{})
@@ -75,7 +77,6 @@ func (q *booleanQuery) AddShould(m Query) {
 		q.Should = NewDisjunctionQuery([]Query{})
 	}
 	q.Should.(*disjunctionQuery).AddQuery(m)
-	q.Should.(*disjunctionQuery).SetMin(1)
 }
 
 func (q *booleanQuery) AddMustNot(m Query) {

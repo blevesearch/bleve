@@ -60,7 +60,7 @@
 		"result": {
 			"total_hits": 0,
 			"hits": []
-		} 
+		}
 	},
 	{
 		"search": {
@@ -555,6 +555,30 @@
 				},
 				{
 					"id": "b"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test query string MUST and SHOULD",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"query": "+age:>20 missess"
+			}
+		},
+		"result": {
+			"total_hits": 3,
+			"hits": [
+				{
+					"id": "b"
+				},
+				{
+					"id": "d"
+				},
+				{
+					"id": "c"
 				}
 			]
 		}
