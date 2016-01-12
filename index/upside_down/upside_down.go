@@ -790,6 +790,18 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 
 	indexStart := time.Now()
 
+	// add the internal ops
+	for internalKey, internalValue := range batch.InternalOps {
+		if internalValue == nil {
+			// delete
+			deleteInternalRow := NewInternalRow([]byte(internalKey), nil)
+			deleteRows = append(deleteRows, deleteInternalRow)
+		} else {
+			updateInternalRow := NewInternalRow([]byte(internalKey), internalValue)
+			updateRows = append(updateRows, updateInternalRow)
+		}
+	}
+
 	for dbir := range docBackIndexRowCh {
 		if dbir.doc == nil && dbir.backIndexRow != nil {
 			// delete
@@ -811,18 +823,6 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	defer detectedUnsafeMutex.RUnlock()
 	if detectedUnsafe {
 		return UnsafeBatchUseDetected
-	}
-
-	// add the internal ops
-	for internalKey, internalValue := range batch.InternalOps {
-		if internalValue == nil {
-			// delete
-			deleteInternalRow := NewInternalRow([]byte(internalKey), nil)
-			deleteRows = append(deleteRows, deleteInternalRow)
-		} else {
-			updateInternalRow := NewInternalRow([]byte(internalKey), internalValue)
-			updateRows = append(updateRows, updateInternalRow)
-		}
 	}
 
 	// start a writer for this batch
