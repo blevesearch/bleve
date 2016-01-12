@@ -324,3 +324,38 @@ func TestMappingWithTokenizerDeps(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
+
+	data := map[string]interface{}{
+		"name": "bleve",
+	}
+	doc := document.NewDocument("x")
+	mapping := NewIndexMapping()
+	err := mapping.mapDocument(doc, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range doc.Fields {
+		if field.Name() == "name" && !field.Options().IsStored() {
+			t.Errorf("expected field 'name' to be stored, isn't")
+		}
+	}
+
+	StoreDynamic = false
+	defer func() {
+		StoreDynamic = true
+	}()
+
+	doc = document.NewDocument("y")
+	err = mapping.mapDocument(doc, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range doc.Fields {
+		if field.Name() == "name" && field.Options().IsStored() {
+			t.Errorf("expected field 'name' to be not stored, is")
+		}
+	}
+
+}

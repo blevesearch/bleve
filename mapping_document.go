@@ -331,11 +331,11 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
 				if err != nil {
 					// index as text
-					fieldMapping := NewTextFieldMapping()
+					fieldMapping := newTextFieldMappingDynamic()
 					fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
 				} else {
 					// index as datetime
-					fieldMapping := NewDateTimeFieldMapping()
+					fieldMapping := newDateTimeFieldMappingDynamic()
 					fieldMapping.processTime(parsedDateTime, pathString, path, indexes, context)
 				}
 			}
@@ -349,7 +349,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			}
 		} else if dm.Dynamic {
 			// automatic indexing behavior
-			fieldMapping := NewNumericFieldMapping()
+			fieldMapping := newNumericFieldMappingDynamic()
 			fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
 		}
 	case reflect.Struct:
@@ -362,7 +362,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 					fieldMapping.processTime(property, pathString, path, indexes, context)
 				}
 			} else if dm.Dynamic {
-				fieldMapping := NewDateTimeFieldMapping()
+				fieldMapping := newDateTimeFieldMappingDynamic()
 				fieldMapping.processTime(property, pathString, path, indexes, context)
 			}
 		default:

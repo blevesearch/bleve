@@ -16,6 +16,12 @@ import (
 	"github.com/blevesearch/bleve/document"
 )
 
+// control the default behavior for dynamic fields (those not explicitly mapped)
+var (
+	IndexDynamic = true
+	StoreDynamic = true
+)
+
 // A FieldMapping describes how a specific item
 // should be put into the index.
 type FieldMapping struct {
@@ -53,6 +59,13 @@ func NewTextFieldMapping() *FieldMapping {
 	}
 }
 
+func newTextFieldMappingDynamic() *FieldMapping {
+	rv := NewTextFieldMapping()
+	rv.Store = StoreDynamic
+	rv.Index = IndexDynamic
+	return rv
+}
+
 // NewNumericFieldMapping returns a default field mapping for numbers
 func NewNumericFieldMapping() *FieldMapping {
 	return &FieldMapping{
@@ -63,6 +76,13 @@ func NewNumericFieldMapping() *FieldMapping {
 	}
 }
 
+func newNumericFieldMappingDynamic() *FieldMapping {
+	rv := NewNumericFieldMapping()
+	rv.Store = StoreDynamic
+	rv.Index = IndexDynamic
+	return rv
+}
+
 // NewDateTimeFieldMapping returns a default field mapping for dates
 func NewDateTimeFieldMapping() *FieldMapping {
 	return &FieldMapping{
@@ -71,6 +91,13 @@ func NewDateTimeFieldMapping() *FieldMapping {
 		Index:        true,
 		IncludeInAll: true,
 	}
+}
+
+func newDateTimeFieldMappingDynamic() *FieldMapping {
+	rv := NewDateTimeFieldMapping()
+	rv.Store = StoreDynamic
+	rv.Index = IndexDynamic
+	return rv
 }
 
 // Options returns the indexing options for this field.
