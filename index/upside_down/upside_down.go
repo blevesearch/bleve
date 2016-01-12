@@ -10,6 +10,7 @@
 package upside_down
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -152,6 +153,8 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 	// buffer to work with
 	rowBuf := GetRowBuffer()
 
+	dictionaryDeltas := make(map[string]int64)
+
 	// add
 	for _, row := range addRows {
 		tfr, ok := row.(*TermFrequencyRow)
@@ -163,7 +166,7 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 			if err != nil {
 				return err
 			}
-			wb.Merge(rowBuf[:dictKeySize], dictionaryTermIncr)
+			dictionaryDeltas[string(rowBuf[:dictKeySize])] += 1
 		}
 		if row.KeySize()+row.ValueSize() > len(rowBuf) {
 			rowBuf = make([]byte, row.KeySize()+row.ValueSize())
@@ -204,7 +207,7 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 			if err != nil {
 				return err
 			}
-			wb.Merge(rowBuf[:dictKeySize], dictionaryTermDecr)
+			dictionaryDeltas[string(rowBuf[:dictKeySize])] -= 1
 		}
 		if row.KeySize()+row.ValueSize() > len(rowBuf) {
 			rowBuf = make([]byte, row.KeySize()+row.ValueSize())
@@ -214,6 +217,15 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRows []UpsideDow
 			return err
 		}
 		wb.Delete(rowBuf[:keySize])
+	}
+
+	if 8 > len(rowBuf) {
+		rowBuf = make([]byte, 8)
+	}
+
+	for dictRowKey, delta := range dictionaryDeltas {
+		binary.LittleEndian.PutUint64(rowBuf, uint64(delta))
+		wb.Merge([]byte(dictRowKey), rowBuf[0:8])
 	}
 
 	PutRowBuffer(rowBuf)
