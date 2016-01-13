@@ -112,6 +112,8 @@ func (r *firestormReader) decodeFieldType(name string, pos []uint64, value []byt
 		return document.NewNumericFieldFromBytes(name, pos, value[1:])
 	case 'd':
 		return document.NewDateTimeFieldFromBytes(name, pos, value[1:])
+	case 'b':
+		return document.NewBooleanFieldFromBytes(name, pos, value[1:])
 	}
 	return nil
 }
