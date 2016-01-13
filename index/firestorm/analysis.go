@@ -158,6 +158,8 @@ func encodeFieldType(f document.Field) byte {
 		fieldType = 'n'
 	case *document.DateTimeField:
 		fieldType = 'd'
+	case *document.BooleanField:
+		fieldType = 'b'
 	case *document.CompositeField:
 		fieldType = 'c'
 	}

@@ -100,6 +100,16 @@ func newDateTimeFieldMappingDynamic() *FieldMapping {
 	return rv
 }
 
+// NewBooleanFieldMapping returns a default field mapping for booleans
+func NewBooleanFieldMapping() *FieldMapping {
+	return &FieldMapping{
+		Type:         "boolean",
+		Store:        true,
+		Index:        true,
+		IncludeInAll: true,
+	}
+}
+
 // Options returns the indexing options for this field.
 func (fm *FieldMapping) Options() document.IndexingOptions {
 	var rv document.IndexingOptions
@@ -164,6 +174,19 @@ func (fm *FieldMapping) processTime(propertyValueTime time.Time, pathString stri
 		} else {
 			logger.Printf("could not build date %v", err)
 		}
+
+		if !fm.IncludeInAll {
+			context.excludedFromAll = append(context.excludedFromAll, fieldName)
+		}
+	}
+}
+
+func (fm *FieldMapping) processBoolean(propertyValueBool bool, pathString string, path []string, indexes []uint64, context *walkContext) {
+	fieldName := getFieldName(pathString, path, fm)
+	if fm.Type == "boolean" {
+		options := fm.Options()
+		field := document.NewBooleanFieldWithIndexingOptions(fieldName, indexes, propertyValueBool, options)
+		context.doc.AddField(field)
 
 		if !fm.IncludeInAll {
 			context.excludedFromAll = append(context.excludedFromAll, fieldName)

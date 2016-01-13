@@ -357,5 +357,48 @@ func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
 			t.Errorf("expected field 'name' to be not stored, is")
 		}
 	}
+}
 
+func TestMappingBool(t *testing.T) {
+	boolMapping := NewBooleanFieldMapping()
+	docMapping := NewDocumentMapping()
+	docMapping.AddFieldMappingsAt("prop", boolMapping)
+	mapping := NewIndexMapping()
+	mapping.AddDocumentMapping("doc", docMapping)
+
+	pprop := false
+	x := struct {
+		Prop  bool  `json:"prop"`
+		PProp *bool `json:"pprop"`
+	}{
+		Prop:  true,
+		PProp: &pprop,
+	}
+
+	doc := document.NewDocument("1")
+	err := mapping.mapDocument(doc, x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundProp := false
+	foundPProp := false
+	count := 0
+	for _, f := range doc.Fields {
+		if f.Name() == "prop" {
+			foundProp = true
+		}
+		if f.Name() == "pprop" {
+			foundPProp = true
+		}
+		count++
+	}
+	if !foundProp {
+		t.Errorf("expected to find bool field named 'prop'")
+	}
+	if !foundPProp {
+		t.Errorf("expected to find pointer to bool field named 'pprop'")
+	}
+	if count != 2 {
+		t.Errorf("expected to find 1 find, found %d", count)
+	}
 }

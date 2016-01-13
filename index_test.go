@@ -421,6 +421,8 @@ func TestStoredFieldPreserved(t *testing.T) {
 	doca := map[string]interface{}{
 		"name": "Marty",
 		"desc": "GopherCON India",
+		"bool": true,
+		"num":  float64(1),
 	}
 	err = index.Index("a", doca)
 	if err != nil {
@@ -429,7 +431,7 @@ func TestStoredFieldPreserved(t *testing.T) {
 
 	q := NewTermQuery("marty")
 	req := NewSearchRequest(q)
-	req.Fields = []string{"name", "desc"}
+	req.Fields = []string{"name", "desc", "bool", "num"}
 	res, err := index.Search(req)
 	if err != nil {
 		t.Error(err)
@@ -438,14 +440,18 @@ func TestStoredFieldPreserved(t *testing.T) {
 	if len(res.Hits) != 1 {
 		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
 	}
-
 	if res.Hits[0].Fields["name"] != "Marty" {
 		t.Errorf("expected 'Marty' got '%s'", res.Hits[0].Fields["name"])
 	}
 	if res.Hits[0].Fields["desc"] != "GopherCON India" {
 		t.Errorf("expected 'GopherCON India' got '%s'", res.Hits[0].Fields["desc"])
 	}
-
+	if res.Hits[0].Fields["num"] != float64(1) {
+		t.Errorf("expected '1' got '%v'", res.Hits[0].Fields["num"])
+	}
+	if res.Hits[0].Fields["bool"] != true {
+		t.Errorf("expected 'true' got '%v'", res.Hits[0].Fields["bool"])
+	}
 }
 
 func TestDict(t *testing.T) {
@@ -1304,6 +1310,62 @@ func TestDocumentFieldArrayPositionsBug295(t *testing.T) {
 	}
 	if results.Hits[0].Locations["Messages"]["bleve"][1].ArrayPositions[0] != 1 {
 		t.Errorf("expected array position to be 1")
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBooleanFieldMappingIssue109(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	m := NewIndexMapping()
+	m.DefaultMapping = NewDocumentMapping()
+	m.DefaultMapping.AddFieldMappingsAt("Bool", NewBooleanFieldMapping())
+
+	index, err := New("testidx", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type doc struct {
+		Bool bool
+	}
+	index.Index("true", &doc{Bool: true})
+	index.Index("false", &doc{Bool: false})
+
+	sreq := NewSearchRequest(NewBoolFieldQuery(true).SetField("Bool"))
+	sres, err := index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 results, got %d", sres.Total)
+	}
+
+	sreq = NewSearchRequest(NewBoolFieldQuery(false).SetField("Bool"))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 results, got %d", sres.Total)
+	}
+
+	sreq = NewSearchRequest(NewBoolFieldQuery(true))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 results, got %d", sres.Total)
 	}
 
 	err = index.Close()
