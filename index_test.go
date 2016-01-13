@@ -1338,8 +1338,14 @@ func TestBooleanFieldMappingIssue109(t *testing.T) {
 	type doc struct {
 		Bool bool
 	}
-	index.Index("true", &doc{Bool: true})
-	index.Index("false", &doc{Bool: false})
+	err = index.Index("true", &doc{Bool: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = index.Index("false", &doc{Bool: false})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	sreq := NewSearchRequest(NewBoolFieldQuery(true).SetField("Bool"))
 	sres, err := index.Search(sreq)
