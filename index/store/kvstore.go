@@ -40,6 +40,9 @@ type KVReader interface {
 	// The caller owns the bytes returned.
 	Get(key []byte) ([]byte, error)
 
+	// MultiGet retrieves multiple values in one call.
+	MultiGet(keys [][]byte) ([][]byte, error)
+
 	// PrefixIterator returns a KVIterator that will
 	// visit all K/V pairs with the provided prefix
 	PrefixIterator(prefix []byte) KVIterator

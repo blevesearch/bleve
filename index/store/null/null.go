@@ -40,6 +40,10 @@ func (r *reader) Get(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
+func (r *reader) MultiGet(keys [][]byte) ([][]byte, error) {
+	return make([][]byte, len(keys)), nil
+}
+
 func (r *reader) PrefixIterator(prefix []byte) store.KVIterator {
 	return &iterator{}
 }

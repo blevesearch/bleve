@@ -17,6 +17,16 @@ func (r *Reader) Get(key []byte) (v []byte, err error) {
 	return
 }
 
+func (r *Reader) MultiGet(keys [][]byte) (vals [][]byte, err error) {
+	r.s.TimerReaderMultiGet.Time(func() {
+		vals, err = r.o.MultiGet(keys)
+		if err != nil {
+			r.s.AddError("Reader.MultiGet", err, nil)
+		}
+	})
+	return
+}
+
 func (r *Reader) PrefixIterator(prefix []byte) (i store.KVIterator) {
 	r.s.TimerReaderPrefixIterator.Time(func() {
 		i = &Iterator{s: r.s, o: r.o.PrefixIterator(prefix)}
