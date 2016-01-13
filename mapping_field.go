@@ -110,6 +110,13 @@ func NewBooleanFieldMapping() *FieldMapping {
 	}
 }
 
+func newBooleanFieldMappingDynamic() *FieldMapping {
+	rv := NewBooleanFieldMapping()
+	rv.Store = StoreDynamic
+	rv.Index = IndexDynamic
+	return rv
+}
+
 // Options returns the indexing options for this field.
 func (fm *FieldMapping) Options() document.IndexingOptions {
 	var rv document.IndexingOptions

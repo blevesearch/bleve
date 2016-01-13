@@ -361,7 +361,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			}
 		} else if dm.Dynamic {
 			// automatic indexing behavior
-			fieldMapping := NewBooleanFieldMapping()
+			fieldMapping := newBooleanFieldMappingDynamic()
 			fieldMapping.processBoolean(propertyValBool, pathString, path, indexes, context)
 		}
 	case reflect.Struct:
