@@ -50,6 +50,7 @@ type UpsideDownCouch struct {
 	storeName     string
 	storeConfig   map[string]interface{}
 	store         store.KVStore
+	storeDirect   store.KVDirectStore
 	fieldCache    *index.FieldCache
 	analysisQueue *index.AnalysisQueue
 	stats         *indexStat
@@ -176,6 +177,9 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]Upsi
 				return err
 			}
 			valSize, err := row.ValueTo(rowBuf[keySize:])
+			if err != nil {
+				return err
+			}
 			wb.Set(rowBuf[:keySize], rowBuf[keySize:keySize+valSize])
 		}
 	}
@@ -238,6 +242,145 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]Upsi
 	return writer.ExecuteBatch(wb)
 }
 
+func (udc *UpsideDownCouch) batchRowsDirect(storeDirect store.KVDirectStore, addRowsAll [][]UpsideDownCouchRow, updateRowsAll [][]UpsideDownCouchRow, deleteRowsAll [][]UpsideDownCouchRow) (err error) {
+	rowBuf := GetRowBuffer()
+
+	dictionaryDeltas := make(map[string]int64)
+
+	addNum := 0
+	addKeyBytes := 0
+	addValBytes := 0
+
+	updateNum := 0
+	updateKeyBytes := 0
+	updateValBytes := 0
+
+	deleteNum := 0
+	deleteKeyBytes := 0
+
+	for _, addRows := range addRowsAll {
+		for _, row := range addRows {
+			tfr, ok := row.(*TermFrequencyRow)
+			if ok {
+				if tfr.DictionaryRowKeySize() > len(rowBuf) {
+					rowBuf = make([]byte, tfr.DictionaryRowKeySize())
+				}
+				dictKeySize, err := tfr.DictionaryRowKeyTo(rowBuf)
+				if err != nil {
+					return err
+				}
+				dictionaryDeltas[string(rowBuf[:dictKeySize])] += 1
+			}
+			addKeyBytes += row.KeySize()
+			addValBytes += row.ValueSize()
+		}
+		addNum += len(addRows)
+	}
+
+	for _, updateRows := range updateRowsAll {
+		for _, row := range updateRows {
+			updateKeyBytes += row.KeySize()
+			updateValBytes += row.ValueSize()
+		}
+		updateNum += len(updateRows)
+	}
+
+	for _, deleteRows := range deleteRowsAll {
+		for _, row := range deleteRows {
+			tfr, ok := row.(*TermFrequencyRow)
+			if ok {
+				// need to decrement counter
+				if tfr.DictionaryRowKeySize() > len(rowBuf) {
+					rowBuf = make([]byte, tfr.DictionaryRowKeySize())
+				}
+				dictKeySize, err := tfr.DictionaryRowKeyTo(rowBuf)
+				if err != nil {
+					return err
+				}
+				dictionaryDeltas[string(rowBuf[:dictKeySize])] -= 1
+			}
+			deleteKeyBytes += row.KeySize()
+		}
+		deleteNum += len(deleteRows)
+	}
+
+	PutRowBuffer(rowBuf)
+
+	mergeNum := len(dictionaryDeltas)
+	mergeKeyBytes := 0
+	mergeValBytes := mergeNum * 8
+
+	for dictRowKey, _ := range dictionaryDeltas {
+		mergeKeyBytes += len(dictRowKey)
+	}
+
+	totBytes := addKeyBytes + addValBytes +
+		updateKeyBytes + updateValBytes +
+		deleteKeyBytes +
+		mergeValBytes
+
+	buf := make([]byte, totBytes)
+
+	setKVs := make([]store.KVDirectKeyVal, 0, addNum+updateNum)
+	mergeKVs := make([]store.KVDirectKeyVal, 0, mergeNum)
+	deleteKeys := make([][]byte, 0, deleteNum)
+
+	for _, addRows := range addRowsAll {
+		for _, row := range addRows {
+			keySize, err := row.KeyTo(buf)
+			if err != nil {
+				return err
+			}
+			valSize, err := row.ValueTo(buf[keySize:])
+			if err != nil {
+				return err
+			}
+			setKVs = append(setKVs, store.KVDirectKeyVal{
+				Key: buf[0:keySize], Val: buf[keySize : keySize+valSize],
+			})
+			buf = buf[keySize+valSize:]
+		}
+	}
+
+	for _, updateRows := range updateRowsAll {
+		for _, row := range updateRows {
+			keySize, err := row.KeyTo(buf)
+			if err != nil {
+				return err
+			}
+			valSize, err := row.ValueTo(buf[keySize:])
+			if err != nil {
+				return err
+			}
+			setKVs = append(setKVs, store.KVDirectKeyVal{
+				Key: buf[0:keySize], Val: buf[keySize : keySize+valSize],
+			})
+			buf = buf[keySize+valSize:]
+		}
+	}
+
+	for _, deleteRows := range deleteRowsAll {
+		for _, row := range deleteRows {
+			keySize, err := row.KeyTo(buf)
+			if err != nil {
+				return err
+			}
+			deleteKeys = append(deleteKeys, buf[0:keySize])
+			buf = buf[keySize:]
+		}
+	}
+
+	for dictRowKey, delta := range dictionaryDeltas {
+		binary.LittleEndian.PutUint64(buf, uint64(delta))
+		mergeKVs = append(mergeKVs, store.KVDirectKeyVal{
+			Key: []byte(dictRowKey), Val: buf[0:8],
+		})
+		buf = buf[8:]
+	}
+
+	return storeDirect.ExecuteDirectBatch(setKVs, mergeKVs, deleteKeys)
+}
+
 func (udc *UpsideDownCouch) DocCount() (uint64, error) {
 	udc.m.RLock()
 	defer udc.m.RUnlock()
@@ -260,6 +403,12 @@ func (udc *UpsideDownCouch) Open() (err error) {
 	udc.store, err = storeConstructor(&mergeOperator, udc.storeConfig)
 	if err != nil {
 		return
+	}
+
+	// the store might have advanced, direct implemenation
+	storeDirect, ok := udc.store.(store.KVDirectStore)
+	if ok {
+		udc.storeDirect = storeDirect
 	}
 
 	// start a reader to look at the index
@@ -780,6 +929,61 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	go func() {
 		defer close(docBackIndexRowCh)
 
+		if udc.storeDirect != nil {
+			docIDs := make([]string, 0, len(batch.IndexOps))
+			keys := make([][]byte, 0, len(batch.IndexOps))
+			keyBuf := GetRowBuffer()
+			for docID := range batch.IndexOps {
+				docIDs = append(docIDs, docID)
+
+				tmpRow := BackIndexRow{doc: []byte(docID)}
+				if tmpRow.KeySize() > len(keyBuf) {
+					keyBuf = make([]byte, 2*tmpRow.KeySize())
+				}
+
+				keySize, err := tmpRow.KeyTo(keyBuf)
+				if err != nil {
+					docBackIndexRowErr = err
+					return
+				}
+
+				keys = append(keys, append([]byte(nil), keyBuf[:keySize]...))
+			}
+			PutRowBuffer(keyBuf)
+
+			vals, err := udc.storeDirect.MultiGet(keys)
+			if err != nil {
+				docBackIndexRowErr = err
+				return
+			}
+
+			if len(vals) != len(keys) {
+				docBackIndexRowErr = fmt.Errorf("upside_down backIndex MultiGet len mismatch, len(vals): %d, len(keys): %d", len(vals), len(keys))
+				return
+			}
+
+			for i, docID := range docIDs {
+				val := vals[i]
+				if val == nil {
+					docBackIndexRowCh <- &docBackIndexRow{
+						docID, batch.IndexOps[docID], nil,
+					}
+				} else {
+					backIndexRow, err := NewBackIndexRowKV(keys[i], val)
+					if err != nil {
+						docBackIndexRowErr = err
+						return
+					}
+
+					docBackIndexRowCh <- &docBackIndexRow{
+						docID, batch.IndexOps[docID], backIndexRow,
+					}
+				}
+			}
+
+			return // END storeDirect MultiGet().
+		}
+
 		// open a reader for backindex lookup
 		var kvreader store.KVReader
 		kvreader, err = udc.store.Reader()
@@ -885,21 +1089,25 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 		return UnsafeBatchUseDetected
 	}
 
-	// start a writer for this batch
-	var kvwriter store.KVWriter
-	kvwriter, err = udc.store.Writer()
-	if err != nil {
-		return
-	}
+	if udc.storeDirect != nil {
+		err = udc.batchRowsDirect(udc.storeDirect, addRowsAll, updateRowsAll, deleteRowsAll)
+	} else {
+		// start a writer for this batch
+		var kvwriter store.KVWriter
+		kvwriter, err = udc.store.Writer()
+		if err != nil {
+			return
+		}
 
-	err = udc.batchRows(kvwriter, addRowsAll, updateRowsAll, deleteRowsAll)
-	if err != nil {
-		_ = kvwriter.Close()
-		atomic.AddUint64(&udc.stats.errors, 1)
-		return
-	}
+		err = udc.batchRows(kvwriter, addRowsAll, updateRowsAll, deleteRowsAll)
+		if err != nil {
+			_ = kvwriter.Close()
+			atomic.AddUint64(&udc.stats.errors, 1)
+			return
+		}
 
-	err = kvwriter.Close()
+		err = kvwriter.Close()
+	}
 
 	atomic.AddUint64(&udc.stats.indexTime, uint64(time.Since(indexStart)))
 

@@ -74,7 +74,7 @@ func TestAnalysis(t *testing.T) {
 		{
 			d: document.NewDocument("a").
 				AddField(
-					document.NewTextFieldWithIndexingOptions("name", nil, []byte("test"), document.IndexField|document.StoreField|document.IncludeTermVectors)),
+				document.NewTextFieldWithIndexingOptions("name", nil, []byte("test"), document.IndexField|document.StoreField|document.IncludeTermVectors)),
 			r: &index.AnalysisResult{
 				DocID: "a",
 				Rows: []index.IndexRow{
