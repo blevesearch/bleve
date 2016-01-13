@@ -925,6 +925,61 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	go func() {
 		defer close(docBackIndexRowCh)
 
+		if udc.storeDirect != nil {
+			docIDs := make([]string, 0, len(batch.IndexOps))
+			keys := make([][]byte, 0, len(batch.IndexOps))
+			keyBuf := GetRowBuffer()
+			for docID := range batch.IndexOps {
+				docIDs = append(docIDs, docID)
+
+				tmpRow := BackIndexRow{doc: []byte(docID)}
+				if tmpRow.KeySize() > len(keyBuf) {
+					keyBuf = make([]byte, 2*tmpRow.KeySize())
+				}
+
+				keySize, err := tmpRow.KeyTo(keyBuf)
+				if err != nil {
+					docBackIndexRowErr = err
+					return
+				}
+
+				keys = append(keys, append([]byte(nil), keyBuf[:keySize]...))
+			}
+			PutRowBuffer(keyBuf)
+
+			vals, err := udc.storeDirect.MultiGet(keys)
+			if err != nil {
+				docBackIndexRowErr = err
+				return
+			}
+
+			if len(vals) != len(keys) {
+				docBackIndexRowErr = fmt.Errorf("upside_down backIndex MultiGet len mismatch, len(vals): %d, len(keys): %d", len(vals), len(keys))
+				return
+			}
+
+			for i, docID := range docIDs {
+				val := vals[i]
+				if val == nil {
+					docBackIndexRowCh <- &docBackIndexRow{
+						docID, batch.IndexOps[docID], nil,
+					}
+				} else {
+					backIndexRow, err := NewBackIndexRowKV(keys[i], val)
+					if err != nil {
+						docBackIndexRowErr = err
+						return
+					}
+
+					docBackIndexRowCh <- &docBackIndexRow{
+						docID, batch.IndexOps[docID], backIndexRow,
+					}
+				}
+			}
+
+			return // END storeDirect MultiGet().
+		}
+
 		// open a reader for backindex lookup
 		var kvreader store.KVReader
 		kvreader, err = udc.store.Reader()

@@ -136,6 +136,9 @@ type KVDirectStore interface {
 		sets []KVDirectKeyVal,
 		merges []KVDirectKeyVal,
 		deletes [][]byte) error
+
+	// MultiGet retrieves multiple values in one shot to the KVStore.
+	MultiGet(keys [][]byte) (vals [][]byte, err error)
 }
 
 type KVDirectKeyVal struct {
