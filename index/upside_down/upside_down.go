@@ -142,19 +142,22 @@ func PutRowBuffer(buf []byte) {
 }
 
 func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]UpsideDownCouchRow, updateRowsAll [][]UpsideDownCouchRow, deleteRowsAll [][]UpsideDownCouchRow) (err error) {
-
-	// prepare batch
-	wb := writer.NewBatch()
-	defer func() {
-		_ = wb.Close()
-	}()
-
-	// buffer to work with
-	rowBuf := GetRowBuffer()
-
 	dictionaryDeltas := make(map[string]int64)
 
-	// add
+	// count up bytes needed for buffering.
+	addNum := 0
+	addKeyBytes := 0
+	addValBytes := 0
+
+	updateNum := 0
+	updateKeyBytes := 0
+	updateValBytes := 0
+
+	deleteNum := 0
+	deleteKeyBytes := 0
+
+	rowBuf := GetRowBuffer()
+
 	for _, addRows := range addRowsAll {
 		for _, row := range addRows {
 			tfr, ok := row.(*TermFrequencyRow)
@@ -168,37 +171,20 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]Upsi
 				}
 				dictionaryDeltas[string(rowBuf[:dictKeySize])] += 1
 			}
-			if row.KeySize()+row.ValueSize() > len(rowBuf) {
-				rowBuf = make([]byte, row.KeySize()+row.ValueSize())
-			}
-			keySize, err := row.KeyTo(rowBuf)
-			if err != nil {
-				return err
-			}
-			valSize, err := row.ValueTo(rowBuf[keySize:])
-			wb.Set(rowBuf[:keySize], rowBuf[keySize:keySize+valSize])
+			addKeyBytes += row.KeySize()
+			addValBytes += row.ValueSize()
 		}
+		addNum += len(addRows)
 	}
 
-	// update
 	for _, updateRows := range updateRowsAll {
 		for _, row := range updateRows {
-			if row.KeySize()+row.ValueSize() > len(rowBuf) {
-				rowBuf = make([]byte, row.KeySize()+row.ValueSize())
-			}
-			keySize, err := row.KeyTo(rowBuf)
-			if err != nil {
-				return err
-			}
-			valSize, err := row.ValueTo(rowBuf[keySize:])
-			if err != nil {
-				return err
-			}
-			wb.Set(rowBuf[:keySize], rowBuf[keySize:keySize+valSize])
+			updateKeyBytes += row.KeySize()
+			updateValBytes += row.ValueSize()
 		}
+		updateNum += len(updateRows)
 	}
 
-	// delete
 	for _, deleteRows := range deleteRowsAll {
 		for _, row := range deleteRows {
 			tfr, ok := row.(*TermFrequencyRow)
@@ -213,26 +199,88 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]Upsi
 				}
 				dictionaryDeltas[string(rowBuf[:dictKeySize])] -= 1
 			}
-			if row.KeySize()+row.ValueSize() > len(rowBuf) {
-				rowBuf = make([]byte, row.KeySize()+row.ValueSize())
-			}
-			keySize, err := row.KeyTo(rowBuf)
-			if err != nil {
-				return err
-			}
-			wb.Delete(rowBuf[:keySize])
+			deleteKeyBytes += row.KeySize()
 		}
-	}
-
-	if 8 > len(rowBuf) {
-		rowBuf = make([]byte, 8)
-	}
-	for dictRowKey, delta := range dictionaryDeltas {
-		binary.LittleEndian.PutUint64(rowBuf, uint64(delta))
-		wb.Merge([]byte(dictRowKey), rowBuf[0:8])
+		deleteNum += len(deleteRows)
 	}
 
 	PutRowBuffer(rowBuf)
+
+	mergeNum := len(dictionaryDeltas)
+	mergeKeyBytes := 0
+	mergeValBytes := mergeNum * 8
+
+	for dictRowKey, _ := range dictionaryDeltas {
+		mergeKeyBytes += len(dictRowKey)
+	}
+
+	// prepare batch
+	totBytes := addKeyBytes + addValBytes +
+		updateKeyBytes + updateValBytes +
+		deleteKeyBytes +
+		mergeKeyBytes + mergeValBytes
+
+	buf, wb, err := writer.NewBatchEx(store.KVBatchOptions{
+		TotalBytes: totBytes,
+		NumSets:    addNum + updateNum,
+		NumDeletes: deleteNum,
+		NumMerges:  mergeNum,
+	})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = wb.Close()
+	}()
+
+	// fill the batch
+	for _, addRows := range addRowsAll {
+		for _, row := range addRows {
+			keySize, err := row.KeyTo(buf)
+			if err != nil {
+				return err
+			}
+			valSize, err := row.ValueTo(buf[keySize:])
+			if err != nil {
+				return err
+			}
+			wb.Set(buf[:keySize], buf[keySize:keySize+valSize])
+			buf = buf[keySize+valSize:]
+		}
+	}
+
+	for _, updateRows := range updateRowsAll {
+		for _, row := range updateRows {
+			keySize, err := row.KeyTo(buf)
+			if err != nil {
+				return err
+			}
+			valSize, err := row.ValueTo(buf[keySize:])
+			if err != nil {
+				return err
+			}
+			wb.Set(buf[:keySize], buf[keySize:keySize+valSize])
+			buf = buf[keySize+valSize:]
+		}
+	}
+
+	for _, deleteRows := range deleteRowsAll {
+		for _, row := range deleteRows {
+			keySize, err := row.KeyTo(buf)
+			if err != nil {
+				return err
+			}
+			wb.Delete(buf[:keySize])
+			buf = buf[keySize:]
+		}
+	}
+
+	for dictRowKey, delta := range dictionaryDeltas {
+		dictRowKeyLen := copy(buf, dictRowKey)
+		binary.LittleEndian.PutUint64(buf[dictRowKeyLen:], uint64(delta))
+		wb.Merge(buf[:dictRowKeyLen], buf[dictRowKeyLen:dictRowKeyLen+8])
+		buf = buf[dictRowKeyLen+8:]
+	}
 
 	// write out the batch
 	return writer.ExecuteBatch(wb)

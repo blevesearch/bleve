@@ -192,14 +192,17 @@ func (f *Firestorm) Delete(id string) error {
 
 func (f *Firestorm) batchRows(writer store.KVWriter, rowsOfRows [][]index.IndexRow, deleteKeys [][]byte) (map[string]int64, error) {
 
-	// prepare batch
-	wb := writer.NewBatch()
-	defer func() {
-		_ = wb.Close()
-	}()
+	dictionaryDeltas := make(map[string]int64)
+
+	// count up bytes needed for buffering.
+	addNum := 0
+	addKeyBytes := 0
+	addValBytes := 0
+
+	deleteNum := 0
+	deleteKeyBytes := 0
 
 	var kbuf []byte
-	var vbuf []byte
 
 	prepareBuf := func(buf []byte, sizeNeeded int) []byte {
 		if cap(buf) < sizeNeeded {
@@ -207,8 +210,6 @@ func (f *Firestorm) batchRows(writer store.KVWriter, rowsOfRows [][]index.IndexR
 		}
 		return buf[0:sizeNeeded]
 	}
-
-	dictionaryDeltas := make(map[string]int64)
 
 	for _, rows := range rowsOfRows {
 		for _, row := range rows {
@@ -225,28 +226,59 @@ func (f *Firestorm) batchRows(writer store.KVWriter, rowsOfRows [][]index.IndexR
 				}
 			}
 
-			kbuf = prepareBuf(kbuf, row.KeySize())
-			klen, err := row.KeyTo(kbuf)
+			addKeyBytes += row.KeySize()
+			addValBytes += row.ValueSize()
+		}
+		addNum += len(rows)
+	}
+
+	for _, dk := range deleteKeys {
+		deleteKeyBytes += len(dk)
+	}
+	deleteNum += len(deleteKeys)
+
+	// prepare batch
+	totBytes := addKeyBytes + addValBytes + deleteKeyBytes
+
+	buf, wb, err := writer.NewBatchEx(store.KVBatchOptions{
+		TotalBytes: totBytes,
+		NumSets:    addNum,
+		NumDeletes: deleteNum,
+		NumMerges:  0,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = wb.Close()
+	}()
+
+	for _, rows := range rowsOfRows {
+		for _, row := range rows {
+			klen, err := row.KeyTo(buf)
 			if err != nil {
 				return nil, err
 			}
 
-			vbuf = prepareBuf(vbuf, row.ValueSize())
-			vlen, err := row.ValueTo(vbuf)
+			vlen, err := row.ValueTo(buf[klen:])
 			if err != nil {
 				return nil, err
 			}
 
-			wb.Set(kbuf[0:klen], vbuf[0:vlen])
+			wb.Set(buf[0:klen], buf[klen:klen+vlen])
+
+			buf = buf[klen+vlen:]
 		}
 	}
 
 	for _, dk := range deleteKeys {
-		wb.Delete(dk)
+		dklen := copy(buf, dk)
+		wb.Delete(buf[0:dklen])
+		buf = buf[dklen:]
 	}
 
 	// write out the batch
-	err := writer.ExecuteBatch(wb)
+	err = writer.ExecuteBatch(wb)
 	if err != nil {
 		return nil, err
 	}
