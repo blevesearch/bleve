@@ -399,6 +399,6 @@ func TestMappingBool(t *testing.T) {
 		t.Errorf("expected to find pointer to bool field named 'pprop'")
 	}
 	if count != 2 {
-		t.Errorf("expected to find 1 find, found %d", count)
+		t.Errorf("expected to find 2 fields, found %d", count)
 	}
 }
