@@ -126,7 +126,7 @@ func incrementBytes(in []byte) []byte {
 	for i := len(rv) - 1; i >= 0; i-- {
 		rv[i] = rv[i] + 1
 		if rv[i] != 0 {
-			// didnt' overflow, so stop
+			// didn't overflow, so stop
 			break
 		}
 	}

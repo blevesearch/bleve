@@ -51,7 +51,7 @@ OUTER:
 		}
 
 		// if we still have more characters available to us
-		// push back towards begining
+		// push back towards beginning
 		// without cross maxbegin
 		for start > 0 && used < s.fragmentSize {
 			r, size := utf8.DecodeLastRune(orig[0:start])

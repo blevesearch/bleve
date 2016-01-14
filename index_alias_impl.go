@@ -438,7 +438,7 @@ func (i *indexAliasImpl) Swap(in, out []Index) {
 // createChildSearchRequest creates a separate
 // request from the original
 // For now, avoid data race on req structure.
-// TODO disable highligh/field load on child
+// TODO disable highlight/field load on child
 // requests, and add code to do this only on
 // the actual final results.
 // Perhaps that part needs to be optional,
