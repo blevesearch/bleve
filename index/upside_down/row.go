@@ -321,7 +321,7 @@ func NewDictionaryRowK(key []byte) (*DictionaryRow, error) {
 }
 
 func (dr *DictionaryRow) parseDictionaryV(value []byte) error {
-	buf := bytes.NewBuffer((value))
+	buf := bytes.NewBuffer(value)
 
 	count, err := binary.ReadUvarint(buf)
 	if err != nil {
