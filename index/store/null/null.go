@@ -96,6 +96,10 @@ func (w *writer) NewBatch() store.KVBatch {
 	return &batch{}
 }
 
+func (w *writer) NewBatchEx(options store.KVBatchOptions) ([]byte, store.KVBatch, error) {
+	return make([]byte, options.TotalBytes), w.NewBatch(), nil
+}
+
 func (w *writer) ExecuteBatch(store.KVBatch) error {
 	return nil
 }
