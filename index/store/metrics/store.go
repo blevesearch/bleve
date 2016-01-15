@@ -33,6 +33,7 @@ type Store struct {
 	o store.KVStore
 
 	TimerReaderGet            metrics.Timer
+	TimerReaderMultiGet       metrics.Timer
 	TimerReaderPrefixIterator metrics.Timer
 	TimerReaderRangeIterator  metrics.Timer
 	TimerWriterExecuteBatch   metrics.Timer
@@ -71,6 +72,7 @@ func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, 
 		o: kvs,
 
 		TimerReaderGet:            metrics.NewTimer(),
+		TimerReaderMultiGet:       metrics.NewTimer(),
 		TimerReaderPrefixIterator: metrics.NewTimer(),
 		TimerReaderRangeIterator:  metrics.NewTimer(),
 		TimerWriterExecuteBatch:   metrics.NewTimer(),
@@ -141,6 +143,11 @@ func (s *Store) WriteJSON(w io.Writer) (err error) {
 		return
 	}
 	WriteTimerJSON(w, s.TimerReaderGet)
+	_, err = w.Write([]byte(`,"TimerReaderMultiGet":`))
+	if err != nil {
+		return
+	}
+	WriteTimerJSON(w, s.TimerReaderMultiGet)
 	_, err = w.Write([]byte(`,"TimerReaderPrefixIterator":`))
 	if err != nil {
 		return

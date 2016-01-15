@@ -40,6 +40,10 @@ func (r *reader) Get(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
+func (r *reader) MultiGet(keys [][]byte) ([][]byte, error) {
+	return make([][]byte, len(keys)), nil
+}
+
 func (r *reader) PrefixIterator(prefix []byte) store.KVIterator {
 	return &iterator{}
 }
@@ -90,6 +94,10 @@ type writer struct{}
 
 func (w *writer) NewBatch() store.KVBatch {
 	return &batch{}
+}
+
+func (w *writer) NewBatchEx(options store.KVBatchOptions) ([]byte, store.KVBatch, error) {
+	return make([]byte, options.TotalBytes), w.NewBatch(), nil
 }
 
 func (w *writer) ExecuteBatch(store.KVBatch) error {

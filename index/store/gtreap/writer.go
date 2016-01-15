@@ -29,6 +29,10 @@ func (w *Writer) NewBatch() store.KVBatch {
 	return store.NewEmulatedBatch(w.s.mo)
 }
 
+func (w *Writer) NewBatchEx(options store.KVBatchOptions) ([]byte, store.KVBatch, error) {
+	return make([]byte, options.TotalBytes), w.NewBatch(), nil
+}
+
 func (w *Writer) ExecuteBatch(batch store.KVBatch) error {
 
 	emulatedBatch, ok := batch.(*store.EmulatedBatch)
