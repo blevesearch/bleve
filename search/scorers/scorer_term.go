@@ -29,6 +29,7 @@ type TermQueryScorer struct {
 	queryNorm              float64
 	queryWeight            float64
 	queryWeightExplanation *search.Explanation
+	rv                     search.DocumentMatch
 }
 
 func NewTermQueryScorer(queryTerm string, queryField string, queryBoost float64, docTotal, docTerm uint64, explain bool) *TermQueryScorer {
@@ -128,19 +129,18 @@ func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc) *search.DocumentM
 		}
 	}
 
-	rv := search.DocumentMatch{
-		ID:    termMatch.ID,
-		Score: score,
-	}
+	s.rv.ID = termMatch.ID
+	s.rv.Score = score
+	s.rv.Locations = nil
 	if s.explain {
-		rv.Expl = scoreExplanation
+		s.rv.Expl = scoreExplanation
 	}
 
 	if termMatch.Vectors != nil && len(termMatch.Vectors) > 0 {
 
-		rv.Locations = make(search.FieldTermLocationMap)
+		s.rv.Locations = make(search.FieldTermLocationMap)
 		for _, v := range termMatch.Vectors {
-			tlm := rv.Locations[v.Field]
+			tlm := s.rv.Locations[v.Field]
 			if tlm == nil {
 				tlm = make(search.TermLocationMap)
 			}
@@ -167,10 +167,10 @@ func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc) *search.DocumentM
 			}
 			tlm[s.queryTerm] = locations
 
-			rv.Locations[v.Field] = tlm
+			s.rv.Locations[v.Field] = tlm
 		}
 
 	}
 
-	return &rv
+	return &s.rv
 }

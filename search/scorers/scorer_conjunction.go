@@ -15,6 +15,7 @@ import (
 
 type ConjunctionQueryScorer struct {
 	explain bool
+	rv      search.DocumentMatch
 }
 
 func NewConjunctionQueryScorer(explain bool) *ConjunctionQueryScorer {
@@ -24,9 +25,8 @@ func NewConjunctionQueryScorer(explain bool) *ConjunctionQueryScorer {
 }
 
 func (s *ConjunctionQueryScorer) Score(constituents []*search.DocumentMatch) *search.DocumentMatch {
-	rv := search.DocumentMatch{
-		ID: constituents[0].ID,
-	}
+	s.rv.ID = constituents[0].ID
+	s.rv.Locations = nil
 
 	var sum float64
 	var childrenExplanations []*search.Explanation
@@ -44,16 +44,16 @@ func (s *ConjunctionQueryScorer) Score(constituents []*search.DocumentMatch) *se
 			locations = append(locations, docMatch.Locations)
 		}
 	}
-	rv.Score = sum
+	s.rv.Score = sum
 	if s.explain {
-		rv.Expl = &search.Explanation{Value: sum, Message: "sum of:", Children: childrenExplanations}
+		s.rv.Expl = &search.Explanation{Value: sum, Message: "sum of:", Children: childrenExplanations}
 	}
 
 	if len(locations) == 1 {
-		rv.Locations = locations[0]
+		s.rv.Locations = locations[0]
 	} else if len(locations) > 1 {
-		rv.Locations = search.MergeLocations(locations)
+		s.rv.Locations = search.MergeLocations(locations)
 	}
 
-	return &rv
+	return &s.rv
 }
