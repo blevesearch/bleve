@@ -57,7 +57,7 @@ func (t TermLocations) Less(i, j int) bool {
 	}
 	// all the common array positions are the same
 	if len(t[i].ArrayPositions) < len(t[j].ArrayPositions) {
-		return true // j array positions, longer so greather
+		return true // j array positions, longer so greater
 	} else if len(t[i].ArrayPositions) > len(t[j].ArrayPositions) {
 		return false // j array positions, shorter so less
 	}

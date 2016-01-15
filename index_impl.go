@@ -172,7 +172,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		return nil, err
 	}
 
-	// backwards compatability if index type is missing
+	// backwards compatibility if index type is missing
 	if rv.meta.IndexType == "" {
 		rv.meta.IndexType = upside_down.Name
 	}

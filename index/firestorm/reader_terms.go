@@ -45,7 +45,7 @@ func newFirestormTermFieldReader(r *firestormReader, field uint16, term []byte) 
 
 	// NOTE: in firestorm the dictionary row is advisory in nature
 	// it *may* tell us the correct out
-	// if this record does not exist, it DOES not mean that there isno
+	// if this record does not exist, it DOES not mean that there is no
 	// usage, we must scan the term frequencies to be sure
 	if dictionaryValue != nil {
 		dictionaryRow, err := NewDictionaryRowKV(dictionaryKey, dictionaryValue)

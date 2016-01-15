@@ -8,7 +8,7 @@ import (
 	"github.com/blevesearch/bleve/index/store"
 )
 
-// tests focused on verfiying that readers are isolated from writers
+// tests focused on verifying that readers are isolated from writers
 
 func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	// insert a kv pair
@@ -30,7 +30,7 @@ func CommonTestReaderIsolation(t *testing.T, s store.KVStore) {
 	// reader is closed.
 	// in general this is not a problem for bleve
 	// (though it may affect performance in some cases)
-	// but it is a problem for this test which attemps
+	// but it is a problem for this test which attempts
 	// to easily verify that readers are isolated
 	// this hack writes enough initial data such that
 	// the subsequent writes do not require additional

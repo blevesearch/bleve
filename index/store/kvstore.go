@@ -88,7 +88,7 @@ type KVIterator interface {
 // to do this in a way that is safe and makes sense
 type KVWriter interface {
 
-	// NewBatch returns a KVBatch for performaing batch operations on this kvstore
+	// NewBatch returns a KVBatch for performing batch operations on this kvstore
 	NewBatch() KVBatch
 
 	// ExecuteBatch will execute the KVBatch, the provided KVBatch **MUST** have
