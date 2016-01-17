@@ -1027,7 +1027,7 @@ func (udc *UpsideDownCouch) Stats() json.Marshaler {
 func (udc *UpsideDownCouch) fieldIndexOrNewRow(name string) (uint16, *FieldRow) {
 	index, existed := udc.fieldCache.FieldNamed(name, true)
 	if !existed {
-		return index, NewFieldRow(uint16(index), name)
+		return index, NewFieldRow(index, name)
 	}
 	return index, nil
 }
