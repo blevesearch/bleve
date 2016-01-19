@@ -49,7 +49,12 @@ func (tfs TokenFrequencies) MergeAll(remoteField string, other TokenFrequencies)
 			existingTf.Locations = append(existingTf.Locations, tf.Locations...)
 			existingTf.frequency = existingTf.frequency + tf.frequency
 		} else {
-			tfs[tfk] = tf
+			tfs[tfk] = &TokenFreq{
+				Term:      tf.Term,
+				frequency: tf.frequency,
+				Locations: make([]*TokenLocation, len(tf.Locations)),
+			}
+			copy(tfs[tfk].Locations, tf.Locations)
 		}
 	}
 }
