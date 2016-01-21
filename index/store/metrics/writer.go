@@ -24,7 +24,11 @@ func (w *Writer) NewBatch() store.KVBatch {
 }
 
 func (w *Writer) NewBatchEx(options store.KVBatchOptions) ([]byte, store.KVBatch, error) {
-	return make([]byte, options.TotalBytes), w.NewBatch(), nil
+	buf, b, err :=  w.o.NewBatchEx(options)
+	if err != nil {
+		return nil, nil, err
+	}
+	return buf, &Batch{s: w.s, o: b}, nil
 }
 
 func (w *Writer) ExecuteBatch(b store.KVBatch) (err error) {
