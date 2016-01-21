@@ -58,6 +58,19 @@ func (q *regexpQuery) Searcher(i index.IndexReader, m *IndexMapping, explain boo
 	if q.FieldVal == "" {
 		field = m.DefaultField
 	}
+	err := q.compile()
+	if err != nil {
+		return nil, err
+	}
+
+	return searchers.NewRegexpSearcher(i, q.compiled, field, q.BoostVal, explain)
+}
+
+func (q *regexpQuery) Validate() error {
+	return q.compile()
+}
+
+func (q *regexpQuery) compile() error {
 	if q.compiled == nil {
 		// require that pattern be anchored to start and end of term
 		actualRegexp := q.Regexp
@@ -70,15 +83,8 @@ func (q *regexpQuery) Searcher(i index.IndexReader, m *IndexMapping, explain boo
 		var err error
 		q.compiled, err = regexp.Compile(actualRegexp)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-
-	return searchers.NewRegexpSearcher(i, q.compiled, field, q.BoostVal, explain)
-}
-
-func (q *regexpQuery) Validate() error {
-	var err error
-	q.compiled, err = regexp.Compile(q.Regexp)
-	return err
+	return nil
 }
