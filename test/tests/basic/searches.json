@@ -582,5 +582,39 @@
 				}
 			]
 		}
+	},
+	{
+		"comment": "test regexp matching term",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "name",
+				"regexp": "mar.*"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "a"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test regexp that should not match when properly anchored",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "name",
+				"regexp": "mar."
+			}
+		},
+		"result": {
+			"total_hits": 0,
+			"hits": []
+		}
 	}
 ]

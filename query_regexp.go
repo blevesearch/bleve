@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"regexp"
+	"strings"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
@@ -58,8 +59,16 @@ func (q *regexpQuery) Searcher(i index.IndexReader, m *IndexMapping, explain boo
 		field = m.DefaultField
 	}
 	if q.compiled == nil {
+		// require that pattern be anchored to start and end of term
+		actualRegexp := q.Regexp
+		if !strings.HasPrefix(actualRegexp, "^") {
+			actualRegexp = "^" + actualRegexp
+		}
+		if !strings.HasSuffix(actualRegexp, "$") {
+			actualRegexp = actualRegexp + "$"
+		}
 		var err error
-		q.compiled, err = regexp.Compile(q.Regexp)
+		q.compiled, err = regexp.Compile(actualRegexp)
 		if err != nil {
 			return nil, err
 		}
