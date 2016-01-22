@@ -24,7 +24,7 @@ func (w *Writer) NewBatch() store.KVBatch {
 }
 
 func (w *Writer) NewBatchEx(options store.KVBatchOptions) ([]byte, store.KVBatch, error) {
-	buf, b, err :=  w.o.NewBatchEx(options)
+	buf, b, err := w.o.NewBatchEx(options)
 	if err != nil {
 		return nil, nil, err
 	}

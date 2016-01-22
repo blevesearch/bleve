@@ -363,7 +363,7 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 }
 
 func (im *IndexMapping) determineType(data interface{}) string {
-	// first see if the object implements Identifier
+	// first see if the object implements Classifier
 	classifier, ok := data.(Classifier)
 	if ok {
 		return classifier.Type()
