@@ -402,13 +402,15 @@ func (im *IndexMapping) mapDocument(doc *document.Document, data interface{}) er
 	docType := im.determineType(data)
 	docMapping := im.mappingForType(docType)
 	walkContext := im.newWalkContext(doc, docMapping)
-	docMapping.walkDocument(data, []string{}, []uint64{}, walkContext)
+	if docMapping.Enabled {
+		docMapping.walkDocument(data, []string{}, []uint64{}, walkContext)
 
-	// see if the _all field was disabled
-	allMapping := docMapping.documentMappingForPath("_all")
-	if allMapping == nil || (allMapping.Enabled != false) {
-		field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, document.IndexField|document.IncludeTermVectors)
-		doc.AddField(field)
+		// see if the _all field was disabled
+		allMapping := docMapping.documentMappingForPath("_all")
+		if allMapping == nil || (allMapping.Enabled != false) {
+			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, document.IndexField|document.IncludeTermVectors)
+			doc.AddField(field)
+		}
 	}
 
 	return nil

@@ -402,3 +402,22 @@ func TestMappingBool(t *testing.T) {
 		t.Errorf("expected to find 2 fields, found %d", count)
 	}
 }
+
+func TestDisableDefaultMapping(t *testing.T) {
+	indexMapping := NewIndexMapping()
+	indexMapping.DefaultMapping.Enabled = false
+
+	data := map[string]string{
+		"name": "bleve",
+	}
+
+	doc := document.NewDocument("x")
+	err := indexMapping.mapDocument(doc, data)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(doc.Fields) > 0 {
+		t.Errorf("expected no fields, got %d", len(doc.Fields))
+	}
+}
