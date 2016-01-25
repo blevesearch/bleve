@@ -446,7 +446,7 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 
 		for _, hit := range hits {
 			doc, err := indexReader.Document(hit.ID)
-			if err == nil {
+			if err == nil && doc != nil {
 				highlightFields := req.Highlight.Fields
 				if highlightFields == nil {
 					// add all fields with matches
@@ -459,6 +459,10 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 				for _, hf := range highlightFields {
 					highlighter.BestFragmentsInField(hit, doc, hf, 1)
 				}
+			} else if err == nil {
+				// unexpected case, a doc ID that was found as a search hit
+				// was unable to be found during document lookup
+				panic(fmt.Sprintf("search hit with doc id: '%s' not found in doc lookup", hit.ID))
 			}
 		}
 	}
