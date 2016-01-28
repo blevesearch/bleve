@@ -82,7 +82,7 @@ func LevenshteinDistanceMax(a, b *string, max int) (int, bool) {
 
 			lastdiag = olddiag
 		}
-		// after each row if rowmin isnt less than max stop
+		// after each row if rowmin isn't less than max stop
 		if rowmin > max {
 			return max, true
 		}

@@ -40,6 +40,10 @@ func (r *reader) Get(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
+func (r *reader) MultiGet(keys [][]byte) ([][]byte, error) {
+	return make([][]byte, len(keys)), nil
+}
+
 func (r *reader) PrefixIterator(prefix []byte) store.KVIterator {
 	return &iterator{}
 }
@@ -84,11 +88,16 @@ func (i *batch) Set(key, val []byte)   {}
 func (i *batch) Delete(key []byte)     {}
 func (i *batch) Merge(key, val []byte) {}
 func (i *batch) Reset()                {}
+func (i *batch) Close() error          { return nil }
 
 type writer struct{}
 
 func (w *writer) NewBatch() store.KVBatch {
 	return &batch{}
+}
+
+func (w *writer) NewBatchEx(options store.KVBatchOptions) ([]byte, store.KVBatch, error) {
+	return make([]byte, options.TotalBytes), w.NewBatch(), nil
 }
 
 func (w *writer) ExecuteBatch(store.KVBatch) error {

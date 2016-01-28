@@ -67,7 +67,7 @@ func (dm *DocumentMapping) validate(cache *registry.Cache) error {
 			}
 		}
 		switch field.Type {
-		case "text", "datetime", "number":
+		case "text", "datetime", "number", "boolean":
 		default:
 			return fmt.Errorf("unknown field type: '%s'", field.Type)
 		}
@@ -331,11 +331,11 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
 				if err != nil {
 					// index as text
-					fieldMapping := NewTextFieldMapping()
+					fieldMapping := newTextFieldMappingDynamic()
 					fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
 				} else {
 					// index as datetime
-					fieldMapping := NewDateTimeFieldMapping()
+					fieldMapping := newDateTimeFieldMappingDynamic()
 					fieldMapping.processTime(parsedDateTime, pathString, path, indexes, context)
 				}
 			}
@@ -349,8 +349,20 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			}
 		} else if dm.Dynamic {
 			// automatic indexing behavior
-			fieldMapping := NewNumericFieldMapping()
+			fieldMapping := newNumericFieldMappingDynamic()
 			fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
+		}
+	case reflect.Bool:
+		propertyValBool := propertyValue.Bool()
+		if subDocMapping != nil {
+			// index by explicit mapping
+			for _, fieldMapping := range subDocMapping.Fields {
+				fieldMapping.processBoolean(propertyValBool, pathString, path, indexes, context)
+			}
+		} else if dm.Dynamic {
+			// automatic indexing behavior
+			fieldMapping := newBooleanFieldMappingDynamic()
+			fieldMapping.processBoolean(propertyValBool, pathString, path, indexes, context)
 		}
 	case reflect.Struct:
 		switch property := property.(type) {
@@ -362,7 +374,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 					fieldMapping.processTime(property, pathString, path, indexes, context)
 				}
 			} else if dm.Dynamic {
-				fieldMapping := NewDateTimeFieldMapping()
+				fieldMapping := newDateTimeFieldMappingDynamic()
 				fieldMapping.processTime(property, pathString, path, indexes, context)
 			}
 		default:

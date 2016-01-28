@@ -60,7 +60,7 @@ func (t *TextField) Analyze() (int, analysis.TokenFrequencies) {
 		}
 	}
 	fieldLength := len(tokens) // number of tokens in this doc field
-	tokenFreqs := analysis.TokenFrequency(tokens, t.arrayPositions)
+	tokenFreqs := analysis.TokenFrequency(tokens, t.arrayPositions, t.options.IncludeTermVectors())
 	return fieldLength, tokenFreqs
 }
 

@@ -573,6 +573,7 @@ func TestMultiSearchNoError(t *testing.T) {
 		Total: 1,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{
+				Index: "1",
 				ID:    "a",
 				Score: 1.0,
 			},
@@ -583,6 +584,7 @@ func TestMultiSearchNoError(t *testing.T) {
 		Total: 1,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{
+				Index: "2",
 				ID:    "b",
 				Score: 2.0,
 			},
@@ -596,10 +598,12 @@ func TestMultiSearchNoError(t *testing.T) {
 		Total:   2,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{
+				Index: "2",
 				ID:    "b",
 				Score: 2.0,
 			},
 			&search.DocumentMatch{
+				Index: "1",
 				ID:    "a",
 				Score: 1.0,
 			},
@@ -683,6 +687,7 @@ func TestMultiSearchSecondPage(t *testing.T) {
 // corresponding operation result value has been
 // set, in which case that is returned instead
 type stubIndex struct {
+	name           string
 	err            error
 	searchResult   *SearchResult
 	documentResult *document.Document
@@ -787,4 +792,12 @@ func (i *stubIndex) Advanced() (index.Index, store.KVStore, error) {
 
 func (i *stubIndex) NewBatch() *Batch {
 	return &Batch{}
+}
+
+func (i *stubIndex) Name() string {
+	return i.name
+}
+
+func (i *stubIndex) SetName(name string) {
+	i.name = name
 }

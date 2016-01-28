@@ -21,6 +21,7 @@ import (
 )
 
 type indexAliasImpl struct {
+	name    string
 	indexes []Index
 	mutex   sync.RWMutex
 	open    bool
@@ -30,6 +31,7 @@ type indexAliasImpl struct {
 // Index objects.
 func NewIndexAlias(indexes ...Index) *indexAliasImpl {
 	return &indexAliasImpl{
+		name:    "alias",
 		indexes: indexes,
 		open:    true,
 	}
@@ -436,7 +438,7 @@ func (i *indexAliasImpl) Swap(in, out []Index) {
 // createChildSearchRequest creates a separate
 // request from the original
 // For now, avoid data race on req structure.
-// TODO disable highligh/field load on child
+// TODO disable highlight/field load on child
 // requests, and add code to do this only on
 // the actual final results.
 // Perhaps that part needs to be optional,
@@ -559,6 +561,14 @@ func (i *indexAliasImpl) NewBatch() *Batch {
 	}
 
 	return i.indexes[0].NewBatch()
+}
+
+func (i *indexAliasImpl) Name() string {
+	return i.name
+}
+
+func (i *indexAliasImpl) SetName(name string) {
+	i.name = name
 }
 
 type indexAliasImplFieldDict struct {

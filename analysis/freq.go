@@ -26,6 +26,11 @@ type TokenLocation struct {
 type TokenFreq struct {
 	Term      []byte
 	Locations []*TokenLocation
+	frequency int
+}
+
+func (tf *TokenFreq) Frequency() int {
+	return tf.frequency
 }
 
 // TokenFrequencies maps document terms to their combined frequencies from all
@@ -42,35 +47,57 @@ func (tfs TokenFrequencies) MergeAll(remoteField string, other TokenFrequencies)
 		existingTf, exists := tfs[tfk]
 		if exists {
 			existingTf.Locations = append(existingTf.Locations, tf.Locations...)
+			existingTf.frequency = existingTf.frequency + tf.frequency
 		} else {
-			tfs[tfk] = tf
+			tfs[tfk] = &TokenFreq{
+				Term:      tf.Term,
+				frequency: tf.frequency,
+				Locations: make([]*TokenLocation, len(tf.Locations)),
+			}
+			copy(tfs[tfk].Locations, tf.Locations)
 		}
 	}
 }
 
-func TokenFrequency(tokens TokenStream, arrayPositions []uint64) TokenFrequencies {
+func TokenFrequency(tokens TokenStream, arrayPositions []uint64, includeTermVectors bool) TokenFrequencies {
 	rv := make(map[string]*TokenFreq, len(tokens))
 
-	for _, token := range tokens {
-		curr, ok := rv[string(token.Term)]
-		if ok {
-			curr.Locations = append(curr.Locations, &TokenLocation{
+	if includeTermVectors {
+		tls := make([]TokenLocation, len(tokens))
+		tlNext := 0
+
+		for _, token := range tokens {
+			tls[tlNext] = TokenLocation{
 				ArrayPositions: arrayPositions,
 				Start:          token.Start,
 				End:            token.End,
 				Position:       token.Position,
-			})
-		} else {
-			rv[string(token.Term)] = &TokenFreq{
-				Term: token.Term,
-				Locations: []*TokenLocation{
-					&TokenLocation{
-						ArrayPositions: arrayPositions,
-						Start:          token.Start,
-						End:            token.End,
-						Position:       token.Position,
-					},
-				},
+			}
+
+			curr, ok := rv[string(token.Term)]
+			if ok {
+				curr.Locations = append(curr.Locations, &tls[tlNext])
+				curr.frequency++
+			} else {
+				rv[string(token.Term)] = &TokenFreq{
+					Term:      token.Term,
+					Locations: []*TokenLocation{&tls[tlNext]},
+					frequency: 1,
+				}
+			}
+
+			tlNext++
+		}
+	} else {
+		for _, token := range tokens {
+			curr, exists := rv[string(token.Term)]
+			if exists {
+				curr.frequency++
+			} else {
+				rv[string(token.Term)] = &TokenFreq{
+					Term:      token.Term,
+					frequency: 1,
+				}
 			}
 		}
 	}

@@ -19,6 +19,7 @@ import (
 
 	"github.com/blevesearch/bleve"
 	_ "github.com/blevesearch/bleve/config"
+	_ "github.com/blevesearch/bleve/index/store/metrics"
 )
 
 var indexPath = flag.String("index", "", "index path")
@@ -26,8 +27,11 @@ var limit = flag.Int("limit", 10, "limit to first N results")
 var skip = flag.Int("skip", 0, "skip the first N results")
 var explain = flag.Bool("explain", false, "explain scores")
 var includeHighlights = flag.Bool("highlight", true, "highlight matches")
+var includeStoredFields = flag.Bool("fields", false, "return stored fields")
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 var repeat = flag.Int("repeat", 1, "repeat query n times")
+var qtype = flag.String("queryType", "query_string", "type of query to execute: query_string, prefix")
+var qfield = flag.String("field", "", "the field to query, not applicable to query_string queries")
 
 func main() {
 
@@ -66,14 +70,36 @@ func main() {
 	}()
 
 	for i := 0; i < *repeat; i++ {
-		// build a search with the provided parameters
-		queryString := strings.Join(flag.Args(), " ")
-		query := bleve.NewQueryStringQuery(queryString)
+		var query bleve.Query
+
+		switch *qtype {
+		case "prefix":
+			pquery := bleve.NewPrefixQuery(strings.Join(flag.Args(), " "))
+			if *qfield != "" {
+				pquery.SetField(*qfield)
+			}
+			query = pquery
+		case "term":
+			pquery := bleve.NewTermQuery(strings.Join(flag.Args(), " "))
+			if *qfield != "" {
+				pquery.SetField(*qfield)
+			}
+			query = pquery
+		default:
+			// build a search with the provided parameters
+			queryString := strings.Join(flag.Args(), " ")
+			query = bleve.NewQueryStringQuery(queryString)
+		}
+
 		searchRequest := bleve.NewSearchRequestOptions(query, *limit, *skip, *explain)
 
 		// enable highlights if requested
 		if *includeHighlights {
 			searchRequest.Highlight = bleve.NewHighlightWithStyle("ansi")
+		}
+
+		if *includeStoredFields {
+			searchRequest.Fields = []string{"*"}
 		}
 
 		// execute the search

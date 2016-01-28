@@ -40,6 +40,9 @@ type KVReader interface {
 	// The caller owns the bytes returned.
 	Get(key []byte) ([]byte, error)
 
+	// MultiGet retrieves multiple values in one call.
+	MultiGet(keys [][]byte) ([][]byte, error)
+
 	// PrefixIterator returns a KVIterator that will
 	// visit all K/V pairs with the provided prefix
 	PrefixIterator(prefix []byte) KVIterator
@@ -88,8 +91,16 @@ type KVIterator interface {
 // to do this in a way that is safe and makes sense
 type KVWriter interface {
 
-	// NewBatch returns a KVBatch for performaing batch operations on this kvstore
+	// NewBatch returns a KVBatch for performing batch operations on this kvstore
 	NewBatch() KVBatch
+
+	// NewBatchEx returns a KVBatch and an associated byte array
+	// that's pre-sized based on the KVBatchOptions.  The caller can
+	// use the returned byte array for keys and values associated with
+	// the batch.  Once the batch is either executed or closed, the
+	// associated byte array should no longer be accessed by the
+	// caller.
+	NewBatchEx(KVBatchOptions) ([]byte, KVBatch, error)
 
 	// ExecuteBatch will execute the KVBatch, the provided KVBatch **MUST** have
 	// been created by the same KVStore (though not necessarily the same KVWriter)
@@ -98,6 +109,27 @@ type KVWriter interface {
 
 	// Close closes the writer
 	Close() error
+}
+
+// KVBatchOptions provides the KVWriter.NewBatchEx() method with batch
+// preparation and preallocation information.
+type KVBatchOptions struct {
+	// TotalBytes is the sum of key and value bytes needed by the
+	// caller for the entire batch.  It affects the size of the
+	// returned byte array of KVWrite.NewBatchEx().
+	TotalBytes int
+
+	// NumSets is the number of Set() calls the caller will invoke on
+	// the KVBatch.
+	NumSets int
+
+	// NumMerges is the number of Merge() calls the caller will invoke
+	// on the KVBatch.
+	NumDeletes int
+
+	// NumMerges is the number of Merge() calls the caller will invoke
+	// on the KVBatch.
+	NumMerges int
 }
 
 // KVBatch is an abstraction for making multiple KV mutations at once
@@ -118,4 +150,7 @@ type KVBatch interface {
 
 	// Reset frees resources for this batch and allows reuse
 	Reset()
+
+	// Close frees resources
+	Close() error
 }

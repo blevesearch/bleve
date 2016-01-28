@@ -10,6 +10,7 @@
 package upside_down
 
 import (
+	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 )
@@ -20,56 +21,84 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		Rows:  make([]index.IndexRow, 0, 100),
 	}
 
+	docIDBytes := []byte(d.ID)
+
 	// track our back index entries
-	backIndexTermEntries := make([]*BackIndexTermEntry, 0)
 	backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
 
-	for _, field := range d.Fields {
+	// information we collate as we merge fields with same name
+	fieldTermFreqs := make(map[uint16]analysis.TokenFrequencies)
+	fieldLengths := make(map[uint16]int)
+	fieldIncludeTermVectors := make(map[uint16]bool)
+	fieldNames := make(map[uint16]string)
+
+	analyzeField := func(field document.Field, storable bool) {
 		fieldIndex, newFieldRow := udc.fieldIndexOrNewRow(field.Name())
 		if newFieldRow != nil {
 			rv.Rows = append(rv.Rows, newFieldRow)
 		}
+		fieldNames[fieldIndex] = field.Name()
 
 		if field.Options().IsIndexed() {
-
 			fieldLength, tokenFreqs := field.Analyze()
-
-			// see if any of the composite fields need this
-			for _, compositeField := range d.CompositeFields {
-				compositeField.Compose(field.Name(), fieldLength, tokenFreqs)
+			existingFreqs := fieldTermFreqs[fieldIndex]
+			if existingFreqs == nil {
+				fieldTermFreqs[fieldIndex] = tokenFreqs
+			} else {
+				existingFreqs.MergeAll(field.Name(), tokenFreqs)
+				fieldTermFreqs[fieldIndex] = existingFreqs
 			}
-
-			// encode this field
-			indexRows, indexBackIndexTermEntries := udc.indexField(d.ID, field, fieldIndex, fieldLength, tokenFreqs)
-			rv.Rows = append(rv.Rows, indexRows...)
-			backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
+			fieldLengths[fieldIndex] += fieldLength
+			fieldIncludeTermVectors[fieldIndex] = field.Options().IncludeTermVectors()
 		}
 
-		if field.Options().IsStored() {
-			storeRows, indexBackIndexStoreEntries := udc.storeField(d.ID, field, fieldIndex)
-			rv.Rows = append(rv.Rows, storeRows...)
-			backIndexStoredEntries = append(backIndexStoredEntries, indexBackIndexStoreEntries...)
+		if storable && field.Options().IsStored() {
+			rv.Rows, backIndexStoredEntries = udc.storeField(docIDBytes, field, fieldIndex, rv.Rows, backIndexStoredEntries)
 		}
-
 	}
 
-	// now index the composite fields
-	for _, compositeField := range d.CompositeFields {
-		fieldIndex, newFieldRow := udc.fieldIndexOrNewRow(compositeField.Name())
-		if newFieldRow != nil {
-			rv.Rows = append(rv.Rows, newFieldRow)
+	// walk all the fields, record stored fields now
+	// place information about indexed fields into map
+	// this collates information across fields with
+	// same names (arrays)
+	for _, field := range d.Fields {
+		analyzeField(field, true)
+	}
+
+	if len(d.CompositeFields) > 0 {
+		for fieldIndex, tokenFreqs := range fieldTermFreqs {
+			// see if any of the composite fields need this
+			for _, compositeField := range d.CompositeFields {
+				compositeField.Compose(fieldNames[fieldIndex], fieldLengths[fieldIndex], tokenFreqs)
+			}
 		}
-		if compositeField.Options().IsIndexed() {
-			fieldLength, tokenFreqs := compositeField.Analyze()
-			// encode this field
-			indexRows, indexBackIndexTermEntries := udc.indexField(d.ID, compositeField, fieldIndex, fieldLength, tokenFreqs)
-			rv.Rows = append(rv.Rows, indexRows...)
-			backIndexTermEntries = append(backIndexTermEntries, indexBackIndexTermEntries...)
+
+		for _, compositeField := range d.CompositeFields {
+			analyzeField(compositeField, false)
 		}
+	}
+
+	rowsCapNeeded := len(rv.Rows) + 1
+	for _, tokenFreqs := range fieldTermFreqs {
+		rowsCapNeeded += len(tokenFreqs)
+	}
+
+	rv.Rows = append(make([]index.IndexRow, 0, rowsCapNeeded), rv.Rows...)
+
+	backIndexTermEntries := make([]*BackIndexTermEntry, 0, rowsCapNeeded)
+
+	// walk through the collated information and proccess
+	// once for each indexed field (unique name)
+	for fieldIndex, tokenFreqs := range fieldTermFreqs {
+		fieldLength := fieldLengths[fieldIndex]
+		includeTermVectors := fieldIncludeTermVectors[fieldIndex]
+
+		// encode this field
+		rv.Rows, backIndexTermEntries = udc.indexField(docIDBytes, includeTermVectors, fieldIndex, fieldLength, tokenFreqs, rv.Rows, backIndexTermEntries)
 	}
 
 	// build the back index row
-	backIndexRow := NewBackIndexRow(d.ID, backIndexTermEntries, backIndexStoredEntries)
+	backIndexRow := NewBackIndexRow(docIDBytes, backIndexTermEntries, backIndexStoredEntries)
 	rv.Rows = append(rv.Rows, backIndexRow)
 
 	return rv

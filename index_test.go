@@ -21,6 +21,9 @@ import (
 	"testing"
 	"time"
 
+	"encoding/json"
+	"strconv"
+
 	"github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
 )
 
@@ -418,6 +421,8 @@ func TestStoredFieldPreserved(t *testing.T) {
 	doca := map[string]interface{}{
 		"name": "Marty",
 		"desc": "GopherCON India",
+		"bool": true,
+		"num":  float64(1),
 	}
 	err = index.Index("a", doca)
 	if err != nil {
@@ -426,7 +431,7 @@ func TestStoredFieldPreserved(t *testing.T) {
 
 	q := NewTermQuery("marty")
 	req := NewSearchRequest(q)
-	req.Fields = []string{"name", "desc"}
+	req.Fields = []string{"name", "desc", "bool", "num"}
 	res, err := index.Search(req)
 	if err != nil {
 		t.Error(err)
@@ -435,14 +440,18 @@ func TestStoredFieldPreserved(t *testing.T) {
 	if len(res.Hits) != 1 {
 		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
 	}
-
 	if res.Hits[0].Fields["name"] != "Marty" {
 		t.Errorf("expected 'Marty' got '%s'", res.Hits[0].Fields["name"])
 	}
 	if res.Hits[0].Fields["desc"] != "GopherCON India" {
 		t.Errorf("expected 'GopherCON India' got '%s'", res.Hits[0].Fields["desc"])
 	}
-
+	if res.Hits[0].Fields["num"] != float64(1) {
+		t.Errorf("expected '1' got '%v'", res.Hits[0].Fields["num"])
+	}
+	if res.Hits[0].Fields["bool"] != true {
+		t.Errorf("expected 'true' got '%v'", res.Hits[0].Fields["bool"])
+	}
 }
 
 func TestDict(t *testing.T) {
@@ -1137,5 +1146,236 @@ func TestIndexEmptyDocId(t *testing.T) {
 	batch.Delete("")
 	if batch.Size() > 0 {
 		t.Errorf("expect delete empty doc id in batch to be ignored")
+	}
+}
+
+func TestDateTimeFieldMappingIssue287(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	f := NewDateTimeFieldMapping()
+
+	m := NewIndexMapping()
+	m.DefaultMapping = NewDocumentMapping()
+	m.DefaultMapping.AddFieldMappingsAt("Date", f)
+
+	index, err := New("testidx", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type doc struct {
+		Date time.Time
+	}
+
+	now := time.Now()
+
+	// 3hr ago to 1hr ago
+	for i := 0; i < 3; i++ {
+		d := doc{now.Add(time.Duration((i - 3)) * time.Hour)}
+
+		docJson, err := json.Marshal(d)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = index.Index(strconv.FormatInt(int64(i), 10), docJson)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// search range across all docs
+	start := now.Add(-4 * time.Hour).Format(time.RFC3339)
+	end := now.Format(time.RFC3339)
+	sreq := NewSearchRequest(NewDateRangeQuery(&start, &end))
+	sres, err := index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 3 {
+		t.Errorf("expected 3 results, got %d", sres.Total)
+	}
+
+	// search range includes only oldest
+	start = now.Add(-4 * time.Hour).Format(time.RFC3339)
+	end = now.Add(-121 * time.Minute).Format(time.RFC3339)
+	sreq = NewSearchRequest(NewDateRangeQuery(&start, &end))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 results, got %d", sres.Total)
+	}
+	if sres.Total > 0 && sres.Hits[0].ID != "0" {
+		t.Errorf("expecated id '0', got '%s'", sres.Hits[0].ID)
+	}
+
+	// search range includes only newest
+	start = now.Add(-61 * time.Minute).Format(time.RFC3339)
+	end = now.Format(time.RFC3339)
+	sreq = NewSearchRequest(NewDateRangeQuery(&start, &end))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 results, got %d", sres.Total)
+	}
+	if sres.Total > 0 && sres.Hits[0].ID != "2" {
+		t.Errorf("expecated id '2', got '%s'", sres.Hits[0].ID)
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDocumentFieldArrayPositionsBug295(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// index a document with an array of strings
+	err = index.Index("k", struct {
+		Messages []string
+		Another  string
+		MoreData []string
+	}{
+		Messages: []string{
+			"bleve",
+			"bleve",
+		},
+		Another: "text",
+		MoreData: []string{
+			"a",
+			"b",
+			"c",
+			"bleve",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// search for it in the messages field
+	tq := NewTermQuery("bleve").SetField("Messages")
+	tsr := NewSearchRequest(tq)
+	results, err := index.Search(tsr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results.Total != 1 {
+		t.Fatalf("expected 1 result, got %d", results.Total)
+	}
+	if len(results.Hits[0].Locations["Messages"]["bleve"]) != 2 {
+		t.Fatalf("expected 2 locations of 'bleve', got %d", len(results.Hits[0].Locations["Messages"]["bleve"]))
+	}
+	if results.Hits[0].Locations["Messages"]["bleve"][0].ArrayPositions[0] != 0 {
+		t.Errorf("expected array position to be 0")
+	}
+	if results.Hits[0].Locations["Messages"]["bleve"][1].ArrayPositions[0] != 1 {
+		t.Errorf("expected array position to be 1")
+	}
+
+	// search for it in all
+	tq = NewTermQuery("bleve")
+	tsr = NewSearchRequest(tq)
+	results, err = index.Search(tsr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results.Total != 1 {
+		t.Fatalf("expected 1 result, got %d", results.Total)
+	}
+	if len(results.Hits[0].Locations["Messages"]["bleve"]) != 2 {
+		t.Fatalf("expected 2 locations of 'bleve', got %d", len(results.Hits[0].Locations["Messages"]["bleve"]))
+	}
+	if results.Hits[0].Locations["Messages"]["bleve"][0].ArrayPositions[0] != 0 {
+		t.Errorf("expected array position to be 0")
+	}
+	if results.Hits[0].Locations["Messages"]["bleve"][1].ArrayPositions[0] != 1 {
+		t.Errorf("expected array position to be 1")
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBooleanFieldMappingIssue109(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	m := NewIndexMapping()
+	m.DefaultMapping = NewDocumentMapping()
+	m.DefaultMapping.AddFieldMappingsAt("Bool", NewBooleanFieldMapping())
+
+	index, err := New("testidx", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type doc struct {
+		Bool bool
+	}
+	err = index.Index("true", &doc{Bool: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = index.Index("false", &doc{Bool: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sreq := NewSearchRequest(NewBoolFieldQuery(true).SetField("Bool"))
+	sres, err := index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 results, got %d", sres.Total)
+	}
+
+	sreq = NewSearchRequest(NewBoolFieldQuery(false).SetField("Bool"))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 results, got %d", sres.Total)
+	}
+
+	sreq = NewSearchRequest(NewBoolFieldQuery(true))
+	sres, err = index.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sres.Total != 1 {
+		t.Errorf("expected 1 results, got %d", sres.Total)
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

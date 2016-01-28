@@ -324,3 +324,100 @@ func TestMappingWithTokenizerDeps(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
+
+	data := map[string]interface{}{
+		"name": "bleve",
+	}
+	doc := document.NewDocument("x")
+	mapping := NewIndexMapping()
+	err := mapping.mapDocument(doc, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range doc.Fields {
+		if field.Name() == "name" && !field.Options().IsStored() {
+			t.Errorf("expected field 'name' to be stored, isn't")
+		}
+	}
+
+	StoreDynamic = false
+	defer func() {
+		StoreDynamic = true
+	}()
+
+	doc = document.NewDocument("y")
+	err = mapping.mapDocument(doc, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range doc.Fields {
+		if field.Name() == "name" && field.Options().IsStored() {
+			t.Errorf("expected field 'name' to be not stored, is")
+		}
+	}
+}
+
+func TestMappingBool(t *testing.T) {
+	boolMapping := NewBooleanFieldMapping()
+	docMapping := NewDocumentMapping()
+	docMapping.AddFieldMappingsAt("prop", boolMapping)
+	mapping := NewIndexMapping()
+	mapping.AddDocumentMapping("doc", docMapping)
+
+	pprop := false
+	x := struct {
+		Prop  bool  `json:"prop"`
+		PProp *bool `json:"pprop"`
+	}{
+		Prop:  true,
+		PProp: &pprop,
+	}
+
+	doc := document.NewDocument("1")
+	err := mapping.mapDocument(doc, x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundProp := false
+	foundPProp := false
+	count := 0
+	for _, f := range doc.Fields {
+		if f.Name() == "prop" {
+			foundProp = true
+		}
+		if f.Name() == "pprop" {
+			foundPProp = true
+		}
+		count++
+	}
+	if !foundProp {
+		t.Errorf("expected to find bool field named 'prop'")
+	}
+	if !foundPProp {
+		t.Errorf("expected to find pointer to bool field named 'pprop'")
+	}
+	if count != 2 {
+		t.Errorf("expected to find 2 fields, found %d", count)
+	}
+}
+
+func TestDisableDefaultMapping(t *testing.T) {
+	indexMapping := NewIndexMapping()
+	indexMapping.DefaultMapping.Enabled = false
+
+	data := map[string]string{
+		"name": "bleve",
+	}
+
+	doc := document.NewDocument("x")
+	err := indexMapping.mapDocument(doc, data)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(doc.Fields) > 0 {
+		t.Errorf("expected no fields, got %d", len(doc.Fields))
+	}
+}

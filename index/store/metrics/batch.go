@@ -24,3 +24,9 @@ func (b *Batch) Merge(key, val []byte) {
 func (b *Batch) Reset() {
 	b.o.Reset()
 }
+
+func (b *Batch) Close() error {
+	err := b.o.Close()
+	b.o = nil
+	return err
+}

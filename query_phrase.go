@@ -28,7 +28,8 @@ type phraseQuery struct {
 // exact term phrases in the index.
 // The provided terms must exist in the correct
 // order, at the correct index offsets, in the
-// specified field.
+// specified field. Queried field must have been indexed with
+// IncludeTermVectors set to true.
 func NewPhraseQuery(terms []string, field string) *phraseQuery {
 	termQueries := make([]Query, 0)
 	for _, term := range terms {

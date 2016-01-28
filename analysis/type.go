@@ -28,6 +28,7 @@ const (
 	Shingle
 	Single
 	Double
+	Boolean
 )
 
 // Token represents one occurrence of a term at a particular location in a

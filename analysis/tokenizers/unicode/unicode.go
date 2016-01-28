@@ -26,29 +26,82 @@ func NewUnicodeTokenizer() *UnicodeTokenizer {
 }
 
 func (rt *UnicodeTokenizer) Tokenize(input []byte) analysis.TokenStream {
+	rvx := make([]analysis.TokenStream, 0, 10) // When rv gets full, append to rvx.
+	rv := make(analysis.TokenStream, 0, 1)
 
-	rv := make(analysis.TokenStream, 0)
+	ta := []analysis.Token(nil)
+	taNext := 0
 
 	segmenter := segment.NewWordSegmenterDirect(input)
 	start := 0
 	pos := 1
+
+	guessRemaining := func(end int) int {
+		avgSegmentLen := end / (len(rv) + 1)
+		if avgSegmentLen < 1 {
+			avgSegmentLen = 1
+		}
+
+		remainingLen := len(input) - end
+
+		return remainingLen / avgSegmentLen
+	}
+
 	for segmenter.Segment() {
 		segmentBytes := segmenter.Bytes()
 		end := start + len(segmentBytes)
 		if segmenter.Type() != segment.None {
-			token := analysis.Token{
-				Term:     segmentBytes,
-				Start:    start,
-				End:      end,
-				Position: pos,
-				Type:     convertType(segmenter.Type()),
+			if taNext >= len(ta) {
+				remainingSegments := guessRemaining(end)
+				if remainingSegments > 1000 {
+					remainingSegments = 1000
+				}
+				if remainingSegments < 1 {
+					remainingSegments = 1
+				}
+
+				ta = make([]analysis.Token, remainingSegments)
+				taNext = 0
 			}
-			rv = append(rv, &token)
+
+			token := &ta[taNext]
+			taNext++
+
+			token.Term = segmentBytes
+			token.Start = start
+			token.End = end
+			token.Position = pos
+			token.Type = convertType(segmenter.Type())
+
+			if len(rv) >= cap(rv) { // When rv is full, save it into rvx.
+				rvx = append(rvx, rv)
+
+				rvCap := cap(rv) * 2
+				if rvCap > 256 {
+					rvCap = 256
+				}
+
+				rv = make(analysis.TokenStream, 0, rvCap) // Next rv cap is bigger.
+			}
+
+			rv = append(rv, token)
 			pos++
 		}
 		start = end
-
 	}
+
+	if len(rvx) > 0 {
+		n := len(rv)
+		for _, r := range rvx {
+			n += len(r)
+		}
+		rall := make(analysis.TokenStream, 0, n)
+		for _, r := range rvx {
+			rall = append(rall, r...)
+		}
+		return append(rall, rv...)
+	}
+
 	return rv
 }
 

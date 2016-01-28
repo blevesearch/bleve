@@ -60,7 +60,7 @@
 		"result": {
 			"total_hits": 0,
 			"hits": []
-		} 
+		}
 	},
 	{
 		"search": {
@@ -476,6 +476,145 @@
 					}
 				}
 			]
+		}
+	},
+	{
+		"comment": "reproduce bug in prefix search",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "title",
+				"prefix": "miss"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "b"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test match none",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"match_none": {}
+			}
+		},
+		"result": {
+			"total_hits": 0,
+			"hits": []
+		}
+	},
+	{
+		"comment": "test match all",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"match_all": {}
+			}
+		},
+		"result": {
+			"total_hits": 4,
+			"hits": [
+				{
+					"id": "d"
+				},
+				{
+					"id": "c"
+				},
+				{
+					"id": "b"
+				},
+				{
+					"id": "a"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test doc id query",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"ids": ["b", "c"]
+			}
+		},
+		"result": {
+			"total_hits": 2,
+			"hits": [
+				{
+					"id": "c"
+				},
+				{
+					"id": "b"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test query string MUST and SHOULD",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"query": "+age:>20 missess"
+			}
+		},
+		"result": {
+			"total_hits": 3,
+			"hits": [
+				{
+					"id": "b"
+				},
+				{
+					"id": "d"
+				},
+				{
+					"id": "c"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test regexp matching term",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "name",
+				"regexp": "mar.*"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "a"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test regexp that should not match when properly anchored",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "name",
+				"regexp": "mar."
+			}
+		},
+		"result": {
+			"total_hits": 0,
+			"hits": []
 		}
 	}
 ]

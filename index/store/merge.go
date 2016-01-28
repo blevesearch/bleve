@@ -9,6 +9,8 @@
 
 package store
 
+import "unsafe"
+
 // At the moment this happens to be the same interface as described by
 // RocksDB, but this may not always be the case.
 
@@ -26,6 +28,34 @@ type MergeOperator interface {
 
 	// Name returns an identifier for the operator
 	Name() string
+}
+
+// NativeMergeOperator is a merge operator that also includeTermVectors
+// a C implementation
+type NativeMergeOperator interface {
+	MergeOperator
+
+	// a pointer to function in C with the signature
+	// char* (*full_merge)(void *state,
+	//     const char* key, size_t key_length,
+	//     const char* existing_value,
+	//     size_t existing_value_length,
+	//     const char* const* operands_list,
+	//     const size_t* operands_list_length, int num_operands,
+	//     unsigned char* success, size_t* new_value_length)
+	FullMergeC() unsafe.Pointer
+
+	// a pointer to function in C with the signature
+	// char* (*partial_merge)(void *state,
+	//     const char* key, size_t key_length,
+	//     const char* const* operands_list,
+	//     const size_t* operands_list_length, int num_operands,
+	//     unsigned char* success, size_t* new_value_length)
+	PartialMergeC() unsafe.Pointer
+
+	// a pointer to function in C with signature
+	// const char* merge_operator_name_fn(void *state)
+	NameC() unsafe.Pointer
 }
 
 type EmulatedMerge struct {

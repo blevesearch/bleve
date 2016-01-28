@@ -321,7 +321,7 @@ func NewDictionaryRowK(key []byte) (*DictionaryRow, error) {
 }
 
 func (dr *DictionaryRow) parseDictionaryV(value []byte) error {
-	buf := bytes.NewBuffer((value))
+	buf := bytes.NewBuffer(value)
 
 	count, err := binary.ReadUvarint(buf)
 	if err != nil {
@@ -459,21 +459,21 @@ func (tfr *TermFrequencyRow) String() string {
 	return fmt.Sprintf("Term: `%s` Field: %d DocId: `%s` Frequency: %d Norm: %f Vectors: %v", string(tfr.term), tfr.field, string(tfr.doc), tfr.freq, tfr.norm, tfr.vectors)
 }
 
-func NewTermFrequencyRow(term []byte, field uint16, doc string, freq uint64, norm float32) *TermFrequencyRow {
+func NewTermFrequencyRow(term []byte, field uint16, docID []byte, freq uint64, norm float32) *TermFrequencyRow {
 	return &TermFrequencyRow{
 		term:  term,
 		field: field,
-		doc:   []byte(doc),
+		doc:   docID,
 		freq:  freq,
 		norm:  norm,
 	}
 }
 
-func NewTermFrequencyRowWithTermVectors(term []byte, field uint16, doc string, freq uint64, norm float32, vectors []*TermVector) *TermFrequencyRow {
+func NewTermFrequencyRowWithTermVectors(term []byte, field uint16, docID []byte, freq uint64, norm float32, vectors []*TermVector) *TermFrequencyRow {
 	return &TermFrequencyRow{
 		term:    term,
 		field:   field,
-		doc:     []byte(doc),
+		doc:     docID,
 		freq:    freq,
 		norm:    norm,
 		vectors: vectors,
@@ -605,7 +605,7 @@ func (br *BackIndexRow) AllTermKeys() [][]byte {
 	}
 	rv := make([][]byte, len(br.termEntries))
 	for i, termEntry := range br.termEntries {
-		termRow := NewTermFrequencyRow([]byte(termEntry.GetTerm()), uint16(termEntry.GetField()), string(br.doc), 0, 0)
+		termRow := NewTermFrequencyRow([]byte(termEntry.GetTerm()), uint16(termEntry.GetField()), br.doc, 0, 0)
 		rv[i] = termRow.Key()
 	}
 	return rv
@@ -617,7 +617,7 @@ func (br *BackIndexRow) AllStoredKeys() [][]byte {
 	}
 	rv := make([][]byte, len(br.storedEntries))
 	for i, storedEntry := range br.storedEntries {
-		storedRow := NewStoredRow(string(br.doc), uint16(storedEntry.GetField()), storedEntry.GetArrayPositions(), 'x', []byte{})
+		storedRow := NewStoredRow(br.doc, uint16(storedEntry.GetField()), storedEntry.GetArrayPositions(), 'x', []byte{})
 		rv[i] = storedRow.Key()
 	}
 	return rv
@@ -665,9 +665,9 @@ func (br *BackIndexRow) String() string {
 	return fmt.Sprintf("Backindex DocId: `%s` Term Entries: %v, Stored Entries: %v", string(br.doc), br.termEntries, br.storedEntries)
 }
 
-func NewBackIndexRow(doc string, entries []*BackIndexTermEntry, storedFields []*BackIndexStoreEntry) *BackIndexRow {
+func NewBackIndexRow(docID []byte, entries []*BackIndexTermEntry, storedFields []*BackIndexStoreEntry) *BackIndexRow {
 	return &BackIndexRow{
-		doc:           []byte(doc),
+		doc:           docID,
 		termEntries:   entries,
 		storedEntries: storedFields,
 	}
@@ -766,9 +766,9 @@ func (s *StoredRow) ScanPrefixForDoc() []byte {
 	return buf
 }
 
-func NewStoredRow(doc string, field uint16, arrayPositions []uint64, typ byte, value []byte) *StoredRow {
+func NewStoredRow(docID []byte, field uint16, arrayPositions []uint64, typ byte, value []byte) *StoredRow {
 	return &StoredRow{
-		doc:            []byte(doc),
+		doc:            docID,
 		field:          field,
 		arrayPositions: arrayPositions,
 		typ:            typ,

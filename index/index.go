@@ -12,6 +12,7 @@ package index
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/blevesearch/bleve/document"
 )
@@ -42,6 +43,16 @@ type Index interface {
 	Stats() json.Marshaler
 
 	Analyze(d *document.Document) *AnalysisResult
+}
+
+// AsyncIndex is an interface for indexes which perform
+// some important operations asynchronously.
+type AsyncIndex interface {
+	// Wait will block until asynchronous operations started
+	// before this call have finished or until the specified
+	// timeout has been reached.  If the timeout is reached
+	// an error is returned.
+	Wait(timeout time.Duration) error
 }
 
 type IndexReader interface {

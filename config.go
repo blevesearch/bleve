@@ -20,6 +20,8 @@ import (
 	"github.com/blevesearch/bleve/index/upside_down"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search/highlight/highlighters/html"
+
+	_ "github.com/blevesearch/bleve/index/firestorm"
 )
 
 var bleveExpVar = expvar.NewMap("bleve")
@@ -64,6 +66,8 @@ func init() {
 
 	bootDuration := time.Since(bootStart)
 	bleveExpVar.Add("bootDuration", int64(bootDuration))
+	indexStats = NewIndexStats()
+	bleveExpVar.Set("indexes", indexStats)
 }
 
 var logger = log.New(ioutil.Discard, "bleve", log.LstdFlags)

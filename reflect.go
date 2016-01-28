@@ -19,7 +19,7 @@ func lookupPropertyPath(data interface{}, path string) interface{} {
 
 	current := data
 	for _, part := range pathParts {
-		current = lookupProptyPathPart(current, part)
+		current = lookupPropertyPathPart(current, part)
 		if current == nil {
 			break
 		}
@@ -28,7 +28,7 @@ func lookupPropertyPath(data interface{}, path string) interface{} {
 	return current
 }
 
-func lookupProptyPathPart(data interface{}, part string) interface{} {
+func lookupPropertyPathPart(data interface{}, part string) interface{} {
 	val := reflect.ValueOf(data)
 	typ := val.Type()
 	switch typ.Kind() {

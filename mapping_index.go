@@ -363,7 +363,7 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 }
 
 func (im *IndexMapping) determineType(data interface{}) string {
-	// first see if the object implements Identifier
+	// first see if the object implements Classifier
 	classifier, ok := data.(Classifier)
 	if ok {
 		return classifier.Type()
@@ -402,13 +402,15 @@ func (im *IndexMapping) mapDocument(doc *document.Document, data interface{}) er
 	docType := im.determineType(data)
 	docMapping := im.mappingForType(docType)
 	walkContext := im.newWalkContext(doc, docMapping)
-	docMapping.walkDocument(data, []string{}, []uint64{}, walkContext)
+	if docMapping.Enabled {
+		docMapping.walkDocument(data, []string{}, []uint64{}, walkContext)
 
-	// see if the _all field was disabled
-	allMapping := docMapping.documentMappingForPath("_all")
-	if allMapping == nil || (allMapping.Enabled != false) {
-		field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, document.IndexField|document.IncludeTermVectors)
-		doc.AddField(field)
+		// see if the _all field was disabled
+		allMapping := docMapping.documentMappingForPath("_all")
+		if allMapping == nil || (allMapping.Enabled != false) {
+			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, document.IndexField|document.IncludeTermVectors)
+			doc.AddField(field)
+		}
 	}
 
 	return nil
@@ -506,4 +508,9 @@ func (im *IndexMapping) AnalyzeText(analyzerName string, text []byte) (analysis.
 		return nil, err
 	}
 	return analyzer.Analyze(text), nil
+}
+
+// FieldAnalyzer returns the name of the analyzer used on a field.
+func (im *IndexMapping) FieldAnalyzer(field string) string {
+	return im.analyzerNameForPath(field)
 }

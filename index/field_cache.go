@@ -50,6 +50,11 @@ func (f *FieldCache) FieldNamed(field string, createIfMissing bool) (uint16, boo
 	// trade read lock for write lock
 	f.mutex.RUnlock()
 	f.mutex.Lock()
+	// need to check again with write lock
+	if index, ok := f.fieldIndexes[field]; ok {
+		f.mutex.Unlock()
+		return index, true
+	}
 	// assign next field id
 	index := uint16(f.lastFieldIndex + 1)
 	f.fieldIndexes[field] = index

@@ -203,6 +203,42 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
+	_, hasMatchAll := tmp["match_all"]
+	if hasMatchAll {
+		var rv matchAllQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
+		return &rv, nil
+	}
+	_, hasMatchNone := tmp["match_none"]
+	if hasMatchNone {
+		var rv matchNoneQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
+		return &rv, nil
+	}
+	_, hasDocIds := tmp["ids"]
+	if hasDocIds {
+		var rv docIDQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
+		return &rv, nil
+	}
 	return nil, ErrorUnknownQueryType
 }
 

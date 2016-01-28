@@ -35,6 +35,7 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
 	_ "github.com/blevesearch/bleve/analysis/analyzers/simple_analyzer"
 	_ "github.com/blevesearch/bleve/analysis/analyzers/standard_analyzer"
+	_ "github.com/blevesearch/bleve/analysis/analyzers/web"
 
 	// token filters
 	_ "github.com/blevesearch/bleve/analysis/token_filters/apostrophe_filter"
@@ -55,6 +56,7 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/tokenizers/regexp_tokenizer"
 	_ "github.com/blevesearch/bleve/analysis/tokenizers/single_token"
 	_ "github.com/blevesearch/bleve/analysis/tokenizers/unicode"
+	_ "github.com/blevesearch/bleve/analysis/tokenizers/web"
 	_ "github.com/blevesearch/bleve/analysis/tokenizers/whitespace_tokenizer"
 
 	// date time parsers
@@ -88,6 +90,7 @@ import (
 	_ "github.com/blevesearch/bleve/index/store/gtreap"
 
 	// index types
+	_ "github.com/blevesearch/bleve/index/firestorm"
 	_ "github.com/blevesearch/bleve/index/upside_down"
 
 	// byte array converters

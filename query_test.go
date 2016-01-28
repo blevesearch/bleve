@@ -40,10 +40,11 @@ func TestParseQuery(t *testing.T) {
 		},
 		{
 			input: []byte(`{"must":{"conjuncts": [{"match":"beer","field":"desc"}]},"should":{"disjuncts": [{"match":"water","field":"desc"}],"min":1.0},"must_not":{"disjuncts": [{"match":"devon","field":"desc"}]}}`),
-			output: NewBooleanQuery(
+			output: NewBooleanQueryMinShould(
 				[]Query{NewMatchQuery("beer").SetField("desc")},
 				[]Query{NewMatchQuery("water").SetField("desc")},
-				[]Query{NewMatchQuery("devon").SetField("desc")}),
+				[]Query{NewMatchQuery("devon").SetField("desc")},
+				1.0),
 		},
 		{
 			input:  []byte(`{"terms":["watered","down"],"field":"desc"}`),
@@ -66,6 +67,18 @@ func TestParseQuery(t *testing.T) {
 			output: NewPrefixQuery("budwei").SetField("desc"),
 		},
 		{
+			input:  []byte(`{"match_all":{}}`),
+			output: NewMatchAllQuery(),
+		},
+		{
+			input:  []byte(`{"match_none":{}}`),
+			output: NewMatchNoneQuery(),
+		},
+		{
+			input:  []byte(`{"ids":["a","b","c"]}`),
+			output: NewDocIDQuery([]string{"a", "b", "c"}),
+		},
+		{
 			input:  []byte(`{"madeitup":"queryhere"}`),
 			output: nil,
 			err:    ErrorUnknownQueryType,
@@ -84,7 +97,6 @@ func TestParseQuery(t *testing.T) {
 
 		if !reflect.DeepEqual(test.output, actual) {
 			t.Errorf("expected: %#v, got: %#v", test.output, actual)
-			// t.Errorf("expected: %#v, got: %#v", test.output.(*BooleanQuery).Should, actual.(*BooleanQuery).Should)
 		}
 	}
 }
@@ -268,7 +280,7 @@ func TestDumpQuery(t *testing.T) {
       }
     ],
     "boost": 1,
-    "min": 1
+    "min": 0
   },
   "must_not": {
     "disjuncts": [

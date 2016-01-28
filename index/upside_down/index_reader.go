@@ -42,7 +42,7 @@ func (i *IndexReader) FieldDictRange(fieldName string, startTerm []byte, endTerm
 }
 
 func (i *IndexReader) FieldDictPrefix(fieldName string, termPrefix []byte) (index.FieldDict, error) {
-	return i.FieldDictRange(fieldName, termPrefix, incrementBytes(termPrefix))
+	return i.FieldDictRange(fieldName, termPrefix, termPrefix)
 }
 
 func (i *IndexReader) DocIDReader(start, end string) (index.DocIDReader, error) {
@@ -60,7 +60,7 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 		return
 	}
 	doc = document.NewDocument(id)
-	storedRow := NewStoredRow(id, 0, []uint64{}, 'x', nil)
+	storedRow := NewStoredRow([]byte(id), 0, []uint64{}, 'x', nil)
 	storedRowScanPrefix := storedRow.ScanPrefixForDoc()
 	it := i.kvreader.PrefixIterator(storedRowScanPrefix)
 	defer func() {

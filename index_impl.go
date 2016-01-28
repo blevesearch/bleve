@@ -30,6 +30,7 @@ import (
 
 type indexImpl struct {
 	path  string
+	name  string
 	meta  *indexMeta
 	s     store.KVStore
 	i     index.Index
@@ -50,6 +51,7 @@ func indexStorePath(path string) string {
 func newMemIndex(indexType string, mapping *IndexMapping) (*indexImpl, error) {
 	rv := indexImpl{
 		path:  "",
+		name:  "mem",
 		m:     mapping,
 		meta:  newIndexMeta(indexType, gtreap.Name, nil),
 		stats: &IndexStat{},
@@ -86,6 +88,7 @@ func newMemIndex(indexType string, mapping *IndexMapping) (*indexImpl, error) {
 	rv.mutex.Lock()
 	defer rv.mutex.Unlock()
 	rv.open = true
+	indexStats.Register(&rv)
 	return &rv, nil
 }
 
@@ -106,6 +109,7 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 
 	rv := indexImpl{
 		path:  path,
+		name:  path,
 		m:     mapping,
 		meta:  newIndexMeta(indexType, kvstore, kvconfig),
 		stats: &IndexStat{},
@@ -152,12 +156,14 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 	rv.mutex.Lock()
 	defer rv.mutex.Unlock()
 	rv.open = true
+	indexStats.Register(&rv)
 	return &rv, nil
 }
 
 func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *indexImpl, err error) {
 	rv = &indexImpl{
 		path:  path,
+		name:  path,
 		stats: &IndexStat{},
 	}
 
@@ -166,7 +172,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		return nil, err
 	}
 
-	// backwards compatability if index type is missing
+	// backwards compatibility if index type is missing
 	if rv.meta.IndexType == "" {
 		rv.meta.IndexType = upside_down.Name
 	}
@@ -238,6 +244,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	}
 
 	rv.m = &im
+	indexStats.Register(rv)
 	return rv, err
 }
 
@@ -439,7 +446,7 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 
 		for _, hit := range hits {
 			doc, err := indexReader.Document(hit.ID)
-			if err == nil {
+			if err == nil && doc != nil {
 				highlightFields := req.Highlight.Fields
 				if highlightFields == nil {
 					// add all fields with matches
@@ -452,6 +459,10 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 				for _, hf := range highlightFields {
 					highlighter.BestFragmentsInField(hit, doc, hf, 1)
 				}
+			} else if err == nil {
+				// unexpected case, a doc ID that was found as a search hit
+				// was unable to be found during document lookup
+				panic(fmt.Sprintf("search hit with doc id: '%s' not found in doc lookup", hit.ID))
 			}
 		}
 	}
@@ -479,6 +490,11 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 								if err == nil {
 									value = datetime.Format(time.RFC3339)
 								}
+							case *document.BooleanField:
+								boolean, err := docF.Boolean()
+								if err == nil {
+									value = boolean
+								}
 							}
 							if value != nil {
 								hit.AddFieldValue(docF.Name(), value)
@@ -487,6 +503,12 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 					}
 				}
 			}
+		}
+	}
+
+	for _, hit := range hits {
+		if i.name != "" {
+			hit.Index = i.name
 		}
 	}
 
@@ -723,6 +745,16 @@ func (i *indexImpl) NewBatch() *Batch {
 		index:    i,
 		internal: index.NewBatch(),
 	}
+}
+
+func (i *indexImpl) Name() string {
+	return i.name
+}
+
+func (i *indexImpl) SetName(name string) {
+	indexStats.UnRegister(i)
+	i.name = name
+	indexStats.Register(i)
 }
 
 type indexImplFieldDict struct {

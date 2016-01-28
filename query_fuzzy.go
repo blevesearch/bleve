@@ -28,7 +28,7 @@ type fuzzyQuery struct {
 // fuzziness of the specified term.
 // The default fuzziness is 2.
 //
-// The current implementation uses Leveshtein edit
+// The current implementation uses Levenshtein edit
 // distance as the fuzziness metric.
 func NewFuzzyQuery(term string) *fuzzyQuery {
 	return &fuzzyQuery{

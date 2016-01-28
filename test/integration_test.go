@@ -18,8 +18,10 @@ import (
 	"reflect"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve"
+	bleveIndex "github.com/blevesearch/bleve/index"
 
 	// we must explicitly include any functionality we plan on testing
 	_ "github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
@@ -28,9 +30,14 @@ import (
 var dataset = flag.String("dataset", "", "only test datasets matching this regex")
 var keepIndex = flag.Bool("keepIndex", false, "keep the index after testing")
 
+var indexType = flag.String("indexType", bleve.Config.DefaultIndexType, "index type to build")
+
 func TestIntegration(t *testing.T) {
 
 	flag.Parse()
+
+	bleve.Config.DefaultIndexType = *indexType
+	t.Logf("using index type %s", *indexType)
 
 	var err error
 	var datasetRegexp *regexp.Regexp
@@ -53,12 +60,12 @@ func TestIntegration(t *testing.T) {
 		}
 		if fi.IsDir() {
 			t.Logf("Running test: %s", fi.Name())
-			runTestDir(t, "tests"+string(filepath.Separator)+fi.Name())
+			runTestDir(t, "tests"+string(filepath.Separator)+fi.Name(), fi.Name())
 		}
 	}
 }
 
-func runTestDir(t *testing.T, dir string) {
+func runTestDir(t *testing.T, dir, datasetName string) {
 	// read the mapping
 	mappingBytes, err := ioutil.ReadFile(dir + string(filepath.Separator) + "mapping.json")
 	if err != nil {
@@ -86,6 +93,8 @@ func runTestDir(t *testing.T, dir string) {
 		t.Errorf("error creating new index: %v", err)
 		return
 	}
+	// set a custom index name
+	index.SetName(datasetName)
 	defer func() {
 		err := index.Close()
 		if err != nil {
@@ -113,6 +122,19 @@ func runTestDir(t *testing.T, dir string) {
 			t.Errorf("error indexing data: %v", err)
 			return
 		}
+	}
+
+	indexInternal, _, err := index.Advanced()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if indexInternal, ok := indexInternal.(bleveIndex.AsyncIndex); ok {
+		start := time.Now()
+		err = indexInternal.Wait(5 * time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("we had to wait for %v", time.Since(start))
 	}
 
 	// read the searches
@@ -156,10 +178,22 @@ func runTestDir(t *testing.T, dir string) {
 					t.Errorf("test %d - expected hit %d to have fragments %#v got %#v", testNum, hi, hit.Fragments, res.Hits[hi].Fragments)
 				}
 			}
+			if hit.Locations != nil {
+				if !reflect.DeepEqual(hit.Locations, res.Hits[hi].Locations) {
+					t.Errorf("test %d - expected hit %d to have locations %v got %v", testNum, hi, hit.Locations, res.Hits[hi].Locations)
+				}
+			}
 		}
 		if search.Result.Facets != nil {
 			if !reflect.DeepEqual(search.Result.Facets, res.Facets) {
 				t.Errorf("test %d - expected facets: %#v got %#v", testNum, search.Result.Facets, res.Facets)
+			}
+		}
+		// check that custom index name is in results
+		for _, hit := range res.Hits {
+			if hit.Index != datasetName {
+				t.Fatalf("expected name: %s, got: %s", datasetName, hit.Index)
+
 			}
 		}
 	}

@@ -16,6 +16,12 @@ import (
 	"github.com/blevesearch/bleve/document"
 )
 
+// control the default behavior for dynamic fields (those not explicitly mapped)
+var (
+	IndexDynamic = true
+	StoreDynamic = true
+)
+
 // A FieldMapping describes how a specific item
 // should be put into the index.
 type FieldMapping struct {
@@ -30,8 +36,13 @@ type FieldMapping struct {
 
 	// Store indicates whether to store field values in the index. Stored
 	// values can be retrieved from search results using SearchRequest.Fields.
-	Store              bool   `json:"store,omitempty"`
-	Index              bool   `json:"index,omitempty"`
+	Store bool `json:"store,omitempty"`
+	Index bool `json:"index,omitempty"`
+
+	// IncludeTermVectors, if true, makes terms occurrences to be recorded for
+	// this field. It includes the term position within the terms sequence and
+	// the term offsets in the source document field. Term vectors are required
+	// to perform phrase queries or terms highlighting in source documents.
 	IncludeTermVectors bool   `json:"include_term_vectors,omitempty"`
 	IncludeInAll       bool   `json:"include_in_all,omitempty"`
 	DateFormat         string `json:"date_format,omitempty"`
@@ -48,6 +59,13 @@ func NewTextFieldMapping() *FieldMapping {
 	}
 }
 
+func newTextFieldMappingDynamic() *FieldMapping {
+	rv := NewTextFieldMapping()
+	rv.Store = StoreDynamic
+	rv.Index = IndexDynamic
+	return rv
+}
+
 // NewNumericFieldMapping returns a default field mapping for numbers
 func NewNumericFieldMapping() *FieldMapping {
 	return &FieldMapping{
@@ -58,6 +76,13 @@ func NewNumericFieldMapping() *FieldMapping {
 	}
 }
 
+func newNumericFieldMappingDynamic() *FieldMapping {
+	rv := NewNumericFieldMapping()
+	rv.Store = StoreDynamic
+	rv.Index = IndexDynamic
+	return rv
+}
+
 // NewDateTimeFieldMapping returns a default field mapping for dates
 func NewDateTimeFieldMapping() *FieldMapping {
 	return &FieldMapping{
@@ -66,6 +91,30 @@ func NewDateTimeFieldMapping() *FieldMapping {
 		Index:        true,
 		IncludeInAll: true,
 	}
+}
+
+func newDateTimeFieldMappingDynamic() *FieldMapping {
+	rv := NewDateTimeFieldMapping()
+	rv.Store = StoreDynamic
+	rv.Index = IndexDynamic
+	return rv
+}
+
+// NewBooleanFieldMapping returns a default field mapping for booleans
+func NewBooleanFieldMapping() *FieldMapping {
+	return &FieldMapping{
+		Type:         "boolean",
+		Store:        true,
+		Index:        true,
+		IncludeInAll: true,
+	}
+}
+
+func newBooleanFieldMappingDynamic() *FieldMapping {
+	rv := NewBooleanFieldMapping()
+	rv.Store = StoreDynamic
+	rv.Index = IndexDynamic
+	return rv
 }
 
 // Options returns the indexing options for this field.
@@ -102,7 +151,7 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 		dateTimeParser := context.im.dateTimeParserNamed(dateTimeFormat)
 		if dateTimeParser != nil {
 			parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
-			if err != nil {
+			if err == nil {
 				fm.processTime(parsedDateTime, pathString, path, indexes, context)
 			}
 		}
@@ -132,6 +181,19 @@ func (fm *FieldMapping) processTime(propertyValueTime time.Time, pathString stri
 		} else {
 			logger.Printf("could not build date %v", err)
 		}
+
+		if !fm.IncludeInAll {
+			context.excludedFromAll = append(context.excludedFromAll, fieldName)
+		}
+	}
+}
+
+func (fm *FieldMapping) processBoolean(propertyValueBool bool, pathString string, path []string, indexes []uint64, context *walkContext) {
+	fieldName := getFieldName(pathString, path, fm)
+	if fm.Type == "boolean" {
+		options := fm.Options()
+		field := document.NewBooleanFieldWithIndexingOptions(fieldName, indexes, propertyValueBool, options)
+		context.doc.AddField(field)
 
 		if !fm.IncludeInAll {
 			context.excludedFromAll = append(context.excludedFromAll, fieldName)
