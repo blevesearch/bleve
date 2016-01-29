@@ -470,7 +470,7 @@ func TestInvalidDocumentMappingStrict(t *testing.T) {
 	}
 
 	if dm.Enabled != false {
-		t.Fatalf("expect to find document mapping enabled false, got '%s'", dm.Enabled)
+		t.Fatalf("expect to find document mapping enabled false, got '%t'", dm.Enabled)
 	}
 
 	// reset
@@ -490,7 +490,7 @@ func TestInvalidDocumentMappingStrict(t *testing.T) {
 	}
 
 	if dm.Enabled != false {
-		t.Fatalf("expect to find document mapping enabled false, got '%s'", dm.Enabled)
+		t.Fatalf("expect to find document mapping enabled false, got '%t'", dm.Enabled)
 	}
 }
 
