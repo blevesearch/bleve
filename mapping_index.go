@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/analysis/analyzers/standard_analyzer"
@@ -19,6 +20,8 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/registry"
 )
+
+var MappingJSONStrict = false
 
 const defaultTypeField = "_type"
 const defaultType = "_default"
@@ -272,86 +275,82 @@ func (im *IndexMapping) mappingForType(docType string) *DocumentMapping {
 	return docMapping
 }
 
-// UnmarshalJSON deserializes a JSON representation of the IndexMapping
+// UnmarshalJSON offers custom unmarshaling with optional strict validation
 func (im *IndexMapping) UnmarshalJSON(data []byte) error {
-	var tmp struct {
-		TypeMapping           map[string]*DocumentMapping `json:"types"`
-		DefaultMapping        *DocumentMapping            `json:"default_mapping"`
-		TypeField             string                      `json:"type_field"`
-		DefaultType           string                      `json:"default_type"`
-		DefaultAnalyzer       string                      `json:"default_analyzer"`
-		DefaultDateTimeParser string                      `json:"default_datetime_parser"`
-		DefaultField          string                      `json:"default_field"`
-		ByteArrayConverter    string                      `json:"byte_array_converter"`
-		CustomAnalysis        *customAnalysis             `json:"analysis"`
-	}
+
+	var tmp map[string]json.RawMessage
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
 
+	// set defaults for fields which might have been omitted
 	im.cache = registry.NewCache()
-
 	im.CustomAnalysis = newCustomAnalysis()
-	if tmp.CustomAnalysis != nil {
-		if tmp.CustomAnalysis.CharFilters != nil {
-			im.CustomAnalysis.CharFilters = tmp.CustomAnalysis.CharFilters
-		}
-		if tmp.CustomAnalysis.Tokenizers != nil {
-			im.CustomAnalysis.Tokenizers = tmp.CustomAnalysis.Tokenizers
-		}
-		if tmp.CustomAnalysis.TokenMaps != nil {
-			im.CustomAnalysis.TokenMaps = tmp.CustomAnalysis.TokenMaps
-		}
-		if tmp.CustomAnalysis.TokenFilters != nil {
-			im.CustomAnalysis.TokenFilters = tmp.CustomAnalysis.TokenFilters
-		}
-		if tmp.CustomAnalysis.Analyzers != nil {
-			im.CustomAnalysis.Analyzers = tmp.CustomAnalysis.Analyzers
-		}
-		if tmp.CustomAnalysis.DateTimeParsers != nil {
-			im.CustomAnalysis.DateTimeParsers = tmp.CustomAnalysis.DateTimeParsers
-		}
-	}
-
 	im.TypeField = defaultTypeField
-	if tmp.TypeField != "" {
-		im.TypeField = tmp.TypeField
-	}
-
 	im.DefaultType = defaultType
-	if tmp.DefaultType != "" {
-		im.DefaultType = tmp.DefaultType
-	}
-
 	im.DefaultAnalyzer = defaultAnalyzer
-	if tmp.DefaultAnalyzer != "" {
-		im.DefaultAnalyzer = tmp.DefaultAnalyzer
-	}
-
 	im.DefaultDateTimeParser = defaultDateTimeParser
-	if tmp.DefaultDateTimeParser != "" {
-		im.DefaultDateTimeParser = tmp.DefaultDateTimeParser
-	}
-
 	im.DefaultField = defaultField
-	if tmp.DefaultField != "" {
-		im.DefaultField = tmp.DefaultField
-	}
-
 	im.ByteArrayConverter = defaultByteArrayConverter
-	if tmp.ByteArrayConverter != "" {
-		im.ByteArrayConverter = tmp.ByteArrayConverter
-	}
-
 	im.DefaultMapping = NewDocumentMapping()
-	if tmp.DefaultMapping != nil {
-		im.DefaultMapping = tmp.DefaultMapping
+	im.TypeMapping = make(map[string]*DocumentMapping)
+
+	var invalidKeys []string
+	for k, v := range tmp {
+		switch k {
+		case "analysis":
+			err := json.Unmarshal(v, &im.CustomAnalysis)
+			if err != nil {
+				return err
+			}
+		case "type_field":
+			err := json.Unmarshal(v, &im.TypeField)
+			if err != nil {
+				return err
+			}
+		case "default_type":
+			err := json.Unmarshal(v, &im.DefaultType)
+			if err != nil {
+				return err
+			}
+		case "default_analyzer":
+			err := json.Unmarshal(v, &im.DefaultAnalyzer)
+			if err != nil {
+				return err
+			}
+		case "default_datetime_parser":
+			err := json.Unmarshal(v, &im.DefaultDateTimeParser)
+			if err != nil {
+				return err
+			}
+		case "default_field":
+			err := json.Unmarshal(v, &im.DefaultField)
+			if err != nil {
+				return err
+			}
+		case "byte_array_converter":
+			err := json.Unmarshal(v, &im.ByteArrayConverter)
+			if err != nil {
+				return err
+			}
+		case "default_mapping":
+			err := json.Unmarshal(v, &im.DefaultMapping)
+			if err != nil {
+				return err
+			}
+		case "types":
+			err := json.Unmarshal(v, &im.TypeMapping)
+			if err != nil {
+				return err
+			}
+		default:
+			invalidKeys = append(invalidKeys, k)
+		}
 	}
 
-	im.TypeMapping = make(map[string]*DocumentMapping, len(tmp.TypeMapping))
-	for typeName, typeDocMapping := range tmp.TypeMapping {
-		im.TypeMapping[typeName] = typeDocMapping
+	if MappingJSONStrict && len(invalidKeys) > 0 {
+		return fmt.Errorf("index mapping contains invalid keys: %v", invalidKeys)
 	}
 
 	err = im.CustomAnalysis.registerAll(im)

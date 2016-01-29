@@ -192,45 +192,56 @@ func (dm *DocumentMapping) AddFieldMapping(fm *FieldMapping) {
 	dm.Fields = append(dm.Fields, fm)
 }
 
-// UnmarshalJSON deserializes a JSON representation
-// of the DocumentMapping.
+// UnmarshalJSON offers custom unmarshaling with optional strict validation
 func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
-	var tmp struct {
-		Enabled         *bool                       `json:"enabled"`
-		Dynamic         *bool                       `json:"dynamic"`
-		Properties      map[string]*DocumentMapping `json:"properties"`
-		Fields          []*FieldMapping             `json:"fields"`
-		DefaultAnalyzer string                      `json:"default_analyzer"`
-	}
+
+	var tmp map[string]json.RawMessage
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
 	}
 
+	// set defaults for fields which might have been omitted
 	dm.Enabled = true
-	if tmp.Enabled != nil {
-		dm.Enabled = *tmp.Enabled
-	}
-
 	dm.Dynamic = true
-	if tmp.Dynamic != nil {
-		dm.Dynamic = *tmp.Dynamic
+
+	var invalidKeys []string
+	for k, v := range tmp {
+		switch k {
+		case "enabled":
+			err := json.Unmarshal(v, &dm.Enabled)
+			if err != nil {
+				return err
+			}
+		case "dynamic":
+			err := json.Unmarshal(v, &dm.Dynamic)
+			if err != nil {
+				return err
+			}
+		case "default_analyzer":
+			err := json.Unmarshal(v, &dm.DefaultAnalyzer)
+			if err != nil {
+				return err
+			}
+		case "properties":
+			err := json.Unmarshal(v, &dm.Properties)
+			if err != nil {
+				return err
+			}
+		case "fields":
+			err := json.Unmarshal(v, &dm.Fields)
+			if err != nil {
+				return err
+			}
+		default:
+			invalidKeys = append(invalidKeys, k)
+		}
 	}
 
-	dm.DefaultAnalyzer = tmp.DefaultAnalyzer
+	if MappingJSONStrict && len(invalidKeys) > 0 {
+		return fmt.Errorf("document mapping contains invalid keys: %v", invalidKeys)
+	}
 
-	if tmp.Properties != nil {
-		dm.Properties = make(map[string]*DocumentMapping, len(tmp.Properties))
-	}
-	for propName, propMapping := range tmp.Properties {
-		dm.Properties[propName] = propMapping
-	}
-	if tmp.Fields != nil {
-		dm.Fields = make([]*FieldMapping, len(tmp.Fields))
-	}
-	for i, field := range tmp.Fields {
-		dm.Fields[i] = field
-	}
 	return nil
 }
 

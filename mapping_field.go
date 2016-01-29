@@ -10,6 +10,8 @@
 package bleve
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -222,4 +224,68 @@ func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) 
 		fieldName = parentName + fieldMapping.Name
 	}
 	return fieldName
+}
+
+// UnmarshalJSON offers custom unmarshaling with optional strict validation
+func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
+
+	var tmp map[string]json.RawMessage
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
+	}
+
+	var invalidKeys []string
+	for k, v := range tmp {
+		switch k {
+		case "name":
+			err := json.Unmarshal(v, &fm.Name)
+			if err != nil {
+				return err
+			}
+		case "type":
+			err := json.Unmarshal(v, &fm.Type)
+			if err != nil {
+				return err
+			}
+		case "analyzer":
+			err := json.Unmarshal(v, &fm.Analyzer)
+			if err != nil {
+				return err
+			}
+		case "store":
+			err := json.Unmarshal(v, &fm.Store)
+			if err != nil {
+				return err
+			}
+		case "index":
+			err := json.Unmarshal(v, &fm.Index)
+			if err != nil {
+				return err
+			}
+		case "include_term_vectors":
+			err := json.Unmarshal(v, &fm.IncludeTermVectors)
+			if err != nil {
+				return err
+			}
+		case "include_in_all":
+			err := json.Unmarshal(v, &fm.IncludeInAll)
+			if err != nil {
+				return err
+			}
+		case "date_format":
+			err := json.Unmarshal(v, &fm.DateFormat)
+			if err != nil {
+				return err
+			}
+		default:
+			invalidKeys = append(invalidKeys, k)
+		}
+	}
+
+	if MappingJSONStrict && len(invalidKeys) > 0 {
+		return fmt.Errorf("field mapping contains invalid keys: %v", invalidKeys)
+	}
+
+	return nil
 }

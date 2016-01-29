@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -419,5 +420,111 @@ func TestDisableDefaultMapping(t *testing.T) {
 
 	if len(doc.Fields) > 0 {
 		t.Errorf("expected no fields, got %d", len(doc.Fields))
+	}
+}
+
+func TestInvalidFieldMappingStrict(t *testing.T) {
+	mappingBytes := []byte(`{"includeInAll":true,"name":"a parsed name"}`)
+
+	// first unmarhsal it without strict
+	var fm FieldMapping
+	err := json.Unmarshal(mappingBytes, &fm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if fm.Name != "a parsed name" {
+		t.Fatalf("expect to find field mapping name 'a parsed name', got '%s'", fm.Name)
+	}
+
+	// reset
+	fm.Name = ""
+
+	// now enable strict
+	MappingJSONStrict = true
+	defer func() {
+		MappingJSONStrict = false
+	}()
+
+	expectedInvalidKeys := []string{"includeInAll"}
+	expectedErr := fmt.Errorf("field mapping contains invalid keys: %v", expectedInvalidKeys)
+	err = json.Unmarshal(mappingBytes, &fm)
+	if err.Error() != expectedErr.Error() {
+		t.Fatalf("expected err: %v, got err: %v", expectedErr, err)
+	}
+
+	if fm.Name != "a parsed name" {
+		t.Fatalf("expect to find field mapping name 'a parsed name', got '%s'", fm.Name)
+	}
+
+}
+
+func TestInvalidDocumentMappingStrict(t *testing.T) {
+	mappingBytes := []byte(`{"defaultAnalyzer":true,"enabled":false}`)
+
+	// first unmarhsal it without strict
+	var dm DocumentMapping
+	err := json.Unmarshal(mappingBytes, &dm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if dm.Enabled != false {
+		t.Fatalf("expect to find document mapping enabled false, got '%s'", dm.Enabled)
+	}
+
+	// reset
+	dm.Enabled = true
+
+	// now enable strict
+	MappingJSONStrict = true
+	defer func() {
+		MappingJSONStrict = false
+	}()
+
+	expectedInvalidKeys := []string{"defaultAnalyzer"}
+	expectedErr := fmt.Errorf("document mapping contains invalid keys: %v", expectedInvalidKeys)
+	err = json.Unmarshal(mappingBytes, &dm)
+	if err.Error() != expectedErr.Error() {
+		t.Fatalf("expected err: %v, got err: %v", expectedErr, err)
+	}
+
+	if dm.Enabled != false {
+		t.Fatalf("expect to find document mapping enabled false, got '%s'", dm.Enabled)
+	}
+}
+
+func TestInvalidIndexMappingStrict(t *testing.T) {
+	mappingBytes := []byte(`{"typeField":"type","default_field":"all"}`)
+
+	// first unmarhsal it without strict
+	var im IndexMapping
+	err := json.Unmarshal(mappingBytes, &im)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if im.DefaultField != "all" {
+		t.Fatalf("expect to find index mapping default field 'all', got '%s'", im.DefaultField)
+	}
+
+	// reset
+	im.DefaultField = "_all"
+
+	// now enable strict
+	MappingJSONStrict = true
+	defer func() {
+		MappingJSONStrict = false
+	}()
+
+	expectedInvalidKeys := []string{"typeField"}
+	expectedErr := fmt.Errorf("index mapping contains invalid keys: %v", expectedInvalidKeys)
+	err = json.Unmarshal(mappingBytes, &im)
+	if err.Error() != expectedErr.Error() {
+		t.Fatalf("expected err: %v, got err: %v", expectedErr, err)
+	}
+
+	if im.DefaultField != "all" {
+		t.Fatalf("expect to find index mapping default field 'all', got '%s'", im.DefaultField)
 	}
 }
