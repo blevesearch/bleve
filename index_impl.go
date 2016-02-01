@@ -358,6 +358,10 @@ func (i *indexImpl) DocCount() (uint64, error) {
 	return i.i.DocCount()
 }
 
+// this error message is a temporary measure to avoid crashing when an
+// inconsistent state of the index is encountered
+var errMsg17298 = fmt.Errorf("Internal Error Detected - A known inconsistency has been detected, and this search cannot be completed.  The index is not corrupt and the search may succeed if you try again.  Please see the following bug for the latest information: https://issues.couchbase.com/browse/MB-17298")
+
 // Search executes a search request operation.
 // Returns a SearchResult object or an error.
 func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
@@ -462,7 +466,7 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 			} else if err == nil {
 				// unexpected case, a doc ID that was found as a search hit
 				// was unable to be found during document lookup
-				panic(fmt.Sprintf("search hit with doc id: '%s' not found in doc lookup", hit.ID))
+				return nil, errMsg17298
 			}
 		}
 	}
@@ -472,7 +476,7 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 			// FIXME avoid loading doc second time
 			// if we already loaded it for highlighting
 			doc, err := indexReader.Document(hit.ID)
-			if err == nil {
+			if err == nil && doc != nil {
 				for _, f := range req.Fields {
 					for _, docF := range doc.Fields {
 						if f == "*" || docF.Name() == f {
@@ -502,6 +506,10 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 						}
 					}
 				}
+			} else if doc == nil {
+				// unexpected case, a doc ID that was found as a search hit
+				// was unable to be found during document lookup
+				return nil, errMsg17298
 			}
 		}
 	}
