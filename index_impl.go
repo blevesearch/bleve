@@ -32,7 +32,6 @@ type indexImpl struct {
 	path  string
 	name  string
 	meta  *indexMeta
-	s     store.KVStore
 	i     index.Index
 	m     *IndexMapping
 	mutex sync.RWMutex
@@ -251,7 +250,11 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 // Advanced returns implementation internals
 // necessary ONLY for advanced usage.
 func (i *indexImpl) Advanced() (index.Index, store.KVStore, error) {
-	return i.i, i.s, nil
+	s, err := i.i.Advanced()
+	if err != nil {
+		return nil, nil, err
+	}
+	return i.i, s, nil
 }
 
 // Mapping returns the IndexMapping in use by this

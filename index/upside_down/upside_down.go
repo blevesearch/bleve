@@ -1024,6 +1024,10 @@ func (udc *UpsideDownCouch) Stats() json.Marshaler {
 	return udc.stats
 }
 
+func (udc *UpsideDownCouch) Advanced() (store.KVStore, error) {
+	return udc.store, nil
+}
+
 func (udc *UpsideDownCouch) fieldIndexOrNewRow(name string) (uint16, *FieldRow) {
 	index, existed := udc.fieldCache.FieldNamed(name, true)
 	if !existed {

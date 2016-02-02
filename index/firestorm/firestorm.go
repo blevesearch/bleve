@@ -546,6 +546,10 @@ func (f *Firestorm) Wait(timeout time.Duration) error {
 	return f.dictUpdater.waitTasksDone(timeout)
 }
 
+func (f *Firestorm) Advanced() (store.KVStore, error) {
+	return f.store, nil
+}
+
 func init() {
 	registry.RegisterIndexType(Name, NewFirestorm)
 }
