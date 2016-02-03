@@ -61,7 +61,7 @@ func NewNumericRangeSearcher(indexReader index.IndexReader, min *float64, max *f
 	qsearchers := make([]search.Searcher, len(terms))
 	for i, term := range terms {
 		var err error
-		qsearchers[i], err = NewTermSearcher(indexReader, string(term), field, 1.0, explain)
+		qsearchers[i], err = NewTermSearcher(indexReader, string(term), field, boost, explain)
 		if err != nil {
 			return nil, err
 		}

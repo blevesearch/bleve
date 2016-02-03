@@ -57,7 +57,7 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp, fi
 	qsearchers := make([]search.Searcher, 0, 25)
 
 	for _, cterm := range candidateTerms {
-		qsearcher, err := NewTermSearcher(indexReader, cterm, field, 1.0, explain)
+		qsearcher, err := NewTermSearcher(indexReader, cterm, field, boost, explain)
 		if err != nil {
 			return nil, err
 		}
