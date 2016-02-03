@@ -26,6 +26,7 @@ const (
 	ErrorAliasEmpty
 	ErrorUnknownIndexType
 	ErrorEmptyID
+	ErrorIndexReadInconsistency
 )
 
 // Error represents a more strongly typed bleve error for detecting
@@ -52,4 +53,5 @@ var errorMessages = map[Error]string{
 	ErrorAliasEmpty:                             "cannot perform operation on empty alias",
 	ErrorUnknownIndexType:                       "unknown index type",
 	ErrorEmptyID:                                "document ID cannot be empty",
+	ErrorIndexReadInconsistency:                 "index read inconsistency detected",
 }
