@@ -239,3 +239,30 @@ func TestTermScorerWithQueryNorm(t *testing.T) {
 	}
 
 }
+
+func BenchmarkTermScore(b *testing.B) {
+	var docTotal uint64 = 100
+	var docTerm uint64 = 9
+	var queryTerm = "beer"
+	var queryField = "desc"
+	var queryBoost = 1.0
+	scorer := NewTermQueryScorer(queryTerm, queryField, queryBoost, docTotal, docTerm, false)
+
+	termMatch := index.TermFieldDoc{
+		ID:   "one",
+		Freq: 1,
+		Norm: 1.0,
+		Vectors: []*index.TermFieldVector{
+			&index.TermFieldVector{
+				Field: "desc",
+				Pos:   1,
+				Start: 0,
+				End:   4,
+			},
+		},
+	}
+
+	for i := 0; i < b.N; i++ {
+		scorer.Score(&termMatch)
+	}
+}
