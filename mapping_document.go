@@ -351,7 +351,13 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				}
 			}
 		}
-	case reflect.Float64:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		dm.processProperty(float64(propertyValue.Int()), path, indexes, context)
+		return
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		dm.processProperty(float64(propertyValue.Uint()), path, indexes, context)
+		return
+	case reflect.Float64, reflect.Float32:
 		propertyValFloat := propertyValue.Float()
 		if subDocMapping != nil {
 			// index by explicit mapping
