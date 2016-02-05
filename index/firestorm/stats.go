@@ -18,6 +18,7 @@ type indexStat struct {
 	f                                 *Firestorm
 	updates, deletes, batches, errors uint64
 	analysisTime, indexTime           uint64
+	kvStats                           json.Marshaler
 }
 
 func (i *indexStat) MarshalJSON() ([]byte, error) {
@@ -29,5 +30,8 @@ func (i *indexStat) MarshalJSON() ([]byte, error) {
 	m["analysis_time"] = atomic.LoadUint64(&i.analysisTime)
 	m["index_time"] = atomic.LoadUint64(&i.indexTime)
 	m["lookup_queue_len"] = len(i.f.lookuper.workChan)
+	if i.kvStats != nil {
+		m["kv"] = i.kvStats
+	}
 	return json.Marshal(m)
 }

@@ -75,6 +75,10 @@ func (f *Firestorm) Open() (err error) {
 		return
 	}
 
+	if ss, ok := f.store.(store.KVStoreStats); ok {
+		f.stats.kvStats = ss.Stats()
+	}
+
 	// start a reader
 	var kvreader store.KVReader
 	kvreader, err = f.store.Reader()

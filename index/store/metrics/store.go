@@ -213,6 +213,20 @@ func (s *Store) WriteJSON(w io.Writer) (err error) {
 		return
 	}
 
+	// see if the underlying implementation has its own stats
+	if o, ok := s.o.(store.KVStoreStats); ok {
+		storeStats := o.Stats()
+		var storeBytes []byte
+		storeBytes, err = json.Marshal(storeStats)
+		if err != nil {
+			return
+		}
+		_, err = fmt.Fprintf(w, `, "store": %s`, string(storeBytes))
+		if err != nil {
+			return
+		}
+	}
+
 	_, err = w.Write([]byte(`}`))
 	if err != nil {
 		return

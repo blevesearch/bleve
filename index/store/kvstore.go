@@ -9,6 +9,8 @@
 
 package store
 
+import "encoding/json"
+
 // KVStore is an abstraction for working with KV stores
 type KVStore interface {
 
@@ -153,4 +155,11 @@ type KVBatch interface {
 
 	// Close frees resources
 	Close() error
+}
+
+// KVStoreStats is an optional interface that KVStores can implement
+// if they're able to report any useful stats
+type KVStoreStats interface {
+	// Stats returns a JSON serializable object representing stats for this KVStore
+	Stats() json.Marshaler
 }

@@ -17,6 +17,7 @@ import (
 type indexStat struct {
 	updates, deletes, batches, errors uint64
 	analysisTime, indexTime           uint64
+	kvStats                           json.Marshaler
 }
 
 func (i *indexStat) MarshalJSON() ([]byte, error) {
@@ -27,5 +28,8 @@ func (i *indexStat) MarshalJSON() ([]byte, error) {
 	m["errors"] = atomic.LoadUint64(&i.errors)
 	m["analysis_time"] = atomic.LoadUint64(&i.analysisTime)
 	m["index_time"] = atomic.LoadUint64(&i.indexTime)
+	if i.kvStats != nil {
+		m["kv"] = i.kvStats
+	}
 	return json.Marshal(m)
 }

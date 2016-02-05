@@ -310,6 +310,10 @@ func (udc *UpsideDownCouch) Open() (err error) {
 		return
 	}
 
+	if ss, ok := udc.store.(store.KVStoreStats); ok {
+		udc.stats.kvStats = ss.Stats()
+	}
+
 	// start a reader to look at the index
 	var kvreader store.KVReader
 	kvreader, err = udc.store.Reader()
