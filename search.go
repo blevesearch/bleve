@@ -160,13 +160,14 @@ func (h *HighlightRequest) AddField(field string) {
 //
 // A special field named "*" can be used to return all fields.
 type SearchRequest struct {
-	Query     Query             `json:"query"`
-	Size      int               `json:"size"`
-	From      int               `json:"from"`
-	Highlight *HighlightRequest `json:"highlight"`
-	Fields    []string          `json:"fields"`
-	Facets    FacetsRequest     `json:"facets"`
-	Explain   bool              `json:"explain"`
+	Query            Query             `json:"query"`
+	Size             int               `json:"size"`
+	From             int               `json:"from"`
+	Highlight        *HighlightRequest `json:"highlight"`
+	Fields           []string          `json:"fields"`
+	Facets           FacetsRequest     `json:"facets"`
+	Explain          bool              `json:"explain"`
+	PartialResultsOk bool              `json:"partial_results_ok"`
 }
 
 // AddFacet adds a FacetRequest to this SearchRequest
@@ -181,13 +182,14 @@ func (r *SearchRequest) AddFacet(facetName string, f *FacetRequest) {
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	var temp struct {
-		Q         json.RawMessage   `json:"query"`
-		Size      int               `json:"size"`
-		From      int               `json:"from"`
-		Highlight *HighlightRequest `json:"highlight"`
-		Fields    []string          `json:"fields"`
-		Facets    FacetsRequest     `json:"facets"`
-		Explain   bool              `json:"explain"`
+		Q                json.RawMessage   `json:"query"`
+		Size             int               `json:"size"`
+		From             int               `json:"from"`
+		Highlight        *HighlightRequest `json:"highlight"`
+		Fields           []string          `json:"fields"`
+		Facets           FacetsRequest     `json:"facets"`
+		Explain          bool              `json:"explain"`
+		PartialResultsOk bool              `json:"partial_results_ok"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -202,6 +204,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Fields = temp.Fields
 	r.Facets = temp.Facets
 	r.Query, err = ParseQuery(temp.Q)
+	r.PartialResultsOk = temp.PartialResultsOk
 	if err != nil {
 		return err
 	}
@@ -236,6 +239,12 @@ func NewSearchRequestOptions(q Query, size, from int, explain bool) *SearchReque
 	}
 }
 
+type PartialResults struct {
+	Successful uint16 `json:"succesful"`
+	Failed     uint16 `json:"failed"`
+	Partial    uint16 `json:"partial"`
+}
+
 // A SearchResult describes the results of executing
 // a SearchRequest.
 type SearchResult struct {
@@ -245,6 +254,7 @@ type SearchResult struct {
 	MaxScore float64                        `json:"max_score"`
 	Took     time.Duration                  `json:"took"`
 	Facets   search.FacetResults            `json:"facets"`
+	Pr       *PartialResults                `json:"partial_results_status"`
 }
 
 func (sr *SearchResult) String() string {
