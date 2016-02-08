@@ -166,3 +166,41 @@ func TestDisjunctionAdvance(t *testing.T) {
 		t.Errorf("expected 3, got nil")
 	}
 }
+
+func TestDisjunctionSearchTooMany(t *testing.T) {
+
+	// set to max to a low non-zero value
+	DisjunctionMaxClauseCount = 2
+	defer func() {
+		// reset it after the test
+		DisjunctionMaxClauseCount = 0
+	}()
+
+	twoDocIndexReader, err := twoDocIndex.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err := twoDocIndexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dustinTermSearcher, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	steveTermSearcher, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher, steveTermSearcher}, 0, true)
+	if err == nil {
+		t.Fatal(err)
+	}
+}
