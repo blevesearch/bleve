@@ -701,4 +701,15 @@ func TestHandlers(t *testing.T) {
 			}
 		}
 	}
+
+	// close indexes
+	for _, indexName := range IndexNames() {
+		index := UnregisterIndexByName(indexName)
+		if index != nil {
+			err := index.Close()
+			if err != nil {
+				t.Errorf("error closing index %s: %v", indexName, err)
+			}
+		}
+	}
 }
