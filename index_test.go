@@ -593,6 +593,12 @@ func TestBatchString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	batch := index.NewBatch()
 	err = batch.Index("a", []byte("{}"))
@@ -634,12 +640,24 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
+	done := make(chan struct{})
 	go func() {
 		for {
-			_, err := index.DocCount()
-			if err != nil {
-				t.Fatal(err)
+			select {
+			case <-done:
+				return
+			default:
+				_, err := index.DocCount()
+				if err != nil {
+					t.Fatal(err)
+				}
 			}
 		}
 	}()
@@ -655,7 +673,7 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
+	close(done)
 }
 
 func TestIndexCountMatchSearch(t *testing.T) {
@@ -1122,6 +1140,12 @@ func TestIndexEmptyDocId(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	doc := map[string]interface{}{
 		"body": "nodocid",

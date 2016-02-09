@@ -28,6 +28,12 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	toRun := m.Run()
+	if example_index != nil {
+		err = example_index.Close()
+		if err != nil {
+			panic(err)
+		}
+	}
 	err = os.RemoveAll("path_to_index")
 	if err != nil {
 		panic(err)
