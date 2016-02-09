@@ -25,6 +25,8 @@ import (
 	"strconv"
 
 	"github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/search"
 )
 
 func TestCrud(t *testing.T) {
@@ -339,6 +341,36 @@ func TestClosedIndex(t *testing.T) {
 	}
 }
 
+type slowQuery struct {
+	actual Query
+	delay  time.Duration
+}
+
+func (s *slowQuery) Boost() float64 {
+	return s.actual.Boost()
+}
+
+func (s *slowQuery) SetBoost(b float64) Query {
+	return s.actual.SetBoost(b)
+}
+
+func (s *slowQuery) Field() string {
+	return s.actual.Field()
+}
+
+func (s *slowQuery) SetField(f string) Query {
+	return s.actual.SetField(f)
+}
+
+func (s *slowQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
+	time.Sleep(s.delay)
+	return s.actual.Searcher(i, m, explain)
+}
+
+func (s *slowQuery) Validate() error {
+	return s.actual.Validate()
+}
+
 func TestSlowSearch(t *testing.T) {
 	defer func() {
 		err := os.RemoveAll("testidx")
@@ -379,6 +411,11 @@ func TestSlowSearch(t *testing.T) {
 		t.Errorf("expected to not see slow query logged, but did")
 	}
 
+	sq := &slowQuery{
+		actual: query,
+		delay:  50 * time.Millisecond, // on Windows timer resolution is 15ms
+	}
+	req.Query = sq
 	Config.SlowSearchLogThreshold = 1 * time.Microsecond
 	_, err = index.Search(req)
 	if err != nil {
