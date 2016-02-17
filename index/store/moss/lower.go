@@ -66,7 +66,7 @@ func initLowerLevelStore(
 
 	llSnapshot, err := llUpdate(nil)
 	if err != nil {
-		kvStore.Close()
+		_ = kvStore.Close()
 		return nil, nil, err
 	}
 
@@ -126,7 +126,10 @@ func (s *llStore) decRef() {
 	s.m.Lock()
 	s.refs -= 1
 	if s.refs <= 0 {
-		s.kvStore.Close()
+		err := s.kvStore.Close()
+		if err != nil {
+			s.logf("llStore kvStore.Close err: %v", err)
+		}
 	}
 	s.m.Unlock()
 }
@@ -146,20 +149,33 @@ func (s *llStore) update(ssHigher moss.Snapshot, maxBatchSize uint64) (
 			return nil, err
 		}
 
-		defer iter.Close()
+		defer func() {
+			err = iter.Close()
+			if err != nil {
+				s.logf("llStore iter.Close err: %v", err)
+			}
+		}()
 
 		kvWriter, err := s.kvStore.Writer()
 		if err != nil {
 			return nil, err
 		}
 
-		defer kvWriter.Close()
+		defer func() {
+			err = kvWriter.Close()
+			if err != nil {
+				s.logf("llStore kvWriter.Close err: %v", err)
+			}
+		}()
 
 		batch := kvWriter.NewBatch()
 
 		defer func() {
 			if batch != nil {
-				batch.Close()
+				err = batch.Close()
+				if err != nil {
+					s.logf("llStore batch.Close err: %v", err)
+				}
 			}
 		}()
 
@@ -217,8 +233,10 @@ func (s *llStore) update(ssHigher moss.Snapshot, maxBatchSize uint64) (
 					return nil, err
 				}
 
-				batch.Close()
-				batch = nil
+				err = batch.Close()
+				if err != nil {
+					return nil, err
+				}
 
 				batch = kvWriter.NewBatch()
 			}
@@ -267,7 +285,11 @@ func (llss *llSnapshot) decRef() {
 	llss.refs -= 1
 	if llss.refs <= 0 {
 		if llss.kvReader != nil {
-			llss.kvReader.Close()
+			err := llss.kvReader.Close()
+			if err != nil {
+				llss.llStore.logf("llSnapshot kvReader.Close err: %v", err)
+			}
+
 			llss.kvReader = nil
 		}
 
@@ -296,7 +318,7 @@ func (llss *llSnapshot) Get(key []byte,
 
 		val, err := r2.Get(key)
 
-		r2.Close()
+		_ = r2.Close()
 
 		return val, err
 	}

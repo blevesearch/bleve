@@ -178,6 +178,13 @@ func (s *Store) Writer() (store.KVWriter, error) {
 	return &Writer{s: s}, nil
 }
 
+func (s *Store) Logf(fmt string, args ...interface{}) {
+	options := s.ms.Options()
+	if options.Log != nil {
+		options.Log(fmt, args...)
+	}
+}
+
 func init() {
 	registry.RegisterKVStore(Name, New)
 }

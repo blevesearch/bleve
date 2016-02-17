@@ -18,7 +18,8 @@ import (
 )
 
 type Reader struct {
-	ss moss.Snapshot
+	store *Store
+	ss    moss.Snapshot
 }
 
 func (r *Reader) Get(k []byte) (v []byte, err error) {
@@ -43,6 +44,7 @@ func (r *Reader) PrefixIterator(k []byte) store.KVIterator {
 	}
 
 	rv := &Iterator{
+		store:  r.store,
 		ss:     r.ss,
 		iter:   iter,
 		prefix: k,
@@ -62,6 +64,7 @@ func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
 	}
 
 	rv := &Iterator{
+		store:  r.store,
 		ss:     r.ss,
 		iter:   iter,
 		prefix: nil,

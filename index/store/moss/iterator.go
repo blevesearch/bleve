@@ -18,6 +18,7 @@ import (
 )
 
 type Iterator struct {
+	store  *Store
 	ss     moss.Snapshot
 	iter   moss.Iterator
 	prefix []byte
@@ -39,10 +40,16 @@ func (x *Iterator) Seek(seekToKey []byte) {
 
 	iter, err := x.ss.StartIterator(seekToKey, x.end, moss.IteratorOptions{})
 	if err != nil {
+		x.store.Logf("bleve moss StartIterator err: %v", err)
 		return
 	}
 
-	x.iter.Close()
+	err = x.iter.Close()
+	if err != nil {
+		x.store.Logf("bleve moss iterator.Seek err: %v", err)
+		return
+	}
+
 	x.iter = iter
 
 	x.checkDone()
@@ -90,10 +97,12 @@ func (x *Iterator) Valid() bool {
 }
 
 func (x *Iterator) Close() error {
+	var err error
+
 	x.ss = nil
 
 	if x.iter != nil {
-		x.iter.Close()
+		err = x.iter.Close()
 		x.iter = nil
 	}
 
@@ -102,7 +111,7 @@ func (x *Iterator) Close() error {
 	x.k = nil
 	x.v = nil
 
-	return nil
+	return err
 }
 
 func (x *Iterator) checkDone() {

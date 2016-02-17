@@ -25,18 +25,28 @@ type Batch struct {
 }
 
 func (b *Batch) Set(key, val []byte) {
+	var err error
 	if b.alloced {
-		b.batch.AllocSet(key, val)
+		err = b.batch.AllocSet(key, val)
 	} else {
-		b.batch.Set(key, val)
+		err = b.batch.Set(key, val)
+	}
+
+	if err != nil {
+		b.store.Logf("bleve moss batch.Set err: %v", err)
 	}
 }
 
 func (b *Batch) Delete(key []byte) {
+	var err error
 	if b.alloced {
-		b.batch.AllocDel(key)
+		err = b.batch.AllocDel(key)
 	} else {
-		b.batch.Del(key)
+		err = b.batch.Del(key)
+	}
+
+	if err != nil {
+		b.store.Logf("bleve moss batch.Delete err: %v", err)
 	}
 }
 
@@ -45,7 +55,11 @@ func (b *Batch) Merge(key, val []byte) {
 }
 
 func (b *Batch) Reset() {
-	b.Close()
+	err := b.Close()
+	if err != nil {
+		b.store.Logf("bleve moss batch.Close err: %v", err)
+		return
+	}
 
 	batch, err := b.store.ms.NewBatch(0, 0)
 	if err == nil {
@@ -56,7 +70,7 @@ func (b *Batch) Reset() {
 
 func (b *Batch) Close() error {
 	b.merge = nil
-	b.batch.Close()
+	err := b.batch.Close()
 	b.batch = nil
-	return nil
+	return err
 }
