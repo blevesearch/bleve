@@ -4,6 +4,8 @@
 .#*
 .project
 .settings
+**/.idea/
+**/*.iml
 .DS_Store
 /analysis/token_filters/cld2/cld2-read-only
 /analysis/token_filters/cld2/libcld2_full.a
