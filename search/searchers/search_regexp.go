@@ -51,6 +51,11 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp, fi
 		if err != nil {
 			return nil, err
 		}
+
+		err = fieldDict.Close()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// enumerate all the terms in the range

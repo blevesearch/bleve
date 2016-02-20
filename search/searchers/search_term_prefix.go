@@ -37,6 +37,12 @@ func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string, field s
 		qsearchers = append(qsearchers, qsearcher)
 		tfd, err = fieldDict.Next()
 	}
+
+	err = fieldDict.Close()
+	if err != nil {
+		return nil, err
+	}
+
 	// build disjunction searcher of these ranges
 	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, explain)
 	if err != nil {
