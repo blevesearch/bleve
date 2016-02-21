@@ -13,7 +13,7 @@ import (
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
 
-	"github.com/ikawaha/kagome/tokenizer"
+	"github.com/ikawaha/kagome.ipadic/tokenizer"
 )
 
 const TokenizerName = "kagome"
