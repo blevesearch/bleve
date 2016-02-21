@@ -41,6 +41,32 @@ func TestKagome(t *testing.T) {
 				},
 			},
 		},
+		{
+			[]byte("関西国際空港"),
+			analysis.TokenStream{
+				{
+					Start:    0,
+					End:      6,
+					Term:     []byte("関西"),
+					Position: 1,
+					Type:     analysis.Ideographic,
+				},
+				{
+					Start:    6,
+					End:      12,
+					Term:     []byte("国際"),
+					Position: 2,
+					Type:     analysis.Ideographic,
+				},
+				{
+					Start:    12,
+					End:      18,
+					Term:     []byte("空港"),
+					Position: 3,
+					Type:     analysis.Ideographic,
+				},
+			},
+		},
 	}
 
 	tokenizer := NewKagomeMorphTokenizer()
