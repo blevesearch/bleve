@@ -145,7 +145,19 @@ func (i *indexAliasImpl) Search(req *SearchRequest) (*SearchResult, error) {
 
 	// short circuit the simple case
 	if len(i.indexes) == 1 {
-		return i.indexes[0].Search(req)
+		rel, err := i.indexes[0].Search(req)
+		if req.PartialResultsOk {
+			if rel.Pr == nil {
+				pr := &PartialResults{}
+				if err == nil {
+					pr.Successful = 1
+				} else {
+					pr.Failed = 1
+				}
+				rel.Pr = pr
+			}
+		}
+		return rel, err
 	}
 
 	return MultiSearch(req, i.indexes...)
@@ -494,11 +506,21 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	var sr *SearchResult
 	var err error
 	var result *SearchResult
+	pr := &PartialResults{}
 	ok := true
 	for ok {
 		select {
 		case result, ok = <-results:
 			if ok {
+				if req.PartialResultsOk {
+					if result.Pr != nil &&
+						(result.Pr.Failed > 0 ||
+							result.Pr.Partial > 0) {
+						pr.Partial++
+					} else {
+						pr.Successful++
+					}
+				}
 				if sr == nil {
 					// first result
 					sr = result
@@ -511,11 +533,18 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 			// for now stop on any error
 			// FIXME offer other behaviors
 			if err != nil {
-				return nil, err
+				if req.PartialResultsOk {
+					pr.Failed++
+				} else {
+					return nil, err
+				}
 			}
 		}
 	}
 
+	if req.PartialResultsOk {
+		sr.Pr = pr
+	}
 	// merge just concatenated all the hits
 	// now lets clean it up
 
