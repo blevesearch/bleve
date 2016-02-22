@@ -456,23 +456,31 @@ func createChildSearchRequest(req *SearchRequest) *SearchRequest {
 	return &rv
 }
 
+type errWrap struct {
+	Name string
+	Err  error
+}
+
 // MultiSearch executes a SearchRequest across multiple
 // Index objects, then merges the results.
 func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	searchStart := time.Now()
 	results := make(chan *SearchResult)
-	errs := make(chan error)
+	errs := make(chan *errWrap)
 
 	// run search on each index in separate go routine
 	var waitGroup sync.WaitGroup
 
-	var searchChildIndex = func(waitGroup *sync.WaitGroup, in Index, results chan *SearchResult, errs chan error) {
+	var searchChildIndex = func(waitGroup *sync.WaitGroup, in Index, results chan *SearchResult, errs chan *errWrap) {
 		go func() {
 			defer waitGroup.Done()
 			childReq := createChildSearchRequest(req)
 			searchResult, err := in.Search(childReq)
 			if err != nil {
-				errs <- err
+				errs <- &errWrap{
+					Name: in.Name(),
+					Err:  err,
+				}
 			} else {
 				results <- searchResult
 			}
@@ -492,8 +500,9 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	}()
 
 	var sr *SearchResult
-	var err error
+	var ew *errWrap
 	var result *SearchResult
+	indexErrors := make(map[string]error)
 	ok := true
 	for ok {
 		select {
@@ -507,17 +516,24 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 					sr.Merge(result)
 				}
 			}
-		case err, ok = <-errs:
-			// for now stop on any error
-			// FIXME offer other behaviors
-			if err != nil {
-				return nil, err
+		case ew, ok = <-errs:
+			if ok {
+				indexErrors[ew.Name] = ew.Err
 			}
 		}
 	}
 
 	// merge just concatenated all the hits
 	// now lets clean it up
+
+	// handle case where no results were successful
+	if sr == nil {
+		sr = &SearchResult{
+			Status: &SearchStatus{
+				Errors: make(map[string]error),
+			},
+		}
+	}
 
 	// first sort it by score
 	sort.Sort(sr.Hits)
@@ -543,6 +559,13 @@ func MultiSearch(req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	sr.Request = req
 	searchDuration := time.Since(searchStart)
 	sr.Took = searchDuration
+
+	// fix up errors
+	for indexName, indexErr := range indexErrors {
+		sr.Status.Errors[indexName] = indexErr
+		sr.Status.Total++
+		sr.Status.Failed++
+	}
 
 	return sr, nil
 }

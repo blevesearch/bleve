@@ -236,9 +236,42 @@ func NewSearchRequestOptions(q Query, size, from int, explain bool) *SearchReque
 	}
 }
 
+// IndexErrMap tracks errors with the name of the index where it occurred
+type IndexErrMap map[string]error
+
+// MarshalJSON seralizes the error into a string for JSON consumption
+func (iem IndexErrMap) MarshalJSON() ([]byte, error) {
+	tmp := make(map[string]string, len(iem))
+	for k, v := range iem {
+		tmp[k] = v.Error()
+	}
+	return json.Marshal(tmp)
+}
+
+// SearchStatus is a secion in the SearchResult reporting how many
+// underlying indexes were queried, how many were successful/failed
+// and a map of any errors that were encountered
+type SearchStatus struct {
+	Total      int         `json:"total"`
+	Failed     int         `json:"failed"`
+	Successful int         `json:"successful"`
+	Errors     IndexErrMap `json:"errors,omitempty"`
+}
+
+// Merge will merge together multiple SearchStatuses during a MultiSearch
+func (ss *SearchStatus) Merge(other *SearchStatus) {
+	ss.Total += other.Total
+	ss.Failed += other.Failed
+	ss.Successful += other.Successful
+	for otherIndex, otherError := range other.Errors {
+		ss.Errors[otherIndex] = otherError
+	}
+}
+
 // A SearchResult describes the results of executing
 // a SearchRequest.
 type SearchResult struct {
+	Status   *SearchStatus                  `json:"status"`
 	Request  *SearchRequest                 `json:"request"`
 	Hits     search.DocumentMatchCollection `json:"hits"`
 	Total    uint64                         `json:"total_hits"`
@@ -288,7 +321,9 @@ func (sr *SearchResult) String() string {
 	return rv
 }
 
+// Merge will merge together multiple SearchResults during a MultiSearch
 func (sr *SearchResult) Merge(other *SearchResult) {
+	sr.Status.Merge(other.Status)
 	sr.Hits = append(sr.Hits, other.Hits...)
 	sr.Total += other.Total
 	if other.MaxScore > sr.MaxScore {

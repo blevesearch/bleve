@@ -442,6 +442,11 @@ func TestIndexAliasMulti(t *testing.T) {
 		err:            nil,
 		docCountResult: &ei1Count,
 		searchResult: &SearchResult{
+			Status: &SearchStatus{
+				Total:      1,
+				Successful: 1,
+				Errors:     make(map[string]error),
+			},
 			Total: 1,
 			Hits: search.DocumentMatchCollection{
 				&search.DocumentMatch{
@@ -456,6 +461,11 @@ func TestIndexAliasMulti(t *testing.T) {
 		err:            nil,
 		docCountResult: &ei2Count,
 		searchResult: &SearchResult{
+			Status: &SearchStatus{
+				Total:      1,
+				Successful: 1,
+				Errors:     make(map[string]error),
+			},
 			Total: 1,
 			Hits: search.DocumentMatchCollection{
 				&search.DocumentMatch{
@@ -537,6 +547,11 @@ func TestIndexAliasMulti(t *testing.T) {
 	// now a few things that should work
 	sr := NewSearchRequest(NewTermQuery("test"))
 	expected := &SearchResult{
+		Status: &SearchStatus{
+			Total:      2,
+			Successful: 2,
+			Errors:     make(map[string]error),
+		},
 		Request: sr,
 		Total:   2,
 		Hits: search.DocumentMatchCollection{
@@ -570,6 +585,11 @@ func TestIndexAliasMulti(t *testing.T) {
 // TestMultiSearchNoError
 func TestMultiSearchNoError(t *testing.T) {
 	ei1 := &stubIndex{err: nil, searchResult: &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
 		Total: 1,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{
@@ -581,6 +601,11 @@ func TestMultiSearchNoError(t *testing.T) {
 		MaxScore: 1.0,
 	}}
 	ei2 := &stubIndex{err: nil, searchResult: &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
 		Total: 1,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{
@@ -594,6 +619,11 @@ func TestMultiSearchNoError(t *testing.T) {
 
 	sr := NewSearchRequest(NewTermQuery("test"))
 	expected := &SearchResult{
+		Status: &SearchStatus{
+			Total:      2,
+			Successful: 2,
+			Errors:     make(map[string]error),
+		},
 		Request: sr,
 		Total:   2,
 		Hits: search.DocumentMatchCollection{
@@ -624,7 +654,12 @@ func TestMultiSearchNoError(t *testing.T) {
 
 // TestMultiSearchSomeError
 func TestMultiSearchSomeError(t *testing.T) {
-	ei1 := &stubIndex{err: nil, searchResult: &SearchResult{
+	ei1 := &stubIndex{name: "ei1", err: nil, searchResult: &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
 		Total: 1,
 		Hits: search.DocumentMatchCollection{
 			&search.DocumentMatch{
@@ -635,23 +670,56 @@ func TestMultiSearchSomeError(t *testing.T) {
 		Took:     1 * time.Second,
 		MaxScore: 1.0,
 	}}
-	ei2 := &stubIndex{err: fmt.Errorf("deliberate error")}
+	ei2 := &stubIndex{name: "ei2", err: fmt.Errorf("deliberate error")}
 	sr := NewSearchRequest(NewTermQuery("test"))
-	_, err := MultiSearch(sr, ei1, ei2)
-	if err == nil {
-		t.Errorf("expected error, got %v", err)
+	res, err := MultiSearch(sr, ei1, ei2)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if res.Status.Total != 2 {
+		t.Errorf("expected 2 indexes to be queried, got %d", res.Status.Total)
+	}
+	if res.Status.Failed != 1 {
+		t.Errorf("expected 1 index to fail, got %d", res.Status.Failed)
+	}
+	if res.Status.Successful != 1 {
+		t.Errorf("expected 1 index to be successful, got %d", res.Status.Successful)
+	}
+	if len(res.Status.Errors) != 1 {
+		t.Fatalf("expected 1 status error message, got %d", len(res.Status.Errors))
+	}
+	if res.Status.Errors["ei2"].Error() != "deliberate error" {
+		t.Errorf("expected ei2 index error message 'deliberate error', got '%s'", res.Status.Errors["ei2"])
 	}
 }
 
 // TestMultiSearchAllError
 // reproduces https://github.com/blevesearch/bleve/issues/126
 func TestMultiSearchAllError(t *testing.T) {
-	ei1 := &stubIndex{err: fmt.Errorf("deliberate error")}
-	ei2 := &stubIndex{err: fmt.Errorf("deliberate error")}
+	ei1 := &stubIndex{name: "ei1", err: fmt.Errorf("deliberate error")}
+	ei2 := &stubIndex{name: "ei2", err: fmt.Errorf("deliberate error")}
 	sr := NewSearchRequest(NewTermQuery("test"))
-	_, err := MultiSearch(sr, ei1, ei2)
-	if err == nil {
-		t.Errorf("expected error, got %v", err)
+	res, err := MultiSearch(sr, ei1, ei2)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if res.Status.Total != 2 {
+		t.Errorf("expected 2 indexes to be queried, got %d", res.Status.Total)
+	}
+	if res.Status.Failed != 2 {
+		t.Errorf("expected 2 indexes to fail, got %d", res.Status.Failed)
+	}
+	if res.Status.Successful != 0 {
+		t.Errorf("expected 0 indexes to be successful, got %d", res.Status.Successful)
+	}
+	if len(res.Status.Errors) != 2 {
+		t.Fatalf("expected 2 status error messages, got %d", len(res.Status.Errors))
+	}
+	if res.Status.Errors["ei1"].Error() != "deliberate error" {
+		t.Errorf("expected ei1 index error message 'deliberate error', got '%s'", res.Status.Errors["ei1"])
+	}
+	if res.Status.Errors["ei2"].Error() != "deliberate error" {
+		t.Errorf("expected ei2 index error message 'deliberate error', got '%s'", res.Status.Errors["ei2"])
 	}
 }
 
@@ -667,11 +735,23 @@ func TestMultiSearchSecondPage(t *testing.T) {
 	}
 
 	ei1 := &stubIndex{
-		searchResult: &SearchResult{},
+		searchResult: &SearchResult{
+			Status: &SearchStatus{
+				Total:      1,
+				Successful: 1,
+				Errors:     make(map[string]error),
+			},
+		},
 		checkRequest: checkRequest,
 	}
 	ei2 := &stubIndex{
-		searchResult: &SearchResult{},
+		searchResult: &SearchResult{
+			Status: &SearchStatus{
+				Total:      1,
+				Successful: 1,
+				Errors:     make(map[string]error),
+			},
+		},
 		checkRequest: checkRequest,
 	}
 	sr := NewSearchRequestOptions(NewTermQuery("test"), 10, 10, false)

@@ -528,6 +528,12 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 	}
 
 	return &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Failed:     0,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
 		Request:  req,
 		Hits:     hits,
 		Total:    collector.Total(),
