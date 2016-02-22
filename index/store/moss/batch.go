@@ -21,12 +21,14 @@ type Batch struct {
 	store   *Store
 	merge   *store.EmulatedMerge
 	batch   moss.Batch
-	alloced bool
+	buf     []byte // Non-nil when using pre-alloc'ed / NewBatchEx().
+	bufUsed int
 }
 
 func (b *Batch) Set(key, val []byte) {
 	var err error
-	if b.alloced {
+	if b.buf != nil {
+		b.bufUsed += len(key) + len(val)
 		err = b.batch.AllocSet(key, val)
 	} else {
 		err = b.batch.Set(key, val)
@@ -39,7 +41,8 @@ func (b *Batch) Set(key, val []byte) {
 
 func (b *Batch) Delete(key []byte) {
 	var err error
-	if b.alloced {
+	if b.buf != nil {
+		b.bufUsed += len(key)
 		err = b.batch.AllocDel(key)
 	} else {
 		err = b.batch.Del(key)
@@ -65,6 +68,8 @@ func (b *Batch) Reset() {
 	if err == nil {
 		b.batch = batch
 		b.merge = store.NewEmulatedMerge(b.store.mo)
+		b.buf = nil
+		b.bufUsed = 0
 	}
 }
 

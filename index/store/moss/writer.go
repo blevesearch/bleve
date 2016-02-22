@@ -30,10 +30,9 @@ func (w *Writer) NewBatch() store.KVBatch {
 	}
 
 	return &Batch{
-		store:   w.s,
-		merge:   store.NewEmulatedMerge(w.s.mo),
-		batch:   b,
-		alloced: false,
+		store: w.s,
+		merge: store.NewEmulatedMerge(w.s.mo),
+		batch: b,
 	}
 }
 
@@ -55,21 +54,31 @@ func (w *Writer) NewBatchEx(options store.KVBatchOptions) (
 		store:   w.s,
 		merge:   store.NewEmulatedMerge(w.s.mo),
 		batch:   b,
-		alloced: true,
+		buf:     buf,
+		bufUsed: 0,
 	}, nil
 }
 
-func (w *Writer) ExecuteBatch(b store.KVBatch) error {
+func (w *Writer) ExecuteBatch(b store.KVBatch) (err error) {
 	batch, ok := b.(*Batch)
 	if !ok {
 		return fmt.Errorf("wrong type of batch")
 	}
 
 	for kStr, mergeOps := range batch.merge.Merges {
-		k := []byte(kStr)
-
 		for _, v := range mergeOps {
-			err := batch.batch.Merge(k, v)
+			if batch.buf != nil {
+				kLen := len(kStr)
+				vLen := len(v)
+				kBuf := batch.buf[batch.bufUsed : batch.bufUsed+kLen]
+				vBuf := batch.buf[batch.bufUsed+kLen : batch.bufUsed+kLen+vLen]
+				copy(kBuf, kStr)
+				copy(vBuf, v)
+				batch.bufUsed += kLen + vLen
+				err = batch.batch.AllocMerge(kBuf, vBuf)
+			} else {
+				err = batch.batch.Merge([]byte(kStr), v)
+			}
 			if err != nil {
 				return err
 			}
