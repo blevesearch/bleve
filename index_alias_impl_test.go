@@ -93,9 +93,12 @@ func TestIndexAliasSingle(t *testing.T) {
 		t.Errorf("expected %v, got %v", expectedError, err)
 	}
 
-	_, err = alias.DocCount()
-	if err != expectedError {
-		t.Errorf("expected %v, got %v", expectedError, err)
+	count, err := alias.DocCount()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected count 0, got %d", count)
 	}
 
 	// now change the def using add/remove
@@ -178,9 +181,12 @@ func TestIndexAliasSingle(t *testing.T) {
 		t.Errorf("expected %v, got %v", expectedError2, err)
 	}
 
-	_, err = alias.DocCount()
-	if err != expectedError2 {
-		t.Errorf("expected %v, got %v", expectedError2, err)
+	count, err = alias.DocCount()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected count 0, got %d", count)
 	}
 
 	// now change the def using swap
@@ -262,9 +268,12 @@ func TestIndexAliasSingle(t *testing.T) {
 		t.Errorf("expected %v, got %v", expectedError3, err)
 	}
 
-	_, err = alias.DocCount()
-	if err != expectedError3 {
-		t.Errorf("expected %v, got %v", expectedError3, err)
+	count, err = alias.DocCount()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected count 0, got %d", count)
 	}
 }
 
