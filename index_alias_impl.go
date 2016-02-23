@@ -122,10 +122,10 @@ func (i *indexAliasImpl) DocCount() (uint64, error) {
 
 	for _, index := range i.indexes {
 		otherCount, err := index.DocCount()
-		if err != nil {
-			return 0, err
+		if err == nil {
+			rv += otherCount
 		}
-		rv += otherCount
+		// tolerate errors to produce partial counts
 	}
 
 	return rv, nil
