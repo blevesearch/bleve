@@ -102,11 +102,34 @@ type DateRangeFacet struct {
 	Count int     `json:"count"`
 }
 
+func (drf *DateRangeFacet) Same(other *DateRangeFacet) bool {
+	if drf.Start == nil && other.Start != nil {
+		return false
+	}
+	if drf.Start != nil && other.Start == nil {
+		return false
+	}
+	if drf.Start != nil && other.Start != nil && *drf.Start != *other.Start {
+		return false
+	}
+	if drf.End == nil && other.End != nil {
+		return false
+	}
+	if drf.End != nil && other.End == nil {
+		return false
+	}
+	if drf.End != nil && other.End != nil && *drf.End != *other.End {
+		return false
+	}
+
+	return true
+}
+
 type DateRangeFacets []*DateRangeFacet
 
 func (drf DateRangeFacets) Add(dateRangeFacet *DateRangeFacet) DateRangeFacets {
 	for _, existingDr := range drf {
-		if dateRangeFacet.Start == existingDr.Start && dateRangeFacet.End == existingDr.End {
+		if dateRangeFacet.Same(existingDr) {
 			existingDr.Count += dateRangeFacet.Count
 			return drf
 		}

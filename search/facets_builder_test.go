@@ -208,6 +208,12 @@ func TestDateFacetResultsMerge(t *testing.T) {
 	medhi := "2011-01-01"
 	hihigher := "2012-01-01"
 
+	// why second copy? the pointer are to strings done by date time parsing
+	// inside the facet generation, so comparing pointers will not work
+	lowmed2 := "2010-01-01"
+	medhi2 := "2011-01-01"
+	hihigher2 := "2012-01-01"
+
 	fr1 := &FacetResult{
 		Field:   "birthday",
 		Total:   100,
@@ -245,18 +251,18 @@ func TestDateFacetResultsMerge(t *testing.T) {
 		DateRanges: []*DateRangeFacet{
 			&DateRangeFacet{
 				Name:  "low",
-				End:   &lowmed,
+				End:   &lowmed2,
 				Count: 25,
 			},
 			&DateRangeFacet{
 				Name:  "med",
-				Start: &lowmed,
-				End:   &medhi,
+				Start: &lowmed2,
+				End:   &medhi2,
 				Count: 22,
 			},
 			&DateRangeFacet{
 				Name:  "highest",
-				Start: &hihigher,
+				Start: &hihigher2,
 				Count: 3,
 			},
 		},
