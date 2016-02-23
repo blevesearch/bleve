@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"flag"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -28,6 +29,7 @@ import (
 )
 
 var dataset = flag.String("dataset", "", "only test datasets matching this regex")
+var onlynum = flag.Int("testnum", -1, "only run the test with this number")
 var keepIndex = flag.Bool("keepIndex", false, "keep the index after testing")
 
 var indexType = flag.String("indexType", bleve.Config.DefaultIndexType, "index type to build")
@@ -152,48 +154,54 @@ func runTestDir(t *testing.T, dir, datasetName string) {
 
 	// run the searches
 	for testNum, search := range searches {
-		res, err := index.Search(search.Search)
-		if err != nil {
-			t.Errorf("error running search: %v", err)
-		}
-		if res.Total != search.Result.Total {
-			t.Errorf("test %d - expected total: %d got %d", testNum, search.Result.Total, res.Total)
-			continue
-		}
-		if len(res.Hits) != len(search.Result.Hits) {
-			t.Errorf("test %d - expected hits len: %d got %d", testNum, len(search.Result.Hits), len(res.Hits))
-			continue
-		}
-		for hi, hit := range search.Result.Hits {
-			if hit.ID != res.Hits[hi].ID {
-				t.Errorf("test %d - expected hit %d to have ID %s got %s", testNum, hi, hit.ID, res.Hits[hi].ID)
+		if *onlynum < 0 || (*onlynum > 0 && testNum == *onlynum) {
+			res, err := index.Search(search.Search)
+			if err != nil {
+				t.Errorf("error running search: %v", err)
 			}
-			if hit.Fields != nil {
-				if !reflect.DeepEqual(hit.Fields, res.Hits[hi].Fields) {
-					t.Errorf("test  %d - expected hit %d to have fields %#v got %#v", testNum, hi, hit.Fields, res.Hits[hi].Fields)
+			if res.Total != search.Result.Total {
+				t.Errorf("test %d - expected total: %d got %d", testNum, search.Result.Total, res.Total)
+				continue
+			}
+			if len(res.Hits) != len(search.Result.Hits) {
+				t.Errorf("test %d - expected hits len: %d got %d", testNum, len(search.Result.Hits), len(res.Hits))
+				continue
+			}
+			for hi, hit := range search.Result.Hits {
+				if hit.ID != res.Hits[hi].ID {
+					t.Errorf("test %d - expected hit %d to have ID %s got %s", testNum, hi, hit.ID, res.Hits[hi].ID)
+				}
+				if hit.Fields != nil {
+					if !reflect.DeepEqual(hit.Fields, res.Hits[hi].Fields) {
+						t.Errorf("test  %d - expected hit %d to have fields %#v got %#v", testNum, hi, hit.Fields, res.Hits[hi].Fields)
+					}
+				}
+				if hit.Fragments != nil {
+					if !reflect.DeepEqual(hit.Fragments, res.Hits[hi].Fragments) {
+						t.Errorf("test %d - expected hit %d to have fragments %#v got %#v", testNum, hi, hit.Fragments, res.Hits[hi].Fragments)
+					}
+				}
+				if hit.Locations != nil {
+					if !reflect.DeepEqual(hit.Locations, res.Hits[hi].Locations) {
+						t.Errorf("test %d - expected hit %d to have locations %v got %v", testNum, hi, hit.Locations, res.Hits[hi].Locations)
+					}
+				}
+				// assert that none of the scores were NaN,+Inf,-Inf
+				if math.IsInf(res.Hits[hi].Score, 0) || math.IsNaN(res.Hits[hi].Score) {
+					t.Errorf("test %d - invalid score %f", testNum, res.Hits[hi].Score)
 				}
 			}
-			if hit.Fragments != nil {
-				if !reflect.DeepEqual(hit.Fragments, res.Hits[hi].Fragments) {
-					t.Errorf("test %d - expected hit %d to have fragments %#v got %#v", testNum, hi, hit.Fragments, res.Hits[hi].Fragments)
+			if search.Result.Facets != nil {
+				if !reflect.DeepEqual(search.Result.Facets, res.Facets) {
+					t.Errorf("test %d - expected facets: %#v got %#v", testNum, search.Result.Facets, res.Facets)
 				}
 			}
-			if hit.Locations != nil {
-				if !reflect.DeepEqual(hit.Locations, res.Hits[hi].Locations) {
-					t.Errorf("test %d - expected hit %d to have locations %v got %v", testNum, hi, hit.Locations, res.Hits[hi].Locations)
-				}
-			}
-		}
-		if search.Result.Facets != nil {
-			if !reflect.DeepEqual(search.Result.Facets, res.Facets) {
-				t.Errorf("test %d - expected facets: %#v got %#v", testNum, search.Result.Facets, res.Facets)
-			}
-		}
-		// check that custom index name is in results
-		for _, hit := range res.Hits {
-			if hit.Index != datasetName {
-				t.Fatalf("expected name: %s, got: %s", datasetName, hit.Index)
+			// check that custom index name is in results
+			for _, hit := range res.Hits {
+				if hit.Index != datasetName {
+					t.Fatalf("expected name: %s, got: %s", datasetName, hit.Index)
 
+				}
 			}
 		}
 	}
