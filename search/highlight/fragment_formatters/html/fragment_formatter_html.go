@@ -38,6 +38,10 @@ func (a *FragmentFormatter) Format(f *highlight.Fragment, orderedTermLocations h
 		if termLocation == nil {
 			continue
 		}
+		// make sure the array positions match
+		if !highlight.SameArrayPositions(f.ArrayPositions, termLocation.ArrayPositions) {
+			continue
+		}
 		if termLocation.Start < curr {
 			continue
 		}
