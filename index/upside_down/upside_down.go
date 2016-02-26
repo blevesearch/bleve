@@ -208,7 +208,7 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]Upsi
 
 	mergeNum := len(dictionaryDeltas)
 	mergeKeyBytes := 0
-	mergeValBytes := mergeNum * 8
+	mergeValBytes := mergeNum * DictionaryRowMaxValueSize
 
 	for dictRowKey, _ := range dictionaryDeltas {
 		mergeKeyBytes += len(dictRowKey)
@@ -278,8 +278,8 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]Upsi
 	for dictRowKey, delta := range dictionaryDeltas {
 		dictRowKeyLen := copy(buf, dictRowKey)
 		binary.LittleEndian.PutUint64(buf[dictRowKeyLen:], uint64(delta))
-		wb.Merge(buf[:dictRowKeyLen], buf[dictRowKeyLen:dictRowKeyLen+8])
-		buf = buf[dictRowKeyLen+8:]
+		wb.Merge(buf[:dictRowKeyLen], buf[dictRowKeyLen:dictRowKeyLen+DictionaryRowMaxValueSize])
+		buf = buf[dictRowKeyLen+DictionaryRowMaxValueSize:]
 	}
 
 	// write out the batch

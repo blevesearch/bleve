@@ -234,6 +234,8 @@ func NewFieldRowKV(key, value []byte) (*FieldRow, error) {
 
 // DICTIONARY
 
+const DictionaryRowMaxValueSize = binary.MaxVarintLen64
+
 type DictionaryRow struct {
 	field uint16
 	term  []byte
@@ -264,7 +266,7 @@ func (dr *DictionaryRow) Value() []byte {
 }
 
 func (dr *DictionaryRow) ValueSize() int {
-	return binary.MaxVarintLen64
+	return DictionaryRowMaxValueSize
 }
 
 func (dr *DictionaryRow) ValueTo(buf []byte) (int, error) {
