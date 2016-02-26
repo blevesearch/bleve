@@ -232,7 +232,13 @@ func TestMappingForPath(t *testing.T) {
 	customMapping.Analyzer = "xyz"
 	customMapping.Name = "nameCustom"
 
+	subDocMappingB := NewDocumentMapping()
+	customFieldX := NewTextFieldMapping()
+	customFieldX.Analyzer = "analyzerx"
+	subDocMappingB.AddFieldMappingsAt("desc", customFieldX)
+
 	docMappingA.AddFieldMappingsAt("author", enFieldMapping, customMapping)
+	docMappingA.AddSubDocumentMapping("child", subDocMappingB)
 
 	mapping := NewIndexMapping()
 	mapping.AddDocumentMapping("a", docMappingA)
@@ -245,6 +251,11 @@ func TestMappingForPath(t *testing.T) {
 	analyzerName = mapping.analyzerNameForPath("nameCustom")
 	if analyzerName != customMapping.Analyzer {
 		t.Errorf("expected '%s' got '%s'", customMapping.Analyzer, analyzerName)
+	}
+
+	analyzerName = mapping.analyzerNameForPath("child.desc")
+	if analyzerName != customFieldX.Analyzer {
+		t.Errorf("expected '%s' got '%s'", customFieldX.Analyzer, analyzerName)
 	}
 
 }

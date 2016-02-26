@@ -75,35 +75,56 @@ func (dm *DocumentMapping) validate(cache *registry.Cache) error {
 	return nil
 }
 
+// analyzerNameForPath attempts to first find the field
+// described by this path, then returns the analyzer
+// configured for that field
 func (dm *DocumentMapping) analyzerNameForPath(path string) string {
+	field := dm.fieldDescribedByPath(path)
+	if field != nil {
+		return field.Analyzer
+	}
+	return ""
+}
+
+func (dm *DocumentMapping) fieldDescribedByPath(path string) *FieldMapping {
 	pathElements := decodePath(path)
-	last := false
-	current := dm
-OUTER:
-	for i, pathElement := range pathElements {
-		if i == len(pathElements)-1 {
-			last = true
+	if len(pathElements) > 1 {
+		// easy case, there is more than 1 path element remaining
+		// the next path element must match a property name
+		// at this level
+		for propName, subDocMapping := range dm.Properties {
+			if propName == pathElements[0] {
+				return subDocMapping.fieldDescribedByPath(encodePath(pathElements[1:]))
+			}
 		}
-		for name, subDocMapping := range current.Properties {
-			for _, field := range subDocMapping.Fields {
-				if field.Name == "" && name == pathElement {
-					if last {
-						return field.Analyzer
+	} else {
+		// just 1 path elememnt
+		// first look for property name with empty field
+		for propName, subDocMapping := range dm.Properties {
+			if propName == pathElements[0] {
+				// found property name match, now look at its fields
+				for _, field := range subDocMapping.Fields {
+					if field.Name == "" || field.Name == pathElements[0] {
+						// match
+						return field
 					}
-					current = subDocMapping
-					continue OUTER
-				} else if field.Name == pathElement {
-					if last {
-						return field.Analyzer
-					}
-					current = subDocMapping
-					continue OUTER
 				}
 			}
 		}
-		return ""
+		// next, walk the properties again, looking for field overriding the name
+		for propName, subDocMapping := range dm.Properties {
+			if propName != pathElements[0] {
+				// property name isn't a match, but field name could override it
+				for _, field := range subDocMapping.Fields {
+					if field.Name == pathElements[0] {
+						return field
+					}
+				}
+			}
+		}
 	}
-	return ""
+
+	return nil
 }
 
 func (dm *DocumentMapping) documentMappingForPath(path string) *DocumentMapping {
