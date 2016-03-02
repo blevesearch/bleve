@@ -13,6 +13,8 @@ import (
 	"container/list"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -54,18 +56,30 @@ func (tksc *TopScoreCollector) Took() time.Duration {
 	return tksc.took
 }
 
-func (tksc *TopScoreCollector) Collect(searcher search.Searcher) error {
+func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Searcher) error {
 	startTime := time.Now()
-	next, err := searcher.Next()
-	for err == nil && next != nil {
-		tksc.collectSingle(next)
-		if tksc.facetsBuilder != nil {
-			err = tksc.facetsBuilder.Update(next)
-			if err != nil {
-				break
-			}
-		}
+	var err error
+	var next *search.DocumentMatch
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
 		next, err = searcher.Next()
+	}
+	for err == nil && next != nil {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			tksc.collectSingle(next)
+			if tksc.facetsBuilder != nil {
+				err = tksc.facetsBuilder.Update(next)
+				if err != nil {
+					break
+				}
+			}
+			next, err = searcher.Next()
+		}
 	}
 	// compute search duration
 	tksc.took = time.Since(startTime)

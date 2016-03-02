@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -84,7 +86,7 @@ func TestTop10Scores(t *testing.T) {
 	}
 
 	collector := NewTopScorerCollector(10)
-	err := collector.Collect(searcher)
+	err := collector.Collect(context.Background(), searcher)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +194,7 @@ func TestTop10ScoresSkip10(t *testing.T) {
 	}
 
 	collector := NewTopScorerSkipCollector(10, 10)
-	err := collector.Collect(searcher)
+	err := collector.Collect(context.Background(), searcher)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +240,7 @@ func BenchmarkTop10of100000Scores(b *testing.B) {
 	collector := NewTopScorerCollector(10)
 	b.ResetTimer()
 
-	err := collector.Collect(searcher)
+	err := collector.Collect(context.Background(), searcher)
 	if err != nil {
 		b.Fatal(err)
 	}

@@ -11,10 +11,12 @@ package search
 
 import (
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 type Collector interface {
-	Collect(searcher Searcher) error
+	Collect(ctx context.Context, searcher Searcher) error
 	Results() DocumentMatchCollection
 	Total() uint64
 	MaxScore() float64

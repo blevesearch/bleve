@@ -17,6 +17,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
@@ -364,6 +366,12 @@ func (i *indexImpl) DocCount() (uint64, error) {
 // Search executes a search request operation.
 // Returns a SearchResult object or an error.
 func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
+	return i.SearchInContext(context.Background(), req)
+}
+
+// SearchInContext executes a search request operation within the provided
+// Context.  Returns a SearchResult object or an error.
+func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr *SearchResult, err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -424,7 +432,7 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 		collector.SetFacetsBuilder(facetsBuilder)
 	}
 
-	err = collector.Collect(searcher)
+	err = collector.Collect(ctx, searcher)
 	if err != nil {
 		return nil, err
 	}
