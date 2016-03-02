@@ -187,14 +187,6 @@ func (s *llStore) update(ssHigher moss.Snapshot, maxBatchSize uint64) (
 				s.logf("llStore.update, i: %d", i)
 			}
 
-			err = iter.Next()
-			if err == moss.ErrIteratorDone {
-				break
-			}
-			if err != nil {
-				return nil, err
-			}
-
 			ex, key, val, err := iter.CurrentEx()
 			if err == moss.ErrIteratorDone {
 				break
@@ -225,6 +217,14 @@ func (s *llStore) update(ssHigher moss.Snapshot, maxBatchSize uint64) (
 			default:
 				return nil, fmt.Errorf("moss store, update,"+
 					" unexpected operation, ex: %v", ex)
+			}
+
+			err = iter.Next()
+			if err == moss.ErrIteratorDone {
+				break
+			}
+			if err != nil {
+				return nil, err
 			}
 
 			if maxBatchSize > 0 && i%maxBatchSize == 0 {
