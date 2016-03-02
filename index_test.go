@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"encoding/json"
 	"strconv"
 
@@ -1438,5 +1440,59 @@ func TestBooleanFieldMappingIssue109(t *testing.T) {
 	err = index.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSearchTimeout(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// first run a search with an absurdly long timeout (should succeeed)
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	query := NewTermQuery("water")
+	req := NewSearchRequest(query)
+	_, err = index.SearchInContext(ctx, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// now run a search again with an absurdly low timeout (should timeout)
+	ctx, _ = context.WithTimeout(context.Background(), 1*time.Microsecond)
+	sq := &slowQuery{
+		actual: query,
+		delay:  50 * time.Millisecond, // on Windows timer resolution is 15ms
+	}
+	req.Query = sq
+	_, err = index.SearchInContext(ctx, req)
+	if err != context.DeadlineExceeded {
+		t.Fatalf("exected %v, got: %v", context.DeadlineExceeded, err)
+	}
+
+	// now run a search with a long timeout, but with a long query, and cancel it
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	sq = &slowQuery{
+		actual: query,
+		delay:  100 * time.Millisecond, // on Windows timer resolution is 15ms
+	}
+	req = NewSearchRequest(sq)
+	cancel()
+	_, err = index.SearchInContext(ctx, req)
+	if err != context.Canceled {
+		t.Fatalf("exected %v, got: %v", context.Canceled, err)
 	}
 }
