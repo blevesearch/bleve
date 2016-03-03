@@ -61,16 +61,16 @@ func NewEx(mo store.MergeOperator, config map[string]interface{},
 		}
 	}
 
-	maxStackDirtyTopHeight := moss.DefaultCollectionOptions.MaxStackDirtyTopHeight
-	v, ok = config["mossMaxStackDirtyTopHeight"]
+	maxPreMergerBatches := moss.DefaultCollectionOptions.MaxPreMergerBatches
+	v, ok = config["mossMaxPreMergerBatches"]
 	if ok {
-		maxStackDirtyTopHeightF, ok := v.(float64)
+		maxPreMergerBatchesF, ok := v.(float64)
 		if !ok {
 			return nil, fmt.Errorf("moss store,"+
-				" could not parse config[mossMaxStackDirtyTopHeight]: %v", v)
+				" could not parse config[mossMaxPreMergerBatches]: %v", v)
 		}
 
-		maxStackDirtyTopHeight = int(maxStackDirtyTopHeightF)
+		maxPreMergerBatches = int(maxPreMergerBatchesF)
 	}
 
 	mossLowerLevelStoreName := ""
@@ -105,8 +105,8 @@ func NewEx(mo store.MergeOperator, config map[string]interface{},
 		options.MinMergePercentage = minMergePercentage
 	}
 
-	if options.MaxStackDirtyTopHeight <= 0 {
-		options.MaxStackDirtyTopHeight = maxStackDirtyTopHeight
+	if options.MaxPreMergerBatches <= 0 {
+		options.MaxPreMergerBatches = maxPreMergerBatches
 	}
 
 	if options.Debug <= 0 {
