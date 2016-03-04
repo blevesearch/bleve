@@ -31,10 +31,10 @@ func initLowerLevelStore(
 	lowerLevelStoreConfig map[string]interface{},
 	lowerLevelMaxBatchSize uint64,
 	logf func(format string, a ...interface{}),
-) (moss.Snapshot, moss.LowerLevelUpdate, error) {
+) (moss.Snapshot, moss.LowerLevelUpdate, store.KVStore, error) {
 	constructor := registry.KVStoreConstructorByName(lowerLevelStoreName)
 	if constructor == nil {
-		return nil, nil, fmt.Errorf("moss store, initLowerLevelStore,"+
+		return nil, nil, nil, fmt.Errorf("moss store, initLowerLevelStore,"+
 			" could not find lower level store: %s", lowerLevelStoreName)
 	}
 
@@ -51,7 +51,7 @@ func initLowerLevelStore(
 
 	kvStore, err := constructor(mo, lowerLevelStoreConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	llStore := &llStore{
@@ -67,10 +67,10 @@ func initLowerLevelStore(
 	llSnapshot, err := llUpdate(nil)
 	if err != nil {
 		_ = kvStore.Close()
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return llSnapshot, llUpdate, nil // llStore.refs is now 1.
+	return llSnapshot, llUpdate, kvStore, nil // llStore.refs is now 1.
 }
 
 // ------------------------------------------------

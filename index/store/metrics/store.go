@@ -254,3 +254,13 @@ func (s *Store) WriteCSV(w io.Writer) {
 	WriteTimerCSV(w, s.TimerIteratorNext)
 	WriteTimerCSV(w, s.TimerBatchMerge)
 }
+
+func (s *Store) Stats() json.Marshaler {
+	rv := stats{
+		s: s,
+	}
+	if o, ok := s.o.(store.KVStoreStats); ok {
+		rv.ostats = o.Stats()
+	}
+	return &rv
+}

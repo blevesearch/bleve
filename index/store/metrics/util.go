@@ -12,6 +12,36 @@ import (
 
 var timerPercentiles = []float64{0.5, 0.75, 0.95, 0.99, 0.999}
 
+func TimerMap(timer metrics.Timer) map[string]interface{} {
+
+	rv := make(map[string]interface{})
+	t := timer.Snapshot()
+	p := t.Percentiles(timerPercentiles)
+
+	percentiles := make(map[string]interface{})
+	percentiles["median"] = p[0]
+	percentiles["75%"] = p[1]
+	percentiles["95%"] = p[2]
+	percentiles["99%"] = p[3]
+	percentiles["99.9%"] = p[4]
+
+	rates := make(map[string]interface{})
+	rates["1-min"] = t.Rate1()
+	rates["5-min"] = t.Rate5()
+	rates["15-min"] = t.Rate15()
+	rates["mean"] = t.RateMean()
+
+	rv["count"] = t.Count()
+	rv["min"] = t.Min()
+	rv["max"] = t.Max()
+	rv["mean"] = t.Mean()
+	rv["stddev"] = t.StdDev()
+	rv["percentiles"] = percentiles
+	rv["rates"] = rates
+
+	return rv
+}
+
 func WriteTimerJSON(w io.Writer, timer metrics.Timer) {
 	t := timer.Snapshot()
 	p := t.Percentiles(timerPercentiles)

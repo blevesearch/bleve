@@ -15,6 +15,7 @@
 package moss
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -27,9 +28,10 @@ import (
 const Name = "moss"
 
 type Store struct {
-	m  sync.Mutex
-	ms moss.Collection
-	mo store.MergeOperator
+	m       sync.Mutex
+	ms      moss.Collection
+	mo      store.MergeOperator
+	llstore store.KVStore
 }
 
 func New(mo store.MergeOperator, config map[string]interface{}) (
@@ -117,6 +119,7 @@ func NewEx(mo store.MergeOperator, config map[string]interface{},
 		options.Log = func(format string, a ...interface{}) {}
 	}
 
+	var llStore store.KVStore
 	if options.LowerLevelInit == nil &&
 		options.LowerLevelUpdate == nil &&
 		mossLowerLevelStoreName != "" {
@@ -131,7 +134,7 @@ func NewEx(mo store.MergeOperator, config map[string]interface{},
 			}
 		}
 
-		lowerLevelInit, lowerLevelUpdate, err :=
+		lowerLevelInit, lowerLevelUpdate, lowerLevelStore, err :=
 			initLowerLevelStore(mo, config,
 				mossLowerLevelStoreName,
 				mossLowerLevelStoreConfig,
@@ -143,6 +146,7 @@ func NewEx(mo store.MergeOperator, config map[string]interface{},
 
 		options.LowerLevelInit = lowerLevelInit
 		options.LowerLevelUpdate = lowerLevelUpdate
+		llStore = lowerLevelStore
 	}
 
 	// --------------------------------------------------
@@ -156,8 +160,9 @@ func NewEx(mo store.MergeOperator, config map[string]interface{},
 		return nil, err
 	}
 	rv := Store{
-		ms: ms,
-		mo: mo,
+		ms:      ms,
+		mo:      mo,
+		llstore: llStore,
 	}
 	return &rv, nil
 }
@@ -183,6 +188,16 @@ func (s *Store) Logf(fmt string, args ...interface{}) {
 	if options.Log != nil {
 		options.Log(fmt, args...)
 	}
+}
+
+func (s *Store) Stats() json.Marshaler {
+	rv := stats{
+		s: s,
+	}
+	if llstore, ok := s.llstore.(store.KVStoreStats); ok {
+		rv.llstats = llstore.Stats()
+	}
+	return &rv
 }
 
 func init() {
