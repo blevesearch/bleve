@@ -21,10 +21,11 @@ const DefaultNumericIndexingOptions = StoreField | IndexField
 const DefaultPrecisionStep uint = 4
 
 type NumericField struct {
-	name           string
-	arrayPositions []uint64
-	options        IndexingOptions
-	value          numeric_util.PrefixCoded
+	name              string
+	arrayPositions    []uint64
+	options           IndexingOptions
+	value             numeric_util.PrefixCoded
+	numPlainTextBytes uint64
 }
 
 func (n *NumericField) Name() string {
@@ -91,12 +92,17 @@ func (n *NumericField) GoString() string {
 	return fmt.Sprintf("&document.NumericField{Name:%s, Options: %s, Value: %s}", n.name, n.options, n.value)
 }
 
+func (n *NumericField) NumPlainTextBytes() uint64 {
+	return n.numPlainTextBytes
+}
+
 func NewNumericFieldFromBytes(name string, arrayPositions []uint64, value []byte) *NumericField {
 	return &NumericField{
-		name:           name,
-		arrayPositions: arrayPositions,
-		value:          value,
-		options:        DefaultNumericIndexingOptions,
+		name:              name,
+		arrayPositions:    arrayPositions,
+		value:             value,
+		options:           DefaultNumericIndexingOptions,
+		numPlainTextBytes: uint64(len(value)),
 	}
 }
 
@@ -112,5 +118,8 @@ func NewNumericFieldWithIndexingOptions(name string, arrayPositions []uint64, nu
 		arrayPositions: arrayPositions,
 		value:          prefixCoded,
 		options:        options,
+		// not correct, just a place holder until we revisit how fields are
+		// represented and can fix this better
+		numPlainTextBytes: uint64(8),
 	}
 }

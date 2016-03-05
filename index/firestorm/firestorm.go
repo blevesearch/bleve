@@ -146,6 +146,7 @@ func (f *Firestorm) Update(doc *document.Document) (err error) {
 
 	// do analysis before acquiring write lock
 	analysisStart := time.Now()
+	numPlainTextBytes := doc.NumPlainTextBytes()
 	resultChan := make(chan *index.AnalysisResult)
 	aw := index.NewAnalysisWork(f, doc, resultChan)
 
@@ -183,6 +184,7 @@ func (f *Firestorm) Update(doc *document.Document) (err error) {
 	f.dictUpdater.NotifyBatch(dictionaryDeltas)
 
 	atomic.AddUint64(&f.stats.indexTime, uint64(time.Since(indexStart)))
+	atomic.AddUint64(&f.stats.numPlainTextBytesIndexed, numPlainTextBytes)
 	return
 }
 
@@ -302,11 +304,13 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 
 	var docsUpdated uint64
 	var docsDeleted uint64
+	var numPlainTextBytes uint64
 	for _, doc := range batch.IndexOps {
 		if doc != nil {
 			doc.Number = firstDocNumber // actually assign doc numbers here
 			firstDocNumber++
 			docsUpdated++
+			numPlainTextBytes += doc.NumPlainTextBytes()
 		} else {
 			docsDeleted++
 		}
@@ -411,6 +415,7 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 		atomic.AddUint64(&f.stats.updates, docsUpdated)
 		atomic.AddUint64(&f.stats.deletes, docsDeleted)
 		atomic.AddUint64(&f.stats.batches, 1)
+		atomic.AddUint64(&f.stats.numPlainTextBytesIndexed, numPlainTextBytes)
 	} else {
 		atomic.AddUint64(&f.stats.errors, 1)
 	}

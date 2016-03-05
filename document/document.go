@@ -55,3 +55,18 @@ func (d *Document) GoString() string {
 	}
 	return fmt.Sprintf("&document.Document{ID:%s, Fields: %s, CompositeFields: %s}", d.ID, fields, compositeFields)
 }
+
+func (d *Document) NumPlainTextBytes() uint64 {
+	rv := uint64(0)
+	for _, field := range d.Fields {
+		rv += field.NumPlainTextBytes()
+	}
+	for _, compositeField := range d.CompositeFields {
+		for _, field := range d.Fields {
+			if compositeField.includesField(field.Name()) {
+				rv += field.NumPlainTextBytes()
+			}
+		}
+	}
+	return rv
+}

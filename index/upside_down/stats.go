@@ -19,6 +19,7 @@ type indexStat struct {
 	analysisTime, indexTime           uint64
 	termSearchersStarted              uint64
 	termSearchersFinished             uint64
+	numPlainTextBytesIndexed          uint64
 	kvStats                           json.Marshaler
 }
 
@@ -32,6 +33,7 @@ func (i *indexStat) MarshalJSON() ([]byte, error) {
 	m["index_time"] = atomic.LoadUint64(&i.indexTime)
 	m["term_searchers_started"] = atomic.LoadUint64(&i.termSearchersStarted)
 	m["term_searchers_finished"] = atomic.LoadUint64(&i.termSearchersFinished)
+	m["num_plain_text_bytes_indexed"] = atomic.LoadUint64(&i.numPlainTextBytesIndexed)
 	if i.kvStats != nil {
 		m["kv"] = i.kvStats
 	}

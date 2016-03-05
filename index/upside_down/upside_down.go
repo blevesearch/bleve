@@ -419,6 +419,7 @@ func (udc *UpsideDownCouch) Close() error {
 func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	// do analysis before acquiring write lock
 	analysisStart := time.Now()
+	numPlainTextBytes := doc.NumPlainTextBytes()
 	resultChan := make(chan *index.AnalysisResult)
 	aw := index.NewAnalysisWork(udc, doc, resultChan)
 
@@ -493,6 +494,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	atomic.AddUint64(&udc.stats.indexTime, uint64(time.Since(indexStart)))
 	if err == nil {
 		atomic.AddUint64(&udc.stats.updates, 1)
+		atomic.AddUint64(&udc.stats.numPlainTextBytesIndexed, numPlainTextBytes)
 	} else {
 		atomic.AddUint64(&udc.stats.errors, 1)
 	}
@@ -795,9 +797,11 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	resultChan := make(chan *index.AnalysisResult, len(batch.IndexOps))
 
 	var numUpdates uint64
+	var numPlainTextBytes uint64
 	for _, doc := range batch.IndexOps {
 		if doc != nil {
 			numUpdates++
+			numPlainTextBytes += doc.NumPlainTextBytes()
 		}
 	}
 
@@ -963,6 +967,7 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 		atomic.AddUint64(&udc.stats.updates, numUpdates)
 		atomic.AddUint64(&udc.stats.deletes, docsDeleted)
 		atomic.AddUint64(&udc.stats.batches, 1)
+		atomic.AddUint64(&udc.stats.numPlainTextBytesIndexed, numPlainTextBytes)
 	} else {
 		atomic.AddUint64(&udc.stats.errors, 1)
 	}

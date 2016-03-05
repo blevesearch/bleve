@@ -18,10 +18,11 @@ import (
 const DefaultBooleanIndexingOptions = StoreField | IndexField
 
 type BooleanField struct {
-	name           string
-	arrayPositions []uint64
-	options        IndexingOptions
-	value          []byte
+	name              string
+	arrayPositions    []uint64
+	options           IndexingOptions
+	value             []byte
+	numPlainTextBytes uint64
 }
 
 func (b *BooleanField) Name() string {
@@ -66,12 +67,17 @@ func (b *BooleanField) GoString() string {
 	return fmt.Sprintf("&document.BooleanField{Name:%s, Options: %s, Value: %s}", b.name, b.options, b.value)
 }
 
+func (b *BooleanField) NumPlainTextBytes() uint64 {
+	return b.numPlainTextBytes
+}
+
 func NewBooleanFieldFromBytes(name string, arrayPositions []uint64, value []byte) *BooleanField {
 	return &BooleanField{
-		name:           name,
-		arrayPositions: arrayPositions,
-		value:          value,
-		options:        DefaultNumericIndexingOptions,
+		name:              name,
+		arrayPositions:    arrayPositions,
+		value:             value,
+		options:           DefaultNumericIndexingOptions,
+		numPlainTextBytes: uint64(len(value)),
 	}
 }
 
@@ -80,14 +86,17 @@ func NewBooleanField(name string, arrayPositions []uint64, b bool) *BooleanField
 }
 
 func NewBooleanFieldWithIndexingOptions(name string, arrayPositions []uint64, b bool, options IndexingOptions) *BooleanField {
+	numPlainTextBytes := 5
 	v := []byte("F")
 	if b {
+		numPlainTextBytes = 4
 		v = []byte("T")
 	}
 	return &BooleanField{
-		name:           name,
-		arrayPositions: arrayPositions,
-		value:          v,
-		options:        options,
+		name:              name,
+		arrayPositions:    arrayPositions,
+		value:             v,
+		options:           options,
+		numPlainTextBytes: uint64(numPlainTextBytes),
 	}
 }
