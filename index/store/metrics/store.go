@@ -43,6 +43,8 @@ type Store struct {
 
 	m      sync.Mutex // Protects the fields that follow.
 	errors *list.List // Capped list of StoreError's.
+
+	s *stats
 }
 
 func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, error) {
@@ -68,7 +70,7 @@ func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, 
 		return nil, err
 	}
 
-	return &Store{
+	rv := &Store{
 		o: kvs,
 
 		TimerReaderGet:            metrics.NewTimer(),
@@ -81,7 +83,11 @@ func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, 
 		TimerBatchMerge:           metrics.NewTimer(),
 
 		errors: list.New(),
-	}, nil
+	}
+
+	rv.s = &stats{s: rv}
+
+	return rv, nil
 }
 
 func init() {
@@ -256,11 +262,9 @@ func (s *Store) WriteCSV(w io.Writer) {
 }
 
 func (s *Store) Stats() json.Marshaler {
-	rv := stats{
-		s: s,
-	}
-	if o, ok := s.o.(store.KVStoreStats); ok {
-		rv.ostats = o.Stats()
-	}
-	return &rv
+	return s.s
+}
+
+func (s *Store) StatsMap() map[string]interface{} {
+	return s.s.statsMap()
 }

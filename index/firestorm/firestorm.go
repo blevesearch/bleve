@@ -75,10 +75,6 @@ func (f *Firestorm) Open() (err error) {
 		return
 	}
 
-	if ss, ok := f.store.(store.KVStoreStats); ok {
-		f.stats.kvStats = ss.Stats()
-	}
-
 	// start a reader
 	var kvreader store.KVReader
 	kvreader, err = f.store.Reader()
@@ -548,7 +544,10 @@ func (f *Firestorm) Reader() (index.IndexReader, error) {
 
 func (f *Firestorm) Stats() json.Marshaler {
 	return f.stats
+}
 
+func (f *Firestorm) StatsMap() map[string]interface{} {
+	return f.stats.statsMap()
 }
 
 func (f *Firestorm) Wait(timeout time.Duration) error {

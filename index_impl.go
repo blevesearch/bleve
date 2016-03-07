@@ -73,7 +73,6 @@ func newMemIndex(indexType string, mapping *IndexMapping) (*indexImpl, error) {
 	if err != nil {
 		return nil, err
 	}
-	rv.stats.indexStat = rv.i.Stats()
 
 	// now persist the mapping
 	mappingBytes, err := json.Marshal(mapping)
@@ -109,12 +108,12 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 	}
 
 	rv := indexImpl{
-		path:  path,
-		name:  path,
-		m:     mapping,
-		meta:  newIndexMeta(indexType, kvstore, kvconfig),
-		stats: &IndexStat{},
+		path: path,
+		name: path,
+		m:    mapping,
+		meta: newIndexMeta(indexType, kvstore, kvconfig),
 	}
+	rv.stats = &IndexStat{i: &rv}
 	// at this point there is hope that we can be successful, so save index meta
 	err = rv.meta.Save(path)
 	if err != nil {
@@ -141,7 +140,6 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 		}
 		return nil, err
 	}
-	rv.stats.indexStat = rv.i.Stats()
 
 	// now persist the mapping
 	mappingBytes, err := json.Marshal(mapping)
@@ -163,10 +161,10 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 
 func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *indexImpl, err error) {
 	rv = &indexImpl{
-		path:  path,
-		name:  path,
-		stats: &IndexStat{},
+		path: path,
+		name: path,
 	}
+	rv.stats = &IndexStat{i: rv}
 
 	rv.meta, err = openIndexMeta(path)
 	if err != nil {
@@ -207,7 +205,6 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		}
 		return nil, err
 	}
-	rv.stats.indexStat = rv.i.Stats()
 
 	// now load the mapping
 	indexReader, err := rv.i.Reader()
@@ -711,6 +708,10 @@ func (i *indexImpl) Close() error {
 
 func (i *indexImpl) Stats() *IndexStat {
 	return i.stats
+}
+
+func (i *indexImpl) StatsMap() map[string]interface{} {
+	return i.stats.statsMap()
 }
 
 func (i *indexImpl) GetInternal(key []byte) (val []byte, err error) {

@@ -32,6 +32,8 @@ type Store struct {
 	ms      moss.Collection
 	mo      store.MergeOperator
 	llstore store.KVStore
+
+	s *stats
 }
 
 func New(mo store.MergeOperator, config map[string]interface{}) (
@@ -164,6 +166,7 @@ func NewEx(mo store.MergeOperator, config map[string]interface{},
 		mo:      mo,
 		llstore: llStore,
 	}
+	rv.s = &stats{s: &rv}
 	return &rv, nil
 }
 
@@ -191,13 +194,11 @@ func (s *Store) Logf(fmt string, args ...interface{}) {
 }
 
 func (s *Store) Stats() json.Marshaler {
-	rv := stats{
-		s: s,
-	}
-	if llstore, ok := s.llstore.(store.KVStoreStats); ok {
-		rv.llstats = llstore.Stats()
-	}
-	return &rv
+	return s.s
+}
+
+func (s *Store) StatsMap() map[string]interface{} {
+	return s.s.statsMap()
 }
 
 func init() {

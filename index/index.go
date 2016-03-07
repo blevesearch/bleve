@@ -42,6 +42,7 @@ type Index interface {
 	Reader() (IndexReader, error)
 
 	Stats() json.Marshaler
+	StatsMap() map[string]interface{}
 
 	Analyze(d *document.Document) *AnalysisResult
 

@@ -162,4 +162,6 @@ type KVBatch interface {
 type KVStoreStats interface {
 	// Stats returns a JSON serializable object representing stats for this KVStore
 	Stats() json.Marshaler
+
+	StatsMap() map[string]interface{}
 }

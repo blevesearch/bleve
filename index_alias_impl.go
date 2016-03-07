@@ -339,6 +339,22 @@ func (i *indexAliasImpl) Stats() *IndexStat {
 	return i.indexes[0].Stats()
 }
 
+func (i *indexAliasImpl) StatsMap() map[string]interface{} {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return nil
+	}
+
+	err := i.isAliasToSingleIndex()
+	if err != nil {
+		return nil
+	}
+
+	return i.indexes[0].StatsMap()
+}
+
 func (i *indexAliasImpl) GetInternal(key []byte) ([]byte, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()

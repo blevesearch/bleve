@@ -9,18 +9,22 @@
 
 package metrics
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/blevesearch/bleve/index/store"
+)
 
 type stats struct {
-	s      *Store
-	ostats json.Marshaler
+	s *Store
 }
 
-func (s *stats) MarshalJSON() ([]byte, error) {
+func (s *stats) statsMap() map[string]interface{} {
 	ms := map[string]interface{}{}
 
 	ms["metrics"] = map[string]interface{}{
 		"reader_get":             TimerMap(s.s.TimerReaderGet),
+		"reader_multi_get":       TimerMap(s.s.TimerReaderMultiGet),
 		"reader_prefix_iterator": TimerMap(s.s.TimerReaderPrefixIterator),
 		"reader_range_iterator":  TimerMap(s.s.TimerReaderRangeIterator),
 		"writer_execute_batch":   TimerMap(s.s.TimerWriterExecuteBatch),
@@ -29,9 +33,14 @@ func (s *stats) MarshalJSON() ([]byte, error) {
 		"batch_merge":            TimerMap(s.s.TimerBatchMerge),
 	}
 
-	if s.ostats != nil {
-		ms["kv"] = s.ostats
+	if o, ok := s.s.o.(store.KVStoreStats); ok {
+		ms["kv"] = o.StatsMap()
 	}
 
-	return json.Marshal(ms)
+	return ms
+}
+
+func (s *stats) MarshalJSON() ([]byte, error) {
+	m := s.statsMap()
+	return json.Marshal(m)
 }

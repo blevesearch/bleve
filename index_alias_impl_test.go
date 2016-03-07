@@ -1239,6 +1239,10 @@ func (i *stubIndex) Stats() *IndexStat {
 	return nil
 }
 
+func (i *stubIndex) StatsMap() map[string]interface{} {
+	return nil
+}
+
 func (i *stubIndex) GetInternal(key []byte) ([]byte, error) {
 	return nil, i.err
 }

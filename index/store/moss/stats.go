@@ -9,24 +9,35 @@
 
 package moss
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/blevesearch/bleve/index/store"
+)
 
 type stats struct {
-	s       *Store
-	llstats json.Marshaler
+	s *Store
 }
 
-func (s *stats) MarshalJSON() ([]byte, error) {
+func (s *stats) statsMap() map[string]interface{} {
 	ms := map[string]interface{}{}
 
 	var err error
 	ms["moss"], err = s.s.ms.Stats()
 	if err != nil {
-		return nil, err
+		return ms
 	}
 
-	if s.llstats != nil {
-		ms["kv"] = s.llstats
+	if s.s.llstore != nil {
+		if o, ok := s.s.llstore.(store.KVStoreStats); ok {
+			ms["kv"] = o.StatsMap()
+		}
 	}
-	return json.Marshal(ms)
+
+	return ms
+}
+
+func (s *stats) MarshalJSON() ([]byte, error) {
+	m := s.statsMap()
+	return json.Marshal(m)
 }

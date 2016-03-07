@@ -68,14 +68,15 @@ type docBackIndexRow struct {
 }
 
 func NewUpsideDownCouch(storeName string, storeConfig map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error) {
-	return &UpsideDownCouch{
+	rv := &UpsideDownCouch{
 		version:       Version,
 		fieldCache:    index.NewFieldCache(),
 		storeName:     storeName,
 		storeConfig:   storeConfig,
 		analysisQueue: analysisQueue,
-		stats:         &indexStat{},
-	}, nil
+	}
+	rv.stats = &indexStat{i: rv}
+	return rv, nil
 }
 
 func (udc *UpsideDownCouch) init(kvwriter store.KVWriter) (err error) {
@@ -308,10 +309,6 @@ func (udc *UpsideDownCouch) Open() (err error) {
 	udc.store, err = storeConstructor(&mergeOperator, udc.storeConfig)
 	if err != nil {
 		return
-	}
-
-	if ss, ok := udc.store.(store.KVStoreStats); ok {
-		udc.stats.kvStats = ss.Stats()
 	}
 
 	// start a reader to look at the index
@@ -1031,6 +1028,10 @@ func (udc *UpsideDownCouch) Reader() (index.IndexReader, error) {
 
 func (udc *UpsideDownCouch) Stats() json.Marshaler {
 	return udc.stats
+}
+
+func (udc *UpsideDownCouch) StatsMap() map[string]interface{} {
+	return udc.stats.statsMap()
 }
 
 func (udc *UpsideDownCouch) Advanced() (store.KVStore, error) {

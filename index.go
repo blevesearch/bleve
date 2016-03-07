@@ -199,6 +199,7 @@ type Index interface {
 	Mapping() *IndexMapping
 
 	Stats() *IndexStat
+	StatsMap() map[string]interface{}
 
 	GetInternal(key []byte) ([]byte, error)
 	SetInternal(key, val []byte) error

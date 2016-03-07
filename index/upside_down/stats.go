@@ -12,18 +12,20 @@ package upside_down
 import (
 	"encoding/json"
 	"sync/atomic"
+
+	"github.com/blevesearch/bleve/index/store"
 )
 
 type indexStat struct {
+	i                                 *UpsideDownCouch
 	updates, deletes, batches, errors uint64
 	analysisTime, indexTime           uint64
 	termSearchersStarted              uint64
 	termSearchersFinished             uint64
 	numPlainTextBytesIndexed          uint64
-	kvStats                           json.Marshaler
 }
 
-func (i *indexStat) MarshalJSON() ([]byte, error) {
+func (i *indexStat) statsMap() map[string]interface{} {
 	m := map[string]interface{}{}
 	m["updates"] = atomic.LoadUint64(&i.updates)
 	m["deletes"] = atomic.LoadUint64(&i.deletes)
@@ -34,8 +36,15 @@ func (i *indexStat) MarshalJSON() ([]byte, error) {
 	m["term_searchers_started"] = atomic.LoadUint64(&i.termSearchersStarted)
 	m["term_searchers_finished"] = atomic.LoadUint64(&i.termSearchersFinished)
 	m["num_plain_text_bytes_indexed"] = atomic.LoadUint64(&i.numPlainTextBytesIndexed)
-	if i.kvStats != nil {
-		m["kv"] = i.kvStats
+
+	if o, ok := i.i.store.(store.KVStoreStats); ok {
+		m["kv"] = o.StatsMap()
 	}
+
+	return m
+}
+
+func (i *indexStat) MarshalJSON() ([]byte, error) {
+	m := i.statsMap()
 	return json.Marshal(m)
 }
