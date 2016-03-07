@@ -26,6 +26,9 @@ import (
 
 	// we must explicitly include any functionality we plan on testing
 	_ "github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
+
+	// allow choosing alternate kvstores
+	_ "github.com/blevesearch/bleve/config"
 )
 
 var dataset = flag.String("dataset", "", "only test datasets matching this regex")
@@ -33,13 +36,15 @@ var onlynum = flag.Int("testnum", -1, "only run the test with this number")
 var keepIndex = flag.Bool("keepIndex", false, "keep the index after testing")
 
 var indexType = flag.String("indexType", bleve.Config.DefaultIndexType, "index type to build")
+var kvType = flag.String("kvType", bleve.Config.DefaultKVStore, "kv store type to build")
 
 func TestIntegration(t *testing.T) {
 
 	flag.Parse()
 
 	bleve.Config.DefaultIndexType = *indexType
-	t.Logf("using index type %s", *indexType)
+	bleve.Config.DefaultKVStore = *kvType
+	t.Logf("using index type %s and kv type %s", *indexType, *kvType)
 
 	var err error
 	var datasetRegexp *regexp.Regexp
