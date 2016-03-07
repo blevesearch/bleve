@@ -25,40 +25,47 @@ func RegisterTokenizer(name string, constructor TokenizerConstructor) {
 
 type TokenizerConstructor func(config map[string]interface{}, cache *Cache) (analysis.Tokenizer, error)
 type TokenizerRegistry map[string]TokenizerConstructor
-type TokenizerCache map[string]analysis.Tokenizer
 
-func (c TokenizerCache) TokenizerNamed(name string, cache *Cache) (analysis.Tokenizer, error) {
-	tokenizer, cached := c[name]
-	if cached {
-		return tokenizer, nil
+type TokenizerCache struct {
+	*ConcurrentCache
+}
+
+func NewTokenizerCache() *TokenizerCache {
+	return &TokenizerCache{
+		NewConcurrentCache(),
 	}
-	tokenizerConstructor, registered := tokenizers[name]
+}
+
+func TokenizerBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
+	cons, registered := tokenizers[name]
 	if !registered {
 		return nil, fmt.Errorf("no tokenizer with name or type '%s' registered", name)
 	}
-	tokenizer, err := tokenizerConstructor(nil, cache)
+	tokenizer, err := cons(config, cache)
 	if err != nil {
-		return nil, fmt.Errorf("error building tokenizer '%s': %v", name, err)
+		return nil, fmt.Errorf("error building tokenizer: %v", err)
 	}
-	c[name] = tokenizer
 	return tokenizer, nil
 }
 
-func (c TokenizerCache) DefineTokenizer(name string, typ string, config map[string]interface{}, cache *Cache) (analysis.Tokenizer, error) {
-	_, cached := c[name]
-	if cached {
-		return nil, fmt.Errorf("tokenizer named '%s' already defined", name)
-	}
-	tokenizerConstructor, registered := tokenizers[typ]
-	if !registered {
-		return nil, fmt.Errorf("no tokenizer type '%s' registered", typ)
-	}
-	tokenizer, err := tokenizerConstructor(config, cache)
+func (c *TokenizerCache) TokenizerNamed(name string, cache *Cache) (analysis.Tokenizer, error) {
+	item, err := c.ItemNamed(name, cache, TokenizerBuild)
 	if err != nil {
-		return nil, fmt.Errorf("error building tokenizer '%s': %v", name, err)
+		return nil, err
 	}
-	c[name] = tokenizer
-	return tokenizer, nil
+	return item.(analysis.Tokenizer), nil
+}
+
+func (c *TokenizerCache) DefineTokenizer(name string, typ string, config map[string]interface{}, cache *Cache) (analysis.Tokenizer, error) {
+	item, err := c.DefineItem(name, typ, config, cache, TokenizerBuild)
+	if err != nil {
+		if err == ErrAlreadyDefined {
+			return nil, fmt.Errorf("tokenizer named '%s' already defined", name)
+		} else {
+			return nil, err
+		}
+	}
+	return item.(analysis.Tokenizer), nil
 }
 
 func TokenizerTypesAndInstances() ([]string, []string) {

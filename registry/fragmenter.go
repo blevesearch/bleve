@@ -25,40 +25,47 @@ func RegisterFragmenter(name string, constructor FragmenterConstructor) {
 
 type FragmenterConstructor func(config map[string]interface{}, cache *Cache) (highlight.Fragmenter, error)
 type FragmenterRegistry map[string]FragmenterConstructor
-type FragmenterCache map[string]highlight.Fragmenter
 
-func (c FragmenterCache) FragmenterNamed(name string, cache *Cache) (highlight.Fragmenter, error) {
-	fragmenter, cached := c[name]
-	if cached {
-		return fragmenter, nil
+type FragmenterCache struct {
+	*ConcurrentCache
+}
+
+func NewFragmenterCache() *FragmenterCache {
+	return &FragmenterCache{
+		NewConcurrentCache(),
 	}
-	fragmenterConstructor, registered := fragmenters[name]
+}
+
+func FragmenterBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
+	cons, registered := fragmenters[name]
 	if !registered {
 		return nil, fmt.Errorf("no fragmenter with name or type '%s' registered", name)
 	}
-	fragmenter, err := fragmenterConstructor(nil, cache)
+	fragmenter, err := cons(config, cache)
 	if err != nil {
 		return nil, fmt.Errorf("error building fragmenter: %v", err)
 	}
-	c[name] = fragmenter
 	return fragmenter, nil
 }
 
-func (c FragmenterCache) DefineFragmenter(name string, typ string, config map[string]interface{}, cache *Cache) (highlight.Fragmenter, error) {
-	_, cached := c[name]
-	if cached {
-		return nil, fmt.Errorf("fragmenter named '%s' already defined", name)
-	}
-	fragmenterConstructor, registered := fragmenters[typ]
-	if !registered {
-		return nil, fmt.Errorf("no fragmenter type '%s' registered", typ)
-	}
-	fragmenter, err := fragmenterConstructor(config, cache)
+func (c *FragmenterCache) FragmenterNamed(name string, cache *Cache) (highlight.Fragmenter, error) {
+	item, err := c.ItemNamed(name, cache, FragmenterBuild)
 	if err != nil {
-		return nil, fmt.Errorf("error building fragmenter: %v", err)
+		return nil, err
 	}
-	c[name] = fragmenter
-	return fragmenter, nil
+	return item.(highlight.Fragmenter), nil
+}
+
+func (c *FragmenterCache) DefineFragmenter(name string, typ string, config map[string]interface{}, cache *Cache) (highlight.Fragmenter, error) {
+	item, err := c.DefineItem(name, typ, config, cache, FragmenterBuild)
+	if err != nil {
+		if err == ErrAlreadyDefined {
+			return nil, fmt.Errorf("fragmenter named '%s' already defined", name)
+		} else {
+			return nil, err
+		}
+	}
+	return item.(highlight.Fragmenter), nil
 }
 
 func FragmenterTypesAndInstances() ([]string, []string) {

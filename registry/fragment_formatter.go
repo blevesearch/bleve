@@ -25,40 +25,47 @@ func RegisterFragmentFormatter(name string, constructor FragmentFormatterConstru
 
 type FragmentFormatterConstructor func(config map[string]interface{}, cache *Cache) (highlight.FragmentFormatter, error)
 type FragmentFormatterRegistry map[string]FragmentFormatterConstructor
-type FragmentFormatterCache map[string]highlight.FragmentFormatter
 
-func (c FragmentFormatterCache) FragmentFormatterNamed(name string, cache *Cache) (highlight.FragmentFormatter, error) {
-	fragmentFormatter, cached := c[name]
-	if cached {
-		return fragmentFormatter, nil
+type FragmentFormatterCache struct {
+	*ConcurrentCache
+}
+
+func NewFragmentFormatterCache() *FragmentFormatterCache {
+	return &FragmentFormatterCache{
+		NewConcurrentCache(),
 	}
-	fragmentFormatterConstructor, registered := fragmentFormatters[name]
+}
+
+func FragmentFormatterBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
+	cons, registered := fragmentFormatters[name]
 	if !registered {
 		return nil, fmt.Errorf("no fragment formatter with name or type '%s' registered", name)
 	}
-	fragmentFormatter, err := fragmentFormatterConstructor(nil, cache)
+	fragmentFormatter, err := cons(config, cache)
 	if err != nil {
 		return nil, fmt.Errorf("error building fragment formatter: %v", err)
 	}
-	c[name] = fragmentFormatter
 	return fragmentFormatter, nil
 }
 
-func (c FragmentFormatterCache) DefineFragmentFormatter(name string, typ string, config map[string]interface{}, cache *Cache) (highlight.FragmentFormatter, error) {
-	_, cached := c[name]
-	if cached {
-		return nil, fmt.Errorf("fragment formatter named '%s' already defined", name)
-	}
-	fragmentFormatterConstructor, registered := fragmentFormatters[typ]
-	if !registered {
-		return nil, fmt.Errorf("no fragment formatter type '%s' registered", typ)
-	}
-	fragmentFormatter, err := fragmentFormatterConstructor(config, cache)
+func (c *FragmentFormatterCache) FragmentFormatterNamed(name string, cache *Cache) (highlight.FragmentFormatter, error) {
+	item, err := c.ItemNamed(name, cache, FragmentFormatterBuild)
 	if err != nil {
-		return nil, fmt.Errorf("error building fragment formatter: %v", err)
+		return nil, err
 	}
-	c[name] = fragmentFormatter
-	return fragmentFormatter, nil
+	return item.(highlight.FragmentFormatter), nil
+}
+
+func (c *FragmentFormatterCache) DefineFragmentFormatter(name string, typ string, config map[string]interface{}, cache *Cache) (highlight.FragmentFormatter, error) {
+	item, err := c.DefineItem(name, typ, config, cache, FragmentFormatterBuild)
+	if err != nil {
+		if err == ErrAlreadyDefined {
+			return nil, fmt.Errorf("fragment formatter named '%s' already defined", name)
+		} else {
+			return nil, err
+		}
+	}
+	return item.(highlight.FragmentFormatter), nil
 }
 
 func FragmentFormatterTypesAndInstances() ([]string, []string) {

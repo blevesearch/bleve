@@ -1496,3 +1496,15 @@ func TestSearchTimeout(t *testing.T) {
 		t.Fatalf("exected %v, got: %v", context.Canceled, err)
 	}
 }
+
+// TestConfigCache exposes a concurrent map write with go 1.6
+func TestConfigCache(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		go func() {
+			_, err := Config.Cache.HighlighterNamed(Config.DefaultHighlighter)
+			if err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+}

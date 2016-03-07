@@ -25,40 +25,47 @@ func RegisterCharFilter(name string, constructor CharFilterConstructor) {
 
 type CharFilterConstructor func(config map[string]interface{}, cache *Cache) (analysis.CharFilter, error)
 type CharFilterRegistry map[string]CharFilterConstructor
-type CharFilterCache map[string]analysis.CharFilter
 
-func (c CharFilterCache) CharFilterNamed(name string, cache *Cache) (analysis.CharFilter, error) {
-	charFilter, cached := c[name]
-	if cached {
-		return charFilter, nil
+type CharFilterCache struct {
+	*ConcurrentCache
+}
+
+func NewCharFilterCache() *CharFilterCache {
+	return &CharFilterCache{
+		NewConcurrentCache(),
 	}
-	charFilterConstructor, registered := charFilters[name]
+}
+
+func CharFilterBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
+	cons, registered := charFilters[name]
 	if !registered {
 		return nil, fmt.Errorf("no char filter with name or type '%s' registered", name)
 	}
-	charFilter, err := charFilterConstructor(nil, cache)
+	charFilter, err := cons(config, cache)
 	if err != nil {
 		return nil, fmt.Errorf("error building char filter: %v", err)
 	}
-	c[name] = charFilter
 	return charFilter, nil
 }
 
-func (c CharFilterCache) DefineCharFilter(name string, typ string, config map[string]interface{}, cache *Cache) (analysis.CharFilter, error) {
-	_, cached := c[name]
-	if cached {
-		return nil, fmt.Errorf("char filter named '%s' already defined", name)
-	}
-	charFilterConstructor, registered := charFilters[typ]
-	if !registered {
-		return nil, fmt.Errorf("no char filter type '%s' registered", typ)
-	}
-	charFilter, err := charFilterConstructor(config, cache)
+func (c *CharFilterCache) CharFilterNamed(name string, cache *Cache) (analysis.CharFilter, error) {
+	item, err := c.ItemNamed(name, cache, CharFilterBuild)
 	if err != nil {
-		return nil, fmt.Errorf("error building char filter: %v", err)
+		return nil, err
 	}
-	c[name] = charFilter
-	return charFilter, nil
+	return item.(analysis.CharFilter), nil
+}
+
+func (c *CharFilterCache) DefineCharFilter(name string, typ string, config map[string]interface{}, cache *Cache) (analysis.CharFilter, error) {
+	item, err := c.DefineItem(name, typ, config, cache, CharFilterBuild)
+	if err != nil {
+		if err == ErrAlreadyDefined {
+			return nil, fmt.Errorf("char filter named '%s' already defined", name)
+		} else {
+			return nil, err
+		}
+	}
+	return item.(analysis.CharFilter), nil
 }
 
 func CharFilterTypesAndInstances() ([]string, []string) {

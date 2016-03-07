@@ -25,40 +25,47 @@ func RegisterTokenFilter(name string, constructor TokenFilterConstructor) {
 
 type TokenFilterConstructor func(config map[string]interface{}, cache *Cache) (analysis.TokenFilter, error)
 type TokenFilterRegistry map[string]TokenFilterConstructor
-type TokenFilterCache map[string]analysis.TokenFilter
 
-func (c TokenFilterCache) TokenFilterNamed(name string, cache *Cache) (analysis.TokenFilter, error) {
-	tokenFilter, cached := c[name]
-	if cached {
-		return tokenFilter, nil
+type TokenFilterCache struct {
+	*ConcurrentCache
+}
+
+func NewTokenFilterCache() *TokenFilterCache {
+	return &TokenFilterCache{
+		NewConcurrentCache(),
 	}
-	tokenFilterConstructor, registered := tokenFilters[name]
+}
+
+func TokenFilterBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
+	cons, registered := tokenFilters[name]
 	if !registered {
 		return nil, fmt.Errorf("no token filter with name or type '%s' registered", name)
 	}
-	tokenFilter, err := tokenFilterConstructor(nil, cache)
+	tokenFilter, err := cons(config, cache)
 	if err != nil {
 		return nil, fmt.Errorf("error building token filter: %v", err)
 	}
-	c[name] = tokenFilter
 	return tokenFilter, nil
 }
 
-func (c TokenFilterCache) DefineTokenFilter(name string, typ string, config map[string]interface{}, cache *Cache) (analysis.TokenFilter, error) {
-	_, cached := c[name]
-	if cached {
-		return nil, fmt.Errorf("token filter named '%s' already defined", name)
-	}
-	tokenFilterConstructor, registered := tokenFilters[typ]
-	if !registered {
-		return nil, fmt.Errorf("no token filter type '%s' registered", typ)
-	}
-	tokenFilter, err := tokenFilterConstructor(config, cache)
+func (c *TokenFilterCache) TokenFilterNamed(name string, cache *Cache) (analysis.TokenFilter, error) {
+	item, err := c.ItemNamed(name, cache, TokenFilterBuild)
 	if err != nil {
-		return nil, fmt.Errorf("error building token filter: %v", err)
+		return nil, err
 	}
-	c[name] = tokenFilter
-	return tokenFilter, nil
+	return item.(analysis.TokenFilter), nil
+}
+
+func (c *TokenFilterCache) DefineTokenFilter(name string, typ string, config map[string]interface{}, cache *Cache) (analysis.TokenFilter, error) {
+	item, err := c.DefineItem(name, typ, config, cache, TokenFilterBuild)
+	if err != nil {
+		if err == ErrAlreadyDefined {
+			return nil, fmt.Errorf("token filter named '%s' already defined", name)
+		} else {
+			return nil, err
+		}
+	}
+	return item.(analysis.TokenFilter), nil
 }
 
 func TokenFilterTypesAndInstances() ([]string, []string) {
