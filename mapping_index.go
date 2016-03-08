@@ -130,6 +130,8 @@ type IndexMapping struct {
 	DefaultDateTimeParser string                      `json:"default_datetime_parser"`
 	DefaultField          string                      `json:"default_field"`
 	ByteArrayConverter    string                      `json:"byte_array_converter"`
+	StoreDynamic          bool                        `json:"store_dynamic"`
+	IndexDynamic          bool                        `json:"index_dynamic"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
 	cache                 *registry.Cache
 }
@@ -233,6 +235,8 @@ func NewIndexMapping() *IndexMapping {
 		DefaultDateTimeParser: defaultDateTimeParser,
 		DefaultField:          defaultField,
 		ByteArrayConverter:    defaultByteArrayConverter,
+		IndexDynamic:          IndexDynamic,
+		StoreDynamic:          StoreDynamic,
 		CustomAnalysis:        newCustomAnalysis(),
 		cache:                 registry.NewCache(),
 	}
@@ -295,6 +299,8 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 	im.ByteArrayConverter = defaultByteArrayConverter
 	im.DefaultMapping = NewDocumentMapping()
 	im.TypeMapping = make(map[string]*DocumentMapping)
+	im.StoreDynamic = StoreDynamic
+	im.IndexDynamic = IndexDynamic
 
 	var invalidKeys []string
 	for k, v := range tmp {
@@ -341,6 +347,16 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 			}
 		case "types":
 			err := json.Unmarshal(v, &im.TypeMapping)
+			if err != nil {
+				return err
+			}
+		case "store_dynamic":
+			err := json.Unmarshal(v, &im.StoreDynamic)
+			if err != nil {
+				return err
+			}
+		case "index_dynamic":
+			err := json.Unmarshal(v, &im.IndexDynamic)
 			if err != nil {
 				return err
 			}

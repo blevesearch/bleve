@@ -339,6 +339,7 @@ func TestMappingWithTokenizerDeps(t *testing.T) {
 
 func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
 
+	// first verify that with system defaults, dynamic field is stored
 	data := map[string]interface{}{
 		"name": "bleve",
 	}
@@ -354,11 +355,13 @@ func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
 		}
 	}
 
+	// now change system level defaults, verify dynamic field is not stored
 	StoreDynamic = false
 	defer func() {
 		StoreDynamic = true
 	}()
 
+	mapping = NewIndexMapping()
 	doc = document.NewDocument("y")
 	err = mapping.mapDocument(doc, data)
 	if err != nil {
@@ -367,6 +370,20 @@ func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
 	for _, field := range doc.Fields {
 		if field.Name() == "name" && field.Options().IsStored() {
 			t.Errorf("expected field 'name' to be not stored, is")
+		}
+	}
+
+	// now override the system level defaults inside the index mapping
+	mapping = NewIndexMapping()
+	mapping.StoreDynamic = true
+	doc = document.NewDocument("y")
+	err = mapping.mapDocument(doc, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range doc.Fields {
+		if field.Name() == "name" && !field.Options().IsStored() {
+			t.Errorf("expected field 'name' to be stored, isn't")
 		}
 	}
 }
