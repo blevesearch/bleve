@@ -92,26 +92,11 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 		}
 	}
 
-	mossLowerLevelMaxBatchSize := uint64(0)
-	v, ok = config["mossLowerLevelMaxBatchSize"]
-	if ok {
-		mossLowerLevelMaxBatchSizeF, ok := v.(float64)
-		if !ok {
-			return nil, fmt.Errorf("moss store,"+
-				" could not parse config[mossLowerLevelMaxBatchSize]: %v", v)
-		}
-
-		mossLowerLevelMaxBatchSize = uint64(mossLowerLevelMaxBatchSizeF)
-	}
-
-	// --------------------------------------------------
-
 	var llStore store.KVStore
 	if options.LowerLevelInit == nil &&
 		options.LowerLevelUpdate == nil &&
 		mossLowerLevelStoreName != "" {
 		mossLowerLevelStoreConfig := map[string]interface{}{}
-
 		v, ok := config["mossLowerLevelStoreConfig"]
 		if ok {
 			mossLowerLevelStoreConfig, ok = v.(map[string]interface{})
@@ -119,6 +104,18 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 				return nil, fmt.Errorf("moss store, initLowerLevelStore,"+
 					" could parse mossLowerLevelStoreConfig: %v", v)
 			}
+		}
+
+		mossLowerLevelMaxBatchSize := uint64(0)
+		v, ok = config["mossLowerLevelMaxBatchSize"]
+		if ok {
+			mossLowerLevelMaxBatchSizeF, ok := v.(float64)
+			if !ok {
+				return nil, fmt.Errorf("moss store,"+
+					" could not parse config[mossLowerLevelMaxBatchSize]: %v", v)
+			}
+
+			mossLowerLevelMaxBatchSize = uint64(mossLowerLevelMaxBatchSizeF)
 		}
 
 		lowerLevelInit, lowerLevelUpdate, lowerLevelStore, err :=
