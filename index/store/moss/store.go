@@ -82,6 +82,12 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 
 	// --------------------------------------------------
 
+	if options.Log == nil {
+		options.Log = func(format string, a ...interface{}) {}
+	}
+
+	// --------------------------------------------------
+
 	mossLowerLevelStoreName := ""
 	v, ok = config["mossLowerLevelStoreName"]
 	if ok {
