@@ -25,6 +25,10 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
+// RegistryCollectionOptions should be treated as read-only after
+// process init()'ialization.
+var RegistryCollectionOptions = map[string]moss.CollectionOptions{}
+
 const Name = "moss"
 
 type Store struct {
@@ -36,46 +40,47 @@ type Store struct {
 	s *stats
 }
 
+// New initializes a moss storage with values from the optional
+// config["mossCollectionOptions"] (a JSON moss.CollectionOptions).
+// Next, values from the RegistryCollectionOptions, named by the
+// optional config["mossCollectionOptionsName"], take precedence.
+// Finally, base case defaults are taken from
+// moss.DefaultCollectionOptions.
 func New(mo store.MergeOperator, config map[string]interface{}) (
 	store.KVStore, error) {
-	return NewEx(mo, config, moss.CollectionOptions{})
-}
+	options := moss.DefaultCollectionOptions // Copy.
 
-func NewEx(mo store.MergeOperator, config map[string]interface{},
-	options moss.CollectionOptions) (store.KVStore, error) {
-	debug := moss.DefaultCollectionOptions.Debug
-	v, ok := config["mossDebug"]
+	v, ok := config["mossCollectionOptionsName"]
 	if ok {
-		debugF, ok := v.(float64)
+		name, ok := v.(string)
 		if !ok {
 			return nil, fmt.Errorf("moss store,"+
-				" could not parse config[mossDebug]: %v", v)
+				" could not parse config[mossCollectionOptionsName]: %v", v)
 		}
 
-		debug = int(debugF)
-	}
-
-	minMergePercentage := moss.DefaultCollectionOptions.MinMergePercentage
-	v, ok = config["mossMinMergePercentage"]
-	if ok {
-		minMergePercentage, ok = v.(float64)
+		options, ok = RegistryCollectionOptions[name] // Copy.
 		if !ok {
 			return nil, fmt.Errorf("moss store,"+
-				" could not parse config[mossMinMergePercentage]: %v", v)
+				" could not find RegistryCollectionOptions, name: %s", name)
 		}
 	}
 
-	maxPreMergerBatches := moss.DefaultCollectionOptions.MaxPreMergerBatches
-	v, ok = config["mossMaxPreMergerBatches"]
+	v, ok = config["mossCollectionOptions"]
 	if ok {
-		maxPreMergerBatchesF, ok := v.(float64)
-		if !ok {
+		b, err := json.Marshal(v) // Convert from map[string]interface{}.
+		if err != nil {
 			return nil, fmt.Errorf("moss store,"+
-				" could not parse config[mossMaxPreMergerBatches]: %v", v)
+				" could not marshal config[mossCollectionOptions]: %v", v)
 		}
 
-		maxPreMergerBatches = int(maxPreMergerBatchesF)
+		err = json.Unmarshal(b, &options)
+		if err != nil {
+			return nil, fmt.Errorf("moss store,"+
+				" could not unmarshal config[mossCollectionOptions]: %v", v)
+		}
 	}
+
+	// --------------------------------------------------
 
 	mossLowerLevelStoreName := ""
 	v, ok = config["mossLowerLevelStoreName"]
@@ -100,26 +105,6 @@ func NewEx(mo store.MergeOperator, config map[string]interface{},
 	}
 
 	// --------------------------------------------------
-
-	if options.MergeOperator == nil {
-		options.MergeOperator = mo
-	}
-
-	if options.MinMergePercentage <= 0 {
-		options.MinMergePercentage = minMergePercentage
-	}
-
-	if options.MaxPreMergerBatches <= 0 {
-		options.MaxPreMergerBatches = maxPreMergerBatches
-	}
-
-	if options.Debug <= 0 {
-		options.Debug = debug
-	}
-
-	if options.Log == nil {
-		options.Log = func(format string, a ...interface{}) {}
-	}
 
 	var llStore store.KVStore
 	if options.LowerLevelInit == nil &&
@@ -152,6 +137,8 @@ func NewEx(mo store.MergeOperator, config map[string]interface{},
 	}
 
 	// --------------------------------------------------
+
+	options.MergeOperator = mo
 
 	ms, err := moss.NewCollection(options)
 	if err != nil {
