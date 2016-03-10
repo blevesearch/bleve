@@ -263,8 +263,13 @@ func (ss *SearchStatus) Merge(other *SearchStatus) {
 	ss.Total += other.Total
 	ss.Failed += other.Failed
 	ss.Successful += other.Successful
-	for otherIndex, otherError := range other.Errors {
-		ss.Errors[otherIndex] = otherError
+	if len(other.Errors) > 0 {
+		if ss.Errors == nil {
+			ss.Errors = make(map[string]error)
+		}
+		for otherIndex, otherError := range other.Errors {
+			ss.Errors[otherIndex] = otherError
+		}
 	}
 }
 

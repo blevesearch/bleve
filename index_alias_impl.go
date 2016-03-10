@@ -594,10 +594,15 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 	sr.Took = searchDuration
 
 	// fix up errors
-	for indexName, indexErr := range indexErrors {
-		sr.Status.Errors[indexName] = indexErr
-		sr.Status.Total++
-		sr.Status.Failed++
+	if len(indexErrors) > 0 {
+		if sr.Status.Errors == nil {
+			sr.Status.Errors = make(map[string]error)
+		}
+		for indexName, indexErr := range indexErrors {
+			sr.Status.Errors[indexName] = indexErr
+			sr.Status.Total++
+			sr.Status.Failed++
+		}
 	}
 
 	return sr, nil
