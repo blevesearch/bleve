@@ -225,7 +225,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	var im IndexMapping
 	err = json.Unmarshal(mappingBytes, &im)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing mapping JSON: %v\nmapping contents:\n%s", err, string(mappingBytes))
 	}
 
 	// mark the index as open
