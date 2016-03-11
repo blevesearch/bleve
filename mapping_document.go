@@ -127,7 +127,39 @@ func (dm *DocumentMapping) fieldDescribedByPath(path string) *FieldMapping {
 	return nil
 }
 
+// documentMappingForPath only returns EXACT matches for a sub document
+// or for an explicitly mapped field, if you want to find the
+// closest document mapping to a field not explicitly mapped
+// use closestDocMapping
 func (dm *DocumentMapping) documentMappingForPath(path string) *DocumentMapping {
+	pathElements := decodePath(path)
+	current := dm
+OUTER:
+	for i, pathElement := range pathElements {
+		for name, subDocMapping := range current.Properties {
+			if name == pathElement {
+				current = subDocMapping
+				continue OUTER
+			}
+		}
+		// no subDocMapping matches this pathElement
+		// only if this is the last element check for field name
+		if i == len(pathElements)-1 {
+			for _, field := range current.Fields {
+				if field.Name == pathElement {
+					break
+				}
+			}
+		}
+
+		return nil
+	}
+	return current
+}
+
+// closestDocMapping findest the most specific document mapping that matches
+// part of the provided path
+func (dm *DocumentMapping) closestDocMapping(path string) *DocumentMapping {
 	pathElements := decodePath(path)
 	current := dm
 OUTER:
@@ -138,12 +170,6 @@ OUTER:
 				continue OUTER
 			}
 		}
-		for _, field := range current.Fields {
-			if field.Name == pathElement {
-				continue OUTER
-			}
-		}
-		return nil
 	}
 	return current
 }
@@ -334,6 +360,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 	pathString := encodePath(path)
 	// look to see if there is a mapping for this field
 	subDocMapping := dm.documentMappingForPath(pathString)
+	closestDocMapping := dm.closestDocMapping(pathString)
 
 	// check to see if we even need to do further processing
 	if subDocMapping != nil && !subDocMapping.Enabled {
@@ -354,7 +381,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			for _, fieldMapping := range subDocMapping.Fields {
 				fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
 			}
-		} else if dm.Dynamic {
+		} else if closestDocMapping.Dynamic {
 			// automatic indexing behavior
 
 			// first see if it can be parsed by the default date parser
@@ -385,7 +412,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			for _, fieldMapping := range subDocMapping.Fields {
 				fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
 			}
-		} else if dm.Dynamic {
+		} else if closestDocMapping.Dynamic {
 			// automatic indexing behavior
 			fieldMapping := newNumericFieldMappingDynamic(context.im)
 			fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
@@ -397,7 +424,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			for _, fieldMapping := range subDocMapping.Fields {
 				fieldMapping.processBoolean(propertyValBool, pathString, path, indexes, context)
 			}
-		} else if dm.Dynamic {
+		} else if closestDocMapping.Dynamic {
 			// automatic indexing behavior
 			fieldMapping := newBooleanFieldMappingDynamic(context.im)
 			fieldMapping.processBoolean(propertyValBool, pathString, path, indexes, context)
@@ -411,7 +438,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				for _, fieldMapping := range subDocMapping.Fields {
 					fieldMapping.processTime(property, pathString, path, indexes, context)
 				}
-			} else if dm.Dynamic {
+			} else if closestDocMapping.Dynamic {
 				fieldMapping := newDateTimeFieldMappingDynamic(context.im)
 				fieldMapping.processTime(property, pathString, path, indexes, context)
 			}

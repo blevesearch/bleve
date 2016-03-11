@@ -556,3 +556,50 @@ func TestInvalidIndexMappingStrict(t *testing.T) {
 		t.Fatalf("expect to find index mapping default field 'all', got '%s'", im.DefaultField)
 	}
 }
+
+func TestMappingBug353(t *testing.T) {
+	dataBytes := `{
+  "Reviews": [
+    {
+      "ReviewID": "RX16692001",
+      "Content": "Usually stay near the airport..."
+    }
+	],
+	"Other": {
+	  "Inside": "text"
+  },
+  "Name": "The Inn at Baltimore White Marsh"
+}`
+
+	var data map[string]interface{}
+	err := json.Unmarshal([]byte(dataBytes), &data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reviewContentFieldMapping := NewTextFieldMapping()
+	reviewContentFieldMapping.Analyzer = "crazy"
+
+	reviewsMapping := NewDocumentMapping()
+	reviewsMapping.Dynamic = false
+	reviewsMapping.AddFieldMappingsAt("Content", reviewContentFieldMapping)
+	otherMapping := NewDocumentMapping()
+	otherMapping.Dynamic = false
+	mapping := NewIndexMapping()
+	mapping.DefaultMapping.AddSubDocumentMapping("Reviews", reviewsMapping)
+	mapping.DefaultMapping.AddSubDocumentMapping("Other", otherMapping)
+
+	doc := document.NewDocument("x")
+	err = mapping.mapDocument(doc, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// expect doc has only 2 fields
+	if len(doc.Fields) != 2 {
+		t.Errorf("expected doc with 2 fields, got: %d", len(doc.Fields))
+		for _, f := range doc.Fields {
+			t.Logf("field named: %s", f.Name())
+		}
+	}
+}
