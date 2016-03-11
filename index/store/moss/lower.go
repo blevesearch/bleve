@@ -55,9 +55,11 @@ func initLowerLevelStore(
 	}
 
 	llStore := &llStore{
-		refs:    0,
-		kvStore: kvStore,
-		logf:    logf,
+		refs:     0,
+		config:   config,
+		llConfig: lowerLevelStoreConfig,
+		kvStore:  kvStore,
+		logf:     logf,
 	}
 
 	llUpdate := func(ssHigher moss.Snapshot) (ssLower moss.Snapshot, err error) {
@@ -79,6 +81,9 @@ func initLowerLevelStore(
 // bleve store.KVStore.
 type llStore struct {
 	kvStore store.KVStore
+
+	config   map[string]interface{}
+	llConfig map[string]interface{}
 
 	logf func(format string, a ...interface{})
 
@@ -219,6 +224,8 @@ func (s *llStore) update(ssHigher moss.Snapshot, maxBatchSize uint64) (
 					" unexpected operation, ex: %v", ex)
 			}
 
+			i++
+
 			err = iter.Next()
 			if err == moss.ErrIteratorDone {
 				break
@@ -240,19 +247,19 @@ func (s *llStore) update(ssHigher moss.Snapshot, maxBatchSize uint64) (
 
 				batch = kvWriter.NewBatch()
 			}
-
-			i++
 		}
 
 		if i > 0 {
-			s.logf("llStore.update, total: %d, ExecuteBatch: ...", i)
+			s.logf("llStore.update, ExecuteBatch,"+
+				" path: %s, total: %d, start", s.llConfig["path"], i)
 
 			err = kvWriter.ExecuteBatch(batch)
 			if err != nil {
 				return nil, err
 			}
 
-			s.logf("llStore.update, total: %d, ExecuteBatch: done", i)
+			s.logf("llStore.update, ExecuteBatch,"+
+				" path: %s: total: %d, done", s.llConfig["path"], i)
 		}
 	}
 
