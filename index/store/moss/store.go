@@ -82,7 +82,7 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 
 	// --------------------------------------------------
 
-	if options.Log == nil {
+	if options.Log == nil || options.Debug <= 0 {
 		options.Log = func(format string, a ...interface{}) {}
 	}
 
