@@ -10,7 +10,7 @@
 package facets
 
 import (
-	"container/list"
+	"sort"
 	"time"
 
 	"github.com/blevesearch/bleve/index"
@@ -90,11 +90,8 @@ func (fb *DateTimeFacetBuilder) Result() *search.FacetResult {
 		Missing: fb.missing,
 	}
 
-	// FIXME better implementation needed here this is quick and dirty
-	topN := list.New()
+	rv.DateRanges = make([]*search.DateRangeFacet, 0, len(fb.termsCount))
 
-	// walk entries and find top N
-OUTER:
 	for term, count := range fb.termsCount {
 		dateRange := fb.ranges[term]
 		tf := &search.DateRangeFacet{
@@ -109,37 +106,19 @@ OUTER:
 			end := dateRange.end.Format(time.RFC3339Nano)
 			tf.End = &end
 		}
-
-		for e := topN.Front(); e != nil; e = e.Next() {
-			curr := e.Value.(*search.DateRangeFacet)
-			if tf.Count < curr.Count {
-
-				topN.InsertBefore(tf, e)
-				// if we just made the list too long
-				if topN.Len() > fb.size {
-					// remove the head
-					topN.Remove(topN.Front())
-				}
-				continue OUTER
-			}
-		}
-		// if we got to the end, we still have to add it
-		topN.PushBack(tf)
-		if topN.Len() > fb.size {
-			// remove the head
-			topN.Remove(topN.Front())
-		}
-
+		rv.DateRanges = append(rv.DateRanges, tf)
 	}
 
+	sort.Sort(rv.DateRanges)
+
 	// we now have the list of the top N facets
-	rv.DateRanges = make([]*search.DateRangeFacet, topN.Len())
-	i := 0
+	if fb.size < len(rv.DateRanges) {
+		rv.DateRanges = rv.DateRanges[:fb.size]
+	}
+
 	notOther := 0
-	for e := topN.Back(); e != nil; e = e.Prev() {
-		rv.DateRanges[i] = e.Value.(*search.DateRangeFacet)
-		i++
-		notOther += e.Value.(*search.DateRangeFacet).Count
+	for _, nr := range rv.DateRanges {
+		notOther += nr.Count
 	}
 	rv.Other = fb.total - notOther
 
