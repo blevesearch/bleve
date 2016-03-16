@@ -54,6 +54,9 @@ func (b *Batch) Delete(key []byte) {
 }
 
 func (b *Batch) Merge(key, val []byte) {
+	if b.buf != nil {
+		b.bufUsed += len(key) + len(val)
+	}
 	b.merge.Merge(key, val)
 }
 
