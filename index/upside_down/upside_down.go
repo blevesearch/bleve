@@ -219,7 +219,7 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]Upsi
 	totBytes := addKeyBytes + addValBytes +
 		updateKeyBytes + updateValBytes +
 		deleteKeyBytes +
-		mergeKeyBytes + mergeValBytes
+		2*(mergeKeyBytes+mergeValBytes)
 
 	buf, wb, err := writer.NewBatchEx(store.KVBatchOptions{
 		TotalBytes: totBytes,
