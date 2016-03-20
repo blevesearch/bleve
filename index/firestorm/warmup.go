@@ -90,7 +90,7 @@ func (f *Firestorm) warmup(reader store.KVReader) error {
 			lastDocNumbers = append(lastDocNumbers, docNum)
 		} else {
 			// new doc id
-			atomic.AddUint64(f.docCount, 1)
+			atomic.AddUint64(&f.docCount, 1)
 
 			// last docID had multiple doc numbers
 			if len(lastDocNumbers) > 1 {

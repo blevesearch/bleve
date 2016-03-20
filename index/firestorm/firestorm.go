@@ -27,14 +27,15 @@ const Name = "firestorm"
 var UnsafeBatchUseDetected = fmt.Errorf("bleve.Batch is NOT thread-safe, modification after execution detected")
 
 type Firestorm struct {
+	highDocNumber uint64
+	docCount      uint64
+
 	storeName        string
 	storeConfig      map[string]interface{}
 	store            store.KVStore
 	compensator      *Compensator
 	analysisQueue    *index.AnalysisQueue
 	fieldCache       *index.FieldCache
-	highDocNumber    uint64
-	docCount         *uint64
 	garbageCollector *GarbageCollector
 	lookuper         *Lookuper
 	dictUpdater      *DictUpdater
@@ -42,14 +43,13 @@ type Firestorm struct {
 }
 
 func NewFirestorm(storeName string, storeConfig map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error) {
-	initialCount := uint64(0)
 	rv := Firestorm{
 		storeName:     storeName,
 		storeConfig:   storeConfig,
 		compensator:   NewCompensator(),
 		analysisQueue: analysisQueue,
 		fieldCache:    index.NewFieldCache(),
-		docCount:      &initialCount,
+		docCount:      0,
 		highDocNumber: 0,
 		stats:         &indexStat{},
 	}
@@ -130,7 +130,7 @@ func (f *Firestorm) Close() error {
 }
 
 func (f *Firestorm) DocCount() (uint64, error) {
-	count := atomic.LoadUint64(f.docCount)
+	count := atomic.LoadUint64(&f.docCount)
 	return count, nil
 
 }
