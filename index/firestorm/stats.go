@@ -17,12 +17,12 @@ import (
 )
 
 type indexStat struct {
-	f                                 *Firestorm
 	updates, deletes, batches, errors uint64
 	analysisTime, indexTime           uint64
 	termSearchersStarted              uint64
 	termSearchersFinished             uint64
 	numPlainTextBytesIndexed          uint64
+	f                                 *Firestorm
 }
 
 func (i *indexStat) statsMap() map[string]interface{} {

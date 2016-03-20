@@ -16,9 +16,9 @@ import (
 )
 
 type IndexStat struct {
-	i          *indexImpl
 	searches   uint64
 	searchTime uint64
+	i          *indexImpl
 }
 
 func (is *IndexStat) statsMap() map[string]interface{} {
