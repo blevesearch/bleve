@@ -195,10 +195,6 @@ func (b *Batch) String() string {
 }
 
 func (b *Batch) Reset() {
-	for k, _ := range b.IndexOps {
-		delete(b.IndexOps, k)
-	}
-	for k, _ := range b.InternalOps {
-		delete(b.InternalOps, k)
-	}
+	b.IndexOps = make(map[string]*document.Document)
+	b.InternalOps = make(map[string][]byte)
 }

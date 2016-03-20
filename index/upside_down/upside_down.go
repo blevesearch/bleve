@@ -38,8 +38,6 @@ const RowBufferSize = 4 * 1024
 
 var VersionKey = []byte{'v'}
 
-var UnsafeBatchUseDetected = fmt.Errorf("bleve.Batch is NOT thread-safe, modification after execution detected")
-
 const Version uint8 = 5
 
 var IncompatibleVersion = fmt.Errorf("incompatible version, %d is supported", Version)
@@ -802,20 +800,9 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 		}
 	}
 
-	var detectedUnsafeMutex sync.RWMutex
-	detectedUnsafe := false
-
 	go func() {
-		sofar := uint64(0)
 		for _, doc := range batch.IndexOps {
 			if doc != nil {
-				sofar++
-				if sofar > numUpdates {
-					detectedUnsafeMutex.Lock()
-					detectedUnsafe = true
-					detectedUnsafeMutex.Unlock()
-					return
-				}
 				aw := index.NewAnalysisWork(udc, doc, resultChan)
 				// put the work on the queue
 				udc.analysisQueue.Queue(aw)
@@ -930,12 +917,6 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 
 	if docBackIndexRowErr != nil {
 		return docBackIndexRowErr
-	}
-
-	detectedUnsafeMutex.RLock()
-	defer detectedUnsafeMutex.RUnlock()
-	if detectedUnsafe {
-		return UnsafeBatchUseDetected
 	}
 
 	// start a writer for this batch
