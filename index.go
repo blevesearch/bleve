@@ -13,6 +13,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
+	"golang.org/x/net/context"
 )
 
 // A Batch groups together multiple Index and Delete
@@ -167,6 +168,7 @@ type Index interface {
 	DocCount() (uint64, error)
 
 	Search(req *SearchRequest) (*SearchResult, error)
+	SearchInContext(ctx context.Context, req *SearchRequest) (*SearchResult, error)
 
 	Fields() ([]string, error)
 
@@ -197,6 +199,7 @@ type Index interface {
 	Mapping() *IndexMapping
 
 	Stats() *IndexStat
+	StatsMap() map[string]interface{}
 
 	GetInternal(key []byte) ([]byte, error)
 	SetInternal(key, val []byte) error

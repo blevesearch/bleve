@@ -17,6 +17,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
@@ -32,7 +34,6 @@ type indexImpl struct {
 	path  string
 	name  string
 	meta  *indexMeta
-	s     store.KVStore
 	i     index.Index
 	m     *IndexMapping
 	mutex sync.RWMutex
@@ -72,7 +73,6 @@ func newMemIndex(indexType string, mapping *IndexMapping) (*indexImpl, error) {
 	if err != nil {
 		return nil, err
 	}
-	rv.stats.indexStat = rv.i.Stats()
 
 	// now persist the mapping
 	mappingBytes, err := json.Marshal(mapping)
@@ -108,12 +108,12 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 	}
 
 	rv := indexImpl{
-		path:  path,
-		name:  path,
-		m:     mapping,
-		meta:  newIndexMeta(indexType, kvstore, kvconfig),
-		stats: &IndexStat{},
+		path: path,
+		name: path,
+		m:    mapping,
+		meta: newIndexMeta(indexType, kvstore, kvconfig),
 	}
+	rv.stats = &IndexStat{i: &rv}
 	// at this point there is hope that we can be successful, so save index meta
 	err = rv.meta.Save(path)
 	if err != nil {
@@ -140,7 +140,6 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 		}
 		return nil, err
 	}
-	rv.stats.indexStat = rv.i.Stats()
 
 	// now persist the mapping
 	mappingBytes, err := json.Marshal(mapping)
@@ -162,10 +161,10 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 
 func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *indexImpl, err error) {
 	rv = &indexImpl{
-		path:  path,
-		name:  path,
-		stats: &IndexStat{},
+		path: path,
+		name: path,
 	}
+	rv.stats = &IndexStat{i: rv}
 
 	rv.meta, err = openIndexMeta(path)
 	if err != nil {
@@ -206,7 +205,6 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		}
 		return nil, err
 	}
-	rv.stats.indexStat = rv.i.Stats()
 
 	// now load the mapping
 	indexReader, err := rv.i.Reader()
@@ -227,7 +225,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	var im IndexMapping
 	err = json.Unmarshal(mappingBytes, &im)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing mapping JSON: %v\nmapping contents:\n%s", err, string(mappingBytes))
 	}
 
 	// mark the index as open
@@ -251,7 +249,11 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 // Advanced returns implementation internals
 // necessary ONLY for advanced usage.
 func (i *indexImpl) Advanced() (index.Index, store.KVStore, error) {
-	return i.i, i.s, nil
+	s, err := i.i.Advanced()
+	if err != nil {
+		return nil, nil, err
+	}
+	return i.i, s, nil
 }
 
 // Mapping returns the IndexMapping in use by this
@@ -361,6 +363,12 @@ func (i *indexImpl) DocCount() (uint64, error) {
 // Search executes a search request operation.
 // Returns a SearchResult object or an error.
 func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
+	return i.SearchInContext(context.Background(), req)
+}
+
+// SearchInContext executes a search request operation within the provided
+// Context.  Returns a SearchResult object or an error.
+func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr *SearchResult, err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -421,7 +429,7 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 		collector.SetFacetsBuilder(facetsBuilder)
 	}
 
-	err = collector.Collect(searcher)
+	err = collector.Collect(ctx, searcher)
 	if err != nil {
 		return nil, err
 	}
@@ -462,7 +470,7 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 			} else if err == nil {
 				// unexpected case, a doc ID that was found as a search hit
 				// was unable to be found during document lookup
-				panic(fmt.Sprintf("search hit with doc id: '%s' not found in doc lookup", hit.ID))
+				return nil, ErrorIndexReadInconsistency
 			}
 		}
 	}
@@ -472,7 +480,7 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 			// FIXME avoid loading doc second time
 			// if we already loaded it for highlighting
 			doc, err := indexReader.Document(hit.ID)
-			if err == nil {
+			if err == nil && doc != nil {
 				for _, f := range req.Fields {
 					for _, docF := range doc.Fields {
 						if f == "*" || docF.Name() == f {
@@ -502,6 +510,10 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 						}
 					}
 				}
+			} else if doc == nil {
+				// unexpected case, a doc ID that was found as a search hit
+				// was unable to be found during document lookup
+				return nil, ErrorIndexReadInconsistency
 			}
 		}
 	}
@@ -521,6 +533,12 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 	}
 
 	return &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Failed:     0,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
 		Request:  req,
 		Hits:     hits,
 		Total:    collector.Total(),
@@ -690,6 +708,10 @@ func (i *indexImpl) Close() error {
 
 func (i *indexImpl) Stats() *IndexStat {
 	return i.stats
+}
+
+func (i *indexImpl) StatsMap() map[string]interface{} {
+	return i.stats.statsMap()
 }
 
 func (i *indexImpl) GetInternal(key []byte) (val []byte, err error) {

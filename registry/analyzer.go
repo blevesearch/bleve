@@ -25,40 +25,47 @@ func RegisterAnalyzer(name string, constructor AnalyzerConstructor) {
 
 type AnalyzerConstructor func(config map[string]interface{}, cache *Cache) (*analysis.Analyzer, error)
 type AnalyzerRegistry map[string]AnalyzerConstructor
-type AnalyzerCache map[string]*analysis.Analyzer
 
-func (c AnalyzerCache) AnalyzerNamed(name string, cache *Cache) (*analysis.Analyzer, error) {
-	analyzer, cached := c[name]
-	if cached {
-		return analyzer, nil
+type AnalyzerCache struct {
+	*ConcurrentCache
+}
+
+func NewAnalyzerCache() *AnalyzerCache {
+	return &AnalyzerCache{
+		NewConcurrentCache(),
 	}
-	analyzerConstructor, registered := analyzers[name]
+}
+
+func AnalyzerBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
+	cons, registered := analyzers[name]
 	if !registered {
 		return nil, fmt.Errorf("no analyzer with name or type '%s' registered", name)
 	}
-	analyzer, err := analyzerConstructor(nil, cache)
+	analyzer, err := cons(config, cache)
 	if err != nil {
 		return nil, fmt.Errorf("error building analyzer: %v", err)
 	}
-	c[name] = analyzer
 	return analyzer, nil
 }
 
-func (c AnalyzerCache) DefineAnalyzer(name string, typ string, config map[string]interface{}, cache *Cache) (*analysis.Analyzer, error) {
-	_, cached := c[name]
-	if cached {
-		return nil, fmt.Errorf("analyzer named '%s' already defined", name)
-	}
-	analyzerConstructor, registered := analyzers[typ]
-	if !registered {
-		return nil, fmt.Errorf("no analyzer type '%s' registered", typ)
-	}
-	analyzer, err := analyzerConstructor(config, cache)
+func (c *AnalyzerCache) AnalyzerNamed(name string, cache *Cache) (*analysis.Analyzer, error) {
+	item, err := c.ItemNamed(name, cache, AnalyzerBuild)
 	if err != nil {
-		return nil, fmt.Errorf("error building analyzer: %v", err)
+		return nil, err
 	}
-	c[name] = analyzer
-	return analyzer, nil
+	return item.(*analysis.Analyzer), nil
+}
+
+func (c *AnalyzerCache) DefineAnalyzer(name string, typ string, config map[string]interface{}, cache *Cache) (*analysis.Analyzer, error) {
+	item, err := c.DefineItem(name, typ, config, cache, AnalyzerBuild)
+	if err != nil {
+		if err == ErrAlreadyDefined {
+			return nil, fmt.Errorf("analyzer named '%s' already defined", name)
+		} else {
+			return nil, err
+		}
+	}
+	return item.(*analysis.Analyzer), nil
 }
 
 func AnalyzerTypesAndInstances() ([]string, []string) {

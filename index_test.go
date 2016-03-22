@@ -21,10 +21,14 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"encoding/json"
 	"strconv"
 
 	"github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/search"
 )
 
 func TestCrud(t *testing.T) {
@@ -339,6 +343,36 @@ func TestClosedIndex(t *testing.T) {
 	}
 }
 
+type slowQuery struct {
+	actual Query
+	delay  time.Duration
+}
+
+func (s *slowQuery) Boost() float64 {
+	return s.actual.Boost()
+}
+
+func (s *slowQuery) SetBoost(b float64) Query {
+	return s.actual.SetBoost(b)
+}
+
+func (s *slowQuery) Field() string {
+	return s.actual.Field()
+}
+
+func (s *slowQuery) SetField(f string) Query {
+	return s.actual.SetField(f)
+}
+
+func (s *slowQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
+	time.Sleep(s.delay)
+	return s.actual.Searcher(i, m, explain)
+}
+
+func (s *slowQuery) Validate() error {
+	return s.actual.Validate()
+}
+
 func TestSlowSearch(t *testing.T) {
 	defer func() {
 		err := os.RemoveAll("testidx")
@@ -379,6 +413,11 @@ func TestSlowSearch(t *testing.T) {
 		t.Errorf("expected to not see slow query logged, but did")
 	}
 
+	sq := &slowQuery{
+		actual: query,
+		delay:  50 * time.Millisecond, // on Windows timer resolution is 15ms
+	}
+	req.Query = sq
 	Config.SlowSearchLogThreshold = 1 * time.Microsecond
 	_, err = index.Search(req)
 	if err != nil {
@@ -593,6 +632,12 @@ func TestBatchString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	batch := index.NewBatch()
 	err = batch.Index("a", []byte("{}"))
@@ -634,12 +679,24 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
+	done := make(chan struct{})
 	go func() {
 		for {
-			_, err := index.DocCount()
-			if err != nil {
-				t.Fatal(err)
+			select {
+			case <-done:
+				return
+			default:
+				_, err := index.DocCount()
+				if err != nil {
+					t.Fatal(err)
+				}
 			}
 		}
 	}()
@@ -655,7 +712,7 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
+	close(done)
 }
 
 func TestIndexCountMatchSearch(t *testing.T) {
@@ -1122,6 +1179,12 @@ func TestIndexEmptyDocId(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	doc := map[string]interface{}{
 		"body": "nodocid",
@@ -1377,5 +1440,71 @@ func TestBooleanFieldMappingIssue109(t *testing.T) {
 	err = index.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSearchTimeout(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// first run a search with an absurdly long timeout (should succeeed)
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	query := NewTermQuery("water")
+	req := NewSearchRequest(query)
+	_, err = index.SearchInContext(ctx, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// now run a search again with an absurdly low timeout (should timeout)
+	ctx, _ = context.WithTimeout(context.Background(), 1*time.Microsecond)
+	sq := &slowQuery{
+		actual: query,
+		delay:  50 * time.Millisecond, // on Windows timer resolution is 15ms
+	}
+	req.Query = sq
+	_, err = index.SearchInContext(ctx, req)
+	if err != context.DeadlineExceeded {
+		t.Fatalf("exected %v, got: %v", context.DeadlineExceeded, err)
+	}
+
+	// now run a search with a long timeout, but with a long query, and cancel it
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	sq = &slowQuery{
+		actual: query,
+		delay:  100 * time.Millisecond, // on Windows timer resolution is 15ms
+	}
+	req = NewSearchRequest(sq)
+	cancel()
+	_, err = index.SearchInContext(ctx, req)
+	if err != context.Canceled {
+		t.Fatalf("exected %v, got: %v", context.Canceled, err)
+	}
+}
+
+// TestConfigCache exposes a concurrent map write with go 1.6
+func TestConfigCache(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		go func() {
+			_, err := Config.Cache.HighlighterNamed(Config.DefaultHighlighter)
+			if err != nil {
+				t.Error(err)
+			}
+		}()
 	}
 }

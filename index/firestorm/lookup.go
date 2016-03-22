@@ -19,13 +19,13 @@ import (
 const channelBufferSize = 1000
 
 type Lookuper struct {
+	tasksQueued uint64
+	tasksDone   uint64
+
 	f         *Firestorm
 	workChan  chan []*InFlightItem
 	quit      chan struct{}
 	closeWait sync.WaitGroup
-
-	tasksQueued uint64
-	tasksDone   uint64
 }
 
 func NewLookuper(f *Firestorm) *Lookuper {
@@ -117,10 +117,10 @@ func (l *Lookuper) lookup(item *InFlightItem) {
 	l.f.compensator.Migrate(item.docID, item.docNum, oldDocNums)
 	if len(oldDocNums) == 0 && item.docNum != 0 {
 		// this was an add, not an update
-		atomic.AddUint64(l.f.docCount, 1)
+		atomic.AddUint64(&l.f.docCount, 1)
 	} else if len(oldDocNums) > 0 && item.docNum == 0 {
 		// this was a delete (and it previously existed)
-		atomic.AddUint64(l.f.docCount, ^uint64(0))
+		atomic.AddUint64(&l.f.docCount, ^uint64(0))
 	}
 }
 

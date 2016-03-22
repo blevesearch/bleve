@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index/store"
 )
 
 var ErrorUnknownStorageType = fmt.Errorf("unknown storage type")
@@ -41,8 +42,11 @@ type Index interface {
 	Reader() (IndexReader, error)
 
 	Stats() json.Marshaler
+	StatsMap() map[string]interface{}
 
 	Analyze(d *document.Document) *AnalysisResult
+
+	Advanced() (store.KVStore, error)
 }
 
 // AsyncIndex is an interface for indexes which perform

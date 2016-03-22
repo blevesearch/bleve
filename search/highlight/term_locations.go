@@ -98,3 +98,15 @@ func OrderTermLocations(tlm search.TermLocationMap) TermLocations {
 	sort.Sort(rv)
 	return rv
 }
+
+func SameArrayPositions(fieldArrayPositions []uint64, termLocationArrayPositions []float64) bool {
+	if len(fieldArrayPositions) != len(termLocationArrayPositions) {
+		return false
+	}
+	for i := 0; i < len(fieldArrayPositions); i++ {
+		if fieldArrayPositions[i] != uint64(termLocationArrayPositions[i]) {
+			return false
+		}
+	}
+	return true
+}

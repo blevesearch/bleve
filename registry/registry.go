@@ -35,28 +35,28 @@ var analyzers = make(AnalyzerRegistry, 0)
 var dateTimeParsers = make(DateTimeParserRegistry, 0)
 
 type Cache struct {
-	CharFilters        CharFilterCache
-	Tokenizers         TokenizerCache
-	TokenMaps          TokenMapCache
-	TokenFilters       TokenFilterCache
-	Analyzers          AnalyzerCache
-	DateTimeParsers    DateTimeParserCache
-	FragmentFormatters FragmentFormatterCache
-	Fragmenters        FragmenterCache
-	Highlighters       HighlighterCache
+	CharFilters        *CharFilterCache
+	Tokenizers         *TokenizerCache
+	TokenMaps          *TokenMapCache
+	TokenFilters       *TokenFilterCache
+	Analyzers          *AnalyzerCache
+	DateTimeParsers    *DateTimeParserCache
+	FragmentFormatters *FragmentFormatterCache
+	Fragmenters        *FragmenterCache
+	Highlighters       *HighlighterCache
 }
 
 func NewCache() *Cache {
 	return &Cache{
-		CharFilters:        make(CharFilterCache, 0),
-		Tokenizers:         make(TokenizerCache, 0),
-		TokenMaps:          make(TokenMapCache, 0),
-		TokenFilters:       make(TokenFilterCache, 0),
-		Analyzers:          make(AnalyzerCache, 0),
-		DateTimeParsers:    make(DateTimeParserCache, 0),
-		FragmentFormatters: make(FragmentFormatterCache, 0),
-		Fragmenters:        make(FragmenterCache, 0),
-		Highlighters:       make(HighlighterCache, 0),
+		CharFilters:        NewCharFilterCache(),
+		Tokenizers:         NewTokenizerCache(),
+		TokenMaps:          NewTokenMapCache(),
+		TokenFilters:       NewTokenFilterCache(),
+		Analyzers:          NewAnalyzerCache(),
+		DateTimeParsers:    NewDateTimeParserCache(),
+		FragmentFormatters: NewFragmentFormatterCache(),
+		Fragmenters:        NewFragmenterCache(),
+		Highlighters:       NewHighlighterCache(),
 	}
 }
 

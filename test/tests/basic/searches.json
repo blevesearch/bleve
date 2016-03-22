@@ -616,5 +616,154 @@
 			"total_hits": 0,
 			"hits": []
 		}
+	},
+	{
+		"comment": "test wildcard matching term",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "name",
+				"wildcard": "mar*"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "a"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test boost - term query",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"disjuncts": [
+					{
+						"field": "name",
+						"term": "marti",
+						"boost": 1.0
+					},
+					{
+						"field": "name",
+						"term": "steve",
+						"boost": 5.0
+					}
+				]
+			}
+		},
+		"result": {
+			"total_hits": 2,
+			"hits": [
+				{
+					"id": "b"
+				},
+				{
+					"id": "a"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test boost - term query",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"disjuncts": [
+					{
+						"field": "name",
+						"term": "marti",
+						"boost": 1.0
+					},
+					{
+						"fuzziness": 1,
+						"field": "name",
+						"term": "steve",
+						"boost": 5.0
+					}
+				]
+			}
+		},
+		"result": {
+			"total_hits": 2,
+			"hits": [
+				{
+					"id": "b"
+				},
+				{
+					"id": "a"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test boost - numeric range query",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"disjuncts": [
+					{
+						"field": "name",
+						"term": "marti",
+						"boost": 1.0
+					},
+					{
+						"field": "age",
+						"min": 25,
+						"max": 29,
+						"boost": 50.0
+					}
+				]
+			}
+		},
+		"result": {
+			"total_hits": 2,
+			"hits": [
+				{
+					"id": "b"
+				},
+				{
+					"id": "a"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test boost - regexp query",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"disjuncts": [
+					{
+						"field": "name",
+						"term": "marti",
+						"boost": 1.0
+					},
+					{
+						"field": "name",
+						"regexp": "stev.*",
+						"boost": 5.0
+					}
+				]
+			}
+		},
+		"result": {
+			"total_hits": 2,
+			"hits": [
+				{
+					"id": "b"
+				},
+				{
+					"id": "a"
+				}
+			]
+		}
 	}
 ]

@@ -56,9 +56,12 @@ func openIndexMeta(path string) (*indexMeta, error) {
 func (i *indexMeta) Save(path string) (err error) {
 	indexMetaPath := indexMetaPath(path)
 	// ensure any necessary parent directories exist
-	err = os.Mkdir(path, 0700)
+	err = os.MkdirAll(path, 0700)
 	if err != nil {
-		return ErrorIndexPathExists
+		if os.IsExist(err) {
+			return ErrorIndexPathExists
+		}
+		return err
 	}
 	metaBytes, err := json.Marshal(i)
 	if err != nil {

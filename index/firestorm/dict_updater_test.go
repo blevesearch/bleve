@@ -91,7 +91,10 @@ func TestDictUpdater(t *testing.T) {
 	for len(f.(*Firestorm).dictUpdater.incoming) > 0 {
 		runtime.Gosched()
 	}
-	f.(*Firestorm).dictUpdater.update()
+	err = f.(*Firestorm).dictUpdater.waitTasksDone(5 * time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// assert that dictionary rows are correct
 	reader, err = f.(*Firestorm).store.Reader()
@@ -133,7 +136,10 @@ func TestDictUpdater(t *testing.T) {
 	for len(f.(*Firestorm).dictUpdater.incoming) > 0 {
 		runtime.Gosched()
 	}
-	f.(*Firestorm).dictUpdater.update()
+	err = f.(*Firestorm).dictUpdater.waitTasksDone(5 * time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// assert that dictionary rows are correct
 	reader, err = f.(*Firestorm).store.Reader()

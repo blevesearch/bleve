@@ -10,6 +10,8 @@
 package upside_down
 
 import (
+	"sync/atomic"
+
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
 )
@@ -29,6 +31,7 @@ func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 		return nil, err
 	}
 	if val == nil {
+		atomic.AddUint64(&indexReader.index.stats.termSearchersStarted, uint64(1))
 		return &UpsideDownCouchTermFieldReader{
 			count: 0,
 			term:  term,
@@ -44,6 +47,7 @@ func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 	tfr := NewTermFrequencyRow(term, field, []byte{}, 0, 0)
 	it := indexReader.kvreader.PrefixIterator(tfr.Key())
 
+	atomic.AddUint64(&indexReader.index.stats.termSearchersStarted, uint64(1))
 	return &UpsideDownCouchTermFieldReader{
 		indexReader: indexReader,
 		iterator:    it,
@@ -163,5 +167,6 @@ func (r *UpsideDownCouchDocIDReader) Advance(docID string) (string, error) {
 }
 
 func (r *UpsideDownCouchDocIDReader) Close() error {
+	atomic.AddUint64(&r.indexReader.index.stats.termSearchersFinished, uint64(1))
 	return r.iterator.Close()
 }

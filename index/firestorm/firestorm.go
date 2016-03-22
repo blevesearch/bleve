@@ -27,14 +27,15 @@ const Name = "firestorm"
 var UnsafeBatchUseDetected = fmt.Errorf("bleve.Batch is NOT thread-safe, modification after execution detected")
 
 type Firestorm struct {
+	highDocNumber uint64
+	docCount      uint64
+
 	storeName        string
 	storeConfig      map[string]interface{}
 	store            store.KVStore
 	compensator      *Compensator
 	analysisQueue    *index.AnalysisQueue
 	fieldCache       *index.FieldCache
-	highDocNumber    uint64
-	docCount         *uint64
 	garbageCollector *GarbageCollector
 	lookuper         *Lookuper
 	dictUpdater      *DictUpdater
@@ -42,14 +43,13 @@ type Firestorm struct {
 }
 
 func NewFirestorm(storeName string, storeConfig map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error) {
-	initialCount := uint64(0)
 	rv := Firestorm{
 		storeName:     storeName,
 		storeConfig:   storeConfig,
 		compensator:   NewCompensator(),
 		analysisQueue: analysisQueue,
 		fieldCache:    index.NewFieldCache(),
-		docCount:      &initialCount,
+		docCount:      0,
 		highDocNumber: 0,
 		stats:         &indexStat{},
 	}
@@ -130,7 +130,7 @@ func (f *Firestorm) Close() error {
 }
 
 func (f *Firestorm) DocCount() (uint64, error) {
-	count := atomic.LoadUint64(f.docCount)
+	count := atomic.LoadUint64(&f.docCount)
 	return count, nil
 
 }
@@ -142,6 +142,7 @@ func (f *Firestorm) Update(doc *document.Document) (err error) {
 
 	// do analysis before acquiring write lock
 	analysisStart := time.Now()
+	numPlainTextBytes := doc.NumPlainTextBytes()
 	resultChan := make(chan *index.AnalysisResult)
 	aw := index.NewAnalysisWork(f, doc, resultChan)
 
@@ -179,6 +180,7 @@ func (f *Firestorm) Update(doc *document.Document) (err error) {
 	f.dictUpdater.NotifyBatch(dictionaryDeltas)
 
 	atomic.AddUint64(&f.stats.indexTime, uint64(time.Since(indexStart)))
+	atomic.AddUint64(&f.stats.numPlainTextBytesIndexed, numPlainTextBytes)
 	return
 }
 
@@ -298,11 +300,13 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 
 	var docsUpdated uint64
 	var docsDeleted uint64
+	var numPlainTextBytes uint64
 	for _, doc := range batch.IndexOps {
 		if doc != nil {
 			doc.Number = firstDocNumber // actually assign doc numbers here
 			firstDocNumber++
 			docsUpdated++
+			numPlainTextBytes += doc.NumPlainTextBytes()
 		} else {
 			docsDeleted++
 		}
@@ -407,6 +411,7 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 		atomic.AddUint64(&f.stats.updates, docsUpdated)
 		atomic.AddUint64(&f.stats.deletes, docsDeleted)
 		atomic.AddUint64(&f.stats.batches, 1)
+		atomic.AddUint64(&f.stats.numPlainTextBytesIndexed, numPlainTextBytes)
 	} else {
 		atomic.AddUint64(&f.stats.errors, 1)
 	}
@@ -539,11 +544,18 @@ func (f *Firestorm) Reader() (index.IndexReader, error) {
 
 func (f *Firestorm) Stats() json.Marshaler {
 	return f.stats
+}
 
+func (f *Firestorm) StatsMap() map[string]interface{} {
+	return f.stats.statsMap()
 }
 
 func (f *Firestorm) Wait(timeout time.Duration) error {
 	return f.dictUpdater.waitTasksDone(timeout)
+}
+
+func (f *Firestorm) Advanced() (store.KVStore, error) {
+	return f.store, nil
 }
 
 func init() {

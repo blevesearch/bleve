@@ -25,40 +25,47 @@ func RegisterTokenMap(name string, constructor TokenMapConstructor) {
 
 type TokenMapConstructor func(config map[string]interface{}, cache *Cache) (analysis.TokenMap, error)
 type TokenMapRegistry map[string]TokenMapConstructor
-type TokenMapCache map[string]analysis.TokenMap
 
-func (c TokenMapCache) TokenMapNamed(name string, cache *Cache) (analysis.TokenMap, error) {
-	tokenMap, cached := c[name]
-	if cached {
-		return tokenMap, nil
+type TokenMapCache struct {
+	*ConcurrentCache
+}
+
+func NewTokenMapCache() *TokenMapCache {
+	return &TokenMapCache{
+		NewConcurrentCache(),
 	}
-	tokenMapConstructor, registered := tokenMaps[name]
+}
+
+func TokenMapBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
+	cons, registered := tokenMaps[name]
 	if !registered {
 		return nil, fmt.Errorf("no token map with name or type '%s' registered", name)
 	}
-	tokenMap, err := tokenMapConstructor(nil, cache)
+	tokenMap, err := cons(config, cache)
 	if err != nil {
 		return nil, fmt.Errorf("error building token map: %v", err)
 	}
-	c[name] = tokenMap
 	return tokenMap, nil
 }
 
-func (c TokenMapCache) DefineTokenMap(name string, typ string, config map[string]interface{}, cache *Cache) (analysis.TokenMap, error) {
-	_, cached := c[name]
-	if cached {
-		return nil, fmt.Errorf("token map named '%s' already defined", name)
-	}
-	tokenMapConstructor, registered := tokenMaps[typ]
-	if !registered {
-		return nil, fmt.Errorf("no token map type '%s' registered", typ)
-	}
-	tokenMap, err := tokenMapConstructor(config, cache)
+func (c *TokenMapCache) TokenMapNamed(name string, cache *Cache) (analysis.TokenMap, error) {
+	item, err := c.ItemNamed(name, cache, TokenMapBuild)
 	if err != nil {
-		return nil, fmt.Errorf("error building token map: %v", err)
+		return nil, err
 	}
-	c[name] = tokenMap
-	return tokenMap, nil
+	return item.(analysis.TokenMap), nil
+}
+
+func (c *TokenMapCache) DefineTokenMap(name string, typ string, config map[string]interface{}, cache *Cache) (analysis.TokenMap, error) {
+	item, err := c.DefineItem(name, typ, config, cache, TokenMapBuild)
+	if err != nil {
+		if err == ErrAlreadyDefined {
+			return nil, fmt.Errorf("token map named '%s' already defined", name)
+		} else {
+			return nil, err
+		}
+	}
+	return item.(analysis.TokenMap), nil
 }
 
 func TokenMapTypesAndInstances() ([]string, []string) {

@@ -22,6 +22,9 @@ const DefaultDictUpdateThreshold = 10
 var DefaultDictUpdateSleep = 1 * time.Second
 
 type DictUpdater struct {
+	batchesStarted uint64
+	batchesFlushed uint64
+
 	f               *Firestorm
 	dictUpdateSleep time.Duration
 	quit            chan struct{}
@@ -30,9 +33,6 @@ type DictUpdater struct {
 	mutex      sync.RWMutex
 	workingSet map[string]int64
 	closeWait  sync.WaitGroup
-
-	batchesStarted uint64
-	batchesFlushed uint64
 }
 
 func NewDictUpdater(f *Firestorm) *DictUpdater {

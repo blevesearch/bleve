@@ -69,7 +69,11 @@ func (c *CompositeField) Value() []byte {
 	return []byte{}
 }
 
-func (c *CompositeField) Compose(field string, length int, freq analysis.TokenFrequencies) {
+func (c *CompositeField) NumPlainTextBytes() uint64 {
+	return 0
+}
+
+func (c *CompositeField) includesField(field string) bool {
 	shouldInclude := c.defaultInclude
 	_, fieldShouldBeIncluded := c.includedFields[field]
 	if fieldShouldBeIncluded {
@@ -79,8 +83,11 @@ func (c *CompositeField) Compose(field string, length int, freq analysis.TokenFr
 	if fieldShouldBeExcluded {
 		shouldInclude = false
 	}
+	return shouldInclude
+}
 
-	if shouldInclude {
+func (c *CompositeField) Compose(field string, length int, freq analysis.TokenFrequencies) {
+	if c.includesField(field) {
 		c.totalLength += length
 		c.compositeFrequencies.MergeAll(field, freq)
 	}

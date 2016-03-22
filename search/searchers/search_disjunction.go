@@ -10,6 +10,7 @@
 package searchers
 
 import (
+	"fmt"
 	"math"
 	"sort"
 
@@ -17,6 +18,11 @@ import (
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/scorers"
 )
+
+// DisjunctionMaxClauseCount is a compile time setting that applications can
+// adjust to non-zero value to cause the DisjunctionSearcher to return an
+// error instead of exeucting searches when the size exceeds this value.
+var DisjunctionMaxClauseCount = 0
 
 type DisjunctionSearcher struct {
 	initialized bool
@@ -30,6 +36,9 @@ type DisjunctionSearcher struct {
 }
 
 func NewDisjunctionSearcher(indexReader index.IndexReader, qsearchers []search.Searcher, min float64, explain bool) (*DisjunctionSearcher, error) {
+	if DisjunctionMaxClauseCount != 0 && len(qsearchers) > DisjunctionMaxClauseCount {
+		return nil, fmt.Errorf("TooManyClauses[maxClauseCount is set to %d]", DisjunctionMaxClauseCount)
+	}
 	// build the downstream searchers
 	searchers := make(OrderedSearcherList, len(qsearchers))
 	for i, searcher := range qsearchers {

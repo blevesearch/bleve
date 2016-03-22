@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -231,7 +232,13 @@ func TestMappingForPath(t *testing.T) {
 	customMapping.Analyzer = "xyz"
 	customMapping.Name = "nameCustom"
 
+	subDocMappingB := NewDocumentMapping()
+	customFieldX := NewTextFieldMapping()
+	customFieldX.Analyzer = "analyzerx"
+	subDocMappingB.AddFieldMappingsAt("desc", customFieldX)
+
 	docMappingA.AddFieldMappingsAt("author", enFieldMapping, customMapping)
+	docMappingA.AddSubDocumentMapping("child", subDocMappingB)
 
 	mapping := NewIndexMapping()
 	mapping.AddDocumentMapping("a", docMappingA)
@@ -244,6 +251,11 @@ func TestMappingForPath(t *testing.T) {
 	analyzerName = mapping.analyzerNameForPath("nameCustom")
 	if analyzerName != customMapping.Analyzer {
 		t.Errorf("expected '%s' got '%s'", customMapping.Analyzer, analyzerName)
+	}
+
+	analyzerName = mapping.analyzerNameForPath("child.desc")
+	if analyzerName != customFieldX.Analyzer {
+		t.Errorf("expected '%s' got '%s'", customFieldX.Analyzer, analyzerName)
 	}
 
 }
@@ -327,6 +339,7 @@ func TestMappingWithTokenizerDeps(t *testing.T) {
 
 func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
 
+	// first verify that with system defaults, dynamic field is stored
 	data := map[string]interface{}{
 		"name": "bleve",
 	}
@@ -342,11 +355,13 @@ func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
 		}
 	}
 
+	// now change system level defaults, verify dynamic field is not stored
 	StoreDynamic = false
 	defer func() {
 		StoreDynamic = true
 	}()
 
+	mapping = NewIndexMapping()
 	doc = document.NewDocument("y")
 	err = mapping.mapDocument(doc, data)
 	if err != nil {
@@ -355,6 +370,20 @@ func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
 	for _, field := range doc.Fields {
 		if field.Name() == "name" && field.Options().IsStored() {
 			t.Errorf("expected field 'name' to be not stored, is")
+		}
+	}
+
+	// now override the system level defaults inside the index mapping
+	mapping = NewIndexMapping()
+	mapping.StoreDynamic = true
+	doc = document.NewDocument("y")
+	err = mapping.mapDocument(doc, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range doc.Fields {
+		if field.Name() == "name" && !field.Options().IsStored() {
+			t.Errorf("expected field 'name' to be stored, isn't")
 		}
 	}
 }
@@ -419,5 +448,158 @@ func TestDisableDefaultMapping(t *testing.T) {
 
 	if len(doc.Fields) > 0 {
 		t.Errorf("expected no fields, got %d", len(doc.Fields))
+	}
+}
+
+func TestInvalidFieldMappingStrict(t *testing.T) {
+	mappingBytes := []byte(`{"includeInAll":true,"name":"a parsed name"}`)
+
+	// first unmarhsal it without strict
+	var fm FieldMapping
+	err := json.Unmarshal(mappingBytes, &fm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if fm.Name != "a parsed name" {
+		t.Fatalf("expect to find field mapping name 'a parsed name', got '%s'", fm.Name)
+	}
+
+	// reset
+	fm.Name = ""
+
+	// now enable strict
+	MappingJSONStrict = true
+	defer func() {
+		MappingJSONStrict = false
+	}()
+
+	expectedInvalidKeys := []string{"includeInAll"}
+	expectedErr := fmt.Errorf("field mapping contains invalid keys: %v", expectedInvalidKeys)
+	err = json.Unmarshal(mappingBytes, &fm)
+	if err.Error() != expectedErr.Error() {
+		t.Fatalf("expected err: %v, got err: %v", expectedErr, err)
+	}
+
+	if fm.Name != "a parsed name" {
+		t.Fatalf("expect to find field mapping name 'a parsed name', got '%s'", fm.Name)
+	}
+
+}
+
+func TestInvalidDocumentMappingStrict(t *testing.T) {
+	mappingBytes := []byte(`{"defaultAnalyzer":true,"enabled":false}`)
+
+	// first unmarhsal it without strict
+	var dm DocumentMapping
+	err := json.Unmarshal(mappingBytes, &dm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if dm.Enabled != false {
+		t.Fatalf("expect to find document mapping enabled false, got '%t'", dm.Enabled)
+	}
+
+	// reset
+	dm.Enabled = true
+
+	// now enable strict
+	MappingJSONStrict = true
+	defer func() {
+		MappingJSONStrict = false
+	}()
+
+	expectedInvalidKeys := []string{"defaultAnalyzer"}
+	expectedErr := fmt.Errorf("document mapping contains invalid keys: %v", expectedInvalidKeys)
+	err = json.Unmarshal(mappingBytes, &dm)
+	if err.Error() != expectedErr.Error() {
+		t.Fatalf("expected err: %v, got err: %v", expectedErr, err)
+	}
+
+	if dm.Enabled != false {
+		t.Fatalf("expect to find document mapping enabled false, got '%t'", dm.Enabled)
+	}
+}
+
+func TestInvalidIndexMappingStrict(t *testing.T) {
+	mappingBytes := []byte(`{"typeField":"type","default_field":"all"}`)
+
+	// first unmarhsal it without strict
+	var im IndexMapping
+	err := json.Unmarshal(mappingBytes, &im)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if im.DefaultField != "all" {
+		t.Fatalf("expect to find index mapping default field 'all', got '%s'", im.DefaultField)
+	}
+
+	// reset
+	im.DefaultField = "_all"
+
+	// now enable strict
+	MappingJSONStrict = true
+	defer func() {
+		MappingJSONStrict = false
+	}()
+
+	expectedInvalidKeys := []string{"typeField"}
+	expectedErr := fmt.Errorf("index mapping contains invalid keys: %v", expectedInvalidKeys)
+	err = json.Unmarshal(mappingBytes, &im)
+	if err.Error() != expectedErr.Error() {
+		t.Fatalf("expected err: %v, got err: %v", expectedErr, err)
+	}
+
+	if im.DefaultField != "all" {
+		t.Fatalf("expect to find index mapping default field 'all', got '%s'", im.DefaultField)
+	}
+}
+
+func TestMappingBug353(t *testing.T) {
+	dataBytes := `{
+  "Reviews": [
+    {
+      "ReviewID": "RX16692001",
+      "Content": "Usually stay near the airport..."
+    }
+	],
+	"Other": {
+	  "Inside": "text"
+  },
+  "Name": "The Inn at Baltimore White Marsh"
+}`
+
+	var data map[string]interface{}
+	err := json.Unmarshal([]byte(dataBytes), &data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reviewContentFieldMapping := NewTextFieldMapping()
+	reviewContentFieldMapping.Analyzer = "crazy"
+
+	reviewsMapping := NewDocumentMapping()
+	reviewsMapping.Dynamic = false
+	reviewsMapping.AddFieldMappingsAt("Content", reviewContentFieldMapping)
+	otherMapping := NewDocumentMapping()
+	otherMapping.Dynamic = false
+	mapping := NewIndexMapping()
+	mapping.DefaultMapping.AddSubDocumentMapping("Reviews", reviewsMapping)
+	mapping.DefaultMapping.AddSubDocumentMapping("Other", otherMapping)
+
+	doc := document.NewDocument("x")
+	err = mapping.mapDocument(doc, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// expect doc has only 2 fields
+	if len(doc.Fields) != 2 {
+		t.Errorf("expected doc with 2 fields, got: %d", len(doc.Fields))
+		for _, f := range doc.Fields {
+			t.Logf("field named: %s", f.Name())
+		}
 	}
 }

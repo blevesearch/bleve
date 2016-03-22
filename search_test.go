@@ -73,6 +73,11 @@ func TestSearchResultString(t *testing.T) {
 
 func TestSearchResultMerge(t *testing.T) {
 	l := &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
 		Total:    1,
 		MaxScore: 1,
 		Hits: search.DocumentMatchCollection{
@@ -84,6 +89,11 @@ func TestSearchResultMerge(t *testing.T) {
 	}
 
 	r := &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
 		Total:    1,
 		MaxScore: 2,
 		Hits: search.DocumentMatchCollection{
@@ -95,6 +105,11 @@ func TestSearchResultMerge(t *testing.T) {
 	}
 
 	expected := &SearchResult{
+		Status: &SearchStatus{
+			Total:      2,
+			Successful: 2,
+			Errors:     make(map[string]error),
+		},
 		Total:    2,
 		MaxScore: 2,
 		Hits: search.DocumentMatchCollection{

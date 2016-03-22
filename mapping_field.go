@@ -10,6 +10,8 @@
 package bleve
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -59,10 +61,10 @@ func NewTextFieldMapping() *FieldMapping {
 	}
 }
 
-func newTextFieldMappingDynamic() *FieldMapping {
+func newTextFieldMappingDynamic(im *IndexMapping) *FieldMapping {
 	rv := NewTextFieldMapping()
-	rv.Store = StoreDynamic
-	rv.Index = IndexDynamic
+	rv.Store = im.StoreDynamic
+	rv.Index = im.IndexDynamic
 	return rv
 }
 
@@ -76,10 +78,10 @@ func NewNumericFieldMapping() *FieldMapping {
 	}
 }
 
-func newNumericFieldMappingDynamic() *FieldMapping {
+func newNumericFieldMappingDynamic(im *IndexMapping) *FieldMapping {
 	rv := NewNumericFieldMapping()
-	rv.Store = StoreDynamic
-	rv.Index = IndexDynamic
+	rv.Store = im.StoreDynamic
+	rv.Index = im.IndexDynamic
 	return rv
 }
 
@@ -93,10 +95,10 @@ func NewDateTimeFieldMapping() *FieldMapping {
 	}
 }
 
-func newDateTimeFieldMappingDynamic() *FieldMapping {
+func newDateTimeFieldMappingDynamic(im *IndexMapping) *FieldMapping {
 	rv := NewDateTimeFieldMapping()
-	rv.Store = StoreDynamic
-	rv.Index = IndexDynamic
+	rv.Store = im.StoreDynamic
+	rv.Index = im.IndexDynamic
 	return rv
 }
 
@@ -110,10 +112,10 @@ func NewBooleanFieldMapping() *FieldMapping {
 	}
 }
 
-func newBooleanFieldMappingDynamic() *FieldMapping {
+func newBooleanFieldMappingDynamic(im *IndexMapping) *FieldMapping {
 	rv := NewBooleanFieldMapping()
-	rv.Store = StoreDynamic
-	rv.Index = IndexDynamic
+	rv.Store = im.StoreDynamic
+	rv.Index = im.IndexDynamic
 	return rv
 }
 
@@ -222,4 +224,68 @@ func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) 
 		fieldName = parentName + fieldMapping.Name
 	}
 	return fieldName
+}
+
+// UnmarshalJSON offers custom unmarshaling with optional strict validation
+func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
+
+	var tmp map[string]json.RawMessage
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
+	}
+
+	var invalidKeys []string
+	for k, v := range tmp {
+		switch k {
+		case "name":
+			err := json.Unmarshal(v, &fm.Name)
+			if err != nil {
+				return err
+			}
+		case "type":
+			err := json.Unmarshal(v, &fm.Type)
+			if err != nil {
+				return err
+			}
+		case "analyzer":
+			err := json.Unmarshal(v, &fm.Analyzer)
+			if err != nil {
+				return err
+			}
+		case "store":
+			err := json.Unmarshal(v, &fm.Store)
+			if err != nil {
+				return err
+			}
+		case "index":
+			err := json.Unmarshal(v, &fm.Index)
+			if err != nil {
+				return err
+			}
+		case "include_term_vectors":
+			err := json.Unmarshal(v, &fm.IncludeTermVectors)
+			if err != nil {
+				return err
+			}
+		case "include_in_all":
+			err := json.Unmarshal(v, &fm.IncludeInAll)
+			if err != nil {
+				return err
+			}
+		case "date_format":
+			err := json.Unmarshal(v, &fm.DateFormat)
+			if err != nil {
+				return err
+			}
+		default:
+			invalidKeys = append(invalidKeys, k)
+		}
+	}
+
+	if MappingJSONStrict && len(invalidKeys) > 0 {
+		return fmt.Errorf("field mapping contains invalid keys: %v", invalidKeys)
+	}
+
+	return nil
 }

@@ -7,20 +7,37 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package search
+package moss
 
 import (
-	"time"
+	"encoding/json"
 
-	"golang.org/x/net/context"
+	"github.com/blevesearch/bleve/index/store"
 )
 
-type Collector interface {
-	Collect(ctx context.Context, searcher Searcher) error
-	Results() DocumentMatchCollection
-	Total() uint64
-	MaxScore() float64
-	Took() time.Duration
-	SetFacetsBuilder(facetsBuilder *FacetsBuilder)
-	FacetResults() FacetResults
+type stats struct {
+	s *Store
+}
+
+func (s *stats) statsMap() map[string]interface{} {
+	ms := map[string]interface{}{}
+
+	var err error
+	ms["moss"], err = s.s.ms.Stats()
+	if err != nil {
+		return ms
+	}
+
+	if s.s.llstore != nil {
+		if o, ok := s.s.llstore.(store.KVStoreStats); ok {
+			ms["kv"] = o.StatsMap()
+		}
+	}
+
+	return ms
+}
+
+func (s *stats) MarshalJSON() ([]byte, error) {
+	m := s.statsMap()
+	return json.Marshal(m)
 }

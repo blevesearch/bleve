@@ -25,40 +25,47 @@ func RegisterDateTimeParser(name string, constructor DateTimeParserConstructor) 
 
 type DateTimeParserConstructor func(config map[string]interface{}, cache *Cache) (analysis.DateTimeParser, error)
 type DateTimeParserRegistry map[string]DateTimeParserConstructor
-type DateTimeParserCache map[string]analysis.DateTimeParser
 
-func (c DateTimeParserCache) DateTimeParserNamed(name string, cache *Cache) (analysis.DateTimeParser, error) {
-	dateTimeParser, cached := c[name]
-	if cached {
-		return dateTimeParser, nil
+type DateTimeParserCache struct {
+	*ConcurrentCache
+}
+
+func NewDateTimeParserCache() *DateTimeParserCache {
+	return &DateTimeParserCache{
+		NewConcurrentCache(),
 	}
-	dateTimeParserConstructor, registered := dateTimeParsers[name]
+}
+
+func DateTimeParserBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
+	cons, registered := dateTimeParsers[name]
 	if !registered {
 		return nil, fmt.Errorf("no date time parser with name or type '%s' registered", name)
 	}
-	dateTimeParser, err := dateTimeParserConstructor(nil, cache)
-	if err != nil {
-		return nil, fmt.Errorf("error building date time parse: %v", err)
-	}
-	c[name] = dateTimeParser
-	return dateTimeParser, nil
-}
-
-func (c DateTimeParserCache) DefineDateTimeParser(name string, typ string, config map[string]interface{}, cache *Cache) (analysis.DateTimeParser, error) {
-	_, cached := c[name]
-	if cached {
-		return nil, fmt.Errorf("date time parser named '%s' already defined", name)
-	}
-	dateTimeParserConstructor, registered := dateTimeParsers[typ]
-	if !registered {
-		return nil, fmt.Errorf("no date time parser type '%s' registered", typ)
-	}
-	dateTimeParser, err := dateTimeParserConstructor(config, cache)
+	dateTimeParser, err := cons(config, cache)
 	if err != nil {
 		return nil, fmt.Errorf("error building date time parser: %v", err)
 	}
-	c[name] = dateTimeParser
 	return dateTimeParser, nil
+}
+
+func (c *DateTimeParserCache) DateTimeParserNamed(name string, cache *Cache) (analysis.DateTimeParser, error) {
+	item, err := c.ItemNamed(name, cache, DateTimeParserBuild)
+	if err != nil {
+		return nil, err
+	}
+	return item.(analysis.DateTimeParser), nil
+}
+
+func (c *DateTimeParserCache) DefineDateTimeParser(name string, typ string, config map[string]interface{}, cache *Cache) (analysis.DateTimeParser, error) {
+	item, err := c.DefineItem(name, typ, config, cache, DateTimeParserBuild)
+	if err != nil {
+		if err == ErrAlreadyDefined {
+			return nil, fmt.Errorf("date time parser named '%s' already defined", name)
+		} else {
+			return nil, err
+		}
+	}
+	return item.(analysis.DateTimeParser), nil
 }
 
 func DateTimeParserTypesAndInstances() ([]string, []string) {

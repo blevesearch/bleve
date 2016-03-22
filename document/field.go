@@ -26,4 +26,9 @@ type Field interface {
 	Options() IndexingOptions
 	Analyze() (int, analysis.TokenFrequencies)
 	Value() []byte
+
+	// NumPlainTextBytes should return the number of plain text bytes
+	// that this field represents - this is a common metric for tracking
+	// the rate of indexing
+	NumPlainTextBytes() uint64
 }

@@ -192,6 +192,9 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
+		}
 		return &rv, nil
 	}
 	_, hasWildcard := tmp["wildcard"]
@@ -200,6 +203,9 @@ func ParseQuery(input []byte) (Query, error) {
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
+		}
+		if rv.Boost() == 0 {
+			rv.SetBoost(1)
 		}
 		return &rv, nil
 	}

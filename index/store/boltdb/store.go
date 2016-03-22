@@ -18,6 +18,7 @@
 package boltdb
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/blevesearch/bleve/index/store"
@@ -93,6 +94,12 @@ func (bs *Store) Writer() (store.KVWriter, error) {
 	return &Writer{
 		store: bs,
 	}, nil
+}
+
+func (bs *Store) Stats() json.Marshaler {
+	return &stats{
+		s: bs,
+	}
 }
 
 func init() {

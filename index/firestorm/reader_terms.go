@@ -11,6 +11,7 @@ package firestorm
 
 import (
 	"bytes"
+	"sync/atomic"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
@@ -55,6 +56,7 @@ func newFirestormTermFieldReader(r *firestormReader, field uint16, term []byte) 
 		rv.count = dictionaryRow.Count()
 	}
 
+	atomic.AddUint64(&r.f.stats.termSearchersStarted, uint64(1))
 	return &rv, nil
 }
 
@@ -135,6 +137,7 @@ func (r *firestormTermFieldReader) Count() uint64 {
 }
 
 func (r *firestormTermFieldReader) Close() error {
+	atomic.AddUint64(&r.r.f.stats.termSearchersFinished, uint64(1))
 	if r.i != nil {
 		return r.i.Close()
 	}

@@ -25,10 +25,11 @@ var MinTimeRepresentable = time.Unix(0, math.MinInt64)
 var MaxTimeRepresentable = time.Unix(0, math.MaxInt64)
 
 type DateTimeField struct {
-	name           string
-	arrayPositions []uint64
-	options        IndexingOptions
-	value          numeric_util.PrefixCoded
+	name              string
+	arrayPositions    []uint64
+	options           IndexingOptions
+	value             numeric_util.PrefixCoded
+	numPlainTextBytes uint64
 }
 
 func (n *DateTimeField) Name() string {
@@ -95,12 +96,17 @@ func (n *DateTimeField) GoString() string {
 	return fmt.Sprintf("&document.DateField{Name:%s, Options: %s, Value: %s}", n.name, n.options, n.value)
 }
 
+func (n *DateTimeField) NumPlainTextBytes() uint64 {
+	return n.numPlainTextBytes
+}
+
 func NewDateTimeFieldFromBytes(name string, arrayPositions []uint64, value []byte) *DateTimeField {
 	return &DateTimeField{
-		name:           name,
-		arrayPositions: arrayPositions,
-		value:          value,
-		options:        DefaultDateTimeIndexingOptions,
+		name:              name,
+		arrayPositions:    arrayPositions,
+		value:             value,
+		options:           DefaultDateTimeIndexingOptions,
+		numPlainTextBytes: uint64(len(value)),
 	}
 }
 
@@ -117,6 +123,9 @@ func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, d
 			arrayPositions: arrayPositions,
 			value:          prefixCoded,
 			options:        options,
+			// not correct, just a place holder until we revisit how fields are
+			// represented and can fix this better
+			numPlainTextBytes: uint64(8),
 		}, nil
 	}
 	return nil, fmt.Errorf("cannot represent %s in this type", dt)

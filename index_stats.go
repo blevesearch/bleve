@@ -16,16 +16,21 @@ import (
 )
 
 type IndexStat struct {
-	indexStat  json.Marshaler
 	searches   uint64
 	searchTime uint64
+	i          *indexImpl
+}
+
+func (is *IndexStat) statsMap() map[string]interface{} {
+	m := map[string]interface{}{}
+	m["index"] = is.i.i.StatsMap()
+	m["searches"] = atomic.LoadUint64(&is.searches)
+	m["search_time"] = atomic.LoadUint64(&is.searchTime)
+	return m
 }
 
 func (is *IndexStat) MarshalJSON() ([]byte, error) {
-	m := map[string]interface{}{}
-	m["index"] = is.indexStat
-	m["searches"] = atomic.LoadUint64(&is.searches)
-	m["search_time"] = atomic.LoadUint64(&is.searchTime)
+	m := is.statsMap()
 	return json.Marshal(m)
 }
 

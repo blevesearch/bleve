@@ -68,14 +68,15 @@ type docBackIndexRow struct {
 }
 
 func NewUpsideDownCouch(storeName string, storeConfig map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error) {
-	return &UpsideDownCouch{
+	rv := &UpsideDownCouch{
 		version:       Version,
 		fieldCache:    index.NewFieldCache(),
 		storeName:     storeName,
 		storeConfig:   storeConfig,
 		analysisQueue: analysisQueue,
-		stats:         &indexStat{},
-	}, nil
+	}
+	rv.stats = &indexStat{i: rv}
+	return rv, nil
 }
 
 func (udc *UpsideDownCouch) init(kvwriter store.KVWriter) (err error) {
@@ -208,7 +209,7 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]Upsi
 
 	mergeNum := len(dictionaryDeltas)
 	mergeKeyBytes := 0
-	mergeValBytes := mergeNum * 8
+	mergeValBytes := mergeNum * DictionaryRowMaxValueSize
 
 	for dictRowKey, _ := range dictionaryDeltas {
 		mergeKeyBytes += len(dictRowKey)
@@ -218,7 +219,7 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]Upsi
 	totBytes := addKeyBytes + addValBytes +
 		updateKeyBytes + updateValBytes +
 		deleteKeyBytes +
-		mergeKeyBytes + mergeValBytes
+		2*(mergeKeyBytes+mergeValBytes)
 
 	buf, wb, err := writer.NewBatchEx(store.KVBatchOptions{
 		TotalBytes: totBytes,
@@ -278,8 +279,8 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]Upsi
 	for dictRowKey, delta := range dictionaryDeltas {
 		dictRowKeyLen := copy(buf, dictRowKey)
 		binary.LittleEndian.PutUint64(buf[dictRowKeyLen:], uint64(delta))
-		wb.Merge(buf[:dictRowKeyLen], buf[dictRowKeyLen:dictRowKeyLen+8])
-		buf = buf[dictRowKeyLen+8:]
+		wb.Merge(buf[:dictRowKeyLen], buf[dictRowKeyLen:dictRowKeyLen+DictionaryRowMaxValueSize])
+		buf = buf[dictRowKeyLen+DictionaryRowMaxValueSize:]
 	}
 
 	// write out the batch
@@ -415,6 +416,7 @@ func (udc *UpsideDownCouch) Close() error {
 func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	// do analysis before acquiring write lock
 	analysisStart := time.Now()
+	numPlainTextBytes := doc.NumPlainTextBytes()
 	resultChan := make(chan *index.AnalysisResult)
 	aw := index.NewAnalysisWork(udc, doc, resultChan)
 
@@ -489,6 +491,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	atomic.AddUint64(&udc.stats.indexTime, uint64(time.Since(indexStart)))
 	if err == nil {
 		atomic.AddUint64(&udc.stats.updates, 1)
+		atomic.AddUint64(&udc.stats.numPlainTextBytesIndexed, numPlainTextBytes)
 	} else {
 		atomic.AddUint64(&udc.stats.errors, 1)
 	}
@@ -791,9 +794,11 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	resultChan := make(chan *index.AnalysisResult, len(batch.IndexOps))
 
 	var numUpdates uint64
+	var numPlainTextBytes uint64
 	for _, doc := range batch.IndexOps {
 		if doc != nil {
 			numUpdates++
+			numPlainTextBytes += doc.NumPlainTextBytes()
 		}
 	}
 
@@ -959,6 +964,7 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 		atomic.AddUint64(&udc.stats.updates, numUpdates)
 		atomic.AddUint64(&udc.stats.deletes, docsDeleted)
 		atomic.AddUint64(&udc.stats.batches, 1)
+		atomic.AddUint64(&udc.stats.numPlainTextBytesIndexed, numPlainTextBytes)
 	} else {
 		atomic.AddUint64(&udc.stats.errors, 1)
 	}
@@ -1022,6 +1028,14 @@ func (udc *UpsideDownCouch) Reader() (index.IndexReader, error) {
 
 func (udc *UpsideDownCouch) Stats() json.Marshaler {
 	return udc.stats
+}
+
+func (udc *UpsideDownCouch) StatsMap() map[string]interface{} {
+	return udc.stats.statsMap()
+}
+
+func (udc *UpsideDownCouch) Advanced() (store.KVStore, error) {
+	return udc.store, nil
 }
 
 func (udc *UpsideDownCouch) fieldIndexOrNewRow(name string) (uint16, *FieldRow) {
