@@ -7,6 +7,8 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
+// Package lower_case_filter implements a TokenFilter which converts
+// tokens to lower case according to unicode rules.
 package lower_case_filter
 
 import (
@@ -18,6 +20,7 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
+// Name is the name used to register LowerCaseFilter in the bleve registry
 const Name = "to_lower"
 
 type LowerCaseFilter struct {

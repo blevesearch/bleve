@@ -16,6 +16,8 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
+// PossessiveName is the name PossessiveFilter is registered as
+// in the bleve registry.
 const PossessiveName = "possessive_en"
 
 const rightSingleQuotationMark = '’'
@@ -24,6 +26,11 @@ const fullWidthApostrophe = '＇'
 
 const apostropheChars = rightSingleQuotationMark + apostrophe + fullWidthApostrophe
 
+// PossessiveFilter implements a TokenFilter which
+// strips the English possessive suffix ('s) from tokens.
+// It handle a variety of apostrophe types, is case-insensitive
+// and doesn't distinguish between possessive and contraction.
+// (ie "She's So Rad" becomes "She So Rad")
 type PossessiveFilter struct {
 }
 
