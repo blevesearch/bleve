@@ -39,7 +39,7 @@ type DocumentMapping struct {
 	DefaultAnalyzer string                      `json:"default_analyzer"`
 }
 
-func (dm *DocumentMapping) validate(cache *registry.Cache) error {
+func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 	var err error
 	if dm.DefaultAnalyzer != "" {
 		_, err := cache.AnalyzerNamed(dm.DefaultAnalyzer)
@@ -48,7 +48,7 @@ func (dm *DocumentMapping) validate(cache *registry.Cache) error {
 		}
 	}
 	for _, property := range dm.Properties {
-		err = property.validate(cache)
+		err = property.Validate(cache)
 		if err != nil {
 			return err
 		}

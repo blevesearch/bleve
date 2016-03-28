@@ -244,7 +244,7 @@ func NewIndexMapping() *IndexMapping {
 
 // Validate will walk the entire structure ensuring the following
 // explicitly named and default analyzers can be built
-func (im *IndexMapping) validate() error {
+func (im *IndexMapping) Validate() error {
 	_, err := im.cache.AnalyzerNamed(im.DefaultAnalyzer)
 	if err != nil {
 		return err
@@ -253,12 +253,12 @@ func (im *IndexMapping) validate() error {
 	if err != nil {
 		return err
 	}
-	err = im.DefaultMapping.validate(im.cache)
+	err = im.DefaultMapping.Validate(im.cache)
 	if err != nil {
 		return err
 	}
 	for _, docMapping := range im.TypeMapping {
-		err = docMapping.validate(im.cache)
+		err = docMapping.Validate(im.cache)
 		if err != nil {
 			return err
 		}

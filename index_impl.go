@@ -94,7 +94,7 @@ func newMemIndex(indexType string, mapping *IndexMapping) (*indexImpl, error) {
 
 func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
 	// first validate the mapping
-	err := mapping.validate()
+	err := mapping.Validate()
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +234,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	rv.open = true
 
 	// validate the mapping
-	err = im.validate()
+	err = im.Validate()
 	if err != nil {
 		// note even if the mapping is invalid
 		// we still return an open usable index
