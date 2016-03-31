@@ -182,7 +182,7 @@ func (r *SearchRequest) AddFacet(facetName string, f *FacetRequest) {
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	var temp struct {
 		Q         json.RawMessage   `json:"query"`
-		Size      int               `json:"size"`
+		Size      *int              `json:"size"`
 		From      int               `json:"from"`
 		Highlight *HighlightRequest `json:"highlight"`
 		Fields    []string          `json:"fields"`
@@ -195,7 +195,11 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		return err
 	}
 
-	r.Size = temp.Size
+	if temp.Size == nil {
+		r.Size = 10
+	} else {
+		r.Size = *temp.Size
+	}
 	r.From = temp.From
 	r.Explain = temp.Explain
 	r.Highlight = temp.Highlight
