@@ -12,14 +12,14 @@ package simple_analyzer
 import (
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
-	"github.com/blevesearch/bleve/analysis/tokenizers/unicode"
+	"github.com/blevesearch/bleve/analysis/tokenizers/letter"
 	"github.com/blevesearch/bleve/registry"
 )
 
 const Name = "simple"
 
 func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
-	tokenizer, err := cache.TokenizerNamed(unicode.Name)
+	tokenizer, err := cache.TokenizerNamed(letter.Name)
 	if err != nil {
 		return nil, err
 	}
