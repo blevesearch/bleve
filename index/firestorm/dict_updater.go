@@ -134,7 +134,7 @@ func (d *DictUpdater) update() {
 
 	atomic.AddUint64(&d.batchesFlushed, 1)
 
-	err = writer.Close()
+	_ = writer.Close()
 }
 
 // this is not intended to be used publicly, only for unit tests

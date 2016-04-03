@@ -36,38 +36,31 @@ func (s *FrenchMinimalStemmerFilter) Filter(input analysis.TokenStream) analysis
 
 func minstem(input []rune) []rune {
 
-	inputLen := len(input)
-
-	if inputLen < 6 {
+	if len(input) < 6 {
 		return input
 	}
 
-	if input[inputLen-1] == 'x' {
-		if input[inputLen-3] == 'a' && input[inputLen-2] == 'u' {
-			input[inputLen-2] = 'l'
+	if input[len(input)-1] == 'x' {
+		if input[len(input)-3] == 'a' && input[len(input)-2] == 'u' {
+			input[len(input)-2] = 'l'
 		}
-		return input[0 : inputLen-1]
+		return input[0 : len(input)-1]
 	}
 
-	if input[inputLen-1] == 's' {
-		input = input[0 : inputLen-1]
-		inputLen = len(input)
+	if input[len(input)-1] == 's' {
+		input = input[0 : len(input)-1]
 	}
-	if input[inputLen-1] == 'r' {
-		input = input[0 : inputLen-1]
-		inputLen = len(input)
+	if input[len(input)-1] == 'r' {
+		input = input[0 : len(input)-1]
 	}
-	if input[inputLen-1] == 'e' {
-		input = input[0 : inputLen-1]
-		inputLen = len(input)
+	if input[len(input)-1] == 'e' {
+		input = input[0 : len(input)-1]
 	}
-	if input[inputLen-1] == 'é' {
-		input = input[0 : inputLen-1]
-		inputLen = len(input)
+	if input[len(input)-1] == 'é' {
+		input = input[0 : len(input)-1]
 	}
-	if input[inputLen-1] == input[inputLen-2] {
-		input = input[0 : inputLen-1]
-		inputLen = len(input)
+	if input[len(input)-1] == input[len(input)-2] {
+		input = input[0 : len(input)-1]
 	}
 	return input
 }

@@ -21,9 +21,9 @@ type KVVisitor func(key, val []byte) (bool, error)
 func visitPrefix(reader store.KVReader, prefix []byte, visitor KVVisitor) (err error) {
 	start := prefix
 	if start == nil {
-		start = []byte{0}
+		start = []byte{}
 	}
-	it := reader.PrefixIterator(prefix)
+	it := reader.PrefixIterator(start)
 	defer func() {
 		if cerr := it.Close(); err == nil && cerr != nil {
 			err = cerr

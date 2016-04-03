@@ -442,6 +442,9 @@ func TestIndexAliasEmpty(t *testing.T) {
 	}
 
 	count, err := alias.DocCount()
+	if err != nil {
+		t.Errorf("error getting alias doc count: %v", err)
+	}
 	if count != 0 {
 		t.Errorf("expected %d, got %d", 0, count)
 	}
@@ -588,6 +591,9 @@ func TestIndexAliasMulti(t *testing.T) {
 	}
 
 	count, err := alias.DocCount()
+	if err != nil {
+		t.Errorf("error getting alias doc count: %v", err)
+	}
 	if count != (*ei1.docCountResult + *ei2.docCountResult) {
 		t.Errorf("expected %d, got %d", (*ei1.docCountResult + *ei2.docCountResult), count)
 	}

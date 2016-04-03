@@ -241,9 +241,8 @@ func stem(input []rune) []rune {
 
 func norm(input []rune) []rune {
 
-	inputLen := len(input)
-	if inputLen > 4 {
-		for i := 0; i < inputLen; i++ {
+	if len(input) > 4 {
+		for i := 0; i < len(input); i++ {
 			switch input[i] {
 			case 'à', 'á', 'â':
 				input[i] = 'a'
@@ -260,11 +259,10 @@ func norm(input []rune) []rune {
 			}
 
 			ch := input[0]
-			for i := 1; i < inputLen; i++ {
+			for i := 1; i < len(input); i++ {
 				if input[i] == ch && unicode.IsLetter(ch) {
 					input = analysis.DeleteRune(input, i)
 					i -= 1
-					inputLen = len(input)
 				} else {
 					ch = input[i]
 				}
@@ -272,27 +270,22 @@ func norm(input []rune) []rune {
 		}
 	}
 
-	if inputLen > 4 && analysis.RunesEndsWith(input, "ie") {
-		input = input[0 : inputLen-2]
-		inputLen = len(input)
+	if len(input) > 4 && analysis.RunesEndsWith(input, "ie") {
+		input = input[0 : len(input)-2]
 	}
 
-	if inputLen > 4 {
-		if input[inputLen-1] == 'r' {
-			input = input[0 : inputLen-1]
-			inputLen = len(input)
+	if len(input) > 4 {
+		if input[len(input)-1] == 'r' {
+			input = input[0 : len(input)-1]
 		}
-		if input[inputLen-1] == 'e' {
-			input = input[0 : inputLen-1]
-			inputLen = len(input)
+		if input[len(input)-1] == 'e' {
+			input = input[0 : len(input)-1]
 		}
-		if input[inputLen-1] == 'e' {
-			input = input[0 : inputLen-1]
-			inputLen = len(input)
+		if input[len(input)-1] == 'e' {
+			input = input[0 : len(input)-1]
 		}
-		if input[inputLen-1] == input[inputLen-2] && unicode.IsLetter(input[inputLen-1]) {
-			input = input[0 : inputLen-1]
-			inputLen = len(input)
+		if input[len(input)-1] == input[len(input)-2] && unicode.IsLetter(input[len(input)-1]) {
+			input = input[0 : len(input)-1]
 		}
 	}
 

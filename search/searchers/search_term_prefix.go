@@ -30,7 +30,8 @@ func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string, field s
 	qsearchers := make([]search.Searcher, 0, 25)
 	tfd, err := fieldDict.Next()
 	for err == nil && tfd != nil {
-		qsearcher, err := NewTermSearcher(indexReader, string(tfd.Term), field, 1.0, explain)
+		var qsearcher *TermSearcher
+		qsearcher, err = NewTermSearcher(indexReader, string(tfd.Term), field, 1.0, explain)
 		if err != nil {
 			return nil, err
 		}
