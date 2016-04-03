@@ -35,14 +35,14 @@ func TestSimpleHighlighter(t *testing.T) {
 		Locations: search.FieldTermLocationMap{
 			"desc": search.TermLocationMap{
 				"quick": []*search.Location{
-					&search.Location{
+					{
 						Pos:   2,
 						Start: 4,
 						End:   9,
 					},
 				},
 				"fox": []*search.Location{
-					&search.Location{
+					{
 						Pos:   4,
 						Start: 16,
 						End:   19,
@@ -80,61 +80,61 @@ Etiam vel augue vel nisl commodo suscipit et ac nisl. Quisque eros diam, porttit
 		Locations: search.FieldTermLocationMap{
 			"full": search.TermLocationMap{
 				"metus": []*search.Location{
-					&search.Location{
+					{
 						Pos:   0,
 						Start: 883,
 						End:   888,
 					},
-					&search.Location{
+					{
 						Pos:   0,
 						Start: 915,
 						End:   920,
 					},
-					&search.Location{
+					{
 						Pos:   0,
 						Start: 2492,
 						End:   2497,
 					},
-					&search.Location{
+					{
 						Pos:   0,
 						Start: 2822,
 						End:   2827,
 					},
-					&search.Location{
+					{
 						Pos:   0,
 						Start: 3417,
 						End:   3422,
 					},
 				},
 				"interdum": []*search.Location{
-					&search.Location{
+					{
 						Pos:   0,
 						Start: 1891,
 						End:   1899,
 					},
-					&search.Location{
+					{
 						Pos:   0,
 						Start: 2813,
 						End:   2821,
 					},
 				},
 				"venenatis": []*search.Location{
-					&search.Location{
+					{
 						Pos:   0,
 						Start: 954,
 						End:   963,
 					},
-					&search.Location{
+					{
 						Pos:   0,
 						Start: 1252,
 						End:   1261,
 					},
-					&search.Location{
+					{
 						Pos:   0,
 						Start: 1795,
 						End:   1804,
 					},
-					&search.Location{
+					{
 						Pos:   0,
 						Start: 2803,
 						End:   2812,
