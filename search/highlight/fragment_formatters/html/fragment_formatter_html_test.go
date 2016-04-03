@@ -29,7 +29,7 @@ func TestHTMLFragmentFormatter1(t *testing.T) {
 				End:   19,
 			},
 			tlm: search.TermLocationMap{
-				"quick": search.Locations{
+				"quick": []*search.Location{
 					{
 						Pos:   2,
 						Start: 4,
@@ -64,7 +64,7 @@ func TestHTMLFragmentFormatter2(t *testing.T) {
 				End:   19,
 			},
 			tlm: search.TermLocationMap{
-				"quick": search.Locations{
+				"quick": []*search.Location{
 					{
 						Pos:   2,
 						Start: 4,
