@@ -340,7 +340,7 @@ func TestTermLocationsOrder(t *testing.T) {
 		},
 		{
 			input: search.TermLocationMap{
-				"term": search.Locations{
+				"term": []*search.Location{
 					&search.Location{
 						Start: 0,
 					},
@@ -362,7 +362,7 @@ func TestTermLocationsOrder(t *testing.T) {
 		},
 		{
 			input: search.TermLocationMap{
-				"term": search.Locations{
+				"term": []*search.Location{
 					&search.Location{
 						Start: 5,
 					},
@@ -385,7 +385,7 @@ func TestTermLocationsOrder(t *testing.T) {
 		// with array positions
 		{
 			input: search.TermLocationMap{
-				"term": search.Locations{
+				"term": []*search.Location{
 					&search.Location{
 						ArrayPositions: []float64{0},
 						Start:          0,
@@ -411,7 +411,7 @@ func TestTermLocationsOrder(t *testing.T) {
 		},
 		{
 			input: search.TermLocationMap{
-				"term": search.Locations{
+				"term": []*search.Location{
 					&search.Location{
 						ArrayPositions: []float64{0},
 						Start:          5,
@@ -437,7 +437,7 @@ func TestTermLocationsOrder(t *testing.T) {
 		},
 		{
 			input: search.TermLocationMap{
-				"term": search.Locations{
+				"term": []*search.Location{
 					&search.Location{
 						ArrayPositions: []float64{0},
 						Start:          5,
@@ -463,7 +463,7 @@ func TestTermLocationsOrder(t *testing.T) {
 		},
 		{
 			input: search.TermLocationMap{
-				"term": search.Locations{
+				"term": []*search.Location{
 					&search.Location{
 						ArrayPositions: []float64{0},
 						Start:          5,

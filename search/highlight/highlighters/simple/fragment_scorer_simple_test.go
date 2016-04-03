@@ -30,7 +30,7 @@ func TestSimpleFragmentScorer(t *testing.T) {
 				End:   14,
 			},
 			tlm: search.TermLocationMap{
-				"cat": search.Locations{
+				"cat": []*search.Location{
 					&search.Location{
 						Pos:   0,
 						Start: 0,
@@ -47,14 +47,14 @@ func TestSimpleFragmentScorer(t *testing.T) {
 				End:   14,
 			},
 			tlm: search.TermLocationMap{
-				"cat": search.Locations{
+				"cat": []*search.Location{
 					&search.Location{
 						Pos:   1,
 						Start: 0,
 						End:   3,
 					},
 				},
-				"hat": search.Locations{
+				"hat": []*search.Location{
 					&search.Location{
 						Pos:   4,
 						Start: 11,
