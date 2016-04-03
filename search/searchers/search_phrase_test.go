@@ -52,7 +52,7 @@ func TestPhraseSearch(t *testing.T) {
 		{
 			searcher: phraseSearcher,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "2",
 					Score: 1.0807601687084403,
 				},

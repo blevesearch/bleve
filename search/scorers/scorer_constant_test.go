@@ -32,7 +32,7 @@ func TestConstantScorer(t *testing.T) {
 				Freq: 1,
 				Norm: 1.0,
 				Vectors: []*index.TermFieldVector{
-					&index.TermFieldVector{
+					{
 						Field: "desc",
 						Pos:   1,
 						Start: 0,
@@ -83,21 +83,21 @@ func TestConstantScorerWithQueryNorm(t *testing.T) {
 					Value:   2.0,
 					Message: "weight(^1.000000), product of:",
 					Children: []*search.Explanation{
-						&search.Explanation{
+						{
 							Value:   2.0,
 							Message: "ConstantScore()^1.000000, product of:",
 							Children: []*search.Explanation{
-								&search.Explanation{
+								{
 									Value:   1,
 									Message: "boost",
 								},
-								&search.Explanation{
+								{
 									Value:   2,
 									Message: "queryNorm",
 								},
 							},
 						},
-						&search.Explanation{
+						{
 							Value:   1.0,
 							Message: "ConstantScore()",
 						},

@@ -460,7 +460,7 @@ func TestIndexAliasMulti(t *testing.T) {
 			},
 			Total: 1,
 			Hits: search.DocumentMatchCollection{
-				&search.DocumentMatch{
+				{
 					ID:    "a",
 					Score: 1.0,
 				},
@@ -479,7 +479,7 @@ func TestIndexAliasMulti(t *testing.T) {
 			},
 			Total: 1,
 			Hits: search.DocumentMatchCollection{
-				&search.DocumentMatch{
+				{
 					ID:    "b",
 					Score: 2.0,
 				},
@@ -566,11 +566,11 @@ func TestIndexAliasMulti(t *testing.T) {
 		Request: sr,
 		Total:   2,
 		Hits: search.DocumentMatchCollection{
-			&search.DocumentMatch{
+			{
 				ID:    "b",
 				Score: 2.0,
 			},
-			&search.DocumentMatch{
+			{
 				ID:    "a",
 				Score: 1.0,
 			},
@@ -603,7 +603,7 @@ func TestMultiSearchNoError(t *testing.T) {
 		},
 		Total: 1,
 		Hits: search.DocumentMatchCollection{
-			&search.DocumentMatch{
+			{
 				Index: "1",
 				ID:    "a",
 				Score: 1.0,
@@ -619,7 +619,7 @@ func TestMultiSearchNoError(t *testing.T) {
 		},
 		Total: 1,
 		Hits: search.DocumentMatchCollection{
-			&search.DocumentMatch{
+			{
 				Index: "2",
 				ID:    "b",
 				Score: 2.0,
@@ -638,12 +638,12 @@ func TestMultiSearchNoError(t *testing.T) {
 		Request: sr,
 		Total:   2,
 		Hits: search.DocumentMatchCollection{
-			&search.DocumentMatch{
+			{
 				Index: "2",
 				ID:    "b",
 				Score: 2.0,
 			},
-			&search.DocumentMatch{
+			{
 				Index: "1",
 				ID:    "a",
 				Score: 1.0,
@@ -673,7 +673,7 @@ func TestMultiSearchSomeError(t *testing.T) {
 		},
 		Total: 1,
 		Hits: search.DocumentMatchCollection{
-			&search.DocumentMatch{
+			{
 				ID:    "a",
 				Score: 1.0,
 			},
@@ -793,7 +793,7 @@ func TestMultiSearchTimeout(t *testing.T) {
 			},
 			Total: 1,
 			Hits: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					Index: "1",
 					ID:    "a",
 					Score: 1.0,
@@ -816,7 +816,7 @@ func TestMultiSearchTimeout(t *testing.T) {
 			},
 			Total: 1,
 			Hits: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					Index: "2",
 					ID:    "b",
 					Score: 2.0,
@@ -914,7 +914,7 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 			},
 			Total: 1,
 			Hits: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					Index: "1",
 					ID:    "a",
 					Score: 1.0,
@@ -933,7 +933,7 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 			},
 			Total: 1,
 			Hits: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					Index: "2",
 					ID:    "b",
 					Score: 2.0,
@@ -957,7 +957,7 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 			},
 			Total: 1,
 			Hits: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					Index: "3",
 					ID:    "c",
 					Score: 3.0,
@@ -983,12 +983,12 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 		Request: sr,
 		Total:   2,
 		Hits: search.DocumentMatchCollection{
-			&search.DocumentMatch{
+			{
 				Index: "2",
 				ID:    "b",
 				Score: 2.0,
 			},
-			&search.DocumentMatch{
+			{
 				Index: "1",
 				ID:    "a",
 				Score: 1.0,
@@ -1019,7 +1019,7 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 			},
 			Total: 1,
 			Hits: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					Index: "1",
 					ID:    "a",
 					Score: 1.0,
@@ -1042,7 +1042,7 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 			},
 			Total: 1,
 			Hits: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					Index: "2",
 					ID:    "b",
 					Score: 2.0,
@@ -1066,7 +1066,7 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 			},
 			Total: 1,
 			Hits: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					Index: "3",
 					ID:    "c",
 					Score: 3.0,
@@ -1086,7 +1086,7 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 			},
 			Total: 1,
 			Hits: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					Index: "4",
 					ID:    "d",
 					Score: 4.0,
@@ -1119,12 +1119,12 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 		Request: sr,
 		Total:   2,
 		Hits: search.DocumentMatchCollection{
-			&search.DocumentMatch{
+			{
 				Index: "4",
 				ID:    "d",
 				Score: 4.0,
 			},
-			&search.DocumentMatch{
+			{
 				Index: "1",
 				ID:    "a",
 				Score: 1.0,

@@ -39,7 +39,7 @@ func TestTermScorer(t *testing.T) {
 				Freq: 1,
 				Norm: 1.0,
 				Vectors: []*index.TermFieldVector{
-					&index.TermFieldVector{
+					{
 						Field: "desc",
 						Pos:   1,
 						Start: 0,
@@ -54,15 +54,15 @@ func TestTermScorer(t *testing.T) {
 					Value:   math.Sqrt(1.0) * idf,
 					Message: "fieldWeight(desc:beer in one), product of:",
 					Children: []*search.Explanation{
-						&search.Explanation{
+						{
 							Value:   1,
 							Message: "tf(termFreq(desc:beer)=1",
 						},
-						&search.Explanation{
+						{
 							Value:   1,
 							Message: "fieldNorm(field=desc, doc=one)",
 						},
-						&search.Explanation{
+						{
 							Value:   idf,
 							Message: "idf(docFreq=9, maxDocs=100)",
 						},
@@ -95,15 +95,15 @@ func TestTermScorer(t *testing.T) {
 					Value:   math.Sqrt(1.0) * idf,
 					Message: "fieldWeight(desc:beer in one), product of:",
 					Children: []*search.Explanation{
-						&search.Explanation{
+						{
 							Value:   1,
 							Message: "tf(termFreq(desc:beer)=1",
 						},
-						&search.Explanation{
+						{
 							Value:   1,
 							Message: "fieldNorm(field=desc, doc=one)",
 						},
-						&search.Explanation{
+						{
 							Value:   idf,
 							Message: "idf(docFreq=9, maxDocs=100)",
 						},
@@ -125,15 +125,15 @@ func TestTermScorer(t *testing.T) {
 					Value:   math.Sqrt(65) * idf,
 					Message: "fieldWeight(desc:beer in one), product of:",
 					Children: []*search.Explanation{
-						&search.Explanation{
+						{
 							Value:   math.Sqrt(65),
 							Message: "tf(termFreq(desc:beer)=65",
 						},
-						&search.Explanation{
+						{
 							Value:   1,
 							Message: "fieldNorm(field=desc, doc=one)",
 						},
-						&search.Explanation{
+						{
 							Value:   idf,
 							Message: "idf(docFreq=9, maxDocs=100)",
 						},
@@ -188,37 +188,37 @@ func TestTermScorerWithQueryNorm(t *testing.T) {
 					Value:   math.Sqrt(1.0) * idf * 3.0 * idf * 2.0,
 					Message: "weight(desc:beer^3.000000 in one), product of:",
 					Children: []*search.Explanation{
-						&search.Explanation{
+						{
 							Value:   2.0 * idf * 3.0,
 							Message: "queryWeight(desc:beer^3.000000), product of:",
 							Children: []*search.Explanation{
-								&search.Explanation{
+								{
 									Value:   3,
 									Message: "boost",
 								},
-								&search.Explanation{
+								{
 									Value:   idf,
 									Message: "idf(docFreq=9, maxDocs=100)",
 								},
-								&search.Explanation{
+								{
 									Value:   2,
 									Message: "queryNorm",
 								},
 							},
 						},
-						&search.Explanation{
+						{
 							Value:   math.Sqrt(1.0) * idf,
 							Message: "fieldWeight(desc:beer in one), product of:",
 							Children: []*search.Explanation{
-								&search.Explanation{
+								{
 									Value:   1,
 									Message: "tf(termFreq(desc:beer)=1",
 								},
-								&search.Explanation{
+								{
 									Value:   1,
 									Message: "fieldNorm(field=desc, doc=one)",
 								},
-								&search.Explanation{
+								{
 									Value:   idf,
 									Message: "idf(docFreq=9, maxDocs=100)",
 								},

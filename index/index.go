@@ -195,10 +195,10 @@ func (b *Batch) String() string {
 }
 
 func (b *Batch) Reset() {
-	for k, _ := range b.IndexOps {
+	for k := range b.IndexOps {
 		delete(b.IndexOps, k)
 	}
-	for k, _ := range b.InternalOps {
+	for k := range b.InternalOps {
 		delete(b.InternalOps, k)
 	}
 }

@@ -33,12 +33,12 @@ func TestTokenFrequency(t *testing.T) {
 		"water": &TokenFreq{
 			Term: []byte("water"),
 			Locations: []*TokenLocation{
-				&TokenLocation{
+				{
 					Position: 1,
 					Start:    0,
 					End:      5,
 				},
-				&TokenLocation{
+				{
 					Position: 2,
 					Start:    6,
 					End:      11,
@@ -58,12 +58,12 @@ func TestTokenFrequenciesMergeAll(t *testing.T) {
 		"water": &TokenFreq{
 			Term: []byte("water"),
 			Locations: []*TokenLocation{
-				&TokenLocation{
+				{
 					Position: 1,
 					Start:    0,
 					End:      5,
 				},
-				&TokenLocation{
+				{
 					Position: 2,
 					Start:    6,
 					End:      11,
@@ -75,12 +75,12 @@ func TestTokenFrequenciesMergeAll(t *testing.T) {
 		"water": &TokenFreq{
 			Term: []byte("water"),
 			Locations: []*TokenLocation{
-				&TokenLocation{
+				{
 					Position: 1,
 					Start:    0,
 					End:      5,
 				},
-				&TokenLocation{
+				{
 					Position: 2,
 					Start:    6,
 					End:      11,
@@ -92,23 +92,23 @@ func TestTokenFrequenciesMergeAll(t *testing.T) {
 		"water": &TokenFreq{
 			Term: []byte("water"),
 			Locations: []*TokenLocation{
-				&TokenLocation{
+				{
 					Position: 1,
 					Start:    0,
 					End:      5,
 				},
-				&TokenLocation{
+				{
 					Position: 2,
 					Start:    6,
 					End:      11,
 				},
-				&TokenLocation{
+				{
 					Field:    "tf2",
 					Position: 1,
 					Start:    0,
 					End:      5,
 				},
-				&TokenLocation{
+				{
 					Field:    "tf2",
 					Position: 2,
 					Start:    6,
@@ -129,12 +129,12 @@ func TestTokenFrequenciesMergeAllLeftEmpty(t *testing.T) {
 		"water": &TokenFreq{
 			Term: []byte("water"),
 			Locations: []*TokenLocation{
-				&TokenLocation{
+				{
 					Position: 1,
 					Start:    0,
 					End:      5,
 				},
-				&TokenLocation{
+				{
 					Position: 2,
 					Start:    6,
 					End:      11,
@@ -146,13 +146,13 @@ func TestTokenFrequenciesMergeAllLeftEmpty(t *testing.T) {
 		"water": &TokenFreq{
 			Term: []byte("water"),
 			Locations: []*TokenLocation{
-				&TokenLocation{
+				{
 					Field:    "tf2",
 					Position: 1,
 					Start:    0,
 					End:      5,
 				},
-				&TokenLocation{
+				{
 					Field:    "tf2",
 					Position: 2,
 					Start:    6,

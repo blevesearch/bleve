@@ -176,7 +176,7 @@ func (f *Firestorm) Update(doc *document.Document) (err error) {
 	}
 
 	f.compensator.Mutate([]byte(doc.ID), doc.Number)
-	f.lookuper.NotifyBatch([]*InFlightItem{&InFlightItem{[]byte(doc.ID), doc.Number}})
+	f.lookuper.NotifyBatch([]*InFlightItem{{[]byte(doc.ID), doc.Number}})
 	f.dictUpdater.NotifyBatch(dictionaryDeltas)
 
 	atomic.AddUint64(&f.stats.indexTime, uint64(time.Since(indexStart)))
@@ -187,7 +187,7 @@ func (f *Firestorm) Update(doc *document.Document) (err error) {
 func (f *Firestorm) Delete(id string) error {
 	indexStart := time.Now()
 	f.compensator.Mutate([]byte(id), 0)
-	f.lookuper.NotifyBatch([]*InFlightItem{&InFlightItem{[]byte(id), 0}})
+	f.lookuper.NotifyBatch([]*InFlightItem{{[]byte(id), 0}})
 	atomic.AddUint64(&f.stats.indexTime, uint64(time.Since(indexStart)))
 	return nil
 }

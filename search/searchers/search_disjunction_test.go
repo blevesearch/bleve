@@ -70,11 +70,11 @@ func TestDisjunctionSearch(t *testing.T) {
 		{
 			searcher: martyOrDustinSearcher,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "1",
 					Score: 0.6775110856165737,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "3",
 					Score: 0.6775110856165737,
 				},
@@ -84,15 +84,15 @@ func TestDisjunctionSearch(t *testing.T) {
 		{
 			searcher: nestedRaviOrMartyOrDustinSearcher,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "1",
 					Score: 0.2765927424732821,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "3",
 					Score: 0.2765927424732821,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "4",
 					Score: 0.5531854849465642,
 				},

@@ -247,15 +247,15 @@ func TestBooleanSearch(t *testing.T) {
 		{
 			searcher: booleanSearcher,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "1",
 					Score: 0.9818005051949021,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "3",
 					Score: 0.808709699395535,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "4",
 					Score: 0.34618161159873423,
 				},
@@ -264,11 +264,11 @@ func TestBooleanSearch(t *testing.T) {
 		{
 			searcher: booleanSearcher2,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "1",
 					Score: 0.6775110856165737,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "3",
 					Score: 0.6775110856165737,
 				},
@@ -282,15 +282,15 @@ func TestBooleanSearch(t *testing.T) {
 		{
 			searcher: booleanSearcher4,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "1",
 					Score: 1.0,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "3",
 					Score: 0.5,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "4",
 					Score: 1.0,
 				},
@@ -299,11 +299,11 @@ func TestBooleanSearch(t *testing.T) {
 		{
 			searcher: booleanSearcher5,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "3",
 					Score: 0.5,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "4",
 					Score: 1.0,
 				},
@@ -317,7 +317,7 @@ func TestBooleanSearch(t *testing.T) {
 		{
 			searcher: conjunctionSearcher7,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "1",
 					Score: 2.0097428702814377,
 				},
@@ -326,7 +326,7 @@ func TestBooleanSearch(t *testing.T) {
 		{
 			searcher: conjunctionSearcher8,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "3",
 					Score: 2.0681575785068107,
 				},

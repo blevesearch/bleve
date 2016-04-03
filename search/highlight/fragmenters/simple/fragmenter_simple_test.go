@@ -27,7 +27,7 @@ func TestSimpleFragmenter(t *testing.T) {
 		{
 			orig: []byte("this is a test"),
 			fragments: []*highlight.Fragment{
-				&highlight.Fragment{
+				{
 					Orig:  []byte("this is a test"),
 					Start: 0,
 					End:   14,
@@ -46,7 +46,7 @@ func TestSimpleFragmenter(t *testing.T) {
 		{
 			orig: []byte("0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"),
 			fragments: []*highlight.Fragment{
-				&highlight.Fragment{
+				{
 					Orig:  []byte("0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"),
 					Start: 0,
 					End:   100,
@@ -65,52 +65,52 @@ func TestSimpleFragmenter(t *testing.T) {
 		{
 			orig: []byte("01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 			fragments: []*highlight.Fragment{
-				&highlight.Fragment{
+				{
 					Orig:  []byte("01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 					Start: 0,
 					End:   100,
 				},
-				&highlight.Fragment{
+				{
 					Orig:  []byte("01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 					Start: 10,
 					End:   101,
 				},
-				&highlight.Fragment{
+				{
 					Orig:  []byte("01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 					Start: 20,
 					End:   101,
 				},
-				&highlight.Fragment{
+				{
 					Orig:  []byte("01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 					Start: 30,
 					End:   101,
 				},
-				&highlight.Fragment{
+				{
 					Orig:  []byte("01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 					Start: 40,
 					End:   101,
 				},
-				&highlight.Fragment{
+				{
 					Orig:  []byte("01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 					Start: 50,
 					End:   101,
 				},
-				&highlight.Fragment{
+				{
 					Orig:  []byte("01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 					Start: 60,
 					End:   101,
 				},
-				&highlight.Fragment{
+				{
 					Orig:  []byte("01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 					Start: 70,
 					End:   101,
 				},
-				&highlight.Fragment{
+				{
 					Orig:  []byte("01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 					Start: 80,
 					End:   101,
 				},
-				&highlight.Fragment{
+				{
 					Orig:  []byte("01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"),
 					Start: 90,
 					End:   101,
@@ -183,7 +183,7 @@ func TestSimpleFragmenter(t *testing.T) {
 		{
 			orig: []byte("[[पानी का स्वाद]] [[नीलेश रघुवंशी]] का कविता संग्रह हैं। इस कृति के लिए उन्हें २००४ में [[केदार सम्मान]] से सम्मानित किया गया है।{{केदार सम्मान से सम्मानित कृतियाँ}}"),
 			fragments: []*highlight.Fragment{
-				&highlight.Fragment{
+				{
 					Orig:  []byte("[[पानी का स्वाद]] [[नीलेश रघुवंशी]] का कविता संग्रह हैं। इस कृति के लिए उन्हें २००४ में [[केदार सम्मान]] से सम्मानित किया गया है।{{केदार सम्मान से सम्मानित कृतियाँ}}"),
 					Start: 0,
 					End:   411,
@@ -202,12 +202,12 @@ func TestSimpleFragmenter(t *testing.T) {
 		{
 			orig: []byte("交换机"),
 			fragments: []*highlight.Fragment{
-				&highlight.Fragment{
+				{
 					Orig:  []byte("交换机"),
 					Start: 0,
 					End:   9,
 				},
-				&highlight.Fragment{
+				{
 					Orig:  []byte("交换机"),
 					Start: 3,
 					End:   9,
@@ -254,12 +254,12 @@ func TestSimpleFragmenterWithSize(t *testing.T) {
 		{
 			orig: []byte("this is a test"),
 			fragments: []*highlight.Fragment{
-				&highlight.Fragment{
+				{
 					Orig:  []byte("this is a test"),
 					Start: 0,
 					End:   5,
 				},
-				&highlight.Fragment{
+				{
 					Orig:  []byte("this is a test"),
 					Start: 9,
 					End:   14,

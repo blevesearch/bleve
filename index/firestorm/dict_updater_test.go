@@ -54,7 +54,7 @@ func TestDictUpdater(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for key, _ := range dictBatch {
+	for key := range dictBatch {
 		v, err := reader.Get([]byte(key))
 		if err != nil {
 			t.Fatal(err)
@@ -102,7 +102,7 @@ func TestDictUpdater(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for key, _ := range dictBatch {
+	for key := range dictBatch {
 		v, err := reader.Get([]byte(key))
 		if err != nil {
 			t.Fatal(err)
@@ -147,7 +147,7 @@ func TestDictUpdater(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for key, _ := range dictBatch {
+	for key := range dictBatch {
 		v, err := reader.Get([]byte(key))
 		if err != nil {
 			t.Fatal(err)

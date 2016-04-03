@@ -13,15 +13,15 @@ func TestTermFacetResultsMerge(t *testing.T) {
 		Missing: 25,
 		Other:   25,
 		Terms: []*TermFacet{
-			&TermFacet{
+			{
 				Term:  "blog",
 				Count: 25,
 			},
-			&TermFacet{
+			{
 				Term:  "comment",
 				Count: 24,
 			},
-			&TermFacet{
+			{
 				Term:  "feedback",
 				Count: 1,
 			},
@@ -33,11 +33,11 @@ func TestTermFacetResultsMerge(t *testing.T) {
 		Missing: 22,
 		Other:   15,
 		Terms: []*TermFacet{
-			&TermFacet{
+			{
 				Term:  "clothing",
 				Count: 35,
 			},
-			&TermFacet{
+			{
 				Term:  "electronics",
 				Count: 25,
 			},
@@ -54,15 +54,15 @@ func TestTermFacetResultsMerge(t *testing.T) {
 		Missing: 25,
 		Other:   25,
 		Terms: []*TermFacet{
-			&TermFacet{
+			{
 				Term:  "blog",
 				Count: 25,
 			},
-			&TermFacet{
+			{
 				Term:  "comment",
 				Count: 22,
 			},
-			&TermFacet{
+			{
 				Term:  "flag",
 				Count: 3,
 			},
@@ -78,15 +78,15 @@ func TestTermFacetResultsMerge(t *testing.T) {
 		Missing: 50,
 		Other:   51,
 		Terms: []*TermFacet{
-			&TermFacet{
+			{
 				Term:  "blog",
 				Count: 50,
 			},
-			&TermFacet{
+			{
 				Term:  "comment",
 				Count: 46,
 			},
-			&TermFacet{
+			{
 				Term:  "flag",
 				Count: 3,
 			},
@@ -116,18 +116,18 @@ func TestNumericFacetResultsMerge(t *testing.T) {
 		Missing: 25,
 		Other:   25,
 		NumericRanges: []*NumericRangeFacet{
-			&NumericRangeFacet{
+			{
 				Name:  "low",
 				Max:   &lowmed,
 				Count: 25,
 			},
-			&NumericRangeFacet{
+			{
 				Name:  "med",
 				Count: 24,
 				Max:   &lowmed,
 				Min:   &medhi,
 			},
-			&NumericRangeFacet{
+			{
 				Name:  "hi",
 				Count: 1,
 				Min:   &medhi,
@@ -145,18 +145,18 @@ func TestNumericFacetResultsMerge(t *testing.T) {
 		Missing: 25,
 		Other:   25,
 		NumericRanges: []*NumericRangeFacet{
-			&NumericRangeFacet{
+			{
 				Name:  "low",
 				Max:   &lowmed,
 				Count: 25,
 			},
-			&NumericRangeFacet{
+			{
 				Name:  "med",
 				Max:   &lowmed,
 				Min:   &medhi,
 				Count: 22,
 			},
-			&NumericRangeFacet{
+			{
 				Name:  "highest",
 				Min:   &hihigher,
 				Count: 3,
@@ -173,18 +173,18 @@ func TestNumericFacetResultsMerge(t *testing.T) {
 		Missing: 50,
 		Other:   51,
 		NumericRanges: []*NumericRangeFacet{
-			&NumericRangeFacet{
+			{
 				Name:  "low",
 				Count: 50,
 				Max:   &lowmed,
 			},
-			&NumericRangeFacet{
+			{
 				Name:  "med",
 				Max:   &lowmed,
 				Min:   &medhi,
 				Count: 46,
 			},
-			&NumericRangeFacet{
+			{
 				Name:  "highest",
 				Min:   &hihigher,
 				Count: 3,
@@ -220,18 +220,18 @@ func TestDateFacetResultsMerge(t *testing.T) {
 		Missing: 25,
 		Other:   25,
 		DateRanges: []*DateRangeFacet{
-			&DateRangeFacet{
+			{
 				Name:  "low",
 				End:   &lowmed,
 				Count: 25,
 			},
-			&DateRangeFacet{
+			{
 				Name:  "med",
 				Count: 24,
 				Start: &lowmed,
 				End:   &medhi,
 			},
-			&DateRangeFacet{
+			{
 				Name:  "hi",
 				Count: 1,
 				Start: &medhi,
@@ -249,18 +249,18 @@ func TestDateFacetResultsMerge(t *testing.T) {
 		Missing: 25,
 		Other:   25,
 		DateRanges: []*DateRangeFacet{
-			&DateRangeFacet{
+			{
 				Name:  "low",
 				End:   &lowmed2,
 				Count: 25,
 			},
-			&DateRangeFacet{
+			{
 				Name:  "med",
 				Start: &lowmed2,
 				End:   &medhi2,
 				Count: 22,
 			},
-			&DateRangeFacet{
+			{
 				Name:  "highest",
 				Start: &hihigher2,
 				Count: 3,
@@ -277,18 +277,18 @@ func TestDateFacetResultsMerge(t *testing.T) {
 		Missing: 50,
 		Other:   51,
 		DateRanges: []*DateRangeFacet{
-			&DateRangeFacet{
+			{
 				Name:  "low",
 				Count: 50,
 				End:   &lowmed,
 			},
-			&DateRangeFacet{
+			{
 				Name:  "med",
 				Start: &lowmed,
 				End:   &medhi,
 				Count: 46,
 			},
-			&DateRangeFacet{
+			{
 				Name:  "highest",
 				Start: &hihigher,
 				Count: 3,

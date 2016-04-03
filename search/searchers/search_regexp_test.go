@@ -56,7 +56,7 @@ func TestRegexpSearch(t *testing.T) {
 		{
 			searcher: regexpSearcher,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "1",
 					Score: 1.916290731874155,
 				},
@@ -65,11 +65,11 @@ func TestRegexpSearch(t *testing.T) {
 		{
 			searcher: regexpSearcherCo,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "2",
 					Score: 0.33875554280828685,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "3",
 					Score: 0.33875554280828685,
 				},

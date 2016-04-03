@@ -80,7 +80,7 @@ func TestDump(t *testing.T) {
 
 	fieldsCount := 0
 	fieldsRows := idx.DumpFields()
-	for _ = range fieldsRows {
+	for range fieldsRows {
 		fieldsCount++
 	}
 	if fieldsCount != 3 {
@@ -94,7 +94,7 @@ func TestDump(t *testing.T) {
 	expectedDocRowCount := int(1 + (2 * (64 / document.DefaultPrecisionStep)) + 3)
 	docRowCount := 0
 	docRows := idx.DumpDoc("1")
-	for _ = range docRows {
+	for range docRows {
 		docRowCount++
 	}
 	if docRowCount != expectedDocRowCount {
@@ -103,7 +103,7 @@ func TestDump(t *testing.T) {
 
 	docRowCount = 0
 	docRows = idx.DumpDoc("2")
-	for _ = range docRows {
+	for range docRows {
 		docRowCount++
 	}
 	if docRowCount != expectedDocRowCount {
@@ -120,7 +120,7 @@ func TestDump(t *testing.T) {
 	expectedAllRowCount := int(1 + fieldsCount + (2 * expectedDocRowCount) + 2 + 2 + int((2 * (64 / document.DefaultPrecisionStep))))
 	allRowCount := 0
 	allRows := idx.DumpAll()
-	for _ = range allRows {
+	for range allRows {
 		allRowCount++
 	}
 	if allRowCount != expectedAllRowCount {

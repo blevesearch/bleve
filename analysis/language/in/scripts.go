@@ -23,39 +23,39 @@ type ScriptData struct {
 }
 
 var scripts = map[*unicode.RangeTable]*ScriptData{
-	unicode.Devanagari: &ScriptData{
+	unicode.Devanagari: {
 		flag: 1,
 		base: 0x0900,
 	},
-	unicode.Bengali: &ScriptData{
+	unicode.Bengali: {
 		flag: 2,
 		base: 0x0980,
 	},
-	unicode.Gurmukhi: &ScriptData{
+	unicode.Gurmukhi: {
 		flag: 4,
 		base: 0x0A00,
 	},
-	unicode.Gujarati: &ScriptData{
+	unicode.Gujarati: {
 		flag: 8,
 		base: 0x0A80,
 	},
-	unicode.Oriya: &ScriptData{
+	unicode.Oriya: {
 		flag: 16,
 		base: 0x0B00,
 	},
-	unicode.Tamil: &ScriptData{
+	unicode.Tamil: {
 		flag: 32,
 		base: 0x0B80,
 	},
-	unicode.Telugu: &ScriptData{
+	unicode.Telugu: {
 		flag: 64,
 		base: 0x0C00,
 	},
-	unicode.Kannada: &ScriptData{
+	unicode.Kannada: {
 		flag: 128,
 		base: 0x0C80,
 	},
-	unicode.Malayalam: &ScriptData{
+	unicode.Malayalam: {
 		flag: 256,
 		base: 0x0D00,
 	},
@@ -226,7 +226,7 @@ func init() {
 }
 
 func lookupScript(r rune) *unicode.RangeTable {
-	for script, _ := range scripts {
+	for script := range scripts {
 		if unicode.Is(script, r) {
 			return script
 		}

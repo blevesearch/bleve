@@ -55,19 +55,19 @@ func TestFuzzySearch(t *testing.T) {
 		{
 			searcher: fuzzySearcherbeet,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "1",
 					Score: 1.0,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "2",
 					Score: 0.5,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "3",
 					Score: 0.5,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "4",
 					Score: 0.9999999838027345,
 				},
@@ -80,7 +80,7 @@ func TestFuzzySearch(t *testing.T) {
 		{
 			searcher: fuzzySearcheraplee,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "3",
 					Score: 0.9581453659370776,
 				},
@@ -89,7 +89,7 @@ func TestFuzzySearch(t *testing.T) {
 		{
 			searcher: fuzzySearcherprefix,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "5",
 					Score: 1.916290731874155,
 				},

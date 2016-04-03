@@ -115,7 +115,7 @@ func TestIndexReader(t *testing.T) {
 		Freq: 1,
 		Norm: 0.5773502588272095,
 		Vectors: []*index.TermFieldVector{
-			&index.TermFieldVector{
+			{
 				Field: "desc",
 				Pos:   3,
 				Start: 9,

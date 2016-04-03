@@ -127,7 +127,7 @@ func TestConjunctionSearch(t *testing.T) {
 		{
 			searcher: beerAndMartySearcher,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "1",
 					Score: 2.0097428702814377,
 				},
@@ -136,7 +136,7 @@ func TestConjunctionSearch(t *testing.T) {
 		{
 			searcher: angstAndBeerSearcher,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "2",
 					Score: 1.0807601687084403,
 				},
@@ -149,11 +149,11 @@ func TestConjunctionSearch(t *testing.T) {
 		{
 			searcher: beerAndMisterSearcher,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "2",
 					Score: 1.2877980334016337,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "3",
 					Score: 1.2877980334016337,
 				},
@@ -162,7 +162,7 @@ func TestConjunctionSearch(t *testing.T) {
 		{
 			searcher: couchbaseAndMisterSearcher,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "2",
 					Score: 1.4436599157093672,
 				},
@@ -171,7 +171,7 @@ func TestConjunctionSearch(t *testing.T) {
 		{
 			searcher: beerAndCouchbaseAndMisterSearcher,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "2",
 					Score: 1.441614953806971,
 				},

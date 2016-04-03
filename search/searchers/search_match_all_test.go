@@ -47,23 +47,23 @@ func TestMatchAllSearch(t *testing.T) {
 			searcher:  allSearcher,
 			queryNorm: 1.0,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "1",
 					Score: 1.0,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "2",
 					Score: 1.0,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "3",
 					Score: 1.0,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "4",
 					Score: 1.0,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "5",
 					Score: 1.0,
 				},
@@ -73,23 +73,23 @@ func TestMatchAllSearch(t *testing.T) {
 			searcher:  allSearcher2,
 			queryNorm: 0.8333333,
 			results: []*search.DocumentMatch{
-				&search.DocumentMatch{
+				{
 					ID:    "1",
 					Score: 1.0,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "2",
 					Score: 1.0,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "3",
 					Score: 1.0,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "4",
 					Score: 1.0,
 				},
-				&search.DocumentMatch{
+				{
 					ID:    "5",
 					Score: 1.0,
 				},

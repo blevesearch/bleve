@@ -82,7 +82,7 @@ func NewUpsideDownCouch(storeName string, storeConfig map[string]interface{}, an
 func (udc *UpsideDownCouch) init(kvwriter store.KVWriter) (err error) {
 	// version marker
 	rowsAll := [][]UpsideDownCouchRow{
-		[]UpsideDownCouchRow{NewVersionRow(udc.version)},
+		{NewVersionRow(udc.version)},
 	}
 
 	err = udc.batchRows(kvwriter, nil, rowsAll, nil)
@@ -211,7 +211,7 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]Upsi
 	mergeKeyBytes := 0
 	mergeValBytes := mergeNum * DictionaryRowMaxValueSize
 
-	for dictRowKey, _ := range dictionaryDeltas {
+	for dictRowKey := range dictionaryDeltas {
 		mergeKeyBytes += len(dictRowKey)
 	}
 

@@ -50,7 +50,7 @@ func (c *customAnalysis) registerAll(i *IndexMapping) error {
 	if len(c.Tokenizers) > 0 {
 		// put all the names in map tracking work to do
 		todo := map[string]struct{}{}
-		for name, _ := range c.Tokenizers {
+		for name := range c.Tokenizers {
 			todo[name] = struct{}{}
 		}
 		registered := 1
@@ -59,7 +59,7 @@ func (c *customAnalysis) registerAll(i *IndexMapping) error {
 		for len(todo) > 0 && registered > 0 {
 			registered = 0
 			errs = []error{}
-			for name, _ := range todo {
+			for name := range todo {
 				config := c.Tokenizers[name]
 				_, err := i.cache.DefineTokenizer(name, config)
 				if err != nil {
