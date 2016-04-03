@@ -268,7 +268,7 @@ func TestArabicStemmerFilter(t *testing.T) {
 				},
 			},
 		},
-		// ShouldntStem
+		// Shouldn't Stem
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{

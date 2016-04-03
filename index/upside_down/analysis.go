@@ -87,7 +87,7 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 
 	backIndexTermEntries := make([]*BackIndexTermEntry, 0, rowsCapNeeded)
 
-	// walk through the collated information and proccess
+	// walk through the collated information and process
 	// once for each indexed field (unique name)
 	for fieldIndex, tokenFreqs := range fieldTermFreqs {
 		fieldLength := fieldLengths[fieldIndex]
