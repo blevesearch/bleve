@@ -32,7 +32,7 @@
 		{
 			"importpath": "github.com/golang/protobuf/proto",
 			"repository": "https://github.com/golang/protobuf",
-			"revision": "dda510ac0fd43b39770f22ac6260eb91d377bce3",
+			"revision": "655cdfa588ea190e901bc5590e65d5621688847c",
 			"branch": "master",
 			"path": "/proto",
 			"notests": true
@@ -47,7 +47,7 @@
 		{
 			"importpath": "github.com/rcrowley/go-metrics",
 			"repository": "https://github.com/rcrowley/go-metrics",
-			"revision": "eeba7bd0dd01ace6e690fa833b3f22aaec29af43",
+			"revision": "dee209f2455f101a5e4e593dea94872d2c62d85d",
 			"branch": "master",
 			"notests": true
 		},
