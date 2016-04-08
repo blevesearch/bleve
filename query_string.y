@@ -1,6 +1,14 @@
 %{
 package bleve
-import "strconv"
+import ("strconv"
+        "time"
+)
+
+// Format 02-01-2015 is used for specifying date without any time. It's a
+// reference layout for DD-MM-YYYY date format.
+// See here for more: https://golang.org/pkg/time/#pkg-constants
+var dateFormats = []string{"02-01-2006", "01-02-2006", time.RFC822,
+                           time.UnixDate, time.RFC3339, time.RFC3339Nano}
 
 func logDebugGrammar(format string, v ...interface{}) {
 	if debugParser {
@@ -9,8 +17,8 @@ func logDebugGrammar(format string, v ...interface{}) {
 }
 %}
 
-%union { 
-s string 
+%union {
+s string
 n int
 f float64
 q Query}
@@ -30,7 +38,7 @@ tEQUAL tTILDE tTILDENUMBER
 
 %%
 
-input: 
+input:
 searchParts {
 	logDebugGrammar("INPUT")
 };
@@ -140,6 +148,66 @@ tPHRASE {
 	$$ = q
 }
 |
+tSTRING tCOLON tGREATER tPHRASE {
+    field := $1
+    minInclusive := false
+    phrase := $4
+
+    for _, format := range dateFormats {
+        if _, err := time.Parse(format, phrase); err == nil {
+            logDebugGrammar("PHRASE - GREATER THAN %f", phrase)
+            q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil).SetField(field)
+            $$ = q
+            break
+        }
+    }
+}
+|
+tSTRING tCOLON tGREATER tEQUAL tPHRASE {
+    field := $1
+    minInclusive := true
+    phrase := $5
+
+    for _, format := range dateFormats {
+        if _, err := time.Parse(format, phrase); err == nil {
+            logDebugGrammar("PHRASE - GREATER EQUAL THAN %f", phrase)
+            q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil).SetField(field)
+            $$ = q
+            break
+        }
+    }
+}
+|
+tSTRING tCOLON tLESS tPHRASE {
+    field := $1
+    maxInclusive := false
+    phrase := $4
+
+    for _, format := range dateFormats {
+        if _, err := time.Parse(format, phrase); err == nil {
+            logDebugGrammar("PHRASE - LESS THAN %f", phrase)
+            q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive).SetField(field)
+            $$ = q
+            break
+        }
+    }
+}
+|
+tSTRING tCOLON tLESS tEQUAL tPHRASE {
+    field := $1
+    maxInclusive := true
+    phrase := $5
+
+    for _, format := range dateFormats {
+        if _, err := time.Parse(format, phrase); err == nil {
+            logDebugGrammar("PHRASE - LESS THAN %f", phrase)
+            q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive).SetField(field)
+            $$ = q
+            break
+        }
+    }
+}
+|
 tSTRING tCOLON tSTRING {
 	field := $1
 	str := $3
@@ -213,5 +281,5 @@ searchSuffix:
 }
 |
 searchBoost {
-	
+
 };
