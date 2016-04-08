@@ -3,16 +3,18 @@ sudo: false
 language: go
 
 go:
- - 1.5
+ - 1.6
 
 script:
   - go get golang.org/x/tools/cmd/cover
   - go get github.com/mattn/goveralls
   - go get github.com/kisielk/errcheck
-  - go test -v ./...
+  - go get -u github.com/FiloSottile/gvt
+  - gvt restore
+  - go test -v $(go list ./... | grep -v vendor/)
   - go test -v ./test -indexType=firestorm
-  - go vet ./...
-  - errcheck ./...
+  - go vet $(go list ./... | grep -v vendor/)
+  - errcheck $(go list ./... | grep -v vendor/)
   - docs/project-code-coverage.sh
   - docs/build_children.sh
 
