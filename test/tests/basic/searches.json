@@ -765,5 +765,41 @@
 				}
 			]
 		}
+	},
+	{
+		"comment": "test wildcard inside query string",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"query": "name:mar*"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "a"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test regexp inside query string",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"query": "name:/mar.*/"
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "a"
+				}
+			]
+		}
 	}
 ]

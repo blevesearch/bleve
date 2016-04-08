@@ -9,16 +9,18 @@ func logDebugGrammar(format string, v ...interface{}) {
 }
 %}
 
-%union { 
-s string 
+%union {
+s string
 n int
 f float64
 q Query}
 
 %token tSTRING tPHRASE tPLUS tMINUS tCOLON tBOOST tLPAREN tRPAREN tNUMBER tSTRING tGREATER tLESS
-tEQUAL tTILDE tTILDENUMBER
+tEQUAL tTILDE tTILDENUMBER tREGEXP tWILD
 
 %type <s>                tSTRING
+%type <s>                tWILD
+%type <s>                tREGEXP
 %type <s>                tPHRASE
 %type <s>                tNUMBER
 %type <s>                tTILDENUMBER
@@ -30,7 +32,7 @@ tEQUAL tTILDE tTILDENUMBER
 
 %%
 
-input: 
+input:
 searchParts {
 	logDebugGrammar("INPUT")
 };
@@ -88,6 +90,20 @@ tSTRING {
 	$$ = q
 }
 |
+tREGEXP {
+	str := $1
+	logDebugGrammar("REGEXP - %s", str)
+	q := NewRegexpQuery(str)
+	$$ = q
+}
+|
+tWILD {
+	str := $1
+	logDebugGrammar("WILDCARD - %s", str)
+	q := NewWildcardQuery(str)
+	$$ = q
+}
+|
 tSTRING tTILDE {
 	str := $1
 	logDebugGrammar("FUZZY STRING - %s", str)
@@ -122,6 +138,24 @@ tSTRING tCOLON tSTRING tTILDENUMBER {
 	logDebugGrammar("FIELD - %s FUZZY-%f STRING - %s", field, fuzziness, str)
 	q := NewMatchQuery(str)
 	q.SetFuzziness(int(fuzziness))
+	q.SetField(field)
+	$$ = q
+}
+|
+tSTRING tCOLON tREGEXP {
+	field := $1
+	str := $3
+	logDebugGrammar("FIELD - %s REGEXP - %s", field, str)
+	q := NewRegexpQuery(str)
+	q.SetField(field)
+	$$ = q
+}
+|
+tSTRING tCOLON tWILD {
+	field := $1
+	str := $3
+	logDebugGrammar("FIELD - %s WILD - %s", field, str)
+	q := NewWildcardQuery(str)
 	q.SetField(field)
 	$$ = q
 }
@@ -213,5 +247,5 @@ searchSuffix:
 }
 |
 searchBoost {
-	
+
 };
