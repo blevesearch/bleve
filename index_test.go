@@ -28,6 +28,7 @@ import (
 
 	"github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -1506,5 +1507,66 @@ func TestConfigCache(t *testing.T) {
 				t.Error(err)
 			}
 		}()
+	}
+}
+
+func TestBatchRaceBug260(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	i, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := i.NewBatch()
+	err = b.Index("1", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Batch(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.Reset()
+	err = b.Index("2", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Batch(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.Reset()
+}
+
+func BenchmarkBatchOverhead(b *testing.B) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+	m := NewIndexMapping()
+	i, err := NewUsing("testidx", m, Config.DefaultIndexType, null.Name, nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	for n := 0; n < b.N; n++ {
+		// put 1000 items in a batch
+		batch := i.NewBatch()
+		for i := 0; i < 1000; i++ {
+			err = batch.Index(fmt.Sprintf("%d", i), map[string]interface{}{"name": "bleve"})
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+		err = i.Batch(batch)
+		if err != nil {
+			b.Fatal(err)
+		}
+		batch.Reset()
 	}
 }

@@ -11,8 +11,6 @@ package firestorm
 
 import (
 	"encoding/json"
-	"fmt"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -23,8 +21,6 @@ import (
 )
 
 const Name = "firestorm"
-
-var UnsafeBatchUseDetected = fmt.Errorf("bleve.Batch is NOT thread-safe, modification after execution detected")
 
 type Firestorm struct {
 	highDocNumber uint64
@@ -312,20 +308,9 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 		}
 	}
 
-	var detectedUnsafeMutex sync.RWMutex
-	detectedUnsafe := false
-
 	go func() {
-		sofar := uint64(0)
 		for _, doc := range batch.IndexOps {
 			if doc != nil {
-				sofar++
-				if sofar > docsUpdated {
-					detectedUnsafeMutex.Lock()
-					detectedUnsafe = true
-					detectedUnsafeMutex.Unlock()
-					return
-				}
 				aw := index.NewAnalysisWork(f, doc, resultChan)
 				// put the work on the queue
 				f.analysisQueue.Queue(aw)
@@ -344,12 +329,6 @@ func (f *Firestorm) Batch(batch *index.Batch) (err error) {
 		itemsDeQueued++
 	}
 	close(resultChan)
-
-	detectedUnsafeMutex.RLock()
-	defer detectedUnsafeMutex.RUnlock()
-	if detectedUnsafe {
-		return UnsafeBatchUseDetected
-	}
 
 	atomic.AddUint64(&f.stats.analysisTime, uint64(time.Since(analysisStart)))
 
