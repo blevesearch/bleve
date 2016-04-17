@@ -10,6 +10,8 @@
 package bleve
 
 import (
+	"encoding/json"
+
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
@@ -50,4 +52,12 @@ func (q *matchNoneQuery) Field() string {
 
 func (q *matchNoneQuery) SetField(f string) Query {
 	return q
+}
+
+func (q *matchNoneQuery) MarshalJSON() ([]byte, error) {
+	tmp := map[string]interface{}{
+		"boost":      q.BoostVal,
+		"match_none": map[string]interface{}{},
+	}
+	return json.Marshal(tmp)
 }
