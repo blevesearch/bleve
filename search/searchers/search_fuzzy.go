@@ -32,36 +32,13 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string, prefix, fuzzin
 		}
 	}
 
-	// find the terms with this prefix
-	var fieldDict index.FieldDict
-	var err error
-	if len(prefixTerm) > 0 {
-		fieldDict, err = indexReader.FieldDictPrefix(field, []byte(prefixTerm))
-	} else {
-		fieldDict, err = indexReader.FieldDict(field)
-	}
-
-	// enumerate terms and check levenshtein distance
-	candidateTerms := make([]string, 0)
-	tfd, err := fieldDict.Next()
-	for err == nil && tfd != nil {
-		ld, exceeded := search.LevenshteinDistanceMax(&term, &tfd.Term, fuzziness)
-		if !exceeded && ld <= fuzziness {
-			candidateTerms = append(candidateTerms, tfd.Term)
-		}
-		tfd, err = fieldDict.Next()
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	err = fieldDict.Close()
+	candidateTerms, err := findFuzzyCandidateTerms(indexReader, &term, fuzziness, field, prefixTerm)
 	if err != nil {
 		return nil, err
 	}
 
 	// enumerate all the terms in the range
-	qsearchers := make([]search.Searcher, 0, 25)
+	qsearchers := make([]search.Searcher, 0, len(candidateTerms))
 
 	for _, cterm := range candidateTerms {
 		qsearcher, err := NewTermSearcher(indexReader, cterm, field, boost, explain)
@@ -87,6 +64,37 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string, prefix, fuzzin
 		searcher:    searcher,
 	}, nil
 }
+
+func findFuzzyCandidateTerms(indexReader index.IndexReader, term *string, fuzziness int, field, prefixTerm string) (rv []string, err error) {
+	rv = make([]string, 0)
+	var fieldDict index.FieldDict
+	if len(prefixTerm) > 0 {
+		fieldDict, err = indexReader.FieldDictPrefix(field, []byte(prefixTerm))
+	} else {
+		fieldDict, err = indexReader.FieldDict(field)
+	}
+	defer func() {
+		if cerr := fieldDict.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
+
+	// enumerate terms and check levenshtein distance
+	tfd, err := fieldDict.Next()
+	for err == nil && tfd != nil {
+		ld, exceeded := search.LevenshteinDistanceMax(term, &tfd.Term, fuzziness)
+		if !exceeded && ld <= fuzziness {
+			rv = append(rv, tfd.Term)
+			if tooManyClauses(len(rv)) {
+				return rv, tooManyClausesErr()
+			}
+		}
+		tfd, err = fieldDict.Next()
+	}
+
+	return rv, err
+}
+
 func (s *FuzzySearcher) Count() uint64 {
 	return s.searcher.Count()
 }

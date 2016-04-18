@@ -35,9 +35,20 @@ type DisjunctionSearcher struct {
 	min         float64
 }
 
+func tooManyClauses(count int) bool {
+	if DisjunctionMaxClauseCount != 0 && count > DisjunctionMaxClauseCount {
+		return true
+	}
+	return false
+}
+
+func tooManyClausesErr() error {
+	return fmt.Errorf("TooManyClauses[maxClauseCount is set to %d]", DisjunctionMaxClauseCount)
+}
+
 func NewDisjunctionSearcher(indexReader index.IndexReader, qsearchers []search.Searcher, min float64, explain bool) (*DisjunctionSearcher, error) {
-	if DisjunctionMaxClauseCount != 0 && len(qsearchers) > DisjunctionMaxClauseCount {
-		return nil, fmt.Errorf("TooManyClauses[maxClauseCount is set to %d]", DisjunctionMaxClauseCount)
+	if tooManyClauses(len(qsearchers)) {
+		return nil, tooManyClausesErr()
 	}
 	// build the downstream searchers
 	searchers := make(OrderedSearcherList, len(qsearchers))

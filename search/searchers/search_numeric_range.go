@@ -57,6 +57,9 @@ func NewNumericRangeSearcher(indexReader index.IndexReader, min *float64, max *f
 	// FIXME hard-coded precision, should match field declaration
 	termRanges := splitInt64Range(minInt64, maxInt64, 4)
 	terms := termRanges.Enumerate()
+	if tooManyClauses(len(terms)) {
+		return nil, tooManyClausesErr()
+	}
 	// enumerate all the terms in the range
 	qsearchers := make([]search.Searcher, len(terms))
 	for i, term := range terms {
