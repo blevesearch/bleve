@@ -12,6 +12,7 @@ package bleve
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/numeric_util"
@@ -20,36 +21,44 @@ import (
 )
 
 type dateRangeQuery struct {
-	Start          *string `json:"start,omitempty"`
-	End            *string `json:"end,omitempty"`
-	InclusiveStart *bool   `json:"inclusive_start,omitempty"`
-	InclusiveEnd   *bool   `json:"inclusive_end,omitempty"`
-	FieldVal       string  `json:"field,omitempty"`
-	BoostVal       float64 `json:"boost,omitempty"`
-	DateTimeParser *string `json:"datetime_parser,omitempty"`
+	Start          *time.Time `json:"start,omitempty"`
+	End            *time.Time `json:"end,omitempty"`
+	InclusiveStart *bool      `json:"inclusive_start,omitempty"`
+	InclusiveEnd   *bool      `json:"inclusive_end,omitempty"`
+	FieldVal       string     `json:"field,omitempty"`
+	BoostVal       float64    `json:"boost,omitempty"`
 }
 
 // NewDateRangeQuery creates a new Query for ranges
 // of date values.
-// A DateTimeParser is chosen based on the field.
-// Either, but not both endpoints can be nil.
-func NewDateRangeQuery(start, end *string) *dateRangeQuery {
-	return NewDateRangeInclusiveQuery(start, end, nil, nil)
+// The range matches time t as:  start >= t < end
+// That is, the lower bound inclusive, and the upper bound is exclusive.
+// Either, but not both endpoints can be the zero time, in which case the
+// range becomes a one-sided greater-than-or-equal or less-than comparison.
+func NewDateRangeQuery(start, end time.Time) *dateRangeQuery {
+	return NewDateRangeInclusiveQuery(start, end, true, false)
 }
 
 // NewDateRangeInclusiveQuery creates a new Query for ranges
 // of date values.
-// A DateTimeParser is chosen based on the field.
-// Either, but not both endpoints can be nil.
+// Either, but not both endpoints can be the zero time.
 // startInclusive and endInclusive control inclusion of the endpoints.
-func NewDateRangeInclusiveQuery(start, end *string, startInclusive, endInclusive *bool) *dateRangeQuery {
-	return &dateRangeQuery{
-		Start:          start,
-		End:            end,
-		InclusiveStart: startInclusive,
-		InclusiveEnd:   endInclusive,
-		BoostVal:       1.0,
+func NewDateRangeInclusiveQuery(start, end time.Time, startInclusive, endInclusive bool) *dateRangeQuery {
+
+	q := &dateRangeQuery{
+		BoostVal: 1.0,
 	}
+
+	if !start.IsZero() {
+		q.Start = &start
+		q.InclusiveStart = &startInclusive
+	}
+	if !end.IsZero() {
+		q.End = &end
+		q.InclusiveEnd = &endInclusive
+	}
+
+	return q
 }
 
 func (q *dateRangeQuery) Boost() float64 {
@@ -72,38 +81,19 @@ func (q *dateRangeQuery) SetField(f string) Query {
 
 func (q *dateRangeQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 
-	dateTimeParserName := ""
-	if q.DateTimeParser != nil {
-		dateTimeParserName = *q.DateTimeParser
-	} else {
-		dateTimeParserName = m.datetimeParserNameForPath(q.FieldVal)
-	}
-	dateTimeParser := m.dateTimeParserNamed(dateTimeParserName)
-	if dateTimeParser == nil {
-		return nil, fmt.Errorf("no datetime parser named '%s' registered", *q.DateTimeParser)
-	}
-
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultField
 	}
 
-	// now parse the endpoints
+	// use +/- infinity for missing endpoints
 	min := math.Inf(-1)
-	max := math.Inf(1)
-	if q.Start != nil && *q.Start != "" {
-		startTime, err := dateTimeParser.ParseDateTime(*q.Start)
-		if err != nil {
-			return nil, err
-		}
-		min = numeric_util.Int64ToFloat64(startTime.UnixNano())
+	if q.Start != nil {
+		min = numeric_util.Int64ToFloat64((*q.Start).UnixNano())
 	}
-	if q.End != nil && *q.End != "" {
-		endTime, err := dateTimeParser.ParseDateTime(*q.End)
-		if err != nil {
-			return nil, err
-		}
-		max = numeric_util.Int64ToFloat64(endTime.UnixNano())
+	max := math.Inf(1)
+	if q.End != nil {
+		max = numeric_util.Int64ToFloat64((*q.End).UnixNano())
 	}
 
 	return searchers.NewNumericRangeSearcher(i, &min, &max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal, explain)
