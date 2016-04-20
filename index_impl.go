@@ -51,12 +51,13 @@ func indexStorePath(path string) string {
 
 func newMemIndex(indexType string, mapping *IndexMapping) (*indexImpl, error) {
 	rv := indexImpl{
-		path:  "",
-		name:  "mem",
-		m:     mapping,
-		meta:  newIndexMeta(indexType, gtreap.Name, nil),
-		stats: &IndexStat{},
+		path: "",
+		name: "mem",
+		m:    mapping,
+		meta: newIndexMeta(indexType, gtreap.Name, nil),
 	}
+
+	rv.stats = &IndexStat{i: &rv}
 
 	// open the index
 	indexTypeConstructor := registry.IndexTypeConstructorByName(rv.meta.IndexType)
