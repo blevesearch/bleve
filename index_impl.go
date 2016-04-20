@@ -703,6 +703,8 @@ func (i *indexImpl) Close() error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
+	indexStats.UnRegister(i)
+
 	i.open = false
 	return i.i.Close()
 }
