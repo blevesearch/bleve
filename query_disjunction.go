@@ -81,6 +81,12 @@ func (q *disjunctionQuery) Validate() error {
 	if int(q.MinVal) > len(q.Disjuncts) {
 		return ErrorDisjunctionFewerThanMinClauses
 	}
+	for _, q := range q.Disjuncts {
+		err := q.Validate()
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -232,6 +232,46 @@ tSTRING tCOLON tLESS tEQUAL tNUMBER {
 	logDebugGrammar("FIELD - LESS THAN OR EQUAL %f", max)
 	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
 	$$ = q
+}
+|
+tSTRING tCOLON tGREATER tPHRASE {
+	field := $1
+	minInclusive := false
+	phrase := $4
+
+	logDebugGrammar("FIELD - GREATER THAN DATE %s", phrase)
+	q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil).SetField(field)
+	$$ = q
+}
+|
+tSTRING tCOLON tGREATER tEQUAL tPHRASE {
+	field := $1
+	minInclusive := true
+	phrase := $5
+
+	logDebugGrammar("FIELD - GREATER THAN OR EQUAL DATE %s", phrase)
+	q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil).SetField(field)
+	$$ = q
+}
+|
+tSTRING tCOLON tLESS tPHRASE {
+	field := $1
+	maxInclusive := false
+	phrase := $4
+
+	logDebugGrammar("FIELD - LESS THAN DATE %s", phrase)
+	q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive).SetField(field)
+	$$ = q
+}
+|
+tSTRING tCOLON tLESS tEQUAL tPHRASE {
+	field := $1
+	maxInclusive := true
+	phrase := $5
+
+	logDebugGrammar("FIELD - LESS THAN OR EQUAL DATE %s", phrase)
+	q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive).SetField(field)
+	$$ = q
 };
 
 searchBoost:

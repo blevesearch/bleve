@@ -74,57 +74,62 @@ var yyExca = [...]int{
 	-2, 5,
 }
 
-const yyNprod = 30
+const yyNprod = 34
 const yyPrivate = 57344
 
 var yyTokenNames []string
 var yyStates []string
 
-const yyLast = 36
+const yyLast = 40
 
 var yyAct = [...]int{
 
-	22, 26, 36, 10, 14, 29, 30, 35, 25, 27,
-	28, 13, 19, 33, 23, 24, 34, 11, 12, 31,
-	18, 20, 32, 21, 17, 6, 7, 2, 3, 1,
-	16, 8, 5, 4, 15, 9,
+	22, 26, 21, 10, 14, 29, 30, 17, 25, 27,
+	28, 13, 19, 3, 23, 24, 36, 11, 12, 1,
+	18, 20, 33, 34, 40, 16, 35, 38, 5, 31,
+	4, 39, 32, 2, 37, 6, 7, 8, 15, 9,
 }
 var yyPact = [...]int{
 
-	19, -1000, -1000, 19, -1, -1000, -1000, -1000, -1000, 15,
-	4, -1000, -1000, -1000, -1000, -1000, -1000, 11, -1000, -4,
-	-1000, -1000, -11, -1000, -1000, -1000, -1000, 7, 1, -1000,
-	-1000, -1000, -5, -1000, -10, -1000, -1000,
+	29, -1000, -1000, 29, -1, -1000, -1000, -1000, -1000, -2,
+	4, -1000, -1000, -1000, -1000, -1000, -1000, -10, -1000, -4,
+	-1000, -1000, -11, -1000, -1000, -1000, -1000, 17, 11, -1000,
+	-1000, -1000, 22, -1000, -1000, 19, -1000, -1000, -1000, -1000,
+	-1000,
 }
 var yyPgo = [...]int{
 
-	0, 35, 34, 33, 32, 30, 29, 27, 28,
+	0, 39, 38, 30, 28, 25, 19, 33, 13,
 }
 var yyR1 = [...]int{
 
 	0, 6, 7, 7, 8, 3, 3, 4, 4, 1,
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 5, 2, 2,
+	1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	1, 5, 2, 2,
 }
 var yyR2 = [...]int{
 
 	0, 1, 2, 1, 3, 0, 1, 1, 1, 1,
 	1, 1, 2, 4, 2, 4, 3, 3, 1, 1,
-	3, 3, 3, 4, 5, 4, 5, 2, 0, 1,
+	3, 3, 3, 4, 5, 4, 5, 4, 5, 4,
+	5, 2, 0, 1,
 }
 var yyChk = [...]int{
 
 	-1000, -6, -7, -8, -3, -4, 6, 7, -7, -1,
 	4, 18, 19, 12, 5, -2, -5, 9, 16, 8,
 	17, 12, 4, 18, 19, 12, 5, 13, 14, 16,
-	17, 12, 15, 12, 15, 12, 12,
+	17, 12, 15, 5, 12, 15, 5, 12, 5, 12,
+	5,
 }
 var yyDef = [...]int{
 
-	5, -2, 1, -2, 0, 6, 7, 8, 2, 28,
-	9, 10, 11, 18, 19, 4, 29, 0, 12, 0,
-	14, 27, 20, 16, 17, 21, 22, 0, 0, 13,
-	15, 23, 0, 25, 0, 24, 26,
+	5, -2, 1, -2, 0, 6, 7, 8, 2, 32,
+	9, 10, 11, 18, 19, 4, 33, 0, 12, 0,
+	14, 31, 20, 16, 17, 21, 22, 0, 0, 13,
+	15, 23, 0, 27, 25, 0, 29, 24, 28, 26,
+	30,
 }
 var yyTok1 = [...]int{
 
@@ -723,22 +728,70 @@ yydefault:
 			yyVAL.q = q
 		}
 	case 27:
+		yyDollar = yyS[yypt-4 : yypt+1]
+		//line query_string.y:237
+		{
+			field := yyDollar[1].s
+			minInclusive := false
+			phrase := yyDollar[4].s
+
+			logDebugGrammar("FIELD - GREATER THAN DATE %s", phrase)
+			q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil).SetField(field)
+			yyVAL.q = q
+		}
+	case 28:
+		yyDollar = yyS[yypt-5 : yypt+1]
+		//line query_string.y:247
+		{
+			field := yyDollar[1].s
+			minInclusive := true
+			phrase := yyDollar[5].s
+
+			logDebugGrammar("FIELD - GREATER THAN OR EQUAL DATE %s", phrase)
+			q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil).SetField(field)
+			yyVAL.q = q
+		}
+	case 29:
+		yyDollar = yyS[yypt-4 : yypt+1]
+		//line query_string.y:257
+		{
+			field := yyDollar[1].s
+			maxInclusive := false
+			phrase := yyDollar[4].s
+
+			logDebugGrammar("FIELD - LESS THAN DATE %s", phrase)
+			q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive).SetField(field)
+			yyVAL.q = q
+		}
+	case 30:
+		yyDollar = yyS[yypt-5 : yypt+1]
+		//line query_string.y:267
+		{
+			field := yyDollar[1].s
+			maxInclusive := true
+			phrase := yyDollar[5].s
+
+			logDebugGrammar("FIELD - LESS THAN OR EQUAL DATE %s", phrase)
+			q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive).SetField(field)
+			yyVAL.q = q
+		}
+	case 31:
 		yyDollar = yyS[yypt-2 : yypt+1]
-		//line query_string.y:238
+		//line query_string.y:278
 		{
 			boost, _ := strconv.ParseFloat(yyDollar[2].s, 64)
 			yyVAL.f = boost
 			logDebugGrammar("BOOST %f", boost)
 		}
-	case 28:
+	case 32:
 		yyDollar = yyS[yypt-0 : yypt+1]
-		//line query_string.y:245
+		//line query_string.y:285
 		{
 			yyVAL.f = 1.0
 		}
-	case 29:
+	case 33:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:249
+		//line query_string.y:289
 		{
 
 		}

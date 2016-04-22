@@ -18,6 +18,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 	fivePointOh := 5.0
 	theTruth := true
 	theFalsehood := false
+	theDate := "2006-01-02T15:04:05Z07:00"
 	tests := []struct {
 		input   string
 		result  Query
@@ -324,6 +325,46 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				},
 				nil),
 		},
+		{
+			input:   `field:>"2006-01-02T15:04:05Z07:00"`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewDateRangeInclusiveQuery(&theDate, nil, &theFalsehood, nil).SetField("field"),
+				},
+				nil),
+		},
+		{
+			input:   `field:>="2006-01-02T15:04:05Z07:00"`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewDateRangeInclusiveQuery(&theDate, nil, &theTruth, nil).SetField("field"),
+				},
+				nil),
+		},
+		{
+			input:   `field:<"2006-01-02T15:04:05Z07:00"`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewDateRangeInclusiveQuery(nil, &theDate, nil, &theFalsehood).SetField("field"),
+				},
+				nil),
+		},
+		{
+			input:   `field:<="2006-01-02T15:04:05Z07:00"`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewDateRangeInclusiveQuery(nil, &theDate, nil, &theTruth).SetField("field"),
+				},
+				nil),
+		},
 	}
 
 	// turn on lexer debugging
@@ -332,7 +373,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 
 	for _, test := range tests {
 
-		q, err := parseQuerySyntax(test.input, test.mapping)
+		q, err := parseQuerySyntax(test.input)
 		if err != nil {
 			t.Error(err)
 		}
@@ -365,7 +406,7 @@ func TestQuerySyntaxParserInvalid(t *testing.T) {
 	// logger = log.New(os.Stderr, "bleve", log.LstdFlags)
 
 	for _, test := range tests {
-		_, err := parseQuerySyntax(test.input, NewIndexMapping())
+		_, err := parseQuerySyntax(test.input)
 		if err == nil {
 			t.Errorf("expected error, got nil for `%s`", test.input)
 		}

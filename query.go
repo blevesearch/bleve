@@ -271,7 +271,7 @@ func expandQuery(m *IndexMapping, query Query) (Query, error) {
 		switch query.(type) {
 		case *queryStringQuery:
 			q := query.(*queryStringQuery)
-			parsed, err := parseQuerySyntax(q.Query, m)
+			parsed, err := parseQuerySyntax(q.Query)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse '%s': %s", q.Query, err)
 			}

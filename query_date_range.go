@@ -26,7 +26,6 @@ type dateRangeQuery struct {
 	InclusiveEnd   *bool   `json:"inclusive_end,omitempty"`
 	FieldVal       string  `json:"field,omitempty"`
 	BoostVal       float64 `json:"boost,omitempty"`
-	DateTimeParser *string `json:"datetime_parser,omitempty"`
 }
 
 // NewDateRangeQuery creates a new Query for ranges
@@ -72,20 +71,23 @@ func (q *dateRangeQuery) SetField(f string) Query {
 
 func (q *dateRangeQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
 
-	dateTimeParserName := ""
-	if q.DateTimeParser != nil {
-		dateTimeParserName = *q.DateTimeParser
-	} else {
-		dateTimeParserName = m.datetimeParserNameForPath(q.FieldVal)
-	}
-	dateTimeParser := m.dateTimeParserNamed(dateTimeParserName)
-	if dateTimeParser == nil {
-		return nil, fmt.Errorf("no datetime parser named '%s' registered", *q.DateTimeParser)
+	min, max, err := q.parseEndpoints()
+	if err != nil {
+		return nil, err
 	}
 
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultField
+	}
+
+	return searchers.NewNumericRangeSearcher(i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal, explain)
+}
+
+func (q *dateRangeQuery) parseEndpoints() (*float64, *float64, error) {
+	dateTimeParser, err := Config.Cache.DateTimeParserNamed(Config.QueryDateTimeParser)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	// now parse the endpoints
@@ -94,24 +96,28 @@ func (q *dateRangeQuery) Searcher(i index.IndexReader, m *IndexMapping, explain 
 	if q.Start != nil && *q.Start != "" {
 		startTime, err := dateTimeParser.ParseDateTime(*q.Start)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		min = numeric_util.Int64ToFloat64(startTime.UnixNano())
 	}
 	if q.End != nil && *q.End != "" {
 		endTime, err := dateTimeParser.ParseDateTime(*q.End)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		max = numeric_util.Int64ToFloat64(endTime.UnixNano())
 	}
 
-	return searchers.NewNumericRangeSearcher(i, &min, &max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal, explain)
+	return &min, &max, nil
 }
 
 func (q *dateRangeQuery) Validate() error {
 	if q.Start == nil && q.Start == q.End {
 		return fmt.Errorf("must specify start or end")
+	}
+	_, _, err := q.parseEndpoints()
+	if err != nil {
+		return err
 	}
 	return nil
 }

@@ -58,6 +58,12 @@ func (q *conjunctionQuery) Searcher(i index.IndexReader, m *IndexMapping, explai
 }
 
 func (q *conjunctionQuery) Validate() error {
+	for _, q := range q.Conjuncts {
+		err := q.Validate()
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

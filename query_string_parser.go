@@ -25,7 +25,7 @@ import (
 var debugParser bool
 var debugLexer bool
 
-func parseQuerySyntax(query string, mapping *IndexMapping) (rq Query, err error) {
+func parseQuerySyntax(query string) (rq Query, err error) {
 	lex := newLexerWrapper(newLexer(strings.NewReader(query)))
 	doParse(lex)
 
