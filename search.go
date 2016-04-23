@@ -80,6 +80,30 @@ type FacetRequest struct {
 	DateTimeRanges []*dateTimeRange `json:"date_ranges,omitempty"`
 }
 
+func (fr *FacetRequest) Validate() error {
+	if len(fr.NumericRanges) > 0 && len(fr.DateTimeRanges) > 0 {
+		return fmt.Errorf("facet can only conain numeric ranges or date ranges, not both")
+	}
+
+	nrNames := map[string]interface{}{}
+	for _, nr := range fr.NumericRanges {
+		if _, ok := nrNames[nr.Name]; ok {
+			return fmt.Errorf("numeric ranges contains duplicate name '%s'", nr.Name)
+		}
+		nrNames[nr.Name] = struct{}{}
+	}
+
+	drNames := map[string]interface{}{}
+	for _, dr := range fr.DateTimeRanges {
+		if _, ok := drNames[dr.Name]; ok {
+			return fmt.Errorf("date ranges contains duplicate name '%s'", dr.Name)
+		}
+		drNames[dr.Name] = struct{}{}
+	}
+
+	return nil
+}
+
 // NewFacetRequest creates a facet on the specified
 // field that limits the number of entries to the
 // specified size.
@@ -115,6 +139,16 @@ func (fr *FacetRequest) AddNumericRange(name string, min, max *float64) {
 // FacetsRequest groups together all the
 // FacetRequest objects for a single query.
 type FacetsRequest map[string]*FacetRequest
+
+func (fr FacetsRequest) Validate() error {
+	for _, v := range fr {
+		err := v.Validate()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // HighlightRequest describes how field matches
 // should be highlighted.
@@ -167,6 +201,15 @@ type SearchRequest struct {
 	Fields    []string          `json:"fields"`
 	Facets    FacetsRequest     `json:"facets"`
 	Explain   bool              `json:"explain"`
+}
+
+func (sr *SearchRequest) Validate() error {
+	err := sr.Query.Validate()
+	if err != nil {
+		return err
+	}
+
+	return sr.Facets.Validate()
 }
 
 // AddFacet adds a FacetRequest to this SearchRequest
