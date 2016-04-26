@@ -295,6 +295,18 @@ func (iem IndexErrMap) MarshalJSON() ([]byte, error) {
 	return json.Marshal(tmp)
 }
 
+func (iem IndexErrMap) UnmarshalJSON(data []byte) error {
+	var tmp map[string]string
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
+	}
+	for k, v := range tmp {
+		iem[k] = fmt.Errorf("%s", v)
+	}
+	return nil
+}
+
 // SearchStatus is a secion in the SearchResult reporting how many
 // underlying indexes were queried, how many were successful/failed
 // and a map of any errors that were encountered
