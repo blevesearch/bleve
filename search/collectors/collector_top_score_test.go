@@ -10,8 +10,6 @@
 package collectors
 
 import (
-	"math/rand"
-	"strconv"
 	"testing"
 
 	"golang.org/x/net/context"
@@ -225,27 +223,17 @@ func TestTop10ScoresSkip10(t *testing.T) {
 }
 
 func BenchmarkTop10of100000Scores(b *testing.B) {
+	benchHelper(10000, NewTopScorerCollector(10), b)
+}
 
-	matches := make(search.DocumentMatchCollection, 0, 100000)
-	for i := 0; i < 100000; i++ {
-		matches = append(matches, &search.DocumentMatch{
-			ID:    strconv.Itoa(i),
-			Score: rand.Float64(),
-		})
-	}
-	searcher := &stubSearcher{
-		matches: matches,
-	}
+func BenchmarkTop100of100000Scores(b *testing.B) {
+	benchHelper(10000, NewTopScorerCollector(100), b)
+}
 
-	collector := NewTopScorerCollector(10)
-	b.ResetTimer()
+func BenchmarkTop10of1000000Scores(b *testing.B) {
+	benchHelper(100000, NewTopScorerCollector(10), b)
+}
 
-	err := collector.Collect(context.Background(), searcher)
-	if err != nil {
-		b.Fatal(err)
-	}
-	res := collector.Results()
-	for _, dm := range res {
-		b.Logf("%s - %f\n", dm.ID, dm.Score)
-	}
+func BenchmarkTop100of1000000Scores(b *testing.B) {
+	benchHelper(100000, NewTopScorerCollector(100), b)
 }

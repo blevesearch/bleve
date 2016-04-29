@@ -28,6 +28,7 @@ import (
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/collectors"
 	"github.com/blevesearch/bleve/search/facets"
+	"github.com/blevesearch/bleve/search/highlight"
 )
 
 type indexImpl struct {
@@ -437,9 +438,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	hits := collector.Results()
 
+	var highlighter highlight.Highlighter
+
 	if req.Highlight != nil {
 		// get the right highlighter
-		highlighter, err := Config.Cache.HighlighterNamed(Config.DefaultHighlighter)
+		highlighter, err = Config.Cache.HighlighterNamed(Config.DefaultHighlighter)
 		if err != nil {
 			return nil, err
 		}
@@ -452,63 +455,54 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if highlighter == nil {
 			return nil, fmt.Errorf("no highlighter named `%s` registered", *req.Highlight.Style)
 		}
-
-		for _, hit := range hits {
-			doc, err := indexReader.Document(hit.ID)
-			if err == nil && doc != nil {
-				highlightFields := req.Highlight.Fields
-				if highlightFields == nil {
-					// add all fields with matches
-					highlightFields = make([]string, 0, len(hit.Locations))
-					for k := range hit.Locations {
-						highlightFields = append(highlightFields, k)
-					}
-				}
-
-				for _, hf := range highlightFields {
-					highlighter.BestFragmentsInField(hit, doc, hf, 1)
-				}
-			} else if err == nil {
-				// unexpected case, a doc ID that was found as a search hit
-				// was unable to be found during document lookup
-				return nil, ErrorIndexReadInconsistency
-			}
-		}
 	}
 
-	if len(req.Fields) > 0 {
-		for _, hit := range hits {
-			// FIXME avoid loading doc second time
-			// if we already loaded it for highlighting
+	for _, hit := range hits {
+		if len(req.Fields) > 0 || highlighter != nil {
 			doc, err := indexReader.Document(hit.ID)
 			if err == nil && doc != nil {
-				for _, f := range req.Fields {
-					for _, docF := range doc.Fields {
-						if f == "*" || docF.Name() == f {
-							var value interface{}
-							switch docF := docF.(type) {
-							case *document.TextField:
-								value = string(docF.Value())
-							case *document.NumericField:
-								num, err := docF.Number()
-								if err == nil {
-									value = num
+				if len(req.Fields) > 0 {
+					for _, f := range req.Fields {
+						for _, docF := range doc.Fields {
+							if f == "*" || docF.Name() == f {
+								var value interface{}
+								switch docF := docF.(type) {
+								case *document.TextField:
+									value = string(docF.Value())
+								case *document.NumericField:
+									num, err := docF.Number()
+									if err == nil {
+										value = num
+									}
+								case *document.DateTimeField:
+									datetime, err := docF.DateTime()
+									if err == nil {
+										value = datetime.Format(time.RFC3339)
+									}
+								case *document.BooleanField:
+									boolean, err := docF.Boolean()
+									if err == nil {
+										value = boolean
+									}
 								}
-							case *document.DateTimeField:
-								datetime, err := docF.DateTime()
-								if err == nil {
-									value = datetime.Format(time.RFC3339)
+								if value != nil {
+									hit.AddFieldValue(docF.Name(), value)
 								}
-							case *document.BooleanField:
-								boolean, err := docF.Boolean()
-								if err == nil {
-									value = boolean
-								}
-							}
-							if value != nil {
-								hit.AddFieldValue(docF.Name(), value)
 							}
 						}
+					}
+				}
+				if highlighter != nil {
+					highlightFields := req.Highlight.Fields
+					if highlightFields == nil {
+						// add all fields with matches
+						highlightFields = make([]string, 0, len(hit.Locations))
+						for k := range hit.Locations {
+							highlightFields = append(highlightFields, k)
+						}
+					}
+					for _, hf := range highlightFields {
+						highlighter.BestFragmentsInField(hit, doc, hf, 1)
 					}
 				}
 			} else if doc == nil {
@@ -517,9 +511,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				return nil, ErrorIndexReadInconsistency
 			}
 		}
-	}
-
-	for _, hit := range hits {
 		if i.name != "" {
 			hit.Index = i.name
 		}
