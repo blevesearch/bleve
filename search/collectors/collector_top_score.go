@@ -24,6 +24,7 @@ type TopScoreCollector struct {
 	results       *list.List
 	took          time.Duration
 	maxScore      float64
+	minScore      float64
 	total         uint64
 	facetsBuilder *search.FacetsBuilder
 }
@@ -98,6 +99,10 @@ func (tksc *TopScoreCollector) collectSingle(dm *search.DocumentMatch) {
 		tksc.maxScore = dm.Score
 	}
 
+	if dm.Score <= tksc.minScore {
+		return
+	}
+
 	for e := tksc.results.Front(); e != nil; e = e.Next() {
 		curr := e.Value.(*search.DocumentMatch)
 		if dm.Score < curr.Score {
@@ -106,7 +111,7 @@ func (tksc *TopScoreCollector) collectSingle(dm *search.DocumentMatch) {
 			// if we just made the list too long
 			if tksc.results.Len() > (tksc.k + tksc.skip) {
 				// remove the head
-				tksc.results.Remove(tksc.results.Front())
+				tksc.minScore = tksc.results.Remove(tksc.results.Front()).(*search.DocumentMatch).Score
 			}
 			return
 		}
@@ -115,7 +120,7 @@ func (tksc *TopScoreCollector) collectSingle(dm *search.DocumentMatch) {
 	tksc.results.PushBack(dm)
 	if tksc.results.Len() > (tksc.k + tksc.skip) {
 		// remove the head
-		tksc.results.Remove(tksc.results.Front())
+		tksc.minScore = tksc.results.Remove(tksc.results.Front()).(*search.DocumentMatch).Score
 	}
 }
 
