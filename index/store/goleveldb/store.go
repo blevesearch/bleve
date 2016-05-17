@@ -16,6 +16,7 @@ import (
 	"github.com/blevesearch/bleve/registry"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 const Name = "goleveldb"
@@ -75,6 +76,10 @@ func (ldbs *Store) Writer() (store.KVWriter, error) {
 	return &Writer{
 		store: ldbs,
 	}, nil
+}
+
+func (ldbs *Store) Compact() error {
+	return ldbs.db.CompactRange(util.Range{nil, nil})
 }
 
 func init() {
