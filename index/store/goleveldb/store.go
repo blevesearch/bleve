@@ -88,11 +88,11 @@ func (ldbs *Store) CompactWithBatchSize(batchSize int) error {
 	// workaround for github issue #374 - remove DictionaryTerm keys with count=0
 	batch := &leveldb.Batch{}
 	for {
-		iter := ldbs.db.NewIterator(util.BytesPrefix([]byte("d")), ldbs.defaultReadOptions)
 		t, err := ldbs.db.OpenTransaction()
 		if err != nil {
 			return err
 		}
+		iter := t.NewIterator(util.BytesPrefix([]byte("d")), ldbs.defaultReadOptions)
 
 		for iter.Next() {
 			if bytes.Equal(iter.Value(), []byte{0}) {
