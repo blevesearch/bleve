@@ -16,6 +16,7 @@ package moss
 
 import (
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/couchbase/moss"
@@ -32,12 +33,6 @@ func initLowerLevelStore(
 	lowerLevelMaxBatchSize uint64,
 	logf func(format string, a ...interface{}),
 ) (moss.Snapshot, moss.LowerLevelUpdate, store.KVStore, error) {
-	constructor := registry.KVStoreConstructorByName(lowerLevelStoreName)
-	if constructor == nil {
-		return nil, nil, nil, fmt.Errorf("moss store, initLowerLevelStore,"+
-			" could not find lower level store: %s", lowerLevelStoreName)
-	}
-
 	if lowerLevelStoreConfig == nil {
 		lowerLevelStoreConfig = map[string]interface{}{}
 	}
@@ -47,6 +42,16 @@ func initLowerLevelStore(
 		if !exists {
 			lowerLevelStoreConfig[k] = v
 		}
+	}
+
+	if lowerLevelStoreName == "mossStore" {
+		return InitMossStore(mo, lowerLevelStoreConfig)
+	}
+
+	constructor := registry.KVStoreConstructorByName(lowerLevelStoreName)
+	if constructor == nil {
+		return nil, nil, nil, fmt.Errorf("moss store, initLowerLevelStore,"+
+			" could not find lower level store: %s", lowerLevelStoreName)
 	}
 
 	kvStore, err := constructor(mo, lowerLevelStoreConfig)
@@ -400,5 +405,76 @@ func (lli *llIterator) Current() (key, val []byte, err error) {
 func (lli *llIterator) CurrentEx() (
 	entryEx moss.EntryEx, key, val []byte, err error) {
 	return moss.EntryEx{}, nil, nil, moss.ErrUnimplemented
+}
 
+// ------------------------------------------------
+
+func InitMossStore(mo store.MergeOperator, config map[string]interface{}) (
+	moss.Snapshot, moss.LowerLevelUpdate, store.KVStore, error) {
+	path, ok := config["path"].(string)
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("lower: missing path for InitMossStore config")
+	}
+
+	err := os.MkdirAll(path, 0700)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("lower: InitMossStore mkdir, path: %s, err: %v",
+			path, err)
+	}
+
+	s, err := moss.OpenStore(path, moss.StoreOptions{ // TODO: more options.
+		CollectionOptions: moss.CollectionOptions{
+			MergeOperator: mo,
+		},
+		CompactionPercentage: 0.0,
+	})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("lower: moss.OpenStore, path: %s, err: %v",
+			path, err)
+	}
+
+	sw := &mossStoreWrapper{s: s}
+
+	llUpdate := func(ssHigher moss.Snapshot) (moss.Snapshot, error) {
+		ss, err := sw.s.Persist(ssHigher, moss.StorePersistOptions{
+			CompactionConcern: moss.CompactionAllow,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		sw.AddRef() // Ref-count to be owned bysnapshot wrapper.
+
+		return moss.NewSnapshotWrapper(ss, sw), nil
+	}
+
+	llSnapshot, err := llUpdate(nil)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return llSnapshot, llUpdate, nil, nil
+}
+
+type mossStoreWrapper struct {
+	m    sync.Mutex
+	refs int
+	s    *moss.Store
+}
+
+func (w *mossStoreWrapper) AddRef() {
+	w.m.Lock()
+	w.refs++
+	w.m.Unlock()
+}
+
+func (w *mossStoreWrapper) Close() (err error) {
+	w.m.Lock()
+	w.refs--
+	if w.refs <= 0 {
+		err = w.s.Close()
+		w.s = nil
+	}
+	w.m.Unlock()
+	return err
 }

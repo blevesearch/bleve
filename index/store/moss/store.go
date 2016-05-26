@@ -70,13 +70,13 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 		b, err := json.Marshal(v) // Convert from map[string]interface{}.
 		if err != nil {
 			return nil, fmt.Errorf("moss store,"+
-				" could not marshal config[mossCollectionOptions]: %v", v)
+				" could not marshal config[mossCollectionOptions]: %v, err: %v", v, err)
 		}
 
 		err = json.Unmarshal(b, &options)
 		if err != nil {
 			return nil, fmt.Errorf("moss store,"+
-				" could not unmarshal config[mossCollectionOptions]: %v", v)
+				" could not unmarshal config[mossCollectionOptions]: %v, err: %v", v, err)
 		}
 	}
 
