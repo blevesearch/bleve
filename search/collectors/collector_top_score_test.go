@@ -222,6 +222,184 @@ func TestTop10ScoresSkip10(t *testing.T) {
 	}
 }
 
+func TestPaginationSameScores(t *testing.T) {
+
+	// a stub search with more than 10 matches
+	// all documents have the same score
+	searcher := &stubSearcher{
+		matches: search.DocumentMatchCollection{
+			&search.DocumentMatch{
+				ID:    "a",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "b",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "c",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "d",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "e",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "f",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "g",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "h",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "i",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "j",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "k",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "l",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "m",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "n",
+				Score: 5,
+			},
+		},
+	}
+
+	// first get first 5 hits
+	collector := NewTopScorerSkipCollector(5, 0)
+	err := collector.Collect(context.Background(), searcher)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	total := collector.Total()
+	if total != 14 {
+		t.Errorf("expected 14 total results, got %d", total)
+	}
+
+	results := collector.Results()
+
+	if len(results) != 5 {
+		t.Fatalf("expected 5 results, got %d", len(results))
+	}
+
+	firstResults := make(map[string]struct{})
+	for _, hit := range results {
+		firstResults[hit.ID] = struct{}{}
+	}
+
+	// a stub search with more than 10 matches
+	// all documents have the same score
+	searcher = &stubSearcher{
+		matches: search.DocumentMatchCollection{
+			&search.DocumentMatch{
+				ID:    "a",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "b",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "c",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "d",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "e",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "f",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "g",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "h",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "i",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "j",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "k",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "l",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "m",
+				Score: 5,
+			},
+			&search.DocumentMatch{
+				ID:    "n",
+				Score: 5,
+			},
+		},
+	}
+
+	// now get next 5 hits
+	collector = NewTopScorerSkipCollector(5, 5)
+	err = collector.Collect(context.Background(), searcher)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	total = collector.Total()
+	if total != 14 {
+		t.Errorf("expected 14 total results, got %d", total)
+	}
+
+	results = collector.Results()
+
+	if len(results) != 5 {
+		t.Fatalf("expected 5 results, got %d", len(results))
+	}
+
+	// make sure that none of these hits repeat ones we saw in the top 5
+	for _, hit := range results {
+		if _, ok := firstResults[hit.ID]; ok {
+			t.Errorf("doc ID %s is in top 5 and next 5 result sets", hit.ID)
+		}
+	}
+
+}
+
 func BenchmarkTop10of100000Scores(b *testing.B) {
 	benchHelper(10000, NewTopScorerCollector(10), b)
 }
