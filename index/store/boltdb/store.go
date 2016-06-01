@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	Name             = "boltdb"
-	defaultBatchSize = 100
+	Name                    = "boltdb"
+	defaultCompactBatchSize = 100
 )
 
 type Store struct {
@@ -143,7 +143,7 @@ func (bs *Store) CompactWithBatchSize(batchSize int) error {
 // Compact calls CompactWithBatchSize with a default batch size of 100.  This is a workaround
 // for github issue #374.
 func (bs *Store) Compact() error {
-	return bs.CompactWithBatchSize(defaultBatchSize)
+	return bs.CompactWithBatchSize(defaultCompactBatchSize)
 }
 
 func init() {
