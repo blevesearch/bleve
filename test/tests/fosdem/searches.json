@@ -12,17 +12,16 @@
 			"total_hits": 4,
 			"hits": [
 				{
-					"id": "3507@FOSDEM15@fosdem.org"
+					"id": "3492@FOSDEM15@fosdem.org"
+				},
+				{
+					"id": "3496@FOSDEM15@fosdem.org"
 				},
 				{
 					"id": "3505@FOSDEM15@fosdem.org"
 				},
 				{
-					"id": "3496@FOSDEM15@fosdem.org"
-				}
-				,
-				{
-					"id": "3492@FOSDEM15@fosdem.org"
+					"id": "3507@FOSDEM15@fosdem.org"
 				}
 			]
 		}
@@ -39,10 +38,10 @@
 			"total_hits": 2,
 			"hits": [
 				{
-					"id": "3505@FOSDEM15@fosdem.org"
+					"id": "3311@FOSDEM15@fosdem.org"
 				},
 				{
-					"id": "3311@FOSDEM15@fosdem.org"
+					"id": "3505@FOSDEM15@fosdem.org"
 				}
 			]
 		}
@@ -94,10 +93,10 @@
 			"total_hits": 2,
 			"hits": [
 				{
-					"id": "3496@FOSDEM15@fosdem.org"
+					"id": "3492@FOSDEM15@fosdem.org"
 				},
 				{
-					"id": "3492@FOSDEM15@fosdem.org"
+					"id": "3496@FOSDEM15@fosdem.org"
 				}
 			]
 		}

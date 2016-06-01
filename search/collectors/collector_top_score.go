@@ -105,7 +105,7 @@ func (tksc *TopScoreCollector) collectSingle(dm *search.DocumentMatch) {
 
 	for e := tksc.results.Front(); e != nil; e = e.Next() {
 		curr := e.Value.(*search.DocumentMatch)
-		if dm.Score < curr.Score {
+		if dm.Score <= curr.Score {
 
 			tksc.results.InsertBefore(dm, e)
 			// if we just made the list too long
