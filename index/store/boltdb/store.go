@@ -18,6 +18,7 @@
 package boltdb
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -26,7 +27,10 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-const Name = "boltdb"
+const (
+	Name             = "boltdb"
+	defaultBatchSize = 100
+)
 
 type Store struct {
 	path   string
@@ -100,6 +104,46 @@ func (bs *Store) Stats() json.Marshaler {
 	return &stats{
 		s: bs,
 	}
+}
+
+// CompactWithBatchSize removes DictionaryTerm entries with a count of zero (in batchSize batches), then
+// compacts the underlying boltdb store.  Removing entries is a workaround for github issue #374.
+func (bs *Store) CompactWithBatchSize(batchSize int) error {
+	for {
+		cnt := 0
+		err := bs.db.Batch(func(tx *bolt.Tx) error {
+			c := tx.Bucket([]byte(bs.bucket)).Cursor()
+			prefix := []byte("d")
+
+			for k, v := c.Seek(prefix); bytes.HasPrefix(k, prefix); k, v = c.Next() {
+				if bytes.Equal(v, []byte{0}) {
+					cnt++
+					if err := c.Delete(); err != nil {
+						return err
+					}
+					if cnt == batchSize {
+						break
+					}
+				}
+
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		if cnt == 0 {
+			break
+		}
+	}
+	return nil
+}
+
+// Compact compacts the underlying boltdb store.  The current implementation includes a workaround
+// for github issue #374 (see CompactWithBatchSize).
+func (bs *Store) Compact() error {
+	return bs.CompactWithBatchSize(defaultBatchSize)
 }
 
 func init() {
