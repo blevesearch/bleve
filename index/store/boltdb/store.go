@@ -106,8 +106,8 @@ func (bs *Store) Stats() json.Marshaler {
 	}
 }
 
-// CompactWithBatchSize removes DictionaryTerm entries with a count of zero (in batchSize batches), then
-// compacts the underlying boltdb store.  Removing entries is a workaround for github issue #374.
+// CompactWithBatchSize removes DictionaryTerm entries with a count of zero (in batchSize batches)
+// Removing entries is a workaround for github issue #374.
 func (bs *Store) CompactWithBatchSize(batchSize int) error {
 	for {
 		cnt := 0
@@ -140,8 +140,8 @@ func (bs *Store) CompactWithBatchSize(batchSize int) error {
 	return nil
 }
 
-// Compact compacts the underlying boltdb store.  The current implementation includes a workaround
-// for github issue #374 (see CompactWithBatchSize).
+// Compact calls CompactWithBatchSize with a default batch size of 100.  This is a workaround
+// for github issue #374.
 func (bs *Store) Compact() error {
 	return bs.CompactWithBatchSize(defaultBatchSize)
 }
