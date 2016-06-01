@@ -10,6 +10,7 @@
 package goleveldb
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/blevesearch/bleve/index/store"
@@ -19,7 +20,10 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
-const Name = "goleveldb"
+const (
+	Name             = "goleveldb"
+	defaultBatchSize = 250
+)
 
 type Store struct {
 	path string
@@ -78,8 +82,57 @@ func (ldbs *Store) Writer() (store.KVWriter, error) {
 	}, nil
 }
 
-func (ldbs *Store) Compact() error {
+// CompactWithBatchSize removes DictionaryTerm entries with a count of zero (in batchSize batches), then
+// compacts the underlying goleveldb store.  Removing entries is a workaround for github issue #374.
+func (ldbs *Store) CompactWithBatchSize(batchSize int) error {
+	// workaround for github issue #374 - remove DictionaryTerm keys with count=0
+	batch := &leveldb.Batch{}
+	for {
+		t, err := ldbs.db.OpenTransaction()
+		if err != nil {
+			return err
+		}
+		iter := t.NewIterator(util.BytesPrefix([]byte("d")), ldbs.defaultReadOptions)
+
+		for iter.Next() {
+			if bytes.Equal(iter.Value(), []byte{0}) {
+				k := append([]byte{}, iter.Key()...)
+				batch.Delete(k)
+			}
+			if batch.Len() == batchSize {
+				break
+			}
+		}
+		iter.Release()
+		if iter.Error() != nil {
+			t.Discard()
+			return iter.Error()
+		}
+
+		if batch.Len() > 0 {
+			err := t.Write(batch, ldbs.defaultWriteOptions)
+			if err != nil {
+				t.Discard()
+				return err
+			}
+			err = t.Commit()
+			if err != nil {
+				return err
+			}
+		} else {
+			t.Discard()
+			break
+		}
+		batch.Reset()
+	}
+
 	return ldbs.db.CompactRange(util.Range{nil, nil})
+}
+
+// Compact compacts the underlying goleveldb store.  The current implementation includes a workaround
+// for github issue #374 (see CompactWithBatchSize).
+func (ldbs *Store) Compact() error {
+	return ldbs.CompactWithBatchSize(defaultBatchSize)
 }
 
 func init() {
