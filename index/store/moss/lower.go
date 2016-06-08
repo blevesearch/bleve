@@ -15,6 +15,7 @@
 package moss
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"sync"
@@ -26,12 +27,11 @@ import (
 )
 
 func initLowerLevelStore(
-	mo store.MergeOperator,
 	config map[string]interface{},
 	lowerLevelStoreName string,
 	lowerLevelStoreConfig map[string]interface{},
 	lowerLevelMaxBatchSize uint64,
-	logf func(format string, a ...interface{}),
+	options moss.CollectionOptions,
 ) (moss.Snapshot, moss.LowerLevelUpdate, store.KVStore, error) {
 	if lowerLevelStoreConfig == nil {
 		lowerLevelStoreConfig = map[string]interface{}{}
@@ -45,7 +45,7 @@ func initLowerLevelStore(
 	}
 
 	if lowerLevelStoreName == "mossStore" {
-		return InitMossStore(mo, lowerLevelStoreConfig)
+		return InitMossStore(lowerLevelStoreConfig, options)
 	}
 
 	constructor := registry.KVStoreConstructorByName(lowerLevelStoreName)
@@ -54,7 +54,7 @@ func initLowerLevelStore(
 			" could not find lower level store: %s", lowerLevelStoreName)
 	}
 
-	kvStore, err := constructor(mo, lowerLevelStoreConfig)
+	kvStore, err := constructor(options.MergeOperator, lowerLevelStoreConfig)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -64,7 +64,7 @@ func initLowerLevelStore(
 		config:   config,
 		llConfig: lowerLevelStoreConfig,
 		kvStore:  kvStore,
-		logf:     logf,
+		logf:     options.Log,
 	}
 
 	llUpdate := func(ssHigher moss.Snapshot) (ssLower moss.Snapshot, err error) {
@@ -409,7 +409,7 @@ func (lli *llIterator) CurrentEx() (
 
 // ------------------------------------------------
 
-func InitMossStore(mo store.MergeOperator, config map[string]interface{}) (
+func InitMossStore(config map[string]interface{}, options moss.CollectionOptions) (
 	moss.Snapshot, moss.LowerLevelUpdate, store.KVStore, error) {
 	path, ok := config["path"].(string)
 	if !ok {
@@ -422,12 +422,23 @@ func InitMossStore(mo store.MergeOperator, config map[string]interface{}) (
 			path, err)
 	}
 
-	s, err := moss.OpenStore(path, moss.StoreOptions{ // TODO: more options.
-		CollectionOptions: moss.CollectionOptions{
-			MergeOperator: mo,
-		},
-		CompactionPercentage: 0.0,
-	})
+	storeOptions := moss.StoreOptions{
+		CollectionOptions: options,
+	}
+	v, ok := config["mossStoreOptions"]
+	if ok {
+		b, err := json.Marshal(v) // Convert from map[string]interface{}.
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		err = json.Unmarshal(b, &storeOptions)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	}
+
+	s, err := moss.OpenStore(path, storeOptions)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("lower: moss.OpenStore, path: %s, err: %v",
 			path, err)
@@ -443,7 +454,7 @@ func InitMossStore(mo store.MergeOperator, config map[string]interface{}) (
 			return nil, err
 		}
 
-		sw.AddRef() // Ref-count to be owned bysnapshot wrapper.
+		sw.AddRef() // Ref-count to be owned by snapshot wrapper.
 
 		return moss.NewSnapshotWrapper(ss, sw), nil
 	}

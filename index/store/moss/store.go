@@ -65,6 +65,9 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 		}
 	}
 
+	options.MergeOperator = mo
+	options.DeferredSort = true
+
 	v, ok = config["mossCollectionOptions"]
 	if ok {
 		b, err := json.Marshal(v) // Convert from map[string]interface{}.
@@ -125,11 +128,11 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 		}
 
 		lowerLevelInit, lowerLevelUpdate, lowerLevelStore, err :=
-			initLowerLevelStore(mo, config,
+			initLowerLevelStore(config,
 				mossLowerLevelStoreName,
 				mossLowerLevelStoreConfig,
 				mossLowerLevelMaxBatchSize,
-				options.Log)
+				options)
 		if err != nil {
 			return nil, err
 		}
@@ -140,8 +143,6 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 	}
 
 	// --------------------------------------------------
-
-	options.MergeOperator = mo
 
 	ms, err := moss.NewCollection(options)
 	if err != nil {
