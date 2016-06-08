@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	Name             = "goleveldb"
-	defaultBatchSize = 250
+	Name                    = "goleveldb"
+	defaultCompactBatchSize = 250
 )
 
 type Store struct {
@@ -132,7 +132,7 @@ func (ldbs *Store) CompactWithBatchSize(batchSize int) error {
 // Compact compacts the underlying goleveldb store.  The current implementation includes a workaround
 // for github issue #374 (see CompactWithBatchSize).
 func (ldbs *Store) Compact() error {
-	return ldbs.CompactWithBatchSize(defaultBatchSize)
+	return ldbs.CompactWithBatchSize(defaultCompactBatchSize)
 }
 
 func init() {
