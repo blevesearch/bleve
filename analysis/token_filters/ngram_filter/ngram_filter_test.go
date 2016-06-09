@@ -130,3 +130,58 @@ func TestNgramFilter(t *testing.T) {
 		}
 	}
 }
+
+func TestConversionInt(t *testing.T) {
+	config := map[string]interface{}{
+		"type": Name,
+		"min":  3,
+		"max":  8,
+	}
+
+	f, err := NgramFilterConstructor(config, nil)
+
+	if err != nil {
+		t.Errorf("Failed to construct the ngram filter: %v", err)
+	}
+
+	ngram := f.(*NgramFilter)
+	if ngram.minLength != 3 && ngram.maxLength != 8 {
+		t.Errorf("Failed to construct the bounds. Got %v and %v.", ngram.minLength, ngram.maxLength)
+	}
+}
+
+func TestConversionFloat(t *testing.T) {
+	config := map[string]interface{}{
+		"type": Name,
+		"min":  float64(3),
+		"max":  float64(8),
+	}
+
+	f, err := NgramFilterConstructor(config, nil)
+
+	if err != nil {
+		t.Errorf("Failed to construct the ngram filter: %v", err)
+	}
+
+	ngram := f.(*NgramFilter)
+	if ngram.minLength != 3 && ngram.maxLength != 8 {
+		t.Errorf("Failed to construct the bounds. Got %v and %v.", ngram.minLength, ngram.maxLength)
+	}
+}
+
+func TestBadConversion(t *testing.T) {
+	config := map[string]interface{}{
+		"type": Name,
+		"min":  "3",
+	}
+
+	_, err := NgramFilterConstructor(config, nil)
+
+	if err == nil {
+		t.Errorf("Expected conversion error.")
+	}
+
+	if err.Error() != "failed to convert to int value" {
+		t.Errorf("Wrong error recevied. Got %v.", err)
+	}
+}
