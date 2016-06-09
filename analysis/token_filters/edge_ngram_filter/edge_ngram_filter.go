@@ -51,7 +51,7 @@ func (s *EdgeNgramFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
 			for ngramSize := s.minLength; ngramSize <= s.maxLength; ngramSize++ {
 				// build an ngram of this size starting at i
 				if i-ngramSize > 0 {
-					ngramTerm := buildTermFromRunes(runes[i-ngramSize : i])
+					ngramTerm := analysis.BuildTermFromRunes(runes[i-ngramSize : i])
 					token := analysis.Token{
 						Position: token.Position,
 						Start:    token.Start,
@@ -68,7 +68,7 @@ func (s *EdgeNgramFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
 			for ngramSize := s.minLength; ngramSize <= s.maxLength; ngramSize++ {
 				// build an ngram of this size starting at i
 				if i+ngramSize <= runeCount {
-					ngramTerm := buildTermFromRunes(runes[i : i+ngramSize])
+					ngramTerm := analysis.BuildTermFromRunes(runes[i : i+ngramSize])
 					token := analysis.Token{
 						Position: token.Position,
 						Start:    token.Start,
@@ -82,16 +82,6 @@ func (s *EdgeNgramFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
 		}
 	}
 
-	return rv
-}
-
-func buildTermFromRunes(runes []rune) []byte {
-	rv := make([]byte, 0, len(runes)*4)
-	for _, r := range runes {
-		runeBytes := make([]byte, utf8.RuneLen(r))
-		utf8.EncodeRune(runeBytes, r)
-		rv = append(rv, runeBytes...)
-	}
 	return rv
 }
 
