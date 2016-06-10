@@ -164,35 +164,35 @@ func TestCJKAnalyzer(t *testing.T) {
 				&analysis.Token{
 					Term:     []byte("五六"),
 					Type:     analysis.Double,
-					Position: 5,
+					Position: 4,
 					Start:    14,
 					End:      20,
 				},
 				&analysis.Token{
 					Term:     []byte("六七"),
 					Type:     analysis.Double,
-					Position: 6,
+					Position: 5,
 					Start:    17,
 					End:      23,
 				},
 				&analysis.Token{
 					Term:     []byte("七八"),
 					Type:     analysis.Double,
-					Position: 7,
+					Position: 6,
 					Start:    20,
 					End:      26,
 				},
 				&analysis.Token{
 					Term:     []byte("八九"),
 					Type:     analysis.Double,
-					Position: 8,
+					Position: 7,
 					Start:    23,
 					End:      29,
 				},
 				&analysis.Token{
 					Term:     []byte("十"),
 					Type:     analysis.Single,
-					Position: 10,
+					Position: 8,
 					Start:    30,
 					End:      33,
 				},
@@ -306,7 +306,7 @@ func TestCJKAnalyzer(t *testing.T) {
 				&analysis.Token{
 					Term:     []byte("test"),
 					Type:     analysis.AlphaNumeric,
-					Position: 3,
+					Position: 2,
 					Start:    6,
 					End:      10,
 				},
@@ -365,35 +365,35 @@ func TestCJKAnalyzer(t *testing.T) {
 				&analysis.Token{
 					Term:     []byte("abc"),
 					Type:     analysis.AlphaNumeric,
-					Position: 6,
+					Position: 5,
 					Start:    15,
 					End:      18,
 				},
 				&analysis.Token{
 					Term:     []byte("かき"),
 					Type:     analysis.Double,
-					Position: 7,
+					Position: 6,
 					Start:    18,
 					End:      24,
 				},
 				&analysis.Token{
 					Term:     []byte("きく"),
 					Type:     analysis.Double,
-					Position: 8,
+					Position: 7,
 					Start:    21,
 					End:      27,
 				},
 				&analysis.Token{
 					Term:     []byte("くけ"),
 					Type:     analysis.Double,
-					Position: 9,
+					Position: 8,
 					Start:    24,
 					End:      30,
 				},
 				&analysis.Token{
 					Term:     []byte("けこ"),
 					Type:     analysis.Double,
-					Position: 10,
+					Position: 9,
 					Start:    27,
 					End:      33,
 				},
@@ -433,49 +433,49 @@ func TestCJKAnalyzer(t *testing.T) {
 				&analysis.Token{
 					Term:     []byte("ab"),
 					Type:     analysis.AlphaNumeric,
-					Position: 6,
+					Position: 5,
 					Start:    15,
 					End:      17,
 				},
 				&analysis.Token{
 					Term:     []byte("ん"),
 					Type:     analysis.Single,
-					Position: 7,
+					Position: 6,
 					Start:    17,
 					End:      20,
 				},
 				&analysis.Token{
 					Term:     []byte("c"),
 					Type:     analysis.AlphaNumeric,
-					Position: 8,
+					Position: 7,
 					Start:    20,
 					End:      21,
 				},
 				&analysis.Token{
 					Term:     []byte("かき"),
 					Type:     analysis.Double,
-					Position: 9,
+					Position: 8,
 					Start:    21,
 					End:      27,
 				},
 				&analysis.Token{
 					Term:     []byte("きく"),
 					Type:     analysis.Double,
-					Position: 10,
+					Position: 9,
 					Start:    24,
 					End:      30,
 				},
 				&analysis.Token{
 					Term:     []byte("くけ"),
 					Type:     analysis.Double,
-					Position: 11,
+					Position: 10,
 					Start:    27,
 					End:      33,
 				},
 				&analysis.Token{
 					Term:     []byte("こ"),
 					Type:     analysis.Single,
-					Position: 13,
+					Position: 11,
 					Start:    34,
 					End:      37,
 				},
@@ -618,3 +618,20 @@ func TestCJKAnalyzer(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkCJKAnalyzer(b *testing.B) {
+	cache := registry.NewCache()
+	analyzer, err := cache.AnalyzerNamed(AnalyzerName)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	for i := 0; i < b.N; i++ {
+		ts := analyzer.Analyze(bleveWikiArticleJapanese)
+	}
+}
+
+var bleveWikiArticleJapanese = []byte(`加圧容器に貯蔵されている液体物質は、その時の気液平衡状態にあるが、火災により容器が加熱されていると容器内の液体は、その物質の大気圧のもとでの沸点より十分に高い温度まで加熱され、圧力も高くなる。この状態で容器が破裂すると容器内部の圧力は瞬間的に大気圧にまで低下する。
+この時に容器内の平衡状態が破られ、液体は突沸し、気体になることで爆発現象を起こす。液化石油ガスなどでは、さらに拡散して空気と混ざったガスが自由空間蒸気雲爆発を起こす。液化石油ガスなどの常温常圧で気体になる物を高い圧力で液化して収納している容器、あるいは、そのような液体を輸送するためのパイプラインや配管などが火災などによって破壊されたときに起きる。
+ブリーブという現象が明らかになったのは、フランス・リヨンの郊外にあるフェザンという町のフェザン製油所（ウニオン・ド・ゼネラル・ド・ペトロール）で大規模な爆発火災事故が発生したときだと言われている。
+中身の液体が高温高圧の水である場合には「水蒸気爆発」と呼ばれる。`)

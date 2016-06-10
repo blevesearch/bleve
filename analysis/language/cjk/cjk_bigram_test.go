@@ -23,6 +23,7 @@ func TestCJKBigramFilter(t *testing.T) {
 		input         analysis.TokenStream
 		output        analysis.TokenStream
 	}{
+		// first test that non-adjacent terms are not combined
 		{
 			outputUnigram: false,
 			input: analysis.TokenStream{
@@ -38,7 +39,7 @@ func TestCJKBigramFilter(t *testing.T) {
 					Type:     analysis.Ideographic,
 					Position: 2,
 					Start:    5,
-					End:      7,
+					End:      8,
 				},
 			},
 			output: analysis.TokenStream{
@@ -54,7 +55,7 @@ func TestCJKBigramFilter(t *testing.T) {
 					Type:     analysis.Single,
 					Position: 2,
 					Start:    5,
-					End:      7,
+					End:      8,
 				},
 			},
 		},
@@ -395,16 +396,65 @@ func TestCJKBigramFilter(t *testing.T) {
 				&analysis.Token{
 					Term:     []byte("cat"),
 					Type:     analysis.AlphaNumeric,
-					Position: 6,
+					Position: 5,
 					Start:    12,
 					End:      15,
 				},
 				&analysis.Token{
 					Term:     []byte("世界"),
 					Type:     analysis.Double,
-					Position: 7,
+					Position: 6,
 					Start:    18,
 					End:      24,
+				},
+			},
+		},
+		{
+			outputUnigram: false,
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term:     []byte("パイプライン"),
+					Type:     analysis.Ideographic,
+					Position: 1,
+					Start:    0,
+					End:      18,
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term:     []byte("パイ"),
+					Type:     analysis.Double,
+					Position: 1,
+					Start:    0,
+					End:      6,
+				},
+				&analysis.Token{
+					Term:     []byte("イプ"),
+					Type:     analysis.Double,
+					Position: 2,
+					Start:    3,
+					End:      9,
+				},
+				&analysis.Token{
+					Term:     []byte("プラ"),
+					Type:     analysis.Double,
+					Position: 3,
+					Start:    6,
+					End:      12,
+				},
+				&analysis.Token{
+					Term:     []byte("ライ"),
+					Type:     analysis.Double,
+					Position: 4,
+					Start:    9,
+					End:      15,
+				},
+				&analysis.Token{
+					Term:     []byte("イン"),
+					Type:     analysis.Double,
+					Position: 5,
+					Start:    12,
+					End:      18,
 				},
 			},
 		},

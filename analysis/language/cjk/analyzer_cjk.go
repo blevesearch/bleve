@@ -14,18 +14,20 @@ import (
 	"github.com/blevesearch/bleve/registry"
 
 	"github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
-	"github.com/blevesearch/bleve/analysis/token_filters/unicode_normalize"
-	"github.com/blevesearch/bleve/analysis/tokenizers/whitespace_tokenizer"
+	"github.com/blevesearch/bleve/analysis/tokenizers/unicode"
 )
 
 const AnalyzerName = "cjk"
 
 func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
-	whitespaceTokenizer, err := cache.TokenizerNamed(whitespace_tokenizer.Name)
+	whitespaceTokenizer, err := cache.TokenizerNamed(unicode.Name)
 	if err != nil {
 		return nil, err
 	}
-	normalizeFilter := unicode_normalize.MustNewUnicodeNormalizeFilter(unicode_normalize.NFKD)
+	widthFilter, err := cache.TokenFilterNamed(WidthName)
+	if err != nil {
+		return nil, err
+	}
 	toLowerFilter, err := cache.TokenFilterNamed(lower_case_filter.Name)
 	if err != nil {
 		return nil, err
@@ -37,7 +39,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	rv := analysis.Analyzer{
 		Tokenizer: whitespaceTokenizer,
 		TokenFilters: []analysis.TokenFilter{
-			normalizeFilter,
+			widthFilter,
 			toLowerFilter,
 			bigramFilter,
 		},
