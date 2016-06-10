@@ -10,19 +10,21 @@
 package whitespace_tokenizer
 
 import (
-	"regexp"
+	"unicode"
 
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/tokenizers/regexp_tokenizer"
+	"github.com/blevesearch/bleve/analysis/tokenizers/character"
 	"github.com/blevesearch/bleve/registry"
 )
 
 const Name = "whitespace"
 
-var whitespaceTokenizerRegexp = regexp.MustCompile(`\p{Han}|\p{Hangul}|\p{Hiragana}|\p{Katakana}|[^\p{Z}\p{P}\p{C}\p{Han}\p{Hangul}\p{Hiragana}\p{Katakana}]+`)
-
 func TokenizerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.Tokenizer, error) {
-	return regexp_tokenizer.NewRegexpTokenizer(whitespaceTokenizerRegexp), nil
+	return character.NewCharacterTokenizer(notSpace), nil
+}
+
+func notSpace(r rune) bool {
+	return !unicode.IsSpace(r)
 }
 
 func init() {

@@ -14,7 +14,7 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/tokenizers/regexp_tokenizer"
+	"github.com/blevesearch/bleve/analysis/tokenizers/character"
 )
 
 func TestBoundary(t *testing.T) {
@@ -35,8 +35,8 @@ func TestBoundary(t *testing.T) {
 				},
 				{
 					Start:    6,
-					End:      11,
-					Term:     []byte("World"),
+					End:      12,
+					Term:     []byte("World."),
 					Position: 2,
 					Type:     analysis.AlphaNumeric,
 				},
@@ -47,52 +47,10 @@ func TestBoundary(t *testing.T) {
 			analysis.TokenStream{
 				{
 					Start:    0,
-					End:      3,
-					Term:     []byte("こ"),
-					Position: 1,
-					Type:     analysis.Ideographic,
-				},
-				{
-					Start:    3,
-					End:      6,
-					Term:     []byte("ん"),
-					Position: 2,
-					Type:     analysis.Ideographic,
-				},
-				{
-					Start:    6,
-					End:      9,
-					Term:     []byte("に"),
-					Position: 3,
-					Type:     analysis.Ideographic,
-				},
-				{
-					Start:    9,
-					End:      12,
-					Term:     []byte("ち"),
-					Position: 4,
-					Type:     analysis.Ideographic,
-				},
-				{
-					Start:    12,
-					End:      15,
-					Term:     []byte("は"),
-					Position: 5,
-					Type:     analysis.Ideographic,
-				},
-				{
-					Start:    15,
-					End:      18,
-					Term:     []byte("世"),
-					Position: 6,
-					Type:     analysis.Ideographic,
-				},
-				{
-					Start:    18,
 					End:      21,
-					Term:     []byte("界"),
-					Position: 7,
-					Type:     analysis.Ideographic,
+					Term:     []byte("こんにちは世界"),
+					Position: 1,
+					Type:     analysis.AlphaNumeric,
 				},
 			},
 		},
@@ -105,24 +63,17 @@ func TestBoundary(t *testing.T) {
 			analysis.TokenStream{
 				{
 					Start:    0,
-					End:      3,
-					Term:     []byte("abc"),
+					End:      6,
+					Term:     []byte("abc界"),
 					Position: 1,
 					Type:     analysis.AlphaNumeric,
-				},
-				{
-					Start:    3,
-					End:      6,
-					Term:     []byte("界"),
-					Position: 2,
-					Type:     analysis.Ideographic,
 				},
 			},
 		},
 	}
 
 	for _, test := range tests {
-		tokenizer := regexp_tokenizer.NewRegexpTokenizer(whitespaceTokenizerRegexp)
+		tokenizer := character.NewCharacterTokenizer(notSpace)
 		actual := tokenizer.Tokenize(test.input)
 
 		if !reflect.DeepEqual(actual, test.output) {
@@ -140,7 +91,7 @@ If the pressurized vessel, containing liquid at high temperature (which may be r
 
 func BenchmarkTokenizeEnglishText(b *testing.B) {
 
-	tokenizer := regexp_tokenizer.NewRegexpTokenizer(whitespaceTokenizerRegexp)
+	tokenizer := character.NewCharacterTokenizer(notSpace)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
