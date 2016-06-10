@@ -627,7 +627,7 @@ func BenchmarkCJKAnalyzer(b *testing.B) {
 	}
 
 	for i := 0; i < b.N; i++ {
-		ts := analyzer.Analyze(bleveWikiArticleJapanese)
+		analyzer.Analyze(bleveWikiArticleJapanese)
 	}
 }
 
