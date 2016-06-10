@@ -62,7 +62,7 @@ index specified by -index.
 	if *countOnly {
 		count, err := index.DocCount()
 		if err != nil {
-			log.Fatal("error getting doc count: %v", err)
+			log.Fatalf("error getting doc count: %v", err)
 		}
 		fmt.Printf("doc count: %d\n", count)
 		return
