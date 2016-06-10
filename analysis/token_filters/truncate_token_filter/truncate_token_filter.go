@@ -10,7 +10,6 @@
 package truncate_token_filter
 
 import (
-	"bytes"
 	"fmt"
 	"unicode/utf8"
 
@@ -34,14 +33,7 @@ func (s *TruncateTokenFilter) Filter(input analysis.TokenStream) analysis.TokenS
 	for _, token := range input {
 		wordLen := utf8.RuneCount(token.Term)
 		if wordLen > s.length {
-			runes := bytes.Runes(token.Term)[0:s.length]
-			newterm := make([]byte, 0, s.length*4)
-			for _, r := range runes {
-				runeBytes := make([]byte, utf8.RuneLen(r))
-				utf8.EncodeRune(runeBytes, r)
-				newterm = append(newterm, runeBytes...)
-			}
-			token.Term = newterm
+			token.Term = analysis.TruncateRunes(token.Term, wordLen-s.length)
 		}
 	}
 	return input

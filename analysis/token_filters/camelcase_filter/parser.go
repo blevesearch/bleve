@@ -1,26 +1,13 @@
 package camelcase_filter
 
 import (
-	"unicode/utf8"
-
 	"github.com/blevesearch/bleve/analysis"
 )
 
 func buildTokenFromTerm(buffer []rune) *analysis.Token {
 	return &analysis.Token{
-		Term: buildTermFromRunes(buffer),
+		Term: analysis.BuildTermFromRunes(buffer),
 	}
-}
-
-// TODO: Lifted from ngram_filter. Expose as public and re-use?
-func buildTermFromRunes(runes []rune) []byte {
-	rv := make([]byte, 0, len(runes)*4)
-	for _, r := range runes {
-		runeBytes := make([]byte, utf8.RuneLen(r))
-		utf8.EncodeRune(runeBytes, r)
-		rv = append(rv, runeBytes...)
-	}
-	return rv
 }
 
 // Parser accepts a symbol and passes it to the current state (representing a class).
