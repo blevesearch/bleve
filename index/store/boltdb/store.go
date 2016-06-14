@@ -33,11 +33,12 @@ const (
 )
 
 type Store struct {
-	path   string
-	bucket string
-	db     *bolt.DB
-	noSync bool
-	mo     store.MergeOperator
+	path        string
+	bucket      string
+	db          *bolt.DB
+	noSync      bool
+	fillPercent float64
+	mo          store.MergeOperator
 }
 
 func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, error) {
@@ -52,6 +53,11 @@ func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, 
 	}
 
 	noSync, _ := config["nosync"].(bool)
+
+	fillPercent, ok := config["fillPercent"].(float64)
+	if !ok {
+		fillPercent = bolt.DefaultFillPercent
+	}
 
 	db, err := bolt.Open(path, 0600, nil)
 	if err != nil {
@@ -69,11 +75,12 @@ func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, 
 	}
 
 	rv := Store{
-		path:   path,
-		bucket: bucket,
-		db:     db,
-		mo:     mo,
-		noSync: noSync,
+		path:        path,
+		bucket:      bucket,
+		db:          db,
+		mo:          mo,
+		noSync:      noSync,
+		fillPercent: fillPercent,
 	}
 	return &rv, nil
 }
