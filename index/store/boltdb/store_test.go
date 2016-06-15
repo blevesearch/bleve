@@ -15,6 +15,7 @@ import (
 
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/store/test"
+	"github.com/boltdb/bolt"
 )
 
 func open(t *testing.T, mo store.MergeOperator) store.KVStore {
@@ -88,4 +89,53 @@ func TestBoltDBMerge(t *testing.T) {
 	s := open(t, &test.TestMergeCounter{})
 	defer cleanup(t, s)
 	test.CommonTestMerge(t, s)
+}
+
+func TestBoltDBConfig(t *testing.T) {
+	var tests = []struct {
+		in          map[string]interface{}
+		path        string
+		bucket      string
+		noSync      bool
+		fillPercent float64
+	}{
+		{
+			map[string]interface{}{"path": "test", "bucket": "mybucket", "nosync": true, "fillPercent": 0.75},
+			"test",
+			"mybucket",
+			true,
+			0.75,
+		},
+		{
+			map[string]interface{}{"path": "test"},
+			"test",
+			"bleve",
+			false,
+			bolt.DefaultFillPercent,
+		},
+	}
+
+	for _, test := range tests {
+		kv, err := New(nil, test.in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bs, ok := kv.(*Store)
+		if !ok {
+			t.Fatal("failed type assertion to *boltdb.Store")
+		}
+		if bs.path != test.path {
+			t.Fatalf("path: expected %q, got %q", test.path, bs.path)
+		}
+		if bs.bucket != test.bucket {
+			t.Fatalf("bucket: expected %q, got %q", test.bucket, bs.bucket)
+		}
+		if bs.noSync != test.noSync {
+			t.Fatalf("noSync: expected %t, got %t", test.noSync, bs.noSync)
+		}
+		if bs.fillPercent != test.fillPercent {
+			t.Fatalf("fillPercent: expected %f, got %f", test.fillPercent, bs.fillPercent)
+		}
+		cleanup(t, kv)
+	}
 }
