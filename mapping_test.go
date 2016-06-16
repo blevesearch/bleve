@@ -603,3 +603,124 @@ func TestMappingBug353(t *testing.T) {
 		}
 	}
 }
+
+func TestAnonymousStructFields(t *testing.T) {
+
+	type Contact0 string
+
+	type Contact1 struct {
+		Name string
+	}
+
+	type Contact2 interface{}
+
+	type Contact3 interface{}
+
+	type Thing struct {
+		Contact0
+		Contact1
+		Contact2
+		Contact3
+	}
+
+	x := Thing{
+		Contact0: "hello",
+		Contact1: Contact1{
+			Name: "marty",
+		},
+		Contact2: Contact1{
+			Name: "will",
+		},
+		Contact3: "steve",
+	}
+
+	doc := document.NewDocument("1")
+	m := NewIndexMapping()
+	err := m.mapDocument(doc, x)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(doc.Fields) != 4 {
+		t.Fatalf("expected 4 fields, got %d", len(doc.Fields))
+	}
+	if doc.Fields[0].Name() != "Contact0" {
+		t.Errorf("expected field named 'Contact0', got '%s'", doc.Fields[0].Name())
+	}
+	if doc.Fields[1].Name() != "Name" {
+		t.Errorf("expected field named 'Name', got '%s'", doc.Fields[1].Name())
+	}
+	if doc.Fields[2].Name() != "Contact2.Name" {
+		t.Errorf("expected field named 'Contact2.Name', got '%s'", doc.Fields[2].Name())
+	}
+	if doc.Fields[3].Name() != "Contact3" {
+		t.Errorf("expected field named 'Contact3', got '%s'", doc.Fields[3].Name())
+	}
+
+	type AnotherThing struct {
+		Contact0 `json:"Alternate0"`
+		Contact1 `json:"Alternate1"`
+		Contact2 `json:"Alternate2"`
+		Contact3 `json:"Alternate3"`
+	}
+
+	y := AnotherThing{
+		Contact0: "hello",
+		Contact1: Contact1{
+			Name: "marty",
+		},
+		Contact2: Contact1{
+			Name: "will",
+		},
+		Contact3: "steve",
+	}
+
+	doc2 := document.NewDocument("2")
+	err = m.mapDocument(doc2, y)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(doc2.Fields) != 4 {
+		t.Fatalf("expected 4 fields, got %d", len(doc2.Fields))
+	}
+	if doc2.Fields[0].Name() != "Alternate0" {
+		t.Errorf("expected field named 'Alternate0', got '%s'", doc2.Fields[0].Name())
+	}
+	if doc2.Fields[1].Name() != "Alternate1.Name" {
+		t.Errorf("expected field named 'Name', got '%s'", doc2.Fields[1].Name())
+	}
+	if doc2.Fields[2].Name() != "Alternate2.Name" {
+		t.Errorf("expected field named 'Alternate2.Name', got '%s'", doc2.Fields[2].Name())
+	}
+	if doc2.Fields[3].Name() != "Alternate3" {
+		t.Errorf("expected field named 'Alternate3', got '%s'", doc2.Fields[3].Name())
+	}
+}
+
+func TestAnonymousStructFieldWithJSONStructTagEmptString(t *testing.T) {
+	type InterfaceThing interface{}
+	type Thing struct {
+		InterfaceThing `json:""`
+	}
+
+	x := Thing{
+		InterfaceThing: map[string]interface{}{
+			"key": "value",
+		},
+	}
+
+	doc := document.NewDocument("1")
+	m := NewIndexMapping()
+	err := m.mapDocument(doc, x)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(doc.Fields) != 1 {
+		t.Fatalf("expected 1 field, got %d", len(doc.Fields))
+	}
+	if doc.Fields[0].Name() != "key" {
+		t.Errorf("expected field named 'key', got '%s'", doc.Fields[0].Name())
+	}
+}

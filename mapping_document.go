@@ -325,6 +325,10 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 		for i := 0; i < val.NumField(); i++ {
 			field := typ.Field(i)
 			fieldName := field.Name
+			// anonymous fields of type struct can elide the type name
+			if field.Anonymous && field.Type.Kind() == reflect.Struct {
+				fieldName = ""
+			}
 
 			// if the field has a JSON name, prefer that
 			jsonTag := field.Tag.Get("json")
@@ -332,13 +336,18 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 			if jsonFieldName == "-" {
 				continue
 			}
-			if jsonFieldName != "" {
+			// allow json tag to set field name to empty, only if anonymous
+			if field.Tag != "" && (jsonFieldName != "" || field.Anonymous) {
 				fieldName = jsonFieldName
 			}
 
 			if val.Field(i).CanInterface() {
 				fieldVal := val.Field(i).Interface()
-				dm.processProperty(fieldVal, append(path, fieldName), indexes, context)
+				newpath := path
+				if fieldName != "" {
+					newpath = append(path, fieldName)
+				}
+				dm.processProperty(fieldVal, newpath, indexes, context)
 			}
 		}
 	case reflect.Slice, reflect.Array:
