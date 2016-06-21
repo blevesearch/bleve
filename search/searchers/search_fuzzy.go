@@ -113,7 +113,7 @@ func (s *FuzzySearcher) Next() (*search.DocumentMatch, error) {
 }
 
 func (s *FuzzySearcher) Advance(ID string) (*search.DocumentMatch, error) {
-	return s.searcher.Next()
+	return s.searcher.Advance(ID)
 }
 
 func (s *FuzzySearcher) Close() error {

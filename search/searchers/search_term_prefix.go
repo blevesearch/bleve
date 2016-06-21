@@ -76,7 +76,7 @@ func (s *TermPrefixSearcher) Next() (*search.DocumentMatch, error) {
 }
 
 func (s *TermPrefixSearcher) Advance(ID string) (*search.DocumentMatch, error) {
-	return s.searcher.Next()
+	return s.searcher.Advance(ID)
 }
 
 func (s *TermPrefixSearcher) Close() error {
