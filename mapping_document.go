@@ -362,7 +362,18 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 		if ptrElem.IsValid() && ptrElem.CanInterface() {
 			dm.processProperty(ptrElem.Interface(), path, indexes, context)
 		}
+	case reflect.String:
+		dm.processProperty(val.String(), path, indexes, context)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		dm.processProperty(float64(val.Int()), path, indexes, context)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		dm.processProperty(float64(val.Uint()), path, indexes, context)
+	case reflect.Float32, reflect.Float64:
+		dm.processProperty(float64(val.Float()), path, indexes, context)
+	case reflect.Bool:
+		dm.processProperty(val.Bool(), path, indexes, context)
 	}
+
 }
 
 func (dm *DocumentMapping) processProperty(property interface{}, path []string, indexes []uint64, context *walkContext) {

@@ -724,3 +724,37 @@ func TestAnonymousStructFieldWithJSONStructTagEmptString(t *testing.T) {
 		t.Errorf("expected field named 'key', got '%s'", doc.Fields[0].Name())
 	}
 }
+
+func TestMappingPrimitives(t *testing.T) {
+
+	tests := []struct {
+		data interface{}
+	}{
+		{data: "marty"},
+		{data: int(1)},
+		{data: int8(2)},
+		{data: int16(3)},
+		{data: int32(4)},
+		{data: int64(5)},
+		{data: uint(6)},
+		{data: uint8(7)},
+		{data: uint16(8)},
+		{data: uint32(9)},
+		{data: uint64(10)},
+		{data: float32(11.0)},
+		{data: float64(12.0)},
+		{data: false},
+	}
+
+	m := NewIndexMapping()
+	for _, test := range tests {
+		doc := document.NewDocument("x")
+		err := m.mapDocument(doc, test.data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(doc.Fields) != 1 {
+			t.Errorf("expected 1 field, got %d for %v", len(doc.Fields), test.data)
+		}
+	}
+}
