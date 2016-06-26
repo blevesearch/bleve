@@ -30,7 +30,8 @@ type dateRangeQuery struct {
 
 // NewDateRangeQuery creates a new Query for ranges
 // of date values.
-// A DateTimeParser is chosen based on the field.
+// Date strings are parsed using the DateTimeParser configured in the
+//  top-level config.QueryDateTimeParser
 // Either, but not both endpoints can be nil.
 func NewDateRangeQuery(start, end *string) *dateRangeQuery {
 	return NewDateRangeInclusiveQuery(start, end, nil, nil)
@@ -38,7 +39,8 @@ func NewDateRangeQuery(start, end *string) *dateRangeQuery {
 
 // NewDateRangeInclusiveQuery creates a new Query for ranges
 // of date values.
-// A DateTimeParser is chosen based on the field.
+// Date strings are parsed using the DateTimeParser configured in the
+//  top-level config.QueryDateTimeParser
 // Either, but not both endpoints can be nil.
 // startInclusive and endInclusive control inclusion of the endpoints.
 func NewDateRangeInclusiveQuery(start, end *string, startInclusive, endInclusive *bool) *dateRangeQuery {
