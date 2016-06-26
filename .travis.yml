@@ -12,7 +12,6 @@ script:
   - go get -u github.com/FiloSottile/gvt
   - gvt restore
   - go test -v $(go list ./... | grep -v vendor/)
-  - go test -v ./test -indexType=firestorm
   - go vet $(go list ./... | grep -v vendor/)
   - errcheck $(go list ./... | grep -v vendor/)
   - docs/project-code-coverage.sh
