@@ -15,7 +15,6 @@ import (
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/analysis/analyzers/standard_analyzer"
-	"github.com/blevesearch/bleve/analysis/byte_array_converters/json"
 	"github.com/blevesearch/bleve/analysis/datetime_parsers/datetime_optional"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/registry"
@@ -28,7 +27,6 @@ const defaultType = "_default"
 const defaultField = "_all"
 const defaultAnalyzer = standard_analyzer.Name
 const defaultDateTimeParser = datetime_optional.Name
-const defaultByteArrayConverter = json_byte_array_converter.Name
 
 type customAnalysis struct {
 	CharFilters     map[string]map[string]interface{} `json:"char_filters,omitempty"`
@@ -129,7 +127,6 @@ type IndexMapping struct {
 	DefaultAnalyzer       string                      `json:"default_analyzer"`
 	DefaultDateTimeParser string                      `json:"default_datetime_parser"`
 	DefaultField          string                      `json:"default_field"`
-	ByteArrayConverter    string                      `json:"byte_array_converter"`
 	StoreDynamic          bool                        `json:"store_dynamic"`
 	IndexDynamic          bool                        `json:"index_dynamic"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
@@ -234,7 +231,6 @@ func NewIndexMapping() *IndexMapping {
 		DefaultAnalyzer:       defaultAnalyzer,
 		DefaultDateTimeParser: defaultDateTimeParser,
 		DefaultField:          defaultField,
-		ByteArrayConverter:    defaultByteArrayConverter,
 		IndexDynamic:          IndexDynamic,
 		StoreDynamic:          StoreDynamic,
 		CustomAnalysis:        newCustomAnalysis(),
@@ -296,7 +292,6 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 	im.DefaultAnalyzer = defaultAnalyzer
 	im.DefaultDateTimeParser = defaultDateTimeParser
 	im.DefaultField = defaultField
-	im.ByteArrayConverter = defaultByteArrayConverter
 	im.DefaultMapping = NewDocumentMapping()
 	im.TypeMapping = make(map[string]*DocumentMapping)
 	im.StoreDynamic = StoreDynamic
@@ -332,11 +327,6 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 			}
 		case "default_field":
 			err := json.Unmarshal(v, &im.DefaultField)
-			if err != nil {
-				return err
-			}
-		case "byte_array_converter":
-			err := json.Unmarshal(v, &im.ByteArrayConverter)
 			if err != nil {
 				return err
 			}
@@ -394,26 +384,6 @@ func (im *IndexMapping) determineType(data interface{}) string {
 }
 
 func (im *IndexMapping) mapDocument(doc *document.Document, data interface{}) error {
-	// see if the top level object is a byte array, and possibly run through a converter
-	byteArrayData, ok := data.([]byte)
-	if ok {
-		byteArrayConverterConstructor := registry.ByteArrayConverterByName(im.ByteArrayConverter)
-		if byteArrayConverterConstructor != nil {
-			byteArrayConverter, err := byteArrayConverterConstructor(nil, nil)
-			if err == nil {
-				convertedData, err := byteArrayConverter.Convert(byteArrayData)
-				if err != nil {
-					return err
-				}
-				data = convertedData
-			} else {
-				logger.Printf("error creating byte array converter: %v", err)
-			}
-		} else {
-			logger.Printf("no byte array converter named: %s", im.ByteArrayConverter)
-		}
-	}
-
 	docType := im.determineType(data)
 	docMapping := im.mappingForType(docType)
 	walkContext := im.newWalkContext(doc, docMapping)

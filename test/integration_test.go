@@ -121,10 +121,15 @@ func runTestDir(t *testing.T, dir, datasetName string) {
 			t.Errorf("error reading data file: %v", err)
 			return
 		}
+		var fileDoc interface{}
+		err = json.Unmarshal(fileBytes, &fileDoc)
+		if err != nil {
+			t.Errorf("error parsing data file as json: %v", err)
+		}
 		filename := fi.Name()
 		ext := filepath.Ext(filename)
 		id := filename[0 : len(filename)-len(ext)]
-		err = index.Index(id, fileBytes)
+		err = index.Index(id, fileDoc)
 		if err != nil {
 			t.Errorf("error indexing data: %v", err)
 			return

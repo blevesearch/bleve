@@ -10,6 +10,7 @@
 package http
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -60,7 +61,15 @@ func (h *DocIndexHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err = index.Index(docID, requestBody)
+	// parse request body as json
+	var doc interface{}
+	err = json.Unmarshal(requestBody, &doc)
+	if err != nil {
+		showError(w, req, fmt.Sprintf("error parsing request body as JSON: %v", err), 400)
+		return
+	}
+
+	err = index.Index(docID, doc)
 	if err != nil {
 		showError(w, req, fmt.Sprintf("error indexing document '%s': %v", docID, err), 500)
 		return

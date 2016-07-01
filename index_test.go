@@ -23,7 +23,6 @@ import (
 
 	"golang.org/x/net/context"
 
-	"encoding/json"
 	"strconv"
 
 	"github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
@@ -1242,12 +1241,7 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		d := doc{now.Add(time.Duration((i - 3)) * time.Hour)}
 
-		docJson, err := json.Marshal(d)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = index.Index(strconv.FormatInt(int64(i), 10), docJson)
+		err = index.Index(strconv.FormatInt(int64(i), 10), d)
 		if err != nil {
 			t.Fatal(err)
 		}
