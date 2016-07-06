@@ -416,6 +416,19 @@ func ExampleNewConjunctionQuery() {
 	// document id 2
 }
 
+func ExampleNewMatchQueryOperator() {
+	query := NewMatchQueryOperator("great one", MatchQueryOperatorAnd)
+	searchRequest := NewSearchRequest(query)
+	searchResults, err := example_index.Search(searchRequest)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(searchResults.Hits[0].ID)
+	// Output:
+	// document id 2
+}
+
 func ExampleNewDisjunctionQuery() {
 	disjuncts := make([]Query, 2)
 	disjuncts[0] = NewMatchQuery("great")

@@ -10,6 +10,7 @@
 package bleve
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/blevesearch/bleve/index"
@@ -17,12 +18,58 @@ import (
 )
 
 type matchQuery struct {
-	Match        string  `json:"match"`
-	FieldVal     string  `json:"field,omitempty"`
-	Analyzer     string  `json:"analyzer,omitempty"`
-	BoostVal     float64 `json:"boost,omitempty"`
-	PrefixVal    int     `json:"prefix_length"`
-	FuzzinessVal int     `json:"fuzziness"`
+	Match        string             `json:"match"`
+	FieldVal     string             `json:"field,omitempty"`
+	Analyzer     string             `json:"analyzer,omitempty"`
+	BoostVal     float64            `json:"boost,omitempty"`
+	PrefixVal    int                `json:"prefix_length"`
+	FuzzinessVal int                `json:"fuzziness"`
+	OperatorVal  MatchQueryOperator `json:"operator,omitempty"`
+}
+
+type MatchQueryOperator int
+
+const (
+	// Document must satisfy AT LEAST ONE of term searches.
+	MatchQueryOperatorOr = 0
+	// Document must satisfy ALL of term searches.
+	MatchQueryOperatorAnd = 1
+)
+
+func (o MatchQueryOperator) MarshalJSON() ([]byte, error) {
+	switch o {
+	case MatchQueryOperatorOr:
+		return json.Marshal("or")
+	case MatchQueryOperatorAnd:
+		return json.Marshal("and")
+	default:
+		return nil, fmt.Errorf("cannot marshal match operator %d to JSON", o)
+	}
+}
+
+func (o *MatchQueryOperator) UnmarshalJSON(data []byte) error {
+	var operatorString string
+	err := json.Unmarshal(data, &operatorString)
+	if err != nil {
+		return err
+	}
+
+	switch operatorString {
+	case "or":
+		*o = MatchQueryOperatorOr
+		return nil
+	case "and":
+		*o = MatchQueryOperatorAnd
+		return nil
+	default:
+		return matchQueryOperatorUnmarshalError(operatorString)
+	}
+}
+
+type matchQueryOperatorUnmarshalError string
+
+func (e matchQueryOperatorUnmarshalError) Error() string {
+	return fmt.Sprintf("cannot unmarshal match operator '%s' from JSON", e)
 }
 
 // NewMatchQuery creates a Query for matching text.
@@ -33,8 +80,23 @@ type matchQuery struct {
 // must satisfy at least one of these term searches.
 func NewMatchQuery(match string) *matchQuery {
 	return &matchQuery{
-		Match:    match,
-		BoostVal: 1.0,
+		Match:       match,
+		BoostVal:    1.0,
+		OperatorVal: MatchQueryOperatorOr,
+	}
+}
+
+// NewMatchQuery creates a Query for matching text.
+// An Analyzer is chosen based on the field.
+// Input text is analyzed using this analyzer.
+// Token terms resulting from this analysis are
+// used to perform term searches.  Result documents
+// must satisfy term searches according to given operator.
+func NewMatchQueryOperator(match string, operator MatchQueryOperator) *matchQuery {
+	return &matchQuery{
+		Match:       match,
+		BoostVal:    1.0,
+		OperatorVal: operator,
 	}
 }
 
@@ -71,6 +133,15 @@ func (q *matchQuery) Prefix() int {
 
 func (q *matchQuery) SetPrefix(p int) Query {
 	q.PrefixVal = p
+	return q
+}
+
+func (q *matchQuery) Operator() MatchQueryOperator {
+	return q.OperatorVal
+}
+
+func (q *matchQuery) SetOperator(operator MatchQueryOperator) Query {
+	q.OperatorVal = operator
 	return q
 }
 
@@ -114,10 +185,22 @@ func (q *matchQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool
 			}
 		}
 
-		shouldQuery := NewDisjunctionQueryMin(tqs, 1).
-			SetBoost(q.BoostVal)
+		switch q.OperatorVal {
+		case MatchQueryOperatorOr:
+			shouldQuery := NewDisjunctionQueryMin(tqs, 1).
+				SetBoost(q.BoostVal)
 
-		return shouldQuery.Searcher(i, m, explain)
+			return shouldQuery.Searcher(i, m, explain)
+
+		case MatchQueryOperatorAnd:
+			mustQuery := NewConjunctionQuery(tqs).
+				SetBoost(q.BoostVal)
+
+			return mustQuery.Searcher(i, m, explain)
+
+		default:
+			return nil, fmt.Errorf("unhandled operator %d", q.OperatorVal)
+		}
 	}
 	noneQuery := NewMatchNoneQuery()
 	return noneQuery.Searcher(i, m, explain)
