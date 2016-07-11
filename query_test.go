@@ -35,6 +35,23 @@ func TestParseQuery(t *testing.T) {
 			output: NewMatchQuery("beer").SetField("desc"),
 		},
 		{
+			input:  []byte(`{"match":"beer","field":"desc","operator":"or"}`),
+			output: NewMatchQuery("beer").SetField("desc"),
+		},
+		{
+			input:  []byte(`{"match":"beer","field":"desc","operator":"and"}`),
+			output: NewMatchQueryOperator("beer", MatchQueryOperatorAnd).SetField("desc"),
+		},
+		{
+			input:  []byte(`{"match":"beer","field":"desc","operator":"or"}`),
+			output: NewMatchQueryOperator("beer", MatchQueryOperatorOr).SetField("desc"),
+		},
+		{
+			input:  []byte(`{"match":"beer","field":"desc","operator":"does not exist"}`),
+			output: nil,
+			err:    matchQueryOperatorUnmarshalError("does not exist"),
+		},
+		{
 			input:  []byte(`{"match_phrase":"light beer","field":"desc"}`),
 			output: NewMatchPhraseQuery("light beer").SetField("desc"),
 		},
