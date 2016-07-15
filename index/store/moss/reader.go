@@ -28,7 +28,7 @@ func (r *Reader) Get(k []byte) (v []byte, err error) {
 		return nil, err
 	}
 	if v != nil {
-		return append([]byte(nil), v...), nil
+		return append(make([]byte, 0, len(v)), v...), nil
 	}
 	return nil, nil
 }
