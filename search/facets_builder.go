@@ -24,29 +24,38 @@ type FacetBuilder interface {
 type FacetsBuilder struct {
 	indexReader index.IndexReader
 	facets      map[string]FacetBuilder
+	fieldIDs    map[string]uint16 // Not thread safe
 }
 
 func NewFacetsBuilder(indexReader index.IndexReader) *FacetsBuilder {
 	return &FacetsBuilder{
 		indexReader: indexReader,
 		facets:      make(map[string]FacetBuilder, 0),
+		fieldIDs:    make(map[string]uint16, 0),
 	}
 }
 
 func (fb *FacetsBuilder) Add(name string, facetBuilder FacetBuilder) {
 	fb.facets[name] = facetBuilder
+	fieldIDs, err := fb.indexReader.FieldIDs([]string{facetBuilder.Field()})
+	if err == nil {
+		fb.fieldIDs[facetBuilder.Field()] = fieldIDs[0]
+	}
 }
 
 func (fb *FacetsBuilder) Update(docMatch *DocumentMatch) error {
-	var fields []string
 	for _, facetBuilder := range fb.facets {
-		fields = append(fields, facetBuilder.Field())
+		field := facetBuilder.Field()
+		// Just in-case we added a field since creating the facets builder
+		if _, ok := fb.fieldIDs[field]; !ok {
+			fieldIDs, err := fb.indexReader.FieldIDs([]string{field})
+			if err != nil {
+				return err
+			}
+			fb.fieldIDs[field] = fieldIDs[0]
+		}
 	}
-	fieldIds, err := fb.indexReader.FieldIDs(fields)
-	if err != nil {
-		return err
-	}
-	fieldTerms, err := fb.indexReader.DocumentFieldTermsForFields(docMatch.ID, fieldIds, fields)
+	fieldTerms, err := fb.indexReader.DocumentFieldTermsForFields(docMatch.ID, fb.fieldIDs)
 	if err != nil {
 		return err
 	}

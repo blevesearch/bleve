@@ -191,8 +191,6 @@ func (h *HighlightRequest) AddField(field string) {
 // Facets describe the set of facets to be computed.
 // Explain triggers inclusion of additional search
 // result score explanations.
-// Sort specifies the sorting for the returned results
-// results will be sorted by score if this is empty
 //
 // A special field named "*" can be used to return all fields.
 type SearchRequest struct {
@@ -203,7 +201,6 @@ type SearchRequest struct {
 	Fields    []string          `json:"fields"`
 	Facets    FacetsRequest     `json:"facets"`
 	Explain   bool              `json:"explain"`
-	Sort      map[string]bool   `json:"sort"`
 }
 
 func (sr *SearchRequest) Validate() error {
@@ -223,14 +220,6 @@ func (r *SearchRequest) AddFacet(facetName string, f *FacetRequest) {
 	r.Facets[facetName] = f
 }
 
-// AddSort field in ascending or descending direction
-func (r *SearchRequest) AddSort(field string, ascending bool) {
-	if r.Sort == nil {
-		r.Sort = make(map[string]bool)
-	}
-	r.Sort[field] = ascending
-}
-
 // UnmarshalJSON deserializes a JSON representation of
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
@@ -242,7 +231,6 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Fields    []string          `json:"fields"`
 		Facets    FacetsRequest     `json:"facets"`
 		Explain   bool              `json:"explain"`
-		Sort      map[string]bool   `json:"sort"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -260,7 +248,6 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Highlight = temp.Highlight
 	r.Fields = temp.Fields
 	r.Facets = temp.Facets
-	r.Sort = temp.Sort
 	r.Query, err = ParseQuery(temp.Q)
 	if err != nil {
 		return err
@@ -293,7 +280,6 @@ func NewSearchRequestOptions(q Query, size, from int, explain bool) *SearchReque
 		Size:    size,
 		From:    from,
 		Explain: explain,
-		Sort:    make(map[string]bool),
 	}
 }
 
@@ -321,7 +307,7 @@ func (iem IndexErrMap) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// SearchStatus is a section in the SearchResult reporting how many
+// SearchStatus is a secion in the SearchResult reporting how many
 // underlying indexes were queried, how many were successful/failed
 // and a map of any errors that were encountered
 type SearchStatus struct {

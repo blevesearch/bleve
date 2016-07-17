@@ -10,10 +10,11 @@
 package upside_down
 
 import (
+	"fmt"
+
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
-	"fmt"
 )
 
 type IndexReader struct {
@@ -111,21 +112,21 @@ func (i *IndexReader) DocumentFieldTerms(id string) (index.FieldTerms, error) {
 	return rv, nil
 }
 
-func (i *IndexReader) DocumentFieldTermsForFields(id string, fieldIDs []uint16, fields []string) (index.FieldTerms, error) {
+func (i *IndexReader) DocumentFieldTermsForFields(id string, fields map[string]uint16) (index.FieldTerms, error) {
 	back, err := i.index.backIndexRowForDoc(i.kvreader, id)
 	if err != nil {
 		return nil, err
 	}
-	rv := make(index.FieldTerms, len(fieldIDs))
+	rv := make(index.FieldTerms, len(fields))
 	for _, entry := range back.termEntries {
-		for id, field := range fieldIDs {
-			if field == uint16(*entry.Field) {
-				terms, ok := rv[fields[id]]
+		for field, id := range fields {
+			if id == uint16(*entry.Field) {
+				terms, ok := rv[field]
 				if !ok {
 					terms = make([]string, 0)
 				}
 				terms = append(terms, *entry.Term)
-				rv[fields[id]] = terms
+				rv[field] = terms
 			}
 		}
 	}
