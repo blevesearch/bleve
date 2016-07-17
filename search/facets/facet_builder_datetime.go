@@ -49,6 +49,10 @@ func (fb *DateTimeFacetBuilder) AddRange(name string, start, end time.Time) {
 	fb.ranges[name] = &r
 }
 
+func (fb *DateTimeFacetBuilder) Field() string {
+	return fb.field
+}
+
 func (fb *DateTimeFacetBuilder) Update(ft index.FieldTerms) {
 	terms, ok := ft[fb.field]
 	if ok {
