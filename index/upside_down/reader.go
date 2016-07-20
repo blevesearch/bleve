@@ -22,6 +22,7 @@ type UpsideDownCouchTermFieldReader struct {
 	count       uint64
 	term        []byte
 	field       uint16
+	tfrNext     TermFrequencyRow
 }
 
 func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, field uint16) (*UpsideDownCouchTermFieldReader, error) {
@@ -65,7 +66,12 @@ func (r *UpsideDownCouchTermFieldReader) Next() (*index.TermFieldDoc, error) {
 	if r.iterator != nil {
 		key, val, valid := r.iterator.Current()
 		if valid {
-			tfr, err := NewTermFrequencyRowKV(key, val)
+			tfr := r.tfrNext
+			err := tfr.parseK(key)
+			if err != nil {
+				return nil, err
+			}
+			err = tfr.parseV(val)
 			if err != nil {
 				return nil, err
 			}
