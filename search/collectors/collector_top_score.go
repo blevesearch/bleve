@@ -60,12 +60,13 @@ func (tksc *TopScoreCollector) Took() time.Duration {
 func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Searcher) error {
 	startTime := time.Now()
 	var err error
+	var pre search.DocumentMatch // Pre-alloc'ed instance.
 	var next *search.DocumentMatch
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
-		next, err = searcher.Next()
+		next, err = searcher.Next(&pre)
 	}
 	for err == nil && next != nil {
 		select {
@@ -79,7 +80,7 @@ func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Sear
 					break
 				}
 			}
-			next, err = searcher.Next()
+			next, err = searcher.Next(pre.Reset())
 		}
 	}
 	// compute search duration
@@ -90,18 +91,21 @@ func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Sear
 	return nil
 }
 
-func (tksc *TopScoreCollector) collectSingle(dm *search.DocumentMatch) {
+func (tksc *TopScoreCollector) collectSingle(dmIn *search.DocumentMatch) {
 	// increment total hits
 	tksc.total++
 
 	// update max score
-	if dm.Score > tksc.maxScore {
-		tksc.maxScore = dm.Score
+	if dmIn.Score > tksc.maxScore {
+		tksc.maxScore = dmIn.Score
 	}
 
-	if dm.Score <= tksc.minScore {
+	if dmIn.Score <= tksc.minScore {
 		return
 	}
+
+	dm := &search.DocumentMatch{}
+	*dm = *dmIn
 
 	for e := tksc.results.Front(); e != nil; e = e.Next() {
 		curr := e.Value.(*search.DocumentMatch)

@@ -144,7 +144,7 @@ func TestTermScorer(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := scorer.Score(test.termMatch)
+		actual := scorer.Score(test.termMatch, nil)
 
 		if !reflect.DeepEqual(actual, test.result) {
 			t.Errorf("expected %#v got %#v for %#v", test.result, actual, test.termMatch)
@@ -231,7 +231,7 @@ func TestTermScorerWithQueryNorm(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := scorer.Score(test.termMatch)
+		actual := scorer.Score(test.termMatch, nil)
 
 		if !reflect.DeepEqual(actual, test.result) {
 			t.Errorf("expected %#v got %#v for %#v", test.result, actual, test.termMatch)

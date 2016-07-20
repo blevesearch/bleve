@@ -68,7 +68,7 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 
 	// Check the sequence
 	for i, id := range wanted {
-		m, err := searcher.Next()
+		m, err := searcher.Next(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +76,7 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 			t.Fatalf("expected %v at position %v, got %v", id, i, m.ID)
 		}
 	}
-	m, err := searcher.Next()
+	m, err := searcher.Next(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

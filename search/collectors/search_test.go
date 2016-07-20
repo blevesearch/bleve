@@ -18,7 +18,7 @@ type stubSearcher struct {
 	matches search.DocumentMatchCollection
 }
 
-func (ss *stubSearcher) Next() (*search.DocumentMatch, error) {
+func (ss *stubSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	if ss.index < len(ss.matches) {
 		rv := ss.matches[ss.index]
 		ss.index++

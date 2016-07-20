@@ -67,7 +67,7 @@ func (s *ConjunctionSearcher) initSearchers() error {
 	var err error
 	// get all searchers pointing at their first match
 	for i, termSearcher := range s.searchers {
-		s.currs[i], err = termSearcher.Next()
+		s.currs[i], err = termSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func (s *ConjunctionSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *ConjunctionSearcher) Next() (*search.DocumentMatch, error) {
+func (s *ConjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {
@@ -140,7 +140,7 @@ OUTER:
 		rv = s.scorer.Score(s.currs)
 
 		// prepare for next entry
-		s.currs[0], err = s.searchers[0].Next()
+		s.currs[0], err = s.searchers[0].Next(nil)
 		if err != nil {
 			return nil, err
 		}
@@ -170,7 +170,7 @@ func (s *ConjunctionSearcher) Advance(ID string) (*search.DocumentMatch, error) 
 		}
 	}
 	s.currentID = ID
-	return s.Next()
+	return s.Next(nil)
 }
 
 func (s *ConjunctionSearcher) Count() uint64 {

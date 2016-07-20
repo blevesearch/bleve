@@ -70,21 +70,21 @@ func (s *BooleanSearcher) initSearchers() error {
 	var err error
 	// get all searchers pointing at their first match
 	if s.mustSearcher != nil {
-		s.currMust, err = s.mustSearcher.Next()
+		s.currMust, err = s.mustSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
 	}
 
 	if s.shouldSearcher != nil {
-		s.currShould, err = s.shouldSearcher.Next()
+		s.currShould, err = s.shouldSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
 	}
 
 	if s.mustNotSearcher != nil {
-		s.currMustNot, err = s.mustNotSearcher.Next()
+		s.currMustNot, err = s.mustNotSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
@@ -106,12 +106,12 @@ func (s *BooleanSearcher) advanceNextMust() error {
 	var err error
 
 	if s.mustSearcher != nil {
-		s.currMust, err = s.mustSearcher.Next()
+		s.currMust, err = s.mustSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
 	} else if s.mustSearcher == nil {
-		s.currShould, err = s.shouldSearcher.Next()
+		s.currShould, err = s.shouldSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
@@ -148,7 +148,7 @@ func (s *BooleanSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *BooleanSearcher) Next() (*search.DocumentMatch, error) {
+func (s *BooleanSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 
 	if !s.initialized {
 		err := s.initSearchers()
@@ -292,7 +292,7 @@ func (s *BooleanSearcher) Advance(ID string) (*search.DocumentMatch, error) {
 		s.currentID = ""
 	}
 
-	return s.Next()
+	return s.Next(nil)
 }
 
 func (s *BooleanSearcher) Count() uint64 {

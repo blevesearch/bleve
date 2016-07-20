@@ -70,8 +70,8 @@ func (s *TermPrefixSearcher) SetQueryNorm(qnorm float64) {
 	s.searcher.SetQueryNorm(qnorm)
 }
 
-func (s *TermPrefixSearcher) Next() (*search.DocumentMatch, error) {
-	return s.searcher.Next()
+func (s *TermPrefixSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+	return s.searcher.Next(preAllocated)
 
 }
 

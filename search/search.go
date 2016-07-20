@@ -85,6 +85,11 @@ func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
 	dm.Fields[name] = valSlice
 }
 
+func (dm *DocumentMatch) Reset() *DocumentMatch {
+	*dm = DocumentMatch{}
+	return dm
+}
+
 type DocumentMatchCollection []*DocumentMatch
 
 func (c DocumentMatchCollection) Len() int           { return len(c) }
@@ -92,7 +97,7 @@ func (c DocumentMatchCollection) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c DocumentMatchCollection) Less(i, j int) bool { return c[i].Score > c[j].Score }
 
 type Searcher interface {
-	Next() (*DocumentMatch, error)
+	Next(preAllocated *DocumentMatch) (*DocumentMatch, error)
 	Advance(ID string) (*DocumentMatch, error)
 	Close() error
 	Weight() float64

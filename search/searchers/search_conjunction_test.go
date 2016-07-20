@@ -187,7 +187,7 @@ func TestConjunctionSearch(t *testing.T) {
 			}
 		}()
 
-		next, err := test.searcher.Next()
+		next, err := test.searcher.Next(nil)
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
@@ -199,7 +199,7 @@ func TestConjunctionSearch(t *testing.T) {
 					t.Logf("scoring explanation: %s", next.Expl)
 				}
 			}
-			next, err = test.searcher.Next()
+			next, err = test.searcher.Next(nil)
 			i++
 		}
 		if err != nil {
