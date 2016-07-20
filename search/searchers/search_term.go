@@ -22,6 +22,7 @@ type TermSearcher struct {
 	explain     bool
 	reader      index.TermFieldReader
 	scorer      *scorers.TermQueryScorer
+	tfd         index.TermFieldDoc
 }
 
 func NewTermSearcher(indexReader index.IndexReader, term string, field string, boost float64, explain bool) (*TermSearcher, error) {
@@ -53,7 +54,7 @@ func (s *TermSearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *TermSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
-	termMatch, err := s.reader.Next()
+	termMatch, err := s.reader.Next(s.tfd.Reset())
 	if err != nil {
 		return nil, err
 	}

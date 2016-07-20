@@ -62,7 +62,7 @@ func (r *UpsideDownCouchTermFieldReader) Count() uint64 {
 	return r.count
 }
 
-func (r *UpsideDownCouchTermFieldReader) Next() (*index.TermFieldDoc, error) {
+func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
 	if r.iterator != nil {
 		key, val, valid := r.iterator.Current()
 		if valid {
@@ -75,14 +75,16 @@ func (r *UpsideDownCouchTermFieldReader) Next() (*index.TermFieldDoc, error) {
 			if err != nil {
 				return nil, err
 			}
-			rv := index.TermFieldDoc{
-				ID:      string(tfr.doc),
-				Freq:    tfr.freq,
-				Norm:    float64(tfr.norm),
-				Vectors: r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors),
+			rv := preAlloced
+			if rv == nil {
+				rv = &index.TermFieldDoc{}
 			}
+			rv.ID = string(tfr.doc)
+			rv.Freq = tfr.freq
+			rv.Norm = float64(tfr.norm)
+			rv.Vectors = r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors)
 			r.iterator.Next()
-			return &rv, nil
+			return rv, nil
 		}
 	}
 	return nil, nil
