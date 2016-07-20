@@ -112,22 +112,28 @@ func (i *IndexReader) DocumentFieldTerms(id string) (index.FieldTerms, error) {
 	return rv, nil
 }
 
-func (i *IndexReader) DocumentFieldTermsForFields(id string, fields map[string]uint16) (index.FieldTerms, error) {
+func (i *IndexReader) DocumentFieldTermsForFields(id string, fields []string) (index.FieldTerms, error) {
 	back, err := i.index.backIndexRowForDoc(i.kvreader, id)
 	if err != nil {
 		return nil, err
 	}
 	rv := make(index.FieldTerms, len(fields))
+	fieldsMap := make(map[uint16]string, len(fields))
+	for _, f := range fields {
+		id, ok := i.index.fieldCache.FieldNamed(f, false)
+		if !ok {
+			return nil, fmt.Errorf("Field %s was not found in cache", f)
+		}
+		fieldsMap[id] = f
+	}
 	for _, entry := range back.termEntries {
-		for field, id := range fields {
-			if id == uint16(*entry.Field) {
-				terms, ok := rv[field]
-				if !ok {
-					terms = make([]string, 0)
-				}
-				terms = append(terms, *entry.Term)
-				rv[field] = terms
+		if field, ok := fieldsMap[uint16(*entry.Field)]; ok {
+			terms, ok := rv[field]
+			if !ok {
+				terms = make([]string, 0)
 			}
+			terms = append(terms, *entry.Term)
+			rv[field] = terms
 		}
 	}
 	return rv, nil
@@ -158,17 +164,6 @@ func (i *IndexReader) Fields() (fields []string, err error) {
 
 		it.Next()
 		key, val, valid = it.Current()
-	}
-	return
-}
-
-func (i *IndexReader) FieldIDs(fields []string) (ids []uint16, err error) {
-	for _, f := range fields {
-		id, found := i.index.fieldCache.FieldNamed(f, false)
-		if !found {
-			return nil, fmt.Errorf("Field %s was not found in cache", f)
-		}
-		ids = append(ids, id)
 	}
 	return
 }

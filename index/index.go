@@ -77,10 +77,9 @@ type IndexReader interface {
 
 	Document(id string) (*document.Document, error)
 	DocumentFieldTerms(id string) (FieldTerms, error)
-	DocumentFieldTermsForFields(id string, fields map[string]uint16) (FieldTerms, error)
+	DocumentFieldTermsForFields(id string, fields []string) (FieldTerms, error)
 
 	Fields() ([]string, error)
-	FieldIDs(fields []string) ([]uint16, error)
 
 	GetInternal(key []byte) ([]byte, error)
 
