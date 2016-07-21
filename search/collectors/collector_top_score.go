@@ -60,7 +60,7 @@ func (tksc *TopScoreCollector) Took() time.Duration {
 func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Searcher) error {
 	startTime := time.Now()
 	var err error
-	var pre search.DocumentMatch // Pre-alloc'ed instance.
+	var pre search.DocumentMatch // A single pre-alloc'ed, reused instance.
 	var next *search.DocumentMatch
 	select {
 	case <-ctx.Done():
@@ -104,6 +104,9 @@ func (tksc *TopScoreCollector) collectSingle(dmIn *search.DocumentMatch) {
 		return
 	}
 
+	// Because the dmIn will be the single, pre-allocated, reused
+	// instance, we need to copy the dmIn into a new, standalone
+	// instance before inserting into our candidate results list.
 	dm := &search.DocumentMatch{}
 	*dm = *dmIn
 
