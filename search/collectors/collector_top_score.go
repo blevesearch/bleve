@@ -57,6 +57,8 @@ func (tksc *TopScoreCollector) Took() time.Duration {
 	return tksc.took
 }
 
+var COLLECT_CHECK_DONE_EVERY = uint64(1024)
+
 func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Searcher) error {
 	startTime := time.Now()
 	var err error
@@ -69,19 +71,21 @@ func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Sear
 		next, err = searcher.Next(&pre)
 	}
 	for err == nil && next != nil {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			tksc.collectSingle(next)
-			if tksc.facetsBuilder != nil {
-				err = tksc.facetsBuilder.Update(next)
-				if err != nil {
-					break
-				}
+		if tksc.total%COLLECT_CHECK_DONE_EVERY == 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
 			}
-			next, err = searcher.Next(pre.Reset())
 		}
+		tksc.collectSingle(next)
+		if tksc.facetsBuilder != nil {
+			err = tksc.facetsBuilder.Update(next)
+			if err != nil {
+				break
+			}
+		}
+		next, err = searcher.Next(pre.Reset())
 	}
 	// compute search duration
 	tksc.took = time.Since(startTime)
