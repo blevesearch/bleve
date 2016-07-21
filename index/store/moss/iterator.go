@@ -115,16 +115,11 @@ func (x *Iterator) Close() error {
 }
 
 func (x *Iterator) checkDone() {
-	x.done = true
-	x.k = nil
-	x.v = nil
-
 	k, v, err := x.iter.Current()
-	if err != nil {
-		return
-	}
-
-	if x.prefix != nil && !bytes.HasPrefix(k, x.prefix) {
+	if err != nil || (x.prefix != nil && !bytes.HasPrefix(k, x.prefix)) {
+		x.done = true
+		x.k = nil
+		x.v = nil
 		return
 	}
 
