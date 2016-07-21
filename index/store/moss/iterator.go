@@ -60,12 +60,11 @@ func (x *Iterator) Next() {
 		return
 	}
 
-	x.done = true
-	x.k = nil
-	x.v = nil
-
 	err := x.iter.Next()
 	if err != nil {
+		x.done = true
+		x.k = nil
+		x.v = nil
 		return
 	}
 
