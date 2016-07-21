@@ -769,11 +769,9 @@ func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.
 	return rv, rows
 }
 
-var emptyTermFieldVectors = []*index.TermFieldVector{}
-
 func (udc *UpsideDownCouch) termFieldVectorsFromTermVectors(in []*TermVector) []*index.TermFieldVector {
 	if len(in) <= 0 {
-		return emptyTermFieldVectors
+		return nil
 	}
 
 	rv := make([]*index.TermFieldVector, len(in))
