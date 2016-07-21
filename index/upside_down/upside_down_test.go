@@ -1126,7 +1126,7 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 
 	tfd, err := termFieldReader.Next(nil)
 	for tfd != nil && err == nil {
-		if tfd.ID != "1" {
+		if string(tfd.ID) != "1" {
 			t.Errorf("expected to find document id 1")
 		}
 		tfd, err = termFieldReader.Next(nil)

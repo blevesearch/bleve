@@ -25,7 +25,7 @@ func NewConjunctionQueryScorer(explain bool) *ConjunctionQueryScorer {
 
 func (s *ConjunctionQueryScorer) Score(constituents []*search.DocumentMatch) *search.DocumentMatch {
 	rv := search.DocumentMatch{
-		ID: constituents[0].ID,
+		ID: constituents[0].ArrangeID(),
 	}
 
 	var sum float64
