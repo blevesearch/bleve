@@ -77,6 +77,7 @@ type IndexReader interface {
 
 	Document(id string) (*document.Document, error)
 	DocumentFieldTerms(id string) (FieldTerms, error)
+	DocumentFieldTermsForFields(id string, fields []string) (FieldTerms, error)
 
 	Fields() ([]string, error)
 

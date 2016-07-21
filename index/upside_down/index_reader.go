@@ -10,6 +10,8 @@
 package upside_down
 
 import (
+	"fmt"
+
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
@@ -106,6 +108,33 @@ func (i *IndexReader) DocumentFieldTerms(id string) (index.FieldTerms, error) {
 		}
 		terms = append(terms, *entry.Term)
 		rv[fieldName] = terms
+	}
+	return rv, nil
+}
+
+func (i *IndexReader) DocumentFieldTermsForFields(id string, fields []string) (index.FieldTerms, error) {
+	back, err := i.index.backIndexRowForDoc(i.kvreader, id)
+	if err != nil {
+		return nil, err
+	}
+	rv := make(index.FieldTerms, len(fields))
+	fieldsMap := make(map[uint16]string, len(fields))
+	for _, f := range fields {
+		id, ok := i.index.fieldCache.FieldNamed(f, false)
+		if !ok {
+			return nil, fmt.Errorf("Field %s was not found in cache", f)
+		}
+		fieldsMap[id] = f
+	}
+	for _, entry := range back.termEntries {
+		if field, ok := fieldsMap[uint16(*entry.Field)]; ok {
+			terms, ok := rv[field]
+			if !ok {
+				terms = make([]string, 0)
+			}
+			terms = append(terms, *entry.Term)
+			rv[field] = terms
+		}
 	}
 	return rv, nil
 }

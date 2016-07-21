@@ -32,6 +32,10 @@ func NewTermsFacetBuilder(field string, size int) *TermsFacetBuilder {
 	}
 }
 
+func (fb *TermsFacetBuilder) Field() string {
+	return fb.field
+}
+
 func (fb *TermsFacetBuilder) Update(ft index.FieldTerms) {
 	terms, ok := ft[fb.field]
 	if ok {

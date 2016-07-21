@@ -18,6 +18,7 @@ import (
 type FacetBuilder interface {
 	Update(index.FieldTerms)
 	Result() *FacetResult
+	Field() string
 }
 
 type FacetsBuilder struct {
@@ -37,7 +38,11 @@ func (fb *FacetsBuilder) Add(name string, facetBuilder FacetBuilder) {
 }
 
 func (fb *FacetsBuilder) Update(docMatch *DocumentMatch) error {
-	fieldTerms, err := fb.indexReader.DocumentFieldTerms(docMatch.ID)
+	var fields []string
+	for _, facetBuilder := range fb.facets {
+		fields = append(fields, facetBuilder.Field())
+	}
+	fieldTerms, err := fb.indexReader.DocumentFieldTermsForFields(docMatch.ID, fields)
 	if err != nil {
 		return err
 	}

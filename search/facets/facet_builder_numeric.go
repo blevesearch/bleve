@@ -48,6 +48,10 @@ func (fb *NumericFacetBuilder) AddRange(name string, min, max *float64) {
 	fb.ranges[name] = &r
 }
 
+func (fb *NumericFacetBuilder) Field() string {
+	return fb.field
+}
+
 func (fb *NumericFacetBuilder) Update(ft index.FieldTerms) {
 	terms, ok := ft[fb.field]
 	if ok {
