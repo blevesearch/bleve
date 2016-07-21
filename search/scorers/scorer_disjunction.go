@@ -27,7 +27,7 @@ func NewDisjunctionQueryScorer(explain bool) *DisjunctionQueryScorer {
 
 func (s *DisjunctionQueryScorer) Score(constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
 	rv := search.DocumentMatch{
-		ID: constituents[0].ID,
+		ID: constituents[0].ArrangeID(),
 	}
 
 	var sum float64

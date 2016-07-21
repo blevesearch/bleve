@@ -75,7 +75,7 @@ func (s *ConjunctionSearcher) initSearchers() error {
 
 	if len(s.currs) > 0 {
 		if s.currs[0] != nil {
-			s.currentID = s.currs[0].ID
+			s.currentID = s.currs[0].ArrangeID()
 		} else {
 			s.currentID = ""
 		}
@@ -111,9 +111,9 @@ func (s *ConjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.
 OUTER:
 	for s.currentID != "" {
 		for i, termSearcher := range s.searchers {
-			if s.currs[i] != nil && s.currs[i].ID != s.currentID {
-				if s.currentID < s.currs[i].ID {
-					s.currentID = s.currs[i].ID
+			if s.currs[i] != nil && s.currs[i].ArrangeID() != s.currentID {
+				if s.currentID < s.currs[i].ArrangeID() {
+					s.currentID = s.currs[i].ArrangeID()
 					continue OUTER
 				}
 				// this reader doesn't have the currentID, try to advance
@@ -125,10 +125,10 @@ OUTER:
 					s.currentID = ""
 					continue OUTER
 				}
-				if s.currs[i].ID != s.currentID {
+				if s.currs[i].ArrangeID() != s.currentID {
 					// we just advanced, so it doesn't match, it must be greater
 					// no need to call next
-					s.currentID = s.currs[i].ID
+					s.currentID = s.currs[i].ArrangeID()
 					continue OUTER
 				}
 			} else if s.currs[i] == nil {
@@ -147,7 +147,7 @@ OUTER:
 		if s.currs[0] == nil {
 			s.currentID = ""
 		} else {
-			s.currentID = s.currs[0].ID
+			s.currentID = s.currs[0].ArrangeID()
 		}
 		// don't continue now, wait for the next call to Next()
 		break

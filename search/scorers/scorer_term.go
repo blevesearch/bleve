@@ -132,8 +132,9 @@ func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc, preAllocated *sea
 	if rv == nil {
 		rv = &search.DocumentMatch{}
 	}
-	rv.ID = termMatch.ID
+	rv.SetIDBytes(termMatch.ID)
 	rv.Score = score
+
 	if s.explain {
 		rv.Expl = scoreExplanation
 	}

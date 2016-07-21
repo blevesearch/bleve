@@ -100,7 +100,7 @@ type TermFieldVector struct {
 
 type TermFieldDoc struct {
 	Term    string
-	ID      string
+	ID      []byte
 	Freq    uint64
 	Norm    float64
 	Vectors []*TermFieldVector

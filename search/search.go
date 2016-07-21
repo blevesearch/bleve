@@ -62,6 +62,8 @@ type DocumentMatch struct {
 	// SearchRequest.Fields. Text fields are returned as strings, numeric
 	// fields as float64s and date fields as time.RFC3339 formatted strings.
 	Fields map[string]interface{} `json:"fields,omitempty"`
+
+	idBytes []byte // Helps avoid string conversion until last moment.
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
@@ -88,6 +90,23 @@ func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
 func (dm *DocumentMatch) Reset() *DocumentMatch {
 	*dm = DocumentMatch{}
 	return dm
+}
+
+// ArrangeID converts the idBytes to an ID string, which allows us to
+// delay conversion work for performance.  Of note, we need to be
+// careful to ArrangeID() before returning or exposing a DocumentMatch
+// to the user's application.
+func (dm *DocumentMatch) ArrangeID() string {
+	if dm.ID == "" && dm.idBytes != nil {
+		dm.ID = string(dm.idBytes)
+		dm.idBytes = nil
+	}
+	return dm.ID
+}
+
+func (dm *DocumentMatch) SetIDBytes(v []byte) {
+	dm.idBytes = v
+	dm.ID = ""
 }
 
 type DocumentMatchCollection []*DocumentMatch

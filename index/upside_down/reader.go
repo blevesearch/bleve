@@ -81,7 +81,7 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 			if rv == nil {
 				rv = &index.TermFieldDoc{}
 			}
-			rv.ID = string(tfr.doc)
+			rv.ID = tfr.doc
 			rv.Freq = tfr.freq
 			rv.Norm = float64(tfr.norm)
 			if tfr.vectors != nil {
@@ -105,7 +105,7 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docID string) (*index.TermField
 				return nil, err
 			}
 			rv := index.TermFieldDoc{
-				ID:      string(tfr.doc),
+				ID:      tfr.doc,
 				Freq:    tfr.freq,
 				Norm:    float64(tfr.norm),
 				Vectors: r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors),

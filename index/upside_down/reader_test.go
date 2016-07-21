@@ -111,7 +111,7 @@ func TestIndexReader(t *testing.T) {
 	}
 
 	expectedMatch := &index.TermFieldDoc{
-		ID:   "2",
+		ID:   []byte("2"),
 		Freq: 1,
 		Norm: 0.5773502588272095,
 		Vectors: []*index.TermFieldVector{
@@ -152,7 +152,7 @@ func TestIndexReader(t *testing.T) {
 	if match == nil {
 		t.Fatalf("Expected match, got nil")
 	}
-	if match.ID != "2" {
+	if string(match.ID) != "2" {
 		t.Errorf("Expected ID '2', got '%s'", match.ID)
 	}
 	match, err = reader.Advance("3")

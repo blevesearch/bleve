@@ -146,6 +146,7 @@ func (tksc *TopScoreCollector) Results() search.DocumentMatchCollection {
 				continue
 			}
 			rv[i] = e.Value.(*search.DocumentMatch)
+			rv[i].ArrangeID()
 			i++
 		}
 		return rv
