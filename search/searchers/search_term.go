@@ -19,10 +19,10 @@ type TermSearcher struct {
 	indexReader index.IndexReader
 	term        string
 	field       string
-	explain     bool
 	reader      index.TermFieldReader
 	scorer      *scorers.TermQueryScorer
 	tfd         index.TermFieldDoc
+	explain     bool
 }
 
 func NewTermSearcher(indexReader index.IndexReader, term string, field string, boost float64, explain bool) (*TermSearcher, error) {

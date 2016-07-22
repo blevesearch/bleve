@@ -17,12 +17,12 @@ import (
 )
 
 type UpsideDownCouchTermFieldReader struct {
+	count       uint64
 	indexReader *IndexReader
 	iterator    store.KVIterator
-	count       uint64
 	term        []byte
+	tfrNext     *TermFrequencyRow
 	field       uint16
-	tfrNext     TermFrequencyRow
 }
 
 func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, field uint16) (*UpsideDownCouchTermFieldReader, error) {
@@ -34,9 +34,10 @@ func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 	if val == nil {
 		atomic.AddUint64(&indexReader.index.stats.termSearchersStarted, uint64(1))
 		return &UpsideDownCouchTermFieldReader{
-			count: 0,
-			term:  term,
-			field: field,
+			count:   0,
+			term:    term,
+			tfrNext: &TermFrequencyRow{},
+			field:   field,
 		}, nil
 	}
 
@@ -54,6 +55,7 @@ func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 		iterator:    it,
 		count:       dictionaryRow.count,
 		term:        term,
+		tfrNext:     &TermFrequencyRow{},
 		field:       field,
 	}, nil
 }
@@ -66,8 +68,8 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 	if r.iterator != nil {
 		key, val, valid := r.iterator.Current()
 		if valid {
-			tfr := &r.tfrNext
-			err := tfr.parseK(key)
+			tfr := r.tfrNext
+			err := tfr.parseKDoc(key)
 			if err != nil {
 				return nil, err
 			}
@@ -82,7 +84,9 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 			rv.ID = string(tfr.doc)
 			rv.Freq = tfr.freq
 			rv.Norm = float64(tfr.norm)
-			rv.Vectors = r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors)
+			if tfr.vectors != nil {
+				rv.Vectors = r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors)
+			}
 			r.iterator.Next()
 			return rv, nil
 		}
