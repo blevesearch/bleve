@@ -57,30 +57,35 @@ func (tksc *TopScoreCollector) Took() time.Duration {
 	return tksc.took
 }
 
+var COLLECT_CHECK_DONE_EVERY = uint64(1024)
+
 func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Searcher) error {
 	startTime := time.Now()
 	var err error
+	var pre search.DocumentMatch // A single pre-alloc'ed, reused instance.
 	var next *search.DocumentMatch
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
-		next, err = searcher.Next()
+		next, err = searcher.Next(&pre)
 	}
 	for err == nil && next != nil {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			tksc.collectSingle(next)
-			if tksc.facetsBuilder != nil {
-				err = tksc.facetsBuilder.Update(next)
-				if err != nil {
-					break
-				}
+		if tksc.total%COLLECT_CHECK_DONE_EVERY == 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
 			}
-			next, err = searcher.Next()
 		}
+		tksc.collectSingle(next)
+		if tksc.facetsBuilder != nil {
+			err = tksc.facetsBuilder.Update(next)
+			if err != nil {
+				break
+			}
+		}
+		next, err = searcher.Next(pre.Reset())
 	}
 	// compute search duration
 	tksc.took = time.Since(startTime)
@@ -90,18 +95,24 @@ func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Sear
 	return nil
 }
 
-func (tksc *TopScoreCollector) collectSingle(dm *search.DocumentMatch) {
+func (tksc *TopScoreCollector) collectSingle(dmIn *search.DocumentMatch) {
 	// increment total hits
 	tksc.total++
 
 	// update max score
-	if dm.Score > tksc.maxScore {
-		tksc.maxScore = dm.Score
+	if dmIn.Score > tksc.maxScore {
+		tksc.maxScore = dmIn.Score
 	}
 
-	if dm.Score <= tksc.minScore {
+	if dmIn.Score <= tksc.minScore {
 		return
 	}
+
+	// Because the dmIn will be the single, pre-allocated, reused
+	// instance, we need to copy the dmIn into a new, standalone
+	// instance before inserting into our candidate results list.
+	dm := &search.DocumentMatch{}
+	*dm = *dmIn
 
 	for e := tksc.results.Front(); e != nil; e = e.Next() {
 		curr := e.Value.(*search.DocumentMatch)
@@ -135,6 +146,7 @@ func (tksc *TopScoreCollector) Results() search.DocumentMatchCollection {
 				continue
 			}
 			rv[i] = e.Value.(*search.DocumentMatch)
+			rv[i].ArrangeID()
 			i++
 		}
 		return rv

@@ -12,6 +12,8 @@
 package moss
 
 import (
+	"math/big"
+
 	"github.com/couchbase/moss"
 
 	"github.com/blevesearch/bleve/index/store"
@@ -37,19 +39,22 @@ func (r *Reader) MultiGet(keys [][]byte) ([][]byte, error) {
 	return store.MultiGet(r, keys)
 }
 
+var bigOne = big.NewInt(1)
+
 func (r *Reader) PrefixIterator(k []byte) store.KVIterator {
-	iter, err := r.ss.StartIterator(k, nil, moss.IteratorOptions{})
+	kEnd := big.NewInt(0).Add(big.NewInt(0).SetBytes(k), bigOne).Bytes()
+
+	iter, err := r.ss.StartIterator(k, kEnd, moss.IteratorOptions{})
 	if err != nil {
 		return nil
 	}
 
 	rv := &Iterator{
-		store:  r.store,
-		ss:     r.ss,
-		iter:   iter,
-		prefix: k,
-		start:  k,
-		end:    nil,
+		store: r.store,
+		ss:    r.ss,
+		iter:  iter,
+		start: k,
+		end:   kEnd,
 	}
 
 	rv.checkDone()
@@ -64,12 +69,11 @@ func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
 	}
 
 	rv := &Iterator{
-		store:  r.store,
-		ss:     r.ss,
-		iter:   iter,
-		prefix: nil,
-		start:  start,
-		end:    end,
+		store: r.store,
+		ss:    r.ss,
+		iter:  iter,
+		start: start,
+		end:   end,
 	}
 
 	rv.checkDone()

@@ -35,7 +35,7 @@ func TestTermScorer(t *testing.T) {
 		// test some simple math
 		{
 			termMatch: &index.TermFieldDoc{
-				ID:   "one",
+				ID:   []byte("one"),
 				Freq: 1,
 				Norm: 1.0,
 				Vectors: []*index.TermFieldVector{
@@ -84,7 +84,7 @@ func TestTermScorer(t *testing.T) {
 		// test the same thing again (score should be cached this time)
 		{
 			termMatch: &index.TermFieldDoc{
-				ID:   "one",
+				ID:   []byte("one"),
 				Freq: 1,
 				Norm: 1.0,
 			},
@@ -114,7 +114,7 @@ func TestTermScorer(t *testing.T) {
 		// test a case where the sqrt isn't precalculated
 		{
 			termMatch: &index.TermFieldDoc{
-				ID:   "one",
+				ID:   []byte("one"),
 				Freq: 65,
 				Norm: 1.0,
 			},
@@ -144,7 +144,8 @@ func TestTermScorer(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := scorer.Score(test.termMatch)
+		actual := scorer.Score(test.termMatch, nil)
+		actual.ArrangeID()
 
 		if !reflect.DeepEqual(actual, test.result) {
 			t.Errorf("expected %#v got %#v for %#v", test.result, actual, test.termMatch)
@@ -177,7 +178,7 @@ func TestTermScorerWithQueryNorm(t *testing.T) {
 	}{
 		{
 			termMatch: &index.TermFieldDoc{
-				ID:   "one",
+				ID:   []byte("one"),
 				Freq: 1,
 				Norm: 1.0,
 			},
@@ -231,7 +232,8 @@ func TestTermScorerWithQueryNorm(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := scorer.Score(test.termMatch)
+		actual := scorer.Score(test.termMatch, nil)
+		actual.ArrangeID()
 
 		if !reflect.DeepEqual(actual, test.result) {
 			t.Errorf("expected %#v got %#v for %#v", test.result, actual, test.termMatch)

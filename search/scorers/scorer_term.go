@@ -83,7 +83,7 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc) *search.DocumentMatch {
+func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc, preAllocated *search.DocumentMatch) *search.DocumentMatch {
 	var scoreExplanation *search.Explanation
 
 	// need to compute score
@@ -128,10 +128,13 @@ func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc) *search.DocumentM
 		}
 	}
 
-	rv := search.DocumentMatch{
-		ID:    termMatch.ID,
-		Score: score,
+	rv := preAllocated
+	if rv == nil {
+		rv = &search.DocumentMatch{}
 	}
+	rv.SetIDBytes(termMatch.ID)
+	rv.Score = score
+
 	if s.explain {
 		rv.Expl = scoreExplanation
 	}
@@ -172,5 +175,5 @@ func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc) *search.DocumentM
 
 	}
 
-	return &rv
+	return rv
 }

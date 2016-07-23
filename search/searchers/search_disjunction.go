@@ -87,7 +87,7 @@ func (s *DisjunctionSearcher) initSearchers() error {
 	var err error
 	// get all searchers pointing at their first match
 	for i, termSearcher := range s.searchers {
-		s.currs[i], err = termSearcher.Next()
+		s.currs[i], err = termSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
@@ -101,8 +101,8 @@ func (s *DisjunctionSearcher) initSearchers() error {
 func (s *DisjunctionSearcher) nextSmallestID() string {
 	rv := ""
 	for _, curr := range s.currs {
-		if curr != nil && (curr.ID < rv || rv == "") {
-			rv = curr.ID
+		if curr != nil && (curr.ArrangeID() < rv || rv == "") {
+			rv = curr.ArrangeID()
 		}
 	}
 	return rv
@@ -122,7 +122,7 @@ func (s *DisjunctionSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *DisjunctionSearcher) Next() (*search.DocumentMatch, error) {
+func (s *DisjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {
@@ -136,7 +136,7 @@ func (s *DisjunctionSearcher) Next() (*search.DocumentMatch, error) {
 	found := false
 	for !found && s.currentID != "" {
 		for _, curr := range s.currs {
-			if curr != nil && curr.ID == s.currentID {
+			if curr != nil && curr.ArrangeID() == s.currentID {
 				matching = append(matching, curr)
 			}
 		}
@@ -151,9 +151,9 @@ func (s *DisjunctionSearcher) Next() (*search.DocumentMatch, error) {
 		matching = make([]*search.DocumentMatch, 0)
 		// invoke next on all the matching searchers
 		for i, curr := range s.currs {
-			if curr != nil && curr.ID == s.currentID {
+			if curr != nil && curr.ArrangeID() == s.currentID {
 				searcher := s.searchers[i]
-				s.currs[i], err = searcher.Next()
+				s.currs[i], err = searcher.Next(nil)
 				if err != nil {
 					return nil, err
 				}
@@ -182,7 +182,7 @@ func (s *DisjunctionSearcher) Advance(ID string) (*search.DocumentMatch, error) 
 
 	s.currentID = s.nextSmallestID()
 
-	return s.Next()
+	return s.Next(nil)
 }
 
 func (s *DisjunctionSearcher) Count() uint64 {

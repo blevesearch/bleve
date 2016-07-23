@@ -105,8 +105,8 @@ func TestTop10Scores(t *testing.T) {
 		t.Fatalf("expected 10 results, got %d", len(results))
 	}
 
-	if results[0].ID != "l" {
-		t.Errorf("expected first result to have ID 'l', got %s", results[0].ID)
+	if results[0].ArrangeID() != "l" {
+		t.Errorf("expected first result to have ID 'l', got %s", results[0].ArrangeID())
 	}
 
 	if results[0].Score != 99.0 {
@@ -213,8 +213,8 @@ func TestTop10ScoresSkip10(t *testing.T) {
 		t.Fatalf("expected 4 results, got %d", len(results))
 	}
 
-	if results[0].ID != "b" {
-		t.Errorf("expected first result to have ID 'b', got %s", results[0].ID)
+	if results[0].ArrangeID() != "b" {
+		t.Errorf("expected first result to have ID 'b', got %s", results[0].ArrangeID())
 	}
 
 	if results[0].Score != 9.5 {
@@ -307,7 +307,7 @@ func TestPaginationSameScores(t *testing.T) {
 
 	firstResults := make(map[string]struct{})
 	for _, hit := range results {
-		firstResults[hit.ID] = struct{}{}
+		firstResults[hit.ArrangeID()] = struct{}{}
 	}
 
 	// a stub search with more than 10 matches
@@ -393,8 +393,8 @@ func TestPaginationSameScores(t *testing.T) {
 
 	// make sure that none of these hits repeat ones we saw in the top 5
 	for _, hit := range results {
-		if _, ok := firstResults[hit.ID]; ok {
-			t.Errorf("doc ID %s is in top 5 and next 5 result sets", hit.ID)
+		if _, ok := firstResults[hit.ArrangeID()]; ok {
+			t.Errorf("doc ID %s is in top 5 and next 5 result sets", hit.ArrangeID())
 		}
 	}
 

@@ -106,8 +106,8 @@ func (s *RegexpSearcher) SetQueryNorm(qnorm float64) {
 	s.searcher.SetQueryNorm(qnorm)
 }
 
-func (s *RegexpSearcher) Next() (*search.DocumentMatch, error) {
-	return s.searcher.Next()
+func (s *RegexpSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+	return s.searcher.Next(preAllocated)
 
 }
 

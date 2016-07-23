@@ -107,8 +107,8 @@ func (s *FuzzySearcher) SetQueryNorm(qnorm float64) {
 	s.searcher.SetQueryNorm(qnorm)
 }
 
-func (s *FuzzySearcher) Next() (*search.DocumentMatch, error) {
-	return s.searcher.Next()
+func (s *FuzzySearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+	return s.searcher.Next(preAllocated)
 
 }
 

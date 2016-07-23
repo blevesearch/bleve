@@ -100,7 +100,7 @@ type TermFieldVector struct {
 
 type TermFieldDoc struct {
 	Term    string
-	ID      string
+	ID      []byte
 	Freq    uint64
 	Norm    float64
 	Vectors []*TermFieldVector
@@ -111,8 +111,9 @@ type TermFieldDoc struct {
 // lexicographic order over their identifiers.
 type TermFieldReader interface {
 	// Next returns the next document containing the term in this field, or nil
-	// when it reaches the end of the enumeration.
-	Next() (*TermFieldDoc, error)
+	// when it reaches the end of the enumeration.  The preAlloced TermFieldDoc
+	// is optional, and when non-nil, will be used instead of allocating memory.
+	Next(preAlloced *TermFieldDoc) (*TermFieldDoc, error)
 
 	// Advance resets the enumeration at specified document or its immediate
 	// follower.
@@ -198,4 +199,9 @@ func (b *Batch) String() string {
 func (b *Batch) Reset() {
 	b.IndexOps = make(map[string]*document.Document)
 	b.InternalOps = make(map[string][]byte)
+}
+
+func (tfd *TermFieldDoc) Reset() *TermFieldDoc {
+	*tfd = TermFieldDoc{}
+	return tfd
 }

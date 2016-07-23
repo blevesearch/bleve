@@ -70,30 +70,30 @@ func (s *BooleanSearcher) initSearchers() error {
 	var err error
 	// get all searchers pointing at their first match
 	if s.mustSearcher != nil {
-		s.currMust, err = s.mustSearcher.Next()
+		s.currMust, err = s.mustSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
 	}
 
 	if s.shouldSearcher != nil {
-		s.currShould, err = s.shouldSearcher.Next()
+		s.currShould, err = s.shouldSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
 	}
 
 	if s.mustNotSearcher != nil {
-		s.currMustNot, err = s.mustNotSearcher.Next()
+		s.currMustNot, err = s.mustNotSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
 	}
 
 	if s.mustSearcher != nil && s.currMust != nil {
-		s.currentID = s.currMust.ID
+		s.currentID = s.currMust.ArrangeID()
 	} else if s.mustSearcher == nil && s.currShould != nil {
-		s.currentID = s.currShould.ID
+		s.currentID = s.currShould.ArrangeID()
 	} else {
 		s.currentID = ""
 	}
@@ -106,21 +106,21 @@ func (s *BooleanSearcher) advanceNextMust() error {
 	var err error
 
 	if s.mustSearcher != nil {
-		s.currMust, err = s.mustSearcher.Next()
+		s.currMust, err = s.mustSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
 	} else if s.mustSearcher == nil {
-		s.currShould, err = s.shouldSearcher.Next()
+		s.currShould, err = s.shouldSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
 	}
 
 	if s.mustSearcher != nil && s.currMust != nil {
-		s.currentID = s.currMust.ID
+		s.currentID = s.currMust.ArrangeID()
 	} else if s.mustSearcher == nil && s.currShould != nil {
-		s.currentID = s.currShould.ID
+		s.currentID = s.currShould.ArrangeID()
 	} else {
 		s.currentID = ""
 	}
@@ -148,7 +148,7 @@ func (s *BooleanSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *BooleanSearcher) Next() (*search.DocumentMatch, error) {
+func (s *BooleanSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 
 	if !s.initialized {
 		err := s.initSearchers()
@@ -161,13 +161,13 @@ func (s *BooleanSearcher) Next() (*search.DocumentMatch, error) {
 	var rv *search.DocumentMatch
 
 	for s.currentID != "" {
-		if s.currMustNot != nil && s.currMustNot.ID < s.currentID {
+		if s.currMustNot != nil && s.currMustNot.ArrangeID() < s.currentID {
 			// advance must not searcher to our candidate entry
 			s.currMustNot, err = s.mustNotSearcher.Advance(s.currentID)
 			if err != nil {
 				return nil, err
 			}
-			if s.currMustNot != nil && s.currMustNot.ID == s.currentID {
+			if s.currMustNot != nil && s.currMustNot.ArrangeID() == s.currentID {
 				// the candidate is excluded
 				err = s.advanceNextMust()
 				if err != nil {
@@ -175,7 +175,7 @@ func (s *BooleanSearcher) Next() (*search.DocumentMatch, error) {
 				}
 				continue
 			}
-		} else if s.currMustNot != nil && s.currMustNot.ID == s.currentID {
+		} else if s.currMustNot != nil && s.currMustNot.ArrangeID() == s.currentID {
 			// the candidate is excluded
 			err = s.advanceNextMust()
 			if err != nil {
@@ -184,13 +184,13 @@ func (s *BooleanSearcher) Next() (*search.DocumentMatch, error) {
 			continue
 		}
 
-		if s.currShould != nil && s.currShould.ID < s.currentID {
+		if s.currShould != nil && s.currShould.ArrangeID() < s.currentID {
 			// advance should searcher to our candidate entry
 			s.currShould, err = s.shouldSearcher.Advance(s.currentID)
 			if err != nil {
 				return nil, err
 			}
-			if s.currShould != nil && s.currShould.ID == s.currentID {
+			if s.currShould != nil && s.currShould.ArrangeID() == s.currentID {
 				// score bonus matches should
 				var cons []*search.DocumentMatch
 				if s.currMust != nil {
@@ -218,7 +218,7 @@ func (s *BooleanSearcher) Next() (*search.DocumentMatch, error) {
 				}
 				break
 			}
-		} else if s.currShould != nil && s.currShould.ID == s.currentID {
+		} else if s.currShould != nil && s.currShould.ArrangeID() == s.currentID {
 			// score bonus matches should
 			var cons []*search.DocumentMatch
 			if s.currMust != nil {
@@ -285,14 +285,14 @@ func (s *BooleanSearcher) Advance(ID string) (*search.DocumentMatch, error) {
 	}
 
 	if s.mustSearcher != nil && s.currMust != nil {
-		s.currentID = s.currMust.ID
+		s.currentID = s.currMust.ArrangeID()
 	} else if s.mustSearcher == nil && s.currShould != nil {
-		s.currentID = s.currShould.ID
+		s.currentID = s.currShould.ArrangeID()
 	} else {
 		s.currentID = ""
 	}
 
-	return s.Next()
+	return s.Next(nil)
 }
 
 func (s *BooleanSearcher) Count() uint64 {
