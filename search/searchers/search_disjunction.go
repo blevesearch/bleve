@@ -164,7 +164,7 @@ func (s *DisjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.
 	return rv, nil
 }
 
-func (s *DisjunctionSearcher) Advance(ID string) (*search.DocumentMatch, error) {
+func (s *DisjunctionSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {
@@ -174,7 +174,7 @@ func (s *DisjunctionSearcher) Advance(ID string) (*search.DocumentMatch, error) 
 	// get all searchers pointing at their first match
 	var err error
 	for i, termSearcher := range s.searchers {
-		s.currs[i], err = termSearcher.Advance(ID)
+		s.currs[i], err = termSearcher.Advance(ID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -182,7 +182,7 @@ func (s *DisjunctionSearcher) Advance(ID string) (*search.DocumentMatch, error) 
 
 	s.currentID = s.nextSmallestID()
 
-	return s.Next(nil)
+	return s.Next(preAllocated)
 }
 
 func (s *DisjunctionSearcher) Count() uint64 {

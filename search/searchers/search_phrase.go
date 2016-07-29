@@ -160,7 +160,7 @@ func (s *PhraseSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docum
 	return nil, nil
 }
 
-func (s *PhraseSearcher) Advance(ID string) (*search.DocumentMatch, error) {
+func (s *PhraseSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {
@@ -168,11 +168,11 @@ func (s *PhraseSearcher) Advance(ID string) (*search.DocumentMatch, error) {
 		}
 	}
 	var err error
-	s.currMust, err = s.mustSearcher.Advance(ID)
+	s.currMust, err = s.mustSearcher.Advance(ID, nil)
 	if err != nil {
 		return nil, err
 	}
-	return s.Next(nil)
+	return s.Next(preAllocated)
 }
 
 func (s *PhraseSearcher) Count() uint64 {

@@ -100,8 +100,8 @@ func (s *NumericRangeSearcher) Next(preAllocated *search.DocumentMatch) (*search
 	return s.searcher.Next(preAllocated)
 }
 
-func (s *NumericRangeSearcher) Advance(ID string) (*search.DocumentMatch, error) {
-	return s.searcher.Advance(ID)
+func (s *NumericRangeSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+	return s.searcher.Advance(ID, preAllocated)
 }
 
 func (s *NumericRangeSearcher) Close() error {

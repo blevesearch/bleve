@@ -111,8 +111,8 @@ func (s *RegexpSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docum
 
 }
 
-func (s *RegexpSearcher) Advance(ID string) (*search.DocumentMatch, error) {
-	return s.searcher.Advance(ID)
+func (s *RegexpSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+	return s.searcher.Advance(ID, preAllocated)
 }
 
 func (s *RegexpSearcher) Close() error {

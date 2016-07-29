@@ -88,9 +88,9 @@ func (s *DocIDSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docume
 
 }
 
-func (s *DocIDSearcher) Advance(ID string) (*search.DocumentMatch, error) {
+func (s *DocIDSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	s.current = sort.SearchStrings(s.ids, ID)
-	return s.Next(nil)
+	return s.Next(preAllocated)
 }
 
 func (s *DocIDSearcher) Close() error {

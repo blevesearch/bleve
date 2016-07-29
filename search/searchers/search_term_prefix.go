@@ -75,8 +75,8 @@ func (s *TermPrefixSearcher) Next(preAllocated *search.DocumentMatch) (*search.D
 
 }
 
-func (s *TermPrefixSearcher) Advance(ID string) (*search.DocumentMatch, error) {
-	return s.searcher.Advance(ID)
+func (s *TermPrefixSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+	return s.searcher.Advance(ID, preAllocated)
 }
 
 func (s *TermPrefixSearcher) Close() error {

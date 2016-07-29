@@ -163,7 +163,7 @@ func (s *BooleanSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docu
 	for s.currentID != "" {
 		if s.currMustNot != nil && s.currMustNot.ID < s.currentID {
 			// advance must not searcher to our candidate entry
-			s.currMustNot, err = s.mustNotSearcher.Advance(s.currentID)
+			s.currMustNot, err = s.mustNotSearcher.Advance(s.currentID, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -186,7 +186,7 @@ func (s *BooleanSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docu
 
 		if s.currShould != nil && s.currShould.ID < s.currentID {
 			// advance should searcher to our candidate entry
-			s.currShould, err = s.shouldSearcher.Advance(s.currentID)
+			s.currShould, err = s.shouldSearcher.Advance(s.currentID, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -255,7 +255,7 @@ func (s *BooleanSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docu
 	return rv, nil
 }
 
-func (s *BooleanSearcher) Advance(ID string) (*search.DocumentMatch, error) {
+func (s *BooleanSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 
 	if !s.initialized {
 		err := s.initSearchers()
@@ -266,19 +266,19 @@ func (s *BooleanSearcher) Advance(ID string) (*search.DocumentMatch, error) {
 
 	var err error
 	if s.mustSearcher != nil {
-		s.currMust, err = s.mustSearcher.Advance(ID)
+		s.currMust, err = s.mustSearcher.Advance(ID, nil)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if s.shouldSearcher != nil {
-		s.currShould, err = s.shouldSearcher.Advance(ID)
+		s.currShould, err = s.shouldSearcher.Advance(ID, nil)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if s.mustNotSearcher != nil {
-		s.currMustNot, err = s.mustNotSearcher.Advance(ID)
+		s.currMustNot, err = s.mustNotSearcher.Advance(ID, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -292,7 +292,7 @@ func (s *BooleanSearcher) Advance(ID string) (*search.DocumentMatch, error) {
 		s.currentID = ""
 	}
 
-	return s.Next(nil)
+	return s.Next(preAllocated)
 }
 
 func (s *BooleanSearcher) Count() uint64 {

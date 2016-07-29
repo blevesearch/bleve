@@ -117,7 +117,7 @@ OUTER:
 					continue OUTER
 				}
 				// this reader doesn't have the currentID, try to advance
-				s.currs[i], err = termSearcher.Advance(s.currentID)
+				s.currs[i], err = termSearcher.Advance(s.currentID, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -155,7 +155,7 @@ OUTER:
 	return rv, nil
 }
 
-func (s *ConjunctionSearcher) Advance(ID string) (*search.DocumentMatch, error) {
+func (s *ConjunctionSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {
@@ -164,13 +164,13 @@ func (s *ConjunctionSearcher) Advance(ID string) (*search.DocumentMatch, error) 
 	}
 	var err error
 	for i, searcher := range s.searchers {
-		s.currs[i], err = searcher.Advance(ID)
+		s.currs[i], err = searcher.Advance(ID, nil)
 		if err != nil {
 			return nil, err
 		}
 	}
 	s.currentID = ID
-	return s.Next(nil)
+	return s.Next(preAllocated)
 }
 
 func (s *ConjunctionSearcher) Count() uint64 {

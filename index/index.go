@@ -117,7 +117,7 @@ type TermFieldReader interface {
 
 	// Advance resets the enumeration at specified document or its immediate
 	// follower.
-	Advance(ID string) (*TermFieldDoc, error)
+	Advance(ID string, preAlloced *TermFieldDoc) (*TermFieldDoc, error)
 
 	// Count returns the number of documents contains the term in this field.
 	Count() uint64

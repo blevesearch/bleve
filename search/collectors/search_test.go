@@ -27,7 +27,7 @@ func (ss *stubSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docume
 	return nil, nil
 }
 
-func (ss *stubSearcher) Advance(ID string) (*search.DocumentMatch, error) {
+func (ss *stubSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 
 	for ss.index < len(ss.matches) && ss.matches[ss.index].ID < ID {
 		ss.index++

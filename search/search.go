@@ -98,7 +98,7 @@ func (c DocumentMatchCollection) Less(i, j int) bool { return c[i].Score > c[j].
 
 type Searcher interface {
 	Next(preAllocated *DocumentMatch) (*DocumentMatch, error)
-	Advance(ID string) (*DocumentMatch, error)
+	Advance(ID string, preAllocated *DocumentMatch) (*DocumentMatch, error)
 	Close() error
 	Weight() float64
 	SetQueryNorm(float64)

@@ -112,8 +112,8 @@ func (s *FuzzySearcher) Next(preAllocated *search.DocumentMatch) (*search.Docume
 
 }
 
-func (s *FuzzySearcher) Advance(ID string) (*search.DocumentMatch, error) {
-	return s.searcher.Advance(ID)
+func (s *FuzzySearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+	return s.searcher.Advance(ID, preAllocated)
 }
 
 func (s *FuzzySearcher) Close() error {

@@ -158,7 +158,7 @@ func TestDisjunctionAdvance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	match, err := martyOrDustinSearcher.Advance("3")
+	match, err := martyOrDustinSearcher.Advance("3", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

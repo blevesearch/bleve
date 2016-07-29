@@ -63,7 +63,7 @@ func (s *MatchAllSearcher) Next(preAllocated *search.DocumentMatch) (*search.Doc
 
 }
 
-func (s *MatchAllSearcher) Advance(ID string) (*search.DocumentMatch, error) {
+func (s *MatchAllSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	id, err := s.reader.Advance(ID)
 	if err != nil {
 		return nil, err
