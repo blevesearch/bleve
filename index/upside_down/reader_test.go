@@ -98,9 +98,9 @@ func TestIndexReader(t *testing.T) {
 
 	var match *index.TermFieldDoc
 	var actualCount uint64
-	match, err = reader.Next()
+	match, err = reader.Next(nil)
 	for err == nil && match != nil {
-		match, err = reader.Next()
+		match, err = reader.Next(nil)
 		if err != nil {
 			t.Errorf("unexpected error reading next")
 		}
@@ -127,7 +127,7 @@ func TestIndexReader(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	match, err = tfr.Next()
+	match, err = tfr.Next(nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestIndexReader(t *testing.T) {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
 
-	match, err = reader.Advance("2")
+	match, err = reader.Advance("2", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -155,7 +155,7 @@ func TestIndexReader(t *testing.T) {
 	if match.ID != "2" {
 		t.Errorf("Expected ID '2', got '%s'", match.ID)
 	}
-	match, err = reader.Advance("3")
+	match, err = reader.Advance("3", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -176,14 +176,14 @@ func TestIndexReader(t *testing.T) {
 	if count != 0 {
 		t.Errorf("expected count 0 for reader of non-existant field")
 	}
-	match, err = reader.Next()
+	match, err = reader.Next(nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if match != nil {
 		t.Errorf("expected nil, got %v", match)
 	}
-	match, err = reader.Advance("anywhere")
+	match, err = reader.Advance("anywhere", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

@@ -56,7 +56,7 @@ func (s *PhraseSearcher) initSearchers() error {
 	var err error
 	// get all searchers pointing at their first match
 	if s.mustSearcher != nil {
-		s.currMust, err = s.mustSearcher.Next()
+		s.currMust, err = s.mustSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
@@ -70,7 +70,7 @@ func (s *PhraseSearcher) advanceNextMust() error {
 	var err error
 
 	if s.mustSearcher != nil {
-		s.currMust, err = s.mustSearcher.Next()
+		s.currMust, err = s.mustSearcher.Next(nil)
 		if err != nil {
 			return err
 		}
@@ -90,7 +90,7 @@ func (s *PhraseSearcher) SetQueryNorm(qnorm float64) {
 	s.mustSearcher.SetQueryNorm(qnorm)
 }
 
-func (s *PhraseSearcher) Next() (*search.DocumentMatch, error) {
+func (s *PhraseSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {
@@ -160,7 +160,7 @@ func (s *PhraseSearcher) Next() (*search.DocumentMatch, error) {
 	return nil, nil
 }
 
-func (s *PhraseSearcher) Advance(ID string) (*search.DocumentMatch, error) {
+func (s *PhraseSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {
@@ -168,11 +168,11 @@ func (s *PhraseSearcher) Advance(ID string) (*search.DocumentMatch, error) {
 		}
 	}
 	var err error
-	s.currMust, err = s.mustSearcher.Advance(ID)
+	s.currMust, err = s.mustSearcher.Advance(ID, nil)
 	if err != nil {
 		return nil, err
 	}
-	return s.Next()
+	return s.Next(preAllocated)
 }
 
 func (s *PhraseSearcher) Count() uint64 {

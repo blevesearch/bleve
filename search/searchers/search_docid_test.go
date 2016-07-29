@@ -68,7 +68,7 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 
 	// Check the sequence
 	for i, id := range wanted {
-		m, err := searcher.Next()
+		m, err := searcher.Next(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +76,7 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 			t.Fatalf("expected %v at position %v, got %v", id, i, m.ID)
 		}
 	}
-	m, err := searcher.Next()
+	m, err := searcher.Next(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 		}
 		before := id[:1]
 		for _, target := range []string{before, id} {
-			m, err := searcher.Advance(target)
+			m, err := searcher.Advance(target, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -102,7 +102,7 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 	}
 	// Seek after the end of the sequence
 	after := "zzz"
-	m, err = searcher.Advance(after)
+	m, err = searcher.Advance(after, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

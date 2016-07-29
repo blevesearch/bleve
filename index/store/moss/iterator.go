@@ -18,15 +18,14 @@ import (
 )
 
 type Iterator struct {
-	store  *Store
-	ss     moss.Snapshot
-	iter   moss.Iterator
-	prefix []byte
-	start  []byte
-	end    []byte
-	done   bool
-	k      []byte
-	v      []byte
+	store *Store
+	ss    moss.Snapshot
+	iter  moss.Iterator
+	start []byte
+	end   []byte
+	done  bool
+	k     []byte
+	v     []byte
 }
 
 func (x *Iterator) Seek(seekToKey []byte) {
@@ -60,12 +59,11 @@ func (x *Iterator) Next() {
 		return
 	}
 
-	x.done = true
-	x.k = nil
-	x.v = nil
-
 	err := x.iter.Next()
 	if err != nil {
+		x.done = true
+		x.k = nil
+		x.v = nil
 		return
 	}
 
@@ -106,7 +104,6 @@ func (x *Iterator) Close() error {
 		x.iter = nil
 	}
 
-	x.prefix = nil
 	x.done = true
 	x.k = nil
 	x.v = nil
@@ -115,16 +112,11 @@ func (x *Iterator) Close() error {
 }
 
 func (x *Iterator) checkDone() {
-	x.done = true
-	x.k = nil
-	x.v = nil
-
 	k, v, err := x.iter.Current()
 	if err != nil {
-		return
-	}
-
-	if x.prefix != nil && !bytes.HasPrefix(k, x.prefix) {
+		x.done = true
+		x.k = nil
+		x.v = nil
 		return
 	}
 

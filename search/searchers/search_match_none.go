@@ -36,11 +36,11 @@ func (s *MatchNoneSearcher) SetQueryNorm(qnorm float64) {
 
 }
 
-func (s *MatchNoneSearcher) Next() (*search.DocumentMatch, error) {
+func (s *MatchNoneSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	return nil, nil
 }
 
-func (s *MatchNoneSearcher) Advance(ID string) (*search.DocumentMatch, error) {
+func (s *MatchNoneSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	return nil, nil
 }
 
