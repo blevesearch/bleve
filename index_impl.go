@@ -109,6 +109,10 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 		kvconfig = map[string]interface{}{}
 	}
 
+	if kvstore == "" {
+		return nil, fmt.Errorf("bleve not configured for file based indexing")
+	}
+
 	rv := indexImpl{
 		path: path,
 		name: path,
