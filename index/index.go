@@ -60,7 +60,7 @@ type AsyncIndex interface {
 }
 
 type IndexReader interface {
-	TermFieldReader(term []byte, field string) (TermFieldReader, error)
+	TermFieldReader(term []byte, field string, includeFreq, includeNorm, includeTermVectors bool) (TermFieldReader, error)
 
 	// DocIDReader returns an iterator over documents which identifiers are
 	// greater than or equal to start and smaller than end. Set start to the

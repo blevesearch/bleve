@@ -23,12 +23,12 @@ type IndexReader struct {
 	docCount uint64
 }
 
-func (i *IndexReader) TermFieldReader(term []byte, fieldName string) (index.TermFieldReader, error) {
+func (i *IndexReader) TermFieldReader(term []byte, fieldName string, includeFreq, includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
 	fieldIndex, fieldExists := i.index.fieldCache.FieldNamed(fieldName, false)
 	if fieldExists {
-		return newUpsideDownCouchTermFieldReader(i, term, uint16(fieldIndex))
+		return newUpsideDownCouchTermFieldReader(i, term, uint16(fieldIndex), includeFreq, includeNorm, includeTermVectors)
 	}
-	return newUpsideDownCouchTermFieldReader(i, []byte{ByteSeparator}, ^uint16(0))
+	return newUpsideDownCouchTermFieldReader(i, []byte{ByteSeparator}, ^uint16(0), includeFreq, includeNorm, includeTermVectors)
 }
 
 func (i *IndexReader) FieldDict(fieldName string) (index.FieldDict, error) {

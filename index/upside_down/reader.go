@@ -25,7 +25,7 @@ type UpsideDownCouchTermFieldReader struct {
 	field       uint16
 }
 
-func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, field uint16) (*UpsideDownCouchTermFieldReader, error) {
+func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, field uint16, includeFreq, includeNorm, includeTermVectors bool) (*UpsideDownCouchTermFieldReader, error) {
 	dictionaryRow := NewDictionaryRow(term, field, 0)
 	val, err := indexReader.kvreader.Get(dictionaryRow.Key())
 	if err != nil {

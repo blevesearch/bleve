@@ -26,7 +26,7 @@ type TermSearcher struct {
 }
 
 func NewTermSearcher(indexReader index.IndexReader, term string, field string, boost float64, explain bool) (*TermSearcher, error) {
-	reader, err := indexReader.TermFieldReader([]byte(term), field)
+	reader, err := indexReader.TermFieldReader([]byte(term), field, true, true, true)
 	if err != nil {
 		return nil, err
 	}
