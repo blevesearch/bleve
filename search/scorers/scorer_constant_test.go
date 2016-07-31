@@ -23,12 +23,12 @@ func TestConstantScorer(t *testing.T) {
 
 	tests := []struct {
 		termMatch *index.TermFieldDoc
-		result    *search.DocumentMatch
+		result    *search.DocumentMatchInternal
 	}{
 		// test some simple math
 		{
 			termMatch: &index.TermFieldDoc{
-				ID:   "one",
+				ID:   testInternalId("one"),
 				Freq: 1,
 				Norm: 1.0,
 				Vectors: []*index.TermFieldVector{
@@ -40,8 +40,8 @@ func TestConstantScorer(t *testing.T) {
 					},
 				},
 			},
-			result: &search.DocumentMatch{
-				ID:    "one",
+			result: &search.DocumentMatchInternal{
+				ID:    testInternalId("one"),
 				Score: 1.0,
 				Expl: &search.Explanation{
 					Value:   1.0,
@@ -68,16 +68,16 @@ func TestConstantScorerWithQueryNorm(t *testing.T) {
 
 	tests := []struct {
 		termMatch *index.TermFieldDoc
-		result    *search.DocumentMatch
+		result    *search.DocumentMatchInternal
 	}{
 		{
 			termMatch: &index.TermFieldDoc{
-				ID:   "one",
+				ID:   testInternalId("one"),
 				Freq: 1,
 				Norm: 1.0,
 			},
-			result: &search.DocumentMatch{
-				ID:    "one",
+			result: &search.DocumentMatchInternal{
+				ID:    testInternalId("one"),
 				Score: 2.0,
 				Expl: &search.Explanation{
 					Value:   2.0,

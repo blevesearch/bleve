@@ -12,6 +12,7 @@ package searchers
 import (
 	"testing"
 
+	"github.com/blevesearch/bleve/index/upside_down"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -65,17 +66,17 @@ func TestDisjunctionSearch(t *testing.T) {
 
 	tests := []struct {
 		searcher search.Searcher
-		results  []*search.DocumentMatch
+		results  []*search.DocumentMatchInternal
 	}{
 		{
 			searcher: martyOrDustinSearcher,
-			results: []*search.DocumentMatch{
+			results: []*search.DocumentMatchInternal{
 				{
-					ID:    "1",
+					ID:    upside_down.InternalId("1"),
 					Score: 0.6775110856165737,
 				},
 				{
-					ID:    "3",
+					ID:    upside_down.InternalId("3"),
 					Score: 0.6775110856165737,
 				},
 			},
@@ -83,17 +84,17 @@ func TestDisjunctionSearch(t *testing.T) {
 		// test a nested disjunction
 		{
 			searcher: nestedRaviOrMartyOrDustinSearcher,
-			results: []*search.DocumentMatch{
+			results: []*search.DocumentMatchInternal{
 				{
-					ID:    "1",
+					ID:    upside_down.InternalId("1"),
 					Score: 0.2765927424732821,
 				},
 				{
-					ID:    "3",
+					ID:    upside_down.InternalId("3"),
 					Score: 0.2765927424732821,
 				},
 				{
-					ID:    "4",
+					ID:    upside_down.InternalId("4"),
 					Score: 0.5531854849465642,
 				},
 			},
@@ -112,7 +113,7 @@ func TestDisjunctionSearch(t *testing.T) {
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
-				if next.ID != test.results[i].ID {
+				if !next.ID.Equals(test.results[i].ID) {
 					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].ID, next.ID, testIndex)
 				}
 				if !scoresCloseEnough(next.Score, test.results[i].Score) {
@@ -158,7 +159,7 @@ func TestDisjunctionAdvance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	match, err := martyOrDustinSearcher.Advance("3", nil)
+	match, err := martyOrDustinSearcher.Advance(upside_down.InternalId("3"), nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

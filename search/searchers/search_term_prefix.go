@@ -70,12 +70,12 @@ func (s *TermPrefixSearcher) SetQueryNorm(qnorm float64) {
 	s.searcher.SetQueryNorm(qnorm)
 }
 
-func (s *TermPrefixSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *TermPrefixSearcher) Next(preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
 	return s.searcher.Next(preAllocated)
 
 }
 
-func (s *TermPrefixSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *TermPrefixSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
 	return s.searcher.Advance(ID, preAllocated)
 }
 

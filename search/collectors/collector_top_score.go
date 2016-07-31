@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/net/context"
 
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -27,6 +28,7 @@ type TopScoreCollector struct {
 	minScore      float64
 	total         uint64
 	facetsBuilder *search.FacetsBuilder
+	actualResults search.DocumentMatchCollection
 }
 
 func NewTopScorerCollector(k int) *TopScoreCollector {
@@ -59,11 +61,11 @@ func (tksc *TopScoreCollector) Took() time.Duration {
 
 var COLLECT_CHECK_DONE_EVERY = uint64(1024)
 
-func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Searcher) error {
+func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Searcher, reader index.IndexReader) error {
 	startTime := time.Now()
 	var err error
-	var pre search.DocumentMatch // A single pre-alloc'ed, reused instance.
-	var next *search.DocumentMatch
+	var pre search.DocumentMatchInternal // A single pre-alloc'ed, reused instance.
+	var next *search.DocumentMatchInternal
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -87,6 +89,12 @@ func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Sear
 		}
 		next, err = searcher.Next(pre.Reset())
 	}
+	// finalize actual results
+	tksc.actualResults, err = tksc.finalizeResults(reader)
+	if err != nil {
+		return err
+	}
+
 	// compute search duration
 	tksc.took = time.Since(startTime)
 	if err != nil {
@@ -95,7 +103,7 @@ func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Sear
 	return nil
 }
 
-func (tksc *TopScoreCollector) collectSingle(dmIn *search.DocumentMatch) {
+func (tksc *TopScoreCollector) collectSingle(dmIn *search.DocumentMatchInternal) {
 	// increment total hits
 	tksc.total++
 
@@ -111,18 +119,18 @@ func (tksc *TopScoreCollector) collectSingle(dmIn *search.DocumentMatch) {
 	// Because the dmIn will be the single, pre-allocated, reused
 	// instance, we need to copy the dmIn into a new, standalone
 	// instance before inserting into our candidate results list.
-	dm := &search.DocumentMatch{}
+	dm := &search.DocumentMatchInternal{}
 	*dm = *dmIn
 
 	for e := tksc.results.Front(); e != nil; e = e.Next() {
-		curr := e.Value.(*search.DocumentMatch)
+		curr := e.Value.(*search.DocumentMatchInternal)
 		if dm.Score <= curr.Score {
 
 			tksc.results.InsertBefore(dm, e)
 			// if we just made the list too long
 			if tksc.results.Len() > (tksc.k + tksc.skip) {
 				// remove the head
-				tksc.minScore = tksc.results.Remove(tksc.results.Front()).(*search.DocumentMatch).Score
+				tksc.minScore = tksc.results.Remove(tksc.results.Front()).(*search.DocumentMatchInternal).Score
 			}
 			return
 		}
@@ -131,11 +139,15 @@ func (tksc *TopScoreCollector) collectSingle(dmIn *search.DocumentMatch) {
 	tksc.results.PushBack(dm)
 	if tksc.results.Len() > (tksc.k + tksc.skip) {
 		// remove the head
-		tksc.minScore = tksc.results.Remove(tksc.results.Front()).(*search.DocumentMatch).Score
+		tksc.minScore = tksc.results.Remove(tksc.results.Front()).(*search.DocumentMatchInternal).Score
 	}
 }
 
 func (tksc *TopScoreCollector) Results() search.DocumentMatchCollection {
+	return tksc.actualResults
+}
+
+func (tksc *TopScoreCollector) finalizeResults(r index.IndexReader) (search.DocumentMatchCollection, error) {
 	if tksc.results.Len()-tksc.skip > 0 {
 		rv := make(search.DocumentMatchCollection, tksc.results.Len()-tksc.skip)
 		i := 0
@@ -145,12 +157,16 @@ func (tksc *TopScoreCollector) Results() search.DocumentMatchCollection {
 				skipped++
 				continue
 			}
-			rv[i] = e.Value.(*search.DocumentMatch)
+			var err error
+			rv[i], err = e.Value.(*search.DocumentMatchInternal).Finalize(r)
+			if err != nil {
+				return nil, err
+			}
 			i++
 		}
-		return rv
+		return rv, nil
 	}
-	return search.DocumentMatchCollection{}
+	return search.DocumentMatchCollection{}, nil
 }
 
 func (tksc *TopScoreCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {

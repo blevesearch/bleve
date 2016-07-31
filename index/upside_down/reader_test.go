@@ -111,7 +111,7 @@ func TestIndexReader(t *testing.T) {
 	}
 
 	expectedMatch := &index.TermFieldDoc{
-		ID:   "2",
+		ID:   InternalId("2"),
 		Freq: 1,
 		Norm: 0.5773502588272095,
 		Vectors: []*index.TermFieldVector{
@@ -145,17 +145,17 @@ func TestIndexReader(t *testing.T) {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
 
-	match, err = reader.Advance("2", nil)
+	match, err = reader.Advance(InternalId("2"), nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if match == nil {
 		t.Fatalf("Expected match, got nil")
 	}
-	if match.ID != "2" {
+	if !match.ID.Equals(InternalId("2")) {
 		t.Errorf("Expected ID '2', got '%s'", match.ID)
 	}
-	match, err = reader.Advance("3", nil)
+	match, err = reader.Advance(InternalId("3"), nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestIndexReader(t *testing.T) {
 	if match != nil {
 		t.Errorf("expected nil, got %v", match)
 	}
-	match, err = reader.Advance("anywhere", nil)
+	match, err = reader.Advance(InternalId("anywhere"), nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestIndexDocIdReader(t *testing.T) {
 
 	id, err := reader.Next()
 	count := uint64(0)
-	for id != "" {
+	for id != nil {
 		count++
 		id, err = reader.Next()
 	}
@@ -280,19 +280,19 @@ func TestIndexDocIdReader(t *testing.T) {
 		}
 	}()
 
-	id, err = reader2.Advance("2")
+	id, err = reader2.Advance(InternalId("2"))
 	if err != nil {
 		t.Error(err)
 	}
-	if id != "2" {
+	if !id.Equals(InternalId("2")) {
 		t.Errorf("expected to find id '2', got '%s'", id)
 	}
 
-	id, err = reader2.Advance("3")
+	id, err = reader2.Advance(InternalId("3"))
 	if err != nil {
 		t.Error(err)
 	}
-	if id != "" {
+	if id != nil {
 		t.Errorf("expected to find id '', got '%s'", id)
 	}
 }

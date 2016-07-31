@@ -107,12 +107,12 @@ func (s *FuzzySearcher) SetQueryNorm(qnorm float64) {
 	s.searcher.SetQueryNorm(qnorm)
 }
 
-func (s *FuzzySearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *FuzzySearcher) Next(preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
 	return s.searcher.Next(preAllocated)
 
 }
 
-func (s *FuzzySearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *FuzzySearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
 	return s.searcher.Advance(ID, preAllocated)
 }
 

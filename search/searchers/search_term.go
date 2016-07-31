@@ -53,7 +53,7 @@ func (s *TermSearcher) SetQueryNorm(qnorm float64) {
 	s.scorer.SetQueryNorm(qnorm)
 }
 
-func (s *TermSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *TermSearcher) Next(preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
 	termMatch, err := s.reader.Next(s.tfd.Reset())
 	if err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ func (s *TermSearcher) Next(preAllocated *search.DocumentMatch) (*search.Documen
 
 }
 
-func (s *TermSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *TermSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
 	termMatch, err := s.reader.Advance(ID, s.tfd.Reset())
 	if err != nil {
 		return nil, err

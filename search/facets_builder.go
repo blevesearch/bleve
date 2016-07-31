@@ -37,7 +37,7 @@ func (fb *FacetsBuilder) Add(name string, facetBuilder FacetBuilder) {
 	fb.facets[name] = facetBuilder
 }
 
-func (fb *FacetsBuilder) Update(docMatch *DocumentMatch) error {
+func (fb *FacetsBuilder) Update(docMatch *DocumentMatchInternal) error {
 	var fields []string
 	for _, facetBuilder := range fb.facets {
 		fields = append(fields, facetBuilder.Field())

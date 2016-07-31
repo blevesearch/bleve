@@ -35,11 +35,11 @@ func TestMatchNoneSearch(t *testing.T) {
 
 	tests := []struct {
 		searcher search.Searcher
-		results  []*search.DocumentMatch
+		results  []*search.DocumentMatchInternal
 	}{
 		{
 			searcher: noneSearcher,
-			results:  []*search.DocumentMatch{},
+			results:  []*search.DocumentMatchInternal{},
 		},
 	}
 

@@ -663,16 +663,16 @@ func TestIndexBatch(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	docIds := make([]string, 0)
+	docIds := make([]InternalId, 0)
 	docID, err := docIDReader.Next()
-	for docID != "" && err == nil {
-		docIds = append(docIds, docID)
+	for docID != nil && err == nil {
+		docIds = append(docIds, docID.(InternalId))
 		docID, err = docIDReader.Next()
 	}
 	if err != nil {
 		t.Error(err)
 	}
-	expectedDocIds := []string{"2", "3"}
+	expectedDocIds := []InternalId{InternalId("2"), InternalId("3")}
 	if !reflect.DeepEqual(docIds, expectedDocIds) {
 		t.Errorf("expected ids: %v, got ids: %v", expectedDocIds, docIds)
 	}
@@ -1126,7 +1126,7 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 
 	tfd, err := termFieldReader.Next(nil)
 	for tfd != nil && err == nil {
-		if tfd.ID != "1" {
+		if !tfd.ID.Equals(InternalId("1")) {
 			t.Errorf("expected to find document id 1")
 		}
 		tfd, err = termFieldReader.Next(nil)
@@ -1179,7 +1179,7 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 		}
 	}()
 
-	fieldTerms, err := indexReader.DocumentFieldTerms("1")
+	fieldTerms, err := indexReader.DocumentFieldTerms(InternalId("1"))
 	if err != nil {
 		t.Error(err)
 	}

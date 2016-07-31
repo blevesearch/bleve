@@ -435,7 +435,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		collector.SetFacetsBuilder(facetsBuilder)
 	}
 
-	err = collector.Collect(ctx, searcher)
+	err = collector.Collect(ctx, searcher, indexReader)
 	if err != nil {
 		return nil, err
 	}

@@ -151,7 +151,7 @@ func (udc *UpsideDownCouch) DumpDoc(id string) chan interface{} {
 			}
 		}()
 
-		back, err := udc.backIndexRowForDoc(kvreader, id)
+		back, err := udc.backIndexRowForDoc(kvreader, []byte(id))
 		if err != nil {
 			rv <- err
 			return

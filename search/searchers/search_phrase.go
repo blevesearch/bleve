@@ -21,7 +21,7 @@ type PhraseSearcher struct {
 	indexReader  index.IndexReader
 	mustSearcher *ConjunctionSearcher
 	queryNorm    float64
-	currMust     *search.DocumentMatch
+	currMust     *search.DocumentMatchInternal
 	slop         int
 	terms        []string
 }
@@ -90,7 +90,7 @@ func (s *PhraseSearcher) SetQueryNorm(qnorm float64) {
 	s.mustSearcher.SetQueryNorm(qnorm)
 }
 
-func (s *PhraseSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *PhraseSearcher) Next(preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {
@@ -98,7 +98,7 @@ func (s *PhraseSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docum
 		}
 	}
 
-	var rv *search.DocumentMatch
+	var rv *search.DocumentMatchInternal
 	for s.currMust != nil {
 		rvftlm := make(search.FieldTermLocationMap, 0)
 		freq := 0
@@ -160,7 +160,7 @@ func (s *PhraseSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docum
 	return nil, nil
 }
 
-func (s *PhraseSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *PhraseSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {

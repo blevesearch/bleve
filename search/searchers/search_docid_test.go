@@ -62,17 +62,13 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 		}
 	}()
 
-	if searcher.Count() != uint64(len(wanted)) {
-		t.Fatalf("expected count %v got %v", len(wanted), searcher.Count())
-	}
-
 	// Check the sequence
 	for i, id := range wanted {
 		m, err := searcher.Next(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if id != m.ID {
+		if !upside_down.InternalId(id).Equals(m.ID) {
 			t.Fatalf("expected %v at position %v, got %v", id, i, m.ID)
 		}
 	}
@@ -91,18 +87,18 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 		}
 		before := id[:1]
 		for _, target := range []string{before, id} {
-			m, err := searcher.Advance(target, nil)
+			m, err := searcher.Advance(upside_down.InternalId(target), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if m == nil || m.ID != id {
+			if m == nil || !m.ID.Equals(upside_down.InternalId(id)) {
 				t.Fatalf("advancing to %v returned %v instead of %v", before, m, id)
 			}
 		}
 	}
 	// Seek after the end of the sequence
 	after := "zzz"
-	m, err = searcher.Advance(after, nil)
+	m, err = searcher.Advance(upside_down.InternalId(after), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,6 +10,8 @@
 package upside_down
 
 import (
+	"bytes"
+	"sort"
 	"sync/atomic"
 
 	"github.com/blevesearch/bleve/index"
@@ -81,7 +83,7 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 			if rv == nil {
 				rv = &index.TermFieldDoc{}
 			}
-			rv.ID = string(tfr.doc)
+			rv.ID = InternalId(tfr.doc)
 			rv.Freq = tfr.freq
 			rv.Norm = float64(tfr.norm)
 			if tfr.vectors != nil {
@@ -94,9 +96,10 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 	return nil, nil
 }
 
-func (r *UpsideDownCouchTermFieldReader) Advance(docID string, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
+func (r *UpsideDownCouchTermFieldReader) Advance(docIDInternal index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
+	docID := docIDInternal.(InternalId)
 	if r.iterator != nil {
-		tfr := NewTermFrequencyRow(r.term, r.field, []byte(docID), 0, 0)
+		tfr := NewTermFrequencyRow(r.term, r.field, docID, 0, 0)
 		r.iterator.Seek(tfr.Key())
 		key, val, valid := r.iterator.Current()
 		if valid {
@@ -108,7 +111,7 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docID string, preAlloced *index
 			if rv == nil {
 				rv = &index.TermFieldDoc{}
 			}
-			rv.ID = string(tfr.doc)
+			rv.ID = InternalId(tfr.doc)
 			rv.Freq = tfr.freq
 			rv.Norm = float64(tfr.norm)
 			if tfr.vectors != nil {
@@ -131,6 +134,9 @@ func (r *UpsideDownCouchTermFieldReader) Close() error {
 type UpsideDownCouchDocIDReader struct {
 	indexReader *IndexReader
 	iterator    store.KVIterator
+	only        []string
+	onlyPos     int
+	onlyMode    bool
 }
 
 func newUpsideDownCouchDocIDReader(indexReader *IndexReader, start, end string) (*UpsideDownCouchDocIDReader, error) {
@@ -152,37 +158,138 @@ func newUpsideDownCouchDocIDReader(indexReader *IndexReader, start, end string) 
 	}, nil
 }
 
-func (r *UpsideDownCouchDocIDReader) Next() (string, error) {
-	key, val, valid := r.iterator.Current()
-	if valid {
-		br, err := NewBackIndexRowKV(key, val)
-		if err != nil {
-			return "", err
-		}
-		rv := string(br.doc)
-		r.iterator.Next()
-		return rv, nil
+func newUpsideDownCouchDocIDReaderOnly(indexReader *IndexReader, ids []string) (*UpsideDownCouchDocIDReader, error) {
+	// ensure ids are sorted
+	sort.Strings(ids)
+	startBytes := []byte{0x0}
+	if len(ids) > 0 {
+		startBytes = []byte(ids[0])
 	}
-	return "", nil
+	endBytes := []byte{0xff}
+	if len(ids) > 0 {
+		endBytes = incrementBytes([]byte(ids[len(ids)-1]))
+	}
+	bisr := NewBackIndexRow(startBytes, nil, nil)
+	bier := NewBackIndexRow(endBytes, nil, nil)
+	it := indexReader.kvreader.RangeIterator(bisr.Key(), bier.Key())
+
+	return &UpsideDownCouchDocIDReader{
+		indexReader: indexReader,
+		iterator:    it,
+		only:        ids,
+		onlyMode:    true,
+	}, nil
 }
 
-func (r *UpsideDownCouchDocIDReader) Advance(docID string) (string, error) {
-	bir := NewBackIndexRow([]byte(docID), nil, nil)
+func (r *UpsideDownCouchDocIDReader) Next() (index.IndexInternalID, error) {
+	key, val, valid := r.iterator.Current()
+
+	if r.onlyMode {
+		var rv InternalId
+		for valid && r.onlyPos < len(r.only) {
+			br, err := NewBackIndexRowKV(key, val)
+			if err != nil {
+				return nil, err
+			}
+			if !bytes.Equal(br.doc, []byte(r.only[r.onlyPos])) {
+				ok := r.nextOnly()
+				if !ok {
+					return nil, nil
+				}
+				r.iterator.Seek(NewBackIndexRow([]byte(r.only[r.onlyPos]), nil, nil).Key())
+				key, val, valid = r.iterator.Current()
+				continue
+			} else {
+				rv = InternalId(br.doc)
+				break
+			}
+		}
+		if valid && r.onlyPos < len(r.only) {
+			ok := r.nextOnly()
+			if ok {
+				r.iterator.Seek(NewBackIndexRow([]byte(r.only[r.onlyPos]), nil, nil).Key())
+			}
+			return rv, nil
+		}
+
+	} else {
+		if valid {
+			br, err := NewBackIndexRowKV(key, val)
+			if err != nil {
+				return nil, err
+			}
+			rv := InternalId(br.doc)
+			r.iterator.Next()
+			return rv, nil
+		}
+	}
+	return nil, nil
+}
+
+func (r *UpsideDownCouchDocIDReader) Advance(docID index.IndexInternalID) (index.IndexInternalID, error) {
+	docIDInternal := docID.(InternalId)
+	bir := NewBackIndexRow(docIDInternal, nil, nil)
 	r.iterator.Seek(bir.Key())
 	key, val, valid := r.iterator.Current()
-	if valid {
-		br, err := NewBackIndexRowKV(key, val)
-		if err != nil {
-			return "", err
+	r.onlyPos = sort.SearchStrings(r.only, string(docIDInternal))
+
+	if r.onlyMode {
+		var rv InternalId
+		for valid && r.onlyPos < len(r.only) {
+			br, err := NewBackIndexRowKV(key, val)
+			if err != nil {
+				return nil, err
+			}
+			if !bytes.Equal(br.doc, []byte(r.only[r.onlyPos])) {
+				ok := r.nextOnly()
+				if !ok {
+					return nil, nil
+				}
+				r.iterator.Seek(NewBackIndexRow([]byte(r.only[r.onlyPos]), nil, nil).Key())
+				continue
+			} else {
+				rv = InternalId(br.doc)
+				break
+			}
 		}
-		rv := string(br.doc)
-		r.iterator.Next()
-		return rv, nil
+		if valid && r.onlyPos < len(r.only) {
+			ok := r.nextOnly()
+			if ok {
+				r.iterator.Seek(NewBackIndexRow([]byte(r.only[r.onlyPos]), nil, nil).Key())
+			}
+			return rv, nil
+		}
+	} else {
+		if valid {
+			br, err := NewBackIndexRowKV(key, val)
+			if err != nil {
+				return nil, err
+			}
+			rv := InternalId(br.doc)
+			r.iterator.Next()
+			return rv, nil
+		}
 	}
-	return "", nil
+	return nil, nil
 }
 
 func (r *UpsideDownCouchDocIDReader) Close() error {
 	atomic.AddUint64(&r.indexReader.index.stats.termSearchersFinished, uint64(1))
 	return r.iterator.Close()
+}
+
+// move the r.only pos forward one, skipping duplicates
+// return true if there is more data, or false if we got to the end of the list
+func (r *UpsideDownCouchDocIDReader) nextOnly() bool {
+
+	// advance 1 position, until we see a different key
+	//   it's already sorted, so this skips duplicates
+	start := r.onlyPos
+	r.onlyPos++
+	for r.onlyPos < len(r.only) && r.only[r.onlyPos] == r.only[start] {
+		start = r.onlyPos
+		r.onlyPos++
+	}
+	// inidicate if we got to the end of the list
+	return r.onlyPos < len(r.only)
 }

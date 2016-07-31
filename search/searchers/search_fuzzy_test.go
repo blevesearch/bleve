@@ -12,6 +12,7 @@ package searchers
 import (
 	"testing"
 
+	"github.com/blevesearch/bleve/index/upside_down"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -50,47 +51,47 @@ func TestFuzzySearch(t *testing.T) {
 
 	tests := []struct {
 		searcher search.Searcher
-		results  []*search.DocumentMatch
+		results  []*search.DocumentMatchInternal
 	}{
 		{
 			searcher: fuzzySearcherbeet,
-			results: []*search.DocumentMatch{
+			results: []*search.DocumentMatchInternal{
 				{
-					ID:    "1",
+					ID:    upside_down.InternalId("1"),
 					Score: 1.0,
 				},
 				{
-					ID:    "2",
+					ID:    upside_down.InternalId("2"),
 					Score: 0.5,
 				},
 				{
-					ID:    "3",
+					ID:    upside_down.InternalId("3"),
 					Score: 0.5,
 				},
 				{
-					ID:    "4",
+					ID:    upside_down.InternalId("4"),
 					Score: 0.9999999838027345,
 				},
 			},
 		},
 		{
 			searcher: fuzzySearcherdouches,
-			results:  []*search.DocumentMatch{},
+			results:  []*search.DocumentMatchInternal{},
 		},
 		{
 			searcher: fuzzySearcheraplee,
-			results: []*search.DocumentMatch{
+			results: []*search.DocumentMatchInternal{
 				{
-					ID:    "3",
+					ID:    upside_down.InternalId("3"),
 					Score: 0.9581453659370776,
 				},
 			},
 		},
 		{
 			searcher: fuzzySearcherprefix,
-			results: []*search.DocumentMatch{
+			results: []*search.DocumentMatchInternal{
 				{
-					ID:    "5",
+					ID:    upside_down.InternalId("5"),
 					Score: 1.916290731874155,
 				},
 			},
@@ -109,7 +110,7 @@ func TestFuzzySearch(t *testing.T) {
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
-				if next.ID != test.results[i].ID {
+				if !next.ID.Equals(test.results[i].ID) {
 					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].ID, next.ID, testIndex)
 				}
 				if next.Score != test.results[i].Score {

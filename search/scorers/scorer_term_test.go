@@ -10,6 +10,7 @@
 package scorers
 
 import (
+	"bytes"
 	"math"
 	"reflect"
 	"testing"
@@ -17,6 +18,16 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
+
+type testInternalId []byte
+
+func (t testInternalId) Compare(other index.IndexInternalID) int {
+	return bytes.Compare(t, other.(testInternalId))
+}
+
+func (t testInternalId) Equals(other index.IndexInternalID) bool {
+	return t.Compare(other.(testInternalId)) == 0
+}
 
 func TestTermScorer(t *testing.T) {
 
@@ -30,12 +41,12 @@ func TestTermScorer(t *testing.T) {
 
 	tests := []struct {
 		termMatch *index.TermFieldDoc
-		result    *search.DocumentMatch
+		result    *search.DocumentMatchInternal
 	}{
 		// test some simple math
 		{
 			termMatch: &index.TermFieldDoc{
-				ID:   "one",
+				ID:   testInternalId("one"),
 				Freq: 1,
 				Norm: 1.0,
 				Vectors: []*index.TermFieldVector{
@@ -47,8 +58,8 @@ func TestTermScorer(t *testing.T) {
 					},
 				},
 			},
-			result: &search.DocumentMatch{
-				ID:    "one",
+			result: &search.DocumentMatchInternal{
+				ID:    testInternalId("one"),
 				Score: math.Sqrt(1.0) * idf,
 				Expl: &search.Explanation{
 					Value:   math.Sqrt(1.0) * idf,
@@ -84,12 +95,12 @@ func TestTermScorer(t *testing.T) {
 		// test the same thing again (score should be cached this time)
 		{
 			termMatch: &index.TermFieldDoc{
-				ID:   "one",
+				ID:   testInternalId("one"),
 				Freq: 1,
 				Norm: 1.0,
 			},
-			result: &search.DocumentMatch{
-				ID:    "one",
+			result: &search.DocumentMatchInternal{
+				ID:    testInternalId("one"),
 				Score: math.Sqrt(1.0) * idf,
 				Expl: &search.Explanation{
 					Value:   math.Sqrt(1.0) * idf,
@@ -114,12 +125,12 @@ func TestTermScorer(t *testing.T) {
 		// test a case where the sqrt isn't precalculated
 		{
 			termMatch: &index.TermFieldDoc{
-				ID:   "one",
+				ID:   testInternalId("one"),
 				Freq: 65,
 				Norm: 1.0,
 			},
-			result: &search.DocumentMatch{
-				ID:    "one",
+			result: &search.DocumentMatchInternal{
+				ID:    testInternalId("one"),
 				Score: math.Sqrt(65) * idf,
 				Expl: &search.Explanation{
 					Value:   math.Sqrt(65) * idf,
@@ -173,16 +184,16 @@ func TestTermScorerWithQueryNorm(t *testing.T) {
 
 	tests := []struct {
 		termMatch *index.TermFieldDoc
-		result    *search.DocumentMatch
+		result    *search.DocumentMatchInternal
 	}{
 		{
 			termMatch: &index.TermFieldDoc{
-				ID:   "one",
+				ID:   testInternalId("one"),
 				Freq: 1,
 				Norm: 1.0,
 			},
-			result: &search.DocumentMatch{
-				ID:    "one",
+			result: &search.DocumentMatchInternal{
+				ID:    testInternalId("one"),
 				Score: math.Sqrt(1.0) * idf * 3.0 * idf * 2.0,
 				Expl: &search.Explanation{
 					Value:   math.Sqrt(1.0) * idf * 3.0 * idf * 2.0,

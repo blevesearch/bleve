@@ -69,6 +69,8 @@ type IndexReader interface {
 	// The caller must close returned instance to release associated resources.
 	DocIDReader(start, end string) (DocIDReader, error)
 
+	DocIDReaderOnly(ids []string) (DocIDReader, error)
+
 	FieldDict(field string) (FieldDict, error)
 
 	// FieldDictRange is currently defined to include the start and end terms
@@ -76,14 +78,16 @@ type IndexReader interface {
 	FieldDictPrefix(field string, termPrefix []byte) (FieldDict, error)
 
 	Document(id string) (*document.Document, error)
-	DocumentFieldTerms(id string) (FieldTerms, error)
-	DocumentFieldTermsForFields(id string, fields []string) (FieldTerms, error)
+	DocumentFieldTerms(id IndexInternalID) (FieldTerms, error)
+	DocumentFieldTermsForFields(id IndexInternalID, fields []string) (FieldTerms, error)
 
 	Fields() ([]string, error)
 
 	GetInternal(key []byte) ([]byte, error)
 
 	DocCount() uint64
+
+	FinalizeDocID(id IndexInternalID) (string, error)
 
 	Close() error
 }
@@ -98,12 +102,26 @@ type TermFieldVector struct {
 	End            uint64
 }
 
+// IndexInternalID is an opaque document identifier interal to the index impl
+// This allows us to delay the conversion to public identifier (string) and
+// avoid it completely in other cases.  It also servces to hide the underlying
+// representation of a document identifer, allow more flexibility.
+type IndexInternalID interface {
+	Equals(other IndexInternalID) bool
+	Compare(other IndexInternalID) int
+}
+
 type TermFieldDoc struct {
 	Term    string
-	ID      string
+	ID      IndexInternalID
 	Freq    uint64
 	Norm    float64
 	Vectors []*TermFieldVector
+}
+
+func (tfd *TermFieldDoc) Reset() *TermFieldDoc {
+	*tfd = TermFieldDoc{}
+	return tfd
 }
 
 // TermFieldReader is the interface exposing the enumeration of documents
@@ -117,7 +135,7 @@ type TermFieldReader interface {
 
 	// Advance resets the enumeration at specified document or its immediate
 	// follower.
-	Advance(ID string, preAlloced *TermFieldDoc) (*TermFieldDoc, error)
+	Advance(ID IndexInternalID, preAlloced *TermFieldDoc) (*TermFieldDoc, error)
 
 	// Count returns the number of documents contains the term in this field.
 	Count() uint64
@@ -137,15 +155,15 @@ type FieldDict interface {
 // DocIDReader is the interface exposing enumeration of documents identifiers.
 // Close the reader to release associated resources.
 type DocIDReader interface {
-	// Next returns the next document identifier in ascending lexicographic
-	// byte order, or io.EOF when the end of the sequence is reached.
-	Next() (string, error)
+	// Next returns the next document internal identifier in the natural
+	// index order, or io.EOF when the end of the sequence is reached.
+	Next() (IndexInternalID, error)
 
-	// Advance resets the iteration to the first identifier greater than or
-	// equal to ID. If ID is smaller than the start of the range, the iteration
+	// Advance resets the iteration to the first internal identifier greater than
+	// or equal to ID. If ID is smaller than the start of the range, the iteration
 	// will start there instead. If ID is greater than or equal to the end of
 	// the range, Next() call will return io.EOF.
-	Advance(ID string) (string, error)
+	Advance(ID IndexInternalID) (IndexInternalID, error)
 	Close() error
 }
 
@@ -199,9 +217,4 @@ func (b *Batch) String() string {
 func (b *Batch) Reset() {
 	b.IndexOps = make(map[string]*document.Document)
 	b.InternalOps = make(map[string][]byte)
-}
-
-func (tfd *TermFieldDoc) Reset() *TermFieldDoc {
-	*tfd = TermFieldDoc{}
-	return tfd
 }

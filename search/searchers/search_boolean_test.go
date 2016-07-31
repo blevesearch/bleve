@@ -12,6 +12,7 @@ package searchers
 import (
 	"testing"
 
+	"github.com/blevesearch/bleve/index/upside_down"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -242,34 +243,34 @@ func TestBooleanSearch(t *testing.T) {
 
 	tests := []struct {
 		searcher search.Searcher
-		results  []*search.DocumentMatch
+		results  []*search.DocumentMatchInternal
 	}{
 		{
 			searcher: booleanSearcher,
-			results: []*search.DocumentMatch{
+			results: []*search.DocumentMatchInternal{
 				{
-					ID:    "1",
+					ID:    upside_down.InternalId("1"),
 					Score: 0.9818005051949021,
 				},
 				{
-					ID:    "3",
+					ID:    upside_down.InternalId("3"),
 					Score: 0.808709699395535,
 				},
 				{
-					ID:    "4",
+					ID:    upside_down.InternalId("4"),
 					Score: 0.34618161159873423,
 				},
 			},
 		},
 		{
 			searcher: booleanSearcher2,
-			results: []*search.DocumentMatch{
+			results: []*search.DocumentMatchInternal{
 				{
-					ID:    "1",
+					ID:    upside_down.InternalId("1"),
 					Score: 0.6775110856165737,
 				},
 				{
-					ID:    "3",
+					ID:    upside_down.InternalId("3"),
 					Score: 0.6775110856165737,
 				},
 			},
@@ -277,57 +278,57 @@ func TestBooleanSearch(t *testing.T) {
 		// no MUST or SHOULD clauses yields no results
 		{
 			searcher: booleanSearcher3,
-			results:  []*search.DocumentMatch{},
+			results:  []*search.DocumentMatchInternal{},
 		},
 		{
 			searcher: booleanSearcher4,
-			results: []*search.DocumentMatch{
+			results: []*search.DocumentMatchInternal{
 				{
-					ID:    "1",
+					ID:    upside_down.InternalId("1"),
 					Score: 1.0,
 				},
 				{
-					ID:    "3",
+					ID:    upside_down.InternalId("3"),
 					Score: 0.5,
 				},
 				{
-					ID:    "4",
+					ID:    upside_down.InternalId("4"),
 					Score: 1.0,
 				},
 			},
 		},
 		{
 			searcher: booleanSearcher5,
-			results: []*search.DocumentMatch{
+			results: []*search.DocumentMatchInternal{
 				{
-					ID:    "3",
+					ID:    upside_down.InternalId("3"),
 					Score: 0.5,
 				},
 				{
-					ID:    "4",
+					ID:    upside_down.InternalId("4"),
 					Score: 1.0,
 				},
 			},
 		},
 		{
 			searcher: booleanSearcher6,
-			results:  []*search.DocumentMatch{},
+			results:  []*search.DocumentMatchInternal{},
 		},
 		// test a conjunction query with a nested boolean
 		{
 			searcher: conjunctionSearcher7,
-			results: []*search.DocumentMatch{
+			results: []*search.DocumentMatchInternal{
 				{
-					ID:    "1",
+					ID:    upside_down.InternalId("1"),
 					Score: 2.0097428702814377,
 				},
 			},
 		},
 		{
 			searcher: conjunctionSearcher8,
-			results: []*search.DocumentMatch{
+			results: []*search.DocumentMatchInternal{
 				{
-					ID:    "3",
+					ID:    upside_down.InternalId("3"),
 					Score: 2.0681575785068107,
 				},
 			},
@@ -346,7 +347,7 @@ func TestBooleanSearch(t *testing.T) {
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
-				if next.ID != test.results[i].ID {
+				if !next.ID.Equals(test.results[i].ID) {
 					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].ID, next.ID, testIndex)
 				}
 				if !scoresCloseEnough(next.Score, test.results[i].Score) {

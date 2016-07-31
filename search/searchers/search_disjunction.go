@@ -29,8 +29,8 @@ type DisjunctionSearcher struct {
 	indexReader index.IndexReader
 	searchers   OrderedSearcherList
 	queryNorm   float64
-	currs       []*search.DocumentMatch
-	currentID   string
+	currs       []*search.DocumentMatchInternal
+	currentID   index.IndexInternalID
 	scorer      *scorers.DisjunctionQueryScorer
 	min         float64
 }
@@ -61,7 +61,7 @@ func NewDisjunctionSearcher(indexReader index.IndexReader, qsearchers []search.S
 	rv := DisjunctionSearcher{
 		indexReader: indexReader,
 		searchers:   searchers,
-		currs:       make([]*search.DocumentMatch, len(searchers)),
+		currs:       make([]*search.DocumentMatchInternal, len(searchers)),
 		scorer:      scorers.NewDisjunctionQueryScorer(explain),
 		min:         min,
 	}
@@ -98,10 +98,10 @@ func (s *DisjunctionSearcher) initSearchers() error {
 	return nil
 }
 
-func (s *DisjunctionSearcher) nextSmallestID() string {
-	rv := ""
+func (s *DisjunctionSearcher) nextSmallestID() index.IndexInternalID {
+	var rv index.IndexInternalID
 	for _, curr := range s.currs {
-		if curr != nil && (curr.ID < rv || rv == "") {
+		if curr != nil && (curr.ID.Compare(rv) < 0 || rv == nil) {
 			rv = curr.ID
 		}
 	}
@@ -122,7 +122,7 @@ func (s *DisjunctionSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *DisjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *DisjunctionSearcher) Next(preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {
@@ -130,13 +130,13 @@ func (s *DisjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.
 		}
 	}
 	var err error
-	var rv *search.DocumentMatch
-	matching := make([]*search.DocumentMatch, 0, len(s.searchers))
+	var rv *search.DocumentMatchInternal
+	matching := make([]*search.DocumentMatchInternal, 0, len(s.searchers))
 
 	found := false
-	for !found && s.currentID != "" {
+	for !found && s.currentID != nil {
 		for _, curr := range s.currs {
-			if curr != nil && curr.ID == s.currentID {
+			if curr != nil && curr.ID.Equals(s.currentID) {
 				matching = append(matching, curr)
 			}
 		}
@@ -148,10 +148,10 @@ func (s *DisjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.
 		}
 
 		// reset matching
-		matching = make([]*search.DocumentMatch, 0)
+		matching = make([]*search.DocumentMatchInternal, 0)
 		// invoke next on all the matching searchers
 		for i, curr := range s.currs {
-			if curr != nil && curr.ID == s.currentID {
+			if curr != nil && curr.ID.Equals(s.currentID) {
 				searcher := s.searchers[i]
 				s.currs[i], err = searcher.Next(nil)
 				if err != nil {
@@ -164,7 +164,7 @@ func (s *DisjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.
 	return rv, nil
 }
 
-func (s *DisjunctionSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *DisjunctionSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {

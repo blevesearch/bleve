@@ -9,6 +9,8 @@
 
 package search
 
+import "github.com/blevesearch/bleve/index"
+
 type Location struct {
 	Pos            float64   `json:"pos"`
 	Start          float64   `json:"start"`
@@ -49,6 +51,40 @@ func (t TermLocationMap) AddLocation(term string, location *Location) {
 type FieldTermLocationMap map[string]TermLocationMap
 
 type FieldFragmentMap map[string][]string
+
+type DocumentMatchInternal struct {
+	Index     string
+	ID        index.IndexInternalID
+	Score     float64
+	Expl      *Explanation
+	Locations FieldTermLocationMap
+	Fragments FieldFragmentMap
+
+	// Fields contains the values for document fields listed in
+	// SearchRequest.Fields. Text fields are returned as strings, numeric
+	// fields as float64s and date fields as time.RFC3339 formatted strings.
+	Fields map[string]interface{}
+}
+
+func (dm *DocumentMatchInternal) Reset() *DocumentMatchInternal {
+	*dm = DocumentMatchInternal{}
+	return dm
+}
+
+func (dm *DocumentMatchInternal) Finalize(r index.IndexReader) (rv *DocumentMatch, err error) {
+	rv = &DocumentMatch{}
+	rv.ID, err = r.FinalizeDocID(dm.ID)
+	if err != nil {
+		return nil, err
+	}
+	rv.Index = dm.Index
+	rv.Expl = dm.Expl
+	rv.Fields = dm.Fields
+	rv.Fragments = dm.Fragments
+	rv.Locations = dm.Locations
+	rv.Score = dm.Score
+	return rv, nil
+}
 
 type DocumentMatch struct {
 	Index     string               `json:"index,omitempty"`
@@ -97,8 +133,8 @@ func (c DocumentMatchCollection) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c DocumentMatchCollection) Less(i, j int) bool { return c[i].Score > c[j].Score }
 
 type Searcher interface {
-	Next(preAllocated *DocumentMatch) (*DocumentMatch, error)
-	Advance(ID string, preAllocated *DocumentMatch) (*DocumentMatch, error)
+	Next(preAllocated *DocumentMatchInternal) (*DocumentMatchInternal, error)
+	Advance(ID index.IndexInternalID, preAllocated *DocumentMatchInternal) (*DocumentMatchInternal, error)
 	Close() error
 	Weight() float64
 	SetQueryNorm(float64)
