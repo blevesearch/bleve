@@ -544,6 +544,7 @@ func (tfr *TermFrequencyRow) parseV(value []byte) error {
 
 	tfr.norm = math.Float32frombits(uint32(norm))
 
+	tfr.vectors = nil
 	var field uint64
 	field, bytesRead = binary.Uvarint(value[currOffset:])
 	for bytesRead > 0 {
@@ -551,7 +552,9 @@ func (tfr *TermFrequencyRow) parseV(value []byte) error {
 		tv := TermVector{}
 		tv.field = uint16(field)
 		// at this point we expect at least one term vector
-		tfr.vectors = make([]*TermVector, 0)
+		if tfr.vectors == nil {
+			tfr.vectors = make([]*TermVector, 0)
+		}
 
 		tv.pos, bytesRead = binary.Uvarint(value[currOffset:])
 		if bytesRead <= 0 {
