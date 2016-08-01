@@ -23,7 +23,7 @@ func TestConstantScorer(t *testing.T) {
 
 	tests := []struct {
 		termMatch *index.TermFieldDoc
-		result    *search.DocumentMatchInternal
+		result    *search.DocumentMatch
 	}{
 		// test some simple math
 		{
@@ -40,9 +40,9 @@ func TestConstantScorer(t *testing.T) {
 					},
 				},
 			},
-			result: &search.DocumentMatchInternal{
-				ID:    index.IndexInternalID("one"),
-				Score: 1.0,
+			result: &search.DocumentMatch{
+				IndexInternalID: index.IndexInternalID("one"),
+				Score:           1.0,
 				Expl: &search.Explanation{
 					Value:   1.0,
 					Message: "ConstantScore()",
@@ -68,7 +68,7 @@ func TestConstantScorerWithQueryNorm(t *testing.T) {
 
 	tests := []struct {
 		termMatch *index.TermFieldDoc
-		result    *search.DocumentMatchInternal
+		result    *search.DocumentMatch
 	}{
 		{
 			termMatch: &index.TermFieldDoc{
@@ -76,9 +76,9 @@ func TestConstantScorerWithQueryNorm(t *testing.T) {
 				Freq: 1,
 				Norm: 1.0,
 			},
-			result: &search.DocumentMatchInternal{
-				ID:    index.IndexInternalID("one"),
-				Score: 2.0,
+			result: &search.DocumentMatch{
+				IndexInternalID: index.IndexInternalID("one"),
+				Score:           2.0,
 				Expl: &search.Explanation{
 					Value:   2.0,
 					Message: "weight(^1.000000), product of:",

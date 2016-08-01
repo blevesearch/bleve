@@ -52,47 +52,14 @@ type FieldTermLocationMap map[string]TermLocationMap
 
 type FieldFragmentMap map[string][]string
 
-type DocumentMatchInternal struct {
-	Index     string
-	ID        index.IndexInternalID
-	Score     float64
-	Expl      *Explanation
-	Locations FieldTermLocationMap
-	Fragments FieldFragmentMap
-
-	// Fields contains the values for document fields listed in
-	// SearchRequest.Fields. Text fields are returned as strings, numeric
-	// fields as float64s and date fields as time.RFC3339 formatted strings.
-	Fields map[string]interface{}
-}
-
-func (dm *DocumentMatchInternal) Reset() *DocumentMatchInternal {
-	*dm = DocumentMatchInternal{}
-	return dm
-}
-
-func (dm *DocumentMatchInternal) Finalize(r index.IndexReader) (rv *DocumentMatch, err error) {
-	rv = &DocumentMatch{}
-	rv.ID, err = r.FinalizeDocID(dm.ID)
-	if err != nil {
-		return nil, err
-	}
-	rv.Index = dm.Index
-	rv.Expl = dm.Expl
-	rv.Fields = dm.Fields
-	rv.Fragments = dm.Fragments
-	rv.Locations = dm.Locations
-	rv.Score = dm.Score
-	return rv, nil
-}
-
 type DocumentMatch struct {
-	Index     string               `json:"index,omitempty"`
-	ID        string               `json:"id"`
-	Score     float64              `json:"score"`
-	Expl      *Explanation         `json:"explanation,omitempty"`
-	Locations FieldTermLocationMap `json:"locations,omitempty"`
-	Fragments FieldFragmentMap     `json:"fragments,omitempty"`
+	Index           string                `json:"index,omitempty"`
+	ID              string                `json:"id"`
+	IndexInternalID index.IndexInternalID `json:"-"`
+	Score           float64               `json:"score"`
+	Expl            *Explanation          `json:"explanation,omitempty"`
+	Locations       FieldTermLocationMap  `json:"locations,omitempty"`
+	Fragments       FieldFragmentMap      `json:"fragments,omitempty"`
 
 	// Fields contains the values for document fields listed in
 	// SearchRequest.Fields. Text fields are returned as strings, numeric
@@ -133,8 +100,8 @@ func (c DocumentMatchCollection) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c DocumentMatchCollection) Less(i, j int) bool { return c[i].Score > c[j].Score }
 
 type Searcher interface {
-	Next(preAllocated *DocumentMatchInternal) (*DocumentMatchInternal, error)
-	Advance(ID index.IndexInternalID, preAllocated *DocumentMatchInternal) (*DocumentMatchInternal, error)
+	Next(preAllocated *DocumentMatch) (*DocumentMatch, error)
+	Advance(ID index.IndexInternalID, preAllocated *DocumentMatch) (*DocumentMatch, error)
 	Close() error
 	Weight() float64
 	SetQueryNorm(float64)

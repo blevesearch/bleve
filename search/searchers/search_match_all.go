@@ -46,7 +46,7 @@ func (s *MatchAllSearcher) SetQueryNorm(qnorm float64) {
 	s.scorer.SetQueryNorm(qnorm)
 }
 
-func (s *MatchAllSearcher) Next(preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
+func (s *MatchAllSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	id, err := s.reader.Next()
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (s *MatchAllSearcher) Next(preAllocated *search.DocumentMatchInternal) (*se
 
 }
 
-func (s *MatchAllSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
+func (s *MatchAllSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	id, err := s.reader.Advance(ID)
 	if err != nil {
 		return nil, err

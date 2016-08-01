@@ -24,7 +24,7 @@ type ConjunctionSearcher struct {
 	searchers   OrderedSearcherList
 	explain     bool
 	queryNorm   float64
-	currs       []*search.DocumentMatchInternal
+	currs       []*search.DocumentMatch
 	currentID   index.IndexInternalID
 	scorer      *scorers.ConjunctionQueryScorer
 }
@@ -42,7 +42,7 @@ func NewConjunctionSearcher(indexReader index.IndexReader, qsearchers []search.S
 		indexReader: indexReader,
 		explain:     explain,
 		searchers:   searchers,
-		currs:       make([]*search.DocumentMatchInternal, len(searchers)),
+		currs:       make([]*search.DocumentMatch, len(searchers)),
 		scorer:      scorers.NewConjunctionQueryScorer(explain),
 	}
 	rv.computeQueryNorm()
@@ -75,7 +75,7 @@ func (s *ConjunctionSearcher) initSearchers() error {
 
 	if len(s.currs) > 0 {
 		if s.currs[0] != nil {
-			s.currentID = s.currs[0].ID
+			s.currentID = s.currs[0].IndexInternalID
 		} else {
 			s.currentID = nil
 		}
@@ -99,21 +99,21 @@ func (s *ConjunctionSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *ConjunctionSearcher) Next(preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
+func (s *ConjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {
 			return nil, err
 		}
 	}
-	var rv *search.DocumentMatchInternal
+	var rv *search.DocumentMatch
 	var err error
 OUTER:
 	for s.currentID != nil {
 		for i, termSearcher := range s.searchers {
-			if s.currs[i] != nil && !s.currs[i].ID.Equals(s.currentID) {
-				if s.currentID.Compare(s.currs[i].ID) < 0 {
-					s.currentID = s.currs[i].ID
+			if s.currs[i] != nil && !s.currs[i].IndexInternalID.Equals(s.currentID) {
+				if s.currentID.Compare(s.currs[i].IndexInternalID) < 0 {
+					s.currentID = s.currs[i].IndexInternalID
 					continue OUTER
 				}
 				// this reader doesn't have the currentID, try to advance
@@ -125,10 +125,10 @@ OUTER:
 					s.currentID = nil
 					continue OUTER
 				}
-				if !s.currs[i].ID.Equals(s.currentID) {
+				if !s.currs[i].IndexInternalID.Equals(s.currentID) {
 					// we just advanced, so it doesn't match, it must be greater
 					// no need to call next
-					s.currentID = s.currs[i].ID
+					s.currentID = s.currs[i].IndexInternalID
 					continue OUTER
 				}
 			} else if s.currs[i] == nil {
@@ -147,7 +147,7 @@ OUTER:
 		if s.currs[0] == nil {
 			s.currentID = nil
 		} else {
-			s.currentID = s.currs[0].ID
+			s.currentID = s.currs[0].IndexInternalID
 		}
 		// don't continue now, wait for the next call to Next()
 		break
@@ -155,7 +155,7 @@ OUTER:
 	return rv, nil
 }
 
-func (s *ConjunctionSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
+func (s *ConjunctionSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	if !s.initialized {
 		err := s.initSearchers()
 		if err != nil {

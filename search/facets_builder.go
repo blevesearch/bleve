@@ -37,12 +37,12 @@ func (fb *FacetsBuilder) Add(name string, facetBuilder FacetBuilder) {
 	fb.facets[name] = facetBuilder
 }
 
-func (fb *FacetsBuilder) Update(docMatch *DocumentMatchInternal) error {
+func (fb *FacetsBuilder) Update(docMatch *DocumentMatch) error {
 	var fields []string
 	for _, facetBuilder := range fb.facets {
 		fields = append(fields, facetBuilder.Field())
 	}
-	fieldTerms, err := fb.indexReader.DocumentFieldTermsForFields(docMatch.ID, fields)
+	fieldTerms, err := fb.indexReader.DocumentFieldTermsForFields(docMatch.IndexInternalID, fields)
 	if err != nil {
 		return err
 	}

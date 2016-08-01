@@ -25,9 +25,9 @@ func NewDisjunctionQueryScorer(explain bool) *DisjunctionQueryScorer {
 	}
 }
 
-func (s *DisjunctionQueryScorer) Score(constituents []*search.DocumentMatchInternal, countMatch, countTotal int) *search.DocumentMatchInternal {
-	rv := search.DocumentMatchInternal{
-		ID: constituents[0].ID,
+func (s *DisjunctionQueryScorer) Score(constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
+	rv := search.DocumentMatch{
+		IndexInternalID: constituents[0].IndexInternalID,
 	}
 
 	var sum float64

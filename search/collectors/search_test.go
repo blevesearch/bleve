@@ -17,10 +17,10 @@ import (
 
 type stubSearcher struct {
 	index   int
-	matches []*search.DocumentMatchInternal
+	matches []*search.DocumentMatch
 }
 
-func (ss *stubSearcher) Next(preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
+func (ss *stubSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	if ss.index < len(ss.matches) {
 		rv := ss.matches[ss.index]
 		ss.index++
@@ -29,9 +29,9 @@ func (ss *stubSearcher) Next(preAllocated *search.DocumentMatchInternal) (*searc
 	return nil, nil
 }
 
-func (ss *stubSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
+func (ss *stubSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 
-	for ss.index < len(ss.matches) && ss.matches[ss.index].ID.Compare(ID) < 0 {
+	for ss.index < len(ss.matches) && ss.matches[ss.index].IndexInternalID.Compare(ID) < 0 {
 		ss.index++
 	}
 	if ss.index < len(ss.matches) {

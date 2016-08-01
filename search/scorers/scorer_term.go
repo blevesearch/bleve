@@ -83,7 +83,7 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc, preAllocated *search.DocumentMatchInternal) *search.DocumentMatchInternal {
+func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc, preAllocated *search.DocumentMatch) *search.DocumentMatch {
 	var scoreExplanation *search.Explanation
 
 	// need to compute score
@@ -130,9 +130,9 @@ func (s *TermQueryScorer) Score(termMatch *index.TermFieldDoc, preAllocated *sea
 
 	rv := preAllocated
 	if rv == nil {
-		rv = &search.DocumentMatchInternal{}
+		rv = &search.DocumentMatch{}
 	}
-	rv.ID = termMatch.ID
+	rv.IndexInternalID = termMatch.ID
 	rv.Score = score
 	if s.explain {
 		rv.Expl = scoreExplanation

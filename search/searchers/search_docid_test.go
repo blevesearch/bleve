@@ -68,8 +68,8 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !index.IndexInternalID(id).Equals(m.ID) {
-			t.Fatalf("expected %v at position %v, got %v", id, i, m.ID)
+		if !index.IndexInternalID(id).Equals(m.IndexInternalID) {
+			t.Fatalf("expected %v at position %v, got %v", id, i, m.IndexInternalID)
 		}
 	}
 	m, err := searcher.Next(nil)
@@ -77,7 +77,7 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 		t.Fatal(err)
 	}
 	if m != nil {
-		t.Fatalf("expected nil past the end of the sequence, got %v", m.ID)
+		t.Fatalf("expected nil past the end of the sequence, got %v", m.IndexInternalID)
 	}
 
 	// Check seeking
@@ -91,7 +91,7 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if m == nil || !m.ID.Equals(index.IndexInternalID(id)) {
+			if m == nil || !m.IndexInternalID.Equals(index.IndexInternalID(id)) {
 				t.Fatalf("advancing to %v returned %v instead of %v", before, m, id)
 			}
 		}

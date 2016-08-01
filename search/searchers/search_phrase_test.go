@@ -48,14 +48,14 @@ func TestPhraseSearch(t *testing.T) {
 
 	tests := []struct {
 		searcher search.Searcher
-		results  []*search.DocumentMatchInternal
+		results  []*search.DocumentMatch
 	}{
 		{
 			searcher: phraseSearcher,
-			results: []*search.DocumentMatchInternal{
+			results: []*search.DocumentMatch{
 				{
-					ID:    index.IndexInternalID("2"),
-					Score: 1.0807601687084403,
+					IndexInternalID: index.IndexInternalID("2"),
+					Score:           1.0807601687084403,
 				},
 			},
 		},
@@ -73,8 +73,8 @@ func TestPhraseSearch(t *testing.T) {
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
-				if !next.ID.Equals(test.results[i].ID) {
-					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].ID, next.ID, testIndex)
+				if !next.IndexInternalID.Equals(test.results[i].IndexInternalID) {
+					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].IndexInternalID, next.IndexInternalID, testIndex)
 				}
 				if next.Score != test.results[i].Score {
 					t.Errorf("expected result %d to have score %v got  %v for test %d", i, test.results[i].Score, next.Score, testIndex)

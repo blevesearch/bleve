@@ -82,7 +82,7 @@ func (s *DocIDSearcher) SetQueryNorm(qnorm float64) {
 	s.scorer.SetQueryNorm(qnorm)
 }
 
-func (s *DocIDSearcher) Next(preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
+func (s *DocIDSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	// if s.current >= len(s.ids) {
 	// 	return nil, nil
 	// }
@@ -103,7 +103,7 @@ func (s *DocIDSearcher) Next(preAllocated *search.DocumentMatchInternal) (*searc
 	return docMatch, nil
 }
 
-func (s *DocIDSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatchInternal) (*search.DocumentMatchInternal, error) {
+func (s *DocIDSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
 	// s.current = sort.SearchStrings(s.ids, ID)
 	// return s.Next(preAllocated)
 

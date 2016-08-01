@@ -23,9 +23,9 @@ func NewConjunctionQueryScorer(explain bool) *ConjunctionQueryScorer {
 	}
 }
 
-func (s *ConjunctionQueryScorer) Score(constituents []*search.DocumentMatchInternal) *search.DocumentMatchInternal {
-	rv := search.DocumentMatchInternal{
-		ID: constituents[0].ID,
+func (s *ConjunctionQueryScorer) Score(constituents []*search.DocumentMatch) *search.DocumentMatch {
+	rv := search.DocumentMatch{
+		IndexInternalID: constituents[0].IndexInternalID,
 	}
 
 	var sum float64

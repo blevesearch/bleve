@@ -64,8 +64,8 @@ var COLLECT_CHECK_DONE_EVERY = uint64(1024)
 func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Searcher, reader index.IndexReader) error {
 	startTime := time.Now()
 	var err error
-	var pre search.DocumentMatchInternal // A single pre-alloc'ed, reused instance.
-	var next *search.DocumentMatchInternal
+	var pre search.DocumentMatch // A single pre-alloc'ed, reused instance.
+	var next *search.DocumentMatch
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -103,7 +103,7 @@ func (tksc *TopScoreCollector) Collect(ctx context.Context, searcher search.Sear
 	return nil
 }
 
-func (tksc *TopScoreCollector) collectSingle(dmIn *search.DocumentMatchInternal) {
+func (tksc *TopScoreCollector) collectSingle(dmIn *search.DocumentMatch) {
 	// increment total hits
 	tksc.total++
 
@@ -119,18 +119,18 @@ func (tksc *TopScoreCollector) collectSingle(dmIn *search.DocumentMatchInternal)
 	// Because the dmIn will be the single, pre-allocated, reused
 	// instance, we need to copy the dmIn into a new, standalone
 	// instance before inserting into our candidate results list.
-	dm := &search.DocumentMatchInternal{}
+	dm := &search.DocumentMatch{}
 	*dm = *dmIn
 
 	for e := tksc.results.Front(); e != nil; e = e.Next() {
-		curr := e.Value.(*search.DocumentMatchInternal)
+		curr := e.Value.(*search.DocumentMatch)
 		if dm.Score <= curr.Score {
 
 			tksc.results.InsertBefore(dm, e)
 			// if we just made the list too long
 			if tksc.results.Len() > (tksc.k + tksc.skip) {
 				// remove the head
-				tksc.minScore = tksc.results.Remove(tksc.results.Front()).(*search.DocumentMatchInternal).Score
+				tksc.minScore = tksc.results.Remove(tksc.results.Front()).(*search.DocumentMatch).Score
 			}
 			return
 		}
@@ -139,7 +139,7 @@ func (tksc *TopScoreCollector) collectSingle(dmIn *search.DocumentMatchInternal)
 	tksc.results.PushBack(dm)
 	if tksc.results.Len() > (tksc.k + tksc.skip) {
 		// remove the head
-		tksc.minScore = tksc.results.Remove(tksc.results.Front()).(*search.DocumentMatchInternal).Score
+		tksc.minScore = tksc.results.Remove(tksc.results.Front()).(*search.DocumentMatch).Score
 	}
 }
 
@@ -158,7 +158,8 @@ func (tksc *TopScoreCollector) finalizeResults(r index.IndexReader) (search.Docu
 				continue
 			}
 			var err error
-			rv[i], err = e.Value.(*search.DocumentMatchInternal).Finalize(r)
+			rv[i] = e.Value.(*search.DocumentMatch)
+			rv[i].ID, err = r.FinalizeDocID(rv[i].IndexInternalID)
 			if err != nil {
 				return nil, err
 			}

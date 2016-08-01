@@ -123,58 +123,58 @@ func TestConjunctionSearch(t *testing.T) {
 
 	tests := []struct {
 		searcher search.Searcher
-		results  []*search.DocumentMatchInternal
+		results  []*search.DocumentMatch
 	}{
 		{
 			searcher: beerAndMartySearcher,
-			results: []*search.DocumentMatchInternal{
+			results: []*search.DocumentMatch{
 				{
-					ID:    index.IndexInternalID("1"),
-					Score: 2.0097428702814377,
+					IndexInternalID: index.IndexInternalID("1"),
+					Score:           2.0097428702814377,
 				},
 			},
 		},
 		{
 			searcher: angstAndBeerSearcher,
-			results: []*search.DocumentMatchInternal{
+			results: []*search.DocumentMatch{
 				{
-					ID:    index.IndexInternalID("2"),
-					Score: 1.0807601687084403,
+					IndexInternalID: index.IndexInternalID("2"),
+					Score:           1.0807601687084403,
 				},
 			},
 		},
 		{
 			searcher: beerAndJackSearcher,
-			results:  []*search.DocumentMatchInternal{},
+			results:  []*search.DocumentMatch{},
 		},
 		{
 			searcher: beerAndMisterSearcher,
-			results: []*search.DocumentMatchInternal{
+			results: []*search.DocumentMatch{
 				{
-					ID:    index.IndexInternalID("2"),
-					Score: 1.2877980334016337,
+					IndexInternalID: index.IndexInternalID("2"),
+					Score:           1.2877980334016337,
 				},
 				{
-					ID:    index.IndexInternalID("3"),
-					Score: 1.2877980334016337,
+					IndexInternalID: index.IndexInternalID("3"),
+					Score:           1.2877980334016337,
 				},
 			},
 		},
 		{
 			searcher: couchbaseAndMisterSearcher,
-			results: []*search.DocumentMatchInternal{
+			results: []*search.DocumentMatch{
 				{
-					ID:    index.IndexInternalID("2"),
-					Score: 1.4436599157093672,
+					IndexInternalID: index.IndexInternalID("2"),
+					Score:           1.4436599157093672,
 				},
 			},
 		},
 		{
 			searcher: beerAndCouchbaseAndMisterSearcher,
-			results: []*search.DocumentMatchInternal{
+			results: []*search.DocumentMatch{
 				{
-					ID:    index.IndexInternalID("2"),
-					Score: 1.441614953806971,
+					IndexInternalID: index.IndexInternalID("2"),
+					Score:           1.441614953806971,
 				},
 			},
 		},
@@ -192,8 +192,8 @@ func TestConjunctionSearch(t *testing.T) {
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
-				if !next.ID.Equals(test.results[i].ID) {
-					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].ID, next.ID, testIndex)
+				if !next.IndexInternalID.Equals(test.results[i].IndexInternalID) {
+					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].IndexInternalID, next.IndexInternalID, testIndex)
 				}
 				if !scoresCloseEnough(next.Score, test.results[i].Score) {
 					t.Errorf("expected result %d to have score %v got  %v for test %d", i, test.results[i].Score, next.Score, testIndex)

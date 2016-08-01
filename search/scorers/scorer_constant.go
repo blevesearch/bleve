@@ -65,7 +65,7 @@ func (s *ConstantScorer) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *ConstantScorer) Score(id index.IndexInternalID) *search.DocumentMatchInternal {
+func (s *ConstantScorer) Score(id index.IndexInternalID) *search.DocumentMatch {
 	var scoreExplanation *search.Explanation
 
 	score := s.constant
@@ -92,9 +92,9 @@ func (s *ConstantScorer) Score(id index.IndexInternalID) *search.DocumentMatchIn
 		}
 	}
 
-	rv := search.DocumentMatchInternal{
-		ID:    id,
-		Score: score,
+	rv := search.DocumentMatch{
+		IndexInternalID: id,
+		Score:           score,
 	}
 	if s.explain {
 		rv.Expl = scoreExplanation

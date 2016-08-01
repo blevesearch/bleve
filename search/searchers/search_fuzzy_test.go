@@ -51,48 +51,48 @@ func TestFuzzySearch(t *testing.T) {
 
 	tests := []struct {
 		searcher search.Searcher
-		results  []*search.DocumentMatchInternal
+		results  []*search.DocumentMatch
 	}{
 		{
 			searcher: fuzzySearcherbeet,
-			results: []*search.DocumentMatchInternal{
+			results: []*search.DocumentMatch{
 				{
-					ID:    index.IndexInternalID("1"),
-					Score: 1.0,
+					IndexInternalID: index.IndexInternalID("1"),
+					Score:           1.0,
 				},
 				{
-					ID:    index.IndexInternalID("2"),
-					Score: 0.5,
+					IndexInternalID: index.IndexInternalID("2"),
+					Score:           0.5,
 				},
 				{
-					ID:    index.IndexInternalID("3"),
-					Score: 0.5,
+					IndexInternalID: index.IndexInternalID("3"),
+					Score:           0.5,
 				},
 				{
-					ID:    index.IndexInternalID("4"),
-					Score: 0.9999999838027345,
+					IndexInternalID: index.IndexInternalID("4"),
+					Score:           0.9999999838027345,
 				},
 			},
 		},
 		{
 			searcher: fuzzySearcherdouches,
-			results:  []*search.DocumentMatchInternal{},
+			results:  []*search.DocumentMatch{},
 		},
 		{
 			searcher: fuzzySearcheraplee,
-			results: []*search.DocumentMatchInternal{
+			results: []*search.DocumentMatch{
 				{
-					ID:    index.IndexInternalID("3"),
-					Score: 0.9581453659370776,
+					IndexInternalID: index.IndexInternalID("3"),
+					Score:           0.9581453659370776,
 				},
 			},
 		},
 		{
 			searcher: fuzzySearcherprefix,
-			results: []*search.DocumentMatchInternal{
+			results: []*search.DocumentMatch{
 				{
-					ID:    index.IndexInternalID("5"),
-					Score: 1.916290731874155,
+					IndexInternalID: index.IndexInternalID("5"),
+					Score:           1.916290731874155,
 				},
 			},
 		},
@@ -110,8 +110,8 @@ func TestFuzzySearch(t *testing.T) {
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
-				if !next.ID.Equals(test.results[i].ID) {
-					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].ID, next.ID, testIndex)
+				if !next.IndexInternalID.Equals(test.results[i].IndexInternalID) {
+					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].IndexInternalID, next.IndexInternalID, testIndex)
 				}
 				if next.Score != test.results[i].Score {
 					t.Errorf("expected result %d to have score %v got %v for test %d", i, test.results[i].Score, next.Score, testIndex)

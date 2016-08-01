@@ -66,36 +66,36 @@ func TestDisjunctionSearch(t *testing.T) {
 
 	tests := []struct {
 		searcher search.Searcher
-		results  []*search.DocumentMatchInternal
+		results  []*search.DocumentMatch
 	}{
 		{
 			searcher: martyOrDustinSearcher,
-			results: []*search.DocumentMatchInternal{
+			results: []*search.DocumentMatch{
 				{
-					ID:    index.IndexInternalID("1"),
-					Score: 0.6775110856165737,
+					IndexInternalID: index.IndexInternalID("1"),
+					Score:           0.6775110856165737,
 				},
 				{
-					ID:    index.IndexInternalID("3"),
-					Score: 0.6775110856165737,
+					IndexInternalID: index.IndexInternalID("3"),
+					Score:           0.6775110856165737,
 				},
 			},
 		},
 		// test a nested disjunction
 		{
 			searcher: nestedRaviOrMartyOrDustinSearcher,
-			results: []*search.DocumentMatchInternal{
+			results: []*search.DocumentMatch{
 				{
-					ID:    index.IndexInternalID("1"),
-					Score: 0.2765927424732821,
+					IndexInternalID: index.IndexInternalID("1"),
+					Score:           0.2765927424732821,
 				},
 				{
-					ID:    index.IndexInternalID("3"),
-					Score: 0.2765927424732821,
+					IndexInternalID: index.IndexInternalID("3"),
+					Score:           0.2765927424732821,
 				},
 				{
-					ID:    index.IndexInternalID("4"),
-					Score: 0.5531854849465642,
+					IndexInternalID: index.IndexInternalID("4"),
+					Score:           0.5531854849465642,
 				},
 			},
 		},
@@ -113,8 +113,8 @@ func TestDisjunctionSearch(t *testing.T) {
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
-				if !next.ID.Equals(test.results[i].ID) {
-					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].ID, next.ID, testIndex)
+				if !next.IndexInternalID.Equals(test.results[i].IndexInternalID) {
+					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].IndexInternalID, next.IndexInternalID, testIndex)
 				}
 				if !scoresCloseEnough(next.Score, test.results[i].Score) {
 					t.Errorf("expected result %d to have score %v got  %v for test %d", i, test.results[i].Score, next.Score, testIndex)

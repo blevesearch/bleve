@@ -11,11 +11,11 @@ import (
 )
 
 func benchHelper(numOfMatches int, collector search.Collector, b *testing.B) {
-	matches := make([]*search.DocumentMatchInternal, 0, numOfMatches)
+	matches := make([]*search.DocumentMatch, 0, numOfMatches)
 	for i := 0; i < numOfMatches; i++ {
-		matches = append(matches, &search.DocumentMatchInternal{
-			ID:    index.IndexInternalID(strconv.Itoa(i)),
-			Score: rand.Float64(),
+		matches = append(matches, &search.DocumentMatch{
+			IndexInternalID: index.IndexInternalID(strconv.Itoa(i)),
+			Score:           rand.Float64(),
 		})
 	}
 
