@@ -83,7 +83,7 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 			if rv == nil {
 				rv = &index.TermFieldDoc{}
 			}
-			rv.ID = tfr.doc
+			rv.ID = append([]byte(nil), tfr.doc...)
 			rv.Freq = tfr.freq
 			rv.Norm = float64(tfr.norm)
 			if tfr.vectors != nil {
@@ -110,7 +110,7 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docID index.IndexInternalID, pr
 			if rv == nil {
 				rv = &index.TermFieldDoc{}
 			}
-			rv.ID = tfr.doc
+			rv.ID = append([]byte(nil), tfr.doc...)
 			rv.Freq = tfr.freq
 			rv.Norm = float64(tfr.norm)
 			if tfr.vectors != nil {
@@ -199,7 +199,7 @@ func (r *UpsideDownCouchDocIDReader) Next() (index.IndexInternalID, error) {
 				key, val, valid = r.iterator.Current()
 				continue
 			} else {
-				rv = br.doc
+				rv = append([]byte(nil), br.doc...)
 				break
 			}
 		}
@@ -217,7 +217,7 @@ func (r *UpsideDownCouchDocIDReader) Next() (index.IndexInternalID, error) {
 			if err != nil {
 				return nil, err
 			}
-			rv := br.doc
+			rv := append([]byte(nil), br.doc...)
 			r.iterator.Next()
 			return rv, nil
 		}
@@ -246,7 +246,7 @@ func (r *UpsideDownCouchDocIDReader) Advance(docID index.IndexInternalID) (index
 				r.iterator.Seek(NewBackIndexRow([]byte(r.only[r.onlyPos]), nil, nil).Key())
 				continue
 			} else {
-				rv = br.doc
+				rv = append([]byte(nil), br.doc...)
 				break
 			}
 		}
@@ -263,7 +263,7 @@ func (r *UpsideDownCouchDocIDReader) Advance(docID index.IndexInternalID) (index
 			if err != nil {
 				return nil, err
 			}
-			rv := br.doc
+			rv := append([]byte(nil), br.doc...)
 			r.iterator.Next()
 			return rv, nil
 		}
