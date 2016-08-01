@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"golang.org/x/net/context"
 )
@@ -13,7 +14,7 @@ func benchHelper(numOfMatches int, collector search.Collector, b *testing.B) {
 	matches := make([]*search.DocumentMatchInternal, 0, numOfMatches)
 	for i := 0; i < numOfMatches; i++ {
 		matches = append(matches, &search.DocumentMatchInternal{
-			ID:    testInternalId(strconv.Itoa(i)),
+			ID:    index.IndexInternalID(strconv.Itoa(i)),
 			Score: rand.Float64(),
 		})
 	}

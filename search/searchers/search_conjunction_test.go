@@ -12,7 +12,7 @@ package searchers
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -129,7 +129,7 @@ func TestConjunctionSearch(t *testing.T) {
 			searcher: beerAndMartySearcher,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("1"),
+					ID:    index.IndexInternalID("1"),
 					Score: 2.0097428702814377,
 				},
 			},
@@ -138,7 +138,7 @@ func TestConjunctionSearch(t *testing.T) {
 			searcher: angstAndBeerSearcher,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("2"),
+					ID:    index.IndexInternalID("2"),
 					Score: 1.0807601687084403,
 				},
 			},
@@ -151,11 +151,11 @@ func TestConjunctionSearch(t *testing.T) {
 			searcher: beerAndMisterSearcher,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("2"),
+					ID:    index.IndexInternalID("2"),
 					Score: 1.2877980334016337,
 				},
 				{
-					ID:    upside_down.InternalId("3"),
+					ID:    index.IndexInternalID("3"),
 					Score: 1.2877980334016337,
 				},
 			},
@@ -164,7 +164,7 @@ func TestConjunctionSearch(t *testing.T) {
 			searcher: couchbaseAndMisterSearcher,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("2"),
+					ID:    index.IndexInternalID("2"),
 					Score: 1.4436599157093672,
 				},
 			},
@@ -173,7 +173,7 @@ func TestConjunctionSearch(t *testing.T) {
 			searcher: beerAndCouchbaseAndMisterSearcher,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("2"),
+					ID:    index.IndexInternalID("2"),
 					Score: 1.441614953806971,
 				},
 			},

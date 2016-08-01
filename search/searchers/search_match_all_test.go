@@ -12,7 +12,7 @@ package searchers
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -49,23 +49,23 @@ func TestMatchAllSearch(t *testing.T) {
 			queryNorm: 1.0,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("1"),
+					ID:    index.IndexInternalID("1"),
 					Score: 1.0,
 				},
 				{
-					ID:    upside_down.InternalId("2"),
+					ID:    index.IndexInternalID("2"),
 					Score: 1.0,
 				},
 				{
-					ID:    upside_down.InternalId("3"),
+					ID:    index.IndexInternalID("3"),
 					Score: 1.0,
 				},
 				{
-					ID:    upside_down.InternalId("4"),
+					ID:    index.IndexInternalID("4"),
 					Score: 1.0,
 				},
 				{
-					ID:    upside_down.InternalId("5"),
+					ID:    index.IndexInternalID("5"),
 					Score: 1.0,
 				},
 			},
@@ -75,23 +75,23 @@ func TestMatchAllSearch(t *testing.T) {
 			queryNorm: 0.8333333,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("1"),
+					ID:    index.IndexInternalID("1"),
 					Score: 1.0,
 				},
 				{
-					ID:    upside_down.InternalId("2"),
+					ID:    index.IndexInternalID("2"),
 					Score: 1.0,
 				},
 				{
-					ID:    upside_down.InternalId("3"),
+					ID:    index.IndexInternalID("3"),
 					Score: 1.0,
 				},
 				{
-					ID:    upside_down.InternalId("4"),
+					ID:    index.IndexInternalID("4"),
 					Score: 1.0,
 				},
 				{
-					ID:    upside_down.InternalId("5"),
+					ID:    index.IndexInternalID("5"),
 					Score: 1.0,
 				},
 			},

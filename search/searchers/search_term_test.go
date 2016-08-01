@@ -167,19 +167,19 @@ func TestTermSearcher(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected result, got %v", err)
 	}
-	if !docMatch.ID.Equals(upside_down.InternalId("a")) {
+	if !docMatch.ID.Equals(index.IndexInternalID("a")) {
 		t.Errorf("expected result ID to be 'a', got '%s", docMatch.ID)
 	}
-	docMatch, err = searcher.Advance(upside_down.InternalId("c"), nil)
+	docMatch, err = searcher.Advance(index.IndexInternalID("c"), nil)
 	if err != nil {
 		t.Errorf("expected result, got %v", err)
 	}
-	if !docMatch.ID.Equals(upside_down.InternalId("c")) {
+	if !docMatch.ID.Equals(index.IndexInternalID("c")) {
 		t.Errorf("expected result ID to be 'c' got '%s'", docMatch.ID)
 	}
 
 	// try advancing past end
-	docMatch, err = searcher.Advance(upside_down.InternalId("z"), nil)
+	docMatch, err = searcher.Advance(index.IndexInternalID("z"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -55,7 +55,7 @@ func TestMatchNoneSearch(t *testing.T) {
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
-				if next.ID != test.results[i].ID {
+				if !next.ID.Equals(test.results[i].ID) {
 					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].ID, next.ID, testIndex)
 				}
 				if !scoresCloseEnough(next.Score, test.results[i].Score) {

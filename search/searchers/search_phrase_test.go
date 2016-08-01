@@ -12,7 +12,7 @@ package searchers
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -54,7 +54,7 @@ func TestPhraseSearch(t *testing.T) {
 			searcher: phraseSearcher,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("2"),
+					ID:    index.IndexInternalID("2"),
 					Score: 1.0807601687084403,
 				},
 			},

@@ -10,27 +10,12 @@
 package upside_down
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
 )
-
-type InternalId []byte
-
-func (u InternalId) Compare(other index.IndexInternalID) int {
-	if other == nil {
-		// this internal ID is always greater than nil
-		return 1
-	}
-	return bytes.Compare(u, other.(InternalId))
-}
-
-func (u InternalId) Equals(other index.IndexInternalID) bool {
-	return u.Compare(other.(InternalId)) == 0
-}
 
 type IndexReader struct {
 	index    *UpsideDownCouch
@@ -114,7 +99,7 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 }
 
 func (i *IndexReader) DocumentFieldTerms(id index.IndexInternalID) (index.FieldTerms, error) {
-	back, err := i.index.backIndexRowForDoc(i.kvreader, id.(InternalId))
+	back, err := i.index.backIndexRowForDoc(i.kvreader, id)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +117,7 @@ func (i *IndexReader) DocumentFieldTerms(id index.IndexInternalID) (index.FieldT
 }
 
 func (i *IndexReader) DocumentFieldTermsForFields(id index.IndexInternalID, fields []string) (index.FieldTerms, error) {
-	back, err := i.index.backIndexRowForDoc(i.kvreader, id.(InternalId))
+	back, err := i.index.backIndexRowForDoc(i.kvreader, id)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +186,7 @@ func (i *IndexReader) Close() error {
 }
 
 func (i *IndexReader) FinalizeDocID(id index.IndexInternalID) (string, error) {
-	return string(id.(InternalId)), nil
+	return string(id), nil
 }
 
 func incrementBytes(in []byte) []byte {

@@ -12,7 +12,7 @@ package searchers
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -249,15 +249,15 @@ func TestBooleanSearch(t *testing.T) {
 			searcher: booleanSearcher,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("1"),
+					ID:    index.IndexInternalID("1"),
 					Score: 0.9818005051949021,
 				},
 				{
-					ID:    upside_down.InternalId("3"),
+					ID:    index.IndexInternalID("3"),
 					Score: 0.808709699395535,
 				},
 				{
-					ID:    upside_down.InternalId("4"),
+					ID:    index.IndexInternalID("4"),
 					Score: 0.34618161159873423,
 				},
 			},
@@ -266,11 +266,11 @@ func TestBooleanSearch(t *testing.T) {
 			searcher: booleanSearcher2,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("1"),
+					ID:    index.IndexInternalID("1"),
 					Score: 0.6775110856165737,
 				},
 				{
-					ID:    upside_down.InternalId("3"),
+					ID:    index.IndexInternalID("3"),
 					Score: 0.6775110856165737,
 				},
 			},
@@ -284,15 +284,15 @@ func TestBooleanSearch(t *testing.T) {
 			searcher: booleanSearcher4,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("1"),
+					ID:    index.IndexInternalID("1"),
 					Score: 1.0,
 				},
 				{
-					ID:    upside_down.InternalId("3"),
+					ID:    index.IndexInternalID("3"),
 					Score: 0.5,
 				},
 				{
-					ID:    upside_down.InternalId("4"),
+					ID:    index.IndexInternalID("4"),
 					Score: 1.0,
 				},
 			},
@@ -301,11 +301,11 @@ func TestBooleanSearch(t *testing.T) {
 			searcher: booleanSearcher5,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("3"),
+					ID:    index.IndexInternalID("3"),
 					Score: 0.5,
 				},
 				{
-					ID:    upside_down.InternalId("4"),
+					ID:    index.IndexInternalID("4"),
 					Score: 1.0,
 				},
 			},
@@ -319,7 +319,7 @@ func TestBooleanSearch(t *testing.T) {
 			searcher: conjunctionSearcher7,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("1"),
+					ID:    index.IndexInternalID("1"),
 					Score: 2.0097428702814377,
 				},
 			},
@@ -328,7 +328,7 @@ func TestBooleanSearch(t *testing.T) {
 			searcher: conjunctionSearcher8,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("3"),
+					ID:    index.IndexInternalID("3"),
 					Score: 2.0681575785068107,
 				},
 			},

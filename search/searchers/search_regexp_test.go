@@ -13,7 +13,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -58,7 +58,7 @@ func TestRegexpSearch(t *testing.T) {
 			searcher: regexpSearcher,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("1"),
+					ID:    index.IndexInternalID("1"),
 					Score: 1.916290731874155,
 				},
 			},
@@ -67,11 +67,11 @@ func TestRegexpSearch(t *testing.T) {
 			searcher: regexpSearcherCo,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("2"),
+					ID:    index.IndexInternalID("2"),
 					Score: 0.33875554280828685,
 				},
 				{
-					ID:    upside_down.InternalId("3"),
+					ID:    index.IndexInternalID("3"),
 					Score: 0.33875554280828685,
 				},
 			},

@@ -439,7 +439,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	// first we lookup the backindex row for the doc id if it exists
 	// lookup the back index row
 	var backIndexRow *BackIndexRow
-	backIndexRow, err = udc.backIndexRowForDoc(kvreader, InternalId(doc.ID))
+	backIndexRow, err = udc.backIndexRowForDoc(kvreader, index.IndexInternalID(doc.ID))
 	if err != nil {
 		_ = kvreader.Close()
 		atomic.AddUint64(&udc.stats.errors, 1)
@@ -627,7 +627,7 @@ func (udc *UpsideDownCouch) Delete(id string) (err error) {
 	// first we lookup the backindex row for the doc id if it exists
 	// lookup the back index row
 	var backIndexRow *BackIndexRow
-	backIndexRow, err = udc.backIndexRowForDoc(kvreader, InternalId(id))
+	backIndexRow, err = udc.backIndexRowForDoc(kvreader, index.IndexInternalID(id))
 	if err != nil {
 		_ = kvreader.Close()
 		atomic.AddUint64(&udc.stats.errors, 1)
@@ -695,7 +695,7 @@ func (udc *UpsideDownCouch) deleteSingle(id string, backIndexRow *BackIndexRow, 
 	return deleteRows
 }
 
-func (udc *UpsideDownCouch) backIndexRowForDoc(kvreader store.KVReader, docID InternalId) (*BackIndexRow, error) {
+func (udc *UpsideDownCouch) backIndexRowForDoc(kvreader store.KVReader, docID index.IndexInternalID) (*BackIndexRow, error) {
 	// use a temporary row structure to build key
 	tempRow := &BackIndexRow{
 		doc: docID,
@@ -833,7 +833,7 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 		}
 
 		for docID, doc := range batch.IndexOps {
-			backIndexRow, err := udc.backIndexRowForDoc(kvreader, InternalId(docID))
+			backIndexRow, err := udc.backIndexRowForDoc(kvreader, index.IndexInternalID(docID))
 			if err != nil {
 				docBackIndexRowErr = err
 				return

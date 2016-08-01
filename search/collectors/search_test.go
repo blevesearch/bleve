@@ -10,8 +10,6 @@
 package collectors
 
 import (
-	"bytes"
-
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
@@ -61,16 +59,6 @@ func (ss *stubSearcher) Count() uint64 {
 
 func (ss *stubSearcher) Min() int {
 	return 0
-}
-
-type testInternalId []byte
-
-func (t testInternalId) Compare(other index.IndexInternalID) int {
-	return bytes.Compare(t, other.(testInternalId))
-}
-
-func (t testInternalId) Equals(other index.IndexInternalID) bool {
-	return t.Compare(other.(testInternalId)) == 0
 }
 
 type stubReader struct{}
@@ -124,7 +112,7 @@ func (sr *stubReader) DocCount() uint64 {
 }
 
 func (sr *stubReader) FinalizeDocID(id index.IndexInternalID) (string, error) {
-	return string(id.(testInternalId)), nil
+	return string(id), nil
 }
 
 func (sr *stubReader) Close() error {

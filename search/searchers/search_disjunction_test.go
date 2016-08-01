@@ -12,7 +12,7 @@ package searchers
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -72,11 +72,11 @@ func TestDisjunctionSearch(t *testing.T) {
 			searcher: martyOrDustinSearcher,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("1"),
+					ID:    index.IndexInternalID("1"),
 					Score: 0.6775110856165737,
 				},
 				{
-					ID:    upside_down.InternalId("3"),
+					ID:    index.IndexInternalID("3"),
 					Score: 0.6775110856165737,
 				},
 			},
@@ -86,15 +86,15 @@ func TestDisjunctionSearch(t *testing.T) {
 			searcher: nestedRaviOrMartyOrDustinSearcher,
 			results: []*search.DocumentMatchInternal{
 				{
-					ID:    upside_down.InternalId("1"),
+					ID:    index.IndexInternalID("1"),
 					Score: 0.2765927424732821,
 				},
 				{
-					ID:    upside_down.InternalId("3"),
+					ID:    index.IndexInternalID("3"),
 					Score: 0.2765927424732821,
 				},
 				{
-					ID:    upside_down.InternalId("4"),
+					ID:    index.IndexInternalID("4"),
 					Score: 0.5531854849465642,
 				},
 			},
@@ -159,7 +159,7 @@ func TestDisjunctionAdvance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	match, err := martyOrDustinSearcher.Advance(upside_down.InternalId("3"), nil)
+	match, err := martyOrDustinSearcher.Advance(index.IndexInternalID("3"), nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

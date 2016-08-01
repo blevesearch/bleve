@@ -83,7 +83,7 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 			if rv == nil {
 				rv = &index.TermFieldDoc{}
 			}
-			rv.ID = InternalId(tfr.doc)
+			rv.ID = tfr.doc
 			rv.Freq = tfr.freq
 			rv.Norm = float64(tfr.norm)
 			if tfr.vectors != nil {
@@ -96,8 +96,7 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 	return nil, nil
 }
 
-func (r *UpsideDownCouchTermFieldReader) Advance(docIDInternal index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
-	docID := docIDInternal.(InternalId)
+func (r *UpsideDownCouchTermFieldReader) Advance(docID index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
 	if r.iterator != nil {
 		tfr := NewTermFrequencyRow(r.term, r.field, docID, 0, 0)
 		r.iterator.Seek(tfr.Key())
@@ -111,7 +110,7 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docIDInternal index.IndexIntern
 			if rv == nil {
 				rv = &index.TermFieldDoc{}
 			}
-			rv.ID = InternalId(tfr.doc)
+			rv.ID = tfr.doc
 			rv.Freq = tfr.freq
 			rv.Norm = float64(tfr.norm)
 			if tfr.vectors != nil {
@@ -185,7 +184,7 @@ func (r *UpsideDownCouchDocIDReader) Next() (index.IndexInternalID, error) {
 	key, val, valid := r.iterator.Current()
 
 	if r.onlyMode {
-		var rv InternalId
+		var rv index.IndexInternalID
 		for valid && r.onlyPos < len(r.only) {
 			br, err := NewBackIndexRowKV(key, val)
 			if err != nil {
@@ -200,7 +199,7 @@ func (r *UpsideDownCouchDocIDReader) Next() (index.IndexInternalID, error) {
 				key, val, valid = r.iterator.Current()
 				continue
 			} else {
-				rv = InternalId(br.doc)
+				rv = br.doc
 				break
 			}
 		}
@@ -218,7 +217,7 @@ func (r *UpsideDownCouchDocIDReader) Next() (index.IndexInternalID, error) {
 			if err != nil {
 				return nil, err
 			}
-			rv := InternalId(br.doc)
+			rv := br.doc
 			r.iterator.Next()
 			return rv, nil
 		}
@@ -227,14 +226,13 @@ func (r *UpsideDownCouchDocIDReader) Next() (index.IndexInternalID, error) {
 }
 
 func (r *UpsideDownCouchDocIDReader) Advance(docID index.IndexInternalID) (index.IndexInternalID, error) {
-	docIDInternal := docID.(InternalId)
-	bir := NewBackIndexRow(docIDInternal, nil, nil)
+	bir := NewBackIndexRow(docID, nil, nil)
 	r.iterator.Seek(bir.Key())
 	key, val, valid := r.iterator.Current()
-	r.onlyPos = sort.SearchStrings(r.only, string(docIDInternal))
+	r.onlyPos = sort.SearchStrings(r.only, string(docID))
 
 	if r.onlyMode {
-		var rv InternalId
+		var rv index.IndexInternalID
 		for valid && r.onlyPos < len(r.only) {
 			br, err := NewBackIndexRowKV(key, val)
 			if err != nil {
@@ -248,7 +246,7 @@ func (r *UpsideDownCouchDocIDReader) Advance(docID index.IndexInternalID) (index
 				r.iterator.Seek(NewBackIndexRow([]byte(r.only[r.onlyPos]), nil, nil).Key())
 				continue
 			} else {
-				rv = InternalId(br.doc)
+				rv = br.doc
 				break
 			}
 		}
@@ -265,7 +263,7 @@ func (r *UpsideDownCouchDocIDReader) Advance(docID index.IndexInternalID) (index
 			if err != nil {
 				return nil, err
 			}
-			rv := InternalId(br.doc)
+			rv := br.doc
 			r.iterator.Next()
 			return rv, nil
 		}

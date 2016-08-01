@@ -10,6 +10,7 @@
 package index
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -103,12 +104,14 @@ type TermFieldVector struct {
 }
 
 // IndexInternalID is an opaque document identifier interal to the index impl
-// This allows us to delay the conversion to public identifier (string) and
-// avoid it completely in other cases.  It also servces to hide the underlying
-// representation of a document identifer, allow more flexibility.
-type IndexInternalID interface {
-	Equals(other IndexInternalID) bool
-	Compare(other IndexInternalID) int
+type IndexInternalID []byte
+
+func (id IndexInternalID) Equals(other IndexInternalID) bool {
+	return id.Compare(other) == 0
+}
+
+func (id IndexInternalID) Compare(other IndexInternalID) int {
+	return bytes.Compare(id, other)
 }
 
 type TermFieldDoc struct {

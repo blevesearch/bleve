@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/net/context"
 
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -25,59 +26,59 @@ func TestTop10Scores(t *testing.T) {
 	searcher := &stubSearcher{
 		matches: []*search.DocumentMatchInternal{
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("a"),
+				ID:    index.IndexInternalID("a"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("b"),
+				ID:    index.IndexInternalID("b"),
 				Score: 9,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("c"),
+				ID:    index.IndexInternalID("c"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("d"),
+				ID:    index.IndexInternalID("d"),
 				Score: 9,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("e"),
+				ID:    index.IndexInternalID("e"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("f"),
+				ID:    index.IndexInternalID("f"),
 				Score: 9,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("g"),
+				ID:    index.IndexInternalID("g"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("h"),
+				ID:    index.IndexInternalID("h"),
 				Score: 9,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("i"),
+				ID:    index.IndexInternalID("i"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("j"),
+				ID:    index.IndexInternalID("j"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("k"),
+				ID:    index.IndexInternalID("k"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("l"),
+				ID:    index.IndexInternalID("l"),
 				Score: 99,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("m"),
+				ID:    index.IndexInternalID("m"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("n"),
+				ID:    index.IndexInternalID("n"),
 				Score: 11,
 			},
 		},
@@ -133,59 +134,59 @@ func TestTop10ScoresSkip10(t *testing.T) {
 	searcher := &stubSearcher{
 		matches: []*search.DocumentMatchInternal{
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("a"),
+				ID:    index.IndexInternalID("a"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("b"),
+				ID:    index.IndexInternalID("b"),
 				Score: 9.5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("c"),
+				ID:    index.IndexInternalID("c"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("d"),
+				ID:    index.IndexInternalID("d"),
 				Score: 9,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("e"),
+				ID:    index.IndexInternalID("e"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("f"),
+				ID:    index.IndexInternalID("f"),
 				Score: 9,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("g"),
+				ID:    index.IndexInternalID("g"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("h"),
+				ID:    index.IndexInternalID("h"),
 				Score: 9,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("i"),
+				ID:    index.IndexInternalID("i"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("j"),
+				ID:    index.IndexInternalID("j"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("k"),
+				ID:    index.IndexInternalID("k"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("l"),
+				ID:    index.IndexInternalID("l"),
 				Score: 99,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("m"),
+				ID:    index.IndexInternalID("m"),
 				Score: 11,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("n"),
+				ID:    index.IndexInternalID("n"),
 				Score: 11,
 			},
 		},
@@ -229,59 +230,59 @@ func TestPaginationSameScores(t *testing.T) {
 	searcher := &stubSearcher{
 		matches: []*search.DocumentMatchInternal{
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("a"),
+				ID:    index.IndexInternalID("a"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("b"),
+				ID:    index.IndexInternalID("b"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("c"),
+				ID:    index.IndexInternalID("c"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("d"),
+				ID:    index.IndexInternalID("d"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("e"),
+				ID:    index.IndexInternalID("e"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("f"),
+				ID:    index.IndexInternalID("f"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("g"),
+				ID:    index.IndexInternalID("g"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("h"),
+				ID:    index.IndexInternalID("h"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("i"),
+				ID:    index.IndexInternalID("i"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("j"),
+				ID:    index.IndexInternalID("j"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("k"),
+				ID:    index.IndexInternalID("k"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("l"),
+				ID:    index.IndexInternalID("l"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("m"),
+				ID:    index.IndexInternalID("m"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("n"),
+				ID:    index.IndexInternalID("n"),
 				Score: 5,
 			},
 		},
@@ -315,59 +316,59 @@ func TestPaginationSameScores(t *testing.T) {
 	searcher = &stubSearcher{
 		matches: []*search.DocumentMatchInternal{
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("a"),
+				ID:    index.IndexInternalID("a"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("b"),
+				ID:    index.IndexInternalID("b"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("c"),
+				ID:    index.IndexInternalID("c"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("d"),
+				ID:    index.IndexInternalID("d"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("e"),
+				ID:    index.IndexInternalID("e"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("f"),
+				ID:    index.IndexInternalID("f"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("g"),
+				ID:    index.IndexInternalID("g"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("h"),
+				ID:    index.IndexInternalID("h"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("i"),
+				ID:    index.IndexInternalID("i"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("j"),
+				ID:    index.IndexInternalID("j"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("k"),
+				ID:    index.IndexInternalID("k"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("l"),
+				ID:    index.IndexInternalID("l"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("m"),
+				ID:    index.IndexInternalID("m"),
 				Score: 5,
 			},
 			&search.DocumentMatchInternal{
-				ID:    testInternalId("n"),
+				ID:    index.IndexInternalID("n"),
 				Score: 5,
 			},
 		},
