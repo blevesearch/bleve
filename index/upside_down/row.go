@@ -551,9 +551,7 @@ func (tfr *TermFrequencyRow) parseV(value []byte) error {
 		tv := TermVector{}
 		tv.field = uint16(field)
 		// at this point we expect at least one term vector
-		if tfr.vectors == nil {
-			tfr.vectors = make([]*TermVector, 0)
-		}
+		tfr.vectors = make([]*TermVector, 0)
 
 		tv.pos, bytesRead = binary.Uvarint(value[currOffset:])
 		if bytesRead <= 0 {
