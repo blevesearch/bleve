@@ -25,38 +25,6 @@ type DocIDSearcher struct {
 func NewDocIDSearcher(indexReader index.IndexReader, ids []string, boost float64,
 	explain bool) (searcher *DocIDSearcher, err error) {
 
-	// kept := make([]string, len(ids))
-	// copy(kept, ids)
-	// sort.Strings(kept)
-	//
-	// if len(ids) > 0 {
-	// 	var idReader index.DocIDReader
-	// 	endTerm := string(incrementBytes([]byte(kept[len(kept)-1])))
-	// 	idReader, err = indexReader.DocIDReader(kept[0], endTerm)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	defer func() {
-	// 		if cerr := idReader.Close(); err == nil && cerr != nil {
-	// 			err = cerr
-	// 		}
-	// 	}()
-	// 	j := 0
-	// 	for _, id := range kept {
-	// 		doc, err := idReader.Next()
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		// Non-duplicate match
-	// 		actualDocID := indexReader.FinalizeDocID(doc)
-	// 		if actualDocID == id && (j == 0 || kept[j-1] != id) {
-	// 			kept[j] = id
-	// 			j++
-	// 		}
-	// 	}
-	// 	kept = kept[:j]
-	// }
-
 	reader, err := indexReader.DocIDReaderOnly(ids)
 	if err != nil {
 		return nil, err
@@ -70,7 +38,6 @@ func NewDocIDSearcher(indexReader index.IndexReader, ids []string, boost float64
 }
 
 func (s *DocIDSearcher) Count() uint64 {
-	// return uint64(len(s.ids))
 	return uint64(s.count)
 }
 
@@ -83,14 +50,6 @@ func (s *DocIDSearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *DocIDSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
-	// if s.current >= len(s.ids) {
-	// 	return nil, nil
-	// }
-	// id := s.ids[s.current]
-	// s.current++
-	// docMatch := s.scorer.Score(id)
-	// return docMatch, nil
-
 	docidMatch, err := s.reader.Next()
 	if err != nil {
 		return nil, err
@@ -104,9 +63,6 @@ func (s *DocIDSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docume
 }
 
 func (s *DocIDSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
-	// s.current = sort.SearchStrings(s.ids, ID)
-	// return s.Next(preAllocated)
-
 	docidMatch, err := s.reader.Advance(ID)
 	if err != nil {
 		return nil, err
