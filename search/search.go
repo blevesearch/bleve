@@ -88,9 +88,13 @@ func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
 	dm.Fields[name] = valSlice
 }
 
+// Reset allows an already allocated DocumentMatch to be reused
 func (dm *DocumentMatch) Reset() *DocumentMatch {
+	// remember the []byte used for the IndexInternalID
 	indexInternalId := dm.IndexInternalID
+	// idiom to copy over from empty DocumentMatch (0 allocations)
 	*dm = DocumentMatch{}
+	// reuse the []byte already allocated (and reset len to 0)
 	dm.IndexInternalID = indexInternalId[:0]
 	return dm
 }

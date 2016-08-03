@@ -122,9 +122,13 @@ type TermFieldDoc struct {
 	Vectors []*TermFieldVector
 }
 
+// Reset allows an already allocated TermFieldDoc to be reused
 func (tfd *TermFieldDoc) Reset() *TermFieldDoc {
+	// remember the []byte used for the ID
 	id := tfd.ID
+	// idiom to copy over from empty TermFieldDoc (0 allocations)
 	*tfd = TermFieldDoc{}
+	// reuse the []byte already allocated (and reset len to 0)
 	tfd.ID = id[:0]
 	return tfd
 }
