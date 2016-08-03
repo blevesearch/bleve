@@ -123,7 +123,9 @@ type TermFieldDoc struct {
 }
 
 func (tfd *TermFieldDoc) Reset() *TermFieldDoc {
+	id := tfd.ID
 	*tfd = TermFieldDoc{}
+	tfd.ID = id[:0]
 	return tfd
 }
 

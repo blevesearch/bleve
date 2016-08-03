@@ -83,7 +83,6 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 			if rv == nil {
 				rv = &index.TermFieldDoc{}
 			}
-			rv.ID = rv.ID[:0]
 			rv.ID = append(rv.ID, tfr.doc...)
 			rv.Freq = tfr.freq
 			rv.Norm = float64(tfr.norm)
@@ -111,7 +110,6 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docID index.IndexInternalID, pr
 			if rv == nil {
 				rv = &index.TermFieldDoc{}
 			}
-			rv.ID = rv.ID[:0]
 			rv.ID = append(rv.ID, tfr.doc...)
 			rv.Freq = tfr.freq
 			rv.Norm = float64(tfr.norm)

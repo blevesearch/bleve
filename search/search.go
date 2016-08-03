@@ -89,7 +89,9 @@ func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
 }
 
 func (dm *DocumentMatch) Reset() *DocumentMatch {
+	indexInternalId := dm.IndexInternalID
 	*dm = DocumentMatch{}
+	dm.IndexInternalID = indexInternalId[:0]
 	return dm
 }
 
