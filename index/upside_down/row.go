@@ -544,6 +544,7 @@ func (tfr *TermFrequencyRow) parseV(value []byte) error {
 
 	tfr.norm = math.Float32frombits(uint32(norm))
 
+	tfr.vectors = nil
 	var field uint64
 	field, bytesRead = binary.Uvarint(value[currOffset:])
 	for bytesRead > 0 {
