@@ -1564,3 +1564,59 @@ func BenchmarkBatchOverhead(b *testing.B) {
 		batch.Reset()
 	}
 }
+
+func TestOpenReadonlyMultiple(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// build an index and close it
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doca := map[string]interface{}{
+		"name": "marty",
+		"desc": "gophercon india",
+	}
+	err = index.Index("a", doca)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// now open it read-only
+	index, err = OpenUsing("testidx", map[string]interface{}{
+		"read_only": true,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// now open it again
+	index2, err := OpenUsing("testidx", map[string]interface{}{
+		"read_only": true,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = index2.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}

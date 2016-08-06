@@ -59,19 +59,27 @@ func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, 
 		fillPercent = bolt.DefaultFillPercent
 	}
 
-	db, err := bolt.Open(path, 0600, nil)
+	bo := &bolt.Options{}
+	ro, ok := config["read_only"].(bool)
+	if ok {
+		bo.ReadOnly = ro
+	}
+
+	db, err := bolt.Open(path, 0600, bo)
 	if err != nil {
 		return nil, err
 	}
 	db.NoSync = noSync
 
-	err = db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(bucket))
+	if !bo.ReadOnly {
+		err = db.Update(func(tx *bolt.Tx) error {
+			_, err := tx.CreateBucketIfNotExists([]byte(bucket))
 
-		return err
-	})
-	if err != nil {
-		return nil, err
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	rv := Store{
