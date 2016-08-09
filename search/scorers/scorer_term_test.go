@@ -144,7 +144,10 @@ func TestTermScorer(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := scorer.Score(test.termMatch, nil)
+		ctx := &search.SearchContext{
+			DocumentMatchPool: search.NewDocumentMatchPool(1),
+		}
+		actual := scorer.Score(ctx, test.termMatch)
 
 		if !reflect.DeepEqual(actual, test.result) {
 			t.Errorf("expected %#v got %#v for %#v", test.result, actual, test.termMatch)
@@ -231,7 +234,10 @@ func TestTermScorerWithQueryNorm(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := scorer.Score(test.termMatch, nil)
+		ctx := &search.SearchContext{
+			DocumentMatchPool: search.NewDocumentMatchPool(1),
+		}
+		actual := scorer.Score(ctx, test.termMatch)
 
 		if !reflect.DeepEqual(actual, test.result) {
 			t.Errorf("expected %#v got %#v for %#v", test.result, actual, test.termMatch)

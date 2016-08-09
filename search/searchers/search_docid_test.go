@@ -16,6 +16,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/gtreap"
 	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/search"
 )
 
 func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
@@ -62,23 +63,29 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 		}
 	}()
 
+	ctx := &search.SearchContext{
+		DocumentMatchPool: search.NewDocumentMatchPool(searcher.DocumentMatchPoolSize()),
+	}
+
 	// Check the sequence
 	for i, id := range wanted {
-		m, err := searcher.Next(nil)
+		m, err := searcher.Next(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !index.IndexInternalID(id).Equals(m.IndexInternalID) {
 			t.Fatalf("expected %v at position %v, got %v", id, i, m.IndexInternalID)
 		}
+		ctx.DocumentMatchPool.Put(m)
 	}
-	m, err := searcher.Next(nil)
+	m, err := searcher.Next(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if m != nil {
 		t.Fatalf("expected nil past the end of the sequence, got %v", m.IndexInternalID)
 	}
+	ctx.DocumentMatchPool.Put(m)
 
 	// Check seeking
 	for _, id := range wanted {
@@ -87,24 +94,26 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 		}
 		before := id[:1]
 		for _, target := range []string{before, id} {
-			m, err := searcher.Advance(index.IndexInternalID(target), nil)
+			m, err := searcher.Advance(ctx, index.IndexInternalID(target))
 			if err != nil {
 				t.Fatal(err)
 			}
 			if m == nil || !m.IndexInternalID.Equals(index.IndexInternalID(id)) {
 				t.Fatalf("advancing to %v returned %v instead of %v", before, m, id)
 			}
+			ctx.DocumentMatchPool.Put(m)
 		}
 	}
 	// Seek after the end of the sequence
 	after := "zzz"
-	m, err = searcher.Advance(index.IndexInternalID(after), nil)
+	m, err = searcher.Advance(ctx, index.IndexInternalID(after))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if m != nil {
 		t.Fatalf("advancing past the end of the sequence should return nil, got %v", m)
 	}
+	ctx.DocumentMatchPool.Put(m)
 }
 
 func TestDocIDSearcherEmptySearchEmptyIndex(t *testing.T) {

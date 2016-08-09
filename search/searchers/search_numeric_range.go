@@ -96,12 +96,12 @@ func (s *NumericRangeSearcher) SetQueryNorm(qnorm float64) {
 	s.searcher.SetQueryNorm(qnorm)
 }
 
-func (s *NumericRangeSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
-	return s.searcher.Next(preAllocated)
+func (s *NumericRangeSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+	return s.searcher.Next(ctx)
 }
 
-func (s *NumericRangeSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
-	return s.searcher.Advance(ID, preAllocated)
+func (s *NumericRangeSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
+	return s.searcher.Advance(ctx, ID)
 }
 
 func (s *NumericRangeSearcher) Close() error {
@@ -214,4 +214,8 @@ func newRangeBytes(minBytes, maxBytes []byte) *termRange {
 
 func (s *NumericRangeSearcher) Min() int {
 	return 0
+}
+
+func (s *NumericRangeSearcher) DocumentMatchPoolSize() int {
+	return s.searcher.DocumentMatchPoolSize()
 }

@@ -188,7 +188,10 @@ func TestConjunctionSearch(t *testing.T) {
 			}
 		}()
 
-		next, err := test.searcher.Next(nil)
+		ctx := &search.SearchContext{
+			DocumentMatchPool: search.NewDocumentMatchPool(10),
+		}
+		next, err := test.searcher.Next(ctx)
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
@@ -200,7 +203,7 @@ func TestConjunctionSearch(t *testing.T) {
 					t.Logf("scoring explanation: %s", next.Expl)
 				}
 			}
-			next, err = test.searcher.Next(nil)
+			next, err = test.searcher.Next(ctx)
 			i++
 		}
 		if err != nil {

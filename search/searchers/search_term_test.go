@@ -17,6 +17,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/gtreap"
 	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/search"
 )
 
 func TestTermSearcher(t *testing.T) {
@@ -163,14 +164,18 @@ func TestTermSearcher(t *testing.T) {
 		t.Errorf("expected count of 9, got %d", searcher.Count())
 	}
 
-	docMatch, err := searcher.Next(nil)
+	ctx := &search.SearchContext{
+		DocumentMatchPool: search.NewDocumentMatchPool(1),
+	}
+	docMatch, err := searcher.Next(ctx)
 	if err != nil {
 		t.Errorf("expected result, got %v", err)
 	}
 	if !docMatch.IndexInternalID.Equals(index.IndexInternalID("a")) {
 		t.Errorf("expected result ID to be 'a', got '%s", docMatch.IndexInternalID)
 	}
-	docMatch, err = searcher.Advance(index.IndexInternalID("c"), nil)
+	ctx.DocumentMatchPool.Put(docMatch)
+	docMatch, err = searcher.Advance(ctx, index.IndexInternalID("c"))
 	if err != nil {
 		t.Errorf("expected result, got %v", err)
 	}
@@ -179,7 +184,8 @@ func TestTermSearcher(t *testing.T) {
 	}
 
 	// try advancing past end
-	docMatch, err = searcher.Advance(index.IndexInternalID("z"), nil)
+	ctx.DocumentMatchPool.Put(docMatch)
+	docMatch, err = searcher.Advance(ctx, index.IndexInternalID("z"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +194,8 @@ func TestTermSearcher(t *testing.T) {
 	}
 
 	// try pushing next past end
-	docMatch, err = searcher.Next(nil)
+	ctx.DocumentMatchPool.Put(docMatch)
+	docMatch, err = searcher.Next(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

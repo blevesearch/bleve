@@ -106,13 +106,13 @@ func (s *RegexpSearcher) SetQueryNorm(qnorm float64) {
 	s.searcher.SetQueryNorm(qnorm)
 }
 
-func (s *RegexpSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
-	return s.searcher.Next(preAllocated)
+func (s *RegexpSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+	return s.searcher.Next(ctx)
 
 }
 
-func (s *RegexpSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
-	return s.searcher.Advance(ID, preAllocated)
+func (s *RegexpSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
+	return s.searcher.Advance(ctx, ID)
 }
 
 func (s *RegexpSearcher) Close() error {
@@ -121,4 +121,8 @@ func (s *RegexpSearcher) Close() error {
 
 func (s *RegexpSearcher) Min() int {
 	return 0
+}
+
+func (s *RegexpSearcher) DocumentMatchPoolSize() int {
+	return s.searcher.DocumentMatchPoolSize()
 }

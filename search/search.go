@@ -106,11 +106,18 @@ func (c DocumentMatchCollection) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c DocumentMatchCollection) Less(i, j int) bool { return c[i].Score > c[j].Score }
 
 type Searcher interface {
-	Next(preAllocated *DocumentMatch) (*DocumentMatch, error)
-	Advance(ID index.IndexInternalID, preAllocated *DocumentMatch) (*DocumentMatch, error)
+	Next(ctx *SearchContext) (*DocumentMatch, error)
+	Advance(ctx *SearchContext, ID index.IndexInternalID) (*DocumentMatch, error)
 	Close() error
 	Weight() float64
 	SetQueryNorm(float64)
 	Count() uint64
 	Min() int
+
+	DocumentMatchPoolSize() int
+}
+
+// SearchContext represents the context around a single search
+type SearchContext struct {
+	DocumentMatchPool *DocumentMatchPool
 }

@@ -49,7 +49,7 @@ func (s *DocIDSearcher) SetQueryNorm(qnorm float64) {
 	s.scorer.SetQueryNorm(qnorm)
 }
 
-func (s *DocIDSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *DocIDSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	docidMatch, err := s.reader.Next()
 	if err != nil {
 		return nil, err
@@ -58,11 +58,11 @@ func (s *DocIDSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docume
 		return nil, nil
 	}
 
-	docMatch := s.scorer.Score(docidMatch)
+	docMatch := s.scorer.Score(ctx, docidMatch)
 	return docMatch, nil
 }
 
-func (s *DocIDSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *DocIDSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
 	docidMatch, err := s.reader.Advance(ID)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (s *DocIDSearcher) Advance(ID index.IndexInternalID, preAllocated *search.D
 		return nil, nil
 	}
 
-	docMatch := s.scorer.Score(docidMatch)
+	docMatch := s.scorer.Score(ctx, docidMatch)
 	return docMatch, nil
 }
 
@@ -81,4 +81,8 @@ func (s *DocIDSearcher) Close() error {
 
 func (s *DocIDSearcher) Min() int {
 	return 0
+}
+
+func (s *DocIDSearcher) DocumentMatchPoolSize() int {
+	return 1
 }

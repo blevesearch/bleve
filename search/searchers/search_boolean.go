@@ -66,25 +66,34 @@ func (s *BooleanSearcher) computeQueryNorm() {
 	}
 }
 
-func (s *BooleanSearcher) initSearchers() error {
+func (s *BooleanSearcher) initSearchers(ctx *search.SearchContext) error {
 	var err error
 	// get all searchers pointing at their first match
 	if s.mustSearcher != nil {
-		s.currMust, err = s.mustSearcher.Next(nil)
+		if s.currMust != nil {
+			ctx.DocumentMatchPool.Put(s.currMust)
+		}
+		s.currMust, err = s.mustSearcher.Next(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
 	if s.shouldSearcher != nil {
-		s.currShould, err = s.shouldSearcher.Next(nil)
+		if s.currShould != nil {
+			ctx.DocumentMatchPool.Put(s.currShould)
+		}
+		s.currShould, err = s.shouldSearcher.Next(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
 	if s.mustNotSearcher != nil {
-		s.currMustNot, err = s.mustNotSearcher.Next(nil)
+		if s.currMustNot != nil {
+			ctx.DocumentMatchPool.Put(s.currMustNot)
+		}
+		s.currMustNot, err = s.mustNotSearcher.Next(ctx)
 		if err != nil {
 			return err
 		}
@@ -102,16 +111,22 @@ func (s *BooleanSearcher) initSearchers() error {
 	return nil
 }
 
-func (s *BooleanSearcher) advanceNextMust() error {
+func (s *BooleanSearcher) advanceNextMust(ctx *search.SearchContext, skipReturn *search.DocumentMatch) error {
 	var err error
 
 	if s.mustSearcher != nil {
-		s.currMust, err = s.mustSearcher.Next(nil)
+		if s.currMust != skipReturn {
+			ctx.DocumentMatchPool.Put(s.currMust)
+		}
+		s.currMust, err = s.mustSearcher.Next(ctx)
 		if err != nil {
 			return err
 		}
 	} else if s.mustSearcher == nil {
-		s.currShould, err = s.shouldSearcher.Next(nil)
+		if s.currShould != skipReturn {
+			ctx.DocumentMatchPool.Put(s.currShould)
+		}
+		s.currShould, err = s.shouldSearcher.Next(ctx)
 		if err != nil {
 			return err
 		}
@@ -148,10 +163,10 @@ func (s *BooleanSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *BooleanSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 
 	if !s.initialized {
-		err := s.initSearchers()
+		err := s.initSearchers(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -162,14 +177,17 @@ func (s *BooleanSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docu
 
 	for s.currentID != nil {
 		if s.currMustNot != nil && s.currMustNot.IndexInternalID.Compare(s.currentID) < 0 {
+			if s.currMustNot != nil {
+				ctx.DocumentMatchPool.Put(s.currMustNot)
+			}
 			// advance must not searcher to our candidate entry
-			s.currMustNot, err = s.mustNotSearcher.Advance(s.currentID, nil)
+			s.currMustNot, err = s.mustNotSearcher.Advance(ctx, s.currentID)
 			if err != nil {
 				return nil, err
 			}
 			if s.currMustNot != nil && s.currMustNot.IndexInternalID.Equals(s.currentID) {
 				// the candidate is excluded
-				err = s.advanceNextMust()
+				err = s.advanceNextMust(ctx, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -177,7 +195,7 @@ func (s *BooleanSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docu
 			}
 		} else if s.currMustNot != nil && s.currMustNot.IndexInternalID.Equals(s.currentID) {
 			// the candidate is excluded
-			err = s.advanceNextMust()
+			err = s.advanceNextMust(ctx, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -186,7 +204,10 @@ func (s *BooleanSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docu
 
 		if s.currShould != nil && s.currShould.IndexInternalID.Compare(s.currentID) < 0 {
 			// advance should searcher to our candidate entry
-			s.currShould, err = s.shouldSearcher.Advance(s.currentID, nil)
+			if s.currShould != nil {
+				ctx.DocumentMatchPool.Put(s.currShould)
+			}
+			s.currShould, err = s.shouldSearcher.Advance(ctx, s.currentID)
 			if err != nil {
 				return nil, err
 			}
@@ -203,16 +224,16 @@ func (s *BooleanSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docu
 						s.currShould,
 					}
 				}
-				rv = s.scorer.Score(cons)
-				err = s.advanceNextMust()
+				rv = s.scorer.Score(ctx, cons)
+				err = s.advanceNextMust(ctx, rv)
 				if err != nil {
 					return nil, err
 				}
 				break
 			} else if s.shouldSearcher.Min() == 0 {
 				// match is OK anyway
-				rv = s.scorer.Score([]*search.DocumentMatch{s.currMust})
-				err = s.advanceNextMust()
+				rv = s.scorer.Score(ctx, []*search.DocumentMatch{s.currMust})
+				err = s.advanceNextMust(ctx, rv)
 				if err != nil {
 					return nil, err
 				}
@@ -231,23 +252,23 @@ func (s *BooleanSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docu
 					s.currShould,
 				}
 			}
-			rv = s.scorer.Score(cons)
-			err = s.advanceNextMust()
+			rv = s.scorer.Score(ctx, cons)
+			err = s.advanceNextMust(ctx, rv)
 			if err != nil {
 				return nil, err
 			}
 			break
 		} else if s.shouldSearcher == nil || s.shouldSearcher.Min() == 0 {
 			// match is OK anyway
-			rv = s.scorer.Score([]*search.DocumentMatch{s.currMust})
-			err = s.advanceNextMust()
+			rv = s.scorer.Score(ctx, []*search.DocumentMatch{s.currMust})
+			err = s.advanceNextMust(ctx, rv)
 			if err != nil {
 				return nil, err
 			}
 			break
 		}
 
-		err = s.advanceNextMust()
+		err = s.advanceNextMust(ctx, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -255,10 +276,10 @@ func (s *BooleanSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docu
 	return rv, nil
 }
 
-func (s *BooleanSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *BooleanSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
 
 	if !s.initialized {
-		err := s.initSearchers()
+		err := s.initSearchers(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -266,19 +287,28 @@ func (s *BooleanSearcher) Advance(ID index.IndexInternalID, preAllocated *search
 
 	var err error
 	if s.mustSearcher != nil {
-		s.currMust, err = s.mustSearcher.Advance(ID, nil)
+		if s.currMust != nil {
+			ctx.DocumentMatchPool.Put(s.currMust)
+		}
+		s.currMust, err = s.mustSearcher.Advance(ctx, ID)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if s.shouldSearcher != nil {
-		s.currShould, err = s.shouldSearcher.Advance(ID, nil)
+		if s.currShould != nil {
+			ctx.DocumentMatchPool.Put(s.currShould)
+		}
+		s.currShould, err = s.shouldSearcher.Advance(ctx, ID)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if s.mustNotSearcher != nil {
-		s.currMustNot, err = s.mustNotSearcher.Advance(ID, nil)
+		if s.currMustNot != nil {
+			ctx.DocumentMatchPool.Put(s.currMustNot)
+		}
+		s.currMustNot, err = s.mustNotSearcher.Advance(ctx, ID)
 		if err != nil {
 			return nil, err
 		}
@@ -292,7 +322,7 @@ func (s *BooleanSearcher) Advance(ID index.IndexInternalID, preAllocated *search
 		s.currentID = nil
 	}
 
-	return s.Next(preAllocated)
+	return s.Next(ctx)
 }
 
 func (s *BooleanSearcher) Count() uint64 {
@@ -332,4 +362,18 @@ func (s *BooleanSearcher) Close() error {
 
 func (s *BooleanSearcher) Min() int {
 	return 0
+}
+
+func (s *BooleanSearcher) DocumentMatchPoolSize() int {
+	rv := 3
+	if s.mustSearcher != nil {
+		rv += s.mustSearcher.DocumentMatchPoolSize()
+	}
+	if s.shouldSearcher != nil {
+		rv += s.shouldSearcher.DocumentMatchPoolSize()
+	}
+	if s.mustNotSearcher != nil {
+		rv += s.mustNotSearcher.DocumentMatchPoolSize()
+	}
+	return rv
 }

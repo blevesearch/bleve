@@ -109,7 +109,10 @@ func TestDisjunctionSearch(t *testing.T) {
 			}
 		}()
 
-		next, err := test.searcher.Next(nil)
+		ctx := &search.SearchContext{
+			DocumentMatchPool: search.NewDocumentMatchPool(test.searcher.DocumentMatchPoolSize()),
+		}
+		next, err := test.searcher.Next(ctx)
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
@@ -121,7 +124,8 @@ func TestDisjunctionSearch(t *testing.T) {
 					t.Logf("scoring explanation: %s", next.Expl)
 				}
 			}
-			next, err = test.searcher.Next(nil)
+			ctx.DocumentMatchPool.Put(next)
+			next, err = test.searcher.Next(ctx)
 			i++
 		}
 		if err != nil {
@@ -159,7 +163,10 @@ func TestDisjunctionAdvance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	match, err := martyOrDustinSearcher.Advance(index.IndexInternalID("3"), nil)
+	ctx := &search.SearchContext{
+		DocumentMatchPool: search.NewDocumentMatchPool(martyOrDustinSearcher.DocumentMatchPoolSize()),
+	}
+	match, err := martyOrDustinSearcher.Advance(ctx, index.IndexInternalID("3"))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

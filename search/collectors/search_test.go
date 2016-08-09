@@ -20,7 +20,7 @@ type stubSearcher struct {
 	matches []*search.DocumentMatch
 }
 
-func (ss *stubSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (ss *stubSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	if ss.index < len(ss.matches) {
 		rv := ss.matches[ss.index]
 		ss.index++
@@ -29,7 +29,7 @@ func (ss *stubSearcher) Next(preAllocated *search.DocumentMatch) (*search.Docume
 	return nil, nil
 }
 
-func (ss *stubSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (ss *stubSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
 
 	for ss.index < len(ss.matches) && ss.matches[ss.index].IndexInternalID.Compare(ID) < 0 {
 		ss.index++
@@ -58,6 +58,10 @@ func (ss *stubSearcher) Count() uint64 {
 }
 
 func (ss *stubSearcher) Min() int {
+	return 0
+}
+
+func (ss *stubSearcher) DocumentMatchPoolSize() int {
 	return 0
 }
 

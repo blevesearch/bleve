@@ -53,7 +53,7 @@ func (s *TermSearcher) SetQueryNorm(qnorm float64) {
 	s.scorer.SetQueryNorm(qnorm)
 }
 
-func (s *TermSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *TermSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	termMatch, err := s.reader.Next(s.tfd.Reset())
 	if err != nil {
 		return nil, err
@@ -64,13 +64,13 @@ func (s *TermSearcher) Next(preAllocated *search.DocumentMatch) (*search.Documen
 	}
 
 	// score match
-	docMatch := s.scorer.Score(termMatch, preAllocated)
+	docMatch := s.scorer.Score(ctx, termMatch)
 	// return doc match
 	return docMatch, nil
 
 }
 
-func (s *TermSearcher) Advance(ID index.IndexInternalID, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *TermSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
 	termMatch, err := s.reader.Advance(ID, s.tfd.Reset())
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (s *TermSearcher) Advance(ID index.IndexInternalID, preAllocated *search.Do
 	}
 
 	// score match
-	docMatch := s.scorer.Score(termMatch, preAllocated)
+	docMatch := s.scorer.Score(ctx, termMatch)
 
 	// return doc match
 	return docMatch, nil
@@ -93,4 +93,8 @@ func (s *TermSearcher) Close() error {
 
 func (s *TermSearcher) Min() int {
 	return 0
+}
+
+func (s *TermSearcher) DocumentMatchPoolSize() int {
+	return 1
 }
