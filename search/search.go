@@ -105,3 +105,10 @@ type Searcher interface {
 	Count() uint64
 	Min() int
 }
+
+type SearchSort struct {
+	Field   string `json:"field"`
+	Ascends bool   `json:"ascends"`
+}
+
+type SortOrder []SearchSort
