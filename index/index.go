@@ -10,6 +10,7 @@
 package index
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -60,7 +61,7 @@ type AsyncIndex interface {
 }
 
 type IndexReader interface {
-	TermFieldReader(term []byte, field string) (TermFieldReader, error)
+	TermFieldReader(term []byte, field string, includeFreq, includeNorm, includeTermVectors bool) (TermFieldReader, error)
 
 	// DocIDReader returns an iterator over documents which identifiers are
 	// greater than or equal to start and smaller than end. Set start to the
@@ -69,6 +70,8 @@ type IndexReader interface {
 	// The caller must close returned instance to release associated resources.
 	DocIDReader(start, end string) (DocIDReader, error)
 
+	DocIDReaderOnly(ids []string) (DocIDReader, error)
+
 	FieldDict(field string) (FieldDict, error)
 
 	// FieldDictRange is currently defined to include the start and end terms
@@ -76,14 +79,16 @@ type IndexReader interface {
 	FieldDictPrefix(field string, termPrefix []byte) (FieldDict, error)
 
 	Document(id string) (*document.Document, error)
-	DocumentFieldTerms(id string) (FieldTerms, error)
-	DocumentFieldTermsForFields(id string, fields []string) (FieldTerms, error)
+	DocumentFieldTerms(id IndexInternalID) (FieldTerms, error)
+	DocumentFieldTermsForFields(id IndexInternalID, fields []string) (FieldTerms, error)
 
 	Fields() ([]string, error)
 
 	GetInternal(key []byte) ([]byte, error)
 
 	DocCount() uint64
+
+	FinalizeDocID(id IndexInternalID) (string, error)
 
 	Close() error
 }
@@ -98,12 +103,34 @@ type TermFieldVector struct {
 	End            uint64
 }
 
+// IndexInternalID is an opaque document identifier interal to the index impl
+type IndexInternalID []byte
+
+func (id IndexInternalID) Equals(other IndexInternalID) bool {
+	return id.Compare(other) == 0
+}
+
+func (id IndexInternalID) Compare(other IndexInternalID) int {
+	return bytes.Compare(id, other)
+}
+
 type TermFieldDoc struct {
 	Term    string
-	ID      string
+	ID      IndexInternalID
 	Freq    uint64
 	Norm    float64
 	Vectors []*TermFieldVector
+}
+
+// Reset allows an already allocated TermFieldDoc to be reused
+func (tfd *TermFieldDoc) Reset() *TermFieldDoc {
+	// remember the []byte used for the ID
+	id := tfd.ID
+	// idiom to copy over from empty TermFieldDoc (0 allocations)
+	*tfd = TermFieldDoc{}
+	// reuse the []byte already allocated (and reset len to 0)
+	tfd.ID = id[:0]
+	return tfd
 }
 
 // TermFieldReader is the interface exposing the enumeration of documents
@@ -117,7 +144,7 @@ type TermFieldReader interface {
 
 	// Advance resets the enumeration at specified document or its immediate
 	// follower.
-	Advance(ID string, preAlloced *TermFieldDoc) (*TermFieldDoc, error)
+	Advance(ID IndexInternalID, preAlloced *TermFieldDoc) (*TermFieldDoc, error)
 
 	// Count returns the number of documents contains the term in this field.
 	Count() uint64
@@ -137,15 +164,15 @@ type FieldDict interface {
 // DocIDReader is the interface exposing enumeration of documents identifiers.
 // Close the reader to release associated resources.
 type DocIDReader interface {
-	// Next returns the next document identifier in ascending lexicographic
-	// byte order, or io.EOF when the end of the sequence is reached.
-	Next() (string, error)
+	// Next returns the next document internal identifier in the natural
+	// index order, or io.EOF when the end of the sequence is reached.
+	Next() (IndexInternalID, error)
 
-	// Advance resets the iteration to the first identifier greater than or
-	// equal to ID. If ID is smaller than the start of the range, the iteration
+	// Advance resets the iteration to the first internal identifier greater than
+	// or equal to ID. If ID is smaller than the start of the range, the iteration
 	// will start there instead. If ID is greater than or equal to the end of
 	// the range, Next() call will return io.EOF.
-	Advance(ID string) (string, error)
+	Advance(ID IndexInternalID) (IndexInternalID, error)
 	Close() error
 }
 
@@ -199,9 +226,4 @@ func (b *Batch) String() string {
 func (b *Batch) Reset() {
 	b.IndexOps = make(map[string]*document.Document)
 	b.InternalOps = make(map[string][]byte)
-}
-
-func (tfd *TermFieldDoc) Reset() *TermFieldDoc {
-	*tfd = TermFieldDoc{}
-	return tfd
 }

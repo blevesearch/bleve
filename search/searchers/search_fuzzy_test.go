@@ -12,6 +12,7 @@ package searchers
 import (
 	"testing"
 
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -56,20 +57,20 @@ func TestFuzzySearch(t *testing.T) {
 			searcher: fuzzySearcherbeet,
 			results: []*search.DocumentMatch{
 				{
-					ID:    "1",
-					Score: 1.0,
+					IndexInternalID: index.IndexInternalID("1"),
+					Score:           1.0,
 				},
 				{
-					ID:    "2",
-					Score: 0.5,
+					IndexInternalID: index.IndexInternalID("2"),
+					Score:           0.5,
 				},
 				{
-					ID:    "3",
-					Score: 0.5,
+					IndexInternalID: index.IndexInternalID("3"),
+					Score:           0.5,
 				},
 				{
-					ID:    "4",
-					Score: 0.9999999838027345,
+					IndexInternalID: index.IndexInternalID("4"),
+					Score:           0.9999999838027345,
 				},
 			},
 		},
@@ -81,8 +82,8 @@ func TestFuzzySearch(t *testing.T) {
 			searcher: fuzzySearcheraplee,
 			results: []*search.DocumentMatch{
 				{
-					ID:    "3",
-					Score: 0.9581453659370776,
+					IndexInternalID: index.IndexInternalID("3"),
+					Score:           0.9581453659370776,
 				},
 			},
 		},
@@ -90,8 +91,8 @@ func TestFuzzySearch(t *testing.T) {
 			searcher: fuzzySearcherprefix,
 			results: []*search.DocumentMatch{
 				{
-					ID:    "5",
-					Score: 1.916290731874155,
+					IndexInternalID: index.IndexInternalID("5"),
+					Score:           1.916290731874155,
 				},
 			},
 		},
@@ -105,19 +106,23 @@ func TestFuzzySearch(t *testing.T) {
 			}
 		}()
 
-		next, err := test.searcher.Next(nil)
+		ctx := &search.SearchContext{
+			DocumentMatchPool: search.NewDocumentMatchPool(test.searcher.DocumentMatchPoolSize()),
+		}
+		next, err := test.searcher.Next(ctx)
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
-				if next.ID != test.results[i].ID {
-					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].ID, next.ID, testIndex)
+				if !next.IndexInternalID.Equals(test.results[i].IndexInternalID) {
+					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].IndexInternalID, next.IndexInternalID, testIndex)
 				}
 				if next.Score != test.results[i].Score {
 					t.Errorf("expected result %d to have score %v got %v for test %d", i, test.results[i].Score, next.Score, testIndex)
 					t.Logf("scoring explanation: %s", next.Expl)
 				}
 			}
-			next, err = test.searcher.Next(nil)
+			ctx.DocumentMatchPool.Put(next)
+			next, err = test.searcher.Next(ctx)
 			i++
 		}
 		if err != nil {

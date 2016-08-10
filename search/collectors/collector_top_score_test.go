@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/net/context"
 
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -23,68 +24,68 @@ func TestTop10Scores(t *testing.T) {
 	// the top-10 scores are > 10
 	// everything else is less than 10
 	searcher := &stubSearcher{
-		matches: search.DocumentMatchCollection{
+		matches: []*search.DocumentMatch{
 			&search.DocumentMatch{
-				ID:    "a",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("a"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "b",
-				Score: 9,
+				IndexInternalID: index.IndexInternalID("b"),
+				Score:           9,
 			},
 			&search.DocumentMatch{
-				ID:    "c",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("c"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "d",
-				Score: 9,
+				IndexInternalID: index.IndexInternalID("d"),
+				Score:           9,
 			},
 			&search.DocumentMatch{
-				ID:    "e",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("e"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "f",
-				Score: 9,
+				IndexInternalID: index.IndexInternalID("f"),
+				Score:           9,
 			},
 			&search.DocumentMatch{
-				ID:    "g",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("g"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "h",
-				Score: 9,
+				IndexInternalID: index.IndexInternalID("h"),
+				Score:           9,
 			},
 			&search.DocumentMatch{
-				ID:    "i",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("i"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "j",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("j"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "k",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("k"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "l",
-				Score: 99,
+				IndexInternalID: index.IndexInternalID("l"),
+				Score:           99,
 			},
 			&search.DocumentMatch{
-				ID:    "m",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("m"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "n",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("n"),
+				Score:           11,
 			},
 		},
 	}
 
 	collector := NewTopScorerCollector(10)
-	err := collector.Collect(context.Background(), searcher)
+	err := collector.Collect(context.Background(), searcher, &stubReader{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,68 +132,68 @@ func TestTop10ScoresSkip10(t *testing.T) {
 	// the top-10 scores are > 10
 	// everything else is less than 10
 	searcher := &stubSearcher{
-		matches: search.DocumentMatchCollection{
+		matches: []*search.DocumentMatch{
 			&search.DocumentMatch{
-				ID:    "a",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("a"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "b",
-				Score: 9.5,
+				IndexInternalID: index.IndexInternalID("b"),
+				Score:           9.5,
 			},
 			&search.DocumentMatch{
-				ID:    "c",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("c"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "d",
-				Score: 9,
+				IndexInternalID: index.IndexInternalID("d"),
+				Score:           9,
 			},
 			&search.DocumentMatch{
-				ID:    "e",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("e"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "f",
-				Score: 9,
+				IndexInternalID: index.IndexInternalID("f"),
+				Score:           9,
 			},
 			&search.DocumentMatch{
-				ID:    "g",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("g"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "h",
-				Score: 9,
+				IndexInternalID: index.IndexInternalID("h"),
+				Score:           9,
 			},
 			&search.DocumentMatch{
-				ID:    "i",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("i"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "j",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("j"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "k",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("k"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "l",
-				Score: 99,
+				IndexInternalID: index.IndexInternalID("l"),
+				Score:           99,
 			},
 			&search.DocumentMatch{
-				ID:    "m",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("m"),
+				Score:           11,
 			},
 			&search.DocumentMatch{
-				ID:    "n",
-				Score: 11,
+				IndexInternalID: index.IndexInternalID("n"),
+				Score:           11,
 			},
 		},
 	}
 
 	collector := NewTopScorerSkipCollector(10, 10)
-	err := collector.Collect(context.Background(), searcher)
+	err := collector.Collect(context.Background(), searcher, &stubReader{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,69 +228,69 @@ func TestPaginationSameScores(t *testing.T) {
 	// a stub search with more than 10 matches
 	// all documents have the same score
 	searcher := &stubSearcher{
-		matches: search.DocumentMatchCollection{
+		matches: []*search.DocumentMatch{
 			&search.DocumentMatch{
-				ID:    "a",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("a"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "b",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("b"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "c",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("c"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "d",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("d"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "e",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("e"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "f",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("f"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "g",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("g"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "h",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("h"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "i",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("i"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "j",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("j"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "k",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("k"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "l",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("l"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "m",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("m"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "n",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("n"),
+				Score:           5,
 			},
 		},
 	}
 
 	// first get first 5 hits
 	collector := NewTopScorerSkipCollector(5, 0)
-	err := collector.Collect(context.Background(), searcher)
+	err := collector.Collect(context.Background(), searcher, &stubReader{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,69 +314,69 @@ func TestPaginationSameScores(t *testing.T) {
 	// a stub search with more than 10 matches
 	// all documents have the same score
 	searcher = &stubSearcher{
-		matches: search.DocumentMatchCollection{
+		matches: []*search.DocumentMatch{
 			&search.DocumentMatch{
-				ID:    "a",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("a"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "b",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("b"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "c",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("c"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "d",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("d"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "e",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("e"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "f",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("f"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "g",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("g"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "h",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("h"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "i",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("i"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "j",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("j"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "k",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("k"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "l",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("l"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "m",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("m"),
+				Score:           5,
 			},
 			&search.DocumentMatch{
-				ID:    "n",
-				Score: 5,
+				IndexInternalID: index.IndexInternalID("n"),
+				Score:           5,
 			},
 		},
 	}
 
 	// now get next 5 hits
 	collector = NewTopScorerSkipCollector(5, 5)
-	err = collector.Collect(context.Background(), searcher)
+	err = collector.Collect(context.Background(), searcher, &stubReader{})
 	if err != nil {
 		t.Fatal(err)
 	}

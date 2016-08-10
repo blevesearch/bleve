@@ -25,7 +25,7 @@ type ConjunctionSearcher struct {
 	explain     bool
 	queryNorm   float64
 	currs       []*search.DocumentMatch
-	currentID   string
+	currentID   index.IndexInternalID
 	scorer      *scorers.ConjunctionQueryScorer
 }
 
@@ -63,11 +63,14 @@ func (s *ConjunctionSearcher) computeQueryNorm() {
 	}
 }
 
-func (s *ConjunctionSearcher) initSearchers() error {
+func (s *ConjunctionSearcher) initSearchers(ctx *search.SearchContext) error {
 	var err error
 	// get all searchers pointing at their first match
 	for i, termSearcher := range s.searchers {
-		s.currs[i], err = termSearcher.Next(nil)
+		if s.currs[i] != nil {
+			ctx.DocumentMatchPool.Put(s.currs[i])
+		}
+		s.currs[i], err = termSearcher.Next(ctx)
 		if err != nil {
 			return err
 		}
@@ -75,9 +78,9 @@ func (s *ConjunctionSearcher) initSearchers() error {
 
 	if len(s.currs) > 0 {
 		if s.currs[0] != nil {
-			s.currentID = s.currs[0].ID
+			s.currentID = s.currs[0].IndexInternalID
 		} else {
-			s.currentID = ""
+			s.currentID = nil
 		}
 	}
 
@@ -99,9 +102,9 @@ func (s *ConjunctionSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *ConjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *ConjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	if !s.initialized {
-		err := s.initSearchers()
+		err := s.initSearchers(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -109,68 +112,82 @@ func (s *ConjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.
 	var rv *search.DocumentMatch
 	var err error
 OUTER:
-	for s.currentID != "" {
+	for s.currentID != nil {
 		for i, termSearcher := range s.searchers {
-			if s.currs[i] != nil && s.currs[i].ID != s.currentID {
-				if s.currentID < s.currs[i].ID {
-					s.currentID = s.currs[i].ID
+			if s.currs[i] != nil && !s.currs[i].IndexInternalID.Equals(s.currentID) {
+				if s.currentID.Compare(s.currs[i].IndexInternalID) < 0 {
+					s.currentID = s.currs[i].IndexInternalID
 					continue OUTER
 				}
 				// this reader doesn't have the currentID, try to advance
-				s.currs[i], err = termSearcher.Advance(s.currentID, nil)
+				if s.currs[i] != nil {
+					ctx.DocumentMatchPool.Put(s.currs[i])
+				}
+				s.currs[i], err = termSearcher.Advance(ctx, s.currentID)
 				if err != nil {
 					return nil, err
 				}
 				if s.currs[i] == nil {
-					s.currentID = ""
+					s.currentID = nil
 					continue OUTER
 				}
-				if s.currs[i].ID != s.currentID {
+				if !s.currs[i].IndexInternalID.Equals(s.currentID) {
 					// we just advanced, so it doesn't match, it must be greater
 					// no need to call next
-					s.currentID = s.currs[i].ID
+					s.currentID = s.currs[i].IndexInternalID
 					continue OUTER
 				}
 			} else if s.currs[i] == nil {
-				s.currentID = ""
+				s.currentID = nil
 				continue OUTER
 			}
 		}
 		// if we get here, a doc matched all readers, sum the score and add it
-		rv = s.scorer.Score(s.currs)
+		rv = s.scorer.Score(ctx, s.currs)
 
-		// prepare for next entry
-		s.currs[0], err = s.searchers[0].Next(nil)
-		if err != nil {
-			return nil, err
+		// we know all the searchers are pointing at the same thing
+		// so they all need to be advanced
+		for i, termSearcher := range s.searchers {
+			if s.currs[i] != rv {
+				ctx.DocumentMatchPool.Put(s.currs[i])
+			}
+			s.currs[i], err = termSearcher.Next(ctx)
+			if err != nil {
+				return nil, err
+			}
 		}
+
 		if s.currs[0] == nil {
-			s.currentID = ""
+			s.currentID = nil
 		} else {
-			s.currentID = s.currs[0].ID
+			s.currentID = s.currs[0].IndexInternalID
 		}
+
 		// don't continue now, wait for the next call to Next()
 		break
 	}
 	return rv, nil
 }
 
-func (s *ConjunctionSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *ConjunctionSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
 	if !s.initialized {
-		err := s.initSearchers()
+		err := s.initSearchers(ctx)
 		if err != nil {
 			return nil, err
 		}
 	}
 	var err error
 	for i, searcher := range s.searchers {
-		s.currs[i], err = searcher.Advance(ID, nil)
+		if s.currs[i] != nil {
+			ctx.DocumentMatchPool.Put(s.currs[i])
+		}
+		s.currs[i], err = searcher.Advance(ctx, ID)
 		if err != nil {
 			return nil, err
 		}
 	}
 	s.currentID = ID
-	return s.Next(preAllocated)
+	return s.Next(ctx)
 }
 
 func (s *ConjunctionSearcher) Count() uint64 {
@@ -194,4 +211,12 @@ func (s *ConjunctionSearcher) Close() error {
 
 func (s *ConjunctionSearcher) Min() int {
 	return 0
+}
+
+func (s *ConjunctionSearcher) DocumentMatchPoolSize() int {
+	rv := len(s.currs)
+	for _, s := range s.searchers {
+		rv += s.DocumentMatchPoolSize()
+	}
+	return rv
 }

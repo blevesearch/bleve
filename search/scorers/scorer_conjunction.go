@@ -23,11 +23,7 @@ func NewConjunctionQueryScorer(explain bool) *ConjunctionQueryScorer {
 	}
 }
 
-func (s *ConjunctionQueryScorer) Score(constituents []*search.DocumentMatch) *search.DocumentMatch {
-	rv := search.DocumentMatch{
-		ID: constituents[0].ID,
-	}
-
+func (s *ConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch) *search.DocumentMatch {
 	var sum float64
 	var childrenExplanations []*search.Explanation
 	if s.explain {
@@ -44,16 +40,21 @@ func (s *ConjunctionQueryScorer) Score(constituents []*search.DocumentMatch) *se
 			locations = append(locations, docMatch.Locations)
 		}
 	}
-	rv.Score = sum
+	newScore := sum
+	var newExpl *search.Explanation
 	if s.explain {
-		rv.Expl = &search.Explanation{Value: sum, Message: "sum of:", Children: childrenExplanations}
+		newExpl = &search.Explanation{Value: sum, Message: "sum of:", Children: childrenExplanations}
 	}
 
+	// reuse constituents[0] as the return value
+	rv := constituents[0]
+	rv.Score = newScore
+	rv.Expl = newExpl
 	if len(locations) == 1 {
 		rv.Locations = locations[0]
 	} else if len(locations) > 1 {
 		rv.Locations = search.MergeLocations(locations)
 	}
 
-	return &rv
+	return rv
 }

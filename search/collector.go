@@ -12,11 +12,13 @@ package search
 import (
 	"time"
 
+	"github.com/blevesearch/bleve/index"
+
 	"golang.org/x/net/context"
 )
 
 type Collector interface {
-	Collect(ctx context.Context, searcher Searcher) error
+	Collect(ctx context.Context, searcher Searcher, reader index.IndexReader) error
 	Results() DocumentMatchCollection
 	Total() uint64
 	MaxScore() float64

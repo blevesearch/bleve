@@ -25,11 +25,7 @@ func NewDisjunctionQueryScorer(explain bool) *DisjunctionQueryScorer {
 	}
 }
 
-func (s *DisjunctionQueryScorer) Score(constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
-	rv := search.DocumentMatch{
-		ID: constituents[0].ID,
-	}
-
+func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
 	var sum float64
 	var childrenExplanations []*search.Explanation
 	if s.explain {
@@ -53,19 +49,24 @@ func (s *DisjunctionQueryScorer) Score(constituents []*search.DocumentMatch, cou
 	}
 
 	coord := float64(countMatch) / float64(countTotal)
-	rv.Score = sum * coord
+	newScore := sum * coord
+	var newExpl *search.Explanation
 	if s.explain {
 		ce := make([]*search.Explanation, 2)
 		ce[0] = rawExpl
 		ce[1] = &search.Explanation{Value: coord, Message: fmt.Sprintf("coord(%d/%d)", countMatch, countTotal)}
-		rv.Expl = &search.Explanation{Value: rv.Score, Message: "product of:", Children: ce}
+		newExpl = &search.Explanation{Value: newScore, Message: "product of:", Children: ce}
 	}
 
+	// reuse constituents[0] as the return value
+	rv := constituents[0]
+	rv.Score = newScore
+	rv.Expl = newExpl
 	if len(locations) == 1 {
 		rv.Locations = locations[0]
 	} else if len(locations) > 1 {
 		rv.Locations = search.MergeLocations(locations)
 	}
 
-	return &rv
+	return rv
 }

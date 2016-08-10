@@ -36,11 +36,11 @@ func (s *MatchNoneSearcher) SetQueryNorm(qnorm float64) {
 
 }
 
-func (s *MatchNoneSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *MatchNoneSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	return nil, nil
 }
 
-func (s *MatchNoneSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *MatchNoneSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
 	return nil, nil
 }
 
@@ -49,5 +49,9 @@ func (s *MatchNoneSearcher) Close() error {
 }
 
 func (s *MatchNoneSearcher) Min() int {
+	return 0
+}
+
+func (s *MatchNoneSearcher) DocumentMatchPoolSize() int {
 	return 0
 }

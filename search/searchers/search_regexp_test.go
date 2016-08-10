@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -57,8 +58,8 @@ func TestRegexpSearch(t *testing.T) {
 			searcher: regexpSearcher,
 			results: []*search.DocumentMatch{
 				{
-					ID:    "1",
-					Score: 1.916290731874155,
+					IndexInternalID: index.IndexInternalID("1"),
+					Score:           1.916290731874155,
 				},
 			},
 		},
@@ -66,12 +67,12 @@ func TestRegexpSearch(t *testing.T) {
 			searcher: regexpSearcherCo,
 			results: []*search.DocumentMatch{
 				{
-					ID:    "2",
-					Score: 0.33875554280828685,
+					IndexInternalID: index.IndexInternalID("2"),
+					Score:           0.33875554280828685,
 				},
 				{
-					ID:    "3",
-					Score: 0.33875554280828685,
+					IndexInternalID: index.IndexInternalID("3"),
+					Score:           0.33875554280828685,
 				},
 			},
 		},
@@ -85,19 +86,23 @@ func TestRegexpSearch(t *testing.T) {
 			}
 		}()
 
-		next, err := test.searcher.Next(nil)
+		ctx := &search.SearchContext{
+			DocumentMatchPool: search.NewDocumentMatchPool(test.searcher.DocumentMatchPoolSize()),
+		}
+		next, err := test.searcher.Next(ctx)
 		i := 0
 		for err == nil && next != nil {
 			if i < len(test.results) {
-				if next.ID != test.results[i].ID {
-					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].ID, next.ID, testIndex)
+				if !next.IndexInternalID.Equals(test.results[i].IndexInternalID) {
+					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].IndexInternalID, next.IndexInternalID, testIndex)
 				}
 				if next.Score != test.results[i].Score {
 					t.Errorf("expected result %d to have score %v got  %v for test %d", i, test.results[i].Score, next.Score, testIndex)
 					t.Logf("scoring explanation: %s", next.Expl)
 				}
 			}
-			next, err = test.searcher.Next(nil)
+			ctx.DocumentMatchPool.Put(next)
+			next, err = test.searcher.Next(ctx)
 			i++
 		}
 		if err != nil {

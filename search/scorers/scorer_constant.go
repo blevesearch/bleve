@@ -12,6 +12,7 @@ package scorers
 import (
 	"fmt"
 
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -64,7 +65,7 @@ func (s *ConstantScorer) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *ConstantScorer) Score(id string) *search.DocumentMatch {
+func (s *ConstantScorer) Score(ctx *search.SearchContext, id index.IndexInternalID) *search.DocumentMatch {
 	var scoreExplanation *search.Explanation
 
 	score := s.constant
@@ -91,13 +92,12 @@ func (s *ConstantScorer) Score(id string) *search.DocumentMatch {
 		}
 	}
 
-	rv := search.DocumentMatch{
-		ID:    id,
-		Score: score,
-	}
+	rv := ctx.DocumentMatchPool.Get()
+	rv.IndexInternalID = id
+	rv.Score = score
 	if s.explain {
 		rv.Expl = scoreExplanation
 	}
 
-	return &rv
+	return rv
 }

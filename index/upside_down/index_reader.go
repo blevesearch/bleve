@@ -23,12 +23,12 @@ type IndexReader struct {
 	docCount uint64
 }
 
-func (i *IndexReader) TermFieldReader(term []byte, fieldName string) (index.TermFieldReader, error) {
+func (i *IndexReader) TermFieldReader(term []byte, fieldName string, includeFreq, includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
 	fieldIndex, fieldExists := i.index.fieldCache.FieldNamed(fieldName, false)
 	if fieldExists {
-		return newUpsideDownCouchTermFieldReader(i, term, uint16(fieldIndex))
+		return newUpsideDownCouchTermFieldReader(i, term, uint16(fieldIndex), includeFreq, includeNorm, includeTermVectors)
 	}
-	return newUpsideDownCouchTermFieldReader(i, []byte{ByteSeparator}, ^uint16(0))
+	return newUpsideDownCouchTermFieldReader(i, []byte{ByteSeparator}, ^uint16(0), includeFreq, includeNorm, includeTermVectors)
 }
 
 func (i *IndexReader) FieldDict(fieldName string) (index.FieldDict, error) {
@@ -51,10 +51,14 @@ func (i *IndexReader) DocIDReader(start, end string) (index.DocIDReader, error) 
 	return newUpsideDownCouchDocIDReader(i, start, end)
 }
 
+func (i *IndexReader) DocIDReaderOnly(ids []string) (index.DocIDReader, error) {
+	return newUpsideDownCouchDocIDReaderOnly(i, ids)
+}
+
 func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 	// first hit the back index to confirm doc exists
 	var backIndexRow *BackIndexRow
-	backIndexRow, err = i.index.backIndexRowForDoc(i.kvreader, id)
+	backIndexRow, err = i.index.backIndexRowForDoc(i.kvreader, []byte(id))
 	if err != nil {
 		return
 	}
@@ -94,7 +98,7 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 	return
 }
 
-func (i *IndexReader) DocumentFieldTerms(id string) (index.FieldTerms, error) {
+func (i *IndexReader) DocumentFieldTerms(id index.IndexInternalID) (index.FieldTerms, error) {
 	back, err := i.index.backIndexRowForDoc(i.kvreader, id)
 	if err != nil {
 		return nil, err
@@ -112,7 +116,7 @@ func (i *IndexReader) DocumentFieldTerms(id string) (index.FieldTerms, error) {
 	return rv, nil
 }
 
-func (i *IndexReader) DocumentFieldTermsForFields(id string, fields []string) (index.FieldTerms, error) {
+func (i *IndexReader) DocumentFieldTermsForFields(id index.IndexInternalID, fields []string) (index.FieldTerms, error) {
 	back, err := i.index.backIndexRowForDoc(i.kvreader, id)
 	if err != nil {
 		return nil, err
@@ -179,6 +183,10 @@ func (i *IndexReader) DocCount() uint64 {
 
 func (i *IndexReader) Close() error {
 	return i.kvreader.Close()
+}
+
+func (i *IndexReader) FinalizeDocID(id index.IndexInternalID) (string, error) {
+	return string(id), nil
 }
 
 func incrementBytes(in []byte) []byte {

@@ -9,6 +9,8 @@
 
 package search
 
+import "github.com/blevesearch/bleve/index"
+
 type Location struct {
 	Pos            float64   `json:"pos"`
 	Start          float64   `json:"start"`
@@ -51,12 +53,13 @@ type FieldTermLocationMap map[string]TermLocationMap
 type FieldFragmentMap map[string][]string
 
 type DocumentMatch struct {
-	Index     string               `json:"index,omitempty"`
-	ID        string               `json:"id"`
-	Score     float64              `json:"score"`
-	Expl      *Explanation         `json:"explanation,omitempty"`
-	Locations FieldTermLocationMap `json:"locations,omitempty"`
-	Fragments FieldFragmentMap     `json:"fragments,omitempty"`
+	Index           string                `json:"index,omitempty"`
+	ID              string                `json:"id"`
+	IndexInternalID index.IndexInternalID `json:"-"`
+	Score           float64               `json:"score"`
+	Expl            *Explanation          `json:"explanation,omitempty"`
+	Locations       FieldTermLocationMap  `json:"locations,omitempty"`
+	Fragments       FieldFragmentMap      `json:"fragments,omitempty"`
 
 	// Fields contains the values for document fields listed in
 	// SearchRequest.Fields. Text fields are returned as strings, numeric
@@ -85,8 +88,14 @@ func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
 	dm.Fields[name] = valSlice
 }
 
+// Reset allows an already allocated DocumentMatch to be reused
 func (dm *DocumentMatch) Reset() *DocumentMatch {
+	// remember the []byte used for the IndexInternalID
+	indexInternalId := dm.IndexInternalID
+	// idiom to copy over from empty DocumentMatch (0 allocations)
 	*dm = DocumentMatch{}
+	// reuse the []byte already allocated (and reset len to 0)
+	dm.IndexInternalID = indexInternalId[:0]
 	return dm
 }
 
@@ -97,11 +106,18 @@ func (c DocumentMatchCollection) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c DocumentMatchCollection) Less(i, j int) bool { return c[i].Score > c[j].Score }
 
 type Searcher interface {
-	Next(preAllocated *DocumentMatch) (*DocumentMatch, error)
-	Advance(ID string, preAllocated *DocumentMatch) (*DocumentMatch, error)
+	Next(ctx *SearchContext) (*DocumentMatch, error)
+	Advance(ctx *SearchContext, ID index.IndexInternalID) (*DocumentMatch, error)
 	Close() error
 	Weight() float64
 	SetQueryNorm(float64)
 	Count() uint64
 	Min() int
+
+	DocumentMatchPoolSize() int
+}
+
+// SearchContext represents the context around a single search
+type SearchContext struct {
+	DocumentMatchPool *DocumentMatchPool
 }

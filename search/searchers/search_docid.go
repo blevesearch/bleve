@@ -10,8 +10,6 @@
 package searchers
 
 import (
-	"sort"
-
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/scorers"
@@ -19,54 +17,28 @@ import (
 
 // DocIDSearcher returns documents matching a predefined set of identifiers.
 type DocIDSearcher struct {
-	ids     []string
-	current int
-	scorer  *scorers.ConstantScorer
+	reader index.DocIDReader
+	scorer *scorers.ConstantScorer
+	count  int
 }
 
 func NewDocIDSearcher(indexReader index.IndexReader, ids []string, boost float64,
 	explain bool) (searcher *DocIDSearcher, err error) {
 
-	kept := make([]string, len(ids))
-	copy(kept, ids)
-	sort.Strings(kept)
-
-	if len(ids) > 0 {
-		var idReader index.DocIDReader
-		endTerm := string(incrementBytes([]byte(kept[len(kept)-1])))
-		idReader, err = indexReader.DocIDReader(kept[0], endTerm)
-		if err != nil {
-			return nil, err
-		}
-		defer func() {
-			if cerr := idReader.Close(); err == nil && cerr != nil {
-				err = cerr
-			}
-		}()
-		j := 0
-		for _, id := range kept {
-			doc, err := idReader.Advance(id)
-			if err != nil {
-				return nil, err
-			}
-			// Non-duplicate match
-			if doc == id && (j == 0 || kept[j-1] != id) {
-				kept[j] = id
-				j++
-			}
-		}
-		kept = kept[:j]
+	reader, err := indexReader.DocIDReaderOnly(ids)
+	if err != nil {
+		return nil, err
 	}
-
 	scorer := scorers.NewConstantScorer(1.0, boost, explain)
 	return &DocIDSearcher{
-		ids:    kept,
 		scorer: scorer,
+		reader: reader,
+		count:  len(ids),
 	}, nil
 }
 
 func (s *DocIDSearcher) Count() uint64 {
-	return uint64(len(s.ids))
+	return uint64(s.count)
 }
 
 func (s *DocIDSearcher) Weight() float64 {
@@ -77,20 +49,30 @@ func (s *DocIDSearcher) SetQueryNorm(qnorm float64) {
 	s.scorer.SetQueryNorm(qnorm)
 }
 
-func (s *DocIDSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
-	if s.current >= len(s.ids) {
+func (s *DocIDSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+	docidMatch, err := s.reader.Next()
+	if err != nil {
+		return nil, err
+	}
+	if docidMatch == nil {
 		return nil, nil
 	}
-	id := s.ids[s.current]
-	s.current++
-	docMatch := s.scorer.Score(id)
-	return docMatch, nil
 
+	docMatch := s.scorer.Score(ctx, docidMatch)
+	return docMatch, nil
 }
 
-func (s *DocIDSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
-	s.current = sort.SearchStrings(s.ids, ID)
-	return s.Next(preAllocated)
+func (s *DocIDSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
+	docidMatch, err := s.reader.Advance(ID)
+	if err != nil {
+		return nil, err
+	}
+	if docidMatch == nil {
+		return nil, nil
+	}
+
+	docMatch := s.scorer.Score(ctx, docidMatch)
+	return docMatch, nil
 }
 
 func (s *DocIDSearcher) Close() error {
@@ -99,4 +81,8 @@ func (s *DocIDSearcher) Close() error {
 
 func (s *DocIDSearcher) Min() int {
 	return 0
+}
+
+func (s *DocIDSearcher) DocumentMatchPoolSize() int {
+	return 1
 }

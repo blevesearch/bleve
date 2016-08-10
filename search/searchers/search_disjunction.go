@@ -30,7 +30,7 @@ type DisjunctionSearcher struct {
 	searchers   OrderedSearcherList
 	queryNorm   float64
 	currs       []*search.DocumentMatch
-	currentID   string
+	currentID   index.IndexInternalID
 	scorer      *scorers.DisjunctionQueryScorer
 	min         float64
 }
@@ -83,11 +83,14 @@ func (s *DisjunctionSearcher) computeQueryNorm() {
 	}
 }
 
-func (s *DisjunctionSearcher) initSearchers() error {
+func (s *DisjunctionSearcher) initSearchers(ctx *search.SearchContext) error {
 	var err error
 	// get all searchers pointing at their first match
 	for i, termSearcher := range s.searchers {
-		s.currs[i], err = termSearcher.Next(nil)
+		if s.currs[i] != nil {
+			ctx.DocumentMatchPool.Put(s.currs[i])
+		}
+		s.currs[i], err = termSearcher.Next(ctx)
 		if err != nil {
 			return err
 		}
@@ -98,11 +101,11 @@ func (s *DisjunctionSearcher) initSearchers() error {
 	return nil
 }
 
-func (s *DisjunctionSearcher) nextSmallestID() string {
-	rv := ""
+func (s *DisjunctionSearcher) nextSmallestID() index.IndexInternalID {
+	var rv index.IndexInternalID
 	for _, curr := range s.currs {
-		if curr != nil && (curr.ID < rv || rv == "") {
-			rv = curr.ID
+		if curr != nil && (curr.IndexInternalID.Compare(rv) < 0 || rv == nil) {
+			rv = curr.IndexInternalID
 		}
 	}
 	return rv
@@ -122,9 +125,9 @@ func (s *DisjunctionSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *DisjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *DisjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	if !s.initialized {
-		err := s.initSearchers()
+		err := s.initSearchers(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -134,9 +137,9 @@ func (s *DisjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.
 	matching := make([]*search.DocumentMatch, 0, len(s.searchers))
 
 	found := false
-	for !found && s.currentID != "" {
+	for !found && s.currentID != nil {
 		for _, curr := range s.currs {
-			if curr != nil && curr.ID == s.currentID {
+			if curr != nil && curr.IndexInternalID.Equals(s.currentID) {
 				matching = append(matching, curr)
 			}
 		}
@@ -144,16 +147,19 @@ func (s *DisjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.
 		if len(matching) >= int(s.min) {
 			found = true
 			// score this match
-			rv = s.scorer.Score(matching, len(matching), len(s.searchers))
+			rv = s.scorer.Score(ctx, matching, len(matching), len(s.searchers))
 		}
 
 		// reset matching
 		matching = make([]*search.DocumentMatch, 0)
 		// invoke next on all the matching searchers
 		for i, curr := range s.currs {
-			if curr != nil && curr.ID == s.currentID {
+			if curr != nil && curr.IndexInternalID.Equals(s.currentID) {
 				searcher := s.searchers[i]
-				s.currs[i], err = searcher.Next(nil)
+				if s.currs[i] != rv {
+					ctx.DocumentMatchPool.Put(s.currs[i])
+				}
+				s.currs[i], err = searcher.Next(ctx)
 				if err != nil {
 					return nil, err
 				}
@@ -164,9 +170,9 @@ func (s *DisjunctionSearcher) Next(preAllocated *search.DocumentMatch) (*search.
 	return rv, nil
 }
 
-func (s *DisjunctionSearcher) Advance(ID string, preAllocated *search.DocumentMatch) (*search.DocumentMatch, error) {
+func (s *DisjunctionSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
 	if !s.initialized {
-		err := s.initSearchers()
+		err := s.initSearchers(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -174,7 +180,10 @@ func (s *DisjunctionSearcher) Advance(ID string, preAllocated *search.DocumentMa
 	// get all searchers pointing at their first match
 	var err error
 	for i, termSearcher := range s.searchers {
-		s.currs[i], err = termSearcher.Advance(ID, nil)
+		if s.currs[i] != nil {
+			ctx.DocumentMatchPool.Put(s.currs[i])
+		}
+		s.currs[i], err = termSearcher.Advance(ctx, ID)
 		if err != nil {
 			return nil, err
 		}
@@ -182,7 +191,7 @@ func (s *DisjunctionSearcher) Advance(ID string, preAllocated *search.DocumentMa
 
 	s.currentID = s.nextSmallestID()
 
-	return s.Next(preAllocated)
+	return s.Next(ctx)
 }
 
 func (s *DisjunctionSearcher) Count() uint64 {
@@ -206,4 +215,12 @@ func (s *DisjunctionSearcher) Close() error {
 
 func (s *DisjunctionSearcher) Min() int {
 	return int(s.min) // FIXME just make this an int
+}
+
+func (s *DisjunctionSearcher) DocumentMatchPoolSize() int {
+	rv := len(s.currs)
+	for _, s := range s.searchers {
+		rv += s.DocumentMatchPoolSize()
+	}
+	return rv
 }
