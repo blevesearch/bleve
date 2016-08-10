@@ -84,7 +84,6 @@ func TestTop10Scores(t *testing.T) {
 	}
 
 	collector := NewHeapCollector(10, 0, nil, nil)
-	//collector:=NewTopScorerCollector(10)
 	err := collector.Collect(context.Background(), searcher)
 	if err != nil {
 		t.Fatal(err)
