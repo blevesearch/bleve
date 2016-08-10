@@ -235,8 +235,8 @@ func (hc *HeapCollector) Less(i, j int) bool {
 	scori := hc.results[i].match.Score
 	scorj := hc.results[j].match.Score
 	// make sure the list is ordered if everything else is the same...
-	if scori==scorj{
-		return hc.results[i].match.ID < hc.results[j].match.ID
+	if scori == scorj {
+		return hc.results[i].match.ID > hc.results[j].match.ID
 	}
 	return scori < scorj
 }
