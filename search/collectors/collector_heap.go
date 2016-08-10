@@ -63,7 +63,10 @@ func (hc *HeapCollector) Collect(ctx context.Context, searcher search.Searcher) 
 			default:
 			}
 		}
-		hc.collectSingle(next)
+		err = hc.collectSingle(next)
+		if err != nil {
+			break
+		}
 		if hc.facetsBuilder != nil {
 			err = hc.facetsBuilder.Update(next)
 			if err != nil {
