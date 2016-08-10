@@ -406,7 +406,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}()
 
 	collector := collectors.NewHeapCollector(req.Size, req.From, indexReader, req.Sort)
-	//collector := collectors.NewTopScorerSkipCollector(req.Size, req.From)
 
 	if req.Facets != nil {
 		facetsBuilder := search.NewFacetsBuilder(indexReader)
