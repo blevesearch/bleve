@@ -201,6 +201,7 @@ type SearchRequest struct {
 	Fields    []string          `json:"fields"`
 	Facets    FacetsRequest     `json:"facets"`
 	Explain   bool              `json:"explain"`
+	Sort      search.SortOrder  `json:"sort"`
 }
 
 func (sr *SearchRequest) Validate() error {
@@ -218,6 +219,10 @@ func (r *SearchRequest) AddFacet(facetName string, f *FacetRequest) {
 		r.Facets = make(FacetsRequest, 1)
 	}
 	r.Facets[facetName] = f
+}
+
+func (r *SearchRequest) SortBy(fieldName string, ascends bool) {
+	r.Sort = append(r.Sort, search.SearchSort{Field: fieldName, Ascends: ascends})
 }
 
 // UnmarshalJSON deserializes a JSON representation of

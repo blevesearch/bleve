@@ -384,8 +384,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		return nil, ErrorIndexClosed
 	}
 
-	collector := collectors.NewTopScorerSkipCollector(req.Size, req.From)
-
 	// open a reader for this search
 	indexReader, err := i.i.Reader()
 	if err != nil {
@@ -406,6 +404,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			err = serr
 		}
 	}()
+
+	collector := collectors.NewHeapCollector(req.Size, req.From, indexReader, req.Sort)
 
 	if req.Facets != nil {
 		facetsBuilder := search.NewFacetsBuilder(indexReader)

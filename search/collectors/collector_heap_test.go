@@ -83,7 +83,7 @@ func TestTop10Scores(t *testing.T) {
 		},
 	}
 
-	collector := NewTopScorerCollector(10)
+	collector := NewHeapCollector(10, 0, nil, nil)
 	err := collector.Collect(context.Background(), searcher)
 	if err != nil {
 		t.Fatal(err)
@@ -191,7 +191,7 @@ func TestTop10ScoresSkip10(t *testing.T) {
 		},
 	}
 
-	collector := NewTopScorerSkipCollector(10, 10)
+	collector := NewHeapCollector(10, 10, nil, nil)
 	err := collector.Collect(context.Background(), searcher)
 	if err != nil {
 		t.Fatal(err)
@@ -288,7 +288,7 @@ func TestPaginationSameScores(t *testing.T) {
 	}
 
 	// first get first 5 hits
-	collector := NewTopScorerSkipCollector(5, 0)
+	collector := NewHeapCollector(5, 0, nil, nil)
 	err := collector.Collect(context.Background(), searcher)
 	if err != nil {
 		t.Fatal(err)
@@ -374,7 +374,7 @@ func TestPaginationSameScores(t *testing.T) {
 	}
 
 	// now get next 5 hits
-	collector = NewTopScorerSkipCollector(5, 5)
+	collector = NewHeapCollector(5, 5, nil, nil)
 	err = collector.Collect(context.Background(), searcher)
 	if err != nil {
 		t.Fatal(err)
@@ -397,21 +397,20 @@ func TestPaginationSameScores(t *testing.T) {
 			t.Errorf("doc ID %s is in top 5 and next 5 result sets", hit.ID)
 		}
 	}
-
 }
 
 func BenchmarkTop10of100000Scores(b *testing.B) {
-	benchHelper(10000, NewTopScorerCollector(10), b)
+	benchHelper(10000, NewHeapCollector(10, 0, nil, nil), b)
 }
 
 func BenchmarkTop100of100000Scores(b *testing.B) {
-	benchHelper(10000, NewTopScorerCollector(100), b)
+	benchHelper(10000, NewHeapCollector(100, 0, nil, nil), b)
 }
 
 func BenchmarkTop10of1000000Scores(b *testing.B) {
-	benchHelper(100000, NewTopScorerCollector(10), b)
+	benchHelper(100000, NewHeapCollector(10, 0, nil, nil), b)
 }
 
 func BenchmarkTop100of1000000Scores(b *testing.B) {
-	benchHelper(100000, NewTopScorerCollector(100), b)
+	benchHelper(100000, NewHeapCollector(100, 0, nil, nil), b)
 }

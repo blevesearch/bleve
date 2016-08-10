@@ -29,6 +29,9 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/search"
+
+	"github.com/Pallinder/go-randomdata"
+	"github.com/divan/num2words"
 )
 
 func TestCrud(t *testing.T) {
@@ -713,6 +716,52 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 		}
 	}
 	close(done)
+}
+
+func TestSortMatchSearch(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 200; i++ {
+		doc := make(map[string]interface{})
+		doc["Name"] = randomdata.SillyName()
+		doc["Day"] = randomdata.Day()
+		doc["Number"] = num2words.Convert(i)
+		err = index.Index(fmt.Sprintf("%d", i), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	req := NewSearchRequest(NewMatchQuery("one"))
+	req.SortBy("Day", true)
+	req.SortBy("Name", true)
+	req.Fields = []string{"*"}
+	sr, err := index.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prev := ""
+	for _, hit := range sr.Hits {
+		val := hit.Fields["Day"].(string)
+		if prev > val {
+			t.Errorf("Hits must be sorted by 'Day'. Found '%s' before '%s'", prev, val)
+		}
+		prev = val
+	}
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestIndexCountMatchSearch(t *testing.T) {
