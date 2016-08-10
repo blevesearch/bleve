@@ -1,12 +1,23 @@
+//  Copyright (c) 2014 Couchbase, Inc.
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//    http://www.apache.org/licenses/LICENSE-2.0
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
+//
 package collectors
 
 import (
 	"container/heap"
+	"math"
+	"time"
+
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"golang.org/x/net/context"
-	"time"
 )
 
 type collectedDoc struct {
@@ -24,6 +35,8 @@ type HeapCollector struct {
 	facetsBuilder *search.FacetsBuilder
 	reader        index.IndexReader
 }
+
+var COLLECT_CHECK_DONE_EVERY = uint64(1024)
 
 func NewHeapCollector(size int, skip int, reader index.IndexReader, sort search.SortOrder) *HeapCollector {
 	hc := &HeapCollector{size: size, skip: skip, reader: reader, sort: sort}
@@ -79,12 +92,11 @@ func (hc *HeapCollector) collectSingle(dmIn *search.DocumentMatch) error {
 			return err
 		}
 	}
-	if hc.Len() >= hc.size {
-		hc.Pop()
-	}
 	heap.Push(hc, single)
+	if hc.Len() > hc.size+hc.skip {
+		heap.Pop(hc)
+	}
 	return nil
-
 }
 
 func (hc *HeapCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
@@ -92,10 +104,16 @@ func (hc *HeapCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
 }
 
 func (hc *HeapCollector) Results() search.DocumentMatchCollection {
-	rv := make(search.DocumentMatchCollection, hc.Len())
-	for i := 0; hc.Len() > 0; i++ {
-		doc := heap.Pop(hc).(*collectedDoc)
-		rv[i] = &doc.match
+	count := hc.Len()
+	size := count - hc.skip
+	rv := make(search.DocumentMatchCollection, size)
+	for count > 0 {
+		count--
+		if count >= hc.skip {
+			size--
+			doc := heap.Pop(hc).(*collectedDoc)
+			rv[size] = &doc.match
+		}
 	}
 	return rv
 }
@@ -105,7 +123,15 @@ func (hc *HeapCollector) Total() uint64 {
 }
 
 func (hc *HeapCollector) MaxScore() float64 {
-	return 0
+	var max float64
+	for _, res := range hc.results {
+		max = math.Max(max, res.match.Score)
+	}
+	return max
+}
+
+func (hc *HeapCollector) Took() time.Duration {
+	return hc.took
 }
 
 func (hc *HeapCollector) FacetResults() search.FacetResults {
@@ -206,7 +232,13 @@ func (hc *HeapCollector) Less(i, j int) bool {
 			}
 		}
 	}
-	return hc.results[i].match.Score > hc.results[j].match.Score
+	scori := hc.results[i].match.Score
+	scorj := hc.results[j].match.Score
+	// make sure the list is ordered if everything else is the same...
+	if scori==scorj{
+		return hc.results[i].match.ID < hc.results[j].match.ID
+	}
+	return scori < scorj
 }
 
 func (hc *HeapCollector) Swap(i, j int) {
