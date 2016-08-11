@@ -167,9 +167,9 @@ func textFieldCompare(i, j *document.TextField, ascends bool) (bool, bool) {
 		return true, false
 	}
 	if ascends {
-		return false, ivalue < jvalue
+		return false, ivalue > jvalue
 	}
-	return false, ivalue > jvalue
+	return false, ivalue < jvalue
 }
 
 func numericFieldCompare(i, j *document.NumericField, ascends bool) (bool, bool) {
@@ -179,9 +179,9 @@ func numericFieldCompare(i, j *document.NumericField, ascends bool) (bool, bool)
 		return true, false
 	}
 	if ascends {
-		return false, ivalue < jvalue
+		return false, ivalue > jvalue
 	}
-	return false, ivalue > jvalue
+	return false, ivalue < jvalue
 }
 
 func dateTimeFieldCompare(i, j *document.DateTimeField, ascends bool) (bool, bool) {
@@ -191,9 +191,9 @@ func dateTimeFieldCompare(i, j *document.DateTimeField, ascends bool) (bool, boo
 		return true, false
 	}
 	if ascends {
-		return false, ivalue.Before(jvalue)
+		return false, ivalue.After(jvalue)
 	}
-	return false, ivalue.After(jvalue)
+	return false, ivalue.Before(jvalue)
 }
 
 func boolFieldCompare(i, j *document.BooleanField, ascends bool) (bool, bool) {

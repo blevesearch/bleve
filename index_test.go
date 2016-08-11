@@ -29,9 +29,6 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/search"
-
-	"github.com/Pallinder/go-randomdata"
-	"github.com/divan/num2words"
 )
 
 func TestCrud(t *testing.T) {
@@ -731,18 +728,21 @@ func TestSortMatchSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	names := []string{"Noam", "Uri", "David", "Yosef", "Eitan", "Itay", "Ariel", "Daniel", "Omer", "Yogev", "Yehonatan", "Moshe", "Mohammed", "Yusuf", "Omar"}
+	days := []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+	numbers := []string{"One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"}
 	for i := 0; i < 200; i++ {
 		doc := make(map[string]interface{})
-		doc["Name"] = randomdata.SillyName()
-		doc["Day"] = randomdata.Day()
-		doc["Number"] = num2words.Convert(i)
+		doc["Name"] = names[i%len(names)]
+		doc["Day"] = days[i%len(days)]
+		doc["Number"] = numbers[i%len(numbers)]
 		err = index.Index(fmt.Sprintf("%d", i), doc)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	req := NewSearchRequest(NewMatchQuery("one"))
+	req := NewSearchRequest(NewMatchQuery("One"))
 	req.SortBy("Day", true)
 	req.SortBy("Name", true)
 	req.Fields = []string{"*"}
