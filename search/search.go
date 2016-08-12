@@ -9,7 +9,12 @@
 
 package search
 
-import "github.com/blevesearch/bleve/index"
+import (
+	"fmt"
+
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index"
+)
 
 type Location struct {
 	Pos            float64   `json:"pos"`
@@ -65,6 +70,12 @@ type DocumentMatch struct {
 	// SearchRequest.Fields. Text fields are returned as strings, numeric
 	// fields as float64s and date fields as time.RFC3339 formatted strings.
 	Fields map[string]interface{} `json:"fields,omitempty"`
+
+	// if we load the document for this hit, remember it so we dont load again
+	Document *document.Document `json:"-"`
+
+	// used to maintain natural index order
+	HitNumber uint64 `json:"-"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
@@ -99,6 +110,10 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	return dm
 }
 
+func (dm *DocumentMatch) String() string {
+	return fmt.Sprintf("[%s-%f]", string(dm.IndexInternalID), dm.Score)
+}
+
 type DocumentMatchCollection []*DocumentMatch
 
 func (c DocumentMatchCollection) Len() int           { return len(c) }
@@ -120,4 +135,60 @@ type Searcher interface {
 // SearchContext represents the context around a single search
 type SearchContext struct {
 	DocumentMatchPool *DocumentMatchPool
+}
+
+type SearchSort interface {
+	Compare(a, b *DocumentMatch) int
+
+	RequiresDocID() bool
+	RequiresScoring() bool
+	RequiresStoredFields() []string
+}
+
+type SortOrder []SearchSort
+
+func (so SortOrder) Compare(i, j *DocumentMatch) int {
+	// compare the documents on all search sorts until a differences is found
+	for _, soi := range so {
+		c := soi.Compare(i, j)
+		if c == 0 {
+			continue
+		}
+		return c
+	}
+	// if they are the same at this point, impose order based on index natural sort order
+	if i.HitNumber == j.HitNumber {
+		return 0
+	} else if i.HitNumber > j.HitNumber {
+		return 1
+	}
+	return -1
+}
+
+func (so SortOrder) RequiresScore() bool {
+	rv := false
+	for _, soi := range so {
+		if soi.RequiresScoring() {
+			rv = true
+		}
+	}
+	return rv
+}
+
+func (so SortOrder) RequiresDocID() bool {
+	rv := false
+	for _, soi := range so {
+		if soi.RequiresDocID() {
+			rv = true
+		}
+	}
+	return rv
+}
+
+func (so SortOrder) RequiredStoredFields() []string {
+	var rv []string
+	for _, soi := range so {
+		rv = append(rv, soi.RequiresStoredFields()...)
+	}
+	return rv
 }

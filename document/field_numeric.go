@@ -96,6 +96,17 @@ func (n *NumericField) NumPlainTextBytes() uint64 {
 	return n.numPlainTextBytes
 }
 
+func (n *NumericField) Compare(other *NumericField, descending bool) int {
+	num, _ := n.Number()
+	othernum, _ := other.Number()
+	if num == othernum {
+		return 0
+	} else if (num < othernum && !descending) || (num > othernum && descending) {
+		return -1
+	}
+	return 1
+}
+
 func NewNumericFieldFromBytes(name string, arrayPositions []uint64, value []byte) *NumericField {
 	return &NumericField{
 		name:              name,

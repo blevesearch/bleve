@@ -100,6 +100,17 @@ func (n *DateTimeField) NumPlainTextBytes() uint64 {
 	return n.numPlainTextBytes
 }
 
+func (n *DateTimeField) Compare(other *DateTimeField, descending bool) int {
+	dt, _ := n.DateTime()
+	otherdt, _ := other.DateTime()
+	if dt.Equal(otherdt) {
+		return 0
+	} else if (dt.Before(otherdt) && !descending) || (otherdt.Before(dt) && descending) {
+		return -1
+	}
+	return 1
+}
+
 func NewDateTimeFieldFromBytes(name string, arrayPositions []uint64, value []byte) *DateTimeField {
 	return &DateTimeField{
 		name:              name,

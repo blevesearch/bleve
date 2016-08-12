@@ -384,7 +384,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		return nil, ErrorIndexClosed
 	}
 
-	collector := collectors.NewTopScorerSkipCollector(req.Size, req.From)
+	collector := collectors.NewHeapCollector(req.Size, req.From, req.Sort)
 
 	// open a reader for this search
 	indexReader, err := i.i.Reader()

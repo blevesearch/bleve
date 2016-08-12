@@ -191,6 +191,7 @@ func (h *HighlightRequest) AddField(field string) {
 // Facets describe the set of facets to be computed.
 // Explain triggers inclusion of additional search
 // result score explanations.
+// Sort describes the desired order for the results to be returned.
 //
 // A special field named "*" can be used to return all fields.
 type SearchRequest struct {
@@ -201,6 +202,7 @@ type SearchRequest struct {
 	Fields    []string          `json:"fields"`
 	Facets    FacetsRequest     `json:"facets"`
 	Explain   bool              `json:"explain"`
+	Sort      search.SortOrder  `json:"sort"`
 }
 
 func (sr *SearchRequest) Validate() error {
@@ -218,6 +220,11 @@ func (r *SearchRequest) AddFacet(facetName string, f *FacetRequest) {
 		r.Facets = make(FacetsRequest, 1)
 	}
 	r.Facets[facetName] = f
+}
+
+// SortBy changes the request to use the requested sort order
+func (r *SearchRequest) SortBy(order search.SortOrder) {
+	r.Sort = order
 }
 
 // UnmarshalJSON deserializes a JSON representation of
@@ -274,12 +281,14 @@ func NewSearchRequest(q Query) *SearchRequest {
 // NewSearchRequestOptions creates a new SearchRequest
 // for the Query, with the requested size, from
 // and explanation search parameters.
+// By default results are ordered by score, descending.
 func NewSearchRequestOptions(q Query, size, from int, explain bool) *SearchRequest {
 	return &SearchRequest{
 		Query:   q,
 		Size:    size,
 		From:    from,
 		Explain: explain,
+		Sort:    search.SortOrder{&search.SortScore{Descending: true}},
 	}
 }
 

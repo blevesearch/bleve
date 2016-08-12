@@ -9,9 +9,7 @@
 
 package document
 
-import (
-	"fmt"
-)
+import "fmt"
 
 type Document struct {
 	ID              string  `json:"id"`
@@ -36,6 +34,21 @@ func (d *Document) AddField(f Field) *Document {
 		d.Fields = append(d.Fields, f)
 	}
 	return d
+}
+
+func (d *Document) FieldNamed(field string) Field {
+	for _, f := range d.Fields {
+		if f.Name() == field {
+			return f
+		}
+	}
+	return nil
+}
+
+func (d *Document) CompareFieldsNamed(other *Document, field string, descending bool) int {
+	fieldi := d.FieldNamed(field)
+	fieldj := other.FieldNamed(field)
+	return CompareFieldValues(fieldi, fieldj, descending)
 }
 
 func (d *Document) GoString() string {
