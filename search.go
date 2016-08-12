@@ -238,6 +238,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Fields    []string          `json:"fields"`
 		Facets    FacetsRequest     `json:"facets"`
 		Explain   bool              `json:"explain"`
+		Sort      search.SortOrder  `json:"sort"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -249,6 +250,9 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.Size = 10
 	} else {
 		r.Size = *temp.Size
+	}
+	if temp.Sort == nil {
+		r.Sort = search.SortOrder{&search.SortScore{Descending: true}}
 	}
 	r.From = temp.From
 	r.Explain = temp.Explain
