@@ -743,10 +743,7 @@ func TestSortMatchSearch(t *testing.T) {
 	}
 
 	req := NewSearchRequest(NewMatchQuery("One"))
-	req.SortBy(search.SortOrder{
-		&search.SortField{Field: "Day"},
-		&search.SortField{Field: "Name"},
-	})
+	req.SortBy([]string{"Day", "Name"})
 	req.Fields = []string{"*"}
 	sr, err := index.Search(req)
 	if err != nil {

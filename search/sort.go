@@ -98,7 +98,7 @@ func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 	return nil, fmt.Errorf("unknown search sort by: %s", by)
 }
 
-func ParseSearchSortString(input string) (SearchSort, error) {
+func ParseSearchSortString(input string) SearchSort {
 	descending := false
 	if strings.HasPrefix(input, "-") {
 		descending = true
@@ -109,16 +109,16 @@ func ParseSearchSortString(input string) (SearchSort, error) {
 	if input == "_id" {
 		return &SortDocID{
 			Descending: descending,
-		}, nil
+		}
 	} else if input == "_score" {
 		return &SortScore{
 			Descending: descending,
-		}, nil
+		}
 	}
 	return &SortField{
 		Field:      input,
 		Descending: descending,
-	}, nil
+	}
 }
 
 func ParseSearchSortJSON(input json.RawMessage) (SearchSort, error) {
@@ -133,7 +133,16 @@ func ParseSearchSortJSON(input json.RawMessage) (SearchSort, error) {
 		}
 		return ParseSearchSortObj(sortObj)
 	}
-	return ParseSearchSortString(sortString)
+	return ParseSearchSortString(sortString), nil
+}
+
+func ParseSortOrderStrings(in []string) SortOrder {
+	rv := make(SortOrder, 0, len(in))
+	for _, i := range in {
+		ss := ParseSearchSortString(i)
+		rv = append(rv, ss)
+	}
+	return rv
 }
 
 func ParseSortOrderJSON(in []json.RawMessage) (SortOrder, error) {

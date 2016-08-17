@@ -223,7 +223,17 @@ func (r *SearchRequest) AddFacet(facetName string, f *FacetRequest) {
 }
 
 // SortBy changes the request to use the requested sort order
-func (r *SearchRequest) SortBy(order search.SortOrder) {
+// this form uses the simplified syntax with an array of strings
+// each string can either be a field name
+// or the magic value _id and _score which refer to the doc id and search score
+// any of these values can optionally be prefixed with - to reverse the order
+func (r *SearchRequest) SortBy(order []string) {
+	so := search.ParseSortOrderStrings(order)
+	r.Sort = so
+}
+
+// SortByCustom changes the request to use the requested sort order
+func (r *SearchRequest) SortByCustom(order search.SortOrder) {
 	r.Sort = order
 }
 
