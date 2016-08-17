@@ -11,15 +11,21 @@ package search
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
+
+	"github.com/blevesearch/bleve/numeric_util"
 )
+
+var HighTerm = strings.Repeat(string([]byte{0xff}), 10)
+var LowTerm = string([]byte{0x00})
 
 type SearchSort interface {
 	Compare(a, b *DocumentMatch) int
 
 	RequiresDocID() bool
 	RequiresScoring() bool
-	RequiresStoredFields() []string
+	RequiresFields() []string
 }
 
 func ParseSearchSort(input json.RawMessage) (SearchSort, error) {
@@ -42,7 +48,7 @@ func ParseSearchSort(input json.RawMessage) (SearchSort, error) {
 			Descending: descending,
 		}, nil
 	}
-	return &SortStoredField{
+	return &SortField{
 		Field:      tmp,
 		Descending: descending,
 	}, nil
@@ -100,35 +106,146 @@ func (so SortOrder) RequiresDocID() bool {
 	return rv
 }
 
-func (so SortOrder) RequiredStoredFields() []string {
+func (so SortOrder) RequiredFields() []string {
 	var rv []string
 	for _, soi := range so {
-		rv = append(rv, soi.RequiresStoredFields()...)
+		rv = append(rv, soi.RequiresFields()...)
 	}
 	return rv
 }
 
-// SortStoredField will sort results by the value of a stored field
-type SortStoredField struct {
+// SortFieldType lets you control some internal sort behavior
+// normally leaving this to the zero-value of SortFieldAuto is fine
+type SortFieldType int
+
+const (
+	// SortFieldAuto applies heuristics attempt to automatically sort correctly
+	SortFieldAuto SortFieldType = iota
+	// SortFieldAsString forces sort as string (no prefix coded terms removed)
+	SortFieldAsString
+	// SortFieldAsNumber forces sort as string (prefix coded terms with shift > 0 removed)
+	SortFieldAsNumber
+	// SortFieldAsDate forces sort as string (prefix coded terms with shift > 0 removed)
+	SortFieldAsDate
+)
+
+// SortFieldMode describes the behavior if the field has multiple values
+type SortFieldMode int
+
+const (
+	// SortFieldFirst uses the first (or only) value, this is the default zero-value
+	SortFieldFirst SortFieldMode = iota // FIXME name is confusing
+	// SortFieldMin uses the minimum value
+	SortFieldMin
+	// SortFieldMax uses the maximum value
+	SortFieldMax
+)
+
+const SortFieldMissingLast = "_last"
+const SortFieldMissingFirst = "_first"
+
+// SortField will sort results by the value of a stored field
+//   Field is the name of the field
+//   Descending reverse the sort order (default false)
+//   Type allows forcing of string/number/date behavior (default auto)
+//   Mode controls behavior for multi-values fields (default first)
+//   Missing controls behavior of missing values (default last)
+type SortField struct {
 	Field      string
 	Descending bool
+	Type       SortFieldType
+	Mode       SortFieldMode
+	Missing    string
 }
 
 // Compare orders DocumentMatch instances by stored field values
-func (s *SortStoredField) Compare(i, j *DocumentMatch) int {
-	return i.Document.CompareFieldsNamed(j.Document, s.Field, s.Descending)
+func (s *SortField) Compare(i, j *DocumentMatch) int {
+	iTerms := i.CachedFieldTerms[s.Field]
+	iTerms = s.filterTermsByType(iTerms)
+	iTerm := s.filterTermsByMode(iTerms)
+	jTerms := j.CachedFieldTerms[s.Field]
+	jTerms = s.filterTermsByType(jTerms)
+	jTerm := s.filterTermsByMode(jTerms)
+	rv := strings.Compare(iTerm, jTerm)
+	if s.Descending {
+		rv = -rv
+	}
+	return rv
+}
+
+func (s *SortField) filterTermsByMode(terms []string) string {
+	if len(terms) == 1 || (len(terms) > 1 && s.Mode == SortFieldFirst) {
+		return terms[0]
+	} else if len(terms) > 1 {
+		switch s.Mode {
+		case SortFieldMin:
+			sort.Strings(terms)
+			return terms[0]
+		case SortFieldMax:
+			sort.Strings(terms)
+			return terms[len(terms)-1]
+		}
+	}
+
+	// handle missing terms
+	if s.Missing == "" || s.Missing == SortFieldMissingLast {
+		if s.Descending {
+			return LowTerm
+		}
+		return HighTerm
+	} else if s.Missing == SortFieldMissingFirst {
+		if s.Descending {
+			return HighTerm
+		}
+		return LowTerm
+	}
+	return s.Missing
+}
+
+// filterTermsByType attempts to make one pass on the terms
+// if we are in auto-mode AND all the terms look like prefix-coded numbers
+// return only the terms which had shift of 0
+// if we are in explicit number or date mode, return only valid
+// prefix coded numbers with shift of 0
+func (s *SortField) filterTermsByType(terms []string) []string {
+	stype := s.Type
+	if stype == SortFieldAuto {
+		allTermsPrefixCoded := true
+		var termsWithShiftZero []string
+		for _, term := range terms {
+			valid, shift := numeric_util.ValidPrefixCodedTerm(term)
+			if valid && shift == 0 {
+				termsWithShiftZero = append(termsWithShiftZero, term)
+			} else if !valid {
+				allTermsPrefixCoded = false
+			}
+		}
+		if allTermsPrefixCoded {
+			terms = termsWithShiftZero
+		}
+	} else if stype == SortFieldAsNumber || stype == SortFieldAsDate {
+		var termsWithShiftZero []string
+		for _, term := range terms {
+			valid, shift := numeric_util.ValidPrefixCodedTerm(term)
+			if valid && shift == 0 {
+				termsWithShiftZero = append(termsWithShiftZero)
+			}
+		}
+		terms = termsWithShiftZero
+	}
+	return terms
 }
 
 // RequiresDocID says this SearchSort does not require the DocID be loaded
-func (s *SortStoredField) RequiresDocID() bool { return false }
+func (s *SortField) RequiresDocID() bool { return false }
 
 // RequiresScoring says this SearchStore does not require scoring
-func (s *SortStoredField) RequiresScoring() bool { return false }
+func (s *SortField) RequiresScoring() bool { return false }
 
-// RequiresStoredFields says this SearchStore requires the specified stored field
-func (s *SortStoredField) RequiresStoredFields() []string { return []string{s.Field} }
+// RequiresFields says this SearchStore requires the specified stored field
+func (s *SortField) RequiresFields() []string { return []string{s.Field} }
 
-func (s *SortStoredField) MarshalJSON() ([]byte, error) {
+func (s *SortField) MarshalJSON() ([]byte, error) {
 	if s.Descending {
 		return json.Marshal("-" + s.Field)
 	}
@@ -154,8 +271,8 @@ func (s *SortDocID) RequiresDocID() bool { return true }
 // RequiresScoring says this SearchStore does not require scoring
 func (s *SortDocID) RequiresScoring() bool { return false }
 
-// RequiresStoredFields says this SearchStore does not require any stored fields
-func (s *SortDocID) RequiresStoredFields() []string { return nil }
+// RequiresFields says this SearchStore does not require any stored fields
+func (s *SortDocID) RequiresFields() []string { return nil }
 
 func (s *SortDocID) MarshalJSON() ([]byte, error) {
 	if s.Descending {
@@ -185,8 +302,8 @@ func (s *SortScore) RequiresDocID() bool { return false }
 // RequiresScoring says this SearchStore does require scoring
 func (s *SortScore) RequiresScoring() bool { return true }
 
-// RequiresStoredFields says this SearchStore does not require any store fields
-func (s *SortScore) RequiresStoredFields() []string { return nil }
+// RequiresFields says this SearchStore does not require any store fields
+func (s *SortScore) RequiresFields() []string { return nil }
 
 func (s *SortScore) MarshalJSON() ([]byte, error) {
 	if s.Descending {

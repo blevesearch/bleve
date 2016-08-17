@@ -11,7 +11,6 @@ package document
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/blevesearch/bleve/analysis"
 )
@@ -76,13 +75,6 @@ func (t *TextField) GoString() string {
 
 func (t *TextField) NumPlainTextBytes() uint64 {
 	return t.numPlainTextBytes
-}
-
-func (t *TextField) Compare(other *TextField, descending bool) int {
-	if descending {
-		return strings.Compare(string(other.value), string(t.value))
-	}
-	return strings.Compare(string(t.value), string(other.value))
 }
 
 func NewTextField(name string, arrayPositions []uint64, value []byte) *TextField {

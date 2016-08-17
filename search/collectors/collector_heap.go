@@ -113,18 +113,19 @@ func (hc *HeapCollector) collectSingle(ctx *search.SearchContext, reader index.I
 	}
 
 	// see if we need to load the stored fields
-	if len(hc.sort.RequiredStoredFields()) > 0 {
-		if d.ID == "" {
-			// look up the id since we need it for lookup
-			d.ID, err = reader.FinalizeDocID(d.IndexInternalID)
-			if err != nil {
-				return err
-			}
-		}
-		d.Document, err = reader.Document(d.ID)
+	if len(hc.sort.RequiredFields()) > 0 {
+		// find out which fields haven't been loaded yet
+		fieldsToLoad := d.CachedFieldTerms.FieldsNotYetCached(hc.sort.RequiredFields())
+		// look them up
+		fieldTerms, err := reader.DocumentFieldTerms(d.IndexInternalID, fieldsToLoad)
 		if err != nil {
 			return err
 		}
+		// cache these as well
+		if d.CachedFieldTerms == nil {
+			d.CachedFieldTerms = make(map[string][]string)
+		}
+		d.CachedFieldTerms.Merge(fieldTerms)
 	}
 
 	// optimization, we track lowest sorting hit already removed from heap

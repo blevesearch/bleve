@@ -9,9 +9,7 @@
 
 package numeric_util
 
-import (
-	"fmt"
-)
+import "fmt"
 
 const ShiftStartInt64 byte = 0x20
 
@@ -71,4 +69,19 @@ func (p PrefixCoded) Int64() (int64, error) {
 		sortableBits |= int64(inbyte)
 	}
 	return int64(uint64((sortableBits << shift)) ^ 0x8000000000000000), nil
+}
+
+func ValidPrefixCodedTerm(p string) (bool, int) {
+	if len(p) > 0 {
+		if p[0] < ShiftStartInt64 || p[0] > ShiftStartInt64+63 {
+			return false, 0
+		}
+		shift := p[0] - ShiftStartInt64
+		nChars := ((63 - int(shift)) / 7) + 1
+		if len(p) != nChars+1 {
+			return false, 0
+		}
+		return true, int(shift)
+	}
+	return false, 0
 }

@@ -1179,7 +1179,7 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 		}
 	}()
 
-	fieldTerms, err := indexReader.DocumentFieldTerms(index.IndexInternalID("1"))
+	fieldTerms, err := indexReader.DocumentFieldTerms(index.IndexInternalID("1"), []string{"name", "title"})
 	if err != nil {
 		t.Error(err)
 	}

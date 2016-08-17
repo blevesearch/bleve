@@ -71,17 +71,6 @@ func (b *BooleanField) NumPlainTextBytes() uint64 {
 	return b.numPlainTextBytes
 }
 
-func (b *BooleanField) Compare(other *BooleanField, descending bool) int {
-	bv, _ := b.Boolean()
-	otherbv, _ := other.Boolean()
-	if bv == otherbv {
-		return 0
-	} else if (otherbv && !descending) || (bv && descending) {
-		return -1
-	}
-	return 1
-}
-
 func NewBooleanFieldFromBytes(name string, arrayPositions []uint64, value []byte) *BooleanField {
 	return &BooleanField{
 		name:              name,

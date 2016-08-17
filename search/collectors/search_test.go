@@ -95,11 +95,7 @@ func (sr *stubReader) Document(id string) (*document.Document, error) {
 	return nil, nil
 }
 
-func (sr *stubReader) DocumentFieldTerms(id index.IndexInternalID) (index.FieldTerms, error) {
-	return nil, nil
-}
-
-func (sr *stubReader) DocumentFieldTermsForFields(id index.IndexInternalID, fields []string) (index.FieldTerms, error) {
+func (sr *stubReader) DocumentFieldTerms(id index.IndexInternalID, fields []string) (index.FieldTerms, error) {
 	return nil, nil
 }
 

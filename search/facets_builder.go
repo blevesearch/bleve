@@ -42,7 +42,7 @@ func (fb *FacetsBuilder) Update(docMatch *DocumentMatch) error {
 	for _, facetBuilder := range fb.facets {
 		fields = append(fields, facetBuilder.Field())
 	}
-	fieldTerms, err := fb.indexReader.DocumentFieldTermsForFields(docMatch.IndexInternalID, fields)
+	fieldTerms, err := fb.indexReader.DocumentFieldTerms(docMatch.IndexInternalID, fields)
 	if err != nil {
 		return err
 	}
