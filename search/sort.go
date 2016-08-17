@@ -11,6 +11,7 @@ package search
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -28,36 +29,117 @@ type SearchSort interface {
 	RequiresFields() []string
 }
 
-func ParseSearchSort(input json.RawMessage) (SearchSort, error) {
-	var tmp string
-	err := json.Unmarshal(input, &tmp)
-	if err != nil {
-		return nil, err
+func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
+	descending, ok := input["desc"].(bool)
+	by, ok := input["by"].(string)
+	if !ok {
+		return nil, fmt.Errorf("search sort must specify by")
 	}
-	descending := false
-	if strings.HasPrefix(tmp, "-") {
-		descending = true
-		tmp = tmp[1:]
-	}
-	if tmp == "_id" {
+	switch by {
+	case "id":
 		return &SortDocID{
 			Descending: descending,
 		}, nil
-	} else if tmp == "_score" {
+	case "score":
+		return &SortScore{
+			Descending: descending,
+		}, nil
+	case "field":
+		field, ok := input["field"].(string)
+		if !ok {
+			return nil, fmt.Errorf("search sort mode field must specify field")
+		}
+		rv := &SortField{
+			Field:      field,
+			Descending: descending,
+		}
+		typ, ok := input["type"].(string)
+		if ok {
+			switch typ {
+			case "auto":
+				rv.Type = SortFieldAuto
+			case "string":
+				rv.Type = SortFieldAsString
+			case "number":
+				rv.Type = SortFieldAsNumber
+			case "date":
+				rv.Type = SortFieldAsDate
+			default:
+				return nil, fmt.Errorf("unkown sort field type: %s", typ)
+			}
+		}
+		mode, ok := input["mode"].(string)
+		if ok {
+			switch mode {
+			case "default":
+				rv.Mode = SortFieldDefault
+			case "min":
+				rv.Mode = SortFieldMin
+			case "max":
+				rv.Mode = SortFieldMax
+			default:
+				return nil, fmt.Errorf("unknown sort field mode: %s", mode)
+			}
+		}
+		missing, ok := input["missing"].(string)
+		if ok {
+			switch missing {
+			case "first":
+				rv.Missing = SortFieldMissingFirst
+			case "last":
+				rv.Missing = SortFieldMissingLast
+			default:
+				return nil, fmt.Errorf("unknown sort field missing: %s", missing)
+			}
+		}
+		return rv, nil
+	}
+
+	return nil, fmt.Errorf("unknown search sort by: %s", by)
+}
+
+func ParseSearchSortString(input string) (SearchSort, error) {
+	descending := false
+	if strings.HasPrefix(input, "-") {
+		descending = true
+		input = input[1:]
+	} else if strings.HasPrefix(input, "+") {
+		input = input[1:]
+	}
+	if input == "_id" {
+		return &SortDocID{
+			Descending: descending,
+		}, nil
+	} else if input == "_score" {
 		return &SortScore{
 			Descending: descending,
 		}, nil
 	}
 	return &SortField{
-		Field:      tmp,
+		Field:      input,
 		Descending: descending,
 	}, nil
 }
 
-func ParseSortOrder(in []json.RawMessage) (SortOrder, error) {
+func ParseSearchSortJSON(input json.RawMessage) (SearchSort, error) {
+	// first try to parse it as string
+	var sortString string
+	err := json.Unmarshal(input, &sortString)
+	if err != nil {
+		var sortObj map[string]interface{}
+		err = json.Unmarshal(input, &sortObj)
+		if err != nil {
+			return nil, err
+		}
+		return ParseSearchSortObj(sortObj)
+	}
+	return ParseSearchSortString(sortString)
+}
+
+func ParseSortOrderJSON(in []json.RawMessage) (SortOrder, error) {
 	rv := make(SortOrder, 0, len(in))
 	for _, i := range in {
-		ss, err := ParseSearchSort(i)
+		ss, err := ParseSearchSortJSON(i)
 		if err != nil {
 			return nil, err
 		}
@@ -133,16 +215,24 @@ const (
 type SortFieldMode int
 
 const (
-	// SortFieldFirst uses the first (or only) value, this is the default zero-value
-	SortFieldFirst SortFieldMode = iota // FIXME name is confusing
+	// SortFieldDefault uses the first (or only) value, this is the default zero-value
+	SortFieldDefault SortFieldMode = iota // FIXME name is confusing
 	// SortFieldMin uses the minimum value
 	SortFieldMin
 	// SortFieldMax uses the maximum value
 	SortFieldMax
 )
 
-const SortFieldMissingLast = "_last"
-const SortFieldMissingFirst = "_first"
+// SortFieldMissing controls where documents missing a field value should be sorted
+type SortFieldMissing int
+
+const (
+	// SortFieldMissingLast sorts documents missing a field at the end
+	SortFieldMissingLast SortFieldMissing = iota
+
+	// SortFieldMissingFirst sorts documents missing a field at the beginning
+	SortFieldMissingFirst
+)
 
 // SortField will sort results by the value of a stored field
 //   Field is the name of the field
@@ -155,7 +245,7 @@ type SortField struct {
 	Descending bool
 	Type       SortFieldType
 	Mode       SortFieldMode
-	Missing    string
+	Missing    SortFieldMissing
 }
 
 // Compare orders DocumentMatch instances by stored field values
@@ -174,7 +264,7 @@ func (s *SortField) Compare(i, j *DocumentMatch) int {
 }
 
 func (s *SortField) filterTermsByMode(terms []string) string {
-	if len(terms) == 1 || (len(terms) > 1 && s.Mode == SortFieldFirst) {
+	if len(terms) == 1 || (len(terms) > 1 && s.Mode == SortFieldDefault) {
 		return terms[0]
 	} else if len(terms) > 1 {
 		switch s.Mode {
@@ -188,18 +278,16 @@ func (s *SortField) filterTermsByMode(terms []string) string {
 	}
 
 	// handle missing terms
-	if s.Missing == "" || s.Missing == SortFieldMissingLast {
+	if s.Missing == SortFieldMissingLast {
 		if s.Descending {
 			return LowTerm
 		}
 		return HighTerm
-	} else if s.Missing == SortFieldMissingFirst {
-		if s.Descending {
-			return HighTerm
-		}
-		return LowTerm
 	}
-	return s.Missing
+	if s.Descending {
+		return HighTerm
+	}
+	return LowTerm
 }
 
 // filterTermsByType attempts to make one pass on the terms
@@ -246,10 +334,48 @@ func (s *SortField) RequiresScoring() bool { return false }
 func (s *SortField) RequiresFields() []string { return []string{s.Field} }
 
 func (s *SortField) MarshalJSON() ([]byte, error) {
-	if s.Descending {
-		return json.Marshal("-" + s.Field)
+	// see if simple format can be used
+	if s.Missing == SortFieldMissingLast &&
+		s.Mode == SortFieldDefault &&
+		s.Type == SortFieldAuto {
+		if s.Descending {
+			return json.Marshal("-" + s.Field)
+		}
+		return json.Marshal(s.Field)
 	}
-	return json.Marshal(s.Field)
+	sfm := map[string]interface{}{
+		"by":    "field",
+		"field": s.Field,
+	}
+	if s.Descending {
+		sfm["desc"] = true
+	}
+	if s.Missing > SortFieldMissingLast {
+		switch s.Missing {
+		case SortFieldMissingFirst:
+			sfm["missing"] = "first"
+		}
+	}
+	if s.Mode > SortFieldDefault {
+		switch s.Mode {
+		case SortFieldMin:
+			sfm["mode"] = "min"
+		case SortFieldMax:
+			sfm["mode"] = "max"
+		}
+	}
+	if s.Type > SortFieldAuto {
+		switch s.Type {
+		case SortFieldAsString:
+			sfm["type"] = "string"
+		case SortFieldAsNumber:
+			sfm["type"] = "number"
+		case SortFieldAsDate:
+			sfm["type"] = "date"
+		}
+	}
+
+	return json.Marshal(sfm)
 }
 
 // SortDocID will sort results by the document identifier

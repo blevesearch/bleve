@@ -254,7 +254,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	if temp.Sort == nil {
 		r.Sort = search.SortOrder{&search.SortScore{Descending: true}}
 	} else {
-		r.Sort, err = search.ParseSortOrder(temp.Sort)
+		r.Sort, err = search.ParseSortOrderJSON(temp.Sort)
 		if err != nil {
 			return err
 		}
