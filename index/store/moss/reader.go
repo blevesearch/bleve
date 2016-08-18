@@ -57,7 +57,7 @@ func (r *Reader) PrefixIterator(k []byte) store.KVIterator {
 		end:   kEnd,
 	}
 
-	rv.checkDone()
+	rv.current()
 
 	return rv
 }
@@ -76,7 +76,7 @@ func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
 		end:   end,
 	}
 
-	rv.checkDone()
+	rv.current()
 
 	return rv
 }
