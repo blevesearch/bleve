@@ -115,8 +115,12 @@ func (sr *stubReader) DocCount() uint64 {
 	return 0
 }
 
-func (sr *stubReader) FinalizeDocID(id index.IndexInternalID) (string, error) {
+func (sr *stubReader) ExternalID(id index.IndexInternalID) (string, error) {
 	return string(id), nil
+}
+
+func (sr *stubReader) InternalID(id string) (index.IndexInternalID, error) {
+	return []byte(id), nil
 }
 
 func (sr *stubReader) Close() error {

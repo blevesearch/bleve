@@ -151,7 +151,7 @@ func (hc *TopNCollector) collectSingle(ctx *search.SearchContext, reader index.I
 	var err error
 	// see if we need to load ID (at this early stage, for example to sort on it)
 	if hc.needDocIds {
-		d.ID, err = reader.FinalizeDocID(d.IndexInternalID)
+		d.ID, err = reader.ExternalID(d.IndexInternalID)
 		if err != nil {
 			return err
 		}
@@ -224,7 +224,7 @@ func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
 		if doc.ID == "" {
 			// look up the id since we need it for lookup
 			var err error
-			doc.ID, err = r.FinalizeDocID(doc.IndexInternalID)
+			doc.ID, err = r.ExternalID(doc.IndexInternalID)
 			if err != nil {
 				return err
 			}

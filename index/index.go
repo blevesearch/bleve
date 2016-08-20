@@ -87,7 +87,8 @@ type IndexReader interface {
 
 	DocCount() uint64
 
-	FinalizeDocID(id IndexInternalID) (string, error)
+	ExternalID(id IndexInternalID) (string, error)
+	InternalID(id string) (IndexInternalID, error)
 
 	Close() error
 }

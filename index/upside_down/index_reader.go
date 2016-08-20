@@ -164,8 +164,12 @@ func (i *IndexReader) Close() error {
 	return i.kvreader.Close()
 }
 
-func (i *IndexReader) FinalizeDocID(id index.IndexInternalID) (string, error) {
+func (i *IndexReader) ExternalID(id index.IndexInternalID) (string, error) {
 	return string(id), nil
+}
+
+func (i *IndexReader) InternalID(id string) (index.IndexInternalID, error) {
+	return index.IndexInternalID(id), nil
 }
 
 func incrementBytes(in []byte) []byte {
