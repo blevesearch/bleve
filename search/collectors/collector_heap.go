@@ -28,6 +28,9 @@ type HeapCollector struct {
 	results       search.DocumentMatchCollection
 	facetsBuilder *search.FacetsBuilder
 
+	needDocIds   bool
+	neededFields []string
+
 	lowestMatchOutsideResults *search.DocumentMatch
 }
 
@@ -35,7 +38,15 @@ var COLLECT_CHECK_DONE_EVERY = uint64(1024)
 
 func NewHeapCollector(size int, skip int, sort search.SortOrder) *HeapCollector {
 	hc := &HeapCollector{size: size, skip: skip, sort: sort}
+	hc.results = make(search.DocumentMatchCollection, 0, size+skip)
 	heap.Init(hc)
+
+	// these lookups traverse an interface, so do once up-front
+	if sort.RequiresDocID() {
+		hc.needDocIds = true
+	}
+	hc.neededFields = sort.RequiredFields()
+
 	return hc
 }
 
@@ -49,7 +60,7 @@ func (hc *HeapCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	// plus possibly one extra for the highestMatchOutsideResults
 	// plus the amount required by the searcher tree
 	searchContext := &search.SearchContext{
-		DocumentMatchPool: search.NewDocumentMatchPool(hc.size + hc.skip + 1 + searcher.DocumentMatchPoolSize()),
+		DocumentMatchPool: search.NewDocumentMatchPool(hc.size+hc.skip+1+searcher.DocumentMatchPoolSize(), len(hc.sort)),
 	}
 
 	select {
@@ -105,7 +116,7 @@ func (hc *HeapCollector) collectSingle(ctx *search.SearchContext, reader index.I
 
 	var err error
 	// see if we need to load ID (at this early stage, for example to sort on it)
-	if hc.sort.RequiresDocID() {
+	if hc.needDocIds {
 		d.ID, err = reader.FinalizeDocID(d.IndexInternalID)
 		if err != nil {
 			return err
@@ -113,9 +124,9 @@ func (hc *HeapCollector) collectSingle(ctx *search.SearchContext, reader index.I
 	}
 
 	// see if we need to load the stored fields
-	if len(hc.sort.RequiredFields()) > 0 {
+	if len(hc.neededFields) > 0 {
 		// find out which fields haven't been loaded yet
-		fieldsToLoad := d.CachedFieldTerms.FieldsNotYetCached(hc.sort.RequiredFields())
+		fieldsToLoad := d.CachedFieldTerms.FieldsNotYetCached(hc.neededFields)
 		// look them up
 		fieldTerms, err := reader.DocumentFieldTerms(d.IndexInternalID, fieldsToLoad)
 		if err != nil {
@@ -129,7 +140,7 @@ func (hc *HeapCollector) collectSingle(ctx *search.SearchContext, reader index.I
 	}
 
 	// compute this hits sort value
-	d.Sort = hc.sort.Value(d)
+	hc.sort.Value(d)
 
 	// optimization, we track lowest sorting hit already removed from heap
 	// with this one comparision, we can avoid all heap operations if

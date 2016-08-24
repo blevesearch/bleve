@@ -31,12 +31,13 @@ func defaultDocumentMatchPoolTooSmall(p *DocumentMatchPool) *DocumentMatch {
 // NewDocumentMatchPool will build a DocumentMatchPool with memory
 // pre-allocated to accomodate the requested number of DocumentMatch
 // instances
-func NewDocumentMatchPool(size int) *DocumentMatchPool {
+func NewDocumentMatchPool(size, sortsize int) *DocumentMatchPool {
 	avail := make(DocumentMatchCollection, 0, size)
 	// pre-allocate the expected number of instances
 	startBlock := make([]DocumentMatch, size)
 	// make these initial instances available
 	for i := range startBlock {
+		startBlock[i].Sort = make([]interface{}, 0, sortsize)
 		avail = append(avail, &startBlock[i])
 	}
 	return &DocumentMatchPool{

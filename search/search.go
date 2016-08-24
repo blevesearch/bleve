@@ -65,7 +65,7 @@ type DocumentMatch struct {
 	Expl            *Explanation          `json:"explanation,omitempty"`
 	Locations       FieldTermLocationMap  `json:"locations,omitempty"`
 	Fragments       FieldFragmentMap      `json:"fragments,omitempty"`
-	Sort            []string              `json:"sort,omitempty"`
+	Sort            []interface{}         `json:"sort,omitempty"`
 
 	// Fields contains the values for document fields listed in
 	// SearchRequest.Fields. Text fields are returned as strings, numeric
@@ -107,11 +107,15 @@ func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
 // Reset allows an already allocated DocumentMatch to be reused
 func (dm *DocumentMatch) Reset() *DocumentMatch {
 	// remember the []byte used for the IndexInternalID
-	indexInternalId := dm.IndexInternalID
+	indexInternalID := dm.IndexInternalID
+	// remember the []interface{} used for sort
+	sort := dm.Sort
 	// idiom to copy over from empty DocumentMatch (0 allocations)
 	*dm = DocumentMatch{}
 	// reuse the []byte already allocated (and reset len to 0)
-	dm.IndexInternalID = indexInternalId[:0]
+	dm.IndexInternalID = indexInternalID[:0]
+	// reuse the []interface{} already allocated (and reset len to 0)
+	dm.Sort = sort[:0]
 	return dm
 }
 

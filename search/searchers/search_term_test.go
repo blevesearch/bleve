@@ -165,7 +165,7 @@ func TestTermSearcher(t *testing.T) {
 	}
 
 	ctx := &search.SearchContext{
-		DocumentMatchPool: search.NewDocumentMatchPool(1),
+		DocumentMatchPool: search.NewDocumentMatchPool(1, 0),
 	}
 	docMatch, err := searcher.Next(ctx)
 	if err != nil {

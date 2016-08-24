@@ -22,7 +22,7 @@ var HighTerm = strings.Repeat(string([]byte{0xff}), 10)
 var LowTerm = string([]byte{0x00})
 
 type SearchSort interface {
-	Value(a *DocumentMatch) string
+	Value(a *DocumentMatch) interface{}
 	Descending() bool
 
 	RequiresDocID() bool
@@ -160,27 +160,55 @@ func ParseSortOrderJSON(in []json.RawMessage) (SortOrder, error) {
 
 type SortOrder []SearchSort
 
-func (so SortOrder) Value(doc *DocumentMatch) []string {
-	rv := make([]string, len(so))
-	for i, soi := range so {
-		rv[i] = soi.Value(doc)
+func (so SortOrder) Value(doc *DocumentMatch) {
+	for _, soi := range so {
+		doc.Sort = append(doc.Sort, soi.Value(doc))
 	}
-	return rv
 }
 
+// Compare will compare two document matches using the specified sort order
+// if both are numbers, we avoid converting back to term
 func (so SortOrder) Compare(i, j *DocumentMatch) int {
 	// compare the documents on all search sorts until a differences is found
 	for x, soi := range so {
 		iVal := i.Sort[x]
 		jVal := j.Sort[x]
-		c := strings.Compare(iVal, jVal)
+		c := 0
+		switch iVal := iVal.(type) {
+		case string:
+			switch jVal := jVal.(type) {
+			case string:
+				// both string
+				c = strings.Compare(iVal, jVal)
+			case float64:
+				// i is string, j is number, i sorts higher
+				ji := numeric_util.Float64ToInt64(jVal)
+				jt, _ := numeric_util.NewPrefixCodedInt64(ji, 0)
+				c = strings.Compare(iVal, string(jt))
+			}
+		case float64:
+			switch jVal := jVal.(type) {
+			case string:
+				// i is number, j is string
+				ii := numeric_util.Float64ToInt64(iVal)
+				it, _ := numeric_util.NewPrefixCodedInt64(ii, 0)
+				c = strings.Compare(string(it), jVal)
+			case float64:
+				// numeric comparison
+				if iVal < jVal {
+					c = -1
+				} else if iVal > jVal {
+					c = 1
+				}
+			}
+		}
+
 		if c == 0 {
 			continue
 		}
 		if soi.Descending() {
 			c = -c
 		}
-		//c := soi.Compare(i, j)
 		return c
 	}
 	// if they are the same at this point, impose order based on index natural sort order
@@ -273,10 +301,23 @@ type SortField struct {
 }
 
 // Value returns the sort value of the DocumentMatch
-func (s *SortField) Value(i *DocumentMatch) string {
+func (s *SortField) Value(i *DocumentMatch) interface{} {
 	iTerms := i.CachedFieldTerms[s.Field]
 	iTerms = s.filterTermsByType(iTerms)
 	iTerm := s.filterTermsByMode(iTerms)
+	if s.Type == SortFieldAsNumber || s.Type == SortFieldAsDate {
+		// explicitly asked for numeric sort
+		rv, _ := numeric_util.PrefixCoded(iTerm).Int64()
+		return rv
+	} else if s.Type == SortFieldAuto {
+		// asked for auto, looks like a number
+		valid, shift := numeric_util.ValidPrefixCodedTerm(iTerm)
+		if valid && shift == 0 {
+			ri, _ := numeric_util.PrefixCoded(iTerm).Int64()
+			rv := numeric_util.Int64ToFloat64(ri)
+			return rv
+		}
+	}
 	return iTerm
 }
 
@@ -406,7 +447,7 @@ type SortDocID struct {
 }
 
 // Value returns the sort value of the DocumentMatch
-func (s *SortDocID) Value(i *DocumentMatch) string {
+func (s *SortDocID) Value(i *DocumentMatch) interface{} {
 	return i.ID
 }
 
@@ -437,10 +478,8 @@ type SortScore struct {
 }
 
 // Value returns the sort value of the DocumentMatch
-func (s *SortScore) Value(i *DocumentMatch) string {
-	scoreInt := numeric_util.Float64ToInt64(i.Score)
-	prefixCodedScore, _ := numeric_util.NewPrefixCodedInt64(scoreInt, 0)
-	return string(prefixCodedScore)
+func (s *SortScore) Value(i *DocumentMatch) interface{} {
+	return i.Score
 }
 
 // Descending determines the order of the sort
