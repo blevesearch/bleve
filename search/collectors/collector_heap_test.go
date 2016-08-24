@@ -401,17 +401,25 @@ func TestPaginationSameScores(t *testing.T) {
 }
 
 func BenchmarkTop10of100000Scores(b *testing.B) {
-	benchHelper(10000, NewHeapCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}}), b)
+	benchHelper(10000, func() search.Collector {
+		return NewHeapCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
 }
 
 func BenchmarkTop100of100000Scores(b *testing.B) {
-	benchHelper(10000, NewHeapCollector(100, 0, search.SortOrder{&search.SortScore{Desc: true}}), b)
+	benchHelper(10000, func() search.Collector {
+		return NewHeapCollector(100, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
 }
 
 func BenchmarkTop10of1000000Scores(b *testing.B) {
-	benchHelper(100000, NewHeapCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}}), b)
+	benchHelper(100000, func() search.Collector {
+		return NewHeapCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
 }
 
 func BenchmarkTop100of1000000Scores(b *testing.B) {
-	benchHelper(100000, NewHeapCollector(100, 0, search.SortOrder{&search.SortScore{Desc: true}}), b)
+	benchHelper(100000, func() search.Collector {
+		return NewHeapCollector(100, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
 }
