@@ -22,7 +22,8 @@ var HighTerm = strings.Repeat(string([]byte{0xff}), 10)
 var LowTerm = string([]byte{0x00})
 
 type SearchSort interface {
-	Compare(a, b *DocumentMatch) int
+	Value(a *DocumentMatch) string
+	Descending() bool
 
 	RequiresDocID() bool
 	RequiresScoring() bool
@@ -38,11 +39,11 @@ func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 	switch by {
 	case "id":
 		return &SortDocID{
-			Descending: descending,
+			Desc: descending,
 		}, nil
 	case "score":
 		return &SortScore{
-			Descending: descending,
+			Desc: descending,
 		}, nil
 	case "field":
 		field, ok := input["field"].(string)
@@ -50,8 +51,8 @@ func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 			return nil, fmt.Errorf("search sort mode field must specify field")
 		}
 		rv := &SortField{
-			Field:      field,
-			Descending: descending,
+			Field: field,
+			Desc:  descending,
 		}
 		typ, ok := input["type"].(string)
 		if ok {
@@ -108,16 +109,16 @@ func ParseSearchSortString(input string) SearchSort {
 	}
 	if input == "_id" {
 		return &SortDocID{
-			Descending: descending,
+			Desc: descending,
 		}
 	} else if input == "_score" {
 		return &SortScore{
-			Descending: descending,
+			Desc: descending,
 		}
 	}
 	return &SortField{
-		Field:      input,
-		Descending: descending,
+		Field: input,
+		Desc:  descending,
 	}
 }
 
@@ -159,13 +160,27 @@ func ParseSortOrderJSON(in []json.RawMessage) (SortOrder, error) {
 
 type SortOrder []SearchSort
 
+func (so SortOrder) Value(doc *DocumentMatch) []string {
+	rv := make([]string, len(so))
+	for i, soi := range so {
+		rv[i] = soi.Value(doc)
+	}
+	return rv
+}
+
 func (so SortOrder) Compare(i, j *DocumentMatch) int {
 	// compare the documents on all search sorts until a differences is found
-	for _, soi := range so {
-		c := soi.Compare(i, j)
+	for x, soi := range so {
+		iVal := i.Sort[x]
+		jVal := j.Sort[x]
+		c := strings.Compare(iVal, jVal)
 		if c == 0 {
 			continue
 		}
+		if soi.Descending() {
+			c = -c
+		}
+		//c := soi.Compare(i, j)
 		return c
 	}
 	// if they are the same at this point, impose order based on index natural sort order
@@ -250,26 +265,24 @@ const (
 //   Mode controls behavior for multi-values fields (default first)
 //   Missing controls behavior of missing values (default last)
 type SortField struct {
-	Field      string
-	Descending bool
-	Type       SortFieldType
-	Mode       SortFieldMode
-	Missing    SortFieldMissing
+	Field   string
+	Desc    bool
+	Type    SortFieldType
+	Mode    SortFieldMode
+	Missing SortFieldMissing
 }
 
-// Compare orders DocumentMatch instances by stored field values
-func (s *SortField) Compare(i, j *DocumentMatch) int {
+// Value returns the sort value of the DocumentMatch
+func (s *SortField) Value(i *DocumentMatch) string {
 	iTerms := i.CachedFieldTerms[s.Field]
 	iTerms = s.filterTermsByType(iTerms)
 	iTerm := s.filterTermsByMode(iTerms)
-	jTerms := j.CachedFieldTerms[s.Field]
-	jTerms = s.filterTermsByType(jTerms)
-	jTerm := s.filterTermsByMode(jTerms)
-	rv := strings.Compare(iTerm, jTerm)
-	if s.Descending {
-		rv = -rv
-	}
-	return rv
+	return iTerm
+}
+
+// Descending determines the order of the sort
+func (s *SortField) Descending() bool {
+	return s.Desc
 }
 
 func (s *SortField) filterTermsByMode(terms []string) string {
@@ -288,12 +301,12 @@ func (s *SortField) filterTermsByMode(terms []string) string {
 
 	// handle missing terms
 	if s.Missing == SortFieldMissingLast {
-		if s.Descending {
+		if s.Desc {
 			return LowTerm
 		}
 		return HighTerm
 	}
-	if s.Descending {
+	if s.Desc {
 		return HighTerm
 	}
 	return LowTerm
@@ -347,7 +360,7 @@ func (s *SortField) MarshalJSON() ([]byte, error) {
 	if s.Missing == SortFieldMissingLast &&
 		s.Mode == SortFieldDefault &&
 		s.Type == SortFieldAuto {
-		if s.Descending {
+		if s.Desc {
 			return json.Marshal("-" + s.Field)
 		}
 		return json.Marshal(s.Field)
@@ -356,7 +369,7 @@ func (s *SortField) MarshalJSON() ([]byte, error) {
 		"by":    "field",
 		"field": s.Field,
 	}
-	if s.Descending {
+	if s.Desc {
 		sfm["desc"] = true
 	}
 	if s.Missing > SortFieldMissingLast {
@@ -389,15 +402,17 @@ func (s *SortField) MarshalJSON() ([]byte, error) {
 
 // SortDocID will sort results by the document identifier
 type SortDocID struct {
-	Descending bool
+	Desc bool
 }
 
-// Compare orders DocumentMatch instances by document identifiers
-func (s *SortDocID) Compare(i, j *DocumentMatch) int {
-	if s.Descending {
-		return strings.Compare(j.ID, i.ID)
-	}
-	return strings.Compare(i.ID, j.ID)
+// Value returns the sort value of the DocumentMatch
+func (s *SortDocID) Value(i *DocumentMatch) string {
+	return i.ID
+}
+
+// Descending determines the order of the sort
+func (s *SortDocID) Descending() bool {
+	return s.Desc
 }
 
 // RequiresDocID says this SearchSort does require the DocID be loaded
@@ -410,7 +425,7 @@ func (s *SortDocID) RequiresScoring() bool { return false }
 func (s *SortDocID) RequiresFields() []string { return nil }
 
 func (s *SortDocID) MarshalJSON() ([]byte, error) {
-	if s.Descending {
+	if s.Desc {
 		return json.Marshal("-_id")
 	}
 	return json.Marshal("_id")
@@ -418,17 +433,19 @@ func (s *SortDocID) MarshalJSON() ([]byte, error) {
 
 // SortScore will sort results by the document match score
 type SortScore struct {
-	Descending bool
+	Desc bool
 }
 
-// Compare orders DocumentMatch instances by computed scores
-func (s *SortScore) Compare(i, j *DocumentMatch) int {
-	if i.Score == j.Score {
-		return 0
-	} else if (i.Score < j.Score && !s.Descending) || (j.Score < i.Score && s.Descending) {
-		return -1
-	}
-	return 1
+// Value returns the sort value of the DocumentMatch
+func (s *SortScore) Value(i *DocumentMatch) string {
+	scoreInt := numeric_util.Float64ToInt64(i.Score)
+	prefixCodedScore, _ := numeric_util.NewPrefixCodedInt64(scoreInt, 0)
+	return string(prefixCodedScore)
+}
+
+// Descending determines the order of the sort
+func (s *SortScore) Descending() bool {
+	return s.Desc
 }
 
 // RequiresDocID says this SearchSort does not require the DocID be loaded
@@ -441,7 +458,7 @@ func (s *SortScore) RequiresScoring() bool { return true }
 func (s *SortScore) RequiresFields() []string { return nil }
 
 func (s *SortScore) MarshalJSON() ([]byte, error) {
-	if s.Descending {
+	if s.Desc {
 		return json.Marshal("-_score")
 	}
 	return json.Marshal("_score")

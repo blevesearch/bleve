@@ -11,6 +11,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve/numeric_util"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -451,6 +452,8 @@ func TestIndexAliasEmpty(t *testing.T) {
 }
 
 func TestIndexAliasMulti(t *testing.T) {
+	score1, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(1.0), 0)
+	score2, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(2.0), 0)
 	ei1Count := uint64(7)
 	ei1 := &stubIndex{
 		err:            nil,
@@ -466,6 +469,7 @@ func TestIndexAliasMulti(t *testing.T) {
 				{
 					ID:    "a",
 					Score: 1.0,
+					Sort:  []string{string(score1)},
 				},
 			},
 			MaxScore: 1.0,
@@ -485,6 +489,7 @@ func TestIndexAliasMulti(t *testing.T) {
 				{
 					ID:    "b",
 					Score: 2.0,
+					Sort:  []string{string(score2)},
 				},
 			},
 			MaxScore: 2.0,
@@ -572,10 +577,12 @@ func TestIndexAliasMulti(t *testing.T) {
 			{
 				ID:    "b",
 				Score: 2.0,
+				Sort:  []string{string(score2)},
 			},
 			{
 				ID:    "a",
 				Score: 1.0,
+				Sort:  []string{string(score1)},
 			},
 		},
 		MaxScore: 2.0,
@@ -601,6 +608,8 @@ func TestIndexAliasMulti(t *testing.T) {
 
 // TestMultiSearchNoError
 func TestMultiSearchNoError(t *testing.T) {
+	score1, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(1.0), 0)
+	score2, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(2.0), 0)
 	ei1 := &stubIndex{err: nil, searchResult: &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
@@ -613,6 +622,7 @@ func TestMultiSearchNoError(t *testing.T) {
 				Index: "1",
 				ID:    "a",
 				Score: 1.0,
+				Sort:  []string{string(score1)},
 			},
 		},
 		MaxScore: 1.0,
@@ -629,6 +639,7 @@ func TestMultiSearchNoError(t *testing.T) {
 				Index: "2",
 				ID:    "b",
 				Score: 2.0,
+				Sort:  []string{string(score2)},
 			},
 		},
 		MaxScore: 2.0,
@@ -648,11 +659,13 @@ func TestMultiSearchNoError(t *testing.T) {
 				Index: "2",
 				ID:    "b",
 				Score: 2.0,
+				Sort:  []string{string(score2)},
 			},
 			{
 				Index: "1",
 				ID:    "a",
 				Score: 1.0,
+				Sort:  []string{string(score1)},
 			},
 		},
 		MaxScore: 2.0,
@@ -784,6 +797,8 @@ func TestMultiSearchSecondPage(t *testing.T) {
 // 2. no searchers finish before the timeout
 // 3. no searches finish before cancellation
 func TestMultiSearchTimeout(t *testing.T) {
+	score1, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(1.0), 0)
+	score2, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(2.0), 0)
 	ei1 := &stubIndex{
 		name: "ei1",
 		checkRequest: func(req *SearchRequest) error {
@@ -803,6 +818,7 @@ func TestMultiSearchTimeout(t *testing.T) {
 					Index: "1",
 					ID:    "a",
 					Score: 1.0,
+					Sort:  []string{string(score1)},
 				},
 			},
 			MaxScore: 1.0,
@@ -826,6 +842,7 @@ func TestMultiSearchTimeout(t *testing.T) {
 					Index: "2",
 					ID:    "b",
 					Score: 2.0,
+					Sort:  []string{string(score2)},
 				},
 			},
 			MaxScore: 2.0,
@@ -909,6 +926,9 @@ func TestMultiSearchTimeout(t *testing.T) {
 // TestMultiSearchTimeoutPartial tests the case where some indexes exceed
 // the timeout, while others complete successfully
 func TestMultiSearchTimeoutPartial(t *testing.T) {
+	score1, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(1.0), 0)
+	score2, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(2.0), 0)
+	score3, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(3.0), 0)
 	ei1 := &stubIndex{
 		name: "ei1",
 		err:  nil,
@@ -924,6 +944,7 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 					Index: "1",
 					ID:    "a",
 					Score: 1.0,
+					Sort:  []string{string(score1)},
 				},
 			},
 			MaxScore: 1.0,
@@ -943,6 +964,7 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 					Index: "2",
 					ID:    "b",
 					Score: 2.0,
+					Sort:  []string{string(score2)},
 				},
 			},
 			MaxScore: 2.0,
@@ -967,6 +989,7 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 					Index: "3",
 					ID:    "c",
 					Score: 3.0,
+					Sort:  []string{string(score3)},
 				},
 			},
 			MaxScore: 3.0,
@@ -993,11 +1016,13 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 				Index: "2",
 				ID:    "b",
 				Score: 2.0,
+				Sort:  []string{string(score2)},
 			},
 			{
 				Index: "1",
 				ID:    "a",
 				Score: 1.0,
+				Sort:  []string{string(score1)},
 			},
 		},
 		MaxScore: 2.0,
@@ -1014,6 +1039,10 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 }
 
 func TestIndexAliasMultipleLayer(t *testing.T) {
+	score1, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(1.0), 0)
+	score2, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(2.0), 0)
+	score3, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(3.0), 0)
+	score4, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(4.0), 0)
 	ei1 := &stubIndex{
 		name: "ei1",
 		err:  nil,
@@ -1029,6 +1058,7 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 					Index: "1",
 					ID:    "a",
 					Score: 1.0,
+					Sort:  []string{string(score1)},
 				},
 			},
 			MaxScore: 1.0,
@@ -1052,6 +1082,7 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 					Index: "2",
 					ID:    "b",
 					Score: 2.0,
+					Sort:  []string{string(score2)},
 				},
 			},
 			MaxScore: 2.0,
@@ -1076,6 +1107,7 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 					Index: "3",
 					ID:    "c",
 					Score: 3.0,
+					Sort:  []string{string(score3)},
 				},
 			},
 			MaxScore: 3.0,
@@ -1096,6 +1128,7 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 					Index: "4",
 					ID:    "d",
 					Score: 4.0,
+					Sort:  []string{string(score4)},
 				},
 			},
 			MaxScore: 4.0,
@@ -1129,11 +1162,13 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 				Index: "4",
 				ID:    "d",
 				Score: 4.0,
+				Sort:  []string{string(score4)},
 			},
 			{
 				Index: "1",
 				ID:    "a",
 				Score: 1.0,
+				Sort:  []string{string(score1)},
 			},
 		},
 		MaxScore: 4.0,
@@ -1146,6 +1181,105 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 	expected.Took = res.Took
 	if !reflect.DeepEqual(res, expected) {
 		t.Errorf("expected %#v, got %#v", expected, res)
+	}
+}
+
+// TestMultiSearchNoError
+func TestMultiSearchCustomSort(t *testing.T) {
+	ei1 := &stubIndex{err: nil, searchResult: &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
+		Total: 2,
+		Hits: search.DocumentMatchCollection{
+			{
+				Index: "1",
+				ID:    "a",
+				Score: 1.0,
+				Sort:  []string{"albert"},
+			},
+			{
+				Index: "1",
+				ID:    "b",
+				Score: 2.0,
+				Sort:  []string{"crown"},
+			},
+		},
+		MaxScore: 2.0,
+	}}
+	ei2 := &stubIndex{err: nil, searchResult: &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
+		Total: 2,
+		Hits: search.DocumentMatchCollection{
+			{
+				Index: "2",
+				ID:    "c",
+				Score: 2.5,
+				Sort:  []string{"frank"},
+			},
+			{
+				Index: "2",
+				ID:    "d",
+				Score: 3.0,
+				Sort:  []string{"zombie"},
+			},
+		},
+		MaxScore: 3.0,
+	}}
+
+	sr := NewSearchRequest(NewTermQuery("test"))
+	sr.SortBy([]string{"name"})
+	expected := &SearchResult{
+		Status: &SearchStatus{
+			Total:      2,
+			Successful: 2,
+			Errors:     make(map[string]error),
+		},
+		Request: sr,
+		Total:   4,
+		Hits: search.DocumentMatchCollection{
+			{
+				Index: "1",
+				ID:    "a",
+				Score: 1.0,
+				Sort:  []string{"albert"},
+			},
+			{
+				Index: "1",
+				ID:    "b",
+				Score: 2.0,
+				Sort:  []string{"crown"},
+			},
+			{
+				Index: "2",
+				ID:    "c",
+				Score: 2.5,
+				Sort:  []string{"frank"},
+			},
+			{
+				Index: "2",
+				ID:    "d",
+				Score: 3.0,
+				Sort:  []string{"zombie"},
+			},
+		},
+		MaxScore: 3.0,
+	}
+
+	results, err := MultiSearch(context.Background(), sr, ei1, ei2)
+	if err != nil {
+		t.Error(err)
+	}
+	// cheat and ensure that Took field matches since it invovles time
+	expected.Took = results.Took
+	if !reflect.DeepEqual(results, expected) {
+		t.Errorf("expected %v, got %v", expected, results)
 	}
 }
 

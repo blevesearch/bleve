@@ -262,7 +262,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.Size = *temp.Size
 	}
 	if temp.Sort == nil {
-		r.Sort = search.SortOrder{&search.SortScore{Descending: true}}
+		r.Sort = search.SortOrder{&search.SortScore{Desc: true}}
 	} else {
 		r.Sort, err = search.ParseSortOrderJSON(temp.Sort)
 		if err != nil {
@@ -307,7 +307,7 @@ func NewSearchRequestOptions(q Query, size, from int, explain bool) *SearchReque
 		Size:    size,
 		From:    from,
 		Explain: explain,
-		Sort:    search.SortOrder{&search.SortScore{Descending: true}},
+		Sort:    search.SortOrder{&search.SortScore{Desc: true}},
 	}
 }
 

@@ -128,6 +128,9 @@ func (hc *HeapCollector) collectSingle(ctx *search.SearchContext, reader index.I
 		d.CachedFieldTerms.Merge(fieldTerms)
 	}
 
+	// compute this hits sort value
+	d.Sort = hc.sort.Value(d)
+
 	// optimization, we track lowest sorting hit already removed from heap
 	// with this one comparision, we can avoid all heap operations if
 	// this hit would have been added and then immediately removed
