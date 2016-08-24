@@ -402,17 +402,17 @@ func TestPaginationSameScores(t *testing.T) {
 }
 
 func BenchmarkTop10of100000Scores(b *testing.B) {
-	benchHelper(10000, NewTopScorerCollector(10), b)
+	benchHelper(10000, func() search.Collector { return NewTopScorerCollector(10) }, b)
 }
 
 func BenchmarkTop100of100000Scores(b *testing.B) {
-	benchHelper(10000, NewTopScorerCollector(100), b)
+	benchHelper(10000, func() search.Collector { return NewTopScorerCollector(100) }, b)
 }
 
 func BenchmarkTop10of1000000Scores(b *testing.B) {
-	benchHelper(100000, NewTopScorerCollector(10), b)
+	benchHelper(100000, func() search.Collector { return NewTopScorerCollector(10) }, b)
 }
 
 func BenchmarkTop100of1000000Scores(b *testing.B) {
-	benchHelper(100000, NewTopScorerCollector(100), b)
+	benchHelper(100000, func() search.Collector { return NewTopScorerCollector(100) }, b)
 }

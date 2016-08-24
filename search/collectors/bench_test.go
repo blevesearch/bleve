@@ -10,7 +10,9 @@ import (
 	"golang.org/x/net/context"
 )
 
-func benchHelper(numOfMatches int, collector search.Collector, b *testing.B) {
+type createCollector func() search.Collector
+
+func benchHelper(numOfMatches int, cc createCollector, b *testing.B) {
 	matches := make([]*search.DocumentMatch, 0, numOfMatches)
 	for i := 0; i < numOfMatches; i++ {
 		matches = append(matches, &search.DocumentMatch{
@@ -25,6 +27,7 @@ func benchHelper(numOfMatches int, collector search.Collector, b *testing.B) {
 		searcher := &stubSearcher{
 			matches: matches,
 		}
+		collector := cc()
 		err := collector.Collect(context.Background(), searcher, &stubReader{})
 		if err != nil {
 			b.Fatal(err)
