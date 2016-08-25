@@ -50,7 +50,7 @@ func TestTermScorer(t *testing.T) {
 			result: &search.DocumentMatch{
 				IndexInternalID: index.IndexInternalID("one"),
 				Score:           math.Sqrt(1.0) * idf,
-				Sort:            []interface{}{},
+				Sort:            []string{},
 				Expl: &search.Explanation{
 					Value:   math.Sqrt(1.0) * idf,
 					Message: "fieldWeight(desc:beer in one), product of:",
@@ -92,7 +92,7 @@ func TestTermScorer(t *testing.T) {
 			result: &search.DocumentMatch{
 				IndexInternalID: index.IndexInternalID("one"),
 				Score:           math.Sqrt(1.0) * idf,
-				Sort:            []interface{}{},
+				Sort:            []string{},
 				Expl: &search.Explanation{
 					Value:   math.Sqrt(1.0) * idf,
 					Message: "fieldWeight(desc:beer in one), product of:",
@@ -123,7 +123,7 @@ func TestTermScorer(t *testing.T) {
 			result: &search.DocumentMatch{
 				IndexInternalID: index.IndexInternalID("one"),
 				Score:           math.Sqrt(65) * idf,
-				Sort:            []interface{}{},
+				Sort:            []string{},
 				Expl: &search.Explanation{
 					Value:   math.Sqrt(65) * idf,
 					Message: "fieldWeight(desc:beer in one), product of:",
@@ -190,7 +190,7 @@ func TestTermScorerWithQueryNorm(t *testing.T) {
 			result: &search.DocumentMatch{
 				IndexInternalID: index.IndexInternalID("one"),
 				Score:           math.Sqrt(1.0) * idf * 3.0 * idf * 2.0,
-				Sort:            []interface{}{},
+				Sort:            []string{},
 				Expl: &search.Explanation{
 					Value:   math.Sqrt(1.0) * idf * 3.0 * idf * 2.0,
 					Message: "weight(desc:beer^3.000000 in one), product of:",

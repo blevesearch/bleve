@@ -22,7 +22,9 @@ type stubSearcher struct {
 
 func (ss *stubSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	if ss.index < len(ss.matches) {
-		rv := ss.matches[ss.index]
+		rv := ctx.DocumentMatchPool.Get()
+		rv.IndexInternalID = ss.matches[ss.index].IndexInternalID
+		rv.Score = ss.matches[ss.index].Score
 		ss.index++
 		return rv, nil
 	}
@@ -35,7 +37,9 @@ func (ss *stubSearcher) Advance(ctx *search.SearchContext, ID index.IndexInterna
 		ss.index++
 	}
 	if ss.index < len(ss.matches) {
-		rv := ss.matches[ss.index]
+		rv := ctx.DocumentMatchPool.Get()
+		rv.IndexInternalID = ss.matches[ss.index].IndexInternalID
+		rv.Score = ss.matches[ss.index].Score
 		ss.index++
 		return rv, nil
 	}

@@ -37,7 +37,7 @@ func NewDocumentMatchPool(size, sortsize int) *DocumentMatchPool {
 	startBlock := make([]DocumentMatch, size)
 	// make these initial instances available
 	for i := range startBlock {
-		startBlock[i].Sort = make([]interface{}, 0, sortsize)
+		startBlock[i].Sort = make([]string, 0, sortsize)
 		avail = append(avail, &startBlock[i])
 	}
 	return &DocumentMatchPool{

@@ -13,13 +13,12 @@ import (
 type createCollector func() search.Collector
 
 func benchHelper(numOfMatches int, cc createCollector, b *testing.B) {
-	dp := search.NewDocumentMatchPool(numOfMatches, 1)
 	matches := make([]*search.DocumentMatch, 0, numOfMatches)
 	for i := 0; i < numOfMatches; i++ {
-		match := dp.Get()
-		match.IndexInternalID = index.IndexInternalID(strconv.Itoa(i))
-		match.Score = rand.Float64()
-		matches = append(matches, match)
+		matches = append(matches, &search.DocumentMatch{
+			IndexInternalID: index.IndexInternalID(strconv.Itoa(i)),
+			Score:           rand.Float64(),
+		})
 	}
 
 	b.ResetTimer()

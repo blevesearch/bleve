@@ -38,7 +38,9 @@ var COLLECT_CHECK_DONE_EVERY = uint64(1024)
 
 func NewHeapCollector(size int, skip int, sort search.SortOrder) *HeapCollector {
 	hc := &HeapCollector{size: size, skip: skip, sort: sort}
-	hc.results = make(search.DocumentMatchCollection, 0, size+skip)
+	// pre-allocate space on the heap, we need size+skip results
+	// +1 additional while figuring out which to evict
+	hc.results = make(search.DocumentMatchCollection, 0, size+skip+1)
 	heap.Init(hc)
 
 	// these lookups traverse an interface, so do once up-front

@@ -47,7 +47,7 @@ func TestConstantScorer(t *testing.T) {
 					Value:   1.0,
 					Message: "ConstantScore()",
 				},
-				Sort: []interface{}{},
+				Sort: []string{},
 			},
 		},
 	}
@@ -83,7 +83,7 @@ func TestConstantScorerWithQueryNorm(t *testing.T) {
 			result: &search.DocumentMatch{
 				IndexInternalID: index.IndexInternalID("one"),
 				Score:           2.0,
-				Sort:            []interface{}{},
+				Sort:            []string{},
 				Expl: &search.Explanation{
 					Value:   2.0,
 					Message: "weight(^1.000000), product of:",
