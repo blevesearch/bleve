@@ -28,8 +28,10 @@ type HeapCollector struct {
 	results       search.DocumentMatchCollection
 	facetsBuilder *search.FacetsBuilder
 
-	needDocIds   bool
-	neededFields []string
+	needDocIds    bool
+	neededFields  []string
+	cachedScoring []bool
+	cachedDesc    []bool
 
 	lowestMatchOutsideResults *search.DocumentMatch
 }
@@ -48,6 +50,8 @@ func NewHeapCollector(size int, skip int, sort search.SortOrder) *HeapCollector 
 		hc.needDocIds = true
 	}
 	hc.neededFields = sort.RequiredFields()
+	hc.cachedScoring = sort.CacheIsScore()
+	hc.cachedDesc = sort.CacheDescending()
 
 	return hc
 }
@@ -148,7 +152,7 @@ func (hc *HeapCollector) collectSingle(ctx *search.SearchContext, reader index.I
 	// with this one comparision, we can avoid all heap operations if
 	// this hit would have been added and then immediately removed
 	if hc.lowestMatchOutsideResults != nil {
-		cmp := hc.sort.Compare(d, hc.lowestMatchOutsideResults)
+		cmp := hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, d, hc.lowestMatchOutsideResults)
 		if cmp >= 0 {
 			// this hit can't possibly be in the result set, so avoid heap ops
 			ctx.DocumentMatchPool.Put(d)
@@ -162,7 +166,7 @@ func (hc *HeapCollector) collectSingle(ctx *search.SearchContext, reader index.I
 		if hc.lowestMatchOutsideResults == nil {
 			hc.lowestMatchOutsideResults = removed
 		} else {
-			cmp := hc.sort.Compare(removed, hc.lowestMatchOutsideResults)
+			cmp := hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, removed, hc.lowestMatchOutsideResults)
 			if cmp < 0 {
 				tmp := hc.lowestMatchOutsideResults
 				hc.lowestMatchOutsideResults = removed
@@ -239,7 +243,7 @@ func (hc *HeapCollector) Len() int {
 }
 
 func (hc *HeapCollector) Less(i, j int) bool {
-	so := hc.sort.Compare(hc.results[i], hc.results[j])
+	so := hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, hc.results[i], hc.results[j])
 	return -so < 0
 }
 

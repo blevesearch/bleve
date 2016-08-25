@@ -168,11 +168,11 @@ func (so SortOrder) Value(doc *DocumentMatch) {
 
 // Compare will compare two document matches using the specified sort order
 // if both are numbers, we avoid converting back to term
-func (so SortOrder) Compare(i, j *DocumentMatch) int {
+func (so SortOrder) Compare(cachedScoring, cachedDesc []bool, i, j *DocumentMatch) int {
 	// compare the documents on all search sorts until a differences is found
-	for x, soi := range so {
+	for x := range so {
 		c := 0
-		if soi.RequiresScoring() {
+		if cachedScoring[x] {
 			if i.Score < j.Score {
 				c = -1
 			} else if i.Score > j.Score {
@@ -187,7 +187,7 @@ func (so SortOrder) Compare(i, j *DocumentMatch) int {
 		if c == 0 {
 			continue
 		}
-		if soi.Descending() {
+		if cachedDesc[x] {
 			c = -c
 		}
 		return c
@@ -225,6 +225,22 @@ func (so SortOrder) RequiredFields() []string {
 	var rv []string
 	for _, soi := range so {
 		rv = append(rv, soi.RequiresFields()...)
+	}
+	return rv
+}
+
+func (so SortOrder) CacheIsScore() []bool {
+	var rv []bool
+	for _, soi := range so {
+		rv = append(rv, soi.RequiresScoring())
+	}
+	return rv
+}
+
+func (so SortOrder) CacheDescending() []bool {
+	var rv []bool
+	for _, soi := range so {
+		rv = append(rv, soi.Descending())
 	}
 	return rv
 }

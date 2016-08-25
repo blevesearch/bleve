@@ -571,10 +571,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 
 	// sort all hits with the requested order
 	if len(req.Sort) > 0 {
-		sorter := &multiSearchHitSorter{
-			hits: sr.Hits,
-			sort: req.Sort,
-		}
+		sorter := newMultiSearchHitSorter(req.Sort, sr.Hits)
 		sort.Sort(sorter)
 	}
 
@@ -654,13 +651,24 @@ func (f *indexAliasImplFieldDict) Close() error {
 }
 
 type multiSearchHitSorter struct {
-	hits search.DocumentMatchCollection
-	sort search.SortOrder
+	hits          search.DocumentMatchCollection
+	sort          search.SortOrder
+	cachedScoring []bool
+	cachedDesc    []bool
+}
+
+func newMultiSearchHitSorter(sort search.SortOrder, hits search.DocumentMatchCollection) *multiSearchHitSorter {
+	return &multiSearchHitSorter{
+		sort:          sort,
+		hits:          hits,
+		cachedScoring: sort.CacheIsScore(),
+		cachedDesc:    sort.CacheDescending(),
+	}
 }
 
 func (m *multiSearchHitSorter) Len() int      { return len(m.hits) }
 func (m *multiSearchHitSorter) Swap(i, j int) { m.hits[i], m.hits[j] = m.hits[j], m.hits[i] }
 func (m *multiSearchHitSorter) Less(i, j int) bool {
-	c := m.sort.Compare(m.hits[i], m.hits[j])
+	c := m.sort.Compare(m.cachedScoring, m.cachedDesc, m.hits[i], m.hits[j])
 	return c < 0
 }
