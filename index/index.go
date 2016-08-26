@@ -79,8 +79,7 @@ type IndexReader interface {
 	FieldDictPrefix(field string, termPrefix []byte) (FieldDict, error)
 
 	Document(id string) (*document.Document, error)
-	DocumentFieldTerms(id IndexInternalID) (FieldTerms, error)
-	DocumentFieldTermsForFields(id IndexInternalID, fields []string) (FieldTerms, error)
+	DocumentFieldTerms(id IndexInternalID, fields []string) (FieldTerms, error)
 
 	Fields() ([]string, error)
 
@@ -93,7 +92,28 @@ type IndexReader interface {
 	Close() error
 }
 
+// FieldTerms contains the terms used by a document, keyed by field
 type FieldTerms map[string][]string
+
+// FieldsNotYetCached returns a list of fields not yet cached out of a larger list of fields
+func (f FieldTerms) FieldsNotYetCached(fields []string) []string {
+	var rv []string
+	for _, field := range fields {
+		if _, ok := f[field]; !ok {
+			rv = append(rv, field)
+		}
+	}
+	return rv
+}
+
+// Merge will combine two FieldTerms
+// it assumes that the terms lists are complete (thus do not need to be merged)
+// field terms from the other list always replace the ones in the receiver
+func (f FieldTerms) Merge(other FieldTerms) {
+	for field, terms := range other {
+		f[field] = terms
+	}
+}
 
 type TermFieldVector struct {
 	Field          string

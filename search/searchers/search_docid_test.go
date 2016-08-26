@@ -64,7 +64,7 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 	}()
 
 	ctx := &search.SearchContext{
-		DocumentMatchPool: search.NewDocumentMatchPool(searcher.DocumentMatchPoolSize()),
+		DocumentMatchPool: search.NewDocumentMatchPool(searcher.DocumentMatchPoolSize(), 0),
 	}
 
 	// Check the sequence

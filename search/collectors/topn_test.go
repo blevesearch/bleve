@@ -84,7 +84,7 @@ func TestTop10Scores(t *testing.T) {
 		},
 	}
 
-	collector := NewTopScorerCollector(10)
+	collector := NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
 	err := collector.Collect(context.Background(), searcher, &stubReader{})
 	if err != nil {
 		t.Fatal(err)
@@ -103,6 +103,7 @@ func TestTop10Scores(t *testing.T) {
 	results := collector.Results()
 
 	if len(results) != 10 {
+		t.Logf("results: %v", results)
 		t.Fatalf("expected 10 results, got %d", len(results))
 	}
 
@@ -192,7 +193,7 @@ func TestTop10ScoresSkip10(t *testing.T) {
 		},
 	}
 
-	collector := NewTopScorerSkipCollector(10, 10)
+	collector := NewTopNCollector(10, 10, search.SortOrder{&search.SortScore{Desc: true}})
 	err := collector.Collect(context.Background(), searcher, &stubReader{})
 	if err != nil {
 		t.Fatal(err)
@@ -219,7 +220,7 @@ func TestTop10ScoresSkip10(t *testing.T) {
 	}
 
 	if results[0].Score != 9.5 {
-		t.Errorf("expected highest score to be 9.5ß, got %f", results[0].Score)
+		t.Errorf("expected highest score to be 9.5, got %f", results[0].Score)
 	}
 }
 
@@ -289,7 +290,7 @@ func TestPaginationSameScores(t *testing.T) {
 	}
 
 	// first get first 5 hits
-	collector := NewTopScorerSkipCollector(5, 0)
+	collector := NewTopNCollector(5, 0, search.SortOrder{&search.SortScore{Desc: true}})
 	err := collector.Collect(context.Background(), searcher, &stubReader{})
 	if err != nil {
 		t.Fatal(err)
@@ -375,7 +376,7 @@ func TestPaginationSameScores(t *testing.T) {
 	}
 
 	// now get next 5 hits
-	collector = NewTopScorerSkipCollector(5, 5)
+	collector = NewTopNCollector(5, 5, search.SortOrder{&search.SortScore{Desc: true}})
 	err = collector.Collect(context.Background(), searcher, &stubReader{})
 	if err != nil {
 		t.Fatal(err)
@@ -398,21 +399,28 @@ func TestPaginationSameScores(t *testing.T) {
 			t.Errorf("doc ID %s is in top 5 and next 5 result sets", hit.ID)
 		}
 	}
-
 }
 
 func BenchmarkTop10of100000Scores(b *testing.B) {
-	benchHelper(10000, func() search.Collector { return NewTopScorerCollector(10) }, b)
+	benchHelper(10000, func() search.Collector {
+		return NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
 }
 
 func BenchmarkTop100of100000Scores(b *testing.B) {
-	benchHelper(10000, func() search.Collector { return NewTopScorerCollector(100) }, b)
+	benchHelper(10000, func() search.Collector {
+		return NewTopNCollector(100, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
 }
 
 func BenchmarkTop10of1000000Scores(b *testing.B) {
-	benchHelper(100000, func() search.Collector { return NewTopScorerCollector(10) }, b)
+	benchHelper(100000, func() search.Collector {
+		return NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
 }
 
 func BenchmarkTop100of1000000Scores(b *testing.B) {
-	benchHelper(100000, func() search.Collector { return NewTopScorerCollector(100) }, b)
+	benchHelper(100000, func() search.Collector {
+		return NewTopNCollector(100, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
 }

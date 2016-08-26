@@ -52,7 +52,7 @@ func TestMatchNoneSearch(t *testing.T) {
 		}()
 
 		ctx := &search.SearchContext{
-			DocumentMatchPool: search.NewDocumentMatchPool(test.searcher.DocumentMatchPoolSize()),
+			DocumentMatchPool: search.NewDocumentMatchPool(test.searcher.DocumentMatchPoolSize(), 0),
 		}
 		next, err := test.searcher.Next(ctx)
 		i := 0

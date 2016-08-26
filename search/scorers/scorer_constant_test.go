@@ -47,13 +47,14 @@ func TestConstantScorer(t *testing.T) {
 					Value:   1.0,
 					Message: "ConstantScore()",
 				},
+				Sort: []string{},
 			},
 		},
 	}
 
 	for _, test := range tests {
 		ctx := &search.SearchContext{
-			DocumentMatchPool: search.NewDocumentMatchPool(1),
+			DocumentMatchPool: search.NewDocumentMatchPool(1, 0),
 		}
 		actual := scorer.Score(ctx, test.termMatch.ID)
 
@@ -82,6 +83,7 @@ func TestConstantScorerWithQueryNorm(t *testing.T) {
 			result: &search.DocumentMatch{
 				IndexInternalID: index.IndexInternalID("one"),
 				Score:           2.0,
+				Sort:            []string{},
 				Expl: &search.Explanation{
 					Value:   2.0,
 					Message: "weight(^1.000000), product of:",
@@ -112,7 +114,7 @@ func TestConstantScorerWithQueryNorm(t *testing.T) {
 
 	for _, test := range tests {
 		ctx := &search.SearchContext{
-			DocumentMatchPool: search.NewDocumentMatchPool(1),
+			DocumentMatchPool: search.NewDocumentMatchPool(1, 0),
 		}
 		actual := scorer.Score(ctx, test.termMatch.ID)
 

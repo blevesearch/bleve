@@ -10,8 +10,6 @@
 package upside_down
 
 import (
-	"fmt"
-
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
@@ -98,25 +96,7 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 	return
 }
 
-func (i *IndexReader) DocumentFieldTerms(id index.IndexInternalID) (index.FieldTerms, error) {
-	back, err := i.index.backIndexRowForDoc(i.kvreader, id)
-	if err != nil {
-		return nil, err
-	}
-	rv := make(index.FieldTerms, len(back.termEntries))
-	for _, entry := range back.termEntries {
-		fieldName := i.index.fieldCache.FieldIndexed(uint16(*entry.Field))
-		terms, ok := rv[fieldName]
-		if !ok {
-			terms = make([]string, 0)
-		}
-		terms = append(terms, *entry.Term)
-		rv[fieldName] = terms
-	}
-	return rv, nil
-}
-
-func (i *IndexReader) DocumentFieldTermsForFields(id index.IndexInternalID, fields []string) (index.FieldTerms, error) {
+func (i *IndexReader) DocumentFieldTerms(id index.IndexInternalID, fields []string) (index.FieldTerms, error) {
 	back, err := i.index.backIndexRowForDoc(i.kvreader, id)
 	if err != nil {
 		return nil, err
@@ -125,10 +105,9 @@ func (i *IndexReader) DocumentFieldTermsForFields(id index.IndexInternalID, fiel
 	fieldsMap := make(map[uint16]string, len(fields))
 	for _, f := range fields {
 		id, ok := i.index.fieldCache.FieldNamed(f, false)
-		if !ok {
-			return nil, fmt.Errorf("Field %s was not found in cache", f)
+		if ok {
+			fieldsMap[id] = f
 		}
-		fieldsMap[id] = f
 	}
 	for _, entry := range back.termEntries {
 		if field, ok := fieldsMap[uint16(*entry.Field)]; ok {

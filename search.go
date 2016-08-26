@@ -191,6 +191,7 @@ func (h *HighlightRequest) AddField(field string) {
 // Facets describe the set of facets to be computed.
 // Explain triggers inclusion of additional search
 // result score explanations.
+// Sort describes the desired order for the results to be returned.
 //
 // A special field named "*" can be used to return all fields.
 type SearchRequest struct {
@@ -201,6 +202,7 @@ type SearchRequest struct {
 	Fields    []string          `json:"fields"`
 	Facets    FacetsRequest     `json:"facets"`
 	Explain   bool              `json:"explain"`
+	Sort      search.SortOrder  `json:"sort"`
 }
 
 func (sr *SearchRequest) Validate() error {
@@ -220,6 +222,21 @@ func (r *SearchRequest) AddFacet(facetName string, f *FacetRequest) {
 	r.Facets[facetName] = f
 }
 
+// SortBy changes the request to use the requested sort order
+// this form uses the simplified syntax with an array of strings
+// each string can either be a field name
+// or the magic value _id and _score which refer to the doc id and search score
+// any of these values can optionally be prefixed with - to reverse the order
+func (r *SearchRequest) SortBy(order []string) {
+	so := search.ParseSortOrderStrings(order)
+	r.Sort = so
+}
+
+// SortByCustom changes the request to use the requested sort order
+func (r *SearchRequest) SortByCustom(order search.SortOrder) {
+	r.Sort = order
+}
+
 // UnmarshalJSON deserializes a JSON representation of
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
@@ -231,6 +248,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Fields    []string          `json:"fields"`
 		Facets    FacetsRequest     `json:"facets"`
 		Explain   bool              `json:"explain"`
+		Sort      []json.RawMessage `json:"sort"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -242,6 +260,14 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.Size = 10
 	} else {
 		r.Size = *temp.Size
+	}
+	if temp.Sort == nil {
+		r.Sort = search.SortOrder{&search.SortScore{Desc: true}}
+	} else {
+		r.Sort, err = search.ParseSortOrderJSON(temp.Sort)
+		if err != nil {
+			return err
+		}
 	}
 	r.From = temp.From
 	r.Explain = temp.Explain
@@ -274,12 +300,14 @@ func NewSearchRequest(q Query) *SearchRequest {
 // NewSearchRequestOptions creates a new SearchRequest
 // for the Query, with the requested size, from
 // and explanation search parameters.
+// By default results are ordered by score, descending.
 func NewSearchRequestOptions(q Query, size, from int, explain bool) *SearchRequest {
 	return &SearchRequest{
 		Query:   q,
 		Size:    size,
 		From:    from,
 		Explain: explain,
+		Sort:    search.SortOrder{&search.SortScore{Desc: true}},
 	}
 }
 

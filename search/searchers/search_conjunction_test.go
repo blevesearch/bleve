@@ -189,7 +189,7 @@ func TestConjunctionSearch(t *testing.T) {
 		}()
 
 		ctx := &search.SearchContext{
-			DocumentMatchPool: search.NewDocumentMatchPool(10),
+			DocumentMatchPool: search.NewDocumentMatchPool(10, 0),
 		}
 		next, err := test.searcher.Next(ctx)
 		i := 0

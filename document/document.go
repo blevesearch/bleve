@@ -9,9 +9,7 @@
 
 package document
 
-import (
-	"fmt"
-)
+import "fmt"
 
 type Document struct {
 	ID              string  `json:"id"`

@@ -98,6 +98,45 @@ func TestPrefixCoded(t *testing.T) {
 	}
 }
 
+func TestPrefixCodedValid(t *testing.T) {
+	// all of the shared tests should be valid
+	for _, test := range tests {
+		valid, _ := ValidPrefixCodedTerm(string(test.output))
+		if !valid {
+			t.Errorf("expected %s to be valid prefix coded, is not", string(test.output))
+		}
+	}
+
+	invalidTests := []struct {
+		data PrefixCoded
+	}{
+		// first byte invalid skip (too low)
+		{
+			data: PrefixCoded{0x19, 'c', 'a', 't'},
+		},
+		// first byte invalid skip (too high)
+		{
+			data: PrefixCoded{0x20 + 64, 'c'},
+		},
+		// length of trailing bytes wrong (too long)
+		{
+			data: PrefixCoded{0x20, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
+		},
+		// length of trailing bytes wrong (too short)
+		{
+			data: PrefixCoded{0x20 + 63},
+		},
+	}
+
+	// all of the shared tests should be valid
+	for _, test := range invalidTests {
+		valid, _ := ValidPrefixCodedTerm(string(test.data))
+		if valid {
+			t.Errorf("expected %s to be invalid prefix coded, it is", string(test.data))
+		}
+	}
+}
+
 func BenchmarkTestPrefixCoded(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {

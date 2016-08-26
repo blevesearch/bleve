@@ -9,7 +9,12 @@
 
 package search
 
-import "github.com/blevesearch/bleve/index"
+import (
+	"fmt"
+
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index"
+)
 
 type Location struct {
 	Pos            float64   `json:"pos"`
@@ -60,11 +65,22 @@ type DocumentMatch struct {
 	Expl            *Explanation          `json:"explanation,omitempty"`
 	Locations       FieldTermLocationMap  `json:"locations,omitempty"`
 	Fragments       FieldFragmentMap      `json:"fragments,omitempty"`
+	Sort            []string              `json:"sort,omitempty"`
 
 	// Fields contains the values for document fields listed in
 	// SearchRequest.Fields. Text fields are returned as strings, numeric
 	// fields as float64s and date fields as time.RFC3339 formatted strings.
 	Fields map[string]interface{} `json:"fields,omitempty"`
+
+	// as we learn field terms, we can cache important ones for later use
+	// for example, sorting and building facets need these values
+	CachedFieldTerms index.FieldTerms `json:"-"`
+
+	// if we load the document for this hit, remember it so we dont load again
+	Document *document.Document `json:"-"`
+
+	// used to maintain natural index order
+	HitNumber uint64 `json:"-"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
@@ -91,12 +107,20 @@ func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
 // Reset allows an already allocated DocumentMatch to be reused
 func (dm *DocumentMatch) Reset() *DocumentMatch {
 	// remember the []byte used for the IndexInternalID
-	indexInternalId := dm.IndexInternalID
+	indexInternalID := dm.IndexInternalID
+	// remember the []interface{} used for sort
+	sort := dm.Sort
 	// idiom to copy over from empty DocumentMatch (0 allocations)
 	*dm = DocumentMatch{}
 	// reuse the []byte already allocated (and reset len to 0)
-	dm.IndexInternalID = indexInternalId[:0]
+	dm.IndexInternalID = indexInternalID[:0]
+	// reuse the []interface{} already allocated (and reset len to 0)
+	dm.Sort = sort[:0]
 	return dm
+}
+
+func (dm *DocumentMatch) String() string {
+	return fmt.Sprintf("[%s-%f]", string(dm.IndexInternalID), dm.Score)
 }
 
 type DocumentMatchCollection []*DocumentMatch

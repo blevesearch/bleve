@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/highlight/highlighters/ansi"
 )
 
@@ -61,11 +62,13 @@ func ExampleIndex_indexing() {
 	data := struct {
 		Name    string
 		Created time.Time
-	}{Name: "named one", Created: time.Now()}
+		Age     int
+	}{Name: "named one", Created: time.Now(), Age: 50}
 	data2 := struct {
 		Name    string
 		Created time.Time
-	}{Name: "great nameless one", Created: time.Now()}
+		Age     int
+	}{Name: "great nameless one", Created: time.Now(), Age: 25}
 
 	// index some data
 	err = example_index.Index("document id 1", data)
@@ -503,4 +506,47 @@ func ExampleDocumentMapping_AddFieldMappingsAt() {
 	fmt.Println(len(documentMapping.Properties["NestedProperty"].Fields))
 	// Output:
 	// 1
+}
+
+func ExampleSearchRequest_SortBy() {
+	// find docs containing "one", order by Age instead of score
+	query := NewMatchQuery("one")
+	searchRequest := NewSearchRequest(query)
+	searchRequest.SortBy([]string{"Age"})
+	searchResults, err := example_index.Search(searchRequest)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(searchResults.Hits[0].ID)
+	fmt.Println(searchResults.Hits[1].ID)
+	// Output:
+	// document id 2
+	// document id 1
+}
+
+func ExampleSearchRequest_SortByCustom() {
+	// find all docs, order by Age, with docs missing Age field first
+	query := NewMatchAllQuery()
+	searchRequest := NewSearchRequest(query)
+	searchRequest.SortByCustom(search.SortOrder{
+		&search.SortField{
+			Field:   "Age",
+			Missing: search.SortFieldMissingFirst,
+		},
+	})
+	searchResults, err := example_index.Search(searchRequest)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(searchResults.Hits[0].ID)
+	fmt.Println(searchResults.Hits[1].ID)
+	fmt.Println(searchResults.Hits[2].ID)
+	fmt.Println(searchResults.Hits[3].ID)
+	// Output:
+	// document id 3
+	// document id 4
+	// document id 2
+	// document id 1
 }
