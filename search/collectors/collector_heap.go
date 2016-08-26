@@ -146,7 +146,9 @@ func (hc *HeapCollector) collectSingle(ctx *search.SearchContext, reader index.I
 	}
 
 	// compute this hits sort value
-	hc.sort.Value(d)
+	if len(hc.sort) > 1 || len(hc.sort) == 1 && !hc.cachedScoring[0] {
+		hc.sort.Value(d)
+	}
 
 	// optimization, we track lowest sorting hit already removed from heap
 	// with this one comparision, we can avoid all heap operations if
