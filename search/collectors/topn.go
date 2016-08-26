@@ -6,11 +6,10 @@
 //  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
-//
+
 package collectors
 
 import (
-	"container/heap"
 	"time"
 
 	"github.com/blevesearch/bleve/index"
@@ -18,7 +17,12 @@ import (
 	"golang.org/x/net/context"
 )
 
-type HeapCollector struct {
+type collectorCompare func(i, j *search.DocumentMatch) int
+
+type collectorFixup func(d *search.DocumentMatch) error
+
+// TopNCollector collects the top N hits, optionally skipping some results
+type TopNCollector struct {
 	size          int
 	skip          int
 	total         uint64
@@ -28,6 +32,8 @@ type HeapCollector struct {
 	results       search.DocumentMatchCollection
 	facetsBuilder *search.FacetsBuilder
 
+	store *collectStoreList
+
 	needDocIds    bool
 	neededFields  []string
 	cachedScoring []bool
@@ -36,14 +42,19 @@ type HeapCollector struct {
 	lowestMatchOutsideResults *search.DocumentMatch
 }
 
-var COLLECT_CHECK_DONE_EVERY = uint64(1024)
+// CheckDoneEvery controls how frequently we check the context deadline
+const CheckDoneEvery = uint64(1024)
 
-func NewHeapCollector(size int, skip int, sort search.SortOrder) *HeapCollector {
-	hc := &HeapCollector{size: size, skip: skip, sort: sort}
+// NewTopNCollector builds a collector to find the top 'size' hits
+// skipping over the first 'skip' hits
+// ordering hits by the provided sort order
+func NewTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector {
+	hc := &TopNCollector{size: size, skip: skip, sort: sort}
 	// pre-allocate space on the heap, we need size+skip results
 	// +1 additional while figuring out which to evict
-	hc.results = make(search.DocumentMatchCollection, 0, size+skip+1)
-	heap.Init(hc)
+	hc.store = newStoreList(size+skip+1, func(i, j *search.DocumentMatch) int {
+		return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
+	})
 
 	// these lookups traverse an interface, so do once up-front
 	if sort.RequiresDocID() {
@@ -56,7 +67,8 @@ func NewHeapCollector(size int, skip int, sort search.SortOrder) *HeapCollector 
 	return hc
 }
 
-func (hc *HeapCollector) Collect(ctx context.Context, searcher search.Searcher, reader index.IndexReader) error {
+// Collect goes to the index to find the matching documents
+func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, reader index.IndexReader) error {
 	startTime := time.Now()
 	var err error
 	var next *search.DocumentMatch
@@ -76,7 +88,7 @@ func (hc *HeapCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		next, err = searcher.Next(searchContext)
 	}
 	for err == nil && next != nil {
-		if hc.total%COLLECT_CHECK_DONE_EVERY == 0 {
+		if hc.total%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -112,7 +124,7 @@ func (hc *HeapCollector) Collect(ctx context.Context, searcher search.Searcher, 
 
 var sortByScoreOpt = []string{"_score"}
 
-func (hc *HeapCollector) collectSingle(ctx *search.SearchContext, reader index.IndexReader, d *search.DocumentMatch) error {
+func (hc *TopNCollector) collectSingle(ctx *search.SearchContext, reader index.IndexReader, d *search.DocumentMatch) error {
 	// increment total hits
 	hc.total++
 	d.HitNumber = hc.total
@@ -166,9 +178,9 @@ func (hc *HeapCollector) collectSingle(ctx *search.SearchContext, reader index.I
 		}
 	}
 
-	heap.Push(hc, d)
-	if hc.Len() > hc.size+hc.skip {
-		removed := heap.Pop(hc).(*search.DocumentMatch)
+	hc.store.Add(d)
+	if hc.store.Len() > hc.size+hc.skip {
+		removed := hc.store.RemoveLast()
 		if hc.lowestMatchOutsideResults == nil {
 			hc.lowestMatchOutsideResults = removed
 		} else {
@@ -184,85 +196,55 @@ func (hc *HeapCollector) collectSingle(ctx *search.SearchContext, reader index.I
 	return nil
 }
 
-func (hc *HeapCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
+// SetFacetsBuilder registers a facet builder for this collector
+func (hc *TopNCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
 	hc.facetsBuilder = facetsBuilder
 }
 
 // finalizeResults starts with the heap containing the final top size+skip
 // it now throws away the results to be skipped
 // and does final doc id lookup (if necessary)
-func (hc *HeapCollector) finalizeResults(r index.IndexReader) error {
-	count := hc.Len()
-	size := count - hc.skip
-	rv := make(search.DocumentMatchCollection, size)
-	for count > 0 {
-		count--
-
-		if count >= hc.skip {
-			size--
-			doc := heap.Pop(hc).(*search.DocumentMatch)
-			rv[size] = doc
-			if doc.ID == "" {
-				// look up the id since we need it for lookup
-				var err error
-				doc.ID, err = r.FinalizeDocID(doc.IndexInternalID)
-				if err != nil {
-					return err
-				}
+func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
+	var err error
+	hc.results, err = hc.store.Final(hc.skip, func(doc *search.DocumentMatch) error {
+		if doc.ID == "" {
+			// look up the id since we need it for lookup
+			var err error
+			doc.ID, err = r.FinalizeDocID(doc.IndexInternalID)
+			if err != nil {
+				return err
 			}
 		}
-	}
+		return nil
+	})
 
-	// no longer a heap
-	hc.results = rv
-
-	return nil
+	return err
 }
 
-func (hc *HeapCollector) Results() search.DocumentMatchCollection {
+// Results returns the collected hits
+func (hc *TopNCollector) Results() search.DocumentMatchCollection {
 	return hc.results
 }
 
-func (hc *HeapCollector) Total() uint64 {
+// Total returns the total number of hits
+func (hc *TopNCollector) Total() uint64 {
 	return hc.total
 }
 
-func (hc *HeapCollector) MaxScore() float64 {
+// MaxScore returns the maximum score seen across all the hits
+func (hc *TopNCollector) MaxScore() float64 {
 	return hc.maxScore
 }
 
-func (hc *HeapCollector) Took() time.Duration {
+// Took returns the time spent collecting hits
+func (hc *TopNCollector) Took() time.Duration {
 	return hc.took
 }
 
-func (hc *HeapCollector) FacetResults() search.FacetResults {
+// FacetResults returns the computed facets results
+func (hc *TopNCollector) FacetResults() search.FacetResults {
 	if hc.facetsBuilder != nil {
 		return hc.facetsBuilder.Results()
 	}
 	return search.FacetResults{}
-}
-
-// heap interface implementation
-
-func (hc *HeapCollector) Len() int {
-	return len(hc.results)
-}
-
-func (hc *HeapCollector) Less(i, j int) bool {
-	so := hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, hc.results[i], hc.results[j])
-	return -so < 0
-}
-
-func (hc *HeapCollector) Swap(i, j int) {
-	hc.results[i], hc.results[j] = hc.results[j], hc.results[i]
-}
-
-func (hc *HeapCollector) Push(x interface{}) {
-	hc.results = append(hc.results, x.(*search.DocumentMatch))
-}
-
-func (hc *HeapCollector) Pop() interface{} {
-	var rv *search.DocumentMatch
-	rv, hc.results = hc.results[len(hc.results)-1], hc.results[:len(hc.results)-1]
-	return rv
 }
