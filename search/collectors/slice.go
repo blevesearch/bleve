@@ -33,9 +33,6 @@ func (c *collectStoreSlice) Add(doc *search.DocumentMatch) {
 			break
 		}
 	}
-	if i < 0 {
-		i = 0
-	}
 	// insert at i
 	c.slice = append(c.slice, nil)
 	copy(c.slice[i+1:], c.slice[i:])
