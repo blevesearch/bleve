@@ -110,6 +110,8 @@ func (hc *HeapCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	return nil
 }
 
+var sortByScoreOpt = []string{"_score"}
+
 func (hc *HeapCollector) collectSingle(ctx *search.SearchContext, reader index.IndexReader, d *search.DocumentMatch) error {
 	// increment total hits
 	hc.total++
@@ -146,7 +148,9 @@ func (hc *HeapCollector) collectSingle(ctx *search.SearchContext, reader index.I
 	}
 
 	// compute this hits sort value
-	if len(hc.sort) > 1 || len(hc.sort) == 1 && !hc.cachedScoring[0] {
+	if len(hc.sort) == 1 && hc.cachedScoring[0] {
+		d.Sort = sortByScoreOpt
+	} else {
 		hc.sort.Value(d)
 	}
 
