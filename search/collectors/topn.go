@@ -17,6 +17,10 @@ import (
 	"golang.org/x/net/context"
 )
 
+// PreAllocSizeSkipCap will cap preallocation to this amount when
+// size+skip exceeds this value
+const PreAllocSizeSkipCap = 1000
+
 type collectorCompare func(i, j *search.DocumentMatch) int
 
 type collectorFixup func(d *search.DocumentMatch) error
@@ -50,9 +54,16 @@ const CheckDoneEvery = uint64(1024)
 // ordering hits by the provided sort order
 func NewTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector {
 	hc := &TopNCollector{size: size, skip: skip, sort: sort}
-	// pre-allocate space on the heap, we need size+skip results
-	// +1 additional while figuring out which to evict
-	hc.store = newStoreSlice(size+skip+1, func(i, j *search.DocumentMatch) int {
+
+	// pre-allocate space on the store to avoid reslicing
+	// unless the size + skip is too large, then cap it
+	// everything should still work, just reslices as necessary
+	backingSize := size + skip + 1
+	if size+skip > PreAllocSizeSkipCap {
+		backingSize = PreAllocSizeSkipCap + 1
+	}
+
+	hc.store = newStoreSlice(backingSize, func(i, j *search.DocumentMatch) int {
 		return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
 	})
 
@@ -73,12 +84,15 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	var err error
 	var next *search.DocumentMatch
 
-	// search context with enough pre-allocated document matches
-	// we keep references to size+skip ourselves
-	// plus possibly one extra for the highestMatchOutsideResults
-	// plus the amount required by the searcher tree
+	// pre-allocate enough space in the DocumentMatchPool
+	// unless the size + skip is too large, then cap it
+	// everything should still work, just allocates DocumentMatches on demand
+	backingSize := hc.size + hc.skip + 1
+	if hc.size+hc.skip > PreAllocSizeSkipCap {
+		backingSize = PreAllocSizeSkipCap + 1
+	}
 	searchContext := &search.SearchContext{
-		DocumentMatchPool: search.NewDocumentMatchPool(hc.size+hc.skip+1+searcher.DocumentMatchPoolSize(), len(hc.sort)),
+		DocumentMatchPool: search.NewDocumentMatchPool(backingSize+searcher.DocumentMatchPoolSize(), len(hc.sort)),
 	}
 
 	select {
