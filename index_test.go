@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 	"reflect"
 	"sort"
@@ -1666,5 +1667,69 @@ func TestOpenReadonlyMultiple(t *testing.T) {
 	err = index2.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestBug408 tests for VERY large values of size, even though actual result
+// set may be reasonable size
+func TestBug408(t *testing.T) {
+	type TestStruct struct {
+		ID     string  `json:"id"`
+		UserID *string `json:"user_id"`
+	}
+
+	docMapping := NewDocumentMapping()
+	docMapping.AddFieldMappingsAt("id", NewTextFieldMapping())
+	docMapping.AddFieldMappingsAt("user_id", NewTextFieldMapping())
+
+	indexMapping := NewIndexMapping()
+	indexMapping.DefaultMapping = docMapping
+
+	index, err := New("", indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	numToTest := 10
+	matchUserID := "match"
+	noMatchUserID := "no_match"
+	matchingDocIds := make(map[string]struct{})
+
+	for i := 0; i < numToTest; i++ {
+		ds := &TestStruct{"id_" + strconv.Itoa(i), nil}
+		if i%2 == 0 {
+			ds.UserID = &noMatchUserID
+		} else {
+			ds.UserID = &matchUserID
+			matchingDocIds[ds.ID] = struct{}{}
+		}
+		err = index.Index(ds.ID, ds)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cnt, err := index.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if int(cnt) != numToTest {
+		t.Fatalf("expected %d documents in index, got %d", numToTest, cnt)
+	}
+
+	q := NewTermQuery(matchUserID).SetField("user_id")
+	searchReq := NewSearchRequestOptions(q, math.MaxInt32, 0, false)
+	results, err := index.Search(searchReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if int(results.Total) != numToTest/2 {
+		t.Fatalf("expected %d search hits, got %d", numToTest/2, results.Total)
+	}
+
+	for _, result := range results.Hits {
+		if _, found := matchingDocIds[result.ID]; !found {
+			t.Fatalf("document with ID %s not in results as expected", result.ID)
+		}
 	}
 }
