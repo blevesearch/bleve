@@ -19,7 +19,7 @@ import (
 
 // PreAllocSizeSkipCap will cap preallocation to this amount when
 // size+skip exceeds this value
-const PreAllocSizeSkipCap = 1000
+var PreAllocSizeSkipCap = 1000
 
 type collectorCompare func(i, j *search.DocumentMatch) int
 
