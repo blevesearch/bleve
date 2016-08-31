@@ -21,7 +21,7 @@ done
 
 # collect integration test coverage
 echo "mode: count" > integration-acc.out
-INTPACKS=`go list ./... | grep -v vendor | grep -v utils | xargs | sed 's/ /,/g'`
+INTPACKS=`go list ./... | grep -v vendor | grep -v utils | grep -v 'store/test' | xargs | sed 's/ /,/g'`
 returnval=`go test -coverpkg=$INTPACKS -coverprofile=profile.out -covermode=count ./test`
 if [[ ${returnval} != *FAIL* ]]
 then
