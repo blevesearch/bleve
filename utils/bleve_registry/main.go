@@ -45,9 +45,6 @@ func printRegistry() {
 	types, instances = registry.KVStoreTypesAndInstances()
 	printType("KV Store", types, instances)
 
-	types, instances = registry.ByteArrayConverterTypesAndInstances()
-	printType("ByteArrayConverter", types, instances)
-
 	types, instances = registry.FragmentFormatterTypesAndInstances()
 	printType("Fragment Formatter", types, instances)
 
