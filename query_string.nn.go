@@ -1349,10 +1349,11 @@ OUTER0:
 			{
 				lval.s = yylex.Text()[1:]
 				logDebugTokens("TILDENUMBER - %s", lval.s)
-				return tTILDENUMBER
+				return tTILDE
 			}
 		case 11:
 			{
+				lval.s = "1"
 				logDebugTokens("TILDE")
 				return tTILDE
 			}

@@ -19,12 +19,12 @@ f float64
 q Query}
 
 %token tSTRING tPHRASE tPLUS tMINUS tCOLON tBOOST tLPAREN tRPAREN tNUMBER tSTRING tGREATER tLESS
-tEQUAL tTILDE tTILDENUMBER
+tEQUAL tTILDE
 
 %type <s>                tSTRING
 %type <s>                tPHRASE
 %type <s>                tNUMBER
-%type <s>                tTILDENUMBER
+%type <s>                tTILDE
 %type <q>                searchBase
 %type <f>                searchSuffix
 %type <n>                searchPrefix
@@ -100,36 +100,18 @@ tSTRING {
 |
 tSTRING tTILDE {
 	str := $1
-	logDebugGrammar("FUZZY STRING - %s", str)
+	fuzziness, _ := strconv.ParseFloat($2, 64)
+	logDebugGrammar("FUZZY STRING - %s %f", str, fuzziness)
 	q := NewMatchQuery(str)
-	q.SetFuzziness(1)
+	q.SetFuzziness(int(fuzziness))
 	$$ = q
 }
 |
 tSTRING tCOLON tSTRING tTILDE {
 	field := $1
 	str := $3
-	logDebugGrammar("FIELD - %s FUZZY STRING - %s", field, str)
-	q := NewMatchQuery(str)
-	q.SetFuzziness(1)
-	q.SetField(field)
-	$$ = q
-}
-|
-tSTRING tTILDENUMBER {
-	str := $1
-	fuzziness, _ := strconv.ParseFloat($2, 64)
-	logDebugGrammar("FUZZY STRING - %s", str)
-	q := NewMatchQuery(str)
-	q.SetFuzziness(int(fuzziness))
-	$$ = q
-}
-|
-tSTRING tCOLON tSTRING tTILDENUMBER {
-	field := $1
-	str := $3
 	fuzziness, _ := strconv.ParseFloat($4, 64)
-	logDebugGrammar("FIELD - %s FUZZY-%f STRING - %s", field, fuzziness, str)
+	logDebugGrammar("FIELD - %s FUZZY STRING - %s %f", field, str, fuzziness)
 	q := NewMatchQuery(str)
 	q.SetFuzziness(int(fuzziness))
 	q.SetField(field)
