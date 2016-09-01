@@ -1,6 +1,7 @@
 %{
 package bleve
 import (
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -18,7 +19,7 @@ n int
 f float64
 q Query}
 
-%token tSTRING tPHRASE tPLUS tMINUS tCOLON tBOOST tLPAREN tRPAREN tNUMBER tSTRING tGREATER tLESS
+%token tSTRING tPHRASE tPLUS tMINUS tCOLON tBOOST tNUMBER tSTRING tGREATER tLESS
 tEQUAL tTILDE
 
 %type <s>                tSTRING
@@ -93,7 +94,10 @@ tSTRING {
 |
 tSTRING tTILDE {
 	str := $1
-	fuzziness, _ := strconv.ParseFloat($2, 64)
+	fuzziness, err := strconv.ParseFloat($2, 64)
+	if err != nil {
+	  yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid fuzziness value: %v", err))
+	}
 	logDebugGrammar("FUZZY STRING - %s %f", str, fuzziness)
 	q := NewMatchQuery(str)
 	q.SetFuzziness(int(fuzziness))
@@ -103,7 +107,10 @@ tSTRING tTILDE {
 tSTRING tCOLON tSTRING tTILDE {
 	field := $1
 	str := $3
-	fuzziness, _ := strconv.ParseFloat($4, 64)
+	fuzziness, err := strconv.ParseFloat($4, 64)
+	if err != nil {
+		yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid fuzziness value: %v", err))
+	}
 	logDebugGrammar("FIELD - %s FUZZY STRING - %s %f", field, str, fuzziness)
 	q := NewMatchQuery(str)
 	q.SetFuzziness(int(fuzziness))
@@ -239,7 +246,10 @@ searchSuffix:
 }
 |
 tBOOST {
-	boost, _ := strconv.ParseFloat($1, 64)
+	boost, err := strconv.ParseFloat($1, 64)
+	if err != nil {
+	  yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid boost value: %v", err))
+	}
 	$$ = boost
 	logDebugGrammar("BOOST %f", boost)
 };

@@ -4,6 +4,7 @@ import __yyfmt__ "fmt"
 
 //line query_string.y:2
 import (
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -14,7 +15,7 @@ func logDebugGrammar(format string, v ...interface{}) {
 	}
 }
 
-//line query_string.y:15
+//line query_string.y:16
 type yySymType struct {
 	yys int
 	s   string
@@ -29,13 +30,11 @@ const tPLUS = 57348
 const tMINUS = 57349
 const tCOLON = 57350
 const tBOOST = 57351
-const tLPAREN = 57352
-const tRPAREN = 57353
-const tNUMBER = 57354
-const tGREATER = 57355
-const tLESS = 57356
-const tEQUAL = 57357
-const tTILDE = 57358
+const tNUMBER = 57352
+const tGREATER = 57353
+const tLESS = 57354
+const tEQUAL = 57355
+const tTILDE = 57356
 
 var yyToknames = [...]string{
 	"$end",
@@ -47,8 +46,6 @@ var yyToknames = [...]string{
 	"tMINUS",
 	"tCOLON",
 	"tBOOST",
-	"tLPAREN",
-	"tRPAREN",
 	"tNUMBER",
 	"tGREATER",
 	"tLESS",
@@ -77,25 +74,25 @@ const yyPrivate = 57344
 var yyTokenNames []string
 var yyStates []string
 
-const yyLast = 32
+const yyLast = 31
 
 var yyAct = [...]int{
 
-	16, 18, 21, 13, 27, 24, 3, 1, 17, 19,
-	20, 25, 22, 15, 26, 23, 9, 11, 31, 29,
-	4, 14, 5, 6, 10, 30, 28, 2, 12, 8,
-	0, 7,
+	16, 18, 21, 13, 27, 24, 17, 19, 20, 25,
+	22, 15, 26, 23, 9, 11, 31, 14, 29, 3,
+	10, 30, 2, 28, 5, 6, 7, 1, 4, 12,
+	8,
 }
 var yyPact = [...]int{
 
-	16, -1000, -1000, 16, 12, -1000, -1000, -1000, -6, 5,
-	-1000, -1000, -1000, -1000, -1000, -4, -14, -1000, -1000, 0,
-	-1, -1000, -1000, 14, -1000, -1000, 13, -1000, -1000, -1000,
+	18, -1000, -1000, 18, 10, -1000, -1000, -1000, -6, 3,
+	-1000, -1000, -1000, -1000, -1000, -4, -12, -1000, -1000, 0,
+	-1, -1000, -1000, 13, -1000, -1000, 11, -1000, -1000, -1000,
 	-1000, -1000,
 }
 var yyPgo = [...]int{
 
-	0, 29, 28, 20, 7, 27, 6,
+	0, 30, 29, 28, 27, 22, 19,
 }
 var yyR1 = [...]int{
 
@@ -112,9 +109,9 @@ var yyR2 = [...]int{
 var yyChk = [...]int{
 
 	-1000, -4, -5, -6, -3, 6, 7, -5, -1, 4,
-	12, 5, -2, 9, 16, 8, 4, 12, 5, 13,
-	14, 16, 12, 15, 5, 12, 15, 5, 12, 5,
-	12, 5,
+	10, 5, -2, 9, 14, 8, 4, 10, 5, 11,
+	12, 14, 10, 13, 5, 10, 13, 5, 10, 5,
+	10, 5,
 }
 var yyDef = [...]int{
 
@@ -130,7 +127,7 @@ var yyTok1 = [...]int{
 var yyTok2 = [...]int{
 
 	2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-	12, 13, 14, 15, 16,
+	12, 13, 14,
 }
 var yyTok3 = [...]int{
 	0,
@@ -475,25 +472,25 @@ yydefault:
 
 	case 1:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:36
+		//line query_string.y:37
 		{
 			logDebugGrammar("INPUT")
 		}
 	case 2:
 		yyDollar = yyS[yypt-2 : yypt+1]
-		//line query_string.y:41
+		//line query_string.y:42
 		{
 			logDebugGrammar("SEARCH PARTS")
 		}
 	case 3:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:45
+		//line query_string.y:46
 		{
 			logDebugGrammar("SEARCH PART")
 		}
 	case 4:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:50
+		//line query_string.y:51
 		{
 			query := yyDollar[2].q
 			query.SetBoost(yyDollar[3].f)
@@ -508,27 +505,27 @@ yydefault:
 		}
 	case 5:
 		yyDollar = yyS[yypt-0 : yypt+1]
-		//line query_string.y:65
+		//line query_string.y:66
 		{
 			yyVAL.n = queryShould
 		}
 	case 6:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:69
+		//line query_string.y:70
 		{
 			logDebugGrammar("PLUS")
 			yyVAL.n = queryMust
 		}
 	case 7:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:74
+		//line query_string.y:75
 		{
 			logDebugGrammar("MINUS")
 			yyVAL.n = queryMustNot
 		}
 	case 8:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:80
+		//line query_string.y:81
 		{
 			str := yyDollar[1].s
 			logDebugGrammar("STRING - %s", str)
@@ -544,10 +541,13 @@ yydefault:
 		}
 	case 9:
 		yyDollar = yyS[yypt-2 : yypt+1]
-		//line query_string.y:94
+		//line query_string.y:95
 		{
 			str := yyDollar[1].s
-			fuzziness, _ := strconv.ParseFloat(yyDollar[2].s, 64)
+			fuzziness, err := strconv.ParseFloat(yyDollar[2].s, 64)
+			if err != nil {
+				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid fuzziness value: %v", err))
+			}
 			logDebugGrammar("FUZZY STRING - %s %f", str, fuzziness)
 			q := NewMatchQuery(str)
 			q.SetFuzziness(int(fuzziness))
@@ -555,11 +555,14 @@ yydefault:
 		}
 	case 10:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:103
+		//line query_string.y:107
 		{
 			field := yyDollar[1].s
 			str := yyDollar[3].s
-			fuzziness, _ := strconv.ParseFloat(yyDollar[4].s, 64)
+			fuzziness, err := strconv.ParseFloat(yyDollar[4].s, 64)
+			if err != nil {
+				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid fuzziness value: %v", err))
+			}
 			logDebugGrammar("FIELD - %s FUZZY STRING - %s %f", field, str, fuzziness)
 			q := NewMatchQuery(str)
 			q.SetFuzziness(int(fuzziness))
@@ -568,7 +571,7 @@ yydefault:
 		}
 	case 11:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:114
+		//line query_string.y:121
 		{
 			str := yyDollar[1].s
 			logDebugGrammar("STRING - %s", str)
@@ -577,7 +580,7 @@ yydefault:
 		}
 	case 12:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:121
+		//line query_string.y:128
 		{
 			phrase := yyDollar[1].s
 			logDebugGrammar("PHRASE - %s", phrase)
@@ -586,7 +589,7 @@ yydefault:
 		}
 	case 13:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:128
+		//line query_string.y:135
 		{
 			field := yyDollar[1].s
 			str := yyDollar[3].s
@@ -604,7 +607,7 @@ yydefault:
 		}
 	case 14:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:144
+		//line query_string.y:151
 		{
 			field := yyDollar[1].s
 			str := yyDollar[3].s
@@ -614,7 +617,7 @@ yydefault:
 		}
 	case 15:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:152
+		//line query_string.y:159
 		{
 			field := yyDollar[1].s
 			phrase := yyDollar[3].s
@@ -624,7 +627,7 @@ yydefault:
 		}
 	case 16:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:160
+		//line query_string.y:167
 		{
 			field := yyDollar[1].s
 			min, _ := strconv.ParseFloat(yyDollar[4].s, 64)
@@ -635,7 +638,7 @@ yydefault:
 		}
 	case 17:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:169
+		//line query_string.y:176
 		{
 			field := yyDollar[1].s
 			min, _ := strconv.ParseFloat(yyDollar[5].s, 64)
@@ -646,7 +649,7 @@ yydefault:
 		}
 	case 18:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:178
+		//line query_string.y:185
 		{
 			field := yyDollar[1].s
 			max, _ := strconv.ParseFloat(yyDollar[4].s, 64)
@@ -657,7 +660,7 @@ yydefault:
 		}
 	case 19:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:187
+		//line query_string.y:194
 		{
 			field := yyDollar[1].s
 			max, _ := strconv.ParseFloat(yyDollar[5].s, 64)
@@ -668,7 +671,7 @@ yydefault:
 		}
 	case 20:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:196
+		//line query_string.y:203
 		{
 			field := yyDollar[1].s
 			minInclusive := false
@@ -680,7 +683,7 @@ yydefault:
 		}
 	case 21:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:206
+		//line query_string.y:213
 		{
 			field := yyDollar[1].s
 			minInclusive := true
@@ -692,7 +695,7 @@ yydefault:
 		}
 	case 22:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:216
+		//line query_string.y:223
 		{
 			field := yyDollar[1].s
 			maxInclusive := false
@@ -704,7 +707,7 @@ yydefault:
 		}
 	case 23:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:226
+		//line query_string.y:233
 		{
 			field := yyDollar[1].s
 			maxInclusive := true
@@ -716,15 +719,18 @@ yydefault:
 		}
 	case 24:
 		yyDollar = yyS[yypt-0 : yypt+1]
-		//line query_string.y:237
+		//line query_string.y:244
 		{
 			yyVAL.f = 1.0
 		}
 	case 25:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:241
+		//line query_string.y:248
 		{
-			boost, _ := strconv.ParseFloat(yyDollar[1].s, 64)
+			boost, err := strconv.ParseFloat(yyDollar[1].s, 64)
+			if err != nil {
+				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid boost value: %v", err))
+			}
 			yyVAL.f = boost
 			logDebugGrammar("BOOST %f", boost)
 		}

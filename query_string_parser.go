@@ -7,11 +7,6 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-//go:generate nex query_string.nex
-//go:generate sed -i "" -e s/Lexer/lexer/g query_string.nn.go
-//go:generate sed -i "" -e s/Newlexer/newLexer/g query_string.nn.go
-//go:generate sed -i "" -e s/debuglexer/debugLexer/g query_string.nn.go
-//go:generate go fmt query_string.nn.go
 //go:generate go tool yacc -o query_string.y.go query_string.y
 //go:generate sed -i "" -e 1d query_string.y.go
 
@@ -26,21 +21,20 @@ var debugParser bool
 var debugLexer bool
 
 func parseQuerySyntax(query string) (rq Query, err error) {
-	lex := newLexerWrapper(newLexer(strings.NewReader(query)))
+	lex := newLexerWrapper(newQueryStringLex(strings.NewReader(query)))
 	doParse(lex)
 
 	if len(lex.errs) > 0 {
 		return nil, fmt.Errorf(strings.Join(lex.errs, "\n"))
-	} else {
-		return lex.query, nil
 	}
+	return lex.query, nil
 }
 
 func doParse(lex *lexerWrapper) {
 	defer func() {
 		r := recover()
 		if r != nil {
-			lex.Error("Errors while parsing.")
+			lex.errs = append(lex.errs, fmt.Sprintf("parse error: %v", r))
 		}
 	}()
 
@@ -54,23 +48,22 @@ const (
 )
 
 type lexerWrapper struct {
-	nex   yyLexer
+	lex   yyLexer
 	errs  []string
 	query *booleanQuery
 }
 
-func newLexerWrapper(nex yyLexer) *lexerWrapper {
+func newLexerWrapper(lex yyLexer) *lexerWrapper {
 	return &lexerWrapper{
-		nex:   nex,
-		errs:  []string{},
+		lex:   lex,
 		query: NewBooleanQuery(nil, nil, nil),
 	}
 }
 
-func (this *lexerWrapper) Lex(lval *yySymType) int {
-	return this.nex.Lex(lval)
+func (l *lexerWrapper) Lex(lval *yySymType) int {
+	return l.lex.Lex(lval)
 }
 
-func (this *lexerWrapper) Error(s string) {
-	this.errs = append(this.errs, s)
+func (l *lexerWrapper) Error(s string) {
+	l.errs = append(l.errs, s)
 }

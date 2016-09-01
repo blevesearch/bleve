@@ -406,17 +406,142 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				},
 				nil),
 		},
+
+		// tests for escaping
+
+		// escape : as field delimeter
+		{
+			input:   `name\:marty`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("name:marty"),
+				},
+				nil),
+		},
+		// first colon delimiter, second escaped
+		{
+			input:   `name:marty\:couchbase`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("marty:couchbase").SetField("name"),
+				},
+				nil),
+		},
+		// escape space, single arguemnt to match query
+		{
+			input:   `marty\ couchbase`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("marty couchbase"),
+				},
+				nil),
+		},
+		// escape leading plus, not a must clause
+		{
+			input:   `\+marty`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("+marty"),
+				},
+				nil),
+		},
+		// escape leading minus, not a must not clause
+		{
+			input:   `\-marty`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery("-marty"),
+				},
+				nil),
+		},
+		// escape quote inside of phrase
+		{
+			input:   `"what does \"quote\" mean"`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchPhraseQuery(`what does "quote" mean`),
+				},
+				nil),
+		},
+		// escaping an unsupported character retains backslash
+		{
+			input:   `can\ i\ escap\e`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery(`can i escap\e`),
+				},
+				nil),
+		},
+		// leading spaces
+		{
+			input:   `   what`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery(`what`),
+				},
+				nil),
+		},
+		// no boost value defaults to 1
+		{
+			input:   `term^`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery(`term`),
+				},
+				nil),
+		},
+		// weird lexer cases, something that starts like a number
+		// but contains escape and ends up as string
+		{
+			input:   `3.0\:`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery(`3.0:`),
+				},
+				nil),
+		},
+		{
+			input:   `3.0\a`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewMatchQuery(`3.0\a`),
+				},
+				nil),
+		},
 	}
 
 	// turn on lexer debugging
 	// debugLexer = true
-	// logger = log.New(os.Stderr, "bleve", log.LstdFlags)
+	// debugParser = true
+	// logger = log.New(os.Stderr, "bleve ", log.LstdFlags)
 
 	for _, test := range tests {
 
 		q, err := parseQuerySyntax(test.input)
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(q, test.result) {
 			t.Errorf("Expected %#v, got %#v: for %s", test.result, q, test.input)
@@ -440,6 +565,11 @@ func TestQuerySyntaxParserInvalid(t *testing.T) {
 		{"field:~text"},
 		{"field:^text"},
 		{"field::text"},
+		{`"this is the time`},
+		{`cat^3\:`},
+		{`cat^3\0`},
+		{`cat~3\:`},
+		{`cat~3\0`},
 	}
 
 	// turn on lexer debugging
@@ -460,7 +590,7 @@ func BenchmarkLexer(b *testing.B) {
 		var tokenTypes []int
 		var tokens []yySymType
 		r := strings.NewReader(`+field4:"test phrase 1"`)
-		l := newLexer(r)
+		l := newQueryStringLex(r)
 		var lval yySymType
 		rv := l.Lex(&lval)
 		for rv > 0 {
