@@ -8,7 +8,12 @@
 //  and limitations under the License.
 
 //go:generate go tool yacc -o query_string.y.go query_string.y
-//go:generate sed -i "" -e 1d query_string.y.go
+//go:generate sed -i.tmp -e 1d query_string.y.go
+//go:generate rm query_string.y.go.tmp
+
+// note: OSX sed and gnu sed handle the -i (in-place) option differently.
+// using -i.tmp works on both, at the expense of having to remove
+// the unsightly .tmp files
 
 package bleve
 
