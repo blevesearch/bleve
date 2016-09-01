@@ -6,12 +6,21 @@
 /\+/              { logDebugTokens("PLUS"); return tPLUS }
 /-/               { logDebugTokens("MINUS"); return tMINUS }
 /:/               { logDebugTokens("COLON"); return tCOLON }
-/\^/               { logDebugTokens("BOOST"); return tBOOST }
 /\(/              { logDebugTokens("LPAREN"); return tLPAREN }
 /\)/              { logDebugTokens("RPAREN"); return tRPAREN }
 />/              { logDebugTokens("GREATER"); return tGREATER }
 /</              { logDebugTokens("LESS"); return tLESS }
 /=/              { logDebugTokens("EQUAL"); return tEQUAL }
+/\^([0-9]|[1-9][0-9]*)(\.[0-9][0-9]*)?/
+                  {
+                    lval.s = yylex.Text()[1:]
+                    logDebugTokens("BOOST");
+                    return tBOOST }
+/\^/              {
+                    lval.s = "1"
+                    logDebugTokens("BOOST");
+                    return tBOOST
+                  }
 /~([0-9]|[1-9][0-9]*)/
                   {
                     lval.s = yylex.Text()[1:]

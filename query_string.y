@@ -25,10 +25,10 @@ tEQUAL tTILDE
 %type <s>                tPHRASE
 %type <s>                tNUMBER
 %type <s>                tTILDE
+%type <s>                tBOOST
 %type <q>                searchBase
 %type <f>                searchSuffix
 %type <n>                searchPrefix
-%type <f>                searchBoost
 
 %%
 
@@ -233,18 +233,13 @@ tSTRING tCOLON tLESS tEQUAL tPHRASE {
 	$$ = q
 };
 
-searchBoost:
-tBOOST tNUMBER {
-	boost, _ := strconv.ParseFloat($2, 64)
-	$$ = boost
-	logDebugGrammar("BOOST %f", boost)
-};
-
 searchSuffix:
 /* empty */ {
 	$$ = 1.0
 }
 |
-searchBoost {
-
+tBOOST {
+	boost, _ := strconv.ParseFloat($1, 64)
+	$$ = boost
+	logDebugGrammar("BOOST %f", boost)
 };

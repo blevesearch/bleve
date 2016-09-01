@@ -779,24 +779,6 @@ func newLexerWithInit(in io.Reader, initFun func(*lexer)) *lexer {
 			},
 		}, []int{ /* Start-of-input transitions */ -1, -1}, []int{ /* End-of-input transitions */ -1, -1}, nil},
 
-		// \^
-		{[]bool{false, true}, []func(rune) int{ // Transitions
-			func(r rune) int {
-				switch r {
-				case 94:
-					return 1
-				}
-				return -1
-			},
-			func(r rune) int {
-				switch r {
-				case 94:
-					return -1
-				}
-				return -1
-			},
-		}, []int{ /* Start-of-input transitions */ -1, -1}, []int{ /* End-of-input transitions */ -1, -1}, nil},
-
 		// \(
 		{[]bool{false, true}, []func(rune) int{ // Transitions
 			func(r rune) int {
@@ -881,6 +863,148 @@ func newLexerWithInit(in io.Reader, initFun func(*lexer)) *lexer {
 			func(r rune) int {
 				switch r {
 				case 61:
+					return -1
+				}
+				return -1
+			},
+		}, []int{ /* Start-of-input transitions */ -1, -1}, []int{ /* End-of-input transitions */ -1, -1}, nil},
+
+		// \^([0-9]|[1-9][0-9]*)(\.[0-9][0-9]*)?
+		{[]bool{false, false, true, true, false, true, true, true}, []func(rune) int{ // Transitions
+			func(r rune) int {
+				switch r {
+				case 46:
+					return -1
+				case 94:
+					return 1
+				}
+				switch {
+				case 48 <= r && r <= 48:
+					return -1
+				case 49 <= r && r <= 57:
+					return -1
+				}
+				return -1
+			},
+			func(r rune) int {
+				switch r {
+				case 46:
+					return -1
+				case 94:
+					return -1
+				}
+				switch {
+				case 48 <= r && r <= 48:
+					return 2
+				case 49 <= r && r <= 57:
+					return 3
+				}
+				return -1
+			},
+			func(r rune) int {
+				switch r {
+				case 46:
+					return 4
+				case 94:
+					return -1
+				}
+				switch {
+				case 48 <= r && r <= 48:
+					return -1
+				case 49 <= r && r <= 57:
+					return -1
+				}
+				return -1
+			},
+			func(r rune) int {
+				switch r {
+				case 46:
+					return 4
+				case 94:
+					return -1
+				}
+				switch {
+				case 48 <= r && r <= 48:
+					return 5
+				case 49 <= r && r <= 57:
+					return 5
+				}
+				return -1
+			},
+			func(r rune) int {
+				switch r {
+				case 46:
+					return -1
+				case 94:
+					return -1
+				}
+				switch {
+				case 48 <= r && r <= 48:
+					return 6
+				case 49 <= r && r <= 57:
+					return 6
+				}
+				return -1
+			},
+			func(r rune) int {
+				switch r {
+				case 46:
+					return 4
+				case 94:
+					return -1
+				}
+				switch {
+				case 48 <= r && r <= 48:
+					return 5
+				case 49 <= r && r <= 57:
+					return 5
+				}
+				return -1
+			},
+			func(r rune) int {
+				switch r {
+				case 46:
+					return -1
+				case 94:
+					return -1
+				}
+				switch {
+				case 48 <= r && r <= 48:
+					return 7
+				case 49 <= r && r <= 57:
+					return 7
+				}
+				return -1
+			},
+			func(r rune) int {
+				switch r {
+				case 46:
+					return -1
+				case 94:
+					return -1
+				}
+				switch {
+				case 48 <= r && r <= 48:
+					return 7
+				case 49 <= r && r <= 57:
+					return 7
+				}
+				return -1
+			},
+		}, []int{ /* Start-of-input transitions */ -1, -1, -1, -1, -1, -1, -1, -1}, []int{ /* End-of-input transitions */ -1, -1, -1, -1, -1, -1, -1, -1}, nil},
+
+		// \^
+		{[]bool{false, true}, []func(rune) int{ // Transitions
+			func(r rune) int {
+				switch r {
+				case 94:
+					return 1
+				}
+				return -1
+			},
+			func(r rune) int {
+				switch r {
+				case 94:
 					return -1
 				}
 				return -1
@@ -1317,57 +1441,64 @@ OUTER0:
 			}
 		case 4:
 			{
-				logDebugTokens("BOOST")
-				return tBOOST
-			}
-		case 5:
-			{
 				logDebugTokens("LPAREN")
 				return tLPAREN
 			}
-		case 6:
+		case 5:
 			{
 				logDebugTokens("RPAREN")
 				return tRPAREN
 			}
-		case 7:
+		case 6:
 			{
 				logDebugTokens("GREATER")
 				return tGREATER
 			}
-		case 8:
+		case 7:
 			{
 				logDebugTokens("LESS")
 				return tLESS
 			}
-		case 9:
+		case 8:
 			{
 				logDebugTokens("EQUAL")
 				return tEQUAL
 			}
+		case 9:
+			{
+				lval.s = yylex.Text()[1:]
+				logDebugTokens("BOOST")
+				return tBOOST
+			}
 		case 10:
+			{
+				lval.s = "1"
+				logDebugTokens("BOOST")
+				return tBOOST
+			}
+		case 11:
 			{
 				lval.s = yylex.Text()[1:]
 				logDebugTokens("TILDENUMBER - %s", lval.s)
 				return tTILDE
 			}
-		case 11:
+		case 12:
 			{
 				lval.s = "1"
 				logDebugTokens("TILDE")
 				return tTILDE
 			}
-		case 12:
+		case 13:
 			{
 				lval.s = yylex.Text()
 				logDebugTokens("NUMBER - %s", lval.s)
 				return tNUMBER
 			}
-		case 13:
+		case 14:
 			{
 				logDebugTokens("WHITESPACE (count=%d)", len(yylex.Text())) /* eat up whitespace */
 			}
-		case 14:
+		case 15:
 			{
 				lval.s = yylex.Text()
 				logDebugTokens("STRING - %s", lval.s)
