@@ -3,11 +3,6 @@
                     logDebugTokens("PHRASE - %s", lval.s);
                     return tPHRASE
               }
-/\/((\\\")|(\\\\)|(\\\/)|(\\b)|(\\f)|(\\n)|(\\r)|(\\t)|(\\u[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F])|[^\/])*\//     {
-                    lval.s = yylex.Text()[1:len(yylex.Text())-1]
-                    logDebugTokens("REGEXP - %s", lval.s);
-                    return tREGEXP
-              }
 /\+/              { logDebugTokens("PLUS"); return tPLUS }
 /-/               { logDebugTokens("MINUS"); return tMINUS }
 /:/               { logDebugTokens("COLON"); return tCOLON }
@@ -31,15 +26,10 @@
                     return tNUMBER
                   }
 /[ \t\n]+/        { logDebugTokens("WHITESPACE (count=%d)", len(yylex.Text())) /* eat up whitespace */ }
-/[^\t\n\f\r :^\+\*\?><=~-][^\t\n\f\r :^~\*\?]*/           {
+/[^\t\n\f\r :^\+\*\?><=~-][^\t\n\f\r :^~]*/           {
                     lval.s = yylex.Text()
                     logDebugTokens("STRING - %s", lval.s);
                     return tSTRING
-                  }
-/[^\t\n\f\r :^\+\*\?><=~-][^\t\n\f\r :^~]*/           {
-                    lval.s = yylex.Text()
-                    logDebugTokens("WILD - %s", lval.s);
-                    return tWILD
                   }
 //
 package bleve

@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -365,6 +366,46 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				},
 				nil),
 		},
+		{
+			input:   `/mar.*ty/`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewRegexpQuery("mar.*ty"),
+				},
+				nil),
+		},
+		{
+			input:   `name:/mar.*ty/`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewRegexpQuery("mar.*ty").SetField("name"),
+				},
+				nil),
+		},
+		{
+			input:   `mart*`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewWildcardQuery("mart*"),
+				},
+				nil),
+		},
+		{
+			input:   `name:mart*`,
+			mapping: NewIndexMapping(),
+			result: NewBooleanQuery(
+				nil,
+				[]Query{
+					NewWildcardQuery("mart*").SetField("name"),
+				},
+				nil),
+		},
 	}
 
 	// turn on lexer debugging
@@ -411,4 +452,24 @@ func TestQuerySyntaxParserInvalid(t *testing.T) {
 			t.Errorf("expected error, got nil for `%s`", test.input)
 		}
 	}
+}
+
+func BenchmarkLexer(b *testing.B) {
+
+	for n := 0; n < b.N; n++ {
+		var tokenTypes []int
+		var tokens []yySymType
+		r := strings.NewReader(`+field4:"test phrase 1"`)
+		l := newLexer(r)
+		var lval yySymType
+		rv := l.Lex(&lval)
+		for rv > 0 {
+			tokenTypes = append(tokenTypes, rv)
+			tokens = append(tokens, lval)
+			lval.s = ""
+			lval.n = 0
+			rv = l.Lex(&lval)
+		}
+	}
+
 }
