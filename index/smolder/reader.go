@@ -10,8 +10,6 @@
 package smolder
 
 import (
-	"bytes"
-	"sort"
 	"sync/atomic"
 
 	"github.com/blevesearch/bleve/index"
@@ -133,8 +131,7 @@ func (r *SmolderingCouchTermFieldReader) Close() error {
 type SmolderingCouchDocIDReader struct {
 	indexReader *IndexReader
 	iterator    store.KVIterator
-	only        []string
-	onlyPos     int
+	only        map[string]struct{}
 	onlyMode    bool
 }
 
@@ -158,16 +155,14 @@ func newSmolderingCouchDocIDReader(indexReader *IndexReader, start, end string) 
 }
 
 func newSmolderingCouchDocIDReaderOnly(indexReader *IndexReader, ids []string) (*SmolderingCouchDocIDReader, error) {
-	// ensure ids are sorted
-	sort.Strings(ids)
+	// put ids into map
+	only := make(map[string]struct{}, len(ids))
+	for i := range ids {
+		only[ids[i]] = struct{}{}
+	}
+
 	startBytes := []byte{0x0}
-	if len(ids) > 0 {
-		startBytes = []byte(ids[0])
-	}
 	endBytes := []byte{0xff}
-	if len(ids) > 0 {
-		endBytes = incrementBytes([]byte(ids[len(ids)-1]))
-	}
 	bisrk := BackIndexRowKey(startBytes)
 	bierk := BackIndexRowKey(endBytes)
 	it := indexReader.kvreader.RangeIterator(bisrk, bierk)
@@ -175,7 +170,7 @@ func newSmolderingCouchDocIDReaderOnly(indexReader *IndexReader, ids []string) (
 	return &SmolderingCouchDocIDReader{
 		indexReader: indexReader,
 		iterator:    it,
-		only:        ids,
+		only:        only,
 		onlyMode:    true,
 	}, nil
 }
@@ -185,34 +180,26 @@ func (r *SmolderingCouchDocIDReader) Next() (index.IndexInternalID, error) {
 
 	if r.onlyMode {
 		var rv index.IndexInternalID
-		for valid && r.onlyPos < len(r.only) {
+		for valid {
 			br, err := NewBackIndexRowKV(key, val)
 			if err != nil {
 				return nil, err
 			}
-			if !bytes.Equal(br.docNumber, []byte(r.only[r.onlyPos])) {
-				ok := r.nextOnly()
-				if !ok {
-					return nil, nil
-				}
-				birk := BackIndexRowKey([]byte(r.only[r.onlyPos]))
-				r.iterator.Seek(birk)
-				key, val, valid = r.iterator.Current()
-				continue
-			} else {
-				rv = append([]byte(nil), br.docNumber...)
-				break
-			}
-		}
-		if valid && r.onlyPos < len(r.only) {
-			ok := r.nextOnly()
-			if ok {
-				birk := BackIndexRowKey([]byte(r.only[r.onlyPos]))
-				r.iterator.Seek(birk)
-			}
-			return rv, nil
-		}
 
+			// find doc id
+			for _, te := range br.termEntries {
+				if te.GetField() == 0 {
+					if _, ok := r.only[te.GetTerm()]; ok {
+						rv = append([]byte(nil), br.docNumber...)
+						r.iterator.Next()
+						return rv, nil
+					}
+					break
+				}
+			}
+			r.iterator.Next()
+			key, val, valid = r.iterator.Current()
+		}
 	} else {
 		if valid {
 			br, err := NewBackIndexRowKV(key, val)
@@ -231,35 +218,28 @@ func (r *SmolderingCouchDocIDReader) Advance(docID index.IndexInternalID) (index
 	birk := BackIndexRowKey(docID)
 	r.iterator.Seek(birk)
 	key, val, valid := r.iterator.Current()
-	r.onlyPos = sort.SearchStrings(r.only, string(docID))
 
 	if r.onlyMode {
 		var rv index.IndexInternalID
-		for valid && r.onlyPos < len(r.only) {
+		for valid {
 			br, err := NewBackIndexRowKV(key, val)
 			if err != nil {
 				return nil, err
 			}
-			if !bytes.Equal(br.docNumber, []byte(r.only[r.onlyPos])) {
-				ok := r.nextOnly()
-				if !ok {
-					return nil, nil
+
+			// find doc id
+			for _, te := range br.termEntries {
+				if te.GetField() == 0 {
+					if _, ok := r.only[te.GetTerm()]; ok {
+						rv = append([]byte(nil), br.docNumber...)
+						r.iterator.Next()
+						return rv, nil
+					}
+					break
 				}
-				birk := BackIndexRowKey([]byte(r.only[r.onlyPos]))
-				r.iterator.Seek(birk)
-				continue
-			} else {
-				rv = append([]byte(nil), br.docNumber...)
-				break
 			}
-		}
-		if valid && r.onlyPos < len(r.only) {
-			ok := r.nextOnly()
-			if ok {
-				birk := BackIndexRowKey([]byte(r.only[r.onlyPos]))
-				r.iterator.Seek(birk)
-			}
-			return rv, nil
+			r.iterator.Next()
+			key, val, valid = r.iterator.Current()
 		}
 	} else {
 		if valid {
@@ -278,20 +258,4 @@ func (r *SmolderingCouchDocIDReader) Advance(docID index.IndexInternalID) (index
 func (r *SmolderingCouchDocIDReader) Close() error {
 	atomic.AddUint64(&r.indexReader.index.stats.termSearchersFinished, uint64(1))
 	return r.iterator.Close()
-}
-
-// move the r.only pos forward one, skipping duplicates
-// return true if there is more data, or false if we got to the end of the list
-func (r *SmolderingCouchDocIDReader) nextOnly() bool {
-
-	// advance 1 position, until we see a different key
-	//   it's already sorted, so this skips duplicates
-	start := r.onlyPos
-	r.onlyPos++
-	for r.onlyPos < len(r.only) && r.only[r.onlyPos] == r.only[start] {
-		start = r.onlyPos
-		r.onlyPos++
-	}
-	// inidicate if we got to the end of the list
-	return r.onlyPos < len(r.only)
 }
