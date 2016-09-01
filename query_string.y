@@ -28,7 +28,6 @@ tEQUAL tTILDE
 %type <q>                searchBase
 %type <f>                searchSuffix
 %type <n>                searchPrefix
-%type <n>                searchMustMustNot
 %type <f>                searchBoost
 
 %%
@@ -67,12 +66,6 @@ searchPrefix:
 	$$ = queryShould
 }
 |
-searchMustMustNot {
-	$$ = $1
-}
-;
-
-searchMustMustNot:
 tPLUS {
 	logDebugGrammar("PLUS")
 	$$ = queryMust
