@@ -387,7 +387,7 @@ func (udc *SmolderingCouch) countDocs(kvreader store.KVReader) (count, highDocNu
 	}
 
 	if lastValidK != nil {
-		_, highDocNum, err = DecodeUvarintAscending(k[1:])
+		_, highDocNum, err = DecodeUvarintAscending(lastValidK[1:])
 		if err != nil {
 			return 0, 0, err
 		}

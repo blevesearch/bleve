@@ -91,5 +91,6 @@ import (
 	_ "github.com/blevesearch/bleve/index/store/moss"
 
 	// index types
+	_ "github.com/blevesearch/bleve/index/smolder"
 	_ "github.com/blevesearch/bleve/index/upside_down"
 )
