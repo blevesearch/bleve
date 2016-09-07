@@ -46,8 +46,8 @@ func newSmolderingCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 		return nil, err
 	}
 
-	tfr := TermFrequencyRowStart(term, field, []byte{})
-	it := indexReader.kvreader.PrefixIterator(tfr.Key())
+	tfrk := TermFrequencyRowStart(term, field, []byte{})
+	it := indexReader.kvreader.PrefixIterator(tfrk)
 
 	atomic.AddUint64(&indexReader.index.stats.termSearchersStarted, uint64(1))
 	return &SmolderingCouchTermFieldReader{
@@ -96,8 +96,8 @@ func (r *SmolderingCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 
 func (r *SmolderingCouchTermFieldReader) Advance(docID index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
 	if r.iterator != nil {
-		tfr := TermFrequencyRowStart(r.term, r.field, docID)
-		r.iterator.Seek(tfr.Key())
+		tfrk := TermFrequencyRowStart(r.term, r.field, docID)
+		r.iterator.Seek(tfrk)
 		key, val, valid := r.iterator.Current()
 		if valid {
 			tfr, err := NewTermFrequencyRowKV(key, val)

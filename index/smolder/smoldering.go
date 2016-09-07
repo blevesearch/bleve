@@ -25,6 +25,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
+	"github.com/seiflotfy/cuckoofilter"
 
 	"github.com/golang/protobuf/proto"
 )
@@ -61,6 +62,8 @@ type SmolderingCouch struct {
 	writeMutex sync.Mutex
 
 	maxInternalDocID uint64
+
+	cf *cuckoofilter.CuckooFilter
 }
 
 type docBackIndexRow struct {
@@ -316,6 +319,8 @@ func (udc *SmolderingCouch) Open() (err error) {
 		return
 	}
 
+	udc.cf = cuckoofilter.NewDefaultCuckooFilter()
+
 	// start a reader to look at the index
 	var kvreader store.KVReader
 	kvreader, err = udc.store.Reader()
@@ -369,25 +374,33 @@ func (udc *SmolderingCouch) Open() (err error) {
 }
 
 func (udc *SmolderingCouch) countDocs(kvreader store.KVReader) (count, highDocNum uint64, err error) {
-	it := kvreader.PrefixIterator([]byte{'b'})
+	k := TermFrequencyRowStart(nil, 0, nil)
+	it := kvreader.PrefixIterator(k)
 	defer func() {
 		if cerr := it.Close(); err == nil && cerr != nil {
 			err = cerr
 		}
 	}()
 
-	var lastValidK []byte
+	var lastValidDocNum []byte
 	k, _, valid := it.Current()
 	for valid {
-		lastValidK = lastValidK[:0]
-		lastValidK = append(lastValidK, k...)
+		tfr, err := NewTermFrequencyRowK(k)
+		if err != nil {
+			return 0, 0, err
+		}
+		if tfr.term != nil {
+			udc.cf.Insert(tfr.term)
+		}
+		lastValidDocNum = lastValidDocNum[:0]
+		lastValidDocNum = append(lastValidDocNum, tfr.docNumber...)
 		count++
 		it.Next()
 		k, _, valid = it.Current()
 	}
 
-	if lastValidK != nil {
-		_, highDocNum, err = DecodeUvarintAscending(lastValidK[1:])
+	if lastValidDocNum != nil {
+		_, highDocNum, err = DecodeUvarintAscending(lastValidDocNum)
 		if err != nil {
 			return 0, 0, err
 		}
@@ -457,11 +470,13 @@ func (udc *SmolderingCouch) Update(doc *document.Document) (err error) {
 	// first we lookup the backindex row for the doc id if it exists
 	// lookup the back index row
 	var backIndexRow *BackIndexRow
-	backIndexRow, err = udc.backIndexRowForDoc(indexReader, nil, doc.ID)
-	if err != nil {
-		_ = indexReader.Close()
-		atomic.AddUint64(&udc.stats.errors, 1)
-		return
+	if udc.cf.Lookup([]byte(doc.ID)) {
+		backIndexRow, err = udc.backIndexRowForDoc(indexReader, nil, doc.ID)
+		if err != nil {
+			_ = indexReader.Close()
+			atomic.AddUint64(&udc.stats.errors, 1)
+			return
+		}
 	}
 
 	err = indexReader.Close()
@@ -506,6 +521,7 @@ func (udc *SmolderingCouch) Update(doc *document.Document) (err error) {
 	}
 	atomic.AddUint64(&udc.stats.indexTime, uint64(time.Since(indexStart)))
 	if err == nil {
+		udc.cf.Insert([]byte(doc.ID))
 		atomic.AddUint64(&udc.stats.updates, 1)
 		atomic.AddUint64(&udc.stats.numPlainTextBytesIndexed, numPlainTextBytes)
 	} else {
@@ -545,11 +561,8 @@ func (udc *SmolderingCouch) mergeOldAndNew(externalDocId string, backIndexRow *B
 			updateRows = append(updateRows, row)
 		case *TermFrequencyRow:
 			if backIndexRow != nil {
-				// if this is the id term-freq-row, set the doc number from the back-index-row
-				// this could be different if we now know we're doing an update
-				//if row.field == 0 {
+				// doc number could have changed if this is update
 				row.docNumber = backIndexRow.docNumber
-				//}
 			}
 			if row.KeySize() > len(keyBuf) {
 				keyBuf = make([]byte, row.KeySize())
@@ -563,11 +576,8 @@ func (udc *SmolderingCouch) mergeOldAndNew(externalDocId string, backIndexRow *B
 			}
 		case *StoredRow:
 			if backIndexRow != nil {
-				// if this is the id term-freq-row, set the doc number from the back-index-row
-				// this could be different if we now know we're doing an update
-				//if row.field == 0 {
+				// doc number could have changed if this is update
 				row.docNumber = backIndexRow.docNumber
-				//}
 			}
 			if row.KeySize() > len(keyBuf) {
 				keyBuf = make([]byte, row.KeySize())
@@ -712,6 +722,7 @@ func (udc *SmolderingCouch) Delete(id string) (err error) {
 	}
 	atomic.AddUint64(&udc.stats.indexTime, uint64(time.Since(indexStart)))
 	if err == nil {
+		udc.cf.Delete([]byte(id))
 		atomic.AddUint64(&udc.stats.deletes, 1)
 	} else {
 		atomic.AddUint64(&udc.stats.errors, 1)
@@ -721,12 +732,10 @@ func (udc *SmolderingCouch) Delete(id string) (err error) {
 
 func (udc *SmolderingCouch) deleteSingle(id index.IndexInternalID, backIndexRow *BackIndexRow, deleteRows []SmolderingCouchRow) []SmolderingCouchRow {
 	for _, backIndexEntry := range backIndexRow.termEntries {
-		tfr := TermFrequencyRowStart([]byte(*backIndexEntry.Term), uint16(*backIndexEntry.Field), id)
-		//tfr := NewTermFrequencyRow([]byte(*backIndexEntry.Term), uint16(*backIndexEntry.Field), idBytes, 0, 0)
+		tfr := TermFrequencyRowDocNumBytes([]byte(*backIndexEntry.Term), uint16(*backIndexEntry.Field), id)
 		deleteRows = append(deleteRows, tfr)
 	}
 	for _, se := range backIndexRow.storedEntries {
-		//sf := NewStoredRow(idBytes, uint16(*se.Field), se.ArrayPositions, 'x', nil)
 		sf := NewStoredRowDocBytes(id, uint16(*se.Field), se.ArrayPositions, 'x', nil)
 		deleteRows = append(deleteRows, sf)
 	}
@@ -900,10 +909,13 @@ func (udc *SmolderingCouch) Batch(batch *index.Batch) (err error) {
 		}
 
 		for docID, doc := range batch.IndexOps {
-			backIndexRow, err := udc.backIndexRowForDoc(indexReader, nil, docID)
-			if err != nil {
-				docBackIndexRowErr = err
-				return
+			var backIndexRow *BackIndexRow
+			if udc.cf.Lookup([]byte(docID)) {
+				backIndexRow, err = udc.backIndexRowForDoc(indexReader, nil, docID)
+				if err != nil {
+					docBackIndexRowErr = err
+					return
+				}
 			}
 
 			var docNumber []byte
@@ -1017,6 +1029,13 @@ func (udc *SmolderingCouch) Batch(batch *index.Batch) (err error) {
 		udc.docCount += docsAdded
 		udc.docCount -= docsDeleted
 		udc.m.Unlock()
+		for did, doc := range batch.IndexOps {
+			if doc != nil {
+				udc.cf.Insert([]byte(did))
+			} else {
+				udc.cf.Delete([]byte(did))
+			}
+		}
 		atomic.AddUint64(&udc.stats.updates, numUpdates)
 		atomic.AddUint64(&udc.stats.deletes, docsDeleted)
 		atomic.AddUint64(&udc.stats.batches, 1)

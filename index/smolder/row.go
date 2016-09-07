@@ -472,7 +472,7 @@ func NewTermFrequencyRow(term []byte, field uint16, docNum uint64, freq uint64, 
 	}
 }
 
-func TermFrequencyRowStart(term []byte, field uint16, docNum []byte) *TermFrequencyRow {
+func TermFrequencyRowDocNumBytes(term []byte, field uint16, docNum []byte) *TermFrequencyRow {
 	return &TermFrequencyRow{
 		term:      term,
 		field:     field,
@@ -480,6 +480,17 @@ func TermFrequencyRowStart(term []byte, field uint16, docNum []byte) *TermFreque
 		freq:      0,
 		norm:      0,
 	}
+}
+
+func TermFrequencyRowStart(term []byte, field uint16, docNum []byte) []byte {
+	tfr := TermFrequencyRow{
+		term:      term,
+		field:     field,
+		docNumber: docNum,
+		freq:      0,
+		norm:      0,
+	}
+	return tfr.Key()
 }
 
 func NewTermFrequencyRowWithTermVectors(term []byte, field uint16, docNum uint64, freq uint64, norm float32, vectors []*TermVector) *TermFrequencyRow {
@@ -634,6 +645,15 @@ type BackIndexRow struct {
 	storedEntries []*BackIndexStoreEntry
 }
 
+func (br *BackIndexRow) FindExternalID() string {
+	for _, te := range br.termEntries {
+		if te.GetField() == 0 {
+			return te.GetTerm()
+		}
+	}
+	return ""
+}
+
 func (br *BackIndexRow) AllTermKeys() [][]byte {
 	if br == nil {
 		return nil
@@ -641,8 +661,8 @@ func (br *BackIndexRow) AllTermKeys() [][]byte {
 
 	rv := make([][]byte, len(br.termEntries))
 	for i, termEntry := range br.termEntries {
-		termRow := TermFrequencyRowStart([]byte(termEntry.GetTerm()), uint16(termEntry.GetField()), br.docNumber)
-		rv[i] = termRow.Key()
+		termRowK := TermFrequencyRowStart([]byte(termEntry.GetTerm()), uint16(termEntry.GetField()), br.docNumber)
+		rv[i] = termRowK
 	}
 	return rv
 }
@@ -718,24 +738,6 @@ func BackIndexRowKey(docNum []byte) []byte {
 
 func NewBackIndexRowKV(key, value []byte) (*BackIndexRow, error) {
 	rv := BackIndexRow{}
-
-	// buf := bytes.NewBuffer(key)
-	// _, err := buf.ReadByte() // type
-	// if err != nil {
-	// 	return nil, err
-	// }
-	//
-	// rv.docNumber, err = buf.ReadBytes(ByteSeparator)
-	// if err == io.EOF && len(rv.doc) < 1 {
-	// 	err = fmt.Errorf("invalid doc length 0 - % x", key)
-	// }
-	// if err != nil && err != io.EOF {
-	// 	return nil, err
-	// } else if err == nil {
-	// 	rv.doc = rv.doc[:len(rv.doc)-1] // trim off separator byte
-	// }
-
-	//rv.docNumber = key[1:]
 	rv.docNumber = append(rv.docNumber, key[1:]...)
 
 	var birv BackIndexRowValue
@@ -781,6 +783,16 @@ func (s *StoredRow) KeyTo(buf []byte) (int, error) {
 		bytesUsed += varbytes
 	}
 	return bytesUsed, nil
+}
+
+func StoredRowDocFieldKey(docNumber []byte, field uint16) []byte {
+	docNumLen := len(docNumber)
+	buf := make([]byte, 1+docNumLen+1+2)
+	buf[0] = 's'
+	copy(buf[1:], docNumber)
+	buf[1+docNumLen] = ByteSeparator // FIXME can we remove this ByteSeparator? we know the length of the docnum
+	binary.LittleEndian.PutUint16(buf[1+docNumLen+1:], field)
+	return buf
 }
 
 func (s *StoredRow) Value() []byte {

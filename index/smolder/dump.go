@@ -164,10 +164,8 @@ func (udc *SmolderingCouch) DumpDoc(id string) chan interface{} {
 		// build sorted list of term keys
 		keys := make(keyset, 0)
 		for _, entry := range back.termEntries {
-			// tfr := NewTermFrequencyRow([]byte(*entry.Term), uint16(*entry.Field), back.docNumber, 0, 0)
-			tfr := TermFrequencyRowStart([]byte(*entry.Term), uint16(*entry.Field), back.docNumber)
-			key := tfr.Key()
-			keys = append(keys, key)
+			tfrk := TermFrequencyRowStart([]byte(*entry.Term), uint16(*entry.Field), back.docNumber)
+			keys = append(keys, tfrk)
 		}
 		sort.Sort(keys)
 

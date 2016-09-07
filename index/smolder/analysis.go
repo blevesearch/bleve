@@ -31,14 +31,18 @@ func (udc *SmolderingCouch) Analyze(d *document.Document) *index.AnalysisResult 
 	fieldNames := make(map[uint16]string)
 
 	// set the value for the _id field
+	idBytes := []byte(d.ID)
 	fieldTermFreqs[0] = analysis.TokenFrequency(analysis.TokenStream{
 		&analysis.Token{
-			Term:     []byte(d.ID),
+			Term:     idBytes,
 			Position: 1,
 			Start:    0,
 			End:      len(d.ID),
 		},
 	}, nil, false)
+	// store the _id field as well
+	f := document.NewTextField("_id", nil, []byte(idBytes))
+	rv.Rows, backIndexStoredEntries = udc.storeField(d.Number, f, 0, rv.Rows, backIndexStoredEntries)
 
 	analyzeField := func(field document.Field, storable bool) {
 		fieldIndex, newFieldRow := udc.fieldIndexOrNewRow(field.Name())

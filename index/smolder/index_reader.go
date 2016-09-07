@@ -189,15 +189,12 @@ func (i *IndexReader) Close() error {
 }
 
 func (i *IndexReader) ExternalID(id index.IndexInternalID) (string, error) {
-	ft, err := i.DocumentFieldTermsForFields(id, []string{"_id"})
+	k := StoredRowDocFieldKey(id, 0)
+	v, err := i.kvreader.Get(k)
 	if err != nil {
 		return "", err
 	}
-	terms := ft["_id"]
-	if len(terms) < 1 {
-		return "", nil
-	}
-	return terms[0], nil
+	return string(v[1:]), nil
 }
 
 func (i *IndexReader) InternalID(id string) (index.IndexInternalID, error) {
