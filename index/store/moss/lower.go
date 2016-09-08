@@ -32,7 +32,7 @@ func initLowerLevelStore(
 	lowerLevelStoreConfig map[string]interface{},
 	lowerLevelMaxBatchSize uint64,
 	options moss.CollectionOptions,
-) (moss.Snapshot, moss.LowerLevelUpdate, store.KVStore, error) {
+) (moss.Snapshot, moss.LowerLevelUpdate, store.KVStore, statsFunc, error) {
 	if lowerLevelStoreConfig == nil {
 		lowerLevelStoreConfig = map[string]interface{}{}
 	}
@@ -50,13 +50,13 @@ func initLowerLevelStore(
 
 	constructor := registry.KVStoreConstructorByName(lowerLevelStoreName)
 	if constructor == nil {
-		return nil, nil, nil, fmt.Errorf("moss store, initLowerLevelStore,"+
+		return nil, nil, nil, nil, fmt.Errorf("moss store, initLowerLevelStore,"+
 			" could not find lower level store: %s", lowerLevelStoreName)
 	}
 
 	kvStore, err := constructor(options.MergeOperator, lowerLevelStoreConfig)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	llStore := &llStore{
@@ -74,10 +74,10 @@ func initLowerLevelStore(
 	llSnapshot, err := llUpdate(nil)
 	if err != nil {
 		_ = kvStore.Close()
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	return llSnapshot, llUpdate, kvStore, nil // llStore.refs is now 1.
+	return llSnapshot, llUpdate, kvStore, nil, nil // llStore.refs is now 1.
 }
 
 // ------------------------------------------------
@@ -410,16 +410,16 @@ func (lli *llIterator) CurrentEx() (
 // ------------------------------------------------
 
 func InitMossStore(config map[string]interface{}, options moss.CollectionOptions) (
-	moss.Snapshot, moss.LowerLevelUpdate, store.KVStore, error) {
+	moss.Snapshot, moss.LowerLevelUpdate, store.KVStore, statsFunc, error) {
 	path, ok := config["path"].(string)
 	if !ok {
-		return nil, nil, nil, fmt.Errorf("lower: missing path for InitMossStore config")
+		return nil, nil, nil, nil, fmt.Errorf("lower: missing path for InitMossStore config")
 	}
 
 	err := os.MkdirAll(path, 0700)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("lower: InitMossStore mkdir, path: %s, err: %v",
-			path, err)
+		return nil, nil, nil, nil, fmt.Errorf("lower: InitMossStore mkdir,"+
+			" path: %s, err: %v", path, err)
 	}
 
 	storeOptions := moss.StoreOptions{
@@ -429,19 +429,19 @@ func InitMossStore(config map[string]interface{}, options moss.CollectionOptions
 	if ok {
 		b, err := json.Marshal(v) // Convert from map[string]interface{}.
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 
 		err = json.Unmarshal(b, &storeOptions)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 	}
 
 	s, err := moss.OpenStore(path, storeOptions)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("lower: moss.OpenStore, path: %s, err: %v",
-			path, err)
+		return nil, nil, nil, nil, fmt.Errorf("lower: moss.OpenStore,"+
+			" path: %s, err: %v", path, err)
 	}
 
 	sw := &mossStoreWrapper{s: s}
@@ -461,10 +461,18 @@ func InitMossStore(config map[string]interface{}, options moss.CollectionOptions
 
 	llSnapshot, err := llUpdate(nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	return llSnapshot, llUpdate, nil, nil
+	llStats := func() map[string]interface{} {
+		stats, err := s.Stats()
+		if err != nil {
+			return nil
+		}
+		return stats
+	}
+
+	return llSnapshot, llUpdate, nil, llStats, nil
 }
 
 type mossStoreWrapper struct {

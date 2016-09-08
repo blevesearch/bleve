@@ -4,6 +4,7 @@
 		{
 			"importpath": "github.com/blevesearch/go-porterstemmer",
 			"repository": "https://github.com/blevesearch/go-porterstemmer",
+			"vcs": "",
 			"revision": "23a2c8e5cf1f380f27722c6d2ae8896431dc7d0e",
 			"branch": "master",
 			"notests": true
@@ -11,6 +12,7 @@
 		{
 			"importpath": "github.com/blevesearch/segment",
 			"repository": "https://github.com/blevesearch/segment",
+			"vcs": "",
 			"revision": "db70c57796cc8c310613541dfade3dce627d09c7",
 			"branch": "master",
 			"notests": true
@@ -18,6 +20,7 @@
 		{
 			"importpath": "github.com/boltdb/bolt",
 			"repository": "https://github.com/boltdb/bolt",
+			"vcs": "",
 			"revision": "144418e1475d8bf7abbdc48583500f1a20c62ea7",
 			"branch": "master",
 			"notests": true
@@ -25,13 +28,15 @@
 		{
 			"importpath": "github.com/couchbase/moss",
 			"repository": "https://github.com/couchbase/moss",
-			"revision": "e013f5f973e5b094ecf61e08ae9aa3754bd22d15",
+			"vcs": "git",
+			"revision": "564bdbc09ecc32cb398b56b855a5a6dc9fd7cce5",
 			"branch": "master",
 			"notests": true
 		},
 		{
 			"importpath": "github.com/golang/protobuf/proto",
 			"repository": "https://github.com/golang/protobuf",
+			"vcs": "",
 			"revision": "655cdfa588ea190e901bc5590e65d5621688847c",
 			"branch": "master",
 			"path": "/proto",
@@ -40,6 +45,7 @@
 		{
 			"importpath": "github.com/golang/snappy",
 			"repository": "https://github.com/golang/snappy",
+			"vcs": "",
 			"revision": "cef980a12b316c5b7e5bb3a8e168eb43ae999a88",
 			"branch": "master",
 			"notests": true
@@ -47,6 +53,7 @@
 		{
 			"importpath": "github.com/rcrowley/go-metrics",
 			"repository": "https://github.com/rcrowley/go-metrics",
+			"vcs": "",
 			"revision": "dee209f2455f101a5e4e593dea94872d2c62d85d",
 			"branch": "master",
 			"notests": true
@@ -54,6 +61,7 @@
 		{
 			"importpath": "github.com/steveyen/gtreap",
 			"repository": "https://github.com/steveyen/gtreap",
+			"vcs": "",
 			"revision": "0abe01ef9be25c4aedc174758ec2d917314d6d70",
 			"branch": "master",
 			"notests": true
@@ -61,6 +69,7 @@
 		{
 			"importpath": "github.com/syndtr/goleveldb/leveldb",
 			"repository": "https://github.com/syndtr/goleveldb",
+			"vcs": "",
 			"revision": "93fc893f2dadb96ffde441c7546cc67ea290a3a8",
 			"branch": "master",
 			"path": "/leveldb",
@@ -69,6 +78,7 @@
 		{
 			"importpath": "github.com/willf/bitset",
 			"repository": "https://github.com/willf/bitset",
+			"vcs": "",
 			"revision": "2e6e8094ef4745224150c88c16191c7dceaad16f",
 			"branch": "master",
 			"notests": true
@@ -76,6 +86,7 @@
 		{
 			"importpath": "golang.org/x/net/context",
 			"repository": "https://go.googlesource.com/net",
+			"vcs": "",
 			"revision": "e45385e9b226f570b1f086bf287b25d3d4117776",
 			"branch": "master",
 			"path": "/context",
@@ -84,6 +95,7 @@
 		{
 			"importpath": "golang.org/x/text/transform",
 			"repository": "https://go.googlesource.com/text",
+			"vcs": "",
 			"revision": "5ee49cfe751141f8017047bab800d1f528ee3be1",
 			"branch": "master",
 			"path": "/transform",
@@ -92,6 +104,7 @@
 		{
 			"importpath": "golang.org/x/text/unicode/norm",
 			"repository": "https://go.googlesource.com/text",
+			"vcs": "",
 			"revision": "5ee49cfe751141f8017047bab800d1f528ee3be1",
 			"branch": "master",
 			"path": "/unicode/norm",
