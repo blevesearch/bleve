@@ -684,18 +684,24 @@ func TestIndexBatch(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	docIds := make([]index.IndexInternalID, 0)
+	var docIDs []string
 	docID, err := docIDReader.Next()
 	for docID != nil && err == nil {
-		docIds = append(docIds, docID)
+		// lookup external ID for this document
+		var extID string
+		extID, err = indexReader.ExternalID(docID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		docIDs = append(docIDs, extID)
 		docID, err = docIDReader.Next()
 	}
 	if err != nil {
 		t.Error(err)
 	}
-	expectedDocIds := []index.IndexInternalID{EncodeUvarintAscending(nil, 2), EncodeUvarintAscending(nil, 3)}
-	if !reflect.DeepEqual(docIds, expectedDocIds) {
-		t.Errorf("expected ids: %v, got ids: %v", expectedDocIds, docIds)
+	expectedDocIDs := []string{"2", "3"}
+	if !reflect.DeepEqual(docIDs, expectedDocIDs) {
+		t.Errorf("expected ids: %v, got ids: %v", expectedDocIDs, docIDs)
 		allRows := idx.DumpAll()
 		for ar := range allRows {
 			t.Logf("%v", ar)
