@@ -41,7 +41,7 @@ const RowBufferSize = 4 * 1024
 
 var VersionKey = []byte{'v'}
 
-const Version uint8 = 5
+const Version uint8 = 6
 
 var IncompatibleVersion = fmt.Errorf("incompatible version, %d is supported", Version)
 
@@ -374,7 +374,7 @@ func (udc *SmolderingCouch) Open() (err error) {
 }
 
 func (udc *SmolderingCouch) countDocs(kvreader store.KVReader) (count, highDocNum uint64, err error) {
-	k := TermFrequencyRowStart(nil, 0, nil)
+	k := TermFrequencyRowStartField(0)
 	it := kvreader.PrefixIterator(k)
 	defer func() {
 		if cerr := it.Close(); err == nil && cerr != nil {
@@ -552,9 +552,11 @@ func (udc *SmolderingCouch) mergeOldAndNew(externalDocId string, backIndexRow *B
 			if backIndexRow != nil {
 				row.docNumber = backIndexRow.docNumber
 				// look through the backindex and update the term entry for _id
-				for _, te := range row.termEntries {
+				for _, te := range row.termsEntries {
 					if *te.Field == 0 {
-						te.Term = &externalDocId
+						for i := range te.Terms {
+							te.Terms[i] = externalDocId
+						}
 					}
 				}
 			}
@@ -641,9 +643,10 @@ func encodeFieldType(f document.Field) byte {
 	return fieldType
 }
 
-func (udc *SmolderingCouch) indexField(docNum uint64, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies, rows []index.IndexRow, backIndexTermEntries []*BackIndexTermEntry) ([]index.IndexRow, []*BackIndexTermEntry) {
+func (udc *SmolderingCouch) indexField(docNum uint64, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies, rows []index.IndexRow, backIndexTermsEntries []*BackIndexTermsEntry) ([]index.IndexRow, []*BackIndexTermsEntry) {
 	fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
 
+	terms := make([]string, 0, len(tokenFreqs))
 	for k, tf := range tokenFreqs {
 		var termFreqRow *TermFrequencyRow
 		if includeTermVectors {
@@ -655,13 +658,14 @@ func (udc *SmolderingCouch) indexField(docNum uint64, includeTermVectors bool, f
 		}
 
 		// record the back index entry
-		backIndexTermEntry := BackIndexTermEntry{Term: proto.String(k), Field: proto.Uint32(uint32(fieldIndex))}
-		backIndexTermEntries = append(backIndexTermEntries, &backIndexTermEntry)
-
+		terms = append(terms, k)
 		rows = append(rows, termFreqRow)
 	}
 
-	return rows, backIndexTermEntries
+	backIndexTermsEntry := BackIndexTermsEntry{Field: proto.Uint32(uint32(fieldIndex)), Terms: terms}
+	backIndexTermsEntries = append(backIndexTermsEntries, &backIndexTermsEntry)
+
+	return rows, backIndexTermsEntries
 }
 
 func (udc *SmolderingCouch) Delete(id string) (err error) {
@@ -731,9 +735,11 @@ func (udc *SmolderingCouch) Delete(id string) (err error) {
 }
 
 func (udc *SmolderingCouch) deleteSingle(id index.IndexInternalID, backIndexRow *BackIndexRow, deleteRows []SmolderingCouchRow) []SmolderingCouchRow {
-	for _, backIndexEntry := range backIndexRow.termEntries {
-		tfr := TermFrequencyRowDocNumBytes([]byte(*backIndexEntry.Term), uint16(*backIndexEntry.Field), id)
-		deleteRows = append(deleteRows, tfr)
+	for _, backIndexEntry := range backIndexRow.termsEntries {
+		for i := range backIndexEntry.Terms {
+			tfr := TermFrequencyRowDocNumBytes([]byte(backIndexEntry.Terms[i]), uint16(*backIndexEntry.Field), id)
+			deleteRows = append(deleteRows, tfr)
+		}
 	}
 	for _, se := range backIndexRow.storedEntries {
 		sf := NewStoredRowDocBytes(id, uint16(*se.Field), se.ArrayPositions, 'x', nil)

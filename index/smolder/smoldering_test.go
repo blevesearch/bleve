@@ -142,9 +142,10 @@ func TestIndexInsert(t *testing.T) {
 
 	// should have 4 rows (1 for version, 1 for schema field, and 1 for single term, and 1 for the term count, and 1 for the back index entry)
 	// +1 for id term
+	// +1 for id stored
 	// +1 for id term dictionary
 	// +1 for id field def
-	expectedLength := uint64(1 + 1 + 1 + 1 + 1 + 1 + 1 + 1)
+	expectedLength := uint64(1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1)
 	rowCount, err := idx.(*SmolderingCouch).rowCount()
 	if err != nil {
 		t.Error(err)
@@ -294,8 +295,8 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 		t.Errorf("Error deleting entry from index: %v", err)
 	}
 
-	// should have 2 rows (1 for version, 2 for schema field, and 3 for the two term, and 3 for the term counts, and 1 for the back index entry)
-	expectedLength := uint64(1 + 2 + 3 + 3 + 1)
+	// should have 2 rows (1 for version, 2 for schema field, and 3 for the two term, and 3 for the term counts, and 1 for the back index entry, and 1 for stord id)
+	expectedLength := uint64(1 + 2 + 3 + 3 + 1 + 1)
 	rowCount, err := idx.(*SmolderingCouch).rowCount()
 	if err != nil {
 		t.Error(err)
@@ -316,8 +317,8 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 		t.Errorf("Error deleting entry from index: %v", err)
 	}
 
-	// should have 2 rows (1 for version, 2 for schema field, and 2 for the remaining terms, and 2 for the term diciontary, and 1 for the back index entry)
-	expectedLength = uint64(1 + 2 + 2 + 3 + 1)
+	// should have 2 rows (1 for version, 2 for schema field, and 2 for the remaining terms, and 2 for the term diciontary, and 1 for the back index entry, and 1 for stored id)
+	expectedLength = uint64(1 + 2 + 2 + 3 + 1 + 1)
 	rowCount, err = idx.(*SmolderingCouch).rowCount()
 	if err != nil {
 		t.Error(err)
@@ -367,8 +368,8 @@ func TestIndexInsertMultiple(t *testing.T) {
 	}
 	expectedCount++
 
-	// should have 4 rows (1 for version, 1 for schema field, and 4 for terms, and 3 for the term count, and 2 for the back index entries)
-	expectedLength := uint64(1 + 2 + 4 + 3 + 2)
+	// should have 4 rows (1 for version, 1 for schema field, and 4 for terms, and 3 for the term count, and 2 for the back index entries, and 2 for stored ids)
+	expectedLength := uint64(1 + 2 + 4 + 3 + 2 + 2)
 	rowCount, err := idx.(*SmolderingCouch).rowCount()
 	if err != nil {
 		t.Error(err)
@@ -464,8 +465,8 @@ func TestIndexInsertWithStore(t *testing.T) {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
 
-	// should have 6 rows (1 for version, 2 for schema field, and 2 for terms, and 1 for the stored field and 2 for the term counts, and 1 for the back index entry)
-	expectedLength := uint64(1 + 2 + 2 + 1 + 2 + 1)
+	// should have 6 rows (1 for version, 2 for schema field, and 2 for terms, and 2 for the stored field and 2 for the term counts, and 1 for the back index entry)
+	expectedLength := uint64(1 + 2 + 2 + 2 + 2 + 1)
 	rowCount, err := idx.(*SmolderingCouch).rowCount()
 	if err != nil {
 		t.Error(err)
@@ -490,15 +491,19 @@ func TestIndexInsertWithStore(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(storedDoc.Fields) != 1 {
+	if len(storedDoc.Fields) != 2 {
 		t.Errorf("expected 1 stored field, got %d", len(storedDoc.Fields))
 	}
-	textField, ok := storedDoc.Fields[0].(*document.TextField)
-	if !ok {
-		t.Errorf("expected text field")
-	}
-	if string(textField.Value()) != "test" {
-		t.Errorf("expected field content 'test', got '%s'", string(textField.Value()))
+	for _, f := range storedDoc.Fields {
+		if f.Name() == "name" {
+			textField, ok := f.(*document.TextField)
+			if !ok {
+				t.Errorf("expected text field")
+			}
+			if string(textField.Value()) != "test" {
+				t.Errorf("expected field content 'test', got '%s'", string(textField.Value()))
+			}
+		}
 	}
 }
 
@@ -675,7 +680,7 @@ func TestIndexBatch(t *testing.T) {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
 
-	docIDReader, err := indexReader.DocIDReader("", "")
+	docIDReader, err := indexReader.DocIDReaderAll()
 	if err != nil {
 		t.Error(err)
 	}
@@ -753,20 +758,20 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
 
-	// should have 77 rows
+	// should have 78 rows
 	// 1 for version
 	// 4 for schema fields
 	// 1 for id term
 	// 1 for text term
 	// 16 for numeric terms
 	// 16 for date terms
-	// 3 for the stored field
+	// 4 for the stored field
 	// 1 for id term count
 	// 1 for the text term count
 	// 16 for numeric term counts
 	// 16 for date term counts
 	// 1 for the back index entry
-	expectedLength := uint64(1 + 4 + 1 + 1 + (64 / document.DefaultPrecisionStep) + (64 / document.DefaultPrecisionStep) + 3 + 1 + 1 + (64 / document.DefaultPrecisionStep) + (64 / document.DefaultPrecisionStep) + 1)
+	expectedLength := uint64(1 + 4 + 1 + 1 + (64 / document.DefaultPrecisionStep) + (64 / document.DefaultPrecisionStep) + 4 + 1 + 1 + (64 / document.DefaultPrecisionStep) + (64 / document.DefaultPrecisionStep) + 1)
 	rowCount, err := idx.(*SmolderingCouch).rowCount()
 	if err != nil {
 		t.Error(err)
@@ -790,38 +795,48 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(storedDoc.Fields) != 3 {
-		t.Errorf("expected 3 stored field, got %d", len(storedDoc.Fields))
+	if len(storedDoc.Fields) != 4 {
+		t.Errorf("expected 4 stored field, got %d", len(storedDoc.Fields))
 	}
-	textField, ok := storedDoc.Fields[0].(*document.TextField)
-	if !ok {
-		t.Errorf("expected text field")
-	}
-	if string(textField.Value()) != "test" {
-		t.Errorf("expected field content 'test', got '%s'", string(textField.Value()))
-	}
-	numField, ok := storedDoc.Fields[1].(*document.NumericField)
-	if !ok {
-		t.Errorf("expected numeric field")
-	}
-	numFieldNumer, err := numField.Number()
-	if err != nil {
-		t.Error(err)
-	} else {
-		if numFieldNumer != 35.99 {
-			t.Errorf("expeted numeric value 35.99, got %f", numFieldNumer)
+	for _, f := range storedDoc.Fields {
+		if f.Name() == "name" {
+			textField, ok := f.(*document.TextField)
+			if !ok {
+				t.Errorf("expected text field")
+			}
+			if string(textField.Value()) != "test" {
+				t.Errorf("expected field content 'test', got '%s'", string(textField.Value()))
+			}
 		}
-	}
-	dateField, ok := storedDoc.Fields[2].(*document.DateTimeField)
-	if !ok {
-		t.Errorf("expected date field")
-	}
-	dateFieldDate, err := dateField.DateTime()
-	if err != nil {
-		t.Error(err)
-	} else {
-		if dateFieldDate != time.Unix(0, 0).UTC() {
-			t.Errorf("expected date value unix epoch, got %v", dateFieldDate)
+
+		if f.Name() == "age" {
+			numField, ok := f.(*document.NumericField)
+			if !ok {
+				t.Errorf("expected numeric field")
+			}
+			numFieldNumer, err := numField.Number()
+			if err != nil {
+				t.Error(err)
+			} else {
+				if numFieldNumer != 35.99 {
+					t.Errorf("expeted numeric value 35.99, got %f", numFieldNumer)
+				}
+			}
+		}
+
+		if f.Name() == "unixEpoch" {
+			dateField, ok := f.(*document.DateTimeField)
+			if !ok {
+				t.Errorf("expected date field")
+			}
+			dateFieldDate, err := dateField.DateTime()
+			if err != nil {
+				t.Error(err)
+			} else {
+				if dateFieldDate != time.Unix(0, 0).UTC() {
+					t.Errorf("expected date value unix epoch, got %v", dateFieldDate)
+				}
+			}
 		}
 	}
 
@@ -856,26 +871,32 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(storedDoc.Fields) != 2 {
+	if len(storedDoc.Fields) != 3 {
 		t.Errorf("expected 3 stored field, got %d", len(storedDoc.Fields))
 	}
-	textField, ok = storedDoc.Fields[0].(*document.TextField)
-	if !ok {
-		t.Errorf("expected text field")
-	}
-	if string(textField.Value()) != "testup" {
-		t.Errorf("expected field content 'testup', got '%s'", string(textField.Value()))
-	}
-	numField, ok = storedDoc.Fields[1].(*document.NumericField)
-	if !ok {
-		t.Errorf("expected numeric field")
-	}
-	numFieldNumer, err = numField.Number()
-	if err != nil {
-		t.Error(err)
-	} else {
-		if numFieldNumer != 36.99 {
-			t.Errorf("expeted numeric value 36.99, got %f", numFieldNumer)
+	for _, f := range storedDoc.Fields {
+		if f.Name() == "name" {
+			textField, ok := f.(*document.TextField)
+			if !ok {
+				t.Errorf("expected text field")
+			}
+			if string(textField.Value()) != "testup" {
+				t.Errorf("expected field content 'testup', got '%s'", string(textField.Value()))
+			}
+		}
+		if f.Name() == "age" {
+			numField, ok := f.(*document.NumericField)
+			if !ok {
+				t.Errorf("expected numeric field")
+			}
+			numFieldNumer, err := numField.Number()
+			if err != nil {
+				t.Error(err)
+			} else {
+				if numFieldNumer != 36.99 {
+					t.Errorf("expeted numeric value 36.99, got %f", numFieldNumer)
+				}
+			}
 		}
 	}
 
@@ -989,10 +1010,10 @@ func TestIndexUpdateComposites(t *testing.T) {
 	// 1 for version
 	// 4 for schema fields
 	// 5 for text term
-	// 2 for the stored field
+	// 3 for the stored field
 	// 5 for the text term count
 	// 1 for the back index entry
-	expectedLength := uint64(1 + 4 + 5 + 2 + 5 + 1)
+	expectedLength := uint64(1 + 4 + 5 + 3 + 5 + 1)
 	rowCount, err := idx.(*SmolderingCouch).rowCount()
 	if err != nil {
 		t.Error(err)
@@ -1027,15 +1048,19 @@ func TestIndexUpdateComposites(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(storedDoc.Fields) != 2 {
-		t.Errorf("expected 2 stored field, got %d", len(storedDoc.Fields))
+	if len(storedDoc.Fields) != 3 {
+		t.Errorf("expected 3 stored field, got %d", len(storedDoc.Fields))
 	}
-	textField, ok := storedDoc.Fields[0].(*document.TextField)
-	if !ok {
-		t.Errorf("expected text field")
-	}
-	if string(textField.Value()) != "testupdated" {
-		t.Errorf("expected field content 'test', got '%s'", string(textField.Value()))
+	for _, f := range storedDoc.Fields {
+		if f.Name() == "name" {
+			textField, ok := f.(*document.TextField)
+			if !ok {
+				t.Errorf("expected text field")
+			}
+			if string(textField.Value()) != "testupdated" {
+				t.Errorf("expected field content 'test', got '%s'", string(textField.Value()))
+			}
+		}
 	}
 
 	// should have the same row count as before, plus 4 term dictionary garbage rows
@@ -1305,8 +1330,8 @@ func TestConcurrentUpdate(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	if len(doc.Fields) > 1 {
-		t.Errorf("expected single field, found %d", len(doc.Fields))
+	if len(doc.Fields) > 2 {
+		t.Errorf("expected two fields, found %d", len(doc.Fields))
 	}
 }
 

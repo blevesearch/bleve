@@ -659,7 +659,7 @@ func TestIndexBatch(t *testing.T) {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
 
-	docIDReader, err := indexReader.DocIDReader("", "")
+	docIDReader, err := indexReader.DocIDReaderAll()
 	if err != nil {
 		t.Error(err)
 	}

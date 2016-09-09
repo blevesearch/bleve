@@ -47,8 +47,8 @@ func (i *IndexReader) FieldDictPrefix(fieldName string, termPrefix []byte) (inde
 	return i.FieldDictRange(fieldName, termPrefix, termPrefix)
 }
 
-func (i *IndexReader) DocIDReader(start, end string) (index.DocIDReader, error) {
-	return newSmolderingCouchDocIDReader(i, start, end)
+func (i *IndexReader) DocIDReaderAll() (index.DocIDReader, error) {
+	return newSmolderingCouchDocIDReader(i)
 }
 
 func (i *IndexReader) DocIDReaderOnly(ids []string) (index.DocIDReader, error) {
@@ -106,15 +106,10 @@ func (i *IndexReader) DocumentFieldTerms(id index.IndexInternalID) (index.FieldT
 	if back == nil {
 		return nil, nil
 	}
-	rv := make(index.FieldTerms, len(back.termEntries))
-	for _, entry := range back.termEntries {
+	rv := make(index.FieldTerms, len(back.termsEntries))
+	for _, entry := range back.termsEntries {
 		fieldName := i.index.fieldCache.FieldIndexed(uint16(*entry.Field))
-		terms, ok := rv[fieldName]
-		if !ok {
-			terms = make([]string, 0)
-		}
-		terms = append(terms, *entry.Term)
-		rv[fieldName] = terms
+		rv[fieldName] = entry.Terms
 	}
 	return rv, nil
 }
@@ -133,14 +128,9 @@ func (i *IndexReader) DocumentFieldTermsForFields(id index.IndexInternalID, fiel
 		}
 		fieldsMap[id] = f
 	}
-	for _, entry := range back.termEntries {
+	for _, entry := range back.termsEntries {
 		if field, ok := fieldsMap[uint16(*entry.Field)]; ok {
-			terms, ok := rv[field]
-			if !ok {
-				terms = make([]string, 0)
-			}
-			terms = append(terms, *entry.Term)
-			rv[field] = terms
+			rv[field] = entry.Terms
 		}
 	}
 	return rv, nil

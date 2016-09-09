@@ -75,7 +75,7 @@ func (sr *stubReader) TermFieldReader(term []byte, field string, includeFreq, in
 	return nil, nil
 }
 
-func (sr *stubReader) DocIDReader(start, end string) (index.DocIDReader, error) {
+func (sr *stubReader) DocIDReaderAll() (index.DocIDReader, error) {
 	return nil, nil
 }
 

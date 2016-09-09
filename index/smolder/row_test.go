@@ -76,19 +76,50 @@ func TestRows(t *testing.T) {
 			[]byte{168, 202, 1, 195, 235, 163, 130, 4, 255, 1, 1, 3, 11, 1, 0, 0, 150, 17, 23, 31, 2, 1, 2, 0, 3, 43, 51, 3, 3, 4, 5},
 		},
 		{
-			NewBackIndexRow(1, []*BackIndexTermEntry{{Term: proto.String("beer"), Field: proto.Uint32(0)}}, nil),
+			NewBackIndexRow(1, []*BackIndexTermsEntry{{Field: proto.Uint32(0), Terms: []string{"beer"}}}, nil),
 			[]byte{'b', 137},
-			[]byte{10, 8, 10, 4, 'b', 'e', 'e', 'r', 16, 0},
+			[]byte{10, 8, 8, 0, 18, 4, 'b', 'e', 'e', 'r'},
 		},
 		{
-			NewBackIndexRow(1, []*BackIndexTermEntry{{Term: proto.String("beer"), Field: proto.Uint32(0)}, {Term: proto.String("beat"), Field: proto.Uint32(1)}}, nil),
+			NewBackIndexRow(1, []*BackIndexTermsEntry{
+				{
+					Field: proto.Uint32(0),
+					Terms: []string{"beer"},
+				},
+				{
+					Field: proto.Uint32(1),
+					Terms: []string{"beat"},
+				},
+			}, nil),
 			[]byte{'b', 137},
-			[]byte{10, 8, 10, 4, 'b', 'e', 'e', 'r', 16, 0, 10, 8, 10, 4, 'b', 'e', 'a', 't', 16, 1},
+			[]byte{10, 8, 8, 0, 18, 4, 'b', 'e', 'e', 'r', 10, 8, 8, 1, 18, 4, 'b', 'e', 'a', 't'},
 		},
 		{
-			NewBackIndexRow(1, []*BackIndexTermEntry{{Term: proto.String("beer"), Field: proto.Uint32(0)}, {Term: proto.String("beat"), Field: proto.Uint32(1)}}, []*BackIndexStoreEntry{{Field: proto.Uint32(3)}, {Field: proto.Uint32(4)}, {Field: proto.Uint32(5)}}),
+			NewBackIndexRow(1,
+				[]*BackIndexTermsEntry{
+					{
+						Field: proto.Uint32(0),
+						Terms: []string{"beer"},
+					},
+					{
+						Field: proto.Uint32(1),
+						Terms: []string{"beat"},
+					},
+				},
+				[]*BackIndexStoreEntry{
+					{
+						Field: proto.Uint32(3),
+					},
+					{
+						Field: proto.Uint32(4),
+					},
+					{
+						Field: proto.Uint32(5),
+					},
+				},
+			),
 			[]byte{'b', 137},
-			[]byte{10, 8, 10, 4, 'b', 'e', 'e', 'r', 16, 0, 10, 8, 10, 4, 'b', 'e', 'a', 't', 16, 1, 18, 2, 8, 3, 18, 2, 8, 4, 18, 2, 8, 5},
+			[]byte{10, 8, 8, 0, 18, 4, 'b', 'e', 'e', 'r', 10, 8, 8, 1, 18, 4, 'b', 'e', 'a', 't', 18, 2, 8, 3, 18, 2, 8, 4, 18, 2, 8, 5},
 		},
 		{
 			NewStoredRow(1, 0, []uint64{}, byte('t'), []byte("an american beer")),
@@ -305,10 +336,10 @@ func BenchmarkBackIndexRowEncode(b *testing.B) {
 	field := uint32(1)
 	t1 := "term1"
 	row := NewBackIndexRow(1,
-		[]*BackIndexTermEntry{
+		[]*BackIndexTermsEntry{
 			{
-				Term:  &t1,
 				Field: &field,
+				Terms: []string{t1},
 			},
 		},
 		[]*BackIndexStoreEntry{

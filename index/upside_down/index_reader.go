@@ -45,8 +45,8 @@ func (i *IndexReader) FieldDictPrefix(fieldName string, termPrefix []byte) (inde
 	return i.FieldDictRange(fieldName, termPrefix, termPrefix)
 }
 
-func (i *IndexReader) DocIDReader(start, end string) (index.DocIDReader, error) {
-	return newUpsideDownCouchDocIDReader(i, start, end)
+func (i *IndexReader) DocIDReaderAll() (index.DocIDReader, error) {
+	return newUpsideDownCouchDocIDReader(i)
 }
 
 func (i *IndexReader) DocIDReaderOnly(ids []string) (index.DocIDReader, error) {

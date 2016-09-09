@@ -135,15 +135,10 @@ type SmolderingCouchDocIDReader struct {
 	onlyMode    bool
 }
 
-func newSmolderingCouchDocIDReader(indexReader *IndexReader, start, end string) (*SmolderingCouchDocIDReader, error) {
-	startBytes := []byte(start)
-	if start == "" {
-		startBytes = []byte{0x0}
-	}
-	endBytes := []byte(end)
-	if end == "" {
-		endBytes = []byte{0xff}
-	}
+func newSmolderingCouchDocIDReader(indexReader *IndexReader) (*SmolderingCouchDocIDReader, error) {
+
+	startBytes := []byte{0x0}
+	endBytes := []byte{0xff}
 	bisrk := BackIndexRowKey(startBytes)
 	bierk := BackIndexRowKey(endBytes)
 	it := indexReader.kvreader.RangeIterator(bisrk, bierk)
@@ -187,12 +182,14 @@ func (r *SmolderingCouchDocIDReader) Next() (index.IndexInternalID, error) {
 			}
 
 			// find doc id
-			for _, te := range br.termEntries {
+			for _, te := range br.termsEntries {
 				if te.GetField() == 0 {
-					if _, ok := r.only[te.GetTerm()]; ok {
-						rv = append([]byte(nil), br.docNumber...)
-						r.iterator.Next()
-						return rv, nil
+					for i := range te.Terms {
+						if _, ok := r.only[te.Terms[i]]; ok {
+							rv = append([]byte(nil), br.docNumber...)
+							r.iterator.Next()
+							return rv, nil
+						}
 					}
 					break
 				}
@@ -228,12 +225,14 @@ func (r *SmolderingCouchDocIDReader) Advance(docID index.IndexInternalID) (index
 			}
 
 			// find doc id
-			for _, te := range br.termEntries {
+			for _, te := range br.termsEntries {
 				if te.GetField() == 0 {
-					if _, ok := r.only[te.GetTerm()]; ok {
-						rv = append([]byte(nil), br.docNumber...)
-						r.iterator.Next()
-						return rv, nil
+					for i := range te.Terms {
+						if _, ok := r.only[te.Terms[i]]; ok {
+							rv = append([]byte(nil), br.docNumber...)
+							r.iterator.Next()
+							return rv, nil
+						}
 					}
 					break
 				}

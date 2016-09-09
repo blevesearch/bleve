@@ -92,7 +92,8 @@ func TestDump(t *testing.T) {
 	// 16 date terms
 	// 3 stored fields
 	// 1 id term row
-	expectedDocRowCount := int(1+(2*(64/document.DefaultPrecisionStep))+3) + 1
+	// 1 id stored row
+	expectedDocRowCount := int(1+(2*(64/document.DefaultPrecisionStep))+3) + 1 + 1
 	docRowCount := 0
 	docRows := idx.DumpDoc("1")
 	for range docRows {

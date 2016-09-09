@@ -493,6 +493,13 @@ func TermFrequencyRowStart(term []byte, field uint16, docNum []byte) []byte {
 	return tfr.Key()
 }
 
+func TermFrequencyRowStartField(field uint16) []byte {
+	buf := make([]byte, 3)
+	buf[0] = 't'
+	binary.LittleEndian.PutUint16(buf[1:3], field)
+	return buf
+}
+
 func NewTermFrequencyRowWithTermVectors(term []byte, field uint16, docNum uint64, freq uint64, norm float32, vectors []*TermVector) *TermFrequencyRow {
 	return &TermFrequencyRow{
 		term:      term,
@@ -641,17 +648,8 @@ func NewTermFrequencyRowKV(key, value []byte) (*TermFrequencyRow, error) {
 
 type BackIndexRow struct {
 	docNumber     []byte
-	termEntries   []*BackIndexTermEntry
+	termsEntries  []*BackIndexTermsEntry
 	storedEntries []*BackIndexStoreEntry
-}
-
-func (br *BackIndexRow) FindExternalID() string {
-	for _, te := range br.termEntries {
-		if te.GetField() == 0 {
-			return te.GetTerm()
-		}
-	}
-	return ""
 }
 
 func (br *BackIndexRow) AllTermKeys() [][]byte {
@@ -659,10 +657,12 @@ func (br *BackIndexRow) AllTermKeys() [][]byte {
 		return nil
 	}
 
-	rv := make([][]byte, len(br.termEntries))
-	for i, termEntry := range br.termEntries {
-		termRowK := TermFrequencyRowStart([]byte(termEntry.GetTerm()), uint16(termEntry.GetField()), br.docNumber)
-		rv[i] = termRowK
+	rv := make([][]byte, 0, len(br.termsEntries)) // FIXME this underestimates severely
+	for _, termsEntry := range br.termsEntries {
+		for i := range termsEntry.Terms {
+			termRowK := TermFrequencyRowStart([]byte(termsEntry.Terms[i]), uint16(termsEntry.GetField()), br.docNumber)
+			rv = append(rv, termRowK)
+		}
 	}
 	return rv
 }
@@ -703,7 +703,7 @@ func (br *BackIndexRow) Value() []byte {
 
 func (br *BackIndexRow) ValueSize() int {
 	birv := &BackIndexRowValue{
-		TermEntries:   br.termEntries,
+		TermsEntries:  br.termsEntries,
 		StoredEntries: br.storedEntries,
 	}
 	return birv.Size()
@@ -711,7 +711,7 @@ func (br *BackIndexRow) ValueSize() int {
 
 func (br *BackIndexRow) ValueTo(buf []byte) (int, error) {
 	birv := &BackIndexRowValue{
-		TermEntries:   br.termEntries,
+		TermsEntries:  br.termsEntries,
 		StoredEntries: br.storedEntries,
 	}
 	return birv.MarshalTo(buf)
@@ -719,13 +719,13 @@ func (br *BackIndexRow) ValueTo(buf []byte) (int, error) {
 
 func (br *BackIndexRow) String() string {
 	_, dn, _ := DecodeUvarintAscending(br.docNumber)
-	return fmt.Sprintf("Backindex Document: %d Term Entries: %v, Stored Entries: %v", dn, br.termEntries, br.storedEntries)
+	return fmt.Sprintf("Backindex Document: %d Terms Entries: %v, Stored Entries: %v", dn, br.termsEntries, br.storedEntries)
 }
 
-func NewBackIndexRow(docNum uint64, entries []*BackIndexTermEntry, storedFields []*BackIndexStoreEntry) *BackIndexRow {
+func NewBackIndexRow(docNum uint64, entries []*BackIndexTermsEntry, storedFields []*BackIndexStoreEntry) *BackIndexRow {
 	return &BackIndexRow{
 		docNumber:     EncodeUvarintAscending(nil, docNum),
-		termEntries:   entries,
+		termsEntries:  entries,
 		storedEntries: storedFields,
 	}
 }
@@ -745,7 +745,7 @@ func NewBackIndexRowKV(key, value []byte) (*BackIndexRow, error) {
 	if err != nil {
 		return nil, err
 	}
-	rv.termEntries = birv.TermEntries
+	rv.termsEntries = birv.TermsEntries
 	rv.storedEntries = birv.StoredEntries
 
 	return &rv, nil

@@ -63,12 +63,9 @@ type AsyncIndex interface {
 type IndexReader interface {
 	TermFieldReader(term []byte, field string, includeFreq, includeNorm, includeTermVectors bool) (TermFieldReader, error)
 
-	// DocIDReader returns an iterator over documents which identifiers are
-	// greater than or equal to start and smaller than end. Set start to the
-	// empty string to iterate from the first document, end to the empty string
-	// to iterate to the last one.
+	// DocIDReader returns an iterator over all doc ids
 	// The caller must close returned instance to release associated resources.
-	DocIDReader(start, end string) (DocIDReader, error)
+	DocIDReaderAll() (DocIDReader, error)
 
 	DocIDReaderOnly(ids []string) (DocIDReader, error)
 
