@@ -1229,7 +1229,7 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 		}
 	}()
 
-	fieldTerms, err := indexReader.DocumentFieldTerms(EncodeUvarintAscending(nil, 1))
+	fieldTerms, err := indexReader.DocumentFieldTerms(EncodeUvarintAscending(nil, 1), []string{"_id", "name", "title"})
 	if err != nil {
 		t.Error(err)
 	}

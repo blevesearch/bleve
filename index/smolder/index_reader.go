@@ -98,26 +98,13 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 	return
 }
 
-func (i *IndexReader) DocumentFieldTerms(id index.IndexInternalID) (index.FieldTerms, error) {
+func (i *IndexReader) DocumentFieldTerms(id index.IndexInternalID, fields []string) (index.FieldTerms, error) {
 	back, err := i.index.backIndexRowForDoc(i, id, "")
 	if err != nil {
 		return nil, err
 	}
 	if back == nil {
 		return nil, nil
-	}
-	rv := make(index.FieldTerms, len(back.termsEntries))
-	for _, entry := range back.termsEntries {
-		fieldName := i.index.fieldCache.FieldIndexed(uint16(*entry.Field))
-		rv[fieldName] = entry.Terms
-	}
-	return rv, nil
-}
-
-func (i *IndexReader) DocumentFieldTermsForFields(id index.IndexInternalID, fields []string) (index.FieldTerms, error) {
-	back, err := i.index.backIndexRowForDoc(i, id, "")
-	if err != nil {
-		return nil, err
 	}
 	rv := make(index.FieldTerms, len(fields))
 	fieldsMap := make(map[uint16]string, len(fields))
