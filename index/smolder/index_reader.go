@@ -182,8 +182,11 @@ func (i *IndexReader) InternalID(id string) (index.IndexInternalID, error) {
 	if tfr.Count() < 1 {
 		return nil, nil
 	}
-	tfd := index.TermFieldDoc{}
-	tfr.Next(&tfd)
+	pre := index.TermFieldDoc{}
+	tfd, err := tfr.Next(&pre)
+	if err != nil {
+		return nil, err
+	}
 	return tfd.ID, nil
 }
 
