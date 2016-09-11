@@ -45,6 +45,12 @@ func TestEnglishPossessiveFilter(t *testing.T) {
 				&analysis.Token{
 					Term: []byte("m"),
 				},
+				&analysis.Token{
+					Term: []byte("s"),
+				},
+				&analysis.Token{
+					Term: []byte("'s"),
+				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
@@ -68,6 +74,12 @@ func TestEnglishPossessiveFilter(t *testing.T) {
 				&analysis.Token{
 					Term: []byte("m"),
 				},
+				&analysis.Token{
+					Term: []byte("s"),
+				},
+				&analysis.Token{
+					Term: []byte(""),
+				},
 			},
 		},
 	}
@@ -83,4 +95,43 @@ func TestEnglishPossessiveFilter(t *testing.T) {
 			t.Errorf("expected %s, got %s", test.output, actual)
 		}
 	}
+}
+
+func BenchmarkEnglishPossessiveFilter(b *testing.B) {
+
+	input := analysis.TokenStream{
+		&analysis.Token{
+			Term: []byte("marty's"),
+		},
+		&analysis.Token{
+			Term: []byte("MARTY'S"),
+		},
+		&analysis.Token{
+			Term: []byte("marty’s"),
+		},
+		&analysis.Token{
+			Term: []byte("MARTY’S"),
+		},
+		&analysis.Token{
+			Term: []byte("marty＇s"),
+		},
+		&analysis.Token{
+			Term: []byte("MARTY＇S"),
+		},
+		&analysis.Token{
+			Term: []byte("m"),
+		},
+	}
+
+	cache := registry.NewCache()
+	stemmerFilter, err := cache.TokenFilterNamed(PossessiveName)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		stemmerFilter.Filter(input)
+	}
+
 }

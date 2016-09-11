@@ -10,7 +10,7 @@
 package en
 
 import (
-	"bytes"
+	"unicode/utf8"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
@@ -40,15 +40,13 @@ func NewPossessiveFilter() *PossessiveFilter {
 
 func (s *PossessiveFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 	for _, token := range input {
-		runes := bytes.Runes(token.Term)
-		if len(runes) >= 2 {
-			secondToLastRune := runes[len(runes)-2]
-			lastRune := runes[len(runes)-1]
-			if (secondToLastRune == rightSingleQuotationMark ||
-				secondToLastRune == apostrophe ||
-				secondToLastRune == fullWidthApostrophe) &&
-				(lastRune == 's' || lastRune == 'S') {
-				token.Term = analysis.TruncateRunes(token.Term, 2)
+		lastRune, lastRuneSize := utf8.DecodeLastRune(token.Term)
+		if lastRune == 's' || lastRune == 'S' {
+			nextLastRune, nextLastRuneSize := utf8.DecodeLastRune(token.Term[:len(token.Term)-lastRuneSize])
+			if nextLastRune == rightSingleQuotationMark ||
+				nextLastRune == apostrophe ||
+				nextLastRune == fullWidthApostrophe {
+				token.Term = token.Term[:len(token.Term)-lastRuneSize-nextLastRuneSize]
 			}
 		}
 	}
