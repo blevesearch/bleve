@@ -616,7 +616,7 @@ func (udc *SmolderingCouch) mergeOldAndNew(externalDocId string, backIndexRow *B
 	return addRows, updateRows, deleteRows
 }
 
-func (udc *SmolderingCouch) storeField(docNum uint64, field document.Field, fieldIndex uint16, rows []index.IndexRow, backIndexStoredEntries []*BackIndexStoreEntry) ([]index.IndexRow, []*BackIndexStoreEntry) {
+func (udc *SmolderingCouch) storeField(docNum []byte, field document.Field, fieldIndex uint16, rows []index.IndexRow, backIndexStoredEntries []*BackIndexStoreEntry) ([]index.IndexRow, []*BackIndexStoreEntry) {
 	fieldType := encodeFieldType(field)
 	storedRow := NewStoredRow(docNum, fieldIndex, field.ArrayPositions(), fieldType, field.Value())
 
@@ -643,7 +643,7 @@ func encodeFieldType(f document.Field) byte {
 	return fieldType
 }
 
-func (udc *SmolderingCouch) indexField(docNum uint64, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies, rows []index.IndexRow, backIndexTermsEntries []*BackIndexTermsEntry) ([]index.IndexRow, []*BackIndexTermsEntry) {
+func (udc *SmolderingCouch) indexField(docNum []byte, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies, rows []index.IndexRow, backIndexTermsEntries []*BackIndexTermsEntry) ([]index.IndexRow, []*BackIndexTermsEntry) {
 	fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
 
 	terms := make([]string, 0, len(tokenFreqs))

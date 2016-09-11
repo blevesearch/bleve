@@ -21,6 +21,8 @@ func (udc *SmolderingCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		Rows:  make([]index.IndexRow, 0, 100),
 	}
 
+	docNumBytes := EncodeUvarintAscending(nil, d.Number)
+
 	// track our back index entries
 	backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
 
@@ -42,7 +44,7 @@ func (udc *SmolderingCouch) Analyze(d *document.Document) *index.AnalysisResult 
 	}, nil, false)
 	// store the _id field as well
 	f := document.NewTextField("_id", nil, []byte(idBytes))
-	rv.Rows, backIndexStoredEntries = udc.storeField(d.Number, f, 0, rv.Rows, backIndexStoredEntries)
+	rv.Rows, backIndexStoredEntries = udc.storeField(docNumBytes, f, 0, rv.Rows, backIndexStoredEntries)
 
 	analyzeField := func(field document.Field, storable bool) {
 		fieldIndex, newFieldRow := udc.fieldIndexOrNewRow(field.Name())
@@ -65,7 +67,7 @@ func (udc *SmolderingCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		}
 
 		if storable && field.Options().IsStored() {
-			rv.Rows, backIndexStoredEntries = udc.storeField(d.Number, field, fieldIndex, rv.Rows, backIndexStoredEntries)
+			rv.Rows, backIndexStoredEntries = udc.storeField(docNumBytes, field, fieldIndex, rv.Rows, backIndexStoredEntries)
 		}
 	}
 
@@ -110,11 +112,11 @@ func (udc *SmolderingCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		includeTermVectors := fieldIncludeTermVectors[fieldIndex]
 
 		// encode this field
-		rv.Rows, backIndexTermsEntries = udc.indexField(d.Number, includeTermVectors, fieldIndex, fieldLength, tokenFreqs, rv.Rows, backIndexTermsEntries)
+		rv.Rows, backIndexTermsEntries = udc.indexField(docNumBytes, includeTermVectors, fieldIndex, fieldLength, tokenFreqs, rv.Rows, backIndexTermsEntries)
 	}
 
 	// build the back index row
-	backIndexRow := NewBackIndexRow(d.Number, backIndexTermsEntries, backIndexStoredEntries)
+	backIndexRow := NewBackIndexRow(docNumBytes, backIndexTermsEntries, backIndexStoredEntries)
 	rv.Rows = append(rv.Rows, backIndexRow)
 
 	return rv

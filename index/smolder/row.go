@@ -462,11 +462,11 @@ func (tfr *TermFrequencyRow) String() string {
 	return fmt.Sprintf("Term: `%s` Field: %d Document: %d Frequency: %d Norm: %f Vectors: %v", string(tfr.term), tfr.field, dn, tfr.freq, tfr.norm, tfr.vectors)
 }
 
-func NewTermFrequencyRow(term []byte, field uint16, docNum uint64, freq uint64, norm float32) *TermFrequencyRow {
+func NewTermFrequencyRow(term []byte, field uint16, docNum []byte, freq uint64, norm float32) *TermFrequencyRow {
 	return &TermFrequencyRow{
 		term:      term,
 		field:     field,
-		docNumber: EncodeUvarintAscending(nil, docNum),
+		docNumber: docNum,
 		freq:      freq,
 		norm:      norm,
 	}
@@ -500,11 +500,11 @@ func TermFrequencyRowStartField(field uint16) []byte {
 	return buf
 }
 
-func NewTermFrequencyRowWithTermVectors(term []byte, field uint16, docNum uint64, freq uint64, norm float32, vectors []*TermVector) *TermFrequencyRow {
+func NewTermFrequencyRowWithTermVectors(term []byte, field uint16, docNum []byte, freq uint64, norm float32, vectors []*TermVector) *TermFrequencyRow {
 	return &TermFrequencyRow{
 		term:      term,
 		field:     field,
-		docNumber: EncodeUvarintAscending(nil, docNum),
+		docNumber: docNum,
 		freq:      freq,
 		norm:      norm,
 		vectors:   vectors,
@@ -722,9 +722,9 @@ func (br *BackIndexRow) String() string {
 	return fmt.Sprintf("Backindex Document: %d Terms Entries: %v, Stored Entries: %v", dn, br.termsEntries, br.storedEntries)
 }
 
-func NewBackIndexRow(docNum uint64, entries []*BackIndexTermsEntry, storedFields []*BackIndexStoreEntry) *BackIndexRow {
+func NewBackIndexRow(docNum []byte, entries []*BackIndexTermsEntry, storedFields []*BackIndexStoreEntry) *BackIndexRow {
 	return &BackIndexRow{
-		docNumber:     EncodeUvarintAscending(nil, docNum),
+		docNumber:     docNum,
 		termsEntries:  entries,
 		storedEntries: storedFields,
 	}
@@ -825,9 +825,9 @@ func (s *StoredRow) ScanPrefixForDoc() []byte {
 	return buf
 }
 
-func NewStoredRow(docNum uint64, field uint16, arrayPositions []uint64, typ byte, value []byte) *StoredRow {
+func NewStoredRow(docNum []byte, field uint16, arrayPositions []uint64, typ byte, value []byte) *StoredRow {
 	return &StoredRow{
-		docNumber:      EncodeUvarintAscending(nil, docNum),
+		docNumber:      docNum,
 		field:          field,
 		arrayPositions: arrayPositions,
 		typ:            typ,
