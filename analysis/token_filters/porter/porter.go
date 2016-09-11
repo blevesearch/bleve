@@ -10,6 +10,8 @@
 package porter
 
 import (
+	"bytes"
+
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/registry"
 
@@ -29,8 +31,9 @@ func (s *PorterStemmer) Filter(input analysis.TokenStream) analysis.TokenStream 
 	for _, token := range input {
 		// if it is not a protected keyword, stem it
 		if !token.KeyWord {
-			stemmed := porterstemmer.StemString(string(token.Term))
-			token.Term = []byte(stemmed)
+			termRunes := bytes.Runes(token.Term)
+			stemmedRunes := porterstemmer.StemWithoutLowerCasing(termRunes)
+			token.Term = analysis.BuildTermFromRunes(stemmedRunes)
 		}
 	}
 	return input

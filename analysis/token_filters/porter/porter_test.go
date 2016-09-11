@@ -32,6 +32,16 @@ func TestPorterStemmer(t *testing.T) {
 			Term:    []byte("protected"),
 			KeyWord: true,
 		},
+		&analysis.Token{
+			Term: []byte("cat"),
+		},
+		&analysis.Token{
+			Term: []byte("done"),
+		},
+		// a term which does stem, but does not change length
+		&analysis.Token{
+			Term: []byte("marty"),
+		},
 	}
 
 	expectedTokenStream := analysis.TokenStream{
@@ -48,6 +58,15 @@ func TestPorterStemmer(t *testing.T) {
 			Term:    []byte("protected"),
 			KeyWord: true,
 		},
+		&analysis.Token{
+			Term: []byte("cat"),
+		},
+		&analysis.Token{
+			Term: []byte("done"),
+		},
+		&analysis.Token{
+			Term: []byte("marti"),
+		},
 	}
 
 	filter := NewPorterStemmer()
@@ -55,4 +74,37 @@ func TestPorterStemmer(t *testing.T) {
 	if !reflect.DeepEqual(ouputTokenStream, expectedTokenStream) {
 		t.Errorf("expected %#v got %#v", expectedTokenStream[3], ouputTokenStream[3])
 	}
+}
+
+func BenchmarkPorterStemmer(b *testing.B) {
+
+	inputTokenStream := analysis.TokenStream{
+		&analysis.Token{
+			Term: []byte("walking"),
+		},
+		&analysis.Token{
+			Term: []byte("talked"),
+		},
+		&analysis.Token{
+			Term: []byte("business"),
+		},
+		&analysis.Token{
+			Term:    []byte("protected"),
+			KeyWord: true,
+		},
+		&analysis.Token{
+			Term: []byte("cat"),
+		},
+		&analysis.Token{
+			Term: []byte("done"),
+		},
+	}
+
+	filter := NewPorterStemmer()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		filter.Filter(inputTokenStream)
+	}
+
 }
