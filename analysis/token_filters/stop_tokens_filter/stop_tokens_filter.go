@@ -36,16 +36,16 @@ func NewStopTokensFilter(stopTokens analysis.TokenMap) *StopTokensFilter {
 }
 
 func (f *StopTokensFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
-	rv := make(analysis.TokenStream, 0, len(input))
-
+	j := 0
 	for _, token := range input {
 		_, isStopToken := f.stopTokens[string(token.Term)]
 		if !isStopToken {
-			rv = append(rv, token)
+			input[j] = token
+			j++
 		}
 	}
 
-	return rv
+	return input[:j]
 }
 
 func StopTokensFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
