@@ -71,3 +71,49 @@ func TestStopWordsFilter(t *testing.T) {
 		t.Errorf("expected %#v got %#v", expectedTokenStream, ouputTokenStream)
 	}
 }
+
+func BenchmarkStopWordsFilter(b *testing.B) {
+
+	inputTokenStream := analysis.TokenStream{
+		&analysis.Token{
+			Term: []byte("a"),
+		},
+		&analysis.Token{
+			Term: []byte("walk"),
+		},
+		&analysis.Token{
+			Term: []byte("in"),
+		},
+		&analysis.Token{
+			Term: []byte("the"),
+		},
+		&analysis.Token{
+			Term: []byte("park"),
+		},
+	}
+
+	cache := registry.NewCache()
+	stopListConfig := map[string]interface{}{
+		"type":   token_map.Name,
+		"tokens": []interface{}{"a", "in", "the"},
+	}
+	_, err := cache.DefineTokenMap("stop_test", stopListConfig)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	stopConfig := map[string]interface{}{
+		"type":           "stop_tokens",
+		"stop_token_map": "stop_test",
+	}
+	stopFilter, err := cache.DefineTokenFilter("stop_test", stopConfig)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		stopFilter.Filter(inputTokenStream)
+	}
+
+}
