@@ -51,10 +51,26 @@
 			"notests": true
 		},
 		{
+			"importpath": "github.com/leemcloughlin/gofarmhash",
+			"repository": "https://github.com/leemcloughlin/gofarmhash",
+			"vcs": "git",
+			"revision": "b3cc1466b93e9c540eda444faaeba9876682c61b",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/rcrowley/go-metrics",
 			"repository": "https://github.com/rcrowley/go-metrics",
 			"vcs": "",
 			"revision": "dee209f2455f101a5e4e593dea94872d2c62d85d",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/seiflotfy/cuckoofilter",
+			"repository": "https://github.com/seiflotfy/cuckoofilter",
+			"vcs": "git",
+			"revision": "d04838794ab86926d32b124345777e55e6f43974",
 			"branch": "master",
 			"notests": true
 		},
