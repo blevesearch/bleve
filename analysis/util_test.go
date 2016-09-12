@@ -69,3 +69,67 @@ func TestInsertRune(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildTermFromRunes(t *testing.T) {
+	tests := []struct {
+		in []rune
+	}{
+		{
+			in: []rune{'a', 'b', 'c'},
+		},
+		{
+			in: []rune{'こ', 'ん', 'に', 'ち', 'は', '世', '界'},
+		},
+	}
+	for _, test := range tests {
+		out := BuildTermFromRunes(test.in)
+		back := []rune(string(out))
+		if !reflect.DeepEqual(back, test.in) {
+			t.Errorf("expected %v to convert back to %v", out, test.in)
+		}
+	}
+}
+
+func TestBuildTermFromRunesOptimistic(t *testing.T) {
+	tests := []struct {
+		buf []byte
+		in  []rune
+	}{
+		{
+			buf: []byte("abc"),
+			in:  []rune{'a', 'b', 'c'},
+		},
+		{
+			buf: []byte("こんにちは世界"),
+			in:  []rune{'こ', 'ん', 'に', 'ち', 'は', '世', '界'},
+		},
+		// same, but don't give enough buffer
+		{
+			buf: []byte("ab"),
+			in:  []rune{'a', 'b', 'c'},
+		},
+		{
+			buf: []byte("こ"),
+			in:  []rune{'こ', 'ん', 'に', 'ち', 'は', '世', '界'},
+		},
+	}
+	for _, test := range tests {
+		out := BuildTermFromRunesOptimistic(test.buf, test.in)
+		back := []rune(string(out))
+		if !reflect.DeepEqual(back, test.in) {
+			t.Errorf("expected %v to convert back to %v", out, test.in)
+		}
+	}
+}
+
+func BenchmarkBuildTermFromRunes(b *testing.B) {
+	input := [][]rune{
+		{'a', 'b', 'c'},
+		{'こ', 'ん', 'に', 'ち', 'は', '世', '界'},
+	}
+	for i := 0; i < b.N; i++ {
+		for _, i := range input {
+			BuildTermFromRunes(i)
+		}
+	}
+}
