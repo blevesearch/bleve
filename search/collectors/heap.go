@@ -40,6 +40,9 @@ func (c *collectStoreHeap) RemoveLast() *search.DocumentMatch {
 func (c *collectStoreHeap) Final(skip int, fixup collectorFixup) (search.DocumentMatchCollection, error) {
 	count := c.Len()
 	size := count - skip
+	if size <= 0 {
+		return make(search.DocumentMatchCollection, 0), nil
+	}
 	rv := make(search.DocumentMatchCollection, size)
 	for count > 0 {
 		count--
