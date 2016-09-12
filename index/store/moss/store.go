@@ -35,10 +35,13 @@ type Store struct {
 	m       sync.Mutex
 	ms      moss.Collection
 	mo      store.MergeOperator
-	llstore store.KVStore
+	llstore store.KVStore // May be nil (ex: when using mossStore).
+	llstats statsFunc     // May be nil.
 
 	s *stats
 }
+
+type statsFunc func() map[string]interface{}
 
 // New initializes a moss storage with values from the optional
 // config["mossCollectionOptions"] (a JSON moss.CollectionOptions).
@@ -102,6 +105,8 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 	}
 
 	var llStore store.KVStore
+	var llStats statsFunc
+
 	if options.LowerLevelInit == nil &&
 		options.LowerLevelUpdate == nil &&
 		mossLowerLevelStoreName != "" {
@@ -127,7 +132,7 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 			mossLowerLevelMaxBatchSize = uint64(mossLowerLevelMaxBatchSizeF)
 		}
 
-		lowerLevelInit, lowerLevelUpdate, lowerLevelStore, err :=
+		lowerLevelInit, lowerLevelUpdate, lowerLevelStore, lowerLevelStats, err :=
 			initLowerLevelStore(config,
 				mossLowerLevelStoreName,
 				mossLowerLevelStoreConfig,
@@ -139,7 +144,9 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 
 		options.LowerLevelInit = lowerLevelInit
 		options.LowerLevelUpdate = lowerLevelUpdate
+
 		llStore = lowerLevelStore
+		llStats = lowerLevelStats
 	}
 
 	// --------------------------------------------------
@@ -156,6 +163,7 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 		ms:      ms,
 		mo:      mo,
 		llstore: llStore,
+		llstats: llStats,
 	}
 	rv.s = &stats{s: &rv}
 	return &rv, nil

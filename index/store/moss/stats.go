@@ -34,6 +34,11 @@ func (s *stats) statsMap() map[string]interface{} {
 		}
 	}
 
+	_, exists := ms["kv"]
+	if !exists && s.s.llstats != nil {
+		ms["kv"] = s.s.llstats()
+	}
+
 	return ms
 }
 
