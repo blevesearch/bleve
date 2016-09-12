@@ -22,7 +22,7 @@ type MatchAllSearcher struct {
 }
 
 func NewMatchAllSearcher(indexReader index.IndexReader, boost float64, explain bool) (*MatchAllSearcher, error) {
-	reader, err := indexReader.DocIDReader("", "")
+	reader, err := indexReader.DocIDReaderAll()
 	if err != nil {
 		return nil, err
 	}

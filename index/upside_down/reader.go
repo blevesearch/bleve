@@ -138,15 +138,11 @@ type UpsideDownCouchDocIDReader struct {
 	onlyMode    bool
 }
 
-func newUpsideDownCouchDocIDReader(indexReader *IndexReader, start, end string) (*UpsideDownCouchDocIDReader, error) {
-	startBytes := []byte(start)
-	if start == "" {
-		startBytes = []byte{0x0}
-	}
-	endBytes := []byte(end)
-	if end == "" {
-		endBytes = []byte{0xff}
-	}
+func newUpsideDownCouchDocIDReader(indexReader *IndexReader) (*UpsideDownCouchDocIDReader, error) {
+
+	startBytes := []byte{0x0}
+	endBytes := []byte{0xff}
+
 	bisr := NewBackIndexRow(startBytes, nil, nil)
 	bier := NewBackIndexRow(endBytes, nil, nil)
 	it := indexReader.kvreader.RangeIterator(bisr.Key(), bier.Key())

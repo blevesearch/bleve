@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package upside_down
+package smolder
 
 import (
 	"reflect"
@@ -27,7 +27,7 @@ func TestIndexReader(t *testing.T) {
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
+	idx, err := NewSmolderingCouch(boltdb.Name, boltTestConfig, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestIndexReader(t *testing.T) {
 	}
 
 	expectedMatch := &index.TermFieldDoc{
-		ID:   index.IndexInternalID("2"),
+		ID:   EncodeUvarintAscending(nil, 2),
 		Freq: 1,
 		Norm: 0.5773502588272095,
 		Vectors: []*index.TermFieldVector{
@@ -145,17 +145,19 @@ func TestIndexReader(t *testing.T) {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
 
-	match, err = reader.Advance(index.IndexInternalID("2"), nil)
+	internalID2 := EncodeUvarintAscending(nil, 2)
+	match, err = reader.Advance(internalID2, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if match == nil {
 		t.Fatalf("Expected match, got nil")
 	}
-	if !match.ID.Equals(index.IndexInternalID("2")) {
+	if !match.ID.Equals(internalID2) {
 		t.Errorf("Expected ID '2', got '%s'", match.ID)
 	}
-	match, err = reader.Advance(index.IndexInternalID("3"), nil)
+	internalID3 := EncodeUvarintAscending(nil, 3)
+	match, err = reader.Advance(internalID3, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -202,7 +204,7 @@ func TestIndexDocIdReader(t *testing.T) {
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
+	idx, err := NewSmolderingCouch(boltdb.Name, boltTestConfig, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,29 +282,21 @@ func TestIndexDocIdReader(t *testing.T) {
 		}
 	}()
 
-	id, err = reader2.Advance(index.IndexInternalID("2"))
+	internalID2 := EncodeUvarintAscending(nil, 2)
+	id, err = reader2.Advance(internalID2)
 	if err != nil {
 		t.Error(err)
 	}
-	if !id.Equals(index.IndexInternalID("2")) {
+	if !id.Equals(internalID2) {
 		t.Errorf("expected to find id '2', got '%s'", id)
 	}
 
-	id, err = reader2.Advance(index.IndexInternalID("3"))
+	internalID3 := EncodeUvarintAscending(nil, 3)
+	id, err = reader2.Advance(internalID3)
 	if err != nil {
 		t.Error(err)
 	}
 	if id != nil {
 		t.Errorf("expected to find id '', got '%s'", id)
-	}
-}
-
-func TestCrashBadBackIndexRow(t *testing.T) {
-	br, err := NewBackIndexRowKV([]byte{byte('b'), byte('a'), ByteSeparator}, []byte{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(br.doc) != "a" {
-		t.Fatal(err)
 	}
 }

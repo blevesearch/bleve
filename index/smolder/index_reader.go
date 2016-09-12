@@ -7,16 +7,18 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package upside_down
+package smolder
 
 import (
+	"fmt"
+
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
 )
 
 type IndexReader struct {
-	index    *UpsideDownCouch
+	index    *SmolderingCouch
 	kvreader store.KVReader
 	docCount uint64
 }
@@ -24,9 +26,9 @@ type IndexReader struct {
 func (i *IndexReader) TermFieldReader(term []byte, fieldName string, includeFreq, includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
 	fieldIndex, fieldExists := i.index.fieldCache.FieldNamed(fieldName, false)
 	if fieldExists {
-		return newUpsideDownCouchTermFieldReader(i, term, uint16(fieldIndex), includeFreq, includeNorm, includeTermVectors)
+		return newSmolderingCouchTermFieldReader(i, term, uint16(fieldIndex), includeFreq, includeNorm, includeTermVectors)
 	}
-	return newUpsideDownCouchTermFieldReader(i, []byte{ByteSeparator}, ^uint16(0), includeFreq, includeNorm, includeTermVectors)
+	return newSmolderingCouchTermFieldReader(i, []byte{ByteSeparator}, ^uint16(0), includeFreq, includeNorm, includeTermVectors)
 }
 
 func (i *IndexReader) FieldDict(fieldName string) (index.FieldDict, error) {
@@ -36,9 +38,9 @@ func (i *IndexReader) FieldDict(fieldName string) (index.FieldDict, error) {
 func (i *IndexReader) FieldDictRange(fieldName string, startTerm []byte, endTerm []byte) (index.FieldDict, error) {
 	fieldIndex, fieldExists := i.index.fieldCache.FieldNamed(fieldName, false)
 	if fieldExists {
-		return newUpsideDownCouchFieldDict(i, uint16(fieldIndex), startTerm, endTerm)
+		return newSmolderingCouchFieldDict(i, uint16(fieldIndex), startTerm, endTerm)
 	}
-	return newUpsideDownCouchFieldDict(i, ^uint16(0), []byte{ByteSeparator}, []byte{})
+	return newSmolderingCouchFieldDict(i, ^uint16(0), []byte{ByteSeparator}, []byte{})
 }
 
 func (i *IndexReader) FieldDictPrefix(fieldName string, termPrefix []byte) (index.FieldDict, error) {
@@ -46,17 +48,18 @@ func (i *IndexReader) FieldDictPrefix(fieldName string, termPrefix []byte) (inde
 }
 
 func (i *IndexReader) DocIDReaderAll() (index.DocIDReader, error) {
-	return newUpsideDownCouchDocIDReader(i)
+	return newSmolderingCouchDocIDReader(i)
 }
 
 func (i *IndexReader) DocIDReaderOnly(ids []string) (index.DocIDReader, error) {
-	return newUpsideDownCouchDocIDReaderOnly(i, ids)
+	return newSmolderingCouchDocIDReaderOnly(i, ids)
 }
 
 func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
+
 	// first hit the back index to confirm doc exists
 	var backIndexRow *BackIndexRow
-	backIndexRow, err = i.index.backIndexRowForDoc(i.kvreader, []byte(id))
+	backIndexRow, err = i.index.backIndexRowForDoc(i, nil, id)
 	if err != nil {
 		return
 	}
@@ -64,8 +67,7 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 		return
 	}
 	doc = document.NewDocument(id)
-	storedRow := NewStoredRow([]byte(id), 0, []uint64{}, 'x', nil)
-	storedRowScanPrefix := storedRow.ScanPrefixForDoc()
+	storedRowScanPrefix := NewStoredRowDocBytes(backIndexRow.docNumber, 0, []uint64{}, 'x', nil).ScanPrefixForDoc()
 	it := i.kvreader.PrefixIterator(storedRowScanPrefix)
 	defer func() {
 		if cerr := it.Close(); err == nil && cerr != nil {
@@ -97,26 +99,25 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 }
 
 func (i *IndexReader) DocumentFieldTerms(id index.IndexInternalID, fields []string) (index.FieldTerms, error) {
-	back, err := i.index.backIndexRowForDoc(i.kvreader, id)
+	back, err := i.index.backIndexRowForDoc(i, id, "")
 	if err != nil {
 		return nil, err
+	}
+	if back == nil {
+		return nil, nil
 	}
 	rv := make(index.FieldTerms, len(fields))
 	fieldsMap := make(map[uint16]string, len(fields))
 	for _, f := range fields {
 		id, ok := i.index.fieldCache.FieldNamed(f, false)
-		if ok {
-			fieldsMap[id] = f
+		if !ok {
+			return nil, fmt.Errorf("Field %s was not found in cache", f)
 		}
+		fieldsMap[id] = f
 	}
-	for _, entry := range back.termEntries {
+	for _, entry := range back.termsEntries {
 		if field, ok := fieldsMap[uint16(*entry.Field)]; ok {
-			terms, ok := rv[field]
-			if !ok {
-				terms = make([]string, 0)
-			}
-			terms = append(terms, *entry.Term)
-			rv[field] = terms
+			rv[field] = entry.Terms
 		}
 	}
 	return rv, nil
@@ -132,7 +133,7 @@ func (i *IndexReader) Fields() (fields []string, err error) {
 	}()
 	key, val, valid := it.Current()
 	for valid {
-		var row UpsideDownCouchRow
+		var row SmolderingCouchRow
 		row, err = ParseFromKeyValue(key, val)
 		if err != nil {
 			fields = nil
@@ -165,11 +166,28 @@ func (i *IndexReader) Close() error {
 }
 
 func (i *IndexReader) ExternalID(id index.IndexInternalID) (string, error) {
-	return string(id), nil
+	k := StoredRowDocFieldKey(id, 0)
+	v, err := i.kvreader.Get(k)
+	if err != nil {
+		return "", err
+	}
+	return string(v[1:]), nil
 }
 
 func (i *IndexReader) InternalID(id string) (index.IndexInternalID, error) {
-	return index.IndexInternalID(id), nil
+	tfr, err := i.TermFieldReader([]byte(id), "_id", false, false, false)
+	if err != nil {
+		return nil, err
+	}
+	if tfr.Count() < 1 {
+		return nil, nil
+	}
+	pre := index.TermFieldDoc{}
+	tfd, err := tfr.Next(&pre)
+	if err != nil {
+		return nil, err
+	}
+	return tfd.ID, nil
 }
 
 func incrementBytes(in []byte) []byte {
