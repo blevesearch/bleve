@@ -64,29 +64,14 @@ func TestIndexAliasSingle(t *testing.T) {
 		t.Errorf("expected %v, got %v", expectedError, err)
 	}
 
-	res := alias.DumpAll()
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
-	res = alias.DumpDoc("a")
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
-	res = alias.DumpFields()
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
 	mapping := alias.Mapping()
 	if mapping != nil {
-		t.Errorf("expected nil, got %v", res)
+		t.Errorf("expected nil, got %v", mapping)
 	}
 
 	indexStat := alias.Stats()
 	if indexStat != nil {
-		t.Errorf("expected nil, got %v", res)
+		t.Errorf("expected nil, got %v", indexStat)
 	}
 
 	// now a few things that should work
@@ -153,29 +138,14 @@ func TestIndexAliasSingle(t *testing.T) {
 		t.Errorf("expected %v, got %v", expectedError2, err)
 	}
 
-	res = alias.DumpAll()
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
-	res = alias.DumpDoc("a")
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
-	res = alias.DumpFields()
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
 	mapping = alias.Mapping()
 	if mapping != nil {
-		t.Errorf("expected nil, got %v", res)
+		t.Errorf("expected nil, got %v", mapping)
 	}
 
 	indexStat = alias.Stats()
 	if indexStat != nil {
-		t.Errorf("expected nil, got %v", res)
+		t.Errorf("expected nil, got %v", indexStat)
 	}
 
 	// now a few things that should work
@@ -240,29 +210,14 @@ func TestIndexAliasSingle(t *testing.T) {
 		t.Errorf("expected %v, got %v", expectedError3, err)
 	}
 
-	res = alias.DumpAll()
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
-	res = alias.DumpDoc("a")
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
-	res = alias.DumpFields()
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
 	mapping = alias.Mapping()
 	if mapping != nil {
-		t.Errorf("expected nil, got %v", res)
+		t.Errorf("expected nil, got %v", mapping)
 	}
 
 	indexStat = alias.Stats()
 	if indexStat != nil {
-		t.Errorf("expected nil, got %v", res)
+		t.Errorf("expected nil, got %v", indexStat)
 	}
 
 	// now a few things that should work
@@ -328,29 +283,14 @@ func TestIndexAliasClosed(t *testing.T) {
 		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
 	}
 
-	res := alias.DumpAll()
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
-	res = alias.DumpDoc("a")
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
-	res = alias.DumpFields()
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
 	mapping := alias.Mapping()
 	if mapping != nil {
-		t.Errorf("expected nil, got %v", res)
+		t.Errorf("expected nil, got %v", mapping)
 	}
 
 	indexStat := alias.Stats()
 	if indexStat != nil {
-		t.Errorf("expected nil, got %v", res)
+		t.Errorf("expected nil, got %v", indexStat)
 	}
 
 	// now a few things that should work
@@ -410,29 +350,14 @@ func TestIndexAliasEmpty(t *testing.T) {
 		t.Errorf("expected %v, got %v", ErrorAliasEmpty, err)
 	}
 
-	res := alias.DumpAll()
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
-	res = alias.DumpDoc("a")
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
-	res = alias.DumpFields()
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
 	mapping := alias.Mapping()
 	if mapping != nil {
-		t.Errorf("expected nil, got %v", res)
+		t.Errorf("expected nil, got %v", mapping)
 	}
 
 	indexStat := alias.Stats()
 	if indexStat != nil {
-		t.Errorf("expected nil, got %v", res)
+		t.Errorf("expected nil, got %v", indexStat)
 	}
 
 	// now a few things that should work
@@ -538,29 +463,14 @@ func TestIndexAliasMulti(t *testing.T) {
 		t.Errorf("expected %v, got %v", ErrorAliasMulti, err)
 	}
 
-	res := alias.DumpAll()
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
-	res = alias.DumpDoc("a")
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
-	res = alias.DumpFields()
-	if res != nil {
-		t.Errorf("expected nil, got %v", res)
-	}
-
 	mapping := alias.Mapping()
 	if mapping != nil {
-		t.Errorf("expected nil, got %v", res)
+		t.Errorf("expected nil, got %v", mapping)
 	}
 
 	indexStat := alias.Stats()
 	if indexStat != nil {
-		t.Errorf("expected nil, got %v", res)
+		t.Errorf("expected nil, got %v", indexStat)
 	}
 
 	// now a few things that should work
@@ -1353,18 +1263,6 @@ func (i *stubIndex) FieldDictRange(field string, startTerm []byte, endTerm []byt
 
 func (i *stubIndex) FieldDictPrefix(field string, termPrefix []byte) (index.FieldDict, error) {
 	return nil, i.err
-}
-
-func (i *stubIndex) DumpAll() chan interface{} {
-	return nil
-}
-
-func (i *stubIndex) DumpDoc(id string) chan interface{} {
-	return nil
-}
-
-func (i *stubIndex) DumpFields() chan interface{} {
-	return nil
 }
 
 func (i *stubIndex) Close() error {

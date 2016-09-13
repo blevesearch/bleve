@@ -56,7 +56,7 @@ func (i *IndexReader) DocIDReaderOnly(ids []string) (index.DocIDReader, error) {
 func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 	// first hit the back index to confirm doc exists
 	var backIndexRow *BackIndexRow
-	backIndexRow, err = i.index.backIndexRowForDoc(i.kvreader, []byte(id))
+	backIndexRow, err = backIndexRowForDoc(i.kvreader, []byte(id))
 	if err != nil {
 		return
 	}
@@ -97,7 +97,7 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 }
 
 func (i *IndexReader) DocumentFieldTerms(id index.IndexInternalID, fields []string) (index.FieldTerms, error) {
-	back, err := i.index.backIndexRowForDoc(i.kvreader, id)
+	back, err := backIndexRowForDoc(i.kvreader, id)
 	if err != nil {
 		return nil, err
 	}
@@ -156,8 +156,8 @@ func (i *IndexReader) GetInternal(key []byte) ([]byte, error) {
 	return i.kvreader.Get(internalRow.Key())
 }
 
-func (i *IndexReader) DocCount() uint64 {
-	return i.docCount
+func (i *IndexReader) DocCount() (uint64, error) {
+	return i.docCount, nil
 }
 
 func (i *IndexReader) Close() error {

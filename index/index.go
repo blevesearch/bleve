@@ -24,18 +24,12 @@ type Index interface {
 	Open() error
 	Close() error
 
-	DocCount() (uint64, error)
-
 	Update(doc *document.Document) error
 	Delete(id string) error
 	Batch(batch *Batch) error
 
 	SetInternal(key, val []byte) error
 	DeleteInternal(key []byte) error
-
-	DumpAll() chan interface{}
-	DumpDoc(id string) chan interface{}
-	DumpFields() chan interface{}
 
 	// Reader returns a low-level accessor on the index data. Close it to
 	// release associated resources.
@@ -71,10 +65,14 @@ type IndexReader interface {
 
 	GetInternal(key []byte) ([]byte, error)
 
-	DocCount() uint64
+	DocCount() (uint64, error)
 
 	ExternalID(id IndexInternalID) (string, error)
 	InternalID(id string) (IndexInternalID, error)
+
+	DumpAll() chan interface{}
+	DumpDoc(id string) chan interface{}
+	DumpFields() chan interface{}
 
 	Close() error
 }

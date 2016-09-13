@@ -59,7 +59,7 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 
 	// first hit the back index to confirm doc exists
 	var backIndexRow *BackIndexRow
-	backIndexRow, err = i.index.backIndexRowForDoc(i, nil, id)
+	backIndexRow, err = i.backIndexRowForDoc(nil, id)
 	if err != nil {
 		return
 	}
@@ -99,7 +99,7 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 }
 
 func (i *IndexReader) DocumentFieldTerms(id index.IndexInternalID, fields []string) (index.FieldTerms, error) {
-	back, err := i.index.backIndexRowForDoc(i, id, "")
+	back, err := i.backIndexRowForDoc(id, "")
 	if err != nil {
 		return nil, err
 	}
@@ -157,8 +157,8 @@ func (i *IndexReader) GetInternal(key []byte) ([]byte, error) {
 	return i.kvreader.Get(internalRow.Key())
 }
 
-func (i *IndexReader) DocCount() uint64 {
-	return i.docCount
+func (i *IndexReader) DocCount() (uint64, error) {
+	return i.docCount, nil
 }
 
 func (i *IndexReader) Close() error {
@@ -188,6 +188,50 @@ func (i *IndexReader) InternalID(id string) (index.IndexInternalID, error) {
 		return nil, err
 	}
 	return tfd.ID, nil
+}
+
+func (i *IndexReader) backIndexRowForDoc(docID index.IndexInternalID, externalDocID string) (*BackIndexRow, error) {
+
+	var err error
+	// first look up the docID if it isn't known
+	if docID == nil {
+		// first get the internal identifier
+		docID, err = i.InternalID(externalDocID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(docID) < 1 {
+		return nil, nil
+	}
+
+	// use a temporary row structure to build key
+	tempRow := &BackIndexRow{
+		docNumber: docID,
+	}
+
+	keyBuf := GetRowBuffer()
+	if tempRow.KeySize() > len(keyBuf) {
+		keyBuf = make([]byte, 2*tempRow.KeySize())
+	}
+	defer PutRowBuffer(keyBuf)
+	keySize, err := tempRow.KeyTo(keyBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	value, err := i.kvreader.Get(keyBuf[:keySize])
+	if err != nil {
+		return nil, err
+	}
+	if value == nil {
+		return nil, nil
+	}
+	backIndexRow, err := NewBackIndexRowKV(keyBuf[:keySize], value)
+	if err != nil {
+		return nil, err
+	}
+	return backIndexRow, nil
 }
 
 func incrementBytes(in []byte) []byte {

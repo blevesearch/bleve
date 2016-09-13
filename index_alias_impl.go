@@ -251,54 +251,6 @@ func (i *indexAliasImpl) FieldDictPrefix(field string, termPrefix []byte) (index
 	}, nil
 }
 
-func (i *indexAliasImpl) DumpAll() chan interface{} {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-
-	if !i.open {
-		return nil
-	}
-
-	err := i.isAliasToSingleIndex()
-	if err != nil {
-		return nil
-	}
-
-	return i.indexes[0].DumpAll()
-}
-
-func (i *indexAliasImpl) DumpDoc(id string) chan interface{} {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-
-	if !i.open {
-		return nil
-	}
-
-	err := i.isAliasToSingleIndex()
-	if err != nil {
-		return nil
-	}
-
-	return i.indexes[0].DumpDoc(id)
-}
-
-func (i *indexAliasImpl) DumpFields() chan interface{} {
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
-
-	if !i.open {
-		return nil
-	}
-
-	err := i.isAliasToSingleIndex()
-	if err != nil {
-		return nil
-	}
-
-	return i.indexes[0].DumpFields()
-}
-
 func (i *indexAliasImpl) Close() error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()

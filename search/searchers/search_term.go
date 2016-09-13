@@ -30,7 +30,11 @@ func NewTermSearcher(indexReader index.IndexReader, term string, field string, b
 	if err != nil {
 		return nil, err
 	}
-	scorer := scorers.NewTermQueryScorer(term, field, boost, indexReader.DocCount(), reader.Count(), explain)
+	count, err := indexReader.DocCount()
+	if err != nil {
+		return nil, err
+	}
+	scorer := scorers.NewTermQueryScorer(term, field, boost, count, reader.Count(), explain)
 	return &TermSearcher{
 		indexReader: indexReader,
 		term:        term,

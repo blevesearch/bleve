@@ -295,12 +295,6 @@ func (udc *SmolderingCouch) batchRows(writer store.KVWriter, addRowsAll [][]Smol
 	return writer.ExecuteBatch(wb)
 }
 
-func (udc *SmolderingCouch) DocCount() (uint64, error) {
-	udc.m.RLock()
-	defer udc.m.RUnlock()
-	return udc.docCount, nil
-}
-
 func (udc *SmolderingCouch) Open() (err error) {
 	//acquire the write mutex for the duratin of Open()
 	udc.writeMutex.Lock()
@@ -462,7 +456,7 @@ func (udc *SmolderingCouch) Update(doc *document.Document) (err error) {
 	udc.writeMutex.Lock()
 	defer udc.writeMutex.Unlock()
 
-	indexReader, err := udc.Reader()
+	indexReader, err := udc.reader()
 	if err != nil {
 		return
 	}
@@ -471,7 +465,7 @@ func (udc *SmolderingCouch) Update(doc *document.Document) (err error) {
 	// lookup the back index row
 	var backIndexRow *BackIndexRow
 	if udc.cf.Lookup([]byte(doc.ID)) {
-		backIndexRow, err = udc.backIndexRowForDoc(indexReader, nil, doc.ID)
+		backIndexRow, err = indexReader.backIndexRowForDoc(nil, doc.ID)
 		if err != nil {
 			_ = indexReader.Close()
 			atomic.AddUint64(&udc.stats.errors, 1)
@@ -674,7 +668,7 @@ func (udc *SmolderingCouch) Delete(id string) (err error) {
 	udc.writeMutex.Lock()
 	defer udc.writeMutex.Unlock()
 
-	indexReader, err := udc.Reader()
+	indexReader, err := udc.reader()
 	if err != nil {
 		return
 	}
@@ -682,7 +676,7 @@ func (udc *SmolderingCouch) Delete(id string) (err error) {
 	// first we lookup the backindex row for the doc id if it exists
 	// lookup the back index row
 	var backIndexRow *BackIndexRow
-	backIndexRow, err = udc.backIndexRowForDoc(indexReader, nil, id)
+	backIndexRow, err = indexReader.backIndexRowForDoc(nil, id)
 	if err != nil {
 		_ = indexReader.Close()
 		atomic.AddUint64(&udc.stats.errors, 1)
@@ -749,54 +743,6 @@ func (udc *SmolderingCouch) deleteSingle(id index.IndexInternalID, backIndexRow 
 	// also delete the back entry itself
 	deleteRows = append(deleteRows, backIndexRow)
 	return deleteRows
-}
-
-func (udc *SmolderingCouch) backIndexRowForDoc(indexReader index.IndexReader, docID index.IndexInternalID, externalDocID string) (*BackIndexRow, error) {
-
-	var err error
-	// first look up the docID if it isn't known
-	if docID == nil {
-		// first get the internal identifier
-		docID, err = indexReader.InternalID(externalDocID)
-		if err != nil {
-			_ = indexReader.Close()
-			return nil, err
-		}
-	}
-	if len(docID) < 1 {
-		return nil, nil
-	}
-
-	// use a temporary row structure to build key
-	tempRow := &BackIndexRow{
-		docNumber: docID,
-	}
-
-	keyBuf := GetRowBuffer()
-	if tempRow.KeySize() > len(keyBuf) {
-		keyBuf = make([]byte, 2*tempRow.KeySize())
-	}
-	defer PutRowBuffer(keyBuf)
-	keySize, err := tempRow.KeyTo(keyBuf)
-	if err != nil {
-		return nil, err
-	}
-
-	// open a reader for backindex lookup
-	var kvreader = indexReader.(*IndexReader).kvreader
-
-	value, err := kvreader.Get(keyBuf[:keySize])
-	if err != nil {
-		return nil, err
-	}
-	if value == nil {
-		return nil, nil
-	}
-	backIndexRow, err := NewBackIndexRowKV(keyBuf[:keySize], value)
-	if err != nil {
-		return nil, err
-	}
-	return backIndexRow, nil
 }
 
 func decodeFieldType(typ byte, name string, pos []uint64, value []byte) document.Field {
@@ -908,7 +854,7 @@ func (udc *SmolderingCouch) Batch(batch *index.Batch) (err error) {
 
 		// open a reader for backindex lookup
 
-		indexReader, err := udc.Reader()
+		indexReader, err := udc.reader()
 		if err != nil {
 			docBackIndexRowErr = err
 			return
@@ -917,7 +863,7 @@ func (udc *SmolderingCouch) Batch(batch *index.Batch) (err error) {
 		for docID, doc := range batch.IndexOps {
 			var backIndexRow *BackIndexRow
 			if udc.cf.Lookup([]byte(docID)) {
-				backIndexRow, err = udc.backIndexRowForDoc(indexReader, nil, docID)
+				backIndexRow, err = indexReader.backIndexRowForDoc(nil, docID)
 				if err != nil {
 					docBackIndexRowErr = err
 					return
@@ -1094,6 +1040,10 @@ func (udc *SmolderingCouch) DeleteInternal(key []byte) (err error) {
 }
 
 func (udc *SmolderingCouch) Reader() (index.IndexReader, error) {
+	return udc.reader()
+}
+
+func (udc *SmolderingCouch) reader() (*IndexReader, error) {
 	kvr, err := udc.store.Reader()
 	if err != nil {
 		return nil, fmt.Errorf("error opening store reader: %v", err)

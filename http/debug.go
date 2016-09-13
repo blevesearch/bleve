@@ -52,8 +52,19 @@ func (h *DebugDocumentHandler) ServeHTTP(w http.ResponseWriter, req *http.Reques
 		docID = h.DocIDLookup(req)
 	}
 
-	rv := make([]interface{}, 0)
-	rowChan := index.DumpDoc(docID)
+	internalIndex, _, err := index.Advanced()
+	if err != nil {
+		showError(w, req, fmt.Sprintf("error getting index: %v", err), 500)
+		return
+	}
+	internalIndexReader, err := internalIndex.Reader()
+	if err != nil {
+		showError(w, req, fmt.Sprintf("error operning index reader: %v", err), 500)
+		return
+	}
+
+	var rv []interface{}
+	rowChan := internalIndexReader.DumpDoc(docID)
 	for row := range rowChan {
 		switch row := row.(type) {
 		case error:
@@ -69,6 +80,11 @@ func (h *DebugDocumentHandler) ServeHTTP(w http.ResponseWriter, req *http.Reques
 			}
 			rv = append(rv, tmp)
 		}
+	}
+	err = internalIndexReader.Close()
+	if err != nil {
+		showError(w, req, fmt.Sprintf("error closing index reader: %v", err), 500)
+		return
 	}
 	mustEncode(w, rv)
 }
