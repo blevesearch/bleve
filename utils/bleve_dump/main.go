@@ -81,19 +81,27 @@ index specified by -index.
 		return
 	}
 
+	internalIndex, _, err := index.Advanced()
+	if err != nil {
+		log.Fatal(err)
+	}
+	internalIndexReader, err := internalIndex.Reader()
+	if err != nil {
+		log.Fatal(err)
+	}
 	var dumpChan chan interface{}
 	if *docID != "" {
 		if *fieldsOnly {
 			log.Fatal("-docID cannot be used with -fields")
 		}
-		dumpChan = index.DumpDoc(*docID)
+		dumpChan = internalIndexReader.DumpDoc(*docID)
 	} else if *fieldsOnly {
-		dumpChan = index.DumpFields()
+		dumpChan = internalIndexReader.DumpFields()
 	} else if *dictionary != "" {
 		dumpDictionary(index, *dictionary)
 		return
 	} else {
-		dumpChan = index.DumpAll()
+		dumpChan = internalIndexReader.DumpAll()
 	}
 
 	for rowOrErr := range dumpChan {
@@ -104,6 +112,10 @@ index specified by -index.
 			fmt.Printf("%v\n", rowOrErr)
 			fmt.Printf("Key:   % -100x\nValue: % -100x\n\n", rowOrErr.Key(), rowOrErr.Value())
 		}
+	}
+	err = internalIndexReader.Close()
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 

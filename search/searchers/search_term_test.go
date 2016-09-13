@@ -150,7 +150,7 @@ func TestTermSearcher(t *testing.T) {
 	}()
 
 	searcher.SetQueryNorm(2.0)
-	docCount, err := i.DocCount()
+	docCount, err := indexReader.DocCount()
 	if err != nil {
 		t.Fatal(err)
 	}

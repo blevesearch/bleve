@@ -111,8 +111,8 @@ func (sr *stubReader) GetInternal(key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (sr *stubReader) DocCount() uint64 {
-	return 0
+func (sr *stubReader) DocCount() (uint64, error) {
+	return 0, nil
 }
 
 func (sr *stubReader) ExternalID(id index.IndexInternalID) (string, error) {
@@ -121,6 +121,18 @@ func (sr *stubReader) ExternalID(id index.IndexInternalID) (string, error) {
 
 func (sr *stubReader) InternalID(id string) (index.IndexInternalID, error) {
 	return []byte(id), nil
+}
+
+func (sr *stubReader) DumpAll() chan interface{} {
+	return nil
+}
+
+func (sr *stubReader) DumpDoc(id string) chan interface{} {
+	return nil
+}
+
+func (sr *stubReader) DumpFields() chan interface{} {
+	return nil
 }
 
 func (sr *stubReader) Close() error {

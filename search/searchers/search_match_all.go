@@ -19,10 +19,15 @@ type MatchAllSearcher struct {
 	indexReader index.IndexReader
 	reader      index.DocIDReader
 	scorer      *scorers.ConstantScorer
+	count       uint64
 }
 
 func NewMatchAllSearcher(indexReader index.IndexReader, boost float64, explain bool) (*MatchAllSearcher, error) {
 	reader, err := indexReader.DocIDReaderAll()
+	if err != nil {
+		return nil, err
+	}
+	count, err := indexReader.DocCount()
 	if err != nil {
 		return nil, err
 	}
@@ -31,11 +36,12 @@ func NewMatchAllSearcher(indexReader index.IndexReader, boost float64, explain b
 		indexReader: indexReader,
 		reader:      reader,
 		scorer:      scorer,
+		count:       count,
 	}, nil
 }
 
 func (s *MatchAllSearcher) Count() uint64 {
-	return s.indexReader.DocCount()
+	return s.count
 }
 
 func (s *MatchAllSearcher) Weight() float64 {
