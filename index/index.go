@@ -13,7 +13,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index/store"
@@ -48,16 +47,6 @@ type Index interface {
 	Analyze(d *document.Document) *AnalysisResult
 
 	Advanced() (store.KVStore, error)
-}
-
-// AsyncIndex is an interface for indexes which perform
-// some important operations asynchronously.
-type AsyncIndex interface {
-	// Wait will block until asynchronous operations started
-	// before this call have finished or until the specified
-	// timeout has been reached.  If the timeout is reached
-	// an error is returned.
-	Wait(timeout time.Duration) error
 }
 
 type IndexReader interface {
