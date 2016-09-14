@@ -113,3 +113,49 @@ func TestBoundary(t *testing.T) {
 		}
 	}
 }
+
+func TestBugProducingEmptyTokens(t *testing.T) {
+
+	wordRegex := regexp.MustCompile(`[0-9a-zA-Z_]*`)
+
+	tests := []struct {
+		input  []byte
+		output analysis.TokenStream
+	}{
+		{
+			[]byte("Chatha Edwards Sr."),
+			analysis.TokenStream{
+				{
+					Start:    0,
+					End:      6,
+					Term:     []byte("Chatha"),
+					Position: 1,
+					Type:     analysis.AlphaNumeric,
+				},
+				{
+					Start:    7,
+					End:      14,
+					Term:     []byte("Edwards"),
+					Position: 2,
+					Type:     analysis.AlphaNumeric,
+				},
+				{
+					Start:    15,
+					End:      17,
+					Term:     []byte("Sr"),
+					Position: 3,
+					Type:     analysis.AlphaNumeric,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		tokenizer := NewRegexpTokenizer(wordRegex)
+		actual := tokenizer.Tokenize(test.input)
+
+		if !reflect.DeepEqual(actual, test.output) {
+			t.Errorf("Expected %v, got %v for %s", test.output, actual, string(test.input))
+		}
+	}
+}
