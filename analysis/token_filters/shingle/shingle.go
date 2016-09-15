@@ -16,8 +16,6 @@ type ShingleFilter struct {
 	outputOriginal bool
 	tokenSeparator string
 	fill           string
-	ring           *ring.Ring
-	itemsInRing    int
 }
 
 func NewShingleFilter(min, max int, outputOriginal bool, sep, fill string) *ShingleFilter {
@@ -27,13 +25,14 @@ func NewShingleFilter(min, max int, outputOriginal bool, sep, fill string) *Shin
 		outputOriginal: outputOriginal,
 		tokenSeparator: sep,
 		fill:           fill,
-		ring:           ring.New(max),
 	}
 }
 
 func (s *ShingleFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 	rv := make(analysis.TokenStream, 0, len(input))
 
+	ring := ring.New(s.max)
+	itemsInRing := 0
 	currentPosition := 0
 	for _, token := range input {
 		if s.outputOriginal {
@@ -50,35 +49,34 @@ func (s *ShingleFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 				Type:     analysis.AlphaNumeric,
 				Term:     []byte(s.fill),
 			}
-			s.ring.Value = &fillerToken
-			if s.itemsInRing < s.max {
-				s.itemsInRing++
+			ring.Value = &fillerToken
+			if itemsInRing < s.max {
+				itemsInRing++
 			}
-			rv = append(rv, s.shingleCurrentRingState()...)
-			s.ring = s.ring.Next()
+			rv = append(rv, s.shingleCurrentRingState(ring, itemsInRing)...)
+			ring = ring.Next()
 			offset--
 		}
 		currentPosition = token.Position
 
-		s.ring.Value = token
-		if s.itemsInRing < s.max {
-			s.itemsInRing++
+		ring.Value = token
+		if itemsInRing < s.max {
+			itemsInRing++
 		}
-		rv = append(rv, s.shingleCurrentRingState()...)
-		s.ring = s.ring.Next()
-
+		rv = append(rv, s.shingleCurrentRingState(ring, itemsInRing)...)
+		ring = ring.Next()
 	}
 
 	return rv
 }
 
-func (s *ShingleFilter) shingleCurrentRingState() analysis.TokenStream {
+func (s *ShingleFilter) shingleCurrentRingState(ring *ring.Ring, itemsInRing int) analysis.TokenStream {
 	rv := make(analysis.TokenStream, 0)
 	for shingleN := s.min; shingleN <= s.max; shingleN++ {
 		// if there are enough items in the ring
 		// to produce a shingle of this size
-		if s.itemsInRing >= shingleN {
-			thisShingleRing := s.ring.Move(-(shingleN - 1))
+		if itemsInRing >= shingleN {
+			thisShingleRing := ring.Move(-(shingleN - 1))
 			shingledBytes := make([]byte, 0)
 			pos := 0
 			start := -1

@@ -328,3 +328,84 @@ func TestShingleFilter(t *testing.T) {
 		}
 	}
 }
+
+// TestShingleFilterBug431 tests that the shingle filter is in fact stateless
+// by making using the same filter instance twice and ensuring we do not get
+// contaminated output
+func TestShingleFilterBug431(t *testing.T) {
+
+	tests := []struct {
+		input  analysis.TokenStream
+		output analysis.TokenStream
+	}{
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("the"),
+				},
+				&analysis.Token{
+					Term: []byte("quick"),
+				},
+				&analysis.Token{
+					Term: []byte("brown"),
+				},
+				&analysis.Token{
+					Term: []byte("fox"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("the quick"),
+					Type: analysis.Shingle,
+				},
+				&analysis.Token{
+					Term: []byte("quick brown"),
+					Type: analysis.Shingle,
+				},
+				&analysis.Token{
+					Term: []byte("brown fox"),
+					Type: analysis.Shingle,
+				},
+			},
+		},
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("a"),
+				},
+				&analysis.Token{
+					Term: []byte("sad"),
+				},
+				&analysis.Token{
+					Term: []byte("dirty"),
+				},
+				&analysis.Token{
+					Term: []byte("sock"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("a sad"),
+					Type: analysis.Shingle,
+				},
+				&analysis.Token{
+					Term: []byte("sad dirty"),
+					Type: analysis.Shingle,
+				},
+				&analysis.Token{
+					Term: []byte("dirty sock"),
+					Type: analysis.Shingle,
+				},
+			},
+		},
+	}
+
+	shingleFilter := NewShingleFilter(2, 2, false, " ", "_")
+	for _, test := range tests {
+		actual := shingleFilter.Filter(test.input)
+		if !reflect.DeepEqual(actual, test.output) {
+			t.Errorf("expected %s, got %s", test.output, actual)
+		}
+	}
+
+}
