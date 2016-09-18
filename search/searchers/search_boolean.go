@@ -18,7 +18,6 @@ import (
 )
 
 type BooleanSearcher struct {
-	initialized     bool
 	indexReader     index.IndexReader
 	mustSearcher    search.Searcher
 	shouldSearcher  search.Searcher
@@ -30,6 +29,8 @@ type BooleanSearcher struct {
 	currentID       index.IndexInternalID
 	min             uint64
 	scorer          *scorers.ConjunctionQueryScorer
+	matches         []*search.DocumentMatch
+	initialized     bool
 }
 
 func NewBooleanSearcher(indexReader index.IndexReader, mustSearcher search.Searcher, shouldSearcher search.Searcher, mustNotSearcher search.Searcher, explain bool) (*BooleanSearcher, error) {
@@ -40,6 +41,7 @@ func NewBooleanSearcher(indexReader index.IndexReader, mustSearcher search.Searc
 		shouldSearcher:  shouldSearcher,
 		mustNotSearcher: mustNotSearcher,
 		scorer:          scorers.NewConjunctionQueryScorer(explain),
+		matches:         make([]*search.DocumentMatch, 2),
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
@@ -215,14 +217,12 @@ func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch
 				// score bonus matches should
 				var cons []*search.DocumentMatch
 				if s.currMust != nil {
-					cons = []*search.DocumentMatch{
-						s.currMust,
-						s.currShould,
-					}
+					cons = s.matches
+					cons[0] = s.currMust
+					cons[1] = s.currShould
 				} else {
-					cons = []*search.DocumentMatch{
-						s.currShould,
-					}
+					cons = s.matches[0:1]
+					cons[0] = s.currShould
 				}
 				rv = s.scorer.Score(ctx, cons)
 				err = s.advanceNextMust(ctx, rv)
@@ -232,7 +232,9 @@ func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch
 				break
 			} else if s.shouldSearcher.Min() == 0 {
 				// match is OK anyway
-				rv = s.scorer.Score(ctx, []*search.DocumentMatch{s.currMust})
+				cons := s.matches[0:1]
+				cons[0] = s.currMust
+				rv = s.scorer.Score(ctx, cons)
 				err = s.advanceNextMust(ctx, rv)
 				if err != nil {
 					return nil, err
@@ -243,14 +245,12 @@ func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch
 			// score bonus matches should
 			var cons []*search.DocumentMatch
 			if s.currMust != nil {
-				cons = []*search.DocumentMatch{
-					s.currMust,
-					s.currShould,
-				}
+				cons = s.matches
+				cons[0] = s.currMust
+				cons[1] = s.currShould
 			} else {
-				cons = []*search.DocumentMatch{
-					s.currShould,
-				}
+				cons = s.matches[0:1]
+				cons[0] = s.currShould
 			}
 			rv = s.scorer.Score(ctx, cons)
 			err = s.advanceNextMust(ctx, rv)
@@ -260,7 +260,9 @@ func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch
 			break
 		} else if s.shouldSearcher == nil || s.shouldSearcher.Min() == 0 {
 			// match is OK anyway
-			rv = s.scorer.Score(ctx, []*search.DocumentMatch{s.currMust})
+			cons := s.matches[0:1]
+			cons[0] = s.currMust
+			rv = s.scorer.Score(ctx, cons)
 			err = s.advanceNextMust(ctx, rv)
 			if err != nil {
 				return nil, err
