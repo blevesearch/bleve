@@ -71,7 +71,7 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 		key, val, valid := r.iterator.Current()
 		if valid {
 			tfr := r.tfrNext
-			err := tfr.parseKDoc(key)
+			err := tfr.parseKDoc(key, r.term)
 			if err != nil {
 				return nil, err
 			}

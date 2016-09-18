@@ -513,13 +513,8 @@ func (tfr *TermFrequencyRow) parseK(key []byte) error {
 	return nil
 }
 
-func (tfr *TermFrequencyRow) parseKDoc(key []byte) error {
-	termEndPos := bytes.IndexByte(key[3:], ByteSeparator)
-	if termEndPos < 0 {
-		return fmt.Errorf("invalid term frequency key, no byte separator terminating term")
-	}
-
-	tfr.doc = key[3+termEndPos+1:]
+func (tfr *TermFrequencyRow) parseKDoc(key []byte, term []byte) error {
+	tfr.doc = key[3+len(term)+1:]
 	if len(tfr.doc) <= 0 {
 		return fmt.Errorf("invalid term frequency key, empty docid")
 	}
