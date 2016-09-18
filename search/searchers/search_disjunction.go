@@ -25,7 +25,6 @@ import (
 var DisjunctionMaxClauseCount = 0
 
 type DisjunctionSearcher struct {
-	initialized bool
 	indexReader index.IndexReader
 	searchers   OrderedSearcherList
 	queryNorm   float64
@@ -33,6 +32,8 @@ type DisjunctionSearcher struct {
 	currentID   index.IndexInternalID
 	scorer      *scorers.DisjunctionQueryScorer
 	min         float64
+	matching    []*search.DocumentMatch
+	initialized bool
 }
 
 func tooManyClauses(count int) bool {
@@ -64,6 +65,7 @@ func NewDisjunctionSearcher(indexReader index.IndexReader, qsearchers []search.S
 		currs:       make([]*search.DocumentMatch, len(searchers)),
 		scorer:      scorers.NewDisjunctionQueryScorer(explain),
 		min:         min,
+		matching:    make([]*search.DocumentMatch, len(searchers)),
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
@@ -134,10 +136,10 @@ func (s *DisjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 	}
 	var err error
 	var rv *search.DocumentMatch
-	matching := make([]*search.DocumentMatch, 0, len(s.searchers))
 
 	found := false
 	for !found && s.currentID != nil {
+		matching := s.matching[:0]
 		for _, curr := range s.currs {
 			if curr != nil && curr.IndexInternalID.Equals(s.currentID) {
 				matching = append(matching, curr)
@@ -150,8 +152,6 @@ func (s *DisjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 			rv = s.scorer.Score(ctx, matching, len(matching), len(s.searchers))
 		}
 
-		// reset matching
-		matching = make([]*search.DocumentMatch, 0)
 		// invoke next on all the matching searchers
 		for i, curr := range s.currs {
 			if curr != nil && curr.IndexInternalID.Equals(s.currentID) {
