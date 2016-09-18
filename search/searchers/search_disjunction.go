@@ -25,14 +25,16 @@ import (
 var DisjunctionMaxClauseCount = 0
 
 type DisjunctionSearcher struct {
-	initialized bool
-	indexReader index.IndexReader
-	searchers   OrderedSearcherList
-	queryNorm   float64
-	currs       []*search.DocumentMatch
-	currentID   index.IndexInternalID
-	scorer      *scorers.DisjunctionQueryScorer
-	min         float64
+	indexReader  index.IndexReader
+	searchers    OrderedSearcherList
+	queryNorm    float64
+	currs        []*search.DocumentMatch
+	currentID    index.IndexInternalID
+	scorer       *scorers.DisjunctionQueryScorer
+	min          float64
+	matching     []*search.DocumentMatch
+	matchingIdxs []int
+	initialized  bool
 }
 
 func tooManyClauses(count int) bool {
@@ -59,11 +61,13 @@ func NewDisjunctionSearcher(indexReader index.IndexReader, qsearchers []search.S
 	sort.Sort(sort.Reverse(searchers))
 	// build our searcher
 	rv := DisjunctionSearcher{
-		indexReader: indexReader,
-		searchers:   searchers,
-		currs:       make([]*search.DocumentMatch, len(searchers)),
-		scorer:      scorers.NewDisjunctionQueryScorer(explain),
-		min:         min,
+		indexReader:  indexReader,
+		searchers:    searchers,
+		currs:        make([]*search.DocumentMatch, len(searchers)),
+		scorer:       scorers.NewDisjunctionQueryScorer(explain),
+		min:          min,
+		matching:     make([]*search.DocumentMatch, len(searchers)),
+		matchingIdxs: make([]int, len(searchers)),
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
@@ -134,13 +138,15 @@ func (s *DisjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 	}
 	var err error
 	var rv *search.DocumentMatch
-	matching := make([]*search.DocumentMatch, 0, len(s.searchers))
 
 	found := false
 	for !found && s.currentID != nil {
-		for _, curr := range s.currs {
+		matching := s.matching[:0]
+		matchingIdxs := s.matchingIdxs[:0]
+		for i, curr := range s.currs {
 			if curr != nil && curr.IndexInternalID.Equals(s.currentID) {
 				matching = append(matching, curr)
+				matchingIdxs = append(matchingIdxs, i)
 			}
 		}
 
@@ -150,19 +156,15 @@ func (s *DisjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 			rv = s.scorer.Score(ctx, matching, len(matching), len(s.searchers))
 		}
 
-		// reset matching
-		matching = make([]*search.DocumentMatch, 0)
 		// invoke next on all the matching searchers
-		for i, curr := range s.currs {
-			if curr != nil && curr.IndexInternalID.Equals(s.currentID) {
-				searcher := s.searchers[i]
-				if s.currs[i] != rv {
-					ctx.DocumentMatchPool.Put(s.currs[i])
-				}
-				s.currs[i], err = searcher.Next(ctx)
-				if err != nil {
-					return nil, err
-				}
+		for _, i := range matchingIdxs {
+			searcher := s.searchers[i]
+			if s.currs[i] != rv {
+				ctx.DocumentMatchPool.Put(s.currs[i])
+			}
+			s.currs[i], err = searcher.Next(ctx)
+			if err != nil {
+				return nil, err
 			}
 		}
 		s.currentID = s.nextSmallestID()
