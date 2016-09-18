@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
 )
@@ -38,7 +39,7 @@ func (q *matchAllQuery) SetBoost(b float64) Query {
 	return q
 }
 
-func (q *matchAllQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
+func (q *matchAllQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	return searchers.NewMatchAllSearcher(i, q.BoostVal, explain)
 }
 

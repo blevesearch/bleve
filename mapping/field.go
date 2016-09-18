@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package mapping
 
 import (
 	"encoding/json"
@@ -61,7 +61,7 @@ func NewTextFieldMapping() *FieldMapping {
 	}
 }
 
-func newTextFieldMappingDynamic(im *IndexMapping) *FieldMapping {
+func newTextFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewTextFieldMapping()
 	rv.Store = im.StoreDynamic
 	rv.Index = im.IndexDynamic
@@ -78,7 +78,7 @@ func NewNumericFieldMapping() *FieldMapping {
 	}
 }
 
-func newNumericFieldMappingDynamic(im *IndexMapping) *FieldMapping {
+func newNumericFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewNumericFieldMapping()
 	rv.Store = im.StoreDynamic
 	rv.Index = im.IndexDynamic
@@ -95,7 +95,7 @@ func NewDateTimeFieldMapping() *FieldMapping {
 	}
 }
 
-func newDateTimeFieldMappingDynamic(im *IndexMapping) *FieldMapping {
+func newDateTimeFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewDateTimeFieldMapping()
 	rv.Store = im.StoreDynamic
 	rv.Index = im.IndexDynamic
@@ -112,7 +112,7 @@ func NewBooleanFieldMapping() *FieldMapping {
 	}
 }
 
-func newBooleanFieldMappingDynamic(im *IndexMapping) *FieldMapping {
+func newBooleanFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewBooleanFieldMapping()
 	rv.Store = im.StoreDynamic
 	rv.Index = im.IndexDynamic
@@ -150,7 +150,7 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 		if fm.DateFormat != "" {
 			dateTimeFormat = fm.DateFormat
 		}
-		dateTimeParser := context.im.dateTimeParserNamed(dateTimeFormat)
+		dateTimeParser := context.im.DateTimeParserNamed(dateTimeFormat)
 		if dateTimeParser != nil {
 			parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
 			if err == nil {
@@ -211,7 +211,7 @@ func (fm *FieldMapping) analyzerForField(path []string, context *walkContext) *a
 			analyzerName = context.im.DefaultAnalyzer
 		}
 	}
-	return context.im.analyzerNamed(analyzerName)
+	return context.im.AnalyzerNamed(analyzerName)
 }
 
 func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) string {

@@ -268,7 +268,7 @@ func TestQueryValidate(t *testing.T) {
 }
 
 func TestDumpQuery(t *testing.T) {
-	mapping := &IndexMapping{}
+	mapping := NewIndexMapping()
 	q := NewQueryStringQuery("+water -light beer")
 	s, err := DumpQuery(mapping, q)
 	if err != nil {

@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
 )
@@ -54,7 +55,7 @@ func (q *phraseQuery) SetBoost(b float64) Query {
 	return q
 }
 
-func (q *phraseQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
+func (q *phraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 
 	conjunctionQuery := NewConjunctionQuery(q.termQueries)
 	conjunctionSearcher, err := conjunctionQuery.Searcher(i, m, explain)

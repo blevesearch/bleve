@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
 )
@@ -53,10 +54,10 @@ func (q *regexpQuery) SetField(f string) Query {
 	return q
 }
 
-func (q *regexpQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
+func (q *regexpQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
-		field = m.DefaultField
+		field = m.DefaultSearchField()
 	}
 	err := q.compile()
 	if err != nil {

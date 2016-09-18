@@ -14,6 +14,7 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -145,20 +146,20 @@ func (q *matchQuery) SetOperator(operator MatchQueryOperator) Query {
 	return q
 }
 
-func (q *matchQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
+func (q *matchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 
 	field := q.FieldVal
 	if q.FieldVal == "" {
-		field = m.DefaultField
+		field = m.DefaultSearchField()
 	}
 
 	analyzerName := ""
 	if q.Analyzer != "" {
 		analyzerName = q.Analyzer
 	} else {
-		analyzerName = m.analyzerNameForPath(field)
+		analyzerName = m.AnalyzerNameForPath(field)
 	}
-	analyzer := m.analyzerNamed(analyzerName)
+	analyzer := m.AnalyzerNamed(analyzerName)
 
 	if analyzer == nil {
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)

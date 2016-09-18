@@ -14,6 +14,7 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -24,7 +25,7 @@ type Query interface {
 	SetBoost(b float64) Query
 	Field() string
 	SetField(f string) Query
-	Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error)
+	Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error)
 	Validate() error
 }
 
@@ -251,7 +252,7 @@ func ParseQuery(input []byte) (Query, error) {
 // expandQuery traverses the input query tree and returns a new tree where
 // query string queries have been expanded into base queries. Returned tree may
 // reference queries from the input tree or new queries.
-func expandQuery(m *IndexMapping, query Query) (Query, error) {
+func expandQuery(m mapping.IndexMapping, query Query) (Query, error) {
 	var expand func(query Query) (Query, error)
 	var expandSlice func(queries []Query) ([]Query, error)
 
@@ -326,7 +327,7 @@ func expandQuery(m *IndexMapping, query Query) (Query, error) {
 // DumpQuery returns a string representation of the query tree, where query
 // string queries have been expanded into base queries. The output format is
 // meant for debugging purpose and may change in the future.
-func DumpQuery(m *IndexMapping, query Query) (string, error) {
+func DumpQuery(m mapping.IndexMapping, query Query) (string, error) {
 	q, err := expandQuery(m, query)
 	if err != nil {
 		return "", err

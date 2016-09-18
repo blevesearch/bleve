@@ -14,6 +14,7 @@ import (
 	"math"
 
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/numeric_util"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
@@ -71,7 +72,7 @@ func (q *dateRangeQuery) SetField(f string) Query {
 	return q
 }
 
-func (q *dateRangeQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
+func (q *dateRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 
 	min, max, err := q.parseEndpoints()
 	if err != nil {
@@ -80,7 +81,7 @@ func (q *dateRangeQuery) Searcher(i index.IndexReader, m *IndexMapping, explain 
 
 	field := q.FieldVal
 	if q.FieldVal == "" {
-		field = m.DefaultField
+		field = m.DefaultSearchField()
 	}
 
 	return searchers.NewNumericRangeSearcher(i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal, explain)

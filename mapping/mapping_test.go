@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package mapping
 
 import (
 	"encoding/json"
@@ -46,7 +46,7 @@ var mappingSource = []byte(`{
     "default_type": "_default"
 }`)
 
-func buildMapping() *IndexMapping {
+func buildMapping() IndexMapping {
 	nameFieldMapping := NewTextFieldMapping()
 	nameFieldMapping.Name = "name"
 	nameFieldMapping.Analyzer = "standard"
@@ -66,7 +66,7 @@ func buildMapping() *IndexMapping {
 func TestUnmarshalMappingJSON(t *testing.T) {
 	mapping := buildMapping()
 
-	var indexMapping IndexMapping
+	var indexMapping IndexMappingImpl
 	err := json.Unmarshal(mappingSource, &indexMapping)
 	if err != nil {
 		t.Fatal(err)
@@ -88,7 +88,7 @@ func TestMappingStructWithJSONTags(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	err := mapping.mapDocument(doc, x)
+	err := mapping.MapDocument(doc, x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestMappingStructWithJSONTagsOneDisabled(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	err := mapping.mapDocument(doc, x)
+	err := mapping.MapDocument(doc, x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestMappingStructWithPointerToString(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	err := mapping.mapDocument(doc, x)
+	err := mapping.MapDocument(doc, x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestMappingJSONWithNull(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	err = mapping.mapDocument(doc, jsondoc)
+	err = mapping.MapDocument(doc, jsondoc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,17 +243,17 @@ func TestMappingForPath(t *testing.T) {
 	mapping := NewIndexMapping()
 	mapping.AddDocumentMapping("a", docMappingA)
 
-	analyzerName := mapping.analyzerNameForPath("name")
+	analyzerName := mapping.AnalyzerNameForPath("name")
 	if analyzerName != enFieldMapping.Analyzer {
 		t.Errorf("expected '%s' got '%s'", enFieldMapping.Analyzer, analyzerName)
 	}
 
-	analyzerName = mapping.analyzerNameForPath("nameCustom")
+	analyzerName = mapping.AnalyzerNameForPath("nameCustom")
 	if analyzerName != customMapping.Analyzer {
 		t.Errorf("expected '%s' got '%s'", customMapping.Analyzer, analyzerName)
 	}
 
-	analyzerName = mapping.analyzerNameForPath("child.desc")
+	analyzerName = mapping.AnalyzerNameForPath("child.desc")
 	if analyzerName != customFieldX.Analyzer {
 		t.Errorf("expected '%s' got '%s'", customFieldX.Analyzer, analyzerName)
 	}
@@ -345,7 +345,7 @@ func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
 	}
 	doc := document.NewDocument("x")
 	mapping := NewIndexMapping()
-	err := mapping.mapDocument(doc, data)
+	err := mapping.MapDocument(doc, data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,7 +363,7 @@ func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
 
 	mapping = NewIndexMapping()
 	doc = document.NewDocument("y")
-	err = mapping.mapDocument(doc, data)
+	err = mapping.MapDocument(doc, data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -377,7 +377,7 @@ func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
 	mapping = NewIndexMapping()
 	mapping.StoreDynamic = true
 	doc = document.NewDocument("y")
-	err = mapping.mapDocument(doc, data)
+	err = mapping.MapDocument(doc, data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +405,7 @@ func TestMappingBool(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	err := mapping.mapDocument(doc, x)
+	err := mapping.MapDocument(doc, x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -441,7 +441,7 @@ func TestDisableDefaultMapping(t *testing.T) {
 	}
 
 	doc := document.NewDocument("x")
-	err := indexMapping.mapDocument(doc, data)
+	err := indexMapping.MapDocument(doc, data)
 	if err != nil {
 		t.Error(err)
 	}
@@ -526,7 +526,7 @@ func TestInvalidIndexMappingStrict(t *testing.T) {
 	mappingBytes := []byte(`{"typeField":"type","default_field":"all"}`)
 
 	// first unmarhsal it without strict
-	var im IndexMapping
+	var im IndexMappingImpl
 	err := json.Unmarshal(mappingBytes, &im)
 	if err != nil {
 		t.Fatal(err)
@@ -590,7 +590,7 @@ func TestMappingBug353(t *testing.T) {
 	mapping.DefaultMapping.AddSubDocumentMapping("Other", otherMapping)
 
 	doc := document.NewDocument("x")
-	err = mapping.mapDocument(doc, data)
+	err = mapping.MapDocument(doc, data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -636,7 +636,7 @@ func TestAnonymousStructFields(t *testing.T) {
 
 	doc := document.NewDocument("1")
 	m := NewIndexMapping()
-	err := m.mapDocument(doc, x)
+	err := m.MapDocument(doc, x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -676,7 +676,7 @@ func TestAnonymousStructFields(t *testing.T) {
 	}
 
 	doc2 := document.NewDocument("2")
-	err = m.mapDocument(doc2, y)
+	err = m.MapDocument(doc2, y)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -712,7 +712,7 @@ func TestAnonymousStructFieldWithJSONStructTagEmptString(t *testing.T) {
 
 	doc := document.NewDocument("1")
 	m := NewIndexMapping()
-	err := m.mapDocument(doc, x)
+	err := m.MapDocument(doc, x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -749,7 +749,7 @@ func TestMappingPrimitives(t *testing.T) {
 	m := NewIndexMapping()
 	for _, test := range tests {
 		doc := document.NewDocument("x")
-		err := m.mapDocument(doc, test.data)
+		err := m.MapDocument(doc, test.data)
 		if err != nil {
 			t.Fatal(err)
 		}

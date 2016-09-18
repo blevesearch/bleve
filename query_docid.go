@@ -11,6 +11,7 @@ package bleve
 
 import (
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
 )
@@ -47,7 +48,7 @@ func (q *docIDQuery) SetField(f string) Query {
 	return q
 }
 
-func (q *docIDQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
+func (q *docIDQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	return searchers.NewDocIDSearcher(i, q.IDs, q.BoostVal, explain)
 }
 

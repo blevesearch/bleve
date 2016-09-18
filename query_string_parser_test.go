@@ -13,6 +13,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/blevesearch/bleve/mapping"
 )
 
 func TestQuerySyntaxParserValid(t *testing.T) {
@@ -23,7 +25,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 	tests := []struct {
 		input   string
 		result  Query
-		mapping *IndexMapping
+		mapping mapping.IndexMapping
 	}{
 		{
 			input:   "test",

@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package mapping
 
 import (
 	"encoding/json"
@@ -405,7 +405,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			// automatic indexing behavior
 
 			// first see if it can be parsed by the default date parser
-			dateTimeParser := context.im.dateTimeParserNamed(context.im.DefaultDateTimeParser)
+			dateTimeParser := context.im.DateTimeParserNamed(context.im.DefaultDateTimeParser)
 			if dateTimeParser != nil {
 				parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
 				if err != nil {

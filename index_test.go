@@ -29,6 +29,7 @@ import (
 	"github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/null"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -365,7 +366,7 @@ func (s *slowQuery) SetField(f string) Query {
 	return s.actual.SetField(f)
 }
 
-func (s *slowQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
+func (s *slowQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	time.Sleep(s.delay)
 	return s.actual.Searcher(i, m, explain)
 }

@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package mapping
 
 import (
 	"encoding/json"
@@ -28,98 +28,14 @@ const defaultField = "_all"
 const defaultAnalyzer = standard_analyzer.Name
 const defaultDateTimeParser = datetime_optional.Name
 
-type customAnalysis struct {
-	CharFilters     map[string]map[string]interface{} `json:"char_filters,omitempty"`
-	Tokenizers      map[string]map[string]interface{} `json:"tokenizers,omitempty"`
-	TokenMaps       map[string]map[string]interface{} `json:"token_maps,omitempty"`
-	TokenFilters    map[string]map[string]interface{} `json:"token_filters,omitempty"`
-	Analyzers       map[string]map[string]interface{} `json:"analyzers,omitempty"`
-	DateTimeParsers map[string]map[string]interface{} `json:"date_time_parsers,omitempty"`
-}
-
-func (c *customAnalysis) registerAll(i *IndexMapping) error {
-	for name, config := range c.CharFilters {
-		_, err := i.cache.DefineCharFilter(name, config)
-		if err != nil {
-			return err
-		}
-	}
-
-	if len(c.Tokenizers) > 0 {
-		// put all the names in map tracking work to do
-		todo := map[string]struct{}{}
-		for name := range c.Tokenizers {
-			todo[name] = struct{}{}
-		}
-		registered := 1
-		errs := []error{}
-		// as long as we keep making progress, keep going
-		for len(todo) > 0 && registered > 0 {
-			registered = 0
-			errs = []error{}
-			for name := range todo {
-				config := c.Tokenizers[name]
-				_, err := i.cache.DefineTokenizer(name, config)
-				if err != nil {
-					errs = append(errs, err)
-				} else {
-					delete(todo, name)
-					registered++
-				}
-			}
-		}
-
-		if len(errs) > 0 {
-			return errs[0]
-		}
-	}
-	for name, config := range c.TokenMaps {
-		_, err := i.cache.DefineTokenMap(name, config)
-		if err != nil {
-			return err
-		}
-	}
-	for name, config := range c.TokenFilters {
-		_, err := i.cache.DefineTokenFilter(name, config)
-		if err != nil {
-			return err
-		}
-	}
-	for name, config := range c.Analyzers {
-		_, err := i.cache.DefineAnalyzer(name, config)
-		if err != nil {
-			return err
-		}
-	}
-	for name, config := range c.DateTimeParsers {
-		_, err := i.cache.DefineDateTimeParser(name, config)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func newCustomAnalysis() *customAnalysis {
-	rv := customAnalysis{
-		CharFilters:     make(map[string]map[string]interface{}),
-		Tokenizers:      make(map[string]map[string]interface{}),
-		TokenMaps:       make(map[string]map[string]interface{}),
-		TokenFilters:    make(map[string]map[string]interface{}),
-		Analyzers:       make(map[string]map[string]interface{}),
-		DateTimeParsers: make(map[string]map[string]interface{}),
-	}
-	return &rv
-}
-
-// An IndexMapping controls how objects are placed
+// An IndexMappingImpl controls how objects are placed
 // into an index.
 // First the type of the object is determined.
 // Once the type is know, the appropriate
 // DocumentMapping is selected by the type.
 // If no mapping was determined for that type,
 // a DefaultMapping will be used.
-type IndexMapping struct {
+type IndexMappingImpl struct {
 	TypeMapping           map[string]*DocumentMapping `json:"types,omitempty"`
 	DefaultMapping        *DocumentMapping            `json:"default_mapping"`
 	TypeField             string                      `json:"type_field"`
@@ -134,7 +50,7 @@ type IndexMapping struct {
 }
 
 // AddCustomCharFilter defines a custom char filter for use in this mapping
-func (im *IndexMapping) AddCustomCharFilter(name string, config map[string]interface{}) error {
+func (im *IndexMappingImpl) AddCustomCharFilter(name string, config map[string]interface{}) error {
 	_, err := im.cache.DefineCharFilter(name, config)
 	if err != nil {
 		return err
@@ -144,7 +60,7 @@ func (im *IndexMapping) AddCustomCharFilter(name string, config map[string]inter
 }
 
 // AddCustomTokenizer defines a custom tokenizer for use in this mapping
-func (im *IndexMapping) AddCustomTokenizer(name string, config map[string]interface{}) error {
+func (im *IndexMappingImpl) AddCustomTokenizer(name string, config map[string]interface{}) error {
 	_, err := im.cache.DefineTokenizer(name, config)
 	if err != nil {
 		return err
@@ -154,7 +70,7 @@ func (im *IndexMapping) AddCustomTokenizer(name string, config map[string]interf
 }
 
 // AddCustomTokenMap defines a custom token map for use in this mapping
-func (im *IndexMapping) AddCustomTokenMap(name string, config map[string]interface{}) error {
+func (im *IndexMappingImpl) AddCustomTokenMap(name string, config map[string]interface{}) error {
 	_, err := im.cache.DefineTokenMap(name, config)
 	if err != nil {
 		return err
@@ -164,7 +80,7 @@ func (im *IndexMapping) AddCustomTokenMap(name string, config map[string]interfa
 }
 
 // AddCustomTokenFilter defines a custom token filter for use in this mapping
-func (im *IndexMapping) AddCustomTokenFilter(name string, config map[string]interface{}) error {
+func (im *IndexMappingImpl) AddCustomTokenFilter(name string, config map[string]interface{}) error {
 	_, err := im.cache.DefineTokenFilter(name, config)
 	if err != nil {
 		return err
@@ -202,7 +118,7 @@ func (im *IndexMapping) AddCustomTokenFilter(name string, config map[string]inte
 //           ...
 //       },
 //   })
-func (im *IndexMapping) AddCustomAnalyzer(name string, config map[string]interface{}) error {
+func (im *IndexMappingImpl) AddCustomAnalyzer(name string, config map[string]interface{}) error {
 	_, err := im.cache.DefineAnalyzer(name, config)
 	if err != nil {
 		return err
@@ -212,7 +128,7 @@ func (im *IndexMapping) AddCustomAnalyzer(name string, config map[string]interfa
 }
 
 // AddCustomDateTimeParser defines a custom date time parser for use in this mapping
-func (im *IndexMapping) AddCustomDateTimeParser(name string, config map[string]interface{}) error {
+func (im *IndexMappingImpl) AddCustomDateTimeParser(name string, config map[string]interface{}) error {
 	_, err := im.cache.DefineDateTimeParser(name, config)
 	if err != nil {
 		return err
@@ -222,8 +138,8 @@ func (im *IndexMapping) AddCustomDateTimeParser(name string, config map[string]i
 }
 
 // NewIndexMapping creates a new IndexMapping that will use all the default indexing rules
-func NewIndexMapping() *IndexMapping {
-	return &IndexMapping{
+func NewIndexMapping() *IndexMappingImpl {
+	return &IndexMappingImpl{
 		TypeMapping:           make(map[string]*DocumentMapping),
 		DefaultMapping:        NewDocumentMapping(),
 		TypeField:             defaultTypeField,
@@ -240,7 +156,7 @@ func NewIndexMapping() *IndexMapping {
 
 // Validate will walk the entire structure ensuring the following
 // explicitly named and default analyzers can be built
-func (im *IndexMapping) Validate() error {
+func (im *IndexMappingImpl) Validate() error {
 	_, err := im.cache.AnalyzerNamed(im.DefaultAnalyzer)
 	if err != nil {
 		return err
@@ -263,11 +179,11 @@ func (im *IndexMapping) Validate() error {
 }
 
 // AddDocumentMapping sets a custom document mapping for the specified type
-func (im *IndexMapping) AddDocumentMapping(doctype string, dm *DocumentMapping) {
+func (im *IndexMappingImpl) AddDocumentMapping(doctype string, dm *DocumentMapping) {
 	im.TypeMapping[doctype] = dm
 }
 
-func (im *IndexMapping) mappingForType(docType string) *DocumentMapping {
+func (im *IndexMappingImpl) mappingForType(docType string) *DocumentMapping {
 	docMapping := im.TypeMapping[docType]
 	if docMapping == nil {
 		docMapping = im.DefaultMapping
@@ -276,7 +192,7 @@ func (im *IndexMapping) mappingForType(docType string) *DocumentMapping {
 }
 
 // UnmarshalJSON offers custom unmarshaling with optional strict validation
-func (im *IndexMapping) UnmarshalJSON(data []byte) error {
+func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 
 	var tmp map[string]json.RawMessage
 	err := json.Unmarshal(data, &tmp)
@@ -367,7 +283,7 @@ func (im *IndexMapping) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (im *IndexMapping) determineType(data interface{}) string {
+func (im *IndexMappingImpl) determineType(data interface{}) string {
 	// first see if the object implements Classifier
 	classifier, ok := data.(Classifier)
 	if ok {
@@ -383,7 +299,7 @@ func (im *IndexMapping) determineType(data interface{}) string {
 	return im.DefaultType
 }
 
-func (im *IndexMapping) mapDocument(doc *document.Document, data interface{}) error {
+func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}) error {
 	docType := im.determineType(data)
 	docMapping := im.mappingForType(docType)
 	walkContext := im.newWalkContext(doc, docMapping)
@@ -403,12 +319,12 @@ func (im *IndexMapping) mapDocument(doc *document.Document, data interface{}) er
 
 type walkContext struct {
 	doc             *document.Document
-	im              *IndexMapping
+	im              *IndexMappingImpl
 	dm              *DocumentMapping
 	excludedFromAll []string
 }
 
-func (im *IndexMapping) newWalkContext(doc *document.Document, dm *DocumentMapping) *walkContext {
+func (im *IndexMappingImpl) newWalkContext(doc *document.Document, dm *DocumentMapping) *walkContext {
 	return &walkContext{
 		doc:             doc,
 		im:              im,
@@ -422,7 +338,7 @@ func (im *IndexMapping) newWalkContext(doc *document.Document, dm *DocumentMappi
 // provided path, if one exists and it has an explicit analyzer
 // that is returned
 // nil should be an acceptable return value meaning we don't know
-func (im *IndexMapping) analyzerNameForPath(path string) string {
+func (im *IndexMappingImpl) AnalyzerNameForPath(path string) string {
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
 		analyzerName := docMapping.analyzerNameForPath(path)
@@ -452,7 +368,7 @@ func (im *IndexMapping) analyzerNameForPath(path string) string {
 	return im.DefaultAnalyzer
 }
 
-func (im *IndexMapping) analyzerNamed(name string) *analysis.Analyzer {
+func (im *IndexMappingImpl) AnalyzerNamed(name string) *analysis.Analyzer {
 	analyzer, err := im.cache.AnalyzerNamed(name)
 	if err != nil {
 		logger.Printf("error using analyzer named: %s", name)
@@ -461,7 +377,10 @@ func (im *IndexMapping) analyzerNamed(name string) *analysis.Analyzer {
 	return analyzer
 }
 
-func (im *IndexMapping) dateTimeParserNamed(name string) analysis.DateTimeParser {
+func (im *IndexMappingImpl) DateTimeParserNamed(name string) analysis.DateTimeParser {
+	if name == "" {
+		name = im.DefaultDateTimeParser
+	}
 	dateTimeParser, err := im.cache.DateTimeParserNamed(name)
 	if err != nil {
 		logger.Printf("error using datetime parser named: %s", name)
@@ -470,7 +389,7 @@ func (im *IndexMapping) dateTimeParserNamed(name string) analysis.DateTimeParser
 	return dateTimeParser
 }
 
-func (im *IndexMapping) datetimeParserNameForPath(path string) string {
+func (im *IndexMappingImpl) datetimeParserNameForPath(path string) string {
 
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
@@ -487,7 +406,7 @@ func (im *IndexMapping) datetimeParserNameForPath(path string) string {
 	return im.DefaultDateTimeParser
 }
 
-func (im *IndexMapping) AnalyzeText(analyzerName string, text []byte) (analysis.TokenStream, error) {
+func (im *IndexMappingImpl) AnalyzeText(analyzerName string, text []byte) (analysis.TokenStream, error) {
 	analyzer, err := im.cache.AnalyzerNamed(analyzerName)
 	if err != nil {
 		return nil, err
@@ -496,6 +415,12 @@ func (im *IndexMapping) AnalyzeText(analyzerName string, text []byte) (analysis.
 }
 
 // FieldAnalyzer returns the name of the analyzer used on a field.
-func (im *IndexMapping) FieldAnalyzer(field string) string {
-	return im.analyzerNameForPath(field)
+func (im *IndexMappingImpl) FieldAnalyzer(field string) string {
+	return im.AnalyzerNameForPath(field)
+}
+
+// wrapper to satisfy new interface
+
+func (im *IndexMappingImpl) DefaultSearchField() string {
+	return im.DefaultField
 }

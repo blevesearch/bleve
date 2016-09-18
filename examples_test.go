@@ -15,11 +15,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/highlight/highlighters/ansi"
 )
 
-var mapping *IndexMapping
+var indexMapping mapping.IndexMapping
 var example_index Index
 var err error
 
@@ -43,8 +44,8 @@ func TestMain(m *testing.M) {
 }
 
 func ExampleNew() {
-	mapping = NewIndexMapping()
-	example_index, err = New("path_to_index", mapping)
+	indexMapping = NewIndexMapping()
+	example_index, err = New("path_to_index", indexMapping)
 	if err != nil {
 		panic(err)
 	}
