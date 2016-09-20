@@ -178,16 +178,24 @@ func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch
 	var rv *search.DocumentMatch
 
 	for s.currentID != nil {
-		if s.currMustNot != nil && s.currMustNot.IndexInternalID.Compare(s.currentID) < 0 {
-			if s.currMustNot != nil {
+		if s.currMustNot != nil {
+			cmp := s.currMustNot.IndexInternalID.Compare(s.currentID)
+			if cmp < 0 {
 				ctx.DocumentMatchPool.Put(s.currMustNot)
-			}
-			// advance must not searcher to our candidate entry
-			s.currMustNot, err = s.mustNotSearcher.Advance(ctx, s.currentID)
-			if err != nil {
-				return nil, err
-			}
-			if s.currMustNot != nil && s.currMustNot.IndexInternalID.Equals(s.currentID) {
+				// advance must not searcher to our candidate entry
+				s.currMustNot, err = s.mustNotSearcher.Advance(ctx, s.currentID)
+				if err != nil {
+					return nil, err
+				}
+				if s.currMustNot != nil && s.currMustNot.IndexInternalID.Equals(s.currentID) {
+					// the candidate is excluded
+					err = s.advanceNextMust(ctx, nil)
+					if err != nil {
+						return nil, err
+					}
+					continue
+				}
+			} else if cmp == 0 {
 				// the candidate is excluded
 				err = s.advanceNextMust(ctx, nil)
 				if err != nil {
@@ -195,20 +203,16 @@ func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch
 				}
 				continue
 			}
-		} else if s.currMustNot != nil && s.currMustNot.IndexInternalID.Equals(s.currentID) {
-			// the candidate is excluded
-			err = s.advanceNextMust(ctx, nil)
-			if err != nil {
-				return nil, err
-			}
-			continue
 		}
 
-		if s.currShould != nil && s.currShould.IndexInternalID.Compare(s.currentID) < 0 {
+		shouldCmpOrNil := 1 // NOTE: shouldCmp will also be 1 when currShould == nil.
+		if s.currShould != nil {
+			shouldCmpOrNil = s.currShould.IndexInternalID.Compare(s.currentID)
+		}
+
+		if shouldCmpOrNil < 0 {
+			ctx.DocumentMatchPool.Put(s.currShould)
 			// advance should searcher to our candidate entry
-			if s.currShould != nil {
-				ctx.DocumentMatchPool.Put(s.currShould)
-			}
 			s.currShould, err = s.shouldSearcher.Advance(ctx, s.currentID)
 			if err != nil {
 				return nil, err
@@ -241,7 +245,7 @@ func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch
 				}
 				break
 			}
-		} else if s.currShould != nil && s.currShould.IndexInternalID.Equals(s.currentID) {
+		} else if shouldCmpOrNil == 0 {
 			// score bonus matches should
 			var cons []*search.DocumentMatch
 			if s.currMust != nil {
