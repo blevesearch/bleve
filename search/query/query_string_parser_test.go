@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"reflect"
@@ -29,7 +29,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 	}{
 		{
 			input:   "test",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -39,7 +39,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `"test phrase 1"`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -49,7 +49,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   "field:test",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -60,7 +60,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// - is allowed inside a term, just not the start
 		{
 			input:   "field:t-est",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -71,7 +71,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// + is allowed inside a term, just not the start
 		{
 			input:   "field:t+est",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -82,7 +82,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// > is allowed inside a term, just not the start
 		{
 			input:   "field:t>est",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -93,7 +93,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// < is allowed inside a term, just not the start
 		{
 			input:   "field:t<est",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -104,7 +104,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// = is allowed inside a term, just not the start
 		{
 			input:   "field:t=est",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -114,7 +114,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   "+field1:test1",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				[]Query{
 					NewMatchQuery("test1").SetField("field1"),
@@ -124,7 +124,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   "-field2:test2",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				nil,
@@ -134,7 +134,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `field3:"test phrase 2"`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -144,7 +144,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `+field4:"test phrase 1"`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				[]Query{
 					NewMatchPhraseQuery("test phrase 1").SetField("field4"),
@@ -154,7 +154,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `-field5:"test phrase 2"`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				nil,
@@ -164,7 +164,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `+field6:test3 -field7:test4 field8:test5`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				[]Query{
 					NewMatchQuery("test3").SetField("field6"),
@@ -178,7 +178,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   "test^3",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -188,7 +188,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   "test^3 other^6",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -199,7 +199,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   "33",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -209,7 +209,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   "field:33",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -219,7 +219,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   "cat-dog",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -229,7 +229,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   "watex~",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -239,7 +239,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   "watex~2",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -249,7 +249,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   "watex~ 2",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -260,7 +260,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   "field:watex~",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -270,7 +270,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   "field:watex~2",
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -280,7 +280,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `field:555c3bb06f7a127cda000005`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -290,7 +290,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `field:>5`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -300,7 +300,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `field:>=5`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -310,7 +310,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `field:<5`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -320,7 +320,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `field:<=5`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -330,7 +330,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `field:>"2006-01-02T15:04:05Z07:00"`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -340,7 +340,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `field:>="2006-01-02T15:04:05Z07:00"`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -350,7 +350,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `field:<"2006-01-02T15:04:05Z07:00"`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -360,7 +360,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `field:<="2006-01-02T15:04:05Z07:00"`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -370,7 +370,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `/mar.*ty/`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -380,7 +380,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `name:/mar.*ty/`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -390,7 +390,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `mart*`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -400,7 +400,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `name:mart*`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -414,7 +414,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// escape : as field delimeter
 		{
 			input:   `name\:marty`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -425,7 +425,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// first colon delimiter, second escaped
 		{
 			input:   `name:marty\:couchbase`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -436,7 +436,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// escape space, single arguemnt to match query
 		{
 			input:   `marty\ couchbase`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -447,7 +447,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// escape leading plus, not a must clause
 		{
 			input:   `\+marty`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -458,7 +458,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// escape leading minus, not a must not clause
 		{
 			input:   `\-marty`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -469,7 +469,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// escape quote inside of phrase
 		{
 			input:   `"what does \"quote\" mean"`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -480,7 +480,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// escaping an unsupported character retains backslash
 		{
 			input:   `can\ i\ escap\e`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -491,7 +491,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// leading spaces
 		{
 			input:   `   what`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -502,7 +502,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// no boost value defaults to 1
 		{
 			input:   `term^`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -514,7 +514,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		// but contains escape and ends up as string
 		{
 			input:   `3.0\:`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -524,7 +524,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		},
 		{
 			input:   `3.0\a`,
-			mapping: NewIndexMapping(),
+			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
@@ -547,7 +547,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		}
 		if !reflect.DeepEqual(q, test.result) {
 			t.Errorf("Expected %#v, got %#v: for %s", test.result, q, test.input)
-			t.Errorf("Expected %#v, got %#v: for %s", test.result.(*booleanQuery).Should.(*disjunctionQuery).Disjuncts[0], q.(*booleanQuery).Should.(*disjunctionQuery).Disjuncts[0], test.input)
+			t.Errorf("Expected %#v, got %#v: for %s", test.result.(*BooleanQuery).Should.(*DisjunctionQuery).Disjuncts[0], q.(*BooleanQuery).Should.(*DisjunctionQuery).Disjuncts[0], test.input)
 		}
 	}
 }

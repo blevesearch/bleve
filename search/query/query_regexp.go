@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"regexp"
@@ -19,7 +19,7 @@ import (
 	"github.com/blevesearch/bleve/search/searchers"
 )
 
-type regexpQuery struct {
+type RegexpQuery struct {
 	Regexp   string  `json:"regexp"`
 	FieldVal string  `json:"field,omitempty"`
 	BoostVal float64 `json:"boost,omitempty"`
@@ -29,32 +29,32 @@ type regexpQuery struct {
 // NewRegexpQuery creates a new Query which finds
 // documents containing terms that match the
 // specified regular expression.
-func NewRegexpQuery(regexp string) *regexpQuery {
-	return &regexpQuery{
+func NewRegexpQuery(regexp string) *RegexpQuery {
+	return &RegexpQuery{
 		Regexp:   regexp,
 		BoostVal: 1.0,
 	}
 }
 
-func (q *regexpQuery) Boost() float64 {
+func (q *RegexpQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *regexpQuery) SetBoost(b float64) Query {
+func (q *RegexpQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *regexpQuery) Field() string {
+func (q *RegexpQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *regexpQuery) SetField(f string) Query {
+func (q *RegexpQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *regexpQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *RegexpQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -67,11 +67,11 @@ func (q *regexpQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expl
 	return searchers.NewRegexpSearcher(i, q.compiled, field, q.BoostVal, explain)
 }
 
-func (q *regexpQuery) Validate() error {
+func (q *RegexpQuery) Validate() error {
 	return q.compile()
 }
 
-func (q *regexpQuery) compile() error {
+func (q *RegexpQuery) compile() error {
 	if q.compiled == nil {
 		// require that pattern be anchored to start and end of term
 		actualRegexp := q.Regexp

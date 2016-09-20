@@ -16,6 +16,7 @@ import (
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/query"
 )
 
 type numericRange struct {
@@ -195,7 +196,7 @@ func (h *HighlightRequest) AddField(field string) {
 //
 // A special field named "*" can be used to return all fields.
 type SearchRequest struct {
-	Query     Query             `json:"query"`
+	Query     query.Query       `json:"query"`
 	Size      int               `json:"size"`
 	From      int               `json:"from"`
 	Highlight *HighlightRequest `json:"highlight"`
@@ -274,7 +275,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Highlight = temp.Highlight
 	r.Fields = temp.Fields
 	r.Facets = temp.Facets
-	r.Query, err = ParseQuery(temp.Q)
+	r.Query, err = query.ParseQuery(temp.Q)
 	if err != nil {
 		return err
 	}
@@ -293,7 +294,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 // NewSearchRequest creates a new SearchRequest
 // for the Query, using default values for all
 // other search parameters.
-func NewSearchRequest(q Query) *SearchRequest {
+func NewSearchRequest(q query.Query) *SearchRequest {
 	return NewSearchRequestOptions(q, 10, 0, false)
 }
 
@@ -301,7 +302,7 @@ func NewSearchRequest(q Query) *SearchRequest {
 // for the Query, with the requested size, from
 // and explanation search parameters.
 // By default results are ordered by score, descending.
-func NewSearchRequestOptions(q Query, size, from int, explain bool) *SearchRequest {
+func NewSearchRequestOptions(q query.Query, size, from int, explain bool) *SearchRequest {
 	return &SearchRequest{
 		Query:   q,
 		Size:    size,

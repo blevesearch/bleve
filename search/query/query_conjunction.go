@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"encoding/json"
@@ -18,35 +18,35 @@ import (
 	"github.com/blevesearch/bleve/search/searchers"
 )
 
-type conjunctionQuery struct {
+type ConjunctionQuery struct {
 	Conjuncts []Query `json:"conjuncts"`
 	BoostVal  float64 `json:"boost,omitempty"`
 }
 
 // NewConjunctionQuery creates a new compound Query.
 // Result documents must satisfy all of the queries.
-func NewConjunctionQuery(conjuncts []Query) *conjunctionQuery {
-	return &conjunctionQuery{
+func NewConjunctionQuery(conjuncts []Query) *ConjunctionQuery {
+	return &ConjunctionQuery{
 		Conjuncts: conjuncts,
 		BoostVal:  1.0,
 	}
 }
 
-func (q *conjunctionQuery) Boost() float64 {
+func (q *ConjunctionQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *conjunctionQuery) SetBoost(b float64) Query {
+func (q *ConjunctionQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *conjunctionQuery) AddQuery(aq Query) *conjunctionQuery {
+func (q *ConjunctionQuery) AddQuery(aq Query) *ConjunctionQuery {
 	q.Conjuncts = append(q.Conjuncts, aq)
 	return q
 }
 
-func (q *conjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *ConjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	ss := make([]search.Searcher, len(q.Conjuncts))
 	for in, conjunct := range q.Conjuncts {
 		var err error
@@ -58,7 +58,7 @@ func (q *conjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 	return searchers.NewConjunctionSearcher(i, ss, explain)
 }
 
-func (q *conjunctionQuery) Validate() error {
+func (q *ConjunctionQuery) Validate() error {
 	for _, q := range q.Conjuncts {
 		err := q.Validate()
 		if err != nil {
@@ -68,7 +68,7 @@ func (q *conjunctionQuery) Validate() error {
 	return nil
 }
 
-func (q *conjunctionQuery) UnmarshalJSON(data []byte) error {
+func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
 		Conjuncts []json.RawMessage `json:"conjuncts"`
 		BoostVal  float64           `json:"boost,omitempty"`
@@ -92,10 +92,10 @@ func (q *conjunctionQuery) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (q *conjunctionQuery) Field() string {
+func (q *ConjunctionQuery) Field() string {
 	return ""
 }
 
-func (q *conjunctionQuery) SetField(f string) Query {
+func (q *ConjunctionQuery) SetField(f string) Query {
 	return q
 }

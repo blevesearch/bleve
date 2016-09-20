@@ -15,7 +15,7 @@
 // using -i.tmp works on both, at the expense of having to remove
 // the unsightly .tmp files
 
-package bleve
+package query
 
 import (
 	"fmt"
@@ -55,7 +55,7 @@ const (
 type lexerWrapper struct {
 	lex   yyLexer
 	errs  []string
-	query *booleanQuery
+	query *BooleanQuery
 }
 
 func newLexerWrapper(lex yyLexer) *lexerWrapper {

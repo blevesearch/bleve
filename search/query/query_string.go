@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"github.com/blevesearch/bleve/index"
@@ -15,7 +15,7 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type queryStringQuery struct {
+type QueryStringQuery struct {
 	Query    string  `json:"query"`
 	BoostVal float64 `json:"boost,omitempty"`
 }
@@ -23,23 +23,23 @@ type queryStringQuery struct {
 // NewQueryStringQuery creates a new Query used for
 // finding documents that satisfy a query string.  The
 // query string is a small query language for humans.
-func NewQueryStringQuery(query string) *queryStringQuery {
-	return &queryStringQuery{
+func NewQueryStringQuery(query string) *QueryStringQuery {
+	return &QueryStringQuery{
 		Query:    query,
 		BoostVal: 1.0,
 	}
 }
 
-func (q *queryStringQuery) Boost() float64 {
+func (q *QueryStringQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *queryStringQuery) SetBoost(b float64) Query {
+func (q *QueryStringQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *queryStringQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *QueryStringQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	newQuery, err := parseQuerySyntax(q.Query)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (q *queryStringQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 	return newQuery.Searcher(i, m, explain)
 }
 
-func (q *queryStringQuery) Validate() error {
+func (q *QueryStringQuery) Validate() error {
 	newQuery, err := parseQuerySyntax(q.Query)
 	if err != nil {
 		return err
@@ -55,10 +55,10 @@ func (q *queryStringQuery) Validate() error {
 	return newQuery.Validate()
 }
 
-func (q *queryStringQuery) Field() string {
+func (q *QueryStringQuery) Field() string {
 	return ""
 }
 
-func (q *queryStringQuery) SetField(f string) Query {
+func (q *QueryStringQuery) SetField(f string) Query {
 	return q
 }

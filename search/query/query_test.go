@@ -7,12 +7,14 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/blevesearch/bleve/mapping"
 )
 
 var minNum = 5.1
@@ -24,7 +26,7 @@ func TestParseQuery(t *testing.T) {
 	tests := []struct {
 		input  []byte
 		output Query
-		err    error
+		err    bool
 	}{
 		{
 			input:  []byte(`{"term":"water","field":"desc"}`),
@@ -49,7 +51,7 @@ func TestParseQuery(t *testing.T) {
 		{
 			input:  []byte(`{"match":"beer","field":"desc","operator":"does not exist"}`),
 			output: nil,
-			err:    matchQueryOperatorUnmarshalError("does not exist"),
+			err:    true,
 		},
 		{
 			input:  []byte(`{"match_phrase":"light beer","field":"desc"}`),
@@ -98,18 +100,14 @@ func TestParseQuery(t *testing.T) {
 		{
 			input:  []byte(`{"madeitup":"queryhere"}`),
 			output: nil,
-			err:    ErrorUnknownQueryType,
+			err:    true,
 		},
 	}
 
 	for i, test := range tests {
 		actual, err := ParseQuery(test.input)
-		if err != nil && test.err == nil {
+		if err != nil && test.err == false {
 			t.Errorf("error %v for %d", err, i)
-		} else if test.err != nil {
-			if !reflect.DeepEqual(err, test.err) {
-				t.Errorf("expected error: %#v, got: %#v", test.err, err)
-			}
 		}
 
 		if !reflect.DeepEqual(test.output, actual) {
@@ -160,90 +158,77 @@ func TestSetGetField(t *testing.T) {
 func TestQueryValidate(t *testing.T) {
 	tests := []struct {
 		query Query
-		err   error
+		err   bool
 	}{
 		{
 			query: NewTermQuery("water").SetField("desc"),
-			err:   nil,
 		},
 		{
 			query: NewMatchQuery("beer").SetField("desc"),
-			err:   nil,
 		},
 		{
 			query: NewMatchPhraseQuery("light beer").SetField("desc"),
-			err:   nil,
 		},
 		{
 			query: NewNumericRangeQuery(&minNum, &maxNum).SetField("desc"),
-			err:   nil,
 		},
 		{
 			query: NewNumericRangeQuery(nil, nil).SetField("desc"),
-			err:   ErrorNumericQueryNoBounds,
+			err:   true,
 		},
 		{
 			query: NewDateRangeQuery(&startDate, &endDate).SetField("desc"),
-			err:   nil,
 		},
 		{
 			query: NewPrefixQuery("budwei").SetField("desc"),
-			err:   nil,
 		},
 		{
 			query: NewQueryStringQuery(`+beer "light beer" -devon`),
-			err:   nil,
 		},
 		{
 			query: NewPhraseQuery([]string{"watered", "down"}, "desc"),
-			err:   nil,
 		},
 		{
 			query: NewPhraseQuery([]string{}, "field"),
-			err:   ErrorPhraseQueryNoTerms,
+			err:   true,
 		},
 		{
 			query: NewMatchNoneQuery().SetBoost(25),
-			err:   nil,
 		},
 		{
 			query: NewMatchAllQuery().SetBoost(25),
-			err:   nil,
 		},
 		{
 			query: NewBooleanQuery(
 				[]Query{NewMatchQuery("beer").SetField("desc")},
 				[]Query{NewMatchQuery("water").SetField("desc")},
 				[]Query{NewMatchQuery("devon").SetField("desc")}),
-			err: nil,
 		},
 		{
 			query: NewBooleanQuery(
 				nil,
 				nil,
 				[]Query{NewMatchQuery("devon").SetField("desc")}),
-			err: nil,
 		},
 		{
 			query: NewBooleanQuery(
 				[]Query{},
 				[]Query{},
 				[]Query{NewMatchQuery("devon").SetField("desc")}),
-			err: nil,
 		},
 		{
 			query: NewBooleanQuery(
 				nil,
 				nil,
 				nil),
-			err: ErrorBooleanQueryNeedsMustOrShouldOrNotMust,
+			err: true,
 		},
 		{
 			query: NewBooleanQuery(
 				[]Query{},
 				[]Query{},
 				[]Query{}),
-			err: ErrorBooleanQueryNeedsMustOrShouldOrNotMust,
+			err: true,
 		},
 		{
 			query: NewBooleanQueryMinShould(
@@ -251,24 +236,25 @@ func TestQueryValidate(t *testing.T) {
 				[]Query{NewMatchQuery("water").SetField("desc")},
 				[]Query{NewMatchQuery("devon").SetField("desc")},
 				2.0),
-			err: ErrorDisjunctionFewerThanMinClauses,
+			err: true,
 		},
 		{
 			query: NewDocIDQuery(nil).SetBoost(25),
-			err:   nil,
 		},
 	}
 
 	for _, test := range tests {
 		actual := test.query.Validate()
-		if !reflect.DeepEqual(actual, test.err) {
+		if actual != nil && !test.err {
+			t.Errorf("expected no error: %#v got %#v", test.err, actual)
+		} else if actual == nil && test.err {
 			t.Errorf("expected error: %#v got %#v", test.err, actual)
 		}
 	}
 }
 
 func TestDumpQuery(t *testing.T) {
-	mapping := NewIndexMapping()
+	mapping := mapping.NewIndexMapping()
 	q := NewQueryStringQuery("+water -light beer")
 	s, err := DumpQuery(mapping, q)
 	if err != nil {

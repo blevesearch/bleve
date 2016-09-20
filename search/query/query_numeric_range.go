@@ -7,16 +7,18 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
+	"fmt"
+
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
 )
 
-type numericRangeQuery struct {
+type NumericRangeQuery struct {
 	Min          *float64 `json:"min,omitempty"`
 	Max          *float64 `json:"max,omitempty"`
 	InclusiveMin *bool    `json:"inclusive_min,omitempty"`
@@ -30,7 +32,7 @@ type numericRangeQuery struct {
 // Either, but not both endpoints can be nil.
 // The minimum value is inclusive.
 // The maximum value is exclusive.
-func NewNumericRangeQuery(min, max *float64) *numericRangeQuery {
+func NewNumericRangeQuery(min, max *float64) *NumericRangeQuery {
 	return NewNumericRangeInclusiveQuery(min, max, nil, nil)
 }
 
@@ -38,8 +40,8 @@ func NewNumericRangeQuery(min, max *float64) *numericRangeQuery {
 // of numeric values.
 // Either, but not both endpoints can be nil.
 // Control endpoint inclusion with inclusiveMin, inclusiveMax.
-func NewNumericRangeInclusiveQuery(min, max *float64, minInclusive, maxInclusive *bool) *numericRangeQuery {
-	return &numericRangeQuery{
+func NewNumericRangeInclusiveQuery(min, max *float64, minInclusive, maxInclusive *bool) *NumericRangeQuery {
+	return &NumericRangeQuery{
 		Min:          min,
 		Max:          max,
 		InclusiveMin: minInclusive,
@@ -48,25 +50,25 @@ func NewNumericRangeInclusiveQuery(min, max *float64, minInclusive, maxInclusive
 	}
 }
 
-func (q *numericRangeQuery) Boost() float64 {
+func (q *NumericRangeQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *numericRangeQuery) SetBoost(b float64) Query {
+func (q *NumericRangeQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *numericRangeQuery) Field() string {
+func (q *NumericRangeQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *numericRangeQuery) SetField(f string) Query {
+func (q *NumericRangeQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *numericRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *NumericRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -74,9 +76,9 @@ func (q *numericRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping
 	return searchers.NewNumericRangeSearcher(i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.BoostVal, explain)
 }
 
-func (q *numericRangeQuery) Validate() error {
+func (q *NumericRangeQuery) Validate() error {
 	if q.Min == nil && q.Min == q.Max {
-		return ErrorNumericQueryNoBounds
+		return fmt.Errorf("numeric range query must specify min or max")
 	}
 	return nil
 }

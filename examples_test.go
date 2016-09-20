@@ -18,6 +18,7 @@ import (
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/highlight/highlighters/ansi"
+	"github.com/blevesearch/bleve/search/query"
 )
 
 var indexMapping mapping.IndexMapping
@@ -372,11 +373,11 @@ func ExampleNewSearchRequest() {
 }
 
 func ExampleNewBooleanQuery() {
-	must := make([]Query, 1)
-	mustNot := make([]Query, 1)
-	must[0] = NewMatchQuery("one")
-	mustNot[0] = NewMatchQuery("great")
-	query := NewBooleanQuery(must, nil, mustNot)
+	must := NewMatchQuery("one")
+	mustNot := NewMatchQuery("great")
+	query := NewBooleanQuery()
+	query.AddMust(must)
+	query.AddMustNot(mustNot)
 	searchRequest := NewSearchRequest(query)
 	searchResults, err := example_index.Search(searchRequest)
 	if err != nil {
@@ -388,27 +389,10 @@ func ExampleNewBooleanQuery() {
 	// document id 1
 }
 
-func ExampleNewBooleanQueryMinShould() {
-	should := make([]Query, 2)
-	should[0] = NewMatchQuery("great")
-	should[1] = NewMatchQuery("one")
-	query := NewBooleanQueryMinShould(nil, should, nil, float64(2))
-	searchRequest := NewSearchRequest(query)
-	searchResults, err := example_index.Search(searchRequest)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(searchResults.Hits[0].ID)
-	// Output:
-	// document id 2
-}
-
 func ExampleNewConjunctionQuery() {
-	conjuncts := make([]Query, 2)
-	conjuncts[0] = NewMatchQuery("great")
-	conjuncts[1] = NewMatchQuery("one")
-	query := NewConjunctionQuery(conjuncts)
+	conjunct1 := NewMatchQuery("great")
+	conjunct2 := NewMatchQuery("one")
+	query := NewConjunctionQuery(conjunct1, conjunct2)
 	searchRequest := NewSearchRequest(query)
 	searchResults, err := example_index.Search(searchRequest)
 	if err != nil {
@@ -421,7 +405,7 @@ func ExampleNewConjunctionQuery() {
 }
 
 func ExampleNewMatchQueryOperator() {
-	query := NewMatchQueryOperator("great one", MatchQueryOperatorAnd)
+	query := NewMatchQueryOperator("great one", query.MatchQueryOperatorAnd)
 	searchRequest := NewSearchRequest(query)
 	searchResults, err := example_index.Search(searchRequest)
 	if err != nil {
@@ -434,10 +418,9 @@ func ExampleNewMatchQueryOperator() {
 }
 
 func ExampleNewDisjunctionQuery() {
-	disjuncts := make([]Query, 2)
-	disjuncts[0] = NewMatchQuery("great")
-	disjuncts[1] = NewMatchQuery("named")
-	query := NewDisjunctionQuery(disjuncts)
+	disjunct1 := NewMatchQuery("great")
+	disjunct2 := NewMatchQuery("named")
+	query := NewDisjunctionQuery(disjunct1, disjunct2)
 	searchRequest := NewSearchRequest(query)
 	searchResults, err := example_index.Search(searchRequest)
 	if err != nil {
@@ -450,10 +433,9 @@ func ExampleNewDisjunctionQuery() {
 }
 
 func ExampleNewDisjunctionQueryMin() {
-	disjuncts := make([]Query, 2)
-	disjuncts[0] = NewMatchQuery("great")
-	disjuncts[1] = NewMatchQuery("named")
-	query := NewDisjunctionQueryMin(disjuncts, float64(2))
+	disjunct1 := NewMatchQuery("great")
+	disjunct2 := NewMatchQuery("named")
+	query := NewDisjunctionQueryMin(2, disjunct1, disjunct2)
 	searchRequest := NewSearchRequest(query)
 	searchResults, err := example_index.Search(searchRequest)
 	if err != nil {

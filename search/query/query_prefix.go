@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"github.com/blevesearch/bleve/index"
@@ -16,47 +16,48 @@ import (
 	"github.com/blevesearch/bleve/search/searchers"
 )
 
-type termQuery struct {
-	Term     string  `json:"term"`
+type PrefixQuery struct {
+	Prefix   string  `json:"prefix"`
 	FieldVal string  `json:"field,omitempty"`
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
-// NewTermQuery creates a new Query for finding an
-// exact term match in the index.
-func NewTermQuery(term string) *termQuery {
-	return &termQuery{
-		Term:     term,
+// NewPrefixQuery creates a new Query which finds
+// documents containing terms that start with the
+// specified prefix.
+func NewPrefixQuery(prefix string) *PrefixQuery {
+	return &PrefixQuery{
+		Prefix:   prefix,
 		BoostVal: 1.0,
 	}
 }
 
-func (q *termQuery) Boost() float64 {
+func (q *PrefixQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *termQuery) SetBoost(b float64) Query {
+func (q *PrefixQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *termQuery) Field() string {
+func (q *PrefixQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *termQuery) SetField(f string) Query {
+func (q *PrefixQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *termQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *PrefixQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
-	return searchers.NewTermSearcher(i, q.Term, field, q.BoostVal, explain)
+	return searchers.NewTermPrefixSearcher(i, q.Prefix, field, q.BoostVal, explain)
 }
 
-func (q *termQuery) Validate() error {
+func (q *PrefixQuery) Validate() error {
 	return nil
 }

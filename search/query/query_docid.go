@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"github.com/blevesearch/bleve/index"
@@ -16,7 +16,7 @@ import (
 	"github.com/blevesearch/bleve/search/searchers"
 )
 
-type docIDQuery struct {
+type DocIDQuery struct {
 	IDs      []string `json:"ids"`
 	BoostVal float64  `json:"boost,omitempty"`
 }
@@ -24,34 +24,34 @@ type docIDQuery struct {
 // NewDocIDQuery creates a new Query object returning indexed documents among
 // the specified set. Combine it with ConjunctionQuery to restrict the scope of
 // other queries output.
-func NewDocIDQuery(ids []string) *docIDQuery {
-	return &docIDQuery{
+func NewDocIDQuery(ids []string) *DocIDQuery {
+	return &DocIDQuery{
 		IDs:      ids,
 		BoostVal: 1.0,
 	}
 }
 
-func (q *docIDQuery) Boost() float64 {
+func (q *DocIDQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *docIDQuery) SetBoost(b float64) Query {
+func (q *DocIDQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *docIDQuery) Field() string {
+func (q *DocIDQuery) Field() string {
 	return ""
 }
 
-func (q *docIDQuery) SetField(f string) Query {
+func (q *DocIDQuery) SetField(f string) Query {
 	return q
 }
 
-func (q *docIDQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *DocIDQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	return searchers.NewDocIDSearcher(i, q.IDs, q.BoostVal, explain)
 }
 
-func (q *docIDQuery) Validate() error {
+func (q *DocIDQuery) Validate() error {
 	return nil
 }

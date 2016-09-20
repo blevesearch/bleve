@@ -31,6 +31,7 @@ import (
 	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/query"
 )
 
 func TestCrud(t *testing.T) {
@@ -346,7 +347,7 @@ func TestClosedIndex(t *testing.T) {
 }
 
 type slowQuery struct {
-	actual Query
+	actual query.Query
 	delay  time.Duration
 }
 
@@ -354,7 +355,7 @@ func (s *slowQuery) Boost() float64 {
 	return s.actual.Boost()
 }
 
-func (s *slowQuery) SetBoost(b float64) Query {
+func (s *slowQuery) SetBoost(b float64) query.Query {
 	return s.actual.SetBoost(b)
 }
 
@@ -362,7 +363,7 @@ func (s *slowQuery) Field() string {
 	return s.actual.Field()
 }
 
-func (s *slowQuery) SetField(f string) Query {
+func (s *slowQuery) SetField(f string) query.Query {
 	return s.actual.SetField(f)
 }
 

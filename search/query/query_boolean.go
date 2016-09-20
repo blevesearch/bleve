@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"encoding/json"
@@ -19,7 +19,7 @@ import (
 	"github.com/blevesearch/bleve/search/searchers"
 )
 
-type booleanQuery struct {
+type BooleanQuery struct {
 	Must     Query   `json:"must,omitempty"`
 	Should   Query   `json:"should,omitempty"`
 	MustNot  Query   `json:"must_not,omitempty"`
@@ -34,7 +34,7 @@ type booleanQuery struct {
 // Queries.
 // Result documents that ALSO satisfy any of the should
 // Queries will score higher.
-func NewBooleanQuery(must []Query, should []Query, mustNot []Query) *booleanQuery {
+func NewBooleanQuery(must []Query, should []Query, mustNot []Query) *BooleanQuery {
 	return NewBooleanQueryMinShould(must, should, mustNot, 0.0)
 }
 
@@ -42,9 +42,9 @@ func NewBooleanQuery(must []Query, should []Query, mustNot []Query) *booleanQuer
 // NewBooleanQuery, only it offers control of the
 // minimum number of should queries that must be
 // satisfied.
-func NewBooleanQueryMinShould(must []Query, should []Query, mustNot []Query, minShould float64) *booleanQuery {
+func NewBooleanQueryMinShould(must []Query, should []Query, mustNot []Query, minShould float64) *BooleanQuery {
 
-	rv := booleanQuery{
+	rv := BooleanQuery{
 		BoostVal: 1.0,
 	}
 	if len(must) > 0 {
@@ -62,41 +62,47 @@ func NewBooleanQueryMinShould(must []Query, should []Query, mustNot []Query, min
 
 // SetMinShould requires that at least minShould of the
 // should Queries must be satisfied.
-func (q *booleanQuery) SetMinShould(minShould float64) {
-	q.Should.(*disjunctionQuery).SetMin(minShould)
+func (q *BooleanQuery) SetMinShould(minShould float64) {
+	q.Should.(*DisjunctionQuery).SetMin(minShould)
 }
 
-func (q *booleanQuery) AddMust(m Query) {
+func (q *BooleanQuery) AddMust(m ...Query) {
 	if q.Must == nil {
 		q.Must = NewConjunctionQuery([]Query{})
 	}
-	q.Must.(*conjunctionQuery).AddQuery(m)
+	for _, mq := range m {
+		q.Must.(*ConjunctionQuery).AddQuery(mq)
+	}
 }
 
-func (q *booleanQuery) AddShould(m Query) {
+func (q *BooleanQuery) AddShould(m ...Query) {
 	if q.Should == nil {
 		q.Should = NewDisjunctionQuery([]Query{})
 	}
-	q.Should.(*disjunctionQuery).AddQuery(m)
+	for _, mq := range m {
+		q.Should.(*DisjunctionQuery).AddQuery(mq)
+	}
 }
 
-func (q *booleanQuery) AddMustNot(m Query) {
+func (q *BooleanQuery) AddMustNot(m ...Query) {
 	if q.MustNot == nil {
 		q.MustNot = NewDisjunctionQuery([]Query{})
 	}
-	q.MustNot.(*disjunctionQuery).AddQuery(m)
+	for _, mq := range m {
+		q.MustNot.(*DisjunctionQuery).AddQuery(mq)
+	}
 }
 
-func (q *booleanQuery) Boost() float64 {
+func (q *BooleanQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *booleanQuery) SetBoost(b float64) Query {
+func (q *BooleanQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *booleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	var err error
 	var mustNotSearcher search.Searcher
 	if q.MustNot != nil {
@@ -132,7 +138,7 @@ func (q *booleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, exp
 	return searchers.NewBooleanSearcher(i, mustSearcher, shouldSearcher, mustNotSearcher, explain)
 }
 
-func (q *booleanQuery) Validate() error {
+func (q *BooleanQuery) Validate() error {
 	if q.Must != nil {
 		err := q.Must.Validate()
 		if err != nil {
@@ -152,12 +158,12 @@ func (q *booleanQuery) Validate() error {
 		}
 	}
 	if q.Must == nil && q.Should == nil && q.MustNot == nil {
-		return ErrorBooleanQueryNeedsMustOrShouldOrNotMust
+		return fmt.Errorf("boolean query must contain at least one must or should or not must clause")
 	}
 	return nil
 }
 
-func (q *booleanQuery) UnmarshalJSON(data []byte) error {
+func (q *BooleanQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
 		Must     json.RawMessage `json:"must,omitempty"`
 		Should   json.RawMessage `json:"should,omitempty"`
@@ -174,7 +180,7 @@ func (q *booleanQuery) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return err
 		}
-		_, isConjunctionQuery := q.Must.(*conjunctionQuery)
+		_, isConjunctionQuery := q.Must.(*ConjunctionQuery)
 		if !isConjunctionQuery {
 			return fmt.Errorf("must clause must be conjunction")
 		}
@@ -185,7 +191,7 @@ func (q *booleanQuery) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return err
 		}
-		_, isDisjunctionQuery := q.Should.(*disjunctionQuery)
+		_, isDisjunctionQuery := q.Should.(*DisjunctionQuery)
 		if !isDisjunctionQuery {
 			return fmt.Errorf("should clause must be disjunction")
 		}
@@ -196,7 +202,7 @@ func (q *booleanQuery) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return err
 		}
-		_, isDisjunctionQuery := q.MustNot.(*disjunctionQuery)
+		_, isDisjunctionQuery := q.MustNot.(*DisjunctionQuery)
 		if !isDisjunctionQuery {
 			return fmt.Errorf("must not clause must be disjunction")
 		}
@@ -209,10 +215,10 @@ func (q *booleanQuery) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (q *booleanQuery) Field() string {
+func (q *BooleanQuery) Field() string {
 	return ""
 }
 
-func (q *booleanQuery) SetField(f string) Query {
+func (q *BooleanQuery) SetField(f string) Query {
 	return q
 }

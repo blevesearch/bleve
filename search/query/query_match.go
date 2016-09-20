@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"encoding/json"
@@ -18,7 +18,7 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type matchQuery struct {
+type MatchQuery struct {
 	Match        string             `json:"match"`
 	FieldVal     string             `json:"field,omitempty"`
 	Analyzer     string             `json:"analyzer,omitempty"`
@@ -63,14 +63,8 @@ func (o *MatchQueryOperator) UnmarshalJSON(data []byte) error {
 		*o = MatchQueryOperatorAnd
 		return nil
 	default:
-		return matchQueryOperatorUnmarshalError(operatorString)
+		return fmt.Errorf("cannot unmarshal match operator '%s' from JSON", o)
 	}
-}
-
-type matchQueryOperatorUnmarshalError string
-
-func (e matchQueryOperatorUnmarshalError) Error() string {
-	return fmt.Sprintf("cannot unmarshal match operator '%s' from JSON", e)
 }
 
 // NewMatchQuery creates a Query for matching text.
@@ -79,74 +73,74 @@ func (e matchQueryOperatorUnmarshalError) Error() string {
 // Token terms resulting from this analysis are
 // used to perform term searches.  Result documents
 // must satisfy at least one of these term searches.
-func NewMatchQuery(match string) *matchQuery {
-	return &matchQuery{
+func NewMatchQuery(match string) *MatchQuery {
+	return &MatchQuery{
 		Match:       match,
 		BoostVal:    1.0,
 		OperatorVal: MatchQueryOperatorOr,
 	}
 }
 
-// NewMatchQuery creates a Query for matching text.
+// NewMatchQueryOperator creates a Query for matching text.
 // An Analyzer is chosen based on the field.
 // Input text is analyzed using this analyzer.
 // Token terms resulting from this analysis are
 // used to perform term searches.  Result documents
 // must satisfy term searches according to given operator.
-func NewMatchQueryOperator(match string, operator MatchQueryOperator) *matchQuery {
-	return &matchQuery{
+func NewMatchQueryOperator(match string, operator MatchQueryOperator) *MatchQuery {
+	return &MatchQuery{
 		Match:       match,
 		BoostVal:    1.0,
 		OperatorVal: operator,
 	}
 }
 
-func (q *matchQuery) Boost() float64 {
+func (q *MatchQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *matchQuery) SetBoost(b float64) Query {
+func (q *MatchQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *matchQuery) Field() string {
+func (q *MatchQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *matchQuery) SetField(f string) Query {
+func (q *MatchQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *matchQuery) Fuzziness() int {
+func (q *MatchQuery) Fuzziness() int {
 	return q.FuzzinessVal
 }
 
-func (q *matchQuery) SetFuzziness(f int) Query {
+func (q *MatchQuery) SetFuzziness(f int) Query {
 	q.FuzzinessVal = f
 	return q
 }
 
-func (q *matchQuery) Prefix() int {
+func (q *MatchQuery) Prefix() int {
 	return q.PrefixVal
 }
 
-func (q *matchQuery) SetPrefix(p int) Query {
+func (q *MatchQuery) SetPrefix(p int) Query {
 	q.PrefixVal = p
 	return q
 }
 
-func (q *matchQuery) Operator() MatchQueryOperator {
+func (q *MatchQuery) Operator() MatchQueryOperator {
 	return q.OperatorVal
 }
 
-func (q *matchQuery) SetOperator(operator MatchQueryOperator) Query {
+func (q *MatchQuery) SetOperator(operator MatchQueryOperator) Query {
 	q.OperatorVal = operator
 	return q
 }
 
-func (q *matchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 
 	field := q.FieldVal
 	if q.FieldVal == "" {
@@ -207,6 +201,6 @@ func (q *matchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expla
 	return noneQuery.Searcher(i, m, explain)
 }
 
-func (q *matchQuery) Validate() error {
+func (q *MatchQuery) Validate() error {
 	return nil
 }

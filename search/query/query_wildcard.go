@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"regexp"
@@ -38,7 +38,7 @@ var wildcardRegexpReplacer = strings.NewReplacer(
 	"*", ".*",
 	"?", ".")
 
-type wildcardQuery struct {
+type WildcardQuery struct {
 	Wildcard string  `json:"wildcard"`
 	FieldVal string  `json:"field,omitempty"`
 	BoostVal float64 `json:"boost,omitempty"`
@@ -50,32 +50,32 @@ type wildcardQuery struct {
 // specified wildcard.  In the wildcard pattern '*'
 // will match any sequence of 0 or more characters,
 // and '?' will match any single character.
-func NewWildcardQuery(wildcard string) *wildcardQuery {
-	return &wildcardQuery{
+func NewWildcardQuery(wildcard string) *WildcardQuery {
+	return &WildcardQuery{
 		Wildcard: wildcard,
 		BoostVal: 1.0,
 	}
 }
 
-func (q *wildcardQuery) Boost() float64 {
+func (q *WildcardQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *wildcardQuery) SetBoost(b float64) Query {
+func (q *WildcardQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *wildcardQuery) Field() string {
+func (q *WildcardQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *wildcardQuery) SetField(f string) Query {
+func (q *WildcardQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *wildcardQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *WildcardQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -91,13 +91,13 @@ func (q *wildcardQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, ex
 	return searchers.NewRegexpSearcher(i, q.compiled, field, q.BoostVal, explain)
 }
 
-func (q *wildcardQuery) Validate() error {
+func (q *WildcardQuery) Validate() error {
 	var err error
 	q.compiled, err = q.convertToRegexp()
 	return err
 }
 
-func (q *wildcardQuery) convertToRegexp() (*regexp.Regexp, error) {
+func (q *WildcardQuery) convertToRegexp() (*regexp.Regexp, error) {
 	regexpString := "^" + wildcardRegexpReplacer.Replace(q.Wildcard) + "$"
 	return regexp.Compile(regexpString)
 }

@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"github.com/blevesearch/bleve/index"
@@ -16,7 +16,7 @@ import (
 	"github.com/blevesearch/bleve/search/searchers"
 )
 
-type fuzzyQuery struct {
+type FuzzyQuery struct {
 	Term         string  `json:"term"`
 	PrefixVal    int     `json:"prefix_length"`
 	FuzzinessVal int     `json:"fuzziness"`
@@ -31,8 +31,8 @@ type fuzzyQuery struct {
 //
 // The current implementation uses Levenshtein edit
 // distance as the fuzziness metric.
-func NewFuzzyQuery(term string) *fuzzyQuery {
-	return &fuzzyQuery{
+func NewFuzzyQuery(term string) *FuzzyQuery {
+	return &FuzzyQuery{
 		Term:         term,
 		PrefixVal:    0,
 		FuzzinessVal: 2,
@@ -40,43 +40,43 @@ func NewFuzzyQuery(term string) *fuzzyQuery {
 	}
 }
 
-func (q *fuzzyQuery) Boost() float64 {
+func (q *FuzzyQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *fuzzyQuery) SetBoost(b float64) Query {
+func (q *FuzzyQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *fuzzyQuery) Field() string {
+func (q *FuzzyQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *fuzzyQuery) SetField(f string) Query {
+func (q *FuzzyQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *fuzzyQuery) Fuzziness() int {
+func (q *FuzzyQuery) Fuzziness() int {
 	return q.FuzzinessVal
 }
 
-func (q *fuzzyQuery) SetFuzziness(f int) Query {
+func (q *FuzzyQuery) SetFuzziness(f int) Query {
 	q.FuzzinessVal = f
 	return q
 }
 
-func (q *fuzzyQuery) Prefix() int {
+func (q *FuzzyQuery) Prefix() int {
 	return q.PrefixVal
 }
 
-func (q *fuzzyQuery) SetPrefix(p int) Query {
+func (q *FuzzyQuery) SetPrefix(p int) Query {
 	q.PrefixVal = p
 	return q
 }
 
-func (q *fuzzyQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *FuzzyQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -84,6 +84,6 @@ func (q *fuzzyQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expla
 	return searchers.NewFuzzySearcher(i, q.Term, q.PrefixVal, q.FuzzinessVal, field, q.BoostVal, explain)
 }
 
-func (q *fuzzyQuery) Validate() error {
+func (q *FuzzyQuery) Validate() error {
 	return nil
 }

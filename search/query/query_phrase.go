@@ -7,10 +7,11 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/mapping"
@@ -18,7 +19,7 @@ import (
 	"github.com/blevesearch/bleve/search/searchers"
 )
 
-type phraseQuery struct {
+type PhraseQuery struct {
 	Terms       []string `json:"terms"`
 	FieldVal    string   `json:"field,omitempty"`
 	BoostVal    float64  `json:"boost,omitempty"`
@@ -31,14 +32,14 @@ type phraseQuery struct {
 // order, at the correct index offsets, in the
 // specified field. Queried field must have been indexed with
 // IncludeTermVectors set to true.
-func NewPhraseQuery(terms []string, field string) *phraseQuery {
+func NewPhraseQuery(terms []string, field string) *PhraseQuery {
 	termQueries := make([]Query, 0)
 	for _, term := range terms {
 		if term != "" {
 			termQueries = append(termQueries, NewTermQuery(term).SetField(field))
 		}
 	}
-	return &phraseQuery{
+	return &PhraseQuery{
 		Terms:       terms,
 		FieldVal:    field,
 		BoostVal:    1.0,
@@ -46,16 +47,16 @@ func NewPhraseQuery(terms []string, field string) *phraseQuery {
 	}
 }
 
-func (q *phraseQuery) Boost() float64 {
+func (q *PhraseQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *phraseQuery) SetBoost(b float64) Query {
+func (q *PhraseQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *phraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *PhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 
 	conjunctionQuery := NewConjunctionQuery(q.termQueries)
 	conjunctionSearcher, err := conjunctionQuery.Searcher(i, m, explain)
@@ -65,15 +66,15 @@ func (q *phraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expl
 	return searchers.NewPhraseSearcher(i, conjunctionSearcher.(*searchers.ConjunctionSearcher), q.Terms)
 }
 
-func (q *phraseQuery) Validate() error {
+func (q *PhraseQuery) Validate() error {
 	if len(q.termQueries) < 1 {
-		return ErrorPhraseQueryNoTerms
+		return fmt.Errorf("phrase query must contain at least one term")
 	}
 	return nil
 }
 
-func (q *phraseQuery) UnmarshalJSON(data []byte) error {
-	type _phraseQuery phraseQuery
+func (q *PhraseQuery) UnmarshalJSON(data []byte) error {
+	type _phraseQuery PhraseQuery
 	tmp := _phraseQuery{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
@@ -87,15 +88,15 @@ func (q *phraseQuery) UnmarshalJSON(data []byte) error {
 	}
 	q.termQueries = make([]Query, len(q.Terms))
 	for i, term := range q.Terms {
-		q.termQueries[i] = &termQuery{Term: term, FieldVal: q.FieldVal, BoostVal: q.BoostVal}
+		q.termQueries[i] = &TermQuery{Term: term, FieldVal: q.FieldVal, BoostVal: q.BoostVal}
 	}
 	return nil
 }
 
-func (q *phraseQuery) Field() string {
+func (q *PhraseQuery) Field() string {
 	return ""
 }
 
-func (q *phraseQuery) SetField(f string) Query {
+func (q *PhraseQuery) SetField(f string) Query {
 	return q
 }

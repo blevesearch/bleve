@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"github.com/blevesearch/bleve/index"
@@ -16,39 +16,39 @@ import (
 	"github.com/blevesearch/bleve/search/searchers"
 )
 
-type boolFieldQuery struct {
+type BoolFieldQuery struct {
 	Bool     bool    `json:"bool"`
 	FieldVal string  `json:"field,omitempty"`
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
 // NewBoolFieldQuery creates a new Query for boolean fields
-func NewBoolFieldQuery(val bool) *boolFieldQuery {
-	return &boolFieldQuery{
+func NewBoolFieldQuery(val bool) *BoolFieldQuery {
+	return &BoolFieldQuery{
 		Bool:     val,
 		BoostVal: 1.0,
 	}
 }
 
-func (q *boolFieldQuery) Boost() float64 {
+func (q *BoolFieldQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *boolFieldQuery) SetBoost(b float64) Query {
+func (q *BoolFieldQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *boolFieldQuery) Field() string {
+func (q *BoolFieldQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *boolFieldQuery) SetField(f string) Query {
+func (q *BoolFieldQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *boolFieldQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *BoolFieldQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -60,6 +60,6 @@ func (q *boolFieldQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, e
 	return searchers.NewTermSearcher(i, term, field, q.BoostVal, explain)
 }
 
-func (q *boolFieldQuery) Validate() error {
+func (q *BoolFieldQuery) Validate() error {
 	return nil
 }

@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 
 	"github.com/blevesearch/bleve"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +39,7 @@ var createCmd = &cobra.Command{
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var mapping *bleve.IndexMapping
+		var mapping mapping.IndexMapping
 		var err error
 		mapping, err = buildMapping()
 		if err != nil {
@@ -53,8 +54,8 @@ var createCmd = &cobra.Command{
 	},
 }
 
-func buildMapping() (*bleve.IndexMapping, error) {
-	mapping := bleve.NewIndexMapping()
+func buildMapping() (mapping.IndexMapping, error) {
+	mapping := mapping.NewIndexMapping()
 	if mappingPath != "" {
 		mappingBytes, err := ioutil.ReadFile(mappingPath)
 		if err != nil {

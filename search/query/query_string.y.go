@@ -1,4 +1,4 @@
-package bleve
+package query
 
 import __yyfmt__ "fmt"
 

@@ -7,20 +7,27 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"fmt"
 	"math"
 
+	"github.com/blevesearch/bleve/analysis/datetime_parsers/datetime_optional"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/numeric_util"
+	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
 )
 
-type dateRangeQuery struct {
+// QueryDateTimeParser controls the default query date time parser
+var QueryDateTimeParser = datetime_optional.Name
+
+var cache = registry.NewCache()
+
+type DateRangeQuery struct {
 	Start          *string `json:"start,omitempty"`
 	End            *string `json:"end,omitempty"`
 	InclusiveStart *bool   `json:"inclusive_start,omitempty"`
@@ -34,7 +41,7 @@ type dateRangeQuery struct {
 // Date strings are parsed using the DateTimeParser configured in the
 //  top-level config.QueryDateTimeParser
 // Either, but not both endpoints can be nil.
-func NewDateRangeQuery(start, end *string) *dateRangeQuery {
+func NewDateRangeQuery(start, end *string) *DateRangeQuery {
 	return NewDateRangeInclusiveQuery(start, end, nil, nil)
 }
 
@@ -44,8 +51,8 @@ func NewDateRangeQuery(start, end *string) *dateRangeQuery {
 //  top-level config.QueryDateTimeParser
 // Either, but not both endpoints can be nil.
 // startInclusive and endInclusive control inclusion of the endpoints.
-func NewDateRangeInclusiveQuery(start, end *string, startInclusive, endInclusive *bool) *dateRangeQuery {
-	return &dateRangeQuery{
+func NewDateRangeInclusiveQuery(start, end *string, startInclusive, endInclusive *bool) *DateRangeQuery {
+	return &DateRangeQuery{
 		Start:          start,
 		End:            end,
 		InclusiveStart: startInclusive,
@@ -54,25 +61,25 @@ func NewDateRangeInclusiveQuery(start, end *string, startInclusive, endInclusive
 	}
 }
 
-func (q *dateRangeQuery) Boost() float64 {
+func (q *DateRangeQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *dateRangeQuery) SetBoost(b float64) Query {
+func (q *DateRangeQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *dateRangeQuery) Field() string {
+func (q *DateRangeQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *dateRangeQuery) SetField(f string) Query {
+func (q *DateRangeQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *dateRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *DateRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 
 	min, max, err := q.parseEndpoints()
 	if err != nil {
@@ -87,8 +94,8 @@ func (q *dateRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, e
 	return searchers.NewNumericRangeSearcher(i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal, explain)
 }
 
-func (q *dateRangeQuery) parseEndpoints() (*float64, *float64, error) {
-	dateTimeParser, err := Config.Cache.DateTimeParserNamed(Config.QueryDateTimeParser)
+func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
+	dateTimeParser, err := cache.DateTimeParserNamed(QueryDateTimeParser)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -114,7 +121,7 @@ func (q *dateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 	return &min, &max, nil
 }
 
-func (q *dateRangeQuery) Validate() error {
+func (q *DateRangeQuery) Validate() error {
 	if q.Start == nil && q.Start == q.End {
 		return fmt.Errorf("must specify start or end")
 	}

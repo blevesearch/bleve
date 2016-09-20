@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"encoding/json"
@@ -18,47 +18,47 @@ import (
 	"github.com/blevesearch/bleve/search/searchers"
 )
 
-type matchNoneQuery struct {
+type MatchAllQuery struct {
 	BoostVal float64 `json:"boost,omitempty"`
 }
 
-// NewMatchNoneQuery creates a Query which will not
-// match any documents in the index.
-func NewMatchNoneQuery() *matchNoneQuery {
-	return &matchNoneQuery{
+// NewMatchAllQuery creates a Query which will
+// match all documents in the index.
+func NewMatchAllQuery() *MatchAllQuery {
+	return &MatchAllQuery{
 		BoostVal: 1.0,
 	}
 }
 
-func (q *matchNoneQuery) Boost() float64 {
+func (q *MatchAllQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *matchNoneQuery) SetBoost(b float64) Query {
+func (q *MatchAllQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *matchNoneQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	return searchers.NewMatchNoneSearcher(i)
+func (q *MatchAllQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+	return searchers.NewMatchAllSearcher(i, q.BoostVal, explain)
 }
 
-func (q *matchNoneQuery) Validate() error {
+func (q *MatchAllQuery) Validate() error {
 	return nil
 }
 
-func (q *matchNoneQuery) Field() string {
+func (q *MatchAllQuery) Field() string {
 	return ""
 }
 
-func (q *matchNoneQuery) SetField(f string) Query {
+func (q *MatchAllQuery) SetField(f string) Query {
 	return q
 }
 
-func (q *matchNoneQuery) MarshalJSON() ([]byte, error) {
+func (q *MatchAllQuery) MarshalJSON() ([]byte, error) {
 	tmp := map[string]interface{}{
-		"boost":      q.BoostVal,
-		"match_none": map[string]interface{}{},
+		"boost":     q.BoostVal,
+		"match_all": map[string]interface{}{},
 	}
 	return json.Marshal(tmp)
 }

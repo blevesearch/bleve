@@ -1,5 +1,5 @@
 %{
-package bleve
+package query
 import (
 	"fmt"
 	"strconv"

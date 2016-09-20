@@ -7,7 +7,7 @@
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 
-package bleve
+package query
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type matchPhraseQuery struct {
+type MatchPhraseQuery struct {
 	MatchPhrase string  `json:"match_phrase"`
 	FieldVal    string  `json:"field,omitempty"`
 	Analyzer    string  `json:"analyzer,omitempty"`
@@ -33,32 +33,32 @@ type matchPhraseQuery struct {
 // used to build a search phrase.  Result documents
 // must match this phrase. Queried field must have been indexed with
 // IncludeTermVectors set to true.
-func NewMatchPhraseQuery(matchPhrase string) *matchPhraseQuery {
-	return &matchPhraseQuery{
+func NewMatchPhraseQuery(matchPhrase string) *MatchPhraseQuery {
+	return &MatchPhraseQuery{
 		MatchPhrase: matchPhrase,
 		BoostVal:    1.0,
 	}
 }
 
-func (q *matchPhraseQuery) Boost() float64 {
+func (q *MatchPhraseQuery) Boost() float64 {
 	return q.BoostVal
 }
 
-func (q *matchPhraseQuery) SetBoost(b float64) Query {
+func (q *MatchPhraseQuery) SetBoost(b float64) Query {
 	q.BoostVal = b
 	return q
 }
 
-func (q *matchPhraseQuery) Field() string {
+func (q *MatchPhraseQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *matchPhraseQuery) SetField(f string) Query {
+func (q *MatchPhraseQuery) SetField(f string) Query {
 	q.FieldVal = f
 	return q
 }
 
-func (q *matchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -111,6 +111,6 @@ func tokenStreamToPhrase(tokens analysis.TokenStream) []string {
 	return nil
 }
 
-func (q *matchPhraseQuery) Validate() error {
+func (q *MatchPhraseQuery) Validate() error {
 	return nil
 }
