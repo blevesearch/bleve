@@ -24,7 +24,7 @@ import (
 
 // mappingCmd represents the mapping command
 var mappingCmd = &cobra.Command{
-	Use:   "mapping",
+	Use:   "mapping [index path]",
 	Short: "prints the mapping used for this index",
 	Long:  `The mapping command prints a JSON represenation of the mapping used for this index.`,
 	Run: func(cmd *cobra.Command, args []string) {

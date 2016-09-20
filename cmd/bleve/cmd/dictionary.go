@@ -22,7 +22,7 @@ import (
 
 // dictionaryCmd represents the dictionary command
 var dictionaryCmd = &cobra.Command{
-	Use:   "dictionary",
+	Use:   "dictionary [index path] [field name]",
 	Short: "prints the term dictionary for the specified field in the index",
 	Long:  `The dictionary command will print the term dictionary for the specified field.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

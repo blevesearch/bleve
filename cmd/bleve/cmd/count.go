@@ -22,7 +22,7 @@ import (
 
 // countCmd represents the count command
 var countCmd = &cobra.Command{
-	Use:   "count",
+	Use:   "count [index path]",
 	Short: "counts the number documents in the index",
 	Long:  `The count command will count the number of documents in the index.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

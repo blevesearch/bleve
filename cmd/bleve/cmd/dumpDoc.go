@@ -23,7 +23,7 @@ import (
 
 // dumpDocCmd represents the dumpDoc command
 var dumpDocCmd = &cobra.Command{
-	Use:   "doc",
+	Use:   "doc [index path] [doc id]",
 	Short: "dump only the rows relating to this doc ID",
 	Long:  `The doc sub-command of dump will only dump the rows relating to this doc ID.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

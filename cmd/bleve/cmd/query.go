@@ -28,7 +28,7 @@ var qtype, qfield string
 
 // queryCmd represents the query command
 var queryCmd = &cobra.Command{
-	Use:   "query",
+	Use:   "query [index path] [query]",
 	Short: "queries the index",
 	Long:  `The query command will execute a query against the index.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

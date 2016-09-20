@@ -25,7 +25,7 @@ var docID string
 
 // dumpCmd represents the dump command
 var dumpCmd = &cobra.Command{
-	Use:   "dump",
+	Use:   "dump [index path]",
 	Short: "dumps the contents of the index",
 	Long:  `The dump command will dump (possibly a section of) the index.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

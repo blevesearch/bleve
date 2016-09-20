@@ -28,7 +28,7 @@ var batchSize int
 
 // bulkCmd represents the bulk command
 var bulkCmd = &cobra.Command{
-	Use:   "bulk",
+	Use:   "bulk [index path] [data paths ...]",
 	Short: "bulk loads from newline delimited JSON files",
 	Long:  `The bulk command will perform batch loading of documents in one or more newline delimited JSON files.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

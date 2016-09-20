@@ -23,7 +23,7 @@ import (
 
 // dumpFieldsCmd represents the dumpFields command
 var dumpFieldsCmd = &cobra.Command{
-	Use:   "fields",
+	Use:   "fields [index path]",
 	Short: "dump only the field rows",
 	Long:  `The fields sub-command of dump will only dump the field rows.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

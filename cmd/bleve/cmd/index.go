@@ -29,7 +29,7 @@ var keepDir, keepExt, parseJSON bool
 
 // indexCmd represents the index command
 var indexCmd = &cobra.Command{
-	Use:   "index",
+	Use:   "index [index path] [data paths ...]",
 	Short: "adds the files to the index",
 	Long:  `The index command adds the specified files to the index.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

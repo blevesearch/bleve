@@ -27,7 +27,7 @@ var mappingPath, indexType, storeType string
 
 // createCmd represents the create command
 var createCmd = &cobra.Command{
-	Use:   "create",
+	Use:   "create [index path]",
 	Short: "creates a new index",
 	Long:  `The create command will create a new empty index.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

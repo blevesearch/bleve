@@ -22,7 +22,7 @@ import (
 
 // fieldsCmd represents the fields command
 var fieldsCmd = &cobra.Command{
-	Use:   "fields",
+	Use:   "fields [index path]",
 	Short: "lists the fields in this index",
 	Long:  `The fields command will list the fields used in this index.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
