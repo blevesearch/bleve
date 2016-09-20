@@ -133,6 +133,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	if err != nil {
 		return err
 	}
+	hc.total += searchContext.LowScoreNumMatches
 	return nil
 }
 
@@ -174,11 +175,14 @@ func (hc *TopNCollector) collectSingle(ctx *search.SearchContext, reader index.I
 	}
 
 	// compute this hits sort value
-	if len(hc.sort) == 1 && hc.cachedScoring[0] {
+	scoreOpt := len(hc.sort) == 1 && hc.cachedScoring[0]
+	if scoreOpt {
 		d.Sort = sortByScoreOpt
 	} else {
 		hc.sort.Value(d)
 	}
+
+	ctx.LowScoreFilter = 0
 
 	// optimization, we track lowest sorting hit already removed from heap
 	// with this one comparision, we can avoid all heap operations if
@@ -188,6 +192,10 @@ func (hc *TopNCollector) collectSingle(ctx *search.SearchContext, reader index.I
 		if cmp >= 0 {
 			// this hit can't possibly be in the result set, so avoid heap ops
 			ctx.DocumentMatchPool.Put(d)
+
+			if scoreOpt && hc.facetsBuilder == nil {
+				ctx.LowScoreFilter = hc.lowestMatchOutsideResults.Score
+			}
 			return nil
 		}
 	}
@@ -207,6 +215,9 @@ func (hc *TopNCollector) collectSingle(ctx *search.SearchContext, reader index.I
 		}
 	}
 
+	if scoreOpt && hc.facetsBuilder == nil && hc.lowestMatchOutsideResults != nil {
+		ctx.LowScoreFilter = hc.lowestMatchOutsideResults.Score
+	}
 	return nil
 }
 

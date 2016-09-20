@@ -144,4 +144,14 @@ type Searcher interface {
 // SearchContext represents the context around a single search
 type SearchContext struct {
 	DocumentMatchPool *DocumentMatchPool
+
+	// A LowScoreFilter is an optional score provided by the
+	// collector, allowing searchers to potentially optimize by
+	// performing early filtering of doc matches with low score.
+	LowScoreFilter float64
+
+	// A count of the matches which were filtered out due to a low
+	// score w.r.t. the LowScoreFilter.  These need to be counted
+	// into the search result's total hits.
+	LowScoreNumMatches uint64
 }

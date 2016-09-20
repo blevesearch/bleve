@@ -130,6 +130,8 @@ func (s *DisjunctionSearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *DisjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+	ctx.LowScoreFilter = 0
+
 	if !s.initialized {
 		err := s.initSearchers(ctx)
 		if err != nil {

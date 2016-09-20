@@ -50,6 +50,8 @@ func (s *DocIDSearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *DocIDSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+	ctx.LowScoreFilter = 0
+
 	docidMatch, err := s.reader.Next()
 	if err != nil {
 		return nil, err

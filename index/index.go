@@ -142,10 +142,17 @@ func (tfd *TermFieldDoc) Reset() *TermFieldDoc {
 // containing a given term in a given field. Documents are returned in byte
 // lexicographic order over their identifiers.
 type TermFieldReader interface {
-	// Next returns the next document containing the term in this field, or nil
-	// when it reaches the end of the enumeration.  The preAlloced TermFieldDoc
-	// is optional, and when non-nil, will be used instead of allocating memory.
-	Next(preAlloced *TermFieldDoc) (*TermFieldDoc, error)
+	// Next returns the next document containing the term in this
+	// field, or nil when it reaches the end of the enumeration.
+	//
+	// The preAlloced TermFieldDoc is optional, and when non-nil, will
+	// be used instead of allocating memory.
+	//
+	// The filter is optional optimization, and allows the caller to
+	// filter the candidate TermFieldDoc's sooner by their freq and
+	// norm.  Since it is just an optimization, implementations of the
+	// Next() method are allowed to ignore the optional filter.
+	Next(preAlloced *TermFieldDoc, filter FreqNormFilter) (*TermFieldDoc, error)
 
 	// Advance resets the enumeration at specified document or its immediate
 	// follower.
@@ -155,6 +162,10 @@ type TermFieldReader interface {
 	Count() uint64
 	Close() error
 }
+
+// A FreqNormFilter returns true if a match can be skipped during
+// TermFieldReader.Next() iteration based on its freq/norm score.
+type FreqNormFilter func(freq uint64, norm float64) bool
 
 type DictEntry struct {
 	Term  string

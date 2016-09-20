@@ -183,7 +183,7 @@ func (i *IndexReader) InternalID(id string) (index.IndexInternalID, error) {
 		return nil, nil
 	}
 	pre := index.TermFieldDoc{}
-	tfd, err := tfr.Next(&pre)
+	tfd, err := tfr.Next(&pre, nil)
 	if err != nil {
 		return nil, err
 	}

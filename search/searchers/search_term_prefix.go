@@ -71,6 +71,8 @@ func (s *TermPrefixSearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *TermPrefixSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+	ctx.LowScoreFilter = 0
+
 	return s.searcher.Next(ctx)
 
 }

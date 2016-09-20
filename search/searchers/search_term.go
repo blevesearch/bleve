@@ -22,6 +22,8 @@ type TermSearcher struct {
 	reader      index.TermFieldReader
 	scorer      *scorers.TermQueryScorer
 	tfd         index.TermFieldDoc
+	ctx         *search.SearchContext
+	filter      index.FreqNormFilter
 	explain     bool
 }
 
@@ -35,14 +37,26 @@ func NewTermSearcher(indexReader index.IndexReader, term string, field string, b
 		return nil, err
 	}
 	scorer := scorers.NewTermQueryScorer(term, field, boost, count, reader.Count(), explain)
-	return &TermSearcher{
+
+	s := &TermSearcher{
 		indexReader: indexReader,
 		term:        term,
 		field:       field,
 		explain:     explain,
 		reader:      reader,
 		scorer:      scorer,
-	}, nil
+	}
+
+	s.filter = func(freq uint64, norm float64) bool {
+		_, score := scorer.ScoreFreqNorm(freq, norm)
+		if score < s.ctx.LowScoreFilter {
+			s.ctx.LowScoreNumMatches++
+			return true
+		}
+		return false
+	}
+
+	return s, nil
 }
 
 func (s *TermSearcher) Count() uint64 {
@@ -58,7 +72,14 @@ func (s *TermSearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *TermSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
-	termMatch, err := s.reader.Next(s.tfd.Reset())
+	var filter index.FreqNormFilter
+
+	if ctx.LowScoreFilter > 0 {
+		filter = s.filter
+		s.ctx = ctx
+	}
+
+	termMatch, err := s.reader.Next(s.tfd.Reset(), filter)
 	if err != nil {
 		return nil, err
 	}
