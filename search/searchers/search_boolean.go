@@ -124,7 +124,7 @@ func (s *BooleanSearcher) advanceNextMust(ctx *search.SearchContext, skipReturn 
 		if err != nil {
 			return err
 		}
-	} else if s.mustSearcher == nil {
+	} else {
 		if s.currShould != skipReturn {
 			ctx.DocumentMatchPool.Put(s.currShould)
 		}

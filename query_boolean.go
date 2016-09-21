@@ -123,6 +123,11 @@ func (q *booleanQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bo
 			return nil, err
 		}
 	}
+
+	if mustSearcher == nil && shouldSearcher != nil && mustNotSearcher == nil {
+		return shouldSearcher, nil
+	}
+
 	return searchers.NewBooleanSearcher(i, mustSearcher, shouldSearcher, mustNotSearcher, explain)
 }
 
