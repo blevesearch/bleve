@@ -38,7 +38,8 @@ func (w *Writer) ExecuteBatch(batch store.KVBatch) error {
 	if err != nil {
 		return err
 	}
-
+	defer tx.Rollback()
+	
 	bucket := tx.Bucket([]byte(w.store.bucket))
 	bucket.FillPercent = w.store.fillPercent
 
