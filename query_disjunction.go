@@ -66,6 +66,10 @@ func (q *disjunctionQuery) SetMin(m float64) Query {
 }
 
 func (q *disjunctionQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
+	if len(q.Disjuncts) == 1 {
+		return q.Disjuncts[0].Searcher(i, m, explain)
+	}
+
 	ss := make([]search.Searcher, len(q.Disjuncts))
 	for in, disjunct := range q.Disjuncts {
 		var err error
