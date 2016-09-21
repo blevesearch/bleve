@@ -19,14 +19,14 @@ import (
 )
 
 type ConjunctionSearcher struct {
-	initialized bool
 	indexReader index.IndexReader
 	searchers   OrderedSearcherList
-	explain     bool
 	queryNorm   float64
 	currs       []*search.DocumentMatch
 	currentID   index.IndexInternalID
 	scorer      *scorers.ConjunctionQueryScorer
+	initialized bool
+	explain     bool
 }
 
 func NewConjunctionSearcher(indexReader index.IndexReader, qsearchers []search.Searcher, explain bool) (*ConjunctionSearcher, error) {
