@@ -17,6 +17,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/blevesearch/bleve/cmd/bleve/cmd"
 
 	"github.com/spf13/cobra/doc"
@@ -34,5 +36,9 @@ import (
 
 func main() {
 	cmd.RootCmd.DisableAutoGenTag = true
-	doc.GenMarkdownTree(cmd.RootCmd, "./")
+	identity := func(s string) string {
+		return fmt.Sprintf(`{{< relref "docs/%s" >}}`, s)
+	}
+	emptyStr := func(s string) string { return "" }
+	doc.GenMarkdownTreeCustom(cmd.RootCmd, "./", emptyStr, identity)
 }
