@@ -31,7 +31,7 @@ type DisjunctionSearcher struct {
 	currs        []*search.DocumentMatch
 	currentID    index.IndexInternalID
 	scorer       *scorers.DisjunctionQueryScorer
-	min          float64
+	min          int
 	matching     []*search.DocumentMatch
 	matchingIdxs []int
 	initialized  bool
@@ -65,7 +65,7 @@ func NewDisjunctionSearcher(indexReader index.IndexReader, qsearchers []search.S
 		searchers:    searchers,
 		currs:        make([]*search.DocumentMatch, len(searchers)),
 		scorer:       scorers.NewDisjunctionQueryScorer(explain),
-		min:          min,
+		min:          int(min),
 		matching:     make([]*search.DocumentMatch, len(searchers)),
 		matchingIdxs: make([]int, len(searchers)),
 	}
@@ -150,7 +150,7 @@ func (s *DisjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 			}
 		}
 
-		if len(matching) >= int(s.min) {
+		if len(matching) >= s.min {
 			found = true
 			// score this match
 			rv = s.scorer.Score(ctx, matching, len(matching), len(s.searchers))
@@ -216,7 +216,7 @@ func (s *DisjunctionSearcher) Close() error {
 }
 
 func (s *DisjunctionSearcher) Min() int {
-	return int(s.min) // FIXME just make this an int
+	return s.min
 }
 
 func (s *DisjunctionSearcher) DocumentMatchPoolSize() int {
