@@ -48,7 +48,7 @@ func (w *Writer) ExecuteBatch(batch store.KVBatch) (err error) {
 		} else {
 			// caller should see error that caused abort,
 			// not success or failure of Rollback itself
-			tx.Rollback()
+			_ = tx.Rollback()
 		}
 	}()
 
