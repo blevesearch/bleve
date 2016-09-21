@@ -166,6 +166,7 @@ func (s *BooleanSearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+	ctx.LowScoreFilter = 0
 
 	if !s.initialized {
 		err := s.initSearchers(ctx)

@@ -37,6 +37,8 @@ func (s *MatchNoneSearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *MatchNoneSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+	ctx.LowScoreFilter = 0
+
 	return nil, nil
 }
 

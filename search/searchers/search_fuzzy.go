@@ -108,6 +108,8 @@ func (s *FuzzySearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *FuzzySearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+	ctx.LowScoreFilter = 0
+
 	return s.searcher.Next(ctx)
 
 }

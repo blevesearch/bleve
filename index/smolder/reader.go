@@ -64,7 +64,8 @@ func (r *SmolderingCouchTermFieldReader) Count() uint64 {
 	return r.count
 }
 
-func (r *SmolderingCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
+func (r *SmolderingCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc,
+	filter index.FreqNormFilter) (*index.TermFieldDoc, error) {
 	if r.iterator != nil {
 		key, val, valid := r.iterator.Current()
 		if valid {

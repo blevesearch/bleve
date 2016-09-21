@@ -66,33 +66,44 @@ func (r *UpsideDownCouchTermFieldReader) Count() uint64 {
 	return r.count
 }
 
-func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
+func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc,
+	filter index.FreqNormFilter) (*index.TermFieldDoc, error) {
 	if r.iterator != nil {
-		key, val, valid := r.iterator.Current()
-		if valid {
-			tfr := r.tfrNext
-			err := tfr.parseKDoc(key, r.term)
-			if err != nil {
-				return nil, err
+		tfr := r.tfrNext
+	LOOP:
+		for {
+			key, val, valid := r.iterator.Current()
+			if valid {
+				err := tfr.parseV(val)
+				if err != nil {
+					return nil, err
+				}
+				if filter != nil && filter(tfr.freq, float64(tfr.norm)) {
+					r.iterator.Next()
+					continue LOOP
+				}
+				err = tfr.parseKDoc(key, r.term)
+				if err != nil {
+					return nil, err
+				}
+				rv := preAlloced
+				if rv == nil {
+					rv = &index.TermFieldDoc{}
+				}
+				rv.ID = append(rv.ID, tfr.doc...)
+				rv.Freq = tfr.freq
+				rv.Norm = float64(tfr.norm)
+				if tfr.vectors != nil {
+					rv.Vectors = r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors)
+				}
+				r.iterator.Next()
+				return rv, nil
 			}
-			err = tfr.parseV(val)
-			if err != nil {
-				return nil, err
-			}
-			rv := preAlloced
-			if rv == nil {
-				rv = &index.TermFieldDoc{}
-			}
-			rv.ID = append(rv.ID, tfr.doc...)
-			rv.Freq = tfr.freq
-			rv.Norm = float64(tfr.norm)
-			if tfr.vectors != nil {
-				rv.Vectors = r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors)
-			}
-			r.iterator.Next()
-			return rv, nil
+
+			return nil, nil
 		}
 	}
+
 	return nil, nil
 }
 

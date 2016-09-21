@@ -86,14 +86,7 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.TermFieldDoc) *search.DocumentMatch {
 	var scoreExplanation *search.Explanation
 
-	// need to compute score
-	var tf float64
-	if termMatch.Freq < MaxSqrtCache {
-		tf = SqrtCache[int(termMatch.Freq)]
-	} else {
-		tf = math.Sqrt(float64(termMatch.Freq))
-	}
-	score := tf * termMatch.Norm * s.idf
+	tf, score := s.ScoreFreqNorm(termMatch.Freq, termMatch.Norm)
 
 	if s.explain {
 		childrenExplanations := make([]*search.Explanation, 3)
@@ -172,4 +165,14 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 	}
 
 	return rv
+}
+
+func (s *TermQueryScorer) ScoreFreqNorm(freq uint64, norm float64) (tf, score float64) {
+	// need to compute score
+	if freq < MaxSqrtCache {
+		tf = SqrtCache[int(freq)]
+	} else {
+		tf = math.Sqrt(float64(freq))
+	}
+	return tf, tf * norm * s.idf
 }

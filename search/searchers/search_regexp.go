@@ -107,6 +107,8 @@ func (s *RegexpSearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *RegexpSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+	ctx.LowScoreFilter = 0
+
 	return s.searcher.Next(ctx)
 
 }

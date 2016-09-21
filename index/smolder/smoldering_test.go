@@ -1313,12 +1313,12 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 		t.Error(err)
 	}
 
-	tfd, err := termFieldReader.Next(nil)
+	tfd, err := termFieldReader.Next(nil, nil)
 	for tfd != nil && err == nil {
 		if !tfd.ID.Equals(EncodeUvarintAscending(nil, 1)) {
 			t.Errorf("expected to find document id 1")
 		}
-		tfd, err = termFieldReader.Next(nil)
+		tfd, err = termFieldReader.Next(nil, nil)
 	}
 	if err != nil {
 		t.Error(err)
