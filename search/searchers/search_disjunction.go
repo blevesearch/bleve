@@ -29,7 +29,6 @@ type DisjunctionSearcher struct {
 	searchers    OrderedSearcherList
 	queryNorm    float64
 	currs        []*search.DocumentMatch
-	currentID    index.IndexInternalID
 	scorer       *scorers.DisjunctionQueryScorer
 	min          int
 	matching     []*search.DocumentMatch
@@ -100,19 +99,38 @@ func (s *DisjunctionSearcher) initSearchers(ctx *search.SearchContext) error {
 		}
 	}
 
-	s.currentID = s.nextSmallestID()
+	s.updateMatches()
 	s.initialized = true
 	return nil
 }
 
-func (s *DisjunctionSearcher) nextSmallestID() index.IndexInternalID {
-	var rv index.IndexInternalID
-	for _, curr := range s.currs {
-		if curr != nil && (curr.IndexInternalID.Compare(rv) < 0 || rv == nil) {
-			rv = curr.IndexInternalID
+func (s *DisjunctionSearcher) updateMatches() {
+	matching := s.matching[:0]
+	matchingIdxs := s.matchingIdxs[:0]
+
+	for i, curr := range s.currs {
+		if curr == nil {
+			continue
 		}
+
+		if len(matching) > 0 {
+			cmp := curr.IndexInternalID.Compare(matching[0].IndexInternalID)
+			if cmp > 0 {
+				continue
+			}
+
+			if cmp < 0 {
+				matching = matching[:0]
+				matchingIdxs = matchingIdxs[:0]
+			}
+		}
+
+		matching = append(matching, curr)
+		matchingIdxs = append(matchingIdxs, i)
 	}
-	return rv
+
+	s.matching = matching
+	s.matchingIdxs = matchingIdxs
 }
 
 func (s *DisjunctionSearcher) Weight() float64 {
@@ -140,24 +158,15 @@ func (s *DisjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 	var rv *search.DocumentMatch
 
 	found := false
-	for !found && s.currentID != nil {
-		matching := s.matching[:0]
-		matchingIdxs := s.matchingIdxs[:0]
-		for i, curr := range s.currs {
-			if curr != nil && curr.IndexInternalID.Equals(s.currentID) {
-				matching = append(matching, curr)
-				matchingIdxs = append(matchingIdxs, i)
-			}
-		}
-
-		if len(matching) >= s.min {
+	for !found && len(s.matching) > 0 {
+		if len(s.matching) >= s.min {
 			found = true
 			// score this match
-			rv = s.scorer.Score(ctx, matching, len(matching), len(s.searchers))
+			rv = s.scorer.Score(ctx, s.matching, len(s.matching), len(s.searchers))
 		}
 
 		// invoke next on all the matching searchers
-		for _, i := range matchingIdxs {
+		for _, i := range s.matchingIdxs {
 			searcher := s.searchers[i]
 			if s.currs[i] != rv {
 				ctx.DocumentMatchPool.Put(s.currs[i])
@@ -167,7 +176,8 @@ func (s *DisjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 				return nil, err
 			}
 		}
-		s.currentID = s.nextSmallestID()
+
+		s.updateMatches()
 	}
 	return rv, nil
 }
@@ -191,7 +201,7 @@ func (s *DisjunctionSearcher) Advance(ctx *search.SearchContext, ID index.IndexI
 		}
 	}
 
-	s.currentID = s.nextSmallestID()
+	s.updateMatches()
 
 	return s.Next(ctx)
 }
