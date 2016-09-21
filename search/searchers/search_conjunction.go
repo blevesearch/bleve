@@ -114,12 +114,18 @@ func (s *ConjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 OUTER:
 	for s.currentID != nil {
 		for i, termSearcher := range s.searchers {
-			if s.currs[i] != nil && !s.currs[i].IndexInternalID.Equals(s.currentID) {
-				if s.currentID.Compare(s.currs[i].IndexInternalID) < 0 {
+			if s.currs[i] == nil {
+				s.currentID = nil
+				continue OUTER
+			}
+
+			cmp := s.currentID.Compare(s.currs[i].IndexInternalID)
+			if cmp != 0 {
+				if cmp < 0 {
 					s.currentID = s.currs[i].IndexInternalID
 					continue OUTER
 				}
-				// this reader doesn't have the currentID, try to advance
+				// this reader is less than the currentID, try to advance
 				if s.currs[i] != nil {
 					ctx.DocumentMatchPool.Put(s.currs[i])
 				}
@@ -137,9 +143,6 @@ OUTER:
 					s.currentID = s.currs[i].IndexInternalID
 					continue OUTER
 				}
-			} else if s.currs[i] == nil {
-				s.currentID = nil
-				continue OUTER
 			}
 		}
 		// if we get here, a doc matched all readers, sum the score and add it
