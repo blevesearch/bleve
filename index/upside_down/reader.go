@@ -57,7 +57,6 @@ func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 		iterator:    it,
 		count:       dictionaryRow.count,
 		term:        term,
-		tfrNext:     &TermFrequencyRow{},
 		field:       field,
 	}, nil
 }
@@ -68,6 +67,14 @@ func (r *UpsideDownCouchTermFieldReader) Count() uint64 {
 
 func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
 	if r.iterator != nil {
+		// We treat tfrNext also like an initialization flag, which
+		// tells us whether we need to invoke the underlying
+		// iterator.Next().  The first time, don't call iterator.Next().
+		if r.tfrNext != nil {
+			r.iterator.Next()
+		} else {
+			r.tfrNext = &TermFrequencyRow{}
+		}
 		key, val, valid := r.iterator.Current()
 		if valid {
 			tfr := r.tfrNext
@@ -89,7 +96,6 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 			if tfr.vectors != nil {
 				rv.Vectors = r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors)
 			}
-			r.iterator.Next()
 			return rv, nil
 		}
 	}
@@ -116,7 +122,6 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docID index.IndexInternalID, pr
 			if tfr.vectors != nil {
 				rv.Vectors = r.indexReader.index.termFieldVectorsFromTermVectors(tfr.vectors)
 			}
-			r.iterator.Next()
 			return rv, nil
 		}
 	}
