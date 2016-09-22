@@ -20,7 +20,7 @@ import (
 
 type ConjunctionQuery struct {
 	Conjuncts []Query `json:"conjuncts"`
-	BoostVal  float64 `json:"boost,omitempty"`
+	Boost     *Boost  `json:"boost,omitempty"`
 }
 
 // NewConjunctionQuery creates a new compound Query.
@@ -28,17 +28,12 @@ type ConjunctionQuery struct {
 func NewConjunctionQuery(conjuncts []Query) *ConjunctionQuery {
 	return &ConjunctionQuery{
 		Conjuncts: conjuncts,
-		BoostVal:  1.0,
 	}
 }
 
-func (q *ConjunctionQuery) Boost() float64 {
-	return q.BoostVal
-}
-
-func (q *ConjunctionQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
+func (q *ConjunctionQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
 func (q *ConjunctionQuery) AddQuery(aq Query) *ConjunctionQuery {
@@ -60,9 +55,11 @@ func (q *ConjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 
 func (q *ConjunctionQuery) Validate() error {
 	for _, q := range q.Conjuncts {
-		err := q.Validate()
-		if err != nil {
-			return err
+		if q, ok := q.(ValidatableQuery); ok {
+			err := q.Validate()
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -71,7 +68,7 @@ func (q *ConjunctionQuery) Validate() error {
 func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
 		Conjuncts []json.RawMessage `json:"conjuncts"`
-		BoostVal  float64           `json:"boost,omitempty"`
+		Boost     *Boost            `json:"boost,omitempty"`
 	}{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
@@ -85,17 +82,6 @@ func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 		}
 		q.Conjuncts[i] = query
 	}
-	q.BoostVal = tmp.BoostVal
-	if q.BoostVal == 0 {
-		q.BoostVal = 1
-	}
+	q.Boost = tmp.Boost
 	return nil
-}
-
-func (q *ConjunctionQuery) Field() string {
-	return ""
-}
-
-func (q *ConjunctionQuery) SetField(f string) Query {
-	return q
 }

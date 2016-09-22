@@ -19,45 +19,27 @@ import (
 )
 
 type MatchNoneQuery struct {
-	BoostVal float64 `json:"boost,omitempty"`
+	Boost *Boost `json:"boost,omitempty"`
 }
 
 // NewMatchNoneQuery creates a Query which will not
 // match any documents in the index.
 func NewMatchNoneQuery() *MatchNoneQuery {
-	return &MatchNoneQuery{
-		BoostVal: 1.0,
-	}
+	return &MatchNoneQuery{}
 }
 
-func (q *MatchNoneQuery) Boost() float64 {
-	return q.BoostVal
-}
-
-func (q *MatchNoneQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
+func (q *MatchNoneQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
 func (q *MatchNoneQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	return searchers.NewMatchNoneSearcher(i)
 }
 
-func (q *MatchNoneQuery) Validate() error {
-	return nil
-}
-
-func (q *MatchNoneQuery) Field() string {
-	return ""
-}
-
-func (q *MatchNoneQuery) SetField(f string) Query {
-	return q
-}
-
 func (q *MatchNoneQuery) MarshalJSON() ([]byte, error) {
 	tmp := map[string]interface{}{
-		"boost":      q.BoostVal,
+		"boost":      q.Boost,
 		"match_none": map[string]interface{}{},
 	}
 	return json.Marshal(tmp)

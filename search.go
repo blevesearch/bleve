@@ -207,9 +207,11 @@ type SearchRequest struct {
 }
 
 func (sr *SearchRequest) Validate() error {
-	err := sr.Query.Validate()
-	if err != nil {
-		return err
+	if srq, ok := sr.Query.(query.ValidatableQuery); ok {
+		err := srq.Validate()
+		if err != nil {
+			return err
+		}
 	}
 
 	return sr.Facets.Validate()

@@ -19,13 +19,13 @@ import (
 )
 
 type MatchQuery struct {
-	Match        string             `json:"match"`
-	FieldVal     string             `json:"field,omitempty"`
-	Analyzer     string             `json:"analyzer,omitempty"`
-	BoostVal     float64            `json:"boost,omitempty"`
-	PrefixVal    int                `json:"prefix_length"`
-	FuzzinessVal int                `json:"fuzziness"`
-	OperatorVal  MatchQueryOperator `json:"operator,omitempty"`
+	Match     string             `json:"match"`
+	Field     string             `json:"field,omitempty"`
+	Analyzer  string             `json:"analyzer,omitempty"`
+	Boost     *Boost             `json:"boost,omitempty"`
+	Prefix    int                `json:"prefix_length"`
+	Fuzziness int                `json:"fuzziness"`
+	Operator  MatchQueryOperator `json:"operator,omitempty"`
 }
 
 type MatchQueryOperator int
@@ -75,9 +75,8 @@ func (o *MatchQueryOperator) UnmarshalJSON(data []byte) error {
 // must satisfy at least one of these term searches.
 func NewMatchQuery(match string) *MatchQuery {
 	return &MatchQuery{
-		Match:       match,
-		BoostVal:    1.0,
-		OperatorVal: MatchQueryOperatorOr,
+		Match:    match,
+		Operator: MatchQueryOperatorOr,
 	}
 }
 
@@ -89,61 +88,36 @@ func NewMatchQuery(match string) *MatchQuery {
 // must satisfy term searches according to given operator.
 func NewMatchQueryOperator(match string, operator MatchQueryOperator) *MatchQuery {
 	return &MatchQuery{
-		Match:       match,
-		BoostVal:    1.0,
-		OperatorVal: operator,
+		Match:    match,
+		Operator: operator,
 	}
 }
 
-func (q *MatchQuery) Boost() float64 {
-	return q.BoostVal
+func (q *MatchQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
-func (q *MatchQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
+func (q *MatchQuery) SetField(f string) {
+	q.Field = f
 }
 
-func (q *MatchQuery) Field() string {
-	return q.FieldVal
+func (q *MatchQuery) SetFuzziness(f int) {
+	q.Fuzziness = f
 }
 
-func (q *MatchQuery) SetField(f string) Query {
-	q.FieldVal = f
-	return q
+func (q *MatchQuery) SetPrefix(p int) {
+	q.Prefix = p
 }
 
-func (q *MatchQuery) Fuzziness() int {
-	return q.FuzzinessVal
-}
-
-func (q *MatchQuery) SetFuzziness(f int) Query {
-	q.FuzzinessVal = f
-	return q
-}
-
-func (q *MatchQuery) Prefix() int {
-	return q.PrefixVal
-}
-
-func (q *MatchQuery) SetPrefix(p int) Query {
-	q.PrefixVal = p
-	return q
-}
-
-func (q *MatchQuery) Operator() MatchQueryOperator {
-	return q.OperatorVal
-}
-
-func (q *MatchQuery) SetOperator(operator MatchQueryOperator) Query {
-	q.OperatorVal = operator
-	return q
+func (q *MatchQuery) SetOperator(operator MatchQueryOperator) {
+	q.Operator = operator
 }
 
 func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 
-	field := q.FieldVal
-	if q.FieldVal == "" {
+	field := q.Field
+	if q.Field == "" {
 		field = m.DefaultSearchField()
 	}
 
@@ -163,44 +137,39 @@ func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expla
 	if len(tokens) > 0 {
 
 		tqs := make([]Query, len(tokens))
-		if q.FuzzinessVal != 0 {
+		if q.Fuzziness != 0 {
 			for i, token := range tokens {
 				query := NewFuzzyQuery(string(token.Term))
-				query.SetFuzziness(q.FuzzinessVal)
-				query.SetPrefix(q.PrefixVal)
+				query.SetFuzziness(q.Fuzziness)
+				query.SetPrefix(q.Prefix)
 				query.SetField(field)
-				query.SetBoost(q.BoostVal)
+				query.SetBoost(q.Boost.Value())
 				tqs[i] = query
 			}
 		} else {
 			for i, token := range tokens {
-				tqs[i] = NewTermQuery(string(token.Term)).
-					SetField(field).
-					SetBoost(q.BoostVal)
+				tq := NewTermQuery(string(token.Term))
+				tq.SetField(field)
+				tq.SetBoost(q.Boost.Value())
+				tqs[i] = tq
 			}
 		}
 
-		switch q.OperatorVal {
+		switch q.Operator {
 		case MatchQueryOperatorOr:
-			shouldQuery := NewDisjunctionQueryMin(tqs, 1).
-				SetBoost(q.BoostVal)
-
+			shouldQuery := NewDisjunctionQueryMin(tqs, 1)
+			shouldQuery.SetBoost(q.Boost.Value())
 			return shouldQuery.Searcher(i, m, explain)
 
 		case MatchQueryOperatorAnd:
-			mustQuery := NewConjunctionQuery(tqs).
-				SetBoost(q.BoostVal)
-
+			mustQuery := NewConjunctionQuery(tqs)
+			mustQuery.SetBoost(q.Boost.Value())
 			return mustQuery.Searcher(i, m, explain)
 
 		default:
-			return nil, fmt.Errorf("unhandled operator %d", q.OperatorVal)
+			return nil, fmt.Errorf("unhandled operator %d", q.Operator)
 		}
 	}
 	noneQuery := NewMatchNoneQuery()
 	return noneQuery.Searcher(i, m, explain)
-}
-
-func (q *MatchQuery) Validate() error {
-	return nil
 }

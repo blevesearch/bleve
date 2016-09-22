@@ -17,9 +17,9 @@ import (
 )
 
 type PrefixQuery struct {
-	Prefix   string  `json:"prefix"`
-	FieldVal string  `json:"field,omitempty"`
-	BoostVal float64 `json:"boost,omitempty"`
+	Prefix string `json:"prefix"`
+	Field  string `json:"field,omitempty"`
+	Boost  *Boost `json:"boost,omitempty"`
 }
 
 // NewPrefixQuery creates a new Query which finds
@@ -27,37 +27,23 @@ type PrefixQuery struct {
 // specified prefix.
 func NewPrefixQuery(prefix string) *PrefixQuery {
 	return &PrefixQuery{
-		Prefix:   prefix,
-		BoostVal: 1.0,
+		Prefix: prefix,
 	}
 }
 
-func (q *PrefixQuery) Boost() float64 {
-	return q.BoostVal
+func (q *PrefixQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
-func (q *PrefixQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
-}
-
-func (q *PrefixQuery) Field() string {
-	return q.FieldVal
-}
-
-func (q *PrefixQuery) SetField(f string) Query {
-	q.FieldVal = f
-	return q
+func (q *PrefixQuery) SetField(f string) {
+	q.Field = f
 }
 
 func (q *PrefixQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	field := q.FieldVal
-	if q.FieldVal == "" {
+	field := q.Field
+	if q.Field == "" {
 		field = m.DefaultSearchField()
 	}
-	return searchers.NewTermPrefixSearcher(i, q.Prefix, field, q.BoostVal, explain)
-}
-
-func (q *PrefixQuery) Validate() error {
-	return nil
+	return searchers.NewTermPrefixSearcher(i, q.Prefix, field, q.Boost.Value(), explain)
 }

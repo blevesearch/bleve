@@ -19,45 +19,27 @@ import (
 )
 
 type MatchAllQuery struct {
-	BoostVal float64 `json:"boost,omitempty"`
+	Boost *Boost `json:"boost,omitempty"`
 }
 
 // NewMatchAllQuery creates a Query which will
 // match all documents in the index.
 func NewMatchAllQuery() *MatchAllQuery {
-	return &MatchAllQuery{
-		BoostVal: 1.0,
-	}
+	return &MatchAllQuery{}
 }
 
-func (q *MatchAllQuery) Boost() float64 {
-	return q.BoostVal
-}
-
-func (q *MatchAllQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
+func (q *MatchAllQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
 func (q *MatchAllQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	return searchers.NewMatchAllSearcher(i, q.BoostVal, explain)
-}
-
-func (q *MatchAllQuery) Validate() error {
-	return nil
-}
-
-func (q *MatchAllQuery) Field() string {
-	return ""
-}
-
-func (q *MatchAllQuery) SetField(f string) Query {
-	return q
+	return searchers.NewMatchAllSearcher(i, q.Boost.Value(), explain)
 }
 
 func (q *MatchAllQuery) MarshalJSON() ([]byte, error) {
 	tmp := map[string]interface{}{
-		"boost":     q.BoostVal,
+		"boost":     q.Boost,
 		"match_all": map[string]interface{}{},
 	}
 	return json.Marshal(tmp)

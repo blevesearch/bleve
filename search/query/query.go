@@ -31,11 +31,27 @@ func SetLog(l *log.Logger) {
 // A Query represents a description of the type
 // and parameters for a query into the index.
 type Query interface {
-	Boost() float64
-	SetBoost(b float64) Query
-	Field() string
-	SetField(f string) Query
 	Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error)
+}
+
+// A BoostableQuery represents a Query which can be boosted
+// relative to other queries.
+type BoostableQuery interface {
+	Query
+	SetBoost(b float64)
+}
+
+// A FieldableQuery represents a Query which can be restricted
+// to a single field.
+type FieldableQuery interface {
+	Query
+	SetField(f string)
+}
+
+// A ValidatableQuery represents a Query which can be validated
+// prior to execution.
+type ValidatableQuery interface {
+	Query
 	Validate() error
 }
 
@@ -55,9 +71,6 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
 		return &rv, nil
 	}
 	_, isTermQuery := tmp["term"]
@@ -67,9 +80,6 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
 		return &rv, nil
 	}
 	if isMatchQuery {
@@ -77,9 +87,6 @@ func ParseQuery(input []byte) (Query, error) {
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
 		}
 		return &rv, nil
 	}
@@ -89,9 +96,6 @@ func ParseQuery(input []byte) (Query, error) {
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
 		}
 		return &rv, nil
 	}
@@ -104,9 +108,6 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
 		return &rv, nil
 	}
 	_, hasTerms := tmp["terms"]
@@ -115,9 +116,6 @@ func ParseQuery(input []byte) (Query, error) {
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
 		}
 		return &rv, nil
 	}
@@ -128,9 +126,6 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
 		return &rv, nil
 	}
 	_, hasDisjuncts := tmp["disjuncts"]
@@ -139,9 +134,6 @@ func ParseQuery(input []byte) (Query, error) {
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
 		}
 		return &rv, nil
 	}
@@ -153,9 +145,6 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
 		return &rv, nil
 	}
 	_, hasMin := tmp["min"]
@@ -165,9 +154,6 @@ func ParseQuery(input []byte) (Query, error) {
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
 		}
 		return &rv, nil
 	}
@@ -179,9 +165,6 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
 		return &rv, nil
 	}
 	_, hasPrefix := tmp["prefix"]
@@ -190,9 +173,6 @@ func ParseQuery(input []byte) (Query, error) {
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
 		}
 		return &rv, nil
 	}
@@ -203,9 +183,6 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
 		return &rv, nil
 	}
 	_, hasWildcard := tmp["wildcard"]
@@ -214,9 +191,6 @@ func ParseQuery(input []byte) (Query, error) {
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
 		}
 		return &rv, nil
 	}
@@ -227,9 +201,6 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
 		return &rv, nil
 	}
 	_, hasMatchNone := tmp["match_none"]
@@ -239,9 +210,6 @@ func ParseQuery(input []byte) (Query, error) {
 		if err != nil {
 			return nil, err
 		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
 		return &rv, nil
 	}
 	_, hasDocIds := tmp["ids"]
@@ -250,9 +218,6 @@ func ParseQuery(input []byte) (Query, error) {
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
 		}
 		return &rv, nil
 	}

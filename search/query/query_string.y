@@ -17,7 +17,8 @@ func logDebugGrammar(format string, v ...interface{}) {
 s string
 n int
 f float64
-q Query}
+q Query
+pf *float64}
 
 %token tSTRING tPHRASE tPLUS tMINUS tCOLON tBOOST tNUMBER tSTRING tGREATER tLESS
 tEQUAL tTILDE
@@ -28,7 +29,7 @@ tEQUAL tTILDE
 %type <s>                tTILDE
 %type <s>                tBOOST
 %type <q>                searchBase
-%type <f>                searchSuffix
+%type <pf>                searchSuffix
 %type <n>                searchPrefix
 
 %%
@@ -50,7 +51,11 @@ searchPart {
 searchPart:
 searchPrefix searchBase searchSuffix {
 	query := $2
-	query.SetBoost($3)
+	if $3 != nil {
+		if query, ok := query.(BoostableQuery); ok {
+			query.SetBoost(*$3)
+			}
+	}
 	switch($1) {
 		case queryShould:
 			yylex.(*lexerWrapper).query.AddShould(query)
@@ -81,7 +86,7 @@ searchBase:
 tSTRING {
 	str := $1
 	logDebugGrammar("STRING - %s", str)
-	var q Query
+	var q FieldableQuery
 	if strings.HasPrefix(str, "/") && strings.HasSuffix(str, "/") {
 	  q = NewRegexpQuery(str[1:len(str)-1])
 	} else if strings.ContainsAny(str, "*?"){
@@ -136,7 +141,7 @@ tSTRING tCOLON tSTRING {
 	field := $1
 	str := $3
 	logDebugGrammar("FIELD - %s STRING - %s", field, str)
-	var q Query
+	var q FieldableQuery
 	if strings.HasPrefix(str, "/") && strings.HasSuffix(str, "/") {
 		q = NewRegexpQuery(str[1:len(str)-1])
 	} else if strings.ContainsAny(str, "*?"){
@@ -152,7 +157,8 @@ tSTRING tCOLON tNUMBER {
 	field := $1
 	str := $3
 	logDebugGrammar("FIELD - %s STRING - %s", field, str)
-	q := NewMatchQuery(str).SetField(field)
+	q := NewMatchQuery(str)
+	q.SetField(field)
 	$$ = q
 }
 |
@@ -160,7 +166,8 @@ tSTRING tCOLON tPHRASE {
 	field := $1
 	phrase := $3
 	logDebugGrammar("FIELD - %s PHRASE - %s", field, phrase)
-	q := NewMatchPhraseQuery(phrase).SetField(field)
+	q := NewMatchPhraseQuery(phrase)
+	q.SetField(field)
 	$$ = q
 }
 |
@@ -169,7 +176,8 @@ tSTRING tCOLON tGREATER tNUMBER {
 	min, _ := strconv.ParseFloat($4, 64)
 	minInclusive := false
 	logDebugGrammar("FIELD - GREATER THAN %f", min)
-	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
+	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil)
+	q.SetField(field)
 	$$ = q
 }
 |
@@ -178,7 +186,8 @@ tSTRING tCOLON tGREATER tEQUAL tNUMBER {
 	min, _ := strconv.ParseFloat($5, 64)
 	minInclusive := true
 	logDebugGrammar("FIELD - GREATER THAN OR EQUAL %f", min)
-	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil).SetField(field)
+	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil)
+	q.SetField(field)
 	$$ = q
 }
 |
@@ -187,7 +196,8 @@ tSTRING tCOLON tLESS tNUMBER {
 	max, _ := strconv.ParseFloat($4, 64)
 	maxInclusive := false
 	logDebugGrammar("FIELD - LESS THAN %f", max)
-	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
+	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive)
+	q.SetField(field)
 	$$ = q
 }
 |
@@ -196,7 +206,8 @@ tSTRING tCOLON tLESS tEQUAL tNUMBER {
 	max, _ := strconv.ParseFloat($5, 64)
 	maxInclusive := true
 	logDebugGrammar("FIELD - LESS THAN OR EQUAL %f", max)
-	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive).SetField(field)
+	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive)
+	q.SetField(field)
 	$$ = q
 }
 |
@@ -206,7 +217,8 @@ tSTRING tCOLON tGREATER tPHRASE {
 	phrase := $4
 
 	logDebugGrammar("FIELD - GREATER THAN DATE %s", phrase)
-	q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil).SetField(field)
+	q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil)
+	q.SetField(field)
 	$$ = q
 }
 |
@@ -216,7 +228,8 @@ tSTRING tCOLON tGREATER tEQUAL tPHRASE {
 	phrase := $5
 
 	logDebugGrammar("FIELD - GREATER THAN OR EQUAL DATE %s", phrase)
-	q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil).SetField(field)
+	q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil)
+	q.SetField(field)
 	$$ = q
 }
 |
@@ -226,7 +239,8 @@ tSTRING tCOLON tLESS tPHRASE {
 	phrase := $4
 
 	logDebugGrammar("FIELD - LESS THAN DATE %s", phrase)
-	q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive).SetField(field)
+	q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive)
+	q.SetField(field)
 	$$ = q
 }
 |
@@ -236,20 +250,23 @@ tSTRING tCOLON tLESS tEQUAL tPHRASE {
 	phrase := $5
 
 	logDebugGrammar("FIELD - LESS THAN OR EQUAL DATE %s", phrase)
-	q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive).SetField(field)
+	q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive)
+	q.SetField(field)
 	$$ = q
 };
 
 searchSuffix:
 /* empty */ {
-	$$ = 1.0
+	$$ = nil
 }
 |
 tBOOST {
+  $$ = nil
 	boost, err := strconv.ParseFloat($1, 64)
 	if err != nil {
 	  yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid boost value: %v", err))
+	} else {
+		$$ = &boost
 	}
-	$$ = boost
 	logDebugGrammar("BOOST %f", boost)
 };

@@ -20,10 +20,10 @@ import (
 )
 
 type BooleanQuery struct {
-	Must     Query   `json:"must,omitempty"`
-	Should   Query   `json:"should,omitempty"`
-	MustNot  Query   `json:"must_not,omitempty"`
-	BoostVal float64 `json:"boost,omitempty"`
+	Must    Query  `json:"must,omitempty"`
+	Should  Query  `json:"should,omitempty"`
+	MustNot Query  `json:"must_not,omitempty"`
+	Boost   *Boost `json:"boost,omitempty"`
 }
 
 // NewBooleanQuery creates a compound Query composed
@@ -44,9 +44,7 @@ func NewBooleanQuery(must []Query, should []Query, mustNot []Query) *BooleanQuer
 // satisfied.
 func NewBooleanQueryMinShould(must []Query, should []Query, mustNot []Query, minShould float64) *BooleanQuery {
 
-	rv := BooleanQuery{
-		BoostVal: 1.0,
-	}
+	rv := BooleanQuery{}
 	if len(must) > 0 {
 		rv.Must = NewConjunctionQuery(must)
 	}
@@ -93,13 +91,9 @@ func (q *BooleanQuery) AddMustNot(m ...Query) {
 	}
 }
 
-func (q *BooleanQuery) Boost() float64 {
-	return q.BoostVal
-}
-
-func (q *BooleanQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
+func (q *BooleanQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
 func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
@@ -139,20 +133,20 @@ func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, exp
 }
 
 func (q *BooleanQuery) Validate() error {
-	if q.Must != nil {
-		err := q.Must.Validate()
+	if qm, ok := q.Must.(ValidatableQuery); ok {
+		err := qm.Validate()
 		if err != nil {
 			return err
 		}
 	}
-	if q.Should != nil {
-		err := q.Should.Validate()
+	if qs, ok := q.Should.(ValidatableQuery); ok {
+		err := qs.Validate()
 		if err != nil {
 			return err
 		}
 	}
-	if q.MustNot != nil {
-		err := q.MustNot.Validate()
+	if qmn, ok := q.MustNot.(ValidatableQuery); ok {
+		err := qmn.Validate()
 		if err != nil {
 			return err
 		}
@@ -165,10 +159,10 @@ func (q *BooleanQuery) Validate() error {
 
 func (q *BooleanQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
-		Must     json.RawMessage `json:"must,omitempty"`
-		Should   json.RawMessage `json:"should,omitempty"`
-		MustNot  json.RawMessage `json:"must_not,omitempty"`
-		BoostVal float64         `json:"boost,omitempty"`
+		Must    json.RawMessage `json:"must,omitempty"`
+		Should  json.RawMessage `json:"should,omitempty"`
+		MustNot json.RawMessage `json:"must_not,omitempty"`
+		Boost   *Boost          `json:"boost,omitempty"`
 	}{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
@@ -208,17 +202,7 @@ func (q *BooleanQuery) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	q.BoostVal = tmp.BoostVal
-	if q.BoostVal == 0 {
-		q.BoostVal = 1
-	}
+	q.Boost = tmp.Boost
+
 	return nil
-}
-
-func (q *BooleanQuery) Field() string {
-	return ""
-}
-
-func (q *BooleanQuery) SetField(f string) Query {
-	return q
 }

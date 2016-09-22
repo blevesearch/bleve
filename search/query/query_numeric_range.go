@@ -23,8 +23,8 @@ type NumericRangeQuery struct {
 	Max          *float64 `json:"max,omitempty"`
 	InclusiveMin *bool    `json:"inclusive_min,omitempty"`
 	InclusiveMax *bool    `json:"inclusive_max,omitempty"`
-	FieldVal     string   `json:"field,omitempty"`
-	BoostVal     float64  `json:"boost,omitempty"`
+	Field        string   `json:"field,omitempty"`
+	Boost        *Boost   `json:"boost,omitempty"`
 }
 
 // NewNumericRangeQuery creates a new Query for ranges
@@ -46,34 +46,24 @@ func NewNumericRangeInclusiveQuery(min, max *float64, minInclusive, maxInclusive
 		Max:          max,
 		InclusiveMin: minInclusive,
 		InclusiveMax: maxInclusive,
-		BoostVal:     1.0,
 	}
 }
 
-func (q *NumericRangeQuery) Boost() float64 {
-	return q.BoostVal
+func (q *NumericRangeQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
-func (q *NumericRangeQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
-}
-
-func (q *NumericRangeQuery) Field() string {
-	return q.FieldVal
-}
-
-func (q *NumericRangeQuery) SetField(f string) Query {
-	q.FieldVal = f
-	return q
+func (q *NumericRangeQuery) SetField(f string) {
+	q.Field = f
 }
 
 func (q *NumericRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	field := q.FieldVal
-	if q.FieldVal == "" {
+	field := q.Field
+	if q.Field == "" {
 		field = m.DefaultSearchField()
 	}
-	return searchers.NewNumericRangeSearcher(i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.BoostVal, explain)
+	return searchers.NewNumericRangeSearcher(i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.Boost.Value(), explain)
 }
 
 func (q *NumericRangeQuery) Validate() error {

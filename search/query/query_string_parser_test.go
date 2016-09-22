@@ -53,7 +53,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("test").SetField("field"),
+					func() Query {
+						q := NewMatchQuery("test")
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -64,7 +68,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("t-est").SetField("field"),
+					func() Query {
+						q := NewMatchQuery("t-est")
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -75,7 +83,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("t+est").SetField("field"),
+					func() Query {
+						q := NewMatchQuery("t+est")
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -86,7 +98,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("t>est").SetField("field"),
+					func() Query {
+						q := NewMatchQuery("t>est")
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -97,7 +113,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("t<est").SetField("field"),
+					func() Query {
+						q := NewMatchQuery("t<est")
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -108,7 +128,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("t=est").SetField("field"),
+					func() Query {
+						q := NewMatchQuery("t=est")
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -117,7 +141,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				[]Query{
-					NewMatchQuery("test1").SetField("field1"),
+					func() Query {
+						q := NewMatchQuery("test1")
+						q.SetField("field1")
+						return q
+					}(),
 				},
 				nil,
 				nil),
@@ -129,7 +157,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				nil,
 				nil,
 				[]Query{
-					NewMatchQuery("test2").SetField("field2"),
+					func() Query {
+						q := NewMatchQuery("test2")
+						q.SetField("field2")
+						return q
+					}(),
 				}),
 		},
 		{
@@ -138,7 +170,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchPhraseQuery("test phrase 2").SetField("field3"),
+					func() Query {
+						q := NewMatchPhraseQuery("test phrase 2")
+						q.SetField("field3")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -147,7 +183,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				[]Query{
-					NewMatchPhraseQuery("test phrase 1").SetField("field4"),
+					func() Query {
+						q := NewMatchPhraseQuery("test phrase 1")
+						q.SetField("field4")
+						return q
+					}(),
 				},
 				nil,
 				nil),
@@ -159,7 +199,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				nil,
 				nil,
 				[]Query{
-					NewMatchPhraseQuery("test phrase 2").SetField("field5"),
+					func() Query {
+						q := NewMatchPhraseQuery("test phrase 2")
+						q.SetField("field5")
+						return q
+					}(),
 				}),
 		},
 		{
@@ -167,13 +211,25 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				[]Query{
-					NewMatchQuery("test3").SetField("field6"),
+					func() Query {
+						q := NewMatchQuery("test3")
+						q.SetField("field6")
+						return q
+					}(),
 				},
 				[]Query{
-					NewMatchQuery("test5").SetField("field8"),
+					func() Query {
+						q := NewMatchQuery("test5")
+						q.SetField("field8")
+						return q
+					}(),
 				},
 				[]Query{
-					NewMatchQuery("test4").SetField("field7"),
+					func() Query {
+						q := NewMatchQuery("test4")
+						q.SetField("field7")
+						return q
+					}(),
 				}),
 		},
 		{
@@ -182,7 +238,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("test").SetBoost(3.0),
+					func() Query {
+						q := NewMatchQuery("test")
+						q.SetBoost(3.0)
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -192,8 +252,16 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("test").SetBoost(3.0),
-					NewMatchQuery("other").SetBoost(6.0),
+					func() Query {
+						q := NewMatchQuery("test")
+						q.SetBoost(3.0)
+						return q
+					}(),
+					func() Query {
+						q := NewMatchQuery("other")
+						q.SetBoost(6.0)
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -213,7 +281,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("33").SetField("field"),
+					func() Query {
+						q := NewMatchQuery("33")
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -233,7 +305,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("watex").SetFuzziness(1),
+					func() Query {
+						q := NewMatchQuery("watex")
+						q.SetFuzziness(1)
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -243,7 +319,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("watex").SetFuzziness(2),
+					func() Query {
+						q := NewMatchQuery("watex")
+						q.SetFuzziness(2)
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -253,7 +333,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("watex").SetFuzziness(1),
+					func() Query {
+						q := NewMatchQuery("watex")
+						q.SetFuzziness(1)
+						return q
+					}(),
 					NewMatchQuery("2"),
 				},
 				nil),
@@ -264,7 +348,12 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("watex").SetFuzziness(1).SetField("field"),
+					func() Query {
+						q := NewMatchQuery("watex")
+						q.SetFuzziness(1)
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -274,7 +363,12 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("watex").SetFuzziness(2).SetField("field"),
+					func() Query {
+						q := NewMatchQuery("watex")
+						q.SetFuzziness(2)
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -284,7 +378,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("555c3bb06f7a127cda000005").SetField("field"),
+					func() Query {
+						q := NewMatchQuery("555c3bb06f7a127cda000005")
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -294,7 +392,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewNumericRangeInclusiveQuery(&fivePointOh, nil, &theFalsehood, nil).SetField("field"),
+					func() Query {
+						q := NewNumericRangeInclusiveQuery(&fivePointOh, nil, &theFalsehood, nil)
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -304,7 +406,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewNumericRangeInclusiveQuery(&fivePointOh, nil, &theTruth, nil).SetField("field"),
+					func() Query {
+						q := NewNumericRangeInclusiveQuery(&fivePointOh, nil, &theTruth, nil)
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -314,7 +420,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewNumericRangeInclusiveQuery(nil, &fivePointOh, nil, &theFalsehood).SetField("field"),
+					func() Query {
+						q := NewNumericRangeInclusiveQuery(nil, &fivePointOh, nil, &theFalsehood)
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -324,7 +434,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewNumericRangeInclusiveQuery(nil, &fivePointOh, nil, &theTruth).SetField("field"),
+					func() Query {
+						q := NewNumericRangeInclusiveQuery(nil, &fivePointOh, nil, &theTruth)
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -334,7 +448,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewDateRangeInclusiveQuery(&theDate, nil, &theFalsehood, nil).SetField("field"),
+					func() Query {
+						q := NewDateRangeInclusiveQuery(&theDate, nil, &theFalsehood, nil)
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -344,7 +462,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewDateRangeInclusiveQuery(&theDate, nil, &theTruth, nil).SetField("field"),
+					func() Query {
+						q := NewDateRangeInclusiveQuery(&theDate, nil, &theTruth, nil)
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -354,7 +476,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewDateRangeInclusiveQuery(nil, &theDate, nil, &theFalsehood).SetField("field"),
+					func() Query {
+						q := NewDateRangeInclusiveQuery(nil, &theDate, nil, &theFalsehood)
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -364,7 +490,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewDateRangeInclusiveQuery(nil, &theDate, nil, &theTruth).SetField("field"),
+					func() Query {
+						q := NewDateRangeInclusiveQuery(nil, &theDate, nil, &theTruth)
+						q.SetField("field")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -384,7 +514,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewRegexpQuery("mar.*ty").SetField("name"),
+					func() Query {
+						q := NewRegexpQuery("mar.*ty")
+						q.SetField("name")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -404,7 +538,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewWildcardQuery("mart*").SetField("name"),
+					func() Query {
+						q := NewWildcardQuery("mart*")
+						q.SetField("name")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -429,7 +567,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery("marty:couchbase").SetField("name"),
+					func() Query {
+						q := NewMatchQuery("marty:couchbase")
+						q.SetField("name")
+						return q
+					}(),
 				},
 				nil),
 		},
@@ -506,7 +648,11 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
-					NewMatchQuery(`term`),
+					func() Query {
+						q := NewMatchQuery(`term`)
+						q.SetBoost(1.0)
+						return q
+					}(),
 				},
 				nil),
 		},

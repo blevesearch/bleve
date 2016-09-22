@@ -17,49 +17,35 @@ import (
 )
 
 type BoolFieldQuery struct {
-	Bool     bool    `json:"bool"`
-	FieldVal string  `json:"field,omitempty"`
-	BoostVal float64 `json:"boost,omitempty"`
+	Bool  bool   `json:"bool"`
+	Field string `json:"field,omitempty"`
+	Boost *Boost `json:"boost,omitempty"`
 }
 
 // NewBoolFieldQuery creates a new Query for boolean fields
 func NewBoolFieldQuery(val bool) *BoolFieldQuery {
 	return &BoolFieldQuery{
-		Bool:     val,
-		BoostVal: 1.0,
+		Bool: val,
 	}
 }
 
-func (q *BoolFieldQuery) Boost() float64 {
-	return q.BoostVal
+func (q *BoolFieldQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
-func (q *BoolFieldQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
-}
-
-func (q *BoolFieldQuery) Field() string {
-	return q.FieldVal
-}
-
-func (q *BoolFieldQuery) SetField(f string) Query {
-	q.FieldVal = f
-	return q
+func (q *BoolFieldQuery) SetField(f string) {
+	q.Field = f
 }
 
 func (q *BoolFieldQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	field := q.FieldVal
-	if q.FieldVal == "" {
+	field := q.Field
+	if q.Field == "" {
 		field = m.DefaultSearchField()
 	}
 	term := "F"
 	if q.Bool {
 		term = "T"
 	}
-	return searchers.NewTermSearcher(i, term, field, q.BoostVal, explain)
-}
-
-func (q *BoolFieldQuery) Validate() error {
-	return nil
+	return searchers.NewTermSearcher(i, term, field, q.Boost.Value(), explain)
 }

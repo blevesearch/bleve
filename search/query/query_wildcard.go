@@ -39,9 +39,9 @@ var wildcardRegexpReplacer = strings.NewReplacer(
 	"?", ".")
 
 type WildcardQuery struct {
-	Wildcard string  `json:"wildcard"`
-	FieldVal string  `json:"field,omitempty"`
-	BoostVal float64 `json:"boost,omitempty"`
+	Wildcard string `json:"wildcard"`
+	Field    string `json:"field,omitempty"`
+	Boost    *Boost `json:"boost,omitempty"`
 	compiled *regexp.Regexp
 }
 
@@ -53,31 +53,21 @@ type WildcardQuery struct {
 func NewWildcardQuery(wildcard string) *WildcardQuery {
 	return &WildcardQuery{
 		Wildcard: wildcard,
-		BoostVal: 1.0,
 	}
 }
 
-func (q *WildcardQuery) Boost() float64 {
-	return q.BoostVal
+func (q *WildcardQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
-func (q *WildcardQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
-}
-
-func (q *WildcardQuery) Field() string {
-	return q.FieldVal
-}
-
-func (q *WildcardQuery) SetField(f string) Query {
-	q.FieldVal = f
-	return q
+func (q *WildcardQuery) SetField(f string) {
+	q.Field = f
 }
 
 func (q *WildcardQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	field := q.FieldVal
-	if q.FieldVal == "" {
+	field := q.Field
+	if q.Field == "" {
 		field = m.DefaultSearchField()
 	}
 	if q.compiled == nil {
@@ -88,7 +78,7 @@ func (q *WildcardQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, ex
 		}
 	}
 
-	return searchers.NewRegexpSearcher(i, q.compiled, field, q.BoostVal, explain)
+	return searchers.NewRegexpSearcher(i, q.compiled, field, q.Boost.Value(), explain)
 }
 
 func (q *WildcardQuery) Validate() error {

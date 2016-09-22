@@ -19,10 +19,10 @@ import (
 )
 
 type MatchPhraseQuery struct {
-	MatchPhrase string  `json:"match_phrase"`
-	FieldVal    string  `json:"field,omitempty"`
-	Analyzer    string  `json:"analyzer,omitempty"`
-	BoostVal    float64 `json:"boost,omitempty"`
+	MatchPhrase string `json:"match_phrase"`
+	Field       string `json:"field,omitempty"`
+	Analyzer    string `json:"analyzer,omitempty"`
+	Boost       *Boost `json:"boost,omitempty"`
 }
 
 // NewMatchPhraseQuery creates a new Query object
@@ -36,31 +36,21 @@ type MatchPhraseQuery struct {
 func NewMatchPhraseQuery(matchPhrase string) *MatchPhraseQuery {
 	return &MatchPhraseQuery{
 		MatchPhrase: matchPhrase,
-		BoostVal:    1.0,
 	}
 }
 
-func (q *MatchPhraseQuery) Boost() float64 {
-	return q.BoostVal
+func (q *MatchPhraseQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
-func (q *MatchPhraseQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
-}
-
-func (q *MatchPhraseQuery) Field() string {
-	return q.FieldVal
-}
-
-func (q *MatchPhraseQuery) SetField(f string) Query {
-	q.FieldVal = f
-	return q
+func (q *MatchPhraseQuery) SetField(f string) {
+	q.Field = f
 }
 
 func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	field := q.FieldVal
-	if q.FieldVal == "" {
+	field := q.Field
+	if q.Field == "" {
 		field = m.DefaultSearchField()
 	}
 
@@ -78,7 +68,8 @@ func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 	tokens := analyzer.Analyze([]byte(q.MatchPhrase))
 	if len(tokens) > 0 {
 		phrase := tokenStreamToPhrase(tokens)
-		phraseQuery := NewPhraseQuery(phrase, field).SetBoost(q.BoostVal)
+		phraseQuery := NewPhraseQuery(phrase, field)
+		phraseQuery.SetBoost(q.Boost.Value())
 		return phraseQuery.Searcher(i, m, explain)
 	}
 	noneQuery := NewMatchNoneQuery()
@@ -108,9 +99,5 @@ func tokenStreamToPhrase(tokens analysis.TokenStream) []string {
 		}
 		return rv
 	}
-	return nil
-}
-
-func (q *MatchPhraseQuery) Validate() error {
 	return nil
 }

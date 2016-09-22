@@ -17,11 +17,11 @@ import (
 )
 
 type FuzzyQuery struct {
-	Term         string  `json:"term"`
-	PrefixVal    int     `json:"prefix_length"`
-	FuzzinessVal int     `json:"fuzziness"`
-	FieldVal     string  `json:"field,omitempty"`
-	BoostVal     float64 `json:"boost,omitempty"`
+	Term      string `json:"term"`
+	Prefix    int    `json:"prefix_length"`
+	Fuzziness int    `json:"fuzziness"`
+	Field     string `json:"field,omitempty"`
+	Boost     *Boost `json:"boost,omitempty"`
 }
 
 // NewFuzzyQuery creates a new Query which finds
@@ -33,57 +33,32 @@ type FuzzyQuery struct {
 // distance as the fuzziness metric.
 func NewFuzzyQuery(term string) *FuzzyQuery {
 	return &FuzzyQuery{
-		Term:         term,
-		PrefixVal:    0,
-		FuzzinessVal: 2,
-		BoostVal:     1.0,
+		Term:      term,
+		Fuzziness: 2,
 	}
 }
 
-func (q *FuzzyQuery) Boost() float64 {
-	return q.BoostVal
+func (q *FuzzyQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
-func (q *FuzzyQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
+func (q *FuzzyQuery) SetField(f string) {
+	q.Field = f
 }
 
-func (q *FuzzyQuery) Field() string {
-	return q.FieldVal
+func (q *FuzzyQuery) SetFuzziness(f int) {
+	q.Fuzziness = f
 }
 
-func (q *FuzzyQuery) SetField(f string) Query {
-	q.FieldVal = f
-	return q
-}
-
-func (q *FuzzyQuery) Fuzziness() int {
-	return q.FuzzinessVal
-}
-
-func (q *FuzzyQuery) SetFuzziness(f int) Query {
-	q.FuzzinessVal = f
-	return q
-}
-
-func (q *FuzzyQuery) Prefix() int {
-	return q.PrefixVal
-}
-
-func (q *FuzzyQuery) SetPrefix(p int) Query {
-	q.PrefixVal = p
-	return q
+func (q *FuzzyQuery) SetPrefix(p int) {
+	q.Prefix = p
 }
 
 func (q *FuzzyQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	field := q.FieldVal
-	if q.FieldVal == "" {
+	field := q.Field
+	if q.Field == "" {
 		field = m.DefaultSearchField()
 	}
-	return searchers.NewFuzzySearcher(i, q.Term, q.PrefixVal, q.FuzzinessVal, field, q.BoostVal, explain)
-}
-
-func (q *FuzzyQuery) Validate() error {
-	return nil
+	return searchers.NewFuzzySearcher(i, q.Term, q.Prefix, q.Fuzziness, field, q.Boost.Value(), explain)
 }

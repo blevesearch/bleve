@@ -16,8 +16,8 @@ import (
 )
 
 type QueryStringQuery struct {
-	Query    string  `json:"query"`
-	BoostVal float64 `json:"boost,omitempty"`
+	Query string `json:"query"`
+	Boost *Boost `json:"boost,omitempty"`
 }
 
 // NewQueryStringQuery creates a new Query used for
@@ -25,18 +25,13 @@ type QueryStringQuery struct {
 // query string is a small query language for humans.
 func NewQueryStringQuery(query string) *QueryStringQuery {
 	return &QueryStringQuery{
-		Query:    query,
-		BoostVal: 1.0,
+		Query: query,
 	}
 }
 
-func (q *QueryStringQuery) Boost() float64 {
-	return q.BoostVal
-}
-
-func (q *QueryStringQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
+func (q *QueryStringQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
 func (q *QueryStringQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
@@ -52,13 +47,8 @@ func (q *QueryStringQuery) Validate() error {
 	if err != nil {
 		return err
 	}
-	return newQuery.Validate()
-}
-
-func (q *QueryStringQuery) Field() string {
-	return ""
-}
-
-func (q *QueryStringQuery) SetField(f string) Query {
-	return q
+	if newQuery, ok := newQuery.(ValidatableQuery); ok {
+		return newQuery.Validate()
+	}
+	return nil
 }

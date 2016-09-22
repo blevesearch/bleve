@@ -17,46 +17,32 @@ import (
 )
 
 type TermQuery struct {
-	Term     string  `json:"term"`
-	FieldVal string  `json:"field,omitempty"`
-	BoostVal float64 `json:"boost,omitempty"`
+	Term  string `json:"term"`
+	Field string `json:"field,omitempty"`
+	Boost *Boost `json:"boost,omitempty"`
 }
 
 // NewTermQuery creates a new Query for finding an
 // exact term match in the index.
 func NewTermQuery(term string) *TermQuery {
 	return &TermQuery{
-		Term:     term,
-		BoostVal: 1.0,
+		Term: term,
 	}
 }
 
-func (q *TermQuery) Boost() float64 {
-	return q.BoostVal
+func (q *TermQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
-func (q *TermQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
-}
-
-func (q *TermQuery) Field() string {
-	return q.FieldVal
-}
-
-func (q *TermQuery) SetField(f string) Query {
-	q.FieldVal = f
-	return q
+func (q *TermQuery) SetField(f string) {
+	q.Field = f
 }
 
 func (q *TermQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	field := q.FieldVal
-	if q.FieldVal == "" {
+	field := q.Field
+	if q.Field == "" {
 		field = m.DefaultSearchField()
 	}
-	return searchers.NewTermSearcher(i, q.Term, field, q.BoostVal, explain)
-}
-
-func (q *TermQuery) Validate() error {
-	return nil
+	return searchers.NewTermSearcher(i, q.Term, field, q.Boost.Value(), explain)
 }

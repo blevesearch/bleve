@@ -21,8 +21,8 @@ import (
 
 type DisjunctionQuery struct {
 	Disjuncts []Query `json:"disjuncts"`
-	BoostVal  float64 `json:"boost,omitempty"`
-	MinVal    float64 `json:"min"`
+	Boost     *Boost  `json:"boost,omitempty"`
+	Min       float64 `json:"min"`
 }
 
 // NewDisjunctionQuery creates a new compound Query.
@@ -30,7 +30,6 @@ type DisjunctionQuery struct {
 func NewDisjunctionQuery(disjuncts []Query) *DisjunctionQuery {
 	return &DisjunctionQuery{
 		Disjuncts: disjuncts,
-		BoostVal:  1.0,
 	}
 }
 
@@ -39,32 +38,21 @@ func NewDisjunctionQuery(disjuncts []Query) *DisjunctionQuery {
 func NewDisjunctionQueryMin(disjuncts []Query, min float64) *DisjunctionQuery {
 	return &DisjunctionQuery{
 		Disjuncts: disjuncts,
-		BoostVal:  1.0,
-		MinVal:    min,
+		Min:       min,
 	}
 }
 
-func (q *DisjunctionQuery) Boost() float64 {
-	return q.BoostVal
+func (q *DisjunctionQuery) SetBoost(b float64) {
+	boost := Boost(b)
+	q.Boost = &boost
 }
 
-func (q *DisjunctionQuery) SetBoost(b float64) Query {
-	q.BoostVal = b
-	return q
-}
-
-func (q *DisjunctionQuery) AddQuery(aq Query) Query {
+func (q *DisjunctionQuery) AddQuery(aq Query) {
 	q.Disjuncts = append(q.Disjuncts, aq)
-	return q
 }
 
-func (q *DisjunctionQuery) Min() float64 {
-	return q.MinVal
-}
-
-func (q *DisjunctionQuery) SetMin(m float64) Query {
-	q.MinVal = m
-	return q
+func (q *DisjunctionQuery) SetMin(m float64) {
+	q.Min = m
 }
 
 func (q *DisjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
@@ -76,17 +64,19 @@ func (q *DisjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 			return nil, err
 		}
 	}
-	return searchers.NewDisjunctionSearcher(i, ss, q.MinVal, explain)
+	return searchers.NewDisjunctionSearcher(i, ss, q.Min, explain)
 }
 
 func (q *DisjunctionQuery) Validate() error {
-	if int(q.MinVal) > len(q.Disjuncts) {
+	if int(q.Min) > len(q.Disjuncts) {
 		return fmt.Errorf("disjunction query has fewer than the minimum number of clauses to satisfy")
 	}
 	for _, q := range q.Disjuncts {
-		err := q.Validate()
-		if err != nil {
-			return err
+		if q, ok := q.(ValidatableQuery); ok {
+			err := q.Validate()
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -95,8 +85,8 @@ func (q *DisjunctionQuery) Validate() error {
 func (q *DisjunctionQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
 		Disjuncts []json.RawMessage `json:"disjuncts"`
-		BoostVal  float64           `json:"boost,omitempty"`
-		MinVal    float64           `json:"min"`
+		Boost     *Boost            `json:"boost,omitempty"`
+		Min       float64           `json:"min"`
 	}{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
@@ -110,18 +100,7 @@ func (q *DisjunctionQuery) UnmarshalJSON(data []byte) error {
 		}
 		q.Disjuncts[i] = query
 	}
-	q.BoostVal = tmp.BoostVal
-	if q.BoostVal == 0 {
-		q.BoostVal = 1
-	}
-	q.MinVal = tmp.MinVal
+	q.Boost = tmp.Boost
+	q.Min = tmp.Min
 	return nil
-}
-
-func (q *DisjunctionQuery) Field() string {
-	return ""
-}
-
-func (q *DisjunctionQuery) SetField(f string) Query {
-	return q
 }
