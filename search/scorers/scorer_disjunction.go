@@ -32,7 +32,7 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 		childrenExplanations = make([]*search.Explanation, len(constituents))
 	}
 
-	locations := []search.FieldTermLocationMap{}
+	var locations []search.FieldTermLocationMap
 	for i, docMatch := range constituents {
 		sum += docMatch.Score
 		if s.explain {

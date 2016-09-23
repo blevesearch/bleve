@@ -24,6 +24,7 @@ type UpsideDownCouchTermFieldReader struct {
 	iterator    store.KVIterator
 	term        []byte
 	tfrNext     *TermFrequencyRow
+	keyBuf      []byte
 	field       uint16
 }
 
@@ -104,11 +105,23 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 
 func (r *UpsideDownCouchTermFieldReader) Advance(docID index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
 	if r.iterator != nil {
-		tfr := NewTermFrequencyRow(r.term, r.field, docID, 0, 0)
-		r.iterator.Seek(tfr.Key())
+		if r.tfrNext == nil {
+			r.tfrNext = &TermFrequencyRow{}
+		}
+		tfr := InitTermFrequencyRow(r.tfrNext, r.term, r.field, docID, 0, 0)
+		keySize := tfr.KeySize()
+		if cap(r.keyBuf) < keySize {
+			r.keyBuf = make([]byte, keySize)
+		}
+		keySize, _ = tfr.KeyTo(r.keyBuf[0:keySize])
+		r.iterator.Seek(r.keyBuf[0:keySize])
 		key, val, valid := r.iterator.Current()
 		if valid {
-			tfr, err := NewTermFrequencyRowKV(key, val)
+			err := tfr.parseKDoc(key, r.term)
+			if err != nil {
+				return nil, err
+			}
+			err = tfr.parseV(val)
 			if err != nil {
 				return nil, err
 			}
