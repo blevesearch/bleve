@@ -63,7 +63,7 @@ func (o *MatchQueryOperator) UnmarshalJSON(data []byte) error {
 		*o = MatchQueryOperatorAnd
 		return nil
 	default:
-		return fmt.Errorf("cannot unmarshal match operator '%s' from JSON", o)
+		return fmt.Errorf("cannot unmarshal match operator '%v' from JSON", o)
 	}
 }
 
