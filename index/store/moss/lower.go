@@ -393,6 +393,12 @@ func (lli *llIterator) Next() error {
 	return nil
 }
 
+func (lli *llIterator) SeekTo(k []byte) error {
+	lli.kvIterator.Seek(k)
+
+	return nil
+}
+
 func (lli *llIterator) Current() (key, val []byte, err error) {
 	key, val, ok := lli.kvIterator.Current()
 	if !ok {

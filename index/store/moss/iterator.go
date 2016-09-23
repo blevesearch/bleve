@@ -12,8 +12,6 @@
 package moss
 
 import (
-	"bytes"
-
 	"github.com/couchbase/moss"
 )
 
@@ -29,29 +27,9 @@ type Iterator struct {
 }
 
 func (x *Iterator) Seek(seekToKey []byte) {
-	x.k = nil
-	x.v = nil
-	x.err = moss.ErrIteratorDone
+	_ = x.iter.SeekTo(seekToKey)
 
-	if bytes.Compare(seekToKey, x.start) < 0 {
-		seekToKey = x.start
-	}
-
-	iter, err := x.ss.StartIterator(seekToKey, x.end, moss.IteratorOptions{})
-	if err != nil {
-		x.store.Logf("bleve moss StartIterator err: %v", err)
-		return
-	}
-
-	err = x.iter.Close()
-	if err != nil {
-		x.store.Logf("bleve moss iterator.Seek err: %v", err)
-		return
-	}
-
-	x.iter = iter
-
-	x.current()
+	x.k, x.v, x.err = x.iter.Current()
 }
 
 func (x *Iterator) Next() {
