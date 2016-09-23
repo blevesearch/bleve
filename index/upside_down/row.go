@@ -461,6 +461,15 @@ func (tfr *TermFrequencyRow) String() string {
 	return fmt.Sprintf("Term: `%s` Field: %d DocId: `%s` Frequency: %d Norm: %f Vectors: %v", string(tfr.term), tfr.field, string(tfr.doc), tfr.freq, tfr.norm, tfr.vectors)
 }
 
+func InitTermFrequencyRow(tfr *TermFrequencyRow, term []byte, field uint16, docID []byte, freq uint64, norm float32) *TermFrequencyRow {
+	tfr.term = term
+	tfr.field = field
+	tfr.doc = docID
+	tfr.freq = freq
+	tfr.norm = norm
+	return tfr
+}
+
 func NewTermFrequencyRow(term []byte, field uint16, docID []byte, freq uint64, norm float32) *TermFrequencyRow {
 	return &TermFrequencyRow{
 		term:  term,
