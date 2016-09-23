@@ -36,9 +36,10 @@ func (q *ConjunctionQuery) SetBoost(b float64) {
 	q.Boost = &boost
 }
 
-func (q *ConjunctionQuery) AddQuery(aq Query) *ConjunctionQuery {
-	q.Conjuncts = append(q.Conjuncts, aq)
-	return q
+func (q *ConjunctionQuery) AddQuery(aq ...Query) {
+	for _, aaq := range aq {
+		q.Conjuncts = append(q.Conjuncts, aaq)
+	}
 }
 
 func (q *ConjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {

@@ -18,7 +18,6 @@ import (
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/highlight/highlighters/ansi"
-	"github.com/blevesearch/bleve/search/query"
 )
 
 var indexMapping mapping.IndexMapping
@@ -404,19 +403,6 @@ func ExampleNewConjunctionQuery() {
 	// document id 2
 }
 
-func ExampleNewMatchQueryOperator() {
-	query := NewMatchQueryOperator("great one", query.MatchQueryOperatorAnd)
-	searchRequest := NewSearchRequest(query)
-	searchResults, err := example_index.Search(searchRequest)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(searchResults.Hits[0].ID)
-	// Output:
-	// document id 2
-}
-
 func ExampleNewDisjunctionQuery() {
 	disjunct1 := NewMatchQuery("great")
 	disjunct2 := NewMatchQuery("named")
@@ -430,21 +416,6 @@ func ExampleNewDisjunctionQuery() {
 	fmt.Println(len(searchResults.Hits))
 	// Output:
 	// 2
-}
-
-func ExampleNewDisjunctionQueryMin() {
-	disjunct1 := NewMatchQuery("great")
-	disjunct2 := NewMatchQuery("named")
-	query := NewDisjunctionQueryMin(2, disjunct1, disjunct2)
-	searchRequest := NewSearchRequest(query)
-	searchResults, err := example_index.Search(searchRequest)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(len(searchResults.Hits))
-	// Output:
-	// 0
 }
 
 func ExampleSearchRequest_SortBy() {

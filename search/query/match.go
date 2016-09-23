@@ -80,19 +80,6 @@ func NewMatchQuery(match string) *MatchQuery {
 	}
 }
 
-// NewMatchQueryOperator creates a Query for matching text.
-// An Analyzer is chosen based on the field.
-// Input text is analyzed using this analyzer.
-// Token terms resulting from this analysis are
-// used to perform term searches.  Result documents
-// must satisfy term searches according to given operator.
-func NewMatchQueryOperator(match string, operator MatchQueryOperator) *MatchQuery {
-	return &MatchQuery{
-		Match:    match,
-		Operator: operator,
-	}
-}
-
 func (q *MatchQuery) SetBoost(b float64) {
 	boost := Boost(b)
 	q.Boost = &boost
@@ -157,7 +144,8 @@ func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expla
 
 		switch q.Operator {
 		case MatchQueryOperatorOr:
-			shouldQuery := NewDisjunctionQueryMin(tqs, 1)
+			shouldQuery := NewDisjunctionQuery(tqs)
+			shouldQuery.SetMin(1)
 			shouldQuery.SetBoost(q.Boost.Value())
 			return shouldQuery.Searcher(i, m, explain)
 

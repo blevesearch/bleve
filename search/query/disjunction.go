@@ -33,22 +33,15 @@ func NewDisjunctionQuery(disjuncts []Query) *DisjunctionQuery {
 	}
 }
 
-// NewDisjunctionQueryMin creates a new compound Query.
-// Result documents satisfy at least min Queries.
-func NewDisjunctionQueryMin(disjuncts []Query, min float64) *DisjunctionQuery {
-	return &DisjunctionQuery{
-		Disjuncts: disjuncts,
-		Min:       min,
-	}
-}
-
 func (q *DisjunctionQuery) SetBoost(b float64) {
 	boost := Boost(b)
 	q.Boost = &boost
 }
 
-func (q *DisjunctionQuery) AddQuery(aq Query) {
-	q.Disjuncts = append(q.Disjuncts, aq)
+func (q *DisjunctionQuery) AddQuery(aq ...Query) {
+	for _, aaq := range aq {
+		q.Disjuncts = append(q.Disjuncts, aaq)
+	}
 }
 
 func (q *DisjunctionQuery) SetMin(m float64) {

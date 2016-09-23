@@ -70,7 +70,8 @@ func TestParseQuery(t *testing.T) {
 		{
 			input: []byte(`{"match":"beer","field":"desc","operator":"and"}`),
 			output: func() Query {
-				q := NewMatchQueryOperator("beer", MatchQueryOperatorAnd)
+				q := NewMatchQuery("beer")
+				q.SetOperator(MatchQueryOperatorAnd)
 				q.SetField("desc")
 				return q
 			}(),
@@ -78,7 +79,8 @@ func TestParseQuery(t *testing.T) {
 		{
 			input: []byte(`{"match":"beer","field":"desc","operator":"or"}`),
 			output: func() Query {
-				q := NewMatchQueryOperator("beer", MatchQueryOperatorOr)
+				q := NewMatchQuery("beer")
+				q.SetOperator(MatchQueryOperatorOr)
 				q.SetField("desc")
 				return q
 			}(),
@@ -98,23 +100,26 @@ func TestParseQuery(t *testing.T) {
 		},
 		{
 			input: []byte(`{"must":{"conjuncts": [{"match":"beer","field":"desc"}]},"should":{"disjuncts": [{"match":"water","field":"desc"}],"min":1.0},"must_not":{"disjuncts": [{"match":"devon","field":"desc"}]}}`),
-			output: NewBooleanQueryMinShould(
-				[]Query{func() Query {
-					q := NewMatchQuery("beer")
-					q.SetField("desc")
-					return q
-				}()},
-				[]Query{func() Query {
-					q := NewMatchQuery("water")
-					q.SetField("desc")
-					return q
-				}()},
-				[]Query{func() Query {
-					q := NewMatchQuery("devon")
-					q.SetField("desc")
-					return q
-				}()},
-				1.0),
+			output: func() Query {
+				q := NewBooleanQuery(
+					[]Query{func() Query {
+						q := NewMatchQuery("beer")
+						q.SetField("desc")
+						return q
+					}()},
+					[]Query{func() Query {
+						q := NewMatchQuery("water")
+						q.SetField("desc")
+						return q
+					}()},
+					[]Query{func() Query {
+						q := NewMatchQuery("devon")
+						q.SetField("desc")
+						return q
+					}()})
+				q.SetMinShould(1)
+				return q
+			}(),
 		},
 		{
 			input:  []byte(`{"terms":["watered","down"],"field":"desc"}`),
@@ -311,23 +316,26 @@ func TestQueryValidate(t *testing.T) {
 			err: true,
 		},
 		{
-			query: NewBooleanQueryMinShould(
-				[]Query{func() Query {
-					q := NewMatchQuery("beer")
-					q.SetField("desc")
-					return q
-				}()},
-				[]Query{func() Query {
-					q := NewMatchQuery("water")
-					q.SetField("desc")
-					return q
-				}()},
-				[]Query{func() Query {
-					q := NewMatchQuery("devon")
-					q.SetField("desc")
-					return q
-				}()},
-				2.0),
+			query: func() Query {
+				q := NewBooleanQuery(
+					[]Query{func() Query {
+						q := NewMatchQuery("beer")
+						q.SetField("desc")
+						return q
+					}()},
+					[]Query{func() Query {
+						q := NewMatchQuery("water")
+						q.SetField("desc")
+						return q
+					}()},
+					[]Query{func() Query {
+						q := NewMatchQuery("devon")
+						q.SetField("desc")
+						return q
+					}()})
+				q.SetMinShould(2)
+				return q
+			}(),
 			err: true,
 		},
 		{

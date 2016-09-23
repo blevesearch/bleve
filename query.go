@@ -65,12 +65,6 @@ func NewDisjunctionQuery(disjuncts ...query.Query) *query.DisjunctionQuery {
 	return query.NewDisjunctionQuery(disjuncts)
 }
 
-// NewDisjunctionQueryMin creates a new compound Query.
-// Result documents satisfy at least min Queries.
-func NewDisjunctionQueryMin(min float64, disjuncts ...query.Query) *query.DisjunctionQuery {
-	return query.NewDisjunctionQueryMin(disjuncts, min)
-}
-
 // NewDocIDQuery creates a new Query object returning indexed documents among
 // the specified set. Combine it with ConjunctionQuery to restrict the scope of
 // other queries output.
@@ -121,16 +115,6 @@ func NewMatchPhraseQuery(matchPhrase string) *query.MatchPhraseQuery {
 // must satisfy at least one of these term searches.
 func NewMatchQuery(match string) *query.MatchQuery {
 	return query.NewMatchQuery(match)
-}
-
-// NewMatchQueryOperator creates a Query for matching text.
-// An Analyzer is chosen based on the field.
-// Input text is analyzed using this analyzer.
-// Token terms resulting from this analysis are
-// used to perform term searches.  Result documents
-// must satisfy term searches according to given operator.
-func NewMatchQueryOperator(match string, operator query.MatchQueryOperator) *query.MatchQuery {
-	return query.NewMatchQueryOperator(match, operator)
 }
 
 // NewNumericRangeQuery creates a new Query for ranges
