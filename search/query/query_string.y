@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func logDebugGrammar(format string, v ...interface{}) {
@@ -217,7 +218,11 @@ tSTRING tCOLON tGREATER tPHRASE {
 	phrase := $4
 
 	logDebugGrammar("FIELD - GREATER THAN DATE %s", phrase)
-	q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil)
+	minTime, err := QueryTimeFromString(phrase)
+	if err != nil {
+	  yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid time: %v", err))
+	}
+	q := NewDateRangeInclusiveQuery(minTime, time.Time{}, &minInclusive, nil)
 	q.SetField(field)
 	$$ = q
 }
@@ -228,7 +233,11 @@ tSTRING tCOLON tGREATER tEQUAL tPHRASE {
 	phrase := $5
 
 	logDebugGrammar("FIELD - GREATER THAN OR EQUAL DATE %s", phrase)
-	q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil)
+	minTime, err := QueryTimeFromString(phrase)
+	if err != nil {
+		yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid time: %v", err))
+	}
+	q := NewDateRangeInclusiveQuery(minTime, time.Time{}, &minInclusive, nil)
 	q.SetField(field)
 	$$ = q
 }
@@ -239,7 +248,11 @@ tSTRING tCOLON tLESS tPHRASE {
 	phrase := $4
 
 	logDebugGrammar("FIELD - LESS THAN DATE %s", phrase)
-	q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive)
+	maxTime, err := QueryTimeFromString(phrase)
+	if err != nil {
+		yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid time: %v", err))
+	}
+	q := NewDateRangeInclusiveQuery(time.Time{}, maxTime, nil, &maxInclusive)
 	q.SetField(field)
 	$$ = q
 }
@@ -250,7 +263,11 @@ tSTRING tCOLON tLESS tEQUAL tPHRASE {
 	phrase := $5
 
 	logDebugGrammar("FIELD - LESS THAN OR EQUAL DATE %s", phrase)
-	q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive)
+	maxTime, err := QueryTimeFromString(phrase)
+	if err != nil {
+		yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid time: %v", err))
+	}
+	q := NewDateRangeInclusiveQuery(time.Time{}, maxTime, nil, &maxInclusive)
 	q.SetField(field)
 	$$ = q
 };

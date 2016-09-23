@@ -1280,9 +1280,9 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	}
 
 	// search range across all docs
-	start := now.Add(-4 * time.Hour).Format(time.RFC3339)
-	end := now.Format(time.RFC3339)
-	sreq := NewSearchRequest(NewDateRangeQuery(&start, &end))
+	start := now.Add(-4 * time.Hour)
+	end := now
+	sreq := NewSearchRequest(NewDateRangeQuery(start, end))
 	sres, err := index.Search(sreq)
 	if err != nil {
 		t.Fatal(err)
@@ -1292,9 +1292,9 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	}
 
 	// search range includes only oldest
-	start = now.Add(-4 * time.Hour).Format(time.RFC3339)
-	end = now.Add(-121 * time.Minute).Format(time.RFC3339)
-	sreq = NewSearchRequest(NewDateRangeQuery(&start, &end))
+	start = now.Add(-4 * time.Hour)
+	end = now.Add(-121 * time.Minute)
+	sreq = NewSearchRequest(NewDateRangeQuery(start, end))
 	sres, err = index.Search(sreq)
 	if err != nil {
 		t.Fatal(err)
@@ -1307,9 +1307,9 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	}
 
 	// search range includes only newest
-	start = now.Add(-61 * time.Minute).Format(time.RFC3339)
-	end = now.Format(time.RFC3339)
-	sreq = NewSearchRequest(NewDateRangeQuery(&start, &end))
+	start = now.Add(-61 * time.Minute)
+	end = now
+	sreq = NewSearchRequest(NewDateRangeQuery(start, end))
 	sres, err = index.Search(sreq)
 	if err != nil {
 		t.Fatal(err)

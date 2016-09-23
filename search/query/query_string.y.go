@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func logDebugGrammar(format string, v ...interface{}) {
@@ -15,7 +16,7 @@ func logDebugGrammar(format string, v ...interface{}) {
 	}
 }
 
-//line query_string.y:16
+//line query_string.y:17
 type yySymType struct {
 	yys int
 	s   string
@@ -473,25 +474,25 @@ yydefault:
 
 	case 1:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:38
+		//line query_string.y:39
 		{
 			logDebugGrammar("INPUT")
 		}
 	case 2:
 		yyDollar = yyS[yypt-2 : yypt+1]
-		//line query_string.y:43
+		//line query_string.y:44
 		{
 			logDebugGrammar("SEARCH PARTS")
 		}
 	case 3:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:47
+		//line query_string.y:48
 		{
 			logDebugGrammar("SEARCH PART")
 		}
 	case 4:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:52
+		//line query_string.y:53
 		{
 			query := yyDollar[2].q
 			if yyDollar[3].pf != nil {
@@ -510,27 +511,27 @@ yydefault:
 		}
 	case 5:
 		yyDollar = yyS[yypt-0 : yypt+1]
-		//line query_string.y:71
+		//line query_string.y:72
 		{
 			yyVAL.n = queryShould
 		}
 	case 6:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:75
+		//line query_string.y:76
 		{
 			logDebugGrammar("PLUS")
 			yyVAL.n = queryMust
 		}
 	case 7:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:80
+		//line query_string.y:81
 		{
 			logDebugGrammar("MINUS")
 			yyVAL.n = queryMustNot
 		}
 	case 8:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:86
+		//line query_string.y:87
 		{
 			str := yyDollar[1].s
 			logDebugGrammar("STRING - %s", str)
@@ -546,7 +547,7 @@ yydefault:
 		}
 	case 9:
 		yyDollar = yyS[yypt-2 : yypt+1]
-		//line query_string.y:100
+		//line query_string.y:101
 		{
 			str := yyDollar[1].s
 			fuzziness, err := strconv.ParseFloat(yyDollar[2].s, 64)
@@ -560,7 +561,7 @@ yydefault:
 		}
 	case 10:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:112
+		//line query_string.y:113
 		{
 			field := yyDollar[1].s
 			str := yyDollar[3].s
@@ -576,7 +577,7 @@ yydefault:
 		}
 	case 11:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:126
+		//line query_string.y:127
 		{
 			str := yyDollar[1].s
 			logDebugGrammar("STRING - %s", str)
@@ -585,7 +586,7 @@ yydefault:
 		}
 	case 12:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:133
+		//line query_string.y:134
 		{
 			phrase := yyDollar[1].s
 			logDebugGrammar("PHRASE - %s", phrase)
@@ -594,7 +595,7 @@ yydefault:
 		}
 	case 13:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:140
+		//line query_string.y:141
 		{
 			field := yyDollar[1].s
 			str := yyDollar[3].s
@@ -612,7 +613,7 @@ yydefault:
 		}
 	case 14:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:156
+		//line query_string.y:157
 		{
 			field := yyDollar[1].s
 			str := yyDollar[3].s
@@ -623,7 +624,7 @@ yydefault:
 		}
 	case 15:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:165
+		//line query_string.y:166
 		{
 			field := yyDollar[1].s
 			phrase := yyDollar[3].s
@@ -634,7 +635,7 @@ yydefault:
 		}
 	case 16:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:174
+		//line query_string.y:175
 		{
 			field := yyDollar[1].s
 			min, _ := strconv.ParseFloat(yyDollar[4].s, 64)
@@ -646,7 +647,7 @@ yydefault:
 		}
 	case 17:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:184
+		//line query_string.y:185
 		{
 			field := yyDollar[1].s
 			min, _ := strconv.ParseFloat(yyDollar[5].s, 64)
@@ -658,7 +659,7 @@ yydefault:
 		}
 	case 18:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:194
+		//line query_string.y:195
 		{
 			field := yyDollar[1].s
 			max, _ := strconv.ParseFloat(yyDollar[4].s, 64)
@@ -670,7 +671,7 @@ yydefault:
 		}
 	case 19:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:204
+		//line query_string.y:205
 		{
 			field := yyDollar[1].s
 			max, _ := strconv.ParseFloat(yyDollar[5].s, 64)
@@ -682,65 +683,81 @@ yydefault:
 		}
 	case 20:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:214
+		//line query_string.y:215
 		{
 			field := yyDollar[1].s
 			minInclusive := false
 			phrase := yyDollar[4].s
 
 			logDebugGrammar("FIELD - GREATER THAN DATE %s", phrase)
-			q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil)
+			minTime, err := QueryTimeFromString(phrase)
+			if err != nil {
+				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid time: %v", err))
+			}
+			q := NewDateRangeInclusiveQuery(minTime, time.Time{}, &minInclusive, nil)
 			q.SetField(field)
 			yyVAL.q = q
 		}
 	case 21:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:225
+		//line query_string.y:230
 		{
 			field := yyDollar[1].s
 			minInclusive := true
 			phrase := yyDollar[5].s
 
 			logDebugGrammar("FIELD - GREATER THAN OR EQUAL DATE %s", phrase)
-			q := NewDateRangeInclusiveQuery(&phrase, nil, &minInclusive, nil)
+			minTime, err := QueryTimeFromString(phrase)
+			if err != nil {
+				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid time: %v", err))
+			}
+			q := NewDateRangeInclusiveQuery(minTime, time.Time{}, &minInclusive, nil)
 			q.SetField(field)
 			yyVAL.q = q
 		}
 	case 22:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:236
+		//line query_string.y:245
 		{
 			field := yyDollar[1].s
 			maxInclusive := false
 			phrase := yyDollar[4].s
 
 			logDebugGrammar("FIELD - LESS THAN DATE %s", phrase)
-			q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive)
+			maxTime, err := QueryTimeFromString(phrase)
+			if err != nil {
+				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid time: %v", err))
+			}
+			q := NewDateRangeInclusiveQuery(time.Time{}, maxTime, nil, &maxInclusive)
 			q.SetField(field)
 			yyVAL.q = q
 		}
 	case 23:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:247
+		//line query_string.y:260
 		{
 			field := yyDollar[1].s
 			maxInclusive := true
 			phrase := yyDollar[5].s
 
 			logDebugGrammar("FIELD - LESS THAN OR EQUAL DATE %s", phrase)
-			q := NewDateRangeInclusiveQuery(nil, &phrase, nil, &maxInclusive)
+			maxTime, err := QueryTimeFromString(phrase)
+			if err != nil {
+				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid time: %v", err))
+			}
+			q := NewDateRangeInclusiveQuery(time.Time{}, maxTime, nil, &maxInclusive)
 			q.SetField(field)
 			yyVAL.q = q
 		}
 	case 24:
 		yyDollar = yyS[yypt-0 : yypt+1]
-		//line query_string.y:259
+		//line query_string.y:276
 		{
 			yyVAL.pf = nil
 		}
 	case 25:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:263
+		//line query_string.y:280
 		{
 			yyVAL.pf = nil
 			boost, err := strconv.ParseFloat(yyDollar[1].s, 64)

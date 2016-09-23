@@ -10,8 +10,10 @@
 package query
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/blevesearch/bleve/analysis/datetime_parsers/datetime_optional"
 	"github.com/blevesearch/bleve/index"
@@ -25,15 +27,56 @@ import (
 // QueryDateTimeParser controls the default query date time parser
 var QueryDateTimeParser = datetime_optional.Name
 
+// QueryDateTimeFormat controls the format when Marshaling to JSON
+var QueryDateTimeFormat = time.RFC3339
+
 var cache = registry.NewCache()
 
+type BleveQueryTime struct {
+	time.Time
+}
+
+func QueryTimeFromString(t string) (time.Time, error) {
+	dateTimeParser, err := cache.DateTimeParserNamed(QueryDateTimeParser)
+	if err != nil {
+		return time.Time{}, err
+	}
+	rv, err := dateTimeParser.ParseDateTime(t)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return rv, nil
+}
+
+func (t *BleveQueryTime) MarshalJSON() ([]byte, error) {
+	tt := time.Time(t.Time)
+	return []byte(tt.Format(QueryDateTimeFormat)), nil
+}
+
+func (t *BleveQueryTime) UnmarshalJSON(data []byte) error {
+	var timeString string
+	err := json.Unmarshal(data, &timeString)
+	if err != nil {
+		return err
+	}
+	dateTimeParser, err := cache.DateTimeParserNamed(QueryDateTimeParser)
+	if err != nil {
+		return err
+	}
+	t.Time, err = dateTimeParser.ParseDateTime(timeString)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type DateRangeQuery struct {
-	Start          *string `json:"start,omitempty"`
-	End            *string `json:"end,omitempty"`
-	InclusiveStart *bool   `json:"inclusive_start,omitempty"`
-	InclusiveEnd   *bool   `json:"inclusive_end,omitempty"`
-	Field          string  `json:"field,omitempty"`
-	Boost          *Boost  `json:"boost,omitempty"`
+	Start          BleveQueryTime `json:"start,omitempty"`
+	End            BleveQueryTime `json:"end,omitempty"`
+	InclusiveStart *bool          `json:"inclusive_start,omitempty"`
+	InclusiveEnd   *bool          `json:"inclusive_end,omitempty"`
+	Field          string         `json:"field,omitempty"`
+	Boost          *Boost         `json:"boost,omitempty"`
 }
 
 // NewDateRangeQuery creates a new Query for ranges
@@ -41,7 +84,7 @@ type DateRangeQuery struct {
 // Date strings are parsed using the DateTimeParser configured in the
 //  top-level config.QueryDateTimeParser
 // Either, but not both endpoints can be nil.
-func NewDateRangeQuery(start, end *string) *DateRangeQuery {
+func NewDateRangeQuery(start, end time.Time) *DateRangeQuery {
 	return NewDateRangeInclusiveQuery(start, end, nil, nil)
 }
 
@@ -51,10 +94,10 @@ func NewDateRangeQuery(start, end *string) *DateRangeQuery {
 //  top-level config.QueryDateTimeParser
 // Either, but not both endpoints can be nil.
 // startInclusive and endInclusive control inclusion of the endpoints.
-func NewDateRangeInclusiveQuery(start, end *string, startInclusive, endInclusive *bool) *DateRangeQuery {
+func NewDateRangeInclusiveQuery(start, end time.Time, startInclusive, endInclusive *bool) *DateRangeQuery {
 	return &DateRangeQuery{
-		Start:          start,
-		End:            end,
+		Start:          BleveQueryTime{start},
+		End:            BleveQueryTime{end},
 		InclusiveStart: startInclusive,
 		InclusiveEnd:   endInclusive,
 	}
@@ -70,7 +113,6 @@ func (q *DateRangeQuery) SetField(f string) {
 }
 
 func (q *DateRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-
 	min, max, err := q.parseEndpoints()
 	if err != nil {
 		return nil, err
@@ -85,34 +127,20 @@ func (q *DateRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, e
 }
 
 func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
-	dateTimeParser, err := cache.DateTimeParserNamed(QueryDateTimeParser)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// now parse the endpoints
 	min := math.Inf(-1)
 	max := math.Inf(1)
-	if q.Start != nil && *q.Start != "" {
-		startTime, err := dateTimeParser.ParseDateTime(*q.Start)
-		if err != nil {
-			return nil, nil, err
-		}
-		min = numeric_util.Int64ToFloat64(startTime.UnixNano())
+	if !q.Start.IsZero() {
+		min = numeric_util.Int64ToFloat64(q.Start.UnixNano())
 	}
-	if q.End != nil && *q.End != "" {
-		endTime, err := dateTimeParser.ParseDateTime(*q.End)
-		if err != nil {
-			return nil, nil, err
-		}
-		max = numeric_util.Int64ToFloat64(endTime.UnixNano())
+	if !q.End.IsZero() {
+		max = numeric_util.Int64ToFloat64(q.End.UnixNano())
 	}
 
 	return &min, &max, nil
 }
 
 func (q *DateRangeQuery) Validate() error {
-	if q.Start == nil && q.Start == q.End {
+	if q.Start.IsZero() && q.End.IsZero() {
 		return fmt.Errorf("must specify start or end")
 	}
 	_, _, err := q.parseEndpoints()

@@ -13,14 +13,29 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve/mapping"
 )
 
 var minNum = 5.1
 var maxNum = 7.1
-var startDate = "2011-01-01"
-var endDate = "2012-01-01"
+var startDateStr = "2011-01-01T00:00:00Z"
+var endDateStr = "2012-01-01T00:00:00Z"
+var startDate time.Time
+var endDate time.Time
+
+func init() {
+	var err error
+	startDate, err = time.Parse(time.RFC3339, startDateStr)
+	if err != nil {
+		panic(err)
+	}
+	endDate, err = time.Parse(time.RFC3339, endDateStr)
+	if err != nil {
+		panic(err)
+	}
+}
 
 func TestParseQuery(t *testing.T) {
 	tests := []struct {
@@ -118,9 +133,9 @@ func TestParseQuery(t *testing.T) {
 			}(),
 		},
 		{
-			input: []byte(`{"start":"` + startDate + `","end":"` + endDate + `","field":"desc"}`),
+			input: []byte(`{"start":"` + startDateStr + `","end":"` + endDateStr + `","field":"desc"}`),
 			output: func() Query {
-				q := NewDateRangeQuery(&startDate, &endDate)
+				q := NewDateRangeQuery(startDate, endDate)
 				q.SetField("desc")
 				return q
 			}(),
@@ -159,7 +174,7 @@ func TestParseQuery(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(test.output, actual) {
-			t.Errorf("expected: %#v, got: %#v", test.output, actual)
+			t.Errorf("expected: %#v, got: %#v for %s", test.output, actual, string(test.input))
 		}
 	}
 }
@@ -207,7 +222,7 @@ func TestQueryValidate(t *testing.T) {
 		},
 		{
 			query: func() Query {
-				q := NewDateRangeQuery(&startDate, &endDate)
+				q := NewDateRangeQuery(startDate, endDate)
 				q.SetField("desc")
 				return q
 			}(),

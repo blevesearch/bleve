@@ -9,7 +9,11 @@
 
 package bleve
 
-import "github.com/blevesearch/bleve/search/query"
+import (
+	"time"
+
+	"github.com/blevesearch/bleve/search/query"
+)
 
 // NewBoolFieldQuery creates a new Query for boolean fields
 func NewBoolFieldQuery(val bool) *query.BoolFieldQuery {
@@ -41,7 +45,7 @@ func NewConjunctionQuery(conjuncts ...query.Query) *query.ConjunctionQuery {
 // Date strings are parsed using the DateTimeParser configured in the
 //  top-level config.QueryDateTimeParser
 // Either, but not both endpoints can be nil.
-func NewDateRangeQuery(start, end *string) *query.DateRangeQuery {
+func NewDateRangeQuery(start, end time.Time) *query.DateRangeQuery {
 	return query.NewDateRangeQuery(start, end)
 }
 
@@ -51,7 +55,7 @@ func NewDateRangeQuery(start, end *string) *query.DateRangeQuery {
 //  top-level config.QueryDateTimeParser
 // Either, but not both endpoints can be nil.
 // startInclusive and endInclusive control inclusion of the endpoints.
-func NewDateRangeInclusiveQuery(start, end *string, startInclusive, endInclusive *bool) *query.DateRangeQuery {
+func NewDateRangeInclusiveQuery(start, end time.Time, startInclusive, endInclusive *bool) *query.DateRangeQuery {
 	return query.NewDateRangeInclusiveQuery(start, end, startInclusive, endInclusive)
 }
 

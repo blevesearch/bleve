@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve/mapping"
 )
@@ -21,7 +22,10 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 	fivePointOh := 5.0
 	theTruth := true
 	theFalsehood := false
-	theDate := "2006-01-02T15:04:05Z07:00"
+	theDate, err := time.Parse(time.RFC3339, "2006-01-02T15:04:05Z")
+	if err != nil {
+		t.Fatal(err)
+	}
 	tests := []struct {
 		input   string
 		result  Query
@@ -443,13 +447,13 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				nil),
 		},
 		{
-			input:   `field:>"2006-01-02T15:04:05Z07:00"`,
+			input:   `field:>"2006-01-02T15:04:05Z"`,
 			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
 					func() Query {
-						q := NewDateRangeInclusiveQuery(&theDate, nil, &theFalsehood, nil)
+						q := NewDateRangeInclusiveQuery(theDate, time.Time{}, &theFalsehood, nil)
 						q.SetField("field")
 						return q
 					}(),
@@ -457,13 +461,13 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				nil),
 		},
 		{
-			input:   `field:>="2006-01-02T15:04:05Z07:00"`,
+			input:   `field:>="2006-01-02T15:04:05Z"`,
 			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
 					func() Query {
-						q := NewDateRangeInclusiveQuery(&theDate, nil, &theTruth, nil)
+						q := NewDateRangeInclusiveQuery(theDate, time.Time{}, &theTruth, nil)
 						q.SetField("field")
 						return q
 					}(),
@@ -471,13 +475,13 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				nil),
 		},
 		{
-			input:   `field:<"2006-01-02T15:04:05Z07:00"`,
+			input:   `field:<"2006-01-02T15:04:05Z"`,
 			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
 					func() Query {
-						q := NewDateRangeInclusiveQuery(nil, &theDate, nil, &theFalsehood)
+						q := NewDateRangeInclusiveQuery(time.Time{}, theDate, nil, &theFalsehood)
 						q.SetField("field")
 						return q
 					}(),
@@ -485,13 +489,13 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				nil),
 		},
 		{
-			input:   `field:<="2006-01-02T15:04:05Z07:00"`,
+			input:   `field:<="2006-01-02T15:04:05Z"`,
 			mapping: mapping.NewIndexMapping(),
 			result: NewBooleanQuery(
 				nil,
 				[]Query{
 					func() Query {
-						q := NewDateRangeInclusiveQuery(nil, &theDate, nil, &theTruth)
+						q := NewDateRangeInclusiveQuery(time.Time{}, theDate, nil, &theTruth)
 						q.SetField("field")
 						return q
 					}(),
