@@ -103,18 +103,17 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 	return nil, nil
 }
 
-func (r *UpsideDownCouchTermFieldReader) Advance(docID index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
+func (r *UpsideDownCouchTermFieldReader) Advance(docID index.IndexInternalID, preAlloced *index.TermFieldDoc) (rv *index.TermFieldDoc, err error) {
 	if r.iterator != nil {
 		if r.tfrNext == nil {
 			r.tfrNext = &TermFrequencyRow{}
 		}
 		tfr := InitTermFrequencyRow(r.tfrNext, r.term, r.field, docID, 0, 0)
-		keySize := tfr.KeySize()
-		if cap(r.keyBuf) < keySize {
-			r.keyBuf = make([]byte, keySize)
+		r.keyBuf, err = tfr.KeyAppendTo(r.keyBuf[:0])
+		if err != nil {
+			return nil, err
 		}
-		keySize, _ = tfr.KeyTo(r.keyBuf[0:keySize])
-		r.iterator.Seek(r.keyBuf[0:keySize])
+		r.iterator.Seek(r.keyBuf)
 		key, val, valid := r.iterator.Current()
 		if valid {
 			err := tfr.parseKDoc(key, r.term)
@@ -125,7 +124,7 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docID index.IndexInternalID, pr
 			if err != nil {
 				return nil, err
 			}
-			rv := preAlloced
+			rv = preAlloced
 			if rv == nil {
 				rv = &index.TermFieldDoc{}
 			}

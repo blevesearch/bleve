@@ -408,6 +408,15 @@ func (tfr *TermFrequencyRow) KeyTo(buf []byte) (int, error) {
 	return 3 + termLen + 1 + docLen, nil
 }
 
+func (tfr *TermFrequencyRow) KeyAppendTo(buf []byte) ([]byte, error) {
+	keySize := tfr.KeySize()
+	if cap(buf) < keySize {
+		buf = make([]byte, keySize)
+	}
+	actualSize, err := tfr.KeyTo(buf[0:keySize])
+	return buf[0:actualSize], err
+}
+
 func (tfr *TermFrequencyRow) DictionaryRowKey() []byte {
 	dr := NewDictionaryRow(tfr.term, tfr.field, 0)
 	return dr.Key()
