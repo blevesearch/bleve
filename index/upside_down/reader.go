@@ -240,12 +240,16 @@ func (r *UpsideDownCouchDocIDReader) Next() (index.IndexInternalID, error) {
 }
 
 func (r *UpsideDownCouchDocIDReader) Advance(docID index.IndexInternalID) (index.IndexInternalID, error) {
-	bir := NewBackIndexRow(docID, nil, nil)
-	r.iterator.Seek(bir.Key())
-	key, val, valid := r.iterator.Current()
-	r.onlyPos = sort.SearchStrings(r.only, string(docID))
 
 	if r.onlyMode {
+		r.onlyPos = sort.SearchStrings(r.only, string(docID))
+		if r.onlyPos >= len(r.only) {
+			// advanced to key after our last only key
+			return nil, nil
+		}
+		r.iterator.Seek(NewBackIndexRow([]byte(r.only[r.onlyPos]), nil, nil).Key())
+		key, val, valid := r.iterator.Current()
+
 		var rv index.IndexInternalID
 		for valid && r.onlyPos < len(r.only) {
 			br, err := NewBackIndexRowKV(key, val)
@@ -253,11 +257,16 @@ func (r *UpsideDownCouchDocIDReader) Advance(docID index.IndexInternalID) (index
 				return nil, err
 			}
 			if !bytes.Equal(br.doc, []byte(r.only[r.onlyPos])) {
-				ok := r.nextOnly()
-				if !ok {
+				// the only key we seek'd to didn't exist
+				// now look for the closest key that did exist in only
+				r.onlyPos = sort.SearchStrings(r.only, string(br.doc))
+				if r.onlyPos >= len(r.only) {
+					// advanced to key after our last only key
 					return nil, nil
 				}
+				// now seek to this new only key
 				r.iterator.Seek(NewBackIndexRow([]byte(r.only[r.onlyPos]), nil, nil).Key())
+				key, val, valid = r.iterator.Current()
 				continue
 			} else {
 				rv = append([]byte(nil), br.doc...)
@@ -272,6 +281,9 @@ func (r *UpsideDownCouchDocIDReader) Advance(docID index.IndexInternalID) (index
 			return rv, nil
 		}
 	} else {
+		bir := NewBackIndexRow(docID, nil, nil)
+		r.iterator.Seek(bir.Key())
+		key, val, valid := r.iterator.Current()
 		if valid {
 			br, err := NewBackIndexRowKV(key, val)
 			if err != nil {

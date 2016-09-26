@@ -306,3 +306,219 @@ func TestCrashBadBackIndexRow(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestIndexDocIdOnlyReader(t *testing.T) {
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := document.NewDocument("1")
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+
+	doc = document.NewDocument("3")
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+
+	doc = document.NewDocument("5")
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+
+	doc = document.NewDocument("7")
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+
+	doc = document.NewDocument("9")
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	onlyIds := []string{"1", "5", "9"}
+	reader, err := indexReader.DocIDReaderOnly(onlyIds)
+	if err != nil {
+		t.Errorf("Error accessing doc id reader: %v", err)
+	}
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	id, err := reader.Next()
+	count := uint64(0)
+	for id != nil {
+		count++
+		id, err = reader.Next()
+	}
+	if count != 3 {
+		t.Errorf("expected 3, got %d", count)
+	}
+
+	// try it again, but jump
+	reader2, err := indexReader.DocIDReaderOnly(onlyIds)
+	if err != nil {
+		t.Errorf("Error accessing doc id reader: %v", err)
+	}
+	defer func() {
+		err := reader2.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	id, err = reader2.Advance(index.IndexInternalID("5"))
+	if err != nil {
+		t.Error(err)
+	}
+	if !id.Equals(index.IndexInternalID("5")) {
+		t.Errorf("expected to find id '5', got '%s'", id)
+	}
+
+	id, err = reader2.Advance(index.IndexInternalID("a"))
+	if err != nil {
+		t.Error(err)
+	}
+	if id != nil {
+		t.Errorf("expected to find id '', got '%s'", id)
+	}
+
+	// some keys aren't actually there
+	onlyIds = []string{"0", "2", "4", "5", "6", "8", "a"}
+	reader3, err := indexReader.DocIDReaderOnly(onlyIds)
+	if err != nil {
+		t.Errorf("Error accessing doc id reader: %v", err)
+	}
+	defer func() {
+		err := reader3.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	id, err = reader3.Next()
+	count = uint64(0)
+	for id != nil {
+		count++
+		id, err = reader3.Next()
+	}
+	if count != 1 {
+		t.Errorf("expected 1, got %d", count)
+	}
+
+	// mix advance and next
+	onlyIds = []string{"0", "1", "3", "5", "6", "9"}
+	reader4, err := indexReader.DocIDReaderOnly(onlyIds)
+	if err != nil {
+		t.Errorf("Error accessing doc id reader: %v", err)
+	}
+	defer func() {
+		err := reader4.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	// first key is "1"
+	id, err = reader4.Next()
+	if err != nil {
+		t.Error(err)
+	}
+	if !id.Equals(index.IndexInternalID("1")) {
+		t.Errorf("expected to find id '1', got '%s'", id)
+	}
+
+	// advancing to key we dont have gives next
+	id, err = reader4.Advance(index.IndexInternalID("2"))
+	if err != nil {
+		t.Error(err)
+	}
+	if !id.Equals(index.IndexInternalID("3")) {
+		t.Errorf("expected to find id '3', got '%s'", id)
+	}
+
+	// next after advance works
+	id, err = reader4.Next()
+	if err != nil {
+		t.Error(err)
+	}
+	if !id.Equals(index.IndexInternalID("5")) {
+		t.Errorf("expected to find id '5', got '%s'", id)
+	}
+
+	// advancing to key we do have works
+	id, err = reader4.Advance(index.IndexInternalID("9"))
+	if err != nil {
+		t.Error(err)
+	}
+	if !id.Equals(index.IndexInternalID("9")) {
+		t.Errorf("expected to find id '9', got '%s'", id)
+	}
+
+	// advance backwards at end
+	id, err = reader4.Advance(index.IndexInternalID("4"))
+	if err != nil {
+		t.Error(err)
+	}
+	if !id.Equals(index.IndexInternalID("5")) {
+		t.Errorf("expected to find id '5', got '%s'", id)
+	}
+
+	// next after advance works
+	id, err = reader4.Next()
+	if err != nil {
+		t.Error(err)
+	}
+	if !id.Equals(index.IndexInternalID("9")) {
+		t.Errorf("expected to find id '9', got '%s'", id)
+	}
+
+	// advance backwards to key that exists, but not in only set
+	id, err = reader4.Advance(index.IndexInternalID("7"))
+	if err != nil {
+		t.Error(err)
+	}
+	if !id.Equals(index.IndexInternalID("9")) {
+		t.Errorf("expected to find id '9', got '%s'", id)
+	}
+
+}
