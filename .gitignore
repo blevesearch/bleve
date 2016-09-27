@@ -10,13 +10,7 @@
 query_string.y.go.tmp
 /analysis/token_filters/cld2/cld2-read-only
 /analysis/token_filters/cld2/libcld2_full.a
-/utils/bleve_create/bleve_create
-/utils/bleve_dump/bleve_dump
-/utils/bleve_index/bleve_index
-/utils/bleve_bulkindex/bleve_bulkindex
-/utils/bleve_index/index.bleve/
-/utils/bleve_query/bleve_query
-/utils/bleve_registry/bleve_registry
+/cmd/bleve/bleve
 vendor/**
 !vendor/manifest
 /y.output
