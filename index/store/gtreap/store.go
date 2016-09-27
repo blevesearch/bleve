@@ -17,6 +17,8 @@ package gtreap
 
 import (
 	"bytes"
+	"fmt"
+	"os"
 	"sync"
 
 	"github.com/blevesearch/bleve/index/store"
@@ -42,6 +44,14 @@ func itemCompare(a, b interface{}) int {
 }
 
 func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, error) {
+	path, ok := config["path"].(string)
+	if !ok {
+		return nil, fmt.Errorf("must specify path")
+	}
+	if path != "" {
+		return nil, os.ErrInvalid
+	}
+
 	rv := Store{
 		t:  gtreap.NewTreap(itemCompare),
 		mo: mo,

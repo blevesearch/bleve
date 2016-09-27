@@ -36,6 +36,7 @@ func TestMetricsStore(t *testing.T) {
 
 	s, err = New(nil, map[string]interface{}{
 		"kvStoreName_actual": gtreap.Name,
+		"path":               "",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -74,6 +75,7 @@ func TestMetricsStore(t *testing.T) {
 func TestErrors(t *testing.T) {
 	s, err := New(nil, map[string]interface{}{
 		"kvStoreName_actual": gtreap.Name,
+		"path":               "",
 	})
 	if err != nil {
 		t.Fatal(err)

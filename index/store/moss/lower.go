@@ -421,6 +421,9 @@ func InitMossStore(config map[string]interface{}, options moss.CollectionOptions
 	if !ok {
 		return nil, nil, nil, nil, fmt.Errorf("lower: missing path for InitMossStore config")
 	}
+	if path == "" {
+		return nil, nil, nil, nil, os.ErrInvalid
+	}
 
 	err := os.MkdirAll(path, 0700)
 	if err != nil {

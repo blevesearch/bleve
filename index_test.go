@@ -287,7 +287,7 @@ func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
 
 func TestInMemIndex(t *testing.T) {
 
-	index, err := New("", NewIndexMapping())
+	index, err := NewMemOnly(NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +298,7 @@ func TestInMemIndex(t *testing.T) {
 }
 
 func TestClosedIndex(t *testing.T) {
-	index, err := New("", NewIndexMapping())
+	index, err := NewMemOnly(NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1685,7 +1685,7 @@ func TestBug408(t *testing.T) {
 	indexMapping := NewIndexMapping()
 	indexMapping.DefaultMapping = docMapping
 
-	index, err := New("", indexMapping)
+	index, err := NewMemOnly(indexMapping)
 	if err != nil {
 		t.Fatal(err)
 	}

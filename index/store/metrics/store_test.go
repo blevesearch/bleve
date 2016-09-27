@@ -9,7 +9,10 @@ import (
 )
 
 func open(t *testing.T, mo store.MergeOperator) store.KVStore {
-	rv, err := New(mo, map[string]interface{}{"kvStoreName_actual": gtreap.Name})
+	rv, err := New(mo, map[string]interface{}{
+		"kvStoreName_actual": gtreap.Name,
+		"path":               "",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

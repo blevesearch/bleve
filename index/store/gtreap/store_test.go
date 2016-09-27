@@ -20,7 +20,9 @@ import (
 )
 
 func open(t *testing.T, mo store.MergeOperator) store.KVStore {
-	rv, err := New(mo, nil)
+	rv, err := New(mo, map[string]interface{}{
+		"path": "",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
