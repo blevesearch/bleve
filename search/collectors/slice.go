@@ -52,7 +52,10 @@ func (c *collectStoreSlice) Final(skip int, fixup collectorFixup) (search.Docume
 			return nil, err
 		}
 	}
-	return c.slice[skip:], nil
+	if skip <= len(c.slice) {
+		return c.slice[skip:], nil
+	}
+	return search.DocumentMatchCollection{}, nil
 }
 
 func (c *collectStoreSlice) Len() int {
