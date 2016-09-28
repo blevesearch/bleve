@@ -21,7 +21,12 @@ import (
 
 func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 	analysisQueue := index.NewAnalysisQueue(1)
-	i, err := upside_down.NewUpsideDownCouch(gtreap.Name, nil, analysisQueue)
+	i, err := upside_down.NewUpsideDownCouch(
+		gtreap.Name,
+		map[string]interface{}{
+			"path": "",
+		},
+		analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}

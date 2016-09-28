@@ -22,7 +22,6 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
-	"github.com/blevesearch/bleve/index/store/gtreap"
 	"github.com/blevesearch/bleve/index/upside_down"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
@@ -50,59 +49,11 @@ func indexStorePath(path string) string {
 	return path + string(os.PathSeparator) + storePath
 }
 
-func newMemIndex(indexType string, mapping *IndexMapping) (*indexImpl, error) {
-	rv := indexImpl{
-		path: "",
-		name: "mem",
-		m:    mapping,
-		meta: newIndexMeta(indexType, gtreap.Name, nil),
-	}
-
-	rv.stats = &IndexStat{i: &rv}
-
-	// open the index
-	indexTypeConstructor := registry.IndexTypeConstructorByName(rv.meta.IndexType)
-	if indexTypeConstructor == nil {
-		return nil, ErrorUnknownIndexType
-	}
-
-	var err error
-	rv.i, err = indexTypeConstructor(rv.meta.Storage, nil, Config.analysisQueue)
-	if err != nil {
-		return nil, err
-	}
-	err = rv.i.Open()
-	if err != nil {
-		return nil, err
-	}
-
-	// now persist the mapping
-	mappingBytes, err := json.Marshal(mapping)
-	if err != nil {
-		return nil, err
-	}
-	err = rv.i.SetInternal(mappingInternalKey, mappingBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	// mark the index as open
-	rv.mutex.Lock()
-	defer rv.mutex.Unlock()
-	rv.open = true
-	indexStats.Register(&rv)
-	return &rv, nil
-}
-
 func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
 	// first validate the mapping
 	err := mapping.Validate()
 	if err != nil {
 		return nil, err
-	}
-
-	if path == "" {
-		return newMemIndex(indexType, mapping)
 	}
 
 	if kvconfig == nil {
@@ -121,13 +72,17 @@ func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore
 	}
 	rv.stats = &IndexStat{i: &rv}
 	// at this point there is hope that we can be successful, so save index meta
-	err = rv.meta.Save(path)
-	if err != nil {
-		return nil, err
+	if path != "" {
+		err = rv.meta.Save(path)
+		if err != nil {
+			return nil, err
+		}
+		kvconfig["create_if_missing"] = true
+		kvconfig["error_if_exists"] = true
+		kvconfig["path"] = indexStorePath(path)
+	} else {
+		kvconfig["path"] = ""
 	}
-	kvconfig["create_if_missing"] = true
-	kvconfig["error_if_exists"] = true
-	kvconfig["path"] = indexStorePath(path)
 
 	// open the index
 	indexTypeConstructor := registry.IndexTypeConstructorByName(rv.meta.IndexType)

@@ -26,7 +26,11 @@ var twoDocIndex index.Index //= upside_down.NewUpsideDownCouch(inmem.MustOpen())
 func init() {
 	analysisQueue := index.NewAnalysisQueue(1)
 	var err error
-	twoDocIndex, err = upside_down.NewUpsideDownCouch(gtreap.Name, nil, analysisQueue)
+	twoDocIndex, err = upside_down.NewUpsideDownCouch(
+		gtreap.Name,
+		map[string]interface{}{
+			"path": "",
+		}, analysisQueue)
 	if err != nil {
 		panic(err)
 	}

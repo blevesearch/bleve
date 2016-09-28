@@ -210,6 +210,15 @@ func New(path string, mapping *IndexMapping) (Index, error) {
 	return newIndexUsing(path, mapping, Config.DefaultIndexType, Config.DefaultKVStore, nil)
 }
 
+// NewMemOnly creates a memory-only index.
+// The contents of the index is NOT persisted,
+// and will be lost once closed.
+// The provided mapping will be used for all
+// Index/Search operations.
+func NewMemOnly(mapping *IndexMapping) (Index, error) {
+	return newIndexUsing("", mapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+}
+
 // NewUsing creates index at the specified path,
 // which must not already exist.
 // The provided mapping will be used for all
