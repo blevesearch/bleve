@@ -224,6 +224,68 @@ func TestTop10ScoresSkip10(t *testing.T) {
 	}
 }
 
+func TestTop10ScoresSkip10Only9Hits(t *testing.T) {
+
+	// a stub search with only 10 matches
+	searcher := &stubSearcher{
+		matches: []*search.DocumentMatch{
+			&search.DocumentMatch{
+				IndexInternalID: index.IndexInternalID("a"),
+				Score:           11,
+			},
+			&search.DocumentMatch{
+				IndexInternalID: index.IndexInternalID("c"),
+				Score:           11,
+			},
+			&search.DocumentMatch{
+				IndexInternalID: index.IndexInternalID("e"),
+				Score:           11,
+			},
+			&search.DocumentMatch{
+				IndexInternalID: index.IndexInternalID("g"),
+				Score:           11,
+			},
+			&search.DocumentMatch{
+				IndexInternalID: index.IndexInternalID("i"),
+				Score:           11,
+			},
+			&search.DocumentMatch{
+				IndexInternalID: index.IndexInternalID("j"),
+				Score:           11,
+			},
+			&search.DocumentMatch{
+				IndexInternalID: index.IndexInternalID("k"),
+				Score:           11,
+			},
+			&search.DocumentMatch{
+				IndexInternalID: index.IndexInternalID("m"),
+				Score:           11,
+			},
+			&search.DocumentMatch{
+				IndexInternalID: index.IndexInternalID("n"),
+				Score:           11,
+			},
+		},
+	}
+
+	collector := NewTopNCollector(10, 10, search.SortOrder{&search.SortScore{Desc: true}})
+	err := collector.Collect(context.Background(), searcher, &stubReader{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	total := collector.Total()
+	if total != 9 {
+		t.Errorf("expected 9 total results, got %d", total)
+	}
+
+	results := collector.Results()
+
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results, got %d", len(results))
+	}
+}
+
 func TestPaginationSameScores(t *testing.T) {
 
 	// a stub search with more than 10 matches
