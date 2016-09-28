@@ -101,6 +101,9 @@ func (i *IndexReader) DocumentFieldTerms(id index.IndexInternalID, fields []stri
 	if err != nil {
 		return nil, err
 	}
+	if back == nil {
+		return nil, nil
+	}
 	rv := make(index.FieldTerms, len(fields))
 	fieldsMap := make(map[uint16]string, len(fields))
 	for _, f := range fields {
