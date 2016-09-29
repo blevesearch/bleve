@@ -7,7 +7,7 @@
 
 modern text indexing in go - [blevesearch.com](http://www.blevesearch.com/)
 
-Try out bleve live by [searching our wiki](http://wikisearch.blevesearch.com/search/).
+Try out bleve live by [searching the bleve website](http://www.blevesearch.com/search/?q=bleve).
 
 ## Features
 
