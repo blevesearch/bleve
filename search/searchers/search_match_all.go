@@ -29,6 +29,7 @@ func NewMatchAllSearcher(indexReader index.IndexReader, boost float64, explain b
 	}
 	count, err := indexReader.DocCount()
 	if err != nil {
+		_ = reader.Close()
 		return nil, err
 	}
 	scorer := scorers.NewConstantScorer(1.0, boost, explain)

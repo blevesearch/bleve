@@ -54,6 +54,11 @@ func (q *DisjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 		var err error
 		ss[in], err = disjunct.Searcher(i, m, explain)
 		if err != nil {
+			for _, searcher := range ss {
+				if searcher != nil {
+					_ = searcher.Close()
+				}
+			}
 			return nil, err
 		}
 	}

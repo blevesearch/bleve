@@ -345,23 +345,24 @@ func (s *BooleanSearcher) Count() uint64 {
 }
 
 func (s *BooleanSearcher) Close() error {
+	var err0, err1, err2 error
 	if s.mustSearcher != nil {
-		err := s.mustSearcher.Close()
-		if err != nil {
-			return err
-		}
+		err0 = s.mustSearcher.Close()
 	}
 	if s.shouldSearcher != nil {
-		err := s.shouldSearcher.Close()
-		if err != nil {
-			return err
-		}
+		err1 = s.shouldSearcher.Close()
 	}
 	if s.mustNotSearcher != nil {
-		err := s.mustNotSearcher.Close()
-		if err != nil {
-			return err
-		}
+		err2 = s.mustNotSearcher.Close()
+	}
+	if err0 != nil {
+		return err0
+	}
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
 	}
 	return nil
 }

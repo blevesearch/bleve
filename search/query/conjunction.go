@@ -48,6 +48,11 @@ func (q *ConjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 		var err error
 		ss[in], err = conjunct.Searcher(i, m, explain)
 		if err != nil {
+			for _, searcher := range ss {
+				if searcher != nil {
+					_ = searcher.Close()
+				}
+			}
 			return nil, err
 		}
 	}

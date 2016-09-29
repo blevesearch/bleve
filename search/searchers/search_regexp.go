@@ -41,10 +41,15 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp, fi
 
 	// enumerate all the terms in the range
 	qsearchers := make([]search.Searcher, 0, len(candidateTerms))
-
+	qsearchersClose := func() {
+		for _, searcher := range qsearchers {
+			_ = searcher.Close()
+		}
+	}
 	for _, cterm := range candidateTerms {
 		qsearcher, err := NewTermSearcher(indexReader, cterm, field, boost, explain)
 		if err != nil {
+			qsearchersClose()
 			return nil, err
 		}
 		qsearchers = append(qsearchers, qsearcher)
@@ -53,6 +58,7 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp, fi
 	// build disjunction searcher of these ranges
 	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, explain)
 	if err != nil {
+		qsearchersClose()
 		return nil, err
 	}
 
