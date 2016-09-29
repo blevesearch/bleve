@@ -15,6 +15,7 @@ import (
 
 type FieldCache struct {
 	fieldIndexes   map[string]uint16
+	indexFields    []string
 	lastFieldIndex int
 	mutex          sync.RWMutex
 }
@@ -28,11 +29,22 @@ func NewFieldCache() *FieldCache {
 
 func (f *FieldCache) AddExisting(field string, index uint16) {
 	f.mutex.Lock()
-	defer f.mutex.Unlock()
+	f.addLOCKED(field, index)
+	f.mutex.Unlock()
+}
+
+func (f *FieldCache) addLOCKED(field string, index uint16) uint16 {
 	f.fieldIndexes[field] = index
+	if len(f.indexFields) < int(index)+1 {
+		prevIndexFields := f.indexFields
+		f.indexFields = make([]string, int(index)+16)
+		copy(f.indexFields, prevIndexFields)
+	}
+	f.indexFields[int(index)] = field
 	if int(index) > f.lastFieldIndex {
 		f.lastFieldIndex = int(index)
 	}
+	return index
 }
 
 // FieldNamed returns the index of the field, and whether or not it existed
@@ -56,20 +68,16 @@ func (f *FieldCache) FieldNamed(field string, createIfMissing bool) (uint16, boo
 		return index, true
 	}
 	// assign next field id
-	index := uint16(f.lastFieldIndex + 1)
-	f.fieldIndexes[field] = index
-	f.lastFieldIndex = int(index)
+	index := f.addLOCKED(field, uint16(f.lastFieldIndex + 1))
 	f.mutex.Unlock()
 	return index, false
 }
 
-func (f *FieldCache) FieldIndexed(index uint16) string {
+func (f *FieldCache) FieldIndexed(index uint16) (field string) {
 	f.mutex.RLock()
-	defer f.mutex.RUnlock()
-	for fieldName, fieldIndex := range f.fieldIndexes {
-		if index == fieldIndex {
-			return fieldName
-		}
+	if int(index) < len(f.indexFields) {
+		field = f.indexFields[int(index)]
 	}
-	return ""
+	f.mutex.RUnlock()
+	return field
 }
