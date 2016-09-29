@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/blevesearch/bleve"
+	"github.com/blevesearch/bleve/search/query"
 	"github.com/spf13/cobra"
 )
 
@@ -55,27 +56,27 @@ var queryCmd = &cobra.Command{
 	},
 }
 
-func buildQuery(args []string) bleve.Query {
-	var query bleve.Query
+func buildQuery(args []string) query.Query {
+	var q query.Query
 	switch qtype {
 	case "prefix":
 		pquery := bleve.NewPrefixQuery(strings.Join(args[1:], " "))
 		if qfield != "" {
 			pquery.SetField(qfield)
 		}
-		query = pquery
+		q = pquery
 	case "term":
 		pquery := bleve.NewTermQuery(strings.Join(args[1:], " "))
 		if qfield != "" {
 			pquery.SetField(qfield)
 		}
-		query = pquery
+		q = pquery
 	default:
 		// build a search with the provided parameters
 		queryString := strings.Join(args[1:], " ")
-		query = bleve.NewQueryStringQuery(queryString)
+		q = bleve.NewQueryStringQuery(queryString)
 	}
-	return query
+	return q
 }
 
 func init() {

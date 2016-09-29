@@ -23,6 +23,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/collectors"
@@ -35,7 +36,7 @@ type indexImpl struct {
 	name  string
 	meta  *indexMeta
 	i     index.Index
-	m     *IndexMapping
+	m     mapping.IndexMapping
 	mutex sync.RWMutex
 	open  bool
 	stats *IndexStat
@@ -49,7 +50,7 @@ func indexStorePath(path string) string {
 	return path + string(os.PathSeparator) + storePath
 }
 
-func newIndexUsing(path string, mapping *IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
+func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (*indexImpl, error) {
 	// first validate the mapping
 	err := mapping.Validate()
 	if err != nil {
@@ -183,7 +184,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		return nil, err
 	}
 
-	var im IndexMapping
+	var im *mapping.IndexMappingImpl
 	err = json.Unmarshal(mappingBytes, &im)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing mapping JSON: %v\nmapping contents:\n%s", err, string(mappingBytes))
@@ -202,7 +203,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		return rv, err
 	}
 
-	rv.m = &im
+	rv.m = im
 	indexStats.Register(rv)
 	return rv, err
 }
@@ -219,7 +220,7 @@ func (i *indexImpl) Advanced() (index.Index, store.KVStore, error) {
 
 // Mapping returns the IndexMapping in use by this
 // Index.
-func (i *indexImpl) Mapping() *IndexMapping {
+func (i *indexImpl) Mapping() mapping.IndexMapping {
 	return i.m
 }
 
@@ -239,7 +240,7 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 	}
 
 	doc := document.NewDocument(id)
-	err = i.m.mapDocument(doc, data)
+	err = i.m.MapDocument(doc, data)
 	if err != nil {
 		return
 	}
@@ -387,7 +388,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			} else if facetRequest.DateTimeRanges != nil {
 				// build date range facet
 				facetBuilder := facets.NewDateTimeFacetBuilder(facetRequest.Field, facetRequest.Size)
-				dateTimeParser := i.m.dateTimeParserNamed(i.m.DefaultDateTimeParser)
+				dateTimeParser := i.m.DateTimeParserNamed("")
 				for _, dr := range facetRequest.DateTimeRanges {
 					dr.ParseDates(dateTimeParser)
 					facetBuilder.AddRange(dr.Name, dr.Start, dr.End)

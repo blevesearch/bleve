@@ -15,11 +15,6 @@ const (
 	ErrorIndexPathDoesNotExist
 	ErrorIndexMetaMissing
 	ErrorIndexMetaCorrupt
-	ErrorDisjunctionFewerThanMinClauses
-	ErrorBooleanQueryNeedsMustOrShouldOrNotMust
-	ErrorNumericQueryNoBounds
-	ErrorPhraseQueryNoTerms
-	ErrorUnknownQueryType
 	ErrorUnknownStorageType
 	ErrorIndexClosed
 	ErrorAliasMulti
@@ -38,20 +33,15 @@ func (e Error) Error() string {
 }
 
 var errorMessages = map[Error]string{
-	ErrorIndexPathExists:                        "cannot create new index, path already exists",
-	ErrorIndexPathDoesNotExist:                  "cannot open index, path does not exist",
-	ErrorIndexMetaMissing:                       "cannot open index, metadata missing",
-	ErrorIndexMetaCorrupt:                       "cannot open index, metadata corrupt",
-	ErrorDisjunctionFewerThanMinClauses:         "disjunction query has fewer than the minimum number of clauses to satisfy",
-	ErrorBooleanQueryNeedsMustOrShouldOrNotMust: "boolean query must contain at least one must or should or not must clause",
-	ErrorNumericQueryNoBounds:                   "numeric range query must specify min or max",
-	ErrorPhraseQueryNoTerms:                     "phrase query must contain at least one term",
-	ErrorUnknownQueryType:                       "unknown query type",
-	ErrorUnknownStorageType:                     "unknown storage type",
-	ErrorIndexClosed:                            "index is closed",
-	ErrorAliasMulti:                             "cannot perform single index operation on multiple index alias",
-	ErrorAliasEmpty:                             "cannot perform operation on empty alias",
-	ErrorUnknownIndexType:                       "unknown index type",
-	ErrorEmptyID:                                "document ID cannot be empty",
-	ErrorIndexReadInconsistency:                 "index read inconsistency detected",
+	ErrorIndexPathExists:        "cannot create new index, path already exists",
+	ErrorIndexPathDoesNotExist:  "cannot open index, path does not exist",
+	ErrorIndexMetaMissing:       "cannot open index, metadata missing",
+	ErrorIndexMetaCorrupt:       "cannot open index, metadata corrupt",
+	ErrorUnknownStorageType:     "unknown storage type",
+	ErrorIndexClosed:            "index is closed",
+	ErrorAliasMulti:             "cannot perform single index operation on multiple index alias",
+	ErrorAliasEmpty:             "cannot perform operation on empty alias",
+	ErrorUnknownIndexType:       "unknown index type",
+	ErrorEmptyID:                "document ID cannot be empty",
+	ErrorIndexReadInconsistency: "index read inconsistency detected",
 }

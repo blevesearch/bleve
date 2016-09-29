@@ -15,7 +15,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/blevesearch/bleve/analysis/datetime_parsers/datetime_optional"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/gtreap"
 	"github.com/blevesearch/bleve/index/upside_down"
@@ -31,7 +30,6 @@ type configuration struct {
 	DefaultKVStore         string
 	DefaultMemKVStore      string
 	DefaultIndexType       string
-	QueryDateTimeParser    string
 	SlowSearchLogThreshold time.Duration
 	analysisQueue          *index.AnalysisQueue
 }
@@ -67,9 +65,6 @@ func init() {
 
 	// default index
 	Config.DefaultIndexType = upside_down.Name
-
-	// default query date time parser
-	Config.QueryDateTimeParser = datetime_optional.Name
 
 	bootDuration := time.Since(bootStart)
 	bleveExpVar.Add("bootDuration", int64(bootDuration))

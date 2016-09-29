@@ -11,6 +11,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/numeric_util"
 	"github.com/blevesearch/bleve/search"
 )
@@ -1269,7 +1270,7 @@ func (i *stubIndex) Close() error {
 	return i.err
 }
 
-func (i *stubIndex) Mapping() *IndexMapping {
+func (i *stubIndex) Mapping() mapping.IndexMapping {
 	return nil
 }
 

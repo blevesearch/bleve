@@ -15,11 +15,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/highlight/highlighters/ansi"
 )
 
-var mapping *IndexMapping
+var indexMapping mapping.IndexMapping
 var example_index Index
 var err error
 
@@ -43,8 +44,8 @@ func TestMain(m *testing.M) {
 }
 
 func ExampleNew() {
-	mapping = NewIndexMapping()
-	example_index, err = New("path_to_index", mapping)
+	indexMapping = NewIndexMapping()
+	example_index, err = New("path_to_index", indexMapping)
 	if err != nil {
 		panic(err)
 	}
@@ -371,11 +372,11 @@ func ExampleNewSearchRequest() {
 }
 
 func ExampleNewBooleanQuery() {
-	must := make([]Query, 1)
-	mustNot := make([]Query, 1)
-	must[0] = NewMatchQuery("one")
-	mustNot[0] = NewMatchQuery("great")
-	query := NewBooleanQuery(must, nil, mustNot)
+	must := NewMatchQuery("one")
+	mustNot := NewMatchQuery("great")
+	query := NewBooleanQuery()
+	query.AddMust(must)
+	query.AddMustNot(mustNot)
 	searchRequest := NewSearchRequest(query)
 	searchResults, err := example_index.Search(searchRequest)
 	if err != nil {
@@ -387,40 +388,10 @@ func ExampleNewBooleanQuery() {
 	// document id 1
 }
 
-func ExampleNewBooleanQueryMinShould() {
-	should := make([]Query, 2)
-	should[0] = NewMatchQuery("great")
-	should[1] = NewMatchQuery("one")
-	query := NewBooleanQueryMinShould(nil, should, nil, float64(2))
-	searchRequest := NewSearchRequest(query)
-	searchResults, err := example_index.Search(searchRequest)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(searchResults.Hits[0].ID)
-	// Output:
-	// document id 2
-}
-
 func ExampleNewConjunctionQuery() {
-	conjuncts := make([]Query, 2)
-	conjuncts[0] = NewMatchQuery("great")
-	conjuncts[1] = NewMatchQuery("one")
-	query := NewConjunctionQuery(conjuncts)
-	searchRequest := NewSearchRequest(query)
-	searchResults, err := example_index.Search(searchRequest)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(searchResults.Hits[0].ID)
-	// Output:
-	// document id 2
-}
-
-func ExampleNewMatchQueryOperator() {
-	query := NewMatchQueryOperator("great one", MatchQueryOperatorAnd)
+	conjunct1 := NewMatchQuery("great")
+	conjunct2 := NewMatchQuery("one")
+	query := NewConjunctionQuery(conjunct1, conjunct2)
 	searchRequest := NewSearchRequest(query)
 	searchResults, err := example_index.Search(searchRequest)
 	if err != nil {
@@ -433,10 +404,9 @@ func ExampleNewMatchQueryOperator() {
 }
 
 func ExampleNewDisjunctionQuery() {
-	disjuncts := make([]Query, 2)
-	disjuncts[0] = NewMatchQuery("great")
-	disjuncts[1] = NewMatchQuery("named")
-	query := NewDisjunctionQuery(disjuncts)
+	disjunct1 := NewMatchQuery("great")
+	disjunct2 := NewMatchQuery("named")
+	query := NewDisjunctionQuery(disjunct1, disjunct2)
 	searchRequest := NewSearchRequest(query)
 	searchResults, err := example_index.Search(searchRequest)
 	if err != nil {
@@ -446,66 +416,6 @@ func ExampleNewDisjunctionQuery() {
 	fmt.Println(len(searchResults.Hits))
 	// Output:
 	// 2
-}
-
-func ExampleNewDisjunctionQueryMin() {
-	disjuncts := make([]Query, 2)
-	disjuncts[0] = NewMatchQuery("great")
-	disjuncts[1] = NewMatchQuery("named")
-	query := NewDisjunctionQueryMin(disjuncts, float64(2))
-	searchRequest := NewSearchRequest(query)
-	searchResults, err := example_index.Search(searchRequest)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(len(searchResults.Hits))
-	// Output:
-	// 0
-}
-
-// Examples for Mapping related functions
-
-func ExampleDocumentMapping_AddSubDocumentMapping() {
-	// adds a document mapping for a property in a document
-	// useful for mapping nested documents
-	documentMapping := NewDocumentMapping()
-	subDocumentMapping := NewDocumentMapping()
-	documentMapping.AddSubDocumentMapping("Property", subDocumentMapping)
-
-	fmt.Println(len(documentMapping.Properties))
-	// Output:
-	// 1
-}
-
-func ExampleDocumentMapping_AddFieldMapping() {
-	// you can only add field mapping to those properties which already have a document mapping
-	documentMapping := NewDocumentMapping()
-	subDocumentMapping := NewDocumentMapping()
-	documentMapping.AddSubDocumentMapping("Property", subDocumentMapping)
-
-	fieldMapping := NewTextFieldMapping()
-	fieldMapping.Analyzer = "en"
-	subDocumentMapping.AddFieldMapping(fieldMapping)
-
-	fmt.Println(len(documentMapping.Properties["Property"].Fields))
-	// Output:
-	// 1
-}
-
-func ExampleDocumentMapping_AddFieldMappingsAt() {
-	// you can only add field mapping to those properties which already have a document mapping
-	documentMapping := NewDocumentMapping()
-	subDocumentMapping := NewDocumentMapping()
-	documentMapping.AddSubDocumentMapping("NestedProperty", subDocumentMapping)
-
-	fieldMapping := NewTextFieldMapping()
-	fieldMapping.Analyzer = "en"
-	documentMapping.AddFieldMappingsAt("NestedProperty", fieldMapping)
-
-	fmt.Println(len(documentMapping.Properties["NestedProperty"].Fields))
-	// Output:
-	// 1
 }
 
 func ExampleSearchRequest_SortBy() {

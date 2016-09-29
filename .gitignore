@@ -14,5 +14,6 @@ query_string.y.go.tmp
 vendor/**
 !vendor/manifest
 /y.output
+/search/query/y.output
 *.test
 tags

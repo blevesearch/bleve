@@ -29,7 +29,9 @@ import (
 	"github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/null"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/query"
 )
 
 func TestCrud(t *testing.T) {
@@ -345,33 +347,13 @@ func TestClosedIndex(t *testing.T) {
 }
 
 type slowQuery struct {
-	actual Query
+	actual query.Query
 	delay  time.Duration
 }
 
-func (s *slowQuery) Boost() float64 {
-	return s.actual.Boost()
-}
-
-func (s *slowQuery) SetBoost(b float64) Query {
-	return s.actual.SetBoost(b)
-}
-
-func (s *slowQuery) Field() string {
-	return s.actual.Field()
-}
-
-func (s *slowQuery) SetField(f string) Query {
-	return s.actual.SetField(f)
-}
-
-func (s *slowQuery) Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error) {
+func (s *slowQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	time.Sleep(s.delay)
 	return s.actual.Searcher(i, m, explain)
-}
-
-func (s *slowQuery) Validate() error {
-	return s.actual.Validate()
 }
 
 func TestSlowSearch(t *testing.T) {
@@ -1130,7 +1112,8 @@ func TestTermVectorArrayPositions(t *testing.T) {
 	}
 
 	// repeat search for this document in Messages field
-	tq2 := NewTermQuery("third").SetField("Messages")
+	tq2 := NewTermQuery("third")
+	tq2.SetField("Messages")
 	tsr = NewSearchRequest(tq2)
 	results, err = index.Search(tsr)
 	if err != nil {
@@ -1297,9 +1280,9 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	}
 
 	// search range across all docs
-	start := now.Add(-4 * time.Hour).Format(time.RFC3339)
-	end := now.Format(time.RFC3339)
-	sreq := NewSearchRequest(NewDateRangeQuery(&start, &end))
+	start := now.Add(-4 * time.Hour)
+	end := now
+	sreq := NewSearchRequest(NewDateRangeQuery(start, end))
 	sres, err := index.Search(sreq)
 	if err != nil {
 		t.Fatal(err)
@@ -1309,9 +1292,9 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	}
 
 	// search range includes only oldest
-	start = now.Add(-4 * time.Hour).Format(time.RFC3339)
-	end = now.Add(-121 * time.Minute).Format(time.RFC3339)
-	sreq = NewSearchRequest(NewDateRangeQuery(&start, &end))
+	start = now.Add(-4 * time.Hour)
+	end = now.Add(-121 * time.Minute)
+	sreq = NewSearchRequest(NewDateRangeQuery(start, end))
 	sres, err = index.Search(sreq)
 	if err != nil {
 		t.Fatal(err)
@@ -1324,9 +1307,9 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	}
 
 	// search range includes only newest
-	start = now.Add(-61 * time.Minute).Format(time.RFC3339)
-	end = now.Format(time.RFC3339)
-	sreq = NewSearchRequest(NewDateRangeQuery(&start, &end))
+	start = now.Add(-61 * time.Minute)
+	end = now
+	sreq = NewSearchRequest(NewDateRangeQuery(start, end))
 	sres, err = index.Search(sreq)
 	if err != nil {
 		t.Fatal(err)
@@ -1380,7 +1363,8 @@ func TestDocumentFieldArrayPositionsBug295(t *testing.T) {
 	}
 
 	// search for it in the messages field
-	tq := NewTermQuery("bleve").SetField("Messages")
+	tq := NewTermQuery("bleve")
+	tq.SetField("Messages")
 	tsr := NewSearchRequest(tq)
 	results, err := index.Search(tsr)
 	if err != nil {
@@ -1454,7 +1438,9 @@ func TestBooleanFieldMappingIssue109(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sreq := NewSearchRequest(NewBoolFieldQuery(true).SetField("Bool"))
+	q := NewBoolFieldQuery(true)
+	q.SetField("Bool")
+	sreq := NewSearchRequest(q)
 	sres, err := index.Search(sreq)
 	if err != nil {
 		t.Fatal(err)
@@ -1463,7 +1449,9 @@ func TestBooleanFieldMappingIssue109(t *testing.T) {
 		t.Errorf("expected 1 results, got %d", sres.Total)
 	}
 
-	sreq = NewSearchRequest(NewBoolFieldQuery(false).SetField("Bool"))
+	q = NewBoolFieldQuery(false)
+	q.SetField("Bool")
+	sreq = NewSearchRequest(q)
 	sres, err = index.Search(sreq)
 	if err != nil {
 		t.Fatal(err)
@@ -1717,7 +1705,8 @@ func TestBug408(t *testing.T) {
 		t.Fatalf("expected %d documents in index, got %d", numToTest, cnt)
 	}
 
-	q := NewTermQuery(matchUserID).SetField("user_id")
+	q := NewTermQuery(matchUserID)
+	q.SetField("user_id")
 	searchReq := NewSearchRequestOptions(q, math.MaxInt32, 0, false)
 	results, err := index.Search(searchReq)
 	if err != nil {

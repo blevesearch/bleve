@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/blevesearch/bleve"
+	"github.com/blevesearch/bleve/mapping"
 )
 
 type GetIndexHandler struct {
@@ -42,9 +42,9 @@ func (h *GetIndexHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	rv := struct {
-		Status  string              `json:"status"`
-		Name    string              `json:"name"`
-		Mapping *bleve.IndexMapping `json:"mapping"`
+		Status  string               `json:"status"`
+		Name    string               `json:"name"`
+		Mapping mapping.IndexMapping `json:"mapping"`
 	}{
 		Status:  "ok",
 		Name:    indexName,

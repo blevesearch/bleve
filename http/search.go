@@ -16,6 +16,7 @@ import (
 	"net/http"
 
 	"github.com/blevesearch/bleve"
+	"github.com/blevesearch/bleve/search/query"
 )
 
 // SearchHandler can handle search requests sent over HTTP
@@ -66,10 +67,12 @@ func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	logger.Printf("parsed request %#v", searchRequest)
 
 	// validate the query
-	err = searchRequest.Query.Validate()
-	if err != nil {
-		showError(w, req, fmt.Sprintf("error validating query: %v", err), 400)
-		return
+	if srqv, ok := searchRequest.Query.(query.ValidatableQuery); ok {
+		err = srqv.Validate()
+		if err != nil {
+			showError(w, req, fmt.Sprintf("error validating query: %v", err), 400)
+			return
+		}
 	}
 
 	// execute the query

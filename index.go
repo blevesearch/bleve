@@ -13,6 +13,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve/mapping"
 	"golang.org/x/net/context"
 )
 
@@ -35,7 +36,7 @@ func (b *Batch) Index(id string, data interface{}) error {
 		return ErrorEmptyID
 	}
 	doc := document.NewDocument(id)
-	err := b.index.Mapping().mapDocument(doc, data)
+	err := b.index.Mapping().MapDocument(doc, data)
 	if err != nil {
 		return err
 	}
@@ -91,11 +92,6 @@ func (b *Batch) Reset() {
 // Index() takes an input value, deduces a DocumentMapping for its type,
 // assigns string paths to its fields or values then applies field mappings on
 // them.
-//
-// If the value is a []byte, the indexer attempts to convert it to something
-// else using the ByteArrayConverter registered as
-// IndexMapping.ByteArrayConverter. By default, it interprets the value as a
-// JSON payload and unmarshals it to map[string]interface{}.
 //
 // The DocumentMapping used to index a value is deduced by the following rules:
 // 1) If value implements Classifier interface, resolve the mapping from Type().
@@ -178,7 +174,7 @@ type Index interface {
 
 	Close() error
 
-	Mapping() *IndexMapping
+	Mapping() mapping.IndexMapping
 
 	Stats() *IndexStat
 	StatsMap() map[string]interface{}
@@ -197,16 +193,10 @@ type Index interface {
 	Advanced() (index.Index, store.KVStore, error)
 }
 
-// A Classifier is an interface describing any object
-// which knows how to identify its own type.
-type Classifier interface {
-	Type() string
-}
-
 // New index at the specified path, must not exist.
 // The provided mapping will be used for all
 // Index/Search operations.
-func New(path string, mapping *IndexMapping) (Index, error) {
+func New(path string, mapping mapping.IndexMapping) (Index, error) {
 	return newIndexUsing(path, mapping, Config.DefaultIndexType, Config.DefaultKVStore, nil)
 }
 
@@ -215,7 +205,7 @@ func New(path string, mapping *IndexMapping) (Index, error) {
 // and will be lost once closed.
 // The provided mapping will be used for all
 // Index/Search operations.
-func NewMemOnly(mapping *IndexMapping) (Index, error) {
+func NewMemOnly(mapping mapping.IndexMapping) (Index, error) {
 	return newIndexUsing("", mapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
 }
 
@@ -227,7 +217,7 @@ func NewMemOnly(mapping *IndexMapping) (Index, error) {
 // The specified kvstore implementation will be used
 // and the provided kvconfig will be passed to its
 // constructor.
-func NewUsing(path string, mapping *IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (Index, error) {
+func NewUsing(path string, mapping mapping.IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (Index, error) {
 	return newIndexUsing(path, mapping, indexType, kvstore, kvconfig)
 }
 

@@ -10,327 +10,172 @@
 package bleve
 
 import (
-	"encoding/json"
-	"fmt"
+	"time"
 
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/query"
 )
 
-// A Query represents a description of the type
-// and parameters for a query into the index.
-type Query interface {
-	Boost() float64
-	SetBoost(b float64) Query
-	Field() string
-	SetField(f string) Query
-	Searcher(i index.IndexReader, m *IndexMapping, explain bool) (search.Searcher, error)
-	Validate() error
+// NewBoolFieldQuery creates a new Query for boolean fields
+func NewBoolFieldQuery(val bool) *query.BoolFieldQuery {
+	return query.NewBoolFieldQuery(val)
 }
 
-// ParseQuery deserializes a JSON representation of
-// a Query object.
-func ParseQuery(input []byte) (Query, error) {
-	var tmp map[string]interface{}
-	err := json.Unmarshal(input, &tmp)
-	if err != nil {
-		return nil, err
-	}
-	_, isMatchQuery := tmp["match"]
-	_, hasFuzziness := tmp["fuzziness"]
-	if hasFuzziness && !isMatchQuery {
-		var rv fuzzyQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, isTermQuery := tmp["term"]
-	if isTermQuery {
-		var rv termQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	if isMatchQuery {
-		var rv matchQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, isMatchPhraseQuery := tmp["match_phrase"]
-	if isMatchPhraseQuery {
-		var rv matchPhraseQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, hasMust := tmp["must"]
-	_, hasShould := tmp["should"]
-	_, hasMustNot := tmp["must_not"]
-	if hasMust || hasShould || hasMustNot {
-		var rv booleanQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, hasTerms := tmp["terms"]
-	if hasTerms {
-		var rv phraseQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, hasConjuncts := tmp["conjuncts"]
-	if hasConjuncts {
-		var rv conjunctionQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, hasDisjuncts := tmp["disjuncts"]
-	if hasDisjuncts {
-		var rv disjunctionQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-
-	_, hasSyntaxQuery := tmp["query"]
-	if hasSyntaxQuery {
-		var rv queryStringQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, hasMin := tmp["min"]
-	_, hasMax := tmp["max"]
-	if hasMin || hasMax {
-		var rv numericRangeQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, hasStart := tmp["start"]
-	_, hasEnd := tmp["end"]
-	if hasStart || hasEnd {
-		var rv dateRangeQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, hasPrefix := tmp["prefix"]
-	if hasPrefix {
-		var rv prefixQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, hasRegexp := tmp["regexp"]
-	if hasRegexp {
-		var rv regexpQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, hasWildcard := tmp["wildcard"]
-	if hasWildcard {
-		var rv wildcardQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, hasMatchAll := tmp["match_all"]
-	if hasMatchAll {
-		var rv matchAllQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, hasMatchNone := tmp["match_none"]
-	if hasMatchNone {
-		var rv matchNoneQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	_, hasDocIds := tmp["ids"]
-	if hasDocIds {
-		var rv docIDQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		if rv.Boost() == 0 {
-			rv.SetBoost(1)
-		}
-		return &rv, nil
-	}
-	return nil, ErrorUnknownQueryType
+// NewBooleanQuery creates a compound Query composed
+// of several other Query objects.
+// These other query objects are added using the
+// AddMust() AddShould() and AddMustNot() methods.
+// Result documents must satisfy ALL of the
+// must Queries.
+// Result documents must satisfy NONE of the must not
+// Queries.
+// Result documents that ALSO satisfy any of the should
+// Queries will score higher.
+func NewBooleanQuery() *query.BooleanQuery {
+	return query.NewBooleanQuery(nil, nil, nil)
 }
 
-// expandQuery traverses the input query tree and returns a new tree where
-// query string queries have been expanded into base queries. Returned tree may
-// reference queries from the input tree or new queries.
-func expandQuery(m *IndexMapping, query Query) (Query, error) {
-	var expand func(query Query) (Query, error)
-	var expandSlice func(queries []Query) ([]Query, error)
-
-	expandSlice = func(queries []Query) ([]Query, error) {
-		expanded := []Query{}
-		for _, q := range queries {
-			exp, err := expand(q)
-			if err != nil {
-				return nil, err
-			}
-			expanded = append(expanded, exp)
-		}
-		return expanded, nil
-	}
-
-	expand = func(query Query) (Query, error) {
-		switch query.(type) {
-		case *queryStringQuery:
-			q := query.(*queryStringQuery)
-			parsed, err := parseQuerySyntax(q.Query)
-			if err != nil {
-				return nil, fmt.Errorf("could not parse '%s': %s", q.Query, err)
-			}
-			return expand(parsed)
-		case *conjunctionQuery:
-			q := *query.(*conjunctionQuery)
-			children, err := expandSlice(q.Conjuncts)
-			if err != nil {
-				return nil, err
-			}
-			q.Conjuncts = children
-			return &q, nil
-		case *disjunctionQuery:
-			q := *query.(*disjunctionQuery)
-			children, err := expandSlice(q.Disjuncts)
-			if err != nil {
-				return nil, err
-			}
-			q.Disjuncts = children
-			return &q, nil
-		case *booleanQuery:
-			q := *query.(*booleanQuery)
-			var err error
-			q.Must, err = expand(q.Must)
-			if err != nil {
-				return nil, err
-			}
-			q.Should, err = expand(q.Should)
-			if err != nil {
-				return nil, err
-			}
-			q.MustNot, err = expand(q.MustNot)
-			if err != nil {
-				return nil, err
-			}
-			return &q, nil
-		case *phraseQuery:
-			q := *query.(*phraseQuery)
-			children, err := expandSlice(q.termQueries)
-			if err != nil {
-				return nil, err
-			}
-			q.termQueries = children
-			return &q, nil
-		default:
-			return query, nil
-		}
-	}
-	return expand(query)
+// NewConjunctionQuery creates a new compound Query.
+// Result documents must satisfy all of the queries.
+func NewConjunctionQuery(conjuncts ...query.Query) *query.ConjunctionQuery {
+	return query.NewConjunctionQuery(conjuncts)
 }
 
-// DumpQuery returns a string representation of the query tree, where query
-// string queries have been expanded into base queries. The output format is
-// meant for debugging purpose and may change in the future.
-func DumpQuery(m *IndexMapping, query Query) (string, error) {
-	q, err := expandQuery(m, query)
-	if err != nil {
-		return "", err
-	}
-	data, err := json.MarshalIndent(q, "", "  ")
-	return string(data), err
+// NewDateRangeQuery creates a new Query for ranges
+// of date values.
+// Date strings are parsed using the DateTimeParser configured in the
+//  top-level config.QueryDateTimeParser
+// Either, but not both endpoints can be nil.
+func NewDateRangeQuery(start, end time.Time) *query.DateRangeQuery {
+	return query.NewDateRangeQuery(start, end)
+}
+
+// NewDateRangeInclusiveQuery creates a new Query for ranges
+// of date values.
+// Date strings are parsed using the DateTimeParser configured in the
+//  top-level config.QueryDateTimeParser
+// Either, but not both endpoints can be nil.
+// startInclusive and endInclusive control inclusion of the endpoints.
+func NewDateRangeInclusiveQuery(start, end time.Time, startInclusive, endInclusive *bool) *query.DateRangeQuery {
+	return query.NewDateRangeInclusiveQuery(start, end, startInclusive, endInclusive)
+}
+
+// NewDisjunctionQuery creates a new compound Query.
+// Result documents satisfy at least one Query.
+func NewDisjunctionQuery(disjuncts ...query.Query) *query.DisjunctionQuery {
+	return query.NewDisjunctionQuery(disjuncts)
+}
+
+// NewDocIDQuery creates a new Query object returning indexed documents among
+// the specified set. Combine it with ConjunctionQuery to restrict the scope of
+// other queries output.
+func NewDocIDQuery(ids []string) *query.DocIDQuery {
+	return query.NewDocIDQuery(ids)
+}
+
+// NewFuzzyQuery creates a new Query which finds
+// documents containing terms within a specific
+// fuzziness of the specified term.
+// The default fuzziness is 2.
+//
+// The current implementation uses Levenshtein edit
+// distance as the fuzziness metric.
+func NewFuzzyQuery(term string) *query.FuzzyQuery {
+	return query.NewFuzzyQuery(term)
+}
+
+// NewMatchAllQuery creates a Query which will
+// match all documents in the index.
+func NewMatchAllQuery() *query.MatchAllQuery {
+	return query.NewMatchAllQuery()
+}
+
+// NewMatchNoneQuery creates a Query which will not
+// match any documents in the index.
+func NewMatchNoneQuery() *query.MatchNoneQuery {
+	return query.NewMatchNoneQuery()
+}
+
+// NewMatchPhraseQuery creates a new Query object
+// for matching phrases in the index.
+// An Analyzer is chosen based on the field.
+// Input text is analyzed using this analyzer.
+// Token terms resulting from this analysis are
+// used to build a search phrase.  Result documents
+// must match this phrase. Queried field must have been indexed with
+// IncludeTermVectors set to true.
+func NewMatchPhraseQuery(matchPhrase string) *query.MatchPhraseQuery {
+	return query.NewMatchPhraseQuery(matchPhrase)
+}
+
+// NewMatchQuery creates a Query for matching text.
+// An Analyzer is chosen based on the field.
+// Input text is analyzed using this analyzer.
+// Token terms resulting from this analysis are
+// used to perform term searches.  Result documents
+// must satisfy at least one of these term searches.
+func NewMatchQuery(match string) *query.MatchQuery {
+	return query.NewMatchQuery(match)
+}
+
+// NewNumericRangeQuery creates a new Query for ranges
+// of numeric values.
+// Either, but not both endpoints can be nil.
+// The minimum value is inclusive.
+// The maximum value is exclusive.
+func NewNumericRangeQuery(min, max *float64) *query.NumericRangeQuery {
+	return query.NewNumericRangeQuery(min, max)
+}
+
+// NewNumericRangeInclusiveQuery creates a new Query for ranges
+// of numeric values.
+// Either, but not both endpoints can be nil.
+// Control endpoint inclusion with inclusiveMin, inclusiveMax.
+func NewNumericRangeInclusiveQuery(min, max *float64, minInclusive, maxInclusive *bool) *query.NumericRangeQuery {
+	return query.NewNumericRangeInclusiveQuery(min, max, minInclusive, maxInclusive)
+}
+
+// NewPhraseQuery creates a new Query for finding
+// exact term phrases in the index.
+// The provided terms must exist in the correct
+// order, at the correct index offsets, in the
+// specified field. Queried field must have been indexed with
+// IncludeTermVectors set to true.
+func NewPhraseQuery(terms []string, field string) *query.PhraseQuery {
+	return query.NewPhraseQuery(terms, field)
+}
+
+// NewPrefixQuery creates a new Query which finds
+// documents containing terms that start with the
+// specified prefix.
+func NewPrefixQuery(prefix string) *query.PrefixQuery {
+	return query.NewPrefixQuery(prefix)
+}
+
+// NewRegexpQuery creates a new Query which finds
+// documents containing terms that match the
+// specified regular expression.
+func NewRegexpQuery(regexp string) *query.RegexpQuery {
+	return query.NewRegexpQuery(regexp)
+}
+
+// NewQueryStringQuery creates a new Query used for
+// finding documents that satisfy a query string.  The
+// query string is a small query language for humans.
+func NewQueryStringQuery(q string) *query.QueryStringQuery {
+	return query.NewQueryStringQuery(q)
+}
+
+// NewTermQuery creates a new Query for finding an
+// exact term match in the index.
+func NewTermQuery(term string) *query.TermQuery {
+	return query.NewTermQuery(term)
+}
+
+// NewWildcardQuery creates a new Query which finds
+// documents containing terms that match the
+// specified wildcard.  In the wildcard pattern '*'
+// will match any sequence of 0 or more characters,
+// and '?' will match any single character.
+func NewWildcardQuery(wildcard string) *query.WildcardQuery {
+	return query.NewWildcardQuery(wildcard)
 }

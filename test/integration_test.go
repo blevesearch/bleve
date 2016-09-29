@@ -24,6 +24,7 @@ import (
 
 	// we must explicitly include any functionality we plan on testing
 	_ "github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
+	"github.com/blevesearch/bleve/mapping"
 
 	// allow choosing alternate kvstores
 	_ "github.com/blevesearch/bleve/config"
@@ -77,7 +78,7 @@ func runTestDir(t *testing.T, dir, datasetName string) {
 		t.Errorf("error reading mapping: %v", err)
 		return
 	}
-	var mapping bleve.IndexMapping
+	var mapping mapping.IndexMappingImpl
 	err = json.Unmarshal(mappingBytes, &mapping)
 	if err != nil {
 		t.Errorf("error unmarshalling mapping: %v", err)

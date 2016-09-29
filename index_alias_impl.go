@@ -19,6 +19,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -259,7 +260,7 @@ func (i *indexAliasImpl) Close() error {
 	return nil
 }
 
-func (i *indexAliasImpl) Mapping() *IndexMapping {
+func (i *indexAliasImpl) Mapping() mapping.IndexMapping {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
