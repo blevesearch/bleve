@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/numeric_util"
+	"github.com/blevesearch/bleve/numeric"
 )
 
 const DefaultDateTimeIndexingOptions = StoreField | IndexField
@@ -28,7 +28,7 @@ type DateTimeField struct {
 	name              string
 	arrayPositions    []uint64
 	options           IndexingOptions
-	value             numeric_util.PrefixCoded
+	value             numeric.PrefixCoded
 	numPlainTextBytes uint64
 }
 
@@ -59,7 +59,7 @@ func (n *DateTimeField) Analyze() (int, analysis.TokenFrequencies) {
 
 		shift := DefaultDateTimePrecisionStep
 		for shift < 64 {
-			shiftEncoded, err := numeric_util.NewPrefixCodedInt64(original, shift)
+			shiftEncoded, err := numeric.NewPrefixCodedInt64(original, shift)
 			if err != nil {
 				break
 			}
@@ -117,7 +117,7 @@ func NewDateTimeField(name string, arrayPositions []uint64, dt time.Time) (*Date
 func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, dt time.Time, options IndexingOptions) (*DateTimeField, error) {
 	if canRepresent(dt) {
 		dtInt64 := dt.UnixNano()
-		prefixCoded := numeric_util.MustNewPrefixCodedInt64(dtInt64, 0)
+		prefixCoded := numeric.MustNewPrefixCodedInt64(dtInt64, 0)
 		return &DateTimeField{
 			name:           name,
 			arrayPositions: arrayPositions,

@@ -14,7 +14,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index/upsidedown"
 )
 
 const metaFilename = "index_meta.json"
@@ -48,7 +48,7 @@ func openIndexMeta(path string) (*indexMeta, error) {
 		return nil, ErrorIndexMetaCorrupt
 	}
 	if im.IndexType == "" {
-		im.IndexType = upside_down.Name
+		im.IndexType = upsidedown.Name
 	}
 	return &im, nil
 }

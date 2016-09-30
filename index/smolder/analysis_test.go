@@ -3,7 +3,7 @@ package smolder
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/analysis/analyzers/standard_analyzer"
+	"github.com/blevesearch/bleve/analysis/analyzers/standard"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/null"
@@ -12,7 +12,7 @@ import (
 
 func TestAnalysisBug328(t *testing.T) {
 	cache := registry.NewCache()
-	analyzer, err := cache.AnalyzerNamed(standard_analyzer.Name)
+	analyzer, err := cache.AnalyzerNamed(standard.Name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestAnalysisBug328(t *testing.T) {
 func BenchmarkAnalyze(b *testing.B) {
 
 	cache := registry.NewCache()
-	analyzer, err := cache.AnalyzerNamed(standard_analyzer.Name)
+	analyzer, err := cache.AnalyzerNamed(standard.Name)
 	if err != nil {
 		b.Fatal(err)
 	}

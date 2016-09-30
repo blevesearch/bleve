@@ -14,7 +14,7 @@ import (
 	"math"
 
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/numeric_util"
+	"github.com/blevesearch/bleve/numeric"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -46,11 +46,11 @@ func NewNumericRangeSearcher(indexReader index.IndexReader, min *float64, max *f
 		inclusiveMax = &defaultInclusiveMax
 	}
 	// find all the ranges
-	minInt64 := numeric_util.Float64ToInt64(*min)
+	minInt64 := numeric.Float64ToInt64(*min)
 	if !*inclusiveMin && minInt64 != math.MaxInt64 {
 		minInt64++
 	}
-	maxInt64 := numeric_util.Float64ToInt64(*max)
+	maxInt64 := numeric.Float64ToInt64(*max)
 	if !*inclusiveMax && maxInt64 != math.MinInt64 {
 		maxInt64--
 	}
@@ -200,8 +200,8 @@ func splitInt64Range(minBound, maxBound int64, precisionStep uint) termRanges {
 
 func newRange(minBound, maxBound int64, shift uint) *termRange {
 	maxBound |= (int64(1) << shift) - int64(1)
-	minBytes := numeric_util.MustNewPrefixCodedInt64(minBound, shift)
-	maxBytes := numeric_util.MustNewPrefixCodedInt64(maxBound, shift)
+	minBytes := numeric.MustNewPrefixCodedInt64(minBound, shift)
+	maxBytes := numeric.MustNewPrefixCodedInt64(maxBound, shift)
 	return newRangeBytes(minBytes, maxBytes)
 }
 

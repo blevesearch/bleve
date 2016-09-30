@@ -17,7 +17,7 @@ import (
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/gtreap"
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index/upsidedown"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search/highlight/highlighters/html"
 )
@@ -64,7 +64,7 @@ func init() {
 	Config.DefaultMemKVStore = gtreap.Name
 
 	// default index
-	Config.DefaultIndexType = upside_down.Name
+	Config.DefaultIndexType = upsidedown.Name
 
 	bootDuration := time.Since(bootStart)
 	bleveExpVar.Add("bootDuration", int64(bootDuration))

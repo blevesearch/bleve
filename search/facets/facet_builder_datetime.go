@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/numeric_util"
+	"github.com/blevesearch/bleve/numeric"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -58,7 +58,7 @@ func (fb *DateTimeFacetBuilder) Update(ft index.FieldTerms) {
 	if ok {
 		for _, term := range terms {
 			// only consider the values which are shifted 0
-			prefixCoded := numeric_util.PrefixCoded(term)
+			prefixCoded := numeric.PrefixCoded(term)
 			shift, err := prefixCoded.Shift()
 			if err == nil && shift == 0 {
 				i64, err := prefixCoded.Int64()

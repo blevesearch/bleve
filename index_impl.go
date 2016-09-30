@@ -22,7 +22,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index/upsidedown"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
@@ -135,7 +135,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 
 	// backwards compatibility if index type is missing
 	if rv.meta.IndexType == "" {
-		rv.meta.IndexType = upside_down.Name
+		rv.meta.IndexType = upsidedown.Name
 	}
 
 	storeConfig := rv.meta.Config

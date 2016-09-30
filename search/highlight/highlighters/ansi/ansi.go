@@ -14,29 +14,29 @@ import (
 
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search/highlight"
-	ansi_formatter "github.com/blevesearch/bleve/search/highlight/fragment_formatters/ansi"
-	simple_fragmenter "github.com/blevesearch/bleve/search/highlight/fragmenters/simple"
-	simple_highlighter "github.com/blevesearch/bleve/search/highlight/highlighters/simple"
+	ansiFormatter "github.com/blevesearch/bleve/search/highlight/format/ansi"
+	simpleFragmenter "github.com/blevesearch/bleve/search/highlight/fragmenters/simple"
+	simpleHighlighter "github.com/blevesearch/bleve/search/highlight/highlighters/simple"
 )
 
 const Name = "ansi"
 
 func Constructor(config map[string]interface{}, cache *registry.Cache) (highlight.Highlighter, error) {
 
-	fragmenter, err := cache.FragmenterNamed(simple_fragmenter.Name)
+	fragmenter, err := cache.FragmenterNamed(simpleFragmenter.Name)
 	if err != nil {
 		return nil, fmt.Errorf("error building fragmenter: %v", err)
 	}
 
-	formatter, err := cache.FragmentFormatterNamed(ansi_formatter.Name)
+	formatter, err := cache.FragmentFormatterNamed(ansiFormatter.Name)
 	if err != nil {
 		return nil, fmt.Errorf("error building fragment formatter: %v", err)
 	}
 
-	return simple_highlighter.NewHighlighter(
+	return simpleHighlighter.NewHighlighter(
 			fragmenter,
 			formatter,
-			simple_highlighter.DefaultSeparator),
+			simpleHighlighter.DefaultSeparator),
 		nil
 }
 

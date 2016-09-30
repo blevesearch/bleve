@@ -14,11 +14,11 @@ import (
 	"regexp"
 
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/tokenizers/regexp_tokenizer"
+	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizers/regexp"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/gtreap"
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index/upsidedown"
 )
 
 var twoDocIndex index.Index //= upside_down.NewUpsideDownCouch(inmem.MustOpen())
@@ -26,7 +26,7 @@ var twoDocIndex index.Index //= upside_down.NewUpsideDownCouch(inmem.MustOpen())
 func init() {
 	analysisQueue := index.NewAnalysisQueue(1)
 	var err error
-	twoDocIndex, err = upside_down.NewUpsideDownCouch(
+	twoDocIndex, err = upsidedown.NewUpsideDownCouch(
 		gtreap.Name,
 		map[string]interface{}{
 			"path": "",
@@ -48,7 +48,7 @@ func init() {
 
 // create a simpler analyzer which will support these tests
 var testAnalyzer = &analysis.Analyzer{
-	Tokenizer: regexp_tokenizer.NewRegexpTokenizer(regexp.MustCompile(`\w+`)),
+	Tokenizer: regexpTokenizer.NewRegexpTokenizer(regexp.MustCompile(`\w+`)),
 }
 
 // sets up some mock data used in many tests in this package

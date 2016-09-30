@@ -15,7 +15,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/blevesearch/bleve/numeric_util"
+	"github.com/blevesearch/bleve/numeric"
 )
 
 var HighTerm = strings.Repeat(string([]byte{0xff}), 10)
@@ -348,7 +348,7 @@ func (s *SortField) filterTermsByType(terms []string) []string {
 		allTermsPrefixCoded := true
 		var termsWithShiftZero []string
 		for _, term := range terms {
-			valid, shift := numeric_util.ValidPrefixCodedTerm(term)
+			valid, shift := numeric.ValidPrefixCodedTerm(term)
 			if valid && shift == 0 {
 				termsWithShiftZero = append(termsWithShiftZero, term)
 			} else if !valid {
@@ -361,7 +361,7 @@ func (s *SortField) filterTermsByType(terms []string) []string {
 	} else if stype == SortFieldAsNumber || stype == SortFieldAsDate {
 		var termsWithShiftZero []string
 		for _, term := range terms {
-			valid, shift := numeric_util.ValidPrefixCodedTerm(term)
+			valid, shift := numeric.ValidPrefixCodedTerm(term)
 			if valid && shift == 0 {
 				termsWithShiftZero = append(termsWithShiftZero)
 			}
