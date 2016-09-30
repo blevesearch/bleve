@@ -92,5 +92,5 @@ import (
 
 	// index types
 	_ "github.com/blevesearch/bleve/index/smolder"
-	_ "github.com/blevesearch/bleve/index/upside_down"
+	_ "github.com/blevesearch/bleve/index/upsidedown"
 )

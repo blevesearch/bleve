@@ -9,7 +9,7 @@
 
 // +build leveldb
 
-package upside_down
+package upsidedown
 
 import (
 	"testing"

@@ -9,7 +9,7 @@
 
 // +build rocksdb
 
-package upside_down
+package upsidedown
 
 import (
 	"testing"

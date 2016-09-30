@@ -16,7 +16,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/gtreap"
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index/upsidedown"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -28,7 +28,7 @@ func TestTermSearcher(t *testing.T) {
 	var queryExplain = true
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	i, err := upside_down.NewUpsideDownCouch(
+	i, err := upsidedown.NewUpsideDownCouch(
 		gtreap.Name,
 		map[string]interface{}{
 			"path": "",

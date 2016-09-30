@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index/upsidedown"
 )
 
 // DebugDocumentHandler allows you to debug the index content
@@ -70,7 +70,7 @@ func (h *DebugDocumentHandler) ServeHTTP(w http.ResponseWriter, req *http.Reques
 		case error:
 			showError(w, req, fmt.Sprintf("error debugging document: %v", row), 500)
 			return
-		case upside_down.UpsideDownCouchRow:
+		case upsidedown.UpsideDownCouchRow:
 			tmp := struct {
 				Key []byte `json:"key"`
 				Val []byte `json:"val"`

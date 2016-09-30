@@ -17,7 +17,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/blevesearch/bleve/index/upside_down"
+	"github.com/blevesearch/bleve/index/upsidedown"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +41,7 @@ var dumpFieldsCmd = &cobra.Command{
 			switch rowOrErr := rowOrErr.(type) {
 			case error:
 				return fmt.Errorf("error dumping: %v", rowOrErr)
-			case upside_down.UpsideDownCouchRow:
+			case upsidedown.UpsideDownCouchRow:
 				fmt.Printf("%v\n", rowOrErr)
 				fmt.Printf("Key:   % -100x\nValue: % -100x\n\n", rowOrErr.Key(), rowOrErr.Value())
 			}

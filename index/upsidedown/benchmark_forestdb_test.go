@@ -9,7 +9,7 @@
 
 // +build forestdb
 
-package upside_down
+package upsidedown
 
 import (
 	"os"

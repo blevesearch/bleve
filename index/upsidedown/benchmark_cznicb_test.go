@@ -9,7 +9,7 @@
 
 // +build cznicb
 
-package upside_down
+package upsidedown
 
 import (
 	"testing"
