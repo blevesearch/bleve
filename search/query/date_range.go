@@ -18,7 +18,7 @@ import (
 	"github.com/blevesearch/bleve/analysis/datetime/optional"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/numeric_util"
+	"github.com/blevesearch/bleve/numeric"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searchers"
@@ -130,10 +130,10 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 	min := math.Inf(-1)
 	max := math.Inf(1)
 	if !q.Start.IsZero() {
-		min = numeric_util.Int64ToFloat64(q.Start.UnixNano())
+		min = numeric.Int64ToFloat64(q.Start.UnixNano())
 	}
 	if !q.End.IsZero() {
-		max = numeric_util.Int64ToFloat64(q.End.UnixNano())
+		max = numeric.Int64ToFloat64(q.End.UnixNano())
 	}
 
 	return &min, &max, nil

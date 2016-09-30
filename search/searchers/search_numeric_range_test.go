@@ -13,12 +13,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blevesearch/bleve/numeric_util"
+	"github.com/blevesearch/bleve/numeric"
 )
 
 func TestSplitRange(t *testing.T) {
-	min := numeric_util.Float64ToInt64(1.0)
-	max := numeric_util.Float64ToInt64(5.0)
+	min := numeric.Float64ToInt64(1.0)
+	max := numeric.Float64ToInt64(5.0)
 	ranges := splitInt64Range(min, max, 4)
 	enumerated := ranges.Enumerate()
 	if len(enumerated) != 135 {

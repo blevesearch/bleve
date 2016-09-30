@@ -13,7 +13,7 @@ import (
 	"sort"
 
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/numeric_util"
+	"github.com/blevesearch/bleve/numeric"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -57,12 +57,12 @@ func (fb *NumericFacetBuilder) Update(ft index.FieldTerms) {
 	if ok {
 		for _, term := range terms {
 			// only consider the values which are shifted 0
-			prefixCoded := numeric_util.PrefixCoded(term)
+			prefixCoded := numeric.PrefixCoded(term)
 			shift, err := prefixCoded.Shift()
 			if err == nil && shift == 0 {
 				i64, err := prefixCoded.Int64()
 				if err == nil {
-					f64 := numeric_util.Int64ToFloat64(i64)
+					f64 := numeric.Int64ToFloat64(i64)
 
 					// look at each of the ranges for a match
 					for rangeName, r := range fb.ranges {

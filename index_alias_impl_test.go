@@ -12,7 +12,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/numeric_util"
+	"github.com/blevesearch/bleve/numeric"
 	"github.com/blevesearch/bleve/search"
 )
 
@@ -378,8 +378,8 @@ func TestIndexAliasEmpty(t *testing.T) {
 }
 
 func TestIndexAliasMulti(t *testing.T) {
-	score1, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(1.0), 0)
-	score2, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(2.0), 0)
+	score1, _ := numeric.NewPrefixCodedInt64(numeric.Float64ToInt64(1.0), 0)
+	score2, _ := numeric.NewPrefixCodedInt64(numeric.Float64ToInt64(2.0), 0)
 	ei1Count := uint64(7)
 	ei1 := &stubIndex{
 		err:            nil,
@@ -519,8 +519,8 @@ func TestIndexAliasMulti(t *testing.T) {
 
 // TestMultiSearchNoError
 func TestMultiSearchNoError(t *testing.T) {
-	score1, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(1.0), 0)
-	score2, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(2.0), 0)
+	score1, _ := numeric.NewPrefixCodedInt64(numeric.Float64ToInt64(1.0), 0)
+	score2, _ := numeric.NewPrefixCodedInt64(numeric.Float64ToInt64(2.0), 0)
 	ei1 := &stubIndex{err: nil, searchResult: &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
@@ -708,8 +708,8 @@ func TestMultiSearchSecondPage(t *testing.T) {
 // 2. no searchers finish before the timeout
 // 3. no searches finish before cancellation
 func TestMultiSearchTimeout(t *testing.T) {
-	score1, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(1.0), 0)
-	score2, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(2.0), 0)
+	score1, _ := numeric.NewPrefixCodedInt64(numeric.Float64ToInt64(1.0), 0)
+	score2, _ := numeric.NewPrefixCodedInt64(numeric.Float64ToInt64(2.0), 0)
 	ei1 := &stubIndex{
 		name: "ei1",
 		checkRequest: func(req *SearchRequest) error {
@@ -837,9 +837,9 @@ func TestMultiSearchTimeout(t *testing.T) {
 // TestMultiSearchTimeoutPartial tests the case where some indexes exceed
 // the timeout, while others complete successfully
 func TestMultiSearchTimeoutPartial(t *testing.T) {
-	score1, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(1.0), 0)
-	score2, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(2.0), 0)
-	score3, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(3.0), 0)
+	score1, _ := numeric.NewPrefixCodedInt64(numeric.Float64ToInt64(1.0), 0)
+	score2, _ := numeric.NewPrefixCodedInt64(numeric.Float64ToInt64(2.0), 0)
+	score3, _ := numeric.NewPrefixCodedInt64(numeric.Float64ToInt64(3.0), 0)
 	ei1 := &stubIndex{
 		name: "ei1",
 		err:  nil,
@@ -950,10 +950,10 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 }
 
 func TestIndexAliasMultipleLayer(t *testing.T) {
-	score1, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(1.0), 0)
-	score2, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(2.0), 0)
-	score3, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(3.0), 0)
-	score4, _ := numeric_util.NewPrefixCodedInt64(numeric_util.Float64ToInt64(4.0), 0)
+	score1, _ := numeric.NewPrefixCodedInt64(numeric.Float64ToInt64(1.0), 0)
+	score2, _ := numeric.NewPrefixCodedInt64(numeric.Float64ToInt64(2.0), 0)
+	score3, _ := numeric.NewPrefixCodedInt64(numeric.Float64ToInt64(3.0), 0)
+	score4, _ := numeric.NewPrefixCodedInt64(numeric.Float64ToInt64(4.0), 0)
 	ei1 := &stubIndex{
 		name: "ei1",
 		err:  nil,
