@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/analyzers/standard_analyzer"
-	"github.com/blevesearch/bleve/analysis/tokenizers/regexp_tokenizer"
+	"github.com/blevesearch/bleve/analysis/analyzers/standard"
+	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizers/regexp"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/boltdb"
@@ -29,7 +29,7 @@ import (
 )
 
 var testAnalyzer = &analysis.Analyzer{
-	Tokenizer: regexp_tokenizer.NewRegexpTokenizer(regexp.MustCompile(`\w+`)),
+	Tokenizer: regexpTokenizer.NewRegexpTokenizer(regexp.MustCompile(`\w+`)),
 }
 
 func TestIndexOpenReopen(t *testing.T) {
@@ -1305,7 +1305,7 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 func BenchmarkBatch(b *testing.B) {
 
 	cache := registry.NewCache()
-	analyzer, err := cache.AnalyzerNamed(standard_analyzer.Name)
+	analyzer, err := cache.AnalyzerNamed(standard.Name)
 	if err != nil {
 		b.Fatal(err)
 	}

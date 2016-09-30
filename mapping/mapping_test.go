@@ -16,7 +16,7 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/analysis/tokenizers/exception"
-	"github.com/blevesearch/bleve/analysis/tokenizers/regexp_tokenizer"
+	"github.com/blevesearch/bleve/analysis/tokenizers/regexp"
 	"github.com/blevesearch/bleve/document"
 )
 
@@ -263,7 +263,7 @@ func TestMappingForPath(t *testing.T) {
 func TestMappingWithTokenizerDeps(t *testing.T) {
 
 	tokNoDeps := map[string]interface{}{
-		"type":   regexp_tokenizer.Name,
+		"type":   regexp.Name,
 		"regexp": "",
 	}
 

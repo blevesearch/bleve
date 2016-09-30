@@ -14,7 +14,7 @@ import (
 	"regexp"
 
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/tokenizers/regexp_tokenizer"
+	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizers/regexp"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/gtreap"
@@ -48,7 +48,7 @@ func init() {
 
 // create a simpler analyzer which will support these tests
 var testAnalyzer = &analysis.Analyzer{
-	Tokenizer: regexp_tokenizer.NewRegexpTokenizer(regexp.MustCompile(`\w+`)),
+	Tokenizer: regexpTokenizer.NewRegexpTokenizer(regexp.MustCompile(`\w+`)),
 }
 
 // sets up some mock data used in many tests in this package

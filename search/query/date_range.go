@@ -15,7 +15,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/blevesearch/bleve/analysis/datetime_parsers/datetime_optional"
+	"github.com/blevesearch/bleve/analysis/datetime/optional"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/numeric_util"
@@ -25,7 +25,7 @@ import (
 )
 
 // QueryDateTimeParser controls the default query date time parser
-var QueryDateTimeParser = datetime_optional.Name
+var QueryDateTimeParser = optional.Name
 
 // QueryDateTimeFormat controls the format when Marshaling to JSON
 var QueryDateTimeFormat = time.RFC3339

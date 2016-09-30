@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/analyzers/standard_analyzer"
+	"github.com/blevesearch/bleve/analysis/analyzers/standard"
 	"github.com/blevesearch/bleve/registry"
 )
 
@@ -12,7 +12,7 @@ func BenchmarkAnalysis(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 
 		cache := registry.NewCache()
-		analyzer, err := cache.AnalyzerNamed(standard_analyzer.Name)
+		analyzer, err := cache.AnalyzerNamed(standard.Name)
 		if err != nil {
 			b.Fatal(err)
 		}

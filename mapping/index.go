@@ -14,8 +14,8 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/analyzers/standard_analyzer"
-	"github.com/blevesearch/bleve/analysis/datetime_parsers/datetime_optional"
+	"github.com/blevesearch/bleve/analysis/analyzers/standard"
+	"github.com/blevesearch/bleve/analysis/datetime/optional"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/registry"
 )
@@ -25,8 +25,8 @@ var MappingJSONStrict = false
 const defaultTypeField = "_type"
 const defaultType = "_default"
 const defaultField = "_all"
-const defaultAnalyzer = standard_analyzer.Name
-const defaultDateTimeParser = datetime_optional.Name
+const defaultAnalyzer = standard.Name
+const defaultDateTimeParser = optional.Name
 
 // An IndexMappingImpl controls how objects are placed
 // into an index.

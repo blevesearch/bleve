@@ -26,7 +26,7 @@ import (
 
 	"strconv"
 
-	"github.com/blevesearch/bleve/analysis/analyzers/keyword_analyzer"
+	"github.com/blevesearch/bleve/analysis/analyzers/keyword"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/mapping"
@@ -974,7 +974,7 @@ func TestKeywordSearchBug207(t *testing.T) {
 	}()
 
 	f := NewTextFieldMapping()
-	f.Analyzer = keyword_analyzer.Name
+	f.Analyzer = keyword.Name
 
 	m := NewIndexMapping()
 	m.DefaultMapping = NewDocumentMapping()
