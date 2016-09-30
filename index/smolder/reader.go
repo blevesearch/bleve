@@ -122,6 +122,9 @@ func (r *SmolderingCouchTermFieldReader) Advance(docID index.IndexInternalID, pr
 }
 
 func (r *SmolderingCouchTermFieldReader) Close() error {
+	if r.indexReader != nil {
+		atomic.AddUint64(&r.indexReader.index.stats.termSearchersFinished, uint64(1))
+	}
 	if r.iterator != nil {
 		return r.iterator.Close()
 	}
@@ -255,6 +258,5 @@ func (r *SmolderingCouchDocIDReader) Advance(docID index.IndexInternalID) (index
 }
 
 func (r *SmolderingCouchDocIDReader) Close() error {
-	atomic.AddUint64(&r.indexReader.index.stats.termSearchersFinished, uint64(1))
 	return r.iterator.Close()
 }
