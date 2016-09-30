@@ -16,7 +16,7 @@ func (b *Batch) Delete(key []byte) {
 }
 
 func (b *Batch) Merge(key, val []byte) {
-	b.s.TimerBatchMerge.Time(func() {
+	b.s.timerBatchMerge.Time(func() {
 		b.o.Merge(key, val)
 	})
 }

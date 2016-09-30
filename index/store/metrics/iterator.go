@@ -8,13 +8,13 @@ type Iterator struct {
 }
 
 func (i *Iterator) Seek(x []byte) {
-	i.s.TimerIteratorSeek.Time(func() {
+	i.s.timerIteratorSeek.Time(func() {
 		i.o.Seek(x)
 	})
 }
 
 func (i *Iterator) Next() {
-	i.s.TimerIteratorNext.Time(func() {
+	i.s.timerIteratorNext.Time(func() {
 		i.o.Next()
 	})
 }

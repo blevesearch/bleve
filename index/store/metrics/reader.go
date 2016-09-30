@@ -8,7 +8,7 @@ type Reader struct {
 }
 
 func (r *Reader) Get(key []byte) (v []byte, err error) {
-	r.s.TimerReaderGet.Time(func() {
+	r.s.timerReaderGet.Time(func() {
 		v, err = r.o.Get(key)
 		if err != nil {
 			r.s.AddError("Reader.Get", err, key)
@@ -18,7 +18,7 @@ func (r *Reader) Get(key []byte) (v []byte, err error) {
 }
 
 func (r *Reader) MultiGet(keys [][]byte) (vals [][]byte, err error) {
-	r.s.TimerReaderMultiGet.Time(func() {
+	r.s.timerReaderMultiGet.Time(func() {
 		vals, err = r.o.MultiGet(keys)
 		if err != nil {
 			r.s.AddError("Reader.MultiGet", err, nil)
@@ -28,14 +28,14 @@ func (r *Reader) MultiGet(keys [][]byte) (vals [][]byte, err error) {
 }
 
 func (r *Reader) PrefixIterator(prefix []byte) (i store.KVIterator) {
-	r.s.TimerReaderPrefixIterator.Time(func() {
+	r.s.timerReaderPrefixIterator.Time(func() {
 		i = &Iterator{s: r.s, o: r.o.PrefixIterator(prefix)}
 	})
 	return
 }
 
 func (r *Reader) RangeIterator(start, end []byte) (i store.KVIterator) {
-	r.s.TimerReaderRangeIterator.Time(func() {
+	r.s.timerReaderRangeIterator.Time(func() {
 		i = &Iterator{s: r.s, o: r.o.RangeIterator(start, end)}
 	})
 	return

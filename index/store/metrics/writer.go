@@ -36,7 +36,7 @@ func (w *Writer) ExecuteBatch(b store.KVBatch) (err error) {
 	if !ok {
 		return fmt.Errorf("wrong type of batch")
 	}
-	w.s.TimerWriterExecuteBatch.Time(func() {
+	w.s.timerWriterExecuteBatch.Time(func() {
 		err = w.o.ExecuteBatch(batch.o)
 		if err != nil {
 			w.s.AddError("Writer.ExecuteBatch", err, nil)
