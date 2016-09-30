@@ -23,14 +23,14 @@ func (s *stats) statsMap() map[string]interface{} {
 	ms := map[string]interface{}{}
 
 	ms["metrics"] = map[string]interface{}{
-		"reader_get":             TimerMap(s.s.TimerReaderGet),
-		"reader_multi_get":       TimerMap(s.s.TimerReaderMultiGet),
-		"reader_prefix_iterator": TimerMap(s.s.TimerReaderPrefixIterator),
-		"reader_range_iterator":  TimerMap(s.s.TimerReaderRangeIterator),
-		"writer_execute_batch":   TimerMap(s.s.TimerWriterExecuteBatch),
-		"iterator_seek":          TimerMap(s.s.TimerIteratorSeek),
-		"iterator_next":          TimerMap(s.s.TimerIteratorNext),
-		"batch_merge":            TimerMap(s.s.TimerBatchMerge),
+		"reader_get":             TimerMap(s.s.timerReaderGet),
+		"reader_multi_get":       TimerMap(s.s.timerReaderMultiGet),
+		"reader_prefix_iterator": TimerMap(s.s.timerReaderPrefixIterator),
+		"reader_range_iterator":  TimerMap(s.s.timerReaderRangeIterator),
+		"writer_execute_batch":   TimerMap(s.s.timerWriterExecuteBatch),
+		"iterator_seek":          TimerMap(s.s.timerIteratorSeek),
+		"iterator_next":          TimerMap(s.s.timerIteratorNext),
+		"batch_merge":            TimerMap(s.s.timerBatchMerge),
 	}
 
 	if o, ok := s.s.o.(store.KVStoreStats); ok {

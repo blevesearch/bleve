@@ -32,14 +32,14 @@ const Name = "metrics"
 type Store struct {
 	o store.KVStore
 
-	TimerReaderGet            metrics.Timer
-	TimerReaderMultiGet       metrics.Timer
-	TimerReaderPrefixIterator metrics.Timer
-	TimerReaderRangeIterator  metrics.Timer
-	TimerWriterExecuteBatch   metrics.Timer
-	TimerIteratorSeek         metrics.Timer
-	TimerIteratorNext         metrics.Timer
-	TimerBatchMerge           metrics.Timer
+	timerReaderGet            metrics.Timer
+	timerReaderMultiGet       metrics.Timer
+	timerReaderPrefixIterator metrics.Timer
+	timerReaderRangeIterator  metrics.Timer
+	timerWriterExecuteBatch   metrics.Timer
+	timerIteratorSeek         metrics.Timer
+	timerIteratorNext         metrics.Timer
+	timerBatchMerge           metrics.Timer
 
 	m      sync.Mutex // Protects the fields that follow.
 	errors *list.List // Capped list of StoreError's.
@@ -73,14 +73,14 @@ func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, 
 	rv := &Store{
 		o: kvs,
 
-		TimerReaderGet:            metrics.NewTimer(),
-		TimerReaderMultiGet:       metrics.NewTimer(),
-		TimerReaderPrefixIterator: metrics.NewTimer(),
-		TimerReaderRangeIterator:  metrics.NewTimer(),
-		TimerWriterExecuteBatch:   metrics.NewTimer(),
-		TimerIteratorSeek:         metrics.NewTimer(),
-		TimerIteratorNext:         metrics.NewTimer(),
-		TimerBatchMerge:           metrics.NewTimer(),
+		timerReaderGet:            metrics.NewTimer(),
+		timerReaderMultiGet:       metrics.NewTimer(),
+		timerReaderPrefixIterator: metrics.NewTimer(),
+		timerReaderRangeIterator:  metrics.NewTimer(),
+		timerWriterExecuteBatch:   metrics.NewTimer(),
+		timerIteratorSeek:         metrics.NewTimer(),
+		timerIteratorNext:         metrics.NewTimer(),
+		timerBatchMerge:           metrics.NewTimer(),
 
 		errors: list.New(),
 	}
@@ -148,42 +148,42 @@ func (s *Store) WriteJSON(w io.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	WriteTimerJSON(w, s.TimerReaderGet)
+	WriteTimerJSON(w, s.timerReaderGet)
 	_, err = w.Write([]byte(`,"TimerReaderMultiGet":`))
 	if err != nil {
 		return
 	}
-	WriteTimerJSON(w, s.TimerReaderMultiGet)
+	WriteTimerJSON(w, s.timerReaderMultiGet)
 	_, err = w.Write([]byte(`,"TimerReaderPrefixIterator":`))
 	if err != nil {
 		return
 	}
-	WriteTimerJSON(w, s.TimerReaderPrefixIterator)
+	WriteTimerJSON(w, s.timerReaderPrefixIterator)
 	_, err = w.Write([]byte(`,"TimerReaderRangeIterator":`))
 	if err != nil {
 		return
 	}
-	WriteTimerJSON(w, s.TimerReaderRangeIterator)
+	WriteTimerJSON(w, s.timerReaderRangeIterator)
 	_, err = w.Write([]byte(`,"TimerWriterExecuteBatch":`))
 	if err != nil {
 		return
 	}
-	WriteTimerJSON(w, s.TimerWriterExecuteBatch)
+	WriteTimerJSON(w, s.timerWriterExecuteBatch)
 	_, err = w.Write([]byte(`,"TimerIteratorSeek":`))
 	if err != nil {
 		return
 	}
-	WriteTimerJSON(w, s.TimerIteratorSeek)
+	WriteTimerJSON(w, s.timerIteratorSeek)
 	_, err = w.Write([]byte(`,"TimerIteratorNext":`))
 	if err != nil {
 		return
 	}
-	WriteTimerJSON(w, s.TimerIteratorNext)
+	WriteTimerJSON(w, s.timerIteratorNext)
 	_, err = w.Write([]byte(`,"TimerBatchMerge":`))
 	if err != nil {
 		return
 	}
-	WriteTimerJSON(w, s.TimerBatchMerge)
+	WriteTimerJSON(w, s.timerBatchMerge)
 
 	_, err = w.Write([]byte(`,"Errors":[`))
 	if err != nil {
@@ -252,13 +252,13 @@ func (s *Store) WriteCSVHeader(w io.Writer) {
 }
 
 func (s *Store) WriteCSV(w io.Writer) {
-	WriteTimerCSV(w, s.TimerReaderGet)
-	WriteTimerCSV(w, s.TimerReaderPrefixIterator)
-	WriteTimerCSV(w, s.TimerReaderRangeIterator)
-	WriteTimerCSV(w, s.TimerWriterExecuteBatch)
-	WriteTimerCSV(w, s.TimerIteratorSeek)
-	WriteTimerCSV(w, s.TimerIteratorNext)
-	WriteTimerCSV(w, s.TimerBatchMerge)
+	WriteTimerCSV(w, s.timerReaderGet)
+	WriteTimerCSV(w, s.timerReaderPrefixIterator)
+	WriteTimerCSV(w, s.timerReaderRangeIterator)
+	WriteTimerCSV(w, s.timerWriterExecuteBatch)
+	WriteTimerCSV(w, s.timerIteratorSeek)
+	WriteTimerCSV(w, s.timerIteratorNext)
+	WriteTimerCSV(w, s.timerBatchMerge)
 }
 
 func (s *Store) Stats() json.Marshaler {
