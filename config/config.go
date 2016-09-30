@@ -14,8 +14,8 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/tokenmap"
 
 	// fragment formatters
-	_ "github.com/blevesearch/bleve/search/highlight/fragment_formatters/ansi"
-	_ "github.com/blevesearch/bleve/search/highlight/fragment_formatters/html"
+	_ "github.com/blevesearch/bleve/search/highlight/format/ansi"
+	_ "github.com/blevesearch/bleve/search/highlight/format/html"
 
 	// fragmenters
 	_ "github.com/blevesearch/bleve/search/highlight/fragmenters/simple"
