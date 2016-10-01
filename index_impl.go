@@ -26,8 +26,8 @@ import (
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/search/collectors"
-	"github.com/blevesearch/bleve/search/facets"
+	"github.com/blevesearch/bleve/search/collector"
+	"github.com/blevesearch/bleve/search/facet"
 	"github.com/blevesearch/bleve/search/highlight"
 )
 

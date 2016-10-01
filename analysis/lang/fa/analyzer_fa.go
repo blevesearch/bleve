@@ -15,8 +15,8 @@ import (
 
 	"github.com/blevesearch/bleve/analysis/char/zerowidthnonjoiner"
 	"github.com/blevesearch/bleve/analysis/lang/ar"
-	"github.com/blevesearch/bleve/analysis/tokenizers/unicode"
-	"github.com/blevesearch/bleve/analysis/tokens/lowercase"
+	"github.com/blevesearch/bleve/analysis/token/lowercase"
+	"github.com/blevesearch/bleve/analysis/tokenizer/unicode"
 )
 
 const AnalyzerName = "fa"

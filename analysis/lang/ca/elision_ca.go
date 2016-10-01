@@ -13,7 +13,7 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/tokens/elision"
+	"github.com/blevesearch/bleve/analysis/token/elision"
 	"github.com/blevesearch/bleve/registry"
 )
 

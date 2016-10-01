@@ -18,12 +18,12 @@ import (
 	_ "github.com/blevesearch/bleve/search/highlight/format/html"
 
 	// fragmenters
-	_ "github.com/blevesearch/bleve/search/highlight/fragmenters/simple"
+	_ "github.com/blevesearch/bleve/search/highlight/fragmenter/simple"
 
 	// highlighters
-	_ "github.com/blevesearch/bleve/search/highlight/highlighters/ansi"
-	_ "github.com/blevesearch/bleve/search/highlight/highlighters/html"
-	_ "github.com/blevesearch/bleve/search/highlight/highlighters/simple"
+	_ "github.com/blevesearch/bleve/search/highlight/highlighter/ansi"
+	_ "github.com/blevesearch/bleve/search/highlight/highlighter/html"
+	_ "github.com/blevesearch/bleve/search/highlight/highlighter/simple"
 
 	// char filters
 	_ "github.com/blevesearch/bleve/analysis/char/html"
@@ -31,33 +31,33 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/char/zerowidthnonjoiner"
 
 	// analyzers
-	_ "github.com/blevesearch/bleve/analysis/analyzers/custom"
-	_ "github.com/blevesearch/bleve/analysis/analyzers/keyword"
-	_ "github.com/blevesearch/bleve/analysis/analyzers/simple"
-	_ "github.com/blevesearch/bleve/analysis/analyzers/standard"
-	_ "github.com/blevesearch/bleve/analysis/analyzers/web"
+	_ "github.com/blevesearch/bleve/analysis/analyzer/custom"
+	_ "github.com/blevesearch/bleve/analysis/analyzer/keyword"
+	_ "github.com/blevesearch/bleve/analysis/analyzer/simple"
+	_ "github.com/blevesearch/bleve/analysis/analyzer/standard"
+	_ "github.com/blevesearch/bleve/analysis/analyzer/web"
 
 	// token filters
-	_ "github.com/blevesearch/bleve/analysis/tokens/apostrophe"
-	_ "github.com/blevesearch/bleve/analysis/tokens/compound"
-	_ "github.com/blevesearch/bleve/analysis/tokens/edgengram"
-	_ "github.com/blevesearch/bleve/analysis/tokens/elision"
-	_ "github.com/blevesearch/bleve/analysis/tokens/keyword"
-	_ "github.com/blevesearch/bleve/analysis/tokens/length"
-	_ "github.com/blevesearch/bleve/analysis/tokens/lowercase"
-	_ "github.com/blevesearch/bleve/analysis/tokens/ngram"
-	_ "github.com/blevesearch/bleve/analysis/tokens/shingle"
-	_ "github.com/blevesearch/bleve/analysis/tokens/stop"
-	_ "github.com/blevesearch/bleve/analysis/tokens/truncate"
-	_ "github.com/blevesearch/bleve/analysis/tokens/unicodenorm"
+	_ "github.com/blevesearch/bleve/analysis/token/apostrophe"
+	_ "github.com/blevesearch/bleve/analysis/token/compound"
+	_ "github.com/blevesearch/bleve/analysis/token/edgengram"
+	_ "github.com/blevesearch/bleve/analysis/token/elision"
+	_ "github.com/blevesearch/bleve/analysis/token/keyword"
+	_ "github.com/blevesearch/bleve/analysis/token/length"
+	_ "github.com/blevesearch/bleve/analysis/token/lowercase"
+	_ "github.com/blevesearch/bleve/analysis/token/ngram"
+	_ "github.com/blevesearch/bleve/analysis/token/shingle"
+	_ "github.com/blevesearch/bleve/analysis/token/stop"
+	_ "github.com/blevesearch/bleve/analysis/token/truncate"
+	_ "github.com/blevesearch/bleve/analysis/token/unicodenorm"
 
 	// tokenizers
-	_ "github.com/blevesearch/bleve/analysis/tokenizers/exception"
-	_ "github.com/blevesearch/bleve/analysis/tokenizers/regexp"
-	_ "github.com/blevesearch/bleve/analysis/tokenizers/single"
-	_ "github.com/blevesearch/bleve/analysis/tokenizers/unicode"
-	_ "github.com/blevesearch/bleve/analysis/tokenizers/web"
-	_ "github.com/blevesearch/bleve/analysis/tokenizers/whitespace"
+	_ "github.com/blevesearch/bleve/analysis/tokenizer/exception"
+	_ "github.com/blevesearch/bleve/analysis/tokenizer/regexp"
+	_ "github.com/blevesearch/bleve/analysis/tokenizer/single"
+	_ "github.com/blevesearch/bleve/analysis/tokenizer/unicode"
+	_ "github.com/blevesearch/bleve/analysis/tokenizer/web"
+	_ "github.com/blevesearch/bleve/analysis/tokenizer/whitespace"
 
 	// date time parsers
 	_ "github.com/blevesearch/bleve/analysis/datetime/flexible"

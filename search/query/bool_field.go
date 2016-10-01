@@ -13,7 +13,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/search/searchers"
+	"github.com/blevesearch/bleve/search/searcher"
 )
 
 type BoolFieldQuery struct {

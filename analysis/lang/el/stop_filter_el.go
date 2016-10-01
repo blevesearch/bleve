@@ -11,7 +11,7 @@ package el
 
 import (
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/tokens/stop"
+	"github.com/blevesearch/bleve/analysis/token/stop"
 	"github.com/blevesearch/bleve/registry"
 )
 
