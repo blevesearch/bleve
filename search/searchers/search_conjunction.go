@@ -204,14 +204,14 @@ func (s *ConjunctionSearcher) Count() uint64 {
 	return sum
 }
 
-func (s *ConjunctionSearcher) Close() error {
+func (s *ConjunctionSearcher) Close() (rv error) {
 	for _, searcher := range s.searchers {
 		err := searcher.Close()
-		if err != nil {
-			return err
+		if err != nil && rv == nil {
+			rv = err
 		}
 	}
-	return nil
+	return rv
 }
 
 func (s *ConjunctionSearcher) Min() int {

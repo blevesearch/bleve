@@ -32,6 +32,7 @@ func NewTermSearcher(indexReader index.IndexReader, term string, field string, b
 	}
 	count, err := indexReader.DocCount()
 	if err != nil {
+		_ = reader.Close()
 		return nil, err
 	}
 	scorer := scorers.NewTermQueryScorer(term, field, boost, count, reader.Count(), explain)

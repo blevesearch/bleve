@@ -76,7 +76,7 @@ func (s *DocIDSearcher) Advance(ctx *search.SearchContext, ID index.IndexInterna
 }
 
 func (s *DocIDSearcher) Close() error {
-	return nil
+	return s.reader.Close()
 }
 
 func (s *DocIDSearcher) Min() int {

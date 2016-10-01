@@ -62,16 +62,25 @@ func NewNumericRangeSearcher(indexReader index.IndexReader, min *float64, max *f
 	}
 	// enumerate all the terms in the range
 	qsearchers := make([]search.Searcher, len(terms))
+	qsearchersClose := func() {
+		for _, searcher := range qsearchers {
+			if searcher != nil {
+				_ = searcher.Close()
+			}
+		}
+	}
 	for i, term := range terms {
 		var err error
 		qsearchers[i], err = NewTermSearcher(indexReader, string(term), field, boost, explain)
 		if err != nil {
+			qsearchersClose()
 			return nil, err
 		}
 	}
 	// build disjunction searcher of these ranges
 	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, explain)
 	if err != nil {
+		qsearchersClose()
 		return nil, err
 	}
 	return &NumericRangeSearcher{
