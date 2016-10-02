@@ -75,8 +75,8 @@ func (c *TokenMapCache) DefineTokenMap(name string, typ string, config map[strin
 func TokenMapTypesAndInstances() ([]string, []string) {
 	emptyConfig := map[string]interface{}{}
 	emptyCache := NewCache()
-	types := make([]string, 0)
-	instances := make([]string, 0)
+	var types []string
+	var instances []string
 	for name, cons := range tokenMaps {
 		_, err := cons(emptyConfig, emptyCache)
 		if err == nil {

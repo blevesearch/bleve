@@ -36,8 +36,8 @@ func IndexTypeConstructorByName(name string) IndexTypeConstructor {
 }
 
 func IndexTypesAndInstances() ([]string, []string) {
-	types := make([]string, 0)
-	instances := make([]string, 0)
+	var types []string
+	var instances []string
 	for name := range stores {
 		types = append(types, name)
 	}
