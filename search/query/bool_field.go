@@ -52,5 +52,5 @@ func (q *BoolFieldQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, e
 	if q.Bool {
 		term = "T"
 	}
-	return searchers.NewTermSearcher(i, term, field, q.Boost.Value(), explain)
+	return searcher.NewTermSearcher(i, term, field, q.Boost.Value(), explain)
 }

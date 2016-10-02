@@ -65,7 +65,7 @@ func (q *PhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expl
 	if err != nil {
 		return nil, err
 	}
-	return searchers.NewPhraseSearcher(i, conjunctionSearcher.(*searchers.ConjunctionSearcher), q.Terms)
+	return searcher.NewPhraseSearcher(i, conjunctionSearcher.(*searcher.ConjunctionSearcher), q.Terms)
 }
 
 func (q *PhraseQuery) Validate() error {

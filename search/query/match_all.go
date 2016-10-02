@@ -39,7 +39,7 @@ func (q *MatchAllQuery) SetBoost(b float64) {
 }
 
 func (q *MatchAllQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	return searchers.NewMatchAllSearcher(i, q.Boost.Value(), explain)
+	return searcher.NewMatchAllSearcher(i, q.Boost.Value(), explain)
 }
 
 func (q *MatchAllQuery) MarshalJSON() ([]byte, error) {

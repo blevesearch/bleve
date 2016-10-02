@@ -67,7 +67,7 @@ func (q *DisjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 			return nil, err
 		}
 	}
-	return searchers.NewDisjunctionSearcher(i, ss, q.Min, explain)
+	return searcher.NewDisjunctionSearcher(i, ss, q.Min, explain)
 }
 
 func (q *DisjunctionQuery) Validate() error {

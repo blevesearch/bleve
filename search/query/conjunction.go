@@ -61,7 +61,7 @@ func (q *ConjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 			return nil, err
 		}
 	}
-	return searchers.NewConjunctionSearcher(i, ss, explain)
+	return searcher.NewConjunctionSearcher(i, ss, explain)
 }
 
 func (q *ConjunctionQuery) Validate() error {

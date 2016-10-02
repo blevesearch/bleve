@@ -65,5 +65,5 @@ func (q *FuzzyQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expla
 	if q.Field == "" {
 		field = m.DefaultSearchField()
 	}
-	return searchers.NewFuzzySearcher(i, q.Term, q.Prefix, q.Fuzziness, field, q.Boost.Value(), explain)
+	return searcher.NewFuzzySearcher(i, q.Term, q.Prefix, q.Fuzziness, field, q.Boost.Value(), explain)
 }

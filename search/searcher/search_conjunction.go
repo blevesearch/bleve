@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package searchers
+package searcher
 
 import (
 	"math"
@@ -29,7 +29,7 @@ type ConjunctionSearcher struct {
 	queryNorm   float64
 	currs       []*search.DocumentMatch
 	maxIDIdx    int
-	scorer      *scorers.ConjunctionQueryScorer
+	scorer      *scorer.ConjunctionQueryScorer
 	initialized bool
 	explain     bool
 }
@@ -48,7 +48,7 @@ func NewConjunctionSearcher(indexReader index.IndexReader, qsearchers []search.S
 		explain:     explain,
 		searchers:   searchers,
 		currs:       make([]*search.DocumentMatch, len(searchers)),
-		scorer:      scorers.NewConjunctionQueryScorer(explain),
+		scorer:      scorer.NewConjunctionQueryScorer(explain),
 	}
 	rv.computeQueryNorm()
 	return &rv, nil

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package searchers
+package searcher
 
 import (
 	"github.com/blevesearch/bleve/index"
@@ -23,7 +23,7 @@ import (
 type MatchAllSearcher struct {
 	indexReader index.IndexReader
 	reader      index.DocIDReader
-	scorer      *scorers.ConstantScorer
+	scorer      *scorer.ConstantScorer
 	count       uint64
 }
 
@@ -37,7 +37,7 @@ func NewMatchAllSearcher(indexReader index.IndexReader, boost float64, explain b
 		_ = reader.Close()
 		return nil, err
 	}
-	scorer := scorers.NewConstantScorer(1.0, boost, explain)
+	scorer := scorer.NewConstantScorer(1.0, boost, explain)
 	return &MatchAllSearcher{
 		indexReader: indexReader,
 		reader:      reader,

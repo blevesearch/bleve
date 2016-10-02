@@ -50,5 +50,5 @@ func (q *PrefixQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expl
 	if q.Field == "" {
 		field = m.DefaultSearchField()
 	}
-	return searchers.NewTermPrefixSearcher(i, q.Prefix, field, q.Boost.Value(), explain)
+	return searcher.NewTermPrefixSearcher(i, q.Prefix, field, q.Boost.Value(), explain)
 }

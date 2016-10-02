@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package searchers
+package searcher
 
 import (
 	"github.com/blevesearch/bleve/index"
@@ -23,7 +23,7 @@ import (
 // DocIDSearcher returns documents matching a predefined set of identifiers.
 type DocIDSearcher struct {
 	reader index.DocIDReader
-	scorer *scorers.ConstantScorer
+	scorer *scorer.ConstantScorer
 	count  int
 }
 
@@ -34,7 +34,7 @@ func NewDocIDSearcher(indexReader index.IndexReader, ids []string, boost float64
 	if err != nil {
 		return nil, err
 	}
-	scorer := scorers.NewConstantScorer(1.0, boost, explain)
+	scorer := scorer.NewConstantScorer(1.0, boost, explain)
 	return &DocIDSearcher{
 		scorer: scorer,
 		reader: reader,

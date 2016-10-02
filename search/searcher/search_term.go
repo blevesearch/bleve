@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package searchers
+package searcher
 
 import (
 	"github.com/blevesearch/bleve/index"
@@ -25,7 +25,7 @@ type TermSearcher struct {
 	term        string
 	field       string
 	reader      index.TermFieldReader
-	scorer      *scorers.TermQueryScorer
+	scorer      *scorer.TermQueryScorer
 	tfd         index.TermFieldDoc
 	explain     bool
 }
@@ -40,7 +40,7 @@ func NewTermSearcher(indexReader index.IndexReader, term string, field string, b
 		_ = reader.Close()
 		return nil, err
 	}
-	scorer := scorers.NewTermQueryScorer(term, field, boost, count, reader.Count(), explain)
+	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), explain)
 	return &TermSearcher{
 		indexReader: indexReader,
 		term:        term,

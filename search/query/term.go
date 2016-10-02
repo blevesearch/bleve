@@ -49,5 +49,5 @@ func (q *TermQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explai
 	if q.Field == "" {
 		field = m.DefaultSearchField()
 	}
-	return searchers.NewTermSearcher(i, q.Term, field, q.Boost.Value(), explain)
+	return searcher.NewTermSearcher(i, q.Term, field, q.Boost.Value(), explain)
 }

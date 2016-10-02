@@ -126,7 +126,7 @@ func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, exp
 		return shouldSearcher, nil
 	}
 
-	return searchers.NewBooleanSearcher(i, mustSearcher, shouldSearcher, mustNotSearcher, explain)
+	return searcher.NewBooleanSearcher(i, mustSearcher, shouldSearcher, mustNotSearcher, explain)
 }
 
 func (q *BooleanQuery) Validate() error {

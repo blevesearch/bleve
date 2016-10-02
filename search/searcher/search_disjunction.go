@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package searchers
+package searcher
 
 import (
 	"fmt"
@@ -34,7 +34,7 @@ type DisjunctionSearcher struct {
 	searchers    OrderedSearcherList
 	queryNorm    float64
 	currs        []*search.DocumentMatch
-	scorer       *scorers.DisjunctionQueryScorer
+	scorer       *scorer.DisjunctionQueryScorer
 	min          int
 	matching     []*search.DocumentMatch
 	matchingIdxs []int
@@ -68,7 +68,7 @@ func NewDisjunctionSearcher(indexReader index.IndexReader, qsearchers []search.S
 		indexReader:  indexReader,
 		searchers:    searchers,
 		currs:        make([]*search.DocumentMatch, len(searchers)),
-		scorer:       scorers.NewDisjunctionQueryScorer(explain),
+		scorer:       scorer.NewDisjunctionQueryScorer(explain),
 		min:          int(min),
 		matching:     make([]*search.DocumentMatch, len(searchers)),
 		matchingIdxs: make([]int, len(searchers)),

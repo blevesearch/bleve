@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package searchers
+package searcher
 
 import (
 	"math"
@@ -33,7 +33,7 @@ type BooleanSearcher struct {
 	currMustNot     *search.DocumentMatch
 	currentID       index.IndexInternalID
 	min             uint64
-	scorer          *scorers.ConjunctionQueryScorer
+	scorer          *scorer.ConjunctionQueryScorer
 	matches         []*search.DocumentMatch
 	initialized     bool
 }
@@ -45,7 +45,7 @@ func NewBooleanSearcher(indexReader index.IndexReader, mustSearcher search.Searc
 		mustSearcher:    mustSearcher,
 		shouldSearcher:  shouldSearcher,
 		mustNotSearcher: mustNotSearcher,
-		scorer:          scorers.NewConjunctionQueryScorer(explain),
+		scorer:          scorer.NewConjunctionQueryScorer(explain),
 		matches:         make([]*search.DocumentMatch, 2),
 	}
 	rv.computeQueryNorm()

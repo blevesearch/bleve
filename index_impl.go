@@ -357,7 +357,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		return nil, ErrorIndexClosed
 	}
 
-	collector := collectors.NewTopNCollector(req.Size, req.From, req.Sort)
+	collector := collector.NewTopNCollector(req.Size, req.From, req.Sort)
 
 	// open a reader for this search
 	indexReader, err := i.i.Reader()
@@ -385,14 +385,14 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		for facetName, facetRequest := range req.Facets {
 			if facetRequest.NumericRanges != nil {
 				// build numeric range facet
-				facetBuilder := facets.NewNumericFacetBuilder(facetRequest.Field, facetRequest.Size)
+				facetBuilder := facet.NewNumericFacetBuilder(facetRequest.Field, facetRequest.Size)
 				for _, nr := range facetRequest.NumericRanges {
 					facetBuilder.AddRange(nr.Name, nr.Min, nr.Max)
 				}
 				facetsBuilder.Add(facetName, facetBuilder)
 			} else if facetRequest.DateTimeRanges != nil {
 				// build date range facet
-				facetBuilder := facets.NewDateTimeFacetBuilder(facetRequest.Field, facetRequest.Size)
+				facetBuilder := facet.NewDateTimeFacetBuilder(facetRequest.Field, facetRequest.Size)
 				dateTimeParser := i.m.DateTimeParserNamed("")
 				for _, dr := range facetRequest.DateTimeRanges {
 					dr.ParseDates(dateTimeParser)
@@ -401,7 +401,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				facetsBuilder.Add(facetName, facetBuilder)
 			} else {
 				// build terms facet
-				facetBuilder := facets.NewTermsFacetBuilder(facetRequest.Field, facetRequest.Size)
+				facetBuilder := facet.NewTermsFacetBuilder(facetRequest.Field, facetRequest.Size)
 				facetsBuilder.Add(facetName, facetBuilder)
 			}
 		}

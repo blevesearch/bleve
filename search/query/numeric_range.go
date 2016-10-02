@@ -68,7 +68,7 @@ func (q *NumericRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping
 	if q.Field == "" {
 		field = m.DefaultSearchField()
 	}
-	return searchers.NewNumericRangeSearcher(i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.Boost.Value(), explain)
+	return searcher.NewNumericRangeSearcher(i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.Boost.Value(), explain)
 }
 
 func (q *NumericRangeQuery) Validate() error {
