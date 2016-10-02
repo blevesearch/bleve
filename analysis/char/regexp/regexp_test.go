@@ -36,7 +36,7 @@ func TestRegexpCharFilter(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		filter := NewRegexpCharFilter(htmlRegex, []byte{' '})
+		filter := New(htmlRegex, []byte{' '})
 		output := filter.Filter(test.input)
 		if !reflect.DeepEqual(output, test.output) {
 			t.Errorf("Expected:\n`%s`\ngot:\n`%s`\nfor:\n`%s`\n", string(test.output), string(output), string(test.input))
@@ -60,7 +60,7 @@ func TestZeroWidthNonJoinerCharFilter(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		filter := NewRegexpCharFilter(zeroWidthNonJoinerRegex, []byte{' '})
+		filter := New(zeroWidthNonJoinerRegex, []byte{' '})
 		output := filter.Filter(test.input)
 		if !reflect.DeepEqual(output, test.output) {
 			t.Errorf("Expected:\n`%s`\ngot:\n`%s`\nfor:\n`%s`\n", string(test.output), string(output), string(test.input))

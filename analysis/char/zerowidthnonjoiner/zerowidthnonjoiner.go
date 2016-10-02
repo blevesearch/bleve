@@ -28,7 +28,7 @@ var zeroWidthNonJoinerRegexp = regexp.MustCompile(`\x{200C}`)
 
 func CharFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.CharFilter, error) {
 	replaceBytes := []byte(" ")
-	return regexpCharFilter.NewRegexpCharFilter(zeroWidthNonJoinerRegexp, replaceBytes), nil
+	return regexpCharFilter.New(zeroWidthNonJoinerRegexp, replaceBytes), nil
 }
 
 func init() {

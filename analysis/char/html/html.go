@@ -28,7 +28,7 @@ var htmlCharFilterRegexp = regexp.MustCompile(`</?[!\w]+((\s+\w+(\s*=\s*(?:".*?"
 
 func CharFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.CharFilter, error) {
 	replaceBytes := []byte(" ")
-	return regexpCharFilter.NewRegexpCharFilter(htmlCharFilterRegexp, replaceBytes), nil
+	return regexpCharFilter.New(htmlCharFilterRegexp, replaceBytes), nil
 }
 
 func init() {
