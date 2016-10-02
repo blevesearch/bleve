@@ -104,7 +104,7 @@ func (s *Highlighter) BestFragmentsInField(dm *search.DocumentMatch, doc *docume
 	}
 
 	// now find the N best non-overlapping fragments
-	bestFragments := make([]*highlight.Fragment, 0)
+	var bestFragments []*highlight.Fragment
 	if len(fq) > 0 {
 		candidate := heap.Pop(&fq)
 	OUTER:
