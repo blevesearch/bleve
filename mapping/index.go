@@ -338,11 +338,10 @@ func (im *IndexMappingImpl) newWalkContext(doc *document.Document, dm *DocumentM
 	}
 }
 
-// attempts to find the best analyzer to use with only a field name
-// will walk all the document types, look for field mappings at the
-// provided path, if one exists and it has an explicit analyzer
-// that is returned
-// nil should be an acceptable return value meaning we don't know
+// AnalyzerNameForPath attempts to find the best analyzer to use with only a
+// field name will walk all the document types, look for field mappings at the
+// provided path, if one exists and it has an explicit analyzer that is
+// returned.
 func (im *IndexMappingImpl) AnalyzerNameForPath(path string) string {
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
