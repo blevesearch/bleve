@@ -22,7 +22,7 @@ import (
 )
 
 var stores = make(KVStoreRegistry, 0)
-var index_types = make(IndexTypeRegistry, 0)
+var indexTypes = make(IndexTypeRegistry, 0)
 
 // highlight
 var fragmentFormatters = make(FragmentFormatterRegistry, 0)

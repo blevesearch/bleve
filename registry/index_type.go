@@ -21,18 +21,18 @@ import (
 )
 
 func RegisterIndexType(name string, constructor IndexTypeConstructor) {
-	_, exists := index_types[name]
+	_, exists := indexTypes[name]
 	if exists {
 		panic(fmt.Errorf("attempted to register duplicate index encoding named '%s'", name))
 	}
-	index_types[name] = constructor
+	indexTypes[name] = constructor
 }
 
 type IndexTypeConstructor func(storeName string, storeConfig map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error)
 type IndexTypeRegistry map[string]IndexTypeConstructor
 
 func IndexTypeConstructorByName(name string) IndexTypeConstructor {
-	return index_types[name]
+	return indexTypes[name]
 }
 
 func IndexTypesAndInstances() ([]string, []string) {
