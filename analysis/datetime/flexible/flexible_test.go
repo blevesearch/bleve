@@ -66,7 +66,7 @@ func TestFlexibleDateTimeParser(t *testing.T) {
 	rfc3339NoTimezoneNoT := "2006-01-02 15:04:05"
 	rfc3339NoTime := "2006-01-02"
 
-	dateOptionalTimeParser := NewFlexibleGoDateTimeParser(
+	dateOptionalTimeParser := New(
 		[]string{
 			time.RFC3339Nano,
 			time.RFC3339,

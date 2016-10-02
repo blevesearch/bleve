@@ -37,7 +37,7 @@ var layouts = []string{
 }
 
 func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.DateTimeParser, error) {
-	return flexible.NewFlexibleGoDateTimeParser(layouts), nil
+	return flexible.New(layouts), nil
 }
 
 func init() {

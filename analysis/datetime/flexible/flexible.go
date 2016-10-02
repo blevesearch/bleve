@@ -24,17 +24,17 @@ import (
 
 const Name = "flexiblego"
 
-type FlexibleGoDateTimeParser struct {
+type DateTimeParser struct {
 	layouts []string
 }
 
-func NewFlexibleGoDateTimeParser(layouts []string) *FlexibleGoDateTimeParser {
-	return &FlexibleGoDateTimeParser{
+func New(layouts []string) *DateTimeParser {
+	return &DateTimeParser{
 		layouts: layouts,
 	}
 }
 
-func (p *FlexibleGoDateTimeParser) ParseDateTime(input string) (time.Time, error) {
+func (p *DateTimeParser) ParseDateTime(input string) (time.Time, error) {
 	for _, layout := range p.layouts {
 		rv, err := time.Parse(layout, input)
 		if err == nil {
@@ -44,21 +44,21 @@ func (p *FlexibleGoDateTimeParser) ParseDateTime(input string) (time.Time, error
 	return time.Time{}, analysis.ErrInvalidDateTime
 }
 
-func FlexibleGoDateTimeParserConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.DateTimeParser, error) {
+func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.DateTimeParser, error) {
 	layouts, ok := config["layouts"].([]interface{})
 	if !ok {
 		return nil, fmt.Errorf("must specify layouts")
 	}
-	layoutStrs := make([]string, 0)
+	var layoutStrs []string
 	for _, layout := range layouts {
 		layoutStr, ok := layout.(string)
 		if ok {
 			layoutStrs = append(layoutStrs, layoutStr)
 		}
 	}
-	return NewFlexibleGoDateTimeParser(layoutStrs), nil
+	return New(layoutStrs), nil
 }
 
 func init() {
-	registry.RegisterDateTimeParser(Name, FlexibleGoDateTimeParserConstructor)
+	registry.RegisterDateTimeParser(Name, DateTimeParserConstructor)
 }
