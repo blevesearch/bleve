@@ -71,7 +71,7 @@ func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 			case "date":
 				rv.Type = SortFieldAsDate
 			default:
-				return nil, fmt.Errorf("unkown sort field type: %s", typ)
+				return nil, fmt.Errorf("unknown sort field type: %s", typ)
 			}
 		}
 		mode, ok := input["mode"].(string)

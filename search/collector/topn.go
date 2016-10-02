@@ -186,7 +186,7 @@ func (hc *TopNCollector) collectSingle(ctx *search.SearchContext, reader index.I
 	}
 
 	// optimization, we track lowest sorting hit already removed from heap
-	// with this one comparision, we can avoid all heap operations if
+	// with this one comparison, we can avoid all heap operations if
 	// this hit would have been added and then immediately removed
 	if hc.lowestMatchOutsideResults != nil {
 		cmp := hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, d, hc.lowestMatchOutsideResults)

@@ -128,7 +128,7 @@ func startState(l *queryStringLex, next rune, eof bool) (lexState, bool) {
 		return inStrState, true
 	}
 
-	// doesnt look like anything, just eat it and stay here
+	// doesn't look like anything, just eat it and stay here
 	l.reset()
 	return startState, true
 }

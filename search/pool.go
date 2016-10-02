@@ -34,7 +34,7 @@ func defaultDocumentMatchPoolTooSmall(p *DocumentMatchPool) *DocumentMatch {
 }
 
 // NewDocumentMatchPool will build a DocumentMatchPool with memory
-// pre-allocated to accomodate the requested number of DocumentMatch
+// pre-allocated to accommodate the requested number of DocumentMatch
 // instances
 func NewDocumentMatchPool(size, sortsize int) *DocumentMatchPool {
 	avail := make(DocumentMatchCollection, 0, size)

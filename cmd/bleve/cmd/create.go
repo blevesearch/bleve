@@ -72,7 +72,7 @@ func buildMapping() (mapping.IndexMapping, error) {
 func init() {
 	RootCmd.AddCommand(createCmd)
 
-	createCmd.Flags().StringVarP(&mappingPath, "mapping", "m", "", "Path to a file containing a JSON represenation of an index mapping to use.")
+	createCmd.Flags().StringVarP(&mappingPath, "mapping", "m", "", "Path to a file containing a JSON representation of an index mapping to use.")
 	createCmd.Flags().StringVarP(&storeType, "store", "s", bleve.Config.DefaultKVStore, "The bleve storage type to use.")
 	createCmd.Flags().StringVarP(&indexType, "index", "i", bleve.Config.DefaultIndexType, "The bleve index type to use.")
 }

@@ -26,7 +26,7 @@ import (
 var mappingCmd = &cobra.Command{
 	Use:   "mapping [index path]",
 	Short: "prints the mapping used for this index",
-	Long:  `The mapping command prints a JSON represenation of the mapping used for this index.`,
+	Long:  `The mapping command prints a JSON representation of the mapping used for this index.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mapping := idx.Mapping()
 		jsonBytes, err := json.MarshalIndent(mapping, "", "  ")

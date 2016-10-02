@@ -181,7 +181,7 @@ func TestIndexReader(t *testing.T) {
 	}
 	count = reader.Count()
 	if count != 0 {
-		t.Errorf("expected count 0 for reader of non-existant field")
+		t.Errorf("expected count 0 for reader of non-existent field")
 	}
 	match, err = reader.Next(nil)
 	if err != nil {

@@ -418,7 +418,7 @@ func TestHandlers(t *testing.T) {
 			},
 		},
 		{
-			Desc:    "search index doesnt exist",
+			Desc:    "search index doesn't exist",
 			Handler: searchHandler,
 			Path:    "/tix/search",
 			Method:  "POST",
@@ -562,7 +562,7 @@ func TestHandlers(t *testing.T) {
 			},
 		},
 		{
-			Desc:    "create alias referring to non-existant index",
+			Desc:    "create alias referring to non-existent index",
 			Handler: aliasHandler,
 			Path:    "/alias",
 			Method:  "POST",
@@ -650,7 +650,7 @@ func TestHandlers(t *testing.T) {
 			ResponseBody: []byte(`{"status":"ok"}`),
 		},
 		{
-			Desc:    "update alias add doesnt exist",
+			Desc:    "update alias add doesn't exist",
 			Handler: aliasHandler,
 			Path:    "/alias",
 			Method:  "POST",
@@ -674,7 +674,7 @@ func TestHandlers(t *testing.T) {
 			ResponseBody: []byte(`{"status":"ok"}`),
 		},
 		{
-			Desc:    "update alias remove doesnt exist",
+			Desc:    "update alias remove doesn't exist",
 			Handler: aliasHandler,
 			Path:    "/alias",
 			Method:  "POST",

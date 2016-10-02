@@ -40,7 +40,7 @@ func TestDocumentMatchPool(t *testing.T) {
 	// get one more and see if too many function is called
 	extra := dmp.Get()
 	if !tooManyCalled {
-		t.Fatal("expected too many function to be called, but wasnt")
+		t.Fatal("expected too many function to be called, but wasn't")
 	}
 
 	// return the first 10
