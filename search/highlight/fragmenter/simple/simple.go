@@ -36,8 +36,7 @@ func NewFragmenter(fragmentSize int) *Fragmenter {
 }
 
 func (s *Fragmenter) Fragment(orig []byte, ot highlight.TermLocations) []*highlight.Fragment {
-	rv := make([]*highlight.Fragment, 0)
-
+	var rv []*highlight.Fragment
 	maxbegin := 0
 OUTER:
 	for currTermIndex, termLocation := range ot {
@@ -52,7 +51,7 @@ OUTER:
 				continue OUTER // bail
 			}
 			end += size
-			used += 1
+			used++
 		}
 
 		// if we still have more characters available to us
@@ -65,7 +64,7 @@ OUTER:
 			}
 			if start-size >= maxbegin {
 				start -= size
-				used += 1
+				used++
 			} else {
 				break
 			}
