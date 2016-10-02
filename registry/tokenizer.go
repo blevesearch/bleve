@@ -66,9 +66,8 @@ func (c *TokenizerCache) DefineTokenizer(name string, typ string, config map[str
 	if err != nil {
 		if err == ErrAlreadyDefined {
 			return nil, fmt.Errorf("tokenizer named '%s' already defined", name)
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return item.(analysis.Tokenizer), nil
 }

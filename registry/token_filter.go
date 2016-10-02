@@ -66,9 +66,8 @@ func (c *TokenFilterCache) DefineTokenFilter(name string, typ string, config map
 	if err != nil {
 		if err == ErrAlreadyDefined {
 			return nil, fmt.Errorf("token filter named '%s' already defined", name)
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return item.(analysis.TokenFilter), nil
 }

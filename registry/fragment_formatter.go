@@ -66,9 +66,8 @@ func (c *FragmentFormatterCache) DefineFragmentFormatter(name string, typ string
 	if err != nil {
 		if err == ErrAlreadyDefined {
 			return nil, fmt.Errorf("fragment formatter named '%s' already defined", name)
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return item.(highlight.FragmentFormatter), nil
 }

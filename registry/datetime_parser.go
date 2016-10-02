@@ -66,9 +66,8 @@ func (c *DateTimeParserCache) DefineDateTimeParser(name string, typ string, conf
 	if err != nil {
 		if err == ErrAlreadyDefined {
 			return nil, fmt.Errorf("date time parser named '%s' already defined", name)
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return item.(analysis.DateTimeParser), nil
 }

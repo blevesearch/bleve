@@ -66,9 +66,8 @@ func (c *TokenMapCache) DefineTokenMap(name string, typ string, config map[strin
 	if err != nil {
 		if err == ErrAlreadyDefined {
 			return nil, fmt.Errorf("token map named '%s' already defined", name)
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return item.(analysis.TokenMap), nil
 }

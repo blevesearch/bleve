@@ -66,9 +66,8 @@ func (c *CharFilterCache) DefineCharFilter(name string, typ string, config map[s
 	if err != nil {
 		if err == ErrAlreadyDefined {
 			return nil, fmt.Errorf("char filter named '%s' already defined", name)
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return item.(analysis.CharFilter), nil
 }

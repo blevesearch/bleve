@@ -66,9 +66,8 @@ func (c *AnalyzerCache) DefineAnalyzer(name string, typ string, config map[strin
 	if err != nil {
 		if err == ErrAlreadyDefined {
 			return nil, fmt.Errorf("analyzer named '%s' already defined", name)
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return item.(*analysis.Analyzer), nil
 }
