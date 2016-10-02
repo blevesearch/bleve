@@ -25,23 +25,23 @@ import (
 
 const Name = "regexp"
 
-type RegexpCharFilter struct {
+type CharFilter struct {
 	r           *regexp.Regexp
 	replacement []byte
 }
 
-func NewRegexpCharFilter(r *regexp.Regexp, replacement []byte) *RegexpCharFilter {
-	return &RegexpCharFilter{
+func New(r *regexp.Regexp, replacement []byte) *CharFilter {
+	return &CharFilter{
 		r:           r,
 		replacement: replacement,
 	}
 }
 
-func (s *RegexpCharFilter) Filter(input []byte) []byte {
+func (s *CharFilter) Filter(input []byte) []byte {
 	return s.r.ReplaceAllFunc(input, func(in []byte) []byte { return bytes.Repeat(s.replacement, len(in)) })
 }
 
-func RegexpCharFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.CharFilter, error) {
+func CharFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.CharFilter, error) {
 	regexpStr, ok := config["regexp"].(string)
 	if !ok {
 		return nil, fmt.Errorf("must specify regexp")
@@ -55,9 +55,9 @@ func RegexpCharFilterConstructor(config map[string]interface{}, cache *registry.
 	if ok {
 		replaceBytes = []byte(replaceStr)
 	}
-	return NewRegexpCharFilter(r, replaceBytes), nil
+	return New(r, replaceBytes), nil
 }
 
 func init() {
-	registry.RegisterCharFilter(Name, RegexpCharFilterConstructor)
+	registry.RegisterCharFilter(Name, CharFilterConstructor)
 }
