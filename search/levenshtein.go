@@ -51,7 +51,7 @@ func LevenshteinDistance(a, b *string) int {
 	return d[la]
 }
 
-// levenshteinDistanceMax same as levenshteinDistance but
+// LevenshteinDistanceMax same as levenshteinDistance but
 // attempts to bail early once we know the distance
 // will be greater than max
 // in which case the first return val will be the max
