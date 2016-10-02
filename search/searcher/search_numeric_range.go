@@ -128,7 +128,7 @@ type termRange struct {
 }
 
 func (t *termRange) Enumerate() [][]byte {
-	rv := make([][]byte, 0)
+	var rv [][]byte
 	next := t.startTerm
 	for bytes.Compare(next, t.endTerm) <= 0 {
 		rv = append(rv, next)
@@ -153,7 +153,7 @@ func incrementBytes(in []byte) []byte {
 type termRanges []*termRange
 
 func (tr termRanges) Enumerate() [][]byte {
-	rv := make([][]byte, 0)
+	var rv [][]byte
 	for _, tri := range tr {
 		trie := tri.Enumerate()
 		rv = append(rv, trie...)
