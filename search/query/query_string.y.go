@@ -690,7 +690,7 @@ yydefault:
 			phrase := yyDollar[4].s
 
 			logDebugGrammar("FIELD - GREATER THAN DATE %s", phrase)
-			minTime, err := QueryTimeFromString(phrase)
+			minTime, err := queryTimeFromString(phrase)
 			if err != nil {
 				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid time: %v", err))
 			}
@@ -707,7 +707,7 @@ yydefault:
 			phrase := yyDollar[5].s
 
 			logDebugGrammar("FIELD - GREATER THAN OR EQUAL DATE %s", phrase)
-			minTime, err := QueryTimeFromString(phrase)
+			minTime, err := queryTimeFromString(phrase)
 			if err != nil {
 				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid time: %v", err))
 			}
@@ -724,7 +724,7 @@ yydefault:
 			phrase := yyDollar[4].s
 
 			logDebugGrammar("FIELD - LESS THAN DATE %s", phrase)
-			maxTime, err := QueryTimeFromString(phrase)
+			maxTime, err := queryTimeFromString(phrase)
 			if err != nil {
 				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid time: %v", err))
 			}
@@ -741,7 +741,7 @@ yydefault:
 			phrase := yyDollar[5].s
 
 			logDebugGrammar("FIELD - LESS THAN OR EQUAL DATE %s", phrase)
-			maxTime, err := QueryTimeFromString(phrase)
+			maxTime, err := queryTimeFromString(phrase)
 			if err != nil {
 				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("invalid time: %v", err))
 			}

@@ -41,7 +41,7 @@ type BleveQueryTime struct {
 	time.Time
 }
 
-func QueryTimeFromString(t string) (time.Time, error) {
+func queryTimeFromString(t string) (time.Time, error) {
 	dateTimeParser, err := cache.DateTimeParserNamed(QueryDateTimeParser)
 	if err != nil {
 		return time.Time{}, err
