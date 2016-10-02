@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/analyzers/standard"
-	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizers/regexp"
+	"github.com/blevesearch/bleve/analysis/analyzer/standard"
+	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizer/regexp"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/boltdb"

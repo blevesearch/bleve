@@ -15,8 +15,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blevesearch/bleve/analysis/tokenizers/exception"
-	"github.com/blevesearch/bleve/analysis/tokenizers/regexp"
+	"github.com/blevesearch/bleve/analysis/tokenizer/exception"
+	"github.com/blevesearch/bleve/analysis/tokenizer/regexp"
 	"github.com/blevesearch/bleve/document"
 )
 

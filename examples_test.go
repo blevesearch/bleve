@@ -17,7 +17,7 @@ import (
 
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/search/highlight/highlighters/ansi"
+	"github.com/blevesearch/bleve/search/highlight/highlighter/ansi"
 )
 
 var indexMapping mapping.IndexMapping

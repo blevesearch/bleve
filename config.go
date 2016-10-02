@@ -19,7 +19,7 @@ import (
 	"github.com/blevesearch/bleve/index/store/gtreap"
 	"github.com/blevesearch/bleve/index/upsidedown"
 	"github.com/blevesearch/bleve/registry"
-	"github.com/blevesearch/bleve/search/highlight/highlighters/html"
+	"github.com/blevesearch/bleve/search/highlight/highlighter/html"
 )
 
 var bleveExpVar = expvar.NewMap("bleve")

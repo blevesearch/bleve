@@ -26,7 +26,7 @@ import (
 
 	"strconv"
 
-	"github.com/blevesearch/bleve/analysis/analyzers/keyword"
+	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/mapping"

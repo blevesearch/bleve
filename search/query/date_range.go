@@ -21,7 +21,7 @@ import (
 	"github.com/blevesearch/bleve/numeric"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/search/searchers"
+	"github.com/blevesearch/bleve/search/searcher"
 )
 
 // QueryDateTimeParser controls the default query date time parser
