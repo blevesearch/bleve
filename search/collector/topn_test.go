@@ -30,59 +30,59 @@ func TestTop10Scores(t *testing.T) {
 	// everything else is less than 10
 	searcher := &stubSearcher{
 		matches: []*search.DocumentMatch{
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("a"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("b"),
 				Score:           9,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("c"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("d"),
 				Score:           9,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("e"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("f"),
 				Score:           9,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("g"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("h"),
 				Score:           9,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("i"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("j"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("k"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("l"),
 				Score:           99,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("m"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("n"),
 				Score:           11,
 			},
@@ -139,59 +139,59 @@ func TestTop10ScoresSkip10(t *testing.T) {
 	// everything else is less than 10
 	searcher := &stubSearcher{
 		matches: []*search.DocumentMatch{
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("a"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("b"),
 				Score:           9.5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("c"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("d"),
 				Score:           9,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("e"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("f"),
 				Score:           9,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("g"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("h"),
 				Score:           9,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("i"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("j"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("k"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("l"),
 				Score:           99,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("m"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("n"),
 				Score:           11,
 			},
@@ -234,39 +234,39 @@ func TestTop10ScoresSkip10Only9Hits(t *testing.T) {
 	// a stub search with only 10 matches
 	searcher := &stubSearcher{
 		matches: []*search.DocumentMatch{
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("a"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("c"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("e"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("g"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("i"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("j"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("k"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("m"),
 				Score:           11,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("n"),
 				Score:           11,
 			},
@@ -297,59 +297,59 @@ func TestPaginationSameScores(t *testing.T) {
 	// all documents have the same score
 	searcher := &stubSearcher{
 		matches: []*search.DocumentMatch{
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("a"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("b"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("c"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("d"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("e"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("f"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("g"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("h"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("i"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("j"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("k"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("l"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("m"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("n"),
 				Score:           5,
 			},
@@ -383,59 +383,59 @@ func TestPaginationSameScores(t *testing.T) {
 	// all documents have the same score
 	searcher = &stubSearcher{
 		matches: []*search.DocumentMatch{
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("a"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("b"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("c"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("d"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("e"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("f"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("g"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("h"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("i"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("j"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("k"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("l"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("m"),
 				Score:           5,
 			},
-			&search.DocumentMatch{
+			{
 				IndexInternalID: index.IndexInternalID("n"),
 				Score:           5,
 			},
