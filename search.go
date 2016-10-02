@@ -211,15 +211,15 @@ type SearchRequest struct {
 	Sort      search.SortOrder  `json:"sort"`
 }
 
-func (sr *SearchRequest) Validate() error {
-	if srq, ok := sr.Query.(query.ValidatableQuery); ok {
+func (r *SearchRequest) Validate() error {
+	if srq, ok := r.Query.(query.ValidatableQuery); ok {
 		err := srq.Validate()
 		if err != nil {
 			return err
 		}
 	}
 
-	return sr.Facets.Validate()
+	return r.Facets.Validate()
 }
 
 // AddFacet adds a FacetRequest to this SearchRequest
