@@ -80,7 +80,7 @@ func NewDocIDQuery(ids []string) *query.DocIDQuery {
 // NewFuzzyQuery creates a new Query which finds
 // documents containing terms within a specific
 // fuzziness of the specified term.
-// The default fuzziness is 2.
+// The default fuzziness is 1.
 //
 // The current implementation uses Levenshtein edit
 // distance as the fuzziness metric.
