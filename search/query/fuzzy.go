@@ -32,14 +32,14 @@ type FuzzyQuery struct {
 // NewFuzzyQuery creates a new Query which finds
 // documents containing terms within a specific
 // fuzziness of the specified term.
-// The default fuzziness is 2.
+// The default fuzziness is 1.
 //
 // The current implementation uses Levenshtein edit
 // distance as the fuzziness metric.
 func NewFuzzyQuery(term string) *FuzzyQuery {
 	return &FuzzyQuery{
 		Term:      term,
-		Fuzziness: 2,
+		Fuzziness: 1,
 	}
 }
 
