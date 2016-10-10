@@ -24,6 +24,8 @@ import (
 type UpsideDownCouchFieldDict struct {
 	indexReader *IndexReader
 	iterator    store.KVIterator
+	dictRow     *DictionaryRow
+	dictEntry   *index.DictEntry
 	field       uint16
 }
 
@@ -42,6 +44,8 @@ func newUpsideDownCouchFieldDict(indexReader *IndexReader, field uint16, startTe
 	return &UpsideDownCouchFieldDict{
 		indexReader: indexReader,
 		iterator:    it,
+		dictRow:     &DictionaryRow{}, // Pre-alloced, reused row.
+		dictEntry:   &index.DictEntry{}, // Pre-alloced, reused entry.
 		field:       field,
 	}, nil
 
@@ -53,17 +57,19 @@ func (r *UpsideDownCouchFieldDict) Next() (*index.DictEntry, error) {
 		return nil, nil
 	}
 
-	currRow, err := NewDictionaryRowKV(key, val)
+	err := r.dictRow.parseDictionaryK(key)
 	if err != nil {
-		return nil, fmt.Errorf("unexpected error parsing dictionary row kv: %v", err)
+		return nil, fmt.Errorf("unexpected error parsing dictionary row key: %v", err)
 	}
-	rv := index.DictEntry{
-		Term:  string(currRow.term),
-		Count: currRow.count,
+	err = r.dictRow.parseDictionaryV(val)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error parsing dictionary row val: %v", err)
 	}
+	r.dictEntry.Term = string(r.dictRow.term)
+	r.dictEntry.Count = r.dictRow.count
 	// advance the iterator to the next term
 	r.iterator.Next()
-	return &rv, nil
+	return r.dictEntry, nil
 
 }
 

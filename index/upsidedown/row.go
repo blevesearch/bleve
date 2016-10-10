@@ -306,25 +306,33 @@ func NewDictionaryRowKV(key, value []byte) (*DictionaryRow, error) {
 }
 
 func NewDictionaryRowK(key []byte) (*DictionaryRow, error) {
-	rv := DictionaryRow{}
+	rv := &DictionaryRow{}
+	err := rv.parseDictionaryK(key)
+	if err != nil {
+		return nil, err
+	}
+	return rv, nil
+}
+
+func (dr *DictionaryRow) parseDictionaryK(key []byte) error {
 	buf := bytes.NewBuffer(key)
 	_, err := buf.ReadByte() // type
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = binary.Read(buf, binary.LittleEndian, &rv.field)
+	err = binary.Read(buf, binary.LittleEndian, &dr.field)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	rv.term, err = buf.ReadBytes(ByteSeparator)
+	dr.term, err = buf.ReadBytes(ByteSeparator)
 	// there is no separator expected here, should get EOF
 	if err != io.EOF {
-		return nil, err
+		return err
 	}
 
-	return &rv, nil
+	return nil
 }
 
 func (dr *DictionaryRow) parseDictionaryV(value []byte) error {
