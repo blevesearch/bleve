@@ -30,6 +30,9 @@ type TermPrefixSearcher struct {
 func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string, field string, boost float64, explain bool) (*TermPrefixSearcher, error) {
 	// find the terms with this prefix
 	fieldDict, err := indexReader.FieldDictPrefix(field, []byte(prefix))
+	if err != nil {
+		return nil, err
+	}
 
 	// enumerate all the terms in the range
 	qsearchers := make([]search.Searcher, 0, 25)
