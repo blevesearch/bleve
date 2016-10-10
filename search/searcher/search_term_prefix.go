@@ -33,11 +33,19 @@ func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string, field s
 
 	// enumerate all the terms in the range
 	qsearchers := make([]search.Searcher, 0, 25)
+	qsearchersClose := func() {
+		for _, searcher := range qsearchers {
+			_ = searcher.Close()
+		}
+	}
+
 	tfd, err := fieldDict.Next()
 	for err == nil && tfd != nil {
 		var qsearcher *TermSearcher
 		qsearcher, err = NewTermSearcher(indexReader, string(tfd.Term), field, 1.0, explain)
 		if err != nil {
+			qsearchersClose()
+			_ = fieldDict.Close()
 			return nil, err
 		}
 		qsearchers = append(qsearchers, qsearcher)
@@ -46,12 +54,14 @@ func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string, field s
 
 	err = fieldDict.Close()
 	if err != nil {
+		qsearchersClose()
 		return nil, err
 	}
 
 	// build disjunction searcher of these ranges
 	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, explain)
 	if err != nil {
+		qsearchersClose()
 		return nil, err
 	}
 
@@ -63,6 +73,7 @@ func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string, field s
 		searcher:    searcher,
 	}, nil
 }
+
 func (s *TermPrefixSearcher) Count() uint64 {
 	return s.searcher.Count()
 }
