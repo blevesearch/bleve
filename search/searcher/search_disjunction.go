@@ -32,6 +32,7 @@ var DisjunctionMaxClauseCount = 0
 type DisjunctionSearcher struct {
 	indexReader  index.IndexReader
 	searchers    OrderedSearcherList
+	numSearchers int
 	queryNorm    float64
 	currs        []*search.DocumentMatch
 	scorer       *scorer.DisjunctionQueryScorer
@@ -67,6 +68,7 @@ func NewDisjunctionSearcher(indexReader index.IndexReader, qsearchers []search.S
 	rv := DisjunctionSearcher{
 		indexReader:  indexReader,
 		searchers:    searchers,
+		numSearchers: len(searchers),
 		currs:        make([]*search.DocumentMatch, len(searchers)),
 		scorer:       scorer.NewDisjunctionQueryScorer(explain),
 		min:          int(min),
@@ -104,17 +106,35 @@ func (s *DisjunctionSearcher) initSearchers(ctx *search.SearchContext) error {
 		}
 	}
 
-	s.updateMatches()
+	err = s.updateMatches()
+	if err != nil {
+		return err
+	}
+
 	s.initialized = true
 	return nil
 }
 
-func (s *DisjunctionSearcher) updateMatches() {
+func (s *DisjunctionSearcher) updateMatches() error {
 	matching := s.matching[:0]
 	matchingIdxs := s.matchingIdxs[:0]
 
-	for i, curr := range s.currs {
+	for i := 0; i < len(s.currs); i++ {
+		curr := s.currs[i]
 		if curr == nil {
+			err := s.searchers[i].Close()
+			if err != nil {
+				return err
+			}
+
+			last := len(s.searchers)-1
+			s.searchers[i] = s.searchers[last]
+			s.searchers = s.searchers[0:last]
+			s.currs[i] = s.currs[last]
+			s.currs = s.currs[0:last]
+
+			i-- // To keep i the same for the next iteration.
+
 			continue
 		}
 
@@ -136,6 +156,8 @@ func (s *DisjunctionSearcher) updateMatches() {
 
 	s.matching = matching
 	s.matchingIdxs = matchingIdxs
+
+	return nil
 }
 
 func (s *DisjunctionSearcher) Weight() float64 {
@@ -167,7 +189,7 @@ func (s *DisjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 		if len(s.matching) >= s.min {
 			found = true
 			// score this match
-			rv = s.scorer.Score(ctx, s.matching, len(s.matching), len(s.searchers))
+			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
 		}
 
 		// invoke next on all the matching searchers
@@ -182,7 +204,10 @@ func (s *DisjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 			}
 		}
 
-		s.updateMatches()
+		err = s.updateMatches()
+		if err != nil {
+			return nil, err
+		}
 	}
 	return rv, nil
 }
@@ -206,7 +231,10 @@ func (s *DisjunctionSearcher) Advance(ctx *search.SearchContext, ID index.IndexI
 		}
 	}
 
-	s.updateMatches()
+	err = s.updateMatches()
+	if err != nil {
+		return nil, err
+	}
 
 	return s.Next(ctx)
 }
