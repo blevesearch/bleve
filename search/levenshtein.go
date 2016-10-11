@@ -18,9 +18,9 @@ import (
 	"math"
 )
 
-func LevenshteinDistance(a, b *string) int {
-	la := len(*a)
-	lb := len(*b)
+func LevenshteinDistance(a, b string) int {
+	la := len(a)
+	lb := len(b)
 	d := make([]int, la+1)
 	var lastdiag, olddiag, temp int
 
@@ -36,7 +36,7 @@ func LevenshteinDistance(a, b *string) int {
 			if (d[j-1] + 1) < min {
 				min = d[j-1] + 1
 			}
-			if (*a)[j-1] == (*b)[i-1] {
+			if a[j-1] == b[i-1] {
 				temp = 0
 			} else {
 				temp = 1
@@ -51,14 +51,14 @@ func LevenshteinDistance(a, b *string) int {
 	return d[la]
 }
 
-// LevenshteinDistanceMax same as levenshteinDistance but
+// LevenshteinDistanceMax same as LevenshteinDistance but
 // attempts to bail early once we know the distance
 // will be greater than max
 // in which case the first return val will be the max
 // and the second will be true, indicating max was exceeded
-func LevenshteinDistanceMax(a, b *string, max int) (int, bool) {
-	la := len(*a)
-	lb := len(*b)
+func LevenshteinDistanceMax(a, b string, max int) (int, bool) {
+	la := len(a)
+	lb := len(b)
 
 	ld := int(math.Abs(float64(la - lb)))
 	if ld > max {
@@ -81,7 +81,7 @@ func LevenshteinDistanceMax(a, b *string, max int) (int, bool) {
 			if (d[j-1] + 1) < min {
 				min = d[j-1] + 1
 			}
-			if (*a)[j-1] == (*b)[i-1] {
+			if a[j-1] == b[i-1] {
 				temp = 0
 			} else {
 				temp = 1

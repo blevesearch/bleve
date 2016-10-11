@@ -37,7 +37,7 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string, prefix, fuzzin
 		}
 	}
 
-	candidateTerms, err := findFuzzyCandidateTerms(indexReader, &term, fuzziness, field, prefixTerm)
+	candidateTerms, err := findFuzzyCandidateTerms(indexReader, term, fuzziness, field, prefixTerm)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string, prefix, fuzzin
 	}, nil
 }
 
-func findFuzzyCandidateTerms(indexReader index.IndexReader, term *string, fuzziness int, field, prefixTerm string) (rv []string, err error) {
+func findFuzzyCandidateTerms(indexReader index.IndexReader, term string, fuzziness int, field, prefixTerm string) (rv []string, err error) {
 	rv = make([]string, 0)
 	var fieldDict index.FieldDict
 	if len(prefixTerm) > 0 {
@@ -93,7 +93,7 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term *string, fuzzin
 	// enumerate terms and check levenshtein distance
 	tfd, err := fieldDict.Next()
 	for err == nil && tfd != nil {
-		ld, exceeded := search.LevenshteinDistanceMax(term, &tfd.Term, fuzziness)
+		ld, exceeded := search.LevenshteinDistanceMax(term, tfd.Term, fuzziness)
 		if !exceeded && ld <= fuzziness {
 			rv = append(rv, tfd.Term)
 			if tooManyClauses(len(rv)) {
