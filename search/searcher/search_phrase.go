@@ -22,13 +22,13 @@ import (
 )
 
 type PhraseSearcher struct {
-	initialized  bool
 	indexReader  index.IndexReader
 	mustSearcher *ConjunctionSearcher
 	queryNorm    float64
 	currMust     *search.DocumentMatch
 	slop         int
 	terms        []string
+	initialized  bool
 }
 
 func NewPhraseSearcher(indexReader index.IndexReader, mustSearcher *ConjunctionSearcher, terms []string) (*PhraseSearcher, error) {
@@ -58,13 +58,9 @@ func (s *PhraseSearcher) computeQueryNorm() {
 }
 
 func (s *PhraseSearcher) initSearchers(ctx *search.SearchContext) error {
-	var err error
-	// get all searchers pointing at their first match
-	if s.mustSearcher != nil {
-		s.currMust, err = s.mustSearcher.Next(ctx)
-		if err != nil {
-			return err
-		}
+	err := s.advanceNextMust(ctx)
+	if err != nil {
+		return err
 	}
 
 	s.initialized = true
@@ -85,10 +81,7 @@ func (s *PhraseSearcher) advanceNextMust(ctx *search.SearchContext) error {
 }
 
 func (s *PhraseSearcher) Weight() float64 {
-	var rv float64
-	rv += s.mustSearcher.Weight()
-
-	return rv
+	return s.mustSearcher.Weight()
 }
 
 func (s *PhraseSearcher) SetQueryNorm(qnorm float64) {
@@ -182,9 +175,7 @@ func (s *PhraseSearcher) Advance(ctx *search.SearchContext, ID index.IndexIntern
 
 func (s *PhraseSearcher) Count() uint64 {
 	// for now return a worst case
-	var sum uint64
-	sum += s.mustSearcher.Count()
-	return sum
+	return s.mustSearcher.Count()
 }
 
 func (s *PhraseSearcher) Close() error {
