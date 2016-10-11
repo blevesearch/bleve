@@ -64,8 +64,18 @@ func toLowerDeferredCopy(s []byte) []byte {
 		if r >= utf8.RuneSelf {
 			r, wid = utf8.DecodeRune(s[i:])
 		}
+
 		l := unicode.ToLower(r)
-		lwid := utf8.RuneLen(l)
+
+		// If the rune is already lowercased, just move to the
+		// next rune.
+		if l == r {
+			i += wid
+			j += wid
+			continue
+		}
+
+  		lwid := utf8.RuneLen(l)
 		if lwid > wid {
 			// utf-8 encoded replacement is wider
 			// for now, punt and defer
