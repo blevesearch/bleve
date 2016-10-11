@@ -242,9 +242,9 @@ func NewFieldRowKV(key, value []byte) (*FieldRow, error) {
 const DictionaryRowMaxValueSize = binary.MaxVarintLen64
 
 type DictionaryRow struct {
-	field uint16
 	term  []byte
 	count uint64
+	field uint16
 }
 
 func (dr *DictionaryRow) Key() []byte {
@@ -315,35 +315,20 @@ func NewDictionaryRowK(key []byte) (*DictionaryRow, error) {
 }
 
 func (dr *DictionaryRow) parseDictionaryK(key []byte) error {
-	buf := bytes.NewBuffer(key)
-	_, err := buf.ReadByte() // type
-	if err != nil {
-		return err
+	dr.field = binary.LittleEndian.Uint16(key[1:3])
+	if dr.term != nil {
+		dr.term = dr.term[:0]
 	}
-
-	err = binary.Read(buf, binary.LittleEndian, &dr.field)
-	if err != nil {
-		return err
-	}
-
-	dr.term, err = buf.ReadBytes(ByteSeparator)
-	// there is no separator expected here, should get EOF
-	if err != io.EOF {
-		return err
-	}
-
+	dr.term = append(dr.term, key[3:]...)
 	return nil
 }
 
 func (dr *DictionaryRow) parseDictionaryV(value []byte) error {
-	buf := bytes.NewBuffer(value)
-
-	count, err := binary.ReadUvarint(buf)
-	if err != nil {
-		return err
+	count, nread := binary.Uvarint(value)
+	if nread <= 0 {
+		return fmt.Errorf("DictionaryRow parse Uvarint error, nread: %d", nread)
 	}
 	dr.count = count
-
 	return nil
 }
 

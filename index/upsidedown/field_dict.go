@@ -44,7 +44,7 @@ func newUpsideDownCouchFieldDict(indexReader *IndexReader, field uint16, startTe
 	return &UpsideDownCouchFieldDict{
 		indexReader: indexReader,
 		iterator:    it,
-		dictRow:     &DictionaryRow{}, // Pre-alloced, reused row.
+		dictRow:     &DictionaryRow{},   // Pre-alloced, reused row.
 		dictEntry:   &index.DictEntry{}, // Pre-alloced, reused entry.
 		field:       field,
 	}, nil

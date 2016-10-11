@@ -78,11 +78,11 @@ func toLowerDeferredCopy(s []byte) []byte {
 		// Handles the Unicode edge-case where the last
 		// rune in a word on the greek Σ needs to be converted
 		// differently.
-		if l == 'σ' && i + 2 == len(s) {
+		if l == 'σ' && i+2 == len(s) {
 			l = 'ς'
 		}
 
-  		lwid := utf8.RuneLen(l)
+		lwid := utf8.RuneLen(l)
 		if lwid > wid {
 			// utf-8 encoded replacement is wider
 			// for now, punt and defer
