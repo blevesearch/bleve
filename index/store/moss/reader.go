@@ -15,8 +15,6 @@
 package moss
 
 import (
-	"math/big"
-
 	"github.com/couchbase/moss"
 
 	"github.com/blevesearch/bleve/index/store"
@@ -42,10 +40,8 @@ func (r *Reader) MultiGet(keys [][]byte) ([][]byte, error) {
 	return store.MultiGet(r, keys)
 }
 
-var bigOne = big.NewInt(1)
-
 func (r *Reader) PrefixIterator(k []byte) store.KVIterator {
-	kEnd := big.NewInt(0).Add(big.NewInt(0).SetBytes(k), bigOne).Bytes()
+	kEnd := incrementBytes(k)
 
 	iter, err := r.ss.StartIterator(k, kEnd, moss.IteratorOptions{})
 	if err != nil {
@@ -86,4 +82,16 @@ func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
 
 func (r *Reader) Close() error {
 	return r.ss.Close()
+}
+
+func incrementBytes(in []byte) []byte {
+	rv := make([]byte, len(in))
+	copy(rv, in)
+	for i := len(rv) - 1; i >= 0; i-- {
+		rv[i] = rv[i] + 1
+		if rv[i] != 0 {
+			return rv // didn't overflow, so stop
+		}
+	}
+	return nil // overflowed
 }
