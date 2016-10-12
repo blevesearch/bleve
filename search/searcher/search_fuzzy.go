@@ -30,10 +30,13 @@ type FuzzySearcher struct {
 }
 
 func NewFuzzySearcher(indexReader index.IndexReader, term string, prefix, fuzziness int, field string, boost float64, explain bool) (*FuzzySearcher, error) {
+	// Note: we don't byte slice the term for a prefix because of runes.
 	prefixTerm := ""
 	for i, r := range term {
 		if i < prefix {
 			prefixTerm += string(r)
+		} else {
+			break
 		}
 	}
 
