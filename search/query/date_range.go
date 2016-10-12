@@ -55,7 +55,7 @@ func queryTimeFromString(t string) (time.Time, error) {
 
 func (t *BleveQueryTime) MarshalJSON() ([]byte, error) {
 	tt := time.Time(t.Time)
-	return []byte(tt.Format(QueryDateTimeFormat)), nil
+	return []byte("\"" + tt.Format(QueryDateTimeFormat) + "\""), nil
 }
 
 func (t *BleveQueryTime) UnmarshalJSON(data []byte) error {
