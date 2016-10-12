@@ -497,7 +497,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	searchDuration := time.Since(searchStart)
 	atomic.AddUint64(&i.stats.searchTime, uint64(searchDuration))
 
-	if searchDuration > Config.SlowSearchLogThreshold {
+	if Config.SlowSearchLogThreshold > 0 &&
+		searchDuration > Config.SlowSearchLogThreshold {
 		logger.Printf("slow search took %s - %v", searchDuration, req)
 	}
 
