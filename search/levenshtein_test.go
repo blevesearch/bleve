@@ -38,7 +38,7 @@ func TestLevenshteinDistance(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := LevenshteinDistance(&test.a, &test.b)
+		actual := LevenshteinDistance(test.a, test.b)
 		if actual != test.dist {
 			t.Errorf("expected %d, got %d for %s and %s", test.dist, actual, test.a, test.b)
 		}
@@ -78,7 +78,7 @@ func TestLevenshteinDistanceMax(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual, exceeded := LevenshteinDistanceMax(&test.a, &test.b, test.max)
+		actual, exceeded := LevenshteinDistanceMax(test.a, test.b, test.max)
 		if actual != test.dist || exceeded != test.exceeded {
 			t.Errorf("expected %d %t, got %d %t for %s and %s", test.dist, test.exceeded, actual, exceeded, test.a, test.b)
 		}
@@ -104,7 +104,7 @@ func BenchmarkLevenshteinDistance(b *testing.B) {
 	a := "water"
 	for i := 0; i < b.N; i++ {
 		for _, t := range benchmarkTerms {
-			LevenshteinDistance(&a, &t)
+			LevenshteinDistance(a, t)
 		}
 	}
 }
@@ -113,7 +113,7 @@ func BenchmarkLevenshteinDistanceMax(b *testing.B) {
 	a := "water"
 	for i := 0; i < b.N; i++ {
 		for _, t := range benchmarkTerms {
-			LevenshteinDistanceMax(&a, &t, 2)
+			LevenshteinDistanceMax(a, t, 2)
 		}
 	}
 }
