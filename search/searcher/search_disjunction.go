@@ -127,7 +127,7 @@ func (s *DisjunctionSearcher) updateMatches() error {
 				return err
 			}
 
-			last := len(s.searchers)-1
+			last := len(s.searchers) - 1
 			s.searchers[i] = s.searchers[last]
 			s.searchers = s.searchers[0:last]
 			s.currs[i] = s.currs[last]
