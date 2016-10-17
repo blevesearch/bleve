@@ -130,7 +130,7 @@ type KVBatchOptions struct {
 	// the KVBatch.
 	NumSets int
 
-	// NumMerges is the number of Merge() calls the caller will invoke
+	// NumDeletes is the number of Delete() calls the caller will invoke
 	// on the KVBatch.
 	NumDeletes int
 
