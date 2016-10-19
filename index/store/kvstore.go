@@ -16,7 +16,9 @@ package store
 
 import "encoding/json"
 
-// KVStore is an abstraction for working with KV stores
+// KVStore is an abstraction for working with KV stores.  Note that 
+// in order to be used with the bleve.registry, it must also implement
+// a constructor function of the registry.KVStoreConstructor type.
 type KVStore interface {
 
 	// Writer returns a KVWriter which can be used to
