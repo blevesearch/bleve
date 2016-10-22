@@ -122,19 +122,6 @@ func (s *DisjunctionSearcher) updateMatches() error {
 	for i := 0; i < len(s.currs); i++ {
 		curr := s.currs[i]
 		if curr == nil {
-			err := s.searchers[i].Close()
-			if err != nil {
-				return err
-			}
-
-			last := len(s.searchers) - 1
-			s.searchers[i] = s.searchers[last]
-			s.searchers = s.searchers[0:last]
-			s.currs[i] = s.currs[last]
-			s.currs = s.currs[0:last]
-
-			i-- // To keep i the same for the next iteration.
-
 			continue
 		}
 
