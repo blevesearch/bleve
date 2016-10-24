@@ -218,10 +218,12 @@ func NewMemOnly(mapping mapping.IndexMapping) (Index, error) {
 // which must not already exist.
 // The provided mapping will be used for all
 // Index/Search operations.
-// The specified index type will be used
+// The specified index type will be used.
 // The specified kvstore implementation will be used
 // and the provided kvconfig will be passed to its
-// constructor.
+// constructor. Note that currently the values of kvconfig must
+// be able to be marshaled and unmarshaled using the encoding/json library (used
+// when reading/writing the index metadata file).
 func NewUsing(path string, mapping mapping.IndexMapping, indexType string, kvstore string, kvconfig map[string]interface{}) (Index, error) {
 	return newIndexUsing(path, mapping, indexType, kvstore, kvconfig)
 }
