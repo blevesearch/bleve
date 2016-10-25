@@ -87,7 +87,7 @@ type FieldTerms map[string][]string
 
 // FieldsNotYetCached returns a list of fields not yet cached out of a larger list of fields
 func (f FieldTerms) FieldsNotYetCached(fields []string) []string {
-	var rv []string
+	rv := make([]string, 0, len(fields))
 	for _, field := range fields {
 		if _, ok := f[field]; !ok {
 			rv = append(rv, field)
