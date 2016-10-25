@@ -42,6 +42,9 @@ type DocumentMapping struct {
 	Properties      map[string]*DocumentMapping `json:"properties,omitempty"`
 	Fields          []*FieldMapping             `json:"fields,omitempty"`
 	DefaultAnalyzer string                      `json:"default_analyzer"`
+
+	// StructTagKey overrides "json" when looking for field names in struct tags
+	StructTagKey string `json:"struct_tag_key,omitempty"`
 }
 
 func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
@@ -285,6 +288,11 @@ func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
+		case "struct_tag_key":
+			err := json.Unmarshal(v, &dm.StructTagKey)
+			if err != nil {
+				return err
+			}
 		default:
 			invalidKeys = append(invalidKeys, k)
 		}
@@ -314,6 +322,12 @@ func (dm *DocumentMapping) defaultAnalyzerName(path []string) string {
 }
 
 func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes []uint64, context *walkContext) {
+	// allow default "json" tag to be overriden
+	structTagKey := dm.StructTagKey
+	if structTagKey == "" {
+		structTagKey = "json"
+	}
+
 	val := reflect.ValueOf(data)
 	typ := val.Type()
 	switch typ.Kind() {
@@ -335,15 +349,15 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 				fieldName = ""
 			}
 
-			// if the field has a JSON name, prefer that
-			jsonTag := field.Tag.Get("json")
-			jsonFieldName := parseJSONTagName(jsonTag)
-			if jsonFieldName == "-" {
+			// if the field has a name under the specified tag, prefer that
+			tag := field.Tag.Get(structTagKey)
+			tagFieldName := parseTagName(tag)
+			if tagFieldName == "-" {
 				continue
 			}
-			// allow json tag to set field name to empty, only if anonymous
-			if field.Tag != "" && (jsonFieldName != "" || field.Anonymous) {
-				fieldName = jsonFieldName
+			// allow tag to set field name to empty, only if anonymous
+			if field.Tag != "" && (tagFieldName != "" || field.Anonymous) {
+				fieldName = tagFieldName
 			}
 
 			if val.Field(i).CanInterface() {
