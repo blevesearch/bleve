@@ -119,12 +119,7 @@ func (i *IndexReader) DocumentFieldTerms(id index.IndexInternalID, fields []stri
 	}
 	for _, entry := range back.termEntries {
 		if field, ok := fieldsMap[uint16(*entry.Field)]; ok {
-			terms, ok := rv[field]
-			if !ok {
-				terms = make([]string, 0)
-			}
-			terms = append(terms, *entry.Term)
-			rv[field] = terms
+			rv[field] = append(rv[field], *entry.Term)
 		}
 	}
 	return rv, nil
