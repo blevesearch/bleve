@@ -102,11 +102,13 @@ func (s *PhraseSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch,
 		freq := 0
 		firstTerm := s.terms[0]
 		for field, termLocMap := range s.currMust.Locations {
-			rvtlm := make(search.TermLocationMap, 0)
 			locations, ok := termLocMap[firstTerm]
 			if !ok {
 				continue
 			}
+
+			rvtlm := make(search.TermLocationMap, 0)
+
 		OUTER:
 			for _, location := range locations {
 				crvtlm := make(search.TermLocationMap, 0)
