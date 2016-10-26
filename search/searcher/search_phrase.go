@@ -110,8 +110,9 @@ func (s *PhraseSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch,
 		OUTER:
 			for _, location := range locations {
 				crvtlm := make(search.TermLocationMap, 0)
+				crvtlm.AddLocation(firstTerm, location)
 			INNER:
-				for i := 0; i < len(s.terms); i++ {
+				for i := 1; i < len(s.terms); i++ {
 					nextTerm := s.terms[i]
 					if nextTerm == "" {
 						continue
