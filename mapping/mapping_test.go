@@ -160,6 +160,88 @@ func TestMappingStructWithJSONTagsOneDisabled(t *testing.T) {
 	}
 }
 
+func TestMappingStructWithAlternateTags(t *testing.T) {
+
+	mapping := buildMapping()
+	mapping.(*IndexMappingImpl).DefaultMapping.StructTagKey = "bleve"
+
+	x := struct {
+		NoBLEVETag string
+		Name       string `bleve:"name"`
+	}{
+		Name: "marty",
+	}
+
+	doc := document.NewDocument("1")
+	err := mapping.MapDocument(doc, x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundBLEVEName := false
+	foundNoBLEVEName := false
+	count := 0
+	for _, f := range doc.Fields {
+		if f.Name() == "name" {
+			foundBLEVEName = true
+		}
+		if f.Name() == "NoBLEVETag" {
+			foundNoBLEVEName = true
+		}
+		count++
+	}
+	if !foundBLEVEName {
+		t.Errorf("expected to find field named 'name'")
+	}
+	if !foundNoBLEVEName {
+		t.Errorf("expected to find field named 'NoBLEVETag'")
+	}
+	if count != 2 {
+		t.Errorf("expected to find 2 find, found %d", count)
+	}
+}
+
+func TestMappingStructWithAlternateTagsTwoDisabled(t *testing.T) {
+
+	mapping := buildMapping()
+	mapping.(*IndexMappingImpl).DefaultMapping.StructTagKey = "bleve"
+
+	x := struct {
+		Name       string `json:"-"     bleve:"name"`
+		Title      string `json:"-"     bleve:"-"`
+		NoBLEVETag string `json:"-"`
+		Extra      string `json:"extra" bleve:"-"`
+	}{
+		Name: "marty",
+	}
+
+	doc := document.NewDocument("1")
+	err := mapping.MapDocument(doc, x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundBLEVEName := false
+	foundNoBLEVEName := false
+	count := 0
+	for _, f := range doc.Fields {
+		if f.Name() == "name" {
+			foundBLEVEName = true
+		}
+		if f.Name() == "NoBLEVETag" {
+			foundNoBLEVEName = true
+		}
+		count++
+	}
+	if !foundBLEVEName {
+		t.Errorf("expected to find field named 'name'")
+	}
+	if !foundNoBLEVEName {
+		t.Errorf("expected to find field named 'NoBLEVETag'")
+	}
+	if count != 2 {
+		t.Errorf("expected to find 2 find, found %d", count)
+	}
+}
+
 func TestMappingStructWithPointerToString(t *testing.T) {
 
 	mapping := buildMapping()
