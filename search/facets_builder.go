@@ -29,6 +29,7 @@ type FacetBuilder interface {
 type FacetsBuilder struct {
 	indexReader index.IndexReader
 	facets      map[string]FacetBuilder
+	fields      []string
 }
 
 func NewFacetsBuilder(indexReader index.IndexReader) *FacetsBuilder {
@@ -43,14 +44,15 @@ func (fb *FacetsBuilder) Add(name string, facetBuilder FacetBuilder) {
 }
 
 func (fb *FacetsBuilder) Update(docMatch *DocumentMatch) error {
-	var fields []string
-	for _, facetBuilder := range fb.facets {
-		fields = append(fields, facetBuilder.Field())
+	if fb.fields == nil {
+		for _, facetBuilder := range fb.facets {
+			fb.fields = append(fb.fields, facetBuilder.Field())
+		}
 	}
 
-	if len(fields) > 0 {
+	if len(fb.fields) > 0 {
 		// find out which fields haven't been loaded yet
-		fieldsToLoad := docMatch.CachedFieldTerms.FieldsNotYetCached(fields)
+		fieldsToLoad := docMatch.CachedFieldTerms.FieldsNotYetCached(fb.fields)
 		// look them up
 		fieldTerms, err := fb.indexReader.DocumentFieldTerms(docMatch.IndexInternalID, fieldsToLoad)
 		if err != nil {
