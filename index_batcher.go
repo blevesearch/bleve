@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+// NOTE XXX As this approach uses carefully orchestrated interactions
+// between a mutex, channels, and reference swapping, be sure to carefully
+// consider the impact of reordering statements or making changes to the
+// patterns present in the code.
+
 // bleveIndex is an alias that allows the IndexBatcher to embed a Index
 type bleveIndex Index
 
@@ -28,7 +33,7 @@ type IndexBatcher struct {
 	signal chan bool
 }
 
-// rslt is used as a silly double pointer for errors
+// rslt is used as a kind of double pointer for errors
 type rslt struct {
 	err error
 }
