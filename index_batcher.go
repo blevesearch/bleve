@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// NOTE XXX As this approach uses carefully orchestrated interactions
+// NOTE As this approach uses carefully orchestrated interactions
 // between a mutex, channels, and reference swapping, be sure to carefully
 // consider the impact of reordering statements or making changes to the
 // patterns present in the code. Specifically, individual operations follow the
