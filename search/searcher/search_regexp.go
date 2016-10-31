@@ -21,15 +21,7 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type RegexpSearcher struct {
-	indexReader index.IndexReader
-	pattern     *regexp.Regexp
-	field       string
-	explain     bool
-	searcher    *DisjunctionSearcher
-}
-
-func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp, field string, boost float64, explain bool) (*RegexpSearcher, error) {
+func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp, field string, boost float64, explain bool) (search.Searcher, error) {
 
 	prefixTerm, complete := pattern.LiteralPrefix()
 	var candidateTerms []string
@@ -67,13 +59,7 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp, fi
 		return nil, err
 	}
 
-	return &RegexpSearcher{
-		indexReader: indexReader,
-		pattern:     pattern,
-		field:       field,
-		explain:     explain,
-		searcher:    searcher,
-	}, nil
+	return searcher, err
 }
 
 func findRegexpCandidateTerms(indexReader index.IndexReader, pattern *regexp.Regexp, field, prefixTerm string) (rv []string, err error) {
@@ -103,37 +89,4 @@ func findRegexpCandidateTerms(indexReader index.IndexReader, pattern *regexp.Reg
 	}
 
 	return rv, err
-}
-
-func (s *RegexpSearcher) Count() uint64 {
-	return s.searcher.Count()
-}
-
-func (s *RegexpSearcher) Weight() float64 {
-	return s.searcher.Weight()
-}
-
-func (s *RegexpSearcher) SetQueryNorm(qnorm float64) {
-	s.searcher.SetQueryNorm(qnorm)
-}
-
-func (s *RegexpSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
-	return s.searcher.Next(ctx)
-
-}
-
-func (s *RegexpSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
-	return s.searcher.Advance(ctx, ID)
-}
-
-func (s *RegexpSearcher) Close() error {
-	return s.searcher.Close()
-}
-
-func (s *RegexpSearcher) Min() int {
-	return 0
-}
-
-func (s *RegexpSearcher) DocumentMatchPoolSize() int {
-	return s.searcher.DocumentMatchPoolSize()
 }
