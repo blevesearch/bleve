@@ -9,9 +9,31 @@ import (
 // NOTE XXX As this approach uses carefully orchestrated interactions
 // between a mutex, channels, and reference swapping, be sure to carefully
 // consider the impact of reordering statements or making changes to the
-// patterns present in the code.
+// patterns present in the code. Specifically, individual operations follow the
+// pattern of:
+// - Construct empty references for result error, signal channel
+// - Acquire lock
+// - Assign references to current result error and signal channel
+// - Add operation to batch
+// - Release lock
+// - Wait on signal channel to close
+// - Return result error
+// While the batch loop follows the pattern on timer event:
+// - Acquire lock
+// - Execute batch
+// - Store result in current result error
+// - Make new current result error for use by operations in the next batch
+// - Close signal channel so that operations waiting on the completion of this
+//   batch will return the result pointed to by the previous result error that
+//   they are still holding.
+// - Make new current signal channel for use by operations in the next batch
+// - Release lock
+// This design minimizes the need for allocating channels, uses only one go
+// routine for the batching, and doesn't require tracking the number of
+// operations waiting on a response or looping to notify each waiting operation.
 
-// bleveIndex is an alias that allows the IndexBatcher to embed a Index
+// bleveIndex is an alias for Index used by the IndexBatcher to avoid a between
+// the embedded Index field and the overrideen Index method
 type bleveIndex Index
 
 // IndexBatcher can be wrapped around a Index to aggregate operations
@@ -29,13 +51,8 @@ type IndexBatcher struct {
 	// and adding operations to the batch.
 	lock   sync.Mutex
 	batch  *Batch
-	result *rslt
+	result *error
 	signal chan bool
-}
-
-// rslt is used as a kind of double pointer for errors
-type rslt struct {
-	err error
 }
 
 // NewIndexBatcher returns an index that will aggregate and fire modifying
@@ -52,7 +69,7 @@ func NewIndexBatcher(index Index, period time.Duration) Index {
 		period: period,
 		closer: make(chan bool),
 		signal: make(chan bool),
-		result: &rslt{},
+		result: new(error),
 	}
 
 	go ib.batchloop()
@@ -72,13 +89,13 @@ BatchLoop:
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						ib.result.err = fmt.Errorf("IndexBatcher caught a panic: %v", r)
+						(*ib.result) = fmt.Errorf("IndexBatcher caught a panic: %v", r)
 					}
 				}()
-				ib.result.err = ib.Batch(ib.batch)
+				(*ib.result) = ib.Batch(ib.batch)
 			}()
 			ib.batch.Reset()
-			ib.result = &rslt{}
+			ib.result = new(error)
 			close(ib.signal)
 			ib.signal = make(chan bool)
 			ib.lock.Unlock()
@@ -88,7 +105,7 @@ BatchLoop:
 	}
 
 	t.Stop()
-	ib.result.err = fmt.Errorf("IndexBatcher has been closed")
+	(*ib.result) = fmt.Errorf("IndexBatcher has been closed")
 	close(ib.signal)
 }
 
@@ -102,7 +119,7 @@ func (ib *IndexBatcher) Close() error {
 // Index the object with the specified identifier. May hold the operation for up
 // to ib.period time before executing in a batch.
 func (ib *IndexBatcher) Index(id string, data interface{}) error {
-	var result *rslt
+	var result *error
 	var signal chan bool
 	ib.lock.Lock()
 	result = ib.result
@@ -115,13 +132,13 @@ func (ib *IndexBatcher) Index(id string, data interface{}) error {
 	}
 
 	<-signal
-	return result.err
+	return *result
 }
 
 // Delete entries for the specified identifier from the index. May hold the
 // operation for up to ib.period time before executing in a batch.
 func (ib *IndexBatcher) Delete(id string) error {
-	var result *rslt
+	var result *error
 	var signal chan bool
 	ib.lock.Lock()
 	result = ib.result
@@ -130,13 +147,13 @@ func (ib *IndexBatcher) Delete(id string) error {
 	ib.lock.Unlock()
 
 	<-signal
-	return result.err
+	return *result
 }
 
 // SetInternal mappings directly in the kvstore. May hold the
 // operation for up to ib.period time before executing in a batch.
 func (ib *IndexBatcher) SetInternal(key, val []byte) error {
-	var result *rslt
+	var result *error
 	var signal chan bool
 	ib.lock.Lock()
 	result = ib.result
@@ -145,13 +162,13 @@ func (ib *IndexBatcher) SetInternal(key, val []byte) error {
 	ib.lock.Unlock()
 
 	<-signal
-	return result.err
+	return *result
 }
 
 // DeleteInternal mappings directly from the kvstore. May hold the
 // operation for up to ib.period time before executing in a batch.
 func (ib *IndexBatcher) DeleteInternal(key []byte) error {
-	var result *rslt
+	var result *error
 	var signal chan bool
 	ib.lock.Lock()
 	result = ib.result
@@ -160,5 +177,5 @@ func (ib *IndexBatcher) DeleteInternal(key []byte) error {
 	ib.lock.Unlock()
 
 	<-signal
-	return result.err
+	return *result
 }
