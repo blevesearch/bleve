@@ -32,8 +32,8 @@ import (
 // routine for the batching, and doesn't require tracking the number of
 // operations waiting on a response or looping to notify each waiting operation.
 
-// bleveIndex is an alias for Index used by the IndexBatcher to avoid a between
-// the embedded Index field and the overrideen Index method
+// bleveIndex is an alias for Index used by the IndexBatcher to avoid a conflict
+// between the embedded Index field and the overridden Index method
 type bleveIndex Index
 
 // IndexBatcher can be wrapped around a Index to aggregate operations
