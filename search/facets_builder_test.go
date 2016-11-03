@@ -124,6 +124,11 @@ func TestNumericFacetResultsMerge(t *testing.T) {
 	medhi := 6.0
 	hihigher := 9.0
 
+	// why second copy? the pointers may be different, but values the same
+	lowmed2 := 3.0
+	medhi2 := 6.0
+	hihigher2 := 9.0
+
 	fr1 := &FacetResult{
 		Field:   "rating",
 		Total:   100,
@@ -161,18 +166,18 @@ func TestNumericFacetResultsMerge(t *testing.T) {
 		NumericRanges: []*NumericRangeFacet{
 			{
 				Name:  "low",
-				Max:   &lowmed,
+				Max:   &lowmed2,
 				Count: 25,
 			},
 			{
 				Name:  "med",
-				Max:   &lowmed,
-				Min:   &medhi,
+				Max:   &lowmed2,
+				Min:   &medhi2,
 				Count: 22,
 			},
 			{
 				Name:  "highest",
-				Min:   &hihigher,
+				Min:   &hihigher2,
 				Count: 3,
 			},
 		},
