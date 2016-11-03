@@ -105,11 +105,34 @@ type NumericRangeFacet struct {
 	Count int      `json:"count"`
 }
 
+func (nrf *NumericRangeFacet) Same(other *NumericRangeFacet) bool {
+	if nrf.Min == nil && other.Min != nil {
+		return false
+	}
+	if nrf.Min != nil && other.Min == nil {
+		return false
+	}
+	if nrf.Min != nil && other.Min != nil && *nrf.Min != *other.Min {
+		return false
+	}
+	if nrf.Max == nil && other.Max != nil {
+		return false
+	}
+	if nrf.Max != nil && other.Max == nil {
+		return false
+	}
+	if nrf.Max != nil && other.Max != nil && *nrf.Max != *other.Max {
+		return false
+	}
+
+	return true
+}
+
 type NumericRangeFacets []*NumericRangeFacet
 
 func (nrf NumericRangeFacets) Add(numericRangeFacet *NumericRangeFacet) NumericRangeFacets {
 	for _, existingNr := range nrf {
-		if numericRangeFacet.Min == existingNr.Min && numericRangeFacet.Max == existingNr.Max {
+		if numericRangeFacet.Same(existingNr) {
 			existingNr.Count += numericRangeFacet.Count
 			return nrf
 		}
