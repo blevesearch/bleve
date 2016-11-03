@@ -443,53 +443,26 @@ type asyncSearchResult struct {
 	Err    error
 }
 
-func wrapSearch(ctx context.Context, in Index, req *SearchRequest) *asyncSearchResult {
-	rv := asyncSearchResult{Name: in.Name()}
-	rv.Result, rv.Err = in.SearchInContext(ctx, req)
-	return &rv
-}
-
-func wrapSearchTimeout(ctx context.Context, in Index, req *SearchRequest) *asyncSearchResult {
-	reschan := make(chan *asyncSearchResult)
-	go func() { reschan <- wrapSearch(ctx, in, req) }()
-	select {
-	case res := <-reschan:
-		return res
-	case <-ctx.Done():
-		return &asyncSearchResult{Name: in.Name(), Err: ctx.Err()}
-	}
-}
-
-// MultiSearch executes a SearchRequest across multiple
-// Index objects, then merges the results.
+// MultiSearch executes a SearchRequest across multiple Index objects,
+// then merges the results.  The indexes must honor any ctx deadline.
 func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 
 	searchStart := time.Now()
-	asyncResults := make(chan *asyncSearchResult)
+	asyncResults := make(chan *asyncSearchResult, len(indexes))
 
 	// run search on each index in separate go routine
 	var waitGroup sync.WaitGroup
 
-	var searchChildIndex = func(waitGroup *sync.WaitGroup, in Index, asyncResults chan *asyncSearchResult) {
-		childReq := createChildSearchRequest(req)
-		if ia, ok := in.(IndexAlias); ok {
-			// if the child index is another alias, trust it returns promptly on timeout/cancel
-			go func() {
-				defer waitGroup.Done()
-				asyncResults <- wrapSearch(ctx, ia, childReq)
-			}()
-		} else {
-			// if the child index is not an alias, enforce timeout here
-			go func() {
-				defer waitGroup.Done()
-				asyncResults <- wrapSearchTimeout(ctx, in, childReq)
-			}()
-		}
+	var searchChildIndex = func(in Index, childReq *SearchRequest) {
+		rv := asyncSearchResult{Name: in.Name()}
+		rv.Result, rv.Err = in.SearchInContext(ctx, childReq)
+		asyncResults <- &rv
+		waitGroup.Done()
 	}
 
+	waitGroup.Add(len(indexes))
 	for _, in := range indexes {
-		waitGroup.Add(1)
-		searchChildIndex(&waitGroup, in, asyncResults)
+		go searchChildIndex(in, createChildSearchRequest(req))
 	}
 
 	// on another go routine, close after finished
