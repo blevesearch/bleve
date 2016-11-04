@@ -38,19 +38,22 @@ type dateTimeRange struct {
 	endString   *string
 }
 
-func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) {
+func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (start, end time.Time) {
+	start = dr.Start
 	if dr.Start.IsZero() && dr.startString != nil {
-		start, err := dateTimeParser.ParseDateTime(*dr.startString)
+		s, err := dateTimeParser.ParseDateTime(*dr.startString)
 		if err == nil {
-			dr.Start = start
+			start = s
 		}
 	}
+	end = dr.End
 	if dr.End.IsZero() && dr.endString != nil {
-		end, err := dateTimeParser.ParseDateTime(*dr.endString)
+		e, err := dateTimeParser.ParseDateTime(*dr.endString)
 		if err == nil {
-			dr.End = end
+			end = e
 		}
 	}
+	return start, end
 }
 
 func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
@@ -74,6 +77,21 @@ func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
 	}
 
 	return nil
+}
+
+func (dr *dateTimeRange) MarshalJSON() ([]byte, error) {
+	rv := map[string]interface{}{
+		"name":  dr.Name,
+		"start": dr.Start,
+		"end":   dr.End,
+	}
+	if dr.Start.IsZero() && dr.startString != nil {
+		rv["start"] = dr.startString
+	}
+	if dr.End.IsZero() && dr.endString != nil {
+		rv["end"] = dr.endString
+	}
+	return json.Marshal(rv)
 }
 
 // A FacetRequest describes a facet or aggregation
