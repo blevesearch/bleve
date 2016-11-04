@@ -395,8 +395,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				facetBuilder := facet.NewDateTimeFacetBuilder(facetRequest.Field, facetRequest.Size)
 				dateTimeParser := i.m.DateTimeParserNamed("")
 				for _, dr := range facetRequest.DateTimeRanges {
-					dr.ParseDates(dateTimeParser)
-					facetBuilder.AddRange(dr.Name, dr.Start, dr.End)
+					start, end := dr.ParseDates(dateTimeParser)
+					facetBuilder.AddRange(dr.Name, start, end)
 				}
 				facetsBuilder.Add(facetName, facetBuilder)
 			} else {
