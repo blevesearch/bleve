@@ -80,8 +80,8 @@ type DateRangeQuery struct {
 	End            BleveQueryTime `json:"end,omitempty"`
 	InclusiveStart *bool          `json:"inclusive_start,omitempty"`
 	InclusiveEnd   *bool          `json:"inclusive_end,omitempty"`
-	Field          string         `json:"field,omitempty"`
-	Boost          *Boost         `json:"boost,omitempty"`
+	FieldVal       string         `json:"field,omitempty"`
+	BoostVal       *Boost         `json:"boost,omitempty"`
 }
 
 // NewDateRangeQuery creates a new Query for ranges
@@ -110,19 +110,20 @@ func NewDateRangeInclusiveQuery(start, end time.Time, startInclusive, endInclusi
 
 func (q *DateRangeQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
 }
+
+func (q *DateRangeQuery) Boost() float64{
+	return q.BoostVal.Value()
+}
+
 
 func (q *DateRangeQuery) SetField(f string) {
-	q.Field = f
+	q.FieldVal = f
 }
 
-func (q *DateRangeQuery) GetField() string{
-	return q.Field
-}
-
-func (q *DateRangeQuery) GetBoost() float64{
-	return q.Boost.Value()
+func (q *DateRangeQuery) Field() string{
+	return q.FieldVal
 }
 
 func (q *DateRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
@@ -131,12 +132,12 @@ func (q *DateRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, e
 		return nil, err
 	}
 
-	field := q.Field
-	if q.Field == "" {
+	field := q.FieldVal
+	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
 
-	return searcher.NewNumericRangeSearcher(i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.Boost.Value(), explain)
+	return searcher.NewNumericRangeSearcher(i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal.Value(), explain)
 }
 
 func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {

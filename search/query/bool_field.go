@@ -23,8 +23,8 @@ import (
 
 type BoolFieldQuery struct {
 	Bool  bool   `json:"bool"`
-	Field string `json:"field,omitempty"`
-	Boost *Boost `json:"boost,omitempty"`
+	FieldVal string `json:"field,omitempty"`
+	BoostVal *Boost `json:"boost,omitempty"`
 }
 
 // NewBoolFieldQuery creates a new Query for boolean fields
@@ -36,30 +36,30 @@ func NewBoolFieldQuery(val bool) *BoolFieldQuery {
 
 func (q *BoolFieldQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
+}
+
+func (q *BoolFieldQuery) Boost() float64{
+	return q.BoostVal.Value()
 }
 
 func (q *BoolFieldQuery) SetField(f string) {
-	q.Field = f
+	q.FieldVal = f
 }
 
-func (q *BoolFieldQuery) GetField() string{
-	return q.Field
-}
-
-func (q *BoolFieldQuery) GetBoost() float64{
-	return q.Boost.Value()
+func (q *BoolFieldQuery) Field() string{
+	return q.FieldVal
 }
 
 
 func (q *BoolFieldQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	field := q.Field
-	if q.Field == "" {
+	field := q.FieldVal
+	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
 	term := "F"
 	if q.Bool {
 		term = "T"
 	}
-	return searcher.NewTermSearcher(i, term, field, q.Boost.Value(), explain)
+	return searcher.NewTermSearcher(i, term, field, q.BoostVal.Value(), explain)
 }

@@ -87,7 +87,7 @@ func (q *PhraseQuery) UnmarshalJSON(data []byte) error {
 	q.Boost = tmp.Boost
 	q.termQueries = make([]Query, len(q.Terms))
 	for i, term := range q.Terms {
-		q.termQueries[i] = &TermQuery{Term: term, Field: q.Field, Boost: q.Boost}
+		q.termQueries[i] = &TermQuery{Term: term, FieldVal: q.Field, BoostVal: q.Boost}
 	}
 	return nil
 }

@@ -25,9 +25,9 @@ import (
 
 type MatchPhraseQuery struct {
 	MatchPhrase string `json:"match_phrase"`
-	Field       string `json:"field,omitempty"`
+	FieldVal    string `json:"field,omitempty"`
 	Analyzer    string `json:"analyzer,omitempty"`
-	Boost       *Boost `json:"boost,omitempty"`
+	BoostVal    *Boost `json:"boost,omitempty"`
 }
 
 // NewMatchPhraseQuery creates a new Query object
@@ -46,24 +46,24 @@ func NewMatchPhraseQuery(matchPhrase string) *MatchPhraseQuery {
 
 func (q *MatchPhraseQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
+}
+
+func (q *MatchPhraseQuery) Boost() float64{
+	return q.BoostVal.Value()
 }
 
 func (q *MatchPhraseQuery) SetField(f string) {
-	q.Field = f
+	q.FieldVal = f
 }
 
-func (q *MatchPhraseQuery) GetField() string{
-	return q.Field
-}
-
-func (q *MatchPhraseQuery) GetBoost() float64{
-	return q.Boost.Value()
+func (q *MatchPhraseQuery) Field() string{
+	return q.FieldVal
 }
 
 func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	field := q.Field
-	if q.Field == "" {
+	field := q.FieldVal
+	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
 
@@ -82,7 +82,7 @@ func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 	if len(tokens) > 0 {
 		phrase := tokenStreamToPhrase(tokens)
 		phraseQuery := NewPhraseQuery(phrase, field)
-		phraseQuery.SetBoost(q.Boost.Value())
+		phraseQuery.SetBoost(q.BoostVal.Value())
 		return phraseQuery.Searcher(i, m, explain)
 	}
 	noneQuery := NewMatchNoneQuery()
