@@ -45,6 +45,14 @@ func (q *PrefixQuery) SetField(f string) {
 	q.Field = f
 }
 
+func (q *PrefixQuery) GetField() string{
+	return q.Field
+}
+
+func (q *PrefixQuery) GetBoost() float64{
+	return q.Boost.Value()
+}
+
 func (q *PrefixQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.Field
 	if q.Field == "" {

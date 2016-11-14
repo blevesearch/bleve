@@ -43,6 +43,15 @@ func (q *BoolFieldQuery) SetField(f string) {
 	q.Field = f
 }
 
+func (q *BoolFieldQuery) GetField() string{
+	return q.Field
+}
+
+func (q *BoolFieldQuery) GetBoost() float64{
+	return q.Boost.Value()
+}
+
+
 func (q *BoolFieldQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.Field
 	if q.Field == "" {

@@ -63,6 +63,14 @@ func (q *NumericRangeQuery) SetField(f string) {
 	q.Field = f
 }
 
+func (q *NumericRangeQuery) GetField() string{
+	return q.Field
+}
+
+func (q *NumericRangeQuery) GetBoost() float64{
+	return q.Boost.Value()
+}
+
 func (q *NumericRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.Field
 	if q.Field == "" {

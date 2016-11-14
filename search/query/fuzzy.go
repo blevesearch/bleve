@@ -52,6 +52,14 @@ func (q *FuzzyQuery) SetField(f string) {
 	q.Field = f
 }
 
+func (q *FuzzyQuery) GetField() string{
+	return q.Field
+}
+
+func (q *FuzzyQuery) GetBoost() float64{
+	return q.Boost.Value()
+}
+
 func (q *FuzzyQuery) SetFuzziness(f int) {
 	q.Fuzziness = f
 }

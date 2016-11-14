@@ -117,6 +117,14 @@ func (q *DateRangeQuery) SetField(f string) {
 	q.Field = f
 }
 
+func (q *DateRangeQuery) GetField() string{
+	return q.Field
+}
+
+func (q *DateRangeQuery) GetBoost() float64{
+	return q.Boost.Value()
+}
+
 func (q *DateRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	min, max, err := q.parseEndpoints()
 	if err != nil {

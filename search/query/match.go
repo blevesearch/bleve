@@ -94,6 +94,14 @@ func (q *MatchQuery) SetField(f string) {
 	q.Field = f
 }
 
+func (q *MatchQuery) GetField() string{
+	return q.Field
+}
+
+func (q *MatchQuery) GetBoost() float64{
+	return q.Boost.Value()
+}
+
 func (q *MatchQuery) SetFuzziness(f int) {
 	q.Fuzziness = f
 }

@@ -70,6 +70,14 @@ func (q *WildcardQuery) SetField(f string) {
 	q.Field = f
 }
 
+func (q *WildcardQuery) GetField() string{
+	return q.Field
+}
+
+func (q *WildcardQuery) GetBoost() float64{
+	return q.Boost.Value()
+}
+
 func (q *WildcardQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.Field
 	if q.Field == "" {

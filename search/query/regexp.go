@@ -49,6 +49,14 @@ func (q *RegexpQuery) SetField(f string) {
 	q.Field = f
 }
 
+func (q *RegexpQuery) GetField() string{
+	return q.Field
+}
+
+func (q *RegexpQuery) GetBoost() float64{
+	return q.Boost.Value()
+}
+
 func (q *RegexpQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.Field
 	if q.Field == "" {

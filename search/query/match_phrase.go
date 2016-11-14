@@ -53,6 +53,14 @@ func (q *MatchPhraseQuery) SetField(f string) {
 	q.Field = f
 }
 
+func (q *MatchPhraseQuery) GetField() string{
+	return q.Field
+}
+
+func (q *MatchPhraseQuery) GetBoost() float64{
+	return q.Boost.Value()
+}
+
 func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.Field
 	if q.Field == "" {

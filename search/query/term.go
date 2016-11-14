@@ -44,6 +44,14 @@ func (q *TermQuery) SetField(f string) {
 	q.Field = f
 }
 
+func (q *TermQuery) GetField() string{
+	return q.Field
+}
+
+func (q *TermQuery) GetBoost() float64{
+	return q.Boost.Value()
+}
+
 func (q *TermQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 	field := q.Field
 	if q.Field == "" {
