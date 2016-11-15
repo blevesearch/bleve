@@ -171,6 +171,10 @@ func TestParseQuery(t *testing.T) {
 			output: NewDocIDQuery([]string{"a", "b", "c"}),
 		},
 		{
+			input:  []byte(`{"bool": true}`),
+			output: NewBoolFieldQuery(true),
+		},
+		{
 			input:  []byte(`{"madeitup":"queryhere"}`),
 			output: nil,
 			err:    true,
