@@ -473,6 +473,7 @@ func InitMossStore(config map[string]interface{}, options moss.CollectionOptions
 
 	llSnapshot, err := llUpdate(nil)
 	if err != nil {
+		_ = s.Close()
 		return nil, nil, nil, nil, err
 	}
 
@@ -484,9 +485,13 @@ func InitMossStore(config map[string]interface{}, options moss.CollectionOptions
 		return stats
 	}
 
-	return llSnapshot, llUpdate, nil, llStats, nil
+	return llSnapshot, llUpdate, sw, llStats, nil
 }
 
+// mossStoreWrapper implements the bleve.index.store.KVStore
+// interface, but only barely enough to allow it to be passed around
+// as a lower-level store.  Advanced apps will likely cast the
+// mossStoreWrapper to access the Actual() method.
 type mossStoreWrapper struct {
 	m    sync.Mutex
 	refs int
@@ -508,4 +513,19 @@ func (w *mossStoreWrapper) Close() (err error) {
 	}
 	w.m.Unlock()
 	return err
+}
+
+func (w *mossStoreWrapper) Reader() (store.KVReader, error) {
+	return nil, fmt.Errorf("unexpected")
+}
+
+func (w *mossStoreWrapper) Writer() (store.KVWriter, error) {
+	return nil, fmt.Errorf("unexpected")
+}
+
+func (w *mossStoreWrapper) Actual() *moss.Store {
+	w.m.Lock()
+	rv := w.s
+	w.m.Unlock()
+	return rv
 }
