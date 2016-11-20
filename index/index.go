@@ -175,7 +175,7 @@ type FieldDict interface {
 // Close the reader to release associated resources.
 type DocIDReader interface {
 	// Next returns the next document internal identifier in the natural
-	// index order, or io.EOF when the end of the sequence is reached.
+	// index order, nil when the end of the sequence is reached.
 	Next() (IndexInternalID, error)
 
 	// Advance resets the iteration to the first internal identifier greater than
