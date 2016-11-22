@@ -50,7 +50,10 @@ func (q *MatchPhraseQuery) SetBoost(b float64) {
 }
 
 func (q *MatchPhraseQuery) Boost() float64{
-	return q.BoostVal.Value()
+	if q.BoostVal != nil {
+		return q.BoostVal.Value()
+	}
+	return 0
 }
 
 func (q *MatchPhraseQuery) SetField(f string) {

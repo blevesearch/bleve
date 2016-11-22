@@ -49,7 +49,10 @@ func (q *FuzzyQuery) SetBoost(b float64) {
 }
 
 func (q *FuzzyQuery) Boost() float64{
-	return q.BoostVal.Value()
+	if q.BoostVal != nil {
+		return q.BoostVal.Value()
+	}
+	return 0
 }
 
 func (q *FuzzyQuery) SetField(f string) {

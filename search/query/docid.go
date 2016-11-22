@@ -22,8 +22,8 @@ import (
 )
 
 type DocIDQuery struct {
-	IDs   []string `json:"ids"`
-	Boost *Boost   `json:"boost,omitempty"`
+	IDs      []string `json:"ids"`
+	BoostVal *Boost   `json:"boost,omitempty"`
 }
 
 // NewDocIDQuery creates a new Query object returning indexed documents among
@@ -37,9 +37,16 @@ func NewDocIDQuery(ids []string) *DocIDQuery {
 
 func (q *DocIDQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
+}
+
+func (q *DocIDQuery) Boost() float64{
+	if q.BoostVal != nil {
+		return q.BoostVal.Value()
+	}
+	return 0
 }
 
 func (q *DocIDQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	return searcher.NewDocIDSearcher(i, q.IDs, q.Boost.Value(), explain)
+	return searcher.NewDocIDSearcher(i, q.IDs, q.BoostVal.Value(), explain)
 }

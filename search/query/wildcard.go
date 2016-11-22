@@ -66,16 +66,19 @@ func (q *WildcardQuery) SetBoost(b float64) {
 	q.BoostVal = &boost
 }
 
+func (q *WildcardQuery) Boost() float64{
+	if q.BoostVal != nil {
+		return q.BoostVal.Value()
+	}
+	return 0
+}
+
 func (q *WildcardQuery) SetField(f string) {
 	q.FieldVal = f
 }
 
 func (q *WildcardQuery) Field() string{
 	return q.FieldVal
-}
-
-func (q *WildcardQuery) Boost() float64{
-	return q.BoostVal.Value()
 }
 
 func (q *WildcardQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {

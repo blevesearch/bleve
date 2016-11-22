@@ -27,7 +27,7 @@ import (
 type PhraseQuery struct {
 	Terms       []string `json:"terms"`
 	Field       string   `json:"field,omitempty"`
-	Boost       *Boost   `json:"boost,omitempty"`
+	BoostVal    *Boost   `json:"boost,omitempty"`
 	termQueries []Query
 }
 
@@ -55,7 +55,14 @@ func NewPhraseQuery(terms []string, field string) *PhraseQuery {
 
 func (q *PhraseQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
+}
+
+func (q *PhraseQuery) Boost() float64{
+	if q.BoostVal != nil {
+		return q.BoostVal.Value()
+	}
+	return 0
 }
 
 func (q *PhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
@@ -84,10 +91,10 @@ func (q *PhraseQuery) UnmarshalJSON(data []byte) error {
 	}
 	q.Terms = tmp.Terms
 	q.Field = tmp.Field
-	q.Boost = tmp.Boost
+	q.BoostVal = tmp.BoostVal
 	q.termQueries = make([]Query, len(q.Terms))
 	for i, term := range q.Terms {
-		q.termQueries[i] = &TermQuery{Term: term, FieldVal: q.Field, BoostVal: q.Boost}
+		q.termQueries[i] = &TermQuery{Term: term, FieldVal: q.Field, BoostVal: q.BoostVal}
 	}
 	return nil
 }

@@ -114,7 +114,10 @@ func (q *DateRangeQuery) SetBoost(b float64) {
 }
 
 func (q *DateRangeQuery) Boost() float64{
-	return q.BoostVal.Value()
+	if q.BoostVal != nil {
+		return q.BoostVal.Value()
+	}
+	return 0
 }
 
 

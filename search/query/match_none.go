@@ -24,7 +24,7 @@ import (
 )
 
 type MatchNoneQuery struct {
-	Boost *Boost `json:"boost,omitempty"`
+	BoostVal *Boost `json:"boost,omitempty"`
 }
 
 // NewMatchNoneQuery creates a Query which will not
@@ -35,7 +35,14 @@ func NewMatchNoneQuery() *MatchNoneQuery {
 
 func (q *MatchNoneQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
+}
+
+func (q *MatchNoneQuery) Boost() float64{
+	if q.BoostVal != nil {
+		return q.BoostVal.Value()
+	}
+	return 0
 }
 
 func (q *MatchNoneQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
@@ -44,7 +51,7 @@ func (q *MatchNoneQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, e
 
 func (q *MatchNoneQuery) MarshalJSON() ([]byte, error) {
 	tmp := map[string]interface{}{
-		"boost":      q.Boost,
+		"boost":      q.BoostVal,
 		"match_none": map[string]interface{}{},
 	}
 	return json.Marshal(tmp)

@@ -41,7 +41,10 @@ func (q *TermQuery) SetBoost(b float64) {
 }
 
 func (q *TermQuery) Boost() float64{
-	return q.BoostVal.Value()
+	if q.BoostVal != nil {
+		return q.BoostVal.Value()
+	}
+	return 0
 }
 
 func (q *TermQuery) SetField(f string) {

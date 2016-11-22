@@ -25,7 +25,7 @@ import (
 
 type ConjunctionQuery struct {
 	Conjuncts []Query `json:"conjuncts"`
-	Boost     *Boost  `json:"boost,omitempty"`
+	BoostVal  *Boost  `json:"boost,omitempty"`
 }
 
 // NewConjunctionQuery creates a new compound Query.
@@ -38,7 +38,14 @@ func NewConjunctionQuery(conjuncts []Query) *ConjunctionQuery {
 
 func (q *ConjunctionQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
+}
+
+func (q *ConjunctionQuery) Boost() float64{
+	if q.BoostVal != nil {
+		return q.BoostVal.Value()
+	}
+	return 0
 }
 
 func (q *ConjunctionQuery) AddQuery(aq ...Query) {
@@ -93,6 +100,6 @@ func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 		}
 		q.Conjuncts[i] = query
 	}
-	q.Boost = tmp.Boost
+	q.BoostVal = tmp.Boost
 	return nil
 }
