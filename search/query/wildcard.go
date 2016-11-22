@@ -94,7 +94,7 @@ func (q *WildcardQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, ex
 		}
 	}
 
-	return searcher.NewRegexpSearcher(i, q.compiled, field, q.BoostVal.Value(), explain)
+	return searcher.NewRegexpSearcher(i, q.compiled, field, q.Boost(), explain)
 }
 
 func (q *WildcardQuery) Validate() error {

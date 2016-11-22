@@ -70,7 +70,7 @@ func (q *RegexpQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expl
 		return nil, err
 	}
 
-	return searcher.NewRegexpSearcher(i, q.compiled, field, q.BoostVal.Value(), explain)
+	return searcher.NewRegexpSearcher(i, q.compiled, field, q.Boost(), explain)
 }
 
 func (q *RegexpQuery) Validate() error {

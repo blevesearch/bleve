@@ -146,14 +146,14 @@ func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expla
 				query.SetFuzziness(q.Fuzziness)
 				query.SetPrefix(q.Prefix)
 				query.SetField(field)
-				query.SetBoost(q.BoostVal.Value())
+				query.SetBoost(q.Boost())
 				tqs[i] = query
 			}
 		} else {
 			for i, token := range tokens {
 				tq := NewTermQuery(string(token.Term))
 				tq.SetField(field)
-				tq.SetBoost(q.BoostVal.Value())
+				tq.SetBoost(q.Boost())
 				tqs[i] = tq
 			}
 		}
@@ -162,12 +162,12 @@ func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expla
 		case MatchQueryOperatorOr:
 			shouldQuery := NewDisjunctionQuery(tqs)
 			shouldQuery.SetMin(1)
-			shouldQuery.SetBoost(q.BoostVal.Value())
+			shouldQuery.SetBoost(q.Boost())
 			return shouldQuery.Searcher(i, m, explain)
 
 		case MatchQueryOperatorAnd:
 			mustQuery := NewConjunctionQuery(tqs)
-			mustQuery.SetBoost(q.BoostVal.Value())
+			mustQuery.SetBoost(q.Boost())
 			return mustQuery.Searcher(i, m, explain)
 
 		default:

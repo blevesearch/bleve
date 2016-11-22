@@ -48,5 +48,5 @@ func (q *DocIDQuery) Boost() float64{
 }
 
 func (q *DocIDQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	return searcher.NewDocIDSearcher(i, q.IDs, q.BoostVal.Value(), explain)
+	return searcher.NewDocIDSearcher(i, q.IDs, q.Boost(), explain)
 }

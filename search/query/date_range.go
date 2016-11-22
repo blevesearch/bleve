@@ -140,7 +140,7 @@ func (q *DateRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, e
 		field = m.DefaultSearchField()
 	}
 
-	return searcher.NewNumericRangeSearcher(i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal.Value(), explain)
+	return searcher.NewNumericRangeSearcher(i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.Boost(), explain)
 }
 
 func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
