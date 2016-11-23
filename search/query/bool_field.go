@@ -40,10 +40,7 @@ func (q *BoolFieldQuery) SetBoost(b float64) {
 }
 
 func (q *BoolFieldQuery) Boost() float64{
-	if q.BoostVal != nil {
 		return q.BoostVal.Value()
-	}
-	return 0
 }
 
 func (q *BoolFieldQuery) SetField(f string) {
@@ -64,5 +61,5 @@ func (q *BoolFieldQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, e
 	if q.Bool {
 		term = "T"
 	}
-	return searcher.NewTermSearcher(i, term, field, q.Boost(), explain)
+	return searcher.NewTermSearcher(i, term, field, q.BoostVal.Value(), explain)
 }

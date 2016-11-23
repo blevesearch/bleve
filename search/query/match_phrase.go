@@ -50,10 +50,7 @@ func (q *MatchPhraseQuery) SetBoost(b float64) {
 }
 
 func (q *MatchPhraseQuery) Boost() float64{
-	if q.BoostVal != nil {
-		return q.BoostVal.Value()
-	}
-	return 0
+	return q.BoostVal.Value()
 }
 
 func (q *MatchPhraseQuery) SetField(f string) {
@@ -85,7 +82,7 @@ func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 	if len(tokens) > 0 {
 		phrase := tokenStreamToPhrase(tokens)
 		phraseQuery := NewPhraseQuery(phrase, field)
-		phraseQuery.SetBoost(q.Boost())
+		phraseQuery.SetBoost(q.BoostVal.Value())
 		return phraseQuery.Searcher(i, m, explain)
 	}
 	noneQuery := NewMatchNoneQuery()

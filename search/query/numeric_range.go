@@ -60,10 +60,7 @@ func (q *NumericRangeQuery) SetBoost(b float64) {
 }
 
 func (q *NumericRangeQuery) Boost() float64{
-	if q.BoostVal != nil {
-		return q.BoostVal.Value()
-	}
-	return 0
+	return q.BoostVal.Value()
 }
 
 func (q *NumericRangeQuery) SetField(f string) {
@@ -79,7 +76,7 @@ func (q *NumericRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
-	return searcher.NewNumericRangeSearcher(i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.Boost(), explain)
+	return searcher.NewNumericRangeSearcher(i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.BoostVal.Value(), explain)
 }
 
 func (q *NumericRangeQuery) Validate() error {

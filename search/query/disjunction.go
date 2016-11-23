@@ -44,10 +44,7 @@ func (q *DisjunctionQuery) SetBoost(b float64) {
 }
 
 func (q *DisjunctionQuery) Boost() float64{
-	if q.BoostVal != nil {
-		return q.BoostVal.Value()
-	}
-	return 0
+	return q.BoostVal.Value()
 }
 
 

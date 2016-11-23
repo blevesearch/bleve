@@ -39,10 +39,7 @@ func (q *MatchNoneQuery) SetBoost(b float64) {
 }
 
 func (q *MatchNoneQuery) Boost() float64{
-	if q.BoostVal != nil {
-		return q.BoostVal.Value()
-	}
-	return 0
+	return q.BoostVal.Value()
 }
 
 func (q *MatchNoneQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {

@@ -46,10 +46,7 @@ func (q *RegexpQuery) SetBoost(b float64) {
 }
 
 func (q *RegexpQuery) Boost() float64{
-	if q.BoostVal != nil {
-		return q.BoostVal.Value()
-	}
-	return 0
+	return q.BoostVal.Value()
 }
 
 func (q *RegexpQuery) SetField(f string) {
@@ -70,7 +67,7 @@ func (q *RegexpQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expl
 		return nil, err
 	}
 
-	return searcher.NewRegexpSearcher(i, q.compiled, field, q.Boost(), explain)
+	return searcher.NewRegexpSearcher(i, q.compiled, field, q.BoostVal.Value(), explain)
 }
 
 func (q *RegexpQuery) Validate() error {

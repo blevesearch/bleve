@@ -67,10 +67,7 @@ func (q *WildcardQuery) SetBoost(b float64) {
 }
 
 func (q *WildcardQuery) Boost() float64{
-	if q.BoostVal != nil {
-		return q.BoostVal.Value()
-	}
-	return 0
+	return q.BoostVal.Value()
 }
 
 func (q *WildcardQuery) SetField(f string) {
@@ -94,7 +91,7 @@ func (q *WildcardQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, ex
 		}
 	}
 
-	return searcher.NewRegexpSearcher(i, q.compiled, field, q.Boost(), explain)
+	return searcher.NewRegexpSearcher(i, q.compiled, field, q.BoostVal.Value(), explain)
 }
 
 func (q *WildcardQuery) Validate() error {

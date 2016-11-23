@@ -114,10 +114,7 @@ func (q *DateRangeQuery) SetBoost(b float64) {
 }
 
 func (q *DateRangeQuery) Boost() float64{
-	if q.BoostVal != nil {
-		return q.BoostVal.Value()
-	}
-	return 0
+	return q.BoostVal.Value()
 }
 
 
@@ -140,7 +137,7 @@ func (q *DateRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, e
 		field = m.DefaultSearchField()
 	}
 
-	return searcher.NewNumericRangeSearcher(i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.Boost(), explain)
+	return searcher.NewNumericRangeSearcher(i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal.Value(), explain)
 }
 
 func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {

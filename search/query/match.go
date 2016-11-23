@@ -91,10 +91,7 @@ func (q *MatchQuery) SetBoost(b float64) {
 }
 
 func (q *MatchQuery) Boost() float64{
-	if q.BoostVal != nil {
-		return q.BoostVal.Value()
-	}
-	return 0
+	return q.BoostVal.Value()
 }
 
 func (q *MatchQuery) SetField(f string) {
@@ -146,14 +143,14 @@ func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expla
 				query.SetFuzziness(q.Fuzziness)
 				query.SetPrefix(q.Prefix)
 				query.SetField(field)
-				query.SetBoost(q.Boost())
+				query.SetBoost(q.BoostVal.Value())
 				tqs[i] = query
 			}
 		} else {
 			for i, token := range tokens {
 				tq := NewTermQuery(string(token.Term))
 				tq.SetField(field)
-				tq.SetBoost(q.Boost())
+				tq.SetBoost(q.BoostVal.Value())
 				tqs[i] = tq
 			}
 		}
@@ -162,12 +159,12 @@ func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expla
 		case MatchQueryOperatorOr:
 			shouldQuery := NewDisjunctionQuery(tqs)
 			shouldQuery.SetMin(1)
-			shouldQuery.SetBoost(q.Boost())
+			shouldQuery.SetBoost(q.BoostVal.Value())
 			return shouldQuery.Searcher(i, m, explain)
 
 		case MatchQueryOperatorAnd:
 			mustQuery := NewConjunctionQuery(tqs)
-			mustQuery.SetBoost(q.Boost())
+			mustQuery.SetBoost(q.BoostVal.Value())
 			return mustQuery.Searcher(i, m, explain)
 
 		default:
