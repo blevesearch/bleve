@@ -26,8 +26,8 @@ import (
 
 type RegexpQuery struct {
 	Regexp   string `json:"regexp"`
-	Field    string `json:"field,omitempty"`
-	Boost    *Boost `json:"boost,omitempty"`
+	FieldVal string `json:"field,omitempty"`
+	BoostVal *Boost `json:"boost,omitempty"`
 	compiled *regexp.Regexp
 }
 
@@ -42,16 +42,24 @@ func NewRegexpQuery(regexp string) *RegexpQuery {
 
 func (q *RegexpQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
+}
+
+func (q *RegexpQuery) Boost() float64{
+	return q.BoostVal.Value()
 }
 
 func (q *RegexpQuery) SetField(f string) {
-	q.Field = f
+	q.FieldVal = f
+}
+
+func (q *RegexpQuery) Field() string{
+	return q.FieldVal
 }
 
 func (q *RegexpQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	field := q.Field
-	if q.Field == "" {
+	field := q.FieldVal
+	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
 	err := q.compile()
@@ -59,7 +67,7 @@ func (q *RegexpQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expl
 		return nil, err
 	}
 
-	return searcher.NewRegexpSearcher(i, q.compiled, field, q.Boost.Value(), explain)
+	return searcher.NewRegexpSearcher(i, q.compiled, field, q.BoostVal.Value(), explain)
 }
 
 func (q *RegexpQuery) Validate() error {

@@ -21,8 +21,8 @@ import (
 )
 
 type QueryStringQuery struct {
-	Query string `json:"query"`
-	Boost *Boost `json:"boost,omitempty"`
+	Query    string `json:"query"`
+	BoostVal *Boost `json:"boost,omitempty"`
 }
 
 // NewQueryStringQuery creates a new Query used for
@@ -36,7 +36,11 @@ func NewQueryStringQuery(query string) *QueryStringQuery {
 
 func (q *QueryStringQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
+}
+
+func (q *QueryStringQuery) Boost() float64{
+	return q.BoostVal.Value()
 }
 
 func (q *QueryStringQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {

@@ -25,8 +25,8 @@ type FuzzyQuery struct {
 	Term      string `json:"term"`
 	Prefix    int    `json:"prefix_length"`
 	Fuzziness int    `json:"fuzziness"`
-	Field     string `json:"field,omitempty"`
-	Boost     *Boost `json:"boost,omitempty"`
+	FieldVal  string `json:"field,omitempty"`
+	BoostVal  *Boost `json:"boost,omitempty"`
 }
 
 // NewFuzzyQuery creates a new Query which finds
@@ -45,11 +45,19 @@ func NewFuzzyQuery(term string) *FuzzyQuery {
 
 func (q *FuzzyQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
+}
+
+func (q *FuzzyQuery) Boost() float64{
+	return q.BoostVal.Value()
 }
 
 func (q *FuzzyQuery) SetField(f string) {
-	q.Field = f
+	q.FieldVal = f
+}
+
+func (q *FuzzyQuery) Field() string{
+	return q.FieldVal
 }
 
 func (q *FuzzyQuery) SetFuzziness(f int) {
@@ -61,9 +69,9 @@ func (q *FuzzyQuery) SetPrefix(p int) {
 }
 
 func (q *FuzzyQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	field := q.Field
-	if q.Field == "" {
+	field := q.FieldVal
+	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
-	return searcher.NewFuzzySearcher(i, q.Term, q.Prefix, q.Fuzziness, field, q.Boost.Value(), explain)
+	return searcher.NewFuzzySearcher(i, q.Term, q.Prefix, q.Fuzziness, field, q.BoostVal.Value(), explain)
 }

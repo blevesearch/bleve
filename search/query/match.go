@@ -25,9 +25,9 @@ import (
 
 type MatchQuery struct {
 	Match     string             `json:"match"`
-	Field     string             `json:"field,omitempty"`
+	FieldVal  string             `json:"field,omitempty"`
 	Analyzer  string             `json:"analyzer,omitempty"`
-	Boost     *Boost             `json:"boost,omitempty"`
+	BoostVal  *Boost             `json:"boost,omitempty"`
 	Prefix    int                `json:"prefix_length"`
 	Fuzziness int                `json:"fuzziness"`
 	Operator  MatchQueryOperator `json:"operator,omitempty"`
@@ -87,11 +87,19 @@ func NewMatchQuery(match string) *MatchQuery {
 
 func (q *MatchQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
+}
+
+func (q *MatchQuery) Boost() float64{
+	return q.BoostVal.Value()
 }
 
 func (q *MatchQuery) SetField(f string) {
-	q.Field = f
+	q.FieldVal = f
+}
+
+func (q *MatchQuery) Field() string{
+	return q.FieldVal
 }
 
 func (q *MatchQuery) SetFuzziness(f int) {
@@ -108,8 +116,8 @@ func (q *MatchQuery) SetOperator(operator MatchQueryOperator) {
 
 func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
 
-	field := q.Field
-	if q.Field == "" {
+	field := q.FieldVal
+	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
 
@@ -135,14 +143,14 @@ func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expla
 				query.SetFuzziness(q.Fuzziness)
 				query.SetPrefix(q.Prefix)
 				query.SetField(field)
-				query.SetBoost(q.Boost.Value())
+				query.SetBoost(q.BoostVal.Value())
 				tqs[i] = query
 			}
 		} else {
 			for i, token := range tokens {
 				tq := NewTermQuery(string(token.Term))
 				tq.SetField(field)
-				tq.SetBoost(q.Boost.Value())
+				tq.SetBoost(q.BoostVal.Value())
 				tqs[i] = tq
 			}
 		}
@@ -151,12 +159,12 @@ func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expla
 		case MatchQueryOperatorOr:
 			shouldQuery := NewDisjunctionQuery(tqs)
 			shouldQuery.SetMin(1)
-			shouldQuery.SetBoost(q.Boost.Value())
+			shouldQuery.SetBoost(q.BoostVal.Value())
 			return shouldQuery.Searcher(i, m, explain)
 
 		case MatchQueryOperatorAnd:
 			mustQuery := NewConjunctionQuery(tqs)
-			mustQuery.SetBoost(q.Boost.Value())
+			mustQuery.SetBoost(q.BoostVal.Value())
 			return mustQuery.Searcher(i, m, explain)
 
 		default:
