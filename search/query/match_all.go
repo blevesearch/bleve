@@ -24,7 +24,7 @@ import (
 )
 
 type MatchAllQuery struct {
-	Boost *Boost `json:"boost,omitempty"`
+	BoostVal *Boost `json:"boost,omitempty"`
 }
 
 // NewMatchAllQuery creates a Query which will
@@ -35,16 +35,22 @@ func NewMatchAllQuery() *MatchAllQuery {
 
 func (q *MatchAllQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
 }
 
+func (q *MatchAllQuery) Boost() float64{
+	return q.BoostVal.Value()
+}
+
+
+
 func (q *MatchAllQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	return searcher.NewMatchAllSearcher(i, q.Boost.Value(), explain)
+	return searcher.NewMatchAllSearcher(i, q.BoostVal.Value(), explain)
 }
 
 func (q *MatchAllQuery) MarshalJSON() ([]byte, error) {
 	tmp := map[string]interface{}{
-		"boost":     q.Boost,
+		"boost":     q.BoostVal,
 		"match_all": map[string]interface{}{},
 	}
 	return json.Marshal(tmp)

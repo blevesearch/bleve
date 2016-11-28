@@ -22,9 +22,9 @@ import (
 )
 
 type TermQuery struct {
-	Term  string `json:"term"`
-	Field string `json:"field,omitempty"`
-	Boost *Boost `json:"boost,omitempty"`
+	Term     string `json:"term"`
+	FieldVal string `json:"field,omitempty"`
+	BoostVal *Boost `json:"boost,omitempty"`
 }
 
 // NewTermQuery creates a new Query for finding an
@@ -37,17 +37,25 @@ func NewTermQuery(term string) *TermQuery {
 
 func (q *TermQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
+}
+
+func (q *TermQuery) Boost() float64{
+	return q.BoostVal.Value()
 }
 
 func (q *TermQuery) SetField(f string) {
-	q.Field = f
+	q.FieldVal = f
+}
+
+func (q *TermQuery) Field() string{
+	return q.FieldVal
 }
 
 func (q *TermQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	field := q.Field
-	if q.Field == "" {
+	field := q.FieldVal
+	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
-	return searcher.NewTermSearcher(i, q.Term, field, q.Boost.Value(), explain)
+	return searcher.NewTermSearcher(i, q.Term, field, q.BoostVal.Value(), explain)
 }

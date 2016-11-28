@@ -25,10 +25,10 @@ import (
 )
 
 type BooleanQuery struct {
-	Must    Query  `json:"must,omitempty"`
-	Should  Query  `json:"should,omitempty"`
-	MustNot Query  `json:"must_not,omitempty"`
-	Boost   *Boost `json:"boost,omitempty"`
+	Must     Query  `json:"must,omitempty"`
+	Should   Query  `json:"should,omitempty"`
+	MustNot  Query  `json:"must_not,omitempty"`
+	BoostVal *Boost `json:"boost,omitempty"`
 }
 
 // NewBooleanQuery creates a compound Query composed
@@ -90,7 +90,11 @@ func (q *BooleanQuery) AddMustNot(m ...Query) {
 
 func (q *BooleanQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
+}
+
+func (q *BooleanQuery) Boost() float64{
+	return q.BoostVal.Value()
 }
 
 func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
@@ -199,7 +203,7 @@ func (q *BooleanQuery) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	q.Boost = tmp.Boost
+	q.BoostVal = tmp.Boost
 
 	return nil
 }

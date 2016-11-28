@@ -26,7 +26,7 @@ import (
 
 type DisjunctionQuery struct {
 	Disjuncts []Query `json:"disjuncts"`
-	Boost     *Boost  `json:"boost,omitempty"`
+	BoostVal  *Boost  `json:"boost,omitempty"`
 	Min       float64 `json:"min"`
 }
 
@@ -40,8 +40,13 @@ func NewDisjunctionQuery(disjuncts []Query) *DisjunctionQuery {
 
 func (q *DisjunctionQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
 }
+
+func (q *DisjunctionQuery) Boost() float64{
+	return q.BoostVal.Value()
+}
+
 
 func (q *DisjunctionQuery) AddQuery(aq ...Query) {
 	for _, aaq := range aq {
@@ -103,7 +108,7 @@ func (q *DisjunctionQuery) UnmarshalJSON(data []byte) error {
 		}
 		q.Disjuncts[i] = query
 	}
-	q.Boost = tmp.Boost
+	q.BoostVal = tmp.Boost
 	q.Min = tmp.Min
 	return nil
 }

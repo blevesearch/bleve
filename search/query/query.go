@@ -44,6 +44,7 @@ type Query interface {
 type BoostableQuery interface {
 	Query
 	SetBoost(b float64)
+	Boost() float64
 }
 
 // A FieldableQuery represents a Query which can be restricted
@@ -51,6 +52,7 @@ type BoostableQuery interface {
 type FieldableQuery interface {
 	Query
 	SetField(f string)
+	Field() string
 }
 
 // A ValidatableQuery represents a Query which can be validated

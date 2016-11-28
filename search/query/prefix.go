@@ -22,9 +22,9 @@ import (
 )
 
 type PrefixQuery struct {
-	Prefix string `json:"prefix"`
-	Field  string `json:"field,omitempty"`
-	Boost  *Boost `json:"boost,omitempty"`
+	Prefix   string `json:"prefix"`
+	FieldVal string `json:"field,omitempty"`
+	BoostVal *Boost `json:"boost,omitempty"`
 }
 
 // NewPrefixQuery creates a new Query which finds
@@ -38,17 +38,25 @@ func NewPrefixQuery(prefix string) *PrefixQuery {
 
 func (q *PrefixQuery) SetBoost(b float64) {
 	boost := Boost(b)
-	q.Boost = &boost
+	q.BoostVal = &boost
+}
+
+func (q *PrefixQuery) Boost() float64{
+	return q.BoostVal.Value()
 }
 
 func (q *PrefixQuery) SetField(f string) {
-	q.Field = f
+	q.FieldVal = f
+}
+
+func (q *PrefixQuery) Field() string{
+	return q.FieldVal
 }
 
 func (q *PrefixQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
-	field := q.Field
-	if q.Field == "" {
+	field := q.FieldVal
+	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
-	return searcher.NewTermPrefixSearcher(i, q.Prefix, field, q.Boost.Value(), explain)
+	return searcher.NewTermPrefixSearcher(i, q.Prefix, field, q.BoostVal.Value(), explain)
 }
