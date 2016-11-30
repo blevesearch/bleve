@@ -1,3 +1,4 @@
+//line query_string.y:2
 package query
 
 import __yyfmt__ "fmt"
@@ -641,7 +642,7 @@ yydefault:
 			min, _ := strconv.ParseFloat(yyDollar[4].s, 64)
 			minInclusive := false
 			logDebugGrammar("FIELD - GREATER THAN %f", min)
-			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil)
+			q := NewNumericRangeInclusiveQuery(&min, nil, nil, nil)
 			q.SetField(field)
 			yyVAL.q = q
 		}
@@ -665,7 +666,7 @@ yydefault:
 			max, _ := strconv.ParseFloat(yyDollar[4].s, 64)
 			maxInclusive := false
 			logDebugGrammar("FIELD - LESS THAN %f", max)
-			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive)
+			q := NewNumericRangeInclusiveQuery(nil, &max, nil, nil)
 			q.SetField(field)
 			yyVAL.q = q
 		}

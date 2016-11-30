@@ -177,7 +177,7 @@ tSTRING tCOLON tGREATER tNUMBER {
 	min, _ := strconv.ParseFloat($4, 64)
 	minInclusive := false
 	logDebugGrammar("FIELD - GREATER THAN %f", min)
-	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil)
+	q := NewNumericRangeInclusiveQuery(&min, nil, nil, nil)
 	q.SetField(field)
 	$$ = q
 }
@@ -197,7 +197,7 @@ tSTRING tCOLON tLESS tNUMBER {
 	max, _ := strconv.ParseFloat($4, 64)
 	maxInclusive := false
 	logDebugGrammar("FIELD - LESS THAN %f", max)
-	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive)
+	q := NewNumericRangeInclusiveQuery(nil, &max, nil, nil)
 	q.SetField(field)
 	$$ = q
 }
