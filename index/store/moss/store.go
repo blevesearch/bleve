@@ -38,7 +38,7 @@ type Store struct {
 	m       sync.Mutex
 	ms      moss.Collection
 	mo      store.MergeOperator
-	llstore store.KVStore // May be nil (ex: when using mossStore).
+	llstore store.KVStore // May be nil.
 	llstats statsFunc     // May be nil.
 
 	s *stats
@@ -201,6 +201,10 @@ func (s *Store) Stats() json.Marshaler {
 
 func (s *Store) StatsMap() map[string]interface{} {
 	return s.s.statsMap()
+}
+
+func (s *Store) LowerLevelStore() store.KVStore {
+	return s.llstore
 }
 
 func init() {
