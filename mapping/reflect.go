@@ -51,6 +51,11 @@ func lookupPropertyPathPart(data interface{}, part string) interface{} {
 		if field.IsValid() && field.CanInterface() {
 			return field.Interface()
 		}
+	case reflect.Ptr:
+		ptrElem := val.Elem()
+		if ptrElem.IsValid() && ptrElem.CanInterface() {
+			return lookupPropertyPathPart(ptrElem.Interface(), part)
+		}
 	}
 	return nil
 }
