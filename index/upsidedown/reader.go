@@ -24,13 +24,14 @@ import (
 )
 
 type UpsideDownCouchTermFieldReader struct {
-	count       uint64
-	indexReader *IndexReader
-	iterator    store.KVIterator
-	term        []byte
-	tfrNext     *TermFrequencyRow
-	keyBuf      []byte
-	field       uint16
+	count              uint64
+	indexReader        *IndexReader
+	iterator           store.KVIterator
+	term               []byte
+	tfrNext            *TermFrequencyRow
+	keyBuf             []byte
+	field              uint16
+	includeTermVectors bool
 }
 
 func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, field uint16, includeFreq, includeNorm, includeTermVectors bool) (*UpsideDownCouchTermFieldReader, error) {
@@ -42,10 +43,11 @@ func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 	if val == nil {
 		atomic.AddUint64(&indexReader.index.stats.termSearchersStarted, uint64(1))
 		return &UpsideDownCouchTermFieldReader{
-			count:   0,
-			term:    term,
-			tfrNext: &TermFrequencyRow{},
-			field:   field,
+			count:              0,
+			term:               term,
+			tfrNext:            &TermFrequencyRow{},
+			field:              field,
+			includeTermVectors: includeTermVectors,
 		}, nil
 	}
 
@@ -59,11 +61,12 @@ func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 
 	atomic.AddUint64(&indexReader.index.stats.termSearchersStarted, uint64(1))
 	return &UpsideDownCouchTermFieldReader{
-		indexReader: indexReader,
-		iterator:    it,
-		count:       dictionaryRow.count,
-		term:        term,
-		field:       field,
+		indexReader:        indexReader,
+		iterator:           it,
+		count:              dictionaryRow.count,
+		term:               term,
+		field:              field,
+		includeTermVectors: includeTermVectors,
 	}, nil
 }
 
@@ -88,7 +91,7 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 			if err != nil {
 				return nil, err
 			}
-			err = tfr.parseV(val)
+			err = tfr.parseV(val, r.includeTermVectors)
 			if err != nil {
 				return nil, err
 			}
@@ -125,7 +128,7 @@ func (r *UpsideDownCouchTermFieldReader) Advance(docID index.IndexInternalID, pr
 			if err != nil {
 				return nil, err
 			}
-			err = tfr.parseV(val)
+			err = tfr.parseV(val, r.includeTermVectors)
 			if err != nil {
 				return nil, err
 			}
