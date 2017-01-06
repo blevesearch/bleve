@@ -45,7 +45,7 @@ func (q *RegexpQuery) SetBoost(b float64) {
 	q.BoostVal = &boost
 }
 
-func (q *RegexpQuery) Boost() float64{
+func (q *RegexpQuery) Boost() float64 {
 	return q.BoostVal.Value()
 }
 
@@ -53,11 +53,11 @@ func (q *RegexpQuery) SetField(f string) {
 	q.FieldVal = f
 }
 
-func (q *RegexpQuery) Field() string{
+func (q *RegexpQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *RegexpQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *RegexpQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -67,7 +67,7 @@ func (q *RegexpQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, expl
 		return nil, err
 	}
 
-	return searcher.NewRegexpSearcher(i, q.compiled, field, q.BoostVal.Value(), explain)
+	return searcher.NewRegexpSearcher(i, q.compiled, field, q.BoostVal.Value(), options)
 }
 
 func (q *RegexpQuery) Validate() error {

@@ -24,7 +24,7 @@ import (
 
 func TestConstantScorer(t *testing.T) {
 
-	scorer := NewConstantScorer(1, 1, true)
+	scorer := NewConstantScorer(1, 1, search.SearcherOptions{Explain: true})
 
 	tests := []struct {
 		termMatch *index.TermFieldDoc
@@ -72,7 +72,7 @@ func TestConstantScorer(t *testing.T) {
 
 func TestConstantScorerWithQueryNorm(t *testing.T) {
 
-	scorer := NewConstantScorer(1, 1, true)
+	scorer := NewConstantScorer(1, 1, search.SearcherOptions{Explain: true})
 	scorer.SetQueryNorm(2.0)
 
 	tests := []struct {

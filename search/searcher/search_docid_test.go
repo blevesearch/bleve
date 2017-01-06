@@ -62,7 +62,9 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 		}
 	}()
 
-	searcher, err := NewDocIDSearcher(indexReader, searched, 1.0, false)
+	explainOff := search.SearcherOptions{Explain: false}
+
+	searcher, err := NewDocIDSearcher(indexReader, searched, 1.0, explainOff)
 	if err != nil {
 		t.Fatal(err)
 	}

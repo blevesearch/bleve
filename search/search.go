@@ -138,6 +138,11 @@ type Searcher interface {
 	DocumentMatchPoolSize() int
 }
 
+type SearcherOptions struct {
+	Explain            bool
+	IncludeTermVectors bool
+}
+
 // SearchContext represents the context around a single search
 type SearchContext struct {
 	DocumentMatchPool *DocumentMatchPool

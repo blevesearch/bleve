@@ -58,14 +58,15 @@ func (q *PhraseQuery) SetBoost(b float64) {
 	q.BoostVal = &boost
 }
 
-func (q *PhraseQuery) Boost() float64{
+func (q *PhraseQuery) Boost() float64 {
 	return q.BoostVal.Value()
 }
 
-func (q *PhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *PhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+	options.IncludeTermVectors = true
 
 	conjunctionQuery := NewConjunctionQuery(q.termQueries)
-	conjunctionSearcher, err := conjunctionQuery.Searcher(i, m, explain)
+	conjunctionSearcher, err := conjunctionQuery.Searcher(i, m, options)
 	if err != nil {
 		return nil, err
 	}

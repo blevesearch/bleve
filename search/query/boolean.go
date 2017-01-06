@@ -93,15 +93,15 @@ func (q *BooleanQuery) SetBoost(b float64) {
 	q.BoostVal = &boost
 }
 
-func (q *BooleanQuery) Boost() float64{
+func (q *BooleanQuery) Boost() float64 {
 	return q.BoostVal.Value()
 }
 
-func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	var err error
 	var mustNotSearcher search.Searcher
 	if q.MustNot != nil {
-		mustNotSearcher, err = q.MustNot.Searcher(i, m, explain)
+		mustNotSearcher, err = q.MustNot.Searcher(i, m, options)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +112,7 @@ func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, exp
 
 	var mustSearcher search.Searcher
 	if q.Must != nil {
-		mustSearcher, err = q.Must.Searcher(i, m, explain)
+		mustSearcher, err = q.Must.Searcher(i, m, options)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +120,7 @@ func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, exp
 
 	var shouldSearcher search.Searcher
 	if q.Should != nil {
-		shouldSearcher, err = q.Should.Searcher(i, m, explain)
+		shouldSearcher, err = q.Should.Searcher(i, m, options)
 		if err != nil {
 			return nil, err
 		}
@@ -130,7 +130,7 @@ func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, exp
 		return shouldSearcher, nil
 	}
 
-	return searcher.NewBooleanSearcher(i, mustSearcher, shouldSearcher, mustNotSearcher, explain)
+	return searcher.NewBooleanSearcher(i, mustSearcher, shouldSearcher, mustNotSearcher, options)
 }
 
 func (q *BooleanQuery) Validate() error {

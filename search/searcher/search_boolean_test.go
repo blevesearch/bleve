@@ -37,211 +37,213 @@ func TestBooleanSearch(t *testing.T) {
 		}
 	}()
 
+	explainTrue := search.SearcherOptions{Explain: true}
+
 	// test 0
-	beerTermSearcher, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, true)
+	beerTermSearcher, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher}, true)
+	mustSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)
+	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dustinTermSearcher, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, true)
+	dustinTermSearcher, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	shouldSearcher, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher}, 0, true)
+	shouldSearcher, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	steveTermSearcher, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, true)
+	steveTermSearcher, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustNotSearcher, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{steveTermSearcher}, 0, true)
+	mustNotSearcher, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{steveTermSearcher}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher, err := NewBooleanSearcher(twoDocIndexReader, mustSearcher, shouldSearcher, mustNotSearcher, true)
+	booleanSearcher, err := NewBooleanSearcher(twoDocIndexReader, mustSearcher, shouldSearcher, mustNotSearcher, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 1
-	martyTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)
+	martyTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dustinTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, true)
+	dustinTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	shouldSearcher2, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher2, dustinTermSearcher2}, 0, true)
+	shouldSearcher2, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher2, dustinTermSearcher2}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	steveTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, true)
+	steveTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustNotSearcher2, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{steveTermSearcher2}, 0, true)
+	mustNotSearcher2, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{steveTermSearcher2}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher2, err := NewBooleanSearcher(twoDocIndexReader, nil, shouldSearcher2, mustNotSearcher2, true)
+	booleanSearcher2, err := NewBooleanSearcher(twoDocIndexReader, nil, shouldSearcher2, mustNotSearcher2, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 2
-	steveTermSearcher3, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, true)
+	steveTermSearcher3, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustNotSearcher3, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{steveTermSearcher3}, 0, true)
+	mustNotSearcher3, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{steveTermSearcher3}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher3, err := NewBooleanSearcher(twoDocIndexReader, nil, nil, mustNotSearcher3, true)
+	booleanSearcher3, err := NewBooleanSearcher(twoDocIndexReader, nil, nil, mustNotSearcher3, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 3
-	beerTermSearcher4, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, true)
+	beerTermSearcher4, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher4, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher4}, true)
+	mustSearcher4, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher4}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	steveTermSearcher4, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, true)
+	steveTermSearcher4, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustNotSearcher4, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{steveTermSearcher4}, 0, true)
+	mustNotSearcher4, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{steveTermSearcher4}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher4, err := NewBooleanSearcher(twoDocIndexReader, mustSearcher4, nil, mustNotSearcher4, true)
+	booleanSearcher4, err := NewBooleanSearcher(twoDocIndexReader, mustSearcher4, nil, mustNotSearcher4, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 4
-	beerTermSearcher5, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, true)
+	beerTermSearcher5, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher5, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher5}, true)
+	mustSearcher5, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher5}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	steveTermSearcher5, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, true)
+	steveTermSearcher5, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyTermSearcher5, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)
+	martyTermSearcher5, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustNotSearcher5, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{steveTermSearcher5, martyTermSearcher5}, 0, true)
+	mustNotSearcher5, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{steveTermSearcher5, martyTermSearcher5}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher5, err := NewBooleanSearcher(twoDocIndexReader, mustSearcher5, nil, mustNotSearcher5, true)
+	booleanSearcher5, err := NewBooleanSearcher(twoDocIndexReader, mustSearcher5, nil, mustNotSearcher5, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 5
-	beerTermSearcher6, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, true)
+	beerTermSearcher6, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher6, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher6}, true)
+	mustSearcher6, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher6}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyTermSearcher6, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)
+	martyTermSearcher6, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dustinTermSearcher6, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, true)
+	dustinTermSearcher6, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	shouldSearcher6, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher6, dustinTermSearcher6}, 2, true)
+	shouldSearcher6, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher6, dustinTermSearcher6}, 2, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher6, err := NewBooleanSearcher(twoDocIndexReader, mustSearcher6, shouldSearcher6, nil, true)
+	booleanSearcher6, err := NewBooleanSearcher(twoDocIndexReader, mustSearcher6, shouldSearcher6, nil, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 6
-	beerTermSearcher7, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, true)
+	beerTermSearcher7, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher7, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher7}, true)
+	mustSearcher7, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher7}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher7, err := NewBooleanSearcher(twoDocIndexReader, mustSearcher7, nil, nil, true)
+	booleanSearcher7, err := NewBooleanSearcher(twoDocIndexReader, mustSearcher7, nil, nil, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyTermSearcher7, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 5.0, true)
+	martyTermSearcher7, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 5.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	conjunctionSearcher7, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher7, booleanSearcher7}, true)
+	conjunctionSearcher7, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher7, booleanSearcher7}, explainTrue)
 
 	// test 7
-	beerTermSearcher8, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, true)
+	beerTermSearcher8, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustSearcher8, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher8}, true)
+	mustSearcher8, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher8}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyTermSearcher8, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)
+	martyTermSearcher8, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dustinTermSearcher8, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, true)
+	dustinTermSearcher8, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	shouldSearcher8, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher8, dustinTermSearcher8}, 0, true)
+	shouldSearcher8, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher8, dustinTermSearcher8}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	steveTermSearcher8, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, true)
+	steveTermSearcher8, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustNotSearcher8, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{steveTermSearcher8}, 0, true)
+	mustNotSearcher8, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{steveTermSearcher8}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	booleanSearcher8, err := NewBooleanSearcher(twoDocIndexReader, mustSearcher8, shouldSearcher8, mustNotSearcher8, true)
+	booleanSearcher8, err := NewBooleanSearcher(twoDocIndexReader, mustSearcher8, shouldSearcher8, mustNotSearcher8, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dustinTermSearcher8a, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 5.0, true)
+	dustinTermSearcher8a, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 5.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	conjunctionSearcher8, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{booleanSearcher8, dustinTermSearcher8a}, true)
+	conjunctionSearcher8, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{booleanSearcher8, dustinTermSearcher8a}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -30,7 +30,7 @@ func TestTermSearcher(t *testing.T) {
 	var queryTerm = "beer"
 	var queryField = "desc"
 	var queryBoost = 3.0
-	var queryExplain = true
+	var queryExplain = search.SearcherOptions{Explain: true}
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	i, err := upsidedown.NewUpsideDownCouch(

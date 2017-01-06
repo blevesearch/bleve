@@ -25,11 +25,11 @@ type FuzzySearcher struct {
 	prefix      int
 	fuzziness   int
 	field       string
-	explain     bool
+	options     search.SearcherOptions
 	searcher    *DisjunctionSearcher
 }
 
-func NewFuzzySearcher(indexReader index.IndexReader, term string, prefix, fuzziness int, field string, boost float64, explain bool) (*FuzzySearcher, error) {
+func NewFuzzySearcher(indexReader index.IndexReader, term string, prefix, fuzziness int, field string, boost float64, options search.SearcherOptions) (*FuzzySearcher, error) {
 	// Note: we don't byte slice the term for a prefix because of runes.
 	prefixTerm := ""
 	for i, r := range term {
@@ -53,7 +53,7 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string, prefix, fuzzin
 		}
 	}
 	for _, cterm := range candidateTerms {
-		qsearcher, err := NewTermSearcher(indexReader, cterm, field, boost, explain)
+		qsearcher, err := NewTermSearcher(indexReader, cterm, field, boost, options)
 		if err != nil {
 			qsearchersClose()
 			return nil, err
@@ -62,7 +62,7 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string, prefix, fuzzin
 	}
 
 	// build disjunction searcher of these ranges
-	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, explain)
+	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, options)
 	if err != nil {
 		qsearchersClose()
 		return nil, err
@@ -74,7 +74,7 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string, prefix, fuzzin
 		prefix:      prefix,
 		fuzziness:   fuzziness,
 		field:       field,
-		explain:     explain,
+		options:     options,
 		searcher:    searcher,
 	}, nil
 }

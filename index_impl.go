@@ -370,7 +370,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}()
 
-	searcher, err := req.Query.Searcher(indexReader, i.m, req.Explain)
+	searcher, err := req.Query.Searcher(indexReader, i.m, search.SearcherOptions{
+		Explain:            req.Explain,
+		IncludeTermVectors: req.IncludeLocations || req.Highlight != nil,
+	})
 	if err != nil {
 		return nil, err
 	}
