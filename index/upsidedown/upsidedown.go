@@ -1008,7 +1008,7 @@ func init() {
 
 func backIndexRowForDoc(kvreader store.KVReader, docID index.IndexInternalID) (*BackIndexRow, error) {
 	// use a temporary row structure to build key
-	tempRow := &BackIndexRow{
+	tempRow := BackIndexRow{
 		doc: docID,
 	}
 
