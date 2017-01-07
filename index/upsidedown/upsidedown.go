@@ -745,18 +745,19 @@ func (udc *UpsideDownCouch) termFieldVectorsFromTermVectors(in []*TermVector) []
 		return nil
 	}
 
+	a := make([]index.TermFieldVector, len(in))
 	rv := make([]*index.TermFieldVector, len(in))
 
 	for i, tv := range in {
 		fieldName := udc.fieldCache.FieldIndexed(tv.field)
-		tfv := index.TermFieldVector{
+		a[i] = index.TermFieldVector{
 			Field:          fieldName,
 			ArrayPositions: tv.arrayPositions,
 			Pos:            tv.pos,
 			Start:          tv.start,
 			End:            tv.end,
 		}
-		rv[i] = &tfv
+		rv[i] = &a[i]
 	}
 	return rv
 }

@@ -141,39 +141,41 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 	}
 
 	if termMatch.Vectors != nil && len(termMatch.Vectors) > 0 {
+		locs := make([]search.Location, len(termMatch.Vectors))
+		locsUsed := 0
+
+		totalPositions := 0
+		for _, v := range termMatch.Vectors {
+			totalPositions += len(v.ArrayPositions)
+		}
+		positions := make([]float64, totalPositions)
+		positionsUsed := 0
 
 		rv.Locations = make(search.FieldTermLocationMap)
 		for _, v := range termMatch.Vectors {
 			tlm := rv.Locations[v.Field]
 			if tlm == nil {
 				tlm = make(search.TermLocationMap)
+				rv.Locations[v.Field] = tlm
 			}
 
-			loc := search.Location{
-				Pos:   float64(v.Pos),
-				Start: float64(v.Start),
-				End:   float64(v.End),
-			}
+			loc := &locs[locsUsed]
+			locsUsed++
+
+			loc.Pos = float64(v.Pos)
+			loc.Start = float64(v.Start)
+			loc.End = float64(v.End)
 
 			if len(v.ArrayPositions) > 0 {
-				loc.ArrayPositions = make([]float64, len(v.ArrayPositions))
+				loc.ArrayPositions = positions[positionsUsed:positionsUsed+len(v.ArrayPositions)]
 				for i, ap := range v.ArrayPositions {
 					loc.ArrayPositions[i] = float64(ap)
 				}
+				positionsUsed += len(v.ArrayPositions)
 			}
 
-			locations := tlm[s.queryTerm]
-			if locations == nil {
-				locations = make(search.Locations, 1)
-				locations[0] = &loc
-			} else {
-				locations = append(locations, &loc)
-			}
-			tlm[s.queryTerm] = locations
-
-			rv.Locations[v.Field] = tlm
+			tlm[s.queryTerm] = append(tlm[s.queryTerm], loc)
 		}
-
 	}
 
 	return rv
