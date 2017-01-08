@@ -502,14 +502,18 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []in
 	updateRows = make([]UpsideDownCouchRow, 0, len(rows))
 	deleteRows = make([]UpsideDownCouchRow, 0, len(rows))
 
-	existingTermKeys := make(map[string]bool)
-	for _, key := range backIndexRow.AllTermKeys() {
-		existingTermKeys[string(key)] = true
+	var mark struct{}
+
+	backIndexTermKeys := backIndexRow.AllTermKeys()
+	existingTermKeys := make(map[string]struct{}, len(backIndexTermKeys))
+	for _, key := range backIndexTermKeys {
+		existingTermKeys[string(key)] = mark
 	}
 
-	existingStoredKeys := make(map[string]bool)
-	for _, key := range backIndexRow.AllStoredKeys() {
-		existingStoredKeys[string(key)] = true
+	backIndexStoredKeys := backIndexRow.AllStoredKeys()
+	existingStoredKeys := make(map[string]struct{}, len(backIndexStoredKeys))
+	for _, key := range backIndexStoredKeys {
+		existingStoredKeys[string(key)] = mark
 	}
 
 	keyBuf := GetRowBuffer()
