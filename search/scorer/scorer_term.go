@@ -167,7 +167,7 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 			loc.End = float64(v.End)
 
 			if len(v.ArrayPositions) > 0 {
-				loc.ArrayPositions = positions[positionsUsed:positionsUsed+len(v.ArrayPositions)]
+				loc.ArrayPositions = positions[positionsUsed : positionsUsed+len(v.ArrayPositions)]
 				for i, ap := range v.ArrayPositions {
 					loc.ArrayPositions[i] = float64(ap)
 				}
