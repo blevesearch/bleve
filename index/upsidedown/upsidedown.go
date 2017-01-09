@@ -504,43 +504,53 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []in
 
 	var mark struct{}
 
+	var existingTermKeys map[string]struct{}
 	backIndexTermKeys := backIndexRow.AllTermKeys()
-	existingTermKeys := make(map[string]struct{}, len(backIndexTermKeys))
-	for _, key := range backIndexTermKeys {
-		existingTermKeys[string(key)] = mark
+	if len(backIndexTermKeys) > 0 {
+		existingTermKeys = make(map[string]struct{}, len(backIndexTermKeys))
+		for _, key := range backIndexTermKeys {
+			existingTermKeys[string(key)] = mark
+		}
 	}
 
+	var existingStoredKeys map[string]struct{}
 	backIndexStoredKeys := backIndexRow.AllStoredKeys()
-	existingStoredKeys := make(map[string]struct{}, len(backIndexStoredKeys))
-	for _, key := range backIndexStoredKeys {
-		existingStoredKeys[string(key)] = mark
+	if len(backIndexStoredKeys) > 0 {
+		existingStoredKeys = make(map[string]struct{}, len(backIndexStoredKeys))
+		for _, key := range backIndexStoredKeys {
+			existingStoredKeys[string(key)] = mark
+		}
 	}
 
 	keyBuf := GetRowBuffer()
 	for _, row := range rows {
 		switch row := row.(type) {
 		case *TermFrequencyRow:
-			if row.KeySize() > len(keyBuf) {
-				keyBuf = make([]byte, row.KeySize())
+			if existingTermKeys != nil {
+				if row.KeySize() > len(keyBuf) {
+					keyBuf = make([]byte, row.KeySize())
+				}
+				keySize, _ := row.KeyTo(keyBuf)
+				if _, ok := existingTermKeys[string(keyBuf[:keySize])]; ok {
+					updateRows = append(updateRows, row)
+					delete(existingTermKeys, string(keyBuf[:keySize]))
+					continue
+				}
 			}
-			keySize, _ := row.KeyTo(keyBuf)
-			if _, ok := existingTermKeys[string(keyBuf[:keySize])]; ok {
-				updateRows = append(updateRows, row)
-				delete(existingTermKeys, string(keyBuf[:keySize]))
-			} else {
-				addRows = append(addRows, row)
-			}
+			addRows = append(addRows, row)
 		case *StoredRow:
-			if row.KeySize() > len(keyBuf) {
-				keyBuf = make([]byte, row.KeySize())
+			if existingStoredKeys != nil {
+				if row.KeySize() > len(keyBuf) {
+					keyBuf = make([]byte, row.KeySize())
+				}
+				keySize, _ := row.KeyTo(keyBuf)
+				if _, ok := existingStoredKeys[string(keyBuf[:keySize])]; ok {
+					updateRows = append(updateRows, row)
+					delete(existingStoredKeys, string(keyBuf[:keySize]))
+					continue
+				}
 			}
-			keySize, _ := row.KeyTo(keyBuf)
-			if _, ok := existingStoredKeys[string(keyBuf[:keySize])]; ok {
-				updateRows = append(updateRows, row)
-				delete(existingStoredKeys, string(keyBuf[:keySize]))
-			} else {
-				addRows = append(addRows, row)
-			}
+			addRows = append(addRows, row)
 		default:
 			updateRows = append(updateRows, row)
 		}
