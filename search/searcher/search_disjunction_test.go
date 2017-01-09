@@ -34,37 +34,39 @@ func TestDisjunctionSearch(t *testing.T) {
 		}
 	}()
 
-	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)
+	explainTrue := search.SearcherOptions{Explain: true}
+
+	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dustinTermSearcher, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, true)
+	dustinTermSearcher, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyOrDustinSearcher, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher}, 0, true)
+	martyOrDustinSearcher, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	martyTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)
+	martyTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dustinTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, true)
+	dustinTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyOrDustinSearcher2, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher2, dustinTermSearcher2}, 0, true)
+	martyOrDustinSearcher2, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher2, dustinTermSearcher2}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	raviTermSearcher, err := NewTermSearcher(twoDocIndexReader, "ravi", "name", 1.0, true)
+	raviTermSearcher, err := NewTermSearcher(twoDocIndexReader, "ravi", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	nestedRaviOrMartyOrDustinSearcher, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{raviTermSearcher, martyOrDustinSearcher2}, 0, true)
+	nestedRaviOrMartyOrDustinSearcher, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{raviTermSearcher, martyOrDustinSearcher2}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,15 +157,17 @@ func TestDisjunctionAdvance(t *testing.T) {
 		}
 	}()
 
-	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)
+	explainTrue := search.SearcherOptions{Explain: true}
+
+	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dustinTermSearcher, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, true)
+	dustinTermSearcher, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyOrDustinSearcher, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher}, 0, true)
+	martyOrDustinSearcher, err := NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher}, 0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,19 +204,21 @@ func TestDisjunctionSearchTooMany(t *testing.T) {
 		}
 	}()
 
-	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, true)
+	explainTrue := search.SearcherOptions{Explain: true}
+
+	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dustinTermSearcher, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, true)
+	dustinTermSearcher, err := NewTermSearcher(twoDocIndexReader, "dustin", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	steveTermSearcher, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, true)
+	steveTermSearcher, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher, steveTermSearcher}, 0, true)
+	_, err = NewDisjunctionSearcher(twoDocIndexReader, []search.Searcher{martyTermSearcher, dustinTermSearcher, steveTermSearcher}, 0, explainTrue)
 	if err == nil {
 		t.Fatal(err)
 	}

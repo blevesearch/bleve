@@ -6,7 +6,8 @@
 			"query": {
 				"field": "manages.reports",
 				"term": "julián"
-			}
+			},
+            "includeLocations": true
 		},
 		"result": {
 			"total_hits": 1,

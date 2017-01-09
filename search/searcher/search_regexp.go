@@ -21,7 +21,7 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp, field string, boost float64, explain bool) (search.Searcher, error) {
+func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp, field string, boost float64, options search.SearcherOptions) (search.Searcher, error) {
 
 	prefixTerm, complete := pattern.LiteralPrefix()
 	var candidateTerms []string
@@ -44,7 +44,7 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp, fi
 		}
 	}
 	for _, cterm := range candidateTerms {
-		qsearcher, err := NewTermSearcher(indexReader, cterm, field, boost, explain)
+		qsearcher, err := NewTermSearcher(indexReader, cterm, field, boost, options)
 		if err != nil {
 			qsearchersClose()
 			return nil, err
@@ -53,7 +53,7 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp, fi
 	}
 
 	// build disjunction searcher of these ranges
-	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, explain)
+	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, options)
 	if err != nil {
 		qsearchersClose()
 		return nil, err

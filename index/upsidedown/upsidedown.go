@@ -502,41 +502,53 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []in
 	updateRows = make([]UpsideDownCouchRow, 0, len(rows))
 	deleteRows = make([]UpsideDownCouchRow, 0, len(rows))
 
-	existingTermKeys := make(map[string]bool)
-	for _, key := range backIndexRow.AllTermKeys() {
-		existingTermKeys[string(key)] = true
+	var existingTermKeys map[string]struct{}
+	backIndexTermKeys := backIndexRow.AllTermKeys()
+	if len(backIndexTermKeys) > 0 {
+		existingTermKeys = make(map[string]struct{}, len(backIndexTermKeys))
+		for _, key := range backIndexTermKeys {
+			existingTermKeys[string(key)] = struct{}{}
+		}
 	}
 
-	existingStoredKeys := make(map[string]bool)
-	for _, key := range backIndexRow.AllStoredKeys() {
-		existingStoredKeys[string(key)] = true
+	var existingStoredKeys map[string]struct{}
+	backIndexStoredKeys := backIndexRow.AllStoredKeys()
+	if len(backIndexStoredKeys) > 0 {
+		existingStoredKeys = make(map[string]struct{}, len(backIndexStoredKeys))
+		for _, key := range backIndexStoredKeys {
+			existingStoredKeys[string(key)] = struct{}{}
+		}
 	}
 
 	keyBuf := GetRowBuffer()
 	for _, row := range rows {
 		switch row := row.(type) {
 		case *TermFrequencyRow:
-			if row.KeySize() > len(keyBuf) {
-				keyBuf = make([]byte, row.KeySize())
+			if existingTermKeys != nil {
+				if row.KeySize() > len(keyBuf) {
+					keyBuf = make([]byte, row.KeySize())
+				}
+				keySize, _ := row.KeyTo(keyBuf)
+				if _, ok := existingTermKeys[string(keyBuf[:keySize])]; ok {
+					updateRows = append(updateRows, row)
+					delete(existingTermKeys, string(keyBuf[:keySize]))
+					continue
+				}
 			}
-			keySize, _ := row.KeyTo(keyBuf)
-			if _, ok := existingTermKeys[string(keyBuf[:keySize])]; ok {
-				updateRows = append(updateRows, row)
-				delete(existingTermKeys, string(keyBuf[:keySize]))
-			} else {
-				addRows = append(addRows, row)
-			}
+			addRows = append(addRows, row)
 		case *StoredRow:
-			if row.KeySize() > len(keyBuf) {
-				keyBuf = make([]byte, row.KeySize())
+			if existingStoredKeys != nil {
+				if row.KeySize() > len(keyBuf) {
+					keyBuf = make([]byte, row.KeySize())
+				}
+				keySize, _ := row.KeyTo(keyBuf)
+				if _, ok := existingStoredKeys[string(keyBuf[:keySize])]; ok {
+					updateRows = append(updateRows, row)
+					delete(existingStoredKeys, string(keyBuf[:keySize]))
+					continue
+				}
 			}
-			keySize, _ := row.KeyTo(keyBuf)
-			if _, ok := existingStoredKeys[string(keyBuf[:keySize])]; ok {
-				updateRows = append(updateRows, row)
-				delete(existingStoredKeys, string(keyBuf[:keySize]))
-			} else {
-				addRows = append(addRows, row)
-			}
+			addRows = append(addRows, row)
 		default:
 			updateRows = append(updateRows, row)
 		}
@@ -745,18 +757,19 @@ func (udc *UpsideDownCouch) termFieldVectorsFromTermVectors(in []*TermVector) []
 		return nil
 	}
 
+	a := make([]index.TermFieldVector, len(in))
 	rv := make([]*index.TermFieldVector, len(in))
 
 	for i, tv := range in {
 		fieldName := udc.fieldCache.FieldIndexed(tv.field)
-		tfv := index.TermFieldVector{
+		a[i] = index.TermFieldVector{
 			Field:          fieldName,
 			ArrayPositions: tv.arrayPositions,
 			Pos:            tv.pos,
 			Start:          tv.start,
 			End:            tv.end,
 		}
-		rv[i] = &tfv
+		rv[i] = &a[i]
 	}
 	return rv
 }
@@ -1008,7 +1021,7 @@ func init() {
 
 func backIndexRowForDoc(kvreader store.KVReader, docID index.IndexInternalID) (*BackIndexRow, error) {
 	// use a temporary row structure to build key
-	tempRow := &BackIndexRow{
+	tempRow := BackIndexRow{
 		doc: docID,
 	}
 

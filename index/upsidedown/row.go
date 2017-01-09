@@ -538,7 +538,7 @@ func (tfr *TermFrequencyRow) parseKDoc(key []byte, term []byte) error {
 	return nil
 }
 
-func (tfr *TermFrequencyRow) parseV(value []byte) error {
+func (tfr *TermFrequencyRow) parseV(value []byte, includeTermVectors bool) error {
 	var bytesRead int
 	tfr.freq, bytesRead = binary.Uvarint(value)
 	if bytesRead <= 0 {
@@ -556,6 +556,10 @@ func (tfr *TermFrequencyRow) parseV(value []byte) error {
 	tfr.norm = math.Float32frombits(uint32(norm))
 
 	tfr.vectors = nil
+	if !includeTermVectors {
+		return nil
+	}
+
 	var field uint64
 	field, bytesRead = binary.Uvarint(value[currOffset:])
 	for bytesRead > 0 {
@@ -620,7 +624,7 @@ func NewTermFrequencyRowKV(key, value []byte) (*TermFrequencyRow, error) {
 		return nil, err
 	}
 
-	err = rv.parseV(value)
+	err = rv.parseV(value, true)
 	if err != nil {
 		return nil, err
 	}

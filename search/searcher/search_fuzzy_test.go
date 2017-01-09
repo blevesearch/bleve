@@ -34,22 +34,24 @@ func TestFuzzySearch(t *testing.T) {
 		}
 	}()
 
-	fuzzySearcherbeet, err := NewFuzzySearcher(twoDocIndexReader, "beet", 0, 1, "desc", 1.0, true)
+	explainTrue := search.SearcherOptions{Explain: true}
+
+	fuzzySearcherbeet, err := NewFuzzySearcher(twoDocIndexReader, "beet", 0, 1, "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fuzzySearcherdouches, err := NewFuzzySearcher(twoDocIndexReader, "douches", 0, 2, "desc", 1.0, true)
+	fuzzySearcherdouches, err := NewFuzzySearcher(twoDocIndexReader, "douches", 0, 2, "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fuzzySearcheraplee, err := NewFuzzySearcher(twoDocIndexReader, "aplee", 0, 2, "desc", 1.0, true)
+	fuzzySearcheraplee, err := NewFuzzySearcher(twoDocIndexReader, "aplee", 0, 2, "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fuzzySearcherprefix, err := NewFuzzySearcher(twoDocIndexReader, "water", 3, 2, "desc", 1.0, true)
+	fuzzySearcherprefix, err := NewFuzzySearcher(twoDocIndexReader, "water", 3, 2, "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}

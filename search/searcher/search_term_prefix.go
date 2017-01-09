@@ -23,11 +23,11 @@ type TermPrefixSearcher struct {
 	indexReader index.IndexReader
 	prefix      string
 	field       string
-	explain     bool
+	options     search.SearcherOptions
 	searcher    *DisjunctionSearcher
 }
 
-func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string, field string, boost float64, explain bool) (*TermPrefixSearcher, error) {
+func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string, field string, boost float64, options search.SearcherOptions) (*TermPrefixSearcher, error) {
 	// find the terms with this prefix
 	fieldDict, err := indexReader.FieldDictPrefix(field, []byte(prefix))
 	if err != nil {
@@ -45,7 +45,7 @@ func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string, field s
 	tfd, err := fieldDict.Next()
 	for err == nil && tfd != nil {
 		var qsearcher *TermSearcher
-		qsearcher, err = NewTermSearcher(indexReader, string(tfd.Term), field, 1.0, explain)
+		qsearcher, err = NewTermSearcher(indexReader, string(tfd.Term), field, 1.0, options)
 		if err != nil {
 			qsearchersClose()
 			_ = fieldDict.Close()
@@ -62,7 +62,7 @@ func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string, field s
 	}
 
 	// build disjunction searcher of these ranges
-	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, explain)
+	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, options)
 	if err != nil {
 		qsearchersClose()
 		return nil, err
@@ -72,7 +72,7 @@ func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string, field s
 		indexReader: indexReader,
 		prefix:      prefix,
 		field:       field,
-		explain:     explain,
+		options:     options,
 		searcher:    searcher,
 	}, nil
 }

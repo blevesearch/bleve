@@ -135,7 +135,7 @@ func (ldbs *Store) CompactWithBatchSize(batchSize int) error {
 		batch.Reset()
 	}
 
-	return ldbs.db.CompactRange(util.Range{nil, nil})
+	return ldbs.db.CompactRange(util.Range{Start: nil, Limit: nil})
 }
 
 // Compact compacts the underlying goleveldb store.  The current implementation includes a workaround

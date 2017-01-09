@@ -219,14 +219,15 @@ func (h *HighlightRequest) AddField(field string) {
 //
 // A special field named "*" can be used to return all fields.
 type SearchRequest struct {
-	Query     query.Query       `json:"query"`
-	Size      int               `json:"size"`
-	From      int               `json:"from"`
-	Highlight *HighlightRequest `json:"highlight"`
-	Fields    []string          `json:"fields"`
-	Facets    FacetsRequest     `json:"facets"`
-	Explain   bool              `json:"explain"`
-	Sort      search.SortOrder  `json:"sort"`
+	Query            query.Query       `json:"query"`
+	Size             int               `json:"size"`
+	From             int               `json:"from"`
+	Highlight        *HighlightRequest `json:"highlight"`
+	Fields           []string          `json:"fields"`
+	Facets           FacetsRequest     `json:"facets"`
+	Explain          bool              `json:"explain"`
+	Sort             search.SortOrder  `json:"sort"`
+	IncludeLocations bool              `json:"includeLocations"`
 }
 
 func (r *SearchRequest) Validate() error {
@@ -267,14 +268,15 @@ func (r *SearchRequest) SortByCustom(order search.SortOrder) {
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	var temp struct {
-		Q         json.RawMessage   `json:"query"`
-		Size      *int              `json:"size"`
-		From      int               `json:"from"`
-		Highlight *HighlightRequest `json:"highlight"`
-		Fields    []string          `json:"fields"`
-		Facets    FacetsRequest     `json:"facets"`
-		Explain   bool              `json:"explain"`
-		Sort      []json.RawMessage `json:"sort"`
+		Q                json.RawMessage   `json:"query"`
+		Size             *int              `json:"size"`
+		From             int               `json:"from"`
+		Highlight        *HighlightRequest `json:"highlight"`
+		Fields           []string          `json:"fields"`
+		Facets           FacetsRequest     `json:"facets"`
+		Explain          bool              `json:"explain"`
+		Sort             []json.RawMessage `json:"sort"`
+		IncludeLocations bool              `json:"includeLocations"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -300,6 +302,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Highlight = temp.Highlight
 	r.Fields = temp.Fields
 	r.Facets = temp.Facets
+	r.IncludeLocations = temp.IncludeLocations
 	r.Query, err = query.ParseQuery(temp.Q)
 	if err != nil {
 		return err

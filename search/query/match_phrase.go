@@ -49,7 +49,7 @@ func (q *MatchPhraseQuery) SetBoost(b float64) {
 	q.BoostVal = &boost
 }
 
-func (q *MatchPhraseQuery) Boost() float64{
+func (q *MatchPhraseQuery) Boost() float64 {
 	return q.BoostVal.Value()
 }
 
@@ -57,11 +57,11 @@ func (q *MatchPhraseQuery) SetField(f string) {
 	q.FieldVal = f
 }
 
-func (q *MatchPhraseQuery) Field() string{
+func (q *MatchPhraseQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -83,10 +83,10 @@ func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 		phrase := tokenStreamToPhrase(tokens)
 		phraseQuery := NewPhraseQuery(phrase, field)
 		phraseQuery.SetBoost(q.BoostVal.Value())
-		return phraseQuery.Searcher(i, m, explain)
+		return phraseQuery.Searcher(i, m, options)
 	}
 	noneQuery := NewMatchNoneQuery()
-	return noneQuery.Searcher(i, m, explain)
+	return noneQuery.Searcher(i, m, options)
 }
 
 func tokenStreamToPhrase(tokens analysis.TokenStream) []string {

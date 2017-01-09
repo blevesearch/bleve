@@ -356,9 +356,9 @@ type slowQuery struct {
 	delay  time.Duration
 }
 
-func (s *slowQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, explain bool) (search.Searcher, error) {
+func (s *slowQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	time.Sleep(s.delay)
-	return s.actual.Searcher(i, m, explain)
+	return s.actual.Searcher(i, m, options)
 }
 
 func TestSlowSearch(t *testing.T) {
@@ -1099,6 +1099,7 @@ func TestTermVectorArrayPositions(t *testing.T) {
 	// search for this document in all field
 	tq := NewTermQuery("second")
 	tsr := NewSearchRequest(tq)
+	tsr.IncludeLocations = true
 	results, err := index.Search(tsr)
 	if err != nil {
 		t.Fatal(err)
@@ -1120,6 +1121,7 @@ func TestTermVectorArrayPositions(t *testing.T) {
 	tq2 := NewTermQuery("third")
 	tq2.SetField("Messages")
 	tsr = NewSearchRequest(tq2)
+	tsr.IncludeLocations = true
 	results, err = index.Search(tsr)
 	if err != nil {
 		t.Fatal(err)
@@ -1371,6 +1373,7 @@ func TestDocumentFieldArrayPositionsBug295(t *testing.T) {
 	tq := NewTermQuery("bleve")
 	tq.SetField("Messages")
 	tsr := NewSearchRequest(tq)
+	tsr.IncludeLocations = true
 	results, err := index.Search(tsr)
 	if err != nil {
 		t.Fatal(err)
@@ -1391,6 +1394,7 @@ func TestDocumentFieldArrayPositionsBug295(t *testing.T) {
 	// search for it in all
 	tq = NewTermQuery("bleve")
 	tsr = NewSearchRequest(tq)
+	tsr.IncludeLocations = true
 	results, err = index.Search(tsr)
 	if err != nil {
 		t.Fatal(err)

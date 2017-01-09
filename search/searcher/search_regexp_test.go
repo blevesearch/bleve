@@ -35,12 +35,14 @@ func TestRegexpSearch(t *testing.T) {
 		}
 	}()
 
+	explainTrue := search.SearcherOptions{Explain: true}
+
 	pattern, err := regexp.Compile("ma.*")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	regexpSearcher, err := NewRegexpSearcher(twoDocIndexReader, pattern, "name", 1.0, true)
+	regexpSearcher, err := NewRegexpSearcher(twoDocIndexReader, pattern, "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +52,7 @@ func TestRegexpSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	regexpSearcherCo, err := NewRegexpSearcher(twoDocIndexReader, patternCo, "desc", 1.0, true)
+	regexpSearcherCo, err := NewRegexpSearcher(twoDocIndexReader, patternCo, "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}

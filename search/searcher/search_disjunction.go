@@ -53,7 +53,7 @@ func tooManyClausesErr() error {
 	return fmt.Errorf("TooManyClauses[maxClauseCount is set to %d]", DisjunctionMaxClauseCount)
 }
 
-func NewDisjunctionSearcher(indexReader index.IndexReader, qsearchers []search.Searcher, min float64, explain bool) (*DisjunctionSearcher, error) {
+func NewDisjunctionSearcher(indexReader index.IndexReader, qsearchers []search.Searcher, min float64, options search.SearcherOptions) (*DisjunctionSearcher, error) {
 	if tooManyClauses(len(qsearchers)) {
 		return nil, tooManyClausesErr()
 	}
@@ -70,7 +70,7 @@ func NewDisjunctionSearcher(indexReader index.IndexReader, qsearchers []search.S
 		searchers:    searchers,
 		numSearchers: len(searchers),
 		currs:        make([]*search.DocumentMatch, len(searchers)),
-		scorer:       scorer.NewDisjunctionQueryScorer(explain),
+		scorer:       scorer.NewDisjunctionQueryScorer(options),
 		min:          int(min),
 		matching:     make([]*search.DocumentMatch, len(searchers)),
 		matchingIdxs: make([]int, len(searchers)),
