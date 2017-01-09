@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/blevesearch/bleve/index"
@@ -52,8 +53,10 @@ func TestPhraseSearch(t *testing.T) {
 	}
 
 	tests := []struct {
-		searcher search.Searcher
-		results  []*search.DocumentMatch
+		searcher   search.Searcher
+		results    []*search.DocumentMatch
+		locations  map[string]map[string][]search.Location
+		fieldterms [][2]string
 	}{
 		{
 			searcher: phraseSearcher,
@@ -63,6 +66,8 @@ func TestPhraseSearch(t *testing.T) {
 					Score:           1.0807601687084403,
 				},
 			},
+			locations:  map[string]map[string][]search.Location{"desc": map[string][]search.Location{"beer": []search.Location{search.Location{Pos: 2, Start: 6, End: 10, ArrayPositions: []float64(nil)}}, "angst": []search.Location{search.Location{Pos: 1, Start: 0, End: 5, ArrayPositions: []float64(nil)}}}},
+			fieldterms: [][2]string{[2]string{"desc", "beer"}, [2]string{"desc", "angst"}},
 		},
 	}
 
@@ -82,13 +87,26 @@ func TestPhraseSearch(t *testing.T) {
 		for err == nil && next != nil {
 			if i < len(test.results) {
 				if !next.IndexInternalID.Equals(test.results[i].IndexInternalID) {
-					t.Errorf("expected result %d to have id %s got %s for test %d", i, test.results[i].IndexInternalID, next.IndexInternalID, testIndex)
+					t.Errorf("expected result %d to have id %s got %s for test %d\n", i, test.results[i].IndexInternalID, next.IndexInternalID, testIndex)
 				}
 				if next.Score != test.results[i].Score {
-					t.Errorf("expected result %d to have score %v got  %v for test %d", i, test.results[i].Score, next.Score, testIndex)
-					t.Logf("scoring explanation: %s", next.Expl)
+					t.Errorf("expected result %d to have score %v got %v for test %d\n", i, test.results[i].Score, next.Score, testIndex)
+					t.Logf("scoring explanation: %s\n", next.Expl)
+				}
+				for _, ft := range test.fieldterms {
+					locs := next.Locations[ft[0]][ft[1]]
+					explocs := test.locations[ft[0]][ft[1]]
+					if len(explocs) != len(locs) {
+						t.Fatalf("expected result %d to have %d Locations (%#v) but got %d (%#v) for test %d with field %q and term %q\n", i, len(explocs), explocs, len(locs), locs, testIndex, ft[0], ft[1])
+					}
+					for ind, exploc := range explocs {
+						if !reflect.DeepEqual(*locs[ind], exploc) {
+							t.Errorf("expected result %d to have Location %v got %v for test %d\n", i, exploc, locs[ind], testIndex)
+						}
+					}
 				}
 			}
+
 			ctx.DocumentMatchPool.Put(next)
 			next, err = test.searcher.Next(ctx)
 			i++
