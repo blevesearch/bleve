@@ -499,6 +499,15 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 
 func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []index.IndexRow) (addRows []UpsideDownCouchRow, updateRows []UpsideDownCouchRow, deleteRows []UpsideDownCouchRow) {
 	addRows = make([]UpsideDownCouchRow, 0, len(rows))
+
+	if backIndexRow == nil {
+		addRows = addRows[0:len(rows)]
+		for i, row := range rows {
+			addRows[i] = row
+		}
+		return addRows, nil, nil
+	}
+
 	updateRows = make([]UpsideDownCouchRow, 0, len(rows))
 	deleteRows = make([]UpsideDownCouchRow, 0, len(rows))
 
