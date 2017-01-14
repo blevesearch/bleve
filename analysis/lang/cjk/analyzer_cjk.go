@@ -25,7 +25,7 @@ import (
 const AnalyzerName = "cjk"
 
 func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
-	whitespaceTokenizer, err := cache.TokenizerNamed(unicode.Name)
+	tokenizer, err := cache.TokenizerNamed(unicode.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 		return nil, err
 	}
 	rv := analysis.Analyzer{
-		Tokenizer: whitespaceTokenizer,
+		Tokenizer: tokenizer,
 		TokenFilters: []analysis.TokenFilter{
 			widthFilter,
 			toLowerFilter,
