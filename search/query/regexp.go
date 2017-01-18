@@ -33,7 +33,9 @@ type RegexpQuery struct {
 
 // NewRegexpQuery creates a new Query which finds
 // documents containing terms that match the
-// specified regular expression.
+// specified regular expression.  The regexp pattern
+// SHOULD NOT include ^ or $ modifiers, the search
+// will only match entire terms even without them.
 func NewRegexpQuery(regexp string) *RegexpQuery {
 	return &RegexpQuery{
 		Regexp: regexp,
@@ -76,14 +78,14 @@ func (q *RegexpQuery) Validate() error {
 
 func (q *RegexpQuery) compile() error {
 	if q.compiled == nil {
-		// require that pattern be anchored to start and end of term
+		// require that pattern NOT be anchored to start and end of term
 		actualRegexp := q.Regexp
-		if !strings.HasPrefix(actualRegexp, "^") {
-			actualRegexp = "^" + actualRegexp
+		if strings.HasPrefix(actualRegexp, "^") {
+			actualRegexp = actualRegexp[1:] // remove leading ^
 		}
-		if !strings.HasSuffix(actualRegexp, "$") {
-			actualRegexp = actualRegexp + "$"
-		}
+		// do not attempt to remove trailing $, it's presence is not
+		// known to interfere with LiteralPrefix() the way ^ does
+		// and removing $ introduces possible ambiguities with escaped \$, \\$, etc
 		var err error
 		q.compiled, err = regexp.Compile(actualRegexp)
 		if err != nil {
