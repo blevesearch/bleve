@@ -101,6 +101,6 @@ func (q *WildcardQuery) Validate() error {
 }
 
 func (q *WildcardQuery) convertToRegexp() (*regexp.Regexp, error) {
-	regexpString := "^" + wildcardRegexpReplacer.Replace(q.Wildcard) + "$"
+	regexpString := wildcardRegexpReplacer.Replace(q.Wildcard)
 	return regexp.Compile(regexpString)
 }
