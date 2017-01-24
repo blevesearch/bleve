@@ -634,7 +634,7 @@ func NewTermFrequencyRowKV(key, value []byte) (*TermFrequencyRow, error) {
 
 type BackIndexRow struct {
 	doc           []byte
-	termEntries   []*BackIndexTermEntry
+	termsEntries  []*BackIndexTermsEntry
 	storedEntries []*BackIndexStoreEntry
 }
 
@@ -642,10 +642,12 @@ func (br *BackIndexRow) AllTermKeys() [][]byte {
 	if br == nil {
 		return nil
 	}
-	rv := make([][]byte, len(br.termEntries))
-	for i, termEntry := range br.termEntries {
-		termRow := NewTermFrequencyRow([]byte(termEntry.GetTerm()), uint16(termEntry.GetField()), br.doc, 0, 0)
-		rv[i] = termRow.Key()
+	rv := make([][]byte, 0, len(br.termsEntries)) // FIXME this underestimates severely
+	for _, termsEntry := range br.termsEntries {
+		for i := range termsEntry.Terms {
+			termRow := NewTermFrequencyRow([]byte(termsEntry.Terms[i]), uint16(termsEntry.GetField()), br.doc, 0, 0)
+			rv = append(rv, termRow.Key())
+		}
 	}
 	return rv
 }
@@ -686,7 +688,7 @@ func (br *BackIndexRow) Value() []byte {
 
 func (br *BackIndexRow) ValueSize() int {
 	birv := &BackIndexRowValue{
-		TermEntries:   br.termEntries,
+		TermsEntries:  br.termsEntries,
 		StoredEntries: br.storedEntries,
 	}
 	return birv.Size()
@@ -694,20 +696,20 @@ func (br *BackIndexRow) ValueSize() int {
 
 func (br *BackIndexRow) ValueTo(buf []byte) (int, error) {
 	birv := &BackIndexRowValue{
-		TermEntries:   br.termEntries,
+		TermsEntries:  br.termsEntries,
 		StoredEntries: br.storedEntries,
 	}
 	return birv.MarshalTo(buf)
 }
 
 func (br *BackIndexRow) String() string {
-	return fmt.Sprintf("Backindex DocId: `%s` Term Entries: %v, Stored Entries: %v", string(br.doc), br.termEntries, br.storedEntries)
+	return fmt.Sprintf("Backindex DocId: `%s` Terms Entries: %v, Stored Entries: %v", string(br.doc), br.termsEntries, br.storedEntries)
 }
 
-func NewBackIndexRow(docID []byte, entries []*BackIndexTermEntry, storedFields []*BackIndexStoreEntry) *BackIndexRow {
+func NewBackIndexRow(docID []byte, entries []*BackIndexTermsEntry, storedFields []*BackIndexStoreEntry) *BackIndexRow {
 	return &BackIndexRow{
 		doc:           docID,
-		termEntries:   entries,
+		termsEntries:  entries,
 		storedEntries: storedFields,
 	}
 }
@@ -736,7 +738,7 @@ func NewBackIndexRowKV(key, value []byte) (*BackIndexRow, error) {
 	if err != nil {
 		return nil, err
 	}
-	rv.termEntries = birv.TermEntries
+	rv.termsEntries = birv.TermsEntries
 	rv.storedEntries = birv.StoredEntries
 
 	return &rv, nil
