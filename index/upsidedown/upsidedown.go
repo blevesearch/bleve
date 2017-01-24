@@ -45,7 +45,7 @@ const RowBufferSize = 4 * 1024
 
 var VersionKey = []byte{'v'}
 
-const Version uint8 = 5
+const Version uint8 = 7
 
 var IncompatibleVersion = fmt.Errorf("incompatible version, %d is supported", Version)
 
@@ -610,12 +610,13 @@ func encodeFieldType(f document.Field) byte {
 	return fieldType
 }
 
-func (udc *UpsideDownCouch) indexField(docID []byte, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies, rows []index.IndexRow, backIndexTermEntries []*BackIndexTermEntry) ([]index.IndexRow, []*BackIndexTermEntry) {
+func (udc *UpsideDownCouch) indexField(docID []byte, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies, rows []index.IndexRow, backIndexTermsEntries []*BackIndexTermsEntry) ([]index.IndexRow, []*BackIndexTermsEntry) {
 	fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
 
 	termFreqRows := make([]TermFrequencyRow, len(tokenFreqs))
 	termFreqRowsUsed := 0
 
+	terms := make([]string, 0, len(tokenFreqs))
 	for k, tf := range tokenFreqs {
 		termFreqRow := &termFreqRows[termFreqRowsUsed]
 		termFreqRowsUsed++
@@ -628,13 +629,14 @@ func (udc *UpsideDownCouch) indexField(docID []byte, includeTermVectors bool, fi
 		}
 
 		// record the back index entry
-		backIndexTermEntry := BackIndexTermEntry{Term: proto.String(k), Field: proto.Uint32(uint32(fieldIndex))}
-		backIndexTermEntries = append(backIndexTermEntries, &backIndexTermEntry)
+		terms = append(terms, k)
 
 		rows = append(rows, termFreqRow)
 	}
+	backIndexTermsEntry := BackIndexTermsEntry{Field: proto.Uint32(uint32(fieldIndex)), Terms: terms}
+	backIndexTermsEntries = append(backIndexTermsEntries, &backIndexTermsEntry)
 
-	return rows, backIndexTermEntries
+	return rows, backIndexTermsEntries
 }
 
 func (udc *UpsideDownCouch) Delete(id string) (err error) {
@@ -707,9 +709,11 @@ func (udc *UpsideDownCouch) Delete(id string) (err error) {
 func (udc *UpsideDownCouch) deleteSingle(id string, backIndexRow *BackIndexRow, deleteRows []UpsideDownCouchRow) []UpsideDownCouchRow {
 	idBytes := []byte(id)
 
-	for _, backIndexEntry := range backIndexRow.termEntries {
-		tfr := NewTermFrequencyRow([]byte(*backIndexEntry.Term), uint16(*backIndexEntry.Field), idBytes, 0, 0)
-		deleteRows = append(deleteRows, tfr)
+	for _, backIndexEntry := range backIndexRow.termsEntries {
+		for i := range backIndexEntry.Terms {
+			tfr := NewTermFrequencyRow([]byte(backIndexEntry.Terms[i]), uint16(*backIndexEntry.Field), idBytes, 0, 0)
+			deleteRows = append(deleteRows, tfr)
+		}
 	}
 	for _, se := range backIndexRow.storedEntries {
 		sf := NewStoredRow(idBytes, uint16(*se.Field), se.ArrayPositions, 'x', nil)
