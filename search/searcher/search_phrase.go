@@ -96,56 +96,10 @@ func (s *PhraseSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch,
 		}
 	}
 
-	var rv *search.DocumentMatch
 	for s.currMust != nil {
-		rvftlm := make(search.FieldTermLocationMap, 0)
-		freq := 0
-		firstTerm := s.terms[0]
-		for field, termLocMap := range s.currMust.Locations {
-			locations, ok := termLocMap[firstTerm]
-			if !ok {
-				continue
-			}
-
-			rvtlm := make(search.TermLocationMap, 0)
-
-		OUTER:
-			for _, location := range locations {
-				crvtlm := make(search.TermLocationMap, 0)
-				crvtlm.AddLocation(firstTerm, location)
-			INNER:
-				for i := 1; i < len(s.terms); i++ {
-					nextTerm := s.terms[i]
-					if nextTerm == "" {
-						continue
-					}
-					// look through all these term locations
-					// to try and find the correct offsets
-					nextLocations, ok := termLocMap[nextTerm]
-					if !ok {
-						continue OUTER
-					}
-					for _, nextLocation := range nextLocations {
-						if nextLocation.Pos == location.Pos+float64(i) && nextLocation.SameArrayElement(location) {
-							// found a location match for this term
-							crvtlm.AddLocation(nextTerm, nextLocation)
-							continue INNER
-						}
-					}
-					// if we got here we didn't find a location match for this term
-					continue OUTER
-				}
-				// if we got here all the terms matched
-				freq++
-				search.MergeTermLocationMaps(rvtlm, crvtlm)
-				rvftlm[field] = rvtlm
-			}
-		}
-
-		if freq > 0 {
-			// return match
-			rv = s.currMust
-			rv.Locations = rvftlm
+		rv := s.checkCurrMustMatch(ctx)
+		if rv != nil {
+			// prepare for next iteration
 			err := s.advanceNextMust(ctx)
 			if err != nil {
 				return nil, err
@@ -160,6 +114,86 @@ func (s *PhraseSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch,
 	}
 
 	return nil, nil
+}
+
+// checkCurrMustMatch is soley concerned with determining if the DocumentMatch
+// pointed to by s.currMust (which satisifies the pre-condition searcher)
+// also satisfies the phase constraints.  if so, it returns a DocumentMatch
+// for this document, otherwise nil
+func (s *PhraseSearcher) checkCurrMustMatch(ctx *search.SearchContext) *search.DocumentMatch {
+	rvftlm := make(search.FieldTermLocationMap, 0)
+	freq := 0
+	// typically we would expect there to only actually be results in
+	// one field, but we allow for this to not be the case
+	// but, we note that phrase constraints can only be satisfied within
+	// a single field, so we can check them each independently
+	for field := range s.currMust.Locations {
+
+		f, rvtlm := s.checkCurrMustMatchField(ctx, field)
+		if f > 0 {
+			freq += f
+			rvftlm[field] = rvtlm
+		}
+	}
+
+	if freq > 0 {
+		// return match
+		rv := s.currMust
+		rv.Locations = rvftlm
+		return rv
+	}
+
+	return nil
+}
+
+// checkCurrMustMatchField is soley concerned with determining if one particular
+// field within the currMust DocumentMatch Locations satisfies the phase
+// constraints (possibly more than once).  if so, the number of times it was
+// satisfied, and these locations are returned.  otherwise 0 and either
+// a nil or empty TermLocationMap
+func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext, field string) (int, search.TermLocationMap) {
+	firstTerm := s.terms[0]
+	freq := 0
+	termLocMap := s.currMust.Locations[field]
+	locations, ok := termLocMap[firstTerm]
+	if !ok {
+		return 0, nil
+	}
+
+	rvtlm := make(search.TermLocationMap, 0)
+
+OUTER:
+	for _, location := range locations {
+		crvtlm := make(search.TermLocationMap, 0)
+		crvtlm.AddLocation(firstTerm, location)
+	INNER:
+		for i := 1; i < len(s.terms); i++ {
+			nextTerm := s.terms[i]
+			if nextTerm == "" {
+				continue
+			}
+			// look through all these term locations
+			// to try and find the correct offsets
+			nextLocations, ok := termLocMap[nextTerm]
+			if !ok {
+				continue OUTER
+			}
+			for _, nextLocation := range nextLocations {
+				if nextLocation.Pos == location.Pos+float64(i) && nextLocation.SameArrayElement(location) {
+					// found a location match for this term
+					crvtlm.AddLocation(nextTerm, nextLocation)
+					continue INNER
+				}
+			}
+			// if we got here we didn't find a location match for this term
+			continue OUTER
+		}
+		// if we got here all the terms matched
+		freq++
+		search.MergeTermLocationMaps(rvtlm, crvtlm)
+	}
+
+	return freq, rvtlm
 }
 
 func (s *PhraseSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
