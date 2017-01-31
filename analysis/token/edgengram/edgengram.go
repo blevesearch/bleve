@@ -55,7 +55,7 @@ func (s *EdgeNgramFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
 			// index of the starting rune for this token
 			for ngramSize := s.minLength; ngramSize <= s.maxLength; ngramSize++ {
 				// build an ngram of this size starting at i
-				if i-ngramSize > 0 {
+				if i-ngramSize >= 0 {
 					ngramTerm := analysis.BuildTermFromRunes(runes[i-ngramSize : i])
 					token := analysis.Token{
 						Position: token.Position,

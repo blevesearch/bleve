@@ -135,6 +135,48 @@ func TestEdgeNgramFilter(t *testing.T) {
 				},
 			},
 		},
+		{
+			side: BACK,
+			min:  3,
+			max:  5,
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("Beryl"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("ryl"),
+				},
+				&analysis.Token{
+					Term: []byte("eryl"),
+				},
+				&analysis.Token{
+					Term: []byte("Beryl"),
+				},
+			},
+		},
+		{
+			side: FRONT,
+			min:  3,
+			max:  5,
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("Beryl"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("Ber"),
+				},
+				&analysis.Token{
+					Term: []byte("Bery"),
+				},
+				&analysis.Token{
+					Term: []byte("Beryl"),
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
