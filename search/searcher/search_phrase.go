@@ -97,19 +97,18 @@ func (s *PhraseSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch,
 	}
 
 	for s.currMust != nil {
+		// check this match against phrase constraints
 		rv := s.checkCurrMustMatch(ctx)
-		if rv != nil {
-			// prepare for next iteration
-			err := s.advanceNextMust(ctx)
-			if err != nil {
-				return nil, err
-			}
-			return rv, nil
-		}
 
+		// prepare for next iteration (either loop or subsequent call to Next())
 		err := s.advanceNextMust(ctx)
 		if err != nil {
 			return nil, err
+		}
+
+		// if match satisfied phrase constraints return it as a hit
+		if rv != nil {
+			return rv, nil
 		}
 	}
 
