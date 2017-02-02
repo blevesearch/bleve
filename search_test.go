@@ -185,19 +185,6 @@ func TestUnmarshalingSearchResult(t *testing.T) {
 	}
 }
 
-func verifyErrors(t *testing.T, actual, expected error) {
-	//success case.
-	if actual == nil && actual == expected {
-		return
-	}
-	//actual error doesn't match the expected error.
-	if actual != nil && expected != nil && actual.Error() != expected.Error() {
-		t.Error(actual)
-	} else if actual == nil {
-		t.Error("Expected -> " + expected.Error())
-	}
-}
-
 func TestFacetNumericDateRangeRequests(t *testing.T) {
 	var drMissingErr = fmt.Errorf("date range query must specify either start, end or both for range name 'testName'")
 	var nrMissingErr = fmt.Errorf("numeric range query must specify either min, max or both for range name 'testName'")
