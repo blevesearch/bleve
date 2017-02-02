@@ -206,67 +206,136 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 	var nrNameDupErr = fmt.Errorf("numeric ranges contains duplicate name 'testName'")
 	value := float64(5)
 
-	facet := NewFacetRequest("Date_Range_Success_With_StartEnd", 1)
-	facet.DateTimeRanges = make([]*dateTimeRange, 0, 1)
-	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName", Start: time.Unix(0, 0), End: time.Now()})
-	verifyErrors(t, facet.Validate(), nil)
+	tests := []struct {
+		facet  *FacetRequest
+		result error
+	}{
+		{
+			facet: &FacetRequest{
+				Field: "Date_Range_Success_With_StartEnd",
+				Size:  1,
+				DateTimeRanges: []*dateTimeRange{
+					&dateTimeRange{Name: "testName", Start: time.Unix(0, 0), End: time.Now()},
+				},
+			},
+			result: nil,
+		},
+		{
+			facet: &FacetRequest{
+				Field: "Date_Range_Success_With_Start",
+				Size:  1,
+				DateTimeRanges: []*dateTimeRange{
+					&dateTimeRange{Name: "testName", Start: time.Unix(0, 0)},
+				},
+			},
+			result: nil,
+		},
+		{
+			facet: &FacetRequest{
+				Field: "Date_Range_Success_With_End",
+				Size:  1,
+				DateTimeRanges: []*dateTimeRange{
+					&dateTimeRange{Name: "testName", End: time.Now()},
+				},
+			},
+			result: nil,
+		},
+		{
+			facet: &FacetRequest{
+				Field: "Numeric_Range_Success_With_MinMax",
+				Size:  1,
+				NumericRanges: []*numericRange{
+					&numericRange{Name: "testName", Min: &value, Max: &value},
+				},
+			},
+			result: nil,
+		},
+		{
+			facet: &FacetRequest{
+				Field: "Numeric_Range_Success_With_Min",
+				Size:  1,
+				NumericRanges: []*numericRange{
+					&numericRange{Name: "testName", Min: &value},
+				},
+			},
+			result: nil,
+		},
+		{
+			facet: &FacetRequest{
+				Field: "Numeric_Range_Success_With_Max",
+				Size:  1,
+				NumericRanges: []*numericRange{
+					&numericRange{Name: "testName", Max: &value},
+				},
+			},
+			result: nil,
+		},
+		{
+			facet: &FacetRequest{
+				Field: "Date_Range_Missing_Failure",
+				Size:  1,
+				DateTimeRanges: []*dateTimeRange{
+					&dateTimeRange{Name: "testName2", Start: time.Unix(0, 0)},
+					&dateTimeRange{Name: "testName1", End: time.Now()},
+					&dateTimeRange{Name: "testName"},
+				},
+			},
+			result: drMissingErr,
+		},
+		{
+			facet: &FacetRequest{
+				Field: "Numeric_Range_Missing_Failure",
+				Size:  1,
+				NumericRanges: []*numericRange{
+					&numericRange{Name: "testName2", Min: &value},
+					&numericRange{Name: "testName1", Max: &value},
+					&numericRange{Name: "testName"},
+				},
+			},
+			result: nrMissingErr,
+		},
+		{
+			facet: &FacetRequest{
+				Field: "Numeric_And_DateRanges_Failure",
+				Size:  1,
+				NumericRanges: []*numericRange{
+					&numericRange{Name: "testName", Max: &value},
+				},
+				DateTimeRanges: []*dateTimeRange{
+					&dateTimeRange{Name: "testName", End: time.Now()},
+				},
+			},
+			result: drNrErr,
+		},
+		{
+			facet: &FacetRequest{
+				Field: "Numeric_Range_Name_Repeat_Failure",
+				Size:  1,
+				NumericRanges: []*numericRange{
+					&numericRange{Name: "testName", Min: &value},
+					&numericRange{Name: "testName", Max: &value},
+				},
+			},
+			result: nrNameDupErr,
+		},
+		{
+			facet: &FacetRequest{
+				Field: "Date_Range_Name_Repeat_Failure",
+				Size:  1,
+				DateTimeRanges: []*dateTimeRange{
+					&dateTimeRange{Name: "testName", Start: time.Unix(0, 0)},
+					&dateTimeRange{Name: "testName", End: time.Now()},
+				},
+			},
+			result: drNameDupErr,
+		},
+	}
 
-	facet = NewFacetRequest("Date_Range_Success_With_Start", 1)
-	facet.DateTimeRanges = make([]*dateTimeRange, 0, 1)
-	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName", Start: time.Unix(0, 0)})
-	verifyErrors(t, facet.Validate(), nil)
-
-	facet = NewFacetRequest("Date_Range_Success_With_End", 1)
-	facet.DateTimeRanges = make([]*dateTimeRange, 0, 1)
-	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName", End: time.Now()})
-	verifyErrors(t, facet.Validate(), nil)
-
-	facet = NewFacetRequest("Numeric_Range_Success_With_MinMax", 1)
-	facet.NumericRanges = make([]*numericRange, 0, 1)
-	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName", Min: &value, Max: &value})
-	verifyErrors(t, facet.Validate(), nil)
-
-	facet = NewFacetRequest("Numeric_Range_Success_With_Min", 1)
-	facet.NumericRanges = make([]*numericRange, 0, 1)
-	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName", Min: &value})
-	verifyErrors(t, facet.Validate(), nil)
-
-	facet = NewFacetRequest("Numeric_Range_Success_With_Max", 1)
-	facet.NumericRanges = make([]*numericRange, 0, 1)
-	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName", Max: &value})
-	verifyErrors(t, facet.Validate(), nil)
-
-	facet = NewFacetRequest("Date_Range_Missing_Failure", 1)
-	facet.DateTimeRanges = make([]*dateTimeRange, 0, 1)
-	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName2", Start: time.Unix(0, 0)})
-	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName1", End: time.Now()})
-	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName"})
-	verifyErrors(t, facet.Validate(), drMissingErr)
-
-	facet = NewFacetRequest("Numeric_Range_Missing_Failure", 1)
-	facet.NumericRanges = make([]*numericRange, 0, 1)
-	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName2", Min: &value})
-	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName1", Max: &value})
-	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName"})
-	verifyErrors(t, facet.Validate(), nrMissingErr)
-
-	facet = NewFacetRequest("Numeric_And_DateRanges_Failure", 1)
-	facet.NumericRanges = make([]*numericRange, 0, 1)
-	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName", Min: &value, Max: nil})
-	facet.DateTimeRanges = make([]*dateTimeRange, 0, 1)
-	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName", Start: time.Unix(0, 0), End: time.Now()})
-	verifyErrors(t, facet.Validate(), drNrErr)
-
-	facet = NewFacetRequest("Date_Range_Name_Repeat_Failure", 1)
-	facet.DateTimeRanges = make([]*dateTimeRange, 0, 1)
-	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName", Start: time.Unix(0, 0)})
-	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName", End: time.Now()})
-	verifyErrors(t, facet.Validate(), drNameDupErr)
-
-	facet = NewFacetRequest("Numeric_Range_Name_Repeat_Failure", 1)
-	facet.NumericRanges = make([]*numericRange, 0, 1)
-	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName", Min: &value})
-	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName", Max: &value})
-	verifyErrors(t, facet.Validate(), nrNameDupErr)
+	for _, test := range tests {
+		result := test.facet.Validate()
+		if !reflect.DeepEqual(result, test.result) {
+			t.Errorf("expected %#v, got %#v", test.result, result)
+		}
+	}
 
 }
