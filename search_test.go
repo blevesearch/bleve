@@ -190,7 +190,7 @@ func verifyErrors(t *testing.T, actual, expected error) {
 	if actual == nil && actual == expected {
 		return
 	}
-	//actual error matches the expected error.
+	//actual error doesn't match the expected error.
 	if actual != nil && expected != nil && actual.Error() != expected.Error() {
 		t.Error(actual)
 	} else if actual == nil {
