@@ -116,7 +116,7 @@ func (fr *FacetRequest) Validate() error {
 	if nrCount > 0 && drCount > 0 {
 		return fmt.Errorf("facet can only conain numeric ranges or date ranges, not both")
 	}
-	rangeSet := false
+
 	if nrCount > 0 {
 		nrNames := map[string]interface{}{}
 		for _, nr := range fr.NumericRanges {
@@ -124,12 +124,9 @@ func (fr *FacetRequest) Validate() error {
 				return fmt.Errorf("numeric ranges contains duplicate name '%s'", nr.Name)
 			}
 			nrNames[nr.Name] = struct{}{}
-			if !rangeSet && (nr.Min != nil || nr.Max != nil) {
-				rangeSet = true
+			if nr.Min == nil && nr.Max == nil {
+				return fmt.Errorf("numeric range query must specify either min, max or both for range name '%s'", nr.Name)
 			}
-		}
-		if !rangeSet {
-			return fmt.Errorf("numeric range query must specify either min, max or both")
 		}
 
 	} else {
@@ -143,15 +140,10 @@ func (fr *FacetRequest) Validate() error {
 				return fmt.Errorf("date ranges contains duplicate name '%s'", dr.Name)
 			}
 			drNames[dr.Name] = struct{}{}
-			if !rangeSet {
-				start, end := dr.ParseDates(dateTimeParser)
-				if !start.IsZero() || !end.IsZero() {
-					rangeSet = true
-				}
+			start, end := dr.ParseDates(dateTimeParser)
+			if start.IsZero() && end.IsZero() {
+				return fmt.Errorf("date range query must specify either start, end or both for range name '%s'", dr.Name)
 			}
-		}
-		if !rangeSet {
-			return fmt.Errorf("date range query must specify either start, end or both")
 		}
 	}
 	return nil

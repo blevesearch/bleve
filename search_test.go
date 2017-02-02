@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -181,5 +182,83 @@ func TestUnmarshalingSearchResult(t *testing.T) {
 	}
 	if len(rv.Status.Errors) != 1 {
 		t.Errorf("expected 1 error, got %d", len(rv.Status.Errors))
+	}
+}
+
+func TestFacetNumericDateRangeRequests(t *testing.T) {
+	var drMissingErr = fmt.Errorf("date range query must specify either start, end or both for range name 'testName'")
+	var nrMissingErr = fmt.Errorf("numeric range query must specify either min, max or both for range name 'testName'")
+	var drNrErr = fmt.Errorf("facet can only conain numeric ranges or date ranges, not both")
+	value := float64(5)
+
+	facet := NewFacetRequest("Date_Range_Success_With_StartEnd", 1)
+	facet.DateTimeRanges = make([]*dateTimeRange, 0, 1)
+	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName", Start: time.Unix(0, 0), End: time.Now()})
+	if err := facet.Validate(); err != nil {
+		t.Error(err)
+	}
+
+	facet = NewFacetRequest("Date_Range_Success_With_Start", 1)
+	facet.DateTimeRanges = make([]*dateTimeRange, 0, 1)
+	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName", Start: time.Unix(0, 0)})
+	if err := facet.Validate(); err != nil {
+		t.Error(err)
+	}
+
+	facet = NewFacetRequest("Date_Range_Success_With_End", 1)
+	facet.DateTimeRanges = make([]*dateTimeRange, 0, 1)
+	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName", End: time.Now()})
+	if err := facet.Validate(); err != nil {
+		t.Error(err)
+	}
+
+	facet = NewFacetRequest("Numeric_Range_Success_With_MinMax", 1)
+	facet.NumericRanges = make([]*numericRange, 0, 1)
+	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName", Min: &value, Max: &value})
+	if err := facet.Validate(); err != nil {
+		t.Error(err)
+	}
+
+	facet = NewFacetRequest("Numeric_Range_Success_With_Min", 1)
+	facet.NumericRanges = make([]*numericRange, 0, 1)
+	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName", Min: &value})
+	if err := facet.Validate(); err != nil {
+		t.Error(err)
+	}
+
+	facet = NewFacetRequest("Numeric_Range_Success_With_Max", 1)
+	facet.NumericRanges = make([]*numericRange, 0, 1)
+	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName", Max: &value})
+	if err := facet.Validate(); err != nil {
+		t.Error(err)
+	}
+
+	facet = NewFacetRequest("Date_Range_Missing_Failure", 1)
+	facet.DateTimeRanges = make([]*dateTimeRange, 0, 1)
+	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName"})
+	if err := facet.Validate(); err != nil {
+		if err.Error() != drMissingErr.Error() {
+			t.Error(err)
+		}
+	}
+
+	facet = NewFacetRequest("Numeric_Range_Missing_Failure", 1)
+	facet.NumericRanges = make([]*numericRange, 0, 1)
+	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName"})
+	if err := facet.Validate(); err != nil {
+		if err.Error() != nrMissingErr.Error() {
+			t.Error(err)
+		}
+	}
+
+	facet = NewFacetRequest("Numeric_And_DateRanges_Failure", 1)
+	facet.NumericRanges = make([]*numericRange, 0, 1)
+	facet.NumericRanges = append(facet.NumericRanges, &numericRange{Name: "testName", Min: &value, Max: nil})
+	facet.DateTimeRanges = make([]*dateTimeRange, 0, 1)
+	facet.DateTimeRanges = append(facet.DateTimeRanges, &dateTimeRange{Name: "testName", Start: time.Unix(0, 0), End: time.Now()})
+	if err := facet.Validate(); err != nil {
+		if err.Error() != drNrErr.Error() {
+			t.Error(err)
+		}
 	}
 }
