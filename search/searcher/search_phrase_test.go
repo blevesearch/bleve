@@ -121,3 +121,124 @@ func TestPhraseSearch(t *testing.T) {
 		}
 	}
 }
+
+func TestFindPhrasePaths(t *testing.T) {
+	tests := []struct {
+		phrase []string
+		tlm    search.TermLocationMap
+		paths  []phrasePath
+	}{
+		// simplest matching case
+		{
+			phrase: []string{"cat", "dog"},
+			tlm: search.TermLocationMap{
+				"cat": search.Locations{
+					&search.Location{
+						Pos: 1,
+					},
+				},
+				"dog": search.Locations{
+					&search.Location{
+						Pos: 2,
+					},
+				},
+			},
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 1}},
+					&phrasePart{"dog", &search.Location{Pos: 2}},
+				},
+			},
+		},
+		// second term missing, no match
+		{
+			phrase: []string{"cat", "dog"},
+			tlm: search.TermLocationMap{
+				"cat": search.Locations{
+					&search.Location{
+						Pos: 1,
+					},
+				},
+			},
+			paths: nil,
+		},
+		// second term exists but in wrong position
+		{
+			phrase: []string{"cat", "dog"},
+			tlm: search.TermLocationMap{
+				"cat": search.Locations{
+					&search.Location{
+						Pos: 1,
+					},
+				},
+				"dog": search.Locations{
+					&search.Location{
+						Pos: 3,
+					},
+				},
+			},
+			paths: nil,
+		},
+		// matches multiple times
+		{
+			phrase: []string{"cat", "dog"},
+			tlm: search.TermLocationMap{
+				"cat": search.Locations{
+					&search.Location{
+						Pos: 1,
+					},
+					&search.Location{
+						Pos: 8,
+					},
+				},
+				"dog": search.Locations{
+					&search.Location{
+						Pos: 2,
+					},
+					&search.Location{
+						Pos: 9,
+					},
+				},
+			},
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 1}},
+					&phrasePart{"dog", &search.Location{Pos: 2}},
+				},
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 8}},
+					&phrasePart{"dog", &search.Location{Pos: 9}},
+				},
+			},
+		},
+		// match over gaps
+		{
+			phrase: []string{"cat", "", "dog"},
+			tlm: search.TermLocationMap{
+				"cat": search.Locations{
+					&search.Location{
+						Pos: 1,
+					},
+				},
+				"dog": search.Locations{
+					&search.Location{
+						Pos: 3,
+					},
+				},
+			},
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 1}},
+					&phrasePart{"dog", &search.Location{Pos: 3}},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		actualPaths := findPhrasePaths(nil, test.phrase, test.tlm, 1, nil)
+		if !reflect.DeepEqual(actualPaths, test.paths) {
+			t.Fatalf("expected: %v got %v", test.paths, actualPaths)
+		}
+	}
+}
