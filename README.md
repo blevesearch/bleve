@@ -33,29 +33,33 @@ Discuss usage and development of bleve in the [google group](https://groups.goog
 
 ## Indexing
 
-		message := struct{
-			Id   string
-			From string
-			Body string
-		}{
-			Id:   "example",
-			From: "marty.schoch@gmail.com",
-			Body: "bleve indexing is easy",
-		}
+```go
+message := struct{
+	Id   string
+	From string
+	Body string
+}{
+	Id:   "example",
+	From: "marty.schoch@gmail.com",
+	Body: "bleve indexing is easy",
+}
 
-		mapping := bleve.NewIndexMapping()
-		index, err := bleve.New("example.bleve", mapping)
-		if err != nil {
-			panic(err)
-		}
-		index.Index(message.Id, message)
+mapping := bleve.NewIndexMapping()
+index, err := bleve.New("example.bleve", mapping)
+if err != nil {
+	panic(err)
+}
+index.Index(message.Id, message)
+```
 
 ## Querying
 
-		index, _ := bleve.Open("example.bleve")
-		query := bleve.NewQueryStringQuery("bleve")
-		searchRequest := bleve.NewSearchRequest(query)
-		searchResult, _ := index.Search(searchRequest)
+```go
+index, _ := bleve.Open("example.bleve")
+query := bleve.NewQueryStringQuery("bleve")
+searchRequest := bleve.NewSearchRequest(query)
+searchResult, _ := index.Search(searchRequest)
+```
 
 ## License
 
