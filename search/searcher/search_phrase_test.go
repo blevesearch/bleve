@@ -121,3 +121,386 @@ func TestPhraseSearch(t *testing.T) {
 		}
 	}
 }
+
+func TestFindPhrasePaths(t *testing.T) {
+	tests := []struct {
+		phrase []string
+		tlm    search.TermLocationMap
+		paths  []phrasePath
+	}{
+		// simplest matching case
+		{
+			phrase: []string{"cat", "dog"},
+			tlm: search.TermLocationMap{
+				"cat": search.Locations{
+					&search.Location{
+						Pos: 1,
+					},
+				},
+				"dog": search.Locations{
+					&search.Location{
+						Pos: 2,
+					},
+				},
+			},
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 1}},
+					&phrasePart{"dog", &search.Location{Pos: 2}},
+				},
+			},
+		},
+		// second term missing, no match
+		{
+			phrase: []string{"cat", "dog"},
+			tlm: search.TermLocationMap{
+				"cat": search.Locations{
+					&search.Location{
+						Pos: 1,
+					},
+				},
+			},
+			paths: nil,
+		},
+		// second term exists but in wrong position
+		{
+			phrase: []string{"cat", "dog"},
+			tlm: search.TermLocationMap{
+				"cat": search.Locations{
+					&search.Location{
+						Pos: 1,
+					},
+				},
+				"dog": search.Locations{
+					&search.Location{
+						Pos: 3,
+					},
+				},
+			},
+			paths: nil,
+		},
+		// matches multiple times
+		{
+			phrase: []string{"cat", "dog"},
+			tlm: search.TermLocationMap{
+				"cat": search.Locations{
+					&search.Location{
+						Pos: 1,
+					},
+					&search.Location{
+						Pos: 8,
+					},
+				},
+				"dog": search.Locations{
+					&search.Location{
+						Pos: 2,
+					},
+					&search.Location{
+						Pos: 9,
+					},
+				},
+			},
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 1}},
+					&phrasePart{"dog", &search.Location{Pos: 2}},
+				},
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 8}},
+					&phrasePart{"dog", &search.Location{Pos: 9}},
+				},
+			},
+		},
+		// match over gaps
+		{
+			phrase: []string{"cat", "", "dog"},
+			tlm: search.TermLocationMap{
+				"cat": search.Locations{
+					&search.Location{
+						Pos: 1,
+					},
+				},
+				"dog": search.Locations{
+					&search.Location{
+						Pos: 3,
+					},
+				},
+			},
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 1}},
+					&phrasePart{"dog", &search.Location{Pos: 3}},
+				},
+			},
+		},
+		// match with leading ""
+		{
+			phrase: []string{"", "cat", "dog"},
+			tlm: search.TermLocationMap{
+				"cat": search.Locations{
+					&search.Location{
+						Pos: 2,
+					},
+				},
+				"dog": search.Locations{
+					&search.Location{
+						Pos: 3,
+					},
+				},
+			},
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 2}},
+					&phrasePart{"dog", &search.Location{Pos: 3}},
+				},
+			},
+		},
+		// match with trailing ""
+		{
+			phrase: []string{"cat", "dog", ""},
+			tlm: search.TermLocationMap{
+				"cat": search.Locations{
+					&search.Location{
+						Pos: 2,
+					},
+				},
+				"dog": search.Locations{
+					&search.Location{
+						Pos: 3,
+					},
+				},
+			},
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 2}},
+					&phrasePart{"dog", &search.Location{Pos: 3}},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		actualPaths := findPhrasePaths(0, nil, test.phrase, test.tlm, nil, 0)
+		if !reflect.DeepEqual(actualPaths, test.paths) {
+			t.Fatalf("expected: %v got %v for test %d", test.paths, actualPaths, i)
+		}
+	}
+}
+
+func TestFindPhrasePathsSloppy(t *testing.T) {
+	tlm := search.TermLocationMap{
+		"one": search.Locations{
+			&search.Location{
+				Pos: 1,
+			},
+		},
+		"two": search.Locations{
+			&search.Location{
+				Pos: 2,
+			},
+		},
+		"three": search.Locations{
+			&search.Location{
+				Pos: 3,
+			},
+		},
+		"four": search.Locations{
+			&search.Location{
+				Pos: 4,
+			},
+		},
+		"five": search.Locations{
+			&search.Location{
+				Pos: 5,
+			},
+		},
+	}
+
+	tests := []struct {
+		phrase []string
+		paths  []phrasePath
+		slop   int
+	}{
+		// no match
+		{
+			phrase: []string{"one", "five"},
+			slop:   2,
+		},
+		// should match
+		{
+			phrase: []string{"one", "five"},
+			slop:   3,
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"one", &search.Location{Pos: 1}},
+					&phrasePart{"five", &search.Location{Pos: 5}},
+				},
+			},
+		},
+		// slop 0 finds exact match
+		{
+			phrase: []string{"four", "five"},
+			slop:   0,
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"four", &search.Location{Pos: 4}},
+					&phrasePart{"five", &search.Location{Pos: 5}},
+				},
+			},
+		},
+		// slop 0 does not find exact match (reversed)
+		{
+			phrase: []string{"two", "one"},
+			slop:   0,
+		},
+		// slop 1 finds exact match
+		{
+			phrase: []string{"one", "two"},
+			slop:   1,
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"one", &search.Location{Pos: 1}},
+					&phrasePart{"two", &search.Location{Pos: 2}},
+				},
+			},
+		},
+		// slop 1 *still* does not find exact match (reversed) requires at least 2
+		{
+			phrase: []string{"two", "one"},
+			slop:   1,
+		},
+		// slop 2 does finds exact match reversed
+		{
+			phrase: []string{"two", "one"},
+			slop:   2,
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"two", &search.Location{Pos: 2}},
+					&phrasePart{"one", &search.Location{Pos: 1}},
+				},
+			},
+		},
+		// slop 2 not enough for this
+		{
+			phrase: []string{"three", "one"},
+			slop:   2,
+		},
+		// slop should be cumulative
+		{
+			phrase: []string{"one", "three", "five"},
+			slop:   2,
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"one", &search.Location{Pos: 1}},
+					&phrasePart{"three", &search.Location{Pos: 3}},
+					&phrasePart{"five", &search.Location{Pos: 5}},
+				},
+			},
+		},
+		// should require 6
+		{
+			phrase: []string{"five", "three", "one"},
+			slop:   5,
+		},
+		// so lets try 6
+		{
+			phrase: []string{"five", "three", "one"},
+			slop:   6,
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"five", &search.Location{Pos: 5}},
+					&phrasePart{"three", &search.Location{Pos: 3}},
+					&phrasePart{"one", &search.Location{Pos: 1}},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		actualPaths := findPhrasePaths(0, nil, test.phrase, tlm, nil, test.slop)
+		if !reflect.DeepEqual(actualPaths, test.paths) {
+			t.Fatalf("expected: %v got %v for test %d", test.paths, actualPaths, i)
+		}
+	}
+}
+
+func TestFindPhrasePathsSloppyPalyndrome(t *testing.T) {
+	tlm := search.TermLocationMap{
+		"one": search.Locations{
+			&search.Location{
+				Pos: 1,
+			},
+			&search.Location{
+				Pos: 5,
+			},
+		},
+		"two": search.Locations{
+			&search.Location{
+				Pos: 2,
+			},
+			&search.Location{
+				Pos: 4,
+			},
+		},
+		"three": search.Locations{
+			&search.Location{
+				Pos: 3,
+			},
+		},
+	}
+
+	tests := []struct {
+		phrase []string
+		paths  []phrasePath
+		slop   int
+	}{
+		// search non palyndrone, exact match
+		{
+			phrase: []string{"two", "three"},
+			slop:   0,
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"two", &search.Location{Pos: 2}},
+					&phrasePart{"three", &search.Location{Pos: 3}},
+				},
+			},
+		},
+		// same with slop 2 (not required) (find it twice)
+		{
+			phrase: []string{"two", "three"},
+			slop:   2,
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"two", &search.Location{Pos: 2}},
+					&phrasePart{"three", &search.Location{Pos: 3}},
+				},
+				phrasePath{
+					&phrasePart{"two", &search.Location{Pos: 4}},
+					&phrasePart{"three", &search.Location{Pos: 3}},
+				},
+			},
+		},
+		// palyndrone reversed
+		{
+			phrase: []string{"three", "two"},
+			slop:   2,
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"three", &search.Location{Pos: 3}},
+					&phrasePart{"two", &search.Location{Pos: 2}},
+				},
+				phrasePath{
+					&phrasePart{"three", &search.Location{Pos: 3}},
+					&phrasePart{"two", &search.Location{Pos: 4}},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		actualPaths := findPhrasePaths(0, nil, test.phrase, tlm, nil, test.slop)
+		if !reflect.DeepEqual(actualPaths, test.paths) {
+			t.Fatalf("expected: %v got %v for test %d", test.paths, actualPaths, i)
+		}
+	}
+}
