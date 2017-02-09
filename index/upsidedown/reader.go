@@ -29,41 +29,49 @@ type UpsideDownCouchTermFieldReader struct {
 	iterator           store.KVIterator
 	term               []byte
 	tfrNext            *TermFrequencyRow
+	tfrPrealloc        TermFrequencyRow
 	keyBuf             []byte
 	field              uint16
 	includeTermVectors bool
 }
 
 func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, field uint16, includeFreq, includeNorm, includeTermVectors bool) (*UpsideDownCouchTermFieldReader, error) {
-	dictionaryRow := NewDictionaryRow(term, field, 0)
-	val, err := indexReader.kvreader.Get(dictionaryRow.Key())
+	bufNeeded := termFrequencyRowKeySize(term, nil)
+	if bufNeeded < dictionaryRowKeySize(term) {
+		bufNeeded = dictionaryRowKeySize(term)
+	}
+	buf := make([]byte, bufNeeded)
+
+	bufUsed := dictionaryRowKeyTo(buf, field, term)
+	val, err := indexReader.kvreader.Get(buf[:bufUsed])
 	if err != nil {
 		return nil, err
 	}
 	if val == nil {
 		atomic.AddUint64(&indexReader.index.stats.termSearchersStarted, uint64(1))
-		return &UpsideDownCouchTermFieldReader{
+		rv := &UpsideDownCouchTermFieldReader{
 			count:              0,
 			term:               term,
-			tfrNext:            &TermFrequencyRow{},
 			field:              field,
 			includeTermVectors: includeTermVectors,
-		}, nil
+		}
+		rv.tfrNext = &rv.tfrPrealloc
+		return rv, nil
 	}
 
-	err = dictionaryRow.parseDictionaryV(val)
+	count, err := dictionaryRowParseV(val)
 	if err != nil {
 		return nil, err
 	}
 
-	tfr := NewTermFrequencyRow(term, field, []byte{}, 0, 0)
-	it := indexReader.kvreader.PrefixIterator(tfr.Key())
+	bufUsed = termFrequencyRowKeyTo(buf, field, term, nil)
+	it := indexReader.kvreader.PrefixIterator(buf[:bufUsed])
 
 	atomic.AddUint64(&indexReader.index.stats.termSearchersStarted, uint64(1))
 	return &UpsideDownCouchTermFieldReader{
 		indexReader:        indexReader,
 		iterator:           it,
-		count:              dictionaryRow.count,
+		count:              count,
 		term:               term,
 		field:              field,
 		includeTermVectors: includeTermVectors,
@@ -82,7 +90,7 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 		if r.tfrNext != nil {
 			r.iterator.Next()
 		} else {
-			r.tfrNext = &TermFrequencyRow{}
+			r.tfrNext = &r.tfrPrealloc
 		}
 		key, val, valid := r.iterator.Current()
 		if valid {

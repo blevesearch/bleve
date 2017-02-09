@@ -254,14 +254,22 @@ func (dr *DictionaryRow) Key() []byte {
 }
 
 func (dr *DictionaryRow) KeySize() int {
-	return len(dr.term) + 3
+	return dictionaryRowKeySize(dr.term)
+}
+
+func dictionaryRowKeySize(term []byte) int {
+	return len(term) + 3
 }
 
 func (dr *DictionaryRow) KeyTo(buf []byte) (int, error) {
+	return dictionaryRowKeyTo(buf, dr.field, dr.term), nil
+}
+
+func dictionaryRowKeyTo(buf []byte, field uint16, term []byte) int {
 	buf[0] = 'd'
-	binary.LittleEndian.PutUint16(buf[1:3], dr.field)
-	size := copy(buf[3:], dr.term)
-	return size + 3, nil
+	binary.LittleEndian.PutUint16(buf[1:3], field)
+	size := copy(buf[3:], term)
+	return size + 3
 }
 
 func (dr *DictionaryRow) Value() []byte {
@@ -324,12 +332,20 @@ func (dr *DictionaryRow) parseDictionaryK(key []byte) error {
 }
 
 func (dr *DictionaryRow) parseDictionaryV(value []byte) error {
-	count, nread := binary.Uvarint(value)
-	if nread <= 0 {
-		return fmt.Errorf("DictionaryRow parse Uvarint error, nread: %d", nread)
+	count, err := dictionaryRowParseV(value)
+	if err != nil {
+		return err
 	}
 	dr.count = count
 	return nil
+}
+
+func dictionaryRowParseV(value []byte) (uint64, error) {
+	count, nread := binary.Uvarint(value)
+	if nread <= 0 {
+		return 0, fmt.Errorf("DictionaryRow parse Uvarint error, nread: %d", nread)
+	}
+	return count, nil
 }
 
 // TERM FIELD FREQUENCY
@@ -394,16 +410,24 @@ func (tfr *TermFrequencyRow) Key() []byte {
 }
 
 func (tfr *TermFrequencyRow) KeySize() int {
-	return 3 + len(tfr.term) + 1 + len(tfr.doc)
+	return termFrequencyRowKeySize(tfr.term, tfr.doc)
+}
+
+func termFrequencyRowKeySize(term, doc []byte) int {
+	return 3 + len(term) + 1 + len(doc)
 }
 
 func (tfr *TermFrequencyRow) KeyTo(buf []byte) (int, error) {
+	return termFrequencyRowKeyTo(buf, tfr.field, tfr.term, tfr.doc), nil
+}
+
+func termFrequencyRowKeyTo(buf []byte, field uint16, term, doc []byte) int {
 	buf[0] = 't'
-	binary.LittleEndian.PutUint16(buf[1:3], tfr.field)
-	termLen := copy(buf[3:], tfr.term)
+	binary.LittleEndian.PutUint16(buf[1:3], field)
+	termLen := copy(buf[3:], term)
 	buf[3+termLen] = ByteSeparator
-	docLen := copy(buf[3+termLen+1:], tfr.doc)
-	return 3 + termLen + 1 + docLen, nil
+	docLen := copy(buf[3+termLen+1:], doc)
+	return 3 + termLen + 1 + docLen
 }
 
 func (tfr *TermFrequencyRow) KeyAppendTo(buf []byte) ([]byte, error) {
