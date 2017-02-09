@@ -21,25 +21,25 @@ import (
 	"github.com/blevesearch/bleve/index"
 )
 
-type Location struct {
-	Pos            float64   `json:"pos"`
-	Start          float64   `json:"start"`
-	End            float64   `json:"end"`
-	ArrayPositions []float64 `json:"array_positions"`
-}
+type ArrayPositions []float64
 
-// SameArrayElement returns true if two locations are point to
-// the same array element
-func (l *Location) SameArrayElement(other *Location) bool {
-	if len(l.ArrayPositions) != len(other.ArrayPositions) {
+func (ap ArrayPositions) Equals(other ArrayPositions) bool {
+	if len(ap) != len(other) {
 		return false
 	}
-	for i, elem := range l.ArrayPositions {
-		if other.ArrayPositions[i] != elem {
+	for i := range ap {
+		if ap[i] != other[i] {
 			return false
 		}
 	}
 	return true
+}
+
+type Location struct {
+	Pos            float64        `json:"pos"`
+	Start          float64        `json:"start"`
+	End            float64        `json:"end"`
+	ArrayPositions ArrayPositions `json:"array_positions"`
 }
 
 type Locations []*Location

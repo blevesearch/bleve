@@ -151,8 +151,8 @@ func (s *PhraseSearcher) checkCurrMustMatch(ctx *search.SearchContext) *search.D
 // satisfied, and these locations are returned.  otherwise 0 and either
 // a nil or empty TermLocationMap
 func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext, tlm search.TermLocationMap) (int, search.TermLocationMap) {
-	paths := findPhrasePaths(nil, s.terms, tlm, 1, nil)
-	rv := make(search.TermLocationMap, 0)
+	paths := findPhrasePaths(0, nil, s.terms, tlm, nil, 0)
+	rv := make(search.TermLocationMap, len(s.terms))
 	for _, p := range paths {
 		p.MergeInto(rv)
 	}
@@ -185,7 +185,7 @@ func (p phrasePath) MergeInto(in search.TermLocationMap) {
 //     this is the primary state being built during the traversal
 //
 // returns slice of paths, or nil if invocation did not find any successul paths
-func findPhrasePaths(prev *search.Location, phraseTerms []string, tlm search.TermLocationMap, offset int, p phrasePath) []phrasePath {
+func findPhrasePaths(prevPos float64, ap search.ArrayPositions, phraseTerms []string, tlm search.TermLocationMap, p phrasePath, remainingSlop int) []phrasePath {
 
 	// no more terms
 	if len(phraseTerms) < 1 {
@@ -195,23 +195,49 @@ func findPhrasePaths(prev *search.Location, phraseTerms []string, tlm search.Ter
 	car := phraseTerms[0]
 	cdr := phraseTerms[1:]
 
-	// empty term is treated as match (continue), but offset now +1
+	// empty term is treated as match (continue)
 	if car == "" {
-		return findPhrasePaths(prev, cdr, tlm, offset+1, p)
+		nextPos := prevPos + 1.0
+		if prevPos == 0.0 {
+			// if prevPos was 0.0, don't set it to 1 (as thats not a real abs pos)
+			nextPos = 0.0 // don't advance nextPos if prevPos was 0
+		}
+		return findPhrasePaths(nextPos, ap, cdr, tlm, p, remainingSlop)
 	}
 
 	// locations for this term
 	locations := tlm[car]
 	var rv []phrasePath
 	for _, loc := range locations {
-		// check each location against prev (nil treated as match, the initial case)
-		if prev == nil || (prev.Pos+float64(offset) == loc.Pos && prev.SameArrayElement(loc)) {
+		if prevPos != 0.0 && !loc.ArrayPositions.Equals(ap) {
+			// if the array positions are wrong, can't match, try next location
+			continue
+		}
+
+		// compute distance from previous phrase term
+		dist := 0
+		if prevPos != 0.0 {
+			dist = editDistance(prevPos+1.0, loc.Pos)
+		}
+
+		// if enough slop reamining, continue recursively
+		if prevPos == 0.0 || (remainingSlop-dist) >= 0 {
 			// this location works, add it to the path (but not for empty term)
 			px := append(p, &phrasePart{term: car, loc: loc})
-			rv = append(rv, findPhrasePaths(loc, cdr, tlm, 1, px)...)
+			rv = append(rv, findPhrasePaths(loc.Pos, loc.ArrayPositions, cdr, tlm, px, remainingSlop-dist)...)
 		}
 	}
 	return rv
+}
+
+func editDistance(p1, p2 float64) int {
+	i1 := int(p1)
+	i2 := int(p2)
+	dist := i1 - i2
+	if dist < 0 {
+		return -dist
+	}
+	return dist
 }
 
 func (s *PhraseSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
