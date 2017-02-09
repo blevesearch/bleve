@@ -29,6 +29,7 @@ type UpsideDownCouchTermFieldReader struct {
 	iterator           store.KVIterator
 	term               []byte
 	tfrNext            *TermFrequencyRow
+	tfrPrealloc        TermFrequencyRow
 	keyBuf             []byte
 	field              uint16
 	includeTermVectors bool
@@ -48,13 +49,14 @@ func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 	}
 	if val == nil {
 		atomic.AddUint64(&indexReader.index.stats.termSearchersStarted, uint64(1))
-		return &UpsideDownCouchTermFieldReader{
+		rv := &UpsideDownCouchTermFieldReader{
 			count:              0,
 			term:               term,
-			tfrNext:            &TermFrequencyRow{},
 			field:              field,
 			includeTermVectors: includeTermVectors,
-		}, nil
+		}
+		rv.tfrNext = &rv.tfrPrealloc
+		return rv, nil
 	}
 
 	count, err := dictionaryRowParseV(val)
@@ -88,7 +90,7 @@ func (r *UpsideDownCouchTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*
 		if r.tfrNext != nil {
 			r.iterator.Next()
 		} else {
-			r.tfrNext = &TermFrequencyRow{}
+			r.tfrNext = &r.tfrPrealloc
 		}
 		key, val, valid := r.iterator.Current()
 		if valid {
