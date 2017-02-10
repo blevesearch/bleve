@@ -81,7 +81,7 @@ func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 	tokens := analyzer.Analyze([]byte(q.MatchPhrase))
 	if len(tokens) > 0 {
 		phrase := tokenStreamToPhrase(tokens)
-		phraseQuery := NewPhraseQuery(phrase, field)
+		phraseQuery := NewMultiPhraseQuery(phrase, field)
 		phraseQuery.SetBoost(q.BoostVal.Value())
 		return phraseQuery.Searcher(i, m, options)
 	}
@@ -89,7 +89,7 @@ func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 	return noneQuery.Searcher(i, m, options)
 }
 
-func tokenStreamToPhrase(tokens analysis.TokenStream) []string {
+func tokenStreamToPhrase(tokens analysis.TokenStream) [][]string {
 	firstPosition := int(^uint(0) >> 1)
 	lastPosition := 0
 	for _, token := range tokens {
@@ -102,13 +102,10 @@ func tokenStreamToPhrase(tokens analysis.TokenStream) []string {
 	}
 	phraseLen := lastPosition - firstPosition + 1
 	if phraseLen > 0 {
-		rv := make([]string, phraseLen)
-		for i := 0; i < phraseLen; i++ {
-			rv[i] = ""
-		}
+		rv := make([][]string, phraseLen)
 		for _, token := range tokens {
 			pos := token.Position - firstPosition
-			rv[pos] = string(token.Term)
+			rv[pos] = append(rv[pos], string(token.Term))
 		}
 		return rv
 	}
