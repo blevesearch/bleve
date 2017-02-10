@@ -68,7 +68,7 @@ func TestPhraseSearch(t *testing.T) {
 					Score:           1.0807601687084403,
 				},
 			},
-			locations:  map[string]map[string][]search.Location{"desc": map[string][]search.Location{"beer": []search.Location{search.Location{Pos: 2, Start: 6, End: 10, ArrayPositions: []float64(nil)}}, "angst": []search.Location{search.Location{Pos: 1, Start: 0, End: 5, ArrayPositions: []float64(nil)}}}},
+			locations:  map[string]map[string][]search.Location{"desc": map[string][]search.Location{"beer": []search.Location{search.Location{Pos: 2, Start: 6, End: 10}}, "angst": []search.Location{search.Location{Pos: 1, Start: 0, End: 5}}}},
 			fieldterms: [][2]string{[2]string{"desc", "beer"}, [2]string{"desc", "angst"}},
 		},
 	}

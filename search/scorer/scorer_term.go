@@ -148,7 +148,7 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 		for _, v := range termMatch.Vectors {
 			totalPositions += len(v.ArrayPositions)
 		}
-		positions := make([]float64, totalPositions)
+		positions := make(search.ArrayPositions, totalPositions)
 		positionsUsed := 0
 
 		rv.Locations = make(search.FieldTermLocationMap)
@@ -162,14 +162,14 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 			loc := &locs[locsUsed]
 			locsUsed++
 
-			loc.Pos = float64(v.Pos)
-			loc.Start = float64(v.Start)
-			loc.End = float64(v.End)
+			loc.Pos = v.Pos
+			loc.Start = v.Start
+			loc.End = v.End
 
 			if len(v.ArrayPositions) > 0 {
 				loc.ArrayPositions = positions[positionsUsed : positionsUsed+len(v.ArrayPositions)]
 				for i, ap := range v.ArrayPositions {
-					loc.ArrayPositions[i] = float64(ap)
+					loc.ArrayPositions[i] = ap
 				}
 				positionsUsed += len(v.ArrayPositions)
 			}

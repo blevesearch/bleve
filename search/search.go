@@ -21,7 +21,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 )
 
-type ArrayPositions []float64
+type ArrayPositions []uint64
 
 func (ap ArrayPositions) Equals(other ArrayPositions) bool {
 	if len(ap) != len(other) {
@@ -36,9 +36,9 @@ func (ap ArrayPositions) Equals(other ArrayPositions) bool {
 }
 
 type Location struct {
-	Pos            float64        `json:"pos"`
-	Start          float64        `json:"start"`
-	End            float64        `json:"end"`
+	Pos            uint64         `json:"pos"`
+	Start          uint64         `json:"start"`
+	End            uint64         `json:"end"`
 	ArrayPositions ArrayPositions `json:"array_positions"`
 }
 
