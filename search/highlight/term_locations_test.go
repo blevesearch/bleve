@@ -64,12 +64,12 @@ func TestTermLocationOverlaps(t *testing.T) {
 		// with array positions
 		{
 			left: &TermLocation{
-				ArrayPositions: []float64{0},
+				ArrayPositions: search.ArrayPositions{0},
 				Start:          0,
 				End:            5,
 			},
 			right: &TermLocation{
-				ArrayPositions: []float64{1},
+				ArrayPositions: search.ArrayPositions{1},
 				Start:          7,
 				End:            11,
 			},
@@ -77,12 +77,12 @@ func TestTermLocationOverlaps(t *testing.T) {
 		},
 		{
 			left: &TermLocation{
-				ArrayPositions: []float64{0},
+				ArrayPositions: search.ArrayPositions{0},
 				Start:          0,
 				End:            5,
 			},
 			right: &TermLocation{
-				ArrayPositions: []float64{1},
+				ArrayPositions: search.ArrayPositions{1},
 				Start:          3,
 				End:            11,
 			},
@@ -90,12 +90,12 @@ func TestTermLocationOverlaps(t *testing.T) {
 		},
 		{
 			left: &TermLocation{
-				ArrayPositions: []float64{0},
+				ArrayPositions: search.ArrayPositions{0},
 				Start:          0,
 				End:            5,
 			},
 			right: &TermLocation{
-				ArrayPositions: []float64{0},
+				ArrayPositions: search.ArrayPositions{0},
 				Start:          3,
 				End:            11,
 			},
@@ -103,12 +103,12 @@ func TestTermLocationOverlaps(t *testing.T) {
 		},
 		{
 			left: &TermLocation{
-				ArrayPositions: []float64{0},
+				ArrayPositions: search.ArrayPositions{0},
 				Start:          0,
 				End:            5,
 			},
 			right: &TermLocation{
-				ArrayPositions: []float64{0},
+				ArrayPositions: search.ArrayPositions{0},
 				Start:          7,
 				End:            11,
 			},
@@ -235,24 +235,24 @@ func TestTermLocationsMergeOverlapping(t *testing.T) {
 		{
 			input: TermLocations{
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Start:          0,
 					End:            5,
 				},
 				&TermLocation{
-					ArrayPositions: []float64{1},
+					ArrayPositions: search.ArrayPositions{1},
 					Start:          7,
 					End:            11,
 				},
 			},
 			output: TermLocations{
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Start:          0,
 					End:            5,
 				},
 				&TermLocation{
-					ArrayPositions: []float64{1},
+					ArrayPositions: search.ArrayPositions{1},
 					Start:          7,
 					End:            11,
 				},
@@ -261,24 +261,24 @@ func TestTermLocationsMergeOverlapping(t *testing.T) {
 		{
 			input: TermLocations{
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Start:          0,
 					End:            5,
 				},
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Start:          7,
 					End:            11,
 				},
 			},
 			output: TermLocations{
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Start:          0,
 					End:            5,
 				},
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Start:          7,
 					End:            11,
 				},
@@ -287,19 +287,19 @@ func TestTermLocationsMergeOverlapping(t *testing.T) {
 		{
 			input: TermLocations{
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Start:          0,
 					End:            5,
 				},
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Start:          3,
 					End:            11,
 				},
 			},
 			output: TermLocations{
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Start:          0,
 					End:            11,
 				},
@@ -309,24 +309,24 @@ func TestTermLocationsMergeOverlapping(t *testing.T) {
 		{
 			input: TermLocations{
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Start:          0,
 					End:            5,
 				},
 				&TermLocation{
-					ArrayPositions: []float64{1},
+					ArrayPositions: search.ArrayPositions{1},
 					Start:          3,
 					End:            11,
 				},
 			},
 			output: TermLocations{
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Start:          0,
 					End:            5,
 				},
 				&TermLocation{
-					ArrayPositions: []float64{1},
+					ArrayPositions: search.ArrayPositions{1},
 					Start:          3,
 					End:            11,
 				},
@@ -401,23 +401,23 @@ func TestTermLocationsOrder(t *testing.T) {
 			input: search.TermLocationMap{
 				"term": []*search.Location{
 					{
-						ArrayPositions: []float64{0},
+						ArrayPositions: search.ArrayPositions{0},
 						Start:          0,
 					},
 					{
-						ArrayPositions: []float64{0},
+						ArrayPositions: search.ArrayPositions{0},
 						Start:          5,
 					},
 				},
 			},
 			output: TermLocations{
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Term:           "term",
 					Start:          0,
 				},
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Term:           "term",
 					Start:          5,
 				},
@@ -427,23 +427,23 @@ func TestTermLocationsOrder(t *testing.T) {
 			input: search.TermLocationMap{
 				"term": []*search.Location{
 					{
-						ArrayPositions: []float64{0},
+						ArrayPositions: search.ArrayPositions{0},
 						Start:          5,
 					},
 					{
-						ArrayPositions: []float64{0},
+						ArrayPositions: search.ArrayPositions{0},
 						Start:          0,
 					},
 				},
 			},
 			output: TermLocations{
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Term:           "term",
 					Start:          0,
 				},
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Term:           "term",
 					Start:          5,
 				},
@@ -453,23 +453,23 @@ func TestTermLocationsOrder(t *testing.T) {
 			input: search.TermLocationMap{
 				"term": []*search.Location{
 					{
-						ArrayPositions: []float64{0},
+						ArrayPositions: search.ArrayPositions{0},
 						Start:          5,
 					},
 					{
-						ArrayPositions: []float64{1},
+						ArrayPositions: search.ArrayPositions{1},
 						Start:          0,
 					},
 				},
 			},
 			output: TermLocations{
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Term:           "term",
 					Start:          5,
 				},
 				&TermLocation{
-					ArrayPositions: []float64{1},
+					ArrayPositions: search.ArrayPositions{1},
 					Term:           "term",
 					Start:          0,
 				},
@@ -479,23 +479,23 @@ func TestTermLocationsOrder(t *testing.T) {
 			input: search.TermLocationMap{
 				"term": []*search.Location{
 					{
-						ArrayPositions: []float64{0},
+						ArrayPositions: search.ArrayPositions{0},
 						Start:          5,
 					},
 					{
-						ArrayPositions: []float64{0, 1},
+						ArrayPositions: search.ArrayPositions{0, 1},
 						Start:          0,
 					},
 				},
 			},
 			output: TermLocations{
 				&TermLocation{
-					ArrayPositions: []float64{0},
+					ArrayPositions: search.ArrayPositions{0},
 					Term:           "term",
 					Start:          5,
 				},
 				&TermLocation{
-					ArrayPositions: []float64{0, 1},
+					ArrayPositions: search.ArrayPositions{0, 1},
 					Term:           "term",
 					Start:          0,
 				},

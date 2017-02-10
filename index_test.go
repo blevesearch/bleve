@@ -1114,7 +1114,7 @@ func TestTermVectorArrayPositions(t *testing.T) {
 		t.Fatalf("expected at least one location array position")
 	}
 	if results.Hits[0].Locations["Messages"]["second"][0].ArrayPositions[0] != 1 {
-		t.Fatalf("expected array position 1, got %f", results.Hits[0].Locations["Messages"]["second"][0].ArrayPositions[0])
+		t.Fatalf("expected array position 1, got %d", results.Hits[0].Locations["Messages"]["second"][0].ArrayPositions[0])
 	}
 
 	// repeat search for this document in Messages field
@@ -1136,7 +1136,7 @@ func TestTermVectorArrayPositions(t *testing.T) {
 		t.Fatalf("expected at least one location array position")
 	}
 	if results.Hits[0].Locations["Messages"]["third"][0].ArrayPositions[0] != 2 {
-		t.Fatalf("expected array position 2, got %f", results.Hits[0].Locations["Messages"]["third"][0].ArrayPositions[0])
+		t.Fatalf("expected array position 2, got %d", results.Hits[0].Locations["Messages"]["third"][0].ArrayPositions[0])
 	}
 
 	err = index.Close()
