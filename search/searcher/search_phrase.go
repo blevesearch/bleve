@@ -169,7 +169,12 @@ func (s *PhraseSearcher) checkCurrMustMatch(ctx *search.SearchContext) *search.D
 // satisfied, and these locations are returned.  otherwise 0 and either
 // a nil or empty TermLocationMap
 func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext, tlm search.TermLocationMap) (int, search.TermLocationMap) {
-	paths := findPhrasePaths(0, nil, s.terms, tlm, nil, 0)
+	// temporarily turn flat terms []sting into [][]string
+	terms := make([][]string, len(s.terms))
+	for i, term := range s.terms {
+		terms[i] = []string{term}
+	}
+	paths := findPhrasePaths(0, nil, terms, tlm, nil, 0)
 	rv := make(search.TermLocationMap, len(s.terms))
 	for _, p := range paths {
 		p.MergeInto(rv)
@@ -203,7 +208,7 @@ func (p phrasePath) MergeInto(in search.TermLocationMap) {
 //     this is the primary state being built during the traversal
 //
 // returns slice of paths, or nil if invocation did not find any successul paths
-func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms []string, tlm search.TermLocationMap, p phrasePath, remainingSlop int) []phrasePath {
+func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]string, tlm search.TermLocationMap, p phrasePath, remainingSlop int) []phrasePath {
 
 	// no more terms
 	if len(phraseTerms) < 1 {
@@ -214,7 +219,7 @@ func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms []str
 	cdr := phraseTerms[1:]
 
 	// empty term is treated as match (continue)
-	if car == "" {
+	if len(car) == 0 || len(car) == 1 && car[0] == "" {
 		nextPos := prevPos + 1
 		if prevPos == 0 {
 			// if prevPos was 0, don't set it to 1 (as thats not a real abs pos)
@@ -223,26 +228,28 @@ func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms []str
 		return findPhrasePaths(nextPos, ap, cdr, tlm, p, remainingSlop)
 	}
 
-	// locations for this term
-	locations := tlm[car]
 	var rv []phrasePath
-	for _, loc := range locations {
-		if prevPos != 0 && !loc.ArrayPositions.Equals(ap) {
-			// if the array positions are wrong, can't match, try next location
-			continue
-		}
+	// locations for this term
+	for _, carTerm := range car {
+		locations := tlm[carTerm]
+		for _, loc := range locations {
+			if prevPos != 0 && !loc.ArrayPositions.Equals(ap) {
+				// if the array positions are wrong, can't match, try next location
+				continue
+			}
 
-		// compute distance from previous phrase term
-		dist := 0
-		if prevPos != 0 {
-			dist = editDistance(prevPos+1, loc.Pos)
-		}
+			// compute distance from previous phrase term
+			dist := 0
+			if prevPos != 0 {
+				dist = editDistance(prevPos+1, loc.Pos)
+			}
 
-		// if enough slop reamining, continue recursively
-		if prevPos == 0 || (remainingSlop-dist) >= 0 {
-			// this location works, add it to the path (but not for empty term)
-			px := append(p, &phrasePart{term: car, loc: loc})
-			rv = append(rv, findPhrasePaths(loc.Pos, loc.ArrayPositions, cdr, tlm, px, remainingSlop-dist)...)
+			// if enough slop reamining, continue recursively
+			if prevPos == 0 || (remainingSlop-dist) >= 0 {
+				// this location works, add it to the path (but not for empty term)
+				px := append(p, &phrasePart{term: carTerm, loc: loc})
+				rv = append(rv, findPhrasePaths(loc.Pos, loc.ArrayPositions, cdr, tlm, px, remainingSlop-dist)...)
+			}
 		}
 	}
 	return rv
