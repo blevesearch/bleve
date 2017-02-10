@@ -33,7 +33,7 @@ type PhraseSearcher struct {
 }
 
 func NewPhraseSearcher(indexReader index.IndexReader, terms []string, field string, options search.SearcherOptions) (*PhraseSearcher, error) {
-	// turn flat terms []sting into [][]string
+	// turn flat terms []string into [][]string
 	mterms := make([][]string, len(terms))
 	for i, term := range terms {
 		mterms[i] = []string{term}
@@ -49,6 +49,10 @@ func NewMultiPhraseSearcher(indexReader index.IndexReader, terms [][]string, fie
 			// single term
 			ts, err := NewTermSearcher(indexReader, termPos[0], field, 1.0, options)
 			if err != nil {
+				// close any searchers already opened
+				for _, ts := range termPositionSearchers {
+					_ = ts.Close()
+				}
 				return nil, fmt.Errorf("phrase searcher error building term searcher: %v", err)
 			}
 			termPositionSearchers = append(termPositionSearchers, ts)
@@ -61,12 +65,20 @@ func NewMultiPhraseSearcher(indexReader index.IndexReader, terms [][]string, fie
 				}
 				ts, err := NewTermSearcher(indexReader, term, field, 1.0, options)
 				if err != nil {
+					// close any searchers already opened
+					for _, ts := range termPositionSearchers {
+						_ = ts.Close()
+					}
 					return nil, fmt.Errorf("phrase searcher error building term searcher: %v", err)
 				}
 				termSearchers = append(termSearchers, ts)
 			}
 			disjunction, err := NewDisjunctionSearcher(indexReader, termSearchers, 1, options)
 			if err != nil {
+				// close any searchers already opened
+				for _, ts := range termPositionSearchers {
+					_ = ts.Close()
+				}
 				return nil, fmt.Errorf("phrase searcher error building term position disjunction searcher: %v", err)
 			}
 			termPositionSearchers = append(termPositionSearchers, disjunction)
@@ -75,6 +87,10 @@ func NewMultiPhraseSearcher(indexReader index.IndexReader, terms [][]string, fie
 
 	mustSearcher, err := NewConjunctionSearcher(indexReader, termPositionSearchers, options)
 	if err != nil {
+		// close any searchers already opened
+		for _, ts := range termPositionSearchers {
+			_ = ts.Close()
+		}
 		return nil, fmt.Errorf("phrase searcher error building conjunction searcher: %v", err)
 	}
 
