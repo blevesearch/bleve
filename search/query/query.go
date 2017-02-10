@@ -123,7 +123,13 @@ func ParseQuery(input []byte) (Query, error) {
 		var rv PhraseQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
-			return nil, err
+			// now try multi-phrase
+			var rv2 MultiPhraseQuery
+			err = json.Unmarshal(input, &rv2)
+			if err != nil {
+				return nil, err
+			}
+			return &rv2, nil
 		}
 		return &rv, nil
 	}

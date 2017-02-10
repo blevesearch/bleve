@@ -372,5 +372,24 @@
 			"total_hits": 0,
 			"hits": []
 		}
+	},
+  {
+    "comment": "multi-phrase terms",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "body",
+				"terms": [["twenti","thirti"],["thousand"]]
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "a"
+				}
+			]
+		}
 	}
 ]
