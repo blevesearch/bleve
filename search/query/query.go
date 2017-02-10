@@ -301,14 +301,6 @@ func expandQuery(m mapping.IndexMapping, query Query) (Query, error) {
 				return nil, err
 			}
 			return &q, nil
-		case *PhraseQuery:
-			q := *query.(*PhraseQuery)
-			children, err := expandSlice(q.termQueries)
-			if err != nil {
-				return nil, err
-			}
-			q.termQueries = children
-			return &q, nil
 		default:
 			return query, nil
 		}

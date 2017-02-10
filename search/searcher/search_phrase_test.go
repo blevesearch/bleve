@@ -36,20 +36,7 @@ func TestPhraseSearch(t *testing.T) {
 	}()
 
 	soptions := search.SearcherOptions{Explain: true, IncludeTermVectors: true}
-
-	angstTermSearcher, err := NewTermSearcher(twoDocIndexReader, "angst", "desc", 1.0, soptions)
-	if err != nil {
-		t.Fatal(err)
-	}
-	beerTermSearcher, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, soptions)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mustSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{angstTermSearcher, beerTermSearcher}, soptions)
-	if err != nil {
-		t.Fatal(err)
-	}
-	phraseSearcher, err := NewPhraseSearcher(twoDocIndexReader, mustSearcher, []string{"angst", "beer"})
+	phraseSearcher, err := NewPhraseSearcher(twoDocIndexReader, []string{"angst", "beer"}, "desc", soptions)
 	if err != nil {
 		t.Fatal(err)
 	}

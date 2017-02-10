@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/blevesearch/bleve/index"
@@ -31,7 +32,24 @@ type PhraseSearcher struct {
 	initialized  bool
 }
 
-func NewPhraseSearcher(indexReader index.IndexReader, mustSearcher *ConjunctionSearcher, terms []string) (*PhraseSearcher, error) {
+func NewPhraseSearcher(indexReader index.IndexReader, terms []string, field string, options search.SearcherOptions) (*PhraseSearcher, error) {
+	options.IncludeTermVectors = true
+	termSearchers := make([]search.Searcher, 0)
+	for _, term := range terms {
+		if term != "" {
+			ts, err := NewTermSearcher(indexReader, term, field, 1.0, options)
+			if err != nil {
+				return nil, fmt.Errorf("phrase searcher error building term searcher: %v", err)
+			}
+			termSearchers = append(termSearchers, ts)
+		}
+	}
+
+	mustSearcher, err := NewConjunctionSearcher(indexReader, termSearchers, options)
+	if err != nil {
+		return nil, fmt.Errorf("phrase searcher error building conjunction searcher: %v", err)
+	}
+
 	// build our searcher
 	rv := PhraseSearcher{
 		indexReader:  indexReader,
