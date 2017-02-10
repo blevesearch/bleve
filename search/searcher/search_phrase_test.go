@@ -109,6 +109,59 @@ func TestPhraseSearch(t *testing.T) {
 	}
 }
 
+func TestMultiPhraseSearch(t *testing.T) {
+
+	soptions := search.SearcherOptions{Explain: true, IncludeTermVectors: true}
+
+	tests := []struct {
+		phrase [][]string
+		docids [][]byte
+	}{
+		{
+			phrase: [][]string{[]string{"angst", "what"}, []string{"beer"}},
+			docids: [][]byte{[]byte("2")},
+		},
+	}
+
+	for i, test := range tests {
+
+		reader, err := twoDocIndex.Reader()
+		if err != nil {
+			t.Error(err)
+		}
+		searcher, err := NewMultiPhraseSearcher(reader, test.phrase, "desc", soptions)
+		if err != nil {
+			t.Error(err)
+		}
+		ctx := &search.SearchContext{
+			DocumentMatchPool: search.NewDocumentMatchPool(searcher.DocumentMatchPoolSize(), 0),
+		}
+		next, err := searcher.Next(ctx)
+		var actualIds [][]byte
+		for err == nil && next != nil {
+			actualIds = append(actualIds, next.IndexInternalID)
+			ctx.DocumentMatchPool.Put(next)
+			next, err = searcher.Next(ctx)
+		}
+		if err != nil {
+			t.Fatalf("error iterating searcher: %v for test %d", err, i)
+		}
+		if !reflect.DeepEqual(test.docids, actualIds) {
+			t.Fatalf("expected ids: %v, got %v", test.docids, actualIds)
+		}
+
+		err = searcher.Close()
+		if err != nil {
+			t.Error(err)
+		}
+
+		err = reader.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}
+}
+
 func TestFindPhrasePaths(t *testing.T) {
 	tests := []struct {
 		phrase [][]string

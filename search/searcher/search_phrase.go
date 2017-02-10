@@ -28,24 +28,52 @@ type PhraseSearcher struct {
 	queryNorm    float64
 	currMust     *search.DocumentMatch
 	slop         int
-	terms        []string
+	terms        [][]string
 	initialized  bool
 }
 
 func NewPhraseSearcher(indexReader index.IndexReader, terms []string, field string, options search.SearcherOptions) (*PhraseSearcher, error) {
+	// turn flat terms []sting into [][]string
+	mterms := make([][]string, len(terms))
+	for i, term := range terms {
+		mterms[i] = []string{term}
+	}
+	return NewMultiPhraseSearcher(indexReader, mterms, field, options)
+}
+
+func NewMultiPhraseSearcher(indexReader index.IndexReader, terms [][]string, field string, options search.SearcherOptions) (*PhraseSearcher, error) {
 	options.IncludeTermVectors = true
-	termSearchers := make([]search.Searcher, 0)
-	for _, term := range terms {
-		if term != "" {
-			ts, err := NewTermSearcher(indexReader, term, field, 1.0, options)
+	var termPositionSearchers []search.Searcher
+	for _, termPos := range terms {
+		if len(termPos) == 1 && termPos[0] != "" {
+			// single term
+			ts, err := NewTermSearcher(indexReader, termPos[0], field, 1.0, options)
 			if err != nil {
 				return nil, fmt.Errorf("phrase searcher error building term searcher: %v", err)
 			}
-			termSearchers = append(termSearchers, ts)
+			termPositionSearchers = append(termPositionSearchers, ts)
+		} else if len(termPos) > 1 {
+			// multiple terms
+			var termSearchers []search.Searcher
+			for _, term := range termPos {
+				if term == "" {
+					continue
+				}
+				ts, err := NewTermSearcher(indexReader, term, field, 1.0, options)
+				if err != nil {
+					return nil, fmt.Errorf("phrase searcher error building term searcher: %v", err)
+				}
+				termSearchers = append(termSearchers, ts)
+			}
+			disjunction, err := NewDisjunctionSearcher(indexReader, termSearchers, 1, options)
+			if err != nil {
+				return nil, fmt.Errorf("phrase searcher error building term position disjunction searcher: %v", err)
+			}
+			termPositionSearchers = append(termPositionSearchers, disjunction)
 		}
 	}
 
-	mustSearcher, err := NewConjunctionSearcher(indexReader, termSearchers, options)
+	mustSearcher, err := NewConjunctionSearcher(indexReader, termPositionSearchers, options)
 	if err != nil {
 		return nil, fmt.Errorf("phrase searcher error building conjunction searcher: %v", err)
 	}
@@ -169,12 +197,7 @@ func (s *PhraseSearcher) checkCurrMustMatch(ctx *search.SearchContext) *search.D
 // satisfied, and these locations are returned.  otherwise 0 and either
 // a nil or empty TermLocationMap
 func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext, tlm search.TermLocationMap) (int, search.TermLocationMap) {
-	// temporarily turn flat terms []sting into [][]string
-	terms := make([][]string, len(s.terms))
-	for i, term := range s.terms {
-		terms[i] = []string{term}
-	}
-	paths := findPhrasePaths(0, nil, terms, tlm, nil, 0)
+	paths := findPhrasePaths(0, nil, s.terms, tlm, nil, 0)
 	rv := make(search.TermLocationMap, len(s.terms))
 	for _, p := range paths {
 		p.MergeInto(rv)
