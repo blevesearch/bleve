@@ -123,7 +123,13 @@ func ParseQuery(input []byte) (Query, error) {
 		var rv PhraseQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
-			return nil, err
+			// now try multi-phrase
+			var rv2 MultiPhraseQuery
+			err = json.Unmarshal(input, &rv2)
+			if err != nil {
+				return nil, err
+			}
+			return &rv2, nil
 		}
 		return &rv, nil
 	}
@@ -300,14 +306,6 @@ func expandQuery(m mapping.IndexMapping, query Query) (Query, error) {
 			if err != nil {
 				return nil, err
 			}
-			return &q, nil
-		case *PhraseQuery:
-			q := *query.(*PhraseQuery)
-			children, err := expandSlice(q.termQueries)
-			if err != nil {
-				return nil, err
-			}
-			q.termQueries = children
 			return &q, nil
 		default:
 			return query, nil

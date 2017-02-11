@@ -36,20 +36,7 @@ func TestPhraseSearch(t *testing.T) {
 	}()
 
 	soptions := search.SearcherOptions{Explain: true, IncludeTermVectors: true}
-
-	angstTermSearcher, err := NewTermSearcher(twoDocIndexReader, "angst", "desc", 1.0, soptions)
-	if err != nil {
-		t.Fatal(err)
-	}
-	beerTermSearcher, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, soptions)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mustSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{angstTermSearcher, beerTermSearcher}, soptions)
-	if err != nil {
-		t.Fatal(err)
-	}
-	phraseSearcher, err := NewPhraseSearcher(twoDocIndexReader, mustSearcher, []string{"angst", "beer"})
+	phraseSearcher, err := NewPhraseSearcher(twoDocIndexReader, []string{"angst", "beer"}, "desc", soptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,15 +109,68 @@ func TestPhraseSearch(t *testing.T) {
 	}
 }
 
+func TestMultiPhraseSearch(t *testing.T) {
+
+	soptions := search.SearcherOptions{Explain: true, IncludeTermVectors: true}
+
+	tests := []struct {
+		phrase [][]string
+		docids [][]byte
+	}{
+		{
+			phrase: [][]string{[]string{"angst", "what"}, []string{"beer"}},
+			docids: [][]byte{[]byte("2")},
+		},
+	}
+
+	for i, test := range tests {
+
+		reader, err := twoDocIndex.Reader()
+		if err != nil {
+			t.Error(err)
+		}
+		searcher, err := NewMultiPhraseSearcher(reader, test.phrase, "desc", soptions)
+		if err != nil {
+			t.Error(err)
+		}
+		ctx := &search.SearchContext{
+			DocumentMatchPool: search.NewDocumentMatchPool(searcher.DocumentMatchPoolSize(), 0),
+		}
+		next, err := searcher.Next(ctx)
+		var actualIds [][]byte
+		for err == nil && next != nil {
+			actualIds = append(actualIds, next.IndexInternalID)
+			ctx.DocumentMatchPool.Put(next)
+			next, err = searcher.Next(ctx)
+		}
+		if err != nil {
+			t.Fatalf("error iterating searcher: %v for test %d", err, i)
+		}
+		if !reflect.DeepEqual(test.docids, actualIds) {
+			t.Fatalf("expected ids: %v, got %v", test.docids, actualIds)
+		}
+
+		err = searcher.Close()
+		if err != nil {
+			t.Error(err)
+		}
+
+		err = reader.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}
+}
+
 func TestFindPhrasePaths(t *testing.T) {
 	tests := []struct {
-		phrase []string
+		phrase [][]string
 		tlm    search.TermLocationMap
 		paths  []phrasePath
 	}{
 		// simplest matching case
 		{
-			phrase: []string{"cat", "dog"},
+			phrase: [][]string{[]string{"cat"}, []string{"dog"}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -152,7 +192,7 @@ func TestFindPhrasePaths(t *testing.T) {
 		},
 		// second term missing, no match
 		{
-			phrase: []string{"cat", "dog"},
+			phrase: [][]string{[]string{"cat"}, []string{"dog"}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -164,7 +204,7 @@ func TestFindPhrasePaths(t *testing.T) {
 		},
 		// second term exists but in wrong position
 		{
-			phrase: []string{"cat", "dog"},
+			phrase: [][]string{[]string{"cat"}, []string{"dog"}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -181,7 +221,7 @@ func TestFindPhrasePaths(t *testing.T) {
 		},
 		// matches multiple times
 		{
-			phrase: []string{"cat", "dog"},
+			phrase: [][]string{[]string{"cat"}, []string{"dog"}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -213,7 +253,7 @@ func TestFindPhrasePaths(t *testing.T) {
 		},
 		// match over gaps
 		{
-			phrase: []string{"cat", "", "dog"},
+			phrase: [][]string{[]string{"cat"}, []string{""}, []string{"dog"}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -235,7 +275,7 @@ func TestFindPhrasePaths(t *testing.T) {
 		},
 		// match with leading ""
 		{
-			phrase: []string{"", "cat", "dog"},
+			phrase: [][]string{[]string{""}, []string{"cat"}, []string{"dog"}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -257,7 +297,7 @@ func TestFindPhrasePaths(t *testing.T) {
 		},
 		// match with trailing ""
 		{
-			phrase: []string{"cat", "dog", ""},
+			phrase: [][]string{[]string{"cat"}, []string{"dog"}, []string{""}},
 			tlm: search.TermLocationMap{
 				"cat": search.Locations{
 					&search.Location{
@@ -317,18 +357,18 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 	}
 
 	tests := []struct {
-		phrase []string
+		phrase [][]string
 		paths  []phrasePath
 		slop   int
 	}{
 		// no match
 		{
-			phrase: []string{"one", "five"},
+			phrase: [][]string{[]string{"one"}, []string{"five"}},
 			slop:   2,
 		},
 		// should match
 		{
-			phrase: []string{"one", "five"},
+			phrase: [][]string{[]string{"one"}, []string{"five"}},
 			slop:   3,
 			paths: []phrasePath{
 				phrasePath{
@@ -339,7 +379,7 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		},
 		// slop 0 finds exact match
 		{
-			phrase: []string{"four", "five"},
+			phrase: [][]string{[]string{"four"}, []string{"five"}},
 			slop:   0,
 			paths: []phrasePath{
 				phrasePath{
@@ -350,12 +390,12 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		},
 		// slop 0 does not find exact match (reversed)
 		{
-			phrase: []string{"two", "one"},
+			phrase: [][]string{[]string{"two"}, []string{"one"}},
 			slop:   0,
 		},
 		// slop 1 finds exact match
 		{
-			phrase: []string{"one", "two"},
+			phrase: [][]string{[]string{"one"}, []string{"two"}},
 			slop:   1,
 			paths: []phrasePath{
 				phrasePath{
@@ -366,12 +406,12 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		},
 		// slop 1 *still* does not find exact match (reversed) requires at least 2
 		{
-			phrase: []string{"two", "one"},
+			phrase: [][]string{[]string{"two"}, []string{"one"}},
 			slop:   1,
 		},
 		// slop 2 does finds exact match reversed
 		{
-			phrase: []string{"two", "one"},
+			phrase: [][]string{[]string{"two"}, []string{"one"}},
 			slop:   2,
 			paths: []phrasePath{
 				phrasePath{
@@ -382,12 +422,12 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		},
 		// slop 2 not enough for this
 		{
-			phrase: []string{"three", "one"},
+			phrase: [][]string{[]string{"three"}, []string{"one"}},
 			slop:   2,
 		},
 		// slop should be cumulative
 		{
-			phrase: []string{"one", "three", "five"},
+			phrase: [][]string{[]string{"one"}, []string{"three"}, []string{"five"}},
 			slop:   2,
 			paths: []phrasePath{
 				phrasePath{
@@ -399,12 +439,12 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		},
 		// should require 6
 		{
-			phrase: []string{"five", "three", "one"},
+			phrase: [][]string{[]string{"five"}, []string{"three"}, []string{"one"}},
 			slop:   5,
 		},
 		// so lets try 6
 		{
-			phrase: []string{"five", "three", "one"},
+			phrase: [][]string{[]string{"five"}, []string{"three"}, []string{"one"}},
 			slop:   6,
 			paths: []phrasePath{
 				phrasePath{
@@ -450,13 +490,13 @@ func TestFindPhrasePathsSloppyPalyndrome(t *testing.T) {
 	}
 
 	tests := []struct {
-		phrase []string
+		phrase [][]string
 		paths  []phrasePath
 		slop   int
 	}{
 		// search non palyndrone, exact match
 		{
-			phrase: []string{"two", "three"},
+			phrase: [][]string{[]string{"two"}, []string{"three"}},
 			slop:   0,
 			paths: []phrasePath{
 				phrasePath{
@@ -467,7 +507,7 @@ func TestFindPhrasePathsSloppyPalyndrome(t *testing.T) {
 		},
 		// same with slop 2 (not required) (find it twice)
 		{
-			phrase: []string{"two", "three"},
+			phrase: [][]string{[]string{"two"}, []string{"three"}},
 			slop:   2,
 			paths: []phrasePath{
 				phrasePath{
@@ -482,7 +522,7 @@ func TestFindPhrasePathsSloppyPalyndrome(t *testing.T) {
 		},
 		// palyndrone reversed
 		{
-			phrase: []string{"three", "two"},
+			phrase: [][]string{[]string{"three"}, []string{"two"}},
 			slop:   2,
 			paths: []phrasePath{
 				phrasePath{
@@ -499,6 +539,102 @@ func TestFindPhrasePathsSloppyPalyndrome(t *testing.T) {
 
 	for i, test := range tests {
 		actualPaths := findPhrasePaths(0, nil, test.phrase, tlm, nil, test.slop)
+		if !reflect.DeepEqual(actualPaths, test.paths) {
+			t.Fatalf("expected: %v got %v for test %d", test.paths, actualPaths, i)
+		}
+	}
+}
+
+func TestFindMultiPhrasePaths(t *testing.T) {
+
+	tlm := search.TermLocationMap{
+		"cat": search.Locations{
+			&search.Location{
+				Pos: 1,
+			},
+		},
+		"dog": search.Locations{
+			&search.Location{
+				Pos: 2,
+			},
+		},
+		"frog": search.Locations{
+			&search.Location{
+				Pos: 3,
+			},
+		},
+	}
+
+	tests := []struct {
+		phrase [][]string
+		paths  []phrasePath
+	}{
+		// simplest, one of two possible terms matches
+		{
+			phrase: [][]string{[]string{"cat", "rat"}, []string{"dog"}},
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 1}},
+					&phrasePart{"dog", &search.Location{Pos: 2}},
+				},
+			},
+		},
+		// two possible terms, neither work
+		{
+			phrase: [][]string{[]string{"cat", "rat"}, []string{"chicken"}},
+		},
+		// two possible terms, one works, but out of position with next
+		{
+			phrase: [][]string{[]string{"cat", "rat"}, []string{"frog"}},
+		},
+		// matches multiple times, with different pairing
+		{
+			phrase: [][]string{[]string{"cat", "dog"}, []string{"dog", "frog"}},
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 1}},
+					&phrasePart{"dog", &search.Location{Pos: 2}},
+				},
+				phrasePath{
+					&phrasePart{"dog", &search.Location{Pos: 2}},
+					&phrasePart{"frog", &search.Location{Pos: 3}},
+				},
+			},
+		},
+		// multi-match over a gap
+		{
+			phrase: [][]string{[]string{"cat", "rat"}, []string{""}, []string{"frog"}},
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 1}},
+					&phrasePart{"frog", &search.Location{Pos: 3}},
+				},
+			},
+		},
+		// multi-match over a gap (same as before, but with empty term list)
+		{
+			phrase: [][]string{[]string{"cat", "rat"}, []string{}, []string{"frog"}},
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 1}},
+					&phrasePart{"frog", &search.Location{Pos: 3}},
+				},
+			},
+		},
+		// multi-match over a gap (same once again, but nil term list)
+		{
+			phrase: [][]string{[]string{"cat", "rat"}, nil, []string{"frog"}},
+			paths: []phrasePath{
+				phrasePath{
+					&phrasePart{"cat", &search.Location{Pos: 1}},
+					&phrasePart{"frog", &search.Location{Pos: 3}},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		actualPaths := findPhrasePaths(0, nil, test.phrase, tlm, nil, 0)
 		if !reflect.DeepEqual(actualPaths, test.paths) {
 			t.Fatalf("expected: %v got %v for test %d", test.paths, actualPaths, i)
 		}

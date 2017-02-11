@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/blevesearch/bleve/index"
@@ -27,11 +28,72 @@ type PhraseSearcher struct {
 	queryNorm    float64
 	currMust     *search.DocumentMatch
 	slop         int
-	terms        []string
+	terms        [][]string
 	initialized  bool
 }
 
-func NewPhraseSearcher(indexReader index.IndexReader, mustSearcher *ConjunctionSearcher, terms []string) (*PhraseSearcher, error) {
+func NewPhraseSearcher(indexReader index.IndexReader, terms []string, field string, options search.SearcherOptions) (*PhraseSearcher, error) {
+	// turn flat terms []string into [][]string
+	mterms := make([][]string, len(terms))
+	for i, term := range terms {
+		mterms[i] = []string{term}
+	}
+	return NewMultiPhraseSearcher(indexReader, mterms, field, options)
+}
+
+func NewMultiPhraseSearcher(indexReader index.IndexReader, terms [][]string, field string, options search.SearcherOptions) (*PhraseSearcher, error) {
+	options.IncludeTermVectors = true
+	var termPositionSearchers []search.Searcher
+	for _, termPos := range terms {
+		if len(termPos) == 1 && termPos[0] != "" {
+			// single term
+			ts, err := NewTermSearcher(indexReader, termPos[0], field, 1.0, options)
+			if err != nil {
+				// close any searchers already opened
+				for _, ts := range termPositionSearchers {
+					_ = ts.Close()
+				}
+				return nil, fmt.Errorf("phrase searcher error building term searcher: %v", err)
+			}
+			termPositionSearchers = append(termPositionSearchers, ts)
+		} else if len(termPos) > 1 {
+			// multiple terms
+			var termSearchers []search.Searcher
+			for _, term := range termPos {
+				if term == "" {
+					continue
+				}
+				ts, err := NewTermSearcher(indexReader, term, field, 1.0, options)
+				if err != nil {
+					// close any searchers already opened
+					for _, ts := range termPositionSearchers {
+						_ = ts.Close()
+					}
+					return nil, fmt.Errorf("phrase searcher error building term searcher: %v", err)
+				}
+				termSearchers = append(termSearchers, ts)
+			}
+			disjunction, err := NewDisjunctionSearcher(indexReader, termSearchers, 1, options)
+			if err != nil {
+				// close any searchers already opened
+				for _, ts := range termPositionSearchers {
+					_ = ts.Close()
+				}
+				return nil, fmt.Errorf("phrase searcher error building term position disjunction searcher: %v", err)
+			}
+			termPositionSearchers = append(termPositionSearchers, disjunction)
+		}
+	}
+
+	mustSearcher, err := NewConjunctionSearcher(indexReader, termPositionSearchers, options)
+	if err != nil {
+		// close any searchers already opened
+		for _, ts := range termPositionSearchers {
+			_ = ts.Close()
+		}
+		return nil, fmt.Errorf("phrase searcher error building conjunction searcher: %v", err)
+	}
+
 	// build our searcher
 	rv := PhraseSearcher{
 		indexReader:  indexReader,
@@ -185,7 +247,7 @@ func (p phrasePath) MergeInto(in search.TermLocationMap) {
 //     this is the primary state being built during the traversal
 //
 // returns slice of paths, or nil if invocation did not find any successul paths
-func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms []string, tlm search.TermLocationMap, p phrasePath, remainingSlop int) []phrasePath {
+func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]string, tlm search.TermLocationMap, p phrasePath, remainingSlop int) []phrasePath {
 
 	// no more terms
 	if len(phraseTerms) < 1 {
@@ -196,7 +258,7 @@ func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms []str
 	cdr := phraseTerms[1:]
 
 	// empty term is treated as match (continue)
-	if car == "" {
+	if len(car) == 0 || (len(car) == 1 && car[0] == "") {
 		nextPos := prevPos + 1
 		if prevPos == 0 {
 			// if prevPos was 0, don't set it to 1 (as thats not a real abs pos)
@@ -205,26 +267,28 @@ func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms []str
 		return findPhrasePaths(nextPos, ap, cdr, tlm, p, remainingSlop)
 	}
 
-	// locations for this term
-	locations := tlm[car]
 	var rv []phrasePath
-	for _, loc := range locations {
-		if prevPos != 0 && !loc.ArrayPositions.Equals(ap) {
-			// if the array positions are wrong, can't match, try next location
-			continue
-		}
+	// locations for this term
+	for _, carTerm := range car {
+		locations := tlm[carTerm]
+		for _, loc := range locations {
+			if prevPos != 0 && !loc.ArrayPositions.Equals(ap) {
+				// if the array positions are wrong, can't match, try next location
+				continue
+			}
 
-		// compute distance from previous phrase term
-		dist := 0
-		if prevPos != 0 {
-			dist = editDistance(prevPos+1, loc.Pos)
-		}
+			// compute distance from previous phrase term
+			dist := 0
+			if prevPos != 0 {
+				dist = editDistance(prevPos+1, loc.Pos)
+			}
 
-		// if enough slop reamining, continue recursively
-		if prevPos == 0 || (remainingSlop-dist) >= 0 {
-			// this location works, add it to the path (but not for empty term)
-			px := append(p, &phrasePart{term: car, loc: loc})
-			rv = append(rv, findPhrasePaths(loc.Pos, loc.ArrayPositions, cdr, tlm, px, remainingSlop-dist)...)
+			// if enough slop reamining, continue recursively
+			if prevPos == 0 || (remainingSlop-dist) >= 0 {
+				// this location works, add it to the path (but not for empty term)
+				px := append(p, &phrasePart{term: carTerm, loc: loc})
+				rv = append(rv, findPhrasePaths(loc.Pos, loc.ArrayPositions, cdr, tlm, px, remainingSlop-dist)...)
+			}
 		}
 	}
 	return rv

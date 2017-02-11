@@ -24,48 +24,51 @@ import (
 	"github.com/blevesearch/bleve/search/searcher"
 )
 
-type PhraseQuery struct {
-	Terms    []string `json:"terms"`
-	Field    string   `json:"field,omitempty"`
-	BoostVal *Boost   `json:"boost,omitempty"`
+type MultiPhraseQuery struct {
+	Terms    [][]string `json:"terms"`
+	Field    string     `json:"field,omitempty"`
+	BoostVal *Boost     `json:"boost,omitempty"`
 }
 
-// NewPhraseQuery creates a new Query for finding
-// exact term phrases in the index.
-// The provided terms must exist in the correct
+// NewMultiPhraseQuery creates a new Query for finding
+// term phrases in the index.
+// It is like PhraseQuery, but each position in the
+// phrase may be satisfied by a list of terms
+// as opposed to just one.
+// At least one of the terms must exist in the correct
 // order, at the correct index offsets, in the
 // specified field. Queried field must have been indexed with
 // IncludeTermVectors set to true.
-func NewPhraseQuery(terms []string, field string) *PhraseQuery {
-	return &PhraseQuery{
+func NewMultiPhraseQuery(terms [][]string, field string) *MultiPhraseQuery {
+	return &MultiPhraseQuery{
 		Terms: terms,
 		Field: field,
 	}
 }
 
-func (q *PhraseQuery) SetBoost(b float64) {
+func (q *MultiPhraseQuery) SetBoost(b float64) {
 	boost := Boost(b)
 	q.BoostVal = &boost
 }
 
-func (q *PhraseQuery) Boost() float64 {
+func (q *MultiPhraseQuery) Boost() float64 {
 	return q.BoostVal.Value()
 }
 
-func (q *PhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-	return searcher.NewPhraseSearcher(i, q.Terms, q.Field, options)
+func (q *MultiPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+	return searcher.NewMultiPhraseSearcher(i, q.Terms, q.Field, options)
 }
 
-func (q *PhraseQuery) Validate() error {
+func (q *MultiPhraseQuery) Validate() error {
 	if len(q.Terms) < 1 {
 		return fmt.Errorf("phrase query must contain at least one term")
 	}
 	return nil
 }
 
-func (q *PhraseQuery) UnmarshalJSON(data []byte) error {
-	type _phraseQuery PhraseQuery
-	tmp := _phraseQuery{}
+func (q *MultiPhraseQuery) UnmarshalJSON(data []byte) error {
+	type _mphraseQuery MultiPhraseQuery
+	tmp := _mphraseQuery{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
