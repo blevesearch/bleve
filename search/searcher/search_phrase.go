@@ -258,7 +258,7 @@ func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]s
 	cdr := phraseTerms[1:]
 
 	// empty term is treated as match (continue)
-	if len(car) == 0 || len(car) == 1 && car[0] == "" {
+	if len(car) == 0 || (len(car) == 1 && car[0] == "") {
 		nextPos := prevPos + 1
 		if prevPos == 0 {
 			// if prevPos was 0, don't set it to 1 (as thats not a real abs pos)
