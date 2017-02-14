@@ -304,8 +304,7 @@ func (im *IndexMappingImpl) determineType(data interface{}) string {
 	return im.DefaultType
 }
 
-func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}) error {
-	docType := im.determineType(data)
+func (im *IndexMappingImpl) MapDocument(doc *document.Document, docType string, data interface{}) error {
 	docMapping := im.mappingForType(docType)
 	walkContext := im.newWalkContext(doc, docMapping)
 	if docMapping.Enabled {

@@ -36,12 +36,12 @@ type Batch struct {
 // Index adds the specified index operation to the
 // batch.  NOTE: the bleve Index is not updated
 // until the batch is executed.
-func (b *Batch) Index(id string, data interface{}) error {
+func (b *Batch) Index(id string, docType string, data interface{}) error {
 	if id == "" {
 		return ErrorEmptyID
 	}
 	doc := document.NewDocument(id)
-	err := b.index.Mapping().MapDocument(doc, data)
+	err := b.index.Mapping().MapDocument(doc, docType, data)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ type Index interface {
 	// identifier is bound to analyzed data and will be retrieved by search
 	// requests. See Index interface documentation for details about mapping
 	// rules.
-	Index(id string, data interface{}) error
+	Index(id string, kind string, data interface{}) error
 	Delete(id string) error
 
 	NewBatch() *Batch

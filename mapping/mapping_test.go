@@ -46,9 +46,7 @@ var mappingSource = []byte(`{
     	},
     	"brewery": {
     	}
-    },
-    "type_field": "_type",
-    "default_type": "_default"
+    }
 }`)
 
 func buildMapping() IndexMapping {
@@ -93,7 +91,7 @@ func TestMappingStructWithJSONTags(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	err := mapping.MapDocument(doc, x)
+	err := mapping.MapDocument(doc, "default", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +131,7 @@ func TestMappingStructWithJSONTagsOneDisabled(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	err := mapping.MapDocument(doc, x)
+	err := mapping.MapDocument(doc, "default", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +171,7 @@ func TestMappingStructWithAlternateTags(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	err := mapping.MapDocument(doc, x)
+	err := mapping.MapDocument(doc, "default", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +213,7 @@ func TestMappingStructWithAlternateTagsTwoDisabled(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	err := mapping.MapDocument(doc, x)
+	err := mapping.MapDocument(doc, "default", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +253,7 @@ func TestMappingStructWithPointerToString(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	err := mapping.MapDocument(doc, x)
+	err := mapping.MapDocument(doc, "default", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +285,7 @@ func TestMappingJSONWithNull(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	err = mapping.MapDocument(doc, jsondoc)
+	err = mapping.MapDocument(doc, "default", jsondoc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -432,7 +430,7 @@ func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
 	}
 	doc := document.NewDocument("x")
 	mapping := NewIndexMapping()
-	err := mapping.MapDocument(doc, data)
+	err := mapping.MapDocument(doc, "default", data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -450,7 +448,7 @@ func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
 
 	mapping = NewIndexMapping()
 	doc = document.NewDocument("y")
-	err = mapping.MapDocument(doc, data)
+	err = mapping.MapDocument(doc, "default", data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -464,7 +462,7 @@ func TestEnablingDisablingStoringDynamicFields(t *testing.T) {
 	mapping = NewIndexMapping()
 	mapping.StoreDynamic = true
 	doc = document.NewDocument("y")
-	err = mapping.MapDocument(doc, data)
+	err = mapping.MapDocument(doc, "default", data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -492,7 +490,7 @@ func TestMappingBool(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	err := mapping.MapDocument(doc, x)
+	err := mapping.MapDocument(doc, "default", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -528,7 +526,7 @@ func TestDisableDefaultMapping(t *testing.T) {
 	}
 
 	doc := document.NewDocument("x")
-	err := indexMapping.MapDocument(doc, data)
+	err := indexMapping.MapDocument(doc, "default", data)
 	if err != nil {
 		t.Error(err)
 	}
@@ -610,7 +608,7 @@ func TestInvalidDocumentMappingStrict(t *testing.T) {
 }
 
 func TestInvalidIndexMappingStrict(t *testing.T) {
-	mappingBytes := []byte(`{"typeField":"type","default_field":"all"}`)
+	mappingBytes := []byte(`{"default_field":"all"}`)
 
 	// first unmarhsal it without strict
 	var im IndexMappingImpl
@@ -632,11 +630,9 @@ func TestInvalidIndexMappingStrict(t *testing.T) {
 		MappingJSONStrict = false
 	}()
 
-	expectedInvalidKeys := []string{"typeField"}
-	expectedErr := fmt.Errorf("index mapping contains invalid keys: %v", expectedInvalidKeys)
 	err = json.Unmarshal(mappingBytes, &im)
-	if err.Error() != expectedErr.Error() {
-		t.Fatalf("expected err: %v, got err: %v", expectedErr, err)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	if im.DefaultField != "all" {
@@ -677,7 +673,7 @@ func TestMappingBug353(t *testing.T) {
 	mapping.DefaultMapping.AddSubDocumentMapping("Other", otherMapping)
 
 	doc := document.NewDocument("x")
-	err = mapping.MapDocument(doc, data)
+	err = mapping.MapDocument(doc, "default", data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -723,7 +719,7 @@ func TestAnonymousStructFields(t *testing.T) {
 
 	doc := document.NewDocument("1")
 	m := NewIndexMapping()
-	err := m.MapDocument(doc, x)
+	err := m.MapDocument(doc, "default", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -763,7 +759,7 @@ func TestAnonymousStructFields(t *testing.T) {
 	}
 
 	doc2 := document.NewDocument("2")
-	err = m.MapDocument(doc2, y)
+	err = m.MapDocument(doc2, "default", y)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -799,7 +795,7 @@ func TestAnonymousStructFieldWithJSONStructTagEmptString(t *testing.T) {
 
 	doc := document.NewDocument("1")
 	m := NewIndexMapping()
-	err := m.MapDocument(doc, x)
+	err := m.MapDocument(doc, "default", x)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -836,7 +832,7 @@ func TestMappingPrimitives(t *testing.T) {
 	m := NewIndexMapping()
 	for _, test := range tests {
 		doc := document.NewDocument("x")
-		err := m.MapDocument(doc, test.data)
+		err := m.MapDocument(doc, "default", test.data)
 		if err != nil {
 			t.Fatal(err)
 		}

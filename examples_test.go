@@ -77,11 +77,11 @@ func ExampleIndex_indexing() {
 	}{Name: "great nameless one", Created: time.Now(), Age: 25}
 
 	// index some data
-	err = exampleIndex.Index("document id 1", data)
+	err = exampleIndex.Index("document id 1", "default", data)
 	if err != nil {
 		panic(err)
 	}
-	err = exampleIndex.Index("document id 2", data2)
+	err = exampleIndex.Index("document id 2", "default", data2)
 	if err != nil {
 		panic(err)
 	}
@@ -161,11 +161,11 @@ func ExampleNewNumericRangeQuery() {
 	data := struct{ Priority float64 }{Priority: float64(15)}
 	data2 := struct{ Priority float64 }{Priority: float64(10)}
 
-	err = exampleIndex.Index("document id 3", data)
+	err = exampleIndex.Index("document id 3", "default", data)
 	if err != nil {
 		panic(err)
 	}
-	err = exampleIndex.Index("document id 4", data2)
+	err = exampleIndex.Index("document id 4", "default", data2)
 	if err != nil {
 		panic(err)
 	}

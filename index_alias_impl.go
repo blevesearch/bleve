@@ -54,7 +54,7 @@ func (i *indexAliasImpl) isAliasToSingleIndex() error {
 	return nil
 }
 
-func (i *indexAliasImpl) Index(id string, data interface{}) error {
+func (i *indexAliasImpl) Index(id string, kind string, data interface{}) error {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -67,7 +67,7 @@ func (i *indexAliasImpl) Index(id string, data interface{}) error {
 		return err
 	}
 
-	return i.indexes[0].Index(id, data)
+	return i.indexes[0].Index(id, kind, data)
 }
 
 func (i *indexAliasImpl) Delete(id string) error {
