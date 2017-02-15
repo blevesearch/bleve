@@ -31,6 +31,9 @@ var bulkCmd = &cobra.Command{
 	Use:   "bulk [index path] [data paths ...]",
 	Short: "bulk loads from newline delimited JSON files",
 	Long:  `The bulk command will perform batch loading of documents in one or more newline delimited JSON files.`,
+	Annotations: map[string]string{
+		canMutateBleveIndex: "true",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("must specify at least one path")

@@ -32,6 +32,9 @@ var indexCmd = &cobra.Command{
 	Use:   "index [index path] [data paths ...]",
 	Short: "adds the files to the index",
 	Long:  `The index command adds the specified files to the index.`,
+	Annotations: map[string]string{
+		canMutateBleveIndex: "true",
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("must specify at least one path")

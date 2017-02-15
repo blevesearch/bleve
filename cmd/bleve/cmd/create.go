@@ -31,6 +31,9 @@ var createCmd = &cobra.Command{
 	Use:   "create [index path]",
 	Short: "creates a new index",
 	Long:  `The create command will create a new empty index.`,
+	Annotations: map[string]string{
+		canMutateBleveIndex: "true",
+	},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// override RootCmd version which opens existing index
 		if len(args) < 1 {
