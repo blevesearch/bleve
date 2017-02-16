@@ -17,6 +17,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/blevesearch/bleve"
 	"github.com/spf13/cobra"
@@ -25,6 +26,22 @@ import (
 var cfgFile string
 
 var idx bleve.Index
+
+const canMutateBleveIndex = "canMutateBleveIndex"
+
+// CanMutateBleveIndex returns true if the command is capable
+// of mutating the bleve index, or false if its operation is
+// read-only
+func CanMutateBleveIndex(c *cobra.Command) bool {
+	for k, v := range c.Annotations {
+		if k == canMutateBleveIndex {
+			if b, err := strconv.ParseBool(v); err == nil && b {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
