@@ -16,8 +16,8 @@ package ru
 
 import (
 	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/token/snowball"
 	"github.com/blevesearch/bleve/registry"
-	"github.com/sokolovstas/bleve/analysis/token/snowball"
 )
 
 const SnowballStemmerName = "stemmer_ru_snowball"
