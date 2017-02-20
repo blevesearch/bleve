@@ -105,8 +105,9 @@ type llSnapshot struct {
 	llStore  *llStore // Holds 1 refs on the llStore.
 	kvReader store.KVReader
 
-	m    sync.Mutex // Protects fields that follow.
-	refs int
+	m              sync.Mutex // Protects fields that follow.
+	refs           int
+	childSnapshots map[string]*llSnapshot
 }
 
 // llIterator represents a lower-level iterator, wrapping a bleve
@@ -314,6 +315,29 @@ func (llss *llSnapshot) decRef() {
 		}
 	}
 	llss.m.Unlock()
+}
+
+// ChildCollectionNames returns an array of child collection name strings.
+func (llss *llSnapshot) ChildCollectionNames() ([]string, error) {
+	var childCollections = make([]string, len(llss.childSnapshots))
+	idx := 0
+	for name, _ := range llss.childSnapshots {
+		childCollections[idx] = name
+		idx++
+	}
+	return childCollections, nil
+}
+
+// ChildCollectionSnapshot returns a Snapshot on a given child
+// collection by its name.
+func (llss *llSnapshot) ChildCollectionSnapshot(childCollectionName string) (
+	moss.Snapshot, error) {
+	childSnapshot, exists := llss.childSnapshots[childCollectionName]
+	if !exists {
+		return nil, nil
+	}
+	childSnapshot.addRef()
+	return childSnapshot, nil
 }
 
 func (llss *llSnapshot) Close() error {
