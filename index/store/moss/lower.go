@@ -102,12 +102,12 @@ type llStore struct {
 // llSnapshot represents a lower-level snapshot, wrapping a bleve
 // store.KVReader, and implements the moss.Snapshot interface.
 type llSnapshot struct {
-	llStore  *llStore // Holds 1 refs on the llStore.
-	kvReader store.KVReader
-
-	m              sync.Mutex // Protects fields that follow.
-	refs           int
+	llStore        *llStore // Holds 1 refs on the llStore.
+	kvReader       store.KVReader
 	childSnapshots map[string]*llSnapshot
+
+	m    sync.Mutex // Protects fields that follow.
+	refs int
 }
 
 // llIterator represents a lower-level iterator, wrapping a bleve
