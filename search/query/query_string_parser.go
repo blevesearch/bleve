@@ -31,6 +31,9 @@ var debugParser bool
 var debugLexer bool
 
 func parseQuerySyntax(query string) (rq Query, err error) {
+	if query == "" {
+		return NewMatchNoneQuery(), nil
+	}
 	lex := newLexerWrapper(newQueryStringLex(strings.NewReader(query)))
 	doParse(lex)
 
@@ -66,7 +69,7 @@ type lexerWrapper struct {
 func newLexerWrapper(lex yyLexer) *lexerWrapper {
 	return &lexerWrapper{
 		lex:   lex,
-		query: NewBooleanQuery(nil, nil, nil),
+		query: NewBooleanQueryForQueryString(nil, nil, nil),
 	}
 }
 

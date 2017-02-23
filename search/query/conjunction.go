@@ -24,8 +24,9 @@ import (
 )
 
 type ConjunctionQuery struct {
-	Conjuncts []Query `json:"conjuncts"`
-	BoostVal  *Boost  `json:"boost,omitempty"`
+	Conjuncts       []Query `json:"conjuncts"`
+	BoostVal        *Boost  `json:"boost,omitempty"`
+	queryStringMode bool
 }
 
 // NewConjunctionQuery creates a new compound Query.
@@ -52,10 +53,9 @@ func (q *ConjunctionQuery) AddQuery(aq ...Query) {
 }
 
 func (q *ConjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-	ss := make([]search.Searcher, len(q.Conjuncts))
-	for in, conjunct := range q.Conjuncts {
-		var err error
-		ss[in], err = conjunct.Searcher(i, m, options)
+	ss := make([]search.Searcher, 0, len(q.Conjuncts))
+	for _, conjunct := range q.Conjuncts {
+		sr, err := conjunct.Searcher(i, m, options)
 		if err != nil {
 			for _, searcher := range ss {
 				if searcher != nil {
@@ -64,6 +64,14 @@ func (q *ConjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 			}
 			return nil, err
 		}
+		if _, ok := sr.(*searcher.MatchNoneSearcher); ok && q.queryStringMode {
+			// in query string mode, skip match none
+			continue
+		}
+		ss = append(ss, sr)
+	}
+	if len(ss) < 1 {
+		return searcher.NewMatchNoneSearcher(i)
 	}
 	return searcher.NewConjunctionSearcher(i, ss, options)
 }
