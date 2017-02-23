@@ -39,7 +39,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "test",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewMatchQuery("test"),
@@ -49,7 +49,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `"test phrase 1"`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewMatchPhraseQuery("test phrase 1"),
@@ -59,7 +59,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "field:test",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -74,7 +74,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "field:t-est",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -89,7 +89,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "field:t+est",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -104,7 +104,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "field:t>est",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -119,7 +119,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "field:t<est",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -134,7 +134,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "field:t=est",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -148,7 +148,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "+field1:test1",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				[]Query{
 					func() Query {
 						q := NewMatchQuery("test1")
@@ -162,7 +162,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "-field2:test2",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				nil,
 				[]Query{
@@ -176,7 +176,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `field3:"test phrase 2"`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -190,7 +190,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `+field4:"test phrase 1"`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				[]Query{
 					func() Query {
 						q := NewMatchPhraseQuery("test phrase 1")
@@ -204,7 +204,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `-field5:"test phrase 2"`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				nil,
 				[]Query{
@@ -218,7 +218,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `+field6:test3 -field7:test4 field8:test5`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				[]Query{
 					func() Query {
 						q := NewMatchQuery("test3")
@@ -244,7 +244,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "test^3",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -258,7 +258,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "test^3 other^6",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -277,7 +277,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "33",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewMatchQuery("33"),
@@ -287,7 +287,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "field:33",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -301,7 +301,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "cat-dog",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewMatchQuery("cat-dog"),
@@ -311,7 +311,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "watex~",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -325,7 +325,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "watex~2",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -339,7 +339,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "watex~ 2",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -354,7 +354,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "field:watex~",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -369,7 +369,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   "field:watex~2",
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -384,7 +384,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `field:555c3bb06f7a127cda000005`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -398,7 +398,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `field:>5`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -412,7 +412,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `field:>=5`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -426,7 +426,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `field:<5`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -440,7 +440,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `field:<=5`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -454,7 +454,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `field:>"2006-01-02T15:04:05Z"`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -468,7 +468,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `field:>="2006-01-02T15:04:05Z"`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -482,7 +482,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `field:<"2006-01-02T15:04:05Z"`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -496,7 +496,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `field:<="2006-01-02T15:04:05Z"`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -510,7 +510,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `/mar.*ty/`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewRegexpQuery("mar.*ty"),
@@ -520,7 +520,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `name:/mar.*ty/`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -534,7 +534,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `mart*`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewWildcardQuery("mart*"),
@@ -544,7 +544,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `name:mart*`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -562,7 +562,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `name\:marty`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewMatchQuery("name:marty"),
@@ -573,7 +573,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `name:marty\:couchbase`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -588,7 +588,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `marty\ couchbase`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewMatchQuery("marty couchbase"),
@@ -599,7 +599,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `\+marty`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewMatchQuery("+marty"),
@@ -610,7 +610,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `\-marty`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewMatchQuery("-marty"),
@@ -621,7 +621,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `"what does \"quote\" mean"`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewMatchPhraseQuery(`what does "quote" mean`),
@@ -632,7 +632,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `can\ i\ escap\e`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewMatchQuery(`can i escap\e`),
@@ -643,7 +643,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `   what`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewMatchQuery(`what`),
@@ -654,7 +654,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `term^`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					func() Query {
@@ -670,7 +670,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `3.0\:`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewMatchQuery(`3.0:`),
@@ -680,7 +680,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		{
 			input:   `3.0\a`,
 			mapping: mapping.NewIndexMapping(),
-			result: NewBooleanQuery(
+			result: NewBooleanQueryForQueryString(
 				nil,
 				[]Query{
 					NewMatchQuery(`3.0\a`),
@@ -702,7 +702,6 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 		}
 		if !reflect.DeepEqual(q, test.result) {
 			t.Errorf("Expected %#v, got %#v: for %s", test.result, q, test.input)
-			t.Errorf("Expected %#v, got %#v: for %s", test.result.(*BooleanQuery).Should.(*DisjunctionQuery).Disjuncts[0], q.(*BooleanQuery).Should.(*DisjunctionQuery).Disjuncts[0], test.input)
 		}
 	}
 }
