@@ -127,7 +127,12 @@ tSTRING tCOLON tSTRING tTILDE {
 tNUMBER {
 	str := $1
 	logDebugGrammar("STRING - %s", str)
-	q := NewMatchQuery(str)
+	q1 := NewMatchQuery(str)
+	val, _ := strconv.ParseFloat($1, 64)
+	inclusive := true
+	q2 := NewNumericRangeInclusiveQuery(&val, &val, &inclusive, &inclusive)
+	q := NewDisjunctionQuery([]Query{q1,q2})
+	q.queryStringMode = true
 	$$ = q
 }
 |
@@ -158,8 +163,14 @@ tSTRING tCOLON tNUMBER {
 	field := $1
 	str := $3
 	logDebugGrammar("FIELD - %s STRING - %s", field, str)
-	q := NewMatchQuery(str)
-	q.SetField(field)
+	q1 := NewMatchQuery(str)
+	q1.SetField(field)
+	val, _ := strconv.ParseFloat($3, 64)
+	inclusive := true
+	q2 := NewNumericRangeInclusiveQuery(&val, &val, &inclusive, &inclusive)
+	q2.SetField(field)
+	q := NewDisjunctionQuery([]Query{q1,q2})
+	q.queryStringMode = true
 	$$ = q
 }
 |
