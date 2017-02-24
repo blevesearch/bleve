@@ -582,7 +582,10 @@ yydefault:
 			str := yyDollar[1].s
 			logDebugGrammar("STRING - %s", str)
 			q1 := NewMatchQuery(str)
-			val, _ := strconv.ParseFloat(yyDollar[1].s, 64)
+			val, err := strconv.ParseFloat(yyDollar[1].s, 64)
+			if err != nil {
+				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("error parsing number: %v", err))
+			}
 			inclusive := true
 			q2 := NewNumericRangeInclusiveQuery(&val, &val, &inclusive, &inclusive)
 			q := NewDisjunctionQuery([]Query{q1, q2})
@@ -591,7 +594,7 @@ yydefault:
 		}
 	case 12:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:139
+		//line query_string.y:142
 		{
 			phrase := yyDollar[1].s
 			logDebugGrammar("PHRASE - %s", phrase)
@@ -600,7 +603,7 @@ yydefault:
 		}
 	case 13:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:146
+		//line query_string.y:149
 		{
 			field := yyDollar[1].s
 			str := yyDollar[3].s
@@ -618,14 +621,17 @@ yydefault:
 		}
 	case 14:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:162
+		//line query_string.y:165
 		{
 			field := yyDollar[1].s
 			str := yyDollar[3].s
 			logDebugGrammar("FIELD - %s STRING - %s", field, str)
 			q1 := NewMatchQuery(str)
 			q1.SetField(field)
-			val, _ := strconv.ParseFloat(yyDollar[3].s, 64)
+			val, err := strconv.ParseFloat(yyDollar[3].s, 64)
+			if err != nil {
+				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("error parsing number: %v", err))
+			}
 			inclusive := true
 			q2 := NewNumericRangeInclusiveQuery(&val, &val, &inclusive, &inclusive)
 			q2.SetField(field)
@@ -635,7 +641,7 @@ yydefault:
 		}
 	case 15:
 		yyDollar = yyS[yypt-3 : yypt+1]
-		//line query_string.y:177
+		//line query_string.y:183
 		{
 			field := yyDollar[1].s
 			phrase := yyDollar[3].s
@@ -646,10 +652,13 @@ yydefault:
 		}
 	case 16:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:186
+		//line query_string.y:192
 		{
 			field := yyDollar[1].s
-			min, _ := strconv.ParseFloat(yyDollar[4].s, 64)
+			min, err := strconv.ParseFloat(yyDollar[4].s, 64)
+			if err != nil {
+				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("error parsing number: %v", err))
+			}
 			minInclusive := false
 			logDebugGrammar("FIELD - GREATER THAN %f", min)
 			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil)
@@ -658,10 +667,13 @@ yydefault:
 		}
 	case 17:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:196
+		//line query_string.y:205
 		{
 			field := yyDollar[1].s
-			min, _ := strconv.ParseFloat(yyDollar[5].s, 64)
+			min, err := strconv.ParseFloat(yyDollar[5].s, 64)
+			if err != nil {
+				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("error parsing number: %v", err))
+			}
 			minInclusive := true
 			logDebugGrammar("FIELD - GREATER THAN OR EQUAL %f", min)
 			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil)
@@ -670,10 +682,13 @@ yydefault:
 		}
 	case 18:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:206
+		//line query_string.y:218
 		{
 			field := yyDollar[1].s
-			max, _ := strconv.ParseFloat(yyDollar[4].s, 64)
+			max, err := strconv.ParseFloat(yyDollar[4].s, 64)
+			if err != nil {
+				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("error parsing number: %v", err))
+			}
 			maxInclusive := false
 			logDebugGrammar("FIELD - LESS THAN %f", max)
 			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive)
@@ -682,10 +697,13 @@ yydefault:
 		}
 	case 19:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:216
+		//line query_string.y:231
 		{
 			field := yyDollar[1].s
-			max, _ := strconv.ParseFloat(yyDollar[5].s, 64)
+			max, err := strconv.ParseFloat(yyDollar[5].s, 64)
+			if err != nil {
+				yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("error parsing number: %v", err))
+			}
 			maxInclusive := true
 			logDebugGrammar("FIELD - LESS THAN OR EQUAL %f", max)
 			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive)
@@ -694,7 +712,7 @@ yydefault:
 		}
 	case 20:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:226
+		//line query_string.y:244
 		{
 			field := yyDollar[1].s
 			minInclusive := false
@@ -711,7 +729,7 @@ yydefault:
 		}
 	case 21:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:241
+		//line query_string.y:259
 		{
 			field := yyDollar[1].s
 			minInclusive := true
@@ -728,7 +746,7 @@ yydefault:
 		}
 	case 22:
 		yyDollar = yyS[yypt-4 : yypt+1]
-		//line query_string.y:256
+		//line query_string.y:274
 		{
 			field := yyDollar[1].s
 			maxInclusive := false
@@ -745,7 +763,7 @@ yydefault:
 		}
 	case 23:
 		yyDollar = yyS[yypt-5 : yypt+1]
-		//line query_string.y:271
+		//line query_string.y:289
 		{
 			field := yyDollar[1].s
 			maxInclusive := true
@@ -762,13 +780,13 @@ yydefault:
 		}
 	case 24:
 		yyDollar = yyS[yypt-0 : yypt+1]
-		//line query_string.y:287
+		//line query_string.y:305
 		{
 			yyVAL.pf = nil
 		}
 	case 25:
 		yyDollar = yyS[yypt-1 : yypt+1]
-		//line query_string.y:291
+		//line query_string.y:309
 		{
 			yyVAL.pf = nil
 			boost, err := strconv.ParseFloat(yyDollar[1].s, 64)

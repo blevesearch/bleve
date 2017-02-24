@@ -128,7 +128,10 @@ tNUMBER {
 	str := $1
 	logDebugGrammar("STRING - %s", str)
 	q1 := NewMatchQuery(str)
-	val, _ := strconv.ParseFloat($1, 64)
+	val, err := strconv.ParseFloat($1, 64)
+	if err != nil {
+		yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("error parsing number: %v", err))
+	}
 	inclusive := true
 	q2 := NewNumericRangeInclusiveQuery(&val, &val, &inclusive, &inclusive)
 	q := NewDisjunctionQuery([]Query{q1,q2})
@@ -165,7 +168,10 @@ tSTRING tCOLON tNUMBER {
 	logDebugGrammar("FIELD - %s STRING - %s", field, str)
 	q1 := NewMatchQuery(str)
 	q1.SetField(field)
-	val, _ := strconv.ParseFloat($3, 64)
+	val, err := strconv.ParseFloat($3, 64)
+	if err != nil {
+		yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("error parsing number: %v", err))
+	}
 	inclusive := true
 	q2 := NewNumericRangeInclusiveQuery(&val, &val, &inclusive, &inclusive)
 	q2.SetField(field)
@@ -185,7 +191,10 @@ tSTRING tCOLON tPHRASE {
 |
 tSTRING tCOLON tGREATER tNUMBER {
 	field := $1
-	min, _ := strconv.ParseFloat($4, 64)
+	min, err := strconv.ParseFloat($4, 64)
+	if err != nil {
+		yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("error parsing number: %v", err))
+	}
 	minInclusive := false
 	logDebugGrammar("FIELD - GREATER THAN %f", min)
 	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil)
@@ -195,7 +204,10 @@ tSTRING tCOLON tGREATER tNUMBER {
 |
 tSTRING tCOLON tGREATER tEQUAL tNUMBER {
 	field := $1
-	min, _ := strconv.ParseFloat($5, 64)
+	min, err := strconv.ParseFloat($5, 64)
+	if err != nil {
+		yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("error parsing number: %v", err))
+	}
 	minInclusive := true
 	logDebugGrammar("FIELD - GREATER THAN OR EQUAL %f", min)
 	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil)
@@ -205,7 +217,10 @@ tSTRING tCOLON tGREATER tEQUAL tNUMBER {
 |
 tSTRING tCOLON tLESS tNUMBER {
 	field := $1
-	max, _ := strconv.ParseFloat($4, 64)
+	max, err := strconv.ParseFloat($4, 64)
+	if err != nil {
+		yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("error parsing number: %v", err))
+	}
 	maxInclusive := false
 	logDebugGrammar("FIELD - LESS THAN %f", max)
 	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive)
@@ -215,7 +230,10 @@ tSTRING tCOLON tLESS tNUMBER {
 |
 tSTRING tCOLON tLESS tEQUAL tNUMBER {
 	field := $1
-	max, _ := strconv.ParseFloat($5, 64)
+	max, err := strconv.ParseFloat($5, 64)
+	if err != nil {
+		yylex.(*lexerWrapper).lex.Error(fmt.Sprintf("error parsing number: %v", err))
+	}
 	maxInclusive := true
 	logDebugGrammar("FIELD - LESS THAN OR EQUAL %f", max)
 	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive)
