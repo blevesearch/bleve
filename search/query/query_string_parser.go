@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:generate go tool yacc -o query_string.y.go query_string.y
+// as of Go 1.8 this requires the goyacc external tool
+// available from golang.org/x/tools/cmd/goyacc
+
+//go:generate goyacc -o query_string.y.go query_string.y
 //go:generate sed -i.tmp -e 1d query_string.y.go
 //go:generate rm query_string.y.go.tmp
 
