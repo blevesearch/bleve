@@ -27,16 +27,16 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 
 	var err error
 	var charFilters []analysis.CharFilter
-	charFiltersNames, ok := config["char_filters"].([]string)
+	charFiltersValue, ok := config["char_filters"]
 	if ok {
-		charFilters, err = getCharFilters(charFiltersNames, cache)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		charFiltersNamesInterfaceSlice, ok := config["char_filters"].([]interface{})
-		if ok {
-			charFiltersNames, err := convertInterfaceSliceToStringSlice(charFiltersNamesInterfaceSlice, "char filter")
+		switch charFiltersValue := charFiltersValue.(type) {
+		case []string:
+			charFilters, err = getCharFilters(charFiltersValue, cache)
+			if err != nil {
+				return nil, err
+			}
+		case []interface{}:
+			charFiltersNames, err := convertInterfaceSliceToStringSlice(charFiltersValue, "char filter")
 			if err != nil {
 				return nil, err
 			}
@@ -44,11 +44,19 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 			if err != nil {
 				return nil, err
 			}
+		default:
+			return nil, fmt.Errorf("unsupported type for char_filters, must be slice")
 		}
 	}
 
-	tokenizerName, ok := config["tokenizer"].(string)
-	if !ok {
+	var tokenizerName string
+	tokenizerValue, ok := config["tokenizer"]
+	if ok {
+		tokenizerName, ok = tokenizerValue.(string)
+		if !ok {
+			return nil, fmt.Errorf("must specify tokenizer as string")
+		}
+	} else {
 		return nil, fmt.Errorf("must specify tokenizer")
 	}
 
@@ -58,16 +66,16 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	}
 
 	var tokenFilters []analysis.TokenFilter
-	tokenFiltersNames, ok := config["token_filters"].([]string)
+	tokenFiltersValue, ok := config["token_filters"]
 	if ok {
-		tokenFilters, err = getTokenFilters(tokenFiltersNames, cache)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		tokenFiltersNamesInterfaceSlice, ok := config["token_filters"].([]interface{})
-		if ok {
-			tokenFiltersNames, err := convertInterfaceSliceToStringSlice(tokenFiltersNamesInterfaceSlice, "token filter")
+		switch tokenFiltersValue := tokenFiltersValue.(type) {
+		case []string:
+			tokenFilters, err = getTokenFilters(tokenFiltersValue, cache)
+			if err != nil {
+				return nil, err
+			}
+		case []interface{}:
+			tokenFiltersNames, err := convertInterfaceSliceToStringSlice(tokenFiltersValue, "token filter")
 			if err != nil {
 				return nil, err
 			}
@@ -75,6 +83,8 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 			if err != nil {
 				return nil, err
 			}
+		default:
+			return nil, fmt.Errorf("unsupported type for token_filters, must be slice")
 		}
 	}
 
