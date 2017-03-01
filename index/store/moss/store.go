@@ -176,8 +176,7 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 
 func (s *Store) Close() error {
 	if v, ok := s.config["mossAbortCloseEnabled"]; ok && v.(bool) == true {
-		msw, ok := s.llstore.(*mossStoreWrapper)
-		if ok {
+		if msw, ok := s.llstore.(*mossStoreWrapper); ok {
 			if s := msw.Actual(); s != nil {
 				s.CloseEx(moss.StoreCloseExOptions{Abort: true})
 			}
