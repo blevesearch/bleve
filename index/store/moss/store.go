@@ -41,7 +41,8 @@ type Store struct {
 	llstore store.KVStore // May be nil.
 	llstats statsFunc     // May be nil.
 
-	s *stats
+	s      *stats
+	config map[string]interface{}
 }
 
 type statsFunc func() map[string]interface{}
@@ -167,12 +168,22 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 		mo:      mo,
 		llstore: llStore,
 		llstats: llStats,
+		config:  config,
 	}
 	rv.s = &stats{s: &rv}
 	return &rv, nil
 }
 
 func (s *Store) Close() error {
+	if v, ok := s.config["mossAbortCloseEnabled"]; ok && v.(bool) == true {
+		msw, ok := s.llstore.(*mossStoreWrapper)
+		if ok {
+			if s := msw.Actual(); s != nil {
+				s.CloseEx(moss.StoreCloseExOptions{Abort: true})
+			}
+		}
+	}
+
 	return s.ms.Close()
 }
 
