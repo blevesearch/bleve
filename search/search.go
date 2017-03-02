@@ -69,10 +69,6 @@ type DocumentMatch struct {
 	// fields as float64s and date fields as time.RFC3339 formatted strings.
 	Fields map[string]interface{} `json:"fields,omitempty"`
 
-	// as we learn field terms, we can cache important ones for later use
-	// for example, sorting and building facets need these values
-	CachedFieldTerms index.FieldTerms `json:"-"`
-
 	// if we load the document for this hit, remember it so we dont load again
 	Document *document.Document `json:"-"`
 

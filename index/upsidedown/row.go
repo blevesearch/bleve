@@ -881,3 +881,232 @@ func NewStoredRowKV(key, value []byte) (*StoredRow, error) {
 	rv.value = value[1:]
 	return rv, nil
 }
+
+type backIndexFieldTermVisitor func(field uint32, term []byte)
+
+// visitBackIndexRow is designed to process a protobuf encoded
+// value, without creating unnecessary garbage.  Instead values are passed
+// to a callback, inspected first, and only copied if necessary.
+// Due to the fact that this borrows from generated code, it must be marnually
+// updated if the protobuf definition changes.
+//
+// This code originates from:
+// func (m *BackIndexRowValue) Unmarshal(data []byte) error
+// the sections which create garbage or parse unintersting sections
+// have been commented out.  This was done by design to allow for easier
+// merging in the future if that original function is regenerated
+func visitBackIndexRow(data []byte, callback backIndexFieldTermVisitor) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TermsEntries", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			postIndex := iNdEx + msglen
+			if msglen < 0 {
+				return ErrInvalidLengthUpsidedown
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			// dont parse term entries
+			// m.TermsEntries = append(m.TermsEntries, &BackIndexTermsEntry{})
+			// if err := m.TermsEntries[len(m.TermsEntries)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			// 	return err
+			// }
+			// instead, inspect them
+			if err := visitBackIndexRowFieldTerms(data[iNdEx:postIndex], callback); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StoredEntries", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			postIndex := iNdEx + msglen
+			if msglen < 0 {
+				return ErrInvalidLengthUpsidedown
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			// don't parse stored entries
+			// m.StoredEntries = append(m.StoredEntries, &BackIndexStoreEntry{})
+			// if err := m.StoredEntries[len(m.StoredEntries)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+			// 	return err
+			// }
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipUpsidedown(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthUpsidedown
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			// don't track unrecognized data
+			//m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	return nil
+}
+
+// visitBackIndexRowFieldTerms is designed to process a protobuf encoded
+// sub-value within the BackIndexRowValue, without creating unnecessary garbage.
+// Instead values are passed to a callback, inspected first, and only copied if
+// necessary.  Due to the fact that this borrows from generated code, it must
+// be marnually updated if the protobuf definition changes.
+//
+// This code originates from:
+// func (m *BackIndexTermsEntry) Unmarshal(data []byte) error {
+// the sections which create garbage or parse uninteresting sections
+// have been commented out.  This was done by design to allow for easier
+// merging in the future if that original function is regenerated
+func visitBackIndexRowFieldTerms(data []byte, callback backIndexFieldTermVisitor) error {
+	var theField uint32
+
+	var hasFields [1]uint64
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Field", wireType)
+			}
+			var v uint32
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			// m.Field = &v
+			theField = v
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Terms", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			postIndex := iNdEx + int(stringLen)
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			//m.Terms = append(m.Terms, string(data[iNdEx:postIndex]))
+			callback(theField, data[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			var sizeOfWire int
+			for {
+				sizeOfWire++
+				wire >>= 7
+				if wire == 0 {
+					break
+				}
+			}
+			iNdEx -= sizeOfWire
+			skippy, err := skipUpsidedown(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthUpsidedown
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			//m.XXX_unrecognized = append(m.XXX_unrecognized, data[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	// if hasFields[0]&uint64(0x00000001) == 0 {
+	// 	return new(github_com_golang_protobuf_proto.RequiredNotSetError)
+	// }
+
+	return nil
+}
