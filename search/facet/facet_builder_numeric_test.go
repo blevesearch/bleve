@@ -18,7 +18,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/numeric"
 )
 
@@ -52,7 +51,9 @@ func numericFacetN(b *testing.B, numTerms int) {
 		nfb.AddRange("rangename"+strconv.Itoa(i), &min, &max)
 
 		for _, pv := range pcodedvalues {
-			nfb.Update(index.FieldTerms{field: []string{string(pv)}})
+			nfb.StartDoc()
+			nfb.UpdateVisitor(field, pv)
+			nfb.EndDoc()
 		}
 	}
 

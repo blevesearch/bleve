@@ -18,8 +18,6 @@ import (
 	"io/ioutil"
 	"regexp"
 	"testing"
-
-	"github.com/blevesearch/bleve/index"
 )
 
 var terms []string
@@ -61,7 +59,9 @@ func termsFacetN(b *testing.B, numTerms int) {
 	for len(tfb.termsCount) < numTerms && i <= termsLen {
 		j := i % termsLen
 		term := terms[j]
-		tfb.Update(index.FieldTerms{field: []string{term}})
+		tfb.StartDoc()
+		tfb.UpdateVisitor(field, []byte(term))
+		tfb.EndDoc()
 		i++
 	}
 

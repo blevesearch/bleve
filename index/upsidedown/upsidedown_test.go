@@ -1251,7 +1251,7 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 	}
 }
 
-func TestIndexDocumentFieldTerms(t *testing.T) {
+func TestIndexDocumentVisitFieldTerms(t *testing.T) {
 	defer func() {
 		err := DestroyTest()
 		if err != nil {
@@ -1294,7 +1294,11 @@ func TestIndexDocumentFieldTerms(t *testing.T) {
 		}
 	}()
 
-	fieldTerms, err := indexReader.DocumentFieldTerms(index.IndexInternalID("1"), []string{"name", "title"})
+	fieldTerms := make(index.FieldTerms)
+
+	err = indexReader.DocumentVisitFieldTerms(index.IndexInternalID("1"), []string{"name", "title"}, func(field string, term []byte) {
+		fieldTerms[field] = append(fieldTerms[field], string(term))
+	})
 	if err != nil {
 		t.Error(err)
 	}

@@ -27,6 +27,7 @@ var HighTerm = strings.Repeat(string([]byte{0xff}), 10)
 var LowTerm = string([]byte{0x00})
 
 type SearchSort interface {
+	UpdateVisitor(field string, term []byte)
 	Value(a *DocumentMatch) string
 	Descending() bool
 
@@ -171,6 +172,12 @@ func (so SortOrder) Value(doc *DocumentMatch) {
 	}
 }
 
+func (so SortOrder) UpdateVisitor(field string, term []byte) {
+	for _, soi := range so {
+		soi.UpdateVisitor(field, term)
+	}
+}
+
 // Compare will compare two document matches using the specified sort order
 // if both are numbers, we avoid converting back to term
 func (so SortOrder) Compare(cachedScoring, cachedDesc []bool, i, j *DocumentMatch) int {
@@ -300,13 +307,24 @@ type SortField struct {
 	Type    SortFieldType
 	Mode    SortFieldMode
 	Missing SortFieldMissing
+	values  []string
+}
+
+// UpdateVisitor notifies this sort field that in this document
+// this field has the specified term
+func (s *SortField) UpdateVisitor(field string, term []byte) {
+	if field == s.Field {
+		s.values = append(s.values, string(term))
+	}
 }
 
 // Value returns the sort value of the DocumentMatch
+// it also resets the state of this SortField for
+// processing the next document
 func (s *SortField) Value(i *DocumentMatch) string {
-	iTerms := i.CachedFieldTerms[s.Field]
-	iTerms = s.filterTermsByType(iTerms)
+	iTerms := s.filterTermsByType(s.values)
 	iTerm := s.filterTermsByMode(iTerms)
+	s.values = nil
 	return iTerm
 }
 
@@ -435,6 +453,12 @@ type SortDocID struct {
 	Desc bool
 }
 
+// UpdateVisitor is a no-op for SortDocID as it's value
+// is not dependent on any field terms
+func (s *SortDocID) UpdateVisitor(field string, term []byte) {
+
+}
+
 // Value returns the sort value of the DocumentMatch
 func (s *SortDocID) Value(i *DocumentMatch) string {
 	return i.ID
@@ -464,6 +488,12 @@ func (s *SortDocID) MarshalJSON() ([]byte, error) {
 // SortScore will sort results by the document match score
 type SortScore struct {
 	Desc bool
+}
+
+// UpdateVisitor is a no-op for SortScore as it's value
+// is not dependent on any field terms
+func (s *SortScore) UpdateVisitor(field string, term []byte) {
+
 }
 
 // Value returns the sort value of the DocumentMatch

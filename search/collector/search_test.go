@@ -104,8 +104,8 @@ func (sr *stubReader) Document(id string) (*document.Document, error) {
 	return nil, nil
 }
 
-func (sr *stubReader) DocumentFieldTerms(id index.IndexInternalID, fields []string) (index.FieldTerms, error) {
-	return nil, nil
+func (sr *stubReader) DocumentVisitFieldTerms(id index.IndexInternalID, fields []string, visitor index.DocumentFieldTermVisitor) error {
+	return nil
 }
 
 func (sr *stubReader) Fields() ([]string, error) {

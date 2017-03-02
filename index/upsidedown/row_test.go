@@ -361,3 +361,22 @@ func BenchmarkStoredRowDecode(b *testing.B) {
 		}
 	}
 }
+
+func TestVisitBackIndexRow(t *testing.T) {
+	expected := map[uint32][]byte{
+		0: []byte("beer"),
+		1: []byte("beat"),
+	}
+	val := []byte{10, 8, 8, 0, 18, 4, 'b', 'e', 'e', 'r', 10, 8, 8, 1, 18, 4, 'b', 'e', 'a', 't', 18, 2, 8, 3, 18, 2, 8, 4, 18, 2, 8, 5}
+	err := visitBackIndexRow(val, func(field uint32, term []byte) {
+		if reflect.DeepEqual(expected[field], term) {
+			delete(expected, field)
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(expected) > 0 {
+		t.Errorf("expected visitor to see these but did not %v", expected)
+	}
+}
