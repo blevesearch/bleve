@@ -138,11 +138,14 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 var sortByScoreOpt = []string{"_score"}
 
 func (hc *TopNCollector) collectSingle(ctx *search.SearchContext, reader index.IndexReader, d *search.DocumentMatch) error {
+	var err error
 
 	// visit field terms for features that require it (sort, facets)
-	err := hc.visitFieldTerms(reader, d)
-	if err != nil {
-		return err
+	if len(hc.neededFields) > 0 {
+		err = hc.visitFieldTerms(reader, d)
+		if err != nil {
+			return err
+		}
 	}
 
 	// increment total hits
