@@ -178,7 +178,7 @@ func (s *Store) Close() error {
 	if v, ok := s.config["mossAbortCloseEnabled"]; ok && v.(bool) == true {
 		if msw, ok := s.llstore.(*mossStoreWrapper); ok {
 			if s := msw.Actual(); s != nil {
-				s.CloseEx(moss.StoreCloseExOptions{Abort: true})
+				_ = s.CloseEx(moss.StoreCloseExOptions{Abort: true})
 			}
 		}
 	}
