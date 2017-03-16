@@ -480,6 +480,18 @@ func BenchmarkTop100of10000Scores(b *testing.B) {
 	}, b)
 }
 
+func BenchmarkTop1000of10000Scores(b *testing.B) {
+	benchHelper(10000, func() search.Collector {
+		return NewTopNCollector(1000, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
+func BenchmarkTop10000of100000Scores(b *testing.B) {
+	benchHelper(100000, func() search.Collector {
+		return NewTopNCollector(10000, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
 func BenchmarkTop10of100000Scores(b *testing.B) {
 	benchHelper(100000, func() search.Collector {
 		return NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
@@ -489,5 +501,17 @@ func BenchmarkTop10of100000Scores(b *testing.B) {
 func BenchmarkTop100of100000Scores(b *testing.B) {
 	benchHelper(100000, func() search.Collector {
 		return NewTopNCollector(100, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
+func BenchmarkTop1000of100000Scores(b *testing.B) {
+	benchHelper(100000, func() search.Collector {
+		return NewTopNCollector(1000, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
+func BenchmarkTop10000of1000000Scores(b *testing.B) {
+	benchHelper(1000000, func() search.Collector {
+		return NewTopNCollector(10000, 0, search.SortOrder{&search.SortScore{Desc: true}})
 	}, b)
 }
