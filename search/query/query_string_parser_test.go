@@ -27,6 +27,7 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 	thirtyThreePointOh := 33.0
 	twoPointOh := 2.0
 	fivePointOh := 5.0
+	minusFivePointOh := -5.0
 	theTruth := true
 	theFalsehood := false
 	theDate, err := time.Parse(time.RFC3339, "2006-01-02T15:04:05Z")
@@ -475,6 +476,89 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				[]Query{
 					func() Query {
 						q := NewNumericRangeInclusiveQuery(nil, &fivePointOh, nil, &theTruth)
+						q.SetField("field")
+						return q
+					}(),
+				},
+				nil),
+		},
+		// new range tests with negative number
+		{
+			input:   "field:-5",
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					func() Query {
+						qo := NewDisjunctionQuery(
+							[]Query{
+								func() Query {
+									q := NewMatchQuery("-5")
+									q.SetField("field")
+									return q
+								}(),
+								func() Query {
+									q := NewNumericRangeInclusiveQuery(&minusFivePointOh, &minusFivePointOh, &theTruth, &theTruth)
+									q.SetField("field")
+									return q
+								}(),
+							})
+						qo.queryStringMode = true
+						return qo
+					}(),
+				},
+				nil),
+		},
+		{
+			input:   `field:>-5`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					func() Query {
+						q := NewNumericRangeInclusiveQuery(&minusFivePointOh, nil, &theFalsehood, nil)
+						q.SetField("field")
+						return q
+					}(),
+				},
+				nil),
+		},
+		{
+			input:   `field:>=-5`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					func() Query {
+						q := NewNumericRangeInclusiveQuery(&minusFivePointOh, nil, &theTruth, nil)
+						q.SetField("field")
+						return q
+					}(),
+				},
+				nil),
+		},
+		{
+			input:   `field:<-5`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					func() Query {
+						q := NewNumericRangeInclusiveQuery(nil, &minusFivePointOh, nil, &theFalsehood)
+						q.SetField("field")
+						return q
+					}(),
+				},
+				nil),
+		},
+		{
+			input:   `field:<=-5`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					func() Query {
+						q := NewNumericRangeInclusiveQuery(nil, &minusFivePointOh, nil, &theTruth)
 						q.SetField("field")
 						return q
 					}(),

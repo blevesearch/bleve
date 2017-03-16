@@ -27,6 +27,7 @@ tEQUAL tTILDE
 %type <s>                tSTRING
 %type <s>                tPHRASE
 %type <s>                tNUMBER
+%type <s>                posOrNegNumber
 %type <s>                tTILDE
 %type <s>                tBOOST
 %type <q>                searchBase
@@ -162,7 +163,7 @@ tSTRING tCOLON tSTRING {
 	$$ = q
 }
 |
-tSTRING tCOLON tNUMBER {
+tSTRING tCOLON posOrNegNumber {
 	field := $1
 	str := $3
 	logDebugGrammar("FIELD - %s STRING - %s", field, str)
@@ -189,7 +190,7 @@ tSTRING tCOLON tPHRASE {
 	$$ = q
 }
 |
-tSTRING tCOLON tGREATER tNUMBER {
+tSTRING tCOLON tGREATER posOrNegNumber {
 	field := $1
 	min, err := strconv.ParseFloat($4, 64)
 	if err != nil {
@@ -202,7 +203,7 @@ tSTRING tCOLON tGREATER tNUMBER {
 	$$ = q
 }
 |
-tSTRING tCOLON tGREATER tEQUAL tNUMBER {
+tSTRING tCOLON tGREATER tEQUAL posOrNegNumber {
 	field := $1
 	min, err := strconv.ParseFloat($5, 64)
 	if err != nil {
@@ -215,7 +216,7 @@ tSTRING tCOLON tGREATER tEQUAL tNUMBER {
 	$$ = q
 }
 |
-tSTRING tCOLON tLESS tNUMBER {
+tSTRING tCOLON tLESS posOrNegNumber {
 	field := $1
 	max, err := strconv.ParseFloat($4, 64)
 	if err != nil {
@@ -228,7 +229,7 @@ tSTRING tCOLON tLESS tNUMBER {
 	$$ = q
 }
 |
-tSTRING tCOLON tLESS tEQUAL tNUMBER {
+tSTRING tCOLON tLESS tEQUAL posOrNegNumber {
 	field := $1
 	max, err := strconv.ParseFloat($5, 64)
 	if err != nil {
@@ -315,4 +316,13 @@ tBOOST {
 		$$ = &boost
 	}
 	logDebugGrammar("BOOST %f", boost)
+};
+
+posOrNegNumber:
+tNUMBER {
+	$$ = $1
+}
+|
+tMINUS tNUMBER {
+	$$ = "-" + $2
 };
