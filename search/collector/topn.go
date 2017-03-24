@@ -41,7 +41,7 @@ type TopNCollector struct {
 	results       search.DocumentMatchCollection
 	facetsBuilder *search.FacetsBuilder
 
-	store *collectStoreSlice
+	store *collectStoreHeap
 
 	needDocIds    bool
 	neededFields  []string
@@ -68,7 +68,7 @@ func NewTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector 
 		backingSize = PreAllocSizeSkipCap + 1
 	}
 
-	hc.store = newStoreSlice(backingSize, func(i, j *search.DocumentMatch) int {
+	hc.store = newStoreHeap(backingSize, func(i, j *search.DocumentMatch) int {
 		return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
 	})
 
