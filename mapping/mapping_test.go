@@ -23,6 +23,7 @@ import (
 	"github.com/blevesearch/bleve/analysis/tokenizer/exception"
 	"github.com/blevesearch/bleve/analysis/tokenizer/regexp"
 	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/numeric"
 )
 
 var mappingSource = []byte(`{
@@ -843,5 +844,59 @@ func TestMappingPrimitives(t *testing.T) {
 		if len(doc.Fields) != 1 {
 			t.Errorf("expected 1 field, got %d for %v", len(doc.Fields), test.data)
 		}
+	}
+}
+
+func TestMappingForGeo(t *testing.T) {
+
+	type Location struct {
+		Lat float64
+		Lon float64
+	}
+
+	nameFieldMapping := NewTextFieldMapping()
+	nameFieldMapping.Name = "name"
+	nameFieldMapping.Analyzer = "standard"
+
+	locFieldMapping := NewGeoPointFieldMapping()
+
+	thingMapping := NewDocumentMapping()
+	thingMapping.AddFieldMappingsAt("name", nameFieldMapping)
+	thingMapping.AddFieldMappingsAt("location", locFieldMapping)
+
+	mapping := NewIndexMapping()
+	mapping.DefaultMapping = thingMapping
+
+	x := struct {
+		Name     string    `json:"name"`
+		Location *Location `json:"location"`
+	}{
+		Name: "marty",
+		Location: &Location{
+			Lon: -180,
+			Lat: -90,
+		},
+	}
+
+	doc := document.NewDocument("1")
+	err := mapping.MapDocument(doc, x)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var foundGeo bool
+	for _, f := range doc.Fields {
+		if f.Name() == "location" {
+			foundGeo = true
+			got := f.Value()
+			expect := []byte(numeric.MustNewPrefixCodedInt64(0, 0))
+			if !reflect.DeepEqual(got, expect) {
+				t.Errorf("expected geo value: %v, got %v", expect, got)
+			}
+		}
+	}
+
+	if !foundGeo {
+		t.Errorf("expected to find geo point, did not")
 	}
 }

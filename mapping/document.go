@@ -75,7 +75,7 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 			}
 		}
 		switch field.Type {
-		case "text", "datetime", "number", "boolean":
+		case "text", "datetime", "number", "boolean", "geopoint":
 		default:
 			return fmt.Errorf("unknown field type: '%s'", field.Type)
 		}
@@ -482,8 +482,24 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				fieldMapping.processTime(property, pathString, path, indexes, context)
 			}
 		default:
+			if subDocMapping != nil {
+				for _, fieldMapping := range subDocMapping.Fields {
+					if fieldMapping.Type == "geopoint" {
+						fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
+					}
+				}
+			}
 			dm.walkDocument(property, path, indexes, context)
 		}
+	case reflect.Map:
+		if subDocMapping != nil {
+			for _, fieldMapping := range subDocMapping.Fields {
+				if fieldMapping.Type == "geopoint" {
+					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
+				}
+			}
+		}
+		dm.walkDocument(property, path, indexes, context)
 	default:
 		dm.walkDocument(property, path, indexes, context)
 	}

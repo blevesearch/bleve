@@ -17,9 +17,11 @@ package search
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
+	"github.com/blevesearch/bleve/geo"
 	"github.com/blevesearch/bleve/numeric"
 )
 
@@ -50,6 +52,21 @@ func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 	case "score":
 		return &SortScore{
 			Desc: descending,
+		}, nil
+	case "geo_distance":
+		field, ok := input["field"].(string)
+		if !ok {
+			return nil, fmt.Errorf("search sort mode geo_distance must specify field")
+		}
+		lon, lat, foundLocation := geo.ExtractGeoPoint(input["location"])
+		if !foundLocation {
+			return nil, fmt.Errorf("unable to parse geo_distance location")
+		}
+		return &SortGeoDistance{
+			Field: field,
+			Desc:  descending,
+			lon:   lon,
+			lat:   lat,
 		}, nil
 	case "field":
 		field, ok := input["field"].(string)
@@ -386,7 +403,7 @@ func (s *SortField) filterTermsByType(terms []string) []string {
 		for _, term := range terms {
 			valid, shift := numeric.ValidPrefixCodedTerm(term)
 			if valid && shift == 0 {
-				termsWithShiftZero = append(termsWithShiftZero)
+				termsWithShiftZero = append(termsWithShiftZero, term)
 			}
 		}
 		terms = termsWithShiftZero
@@ -520,4 +537,100 @@ func (s *SortScore) MarshalJSON() ([]byte, error) {
 		return json.Marshal("-_score")
 	}
 	return json.Marshal("_score")
+}
+
+var maxDistance = string(numeric.MustNewPrefixCodedInt64(math.MaxInt64, 0))
+
+// SortGeoDistance will sort results by the distance of an
+// indexed geo point, from the provided location.
+//   Field is the name of the field
+//   Descending reverse the sort order (default false)
+type SortGeoDistance struct {
+	Field  string
+	Desc   bool
+	values []string
+	lon    float64
+	lat    float64
+}
+
+// UpdateVisitor notifies this sort field that in this document
+// this field has the specified term
+func (s *SortGeoDistance) UpdateVisitor(field string, term []byte) {
+	if field == s.Field {
+		s.values = append(s.values, string(term))
+	}
+}
+
+// Value returns the sort value of the DocumentMatch
+// it also resets the state of this SortField for
+// processing the next document
+func (s *SortGeoDistance) Value(i *DocumentMatch) string {
+	iTerms := s.filterTermsByType(s.values)
+	iTerm := s.filterTermsByMode(iTerms)
+	s.values = nil
+
+	if iTerm == "" {
+		return maxDistance
+	}
+
+	i64, err := numeric.PrefixCoded(iTerm).Int64()
+	if err != nil {
+		return maxDistance
+	}
+	docLon := geo.MortonUnhashLon(uint64(i64))
+	docLat := geo.MortonUnhashLat(uint64(i64))
+
+	dist := geo.Haversin(s.lon, s.lat, docLon, docLat)
+	return string(numeric.MustNewPrefixCodedInt64(int64(dist), 0))
+}
+
+// Descending determines the order of the sort
+func (s *SortGeoDistance) Descending() bool {
+	return s.Desc
+}
+
+func (s *SortGeoDistance) filterTermsByMode(terms []string) string {
+	if len(terms) >= 1 {
+		return terms[0]
+	}
+
+	return ""
+}
+
+// filterTermsByType attempts to make one pass on the terms
+// return only valid prefix coded numbers with shift of 0
+func (s *SortGeoDistance) filterTermsByType(terms []string) []string {
+	var termsWithShiftZero []string
+	for _, term := range terms {
+		valid, shift := numeric.ValidPrefixCodedTerm(term)
+		if valid && shift == 0 {
+			termsWithShiftZero = append(termsWithShiftZero, term)
+		}
+	}
+	return termsWithShiftZero
+}
+
+// RequiresDocID says this SearchSort does not require the DocID be loaded
+func (s *SortGeoDistance) RequiresDocID() bool { return false }
+
+// RequiresScoring says this SearchStore does not require scoring
+func (s *SortGeoDistance) RequiresScoring() bool { return false }
+
+// RequiresFields says this SearchStore requires the specified stored field
+func (s *SortGeoDistance) RequiresFields() []string { return []string{s.Field} }
+
+func (s *SortGeoDistance) MarshalJSON() ([]byte, error) {
+	sfm := map[string]interface{}{
+		"by":    "geo_distance",
+		"field": s.Field,
+		"location": map[string]interface{}{
+			"lon": s.lon,
+			"lat": s.lat,
+		},
+	}
+	if s.Desc {
+		sfm["desc"] = true
+	}
+
+	return json.Marshal(sfm)
 }

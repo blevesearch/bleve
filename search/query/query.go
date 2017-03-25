@@ -244,6 +244,25 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
+	_, hasTopLeft := tmp["top_left"]
+	_, hasBottomRight := tmp["bottom_right"]
+	if hasTopLeft && hasBottomRight {
+		var rv GeoBoundingBoxQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	_, hasDistance := tmp["distance"]
+	if hasDistance {
+		var rv GeoDistanceQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
 	return nil, fmt.Errorf("unknown query type")
 }
 
