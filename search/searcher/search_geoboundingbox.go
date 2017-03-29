@@ -15,8 +15,6 @@
 package searcher
 
 import (
-	"bytes"
-
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/geo"
 	"github.com/blevesearch/bleve/index"
@@ -38,7 +36,7 @@ type GeoBoundingBoxSearcher struct {
 	searcher *DisjunctionSearcher
 }
 
-func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat, maxLon, maxLat float64, field string, boost float64, options search.SearcherOptions) (*GeoBoundingBoxSearcher, error) {
+func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat, maxLon, maxLat float64, field string, boost float64, options search.SearcherOptions, checkBoundaries bool) (*GeoBoundingBoxSearcher, error) {
 	var openedSearchers []search.Searcher
 	cleanupOpenedSearchers := func() {
 		for _, s := range openedSearchers {
@@ -64,42 +62,46 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat, ma
 			cleanupOpenedSearchers()
 			return nil, err
 		}
-		if r.boundary {
+		if r.boundary && checkBoundaries {
 			termsOnBoundary = append(termsOnBoundary, ts)
 		} else {
 			termsNotOnBoundary = append(termsNotOnBoundary, ts)
 		}
 		openedSearchers = append(openedSearchers)
 	}
-	onBoundarySearcher, err := NewDisjunctionSearcher(indexReader, termsOnBoundary, 0, options)
-	if err != nil {
-		cleanupOpenedSearchers()
-		return nil, err
-	}
-	filterOnBoundarySearcher := NewFilteringSearcher(onBoundarySearcher, func(d *search.DocumentMatch) bool {
-		var lon, lat float64
-		var found bool
-		err = indexReader.DocumentVisitFieldTerms(d.IndexInternalID, []string{field}, func(field string, term []byte) {
-			// only consider the values which are shifted 0
-			prefixCoded := numeric.PrefixCoded(term)
-			var shift uint
-			shift, err = prefixCoded.Shift()
-			if err == nil && shift == 0 {
-				var i64 int64
-				i64, err = prefixCoded.Int64()
-				if err == nil {
-					lon = geo.MortonUnhashLon(uint64(i64))
-					lat = geo.MortonUnhashLat(uint64(i64))
-					found = true
-				}
-			}
-		})
-		if err == nil && found {
-			return geo.BoundingBoxContains(lon, lat, minLon, minLat, maxLon, maxLat)
+
+	var filterOnBoundarySearcher search.Searcher
+	if len(termsOnBoundary) > 0 {
+		onBoundarySearcher, err := NewDisjunctionSearcher(indexReader, termsOnBoundary, 0, options)
+		if err != nil {
+			cleanupOpenedSearchers()
+			return nil, err
 		}
-		return false
-	})
-	openedSearchers = append(openedSearchers, filterOnBoundarySearcher)
+		filterOnBoundarySearcher = NewFilteringSearcher(onBoundarySearcher, func(d *search.DocumentMatch) bool {
+			var lon, lat float64
+			var found bool
+			err = indexReader.DocumentVisitFieldTerms(d.IndexInternalID, []string{field}, func(field string, term []byte) {
+				// only consider the values which are shifted 0
+				prefixCoded := numeric.PrefixCoded(term)
+				var shift uint
+				shift, err = prefixCoded.Shift()
+				if err == nil && shift == 0 {
+					var i64 int64
+					i64, err = prefixCoded.Int64()
+					if err == nil {
+						lon = geo.MortonUnhashLon(uint64(i64))
+						lat = geo.MortonUnhashLat(uint64(i64))
+						found = true
+					}
+				}
+			})
+			if err == nil && found {
+				return geo.BoundingBoxContains(lon, lat, minLon, minLat, maxLon, maxLat)
+			}
+			return false
+		})
+		openedSearchers = append(openedSearchers, filterOnBoundarySearcher)
+	}
 	notOnBoundarySearcher, err := NewDisjunctionSearcher(indexReader, termsNotOnBoundary, 0, options)
 	if err != nil {
 		cleanupOpenedSearchers()
@@ -107,6 +109,11 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat, ma
 	}
 	openedSearchers = append(openedSearchers, notOnBoundarySearcher)
 
+	// if there is no filterOnBoundary searcher, just return the notOnBoundarySearcher
+	if filterOnBoundarySearcher == nil {
+		rv.searcher = notOnBoundarySearcher
+		return rv, nil
+	}
 	rv.searcher, err = NewDisjunctionSearcher(indexReader, []search.Searcher{filterOnBoundarySearcher, notOnBoundarySearcher}, 0, options)
 	if err != nil {
 		cleanupOpenedSearchers()
@@ -191,8 +198,4 @@ func newGeoRange(lower uint64, res uint, level uint, boundary bool) *geoRange {
 		boundary: boundary,
 		cell:     numeric.MustNewPrefixCodedInt64(int64(lower), res),
 	}
-}
-
-func (r *geoRange) Compare(other *geoRange) int {
-	return bytes.Compare(r.cell, other.cell)
 }

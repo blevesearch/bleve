@@ -72,11 +72,11 @@ func (q *GeoBoundingBoxQuery) Searcher(i index.IndexReader, m mapping.IndexMappi
 	if q.BottomRight.Lon < q.TopLeft.Lon {
 		// cross date line, rewrite as two parts
 
-		leftSearcher, err := searcher.NewGeoBoundingBoxSearcher(i, -180, q.BottomRight.Lat, q.BottomRight.Lon, q.TopLeft.Lat, field, q.BoostVal.Value(), options)
+		leftSearcher, err := searcher.NewGeoBoundingBoxSearcher(i, -180, q.BottomRight.Lat, q.BottomRight.Lon, q.TopLeft.Lat, field, q.BoostVal.Value(), options, true)
 		if err != nil {
 			return nil, err
 		}
-		rightSearcher, err := searcher.NewGeoBoundingBoxSearcher(i, q.TopLeft.Lon, q.BottomRight.Lat, 180, q.TopLeft.Lat, field, q.BoostVal.Value(), options)
+		rightSearcher, err := searcher.NewGeoBoundingBoxSearcher(i, q.TopLeft.Lon, q.BottomRight.Lat, 180, q.TopLeft.Lat, field, q.BoostVal.Value(), options, true)
 		if err != nil {
 			_ = leftSearcher.Close()
 			return nil, err
@@ -85,7 +85,7 @@ func (q *GeoBoundingBoxQuery) Searcher(i index.IndexReader, m mapping.IndexMappi
 		return searcher.NewDisjunctionSearcher(i, []search.Searcher{leftSearcher, rightSearcher}, 0, options)
 	}
 
-	return searcher.NewGeoBoundingBoxSearcher(i, q.TopLeft.Lon, q.BottomRight.Lat, q.BottomRight.Lon, q.TopLeft.Lat, field, q.BoostVal.Value(), options)
+	return searcher.NewGeoBoundingBoxSearcher(i, q.TopLeft.Lon, q.BottomRight.Lat, q.BottomRight.Lon, q.TopLeft.Lat, field, q.BoostVal.Value(), options, true)
 }
 
 func (q *GeoBoundingBoxQuery) Validate() error {

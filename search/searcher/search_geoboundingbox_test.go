@@ -1,7 +1,21 @@
+//  Copyright (c) 2017 Couchbase, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 		http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package searcher
 
 import (
-	"log"
+	"reflect"
 	"testing"
 
 	"github.com/blevesearch/bleve/document"
@@ -12,7 +26,22 @@ import (
 )
 
 func TestGeoBoundingBox(t *testing.T) {
-	i := setup(t)
+
+	tests := []struct {
+		minLon float64
+		minLat float64
+		maxLon float64
+		maxLat float64
+		field  string
+		want   []string
+	}{
+		{10.001, 10.001, 20.002, 20.002, "loc", nil},
+		{0.001, 0.001, 0.002, 0.002, "loc", []string{"a"}},
+		{0.001, 0.001, 1.002, 1.002, "loc", []string{"a", "b"}},
+		{0.001, 0.001, 9.002, 9.002, "loc", []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}},
+	}
+
+	i := setupGeo(t)
 	indexReader, err := i.Reader()
 	if err != nil {
 		t.Error(err)
@@ -24,28 +53,39 @@ func TestGeoBoundingBox(t *testing.T) {
 		}
 	}()
 
-	gbs, err := NewGeoBoundingBoxSearcher(indexReader, 0.001, 0.001, 0.002, 0.002, "loc", 1.0, search.SearcherOptions{})
+	for _, test := range tests {
+		got, err := testGeoBoundingBoxSearch(indexReader, test.minLon, test.minLat, test.maxLon, test.maxLat, test.field)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("expected %v, got %v for %f %f %f %f %s", test.want, got, test.minLon, test.minLat, test.maxLon, test.maxLat, test.field)
+		}
+
+	}
+}
+
+func testGeoBoundingBoxSearch(i index.IndexReader, minLon, minLat, maxLon, maxLat float64, field string) ([]string, error) {
+	var rv []string
+	gbs, err := NewGeoBoundingBoxSearcher(i, minLon, minLat, maxLon, maxLat, field, 1.0, search.SearcherOptions{}, true)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	ctx := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(gbs.DocumentMatchPoolSize(), 0),
 	}
 	docMatch, err := gbs.Next(ctx)
 	for docMatch != nil && err == nil {
-		if docMatch == nil {
-			log.Printf("nil docmatch")
-		} else {
-			log.Printf("got doc match: %s", docMatch.IndexInternalID)
-		}
+		rv = append(rv, string(docMatch.IndexInternalID))
 		docMatch, err = gbs.Next(ctx)
 	}
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
+	return rv, nil
 }
 
-func setup(t *testing.T) index.Index {
+func setupGeo(t *testing.T) index.Index {
 
 	analysisQueue := index.NewAnalysisQueue(1)
 	i, err := upsidedown.NewUpsideDownCouch(
