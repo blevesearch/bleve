@@ -1,3 +1,17 @@
+//  Copyright (c) 2017 Couchbase, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 		http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package geo
 
 import (
@@ -6,9 +20,41 @@ import (
 )
 
 // ExtractGeoPoint takes an arbitrary interface{} and tries it's best to
-// interpret it is as geo point
+// interpret it is as geo point.  Supportd formats:
+// Container:
+// slice length 2 (GeoJSON)
+//  first element lon, second element lat
+// map[string]interface{}
+//  exact keys lat and lon or lng
+// struct
+//  w/exported fields case-insensitive match on lat and lon or lng
+// struct
+//  satisfying Later and Loner or Lnger interfaces
+//
+// in all cases values must be some sort of numeric-like thing: int/uint/float
 func ExtractGeoPoint(thing interface{}) (lon, lat float64, success bool) {
 	var foundLon, foundLat bool
+
+	thingVal := reflect.ValueOf(thing)
+	thingTyp := thingVal.Type()
+
+	// is it a slice
+	if thingVal.IsValid() && thingVal.Kind() == reflect.Slice {
+		// must be length 2
+		if thingVal.Len() == 2 {
+			first := thingVal.Index(0)
+			if first.CanInterface() {
+				firstVal := first.Interface()
+				lon, foundLon = extractNumericVal(firstVal)
+			}
+			second := thingVal.Index(1)
+			if second.CanInterface() {
+				secondVal := second.Interface()
+				lat, foundLat = extractNumericVal(secondVal)
+			}
+		}
+	}
+
 	// is it a map
 	if l, ok := thing.(map[string]interface{}); ok {
 		if lval, ok := l["lon"]; ok {
@@ -23,8 +69,6 @@ func ExtractGeoPoint(thing interface{}) (lon, lat float64, success bool) {
 	}
 
 	// now try reflection on struct fields
-	thingVal := reflect.ValueOf(thing)
-	thingTyp := thingVal.Type()
 	if thingVal.IsValid() && thingVal.Kind() == reflect.Struct {
 		for i := 0; i < thingVal.NumField(); i++ {
 			field := thingTyp.Field(i)
@@ -70,12 +114,17 @@ func ExtractGeoPoint(thing interface{}) (lon, lat float64, success bool) {
 
 // extract numeric value (if possible) and returna s float64
 func extractNumericVal(v interface{}) (float64, bool) {
-	switch v := v.(type) {
-	case float64:
-		return v, true
-	case float32:
-		return float64(v), true
+	val := reflect.ValueOf(v)
+	typ := val.Type()
+	switch typ.Kind() {
+	case reflect.Float32, reflect.Float64:
+		return val.Float(), true
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(val.Int()), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(val.Uint()), true
 	}
+
 	return 0, false
 }
 

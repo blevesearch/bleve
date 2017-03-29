@@ -39,6 +39,12 @@ type GeoBoundingBoxSearcher struct {
 }
 
 func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat, maxLon, maxLat float64, field string, boost float64, options search.SearcherOptions) (*GeoBoundingBoxSearcher, error) {
+	var openedSearchers []search.Searcher
+	cleanupOpenedSearchers := func() {
+		for _, s := range openedSearchers {
+			_ = s.Close()
+		}
+	}
 	rv := &GeoBoundingBoxSearcher{
 		indexReader: indexReader,
 		minLon:      minLon,
@@ -55,12 +61,7 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat, ma
 	for _, r := range rv.rangeBounds {
 		ts, err := NewTermSearcher(indexReader, string(r.cell), field, 1.0, options)
 		if err != nil {
-			for _, s := range termsOnBoundary {
-				_ = s.Close()
-			}
-			for _, s := range termsNotOnBoundary {
-				_ = s.Close()
-			}
+			cleanupOpenedSearchers()
 			return nil, err
 		}
 		if r.boundary {
@@ -68,15 +69,11 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat, ma
 		} else {
 			termsNotOnBoundary = append(termsNotOnBoundary, ts)
 		}
+		openedSearchers = append(openedSearchers)
 	}
 	onBoundarySearcher, err := NewDisjunctionSearcher(indexReader, termsOnBoundary, 0, options)
 	if err != nil {
-		for _, s := range termsOnBoundary {
-			_ = s.Close()
-		}
-		for _, s := range termsNotOnBoundary {
-			_ = s.Close()
-		}
+		cleanupOpenedSearchers()
 		return nil, err
 	}
 	filterOnBoundarySearcher := NewFilteringSearcher(onBoundarySearcher, func(d *search.DocumentMatch) bool {
@@ -102,28 +99,17 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat, ma
 		}
 		return false
 	})
+	openedSearchers = append(openedSearchers, filterOnBoundarySearcher)
 	notOnBoundarySearcher, err := NewDisjunctionSearcher(indexReader, termsNotOnBoundary, 0, options)
 	if err != nil {
-		for _, s := range termsOnBoundary {
-			_ = s.Close()
-		}
-		for _, s := range termsNotOnBoundary {
-			_ = s.Close()
-		}
-		_ = filterOnBoundarySearcher.Close()
+		cleanupOpenedSearchers()
 		return nil, err
 	}
+	openedSearchers = append(openedSearchers, notOnBoundarySearcher)
 
 	rv.searcher, err = NewDisjunctionSearcher(indexReader, []search.Searcher{filterOnBoundarySearcher, notOnBoundarySearcher}, 0, options)
 	if err != nil {
-		for _, s := range termsOnBoundary {
-			_ = s.Close()
-		}
-		for _, s := range termsNotOnBoundary {
-			_ = s.Close()
-		}
-		_ = filterOnBoundarySearcher.Close()
-		_ = notOnBoundarySearcher.Close()
+		cleanupOpenedSearchers()
 		return nil, err
 	}
 	return rv, nil
@@ -185,24 +171,12 @@ func (s *GeoBoundingBoxSearcher) relateAndRecurse(start, end uint64, res uint) {
 
 	level := ((geo.GeoBits << 1) - res) >> 1
 
-	within := res%document.GeoPrecisionStep == 0 && s.cellWithin(minLon, minLat, maxLon, maxLat)
-	if within || (level == geoDetailLevel && s.cellIntersectShape(minLon, minLat, maxLon, maxLat)) {
+	within := res%document.GeoPrecisionStep == 0 && geo.RectWithin(minLon, minLat, maxLon, maxLat, s.minLon, s.minLat, s.maxLon, s.maxLat)
+	if within || (level == geoDetailLevel && geo.RectIntersects(minLon, minLat, maxLon, maxLat, s.minLon, s.minLat, s.maxLon, s.maxLat)) {
 		s.rangeBounds = append(s.rangeBounds, newGeoRange(start, res, level, !within))
-	} else if level < geoDetailLevel && s.cellIntersectsMBR(minLon, minLat, maxLon, maxLat) {
+	} else if level < geoDetailLevel && geo.RectIntersects(minLon, minLat, maxLon, maxLat, s.minLon, s.minLat, s.maxLon, s.maxLat) {
 		s.computeRange(start, res-1)
 	}
-}
-
-func (s *GeoBoundingBoxSearcher) cellWithin(minLon, minLat, maxLon, maxLat float64) bool {
-	return geo.RectWithin(minLon, minLat, maxLon, maxLat, s.minLon, s.minLat, s.maxLon, s.maxLat)
-}
-
-func (s *GeoBoundingBoxSearcher) cellIntersectShape(minLon, minLat, maxLon, maxLat float64) bool {
-	return s.cellIntersectsMBR(minLon, minLat, maxLon, maxLat)
-}
-
-func (s *GeoBoundingBoxSearcher) cellIntersectsMBR(minLon, minLat, maxLon, maxLat float64) bool {
-	return geo.RectIntersects(minLon, minLat, maxLon, maxLat, s.minLon, s.minLat, s.maxLon, s.maxLat)
 }
 
 type geoRange struct {
