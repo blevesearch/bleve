@@ -20,7 +20,7 @@ import (
 )
 
 // ExtractGeoPoint takes an arbitrary interface{} and tries it's best to
-// interpret it is as geo point.  Supportd formats:
+// interpret it is as geo point.  Supported formats:
 // Container:
 // slice length 2 (GeoJSON)
 //  first element lon, second element lat
