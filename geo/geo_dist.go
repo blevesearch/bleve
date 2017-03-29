@@ -15,6 +15,7 @@
 package geo
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -67,9 +68,23 @@ func ParseDistance(d string) (float64, error) {
 	return parsedNum, nil
 }
 
+// ParseDistanceUnit attempts to parse a distance unit and return the
+// multiplier for converting this to meters.  If the unit cannot be parsed
+// then 0 and the error message is returned.
+func ParseDistanceUnit(u string) (float64, error) {
+	for _, unit := range distanceUnits {
+		for _, unitSuffix := range unit.suffixes {
+			if u == unitSuffix {
+				return unit.conv, nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("unknown distance unit: %s", u)
+}
+
 // Haversin computes the distance between two points.
 // This implemenation uses the sloppy math implemenations which trade off
-// accuracy for performance.
+// accuracy for performance.  The distance returned is in kilometers.
 func Haversin(lon1, lat1, lon2, lat2 float64) float64 {
 	x1 := lat1 * degreesToRadian
 	x2 := lat2 * degreesToRadian

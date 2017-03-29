@@ -15,6 +15,7 @@
 package geo
 
 import (
+	"fmt"
 	"math"
 	"reflect"
 	"strconv"
@@ -37,6 +38,30 @@ func TestParseDistance(t *testing.T) {
 
 	for _, test := range tests {
 		got, err := ParseDistance(test.dist)
+		if !reflect.DeepEqual(err, test.wantErr) {
+			t.Errorf("expected err: %v, got %v for %s", test.wantErr, err, test.dist)
+		}
+		if got != test.want {
+			t.Errorf("expected distance %f got %f for %s", test.want, got, test.dist)
+		}
+	}
+}
+
+func TestParseDistanceUnit(t *testing.T) {
+	tests := []struct {
+		dist    string
+		want    float64
+		wantErr error
+	}{
+		{"mi", 1609.344, nil},
+		{"m", 1, nil},
+		{"km", 1000, nil},
+		{"", 0, fmt.Errorf("unknown distance unit: ")},
+		{"kam", 0, fmt.Errorf("unknown distance unit: kam")},
+	}
+
+	for _, test := range tests {
+		got, err := ParseDistanceUnit(test.dist)
 		if !reflect.DeepEqual(err, test.wantErr) {
 			t.Errorf("expected err: %v, got %v for %s", test.wantErr, err, test.dist)
 		}

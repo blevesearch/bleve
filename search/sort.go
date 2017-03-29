@@ -62,12 +62,22 @@ func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 		if !foundLocation {
 			return nil, fmt.Errorf("unable to parse geo_distance location")
 		}
-		return &SortGeoDistance{
-			Field: field,
-			Desc:  descending,
-			lon:   lon,
-			lat:   lat,
-		}, nil
+		rvd := &SortGeoDistance{
+			Field:    field,
+			Desc:     descending,
+			lon:      lon,
+			lat:      lat,
+			unitMult: 1.0,
+		}
+		if distUnit, ok := input["unit"].(string); ok {
+			var err error
+			rvd.unitMult, err = geo.ParseDistanceUnit(distUnit)
+			if err != nil {
+				return nil, err
+			}
+			rvd.Unit = distUnit
+		}
+		return rvd, nil
 	case "field":
 		field, ok := input["field"].(string)
 		if !ok {
@@ -546,11 +556,13 @@ var maxDistance = string(numeric.MustNewPrefixCodedInt64(math.MaxInt64, 0))
 //   Field is the name of the field
 //   Descending reverse the sort order (default false)
 type SortGeoDistance struct {
-	Field  string
-	Desc   bool
-	values []string
-	lon    float64
-	lat    float64
+	Field    string
+	Desc     bool
+	Unit     string
+	values   []string
+	lon      float64
+	lat      float64
+	unitMult float64
 }
 
 // UpdateVisitor notifies this sort field that in this document
@@ -581,7 +593,13 @@ func (s *SortGeoDistance) Value(i *DocumentMatch) string {
 	docLat := geo.MortonUnhashLat(uint64(i64))
 
 	dist := geo.Haversin(s.lon, s.lat, docLon, docLat)
-	return string(numeric.MustNewPrefixCodedInt64(int64(dist), 0))
+	// dist is returned in km, so convert to m
+	dist *= 1000
+	if s.unitMult != 0 {
+		dist /= s.unitMult
+	}
+	distInt64 := numeric.Float64ToInt64(dist)
+	return string(numeric.MustNewPrefixCodedInt64(distInt64, 0))
 }
 
 // Descending determines the order of the sort
@@ -627,6 +645,9 @@ func (s *SortGeoDistance) MarshalJSON() ([]byte, error) {
 			"lon": s.lon,
 			"lat": s.lat,
 		},
+	}
+	if s.Unit != "" {
+		sfm["unit"] = s.Unit
 	}
 	if s.Desc {
 		sfm["desc"] = true

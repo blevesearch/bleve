@@ -137,7 +137,7 @@ func init() {
 }
 
 // earthDiameter returns an estimation of the earth's diameter at the specified
-// latitude
+// latitude in kilometers
 func earthDiameter(lat float64) float64 {
 	index := math.Mod(math.Abs(lat)*radiusIndexer+0.5, float64(len(earthDiameterPerLatitude)))
 	if math.IsNaN(index) {
