@@ -184,3 +184,18 @@ func NewTermQuery(term string) *query.TermQuery {
 func NewWildcardQuery(wildcard string) *query.WildcardQuery {
 	return query.NewWildcardQuery(wildcard)
 }
+
+// NewGeoBoundingBoxQuery creates a new Query for performing geo bounding
+// box searches. The arguments describe the position of the box and documents
+// which have an indexed geo point inside the box will be returned.
+func NewGeoBoundingBoxQuery(topLeftLon, topLeftLat, bottomRightLon, bottomRightLat float64) *query.GeoBoundingBoxQuery {
+	return query.NewGeoBoundingBoxQuery(topLeftLon, topLeftLat, bottomRightLon, bottomRightLat)
+}
+
+// NewGeoDistanceQuery creates a new Query for performing geo bounding
+// box searches. The arguments describe a position and a distance. Docuements
+// which have an indexed geo point which is less than or equal to the provided
+// distance will be returned.
+func NewGeoDistanceQuery(lon, lat float64, distance string) *query.GeoDistanceQuery {
+	return query.NewGeoDistanceQuery(lon, lat, distance)
+}
