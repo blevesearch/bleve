@@ -15,34 +15,27 @@
 package query
 
 import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/blevesearch/bleve/geo"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/searcher"
 )
 
-type GeoPoint struct {
-	Lon float64 `json:"lon,omitempty"`
-	Lat float64 `json:"lat,omitempty"`
-}
-
 type GeoBoundingBoxQuery struct {
-	TopLeft     *GeoPoint `json:"top_left,omitempty"`
-	BottomRight *GeoPoint `json:"bottom_right,omitempty"`
+	TopLeft     []float64 `json:"top_left,omitempty"`
+	BottomRight []float64 `json:"bottom_right,omitempty"`
 	FieldVal    string    `json:"field,omitempty"`
 	BoostVal    *Boost    `json:"boost,omitempty"`
 }
 
 func NewGeoBoundingBoxQuery(topLeftLon, topLeftLat, bottomRightLon, bottomRightLat float64) *GeoBoundingBoxQuery {
 	return &GeoBoundingBoxQuery{
-		TopLeft: &GeoPoint{
-			Lon: topLeftLon,
-			Lat: topLeftLat,
-		},
-		BottomRight: &GeoPoint{
-			Lon: bottomRightLon,
-			Lat: bottomRightLat,
-		},
+		TopLeft:     []float64{topLeftLon, topLeftLat},
+		BottomRight: []float64{bottomRightLon, bottomRightLat},
 	}
 }
 
@@ -69,14 +62,14 @@ func (q *GeoBoundingBoxQuery) Searcher(i index.IndexReader, m mapping.IndexMappi
 		field = m.DefaultSearchField()
 	}
 
-	if q.BottomRight.Lon < q.TopLeft.Lon {
+	if q.BottomRight[0] < q.TopLeft[0] {
 		// cross date line, rewrite as two parts
 
-		leftSearcher, err := searcher.NewGeoBoundingBoxSearcher(i, -180, q.BottomRight.Lat, q.BottomRight.Lon, q.TopLeft.Lat, field, q.BoostVal.Value(), options, true)
+		leftSearcher, err := searcher.NewGeoBoundingBoxSearcher(i, -180, q.BottomRight[1], q.BottomRight[0], q.TopLeft[1], field, q.BoostVal.Value(), options, true)
 		if err != nil {
 			return nil, err
 		}
-		rightSearcher, err := searcher.NewGeoBoundingBoxSearcher(i, q.TopLeft.Lon, q.BottomRight.Lat, 180, q.TopLeft.Lat, field, q.BoostVal.Value(), options, true)
+		rightSearcher, err := searcher.NewGeoBoundingBoxSearcher(i, q.TopLeft[0], q.BottomRight[1], 180, q.TopLeft[1], field, q.BoostVal.Value(), options, true)
 		if err != nil {
 			_ = leftSearcher.Close()
 			return nil, err
@@ -85,9 +78,36 @@ func (q *GeoBoundingBoxQuery) Searcher(i index.IndexReader, m mapping.IndexMappi
 		return searcher.NewDisjunctionSearcher(i, []search.Searcher{leftSearcher, rightSearcher}, 0, options)
 	}
 
-	return searcher.NewGeoBoundingBoxSearcher(i, q.TopLeft.Lon, q.BottomRight.Lat, q.BottomRight.Lon, q.TopLeft.Lat, field, q.BoostVal.Value(), options, true)
+	return searcher.NewGeoBoundingBoxSearcher(i, q.TopLeft[0], q.BottomRight[1], q.BottomRight[0], q.TopLeft[1], field, q.BoostVal.Value(), options, true)
 }
 
 func (q *GeoBoundingBoxQuery) Validate() error {
+	return nil
+}
+
+func (q *GeoBoundingBoxQuery) UnmarshalJSON(data []byte) error {
+	tmp := struct {
+		TopLeft     interface{} `json:"top_left,omitempty"`
+		BottomRight interface{} `json:"bottom_right,omitempty"`
+		FieldVal    string      `json:"field,omitempty"`
+		BoostVal    *Boost      `json:"boost,omitempty"`
+	}{}
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
+	}
+	// now use our generic point parsing code from the geo package
+	lon, lat, found := geo.ExtractGeoPoint(tmp.TopLeft)
+	if !found {
+		return fmt.Errorf("geo location top_left not in a valid format")
+	}
+	q.TopLeft = []float64{lon, lat}
+	lon, lat, found = geo.ExtractGeoPoint(tmp.BottomRight)
+	if !found {
+		return fmt.Errorf("geo location top_left not in a valid format")
+	}
+	q.BottomRight = []float64{lon, lat}
+	q.FieldVal = tmp.FieldVal
+	q.BoostVal = tmp.BoostVal
 	return nil
 }

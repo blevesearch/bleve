@@ -15,6 +15,9 @@
 package query
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/blevesearch/bleve/geo"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/mapping"
@@ -23,7 +26,7 @@ import (
 )
 
 type GeoDistanceQuery struct {
-	Location *GeoPoint `json:"location,omitempty"`
+	Location []float64 `json:"location,omitempty"`
 	Distance string    `json:"distance,omitempty"`
 	FieldVal string    `json:"field,omitempty"`
 	BoostVal *Boost    `json:"boost,omitempty"`
@@ -31,10 +34,7 @@ type GeoDistanceQuery struct {
 
 func NewGeoDistanceQuery(lon, lat float64, distance string) *GeoDistanceQuery {
 	return &GeoDistanceQuery{
-		Location: &GeoPoint{
-			Lon: lon,
-			Lat: lat,
-		},
+		Location: []float64{lon, lat},
 		Distance: distance,
 	}
 }
@@ -67,9 +67,32 @@ func (q *GeoDistanceQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 		return nil, err
 	}
 
-	return searcher.NewGeoPointDistanceSearcher(i, q.Location.Lon, q.Location.Lat, dist, field, q.BoostVal.Value(), options)
+	return searcher.NewGeoPointDistanceSearcher(i, q.Location[0], q.Location[1], dist, field, q.BoostVal.Value(), options)
 }
 
 func (q *GeoDistanceQuery) Validate() error {
+	return nil
+}
+
+func (q *GeoDistanceQuery) UnmarshalJSON(data []byte) error {
+	tmp := struct {
+		Location interface{} `json:"location,omitempty"`
+		Distance string      `json:"distance,omitempty"`
+		FieldVal string      `json:"field,omitempty"`
+		BoostVal *Boost      `json:"boost,omitempty"`
+	}{}
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
+	}
+	// now use our generic point parsing code from the geo package
+	lon, lat, found := geo.ExtractGeoPoint(tmp.Location)
+	if !found {
+		return fmt.Errorf("geo location not in a valid format")
+	}
+	q.Location = []float64{lon, lat}
+	q.Distance = tmp.Distance
+	q.FieldVal = tmp.FieldVal
+	q.BoostVal = tmp.BoostVal
 	return nil
 }

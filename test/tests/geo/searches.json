@@ -157,5 +157,68 @@
         }
       ]
     }
+  },
+  {
+    "comment": "breweries near the couchbase office, using GeoJSON style points",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "location": [-122.107799,37.399285],
+        "distance": "100mi",
+        "field": "geo"
+      },
+      "sort": [
+        {
+          "by": "geo_distance",
+          "field": "geo",
+          "unit": "mi",
+          "location": [-122.107799,37.399285]
+        }
+      ]
+    },
+    "result": {
+      "total_hits": 3,
+      "hits": [
+        {
+          "id": "firehouse_grill_brewery"
+        },
+        {
+          "id": "jack_s_brewing"
+        },
+        {
+          "id": "brewpub_on_the_green"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "bounding box around DC area, using GeoJSON style",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "top_left": [-78,39.5],
+        "bottom_right": [-76,38.5],
+        "field": "geo"
+      },
+      "sort": [
+        "name"
+      ]
+    },
+    "result": {
+      "total_hits": 3,
+      "hits": [
+        {
+          "id": "capital_city_brewing_company"
+        },
+        {
+          "id": "hook_ladder_brewing_company"
+        },
+        {
+          "id": "sweet_water_tavern_and_brewery"
+        }
+      ]
+    }
   }
 ]
