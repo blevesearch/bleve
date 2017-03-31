@@ -464,6 +464,14 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 									if err == nil {
 										value = boolean
 									}
+								case *document.GeoPointField:
+									lon, err := docF.Lon()
+									if err == nil {
+										lat, err := docF.Lat()
+										if err == nil {
+											value = []float64{lon, lat}
+										}
+									}
 								}
 								if value != nil {
 									hit.AddFieldValue(docF.Name(), value)

@@ -604,6 +604,8 @@ func encodeFieldType(f document.Field) byte {
 		fieldType = 'd'
 	case *document.BooleanField:
 		fieldType = 'b'
+	case *document.GeoPointField:
+		fieldType = 'g'
 	case *document.CompositeField:
 		fieldType = 'c'
 	}
@@ -735,6 +737,8 @@ func decodeFieldType(typ byte, name string, pos []uint64, value []byte) document
 		return document.NewDateTimeFieldFromBytes(name, pos, value)
 	case 'b':
 		return document.NewBooleanFieldFromBytes(name, pos, value)
+	case 'g':
+		return document.NewGeoPointFieldFromBytes(name, pos, value)
 	}
 	return nil
 }
