@@ -49,17 +49,12 @@ func (c *collectStoreHeap) Final(skip int, fixup collectorFixup) (search.Documen
 		return make(search.DocumentMatchCollection, 0), nil
 	}
 	rv := make(search.DocumentMatchCollection, size)
-	for count > 0 {
-		count--
-
-		if count >= skip {
-			size--
-			doc := heap.Pop(c).(*search.DocumentMatch)
-			rv[size] = doc
-			err := fixup(doc)
-			if err != nil {
-				return nil, err
-			}
+	for i := size - 1; i >= 0; i-- {
+		doc := heap.Pop(c).(*search.DocumentMatch)
+		rv[i] = doc
+		err := fixup(doc)
+		if err != nil {
+			return nil, err
 		}
 	}
 	return rv, nil
