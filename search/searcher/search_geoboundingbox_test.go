@@ -39,6 +39,10 @@ func TestGeoBoundingBox(t *testing.T) {
 		{0.001, 0.001, 0.002, 0.002, "loc", []string{"a"}},
 		{0.001, 0.001, 1.002, 1.002, "loc", []string{"a", "b"}},
 		{0.001, 0.001, 9.002, 9.002, "loc", []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}},
+		// same upper-left, bottom-right point
+		{25, 25, 25, 25, "loc", nil},
+		// box that would return points, but points reversed
+		{0.002, 0.002, 0.001, 0.001, "loc", nil},
 	}
 
 	i := setupGeo(t)

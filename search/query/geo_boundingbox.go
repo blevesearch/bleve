@@ -104,7 +104,7 @@ func (q *GeoBoundingBoxQuery) UnmarshalJSON(data []byte) error {
 	q.TopLeft = []float64{lon, lat}
 	lon, lat, found = geo.ExtractGeoPoint(tmp.BottomRight)
 	if !found {
-		return fmt.Errorf("geo location top_left not in a valid format")
+		return fmt.Errorf("geo location bottom_right not in a valid format")
 	}
 	q.BottomRight = []float64{lon, lat}
 	q.FieldVal = tmp.FieldVal
