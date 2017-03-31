@@ -56,7 +56,8 @@ func (q *GeoDistanceQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *GeoDistanceQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *GeoDistanceQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
+	options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -67,7 +68,8 @@ func (q *GeoDistanceQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 		return nil, err
 	}
 
-	return searcher.NewGeoPointDistanceSearcher(i, q.Location[0], q.Location[1], dist, field, q.BoostVal.Value(), options)
+	return searcher.NewGeoPointDistanceSearcher(i, q.Location[0], q.Location[1],
+		dist, field, q.BoostVal.Value(), options)
 }
 
 func (q *GeoDistanceQuery) Validate() error {

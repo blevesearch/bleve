@@ -193,9 +193,9 @@ func NewGeoBoundingBoxQuery(topLeftLon, topLeftLat, bottomRightLon, bottomRightL
 }
 
 // NewGeoDistanceQuery creates a new Query for performing geo bounding
-// box searches. The arguments describe a position and a distance. Docuements
+// box searches. The arguments describe a position and a distance. Documents
 // which have an indexed geo point which is less than or equal to the provided
-// distance will be returned.
+// distance from the given position will be returned.
 func NewGeoDistanceQuery(lon, lat float64, distance string) *query.GeoDistanceQuery {
 	return query.NewGeoDistanceQuery(lon, lat, distance)
 }
