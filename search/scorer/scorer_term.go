@@ -23,7 +23,7 @@ import (
 )
 
 type TermQueryScorer struct {
-	queryTerm              string
+	queryTerm              []byte
 	queryField             string
 	queryBoost             float64
 	docTerm                uint64
@@ -36,7 +36,7 @@ type TermQueryScorer struct {
 	queryWeightExplanation *search.Explanation
 }
 
-func NewTermQueryScorer(queryTerm string, queryField string, queryBoost float64, docTotal, docTerm uint64, options search.SearcherOptions) *TermQueryScorer {
+func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64, docTotal, docTerm uint64, options search.SearcherOptions) *TermQueryScorer {
 	rv := TermQueryScorer{
 		queryTerm:   queryTerm,
 		queryField:  queryField,
@@ -174,7 +174,7 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 				positionsUsed += len(v.ArrayPositions)
 			}
 
-			tlm[s.queryTerm] = append(tlm[s.queryTerm], loc)
+			tlm[string(s.queryTerm)] = append(tlm[string(s.queryTerm)], loc)
 		}
 	}
 

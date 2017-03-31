@@ -26,7 +26,9 @@ import (
 // matching the entire term.  The provided regexp SHOULD NOT start with ^
 // or end with $ as this can intefere with the implementation.  Separately,
 // matches will be checked to ensure they match the entire term.
-func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp, field string, boost float64, options search.SearcherOptions) (search.Searcher, error) {
+func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp,
+	field string, boost float64, options search.SearcherOptions) (
+	search.Searcher, error) {
 
 	prefixTerm, complete := pattern.LiteralPrefix()
 	var candidateTerms []string
@@ -35,39 +37,19 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp, fi
 		candidateTerms = []string{prefixTerm}
 	} else {
 		var err error
-		candidateTerms, err = findRegexpCandidateTerms(indexReader, pattern, field, prefixTerm)
+		candidateTerms, err = findRegexpCandidateTerms(indexReader, pattern, field,
+			prefixTerm)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	// enumerate all the terms in the range
-	qsearchers := make([]search.Searcher, 0, len(candidateTerms))
-	qsearchersClose := func() {
-		for _, searcher := range qsearchers {
-			_ = searcher.Close()
-		}
-	}
-	for _, cterm := range candidateTerms {
-		qsearcher, err := NewTermSearcher(indexReader, cterm, field, boost, options)
-		if err != nil {
-			qsearchersClose()
-			return nil, err
-		}
-		qsearchers = append(qsearchers, qsearcher)
-	}
-
-	// build disjunction searcher of these ranges
-	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, options)
-	if err != nil {
-		qsearchersClose()
-		return nil, err
-	}
-
-	return searcher, err
+	return NewMultiTermSearcher(indexReader, candidateTerms, field, boost,
+		options)
 }
 
-func findRegexpCandidateTerms(indexReader index.IndexReader, pattern *regexp.Regexp, field, prefixTerm string) (rv []string, err error) {
+func findRegexpCandidateTerms(indexReader index.IndexReader,
+	pattern *regexp.Regexp, field, prefixTerm string) (rv []string, err error) {
 	rv = make([]string, 0)
 	var fieldDict index.FieldDict
 	if len(prefixTerm) > 0 {

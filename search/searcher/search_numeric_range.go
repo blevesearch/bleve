@@ -23,16 +23,9 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type NumericRangeSearcher struct {
-	indexReader index.IndexReader
-	min         *float64
-	max         *float64
-	field       string
-	options     search.SearcherOptions
-	searcher    *DisjunctionSearcher
-}
-
-func NewNumericRangeSearcher(indexReader index.IndexReader, min *float64, max *float64, inclusiveMin, inclusiveMax *bool, field string, boost float64, options search.SearcherOptions) (*NumericRangeSearcher, error) {
+func NewNumericRangeSearcher(indexReader index.IndexReader,
+	min *float64, max *float64, inclusiveMin, inclusiveMax *bool, field string,
+	boost float64, options search.SearcherOptions) (search.Searcher, error) {
 	// account for unbounded edges
 	if min == nil {
 		negInf := math.Inf(-1)
@@ -65,61 +58,8 @@ func NewNumericRangeSearcher(indexReader index.IndexReader, min *float64, max *f
 	if tooManyClauses(len(terms)) {
 		return nil, tooManyClausesErr()
 	}
-	// enumerate all the terms in the range
-	qsearchers := make([]search.Searcher, len(terms))
-	qsearchersClose := func() {
-		for _, searcher := range qsearchers {
-			if searcher != nil {
-				_ = searcher.Close()
-			}
-		}
-	}
-	for i, term := range terms {
-		var err error
-		qsearchers[i], err = NewTermSearcher(indexReader, string(term), field, boost, options)
-		if err != nil {
-			qsearchersClose()
-			return nil, err
-		}
-	}
-	// build disjunction searcher of these ranges
-	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, options)
-	if err != nil {
-		qsearchersClose()
-		return nil, err
-	}
-	return &NumericRangeSearcher{
-		indexReader: indexReader,
-		min:         min,
-		max:         max,
-		field:       field,
-		options:     options,
-		searcher:    searcher,
-	}, nil
-}
 
-func (s *NumericRangeSearcher) Count() uint64 {
-	return s.searcher.Count()
-}
-
-func (s *NumericRangeSearcher) Weight() float64 {
-	return s.searcher.Weight()
-}
-
-func (s *NumericRangeSearcher) SetQueryNorm(qnorm float64) {
-	s.searcher.SetQueryNorm(qnorm)
-}
-
-func (s *NumericRangeSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
-	return s.searcher.Next(ctx)
-}
-
-func (s *NumericRangeSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
-	return s.searcher.Advance(ctx, ID)
-}
-
-func (s *NumericRangeSearcher) Close() error {
-	return s.searcher.Close()
+	return NewMultiTermSearcherBytes(indexReader, terms, field, boost, options)
 }
 
 type termRange struct {
@@ -190,7 +130,8 @@ func splitInt64Range(minBound, maxBound int64, precisionStep uint) termRanges {
 		lowerWrapped := nextMinBound < minBound
 		upperWrapped := nextMaxBound > maxBound
 
-		if shift+precisionStep >= 64 || nextMinBound > nextMaxBound || lowerWrapped || upperWrapped {
+		if shift+precisionStep >= 64 || nextMinBound > nextMaxBound ||
+			lowerWrapped || upperWrapped {
 			// We are in the lowest precision or the next precision is not available.
 			rv = append(rv, newRange(minBound, maxBound, shift))
 			// exit the split recursion loop
@@ -224,12 +165,4 @@ func newRangeBytes(minBytes, maxBytes []byte) *termRange {
 		startTerm: minBytes,
 		endTerm:   maxBytes,
 	}
-}
-
-func (s *NumericRangeSearcher) Min() int {
-	return 0
-}
-
-func (s *NumericRangeSearcher) DocumentMatchPoolSize() int {
-	return s.searcher.DocumentMatchPoolSize()
 }

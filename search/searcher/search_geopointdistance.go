@@ -21,36 +21,34 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
-type GeoPointDistanceSearcher struct {
-	indexReader index.IndexReader
-	field       string
-
-	centerLon float64
-	centerLat float64
-	dist      float64
-
-	options search.SearcherOptions
-
-	searcher *FilteringSearcher
-}
-
 func NewGeoPointDistanceSearcher(indexReader index.IndexReader, centerLon,
 	centerLat, dist float64, field string, boost float64,
-	options search.SearcherOptions) (*GeoPointDistanceSearcher, error) {
-	rv := &GeoPointDistanceSearcher{
-		indexReader: indexReader,
-		centerLon:   centerLon,
-		centerLat:   centerLat,
-		dist:        dist,
-		field:       field,
-		options:     options,
-	}
+	options search.SearcherOptions) (search.Searcher, error) {
 
 	// compute bounding box containing the circle
 	topLeftLon, topLeftLat, bottomRightLon, bottomRightLat :=
 		geo.ComputeBoundingBox(centerLon, centerLat, dist)
 
-	var boxSearcher search.Searcher
+		// build a searcher for the box
+	boxSearcher, err := boxSearcher(indexReader,
+		topLeftLon, topLeftLat, bottomRightLon, bottomRightLat,
+		field, boost, options)
+	if err != nil {
+		return nil, err
+	}
+
+	// wrap it in a filtering searcher which checks the actual distance
+	return NewFilteringSearcher(boxSearcher,
+		buildDistFilter(indexReader, field, centerLon, centerLat, dist)), nil
+}
+
+// boxSearcher builds a searcher for the described bounding box
+// if the desired box crosses the dateline, it is automatically split into
+// two boxes joined through a disjunction searcher
+func boxSearcher(indexReader index.IndexReader,
+	topLeftLon, topLeftLat, bottomRightLon, bottomRightLat float64,
+	field string, boost float64, options search.SearcherOptions) (
+	search.Searcher, error) {
 	if bottomRightLon < topLeftLon {
 		// cross date line, rewrite as two parts
 
@@ -67,86 +65,51 @@ func NewGeoPointDistanceSearcher(indexReader index.IndexReader, centerLon,
 			return nil, err
 		}
 
-		boxSearcher, err = NewDisjunctionSearcher(indexReader,
+		boxSearcher, err := NewDisjunctionSearcher(indexReader,
 			[]search.Searcher{leftSearcher, rightSearcher}, 0, options)
 		if err != nil {
 			_ = leftSearcher.Close()
 			_ = rightSearcher.Close()
 			return nil, err
 		}
-	} else {
-
-		// build geoboundinggox searcher for that bounding box
-		var err error
-		boxSearcher, err = NewGeoBoundingBoxSearcher(indexReader,
-			topLeftLon, bottomRightLat, bottomRightLon, topLeftLat, field, boost,
-			options, false)
-		if err != nil {
-			return nil, err
-		}
+		return boxSearcher, nil
 	}
 
-	// wrap it in a filtering searcher which checks the actual distance
-	rv.searcher = NewFilteringSearcher(boxSearcher,
-		func(d *search.DocumentMatch) bool {
-			var lon, lat float64
-			var found bool
-			err := indexReader.DocumentVisitFieldTerms(d.IndexInternalID,
-				[]string{field}, func(field string, term []byte) {
-					// only consider the values which are shifted 0
-					prefixCoded := numeric.PrefixCoded(term)
-					shift, err := prefixCoded.Shift()
-					if err == nil && shift == 0 {
-						i64, err := prefixCoded.Int64()
-						if err == nil {
-							lon = geo.MortonUnhashLon(uint64(i64))
-							lat = geo.MortonUnhashLat(uint64(i64))
-							found = true
-						}
+	// build geoboundinggox searcher for that bounding box
+	boxSearcher, err := NewGeoBoundingBoxSearcher(indexReader,
+		topLeftLon, bottomRightLat, bottomRightLon, topLeftLat, field, boost,
+		options, false)
+	if err != nil {
+		return nil, err
+	}
+	return boxSearcher, nil
+}
+
+func buildDistFilter(indexReader index.IndexReader, field string,
+	centerLon, centerLat, maxDist float64) FilterFunc {
+	return func(d *search.DocumentMatch) bool {
+		var lon, lat float64
+		var found bool
+		err := indexReader.DocumentVisitFieldTerms(d.IndexInternalID,
+			[]string{field}, func(field string, term []byte) {
+				// only consider the values which are shifted 0
+				prefixCoded := numeric.PrefixCoded(term)
+				shift, err := prefixCoded.Shift()
+				if err == nil && shift == 0 {
+					i64, err := prefixCoded.Int64()
+					if err == nil {
+						lon = geo.MortonUnhashLon(uint64(i64))
+						lat = geo.MortonUnhashLat(uint64(i64))
+						found = true
 					}
-				})
-			if err == nil && found {
-				dist := geo.Haversin(lon, lat, rv.centerLon, rv.centerLat)
-				if dist <= rv.dist/1000 {
-					return true
 				}
+			})
+		if err == nil && found {
+			dist := geo.Haversin(lon, lat, centerLon, centerLat)
+			if dist <= maxDist/1000 {
+				return true
 			}
-			return false
-		})
-
-	return rv, nil
-}
-
-func (s *GeoPointDistanceSearcher) Count() uint64 {
-	return s.searcher.Count()
-}
-
-func (s *GeoPointDistanceSearcher) Weight() float64 {
-	return s.searcher.Weight()
-}
-
-func (s *GeoPointDistanceSearcher) SetQueryNorm(qnorm float64) {
-	s.searcher.SetQueryNorm(qnorm)
-}
-
-func (s *GeoPointDistanceSearcher) Next(ctx *search.SearchContext) (
-	*search.DocumentMatch, error) {
-	return s.searcher.Next(ctx)
-}
-
-func (s *GeoPointDistanceSearcher) Advance(ctx *search.SearchContext,
-	ID index.IndexInternalID) (*search.DocumentMatch, error) {
-	return s.searcher.Advance(ctx, ID)
-}
-
-func (s *GeoPointDistanceSearcher) Close() error {
-	return s.searcher.Close()
-}
-
-func (s *GeoPointDistanceSearcher) Min() int {
-	return 0
-}
-
-func (s *GeoPointDistanceSearcher) DocumentMatchPoolSize() int {
-	return s.searcher.DocumentMatchPoolSize()
+		}
+		return false
+	}
 }
