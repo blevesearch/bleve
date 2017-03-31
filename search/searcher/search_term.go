@@ -22,12 +22,9 @@ import (
 
 type TermSearcher struct {
 	indexReader index.IndexReader
-	term        string
-	field       string
 	reader      index.TermFieldReader
 	scorer      *scorer.TermQueryScorer
 	tfd         index.TermFieldDoc
-	options     search.SearcherOptions
 }
 
 func NewTermSearcher(indexReader index.IndexReader, term string, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
@@ -40,12 +37,27 @@ func NewTermSearcher(indexReader index.IndexReader, term string, field string, b
 		_ = reader.Close()
 		return nil, err
 	}
+	scorer := scorer.NewTermQueryScorer([]byte(term), field, boost, count, reader.Count(), options)
+	return &TermSearcher{
+		indexReader: indexReader,
+		reader:      reader,
+		scorer:      scorer,
+	}, nil
+}
+
+func NewTermSearcherBytes(indexReader index.IndexReader, term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
+	reader, err := indexReader.TermFieldReader(term, field, true, true, options.IncludeTermVectors)
+	if err != nil {
+		return nil, err
+	}
+	count, err := indexReader.DocCount()
+	if err != nil {
+		_ = reader.Close()
+		return nil, err
+	}
 	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), options)
 	return &TermSearcher{
 		indexReader: indexReader,
-		term:        term,
-		field:       field,
-		options:     options,
 		reader:      reader,
 		scorer:      scorer,
 	}, nil

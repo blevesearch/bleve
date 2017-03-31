@@ -27,7 +27,7 @@ func TestTermScorer(t *testing.T) {
 
 	var docTotal uint64 = 100
 	var docTerm uint64 = 9
-	var queryTerm = "beer"
+	var queryTerm = []byte("beer")
 	var queryField = "desc"
 	var queryBoost = 1.0
 	scorer := NewTermQueryScorer(queryTerm, queryField, queryBoost, docTotal, docTerm, search.SearcherOptions{Explain: true})
@@ -168,7 +168,7 @@ func TestTermScorerWithQueryNorm(t *testing.T) {
 
 	var docTotal uint64 = 100
 	var docTerm uint64 = 9
-	var queryTerm = "beer"
+	var queryTerm = []byte("beer")
 	var queryField = "desc"
 	var queryBoost = 3.0
 	scorer := NewTermQueryScorer(queryTerm, queryField, queryBoost, docTotal, docTerm, search.SearcherOptions{Explain: true})
