@@ -25,6 +25,8 @@ import (
 
 var minNum = 5.1
 var maxNum = 7.1
+var minTerm = "bob"
+var maxTerm = "cat"
 var startDateStr = "2011-01-01T00:00:00Z"
 var endDateStr = "2012-01-01T00:00:00Z"
 var startDate time.Time
@@ -138,6 +140,14 @@ func TestParseQuery(t *testing.T) {
 			input: []byte(`{"min":5.1,"max":7.1,"field":"desc"}`),
 			output: func() Query {
 				q := NewNumericRangeQuery(&minNum, &maxNum)
+				q.SetField("desc")
+				return q
+			}(),
+		},
+		{
+			input: []byte(`{"min":"bob","max":"cat","field":"desc"}`),
+			output: func() Query {
+				q := NewTermRangeQuery(minTerm, maxTerm)
 				q.SetField("desc")
 				return q
 			}(),

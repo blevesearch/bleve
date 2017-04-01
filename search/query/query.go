@@ -161,10 +161,20 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
-	_, hasMin := tmp["min"]
-	_, hasMax := tmp["max"]
+	_, hasMin := tmp["min"].(float64)
+	_, hasMax := tmp["max"].(float64)
 	if hasMin || hasMax {
 		var rv NumericRangeQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	_, hasMinStr := tmp["min"].(string)
+	_, hasMaxStr := tmp["max"].(string)
+	if hasMinStr || hasMaxStr {
+		var rv TermRangeQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
