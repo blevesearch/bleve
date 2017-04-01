@@ -801,5 +801,28 @@
 				}
 			]
 		}
+	},
+	{
+		"comment": "test term range",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"field": "title",
+				"max": "miz",
+				"min": "mis"
+			}
+		},
+		"result": {
+			"total_hits": 2,
+			"hits": [
+				{
+					"id": "a"
+				},
+				{
+					"id": "b"
+				}
+			]
+		}
 	}
 ]

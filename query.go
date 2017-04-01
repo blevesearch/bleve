@@ -139,6 +139,23 @@ func NewNumericRangeInclusiveQuery(min, max *float64, minInclusive, maxInclusive
 	return query.NewNumericRangeInclusiveQuery(min, max, minInclusive, maxInclusive)
 }
 
+// NewTermRangeQuery creates a new Query for ranges
+// of text terms.
+// Either, but not both endpoints can be "".
+// The minimum value is inclusive.
+// The maximum value is exclusive.
+func NewTermRangeQuery(min, max string) *query.TermRangeQuery {
+	return query.NewTermRangeQuery(min, max)
+}
+
+// NewTermRangeInclusiveQuery creates a new Query for ranges
+// of text terms.
+// Either, but not both endpoints can be "".
+// Control endpoint inclusion with inclusiveMin, inclusiveMax.
+func NewTermRangeInclusiveQuery(min, max string, minInclusive, maxInclusive *bool) *query.TermRangeQuery {
+	return query.NewTermRangeInclusiveQuery(min, max, minInclusive, maxInclusive)
+}
+
 // NewPhraseQuery creates a new Query for finding
 // exact term phrases in the index.
 // The provided terms must exist in the correct
