@@ -45,7 +45,7 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp,
 	}
 
 	return NewMultiTermSearcher(indexReader, candidateTerms, field, boost,
-		options)
+		options, true)
 }
 
 func findRegexpCandidateTerms(indexReader index.IndexReader,

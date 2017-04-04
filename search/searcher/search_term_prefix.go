@@ -35,5 +35,5 @@ func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string,
 		tfd, err = fieldDict.Next()
 	}
 
-	return NewMultiTermSearcher(indexReader, terms, field, boost, options)
+	return NewMultiTermSearcher(indexReader, terms, field, boost, options, true)
 }

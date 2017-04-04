@@ -39,7 +39,7 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string,
 	}
 
 	return NewMultiTermSearcher(indexReader, candidateTerms, field,
-		boost, options)
+		boost, options, true)
 }
 
 func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,

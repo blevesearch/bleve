@@ -29,7 +29,7 @@ func NewGeoPointDistanceSearcher(indexReader index.IndexReader, centerLon,
 	topLeftLon, topLeftLat, bottomRightLon, bottomRightLat :=
 		geo.ComputeBoundingBox(centerLon, centerLat, dist)
 
-		// build a searcher for the box
+	// build a searcher for the box
 	boxSearcher, err := boxSearcher(indexReader,
 		topLeftLon, topLeftLat, bottomRightLon, bottomRightLat,
 		field, boost, options)
