@@ -20,7 +20,7 @@ import (
 )
 
 func NewMultiTermSearcher(indexReader index.IndexReader, terms []string,
-	field string, boost float64, options search.SearcherOptions) (
+	field string, boost float64, options search.SearcherOptions, limit bool) (
 	search.Searcher, error) {
 	qsearchers := make([]search.Searcher, len(terms))
 	qsearchersClose := func() {
@@ -39,17 +39,12 @@ func NewMultiTermSearcher(indexReader index.IndexReader, terms []string,
 		}
 	}
 	// build disjunction searcher of these ranges
-	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, options)
-	if err != nil {
-		qsearchersClose()
-		return nil, err
-	}
-
-	return searcher, nil
+	return newMultiTermSearcherBytes(indexReader, qsearchers, field, boost,
+		options, limit)
 }
 
 func NewMultiTermSearcherBytes(indexReader index.IndexReader, terms [][]byte,
-	field string, boost float64, options search.SearcherOptions) (
+	field string, boost float64, options search.SearcherOptions, limit bool) (
 	search.Searcher, error) {
 	qsearchers := make([]search.Searcher, len(terms))
 	qsearchersClose := func() {
@@ -67,10 +62,22 @@ func NewMultiTermSearcherBytes(indexReader index.IndexReader, terms [][]byte,
 			return nil, err
 		}
 	}
+	return newMultiTermSearcherBytes(indexReader, qsearchers, field, boost,
+		options, limit)
+}
+
+func newMultiTermSearcherBytes(indexReader index.IndexReader,
+	searchers []search.Searcher, field string, boost float64,
+	options search.SearcherOptions, limit bool) (
+	search.Searcher, error) {
+
 	// build disjunction searcher of these ranges
-	searcher, err := NewDisjunctionSearcher(indexReader, qsearchers, 0, options)
+	searcher, err := newDisjunctionSearcher(indexReader, searchers, 0, options,
+		limit)
 	if err != nil {
-		qsearchersClose()
+		for _, s := range searchers {
+			_ = s.Close()
+		}
 		return nil, err
 	}
 

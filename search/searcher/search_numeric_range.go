@@ -59,7 +59,8 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 		return nil, tooManyClausesErr()
 	}
 
-	return NewMultiTermSearcherBytes(indexReader, terms, field, boost, options)
+	return NewMultiTermSearcherBytes(indexReader, terms, field, boost, options,
+		true)
 }
 
 type termRange struct {

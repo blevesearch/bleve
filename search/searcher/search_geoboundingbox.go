@@ -36,13 +36,13 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 	}
 
 	// do math to produce list of terms needed for this search
-	onBoundaryTerms, notOnBoundaryTerms := computeRange(0, (geo.GeoBits<<1)-1,
+	onBoundaryTerms, notOnBoundaryTerms := ComputeGeoRange(0, (geo.GeoBits<<1)-1,
 		minLon, minLat, maxLon, maxLat, checkBoundaries)
 
 	var onBoundarySearcher search.Searcher
 	if len(onBoundaryTerms) > 0 {
 		rawOnBoundarySearcher, err := NewMultiTermSearcherBytes(indexReader,
-			onBoundaryTerms, field, boost, options)
+			onBoundaryTerms, field, boost, options, false)
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +56,7 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 	if len(notOnBoundaryTerms) > 0 {
 		var err error
 		notOnBoundarySearcher, err = NewMultiTermSearcherBytes(indexReader,
-			notOnBoundaryTerms, field, boost, options)
+			notOnBoundaryTerms, field, boost, options, false)
 		if err != nil {
 			cleanupOpenedSearchers()
 			return nil, err
@@ -88,7 +88,7 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 var geoMaxShift = document.GeoPrecisionStep * 4
 var geoDetailLevel = ((geo.GeoBits << 1) - geoMaxShift) / 2
 
-func computeRange(term uint64, shift uint,
+func ComputeGeoRange(term uint64, shift uint,
 	sminLon, sminLat, smaxLon, smaxLat float64,
 	checkBoundaries bool) (
 	onBoundary [][]byte, notOnBoundary [][]byte) {
@@ -138,7 +138,7 @@ func relateAndRecurse(start, end uint64, res uint,
 	} else if level < geoDetailLevel &&
 		geo.RectIntersects(minLon, minLat, maxLon, maxLat,
 			sminLon, sminLat, smaxLon, smaxLat) {
-		return computeRange(start, res-1, sminLon, sminLat, smaxLon, smaxLat,
+		return ComputeGeoRange(start, res-1, sminLon, sminLat, smaxLon, smaxLat,
 			checkBoundaries)
 	}
 	return nil, nil

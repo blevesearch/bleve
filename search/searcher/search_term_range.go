@@ -71,5 +71,5 @@ func NewTermRangeSearcher(indexReader index.IndexReader,
 		terms = terms[:len(terms)-1]
 	}
 
-	return NewMultiTermSearcher(indexReader, terms, field, boost, options)
+	return NewMultiTermSearcher(indexReader, terms, field, boost, options, true)
 }
