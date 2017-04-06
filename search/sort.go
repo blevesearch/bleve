@@ -36,6 +36,8 @@ type SearchSort interface {
 	RequiresDocID() bool
 	RequiresScoring() bool
 	RequiresFields() []string
+
+	Copy() SearchSort
 }
 
 func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
@@ -203,6 +205,14 @@ func (so SortOrder) UpdateVisitor(field string, term []byte) {
 	for _, soi := range so {
 		soi.UpdateVisitor(field, term)
 	}
+}
+
+func (so SortOrder) Copy() SortOrder {
+	rv := make(SortOrder, len(so))
+	for i, soi := range so {
+		rv[i] = soi.Copy()
+	}
+	return rv
 }
 
 // Compare will compare two document matches using the specified sort order
@@ -475,6 +485,12 @@ func (s *SortField) MarshalJSON() ([]byte, error) {
 	return json.Marshal(sfm)
 }
 
+func (s *SortField) Copy() SearchSort {
+	var rv SortField
+	rv = *s
+	return &rv
+}
+
 // SortDocID will sort results by the document identifier
 type SortDocID struct {
 	Desc bool
@@ -512,6 +528,12 @@ func (s *SortDocID) MarshalJSON() ([]byte, error) {
 	return json.Marshal("_id")
 }
 
+func (s *SortDocID) Copy() SearchSort {
+	var rv SortDocID
+	rv = *s
+	return &rv
+}
+
 // SortScore will sort results by the document match score
 type SortScore struct {
 	Desc bool
@@ -547,6 +569,12 @@ func (s *SortScore) MarshalJSON() ([]byte, error) {
 		return json.Marshal("-_score")
 	}
 	return json.Marshal("_score")
+}
+
+func (s *SortScore) Copy() SearchSort {
+	var rv SortScore
+	rv = *s
+	return &rv
 }
 
 var maxDistance = string(numeric.MustNewPrefixCodedInt64(math.MaxInt64, 0))
@@ -674,4 +702,10 @@ func (s *SortGeoDistance) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(sfm)
+}
+
+func (s *SortGeoDistance) Copy() SearchSort {
+	var rv SortGeoDistance
+	rv = *s
+	return &rv
 }
