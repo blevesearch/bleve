@@ -22,6 +22,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -29,9 +30,8 @@ import (
 
 	"golang.org/x/net/context"
 
-	"strconv"
-
 	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
+	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/mapping"
@@ -1729,5 +1729,78 @@ func TestBug408(t *testing.T) {
 		if _, found := matchingDocIds[result.ID]; !found {
 			t.Fatalf("document with ID %s not in results as expected", result.ID)
 		}
+	}
+}
+
+func TestIndexAdvancedCountMatchSearch(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			b := index.NewBatch()
+			for j := 0; j < 200; j++ {
+				id := fmt.Sprintf("%d", (i*200)+j)
+
+				doc := &document.Document{
+					ID: id,
+					Fields: []document.Field{
+						document.NewTextField("body", []uint64{}, []byte("match")),
+					},
+					CompositeFields: []*document.CompositeField{
+						document.NewCompositeField("_all", true, []string{}, []string{}),
+					},
+				}
+
+				err := b.IndexAdvanced(doc)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := index.Batch(b)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	// search for something that should match all documents
+	sr, err := index.Search(NewSearchRequest(NewMatchQuery("match")))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get the index document count
+	dc, err := index.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make sure test is working correctly, doc count should 2000
+	if dc != 2000 {
+		t.Errorf("expected doc count 2000, got %d", dc)
+	}
+
+	// make sure our search found all the documents
+	if dc != sr.Total {
+		t.Errorf("expected search result total %d to match doc count %d", sr.Total, dc)
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

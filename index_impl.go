@@ -253,6 +253,24 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 	return
 }
 
+// IndexAdvanced takes a document.Document object
+// skips the mapping and indexes it.
+func (i *indexImpl) IndexAdvanced(doc *document.Document) (err error) {
+	if doc.ID == "" {
+		return ErrorEmptyID
+	}
+
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	err = i.i.Update(doc)
+	return
+}
+
 // Delete entries for the specified identifier from
 // the index.
 func (i *indexImpl) Delete(id string) (err error) {
