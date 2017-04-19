@@ -468,9 +468,69 @@ func TestPaginationSameScores(t *testing.T) {
 	}
 }
 
+func BenchmarkTop10of0Scores(b *testing.B) {
+	benchHelper(0, func() search.Collector {
+		return NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
+func BenchmarkTop10of3Scores(b *testing.B) {
+	benchHelper(3, func() search.Collector {
+		return NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
+func BenchmarkTop10of10Scores(b *testing.B) {
+	benchHelper(10, func() search.Collector {
+		return NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
+func BenchmarkTop10of25Scores(b *testing.B) {
+	benchHelper(25, func() search.Collector {
+		return NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
+func BenchmarkTop10of50Scores(b *testing.B) {
+	benchHelper(50, func() search.Collector {
+		return NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
 func BenchmarkTop10of10000Scores(b *testing.B) {
 	benchHelper(10000, func() search.Collector {
 		return NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
+func BenchmarkTop100of0Scores(b *testing.B) {
+	benchHelper(0, func() search.Collector {
+		return NewTopNCollector(100, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
+func BenchmarkTop100of3Scores(b *testing.B) {
+	benchHelper(3, func() search.Collector {
+		return NewTopNCollector(100, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
+func BenchmarkTop100of10Scores(b *testing.B) {
+	benchHelper(10, func() search.Collector {
+		return NewTopNCollector(100, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
+func BenchmarkTop100of25Scores(b *testing.B) {
+	benchHelper(25, func() search.Collector {
+		return NewTopNCollector(100, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	}, b)
+}
+
+func BenchmarkTop100of50Scores(b *testing.B) {
+	benchHelper(50, func() search.Collector {
+		return NewTopNCollector(100, 0, search.SortOrder{&search.SortScore{Desc: true}})
 	}, b)
 }
 
