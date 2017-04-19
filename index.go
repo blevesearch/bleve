@@ -49,6 +49,17 @@ func (b *Batch) Index(id string, data interface{}) error {
 	return nil
 }
 
+// IndexAdvanced adds the specified index operation to the
+// batch which skips the mapping.  NOTE: the bleve Index is not updated
+// until the batch is executed.
+func (b *Batch) IndexAdvanced(doc *document.Document) (err error) {
+	if doc.ID == "" {
+		return ErrorEmptyID
+	}
+	b.internal.Update(doc)
+	return nil
+}
+
 // Delete adds the specified delete operation to the
 // batch.  NOTE: the bleve Index is not updated until
 // the batch is executed.
