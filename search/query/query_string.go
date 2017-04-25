@@ -43,6 +43,10 @@ func (q *QueryStringQuery) Boost() float64 {
 	return q.BoostVal.Value()
 }
 
+func (q *QueryStringQuery) Parse() (Query, error) {
+	return parseQuerySyntax(q.Query)
+}
+
 func (q *QueryStringQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	newQuery, err := parseQuerySyntax(q.Query)
 	if err != nil {
