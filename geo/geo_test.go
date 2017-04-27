@@ -83,13 +83,16 @@ func TestScaleLatUnscaleLat(t *testing.T) {
 	}
 }
 
-func TestComputeBoundingBoxCheckLatitudeAtEquator(t *testing.T) {
+func TestRectFromPointDistance(t *testing.T) {
 	// at the equator 1 degree of latitude is about 110567 meters
-	_, upperLeftLat, _, lowerRightLat := ComputeBoundingBox(0, 0, 110567)
-	if math.Abs(upperLeftLat-1) > 1E-4 {
+	_, upperLeftLat, _, lowerRightLat, err := RectFromPointDistance(0, 0, 110567)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if math.Abs(upperLeftLat-1) > 1E-2 {
 		t.Errorf("expected bounding box upper left lat to be almost 1, got %f", upperLeftLat)
 	}
-	if math.Abs(lowerRightLat+1) > 1E-4 {
+	if math.Abs(lowerRightLat+1) > 1E-2 {
 		t.Errorf("expected bounding box lower right lat to be almost -1, got %f", lowerRightLat)
 	}
 }
@@ -175,48 +178,6 @@ func TestBoundingBoxContains(t *testing.T) {
 		got := BoundingBoxContains(test.lon, test.lat, test.minX, test.minY, test.maxX, test.maxY)
 		if test.want != got {
 			t.Errorf("expected box contains %t, got %t for %f,%f in %f %f %f %f ", test.want, got, test.lon, test.lat, test.minX, test.minY, test.maxX, test.maxY)
-		}
-	}
-}
-
-func TestNormalizeLon(t *testing.T) {
-	tests := []struct {
-		lon  float64
-		want float64
-	}{
-		{-180, -180},
-		{0, 0},
-		{180, 180},
-		{181, -179},
-		{-181, 179},
-		{540, 180},
-	}
-
-	for _, test := range tests {
-		got := normalizeLon(test.lon)
-		if test.want != got {
-			t.Errorf("expected normalizedLon %f, got %f for %f", test.want, got, test.lon)
-		}
-	}
-}
-
-func TestNormalizeLat(t *testing.T) {
-	tests := []struct {
-		lat  float64
-		want float64
-	}{
-		{-90, -90},
-		{0, 0},
-		{90, 90},
-		// somewhat unexpected, but double-checked against lucene
-		{91, 89},
-		{-91, -89},
-	}
-
-	for _, test := range tests {
-		got := normalizeLat(test.lat)
-		if test.want != got {
-			t.Errorf("expected normalizedLat %f, got %f for %f", test.want, got, test.lat)
 		}
 	}
 }

@@ -15,6 +15,7 @@
 package geo
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/blevesearch/bleve/numeric"
@@ -26,6 +27,12 @@ var GeoBits uint = 32
 
 var minLon = -180.0
 var minLat = -90.0
+var maxLon = 180.0
+var maxLat = 90.0
+var minLonRad = minLon * degreesToRadian
+var minLatRad = minLat * degreesToRadian
+var maxLonRad = maxLon * degreesToRadian
+var maxLatRad = maxLat * degreesToRadian
 var geoTolerance = 1E-6
 var lonScale = float64((uint64(0x1)<<GeoBits)-1) / 360.0
 var latScale = float64((uint64(0x1)<<GeoBits)-1) / 180.0
@@ -91,26 +98,8 @@ func BoundingBoxContains(lon, lat, minLon, minLat, maxLon, maxLat float64) bool 
 		compareGeo(lat, minLat) >= 0 && compareGeo(lat, maxLat) <= 0
 }
 
-// ComputeBoundingBox will compute a bounding box around the provided point
-// which surrounds a circle of the provided radius (in meters).
-func ComputeBoundingBox(centerLon, centerLat,
-	radius float64) (upperLeftLon float64, upperLeftLat float64,
-	lowerRightLon float64, lowerRightLat float64) {
-	_, tlat := pointFromLonLatBearing(centerLon, centerLat, 0, radius)
-	rlon, _ := pointFromLonLatBearing(centerLon, centerLat, 90, radius)
-	_, blat := pointFromLonLatBearing(centerLon, centerLat, 180, radius)
-	llon, _ := pointFromLonLatBearing(centerLon, centerLat, 270, radius)
-	return normalizeLon(llon), normalizeLat(tlat),
-		normalizeLon(rlon), normalizeLat(blat)
-}
-
 const degreesToRadian = math.Pi / 180
 const radiansToDegrees = 180 / math.Pi
-const flattening = 1.0 / 298.257223563
-const semiMajorAxis = 6378137
-const semiMinorAxis = semiMajorAxis * (1.0 - flattening)
-const semiMajorAxis2 = semiMajorAxis * semiMajorAxis
-const semiMinorAxis2 = semiMinorAxis * semiMinorAxis
 
 // DegreesToRadians converts an angle in degrees to radians
 func DegreesToRadians(d float64) float64 {
@@ -122,84 +111,60 @@ func RadiansToDegrees(r float64) float64 {
 	return r * radiansToDegrees
 }
 
-// pointFromLonLatBearing starts that the provide lon,lat
-// then moves in the bearing direction (in degrees)
-// this move continues for the provided distance (in meters)
-// The lon, lat of this destination location is returned.
-func pointFromLonLatBearing(lon, lat, bearing,
-	dist float64) (float64, float64) {
+var earthMeanRadiusMeters = 6371008.7714
 
-	alpha1 := DegreesToRadians(bearing)
-	cosA1 := math.Cos(alpha1)
-	sinA1 := math.Sin(alpha1)
-	tanU1 := (1 - flattening) * math.Tan(DegreesToRadians(lat))
-	cosU1 := 1 / math.Sqrt(1+tanU1*tanU1)
-	sinU1 := tanU1 * cosU1
-	sig1 := math.Atan2(tanU1, cosA1)
-	sinAlpha := cosU1 * sinA1
-	cosSqAlpha := 1 - sinAlpha*sinAlpha
-	uSq := cosSqAlpha * (semiMajorAxis2 - semiMinorAxis2) / semiMinorAxis2
-	A := 1 + uSq/16384*(4096+uSq*(-768+uSq*(320-175*uSq)))
-	B := uSq / 1024 * (256 + uSq*(-128+uSq*(74-47*uSq)))
+func RectFromPointDistance(lon, lat, dist float64) (float64, float64, float64, float64, error) {
+	err := checkLongitude(lon)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+	err = checkLatitude(lat)
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+	radLon := DegreesToRadians(lon)
+	radLat := DegreesToRadians(lat)
+	radDistance := (dist + 7e-2) / earthMeanRadiusMeters
 
-	sigma := dist / (semiMinorAxis * A)
+	minLatL := radLat - radDistance
+	maxLatL := radLat + radDistance
 
-	cos25SigmaM := math.Cos(2*sig1 + sigma)
-	sinSigma := math.Sin(sigma)
-	cosSigma := math.Cos(sigma)
-	deltaSigma := B * sinSigma * (cos25SigmaM + (B/4)*
-		(cosSigma*(-1+2*cos25SigmaM*cos25SigmaM)-(B/6)*cos25SigmaM*
-			(-1+4*sinSigma*sinSigma)*(-3+4*cos25SigmaM*cos25SigmaM)))
-	sigmaP := sigma
-	sigma = dist/(semiMinorAxis*A) + deltaSigma
-	for math.Abs(sigma-sigmaP) > 1E-12 {
-		cos25SigmaM = math.Cos(2*sig1 + sigma)
-		sinSigma = math.Sin(sigma)
-		cosSigma = math.Cos(sigma)
-		deltaSigma = B * sinSigma * (cos25SigmaM + (B/4)*
-			(cosSigma*(-1+2*cos25SigmaM*cos25SigmaM)-(B/6)*cos25SigmaM*
-				(-1+4*sinSigma*sinSigma)*(-3+4*cos25SigmaM*cos25SigmaM)))
-		sigmaP = sigma
-		sigma = dist/(semiMinorAxis*A) + deltaSigma
+	var minLonL, maxLonL float64
+	if minLatL > minLatRad && maxLatL < maxLatRad {
+		deltaLon := asin(sin(radDistance) / cos(radLat))
+		minLonL = radLon - deltaLon
+		if minLonL < minLonRad {
+			minLonL += 2 * math.Pi
+		}
+		maxLonL = radLon + deltaLon
+		if maxLonL > maxLonRad {
+			maxLonL -= 2 * math.Pi
+		}
+	} else {
+		// pole is inside distance
+		minLatL = math.Max(minLatL, minLatRad)
+		maxLatL = math.Min(maxLatL, maxLatRad)
+		minLonL = minLonRad
+		maxLonL = maxLonRad
 	}
 
-	tmp := sinU1*sinSigma - cosU1*cosSigma*cosA1
-	lat2 := math.Atan2(sinU1*cosSigma+cosU1*sinSigma*cosA1,
-		(1-flattening)*math.Sqrt(sinAlpha*sinAlpha+tmp*tmp))
-	lamda := math.Atan2(sinSigma*sinA1, cosU1*cosSigma-sinU1*sinSigma*cosA1)
-	c := flattening / 16 * cosSqAlpha * (4 + flattening*(4-3*cosSqAlpha))
-	lam := lamda - (1-c)*flattening*sinAlpha*
-		(sigma+c*sinSigma*(cos25SigmaM+c*cosSigma*(-1+2*cos25SigmaM*cos25SigmaM)))
-
-	rvlon := lon + RadiansToDegrees(lam)
-	rvlat := RadiansToDegrees(lat2)
-
-	return rvlon, rvlat
+	return RadiansToDegrees(minLonL),
+		RadiansToDegrees(maxLatL),
+		RadiansToDegrees(maxLonL),
+		RadiansToDegrees(minLatL),
+		nil
 }
 
-// normalizeLon normalizes a longitude value within the -180 to 180 range
-func normalizeLon(lonDeg float64) float64 {
-	if lonDeg >= -180 && lonDeg <= 180 {
-		return lonDeg
+func checkLatitude(latitude float64) error {
+	if math.IsNaN(latitude) || latitude < minLat || latitude > maxLat {
+		return fmt.Errorf("invalid latitude %f; must be between %f and %f", latitude, minLat, maxLat)
 	}
-
-	off := math.Mod(lonDeg+180, 360)
-	if off < 0 {
-		return 180 + off
-	} else if off == 0 && lonDeg > 0 {
-		return 180
-	}
-	return -180 + off
+	return nil
 }
 
-// normalizeLat normalizes a latitude value within the -90 to 90 range
-func normalizeLat(latDeg float64) float64 {
-	if latDeg >= -90 && latDeg <= 90 {
-		return latDeg
+func checkLongitude(longitude float64) error {
+	if math.IsNaN(longitude) || longitude < minLon || longitude > maxLon {
+		return fmt.Errorf("invalid longitude %f; must be between %f and %f", longitude, minLon, maxLon)
 	}
-	off := math.Abs(math.Mod(latDeg+90, 360))
-	if off <= 180 {
-		return off - 90
-	}
-	return (360 - off) - 90
+	return nil
 }

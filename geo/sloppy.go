@@ -146,6 +146,12 @@ func earthDiameter(lat float64) float64 {
 	return earthDiameterPerLatitude[int(index)]
 }
 
+var pio2 = math.Pi / 2
+
+func sin(a float64) float64 {
+	return cos(a - pio2)
+}
+
 // cos is a sloppy math (faster) implementation of math.Cos
 func cos(a float64) float64 {
 	if a < 0.0 {

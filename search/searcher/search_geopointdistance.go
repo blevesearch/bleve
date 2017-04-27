@@ -24,10 +24,12 @@ import (
 func NewGeoPointDistanceSearcher(indexReader index.IndexReader, centerLon,
 	centerLat, dist float64, field string, boost float64,
 	options search.SearcherOptions) (search.Searcher, error) {
-
 	// compute bounding box containing the circle
-	topLeftLon, topLeftLat, bottomRightLon, bottomRightLat :=
-		geo.ComputeBoundingBox(centerLon, centerLat, dist)
+	topLeftLon, topLeftLat, bottomRightLon, bottomRightLat, err :=
+		geo.RectFromPointDistance(centerLon, centerLat, dist)
+	if err != nil {
+		return nil, err
+	}
 
 	// build a searcher for the box
 	boxSearcher, err := boxSearcher(indexReader,
