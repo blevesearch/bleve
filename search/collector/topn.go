@@ -22,6 +22,15 @@ import (
 	"golang.org/x/net/context"
 )
 
+type collectorStore interface {
+	// Add the document, and if the new store size exceeds the provided size
+	// the last element is removed and returned.  If the size has not been
+	// exceeded, nil is returned.
+	AddNotExceedingSize(doc *search.DocumentMatch, size int) *search.DocumentMatch
+
+	Final(skip int, fixup collectorFixup) (search.DocumentMatchCollection, error)
+}
+
 // PreAllocSizeSkipCap will cap preallocation to this amount when
 // size+skip exceeds this value
 var PreAllocSizeSkipCap = 1000
@@ -41,7 +50,7 @@ type TopNCollector struct {
 	results       search.DocumentMatchCollection
 	facetsBuilder *search.FacetsBuilder
 
-	store *collectStoreHeap
+	store collectorStore
 
 	needDocIds    bool
 	neededFields  []string
@@ -68,9 +77,15 @@ func NewTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector 
 		backingSize = PreAllocSizeSkipCap + 1
 	}
 
-	hc.store = newStoreHeap(backingSize, func(i, j *search.DocumentMatch) int {
-		return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
-	})
+	if size+skip > 10 {
+		hc.store = newStoreHeap(backingSize, func(i, j *search.DocumentMatch) int {
+			return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
+		})
+	} else {
+		hc.store = newStoreSlice(backingSize, func(i, j *search.DocumentMatch) int {
+			return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
+		})
+	}
 
 	// these lookups traverse an interface, so do once up-front
 	if sort.RequiresDocID() {
@@ -184,9 +199,8 @@ func (hc *TopNCollector) collectSingle(ctx *search.SearchContext, reader index.I
 		}
 	}
 
-	hc.store.Add(d)
-	if hc.store.Len() > hc.size+hc.skip {
-		removed := hc.store.RemoveLast()
+	removed := hc.store.AddNotExceedingSize(d, hc.size+hc.skip)
+	if removed != nil {
 		if hc.lowestMatchOutsideResults == nil {
 			hc.lowestMatchOutsideResults = removed
 		} else {

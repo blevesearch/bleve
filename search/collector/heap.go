@@ -34,11 +34,20 @@ func newStoreHeap(cap int, compare collectorCompare) *collectStoreHeap {
 	return rv
 }
 
-func (c *collectStoreHeap) Add(doc *search.DocumentMatch) {
+func (c *collectStoreHeap) AddNotExceedingSize(doc *search.DocumentMatch,
+	size int) *search.DocumentMatch {
+	c.add(doc)
+	if c.Len() > size {
+		return c.removeLast()
+	}
+	return nil
+}
+
+func (c *collectStoreHeap) add(doc *search.DocumentMatch) {
 	heap.Push(c, doc)
 }
 
-func (c *collectStoreHeap) RemoveLast() *search.DocumentMatch {
+func (c *collectStoreHeap) removeLast() *search.DocumentMatch {
 	return heap.Pop(c).(*search.DocumentMatch)
 }
 
