@@ -64,6 +64,10 @@ func NewTermRangeSearcher(indexReader index.IndexReader,
 
 	if !*inclusiveMin && min != nil && string(min) == terms[0] {
 		terms = terms[1:]
+		// check again, as we might have removed only entry
+		if len(terms) < 1 {
+			return NewMatchNoneSearcher(indexReader)
+		}
 	}
 
 	// if our term list included the max, it would be the last item

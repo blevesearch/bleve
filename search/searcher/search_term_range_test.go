@@ -157,6 +157,15 @@ func TestTermRangeSearch(t *testing.T) {
 			inclusiveMax: true,
 			want:         nil,
 		},
+		// min and max same (and term exists), both exlusive
+		{
+			min:          []byte("marty"),
+			max:          []byte("marty"),
+			field:        "name",
+			inclusiveMin: false,
+			inclusiveMax: false,
+			want:         nil,
+		},
 	}
 
 	for _, test := range tests {
