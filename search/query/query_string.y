@@ -198,7 +198,7 @@ tSTRING tCOLON tGREATER posOrNegNumber {
 	}
 	minInclusive := false
 	logDebugGrammar("FIELD - GREATER THAN %f", min)
-	q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil)
+	q := NewNumericRangeInclusiveQuery(&min, nil, nil, nil)
 	q.SetField(field)
 	$$ = q
 }
@@ -224,7 +224,7 @@ tSTRING tCOLON tLESS posOrNegNumber {
 	}
 	maxInclusive := false
 	logDebugGrammar("FIELD - LESS THAN %f", max)
-	q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive)
+	q := NewNumericRangeInclusiveQuery(nil, &max, nil, nil)
 	q.SetField(field)
 	$$ = q
 }

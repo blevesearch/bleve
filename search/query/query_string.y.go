@@ -1,3 +1,4 @@
+//line query_string.y:2
 package query
 
 import __yyfmt__ "fmt"
@@ -662,7 +663,7 @@ yydefault:
 			}
 			minInclusive := false
 			logDebugGrammar("FIELD - GREATER THAN %f", min)
-			q := NewNumericRangeInclusiveQuery(&min, nil, &minInclusive, nil)
+			q := NewNumericRangeInclusiveQuery(&min, nil, nil, nil)
 			q.SetField(field)
 			yyVAL.q = q
 		}
@@ -692,7 +693,7 @@ yydefault:
 			}
 			maxInclusive := false
 			logDebugGrammar("FIELD - LESS THAN %f", max)
-			q := NewNumericRangeInclusiveQuery(nil, &max, nil, &maxInclusive)
+			q := NewNumericRangeInclusiveQuery(nil, &max, nil, nil)
 			q.SetField(field)
 			yyVAL.q = q
 		}
