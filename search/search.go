@@ -62,7 +62,7 @@ type DocumentMatch struct {
 	Expl            *Explanation          `json:"explanation,omitempty"`
 	Locations       FieldTermLocationMap  `json:"locations,omitempty"`
 	Fragments       FieldFragmentMap      `json:"fragments,omitempty"`
-	Sort            []string              `json:"sort,omitempty"`
+	Sort            []string              `json:"-"`
 
 	// Fields contains the values for document fields listed in
 	// SearchRequest.Fields. Text fields are returned as strings, numeric
