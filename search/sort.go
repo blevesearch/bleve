@@ -67,8 +67,8 @@ func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 		rvd := &SortGeoDistance{
 			Field:    field,
 			Desc:     descending,
-			lon:      lon,
-			lat:      lat,
+			Lon:      lon,
+			Lat:      lat,
 			unitMult: 1.0,
 		}
 		if distUnit, ok := input["unit"].(string); ok {
@@ -588,8 +588,8 @@ func NewSortGeoDistance(field, unit string, lon, lat float64, desc bool) (
 		Field: field,
 		Desc:  desc,
 		Unit:  unit,
-		lon:   lon,
-		lat:   lat,
+		Lon:   lon,
+		Lat:   lat,
 	}
 	var err error
 	rv.unitMult, err = geo.ParseDistanceUnit(unit)
@@ -608,8 +608,8 @@ type SortGeoDistance struct {
 	Desc     bool
 	Unit     string
 	values   []string
-	lon      float64
-	lat      float64
+	Lon      float64
+	Lat      float64
 	unitMult float64
 }
 
@@ -640,7 +640,7 @@ func (s *SortGeoDistance) Value(i *DocumentMatch) string {
 	docLon := geo.MortonUnhashLon(uint64(i64))
 	docLat := geo.MortonUnhashLat(uint64(i64))
 
-	dist := geo.Haversin(s.lon, s.lat, docLon, docLat)
+	dist := geo.Haversin(s.Lon, s.Lat, docLon, docLat)
 	// dist is returned in km, so convert to m
 	dist *= 1000
 	if s.unitMult != 0 {
@@ -690,8 +690,8 @@ func (s *SortGeoDistance) MarshalJSON() ([]byte, error) {
 		"by":    "geo_distance",
 		"field": s.Field,
 		"location": map[string]interface{}{
-			"lon": s.lon,
-			"lat": s.lat,
+			"lon": s.Lon,
+			"lat": s.Lat,
 		},
 	}
 	if s.Unit != "" {

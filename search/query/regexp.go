@@ -25,10 +25,10 @@ import (
 )
 
 type RegexpQuery struct {
-	Regexp   string `json:"regexp"`
-	FieldVal string `json:"field,omitempty"`
-	BoostVal *Boost `json:"boost,omitempty"`
-	compiled *regexp.Regexp
+	Regexp   string         `json:"regexp"`
+	FieldVal string         `json:"field,omitempty"`
+	BoostVal *Boost         `json:"boost,omitempty"`
+	compiled *regexp.Regexp `json:"-"`
 }
 
 // NewRegexpQuery creates a new Query which finds

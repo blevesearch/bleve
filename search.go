@@ -36,25 +36,25 @@ type numericRange struct {
 	Max  *float64 `json:"max,omitempty"`
 }
 
-type dateTimeRange struct {
+type DateTimeRange struct {
 	Name        string    `json:"name,omitempty"`
 	Start       time.Time `json:"start,omitempty"`
 	End         time.Time `json:"end,omitempty"`
-	startString *string
-	endString   *string
+	StartString *string   `json:"-"`
+	EndString   *string   `json:"-"`
 }
 
-func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (start, end time.Time) {
+func (dr *DateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (start, end time.Time) {
 	start = dr.Start
-	if dr.Start.IsZero() && dr.startString != nil {
-		s, err := dateTimeParser.ParseDateTime(*dr.startString)
+	if dr.Start.IsZero() && dr.StartString != nil {
+		s, err := dateTimeParser.ParseDateTime(*dr.StartString)
 		if err == nil {
 			start = s
 		}
 	}
 	end = dr.End
-	if dr.End.IsZero() && dr.endString != nil {
-		e, err := dateTimeParser.ParseDateTime(*dr.endString)
+	if dr.End.IsZero() && dr.EndString != nil {
+		e, err := dateTimeParser.ParseDateTime(*dr.EndString)
 		if err == nil {
 			end = e
 		}
@@ -62,7 +62,7 @@ func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (sta
 	return start, end
 }
 
-func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
+func (dr *DateTimeRange) UnmarshalJSON(input []byte) error {
 	var temp struct {
 		Name  string  `json:"name,omitempty"`
 		Start *string `json:"start,omitempty"`
@@ -76,26 +76,26 @@ func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
 
 	dr.Name = temp.Name
 	if temp.Start != nil {
-		dr.startString = temp.Start
+		dr.StartString = temp.Start
 	}
 	if temp.End != nil {
-		dr.endString = temp.End
+		dr.EndString = temp.End
 	}
 
 	return nil
 }
 
-func (dr *dateTimeRange) MarshalJSON() ([]byte, error) {
+func (dr *DateTimeRange) MarshalJSON() ([]byte, error) {
 	rv := map[string]interface{}{
 		"name":  dr.Name,
 		"start": dr.Start,
 		"end":   dr.End,
 	}
-	if dr.Start.IsZero() && dr.startString != nil {
-		rv["start"] = dr.startString
+	if dr.Start.IsZero() && dr.StartString != nil {
+		rv["start"] = dr.StartString
 	}
-	if dr.End.IsZero() && dr.endString != nil {
-		rv["end"] = dr.endString
+	if dr.End.IsZero() && dr.EndString != nil {
+		rv["end"] = dr.EndString
 	}
 	return json.Marshal(rv)
 }
@@ -107,7 +107,7 @@ type FacetRequest struct {
 	Size           int              `json:"size"`
 	Field          string           `json:"field"`
 	NumericRanges  []*numericRange  `json:"numeric_ranges,omitempty"`
-	DateTimeRanges []*dateTimeRange `json:"date_ranges,omitempty"`
+	DateTimeRanges []*DateTimeRange `json:"date_ranges,omitempty"`
 }
 
 func (fr *FacetRequest) Validate() error {
@@ -165,9 +165,9 @@ func NewFacetRequest(field string, size int) *FacetRequest {
 // as part of this bucket/range.
 func (fr *FacetRequest) AddDateTimeRange(name string, start, end time.Time) {
 	if fr.DateTimeRanges == nil {
-		fr.DateTimeRanges = make([]*dateTimeRange, 0, 1)
+		fr.DateTimeRanges = make([]*DateTimeRange, 0, 1)
 	}
-	fr.DateTimeRanges = append(fr.DateTimeRanges, &dateTimeRange{Name: name, Start: start, End: end})
+	fr.DateTimeRanges = append(fr.DateTimeRanges, &DateTimeRange{Name: name, Start: start, End: end})
 }
 
 // AddNumericRange adds a bucket to a field
