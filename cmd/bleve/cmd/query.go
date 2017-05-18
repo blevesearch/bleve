@@ -97,5 +97,5 @@ func init() {
 	queryCmd.Flags().BoolVar(&fields, "fields", false, "Load stored fields, default false.")
 	queryCmd.Flags().StringVarP(&qtype, "type", "t", "query_string", "Type of query to run, defaults to 'query_string'")
 	queryCmd.Flags().StringVarP(&qfield, "field", "f", "", "Restrict query to field, by default no restriction, not applicable to query_string queries.")
-	queryCmd.Flags().StringVarP(&sortby, "sortby", "b", "", "Sort by field.")
+	queryCmd.Flags().StringVarP(&sortby, "sort-by", "b", "", "Sort by field.")
 }
