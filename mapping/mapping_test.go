@@ -900,3 +900,69 @@ func TestMappingForGeo(t *testing.T) {
 		t.Errorf("expected to find geo point, did not")
 	}
 }
+
+type textMarshalable struct {
+	body  string
+	Extra string
+}
+
+func (t *textMarshalable) MarshalText() ([]byte, error) {
+	return []byte(t.body), nil
+}
+
+func TestMappingForTextMarshaler(t *testing.T) {
+	tm := struct {
+		Marshalable *textMarshalable
+	}{
+		Marshalable: &textMarshalable{
+			body:  "text",
+			Extra: "stuff",
+		},
+	}
+
+	// first verify that when using a mapping that doesn't explicity
+	// map the stuct field as text, then we traverse inside the struct
+	// and do our best
+	m := NewIndexMapping()
+	doc := document.NewDocument("x")
+	err := m.MapDocument(doc, tm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(doc.Fields) != 1 {
+		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
+	}
+	if doc.Fields[0].Name() != "Marshalable.Extra" {
+		t.Errorf("expected field to be named 'Marshalable.Extra', got: '%s'", doc.Fields[0].Name())
+	}
+	if string(doc.Fields[0].Value()) != tm.Marshalable.Extra {
+		t.Errorf("expected field value to be '%s', got: '%s'", tm.Marshalable.Extra, string(doc.Fields[0].Value()))
+	}
+
+	// now verify that when a mapping explicity
+	m = NewIndexMapping()
+	txt := NewTextFieldMapping()
+	m.DefaultMapping.AddFieldMappingsAt("Marshalable", txt)
+	doc = document.NewDocument("x")
+	err = m.MapDocument(doc, tm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(doc.Fields) != 1 {
+		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
+
+	}
+	if doc.Fields[0].Name() != "Marshalable" {
+		t.Errorf("expected field to be named 'Marshalable', got: '%s'", doc.Fields[0].Name())
+	}
+	want, err := tm.Marshalable.MarshalText()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(doc.Fields[0].Value()) != string(want) {
+		t.Errorf("expected field value to be  '%s', got: '%s'", string(want), string(doc.Fields[0].Value()))
+	}
+
+}
