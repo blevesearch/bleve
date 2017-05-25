@@ -44,6 +44,12 @@ func (s *stats) statsMap() map[string]interface{} {
 		ms["kv"] = s.s.llstats()
 	}
 
+	if msw, ok := s.s.llstore.(*mossStoreWrapper); ok {
+		ms["store_histograms"] = msw.Actual().Histograms().String()
+	}
+
+	ms["coll_histograms"] = s.s.ms.Histograms().String()
+
 	return ms
 }
 
