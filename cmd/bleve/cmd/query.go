@@ -25,7 +25,7 @@ import (
 
 var limit, skip, repeat int
 var explain, highlight, fields bool
-var qtype, qfield string
+var qtype, qfield, sortby string
 
 // queryCmd represents the query command
 var queryCmd = &cobra.Command{
@@ -45,6 +45,13 @@ var queryCmd = &cobra.Command{
 			}
 			if fields {
 				req.Fields = []string{"*"}
+			}
+			if sortby != "" {
+				if strings.Contains(sortby, ",") {
+					req.SortBy(strings.Split(sortby, ","))
+				} else {
+					req.SortBy([]string{sortby})
+				}
 			}
 			res, err := idx.Search(req)
 			if err != nil {
@@ -90,4 +97,5 @@ func init() {
 	queryCmd.Flags().BoolVar(&fields, "fields", false, "Load stored fields, default false.")
 	queryCmd.Flags().StringVarP(&qtype, "type", "t", "query_string", "Type of query to run, defaults to 'query_string'")
 	queryCmd.Flags().StringVarP(&qfield, "field", "f", "", "Restrict query to field, by default no restriction, not applicable to query_string queries.")
+	queryCmd.Flags().StringVarP(&sortby, "sort-by", "b", "", "Sort by field.")
 }
