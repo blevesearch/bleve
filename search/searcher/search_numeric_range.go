@@ -17,6 +17,7 @@ package searcher
 import (
 	"bytes"
 	"math"
+	"sort"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/numeric"
@@ -55,12 +56,49 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 	// FIXME hard-coded precision, should match field declaration
 	termRanges := splitInt64Range(minInt64, maxInt64, 4)
 	terms := termRanges.Enumerate()
+	if len(terms) < 1 {
+		return NewMatchNoneSearcher(indexReader)
+	}
+	var err error
+	terms, err = filterCandidateTerms(indexReader, terms, field)
+	if err != nil {
+		return nil, err
+	}
+	if len(terms) < 1 {
+		return NewMatchNoneSearcher(indexReader)
+	}
 	if tooManyClauses(len(terms)) {
 		return nil, tooManyClausesErr()
 	}
 
 	return NewMultiTermSearcherBytes(indexReader, terms, field, boost, options,
 		true)
+}
+
+func filterCandidateTerms(indexReader index.IndexReader,
+	terms [][]byte, field string) (rv [][]byte, err error) {
+	fieldDict, err := indexReader.FieldDictRange(field, terms[0], terms[len(terms)-1])
+	if err != nil {
+		return nil, err
+	}
+
+	// enumerate the terms and check against list of terms
+	tfd, err := fieldDict.Next()
+	for err == nil && tfd != nil {
+		termBytes := []byte(tfd.Term)
+		i := sort.Search(len(terms), func(i int) bool { return bytes.Compare(terms[i], termBytes) >= 0 })
+		if i < len(terms) && bytes.Compare(terms[i], termBytes) == 0 {
+			rv = append(rv, terms[i])
+		}
+		terms = terms[i:]
+		tfd, err = fieldDict.Next()
+	}
+
+	if cerr := fieldDict.Close(); cerr != nil && err == nil {
+		err = cerr
+	}
+
+	return rv, err
 }
 
 type termRange struct {
