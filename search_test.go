@@ -201,8 +201,8 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 			facet: &FacetRequest{
 				Field: "Date_Range_Success_With_StartEnd",
 				Size:  1,
-				DateTimeRanges: []*dateTimeRange{
-					&dateTimeRange{Name: "testName", Start: time.Unix(0, 0), End: time.Now()},
+				DateTimeRanges: []*DateTimeRange{
+					&DateTimeRange{Name: "testName", Start: time.Unix(0, 0), End: time.Now()},
 				},
 			},
 			result: nil,
@@ -211,8 +211,8 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 			facet: &FacetRequest{
 				Field: "Date_Range_Success_With_Start",
 				Size:  1,
-				DateTimeRanges: []*dateTimeRange{
-					&dateTimeRange{Name: "testName", Start: time.Unix(0, 0)},
+				DateTimeRanges: []*DateTimeRange{
+					&DateTimeRange{Name: "testName", Start: time.Unix(0, 0)},
 				},
 			},
 			result: nil,
@@ -221,8 +221,8 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 			facet: &FacetRequest{
 				Field: "Date_Range_Success_With_End",
 				Size:  1,
-				DateTimeRanges: []*dateTimeRange{
-					&dateTimeRange{Name: "testName", End: time.Now()},
+				DateTimeRanges: []*DateTimeRange{
+					&DateTimeRange{Name: "testName", End: time.Now()},
 				},
 			},
 			result: nil,
@@ -261,10 +261,10 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 			facet: &FacetRequest{
 				Field: "Date_Range_Missing_Failure",
 				Size:  1,
-				DateTimeRanges: []*dateTimeRange{
-					&dateTimeRange{Name: "testName2", Start: time.Unix(0, 0)},
-					&dateTimeRange{Name: "testName1", End: time.Now()},
-					&dateTimeRange{Name: "testName"},
+				DateTimeRanges: []*DateTimeRange{
+					&DateTimeRange{Name: "testName2", Start: time.Unix(0, 0)},
+					&DateTimeRange{Name: "testName1", End: time.Now()},
+					&DateTimeRange{Name: "testName"},
 				},
 			},
 			result: drMissingErr,
@@ -288,8 +288,8 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 				NumericRanges: []*numericRange{
 					&numericRange{Name: "testName", Max: &value},
 				},
-				DateTimeRanges: []*dateTimeRange{
-					&dateTimeRange{Name: "testName", End: time.Now()},
+				DateTimeRanges: []*DateTimeRange{
+					&DateTimeRange{Name: "testName", End: time.Now()},
 				},
 			},
 			result: drNrErr,
@@ -309,9 +309,9 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 			facet: &FacetRequest{
 				Field: "Date_Range_Name_Repeat_Failure",
 				Size:  1,
-				DateTimeRanges: []*dateTimeRange{
-					&dateTimeRange{Name: "testName", Start: time.Unix(0, 0)},
-					&dateTimeRange{Name: "testName", End: time.Now()},
+				DateTimeRanges: []*DateTimeRange{
+					&DateTimeRange{Name: "testName", Start: time.Unix(0, 0)},
+					&DateTimeRange{Name: "testName", End: time.Now()},
 				},
 			},
 			result: drNameDupErr,

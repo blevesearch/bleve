@@ -44,10 +44,10 @@ var wildcardRegexpReplacer = strings.NewReplacer(
 	"?", ".")
 
 type WildcardQuery struct {
-	Wildcard string `json:"wildcard"`
-	FieldVal string `json:"field,omitempty"`
-	BoostVal *Boost `json:"boost,omitempty"`
-	compiled *regexp.Regexp
+	Wildcard string         `json:"wildcard"`
+	FieldVal string         `json:"field,omitempty"`
+	BoostVal *Boost         `json:"boost,omitempty"`
+	compiled *regexp.Regexp `json:"-"`
 }
 
 // NewWildcardQuery creates a new Query which finds
