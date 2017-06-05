@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve/analysis/tokenizer/exception"
 	"github.com/blevesearch/bleve/analysis/tokenizer/regexp"
@@ -963,6 +964,30 @@ func TestMappingForTextMarshaler(t *testing.T) {
 	}
 	if string(doc.Fields[0].Value()) != string(want) {
 		t.Errorf("expected field value to be  '%s', got: '%s'", string(want), string(doc.Fields[0].Value()))
+	}
+
+}
+
+func TestMappingForNilTextMarshaler(t *testing.T) {
+	tm := struct {
+		Marshalable *time.Time
+	}{
+		Marshalable: nil,
+	}
+
+	// now verify that when a mapping explicity
+	m := NewIndexMapping()
+	txt := NewTextFieldMapping()
+	m.DefaultMapping.AddFieldMappingsAt("Marshalable", txt)
+	doc := document.NewDocument("x")
+	err := m.MapDocument(doc, tm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(doc.Fields) != 0 {
+		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
+
 	}
 
 }
