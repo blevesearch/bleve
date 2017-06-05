@@ -513,21 +513,25 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		}
 		dm.walkDocument(property, path, indexes, context)
 	case reflect.Ptr:
-		switch property := property.(type) {
-		case encoding.TextMarshaler:
-			txt, err := property.MarshalText()
-			if err == nil && subDocMapping != nil {
-				// index by explicit mapping
-				for _, fieldMapping := range subDocMapping.Fields {
-					if fieldMapping.Type == "text" {
-						fieldMapping.processString(string(txt), pathString, path, indexes, context)
+		if !propertyValue.IsNil() {
+			switch property := property.(type) {
+			case encoding.TextMarshaler:
+
+				txt, err := property.MarshalText()
+				if err == nil && subDocMapping != nil {
+					// index by explicit mapping
+					for _, fieldMapping := range subDocMapping.Fields {
+						if fieldMapping.Type == "text" {
+							fieldMapping.processString(string(txt), pathString, path, indexes, context)
+						}
 					}
+				} else {
+					dm.walkDocument(property, path, indexes, context)
 				}
-			} else {
+
+			default:
 				dm.walkDocument(property, path, indexes, context)
 			}
-		default:
-			dm.walkDocument(property, path, indexes, context)
 		}
 	default:
 		dm.walkDocument(property, path, indexes, context)
