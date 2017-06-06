@@ -459,7 +459,9 @@ func InitMossStore(config map[string]interface{}, options moss.CollectionOptions
 	}
 
 	storeOptions := moss.StoreOptions{
-		CollectionOptions: options,
+		CollectionOptions:     options,
+		CompactionPercentage:  100.0,
+		CompactionMaxSegments: 20,
 	}
 	v, ok := config["mossStoreOptions"]
 	if ok {
