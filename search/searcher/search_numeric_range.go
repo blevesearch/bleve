@@ -57,15 +57,15 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 	termRanges := splitInt64Range(minInt64, maxInt64, 4)
 	terms := termRanges.Enumerate()
 	if len(terms) < 1 {
-		return NewMatchNoneSearcher(indexReader)
+		// cannot return MatchNoneSearcher because of interaction with
+		// commit f391b991c20f02681bacd197afc6d8aed444e132
+		return NewMultiTermSearcherBytes(indexReader, terms, field, boost, options,
+			true)
 	}
 	var err error
 	terms, err = filterCandidateTerms(indexReader, terms, field)
 	if err != nil {
 		return nil, err
-	}
-	if len(terms) < 1 {
-		return NewMatchNoneSearcher(indexReader)
 	}
 	if tooManyClauses(len(terms)) {
 		return nil, tooManyClausesErr()
