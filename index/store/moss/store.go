@@ -22,10 +22,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/couchbase/moss"
-
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
+	"github.com/couchbase/moss"
 )
 
 // RegistryCollectionOptions should be treated as read-only after
@@ -98,7 +97,7 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 
 	// --------------------------------------------------
 
-	mossLowerLevelStoreName := ""
+	mossLowerLevelStoreName := "mossStore"
 	v, ok = config["mossLowerLevelStoreName"]
 	if ok {
 		mossLowerLevelStoreName, ok = v.(string)
@@ -155,6 +154,31 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 
 	// --------------------------------------------------
 
+	v, ok = config["mossPersistSync"]
+	if ok {
+		if val, ok := v.(bool); ok && val {
+			options.OnEvent = func(event moss.Event) {
+				if msw, ok := llStore.(*mossStoreWrapper); ok {
+					msw.enablePersistSync = true
+					if event.Kind == moss.EventKindPersisterProgress {
+						stats, err := event.Collection.Stats()
+						if err == nil && stats.CurDirtyOps <= 0 &&
+							stats.CurDirtyBytes <= 0 && stats.CurDirtySegments <= 0 {
+							msw.m.Lock()
+							if msw.persistCh != nil {
+								msw.persistCh <- struct{}{}
+								msw.persistCh = nil
+							}
+							msw.m.Unlock()
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// --------------------------------------------------
+
 	ms, err := moss.NewCollection(options)
 	if err != nil {
 		return nil, err
@@ -175,12 +199,14 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 }
 
 func (s *Store) Close() error {
-	if val, ok := s.config["mossAbortCloseEnabled"]; ok {
-		if v, ok := val.(bool); ok && v {
-			if msw, ok := s.llstore.(*mossStoreWrapper); ok {
-				if s := msw.Actual(); s != nil {
-					_ = s.CloseEx(moss.StoreCloseExOptions{Abort: true})
+	if msw, ok := s.llstore.(*mossStoreWrapper); ok {
+		if ss := msw.Actual(); ss != nil {
+			if val, ok := s.config["mossAbortCloseEnabled"]; ok {
+				if v, ok := val.(bool); ok && v {
+					_ = ss.CloseEx(moss.StoreCloseExOptions{Abort: true})
 				}
+			} else {
+				ss.CloseEx(moss.StoreCloseExOptions{})
 			}
 		}
 	}
