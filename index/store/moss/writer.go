@@ -88,20 +88,16 @@ func (w *Writer) ExecuteBatch(b store.KVBatch) (err error) {
 		}
 	}
 
-	var persistCh chan struct{}
-	if msw, ok := batch.store.llstore.(*mossStoreWrapper); ok {
-		persistCh = make(chan struct{}, 1)
+	err = w.s.ms.ExecuteBatch(batch.batch, moss.WriteOptions{})
+	if msw, ok := batch.store.llstore.(*mossStoreWrapper); ok && msw.enablePersistSync {
+		persistCh := make(chan struct{}, 1)
 
 		batch.store.m.Lock()
 		msw.persistCh = persistCh
 		batch.store.m.Unlock()
-	}
 
-	err = w.s.ms.ExecuteBatch(batch.batch, moss.WriteOptions{})
-	if persistCh != nil {
 		<-persistCh
 	}
-
 	return err
 }
 

@@ -22,10 +22,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/couchbase/moss"
-
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
+	"github.com/couchbase/moss"
 )
 
 // RegistryCollectionOptions should be treated as read-only after
@@ -155,30 +154,23 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 
 	// --------------------------------------------------
 
-	v, ok = config["mossOnEventFunc"]
+	v, ok = config["mossPersistSync"]
 	if ok {
-		f, ok := v.(func(event moss.Event))
-		if !ok {
-			return nil, fmt.Errorf("moss store,"+
-				" could not parse config[mossOnEventFunc]: %v", v)
-		}
-
-		if ok {
-			options.OnEvent = f
-		}
-	} else {
-		options.OnEvent = func(event moss.Event) {
-			if msw, ok := llStore.(*mossStoreWrapper); ok {
-				if event.Kind == moss.EventKindPersisterProgress {
-					stats, err := event.Collection.Stats()
-					if err == nil && stats.CurDirtyOps <= 0 &&
-						stats.CurDirtyBytes <= 0 && stats.CurDirtySegments <= 0 {
-						msw.m.Lock()
-						if msw.persistCh != nil {
-							msw.persistCh <- struct{}{}
-							msw.persistCh = nil
+		if val, ok := v.(bool); ok && val {
+			options.OnEvent = func(event moss.Event) {
+				if msw, ok := llStore.(*mossStoreWrapper); ok {
+					msw.enablePersistSync = true
+					if event.Kind == moss.EventKindPersisterProgress {
+						stats, err := event.Collection.Stats()
+						if err == nil && stats.CurDirtyOps <= 0 &&
+							stats.CurDirtyBytes <= 0 && stats.CurDirtySegments <= 0 {
+							msw.m.Lock()
+							if msw.persistCh != nil {
+								msw.persistCh <- struct{}{}
+								msw.persistCh = nil
+							}
+							msw.m.Unlock()
 						}
-						msw.m.Unlock()
 					}
 				}
 			}
@@ -214,7 +206,6 @@ func (s *Store) Close() error {
 					_ = ss.CloseEx(moss.StoreCloseExOptions{Abort: true})
 				}
 			} else {
-				// Close gracefully
 				ss.CloseEx(moss.StoreCloseExOptions{})
 			}
 		}

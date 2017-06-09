@@ -522,7 +522,9 @@ type mossStoreWrapper struct {
 	s    *moss.Store
 
 	pendingWrites int
-	persistCh     chan struct{}
+
+	enablePersistSync bool
+	persistCh         chan struct{}
 }
 
 func (w *mossStoreWrapper) AddRef() {
