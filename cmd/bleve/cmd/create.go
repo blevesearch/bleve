@@ -48,7 +48,16 @@ var createCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("error building mapping: %v", err)
 		}
-		idx, err = bleve.NewUsing(args[0], mapping, indexType, storeType, nil)
+
+		// If we are using moss, use mossStore and turn on persistSync
+		var kvconfig map[string]interface{}
+		if storeType == "moss" {
+			kvconfig = make(map[string]interface{})
+			kvconfig["mossLowerLevelStoreName"] = "mossStore"
+			kvconfig["mossPersistSync"] = true
+		}
+
+		idx, err = bleve.NewUsing(args[0], mapping, indexType, storeType, kvconfig)
 		if err != nil {
 			return fmt.Errorf("error creating index: %v", err)
 		}
