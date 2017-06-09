@@ -98,7 +98,7 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 
 	// --------------------------------------------------
 
-	mossLowerLevelStoreName := ""
+	mossLowerLevelStoreName := "mossStore"
 	v, ok = config["mossLowerLevelStoreName"]
 	if ok {
 		mossLowerLevelStoreName, ok = v.(string)
@@ -155,6 +155,38 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 
 	// --------------------------------------------------
 
+	v, ok = config["mossOnEventFunc"]
+	if ok {
+		f, ok := v.(func(event moss.Event))
+		if !ok {
+			return nil, fmt.Errorf("moss store,"+
+				" could not parse config[mossOnEventFunc]: %v", v)
+		}
+
+		if ok {
+			options.OnEvent = f
+		}
+	} else {
+		options.OnEvent = func(event moss.Event) {
+			if msw, ok := llStore.(*mossStoreWrapper); ok {
+				if event.Kind == moss.EventKindPersisterProgress {
+					stats, err := event.Collection.Stats()
+					if err == nil && stats.CurDirtyOps <= 0 &&
+						stats.CurDirtyBytes <= 0 && stats.CurDirtySegments <= 0 {
+						msw.m.Lock()
+						if msw.persistCh != nil {
+							msw.persistCh <- struct{}{}
+							msw.persistCh = nil
+						}
+						msw.m.Unlock()
+					}
+				}
+			}
+		}
+	}
+
+	// --------------------------------------------------
+
 	ms, err := moss.NewCollection(options)
 	if err != nil {
 		return nil, err
@@ -175,12 +207,15 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 }
 
 func (s *Store) Close() error {
-	if val, ok := s.config["mossAbortCloseEnabled"]; ok {
-		if v, ok := val.(bool); ok && v {
-			if msw, ok := s.llstore.(*mossStoreWrapper); ok {
-				if s := msw.Actual(); s != nil {
-					_ = s.CloseEx(moss.StoreCloseExOptions{Abort: true})
+	if msw, ok := s.llstore.(*mossStoreWrapper); ok {
+		if ss := msw.Actual(); ss != nil {
+			if val, ok := s.config["mossAbortCloseEnabled"]; ok {
+				if v, ok := val.(bool); ok && v {
+					_ = ss.CloseEx(moss.StoreCloseExOptions{Abort: true})
 				}
+			} else {
+				// Close gracefully
+				ss.CloseEx(moss.StoreCloseExOptions{})
 			}
 		}
 	}

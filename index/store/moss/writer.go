@@ -88,7 +88,21 @@ func (w *Writer) ExecuteBatch(b store.KVBatch) (err error) {
 		}
 	}
 
-	return w.s.ms.ExecuteBatch(batch.batch, moss.WriteOptions{})
+	var persistCh chan struct{}
+	if msw, ok := batch.store.llstore.(*mossStoreWrapper); ok {
+		persistCh = make(chan struct{}, 1)
+
+		batch.store.m.Lock()
+		msw.persistCh = persistCh
+		batch.store.m.Unlock()
+	}
+
+	err = w.s.ms.ExecuteBatch(batch.batch, moss.WriteOptions{})
+	if persistCh != nil {
+		<-persistCh
+	}
+
+	return err
 }
 
 func (w *Writer) Close() error {
