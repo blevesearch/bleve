@@ -28,176 +28,45 @@ func TestCamelCaseFilter(t *testing.T) {
 		output analysis.TokenStream
 	}{
 		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte(""),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte(""),
-				},
-			},
+			input:  tokenStream(""),
+			output: tokenStream(""),
 		},
 		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("a"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("a"),
-				},
-			},
+			input:  tokenStream("a"),
+			output: tokenStream("a"),
 		},
 
 		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("...aMACMac123macILoveGolang"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("..."),
-				},
-				&analysis.Token{
-					Term: []byte("a"),
-				},
-				&analysis.Token{
-					Term: []byte("MAC"),
-				},
-				&analysis.Token{
-					Term: []byte("Mac"),
-				},
-				&analysis.Token{
-					Term: []byte("123"),
-				},
-				&analysis.Token{
-					Term: []byte("mac"),
-				},
-				&analysis.Token{
-					Term: []byte("I"),
-				},
-				&analysis.Token{
-					Term: []byte("Love"),
-				},
-				&analysis.Token{
-					Term: []byte("Golang"),
-				},
-			},
+			input:  tokenStream("...aMACMac123macILoveGolang"),
+			output: tokenStream("...", "a", "MAC", "Mac", "123", "mac", "I", "Love", "Golang"),
 		},
 		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("Lang"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("Lang"),
-				},
-			},
+			input:  tokenStream("Lang"),
+			output: tokenStream("Lang"),
 		},
 		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("GLang"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("G"),
-				},
-				&analysis.Token{
-					Term: []byte("Lang"),
-				},
-			},
+			input:  tokenStream("GLang"),
+			output: tokenStream("G", "Lang"),
 		},
 		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("GOLang"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("GO"),
-				},
-				&analysis.Token{
-					Term: []byte("Lang"),
-				},
-			},
+			input:  tokenStream("GOLang"),
+			output: tokenStream("GO", "Lang"),
 		},
 		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("GOOLang"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("GOO"),
-				},
-				&analysis.Token{
-					Term: []byte("Lang"),
-				},
-			},
+			input:  tokenStream("GOOLang"),
+			output: tokenStream("GOO", "Lang"),
 		},
 		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("1234"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("1234"),
-				},
-			},
+			input:  tokenStream("1234"),
+			output: tokenStream("1234"),
 		},
 		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("starbucks"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("starbucks"),
-				},
-			},
+			input:  tokenStream("starbucks"),
+			output: tokenStream("starbucks"),
 		},
 		{
-			input: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("Starbucks TVSamsungIsGREAT000"),
-				},
-			},
-			output: analysis.TokenStream{
-				&analysis.Token{
-					Term: []byte("Starbucks"),
-				},
-				&analysis.Token{
-					Term: []byte(" "),
-				},
-				&analysis.Token{
-					Term: []byte("TV"),
-				},
-				&analysis.Token{
-					Term: []byte("Samsung"),
-				},
-				&analysis.Token{
-					Term: []byte("Is"),
-				},
-				&analysis.Token{
-					Term: []byte("GREAT"),
-				},
-				&analysis.Token{
-					Term: []byte("000"),
-				},
-			},
+			input:  tokenStream("Starbucks TVSamsungIsGREAT000"),
+			output: tokenStream("Starbucks", " ", "TV", "Samsung", "Is", "GREAT", "000"),
 		},
 	}
 
@@ -208,4 +77,19 @@ func TestCamelCaseFilter(t *testing.T) {
 			t.Errorf("expected %s \n\n got %s", test.output, actual)
 		}
 	}
+}
+
+func tokenStream(termStrs ...string) analysis.TokenStream {
+	tokenStream := make([]*analysis.Token, len(termStrs))
+	index := 0
+	for i, termStr := range termStrs {
+		tokenStream[i] = &analysis.Token{
+			Term:     []byte(termStr),
+			Position: i + 1,
+			Start:    index,
+			End:      index + len(termStr),
+		}
+		index += len(termStr)
+	}
+	return analysis.TokenStream(tokenStream)
 }
