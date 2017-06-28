@@ -50,11 +50,12 @@ func NewCamelCaseFilter() *CamelCaseFilter {
 func (f *CamelCaseFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 	rv := make(analysis.TokenStream, 0, len(input))
 
+	nextPosition := 1
 	for _, token := range input {
 		runeCount := utf8.RuneCount(token.Term)
 		runes := bytes.Runes(token.Term)
 
-		p := NewParser(runeCount)
+		p := NewParser(runeCount, nextPosition, token.Start)
 		for i := 0; i < runeCount; i++ {
 			if i+1 >= runeCount {
 				p.Push(runes[i], nil)
@@ -63,6 +64,7 @@ func (f *CamelCaseFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
 			}
 		}
 		rv = append(rv, p.FlushTokens()...)
+		nextPosition = p.NextPosition()
 	}
 	return rv
 }
