@@ -14,7 +14,10 @@
 
 package document
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+)
 
 type Document struct {
 	ID              string  `json:"id"`
@@ -42,21 +45,21 @@ func (d *Document) AddField(f Field) *Document {
 }
 
 func (d *Document) GoString() string {
-	fields := ""
+	var fields bytes.Buffer
 	for i, field := range d.Fields {
 		if i != 0 {
-			fields += ", "
+			fields.WriteString(", ")
 		}
-		fields += fmt.Sprintf("%#v", field)
+		fields.WriteString(fmt.Sprintf("%#v", field))
 	}
-	compositeFields := ""
+	var compositeFields bytes.Buffer
 	for i, field := range d.CompositeFields {
 		if i != 0 {
-			compositeFields += ", "
+			compositeFields.WriteString(", ")
 		}
-		compositeFields += fmt.Sprintf("%#v", field)
+		compositeFields.WriteString(fmt.Sprintf("%#v", field))
 	}
-	return fmt.Sprintf("&document.Document{ID:%s, Fields: %s, CompositeFields: %s}", d.ID, fields, compositeFields)
+	return fmt.Sprintf("&document.Document{ID:%s, Fields: %s, CompositeFields: %s}", d.ID, fields.String(), compositeFields.String())
 }
 
 func (d *Document) NumPlainTextBytes() uint64 {
