@@ -26,6 +26,7 @@ import (
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
+	"github.com/go-errors/errors"
 )
 
 type indexAliasImpl struct {
@@ -455,10 +456,15 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 	var waitGroup sync.WaitGroup
 
 	var searchChildIndex = func(in Index, childReq *SearchRequest) {
-		rv := asyncSearchResult{Name: in.Name()}
+		rv := &asyncSearchResult{Name: in.Name()}
+		defer func() {
+			if err := recover(); err != nil {
+				rv.Err = errors.Wrap(err, 2)
+			}
+			asyncResults <- rv
+			waitGroup.Done()
+		}()
 		rv.Result, rv.Err = in.SearchInContext(ctx, childReq)
-		asyncResults <- &rv
-		waitGroup.Done()
 	}
 
 	waitGroup.Add(len(indexes))
