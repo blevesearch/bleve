@@ -18,10 +18,17 @@ import (
 	"github.com/blevesearch/bleve/analysis"
 )
 
-func buildTokenFromTerm(buffer []rune) *analysis.Token {
-	return &analysis.Token{
-		Term: analysis.BuildTermFromRunes(buffer),
+func (p *Parser) buildTokenFromTerm(buffer []rune) *analysis.Token {
+	term := analysis.BuildTermFromRunes(buffer)
+	token := &analysis.Token{
+		Term:     term,
+		Position: p.position,
+		Start:    p.index,
+		End:      p.index + len(term),
 	}
+	p.position++
+	p.index += len(term)
+	return token
 }
 
 // Parser accepts a symbol and passes it to the current state (representing a class).
@@ -35,13 +42,17 @@ type Parser struct {
 	buffer    []rune
 	current   State
 	tokens    []*analysis.Token
+	position  int
+	index     int
 }
 
-func NewParser(len int) *Parser {
+func NewParser(len, position, index int) *Parser {
 	return &Parser{
 		bufferLen: len,
 		buffer:    make([]rune, 0, len),
 		tokens:    make([]*analysis.Token, 0, len),
+		position:  position,
+		index:     index,
 	}
 }
 
@@ -57,7 +68,7 @@ func (p *Parser) Push(sym rune, peek *rune) {
 
 	} else {
 		// the old state is no more, thus convert the buffer
-		p.tokens = append(p.tokens, buildTokenFromTerm(p.buffer))
+		p.tokens = append(p.tokens, p.buildTokenFromTerm(p.buffer))
 
 		// let the new state begin
 		p.current = p.NewState(sym)
@@ -89,6 +100,10 @@ func (p *Parser) NewState(sym rune) State {
 }
 
 func (p *Parser) FlushTokens() []*analysis.Token {
-	p.tokens = append(p.tokens, buildTokenFromTerm(p.buffer))
+	p.tokens = append(p.tokens, p.buildTokenFromTerm(p.buffer))
 	return p.tokens
+}
+
+func (p *Parser) NextPosition() int {
+	return p.position
 }
