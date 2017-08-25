@@ -318,7 +318,7 @@ func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}
 
 		// see if the _all field was disabled
 		allMapping := docMapping.documentMappingForPath("_all")
-		if allMapping == nil || (allMapping.Enabled != false) {
+		if allMapping == nil || allMapping.Enabled {
 			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, document.IndexField|document.IncludeTermVectors)
 			doc.AddField(field)
 		}
