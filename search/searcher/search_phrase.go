@@ -226,6 +226,10 @@ type phrasePart struct {
 	loc  *search.Location
 }
 
+func (p *phrasePart) String() string {
+	return fmt.Sprintf("[%s %v]", p.term, p.loc)
+}
+
 type phrasePath []*phrasePart
 
 func (p phrasePath) MergeInto(in search.TermLocationMap) {
