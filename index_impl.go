@@ -126,7 +126,7 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	return &rv, nil
 }
 
-func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *indexImpl, err error) {
+func openIndexUsing(path string, indexMapping mapping.IndexMapping, runtimeConfig map[string]interface{}) (rv *indexImpl, err error) {
 	rv = &indexImpl{
 		path: path,
 		name: path,
@@ -171,6 +171,23 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 			return nil, ErrorUnknownStorageType
 		}
 		return nil, err
+	}
+
+	// use mapping
+	if indexMapping != nil {
+		err = indexMapping.Validate()
+		if err != nil {
+			return nil, err
+		}
+
+		// mark the index as open
+		rv.mutex.Lock()
+		defer rv.mutex.Unlock()
+		rv.open = true
+
+		rv.m = indexMapping
+		indexStats.Register(rv)
+		return rv, err
 	}
 
 	// now load the mapping

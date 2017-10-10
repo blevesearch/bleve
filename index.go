@@ -245,7 +245,7 @@ func NewUsing(path string, mapping mapping.IndexMapping, indexType string, kvsto
 // Open index at the specified path, must exist.
 // The mapping used when it was created will be used for all Index/Search operations.
 func Open(path string) (Index, error) {
-	return openIndexUsing(path, nil)
+	return openIndexUsing(path, nil, nil)
 }
 
 // OpenUsing opens index at the specified path, must exist.
@@ -253,5 +253,14 @@ func Open(path string) (Index, error) {
 // The provided runtimeConfig can override settings
 // persisted when the kvstore was created.
 func OpenUsing(path string, runtimeConfig map[string]interface{}) (Index, error) {
-	return openIndexUsing(path, runtimeConfig)
+	return openIndexUsing(path, nil, runtimeConfig)
+}
+
+// OpenUsingMapping opens index at the specified path, must exist.
+// The mapping used when it was created will be used for all Index/Search operations.
+// The provided runtimeConfig can override settings
+// persisted when the kvstore was created.
+// The provided mapping will be used for all, when alias use multiple the same index mapping.
+func OpenUsingMapping(path string, mapping mapping.IndexMapping) (Index, error) {
+	return openIndexUsing(path, mapping, nil)
 }
