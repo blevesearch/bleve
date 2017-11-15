@@ -17,6 +17,7 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -135,6 +136,16 @@ func NewGeoPointFieldMapping() *FieldMapping {
 	}
 }
 
+// NewIPFieldMapping returns a default field mapping for geo points
+func NewIPFieldMapping() *FieldMapping {
+	return &FieldMapping{
+		Type:         "IP",
+		Store:        true,
+		Index:        true,
+		IncludeInAll: true,
+	}
+}
+
 // Options returns the indexing options for this field.
 func (fm *FieldMapping) Options() document.IndexingOptions {
 	var rv document.IndexingOptions
@@ -171,6 +182,17 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 			parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
 			if err == nil {
 				fm.processTime(parsedDateTime, pathString, path, indexes, context)
+			}
+		}
+	} else if fm.Type == "IP" {
+		ip := net.ParseIP(propertyValueString)
+		if ip != nil {
+			options := fm.Options()
+			field := document.NewIPFieldWithIndexingOptions(fieldName, indexes, ip, options)
+			context.doc.AddField(field)
+
+			if !fm.IncludeInAll {
+				context.excludedFromAll = append(context.excludedFromAll, fieldName)
 			}
 		}
 	}
