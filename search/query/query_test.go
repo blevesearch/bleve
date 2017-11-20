@@ -31,6 +31,7 @@ var startDateStr = "2011-01-01T00:00:00Z"
 var endDateStr = "2012-01-01T00:00:00Z"
 var startDate time.Time
 var endDate time.Time
+var cidr = "192.168.0.1/32"
 
 func init() {
 	var err error
@@ -188,6 +189,10 @@ func TestParseQuery(t *testing.T) {
 			input:  []byte(`{"madeitup":"queryhere"}`),
 			output: nil,
 			err:    true,
+		},
+		{
+			input:  []byte(`{"cidr":"` + cidr + `"}`),
+			output: NewIPRangeQuery(cidr),
 		},
 	}
 
