@@ -42,7 +42,20 @@ func (q *IPRangeQuery) Field() string {
 func (q *IPRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	_, ipNet, err := net.ParseCIDR(q.CIDRVal)
 	if err != nil {
-		return nil, err
+		isIP := net.ParseIP(q.CIDRVal)
+		if isIP == nil {
+			return nil, err
+		}
+
+		if isIP.DefaultMask() != nil {
+			q.CIDRVal = q.CIDRVal + `/32`
+		} else {
+			q.CIDRVal = q.CIDRVal + `/128`
+		}
+		_, ipNet, err = net.ParseCIDR(q.CIDRVal)
+		if err != nil {
+			return nil, err
+		}
 	}
 	cq := ipRangeToConjuctionQuery(q.FieldVal, ipNet)
 	return cq.Searcher(i, m, options)
