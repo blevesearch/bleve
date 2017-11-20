@@ -216,3 +216,7 @@ func NewGeoBoundingBoxQuery(topLeftLon, topLeftLat, bottomRightLon, bottomRightL
 func NewGeoDistanceQuery(lon, lat float64, distance string) *query.GeoDistanceQuery {
 	return query.NewGeoDistanceQuery(lon, lat, distance)
 }
+
+func NewIPRangeQuery(cidr string) *query.IPRangeQuery {
+	return query.NewIPRangeQuery(cidr)
+}
