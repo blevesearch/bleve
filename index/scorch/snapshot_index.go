@@ -161,13 +161,17 @@ func (i *IndexSnapshot) DocCount() (uint64, error) {
 	return rv, nil
 }
 
-func (i *IndexSnapshot) Document(id string) (*document.Document, error) {
+func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 	// FIXME could be done more efficiently directly, but reusing for simplicity
 	tfr, err := i.TermFieldReader([]byte(id), "_id", false, false, false)
 	if err != nil {
 		return nil, err
 	}
-	defer tfr.Close()
+	defer func() {
+		if cerr := tfr.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
 
 	next, err := tfr.Next(nil)
 	if err != nil {
@@ -177,8 +181,8 @@ func (i *IndexSnapshot) Document(id string) (*document.Document, error) {
 	docNum := docInternalToNumber(next.ID)
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
-	rv := document.NewDocument(id)
-	i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, value []byte, pos []uint64) bool {
+	rv = document.NewDocument(id)
+	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, value []byte, pos []uint64) bool {
 		switch typ {
 		case 't':
 			rv.AddField(document.NewTextField(name, pos, value))
@@ -194,6 +198,9 @@ func (i *IndexSnapshot) Document(id string) (*document.Document, error) {
 
 		return true
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return rv, nil
 }
@@ -218,7 +225,7 @@ func (i *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
 
 	var found bool
 	var rv string
-	i.segment[segmentIndex].VisitDocument(localDocNum, func(field string, typ byte, value []byte, pos []uint64) bool {
+	err := i.segment[segmentIndex].VisitDocument(localDocNum, func(field string, typ byte, value []byte, pos []uint64) bool {
 		if field == "_id" {
 			found = true
 			rv = string(value)
@@ -226,6 +233,9 @@ func (i *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
 		}
 		return true
 	})
+	if err != nil {
+		return "", err
+	}
 
 	if found {
 		return rv, nil
@@ -233,13 +243,17 @@ func (i *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
 	return "", fmt.Errorf("document number %d not found", docNum)
 }
 
-func (i *IndexSnapshot) InternalID(id string) (index.IndexInternalID, error) {
+func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err error) {
 	// FIXME could be done more efficiently directly, but reusing for simplicity
 	tfr, err := i.TermFieldReader([]byte(id), "_id", false, false, false)
 	if err != nil {
 		return nil, err
 	}
-	defer tfr.Close()
+	defer func() {
+		if cerr := tfr.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
 
 	next, err := tfr.Next(nil)
 	if err != nil {
@@ -295,6 +309,6 @@ func docNumberToBytes(in uint64) []byte {
 
 func docInternalToNumber(in index.IndexInternalID) uint64 {
 	var res uint64
-	binary.Read(bytes.NewReader(in), binary.BigEndian, &res)
+	_ = binary.Read(bytes.NewReader(in), binary.BigEndian, &res)
 	return res
 }

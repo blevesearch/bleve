@@ -44,10 +44,13 @@ func TestEmpty(t *testing.T) {
 	}
 
 	// now try and visit a document
-	emptySegment.VisitDocument(0, func(field string, typ byte, value []byte, pos []uint64) bool {
+	err := emptySegment.VisitDocument(0, func(field string, typ byte, value []byte, pos []uint64) bool {
 		t.Errorf("document visitor called, not expected")
 		return true
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestSingle(t *testing.T) {
@@ -288,10 +291,13 @@ func TestSingle(t *testing.T) {
 
 	// now try and visit a document
 	var fieldValuesSeen int
-	segment.VisitDocument(0, func(field string, typ byte, value []byte, pos []uint64) bool {
+	err := segment.VisitDocument(0, func(field string, typ byte, value []byte, pos []uint64) bool {
 		fieldValuesSeen++
 		return true
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if fieldValuesSeen != 5 {
 		t.Errorf("expected 5 field values, got %d", fieldValuesSeen)
 	}

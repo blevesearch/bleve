@@ -121,9 +121,7 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 	} else {
 		newSegment = mem.New()
 	}
-	s.prepareSegment(newSegment, ids, batch.InternalOps)
-
-	return nil
+	return s.prepareSegment(newSegment, ids, batch.InternalOps)
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
