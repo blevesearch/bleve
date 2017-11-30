@@ -93,6 +93,14 @@ func TestIndexReader(t *testing.T) {
 		t.Errorf("count was 2, but only saw %d", actualCount)
 	}
 
+	internalIDBogus, err := indexReader.InternalID("a-bogus-docId")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if internalIDBogus != nil {
+		t.Errorf("expected bogus docId to have nil InternalID")
+	}
+
 	internalID2, err := indexReader.InternalID("2")
 	if err != nil {
 		t.Fatal(err)

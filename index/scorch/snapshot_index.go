@@ -256,7 +256,7 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 	}()
 
 	next, err := tfr.Next(nil)
-	if err != nil {
+	if err != nil || next == nil {
 		return nil, err
 	}
 
