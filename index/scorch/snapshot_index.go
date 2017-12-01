@@ -5,6 +5,7 @@ import (
 	"container/heap"
 	"encoding/binary"
 	"fmt"
+	"sort"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/document"
@@ -191,14 +192,10 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 }
 
 func (i *IndexSnapshot) segmentIndexAndLocalDocNumFromGlobal(docNum uint64) (int, uint64) {
-	var segmentIndex uint64
-	for j := 1; j < len(i.offsets); j++ {
-		if docNum >= i.offsets[j] {
-			segmentIndex = uint64(j)
-		} else {
-			break
-		}
-	}
+	segmentIndex := sort.Search(len(i.offsets),
+		func(x int) bool {
+			return i.offsets[x] > docNum
+		}) - 1
 
 	localDocNum := docNum - i.offsets[segmentIndex]
 	return int(segmentIndex), localDocNum

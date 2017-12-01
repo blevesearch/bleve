@@ -517,3 +517,107 @@ func TestIndexDocIdOnlyReader(t *testing.T) {
 	// }
 
 }
+
+func TestSegmentIndexAndLocalDocNumFromGlobal(t *testing.T) {
+	tests := []struct {
+		offsets      []uint64
+		globalDocNum uint64
+		segmentIndex int
+		localDocNum  uint64
+	}{
+		// just 1 segment
+		{
+			offsets:      []uint64{0},
+			globalDocNum: 0,
+			segmentIndex: 0,
+			localDocNum:  0,
+		},
+		{
+			offsets:      []uint64{0},
+			globalDocNum: 1,
+			segmentIndex: 0,
+			localDocNum:  1,
+		},
+		{
+			offsets:      []uint64{0},
+			globalDocNum: 25,
+			segmentIndex: 0,
+			localDocNum:  25,
+		},
+		// now 2 segments, 30 docs in first
+		{
+			offsets:      []uint64{0, 30},
+			globalDocNum: 0,
+			segmentIndex: 0,
+			localDocNum:  0,
+		},
+		{
+			offsets:      []uint64{0, 30},
+			globalDocNum: 1,
+			segmentIndex: 0,
+			localDocNum:  1,
+		},
+		{
+			offsets:      []uint64{0, 30},
+			globalDocNum: 25,
+			segmentIndex: 0,
+			localDocNum:  25,
+		},
+		{
+			offsets:      []uint64{0, 30},
+			globalDocNum: 30,
+			segmentIndex: 1,
+			localDocNum:  0,
+		},
+		{
+			offsets:      []uint64{0, 30},
+			globalDocNum: 35,
+			segmentIndex: 1,
+			localDocNum:  5,
+		},
+		// lots of segments
+		{
+			offsets:      []uint64{0, 30, 40, 70, 99, 172, 800, 25000},
+			globalDocNum: 0,
+			segmentIndex: 0,
+			localDocNum:  0,
+		},
+		{
+			offsets:      []uint64{0, 30, 40, 70, 99, 172, 800, 25000},
+			globalDocNum: 25,
+			segmentIndex: 0,
+			localDocNum:  25,
+		},
+		{
+			offsets:      []uint64{0, 30, 40, 70, 99, 172, 800, 25000},
+			globalDocNum: 35,
+			segmentIndex: 1,
+			localDocNum:  5,
+		},
+		{
+			offsets:      []uint64{0, 30, 40, 70, 99, 172, 800, 25000},
+			globalDocNum: 100,
+			segmentIndex: 4,
+			localDocNum:  1,
+		},
+		{
+			offsets:      []uint64{0, 30, 40, 70, 99, 172, 800, 25000},
+			globalDocNum: 825,
+			segmentIndex: 6,
+			localDocNum:  25,
+		},
+	}
+
+	for _, test := range tests {
+		i := &IndexSnapshot{
+			offsets: test.offsets,
+		}
+		gotSegmentIndex, gotLocalDocNum := i.segmentIndexAndLocalDocNumFromGlobal(test.globalDocNum)
+		if gotSegmentIndex != test.segmentIndex {
+			t.Errorf("got segment index %d expected %d for offsets %v globalDocNum %d", gotSegmentIndex, test.segmentIndex, test.offsets, test.globalDocNum)
+		}
+		if gotLocalDocNum != test.localDocNum {
+			t.Errorf("got localDocNum %d expected %d for offsets %v globalDocNum %d", gotLocalDocNum, test.localDocNum, test.offsets, test.globalDocNum)
+		}
+	}
+}
