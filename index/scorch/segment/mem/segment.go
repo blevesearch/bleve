@@ -5,6 +5,9 @@ import (
 	"github.com/blevesearch/bleve/index/scorch/segment"
 )
 
+// _id field is always guaranteed to have fieldID of 0
+const idFieldID uint16 = 0
+
 // KNOWN ISSUES
 // - LIMITATION - we decided whether or not to store term vectors for a field
 //                at the segment level, based on the first definition of a
@@ -120,7 +123,7 @@ func (s *Segment) Count() uint64 {
 // provided _id strings
 func (s *Segment) DocNumbers(ids []string) *roaring.Bitmap {
 
-	idDictionary := s.Dicts[s.getOrDefineField("_id", false)]
+	idDictionary := s.Dicts[idFieldID]
 	rv := roaring.New()
 	for _, id := range ids {
 		postingID := idDictionary[id]
