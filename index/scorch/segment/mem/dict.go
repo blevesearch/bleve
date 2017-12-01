@@ -21,7 +21,7 @@ func (d *Dictionary) PostingsList(term string, except *roaring.Bitmap) segment.P
 	return &PostingsList{
 		dictionary: d,
 		term:       term,
-		postingsID: d.segment.dicts[d.fieldID][term],
+		postingsID: d.segment.Dicts[d.fieldID][term],
 		except:     except,
 	}
 }
@@ -36,7 +36,7 @@ func (d *Dictionary) Iterator() segment.DictionaryIterator {
 // PrefixIterator returns an iterator which only visits terms having the
 // the specified prefix
 func (d *Dictionary) PrefixIterator(prefix string) segment.DictionaryIterator {
-	offset := sort.SearchStrings(d.segment.dictKeys[d.fieldID], prefix)
+	offset := sort.SearchStrings(d.segment.DictKeys[d.fieldID], prefix)
 	return &DictionaryIterator{
 		d:      d,
 		prefix: prefix,
@@ -47,7 +47,7 @@ func (d *Dictionary) PrefixIterator(prefix string) segment.DictionaryIterator {
 // RangeIterator returns an iterator which only visits terms between the
 // start and end terms.  NOTE: bleve.index API specifies the end is inclusive.
 func (d *Dictionary) RangeIterator(start, end string) segment.DictionaryIterator {
-	offset := sort.SearchStrings(d.segment.dictKeys[d.fieldID], start)
+	offset := sort.SearchStrings(d.segment.DictKeys[d.fieldID], start)
 	return &DictionaryIterator{
 		d:      d,
 		offset: offset,
@@ -65,10 +65,10 @@ type DictionaryIterator struct {
 
 // Next returns the next entry in the dictionary
 func (d *DictionaryIterator) Next() (*index.DictEntry, error) {
-	if d.offset > len(d.d.segment.dictKeys[d.d.fieldID])-1 {
+	if d.offset > len(d.d.segment.DictKeys[d.d.fieldID])-1 {
 		return nil, nil
 	}
-	next := d.d.segment.dictKeys[d.d.fieldID][d.offset]
+	next := d.d.segment.DictKeys[d.d.fieldID][d.offset]
 	// check prefix
 	if d.prefix != "" && !strings.HasPrefix(next, d.prefix) {
 		return nil, nil
@@ -79,9 +79,9 @@ func (d *DictionaryIterator) Next() (*index.DictEntry, error) {
 	}
 
 	d.offset++
-	postingID := d.d.segment.dicts[d.d.fieldID][next]
+	postingID := d.d.segment.Dicts[d.d.fieldID][next]
 	return &index.DictEntry{
 		Term:  next,
-		Count: d.d.segment.postings[postingID-1].GetCardinality(),
+		Count: d.d.segment.Postings[postingID-1].GetCardinality(),
 	}, nil
 }

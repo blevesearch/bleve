@@ -17,7 +17,7 @@ type PostingsList struct {
 func (p *PostingsList) Count() uint64 {
 	var rv uint64
 	if p.postingsID > 0 {
-		rv = p.dictionary.segment.postings[p.postingsID-1].GetCardinality()
+		rv = p.dictionary.segment.Postings[p.postingsID-1].GetCardinality()
 		if p.except != nil {
 			except := p.except.GetCardinality()
 			if except > rv {
@@ -36,7 +36,7 @@ func (p *PostingsList) Iterator() segment.PostingsIterator {
 		postings: p,
 	}
 	if p.postingsID > 0 {
-		allbits := p.dictionary.segment.postings[p.postingsID-1]
+		allbits := p.dictionary.segment.Postings[p.postingsID-1]
 		rv.all = allbits.Iterator()
 		if p.except != nil {
 			allExcept := allbits.Clone()
@@ -72,7 +72,7 @@ func (i *PostingsIterator) Next() segment.Posting {
 	// if they don't match, adjust offsets to factor in item we're skipping over
 	// incr the all iterator, and check again
 	for allN != n {
-		i.locoffset += int(i.postings.dictionary.segment.freqs[i.postings.postingsID-1][i.offset])
+		i.locoffset += int(i.postings.dictionary.segment.Freqs[i.postings.postingsID-1][i.offset])
 		i.offset++
 		allN = i.all.Next()
 	}
@@ -83,7 +83,7 @@ func (i *PostingsIterator) Next() segment.Posting {
 		locoffset: i.locoffset,
 	}
 
-	i.locoffset += int(i.postings.dictionary.segment.freqs[i.postings.postingsID-1][i.offset])
+	i.locoffset += int(i.postings.dictionary.segment.Freqs[i.postings.postingsID-1][i.offset])
 	i.offset++
 	return rv
 }
@@ -103,17 +103,17 @@ func (p *Posting) Number() uint64 {
 
 // Frequency returns the frequence of occurance of this term in this doc/field
 func (p *Posting) Frequency() uint64 {
-	return p.iterator.postings.dictionary.segment.freqs[p.iterator.postings.postingsID-1][p.offset]
+	return p.iterator.postings.dictionary.segment.Freqs[p.iterator.postings.postingsID-1][p.offset]
 }
 
 // Norm returns the normalization factor for this posting
 func (p *Posting) Norm() float64 {
-	return float64(p.iterator.postings.dictionary.segment.norms[p.iterator.postings.postingsID-1][p.offset])
+	return float64(p.iterator.postings.dictionary.segment.Norms[p.iterator.postings.postingsID-1][p.offset])
 }
 
 // Locations returns the location information for each occurance
 func (p *Posting) Locations() []segment.Location {
-	if !p.iterator.postings.dictionary.segment.fieldsLoc[p.iterator.postings.dictionary.fieldID] {
+	if !p.iterator.postings.dictionary.segment.FieldsLoc[p.iterator.postings.dictionary.fieldID] {
 		return nil
 	}
 	freq := int(p.Frequency())
@@ -136,25 +136,25 @@ type Location struct {
 // Field returns the name of the field (useful in composite fields to know
 // which original field the value came from)
 func (l *Location) Field() string {
-	return l.p.iterator.postings.dictionary.segment.fieldsInv[l.p.iterator.postings.dictionary.segment.locfields[l.p.iterator.postings.postingsID-1][l.offset]]
+	return l.p.iterator.postings.dictionary.segment.FieldsInv[l.p.iterator.postings.dictionary.segment.Locfields[l.p.iterator.postings.postingsID-1][l.offset]]
 }
 
 // Start returns the start byte offset of this occurance
 func (l *Location) Start() uint64 {
-	return l.p.iterator.postings.dictionary.segment.locstarts[l.p.iterator.postings.postingsID-1][l.offset]
+	return l.p.iterator.postings.dictionary.segment.Locstarts[l.p.iterator.postings.postingsID-1][l.offset]
 }
 
 // End returns the end byte offset of this occurance
 func (l *Location) End() uint64 {
-	return l.p.iterator.postings.dictionary.segment.locends[l.p.iterator.postings.postingsID-1][l.offset]
+	return l.p.iterator.postings.dictionary.segment.Locends[l.p.iterator.postings.postingsID-1][l.offset]
 }
 
 // Pos returns the 1-based phrase position of this occurance
 func (l *Location) Pos() uint64 {
-	return l.p.iterator.postings.dictionary.segment.locpos[l.p.iterator.postings.postingsID-1][l.offset]
+	return l.p.iterator.postings.dictionary.segment.Locpos[l.p.iterator.postings.postingsID-1][l.offset]
 }
 
 // ArrayPositions returns the array position vector associated with this occurance
 func (l *Location) ArrayPositions() []uint64 {
-	return l.p.iterator.postings.dictionary.segment.locarraypos[l.p.iterator.postings.postingsID-1][l.offset]
+	return l.p.iterator.postings.dictionary.segment.Locarraypos[l.p.iterator.postings.postingsID-1][l.offset]
 }

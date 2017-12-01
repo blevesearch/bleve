@@ -23,7 +23,7 @@ func NewFromAnalyzedDocs(results []*index.AnalysisResult) *Segment {
 	}
 
 	// go back and sort the dictKeys
-	for _, dict := range s.dictKeys {
+	for _, dict := range s.DictKeys {
 		sort.Strings(dict)
 	}
 
@@ -81,9 +81,9 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 	}
 
 	storeField := func(docNum uint64, field uint16, typ byte, val []byte, pos []uint64) {
-		s.stored[docNum][field] = append(s.stored[docNum][field], val)
-		s.storedTypes[docNum][field] = append(s.storedTypes[docNum][field], typ)
-		s.storedPos[docNum][field] = append(s.storedPos[docNum][field], pos)
+		s.Stored[docNum][field] = append(s.Stored[docNum][field], val)
+		s.StoredTypes[docNum][field] = append(s.StoredTypes[docNum][field], typ)
+		s.StoredPos[docNum][field] = append(s.StoredPos[docNum][field], pos)
 	}
 
 	// walk each composite field
@@ -107,7 +107,7 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 	// now that its been rolled up into docMap, walk that
 	for fieldID, tokenFrequencies := range docMap {
 		for term, tokenFreq := range tokenFrequencies {
-			fieldTermPostings := s.dicts[fieldID][term]
+			fieldTermPostings := s.Dicts[fieldID][term]
 
 			// FIXME this if/else block has duplicate code that has resulted in
 			// bugs fixed/missed more than once, need to refactor
@@ -116,12 +116,12 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 				bs := roaring.New()
 				bs.AddInt(int(docNum))
 
-				newPostingID := uint64(len(s.postings) + 1)
+				newPostingID := uint64(len(s.Postings) + 1)
 				// add this new bitset to the postings slice
-				s.postings = append(s.postings, bs)
+				s.Postings = append(s.Postings, bs)
 				// add this to the details slice
-				s.freqs = append(s.freqs, []uint64{uint64(tokenFreq.Frequency())})
-				s.norms = append(s.norms, []float32{float32(1.0 / math.Sqrt(float64(fieldLens[fieldID])))})
+				s.Freqs = append(s.Freqs, []uint64{uint64(tokenFreq.Frequency())})
+				s.Norms = append(s.Norms, []float32{float32(1.0 / math.Sqrt(float64(fieldLens[fieldID])))})
 				// add to locations
 				var locfields []uint16
 				var locstarts []uint64
@@ -143,35 +143,35 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 						locarraypos = append(locarraypos, nil)
 					}
 				}
-				s.locfields = append(s.locfields, locfields)
-				s.locstarts = append(s.locstarts, locstarts)
-				s.locends = append(s.locends, locends)
-				s.locpos = append(s.locpos, locpos)
-				s.locarraypos = append(s.locarraypos, locarraypos)
+				s.Locfields = append(s.Locfields, locfields)
+				s.Locstarts = append(s.Locstarts, locstarts)
+				s.Locends = append(s.Locends, locends)
+				s.Locpos = append(s.Locpos, locpos)
+				s.Locarraypos = append(s.Locarraypos, locarraypos)
 				// record it
-				s.dicts[fieldID][term] = newPostingID
+				s.Dicts[fieldID][term] = newPostingID
 				// this term was new for this field, add it to dictKeys
-				s.dictKeys[fieldID] = append(s.dictKeys[fieldID], term)
+				s.DictKeys[fieldID] = append(s.DictKeys[fieldID], term)
 			} else {
 				// posting already started for this field/term
 				// the actual offset is - 1, because 0 is zero value
-				bs := s.postings[fieldTermPostings-1]
+				bs := s.Postings[fieldTermPostings-1]
 				bs.AddInt(int(docNum))
-				s.freqs[fieldTermPostings-1] = append(s.freqs[fieldTermPostings-1], uint64(tokenFreq.Frequency()))
-				s.norms[fieldTermPostings-1] = append(s.norms[fieldTermPostings-1], float32(1.0/math.Sqrt(float64(fieldLens[fieldID]))))
+				s.Freqs[fieldTermPostings-1] = append(s.Freqs[fieldTermPostings-1], uint64(tokenFreq.Frequency()))
+				s.Norms[fieldTermPostings-1] = append(s.Norms[fieldTermPostings-1], float32(1.0/math.Sqrt(float64(fieldLens[fieldID]))))
 				for _, loc := range tokenFreq.Locations {
 					var locf = fieldID
 					if loc.Field != "" {
 						locf = uint16(s.getOrDefineField(loc.Field, false))
 					}
-					s.locfields[fieldTermPostings-1] = append(s.locfields[fieldTermPostings-1], locf)
-					s.locstarts[fieldTermPostings-1] = append(s.locstarts[fieldTermPostings-1], uint64(loc.Start))
-					s.locends[fieldTermPostings-1] = append(s.locends[fieldTermPostings-1], uint64(loc.End))
-					s.locpos[fieldTermPostings-1] = append(s.locpos[fieldTermPostings-1], uint64(loc.Position))
+					s.Locfields[fieldTermPostings-1] = append(s.Locfields[fieldTermPostings-1], locf)
+					s.Locstarts[fieldTermPostings-1] = append(s.Locstarts[fieldTermPostings-1], uint64(loc.Start))
+					s.Locends[fieldTermPostings-1] = append(s.Locends[fieldTermPostings-1], uint64(loc.End))
+					s.Locpos[fieldTermPostings-1] = append(s.Locpos[fieldTermPostings-1], uint64(loc.Position))
 					if len(loc.ArrayPositions) > 0 {
-						s.locarraypos[fieldTermPostings-1] = append(s.locarraypos[fieldTermPostings-1], loc.ArrayPositions)
+						s.Locarraypos[fieldTermPostings-1] = append(s.Locarraypos[fieldTermPostings-1], loc.ArrayPositions)
 					} else {
-						s.locarraypos[fieldTermPostings-1] = append(s.locarraypos[fieldTermPostings-1], nil)
+						s.Locarraypos[fieldTermPostings-1] = append(s.Locarraypos[fieldTermPostings-1], nil)
 					}
 				}
 			}
@@ -180,23 +180,23 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 }
 
 func (s *Segment) getOrDefineField(name string, hasLoc bool) int {
-	fieldID, ok := s.fields[name]
+	fieldID, ok := s.FieldsMap[name]
 	if !ok {
-		fieldID = uint16(len(s.fieldsInv) + 1)
-		s.fields[name] = fieldID
-		s.fieldsInv = append(s.fieldsInv, name)
-		s.fieldsLoc = append(s.fieldsLoc, hasLoc)
-		s.dicts = append(s.dicts, make(map[string]uint64))
-		s.dictKeys = append(s.dictKeys, make([]string, 0))
+		fieldID = uint16(len(s.FieldsInv) + 1)
+		s.FieldsMap[name] = fieldID
+		s.FieldsInv = append(s.FieldsInv, name)
+		s.FieldsLoc = append(s.FieldsLoc, hasLoc)
+		s.Dicts = append(s.Dicts, make(map[string]uint64))
+		s.DictKeys = append(s.DictKeys, make([]string, 0))
 	}
 	return int(fieldID - 1)
 }
 
 func (s *Segment) addDocument() int {
-	docNum := len(s.stored)
-	s.stored = append(s.stored, map[uint16][][]byte{})
-	s.storedTypes = append(s.storedTypes, map[uint16][]byte{})
-	s.storedPos = append(s.storedPos, map[uint16][][]uint64{})
+	docNum := len(s.Stored)
+	s.Stored = append(s.Stored, map[uint16][][]byte{})
+	s.StoredTypes = append(s.StoredTypes, map[uint16][]byte{})
+	s.StoredPos = append(s.StoredPos, map[uint16][][]uint64{})
 	return docNum
 }
 
