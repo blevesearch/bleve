@@ -29,38 +29,38 @@ func NewFromAnalyzedDocs(results []*index.AnalysisResult) *Segment {
 
 	// professional debugging
 	//
-	// log.Printf("fields: %v\n", s.fields)
-	// log.Printf("fieldsInv: %v\n", s.fieldsInv)
-	// log.Printf("fieldsLoc: %v\n", s.fieldsLoc)
-	// log.Printf("dicts: %v\n", s.dicts)
-	// log.Printf("dict keys: %v\n", s.dictKeys)
-	// for i, posting := range s.postings {
+	// log.Printf("fields: %v\n", s.FieldsMap)
+	// log.Printf("fieldsInv: %v\n", s.FieldsInv)
+	// log.Printf("fieldsLoc: %v\n", s.FieldsLoc)
+	// log.Printf("dicts: %v\n", s.Dicts)
+	// log.Printf("dict keys: %v\n", s.DictKeys)
+	// for i, posting := range s.Postings {
 	// 	log.Printf("posting %d: %v\n", i, posting)
 	// }
-	// for i, freq := range s.freqs {
+	// for i, freq := range s.Freqs {
 	// 	log.Printf("freq %d: %v\n", i, freq)
 	// }
-	// for i, norm := range s.norms {
+	// for i, norm := range s.Norms {
 	// 	log.Printf("norm %d: %v\n", i, norm)
 	// }
-	// for i, field := range s.locfields {
+	// for i, field := range s.Locfields {
 	// 	log.Printf("field %d: %v\n", i, field)
 	// }
-	// for i, start := range s.locstarts {
+	// for i, start := range s.Locstarts {
 	// 	log.Printf("start %d: %v\n", i, start)
 	// }
-	// for i, end := range s.locends {
+	// for i, end := range s.Locends {
 	// 	log.Printf("end %d: %v\n", i, end)
 	// }
-	// for i, pos := range s.locpos {
+	// for i, pos := range s.Locpos {
 	// 	log.Printf("pos %d: %v\n", i, pos)
 	// }
-	// for i, apos := range s.locarraypos {
+	// for i, apos := range s.Locarraypos {
 	// 	log.Printf("apos %d: %v\n", i, apos)
 	// }
-	// log.Printf("stored: %v\n", s.stored)
-	// log.Printf("stored types: %v\n", s.storedTypes)
-	// log.Printf("stored pos: %v\n", s.storedPos)
+	// log.Printf("stored: %v\n", s.Stored)
+	// log.Printf("stored types: %v\n", s.StoredTypes)
+	// log.Printf("stored pos: %v\n", s.StoredPos)
 
 	return s
 }
@@ -88,7 +88,7 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 
 	// walk each composite field
 	for _, field := range result.Document.CompositeFields {
-		fieldID := uint16(s.getOrDefineField(field.Name(), false))
+		fieldID := uint16(s.getOrDefineField(field.Name(), true))
 		l, tf := field.Analyze()
 		processField(fieldID, field.Name(), l, tf)
 	}
