@@ -122,13 +122,17 @@ func (s *Segment) Count() uint64 {
 // DocNumbers returns a bitset corresponding to the doc numbers of all the
 // provided _id strings
 func (s *Segment) DocNumbers(ids []string) *roaring.Bitmap {
-
-	idDictionary := s.Dicts[idFieldID]
 	rv := roaring.New()
-	for _, id := range ids {
-		postingID := idDictionary[id]
-		if postingID > 0 {
-			rv.Or(s.Postings[postingID-1])
+
+	// guard against empty segment
+	if len(s.FieldsMap) > 0 {
+		idDictionary := s.Dicts[idFieldID]
+
+		for _, id := range ids {
+			postingID := idDictionary[id]
+			if postingID > 0 {
+				rv.Or(s.Postings[postingID-1])
+			}
 		}
 	}
 	return rv
