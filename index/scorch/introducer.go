@@ -49,8 +49,7 @@ func (s *Scorch) mainLoop() {
 				if s.root.segment[i].deleted == nil {
 					newSnapshot.segment[i].deleted = delta
 				} else {
-					newSnapshot.segment[i].deleted = s.root.segment[i].deleted.Clone()
-					newSnapshot.segment[i].deleted.Or(delta)
+					newSnapshot.segment[i].deleted = roaring.Or(s.root.segment[i].deleted, delta)
 				}
 
 				newSnapshot.offsets[i] = running
