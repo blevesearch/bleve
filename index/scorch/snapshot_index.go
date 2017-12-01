@@ -72,24 +72,39 @@ func (i *IndexSnapshot) FieldDictPrefix(field string,
 }
 
 func (i *IndexSnapshot) DocIDReaderAll() (index.DocIDReader, error) {
-
-	type segmentDocNumsResult struct {
-		index int
-		docs  *roaring.Bitmap
-	}
-
 	results := make(chan *segmentDocNumsResult)
 	for index, segment := range i.segment {
 		go func(index int, segment *SegmentSnapshot) {
-			docnums := roaring.NewBitmap()
-			docnums.AddRange(0, segment.Count())
 			results <- &segmentDocNumsResult{
 				index: index,
-				docs:  docnums,
+				docs:  segment.DocNumbersLive(),
 			}
 		}(index, segment)
 	}
 
+	return i.newDocIDReader(results)
+}
+
+func (i *IndexSnapshot) DocIDReaderOnly(ids []string) (index.DocIDReader, error) {
+	results := make(chan *segmentDocNumsResult)
+	for index, segment := range i.segment {
+		go func(index int, segment *SegmentSnapshot) {
+			results <- &segmentDocNumsResult{
+				index: index,
+				docs:  segment.DocNumbers(ids),
+			}
+		}(index, segment)
+	}
+
+	return i.newDocIDReader(results)
+}
+
+type segmentDocNumsResult struct {
+	index int
+	docs  *roaring.Bitmap
+}
+
+func (i *IndexSnapshot) newDocIDReader(results chan *segmentDocNumsResult) (index.DocIDReader, error) {
 	rv := &IndexSnapshotDocIDReader{
 		snapshot:  i,
 		iterators: make([]roaring.IntIterable, len(i.segment)),
@@ -97,36 +112,6 @@ func (i *IndexSnapshot) DocIDReaderAll() (index.DocIDReader, error) {
 	for count := 0; count < len(i.segment); count++ {
 		sdnr := <-results
 		rv.iterators[sdnr.index] = sdnr.docs.Iterator()
-	}
-
-	return rv, nil
-}
-
-func (i *IndexSnapshot) DocIDReaderOnly(ids []string) (index.DocIDReader, error) {
-
-	type segmentDocNumsResult struct {
-		index int
-		docs  *roaring.Bitmap
-	}
-
-	results := make(chan *segmentDocNumsResult)
-	for index, segment := range i.segment {
-		go func(index int, segment *SegmentSnapshot) {
-			docnums := segment.DocNumbers(ids)
-			results <- &segmentDocNumsResult{
-				index: index,
-				docs:  docnums,
-			}
-		}(index, segment)
-	}
-
-	rv := &IndexSnapshotDocIDReader{
-		snapshot:  i,
-		iterators: make([]roaring.IntIterable, len(i.segment)),
-	}
-	for count := 0; count < len(i.segment); count++ {
-		sdnr := <-results
-		rv.iterators[count] = sdnr.docs.Iterator()
 	}
 
 	return rv, nil

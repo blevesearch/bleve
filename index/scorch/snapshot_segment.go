@@ -59,6 +59,16 @@ func (s *SegmentSnapshot) DocNumbers(docIDs []string) *roaring.Bitmap {
 	return rv
 }
 
+// DocNumbersLive returns bitsit containing doc numbers for all live docs
+func (s *SegmentSnapshot) DocNumbersLive() *roaring.Bitmap {
+	rv := roaring.NewBitmap()
+	rv.AddRange(0, s.segment.Count())
+	if s.deleted != nil {
+		rv.AndNot(s.deleted)
+	}
+	return rv
+}
+
 func (s *SegmentSnapshot) Fields() []string {
 	return s.segment.Fields()
 }
