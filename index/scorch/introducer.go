@@ -53,7 +53,11 @@ func (s *Scorch) mainLoop() {
 				// see if optimistic work included this segment
 				delta, ok := next.obsoletes[s.root.segment[i].id]
 				if !ok {
-					delta = s.root.segment[i].segment.DocNumbers(next.ids)
+					var err error
+					delta, err = s.root.segment[i].segment.DocNumbers(next.ids)
+					if err != nil {
+						panic(err)
+					}
 				}
 				newSnapshot.segment[i] = &SegmentSnapshot{
 					id:      s.root.segment[i].id,

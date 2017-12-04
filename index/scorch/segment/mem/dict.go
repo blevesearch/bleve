@@ -31,13 +31,14 @@ type Dictionary struct {
 }
 
 // PostingsList returns the postings list for the specified term
-func (d *Dictionary) PostingsList(term string, except *roaring.Bitmap) segment.PostingsList {
+func (d *Dictionary) PostingsList(term string,
+	except *roaring.Bitmap) (segment.PostingsList, error) {
 	return &PostingsList{
 		dictionary: d,
 		term:       term,
 		postingsID: d.segment.Dicts[d.fieldID][term],
 		except:     except,
-	}
+	}, nil
 }
 
 // Iterator returns an iterator for this dictionary

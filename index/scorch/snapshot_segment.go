@@ -24,7 +24,7 @@ type SegmentDictionarySnapshot struct {
 	d segment.TermDictionary
 }
 
-func (s *SegmentDictionarySnapshot) PostingsList(term string, except *roaring.Bitmap) segment.PostingsList {
+func (s *SegmentDictionarySnapshot) PostingsList(term string, except *roaring.Bitmap) (segment.PostingsList, error) {
 	return s.d.PostingsList(term, s.s.deleted)
 }
 
@@ -58,19 +58,26 @@ func (s *SegmentSnapshot) Count() uint64 {
 	return rv
 }
 
-func (s *SegmentSnapshot) Dictionary(field string) segment.TermDictionary {
+func (s *SegmentSnapshot) Dictionary(field string) (segment.TermDictionary, error) {
+	d, err := s.segment.Dictionary(field)
+	if err != nil {
+		return nil, err
+	}
 	return &SegmentDictionarySnapshot{
 		s: s,
-		d: s.segment.Dictionary(field),
-	}
+		d: d,
+	}, nil
 }
 
-func (s *SegmentSnapshot) DocNumbers(docIDs []string) *roaring.Bitmap {
-	rv := s.segment.DocNumbers(docIDs)
+func (s *SegmentSnapshot) DocNumbers(docIDs []string) (*roaring.Bitmap, error) {
+	rv, err := s.segment.DocNumbers(docIDs)
+	if err != nil {
+		return nil, err
+	}
 	if s.deleted != nil {
 		rv.AndNot(s.deleted)
 	}
-	return rv
+	return rv, nil
 }
 
 // DocNumbersLive returns bitsit containing doc numbers for all live docs

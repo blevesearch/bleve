@@ -74,9 +74,9 @@ type PostingsIterator struct {
 }
 
 // Next returns the next posting on the postings list, or nil at the end
-func (i *PostingsIterator) Next() segment.Posting {
+func (i *PostingsIterator) Next() (segment.Posting, error) {
 	if i.actual == nil || !i.actual.HasNext() {
-		return nil
+		return nil, nil
 	}
 	n := i.actual.Next()
 	allN := i.all.Next()
@@ -99,7 +99,7 @@ func (i *PostingsIterator) Next() segment.Posting {
 
 	i.locoffset += int(i.postings.dictionary.segment.Freqs[i.postings.postingsID-1][i.offset])
 	i.offset++
-	return rv
+	return rv, nil
 }
 
 // Posting is a single entry in a postings list

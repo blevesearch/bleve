@@ -119,12 +119,12 @@ func (s *Segment) VisitDocument(num uint64, visitor segment.DocumentFieldValueVi
 }
 
 // Dictionary returns the term dictionary for the specified field
-func (s *Segment) Dictionary(field string) segment.TermDictionary {
+func (s *Segment) Dictionary(field string) (segment.TermDictionary, error) {
 	return &Dictionary{
 		segment: s,
 		field:   field,
 		fieldID: uint16(s.getOrDefineField(field, false)),
-	}
+	}, nil
 }
 
 // Count returns the number of documents in this segment
@@ -135,7 +135,7 @@ func (s *Segment) Count() uint64 {
 
 // DocNumbers returns a bitset corresponding to the doc numbers of all the
 // provided _id strings
-func (s *Segment) DocNumbers(ids []string) *roaring.Bitmap {
+func (s *Segment) DocNumbers(ids []string) (*roaring.Bitmap, error) {
 	rv := roaring.New()
 
 	// guard against empty segment
@@ -149,5 +149,5 @@ func (s *Segment) DocNumbers(ids []string) *roaring.Bitmap {
 			}
 		}
 	}
-	return rv
+	return rv, nil
 }

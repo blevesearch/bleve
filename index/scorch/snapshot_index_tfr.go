@@ -38,7 +38,10 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 	}
 	// find the next hit
 	for i.segmentOffset < len(i.postings) {
-		next := i.iterators[i.segmentOffset].Next()
+		next, err := i.iterators[i.segmentOffset].Next()
+		if err != nil {
+			return nil, err
+		}
 		if next != nil {
 			// make segment number into global number by adding offset
 			globalOffset := i.snapshot.offsets[i.segmentOffset]

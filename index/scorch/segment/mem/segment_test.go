@@ -31,12 +31,18 @@ func TestEmpty(t *testing.T) {
 		t.Errorf("expected count 0, got %d", emptySegment.Count())
 	}
 
-	dict := emptySegment.Dictionary("name")
+	dict, err := emptySegment.Dictionary("name")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dict == nil {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList := dict.PostingsList("marty", nil)
+	postingsList, err := dict.PostingsList("marty", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if postingsList == nil {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
@@ -47,10 +53,13 @@ func TestEmpty(t *testing.T) {
 	}
 
 	count := 0
-	nextPosting := postingsItr.Next()
-	for nextPosting != nil {
+	nextPosting, err := postingsItr.Next()
+	for nextPosting != nil && err == nil {
 		count++
-		nextPosting = postingsItr.Next()
+		nextPosting, err = postingsItr.Next()
+	}
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	if count != 0 {
@@ -58,7 +67,7 @@ func TestEmpty(t *testing.T) {
 	}
 
 	// now try and visit a document
-	err := emptySegment.VisitDocument(0, func(field string, typ byte, value []byte, pos []uint64) bool {
+	err = emptySegment.VisitDocument(0, func(field string, typ byte, value []byte, pos []uint64) bool {
 		t.Errorf("document visitor called, not expected")
 		return true
 	})
@@ -164,12 +173,18 @@ func TestSingle(t *testing.T) {
 	}
 
 	// check the _id field
-	dict := segment.Dictionary("_id")
+	dict, err := segment.Dictionary("_id")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dict == nil {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList := dict.PostingsList("a", nil)
+	postingsList, err := dict.PostingsList("a", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if postingsList == nil {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
@@ -180,8 +195,8 @@ func TestSingle(t *testing.T) {
 	}
 
 	count := 0
-	nextPosting := postingsItr.Next()
-	for nextPosting != nil {
+	nextPosting, err := postingsItr.Next()
+	for nextPosting != nil && err == nil {
 		count++
 		if nextPosting.Frequency() != 1 {
 			t.Errorf("expected frequency 1, got %d", nextPosting.Frequency())
@@ -193,7 +208,10 @@ func TestSingle(t *testing.T) {
 			t.Errorf("expected norm 1.0, got %f", nextPosting.Norm())
 		}
 
-		nextPosting = postingsItr.Next()
+		nextPosting, err = postingsItr.Next()
+	}
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	if count != 1 {
@@ -201,12 +219,18 @@ func TestSingle(t *testing.T) {
 	}
 
 	// check the name field
-	dict = segment.Dictionary("name")
+	dict, err = segment.Dictionary("name")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dict == nil {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList = dict.PostingsList("wow", nil)
+	postingsList, err = dict.PostingsList("wow", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if postingsList == nil {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
@@ -217,8 +241,8 @@ func TestSingle(t *testing.T) {
 	}
 
 	count = 0
-	nextPosting = postingsItr.Next()
-	for nextPosting != nil {
+	nextPosting, err = postingsItr.Next()
+	for nextPosting != nil && err == nil {
 		count++
 		if nextPosting.Frequency() != 1 {
 			t.Errorf("expected frequency 1, got %d", nextPosting.Frequency())
@@ -244,7 +268,10 @@ func TestSingle(t *testing.T) {
 			}
 		}
 
-		nextPosting = postingsItr.Next()
+		nextPosting, err = postingsItr.Next()
+	}
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	if count != 1 {
@@ -252,12 +279,18 @@ func TestSingle(t *testing.T) {
 	}
 
 	// check the _all field (composite)
-	dict = segment.Dictionary("_all")
+	dict, err = segment.Dictionary("_all")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dict == nil {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList = dict.PostingsList("wow", nil)
+	postingsList, err = dict.PostingsList("wow", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if postingsList == nil {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
@@ -268,8 +301,8 @@ func TestSingle(t *testing.T) {
 	}
 
 	count = 0
-	nextPosting = postingsItr.Next()
-	for nextPosting != nil {
+	nextPosting, err = postingsItr.Next()
+	for nextPosting != nil && err == nil {
 		count++
 		if nextPosting.Frequency() != 1 {
 			t.Errorf("expected frequency 1, got %d", nextPosting.Frequency())
@@ -296,7 +329,10 @@ func TestSingle(t *testing.T) {
 			}
 		}
 
-		nextPosting = postingsItr.Next()
+		nextPosting, err = postingsItr.Next()
+	}
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	if count != 1 {
@@ -305,7 +341,7 @@ func TestSingle(t *testing.T) {
 
 	// now try and visit a document
 	var fieldValuesSeen int
-	err := segment.VisitDocument(0, func(field string, typ byte, value []byte, pos []uint64) bool {
+	err = segment.VisitDocument(0, func(field string, typ byte, value []byte, pos []uint64) bool {
 		fieldValuesSeen++
 		return true
 	})
@@ -487,12 +523,18 @@ func TestMultiple(t *testing.T) {
 	}
 
 	// check the desc field
-	dict := segment.Dictionary("desc")
+	dict, err := segment.Dictionary("desc")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if dict == nil {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList := dict.PostingsList("thing", nil)
+	postingsList, err := dict.PostingsList("thing", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if postingsList == nil {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
@@ -503,10 +545,13 @@ func TestMultiple(t *testing.T) {
 	}
 
 	count := 0
-	nextPosting := postingsItr.Next()
-	for nextPosting != nil {
+	nextPosting, err := postingsItr.Next()
+	for nextPosting != nil && err == nil {
 		count++
-		nextPosting = postingsItr.Next()
+		nextPosting, err = postingsItr.Next()
+	}
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	if count != 2 {
@@ -514,10 +559,16 @@ func TestMultiple(t *testing.T) {
 	}
 
 	// get docnum of a
-	exclude := segment.DocNumbers([]string{"a"})
+	exclude, err := segment.DocNumbers([]string{"a"})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// look for term 'thing' excluding doc 'a'
-	postingsListExcluding := dict.PostingsList("thing", exclude)
+	postingsListExcluding, err := dict.PostingsList("thing", exclude)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if postingsList == nil {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
@@ -528,10 +579,13 @@ func TestMultiple(t *testing.T) {
 	}
 
 	count = 0
-	nextPosting = postingsItrExcluding.Next()
-	for nextPosting != nil {
+	nextPosting, err = postingsItrExcluding.Next()
+	for nextPosting != nil && err == nil {
 		count++
-		nextPosting = postingsItrExcluding.Next()
+		nextPosting, err = postingsItrExcluding.Next()
+	}
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	if count != 1 {

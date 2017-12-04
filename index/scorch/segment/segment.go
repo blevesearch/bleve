@@ -25,18 +25,18 @@ import (
 type DocumentFieldValueVisitor func(field string, typ byte, value []byte, pos []uint64) bool
 
 type Segment interface {
-	Dictionary(field string) TermDictionary
+	Dictionary(field string) (TermDictionary, error)
 
 	VisitDocument(num uint64, visitor DocumentFieldValueVisitor) error
 	Count() uint64
 
-	DocNumbers([]string) *roaring.Bitmap
+	DocNumbers([]string) (*roaring.Bitmap, error)
 
 	Fields() []string
 }
 
 type TermDictionary interface {
-	PostingsList(term string, except *roaring.Bitmap) PostingsList
+	PostingsList(term string, except *roaring.Bitmap) (PostingsList, error)
 
 	Iterator() DictionaryIterator
 	PrefixIterator(prefix string) DictionaryIterator
@@ -59,7 +59,7 @@ type PostingsList interface {
 }
 
 type PostingsIterator interface {
-	Next() Posting
+	Next() (Posting, error)
 }
 
 type Posting interface {

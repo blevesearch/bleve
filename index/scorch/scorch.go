@@ -154,7 +154,10 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 	// get read lock, to optimistically prepare obsoleted info
 	s.rootLock.RLock()
 	for i := range s.root.segment {
-		delta := s.root.segment[i].segment.DocNumbers(ids)
+		delta, err := s.root.segment[i].segment.DocNumbers(ids)
+		if err != nil {
+			return err
+		}
 		introduction.obsoletes[s.root.segment[i].id] = delta
 	}
 	s.rootLock.RUnlock()

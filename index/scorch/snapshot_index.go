@@ -27,6 +27,17 @@ import (
 	"github.com/blevesearch/bleve/index/scorch/segment"
 )
 
+type asynchSegmentResult struct {
+	dictItr segment.DictionaryIterator
+
+	index int
+	docs  *roaring.Bitmap
+
+	postings segment.PostingsList
+
+	err error
+}
+
 type IndexSnapshot struct {
 	segment  []*SegmentSnapshot
 	offsets  []uint64
@@ -35,30 +46,43 @@ type IndexSnapshot struct {
 
 func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string, makeItr func(i segment.TermDictionary) segment.DictionaryIterator) (*IndexSnapshotFieldDict, error) {
 
-	results := make(chan segment.DictionaryIterator)
+	results := make(chan *asynchSegmentResult)
 	for index, segment := range i.segment {
 		go func(index int, segment *SegmentSnapshot) {
-			dict := segment.Dictionary(field)
-			results <- makeItr(dict)
+			dict, err := segment.Dictionary(field)
+			if err != nil {
+				results <- &asynchSegmentResult{err: err}
+			} else {
+				results <- &asynchSegmentResult{dictItr: makeItr(dict)}
+			}
 		}(index, segment)
 	}
 
+	var err error
 	rv := &IndexSnapshotFieldDict{
 		snapshot: i,
 		cursors:  make([]*segmentDictCursor, 0, len(i.segment)),
 	}
 	for count := 0; count < len(i.segment); count++ {
-		di := <-results
-		next, err := di.Next()
-		if err != nil {
-			return nil, err
+		asr := <-results
+		if asr.err != nil && err == nil {
+			err = asr.err
+		} else {
+			next, err2 := asr.dictItr.Next()
+			if err2 != nil && err == nil {
+				err = err2
+			}
+			if next != nil {
+				rv.cursors = append(rv.cursors, &segmentDictCursor{
+					itr:  asr.dictItr,
+					curr: next,
+				})
+			}
 		}
-		if next != nil {
-			rv.cursors = append(rv.cursors, &segmentDictCursor{
-				itr:  di,
-				curr: next,
-			})
-		}
+	}
+	// after ensuring we've read all items on channel
+	if err != nil {
+		return nil, err
 	}
 	// prepare heap
 	heap.Init(rv)
@@ -87,10 +111,10 @@ func (i *IndexSnapshot) FieldDictPrefix(field string,
 }
 
 func (i *IndexSnapshot) DocIDReaderAll() (index.DocIDReader, error) {
-	results := make(chan *segmentDocNumsResult)
+	results := make(chan *asynchSegmentResult)
 	for index, segment := range i.segment {
 		go func(index int, segment *SegmentSnapshot) {
-			results <- &segmentDocNumsResult{
+			results <- &asynchSegmentResult{
 				index: index,
 				docs:  segment.DocNumbersLive(),
 			}
@@ -101,12 +125,17 @@ func (i *IndexSnapshot) DocIDReaderAll() (index.DocIDReader, error) {
 }
 
 func (i *IndexSnapshot) DocIDReaderOnly(ids []string) (index.DocIDReader, error) {
-	results := make(chan *segmentDocNumsResult)
+	results := make(chan *asynchSegmentResult)
 	for index, segment := range i.segment {
 		go func(index int, segment *SegmentSnapshot) {
-			results <- &segmentDocNumsResult{
-				index: index,
-				docs:  segment.DocNumbers(ids),
+			docs, err := segment.DocNumbers(ids)
+			if err != nil {
+				results <- &asynchSegmentResult{err: err}
+			} else {
+				results <- &asynchSegmentResult{
+					index: index,
+					docs:  docs,
+				}
 			}
 		}(index, segment)
 	}
@@ -114,19 +143,23 @@ func (i *IndexSnapshot) DocIDReaderOnly(ids []string) (index.DocIDReader, error)
 	return i.newDocIDReader(results)
 }
 
-type segmentDocNumsResult struct {
-	index int
-	docs  *roaring.Bitmap
-}
-
-func (i *IndexSnapshot) newDocIDReader(results chan *segmentDocNumsResult) (index.DocIDReader, error) {
+func (i *IndexSnapshot) newDocIDReader(results chan *asynchSegmentResult) (index.DocIDReader, error) {
 	rv := &IndexSnapshotDocIDReader{
 		snapshot:  i,
 		iterators: make([]roaring.IntIterable, len(i.segment)),
 	}
+	var err error
 	for count := 0; count < len(i.segment); count++ {
-		sdnr := <-results
-		rv.iterators[sdnr.index] = sdnr.docs.Iterator()
+		asr := <-results
+		if asr.err != nil && err != nil {
+			err = asr.err
+		} else {
+			rv.iterators[asr.index] = asr.docs.Iterator()
+		}
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	return rv, nil
@@ -262,23 +295,27 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
 
-	type segmentPostingResult struct {
-		index    int
-		postings segment.PostingsList
-	}
-
-	results := make(chan *segmentPostingResult)
+	results := make(chan *asynchSegmentResult)
 	for index, segment := range i.segment {
 		go func(index int, segment *SegmentSnapshot) {
-			dict := segment.Dictionary(field)
-			pl := dict.PostingsList(string(term), nil)
-			results <- &segmentPostingResult{
-				index:    index,
-				postings: pl,
+			dict, err := segment.Dictionary(field)
+			if err != nil {
+				results <- &asynchSegmentResult{err: err}
+			} else {
+				pl, err := dict.PostingsList(string(term), nil)
+				if err != nil {
+					results <- &asynchSegmentResult{err: err}
+				} else {
+					results <- &asynchSegmentResult{
+						index:    index,
+						postings: pl,
+					}
+				}
 			}
 		}(index, segment)
 	}
 
+	var err error
 	rv := &IndexSnapshotTermFieldReader{
 		snapshot:           i,
 		postings:           make([]segment.PostingsList, len(i.segment)),
@@ -288,9 +325,16 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		includeTermVectors: includeTermVectors,
 	}
 	for count := 0; count < len(i.segment); count++ {
-		spr := <-results
-		rv.postings[spr.index] = spr.postings
-		rv.iterators[spr.index] = spr.postings.Iterator()
+		asr := <-results
+		if asr.err != nil && err == nil {
+			err = asr.err
+		} else {
+			rv.postings[asr.index] = asr.postings
+			rv.iterators[asr.index] = asr.postings.Iterator()
+		}
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	return rv, nil
