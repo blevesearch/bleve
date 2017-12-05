@@ -33,6 +33,8 @@ type Segment interface {
 	DocNumbers([]string) (*roaring.Bitmap, error)
 
 	Fields() []string
+
+	Close() error
 }
 
 type TermDictionary interface {

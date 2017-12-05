@@ -151,3 +151,8 @@ func (s *Segment) DocNumbers(ids []string) (*roaring.Bitmap, error) {
 	}
 	return rv, nil
 }
+
+// Close releases all resources associated with this segment
+func (s *Segment) Close() error {
+	return nil
+}
