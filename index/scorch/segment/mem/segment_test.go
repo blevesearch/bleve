@@ -253,7 +253,9 @@ func TestSingle(t *testing.T) {
 		if nextPosting.Norm() != 1.0 {
 			t.Errorf("expected norm 1.0, got %f", nextPosting.Norm())
 		}
+		var numLocs uint64
 		for _, loc := range nextPosting.Locations() {
+			numLocs++
 			if loc.Start() != 0 {
 				t.Errorf("expected loc start to be 0, got %d", loc.Start())
 			}
@@ -266,6 +268,9 @@ func TestSingle(t *testing.T) {
 			if loc.ArrayPositions() != nil {
 				t.Errorf("expect loc array pos to be nil, got %v", loc.ArrayPositions())
 			}
+		}
+		if numLocs != nextPosting.Frequency() {
+			t.Errorf("expected %d locations, got %d", nextPosting.Frequency(), numLocs)
 		}
 
 		nextPosting, err = postingsItr.Next()
@@ -314,7 +319,9 @@ func TestSingle(t *testing.T) {
 		if nextPosting.Norm() != float64(expectedNorm) {
 			t.Errorf("expected norm %f, got %f", expectedNorm, nextPosting.Norm())
 		}
+		var numLocs uint64
 		for _, loc := range nextPosting.Locations() {
+			numLocs++
 			if loc.Start() != 0 {
 				t.Errorf("expected loc start to be 0, got %d", loc.Start())
 			}
@@ -327,6 +334,9 @@ func TestSingle(t *testing.T) {
 			if loc.ArrayPositions() != nil {
 				t.Errorf("expect loc array pos to be nil, got %v", loc.ArrayPositions())
 			}
+		}
+		if numLocs != nextPosting.Frequency() {
+			t.Errorf("expected %d locations, got %d", nextPosting.Frequency(), numLocs)
 		}
 
 		nextPosting, err = postingsItr.Next()
