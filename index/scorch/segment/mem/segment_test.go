@@ -168,6 +168,23 @@ func TestSingle(t *testing.T) {
 		t.Fatalf("segment nil, not expected")
 	}
 
+	expectFields := map[string]struct{}{
+		"_id":  struct{}{},
+		"_all": struct{}{},
+		"name": struct{}{},
+		"desc": struct{}{},
+		"tag":  struct{}{},
+	}
+	fields := segment.Fields()
+	if len(fields) != len(expectFields) {
+		t.Errorf("expected %d fields, only got %d", len(expectFields), len(fields))
+	}
+	for _, field := range fields {
+		if _, ok := expectFields[field]; !ok {
+			t.Errorf("got unexpected field: %s", field)
+		}
+	}
+
 	if segment.Count() != 1 {
 		t.Errorf("expected count 1, got %d", segment.Count())
 	}
