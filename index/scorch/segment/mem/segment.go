@@ -34,7 +34,6 @@ const idFieldID uint16 = 0
 // TODO
 // - need better testing of multiple docs, iterating freqs, locations and
 //   and verifying the correct results are returned
-// - need tests for term dictionary iteration
 
 // Segment is an in memory implementation of scorch.Segment
 type Segment struct {
