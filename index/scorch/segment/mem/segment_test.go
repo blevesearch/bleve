@@ -668,6 +668,11 @@ func TestMultiple(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
+	postingsListExcludingCount := postingsListExcluding.Count()
+	if postingsListExcludingCount != 1 {
+		t.Errorf("expected count from postings list to be 1, got %d", postingsListExcludingCount)
+	}
+
 	postingsItrExcluding := postingsListExcluding.Iterator()
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
