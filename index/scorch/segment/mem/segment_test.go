@@ -16,6 +16,7 @@ package mem
 
 import (
 	"math"
+	"reflect"
 	"testing"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -134,7 +135,7 @@ func TestSingle(t *testing.T) {
 						Position: 1,
 						Term:     []byte("cold"),
 					},
-				}, nil, true),
+				}, []uint64{0}, true),
 				analysis.TokenFrequency(analysis.TokenStream{
 					&analysis.Token{
 						Start:    0,
@@ -142,7 +143,7 @@ func TestSingle(t *testing.T) {
 						Position: 1,
 						Term:     []byte("dark"),
 					},
-				}, nil, true),
+				}, []uint64{1}, true),
 			},
 			Length: []int{
 				1,
@@ -372,6 +373,67 @@ func TestSingle(t *testing.T) {
 		t.Errorf("expected count to be 1, got %d", count)
 	}
 
+	// now try a field with array positions
+	dict, err = segment.Dictionary("tag")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dict == nil {
+		t.Fatal("got nil dict, expected non-nil")
+	}
+
+	postingsList, err = dict.PostingsList("dark", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if postingsList == nil {
+		t.Fatal("got nil postings list, expected non-nil")
+	}
+
+	postingsItr = postingsList.Iterator()
+	if postingsItr == nil {
+		t.Fatal("got nil iterator, expected non-nil")
+	}
+
+	nextPosting, err = postingsItr.Next()
+	for nextPosting != nil && err == nil {
+
+		if nextPosting.Frequency() != 1 {
+			t.Errorf("expected frequency 1, got %d", nextPosting.Frequency())
+		}
+		if nextPosting.Number() != 0 {
+			t.Errorf("expected doc number 0, got %d", nextPosting.Number())
+		}
+		var numLocs uint64
+		for _, loc := range nextPosting.Locations() {
+			numLocs++
+			if loc.Field() != "tag" {
+				t.Errorf("expected loc field to be 'name', got '%s'", loc.Field())
+			}
+			if loc.Start() != 0 {
+				t.Errorf("expected loc start to be 0, got %d", loc.Start())
+			}
+			if loc.End() != 4 {
+				t.Errorf("expected loc end to be 3, got %d", loc.End())
+			}
+			if loc.Pos() != 1 {
+				t.Errorf("expected loc pos to be 1, got %d", loc.Pos())
+			}
+			expectArrayPos := []uint64{1}
+			if !reflect.DeepEqual(loc.ArrayPositions(), expectArrayPos) {
+				t.Errorf("expect loc array pos to be %v, got %v", expectArrayPos, loc.ArrayPositions())
+			}
+		}
+		if numLocs != nextPosting.Frequency() {
+			t.Errorf("expected %d locations, got %d", nextPosting.Frequency(), numLocs)
+		}
+
+		nextPosting, err = postingsItr.Next()
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// now try and visit a document
 	var fieldValuesSeen int
 	err = segment.VisitDocument(0, func(field string, typ byte, value []byte, pos []uint64) bool {
@@ -459,7 +521,7 @@ func TestMultiple(t *testing.T) {
 						Position: 1,
 						Term:     []byte("cold"),
 					},
-				}, nil, true),
+				}, []uint64{0}, true),
 				analysis.TokenFrequency(analysis.TokenStream{
 					&analysis.Token{
 						Start:    0,
@@ -467,7 +529,7 @@ func TestMultiple(t *testing.T) {
 						Position: 1,
 						Term:     []byte("dark"),
 					},
-				}, nil, true),
+				}, []uint64{1}, true),
 			},
 			Length: []int{
 				1,
@@ -517,7 +579,7 @@ func TestMultiple(t *testing.T) {
 						Position: 1,
 						Term:     []byte("cold"),
 					},
-				}, nil, true),
+				}, []uint64{0}, true),
 				analysis.TokenFrequency(analysis.TokenStream{
 					&analysis.Token{
 						Start:    0,
@@ -525,7 +587,7 @@ func TestMultiple(t *testing.T) {
 						Position: 1,
 						Term:     []byte("dark"),
 					},
-				}, nil, true),
+				}, []uint64{1}, true),
 			},
 			Length: []int{
 				1,
