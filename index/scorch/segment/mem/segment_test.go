@@ -273,6 +273,9 @@ func TestSingle(t *testing.T) {
 		var numLocs uint64
 		for _, loc := range nextPosting.Locations() {
 			numLocs++
+			if loc.Field() != "name" {
+				t.Errorf("expected loc field to be 'name', got '%s'", loc.Field())
+			}
 			if loc.Start() != 0 {
 				t.Errorf("expected loc start to be 0, got %d", loc.Start())
 			}
@@ -339,6 +342,9 @@ func TestSingle(t *testing.T) {
 		var numLocs uint64
 		for _, loc := range nextPosting.Locations() {
 			numLocs++
+			if loc.Field() != "name" {
+				t.Errorf("expected loc field to be 'name', got '%s'", loc.Field())
+			}
 			if loc.Start() != 0 {
 				t.Errorf("expected loc start to be 0, got %d", loc.Start())
 			}
