@@ -438,18 +438,36 @@ func persistStored(memSegment *mem.Segment, tx *bolt.Tx) error {
 				// process each value
 				for i := 0; i < num; i++ {
 					// encode field
-					metaEncoder.PutU64(uint64(fieldID))
+					_, err2 := metaEncoder.PutU64(uint64(fieldID))
+					if err2 != nil {
+						return err2
+					}
 					// encode type
-					metaEncoder.PutU64(uint64(memSegment.StoredTypes[docNum][uint16(fieldID)][i]))
+					_, err2 = metaEncoder.PutU64(uint64(memSegment.StoredTypes[docNum][uint16(fieldID)][i]))
+					if err2 != nil {
+						return err2
+					}
 					// encode start offset
-					metaEncoder.PutU64(uint64(curr))
+					_, err2 = metaEncoder.PutU64(uint64(curr))
+					if err2 != nil {
+						return err2
+					}
 					// end len
-					metaEncoder.PutU64(uint64(len(storedFieldValues[i])))
+					_, err2 = metaEncoder.PutU64(uint64(len(storedFieldValues[i])))
+					if err2 != nil {
+						return err2
+					}
 					// encode number of array pos
-					metaEncoder.PutU64(uint64(len(memSegment.StoredPos[docNum][uint16(fieldID)][i])))
+					_, err2 = metaEncoder.PutU64(uint64(len(memSegment.StoredPos[docNum][uint16(fieldID)][i])))
+					if err2 != nil {
+						return err2
+					}
 					// encode all array positions
 					for j := 0; j < len(memSegment.StoredPos[docNum][uint16(fieldID)][i]); j++ {
-						metaEncoder.PutU64(memSegment.StoredPos[docNum][uint16(fieldID)][i][j])
+						_, err2 = metaEncoder.PutU64(memSegment.StoredPos[docNum][uint16(fieldID)][i][j])
+						if err2 != nil {
+							return err2
+						}
 					}
 					// append data
 					data = append(data, storedFieldValues[i]...)

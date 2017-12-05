@@ -25,7 +25,7 @@ import (
 )
 
 func TestBuild(t *testing.T) {
-	os.RemoveAll("/tmp/scorch.bolt")
+	_ = os.RemoveAll("/tmp/scorch.bolt")
 
 	memSegment := buildMemSegment()
 	err := persistSegment(memSegment, "/tmp/scorch.bolt", 1024)
