@@ -23,20 +23,26 @@ import (
 )
 
 func TestIndexFieldDict(t *testing.T) {
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, nil, analysisQueue)
+	idx, err := NewScorch(Name, testConfig, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
 	err = idx.Open()
 	if err != nil {
-		t.Errorf("error opening index: %v", err)
+		t.Fatalf("error opening index: %v", err)
 	}
 	defer func() {
-		err := idx.Close()
-		if err != nil {
-			t.Fatal(err)
+		cerr := idx.Close()
+		if cerr != nil {
+			t.Fatal(cerr)
 		}
 	}()
 
@@ -96,7 +102,7 @@ func TestIndexFieldDict(t *testing.T) {
 
 	dict2, err := indexReader.FieldDict("desc")
 	if err != nil {
-		t.Errorf("error creating reader: %v", err)
+		t.Fatalf("error creating reader: %v", err)
 	}
 	defer func() {
 		err := dict2.Close()

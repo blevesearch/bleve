@@ -109,7 +109,7 @@ func TestDictionary(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.bolt")
 
 	memSegment := buildMemSegmentForDict()
-	err := persistSegment(memSegment, "/tmp/scorch.bolt", 1024)
+	err := PersistSegment(memSegment, "/tmp/scorch.bolt", 1024)
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
 	}

@@ -16,6 +16,8 @@ package scorch
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -28,6 +30,7 @@ import (
 	"github.com/blevesearch/bleve/index/scorch/segment/mem"
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
+	"github.com/boltdb/bolt"
 )
 
 const Name = "scorch"
@@ -35,40 +38,95 @@ const Name = "scorch"
 const Version uint8 = 1
 
 type Scorch struct {
-	version       uint8
-	storeConfig   map[string]interface{}
-	analysisQueue *index.AnalysisQueue
-	stats         *Stats
-	nextSegmentID uint64
+	version           uint8
+	config            map[string]interface{}
+	analysisQueue     *index.AnalysisQueue
+	stats             *Stats
+	nextSegmentID     uint64
+	nextSnapshotEpoch uint64
+	path              string
+
+	unsafeBatch bool
 
 	rootLock sync.RWMutex
 	root     *IndexSnapshot
 
-	closeCh       chan struct{}
-	introductions chan *segmentIntroduction
+	closeCh            chan struct{}
+	introductions      chan *segmentIntroduction
+	introducerNotifier chan notificationChan
+	rootBolt           *bolt.DB
+	asyncTasks         sync.WaitGroup
 }
 
-func NewScorch(storeName string, storeConfig map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error) {
+func NewScorch(storeName string, config map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error) {
 	rv := &Scorch{
-		version:       Version,
-		storeConfig:   storeConfig,
-		analysisQueue: analysisQueue,
-		stats:         &Stats{},
-		root:          &IndexSnapshot{},
+		version:           Version,
+		config:            config,
+		analysisQueue:     analysisQueue,
+		stats:             &Stats{},
+		root:              &IndexSnapshot{},
+		nextSnapshotEpoch: 1,
 	}
 	return rv, nil
 }
 
 func (s *Scorch) Open() error {
+	var ok bool
+	s.path, ok = s.config["path"].(string)
+	if !ok {
+		return fmt.Errorf("must specify path")
+	}
+	if s.path == "" {
+		return os.ErrInvalid
+	}
+
+	err := os.MkdirAll(s.path, 0700)
+	if err != nil {
+		return err
+	}
+
+	rootBoltPath := s.path + string(os.PathSeparator) + "root.bolt"
+
+	s.rootBolt, err = bolt.Open(rootBoltPath, 0600, nil)
+	if err != nil {
+		return err
+	}
+
+	// now see if there is any existing state to load
+	err = s.loadFromBolt()
+	if err != nil {
+		return err
+	}
+
 	s.closeCh = make(chan struct{})
 	s.introductions = make(chan *segmentIntroduction)
+	s.introducerNotifier = make(chan notificationChan)
+
+	s.asyncTasks.Add(1)
 	go s.mainLoop()
+	s.asyncTasks.Add(1)
+	go s.persisterLoop()
+
 	return nil
 }
 
-func (s *Scorch) Close() error {
+func (s *Scorch) Close() (err error) {
+	// signal to async tasks we want to close
 	close(s.closeCh)
-	return nil
+	// wait for them to close
+	s.asyncTasks.Wait()
+	// now close the root bolt
+
+	err = s.rootBolt.Close()
+	s.rootLock.Lock()
+	for _, segment := range s.root.segment {
+		cerr := segment.Close()
+		if err == nil {
+			err = cerr
+		}
+	}
+
+	return
 }
 
 func (s *Scorch) Update(doc *document.Document) error {
@@ -85,7 +143,6 @@ func (s *Scorch) Delete(id string) error {
 
 // Batch applices a batch of changes to the index atomically
 func (s *Scorch) Batch(batch *index.Batch) error {
-
 	analysisStart := time.Now()
 
 	resultChan := make(chan *index.AnalysisResult, len(batch.IndexOps))
@@ -148,7 +205,11 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 		ids:       ids,
 		obsoletes: make(map[uint64]*roaring.Bitmap),
 		internal:  internalOps,
-		applied:   make(chan struct{}),
+		applied:   make(chan error),
+	}
+
+	if !s.unsafeBatch {
+		introduction.persisted = make(chan error)
 	}
 
 	// get read lock, to optimistically prepare obsoleted info
@@ -165,9 +226,16 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 	s.introductions <- introduction
 
 	// block until this segment is applied
-	<-introduction.applied
+	err := <-introduction.applied
+	if err != nil {
+		return err
+	}
 
-	return nil
+	if !s.unsafeBatch {
+		err = <-introduction.persisted
+	}
+
+	return err
 }
 
 func (s *Scorch) SetInternal(key, val []byte) error {

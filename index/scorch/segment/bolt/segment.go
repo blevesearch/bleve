@@ -123,7 +123,7 @@ func (s *Segment) loadFields() (err error) {
 			}
 		} else {
 
-			_, fieldID, err2 := DecodeUvarintAscending(k)
+			_, fieldID, err2 := segment.DecodeUvarintAscending(k)
 			if err2 != nil {
 				return err2
 			}
@@ -164,7 +164,11 @@ func (s *Segment) Count() uint64 {
 
 // Dictionary returns the term dictionary for the specified field
 func (s *Segment) Dictionary(field string) (segment.TermDictionary, error) {
-	return s.dictionary(field)
+	dict, err := s.dictionary(field)
+	if err == nil && dict == nil {
+		return &segment.EmptyDictionary{}, nil
+	}
+	return dict, err
 }
 
 func (s *Segment) dictionary(field string) (*Dictionary, error) {
@@ -177,7 +181,7 @@ func (s *Segment) dictionary(field string) (*Dictionary, error) {
 	rv.fieldID = s.fieldsMap[field]
 	if rv.fieldID > 0 {
 		rv.fieldID = rv.fieldID - 1
-		fieldIDKey := EncodeUvarintAscending(nil, uint64(rv.fieldID))
+		fieldIDKey := segment.EncodeUvarintAscending(nil, uint64(rv.fieldID))
 		bucket := s.tx.Bucket(dictBucket)
 		if bucket == nil {
 			return nil, fmt.Errorf("dictionary bucket missing")
@@ -196,6 +200,8 @@ func (s *Segment) dictionary(field string) (*Dictionary, error) {
 			}
 		}
 
+	} else {
+		return nil, nil
 	}
 
 	return rv, nil
@@ -208,7 +214,7 @@ func (s *Segment) VisitDocument(num uint64, visitor segment.DocumentFieldValueVi
 	if storedBuucket == nil {
 		return fmt.Errorf("stored bucket missing")
 	}
-	docNumKey := EncodeUvarintAscending(nil, num)
+	docNumKey := segment.EncodeUvarintAscending(nil, num)
 	docBucket := storedBuucket.Bucket(docNumKey)
 	if docBucket == nil {
 		return fmt.Errorf("segment has no doc number %d", num)
@@ -306,4 +312,8 @@ func (s *Segment) Close() error {
 		return err
 	}
 	return s.db.Close()
+}
+
+func (s *Segment) Path() string {
+	return s.db.Path()
 }

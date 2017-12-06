@@ -91,7 +91,7 @@ type PostingsIterator struct {
 
 func (i *PostingsIterator) loadChunk(chunk int) error {
 	// load correct chunk bytes
-	chunkID := EncodeUvarintAscending(nil, uint64(chunk))
+	chunkID := segment.EncodeUvarintAscending(nil, uint64(chunk))
 	chunkBucket := i.detailBucket.Bucket(chunkID)
 	if chunkBucket == nil {
 		return fmt.Errorf("chunk %d missing", chunkID)

@@ -15,6 +15,8 @@
 package mem
 
 import (
+	"fmt"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 )
@@ -117,12 +119,25 @@ func (s *Segment) VisitDocument(num uint64, visitor segment.DocumentFieldValueVi
 	return nil
 }
 
+func (s *Segment) getField(name string) (int, error) {
+	fieldID, ok := s.FieldsMap[name]
+	if !ok {
+		return 0, fmt.Errorf("no field named %s", name)
+	}
+	return int(fieldID - 1), nil
+}
+
 // Dictionary returns the term dictionary for the specified field
 func (s *Segment) Dictionary(field string) (segment.TermDictionary, error) {
+	fieldID, err := s.getField(field)
+	if err != nil {
+		// no such field, return empty dictionary
+		return &segment.EmptyDictionary{}, nil
+	}
 	return &Dictionary{
 		segment: s,
 		field:   field,
-		fieldID: uint16(s.getOrDefineField(field, false)),
+		fieldID: uint16(fieldID),
 	}, nil
 }
 

@@ -21,6 +21,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/Smerity/govarint"
+	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/blevesearch/bleve/index/scorch/segment/mem"
 	"github.com/boltdb/bolt"
 	"github.com/couchbaselabs/vellum"
@@ -47,8 +48,7 @@ var versionKey = []byte{'v'}
 
 var version = 0
 
-func persistSegment(memSegment *mem.Segment, path string, chunkFactor uint32) (err error) {
-
+func PersistSegment(memSegment *mem.Segment, path string, chunkFactor uint32) (err error) {
 	db, err := bolt.Open(path, 0777, nil)
 	if err != nil {
 		return err
@@ -133,13 +133,13 @@ func persistFields(memSegment *mem.Segment, tx *bolt.Tx) error {
 	}
 
 	// we use special varint which is still guaranteed to sort correctly
-	fieldBuf := make([]byte, 0, maxVarintSize)
+	fieldBuf := make([]byte, 0, segment.MaxVarintSize)
 	for fieldID, fieldName := range memSegment.FieldsInv {
 		if fieldID != 0 {
 			// reset buffer if necessary
 			fieldBuf = fieldBuf[:0]
 		}
-		fieldBuf = EncodeUvarintAscending(fieldBuf, uint64(fieldID))
+		fieldBuf = segment.EncodeUvarintAscending(fieldBuf, uint64(fieldID))
 		err = bucket.Put(fieldBuf, []byte(fieldName))
 		if err != nil {
 			return err
@@ -160,7 +160,7 @@ func persistDictionary(memSegment *mem.Segment, tx *bolt.Tx) error {
 	// the (presumably) heavier lifting involved in building the FST could
 	// be done concurrently.
 
-	fieldBuf := make([]byte, 0, maxVarintSize)
+	fieldBuf := make([]byte, 0, segment.MaxVarintSize)
 	for fieldID, fieldTerms := range memSegment.DictKeys {
 		if fieldID != 0 {
 			// reset buffers if necessary
@@ -188,7 +188,7 @@ func persistDictionary(memSegment *mem.Segment, tx *bolt.Tx) error {
 
 		// put this FST into bolt
 		// we use special varint which is still guaranteed to sort correctly
-		fieldBuf = EncodeUvarintAscending(fieldBuf, uint64(fieldID))
+		fieldBuf = segment.EncodeUvarintAscending(fieldBuf, uint64(fieldID))
 		err = bucket.Put(fieldBuf, buffer.Bytes())
 		if err != nil {
 			return err
@@ -205,13 +205,13 @@ func persistPostings(memSegment *mem.Segment, tx *bolt.Tx) error {
 	}
 	bucket.FillPercent = 1.0
 
-	postingIDBuf := make([]byte, 0, maxVarintSize)
+	postingIDBuf := make([]byte, 0, segment.MaxVarintSize)
 	for postingID := range memSegment.Postings {
 		if postingID != 0 {
 			// reset buffers if necessary
 			postingIDBuf = postingIDBuf[:0]
 		}
-		postingIDBuf = EncodeUvarintAscending(postingIDBuf, uint64(postingID))
+		postingIDBuf = segment.EncodeUvarintAscending(postingIDBuf, uint64(postingID))
 		var postingsBuf bytes.Buffer
 		_, err := memSegment.Postings[postingID].WriteTo(&postingsBuf)
 		if err != nil {
@@ -234,13 +234,13 @@ func persistPostingsDetails(memSegment *mem.Segment, tx *bolt.Tx,
 	}
 	bucket.FillPercent = 1.0
 
-	postingIDBuf := make([]byte, 0, maxVarintSize)
+	postingIDBuf := make([]byte, 0, segment.MaxVarintSize)
 	for postingID := range memSegment.Postings {
 		if postingID != 0 {
 			// reset buffers if necessary
 			postingIDBuf = postingIDBuf[:0]
 		}
-		postingIDBuf = EncodeUvarintAscending(postingIDBuf, uint64(postingID))
+		postingIDBuf = segment.EncodeUvarintAscending(postingIDBuf, uint64(postingID))
 
 		// make bucket for posting details
 		postingBucket, err := bucket.CreateBucket(postingIDBuf)
@@ -264,7 +264,7 @@ func persistPostingDetails(memSegment *mem.Segment, postingBucket *bolt.Bucket,
 	var err error
 	var chunkBucket *bolt.Bucket
 	var currChunk uint32
-	chunkIDBuf := make([]byte, 0, maxVarintSize)
+	chunkIDBuf := make([]byte, 0, segment.MaxVarintSize)
 	postingsListItr := memSegment.Postings[postingID].Iterator()
 	var encoder *govarint.Base128Encoder
 	var locEncoder *govarint.Base128Encoder
@@ -303,7 +303,7 @@ func persistPostingDetails(memSegment *mem.Segment, postingBucket *bolt.Bucket,
 			}
 
 			// prepare next chunk
-			chunkIDBuf = EncodeUvarintAscending(chunkIDBuf, uint64(chunk))
+			chunkIDBuf = segment.EncodeUvarintAscending(chunkIDBuf, uint64(chunk))
 			chunkBucket, err = postingBucket.CreateBucket(chunkIDBuf)
 			if err != nil {
 				return err
@@ -410,7 +410,7 @@ func persistStored(memSegment *mem.Segment, tx *bolt.Tx) error {
 
 	var curr int
 	// we use special varint which is still guaranteed to sort correctly
-	docNumBuf := make([]byte, 0, maxVarintSize)
+	docNumBuf := make([]byte, 0, segment.MaxVarintSize)
 	for docNum, storedValues := range memSegment.Stored {
 		var metaBuf bytes.Buffer
 		var data, compressed []byte
@@ -420,7 +420,7 @@ func persistStored(memSegment *mem.Segment, tx *bolt.Tx) error {
 			curr = 0
 		}
 		// create doc sub-bucket
-		docNumBuf = EncodeUvarintAscending(docNumBuf, uint64(docNum))
+		docNumBuf = segment.EncodeUvarintAscending(docNumBuf, uint64(docNum))
 		docBucket, err := bucket.CreateBucket(docNumBuf)
 		if err != nil {
 			return err

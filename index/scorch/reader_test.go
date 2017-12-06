@@ -23,14 +23,21 @@ import (
 )
 
 func TestIndexReader(t *testing.T) {
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, nil, analysisQueue)
+	idx, err := NewScorch(Name, testConfig, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
 	err = idx.Open()
 	if err != nil {
-		t.Errorf("error opening index: %v", err)
+		t.Fatalf("error opening index: %v", err)
 	}
 	defer func() {
 		err := idx.Close()
@@ -205,14 +212,21 @@ func TestIndexReader(t *testing.T) {
 }
 
 func TestIndexDocIdReader(t *testing.T) {
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, nil, analysisQueue)
+	idx, err := NewScorch(Name, testConfig, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
 	err = idx.Open()
 	if err != nil {
-		t.Errorf("error opening index: %v", err)
+		t.Fatalf("error opening index: %v", err)
 	}
 	defer func() {
 		err := idx.Close()
@@ -309,14 +323,21 @@ func TestIndexDocIdReader(t *testing.T) {
 }
 
 func TestIndexDocIdOnlyReader(t *testing.T) {
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, nil, analysisQueue)
+	idx, err := NewScorch(Name, testConfig, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
 	err = idx.Open()
 	if err != nil {
-		t.Errorf("error opening index: %v", err)
+		t.Fatalf("error opening index: %v", err)
 	}
 	defer func() {
 		err := idx.Close()

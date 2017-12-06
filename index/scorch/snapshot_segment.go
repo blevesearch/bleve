@@ -44,6 +44,12 @@ type SegmentSnapshot struct {
 	id      uint64
 	segment segment.Segment
 	deleted *roaring.Bitmap
+
+	notify []chan error
+}
+
+func (s *SegmentSnapshot) Close() error {
+	return s.segment.Close()
 }
 
 func (s *SegmentSnapshot) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
@@ -51,6 +57,7 @@ func (s *SegmentSnapshot) VisitDocument(num uint64, visitor segment.DocumentFiel
 }
 
 func (s *SegmentSnapshot) Count() uint64 {
+
 	rv := s.segment.Count()
 	if s.deleted != nil {
 		rv -= s.deleted.GetCardinality()

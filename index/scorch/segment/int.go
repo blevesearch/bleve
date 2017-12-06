@@ -17,12 +17,12 @@
 
 // Modified to not use pkg/errors
 
-package bolt
+package segment
 
 import "fmt"
 
 const (
-	maxVarintSize = 9
+	MaxVarintSize = 9
 
 	// IntMin is chosen such that the range of int tags does not overlap the
 	// ascii character set that is frequently used in testing.

@@ -28,7 +28,7 @@ func TestBuild(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.bolt")
 
 	memSegment := buildMemSegment()
-	err := persistSegment(memSegment, "/tmp/scorch.bolt", 1024)
+	err := PersistSegment(memSegment, "/tmp/scorch.bolt", 1024)
 	if err != nil {
 		t.Fatal(err)
 	}

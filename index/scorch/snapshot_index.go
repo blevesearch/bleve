@@ -42,6 +42,7 @@ type IndexSnapshot struct {
 	segment  []*SegmentSnapshot
 	offsets  []uint64
 	internal map[string][]byte
+	epoch    uint64
 }
 
 func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string, makeItr func(i segment.TermDictionary) segment.DictionaryIterator) (*IndexSnapshotFieldDict, error) {

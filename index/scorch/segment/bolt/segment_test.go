@@ -25,7 +25,7 @@ func TestOpen(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.bolt")
 
 	memSegment := buildMemSegment()
-	err := persistSegment(memSegment, "/tmp/scorch.bolt", 1024)
+	err := PersistSegment(memSegment, "/tmp/scorch.bolt", 1024)
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
 	}
@@ -325,7 +325,7 @@ func TestOpenMulti(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.bolt")
 
 	memSegment := buildMemSegmentMulti()
-	err := persistSegment(memSegment, "/tmp/scorch.bolt", 1024)
+	err := PersistSegment(memSegment, "/tmp/scorch.bolt", 1024)
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
 	}
@@ -425,7 +425,7 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.bolt")
 
 	memSegment := buildMemSegmentMulti()
-	err := persistSegment(memSegment, "/tmp/scorch.bolt", 1)
+	err := PersistSegment(memSegment, "/tmp/scorch.bolt", 1)
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
 	}

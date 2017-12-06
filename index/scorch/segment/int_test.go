@@ -17,7 +17,7 @@
 
 // Modified to only test the parts we borrowed
 
-package bolt
+package segment
 
 import (
 	"bytes"

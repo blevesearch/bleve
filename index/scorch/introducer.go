@@ -15,6 +15,8 @@
 package scorch
 
 import (
+	"fmt"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 )
@@ -26,17 +28,21 @@ type segmentIntroduction struct {
 	ids       []string
 	internal  map[string][]byte
 
-	applied chan struct{}
+	applied   chan error
+	persisted chan error
 }
 
 func (s *Scorch) mainLoop() {
+	var notify notificationChan
+OUTER:
 	for {
 		select {
 		case <-s.closeCh:
-			return
+			break OUTER
+
+		case notify = <-s.introducerNotifier:
 
 		case next := <-s.introductions:
-
 			// acquire lock
 			s.rootLock.Lock()
 
@@ -45,7 +51,9 @@ func (s *Scorch) mainLoop() {
 				segment:  make([]*SegmentSnapshot, len(s.root.segment)+1),
 				offsets:  make([]uint64, len(s.root.segment)+1),
 				internal: make(map[string][]byte, len(s.root.segment)),
+				epoch:    s.nextSnapshotEpoch,
 			}
+			s.nextSnapshotEpoch++
 
 			// iterate through current segments
 			var running uint64
@@ -56,12 +64,15 @@ func (s *Scorch) mainLoop() {
 					var err error
 					delta, err = s.root.segment[i].segment.DocNumbers(next.ids)
 					if err != nil {
-						panic(err)
+						next.applied <- fmt.Errorf("error computing doc numbers: %v", err)
+						close(next.applied)
+						continue OUTER
 					}
 				}
 				newSnapshot.segment[i] = &SegmentSnapshot{
 					id:      s.root.segment[i].id,
 					segment: s.root.segment[i].segment,
+					notify:  s.root.segment[i].notify,
 				}
 				// apply new obsoletions
 				if s.root.segment[i].deleted == nil {
@@ -80,6 +91,12 @@ func (s *Scorch) mainLoop() {
 				segment: next.data,
 			}
 			newSnapshot.offsets[len(s.root.segment)] = running
+			if !s.unsafeBatch {
+				newSnapshot.segment[len(s.root.segment)].notify = append(
+					newSnapshot.segment[len(s.root.segment)].notify,
+					next.persisted,
+				)
+			}
 			// copy old values
 			for key, oldVal := range s.root.internal {
 				newSnapshot.internal[key] = oldVal
@@ -97,6 +114,13 @@ func (s *Scorch) mainLoop() {
 			// release lock
 			s.rootLock.Unlock()
 			close(next.applied)
+
+			if notify != nil {
+				close(notify)
+				notify = nil
+			}
 		}
 	}
+
+	s.asyncTasks.Done()
 }

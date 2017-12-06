@@ -51,7 +51,7 @@ func (d *Dictionary) postingsList(term string, except *roaring.Bitmap) (*Posting
 		}
 		if exists {
 			rv.postingsID = postingsID
-			postingsIDKey := EncodeUvarintAscending(nil, postingsID)
+			postingsIDKey := segment.EncodeUvarintAscending(nil, postingsID)
 			bucket := d.segment.tx.Bucket(postingsBucket)
 			if bucket == nil {
 				return nil, fmt.Errorf("postings bucket missing")
