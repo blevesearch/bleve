@@ -124,7 +124,10 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	}
 	// TODO optimize writing these in order?
 	for k, v := range snapshot.internal {
-		internalBucket.Put([]byte(k), v)
+		err = internalBucket.Put([]byte(k), v)
+		if err != nil {
+			return err
+		}
 	}
 
 	newSegmentPaths := make(map[uint64]string)
@@ -146,12 +149,18 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 				return fmt.Errorf("error persisting segment: %v", err2)
 			}
 			newSegmentPaths[segmentSnapshot.id] = path
-			snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
+			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
+			if err != nil {
+				return err
+			}
 		case *scorchBolt.Segment:
 
 			path := seg.Path()
 			filename := strings.TrimPrefix(path, s.path+string(os.PathSeparator))
-			snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
+			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
+			if err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unknown segment type: %T", seg)
 		}
@@ -162,7 +171,10 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 			if err != nil {
 				return fmt.Errorf("error persisting roaring bytes: %v", err)
 			}
-			snapshotSegmentBucket.Put(boltDeletedKey, roaringBuf.Bytes())
+			err = snapshotSegmentBucket.Put(boltDeletedKey, roaringBuf.Bytes())
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -274,11 +286,14 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 	for k, _ := c.First(); k != nil; k, _ = c.Next() {
 		if k[0] == boltInternalKey[0] {
 			internalBucket := snapshot.Bucket(k)
-			internalBucket.ForEach(func(key []byte, val []byte) error {
+			err := internalBucket.ForEach(func(key []byte, val []byte) error {
 				copiedVal := append([]byte(nil), val...)
 				rv.internal[string(key)] = copiedVal
 				return nil
 			})
+			if err != nil {
+				return nil, err
+			}
 		} else {
 			segmentBucket := snapshot.Bucket(k)
 			if segmentBucket == nil {
