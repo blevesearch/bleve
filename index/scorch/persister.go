@@ -23,8 +23,8 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
-	scorchBolt "github.com/blevesearch/bleve/index/scorch/segment/bolt"
 	"github.com/blevesearch/bleve/index/scorch/segment/mem"
+	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 	"github.com/boltdb/bolt"
 )
 
@@ -142,9 +142,9 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		switch seg := segmentSnapshot.segment.(type) {
 		case *mem.Segment:
 			// need to persist this to disk
-			filename := fmt.Sprintf("%x.bolt", segmentSnapshot.id)
+			filename := fmt.Sprintf("%x.zap", segmentSnapshot.id)
 			path := s.path + string(os.PathSeparator) + filename
-			err2 := scorchBolt.PersistSegment(seg, path, 1024)
+			err2 := zap.PersistSegment(seg, path, 1024)
 			if err2 != nil {
 				return fmt.Errorf("error persisting segment: %v", err2)
 			}
@@ -153,8 +153,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 			if err != nil {
 				return err
 			}
-		case *scorchBolt.Segment:
-
+		case *zap.Segment:
 			path := seg.Path()
 			filename := strings.TrimPrefix(path, s.path+string(os.PathSeparator))
 			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
@@ -181,7 +180,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	// now try to open all the new snapshots
 	newSegments := make(map[uint64]segment.Segment)
 	for segmentID, path := range newSegmentPaths {
-		newSegments[segmentID], err = scorchBolt.Open(path)
+		newSegments[segmentID], err = zap.Open(path)
 		if err != nil {
 			return fmt.Errorf("error opening new segment at %s, %v", path, err)
 		}
@@ -321,7 +320,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		return nil, fmt.Errorf("segment path missing")
 	}
 	segmentPath := s.path + string(os.PathSeparator) + string(pathBytes)
-	segment, err := scorchBolt.Open(segmentPath)
+	segment, err := zap.Open(segmentPath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening bolt segment: %v", err)
 	}
