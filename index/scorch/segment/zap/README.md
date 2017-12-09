@@ -1,5 +1,25 @@
 # zap file format
 
+The file is written in the reverse order that we typically access data.  This helps us write in one pass since later sections of the file require file offsets of things we've already written.
+
+Current usage:
+
+- mmap the entire file
+- crc-32 bytes and version are in fixed position at end of the file
+- reading remainder of footer could be version specific
+- remainder of footer gives us:
+  - 2 important offsets (fields index and stored data index)
+  - 2 important values (number of docs and chunk factor)
+- field data is processed once and memoized onto the heap so that we never have to go back to disk for it
+- access to stored data by doc number means first navigating to the stored data index, then accessing a fixed position offset into that slice, which gives us the actual address of the data.  the first bytes of that section tell us the size of data so that we know where it ends.
+- access to all other indexed data follows the following pattern:
+  - first know the field name -> convert to id
+  - next navigate to term dictionary for that field
+    - some operations stop here and do dictionary ops
+  - next use dictionary to navigate to posting list for a specific term
+  - walk posting list
+  - if necessary, walk posting details as we go
+
 ## stored fields section
 
 - for each document
