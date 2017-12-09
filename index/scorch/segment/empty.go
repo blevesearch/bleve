@@ -19,6 +19,33 @@ import (
 	"github.com/blevesearch/bleve/index"
 )
 
+type EmptySegment struct{}
+
+func (e *EmptySegment) Dictionary(field string) (TermDictionary, error) {
+	return &EmptyDictionary{}, nil
+}
+
+func (e *EmptySegment) VisitDocument(num uint64, visitor DocumentFieldValueVisitor) error {
+	return nil
+}
+
+func (e *EmptySegment) Count() uint64 {
+	return 0
+}
+
+func (e *EmptySegment) DocNumbers([]string) (*roaring.Bitmap, error) {
+	r := roaring.NewBitmap()
+	return r, nil
+}
+
+func (e *EmptySegment) Fields() []string {
+	return []string{}
+}
+
+func (e *EmptySegment) Close() error {
+	return nil
+}
+
 type EmptyDictionary struct{}
 
 func (e *EmptyDictionary) PostingsList(term string,
