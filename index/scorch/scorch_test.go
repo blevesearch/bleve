@@ -1195,6 +1195,66 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 	}
 }
 
+func TestIndexDocumentVisitFieldTerms(t *testing.T) {
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := document.NewDocument("1")
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.IndexField|document.StoreField|document.IncludeTermVectors))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("mister"), document.IndexField|document.StoreField|document.IncludeTermVectors))
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err := indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	fieldTerms := make(index.FieldTerms)
+
+	err = indexReader.DocumentVisitFieldTerms(index.IndexInternalID("1"), []string{"name", "title"}, func(field string, term []byte) {
+		fieldTerms[field] = append(fieldTerms[field], string(term))
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	expectedFieldTerms := index.FieldTerms{
+		"name":  []string{"test"},
+		"title": []string{"mister"},
+	}
+	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	}
+}
+
 func TestConcurrentUpdate(t *testing.T) {
 	defer func() {
 		err := DestroyTest()

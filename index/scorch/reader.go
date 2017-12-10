@@ -58,7 +58,7 @@ func (r *Reader) Document(id string) (*document.Document, error) {
 }
 func (r *Reader) DocumentVisitFieldTerms(id index.IndexInternalID, fields []string,
 	visitor index.DocumentFieldTermVisitor) error {
-	panic("document visit field terms not implemented")
+	return r.root.DocumentVisitFieldTerms(id, fields, visitor)
 }
 
 func (r *Reader) Fields() ([]string, error) {

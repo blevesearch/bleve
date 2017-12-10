@@ -341,6 +341,15 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	return rv, nil
 }
 
+func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID, fields []string,
+	visitor index.DocumentFieldTermVisitor) error {
+
+	docNum := docInternalToNumber(id)
+	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
+
+	return i.segment[segmentIndex].DocumentVisitFieldTerms(localDocNum, fields, visitor)
+}
+
 func docNumberToBytes(in uint64) []byte {
 
 	buf := new(bytes.Buffer)
