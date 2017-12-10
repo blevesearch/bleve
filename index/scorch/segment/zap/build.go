@@ -87,6 +87,11 @@ func PersistSegment(memSegment *mem.Segment, path string, chunkFactor uint32) (e
 		return err
 	}
 
+	err = f.Sync()
+	if err != nil {
+		return err
+	}
+
 	err = f.Close()
 	if err != nil {
 		return err
