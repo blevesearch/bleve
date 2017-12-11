@@ -1240,7 +1240,12 @@ func TestIndexDocumentVisitFieldTerms(t *testing.T) {
 
 	fieldTerms := make(index.FieldTerms)
 
-	err = indexReader.DocumentVisitFieldTerms(index.IndexInternalID("1"), []string{"name", "title"}, func(field string, term []byte) {
+	internalID, err := indexReader.GetInternal([]byte("1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = indexReader.DocumentVisitFieldTerms(internalID, []string{"name", "title"}, func(field string, term []byte) {
 		fieldTerms[field] = append(fieldTerms[field], string(term))
 	})
 	if err != nil {
