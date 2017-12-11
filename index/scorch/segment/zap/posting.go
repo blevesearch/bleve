@@ -27,15 +27,15 @@ import (
 
 // PostingsList is an in-memory represenation of a postings list
 type PostingsList struct {
-	dictionary      *Dictionary
-	term            string
-	postingsOffset  uint64
-	freqOffset      uint64
-	locOffset       uint64
-	locBitmapOffset uint64
-	postings        *roaring.Bitmap
-	except          *roaring.Bitmap
-	postingKey      []byte
+	dictionary     *Dictionary
+	term           string
+	postingsOffset uint64
+	freqOffset     uint64
+	locOffset      uint64
+	locBitmap      *roaring.Bitmap
+	postings       *roaring.Bitmap
+	except         *roaring.Bitmap
+	postingKey     []byte
 }
 
 // Iterator returns an iterator for this postings list
@@ -68,18 +68,7 @@ func (p *PostingsList) Iterator() segment.PostingsIterator {
 			n += uint64(read)
 		}
 		rv.locChunkStart = p.locOffset + n
-
-		var locBitmapLen uint64
-		locBitmapLen, read = binary.Uvarint(p.dictionary.segment.mm[p.locBitmapOffset : p.locBitmapOffset+binary.MaxVarintLen64])
-		roaringBytes := p.dictionary.segment.mm[p.locBitmapOffset+uint64(read) : p.locBitmapOffset+uint64(read)+locBitmapLen]
-		bitmap := roaring.NewBitmap()
-		_, err := bitmap.FromBuffer(roaringBytes)
-		if err != nil {
-			// return nil, fmt.Errorf("error loading roaring bitmap: %v", err)
-			// FIXME dont break api yet
-			panic("i died")
-		}
-		rv.locBitmap = bitmap
+		rv.locBitmap = p.locBitmap
 
 		rv.all = p.postings.Iterator()
 		if p.except != nil {

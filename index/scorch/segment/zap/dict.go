@@ -60,8 +60,21 @@ func (d *Dictionary) postingsList(term string, except *roaring.Bitmap) (*Posting
 			n += uint64(read)
 			rv.locOffset, read = binary.Uvarint(d.segment.mm[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
 			n += uint64(read)
-			rv.locBitmapOffset, read = binary.Uvarint(d.segment.mm[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
+
+			var locBitmapOffset uint64
+			locBitmapOffset, read = binary.Uvarint(d.segment.mm[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
 			n += uint64(read)
+
+			// go ahead and load loc bitmap
+			var locBitmapLen uint64
+			locBitmapLen, read = binary.Uvarint(d.segment.mm[locBitmapOffset : locBitmapOffset+binary.MaxVarintLen64])
+			locRoaringBytes := d.segment.mm[locBitmapOffset+uint64(read) : locBitmapOffset+uint64(read)+locBitmapLen]
+			rv.locBitmap = roaring.NewBitmap()
+			_, err := rv.locBitmap.FromBuffer(locRoaringBytes)
+			if err != nil {
+				return nil, fmt.Errorf("error loading roaring bitmap of locations with hits: %v", err)
+			}
+
 			var postingsLen uint64
 			postingsLen, read = binary.Uvarint(d.segment.mm[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
 			n += uint64(read)
