@@ -44,8 +44,6 @@ type Segment struct {
 	FieldsMap map[string]uint16
 	// fields id -> name
 	FieldsInv []string
-	// field id -> has location info
-	FieldsLoc []bool
 
 	// term dictionary
 	//  field id -> term -> posting id + 1
@@ -58,6 +56,9 @@ type Segment struct {
 	// Postings list
 	//  Postings list id -> Postings bitmap
 	Postings []*roaring.Bitmap
+
+	// Postings List has locations
+	PostingsLocs []*roaring.Bitmap
 
 	// term frequencies
 	//  postings list id -> Freqs (one for each hit in bitmap)

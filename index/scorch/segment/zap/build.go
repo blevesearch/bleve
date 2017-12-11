@@ -27,7 +27,7 @@ import (
 	"github.com/golang/snappy"
 )
 
-var version uint32
+const version uint32 = 1
 
 // PersistSegment takes the in-memory segment and persists it to the specified
 // path in the zap file format.
@@ -58,8 +58,14 @@ func PersistSegment(memSegment *mem.Segment, path string, chunkFactor uint32) (e
 		return err
 	}
 
+	var postingsListLocs []uint64
+	postingsListLocs, err = persistPostingsLocs(memSegment, cr)
+	if err != nil {
+		return err
+	}
+
 	var postingsLocs []uint64
-	postingsLocs, err = persistPostingsLists(memSegment, cr, freqOffsets, locOffsets)
+	postingsLocs, err = persistPostingsLists(memSegment, cr, postingsListLocs, freqOffsets, locOffsets)
 	if err != nil {
 		return err
 	}
@@ -420,7 +426,43 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 	return freqOffsets, locOfffsets, nil
 }
 
-func persistPostingsLists(memSegment *mem.Segment, w *CountHashWriter, freqOffsets, locOffsets []uint64) ([]uint64, error) {
+func persistPostingsLocs(memSegment *mem.Segment, w *CountHashWriter) ([]uint64, error) {
+	var rv []uint64
+
+	var postingsBuf bytes.Buffer
+	for postingID := range memSegment.PostingsLocs {
+		if postingID != 0 {
+			postingsBuf.Reset()
+		}
+
+		// record where we start this posting loc
+		rv = append(rv, uint64(w.Count()))
+
+		// write out postings locs to memory so we know the len
+		postingsLocLen, err := memSegment.PostingsLocs[postingID].WriteTo(&postingsBuf)
+		if err != nil {
+			return nil, err
+		}
+
+		buf := make([]byte, binary.MaxVarintLen64)
+		// write out the length of this postings locs
+		n := binary.PutUvarint(buf, uint64(postingsLocLen))
+		_, err = w.Write(buf[:n])
+		if err != nil {
+			return nil, err
+		}
+
+		// write out the postings list itself
+		_, err = w.Write(postingsBuf.Bytes())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return rv, nil
+}
+
+func persistPostingsLists(memSegment *mem.Segment, w *CountHashWriter, postingsListLocs, freqOffsets, locOffsets []uint64) ([]uint64, error) {
 	var rv []uint64
 
 	var postingsBuf bytes.Buffer
@@ -448,6 +490,13 @@ func persistPostingsLists(memSegment *mem.Segment, w *CountHashWriter, freqOffse
 
 		// write out the start of the loc info
 		n = binary.PutUvarint(buf, locOffsets[postingID])
+		_, err = w.Write(buf[:n])
+		if err != nil {
+			return nil, err
+		}
+
+		// write out the start of the loc posting list
+		n = binary.PutUvarint(buf, postingsListLocs[postingID])
 		_, err = w.Write(buf[:n])
 		if err != nil {
 			return nil, err
@@ -534,20 +583,9 @@ func persistFields(memSegment *mem.Segment, w *CountHashWriter, dictLocs []uint6
 		fieldStarts = append(fieldStarts, uint64(w.Count()))
 
 		buf := make([]byte, binary.MaxVarintLen64)
-		// write out if the field has indexed locs (0 or 1)
-		var indexedLoc uint64
-		if memSegment.FieldsLoc[fieldID] {
-			indexedLoc = 1
-		}
-		n := binary.PutUvarint(buf, indexedLoc)
-		_, err := w.Write(buf[:n])
-		if err != nil {
-			return 0, err
-		}
-
 		// write out dict location for this field
-		n = binary.PutUvarint(buf, dictLocs[fieldID])
-		_, err = w.Write(buf[:n])
+		n := binary.PutUvarint(buf, dictLocs[fieldID])
+		_, err := w.Write(buf[:n])
 		if err != nil {
 			return 0, err
 		}

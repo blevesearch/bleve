@@ -22,6 +22,7 @@ import (
 )
 
 type IndexSnapshotTermFieldReader struct {
+	term               []byte
 	snapshot           *IndexSnapshot
 	postings           []segment.PostingsList
 	iterators          []segment.PostingsIterator
@@ -29,6 +30,8 @@ type IndexSnapshotTermFieldReader struct {
 	includeFreq        bool
 	includeNorm        bool
 	includeTermVectors bool
+	currPosting        segment.Posting
+	currID             index.IndexInternalID
 }
 
 func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
@@ -47,26 +50,11 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 			globalOffset := i.snapshot.offsets[i.segmentOffset]
 			nnum := next.Number()
 			rv.ID = docNumberToBytes(nnum + globalOffset)
-			if i.includeFreq {
-				rv.Freq = next.Frequency()
-			}
-			if i.includeNorm {
-				rv.Norm = next.Norm()
-			}
-			if i.includeTermVectors {
-				locs := next.Locations()
-				rv.Vectors = make([]*index.TermFieldVector, len(locs))
-				for i, loc := range locs {
-					rv.Vectors[i] = &index.TermFieldVector{
-						Start:          loc.Start(),
-						End:            loc.End(),
-						Pos:            loc.Pos(),
-						ArrayPositions: loc.ArrayPositions(),
-						Field:          loc.Field(),
-					}
-				}
-			}
 
+			i.postingToTermFieldDoc(next, rv)
+
+			i.currID = rv.ID
+			i.currPosting = next
 			return rv, nil
 		}
 		i.segmentOffset++
@@ -74,7 +62,40 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 	return nil, nil
 }
 
+func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Posting, rv *index.TermFieldDoc) {
+	if i.includeFreq {
+		rv.Freq = next.Frequency()
+	}
+	if i.includeNorm {
+		rv.Norm = next.Norm()
+	}
+	if i.includeTermVectors {
+		locs := next.Locations()
+		rv.Vectors = make([]*index.TermFieldVector, len(locs))
+		for i, loc := range locs {
+			rv.Vectors[i] = &index.TermFieldVector{
+				Start:          loc.Start(),
+				End:            loc.End(),
+				Pos:            loc.Pos(),
+				ArrayPositions: loc.ArrayPositions(),
+				Field:          loc.Field(),
+			}
+		}
+	}
+}
+
+// Advance go fuck yourself editor
 func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
+	// first make sure we aren't already pointing at the right thing, (due to way searchers work)
+	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
+		rv := preAlloced
+		if rv == nil {
+			rv = &index.TermFieldDoc{}
+		}
+		rv.ID = i.currID
+		i.postingToTermFieldDoc(i.currPosting, rv)
+		return rv, nil
+	}
 	// FIXME do something better
 	next, err := i.Next(preAlloced)
 	if err != nil {

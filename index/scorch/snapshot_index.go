@@ -212,6 +212,11 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 		return nil, err
 	}
 
+	if next == nil {
+		// no such doc exists
+		return nil, nil
+	}
+
 	docNum := docInternalToNumber(next.ID)
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
@@ -318,6 +323,7 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 
 	var err error
 	rv := &IndexSnapshotTermFieldReader{
+		term:               term,
 		snapshot:           i,
 		postings:           make([]segment.PostingsList, len(i.segment)),
 		iterators:          make([]segment.PostingsIterator, len(i.segment)),
@@ -337,7 +343,6 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	if err != nil {
 		return nil, err
 	}
-
 	return rv, nil
 }
 

@@ -29,7 +29,7 @@ func NewFromAnalyzedDocs(results []*index.AnalysisResult) *Segment {
 	s := New()
 
 	// ensure that _id field get fieldID 0
-	s.getOrDefineField("_id", false)
+	s.getOrDefineField("_id")
 
 	// walk each doc
 	for _, result := range results {
@@ -102,14 +102,14 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 
 	// walk each composite field
 	for _, field := range result.Document.CompositeFields {
-		fieldID := uint16(s.getOrDefineField(field.Name(), true))
+		fieldID := uint16(s.getOrDefineField(field.Name()))
 		l, tf := field.Analyze()
 		processField(fieldID, field.Name(), l, tf)
 	}
 
 	// walk each field
 	for i, field := range result.Document.Fields {
-		fieldID := uint16(s.getOrDefineField(field.Name(), field.Options().IncludeTermVectors()))
+		fieldID := uint16(s.getOrDefineField(field.Name()))
 		l := result.Length[i]
 		tf := result.Analyzed[i]
 		processField(fieldID, field.Name(), l, tf)
@@ -133,6 +133,9 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 				newPostingID := uint64(len(s.Postings) + 1)
 				// add this new bitset to the postings slice
 				s.Postings = append(s.Postings, bs)
+
+				locationBS := roaring.New()
+				s.PostingsLocs = append(s.PostingsLocs, locationBS)
 				// add this to the details slice
 				s.Freqs = append(s.Freqs, []uint64{uint64(tokenFreq.Frequency())})
 				s.Norms = append(s.Norms, []float32{float32(1.0 / math.Sqrt(float64(fieldLens[fieldID])))})
@@ -142,10 +145,13 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 				var locends []uint64
 				var locpos []uint64
 				var locarraypos [][]uint64
+				if len(tokenFreq.Locations) > 0 {
+					locationBS.AddInt(int(docNum))
+				}
 				for _, loc := range tokenFreq.Locations {
 					var locf = fieldID
 					if loc.Field != "" {
-						locf = uint16(s.getOrDefineField(loc.Field, false))
+						locf = uint16(s.getOrDefineField(loc.Field))
 					}
 					locfields = append(locfields, locf)
 					locstarts = append(locstarts, uint64(loc.Start))
@@ -171,12 +177,16 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 				// the actual offset is - 1, because 0 is zero value
 				bs := s.Postings[fieldTermPostings-1]
 				bs.AddInt(int(docNum))
+				locationBS := s.PostingsLocs[fieldTermPostings-1]
 				s.Freqs[fieldTermPostings-1] = append(s.Freqs[fieldTermPostings-1], uint64(tokenFreq.Frequency()))
 				s.Norms[fieldTermPostings-1] = append(s.Norms[fieldTermPostings-1], float32(1.0/math.Sqrt(float64(fieldLens[fieldID]))))
+				if len(tokenFreq.Locations) > 0 {
+					locationBS.AddInt(int(docNum))
+				}
 				for _, loc := range tokenFreq.Locations {
 					var locf = fieldID
 					if loc.Field != "" {
-						locf = uint16(s.getOrDefineField(loc.Field, false))
+						locf = uint16(s.getOrDefineField(loc.Field))
 					}
 					s.Locfields[fieldTermPostings-1] = append(s.Locfields[fieldTermPostings-1], locf)
 					s.Locstarts[fieldTermPostings-1] = append(s.Locstarts[fieldTermPostings-1], uint64(loc.Start))
@@ -193,13 +203,12 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 	}
 }
 
-func (s *Segment) getOrDefineField(name string, hasLoc bool) int {
+func (s *Segment) getOrDefineField(name string) int {
 	fieldID, ok := s.FieldsMap[name]
 	if !ok {
 		fieldID = uint16(len(s.FieldsInv) + 1)
 		s.FieldsMap[name] = fieldID
 		s.FieldsInv = append(s.FieldsInv, name)
-		s.FieldsLoc = append(s.FieldsLoc, hasLoc)
 		s.Dicts = append(s.Dicts, make(map[string]uint64))
 		s.DictKeys = append(s.DictKeys, make([]string, 0))
 	}

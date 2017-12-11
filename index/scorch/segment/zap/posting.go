@@ -27,14 +27,15 @@ import (
 
 // PostingsList is an in-memory represenation of a postings list
 type PostingsList struct {
-	dictionary     *Dictionary
-	term           string
-	postingsOffset uint64
-	freqOffset     uint64
-	locOffset      uint64
-	postings       *roaring.Bitmap
-	except         *roaring.Bitmap
-	postingKey     []byte
+	dictionary      *Dictionary
+	term            string
+	postingsOffset  uint64
+	freqOffset      uint64
+	locOffset       uint64
+	locBitmapOffset uint64
+	postings        *roaring.Bitmap
+	except          *roaring.Bitmap
+	postingKey      []byte
 }
 
 // Iterator returns an iterator for this postings list
@@ -68,6 +69,18 @@ func (p *PostingsList) Iterator() segment.PostingsIterator {
 		}
 		rv.locChunkStart = p.locOffset + n
 
+		var locBitmapLen uint64
+		locBitmapLen, read = binary.Uvarint(p.dictionary.segment.mm[p.locBitmapOffset : p.locBitmapOffset+binary.MaxVarintLen64])
+		roaringBytes := p.dictionary.segment.mm[p.locBitmapOffset+uint64(read) : p.locBitmapOffset+uint64(read)+locBitmapLen]
+		bitmap := roaring.NewBitmap()
+		_, err := bitmap.FromBuffer(roaringBytes)
+		if err != nil {
+			// return nil, fmt.Errorf("error loading roaring bitmap: %v", err)
+			// FIXME dont break api yet
+			panic("i died")
+		}
+		rv.locBitmap = bitmap
+
 		rv.all = p.postings.Iterator()
 		if p.except != nil {
 			allExcept := p.postings.Clone()
@@ -86,6 +99,7 @@ func (p *PostingsList) Count() uint64 {
 	var rv uint64
 	if p.postings != nil {
 		rv = p.postings.GetCardinality()
+
 		if p.except != nil {
 			except := p.except.GetCardinality()
 			if except > rv {
@@ -117,6 +131,8 @@ type PostingsIterator struct {
 
 	locChunkLens  []uint64
 	locChunkStart uint64
+
+	locBitmap *roaring.Bitmap
 }
 
 func (i *PostingsIterator) loadChunk(chunk int) error {
@@ -245,7 +261,7 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 			if err != nil {
 				return nil, err
 			}
-			if i.postings.dictionary.segment.fieldsLoc[i.postings.dictionary.fieldID] {
+			if i.locBitmap.Contains(allN) {
 				for j := 0; j < int(freq); j++ {
 					err := i.readLocation(nil)
 					if err != nil {
@@ -280,7 +296,7 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 		return nil, err
 	}
 	rv.norm = math.Float32frombits(uint32(normBits))
-	if i.postings.dictionary.segment.fieldsLoc[i.postings.dictionary.fieldID] {
+	if i.locBitmap.Contains(n) {
 		// read off 'freq' locations
 		rv.locs = make([]segment.Location, rv.freq)
 		locs := make([]Location, rv.freq)

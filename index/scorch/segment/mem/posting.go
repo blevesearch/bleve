@@ -51,6 +51,7 @@ func (p *PostingsList) Iterator() segment.PostingsIterator {
 	}
 	if p.postingsID > 0 {
 		allbits := p.dictionary.segment.Postings[p.postingsID-1]
+		rv.locations = p.dictionary.segment.PostingsLocs[p.postingsID-1]
 		rv.all = allbits.Iterator()
 		if p.except != nil {
 			allExcept := allbits.Clone()
@@ -68,6 +69,7 @@ func (p *PostingsList) Iterator() segment.PostingsIterator {
 type PostingsIterator struct {
 	postings  *PostingsList
 	all       roaring.IntIterable
+	locations *roaring.Bitmap
 	offset    int
 	locoffset int
 	actual    roaring.IntIterable
@@ -95,6 +97,7 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 		docNum:    uint64(n),
 		offset:    i.offset,
 		locoffset: i.locoffset,
+		hasLoc:    i.locations.Contains(n),
 	}
 
 	i.locoffset += int(i.postings.dictionary.segment.Freqs[i.postings.postingsID-1][i.offset])
@@ -108,6 +111,7 @@ type Posting struct {
 	docNum    uint64
 	offset    int
 	locoffset int
+	hasLoc    bool
 }
 
 // Number returns the document number of this posting in this segment
@@ -127,7 +131,7 @@ func (p *Posting) Norm() float64 {
 
 // Locations returns the location information for each occurance
 func (p *Posting) Locations() []segment.Location {
-	if !p.iterator.postings.dictionary.segment.FieldsLoc[p.iterator.postings.dictionary.fieldID] {
+	if !p.hasLoc {
 		return nil
 	}
 	freq := int(p.Frequency())

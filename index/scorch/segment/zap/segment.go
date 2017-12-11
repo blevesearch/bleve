@@ -78,7 +78,6 @@ type Segment struct {
 
 	fieldsMap     map[string]uint16
 	fieldsInv     []string
-	fieldsLoc     []bool
 	fieldsOffsets []uint64
 }
 
@@ -112,16 +111,8 @@ func (s *Segment) loadFields() error {
 	for s.fieldsIndexOffset+(8*fieldID) < fieldsIndexEnd {
 		addr := binary.BigEndian.Uint64(s.mm[s.fieldsIndexOffset+(8*fieldID) : s.fieldsIndexOffset+(8*fieldID)+8])
 		var n uint64
-		hasStoredLoc, read := binary.Uvarint(s.mm[addr:fieldsIndexEnd])
-		n += uint64(read)
-		if hasStoredLoc == 1 {
-			s.fieldsLoc = append(s.fieldsLoc, true)
-		} else {
-			s.fieldsLoc = append(s.fieldsLoc, false)
-		}
 
-		var dictLoc uint64
-		dictLoc, read = binary.Uvarint(s.mm[addr+n : fieldsIndexEnd])
+		dictLoc, read := binary.Uvarint(s.mm[addr+n : fieldsIndexEnd])
 		n += uint64(read)
 		s.fieldsOffsets = append(s.fieldsOffsets, dictLoc)
 

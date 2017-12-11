@@ -82,15 +82,27 @@ func (r *Reader) InternalID(id string) (index.IndexInternalID, error) {
 }
 
 func (r *Reader) DumpAll() chan interface{} {
-	panic("dumpall")
+	rv := make(chan interface{})
+	go func() {
+		close(rv)
+	}()
+	return rv
 }
 
 func (r *Reader) DumpDoc(id string) chan interface{} {
-	panic("dumpdoc")
+	rv := make(chan interface{})
+	go func() {
+		close(rv)
+	}()
+	return rv
 }
 
 func (r *Reader) DumpFields() chan interface{} {
-	panic("dumpfields")
+	rv := make(chan interface{})
+	go func() {
+		close(rv)
+	}()
+	return rv
 }
 
 func (r *Reader) Close() error {

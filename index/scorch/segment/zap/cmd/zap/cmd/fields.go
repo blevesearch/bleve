@@ -43,11 +43,7 @@ var fieldsCmd = &cobra.Command{
 		for fieldsIndexOffset+(8*fieldID) < fieldsIndexEnd {
 			addr := binary.BigEndian.Uint64(data[fieldsIndexOffset+(8*fieldID) : fieldsIndexOffset+(8*fieldID)+8])
 			var n uint64
-			indexedLoc, read := binary.Uvarint(data[addr:fieldsIndexEnd])
-			n += uint64(read)
-
-			var dictLoc uint64
-			dictLoc, read = binary.Uvarint(data[addr+n : fieldsIndexEnd])
+			dictLoc, read := binary.Uvarint(data[addr+n : fieldsIndexEnd])
 			n += uint64(read)
 
 			var nameLen uint64
@@ -56,7 +52,7 @@ var fieldsCmd = &cobra.Command{
 
 			name := string(data[addr+n : addr+n+nameLen])
 
-			fmt.Printf("field %d '%s' indexedLoc: %t starts at %d (%x)\n", fieldID, name, indexedLoc == 1, dictLoc, dictLoc)
+			fmt.Printf("field %d '%s' starts at %d (%x)\n", fieldID, name, dictLoc, dictLoc)
 
 			fieldID++
 		}

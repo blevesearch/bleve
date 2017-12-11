@@ -60,6 +60,8 @@ func (d *Dictionary) postingsList(term string, except *roaring.Bitmap) (*Posting
 			n += uint64(read)
 			rv.locOffset, read = binary.Uvarint(d.segment.mm[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
 			n += uint64(read)
+			rv.locBitmapOffset, read = binary.Uvarint(d.segment.mm[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
+			n += uint64(read)
 			var postingsLen uint64
 			postingsLen, read = binary.Uvarint(d.segment.mm[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
 			n += uint64(read)
