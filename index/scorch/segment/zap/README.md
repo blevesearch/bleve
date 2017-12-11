@@ -19,6 +19,7 @@ Current usage:
   - next use dictionary to navigate to posting list for a specific term
   - walk posting list
   - if necessary, walk posting details as we go
+  - if location info is desired, consult location bitmap to see if it is there
 
 ## stored fields section
 
@@ -89,6 +90,16 @@ If you know the doc number you're interested in, this format lets you jump to th
 
 If you know the doc number you're interested in, this format lets you jump to the correct chunk (docNum/chunkFactor) directly and then seek within that chunk until you find it.
 
+## bitmaps of hits with location info
+
+- for each posting list
+  - preparation phase:
+    - encode roaring bitmap (inidicating which hits have location details indexed) posting list to bytes (so we know the length)
+  - file writing phase:
+    - remember the start position for this bitmap
+    - write length of encoded roaring bitmap
+    - write the serialized roaring bitmap data
+
 ## postings list section
 
 - for each posting list
@@ -98,6 +109,7 @@ If you know the doc number you're interested in, this format lets you jump to th
     - remember the start position for this posting list
     - write freq/norm details offset (remembered from previous, as varint uint64)
     - write location details offset (remembered from previous, as varint uint64)
+    - write location bitmap offset (remembered from pervious, as varint uint64)
     - write length of encoded roaring bitmap
     - write the serialized roaring bitmap data
 
@@ -116,7 +128,6 @@ If you know the doc number you're interested in, this format lets you jump to th
 - for each field
   - file writing phase:
     - remember start offset for each field
-    - write 1 if field has location info indexed, 0 if not (varint uint64)
     - write dictionary address (remembered from previous) (varint uint64)
     - write length of field name (varint uint64)
     - write field name bytes
