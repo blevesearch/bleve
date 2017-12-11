@@ -618,8 +618,8 @@ func persistFields(memSegment *mem.Segment, w *CountHashWriter, dictLocs []uint6
 	return rv, nil
 }
 
-// NOTE: update if you make the footer bigger
-//               crc + ver + chunk + field offset + stored offset + num docs
+// FooterSize is the size of the footer record in bytes
+// crc + ver + chunk + field offset + stored offset + num docs
 const FooterSize = 4 + 4 + 4 + 8 + 8 + 8
 
 func persistFooter(numDocs, storedIndexOffset, fieldIndexOffset uint64,
