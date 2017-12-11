@@ -105,7 +105,7 @@ func (s *Segment) loadConfig() error {
 func (s *Segment) loadFields() error {
 	// NOTE for now we assume the fields index immediately preceeds the footer
 	// if this changes, need to adjust accordingly (or store epxlicit length)
-	fieldsIndexEnd := uint64(len(s.mm) - footerSize)
+	fieldsIndexEnd := uint64(len(s.mm) - FooterSize)
 
 	// iterate through fields index
 	var fieldID uint64

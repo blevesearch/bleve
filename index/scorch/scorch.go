@@ -38,6 +38,7 @@ const Name = "scorch"
 const Version uint8 = 1
 
 type Scorch struct {
+	readOnly          bool
 	version           uint8
 	config            map[string]interface{}
 	analysisQueue     *index.AnalysisQueue
@@ -67,6 +68,10 @@ func NewScorch(storeName string, config map[string]interface{}, analysisQueue *i
 		root:              &IndexSnapshot{},
 		nextSnapshotEpoch: 1,
 	}
+	ro, ok := config["read_only"].(bool)
+	if ok {
+		rv.readOnly = ro
+	}
 	return rv, nil
 }
 
@@ -77,25 +82,35 @@ func (s *Scorch) Open() error {
 		return fmt.Errorf("must specify path")
 	}
 	if s.path == "" {
-		return os.ErrInvalid
+		s.unsafeBatch = true
 	}
 
-	err := os.MkdirAll(s.path, 0700)
-	if err != nil {
-		return err
+	var rootBoltOpt *bolt.Options
+	if s.readOnly {
+		rootBoltOpt = &bolt.Options{
+			ReadOnly: true,
+		}
+	} else {
+		if s.path != "" {
+			err := os.MkdirAll(s.path, 0700)
+			if err != nil {
+				return err
+			}
+		}
 	}
-
 	rootBoltPath := s.path + string(os.PathSeparator) + "root.bolt"
+	var err error
+	if s.path != "" {
+		s.rootBolt, err = bolt.Open(rootBoltPath, 0600, rootBoltOpt)
+		if err != nil {
+			return err
+		}
 
-	s.rootBolt, err = bolt.Open(rootBoltPath, 0600, nil)
-	if err != nil {
-		return err
-	}
-
-	// now see if there is any existing state to load
-	err = s.loadFromBolt()
-	if err != nil {
-		return err
+		// now see if there is any existing state to load
+		err = s.loadFromBolt()
+		if err != nil {
+			return err
+		}
 	}
 
 	s.closeCh = make(chan struct{})
@@ -104,8 +119,11 @@ func (s *Scorch) Open() error {
 
 	s.asyncTasks.Add(1)
 	go s.mainLoop()
-	s.asyncTasks.Add(1)
-	go s.persisterLoop()
+
+	if !s.readOnly && s.path != "" {
+		s.asyncTasks.Add(1)
+		go s.persisterLoop()
+	}
 
 	return nil
 }
@@ -117,12 +135,14 @@ func (s *Scorch) Close() (err error) {
 	s.asyncTasks.Wait()
 	// now close the root bolt
 
-	err = s.rootBolt.Close()
-	s.rootLock.Lock()
-	for _, segment := range s.root.segment {
-		cerr := segment.Close()
-		if err == nil {
-			err = cerr
+	if s.rootBolt != nil {
+		err = s.rootBolt.Close()
+		s.rootLock.Lock()
+		for _, segment := range s.root.segment {
+			cerr := segment.Close()
+			if err == nil {
+				err = cerr
+			}
 		}
 	}
 
