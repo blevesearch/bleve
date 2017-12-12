@@ -130,16 +130,12 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 
 	sort.Sort(byLiveSizeDescending(segments))
 
-	var segmentsLiveSize int64
-
 	var minLiveSize int64 = math.MaxInt64
 
 	var eligibles []Segment
 	var eligiblesLiveSize int64
 
 	for _, segment := range segments {
-		segmentsLiveSize += segment.LiveSize()
-
 		if minLiveSize > segment.LiveSize() {
 			minLiveSize = segment.LiveSize()
 		}
@@ -269,6 +265,10 @@ func ScoreSegments(segments []Segment, o *MergePlanOptions) float64 {
 		totBeforeSize += segment.FullSize()
 		totAfterSize += segment.LiveSize()
 		totAfterSizeFloored += o.RaiseToFloorSegmentSize(segment.LiveSize())
+	}
+
+	if totBeforeSize <= 0 || totAfterSize <= 0 || totAfterSizeFloored <= 0 {
+		return 0
 	}
 
 	// Roughly guess the "balance" of the segments -- whether the

@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// The segment merge planning approach was inspired by Lucene's
+// TieredMergePolicy.java and descriptions like
+// http://blog.mikemccandless.com/2011/02/visualizing-lucenes-segment-merges.html
 package mergeplan
 
 import (
@@ -250,6 +253,43 @@ func TestInsertManySameSizedSegmentsBetweenMerges(t *testing.T) {
 	spec.runCycles(t)
 }
 
+func TestInsertManySameSizedSegmentsWithDeletionsBetweenMerges(t *testing.T) {
+	o := &MergePlanOptions{
+		MaxSegmentSize:       1000,
+		MaxSegmentsPerTier:   3,
+		SegmentsPerMergeTask: 3,
+	}
+
+	spec := testCyclesSpec{
+		descrip: "imssswdbm",
+		verbose: os.Getenv("VERBOSE") == "imssswdbm" || os.Getenv("VERBOSE") == "y",
+		n:       20,
+		o:       o,
+		beforePlan: func(spec *testCyclesSpec) {
+			for i := 0; i < 10; i++ {
+				// Deletions are a shrinking of the live size.
+				for i, seg := range spec.segments {
+					if (spec.cycle+i)%5 == 0 {
+						s := seg.(*segment)
+						if s.MyLiveSize > 0 {
+							s.MyLiveSize -= 1
+						}
+					}
+				}
+
+				spec.segments = append(spec.segments, &segment{
+					MyId:       spec.nextSegmentId,
+					MyFullSize: 1,
+					MyLiveSize: 1,
+				})
+				spec.nextSegmentId++
+			}
+		},
+	}
+
+	spec.runCycles(t)
+}
+
 func TestInsertManyDifferentSizedSegmentsBetweenMerges(t *testing.T) {
 	o := &MergePlanOptions{
 		MaxSegmentSize:       1000,
@@ -384,12 +424,14 @@ func (spec *testCyclesSpec) runCycles(t *testing.T) {
 					totLiveSize += segment.LiveSize()
 				}
 
-				spec.segments = append(spec.segments, &segment{
-					MyId:       spec.nextSegmentId,
-					MyFullSize: totLiveSize,
-					MyLiveSize: totLiveSize,
-				})
-				spec.nextSegmentId++
+				if totLiveSize > 0 {
+					spec.segments = append(spec.segments, &segment{
+						MyId:       spec.nextSegmentId,
+						MyFullSize: totLiveSize,
+						MyLiveSize: totLiveSize,
+					})
+					spec.nextSegmentId++
+				}
 			}
 		}
 
@@ -411,7 +453,7 @@ func emit(descrip string, cycle int, step int, segments []Segment, plan *MergePl
 		suffix = "hasPlan"
 	}
 
-	fmt.Printf("%s %d-%d ---------- %s\n", descrip, cycle, step, suffix)
+	fmt.Printf("%s %d.%d ---------- %s\n", descrip, cycle, step, suffix)
 
 	var maxFullSize int64
 	for _, segment := range segments {
@@ -431,13 +473,15 @@ func emit(descrip string, cycle int, step int, segments []Segment, plan *MergePl
 			barLive = int(float64(barMax) * float64(barLive) / float64(maxFullSize))
 		}
 
-		var barChar = "."
+		barKind := " "
+		barChar := "."
 
 		if plan != nil {
 		TASK_LOOP:
 			for taski, task := range plan.Tasks {
 				for _, taskSegment := range task.Segments {
 					if taskSegment == segment {
+						barKind = "*"
 						barChar = fmt.Sprintf("%d", taski)
 						break TASK_LOOP
 					}
@@ -445,8 +489,14 @@ func emit(descrip string, cycle int, step int, segments []Segment, plan *MergePl
 			}
 		}
 
-		bar := strings.Repeat(barChar, barLive) + strings.Repeat("x", barFull-barLive)
+		bar :=
+			strings.Repeat(barChar, barLive)[0:barLive] +
+				strings.Repeat("x", barFull-barLive)[0:barFull-barLive]
 
-		fmt.Printf("%s %5d %5d - %s\n", descrip, segment.Id(), segment.FullSize(), bar)
+		fmt.Printf("%s %5d: %5d /%5d - %s %s\n", descrip,
+			segment.Id(),
+			segment.LiveSize(),
+			segment.FullSize(),
+			barKind, bar)
 	}
 }
