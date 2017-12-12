@@ -218,7 +218,10 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 							args = append(args, loc.End())
 							args = append(args, uint64(len(loc.ArrayPositions())))
 							args = append(args, loc.ArrayPositions()...)
-							locEncoder.Add(hitNewDocNum, args...)
+							err = locEncoder.Add(hitNewDocNum, args...)
+							if err != nil {
+								return nil, err
+							}
 						}
 					}
 					next, err2 = postItr.Next()
@@ -275,7 +278,10 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 					return nil, err
 				}
 
-				newVellum.Insert(term, postingOffset)
+				err = newVellum.Insert(term, postingOffset)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			err = mergeItr.Next()
