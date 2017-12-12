@@ -19,6 +19,7 @@ import (
 	"container/heap"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"sort"
 
 	"github.com/RoaringBitmap/roaring"
@@ -346,14 +347,6 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	return rv, nil
 }
 
-func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID, fields []string,
-	visitor index.DocumentFieldTermVisitor) error {
-
-	docNum := docInternalToNumber(id)
-	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
-
-	return i.segment[segmentIndex].DocumentVisitFieldTerms(localDocNum, fields, visitor)
-}
 
 func docNumberToBytes(in uint64) []byte {
 
@@ -364,6 +357,43 @@ func docNumberToBytes(in uint64) []byte {
 
 func docInternalToNumber(in index.IndexInternalID) uint64 {
 	var res uint64
-	_ = binary.Read(bytes.NewReader(in), binary.BigEndian, &res)
+	err := binary.Read(bytes.NewReader(in), binary.BigEndian, &res)
+	if err != nil {
+		log.Printf("docInternalToNumber failed, err: %v", err)
+	}
 	return res
+}
+
+func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
+	fields []string, visitor index.DocumentFieldTermVisitor) error {
+	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(
+		docInternalToNumber(id))
+	if segmentIndex >= len(i.segment) {
+		return nil
+	}
+
+	ss := i.segment[segmentIndex]
+	if ss.cachedDocs == nil {
+		ss.cachedDocs = &cachedDocs{cache: nil}
+	}
+
+	err := ss.cachedDocs.prepareFields(localDocNum, fields, ss)
+	if err != nil {
+		return err
+	}
+
+	for _, field := range fields {
+		if cachedFieldDocs, exists := ss.cachedDocs.cache[field]; exists {
+			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
+				terms := bytes.SplitN(tlist, ByteSeparator, -1)
+				for _, term := range terms {
+					if len(term) > 0 {
+						visitor(field, term)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }

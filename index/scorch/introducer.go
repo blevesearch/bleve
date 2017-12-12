@@ -70,9 +70,10 @@ OUTER:
 					}
 				}
 				newSnapshot.segment[i] = &SegmentSnapshot{
-					id:      s.root.segment[i].id,
-					segment: s.root.segment[i].segment,
-					notify:  s.root.segment[i].notify,
+					id:         s.root.segment[i].id,
+					segment:    s.root.segment[i].segment,
+					notify:     s.root.segment[i].notify,
+					cachedDocs: s.root.segment[i].cachedDocs,
 				}
 				// apply new obsoletions
 				if s.root.segment[i].deleted == nil {
@@ -87,8 +88,9 @@ OUTER:
 			}
 			// put new segment at end
 			newSnapshot.segment[len(s.root.segment)] = &SegmentSnapshot{
-				id:      next.id,
-				segment: next.data,
+				id:         next.id,
+				segment:    next.data,
+				cachedDocs: &cachedDocs{cache: nil},
 			}
 			newSnapshot.offsets[len(s.root.segment)] = running
 			if !s.unsafeBatch {
