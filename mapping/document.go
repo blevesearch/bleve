@@ -179,6 +179,7 @@ OUTER:
 				continue OUTER
 			}
 		}
+		break
 	}
 	return current
 }
