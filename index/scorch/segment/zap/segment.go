@@ -150,16 +150,18 @@ func (s *Segment) dictionary(field string) (*Dictionary, error) {
 
 		dictStart := s.fieldsOffsets[rv.fieldID]
 
-		// read the length of the vellum data
-		vellumLen, read := binary.Uvarint(s.mm[dictStart : dictStart+binary.MaxVarintLen64])
-		fstBytes := s.mm[dictStart+uint64(read) : dictStart+uint64(read)+vellumLen]
-		if fstBytes != nil {
-			fst, err := vellum.Load(fstBytes)
-			if err != nil {
-				return nil, fmt.Errorf("dictionary field %s vellum err: %v", field, err)
-			}
-			if err == nil {
-				rv.fst = fst
+		if dictStart > 0 {
+			// read the length of the vellum data
+			vellumLen, read := binary.Uvarint(s.mm[dictStart : dictStart+binary.MaxVarintLen64])
+			fstBytes := s.mm[dictStart+uint64(read) : dictStart+uint64(read)+vellumLen]
+			if fstBytes != nil {
+				fst, err := vellum.Load(fstBytes)
+				if err != nil {
+					return nil, fmt.Errorf("dictionary field %s vellum err: %v", field, err)
+				}
+				if err == nil {
+					rv.fst = fst
+				}
 			}
 		}
 
