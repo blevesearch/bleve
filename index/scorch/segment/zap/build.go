@@ -426,60 +426,24 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 	return freqOffsets, locOfffsets, nil
 }
 
-func persistPostingsLocs(memSegment *mem.Segment, w *CountHashWriter) ([]uint64, error) {
-	var rv []uint64
-
-	var postingsBuf bytes.Buffer
+func persistPostingsLocs(memSegment *mem.Segment, w *CountHashWriter) (rv []uint64, err error) {
 	for postingID := range memSegment.PostingsLocs {
-		if postingID != 0 {
-			postingsBuf.Reset()
-		}
-
 		// record where we start this posting loc
 		rv = append(rv, uint64(w.Count()))
-
-		// write out postings locs to memory so we know the len
-		postingsLocLen, err := memSegment.PostingsLocs[postingID].WriteTo(&postingsBuf)
-		if err != nil {
-			return nil, err
-		}
-
-		buf := make([]byte, binary.MaxVarintLen64)
-		// write out the length of this postings locs
-		n := binary.PutUvarint(buf, uint64(postingsLocLen))
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return nil, err
-		}
-
-		// write out the postings list itself
-		_, err = w.Write(postingsBuf.Bytes())
+		// write out the length and bitmap
+		_, err = writeRoaringWithLen(memSegment.PostingsLocs[postingID], w)
 		if err != nil {
 			return nil, err
 		}
 	}
-
 	return rv, nil
 }
 
-func persistPostingsLists(memSegment *mem.Segment, w *CountHashWriter, postingsListLocs, freqOffsets, locOffsets []uint64) ([]uint64, error) {
-	var rv []uint64
-
-	var postingsBuf bytes.Buffer
+func persistPostingsLists(memSegment *mem.Segment, w *CountHashWriter,
+	postingsListLocs, freqOffsets, locOffsets []uint64) (rv []uint64, err error) {
 	for postingID := range memSegment.Postings {
-		if postingID != 0 {
-			postingsBuf.Reset()
-		}
-
 		// record where we start this posting list
 		rv = append(rv, uint64(w.Count()))
-
-		// write out postings list to memory so we know the len
-		postingsListLen, err := memSegment.Postings[postingID].WriteTo(&postingsBuf)
-		if err != nil {
-			return nil, err
-		}
-
 		// write out the start of the term info
 		buf := make([]byte, binary.MaxVarintLen64)
 		n := binary.PutUvarint(buf, freqOffsets[postingID])
@@ -487,35 +451,24 @@ func persistPostingsLists(memSegment *mem.Segment, w *CountHashWriter, postingsL
 		if err != nil {
 			return nil, err
 		}
-
 		// write out the start of the loc info
 		n = binary.PutUvarint(buf, locOffsets[postingID])
 		_, err = w.Write(buf[:n])
 		if err != nil {
 			return nil, err
 		}
-
 		// write out the start of the loc posting list
 		n = binary.PutUvarint(buf, postingsListLocs[postingID])
 		_, err = w.Write(buf[:n])
 		if err != nil {
 			return nil, err
 		}
-
-		// write out the length of this postings list
-		n = binary.PutUvarint(buf, uint64(postingsListLen))
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return nil, err
-		}
-
-		// write out the postings list itself
-		_, err = w.Write(postingsBuf.Bytes())
+		// write out the length and bitmap
+		_, err = writeRoaringWithLen(memSegment.Postings[postingID], w)
 		if err != nil {
 			return nil, err
 		}
 	}
-
 	return rv, nil
 }
 
