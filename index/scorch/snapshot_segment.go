@@ -171,8 +171,8 @@ func (cfd *cachedFieldDocs) prepareFields(docNum uint64, field string,
 
 		postingsItr := postings.Iterator()
 		nextPosting, err2 := postingsItr.Next()
-		for err2 == nil && nextPosting != nil && nextPosting.Number() <= docNum-1 {
-			if nextPosting.Number() == docNum-1 {
+		for err2 == nil && nextPosting != nil && nextPosting.Number() <= docNum {
+			if nextPosting.Number() == docNum {
 				// got what we're looking for
 				termBytes := append([]byte(next.Term), ByteSeparator)
 				cfd.docs[docNum] = append(cfd.docs[docNum], termBytes...)
