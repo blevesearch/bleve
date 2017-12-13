@@ -84,6 +84,7 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 	return newDocNums, nil
 }
 
+// mapFields takes the fieldsInv list and builds the map
 func mapFields(fields []string) map[string]uint16 {
 	rv := make(map[string]uint16)
 	for i, fieldName := range fields {
@@ -92,6 +93,8 @@ func mapFields(fields []string) map[string]uint16 {
 	return rv
 }
 
+// computeNewDocCount determines how many documents will be in the newly
+// merged segment when obsoleted docs are dropped
 func computeNewDocCount(segments []*Segment, drops []*roaring.Bitmap) uint64 {
 	var newSegDocCount uint64
 	for segI, segment := range segments {
