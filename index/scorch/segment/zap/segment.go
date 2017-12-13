@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/Smerity/govarint"
@@ -47,6 +48,7 @@ func Open(path string) (segment.Segment, error) {
 		mm:        mm,
 		path:      path,
 		fieldsMap: make(map[string]uint16),
+		refs:      1,
 	}
 
 	err = rv.loadConfig()
@@ -79,6 +81,25 @@ type Segment struct {
 	fieldsMap     map[string]uint16
 	fieldsInv     []string
 	fieldsOffsets []uint64
+
+	m    sync.Mutex // Protects the fields that follow.
+	refs int64
+}
+
+func (s *Segment) AddRef() {
+	s.m.Lock()
+	s.refs++
+	s.m.Unlock()
+}
+
+func (s *Segment) DecRef() (err error) {
+	s.m.Lock()
+	s.refs--
+	if s.refs == 0 {
+		err = s.closeActual()
+	}
+	s.m.Unlock()
+	return err
 }
 
 func (s *Segment) loadConfig() error {
@@ -272,6 +293,10 @@ func (s *Segment) Path() string {
 
 // Close releases all resources associated with this segment
 func (s *Segment) Close() (err error) {
+	return s.DecRef()
+}
+
+func (s *Segment) closeActual() (err error) {
 	if s.mm != nil {
 		err = s.mm.Unmap()
 	}

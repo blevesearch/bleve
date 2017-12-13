@@ -46,6 +46,13 @@ func (e *EmptySegment) Close() error {
 	return nil
 }
 
+func (e *EmptySegment) AddRef() {
+}
+
+func (e *EmptySegment) DecRef() error {
+	return nil
+}
+
 type EmptyDictionary struct{}
 
 func (e *EmptyDictionary) PostingsList(term string,

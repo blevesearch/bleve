@@ -38,6 +38,7 @@ OUTER:
 			// check to see if there is a new snapshot to persist
 			s.rootLock.RLock()
 			ourSnapshot := s.root
+			ourSnapshot.AddRef()
 			s.rootLock.RUnlock()
 
 			if ourSnapshot.epoch != lastEpochMergePlanned {
@@ -45,10 +46,12 @@ OUTER:
 				err := s.planMergeAtSnapshot(ourSnapshot)
 				if err != nil {
 					log.Printf("merging err: %v", err)
+					_ = ourSnapshot.DecRef()
 					continue OUTER
 				}
 				lastEpochMergePlanned = ourSnapshot.epoch
 			}
+			_ = ourSnapshot.DecRef()
 
 			// tell the persister we're waiting for changes
 			// first make a notification chan
@@ -64,16 +67,19 @@ OUTER:
 			// check again
 			s.rootLock.RLock()
 			ourSnapshot = s.root
+			ourSnapshot.AddRef()
 			s.rootLock.RUnlock()
 
 			if ourSnapshot.epoch != lastEpochMergePlanned {
 				// lets get started
 				err := s.planMergeAtSnapshot(ourSnapshot)
 				if err != nil {
+					_ = ourSnapshot.DecRef()
 					continue OUTER
 				}
 				lastEpochMergePlanned = ourSnapshot.epoch
 			}
+			_ = ourSnapshot.DecRef()
 
 			// now wait for it (but also detect close)
 			select {
