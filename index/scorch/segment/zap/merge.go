@@ -39,7 +39,7 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 
 	var newDocNums [][]uint64
 	var storedIndexOffset uint64
-	dictLocs := make([]uint64, len(fieldsInv))
+	var dictLocs []uint64
 	if newSegDocCount > 0 {
 		storedIndexOffset, newDocNums, err = mergeStoredAndRemap(segments, drops,
 			fieldsMap, fieldsInv, newSegDocCount, cr)
@@ -48,10 +48,12 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 		}
 
 		dictLocs, err = persistMergedRest(segments, drops, fieldsInv, fieldsMap,
-			newDocNums, newSegDocCount, cr)
+			newDocNums, newSegDocCount, chunkFactor, cr)
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		dictLocs = make([]uint64, len(fieldsInv))
 	}
 
 	var fieldsIndexOffset uint64
@@ -108,7 +110,8 @@ func computeNewDocCount(segments []*Segment, drops []*roaring.Bitmap) uint64 {
 }
 
 func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
-	fieldsInv []string, fieldsMap map[string]uint16, newDocNums [][]uint64, newSegDocCount uint64,
+	fieldsInv []string, fieldsMap map[string]uint16, newDocNums [][]uint64,
+	newSegDocCount uint64, chunkFactor uint32,
 	w *CountHashWriter) ([]uint64, error) {
 
 	rv := make([]uint64, len(fieldsInv))
@@ -149,8 +152,8 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 			return 0
 		})
 
-		tfEncoder := newChunkedIntCoder(1024, newSegDocCount-1)
-		locEncoder := newChunkedIntCoder(1024, newSegDocCount-1)
+		tfEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
+		locEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
 		for err == nil {
 			term, _ := mergeItr.Current()
 
