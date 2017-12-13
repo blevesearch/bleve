@@ -22,7 +22,7 @@ import (
 	"github.com/blevesearch/bleve/index/scorch/segment"
 )
 
-var ByteSeparator = []byte("0xff")
+var ByteSeparator byte = 0xff
 
 type SegmentDictionarySnapshot struct {
 	s *SegmentSnapshot
@@ -174,7 +174,7 @@ func (cfd *cachedFieldDocs) prepareFields(docNum uint64, field string,
 		for err2 == nil && nextPosting != nil && nextPosting.Number() <= docNum-1 {
 			if nextPosting.Number() == docNum-1 {
 				// got what we're looking for
-				termBytes := append([]byte(next.Term), ByteSeparator...)
+				termBytes := append([]byte(next.Term), ByteSeparator)
 				cfd.docs[docNum] = append(cfd.docs[docNum], termBytes...)
 			}
 			nextPosting, err2 = postingsItr.Next()

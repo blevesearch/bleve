@@ -1417,7 +1417,10 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 	}
 
 	fieldTerms := make(index.FieldTerms)
-	docNumber := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1}
+	docNumber, err := indexReader.InternalID("1")
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
 		fieldTerms[field] = append(fieldTerms[field], string(term))
 	})
@@ -1449,7 +1452,10 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 	}
 
 	fieldTerms = make(index.FieldTerms)
-	docNumber = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2}
+	docNumber, err = indexReader.InternalID("2")
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
 		fieldTerms[field] = append(fieldTerms[field], string(term))
 	})
@@ -1481,8 +1487,10 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 	}
 
 	fieldTerms = make(index.FieldTerms)
-
-	docNumber = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3}
+	docNumber, err = indexReader.InternalID("3")
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name3", "title3"}, func(field string, term []byte) {
 		fieldTerms[field] = append(fieldTerms[field], string(term))
 	})
@@ -1497,23 +1505,24 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
 	}
 
-	/*
-		Need to discuss something with Steve
-
-		b = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1}
-		err = indexReader.DocumentVisitFieldTerms(b, []string{"name", "title"}, func(field string, term []byte) {
-			fieldTerms[field] = append(fieldTerms[field], string(term))
-		})
-		if err != nil {
-			t.Error(err)
-		}
-		expectedFieldTerms = index.FieldTerms{
-			"name":  []string{"test"},
-			"title": []string{"mister"},
-		}
-		if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
-			t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
-		}*/
+	fieldTerms = make(index.FieldTerms)
+	docNumber, err = indexReader.InternalID("1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
+		fieldTerms[field] = append(fieldTerms[field], string(term))
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	expectedFieldTerms = index.FieldTerms{
+		"name":  []string{"test"},
+		"title": []string{"mister"},
+	}
+	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	}
 	err = indexReader.Close()
 	if err != nil {
 		t.Fatal(err)

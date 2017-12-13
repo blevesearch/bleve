@@ -385,7 +385,7 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 	for _, field := range fields {
 		if cachedFieldDocs, exists := ss.cachedDocs.cache[field]; exists {
 			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
-				terms := bytes.SplitN(tlist, ByteSeparator, -1)
+				terms := bytes.SplitN(tlist, []byte{ByteSeparator}, -1)
 				for _, term := range terms {
 					if len(term) > 0 {
 						visitor(field, term)
