@@ -109,6 +109,13 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	if err != nil {
 		return err
 	}
+	// defer fsync of the rootbolt
+	defer func() {
+		if err == nil {
+			err = s.rootBolt.Sync()
+		}
+	}()
+	// defer commit/rollback transaction
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
