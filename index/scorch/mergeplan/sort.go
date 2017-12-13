@@ -16,12 +16,13 @@ package mergeplan
 
 type byLiveSizeDescending []Segment
 
-func (a byLiveSizeDescending) Len() int      { return len(a) }
+func (a byLiveSizeDescending) Len() int { return len(a) }
+
 func (a byLiveSizeDescending) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 func (a byLiveSizeDescending) Less(i, j int) bool {
 	if a[i].LiveSize() != a[j].LiveSize() {
-		return a[i].LiveSize() < a[j].LiveSize()
+		return a[i].LiveSize() > a[j].LiveSize()
 	}
 	return a[i].Id() < a[j].Id()
 }
