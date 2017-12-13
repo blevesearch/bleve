@@ -104,6 +104,15 @@ func (s *SegmentSnapshot) DocumentVisitFieldTerms(num uint64, fields []string,
 	return nil
 }
 
+func (s *SegmentSnapshot) Close() error {
+	return s.segment.Close()
+}
+
+func (s *SegmentSnapshot) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
+	return s.segment.VisitDocument(num, visitor)
+}
+
+
 func (s *SegmentSnapshot) Count() uint64 {
 
 	rv := s.segment.Count()
