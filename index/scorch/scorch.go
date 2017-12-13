@@ -50,7 +50,7 @@ type Scorch struct {
 	unsafeBatch bool
 
 	rootLock sync.RWMutex
-	root     *IndexSnapshot
+	root     *IndexSnapshot // holds 1 ref-count on the root
 
 	closeCh            chan struct{}
 	introductions      chan *segmentIntroduction
@@ -67,7 +67,7 @@ func NewScorch(storeName string, config map[string]interface{}, analysisQueue *i
 		config:            config,
 		analysisQueue:     analysisQueue,
 		stats:             &Stats{},
-		root:              &IndexSnapshot{},
+		root:              &IndexSnapshot{refs: 1},
 		nextSnapshotEpoch: 1,
 	}
 	ro, ok := config["read_only"].(bool)
@@ -140,16 +140,12 @@ func (s *Scorch) Close() (err error) {
 	// wait for them to close
 	s.asyncTasks.Wait()
 	// now close the root bolt
-
 	if s.rootBolt != nil {
 		err = s.rootBolt.Close()
 		s.rootLock.Lock()
-		for _, segment := range s.root.segment {
-			cerr := segment.Close()
-			if err == nil {
-				err = cerr
-			}
-		}
+		_ = s.root.DecRef()
+		s.root = nil
+		s.rootLock.Unlock()
 	}
 
 	return
@@ -218,7 +214,12 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 	} else {
 		newSegment = mem.New()
 	}
-	return s.prepareSegment(newSegment, ids, batch.InternalOps)
+
+	err := s.prepareSegment(newSegment, ids, batch.InternalOps)
+	if err != nil {
+		_ = newSegment.Close()
+	}
+	return err
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
@@ -240,12 +241,13 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 
 	// get read lock, to optimistically prepare obsoleted info
 	s.rootLock.RLock()
-	for i := range s.root.segment {
-		delta, err := s.root.segment[i].segment.DocNumbers(ids)
+	for _, seg := range s.root.segment {
+		delta, err := seg.segment.DocNumbers(ids)
 		if err != nil {
+			s.rootLock.RUnlock()
 			return err
 		}
-		introduction.obsoletes[s.root.segment[i].id] = delta
+		introduction.obsoletes[seg.id] = delta
 	}
 	s.rootLock.RUnlock()
 
@@ -280,10 +282,10 @@ func (s *Scorch) DeleteInternal(key []byte) error {
 // release associated resources.
 func (s *Scorch) Reader() (index.IndexReader, error) {
 	s.rootLock.RLock()
-	defer s.rootLock.RUnlock()
-	return &Reader{
-		root: s.root,
-	}, nil
+	rv := &Reader{root: s.root}
+	rv.root.AddRef()
+	s.rootLock.RUnlock()
+	return rv, nil
 }
 
 func (s *Scorch) Stats() json.Marshaler {

@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/document"
@@ -43,6 +44,32 @@ type IndexSnapshot struct {
 	offsets  []uint64
 	internal map[string][]byte
 	epoch    uint64
+
+	m    sync.Mutex // Protects the fields that follow.
+	refs int64
+}
+
+func (i *IndexSnapshot) AddRef() {
+	i.m.Lock()
+	i.refs++
+	i.m.Unlock()
+}
+
+func (i *IndexSnapshot) DecRef() (err error) {
+	i.m.Lock()
+	i.refs--
+	if i.refs == 0 {
+		for _, s := range i.segment {
+			if s != nil {
+				err2 := s.segment.DecRef()
+				if err == nil {
+					err = err2
+				}
+			}
+		}
+	}
+	i.m.Unlock()
+	return err
 }
 
 func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string, makeItr func(i segment.TermDictionary) segment.DictionaryIterator) (*IndexSnapshotFieldDict, error) {

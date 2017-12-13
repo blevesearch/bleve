@@ -44,6 +44,7 @@ OUTER:
 			// check to see if there is a new snapshot to persist
 			s.rootLock.RLock()
 			ourSnapshot := s.root
+			ourSnapshot.AddRef()
 			s.rootLock.RUnlock()
 
 			//for ourSnapshot.epoch != lastPersistedEpoch {
@@ -52,6 +53,7 @@ OUTER:
 				err := s.persistSnapshot(ourSnapshot)
 				if err != nil {
 					log.Printf("got err persisting snapshot: %v", err)
+					_ = ourSnapshot.DecRef()
 					continue OUTER
 				}
 				lastPersistedEpoch = ourSnapshot.epoch
@@ -60,6 +62,7 @@ OUTER:
 					notify = nil
 				}
 			}
+			_ = ourSnapshot.DecRef()
 
 			// tell the introducer we're waiting for changes
 			// first make a notification chan
@@ -75,13 +78,15 @@ OUTER:
 			// check again
 			s.rootLock.RLock()
 			ourSnapshot = s.root
+			ourSnapshot.AddRef()
 			s.rootLock.RUnlock()
-			if ourSnapshot.epoch != lastPersistedEpoch {
 
+			if ourSnapshot.epoch != lastPersistedEpoch {
 				// lets get started
 				err := s.persistSnapshot(ourSnapshot)
 				if err != nil {
 					log.Printf("got err persisting snapshot: %v", err)
+					_ = ourSnapshot.DecRef()
 					continue OUTER
 				}
 				lastPersistedEpoch = ourSnapshot.epoch
@@ -90,6 +95,7 @@ OUTER:
 					notify = nil
 				}
 			}
+			_ = ourSnapshot.DecRef()
 
 			// now wait for it (but also detect close)
 			select {
@@ -199,6 +205,9 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	for segmentID, path := range newSegmentPaths {
 		newSegments[segmentID], err = zap.Open(path)
 		if err != nil {
+			for _, s := range newSegments {
+				_ = s.Close() // cleanup segments that were successfully opened
+			}
 			return fmt.Errorf("error opening new segment at %s, %v", path, err)
 		}
 	}
@@ -212,6 +221,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		segment:  make([]*SegmentSnapshot, len(s.root.segment)),
 		offsets:  make([]uint64, len(s.root.offsets)),
 		internal: make(map[string][]byte, len(s.root.internal)),
+		refs:     1,
 	}
 	for i, segmentSnapshot := range s.root.segment {
 		// see if this segment has been replaced
@@ -228,14 +238,20 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 			}
 		} else {
 			newIndexSnapshot.segment[i] = s.root.segment[i]
+			newIndexSnapshot.segment[i].segment.AddRef()
 		}
 		newIndexSnapshot.offsets[i] = s.root.offsets[i]
 	}
 	for k, v := range s.root.internal {
 		newIndexSnapshot.internal[k] = v
 	}
+	rootPrev := s.root
 	s.root = newIndexSnapshot
 	s.rootLock.Unlock()
+
+	if rootPrev != nil {
+		_ = rootPrev.DecRef()
+	}
 
 	// now that we've given up the lock, notify everyone that we've safely
 	// persisted their data
@@ -263,17 +279,17 @@ func (s *Scorch) loadFromBolt() error {
 		for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
 			_, snapshotEpoch, err := segment.DecodeUvarintAscending(k)
 			if err != nil {
-				log.Printf("unable to parse segment epoch % x, contiuing", k)
+				log.Printf("unable to parse segment epoch %x, continuing", k)
 				continue
 			}
 			snapshot := snapshots.Bucket(k)
 			if snapshot == nil {
-				log.Printf("snapshot key, but bucket missing % x, continuing", k)
+				log.Printf("snapshot key, but bucket missing %x, continuing", k)
 				continue
 			}
 			indexSnapshot, err := s.loadSnapshot(snapshot)
 			if err != nil {
-				log.Printf("unable to load snapshot, %v continuing", err)
+				log.Printf("unable to load snapshot, %v, continuing", err)
 				continue
 			}
 			indexSnapshot.epoch = snapshotEpoch
@@ -296,6 +312,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 
 	rv := &IndexSnapshot{
 		internal: make(map[string][]byte),
+		refs:     1,
 	}
 	var running uint64
 	c := snapshot.Cursor()
@@ -308,19 +325,23 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 				return nil
 			})
 			if err != nil {
+				_ = rv.DecRef()
 				return nil, err
 			}
 		} else {
 			segmentBucket := snapshot.Bucket(k)
 			if segmentBucket == nil {
+				_ = rv.DecRef()
 				return nil, fmt.Errorf("segment key, but bucket missing % x", k)
 			}
 			segmentSnapshot, err := s.loadSegment(segmentBucket)
 			if err != nil {
+				_ = rv.DecRef()
 				return nil, fmt.Errorf("failed to load segment: %v", err)
 			}
 			_, segmentSnapshot.id, err = segment.DecodeUvarintAscending(k)
 			if err != nil {
+				_ = rv.DecRef()
 				return nil, fmt.Errorf("failed to decode segment id: %v", err)
 			}
 			rv.segment = append(rv.segment, segmentSnapshot)
@@ -351,6 +372,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		r := bytes.NewReader(deletedBytes)
 		_, err := deletedBitmap.ReadFrom(r)
 		if err != nil {
+			_ = segment.Close()
 			return nil, fmt.Errorf("error reading deleted bytes: %v", err)
 		}
 		rv.deleted = deletedBitmap

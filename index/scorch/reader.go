@@ -20,7 +20,7 @@ import (
 )
 
 type Reader struct {
-	root *IndexSnapshot
+	root *IndexSnapshot // Owns 1 ref-count on the index snapshot.
 }
 
 func (r *Reader) TermFieldReader(term []byte, field string, includeFreq,
@@ -106,5 +106,5 @@ func (r *Reader) DumpFields() chan interface{} {
 }
 
 func (r *Reader) Close() error {
-	return nil
+	return r.root.DecRef()
 }

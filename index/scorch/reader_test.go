@@ -646,6 +646,7 @@ func TestSegmentIndexAndLocalDocNumFromGlobal(t *testing.T) {
 	for _, test := range tests {
 		i := &IndexSnapshot{
 			offsets: test.offsets,
+			refs:    1,
 		}
 		gotSegmentIndex, gotLocalDocNum := i.segmentIndexAndLocalDocNumFromGlobal(test.globalDocNum)
 		if gotSegmentIndex != test.segmentIndex {
@@ -653,6 +654,10 @@ func TestSegmentIndexAndLocalDocNumFromGlobal(t *testing.T) {
 		}
 		if gotLocalDocNum != test.localDocNum {
 			t.Errorf("got localDocNum %d expected %d for offsets %v globalDocNum %d", gotLocalDocNum, test.localDocNum, test.offsets, test.globalDocNum)
+		}
+		err := i.DecRef()
+		if err != nil {
+			t.Errorf("expected no err, got: %v", err)
 		}
 	}
 }
