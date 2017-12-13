@@ -77,7 +77,7 @@ func PersistSegment(memSegment *mem.Segment, path string, chunkFactor uint32) (e
 	}
 
 	var fieldIndexStart uint64
-	fieldIndexStart, err = persistFields(memSegment, cr, dictLocs)
+	fieldIndexStart, err = persistFields(memSegment.FieldsInv, cr, dictLocs)
 	if err != nil {
 		return err
 	}
@@ -567,51 +567,6 @@ func persistDictionary(memSegment *mem.Segment, w *CountHashWriter, postingsLocs
 		_, err = w.Write(vellumData)
 		if err != nil {
 			return nil, err
-		}
-	}
-
-	return rv, nil
-}
-
-func persistFields(memSegment *mem.Segment, w *CountHashWriter, dictLocs []uint64) (uint64, error) {
-	var rv uint64
-
-	var fieldStarts []uint64
-	for fieldID, fieldName := range memSegment.FieldsInv {
-
-		// record start of this field
-		fieldStarts = append(fieldStarts, uint64(w.Count()))
-
-		buf := make([]byte, binary.MaxVarintLen64)
-		// write out dict location for this field
-		n := binary.PutUvarint(buf, dictLocs[fieldID])
-		_, err := w.Write(buf[:n])
-		if err != nil {
-			return 0, err
-		}
-
-		// write out the length of the field name
-		n = binary.PutUvarint(buf, uint64(len(fieldName)))
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return 0, err
-		}
-
-		// write out the field name
-		_, err = w.Write([]byte(fieldName))
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	// now write out the fields index
-	rv = uint64(w.Count())
-
-	// now write out the stored doc index
-	for fieldID := range memSegment.FieldsInv {
-		err := binary.Write(w, binary.BigEndian, fieldStarts[fieldID])
-		if err != nil {
-			return 0, err
 		}
 	}
 

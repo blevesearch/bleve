@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"math"
 	"os"
 
@@ -36,7 +35,6 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 
 	fieldsInv := mergeFields(segments)
 	fieldsMap := mapFields(fieldsInv)
-
 	newSegDocCount := computeNewDocCount(segments, drops)
 
 	var newDocNums [][]uint64
@@ -57,7 +55,7 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 	}
 
 	var fieldsIndexOffset uint64
-	fieldsIndexOffset, err = persistMergedFields(fieldsInv, cr, dictLocs)
+	fieldsIndexOffset, err = persistFields(fieldsInv, cr, dictLocs)
 	if err != nil {
 		return nil, err
 	}
@@ -104,33 +102,6 @@ func computeNewDocCount(segments []*Segment, drops []*roaring.Bitmap) uint64 {
 		newSegDocCount += segIAfterDrop
 	}
 	return newSegDocCount
-}
-
-func writeRoaringWithLen(r *roaring.Bitmap, w io.Writer) (int, error) {
-	var buffer bytes.Buffer
-	// write out postings list to memory so we know the len
-	postingsListLen, err := r.WriteTo(&buffer)
-	if err != nil {
-		return 0, err
-	}
-	var tw int
-	// write out the length of this postings list
-	buf := make([]byte, binary.MaxVarintLen64)
-	n := binary.PutUvarint(buf, uint64(postingsListLen))
-	nw, err := w.Write(buf[:n])
-	tw += nw
-	if err != nil {
-		return tw, err
-	}
-
-	// write out the postings list itself
-	nw, err = w.Write(buffer.Bytes())
-	tw += nw
-	if err != nil {
-		return tw, err
-	}
-
-	return tw, nil
 }
 
 func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
@@ -488,49 +459,4 @@ func mergeFields(segments []*Segment) []string {
 	}
 
 	return rv
-}
-
-func persistMergedFields(fieldsInv []string, w *CountHashWriter, dictLocs []uint64) (uint64, error) {
-	var rv uint64
-
-	var fieldStarts []uint64
-	for fieldID, fieldName := range fieldsInv {
-
-		// record start of this field
-		fieldStarts = append(fieldStarts, uint64(w.Count()))
-
-		buf := make([]byte, binary.MaxVarintLen64)
-		// write out dict location for this field
-		n := binary.PutUvarint(buf, dictLocs[fieldID])
-		_, err := w.Write(buf[:n])
-		if err != nil {
-			return 0, err
-		}
-
-		// write out the length of the field name
-		n = binary.PutUvarint(buf, uint64(len(fieldName)))
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return 0, err
-		}
-
-		// write out the field name
-		_, err = w.Write([]byte(fieldName))
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	// now write out the fields index
-	rv = uint64(w.Count())
-
-	// now write out the stored doc index
-	for fieldID := range fieldsInv {
-		err := binary.Write(w, binary.BigEndian, fieldStarts[fieldID])
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	return rv, nil
 }
