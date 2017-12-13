@@ -19,13 +19,13 @@ import (
 // from the may be dropped, and creates a new segment containing the remaining
 // data.  This new segment is built at the specified path, with the provided
 // chunkFactor.
-func Merge(segments []*Segment, drops []*roaring.Bitmap, path string, chunkFactor uint32) error {
-
+func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
+	chunkFactor uint32) ([][]uint64, error) {
 	flag := os.O_RDWR | os.O_CREATE
 
 	f, err := os.OpenFile(path, flag, 0600)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// bufer the output
@@ -41,50 +41,49 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string, chunkFacto
 
 	var newDocNums [][]uint64
 	var storedIndexOffset uint64
-	storedIndexOffset, newDocNums, err = mergeStoredAndRemap(segments, drops,
-		fieldsMap, fieldsInv, newSegDocCount, cr)
-	if err != nil {
-		return err
-	}
+	dictLocs := make([]uint64, len(fieldsInv))
+	if newSegDocCount > 0 {
+		storedIndexOffset, newDocNums, err = mergeStoredAndRemap(segments, drops,
+			fieldsMap, fieldsInv, newSegDocCount, cr)
+		if err != nil {
+			return nil, err
+		}
 
-	// FIXME temp until computed
-	//dictLocs := make([]uint64, len(fieldsInv))
-
-	var dictLocs []uint64
-	dictLocs, err = persistMergedRest(segments, drops, fieldsInv, fieldsMap,
-		newDocNums, newSegDocCount, cr)
-	if err != nil {
-		return err
+		dictLocs, err = persistMergedRest(segments, drops, fieldsInv, fieldsMap,
+			newDocNums, newSegDocCount, cr)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var fieldsIndexOffset uint64
 	fieldsIndexOffset, err = persistMergedFields(fieldsInv, cr, dictLocs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = persistFooter(newSegDocCount, storedIndexOffset,
 		fieldsIndexOffset, chunkFactor, cr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = br.Flush()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = f.Sync()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = f.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return newDocNums, nil
 }
 
 func mapFields(fields []string) map[string]uint16 {
@@ -161,11 +160,13 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 			}
 			dicts = append(dicts, dict)
 
-			itr, err2 := dict.fst.Iterator(nil, nil)
-			if err2 != nil {
-				return nil, err2
+			if dict != nil && dict.fst != nil {
+				itr, err2 := dict.fst.Iterator(nil, nil)
+				if err2 != nil {
+					return nil, err2
+				}
+				itrs = append(itrs, itr)
 			}
-			itrs = append(itrs, itr)
 		}
 
 		// create merging iterator
@@ -187,6 +188,9 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 			// now go back and get posting list for this term
 			// but pass in the deleted docs for that segment
 			for dictI, dict := range dicts {
+				if dict == nil {
+					continue
+				}
 				postings, err2 := dict.postingsList(string(term), drops[dictI])
 				if err2 != nil {
 					return nil, err2

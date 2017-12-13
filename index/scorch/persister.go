@@ -31,12 +31,14 @@ import (
 type notificationChan chan struct{}
 
 func (s *Scorch) persisterLoop() {
+	var notify notificationChan
 	var lastPersistedEpoch uint64
 OUTER:
 	for {
 		select {
 		case <-s.closeCh:
 			break OUTER
+		case notify = <-s.persisterNotifier:
 
 		default:
 			// check to see if there is a new snapshot to persist
@@ -53,6 +55,10 @@ OUTER:
 					continue OUTER
 				}
 				lastPersistedEpoch = ourSnapshot.epoch
+				if notify != nil {
+					close(notify)
+					notify = nil
+				}
 			}
 
 			// tell the introducer we're waiting for changes
@@ -79,6 +85,10 @@ OUTER:
 					continue OUTER
 				}
 				lastPersistedEpoch = ourSnapshot.epoch
+				if notify != nil {
+					close(notify)
+					notify = nil
+				}
 			}
 
 			// now wait for it (but also detect close)

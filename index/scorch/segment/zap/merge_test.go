@@ -54,7 +54,7 @@ func TestMerge(t *testing.T) {
 	segsToMerge[0] = segment.(*Segment)
 	segsToMerge[1] = segment2.(*Segment)
 
-	err = Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/scorch3.zap", 1024)
+	_, err = Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/scorch3.zap", 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestMergeAndDrop(t *testing.T) {
 	docsToDrop[1] = roaring.NewBitmap()
 	docsToDrop[1].AddInt(1)
 
-	err = Merge(segsToMerge, docsToDrop, "/tmp/scorch3.zap", 1024)
+	_, err = Merge(segsToMerge, docsToDrop, "/tmp/scorch3.zap", 1024)
 	if err != nil {
 		t.Fatal(err)
 	}

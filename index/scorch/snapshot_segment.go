@@ -49,6 +49,18 @@ type SegmentSnapshot struct {
 	notify []chan error
 }
 
+func (s *SegmentSnapshot) Id() uint64 {
+	return s.id
+}
+
+func (s *SegmentSnapshot) FullSize() int64 {
+	return int64(s.segment.Count())
+}
+
+func (s SegmentSnapshot) LiveSize() int64 {
+	return int64(s.Count())
+}
+
 func (s *SegmentSnapshot) Close() error {
 	return s.segment.Close()
 }

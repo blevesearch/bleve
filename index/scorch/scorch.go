@@ -54,7 +54,9 @@ type Scorch struct {
 
 	closeCh            chan struct{}
 	introductions      chan *segmentIntroduction
+	merges             chan *segmentMerge
 	introducerNotifier chan notificationChan
+	persisterNotifier  chan notificationChan
 	rootBolt           *bolt.DB
 	asyncTasks         sync.WaitGroup
 }
@@ -115,7 +117,9 @@ func (s *Scorch) Open() error {
 
 	s.closeCh = make(chan struct{})
 	s.introductions = make(chan *segmentIntroduction)
+	s.merges = make(chan *segmentMerge)
 	s.introducerNotifier = make(chan notificationChan)
+	s.persisterNotifier = make(chan notificationChan)
 
 	s.asyncTasks.Add(1)
 	go s.mainLoop()
@@ -123,6 +127,8 @@ func (s *Scorch) Open() error {
 	if !s.readOnly && s.path != "" {
 		s.asyncTasks.Add(1)
 		go s.persisterLoop()
+		s.asyncTasks.Add(1)
+		go s.mergerLoop()
 	}
 
 	return nil
