@@ -177,17 +177,8 @@ func (s *Segment) dictionary(field string) (*Dictionary, error) {
 func (s *Segment) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
 	// first make sure this is a valid number in this segment
 	if num < s.numDocs {
-		docStoredStartAddr := s.storedIndexOffset + (8 * num)
-		docStoredStart := binary.BigEndian.Uint64(s.mm[docStoredStartAddr : docStoredStartAddr+8])
-		var n uint64
-		metaLen, read := binary.Uvarint(s.mm[docStoredStart : docStoredStart+binary.MaxVarintLen64])
-		n += uint64(read)
-		var dataLen uint64
-		dataLen, read = binary.Uvarint(s.mm[docStoredStart+n : docStoredStart+n+binary.MaxVarintLen64])
-		n += uint64(read)
-		meta := s.mm[docStoredStart+n : docStoredStart+n+metaLen]
-		data := s.mm[docStoredStart+n+metaLen : docStoredStart+n+metaLen+dataLen]
-		uncompressed, err := snappy.Decode(nil, data)
+		meta, compressed := s.getStoredMetaAndCompressed(num)
+		uncompressed, err := snappy.Decode(nil, compressed)
 		if err != nil {
 			panic(err)
 		}

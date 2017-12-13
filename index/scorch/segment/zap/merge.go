@@ -399,16 +399,9 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 				// record where we're about to start writing
 				docNumOffsets[newDocNum] = uint64(w.Count())
 
-				buf := make([]byte, binary.MaxVarintLen64)
-				// write out the meta length
-				n := binary.PutUvarint(buf, uint64(len(metaBytes)))
-				_, err = w.Write(buf[:n])
-				if err != nil {
-					return 0, nil, err
-				}
-				// write out the compressed data length
-				n = binary.PutUvarint(buf, uint64(len(compressed)))
-				_, err = w.Write(buf[:n])
+				// write out the meta len and compressed data len
+				_, err = writeUvarints(w,
+					uint64(len(metaBytes)), uint64(len(compressed)))
 				if err != nil {
 					return 0, nil, err
 				}

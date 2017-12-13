@@ -182,19 +182,12 @@ func persistStored(memSegment *mem.Segment, w *CountHashWriter) (uint64, error) 
 		// record where we're about to start writing
 		docNumOffsets[docNum] = uint64(w.Count())
 
-		buf := make([]byte, binary.MaxVarintLen64)
-		// write out the meta length
-		n := binary.PutUvarint(buf, uint64(len(metaBytes)))
-		_, err := w.Write(buf[:n])
+		// write out the meta len and compressed data len
+		_, err := writeUvarints(w, uint64(len(metaBytes)), uint64(len(compressed)))
 		if err != nil {
 			return 0, err
 		}
-		// write out the compressed data length
-		n = binary.PutUvarint(buf, uint64(len(compressed)))
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return 0, err
-		}
+
 		// now write the meta
 		_, err = w.Write(metaBytes)
 		if err != nil {
@@ -444,25 +437,14 @@ func persistPostingsLists(memSegment *mem.Segment, w *CountHashWriter,
 	for postingID := range memSegment.Postings {
 		// record where we start this posting list
 		rv = append(rv, uint64(w.Count()))
-		// write out the start of the term info
-		buf := make([]byte, binary.MaxVarintLen64)
-		n := binary.PutUvarint(buf, freqOffsets[postingID])
-		_, err = w.Write(buf[:n])
+
+		// write out the term info, loc info, and loc posting list offset
+		_, err = writeUvarints(w, freqOffsets[postingID],
+			locOffsets[postingID], postingsListLocs[postingID])
 		if err != nil {
 			return nil, err
 		}
-		// write out the start of the loc info
-		n = binary.PutUvarint(buf, locOffsets[postingID])
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return nil, err
-		}
-		// write out the start of the loc posting list
-		n = binary.PutUvarint(buf, postingsListLocs[postingID])
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return nil, err
-		}
+
 		// write out the length and bitmap
 		_, err = writeRoaringWithLen(memSegment.Postings[postingID], w)
 		if err != nil {

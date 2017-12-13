@@ -60,17 +60,8 @@ func persistFields(fieldsInv []string, w *CountHashWriter, dictLocs []uint64) (u
 		// record start of this field
 		fieldStarts = append(fieldStarts, uint64(w.Count()))
 
-		buf := make([]byte, binary.MaxVarintLen64)
-		// write out dict location for this field
-		n := binary.PutUvarint(buf, dictLocs[fieldID])
-		_, err := w.Write(buf[:n])
-		if err != nil {
-			return 0, err
-		}
-
-		// write out the length of the field name
-		n = binary.PutUvarint(buf, uint64(len(fieldName)))
-		_, err = w.Write(buf[:n])
+		// write out the dict location and field name length
+		_, err := writeUvarints(w, dictLocs[fieldID], uint64(len(fieldName)))
 		if err != nil {
 			return 0, err
 		}
@@ -131,4 +122,18 @@ func persistFooter(numDocs, storedIndexOffset, fieldIndexOffset uint64,
 		return err
 	}
 	return nil
+}
+
+func writeUvarints(w io.Writer, vals ...uint64) (tw int, err error) {
+	buf := make([]byte, binary.MaxVarintLen64)
+	for _, val := range vals {
+		n := binary.PutUvarint(buf, val)
+		var nw int
+		nw, err = w.Write(buf[:n])
+		tw += nw
+		if err != nil {
+			return tw, err
+		}
+	}
+	return tw, err
 }
