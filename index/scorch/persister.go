@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/RoaringBitmap/roaring"
@@ -35,6 +36,11 @@ func (s *Scorch) persisterLoop() {
 	var lastPersistedEpoch uint64
 OUTER:
 	for {
+		err := s.removeOldSnapshots()
+		if err != nil {
+			log.Printf("got err removing old snapshots: %v", err)
+		}
+
 		select {
 		case <-s.closeCh:
 			break OUTER
@@ -50,7 +56,7 @@ OUTER:
 			//for ourSnapshot.epoch != lastPersistedEpoch {
 			if ourSnapshot.epoch != lastPersistedEpoch {
 				// lets get started
-				err := s.persistSnapshot(ourSnapshot)
+				err = s.persistSnapshot(ourSnapshot)
 				if err != nil {
 					log.Printf("got err persisting snapshot: %v", err)
 					_ = ourSnapshot.DecRef()
@@ -217,6 +223,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 
 	s.rootLock.Lock()
 	newIndexSnapshot := &IndexSnapshot{
+		parent:   s,
 		epoch:    s.root.epoch,
 		segment:  make([]*SegmentSnapshot, len(s.root.segment)),
 		offsets:  make([]uint64, len(s.root.offsets)),
@@ -275,6 +282,7 @@ func (s *Scorch) loadFromBolt() error {
 		if snapshots == nil {
 			return nil
 		}
+		foundRoot := false
 		c := snapshots.Cursor()
 		for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
 			_, snapshotEpoch, err := segment.DecodeUvarintAscending(k)
@@ -282,14 +290,20 @@ func (s *Scorch) loadFromBolt() error {
 				log.Printf("unable to parse segment epoch %x, continuing", k)
 				continue
 			}
+			if foundRoot {
+				s.eligibleForRemoval = append(s.eligibleForRemoval, snapshotEpoch)
+				continue
+			}
 			snapshot := snapshots.Bucket(k)
 			if snapshot == nil {
 				log.Printf("snapshot key, but bucket missing %x, continuing", k)
+				s.eligibleForRemoval = append(s.eligibleForRemoval, snapshotEpoch)
 				continue
 			}
 			indexSnapshot, err := s.loadSnapshot(snapshot)
 			if err != nil {
 				log.Printf("unable to load snapshot, %v, continuing", err)
+				s.eligibleForRemoval = append(s.eligibleForRemoval, snapshotEpoch)
 				continue
 			}
 			indexSnapshot.epoch = snapshotEpoch
@@ -301,8 +315,11 @@ func (s *Scorch) loadFromBolt() error {
 			}
 			s.nextSegmentID++
 			s.nextSnapshotEpoch = snapshotEpoch + 1
+			if s.root != nil {
+				_ = s.root.DecRef()
+			}
 			s.root = indexSnapshot
-			break
+			foundRoot = true
 		}
 		return nil
 	})
@@ -311,6 +328,7 @@ func (s *Scorch) loadFromBolt() error {
 func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 
 	rv := &IndexSnapshot{
+		parent:   s,
 		internal: make(map[string][]byte),
 		refs:     1,
 	}
@@ -380,3 +398,60 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 
 	return rv, nil
 }
+
+type uint64Descending []uint64
+
+func (p uint64Descending) Len() int           { return len(p) }
+func (p uint64Descending) Less(i, j int) bool { return p[i] > p[j] }
+func (p uint64Descending) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+// NumSnapshotsToKeep represents how many recent, old snapshots to
+// keep around per Scorch instance.  Useful for apps that require
+// rollback'ability.
+var NumSnapshotsToKeep int
+
+// Removes enough snapshots from the rootBolt so that the
+// s.eligibleForRemoval stays under the NumSnapshotsToKeep policy.
+func (s *Scorch) removeOldSnapshots() error {
+	var epochsToRemove []uint64
+
+	s.rootLock.Lock()
+	if len(s.eligibleForRemoval) > NumSnapshotsToKeep {
+		sort.Sort(uint64Descending(s.eligibleForRemoval))
+		epochsToRemove = append([]uint64(nil), s.eligibleForRemoval[NumSnapshotsToKeep:]...) // Copy.
+		s.eligibleForRemoval = s.eligibleForRemoval[0:NumSnapshotsToKeep]
+	}
+	s.rootLock.Unlock()
+
+	if len(epochsToRemove) <= 0 {
+		return nil
+	}
+
+	tx, err := s.rootBolt.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = s.rootBolt.Sync()
+		}
+	}()
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+		} else {
+			_ = tx.Rollback()
+		}
+	}()
+
+	for _, epochToRemove := range epochsToRemove {
+		k := segment.EncodeUvarintAscending(nil, epochToRemove)
+		err = tx.DeleteBucket(k)
+		if err == bolt.ErrBucketNotFound {
+			err = nil
+		}
+	}
+
+	return err
+}
+

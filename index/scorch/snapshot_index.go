@@ -40,6 +40,7 @@ type asynchSegmentResult struct {
 }
 
 type IndexSnapshot struct {
+	parent   *Scorch
 	segment  []*SegmentSnapshot
 	offsets  []uint64
 	internal map[string][]byte
@@ -66,6 +67,9 @@ func (i *IndexSnapshot) DecRef() (err error) {
 					err = err2
 				}
 			}
+		}
+		if i.parent != nil {
+			go i.parent.AddEligibleForRemoval(i.epoch)
 		}
 	}
 	i.m.Unlock()

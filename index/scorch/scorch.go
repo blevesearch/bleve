@@ -59,6 +59,8 @@ type Scorch struct {
 	persisterNotifier  chan notificationChan
 	rootBolt           *bolt.DB
 	asyncTasks         sync.WaitGroup
+
+	eligibleForRemoval []uint64 // Index snapshot epoch's that are safe to GC.
 }
 
 func NewScorch(storeName string, config map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error) {
@@ -67,9 +69,9 @@ func NewScorch(storeName string, config map[string]interface{}, analysisQueue *i
 		config:            config,
 		analysisQueue:     analysisQueue,
 		stats:             &Stats{},
-		root:              &IndexSnapshot{refs: 1},
 		nextSnapshotEpoch: 1,
 	}
+	rv.root = &IndexSnapshot{parent: rv, refs: 1}
 	ro, ok := config["read_only"].(bool)
 	if ok {
 		rv.readOnly = ro
@@ -322,6 +324,14 @@ func (s *Scorch) Analyze(d *document.Document) *index.AnalysisResult {
 
 func (s *Scorch) Advanced() (store.KVStore, error) {
 	return nil, nil
+}
+
+func (s *Scorch) AddEligibleForRemoval(epoch uint64) {
+	s.rootLock.Lock()
+	if s.root == nil || s.root.epoch != epoch {
+		s.eligibleForRemoval = append(s.eligibleForRemoval, epoch)
+	}
+	s.rootLock.Unlock()
 }
 
 func init() {

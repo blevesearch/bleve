@@ -68,6 +68,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 
 	// prepare new index snapshot, with curr size + 1
 	newSnapshot := &IndexSnapshot{
+		parent:   s,
 		segment:  make([]*SegmentSnapshot, len(s.root.segment)+1),
 		offsets:  make([]uint64, len(s.root.segment)+1),
 		internal: make(map[string][]byte, len(s.root.segment)),
@@ -155,6 +156,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	currSize := len(s.root.segment)
 	newSize := currSize + 1 - len(nextMerge.old)
 	newSnapshot := &IndexSnapshot{
+		parent:   s,
 		segment:  make([]*SegmentSnapshot, 0, newSize),
 		offsets:  make([]uint64, 0, newSize),
 		internal: make(map[string][]byte, len(s.root.segment)),
