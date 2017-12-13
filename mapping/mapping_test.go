@@ -991,3 +991,26 @@ func TestMappingForNilTextMarshaler(t *testing.T) {
 	}
 
 }
+
+func TestClosestDocDynamicMapping(t *testing.T) {
+	mapping := NewIndexMapping()
+	mapping.IndexDynamic = false
+	mapping.DefaultMapping = NewDocumentStaticMapping()
+	mapping.DefaultMapping.AddFieldMappingsAt("foo", NewTextFieldMapping())
+
+	doc := document.NewDocument("x")
+	err := mapping.MapDocument(doc, map[string]interface{}{
+		"foo": "value",
+		"bar": map[string]string{
+			"foo": "value2",
+			"baz": "value3",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(doc.Fields) != 1 {
+		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
+	}
+}
