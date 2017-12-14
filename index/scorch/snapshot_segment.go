@@ -171,8 +171,7 @@ type cachedFieldDocs struct {
 	docs    map[uint64][]byte // Keyed by localDocNum, value is a list of terms delimited by 0xFF.
 }
 
-func (cfd *cachedFieldDocs) prepareFields(docNum uint64, field string,
-	ss *SegmentSnapshot) {
+func (cfd *cachedFieldDocs) prepareFields(field string, ss *SegmentSnapshot) {
 	defer close(cfd.readyCh)
 
 	dict, err := ss.segment.Dictionary(field)
@@ -183,7 +182,7 @@ func (cfd *cachedFieldDocs) prepareFields(docNum uint64, field string,
 
 	dictItr := dict.Iterator()
 	next, err := dictItr.Next()
-	for next != nil && err == nil {
+	for err == nil && next != nil {
 		postings, err1 := dict.PostingsList(next.Term, nil)
 		if err1 != nil {
 			cfd.err = err1
@@ -192,12 +191,10 @@ func (cfd *cachedFieldDocs) prepareFields(docNum uint64, field string,
 
 		postingsItr := postings.Iterator()
 		nextPosting, err2 := postingsItr.Next()
-		for err2 == nil && nextPosting != nil && nextPosting.Number() <= docNum {
-			if nextPosting.Number() == docNum {
-				// got what we're looking for
-				cfd.docs[docNum] = append(cfd.docs[docNum], []byte(next.Term)...)
-				cfd.docs[docNum] = append(cfd.docs[docNum], TermSeparator)
-			}
+		for err2 == nil && nextPosting != nil {
+			docNum := nextPosting.Number()
+			cfd.docs[docNum] = append(cfd.docs[docNum], []byte(next.Term)...)
+			cfd.docs[docNum] = append(cfd.docs[docNum], TermSeparator)
 			nextPosting, err2 = postingsItr.Next()
 		}
 
@@ -220,8 +217,7 @@ type cachedDocs struct {
 	cache map[string]*cachedFieldDocs // Keyed by field
 }
 
-func (c *cachedDocs) prepareFields(docNum uint64, wantedFields []string,
-	ss *SegmentSnapshot) error {
+func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) error {
 	c.m.Lock()
 	if c.cache == nil {
 		c.cache = make(map[string]*cachedFieldDocs, len(ss.Fields()))
@@ -235,7 +231,7 @@ func (c *cachedDocs) prepareFields(docNum uint64, wantedFields []string,
 				docs:    make(map[uint64][]byte),
 			}
 
-			go c.cache[field].prepareFields(docNum, field, ss)
+			go c.cache[field].prepareFields(field, ss)
 		}
 	}
 
