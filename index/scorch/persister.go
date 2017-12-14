@@ -171,7 +171,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		switch seg := segmentSnapshot.segment.(type) {
 		case *mem.Segment:
 			// need to persist this to disk
-			filename := fmt.Sprintf("%x.zap", segmentSnapshot.id)
+			filename := fmt.Sprintf("%08x.zap", segmentSnapshot.id)
 			path := s.path + string(os.PathSeparator) + filename
 			err2 := zap.PersistSegment(seg, path, 1024)
 			if err2 != nil {
@@ -234,9 +234,10 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		// see if this segment has been replaced
 		if replacement, ok := newSegments[segmentSnapshot.id]; ok {
 			newSegmentSnapshot := &SegmentSnapshot{
-				segment: replacement,
-				deleted: segmentSnapshot.deleted,
-				id:      segmentSnapshot.id,
+				segment:    replacement,
+				deleted:    segmentSnapshot.deleted,
+				id:         segmentSnapshot.id,
+				cachedDocs: segmentSnapshot.cachedDocs,
 			}
 			newIndexSnapshot.segment[i] = newSegmentSnapshot
 			// add the old segment snapshots notifications to the list
@@ -382,7 +383,8 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	}
 
 	rv := &SegmentSnapshot{
-		segment: segment,
+		segment:    segment,
+		cachedDocs: &cachedDocs{cache: nil},
 	}
 	deletedBytes := segmentBucket.Get(boltDeletedKey)
 	if deletedBytes != nil {
@@ -474,7 +476,7 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 
 // Removes any *.zap files which aren't listed in the rootBolt.
 func (s *Scorch) removeOldZapFiles() error {
-	liveFileNames, err := s.loadZapFileNames()
+	liveFileNames, highestName, err := s.loadZapFileNames()
 	if err != nil {
 		return err
 	}
@@ -487,7 +489,7 @@ func (s *Scorch) removeOldZapFiles() error {
 	for _, finfo := range currFileInfos {
 		fname := finfo.Name()
 		if filepath.Ext(fname) == ".zap" {
-			if _, exists := liveFileNames[fname]; !exists {
+			if _, exists := liveFileNames[fname]; !exists && fname < highestName {
 				err := os.Remove(s.path + string(os.PathSeparator) + fname)
 				if err != nil {
 					log.Printf("got err removing file: %s, err: %v", fname, err)
@@ -500,8 +502,9 @@ func (s *Scorch) removeOldZapFiles() error {
 }
 
 // Returns the *.zap file names that are listed in the rootBolt.
-func (s *Scorch) loadZapFileNames() (map[string]struct{}, error) {
+func (s *Scorch) loadZapFileNames() (map[string]struct{}, string, error) {
 	rv := map[string]struct{}{}
+	var highest string
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(boltSnapshotsBucket)
 		if snapshots == nil {
@@ -526,11 +529,15 @@ func (s *Scorch) loadZapFileNames() (map[string]struct{}, error) {
 				if pathBytes == nil {
 					continue
 				}
-				rv[string(pathBytes)] = struct{}{}
+				pathString := string(pathBytes)
+				if pathString > highest {
+					highest = pathString
+				}
+				rv[string(pathString)] = struct{}{}
 			}
 		}
 		return nil
 	})
 
-	return rv, err
+	return rv, highest, err
 }

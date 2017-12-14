@@ -401,6 +401,7 @@ func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
 
 func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 	fields []string, visitor index.DocumentFieldTermVisitor) error {
+
 	docNum, err := docInternalToNumber(id)
 	if err != nil {
 		return err
@@ -410,12 +411,7 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 		return nil
 	}
 
-	i.m.Lock()
 	ss := i.segment[segmentIndex]
-	if ss.cachedDocs == nil {
-		ss.cachedDocs = &cachedDocs{cache: nil}
-	}
-	i.m.Unlock()
 
 	err = ss.cachedDocs.prepareFields(localDocNum, fields, ss)
 	if err != nil {

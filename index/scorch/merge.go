@@ -129,7 +129,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot) error {
 			}
 		}
 
-		filename := fmt.Sprintf("%x.zap", newSegmentID)
+		filename := fmt.Sprintf("%08x.zap", newSegmentID)
 		path := s.path + string(os.PathSeparator) + filename
 		newDocNums, err := zap.Merge(segmentsToMerge, docsToDrop, path, 1024)
 		if err != nil {

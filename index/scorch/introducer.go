@@ -93,9 +93,9 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			}
 		}
 		newSnapshot.segment[i] = &SegmentSnapshot{
-			id:      s.root.segment[i].id,
-			segment: s.root.segment[i].segment,
-			notify:  s.root.segment[i].notify,
+			id:         s.root.segment[i].id,
+			segment:    s.root.segment[i].segment,
+			notify:     s.root.segment[i].notify,
 			cachedDocs: s.root.segment[i].cachedDocs,
 		}
 		s.root.segment[i].segment.AddRef()
@@ -112,8 +112,8 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	}
 	// put new segment at end
 	newSnapshot.segment[len(s.root.segment)] = &SegmentSnapshot{
-		id:      next.id,
-		segment: next.data, // Take ownership of next.data's ref-count.
+		id:         next.id,
+		segment:    next.data, // Take ownership of next.data's ref-count.
 		cachedDocs: &cachedDocs{cache: nil},
 	}
 	newSnapshot.offsets[len(s.root.segment)] = running
@@ -191,10 +191,11 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 		} else {
 			// this segment is staying
 			newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
-				id:      s.root.segment[i].id,
-				segment: s.root.segment[i].segment,
-				notify:  s.root.segment[i].notify,
-				deleted: s.root.segment[i].deleted,
+				id:         s.root.segment[i].id,
+				segment:    s.root.segment[i].segment,
+				notify:     s.root.segment[i].notify,
+				deleted:    s.root.segment[i].deleted,
+				cachedDocs: s.root.segment[i].cachedDocs,
 			})
 			s.root.segment[i].segment.AddRef()
 			newSnapshot.offsets = append(newSnapshot.offsets, running)
@@ -204,9 +205,10 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 
 	// put new segment at end
 	newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
-		id:      nextMerge.id,
-		segment: nextMerge.new, // Take ownership for nextMerge.new's ref-count.
-		deleted: newSegmentDeleted,
+		id:         nextMerge.id,
+		segment:    nextMerge.new, // Take ownership for nextMerge.new's ref-count.
+		deleted:    newSegmentDeleted,
+		cachedDocs: &cachedDocs{cache: nil},
 	})
 	newSnapshot.offsets = append(newSnapshot.offsets, running)
 
