@@ -248,7 +248,10 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 		return nil, nil
 	}
 
-	docNum := docInternalToNumber(next.ID)
+	docNum, err := docInternalToNumber(next.ID)
+	if err != nil {
+		return nil, err
+	}
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
 	rv = document.NewDocument(id)
@@ -286,12 +289,15 @@ func (i *IndexSnapshot) segmentIndexAndLocalDocNumFromGlobal(docNum uint64) (int
 }
 
 func (i *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
-	docNum := docInternalToNumber(id)
+	docNum, err := docInternalToNumber(id)
+	if err != nil {
+		return "", err
+	}
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
 	var found bool
 	var rv string
-	err := i.segment[segmentIndex].VisitDocument(localDocNum, func(field string, typ byte, value []byte, pos []uint64) bool {
+	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(field string, typ byte, value []byte, pos []uint64) bool {
 		if field == "_id" {
 			found = true
 			rv = string(value)
@@ -377,15 +383,6 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	return rv, nil
 }
 
-func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID, fields []string,
-	visitor index.DocumentFieldTermVisitor) error {
-
-	docNum := docInternalToNumber(id)
-	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
-
-	return i.segment[segmentIndex].DocumentVisitFieldTerms(localDocNum, fields, visitor)
-}
-
 func docNumberToBytes(in uint64) []byte {
 
 	buf := new(bytes.Buffer)
@@ -393,8 +390,50 @@ func docNumberToBytes(in uint64) []byte {
 	return buf.Bytes()
 }
 
-func docInternalToNumber(in index.IndexInternalID) uint64 {
+func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
 	var res uint64
-	_ = binary.Read(bytes.NewReader(in), binary.BigEndian, &res)
-	return res
+	err := binary.Read(bytes.NewReader(in), binary.BigEndian, &res)
+	if err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
+	fields []string, visitor index.DocumentFieldTermVisitor) error {
+	docNum, err := docInternalToNumber(id)
+	if err != nil {
+		return err
+	}
+	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
+	if segmentIndex >= len(i.segment) {
+		return nil
+	}
+
+	i.m.Lock()
+	ss := i.segment[segmentIndex]
+	if ss.cachedDocs == nil {
+		ss.cachedDocs = &cachedDocs{cache: nil}
+	}
+	i.m.Unlock()
+
+	err = ss.cachedDocs.prepareFields(localDocNum, fields, ss)
+	if err != nil {
+		return err
+	}
+
+	for _, field := range fields {
+		if cachedFieldDocs, exists := ss.cachedDocs.cache[field]; exists {
+			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
+				terms := bytes.SplitN(tlist, TermSeparatorSplitSlice, -1)
+				for _, term := range terms {
+					if len(term) > 0 {
+						visitor(field, term)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }
