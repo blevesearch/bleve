@@ -325,10 +325,12 @@ func (s *Scorch) loadFromBolt() error {
 			}
 			s.nextSegmentID++
 			s.nextSnapshotEpoch = snapshotEpoch + 1
+			s.rootLock.Lock()
 			if s.root != nil {
 				_ = s.root.DecRef()
 			}
 			s.root = indexSnapshot
+			s.rootLock.Unlock()
 			foundRoot = true
 		}
 		return nil
