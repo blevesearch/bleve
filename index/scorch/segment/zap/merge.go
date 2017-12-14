@@ -153,10 +153,12 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 
 			if dict != nil && dict.fst != nil {
 				itr, err2 := dict.fst.Iterator(nil, nil)
-				if err2 != nil {
+				if err2 != nil && err2 != vellum.ErrIteratorDone {
 					return nil, err2
 				}
-				itrs = append(itrs, itr)
+				if itr != nil {
+					itrs = append(itrs, itr)
+				}
 			}
 		}
 
