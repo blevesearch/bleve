@@ -15,10 +15,14 @@
 package scorch
 
 import (
+	"sync"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 )
+
+var TermSeparator byte = 0xff
 
 type SegmentDictionarySnapshot struct {
 	s *SegmentSnapshot
@@ -46,7 +50,14 @@ type SegmentSnapshot struct {
 	segment segment.Segment
 	deleted *roaring.Bitmap
 
-	notify []chan error
+	notify     []chan error
+	cachedDocs *cachedDocs
+}
+
+type cachedFieldDocs struct {
+	readyCh chan struct{}     // closed when the cachedFieldDocs.docs is ready to be used.
+	err     error             // Non-nil if there was an error when preparing this cachedFieldDocs.
+	docs    map[uint64][]byte // Keyed by localDocNum, value is a list of terms delimited by 0xFF.
 }
 
 func (s *SegmentSnapshot) Id() uint64 {
@@ -113,6 +124,14 @@ func (s *SegmentSnapshot) DocumentVisitFieldTerms(num uint64, fields []string,
 	return nil
 }
 
+func (s *SegmentSnapshot) Close() error {
+	return s.segment.Close()
+}
+
+func (s *SegmentSnapshot) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
+	return s.segment.VisitDocument(num, visitor)
+}
+
 func (s *SegmentSnapshot) Count() uint64 {
 
 	rv := s.segment.Count()
@@ -156,4 +175,84 @@ func (s *SegmentSnapshot) DocNumbersLive() *roaring.Bitmap {
 
 func (s *SegmentSnapshot) Fields() []string {
 	return s.segment.Fields()
+}
+
+func (cfd *cachedFieldDocs) prepareFields(docNum uint64, field string,
+	ss *SegmentSnapshot) {
+	defer close(cfd.readyCh)
+
+	dict, err := ss.segment.Dictionary(field)
+	if err != nil {
+		cfd.err = err
+		return
+	}
+
+	dictItr := dict.Iterator()
+	next, err := dictItr.Next()
+	for next != nil && err == nil {
+		postings, err1 := dict.PostingsList(next.Term, nil)
+		if err1 != nil {
+			cfd.err = err1
+			next, err = dictItr.Next()
+			continue
+		}
+
+		postingsItr := postings.Iterator()
+		nextPosting, err2 := postingsItr.Next()
+		for err2 == nil && nextPosting != nil && nextPosting.Number() <= docNum {
+			if nextPosting.Number() == docNum {
+				// got what we're looking for
+				termBytes := append([]byte(next.Term), TermSeparator)
+				cfd.docs[docNum] = append(cfd.docs[docNum], termBytes...)
+			}
+			nextPosting, err2 = postingsItr.Next()
+		}
+
+		if err2 != nil {
+			cfd.err = err2
+			next, err = dictItr.Next()
+			continue
+		}
+
+		next, err = dictItr.Next()
+	}
+}
+
+type cachedDocs struct {
+	m     sync.Mutex                  // As the cache is asynchronously prepared, need a lock
+	cache map[string]*cachedFieldDocs // Keyed by field
+}
+
+func (c *cachedDocs) prepareFields(docNum uint64, wantedFields []string,
+	ss *SegmentSnapshot) error {
+	c.m.Lock()
+	if c.cache == nil {
+		c.cache = make(map[string]*cachedFieldDocs, len(ss.Fields()))
+	}
+
+	for _, field := range wantedFields {
+		_, exists := c.cache[field]
+		if !exists {
+			c.cache[field] = &cachedFieldDocs{
+				readyCh: make(chan struct{}),
+				docs:    make(map[uint64][]byte),
+			}
+
+			go c.cache[field].prepareFields(docNum, field, ss)
+		}
+	}
+
+	for _, field := range wantedFields {
+		cachedFieldDocs := c.cache[field]
+		c.m.Unlock()
+		<-cachedFieldDocs.readyCh
+
+		if cachedFieldDocs.err != nil {
+			return cachedFieldDocs.err
+		}
+		c.m.Lock()
+	}
+
+	c.m.Unlock()
+	return nil
 }
