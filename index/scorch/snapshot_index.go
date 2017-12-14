@@ -256,6 +256,9 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 
 	rv = document.NewDocument(id)
 	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, value []byte, pos []uint64) bool {
+		if name == "_id" {
+			return true
+		}
 		switch typ {
 		case 't':
 			rv.AddField(document.NewTextField(name, pos, value))
@@ -413,7 +416,7 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 
 	ss := i.segment[segmentIndex]
 
-	err = ss.cachedDocs.prepareFields(localDocNum, fields, ss)
+	err = ss.cachedDocs.prepareFields(fields, ss)
 	if err != nil {
 		return err
 	}
@@ -421,11 +424,13 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 	for _, field := range fields {
 		if cachedFieldDocs, exists := ss.cachedDocs.cache[field]; exists {
 			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
-				terms := bytes.SplitN(tlist, TermSeparatorSplitSlice, -1)
-				for _, term := range terms {
-					if len(term) > 0 {
-						visitor(field, term)
+				for {
+					i := bytes.Index(tlist, TermSeparatorSplitSlice)
+					if i < 0 {
+						break
 					}
+					visitor(field, tlist[0:i])
+					tlist = tlist[i+1:]
 				}
 			}
 		}
