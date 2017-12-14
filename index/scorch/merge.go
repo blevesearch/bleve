@@ -129,14 +129,17 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot) error {
 			}
 		}
 
-		filename := fmt.Sprintf("%08x.zap", newSegmentID)
+		filename := zapFileName(newSegmentID)
+		s.markIneligibleForRemoval(filename)
 		path := s.path + string(os.PathSeparator) + filename
 		newDocNums, err := zap.Merge(segmentsToMerge, docsToDrop, path, 1024)
 		if err != nil {
+			s.unmarkIneligibleForRemoval(filename)
 			return fmt.Errorf("merging failed: %v", err)
 		}
 		segment, err := zap.Open(path)
 		if err != nil {
+			s.unmarkIneligibleForRemoval(filename)
 			return err
 		}
 		sm := &segmentMerge{

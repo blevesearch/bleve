@@ -60,16 +60,19 @@ type Scorch struct {
 	rootBolt           *bolt.DB
 	asyncTasks         sync.WaitGroup
 
-	eligibleForRemoval []uint64 // Index snapshot epoch's that are safe to GC.
+	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
+	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
 }
 
 func NewScorch(storeName string, config map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error) {
 	rv := &Scorch{
-		version:           Version,
-		config:            config,
-		analysisQueue:     analysisQueue,
-		stats:             &Stats{},
-		nextSnapshotEpoch: 1,
+		version:              Version,
+		config:               config,
+		analysisQueue:        analysisQueue,
+		stats:                &Stats{},
+		nextSnapshotEpoch:    1,
+		closeCh:              make(chan struct{}),
+		ineligibleForRemoval: map[string]bool{},
 	}
 	rv.root = &IndexSnapshot{parent: rv, refs: 1}
 	ro, ok := config["read_only"].(bool)
@@ -113,15 +116,23 @@ func (s *Scorch) Open() error {
 		// now see if there is any existing state to load
 		err = s.loadFromBolt()
 		if err != nil {
+			_ = s.Close()
 			return err
 		}
 	}
 
-	s.closeCh = make(chan struct{})
 	s.introductions = make(chan *segmentIntroduction)
 	s.merges = make(chan *segmentMerge)
 	s.introducerNotifier = make(chan notificationChan)
 	s.persisterNotifier = make(chan notificationChan)
+
+	if !s.readOnly && s.path != "" {
+		err := s.removeOldZapFiles() // Before persister or merger create any new files.
+		if err != nil {
+			_ = s.Close()
+			return err
+		}
+	}
 
 	s.asyncTasks.Add(1)
 	go s.mainLoop()
@@ -145,7 +156,9 @@ func (s *Scorch) Close() (err error) {
 	if s.rootBolt != nil {
 		err = s.rootBolt.Close()
 		s.rootLock.Lock()
-		_ = s.root.DecRef()
+		if s.root != nil {
+			_ = s.root.DecRef()
+		}
 		s.root = nil
 		s.rootLock.Unlock()
 	}
@@ -331,6 +344,18 @@ func (s *Scorch) AddEligibleForRemoval(epoch uint64) {
 	if s.root == nil || s.root.epoch != epoch {
 		s.eligibleForRemoval = append(s.eligibleForRemoval, epoch)
 	}
+	s.rootLock.Unlock()
+}
+
+func (s *Scorch) markIneligibleForRemoval(filename string) {
+	s.rootLock.Lock()
+	s.ineligibleForRemoval[filename] = true
+	s.rootLock.Unlock()
+}
+
+func (s *Scorch) unmarkIneligibleForRemoval(filename string) {
+	s.rootLock.Lock()
+	delete(s.ineligibleForRemoval, filename)
 	s.rootLock.Unlock()
 }
 
