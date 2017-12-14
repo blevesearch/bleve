@@ -79,6 +79,10 @@ func NewScorch(storeName string, config map[string]interface{}, analysisQueue *i
 	if ok {
 		rv.readOnly = ro
 	}
+	// hack for now to disable safe batches in FTS
+	if storeName == "moss" {
+		rv.unsafeBatch = true
+	}
 	return rv, nil
 }
 
