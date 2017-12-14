@@ -96,6 +96,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			id:      s.root.segment[i].id,
 			segment: s.root.segment[i].segment,
 			notify:  s.root.segment[i].notify,
+			cachedDocs: s.root.segment[i].cachedDocs,
 		}
 		s.root.segment[i].segment.AddRef()
 		// apply new obsoletions
@@ -113,6 +114,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	newSnapshot.segment[len(s.root.segment)] = &SegmentSnapshot{
 		id:      next.id,
 		segment: next.data, // Take ownership of next.data's ref-count.
+		cachedDocs: &cachedDocs{cache: nil},
 	}
 	newSnapshot.offsets[len(s.root.segment)] = running
 	if !s.unsafeBatch {

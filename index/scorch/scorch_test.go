@@ -1240,7 +1240,7 @@ func TestIndexDocumentVisitFieldTerms(t *testing.T) {
 
 	fieldTerms := make(index.FieldTerms)
 
-	internalID, err := indexReader.GetInternal([]byte("1"))
+	internalID, err := indexReader.InternalID("1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1377,3 +1377,155 @@ Mechanism[edit]
 
 This section needs additional citations for verification. Please help improve this article by adding citations to reliable sources. Unsourced material may be challenged and removed. (July 2013)
 There are three characteristics of liquids which are relevant to the discussion of a BLEVE:`)
+
+func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Fatalf("error opening index: %v", err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := document.NewDocument("1")
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.IndexField|document.StoreField|document.IncludeTermVectors))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("mister"), document.IndexField|document.StoreField|document.IncludeTermVectors))
+
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+
+	fieldTerms := make(index.FieldTerms)
+	docNumber, err := indexReader.InternalID("1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
+		fieldTerms[field] = append(fieldTerms[field], string(term))
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	expectedFieldTerms := index.FieldTerms{
+		"name":  []string{"test"},
+		"title": []string{"mister"},
+	}
+	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	}
+	err = indexReader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc2 := document.NewDocument("2")
+	doc2.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test2"), document.IndexField|document.StoreField|document.IncludeTermVectors))
+	doc2.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("mister2"), document.IndexField|document.StoreField|document.IncludeTermVectors))
+	err = idx.Update(doc2)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+	indexReader, err = idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+
+	fieldTerms = make(index.FieldTerms)
+	docNumber, err = indexReader.InternalID("2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
+		fieldTerms[field] = append(fieldTerms[field], string(term))
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	expectedFieldTerms = index.FieldTerms{
+		"name":  []string{"test2"},
+		"title": []string{"mister2"},
+	}
+	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	}
+	err = indexReader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc3 := document.NewDocument("3")
+	doc3.AddField(document.NewTextFieldWithIndexingOptions("name3", []uint64{}, []byte("test3"), document.IndexField|document.StoreField|document.IncludeTermVectors))
+	doc3.AddField(document.NewTextFieldWithIndexingOptions("title3", []uint64{}, []byte("mister3"), document.IndexField|document.StoreField|document.IncludeTermVectors))
+	err = idx.Update(doc3)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+	indexReader, err = idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+
+	fieldTerms = make(index.FieldTerms)
+	docNumber, err = indexReader.InternalID("3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name3", "title3"}, func(field string, term []byte) {
+		fieldTerms[field] = append(fieldTerms[field], string(term))
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	expectedFieldTerms = index.FieldTerms{
+		"name3":  []string{"test3"},
+		"title3": []string{"mister3"},
+	}
+	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	}
+
+	fieldTerms = make(index.FieldTerms)
+	docNumber, err = indexReader.InternalID("1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
+		fieldTerms[field] = append(fieldTerms[field], string(term))
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	expectedFieldTerms = index.FieldTerms{
+		"name":  []string{"test"},
+		"title": []string{"mister"},
+	}
+	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	}
+	err = indexReader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+}
