@@ -1240,7 +1240,7 @@ func TestIndexDocumentVisitFieldTerms(t *testing.T) {
 
 	fieldTerms := make(index.FieldTerms)
 
-	internalID, err := indexReader.GetInternal([]byte("1"))
+	internalID, err := indexReader.InternalID("1")
 	if err != nil {
 		t.Fatal(err)
 	}
