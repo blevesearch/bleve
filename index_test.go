@@ -674,16 +674,19 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 		}
 	}()
 
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	done := make(chan struct{})
 	go func() {
 		for {
 			select {
 			case <-done:
+				wg.Done()
 				return
 			default:
-				_, err := index.DocCount()
-				if err != nil {
-					t.Fatal(err)
+				_, err2 := index.DocCount()
+				if err2 != nil {
+					t.Fatal(err2)
 				}
 			}
 		}
@@ -701,6 +704,7 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 		}
 	}
 	close(done)
+	wg.Wait()
 }
 
 func TestSortMatchSearch(t *testing.T) {
