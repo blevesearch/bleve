@@ -540,7 +540,7 @@ func TestIndexInsertWithStore(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(storedDoc.Fields) != 2 {
+	if len(storedDoc.Fields) != 1 {
 		t.Errorf("expected 1 stored field, got %d", len(storedDoc.Fields))
 	}
 	for _, field := range storedDoc.Fields {
@@ -553,13 +553,7 @@ func TestIndexInsertWithStore(t *testing.T) {
 				t.Errorf("expected field content 'test', got '%s'", string(textField.Value()))
 			}
 		} else if field.Name() == "_id" {
-			textField, ok := field.(*document.TextField)
-			if !ok {
-				t.Errorf("expected text field")
-			}
-			if string(textField.Value()) != "1" {
-				t.Errorf("expected field content '1', got '%s'", string(textField.Value()))
-			}
+			t.Errorf("not expecting _id field")
 		}
 	}
 }
@@ -857,8 +851,8 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(storedDoc.Fields) != 4 {
-		t.Errorf("expected 4 stored field, got %d", len(storedDoc.Fields))
+	if len(storedDoc.Fields) != 3 {
+		t.Errorf("expected 3 stored field, got %d", len(storedDoc.Fields))
 	}
 	for _, field := range storedDoc.Fields {
 
@@ -896,8 +890,9 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 					t.Errorf("expected date value unix epoch, got %v", dateFieldDate)
 				}
 			}
+		} else if field.Name() == "_id" {
+			t.Errorf("not expecting _id field")
 		}
-
 	}
 
 	// now update the document, but omit one of the fields
@@ -934,8 +929,8 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(storedDoc.Fields) != 3 {
-		t.Errorf("expected 3 stored field, got %d", len(storedDoc.Fields))
+	if len(storedDoc.Fields) != 2 {
+		t.Errorf("expected 2 stored field, got %d", len(storedDoc.Fields))
 	}
 
 	for _, field := range storedDoc.Fields {
@@ -961,6 +956,8 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 					t.Errorf("expeted numeric value 36.99, got %f", numFieldNumer)
 				}
 			}
+		} else if field.Name() == "_id" {
+			t.Errorf("not expecting _id field")
 		}
 	}
 
@@ -1114,8 +1111,8 @@ func TestIndexUpdateComposites(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(storedDoc.Fields) != 3 {
-		t.Errorf("expected 3 stored field, got %d", len(storedDoc.Fields))
+	if len(storedDoc.Fields) != 2 {
+		t.Errorf("expected 2 stored field, got %d", len(storedDoc.Fields))
 	}
 	for _, field := range storedDoc.Fields {
 		if field.Name() == "name" {
@@ -1126,6 +1123,8 @@ func TestIndexUpdateComposites(t *testing.T) {
 			if string(textField.Value()) != "testupdated" {
 				t.Errorf("expected field content 'test', got '%s'", string(textField.Value()))
 			}
+		} else if field.Name() == "_id" {
+			t.Errorf("not expecting _id field")
 		}
 	}
 }

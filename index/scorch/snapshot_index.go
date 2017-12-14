@@ -256,6 +256,9 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 
 	rv = document.NewDocument(id)
 	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, value []byte, pos []uint64) bool {
+		if name == "_id" {
+			return true
+		}
 		switch typ {
 		case 't':
 			rv.AddField(document.NewTextField(name, pos, value))
