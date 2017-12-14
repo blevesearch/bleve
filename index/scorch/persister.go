@@ -212,7 +212,9 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		newSegments[segmentID], err = zap.Open(path)
 		if err != nil {
 			for _, s := range newSegments {
-				_ = s.Close() // cleanup segments that were successfully opened
+				if s != nil {
+					_ = s.Close() // cleanup segments that were successfully opened
+				}
 			}
 			return fmt.Errorf("error opening new segment at %s, %v", path, err)
 		}
