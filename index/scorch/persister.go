@@ -34,8 +34,6 @@ import (
 type notificationChan chan struct{}
 
 func (s *Scorch) persisterLoop() {
-	s.removeOldData(true)
-
 	var notify notificationChan
 	var lastPersistedEpoch uint64
 OUTER:
@@ -52,7 +50,6 @@ OUTER:
 			ourSnapshot.AddRef()
 			s.rootLock.RUnlock()
 
-			//for ourSnapshot.epoch != lastPersistedEpoch {
 			if ourSnapshot.epoch != lastPersistedEpoch {
 				// lets get started
 				err := s.persistSnapshot(ourSnapshot)
@@ -110,7 +107,7 @@ OUTER:
 				// woken up, next loop should pick up work
 			}
 		}
-		s.removeOldData(false)
+		s.removeOldData()
 	}
 	s.asyncTasks.Done()
 }
@@ -159,6 +156,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		}
 	}
 
+	var filenames []string
 	newSegmentPaths := make(map[uint64]string)
 
 	// first ensure that each segment in this snapshot has been persisted
@@ -171,7 +169,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		switch seg := segmentSnapshot.segment.(type) {
 		case *mem.Segment:
 			// need to persist this to disk
-			filename := fmt.Sprintf("%08x.zap", segmentSnapshot.id)
+			filename := zapFileName(segmentSnapshot.id)
 			path := s.path + string(os.PathSeparator) + filename
 			err2 := zap.PersistSegment(seg, path, 1024)
 			if err2 != nil {
@@ -182,6 +180,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 			if err != nil {
 				return err
 			}
+			filenames = append(filenames, filename)
 		case *zap.Segment:
 			path := seg.Path()
 			filename := strings.TrimPrefix(path, s.path+string(os.PathSeparator))
@@ -189,6 +188,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 			if err != nil {
 				return err
 			}
+			filenames = append(filenames, filename)
 		default:
 			return fmt.Errorf("unknown segment type: %T", seg)
 		}
@@ -255,6 +255,9 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	for k, v := range s.root.internal {
 		newIndexSnapshot.internal[k] = v
 	}
+	for _, filename := range filenames {
+		delete(s.ineligibleForRemoval, filename)
+	}
 	rootPrev := s.root
 	s.root = newIndexSnapshot
 	s.rootLock.Unlock()
@@ -270,6 +273,10 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	}
 
 	return nil
+}
+
+func zapFileName(epoch uint64) string {
+	return fmt.Sprintf("%012x.zap", epoch)
 }
 
 // bolt snapshot code
@@ -409,16 +416,16 @@ func (p uint64Descending) Len() int           { return len(p) }
 func (p uint64Descending) Less(i, j int) bool { return p[i] > p[j] }
 func (p uint64Descending) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
-func (s *Scorch) removeOldData(force bool) {
+func (s *Scorch) removeOldData() {
 	removed, err := s.removeOldBoltSnapshots()
 	if err != nil {
 		log.Printf("got err removing old bolt snapshots: %v", err)
 	}
 
-	if force || removed > 0 {
+	if removed > 0 {
 		err = s.removeOldZapFiles()
 		if err != nil {
-			log.Printf("go err removing old zap files: %v", err)
+			log.Printf("got err removing old zap files: %v", err)
 		}
 	}
 }
@@ -478,7 +485,7 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 
 // Removes any *.zap files which aren't listed in the rootBolt.
 func (s *Scorch) removeOldZapFiles() error {
-	liveFileNames, highestName, err := s.loadZapFileNames()
+	liveFileNames, err := s.loadZapFileNames()
 	if err != nil {
 		return err
 	}
@@ -488,10 +495,12 @@ func (s *Scorch) removeOldZapFiles() error {
 		return err
 	}
 
+	s.rootLock.RLock()
+
 	for _, finfo := range currFileInfos {
 		fname := finfo.Name()
 		if filepath.Ext(fname) == ".zap" {
-			if _, exists := liveFileNames[fname]; !exists && fname < highestName {
+			if _, exists := liveFileNames[fname]; !exists && !s.ineligibleForRemoval[fname] {
 				err := os.Remove(s.path + string(os.PathSeparator) + fname)
 				if err != nil {
 					log.Printf("got err removing file: %s, err: %v", fname, err)
@@ -500,13 +509,14 @@ func (s *Scorch) removeOldZapFiles() error {
 		}
 	}
 
+	s.rootLock.RUnlock()
+
 	return nil
 }
 
 // Returns the *.zap file names that are listed in the rootBolt.
-func (s *Scorch) loadZapFileNames() (map[string]struct{}, string, error) {
+func (s *Scorch) loadZapFileNames() (map[string]struct{}, error) {
 	rv := map[string]struct{}{}
-	var highest string
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(boltSnapshotsBucket)
 		if snapshots == nil {
@@ -532,14 +542,11 @@ func (s *Scorch) loadZapFileNames() (map[string]struct{}, string, error) {
 					continue
 				}
 				pathString := string(pathBytes)
-				if pathString > highest {
-					highest = pathString
-				}
 				rv[string(pathString)] = struct{}{}
 			}
 		}
 		return nil
 	})
 
-	return rv, highest, err
+	return rv, err
 }
