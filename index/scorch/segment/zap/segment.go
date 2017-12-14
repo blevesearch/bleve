@@ -201,7 +201,7 @@ func (s *Segment) VisitDocument(num uint64, visitor segment.DocumentFieldValueVi
 		meta, compressed := s.getStoredMetaAndCompressed(num)
 		uncompressed, err := snappy.Decode(nil, compressed)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		// now decode meta and process
 		reader := bytes.NewReader(meta)
