@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/Smerity/govarint"
@@ -47,6 +48,7 @@ func Open(path string) (segment.Segment, error) {
 		mm:        mm,
 		path:      path,
 		fieldsMap: make(map[string]uint16),
+		refs:      1,
 	}
 
 	err = rv.loadConfig()
@@ -79,6 +81,25 @@ type Segment struct {
 	fieldsMap     map[string]uint16
 	fieldsInv     []string
 	fieldsOffsets []uint64
+
+	m    sync.Mutex // Protects the fields that follow.
+	refs int64
+}
+
+func (s *Segment) AddRef() {
+	s.m.Lock()
+	s.refs++
+	s.m.Unlock()
+}
+
+func (s *Segment) DecRef() (err error) {
+	s.m.Lock()
+	s.refs--
+	if s.refs == 0 {
+		err = s.closeActual()
+	}
+	s.m.Unlock()
+	return err
 }
 
 func (s *Segment) loadConfig() error {
@@ -150,16 +171,18 @@ func (s *Segment) dictionary(field string) (*Dictionary, error) {
 
 		dictStart := s.fieldsOffsets[rv.fieldID]
 
-		// read the length of the vellum data
-		vellumLen, read := binary.Uvarint(s.mm[dictStart : dictStart+binary.MaxVarintLen64])
-		fstBytes := s.mm[dictStart+uint64(read) : dictStart+uint64(read)+vellumLen]
-		if fstBytes != nil {
-			fst, err := vellum.Load(fstBytes)
-			if err != nil {
-				return nil, fmt.Errorf("dictionary field %s vellum err: %v", field, err)
-			}
-			if err == nil {
-				rv.fst = fst
+		if dictStart > 0 {
+			// read the length of the vellum data
+			vellumLen, read := binary.Uvarint(s.mm[dictStart : dictStart+binary.MaxVarintLen64])
+			fstBytes := s.mm[dictStart+uint64(read) : dictStart+uint64(read)+vellumLen]
+			if fstBytes != nil {
+				fst, err := vellum.Load(fstBytes)
+				if err != nil {
+					return nil, fmt.Errorf("dictionary field %s vellum err: %v", field, err)
+				}
+				if err == nil {
+					rv.fst = fst
+				}
 			}
 		}
 
@@ -175,17 +198,8 @@ func (s *Segment) dictionary(field string) (*Dictionary, error) {
 func (s *Segment) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
 	// first make sure this is a valid number in this segment
 	if num < s.numDocs {
-		docStoredStartAddr := s.storedIndexOffset + (8 * num)
-		docStoredStart := binary.BigEndian.Uint64(s.mm[docStoredStartAddr : docStoredStartAddr+8])
-		var n uint64
-		metaLen, read := binary.Uvarint(s.mm[docStoredStart : docStoredStart+binary.MaxVarintLen64])
-		n += uint64(read)
-		var dataLen uint64
-		dataLen, read = binary.Uvarint(s.mm[docStoredStart+n : docStoredStart+n+binary.MaxVarintLen64])
-		n += uint64(read)
-		meta := s.mm[docStoredStart+n : docStoredStart+n+metaLen]
-		data := s.mm[docStoredStart+n+metaLen : docStoredStart+n+metaLen+dataLen]
-		uncompressed, err := snappy.Decode(nil, data)
+		meta, compressed := s.getStoredMetaAndCompressed(num)
+		uncompressed, err := snappy.Decode(nil, compressed)
 		if err != nil {
 			panic(err)
 		}
@@ -279,6 +293,10 @@ func (s *Segment) Path() string {
 
 // Close releases all resources associated with this segment
 func (s *Segment) Close() (err error) {
+	return s.DecRef()
+}
+
+func (s *Segment) closeActual() (err error) {
 	if s.mm != nil {
 		err = s.mm.Unmap()
 	}

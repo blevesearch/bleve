@@ -85,20 +85,13 @@ func (p *PostingsList) Iterator() segment.PostingsIterator {
 
 // Count returns the number of items on this postings list
 func (p *PostingsList) Count() uint64 {
-	var rv uint64
 	if p.postings != nil {
-		rv = p.postings.GetCardinality()
-
 		if p.except != nil {
-			except := p.except.GetCardinality()
-			if except > rv {
-				// avoid underflow
-				except = rv
-			}
-			rv -= except
+			return roaring.AndNot(p.postings, p.except).GetCardinality()
 		}
+		return p.postings.GetCardinality()
 	}
-	return rv
+	return 0
 }
 
 // PostingsIterator provides a way to iterate through the postings list

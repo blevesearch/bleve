@@ -37,21 +37,8 @@ type Segment interface {
 // assigned to at most a single MergeTask in the output MergePlan.  A
 // segment not assigned to any MergeTask means the segment should
 // remain unmerged.
-func Plan(segments []Segment, o *MergePlanOptions) (
-	result *MergePlan, err error) {
-	if len(segments) <= 1 {
-		return nil, nil
-	}
-
-	// TODO: PLACEHOLDER implementation for now, that always merges
-	// all the candidates.
-	return &MergePlan{
-		Tasks: []*MergeTask{
-			&MergeTask{
-				Segments: segments,
-			},
-		},
-	}, nil
+func Plan(segments []Segment, o *MergePlanOptions) (*MergePlan, error) {
+	return plan(segments, o)
 }
 
 // A MergePlan is the result of the Plan() API.
@@ -100,10 +87,6 @@ type MergePlanOptions struct {
 	// impact merge selection.
 	ReclaimDeletesWeight float64
 
-	// Only consider a segment for merging if its delete percentage is
-	// over this threshold.
-	MinDeletesPct float64
-
 	// Optional, defaults to mergeplan.CalcBudget().
 	CalcBudget func(totalSize int64, firstTierSize int64,
 		o *MergePlanOptions) (budgetNumSegments int)
@@ -130,13 +113,11 @@ var DefaultMergePlanOptions = MergePlanOptions{
 	SegmentsPerMergeTask: 10,
 	FloorSegmentSize:     2000,
 	ReclaimDeletesWeight: 2.0,
-	MinDeletesPct:        10.0,
 }
 
 // -------------------------------------------
 
-func plan(segmentsIn []Segment, o *MergePlanOptions) (
-	result *MergePlan, err error) {
+func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 	if len(segmentsIn) <= 1 {
 		return nil, nil
 	}
@@ -149,24 +130,20 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (
 
 	sort.Sort(byLiveSizeDescending(segments))
 
-	var segmentsLiveSize int64
-
 	var minLiveSize int64 = math.MaxInt64
 
-	var eligible []Segment
-	var eligibleLiveSize int64
+	var eligibles []Segment
+	var eligiblesLiveSize int64
 
 	for _, segment := range segments {
-		segmentsLiveSize += segment.LiveSize()
-
 		if minLiveSize > segment.LiveSize() {
 			minLiveSize = segment.LiveSize()
 		}
 
 		// Only small-enough segments are eligible.
 		if segment.LiveSize() < o.MaxSegmentSize/2 {
-			eligible = append(eligible, segment)
-			eligibleLiveSize += segment.LiveSize()
+			eligibles = append(eligibles, segment)
+			eligiblesLiveSize += segment.LiveSize()
 		}
 	}
 
@@ -177,7 +154,7 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (
 		calcBudget = CalcBudget
 	}
 
-	budgetNumSegments := CalcBudget(eligibleLiveSize, minLiveSize, o)
+	budgetNumSegments := CalcBudget(eligiblesLiveSize, minLiveSize, o)
 
 	scoreSegments := o.ScoreSegments
 	if scoreSegments == nil {
@@ -188,36 +165,32 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (
 
 	// While we’re over budget, keep looping, which might produce
 	// another MergeTask.
-	for len(eligible) > budgetNumSegments {
+	for len(eligibles) > budgetNumSegments {
 		// Track a current best roster as we examine and score
 		// potential rosters of merges.
 		var bestRoster []Segment
 		var bestRosterScore float64 // Lower score is better.
 
-		for startIdx := 0; startIdx < len(eligible)-o.SegmentsPerMergeTask; startIdx++ {
+		for startIdx := 0; startIdx < len(eligibles)-o.SegmentsPerMergeTask; startIdx++ {
 			var roster []Segment
 			var rosterLiveSize int64
 
-			for idx := startIdx; idx < len(eligible) && len(roster) < o.SegmentsPerMergeTask; idx++ {
-				rosterCandidate := eligible[idx]
+			for idx := startIdx; idx < len(eligibles) && len(roster) < o.SegmentsPerMergeTask; idx++ {
+				eligible := eligibles[idx]
 
-				if rosterLiveSize+rosterCandidate.LiveSize() > o.MaxSegmentSize {
-					// NOTE: We continue the loop, to try to “pack”
-					// the roster with smaller segments to get closer
-					// to the max size; but, we aren't doing full,
-					// comprehensive "bin-packing" permutations.
-					continue
+				if rosterLiveSize+eligible.LiveSize() < o.MaxSegmentSize {
+					roster = append(roster, eligible)
+					rosterLiveSize += eligible.LiveSize()
 				}
-
-				roster = append(roster, rosterCandidate)
-				rosterLiveSize += rosterCandidate.LiveSize()
 			}
 
-			rosterScore := scoreSegments(roster, o)
+			if len(roster) > 0 {
+				rosterScore := scoreSegments(roster, o)
 
-			if len(bestRoster) <= 0 || rosterScore < bestRosterScore {
-				bestRoster = roster
-				bestRosterScore = rosterScore
+				if len(bestRoster) <= 0 || rosterScore < bestRosterScore {
+					bestRoster = roster
+					bestRosterScore = rosterScore
+				}
 			}
 		}
 
@@ -225,11 +198,9 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (
 			return rv, nil
 		}
 
-		rv.Tasks = append(rv.Tasks, &MergeTask{
-			Segments: bestRoster,
-		})
+		rv.Tasks = append(rv.Tasks, &MergeTask{Segments: bestRoster})
 
-		eligible = removeSegments(eligible, bestRoster)
+		eligibles = removeSegments(eligibles, bestRoster)
 	}
 
 	return rv, nil
@@ -240,24 +211,38 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (
 func CalcBudget(totalSize int64, firstTierSize int64, o *MergePlanOptions) (
 	budgetNumSegments int) {
 	tierSize := firstTierSize
+	if tierSize < 1 {
+		tierSize = 1
+	}
+
+	maxSegmentsPerTier := o.MaxSegmentsPerTier
+	if maxSegmentsPerTier < 1 {
+		maxSegmentsPerTier = 1
+	}
+
+	segmentsPerMergeTask := int64(o.SegmentsPerMergeTask)
+	if segmentsPerMergeTask < 2 {
+		segmentsPerMergeTask = 2
+	}
 
 	for totalSize > 0 {
 		segmentsInTier := float64(totalSize) / float64(tierSize)
-		if segmentsInTier < float64(o.MaxSegmentsPerTier) {
+		if segmentsInTier < float64(maxSegmentsPerTier) {
 			budgetNumSegments += int(math.Ceil(segmentsInTier))
 			break
 		}
 
-		budgetNumSegments += o.MaxSegmentsPerTier
-		totalSize -= int64(o.MaxSegmentsPerTier) * tierSize
-		tierSize *= int64(o.SegmentsPerMergeTask)
+		budgetNumSegments += maxSegmentsPerTier
+		totalSize -= int64(maxSegmentsPerTier) * tierSize
+		tierSize *= segmentsPerMergeTask
 	}
 
 	return budgetNumSegments
 }
 
-// removeSegments() keeps the ordering of the result segments stable.
-func removeSegments(segments []Segment, toRemove []Segment) (rv []Segment) {
+// Of note, removeSegments() keeps the ordering of the results stable.
+func removeSegments(segments []Segment, toRemove []Segment) []Segment {
+	rv := make([]Segment, 0, len(segments)-len(toRemove))
 OUTER:
 	for _, segment := range segments {
 		for _, r := range toRemove {
@@ -270,6 +255,37 @@ OUTER:
 	return rv
 }
 
+// Smaller result score is better.
 func ScoreSegments(segments []Segment, o *MergePlanOptions) float64 {
-	return 0 // TODO. Bogus score.
+	var totBeforeSize int64
+	var totAfterSize int64
+	var totAfterSizeFloored int64
+
+	for _, segment := range segments {
+		totBeforeSize += segment.FullSize()
+		totAfterSize += segment.LiveSize()
+		totAfterSizeFloored += o.RaiseToFloorSegmentSize(segment.LiveSize())
+	}
+
+	if totBeforeSize <= 0 || totAfterSize <= 0 || totAfterSizeFloored <= 0 {
+		return 0
+	}
+
+	// Roughly guess the "balance" of the segments -- whether the
+	// segments are about the same size.
+	balance :=
+		float64(o.RaiseToFloorSegmentSize(segments[0].LiveSize())) /
+			float64(totAfterSizeFloored)
+
+	// Gently favor smaller merges over bigger ones.  We don't want to
+	// make the exponent too large else we end up with poor merges of
+	// small segments in order to avoid the large merges.
+	score := balance * math.Pow(float64(totAfterSize), 0.05)
+
+	// Strongly favor merges that reclaim deletes.
+	nonDelRatio := float64(totAfterSize) / float64(totBeforeSize)
+
+	score *= math.Pow(nonDelRatio, o.ReclaimDeletesWeight)
+
+	return score
 }

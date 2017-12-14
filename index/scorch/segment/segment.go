@@ -35,6 +35,9 @@ type Segment interface {
 	Fields() []string
 
 	Close() error
+
+	AddRef()
+	DecRef() error
 }
 
 type TermDictionary interface {

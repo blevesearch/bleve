@@ -47,37 +47,43 @@ func PersistSegment(memSegment *mem.Segment, path string, chunkFactor uint32) (e
 	cr := NewCountHashWriter(br)
 
 	var storedIndexOffset uint64
-	storedIndexOffset, err = persistStored(memSegment, cr)
-	if err != nil {
-		return err
-	}
-
-	var freqOffsets, locOffsets []uint64
-	freqOffsets, locOffsets, err = persistPostingDetails(memSegment, cr, chunkFactor)
-	if err != nil {
-		return err
-	}
-
-	var postingsListLocs []uint64
-	postingsListLocs, err = persistPostingsLocs(memSegment, cr)
-	if err != nil {
-		return err
-	}
-
-	var postingsLocs []uint64
-	postingsLocs, err = persistPostingsLists(memSegment, cr, postingsListLocs, freqOffsets, locOffsets)
-	if err != nil {
-		return err
-	}
-
 	var dictLocs []uint64
-	dictLocs, err = persistDictionary(memSegment, cr, postingsLocs)
-	if err != nil {
-		return err
+	if len(memSegment.Stored) > 0 {
+
+		storedIndexOffset, err = persistStored(memSegment, cr)
+		if err != nil {
+			return err
+		}
+
+		var freqOffsets, locOffsets []uint64
+		freqOffsets, locOffsets, err = persistPostingDetails(memSegment, cr, chunkFactor)
+		if err != nil {
+			return err
+		}
+
+		var postingsListLocs []uint64
+		postingsListLocs, err = persistPostingsLocs(memSegment, cr)
+		if err != nil {
+			return err
+		}
+
+		var postingsLocs []uint64
+		postingsLocs, err = persistPostingsLists(memSegment, cr, postingsListLocs, freqOffsets, locOffsets)
+		if err != nil {
+			return err
+		}
+
+		dictLocs, err = persistDictionary(memSegment, cr, postingsLocs)
+		if err != nil {
+			return err
+		}
+
+	} else {
+		dictLocs = make([]uint64, len(memSegment.FieldsInv))
 	}
 
 	var fieldIndexStart uint64
-	fieldIndexStart, err = persistFields(memSegment, cr, dictLocs)
+	fieldIndexStart, err = persistFields(memSegment.FieldsInv, cr, dictLocs)
 	if err != nil {
 		return err
 	}
@@ -182,19 +188,12 @@ func persistStored(memSegment *mem.Segment, w *CountHashWriter) (uint64, error) 
 		// record where we're about to start writing
 		docNumOffsets[docNum] = uint64(w.Count())
 
-		buf := make([]byte, binary.MaxVarintLen64)
-		// write out the meta length
-		n := binary.PutUvarint(buf, uint64(len(metaBytes)))
-		_, err := w.Write(buf[:n])
+		// write out the meta len and compressed data len
+		_, err := writeUvarints(w, uint64(len(metaBytes)), uint64(len(compressed)))
 		if err != nil {
 			return 0, err
 		}
-		// write out the compressed data length
-		n = binary.PutUvarint(buf, uint64(len(compressed)))
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return 0, err
-		}
+
 		// now write the meta
 		_, err = w.Write(metaBytes)
 		if err != nil {
@@ -222,40 +221,19 @@ func persistStored(memSegment *mem.Segment, w *CountHashWriter) (uint64, error) 
 
 func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFactor uint32) ([]uint64, []uint64, error) {
 	var freqOffsets, locOfffsets []uint64
+	tfEncoder := newChunkedIntCoder(uint64(chunkFactor), uint64(len(memSegment.Stored)-1))
 	for postingID := range memSegment.Postings {
+		if postingID != 0 {
+			tfEncoder.Reset()
+		}
 		postingsListItr := memSegment.Postings[postingID].Iterator()
-
-		total := uint64(len(memSegment.Stored))/uint64(chunkFactor) + 1
-
-		var freqNormBuf []byte
 		var offset int
-
-		var encodingBuf bytes.Buffer
-		encoder := govarint.NewU64Base128Encoder(&encodingBuf)
-
-		chunkLens := make([]uint64, total)
-		var currChunk uint64
 		for postingsListItr.HasNext() {
-			docNum := postingsListItr.Next()
-			chunk := uint64(docNum) / uint64(chunkFactor)
 
-			if chunk != currChunk {
-				// starting a new chunk
-				if encoder != nil {
-					// close out last
-					encoder.Close()
-					encodingBytes := encodingBuf.Bytes()
-					chunkLens[currChunk] = uint64(len(encodingBytes))
-					freqNormBuf = append(freqNormBuf, encodingBytes...)
-					encodingBuf.Reset()
-					encoder = govarint.NewU64Base128Encoder(&encodingBuf)
-				}
-
-				currChunk = chunk
-			}
+			docNum := uint64(postingsListItr.Next())
 
 			// put freq
-			_, err := encoder.PutU64(memSegment.Freqs[postingID][offset])
+			err := tfEncoder.Add(docNum, memSegment.Freqs[postingID][offset])
 			if err != nil {
 				return nil, nil, err
 			}
@@ -263,7 +241,7 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 			// put norm
 			norm := memSegment.Norms[postingID][offset]
 			normBits := math.Float32bits(norm)
-			_, err = encoder.PutU32(normBits)
+			err = tfEncoder.Add(docNum, uint64(normBits))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -271,35 +249,11 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 			offset++
 		}
 
-		// close out last chunk
-		if encoder != nil {
-			// fix me write freq/norms
-			encoder.Close()
-			encodingBytes := encodingBuf.Bytes()
-			chunkLens[currChunk] = uint64(len(encodingBytes))
-			freqNormBuf = append(freqNormBuf, encodingBytes...)
-		}
-
 		// record where this postings freq info starts
 		freqOffsets = append(freqOffsets, uint64(w.Count()))
 
-		buf := make([]byte, binary.MaxVarintLen64)
-		// write out the number of chunks
-		n := binary.PutUvarint(buf, uint64(total))
-		_, err := w.Write(buf[:n])
-		if err != nil {
-			return nil, nil, err
-		}
-		// write out the chunk lens
-		for _, chunkLen := range chunkLens {
-			n := binary.PutUvarint(buf, uint64(chunkLen))
-			_, err = w.Write(buf[:n])
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-		// write out the data
-		_, err = w.Write(freqNormBuf)
+		tfEncoder.Close()
+		_, err := tfEncoder.Write(w)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -307,61 +261,39 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 	}
 
 	// now do it again for the locations
+	locEncoder := newChunkedIntCoder(uint64(chunkFactor), uint64(len(memSegment.Stored)-1))
 	for postingID := range memSegment.Postings {
+		if postingID != 0 {
+			locEncoder.Reset()
+		}
 		postingsListItr := memSegment.Postings[postingID].Iterator()
-
-		total := uint64(len(memSegment.Stored))/uint64(chunkFactor) + 1
-
-		var locBuf []byte
 		var offset int
 		var locOffset int
-
-		var encodingBuf bytes.Buffer
-		encoder := govarint.NewU64Base128Encoder(&encodingBuf)
-
-		chunkLens := make([]uint64, total)
-		var currChunk uint64
 		for postingsListItr.HasNext() {
-			docNum := postingsListItr.Next()
-			chunk := uint64(docNum) / uint64(chunkFactor)
-
-			if chunk != currChunk {
-				// starting a new chunk
-				if encoder != nil {
-					// close out last
-					encoder.Close()
-					encodingBytes := encodingBuf.Bytes()
-					chunkLens[currChunk] = uint64(len(encodingBytes))
-					locBuf = append(locBuf, encodingBytes...)
-					encodingBuf.Reset()
-					encoder = govarint.NewU64Base128Encoder(&encodingBuf)
-				}
-				currChunk = chunk
-			}
-
+			docNum := uint64(postingsListItr.Next())
 			for i := 0; i < int(memSegment.Freqs[postingID][offset]); i++ {
-
 				if len(memSegment.Locfields[postingID]) > 0 {
 					// put field
-					_, err := encoder.PutU64(uint64(memSegment.Locfields[postingID][locOffset]))
+					err := locEncoder.Add(docNum, uint64(memSegment.Locfields[postingID][locOffset]))
 					if err != nil {
 						return nil, nil, err
 					}
 
 					// put pos
-					_, err = encoder.PutU64(memSegment.Locpos[postingID][locOffset])
+
+					err = locEncoder.Add(docNum, memSegment.Locpos[postingID][locOffset])
 					if err != nil {
 						return nil, nil, err
 					}
 
 					// put start
-					_, err = encoder.PutU64(memSegment.Locstarts[postingID][locOffset])
+					err = locEncoder.Add(docNum, memSegment.Locstarts[postingID][locOffset])
 					if err != nil {
 						return nil, nil, err
 					}
 
 					// put end
-					_, err = encoder.PutU64(memSegment.Locends[postingID][locOffset])
+					err = locEncoder.Add(docNum, memSegment.Locends[postingID][locOffset])
 					if err != nil {
 						return nil, nil, err
 					}
@@ -370,152 +302,67 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 					num := len(memSegment.Locarraypos[postingID][locOffset])
 
 					// put the number of array positions to follow
-					_, err = encoder.PutU64(uint64(num))
+					err = locEncoder.Add(docNum, uint64(num))
 					if err != nil {
 						return nil, nil, err
 					}
 
 					// put each array position
 					for j := 0; j < num; j++ {
-						_, err = encoder.PutU64(memSegment.Locarraypos[postingID][locOffset][j])
+						err = locEncoder.Add(docNum, memSegment.Locarraypos[postingID][locOffset][j])
 						if err != nil {
 							return nil, nil, err
 						}
 					}
 				}
-
 				locOffset++
 			}
 			offset++
 		}
 
-		// close out last chunk
-		if encoder != nil {
-			// fix me write freq/norms
-			encoder.Close()
-			encodingBytes := encodingBuf.Bytes()
-			chunkLens[currChunk] = uint64(len(encodingBytes))
-			locBuf = append(locBuf, encodingBytes...)
-		}
-
 		// record where this postings loc info starts
 		locOfffsets = append(locOfffsets, uint64(w.Count()))
-
-		buf := make([]byte, binary.MaxVarintLen64)
-		// write out the number of chunks
-		n := binary.PutUvarint(buf, uint64(total))
-		_, err := w.Write(buf[:n])
+		locEncoder.Close()
+		_, err := locEncoder.Write(w)
 		if err != nil {
 			return nil, nil, err
 		}
-		// write out the chunk lens
-		for _, chunkLen := range chunkLens {
-			n := binary.PutUvarint(buf, uint64(chunkLen))
-			_, err = w.Write(buf[:n])
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-		// write out the data
-		_, err = w.Write(locBuf)
-		if err != nil {
-			return nil, nil, err
-		}
-
 	}
 	return freqOffsets, locOfffsets, nil
 }
 
-func persistPostingsLocs(memSegment *mem.Segment, w *CountHashWriter) ([]uint64, error) {
-	var rv []uint64
-
-	var postingsBuf bytes.Buffer
+func persistPostingsLocs(memSegment *mem.Segment, w *CountHashWriter) (rv []uint64, err error) {
 	for postingID := range memSegment.PostingsLocs {
-		if postingID != 0 {
-			postingsBuf.Reset()
-		}
-
 		// record where we start this posting loc
 		rv = append(rv, uint64(w.Count()))
-
-		// write out postings locs to memory so we know the len
-		postingsLocLen, err := memSegment.PostingsLocs[postingID].WriteTo(&postingsBuf)
-		if err != nil {
-			return nil, err
-		}
-
-		buf := make([]byte, binary.MaxVarintLen64)
-		// write out the length of this postings locs
-		n := binary.PutUvarint(buf, uint64(postingsLocLen))
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return nil, err
-		}
-
-		// write out the postings list itself
-		_, err = w.Write(postingsBuf.Bytes())
+		// write out the length and bitmap
+		_, err = writeRoaringWithLen(memSegment.PostingsLocs[postingID], w)
 		if err != nil {
 			return nil, err
 		}
 	}
-
 	return rv, nil
 }
 
-func persistPostingsLists(memSegment *mem.Segment, w *CountHashWriter, postingsListLocs, freqOffsets, locOffsets []uint64) ([]uint64, error) {
-	var rv []uint64
-
-	var postingsBuf bytes.Buffer
+func persistPostingsLists(memSegment *mem.Segment, w *CountHashWriter,
+	postingsListLocs, freqOffsets, locOffsets []uint64) (rv []uint64, err error) {
 	for postingID := range memSegment.Postings {
-		if postingID != 0 {
-			postingsBuf.Reset()
-		}
-
 		// record where we start this posting list
 		rv = append(rv, uint64(w.Count()))
 
-		// write out postings list to memory so we know the len
-		postingsListLen, err := memSegment.Postings[postingID].WriteTo(&postingsBuf)
+		// write out the term info, loc info, and loc posting list offset
+		_, err = writeUvarints(w, freqOffsets[postingID],
+			locOffsets[postingID], postingsListLocs[postingID])
 		if err != nil {
 			return nil, err
 		}
 
-		// write out the start of the term info
-		buf := make([]byte, binary.MaxVarintLen64)
-		n := binary.PutUvarint(buf, freqOffsets[postingID])
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return nil, err
-		}
-
-		// write out the start of the loc info
-		n = binary.PutUvarint(buf, locOffsets[postingID])
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return nil, err
-		}
-
-		// write out the start of the loc posting list
-		n = binary.PutUvarint(buf, postingsListLocs[postingID])
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return nil, err
-		}
-
-		// write out the length of this postings list
-		n = binary.PutUvarint(buf, uint64(postingsListLen))
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return nil, err
-		}
-
-		// write out the postings list itself
-		_, err = w.Write(postingsBuf.Bytes())
+		// write out the length and bitmap
+		_, err = writeRoaringWithLen(memSegment.Postings[postingID], w)
 		if err != nil {
 			return nil, err
 		}
 	}
-
 	return rv, nil
 }
 
@@ -571,88 +418,4 @@ func persistDictionary(memSegment *mem.Segment, w *CountHashWriter, postingsLocs
 	}
 
 	return rv, nil
-}
-
-func persistFields(memSegment *mem.Segment, w *CountHashWriter, dictLocs []uint64) (uint64, error) {
-	var rv uint64
-
-	var fieldStarts []uint64
-	for fieldID, fieldName := range memSegment.FieldsInv {
-
-		// record start of this field
-		fieldStarts = append(fieldStarts, uint64(w.Count()))
-
-		buf := make([]byte, binary.MaxVarintLen64)
-		// write out dict location for this field
-		n := binary.PutUvarint(buf, dictLocs[fieldID])
-		_, err := w.Write(buf[:n])
-		if err != nil {
-			return 0, err
-		}
-
-		// write out the length of the field name
-		n = binary.PutUvarint(buf, uint64(len(fieldName)))
-		_, err = w.Write(buf[:n])
-		if err != nil {
-			return 0, err
-		}
-
-		// write out the field name
-		_, err = w.Write([]byte(fieldName))
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	// now write out the fields index
-	rv = uint64(w.Count())
-
-	// now write out the stored doc index
-	for fieldID := range memSegment.FieldsInv {
-		err := binary.Write(w, binary.BigEndian, fieldStarts[fieldID])
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	return rv, nil
-}
-
-// FooterSize is the size of the footer record in bytes
-// crc + ver + chunk + field offset + stored offset + num docs
-const FooterSize = 4 + 4 + 4 + 8 + 8 + 8
-
-func persistFooter(numDocs, storedIndexOffset, fieldIndexOffset uint64,
-	chunkFactor uint32, w *CountHashWriter) error {
-	// write out the number of docs
-	err := binary.Write(w, binary.BigEndian, numDocs)
-	if err != nil {
-		return err
-	}
-	// write out the stored field index location:
-	err = binary.Write(w, binary.BigEndian, storedIndexOffset)
-	if err != nil {
-		return err
-	}
-	// write out the field index location
-	err = binary.Write(w, binary.BigEndian, fieldIndexOffset)
-	if err != nil {
-		return err
-	}
-	// write out 32-bit chunk factor
-	err = binary.Write(w, binary.BigEndian, chunkFactor)
-	if err != nil {
-		return err
-	}
-	// write out 32-bit version
-	err = binary.Write(w, binary.BigEndian, version)
-	if err != nil {
-		return err
-	}
-	// write out CRC-32 of everything upto but not including this CRC
-	err = binary.Write(w, binary.BigEndian, w.Sum32())
-	if err != nil {
-		return err
-	}
-	return nil
 }

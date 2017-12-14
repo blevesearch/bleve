@@ -96,6 +96,13 @@ func New() *Segment {
 	}
 }
 
+func (s *Segment) AddRef() {
+}
+
+func (s *Segment) DecRef() error {
+	return nil
+}
+
 // Fields returns the field names used in this segment
 func (s *Segment) Fields() []string {
 	return s.FieldsInv

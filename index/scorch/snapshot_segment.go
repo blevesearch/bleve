@@ -60,6 +60,26 @@ type cachedFieldDocs struct {
 	docs    map[uint64][]byte // Keyed by localDocNum, value is a list of terms delimited by 0xFF.
 }
 
+func (s *SegmentSnapshot) Id() uint64 {
+	return s.id
+}
+
+func (s *SegmentSnapshot) FullSize() int64 {
+	return int64(s.segment.Count())
+}
+
+func (s SegmentSnapshot) LiveSize() int64 {
+	return int64(s.Count())
+}
+
+func (s *SegmentSnapshot) Close() error {
+	return s.segment.Close()
+}
+
+func (s *SegmentSnapshot) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
+	return s.segment.VisitDocument(num, visitor)
+}
+
 func (s *SegmentSnapshot) DocumentVisitFieldTerms(num uint64, fields []string,
 	visitor index.DocumentFieldTermVisitor) error {
 	collection := make(map[string][][]byte)
@@ -111,7 +131,6 @@ func (s *SegmentSnapshot) Close() error {
 func (s *SegmentSnapshot) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
 	return s.segment.VisitDocument(num, visitor)
 }
-
 
 func (s *SegmentSnapshot) Count() uint64 {
 
@@ -237,4 +256,3 @@ func (c *cachedDocs) prepareFields(docNum uint64, wantedFields []string,
 	c.m.Unlock()
 	return nil
 }
-
