@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package mergeplan provides a segment merge planning approach that's
+// inspired by Lucene's TieredMergePolicy.java and descriptions like
+// http://blog.mikemccandless.com/2011/02/visualizing-lucenes-segment-merges.html
 package mergeplan
 
 import (
