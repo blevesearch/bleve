@@ -341,27 +341,6 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
 
-	results := make(chan *asynchSegmentResult)
-	for index, segment := range i.segment {
-		go func(index int, segment *SegmentSnapshot) {
-			dict, err := segment.Dictionary(field)
-			if err != nil {
-				results <- &asynchSegmentResult{err: err}
-			} else {
-				pl, err := dict.PostingsList(string(term), nil)
-				if err != nil {
-					results <- &asynchSegmentResult{err: err}
-				} else {
-					results <- &asynchSegmentResult{
-						index:    index,
-						postings: pl,
-					}
-				}
-			}
-		}(index, segment)
-	}
-
-	var err error
 	rv := &IndexSnapshotTermFieldReader{
 		term:               term,
 		snapshot:           i,
@@ -371,26 +350,27 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		includeNorm:        includeNorm,
 		includeTermVectors: includeTermVectors,
 	}
-	for count := 0; count < len(i.segment); count++ {
-		asr := <-results
-		if asr.err != nil && err == nil {
-			err = asr.err
-		} else {
-			rv.postings[asr.index] = asr.postings
-			rv.iterators[asr.index] = asr.postings.Iterator()
+	for i, segment := range i.segment {
+		dict, err := segment.Dictionary(field)
+		if err != nil {
+			return nil, err
 		}
-	}
-	if err != nil {
-		return nil, err
+		pl, err := dict.PostingsList(string(term), nil)
+		if err != nil {
+			return nil, err
+		}
+		rv.postings[i] = pl
+		rv.iterators[i] = pl.Iterator()
 	}
 	return rv, nil
 }
 
-func docNumberToBytes(in uint64) []byte {
-
-	buf := new(bytes.Buffer)
-	_ = binary.Write(buf, binary.BigEndian, in)
-	return buf.Bytes()
+func docNumberToBytes(buf []byte, in uint64) []byte {
+	if len(buf) != 8 {
+		buf = make([]byte, 8)
+	}
+	binary.BigEndian.PutUint64(buf, in)
+	return buf
 }
 
 func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
