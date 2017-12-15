@@ -115,6 +115,8 @@ type PostingsIterator struct {
 	locChunkStart uint64
 
 	locBitmap *roaring.Bitmap
+
+	next Posting
 }
 
 func (i *PostingsIterator) loadChunk(chunk int) error {
@@ -266,10 +268,10 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 		}
 	}
 
-	rv := &Posting{
-		iterator: i,
-		docNum:   uint64(n),
-	}
+	i.next = Posting{} // clear the struct.
+	rv := &i.next
+	rv.iterator = i
+	rv.docNum = uint64(n)
 
 	var err error
 	var normBits uint64
