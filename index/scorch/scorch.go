@@ -55,6 +55,7 @@ type Scorch struct {
 	closeCh            chan struct{}
 	introductions      chan *segmentIntroduction
 	merges             chan *segmentMerge
+	revertToSnapshots  chan *snapshotRevert
 	introducerNotifier chan notificationChan
 	persisterNotifier  chan notificationChan
 	rootBolt           *bolt.DB
@@ -127,6 +128,7 @@ func (s *Scorch) Open() error {
 
 	s.introductions = make(chan *segmentIntroduction)
 	s.merges = make(chan *segmentMerge)
+	s.revertToSnapshots = make(chan *snapshotRevert)
 	s.introducerNotifier = make(chan notificationChan)
 	s.persisterNotifier = make(chan notificationChan)
 
