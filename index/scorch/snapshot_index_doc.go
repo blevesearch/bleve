@@ -36,7 +36,7 @@ func (i *IndexSnapshotDocIDReader) Next() (index.IndexInternalID, error) {
 		next := i.iterators[i.segmentOffset].Next()
 		// make segment number into global number by adding offset
 		globalOffset := i.snapshot.offsets[i.segmentOffset]
-		return docNumberToBytes(uint64(next) + globalOffset), nil
+		return docNumberToBytes(nil, uint64(next)+globalOffset), nil
 	}
 	return nil, nil
 }

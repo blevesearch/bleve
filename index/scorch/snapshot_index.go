@@ -365,11 +365,12 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	return rv, nil
 }
 
-func docNumberToBytes(in uint64) []byte {
-
-	buf := new(bytes.Buffer)
-	_ = binary.Write(buf, binary.BigEndian, in)
-	return buf.Bytes()
+func docNumberToBytes(buf []byte, in uint64) []byte {
+	if len(buf) != 8 {
+		buf = make([]byte, 8)
+	}
+	binary.BigEndian.PutUint64(buf, in)
+	return buf
 }
 
 func docInternalToNumber(in index.IndexInternalID) (uint64, error) {

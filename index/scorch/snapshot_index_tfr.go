@@ -49,8 +49,7 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 			// make segment number into global number by adding offset
 			globalOffset := i.snapshot.offsets[i.segmentOffset]
 			nnum := next.Number()
-			rv.ID = docNumberToBytes(nnum + globalOffset)
-
+			rv.ID = docNumberToBytes(rv.ID, nnum+globalOffset)
 			i.postingToTermFieldDoc(next, rv)
 
 			i.currID = rv.ID
