@@ -37,6 +37,11 @@ type epochWatcher struct {
 	notifyCh notificationChan
 }
 
+type snapshotReversion struct {
+	snapshot *IndexSnapshot
+	applied  chan error
+}
+
 func (s *Scorch) mainLoop() {
 	var epochWatchers []*epochWatcher
 OUTER:
@@ -53,6 +58,12 @@ OUTER:
 
 		case next := <-s.introductions:
 			err := s.introduceSegment(next)
+			if err != nil {
+				continue OUTER
+			}
+
+		case revertTo := <-s.revertToSnapshots:
+			err := s.revertToSnapshot(revertTo)
 			if err != nil {
 				continue OUTER
 			}
@@ -240,4 +251,45 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 
 	// notify merger we incorporated this
 	close(nextMerge.notify)
+}
+
+func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
+	// acquire lock
+	s.rootLock.Lock()
+
+	// prepare a new index snapshot, based on next snapshot
+	newSnapshot := &IndexSnapshot{
+		parent:   s,
+		segment:  make([]*SegmentSnapshot, len(revertTo.snapshot.segment)),
+		offsets:  revertTo.snapshot.offsets,
+		internal: revertTo.snapshot.internal,
+		epoch:    s.nextSnapshotEpoch,
+		refs:     1,
+	}
+	s.nextSnapshotEpoch++
+
+	// iterate through segments
+	for i, segmentSnapshot := range revertTo.snapshot.segment {
+		newSnapshot.segment[i] = &SegmentSnapshot{
+			id:         segmentSnapshot.id,
+			segment:    segmentSnapshot.segment,
+			deleted:    segmentSnapshot.deleted,
+			cachedDocs: segmentSnapshot.cachedDocs,
+		}
+		segmentSnapshot.segment.AddRef()
+	}
+
+	// swap in new snapshot
+	rootPrev := s.root
+	s.root = newSnapshot
+	// release lock
+	s.rootLock.Unlock()
+
+	if rootPrev != nil {
+		_ = rootPrev.DecRef()
+	}
+
+	close(revertTo.applied)
+
+	return nil
 }
