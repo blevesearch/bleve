@@ -18,8 +18,10 @@
 package mergeplan
 
 import (
+	"fmt"
 	"math"
 	"sort"
+	"strings"
 )
 
 // A Segment represents the information that the planner needs to
@@ -291,4 +293,60 @@ func ScoreSegments(segments []Segment, o *MergePlanOptions) float64 {
 	score *= math.Pow(nonDelRatio, o.ReclaimDeletesWeight)
 
 	return score
+}
+
+// ------------------------------------------
+
+// ToBarChart returns an ASCII rendering of the segments and the plan.
+// The barMax is the max width of the bars in the bar chart.
+func ToBarChart(prefix string, barMax int, segments []Segment, plan *MergePlan) string {
+	rv := make([]string, 0, len(segments))
+
+	var maxFullSize int64
+	for _, segment := range segments {
+		if maxFullSize < segment.FullSize() {
+			maxFullSize = segment.FullSize()
+		}
+	}
+	if maxFullSize < 0 {
+		maxFullSize = 1
+	}
+
+	for _, segment := range segments {
+		barFull := int(segment.FullSize())
+		barLive := int(segment.LiveSize())
+
+		if maxFullSize > int64(barMax) {
+			barFull = int(float64(barMax) * float64(barFull) / float64(maxFullSize))
+			barLive = int(float64(barMax) * float64(barLive) / float64(maxFullSize))
+		}
+
+		barKind := " "
+		barChar := "."
+
+		if plan != nil {
+		TASK_LOOP:
+			for taski, task := range plan.Tasks {
+				for _, taskSegment := range task.Segments {
+					if taskSegment == segment {
+						barKind = "*"
+						barChar = fmt.Sprintf("%d", taski)
+						break TASK_LOOP
+					}
+				}
+			}
+		}
+
+		bar :=
+			strings.Repeat(barChar, barLive)[0:barLive] +
+				strings.Repeat("x", barFull-barLive)[0:barFull-barLive]
+
+		rv = append(rv, fmt.Sprintf("%s %5d: %5d /%5d - %s %s", prefix,
+			segment.Id(),
+			segment.LiveSize(),
+			segment.FullSize(),
+			barKind, bar))
+	}
+
+	return strings.Join(rv, "\n")
 }
