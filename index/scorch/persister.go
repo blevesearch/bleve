@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/RoaringBitmap/roaring"
@@ -318,10 +319,9 @@ func (s *Scorch) loadFromBolt() error {
 			}
 			indexSnapshot.epoch = snapshotEpoch
 			// set the nextSegmentID
-			for _, segment := range indexSnapshot.segment {
-				if segment.id > s.nextSegmentID {
-					s.nextSegmentID = segment.id
-				}
+			s.nextSegmentID, err = s.maxSegmentIDOnDisk()
+			if err != nil {
+				return err
 			}
 			s.nextSegmentID++
 			s.nextSnapshotEpoch = snapshotEpoch + 1
@@ -483,6 +483,29 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 	}
 
 	return numRemoved, err
+}
+
+func (s *Scorch) maxSegmentIDOnDisk() (uint64, error) {
+	currFileInfos, err := ioutil.ReadDir(s.path)
+	if err != nil {
+		return 0, err
+	}
+
+	var rv uint64
+	for _, finfo := range currFileInfos {
+		fname := finfo.Name()
+		if filepath.Ext(fname) == ".zap" {
+			prefix := strings.TrimSuffix(fname, ".zap")
+			id, err2 := strconv.ParseUint(prefix, 16, 64)
+			if err2 != nil {
+				return 0, err2
+			}
+			if id > rv {
+				rv = id
+			}
+		}
+	}
+	return rv, err
 }
 
 // Removes any *.zap files which aren't listed in the rootBolt.
