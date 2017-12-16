@@ -98,6 +98,7 @@ func TestSimplePlan(t *testing.T) {
 			&MergePlanOptions{
 				MaxSegmentsPerTier:   1,
 				MaxSegmentSize:       1000,
+				TierGrowth:           2.0,
 				SegmentsPerMergeTask: 2,
 				FloorSegmentSize:     1,
 			},
@@ -156,11 +157,12 @@ func TestCalcBudget(t *testing.T) {
 	}{
 		{0, 0, MergePlanOptions{}, 0},
 		{1, 0, MergePlanOptions{}, 1},
-		{9, 0, MergePlanOptions{}, 4},
+		{9, 0, MergePlanOptions{}, 9},
 		{1, 1,
 			MergePlanOptions{
 				MaxSegmentsPerTier:   1,
 				MaxSegmentSize:       1000,
+				TierGrowth:           2.0,
 				SegmentsPerMergeTask: 2,
 				FloorSegmentSize:     1,
 			},
@@ -170,6 +172,7 @@ func TestCalcBudget(t *testing.T) {
 			MergePlanOptions{
 				MaxSegmentsPerTier:   1,
 				MaxSegmentSize:       1000,
+				TierGrowth:           2.0,
 				SegmentsPerMergeTask: 2,
 				FloorSegmentSize:     1,
 			},
@@ -179,6 +182,7 @@ func TestCalcBudget(t *testing.T) {
 			MergePlanOptions{
 				MaxSegmentsPerTier:   2,
 				MaxSegmentSize:       1000,
+				TierGrowth:           2.0,
 				SegmentsPerMergeTask: 2,
 				FloorSegmentSize:     1,
 			},
@@ -201,6 +205,7 @@ func TestInsert1SameSizedSegmentBetweenMerges(t *testing.T) {
 	o := &MergePlanOptions{
 		MaxSegmentSize:       1000,
 		MaxSegmentsPerTier:   3,
+		TierGrowth:           3.0,
 		SegmentsPerMergeTask: 3,
 	}
 
@@ -226,6 +231,7 @@ func TestInsertManySameSizedSegmentsBetweenMerges(t *testing.T) {
 	o := &MergePlanOptions{
 		MaxSegmentSize:       1000,
 		MaxSegmentsPerTier:   3,
+		TierGrowth:           3.0,
 		SegmentsPerMergeTask: 3,
 	}
 
@@ -253,6 +259,7 @@ func TestInsertManySameSizedSegmentsWithDeletionsBetweenMerges(t *testing.T) {
 	o := &MergePlanOptions{
 		MaxSegmentSize:       1000,
 		MaxSegmentsPerTier:   3,
+		TierGrowth:           3.0,
 		SegmentsPerMergeTask: 3,
 	}
 
@@ -290,6 +297,7 @@ func TestInsertManyDifferentSizedSegmentsBetweenMerges(t *testing.T) {
 	o := &MergePlanOptions{
 		MaxSegmentSize:       1000,
 		MaxSegmentsPerTier:   3,
+		TierGrowth:           3.0,
 		SegmentsPerMergeTask: 3,
 	}
 
@@ -317,6 +325,7 @@ func TestManySameSizedSegmentsWithDeletesBetweenMerges(t *testing.T) {
 	o := &MergePlanOptions{
 		MaxSegmentSize:       1000,
 		MaxSegmentsPerTier:   3,
+		TierGrowth:           3.0,
 		SegmentsPerMergeTask: 3,
 	}
 

@@ -75,6 +75,10 @@ type MergePlanOptions struct {
 	// planner’s predicted sizes.
 	MaxSegmentSize int64
 
+	// The growth factor for each tier in a staircase of idealized
+	// segments computed by CalcBudget().
+	TierGrowth float64
+
 	// The number of segments in any resulting MergeTask.  e.g.,
 	// len(result.Tasks[ * ].Segments) == SegmentsPerMergeTask.
 	SegmentsPerMergeTask int
@@ -115,6 +119,7 @@ func (o *MergePlanOptions) RaiseToFloorSegmentSize(s int64) int64 {
 var DefaultMergePlanOptions = MergePlanOptions{
 	MaxSegmentsPerTier:   10,
 	MaxSegmentSize:       5000000,
+	TierGrowth:           10.0,
 	SegmentsPerMergeTask: 10,
 	FloorSegmentSize:     2000,
 	ReclaimDeletesWeight: 2.0,
@@ -212,7 +217,8 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 }
 
 // Compute the number of segments that would be needed to cover the
-// totalSize, by climbing up a logarithmic staircase of segment tiers.
+// totalSize, by climbing up a logarithmically growing staircase of
+// segment tiers.
 func CalcBudget(totalSize int64, firstTierSize int64, o *MergePlanOptions) (
 	budgetNumSegments int) {
 	tierSize := firstTierSize
@@ -225,9 +231,9 @@ func CalcBudget(totalSize int64, firstTierSize int64, o *MergePlanOptions) (
 		maxSegmentsPerTier = 1
 	}
 
-	segmentsPerMergeTask := int64(o.SegmentsPerMergeTask)
-	if segmentsPerMergeTask < 2 {
-		segmentsPerMergeTask = 2
+	tierGrowth := o.TierGrowth
+	if tierGrowth < 1.0 {
+		tierGrowth = 1.0
 	}
 
 	for totalSize > 0 {
@@ -239,7 +245,7 @@ func CalcBudget(totalSize int64, firstTierSize int64, o *MergePlanOptions) (
 
 		budgetNumSegments += maxSegmentsPerTier
 		totalSize -= int64(maxSegmentsPerTier) * tierSize
-		tierSize *= segmentsPerMergeTask
+		tierSize = int64(float64(tierSize) * tierGrowth)
 	}
 
 	return budgetNumSegments
