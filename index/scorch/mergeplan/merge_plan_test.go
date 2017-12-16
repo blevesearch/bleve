@@ -20,7 +20,6 @@ import (
 	"os"
 	"reflect"
 	"sort"
-	"strings"
 	"testing"
 )
 
@@ -451,49 +450,5 @@ func emit(descrip string, cycle int, step int, segments []Segment, plan *MergePl
 	}
 
 	fmt.Printf("%s %d.%d ---------- %s\n", descrip, cycle, step, suffix)
-
-	var maxFullSize int64
-	for _, segment := range segments {
-		if maxFullSize < segment.FullSize() {
-			maxFullSize = segment.FullSize()
-		}
-	}
-
-	barMax := 100
-
-	for _, segment := range segments {
-		barFull := int(segment.FullSize())
-		barLive := int(segment.LiveSize())
-
-		if maxFullSize > int64(barMax) {
-			barFull = int(float64(barMax) * float64(barFull) / float64(maxFullSize))
-			barLive = int(float64(barMax) * float64(barLive) / float64(maxFullSize))
-		}
-
-		barKind := " "
-		barChar := "."
-
-		if plan != nil {
-		TASK_LOOP:
-			for taski, task := range plan.Tasks {
-				for _, taskSegment := range task.Segments {
-					if taskSegment == segment {
-						barKind = "*"
-						barChar = fmt.Sprintf("%d", taski)
-						break TASK_LOOP
-					}
-				}
-			}
-		}
-
-		bar :=
-			strings.Repeat(barChar, barLive)[0:barLive] +
-				strings.Repeat("x", barFull-barLive)[0:barFull-barLive]
-
-		fmt.Printf("%s %5d: %5d /%5d - %s %s\n", descrip,
-			segment.Id(),
-			segment.LiveSize(),
-			segment.FullSize(),
-			barKind, bar)
-	}
+	fmt.Printf("%s\n", ToBarChart(descrip, 100, segments, plan))
 }
