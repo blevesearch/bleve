@@ -215,11 +215,9 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 
 	// wait for analysis result
 	analysisResults := make([]*index.AnalysisResult, int(numUpdates))
-	// newRowsMap := make(map[string][]index.IndexRow)
 	var itemsDeQueued uint64
 	for itemsDeQueued < numUpdates {
 		result := <-resultChan
-		//newRowsMap[result.DocID] = result.Rows
 		analysisResults[itemsDeQueued] = result
 		itemsDeQueued++
 	}
@@ -230,12 +228,10 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 	var newSegment segment.Segment
 	if len(analysisResults) > 0 {
 		newSegment = mem.NewFromAnalyzedDocs(analysisResults)
-	} else {
-		newSegment = mem.New()
 	}
 
 	err := s.prepareSegment(newSegment, ids, batch.InternalOps)
-	if err != nil {
+	if err != nil && newSegment != nil {
 		_ = newSegment.Close()
 	}
 	return err
@@ -278,7 +274,7 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 		return err
 	}
 
-	if !s.unsafeBatch {
+	if introduction.persisted != nil {
 		err = <-introduction.persisted
 	}
 

@@ -222,7 +222,10 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	}
 
 	// get write lock and update the current snapshot with disk-based versions
-	var notifications []chan error
+	snapshot.m.Lock()
+	notifications := snapshot.persisted
+	snapshot.persisted = nil
+	snapshot.m.Unlock()
 
 	s.rootLock.Lock()
 	newIndexSnapshot := &IndexSnapshot{
@@ -244,7 +247,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 			}
 			newIndexSnapshot.segment[i] = newSegmentSnapshot
 			// add the old segment snapshots notifications to the list
-			for _, notification := range segmentSnapshot.notify {
+			for _, notification := range segmentSnapshot.persisted {
 				notifications = append(notifications, notification)
 			}
 		} else {

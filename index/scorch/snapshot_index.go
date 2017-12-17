@@ -48,6 +48,8 @@ type IndexSnapshot struct {
 
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
+
+	persisted []chan error
 }
 
 func (i *IndexSnapshot) AddRef() {

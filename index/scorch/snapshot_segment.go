@@ -52,7 +52,8 @@ type SegmentSnapshot struct {
 	segment segment.Segment
 	deleted *roaring.Bitmap
 
-	notify     []chan error
+	persisted []chan error // closed when the segment is persisted
+
 	cachedDocs *cachedDocs
 }
 
