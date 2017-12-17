@@ -35,82 +35,85 @@ import (
 type notificationChan chan struct{}
 
 func (s *Scorch) persisterLoop() {
-	var notify notificationChan
+	defer s.asyncTasks.Done()
+
+	var notifyChs []notificationChan
 	var lastPersistedEpoch uint64
 OUTER:
 	for {
 		select {
 		case <-s.closeCh:
 			break OUTER
-		case notify = <-s.persisterNotifier:
-
+		case notifyCh := <-s.persisterNotifier:
+			notifyChs = append(notifyChs, notifyCh)
 		default:
-			// check to see if there is a new snapshot to persist
-			s.rootLock.RLock()
-			ourSnapshot := s.root
-			ourSnapshot.AddRef()
-			s.rootLock.RUnlock()
+		}
 
-			if ourSnapshot.epoch != lastPersistedEpoch {
-				// lets get started
-				err := s.persistSnapshot(ourSnapshot)
-				if err != nil {
-					log.Printf("got err persisting snapshot: %v", err)
-					_ = ourSnapshot.DecRef()
-					continue OUTER
-				}
-				lastPersistedEpoch = ourSnapshot.epoch
-				if notify != nil {
-					close(notify)
-					notify = nil
-				}
-			}
-			_ = ourSnapshot.DecRef()
+		var ourSnapshot *IndexSnapshot
+		var ourPersisted []chan error
 
-			// tell the introducer we're waiting for changes
-			// first make a notification chan
-			notifyUs := make(notificationChan)
-
-			// give it to the introducer
-			select {
-			case <-s.closeCh:
-				break OUTER
-			case s.introducerNotifier <- notifyUs:
-			}
-
-			// check again
-			s.rootLock.RLock()
+		// check to see if there is a new snapshot to persist
+		s.rootLock.Lock()
+		if s.root != nil && s.root.epoch > lastPersistedEpoch {
 			ourSnapshot = s.root
 			ourSnapshot.AddRef()
-			s.rootLock.RUnlock()
+			ourPersisted = s.rootPersisted
+			s.rootPersisted = nil
+		}
+		s.rootLock.Unlock()
 
-			if ourSnapshot.epoch != lastPersistedEpoch {
-				// lets get started
-				err := s.persistSnapshot(ourSnapshot)
+		if ourSnapshot != nil {
+			err := s.persistSnapshot(ourSnapshot)
+			for _, ch := range ourPersisted {
 				if err != nil {
-					log.Printf("got err persisting snapshot: %v", err)
-					_ = ourSnapshot.DecRef()
-					continue OUTER
+					ch <- err
 				}
-				lastPersistedEpoch = ourSnapshot.epoch
-				if notify != nil {
-					close(notify)
-					notify = nil
-				}
+				close(ch)
 			}
+			if err != nil {
+				log.Printf("got err persisting snapshot: %v", err)
+				_ = ourSnapshot.DecRef()
+				continue OUTER
+			}
+			lastPersistedEpoch = ourSnapshot.epoch
+			for _, notifyCh := range notifyChs {
+				close(notifyCh)
+			}
+			notifyChs = nil
 			_ = ourSnapshot.DecRef()
 
-			// now wait for it (but also detect close)
-			select {
-			case <-s.closeCh:
-				break OUTER
-			case <-notifyUs:
-				// woken up, next loop should pick up work
+			changed := false
+			s.rootLock.RLock()
+			if s.root != nil && s.root.epoch != lastPersistedEpoch {
+				changed = true
+			}
+			s.rootLock.RUnlock()
+			if changed {
+				continue OUTER
 			}
 		}
-		s.removeOldData()
+
+		// tell the introducer we're waiting for changes
+		w := &epochWatcher{
+			epoch:    lastPersistedEpoch,
+			notifyCh: make(notificationChan, 1),
+		}
+
+		select {
+		case <-s.closeCh:
+			break OUTER
+		case s.introducerNotifier <- w:
+		}
+
+		s.removeOldData() // might as well cleanup while waiting
+
+		select {
+		case <-s.closeCh:
+			break OUTER
+		case <-w.notifyCh:
+			// woken up, next loop should pick up work
+		}
 	}
-	s.asyncTasks.Done()
 }
 
 func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
@@ -221,12 +224,6 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		}
 	}
 
-	// get write lock and update the current snapshot with disk-based versions
-	snapshot.m.Lock()
-	notifications := snapshot.persisted
-	snapshot.persisted = nil
-	snapshot.m.Unlock()
-
 	s.rootLock.Lock()
 	newIndexSnapshot := &IndexSnapshot{
 		parent:   s,
@@ -240,16 +237,12 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		// see if this segment has been replaced
 		if replacement, ok := newSegments[segmentSnapshot.id]; ok {
 			newSegmentSnapshot := &SegmentSnapshot{
+				id:         segmentSnapshot.id,
 				segment:    replacement,
 				deleted:    segmentSnapshot.deleted,
-				id:         segmentSnapshot.id,
 				cachedDocs: segmentSnapshot.cachedDocs,
 			}
 			newIndexSnapshot.segment[i] = newSegmentSnapshot
-			// add the old segment snapshots notifications to the list
-			for _, notification := range segmentSnapshot.persisted {
-				notifications = append(notifications, notification)
-			}
 		} else {
 			newIndexSnapshot.segment[i] = s.root.segment[i]
 			newIndexSnapshot.segment[i].segment.AddRef()
@@ -268,12 +261,6 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 
 	if rootPrev != nil {
 		_ = rootPrev.DecRef()
-	}
-
-	// now that we've given up the lock, notify everyone that we've safely
-	// persisted their data
-	for _, notification := range notifications {
-		close(notification)
 	}
 
 	return nil

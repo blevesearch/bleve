@@ -49,13 +49,14 @@ type Scorch struct {
 
 	unsafeBatch bool
 
-	rootLock sync.RWMutex
-	root     *IndexSnapshot // holds 1 ref-count on the root
+	rootLock      sync.RWMutex
+	root          *IndexSnapshot // holds 1 ref-count on the root
+	rootPersisted []chan error   // closed when root is persisted
 
 	closeCh            chan struct{}
 	introductions      chan *segmentIntroduction
 	merges             chan *segmentMerge
-	introducerNotifier chan notificationChan
+	introducerNotifier chan *epochWatcher
 	persisterNotifier  chan notificationChan
 	rootBolt           *bolt.DB
 	asyncTasks         sync.WaitGroup
@@ -127,7 +128,7 @@ func (s *Scorch) Open() error {
 
 	s.introductions = make(chan *segmentIntroduction)
 	s.merges = make(chan *segmentMerge)
-	s.introducerNotifier = make(chan notificationChan)
+	s.introducerNotifier = make(chan *epochWatcher, 1)
 	s.persisterNotifier = make(chan notificationChan)
 
 	if !s.readOnly && s.path != "" {
@@ -251,7 +252,7 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 	}
 
 	if !s.unsafeBatch {
-		introduction.persisted = make(chan error)
+		introduction.persisted = make(chan error, 1)
 	}
 
 	// get read lock, to optimistically prepare obsoleted info
