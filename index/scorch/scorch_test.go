@@ -587,6 +587,10 @@ func TestIndexInternalCRUD(t *testing.T) {
 		t.Error(err)
 	}
 
+	if len(indexReader.(*Reader).root.segment) != 0 {
+		t.Errorf("expected 0 segments")
+	}
+
 	// get something that doesn't exist yet
 	val, err := indexReader.GetInternal([]byte("key"))
 	if err != nil {
@@ -612,6 +616,10 @@ func TestIndexInternalCRUD(t *testing.T) {
 		t.Error(err)
 	}
 
+	if len(indexReader2.(*Reader).root.segment) != 0 {
+		t.Errorf("expected 0 segments")
+	}
+
 	// get
 	val, err = indexReader2.GetInternal([]byte("key"))
 	if err != nil {
@@ -635,6 +643,10 @@ func TestIndexInternalCRUD(t *testing.T) {
 	indexReader3, err := idx.Reader()
 	if err != nil {
 		t.Error(err)
+	}
+
+	if len(indexReader3.(*Reader).root.segment) != 0 {
+		t.Errorf("expected 0 segments")
 	}
 
 	// get again
@@ -725,6 +737,11 @@ func TestIndexBatch(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+
+	numSegments := len(indexReader.(*Reader).root.segment)
+	if numSegments <= 0 {
+		t.Errorf("expected some segments, got: %d", numSegments)
+	}
 
 	docCount, err := indexReader.DocCount()
 	if err != nil {

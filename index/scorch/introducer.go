@@ -32,16 +32,21 @@ type segmentIntroduction struct {
 	persisted chan error
 }
 
+type epochWatcher struct {
+	epoch    uint64
+	notifyCh notificationChan
+}
+
 func (s *Scorch) mainLoop() {
-	var notify notificationChan
+	var epochWatchers []*epochWatcher
 OUTER:
 	for {
 		select {
 		case <-s.closeCh:
 			break OUTER
 
-		case notify = <-s.introducerNotifier:
-			continue
+		case epochWatcher := <-s.introducerNotifier:
+			epochWatchers = append(epochWatchers, epochWatcher)
 
 		case nextMerge := <-s.merges:
 			s.introduceMerge(nextMerge)
@@ -52,11 +57,22 @@ OUTER:
 				continue OUTER
 			}
 		}
-		// notify persister
-		if notify != nil {
-			close(notify)
-			notify = nil
+
+		var epochCurr uint64
+		s.rootLock.RLock()
+		if s.root != nil {
+			epochCurr = s.root.epoch
 		}
+		s.rootLock.RUnlock()
+		var epochWatchersNext []*epochWatcher
+		for _, w := range epochWatchers {
+			if w.epoch < epochCurr {
+				close(w.notifyCh)
+			} else {
+				epochWatchersNext = append(epochWatchersNext, w)
+			}
+		}
+		epochWatchers = epochWatchersNext
 	}
 
 	s.asyncTasks.Done()
@@ -66,12 +82,14 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	// acquire lock
 	s.rootLock.Lock()
 
-	// prepare new index snapshot, with curr size + 1
+	nsegs := len(s.root.segment)
+
+	// prepare new index snapshot
 	newSnapshot := &IndexSnapshot{
 		parent:   s,
-		segment:  make([]*SegmentSnapshot, len(s.root.segment)+1),
-		offsets:  make([]uint64, len(s.root.segment)+1),
-		internal: make(map[string][]byte, len(s.root.segment)),
+		segment:  make([]*SegmentSnapshot, nsegs, nsegs+1),
+		offsets:  make([]uint64, nsegs, nsegs+1),
+		internal: make(map[string][]byte, len(s.root.internal)),
 		epoch:    s.nextSnapshotEpoch,
 		refs:     1,
 	}
@@ -95,10 +113,10 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		newSnapshot.segment[i] = &SegmentSnapshot{
 			id:         s.root.segment[i].id,
 			segment:    s.root.segment[i].segment,
-			notify:     s.root.segment[i].notify,
 			cachedDocs: s.root.segment[i].cachedDocs,
 		}
 		s.root.segment[i].segment.AddRef()
+
 		// apply new obsoletions
 		if s.root.segment[i].deleted == nil {
 			newSnapshot.segment[i].deleted = delta
@@ -110,18 +128,14 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		running += s.root.segment[i].Count()
 
 	}
-	// put new segment at end
-	newSnapshot.segment[len(s.root.segment)] = &SegmentSnapshot{
-		id:         next.id,
-		segment:    next.data, // Take ownership of next.data's ref-count.
-		cachedDocs: &cachedDocs{cache: nil},
-	}
-	newSnapshot.offsets[len(s.root.segment)] = running
-	if !s.unsafeBatch {
-		newSnapshot.segment[len(s.root.segment)].notify = append(
-			newSnapshot.segment[len(s.root.segment)].notify,
-			next.persisted,
-		)
+	// append new segment, if any, to end of the new index snapshot
+	if next.data != nil {
+		newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
+			id:         next.id,
+			segment:    next.data, // take ownership of next.data's ref-count
+			cachedDocs: &cachedDocs{cache: nil},
+		})
+		newSnapshot.offsets = append(newSnapshot.offsets, running)
 	}
 	// copy old values
 	for key, oldVal := range s.root.internal {
@@ -135,7 +149,10 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			delete(newSnapshot.internal, key)
 		}
 	}
-	// swap in new segment
+	if next.persisted != nil {
+		s.rootPersisted = append(s.rootPersisted, next.persisted)
+	}
+	// swap in new index snapshot
 	rootPrev := s.root
 	s.root = newSnapshot
 	// release lock
@@ -161,7 +178,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 		parent:   s,
 		segment:  make([]*SegmentSnapshot, 0, newSize),
 		offsets:  make([]uint64, 0, newSize),
-		internal: make(map[string][]byte, len(s.root.segment)),
+		internal: s.root.internal,
 		epoch:    s.nextSnapshotEpoch,
 		refs:     1,
 	}
@@ -193,7 +210,6 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
 				id:         s.root.segment[i].id,
 				segment:    s.root.segment[i].segment,
-				notify:     s.root.segment[i].notify,
 				deleted:    s.root.segment[i].deleted,
 				cachedDocs: s.root.segment[i].cachedDocs,
 			})
@@ -206,16 +222,11 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	// put new segment at end
 	newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
 		id:         nextMerge.id,
-		segment:    nextMerge.new, // Take ownership for nextMerge.new's ref-count.
+		segment:    nextMerge.new, // take ownership for nextMerge.new's ref-count
 		deleted:    newSegmentDeleted,
 		cachedDocs: &cachedDocs{cache: nil},
 	})
 	newSnapshot.offsets = append(newSnapshot.offsets, running)
-
-	// copy old values
-	for key, oldVal := range s.root.internal {
-		newSnapshot.internal[key] = oldVal
-	}
 
 	// swap in new segment
 	rootPrev := s.root

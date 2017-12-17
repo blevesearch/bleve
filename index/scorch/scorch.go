@@ -49,13 +49,14 @@ type Scorch struct {
 
 	unsafeBatch bool
 
-	rootLock sync.RWMutex
-	root     *IndexSnapshot // holds 1 ref-count on the root
+	rootLock      sync.RWMutex
+	root          *IndexSnapshot // holds 1 ref-count on the root
+	rootPersisted []chan error   // closed when root is persisted
 
 	closeCh            chan struct{}
 	introductions      chan *segmentIntroduction
 	merges             chan *segmentMerge
-	introducerNotifier chan notificationChan
+	introducerNotifier chan *epochWatcher
 	persisterNotifier  chan notificationChan
 	rootBolt           *bolt.DB
 	asyncTasks         sync.WaitGroup
@@ -127,7 +128,7 @@ func (s *Scorch) Open() error {
 
 	s.introductions = make(chan *segmentIntroduction)
 	s.merges = make(chan *segmentMerge)
-	s.introducerNotifier = make(chan notificationChan)
+	s.introducerNotifier = make(chan *epochWatcher, 1)
 	s.persisterNotifier = make(chan notificationChan)
 
 	if !s.readOnly && s.path != "" {
@@ -215,11 +216,9 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 
 	// wait for analysis result
 	analysisResults := make([]*index.AnalysisResult, int(numUpdates))
-	// newRowsMap := make(map[string][]index.IndexRow)
 	var itemsDeQueued uint64
 	for itemsDeQueued < numUpdates {
 		result := <-resultChan
-		//newRowsMap[result.DocID] = result.Rows
 		analysisResults[itemsDeQueued] = result
 		itemsDeQueued++
 	}
@@ -230,12 +229,10 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 	var newSegment segment.Segment
 	if len(analysisResults) > 0 {
 		newSegment = mem.NewFromAnalyzedDocs(analysisResults)
-	} else {
-		newSegment = mem.New()
 	}
 
 	err := s.prepareSegment(newSegment, ids, batch.InternalOps)
-	if err != nil {
+	if err != nil && newSegment != nil {
 		_ = newSegment.Close()
 	}
 	return err
@@ -255,7 +252,7 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 	}
 
 	if !s.unsafeBatch {
-		introduction.persisted = make(chan error)
+		introduction.persisted = make(chan error, 1)
 	}
 
 	// get read lock, to optimistically prepare obsoleted info
@@ -278,7 +275,7 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 		return err
 	}
 
-	if !s.unsafeBatch {
+	if introduction.persisted != nil {
 		err = <-introduction.persisted
 	}
 
