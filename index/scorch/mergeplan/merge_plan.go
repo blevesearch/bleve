@@ -173,6 +173,17 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 
 	rv := &MergePlan{}
 
+	var empties []Segment
+	for _, eligible := range eligibles {
+		if eligible.LiveSize() <= 0 {
+			empties = append(empties, eligible)
+		}
+	}
+	if len(empties) > 0 {
+		rv.Tasks = append(rv.Tasks, &MergeTask{Segments: empties})
+		eligibles = removeSegments(eligibles, empties)
+	}
+
 	// While we’re over budget, keep looping, which might produce
 	// another MergeTask.
 	for len(eligibles) > budgetNumSegments {
