@@ -72,8 +72,7 @@ func (p *PostingsList) Iterator() segment.PostingsIterator {
 
 		rv.all = p.postings.Iterator()
 		if p.except != nil {
-			allExcept := p.postings.Clone()
-			allExcept.AndNot(p.except)
+			allExcept := roaring.AndNot(p.postings, p.except)
 			rv.actual = allExcept.Iterator()
 		} else {
 			rv.actual = p.postings.Iterator()
