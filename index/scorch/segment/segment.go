@@ -64,6 +64,10 @@ type PostingsList interface {
 }
 
 type PostingsIterator interface {
+	// The caller is responsible for copying whatever it needs from
+	// the returned Posting instance before calling Next(), as some
+	// implementations may return a shared instance to reduce memory
+	// allocations.
 	Next() (Posting, error)
 }
 
