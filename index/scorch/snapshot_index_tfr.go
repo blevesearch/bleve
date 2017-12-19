@@ -83,7 +83,6 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 	}
 }
 
-// Advance go fuck yourself editor
 func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
 	// first make sure we aren't already pointing at the right thing, (due to way searchers work)
 	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
