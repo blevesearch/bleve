@@ -18,7 +18,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/couchbaselabs/vellum"
+	"github.com/couchbase/vellum"
 	"github.com/spf13/cobra"
 )
 
