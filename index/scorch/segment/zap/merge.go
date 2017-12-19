@@ -24,7 +24,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/Smerity/govarint"
-	"github.com/couchbaselabs/vellum"
+	"github.com/couchbase/vellum"
 	"github.com/golang/snappy"
 )
 

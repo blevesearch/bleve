@@ -23,7 +23,7 @@ import (
 
 	"github.com/Smerity/govarint"
 	"github.com/blevesearch/bleve/index/scorch/segment/mem"
-	"github.com/couchbaselabs/vellum"
+	"github.com/couchbase/vellum"
 	"github.com/golang/snappy"
 )
 
