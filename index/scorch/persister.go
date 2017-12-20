@@ -450,20 +450,23 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 	}
 	defer func() {
 		if err == nil {
-			err = s.rootBolt.Sync()
-		}
-	}()
-	defer func() {
-		if err == nil {
 			err = tx.Commit()
 		} else {
 			_ = tx.Rollback()
 		}
+		if err == nil {
+			err = s.rootBolt.Sync()
+		}
 	}()
+
+	snapshots := tx.Bucket(boltSnapshotsBucket)
+	if snapshots == nil {
+		return 0, nil
+	}
 
 	for _, epochToRemove := range epochsToRemove {
 		k := segment.EncodeUvarintAscending(nil, epochToRemove)
-		err = tx.DeleteBucket(k)
+		err = snapshots.DeleteBucket(k)
 		if err == bolt.ErrBucketNotFound {
 			err = nil
 		}
