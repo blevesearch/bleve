@@ -159,8 +159,8 @@ func (s *Segment) Dictionary(field string) (segment.TermDictionary, error) {
 	return dict, err
 }
 
-func (s *Segment) dictionary(field string) (*Dictionary, error) {
-	rv := &Dictionary{
+func (s *Segment) dictionary(field string) (rv *Dictionary, err error) {
+	rv = &Dictionary{
 		segment: s,
 		field:   field,
 	}
@@ -170,18 +170,14 @@ func (s *Segment) dictionary(field string) (*Dictionary, error) {
 		rv.fieldID = rv.fieldID - 1
 
 		dictStart := s.fieldsOffsets[rv.fieldID]
-
 		if dictStart > 0 {
 			// read the length of the vellum data
 			vellumLen, read := binary.Uvarint(s.mm[dictStart : dictStart+binary.MaxVarintLen64])
 			fstBytes := s.mm[dictStart+uint64(read) : dictStart+uint64(read)+vellumLen]
 			if fstBytes != nil {
-				fst, err := vellum.Load(fstBytes)
+				rv.fst, err = vellum.Load(fstBytes)
 				if err != nil {
 					return nil, fmt.Errorf("dictionary field %s vellum err: %v", field, err)
-				}
-				if err == nil {
-					rv.fst = fst
 				}
 			}
 		}
