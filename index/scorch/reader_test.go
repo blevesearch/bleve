@@ -646,6 +646,7 @@ func TestSegmentIndexAndLocalDocNumFromGlobal(t *testing.T) {
 	for _, test := range tests {
 		i := &IndexSnapshot{
 			offsets: test.offsets,
+			stats:   &IndexSnapshotStats{},
 			refs:    1,
 		}
 		gotSegmentIndex, gotLocalDocNum := i.segmentIndexAndLocalDocNumFromGlobal(test.globalDocNum)

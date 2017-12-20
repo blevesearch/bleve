@@ -231,8 +231,10 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		segment:  make([]*SegmentSnapshot, len(s.root.segment)),
 		offsets:  make([]uint64, len(s.root.offsets)),
 		internal: make(map[string][]byte, len(s.root.internal)),
+		stats:    &IndexSnapshotStats{},
 		refs:     1,
 	}
+	var numItems uint64
 	for i, segmentSnapshot := range s.root.segment {
 		// see if this segment has been replaced
 		if replacement, ok := newSegments[segmentSnapshot.id]; ok {
@@ -248,6 +250,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 			newIndexSnapshot.segment[i].segment.AddRef()
 		}
 		newIndexSnapshot.offsets[i] = s.root.offsets[i]
+		numItems += newIndexSnapshot.segment[i].Count()
 	}
 	for k, v := range s.root.internal {
 		newIndexSnapshot.internal[k] = v
@@ -257,6 +260,10 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	}
 	rootPrev := s.root
 	s.root = newIndexSnapshot
+
+	// Update numItems within stats of the root
+	s.root.stats.numItems = numItems
+
 	s.rootLock.Unlock()
 
 	if rootPrev != nil {
@@ -332,6 +339,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 	rv := &IndexSnapshot{
 		parent:   s,
 		internal: make(map[string][]byte),
+		stats:    &IndexSnapshotStats{},
 		refs:     1,
 	}
 	var running uint64
@@ -369,6 +377,8 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 			running += segmentSnapshot.segment.Count()
 		}
 	}
+	// Update stats of the IndexSnapshot
+	rv.stats.numItems = running
 	return rv, nil
 }
 

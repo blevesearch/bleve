@@ -46,8 +46,15 @@ type IndexSnapshot struct {
 	internal map[string][]byte
 	epoch    uint64
 
+	stats *IndexSnapshotStats
+
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
+}
+
+// container for stats pertinent to IndexSnapshot
+type IndexSnapshotStats struct {
+	numItems uint64
 }
 
 func (i *IndexSnapshot) AddRef() {
