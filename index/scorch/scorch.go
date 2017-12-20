@@ -71,12 +71,16 @@ func NewScorch(storeName string, config map[string]interface{}, analysisQueue *i
 		version:              Version,
 		config:               config,
 		analysisQueue:        analysisQueue,
-		stats:                &Stats{},
 		nextSnapshotEpoch:    1,
 		closeCh:              make(chan struct{}),
 		ineligibleForRemoval: map[string]bool{},
 	}
-	rv.root = &IndexSnapshot{parent: rv, refs: 1}
+	rv.stats = &Stats{i: rv}
+	rv.root = &IndexSnapshot{
+		parent: rv,
+		stats:  &IndexSnapshotStats{},
+		refs:   1,
+	}
 	ro, ok := config["read_only"].(bool)
 	if ok {
 		rv.readOnly = ro
@@ -360,6 +364,18 @@ func (s *Scorch) unmarkIneligibleForRemoval(filename string) {
 	s.rootLock.Lock()
 	delete(s.ineligibleForRemoval, filename)
 	s.rootLock.Unlock()
+}
+
+func (s *Scorch) fetchRootStats() *IndexSnapshotStats {
+	stats := &IndexSnapshotStats{}
+	s.rootLock.RLock()
+	if s.root != nil {
+		s.root.AddRef()
+		*stats = *s.root.stats
+		s.root.DecRef()
+	}
+	s.rootLock.RUnlock()
+	return stats
 }
 
 func init() {

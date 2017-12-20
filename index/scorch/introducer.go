@@ -102,6 +102,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		offsets:  make([]uint64, nsegs, nsegs+1),
 		internal: make(map[string][]byte, len(s.root.internal)),
 		epoch:    s.nextSnapshotEpoch,
+		stats:    &IndexSnapshotStats{},
 		refs:     1,
 	}
 	s.nextSnapshotEpoch++
@@ -137,8 +138,10 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 
 		newSnapshot.offsets[i] = running
 		running += s.root.segment[i].Count()
-
 	}
+
+	numItems := running
+
 	// append new segment, if any, to end of the new index snapshot
 	if next.data != nil {
 		newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
@@ -147,6 +150,9 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			cachedDocs: &cachedDocs{cache: nil},
 		})
 		newSnapshot.offsets = append(newSnapshot.offsets, running)
+
+		// Get numDocs from the new segment
+		numItems += next.data.Count()
 	}
 	// copy old values
 	for key, oldVal := range s.root.internal {
@@ -166,6 +172,10 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	// swap in new index snapshot
 	rootPrev := s.root
 	s.root = newSnapshot
+
+	// Update numItems within stats of the root
+	s.root.stats.numItems = numItems
+
 	// release lock
 	s.rootLock.Unlock()
 
@@ -191,6 +201,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 		offsets:  make([]uint64, 0, newSize),
 		internal: s.root.internal,
 		epoch:    s.nextSnapshotEpoch,
+		stats:    &IndexSnapshotStats{},
 		refs:     1,
 	}
 	s.nextSnapshotEpoch++
@@ -231,17 +242,22 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	}
 
 	// put new segment at end
-	newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
+	newSegment := &SegmentSnapshot{
 		id:         nextMerge.id,
 		segment:    nextMerge.new, // take ownership for nextMerge.new's ref-count
 		deleted:    newSegmentDeleted,
 		cachedDocs: &cachedDocs{cache: nil},
-	})
+	}
+	newSnapshot.segment = append(newSnapshot.segment, newSegment)
 	newSnapshot.offsets = append(newSnapshot.offsets, running)
 
 	// swap in new segment
 	rootPrev := s.root
 	s.root = newSnapshot
+
+	// Update numItems within stats of the root
+	s.root.stats.numItems = running + newSegment.Count()
+
 	// release lock
 	s.rootLock.Unlock()
 
@@ -270,10 +286,12 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 		offsets:  revertTo.snapshot.offsets,
 		internal: revertTo.snapshot.internal,
 		epoch:    s.nextSnapshotEpoch,
+		stats:    &IndexSnapshotStats{},
 		refs:     1,
 	}
 	s.nextSnapshotEpoch++
 
+	var numItems uint64
 	// iterate through segments
 	for i, segmentSnapshot := range revertTo.snapshot.segment {
 		newSnapshot.segment[i] = &SegmentSnapshot{
@@ -283,11 +301,16 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 			cachedDocs: segmentSnapshot.cachedDocs,
 		}
 		segmentSnapshot.segment.AddRef()
+		numItems += newSnapshot.segment[i].Count()
 	}
 
 	// swap in new snapshot
 	rootPrev := s.root
 	s.root = newSnapshot
+
+	// Update numItems within stats of the new root
+	s.root.stats.numItems = numItems
+
 	// release lock
 	s.rootLock.Unlock()
 
