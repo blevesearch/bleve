@@ -275,6 +275,18 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
+	iid, err := reader.InternalID("1")
+	if err != nil || iid == nil {
+		t.Errorf("unexpected on doc id 1")
+	}
+	iid, err = reader.InternalID("2")
+	if err != nil || iid == nil {
+		t.Errorf("unexpected on doc id 2")
+	}
+	iid, err = reader.InternalID("3")
+	if err != nil || iid != nil {
+		t.Errorf("unexpected on doc id 3")
+	}
 	err = reader.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -297,6 +309,73 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
 	}
+	storedDoc, err := reader.Document("1")
+	if err != nil {
+		t.Error(err)
+	}
+	if storedDoc != nil {
+		t.Errorf("expected nil for deleted stored doc #1, got %v", storedDoc)
+	}
+	storedDoc, err = reader.Document("2")
+	if err != nil {
+		t.Error(err)
+	}
+	if storedDoc == nil {
+		t.Errorf("expected stored doc for #2, got nil")
+	}
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// now close it
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idx, err = NewScorch(Name, testConfig, analysisQueue) // reopen
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error reopening index: %v", err)
+	}
+
+	reader, err = idx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	docCount, err = reader.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+	storedDoc, err = reader.Document("1")
+	if err != nil {
+		t.Error(err)
+	}
+	if storedDoc != nil {
+		t.Errorf("expected nil for deleted stored doc #1, got %v", storedDoc)
+	}
+	storedDoc, err = reader.Document("2")
+	if err != nil {
+		t.Error(err)
+	}
+	if storedDoc == nil {
+		t.Errorf("expected stored doc for #2, got nil")
+	}
+	iid, err = reader.InternalID("1")
+	if err != nil || iid != nil {
+		t.Errorf("unexpected on doc id 1")
+	}
+	iid, err = reader.InternalID("2")
+	if err != nil || iid == nil {
+		t.Errorf("unexpected on doc id 2, should exist")
+	}
 	err = reader.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -318,6 +397,20 @@ func TestIndexInsertThenDelete(t *testing.T) {
 	}
 	if docCount != expectedCount {
 		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+	storedDoc, err = reader.Document("1")
+	if err != nil {
+		t.Error(err)
+	}
+	if storedDoc != nil {
+		t.Errorf("expected nil for deleted stored doc #1, got %v", storedDoc)
+	}
+	storedDoc, err = reader.Document("2")
+	if err != nil {
+		t.Error(err)
+	}
+	if storedDoc != nil {
+		t.Errorf("expected nil for deleted stored doc #2, got nil")
 	}
 	err = reader.Close()
 	if err != nil {
