@@ -367,7 +367,11 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 
 func docNumberToBytes(buf []byte, in uint64) []byte {
 	if len(buf) != 8 {
-		buf = make([]byte, 8)
+		if cap(buf) >= 8 {
+			buf = buf[0:8]
+		} else {
+			buf = make([]byte, 8)
+		}
 	}
 	binary.BigEndian.PutUint64(buf, in)
 	return buf
