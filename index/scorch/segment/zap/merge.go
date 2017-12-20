@@ -41,7 +41,7 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 		return nil, err
 	}
 
-	// bufer the output
+	// buffer the output
 	br := bufio.NewWriter(f)
 
 	// wrap it for counting (tracking offsets)
@@ -128,6 +128,9 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 	newSegDocCount uint64, chunkFactor uint32,
 	w *CountHashWriter) ([]uint64, error) {
 
+	var bufMaxVarintLen64 []byte = make([]byte, binary.MaxVarintLen64)
+	var bufLoc []uint64
+
 	rv := make([]uint64, len(fieldsInv))
 
 	var vellumBuf bytes.Buffer
@@ -208,7 +211,10 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 					if len(locs) > 0 {
 						newRoaringLocs.Add(uint32(hitNewDocNum))
 						for _, loc := range locs {
-							args := make([]uint64, 0, 5+len(loc.ArrayPositions()))
+							if cap(bufLoc) < 5+len(loc.ArrayPositions()) {
+								bufLoc = make([]uint64, 0, 5+len(loc.ArrayPositions()))
+							}
+							args := bufLoc[0:0]
 							args = append(args, uint64(fieldsMap[loc.Field()]))
 							args = append(args, loc.Pos())
 							args = append(args, loc.Start())
@@ -250,7 +256,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 				}
 				postingOffset := uint64(w.Count())
 				// write out the start of the term info
-				buf := make([]byte, binary.MaxVarintLen64)
+				buf := bufMaxVarintLen64
 				n := binary.PutUvarint(buf, freqOffset)
 				_, err = w.Write(buf[:n])
 				if err != nil {
@@ -295,7 +301,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 		vellumData := vellumBuf.Bytes()
 
 		// write out the length of the vellum data
-		buf := make([]byte, binary.MaxVarintLen64)
+		buf := bufMaxVarintLen64
 		// write out the number of chunks
 		n := binary.PutUvarint(buf, uint64(len(vellumData)))
 		_, err = w.Write(buf[:n])
