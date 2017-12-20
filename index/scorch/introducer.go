@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
@@ -137,8 +138,10 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 
 		newSnapshot.offsets[i] = running
 		running += s.root.segment[i].Count()
-
 	}
+
+	numItems := running
+
 	// append new segment, if any, to end of the new index snapshot
 	if next.data != nil {
 		newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
@@ -147,6 +150,9 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			cachedDocs: &cachedDocs{cache: nil},
 		})
 		newSnapshot.offsets = append(newSnapshot.offsets, running)
+
+		// Get numDocs from the new segment
+		numItems += next.data.Count()
 	}
 	// copy old values
 	for key, oldVal := range s.root.internal {
@@ -166,6 +172,10 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	// swap in new index snapshot
 	rootPrev := s.root
 	s.root = newSnapshot
+
+	// Update the numItems count of the root
+	atomic.StoreUint64(&s.root.numItems, numItems)
+
 	// release lock
 	s.rootLock.Unlock()
 
@@ -231,17 +241,22 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	}
 
 	// put new segment at end
-	newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
+	newSegment := &SegmentSnapshot{
 		id:         nextMerge.id,
 		segment:    nextMerge.new, // take ownership for nextMerge.new's ref-count
 		deleted:    newSegmentDeleted,
 		cachedDocs: &cachedDocs{cache: nil},
-	})
+	}
+	newSnapshot.segment = append(newSnapshot.segment, newSegment)
 	newSnapshot.offsets = append(newSnapshot.offsets, running)
 
 	// swap in new segment
 	rootPrev := s.root
 	s.root = newSnapshot
+
+	// Update the numItems count of the root
+	atomic.StoreUint64(&s.root.numItems, running+newSegment.Count())
+
 	// release lock
 	s.rootLock.Unlock()
 
@@ -274,6 +289,7 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 	}
 	s.nextSnapshotEpoch++
 
+	var numItems uint64
 	// iterate through segments
 	for i, segmentSnapshot := range revertTo.snapshot.segment {
 		newSnapshot.segment[i] = &SegmentSnapshot{
@@ -283,11 +299,16 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 			cachedDocs: segmentSnapshot.cachedDocs,
 		}
 		segmentSnapshot.segment.AddRef()
+		numItems += newSnapshot.segment[i].Count()
 	}
 
 	// swap in new snapshot
 	rootPrev := s.root
 	s.root = newSnapshot
+
+	// Update the numItems count of the new root
+	atomic.StoreUint64(&s.root.numItems, numItems)
+
 	// release lock
 	s.rootLock.Unlock()
 
