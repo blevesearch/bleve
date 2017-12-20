@@ -41,7 +41,7 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 		return nil, err
 	}
 
-	// bufer the output
+	// buffer the output
 	br := bufio.NewWriter(f)
 
 	// wrap it for counting (tracking offsets)
@@ -128,6 +128,9 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 	newSegDocCount uint64, chunkFactor uint32,
 	w *CountHashWriter) ([]uint64, error) {
 
+	var bufMaxVarintLen64 []byte = make([]byte, binary.MaxVarintLen64)
+	var bufLoc []uint64
+
 	rv := make([]uint64, len(fieldsInv))
 
 	var vellumBuf bytes.Buffer
@@ -208,7 +211,10 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 					if len(locs) > 0 {
 						newRoaringLocs.Add(uint32(hitNewDocNum))
 						for _, loc := range locs {
-							args := make([]uint64, 0, 5+len(loc.ArrayPositions()))
+							if cap(bufLoc) < 5+len(loc.ArrayPositions()) {
+								bufLoc = make([]uint64, 0, 5+len(loc.ArrayPositions()))
+							}
+							args := bufLoc[0:0]
 							args = append(args, uint64(fieldsMap[loc.Field()]))
 							args = append(args, loc.Pos())
 							args = append(args, loc.Start())
@@ -250,7 +256,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 				}
 				postingOffset := uint64(w.Count())
 				// write out the start of the term info
-				buf := make([]byte, binary.MaxVarintLen64)
+				buf := bufMaxVarintLen64
 				n := binary.PutUvarint(buf, freqOffset)
 				_, err = w.Write(buf[:n])
 				if err != nil {
@@ -295,7 +301,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 		vellumData := vellumBuf.Bytes()
 
 		// write out the length of the vellum data
-		buf := make([]byte, binary.MaxVarintLen64)
+		buf := bufMaxVarintLen64
 		// write out the number of chunks
 		n := binary.PutUvarint(buf, uint64(len(vellumData)))
 		_, err = w.Write(buf[:n])
@@ -327,6 +333,10 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 	var metaBuf bytes.Buffer
 	var data, compressed []byte
 
+	vals := make([][][]byte, len(fieldsInv))
+	typs := make([][]byte, len(fieldsInv))
+	poss := make([][][]uint64, len(fieldsInv))
+
 	docNumOffsets := make([]uint64, newSegDocCount)
 
 	// for each segment
@@ -347,11 +357,13 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 			} else {
 				segNewDocNums = append(segNewDocNums, uint64(newDocNum))
 				// collect all the data
-				vals := make(map[uint16][][]byte)
-				typs := make(map[uint16][]byte)
-				poss := make(map[uint16][][]uint64)
+				for i := 0; i < len(fieldsInv); i++ {
+					vals[i] = vals[i][:0]
+					typs[i] = typs[i][:0]
+					poss[i] = poss[i][:0]
+				}
 				err := segment.VisitDocument(docNum, func(field string, typ byte, value []byte, pos []uint64) bool {
-					fieldID := fieldsMap[field]
+					fieldID := int(fieldsMap[field])
 					vals[fieldID] = append(vals[fieldID], value)
 					typs[fieldID] = append(typs[fieldID], typ)
 					poss[fieldID] = append(poss[fieldID], pos)
@@ -364,51 +376,49 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 				// now walk the fields in order
 				for fieldID := range fieldsInv {
 
-					if storedFieldValues, ok := vals[uint16(fieldID)]; ok {
+					storedFieldValues := vals[int(fieldID)]
 
-						// has stored values for this field
-						num := len(storedFieldValues)
+					// has stored values for this field
+					num := len(storedFieldValues)
 
-						// process each value
-						for i := 0; i < num; i++ {
-							// encode field
-							_, err2 := metaEncoder.PutU64(uint64(fieldID))
-							if err2 != nil {
-								return 0, nil, err2
-							}
-							// encode type
-							_, err2 = metaEncoder.PutU64(uint64(typs[uint16(fieldID)][i]))
-							if err2 != nil {
-								return 0, nil, err2
-							}
-							// encode start offset
-							_, err2 = metaEncoder.PutU64(uint64(curr))
-							if err2 != nil {
-								return 0, nil, err2
-							}
-							// end len
-							_, err2 = metaEncoder.PutU64(uint64(len(storedFieldValues[i])))
-							if err2 != nil {
-								return 0, nil, err2
-							}
-							// encode number of array pos
-							_, err2 = metaEncoder.PutU64(uint64(len(poss[uint16(fieldID)][i])))
-							if err2 != nil {
-								return 0, nil, err2
-							}
-							// encode all array positions
-							for j := 0; j < len(poss[uint16(fieldID)][i]); j++ {
-								_, err2 = metaEncoder.PutU64(poss[uint16(fieldID)][i][j])
-								if err2 != nil {
-									return 0, nil, err2
-								}
-							}
-							// append data
-							data = append(data, storedFieldValues[i]...)
-							// update curr
-							curr += len(storedFieldValues[i])
-
+					// process each value
+					for i := 0; i < num; i++ {
+						// encode field
+						_, err2 := metaEncoder.PutU64(uint64(fieldID))
+						if err2 != nil {
+							return 0, nil, err2
 						}
+						// encode type
+						_, err2 = metaEncoder.PutU64(uint64(typs[int(fieldID)][i]))
+						if err2 != nil {
+							return 0, nil, err2
+						}
+						// encode start offset
+						_, err2 = metaEncoder.PutU64(uint64(curr))
+						if err2 != nil {
+							return 0, nil, err2
+						}
+						// end len
+						_, err2 = metaEncoder.PutU64(uint64(len(storedFieldValues[i])))
+						if err2 != nil {
+							return 0, nil, err2
+						}
+						// encode number of array pos
+						_, err2 = metaEncoder.PutU64(uint64(len(poss[int(fieldID)][i])))
+						if err2 != nil {
+							return 0, nil, err2
+						}
+						// encode all array positions
+						for j := 0; j < len(poss[int(fieldID)][i]); j++ {
+							_, err2 = metaEncoder.PutU64(poss[int(fieldID)][i][j])
+							if err2 != nil {
+								return 0, nil, err2
+							}
+						}
+						// append data
+						data = append(data, storedFieldValues[i]...)
+						// update curr
+						curr += len(storedFieldValues[i])
 					}
 				}
 
