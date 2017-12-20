@@ -71,11 +71,11 @@ func NewScorch(storeName string, config map[string]interface{}, analysisQueue *i
 		version:              Version,
 		config:               config,
 		analysisQueue:        analysisQueue,
-		stats:                &Stats{},
 		nextSnapshotEpoch:    1,
 		closeCh:              make(chan struct{}),
 		ineligibleForRemoval: map[string]bool{},
 	}
+	rv.stats = &Stats{i: rv}
 	rv.root = &IndexSnapshot{parent: rv, refs: 1}
 	ro, ok := config["read_only"].(bool)
 	if ok {

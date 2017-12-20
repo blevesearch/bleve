@@ -22,6 +22,8 @@ import (
 // Stats tracks statistics about the index
 type Stats struct {
 	analysisTime, indexTime uint64
+	numItemsToPersist       uint64
+	i                       *Scorch
 }
 
 // FIXME wire up these other stats again
@@ -36,6 +38,7 @@ func (s *Stats) statsMap() map[string]interface{} {
 	// m["term_searchers_started"] = atomic.LoadUint64(&i.termSearchersStarted)
 	// m["term_searchers_finished"] = atomic.LoadUint64(&i.termSearchersFinished)
 	// m["num_plain_text_bytes_indexed"] = atomic.LoadUint64(&i.numPlainTextBytesIndexed)
+	m["num_items_to_persist"] = atomic.LoadUint64(&s.i.root.numItems)
 
 	return m
 }
