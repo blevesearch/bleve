@@ -32,6 +32,7 @@ type SegmentDictionarySnapshot struct {
 }
 
 func (s *SegmentDictionarySnapshot) PostingsList(term string, except *roaring.Bitmap) (segment.PostingsList, error) {
+	// TODO: if except is non-nil, perhaps need to OR it with s.s.deleted?
 	return s.d.PostingsList(term, s.s.deleted)
 }
 
