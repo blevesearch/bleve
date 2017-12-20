@@ -162,7 +162,11 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot) error {
 		}
 	}
 	for _, notification := range notifications {
-		<-notification
+		select {
+		case <-s.closeCh:
+			return nil
+		case <-notification:
+		}
 	}
 	return nil
 }
