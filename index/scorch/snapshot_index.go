@@ -46,6 +46,8 @@ type IndexSnapshot struct {
 	internal map[string][]byte
 	epoch    uint64
 
+	numItems uint64
+
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
 }

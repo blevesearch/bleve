@@ -307,10 +307,17 @@ func (s *Scorch) Reader() (index.IndexReader, error) {
 }
 
 func (s *Scorch) Stats() json.Marshaler {
+	s.updateStats()
 	return s.stats
 }
 func (s *Scorch) StatsMap() map[string]interface{} {
+	s.updateStats()
 	return s.stats.statsMap()
+}
+
+func (s *Scorch) updateStats() {
+	numItems := atomic.LoadUint64(&s.root.numItems)
+	atomic.StoreUint64(&s.stats.numItemsToPersist, numItems)
 }
 
 func (s *Scorch) Analyze(d *document.Document) *index.AnalysisResult {

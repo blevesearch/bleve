@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
@@ -233,6 +234,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		internal: make(map[string][]byte, len(s.root.internal)),
 		refs:     1,
 	}
+	var numItems uint64
 	for i, segmentSnapshot := range s.root.segment {
 		// see if this segment has been replaced
 		if replacement, ok := newSegments[segmentSnapshot.id]; ok {
@@ -248,6 +250,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 			newIndexSnapshot.segment[i].segment.AddRef()
 		}
 		newIndexSnapshot.offsets[i] = s.root.offsets[i]
+		numItems += newIndexSnapshot.segment[i].Count()
 	}
 	for k, v := range s.root.internal {
 		newIndexSnapshot.internal[k] = v
@@ -257,6 +260,10 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	}
 	rootPrev := s.root
 	s.root = newIndexSnapshot
+
+	// Update the numItems count of the root
+	atomic.StoreUint64(&s.root.numItems, numItems)
+
 	s.rootLock.Unlock()
 
 	if rootPrev != nil {
