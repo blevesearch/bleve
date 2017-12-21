@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/document"
@@ -363,6 +364,7 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		rv.postings[i] = pl
 		rv.iterators[i] = pl.Iterator()
 	}
+	atomic.AddUint64(&i.parent.stats.termSearchersStarted, uint64(1))
 	return rv, nil
 }
 
