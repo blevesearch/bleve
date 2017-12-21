@@ -196,6 +196,7 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 	resultChan := make(chan *index.AnalysisResult, len(batch.IndexOps))
 
 	var numUpdates uint64
+	var numDeletes uint64
 	var numPlainTextBytes uint64
 	var ids []string
 	for docID, doc := range batch.IndexOps {
@@ -204,6 +205,8 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 			doc.AddField(document.NewTextFieldCustom("_id", nil, []byte(doc.ID), document.IndexField|document.StoreField, nil))
 			numUpdates++
 			numPlainTextBytes += doc.NumPlainTextBytes()
+		} else {
+			numDeletes++
 		}
 		ids = append(ids, docID)
 	}
@@ -238,8 +241,16 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 	}
 
 	err := s.prepareSegment(newSegment, ids, batch.InternalOps)
-	if err != nil && newSegment != nil {
-		_ = newSegment.Close()
+	if err != nil {
+		if newSegment != nil {
+			_ = newSegment.Close()
+		}
+		atomic.AddUint64(&s.stats.errors, 1)
+	} else {
+		atomic.AddUint64(&s.stats.updates, numUpdates)
+		atomic.AddUint64(&s.stats.deletes, numDeletes)
+		atomic.AddUint64(&s.stats.batches, 1)
+		atomic.AddUint64(&s.stats.numPlainTextBytesIndexed, numPlainTextBytes)
 	}
 	return err
 }
@@ -307,6 +318,7 @@ func (s *Scorch) Reader() (index.IndexReader, error) {
 	rv := &Reader{root: s.root}
 	rv.root.AddRef()
 	s.rootLock.RUnlock()
+	atomic.AddUint64(&s.stats.termSearchersStarted, 1)
 	return rv, nil
 }
 
