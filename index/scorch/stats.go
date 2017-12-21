@@ -21,23 +21,26 @@ import (
 
 // Stats tracks statistics about the index
 type Stats struct {
-	analysisTime, indexTime uint64
-	i                       *Scorch
+	updates, deletes, batches, errors uint64
+	analysisTime, indexTime           uint64
+	termSearchersStarted              uint64
+	termSearchersFinished             uint64
+	numPlainTextBytesIndexed          uint64
+	i                                 *Scorch
 }
 
-// FIXME wire up these other stats again
 func (s *Stats) statsMap() map[string]interface{} {
 	rootStats := s.i.fetchRootStats()
 	m := map[string]interface{}{}
-	// m["updates"] = atomic.LoadUint64(&i.updates)
-	// m["deletes"] = atomic.LoadUint64(&i.deletes)
-	// m["batches"] = atomic.LoadUint64(&i.batches)
-	// m["errors"] = atomic.LoadUint64(&i.errors)
+	m["updates"] = atomic.LoadUint64(&s.updates)
+	m["deletes"] = atomic.LoadUint64(&s.deletes)
+	m["batches"] = atomic.LoadUint64(&s.batches)
+	m["errors"] = atomic.LoadUint64(&s.errors)
 	m["analysis_time"] = atomic.LoadUint64(&s.analysisTime)
 	m["index_time"] = atomic.LoadUint64(&s.indexTime)
-	// m["term_searchers_started"] = atomic.LoadUint64(&i.termSearchersStarted)
-	// m["term_searchers_finished"] = atomic.LoadUint64(&i.termSearchersFinished)
-	// m["num_plain_text_bytes_indexed"] = atomic.LoadUint64(&i.numPlainTextBytesIndexed)
+	m["term_searchers_started"] = atomic.LoadUint64(&s.termSearchersStarted)
+	m["term_searchers_finished"] = atomic.LoadUint64(&s.termSearchersFinished)
+	m["num_plain_text_bytes_indexed"] = atomic.LoadUint64(&s.numPlainTextBytesIndexed)
 	m["num_items_to_persist"] = rootStats.numItems
 
 	return m
