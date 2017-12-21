@@ -15,6 +15,8 @@
 package scorch
 
 import (
+	"sync/atomic"
+
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 )
@@ -106,5 +108,6 @@ func (r *Reader) DumpFields() chan interface{} {
 }
 
 func (r *Reader) Close() error {
+	atomic.AddUint64(&r.root.parent.stats.termSearchersFinished, 1)
 	return r.root.DecRef()
 }
