@@ -341,11 +341,13 @@ func (vt *VersusTest) run(indexTypeA, kvStoreA, indexTypeB, kvStoreB string,
 	dirA := "/tmp/bleve-versus-test-a"
 	dirB := "/tmp/bleve-versus-test-b"
 
-	defer os.RemoveAll(dirA)
-	defer os.RemoveAll(dirB)
+	defer func() {
+		_ = os.RemoveAll(dirA)
+		_ = os.RemoveAll(dirB)
+	}()
 
-	os.RemoveAll(dirA)
-	os.RemoveAll(dirB)
+	_ = os.RemoveAll(dirA)
+	_ = os.RemoveAll(dirB)
 
 	imA := vt.makeIndexMapping()
 	imB := vt.makeIndexMapping()
@@ -357,13 +359,13 @@ func (vt *VersusTest) run(indexTypeA, kvStoreA, indexTypeB, kvStoreB string,
 	if err != nil || idxA == nil {
 		vt.t.Fatalf("new using err: %v", err)
 	}
-	defer idxA.Close()
+	defer func() { _ = idxA.Close() }()
 
 	idxB, err := bleve.NewUsing(dirB, imB, indexTypeB, kvStoreB, kvConfigB)
 	if err != nil || idxB == nil {
 		vt.t.Fatalf("new using err: %v", err)
 	}
-	defer idxB.Close()
+	defer func() { _ = idxB.Close() }()
 
 	rand.Seed(0)
 
@@ -400,9 +402,12 @@ func (vt *VersusTest) insertBodies(idx bleve.Index) {
 	for i, bodyWords := range vt.Bodies {
 		title := fmt.Sprintf("%d", i)
 		body := strings.Join(bodyWords, " ")
-		batch.Index(title, map[string]interface{}{"title": title, "body": body})
+		err := batch.Index(title, map[string]interface{}{"title": title, "body": body})
+		if err != nil {
+			vt.t.Fatalf("batch.Index err: %v", err)
+		}
 		if i%vt.BatchSize == 0 {
-			err := idx.Batch(batch)
+			err = idx.Batch(batch)
 			if err != nil {
 				vt.t.Fatalf("batch err: %v", err)
 			}
