@@ -223,6 +223,9 @@ func (s *DisjunctionSearcher) Advance(ctx *search.SearchContext,
 	var err error
 	for i, searcher := range s.searchers {
 		if s.currs[i] != nil {
+			if s.currs[i].IndexInternalID.Compare(ID) >= 0 {
+				continue
+			}
 			ctx.DocumentMatchPool.Put(s.currs[i])
 		}
 		s.currs[i], err = searcher.Advance(ctx, ID)

@@ -44,11 +44,11 @@ import (
 func TestScorchVersusUpsideDownBolt(t *testing.T) {
 	(&VersusTest{
 		t:                    t,
-		NumDocs:              10000,
+		NumDocs:              1000,
 		MaxWordsPerDoc:       20,
-		NumWords:             100,
-		BatchSize:            100,
-		NumAttemptsPerSearch: 1000,
+		NumWords:             10,
+		BatchSize:            10,
+		NumAttemptsPerSearch: 100,
 	}).run(scorch.Name, boltdb.Name, upsidedown.Name, boltdb.Name, nil)
 }
 
@@ -138,7 +138,7 @@ var searchTemplates = []string{
       }
      }`,
 	`{
-      "about": "must-not-same-as-must -- FAILS!!!",
+      "about": "must-not-same-as-must -- see: MB-27291",
       "query": {
         "must_not": {"disjuncts": [
           {"field": "body", "match": "{{word}}"}
@@ -149,7 +149,7 @@ var searchTemplates = []string{
       }
      }`,
 	`{
-      "about": "must-not-same-as-should -- FAILS!!!",
+      "about": "must-not-same-as-should",
       "query": {
         "must_not": {"disjuncts": [
           {"field": "body", "match": "{{word}}"}
@@ -160,7 +160,7 @@ var searchTemplates = []string{
       }
      }`,
 	`{
-      "about": "inspired by testrunner RQG issue -- FAILS!!!",
+      "about": "inspired by testrunner RQG issue -- see: MB-27291",
       "query": {
         "must_not": {"disjuncts": [
           {"field": "title", "match": "Trista Allen"},
