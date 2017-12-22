@@ -381,7 +381,7 @@ func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
 	var res uint64
 	err := binary.Read(bytes.NewReader(in), binary.BigEndian, &res)
 	if err != nil {
-		return res, err
+		return 0, err
 	}
 	return res, nil
 }
