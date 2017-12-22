@@ -343,6 +343,7 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 
 	rv := &IndexSnapshotTermFieldReader{
 		term:               term,
+		field:              field,
 		snapshot:           i,
 		postings:           make([]segment.PostingsList, len(i.segment)),
 		iterators:          make([]segment.PostingsIterator, len(i.segment)),

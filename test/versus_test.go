@@ -41,7 +41,7 @@ import (
 //     go test -v -run TestScorchVersusUpsideDownBolt ./test
 //     VERBOSE=1 FOCUS=Trista go test -v -run TestScorchVersusUpsideDownBolt ./test
 //
-func TestScorchVersusUpsideDownBolt(t *testing.T) {
+func TestScorchVersusUpsideDownBoltAll(t *testing.T) {
 	(&VersusTest{
 		t:                    t,
 		NumDocs:              1000,
@@ -49,7 +49,7 @@ func TestScorchVersusUpsideDownBolt(t *testing.T) {
 		NumWords:             10,
 		BatchSize:            10,
 		NumAttemptsPerSearch: 100,
-	}).run(scorch.Name, boltdb.Name, upsidedown.Name, boltdb.Name, nil)
+	}).run(scorch.Name, boltdb.Name, upsidedown.Name, boltdb.Name, nil, nil)
 }
 
 func TestScorchVersusUpsideDownBoltSmallMNSAM(t *testing.T) {
@@ -61,13 +61,25 @@ func TestScorchVersusUpsideDownBoltSmallMNSAM(t *testing.T) {
 		NumWords:             1,
 		BatchSize:            1,
 		NumAttemptsPerSearch: 1,
-	}).run(scorch.Name, boltdb.Name, upsidedown.Name, boltdb.Name, nil)
+	}).run(scorch.Name, boltdb.Name, upsidedown.Name, boltdb.Name, nil, nil)
+}
+
+func TestScorchVersusUpsideDownBoltSmallCMP11(t *testing.T) {
+	(&VersusTest{
+		t:                    t,
+		Focus:                "conjuncts-match-phrase-1-1",
+		NumDocs:              30,
+		MaxWordsPerDoc:       8,
+		NumWords:             2,
+		BatchSize:            1,
+		NumAttemptsPerSearch: 1,
+	}).run(scorch.Name, boltdb.Name, upsidedown.Name, boltdb.Name, nil, nil)
 }
 
 // -------------------------------------------------------
 
 // Templates used to compare search results in the "versus" tests.
-var searchTemplates = []string{
+var testVersusSearchTemplates = []string{
 	`{
       "about": "expected to return zero hits",
       "query": {
@@ -130,7 +142,7 @@ var searchTemplates = []string{
       }
      }`,
 	`{
-      "about": "must-not-only -- FAILS!!!",
+      "about": "must-not-only",
       "query": {
         "must_not": {"disjuncts": [
           {"field": "body", "term": "{{word}}"}
@@ -172,6 +184,24 @@ var searchTemplates = []string{
         ]}
       }
      }`,
+	`{
+      "about": "conjuncts-match-phrase-1-1 inspired by testrunner RQG issue -- see: MB-27291",
+      "query": {
+        "conjuncts": [
+          {"field": "body", "match": "{{bodyWord 0}}"},
+          {"field": "body", "match_phrase": "{{bodyWord 1}} {{bodyWord 1}}"}
+        ]
+      }
+     }`,
+	`{
+      "about": "conjuncts-match-phrase-1-2 inspired by testrunner RQG issue -- see: MB-27291 -- FAILS!!",
+      "query": {
+        "conjuncts": [
+          {"field": "body", "match": "{{bodyWord 0}}"},
+          {"field": "body", "match_phrase": "{{bodyWord 1}} {{bodyWord 2}}"}
+        ]
+      }
+     }`,
 }
 
 // -------------------------------------------------------
@@ -203,12 +233,24 @@ type VersusTest struct {
 
 // -------------------------------------------------------
 
-func testVersusSearches(vt *VersusTest, idxA, idxB bleve.Index) {
+func testVersusSearches(vt *VersusTest, searchTemplates []string, idxA, idxB bleve.Index) {
 	t := vt.t
 
 	funcMap := template.FuncMap{
+		// Returns a word.  The word may or may not be in any
+		// document's body.
 		"word": func() string {
 			return vt.genWord(vt.CurAttempt % vt.NumWords)
+		},
+		// Picks a document and returns the i'th word in that
+		// document's body.  You can use this in searches to
+		// definitely find at least one document.
+		"bodyWord": func(i int) string {
+			body := vt.Bodies[vt.CurAttempt%len(vt.Bodies)]
+			if len(body) <= 0 {
+				return ""
+			}
+			return body[i%len(body)]
 		},
 	}
 
@@ -275,16 +317,24 @@ func testVersusSearches(vt *VersusTest, idxA, idxB bleve.Index) {
 			hitsA := hitsById(resA)
 			hitsB := hitsById(resB)
 			if !reflect.DeepEqual(hitsA, hitsB) {
-				t.Errorf("search: (%d) %s,\n res hits mismatch,\n len(hitsA): %d,\n len(hitsB): %d",
+				t.Errorf("=========\nsearch: (%d) %s,\n res hits mismatch,\n len(hitsA): %d,\n len(hitsB): %d",
 					i, bufBytes, len(hitsA), len(hitsB))
 				t.Errorf("\n  hitsA: %#v,\n  hitsB: %#v",
 					hitsA, hitsB)
 				for id, hitA := range hitsA {
 					hitB := hitsB[id]
 					if !reflect.DeepEqual(hitA, hitB) {
-						t.Errorf("\n  hitA: %#v,\n  hitB: %#v", hitA, hitB)
+						t.Errorf("\n  driving from hitsA\n    hitA: %#v,\n    hitB: %#v", hitA, hitB)
 						idx, _ := strconv.Atoi(id)
-						t.Errorf("\n  body: %s", strings.Join(vt.Bodies[idx], " "))
+						t.Errorf("\n    doc: %d, body: %s", idx, strings.Join(vt.Bodies[idx], " "))
+					}
+				}
+				for id, hitB := range hitsB {
+					hitA := hitsA[id]
+					if !reflect.DeepEqual(hitA, hitB) {
+						t.Errorf("\n  driving from hitsB\n    hitA: %#v,\n    hitB: %#v", hitA, hitB)
+						idx, _ := strconv.Atoi(id)
+						t.Errorf("\n    doc: %d, body: %s", idx, strings.Join(vt.Bodies[idx], " "))
 					}
 				}
 			}
@@ -295,7 +345,7 @@ func testVersusSearches(vt *VersusTest, idxA, idxB bleve.Index) {
 			if !reflect.DeepEqual(resA, resB) {
 				resAj, _ := json.Marshal(resA)
 				resBj, _ := json.Marshal(resB)
-				t.Errorf("search: (%d) %s,\n res mismatch,\n resA: %s,\n resB: %s",
+				t.Errorf("search: (%d) %s,\n  res mismatch,\n  resA: %s,\n  resB: %s",
 					i, bufBytes, resAj, resBj)
 			}
 
@@ -329,9 +379,14 @@ func hitsById(res *bleve.SearchResult) map[string]*search.DocumentMatch {
 // -------------------------------------------------------
 
 func (vt *VersusTest) run(indexTypeA, kvStoreA, indexTypeB, kvStoreB string,
-	cb func(versusTest *VersusTest, idxA, idxB bleve.Index)) {
+	cb func(versusTest *VersusTest, searchTemplates []string, idxA, idxB bleve.Index),
+	searchTemplates []string) {
 	if cb == nil {
 		cb = testVersusSearches
+	}
+
+	if searchTemplates == nil {
+		searchTemplates = testVersusSearchTemplates
 	}
 
 	if vt.Verbose <= 0 {
@@ -369,12 +424,14 @@ func (vt *VersusTest) run(indexTypeA, kvStoreA, indexTypeB, kvStoreB string,
 
 	rand.Seed(0)
 
-	vt.Bodies = vt.genBodies()
+	if vt.Bodies == nil {
+		vt.Bodies = vt.genBodies()
+	}
 
 	vt.insertBodies(idxA)
 	vt.insertBodies(idxB)
 
-	cb(vt, idxA, idxB)
+	cb(vt, searchTemplates, idxA, idxB)
 }
 
 // -------------------------------------------------------

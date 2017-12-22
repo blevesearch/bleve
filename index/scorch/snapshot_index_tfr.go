@@ -23,6 +23,7 @@ import (
 
 type IndexSnapshotTermFieldReader struct {
 	term               []byte
+	field              string
 	snapshot           *IndexSnapshot
 	postings           []segment.PostingsList
 	iterators          []segment.PostingsIterator
@@ -84,15 +85,15 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 }
 
 func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
-	// first make sure we aren't already pointing at the right thing, (due to way searchers work)
+	// FIXME do something better
+	// for now, if we need to seek backwards, then restart from the beginning
 	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
-		rv := preAlloced
-		if rv == nil {
-			rv = &index.TermFieldDoc{}
+		i2, err := i.snapshot.TermFieldReader(i.term, i.field,
+			i.includeFreq, i.includeNorm, i.includeTermVectors)
+		if err != nil {
+			return nil, err
 		}
-		rv.ID = i.currID
-		i.postingToTermFieldDoc(i.currPosting, rv)
-		return rv, nil
+		*i = *(i2.(*IndexSnapshotTermFieldReader))
 	}
 	// FIXME do something better
 	next, err := i.Next(preAlloced)
