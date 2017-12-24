@@ -92,22 +92,24 @@ func TestIndexRollback(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = sh.SnapshotRevert(prev)
-	if err != nil {
-		t.Error(err)
-	}
+	if prev != nil {
+		err = sh.SnapshotRevert(prev)
+		if err != nil {
+			t.Error(err)
+		}
 
-	newRoot := sh.root
-	if newRoot != nil && prev != nil {
-		if newRoot.epoch <= prev.epoch {
-			t.Errorf("Unexpected epoch, %v <= %v", newRoot.epoch, prev.epoch)
-		}
-	} else {
-		if prev == nil {
-			t.Errorf("The last persisted snapshot before the revert was nil!")
-		}
-		if newRoot == nil {
-			t.Errorf("The new root has been set to nil?")
+		newRoot := sh.root
+		if newRoot != nil && prev != nil {
+			if newRoot.epoch <= prev.epoch {
+				t.Errorf("Unexpected epoch, %v <= %v", newRoot.epoch, prev.epoch)
+			}
+		} else {
+			if prev == nil {
+				t.Errorf("The last persisted snapshot before the revert was nil!")
+			}
+			if newRoot == nil {
+				t.Errorf("The new root has been set to nil?")
+			}
 		}
 	}
 }
