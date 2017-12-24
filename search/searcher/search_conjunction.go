@@ -184,6 +184,9 @@ func (s *ConjunctionSearcher) Advance(ctx *search.SearchContext, ID index.IndexI
 		}
 	}
 	for i := range s.searchers {
+		if s.currs[i] != nil && s.currs[i].IndexInternalID.Compare(ID) >= 0 {
+			continue
+		}
 		err := s.advanceChild(ctx, i, ID)
 		if err != nil {
 			return nil, err
