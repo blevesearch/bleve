@@ -91,12 +91,22 @@ func (s *Scorch) PreviousPersistedSnapshot(is *IndexSnapshot) (*IndexSnapshot, e
 // only be passed an IndexSnapshot that came from the same store.
 func (s *Scorch) SnapshotRevert(revertTo *IndexSnapshot) error {
 	revert := &snapshotReversion{
-		snapshot: revertTo,
-		applied:  make(chan error),
+		snapshot:  revertTo,
+		applied:   make(chan error),
+		persisted: make(chan error, 1),
 	}
 
 	s.revertToSnapshots <- revert
 
 	// block until this IndexSnapshot is applied
-	return <-revert.applied
+	err := <-revert.applied
+	if err != nil {
+		return err
+	}
+
+	if revert.persisted != nil {
+		err = <-revert.persisted
+	}
+
+	return err
 }
