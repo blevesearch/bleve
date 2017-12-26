@@ -39,7 +39,8 @@ type epochWatcher struct {
 
 type snapshotReversion struct {
 	snapshot *IndexSnapshot
-	applied  chan error
+	applied   chan error
+	persisted chan error
 }
 
 func (s *Scorch) mainLoop() {
@@ -283,6 +284,10 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 			cachedDocs: segmentSnapshot.cachedDocs,
 		}
 		segmentSnapshot.segment.AddRef()
+	}
+
+	if revertTo.persisted != nil {
+		s.rootPersisted = append(s.rootPersisted, revertTo.persisted)
 	}
 
 	// swap in new snapshot
