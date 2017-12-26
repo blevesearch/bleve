@@ -21,7 +21,7 @@
 			"importpath": "github.com/boltdb/bolt",
 			"repository": "https://github.com/boltdb/bolt",
 			"vcs": "",
-			"revision": "144418e1475d8bf7abbdc48583500f1a20c62ea7",
+			"revision": "9da31745363232bc1e27dbab3569e77383a51585",
 			"branch": "master",
 			"notests": true
 		},
