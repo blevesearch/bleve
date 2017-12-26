@@ -95,8 +95,21 @@ func (s *Scorch) SnapshotRevert(revertTo *IndexSnapshot) error {
 		applied:  make(chan error),
 	}
 
+	if !s.unsafeBatch {
+		revert.persisted = make(chan error)
+	}
+
 	s.revertToSnapshots <- revert
 
 	// block until this IndexSnapshot is applied
-	return <-revert.applied
+	err := <-revert.applied
+	if err != nil {
+		return err
+	}
+
+	if revert.persisted != nil {
+		err = <-revert.persisted
+	}
+
+	return err
 }
