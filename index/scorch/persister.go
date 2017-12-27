@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
@@ -64,6 +65,8 @@ OUTER:
 		s.rootLock.Unlock()
 
 		if ourSnapshot != nil {
+			startTime := time.Now()
+
 			err := s.persistSnapshot(ourSnapshot)
 			for _, ch := range ourPersisted {
 				if err != nil {
@@ -90,6 +93,9 @@ OUTER:
 				changed = true
 			}
 			s.rootLock.RUnlock()
+
+			s.fireEvent(EventKindPersisterProgress, time.Since(startTime))
+
 			if changed {
 				continue OUTER
 			}
