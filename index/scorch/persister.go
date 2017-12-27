@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
@@ -63,6 +64,8 @@ OUTER:
 		s.rootLock.Unlock()
 
 		if ourSnapshot != nil {
+			startTime := time.Now()
+
 			err := s.persistSnapshot(ourSnapshot)
 			for _, ch := range ourPersisted {
 				if err != nil {
@@ -91,6 +94,8 @@ OUTER:
 			if changed {
 				continue OUTER
 			}
+
+			s.fireEvent(EventKindPersisterProgress, time.Since(startTime))
 		}
 
 		// tell the introducer we're waiting for changes
