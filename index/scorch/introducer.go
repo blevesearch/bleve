@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
@@ -142,12 +143,17 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	}
 	// append new segment, if any, to end of the new index snapshot
 	if next.data != nil {
-		newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
+		newSegmentSnapshot := &SegmentSnapshot{
 			id:         next.id,
 			segment:    next.data, // take ownership of next.data's ref-count
 			cachedDocs: &cachedDocs{cache: nil},
-		})
+		}
+		newSnapshot.segment = append(newSnapshot.segment, newSegmentSnapshot)
 		newSnapshot.offsets = append(newSnapshot.offsets, running)
+
+		// increment numItemsIntroduced which tracks the number of items
+		// queued for persistence.
+		atomic.AddUint64(&s.stats.numItemsIntroduced, newSegmentSnapshot.Count())
 	}
 	// copy old values
 	for key, oldVal := range s.root.internal {
