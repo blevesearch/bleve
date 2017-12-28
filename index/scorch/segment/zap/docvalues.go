@@ -173,7 +173,7 @@ func (s *Segment) VisitDocumentFieldTerms(localDocNum uint64, fields []string,
 				}
 			}
 
-			dvIter.visitDocValues(localDocNum, visitor)
+			_ = dvIter.visitDocValues(localDocNum, visitor)
 		}
 	}
 	return nil

@@ -74,7 +74,7 @@ func (c *chunkedContentCoder) Reset() {
 // Close indicates you are done calling Add() this allows
 // the final chunk to be encoded.
 func (c *chunkedContentCoder) Close() {
-	c.flushContents()
+	_ = c.flushContents()
 }
 
 func (c *chunkedContentCoder) flushContents() error {
