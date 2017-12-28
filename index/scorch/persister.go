@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
@@ -51,6 +52,7 @@ OUTER:
 
 		var ourSnapshot *IndexSnapshot
 		var ourPersisted []chan error
+		var numItemsToPersist uint64
 
 		// check to see if there is a new snapshot to persist
 		s.rootLock.Lock()
@@ -59,6 +61,8 @@ OUTER:
 			ourSnapshot.AddRef()
 			ourPersisted = s.rootPersisted
 			s.rootPersisted = nil
+			numItemsToPersist = atomic.LoadUint64(&s.stats.numItemsIntroduced) -
+				atomic.LoadUint64(&s.stats.numItemsPersisted)
 		}
 		s.rootLock.Unlock()
 
@@ -75,6 +79,11 @@ OUTER:
 				_ = ourSnapshot.DecRef()
 				continue OUTER
 			}
+
+			// increment numItemsPersisted with the numItemsToPersist captured
+			// previously.
+			atomic.AddUint64(&s.stats.numItemsPersisted, numItemsToPersist)
+
 			lastPersistedEpoch = ourSnapshot.epoch
 			for _, notifyCh := range notifyChs {
 				close(notifyCh)
