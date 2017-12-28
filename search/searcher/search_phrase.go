@@ -319,6 +319,9 @@ func (s *PhraseSearcher) Advance(ctx *search.SearchContext, ID index.IndexIntern
 		}
 		ctx.DocumentMatchPool.Put(s.currMust)
 	}
+	if s.currMust == nil {
+		return nil, nil
+	}
 	var err error
 	s.currMust, err = s.mustSearcher.Advance(ctx, ID)
 	if err != nil {
