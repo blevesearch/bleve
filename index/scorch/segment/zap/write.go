@@ -86,10 +86,10 @@ func persistFields(fieldsInv []string, w *CountHashWriter, dictLocs []uint64) (u
 }
 
 // FooterSize is the size of the footer record in bytes
-// crc + ver + chunk + field offset + stored offset + num docs
-const FooterSize = 4 + 4 + 4 + 8 + 8 + 8
+// crc + ver + chunk + field offset + stored offset + num docs + docValueOffset
+const FooterSize = 4 + 4 + 4 + 8 + 8 + 8 + 8
 
-func persistFooter(numDocs, storedIndexOffset, fieldIndexOffset uint64,
+func persistFooter(numDocs, storedIndexOffset, fieldIndexOffset, docValueOffset uint64,
 	chunkFactor uint32, w *CountHashWriter) error {
 	// write out the number of docs
 	err := binary.Write(w, binary.BigEndian, numDocs)
@@ -103,6 +103,11 @@ func persistFooter(numDocs, storedIndexOffset, fieldIndexOffset uint64,
 	}
 	// write out the field index location
 	err = binary.Write(w, binary.BigEndian, fieldIndexOffset)
+	if err != nil {
+		return err
+	}
+	// write out the fieldDocValue location
+	err = binary.Write(w, binary.BigEndian, docValueOffset)
 	if err != nil {
 		return err
 	}

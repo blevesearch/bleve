@@ -22,6 +22,9 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/blevesearch/bleve/index/scorch/segment/mem"
+	"github.com/blevesearch/bleve/index/scorch/segment/zap"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
@@ -401,24 +404,35 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 
 	ss := i.segment[segmentIndex]
 
-	err = ss.cachedDocs.prepareFields(fields, ss)
-	if err != nil {
-		return err
-	}
+	switch seg := ss.segment.(type) {
+	case *mem.Segment:
+		err = ss.cachedDocs.prepareFields(fields, ss)
+		if err != nil {
+			return err
+		}
 
-	for _, field := range fields {
-		if cachedFieldDocs, exists := ss.cachedDocs.cache[field]; exists {
-			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
-				for {
-					i := bytes.Index(tlist, TermSeparatorSplitSlice)
-					if i < 0 {
-						break
+		for _, field := range fields {
+			if cachedFieldDocs, exists := ss.cachedDocs.cache[field]; exists {
+				if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
+					for {
+						i := bytes.Index(tlist, TermSeparatorSplitSlice)
+						if i < 0 {
+							break
+						}
+						visitor(field, tlist[0:i])
+						tlist = tlist[i+1:]
 					}
-					visitor(field, tlist[0:i])
-					tlist = tlist[i+1:]
 				}
 			}
 		}
+
+	case *zap.Segment:
+		if zaps, ok := ss.segment.(UnInvertIndex); ok {
+			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+		}
+
+	default:
+		return fmt.Errorf("snapshot_index: DocumentVisitFieldTerms, unknown segment type: %T", seg)
 	}
 
 	return nil
