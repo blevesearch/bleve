@@ -372,7 +372,7 @@ func (s *Segment) DictAddr(field string) (uint64, error) {
 }
 
 func (s *Segment) loadDvIterators() error {
-	if s.docValueOffset == math.MaxUint64 {
+	if s.docValueOffset == math.MaxUint64 || s.docValueOffset == 0 {
 		return nil
 	}
 

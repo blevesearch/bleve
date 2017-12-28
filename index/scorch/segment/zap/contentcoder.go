@@ -46,7 +46,8 @@ type metaData struct {
 
 // newChunkedContentCoder returns a new chunk content coder which
 // packs data into chunks based on the provided chunkSize
-func newChunkedContentCoder(chunkSize uint64, maxDocNum uint64) *chunkedContentCoder {
+func newChunkedContentCoder(chunkSize uint64,
+	maxDocNum uint64) *chunkedContentCoder {
 	total := maxDocNum/chunkSize + 1
 	rv := &chunkedContentCoder{
 		chunkSize: chunkSize,
@@ -113,7 +114,7 @@ func (c *chunkedContentCoder) flushContents() error {
 	// write the compressed data to the final data
 	compressedData := snappy.Encode(nil, c.chunkBuf.Bytes())
 	c.final = append(c.final, compressedData...)
-	//c.chunkLens = append(c.chunkLens, uint64(len(compressedData)+len(metaData)))
+
 	c.chunkLens[c.currChunk] = uint64(len(compressedData) + len(metaData))
 	return nil
 }
