@@ -64,9 +64,41 @@ type Scorch struct {
 
 	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
+
+	onEvent func(event Event)
 }
 
-func NewScorch(storeName string, config map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error) {
+// Event represents the information provided in an OnEvent() callback.
+type Event struct {
+	Kind     EventKind
+	Scorch   *Scorch
+	Duration time.Duration
+}
+
+// EventKind represents an event code for OnEvent() callbacks.
+type EventKind int
+
+// EventKindCLoseStart is fired when a Scorch.Close() has begun.
+var EventKindCloseStart = EventKind(1)
+
+// EventKindClose is fired when a scorch index has been fully closed.
+var EventKindClose = EventKind(2)
+
+// EventKindMergerProgress is fired when the merger has completed a
+// round of merge processing.
+var EventKindMergerProgress = EventKind(3)
+
+// EventKindPersisterProgress is fired when the persister has completed
+// a round of persistence processing.
+var EventKindPersisterProgress = EventKind(4)
+
+// EventKindBatchIntroduction is fired when Batch() is invoked which
+// introduces a new segment.
+var EventKindBatchIntroduction = EventKind(5)
+
+func NewScorch(storeName string,
+	config map[string]interface{},
+	analysisQueue *index.AnalysisQueue) (index.Index, error) {
 	rv := &Scorch{
 		version:              Version,
 		config:               config,
@@ -86,6 +118,16 @@ func NewScorch(storeName string, config map[string]interface{}, analysisQueue *i
 		rv.unsafeBatch = ub
 	}
 	return rv, nil
+}
+
+func (s *Scorch) SetEventCallback(f func(Event)) {
+	s.onEvent = f
+}
+
+func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) {
+	if s.onEvent != nil {
+		s.onEvent(Event{Kind: kind, Scorch: s, Duration: dur})
+	}
 }
 
 func (s *Scorch) Open() error {
@@ -155,6 +197,12 @@ func (s *Scorch) Open() error {
 }
 
 func (s *Scorch) Close() (err error) {
+	s.fireEvent(EventKindCloseStart, 0)
+	startTime := time.Now()
+	defer func() {
+		s.fireEvent(EventKindClose, time.Since(startTime))
+	}()
+
 	// signal to async tasks we want to close
 	close(s.closeCh)
 	// wait for them to close
@@ -187,7 +235,11 @@ func (s *Scorch) Delete(id string) error {
 
 // Batch applices a batch of changes to the index atomically
 func (s *Scorch) Batch(batch *index.Batch) error {
-	analysisStart := time.Now()
+	start := time.Now()
+
+	defer func() {
+		s.fireEvent(EventKindBatchIntroduction, time.Since(start))
+	}()
 
 	resultChan := make(chan *index.AnalysisResult, len(batch.IndexOps))
 
@@ -229,7 +281,7 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 	}
 	close(resultChan)
 
-	atomic.AddUint64(&s.stats.analysisTime, uint64(time.Since(analysisStart)))
+	atomic.AddUint64(&s.stats.analysisTime, uint64(time.Since(start)))
 
 	var newSegment segment.Segment
 	if len(analysisResults) > 0 {
