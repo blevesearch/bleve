@@ -87,6 +87,10 @@ type Segment struct {
 	// stored field array positions
 	//  docNum -> field id -> slice of array positions (each is []uint64)
 	StoredPos []map[uint16][][]uint64
+
+	// footprint of the segment, updated when analyzed document mutations
+	// are added into the segment
+	sizeInBytes uint64
 }
 
 // New builds a new empty Segment
@@ -94,6 +98,84 @@ func New() *Segment {
 	return &Segment{
 		FieldsMap: map[string]uint16{},
 	}
+}
+
+func (s *Segment) updateSizeInBytes() {
+	var sizeInBytes uint64
+	for k, _ := range s.FieldsMap {
+		sizeInBytes += uint64(len(k) + 2 /* size of uint16 */)
+	}
+
+	for _, entry := range s.FieldsInv {
+		sizeInBytes += uint64(len(entry))
+	}
+
+	for _, entry := range s.Dicts {
+		for k, _ := range entry {
+			sizeInBytes += uint64(len(k) + 8 /* size of uint64 */)
+		}
+	}
+
+	for _, entry := range s.DictKeys {
+		for _, item := range entry {
+			sizeInBytes += uint64(len(item))
+		}
+	}
+
+	for i := 0; i < len(s.Postings); i++ {
+		sizeInBytes += s.Postings[i].GetSizeInBytes() + s.PostingsLocs[i].GetSizeInBytes()
+	}
+
+	for _, entry := range s.Freqs {
+		sizeInBytes += uint64(len(entry) * 8 /* size of uint64 */)
+	}
+
+	for _, entry := range s.Norms {
+		sizeInBytes += uint64(len(entry) * 4 /* size of float32 */)
+	}
+
+	for i := 0; i < len(s.Locfields); i++ {
+		sizeInBytes += uint64(len(s.Locfields[i])*2 /* size of uint16 */ +
+			len(s.Locstarts[i])*8 /* size of uint64 */ +
+			len(s.Locends[i])*8 /* size of uint64 */ +
+			len(s.Locpos[i])*8 /* size of uint64 */)
+
+		for j := 0; j < len(s.Locarraypos[i]); j++ {
+			sizeInBytes += uint64(len(s.Locarraypos[i][j]) * 8 /* size of uint64 */)
+		}
+	}
+
+	for _, entry := range s.Stored {
+		for _, v := range entry {
+			sizeInBytes += uint64(2 /* size of uint16 */)
+			for _, arr := range v {
+				sizeInBytes += uint64(len(arr))
+			}
+		}
+	}
+
+	for _, entry := range s.StoredTypes {
+		for _, v := range entry {
+			sizeInBytes += uint64(2 /* size of uint16 */ + len(v))
+		}
+	}
+
+	for _, entry := range s.StoredPos {
+		for _, v := range entry {
+			sizeInBytes += uint64(2 /* size of uint16 */)
+			for _, arr := range v {
+				sizeInBytes += uint64(len(arr) * 8 /* size of uint64 */)
+			}
+		}
+	}
+
+	sizeInBytes += uint64(8 /* size of sizeInBytes -> uint64*/)
+
+	s.sizeInBytes = sizeInBytes
+}
+
+func (s *Segment) SizeInBytes() uint64 {
+	return s.sizeInBytes
 }
 
 func (s *Segment) AddRef() {
