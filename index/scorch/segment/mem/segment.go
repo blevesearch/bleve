@@ -87,6 +87,10 @@ type Segment struct {
 	// stored field array positions
 	//  docNum -> field id -> slice of array positions (each is []uint64)
 	StoredPos []map[uint16][][]uint64
+
+	// footprint of the segment, updated when analyzed document mutations
+	// are added into the segment
+	sizeInBytes uint64
 }
 
 // New builds a new empty Segment
@@ -94,6 +98,70 @@ func New() *Segment {
 	return &Segment{
 		FieldsMap: map[string]uint16{},
 	}
+}
+
+func (s *Segment) updateSizeInBytes() {
+	var sizeInBytes uint64
+
+	for k, _ := range s.FieldsMap {
+		sizeInBytes += uint64(len(k)*2 /* FieldsMap + FieldsInv */ +
+			2 /* size of uint16 */)
+	}
+
+	for _, entry := range s.Dicts {
+		for k, _ := range entry {
+			sizeInBytes += uint64(len(k)*2 /* Dicts + DictKeys */ +
+				8 /* size of uint64 */)
+		}
+	}
+
+	for i := 0; i < len(s.Postings); i++ {
+		sizeInBytes += s.Postings[i].GetSizeInBytes() + s.PostingsLocs[i].GetSizeInBytes()
+	}
+
+	for i := 0; i < len(s.Freqs); i++ {
+		sizeInBytes += uint64(len(s.Freqs[i])*8 /* size of uint64 */ +
+			len(s.Norms[i])*4 /* size of float32 */)
+	}
+
+	for i := 0; i < len(s.Locfields); i++ {
+		sizeInBytes += uint64(len(s.Locfields[i])*2 /* size of uint16 */ +
+			len(s.Locstarts[i])*8 /* size of uint64 */ +
+			len(s.Locends[i])*8 /* size of uint64 */ +
+			len(s.Locpos[i])*8 /* size of uint64 */)
+
+		for j := 0; j < len(s.Locarraypos[i]); j++ {
+			sizeInBytes += uint64(len(s.Locarraypos[i][j]) * 8 /* size of uint64 */)
+		}
+	}
+
+	for i := 0; i < len(s.Stored); i++ {
+		for _, v := range s.Stored[i] {
+			sizeInBytes += uint64(2 /* size of uint16 */)
+			for _, arr := range v {
+				sizeInBytes += uint64(len(arr))
+			}
+		}
+
+		for _, v := range s.StoredTypes[i] {
+			sizeInBytes += uint64(2 /* size of uint16 */ + len(v))
+		}
+
+		for _, v := range s.StoredPos[i] {
+			sizeInBytes += uint64(2 /* size of uint16 */)
+			for _, arr := range v {
+				sizeInBytes += uint64(len(arr) * 8 /* size of uint64 */)
+			}
+		}
+	}
+
+	sizeInBytes += uint64(8 /* size of sizeInBytes -> uint64*/)
+
+	s.sizeInBytes = sizeInBytes
+}
+
+func (s *Segment) SizeInBytes() uint64 {
+	return s.sizeInBytes
 }
 
 func (s *Segment) AddRef() {

@@ -41,6 +41,9 @@ func NewFromAnalyzedDocs(results []*index.AnalysisResult) *Segment {
 		sort.Strings(dict)
 	}
 
+	// compute memory usage of segment
+	s.updateSizeInBytes()
+
 	// professional debugging
 	//
 	// log.Printf("fields: %v\n", s.FieldsMap)
