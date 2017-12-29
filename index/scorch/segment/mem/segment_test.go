@@ -169,6 +169,10 @@ func TestSingle(t *testing.T) {
 		t.Fatalf("segment nil, not expected")
 	}
 
+	if segment.SizeInBytes() <= 0 {
+		t.Fatalf("segment size not updated")
+	}
+
 	expectFields := map[string]struct{}{
 		"_id":  struct{}{},
 		"_all": struct{}{},

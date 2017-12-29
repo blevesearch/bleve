@@ -86,6 +86,31 @@ type Segment struct {
 	refs int64
 }
 
+func (s *Segment) SizeInBytes() uint64 {
+	// 4 /* size of crc -> uint32 */ +
+	// 4 /* size of version -> uint32 */ +
+	// 4 /* size of chunkFactor -> uint32 */ +
+	// 8 /* size of numDocs -> uint64 */ +
+	// 8 /* size of storedIndexOffset -> uint64 */ +
+	// 8 /* size of fieldsIndexOffset -> uint64 */
+	sizeOfUints := 36
+
+	sizeInBytes := len(s.mm) + len(s.path) + sizeOfUints
+
+	for k, _ := range s.fieldsMap {
+		sizeInBytes += len(k) + 2 /* size of uint16 */
+	}
+
+	for _, entry := range s.fieldsInv {
+		sizeInBytes += len(entry)
+	}
+
+	sizeInBytes += len(s.fieldsOffsets) * 8 /* size of uint64 */
+	sizeInBytes += 8                        /* size of refs -> int64 */
+
+	return uint64(sizeInBytes)
+}
+
 func (s *Segment) AddRef() {
 	s.m.Lock()
 	s.refs++

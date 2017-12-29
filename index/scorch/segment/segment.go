@@ -36,6 +36,8 @@ type Segment interface {
 
 	Close() error
 
+	SizeInBytes() uint64
+
 	AddRef()
 	DecRef() error
 }
