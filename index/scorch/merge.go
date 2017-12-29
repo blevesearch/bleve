@@ -19,6 +19,7 @@ import (
 	"log"
 	"os"
 	"sync/atomic"
+	"time"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/mergeplan"
@@ -42,6 +43,8 @@ OUTER:
 			s.rootLock.RUnlock()
 
 			if ourSnapshot.epoch != lastEpochMergePlanned {
+				startTime := time.Now()
+
 				// lets get started
 				err := s.planMergeAtSnapshot(ourSnapshot)
 				if err != nil {
@@ -50,6 +53,9 @@ OUTER:
 					continue OUTER
 				}
 				lastEpochMergePlanned = ourSnapshot.epoch
+
+				s.fireEvent(EventKindMergerProgress, time.Since(startTime))
+
 			}
 			_ = ourSnapshot.DecRef()
 
@@ -71,6 +77,8 @@ OUTER:
 			s.rootLock.RUnlock()
 
 			if ourSnapshot.epoch != lastEpochMergePlanned {
+				startTime := time.Now()
+
 				// lets get started
 				err := s.planMergeAtSnapshot(ourSnapshot)
 				if err != nil {
@@ -78,6 +86,8 @@ OUTER:
 					continue OUTER
 				}
 				lastEpochMergePlanned = ourSnapshot.epoch
+
+				s.fireEvent(EventKindMergerProgress, time.Since(startTime))
 			}
 			_ = ourSnapshot.DecRef()
 
