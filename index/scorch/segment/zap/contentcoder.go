@@ -15,6 +15,7 @@
 package zap
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"io"
@@ -33,15 +34,15 @@ type chunkedContentCoder struct {
 	chunkMetaBuf bytes.Buffer
 	chunkBuf     bytes.Buffer
 
-	chunkMeta []metaData
+	chunkMeta []MetaData
 }
 
-// metaData represents the data information inside a
+// MetaData represents the data information inside a
 // chunk.
-type metaData struct {
-	docID    uint64 // docid of the data inside the chunk
-	docDvLoc uint64 // starting offset for a given docid
-	docDvLen uint64 // length of data inside the chunk for the given docid
+type MetaData struct {
+	DocID    uint64 // docid of the data inside the chunk
+	DocDvLoc uint64 // starting offset for a given docid
+	DocDvLen uint64 // length of data inside the chunk for the given docid
 }
 
 // newChunkedContentCoder returns a new chunk content coder which
@@ -52,7 +53,7 @@ func newChunkedContentCoder(chunkSize uint64,
 	rv := &chunkedContentCoder{
 		chunkSize: chunkSize,
 		chunkLens: make([]uint64, total),
-		chunkMeta: []metaData{},
+		chunkMeta: []MetaData{},
 	}
 
 	return rv
@@ -68,13 +69,13 @@ func (c *chunkedContentCoder) Reset() {
 	for i := range c.chunkLens {
 		c.chunkLens[i] = 0
 	}
-	c.chunkMeta = []metaData{}
+	c.chunkMeta = []MetaData{}
 }
 
 // Close indicates you are done calling Add() this allows
 // the final chunk to be encoded.
-func (c *chunkedContentCoder) Close() {
-	_ = c.flushContents()
+func (c *chunkedContentCoder) Close() error {
+	return c.flushContents()
 }
 
 func (c *chunkedContentCoder) flushContents() error {
@@ -86,26 +87,17 @@ func (c *chunkedContentCoder) flushContents() error {
 		return err
 	}
 
+	w := bufio.NewWriter(&c.chunkMetaBuf)
 	// write out the metaData slice
 	for _, meta := range c.chunkMeta {
-		n := binary.PutUvarint(buf, meta.docID)
-		_, err = c.chunkMetaBuf.Write(buf[:n])
+		_, err := writeUvarints(w, meta.DocID, meta.DocDvLoc, meta.DocDvLen)
 		if err != nil {
 			return err
 		}
-
-		n = binary.PutUvarint(buf, meta.docDvLoc)
-		_, err = c.chunkMetaBuf.Write(buf[:n])
-		if err != nil {
-			return err
-		}
-
-		n = binary.PutUvarint(buf, meta.docDvLen)
-		_, err = c.chunkMetaBuf.Write(buf[:n])
-		if err != nil {
-			return err
-		}
-
+	}
+	err = w.Flush()
+	if err != nil {
+		return err
 	}
 
 	// write the metadata to final data
@@ -132,7 +124,7 @@ func (c *chunkedContentCoder) Add(docNum uint64, vals []byte) error {
 		// clearing the chunk specific meta for next chunk
 		c.chunkBuf.Reset()
 		c.chunkMetaBuf.Reset()
-		c.chunkMeta = []metaData{}
+		c.chunkMeta = []MetaData{}
 		c.currChunk = chunk
 	}
 
@@ -143,10 +135,10 @@ func (c *chunkedContentCoder) Add(docNum uint64, vals []byte) error {
 		return err
 	}
 
-	c.chunkMeta = append(c.chunkMeta, metaData{
-		docID:    docNum,
-		docDvLoc: uint64(dvOffset),
-		docDvLen: uint64(dvSize),
+	c.chunkMeta = append(c.chunkMeta, MetaData{
+		DocID:    docNum,
+		DocDvLoc: uint64(dvOffset),
+		DocDvLen: uint64(dvSize),
 	})
 	return nil
 }

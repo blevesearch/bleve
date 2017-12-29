@@ -19,7 +19,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"sync"
 
@@ -349,9 +348,14 @@ func (s *Segment) FieldsIndexOffset() uint64 {
 	return s.fieldsIndexOffset
 }
 
-// StoredIndexOffset returns the stored value index offset in the file foooter
+// StoredIndexOffset returns the stored value index offset in the file footer
 func (s *Segment) StoredIndexOffset() uint64 {
 	return s.storedIndexOffset
+}
+
+// DocValueOffset returns the docValue offset in the file footer
+func (s *Segment) DocValueOffset() uint64 {
+	return s.docValueOffset
 }
 
 // NumDocs returns the number of documents in the file footer
@@ -372,7 +376,7 @@ func (s *Segment) DictAddr(field string) (uint64, error) {
 }
 
 func (s *Segment) loadDvIterators() error {
-	if s.docValueOffset == math.MaxUint64 || s.docValueOffset == 0 {
+	if s.docValueOffset == fieldNotUninverted || s.docValueOffset == 0 {
 		return nil
 	}
 

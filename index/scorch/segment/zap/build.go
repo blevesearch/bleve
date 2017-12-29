@@ -28,7 +28,9 @@ import (
 	"github.com/golang/snappy"
 )
 
-const version uint32 = 1
+const version uint32 = 2
+
+const fieldNotUninverted = math.MaxUint64
 
 // PersistSegment takes the in-memory segment and persists it to the specified
 // path in the zap file format.
@@ -435,15 +437,15 @@ func (a docIDRange) Less(i, j int) bool { return a[i] < a[j] }
 
 func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 	chunkFactor uint32) (map[uint16]uint64, error) {
-	fieldChunkOffsets := make(map[uint16]uint64, len(memSegment.DocValueFields))
+	fieldChunkOffsets := make(map[uint16]uint64, len(memSegment.FieldsInv))
 	fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), uint64(len(memSegment.Stored)-1))
 
-	for fieldID := range memSegment.DocValueFields {
+	for _, fieldID := range memSegment.DocValueFields {
 		field := memSegment.FieldsInv[fieldID]
 		docTermMap := make(map[uint64][]byte, 0)
 		dict, err := memSegment.Dictionary(field)
 		if err != nil {
-			return fieldChunkOffsets, err
+			return nil, err
 		}
 
 		dictItr := dict.Iterator()
@@ -451,7 +453,7 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 		for err == nil && next != nil {
 			postings, err1 := dict.PostingsList(next.Term, nil)
 			if err1 != nil {
-				return fieldChunkOffsets, err
+				return nil, err
 			}
 
 			postingsItr := postings.Iterator()
@@ -463,14 +465,14 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 				nextPosting, err2 = postingsItr.Next()
 			}
 			if err2 != nil {
-				return fieldChunkOffsets, err2
+				return nil, err2
 			}
 
 			next, err = dictItr.Next()
 		}
 
 		if err != nil {
-			return fieldChunkOffsets, err
+			return nil, err
 		}
 		// sort wrt to docIDs
 		var docNumbers docIDRange
@@ -482,16 +484,19 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 		for _, docNum := range docNumbers {
 			err = fdvEncoder.Add(docNum, docTermMap[docNum])
 			if err != nil {
-				return fieldChunkOffsets, err
+				return nil, err
 			}
 		}
 
 		fieldChunkOffsets[fieldID] = uint64(w.Count())
-		fdvEncoder.Close()
+		err = fdvEncoder.Close()
+		if err != nil {
+			return nil, err
+		}
 		// persist the doc value details for this field
 		_, err = fdvEncoder.Write(w)
 		if err != nil {
-			return fieldChunkOffsets, err
+			return nil, err
 		}
 		// resetting encoder for the next field
 		fdvEncoder.Reset()
@@ -505,23 +510,23 @@ func persistFieldDocValues(w *CountHashWriter, chunkFactor uint32,
 
 	fieldDvOffsets, err := persistDocValues(memSegment, w, chunkFactor)
 	if err != nil {
-		return math.MaxUint64, err
+		return 0, err
 	}
 
 	fieldDocValuesOffset := uint64(w.Count())
 	buf := make([]byte, binary.MaxVarintLen64)
-	offset := uint64(math.MaxUint64)
+	offset := uint64(0)
 	ok := true
 	for fieldID := range memSegment.FieldsInv {
 		// if the field isn't configured for docValue, then mark
 		// the offset accordingly
 		if offset, ok = fieldDvOffsets[uint16(fieldID)]; !ok {
-			offset = math.MaxUint64
+			offset = fieldNotUninverted
 		}
 		n := binary.PutUvarint(buf, uint64(offset))
 		_, err := w.Write(buf[:n])
 		if err != nil {
-			return math.MaxUint64, err
+			return 0, err
 		}
 	}
 

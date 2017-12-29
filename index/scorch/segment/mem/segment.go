@@ -88,16 +88,15 @@ type Segment struct {
 	//  docNum -> field id -> slice of array positions (each is []uint64)
 	StoredPos []map[uint16][][]uint64
 
-	// for marking the docValue override status
-	// field id -> status
-	DocValueFields map[uint16]bool
+	// for storing the docValue persisted fields
+	// field id
+	DocValueFields []uint16
 }
 
 // New builds a new empty Segment
 func New() *Segment {
 	return &Segment{
-		FieldsMap:      map[string]uint16{},
-		DocValueFields: map[uint16]bool{},
+		FieldsMap: map[string]uint16{},
 	}
 }
 

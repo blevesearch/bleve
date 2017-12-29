@@ -87,3 +87,11 @@ type Location interface {
 	Pos() uint64
 	ArrayPositions() []uint64
 }
+
+// DocumentFieldTermVisitable is implemented by various scorch segment
+// implementations to provide the un inverting of the postings
+// or other indexed values.
+type DocumentFieldTermVisitable interface {
+	VisitDocumentFieldTerms(localDocNum uint64, fields []string,
+		visitor index.DocumentFieldTermVisitor) error
+}

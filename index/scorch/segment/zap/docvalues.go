@@ -31,7 +31,7 @@ type docValueIterator struct {
 	numChunks      uint64
 	chunkLens      []uint64
 	dvDataLoc      uint64
-	curChunkHeader []metaData
+	curChunkHeader []MetaData
 	curChunkData   []byte // compressed data cache
 }
 
@@ -96,13 +96,13 @@ func (di *docValueIterator) loadDvChunk(chunkNumber,
 	chunkMetaLoc := destChunkDataLoc + uint64(read)
 
 	offset := uint64(0)
-	di.curChunkHeader = make([]metaData, int(numDocs))
+	di.curChunkHeader = make([]MetaData, int(numDocs))
 	for i := 0; i < int(numDocs); i++ {
-		di.curChunkHeader[i].docID, read = binary.Uvarint(s.mm[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
+		di.curChunkHeader[i].DocID, read = binary.Uvarint(s.mm[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
 		offset += uint64(read)
-		di.curChunkHeader[i].docDvLoc, read = binary.Uvarint(s.mm[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
+		di.curChunkHeader[i].DocDvLoc, read = binary.Uvarint(s.mm[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
 		offset += uint64(read)
-		di.curChunkHeader[i].docDvLen, read = binary.Uvarint(s.mm[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
+		di.curChunkHeader[i].DocDvLen, read = binary.Uvarint(s.mm[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
 		offset += uint64(read)
 	}
 
@@ -143,10 +143,10 @@ func (di *docValueIterator) visitDocValues(docID uint64,
 
 func (di *docValueIterator) getDocValueLocs(docID uint64) (uint64, uint64) {
 	i := sort.Search(len(di.curChunkHeader), func(i int) bool {
-		return di.curChunkHeader[i].docID >= docID
+		return di.curChunkHeader[i].DocID >= docID
 	})
-	if i < len(di.curChunkHeader) && di.curChunkHeader[i].docID == docID {
-		return di.curChunkHeader[i].docDvLoc, di.curChunkHeader[i].docDvLen
+	if i < len(di.curChunkHeader) && di.curChunkHeader[i].DocID == docID {
+		return di.curChunkHeader[i].DocDvLoc, di.curChunkHeader[i].DocDvLen
 	}
 	return math.MaxUint64, math.MaxUint64
 }

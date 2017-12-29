@@ -118,7 +118,7 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 		}
 		// TODO with mapping changes for dv
 		//if field.Options().IncludeDocValues() {
-		s.DocValueFields[fieldID] = true
+		s.DocValueFields = append(s.DocValueFields, fieldID)
 		//}
 	}
 
