@@ -15,7 +15,6 @@
 package zap
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"io"
@@ -87,17 +86,12 @@ func (c *chunkedContentCoder) flushContents() error {
 		return err
 	}
 
-	w := bufio.NewWriter(&c.chunkMetaBuf)
 	// write out the metaData slice
 	for _, meta := range c.chunkMeta {
-		_, err := writeUvarints(w, meta.DocID, meta.DocDvLoc, meta.DocDvLen)
+		_, err := writeUvarints(&c.chunkMetaBuf, meta.DocID, meta.DocDvLoc, meta.DocDvLen)
 		if err != nil {
 			return err
 		}
-	}
-	err = w.Flush()
-	if err != nil {
-		return err
 	}
 
 	// write the metadata to final data

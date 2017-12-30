@@ -46,7 +46,7 @@ func (di *docValueIterator) curChunkNumber() uint64 {
 func (s *Segment) loadFieldDocValueIterator(field string,
 	fieldDvLoc uint64) (*docValueIterator, error) {
 	// get the docValue offset for the given fields
-	if fieldDvLoc == math.MaxUint64 {
+	if fieldDvLoc == fieldNotUninverted {
 		return nil, fmt.Errorf("loadFieldDocValueConfigs: "+
 			"no docValues found for field: %s", field)
 	}

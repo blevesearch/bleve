@@ -401,7 +401,7 @@ func (s *Segment) DictAddr(field string) (uint64, error) {
 }
 
 func (s *Segment) loadDvIterators() error {
-	if s.docValueOffset == fieldNotUninverted || s.docValueOffset == 0 {
+	if s.docValueOffset == fieldNotUninverted {
 		return nil
 	}
 

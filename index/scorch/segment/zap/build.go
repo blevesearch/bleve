@@ -51,7 +51,7 @@ func PersistSegment(memSegment *mem.Segment, path string, chunkFactor uint32) (e
 
 	var storedIndexOffset uint64
 	var dictLocs []uint64
-	var docValueOffset uint64
+	docValueOffset := uint64(fieldNotUninverted)
 	if len(memSegment.Stored) > 0 {
 
 		storedIndexOffset, err = persistStored(memSegment, cr)

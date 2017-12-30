@@ -53,7 +53,8 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 	newSegDocCount := computeNewDocCount(segments, drops)
 
 	var newDocNums [][]uint64
-	var storedIndexOffset, fieldDvLocsOffset uint64
+	var storedIndexOffset uint64
+	fieldDvLocsOffset := uint64(fieldNotUninverted)
 	var dictLocs []uint64
 	if newSegDocCount > 0 {
 		storedIndexOffset, newDocNums, err = mergeStoredAndRemap(segments, drops,
