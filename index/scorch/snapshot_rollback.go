@@ -79,6 +79,12 @@ func (s *Scorch) PreviousPersistedSnapshot(is *IndexSnapshot) (*IndexSnapshot, e
 			}
 
 			indexSnapshot.epoch = snapshotEpoch
+			// Mark segments that are referenced by this indexSnapshot
+			// as ineligible for removal.
+			for _, segSnapshot := range indexSnapshot.segment {
+				filename := zapFileName(segSnapshot.id)
+				s.markIneligibleForRemoval(filename)
+			}
 			return indexSnapshot, nil
 		}
 	}

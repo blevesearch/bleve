@@ -289,7 +289,7 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 			deleted:    segmentSnapshot.deleted,
 			cachedDocs: segmentSnapshot.cachedDocs,
 		}
-		segmentSnapshot.segment.AddRef()
+		newSnapshot.segment[i].segment.AddRef()
 	}
 
 	if revertTo.persisted != nil {
