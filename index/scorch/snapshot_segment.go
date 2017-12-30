@@ -249,3 +249,18 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 	c.m.Unlock()
 	return nil
 }
+
+func (c *cachedDocs) sizeInBytes() uint64 {
+	sizeInBytes := 0
+	c.m.Lock()
+	for k, v := range c.cache { // cachedFieldDocs
+		sizeInBytes += len(k)
+		if v != nil {
+			for _, entry := range v.docs { // docs
+				sizeInBytes += 8 /* size of uint64 */ + len(entry)
+			}
+		}
+	}
+	c.m.Unlock()
+	return uint64(sizeInBytes)
+}

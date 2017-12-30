@@ -72,9 +72,44 @@ type Scorch struct {
 
 	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
+
+	onEvent func(event Event)
 }
 
-func NewScorch(storeName string, config map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error) {
+// Event represents the information provided in an OnEvent() callback.
+type Event struct {
+	Kind     EventKind
+	Scorch   *Scorch
+	Duration time.Duration
+}
+
+// EventKind represents an event code for OnEvent() callbacks.
+type EventKind int
+
+// EventKindCLoseStart is fired when a Scorch.Close() has begun.
+var EventKindCloseStart = EventKind(1)
+
+// EventKindClose is fired when a scorch index has been fully closed.
+var EventKindClose = EventKind(2)
+
+// EventKindMergerProgress is fired when the merger has completed a
+// round of merge processing.
+var EventKindMergerProgress = EventKind(3)
+
+// EventKindPersisterProgress is fired when the persister has completed
+// a round of persistence processing.
+var EventKindPersisterProgress = EventKind(4)
+
+// EventKindBatchIntroductionStart is fired when Batch() is invoked which
+// introduces a new segment.
+var EventKindBatchIntroductionStart = EventKind(5)
+
+// EventKindBatchIntroduction is fired when Batch() completes.
+var EventKindBatchIntroduction = EventKind(6)
+
+func NewScorch(storeName string,
+	config map[string]interface{},
+	analysisQueue *index.AnalysisQueue) (index.Index, error) {
 	rv := &Scorch{
 		version:              Version,
 		config:               config,
@@ -94,6 +129,16 @@ func NewScorch(storeName string, config map[string]interface{}, analysisQueue *i
 		rv.unsafeBatch = ub
 	}
 	return rv, nil
+}
+
+func (s *Scorch) SetEventCallback(f func(Event)) {
+	s.onEvent = f
+}
+
+func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) {
+	if s.onEvent != nil {
+		s.onEvent(Event{Kind: kind, Scorch: s, Duration: dur})
+	}
 }
 
 func (s *Scorch) Open() error {
@@ -163,6 +208,13 @@ func (s *Scorch) Open() error {
 }
 
 func (s *Scorch) Close() (err error) {
+	startTime := time.Now()
+	defer func() {
+		s.fireEvent(EventKindClose, time.Since(startTime))
+	}()
+
+	s.fireEvent(EventKindCloseStart, 0)
+
 	// signal to async tasks we want to close
 	close(s.closeCh)
 	// wait for them to close
@@ -195,11 +247,16 @@ func (s *Scorch) Delete(id string) error {
 
 // Batch applices a batch of changes to the index atomically
 func (s *Scorch) Batch(batch *index.Batch) error {
-	analysisStart := time.Now()
+	start := time.Now()
+
+	defer func() {
+		s.fireEvent(EventKindBatchIntroduction, time.Since(start))
+	}()
 
 	resultChan := make(chan *index.AnalysisResult, len(batch.IndexOps))
 
 	var numUpdates uint64
+	var numDeletes uint64
 	var numPlainTextBytes uint64
 	var ids []string
 	for docID, doc := range batch.IndexOps {
@@ -208,6 +265,8 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 			doc.AddField(document.NewTextFieldCustom("_id", nil, []byte(doc.ID), document.IndexField|document.StoreField, nil))
 			numUpdates++
 			numPlainTextBytes += doc.NumPlainTextBytes()
+		} else {
+			numDeletes++
 		}
 		ids = append(ids, docID)
 	}
@@ -234,7 +293,10 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 	}
 	close(resultChan)
 
-	atomic.AddUint64(&s.stats.analysisTime, uint64(time.Since(analysisStart)))
+	atomic.AddUint64(&s.stats.analysisTime, uint64(time.Since(start)))
+
+	// notify handlers that we're about to introduce a segment
+	s.fireEvent(EventKindBatchIntroductionStart, 0)
 
 	var newSegment segment.Segment
 	if len(analysisResults) > 0 {
@@ -242,8 +304,16 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 	}
 
 	err := s.prepareSegment(newSegment, ids, batch.InternalOps)
-	if err != nil && newSegment != nil {
-		_ = newSegment.Close()
+	if err != nil {
+		if newSegment != nil {
+			_ = newSegment.Close()
+		}
+		atomic.AddUint64(&s.stats.errors, 1)
+	} else {
+		atomic.AddUint64(&s.stats.updates, numUpdates)
+		atomic.AddUint64(&s.stats.deletes, numDeletes)
+		atomic.AddUint64(&s.stats.batches, 1)
+		atomic.AddUint64(&s.stats.numPlainTextBytesIndexed, numPlainTextBytes)
 	}
 	return err
 }
@@ -356,6 +426,21 @@ func (s *Scorch) AddEligibleForRemoval(epoch uint64) {
 		s.eligibleForRemoval = append(s.eligibleForRemoval, epoch)
 	}
 	s.rootLock.Unlock()
+}
+
+func (s *Scorch) MemoryUsed() uint64 {
+	var memUsed uint64
+	s.rootLock.RLock()
+	for _, segmentSnapshot := range s.root.segment {
+		memUsed += 8 /* size of id -> uint64 */ +
+			segmentSnapshot.segment.SizeInBytes()
+		if segmentSnapshot.deleted != nil {
+			memUsed += segmentSnapshot.deleted.GetSizeInBytes()
+		}
+		memUsed += segmentSnapshot.cachedDocs.sizeInBytes()
+	}
+	s.rootLock.RUnlock()
+	return memUsed
 }
 
 func (s *Scorch) markIneligibleForRemoval(filename string) {

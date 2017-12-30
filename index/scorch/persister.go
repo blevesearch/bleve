@@ -24,6 +24,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
@@ -63,6 +65,8 @@ OUTER:
 		s.rootLock.Unlock()
 
 		if ourSnapshot != nil {
+			startTime := time.Now()
+
 			err := s.persistSnapshot(ourSnapshot)
 			for _, ch := range ourPersisted {
 				if err != nil {
@@ -75,6 +79,7 @@ OUTER:
 				_ = ourSnapshot.DecRef()
 				continue OUTER
 			}
+
 			lastPersistedEpoch = ourSnapshot.epoch
 			for _, notifyCh := range notifyChs {
 				close(notifyCh)
@@ -88,6 +93,9 @@ OUTER:
 				changed = true
 			}
 			s.rootLock.RUnlock()
+
+			s.fireEvent(EventKindPersisterProgress, time.Since(startTime))
+
 			if changed {
 				continue OUTER
 			}
@@ -243,6 +251,8 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 				cachedDocs: segmentSnapshot.cachedDocs,
 			}
 			newIndexSnapshot.segment[i] = newSegmentSnapshot
+			// update items persisted incase of a new segment snapshot
+			atomic.AddUint64(&s.stats.numItemsPersisted, newSegmentSnapshot.Count())
 		} else {
 			newIndexSnapshot.segment[i] = s.root.segment[i]
 			newIndexSnapshot.segment[i].segment.AddRef()
