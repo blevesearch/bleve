@@ -45,28 +45,35 @@ func TestIndexRollback(t *testing.T) {
 		}
 	}()
 
-	// create 2 docs
+	sh, ok := idx.(*Scorch)
+	if !ok {
+		t.Errorf("Not a scorch index?")
+	}
+
+	// create a batch, insert 2 new documents
+	batch := index.NewBatch()
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
-	err = idx.Update(doc)
-	if err != nil {
-		t.Error(err)
-	}
-
-	doc = document.NewDocument("2")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
-	err = idx.Update(doc)
-	if err != nil {
-		t.Error(err)
-	}
-
-	// create a batch, insert new doc, update existing doc, delete existing doc
-	batch := index.NewBatch()
-	doc = document.NewDocument("3")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test3")))
 	batch.Update(doc)
 	doc = document.NewDocument("2")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2updated")))
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
+	batch.Update(doc)
+
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Get last persisted snapshot
+	s1, err := sh.PreviousPersistedSnapshot(nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// create another batch, insert 1 new document, and delete an existing one
+	batch = index.NewBatch()
+	doc = document.NewDocument("3")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test3")))
 	batch.Update(doc)
 	batch.Delete("1")
 
@@ -75,40 +82,51 @@ func TestIndexRollback(t *testing.T) {
 		t.Error(err)
 	}
 
-	sh, ok := idx.(*Scorch)
-	if !ok {
-		t.Errorf("Not a scorch index?")
-	}
-
 	// Get Last persisted snapshot
-	ss, err := sh.PreviousPersistedSnapshot(nil)
+	s2, err := sh.PreviousPersistedSnapshot(nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	// Retrieve the snapshot earlier
-	prev, err := sh.PreviousPersistedSnapshot(ss)
+	// the last persisted snapshot should not contain doc 1, but
+	// should contain 2 and 3
+	ret, err := s2.Document("1")
+	if err != nil || ret != nil {
+		t.Error(ret, err)
+	}
+	ret, err = s2.Document("2")
+	if err != nil || ret == nil {
+		t.Error(ret, err)
+	}
+	ret, err = s2.Document("3")
+	if err != nil || ret == nil {
+		t.Error(ret, err)
+	}
+
+	// revert to first persisted snapshot
+	err = sh.SnapshotRevert(s1)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if prev != nil {
-		err = sh.SnapshotRevert(prev)
-		if err != nil {
-			t.Error(err)
-		}
+	// obtain the last persisted snapshot, after rollback
+	latestSnapshot, err := sh.PreviousPersistedSnapshot(nil)
+	if err != nil {
+		t.Error(err)
+	}
 
-		newRoot, err := sh.PreviousPersistedSnapshot(nil)
-		if err != nil {
-			t.Error(err)
-		}
-
-		if newRoot == nil {
-			t.Errorf("Failed to retrieve latest persisted snapshot")
-		}
-
-		if newRoot.epoch <= prev.epoch {
-			t.Errorf("Unexpected epoch, %v <= %v", newRoot.epoch, prev.epoch)
-		}
+	// check that in the latest snapshot docs 1 and 2 are
+	// available, but not 3
+	ret, err = latestSnapshot.Document("1")
+	if err != nil || ret == nil {
+		t.Error(ret, err)
+	}
+	ret, err = latestSnapshot.Document("2")
+	if err != nil || ret == nil {
+		t.Error(ret, err)
+	}
+	ret, err = latestSnapshot.Document("3")
+	if err != nil || ret != nil {
+		t.Error(ret, err)
 	}
 }
