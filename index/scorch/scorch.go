@@ -38,20 +38,22 @@ const Name = "scorch"
 const Version uint8 = 1
 
 type Scorch struct {
-	readOnly          bool
-	version           uint8
-	config            map[string]interface{}
-	analysisQueue     *index.AnalysisQueue
-	stats             *Stats
-	nextSegmentID     uint64
-	nextSnapshotEpoch uint64
-	path              string
+	readOnly      bool
+	version       uint8
+	config        map[string]interface{}
+	analysisQueue *index.AnalysisQueue
+	stats         *Stats
+	nextSegmentID uint64
+	path          string
 
 	unsafeBatch bool
 
-	rootLock      sync.RWMutex
-	root          *IndexSnapshot // holds 1 ref-count on the root
-	rootPersisted []chan error   // closed when root is persisted
+	rootLock             sync.RWMutex
+	root                 *IndexSnapshot // holds 1 ref-count on the root
+	rootPersisted        []chan error   // closed when root is persisted
+	nextSnapshotEpoch    uint64
+	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
+	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
 
 	closeCh            chan struct{}
 	introductions      chan *segmentIntroduction
@@ -61,9 +63,6 @@ type Scorch struct {
 	persisterNotifier  chan notificationChan
 	rootBolt           *bolt.DB
 	asyncTasks         sync.WaitGroup
-
-	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
-	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
 
 	onEvent func(event Event)
 }
