@@ -15,81 +15,142 @@
 package scorch
 
 import (
-	"bytes"
+	"fmt"
 	"log"
 
 	"github.com/blevesearch/bleve/index/scorch/segment"
 )
 
-// PreviousPersistedSnapshot returns the next older, previous
-// IndexSnapshot based on the provided IndexSnapshot. If the provided
-// argument is nil, the most recently persisted IndexSnapshot is returned.
-// This API allows the application to walk backwards into the history
-// of a store to previous points in time. A nil return value indicates
-// that no previous snapshots are available.
-func (s *Scorch) PreviousPersistedSnapshot(is *IndexSnapshot) (*IndexSnapshot, error) {
+type RollbackPoint struct {
+	epoch uint64
+	meta  map[string][]byte
+}
+
+func (r *RollbackPoint) GetInternal(key []byte) []byte {
+	return r.meta[string(key)]
+}
+
+// RollbackPoints returns an array of rollback points available
+// for the application to make a decision on where to rollback
+// to. A nil return value indicates that there are no available
+// rollback points.
+func (s *Scorch) RollbackPoints() ([]*RollbackPoint, error) {
 	if s.rootBolt == nil {
-		return nil, nil
+		return nil, fmt.Errorf("RollbackPoints: root is nil")
 	}
 
-	// start a read-only transaction
+	// start a read-only bolt transaction
 	tx, err := s.rootBolt.Begin(false)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("RollbackPoints: failed to start" +
+			" read-only transaction")
 	}
 
-	// Read-only bolt transactions to be rolled back.
+	// read-only bolt transactions to be rolled back
 	defer func() {
 		_ = tx.Rollback()
 	}()
 
 	snapshots := tx.Bucket(boltSnapshotsBucket)
 	if snapshots == nil {
-		return nil, nil
+		return nil, fmt.Errorf("RollbackPoints: no snapshots available")
 	}
 
-	pos := []byte(nil)
+	rollbackPoints := []*RollbackPoint{}
 
-	if is != nil {
-		pos = segment.EncodeUvarintAscending(nil, is.epoch)
-	}
-
-	c := snapshots.Cursor()
-	for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
-		if pos == nil || bytes.Compare(k, pos) < 0 {
-			_, snapshotEpoch, err := segment.DecodeUvarintAscending(k)
-			if err != nil {
-				log.Printf("PreviousPersistedSnapshot:"+
-					" unable to parse segment epoch %x, continuing", k)
-				continue
-			}
-
-			snapshot := snapshots.Bucket(k)
-			if snapshot == nil {
-				log.Printf("PreviousPersistedSnapshot:"+
-					" snapshot key, but bucket missing %x, continuing", k)
-				continue
-			}
-
-			indexSnapshot, err := s.loadSnapshot(snapshot)
-			if err != nil {
-				log.Printf("PreviousPersistedSnapshot:"+
-					" unable to load snapshot, %v, continuing", err)
-				continue
-			}
-
-			indexSnapshot.epoch = snapshotEpoch
-			return indexSnapshot, nil
+	c1 := snapshots.Cursor()
+	for k, _ := c1.Last(); k != nil; k, _ = c1.Prev() {
+		_, snapshotEpoch, err := segment.DecodeUvarintAscending(k)
+		if err != nil {
+			log.Printf("RollbackPoints:"+
+				" unable to parse segment epoch %x, continuing", k)
+			continue
 		}
+
+		snapshot := snapshots.Bucket(k)
+		if snapshot == nil {
+			log.Printf("RollbackPoints:"+
+				" snapshot key, but bucket missing %x, continuing", k)
+			continue
+		}
+
+		meta := map[string][]byte{}
+		c2 := snapshot.Cursor()
+		for j, _ := c2.First(); j != nil; j, _ = c2.Next() {
+			if j[0] == boltInternalKey[0] {
+				internalBucket := snapshot.Bucket(j)
+				err = internalBucket.ForEach(func(key []byte, val []byte) error {
+					copiedVal := append([]byte(nil), val...)
+					meta[string(key)] = copiedVal
+					return nil
+				})
+				if err != nil {
+					break
+				}
+			}
+		}
+
+		if err != nil {
+			log.Printf("RollbackPoints:"+
+				" failed in fetching interal data: %v", err)
+			continue
+		}
+
+		rollbackPoints = append(rollbackPoints, &RollbackPoint{
+			epoch: snapshotEpoch,
+			meta:  meta,
+		})
 	}
 
-	return nil, nil
+	return rollbackPoints, nil
 }
 
-// SnapshotRevert atomically brings the store back to the point in time
-// as represented by the revertTo IndexSnapshot. SnapshotRevert() should
-// only be passed an IndexSnapshot that came from the same store.
-func (s *Scorch) SnapshotRevert(revertTo *IndexSnapshot) error {
+// Rollback atomically and durably (if unsafeBatch is unset) brings
+// the store back to the point in time as represented by the
+// RollbackPoint. Rollbac() should only be passed a RollbackPoint
+// that came from the same store using the RollbackPoints() API.
+func (s *Scorch) Rollback(to *RollbackPoint) error {
+	if to == nil {
+		return fmt.Errorf("Rollback: RollbackPoint is nil")
+	}
+
+	if s.rootBolt == nil {
+		return fmt.Errorf("Rollback: root is nil")
+	}
+
+	// start a read-only bolt transaction
+	tx, err := s.rootBolt.Begin(false)
+	if err != nil {
+		return fmt.Errorf("Rollback: failed to start read-only transaction")
+	}
+
+	snapshots := tx.Bucket(boltSnapshotsBucket)
+	if snapshots == nil {
+		return fmt.Errorf("Rollback: no snapshots available")
+	}
+
+	pos := segment.EncodeUvarintAscending(nil, to.epoch)
+
+	snapshot := snapshots.Bucket(pos)
+	if snapshot == nil {
+		return fmt.Errorf("Rollback: snapshot not found")
+	}
+
+	revertTo, err := s.loadSnapshot(snapshot)
+	if err != nil {
+		return fmt.Errorf("Rollback: unable to load snapshot: %v", err)
+	}
+
+	// add segments referenced by loaded index snapshot to the
+	// ineligibleForRemoval map
+	for _, segSnap := range revertTo.segment {
+		filename := zapFileName(segSnap.id)
+		s.markIneligibleForRemoval(filename)
+	}
+
+	// read-only bolt transactions to be rolled back
+	_ = tx.Rollback()
+
 	revert := &snapshotReversion{
 		snapshot: revertTo,
 		applied:  make(chan error),
@@ -101,10 +162,10 @@ func (s *Scorch) SnapshotRevert(revertTo *IndexSnapshot) error {
 
 	s.revertToSnapshots <- revert
 
-	// block until this IndexSnapshot is applied
-	err := <-revert.applied
+	// block until this snapshot is applied
+	err = <-revert.applied
 	if err != nil {
-		return err
+		return fmt.Errorf("Rollback: failed with err: %v", err)
 	}
 
 	if revert.persisted != nil {

@@ -45,11 +45,6 @@ func TestIndexRollback(t *testing.T) {
 		}
 	}()
 
-	sh, ok := idx.(*Scorch)
-	if !ok {
-		t.Errorf("Not a scorch index?")
-	}
-
 	// create a batch, insert 2 new documents
 	batch := index.NewBatch()
 	doc := document.NewDocument("1")
@@ -61,72 +56,113 @@ func TestIndexRollback(t *testing.T) {
 
 	err = idx.Batch(batch)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
-	// Get last persisted snapshot
-	s1, err := sh.PreviousPersistedSnapshot(nil)
-	if err != nil {
-		t.Error(err)
+	sh, ok := idx.(*Scorch)
+	if !ok {
+		t.Fatalf("Not a scorch index?")
 	}
 
-	// create another batch, insert 1 new document, and delete an existing one
+	// fetch rollback points available as of here
+	rollbackPoints, err := sh.RollbackPoints()
+	if err != nil || len(rollbackPoints) == 0 {
+		t.Fatal(err, len(rollbackPoints))
+	}
+
+	// set this as a rollback point for the future
+	rollbackPoint := rollbackPoints[0]
+
+	// create another batch, insert 2 new documents, and delete an existing one
 	batch = index.NewBatch()
 	doc = document.NewDocument("3")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test3")))
+	batch.Update(doc)
+	doc = document.NewDocument("4")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test4")))
 	batch.Update(doc)
 	batch.Delete("1")
 
 	err = idx.Batch(batch)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
-	// Get Last persisted snapshot
-	s2, err := sh.PreviousPersistedSnapshot(nil)
+	reader, err := idx.Reader()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
-	// the last persisted snapshot should not contain doc 1, but
-	// should contain 2 and 3
-	ret, err := s2.Document("1")
+	docCount, err := reader.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// expect docs 2, 3, 4
+	if docCount != 3 {
+		t.Fatalf("unexpected doc count: %v", docCount)
+	}
+	ret, err := reader.Document("1")
 	if err != nil || ret != nil {
-		t.Error(ret, err)
+		t.Fatal(ret, err)
 	}
-	ret, err = s2.Document("2")
+	ret, err = reader.Document("2")
 	if err != nil || ret == nil {
-		t.Error(ret, err)
+		t.Fatal(ret, err)
 	}
-	ret, err = s2.Document("3")
+	ret, err = reader.Document("3")
 	if err != nil || ret == nil {
-		t.Error(ret, err)
+		t.Fatal(ret, err)
+	}
+	ret, err = reader.Document("4")
+	if err != nil || ret == nil {
+		t.Fatal(ret, err)
 	}
 
-	// revert to first persisted snapshot
-	err = sh.SnapshotRevert(s1)
+	err = reader.Close()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
-	// obtain the last persisted snapshot, after rollback
-	latestSnapshot, err := sh.PreviousPersistedSnapshot(nil)
+	// rollback to the selected rollback point
+	err = sh.Rollback(rollbackPoint)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
-	// check that in the latest snapshot docs 1 and 2 are
-	// available, but not 3
-	ret, err = latestSnapshot.Document("1")
-	if err != nil || ret == nil {
-		t.Error(ret, err)
+	reader, err = idx.Reader()
+	if err != nil {
+		t.Fatal(err)
 	}
-	ret, err = latestSnapshot.Document("2")
-	if err != nil || ret == nil {
-		t.Error(ret, err)
+
+	docCount, err = reader.DocCount()
+	if err != nil {
+		t.Fatal(err)
 	}
-	ret, err = latestSnapshot.Document("3")
+
+	// expect only docs 1, 2
+	if docCount != 2 {
+		t.Fatalf("unexpected doc count: %v", docCount)
+	}
+	ret, err = reader.Document("1")
+	if err != nil || ret == nil {
+		t.Fatal(ret, err)
+	}
+	ret, err = reader.Document("2")
+	if err != nil || ret == nil {
+		t.Fatal(ret, err)
+	}
+	ret, err = reader.Document("3")
 	if err != nil || ret != nil {
-		t.Error(ret, err)
+		t.Fatal(ret, err)
+	}
+	ret, err = reader.Document("4")
+	if err != nil || ret != nil {
+		t.Fatal(ret, err)
+	}
+
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
