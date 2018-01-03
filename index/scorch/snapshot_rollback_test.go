@@ -45,70 +45,124 @@ func TestIndexRollback(t *testing.T) {
 		}
 	}()
 
-	// create 2 docs
+	// create a batch, insert 2 new documents
+	batch := index.NewBatch()
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test1")))
-	err = idx.Update(doc)
-	if err != nil {
-		t.Error(err)
-	}
-
+	batch.Update(doc)
 	doc = document.NewDocument("2")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
-	err = idx.Update(doc)
+	batch.Update(doc)
+
+	err = idx.Batch(batch)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
-	// create a batch, insert new doc, update existing doc, delete existing doc
-	batch := index.NewBatch()
+	sh, ok := idx.(*Scorch)
+	if !ok {
+		t.Fatalf("Not a scorch index?")
+	}
+
+	// fetch rollback points available as of here
+	rollbackPoints, err := sh.RollbackPoints()
+	if err != nil || len(rollbackPoints) == 0 {
+		t.Fatal(err, len(rollbackPoints))
+	}
+
+	// set this as a rollback point for the future
+	rollbackPoint := rollbackPoints[0]
+
+	// create another batch, insert 2 new documents, and delete an existing one
+	batch = index.NewBatch()
 	doc = document.NewDocument("3")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test3")))
 	batch.Update(doc)
-	doc = document.NewDocument("2")
-	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2updated")))
+	doc = document.NewDocument("4")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test4")))
 	batch.Update(doc)
 	batch.Delete("1")
 
 	err = idx.Batch(batch)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
-	sh, ok := idx.(*Scorch)
-	if !ok {
-		t.Errorf("Not a scorch index?")
-	}
-
-	// Get Last persisted snapshot
-	ss, err := sh.PreviousPersistedSnapshot(nil)
+	reader, err := idx.Reader()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
-	// Retrieve the snapshot earlier
-	prev, err := sh.PreviousPersistedSnapshot(ss)
+	docCount, err := reader.DocCount()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
-	if prev != nil {
-		err = sh.SnapshotRevert(prev)
-		if err != nil {
-			t.Error(err)
-		}
+	// expect docs 2, 3, 4
+	if docCount != 3 {
+		t.Fatalf("unexpected doc count: %v", docCount)
+	}
+	ret, err := reader.Document("1")
+	if err != nil || ret != nil {
+		t.Fatal(ret, err)
+	}
+	ret, err = reader.Document("2")
+	if err != nil || ret == nil {
+		t.Fatal(ret, err)
+	}
+	ret, err = reader.Document("3")
+	if err != nil || ret == nil {
+		t.Fatal(ret, err)
+	}
+	ret, err = reader.Document("4")
+	if err != nil || ret == nil {
+		t.Fatal(ret, err)
+	}
 
-		newRoot, err := sh.PreviousPersistedSnapshot(nil)
-		if err != nil {
-			t.Error(err)
-		}
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		if newRoot == nil {
-			t.Errorf("Failed to retrieve latest persisted snapshot")
-		}
+	// rollback to the selected rollback point
+	err = sh.Rollback(rollbackPoint)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		if newRoot.epoch <= prev.epoch {
-			t.Errorf("Unexpected epoch, %v <= %v", newRoot.epoch, prev.epoch)
-		}
+	reader, err = idx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	docCount, err = reader.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// expect only docs 1, 2
+	if docCount != 2 {
+		t.Fatalf("unexpected doc count: %v", docCount)
+	}
+	ret, err = reader.Document("1")
+	if err != nil || ret == nil {
+		t.Fatal(ret, err)
+	}
+	ret, err = reader.Document("2")
+	if err != nil || ret == nil {
+		t.Fatal(ret, err)
+	}
+	ret, err = reader.Document("3")
+	if err != nil || ret != nil {
+		t.Fatal(ret, err)
+	}
+	ret, err = reader.Document("4")
+	if err != nil || ret != nil {
+		t.Fatal(ret, err)
+	}
+
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

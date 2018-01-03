@@ -289,7 +289,11 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 			deleted:    segmentSnapshot.deleted,
 			cachedDocs: segmentSnapshot.cachedDocs,
 		}
-		segmentSnapshot.segment.AddRef()
+		newSnapshot.segment[i].segment.AddRef()
+
+		// remove segment from ineligibleForRemoval map
+		filename := zapFileName(segmentSnapshot.id)
+		delete(s.ineligibleForRemoval, filename)
 	}
 
 	if revertTo.persisted != nil {
