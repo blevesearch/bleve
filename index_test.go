@@ -1565,6 +1565,12 @@ func TestBatchRaceBug260(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err := i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	b := i.NewBatch()
 	err = b.Index("1", 1)
 	if err != nil {
