@@ -440,7 +440,7 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 	fieldChunkOffsets := make(map[uint16]uint64, len(memSegment.FieldsInv))
 	fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), uint64(len(memSegment.Stored)-1))
 
-	for _, fieldID := range memSegment.DocValueFields {
+	for fieldID := range memSegment.DocValueFields {
 		field := memSegment.FieldsInv[fieldID]
 		docTermMap := make(map[uint64][]byte, 0)
 		dict, err := memSegment.Dictionary(field)

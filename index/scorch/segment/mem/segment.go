@@ -89,9 +89,8 @@ type Segment struct {
 	StoredPos []map[uint16][][]uint64
 
 	// for storing the docValue persisted fields
-	// field id
-	DocValueFields []uint16
-	
+	DocValueFields map[uint16]bool
+
 	// footprint of the segment, updated when analyzed document mutations
 	// are added into the segment
 	sizeInBytes uint64
@@ -100,7 +99,8 @@ type Segment struct {
 // New builds a new empty Segment
 func New() *Segment {
 	return &Segment{
-		FieldsMap: map[string]uint16{},
+		FieldsMap:      map[string]uint16{},
+		DocValueFields: map[uint16]bool{},
 	}
 }
 
