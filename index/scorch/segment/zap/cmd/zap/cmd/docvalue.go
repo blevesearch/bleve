@@ -67,20 +67,50 @@ var docvalueCmd = &cobra.Command{
 		}
 
 		dvLoc := segment.DocValueOffset()
-		fieldDvLoc := uint64(0)
+		fieldDvLoc, total, fdvread := uint64(0), uint64(0), int(0)
+
 		var fieldName string
 		var fieldID uint16
 
 		// if no fields are specified then print the docValue offsets for all fields set
 		for id, field := range fieldInv {
-			fieldLoc, nread = binary.Uvarint(data[dvLoc+read : dvLoc+read+binary.MaxVarintLen64])
-			if nread <= 0 {
+			fieldLoc, fdvread = binary.Uvarint(data[dvLoc+read : dvLoc+read+binary.MaxVarintLen64])
+			if fdvread <= 0 {
 				return fmt.Errorf("loadDvIterators: failed to read the docvalue offsets for field %d", fieldID)
 			}
-			read += uint64(nread)
+			read += uint64(fdvread)
+			if fieldLoc == math.MaxUint64 {
+				fmt.Printf("fieldID: %d '%s' docvalue at %d (%x) not persisted \n", id, field, fieldLoc, fieldLoc)
+				continue
+			}
+
+			var offset, clen, numChunks uint64
+			numChunks, nread = binary.Uvarint(data[fieldLoc : fieldLoc+binary.MaxVarintLen64])
+			if nread <= 0 {
+				return fmt.Errorf("failed to read the field "+
+					"doc values for field %s", fieldName)
+			}
+			offset += uint64(nread)
+
+			// read the length of chunks
+			totalSize := uint64(0)
+			chunkLens := make([]uint64, numChunks)
+			for i := 0; i < int(numChunks); i++ {
+				clen, nread = binary.Uvarint(data[fieldLoc+offset : fieldLoc+offset+binary.MaxVarintLen64])
+				if nread <= 0 {
+					return fmt.Errorf("corrupted chunk length for chunk number: %d", i)
+				}
+
+				chunkLens[i] = clen
+				totalSize += clen
+				offset += uint64(nread)
+			}
+
+			total += totalSize
 			if len(args) == 1 {
 				// if no field args are given, then print out the dv locations for all fields
-				fmt.Printf("fieldID: %d '%s' docvalue at %d (%x)\n", id, field, fieldLoc, fieldLoc)
+				mbsize := float64(totalSize) / (1024 * 1024)
+				fmt.Printf("fieldID: %d '%s' docvalue at %d (%x) numChunks %d  diskSize %.3f MB\n", id, field, fieldLoc, fieldLoc, numChunks, mbsize)
 				continue
 			}
 
@@ -93,6 +123,9 @@ var docvalueCmd = &cobra.Command{
 			}
 
 		}
+
+		mbsize := float64(total) / (1024 * 1024)
+		fmt.Printf("Total Doc Values Size on Disk: %.3f MB\n", mbsize)
 
 		// done with the fields dv locs printing for the given zap file
 		if len(args) == 1 {
@@ -129,6 +162,12 @@ var docvalueCmd = &cobra.Command{
 			if len(args) == 2 {
 				fmt.Printf("chunk: %d size: %d \n", i, clen)
 			}
+			/*
+				TODO => dump all chunk headers??
+				if len(args) == 3 && args[2] == ">" {
+					dumpChunkDocIDs(data, )
+
+				}*/
 		}
 
 		if len(args) == 2 {
@@ -182,6 +221,8 @@ var docvalueCmd = &cobra.Command{
 
 		start, length := getDocValueLocs(uint64(localDocNum), curChunkHeader)
 		if start == math.MaxUint64 || length == math.MaxUint64 {
+			fmt.Printf("no field values found for docID %d\n", localDocNum)
+			fmt.Printf("Try docIDs present in chunk: %s\n", assortDocID(curChunkHeader))
 			return nil
 		}
 		// uncompress the already loaded data
@@ -217,6 +258,15 @@ func getDocValueLocs(docID uint64, metaHeader []zap.MetaData) (uint64, uint64) {
 		return metaHeader[i].DocDvLoc, metaHeader[i].DocDvLen
 	}
 	return math.MaxUint64, math.MaxUint64
+}
+
+func assortDocID(metaHeader []zap.MetaData) string {
+	docIDs := ""
+	for _, meta := range metaHeader {
+		id := fmt.Sprintf("%d", meta.DocID)
+		docIDs += id + ", "
+	}
+	return docIDs
 }
 
 func init() {
