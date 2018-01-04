@@ -44,11 +44,12 @@ func Open(path string) (segment.Segment, error) {
 	}
 
 	rv := &Segment{
-		f:         f,
-		mm:        mm,
-		path:      path,
-		fieldsMap: make(map[string]uint16),
-		refs:      1,
+		f:              f,
+		mm:             mm,
+		path:           path,
+		fieldsMap:      make(map[string]uint16),
+		fieldDvIterMap: make(map[uint16]*docValueIterator),
+		refs:           1,
 	}
 
 	err = rv.loadConfig()
@@ -58,6 +59,12 @@ func Open(path string) (segment.Segment, error) {
 	}
 
 	err = rv.loadFields()
+	if err != nil {
+		_ = rv.Close()
+		return nil, err
+	}
+
+	err = rv.loadDvIterators()
 	if err != nil {
 		_ = rv.Close()
 		return nil, err
@@ -81,6 +88,9 @@ type Segment struct {
 	fieldsMap     map[string]uint16
 	fieldsInv     []string
 	fieldsOffsets []uint64
+
+	docValueOffset uint64
+	fieldDvIterMap map[uint16]*docValueIterator // naive chunk cache per field
 
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
@@ -137,7 +147,11 @@ func (s *Segment) loadConfig() error {
 	}
 	chunkOffset := verOffset - 4
 	s.chunkFactor = binary.BigEndian.Uint32(s.mm[chunkOffset : chunkOffset+4])
-	fieldsOffset := chunkOffset - 8
+
+	docValueOffset := chunkOffset - 8
+	s.docValueOffset = binary.BigEndian.Uint64(s.mm[docValueOffset : docValueOffset+8])
+	fieldsOffset := docValueOffset - 8
+
 	s.fieldsIndexOffset = binary.BigEndian.Uint64(s.mm[fieldsOffset : fieldsOffset+8])
 	storedOffset := fieldsOffset - 8
 	s.storedIndexOffset = binary.BigEndian.Uint64(s.mm[storedOffset : storedOffset+8])
@@ -359,9 +373,14 @@ func (s *Segment) FieldsIndexOffset() uint64 {
 	return s.fieldsIndexOffset
 }
 
-// StoredIndexOffset returns the stored value index offset in the file foooter
+// StoredIndexOffset returns the stored value index offset in the file footer
 func (s *Segment) StoredIndexOffset() uint64 {
 	return s.storedIndexOffset
+}
+
+// DocValueOffset returns the docValue offset in the file footer
+func (s *Segment) DocValueOffset() uint64 {
+	return s.docValueOffset
 }
 
 // NumDocs returns the number of documents in the file footer
@@ -379,4 +398,21 @@ func (s *Segment) DictAddr(field string) (uint64, error) {
 	}
 
 	return s.fieldsOffsets[fieldID-1], nil
+}
+
+func (s *Segment) loadDvIterators() error {
+	if s.docValueOffset == fieldNotUninverted {
+		return nil
+	}
+
+	var read uint64
+	for fieldID, field := range s.fieldsInv {
+		fieldLoc, n := binary.Uvarint(s.mm[s.docValueOffset+read : s.docValueOffset+read+binary.MaxVarintLen64])
+		if n <= 0 {
+			return fmt.Errorf("loadDvIterators: failed to read the docvalue offsets for field %d", fieldID)
+		}
+		s.fieldDvIterMap[uint16(fieldID)], _ = s.loadFieldDocValueIterator(field, fieldLoc)
+		read += uint64(n)
+	}
+	return nil
 }

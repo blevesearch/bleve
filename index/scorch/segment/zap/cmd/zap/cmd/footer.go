@@ -33,6 +33,7 @@ var footerCmd = &cobra.Command{
 		fmt.Printf("Chunk Factor: %d\n", segment.ChunkFactor())
 		fmt.Printf("Fields Idx: %d (%#x)\n", segment.FieldsIndexOffset(), segment.FieldsIndexOffset())
 		fmt.Printf("Stored Idx: %d (%#x)\n", segment.StoredIndexOffset(), segment.StoredIndexOffset())
+		fmt.Printf("DocValue Idx: %d (%#x)\n", segment.DocValueOffset(), segment.DocValueOffset())
 		fmt.Printf("Num Docs: %d\n", segment.NumDocs())
 		return nil
 	},

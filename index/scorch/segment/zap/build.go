@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"math"
 	"os"
+	"sort"
 
 	"github.com/Smerity/govarint"
 	"github.com/blevesearch/bleve/index/scorch/segment/mem"
@@ -27,7 +28,9 @@ import (
 	"github.com/golang/snappy"
 )
 
-const version uint32 = 1
+const version uint32 = 2
+
+const fieldNotUninverted = math.MaxUint64
 
 // PersistSegment takes the in-memory segment and persists it to the specified
 // path in the zap file format.
@@ -48,6 +51,7 @@ func PersistSegment(memSegment *mem.Segment, path string, chunkFactor uint32) (e
 
 	var storedIndexOffset uint64
 	var dictLocs []uint64
+	docValueOffset := uint64(fieldNotUninverted)
 	if len(memSegment.Stored) > 0 {
 
 		storedIndexOffset, err = persistStored(memSegment, cr)
@@ -78,6 +82,11 @@ func PersistSegment(memSegment *mem.Segment, path string, chunkFactor uint32) (e
 			return err
 		}
 
+		docValueOffset, err = persistFieldDocValues(cr, chunkFactor, memSegment)
+		if err != nil {
+			return err
+		}
+
 	} else {
 		dictLocs = make([]uint64, len(memSegment.FieldsInv))
 	}
@@ -89,7 +98,7 @@ func PersistSegment(memSegment *mem.Segment, path string, chunkFactor uint32) (e
 	}
 
 	err = persistFooter(uint64(len(memSegment.Stored)), storedIndexOffset,
-		fieldIndexStart, chunkFactor, cr)
+		fieldIndexStart, docValueOffset, chunkFactor, cr)
 	if err != nil {
 		return err
 	}
@@ -418,4 +427,108 @@ func persistDictionary(memSegment *mem.Segment, w *CountHashWriter, postingsLocs
 	}
 
 	return rv, nil
+}
+
+type docIDRange []uint64
+
+func (a docIDRange) Len() int           { return len(a) }
+func (a docIDRange) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a docIDRange) Less(i, j int) bool { return a[i] < a[j] }
+
+func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
+	chunkFactor uint32) (map[uint16]uint64, error) {
+	fieldChunkOffsets := make(map[uint16]uint64, len(memSegment.FieldsInv))
+	fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), uint64(len(memSegment.Stored)-1))
+
+	for fieldID := range memSegment.DocValueFields {
+		field := memSegment.FieldsInv[fieldID]
+		docTermMap := make(map[uint64][]byte, 0)
+		dict, err := memSegment.Dictionary(field)
+		if err != nil {
+			return nil, err
+		}
+
+		dictItr := dict.Iterator()
+		next, err := dictItr.Next()
+		for err == nil && next != nil {
+			postings, err1 := dict.PostingsList(next.Term, nil)
+			if err1 != nil {
+				return nil, err
+			}
+
+			postingsItr := postings.Iterator()
+			nextPosting, err2 := postingsItr.Next()
+			for err2 == nil && nextPosting != nil {
+				docNum := nextPosting.Number()
+				docTermMap[docNum] = append(docTermMap[docNum], []byte(next.Term)...)
+				docTermMap[docNum] = append(docTermMap[docNum], termSeparator)
+				nextPosting, err2 = postingsItr.Next()
+			}
+			if err2 != nil {
+				return nil, err2
+			}
+
+			next, err = dictItr.Next()
+		}
+
+		if err != nil {
+			return nil, err
+		}
+		// sort wrt to docIDs
+		var docNumbers docIDRange
+		for k := range docTermMap {
+			docNumbers = append(docNumbers, k)
+		}
+		sort.Sort(docNumbers)
+
+		for _, docNum := range docNumbers {
+			err = fdvEncoder.Add(docNum, docTermMap[docNum])
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		fieldChunkOffsets[fieldID] = uint64(w.Count())
+		err = fdvEncoder.Close()
+		if err != nil {
+			return nil, err
+		}
+		// persist the doc value details for this field
+		_, err = fdvEncoder.Write(w)
+		if err != nil {
+			return nil, err
+		}
+		// resetting encoder for the next field
+		fdvEncoder.Reset()
+	}
+
+	return fieldChunkOffsets, nil
+}
+
+func persistFieldDocValues(w *CountHashWriter, chunkFactor uint32,
+	memSegment *mem.Segment) (uint64, error) {
+
+	fieldDvOffsets, err := persistDocValues(memSegment, w, chunkFactor)
+	if err != nil {
+		return 0, err
+	}
+
+	fieldDocValuesOffset := uint64(w.Count())
+	buf := make([]byte, binary.MaxVarintLen64)
+	offset := uint64(0)
+	ok := true
+	for fieldID := range memSegment.FieldsInv {
+		// if the field isn't configured for docValue, then mark
+		// the offset accordingly
+		if offset, ok = fieldDvOffsets[uint16(fieldID)]; !ok {
+			offset = fieldNotUninverted
+		}
+		n := binary.PutUvarint(buf, uint64(offset))
+		_, err := w.Write(buf[:n])
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return fieldDocValuesOffset, nil
 }

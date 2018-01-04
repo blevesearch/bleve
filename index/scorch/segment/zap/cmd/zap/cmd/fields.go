@@ -34,7 +34,7 @@ var fieldsCmd = &cobra.Command{
 		crcOffset := len(data) - 4
 		verOffset := crcOffset - 4
 		chunkOffset := verOffset - 4
-		fieldsOffset := chunkOffset - 8
+		fieldsOffset := chunkOffset - 16
 		fieldsIndexOffset := binary.BigEndian.Uint64(data[fieldsOffset : fieldsOffset+8])
 		fieldsIndexEnd := uint64(len(data) - zap.FooterSize)
 

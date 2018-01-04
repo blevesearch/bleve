@@ -37,6 +37,14 @@ const Name = "scorch"
 
 const Version uint8 = 1
 
+// UnInvertIndex is implemented by various scorch index implementations
+// to provide the un inverting of the postings or other indexed values.
+type UnInvertIndex interface {
+	// apparently need better namings here..
+	VisitDocumentFieldTerms(localDocNum uint64, fields []string,
+		visitor index.DocumentFieldTermVisitor) error
+}
+
 type Scorch struct {
 	readOnly      bool
 	version       uint8

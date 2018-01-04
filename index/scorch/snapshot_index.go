@@ -403,6 +403,11 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 
 	ss := i.segment[segmentIndex]
 
+	if zaps, ok := ss.segment.(segment.DocumentFieldTermVisitable); ok {
+		return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+	}
+
+	// else fallback to the in memory fieldCache
 	err = ss.cachedDocs.prepareFields(fields, ss)
 	if err != nil {
 		return err

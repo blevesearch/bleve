@@ -8,7 +8,7 @@ Current usage:
 - crc-32 bytes and version are in fixed position at end of the file
 - reading remainder of footer could be version specific
 - remainder of footer gives us:
-  - 2 important offsets (fields index and stored data index)
+  - 3 important offsets (docValue , fields index and stored data index)
   - 2 important values (number of docs and chunk factor)
 - field data is processed once and memoized onto the heap so that we never have to go back to disk for it
 - access to stored data by doc number means first navigating to the stored data index, then accessing a fixed position offset into that slice, which gives us the actual address of the data.  the first bytes of that section tell us the size of data so that we know where it ends.
@@ -140,12 +140,28 @@ If you know the doc number you're interested in, this format lets you jump to th
 
 NOTE: currently we don't know or record the length of this fields index.  Instead we rely on the fact that we know it immediately precedes a footer of known size.
 
+## fields DocValue
+
+- for each field
+  - preparation phase:
+    - produce a slice containing multiple consecutive chunks, where each chunk is composed of a meta section followed by compressed columnar field data
+    - produce a slice remembering the length of each chunk
+  - file writing phase:
+    - remember the start position of this first field DocValue offset in the footer
+    - write out number of chunks that follow (varint uint64)
+    - write out length of each chunk (each a varint uint64)
+    - write out the byte slice containing all the chunk data
+
+NOTE: currently the meta header inside each chunk gives clue to the location offsets and size of the data pertaining to a given docID and any
+read operation leverage that meta information to extract the document specific data from the file.
+
 ## footer
 
 - file writing phase
   - write number of docs (big endian uint64)
   - write stored field index location (big endian uint64)
   - write field index location (big endian uint64)
+  - write field docValue location (big endian uint64)
   - write out chunk factor (big endian uint32)
   - write out version (big endian uint32)
   - write out file CRC of everything preceding this (big endian uint32)
