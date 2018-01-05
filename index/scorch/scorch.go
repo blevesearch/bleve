@@ -72,7 +72,8 @@ type Scorch struct {
 	rootBolt           *bolt.DB
 	asyncTasks         sync.WaitGroup
 
-	onEvent func(event Event)
+	onEvent      func(event Event)
+	onAsyncError func(err error)
 }
 
 func NewScorch(storeName string,
@@ -100,12 +101,22 @@ func NewScorch(storeName string,
 	if ok {
 		rv.onEvent = RegistryEventCallbacks[ecbName]
 	}
+	aecbName, ok := config["asyncErrorCallbackName"].(string)
+	if ok {
+		rv.onAsyncError = RegistryAsyncErrorCallbacks[aecbName]
+	}
 	return rv, nil
 }
 
 func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) {
 	if s.onEvent != nil {
 		s.onEvent(Event{Kind: kind, Scorch: s, Duration: dur})
+	}
+}
+
+func (s *Scorch) fireAsyncError(err error) {
+	if s.onAsyncError != nil {
+		s.onAsyncError(err)
 	}
 }
 

@@ -16,6 +16,10 @@ package scorch
 
 import "time"
 
+// RegistryAsyncErrorCallbacks should be treated as read-only after
+// process init()'ialization.
+var RegistryAsyncErrorCallbacks = map[string]func(error){}
+
 // RegistryEventCallbacks should be treated as read-only after
 // process init()'ialization.
 var RegistryEventCallbacks = map[string]func(Event){}

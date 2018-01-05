@@ -74,7 +74,7 @@ OUTER:
 				close(ch)
 			}
 			if err != nil {
-				log.Printf("got err persisting snapshot: %v", err)
+				s.fireAsyncError(fmt.Errorf("got err persisting snapshot: %v", err))
 				_ = ourSnapshot.DecRef()
 				continue OUTER
 			}
@@ -446,13 +446,13 @@ func (p uint64Descending) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (s *Scorch) removeOldData() {
 	removed, err := s.removeOldBoltSnapshots()
 	if err != nil {
-		log.Printf("got err removing old bolt snapshots: %v", err)
+		s.fireAsyncError(fmt.Errorf("got err removing old bolt snapshots: %v", err))
 	}
 
 	if removed > 0 {
 		err = s.removeOldZapFiles()
 		if err != nil {
-			log.Printf("got err removing old zap files: %v", err)
+			s.fireAsyncError(fmt.Errorf("got err removing old zap files: %v", err))
 		}
 	}
 }
