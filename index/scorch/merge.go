@@ -16,7 +16,6 @@ package scorch
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"sync/atomic"
 	"time"
@@ -48,7 +47,7 @@ OUTER:
 				// lets get started
 				err := s.planMergeAtSnapshot(ourSnapshot)
 				if err != nil {
-					log.Printf("merging err: %v", err)
+					s.fireAsyncError(fmt.Errorf("merging err: %v", err))
 					_ = ourSnapshot.DecRef()
 					continue OUTER
 				}
