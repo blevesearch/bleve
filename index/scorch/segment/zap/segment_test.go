@@ -19,6 +19,8 @@ import (
 	"os"
 	"reflect"
 	"testing"
+
+	"github.com/blevesearch/bleve/index/scorch/segment"
 )
 
 func TestOpen(t *testing.T) {
@@ -513,5 +515,67 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 
 	if count != 1 {
 		t.Errorf("expected count to be 1, got %d", count)
+	}
+}
+
+func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
+	_ = os.RemoveAll("/tmp/scorch.zap")
+
+	memSegment := buildMemSegmentMulti()
+	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1)
+	if err != nil {
+		t.Fatalf("error persisting segment: %v", err)
+	}
+
+	seg, err := Open("/tmp/scorch.zap")
+	if err != nil {
+		t.Fatalf("error opening segment: %v", err)
+	}
+	defer func() {
+		cerr := seg.Close()
+		if cerr != nil {
+			t.Fatalf("error closing segment: %v", err)
+		}
+	}()
+
+	if zaps, ok := seg.(segment.DocumentFieldTermVisitable); ok {
+		fields, err := zaps.VisitableDocValueFields()
+		if err != nil {
+			t.Fatalf("segment VisitableDocValueFields err: %v", err)
+		}
+		// no persisted doc value fields
+		if len(fields) != 0 {
+			t.Errorf("expected no persisted fields for doc values, got: %#v", fields)
+		}
+	}
+
+	_ = os.RemoveAll("/tmp/scorch.zap")
+
+	memSegment, expectedFields := buildMemSegmentWithDefaultFieldMapping()
+	err = PersistSegment(memSegment, "/tmp/scorch.zap", 1)
+	if err != nil {
+		t.Fatalf("error persisting segment: %v", err)
+	}
+
+	seg, err = Open("/tmp/scorch.zap")
+	if err != nil {
+		t.Fatalf("error opening segment: %v", err)
+	}
+	defer func() {
+		cerr := seg.Close()
+		if cerr != nil {
+			t.Fatalf("error closing segment: %v", err)
+		}
+	}()
+
+	if zaps, ok := seg.(segment.DocumentFieldTermVisitable); ok {
+		fields, err := zaps.VisitableDocValueFields()
+		if err != nil {
+			t.Fatalf("segment VisitableDocValueFields err: %v", err)
+		}
+
+		if !reflect.DeepEqual(fields, expectedFields) {
+			t.Errorf("expected field terms: %#v, got: %#v", fields, expectedFields)
+		}
 	}
 }

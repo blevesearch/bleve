@@ -404,11 +404,42 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 	ss := i.segment[segmentIndex]
 
 	if zaps, ok := ss.segment.(segment.DocumentFieldTermVisitable); ok {
-		return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+		// get the list of doc value persisted fields
+		pFields, err := zaps.VisitableDocValueFields()
+		if err != nil {
+			return err
+		}
+		// assort the fields for which terms look up have to
+		// be performed runtime
+		fieldsDvPending := stringsRemoveStrings(fields, pFields)
+		if len(fieldsDvPending) == 0 {
+			// all fields are doc value persisted
+			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+		}
+
+		// concurrently trigger the runtime doc value computations for pending fields
+		// as well as the visit of the persisted doc values
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go visitDocumentFieldCacheAsync(localDocNum, fieldsDvPending, ss, &wg, visitor)
+		err = zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+		wg.Wait()
+		return err
 	}
 
-	// else fallback to the in memory fieldCache
-	err = ss.cachedDocs.prepareFields(fields, ss)
+	return visitDocumentFieldCache(localDocNum, fields, ss, visitor)
+}
+
+func visitDocumentFieldCacheAsync(localDocNum uint64, fields []string,
+	ss *SegmentSnapshot, wg *sync.WaitGroup,
+	visitor index.DocumentFieldTermVisitor) {
+	defer wg.Done()
+	_ = visitDocumentFieldCache(localDocNum, fields, ss, visitor)
+}
+
+func visitDocumentFieldCache(localDocNum uint64, fields []string,
+	ss *SegmentSnapshot, visitor index.DocumentFieldTermVisitor) error {
+	err := ss.cachedDocs.prepareFields(fields, ss)
 	if err != nil {
 		return err
 	}
@@ -429,4 +460,26 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 	}
 
 	return nil
+}
+
+func stringsToMap(strsArr []string) map[string]bool {
+	if strsArr == nil {
+		return nil
+	}
+	strs := map[string]bool{}
+	for _, str := range strsArr {
+		strs[str] = true
+	}
+	return strs
+}
+
+func stringsRemoveStrings(stringArr, removeArr []string) []string {
+	removeMap := stringsToMap(removeArr)
+	rv := make([]string, 0, len(stringArr))
+	for _, s := range stringArr {
+		if !removeMap[s] {
+			rv = append(rv, s)
+		}
+	}
+	return rv
 }
