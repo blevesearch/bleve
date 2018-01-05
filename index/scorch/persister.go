@@ -340,6 +340,28 @@ func (s *Scorch) loadFromBolt() error {
 	})
 }
 
+// LoadSnapshot loads the segment with the specified epoch
+// NOTE: this is currently ONLY intended to be used by the command-line tool
+func (s *Scorch) LoadSnapshot(epoch uint64) (rv *IndexSnapshot, err error) {
+	err = s.rootBolt.View(func(tx *bolt.Tx) error {
+		snapshots := tx.Bucket(boltSnapshotsBucket)
+		if snapshots == nil {
+			return nil
+		}
+		snapshotKey := segment.EncodeUvarintAscending(nil, epoch)
+		snapshot := snapshots.Bucket(snapshotKey)
+		if snapshot == nil {
+			return nil
+		}
+		rv, err = s.loadSnapshot(snapshot)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return rv, nil
+}
+
 func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 
 	rv := &IndexSnapshot{

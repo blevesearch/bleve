@@ -51,6 +51,14 @@ type IndexSnapshot struct {
 	refs int64
 }
 
+func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
+	return i.segment
+}
+
+func (i *IndexSnapshot) Internal() map[string][]byte {
+	return i.internal
+}
+
 func (i *IndexSnapshot) AddRef() {
 	i.m.Lock()
 	i.refs++

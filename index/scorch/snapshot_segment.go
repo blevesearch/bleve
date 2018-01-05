@@ -56,6 +56,14 @@ type SegmentSnapshot struct {
 	cachedDocs *cachedDocs
 }
 
+func (s *SegmentSnapshot) Segment() segment.Segment {
+	return s.segment
+}
+
+func (s *SegmentSnapshot) Deleted() *roaring.Bitmap {
+	return s.deleted
+}
+
 func (s *SegmentSnapshot) Id() uint64 {
 	return s.id
 }

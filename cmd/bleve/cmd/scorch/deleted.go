@@ -18,25 +18,18 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 	"github.com/spf13/cobra"
 )
 
-// snapshotCmd represents the snapshot command
-var snapshotCmd = &cobra.Command{
-	Use:   "snapshot",
-	Short: "info prints details about the snapshots in the index",
-	Long:  `The snapshot command prints details about the snapshots in the index.`,
+// deletedCmd represents the deleted command
+var deletedCmd = &cobra.Command{
+	Use:   "deleted",
+	Short: "deleted prints the deleted bitmap for segments in the index snapshot",
+	Long:  `The delete command prints the deleted bitmap for segments in the index snapshot.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if len(args) < 2 {
-			snapshotEpochs, err := index.RootBoltSnapshotEpochs()
-			if err != nil {
-				return err
-			}
-			for _, snapshotEpoch := range snapshotEpochs {
-				fmt.Printf("%d\n", snapshotEpoch)
-			}
+			return fmt.Errorf("snapshot epoch required")
 		} else if len(args) < 3 {
 			snapshotEpoch, err := strconv.ParseUint(args[1], 10, 64)
 			if err != nil {
@@ -48,10 +41,8 @@ var snapshotCmd = &cobra.Command{
 			}
 			segments := snapshot.Segments()
 			for i, segmentSnap := range segments {
-				segment := segmentSnap.Segment()
-				if segment, ok := segment.(*zap.Segment); ok {
-					fmt.Printf("%d %s\n", i, segment.Path())
-				}
+				deleted := segmentSnap.Deleted()
+				fmt.Printf("%d %v\n", i, deleted)
 			}
 		}
 
@@ -60,5 +51,5 @@ var snapshotCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.AddCommand(snapshotCmd)
+	RootCmd.AddCommand(deletedCmd)
 }
