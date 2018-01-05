@@ -184,14 +184,14 @@ func (s *Segment) VisitDocumentFieldTerms(localDocNum uint64, fields []string,
 // persisted doc value terms ready to be visitable using the
 // VisitDocumentFieldTerms method.
 func (s *Segment) VisitableDocValueFields() ([]string, error) {
-	if len(s.fieldsMap) == 0 {
-		return nil, fmt.Errorf("VisitableDocValueFields: no eligible fields" +
-			" with doc value persisted")
+	if len(s.fieldsInv) == 0 {
+		return nil, fmt.Errorf("VisitableDocValueFields: no fields" +
+			" for doc value persistence")
 	}
 
 	var rv []string
-	for field, fieldID := range s.fieldsMap {
-		if dvIter, ok := s.fieldDvIterMap[fieldID-1]; ok {
+	for fieldID, field := range s.fieldsInv {
+		if dvIter, ok := s.fieldDvIterMap[uint16(fieldID)]; ok {
 			if dvIter != nil {
 				rv = append(rv, field)
 			}

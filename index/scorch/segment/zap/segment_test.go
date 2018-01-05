@@ -575,7 +575,7 @@ func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(fields, expectedFields) {
-			t.Errorf("expected field terms: %#v, got: %#v", fields, expectedFields)
+			t.Errorf("expected field terms: %#v, got: %#v", expectedFields, fields)
 		}
 	}
 }
