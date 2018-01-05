@@ -12,34 +12,46 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cmd
+package scorch
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/blevesearch/bleve/index/scorch/segment/zap"
+	"github.com/blevesearch/bleve/index/scorch"
 	"github.com/spf13/cobra"
 )
 
-var segment *zap.Segment
+var index *scorch.Scorch
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
-	Use:   "zap",
-	Short: "command-line tool to interact with a zap file",
-	Long:  `Zap is a command-line tool to interact with a zap file.`,
+	Use:   "scorch",
+	Short: "command-line tool to interact with a scorch index",
+	Long:  `Scorch is a command-line tool to interact with a scorch index.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 
 		if len(args) < 1 {
-			return fmt.Errorf("must specify path to zap file")
+			return fmt.Errorf("must specify path to scorch index")
 		}
 
-		segInf, err := zap.Open(args[0])
-		if err != nil {
-			return fmt.Errorf("error opening zap file: %v", err)
+		readOnly := true
+		config := map[string]interface{}{
+			"read_only": readOnly,
+			"path":      args[0],
 		}
-		segment = segInf.(*zap.Segment)
+
+		idx, err := scorch.NewScorch(scorch.Name, config, nil)
+		if err != nil {
+			return err
+		}
+
+		err = idx.Open()
+		if err != nil {
+			return fmt.Errorf("error opening: %v", err)
+		}
+
+		index = idx.(*scorch.Scorch)
 
 		return nil
 	},

@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package cmd
 
 import (
-	"github.com/blevesearch/bleve/index/scorch/segment/zap/cmd/zap/cmd"
+	"github.com/blevesearch/bleve/cmd/bleve/cmd/scorch"
 )
 
-func main() {
-	cmd.Execute()
+// make scorch command-line tool a bleve sub-command
+
+func init() {
+	RootCmd.AddCommand(scorch.RootCmd)
 }

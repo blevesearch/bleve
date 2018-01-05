@@ -443,7 +443,7 @@ var NumSnapshotsToKeep = 1
 // Removes enough snapshots from the rootBolt so that the
 // s.eligibleForRemoval stays under the NumSnapshotsToKeep policy.
 func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
-	persistedEpochs, err := s.rootBoltSnapshotEpochs()
+	persistedEpochs, err := s.RootBoltSnapshotEpochs()
 	if err != nil {
 		return 0, err
 	}
@@ -565,7 +565,7 @@ func (s *Scorch) removeOldZapFiles() error {
 	return nil
 }
 
-func (s *Scorch) rootBoltSnapshotEpochs() ([]uint64, error) {
+func (s *Scorch) RootBoltSnapshotEpochs() ([]uint64, error) {
 	var rv []uint64
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(boltSnapshotsBucket)
