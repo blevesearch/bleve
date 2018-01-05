@@ -339,7 +339,7 @@ func (im *IndexMappingImpl) newWalkContext(doc *document.Document, dm *DocumentM
 		doc:             doc,
 		im:              im,
 		dm:              dm,
-		excludedFromAll: []string{},
+		excludedFromAll: []string{"_id"},
 	}
 }
 
