@@ -1,4 +1,4 @@
-//  Copyright (c) 2017 Couchbase, Inc.
+//  Copyright (c) 2018 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -75,37 +75,6 @@ type Scorch struct {
 	onEvent func(event Event)
 }
 
-// Event represents the information provided in an OnEvent() callback.
-type Event struct {
-	Kind     EventKind
-	Scorch   *Scorch
-	Duration time.Duration
-}
-
-// EventKind represents an event code for OnEvent() callbacks.
-type EventKind int
-
-// EventKindCLoseStart is fired when a Scorch.Close() has begun.
-var EventKindCloseStart = EventKind(1)
-
-// EventKindClose is fired when a scorch index has been fully closed.
-var EventKindClose = EventKind(2)
-
-// EventKindMergerProgress is fired when the merger has completed a
-// round of merge processing.
-var EventKindMergerProgress = EventKind(3)
-
-// EventKindPersisterProgress is fired when the persister has completed
-// a round of persistence processing.
-var EventKindPersisterProgress = EventKind(4)
-
-// EventKindBatchIntroductionStart is fired when Batch() is invoked which
-// introduces a new segment.
-var EventKindBatchIntroductionStart = EventKind(5)
-
-// EventKindBatchIntroduction is fired when Batch() completes.
-var EventKindBatchIntroduction = EventKind(6)
-
 func NewScorch(storeName string,
 	config map[string]interface{},
 	analysisQueue *index.AnalysisQueue) (index.Index, error) {
@@ -127,11 +96,11 @@ func NewScorch(storeName string,
 	if ok {
 		rv.unsafeBatch = ub
 	}
+	ecbName, ok := config["eventCallbackName"].(string)
+	if ok {
+		rv.onEvent = RegistryEventCallbacks[ecbName]
+	}
 	return rv, nil
-}
-
-func (s *Scorch) SetEventCallback(f func(Event)) {
-	s.onEvent = f
 }
 
 func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) {
