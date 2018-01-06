@@ -91,9 +91,14 @@ type Location interface {
 }
 
 // DocumentFieldTermVisitable is implemented by various scorch segment
-// implementations to provide the un inverting of the postings
-// or other indexed values.
+// implementations with persistence for the un inverting of the
+// postings or other indexed values.
 type DocumentFieldTermVisitable interface {
 	VisitDocumentFieldTerms(localDocNum uint64, fields []string,
 		visitor index.DocumentFieldTermVisitor) error
+
+	// VisitableDocValueFields implementation should return
+	// the list of fields which are document value persisted and
+	// therefore visitable by the above VisitDocumentFieldTerms method.
+	VisitableDocValueFields() ([]string, error)
 }

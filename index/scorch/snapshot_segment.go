@@ -18,7 +18,6 @@ import (
 	"sync"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 )
 
@@ -82,50 +81,6 @@ func (s *SegmentSnapshot) Close() error {
 
 func (s *SegmentSnapshot) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
 	return s.segment.VisitDocument(num, visitor)
-}
-
-func (s *SegmentSnapshot) DocumentVisitFieldTerms(num uint64, fields []string,
-	visitor index.DocumentFieldTermVisitor) error {
-	collection := make(map[string][][]byte)
-	// collect field indexed values
-	for _, field := range fields {
-		dict, err := s.Dictionary(field)
-		if err != nil {
-			return err
-		}
-		dictItr := dict.Iterator()
-		var next *index.DictEntry
-		next, err = dictItr.Next()
-		for next != nil && err == nil {
-			postings, err2 := dict.PostingsList(next.Term, nil)
-			if err2 != nil {
-				return err2
-			}
-			postingsItr := postings.Iterator()
-			nextPosting, err2 := postingsItr.Next()
-			for err2 == nil && nextPosting != nil && nextPosting.Number() <= num {
-				if nextPosting.Number() == num {
-					// got what we're looking for
-					collection[field] = append(collection[field], []byte(next.Term))
-				}
-				nextPosting, err = postingsItr.Next()
-			}
-			if err2 != nil {
-				return err
-			}
-			next, err = dictItr.Next()
-		}
-		if err != nil {
-			return err
-		}
-	}
-	// invoke callback
-	for field, values := range collection {
-		for _, value := range values {
-			visitor(field, value)
-		}
-	}
-	return nil
 }
 
 func (s *SegmentSnapshot) Count() uint64 {

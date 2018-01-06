@@ -40,7 +40,8 @@ var mappingSource = []byte(`{
     						"store": true,
     						"index": true,
                             "include_term_vectors": true,
-                            "include_in_all": true
+                            "include_in_all": true,
+                            "docvalues": true
     					}
     				]
     			}

@@ -119,10 +119,10 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 		if field.Options().IsStored() {
 			storeField(docNum, fieldID, encodeFieldType(field), field.Value(), field.ArrayPositions())
 		}
-		// TODO with mapping changes for dv
-		//if field.Options().IncludeDocValues() {
-		s.DocValueFields[fieldID] = true
-		//}
+
+		if field.Options().IncludeDocValues() {
+			s.DocValueFields[fieldID] = true
+		}
 	}
 
 	// now that its been rolled up into docMap, walk that
