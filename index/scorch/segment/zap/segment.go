@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"unsafe"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/Smerity/govarint"
@@ -103,7 +104,8 @@ func (s *Segment) SizeInBytes() uint64 {
 	// 8 /* size of numDocs -> uint64 */ +
 	// 8 /* size of storedIndexOffset -> uint64 */ +
 	// 8 /* size of fieldsIndexOffset -> uint64 */
-	sizeOfUints := 36
+	// 8 /* size of docValueOffset -> uint64 */
+	sizeOfUints := 44
 
 	sizeInBytes := len(s.mm) + len(s.path) + sizeOfUints
 
@@ -117,6 +119,10 @@ func (s *Segment) SizeInBytes() uint64 {
 
 	sizeInBytes += len(s.fieldsOffsets) * 8 /* size of uint64 */
 	sizeInBytes += 8                        /* size of refs -> int64 */
+
+	for _, entry := range s.fieldDvIterMap {
+		sizeInBytes += int(unsafe.Sizeof(entry)) + 2 /* size of uint16 */
+	}
 
 	return uint64(sizeInBytes)
 }
