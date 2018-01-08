@@ -1638,3 +1638,72 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 	}
 
 }
+
+func TestIndexDocumentVisitFieldTermsWithMultipleFieldOptions(t *testing.T) {
+	defer func() {
+		err := DestroyTest()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Fatalf("error opening index: %v", err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// mix of field options, this exercises the run time/ on the fly un inverting of
+	// doc values for custom options enabled field like designation, dept.
+	options := document.IndexField | document.StoreField | document.IncludeTermVectors
+	doc := document.NewDocument("1")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))    // default doc value persisted
+	doc.AddField(document.NewTextField("title", []uint64{}, []byte("mister"))) // default doc value persisted
+	doc.AddField(document.NewTextFieldWithIndexingOptions("designation", []uint64{}, []byte("engineer"), options))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("dept", []uint64{}, []byte("bleve"), options))
+
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+
+	fieldTerms := make(index.FieldTerms)
+	docNumber, err := indexReader.InternalID("1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "designation", "dept"}, func(field string, term []byte) {
+		fieldTerms[field] = append(fieldTerms[field], string(term))
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	expectedFieldTerms := index.FieldTerms{
+		"name":        []string{"test"},
+		"designation": []string{"engineer"},
+		"dept":        []string{"bleve"},
+	}
+	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	}
+	err = indexReader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+}

@@ -412,14 +412,63 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 	ss := i.segment[segmentIndex]
 
 	if zaps, ok := ss.segment.(segment.DocumentFieldTermVisitable); ok {
-		return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+		// get the list of doc value persisted fields
+		pFields, err := zaps.VisitableDocValueFields()
+		if err != nil {
+			return err
+		}
+		// assort the fields for which terms look up have to
+		// be performed runtime
+		dvPendingFields := extractDvPendingFields(fields, pFields)
+		if len(dvPendingFields) == 0 {
+			// all fields are doc value persisted
+			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+		}
+
+		// concurrently trigger the runtime doc value preparations for
+		// pending fields as well as the visit of the persisted doc values
+		errCh := make(chan error, 1)
+
+		go func() {
+			defer close(errCh)
+			err := ss.cachedDocs.prepareFields(fields, ss)
+			if err != nil {
+				errCh <- err
+			}
+		}()
+
+		// visit the persisted dv while the cache preparation is in progress
+		err = zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+		if err != nil {
+			return err
+		}
+
+		// err out if fieldCache preparation failed
+		err = <-errCh
+		if err != nil {
+			return err
+		}
+
+		visitDocumentFieldCacheTerms(localDocNum, dvPendingFields, ss, visitor)
+		return nil
 	}
 
-	// else fallback to the in memory fieldCache
-	err = ss.cachedDocs.prepareFields(fields, ss)
+	return prepareCacheVisitDocumentFieldTerms(localDocNum, fields, ss, visitor)
+}
+
+func prepareCacheVisitDocumentFieldTerms(localDocNum uint64, fields []string,
+	ss *SegmentSnapshot, visitor index.DocumentFieldTermVisitor) error {
+	err := ss.cachedDocs.prepareFields(fields, ss)
 	if err != nil {
 		return err
 	}
+
+	visitDocumentFieldCacheTerms(localDocNum, fields, ss, visitor)
+	return nil
+}
+
+func visitDocumentFieldCacheTerms(localDocNum uint64, fields []string,
+	ss *SegmentSnapshot, visitor index.DocumentFieldTermVisitor) {
 
 	for _, field := range fields {
 		if cachedFieldDocs, exists := ss.cachedDocs.cache[field]; exists {
@@ -436,5 +485,19 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 		}
 	}
 
-	return nil
+}
+
+func extractDvPendingFields(requestedFields, persistedFields []string) []string {
+	removeMap := map[string]struct{}{}
+	for _, str := range persistedFields {
+		removeMap[str] = struct{}{}
+	}
+
+	rv := make([]string, 0, len(requestedFields))
+	for _, s := range requestedFields {
+		if _, ok := removeMap[s]; !ok {
+			rv = append(rv, s)
+		}
+	}
+	return rv
 }

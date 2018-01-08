@@ -286,3 +286,90 @@ func buildMemSegmentMulti() *mem.Segment {
 
 	return segment
 }
+
+func buildMemSegmentWithDefaultFieldMapping() (*mem.Segment, []string) {
+
+	doc := &document.Document{
+		ID: "a",
+		Fields: []document.Field{
+			document.NewTextField("_id", nil, []byte("a")),
+			document.NewTextField("name", nil, []byte("wow")),
+			document.NewTextField("desc", nil, []byte("some thing")),
+			document.NewTextField("tag", []uint64{0}, []byte("cold")),
+		},
+		CompositeFields: []*document.CompositeField{
+			document.NewCompositeField("_all", true, nil, []string{"_id"}),
+		},
+	}
+
+	var fields []string
+	fields = append(fields, "_id")
+	fields = append(fields, "name")
+	fields = append(fields, "desc")
+	fields = append(fields, "tag")
+
+	// forge analyzed docs
+	results := []*index.AnalysisResult{
+		&index.AnalysisResult{
+			Document: doc,
+			Analyzed: []analysis.TokenFrequencies{
+				analysis.TokenFrequency(analysis.TokenStream{
+					&analysis.Token{
+						Start:    0,
+						End:      1,
+						Position: 1,
+						Term:     []byte("a"),
+					},
+				}, nil, false),
+				analysis.TokenFrequency(analysis.TokenStream{
+					&analysis.Token{
+						Start:    0,
+						End:      3,
+						Position: 1,
+						Term:     []byte("wow"),
+					},
+				}, nil, true),
+				analysis.TokenFrequency(analysis.TokenStream{
+					&analysis.Token{
+						Start:    0,
+						End:      4,
+						Position: 1,
+						Term:     []byte("some"),
+					},
+					&analysis.Token{
+						Start:    5,
+						End:      10,
+						Position: 2,
+						Term:     []byte("thing"),
+					},
+				}, nil, true),
+				analysis.TokenFrequency(analysis.TokenStream{
+					&analysis.Token{
+						Start:    0,
+						End:      4,
+						Position: 1,
+						Term:     []byte("cold"),
+					},
+				}, []uint64{0}, true),
+			},
+			Length: []int{
+				1,
+				1,
+				2,
+				1,
+				1,
+			},
+		},
+	}
+
+	// fix up composite fields
+	for _, ar := range results {
+		for i, f := range ar.Document.Fields {
+			for _, cf := range ar.Document.CompositeFields {
+				cf.Compose(f.Name(), ar.Length[i], ar.Analyzed[i])
+			}
+		}
+	}
+
+	return mem.NewFromAnalyzedDocs(results), fields
+}
