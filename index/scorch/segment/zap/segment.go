@@ -105,7 +105,8 @@ func (s *Segment) SizeInBytes() uint64 {
 	// 8 /* size of fieldsIndexOffset -> uint64 */
 	sizeOfUints := 36
 
-	sizeInBytes := len(s.mm) + len(s.path) + sizeOfUints
+	// Do not include the mmap'ed part
+	sizeInBytes := len(s.path) + sizeOfUints
 
 	for k, _ := range s.fieldsMap {
 		sizeInBytes += len(k) + 2 /* size of uint16 */
