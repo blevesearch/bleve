@@ -50,55 +50,45 @@ OUTER:
 		default:
 		}
 
-		var ourSnapshot *IndexSnapshot
+		var ourEpoch uint64
+		ourInternal := map[string][]byte{}
+		var ourSegmentSnapshots []*SegmentSnapshot
 		var ourPersisted []chan error
 
 		// check to see if there is a new snapshot to persist
 		s.rootLock.Lock()
 		if s.root != nil && s.root.epoch > lastPersistedEpoch {
-			ourSnapshot = s.root
-			ourSnapshot.AddRef()
+			ourEpoch = s.root.epoch
+			for k, v := range s.root.internal {
+				ourInternal[k] = v
+			}
+			ourSegmentSnapshots = s.root.segment
 			ourPersisted = s.rootPersisted
 			s.rootPersisted = nil
 		}
 		s.rootLock.Unlock()
 
-		if ourSnapshot != nil {
-			startTime := time.Now()
+		startTime := time.Now()
 
-			err := s.persistSnapshot(ourSnapshot)
-			for _, ch := range ourPersisted {
-				if err != nil {
-					ch <- err
-				}
-				close(ch)
-			}
+		err := s.persistSnapshot(ourEpoch, ourInternal, ourSegmentSnapshots)
+		for _, ch := range ourPersisted {
 			if err != nil {
-				s.fireAsyncError(fmt.Errorf("got err persisting snapshot: %v", err))
-				_ = ourSnapshot.DecRef()
-				continue OUTER
+				ch <- err
 			}
-
-			lastPersistedEpoch = ourSnapshot.epoch
-			for _, notifyCh := range notifyChs {
-				close(notifyCh)
-			}
-			notifyChs = nil
-			_ = ourSnapshot.DecRef()
-
-			changed := false
-			s.rootLock.RLock()
-			if s.root != nil && s.root.epoch != lastPersistedEpoch {
-				changed = true
-			}
-			s.rootLock.RUnlock()
-
-			s.fireEvent(EventKindPersisterProgress, time.Since(startTime))
-
-			if changed {
-				continue OUTER
-			}
+			close(ch)
 		}
+		if err != nil {
+			s.fireAsyncError(fmt.Errorf("got err persisting snapshot: %v", err))
+			continue OUTER
+		}
+
+		lastPersistedEpoch = ourEpoch
+		for _, notifyCh := range notifyChs {
+			close(notifyCh)
+		}
+		notifyChs = nil
+
+		s.fireEvent(EventKindPersisterProgress, time.Since(startTime))
 
 		// tell the introducer we're waiting for changes
 		w := &epochWatcher{
@@ -123,7 +113,7 @@ OUTER:
 	}
 }
 
-func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
+func (s *Scorch) persistSnapshot(epoch uint64, internal map[string][]byte, segmentSnapshots []*SegmentSnapshot) error {
 	// start a write transaction
 	tx, err := s.rootBolt.Begin(true)
 	if err != nil {
@@ -148,7 +138,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	if err != nil {
 		return err
 	}
-	newSnapshotKey := segment.EncodeUvarintAscending(nil, snapshot.epoch)
+	newSnapshotKey := segment.EncodeUvarintAscending(nil, epoch)
 	snapshotBucket, err := snapshotsBucket.CreateBucketIfNotExists(newSnapshotKey)
 	if err != nil {
 		return err
@@ -160,7 +150,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		return err
 	}
 	// TODO optimize writing these in order?
-	for k, v := range snapshot.internal {
+	for k, v := range internal {
 		err = internalBucket.Put([]byte(k), v)
 		if err != nil {
 			return err
@@ -171,7 +161,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	newSegmentPaths := make(map[uint64]string)
 
 	// first ensure that each segment in this snapshot has been persisted
-	for i, segmentSnapshot := range snapshot.segment {
+	for i, segmentSnapshot := range segmentSnapshots {
 		snapshotSegmentKey := segment.EncodeUvarintAscending(nil, uint64(i))
 		snapshotSegmentBucket, err2 := snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
 		if err2 != nil {
@@ -235,45 +225,25 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		}
 
 		s.rootLock.Lock()
-		newIndexSnapshot := &IndexSnapshot{
-			parent:   s,
-			epoch:    s.nextSnapshotEpoch,
-			segment:  make([]*SegmentSnapshot, len(s.root.segment)),
-			offsets:  make([]uint64, len(s.root.offsets)),
-			internal: make(map[string][]byte, len(s.root.internal)),
-			refs:     1,
-		}
 		s.nextSnapshotEpoch++
 		for i, segmentSnapshot := range s.root.segment {
 			// see if this segment has been replaced
 			if replacement, ok := newSegments[segmentSnapshot.id]; ok {
-				newSegmentSnapshot := &SegmentSnapshot{
-					id:         segmentSnapshot.id,
-					segment:    replacement,
-					deleted:    segmentSnapshot.deleted,
-					cachedDocs: segmentSnapshot.cachedDocs,
-				}
-				newIndexSnapshot.segment[i] = newSegmentSnapshot
+				s.root.segment[i].segment = replacement
 				// update items persisted incase of a new segment snapshot
-				atomic.AddUint64(&s.stats.numItemsPersisted, newSegmentSnapshot.Count())
-			} else {
-				newIndexSnapshot.segment[i] = s.root.segment[i]
-				newIndexSnapshot.segment[i].segment.AddRef()
+				atomic.AddUint64(&s.stats.numItemsPersisted, s.root.segment[i].Count())
 			}
-			newIndexSnapshot.offsets[i] = s.root.offsets[i]
 		}
-		for k, v := range s.root.internal {
-			newIndexSnapshot.internal[k] = v
-		}
+
+		// update epoch
+		s.root.epoch = s.nextSnapshotEpoch
+		s.nextSnapshotEpoch++
+
 		for _, filename := range filenames {
 			delete(s.ineligibleForRemoval, filename)
 		}
-		rootPrev := s.root
-		s.root = newIndexSnapshot
+
 		s.rootLock.Unlock()
-		if rootPrev != nil {
-			_ = rootPrev.DecRef()
-		}
 	}
 
 	return nil

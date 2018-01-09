@@ -95,19 +95,6 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	// acquire lock
 	s.rootLock.Lock()
 
-	nsegs := len(s.root.segment)
-
-	// prepare new index snapshot
-	newSnapshot := &IndexSnapshot{
-		parent:   s,
-		segment:  make([]*SegmentSnapshot, nsegs, nsegs+1),
-		offsets:  make([]uint64, nsegs, nsegs+1),
-		internal: make(map[string][]byte, len(s.root.internal)),
-		epoch:    s.nextSnapshotEpoch,
-		refs:     1,
-	}
-	s.nextSnapshotEpoch++
-
 	// iterate through current segments
 	var running uint64
 	for i := range s.root.segment {
@@ -119,25 +106,19 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			if err != nil {
 				next.applied <- fmt.Errorf("error computing doc numbers: %v", err)
 				close(next.applied)
-				_ = newSnapshot.DecRef()
 				return err
 			}
-		}
-		newSnapshot.segment[i] = &SegmentSnapshot{
-			id:         s.root.segment[i].id,
-			segment:    s.root.segment[i].segment,
-			cachedDocs: s.root.segment[i].cachedDocs,
 		}
 		s.root.segment[i].segment.AddRef()
 
 		// apply new obsoletions
 		if s.root.segment[i].deleted == nil {
-			newSnapshot.segment[i].deleted = delta
+			s.root.segment[i].deleted = delta
 		} else {
-			newSnapshot.segment[i].deleted = roaring.Or(s.root.segment[i].deleted, delta)
+			s.root.segment[i].deleted = roaring.Or(s.root.segment[i].deleted, delta)
 		}
 
-		newSnapshot.offsets[i] = running
+		s.root.offsets[i] = running
 		running += s.root.segment[i].Count()
 
 	}
@@ -148,37 +129,34 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			segment:    next.data, // take ownership of next.data's ref-count
 			cachedDocs: &cachedDocs{cache: nil},
 		}
-		newSnapshot.segment = append(newSnapshot.segment, newSegmentSnapshot)
-		newSnapshot.offsets = append(newSnapshot.offsets, running)
+		s.root.segment = append(s.root.segment, newSegmentSnapshot)
+		s.root.offsets = append(s.root.offsets, running)
 
 		// increment numItemsIntroduced which tracks the number of items
 		// queued for persistence.
 		atomic.AddUint64(&s.stats.numItemsIntroduced, newSegmentSnapshot.Count())
 	}
-	// copy old values
-	for key, oldVal := range s.root.internal {
-		newSnapshot.internal[key] = oldVal
-	}
 	// set new values and apply deletes
+	if s.root.internal == nil {
+		s.root.internal = map[string][]byte{}
+	}
 	for key, newVal := range next.internal {
 		if newVal != nil {
-			newSnapshot.internal[key] = newVal
+			s.root.internal[key] = newVal
 		} else {
-			delete(newSnapshot.internal, key)
+			delete(s.root.internal, key)
 		}
 	}
 	if next.persisted != nil {
 		s.rootPersisted = append(s.rootPersisted, next.persisted)
 	}
-	// swap in new index snapshot
-	rootPrev := s.root
-	s.root = newSnapshot
+
+	// Update the epoch
+	s.root.epoch = s.nextSnapshotEpoch
+	s.nextSnapshotEpoch++
+
 	// release lock
 	s.rootLock.Unlock()
-
-	if rootPrev != nil {
-		_ = rootPrev.DecRef()
-	}
 
 	close(next.applied)
 
