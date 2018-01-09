@@ -407,16 +407,20 @@ func (s *Scorch) AddEligibleForRemoval(epoch uint64) {
 	s.rootLock.Unlock()
 }
 
-func (s *Scorch) MemoryUsed() uint64 {
+func (s *Scorch) CurDirtyBytes() uint64 {
 	var memUsed uint64
 	s.rootLock.RLock()
-	for _, segmentSnapshot := range s.root.segment {
-		memUsed += 8 /* size of id -> uint64 */ +
-			segmentSnapshot.segment.SizeInBytes()
-		if segmentSnapshot.deleted != nil {
-			memUsed += segmentSnapshot.deleted.GetSizeInBytes()
+	if s.root != nil {
+		for _, segmentSnapshot := range s.root.segment {
+			memUsed += 8 /* size of id -> uint64 */
+			if _, ok := segmentSnapshot.segment.(*mem.Segment); ok {
+				memUsed += segmentSnapshot.segment.SizeInBytes()
+			}
+			if segmentSnapshot.deleted != nil {
+				memUsed += segmentSnapshot.deleted.GetSizeInBytes()
+			}
+			memUsed += segmentSnapshot.cachedDocs.sizeInBytes()
 		}
-		memUsed += segmentSnapshot.cachedDocs.sizeInBytes()
 	}
 	s.rootLock.RUnlock()
 	return memUsed
