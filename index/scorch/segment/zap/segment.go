@@ -122,6 +122,9 @@ func (s *Segment) SizeInBytes() uint64 {
 
 	for _, entry := range s.fieldDvIterMap {
 		sizeInBytes += int(unsafe.Sizeof(entry)) + 2 /* size of uint16 */
+		if entry != nil {
+			sizeInBytes += int(entry.sizeInBytes())
+		}
 	}
 
 	return uint64(sizeInBytes)
