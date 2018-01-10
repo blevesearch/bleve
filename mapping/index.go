@@ -50,7 +50,7 @@ type IndexMappingImpl struct {
 	DefaultField          string                      `json:"default_field"`
 	StoreDynamic          bool                        `json:"store_dynamic"`
 	IndexDynamic          bool                        `json:"index_dynamic"`
-	DocValues             bool                        `json:"docvalues,omitempty"`
+	DocValuesDynamic      bool                        `json:"docvalues_dynamic,omitempty"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
 	cache                 *registry.Cache
 }
@@ -155,7 +155,7 @@ func NewIndexMapping() *IndexMappingImpl {
 		DefaultField:          defaultField,
 		IndexDynamic:          IndexDynamic,
 		StoreDynamic:          StoreDynamic,
-		DocValues:             DocValues,
+		DocValuesDynamic:      DocValuesDynamic,
 		CustomAnalysis:        newCustomAnalysis(),
 		cache:                 registry.NewCache(),
 	}
@@ -219,7 +219,7 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 	im.TypeMapping = make(map[string]*DocumentMapping)
 	im.StoreDynamic = StoreDynamic
 	im.IndexDynamic = IndexDynamic
-	im.DocValues = DocValues
+	im.DocValuesDynamic = DocValuesDynamic
 
 	var invalidKeys []string
 	for k, v := range tmp {
@@ -274,8 +274,8 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
-		case "docvalues":
-			err := json.Unmarshal(v, &im.DocValues)
+		case "docvalues_dynamic":
+			err := json.Unmarshal(v, &im.DocValuesDynamic)
 			if err != nil {
 				return err
 			}

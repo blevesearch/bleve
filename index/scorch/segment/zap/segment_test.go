@@ -40,7 +40,7 @@ func TestOpen(t *testing.T) {
 	defer func() {
 		cerr := segment.Close()
 		if cerr != nil {
-			t.Fatalf("error closing segment: %v", err)
+			t.Fatalf("error closing segment: %v", cerr)
 		}
 	}()
 
@@ -340,7 +340,7 @@ func TestOpenMulti(t *testing.T) {
 	defer func() {
 		cerr := segment.Close()
 		if cerr != nil {
-			t.Fatalf("error closing segment: %v", err)
+			t.Fatalf("error closing segment: %v", cerr)
 		}
 	}()
 
@@ -440,7 +440,7 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 	defer func() {
 		cerr := segment.Close()
 		if cerr != nil {
-			t.Fatalf("error closing segment: %v", err)
+			t.Fatalf("error closing segment: %v", cerr)
 		}
 	}()
 
@@ -533,11 +533,6 @@ func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 		t.Fatalf("error opening segment: %v", err)
 	}
 
-	cerr := seg.Close()
-	if cerr != nil {
-		t.Fatalf("error closing segment: %v", err)
-	}
-
 	if zaps, ok := seg.(segment.DocumentFieldTermVisitable); ok {
 		fields, err := zaps.VisitableDocValueFields()
 		if err != nil {
@@ -549,6 +544,10 @@ func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 		}
 	}
 
+	err = seg.Close()
+	if err != nil {
+		t.Fatalf("error closing segment: %v", err)
+	}
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
 	memSegment, expectedFields := buildMemSegmentWithDefaultFieldMapping()
@@ -561,10 +560,11 @@ func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error opening segment: %v", err)
 	}
+
 	defer func() {
 		cerr := seg.Close()
 		if cerr != nil {
-			t.Fatalf("error closing segment: %v", err)
+			t.Fatalf("error closing segment: %v", cerr)
 		}
 	}()
 

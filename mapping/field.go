@@ -26,9 +26,9 @@ import (
 
 // control the default behavior for dynamic fields (those not explicitly mapped)
 var (
-	IndexDynamic = true
-	StoreDynamic = true
-	DocValues    = true // TODO revisit default?
+	IndexDynamic     = true
+	StoreDynamic     = true
+	DocValuesDynamic = true // TODO revisit default?
 )
 
 // A FieldMapping describes how a specific item
@@ -77,7 +77,7 @@ func newTextFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewTextFieldMapping()
 	rv.Store = im.StoreDynamic
 	rv.Index = im.IndexDynamic
-	rv.DocValues = im.DocValues
+	rv.DocValues = im.DocValuesDynamic
 	return rv
 }
 
@@ -96,7 +96,7 @@ func newNumericFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewNumericFieldMapping()
 	rv.Store = im.StoreDynamic
 	rv.Index = im.IndexDynamic
-	rv.DocValues = im.DocValues
+	rv.DocValues = im.DocValuesDynamic
 	return rv
 }
 
@@ -115,7 +115,7 @@ func newDateTimeFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewDateTimeFieldMapping()
 	rv.Store = im.StoreDynamic
 	rv.Index = im.IndexDynamic
-	rv.DocValues = im.DocValues
+	rv.DocValues = im.DocValuesDynamic
 	return rv
 }
 
@@ -134,7 +134,7 @@ func newBooleanFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewBooleanFieldMapping()
 	rv.Store = im.StoreDynamic
 	rv.Index = im.IndexDynamic
-	rv.DocValues = im.DocValues
+	rv.DocValues = im.DocValuesDynamic
 	return rv
 }
 
