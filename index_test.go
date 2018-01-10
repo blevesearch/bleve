@@ -56,7 +56,7 @@ func TestCrud(t *testing.T) {
 		"name": "marty",
 		"desc": "gophercon india",
 	}
-	err = index.Index("a", doca)
+	err = index.Index("a", "default", doca)
 	if err != nil {
 		t.Error(err)
 	}
@@ -65,7 +65,7 @@ func TestCrud(t *testing.T) {
 		"name": "jasper",
 		"desc": "clojure",
 	}
-	err = index.Index("y", docy)
+	err = index.Index("y", "default", docy)
 	if err != nil {
 		t.Error(err)
 	}
@@ -79,7 +79,7 @@ func TestCrud(t *testing.T) {
 		"name": "rose",
 		"desc": "googler",
 	}
-	err = index.Index("x", docx)
+	err = index.Index("x", "default", docx)
 	if err != nil {
 		t.Error(err)
 	}
@@ -94,7 +94,7 @@ func TestCrud(t *testing.T) {
 		"desc": "cbft master",
 	}
 	batch := index.NewBatch()
-	err = batch.Index("b", docb)
+	err = batch.Index("b", "default", docb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -314,7 +314,7 @@ func TestClosedIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = index.Index("test", "test")
+	err = index.Index("test", "default", "test")
 	if err != ErrorIndexClosed {
 		t.Errorf("expected error index closed, got %v", err)
 	}
@@ -451,7 +451,7 @@ func TestStoredFieldPreserved(t *testing.T) {
 		"bool": true,
 		"num":  float64(1),
 	}
-	err = index.Index("a", doca)
+	err = index.Index("a", "default", doca)
 	if err != nil {
 		t.Error(err)
 	}
@@ -498,7 +498,7 @@ func TestDict(t *testing.T) {
 		"name": "marty",
 		"desc": "gophercon india",
 	}
-	err = index.Index("a", doca)
+	err = index.Index("a", "default", doca)
 	if err != nil {
 		t.Error(err)
 	}
@@ -507,7 +507,7 @@ func TestDict(t *testing.T) {
 		"name": "jasper",
 		"desc": "clojure",
 	}
-	err = index.Index("y", docy)
+	err = index.Index("y", "default", docy)
 	if err != nil {
 		t.Error(err)
 	}
@@ -516,7 +516,7 @@ func TestDict(t *testing.T) {
 		"name": "rose",
 		"desc": "googler",
 	}
-	err = index.Index("x", docx)
+	err = index.Index("x", "default", docx)
 	if err != nil {
 		t.Error(err)
 	}
@@ -570,7 +570,7 @@ func TestDict(t *testing.T) {
 		"name": "prefix",
 		"desc": "bob cat cats catting dog doggy zoo",
 	}
-	err = index.Index("z", docz)
+	err = index.Index("z", "default", docz)
 	if err != nil {
 		t.Error(err)
 	}
@@ -628,7 +628,7 @@ func TestBatchString(t *testing.T) {
 	}()
 
 	batch := index.NewBatch()
-	err = batch.Index("a", []byte("{}"))
+	err = batch.Index("a", "default", []byte("{}"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -694,7 +694,7 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		batch := index.NewBatch()
-		err = batch.Index("a", []byte("{}"))
+		err = batch.Index("a", "default", []byte("{}"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -728,7 +728,7 @@ func TestSortMatchSearch(t *testing.T) {
 		doc["Name"] = names[i%len(names)]
 		doc["Day"] = days[i%len(days)]
 		doc["Number"] = numbers[i%len(numbers)]
-		err = index.Index(fmt.Sprintf("%d", i), doc)
+		err = index.Index(fmt.Sprintf("%d", i), "default", doc)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -780,7 +780,7 @@ func TestIndexCountMatchSearch(t *testing.T) {
 				}{
 					Body: "match",
 				}
-				err := b.Index(id, doc)
+				err := b.Index(id, "default", doc)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -836,7 +836,7 @@ func TestBatchReset(t *testing.T) {
 	}
 
 	batch := index.NewBatch()
-	err = batch.Index("k1", struct {
+	err = batch.Index("k1", "default", struct {
 		Body string
 	}{
 		Body: "v1",
@@ -879,7 +879,7 @@ func TestDocumentFieldArrayPositions(t *testing.T) {
 	}
 
 	// index a document with an array of strings
-	err = index.Index("k", struct {
+	err = index.Index("k", "default", struct {
 		Messages []string
 	}{
 		Messages: []string{
@@ -943,7 +943,7 @@ func TestDocumentFieldArrayPositions(t *testing.T) {
 	}
 
 	// now index a document in the same field with a single string
-	err = index.Index("k2", struct {
+	err = index.Index("k2", "default", struct {
 		Messages string
 	}{
 		Messages: "only",
@@ -1000,7 +1000,7 @@ func TestKeywordSearchBug207(t *testing.T) {
 		Body: "a555c3bb06f7a127cda000005",
 	}
 
-	err = index.Index("a", doc1)
+	err = index.Index("a", "default", doc1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1011,7 +1011,7 @@ func TestKeywordSearchBug207(t *testing.T) {
 		Body: "555c3bb06f7a127cda000005",
 	}
 
-	err = index.Index("b", doc2)
+	err = index.Index("b", "default", doc2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1086,7 +1086,7 @@ func TestTermVectorArrayPositions(t *testing.T) {
 	}
 
 	// index a document with an array of strings
-	err = index.Index("k", struct {
+	err = index.Index("k", "default", struct {
 		Messages []string
 	}{
 		Messages: []string{
@@ -1184,7 +1184,7 @@ func TestDocumentStaticMapping(t *testing.T) {
 		IgnoredDate:    time.Unix(2, 0),
 	}
 
-	err = index.Index("a", doc1)
+	err = index.Index("a", "default", doc1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1233,7 +1233,7 @@ func TestIndexEmptyDocId(t *testing.T) {
 		"body": "nodocid",
 	}
 
-	err = index.Index("", doc)
+	err = index.Index("", "default", doc)
 	if err != ErrorEmptyID {
 		t.Errorf("expect index empty doc id to fail")
 	}
@@ -1244,7 +1244,7 @@ func TestIndexEmptyDocId(t *testing.T) {
 	}
 
 	batch := index.NewBatch()
-	err = batch.Index("", doc)
+	err = batch.Index("", "default", doc)
 	if err != ErrorEmptyID {
 		t.Errorf("expect index empty doc id in batch to fail")
 	}
@@ -1284,7 +1284,7 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		d := doc{now.Add(time.Duration((i - 3)) * time.Hour)}
 
-		err = index.Index(strconv.FormatInt(int64(i), 10), d)
+		err = index.Index(strconv.FormatInt(int64(i), 10), "default", d)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1352,7 +1352,7 @@ func TestDocumentFieldArrayPositionsBug295(t *testing.T) {
 	}
 
 	// index a document with an array of strings
-	err = index.Index("k", struct {
+	err = index.Index("k", "default", struct {
 		Messages []string
 		Another  string
 		MoreData []string
@@ -1442,11 +1442,11 @@ func TestBooleanFieldMappingIssue109(t *testing.T) {
 	type doc struct {
 		Bool bool
 	}
-	err = index.Index("true", &doc{Bool: true})
+	err = index.Index("true", "default", &doc{Bool: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = index.Index("false", &doc{Bool: false})
+	err = index.Index("false", "default", &doc{Bool: false})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1572,7 +1572,7 @@ func TestBatchRaceBug260(t *testing.T) {
 		}
 	}()
 	b := i.NewBatch()
-	err = b.Index("1", 1)
+	err = b.Index("1", "default", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1581,7 +1581,7 @@ func TestBatchRaceBug260(t *testing.T) {
 		t.Fatal(err)
 	}
 	b.Reset()
-	err = b.Index("2", 2)
+	err = b.Index("2", "default", 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1608,7 +1608,7 @@ func BenchmarkBatchOverhead(b *testing.B) {
 		// put 1000 items in a batch
 		batch := i.NewBatch()
 		for i := 0; i < 1000; i++ {
-			err = batch.Index(fmt.Sprintf("%d", i), map[string]interface{}{"name": "bleve"})
+			err = batch.Index(fmt.Sprintf("%d", i), "default", map[string]interface{}{"name": "bleve"})
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -1639,7 +1639,7 @@ func TestOpenReadonlyMultiple(t *testing.T) {
 		"name": "marty",
 		"desc": "gophercon india",
 	}
-	err = index.Index("a", doca)
+	err = index.Index("a", "default", doca)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1710,7 +1710,7 @@ func TestBug408(t *testing.T) {
 			ds.UserID = &matchUserID
 			matchingDocIds[ds.ID] = struct{}{}
 		}
-		err = index.Index(ds.ID, ds)
+		err = index.Index(ds.ID, "default", ds)
 		if err != nil {
 			t.Fatal(err)
 		}

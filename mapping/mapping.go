@@ -46,7 +46,7 @@ func SetLog(l *log.Logger) {
 }
 
 type IndexMapping interface {
-	MapDocument(doc *document.Document, data interface{}) error
+	MapDocument(doc *document.Document, docType string, data interface{}) error
 	Validate() error
 
 	DateTimeParserNamed(name string) analysis.DateTimeParser

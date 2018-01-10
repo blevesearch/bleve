@@ -38,7 +38,7 @@ func TestIndexAliasSingle(t *testing.T) {
 
 	alias := NewIndexAlias(ei1)
 
-	err := alias.Index("a", "a")
+	err := alias.Index("a", "default", "a")
 	if err != expectedError {
 		t.Errorf("expected %v, got %v", expectedError, err)
 	}
@@ -113,7 +113,7 @@ func TestIndexAliasSingle(t *testing.T) {
 	alias.Add(ei2)
 	alias.Remove(ei1)
 
-	err = alias.Index("a", "a")
+	err = alias.Index("a", "default", "a")
 	if err != expectedError2 {
 		t.Errorf("expected %v, got %v", expectedError2, err)
 	}
@@ -185,7 +185,7 @@ func TestIndexAliasSingle(t *testing.T) {
 
 	alias.Swap([]Index{ei3}, []Index{ei2})
 
-	err = alias.Index("a", "a")
+	err = alias.Index("a", "default", "a")
 	if err != expectedError3 {
 		t.Errorf("expected %v, got %v", expectedError3, err)
 	}
@@ -257,7 +257,7 @@ func TestIndexAliasClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = alias.Index("a", "a")
+	err = alias.Index("a", "default", "a")
 	if err != ErrorIndexClosed {
 		t.Errorf("expected %v, got %v", ErrorIndexClosed, err)
 	}
@@ -324,7 +324,7 @@ func TestIndexAliasClosed(t *testing.T) {
 func TestIndexAliasEmpty(t *testing.T) {
 	alias := NewIndexAlias()
 
-	err := alias.Index("a", "a")
+	err := alias.Index("a", "default", "a")
 	if err != ErrorAliasEmpty {
 		t.Errorf("expected %v, got %v", ErrorAliasEmpty, err)
 	}
@@ -437,7 +437,7 @@ func TestIndexAliasMulti(t *testing.T) {
 
 	alias := NewIndexAlias(ei1, ei2)
 
-	err := alias.Index("a", "a")
+	err := alias.Index("a", "default", "a")
 	if err != ErrorAliasMulti {
 		t.Errorf("expected %v, got %v", ErrorAliasMulti, err)
 	}
@@ -1245,7 +1245,7 @@ type stubIndex struct {
 	checkRequest   func(*SearchRequest) error
 }
 
-func (i *stubIndex) Index(id string, data interface{}) error {
+func (i *stubIndex) Index(id string, kind string, data interface{}) error {
 	return i.err
 }
 

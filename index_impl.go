@@ -232,7 +232,7 @@ func (i *indexImpl) Mapping() mapping.IndexMapping {
 // Index the object with the specified identifier.
 // The IndexMapping for this index will determine
 // how the object is indexed.
-func (i *indexImpl) Index(id string, data interface{}) (err error) {
+func (i *indexImpl) Index(id string, kind string, data interface{}) (err error) {
 	if id == "" {
 		return ErrorEmptyID
 	}
@@ -245,7 +245,7 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 	}
 
 	doc := document.NewDocument(id)
-	err = i.m.MapDocument(doc, data)
+	err = i.m.MapDocument(doc, kind, data)
 	if err != nil {
 		return
 	}
