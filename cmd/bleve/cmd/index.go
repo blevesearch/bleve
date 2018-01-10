@@ -111,7 +111,7 @@ func getAllFiles(args []string, rv chan file) {
 func init() {
 	RootCmd.AddCommand(indexCmd)
 
-	indexCmd.Flags().BoolVarP(&keepDir, "keepDir", "d", false, "Keep the directory in the dodcument id, defaults false.")
+	indexCmd.Flags().BoolVarP(&keepDir, "keepDir", "d", false, "Keep the directory in the document id, defaults false.")
 	indexCmd.Flags().BoolVarP(&keepExt, "keepExt", "x", false, "Keep the extension in the document id, defaults false.")
 	indexCmd.Flags().BoolVarP(&parseJSON, "json", "j", true, "Parse the contents as JSON, defaults true.")
 }
