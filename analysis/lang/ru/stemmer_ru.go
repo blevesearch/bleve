@@ -1,4 +1,4 @@
-//  Copyright (c) 2014 Couchbase, Inc.
+//  Copyright (c) 2018 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,10 +16,10 @@ package ru
 
 import (
 	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/lang/ru/snowball"
 	"github.com/blevesearch/bleve/registry"
 
-	snowballRuntime "github.com/snowballstem/snowball/go"
+	"github.com/blevesearch/snowballstem"
+	"github.com/blevesearch/snowballstem/russian"
 )
 
 const SnowballStemmerName = "stemmer_ru_snowball"
@@ -33,9 +33,8 @@ func NewRussianStemmerFilter() *RussianStemmerFilter {
 
 func (s *RussianStemmerFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 	for _, token := range input {
-
-		env := snowballRuntime.NewEnv(string(token.Term))
-		snowball.Stem(env)
+		env := snowballstem.NewEnv(string(token.Term))
+		russian.Stem(env)
 		token.Term = []byte(env.Current())
 	}
 	return input

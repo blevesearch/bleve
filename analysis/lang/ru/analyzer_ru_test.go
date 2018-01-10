@@ -1,4 +1,4 @@
-//  Copyright (c) 2014 Couchbase, Inc.
+//  Copyright (c) 2018 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -48,6 +48,58 @@ func TestRussianAnalyzer(t *testing.T) {
 		{
 			input:  []byte("как"),
 			output: analysis.TokenStream{},
+		},
+		// digits safe
+		{
+			input: []byte("text 1000"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("text"),
+				},
+				&analysis.Token{
+					Term: []byte("1000"),
+				},
+			},
+		},
+		{
+			input: []byte("Вместе с тем о силе электромагнитной энергии имели представление еще"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("вмест"),
+				},
+				&analysis.Token{
+					Term: []byte("сил"),
+				},
+				&analysis.Token{
+					Term: []byte("электромагнитн"),
+				},
+				&analysis.Token{
+					Term: []byte("энерг"),
+				},
+				&analysis.Token{
+					Term: []byte("имел"),
+				},
+				&analysis.Token{
+					Term: []byte("представлен"),
+				},
+			},
+		},
+		{
+			input: []byte("Но знание это хранилось в тайне"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("знан"),
+				},
+				&analysis.Token{
+					Term: []byte("эт"),
+				},
+				&analysis.Token{
+					Term: []byte("хран"),
+				},
+				&analysis.Token{
+					Term: []byte("тайн"),
+				},
+			},
 		},
 	}
 
