@@ -151,7 +151,8 @@ func (di *docValueIterator) getDocValueLocs(docID uint64) (uint64, uint64) {
 	return math.MaxUint64, math.MaxUint64
 }
 
-// VisitDocumentFieldTerms is an implementation of the UnInvertIndex interface
+// VisitDocumentFieldTerms is an implementation of the
+// DocumentFieldTermVisitable interface
 func (s *Segment) VisitDocumentFieldTerms(localDocNum uint64, fields []string,
 	visitor index.DocumentFieldTermVisitor) error {
 	fieldID := uint16(0)
@@ -177,4 +178,18 @@ func (s *Segment) VisitDocumentFieldTerms(localDocNum uint64, fields []string,
 		}
 	}
 	return nil
+}
+
+// VisitableDocValueFields returns the list of fields with
+// persisted doc value terms ready to be visitable using the
+// VisitDocumentFieldTerms method.
+func (s *Segment) VisitableDocValueFields() ([]string, error) {
+	var rv []string
+	for fieldID, field := range s.fieldsInv {
+		if dvIter, ok := s.fieldDvIterMap[uint16(fieldID)]; ok &&
+			dvIter != nil {
+			rv = append(rv, field)
+		}
+	}
+	return rv, nil
 }

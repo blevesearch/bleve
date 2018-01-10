@@ -19,6 +19,9 @@ import (
 	"os"
 	"reflect"
 	"testing"
+
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/scorch/segment"
 )
 
 func TestOpen(t *testing.T) {
@@ -37,7 +40,7 @@ func TestOpen(t *testing.T) {
 	defer func() {
 		cerr := segment.Close()
 		if cerr != nil {
-			t.Fatalf("error closing segment: %v", err)
+			t.Fatalf("error closing segment: %v", cerr)
 		}
 	}()
 
@@ -337,7 +340,7 @@ func TestOpenMulti(t *testing.T) {
 	defer func() {
 		cerr := segment.Close()
 		if cerr != nil {
-			t.Fatalf("error closing segment: %v", err)
+			t.Fatalf("error closing segment: %v", cerr)
 		}
 	}()
 
@@ -437,7 +440,7 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 	defer func() {
 		cerr := segment.Close()
 		if cerr != nil {
-			t.Fatalf("error closing segment: %v", err)
+			t.Fatalf("error closing segment: %v", cerr)
 		}
 	}()
 
@@ -513,5 +516,85 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 
 	if count != 1 {
 		t.Errorf("expected count to be 1, got %d", count)
+	}
+}
+
+func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
+	_ = os.RemoveAll("/tmp/scorch.zap")
+
+	memSegment := buildMemSegmentMulti()
+	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1)
+	if err != nil {
+		t.Fatalf("error persisting segment: %v", err)
+	}
+
+	seg, err := Open("/tmp/scorch.zap")
+	if err != nil {
+		t.Fatalf("error opening segment: %v", err)
+	}
+
+	if zaps, ok := seg.(segment.DocumentFieldTermVisitable); ok {
+		fields, err := zaps.VisitableDocValueFields()
+		if err != nil {
+			t.Fatalf("segment VisitableDocValueFields err: %v", err)
+		}
+		// no persisted doc value fields
+		if len(fields) != 0 {
+			t.Errorf("expected no persisted fields for doc values, got: %#v", fields)
+		}
+	}
+
+	err = seg.Close()
+	if err != nil {
+		t.Fatalf("error closing segment: %v", err)
+	}
+	_ = os.RemoveAll("/tmp/scorch.zap")
+
+	memSegment, expectedFields := buildMemSegmentWithDefaultFieldMapping()
+	err = PersistSegment(memSegment, "/tmp/scorch.zap", 1)
+	if err != nil {
+		t.Fatalf("error persisting segment: %v", err)
+	}
+
+	seg, err = Open("/tmp/scorch.zap")
+	if err != nil {
+		t.Fatalf("error opening segment: %v", err)
+	}
+
+	defer func() {
+		cerr := seg.Close()
+		if cerr != nil {
+			t.Fatalf("error closing segment: %v", cerr)
+		}
+	}()
+
+	if zaps, ok := seg.(segment.DocumentFieldTermVisitable); ok {
+		fields, err := zaps.VisitableDocValueFields()
+		if err != nil {
+			t.Fatalf("segment VisitableDocValueFields err: %v", err)
+		}
+
+		if !reflect.DeepEqual(fields, expectedFields) {
+			t.Errorf("expected field terms: %#v, got: %#v", expectedFields, fields)
+		}
+
+		fieldTerms := make(index.FieldTerms)
+		err = zaps.VisitDocumentFieldTerms(0, fields, func(field string, term []byte) {
+			fieldTerms[field] = append(fieldTerms[field], string(term))
+		})
+		if err != nil {
+			t.Error(err)
+		}
+
+		expectedFieldTerms := index.FieldTerms{
+			"name": []string{"wow"},
+			"desc": []string{"some", "thing"},
+			"tag":  []string{"cold"},
+			"_id":  []string{"a"},
+		}
+		if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
+			t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+		}
+
 	}
 }
