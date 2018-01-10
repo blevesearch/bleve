@@ -18,6 +18,14 @@
 			"notests": true
 		},
 		{
+			"importpath": "github.com/blevesearch/snowballstem",
+			"repository": "https://github.com/blevesearch/snowballstem",
+			"vcs": "",
+			"revision": "26b06a2c243d4f8ca5db3486f94409dd5b2a7467",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/boltdb/bolt",
 			"repository": "https://github.com/boltdb/bolt",
 			"vcs": "",
