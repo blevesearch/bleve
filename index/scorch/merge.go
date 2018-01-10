@@ -37,26 +37,24 @@ OUTER:
 		default:
 			// check to see if there is a new snapshot to persist
 			s.rootLock.RLock()
-			ourSnapshot := s.root
-			ourSnapshot.AddRef()
+			ourEpoch := s.root.epoch
+			ourSegmentSnapshots := s.root.segment
 			s.rootLock.RUnlock()
 
-			if ourSnapshot.epoch != lastEpochMergePlanned {
+			if ourEpoch != lastEpochMergePlanned {
 				startTime := time.Now()
 
 				// lets get started
-				err := s.planMergeAtSnapshot(ourSnapshot)
+				err := s.planMergeAtSnapshot(ourSegmentSnapshots)
 				if err != nil {
 					s.fireAsyncError(fmt.Errorf("merging err: %v", err))
-					_ = ourSnapshot.DecRef()
 					continue OUTER
 				}
-				lastEpochMergePlanned = ourSnapshot.epoch
+				lastEpochMergePlanned = ourEpoch
 
 				s.fireEvent(EventKindMergerProgress, time.Since(startTime))
 
 			}
-			_ = ourSnapshot.DecRef()
 
 			// tell the persister we're waiting for changes
 			// first make a notification chan
@@ -71,24 +69,22 @@ OUTER:
 
 			// check again
 			s.rootLock.RLock()
-			ourSnapshot = s.root
-			ourSnapshot.AddRef()
+			ourEpoch = s.root.epoch
+			ourSegmentSnapshots = s.root.segment
 			s.rootLock.RUnlock()
 
-			if ourSnapshot.epoch != lastEpochMergePlanned {
+			if ourEpoch != lastEpochMergePlanned {
 				startTime := time.Now()
 
 				// lets get started
-				err := s.planMergeAtSnapshot(ourSnapshot)
+				err := s.planMergeAtSnapshot(ourSegmentSnapshots)
 				if err != nil {
-					_ = ourSnapshot.DecRef()
 					continue OUTER
 				}
-				lastEpochMergePlanned = ourSnapshot.epoch
+				lastEpochMergePlanned = ourEpoch
 
 				s.fireEvent(EventKindMergerProgress, time.Since(startTime))
 			}
-			_ = ourSnapshot.DecRef()
 
 			// now wait for it (but also detect close)
 			select {
@@ -102,10 +98,10 @@ OUTER:
 	s.asyncTasks.Done()
 }
 
-func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot) error {
+func (s *Scorch) planMergeAtSnapshot(ourSegmentSnapshots []*SegmentSnapshot) error {
 	// build list of zap segments in this snapshot
 	var onlyZapSnapshots []mergeplan.Segment
-	for _, segmentSnapshot := range ourSnapshot.segment {
+	for _, segmentSnapshot := range ourSegmentSnapshots {
 		if _, ok := segmentSnapshot.segment.(*zap.Segment); ok {
 			onlyZapSnapshots = append(onlyZapSnapshots, segmentSnapshot)
 		}
