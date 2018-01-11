@@ -481,5 +481,8 @@ func (sr *SearchResult) Merge(other *SearchResult) {
 	if other.MaxScore > sr.MaxScore {
 		sr.MaxScore = other.MaxScore
 	}
+	if len(sr.Facets) == 0 {
+		sr.Facets = make(search.FacetResults)
+	}
 	sr.Facets.Merge(other.Facets)
 }
