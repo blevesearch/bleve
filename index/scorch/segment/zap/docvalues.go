@@ -40,7 +40,6 @@ func (di *docValueIterator) sizeInBytes() uint64 {
 	sizeInBytes := 24
 	sizeInBytes += len(di.field)
 	sizeInBytes += len(di.chunkLens) * 8
-	sizeInBytes += len(di.curChunkData)
 	sizeInBytes += len(di.curChunkHeader) * 24
 	return uint64(sizeInBytes)
 }
