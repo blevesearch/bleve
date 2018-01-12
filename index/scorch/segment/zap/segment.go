@@ -97,27 +97,44 @@ type Segment struct {
 }
 
 func (s *Segment) SizeInBytes() uint64 {
-	// 4 /* size of crc -> uint32 */ +
-	// 4 /* size of version -> uint32 */ +
-	// 4 /* size of chunkFactor -> uint32 */ +
-	// 8 /* size of numDocs -> uint64 */ +
-	// 8 /* size of storedIndexOffset -> uint64 */ +
+	// 8 /* size of file pointer */
+	// 4 /* size of crc -> uint32 */
+	// 4 /* size of version -> uint32 */
+	// 4 /* size of chunkFactor -> uint32 */
+	// 8 /* size of numDocs -> uint64 */
+	// 8 /* size of storedIndexOffset -> uint64 */
 	// 8 /* size of fieldsIndexOffset -> uint64 */
-	sizeOfUints := 36
+	// 8 /* size of docValueOffset -> uint64 */
+	sizeOfUints := 52
 
 	// Do not include the mmap'ed part
-	sizeInBytes := len(s.path) + sizeOfUints
+	sizeInBytes := (len(s.path) + int(segment.SizeOfString)) + sizeOfUints
 
+	// fieldsMap
 	for k, _ := range s.fieldsMap {
-		sizeInBytes += len(k) + 2 /* size of uint16 */
+		sizeInBytes += (len(k) + int(segment.SizeOfString)) + 2 /* size of uint16 */
 	}
+	sizeInBytes += int(segment.SizeOfMap) /* overhead from map */
 
+	// fieldsInv, fieldsOffsets
 	for _, entry := range s.fieldsInv {
-		sizeInBytes += len(entry)
+		sizeInBytes += (len(entry) + int(segment.SizeOfString))
 	}
+	sizeInBytes += len(s.fieldsOffsets) * 8     /* size of uint64 */
+	sizeInBytes += int(segment.SizeOfSlice) * 2 /* overhead from slices */
 
-	sizeInBytes += len(s.fieldsOffsets) * 8 /* size of uint64 */
-	sizeInBytes += 8                        /* size of refs -> int64 */
+	// fieldDvIterMap
+	sizeInBytes += len(s.fieldDvIterMap) *
+		int(segment.SizeOfPointer+2 /* size of uint16 */)
+	for _, entry := range s.fieldDvIterMap {
+		if entry != nil {
+			sizeInBytes += int(entry.sizeInBytes())
+		}
+	}
+	sizeInBytes += int(segment.SizeOfMap)
+
+	// mutex, refs -> int64
+	sizeInBytes += 16
 
 	return uint64(sizeInBytes)
 }

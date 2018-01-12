@@ -107,27 +107,41 @@ func New() *Segment {
 func (s *Segment) updateSizeInBytes() {
 	var sizeInBytes uint64
 
+	// FieldsMap, FieldsInv
 	for k, _ := range s.FieldsMap {
-		sizeInBytes += uint64(len(k)*2 /* FieldsMap + FieldsInv */ +
+		sizeInBytes += uint64((len(k)+int(segment.SizeOfString))*2 +
 			2 /* size of uint16 */)
 	}
+	// overhead from the data structures
+	sizeInBytes += (segment.SizeOfMap + segment.SizeOfSlice)
 
+	// Dicts, DictKeys
 	for _, entry := range s.Dicts {
 		for k, _ := range entry {
-			sizeInBytes += uint64(len(k)*2 /* Dicts + DictKeys */ +
+			sizeInBytes += uint64((len(k)+int(segment.SizeOfString))*2 +
 				8 /* size of uint64 */)
 		}
+		// overhead from the data structures
+		sizeInBytes += (segment.SizeOfMap + segment.SizeOfSlice)
 	}
+	sizeInBytes += (segment.SizeOfSlice * 2)
 
+	// Postings, PostingsLocs
 	for i := 0; i < len(s.Postings); i++ {
-		sizeInBytes += s.Postings[i].GetSizeInBytes() + s.PostingsLocs[i].GetSizeInBytes()
+		sizeInBytes += (s.Postings[i].GetSizeInBytes() + segment.SizeOfPointer) +
+			(s.PostingsLocs[i].GetSizeInBytes() + segment.SizeOfPointer)
 	}
+	sizeInBytes += (segment.SizeOfSlice * 2)
 
+	// Freqs, Norms
 	for i := 0; i < len(s.Freqs); i++ {
 		sizeInBytes += uint64(len(s.Freqs[i])*8 /* size of uint64 */ +
-			len(s.Norms[i])*4 /* size of float32 */)
+			len(s.Norms[i])*4 /* size of float32 */) +
+			(segment.SizeOfSlice * 2)
 	}
+	sizeInBytes += (segment.SizeOfSlice * 2)
 
+	// Location data
 	for i := 0; i < len(s.Locfields); i++ {
 		sizeInBytes += uint64(len(s.Locfields[i])*2 /* size of uint16 */ +
 			len(s.Locstarts[i])*8 /* size of uint64 */ +
@@ -135,31 +149,49 @@ func (s *Segment) updateSizeInBytes() {
 			len(s.Locpos[i])*8 /* size of uint64 */)
 
 		for j := 0; j < len(s.Locarraypos[i]); j++ {
-			sizeInBytes += uint64(len(s.Locarraypos[i][j]) * 8 /* size of uint64 */)
+			sizeInBytes += uint64(len(s.Locarraypos[i][j])*8 /* size of uint64 */) +
+				segment.SizeOfSlice
 		}
-	}
 
+		sizeInBytes += (segment.SizeOfSlice * 5)
+	}
+	sizeInBytes += (segment.SizeOfSlice * 5)
+
+	// Stored data
 	for i := 0; i < len(s.Stored); i++ {
 		for _, v := range s.Stored[i] {
 			sizeInBytes += uint64(2 /* size of uint16 */)
 			for _, arr := range v {
-				sizeInBytes += uint64(len(arr))
+				sizeInBytes += uint64(len(arr)) + segment.SizeOfSlice
 			}
+			sizeInBytes += segment.SizeOfSlice
 		}
 
 		for _, v := range s.StoredTypes[i] {
-			sizeInBytes += uint64(2 /* size of uint16 */ + len(v))
+			sizeInBytes += uint64(2 /* size of uint16 */ +len(v)) + segment.SizeOfSlice
 		}
 
 		for _, v := range s.StoredPos[i] {
 			sizeInBytes += uint64(2 /* size of uint16 */)
 			for _, arr := range v {
-				sizeInBytes += uint64(len(arr) * 8 /* size of uint64 */)
+				sizeInBytes += uint64(len(arr)*8 /* size of uint64 */) +
+					segment.SizeOfSlice
 			}
+			sizeInBytes += segment.SizeOfSlice
 		}
-	}
 
-	sizeInBytes += uint64(8 /* size of sizeInBytes -> uint64*/)
+		// overhead from map(s) within Stored, StoredTypes, StoredPos
+		sizeInBytes += (segment.SizeOfMap * 3)
+	}
+	// overhead from data structures: Stored, StoredTypes, StoredPos
+	sizeInBytes += (segment.SizeOfSlice * 3)
+
+	// DocValueFields
+	sizeInBytes += uint64(len(s.DocValueFields)*3 /* size of uint16 + bool */) +
+		segment.SizeOfMap
+
+	// SizeInBytes
+	sizeInBytes += uint64(8)
 
 	s.sizeInBytes = sizeInBytes
 }

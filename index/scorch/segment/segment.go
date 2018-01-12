@@ -19,6 +19,12 @@ import (
 	"github.com/blevesearch/bleve/index"
 )
 
+// Overhead from go data structures when deployed on a 64-bit system.
+const SizeOfMap uint64 = 8
+const SizeOfPointer uint64 = 8
+const SizeOfSlice uint64 = 24
+const SizeOfString uint64 = 16
+
 // DocumentFieldValueVisitor defines a callback to be visited for each
 // stored field value.  The return value determines if the visitor
 // should keep going.  Returning true continues visiting, false stops.

@@ -22,6 +22,7 @@ import (
 	"sort"
 
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/golang/snappy"
 )
 
@@ -33,6 +34,23 @@ type docValueIterator struct {
 	dvDataLoc      uint64
 	curChunkHeader []MetaData
 	curChunkData   []byte // compressed data cache
+}
+
+func (di *docValueIterator) sizeInBytes() uint64 {
+	// curChunkNum, numChunks, dvDataLoc --> uint64
+	sizeInBytes := 24
+
+	// field
+	sizeInBytes += (len(di.field) + int(segment.SizeOfString))
+
+	// chunkLens, curChunkHeader
+	sizeInBytes += len(di.chunkLens)*8 +
+		len(di.curChunkHeader)*24 +
+		int(segment.SizeOfSlice*2) /* overhead from slices */
+
+	// curChunkData is mmap'ed, not included
+
+	return uint64(sizeInBytes)
 }
 
 func (di *docValueIterator) fieldName() string {
