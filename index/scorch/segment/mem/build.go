@@ -83,9 +83,12 @@ func NewFromAnalyzedDocs(results []*index.AnalysisResult) *Segment {
 }
 
 func (s *Segment) processDocument(result *index.AnalysisResult) {
+	startNumFields := len(s.FieldsMap)
+
 	// used to collate information across fields
-	docMap := map[uint16]analysis.TokenFrequencies{}
-	fieldLens := map[uint16]int{}
+	docMap := make(map[uint16]analysis.TokenFrequencies, startNumFields)
+	fieldLens := make(map[uint16]int, startNumFields)
+
 	docNum := uint64(s.addDocument())
 
 	processField := func(field uint16, name string, l int, tf analysis.TokenFrequencies) {
