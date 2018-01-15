@@ -188,9 +188,11 @@ func (s *Segment) VisitDocument(num uint64, visitor segment.DocumentFieldValueVi
 		return nil
 	}
 	docFields := s.Stored[int(num)]
+	st := s.StoredTypes[int(num)]
+	sp := s.StoredPos[int(num)]
 	for field, values := range docFields {
 		for i, value := range values {
-			keepGoing := visitor(s.FieldsInv[field], s.StoredTypes[int(num)][field][i], value, s.StoredPos[int(num)][field][i])
+			keepGoing := visitor(s.FieldsInv[field], st[field][i], value, sp[field][i])
 			if !keepGoing {
 				return nil
 			}
