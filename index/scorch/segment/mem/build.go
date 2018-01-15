@@ -24,7 +24,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 )
 
-// NewFromAnalyzedDocs places the analyzed document mutations into this segment
+// NewFromAnalyzedDocs places the analyzed document mutations into a new segment
 func NewFromAnalyzedDocs(results []*index.AnalysisResult) *Segment {
 	s := New()
 

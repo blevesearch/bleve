@@ -46,7 +46,7 @@ type Segment struct {
 	FieldsInv []string
 
 	// term dictionary
-	//  field id -> term -> posting id + 1
+	//  field id -> term -> postings list id + 1
 	Dicts []map[string]uint64
 
 	// term dictionary keys
@@ -54,7 +54,7 @@ type Segment struct {
 	DictKeys [][]string
 
 	// Postings list
-	//  Postings list id -> Postings bitmap
+	//  postings list id -> Postings bitmap
 	Postings []*roaring.Bitmap
 
 	// Postings List has locations
