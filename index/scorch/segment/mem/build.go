@@ -87,17 +87,26 @@ func NewFromAnalyzedDocs(results []*index.AnalysisResult) *Segment {
 
 // fill Dicts/DictKeys and preallocate memory for postings
 func (s *Segment) initializeDict(results []*index.AnalysisResult) {
-	var numPostings int
+	var numPostingsLists int
+
+	numTermsPerPostingsList := make([]int, 0, 64)
+
+	var numTokenFrequencies int
 
 	processField := func(fieldID uint16, tf analysis.TokenFrequencies) {
 		for term, _ := range tf {
-			_, exists := s.Dicts[fieldID][term]
+			pidPlus1, exists := s.Dicts[fieldID][term]
 			if !exists {
-				numPostings++
-				s.Dicts[fieldID][term] = uint64(numPostings)
+				numPostingsLists++
+				pidPlus1 = uint64(numPostingsLists)
+				s.Dicts[fieldID][term] = pidPlus1
 				s.DictKeys[fieldID] = append(s.DictKeys[fieldID], term)
+				numTermsPerPostingsList = append(numTermsPerPostingsList, 0)
 			}
+			pid := pidPlus1 - 1
+			numTermsPerPostingsList[pid]++
 		}
+		numTokenFrequencies += len(tf)
 	}
 
 	for _, result := range results {
@@ -116,21 +125,33 @@ func (s *Segment) initializeDict(results []*index.AnalysisResult) {
 		}
 	}
 
-	s.Postings = make([]*roaring.Bitmap, numPostings)
-	for i := 0; i < numPostings; i++ {
+	s.Postings = make([]*roaring.Bitmap, numPostingsLists)
+	for i := 0; i < numPostingsLists; i++ {
 		s.Postings[i] = roaring.New()
 	}
-	s.PostingsLocs = make([]*roaring.Bitmap, numPostings)
-	for i := 0; i < numPostings; i++ {
+	s.PostingsLocs = make([]*roaring.Bitmap, numPostingsLists)
+	for i := 0; i < numPostingsLists; i++ {
 		s.PostingsLocs[i] = roaring.New()
 	}
-	s.Freqs = make([][]uint64, numPostings)
-	s.Norms = make([][]float32, numPostings)
-	s.Locfields = make([][]uint16, numPostings)
-	s.Locstarts = make([][]uint64, numPostings)
-	s.Locends = make([][]uint64, numPostings)
-	s.Locpos = make([][]uint64, numPostings)
-	s.Locarraypos = make([][][]uint64, numPostings)
+
+	s.Freqs = make([][]uint64, numPostingsLists)
+	s.Norms = make([][]float32, numPostingsLists)
+	s.Locfields = make([][]uint16, numPostingsLists)
+	s.Locstarts = make([][]uint64, numPostingsLists)
+	s.Locends = make([][]uint64, numPostingsLists)
+	s.Locpos = make([][]uint64, numPostingsLists)
+	s.Locarraypos = make([][][]uint64, numPostingsLists)
+
+	uint64Backing := make([]uint64, numTokenFrequencies)
+	float32Backing := make([]float32, numTokenFrequencies)
+
+	for i, numTerms := range numTermsPerPostingsList {
+		s.Freqs[i] = uint64Backing[0:0]
+		uint64Backing = uint64Backing[numTerms:]
+
+		s.Norms[i] = float32Backing[0:0]
+		float32Backing = float32Backing[numTerms:]
+	}
 }
 
 func (s *Segment) processDocument(result *index.AnalysisResult) {
@@ -180,8 +201,7 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 	// now that its been rolled up into docMap, walk that
 	for fieldID, tokenFrequencies := range docMap {
 		for term, tokenFreq := range tokenFrequencies {
-			fieldTermPostings := s.Dicts[fieldID][term]
-			pid := fieldTermPostings-1
+			pid := s.Dicts[fieldID][term]-1
 			bs := s.Postings[pid]
 			bs.AddInt(int(docNum))
 			s.Freqs[pid] = append(s.Freqs[pid], uint64(tokenFreq.Frequency()))
