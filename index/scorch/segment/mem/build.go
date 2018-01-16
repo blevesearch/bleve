@@ -24,12 +24,15 @@ import (
 	"github.com/blevesearch/bleve/index"
 )
 
-// NewFromAnalyzedDocs places the analyzed document mutations into this segment
+// NewFromAnalyzedDocs places the analyzed document mutations into a new segment
 func NewFromAnalyzedDocs(results []*index.AnalysisResult) *Segment {
 	s := New()
 
 	// ensure that _id field get fieldID 0
 	s.getOrDefineField("_id")
+
+	// fill Dicts/DictKeys and preallocate memory
+	s.initializeDict(results)
 
 	// walk each doc
 	for _, result := range results {
@@ -82,10 +85,117 @@ func NewFromAnalyzedDocs(results []*index.AnalysisResult) *Segment {
 	return s
 }
 
+// fill Dicts/DictKeys and preallocate memory for postings
+func (s *Segment) initializeDict(results []*index.AnalysisResult) {
+	var numPostingsLists int
+
+	numTermsPerPostingsList := make([]int, 0, 64) // Keyed by postings list id.
+	numLocsPerPostingsList := make([]int, 0, 64)  // Keyed by postings list id.
+
+	var numTokenFrequencies int
+	var totLocs int
+
+	processField := func(fieldID uint16, tfs analysis.TokenFrequencies) {
+		for term, tf := range tfs {
+			pidPlus1, exists := s.Dicts[fieldID][term]
+			if !exists {
+				numPostingsLists++
+				pidPlus1 = uint64(numPostingsLists)
+				s.Dicts[fieldID][term] = pidPlus1
+				s.DictKeys[fieldID] = append(s.DictKeys[fieldID], term)
+				numTermsPerPostingsList = append(numTermsPerPostingsList, 0)
+				numLocsPerPostingsList = append(numLocsPerPostingsList, 0)
+			}
+			pid := pidPlus1 - 1
+			numTermsPerPostingsList[pid] += 1
+			numLocsPerPostingsList[pid] += len(tf.Locations)
+			totLocs += len(tf.Locations)
+		}
+		numTokenFrequencies += len(tfs)
+	}
+
+	for _, result := range results {
+		// walk each composite field
+		for _, field := range result.Document.CompositeFields {
+			fieldID := uint16(s.getOrDefineField(field.Name()))
+			_, tf := field.Analyze()
+			processField(fieldID, tf)
+		}
+
+		// walk each field
+		for i, field := range result.Document.Fields {
+			fieldID := uint16(s.getOrDefineField(field.Name()))
+			tf := result.Analyzed[i]
+			processField(fieldID, tf)
+		}
+	}
+
+	s.Postings = make([]*roaring.Bitmap, numPostingsLists)
+	for i := 0; i < numPostingsLists; i++ {
+		s.Postings[i] = roaring.New()
+	}
+	s.PostingsLocs = make([]*roaring.Bitmap, numPostingsLists)
+	for i := 0; i < numPostingsLists; i++ {
+		s.PostingsLocs[i] = roaring.New()
+	}
+
+	// Preallocate big, contiguous backing arrays.
+	auint64Backing := make([][]uint64, numPostingsLists*4+totLocs) // For Freqs, Locstarts, Locends, Locpos, sub-Locarraypos.
+	uint64Backing := make([]uint64, numTokenFrequencies+totLocs*3) // For sub-Freqs, sub-Locstarts, sub-Locends, sub-Locpos.
+	float32Backing := make([]float32, numTokenFrequencies)         // For sub-Norms.
+	uint16Backing := make([]uint16, totLocs)                       // For sub-Locfields.
+
+	// Point top-level slices to the backing arrays.
+	s.Freqs = auint64Backing[0:numPostingsLists]
+	auint64Backing = auint64Backing[numPostingsLists:]
+
+	s.Norms = make([][]float32, numPostingsLists)
+
+	s.Locfields = make([][]uint16, numPostingsLists)
+
+	s.Locstarts = auint64Backing[0:numPostingsLists]
+	auint64Backing = auint64Backing[numPostingsLists:]
+
+	s.Locends = auint64Backing[0:numPostingsLists]
+	auint64Backing = auint64Backing[numPostingsLists:]
+
+	s.Locpos = auint64Backing[0:numPostingsLists]
+	auint64Backing = auint64Backing[numPostingsLists:]
+
+	s.Locarraypos = make([][][]uint64, numPostingsLists)
+
+	// Point sub-slices to the backing arrays.
+	for pid, numTerms := range numTermsPerPostingsList {
+		s.Freqs[pid] = uint64Backing[0:0]
+		uint64Backing = uint64Backing[numTerms:]
+
+		s.Norms[pid] = float32Backing[0:0]
+		float32Backing = float32Backing[numTerms:]
+	}
+
+	for pid, numLocs := range numLocsPerPostingsList {
+		s.Locfields[pid] = uint16Backing[0:0]
+		uint16Backing = uint16Backing[numLocs:]
+
+		s.Locstarts[pid] = uint64Backing[0:0]
+		uint64Backing = uint64Backing[numLocs:]
+
+		s.Locends[pid] = uint64Backing[0:0]
+		uint64Backing = uint64Backing[numLocs:]
+
+		s.Locpos[pid] = uint64Backing[0:0]
+		uint64Backing = uint64Backing[numLocs:]
+
+		s.Locarraypos[pid] = auint64Backing[0:0]
+		auint64Backing = auint64Backing[numLocs:]
+	}
+}
+
 func (s *Segment) processDocument(result *index.AnalysisResult) {
 	// used to collate information across fields
-	docMap := map[uint16]analysis.TokenFrequencies{}
-	fieldLens := map[uint16]int{}
+	docMap := make(map[uint16]analysis.TokenFrequencies, len(s.FieldsMap))
+	fieldLens := make(map[uint16]int, len(s.FieldsMap))
+
 	docNum := uint64(s.addDocument())
 
 	processField := func(field uint16, name string, l int, tf analysis.TokenFrequencies) {
@@ -128,81 +238,27 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 	// now that its been rolled up into docMap, walk that
 	for fieldID, tokenFrequencies := range docMap {
 		for term, tokenFreq := range tokenFrequencies {
-			fieldTermPostings := s.Dicts[fieldID][term]
-
-			// FIXME this if/else block has duplicate code that has resulted in
-			// bugs fixed/missed more than once, need to refactor
-			if fieldTermPostings == 0 {
-				// need to build new posting
-				bs := roaring.New()
-				bs.AddInt(int(docNum))
-
-				newPostingID := uint64(len(s.Postings) + 1)
-				// add this new bitset to the postings slice
-				s.Postings = append(s.Postings, bs)
-
-				locationBS := roaring.New()
-				s.PostingsLocs = append(s.PostingsLocs, locationBS)
-				// add this to the details slice
-				s.Freqs = append(s.Freqs, []uint64{uint64(tokenFreq.Frequency())})
-				s.Norms = append(s.Norms, []float32{float32(1.0 / math.Sqrt(float64(fieldLens[fieldID])))})
-				// add to locations
-				var locfields []uint16
-				var locstarts []uint64
-				var locends []uint64
-				var locpos []uint64
-				var locarraypos [][]uint64
-				if len(tokenFreq.Locations) > 0 {
-					locationBS.AddInt(int(docNum))
-				}
+			pid := s.Dicts[fieldID][term] - 1
+			bs := s.Postings[pid]
+			bs.AddInt(int(docNum))
+			s.Freqs[pid] = append(s.Freqs[pid], uint64(tokenFreq.Frequency()))
+			s.Norms[pid] = append(s.Norms[pid], float32(1.0/math.Sqrt(float64(fieldLens[fieldID]))))
+			locationBS := s.PostingsLocs[pid]
+			if len(tokenFreq.Locations) > 0 {
+				locationBS.AddInt(int(docNum))
 				for _, loc := range tokenFreq.Locations {
 					var locf = fieldID
 					if loc.Field != "" {
 						locf = uint16(s.getOrDefineField(loc.Field))
 					}
-					locfields = append(locfields, locf)
-					locstarts = append(locstarts, uint64(loc.Start))
-					locends = append(locends, uint64(loc.End))
-					locpos = append(locpos, uint64(loc.Position))
+					s.Locfields[pid] = append(s.Locfields[pid], locf)
+					s.Locstarts[pid] = append(s.Locstarts[pid], uint64(loc.Start))
+					s.Locends[pid] = append(s.Locends[pid], uint64(loc.End))
+					s.Locpos[pid] = append(s.Locpos[pid], uint64(loc.Position))
 					if len(loc.ArrayPositions) > 0 {
-						locarraypos = append(locarraypos, loc.ArrayPositions)
+						s.Locarraypos[pid] = append(s.Locarraypos[pid], loc.ArrayPositions)
 					} else {
-						locarraypos = append(locarraypos, nil)
-					}
-				}
-				s.Locfields = append(s.Locfields, locfields)
-				s.Locstarts = append(s.Locstarts, locstarts)
-				s.Locends = append(s.Locends, locends)
-				s.Locpos = append(s.Locpos, locpos)
-				s.Locarraypos = append(s.Locarraypos, locarraypos)
-				// record it
-				s.Dicts[fieldID][term] = newPostingID
-				// this term was new for this field, add it to dictKeys
-				s.DictKeys[fieldID] = append(s.DictKeys[fieldID], term)
-			} else {
-				// posting already started for this field/term
-				// the actual offset is - 1, because 0 is zero value
-				bs := s.Postings[fieldTermPostings-1]
-				bs.AddInt(int(docNum))
-				locationBS := s.PostingsLocs[fieldTermPostings-1]
-				s.Freqs[fieldTermPostings-1] = append(s.Freqs[fieldTermPostings-1], uint64(tokenFreq.Frequency()))
-				s.Norms[fieldTermPostings-1] = append(s.Norms[fieldTermPostings-1], float32(1.0/math.Sqrt(float64(fieldLens[fieldID]))))
-				if len(tokenFreq.Locations) > 0 {
-					locationBS.AddInt(int(docNum))
-				}
-				for _, loc := range tokenFreq.Locations {
-					var locf = fieldID
-					if loc.Field != "" {
-						locf = uint16(s.getOrDefineField(loc.Field))
-					}
-					s.Locfields[fieldTermPostings-1] = append(s.Locfields[fieldTermPostings-1], locf)
-					s.Locstarts[fieldTermPostings-1] = append(s.Locstarts[fieldTermPostings-1], uint64(loc.Start))
-					s.Locends[fieldTermPostings-1] = append(s.Locends[fieldTermPostings-1], uint64(loc.End))
-					s.Locpos[fieldTermPostings-1] = append(s.Locpos[fieldTermPostings-1], uint64(loc.Position))
-					if len(loc.ArrayPositions) > 0 {
-						s.Locarraypos[fieldTermPostings-1] = append(s.Locarraypos[fieldTermPostings-1], loc.ArrayPositions)
-					} else {
-						s.Locarraypos[fieldTermPostings-1] = append(s.Locarraypos[fieldTermPostings-1], nil)
+						s.Locarraypos[pid] = append(s.Locarraypos[pid], nil)
 					}
 				}
 			}
