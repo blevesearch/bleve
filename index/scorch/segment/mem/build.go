@@ -93,7 +93,7 @@ func (s *Segment) initializeDict(results []*index.AnalysisResult) {
 	numLocsPerPostingsList := make([]int, 0, 64)  // Keyed by postings list id.
 
 	var numTokenFrequencies int
-	var numLocs int
+	var totLocs int
 
 	processField := func(fieldID uint16, tfs analysis.TokenFrequencies) {
 		for term, tf := range tfs {
@@ -109,7 +109,7 @@ func (s *Segment) initializeDict(results []*index.AnalysisResult) {
 			pid := pidPlus1 - 1
 			numTermsPerPostingsList[pid] += 1
 			numLocsPerPostingsList[pid] += len(tf.Locations)
-			numLocs += len(tf.Locations)
+			totLocs += len(tf.Locations)
 		}
 		numTokenFrequencies += len(tfs)
 	}
@@ -139,12 +139,32 @@ func (s *Segment) initializeDict(results []*index.AnalysisResult) {
 		s.PostingsLocs[i] = roaring.New()
 	}
 
-	s.Freqs = make([][]uint64, numPostingsLists)
+	// Preallocate big, contiguous backing arrays.
+	auint64Backing := make([][]uint64, numPostingsLists*4+totLocs) // For Freqs, Locstarts, Locends, Locpos, sub-Locarraypos.
+	uint64Backing := make([]uint64, numTokenFrequencies+totLocs*3) // For sub-Freqs, sub-Locstarts, sub-Locends, sub-Locpos.
+	float32Backing := make([]float32, numTokenFrequencies)         // For sub-Norms.
+	uint16Backing := make([]uint16, totLocs)                       // For sub-Locfields.
+
+	// Point top-level slices to the backing arrays.
+	s.Freqs = auint64Backing[0:numPostingsLists]
+	auint64Backing = auint64Backing[numPostingsLists:]
+
 	s.Norms = make([][]float32, numPostingsLists)
 
-	uint64Backing := make([]uint64, numTokenFrequencies)
-	float32Backing := make([]float32, numTokenFrequencies)
+	s.Locfields = make([][]uint16, numPostingsLists)
 
+	s.Locstarts = auint64Backing[0:numPostingsLists]
+	auint64Backing = auint64Backing[numPostingsLists:]
+
+	s.Locends = auint64Backing[0:numPostingsLists]
+	auint64Backing = auint64Backing[numPostingsLists:]
+
+	s.Locpos = auint64Backing[0:numPostingsLists]
+	auint64Backing = auint64Backing[numPostingsLists:]
+
+	s.Locarraypos = make([][][]uint64, numPostingsLists)
+
+	// Point sub-slices to the backing arrays.
 	for pid, numTerms := range numTermsPerPostingsList {
 		s.Freqs[pid] = uint64Backing[0:0]
 		uint64Backing = uint64Backing[numTerms:]
@@ -152,16 +172,6 @@ func (s *Segment) initializeDict(results []*index.AnalysisResult) {
 		s.Norms[pid] = float32Backing[0:0]
 		float32Backing = float32Backing[numTerms:]
 	}
-
-	s.Locfields = make([][]uint16, numPostingsLists)
-	s.Locstarts = make([][]uint64, numPostingsLists)
-	s.Locends = make([][]uint64, numPostingsLists)
-	s.Locpos = make([][]uint64, numPostingsLists)
-	s.Locarraypos = make([][][]uint64, numPostingsLists)
-
-	uint16Backing := make([]uint16, numLocs)    // For Locfields.
-	uint64Backing = make([]uint64, numLocs*3)   // For Locstarts, Locends, Locpos.
-	auint64Backing := make([][]uint64, numLocs) // For Locarraypos.
 
 	for pid, numLocs := range numLocsPerPostingsList {
 		s.Locfields[pid] = uint16Backing[0:0]
