@@ -161,6 +161,9 @@ func (s *Segment) updateSizeInBytes() {
 
 	sizeInBytes += uint64(8 /* size of sizeInBytes -> uint64*/)
 
+	// uint16 (2) + bool (1) -> 3
+	sizeInBytes += uint64(len(s.DocValueFields)) * 3
+
 	s.sizeInBytes = sizeInBytes
 }
 

@@ -103,7 +103,8 @@ func (s *Segment) SizeInBytes() uint64 {
 	// 8 /* size of numDocs -> uint64 */ +
 	// 8 /* size of storedIndexOffset -> uint64 */ +
 	// 8 /* size of fieldsIndexOffset -> uint64 */
-	sizeOfUints := 36
+	// 8 /* size of docValueOffset -> uint64 */
+	sizeOfUints := 44
 
 	// Do not include the mmap'ed part
 	sizeInBytes := len(s.path) + sizeOfUints
@@ -118,6 +119,13 @@ func (s *Segment) SizeInBytes() uint64 {
 
 	sizeInBytes += len(s.fieldsOffsets) * 8 /* size of uint64 */
 	sizeInBytes += 8                        /* size of refs -> int64 */
+
+	sizeInBytes += len(s.fieldDvIterMap) * 10 /* size of ptr(8) + uint16(2) */
+	for _, entry := range s.fieldDvIterMap {
+		if entry != nil {
+			sizeInBytes += int(entry.sizeInBytes())
+		}
+	}
 
 	return uint64(sizeInBytes)
 }
