@@ -43,7 +43,7 @@ func PersistSegment(memSegment *mem.Segment, path string, chunkFactor uint32) (e
 		return err
 	}
 
-	// bufer the output
+	// buffer the output
 	br := bufio.NewWriter(f)
 
 	// wrap it for counting (tracking offsets)

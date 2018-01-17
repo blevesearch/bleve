@@ -65,7 +65,7 @@ func (s *Segment) loadFieldDocValueIterator(field string,
 	fieldDvLoc uint64) (*docValueIterator, error) {
 	// get the docValue offset for the given fields
 	if fieldDvLoc == fieldNotUninverted {
-		return nil, fmt.Errorf("loadFieldDocValueConfigs: "+
+		return nil, fmt.Errorf("loadFieldDocValueIterator: "+
 			"no docValues found for field: %s", field)
 	}
 

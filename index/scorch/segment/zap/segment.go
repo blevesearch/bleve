@@ -168,11 +168,13 @@ func (s *Segment) loadConfig() error {
 
 	docValueOffset := chunkOffset - 8
 	s.docValueOffset = binary.BigEndian.Uint64(s.mm[docValueOffset : docValueOffset+8])
-	fieldsOffset := docValueOffset - 8
 
+	fieldsOffset := docValueOffset - 8
 	s.fieldsIndexOffset = binary.BigEndian.Uint64(s.mm[fieldsOffset : fieldsOffset+8])
+
 	storedOffset := fieldsOffset - 8
 	s.storedIndexOffset = binary.BigEndian.Uint64(s.mm[storedOffset : storedOffset+8])
+
 	docNumOffset := storedOffset - 8
 	s.numDocs = binary.BigEndian.Uint64(s.mm[docNumOffset : docNumOffset+8])
 	return nil
@@ -181,7 +183,7 @@ func (s *Segment) loadConfig() error {
 
 func (s *Segment) loadFields() error {
 	// NOTE for now we assume the fields index immediately preceeds the footer
-	// if this changes, need to adjust accordingly (or store epxlicit length)
+	// if this changes, need to adjust accordingly (or store explicit length)
 	fieldsIndexEnd := uint64(len(s.mm) - FooterSize)
 
 	// iterate through fields index
