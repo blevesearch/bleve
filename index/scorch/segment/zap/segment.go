@@ -44,12 +44,15 @@ func Open(path string) (segment.Segment, error) {
 	}
 
 	rv := &Segment{
-		f:              f,
-		mm:             mm,
-		path:           path,
-		fieldsMap:      make(map[string]uint16),
-		fieldDvIterMap: make(map[uint16]*docValueIterator),
-		refs:           1,
+		SegmentBase: SegmentBase{
+			mem:            mm[0 : len(mm)-FooterSize],
+			fieldsMap:      make(map[string]uint16),
+			fieldDvIterMap: make(map[uint16]*docValueIterator),
+		},
+		f:    f,
+		mm:   mm,
+		path: path,
+		refs: 1,
 	}
 
 	err = rv.loadConfig()
@@ -73,24 +76,36 @@ func Open(path string) (segment.Segment, error) {
 	return rv, nil
 }
 
-// Segment implements the segment.Segment inteface over top the zap file format
-type Segment struct {
-	f                 *os.File
-	mm                mmap.MMap
-	path              string
-	crc               uint32
-	version           uint32
+// SegmentBase is a memory only, read-only implementation of the
+// segment.Segment interface, using zap's data representation.
+type SegmentBase struct {
+	mem               []byte
+	memCRC            uint32
 	chunkFactor       uint32
+	fieldsMap         map[string]uint16 // fieldName -> fieldID+1
+	fieldsInv         []string          // fieldID -> fieldName
 	numDocs           uint64
 	storedIndexOffset uint64
 	fieldsIndexOffset uint64
+	docValueOffset    uint64
+	dictLocs          []uint64
+	fieldDvIterMap    map[uint16]*docValueIterator // naive chunk cache per field
+}
 
-	fieldsMap     map[string]uint16
-	fieldsInv     []string
-	fieldsOffsets []uint64
+func (sb *SegmentBase) AddRef()             {}
+func (sb *SegmentBase) DecRef() (err error) { return nil }
+func (sb *SegmentBase) Close() (err error)  { return nil }
 
-	docValueOffset uint64
-	fieldDvIterMap map[uint16]*docValueIterator // naive chunk cache per field
+// Segment implements a persisted segment.Segment interface, by
+// embedding an mmap()'ed SegmentBase.
+type Segment struct {
+	SegmentBase
+
+	f       *os.File
+	mm      mmap.MMap
+	path    string
+	version uint32
+	crc     uint32
 
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
@@ -98,17 +113,29 @@ type Segment struct {
 
 func (s *Segment) SizeInBytes() uint64 {
 	// 8 /* size of file pointer */
-	// 4 /* size of crc -> uint32 */
 	// 4 /* size of version -> uint32 */
+	// 4 /* size of crc -> uint32 */
+	sizeOfUints := 16
+
+	sizeInBytes := (len(s.path) + int(segment.SizeOfString)) + sizeOfUints
+
+	// mutex, refs -> int64
+	sizeInBytes += 16
+
+	// do not include the mmap'ed part
+	return uint64(sizeInBytes) + s.SegmentBase.SizeInBytes() - uint64(len(s.mem))
+}
+
+func (s *SegmentBase) SizeInBytes() uint64 {
+	// 4 /* size of memCRC -> uint32 */
 	// 4 /* size of chunkFactor -> uint32 */
 	// 8 /* size of numDocs -> uint64 */
 	// 8 /* size of storedIndexOffset -> uint64 */
 	// 8 /* size of fieldsIndexOffset -> uint64 */
 	// 8 /* size of docValueOffset -> uint64 */
-	sizeOfUints := 52
+	sizeInBytes := 40
 
-	// Do not include the mmap'ed part
-	sizeInBytes := (len(s.path) + int(segment.SizeOfString)) + sizeOfUints
+	sizeInBytes += len(s.mem) + int(segment.SizeOfSlice)
 
 	// fieldsMap
 	for k, _ := range s.fieldsMap {
@@ -116,12 +143,12 @@ func (s *Segment) SizeInBytes() uint64 {
 	}
 	sizeInBytes += int(segment.SizeOfMap) /* overhead from map */
 
-	// fieldsInv, fieldsOffsets
+	// fieldsInv, dictLocs
 	for _, entry := range s.fieldsInv {
 		sizeInBytes += (len(entry) + int(segment.SizeOfString))
 	}
-	sizeInBytes += len(s.fieldsOffsets) * 8     /* size of uint64 */
-	sizeInBytes += int(segment.SizeOfSlice) * 2 /* overhead from slices */
+	sizeInBytes += len(s.dictLocs) * 8          /* size of uint64 */
+	sizeInBytes += int(segment.SizeOfSlice) * 3 /* overhead from slices */
 
 	// fieldDvIterMap
 	sizeInBytes += len(s.fieldDvIterMap) *
@@ -132,9 +159,6 @@ func (s *Segment) SizeInBytes() uint64 {
 		}
 	}
 	sizeInBytes += int(segment.SizeOfMap)
-
-	// mutex, refs -> int64
-	sizeInBytes += 16
 
 	return uint64(sizeInBytes)
 }
@@ -158,49 +182,50 @@ func (s *Segment) DecRef() (err error) {
 func (s *Segment) loadConfig() error {
 	crcOffset := len(s.mm) - 4
 	s.crc = binary.BigEndian.Uint32(s.mm[crcOffset : crcOffset+4])
+
 	verOffset := crcOffset - 4
 	s.version = binary.BigEndian.Uint32(s.mm[verOffset : verOffset+4])
 	if s.version != version {
 		return fmt.Errorf("unsupported version %d", s.version)
 	}
+
 	chunkOffset := verOffset - 4
 	s.chunkFactor = binary.BigEndian.Uint32(s.mm[chunkOffset : chunkOffset+4])
 
 	docValueOffset := chunkOffset - 8
 	s.docValueOffset = binary.BigEndian.Uint64(s.mm[docValueOffset : docValueOffset+8])
 
-	fieldsOffset := docValueOffset - 8
-	s.fieldsIndexOffset = binary.BigEndian.Uint64(s.mm[fieldsOffset : fieldsOffset+8])
+	fieldsIndexOffset := docValueOffset - 8
+	s.fieldsIndexOffset = binary.BigEndian.Uint64(s.mm[fieldsIndexOffset : fieldsIndexOffset+8])
 
-	storedOffset := fieldsOffset - 8
-	s.storedIndexOffset = binary.BigEndian.Uint64(s.mm[storedOffset : storedOffset+8])
+	storedIndexOffset := fieldsIndexOffset - 8
+	s.storedIndexOffset = binary.BigEndian.Uint64(s.mm[storedIndexOffset : storedIndexOffset+8])
 
-	docNumOffset := storedOffset - 8
-	s.numDocs = binary.BigEndian.Uint64(s.mm[docNumOffset : docNumOffset+8])
+	numDocsOffset := storedIndexOffset - 8
+	s.numDocs = binary.BigEndian.Uint64(s.mm[numDocsOffset : numDocsOffset+8])
 	return nil
-
 }
 
-func (s *Segment) loadFields() error {
-	// NOTE for now we assume the fields index immediately preceeds the footer
-	// if this changes, need to adjust accordingly (or store explicit length)
-	fieldsIndexEnd := uint64(len(s.mm) - FooterSize)
+func (s *SegmentBase) loadFields() error {
+	// NOTE for now we assume the fields index immediately preceeds
+	// the footer, and if this changes, need to adjust accordingly (or
+	// store explicit length), where s.mem was sliced from s.mm in Open().
+	fieldsIndexEnd := uint64(len(s.mem))
 
 	// iterate through fields index
 	var fieldID uint64
 	for s.fieldsIndexOffset+(8*fieldID) < fieldsIndexEnd {
-		addr := binary.BigEndian.Uint64(s.mm[s.fieldsIndexOffset+(8*fieldID) : s.fieldsIndexOffset+(8*fieldID)+8])
-		var n uint64
+		addr := binary.BigEndian.Uint64(s.mem[s.fieldsIndexOffset+(8*fieldID) : s.fieldsIndexOffset+(8*fieldID)+8])
 
-		dictLoc, read := binary.Uvarint(s.mm[addr+n : fieldsIndexEnd])
-		n += uint64(read)
-		s.fieldsOffsets = append(s.fieldsOffsets, dictLoc)
+		dictLoc, read := binary.Uvarint(s.mem[addr:fieldsIndexEnd])
+		n := uint64(read)
+		s.dictLocs = append(s.dictLocs, dictLoc)
 
 		var nameLen uint64
-		nameLen, read = binary.Uvarint(s.mm[addr+n : fieldsIndexEnd])
+		nameLen, read = binary.Uvarint(s.mem[addr+n : fieldsIndexEnd])
 		n += uint64(read)
 
-		name := string(s.mm[addr+n : addr+n+nameLen])
+		name := string(s.mem[addr+n : addr+n+nameLen])
 		s.fieldsInv = append(s.fieldsInv, name)
 		s.fieldsMap[name] = uint16(fieldID + 1)
 
@@ -210,7 +235,7 @@ func (s *Segment) loadFields() error {
 }
 
 // Dictionary returns the term dictionary for the specified field
-func (s *Segment) Dictionary(field string) (segment.TermDictionary, error) {
+func (s *SegmentBase) Dictionary(field string) (segment.TermDictionary, error) {
 	dict, err := s.dictionary(field)
 	if err == nil && dict == nil {
 		return &segment.EmptyDictionary{}, nil
@@ -218,21 +243,20 @@ func (s *Segment) Dictionary(field string) (segment.TermDictionary, error) {
 	return dict, err
 }
 
-func (s *Segment) dictionary(field string) (rv *Dictionary, err error) {
-	rv = &Dictionary{
-		segment: s,
-		field:   field,
-	}
+func (sb *SegmentBase) dictionary(field string) (rv *Dictionary, err error) {
+	fieldIDPlus1 := sb.fieldsMap[field]
+	if fieldIDPlus1 > 0 {
+		rv = &Dictionary{
+			sb:      sb,
+			field:   field,
+			fieldID: fieldIDPlus1 - 1,
+		}
 
-	rv.fieldID = s.fieldsMap[field]
-	if rv.fieldID > 0 {
-		rv.fieldID = rv.fieldID - 1
-
-		dictStart := s.fieldsOffsets[rv.fieldID]
+		dictStart := sb.dictLocs[rv.fieldID]
 		if dictStart > 0 {
 			// read the length of the vellum data
-			vellumLen, read := binary.Uvarint(s.mm[dictStart : dictStart+binary.MaxVarintLen64])
-			fstBytes := s.mm[dictStart+uint64(read) : dictStart+uint64(read)+vellumLen]
+			vellumLen, read := binary.Uvarint(sb.mem[dictStart : dictStart+binary.MaxVarintLen64])
+			fstBytes := sb.mem[dictStart+uint64(read) : dictStart+uint64(read)+vellumLen]
 			if fstBytes != nil {
 				rv.fst, err = vellum.Load(fstBytes)
 				if err != nil {
@@ -240,9 +264,6 @@ func (s *Segment) dictionary(field string) (rv *Dictionary, err error) {
 				}
 			}
 		}
-
-	} else {
-		return nil, nil
 	}
 
 	return rv, nil
@@ -250,10 +271,10 @@ func (s *Segment) dictionary(field string) (rv *Dictionary, err error) {
 
 // VisitDocument invokes the DocFieldValueVistor for each stored field
 // for the specified doc number
-func (s *Segment) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
+func (s *SegmentBase) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
 	// first make sure this is a valid number in this segment
 	if num < s.numDocs {
-		meta, compressed := s.getStoredMetaAndCompressed(num)
+		meta, compressed := s.getDocStoredMetaAndCompressed(num)
 		uncompressed, err := snappy.Decode(nil, compressed)
 		if err != nil {
 			return err
@@ -307,13 +328,13 @@ func (s *Segment) VisitDocument(num uint64, visitor segment.DocumentFieldValueVi
 }
 
 // Count returns the number of documents in this segment.
-func (s *Segment) Count() uint64 {
+func (s *SegmentBase) Count() uint64 {
 	return s.numDocs
 }
 
 // DocNumbers returns a bitset corresponding to the doc numbers of all the
 // provided _id strings
-func (s *Segment) DocNumbers(ids []string) (*roaring.Bitmap, error) {
+func (s *SegmentBase) DocNumbers(ids []string) (*roaring.Bitmap, error) {
 	rv := roaring.New()
 
 	if len(s.fieldsMap) > 0 {
@@ -337,7 +358,7 @@ func (s *Segment) DocNumbers(ids []string) (*roaring.Bitmap, error) {
 }
 
 // Fields returns the field names used in this segment
-func (s *Segment) Fields() []string {
+func (s *SegmentBase) Fields() []string {
 	return s.fieldsInv
 }
 
@@ -411,23 +432,22 @@ func (s *Segment) NumDocs() uint64 {
 // DictAddr is a helper function to compute the file offset where the
 // dictionary is stored for the specified field.
 func (s *Segment) DictAddr(field string) (uint64, error) {
-	var fieldID uint16
-	var ok bool
-	if fieldID, ok = s.fieldsMap[field]; !ok {
+	fieldIDPlus1, ok := s.fieldsMap[field]
+	if !ok {
 		return 0, fmt.Errorf("no such field '%s'", field)
 	}
 
-	return s.fieldsOffsets[fieldID-1], nil
+	return s.dictLocs[fieldIDPlus1-1], nil
 }
 
-func (s *Segment) loadDvIterators() error {
+func (s *SegmentBase) loadDvIterators() error {
 	if s.docValueOffset == fieldNotUninverted {
 		return nil
 	}
 
 	var read uint64
 	for fieldID, field := range s.fieldsInv {
-		fieldLoc, n := binary.Uvarint(s.mm[s.docValueOffset+read : s.docValueOffset+read+binary.MaxVarintLen64])
+		fieldLoc, n := binary.Uvarint(s.mem[s.docValueOffset+read : s.docValueOffset+read+binary.MaxVarintLen64])
 		if n <= 0 {
 			return fmt.Errorf("loadDvIterators: failed to read the docvalue offsets for field %d", fieldID)
 		}

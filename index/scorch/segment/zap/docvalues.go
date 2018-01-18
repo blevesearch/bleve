@@ -61,7 +61,7 @@ func (di *docValueIterator) curChunkNumber() uint64 {
 	return di.curChunkNum
 }
 
-func (s *Segment) loadFieldDocValueIterator(field string,
+func (s *SegmentBase) loadFieldDocValueIterator(field string,
 	fieldDvLoc uint64) (*docValueIterator, error) {
 	// get the docValue offset for the given fields
 	if fieldDvLoc == fieldNotUninverted {
@@ -71,7 +71,7 @@ func (s *Segment) loadFieldDocValueIterator(field string,
 
 	// read the number of chunks, chunk lengths
 	var offset, clen uint64
-	numChunks, read := binary.Uvarint(s.mm[fieldDvLoc : fieldDvLoc+binary.MaxVarintLen64])
+	numChunks, read := binary.Uvarint(s.mem[fieldDvLoc : fieldDvLoc+binary.MaxVarintLen64])
 	if read <= 0 {
 		return nil, fmt.Errorf("failed to read the field "+
 			"doc values for field %s", field)
@@ -84,7 +84,7 @@ func (s *Segment) loadFieldDocValueIterator(field string,
 		chunkLens:   make([]uint64, int(numChunks)),
 	}
 	for i := 0; i < int(numChunks); i++ {
-		clen, read = binary.Uvarint(s.mm[fieldDvLoc+offset : fieldDvLoc+offset+binary.MaxVarintLen64])
+		clen, read = binary.Uvarint(s.mem[fieldDvLoc+offset : fieldDvLoc+offset+binary.MaxVarintLen64])
 		if read <= 0 {
 			return nil, fmt.Errorf("corrupted chunk length during segment load")
 		}
@@ -97,7 +97,7 @@ func (s *Segment) loadFieldDocValueIterator(field string,
 }
 
 func (di *docValueIterator) loadDvChunk(chunkNumber,
-	localDocNum uint64, s *Segment) error {
+	localDocNum uint64, s *SegmentBase) error {
 	// advance to the chunk where the docValues
 	// reside for the given docID
 	destChunkDataLoc := di.dvDataLoc
@@ -107,7 +107,7 @@ func (di *docValueIterator) loadDvChunk(chunkNumber,
 
 	curChunkSize := di.chunkLens[chunkNumber]
 	// read the number of docs reside in the chunk
-	numDocs, read := binary.Uvarint(s.mm[destChunkDataLoc : destChunkDataLoc+binary.MaxVarintLen64])
+	numDocs, read := binary.Uvarint(s.mem[destChunkDataLoc : destChunkDataLoc+binary.MaxVarintLen64])
 	if read <= 0 {
 		return fmt.Errorf("failed to read the chunk")
 	}
@@ -116,17 +116,17 @@ func (di *docValueIterator) loadDvChunk(chunkNumber,
 	offset := uint64(0)
 	di.curChunkHeader = make([]MetaData, int(numDocs))
 	for i := 0; i < int(numDocs); i++ {
-		di.curChunkHeader[i].DocID, read = binary.Uvarint(s.mm[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
+		di.curChunkHeader[i].DocID, read = binary.Uvarint(s.mem[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
 		offset += uint64(read)
-		di.curChunkHeader[i].DocDvLoc, read = binary.Uvarint(s.mm[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
+		di.curChunkHeader[i].DocDvLoc, read = binary.Uvarint(s.mem[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
 		offset += uint64(read)
-		di.curChunkHeader[i].DocDvLen, read = binary.Uvarint(s.mm[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
+		di.curChunkHeader[i].DocDvLen, read = binary.Uvarint(s.mem[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
 		offset += uint64(read)
 	}
 
 	compressedDataLoc := chunkMetaLoc + offset
 	dataLength := destChunkDataLoc + curChunkSize - compressedDataLoc
-	di.curChunkData = s.mm[compressedDataLoc : compressedDataLoc+dataLength]
+	di.curChunkData = s.mem[compressedDataLoc : compressedDataLoc+dataLength]
 	di.curChunkNum = chunkNumber
 	return nil
 }
@@ -171,18 +171,18 @@ func (di *docValueIterator) getDocValueLocs(docID uint64) (uint64, uint64) {
 
 // VisitDocumentFieldTerms is an implementation of the
 // DocumentFieldTermVisitable interface
-func (s *Segment) VisitDocumentFieldTerms(localDocNum uint64, fields []string,
+func (s *SegmentBase) VisitDocumentFieldTerms(localDocNum uint64, fields []string,
 	visitor index.DocumentFieldTermVisitor) error {
-	fieldID := uint16(0)
+	fieldIDPlus1 := uint16(0)
 	ok := true
 	for _, field := range fields {
-		if fieldID, ok = s.fieldsMap[field]; !ok {
+		if fieldIDPlus1, ok = s.fieldsMap[field]; !ok {
 			continue
 		}
 		// find the chunkNumber where the docValues are stored
 		docInChunk := localDocNum / uint64(s.chunkFactor)
 
-		if dvIter, exists := s.fieldDvIterMap[fieldID-1]; exists &&
+		if dvIter, exists := s.fieldDvIterMap[fieldIDPlus1-1]; exists &&
 			dvIter != nil {
 			// check if the chunk is already loaded
 			if docInChunk != dvIter.curChunkNumber() {

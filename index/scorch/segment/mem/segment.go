@@ -40,35 +40,38 @@ const idFieldID uint16 = 0
 // Segment is an in memory implementation of scorch.Segment
 type Segment struct {
 
-	// FieldsMap name -> id+1
+	// FieldsMap adds 1 to field id to avoid zero value issues
+	//  name -> field id + 1
 	FieldsMap map[string]uint16
-	// fields id -> name
+
+	// FieldsInv is the inverse of FieldsMap
+	//  field id -> name
 	FieldsInv []string
 
-	// term dictionary
+	// Term dictionaries for each field
 	//  field id -> term -> postings list id + 1
 	Dicts []map[string]uint64
 
-	// term dictionary keys
-	//  field id -> []dictionary keys
+	// Terms for each field, where terms are sorted ascending
+	//  field id -> []term
 	DictKeys [][]string
 
 	// Postings list
-	//  postings list id -> Postings bitmap
+	//  postings list id -> bitmap by docNum
 	Postings []*roaring.Bitmap
 
-	// Postings List has locations
+	// Postings list has locations
 	PostingsLocs []*roaring.Bitmap
 
-	// term frequencies
+	// Term frequencies
 	//  postings list id -> Freqs (one for each hit in bitmap)
 	Freqs [][]uint64
 
-	// field Norms
+	// Field norms
 	//  postings list id -> Norms (one for each hit in bitmap)
 	Norms [][]float32
 
-	// field/start/end/pos/locarraypos
+	// Field/start/end/pos/locarraypos
 	//  postings list id -> start/end/pos/locarraypos (one for each freq)
 	Locfields   [][]uint16
 	Locstarts   [][]uint64
@@ -80,18 +83,18 @@ type Segment struct {
 	//  docNum -> field id -> slice of values (each value []byte)
 	Stored []map[uint16][][]byte
 
-	// stored field types
+	// Stored field types
 	//  docNum -> field id -> slice of types (each type byte)
 	StoredTypes []map[uint16][]byte
 
-	// stored field array positions
+	// Stored field array positions
 	//  docNum -> field id -> slice of array positions (each is []uint64)
 	StoredPos []map[uint16][][]uint64
 
-	// for storing the docValue persisted fields
+	// For storing the docValue persisted fields
 	DocValueFields map[uint16]bool
 
-	// footprint of the segment, updated when analyzed document mutations
+	// Footprint of the segment, updated when analyzed document mutations
 	// are added into the segment
 	sizeInBytes uint64
 }

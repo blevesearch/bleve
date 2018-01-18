@@ -72,14 +72,13 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 		dictLocs = make([]uint64, len(fieldsInv))
 	}
 
-	var fieldsIndexOffset uint64
-	fieldsIndexOffset, err = persistFields(fieldsInv, cr, dictLocs)
+	fieldsIndexOffset, err := persistFields(fieldsInv, cr, dictLocs)
 	if err != nil {
 		return nil, err
 	}
 
 	err = persistFooter(newSegDocCount, storedIndexOffset,
-		fieldsIndexOffset, fieldDvLocsOffset, chunkFactor, cr)
+		fieldsIndexOffset, fieldDvLocsOffset, chunkFactor, cr.Sum32(), cr)
 	if err != nil {
 		return nil, err
 	}

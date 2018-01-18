@@ -16,16 +16,16 @@ package zap
 
 import "encoding/binary"
 
-func (s *Segment) getStoredMetaAndCompressed(docNum uint64) ([]byte, []byte) {
+func (s *SegmentBase) getDocStoredMetaAndCompressed(docNum uint64) ([]byte, []byte) {
 	docStoredStartAddr := s.storedIndexOffset + (8 * docNum)
-	docStoredStart := binary.BigEndian.Uint64(s.mm[docStoredStartAddr : docStoredStartAddr+8])
+	docStoredStart := binary.BigEndian.Uint64(s.mem[docStoredStartAddr : docStoredStartAddr+8])
 	var n uint64
-	metaLen, read := binary.Uvarint(s.mm[docStoredStart : docStoredStart+binary.MaxVarintLen64])
+	metaLen, read := binary.Uvarint(s.mem[docStoredStart : docStoredStart+binary.MaxVarintLen64])
 	n += uint64(read)
 	var dataLen uint64
-	dataLen, read = binary.Uvarint(s.mm[docStoredStart+n : docStoredStart+n+binary.MaxVarintLen64])
+	dataLen, read = binary.Uvarint(s.mem[docStoredStart+n : docStoredStart+n+binary.MaxVarintLen64])
 	n += uint64(read)
-	meta := s.mm[docStoredStart+n : docStoredStart+n+metaLen]
-	data := s.mm[docStoredStart+n+metaLen : docStoredStart+n+metaLen+dataLen]
+	meta := s.mem[docStoredStart+n : docStoredStart+n+metaLen]
+	data := s.mem[docStoredStart+n+metaLen : docStoredStart+n+metaLen+dataLen]
 	return meta, data
 }

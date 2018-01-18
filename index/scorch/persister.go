@@ -28,10 +28,11 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
-	"github.com/blevesearch/bleve/index/scorch/segment/mem"
 	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 	"github.com/boltdb/bolt"
 )
+
+var DefaultChunkFactor uint32 = 1024
 
 type notificationChan chan struct{}
 
@@ -178,11 +179,11 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 			return err2
 		}
 		switch seg := segmentSnapshot.segment.(type) {
-		case *mem.Segment:
+		case *zap.SegmentBase:
 			// need to persist this to disk
 			filename := zapFileName(segmentSnapshot.id)
 			path := s.path + string(os.PathSeparator) + filename
-			err2 := zap.PersistSegment(seg, path, 1024)
+			err2 := zap.PersistSegmentBase(seg, path)
 			if err2 != nil {
 				return fmt.Errorf("error persisting segment: %v", err2)
 			}

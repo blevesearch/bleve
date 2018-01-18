@@ -267,15 +267,15 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 }
 
 func (s *Segment) getOrDefineField(name string) int {
-	fieldID, ok := s.FieldsMap[name]
+	fieldIDPlus1, ok := s.FieldsMap[name]
 	if !ok {
-		fieldID = uint16(len(s.FieldsInv) + 1)
-		s.FieldsMap[name] = fieldID
+		fieldIDPlus1 = uint16(len(s.FieldsInv) + 1)
+		s.FieldsMap[name] = fieldIDPlus1
 		s.FieldsInv = append(s.FieldsInv, name)
 		s.Dicts = append(s.Dicts, make(map[string]uint64))
 		s.DictKeys = append(s.DictKeys, make([]string, 0))
 	}
-	return int(fieldID - 1)
+	return int(fieldIDPlus1 - 1)
 }
 
 func (s *Segment) addDocument() int {

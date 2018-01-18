@@ -15,32 +15,28 @@
 package zap
 
 import (
-	"hash"
 	"hash/crc32"
 	"io"
 )
 
 // CountHashWriter is a wrapper around a Writer which counts the number of
-// bytes which have been written
+// bytes which have been written and computes a crc32 hash
 type CountHashWriter struct {
-	w io.Writer
-	h hash.Hash32
-	n int
+	w   io.Writer
+	crc uint32
+	n   int
 }
 
 // NewCountHashWriter returns a CountHashWriter which wraps the provided Writer
 func NewCountHashWriter(w io.Writer) *CountHashWriter {
-	return &CountHashWriter{
-		w: w,
-		h: crc32.NewIEEE(),
-	}
+	return &CountHashWriter{w: w}
 }
 
 // Write writes the provided bytes to the wrapped writer and counts the bytes
 func (c *CountHashWriter) Write(b []byte) (int, error) {
 	n, err := c.w.Write(b)
+	c.crc = crc32.Update(c.crc, crc32.IEEETable, b[:n])
 	c.n += n
-	_, _ = c.h.Write(b)
 	return n, err
 }
 
@@ -51,5 +47,5 @@ func (c *CountHashWriter) Count() int {
 
 // Sum32 returns the CRC-32 hash of the content written to this writer
 func (c *CountHashWriter) Sum32() uint32 {
-	return c.h.Sum32()
+	return c.crc
 }
