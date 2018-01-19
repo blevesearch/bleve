@@ -17,6 +17,8 @@ package scorch
 import (
 	"fmt"
 	"os"
+	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -102,6 +104,101 @@ OUTER:
 	s.asyncTasks.Done()
 }
 
+func getWorkerCount(taskCount int) int {
+	ncpu := runtime.NumCPU()
+	if taskCount < ncpu {
+		return taskCount
+	}
+	return ncpu
+}
+
+func (s *Scorch) mergeTasks(plan *mergeplan.MergePlan) []error {
+	var wg sync.WaitGroup
+	size := len(plan.Tasks)
+	requestCh := make(chan *mergeplan.MergeTask, size)
+	responseCh := make(chan error, size)
+	nWorkers := getWorkerCount(size)
+	var notifications []notificationChan
+
+	for i := 0; i < nWorkers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			for task := range requestCh {
+				oldMap := make(map[uint64]*SegmentSnapshot)
+				newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
+				segmentsToMerge := make([]*zap.Segment, 0, len(task.Segments))
+				docsToDrop := make([]*roaring.Bitmap, 0, len(task.Segments))
+				for _, planSegment := range task.Segments {
+					if segSnapshot, ok := planSegment.(*SegmentSnapshot); ok {
+						oldMap[segSnapshot.id] = segSnapshot
+						if zapSeg, ok := segSnapshot.segment.(*zap.Segment); ok {
+							segmentsToMerge = append(segmentsToMerge, zapSeg)
+							docsToDrop = append(docsToDrop, segSnapshot.deleted)
+						}
+					}
+				}
+
+				filename := zapFileName(newSegmentID)
+				s.markIneligibleForRemoval(filename)
+				path := s.path + string(os.PathSeparator) + filename
+				newDocNums, err := zap.Merge(segmentsToMerge, docsToDrop, path, 1024)
+				if err != nil {
+					s.unmarkIneligibleForRemoval(filename)
+					responseCh <- fmt.Errorf("merging failed: %v", err)
+				}
+				segment, err := zap.Open(path)
+				if err != nil {
+					s.unmarkIneligibleForRemoval(filename)
+					responseCh <- err
+				}
+				sm := &segmentMerge{
+					id:            newSegmentID,
+					old:           oldMap,
+					oldNewDocNums: make(map[uint64][]uint64),
+					new:           segment,
+					notify:        make(notificationChan),
+				}
+				notifications = append(notifications, sm.notify)
+				for i, segNewDocNums := range newDocNums {
+					sm.oldNewDocNums[task.Segments[i].Id()] = segNewDocNums
+				}
+
+				// give it to the introducer
+				select {
+				case <-s.closeCh:
+					return
+				case s.merges <- sm:
+				}
+			}
+
+		}()
+	}
+
+	// feed the merge workers
+	for _, task := range plan.Tasks {
+		requestCh <- task
+	}
+	close(requestCh)
+	wg.Wait()
+	close(responseCh)
+
+	for _, notification := range notifications {
+		select {
+		case <-s.closeCh:
+			return nil
+		case <-notification:
+		}
+	}
+
+	var errs []error
+	for err := range responseCh {
+		errs = append(errs, err)
+	}
+	return errs
+}
+
 func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot) error {
 	// build list of zap segments in this snapshot
 	var onlyZapSnapshots []mergeplan.Segment
@@ -121,62 +218,16 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot) error {
 		return nil
 	}
 
-	// process tasks in serial for now
-	var notifications []notificationChan
-	for _, task := range resultMergePlan.Tasks {
-		oldMap := make(map[uint64]*SegmentSnapshot)
-		newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
-		segmentsToMerge := make([]*zap.Segment, 0, len(task.Segments))
-		docsToDrop := make([]*roaring.Bitmap, 0, len(task.Segments))
-		for _, planSegment := range task.Segments {
-			if segSnapshot, ok := planSegment.(*SegmentSnapshot); ok {
-				oldMap[segSnapshot.id] = segSnapshot
-				if zapSeg, ok := segSnapshot.segment.(*zap.Segment); ok {
-					segmentsToMerge = append(segmentsToMerge, zapSeg)
-					docsToDrop = append(docsToDrop, segSnapshot.deleted)
-				}
-			}
+	errs := s.mergeTasks(resultMergePlan)
+	if len(errs) > 0 {
+		var text []string
+		for i, err := range errs {
+			text = append(text, fmt.Sprintf("#%d: %v\n", i, err))
 		}
-
-		filename := zapFileName(newSegmentID)
-		s.markIneligibleForRemoval(filename)
-		path := s.path + string(os.PathSeparator) + filename
-		newDocNums, err := zap.Merge(segmentsToMerge, docsToDrop, path, 1024)
-		if err != nil {
-			s.unmarkIneligibleForRemoval(filename)
-			return fmt.Errorf("merging failed: %v", err)
-		}
-		segment, err := zap.Open(path)
-		if err != nil {
-			s.unmarkIneligibleForRemoval(filename)
-			return err
-		}
-		sm := &segmentMerge{
-			id:            newSegmentID,
-			old:           oldMap,
-			oldNewDocNums: make(map[uint64][]uint64),
-			new:           segment,
-			notify:        make(notificationChan),
-		}
-		notifications = append(notifications, sm.notify)
-		for i, segNewDocNums := range newDocNums {
-			sm.oldNewDocNums[task.Segments[i].Id()] = segNewDocNums
-		}
-
-		// give it to the introducer
-		select {
-		case <-s.closeCh:
-			return nil
-		case s.merges <- sm:
-		}
+		return fmt.Errorf("merge: mergeTasks errors: %d, %#v",
+			len(errs), text)
 	}
-	for _, notification := range notifications {
-		select {
-		case <-s.closeCh:
-			return nil
-		case <-notification:
-		}
-	}
+
 	return nil
 }
 
