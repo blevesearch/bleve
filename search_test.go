@@ -326,3 +326,76 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 	}
 
 }
+
+func TestSearchResultFacetsMerge(t *testing.T) {
+	lowmed := "2010-01-01"
+	medhi := "2011-01-01"
+	hihigher := "2012-01-01"
+
+	fr := &search.FacetResult{
+		Field:   "birthday",
+		Total:   100,
+		Missing: 25,
+		Other:   25,
+		DateRanges: []*search.DateRangeFacet{
+			{
+				Name:  "low",
+				End:   &lowmed,
+				Count: 25,
+			},
+			{
+				Name:  "med",
+				Count: 24,
+				Start: &lowmed,
+				End:   &medhi,
+			},
+			{
+				Name:  "hi",
+				Count: 1,
+				Start: &medhi,
+				End:   &hihigher,
+			},
+		},
+	}
+	frs := search.FacetResults{
+		"birthdays": fr,
+	}
+
+	l := &SearchResult{
+		Status: &SearchStatus{
+			Total:      10,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
+		Total:    10,
+		MaxScore: 1,
+	}
+
+	r := &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
+		Total:    1,
+		MaxScore: 2,
+		Facets:   frs,
+	}
+
+	expected := &SearchResult{
+		Status: &SearchStatus{
+			Total:      11,
+			Successful: 2,
+			Errors:     make(map[string]error),
+		},
+		Total:    11,
+		MaxScore: 2,
+		Facets:   frs,
+	}
+
+	l.Merge(r)
+
+	if !reflect.DeepEqual(l, expected) {
+		t.Errorf("expected %#v, got %#v", expected, l)
+	}
+}
