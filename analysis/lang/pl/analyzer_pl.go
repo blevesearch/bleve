@@ -49,7 +49,6 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 		TokenFilters: []analysis.TokenFilter{
 			toLowerFilter,
 			stopPlFilter,
-			// stemmerPlFilter,
 		},
 	}
 	return &rv, nil
