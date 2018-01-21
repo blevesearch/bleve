@@ -23,31 +23,30 @@ import (
 )
 
 // writes out the length of the roaring bitmap in bytes as varint
-// then writs out the roaring bitmap itself
-func writeRoaringWithLen(r *roaring.Bitmap, w io.Writer) (int, error) {
-	var buffer bytes.Buffer
+// then writes out the roaring bitmap itself
+func writeRoaringWithLen(r *roaring.Bitmap, w io.Writer,
+	reuseBuf *bytes.Buffer, reuseBufVarint []byte) (int, error) {
+	reuseBuf.Reset()
+
 	// write out postings list to memory so we know the len
-	postingsListLen, err := r.WriteTo(&buffer)
+	postingsListLen, err := r.WriteTo(reuseBuf)
 	if err != nil {
 		return 0, err
 	}
 	var tw int
 	// write out the length of this postings list
-	buf := make([]byte, binary.MaxVarintLen64)
-	n := binary.PutUvarint(buf, uint64(postingsListLen))
-	nw, err := w.Write(buf[:n])
+	n := binary.PutUvarint(reuseBufVarint, uint64(postingsListLen))
+	nw, err := w.Write(reuseBufVarint[:n])
 	tw += nw
 	if err != nil {
 		return tw, err
 	}
-
 	// write out the postings list itself
-	nw, err = w.Write(buffer.Bytes())
+	nw, err = w.Write(reuseBuf.Bytes())
 	tw += nw
 	if err != nil {
 		return tw, err
 	}
-
 	return tw, nil
 }
 
