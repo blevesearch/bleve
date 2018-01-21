@@ -117,6 +117,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			var err error
 			delta, err = s.root.segment[i].segment.DocNumbers(next.ids)
 			if err != nil {
+				s.rootLock.Unlock()
 				next.applied <- fmt.Errorf("error computing doc numbers: %v", err)
 				close(next.applied)
 				_ = newSnapshot.DecRef()
