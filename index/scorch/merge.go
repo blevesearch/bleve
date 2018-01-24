@@ -141,7 +141,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot) error {
 		filename := zapFileName(newSegmentID)
 		s.markIneligibleForRemoval(filename)
 		path := s.path + string(os.PathSeparator) + filename
-		newDocNums, err := zap.Merge(segmentsToMerge, docsToDrop, path, 1024)
+		newDocNums, err := zap.Merge(segmentsToMerge, docsToDrop, path, DefaultChunkFactor)
 		if err != nil {
 			s.unmarkIneligibleForRemoval(filename)
 			return fmt.Errorf("merging failed: %v", err)
