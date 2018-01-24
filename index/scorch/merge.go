@@ -54,7 +54,6 @@ OUTER:
 				lastEpochMergePlanned = ourSnapshot.epoch
 
 				s.fireEvent(EventKindMergerProgress, time.Since(startTime))
-
 			}
 			_ = ourSnapshot.DecRef()
 
@@ -81,6 +80,7 @@ OUTER:
 				// lets get started
 				err := s.planMergeAtSnapshot(ourSnapshot)
 				if err != nil {
+					s.fireAsyncError(fmt.Errorf("merging err: %v", err))
 					_ = ourSnapshot.DecRef()
 					continue OUTER
 				}
