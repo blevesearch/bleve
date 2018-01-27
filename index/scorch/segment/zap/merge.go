@@ -206,7 +206,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 				if dict == nil {
 					continue
 				}
-				postings, err2 := dict.postingsList(string(term), drops[dictI])
+				postings, err2 := dict.postingsList(term, drops[dictI])
 				if err2 != nil {
 					return nil, 0, err2
 				}

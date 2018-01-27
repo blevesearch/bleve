@@ -28,7 +28,7 @@ import (
 // PostingsList is an in-memory represenation of a postings list
 type PostingsList struct {
 	sb             *SegmentBase
-	term           string
+	term           []byte
 	postingsOffset uint64
 	freqOffset     uint64
 	locOffset      uint64

@@ -35,10 +35,10 @@ type Dictionary struct {
 
 // PostingsList returns the postings list for the specified term
 func (d *Dictionary) PostingsList(term string, except *roaring.Bitmap) (segment.PostingsList, error) {
-	return d.postingsList(term, except)
+	return d.postingsList([]byte(term), except)
 }
 
-func (d *Dictionary) postingsList(term string, except *roaring.Bitmap) (*PostingsList, error) {
+func (d *Dictionary) postingsList(term []byte, except *roaring.Bitmap) (*PostingsList, error) {
 	rv := &PostingsList{
 		sb:     d.sb,
 		term:   term,
@@ -46,7 +46,7 @@ func (d *Dictionary) postingsList(term string, except *roaring.Bitmap) (*Posting
 	}
 
 	if d.fst != nil {
-		postingsOffset, exists, err := d.fst.Get([]byte(term))
+		postingsOffset, exists, err := d.fst.Get(term)
 		if err != nil {
 			return nil, fmt.Errorf("vellum err: %v", err)
 		}
@@ -96,7 +96,6 @@ func (d *Dictionary) postingsList(term string, except *roaring.Bitmap) (*Posting
 
 // Iterator returns an iterator for this dictionary
 func (d *Dictionary) Iterator() segment.DictionaryIterator {
-
 	rv := &DictionaryIterator{
 		d: d,
 	}
