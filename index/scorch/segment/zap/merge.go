@@ -366,6 +366,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 	}
 
 	fieldDvLocsOffset = uint64(w.Count())
+
 	buf := bufMaxVarintLen64
 	for _, offset := range fieldDvLocs {
 		n := binary.PutUvarint(buf, uint64(offset))
@@ -400,14 +401,14 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 
 	// for each segment
 	for segI, segment := range segments {
-		var segNewDocNums []uint64
+		segNewDocNums := make([]uint64, 0, segment.numDocs)
 
 		// for each doc num
 		for docNum := uint64(0); docNum < segment.numDocs; docNum++ {
+			curr = 0
 			metaBuf.Reset()
 			data = data[:0]
 			compressed = compressed[:0]
-			curr = 0
 
 			if drops[segI] != nil && drops[segI].Contains(uint32(docNum)) {
 				segNewDocNums = append(segNewDocNums, docDropped)
@@ -481,7 +482,9 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 
 				metaEncoder.Close()
 				metaBytes := metaBuf.Bytes()
+
 				compressed = snappy.Encode(compressed, data)
+
 				// record where we're about to start writing
 				docNumOffsets[newDocNum] = uint64(w.Count())
 
@@ -510,6 +513,7 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 
 	// return value is the start of the stored index
 	offset := uint64(w.Count())
+
 	// now write out the stored doc index
 	for docNum := range docNumOffsets {
 		err := binary.Write(w, binary.BigEndian, docNumOffsets[docNum])
@@ -524,13 +528,13 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 // mergeFields builds a unified list of fields used across all the input segments
 func mergeFields(segments []*Segment) []string {
 	fieldsMap := map[string]struct{}{}
-
 	for _, segment := range segments {
 		fields := segment.Fields()
 		for _, field := range fields {
 			fieldsMap[field] = struct{}{}
 		}
 	}
+
 	rv := make([]string, 0, len(fieldsMap))
 	// ensure _id stays first
 	rv = append(rv, "_id")
@@ -539,6 +543,5 @@ func mergeFields(segments []*Segment) []string {
 			rv = append(rv, k)
 		}
 	}
-
 	return rv
 }
