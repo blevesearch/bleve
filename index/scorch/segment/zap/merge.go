@@ -150,6 +150,8 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 	fieldDvLocs := make([]uint64, len(fieldsInv))
 	fieldDvLocsOffset := uint64(fieldNotUninverted)
 
+	var docNumbers docIDRange
+
 	var vellumBuf bytes.Buffer
 
 	// for each field
@@ -343,7 +345,10 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 		rv[fieldID] = dictOffset
 
 		// update the doc nums
-		docNumbers := make(docIDRange, 0, len(docTermMap))
+		if cap(docNumbers) < len(docTermMap) {
+			docNumbers = make(docIDRange, 0, len(docTermMap))
+		}
+		docNumbers = docNumbers[:0]
 		for k := range docTermMap {
 			docNumbers = append(docNumbers, k)
 		}
