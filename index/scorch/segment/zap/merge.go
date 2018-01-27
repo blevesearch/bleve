@@ -394,7 +394,7 @@ const docDropped = math.MaxUint64
 func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 	fieldsMap map[string]uint16, fieldsInv []string, newSegDocCount uint64,
 	w *CountHashWriter) (uint64, [][]uint64, error) {
-	var rv [][]uint64
+	var rv [][]uint64 // The remapped or newDocNums for each segment.
 	var newDocNum int
 
 	var curr int
@@ -415,109 +415,110 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 
 		// for each doc num
 		for docNum := uint64(0); docNum < segment.numDocs; docNum++ {
+			if drops[segI] != nil && drops[segI].Contains(uint32(docNum)) {
+				segNewDocNums = append(segNewDocNums, docDropped)
+				continue
+			}
+
+			segNewDocNums = append(segNewDocNums, uint64(newDocNum))
+
 			curr = 0
 			metaBuf.Reset()
 			data = data[:0]
 			compressed = compressed[:0]
 
-			if drops[segI] != nil && drops[segI].Contains(uint32(docNum)) {
-				segNewDocNums = append(segNewDocNums, docDropped)
-			} else {
-				segNewDocNums = append(segNewDocNums, uint64(newDocNum))
-				// collect all the data
-				for i := 0; i < len(fieldsInv); i++ {
-					vals[i] = vals[i][:0]
-					typs[i] = typs[i][:0]
-					poss[i] = poss[i][:0]
-				}
-				err := segment.VisitDocument(docNum, func(field string, typ byte, value []byte, pos []uint64) bool {
-					fieldID := int(fieldsMap[field])
-					vals[fieldID] = append(vals[fieldID], value)
-					typs[fieldID] = append(typs[fieldID], typ)
-					poss[fieldID] = append(poss[fieldID], pos)
-					return true
-				})
-				if err != nil {
-					return 0, nil, err
-				}
-
-				// now walk the fields in order
-				for fieldID := range fieldsInv {
-
-					storedFieldValues := vals[int(fieldID)]
-
-					// has stored values for this field
-					num := len(storedFieldValues)
-
-					// process each value
-					for i := 0; i < num; i++ {
-						// encode field
-						_, err2 := metaEncoder.PutU64(uint64(fieldID))
-						if err2 != nil {
-							return 0, nil, err2
-						}
-						// encode type
-						_, err2 = metaEncoder.PutU64(uint64(typs[int(fieldID)][i]))
-						if err2 != nil {
-							return 0, nil, err2
-						}
-						// encode start offset
-						_, err2 = metaEncoder.PutU64(uint64(curr))
-						if err2 != nil {
-							return 0, nil, err2
-						}
-						// end len
-						_, err2 = metaEncoder.PutU64(uint64(len(storedFieldValues[i])))
-						if err2 != nil {
-							return 0, nil, err2
-						}
-						// encode number of array pos
-						_, err2 = metaEncoder.PutU64(uint64(len(poss[int(fieldID)][i])))
-						if err2 != nil {
-							return 0, nil, err2
-						}
-						// encode all array positions
-						for j := 0; j < len(poss[int(fieldID)][i]); j++ {
-							_, err2 = metaEncoder.PutU64(poss[int(fieldID)][i][j])
-							if err2 != nil {
-								return 0, nil, err2
-							}
-						}
-						// append data
-						data = append(data, storedFieldValues[i]...)
-						// update curr
-						curr += len(storedFieldValues[i])
-					}
-				}
-
-				metaEncoder.Close()
-				metaBytes := metaBuf.Bytes()
-
-				compressed = snappy.Encode(compressed, data)
-
-				// record where we're about to start writing
-				docNumOffsets[newDocNum] = uint64(w.Count())
-
-				// write out the meta len and compressed data len
-				_, err = writeUvarints(w,
-					uint64(len(metaBytes)), uint64(len(compressed)))
-				if err != nil {
-					return 0, nil, err
-				}
-				// now write the meta
-				_, err = w.Write(metaBytes)
-				if err != nil {
-					return 0, nil, err
-				}
-				// now write the compressed data
-				_, err = w.Write(compressed)
-				if err != nil {
-					return 0, nil, err
-				}
-
-				newDocNum++
+			// collect all the data
+			for i := 0; i < len(fieldsInv); i++ {
+				vals[i] = vals[i][:0]
+				typs[i] = typs[i][:0]
+				poss[i] = poss[i][:0]
 			}
+			err := segment.VisitDocument(docNum, func(field string, typ byte, value []byte, pos []uint64) bool {
+				fieldID := int(fieldsMap[field])
+				vals[fieldID] = append(vals[fieldID], value)
+				typs[fieldID] = append(typs[fieldID], typ)
+				poss[fieldID] = append(poss[fieldID], pos)
+				return true
+			})
+			if err != nil {
+				return 0, nil, err
+			}
+
+			// now walk the fields in order
+			for fieldID := range fieldsInv {
+				storedFieldValues := vals[int(fieldID)]
+
+				// has stored values for this field
+				num := len(storedFieldValues)
+
+				// process each value
+				for i := 0; i < num; i++ {
+					// encode field
+					_, err2 := metaEncoder.PutU64(uint64(fieldID))
+					if err2 != nil {
+						return 0, nil, err2
+					}
+					// encode type
+					_, err2 = metaEncoder.PutU64(uint64(typs[int(fieldID)][i]))
+					if err2 != nil {
+						return 0, nil, err2
+					}
+					// encode start offset
+					_, err2 = metaEncoder.PutU64(uint64(curr))
+					if err2 != nil {
+						return 0, nil, err2
+					}
+					// end len
+					_, err2 = metaEncoder.PutU64(uint64(len(storedFieldValues[i])))
+					if err2 != nil {
+						return 0, nil, err2
+					}
+					// encode number of array pos
+					_, err2 = metaEncoder.PutU64(uint64(len(poss[int(fieldID)][i])))
+					if err2 != nil {
+						return 0, nil, err2
+					}
+					// encode all array positions
+					for j := 0; j < len(poss[int(fieldID)][i]); j++ {
+						_, err2 = metaEncoder.PutU64(poss[int(fieldID)][i][j])
+						if err2 != nil {
+							return 0, nil, err2
+						}
+					}
+					// append data
+					data = append(data, storedFieldValues[i]...)
+					// update curr
+					curr += len(storedFieldValues[i])
+				}
+			}
+
+			metaEncoder.Close()
+			metaBytes := metaBuf.Bytes()
+
+			compressed = snappy.Encode(compressed, data)
+
+			// record where we're about to start writing
+			docNumOffsets[newDocNum] = uint64(w.Count())
+
+			// write out the meta len and compressed data len
+			_, err = writeUvarints(w, uint64(len(metaBytes)), uint64(len(compressed)))
+			if err != nil {
+				return 0, nil, err
+			}
+			// now write the meta
+			_, err = w.Write(metaBytes)
+			if err != nil {
+				return 0, nil, err
+			}
+			// now write the compressed data
+			_, err = w.Write(compressed)
+			if err != nil {
+				return 0, nil, err
+			}
+
+			newDocNum++
 		}
+
 		rv = append(rv, segNewDocNums)
 	}
 
