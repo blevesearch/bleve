@@ -390,6 +390,8 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 	var metaBuf bytes.Buffer
 	var data, compressed []byte
 
+	metaEncoder := govarint.NewU64Base128Encoder(&metaBuf)
+
 	vals := make([][][]byte, len(fieldsInv))
 	typs := make([][]byte, len(fieldsInv))
 	poss := make([][][]uint64, len(fieldsInv))
@@ -406,8 +408,6 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 			data = data[:0]
 			compressed = compressed[:0]
 			curr = 0
-
-			metaEncoder := govarint.NewU64Base128Encoder(&metaBuf)
 
 			if drops[segI] != nil && drops[segI].Contains(uint32(docNum)) {
 				segNewDocNums = append(segNewDocNums, docDropped)
