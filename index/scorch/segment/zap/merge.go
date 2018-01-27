@@ -395,7 +395,8 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 	fieldsMap map[string]uint16, fieldsInv []string, newSegDocCount uint64,
 	w *CountHashWriter) (uint64, [][]uint64, error) {
 	var rv [][]uint64 // The remapped or newDocNums for each segment.
-	var newDocNum int
+
+	var newDocNum uint64
 
 	var curr int
 	var metaBuf bytes.Buffer
@@ -411,16 +412,17 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 
 	// for each segment
 	for segI, segment := range segments {
-		segNewDocNums := make([]uint64, 0, segment.numDocs)
+		segNewDocNums := make([]uint64, segment.numDocs)
 
 		// for each doc num
 		for docNum := uint64(0); docNum < segment.numDocs; docNum++ {
+			// TODO: roaring's API limits docNums to 32-bits?
 			if drops[segI] != nil && drops[segI].Contains(uint32(docNum)) {
-				segNewDocNums = append(segNewDocNums, docDropped)
+				segNewDocNums[docNum] = docDropped
 				continue
 			}
 
-			segNewDocNums = append(segNewDocNums, uint64(newDocNum))
+			segNewDocNums[docNum] = newDocNum
 
 			curr = 0
 			metaBuf.Reset()
