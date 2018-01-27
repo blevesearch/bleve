@@ -151,6 +151,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 	fieldDvLocsOffset := uint64(fieldNotUninverted)
 
 	var vellumBuf bytes.Buffer
+
 	// for each field
 	for fieldID, fieldName := range fieldsInv {
 		if fieldID != 0 {
@@ -190,9 +191,9 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 
 		tfEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
 		locEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
-		fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), newSegDocCount-1)
 
-		docTermMap := make(map[uint64][]byte, 0)
+		docTermMap := make(map[uint64][]byte, newSegDocCount)
+
 		for err == nil {
 			term, _ := mergeItr.Current()
 
@@ -319,6 +320,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 		}
 
 		dictOffset := uint64(w.Count())
+
 		err = newVellum.Close()
 		if err != nil {
 			return nil, 0, err
@@ -326,10 +328,8 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 		vellumData := vellumBuf.Bytes()
 
 		// write out the length of the vellum data
-		buf := bufMaxVarintLen64
-		// write out the number of chunks
-		n := binary.PutUvarint(buf, uint64(len(vellumData)))
-		_, err = w.Write(buf[:n])
+		n := binary.PutUvarint(bufMaxVarintLen64, uint64(len(vellumData)))
+		_, err = w.Write(bufMaxVarintLen64[:n])
 		if err != nil {
 			return nil, 0, err
 		}
@@ -342,25 +342,28 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 
 		rv[fieldID] = dictOffset
 
-		// update the doc value
+		// update the doc nums
 		docNumbers := make(docIDRange, 0, len(docTermMap))
 		for k := range docTermMap {
 			docNumbers = append(docNumbers, k)
 		}
 		sort.Sort(docNumbers)
 
+		fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), newSegDocCount-1)
 		for _, docNum := range docNumbers {
 			err = fdvEncoder.Add(docNum, docTermMap[docNum])
 			if err != nil {
 				return nil, 0, err
 			}
 		}
-		// get the field doc value offset
-		fieldDvLocs[fieldID] = uint64(w.Count())
 		err = fdvEncoder.Close()
 		if err != nil {
 			return nil, 0, err
 		}
+
+		// get the field doc value offset
+		fieldDvLocs[fieldID] = uint64(w.Count())
+
 		// persist the doc value details for this field
 		_, err = fdvEncoder.Write(w)
 		if err != nil {
