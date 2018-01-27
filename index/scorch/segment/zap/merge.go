@@ -247,7 +247,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 						}
 					}
 
-					docTermMap[hitNewDocNum] = append(docTermMap[hitNewDocNum], []byte(term)...)
+					docTermMap[hitNewDocNum] = append(docTermMap[hitNewDocNum], term...)
 					docTermMap[hitNewDocNum] = append(docTermMap[hitNewDocNum], termSeparator)
 					next, err2 = postItr.Next()
 				}
