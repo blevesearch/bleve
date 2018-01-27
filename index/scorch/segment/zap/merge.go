@@ -247,12 +247,12 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 							if cap(bufLoc) < 5+len(loc.ArrayPositions()) {
 								bufLoc = make([]uint64, 0, 5+len(loc.ArrayPositions()))
 							}
-							args := bufLoc[0:0]
-							args = append(args, uint64(fieldsMap[loc.Field()]))
-							args = append(args, loc.Pos())
-							args = append(args, loc.Start())
-							args = append(args, loc.End())
-							args = append(args, uint64(len(loc.ArrayPositions())))
+							args := bufLoc[0:5]
+							args[0] = uint64(fieldsMap[loc.Field()])
+							args[1] = loc.Pos()
+							args[2] = loc.Start()
+							args[3] = loc.End()
+							args[4] = uint64(len(loc.ArrayPositions()))
 							args = append(args, loc.ArrayPositions()...)
 							err = locEncoder.Add(hitNewDocNum, args...)
 							if err != nil {
