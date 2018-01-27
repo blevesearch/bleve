@@ -146,7 +146,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 	var bufMaxVarintLen64 []byte = make([]byte, binary.MaxVarintLen64)
 	var bufLoc []uint64
 
-	rv1 := make([]uint64, len(fieldsInv))
+	rv := make([]uint64, len(fieldsInv))
 	fieldDvLocs := make([]uint64, len(fieldsInv))
 	fieldDvLocsOffset := uint64(fieldNotUninverted)
 
@@ -191,12 +191,14 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 		tfEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
 		locEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
 		fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), newSegDocCount-1)
+
 		docTermMap := make(map[uint64][]byte, 0)
 		for err == nil {
 			term, _ := mergeItr.Current()
 
 			newRoaring := roaring.NewBitmap()
 			newRoaringLocs := roaring.NewBitmap()
+
 			tfEncoder.Reset()
 			locEncoder.Reset()
 
@@ -222,9 +224,9 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 					// encode norm bits
 					norm := next.Norm()
 					normBits := math.Float32bits(float32(norm))
-					err3 := tfEncoder.Add(hitNewDocNum, next.Frequency(), uint64(normBits))
-					if err3 != nil {
-						return nil, 0, err3
+					err = tfEncoder.Add(hitNewDocNum, next.Frequency(), uint64(normBits))
+					if err != nil {
+						return nil, 0, err
 					}
 					locs := next.Locations()
 					if len(locs) > 0 {
@@ -247,15 +249,16 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 						}
 					}
 
-					docTermMap[hitNewDocNum] = append(docTermMap[hitNewDocNum], term...)
-					docTermMap[hitNewDocNum] = append(docTermMap[hitNewDocNum], termSeparator)
+					docTermMap[hitNewDocNum] =
+						append(append(docTermMap[hitNewDocNum], term...), termSeparator)
+
 					next, err2 = postItr.Next()
 				}
-				if err != nil {
-					return nil, 0, err
+				if err2 != nil {
+					return nil, 0, err2
 				}
-
 			}
+
 			tfEncoder.Close()
 			locEncoder.Close()
 
@@ -337,7 +340,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 			return nil, 0, err
 		}
 
-		rv1[fieldID] = dictOffset
+		rv[fieldID] = dictOffset
 
 		// update the doc value
 		docNumbers := make(docIDRange, 0, len(docTermMap))
@@ -376,7 +379,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 		}
 	}
 
-	return rv1, fieldDvLocsOffset, nil
+	return rv, fieldDvLocsOffset, nil
 }
 
 const docDropped = math.MaxUint64
