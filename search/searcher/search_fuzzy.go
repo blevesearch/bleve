@@ -19,6 +19,11 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
+type candidateTerm struct {
+	term string
+	ed   int
+}
+
 func NewFuzzySearcher(indexReader index.IndexReader, term string,
 	prefix, fuzziness int, field string, boost float64,
 	options search.SearcherOptions) (search.Searcher, error) {
@@ -38,13 +43,13 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string,
 		return nil, err
 	}
 
-	return NewMultiTermSearcher(indexReader, candidateTerms, field,
+	return NewFuzzyMultiTermSearcher(indexReader, candidateTerms, field,
 		boost, options, true)
 }
 
 func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
-	fuzziness int, field, prefixTerm string) (rv []string, err error) {
-	rv = make([]string, 0)
+	fuzziness int, field, prefixTerm string) (rv []candidateTerm, err error) {
+	rv = make([]candidateTerm, 0)
 	var fieldDict index.FieldDict
 	if len(prefixTerm) > 0 {
 		fieldDict, err = indexReader.FieldDictPrefix(field, []byte(prefixTerm))
@@ -62,7 +67,7 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 	for err == nil && tfd != nil {
 		ld, exceeded := search.LevenshteinDistanceMax(term, tfd.Term, fuzziness)
 		if !exceeded && ld <= fuzziness {
-			rv = append(rv, tfd.Term)
+			rv = append(rv, candidateTerm{term: tfd.Term, ed: ld})
 			if tooManyClauses(len(rv)) {
 				return rv, tooManyClausesErr()
 			}

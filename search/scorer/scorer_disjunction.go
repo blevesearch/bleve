@@ -21,12 +21,20 @@ import (
 )
 
 type DisjunctionQueryScorer struct {
-	options search.SearcherOptions
+	options    search.SearcherOptions
+	scoreFuzzy bool
 }
 
 func NewDisjunctionQueryScorer(options search.SearcherOptions) *DisjunctionQueryScorer {
 	return &DisjunctionQueryScorer{
 		options: options,
+	}
+}
+
+func NewDisjunctionFuzzyQueryScorer(scoreFuzzy bool, options search.SearcherOptions) *DisjunctionQueryScorer {
+	return &DisjunctionQueryScorer{
+		options:    options,
+		scoreFuzzy: scoreFuzzy,
 	}
 }
 
@@ -54,7 +62,11 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	}
 
 	coord := float64(countMatch) / float64(countTotal)
-	newScore := sum * coord
+	newScore := sum
+	if !s.scoreFuzzy {
+		newScore *= coord
+	}
+
 	var newExpl *search.Explanation
 	if s.options.Explain {
 		ce := make([]*search.Explanation, 2)

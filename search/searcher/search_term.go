@@ -63,6 +63,17 @@ func NewTermSearcherBytes(indexReader index.IndexReader, term []byte, field stri
 	}, nil
 }
 
+func NewTermSearcherWithTermFieldDetails(indexReader index.IndexReader, tfr index.TermFieldReader,
+	term string, field string, boost float64, docTotal, docTerm uint64,
+	options search.SearcherOptions) (*TermSearcher, error) {
+	scorer := scorer.NewTermQueryScorer([]byte(term), field, boost, docTotal, docTerm, options)
+	return &TermSearcher{
+		indexReader: indexReader,
+		reader:      tfr,
+		scorer:      scorer,
+	}, nil
+}
+
 func (s *TermSearcher) Count() uint64 {
 	return s.reader.Count()
 }
