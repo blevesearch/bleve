@@ -28,6 +28,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/blevesearch/bleve/index/scorch/segment/mem"
+	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/boltdb/bolt"
@@ -217,7 +218,7 @@ func (s *Scorch) Delete(id string) error {
 }
 
 // Batch applices a batch of changes to the index atomically
-func (s *Scorch) Batch(batch *index.Batch) error {
+func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	start := time.Now()
 
 	defer func() {
@@ -271,10 +272,13 @@ func (s *Scorch) Batch(batch *index.Batch) error {
 
 	var newSegment segment.Segment
 	if len(analysisResults) > 0 {
-		newSegment = mem.NewFromAnalyzedDocs(analysisResults)
+		newSegment, err = zap.NewSegmentBase(mem.NewFromAnalyzedDocs(analysisResults), DefaultChunkFactor)
+		if err != nil {
+			return err
+		}
 	}
 
-	err := s.prepareSegment(newSegment, ids, batch.InternalOps)
+	err = s.prepareSegment(newSegment, ids, batch.InternalOps)
 	if err != nil {
 		if newSegment != nil {
 			_ = newSegment.Close()

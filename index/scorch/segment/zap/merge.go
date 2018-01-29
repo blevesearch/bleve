@@ -29,10 +29,10 @@ import (
 	"github.com/golang/snappy"
 )
 
-// Merge takes a slice of zap segments, bit masks describing which documents
-// from the may be dropped, and creates a new segment containing the remaining
-// data.  This new segment is built at the specified path, with the provided
-// chunkFactor.
+// Merge takes a slice of zap segments and bit masks describing which
+// documents may be dropped, and creates a new segment containing the
+// remaining data.  This new segment is built at the specified path,
+// with the provided chunkFactor.
 func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 	chunkFactor uint32) ([][]uint64, error) {
 	flag := os.O_RDWR | os.O_CREATE
@@ -40,6 +40,11 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 	f, err := os.OpenFile(path, flag, 0600)
 	if err != nil {
 		return nil, err
+	}
+
+	cleanup := func() {
+		_ = f.Close()
+		_ = os.Remove(path)
 	}
 
 	// buffer the output
@@ -50,52 +55,59 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 
 	fieldsInv := mergeFields(segments)
 	fieldsMap := mapFields(fieldsInv)
-	newSegDocCount := computeNewDocCount(segments, drops)
 
 	var newDocNums [][]uint64
 	var storedIndexOffset uint64
 	fieldDvLocsOffset := uint64(fieldNotUninverted)
 	var dictLocs []uint64
+
+	newSegDocCount := computeNewDocCount(segments, drops)
 	if newSegDocCount > 0 {
 		storedIndexOffset, newDocNums, err = mergeStoredAndRemap(segments, drops,
 			fieldsMap, fieldsInv, newSegDocCount, cr)
 		if err != nil {
+			cleanup()
 			return nil, err
 		}
 
 		dictLocs, fieldDvLocsOffset, err = persistMergedRest(segments, drops, fieldsInv, fieldsMap,
 			newDocNums, newSegDocCount, chunkFactor, cr)
 		if err != nil {
+			cleanup()
 			return nil, err
 		}
 	} else {
 		dictLocs = make([]uint64, len(fieldsInv))
 	}
 
-	var fieldsIndexOffset uint64
-	fieldsIndexOffset, err = persistFields(fieldsInv, cr, dictLocs)
+	fieldsIndexOffset, err := persistFields(fieldsInv, cr, dictLocs)
 	if err != nil {
+		cleanup()
 		return nil, err
 	}
 
 	err = persistFooter(newSegDocCount, storedIndexOffset,
-		fieldsIndexOffset, fieldDvLocsOffset, chunkFactor, cr)
+		fieldsIndexOffset, fieldDvLocsOffset, chunkFactor, cr.Sum32(), cr)
 	if err != nil {
+		cleanup()
 		return nil, err
 	}
 
 	err = br.Flush()
 	if err != nil {
+		cleanup()
 		return nil, err
 	}
 
 	err = f.Sync()
 	if err != nil {
+		cleanup()
 		return nil, err
 	}
 
 	err = f.Close()
 	if err != nil {
+		cleanup()
 		return nil, err
 	}
 
@@ -104,7 +116,7 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 
 // mapFields takes the fieldsInv list and builds the map
 func mapFields(fields []string) map[string]uint16 {
-	rv := make(map[string]uint16)
+	rv := make(map[string]uint16, len(fields))
 	for i, fieldName := range fields {
 		rv[fieldName] = uint16(i)
 	}
@@ -114,15 +126,14 @@ func mapFields(fields []string) map[string]uint16 {
 // computeNewDocCount determines how many documents will be in the newly
 // merged segment when obsoleted docs are dropped
 func computeNewDocCount(segments []*Segment, drops []*roaring.Bitmap) uint64 {
-	var newSegDocCount uint64
+	var newDocCount uint64
 	for segI, segment := range segments {
-		segIAfterDrop := segment.NumDocs()
+		newDocCount += segment.NumDocs()
 		if drops[segI] != nil {
-			segIAfterDrop -= drops[segI].GetCardinality()
+			newDocCount -= drops[segI].GetCardinality()
 		}
-		newSegDocCount += segIAfterDrop
 	}
-	return newSegDocCount
+	return newDocCount
 }
 
 func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
@@ -130,14 +141,18 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 	newSegDocCount uint64, chunkFactor uint32,
 	w *CountHashWriter) ([]uint64, uint64, error) {
 
+	var bufReuse bytes.Buffer
 	var bufMaxVarintLen64 []byte = make([]byte, binary.MaxVarintLen64)
 	var bufLoc []uint64
 
-	rv1 := make([]uint64, len(fieldsInv))
+	rv := make([]uint64, len(fieldsInv))
 	fieldDvLocs := make([]uint64, len(fieldsInv))
 	fieldDvLocsOffset := uint64(fieldNotUninverted)
 
+	var docNumbers docIDRange
+
 	var vellumBuf bytes.Buffer
+
 	// for each field
 	for fieldID, fieldName := range fieldsInv {
 		if fieldID != 0 {
@@ -177,13 +192,15 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 
 		tfEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
 		locEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
-		fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), newSegDocCount-1)
-		docTermMap := make(map[uint64][]byte, 0)
+
+		docTermMap := make(map[uint64][]byte, newSegDocCount)
+
 		for err == nil {
 			term, _ := mergeItr.Current()
 
 			newRoaring := roaring.NewBitmap()
 			newRoaringLocs := roaring.NewBitmap()
+
 			tfEncoder.Reset()
 			locEncoder.Reset()
 
@@ -193,7 +210,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 				if dict == nil {
 					continue
 				}
-				postings, err2 := dict.postingsList(string(term), drops[dictI])
+				postings, err2 := dict.postingsList(term, drops[dictI])
 				if err2 != nil {
 					return nil, 0, err2
 				}
@@ -209,9 +226,9 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 					// encode norm bits
 					norm := next.Norm()
 					normBits := math.Float32bits(float32(norm))
-					err3 := tfEncoder.Add(hitNewDocNum, next.Frequency(), uint64(normBits))
-					if err3 != nil {
-						return nil, 0, err3
+					err = tfEncoder.Add(hitNewDocNum, next.Frequency(), uint64(normBits))
+					if err != nil {
+						return nil, 0, err
 					}
 					locs := next.Locations()
 					if len(locs) > 0 {
@@ -234,15 +251,16 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 						}
 					}
 
-					docTermMap[hitNewDocNum] = append(docTermMap[hitNewDocNum], []byte(term)...)
-					docTermMap[hitNewDocNum] = append(docTermMap[hitNewDocNum], termSeparator)
+					docTermMap[hitNewDocNum] =
+						append(append(docTermMap[hitNewDocNum], term...), termSeparator)
+
 					next, err2 = postItr.Next()
 				}
-				if err != nil {
-					return nil, 0, err
+				if err2 != nil {
+					return nil, 0, err2
 				}
-
 			}
+
 			tfEncoder.Close()
 			locEncoder.Close()
 
@@ -259,7 +277,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 					return nil, 0, err
 				}
 				postingLocOffset := uint64(w.Count())
-				_, err = writeRoaringWithLen(newRoaringLocs, w)
+				_, err = writeRoaringWithLen(newRoaringLocs, w, &bufReuse, bufMaxVarintLen64)
 				if err != nil {
 					return nil, 0, err
 				}
@@ -285,7 +303,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 				if err != nil {
 					return nil, 0, err
 				}
-				_, err = writeRoaringWithLen(newRoaring, w)
+				_, err = writeRoaringWithLen(newRoaring, w, &bufReuse, bufMaxVarintLen64)
 				if err != nil {
 					return nil, 0, err
 				}
@@ -303,6 +321,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 		}
 
 		dictOffset := uint64(w.Count())
+
 		err = newVellum.Close()
 		if err != nil {
 			return nil, 0, err
@@ -310,10 +329,8 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 		vellumData := vellumBuf.Bytes()
 
 		// write out the length of the vellum data
-		buf := bufMaxVarintLen64
-		// write out the number of chunks
-		n := binary.PutUvarint(buf, uint64(len(vellumData)))
-		_, err = w.Write(buf[:n])
+		n := binary.PutUvarint(bufMaxVarintLen64, uint64(len(vellumData)))
+		_, err = w.Write(bufMaxVarintLen64[:n])
 		if err != nil {
 			return nil, 0, err
 		}
@@ -324,27 +341,33 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 			return nil, 0, err
 		}
 
-		rv1[fieldID] = dictOffset
+		rv[fieldID] = dictOffset
 
-		// update the doc value
-		var docNumbers docIDRange
+		// update the doc nums
+		if cap(docNumbers) < len(docTermMap) {
+			docNumbers = make(docIDRange, 0, len(docTermMap))
+		}
+		docNumbers = docNumbers[:0]
 		for k := range docTermMap {
 			docNumbers = append(docNumbers, k)
 		}
 		sort.Sort(docNumbers)
 
+		fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), newSegDocCount-1)
 		for _, docNum := range docNumbers {
 			err = fdvEncoder.Add(docNum, docTermMap[docNum])
 			if err != nil {
 				return nil, 0, err
 			}
 		}
-		// get the field doc value offset
-		fieldDvLocs[fieldID] = uint64(w.Count())
 		err = fdvEncoder.Close()
 		if err != nil {
 			return nil, 0, err
 		}
+
+		// get the field doc value offset
+		fieldDvLocs[fieldID] = uint64(w.Count())
+
 		// persist the doc value details for this field
 		_, err = fdvEncoder.Write(w)
 		if err != nil {
@@ -353,7 +376,8 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 	}
 
 	fieldDvLocsOffset = uint64(w.Count())
-	buf := make([]byte, binary.MaxVarintLen64)
+
+	buf := bufMaxVarintLen64
 	for _, offset := range fieldDvLocs {
 		n := binary.PutUvarint(buf, uint64(offset))
 		_, err := w.Write(buf[:n])
@@ -362,7 +386,7 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 		}
 	}
 
-	return rv1, fieldDvLocsOffset, nil
+	return rv, fieldDvLocsOffset, nil
 }
 
 const docDropped = math.MaxUint64
@@ -370,12 +394,15 @@ const docDropped = math.MaxUint64
 func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 	fieldsMap map[string]uint16, fieldsInv []string, newSegDocCount uint64,
 	w *CountHashWriter) (uint64, [][]uint64, error) {
-	var rv [][]uint64
-	var newDocNum int
+	var rv [][]uint64 // The remapped or newDocNums for each segment.
+
+	var newDocNum uint64
 
 	var curr int
 	var metaBuf bytes.Buffer
 	var data, compressed []byte
+
+	metaEncoder := govarint.NewU64Base128Encoder(&metaBuf)
 
 	vals := make([][][]byte, len(fieldsInv))
 	typs := make([][]byte, len(fieldsInv))
@@ -385,118 +412,121 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 
 	// for each segment
 	for segI, segment := range segments {
-		var segNewDocNums []uint64
+		segNewDocNums := make([]uint64, segment.numDocs)
 
 		// for each doc num
 		for docNum := uint64(0); docNum < segment.numDocs; docNum++ {
+			// TODO: roaring's API limits docNums to 32-bits?
+			if drops[segI] != nil && drops[segI].Contains(uint32(docNum)) {
+				segNewDocNums[docNum] = docDropped
+				continue
+			}
+
+			segNewDocNums[docNum] = newDocNum
+
+			curr = 0
 			metaBuf.Reset()
 			data = data[:0]
 			compressed = compressed[:0]
-			curr = 0
 
-			metaEncoder := govarint.NewU64Base128Encoder(&metaBuf)
-
-			if drops[segI] != nil && drops[segI].Contains(uint32(docNum)) {
-				segNewDocNums = append(segNewDocNums, docDropped)
-			} else {
-				segNewDocNums = append(segNewDocNums, uint64(newDocNum))
-				// collect all the data
-				for i := 0; i < len(fieldsInv); i++ {
-					vals[i] = vals[i][:0]
-					typs[i] = typs[i][:0]
-					poss[i] = poss[i][:0]
-				}
-				err := segment.VisitDocument(docNum, func(field string, typ byte, value []byte, pos []uint64) bool {
-					fieldID := int(fieldsMap[field])
-					vals[fieldID] = append(vals[fieldID], value)
-					typs[fieldID] = append(typs[fieldID], typ)
-					poss[fieldID] = append(poss[fieldID], pos)
-					return true
-				})
-				if err != nil {
-					return 0, nil, err
-				}
-
-				// now walk the fields in order
-				for fieldID := range fieldsInv {
-
-					storedFieldValues := vals[int(fieldID)]
-
-					// has stored values for this field
-					num := len(storedFieldValues)
-
-					// process each value
-					for i := 0; i < num; i++ {
-						// encode field
-						_, err2 := metaEncoder.PutU64(uint64(fieldID))
-						if err2 != nil {
-							return 0, nil, err2
-						}
-						// encode type
-						_, err2 = metaEncoder.PutU64(uint64(typs[int(fieldID)][i]))
-						if err2 != nil {
-							return 0, nil, err2
-						}
-						// encode start offset
-						_, err2 = metaEncoder.PutU64(uint64(curr))
-						if err2 != nil {
-							return 0, nil, err2
-						}
-						// end len
-						_, err2 = metaEncoder.PutU64(uint64(len(storedFieldValues[i])))
-						if err2 != nil {
-							return 0, nil, err2
-						}
-						// encode number of array pos
-						_, err2 = metaEncoder.PutU64(uint64(len(poss[int(fieldID)][i])))
-						if err2 != nil {
-							return 0, nil, err2
-						}
-						// encode all array positions
-						for j := 0; j < len(poss[int(fieldID)][i]); j++ {
-							_, err2 = metaEncoder.PutU64(poss[int(fieldID)][i][j])
-							if err2 != nil {
-								return 0, nil, err2
-							}
-						}
-						// append data
-						data = append(data, storedFieldValues[i]...)
-						// update curr
-						curr += len(storedFieldValues[i])
-					}
-				}
-
-				metaEncoder.Close()
-				metaBytes := metaBuf.Bytes()
-				compressed = snappy.Encode(compressed, data)
-				// record where we're about to start writing
-				docNumOffsets[newDocNum] = uint64(w.Count())
-
-				// write out the meta len and compressed data len
-				_, err = writeUvarints(w,
-					uint64(len(metaBytes)), uint64(len(compressed)))
-				if err != nil {
-					return 0, nil, err
-				}
-				// now write the meta
-				_, err = w.Write(metaBytes)
-				if err != nil {
-					return 0, nil, err
-				}
-				// now write the compressed data
-				_, err = w.Write(compressed)
-				if err != nil {
-					return 0, nil, err
-				}
-
-				newDocNum++
+			// collect all the data
+			for i := 0; i < len(fieldsInv); i++ {
+				vals[i] = vals[i][:0]
+				typs[i] = typs[i][:0]
+				poss[i] = poss[i][:0]
 			}
+			err := segment.VisitDocument(docNum, func(field string, typ byte, value []byte, pos []uint64) bool {
+				fieldID := int(fieldsMap[field])
+				vals[fieldID] = append(vals[fieldID], value)
+				typs[fieldID] = append(typs[fieldID], typ)
+				poss[fieldID] = append(poss[fieldID], pos)
+				return true
+			})
+			if err != nil {
+				return 0, nil, err
+			}
+
+			// now walk the fields in order
+			for fieldID := range fieldsInv {
+				storedFieldValues := vals[int(fieldID)]
+
+				// has stored values for this field
+				num := len(storedFieldValues)
+
+				// process each value
+				for i := 0; i < num; i++ {
+					// encode field
+					_, err2 := metaEncoder.PutU64(uint64(fieldID))
+					if err2 != nil {
+						return 0, nil, err2
+					}
+					// encode type
+					_, err2 = metaEncoder.PutU64(uint64(typs[int(fieldID)][i]))
+					if err2 != nil {
+						return 0, nil, err2
+					}
+					// encode start offset
+					_, err2 = metaEncoder.PutU64(uint64(curr))
+					if err2 != nil {
+						return 0, nil, err2
+					}
+					// end len
+					_, err2 = metaEncoder.PutU64(uint64(len(storedFieldValues[i])))
+					if err2 != nil {
+						return 0, nil, err2
+					}
+					// encode number of array pos
+					_, err2 = metaEncoder.PutU64(uint64(len(poss[int(fieldID)][i])))
+					if err2 != nil {
+						return 0, nil, err2
+					}
+					// encode all array positions
+					for j := 0; j < len(poss[int(fieldID)][i]); j++ {
+						_, err2 = metaEncoder.PutU64(poss[int(fieldID)][i][j])
+						if err2 != nil {
+							return 0, nil, err2
+						}
+					}
+					// append data
+					data = append(data, storedFieldValues[i]...)
+					// update curr
+					curr += len(storedFieldValues[i])
+				}
+			}
+
+			metaEncoder.Close()
+			metaBytes := metaBuf.Bytes()
+
+			compressed = snappy.Encode(compressed, data)
+
+			// record where we're about to start writing
+			docNumOffsets[newDocNum] = uint64(w.Count())
+
+			// write out the meta len and compressed data len
+			_, err = writeUvarints(w, uint64(len(metaBytes)), uint64(len(compressed)))
+			if err != nil {
+				return 0, nil, err
+			}
+			// now write the meta
+			_, err = w.Write(metaBytes)
+			if err != nil {
+				return 0, nil, err
+			}
+			// now write the compressed data
+			_, err = w.Write(compressed)
+			if err != nil {
+				return 0, nil, err
+			}
+
+			newDocNum++
 		}
+
 		rv = append(rv, segNewDocNums)
 	}
 
 	// return value is the start of the stored index
 	offset := uint64(w.Count())
+
 	// now write out the stored doc index
 	for docNum := range docNumOffsets {
 		err := binary.Write(w, binary.BigEndian, docNumOffsets[docNum])
@@ -511,13 +541,13 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 // mergeFields builds a unified list of fields used across all the input segments
 func mergeFields(segments []*Segment) []string {
 	fieldsMap := map[string]struct{}{}
-
 	for _, segment := range segments {
 		fields := segment.Fields()
 		for _, field := range fields {
 			fieldsMap[field] = struct{}{}
 		}
 	}
+
 	rv := make([]string, 0, len(fieldsMap))
 	// ensure _id stays first
 	rv = append(rv, "_id")
@@ -526,6 +556,5 @@ func mergeFields(segments []*Segment) []string {
 			rv = append(rv, k)
 		}
 	}
-
 	return rv
 }

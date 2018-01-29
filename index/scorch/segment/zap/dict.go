@@ -27,7 +27,7 @@ import (
 
 // Dictionary is the zap representation of the term dictionary
 type Dictionary struct {
-	segment *Segment
+	sb      *SegmentBase
 	field   string
 	fieldID uint16
 	fst     *vellum.FST
@@ -35,18 +35,18 @@ type Dictionary struct {
 
 // PostingsList returns the postings list for the specified term
 func (d *Dictionary) PostingsList(term string, except *roaring.Bitmap) (segment.PostingsList, error) {
-	return d.postingsList(term, except)
+	return d.postingsList([]byte(term), except)
 }
 
-func (d *Dictionary) postingsList(term string, except *roaring.Bitmap) (*PostingsList, error) {
+func (d *Dictionary) postingsList(term []byte, except *roaring.Bitmap) (*PostingsList, error) {
 	rv := &PostingsList{
-		dictionary: d,
-		term:       term,
-		except:     except,
+		sb:     d.sb,
+		term:   term,
+		except: except,
 	}
 
 	if d.fst != nil {
-		postingsOffset, exists, err := d.fst.Get([]byte(term))
+		postingsOffset, exists, err := d.fst.Get(term)
 		if err != nil {
 			return nil, fmt.Errorf("vellum err: %v", err)
 		}
@@ -56,19 +56,19 @@ func (d *Dictionary) postingsList(term string, except *roaring.Bitmap) (*Posting
 			var n uint64
 			var read int
 
-			rv.freqOffset, read = binary.Uvarint(d.segment.mm[postingsOffset+n : postingsOffset+binary.MaxVarintLen64])
+			rv.freqOffset, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+binary.MaxVarintLen64])
 			n += uint64(read)
-			rv.locOffset, read = binary.Uvarint(d.segment.mm[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
+			rv.locOffset, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
 			n += uint64(read)
 
 			var locBitmapOffset uint64
-			locBitmapOffset, read = binary.Uvarint(d.segment.mm[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
+			locBitmapOffset, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
 			n += uint64(read)
 
 			// go ahead and load loc bitmap
 			var locBitmapLen uint64
-			locBitmapLen, read = binary.Uvarint(d.segment.mm[locBitmapOffset : locBitmapOffset+binary.MaxVarintLen64])
-			locRoaringBytes := d.segment.mm[locBitmapOffset+uint64(read) : locBitmapOffset+uint64(read)+locBitmapLen]
+			locBitmapLen, read = binary.Uvarint(d.sb.mem[locBitmapOffset : locBitmapOffset+binary.MaxVarintLen64])
+			locRoaringBytes := d.sb.mem[locBitmapOffset+uint64(read) : locBitmapOffset+uint64(read)+locBitmapLen]
 			rv.locBitmap = roaring.NewBitmap()
 			_, err := rv.locBitmap.FromBuffer(locRoaringBytes)
 			if err != nil {
@@ -76,10 +76,10 @@ func (d *Dictionary) postingsList(term string, except *roaring.Bitmap) (*Posting
 			}
 
 			var postingsLen uint64
-			postingsLen, read = binary.Uvarint(d.segment.mm[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
+			postingsLen, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
 			n += uint64(read)
 
-			roaringBytes := d.segment.mm[postingsOffset+n : postingsOffset+n+postingsLen]
+			roaringBytes := d.sb.mem[postingsOffset+n : postingsOffset+n+postingsLen]
 
 			bitmap := roaring.NewBitmap()
 			_, err = bitmap.FromBuffer(roaringBytes)
@@ -96,7 +96,6 @@ func (d *Dictionary) postingsList(term string, except *roaring.Bitmap) (*Posting
 
 // Iterator returns an iterator for this dictionary
 func (d *Dictionary) Iterator() segment.DictionaryIterator {
-
 	rv := &DictionaryIterator{
 		d: d,
 	}

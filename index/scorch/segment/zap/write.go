@@ -23,42 +23,40 @@ import (
 )
 
 // writes out the length of the roaring bitmap in bytes as varint
-// then writs out the roaring bitmap itself
-func writeRoaringWithLen(r *roaring.Bitmap, w io.Writer) (int, error) {
-	var buffer bytes.Buffer
+// then writes out the roaring bitmap itself
+func writeRoaringWithLen(r *roaring.Bitmap, w io.Writer,
+	reuseBuf *bytes.Buffer, reuseBufVarint []byte) (int, error) {
+	reuseBuf.Reset()
+
 	// write out postings list to memory so we know the len
-	postingsListLen, err := r.WriteTo(&buffer)
+	postingsListLen, err := r.WriteTo(reuseBuf)
 	if err != nil {
 		return 0, err
 	}
 	var tw int
 	// write out the length of this postings list
-	buf := make([]byte, binary.MaxVarintLen64)
-	n := binary.PutUvarint(buf, uint64(postingsListLen))
-	nw, err := w.Write(buf[:n])
+	n := binary.PutUvarint(reuseBufVarint, uint64(postingsListLen))
+	nw, err := w.Write(reuseBufVarint[:n])
 	tw += nw
 	if err != nil {
 		return tw, err
 	}
-
 	// write out the postings list itself
-	nw, err = w.Write(buffer.Bytes())
+	nw, err = w.Write(reuseBuf.Bytes())
 	tw += nw
 	if err != nil {
 		return tw, err
 	}
-
 	return tw, nil
 }
 
 func persistFields(fieldsInv []string, w *CountHashWriter, dictLocs []uint64) (uint64, error) {
 	var rv uint64
+	var fieldsOffsets []uint64
 
-	var fieldStarts []uint64
 	for fieldID, fieldName := range fieldsInv {
-
 		// record start of this field
-		fieldStarts = append(fieldStarts, uint64(w.Count()))
+		fieldsOffsets = append(fieldsOffsets, uint64(w.Count()))
 
 		// write out the dict location and field name length
 		_, err := writeUvarints(w, dictLocs[fieldID], uint64(len(fieldName)))
@@ -76,7 +74,7 @@ func persistFields(fieldsInv []string, w *CountHashWriter, dictLocs []uint64) (u
 	// now write out the fields index
 	rv = uint64(w.Count())
 	for fieldID := range fieldsInv {
-		err := binary.Write(w, binary.BigEndian, fieldStarts[fieldID])
+		err := binary.Write(w, binary.BigEndian, fieldsOffsets[fieldID])
 		if err != nil {
 			return 0, err
 		}
@@ -89,8 +87,11 @@ func persistFields(fieldsInv []string, w *CountHashWriter, dictLocs []uint64) (u
 // crc + ver + chunk + field offset + stored offset + num docs + docValueOffset
 const FooterSize = 4 + 4 + 4 + 8 + 8 + 8 + 8
 
-func persistFooter(numDocs, storedIndexOffset, fieldIndexOffset, docValueOffset uint64,
-	chunkFactor uint32, w *CountHashWriter) error {
+func persistFooter(numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset uint64,
+	chunkFactor uint32, crcBeforeFooter uint32, writerIn io.Writer) error {
+	w := NewCountHashWriter(writerIn)
+	w.crc = crcBeforeFooter
+
 	// write out the number of docs
 	err := binary.Write(w, binary.BigEndian, numDocs)
 	if err != nil {
@@ -102,7 +103,7 @@ func persistFooter(numDocs, storedIndexOffset, fieldIndexOffset, docValueOffset 
 		return err
 	}
 	// write out the field index location
-	err = binary.Write(w, binary.BigEndian, fieldIndexOffset)
+	err = binary.Write(w, binary.BigEndian, fieldsIndexOffset)
 	if err != nil {
 		return err
 	}
@@ -122,7 +123,7 @@ func persistFooter(numDocs, storedIndexOffset, fieldIndexOffset, docValueOffset 
 		return err
 	}
 	// write out CRC-32 of everything upto but not including this CRC
-	err = binary.Write(w, binary.BigEndian, w.Sum32())
+	err = binary.Write(w, binary.BigEndian, w.crc)
 	if err != nil {
 		return err
 	}
