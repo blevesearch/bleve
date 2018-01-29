@@ -368,7 +368,6 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 					}
 
 					// put pos
-
 					err = locEncoder.Add(docNum, locpos[locOffset])
 					if err != nil {
 						return nil, nil, err
@@ -386,10 +385,8 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 						return nil, nil, err
 					}
 
-					// put array positions
-					num := len(locarraypos[locOffset])
-
 					// put the number of array positions to follow
+					num := len(locarraypos[locOffset])
 					err = locEncoder.Add(docNum, uint64(num))
 					if err != nil {
 						return nil, nil, err

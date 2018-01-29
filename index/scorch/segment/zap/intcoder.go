@@ -41,6 +41,7 @@ func newChunkedIntCoder(chunkSize uint64, maxDocNum uint64) *chunkedIntCoder {
 		chunkSize: chunkSize,
 		maxDocNum: maxDocNum,
 		chunkLens: make([]uint64, total),
+		final:     make([]byte, 0, 64),
 	}
 	rv.encoder = govarint.NewU64Base128Encoder(&rv.chunkBuf)
 

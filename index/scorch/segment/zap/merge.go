@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"sort"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/Smerity/govarint"
@@ -149,7 +148,11 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 	fieldDvLocs := make([]uint64, len(fieldsInv))
 	fieldDvLocsOffset := uint64(fieldNotUninverted)
 
-	var docNumbers docIDRange
+	// docTermMap is keyed by docNum, where the array impl provides
+	// better memory usage behavior than a sparse-friendlier hashmap
+	// for when docs have much structural similarity (i.e., every doc
+	// has a given field)
+	var docTermMap [][]byte
 
 	var vellumBuf bytes.Buffer
 
@@ -193,7 +196,14 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 		tfEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
 		locEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
 
-		docTermMap := make(map[uint64][]byte, newSegDocCount)
+		if uint64(cap(docTermMap)) < newSegDocCount {
+			docTermMap = make([][]byte, newSegDocCount)
+		} else {
+			docTermMap = docTermMap[0:newSegDocCount]
+			for docNum := range docTermMap { // reset the docTermMap
+				docTermMap[docNum] = docTermMap[docNum][:0]
+			}
+		}
 
 		for err == nil {
 			term, _ := mergeItr.Current()
@@ -237,12 +247,12 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 							if cap(bufLoc) < 5+len(loc.ArrayPositions()) {
 								bufLoc = make([]uint64, 0, 5+len(loc.ArrayPositions()))
 							}
-							args := bufLoc[0:0]
-							args = append(args, uint64(fieldsMap[loc.Field()]))
-							args = append(args, loc.Pos())
-							args = append(args, loc.Start())
-							args = append(args, loc.End())
-							args = append(args, uint64(len(loc.ArrayPositions())))
+							args := bufLoc[0:5]
+							args[0] = uint64(fieldsMap[loc.Field()])
+							args[1] = loc.Pos()
+							args[2] = loc.Start()
+							args[3] = loc.End()
+							args[4] = uint64(len(loc.ArrayPositions()))
 							args = append(args, loc.ArrayPositions()...)
 							err = locEncoder.Add(hitNewDocNum, args...)
 							if err != nil {
@@ -343,21 +353,14 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 
 		rv[fieldID] = dictOffset
 
-		// update the doc nums
-		if cap(docNumbers) < len(docTermMap) {
-			docNumbers = make(docIDRange, 0, len(docTermMap))
-		}
-		docNumbers = docNumbers[:0]
-		for k := range docTermMap {
-			docNumbers = append(docNumbers, k)
-		}
-		sort.Sort(docNumbers)
-
+		// update the field doc values
 		fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), newSegDocCount-1)
-		for _, docNum := range docNumbers {
-			err = fdvEncoder.Add(docNum, docTermMap[docNum])
-			if err != nil {
-				return nil, 0, err
+		for docNum, docTerms := range docTermMap {
+			if len(docTerms) > 0 {
+				err = fdvEncoder.Add(uint64(docNum), docTerms)
+				if err != nil {
+					return nil, 0, err
+				}
 			}
 		}
 		err = fdvEncoder.Close()
