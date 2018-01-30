@@ -98,6 +98,49 @@ func (p *PostingsList) Count() uint64 {
 	return 0
 }
 
+func (rv *PostingsList) read(postingsOffset uint64, d *Dictionary) error {
+	rv.postingsOffset = postingsOffset
+
+	// read the location of the freq/norm details
+	var n uint64
+	var read int
+
+	rv.freqOffset, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+binary.MaxVarintLen64])
+	n += uint64(read)
+
+	rv.locOffset, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
+	n += uint64(read)
+
+	var locBitmapOffset uint64
+	locBitmapOffset, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
+	n += uint64(read)
+
+	var locBitmapLen uint64
+	locBitmapLen, read = binary.Uvarint(d.sb.mem[locBitmapOffset : locBitmapOffset+binary.MaxVarintLen64])
+
+	locRoaringBytes := d.sb.mem[locBitmapOffset+uint64(read) : locBitmapOffset+uint64(read)+locBitmapLen]
+
+	rv.locBitmap = roaring.NewBitmap()
+	_, err := rv.locBitmap.FromBuffer(locRoaringBytes)
+	if err != nil {
+		return fmt.Errorf("error loading roaring bitmap of locations with hits: %v", err)
+	}
+
+	var postingsLen uint64
+	postingsLen, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
+	n += uint64(read)
+
+	roaringBytes := d.sb.mem[postingsOffset+n : postingsOffset+n+postingsLen]
+
+	rv.postings = roaring.NewBitmap()
+	_, err = rv.postings.FromBuffer(roaringBytes)
+	if err != nil {
+		return fmt.Errorf("error loading roaring bitmap: %v", err)
+	}
+
+	return nil
+}
+
 // PostingsIterator provides a way to iterate through the postings list
 type PostingsIterator struct {
 	postings  *PostingsList

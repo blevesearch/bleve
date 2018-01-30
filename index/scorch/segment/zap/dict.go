@@ -15,7 +15,6 @@
 package zap
 
 import (
-	"encoding/binary"
 	"fmt"
 
 	"github.com/RoaringBitmap/roaring"
@@ -51,43 +50,10 @@ func (d *Dictionary) postingsList(term []byte, except *roaring.Bitmap) (*Posting
 			return nil, fmt.Errorf("vellum err: %v", err)
 		}
 		if exists {
-			rv.postingsOffset = postingsOffset
-			// read the location of the freq/norm details
-			var n uint64
-			var read int
-
-			rv.freqOffset, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+binary.MaxVarintLen64])
-			n += uint64(read)
-			rv.locOffset, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
-			n += uint64(read)
-
-			var locBitmapOffset uint64
-			locBitmapOffset, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
-			n += uint64(read)
-
-			// go ahead and load loc bitmap
-			var locBitmapLen uint64
-			locBitmapLen, read = binary.Uvarint(d.sb.mem[locBitmapOffset : locBitmapOffset+binary.MaxVarintLen64])
-			locRoaringBytes := d.sb.mem[locBitmapOffset+uint64(read) : locBitmapOffset+uint64(read)+locBitmapLen]
-			rv.locBitmap = roaring.NewBitmap()
-			_, err := rv.locBitmap.FromBuffer(locRoaringBytes)
+			err = rv.read(postingsOffset, d)
 			if err != nil {
-				return nil, fmt.Errorf("error loading roaring bitmap of locations with hits: %v", err)
+				return nil, err
 			}
-
-			var postingsLen uint64
-			postingsLen, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
-			n += uint64(read)
-
-			roaringBytes := d.sb.mem[postingsOffset+n : postingsOffset+n+postingsLen]
-
-			bitmap := roaring.NewBitmap()
-			_, err = bitmap.FromBuffer(roaringBytes)
-			if err != nil {
-				return nil, fmt.Errorf("error loading roaring bitmap: %v", err)
-			}
-
-			rv.postings = bitmap
 		}
 	}
 
@@ -160,6 +126,7 @@ type DictionaryIterator struct {
 	d   *Dictionary
 	itr vellum.Iterator
 	err error
+	tmp PostingsList
 }
 
 // Next returns the next entry in the dictionary
@@ -169,10 +136,14 @@ func (i *DictionaryIterator) Next() (*index.DictEntry, error) {
 	} else if i.err != nil {
 		return nil, i.err
 	}
-	term, count := i.itr.Current()
+	term, postingsOffset := i.itr.Current()
+	i.err = i.tmp.read(postingsOffset, i.d)
+	if i.err != nil {
+		return nil, i.err
+	}
 	rv := &index.DictEntry{
 		Term:  string(term),
-		Count: count,
+		Count: i.tmp.Count(),
 	}
 	i.err = i.itr.Next()
 	return rv, nil
