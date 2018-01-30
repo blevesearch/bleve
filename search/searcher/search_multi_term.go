@@ -80,10 +80,10 @@ func NewFuzzyMultiTermSearcher(indexReader index.IndexReader, terms []candidateT
 	// apply fuzzy boost based on edit distance
 	edBoost := 0.0
 	for i, term := range terms {
-		if term.ed == 0 {
+		if term.distance == 0 {
 			edBoost = 1
 		} else {
-			edBoost = 1 - float64(term.ed)/float64(len(term.term))
+			edBoost = 1 - float64(term.distance)/float64(len(term.term))
 		}
 
 		qsearchers[i], err = NewTermSearcherWithTermFieldDetails(indexReader, tfrs[i],
