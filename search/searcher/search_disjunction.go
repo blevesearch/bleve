@@ -64,7 +64,7 @@ func NewDisjunctionSearcher(indexReader index.IndexReader,
 
 func newDisjunctionSearcher(indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
-	limit, fuzzyQuery bool) (
+	limit, disableCoord bool) (
 	*DisjunctionSearcher, error) {
 	if limit && tooManyClauses(len(qsearchers)) {
 		return nil, tooManyClausesErr()
@@ -77,19 +77,12 @@ func newDisjunctionSearcher(indexReader index.IndexReader,
 	// sort the searchers
 	sort.Sort(sort.Reverse(searchers))
 	// build our searcher
-	var sr *scorer.DisjunctionQueryScorer
-	if fuzzyQuery {
-		sr = scorer.NewDisjunctionFuzzyQueryScorer(fuzzyQuery, options)
-	} else {
-		sr = scorer.NewDisjunctionQueryScorer(options)
-	}
-
 	rv := DisjunctionSearcher{
 		indexReader:  indexReader,
 		searchers:    searchers,
 		numSearchers: len(searchers),
 		currs:        make([]*search.DocumentMatch, len(searchers)),
-		scorer:       sr,
+		scorer:       scorer.NewDisjunctionQueryScorer(disableCoord, options),
 		min:          int(min),
 		matching:     make([]*search.DocumentMatch, len(searchers)),
 		matchingIdxs: make([]int, len(searchers)),

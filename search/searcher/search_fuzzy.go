@@ -20,8 +20,8 @@ import (
 )
 
 type candidateTerm struct {
-	term string
-	ed   int
+	term     string
+	distance int
 }
 
 func NewFuzzySearcher(indexReader index.IndexReader, term string,
@@ -67,7 +67,7 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 	for err == nil && tfd != nil {
 		ld, exceeded := search.LevenshteinDistanceMax(term, tfd.Term, fuzziness)
 		if !exceeded && ld <= fuzziness {
-			rv = append(rv, candidateTerm{term: tfd.Term, ed: ld})
+			rv = append(rv, candidateTerm{term: tfd.Term, distance: ld})
 			if tooManyClauses(len(rv)) {
 				return rv, tooManyClausesErr()
 			}

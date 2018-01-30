@@ -60,27 +60,12 @@ func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64,
 }
 
 func NewFuzzyTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64,
-	docTotal, docTerm uint64, fuzzyQuery bool, options search.SearcherOptions) *TermQueryScorer {
-	rv := TermQueryScorer{
-		queryTerm:   queryTerm,
-		queryField:  queryField,
-		queryBoost:  queryBoost,
-		docTerm:     docTerm,
-		docTotal:    docTotal,
-		idf:         1.0 + math.Log(float64(docTotal)/float64(docTerm+1.0)),
-		options:     options,
-		queryWeight: 1.0,
-		scoreFuzzy:  fuzzyQuery,
-	}
-
-	if options.Explain {
-		rv.idfExplanation = &search.Explanation{
-			Value:   rv.idf,
-			Message: fmt.Sprintf("idf(docFreq=%d, maxDocs=%d)", docTerm, docTotal),
-		}
-	}
-
-	return &rv
+	docTotal, docTerm uint64, fuzzyQuery bool,
+	options search.SearcherOptions) *TermQueryScorer {
+	rv := NewTermQueryScorer(queryTerm, queryField, queryBoost, docTotal,
+		docTerm, options)
+	rv.scoreFuzzy = fuzzyQuery
+	return rv
 }
 
 func (s *TermQueryScorer) Weight() float64 {
