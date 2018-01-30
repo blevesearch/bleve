@@ -504,7 +504,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			}
 			dm.walkDocument(property, path, indexes, context)
 		}
-	case reflect.Map:
+	case reflect.Map, reflect.Slice:
 		if subDocMapping != nil {
 			for _, fieldMapping := range subDocMapping.Fields {
 				if fieldMapping.Type == "geopoint" {

@@ -869,37 +869,65 @@ func TestMappingForGeo(t *testing.T) {
 	mapping := NewIndexMapping()
 	mapping.DefaultMapping = thingMapping
 
-	x := struct {
+	geopoints := []interface{}{}
+
+	// geopoint as a struct
+	geopoints = append(geopoints, struct {
 		Name     string    `json:"name"`
 		Location *Location `json:"location"`
 	}{
-		Name: "marty",
+		Name: "struct",
 		Location: &Location{
 			Lon: -180,
 			Lat: -90,
 		},
-	}
+	})
 
-	doc := document.NewDocument("1")
-	err := mapping.MapDocument(doc, x)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// geopoint as a map
+	geopoints = append(geopoints, struct {
+		Name     string                 `json:"name"`
+		Location map[string]interface{} `json:"location"`
+	}{
+		Name: "map",
+		Location: map[string]interface{}{
+			"lon": -180,
+			"lat": -90,
+		},
+	})
 
-	var foundGeo bool
-	for _, f := range doc.Fields {
-		if f.Name() == "location" {
-			foundGeo = true
-			got := f.Value()
-			expect := []byte(numeric.MustNewPrefixCodedInt64(0, 0))
-			if !reflect.DeepEqual(got, expect) {
-				t.Errorf("expected geo value: %v, got %v", expect, got)
+	// geopoint as a slice
+	geopoints = append(geopoints, struct {
+		Name     string        `json:"name"`
+		Location []interface{} `json:"location"`
+	}{
+		Name: "slice",
+		Location: []interface{}{
+			-180, -90,
+		},
+	})
+
+	for i, geopoint := range geopoints {
+		doc := document.NewDocument(string(i))
+		err := mapping.MapDocument(doc, geopoint)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var foundGeo bool
+		for _, f := range doc.Fields {
+			if f.Name() == "location" {
+				foundGeo = true
+				got := f.Value()
+				expect := []byte(numeric.MustNewPrefixCodedInt64(0, 0))
+				if !reflect.DeepEqual(got, expect) {
+					t.Errorf("expected geo value: %v, got %v", expect, got)
+				}
 			}
 		}
-	}
 
-	if !foundGeo {
-		t.Errorf("expected to find geo point, did not")
+		if !foundGeo {
+			t.Errorf("expected to find geo point, did not")
+		}
 	}
 }
 
