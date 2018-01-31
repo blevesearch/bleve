@@ -453,50 +453,14 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 			for fieldID := range fieldsInv {
 				storedFieldValues := vals[int(fieldID)]
 
-				// has stored values for this field
-				num := len(storedFieldValues)
-
 				stf := typs[int(fieldID)]
 				spf := poss[int(fieldID)]
 
-				// process each value
-				for i := 0; i < num; i++ {
-					// encode field
-					_, err2 := metaEncoder.PutU64(uint64(fieldID))
-					if err2 != nil {
-						return 0, nil, err2
-					}
-					// encode type
-					_, err2 = metaEncoder.PutU64(uint64(stf[i]))
-					if err2 != nil {
-						return 0, nil, err2
-					}
-					// encode start offset
-					_, err2 = metaEncoder.PutU64(uint64(curr))
-					if err2 != nil {
-						return 0, nil, err2
-					}
-					// end len
-					_, err2 = metaEncoder.PutU64(uint64(len(storedFieldValues[i])))
-					if err2 != nil {
-						return 0, nil, err2
-					}
-					// encode number of array pos
-					_, err2 = metaEncoder.PutU64(uint64(len(spf[i])))
-					if err2 != nil {
-						return 0, nil, err2
-					}
-					// encode all array positions
-					for _, pos := range spf[i] {
-						_, err2 = metaEncoder.PutU64(pos)
-						if err2 != nil {
-							return 0, nil, err2
-						}
-					}
-					// append data
-					data = append(data, storedFieldValues[i]...)
-					// update curr
-					curr += len(storedFieldValues[i])
+				var err2 error
+				curr, data, err2 = persistStoredFieldValues(fieldID,
+					storedFieldValues, stf, spf, curr, metaEncoder, data)
+				if err2 != nil {
+					return 0, nil, err2
 				}
 			}
 
