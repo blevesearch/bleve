@@ -102,6 +102,110 @@ func TestMerge(t *testing.T) {
 	testMergeWithSelf(t, seg3, 4)
 }
 
+func TestMergeWithEmptySegment(t *testing.T) {
+	testMergeWithEmptySegments(t, true, 1)
+}
+
+func TestMergeWithEmptySegments(t *testing.T) {
+	testMergeWithEmptySegments(t, true, 5)
+}
+
+func TestMergeWithEmptySegmentFirst(t *testing.T) {
+	testMergeWithEmptySegments(t, false, 1)
+}
+
+func TestMergeWithEmptySegmentsFirst(t *testing.T) {
+	testMergeWithEmptySegments(t, false, 5)
+}
+
+func testMergeWithEmptySegments(t *testing.T, before bool, numEmptySegments int) {
+	_ = os.RemoveAll("/tmp/scorch.zap")
+
+	memSegment := buildMemSegmentMulti()
+	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	segment, err := Open("/tmp/scorch.zap")
+	if err != nil {
+		t.Fatalf("error opening segment: %v", err)
+	}
+	defer func() {
+		cerr := segment.Close()
+		if cerr != nil {
+			t.Fatalf("error closing segment: %v", err)
+		}
+	}()
+
+	var segsToMerge []*Segment
+
+	if before {
+		segsToMerge = append(segsToMerge, segment.(*Segment))
+	}
+
+	for i := 0; i < numEmptySegments; i++ {
+		fname := fmt.Sprintf("scorch-empty-%d.zap", i)
+
+		_ = os.RemoveAll("/tmp/" + fname)
+
+		emptySegment := mem.NewFromAnalyzedDocs([]*index.AnalysisResult{})
+		err = PersistSegment(emptySegment, "/tmp/"+fname, 1024)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		emptyFileSegment, err := Open("/tmp/" + fname)
+		if err != nil {
+			t.Fatalf("error opening segment: %v", err)
+		}
+		defer func(emptyFileSegment *Segment) {
+			cerr := emptyFileSegment.Close()
+			if cerr != nil {
+				t.Fatalf("error closing segment: %v", err)
+			}
+		}(emptyFileSegment.(*Segment))
+
+		segsToMerge = append(segsToMerge, emptyFileSegment.(*Segment))
+	}
+
+	if !before {
+		segsToMerge = append(segsToMerge, segment.(*Segment))
+	}
+
+	_ = os.RemoveAll("/tmp/scorch3.zap")
+
+	drops := make([]*roaring.Bitmap, len(segsToMerge))
+
+	_, err = Merge(segsToMerge, drops, "/tmp/scorch3.zap", 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	segm, err := Open("/tmp/scorch3.zap")
+	if err != nil {
+		t.Fatalf("error opening merged segment: %v", err)
+	}
+	segCur := segm.(*Segment)
+	defer func() {
+		cerr := segCur.Close()
+		if cerr != nil {
+			t.Fatalf("error closing segment: %v", err)
+		}
+	}()
+
+	if segCur.Path() != "/tmp/scorch3.zap" {
+		t.Fatalf("wrong path")
+	}
+	if segCur.Count() != 2 {
+		t.Fatalf("wrong count, numEmptySegments: %d, got count: %d", numEmptySegments, segCur.Count())
+	}
+	if len(segCur.Fields()) != 5 {
+		t.Fatalf("wrong # fields: %#v\n", segCur.Fields())
+	}
+
+	testMergeWithSelf(t, segCur, 2)
+}
+
 func testMergeWithSelf(t *testing.T, segCur *Segment, expectedCount uint64) {
 	// trying merging the segment with itself for a few rounds
 	var diffs []string
