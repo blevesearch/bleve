@@ -52,41 +52,15 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 	// wrap it for counting (tracking offsets)
 	cr := NewCountHashWriter(br)
 
-	fieldsInv := mergeFields(segments)
-	fieldsMap := mapFields(fieldsInv)
-
-	var newDocNums [][]uint64
-	var storedIndexOffset uint64
-	fieldDvLocsOffset := uint64(fieldNotUninverted)
-	var dictLocs []uint64
-
-	newSegDocCount := computeNewDocCount(segments, drops)
-	if newSegDocCount > 0 {
-		storedIndexOffset, newDocNums, err = mergeStoredAndRemap(segments, drops,
-			fieldsMap, fieldsInv, newSegDocCount, cr)
-		if err != nil {
-			cleanup()
-			return nil, err
-		}
-
-		dictLocs, fieldDvLocsOffset, err = persistMergedRest(segments, drops, fieldsInv, fieldsMap,
-			newDocNums, newSegDocCount, chunkFactor, cr)
-		if err != nil {
-			cleanup()
-			return nil, err
-		}
-	} else {
-		dictLocs = make([]uint64, len(fieldsInv))
-	}
-
-	fieldsIndexOffset, err := persistFields(fieldsInv, cr, dictLocs)
+	newDocNums, numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset, err :=
+		mergeToWriter(segments, drops, chunkFactor, cr)
 	if err != nil {
 		cleanup()
 		return nil, err
 	}
 
-	err = persistFooter(newSegDocCount, storedIndexOffset,
-		fieldsIndexOffset, fieldDvLocsOffset, chunkFactor, cr.Sum32(), cr)
+	err = persistFooter(numDocs, storedIndexOffset, fieldsIndexOffset,
+		docValueOffset, chunkFactor, cr.Sum32(), cr)
 	if err != nil {
 		cleanup()
 		return nil, err
@@ -111,6 +85,43 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 	}
 
 	return newDocNums, nil
+}
+
+func mergeToWriter(segments []*Segment, drops []*roaring.Bitmap,
+	chunkFactor uint32, cr *CountHashWriter) (
+	newDocNums [][]uint64,
+	numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset uint64,
+	err error) {
+	docValueOffset = uint64(fieldNotUninverted)
+
+	var dictLocs []uint64
+
+	fieldsInv := mergeFields(segments)
+	fieldsMap := mapFields(fieldsInv)
+
+	numDocs = computeNewDocCount(segments, drops)
+	if numDocs > 0 {
+		storedIndexOffset, newDocNums, err = mergeStoredAndRemap(segments, drops,
+			fieldsMap, fieldsInv, numDocs, cr)
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
+		dictLocs, docValueOffset, err = persistMergedRest(segments, drops, fieldsInv, fieldsMap,
+			newDocNums, numDocs, chunkFactor, cr)
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+	} else {
+		dictLocs = make([]uint64, len(fieldsInv))
+	}
+
+	fieldsIndexOffset, err = persistFields(fieldsInv, cr, dictLocs)
+	if err != nil {
+		return nil, 0, 0, 0, 0, err
+	}
+
+	return newDocNums, numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset, nil
 }
 
 // mapFields takes the fieldsInv list and builds the map
