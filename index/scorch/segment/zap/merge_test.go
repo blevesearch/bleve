@@ -427,20 +427,12 @@ func TestMergeAndDropAllFromOneSegment(t *testing.T) {
 func testMergeAndDrop(t *testing.T, docsToDrop []*roaring.Bitmap) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 	_ = os.RemoveAll("/tmp/scorch2.zap")
-	_ = os.RemoveAll("/tmp/scorch3.zap")
 
 	memSegment := buildMemSegmentMulti()
 	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	memSegment2 := buildMemSegmentMulti2()
-	err = PersistSegment(memSegment2, "/tmp/scorch2.zap", 1024)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	segment, err := Open("/tmp/scorch.zap")
 	if err != nil {
 		t.Fatalf("error opening segment: %v", err)
@@ -451,6 +443,12 @@ func testMergeAndDrop(t *testing.T, docsToDrop []*roaring.Bitmap) {
 			t.Fatalf("error closing segment: %v", err)
 		}
 	}()
+
+	memSegment2 := buildMemSegmentMulti2()
+	err = PersistSegment(memSegment2, "/tmp/scorch2.zap", 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	segment2, err := Open("/tmp/scorch2.zap")
 	if err != nil {
@@ -467,12 +465,103 @@ func testMergeAndDrop(t *testing.T, docsToDrop []*roaring.Bitmap) {
 	segsToMerge[0] = segment.(*Segment)
 	segsToMerge[1] = segment2.(*Segment)
 
-	_, err = Merge(segsToMerge, docsToDrop, "/tmp/scorch3.zap", 1024)
+	testMergeAndDropSegments(t, segsToMerge, docsToDrop, 2)
+}
+
+func TestMergeWithUpdates(t *testing.T) {
+	segmentDocIds := [][]string{
+		[]string{"a", "b"},
+		[]string{"b", "c"}, // doc "b" updated
+	}
+
+	docsToDrop := make([]*roaring.Bitmap, 2)
+	docsToDrop[0] = roaring.NewBitmap()
+	docsToDrop[0].AddInt(1) // doc "b" updated
+	docsToDrop[1] = roaring.NewBitmap()
+
+	testMergeWithUpdates(t, segmentDocIds, docsToDrop, 3)
+}
+
+func TestMergeWithUpdatesOnManySegments(t *testing.T) {
+	segmentDocIds := [][]string{
+		[]string{"a", "b"},
+		[]string{"b", "c"}, // doc "b" updated
+		[]string{"c", "d"}, // doc "c" updated
+		[]string{"d", "e"}, // doc "d" updated
+	}
+
+	docsToDrop := make([]*roaring.Bitmap, 4)
+	docsToDrop[0] = roaring.NewBitmap()
+	docsToDrop[0].AddInt(1) // doc "b" updated
+	docsToDrop[1] = roaring.NewBitmap()
+	docsToDrop[1].AddInt(1) // doc "c" updated
+	docsToDrop[2] = roaring.NewBitmap()
+	docsToDrop[2].AddInt(1) // doc "d" updated
+	docsToDrop[3] = roaring.NewBitmap()
+
+	testMergeWithUpdates(t, segmentDocIds, docsToDrop, 5)
+}
+
+func TestMergeWithUpdatesOnOneDoc(t *testing.T) {
+	segmentDocIds := [][]string{
+		[]string{"a", "b"},
+		[]string{"a", "c"}, // doc "a" updated
+		[]string{"a", "d"}, // doc "a" updated
+		[]string{"a", "e"}, // doc "a" updated
+	}
+
+	docsToDrop := make([]*roaring.Bitmap, 4)
+	docsToDrop[0] = roaring.NewBitmap()
+	docsToDrop[0].AddInt(0) // doc "a" updated
+	docsToDrop[1] = roaring.NewBitmap()
+	docsToDrop[1].AddInt(0) // doc "a" updated
+	docsToDrop[2] = roaring.NewBitmap()
+	docsToDrop[2].AddInt(0) // doc "a" updated
+	docsToDrop[3] = roaring.NewBitmap()
+
+	testMergeWithUpdates(t, segmentDocIds, docsToDrop, 5)
+}
+
+func testMergeWithUpdates(t *testing.T, segmentDocIds [][]string, docsToDrop []*roaring.Bitmap, expectedNumDocs uint64) {
+	var segsToMerge []*Segment
+
+	// convert segmentDocIds to segsToMerge
+	for i, docIds := range segmentDocIds {
+		fname := fmt.Sprintf("scorch%d.zap", i)
+
+		_ = os.RemoveAll("/tmp/" + fname)
+
+		memSegment := buildMemSegmentMultiHelper(docIds)
+		err := PersistSegment(memSegment, "/tmp/"+fname, 1024)
+		if err != nil {
+			t.Fatal(err)
+		}
+		segment, err := Open("/tmp/" + fname)
+		if err != nil {
+			t.Fatalf("error opening segment: %v", err)
+		}
+		defer func(segment *Segment) {
+			cerr := segment.Close()
+			if cerr != nil {
+				t.Fatalf("error closing segment: %v", err)
+			}
+		}(segment.(*Segment))
+
+		segsToMerge = append(segsToMerge, segment.(*Segment))
+	}
+
+	testMergeAndDropSegments(t, segsToMerge, docsToDrop, expectedNumDocs)
+}
+
+func testMergeAndDropSegments(t *testing.T, segsToMerge []*Segment, docsToDrop []*roaring.Bitmap, expectedNumDocs uint64) {
+	_ = os.RemoveAll("/tmp/scorch-merged.zap")
+
+	_, err := Merge(segsToMerge, docsToDrop, "/tmp/scorch-merged.zap", 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	segm, err := Open("/tmp/scorch3.zap")
+	segm, err := Open("/tmp/scorch-merged.zap")
 	if err != nil {
 		t.Fatalf("error opening merged segment: %v", err)
 	}
@@ -483,22 +572,25 @@ func testMergeAndDrop(t *testing.T, docsToDrop []*roaring.Bitmap) {
 		}
 	}()
 
-	if segm.Count() != 2 {
-		t.Fatalf("wrong count, got: %d", segm.Count())
+	if segm.Count() != expectedNumDocs {
+		t.Fatalf("wrong count, got: %d, wanted: %d", segm.Count(), expectedNumDocs)
 	}
 	if len(segm.Fields()) != 5 {
 		t.Fatalf("wrong # fields: %#v\n", segm.Fields())
 	}
 
-	testMergeWithSelf(t, segm.(*Segment), 2)
+	testMergeWithSelf(t, segm.(*Segment), expectedNumDocs)
 }
 
 func buildMemSegmentMulti2() *mem.Segment {
+	return buildMemSegmentMultiHelper([]string{"c", "d"})
+}
 
+func buildMemSegmentMultiHelper(docIds []string) *mem.Segment {
 	doc := &document.Document{
 		ID: "c",
 		Fields: []document.Field{
-			document.NewTextFieldCustom("_id", nil, []byte("c"), document.IndexField|document.StoreField, nil),
+			document.NewTextFieldCustom("_id", nil, []byte(docIds[0]), document.IndexField|document.StoreField, nil),
 			document.NewTextFieldCustom("name", nil, []byte("mat"), document.IndexField|document.StoreField|document.IncludeTermVectors, nil),
 			document.NewTextFieldCustom("desc", nil, []byte("some thing"), document.IndexField|document.StoreField|document.IncludeTermVectors, nil),
 			document.NewTextFieldCustom("tag", []uint64{0}, []byte("cold"), document.IndexField|document.StoreField|document.IncludeTermVectors, nil),
@@ -512,7 +604,7 @@ func buildMemSegmentMulti2() *mem.Segment {
 	doc2 := &document.Document{
 		ID: "d",
 		Fields: []document.Field{
-			document.NewTextFieldCustom("_id", nil, []byte("d"), document.IndexField|document.StoreField, nil),
+			document.NewTextFieldCustom("_id", nil, []byte(docIds[1]), document.IndexField|document.StoreField, nil),
 			document.NewTextFieldCustom("name", nil, []byte("joa"), document.IndexField|document.StoreField|document.IncludeTermVectors, nil),
 			document.NewTextFieldCustom("desc", nil, []byte("some thing"), document.IndexField|document.StoreField|document.IncludeTermVectors, nil),
 			document.NewTextFieldCustom("tag", []uint64{0}, []byte("cold"), document.IndexField|document.StoreField|document.IncludeTermVectors, nil),
@@ -533,7 +625,7 @@ func buildMemSegmentMulti2() *mem.Segment {
 						Start:    0,
 						End:      1,
 						Position: 1,
-						Term:     []byte("c"),
+						Term:     []byte(docIds[0]),
 					},
 				}, nil, false),
 				analysis.TokenFrequency(analysis.TokenStream{
@@ -591,7 +683,7 @@ func buildMemSegmentMulti2() *mem.Segment {
 						Start:    0,
 						End:      1,
 						Position: 1,
-						Term:     []byte("d"),
+						Term:     []byte(docIds[1]),
 					},
 				}, nil, false),
 				analysis.TokenFrequency(analysis.TokenStream{
