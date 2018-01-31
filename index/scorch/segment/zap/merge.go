@@ -456,6 +456,9 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 				// has stored values for this field
 				num := len(storedFieldValues)
 
+				stf := typs[int(fieldID)]
+				spf := poss[int(fieldID)]
+
 				// process each value
 				for i := 0; i < num; i++ {
 					// encode field
@@ -464,7 +467,7 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 						return 0, nil, err2
 					}
 					// encode type
-					_, err2 = metaEncoder.PutU64(uint64(typs[int(fieldID)][i]))
+					_, err2 = metaEncoder.PutU64(uint64(stf[i]))
 					if err2 != nil {
 						return 0, nil, err2
 					}
@@ -479,13 +482,13 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 						return 0, nil, err2
 					}
 					// encode number of array pos
-					_, err2 = metaEncoder.PutU64(uint64(len(poss[int(fieldID)][i])))
+					_, err2 = metaEncoder.PutU64(uint64(len(spf[i])))
 					if err2 != nil {
 						return 0, nil, err2
 					}
 					// encode all array positions
-					for j := 0; j < len(poss[int(fieldID)][i]); j++ {
-						_, err2 = metaEncoder.PutU64(poss[int(fieldID)][i][j])
+					for _, pos := range spf[i] {
+						_, err2 = metaEncoder.PutU64(pos)
 						if err2 != nil {
 							return 0, nil, err2
 						}
