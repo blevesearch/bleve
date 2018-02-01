@@ -76,11 +76,11 @@ func NewScorch(storeName string,
 		version:              Version,
 		config:               config,
 		analysisQueue:        analysisQueue,
-		stats:                &Stats{},
 		nextSnapshotEpoch:    1,
 		closeCh:              make(chan struct{}),
 		ineligibleForRemoval: map[string]bool{},
 	}
+	rv.stats = &Stats{i: rv}
 	rv.root = &IndexSnapshot{parent: rv, refs: 1}
 	ro, ok := config["read_only"].(bool)
 	if ok {
@@ -363,7 +363,8 @@ func (s *Scorch) Stats() json.Marshaler {
 	return s.stats
 }
 func (s *Scorch) StatsMap() map[string]interface{} {
-	return s.stats.statsMap()
+	m, _ := s.stats.statsMap()
+	return m
 }
 
 func (s *Scorch) Analyze(d *document.Document) *index.AnalysisResult {

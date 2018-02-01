@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"sync/atomic"
 )
 
@@ -28,9 +29,10 @@ type Stats struct {
 	numPlainTextBytesIndexed          uint64
 	numItemsIntroduced                uint64
 	numItemsPersisted                 uint64
+	i                                 *Scorch
 }
 
-func (s *Stats) statsMap() map[string]interface{} {
+func (s *Stats) statsMap() (map[string]interface{}, error) {
 	m := map[string]interface{}{}
 	m["updates"] = atomic.LoadUint64(&s.updates)
 	m["deletes"] = atomic.LoadUint64(&s.deletes)
@@ -44,11 +46,33 @@ func (s *Stats) statsMap() map[string]interface{} {
 	m["num_items_introduced"] = atomic.LoadUint64(&s.numItemsIntroduced)
 	m["num_items_persisted"] = atomic.LoadUint64(&s.numItemsPersisted)
 
-	return m
+	if s.i.path != "" {
+		finfos, err := ioutil.ReadDir(s.i.path)
+		if err != nil {
+			return nil, err
+		}
+
+		var numFilesOnDisk, numBytesUsedDisk uint64
+
+		for _, finfo := range finfos {
+			if !finfo.IsDir() {
+				numBytesUsedDisk += uint64(finfo.Size())
+				numFilesOnDisk++
+			}
+		}
+
+		m["num_bytes_used_disk"] = numBytesUsedDisk
+		m["num_files_on_disk"] = numFilesOnDisk
+	}
+
+	return m, nil
 }
 
 // MarshalJSON implements json.Marshaler
 func (s *Stats) MarshalJSON() ([]byte, error) {
-	m := s.statsMap()
+	m, err := s.statsMap()
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(m)
 }
