@@ -266,9 +266,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		for k, v := range s.root.internal {
 			newIndexSnapshot.internal[k] = v
 		}
-		for _, filename := range filenames {
-			delete(s.ineligibleForRemoval, filename)
-		}
+
 		rootPrev := s.root
 		s.root = newIndexSnapshot
 		s.rootLock.Unlock()
@@ -276,6 +274,12 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 			_ = rootPrev.DecRef()
 		}
 	}
+	// unlock the files for clean up
+	s.rootLock.Lock()
+	for _, filename := range filenames {
+		delete(s.ineligibleForRemoval, filename)
+	}
+	s.rootLock.Unlock()
 
 	return nil
 }
