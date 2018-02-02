@@ -186,8 +186,7 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 
 	// While we’re over budget, keep looping, which might produce
 	// another MergeTask.
-	newlyMerged := int(0)
-	for (len(eligibles) + newlyMerged) > budgetNumSegments {
+	for len(eligibles) > 0 && (len(eligibles)+len(rv.Tasks)) > budgetNumSegments {
 		// Track a current best roster as we examine and score
 		// potential rosters of merges.
 		var bestRoster []Segment
@@ -223,7 +222,6 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		rv.Tasks = append(rv.Tasks, &MergeTask{Segments: bestRoster})
 
 		eligibles = removeSegments(eligibles, bestRoster)
-		newlyMerged++
 	}
 
 	return rv, nil
