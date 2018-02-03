@@ -588,7 +588,7 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 		if err != nil {
 			return nil, err
 		}
-		// resetting encoder for the next field
+		// reseting encoder for the next field
 		fdvEncoder.Reset()
 	}
 
