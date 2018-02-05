@@ -274,7 +274,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 			_ = rootPrev.DecRef()
 		}
 	}
-	// unlock the files for clean up
+	// allow files to become eligible for removal
 	s.rootLock.Lock()
 	for _, filename := range filenames {
 		delete(s.ineligibleForRemoval, filename)
