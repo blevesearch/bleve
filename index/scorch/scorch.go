@@ -61,7 +61,7 @@ type Scorch struct {
 	merges             chan *segmentMerge
 	introducerNotifier chan *epochWatcher
 	revertToSnapshots  chan *snapshotReversion
-	persisterNotifier  chan notificationChan
+	persisterNotifier  chan *epochWatcher
 	rootBolt           *bolt.DB
 	asyncTasks         sync.WaitGroup
 
@@ -156,7 +156,7 @@ func (s *Scorch) Open() error {
 	s.merges = make(chan *segmentMerge)
 	s.introducerNotifier = make(chan *epochWatcher, 1)
 	s.revertToSnapshots = make(chan *snapshotReversion)
-	s.persisterNotifier = make(chan notificationChan)
+	s.persisterNotifier = make(chan *epochWatcher, 1)
 
 	if !s.readOnly && s.path != "" {
 		err := s.removeOldZapFiles() // Before persister or merger create any new files.
