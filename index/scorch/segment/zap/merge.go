@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/Smerity/govarint"
@@ -545,5 +546,8 @@ func mergeFields(segments []*SegmentBase) []string {
 			rv = append(rv, k)
 		}
 	}
+
+	sort.Strings(rv[1:]) // leave _id as first
+
 	return rv
 }
