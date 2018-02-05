@@ -188,6 +188,18 @@ func TestCalcBudget(t *testing.T) {
 			},
 			7,
 		},
+		{1000, 2000, DefaultMergePlanOptions,
+			1},
+		{5000, 2000, DefaultMergePlanOptions,
+			3},
+		{10000, 2000, DefaultMergePlanOptions,
+			5},
+		{30000, 2000, DefaultMergePlanOptions,
+			11},
+		{1000000, 2000, DefaultMergePlanOptions,
+			24},
+		{1000000000, 2000, DefaultMergePlanOptions,
+			54},
 	}
 
 	for testi, test := range tests {
