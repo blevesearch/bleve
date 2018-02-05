@@ -114,6 +114,25 @@ func (s *Scorch) fireAsyncError(err error) {
 }
 
 func (s *Scorch) Open() error {
+	err := s.openBolt()
+	if err != nil {
+		return err
+	}
+
+	s.asyncTasks.Add(1)
+	go s.mainLoop()
+
+	if !s.readOnly && s.path != "" {
+		s.asyncTasks.Add(1)
+		go s.persisterLoop()
+		s.asyncTasks.Add(1)
+		go s.mergerLoop()
+	}
+
+	return nil
+}
+
+func (s *Scorch) openBolt() error {
 	var ok bool
 	s.path, ok = s.config["path"].(string)
 	if !ok {
@@ -136,6 +155,7 @@ func (s *Scorch) Open() error {
 			}
 		}
 	}
+
 	rootBoltPath := s.path + string(os.PathSeparator) + "root.bolt"
 	var err error
 	if s.path != "" {
@@ -164,16 +184,6 @@ func (s *Scorch) Open() error {
 			_ = s.Close()
 			return err
 		}
-	}
-
-	s.asyncTasks.Add(1)
-	go s.mainLoop()
-
-	if !s.readOnly && s.path != "" {
-		s.asyncTasks.Add(1)
-		go s.persisterLoop()
-		s.asyncTasks.Add(1)
-		go s.mergerLoop()
 	}
 
 	return nil

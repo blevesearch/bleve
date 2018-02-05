@@ -22,7 +22,12 @@ import (
 )
 
 func TestIndexRollback(t *testing.T) {
+	numSnapshotsToKeepOrig := NumSnapshotsToKeep
+	NumSnapshotsToKeep = 1000
+
 	defer func() {
+		NumSnapshotsToKeep = numSnapshotsToKeepOrig
+
 		err := DestroyTest()
 		if err != nil {
 			t.Fatal(err)
@@ -34,16 +39,28 @@ func TestIndexRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = idx.Open()
-	if err != nil {
-		t.Fatalf("error opening index: %v", err)
-	}
 	defer func() {
 		err := idx.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
+
+	sh, ok := idx.(*Scorch)
+	if !ok {
+		t.Fatalf("Not a scorch index?")
+	}
+
+	err = sh.openBolt()
+	if err != nil {
+		t.Fatalf("error opening index: %v", err)
+	}
+
+	// start background goroutines except for the merger, which
+	// simulates a super slow merger
+	sh.asyncTasks.Add(2)
+	go sh.mainLoop()
+	go sh.persisterLoop()
 
 	// create a batch, insert 2 new documents
 	batch := index.NewBatch()
@@ -59,14 +76,17 @@ func TestIndexRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sh, ok := idx.(*Scorch)
-	if !ok {
-		t.Fatalf("Not a scorch index?")
+	readerSlow, err := idx.Reader() // keep snapshot around so it's not cleaned up
+	if err != nil {
+		t.Fatal(err)
 	}
+	defer func() {
+		_ = readerSlow.Close()
+	}()
 
 	// fetch rollback points available as of here
 	rollbackPoints, err := sh.RollbackPoints()
-	if err != nil || len(rollbackPoints) == 0 {
+	if err != nil || len(rollbackPoints) != 1 {
 		t.Fatal(err, len(rollbackPoints))
 	}
 
@@ -86,6 +106,21 @@ func TestIndexRollback(t *testing.T) {
 	err = idx.Batch(batch)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	rollbackPointsB, err := sh.RollbackPoints()
+	if err != nil || len(rollbackPointsB) != 3 {
+		t.Fatal(err, len(rollbackPointsB))
+	}
+
+	found := false
+	for _, p := range rollbackPointsB {
+		if rollbackPoint.epoch == p.epoch {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected rollbackPoint epoch to still be available")
 	}
 
 	reader, err := idx.Reader()
