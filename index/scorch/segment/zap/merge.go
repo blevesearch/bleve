@@ -102,13 +102,13 @@ func MergeToWriter(segments []*SegmentBase, drops []*roaring.Bitmap,
 
 	var dictLocs []uint64
 
-	fieldsInv := mergeFields(segments)
+	fieldsSame, fieldsInv := mergeFields(segments)
 	fieldsMap := mapFields(fieldsInv)
 
 	numDocs = computeNewDocCount(segments, drops)
 	if numDocs > 0 {
 		storedIndexOffset, newDocNums, err = mergeStoredAndRemap(segments, drops,
-			fieldsMap, fieldsInv, numDocs, cr)
+			fieldsMap, fieldsInv, fieldsSame, numDocs, cr)
 		if err != nil {
 			return nil, 0, 0, 0, 0, err
 		}
@@ -415,7 +415,7 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 const docDropped = math.MaxUint64
 
 func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
-	fieldsMap map[string]uint16, fieldsInv []string, newSegDocCount uint64,
+	fieldsMap map[string]uint16, fieldsInv []string, fieldsSame bool, newSegDocCount uint64,
 	w *CountHashWriter) (uint64, [][]uint64, error) {
 	var rv [][]uint64 // The remapped or newDocNums for each segment.
 
@@ -528,13 +528,26 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	return storedIndexOffset, rv, nil
 }
 
-// mergeFields builds a unified list of fields used across all the input segments
-func mergeFields(segments []*SegmentBase) []string {
+// mergeFields builds a unified list of fields used across all the
+// input segments, and computes whether the fields are the same across
+// segments (which depends on fields to be sorted in the same way
+// across segments)
+func mergeFields(segments []*SegmentBase) (bool, []string) {
+	fieldsSame := true
+
+	var segment0Fields []string
+	if len(segments) > 0 {
+		segment0Fields = segments[0].Fields()
+	}
+
 	fieldsMap := map[string]struct{}{}
 	for _, segment := range segments {
 		fields := segment.Fields()
-		for _, field := range fields {
+		for fieldi, field := range fields {
 			fieldsMap[field] = struct{}{}
+			if len(segment0Fields) != len(fields) || segment0Fields[fieldi] != field {
+				fieldsSame = false
+			}
 		}
 	}
 
@@ -549,5 +562,5 @@ func mergeFields(segments []*SegmentBase) []string {
 
 	sort.Strings(rv[1:]) // leave _id as first
 
-	return rv
+	return fieldsSame, rv
 }
