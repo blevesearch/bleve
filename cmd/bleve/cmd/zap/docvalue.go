@@ -165,7 +165,7 @@ var docvalueCmd = &cobra.Command{
 			/*
 				TODO => dump all chunk headers??
 				if len(args) == 3 && args[2] == ">" {
-					dumpChunkDocIDs(data, )
+					dumpChunkDocNums(data, )
 
 				}*/
 		}
@@ -187,7 +187,7 @@ var docvalueCmd = &cobra.Command{
 		docInChunk := uint64(localDocNum) / uint64(segment.ChunkFactor())
 
 		if numChunks < docInChunk {
-			return fmt.Errorf("no chunk exists for chunk number: %d for docID: %d", docInChunk, localDocNum)
+			return fmt.Errorf("no chunk exists for chunk number: %d for localDocNum: %d", docInChunk, localDocNum)
 		}
 
 		destChunkDataLoc := fieldDvLoc + offset
@@ -207,7 +207,7 @@ var docvalueCmd = &cobra.Command{
 		offset = uint64(0)
 		curChunkHeader := make([]zap.MetaData, int(numDocs))
 		for i := 0; i < int(numDocs); i++ {
-			curChunkHeader[i].DocID, nread = binary.Uvarint(data[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
+			curChunkHeader[i].DocNum, nread = binary.Uvarint(data[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
 			offset += uint64(nread)
 			curChunkHeader[i].DocDvLoc, nread = binary.Uvarint(data[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
 			offset += uint64(nread)
@@ -221,8 +221,8 @@ var docvalueCmd = &cobra.Command{
 
 		start, length := getDocValueLocs(uint64(localDocNum), curChunkHeader)
 		if start == math.MaxUint64 || length == math.MaxUint64 {
-			fmt.Printf("no field values found for docID %d\n", localDocNum)
-			fmt.Printf("Try docIDs present in chunk: %s\n", assortDocID(curChunkHeader))
+			fmt.Printf("no field values found for localDocNum: %d\n", localDocNum)
+			fmt.Printf("Try docNums present in chunk: %s\n", metaDataDocNums(curChunkHeader))
 			return nil
 		}
 		// uncompress the already loaded data
@@ -234,7 +234,7 @@ var docvalueCmd = &cobra.Command{
 
 		var termSeparator byte = 0xff
 		var termSeparatorSplitSlice = []byte{termSeparator}
-		// pick the terms for the given docID
+		// pick the terms for the given docNum
 		uncompressed = uncompressed[start : start+length]
 		for {
 			i := bytes.Index(uncompressed, termSeparatorSplitSlice)
@@ -250,23 +250,22 @@ var docvalueCmd = &cobra.Command{
 	},
 }
 
-func getDocValueLocs(docID uint64, metaHeader []zap.MetaData) (uint64, uint64) {
+func getDocValueLocs(docNum uint64, metaHeader []zap.MetaData) (uint64, uint64) {
 	i := sort.Search(len(metaHeader), func(i int) bool {
-		return metaHeader[i].DocID >= docID
+		return metaHeader[i].DocNum >= docNum
 	})
-	if i < len(metaHeader) && metaHeader[i].DocID == docID {
+	if i < len(metaHeader) && metaHeader[i].DocNum == docNum {
 		return metaHeader[i].DocDvLoc, metaHeader[i].DocDvLen
 	}
 	return math.MaxUint64, math.MaxUint64
 }
 
-func assortDocID(metaHeader []zap.MetaData) string {
-	docIDs := ""
+func metaDataDocNums(metaHeader []zap.MetaData) string {
+	docNums := ""
 	for _, meta := range metaHeader {
-		id := fmt.Sprintf("%d", meta.DocID)
-		docIDs += id + ", "
+		docNums += fmt.Sprintf("%d", meta.DocNum) + ", "
 	}
-	return docIDs
+	return docNums
 }
 
 func init() {

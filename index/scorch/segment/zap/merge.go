@@ -52,41 +52,15 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 	// wrap it for counting (tracking offsets)
 	cr := NewCountHashWriter(br)
 
-	fieldsInv := mergeFields(segments)
-	fieldsMap := mapFields(fieldsInv)
-
-	var newDocNums [][]uint64
-	var storedIndexOffset uint64
-	fieldDvLocsOffset := uint64(fieldNotUninverted)
-	var dictLocs []uint64
-
-	newSegDocCount := computeNewDocCount(segments, drops)
-	if newSegDocCount > 0 {
-		storedIndexOffset, newDocNums, err = mergeStoredAndRemap(segments, drops,
-			fieldsMap, fieldsInv, newSegDocCount, cr)
-		if err != nil {
-			cleanup()
-			return nil, err
-		}
-
-		dictLocs, fieldDvLocsOffset, err = persistMergedRest(segments, drops, fieldsInv, fieldsMap,
-			newDocNums, newSegDocCount, chunkFactor, cr)
-		if err != nil {
-			cleanup()
-			return nil, err
-		}
-	} else {
-		dictLocs = make([]uint64, len(fieldsInv))
-	}
-
-	fieldsIndexOffset, err := persistFields(fieldsInv, cr, dictLocs)
+	newDocNums, numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset, err :=
+		mergeToWriter(segments, drops, chunkFactor, cr)
 	if err != nil {
 		cleanup()
 		return nil, err
 	}
 
-	err = persistFooter(newSegDocCount, storedIndexOffset,
-		fieldsIndexOffset, fieldDvLocsOffset, chunkFactor, cr.Sum32(), cr)
+	err = persistFooter(numDocs, storedIndexOffset, fieldsIndexOffset,
+		docValueOffset, chunkFactor, cr.Sum32(), cr)
 	if err != nil {
 		cleanup()
 		return nil, err
@@ -111,6 +85,43 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 	}
 
 	return newDocNums, nil
+}
+
+func mergeToWriter(segments []*Segment, drops []*roaring.Bitmap,
+	chunkFactor uint32, cr *CountHashWriter) (
+	newDocNums [][]uint64,
+	numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset uint64,
+	err error) {
+	docValueOffset = uint64(fieldNotUninverted)
+
+	var dictLocs []uint64
+
+	fieldsInv := mergeFields(segments)
+	fieldsMap := mapFields(fieldsInv)
+
+	numDocs = computeNewDocCount(segments, drops)
+	if numDocs > 0 {
+		storedIndexOffset, newDocNums, err = mergeStoredAndRemap(segments, drops,
+			fieldsMap, fieldsInv, numDocs, cr)
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
+		dictLocs, docValueOffset, err = persistMergedRest(segments, drops, fieldsInv, fieldsMap,
+			newDocNums, numDocs, chunkFactor, cr)
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+	} else {
+		dictLocs = make([]uint64, len(fieldsInv))
+	}
+
+	fieldsIndexOffset, err = persistFields(fieldsInv, cr, dictLocs)
+	if err != nil {
+		return nil, 0, 0, 0, 0, err
+	}
+
+	return newDocNums, numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset, nil
 }
 
 // mapFields takes the fieldsInv list and builds the map
@@ -453,47 +464,14 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 			for fieldID := range fieldsInv {
 				storedFieldValues := vals[int(fieldID)]
 
-				// has stored values for this field
-				num := len(storedFieldValues)
+				stf := typs[int(fieldID)]
+				spf := poss[int(fieldID)]
 
-				// process each value
-				for i := 0; i < num; i++ {
-					// encode field
-					_, err2 := metaEncoder.PutU64(uint64(fieldID))
-					if err2 != nil {
-						return 0, nil, err2
-					}
-					// encode type
-					_, err2 = metaEncoder.PutU64(uint64(typs[int(fieldID)][i]))
-					if err2 != nil {
-						return 0, nil, err2
-					}
-					// encode start offset
-					_, err2 = metaEncoder.PutU64(uint64(curr))
-					if err2 != nil {
-						return 0, nil, err2
-					}
-					// end len
-					_, err2 = metaEncoder.PutU64(uint64(len(storedFieldValues[i])))
-					if err2 != nil {
-						return 0, nil, err2
-					}
-					// encode number of array pos
-					_, err2 = metaEncoder.PutU64(uint64(len(poss[int(fieldID)][i])))
-					if err2 != nil {
-						return 0, nil, err2
-					}
-					// encode all array positions
-					for j := 0; j < len(poss[int(fieldID)][i]); j++ {
-						_, err2 = metaEncoder.PutU64(poss[int(fieldID)][i][j])
-						if err2 != nil {
-							return 0, nil, err2
-						}
-					}
-					// append data
-					data = append(data, storedFieldValues[i]...)
-					// update curr
-					curr += len(storedFieldValues[i])
+				var err2 error
+				curr, data, err2 = persistStoredFieldValues(fieldID,
+					storedFieldValues, stf, spf, curr, metaEncoder, data)
+				if err2 != nil {
+					return 0, nil, err2
 				}
 			}
 
