@@ -29,6 +29,8 @@ import (
 	"github.com/golang/snappy"
 )
 
+const docDropped = math.MaxUint64 // sentinel docNum to represent a deleted doc
+
 // Merge takes a slice of zap segments and bit masks describing which
 // documents may be dropped, and creates a new segment containing the
 // remaining data.  This new segment is built at the specified path,
@@ -411,8 +413,6 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 
 	return rv, fieldDvLocsOffset, nil
 }
-
-const docDropped = math.MaxUint64
 
 func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	fieldsMap map[string]uint16, fieldsInv []string, fieldsSame bool, newSegDocCount uint64,
