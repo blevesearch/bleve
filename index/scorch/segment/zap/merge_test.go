@@ -398,6 +398,40 @@ func compareSegments(a, b *Segment) string {
 								fieldName, next.Term, aloc, bloc))
 						}
 					}
+
+					if fieldName == "_id" {
+						docId := next.Term
+						docNumA := apitrn.Number()
+						docNumB := bpitrn.Number()
+						afields := map[string]interface{}{}
+						err = a.VisitDocument(apitrn.Number(),
+							func(field string, typ byte, value []byte, pos []uint64) bool {
+								afields[field+"-typ"] = typ
+								afields[field+"-value"] = value
+								afields[field+"-pos"] = pos
+								return true
+							})
+						if err != nil {
+							rv = append(rv, fmt.Sprintf("a.VisitDocument err: %v", err))
+						}
+						bfields := map[string]interface{}{}
+						err = b.VisitDocument(bpitrn.Number(),
+							func(field string, typ byte, value []byte, pos []uint64) bool {
+								bfields[field+"-typ"] = typ
+								bfields[field+"-value"] = value
+								bfields[field+"-pos"] = pos
+								return true
+							})
+						if err != nil {
+							rv = append(rv, fmt.Sprintf("b.VisitDocument err: %v", err))
+						}
+						if !reflect.DeepEqual(afields, bfields) {
+							rv = append(rv, fmt.Sprintf("afields != bfields,"+
+								" id: %s, docNumA: %d, docNumB: %d,"+
+								" afields: %#v, bfields: %#v",
+								docId, docNumA, docNumB, afields, bfields))
+						}
+					}
 				}
 			}
 		}

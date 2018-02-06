@@ -437,6 +437,24 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	for segI, segment := range segments {
 		segNewDocNums := make([]uint64, segment.numDocs)
 
+		// optimize when the field mapping is the same across all
+		// segments and there are no deletions, via byte-copying
+		// of stored docs bytes directly to the writer
+		if fieldsSame && (drops[segI] == nil || drops[segI].GetCardinality() == 0) {
+			err := segment.copyStoredDocs(newDocNum, docNumOffsets, w)
+			if err != nil {
+				return 0, nil, err
+			}
+
+			for i := uint64(0); i < segment.numDocs; i++ {
+				segNewDocNums[i] = newDocNum
+				newDocNum++
+			}
+			rv = append(rv, segNewDocNums)
+
+			continue
+		}
+
 		// for each doc num
 		for docNum := uint64(0); docNum < segment.numDocs; docNum++ {
 			// TODO: roaring's API limits docNums to 32-bits?
@@ -526,6 +544,41 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	}
 
 	return storedIndexOffset, rv, nil
+}
+
+// copyStoredDocs writes out a segment's stored doc info, optimized by
+// using a single Write() call for the entire set of bytes.  The
+// newDocNumOffsets is filled with the new offsets for each doc.
+func (s *SegmentBase) copyStoredDocs(newDocNum uint64, newDocNumOffsets []uint64,
+	w *CountHashWriter) error {
+	if s.numDocs <= 0 {
+		return nil
+	}
+
+	indexOffset0, storedOffset0, _, _, _ :=
+		s.getDocStoredOffsets(0) // the segment's first doc
+
+	indexOffsetN, storedOffsetN, readN, metaLenN, dataLenN :=
+		s.getDocStoredOffsets(s.numDocs - 1) // the segment's last doc
+
+	storedOffset0New := uint64(w.Count())
+
+	storedBytes := s.mem[storedOffset0 : storedOffsetN+readN+metaLenN+dataLenN]
+	_, err := w.Write(storedBytes)
+	if err != nil {
+		return err
+	}
+
+	// remap the storedOffset's for the docs into new offsets relative
+	// to storedOffset0New, filling the given docNumOffsetsOut array
+	for indexOffset := indexOffset0; indexOffset <= indexOffsetN; indexOffset += 8 {
+		storedOffset := binary.BigEndian.Uint64(s.mem[indexOffset : indexOffset+8])
+		storedOffsetNew := storedOffset - storedOffset0 + storedOffset0New
+		newDocNumOffsets[newDocNum] = storedOffsetNew
+		newDocNum += 1
+	}
+
+	return nil
 }
 
 // mergeFields builds a unified list of fields used across all the
