@@ -24,21 +24,21 @@ import (
 
 const metaFilename = "index_meta.json"
 
-type indexMeta struct {
+type IndexMeta struct {
 	Storage   string                 `json:"storage"`
 	IndexType string                 `json:"index_type"`
 	Config    map[string]interface{} `json:"config,omitempty"`
 }
 
-func newIndexMeta(indexType string, storage string, config map[string]interface{}) *indexMeta {
-	return &indexMeta{
+func NewIndexMeta(indexType string, storage string, config map[string]interface{}) *IndexMeta {
+	return &IndexMeta{
 		IndexType: indexType,
 		Storage:   storage,
 		Config:    config,
 	}
 }
 
-func openIndexMeta(path string) (*indexMeta, error) {
+func OpenIndexMeta(path string) (*IndexMeta, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil, ErrorIndexPathDoesNotExist
 	}
@@ -47,7 +47,7 @@ func openIndexMeta(path string) (*indexMeta, error) {
 	if err != nil {
 		return nil, ErrorIndexMetaMissing
 	}
-	var im indexMeta
+	var im IndexMeta
 	err = json.Unmarshal(metaBytes, &im)
 	if err != nil {
 		return nil, ErrorIndexMetaCorrupt
@@ -58,7 +58,7 @@ func openIndexMeta(path string) (*indexMeta, error) {
 	return &im, nil
 }
 
-func (i *indexMeta) Save(path string) (err error) {
+func (i *IndexMeta) Save(path string) (err error) {
 	indexMetaPath := indexMetaPath(path)
 	// ensure any necessary parent directories exist
 	err = os.MkdirAll(path, 0700)
