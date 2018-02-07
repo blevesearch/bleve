@@ -155,6 +155,8 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 	var bufMaxVarintLen64 []byte = make([]byte, binary.MaxVarintLen64)
 	var bufLoc []uint64
 
+	var postings *PostingsList
+
 	rv := make([]uint64, len(fieldsInv))
 	fieldDvLocs := make([]uint64, len(fieldsInv))
 	fieldDvLocsOffset := uint64(fieldNotUninverted)
@@ -231,7 +233,8 @@ func persistMergedRest(segments []*Segment, drops []*roaring.Bitmap,
 				if dict == nil {
 					continue
 				}
-				postings, err2 := dict.postingsList(term, drops[dictI])
+				var err2 error
+				postings, err2 = dict.postingsList(term, drops[dictI], postings)
 				if err2 != nil {
 					return nil, 0, err2
 				}
