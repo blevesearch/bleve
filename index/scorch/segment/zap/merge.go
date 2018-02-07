@@ -506,17 +506,17 @@ func mergeStoredAndRemap(segments []*Segment, drops []*roaring.Bitmap,
 	}
 
 	// return value is the start of the stored index
-	offset := uint64(w.Count())
+	storedIndexOffset := uint64(w.Count())
 
 	// now write out the stored doc index
-	for docNum := range docNumOffsets {
-		err := binary.Write(w, binary.BigEndian, docNumOffsets[docNum])
+	for _, docNumOffset := range docNumOffsets {
+		err := binary.Write(w, binary.BigEndian, docNumOffset)
 		if err != nil {
 			return 0, nil, err
 		}
 	}
 
-	return offset, rv, nil
+	return storedIndexOffset, rv, nil
 }
 
 // mergeFields builds a unified list of fields used across all the input segments
