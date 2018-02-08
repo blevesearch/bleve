@@ -193,8 +193,8 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	newSegmentPaths := make(map[uint64]string)
 
 	// first ensure that each segment in this snapshot has been persisted
-	for i, segmentSnapshot := range snapshot.segment {
-		snapshotSegmentKey := segment.EncodeUvarintAscending(nil, uint64(i))
+	for _, segmentSnapshot := range snapshot.segment {
+		snapshotSegmentKey := segment.EncodeUvarintAscending(nil, segmentSnapshot.id)
 		snapshotSegmentBucket, err2 := snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
 		if err2 != nil {
 			return err2
