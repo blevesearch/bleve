@@ -31,10 +31,9 @@ func (r *RollbackPoint) GetInternal(key []byte) []byte {
 	return r.meta[string(key)]
 }
 
-// RollbackPoints returns an array of rollback points available
-// for the application to make a decision on where to rollback
-// to. A nil return value indicates that there are no available
-// rollback points.
+// RollbackPoints returns an array of rollback points available for
+// the application to rollback to, with more recent rollback points
+// (higher epochs) coming first.
 func (s *Scorch) RollbackPoints() ([]*RollbackPoint, error) {
 	if s.rootBolt == nil {
 		return nil, fmt.Errorf("RollbackPoints: root is nil")
@@ -54,7 +53,7 @@ func (s *Scorch) RollbackPoints() ([]*RollbackPoint, error) {
 
 	snapshots := tx.Bucket(boltSnapshotsBucket)
 	if snapshots == nil {
-		return nil, fmt.Errorf("RollbackPoints: no snapshots available")
+		return nil, nil
 	}
 
 	rollbackPoints := []*RollbackPoint{}

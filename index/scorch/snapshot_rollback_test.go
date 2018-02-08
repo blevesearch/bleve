@@ -62,6 +62,15 @@ func TestIndexRollback(t *testing.T) {
 	go sh.mainLoop()
 	go sh.persisterLoop()
 
+	// should have no rollback points initially
+	rollbackPoints, err := sh.RollbackPoints()
+	if err != nil {
+		t.Fatalf("expected no err, got: %v, %d", err, len(rollbackPoints))
+	}
+	if len(rollbackPoints) != 0 {
+		t.Fatalf("expected no rollbackPoints, got %d", len(rollbackPoints))
+	}
+
 	// create a batch, insert 2 new documents
 	batch := index.NewBatch()
 	doc := document.NewDocument("1")
@@ -84,10 +93,13 @@ func TestIndexRollback(t *testing.T) {
 		_ = readerSlow.Close()
 	}()
 
-	// fetch rollback points available as of here
-	rollbackPoints, err := sh.RollbackPoints()
-	if err != nil || len(rollbackPoints) != 1 {
-		t.Fatal(err, len(rollbackPoints))
+	// fetch rollback points after first batch
+	rollbackPoints, err = sh.RollbackPoints()
+	if err != nil {
+		t.Fatalf("expected no err, got: %v, %d", err, len(rollbackPoints))
+	}
+	if len(rollbackPoints) == 0 {
+		t.Fatalf("expected some rollbackPoints, got none")
 	}
 
 	// set this as a rollback point for the future
@@ -109,8 +121,8 @@ func TestIndexRollback(t *testing.T) {
 	}
 
 	rollbackPointsB, err := sh.RollbackPoints()
-	if err != nil || len(rollbackPointsB) != 3 {
-		t.Fatal(err, len(rollbackPointsB))
+	if err != nil || len(rollbackPointsB) <= len(rollbackPoints) {
+		t.Fatalf("expected no err, got: %v, %d", err, len(rollbackPointsB))
 	}
 
 	found := false
