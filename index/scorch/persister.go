@@ -196,17 +196,17 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	for _, segmentSnapshot := range snapshot.segment {
 		snapshotSegmentKey := segment.EncodeUvarintAscending(nil, segmentSnapshot.id)
 		snapshotSegmentBucket, err2 := snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
-		if err2 != nil {
-			return err2
+		if err != nil {
+			return err
 		}
 		switch seg := segmentSnapshot.segment.(type) {
 		case *zap.SegmentBase:
 			// need to persist this to disk
 			filename := zapFileName(segmentSnapshot.id)
 			path := s.path + string(os.PathSeparator) + filename
-			err2 := zap.PersistSegmentBase(seg, path)
-			if err2 != nil {
-				return fmt.Errorf("error persisting segment: %v", err2)
+			err = zap.PersistSegmentBase(seg, path)
+			if err != nil {
+				return fmt.Errorf("error persisting segment: %v", err)
 			}
 			newSegmentPaths[segmentSnapshot.id] = path
 			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
