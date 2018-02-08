@@ -310,8 +310,8 @@ func compareSegments(a, b *Segment) string {
 					continue
 				}
 
-				aplist, aerr := adict.(*Dictionary).postingsList([]byte(next.Term), nil)
-				bplist, berr := bdict.(*Dictionary).postingsList([]byte(next.Term), nil)
+				aplist, aerr := adict.(*Dictionary).postingsList([]byte(next.Term), nil, nil)
+				bplist, berr := bdict.(*Dictionary).postingsList([]byte(next.Term), nil, nil)
 				if aerr != berr {
 					rv = append(rv, fmt.Sprintf("field %s, term: %s, postingsList() errors different: %v %v",
 						fieldName, next.Term, aerr, berr))
