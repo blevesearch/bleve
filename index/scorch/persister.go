@@ -39,15 +39,29 @@ type notificationChan chan struct{}
 func (s *Scorch) persisterLoop() {
 	defer s.asyncTasks.Done()
 
-	var notifyChs []notificationChan
+	var persistWatchers []*epochWatcher
 	var lastPersistedEpoch uint64
+
+	notifyWatchers := func() {
+		var watchersNext []*epochWatcher
+		for _, w := range persistWatchers {
+			if w.epoch < lastPersistedEpoch {
+				close(w.notifyCh)
+			} else {
+				watchersNext = append(watchersNext, w)
+			}
+		}
+		persistWatchers = watchersNext
+	}
+
 OUTER:
 	for {
 		select {
 		case <-s.closeCh:
 			break OUTER
-		case notifyCh := <-s.persisterNotifier:
-			notifyChs = append(notifyChs, notifyCh)
+		case ew := <-s.persisterNotifier:
+			persistWatchers = append(persistWatchers, ew)
+			notifyWatchers()
 		default:
 		}
 
@@ -81,10 +95,11 @@ OUTER:
 			}
 
 			lastPersistedEpoch = ourSnapshot.epoch
-			for _, notifyCh := range notifyChs {
-				close(notifyCh)
+			for _, ew := range persistWatchers {
+				close(ew.notifyCh)
 			}
-			notifyChs = nil
+
+			persistWatchers = nil
 			_ = ourSnapshot.DecRef()
 
 			changed := false
@@ -120,6 +135,12 @@ OUTER:
 			break OUTER
 		case <-w.notifyCh:
 			// woken up, next loop should pick up work
+			continue OUTER
+		case ew := <-s.persisterNotifier:
+			// if the watchers are already caught up then let them wait,
+			// else let them continue to do the catch up
+			persistWatchers = append(persistWatchers, ew)
+			notifyWatchers()
 		}
 	}
 }

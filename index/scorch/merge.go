@@ -58,44 +58,24 @@ OUTER:
 			_ = ourSnapshot.DecRef()
 
 			// tell the persister we're waiting for changes
-			// first make a notification chan
-			notifyUs := make(notificationChan)
+			// first make a epochWatcher chan
+			ew := &epochWatcher{
+				epoch:    lastEpochMergePlanned,
+				notifyCh: make(notificationChan, 1),
+			}
 
 			// give it to the persister
 			select {
 			case <-s.closeCh:
 				break OUTER
-			case s.persisterNotifier <- notifyUs:
+			case s.persisterNotifier <- ew:
 			}
 
-			// check again
-			s.rootLock.RLock()
-			ourSnapshot = s.root
-			ourSnapshot.AddRef()
-			s.rootLock.RUnlock()
-
-			if ourSnapshot.epoch != lastEpochMergePlanned {
-				startTime := time.Now()
-
-				// lets get started
-				err := s.planMergeAtSnapshot(ourSnapshot)
-				if err != nil {
-					s.fireAsyncError(fmt.Errorf("merging err: %v", err))
-					_ = ourSnapshot.DecRef()
-					continue OUTER
-				}
-				lastEpochMergePlanned = ourSnapshot.epoch
-
-				s.fireEvent(EventKindMergerProgress, time.Since(startTime))
-			}
-			_ = ourSnapshot.DecRef()
-
-			// now wait for it (but also detect close)
+			// now wait for persister (but also detect close)
 			select {
 			case <-s.closeCh:
 				break OUTER
-			case <-notifyUs:
-				// woken up, next loop should pick up work
+			case <-ew.notifyCh:
 			}
 		}
 	}
