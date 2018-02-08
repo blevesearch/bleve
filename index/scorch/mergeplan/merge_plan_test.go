@@ -73,7 +73,16 @@ func TestSimplePlan(t *testing.T) {
 				segs[2],
 			},
 			nil,
-			&MergePlan{},
+			&MergePlan{
+				Tasks: []*MergeTask{
+					&MergeTask{
+						Segments: []Segment{
+							segs[2],
+							segs[1],
+						},
+					},
+				},
+			},
 			nil,
 		},
 		{"3 segments",
@@ -83,7 +92,17 @@ func TestSimplePlan(t *testing.T) {
 				segs[9],
 			},
 			nil,
-			&MergePlan{},
+			&MergePlan{
+				Tasks: []*MergeTask{
+					&MergeTask{
+						Segments: []Segment{
+							segs[9],
+							segs[2],
+							segs[1],
+						},
+					},
+				},
+			},
 			nil,
 		},
 		{"many segments",
