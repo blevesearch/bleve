@@ -146,6 +146,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot) error {
 		// give it to the introducer
 		select {
 		case <-s.closeCh:
+			_ = segment.Close()
 			return nil
 		case s.merges <- sm:
 		}
