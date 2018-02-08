@@ -239,8 +239,13 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 		}
 	}
 
-	// only alter the root if we actually persisted a segment
-	// (sometimes its just a new snapshot, possibly with new internal values)
+	// we need to swap in a new root only when we've persisted 1 or
+	// more segments -- whereby the new root would have 1-for-1
+	// replacements of in-memory segments with file-based segments
+	//
+	// other cases like updates to internal values only, and/or when
+	// there are only deletions, are already covered and persisted by
+	// the newly populated boltdb snapshotBucket above
 	if len(newSegmentPaths) > 0 {
 		// now try to open all the new snapshots
 		newSegments := make(map[uint64]segment.Segment)
