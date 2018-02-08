@@ -18,6 +18,7 @@ import (
 	"math"
 	"os"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/blevesearch/bleve/index"
@@ -574,6 +575,7 @@ func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 			t.Fatalf("segment VisitableDocValueFields err: %v", err)
 		}
 
+		sort.Strings(expectedFields[1:]) // keep _id as first field
 		if !reflect.DeepEqual(fields, expectedFields) {
 			t.Errorf("expected field terms: %#v, got: %#v", expectedFields, fields)
 		}

@@ -21,12 +21,15 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/Smerity/govarint"
 	"github.com/couchbase/vellum"
 	"github.com/golang/snappy"
 )
+
+const docDropped = math.MaxUint64 // sentinel docNum to represent a deleted doc
 
 // Merge takes a slice of zap segments and bit masks describing which
 // documents may be dropped, and creates a new segment containing the
@@ -101,13 +104,13 @@ func MergeToWriter(segments []*SegmentBase, drops []*roaring.Bitmap,
 
 	var dictLocs []uint64
 
-	fieldsInv := mergeFields(segments)
+	fieldsSame, fieldsInv := mergeFields(segments)
 	fieldsMap := mapFields(fieldsInv)
 
 	numDocs = computeNewDocCount(segments, drops)
 	if numDocs > 0 {
 		storedIndexOffset, newDocNums, err = mergeStoredAndRemap(segments, drops,
-			fieldsMap, fieldsInv, numDocs, cr)
+			fieldsMap, fieldsInv, fieldsSame, numDocs, cr)
 		if err != nil {
 			return nil, 0, 0, 0, 0, err
 		}
@@ -411,10 +414,8 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 	return rv, fieldDvLocsOffset, nil
 }
 
-const docDropped = math.MaxUint64
-
 func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
-	fieldsMap map[string]uint16, fieldsInv []string, newSegDocCount uint64,
+	fieldsMap map[string]uint16, fieldsInv []string, fieldsSame bool, newSegDocCount uint64,
 	w *CountHashWriter) (uint64, [][]uint64, error) {
 	var rv [][]uint64 // The remapped or newDocNums for each segment.
 
@@ -435,6 +436,24 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	// for each segment
 	for segI, segment := range segments {
 		segNewDocNums := make([]uint64, segment.numDocs)
+
+		// optimize when the field mapping is the same across all
+		// segments and there are no deletions, via byte-copying
+		// of stored docs bytes directly to the writer
+		if fieldsSame && (drops[segI] == nil || drops[segI].GetCardinality() == 0) {
+			err := segment.copyStoredDocs(newDocNum, docNumOffsets, w)
+			if err != nil {
+				return 0, nil, err
+			}
+
+			for i := uint64(0); i < segment.numDocs; i++ {
+				segNewDocNums[i] = newDocNum
+				newDocNum++
+			}
+			rv = append(rv, segNewDocNums)
+
+			continue
+		}
 
 		// for each doc num
 		for docNum := uint64(0); docNum < segment.numDocs; docNum++ {
@@ -527,13 +546,61 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	return storedIndexOffset, rv, nil
 }
 
-// mergeFields builds a unified list of fields used across all the input segments
-func mergeFields(segments []*SegmentBase) []string {
+// copyStoredDocs writes out a segment's stored doc info, optimized by
+// using a single Write() call for the entire set of bytes.  The
+// newDocNumOffsets is filled with the new offsets for each doc.
+func (s *SegmentBase) copyStoredDocs(newDocNum uint64, newDocNumOffsets []uint64,
+	w *CountHashWriter) error {
+	if s.numDocs <= 0 {
+		return nil
+	}
+
+	indexOffset0, storedOffset0, _, _, _ :=
+		s.getDocStoredOffsets(0) // the segment's first doc
+
+	indexOffsetN, storedOffsetN, readN, metaLenN, dataLenN :=
+		s.getDocStoredOffsets(s.numDocs - 1) // the segment's last doc
+
+	storedOffset0New := uint64(w.Count())
+
+	storedBytes := s.mem[storedOffset0 : storedOffsetN+readN+metaLenN+dataLenN]
+	_, err := w.Write(storedBytes)
+	if err != nil {
+		return err
+	}
+
+	// remap the storedOffset's for the docs into new offsets relative
+	// to storedOffset0New, filling the given docNumOffsetsOut array
+	for indexOffset := indexOffset0; indexOffset <= indexOffsetN; indexOffset += 8 {
+		storedOffset := binary.BigEndian.Uint64(s.mem[indexOffset : indexOffset+8])
+		storedOffsetNew := storedOffset - storedOffset0 + storedOffset0New
+		newDocNumOffsets[newDocNum] = storedOffsetNew
+		newDocNum += 1
+	}
+
+	return nil
+}
+
+// mergeFields builds a unified list of fields used across all the
+// input segments, and computes whether the fields are the same across
+// segments (which depends on fields to be sorted in the same way
+// across segments)
+func mergeFields(segments []*SegmentBase) (bool, []string) {
+	fieldsSame := true
+
+	var segment0Fields []string
+	if len(segments) > 0 {
+		segment0Fields = segments[0].Fields()
+	}
+
 	fieldsMap := map[string]struct{}{}
 	for _, segment := range segments {
 		fields := segment.Fields()
-		for _, field := range fields {
+		for fieldi, field := range fields {
 			fieldsMap[field] = struct{}{}
+			if len(segment0Fields) != len(fields) || segment0Fields[fieldi] != field {
+				fieldsSame = false
+			}
 		}
 	}
 
@@ -545,5 +612,8 @@ func mergeFields(segments []*SegmentBase) []string {
 			rv = append(rv, k)
 		}
 	}
-	return rv
+
+	sort.Strings(rv[1:]) // leave _id as first
+
+	return fieldsSame, rv
 }
