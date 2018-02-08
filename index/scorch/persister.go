@@ -145,23 +145,15 @@ OUTER:
 	}
 }
 
-func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
+func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) (err error) {
 	// start a write transaction
 	tx, err := s.rootBolt.Begin(true)
 	if err != nil {
 		return err
 	}
-	// defer fsync of the rootbolt
+	// defer rollback on error
 	defer func() {
-		if err == nil {
-			err = s.rootBolt.Sync()
-		}
-	}()
-	// defer commit/rollback transaction
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-		} else {
+		if err != nil {
 			_ = tx.Rollback()
 		}
 	}()
@@ -195,7 +187,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 	// first ensure that each segment in this snapshot has been persisted
 	for _, segmentSnapshot := range snapshot.segment {
 		snapshotSegmentKey := segment.EncodeUvarintAscending(nil, segmentSnapshot.id)
-		snapshotSegmentBucket, err2 := snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
+		snapshotSegmentBucket, err := snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
 		if err != nil {
 			return err
 		}
@@ -300,7 +292,19 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
 			_ = rootPrev.DecRef()
 		}
 	}
-	// allow files to become eligible for removal
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	err = s.rootBolt.Sync()
+	if err != nil {
+		return err
+	}
+
+	// allow files to become eligible for removal after commit, such
+	// as file segments from snapshots that came from the merger
 	s.rootLock.Lock()
 	for _, filename := range filenames {
 		delete(s.ineligibleForRemoval, filename)
