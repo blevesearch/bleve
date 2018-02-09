@@ -168,7 +168,6 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 
 	rv := make([]uint64, len(fieldsInv))
 	fieldDvLocs := make([]uint64, len(fieldsInv))
-	fieldDvLocsOffset := uint64(fieldNotUninverted)
 
 	// docTermMap is keyed by docNum, where the array impl provides
 	// better memory usage behavior than a sparse-friendlier hashmap
@@ -401,7 +400,7 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 		}
 	}
 
-	fieldDvLocsOffset = uint64(w.Count())
+	fieldDvLocsOffset := uint64(w.Count())
 
 	buf := bufMaxVarintLen64
 	for _, offset := range fieldDvLocs {
