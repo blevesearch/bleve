@@ -193,6 +193,12 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	// prepare new index snapshot
 	currSize := len(s.root.segment)
 	newSize := currSize + 1 - len(nextMerge.old)
+
+	// empty segments deletion
+	if nextMerge.new == nil {
+		newSize--
+	}
+
 	newSnapshot := &IndexSnapshot{
 		parent:   s,
 		segment:  make([]*SegmentSnapshot, 0, newSize),
@@ -210,7 +216,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 		segmentID := s.root.segment[i].id
 		if segSnapAtMerge, ok := nextMerge.old[segmentID]; ok {
 			// this segment is going away, see if anything else was deleted since we started the merge
-			if s.root.segment[i].deleted != nil {
+			if segSnapAtMerge != nil && s.root.segment[i].deleted != nil {
 				// assume all these deletes are new
 				deletedSince := s.root.segment[i].deleted
 				// if we already knew about some of them, remove
@@ -238,14 +244,16 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 		}
 	}
 
-	// put new segment at end
-	newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
-		id:         nextMerge.id,
-		segment:    nextMerge.new, // take ownership for nextMerge.new's ref-count
-		deleted:    newSegmentDeleted,
-		cachedDocs: &cachedDocs{cache: nil},
-	})
-	newSnapshot.offsets = append(newSnapshot.offsets, running)
+	if nextMerge.new != nil {
+		// put new segment at end
+		newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
+			id:         nextMerge.id,
+			segment:    nextMerge.new, // take ownership for nextMerge.new's ref-count
+			deleted:    newSegmentDeleted,
+			cachedDocs: &cachedDocs{cache: nil},
+		})
+		newSnapshot.offsets = append(newSnapshot.offsets, running)
+	}
 
 	// swap in new segment
 	rootPrev := s.root
