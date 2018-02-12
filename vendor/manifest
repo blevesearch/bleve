@@ -37,7 +37,7 @@
 			"importpath": "github.com/couchbase/moss",
 			"repository": "https://github.com/couchbase/moss",
 			"vcs": "git",
-			"revision": "fc637b3f82ec5b8139b0d295f6588c6a2bea5a16",
+			"revision": "013a19c55df3e689a66b632c7c8074e37162217d",
 			"branch": "master",
 			"notests": true
 		},
