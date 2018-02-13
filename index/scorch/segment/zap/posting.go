@@ -159,7 +159,9 @@ type PostingsIterator struct {
 	currChunkFreqNorm []byte
 	currChunkLoc      []byte
 	freqNormDecoder   *govarint.Base128Decoder
+	freqNormReader    *bytes.Reader
 	locDecoder        *govarint.Base128Decoder
+	locReader         *bytes.Reader
 
 	freqChunkLens  []uint64
 	freqChunkStart uint64
@@ -183,7 +185,12 @@ func (i *PostingsIterator) loadChunk(chunk int) error {
 	}
 	end := start + i.freqChunkLens[chunk]
 	i.currChunkFreqNorm = i.postings.sb.mem[start:end]
-	i.freqNormDecoder = govarint.NewU64Base128Decoder(bytes.NewReader(i.currChunkFreqNorm))
+	if i.freqNormReader == nil {
+		i.freqNormReader = bytes.NewReader(i.currChunkFreqNorm)
+		i.freqNormDecoder = govarint.NewU64Base128Decoder(i.freqNormReader)
+	} else {
+		i.freqNormReader.Reset(i.currChunkFreqNorm)
+	}
 
 	start = i.locChunkStart
 	for j := 0; j < chunk; j++ {
@@ -191,7 +198,12 @@ func (i *PostingsIterator) loadChunk(chunk int) error {
 	}
 	end = start + i.locChunkLens[chunk]
 	i.currChunkLoc = i.postings.sb.mem[start:end]
-	i.locDecoder = govarint.NewU64Base128Decoder(bytes.NewReader(i.currChunkLoc))
+	if i.locReader == nil {
+		i.locReader = bytes.NewReader(i.currChunkLoc)
+		i.locDecoder = govarint.NewU64Base128Decoder(i.locReader)
+	} else {
+		i.locReader.Reset(i.currChunkLoc)
+	}
 	i.currChunk = uint32(chunk)
 	return nil
 }
