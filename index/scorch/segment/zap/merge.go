@@ -154,8 +154,8 @@ func computeNewDocCount(segments []*SegmentBase, drops []*roaring.Bitmap) uint64
 	return newDocCount
 }
 
-func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
-	fieldsInv []string, fieldsMap map[string]uint16, newDocNums [][]uint64,
+func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
+	fieldsInv []string, fieldsMap map[string]uint16, newDocNumsIn [][]uint64,
 	newSegDocCount uint64, chunkFactor uint32,
 	w *CountHashWriter) ([]uint64, uint64, error) {
 
@@ -187,15 +187,17 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 			return nil, 0, err
 		}
 
-		// collect FST iterators from all segments for this field
+		// collect FST iterators from all active segments for this field
+		var newDocNums [][]uint64
+		var drops []*roaring.Bitmap
 		var dicts []*Dictionary
 		var itrs []vellum.Iterator
-		for _, segment := range segments {
+
+		for segmentI, segment := range segments {
 			dict, err2 := segment.dictionary(fieldName)
 			if err2 != nil {
 				return nil, 0, err2
 			}
-			dicts = append(dicts, dict)
 
 			if dict != nil && dict.fst != nil {
 				itr, err2 := dict.fst.Iterator(nil, nil)
@@ -203,6 +205,9 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 					return nil, 0, err2
 				}
 				if itr != nil {
+					newDocNums = append(newDocNums, newDocNumsIn[segmentI])
+					drops = append(drops, dropsIn[segmentI])
+					dicts = append(dicts, dict)
 					itrs = append(itrs, itr)
 				}
 			}
