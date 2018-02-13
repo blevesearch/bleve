@@ -154,8 +154,8 @@ func computeNewDocCount(segments []*SegmentBase, drops []*roaring.Bitmap) uint64
 	return newDocCount
 }
 
-func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
-	fieldsInv []string, fieldsMap map[string]uint16, newDocNums [][]uint64,
+func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
+	fieldsInv []string, fieldsMap map[string]uint16, newDocNumsIn [][]uint64,
 	newSegDocCount uint64, chunkFactor uint32,
 	w *CountHashWriter) ([]uint64, uint64, error) {
 
@@ -168,7 +168,6 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 
 	rv := make([]uint64, len(fieldsInv))
 	fieldDvLocs := make([]uint64, len(fieldsInv))
-	fieldDvLocsOffset := uint64(fieldNotUninverted)
 
 	// docTermMap is keyed by docNum, where the array impl provides
 	// better memory usage behavior than a sparse-friendlier hashmap
@@ -188,35 +187,30 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 			return nil, 0, err
 		}
 
-		// collect FST iterators from all segments for this field
+		// collect FST iterators from all active segments for this field
+		var newDocNums [][]uint64
+		var drops []*roaring.Bitmap
 		var dicts []*Dictionary
 		var itrs []vellum.Iterator
-		for _, segment := range segments {
+
+		for segmentI, segment := range segments {
 			dict, err2 := segment.dictionary(fieldName)
 			if err2 != nil {
 				return nil, 0, err2
 			}
-			dicts = append(dicts, dict)
-
 			if dict != nil && dict.fst != nil {
 				itr, err2 := dict.fst.Iterator(nil, nil)
 				if err2 != nil && err2 != vellum.ErrIteratorDone {
 					return nil, 0, err2
 				}
 				if itr != nil {
+					newDocNums = append(newDocNums, newDocNumsIn[segmentI])
+					drops = append(drops, dropsIn[segmentI])
+					dicts = append(dicts, dict)
 					itrs = append(itrs, itr)
 				}
 			}
 		}
-
-		// create merging iterator
-		mergeItr, err := vellum.NewMergeIterator(itrs, func(postingOffsets []uint64) uint64 {
-			// we don't actually use the merged value
-			return 0
-		})
-
-		tfEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
-		locEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
 
 		if uint64(cap(docTermMap)) < newSegDocCount {
 			docTermMap = make([][]byte, newSegDocCount)
@@ -227,71 +221,17 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 			}
 		}
 
-		for err == nil {
-			term, _ := mergeItr.Current()
+		var prevTerm []byte
 
-			newRoaring := roaring.NewBitmap()
-			newRoaringLocs := roaring.NewBitmap()
+		newRoaring := roaring.NewBitmap()
+		newRoaringLocs := roaring.NewBitmap()
 
-			tfEncoder.Reset()
-			locEncoder.Reset()
+		tfEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
+		locEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
 
-			// now go back and get posting list for this term
-			// but pass in the deleted docs for that segment
-			for dictI, dict := range dicts {
-				if dict == nil {
-					continue
-				}
-				var err2 error
-				postings, err2 = dict.postingsList(term, drops[dictI], postings)
-				if err2 != nil {
-					return nil, 0, err2
-				}
-
-				postItr = postings.iterator(postItr)
-				next, err2 := postItr.Next()
-				for next != nil && err2 == nil {
-					hitNewDocNum := newDocNums[dictI][next.Number()]
-					if hitNewDocNum == docDropped {
-						return nil, 0, fmt.Errorf("see hit with dropped doc num")
-					}
-					newRoaring.Add(uint32(hitNewDocNum))
-					// encode norm bits
-					norm := next.Norm()
-					normBits := math.Float32bits(float32(norm))
-					err = tfEncoder.Add(hitNewDocNum, next.Frequency(), uint64(normBits))
-					if err != nil {
-						return nil, 0, err
-					}
-					locs := next.Locations()
-					if len(locs) > 0 {
-						newRoaringLocs.Add(uint32(hitNewDocNum))
-						for _, loc := range locs {
-							if cap(bufLoc) < 5+len(loc.ArrayPositions()) {
-								bufLoc = make([]uint64, 0, 5+len(loc.ArrayPositions()))
-							}
-							args := bufLoc[0:5]
-							args[0] = uint64(fieldsMap[loc.Field()])
-							args[1] = loc.Pos()
-							args[2] = loc.Start()
-							args[3] = loc.End()
-							args[4] = uint64(len(loc.ArrayPositions()))
-							args = append(args, loc.ArrayPositions()...)
-							err = locEncoder.Add(hitNewDocNum, args...)
-							if err != nil {
-								return nil, 0, err
-							}
-						}
-					}
-
-					docTermMap[hitNewDocNum] =
-						append(append(docTermMap[hitNewDocNum], term...), termSeparator)
-
-					next, err2 = postItr.Next()
-				}
-				if err2 != nil {
-					return nil, 0, err2
-				}
+		finishTerm := func(term []byte) error {
+			if term == nil {
+				return nil
 			}
 
 			tfEncoder.Close()
@@ -300,56 +240,137 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 			if newRoaring.GetCardinality() > 0 {
 				// this field/term actually has hits in the new segment, lets write it down
 				freqOffset := uint64(w.Count())
-				_, err = tfEncoder.Write(w)
+				_, err := tfEncoder.Write(w)
 				if err != nil {
-					return nil, 0, err
+					return err
 				}
 				locOffset := uint64(w.Count())
 				_, err = locEncoder.Write(w)
 				if err != nil {
-					return nil, 0, err
+					return err
 				}
 				postingLocOffset := uint64(w.Count())
 				_, err = writeRoaringWithLen(newRoaringLocs, w, &bufReuse, bufMaxVarintLen64)
 				if err != nil {
-					return nil, 0, err
+					return err
 				}
 				postingOffset := uint64(w.Count())
+
 				// write out the start of the term info
-				buf := bufMaxVarintLen64
-				n := binary.PutUvarint(buf, freqOffset)
-				_, err = w.Write(buf[:n])
+				n := binary.PutUvarint(bufMaxVarintLen64, freqOffset)
+				_, err = w.Write(bufMaxVarintLen64[:n])
 				if err != nil {
-					return nil, 0, err
+					return err
 				}
-
 				// write out the start of the loc info
-				n = binary.PutUvarint(buf, locOffset)
-				_, err = w.Write(buf[:n])
+				n = binary.PutUvarint(bufMaxVarintLen64, locOffset)
+				_, err = w.Write(bufMaxVarintLen64[:n])
 				if err != nil {
-					return nil, 0, err
+					return err
 				}
-
-				// write out the start of the loc posting list
-				n = binary.PutUvarint(buf, postingLocOffset)
-				_, err = w.Write(buf[:n])
+				// write out the start of the posting locs
+				n = binary.PutUvarint(bufMaxVarintLen64, postingLocOffset)
+				_, err = w.Write(bufMaxVarintLen64[:n])
 				if err != nil {
-					return nil, 0, err
+					return err
 				}
 				_, err = writeRoaringWithLen(newRoaring, w, &bufReuse, bufMaxVarintLen64)
 				if err != nil {
-					return nil, 0, err
+					return err
 				}
 
 				err = newVellum.Insert(term, postingOffset)
 				if err != nil {
-					return nil, 0, err
+					return err
 				}
 			}
 
-			err = mergeItr.Next()
+			newRoaring = roaring.NewBitmap()
+			newRoaringLocs = roaring.NewBitmap()
+
+			tfEncoder.Reset()
+			locEncoder.Reset()
+
+			return nil
+		}
+
+		enumerator, err := newEnumerator(itrs)
+
+		for err == nil {
+			term, itrI, postingsOffset := enumerator.Current()
+
+			if !bytes.Equal(prevTerm, term) {
+				// if the term changed, write out the info collected
+				// for the previous term
+				err2 := finishTerm(prevTerm)
+				if err2 != nil {
+					return nil, 0, err2
+				}
+			}
+
+			var err2 error
+			postings, err2 = dicts[itrI].postingsListFromOffset(
+				postingsOffset, drops[itrI], postings)
+			if err2 != nil {
+				return nil, 0, err2
+			}
+
+			postItr = postings.iterator(postItr)
+			next, err2 := postItr.Next()
+			for next != nil && err2 == nil {
+				hitNewDocNum := newDocNums[itrI][next.Number()]
+				if hitNewDocNum == docDropped {
+					return nil, 0, fmt.Errorf("see hit with dropped doc num")
+				}
+				newRoaring.Add(uint32(hitNewDocNum))
+				// encode norm bits
+				norm := next.Norm()
+				normBits := math.Float32bits(float32(norm))
+				err = tfEncoder.Add(hitNewDocNum, next.Frequency(), uint64(normBits))
+				if err != nil {
+					return nil, 0, err
+				}
+				locs := next.Locations()
+				if len(locs) > 0 {
+					newRoaringLocs.Add(uint32(hitNewDocNum))
+					for _, loc := range locs {
+						if cap(bufLoc) < 5+len(loc.ArrayPositions()) {
+							bufLoc = make([]uint64, 0, 5+len(loc.ArrayPositions()))
+						}
+						args := bufLoc[0:5]
+						args[0] = uint64(fieldsMap[loc.Field()])
+						args[1] = loc.Pos()
+						args[2] = loc.Start()
+						args[3] = loc.End()
+						args[4] = uint64(len(loc.ArrayPositions()))
+						args = append(args, loc.ArrayPositions()...)
+						err = locEncoder.Add(hitNewDocNum, args...)
+						if err != nil {
+							return nil, 0, err
+						}
+					}
+				}
+
+				docTermMap[hitNewDocNum] =
+					append(append(docTermMap[hitNewDocNum], term...), termSeparator)
+
+				next, err2 = postItr.Next()
+			}
+			if err2 != nil {
+				return nil, 0, err2
+			}
+
+			prevTerm = prevTerm[:0] // copy to prevTerm in case Next() reuses term mem
+			prevTerm = append(prevTerm, term...)
+
+			err = enumerator.Next()
 		}
 		if err != nil && err != vellum.ErrIteratorDone {
+			return nil, 0, err
+		}
+
+		err = finishTerm(prevTerm)
+		if err != nil {
 			return nil, 0, err
 		}
 
@@ -401,7 +422,7 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 		}
 	}
 
-	fieldDvLocsOffset = uint64(w.Count())
+	fieldDvLocsOffset := uint64(w.Count())
 
 	buf := bufMaxVarintLen64
 	for _, offset := range fieldDvLocs {
