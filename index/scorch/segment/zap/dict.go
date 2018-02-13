@@ -44,7 +44,6 @@ func (d *Dictionary) postingsList(term []byte, except *roaring.Bitmap, rv *Posti
 		*rv = PostingsList{} // clear the struct
 	}
 	rv.sb = d.sb
-	rv.term = term
 	rv.except = except
 
 	if d.fst != nil {

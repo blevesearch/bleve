@@ -164,6 +164,7 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 	var bufLoc []uint64
 
 	var postings *PostingsList
+	var postItr *PostingsIterator
 
 	rv := make([]uint64, len(fieldsInv))
 	fieldDvLocs := make([]uint64, len(fieldsInv))
@@ -247,7 +248,7 @@ func persistMergedRest(segments []*SegmentBase, drops []*roaring.Bitmap,
 					return nil, 0, err2
 				}
 
-				postItr := postings.Iterator()
+				postItr = postings.iterator(postItr)
 				next, err2 := postItr.Next()
 				for next != nil && err2 == nil {
 					hitNewDocNum := newDocNums[dictI][next.Number()]
