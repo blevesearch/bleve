@@ -34,25 +34,25 @@ import (
 
 var DefaultChunkFactor uint32 = 1024
 
+// Arbitrary number, need to make it configurable.
+// Lower values like 10/making persister really slow
+// doesn't work well as it is creating more files to
+// persist for in next persist iteration and spikes the # FDs.
+// Ideal value should let persister also proceed at
+// an optimum pace so that the merger can skip
+// many intermediate snapshots.
+// This needs to be based on empirical data.
+// With high segment count with snapshots,
+// doubtful on the effectiveness of this approach.
+var highWaterMark = uint64(130)
+
 type notificationChan chan struct{}
 
 func (s *Scorch) persisterLoop() {
 	defer s.asyncTasks.Done()
 
 	var persistWatchers []*epochWatcher
-	var lastPersistedEpoch uint64
-
-	notifyWatchers := func() {
-		var watchersNext []*epochWatcher
-		for _, w := range persistWatchers {
-			if w.epoch < lastPersistedEpoch {
-				close(w.notifyCh)
-			} else {
-				watchersNext = append(watchersNext, w)
-			}
-		}
-		persistWatchers = watchersNext
-	}
+	var lastPersistedEpoch, lastMergedEpoch uint64
 
 OUTER:
 	for {
@@ -61,7 +61,8 @@ OUTER:
 			break OUTER
 		case ew := <-s.persisterNotifier:
 			persistWatchers = append(persistWatchers, ew)
-			notifyWatchers()
+			lastMergedEpoch = ew.epoch
+			persistWatchers = s.pausePersisterForMergerCatchUp(lastPersistedEpoch, &lastMergedEpoch, persistWatchers)
 		default:
 		}
 
@@ -112,6 +113,21 @@ OUTER:
 			s.fireEvent(EventKindPersisterProgress, time.Since(startTime))
 
 			if changed {
+				// before next persist, check for slow merging catch up
+				select {
+				case ew := <-s.persisterNotifier:
+					persistWatchers = append(persistWatchers, ew)
+					lastMergedEpoch = ew.epoch
+					persistWatchers = s.pausePersisterForMergerCatchUp(
+						lastPersistedEpoch,
+						&lastMergedEpoch, persistWatchers)
+
+				default:
+					persistWatchers = s.pausePersisterForMergerCatchUp(
+						lastPersistedEpoch,
+						&lastMergedEpoch, persistWatchers)
+				}
+
 				continue OUTER
 			}
 		}
@@ -140,9 +156,57 @@ OUTER:
 			// if the watchers are already caught up then let them wait,
 			// else let them continue to do the catch up
 			persistWatchers = append(persistWatchers, ew)
-			notifyWatchers()
+			lastMergedEpoch = ew.epoch
+			persistWatchers = s.pausePersisterForMergerCatchUp(
+				lastPersistedEpoch,
+				&lastMergedEpoch, persistWatchers)
 		}
 	}
+}
+
+func notifyMergeWatchers(lastPersistedEpoch uint64,
+	persistWatchers []*epochWatcher) []*epochWatcher {
+	var watchersNext []*epochWatcher
+	for _, w := range persistWatchers {
+		if w.epoch < lastPersistedEpoch {
+			close(w.notifyCh)
+		} else {
+			watchersNext = append(watchersNext, w)
+		}
+	}
+	return watchersNext
+}
+
+func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64, lastMergedEpoch *uint64,
+	persistWatchers []*epochWatcher) []*epochWatcher {
+	// first, let the watchers proceed if they lag behind
+	persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
+
+	// check for slow merger and pause persister until merger catch up
+	if lastPersistedEpoch > *lastMergedEpoch &&
+		lastPersistedEpoch-*lastMergedEpoch > highWaterMark {
+		log.Printf("merger epoch: %d persister epoch: %d", *lastMergedEpoch, lastPersistedEpoch)
+	WAIT:
+		for {
+			select {
+			case ew := <-s.persisterNotifier:
+				persistWatchers = notifyMergeWatchers(lastPersistedEpoch,
+					append(persistWatchers, ew))
+				*lastMergedEpoch = ew.epoch
+				if lastPersistedEpoch > *lastMergedEpoch &&
+					lastPersistedEpoch-*lastMergedEpoch > highWaterMark {
+					log.Printf("persister waiting as lastPersistedEpoch->%d merger epoch->%d", lastPersistedEpoch, *lastMergedEpoch)
+					//persistWatchers = append(persistWatchers, ew)
+					//watchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
+					continue WAIT
+				}
+				//lastMergedEpoch = ew.epoch
+				log.Printf("after caught up merger epoch: %d persister epoch: %d", *lastMergedEpoch, lastPersistedEpoch)
+				return persistWatchers
+			}
+		}
+	}
+	return persistWatchers
 }
 
 func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) (err error) {
