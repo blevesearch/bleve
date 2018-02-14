@@ -60,7 +60,7 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 	// wrap it for counting (tracking offsets)
 	cr := NewCountHashWriter(br)
 
-	newDocNums, numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset, err :=
+	newDocNums, numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset, _, _, _, err :=
 		MergeToWriter(segmentBases, drops, chunkFactor, cr)
 	if err != nil {
 		cleanup()
@@ -99,26 +99,26 @@ func MergeToWriter(segments []*SegmentBase, drops []*roaring.Bitmap,
 	chunkFactor uint32, cr *CountHashWriter) (
 	newDocNums [][]uint64,
 	numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset uint64,
+	dictLocs []uint64, fieldsInv []string, fieldsMap map[string]uint16,
 	err error) {
 	docValueOffset = uint64(fieldNotUninverted)
 
-	var dictLocs []uint64
-
-	fieldsSame, fieldsInv := mergeFields(segments)
-	fieldsMap := mapFields(fieldsInv)
+	var fieldsSame bool
+	fieldsSame, fieldsInv = mergeFields(segments)
+	fieldsMap = mapFields(fieldsInv)
 
 	numDocs = computeNewDocCount(segments, drops)
 	if numDocs > 0 {
 		storedIndexOffset, newDocNums, err = mergeStoredAndRemap(segments, drops,
 			fieldsMap, fieldsInv, fieldsSame, numDocs, cr)
 		if err != nil {
-			return nil, 0, 0, 0, 0, err
+			return nil, 0, 0, 0, 0, nil, nil, nil, err
 		}
 
 		dictLocs, docValueOffset, err = persistMergedRest(segments, drops, fieldsInv, fieldsMap,
 			newDocNums, numDocs, chunkFactor, cr)
 		if err != nil {
-			return nil, 0, 0, 0, 0, err
+			return nil, 0, 0, 0, 0, nil, nil, nil, err
 		}
 	} else {
 		dictLocs = make([]uint64, len(fieldsInv))
@@ -126,17 +126,18 @@ func MergeToWriter(segments []*SegmentBase, drops []*roaring.Bitmap,
 
 	fieldsIndexOffset, err = persistFields(fieldsInv, cr, dictLocs)
 	if err != nil {
-		return nil, 0, 0, 0, 0, err
+		return nil, 0, 0, 0, 0, nil, nil, nil, err
 	}
 
-	return newDocNums, numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset, nil
+	return newDocNums, numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset, dictLocs, fieldsInv, fieldsMap, nil
 }
 
-// mapFields takes the fieldsInv list and builds the map
+// mapFields takes the fieldsInv list and returns a map of fieldName
+// to fieldID+1
 func mapFields(fields []string) map[string]uint16 {
 	rv := make(map[string]uint16, len(fields))
 	for i, fieldName := range fields {
-		rv[fieldName] = uint16(i)
+		rv[fieldName] = uint16(i) + 1
 	}
 	return rv
 }
@@ -338,7 +339,7 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 							bufLoc = make([]uint64, 0, 5+len(loc.ArrayPositions()))
 						}
 						args := bufLoc[0:5]
-						args[0] = uint64(fieldsMap[loc.Field()])
+						args[0] = uint64(fieldsMap[loc.Field()] - 1)
 						args[1] = loc.Pos()
 						args[2] = loc.Start()
 						args[3] = loc.End()
@@ -499,7 +500,7 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 				poss[i] = poss[i][:0]
 			}
 			err := segment.VisitDocument(docNum, func(field string, typ byte, value []byte, pos []uint64) bool {
-				fieldID := int(fieldsMap[field])
+				fieldID := int(fieldsMap[field]) - 1
 				vals[fieldID] = append(vals[fieldID], value)
 				typs[fieldID] = append(typs[fieldID], typ)
 				poss[fieldID] = append(poss[fieldID], pos)
@@ -615,21 +616,21 @@ func mergeFields(segments []*SegmentBase) (bool, []string) {
 		segment0Fields = segments[0].Fields()
 	}
 
-	fieldsMap := map[string]struct{}{}
+	fieldsExist := map[string]struct{}{}
 	for _, segment := range segments {
 		fields := segment.Fields()
 		for fieldi, field := range fields {
-			fieldsMap[field] = struct{}{}
+			fieldsExist[field] = struct{}{}
 			if len(segment0Fields) != len(fields) || segment0Fields[fieldi] != field {
 				fieldsSame = false
 			}
 		}
 	}
 
-	rv := make([]string, 0, len(fieldsMap))
+	rv := make([]string, 0, len(fieldsExist))
 	// ensure _id stays first
 	rv = append(rv, "_id")
-	for k := range fieldsMap {
+	for k := range fieldsExist {
 		if k != "_id" {
 			rv = append(rv, k)
 		}
