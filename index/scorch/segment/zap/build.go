@@ -633,12 +633,21 @@ func NewSegmentBase(memSegment *mem.Segment, chunkFactor uint32) (*SegmentBase, 
 		return nil, err
 	}
 
+	return InitSegmentBase(br.Bytes(), cr.Sum32(), chunkFactor,
+		memSegment.FieldsMap, memSegment.FieldsInv, numDocs,
+		storedIndexOffset, fieldsIndexOffset, docValueOffset, dictLocs)
+}
+
+func InitSegmentBase(mem []byte, memCRC uint32, chunkFactor uint32,
+	fieldsMap map[string]uint16, fieldsInv []string, numDocs uint64,
+	storedIndexOffset uint64, fieldsIndexOffset uint64, docValueOffset uint64,
+	dictLocs []uint64) (*SegmentBase, error) {
 	sb := &SegmentBase{
-		mem:               br.Bytes(),
-		memCRC:            cr.Sum32(),
+		mem:               mem,
+		memCRC:            memCRC,
 		chunkFactor:       chunkFactor,
-		fieldsMap:         memSegment.FieldsMap,
-		fieldsInv:         memSegment.FieldsInv,
+		fieldsMap:         fieldsMap,
+		fieldsInv:         fieldsInv,
 		numDocs:           numDocs,
 		storedIndexOffset: storedIndexOffset,
 		fieldsIndexOffset: fieldsIndexOffset,
@@ -647,7 +656,7 @@ func NewSegmentBase(memSegment *mem.Segment, chunkFactor uint32) (*SegmentBase, 
 		fieldDvIterMap:    make(map[uint16]*docValueIterator),
 	}
 
-	err = sb.loadDvIterators()
+	err := sb.loadDvIterators()
 	if err != nil {
 		return nil, err
 	}
