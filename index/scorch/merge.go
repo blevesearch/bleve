@@ -103,7 +103,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot) error {
 	}
 
 	// process tasks in serial for now
-	var notifications []notificationChan
+	var notifications []chan *IndexSnapshot
 	for _, task := range resultMergePlan.Tasks {
 		oldMap := make(map[uint64]*SegmentSnapshot)
 		newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
@@ -137,7 +137,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot) error {
 			old:           oldMap,
 			oldNewDocNums: make(map[uint64][]uint64),
 			new:           segment,
-			notify:        make(notificationChan),
+			notify:        make(chan *IndexSnapshot, 1),
 		}
 		notifications = append(notifications, sm.notify)
 		for i, segNewDocNums := range newDocNums {
@@ -156,7 +156,10 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot) error {
 		select {
 		case <-s.closeCh:
 			return nil
-		case <-notification:
+		case newSnapshot := <-notification:
+			if newSnapshot != nil {
+				_ = newSnapshot.DecRef()
+			}
 		}
 	}
 	return nil
@@ -167,14 +170,15 @@ type segmentMerge struct {
 	old           map[uint64]*SegmentSnapshot
 	oldNewDocNums map[uint64][]uint64
 	new           segment.Segment
-	notify        notificationChan
+	notify        chan *IndexSnapshot
 }
 
-// perform in-memory merging of the given SegmentBase instances, and
-// synchronously introduce the merged segment into the root
+// perform a merging of the given SegmentBase instances into a new,
+// persisted segment, and synchronously introduce that new segment
+// into the root
 func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	sbs []*zap.SegmentBase, sbsDrops []*roaring.Bitmap, sbsIndexes []int,
-	chunkFactor uint32) (uint64, error) {
+	chunkFactor uint32) (uint64, *IndexSnapshot, uint64, error) {
 	var br bytes.Buffer
 
 	cr := zap.NewCountHashWriter(&br)
@@ -183,24 +187,36 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 		docValueOffset, dictLocs, fieldsInv, fieldsMap, err :=
 		zap.MergeToWriter(sbs, sbsDrops, chunkFactor, cr)
 	if err != nil {
-		return 0, nil
+		return 0, nil, 0, err
 	}
 
-	segment, err := zap.InitSegmentBase(br.Bytes(), cr.Sum32(), chunkFactor,
+	sb, err := zap.InitSegmentBase(br.Bytes(), cr.Sum32(), chunkFactor,
 		fieldsMap, fieldsInv, numDocs, storedIndexOffset, fieldsIndexOffset,
 		docValueOffset, dictLocs)
 	if err != nil {
-		return 0, nil
+		return 0, nil, 0, err
 	}
 
 	newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
+
+	filename := zapFileName(newSegmentID)
+	path := s.path + string(os.PathSeparator) + filename
+	err = zap.PersistSegmentBase(sb, path)
+	if err != nil {
+		return 0, nil, 0, err
+	}
+
+	segment, err := zap.Open(path)
+	if err != nil {
+		return 0, nil, 0, err
+	}
 
 	sm := &segmentMerge{
 		id:            newSegmentID,
 		old:           make(map[uint64]*SegmentSnapshot),
 		oldNewDocNums: make(map[uint64][]uint64),
 		new:           segment,
-		notify:        make(notificationChan),
+		notify:        make(chan *IndexSnapshot, 1),
 	}
 
 	for i, idx := range sbsIndexes {
@@ -211,15 +227,15 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 
 	select { // send to introducer
 	case <-s.closeCh:
-		return 0, nil // TODO: instead return some ErrInterruptedClosed?
+		_ = segment.DecRef()
+		return 0, nil, 0, nil // TODO: return ErrInterruptedClosed?
 	case s.merges <- sm:
 	}
 
 	select { // wait for introduction to complete
 	case <-s.closeCh:
-		return 0, nil // TODO: instead return some ErrInterruptedClosed?
-	case <-sm.notify:
+		return 0, nil, 0, nil // TODO: return ErrInterruptedClosed?
+	case newSnapshot := <-sm.notify:
+		return numDocs, newSnapshot, newSegmentID, nil
 	}
-
-	return numDocs, nil
 }
