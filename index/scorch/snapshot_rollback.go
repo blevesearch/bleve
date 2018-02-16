@@ -149,10 +149,7 @@ func (s *Scorch) Rollback(to *RollbackPoint) error {
 
 		revert.snapshot = indexSnapshot
 		revert.applied = make(chan error)
-
-		if !s.unsafeBatch {
-			revert.persisted = make(chan error)
-		}
+		revert.persisted = make(chan error)
 
 		return nil
 	})
@@ -172,9 +169,5 @@ func (s *Scorch) Rollback(to *RollbackPoint) error {
 		return fmt.Errorf("Rollback: failed with err: %v", err)
 	}
 
-	if revert.persisted != nil {
-		err = <-revert.persisted
-	}
-
-	return err
+	return <-revert.persisted
 }
