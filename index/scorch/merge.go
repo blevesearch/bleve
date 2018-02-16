@@ -15,6 +15,7 @@
 package scorch
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"sync/atomic"
@@ -167,4 +168,58 @@ type segmentMerge struct {
 	oldNewDocNums map[uint64][]uint64
 	new           segment.Segment
 	notify        notificationChan
+}
+
+// perform in-memory merging of the given SegmentBase instances, and
+// synchronously introduce the merged segment into the root
+func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
+	sbs []*zap.SegmentBase, sbsDrops []*roaring.Bitmap, sbsIndexes []int,
+	chunkFactor uint32) (uint64, error) {
+	var br bytes.Buffer
+
+	cr := zap.NewCountHashWriter(&br)
+
+	newDocNums, numDocs, storedIndexOffset, fieldsIndexOffset,
+		docValueOffset, dictLocs, fieldsInv, fieldsMap, err :=
+		zap.MergeToWriter(sbs, sbsDrops, chunkFactor, cr)
+	if err != nil {
+		return 0, nil
+	}
+
+	segment, err := zap.InitSegmentBase(br.Bytes(), cr.Sum32(), chunkFactor,
+		fieldsMap, fieldsInv, numDocs, storedIndexOffset, fieldsIndexOffset,
+		docValueOffset, dictLocs)
+	if err != nil {
+		return 0, nil
+	}
+
+	newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
+
+	sm := &segmentMerge{
+		id:            newSegmentID,
+		old:           make(map[uint64]*SegmentSnapshot),
+		oldNewDocNums: make(map[uint64][]uint64),
+		new:           segment,
+		notify:        make(notificationChan),
+	}
+
+	for i, idx := range sbsIndexes {
+		ss := snapshot.segment[idx]
+		sm.old[ss.id] = ss
+		sm.oldNewDocNums[ss.id] = newDocNums[i]
+	}
+
+	select { // send to introducer
+	case <-s.closeCh:
+		return 0, nil // TODO: instead return some ErrInterruptedClosed?
+	case s.merges <- sm:
+	}
+
+	select { // wait for introduction to complete
+	case <-s.closeCh:
+		return 0, nil // TODO: instead return some ErrInterruptedClosed?
+	case <-sm.notify:
+	}
+
+	return numDocs, nil
 }

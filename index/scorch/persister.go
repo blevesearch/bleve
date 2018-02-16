@@ -130,6 +130,13 @@ OUTER:
 
 		s.removeOldData() // might as well cleanup while waiting
 
+		// ===========================================================
+		// FAKE / PLACEHOLDER - to simulate the potential kind of
+		// effect that sreekanth's change to the persister might have,
+		// in having the persister wait for file merging to catch up.
+		time.Sleep(1000 * time.Millisecond)
+		// ===========================================================
+
 		select {
 		case <-s.closeCh:
 			break OUTER
@@ -145,7 +152,71 @@ OUTER:
 	}
 }
 
+// DefaultMinSegmentsForInMemoryMerge represents the default number of
+// in-memory zap segments that the persister needs to see in an
+// IndexSnapshot before the persister performs an in-memory merge of
+// those segments before continuing with further persistence.
+var DefaultMinSegmentsForInMemoryMerge = 2
+
 func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) (err error) {
+	// collect the in-memory zap segments (aka, the SegmentBase instances)
+	var sbs []*zap.SegmentBase
+	var sbsDrops []*roaring.Bitmap
+	var sbsIndexes []int
+
+	for i, segmentSnapshot := range snapshot.segment {
+		sb, ok := segmentSnapshot.segment.(*zap.SegmentBase)
+		if ok {
+			sbs = append(sbs, sb)
+			sbsDrops = append(sbsDrops, segmentSnapshot.deleted)
+			sbsIndexes = append(sbsIndexes, i)
+		}
+	}
+
+	if len(sbs) >= DefaultMinSegmentsForInMemoryMerge {
+		startTime := time.Now()
+		fmt.Printf("p persistSnapshot saw in-mem segments: %d of %d\n", len(sbs), len(snapshot.segment))
+		fmt.Printf("p   persistSnapshot mergeSegmentBases ...\n")
+
+		numDocsAfter, err := s.mergeSegmentBases(snapshot, sbs, sbsDrops, sbsIndexes, DefaultChunkFactor)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("p   persistSnapshot mergeSegmentBases, numDocsAfter: %d, TOOK: %d (msec)\n",
+			numDocsAfter, time.Since(startTime)/time.Millisecond)
+
+		// TODO: ISSUE: ...and, now what?  Regarding the in-memory
+		// segments that were just in-memory merged and replaced in
+		// the root (X) by introduceMerge()... it'd be great if we
+		// didn't have to persist those merged-away segments (which is
+		// what happens currently, on leaving this if-block).
+		//
+		// Ideas & issues on what we might do instead...?
+		//
+		// A) If we just bailed here and returned from
+		// persistSnapshot() back out to the persisterLoop, then the
+		// next persistSnapshot() call might also decide to do more
+		// in-memory merging.  Worst case -- nothing's ever persisted
+		// as we just keep on choosing in-memory mergings here only.
+		//
+		// B) If we instead merge the above in-memory segments into a
+		// file-based segment (instead of into an in-memory segment),
+		// we'd solve the problem of #A, but #B would be slower.  That
+		// said, you could claim #B is a kind of persistence.
+		//
+		// C) If we finish this persistSnapshot() call by skipping
+		// ahead and instead persisting the "X" root that was just
+		// introduced above, perhaps we might miss persisting some
+		// segments or deletions that were concurrently introduced in
+		// the meantime?  That is, perhaps the X root also has a bunch
+		// of in-memory segments that were introduced in the meantime
+		// that need to be taken care of?
+		//
+		// Currently thinking #C is the way to go, but worried there
+		// might be holes in the thinking.
+	}
+
 	// start a write transaction
 	tx, err := s.rootBolt.Begin(true)
 	if err != nil {
