@@ -44,7 +44,7 @@ var DefaultChunkFactor uint32 = 1024
 // This needs to be based on empirical data.
 // With high segment count with snapshots,
 // doubtful on the effectiveness of this approach.
-var epochDistance = uint64(100)
+var epochDistance = uint64(5)
 
 type notificationChan chan struct{}
 
@@ -63,11 +63,12 @@ OUTER:
 			persistWatchers = append(persistWatchers, ew)
 		default:
 		}
-		if ew != nil {
+		if ew != nil && ew.epoch > lastMergedEpoch {
 			lastMergedEpoch = ew.epoch
-			persistWatchers = s.pausePersisterForMergerCatchUp(lastPersistedEpoch,
-				&lastMergedEpoch, persistWatchers)
 		}
+		persistWatchers = s.pausePersisterForMergerCatchUp(lastPersistedEpoch,
+			&lastMergedEpoch, persistWatchers)
+
 
 		var ourSnapshot *IndexSnapshot
 		var ourPersisted []chan error
@@ -171,8 +172,7 @@ OUTER:
 		persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
 
 		// check for slow merger and pause persister until merger catch up
-		if lastPersistedEpoch > *lastMergedEpoch &&
-			lastPersistedEpoch-*lastMergedEpoch > epochDistance {
+		if lastPersistedEpoch > *lastMergedEpoch+epochDistance {
 
 			select {
 			case <-s.closeCh:
@@ -180,7 +180,6 @@ OUTER:
 			case ew := <-s.persisterNotifier:
 				persistWatchers = append(persistWatchers, ew)
 				*lastMergedEpoch = ew.epoch
-				log.Printf("persister waiting as lastPersistedEpoch->%d merger epoch->%d", lastPersistedEpoch, *lastMergedEpoch)
 				continue OUTER
 			}
 		} else {
