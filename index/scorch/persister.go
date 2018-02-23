@@ -145,7 +145,100 @@ OUTER:
 	}
 }
 
-func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) (err error) {
+func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
+	persisted, err := s.persistSnapshotMaybeMerge(snapshot)
+	if err != nil {
+		return err
+	}
+	if persisted {
+		return nil
+	}
+
+	return s.persistSnapshotDirect(snapshot)
+}
+
+// DefaultMinSegmentsForInMemoryMerge represents the default number of
+// in-memory zap segments that persistSnapshotMaybeMerge() needs to
+// see in an IndexSnapshot before it decides to merge and persist
+// those segments
+var DefaultMinSegmentsForInMemoryMerge = 2
+
+// persistSnapshotMaybeMerge examines the snapshot and might merge and
+// persist the in-memory zap segments if there are enough of them
+func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
+	bool, error) {
+	// collect the in-memory zap segments (SegmentBase instances)
+	var sbs []*zap.SegmentBase
+	var sbsDrops []*roaring.Bitmap
+	var sbsIndexes []int
+
+	for i, segmentSnapshot := range snapshot.segment {
+		if sb, ok := segmentSnapshot.segment.(*zap.SegmentBase); ok {
+			sbs = append(sbs, sb)
+			sbsDrops = append(sbsDrops, segmentSnapshot.deleted)
+			sbsIndexes = append(sbsIndexes, i)
+		}
+	}
+
+	if len(sbs) < DefaultMinSegmentsForInMemoryMerge {
+		return false, nil
+	}
+
+	_, newSnapshot, newSegmentID, err := s.mergeSegmentBases(
+		snapshot, sbs, sbsDrops, sbsIndexes, DefaultChunkFactor)
+	if err != nil {
+		return false, err
+	}
+	if newSnapshot == nil {
+		return false, nil
+	}
+
+	defer func() {
+		_ = newSnapshot.DecRef()
+	}()
+
+	mergedSegmentIDs := map[uint64]struct{}{}
+	for _, idx := range sbsIndexes {
+		mergedSegmentIDs[snapshot.segment[idx].id] = struct{}{}
+	}
+
+	// construct a snapshot that's logically equivalent to the input
+	// snapshot, but with merged segments replaced by the new segment
+	equiv := &IndexSnapshot{
+		parent:   snapshot.parent,
+		segment:  make([]*SegmentSnapshot, 0, len(snapshot.segment)),
+		internal: snapshot.internal,
+		epoch:    snapshot.epoch,
+	}
+
+	// copy to the equiv the segments that weren't replaced
+	for _, segment := range snapshot.segment {
+		if _, wasMerged := mergedSegmentIDs[segment.id]; !wasMerged {
+			equiv.segment = append(equiv.segment, segment)
+		}
+	}
+
+	// append to the equiv the new segment
+	for _, segment := range newSnapshot.segment {
+		if segment.id == newSegmentID {
+			equiv.segment = append(equiv.segment, &SegmentSnapshot{
+				id:      newSegmentID,
+				segment: segment.segment,
+				deleted: nil, // nil since merging handled deletions
+			})
+			break
+		}
+	}
+
+	err = s.persistSnapshotDirect(equiv)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 	// start a write transaction
 	tx, err := s.rootBolt.Begin(true)
 	if err != nil {

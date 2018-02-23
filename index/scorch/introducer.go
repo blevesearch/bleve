@@ -247,6 +247,8 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	})
 	newSnapshot.offsets = append(newSnapshot.offsets, running)
 
+	newSnapshot.AddRef() // 1 ref for the nextMerge.notify response
+
 	// swap in new segment
 	rootPrev := s.root
 	s.root = newSnapshot
@@ -257,7 +259,8 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 		_ = rootPrev.DecRef()
 	}
 
-	// notify merger we incorporated this
+	// notify requester that we incorporated this
+	nextMerge.notify <- newSnapshot
 	close(nextMerge.notify)
 }
 
