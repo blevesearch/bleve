@@ -42,8 +42,7 @@ var DefaultChunkFactor uint32 = 1024
 // an optimum pace so that the merger can skip
 // many intermediate snapshots.
 // This needs to be based on empirical data.
-// With high segment count with snapshots,
-// doubtful on the effectiveness of this approach.
+// TODO - may need to revisit this approach/value.
 var epochDistance = uint64(5)
 
 type notificationChan chan struct{}
@@ -172,18 +171,16 @@ OUTER:
 		persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
 
 		// check for slow merger and pause persister until merger catch up
-		if lastPersistedEpoch > *lastMergedEpoch+epochDistance {
-
-			select {
-			case <-s.closeCh:
-				break OUTER
-			case ew := <-s.persisterNotifier:
-				persistWatchers = append(persistWatchers, ew)
-				*lastMergedEpoch = ew.epoch
-				continue OUTER
-			}
-		} else {
+		if lastPersistedEpoch <= *lastMergedEpoch+epochDistance {
 			break OUTER
+		}
+
+		select {
+		case <-s.closeCh:
+			break OUTER
+		case ew := <-s.persisterNotifier:
+			persistWatchers = append(persistWatchers, ew)
+			*lastMergedEpoch = ew.epoch
 		}
 	}
 
