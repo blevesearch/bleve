@@ -170,6 +170,9 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 	rv := make([]uint64, len(fieldsInv))
 	fieldDvLocs := make([]uint64, len(fieldsInv))
 
+	tfEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
+	locEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
+
 	// docTermMap is keyed by docNum, where the array impl provides
 	// better memory usage behavior than a sparse-friendlier hashmap
 	// for when docs have much structural similarity (i.e., every doc
@@ -226,9 +229,6 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 
 		newRoaring := roaring.NewBitmap()
 		newRoaringLocs := roaring.NewBitmap()
-
-		tfEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
-		locEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
 
 		finishTerm := func(term []byte) error {
 			if term == nil {
