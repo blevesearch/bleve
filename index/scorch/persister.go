@@ -164,16 +164,12 @@ func notifyMergeWatchers(lastPersistedEpoch uint64,
 func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64, lastMergedEpoch *uint64,
 	persistWatchers []*epochWatcher) []*epochWatcher {
 
+	// first, let the watchers proceed if they lag behind
+	persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
+
 OUTER:
-	for {
-
-		// first, let the watchers proceed if they lag behind
-		persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
-
-		// check for slow merger and pause persister until merger catch up
-		if lastPersistedEpoch <= *lastMergedEpoch+epochDistance {
-			break OUTER
-		}
+	// check for slow merger and await until the merger catch up
+	for lastPersistedEpoch > *lastMergedEpoch+epochDistance {
 
 		select {
 		case <-s.closeCh:
@@ -182,6 +178,9 @@ OUTER:
 			persistWatchers = append(persistWatchers, ew)
 			*lastMergedEpoch = ew.epoch
 		}
+
+		// let the watchers proceed if they lag behind
+		persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
 	}
 
 	return persistWatchers
