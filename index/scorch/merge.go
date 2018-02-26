@@ -15,6 +15,7 @@
 package scorch
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"sync/atomic"
@@ -28,7 +29,13 @@ import (
 
 func (s *Scorch) mergerLoop() {
 	var lastEpochMergePlanned uint64
-	mergePlannerOptions := s.parseMergePlannerOptions()
+	mergePlannerOptions, err := s.parseMergePlannerOptions()
+	if err != nil {
+		s.fireAsyncError(fmt.Errorf("mergePlannerOption json parsing err: %v", err))
+		s.asyncTasks.Done()
+		return
+	}
+
 OUTER:
 	for {
 		select {
@@ -83,32 +90,21 @@ OUTER:
 	s.asyncTasks.Done()
 }
 
-func (s *Scorch) parseMergePlannerOptions() *mergeplan.MergePlanOptions {
-	mergePlannerOptions := &mergeplan.DefaultMergePlanOptions
-	scorchOptions := map[string]interface{}{}
-	if v, ok := s.config["scorchOptions"]; ok {
-		if scorchOptions, ok = v.(map[string]interface{}); ok {
-			if v, ok := scorchOptions["maxSegmentsPerTier"].(float64); ok {
-				mergePlannerOptions.MaxSegmentsPerTier = int(v)
-			}
-			if v, ok := scorchOptions["maxSegmentSize"].(float64); ok {
-				mergePlannerOptions.MaxSegmentSize = int64(v)
-			}
-			if v, ok := scorchOptions["tierGrowth"].(float64); ok {
-				mergePlannerOptions.TierGrowth = v
-			}
-			if v, ok := scorchOptions["segmentsPerMergeTask"].(float64); ok {
-				mergePlannerOptions.SegmentsPerMergeTask = int(v)
-			}
-			if v, ok := scorchOptions["floorSegmentSize"].(float64); ok {
-				mergePlannerOptions.FloorSegmentSize = int64(v)
-			}
-			if v, ok := scorchOptions["reclaimDeletesWeight"].(float64); ok {
-				mergePlannerOptions.ReclaimDeletesWeight = v
-			}
+func (s *Scorch) parseMergePlannerOptions() (*mergeplan.MergePlanOptions,
+	error) {
+	mergePlannerOptions := mergeplan.DefaultMergePlanOptions
+	if v, ok := s.config["scorchMergePlanOptions"]; ok {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return &mergePlannerOptions, err
+		}
+
+		err = json.Unmarshal(b, &mergePlannerOptions)
+		if err != nil {
+			return &mergePlannerOptions, err
 		}
 	}
-	return mergePlannerOptions
+	return &mergePlannerOptions, nil
 }
 
 func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
