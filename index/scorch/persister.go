@@ -68,7 +68,6 @@ OUTER:
 		persistWatchers = s.pausePersisterForMergerCatchUp(lastPersistedEpoch,
 			&lastMergedEpoch, persistWatchers)
 
-
 		var ourSnapshot *IndexSnapshot
 		var ourPersisted []chan error
 

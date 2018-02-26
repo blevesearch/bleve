@@ -316,10 +316,12 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				return nil, 0, err2
 			}
 
+			newDocNumsI := newDocNums[itrI]
+
 			postItr = postings.iterator(postItr)
 			next, err2 := postItr.Next()
 			for next != nil && err2 == nil {
-				hitNewDocNum := newDocNums[itrI][next.Number()]
+				hitNewDocNum := newDocNumsI[next.Number()]
 				if hitNewDocNum == docDropped {
 					return nil, 0, fmt.Errorf("see hit with dropped doc num")
 				}
