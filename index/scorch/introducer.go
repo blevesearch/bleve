@@ -130,14 +130,14 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			segment:    s.root.segment[i].segment,
 			cachedDocs: s.root.segment[i].cachedDocs,
 		}
-		
+
 		// apply new obsoletions
 		if s.root.segment[i].deleted == nil {
 			newss.deleted = delta
 		} else {
 			newss.deleted = roaring.Or(s.root.segment[i].deleted, delta)
 		}
-		
+
 		// check for live size before copying
 		if newss.LiveSize() > 0 {
 			newSnapshot.segment = append(newSnapshot.segment, newss)
@@ -241,7 +241,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			// the root segments would be the obsolete segment set
 			delete(nextMerge.old, segmentID)
 
-		} else if s.root.segment[i].LiveSize() > 0 { 
+		} else if s.root.segment[i].LiveSize() > 0 {
 			// this segment is staying
 			newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
 				id:         s.root.segment[i].id,
@@ -269,7 +269,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			}
 		}
 	}
-	// In case where all the docs in the newly merged segment getting 
+	// In case where all the docs in the newly merged segment getting
 	// deleted by the time we reach here, can skip the introduction.
 	if nextMerge.new != nil &&
 		nextMerge.new.Count() > newSegmentDeleted.GetCardinality() {

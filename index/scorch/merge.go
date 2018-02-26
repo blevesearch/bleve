@@ -16,7 +16,7 @@ package scorch
 
 import (
 	"bytes"
-  	"encoding/json"
+	"encoding/json"
 
 	"fmt"
 	"os"
