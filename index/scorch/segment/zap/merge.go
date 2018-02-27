@@ -462,10 +462,12 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	for segI, segment := range segments {
 		segNewDocNums := make([]uint64, segment.numDocs)
 
+		dropsI := drops[segI]
+
 		// optimize when the field mapping is the same across all
 		// segments and there are no deletions, via byte-copying
 		// of stored docs bytes directly to the writer
-		if fieldsSame && (drops[segI] == nil || drops[segI].GetCardinality() == 0) {
+		if fieldsSame && (dropsI == nil || dropsI.GetCardinality() == 0) {
 			err := segment.copyStoredDocs(newDocNum, docNumOffsets, w)
 			if err != nil {
 				return 0, nil, err
@@ -483,7 +485,7 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 		// for each doc num
 		for docNum := uint64(0); docNum < segment.numDocs; docNum++ {
 			// TODO: roaring's API limits docNums to 32-bits?
-			if drops[segI] != nil && drops[segI].Contains(uint32(docNum)) {
+			if dropsI != nil && dropsI.Contains(uint32(docNum)) {
 				segNewDocNums[docNum] = docDropped
 				continue
 			}
