@@ -15,12 +15,11 @@
 package bleve
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
@@ -783,7 +782,9 @@ func TestMultiSearchTimeout(t *testing.T) {
 		}}
 
 	// first run with absurdly long time out, should succeed
-	ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	query := NewTermQuery("test")
 	sr := NewSearchRequest(query)
 	res, err := MultiSearch(ctx, sr, ei1, ei2)
@@ -804,7 +805,8 @@ func TestMultiSearchTimeout(t *testing.T) {
 	}
 
 	// now run a search again with an absurdly low timeout (should timeout)
-	ctx, _ = context.WithTimeout(context.Background(), 1*time.Microsecond)
+	ctx, cancel = context.WithTimeout(context.Background(), 1*time.Microsecond)
+	defer cancel()
 	res, err = MultiSearch(ctx, sr, ei1, ei2)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -830,7 +832,6 @@ func TestMultiSearchTimeout(t *testing.T) {
 	}
 
 	// now run a search again with a normal timeout, but cancel it first
-	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	cancel()
 	res, err = MultiSearch(ctx, sr, ei1, ei2)
@@ -937,7 +938,9 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 
 	// ei3 is set to take >50ms, so run search with timeout less than
 	// this, this should return partial results
-	ctx, _ = context.WithTimeout(context.Background(), 25*time.Millisecond)
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancel()
 	query := NewTermQuery("test")
 	sr := NewSearchRequest(query)
 	expected := &SearchResult{
@@ -1090,8 +1093,9 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 	// ei2 and ei3 have 50ms delay
 	// search across aliasTop should still get results from ei1 and ei4
 	// total should still be 4
-
-	ctx, _ = context.WithTimeout(context.Background(), 25*time.Millisecond)
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancel()
 	query := NewTermQuery("test")
 	sr := NewSearchRequest(query)
 	expected := &SearchResult{

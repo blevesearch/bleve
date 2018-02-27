@@ -15,6 +15,7 @@
 package bleve
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -27,8 +28,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/document"
@@ -1508,7 +1507,8 @@ func TestSearchTimeout(t *testing.T) {
 	}()
 
 	// first run a search with an absurdly long timeout (should succeeed)
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	query := NewTermQuery("water")
 	req := NewSearchRequest(query)
 	_, err = index.SearchInContext(ctx, req)
@@ -1517,7 +1517,8 @@ func TestSearchTimeout(t *testing.T) {
 	}
 
 	// now run a search again with an absurdly low timeout (should timeout)
-	ctx, _ = context.WithTimeout(context.Background(), 1*time.Microsecond)
+	ctx, cancel = context.WithTimeout(context.Background(), 1*time.Microsecond)
+	defer cancel()
 	sq := &slowQuery{
 		actual: query,
 		delay:  50 * time.Millisecond, // on Windows timer resolution is 15ms
@@ -1529,7 +1530,7 @@ func TestSearchTimeout(t *testing.T) {
 	}
 
 	// now run a search with a long timeout, but with a long query, and cancel it
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	sq = &slowQuery{
 		actual: query,
 		delay:  100 * time.Millisecond, // on Windows timer resolution is 15ms
