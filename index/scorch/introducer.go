@@ -195,19 +195,8 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	// acquire lock
 	s.rootLock.Lock()
 
-	// prepare new index snapshot
-	currSize := len(s.root.segment)
-	newSize := currSize + 1 - len(nextMerge.old)
-
-	// empty segments deletion
-	if nextMerge.new == nil {
-		newSize--
-	}
-
 	newSnapshot := &IndexSnapshot{
 		parent:   s,
-		segment:  make([]*SegmentSnapshot, 0, newSize),
-		offsets:  make([]uint64, 0, newSize),
 		internal: s.root.internal,
 		epoch:    s.nextSnapshotEpoch,
 		refs:     1,
