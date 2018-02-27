@@ -108,15 +108,6 @@
 			"notests": true
 		},
 		{
-			"importpath": "golang.org/x/net/context",
-			"repository": "https://go.googlesource.com/net",
-			"vcs": "",
-			"revision": "e45385e9b226f570b1f086bf287b25d3d4117776",
-			"branch": "master",
-			"path": "/context",
-			"notests": true
-		},
-		{
 			"importpath": "golang.org/x/text/transform",
 			"repository": "https://go.googlesource.com/text",
 			"vcs": "",

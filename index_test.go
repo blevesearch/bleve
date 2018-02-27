@@ -15,6 +15,7 @@
 package bleve
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -27,8 +28,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/document"

@@ -15,12 +15,11 @@
 package bleve
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
