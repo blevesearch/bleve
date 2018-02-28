@@ -20,31 +20,78 @@ import (
 	"sync/atomic"
 )
 
-// Stats tracks statistics about the index
+// Stats tracks statistics about the index, fields that are
+// prefixed like CurXxxx are gauges (can go up and down),
+// and fields that are prefixed like TotXxxx are monotonically
+// increasing counters.
 type Stats struct {
-	updates, deletes, batches, errors uint64
-	analysisTime, indexTime           uint64
-	termSearchersStarted              uint64
-	termSearchersFinished             uint64
-	numPlainTextBytesIndexed          uint64
-	numItemsIntroduced                uint64
-	numItemsPersisted                 uint64
-	i                                 *Scorch
+	TotUpdates               uint64
+	TotDeletes               uint64
+	TotBatches               uint64
+	TotEmptyBatches          uint64
+	TotOnErrors              uint64
+	TotAnalysisTime          uint64
+	TotIndexTime             uint64
+	TotIndexedPlainTextBytes uint64
+
+	TotIndexSnapshotBeg uint64
+	TotIndexSnapshotEnd uint64
+
+	TotIntroducedBatchSegments uint64
+	TotIntroducedMergeSegments uint64
+	TotIntroducedItems         uint64
+
+	TotTermSearchersStarted  uint64
+	TotTermSearchersFinished uint64
+
+	TotPersistedItems    uint64
+	TotPersistedSegments uint64
+	TotPersisterPause    uint64
+
+	TotMemoryMergeOpsDone   uint64
+	TotMergedMemorySegments uint64
+	TotMergedFileSegments   uint64
+	TotFileMergeOpsDone     uint64
+
+	TotRollbackOpsDone uint64
+
+	CurInProgressMemoryMerges uint64
+	CurInProgressFileMerges   uint64
+
+	CurMemoryBytes uint64
+
+	i *Scorch
 }
 
 func (s *Stats) statsMap() (map[string]interface{}, error) {
 	m := map[string]interface{}{}
-	m["updates"] = atomic.LoadUint64(&s.updates)
-	m["deletes"] = atomic.LoadUint64(&s.deletes)
-	m["batches"] = atomic.LoadUint64(&s.batches)
-	m["errors"] = atomic.LoadUint64(&s.errors)
-	m["analysis_time"] = atomic.LoadUint64(&s.analysisTime)
-	m["index_time"] = atomic.LoadUint64(&s.indexTime)
-	m["term_searchers_started"] = atomic.LoadUint64(&s.termSearchersStarted)
-	m["term_searchers_finished"] = atomic.LoadUint64(&s.termSearchersFinished)
-	m["num_plain_text_bytes_indexed"] = atomic.LoadUint64(&s.numPlainTextBytesIndexed)
-	m["num_items_introduced"] = atomic.LoadUint64(&s.numItemsIntroduced)
-	m["num_items_persisted"] = atomic.LoadUint64(&s.numItemsPersisted)
+	m["TotUpdates"] = atomic.LoadUint64(&s.TotUpdates)
+	m["TotDeletes"] = atomic.LoadUint64(&s.TotDeletes)
+	m["TotBatches"] = atomic.LoadUint64(&s.TotBatches)
+	m["TotEmptyBatches"] = atomic.LoadUint64(&s.TotEmptyBatches)
+	m["TotOnErrors"] = atomic.LoadUint64(&s.TotOnErrors)
+	m["TotAnalysisTime"] = atomic.LoadUint64(&s.TotAnalysisTime)
+	m["TotIndexSnapshotBeg"] = atomic.LoadUint64(&s.TotIndexSnapshotBeg)
+	m["TotIndexSnapshotEnd"] = atomic.LoadUint64(&s.TotIndexSnapshotEnd)
+
+	m["TotTermSearchersStarted"] = atomic.LoadUint64(&s.TotTermSearchersStarted)
+	m["TotTermSearchersFinished"] = atomic.LoadUint64(&s.TotTermSearchersFinished)
+	m["TotIndexedPlainTextBytes"] = atomic.LoadUint64(&s.TotIndexedPlainTextBytes)
+	m["TotIntroducedItems"] = atomic.LoadUint64(&s.TotIntroducedItems)
+	m["TotPersistedItems"] = atomic.LoadUint64(&s.TotPersistedItems)
+
+	m["TotMemoryMergeOpsDone"] = atomic.LoadUint64(&s.TotMemoryMergeOpsDone)
+	m["TotFileMergeOpsDone"] = atomic.LoadUint64(&s.TotFileMergeOpsDone)
+	m["TotIntroducedBatchSegments"] = atomic.LoadUint64(&s.TotIntroducedBatchSegments)
+	m["TotIntroducedMergeSegments"] = atomic.LoadUint64(&s.TotIntroducedMergeSegments)
+	m["TotPersistedSegments"] = atomic.LoadUint64(&s.TotPersistedSegments)
+	m["TotRollbackOpsDone"] = atomic.LoadUint64(&s.TotRollbackOpsDone)
+	m["CurInProgressFileMerges"] = atomic.LoadUint64(&s.CurInProgressFileMerges)
+	m["CurInProgressMemoryMerges"] = atomic.LoadUint64(&s.CurInProgressMemoryMerges)
+	m["TotPersisterPause"] = atomic.LoadUint64(&s.TotPersisterPause)
+	m["TotMergedMemorySegments"] = atomic.LoadUint64(&s.TotMergedMemorySegments)
+	m["TotMergedFileSegments"] = atomic.LoadUint64(&s.TotMergedFileSegments)
+	m["CurMemoryBytes"] = s.i.MemoryUsed()
 
 	if s.i.path != "" {
 		finfos, err := ioutil.ReadDir(s.i.path)
@@ -61,8 +108,8 @@ func (s *Stats) statsMap() (map[string]interface{}, error) {
 			}
 		}
 
-		m["num_bytes_used_disk"] = numBytesUsedDisk
-		m["num_files_on_disk"] = numFilesOnDisk
+		m["TotOnDiskBytes"] = numBytesUsedDisk
+		m["TotOnDiskFiles"] = numFilesOnDisk
 	}
 
 	return m, nil

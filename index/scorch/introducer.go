@@ -159,7 +159,8 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 
 		// increment numItemsIntroduced which tracks the number of items
 		// queued for persistence.
-		atomic.AddUint64(&s.stats.numItemsIntroduced, newSegmentSnapshot.Count())
+		atomic.AddUint64(&s.stats.TotIntroducedItems, newSegmentSnapshot.Count())
+		atomic.AddUint64(&s.stats.TotIntroducedBatchSegments, 1)
 	}
 	// copy old values
 	for key, oldVal := range s.root.internal {
@@ -270,6 +271,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			cachedDocs: &cachedDocs{cache: nil},
 		})
 		newSnapshot.offsets = append(newSnapshot.offsets, running)
+		atomic.AddUint64(&s.stats.TotIntroducedMergeSegments, 1)
 	}
 
 	newSnapshot.AddRef() // 1 ref for the nextMerge.notify response
@@ -334,6 +336,8 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 	s.root = newSnapshot
 	// release lock
 	s.rootLock.Unlock()
+
+	atomic.AddUint64(&s.stats.TotRollbackOpsDone, 1)
 
 	if rootPrev != nil {
 		_ = rootPrev.DecRef()

@@ -126,7 +126,7 @@ func (i *IndexSnapshotTermFieldReader) Count() uint64 {
 
 func (i *IndexSnapshotTermFieldReader) Close() error {
 	if i.snapshot != nil {
-		atomic.AddUint64(&i.snapshot.parent.stats.termSearchersFinished, uint64(1))
+		atomic.AddUint64(&i.snapshot.parent.stats.TotTermSearchersFinished, uint64(1))
 	}
 	return nil
 }

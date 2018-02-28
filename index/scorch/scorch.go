@@ -111,6 +111,7 @@ func (s *Scorch) fireAsyncError(err error) {
 	if s.onAsyncError != nil {
 		s.onAsyncError(err)
 	}
+	atomic.AddUint64(&s.stats.TotOnErrors, 1)
 }
 
 func (s *Scorch) Open() error {
@@ -275,7 +276,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	}
 	close(resultChan)
 
-	atomic.AddUint64(&s.stats.analysisTime, uint64(time.Since(start)))
+	atomic.AddUint64(&s.stats.TotAnalysisTime, uint64(time.Since(start)))
 
 	// notify handlers that we're about to introduce a segment
 	s.fireEvent(EventKindBatchIntroductionStart, 0)
@@ -286,6 +287,8 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		if err != nil {
 			return err
 		}
+	} else {
+		atomic.AddUint64(&s.stats.TotEmptyBatches, 1)
 	}
 
 	err = s.prepareSegment(newSegment, ids, batch.InternalOps)
@@ -293,12 +296,12 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		if newSegment != nil {
 			_ = newSegment.Close()
 		}
-		atomic.AddUint64(&s.stats.errors, 1)
+		atomic.AddUint64(&s.stats.TotOnErrors, 1)
 	} else {
-		atomic.AddUint64(&s.stats.updates, numUpdates)
-		atomic.AddUint64(&s.stats.deletes, numDeletes)
-		atomic.AddUint64(&s.stats.batches, 1)
-		atomic.AddUint64(&s.stats.numPlainTextBytesIndexed, numPlainTextBytes)
+		atomic.AddUint64(&s.stats.TotUpdates, numUpdates)
+		atomic.AddUint64(&s.stats.TotDeletes, numDeletes)
+		atomic.AddUint64(&s.stats.TotBatches, 1)
+		atomic.AddUint64(&s.stats.TotIndexedPlainTextBytes, numPlainTextBytes)
 	}
 	return err
 }

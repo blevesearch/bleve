@@ -129,6 +129,9 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 		return nil
 	}
 
+	mip := uint64(len(resultMergePlan.Tasks))
+	atomic.AddUint64(&s.stats.CurInProgressFileMerges, mip)
+
 	// process tasks in serial for now
 	var notifications []chan *IndexSnapshot
 	for _, task := range resultMergePlan.Tasks {
@@ -165,6 +168,10 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 				s.unmarkIneligibleForRemoval(filename)
 				return fmt.Errorf("merging failed: %v", err)
 			}
+
+			// update the count of file segments merged
+			atomic.AddUint64(&s.stats.TotMergedFileSegments, uint64(len(segmentsToMerge)))
+
 			segment, err = zap.Open(path)
 			if err != nil {
 				s.unmarkIneligibleForRemoval(filename)
@@ -193,16 +200,26 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 		case s.merges <- sm:
 		}
 	}
+
+	atomic.AddUint64(&s.stats.CurInProgressFileMerges, ^uint64(mip-1))
+
+	var newSnapshot *IndexSnapshot
 	for _, notification := range notifications {
 		select {
 		case <-s.closeCh:
 			return nil
-		case newSnapshot := <-notification:
+		case newSnapshot = <-notification:
 			if newSnapshot != nil {
 				_ = newSnapshot.DecRef()
 			}
 		}
 	}
+
+	// merge operation completed and the introduction is complete
+	if newSnapshot != nil {
+		atomic.AddUint64(&s.stats.TotFileMergeOpsDone, 1)
+	}
+
 	return nil
 }
 
@@ -224,6 +241,8 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 
 	cr := zap.NewCountHashWriter(&br)
 
+	atomic.AddUint64(&s.stats.CurInProgressMemoryMerges, 1)
+
 	newDocNums, numDocs, storedIndexOffset, fieldsIndexOffset,
 		docValueOffset, dictLocs, fieldsInv, fieldsMap, err :=
 		zap.MergeToWriter(sbs, sbsDrops, chunkFactor, cr)
@@ -238,6 +257,9 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 		return 0, nil, 0, err
 	}
 
+	// update the count of in-memory merged segments
+	atomic.AddUint64(&s.stats.TotMergedMemorySegments, uint64(len(sbs)))
+
 	newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
 
 	filename := zapFileName(newSegmentID)
@@ -251,6 +273,10 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	if err != nil {
 		return 0, nil, 0, err
 	}
+
+	// update persisted stats
+	atomic.AddUint64(&s.stats.TotPersistedItems, segment.Count())
+	atomic.AddUint64(&s.stats.TotPersistedSegments, 1)
 
 	sm := &segmentMerge{
 		id:            newSegmentID,
@@ -273,10 +299,14 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	case s.merges <- sm:
 	}
 
+	atomic.AddUint64(&s.stats.CurInProgressMemoryMerges, ^uint64(0))
+
 	select { // wait for introduction to complete
 	case <-s.closeCh:
 		return 0, nil, 0, nil // TODO: return ErrInterruptedClosed?
 	case newSnapshot := <-sm.notify:
+		// update counters on success
+		atomic.AddUint64(&s.stats.TotMemoryMergeOpsDone, 1)
 		return numDocs, newSnapshot, newSegmentID, nil
 	}
 }

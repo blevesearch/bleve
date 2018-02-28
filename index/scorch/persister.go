@@ -169,6 +169,8 @@ func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64, lastM
 OUTER:
 	// check for slow merger and await until the merger catch up
 	for lastPersistedEpoch > *lastMergedEpoch+epochDistance {
+		// update the stat on each pause cycle
+		atomic.AddUint64(&s.stats.TotPersisterPause, 1)
 
 		select {
 		case <-s.closeCh:
@@ -412,7 +414,8 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 				newIndexSnapshot.segment[i] = newSegmentSnapshot
 				delete(newSegments, segmentSnapshot.id)
 				// update items persisted incase of a new segment snapshot
-				atomic.AddUint64(&s.stats.numItemsPersisted, newSegmentSnapshot.Count())
+				atomic.AddUint64(&s.stats.TotPersistedItems, newSegmentSnapshot.Count())
+				atomic.AddUint64(&s.stats.TotPersistedSegments, 1)
 			} else {
 				newIndexSnapshot.segment[i] = s.root.segment[i]
 				newIndexSnapshot.segment[i].segment.AddRef()
