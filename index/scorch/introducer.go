@@ -48,6 +48,8 @@ func (s *Scorch) mainLoop() {
 	var epochWatchers []*epochWatcher
 OUTER:
 	for {
+		atomic.AddUint64(&s.stats.TotIntroduceLoop, 1)
+
 		select {
 		case <-s.closeCh:
 			break OUTER
@@ -92,6 +94,9 @@ OUTER:
 }
 
 func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
+	atomic.AddUint64(&s.stats.TotIntroduceSegmentBeg, 1)
+	defer atomic.AddUint64(&s.stats.TotIntroduceSegmentEnd, 1)
+
 	// acquire lock
 	s.rootLock.Lock()
 
@@ -160,7 +165,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		// increment numItemsIntroduced which tracks the number of items
 		// queued for persistence.
 		atomic.AddUint64(&s.stats.TotIntroducedItems, newSegmentSnapshot.Count())
-		atomic.AddUint64(&s.stats.TotIntroducedBatchSegments, 1)
+		atomic.AddUint64(&s.stats.TotIntroducedSegmentsBatch, 1)
 	}
 	// copy old values
 	for key, oldVal := range s.root.internal {
@@ -193,6 +198,9 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 }
 
 func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
+	atomic.AddUint64(&s.stats.TotIntroduceMergeBeg, 1)
+	defer atomic.AddUint64(&s.stats.TotIntroduceMergeEnd, 1)
+
 	// acquire lock
 	s.rootLock.Lock()
 
@@ -271,7 +279,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			cachedDocs: &cachedDocs{cache: nil},
 		})
 		newSnapshot.offsets = append(newSnapshot.offsets, running)
-		atomic.AddUint64(&s.stats.TotIntroducedMergeSegments, 1)
+		atomic.AddUint64(&s.stats.TotIntroducedSegmentsMerge, 1)
 	}
 
 	newSnapshot.AddRef() // 1 ref for the nextMerge.notify response
@@ -292,6 +300,9 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 }
 
 func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
+	atomic.AddUint64(&s.stats.TotIntroduceRevertBeg, 1)
+	defer atomic.AddUint64(&s.stats.TotIntroduceRevertEnd, 1)
+
 	if revertTo.snapshot == nil {
 		err := fmt.Errorf("Cannot revert to a nil snapshot")
 		revertTo.applied <- err
@@ -336,8 +347,6 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 	s.root = newSnapshot
 	// release lock
 	s.rootLock.Unlock()
-
-	atomic.AddUint64(&s.stats.TotRollbackOpsDone, 1)
 
 	if rootPrev != nil {
 		_ = rootPrev.DecRef()

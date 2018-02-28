@@ -55,6 +55,8 @@ func (s *Scorch) persisterLoop() {
 	var ew *epochWatcher
 OUTER:
 	for {
+		atomic.AddUint64(&s.stats.TotPersistLoopBeg, 1)
+
 		select {
 		case <-s.closeCh:
 			break OUTER
@@ -65,8 +67,8 @@ OUTER:
 		if ew != nil && ew.epoch > lastMergedEpoch {
 			lastMergedEpoch = ew.epoch
 		}
-		persistWatchers = s.pausePersisterForMergerCatchUp(lastPersistedEpoch,
-			&lastMergedEpoch, persistWatchers)
+		lastMergedEpoch, persistWatchers = s.pausePersisterForMergerCatchUp(lastPersistedEpoch,
+			lastMergedEpoch, persistWatchers)
 
 		var ourSnapshot *IndexSnapshot
 		var ourPersisted []chan error
@@ -94,6 +96,7 @@ OUTER:
 			if err != nil {
 				s.fireAsyncError(fmt.Errorf("got err persisting snapshot: %v", err))
 				_ = ourSnapshot.DecRef()
+				atomic.AddUint64(&s.stats.TotPersistLoopErr, 1)
 				continue OUTER
 			}
 
@@ -115,6 +118,7 @@ OUTER:
 			s.fireEvent(EventKindPersisterProgress, time.Since(startTime))
 
 			if changed {
+				atomic.AddUint64(&s.stats.TotPersistLoopProgress, 1)
 				continue OUTER
 			}
 		}
@@ -133,17 +137,21 @@ OUTER:
 
 		s.removeOldData() // might as well cleanup while waiting
 
+		atomic.AddUint64(&s.stats.TotPersistLoopWait, 1)
+
 		select {
 		case <-s.closeCh:
 			break OUTER
 		case <-w.notifyCh:
 			// woken up, next loop should pick up work
-			continue OUTER
+			atomic.AddUint64(&s.stats.TotPersistLoopWaitNotified, 1)
 		case ew = <-s.persisterNotifier:
 			// if the watchers are already caught up then let them wait,
 			// else let them continue to do the catch up
 			persistWatchers = append(persistWatchers, ew)
 		}
+
+		atomic.AddUint64(&s.stats.TotPersistLoopEnd, 1)
 	}
 }
 
@@ -160,31 +168,32 @@ func notifyMergeWatchers(lastPersistedEpoch uint64,
 	return watchersNext
 }
 
-func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64, lastMergedEpoch *uint64,
-	persistWatchers []*epochWatcher) []*epochWatcher {
+func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64, lastMergedEpoch uint64,
+	persistWatchers []*epochWatcher) (uint64, []*epochWatcher) {
 
 	// first, let the watchers proceed if they lag behind
 	persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
 
 OUTER:
 	// check for slow merger and await until the merger catch up
-	for lastPersistedEpoch > *lastMergedEpoch+epochDistance {
-		// update the stat on each pause cycle
-		atomic.AddUint64(&s.stats.TotPersisterPause, 1)
+	for lastPersistedEpoch > lastMergedEpoch+epochDistance {
+		atomic.AddUint64(&s.stats.TotPersisterSlowMergerPause, 1)
 
 		select {
 		case <-s.closeCh:
 			break OUTER
 		case ew := <-s.persisterNotifier:
 			persistWatchers = append(persistWatchers, ew)
-			*lastMergedEpoch = ew.epoch
+			lastMergedEpoch = ew.epoch
 		}
+
+		atomic.AddUint64(&s.stats.TotPersisterSlowMergerResume, 1)
 
 		// let the watchers proceed if they lag behind
 		persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
 	}
 
-	return persistWatchers
+	return lastMergedEpoch, persistWatchers
 }
 
 func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
@@ -413,6 +422,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 				}
 				newIndexSnapshot.segment[i] = newSegmentSnapshot
 				delete(newSegments, segmentSnapshot.id)
+
 				// update items persisted incase of a new segment snapshot
 				atomic.AddUint64(&s.stats.TotPersistedItems, newSegmentSnapshot.Count())
 				atomic.AddUint64(&s.stats.TotPersistedSegments, 1)

@@ -17,6 +17,7 @@ package scorch
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -43,7 +44,7 @@ type Scorch struct {
 	version       uint8
 	config        map[string]interface{}
 	analysisQueue *index.AnalysisQueue
-	stats         *Stats
+	stats         Stats
 	nextSegmentID uint64
 	path          string
 
@@ -80,7 +81,6 @@ func NewScorch(storeName string,
 		closeCh:              make(chan struct{}),
 		ineligibleForRemoval: map[string]bool{},
 	}
-	rv.stats = &Stats{i: rv}
 	rv.root = &IndexSnapshot{parent: rv, refs: 1}
 	ro, ok := config["read_only"].(bool)
 	if ok {
@@ -288,7 +288,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 			return err
 		}
 	} else {
-		atomic.AddUint64(&s.stats.TotEmptyBatches, 1)
+		atomic.AddUint64(&s.stats.TotBatchesEmpty, 1)
 	}
 
 	err = s.prepareSegment(newSegment, ids, batch.InternalOps)
@@ -377,10 +377,43 @@ func (s *Scorch) Reader() (index.IndexReader, error) {
 }
 
 func (s *Scorch) Stats() json.Marshaler {
-	return s.stats
+	return &s.stats
 }
 func (s *Scorch) StatsMap() map[string]interface{} {
-	m, _ := s.stats.statsMap()
+	m := s.stats.ToMap()
+
+	if s.path != "" {
+		finfos, err := ioutil.ReadDir(s.path)
+		if err == nil {
+			var numFilesOnDisk, numBytesUsedDisk uint64
+			for _, finfo := range finfos {
+				if !finfo.IsDir() {
+					numBytesUsedDisk += uint64(finfo.Size())
+					numFilesOnDisk++
+				}
+			}
+
+			m["TotOnDiskBytes"] = numBytesUsedDisk
+			m["TotOnDiskFiles"] = numFilesOnDisk
+		}
+	}
+
+	// TODO: consider one day removing these backwards compatible
+	// names for apps using the old names
+	m["updates"] = m["TotUpdates"]
+	m["deletes"] = m["TotDeletes"]
+	m["batches"] = m["TotBatches"]
+	m["errors"] = m["TotOnErrors"]
+	m["analysis_time"] = m["TotAnalysisTime"]
+	m["index_time"] = m["TotIndexTime"]
+	m["term_searchers_started"] = m["TotTermSearchersStarted"]
+	m["term_searchers_finished"] = m["TotTermSearchersFinished"]
+	m["num_plain_text_bytes_indexed"] = m["TotIndexedPlainTextBytes"]
+	m["num_items_introduced"] = m["TotIntroducedItems"]
+	m["num_items_persisted"] = m["TotPersistedItems"]
+	m["num_bytes_used_disk"] = m["TotOnDiskBytes"]
+	m["num_files_on_disk"] = m["TotOnDiskFiles"]
+
 	return m
 }
 

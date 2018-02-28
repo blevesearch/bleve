@@ -16,7 +16,7 @@ package scorch
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"reflect"
 	"sync/atomic"
 )
 
@@ -25,101 +25,94 @@ import (
 // and fields that are prefixed like TotXxxx are monotonically
 // increasing counters.
 type Stats struct {
-	TotUpdates               uint64
-	TotDeletes               uint64
-	TotBatches               uint64
-	TotEmptyBatches          uint64
-	TotOnErrors              uint64
-	TotAnalysisTime          uint64
-	TotIndexTime             uint64
+	TotUpdates      uint64
+	TotDeletes      uint64
+	TotBatches      uint64
+	TotBatchesEmpty uint64
+	TotOnErrors     uint64
+
+	TotAnalysisTime uint64
+	TotIndexTime    uint64
+
 	TotIndexedPlainTextBytes uint64
-
-	TotIndexSnapshotBeg uint64
-	TotIndexSnapshotEnd uint64
-
-	TotIntroducedBatchSegments uint64
-	TotIntroducedMergeSegments uint64
-	TotIntroducedItems         uint64
 
 	TotTermSearchersStarted  uint64
 	TotTermSearchersFinished uint64
 
+	TotIntroduceLoop       uint64
+	TotIntroduceSegmentBeg uint64
+	TotIntroduceSegmentEnd uint64
+	TotIntroduceMergeBeg   uint64
+	TotIntroduceMergeEnd   uint64
+	TotIntroduceRevertBeg  uint64
+	TotIntroduceRevertEnd  uint64
+
+	TotIntroducedItems         uint64
+	TotIntroducedSegmentsBatch uint64
+	TotIntroducedSegmentsMerge uint64
+
+	TotPersistLoopBeg          uint64
+	TotPersistLoopErr          uint64
+	TotPersistLoopProgress     uint64
+	TotPersistLoopWait         uint64
+	TotPersistLoopWaitNotified uint64
+	TotPersistLoopEnd          uint64
+
 	TotPersistedItems    uint64
 	TotPersistedSegments uint64
-	TotPersisterPause    uint64
 
-	TotMemoryMergeOpsDone   uint64
-	TotMergedMemorySegments uint64
-	TotMergedFileSegments   uint64
-	TotFileMergeOpsDone     uint64
+	TotPersisterSlowMergerPause  uint64
+	TotPersisterSlowMergerResume uint64
 
-	TotRollbackOpsDone uint64
+	TotFileMergeLoopBeg uint64
+	TotFileMergeLoopErr uint64
+	TotFileMergeLoopEnd uint64
 
-	CurInProgressMemoryMerges uint64
-	CurInProgressFileMerges   uint64
+	TotFileMergePlan     uint64
+	TotFileMergePlanErr  uint64
+	TotFileMergePlanNone uint64
+	TotFileMergePlanOk   uint64
 
-	CurMemoryBytes uint64
+	TotFileMergePlanTasks              uint64
+	TotFileMergePlanTasksDone          uint64
+	TotFileMergePlanTasksErr           uint64
+	TotFileMergePlanTasksSegments      uint64
+	TotFileMergePlanTasksSegmentsEmpty uint64
 
-	i *Scorch
+	TotFileMergeSegmentsEmpty uint64
+	TotFileMergeSegments      uint64
+
+	TotFileMergeZapBeg uint64
+	TotFileMergeZapEnd uint64
+
+	TotFileMergeIntroductions     uint64
+	TotFileMergeIntroductionsDone uint64
+
+	TotMemMergeBeg      uint64
+	TotMemMergeErr      uint64
+	TotMemMergeDone     uint64
+	TotMemMergeZapBeg   uint64
+	TotMemMergeZapEnd   uint64
+	TotMemMergeSegments uint64
 }
 
-func (s *Stats) statsMap() (map[string]interface{}, error) {
+// atomically populates the returned map
+func (s *Stats) ToMap() map[string]interface{} {
 	m := map[string]interface{}{}
-	m["TotUpdates"] = atomic.LoadUint64(&s.TotUpdates)
-	m["TotDeletes"] = atomic.LoadUint64(&s.TotDeletes)
-	m["TotBatches"] = atomic.LoadUint64(&s.TotBatches)
-	m["TotEmptyBatches"] = atomic.LoadUint64(&s.TotEmptyBatches)
-	m["TotOnErrors"] = atomic.LoadUint64(&s.TotOnErrors)
-	m["TotAnalysisTime"] = atomic.LoadUint64(&s.TotAnalysisTime)
-	m["TotIndexSnapshotBeg"] = atomic.LoadUint64(&s.TotIndexSnapshotBeg)
-	m["TotIndexSnapshotEnd"] = atomic.LoadUint64(&s.TotIndexSnapshotEnd)
-
-	m["TotTermSearchersStarted"] = atomic.LoadUint64(&s.TotTermSearchersStarted)
-	m["TotTermSearchersFinished"] = atomic.LoadUint64(&s.TotTermSearchersFinished)
-	m["TotIndexedPlainTextBytes"] = atomic.LoadUint64(&s.TotIndexedPlainTextBytes)
-	m["TotIntroducedItems"] = atomic.LoadUint64(&s.TotIntroducedItems)
-	m["TotPersistedItems"] = atomic.LoadUint64(&s.TotPersistedItems)
-
-	m["TotMemoryMergeOpsDone"] = atomic.LoadUint64(&s.TotMemoryMergeOpsDone)
-	m["TotFileMergeOpsDone"] = atomic.LoadUint64(&s.TotFileMergeOpsDone)
-	m["TotIntroducedBatchSegments"] = atomic.LoadUint64(&s.TotIntroducedBatchSegments)
-	m["TotIntroducedMergeSegments"] = atomic.LoadUint64(&s.TotIntroducedMergeSegments)
-	m["TotPersistedSegments"] = atomic.LoadUint64(&s.TotPersistedSegments)
-	m["TotRollbackOpsDone"] = atomic.LoadUint64(&s.TotRollbackOpsDone)
-	m["CurInProgressFileMerges"] = atomic.LoadUint64(&s.CurInProgressFileMerges)
-	m["CurInProgressMemoryMerges"] = atomic.LoadUint64(&s.CurInProgressMemoryMerges)
-	m["TotPersisterPause"] = atomic.LoadUint64(&s.TotPersisterPause)
-	m["TotMergedMemorySegments"] = atomic.LoadUint64(&s.TotMergedMemorySegments)
-	m["TotMergedFileSegments"] = atomic.LoadUint64(&s.TotMergedFileSegments)
-	m["CurMemoryBytes"] = s.i.MemoryUsed()
-
-	if s.i.path != "" {
-		finfos, err := ioutil.ReadDir(s.i.path)
-		if err != nil {
-			return nil, err
+	sve := reflect.ValueOf(s).Elem()
+	svet := sve.Type()
+	for i := 0; i < svet.NumField(); i++ {
+		svef := sve.Field(i)
+		if svef.CanAddr() {
+			svefp := svef.Addr().Interface()
+			m[svet.Field(i).Name] = atomic.LoadUint64(svefp.(*uint64))
 		}
-
-		var numFilesOnDisk, numBytesUsedDisk uint64
-
-		for _, finfo := range finfos {
-			if !finfo.IsDir() {
-				numBytesUsedDisk += uint64(finfo.Size())
-				numFilesOnDisk++
-			}
-		}
-
-		m["TotOnDiskBytes"] = numBytesUsedDisk
-		m["TotOnDiskFiles"] = numFilesOnDisk
 	}
-
-	return m, nil
+	return m
 }
 
-// MarshalJSON implements json.Marshaler
+// MarshalJSON implements json.Marshaler, and in contrast to standard
+// json marshaling provides atomic safety
 func (s *Stats) MarshalJSON() ([]byte, error) {
-	m, err := s.statsMap()
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(m)
+	return json.Marshal(s.ToMap())
 }
