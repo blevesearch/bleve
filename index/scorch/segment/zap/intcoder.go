@@ -67,11 +67,8 @@ func (c *chunkedIntCoder) Add(docNum uint64, vals ...uint64) error {
 	chunk := docNum / c.chunkSize
 	if chunk != c.currChunk {
 		// starting a new chunk
-		if c.encoder != nil {
-			// close out last
-			c.Close()
-			c.chunkBuf.Reset()
-		}
+		c.Close()
+		c.chunkBuf.Reset()
 		c.currChunk = chunk
 	}
 
@@ -92,6 +89,7 @@ func (c *chunkedIntCoder) Close() {
 	encodingBytes := c.chunkBuf.Bytes()
 	c.chunkLens[c.currChunk] = uint64(len(encodingBytes))
 	c.final = append(c.final, encodingBytes...)
+	c.currChunk = uint64(cap(c.chunkLens)) // sentinel to detect double close
 }
 
 // Write commits all the encoded chunked integers to the provided writer.
