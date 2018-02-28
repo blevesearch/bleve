@@ -159,7 +159,9 @@ type PostingsIterator struct {
 	currChunkFreqNorm []byte
 	currChunkLoc      []byte
 	freqNormDecoder   *govarint.Base128Decoder
+	freqNormReader    *bytes.Reader
 	locDecoder        *govarint.Base128Decoder
+	locReader         *bytes.Reader
 
 	freqChunkLens  []uint64
 	freqChunkStart uint64
@@ -169,7 +171,8 @@ type PostingsIterator struct {
 
 	locBitmap *roaring.Bitmap
 
-	next Posting
+	next     Posting    // reused across Next() calls
+	nextLocs []Location // reused across Next() calls
 }
 
 func (i *PostingsIterator) loadChunk(chunk int) error {
@@ -183,7 +186,12 @@ func (i *PostingsIterator) loadChunk(chunk int) error {
 	}
 	end := start + i.freqChunkLens[chunk]
 	i.currChunkFreqNorm = i.postings.sb.mem[start:end]
-	i.freqNormDecoder = govarint.NewU64Base128Decoder(bytes.NewReader(i.currChunkFreqNorm))
+	if i.freqNormReader == nil {
+		i.freqNormReader = bytes.NewReader(i.currChunkFreqNorm)
+		i.freqNormDecoder = govarint.NewU64Base128Decoder(i.freqNormReader)
+	} else {
+		i.freqNormReader.Reset(i.currChunkFreqNorm)
+	}
 
 	start = i.locChunkStart
 	for j := 0; j < chunk; j++ {
@@ -191,7 +199,12 @@ func (i *PostingsIterator) loadChunk(chunk int) error {
 	}
 	end = start + i.locChunkLens[chunk]
 	i.currChunkLoc = i.postings.sb.mem[start:end]
-	i.locDecoder = govarint.NewU64Base128Decoder(bytes.NewReader(i.currChunkLoc))
+	if i.locReader == nil {
+		i.locReader = bytes.NewReader(i.currChunkLoc)
+		i.locDecoder = govarint.NewU64Base128Decoder(i.locReader)
+	} else {
+		i.locReader.Reset(i.currChunkLoc)
+	}
 	i.currChunk = uint32(chunk)
 	return nil
 }
@@ -321,7 +334,8 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 		}
 	}
 
-	i.next = Posting{} // clear the struct.
+	reuseLocs := i.next.locs // hold for reuse before struct clearing
+	i.next = Posting{}       // clear the struct
 	rv := &i.next
 	rv.iterator = i
 	rv.docNum = uint64(n)
@@ -334,15 +348,23 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 	}
 	rv.norm = math.Float32frombits(uint32(normBits))
 	if i.locBitmap.Contains(n) {
-		// read off 'freq' locations
-		rv.locs = make([]segment.Location, rv.freq)
-		locs := make([]Location, rv.freq)
+		// read off 'freq' locations, into reused slices
+		if cap(i.nextLocs) >= int(rv.freq) {
+			i.nextLocs = i.nextLocs[0:rv.freq]
+		} else {
+			i.nextLocs = make([]Location, rv.freq)
+		}
+		if cap(reuseLocs) >= int(rv.freq) {
+			rv.locs = reuseLocs[0:rv.freq]
+		} else {
+			rv.locs = make([]segment.Location, rv.freq)
+		}
 		for j := 0; j < int(rv.freq); j++ {
-			err := i.readLocation(&locs[j])
+			err := i.readLocation(&i.nextLocs[j])
 			if err != nil {
 				return nil, err
 			}
-			rv.locs[j] = &locs[j]
+			rv.locs[j] = &i.nextLocs[j]
 		}
 	}
 
