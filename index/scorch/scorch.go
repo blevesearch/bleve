@@ -393,8 +393,8 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 				}
 			}
 
-			m["TotOnDiskBytes"] = numBytesUsedDisk
-			m["TotOnDiskFiles"] = numFilesOnDisk
+			m["CurOnDiskBytes"] = numBytesUsedDisk
+			m["CurOnDiskFiles"] = numFilesOnDisk
 		}
 	}
 
@@ -411,8 +411,8 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["num_plain_text_bytes_indexed"] = m["TotIndexedPlainTextBytes"]
 	m["num_items_introduced"] = m["TotIntroducedItems"]
 	m["num_items_persisted"] = m["TotPersistedItems"]
-	m["num_bytes_used_disk"] = m["TotOnDiskBytes"]
-	m["num_files_on_disk"] = m["TotOnDiskFiles"]
+	m["num_bytes_used_disk"] = m["CurOnDiskBytes"]
+	m["num_files_on_disk"] = m["CurOnDiskFiles"]
 
 	return m
 }
