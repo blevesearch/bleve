@@ -180,16 +180,13 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 	var docTermMap [][]byte
 
 	var vellumBuf bytes.Buffer
+	newVellum, err := vellum.New(&vellumBuf, nil)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	// for each field
 	for fieldID, fieldName := range fieldsInv {
-		if fieldID != 0 {
-			vellumBuf.Reset()
-		}
-		newVellum, err := vellum.New(&vellumBuf, nil)
-		if err != nil {
-			return nil, 0, err
-		}
 
 		// collect FST iterators from all active segments for this field
 		var newDocNums [][]uint64
@@ -420,6 +417,13 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 
 		// persist the doc value details for this field
 		_, err = fdvEncoder.Write(w)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		// reset vellum buffer and vellum builder
+		vellumBuf.Reset()
+		err = newVellum.Reset(&vellumBuf)
 		if err != nil {
 			return nil, 0, err
 		}
