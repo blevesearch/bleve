@@ -471,16 +471,11 @@ func persistDictionary(memSegment *mem.Segment, w *CountHashWriter, postingsLocs
 	varintBuf := make([]byte, binary.MaxVarintLen64)
 
 	var buffer bytes.Buffer
+	builder, err := vellum.New(&buffer, nil)
+	if err != nil {
+		return nil, err
+	}
 	for fieldID, fieldTerms := range memSegment.DictKeys {
-		if fieldID != 0 {
-			buffer.Reset()
-		}
-
-		// start a new vellum for this field
-		builder, err := vellum.New(&buffer, nil)
-		if err != nil {
-			return nil, err
-		}
 
 		dict := memSegment.Dicts[fieldID]
 		// now walk the dictionary in order of fieldTerms (already sorted)
@@ -511,6 +506,13 @@ func persistDictionary(memSegment *mem.Segment, w *CountHashWriter, postingsLocs
 
 		// write this vellum to disk
 		_, err = w.Write(vellumData)
+		if err != nil {
+			return nil, err
+		}
+
+		// reset buffer and vellum builder
+		buffer.Reset()
+		err = builder.Reset(&buffer)
 		if err != nil {
 			return nil, err
 		}
