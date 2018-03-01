@@ -372,7 +372,7 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		rv.postings[i] = pl
 		rv.iterators[i] = pl.Iterator()
 	}
-	atomic.AddUint64(&i.parent.stats.termSearchersStarted, uint64(1))
+	atomic.AddUint64(&i.parent.stats.TotTermSearchersStarted, uint64(1))
 	return rv, nil
 }
 
