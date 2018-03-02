@@ -278,6 +278,8 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 
 	atomic.AddUint64(&s.stats.TotAnalysisTime, uint64(time.Since(start)))
 
+	indexStart := time.Now()
+
 	// notify handlers that we're about to introduce a segment
 	s.fireEvent(EventKindBatchIntroductionStart, 0)
 
@@ -303,6 +305,9 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		atomic.AddUint64(&s.stats.TotBatches, 1)
 		atomic.AddUint64(&s.stats.TotIndexedPlainTextBytes, numPlainTextBytes)
 	}
+
+	atomic.AddUint64(&s.stats.TotIndexTime, uint64(time.Since(indexStart)))
+
 	return err
 }
 
@@ -339,6 +344,8 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 
 	_ = root.DecRef()
 
+	introStartTime := time.Now()
+
 	s.introductions <- introduction
 
 	// block until this segment is applied
@@ -349,6 +356,12 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 
 	if introduction.persisted != nil {
 		err = <-introduction.persisted
+	}
+
+	introTime := uint64(time.Since(introStartTime))
+	atomic.AddUint64(&s.stats.TotBatchIntroTime, introTime)
+	if atomic.LoadUint64(&s.stats.MaxBatchIntroTime) < introTime {
+		atomic.AddUint64(&s.stats.MaxBatchIntroTime, introTime)
 	}
 
 	return err
