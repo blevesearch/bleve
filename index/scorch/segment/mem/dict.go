@@ -15,19 +15,39 @@
 package mem
 
 import (
+	"reflect"
 	"sort"
 	"strings"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizeDictionary int
+
+func init() {
+	var d Dictionary
+	reflectStaticSizeDictionary = int(reflect.TypeOf(d).Size())
+}
 
 // Dictionary is the in-memory representation of the term dictionary
 type Dictionary struct {
 	segment *Segment
 	field   string
 	fieldID uint16
+}
+
+func (d *Dictionary) Size() int {
+	sizeInBytes := reflectStaticSizeDictionary + size.SizeOfPtr +
+		len(d.field)
+
+	if d.segment != nil {
+		sizeInBytes += int(d.segment.Size())
+	}
+
+	return sizeInBytes
 }
 
 // PostingsList returns the postings list for the specified term

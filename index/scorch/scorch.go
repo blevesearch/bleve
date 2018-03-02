@@ -472,20 +472,20 @@ func (s *Scorch) AddEligibleForRemoval(epoch uint64) {
 }
 
 func (s *Scorch) MemoryUsed() uint64 {
-	var memUsed uint64
+	var memUsed int
 	s.rootLock.RLock()
 	if s.root != nil {
 		for _, segmentSnapshot := range s.root.segment {
 			memUsed += 8 /* size of id -> uint64 */ +
-				segmentSnapshot.segment.SizeInBytes()
+				segmentSnapshot.segment.Size()
 			if segmentSnapshot.deleted != nil {
-				memUsed += segmentSnapshot.deleted.GetSizeInBytes()
+				memUsed += int(segmentSnapshot.deleted.GetSizeInBytes())
 			}
-			memUsed += segmentSnapshot.cachedDocs.sizeInBytes()
+			memUsed += segmentSnapshot.cachedDocs.size()
 		}
 	}
 	s.rootLock.RUnlock()
-	return memUsed
+	return uint64(memUsed)
 }
 
 func (s *Scorch) markIneligibleForRemoval(filename string) {

@@ -20,15 +20,24 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"sync"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/Smerity/govarint"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/size"
 	"github.com/couchbase/vellum"
 	mmap "github.com/edsrzf/mmap-go"
 	"github.com/golang/snappy"
 )
+
+var reflectStaticSizeSegmentBase int
+
+func init() {
+	var sb SegmentBase
+	reflectStaticSizeSegmentBase = int(reflect.TypeOf(sb).Size())
+}
 
 // Open returns a zap impl of a segment
 func Open(path string) (segment.Segment, error) {
@@ -92,6 +101,32 @@ type SegmentBase struct {
 	fieldDvIterMap    map[uint16]*docValueIterator // naive chunk cache per field
 }
 
+func (sb *SegmentBase) Size() int {
+	sizeInBytes := reflectStaticSizeSegmentBase +
+		len(sb.mem)
+
+	// fieldsMap
+	for k, _ := range sb.fieldsMap {
+		sizeInBytes += (len(k) + size.SizeOfString) + size.SizeOfUint16
+	}
+
+	// fieldsInv, dictLocs
+	for _, entry := range sb.fieldsInv {
+		sizeInBytes += len(entry) + size.SizeOfString
+	}
+	sizeInBytes += len(sb.dictLocs) * size.SizeOfUint64
+
+	// fieldDvIterMap
+	for _, v := range sb.fieldDvIterMap {
+		sizeInBytes += size.SizeOfUint16 + size.SizeOfPtr
+		if v != nil {
+			sizeInBytes += v.size()
+		}
+	}
+
+	return sizeInBytes
+}
+
 func (sb *SegmentBase) AddRef()             {}
 func (sb *SegmentBase) DecRef() (err error) { return nil }
 func (sb *SegmentBase) Close() (err error)  { return nil }
@@ -111,56 +146,19 @@ type Segment struct {
 	refs int64
 }
 
-func (s *Segment) SizeInBytes() uint64 {
+func (s *Segment) Size() int {
 	// 8 /* size of file pointer */
 	// 4 /* size of version -> uint32 */
 	// 4 /* size of crc -> uint32 */
 	sizeOfUints := 16
 
-	sizeInBytes := (len(s.path) + int(segment.SizeOfString)) + sizeOfUints
+	sizeInBytes := (len(s.path) + size.SizeOfString) + sizeOfUints
 
 	// mutex, refs -> int64
 	sizeInBytes += 16
 
 	// do not include the mmap'ed part
-	return uint64(sizeInBytes) + s.SegmentBase.SizeInBytes() - uint64(len(s.mem))
-}
-
-func (s *SegmentBase) SizeInBytes() uint64 {
-	// 4 /* size of memCRC -> uint32 */
-	// 4 /* size of chunkFactor -> uint32 */
-	// 8 /* size of numDocs -> uint64 */
-	// 8 /* size of storedIndexOffset -> uint64 */
-	// 8 /* size of fieldsIndexOffset -> uint64 */
-	// 8 /* size of docValueOffset -> uint64 */
-	sizeInBytes := 40
-
-	sizeInBytes += len(s.mem) + int(segment.SizeOfSlice)
-
-	// fieldsMap
-	for k, _ := range s.fieldsMap {
-		sizeInBytes += (len(k) + int(segment.SizeOfString)) + 2 /* size of uint16 */
-	}
-	sizeInBytes += int(segment.SizeOfMap) /* overhead from map */
-
-	// fieldsInv, dictLocs
-	for _, entry := range s.fieldsInv {
-		sizeInBytes += (len(entry) + int(segment.SizeOfString))
-	}
-	sizeInBytes += len(s.dictLocs) * 8          /* size of uint64 */
-	sizeInBytes += int(segment.SizeOfSlice) * 3 /* overhead from slices */
-
-	// fieldDvIterMap
-	sizeInBytes += len(s.fieldDvIterMap) *
-		int(segment.SizeOfPointer+2 /* size of uint16 */)
-	for _, entry := range s.fieldDvIterMap {
-		if entry != nil {
-			sizeInBytes += int(entry.sizeInBytes())
-		}
-	}
-	sizeInBytes += int(segment.SizeOfMap)
-
-	return uint64(sizeInBytes)
+	return sizeInBytes + s.SegmentBase.Size() - len(s.mem)
 }
 
 func (s *Segment) AddRef() {

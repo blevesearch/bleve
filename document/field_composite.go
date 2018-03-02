@@ -15,8 +15,17 @@
 package document
 
 import (
+	"reflect"
+
 	"github.com/blevesearch/bleve/analysis"
 )
+
+var reflectStaticSizeCompositeField int
+
+func init() {
+	var cf CompositeField
+	reflectStaticSizeCompositeField = int(reflect.TypeOf(cf).Size())
+}
 
 const DefaultCompositeIndexingOptions = IndexField
 

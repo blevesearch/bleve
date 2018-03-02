@@ -16,11 +16,20 @@ package scorch
 
 import (
 	"bytes"
+	"reflect"
 	"sync/atomic"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizeIndexSnapshotTermFieldReader int
+
+func init() {
+	var istfr IndexSnapshotTermFieldReader
+	reflectStaticSizeIndexSnapshotTermFieldReader = int(reflect.TypeOf(istfr).Size())
+}
 
 type IndexSnapshotTermFieldReader struct {
 	term               []byte
@@ -34,6 +43,27 @@ type IndexSnapshotTermFieldReader struct {
 	includeTermVectors bool
 	currPosting        segment.Posting
 	currID             index.IndexInternalID
+}
+
+func (i *IndexSnapshotTermFieldReader) Size() int {
+	sizeInBytes := reflectStaticSizeIndexSnapshotTermFieldReader + size.SizeOfPtr +
+		len(i.term) +
+		len(i.field) +
+		len(i.currID)
+
+	for _, entry := range i.postings {
+		sizeInBytes += entry.Size()
+	}
+
+	for _, entry := range i.iterators {
+		sizeInBytes += entry.Size()
+	}
+
+	if i.currPosting != nil {
+		sizeInBytes += i.currPosting.Size()
+	}
+
+	return sizeInBytes
 }
 
 func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {

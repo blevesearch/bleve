@@ -19,12 +19,6 @@ import (
 	"github.com/blevesearch/bleve/index"
 )
 
-// Overhead from go data structures when deployed on a 64-bit system.
-const SizeOfMap uint64 = 8
-const SizeOfPointer uint64 = 8
-const SizeOfSlice uint64 = 24
-const SizeOfString uint64 = 16
-
 // DocumentFieldValueVisitor defines a callback to be visited for each
 // stored field value.  The return value determines if the visitor
 // should keep going.  Returning true continues visiting, false stops.
@@ -42,7 +36,7 @@ type Segment interface {
 
 	Close() error
 
-	SizeInBytes() uint64
+	Size() int
 
 	AddRef()
 	DecRef() error
@@ -63,6 +57,8 @@ type DictionaryIterator interface {
 type PostingsList interface {
 	Iterator() PostingsIterator
 
+	Size() int
+
 	Count() uint64
 
 	// NOTE deferred for future work
@@ -77,6 +73,8 @@ type PostingsIterator interface {
 	// implementations may return a shared instance to reduce memory
 	// allocations.
 	Next() (Posting, error)
+
+	Size() int
 }
 
 type Posting interface {
@@ -86,6 +84,8 @@ type Posting interface {
 	Norm() float64
 
 	Locations() []Location
+
+	Size() int
 }
 
 type Location interface {
@@ -94,6 +94,7 @@ type Location interface {
 	End() uint64
 	Pos() uint64
 	ArrayPositions() []uint64
+	Size() int
 }
 
 // DocumentFieldTermVisitable is implemented by various scorch segment

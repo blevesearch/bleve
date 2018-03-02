@@ -45,7 +45,7 @@ func NewFromAnalyzedDocs(results []*index.AnalysisResult) *Segment {
 	}
 
 	// compute memory usage of segment
-	s.updateSizeInBytes()
+	s.updateSize()
 
 	// professional debugging
 	//

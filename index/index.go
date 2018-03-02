@@ -18,10 +18,22 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizeTermFieldDoc int
+var reflectStaticSizeTermFieldVector int
+
+func init() {
+	var tfd TermFieldDoc
+	reflectStaticSizeTermFieldDoc = int(reflect.TypeOf(tfd).Size())
+	var tfv TermFieldVector
+	reflectStaticSizeTermFieldVector = int(reflect.TypeOf(tfv).Size())
+}
 
 var ErrorUnknownStorageType = fmt.Errorf("unknown storage type")
 
@@ -82,6 +94,8 @@ type IndexReader interface {
 	DumpFields() chan interface{}
 
 	Close() error
+
+	Size() int
 }
 
 // FieldTerms contains the terms used by a document, keyed by field
@@ -115,6 +129,11 @@ type TermFieldVector struct {
 	End            uint64
 }
 
+func (tfv *TermFieldVector) Size() int {
+	return reflectStaticSizeTermFieldVector + size.SizeOfPtr +
+		len(tfv.Field) + len(tfv.ArrayPositions)*size.SizeOfUint64
+}
+
 // IndexInternalID is an opaque document identifier interal to the index impl
 type IndexInternalID []byte
 
@@ -132,6 +151,17 @@ type TermFieldDoc struct {
 	Freq    uint64
 	Norm    float64
 	Vectors []*TermFieldVector
+}
+
+func (tfd *TermFieldDoc) Size() int {
+	sizeInBytes := reflectStaticSizeTermFieldDoc + size.SizeOfPtr +
+		len(tfd.Term) + len(tfd.ID)
+
+	for _, entry := range tfd.Vectors {
+		sizeInBytes += entry.Size()
+	}
+
+	return sizeInBytes
 }
 
 // Reset allows an already allocated TermFieldDoc to be reused
@@ -161,6 +191,8 @@ type TermFieldReader interface {
 	// Count returns the number of documents contains the term in this field.
 	Count() uint64
 	Close() error
+
+	Size() int
 }
 
 type DictEntry struct {
@@ -185,6 +217,9 @@ type DocIDReader interface {
 	// will start there instead. If ID is greater than or equal to the end of
 	// the range, Next() call will return io.EOF.
 	Advance(ID IndexInternalID) (IndexInternalID, error)
+
+	Size() int
+
 	Close() error
 }
 

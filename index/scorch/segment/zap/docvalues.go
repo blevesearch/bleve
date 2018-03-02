@@ -19,12 +19,20 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"reflect"
 	"sort"
 
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/size"
 	"github.com/golang/snappy"
 )
+
+var reflectStaticSizedocValueIterator int
+
+func init() {
+	var dvi docValueIterator
+	reflectStaticSizedocValueIterator = int(reflect.TypeOf(dvi).Size())
+}
 
 type docValueIterator struct {
 	field          string
@@ -36,21 +44,12 @@ type docValueIterator struct {
 	curChunkData   []byte // compressed data cache
 }
 
-func (di *docValueIterator) sizeInBytes() uint64 {
-	// curChunkNum, numChunks, dvDataLoc --> uint64
-	sizeInBytes := 24
-
-	// field
-	sizeInBytes += (len(di.field) + int(segment.SizeOfString))
-
-	// chunkLens, curChunkHeader
-	sizeInBytes += len(di.chunkLens)*8 +
-		len(di.curChunkHeader)*24 +
-		int(segment.SizeOfSlice*2) /* overhead from slices */
-
-	// curChunkData is mmap'ed, not included
-
-	return uint64(sizeInBytes)
+func (di *docValueIterator) size() int {
+	return reflectStaticSizedocValueIterator + size.SizeOfPtr +
+		len(di.field) +
+		len(di.chunkLens)*size.SizeOfUint64 +
+		len(di.curChunkHeader)*reflectStaticSizeMetaData +
+		len(di.curChunkData)
 }
 
 func (di *docValueIterator) fieldName() string {

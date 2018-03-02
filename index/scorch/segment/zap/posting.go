@@ -19,11 +19,29 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"reflect"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/Smerity/govarint"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizePostingsList int
+var reflectStaticSizePostingsIterator int
+var reflectStaticSizePosting int
+var reflectStaticSizeLocation int
+
+func init() {
+	var pl PostingsList
+	reflectStaticSizePostingsList = int(reflect.TypeOf(pl).Size())
+	var pi PostingsIterator
+	reflectStaticSizePostingsIterator = int(reflect.TypeOf(pi).Size())
+	var p Posting
+	reflectStaticSizePosting = int(reflect.TypeOf(p).Size())
+	var l Location
+	reflectStaticSizeLocation = int(reflect.TypeOf(l).Size())
+}
 
 // PostingsList is an in-memory represenation of a postings list
 type PostingsList struct {
@@ -34,6 +52,28 @@ type PostingsList struct {
 	locBitmap      *roaring.Bitmap
 	postings       *roaring.Bitmap
 	except         *roaring.Bitmap
+}
+
+func (p *PostingsList) Size() int {
+	sizeInBytes := reflectStaticSizePostingsList + size.SizeOfPtr
+
+	if p.sb != nil {
+		sizeInBytes += (p.sb.Size() - len(p.sb.mem)) // do not include the mmap'ed part
+	}
+
+	if p.locBitmap != nil {
+		sizeInBytes += int(p.locBitmap.GetSizeInBytes())
+	}
+
+	if p.postings != nil {
+		sizeInBytes += int(p.postings.GetSizeInBytes())
+	}
+
+	if p.except != nil {
+		sizeInBytes += int(p.except.GetSizeInBytes())
+	}
+
+	return sizeInBytes
 }
 
 // Iterator returns an iterator for this postings list
@@ -191,6 +231,25 @@ type PostingsIterator struct {
 
 	next     Posting    // reused across Next() calls
 	nextLocs []Location // reused across Next() calls
+}
+
+func (i *PostingsIterator) Size() int {
+	sizeInBytes := reflectStaticSizePostingsIterator + size.SizeOfPtr +
+		len(i.currChunkFreqNorm) +
+		len(i.currChunkLoc) +
+		len(i.freqChunkLens)*size.SizeOfUint64 +
+		len(i.locChunkLens)*size.SizeOfUint64 +
+		i.next.Size()
+
+	if i.locBitmap != nil {
+		sizeInBytes += int(i.locBitmap.GetSizeInBytes())
+	}
+
+	for _, entry := range i.nextLocs {
+		sizeInBytes += entry.Size()
+	}
+
+	return sizeInBytes
 }
 
 func (i *PostingsIterator) loadChunk(chunk int) error {
@@ -444,6 +503,20 @@ type Posting struct {
 	locs   []segment.Location
 }
 
+func (p *Posting) Size() int {
+	sizeInBytes := reflectStaticSizePosting
+
+	if p.iterator != nil {
+		sizeInBytes += p.iterator.Size()
+	}
+
+	for _, entry := range p.locs {
+		sizeInBytes += entry.Size()
+	}
+
+	return sizeInBytes
+}
+
 // Number returns the document number of this posting in this segment
 func (p *Posting) Number() uint64 {
 	return p.docNum
@@ -471,6 +544,12 @@ type Location struct {
 	start uint64
 	end   uint64
 	ap    []uint64
+}
+
+func (l *Location) Size() int {
+	return reflectStaticSizeLocation +
+		len(l.field) +
+		len(l.ap)*size.SizeOfUint64
 }
 
 // Field returns the name of the field (useful in composite fields to know

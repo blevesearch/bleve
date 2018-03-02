@@ -17,12 +17,21 @@ package searcher
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"sort"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/scorer"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizeDisjunctionSearcher int
+
+func init() {
+	var ds DisjunctionSearcher
+	reflectStaticSizeDisjunctionSearcher = int(reflect.TypeOf(ds).Size())
+}
 
 // DisjunctionMaxClauseCount is a compile time setting that applications can
 // adjust to non-zero value to cause the DisjunctionSearcher to return an
@@ -88,6 +97,32 @@ func newDisjunctionSearcher(indexReader index.IndexReader,
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
+}
+
+func (s *DisjunctionSearcher) Size() int {
+	sizeInBytes := reflectStaticSizeDisjunctionSearcher + size.SizeOfPtr +
+		s.indexReader.Size() +
+		s.scorer.Size()
+
+	for _, entry := range s.searchers {
+		sizeInBytes += entry.Size()
+	}
+
+	for _, entry := range s.currs {
+		if entry != nil {
+			sizeInBytes += entry.Size()
+		}
+	}
+
+	for _, entry := range s.matching {
+		if entry != nil {
+			sizeInBytes += entry.Size()
+		}
+	}
+
+	sizeInBytes += len(s.matchingIdxs) * size.SizeOfInt
+
+	return sizeInBytes
 }
 
 func (s *DisjunctionSearcher) computeQueryNorm() {
