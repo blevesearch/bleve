@@ -27,6 +27,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/size"
 )
 
 type asynchSegmentResult struct {
@@ -87,6 +88,12 @@ func (i *IndexSnapshot) DecRef() (err error) {
 
 func (i *IndexSnapshot) Close() error {
 	return i.DecRef()
+}
+
+func (i *IndexSnapshot) Size() int {
+	// Just return the size of the pointer for estimating the overhead
+	// during Search, a reference of the IndexSnapshot serves as the reader.
+	return size.SizeOfPtr
 }
 
 func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string, makeItr func(i segment.TermDictionary) segment.DictionaryIterator) (*IndexSnapshotFieldDict, error) {

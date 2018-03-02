@@ -46,6 +46,10 @@ func (e *EmptySegment) Close() error {
 	return nil
 }
 
+func (e *EmptySegment) Size() uint64 {
+	return 0
+}
+
 func (e *EmptySegment) AddRef() {
 }
 
@@ -84,6 +88,10 @@ func (e *EmptyPostingsList) Iterator() PostingsIterator {
 	return &EmptyPostingsIterator{}
 }
 
+func (e *EmptyPostingsList) Size() int {
+	return 0
+}
+
 func (e *EmptyPostingsList) Count() uint64 {
 	return 0
 }
@@ -92,4 +100,8 @@ type EmptyPostingsIterator struct{}
 
 func (e *EmptyPostingsIterator) Next() (Posting, error) {
 	return nil, nil
+}
+
+func (e *EmptyPostingsIterator) Size() int {
+	return 0
 }

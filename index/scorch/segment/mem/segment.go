@@ -16,10 +16,19 @@ package mem
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizeSegment int
+
+func init() {
+	var s Segment
+	reflectStaticSizeSegment = int(reflect.TypeOf(s).Size())
+}
 
 // _id field is always guaranteed to have fieldID of 0
 const idFieldID uint16 = 0
@@ -96,7 +105,7 @@ type Segment struct {
 
 	// Footprint of the segment, updated when analyzed document mutations
 	// are added into the segment
-	sizeInBytes uint64
+	sizeInBytes int
 }
 
 // New builds a new empty Segment
@@ -107,99 +116,87 @@ func New() *Segment {
 	}
 }
 
-func (s *Segment) updateSizeInBytes() {
-	var sizeInBytes uint64
+func (s *Segment) updateSize() {
+	sizeInBytes := reflectStaticSizeSegment
 
 	// FieldsMap, FieldsInv
 	for k, _ := range s.FieldsMap {
-		sizeInBytes += uint64((len(k)+int(segment.SizeOfString))*2 +
-			2 /* size of uint16 */)
+		sizeInBytes += (len(k)+size.SizeOfString)*2 +
+			size.SizeOfUint16
 	}
-	// overhead from the data structures
-	sizeInBytes += (segment.SizeOfMap + segment.SizeOfSlice)
 
 	// Dicts, DictKeys
 	for _, entry := range s.Dicts {
 		for k, _ := range entry {
-			sizeInBytes += uint64((len(k)+int(segment.SizeOfString))*2 +
-				8 /* size of uint64 */)
+			sizeInBytes += (len(k)+size.SizeOfString)*2 +
+				size.SizeOfUint64
 		}
 		// overhead from the data structures
-		sizeInBytes += (segment.SizeOfMap + segment.SizeOfSlice)
+		sizeInBytes += (size.SizeOfMap + size.SizeOfSlice)
 	}
-	sizeInBytes += (segment.SizeOfSlice * 2)
 
 	// Postings, PostingsLocs
 	for i := 0; i < len(s.Postings); i++ {
-		sizeInBytes += (s.Postings[i].GetSizeInBytes() + segment.SizeOfPointer) +
-			(s.PostingsLocs[i].GetSizeInBytes() + segment.SizeOfPointer)
+		sizeInBytes += (int(s.Postings[i].GetSizeInBytes()) + size.SizeOfPtr) +
+			(int(s.PostingsLocs[i].GetSizeInBytes()) + size.SizeOfPtr)
 	}
-	sizeInBytes += (segment.SizeOfSlice * 2)
 
 	// Freqs, Norms
 	for i := 0; i < len(s.Freqs); i++ {
-		sizeInBytes += uint64(len(s.Freqs[i])*8 /* size of uint64 */ +
-			len(s.Norms[i])*4 /* size of float32 */) +
-			(segment.SizeOfSlice * 2)
+		sizeInBytes += (len(s.Freqs[i])*size.SizeOfUint64 +
+			len(s.Norms[i])*size.SizeOfFloat32) +
+			(size.SizeOfSlice * 2)
 	}
-	sizeInBytes += (segment.SizeOfSlice * 2)
 
 	// Location data
 	for i := 0; i < len(s.Locfields); i++ {
-		sizeInBytes += uint64(len(s.Locfields[i])*2 /* size of uint16 */ +
-			len(s.Locstarts[i])*8 /* size of uint64 */ +
-			len(s.Locends[i])*8 /* size of uint64 */ +
-			len(s.Locpos[i])*8 /* size of uint64 */)
+		sizeInBytes += len(s.Locfields[i])*size.SizeOfUint16 +
+			len(s.Locstarts[i])*size.SizeOfUint64 +
+			len(s.Locends[i])*size.SizeOfUint64 +
+			len(s.Locpos[i])*size.SizeOfUint64
 
 		for j := 0; j < len(s.Locarraypos[i]); j++ {
-			sizeInBytes += uint64(len(s.Locarraypos[i][j])*8 /* size of uint64 */) +
-				segment.SizeOfSlice
+			sizeInBytes += len(s.Locarraypos[i][j])*size.SizeOfUint64 +
+				size.SizeOfSlice
 		}
 
-		sizeInBytes += (segment.SizeOfSlice * 5)
+		sizeInBytes += (size.SizeOfSlice * 5)
 	}
-	sizeInBytes += (segment.SizeOfSlice * 5)
 
 	// Stored data
 	for i := 0; i < len(s.Stored); i++ {
 		for _, v := range s.Stored[i] {
-			sizeInBytes += uint64(2 /* size of uint16 */)
+			sizeInBytes += size.SizeOfUint16
 			for _, arr := range v {
-				sizeInBytes += uint64(len(arr)) + segment.SizeOfSlice
+				sizeInBytes += len(arr) + size.SizeOfSlice
 			}
-			sizeInBytes += segment.SizeOfSlice
+			sizeInBytes += size.SizeOfSlice
 		}
 
 		for _, v := range s.StoredTypes[i] {
-			sizeInBytes += uint64(2 /* size of uint16 */ +len(v)) + segment.SizeOfSlice
+			sizeInBytes += size.SizeOfUint16 + len(v) + size.SizeOfSlice
 		}
 
 		for _, v := range s.StoredPos[i] {
-			sizeInBytes += uint64(2 /* size of uint16 */)
+			sizeInBytes += size.SizeOfUint16
 			for _, arr := range v {
-				sizeInBytes += uint64(len(arr)*8 /* size of uint64 */) +
-					segment.SizeOfSlice
+				sizeInBytes += len(arr)*size.SizeOfUint64 +
+					size.SizeOfSlice
 			}
-			sizeInBytes += segment.SizeOfSlice
+			sizeInBytes += size.SizeOfSlice
 		}
 
 		// overhead from map(s) within Stored, StoredTypes, StoredPos
-		sizeInBytes += (segment.SizeOfMap * 3)
+		sizeInBytes += (size.SizeOfMap * 3)
 	}
-	// overhead from data structures: Stored, StoredTypes, StoredPos
-	sizeInBytes += (segment.SizeOfSlice * 3)
 
 	// DocValueFields
-	sizeInBytes += uint64(len(s.DocValueFields)*3 /* size of uint16 + bool */) +
-		segment.SizeOfMap
-
-	// SizeInBytes
-	sizeInBytes += uint64(8)
+	sizeInBytes += len(s.DocValueFields) * (size.SizeOfUint16 + size.SizeOfBool)
 
 	s.sizeInBytes = sizeInBytes
 }
 
-func (s *Segment) SizeInBytes() uint64 {
+func (s *Segment) Size() int {
 	return s.sizeInBytes
 }
 

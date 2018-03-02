@@ -16,11 +16,20 @@ package searcher
 
 import (
 	"math"
+	"reflect"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/scorer"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizeBooleanSearcher int
+
+func init() {
+	var bs BooleanSearcher
+	reflectStaticSizeBooleanSearcher = int(reflect.TypeOf(bs).Size())
+}
 
 type BooleanSearcher struct {
 	indexReader     index.IndexReader
@@ -50,6 +59,33 @@ func NewBooleanSearcher(indexReader index.IndexReader, mustSearcher search.Searc
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
+}
+
+func (s *BooleanSearcher) Size() int {
+	sizeInBytes := reflectStaticSizeBooleanSearcher + size.SizeOfPtr +
+		s.indexReader.Size()
+
+	if s.mustSearcher != nil {
+		sizeInBytes += s.mustSearcher.Size()
+	}
+
+	if s.shouldSearcher != nil {
+		sizeInBytes += s.shouldSearcher.Size()
+	}
+
+	if s.mustNotSearcher != nil {
+		sizeInBytes += s.mustNotSearcher.Size()
+	}
+
+	sizeInBytes += s.scorer.Size()
+
+	for _, entry := range s.matches {
+		if entry != nil {
+			sizeInBytes += entry.Size()
+		}
+	}
+
+	return sizeInBytes
 }
 
 func (s *BooleanSearcher) computeQueryNorm() {

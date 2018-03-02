@@ -15,11 +15,25 @@
 package scorer
 
 import (
+	"reflect"
+
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizeConjunctionQueryScorer int
+
+func init() {
+	var cqs ConjunctionQueryScorer
+	reflectStaticSizeConjunctionQueryScorer = int(reflect.TypeOf(cqs).Size())
+}
 
 type ConjunctionQueryScorer struct {
 	options search.SearcherOptions
+}
+
+func (s *ConjunctionQueryScorer) Size() int {
+	return reflectStaticSizeConjunctionQueryScorer + size.SizeOfPtr
 }
 
 func NewConjunctionQueryScorer(options search.SearcherOptions) *ConjunctionQueryScorer {

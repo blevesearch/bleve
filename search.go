@@ -17,6 +17,7 @@ package bleve
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -24,7 +25,18 @@ import (
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/query"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizeSearchResult int
+var reflectStaticSizeSearchStatus int
+
+func init() {
+	var sr SearchResult
+	reflectStaticSizeSearchResult = int(reflect.TypeOf(sr).Size())
+	var ss SearchStatus
+	reflectStaticSizeSearchStatus = int(reflect.TypeOf(ss).Size())
+}
 
 var cache = registry.NewCache()
 
@@ -430,6 +442,24 @@ type SearchResult struct {
 	MaxScore float64                        `json:"max_score"`
 	Took     time.Duration                  `json:"took"`
 	Facets   search.FacetResults            `json:"facets"`
+}
+
+func (sr *SearchResult) Size() int {
+	sizeInBytes := reflectStaticSizeSearchResult + size.SizeOfPtr +
+		reflectStaticSizeSearchStatus
+
+	for _, entry := range sr.Hits {
+		if entry != nil {
+			sizeInBytes += entry.Size()
+		}
+	}
+
+	for k, v := range sr.Facets {
+		sizeInBytes += size.SizeOfString + len(k) +
+			v.Size()
+	}
+
+	return sizeInBytes
 }
 
 func (sr *SearchResult) String() string {

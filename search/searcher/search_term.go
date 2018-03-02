@@ -15,10 +15,20 @@
 package searcher
 
 import (
+	"reflect"
+
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/scorer"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizeTermSearcher int
+
+func init() {
+	var ts TermSearcher
+	reflectStaticSizeTermSearcher = int(reflect.TypeOf(ts).Size())
+}
 
 type TermSearcher struct {
 	indexReader index.IndexReader
@@ -61,6 +71,14 @@ func NewTermSearcherBytes(indexReader index.IndexReader, term []byte, field stri
 		reader:      reader,
 		scorer:      scorer,
 	}, nil
+}
+
+func (s *TermSearcher) Size() int {
+	return reflectStaticSizeTermSearcher + size.SizeOfPtr +
+		s.indexReader.Size() +
+		s.reader.Size() +
+		s.tfd.Size() +
+		s.scorer.Size()
 }
 
 func (s *TermSearcher) Count() uint64 {
