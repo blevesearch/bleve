@@ -344,6 +344,8 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 
 	_ = root.DecRef()
 
+	introStartTime := time.Now()
+
 	s.introductions <- introduction
 
 	// block until this segment is applied
@@ -354,6 +356,12 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 
 	if introduction.persisted != nil {
 		err = <-introduction.persisted
+	}
+
+	introTime := uint64(time.Since(introStartTime))
+	atomic.AddUint64(&s.stats.TotBatchIntroTime, introTime)
+	if atomic.LoadUint64(&s.stats.MaxBatchIntroTime) < introTime {
+		atomic.AddUint64(&s.stats.MaxBatchIntroTime, introTime)
 	}
 
 	return err

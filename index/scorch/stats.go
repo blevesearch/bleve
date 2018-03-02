@@ -25,11 +25,15 @@ import (
 // and fields that are prefixed like TotXxxx are monotonically
 // increasing counters.
 type Stats struct {
-	TotUpdates      uint64
-	TotDeletes      uint64
-	TotBatches      uint64
-	TotBatchesEmpty uint64
-	TotOnErrors     uint64
+	TotUpdates uint64
+	TotDeletes uint64
+
+	TotBatches        uint64
+	TotBatchesEmpty   uint64
+	TotBatchIntroTime uint64
+	MaxBatchIntroTime uint64
+
+	TotOnErrors uint64
 
 	TotAnalysisTime uint64
 	TotIndexTime    uint64
