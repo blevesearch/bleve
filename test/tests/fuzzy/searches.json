@@ -1,0 +1,168 @@
+[
+
+    {
+		"comment": "test boost",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"disjuncts": [
+					{
+						"field": "name",
+						"term": "blevescore",
+						"boost": 1.0
+					},
+					{
+						"fuzziness": 1,
+						"field": "name",
+						"term": "steve",
+						"boost": 5.0
+					}
+				]
+			}
+		},
+		"result": {
+			"total_hits": 1,
+			"hits": [
+				{
+					"id": "b"
+				}
+			]
+		}
+	},
+	{
+		"comment": "test boost with fuzziness",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"disjuncts": [
+					{
+						"fuzziness": 1,
+						"field": "name",
+						"term": "blevescorc",
+						"boost": 1.0
+					},
+					{
+						"fuzziness": 1,
+						"field": "name",
+						"term": "steven",
+						"boost": 3.0
+					}
+				]
+			}
+		},
+		"result": {
+			"total_hits": 3,
+			"hits": [
+				{
+					"id": "b"
+				},
+				{
+					"id": "a"
+				},
+                {
+					"id": "d"
+				}
+			]
+		}
+	},
+
+     {
+		"comment": "test fuzziness rank with idf",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"disjuncts": [
+					{
+						"fuzziness": 1,
+						"field": "name",
+						"term": "levescorch"
+					},
+					{
+						"fuzziness": 1,
+						"field": "name",
+						"term": "steven"
+					}
+				]
+			}
+		},
+		"result": {
+			"total_hits": 3,
+			"hits": [
+				{
+					"id": "b"
+				},
+                {
+					"id": "a"
+				},
+                {
+					"id": "d"
+				}
+			]
+		}
+	},
+	 {
+		"comment": "test fuzziness rank with term norm",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+				"disjuncts": [
+					{
+						"fuzziness": 1,
+						"field": "name",
+						"term": "stefe"
+					},
+					{
+						"fuzziness": 1,
+						"field": "name",
+						"term": "sre"
+					}
+				]
+			}
+		},
+		"result": {
+			"total_hits": 2,
+			"hits": [
+                {
+					"id": "b"
+				},
+                {
+					"id": "c"
+				}
+			]
+		}
+	},
+
+	{
+		"comment": "test fuzziness rank",
+		"search": {
+			"from": 0,
+			"size": 10,
+			"query": {
+						"fuzziness": 3,
+						"field": "name",
+						"term": "kicker"
+					}				
+		},
+		"result": {
+			"total_hits": 4,
+			"hits": [
+                {
+					"id": "e"
+				},
+                {
+					"id": "f"
+				},
+                {
+					"id": "g"
+				},
+                {
+					"id": "h"
+				}
+			]
+		}
+	}
+]

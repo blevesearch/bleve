@@ -21,12 +21,14 @@ import (
 )
 
 type DisjunctionQueryScorer struct {
-	options search.SearcherOptions
+	options      search.SearcherOptions
+	disableCoord bool
 }
 
-func NewDisjunctionQueryScorer(options search.SearcherOptions) *DisjunctionQueryScorer {
+func NewDisjunctionQueryScorer(disableCoord bool, options search.SearcherOptions) *DisjunctionQueryScorer {
 	return &DisjunctionQueryScorer{
-		options: options,
+		options:      options,
+		disableCoord: disableCoord,
 	}
 }
 
@@ -54,7 +56,11 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	}
 
 	coord := float64(countMatch) / float64(countTotal)
-	newScore := sum * coord
+	newScore := sum
+	if !s.disableCoord {
+		newScore *= coord
+	}
+
 	var newExpl *search.Explanation
 	if s.options.Explain {
 		ce := make([]*search.Explanation, 2)

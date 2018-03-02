@@ -33,6 +33,7 @@ type TermQueryScorer struct {
 	idfExplanation         *search.Explanation
 	queryNorm              float64
 	queryWeight            float64
+	scoreFuzzy             bool
 	queryWeightExplanation *search.Explanation
 }
 
@@ -56,6 +57,15 @@ func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64,
 	}
 
 	return &rv
+}
+
+func NewFuzzyTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64,
+	docTotal, docTerm uint64, fuzzyQuery bool,
+	options search.SearcherOptions) *TermQueryScorer {
+	rv := NewTermQueryScorer(queryTerm, queryField, queryBoost, docTotal,
+		docTerm, options)
+	rv.scoreFuzzy = fuzzyQuery
+	return rv
 }
 
 func (s *TermQueryScorer) Weight() float64 {
@@ -98,7 +108,14 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 	} else {
 		tf = math.Sqrt(float64(termMatch.Freq))
 	}
-	score := tf * termMatch.Norm * s.idf
+	// adjust the score in case of FuzzyQuery
+	fuzzyBoost := 1.0
+	if s.scoreFuzzy {
+		tf = float64(s.docTerm)
+		fuzzyBoost = s.queryBoost
+	}
+
+	score := tf * termMatch.Norm * s.idf * fuzzyBoost
 
 	if s.options.Explain {
 		childrenExplanations := make([]*search.Explanation, 3)

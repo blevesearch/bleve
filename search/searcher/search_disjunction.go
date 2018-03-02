@@ -40,6 +40,7 @@ type DisjunctionSearcher struct {
 	matching     []*search.DocumentMatch
 	matchingIdxs []int
 	initialized  bool
+	fuzzyQuery   bool
 }
 
 func tooManyClauses(count int) bool {
@@ -58,12 +59,12 @@ func NewDisjunctionSearcher(indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions) (
 	*DisjunctionSearcher, error) {
 	return newDisjunctionSearcher(indexReader, qsearchers, min, options,
-		true)
+		true, false)
 }
 
 func newDisjunctionSearcher(indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
-	limit bool) (
+	limit, disableCoord bool) (
 	*DisjunctionSearcher, error) {
 	if limit && tooManyClauses(len(qsearchers)) {
 		return nil, tooManyClausesErr()
@@ -81,7 +82,7 @@ func newDisjunctionSearcher(indexReader index.IndexReader,
 		searchers:    searchers,
 		numSearchers: len(searchers),
 		currs:        make([]*search.DocumentMatch, len(searchers)),
-		scorer:       scorer.NewDisjunctionQueryScorer(options),
+		scorer:       scorer.NewDisjunctionQueryScorer(disableCoord, options),
 		min:          int(min),
 		matching:     make([]*search.DocumentMatch, len(searchers)),
 		matchingIdxs: make([]int, len(searchers)),
