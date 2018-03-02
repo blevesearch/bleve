@@ -39,6 +39,8 @@ const Name = "scorch"
 
 const Version uint8 = 1
 
+var ErrClosed = fmt.Errorf("scorch closed")
+
 type Scorch struct {
 	readOnly      bool
 	version       uint8
@@ -59,6 +61,7 @@ type Scorch struct {
 
 	closeCh            chan struct{}
 	introductions      chan *segmentIntroduction
+	persists           chan *persistIntroduction
 	merges             chan *segmentMerge
 	introducerNotifier chan *epochWatcher
 	revertToSnapshots  chan *snapshotReversion
@@ -174,6 +177,7 @@ func (s *Scorch) openBolt() error {
 	}
 
 	s.introductions = make(chan *segmentIntroduction)
+	s.persists = make(chan *persistIntroduction)
 	s.merges = make(chan *segmentMerge)
 	s.introducerNotifier = make(chan *epochWatcher, 1)
 	s.revertToSnapshots = make(chan *snapshotReversion)

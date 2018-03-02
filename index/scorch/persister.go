@@ -401,46 +401,23 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 			}
 		}
 
-		s.rootLock.Lock()
-		newIndexSnapshot := &IndexSnapshot{
-			parent:   s,
-			epoch:    s.nextSnapshotEpoch,
-			segment:  make([]*SegmentSnapshot, len(s.root.segment)),
-			offsets:  make([]uint64, len(s.root.offsets)),
-			internal: make(map[string][]byte, len(s.root.internal)),
-			refs:     1,
-		}
-		s.nextSnapshotEpoch++
-		for i, segmentSnapshot := range s.root.segment {
-			// see if this segment has been replaced
-			if replacement, ok := newSegments[segmentSnapshot.id]; ok {
-				newSegmentSnapshot := &SegmentSnapshot{
-					id:         segmentSnapshot.id,
-					segment:    replacement,
-					deleted:    segmentSnapshot.deleted,
-					cachedDocs: segmentSnapshot.cachedDocs,
-				}
-				newIndexSnapshot.segment[i] = newSegmentSnapshot
-				delete(newSegments, segmentSnapshot.id)
-
-				// update items persisted incase of a new segment snapshot
-				atomic.AddUint64(&s.stats.TotPersistedItems, newSegmentSnapshot.Count())
-				atomic.AddUint64(&s.stats.TotPersistedSegments, 1)
-			} else {
-				newIndexSnapshot.segment[i] = s.root.segment[i]
-				newIndexSnapshot.segment[i].segment.AddRef()
-			}
-			newIndexSnapshot.offsets[i] = s.root.offsets[i]
-		}
-		for k, v := range s.root.internal {
-			newIndexSnapshot.internal[k] = v
+		persist := &persistIntroduction{
+			persisted: newSegments,
+			applied:   make(notificationChan),
 		}
 
-		rootPrev := s.root
-		s.root = newIndexSnapshot
-		s.rootLock.Unlock()
-		if rootPrev != nil {
-			_ = rootPrev.DecRef()
+		select {
+		case <-s.closeCh:
+			err = ErrClosed
+			return err
+		case s.persists <- persist:
+		}
+
+		select {
+		case <-s.closeCh:
+			err = ErrClosed
+			return err
+		case <-persist.applied:
 		}
 	}
 

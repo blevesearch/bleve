@@ -46,6 +46,8 @@ type Stats struct {
 	TotIntroduceLoop       uint64
 	TotIntroduceSegmentBeg uint64
 	TotIntroduceSegmentEnd uint64
+	TotIntroducePersistBeg uint64
+	TotIntroducePersistEnd uint64
 	TotIntroduceMergeBeg   uint64
 	TotIntroduceMergeEnd   uint64
 	TotIntroduceRevertBeg  uint64
