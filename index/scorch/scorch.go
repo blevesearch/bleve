@@ -383,8 +383,8 @@ func (s *Scorch) DeleteInternal(key []byte) error {
 // release associated resources.
 func (s *Scorch) Reader() (index.IndexReader, error) {
 	s.rootLock.RLock()
-	rv := &Reader{root: s.root}
-	rv.root.AddRef()
+	rv := s.root
+	rv.AddRef()
 	s.rootLock.RUnlock()
 	return rv, nil
 }

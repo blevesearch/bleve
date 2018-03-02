@@ -85,6 +85,10 @@ func (i *IndexSnapshot) DecRef() (err error) {
 	return err
 }
 
+func (i *IndexSnapshot) Close() error {
+	return i.DecRef()
+}
+
 func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string, makeItr func(i segment.TermDictionary) segment.DictionaryIterator) (*IndexSnapshotFieldDict, error) {
 
 	results := make(chan *asynchSegmentResult)
@@ -499,5 +503,29 @@ func extractDvPendingFields(requestedFields, persistedFields []string) []string 
 			rv = append(rv, s)
 		}
 	}
+	return rv
+}
+
+func (i *IndexSnapshot) DumpAll() chan interface{} {
+	rv := make(chan interface{})
+	go func() {
+		close(rv)
+	}()
+	return rv
+}
+
+func (i *IndexSnapshot) DumpDoc(id string) chan interface{} {
+	rv := make(chan interface{})
+	go func() {
+		close(rv)
+	}()
+	return rv
+}
+
+func (i *IndexSnapshot) DumpFields() chan interface{} {
+	rv := make(chan interface{})
+	go func() {
+		close(rv)
+	}()
 	return rv
 }

@@ -680,7 +680,7 @@ func TestIndexInternalCRUD(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(indexReader.(*Reader).root.segment) != 0 {
+	if len(indexReader.(*IndexSnapshot).segment) != 0 {
 		t.Errorf("expected 0 segments")
 	}
 
@@ -709,7 +709,7 @@ func TestIndexInternalCRUD(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(indexReader2.(*Reader).root.segment) != 0 {
+	if len(indexReader2.(*IndexSnapshot).segment) != 0 {
 		t.Errorf("expected 0 segments")
 	}
 
@@ -738,7 +738,7 @@ func TestIndexInternalCRUD(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(indexReader3.(*Reader).root.segment) != 0 {
+	if len(indexReader3.(*IndexSnapshot).segment) != 0 {
 		t.Errorf("expected 0 segments")
 	}
 
@@ -831,7 +831,7 @@ func TestIndexBatch(t *testing.T) {
 		}
 	}()
 
-	numSegments := len(indexReader.(*Reader).root.segment)
+	numSegments := len(indexReader.(*IndexSnapshot).segment)
 	if numSegments <= 0 {
 		t.Errorf("expected some segments, got: %d", numSegments)
 	}
