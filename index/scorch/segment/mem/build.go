@@ -253,12 +253,13 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 	// now that its been rolled up into docMap, walk that
 	for fieldID, tokenFrequencies := range docMap {
 		dict := s.Dicts[fieldID]
+		norm := float32(1.0/math.Sqrt(float64(fieldLens[fieldID])))
 		for term, tokenFreq := range tokenFrequencies {
 			pid := dict[term] - 1
 			bs := s.Postings[pid]
 			bs.AddInt(int(docNum))
 			s.Freqs[pid] = append(s.Freqs[pid], uint64(tokenFreq.Frequency()))
-			s.Norms[pid] = append(s.Norms[pid], float32(1.0/math.Sqrt(float64(fieldLens[fieldID]))))
+			s.Norms[pid] = append(s.Norms[pid], norm)
 			locationBS := s.PostingsLocs[pid]
 			if len(tokenFreq.Locations) > 0 {
 				locationBS.AddInt(int(docNum))
