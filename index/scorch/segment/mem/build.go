@@ -222,18 +222,16 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 		}
 	}
 
-	storeField := func(docNum uint64, field uint16, typ byte, val []byte, pos []uint64) {
-		s.Stored[docNum][field] = append(s.Stored[docNum][field], val)
-		s.StoredTypes[docNum][field] = append(s.StoredTypes[docNum][field], typ)
-		s.StoredPos[docNum][field] = append(s.StoredPos[docNum][field], pos)
-	}
-
 	// walk each composite field
 	for _, field := range result.Document.CompositeFields {
 		fieldID := uint16(s.getOrDefineField(field.Name()))
 		l, tf := field.Analyze()
 		processField(fieldID, field.Name(), l, tf)
 	}
+
+	docStored := s.Stored[docNum]
+	docStoredTypes := s.StoredTypes[docNum]
+	docStoredPos := s.StoredPos[docNum]
 
 	// walk each field
 	for i, field := range result.Document.Fields {
@@ -242,7 +240,9 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 		tf := result.Analyzed[i]
 		processField(fieldID, field.Name(), l, tf)
 		if field.Options().IsStored() {
-			storeField(docNum, fieldID, encodeFieldType(field), field.Value(), field.ArrayPositions())
+			docStored[fieldID] = append(docStored[fieldID], field.Value())
+			docStoredTypes[fieldID] = append(docStoredTypes[fieldID], encodeFieldType(field))
+			docStoredPos[fieldID] = append(docStoredPos[fieldID], field.ArrayPositions())
 		}
 
 		if field.Options().IncludeDocValues() {
