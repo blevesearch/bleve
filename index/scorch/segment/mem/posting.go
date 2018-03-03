@@ -73,6 +73,7 @@ type PostingsIterator struct {
 	offset    int
 	locoffset int
 	actual    roaring.IntIterable
+	reuse     Posting
 }
 
 // Next returns the next posting on the postings list, or nil at the end
@@ -92,17 +93,16 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 		i.offset++
 		allN = i.all.Next()
 	}
-	rv := &Posting{
+	i.reuse = Posting{
 		iterator:  i,
 		docNum:    uint64(n),
 		offset:    i.offset,
 		locoffset: i.locoffset,
 		hasLoc:    i.locations.Contains(n),
 	}
-
 	i.locoffset += int(i.postings.dictionary.segment.Freqs[i.postings.postingsID-1][i.offset])
 	i.offset++
-	return rv, nil
+	return &i.reuse, nil
 }
 
 // Posting is a single entry in a postings list
