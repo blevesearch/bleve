@@ -252,8 +252,9 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 
 	// now that its been rolled up into docMap, walk that
 	for fieldID, tokenFrequencies := range docMap {
+		dict := s.Dicts[fieldID]
 		for term, tokenFreq := range tokenFrequencies {
-			pid := s.Dicts[fieldID][term] - 1
+			pid := dict[term] - 1
 			bs := s.Postings[pid]
 			bs.AddInt(int(docNum))
 			s.Freqs[pid] = append(s.Freqs[pid], uint64(tokenFreq.Frequency()))
