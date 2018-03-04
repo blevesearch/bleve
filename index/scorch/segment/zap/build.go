@@ -532,6 +532,9 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 	fieldChunkOffsets := make(map[uint16]uint64, len(memSegment.FieldsInv))
 	fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), uint64(len(memSegment.Stored)-1))
 
+	var postings *mem.PostingsList
+	var postingsItr *mem.PostingsIterator
+
 	for fieldID := range memSegment.DocValueFields {
 		field := memSegment.FieldsInv[fieldID]
 		docTermMap := make(map[uint64][]byte, 0)
@@ -543,12 +546,13 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 		dictItr := dict.Iterator()
 		next, err := dictItr.Next()
 		for err == nil && next != nil {
-			postings, err1 := dict.PostingsList(next.Term, nil)
+			var err1 error
+			postings, err1 = dict.(*mem.Dictionary).InitPostingsList(next.Term, nil, postings)
 			if err1 != nil {
 				return nil, err
 			}
 
-			postingsItr := postings.Iterator()
+			postingsItr = postings.InitIterator(postingsItr)
 			nextPosting, err2 := postingsItr.Next()
 			for err2 == nil && nextPosting != nil {
 				docNum := nextPosting.Number()
