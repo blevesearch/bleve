@@ -570,7 +570,7 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 		}
 
 		// sort wrt to docIDs
-		var docNumbers docIDRange
+		docNumbers := make(docIDRange, 0, len(docTermMap))
 		for k := range docTermMap {
 			docNumbers = append(docNumbers, k)
 		}
