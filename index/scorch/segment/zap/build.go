@@ -368,7 +368,8 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 		var locOffset int
 		for postingsListItr.HasNext() {
 			docNum := uint64(postingsListItr.Next())
-			for i := 0; i < int(freqs[offset]); i++ {
+			n := int(freqs[offset])
+			for i := 0; i < n; i++ {
 				if len(locfields) > 0 {
 					// put field
 					err := locEncoder.Add(docNum, uint64(locfields[locOffset]))
