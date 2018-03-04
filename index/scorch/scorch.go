@@ -365,7 +365,7 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 	introTime := uint64(time.Since(introStartTime))
 	atomic.AddUint64(&s.stats.TotBatchIntroTime, introTime)
 	if atomic.LoadUint64(&s.stats.MaxBatchIntroTime) < introTime {
-		atomic.AddUint64(&s.stats.MaxBatchIntroTime, introTime)
+		atomic.StoreUint64(&s.stats.MaxBatchIntroTime, introTime)
 	}
 
 	return err
