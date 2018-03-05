@@ -180,7 +180,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 			s.markIneligibleForRemoval(filename)
 			path := s.path + string(os.PathSeparator) + filename
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
-			newDocNums, err := zap.Merge(segmentsToMerge, docsToDrop, path, 1024)
+			newDocNums, err := zap.Merge(segmentsToMerge, docsToDrop, path, 1024, &s.stats)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
 			if err != nil {
 				s.unmarkIneligibleForRemoval(filename)

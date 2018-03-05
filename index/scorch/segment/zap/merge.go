@@ -31,12 +31,17 @@ import (
 
 const docDropped = math.MaxUint64 // sentinel docNum to represent a deleted doc
 
+// StatsReporter interface represents stats reporting methods.
+type StatsReporter interface {
+	ReportBytesWritten(numBytesWritten uint64)
+}
+
 // Merge takes a slice of zap segments and bit masks describing which
 // documents may be dropped, and creates a new segment containing the
 // remaining data.  This new segment is built at the specified path,
 // with the provided chunkFactor.
 func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
-	chunkFactor uint32) ([][]uint64, error) {
+	chunkFactor uint32, stats StatsReporter) ([][]uint64, error) {
 	flag := os.O_RDWR | os.O_CREATE
 
 	f, err := os.OpenFile(path, flag, 0600)
@@ -91,6 +96,8 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 		cleanup()
 		return nil, err
 	}
+
+	stats.ReportBytesWritten(uint64(cr.Count()))
 
 	return newDocNums, nil
 }

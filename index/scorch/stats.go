@@ -100,6 +100,8 @@ type Stats struct {
 	TotMemMergeZapBeg   uint64
 	TotMemMergeZapEnd   uint64
 	TotMemMergeSegments uint64
+
+	TotCompactionWrittenBytes uint64
 }
 
 // atomically populates the returned map
@@ -121,4 +123,8 @@ func (s *Stats) ToMap() map[string]interface{} {
 // json marshaling provides atomic safety
 func (s *Stats) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.ToMap())
+}
+
+func (s *Stats) ReportBytesWritten(numBytesWritten uint64) {
+	atomic.AddUint64(&s.TotCompactionWrittenBytes, numBytesWritten)
 }
