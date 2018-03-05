@@ -97,7 +97,9 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 		return nil, err
 	}
 
-	stats.ReportBytesWritten(uint64(cr.Count()))
+	if stats != nil {
+		stats.ReportBytesWritten(uint64(cr.Count()))
+	}
 
 	return newDocNums, nil
 }
