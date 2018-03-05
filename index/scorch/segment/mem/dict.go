@@ -33,12 +33,20 @@ type Dictionary struct {
 // PostingsList returns the postings list for the specified term
 func (d *Dictionary) PostingsList(term string,
 	except *roaring.Bitmap) (segment.PostingsList, error) {
-	return &PostingsList{
-		dictionary: d,
-		term:       term,
-		postingsID: d.segment.Dicts[d.fieldID][term],
-		except:     except,
-	}, nil
+	return d.InitPostingsList(term, except, nil)
+}
+
+func (d *Dictionary) InitPostingsList(term string, except *roaring.Bitmap,
+	prealloc *PostingsList) (*PostingsList, error) {
+	rv := prealloc
+	if rv == nil {
+		rv = &PostingsList{}
+	}
+	rv.dictionary = d
+	rv.term = term
+	rv.postingsID = d.segment.Dicts[d.fieldID][term]
+	rv.except = except
+	return rv, nil
 }
 
 // Iterator returns an iterator for this dictionary

@@ -46,9 +46,16 @@ func (p *PostingsList) Count() uint64 {
 
 // Iterator returns an iterator for this postings list
 func (p *PostingsList) Iterator() segment.PostingsIterator {
-	rv := &PostingsIterator{
-		postings: p,
+	return p.InitIterator(nil)
+}
+func (p *PostingsList) InitIterator(prealloc *PostingsIterator) *PostingsIterator {
+	rv := prealloc
+	if rv == nil {
+		rv = &PostingsIterator{postings: p}
+	} else {
+		*rv = PostingsIterator{postings: p}
 	}
+
 	if p.postingsID > 0 {
 		allbits := p.dictionary.segment.Postings[p.postingsID-1]
 		rv.locations = p.dictionary.segment.PostingsLocs[p.postingsID-1]

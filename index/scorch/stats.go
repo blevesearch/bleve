@@ -88,8 +88,10 @@ type Stats struct {
 	TotFileMergeSegmentsEmpty uint64
 	TotFileMergeSegments      uint64
 
-	TotFileMergeZapBeg uint64
-	TotFileMergeZapEnd uint64
+	TotFileMergeZapBeg  uint64
+	TotFileMergeZapEnd  uint64
+	TotFileMergeZapTime uint64
+	MaxFileMergeZapTime uint64
 
 	TotFileMergeIntroductions     uint64
 	TotFileMergeIntroductionsDone uint64
@@ -99,6 +101,8 @@ type Stats struct {
 	TotMemMergeDone     uint64
 	TotMemMergeZapBeg   uint64
 	TotMemMergeZapEnd   uint64
+	TotMemMergeZapTime  uint64
+	MaxMemMergeZapTime  uint64
 	TotMemMergeSegments uint64
 }
 
