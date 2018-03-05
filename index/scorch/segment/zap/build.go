@@ -552,8 +552,7 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 			nextPosting, err2 := postingsItr.Next()
 			for err2 == nil && nextPosting != nil {
 				docNum := nextPosting.Number()
-				docTermMap[docNum] = append(docTermMap[docNum], []byte(next.Term)...)
-				docTermMap[docNum] = append(docTermMap[docNum], termSeparator)
+				docTermMap[docNum] = append(append(docTermMap[docNum], []byte(next.Term)...), termSeparator)
 				nextPosting, err2 = postingsItr.Next()
 			}
 			if err2 != nil {
@@ -562,10 +561,10 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 
 			next, err = dictItr.Next()
 		}
-
 		if err != nil {
 			return nil, err
 		}
+
 		// sort wrt to docIDs
 		var docNumbers docIDRange
 		for k := range docTermMap {
