@@ -102,6 +102,18 @@ func (b *Batch) Reset() {
 	b.internal.Reset()
 }
 
+// Merge performs the merge of the internal Index.Batch
+// of the given batch to the self.
+func (b *Batch) Merge(other *Batch) {
+	for k, v := range other.internal.IndexOps {
+		b.internal.IndexOps[k] = v
+	}
+
+	for k, v := range other.internal.InternalOps {
+		b.internal.InternalOps[k] = v
+	}
+}
+
 // An Index implements all the indexing and searching
 // capabilities of bleve.  An Index can be created
 // using the New() and Open() methods.
