@@ -57,18 +57,6 @@ type PostingsList struct {
 func (p *PostingsList) Size() int {
 	sizeInBytes := reflectStaticSizePostingsList + size.SizeOfPtr
 
-	if p.sb != nil {
-		sizeInBytes += (p.sb.Size() - len(p.sb.mem)) // do not include the mmap'ed part
-	}
-
-	if p.locBitmap != nil {
-		sizeInBytes += int(p.locBitmap.GetSizeInBytes())
-	}
-
-	if p.postings != nil {
-		sizeInBytes += int(p.postings.GetSizeInBytes())
-	}
-
 	if p.except != nil {
 		sizeInBytes += int(p.except.GetSizeInBytes())
 	}
