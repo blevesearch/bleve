@@ -50,6 +50,10 @@ const storePath = "store"
 
 var mappingInternalKey = []byte("_mapping")
 
+const SearchMemCheckCallbackKey = "_search_mem_callback_key"
+
+type SearchMemCheckCallbackFn func(size uint64) error
+
 func indexStorePath(path string) string {
 	return path + string(os.PathSeparator) + storePath
 }
@@ -477,6 +481,15 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			}
 		}
 		collector.SetFacetsBuilder(facetsBuilder)
+	}
+
+	if memCb := ctx.Value(SearchMemCheckCallbackKey); memCb != nil {
+		if memCbFn, ok := memCb.(SearchMemCheckCallbackFn); ok {
+			err = memCbFn(memNeededForSearch(req, searcher, collector))
+		}
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	err = collector.Collect(ctx, searcher, indexReader)

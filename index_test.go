@@ -1870,3 +1870,50 @@ func BenchmarkUpsidedownSearchOverhead(b *testing.B) {
 func BenchmarkScorchSearchOverhead(b *testing.B) {
 	benchmarkSearchOverhead(scorch.Name, b)
 }
+
+func TestSearchMemCheckCallback(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	elements := []string{"air", "water", "fire", "earth"}
+	for j := 0; j < 10000; j++ {
+		err = index.Index(fmt.Sprintf("%d", j),
+			map[string]interface{}{"name": elements[j%len(elements)]})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	query := NewTermQuery("water")
+	req := NewSearchRequest(query)
+
+	expErr := fmt.Errorf("MEM_LIMIT_EXCEEDED")
+	f := func(size uint64) error {
+		if size > 1000 {
+			return expErr
+		}
+		return nil
+	}
+
+	ctx := context.WithValue(context.Background(), SearchMemCheckCallbackKey,
+		SearchMemCheckCallbackFn(f))
+	_, err = index.SearchInContext(ctx, req)
+	if err != expErr {
+		t.Fatalf("Expected: %v, Got: %v", expErr, err)
+	}
+}
