@@ -160,7 +160,6 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 	newSegDocCount uint64, chunkFactor uint32,
 	w *CountHashWriter) ([]uint64, uint64, error) {
 
-	var bufReuse bytes.Buffer
 	var bufMaxVarintLen64 []byte = make([]byte, binary.MaxVarintLen64)
 
 	var postings *PostingsList
@@ -247,7 +246,7 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 					return err
 				}
 				postingLocOffset := uint64(w.Count())
-				_, err = writeRoaringWithLen(newRoaringLocs, w, &bufReuse, bufMaxVarintLen64)
+				_, err = writeRoaringWithLen(newRoaringLocs, w, bufMaxVarintLen64)
 				if err != nil {
 					return err
 				}
@@ -271,7 +270,7 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				if err != nil {
 					return err
 				}
-				_, err = writeRoaringWithLen(newRoaring, w, &bufReuse, bufMaxVarintLen64)
+				_, err = writeRoaringWithLen(newRoaring, w, bufMaxVarintLen64)
 				if err != nil {
 					return err
 				}
