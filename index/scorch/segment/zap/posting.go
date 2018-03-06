@@ -337,7 +337,6 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 	reuseLocs := i.next.locs // hold for reuse before struct clearing
 	i.next = Posting{}       // clear the struct
 	rv := &i.next
-	rv.iterator = i
 	rv.docNum = uint64(n)
 
 	var err error
@@ -373,12 +372,10 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 
 // Posting is a single entry in a postings list
 type Posting struct {
-	iterator *PostingsIterator
-	docNum   uint64
-
-	freq uint64
-	norm float32
-	locs []segment.Location
+	docNum uint64
+	freq   uint64
+	norm   float32
+	locs   []segment.Location
 }
 
 // Number returns the document number of this posting in this segment
