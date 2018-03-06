@@ -1815,3 +1815,72 @@ func TestIndexAdvancedCountMatchSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestMatchMerge(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doca := map[string]interface{}{
+		"name": "scorcher",
+		"desc": "cbft",
+	}
+	batcha := index.NewBatch()
+	err = batcha.Index("a", doca)
+	if err != nil {
+		t.Error(err)
+	}
+	batcha.SetInternal([]byte("batch_a"), []byte("batch_a_value"))
+
+	docb := map[string]interface{}{
+		"name": "updc down",
+		"desc": "bleve",
+	}
+
+	batchb := index.NewBatch()
+	err = batchb.Index("b", docb)
+	if err != nil {
+		t.Error(err)
+	}
+	batchb.SetInternal([]byte("batch_b"), []byte("batch_b_value"))
+
+	batcha.Merge(batchb)
+
+	err = index.Batch(batcha)
+	if err != nil {
+		t.Error(err)
+	}
+
+	val, err := index.GetInternal([]byte("batch_b"))
+	if err != nil {
+		t.Error(err)
+	}
+
+	if string(val) != "batch_b_value" {
+		t.Errorf("expected 'batch_b_value', got '%s'", val)
+	}
+
+	val, err = index.GetInternal([]byte("batch_a"))
+	if err != nil {
+		t.Error(err)
+	}
+	if string(val) != "batch_a_value" {
+		t.Errorf("expected 'batch_a_value', got '%s'", val)
+	}
+
+	val, err = index.GetInternal([]byte("status"))
+	if err != nil {
+		t.Error(err)
+	}
+	if val != nil {
+		t.Errorf("expected nil, got '%s'", val)
+	}
+}
