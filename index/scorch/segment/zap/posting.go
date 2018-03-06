@@ -279,74 +279,26 @@ func (i *PostingsIterator) readLocation(l *Location) error {
 
 // Next returns the next posting on the postings list, or nil at the end
 func (i *PostingsIterator) Next() (segment.Posting, error) {
-	if i.actual == nil || !i.actual.HasNext() {
+	docNum, exists, err := i.nextDocNum()
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
 		return nil, nil
-	}
-	n := i.actual.Next()
-	nChunk := n / i.postings.sb.chunkFactor
-	allN := i.all.Next()
-	allNChunk := allN / i.postings.sb.chunkFactor
-
-	// n is the next actual hit (excluding some postings)
-	// allN is the next hit in the full postings
-	// if they don't match, adjust offsets to factor in item we're skipping over
-	// incr the all iterator, and check again
-	for allN != n {
-
-		// in different chunks, reset offsets
-		if allNChunk != nChunk {
-			i.locoffset = 0
-			i.offset = 0
-		} else {
-
-			if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
-				err := i.loadChunk(int(nChunk))
-				if err != nil {
-					return nil, fmt.Errorf("error loading chunk: %v", err)
-				}
-			}
-
-			// read off freq/offsets even though we don't care about them
-			freq, _, err := i.readFreqNorm()
-			if err != nil {
-				return nil, err
-			}
-			if i.locBitmap.Contains(allN) {
-				for j := 0; j < int(freq); j++ {
-					err := i.readLocation(nil)
-					if err != nil {
-						return nil, err
-					}
-				}
-			}
-
-			// in same chunk, need to account for offsets
-			i.offset++
-		}
-
-		allN = i.all.Next()
-	}
-
-	if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
-		err := i.loadChunk(int(nChunk))
-		if err != nil {
-			return nil, fmt.Errorf("error loading chunk: %v", err)
-		}
 	}
 
 	reuseLocs := i.next.locs // hold for reuse before struct clearing
 	i.next = Posting{}       // clear the struct
 	rv := &i.next
-	rv.docNum = uint64(n)
+	rv.docNum = docNum
 
-	var err error
 	var normBits uint64
 	rv.freq, normBits, err = i.readFreqNorm()
 	if err != nil {
 		return nil, err
 	}
 	rv.norm = math.Float32frombits(uint32(normBits))
-	if i.locBitmap.Contains(n) {
+	if i.locBitmap.Contains(uint32(docNum)) {
 		// read off 'freq' locations, into reused slices
 		if cap(i.nextLocs) >= int(rv.freq) {
 			i.nextLocs = i.nextLocs[0:rv.freq]
@@ -368,6 +320,66 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 	}
 
 	return rv, nil
+}
+
+// nextDocNum returns the next docNum on the postings list, and also
+// sets up the currChunk / loc related fields of the iterator.
+func (i *PostingsIterator) nextDocNum() (uint64, bool, error) {
+	if i.actual == nil || !i.actual.HasNext() {
+		return 0, false, nil
+	}
+
+	n := i.actual.Next()
+	nChunk := n / i.postings.sb.chunkFactor
+	allN := i.all.Next()
+	allNChunk := allN / i.postings.sb.chunkFactor
+
+	// n is the next actual hit (excluding some postings)
+	// allN is the next hit in the full postings
+	// if they don't match, adjust offsets to factor in item we're skipping over
+	// incr the all iterator, and check again
+	for allN != n {
+		// in different chunks, reset offsets
+		if allNChunk != nChunk {
+			i.locoffset = 0
+			i.offset = 0
+		} else {
+			if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
+				err := i.loadChunk(int(nChunk))
+				if err != nil {
+					return 0, false, fmt.Errorf("error loading chunk: %v", err)
+				}
+			}
+
+			// read off freq/offsets even though we don't care about them
+			freq, _, err := i.readFreqNorm()
+			if err != nil {
+				return 0, false, err
+			}
+			if i.locBitmap.Contains(allN) {
+				for j := 0; j < int(freq); j++ {
+					err := i.readLocation(nil)
+					if err != nil {
+						return 0, false, err
+					}
+				}
+			}
+
+			// in same chunk, need to account for offsets
+			i.offset++
+		}
+
+		allN = i.all.Next()
+	}
+
+	if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
+		err := i.loadChunk(int(nChunk))
+		if err != nil {
+			return 0, false, fmt.Errorf("error loading chunk: %v", err)
+		}
+	}
+
+	return uint64(n), true, nil
 }
 
 // Posting is a single entry in a postings list
