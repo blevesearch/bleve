@@ -319,19 +319,10 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 		postingsListItr := memSegment.Postings[postingID].Iterator()
 		var offset int
 		for postingsListItr.HasNext() {
-
 			docNum := uint64(postingsListItr.Next())
 
-			// put freq
-			err := tfEncoder.Add(docNum, freqs[offset])
-			if err != nil {
-				return nil, nil, err
-			}
-
-			// put norm
-			norm := norms[offset]
-			normBits := math.Float32bits(norm)
-			err = tfEncoder.Add(docNum, uint64(normBits))
+			// put freq & norm
+			err := tfEncoder.Add(docNum, freqs[offset], uint64(math.Float32bits(norms[offset])))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -347,7 +338,6 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 		if err != nil {
 			return nil, nil, err
 		}
-
 	}
 
 	// now do it again for the locations
@@ -371,43 +361,17 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 			n := int(freqs[offset])
 			for i := 0; i < n; i++ {
 				if len(locfields) > 0 {
-					// put field
-					err := locEncoder.Add(docNum, uint64(locfields[locOffset]))
-					if err != nil {
-						return nil, nil, err
-					}
-
-					// put pos
-					err = locEncoder.Add(docNum, locpos[locOffset])
-					if err != nil {
-						return nil, nil, err
-					}
-
-					// put start
-					err = locEncoder.Add(docNum, locstarts[locOffset])
-					if err != nil {
-						return nil, nil, err
-					}
-
-					// put end
-					err = locEncoder.Add(docNum, locends[locOffset])
-					if err != nil {
-						return nil, nil, err
-					}
-
-					// put the number of array positions to follow
-					num := len(locarraypos[locOffset])
-					err = locEncoder.Add(docNum, uint64(num))
+					err := locEncoder.Add(docNum, uint64(locfields[locOffset]),
+						locpos[locOffset], locstarts[locOffset], locends[locOffset],
+						uint64(len(locarraypos[locOffset])))
 					if err != nil {
 						return nil, nil, err
 					}
 
 					// put each array position
-					for _, pos := range locarraypos[locOffset] {
-						err = locEncoder.Add(docNum, pos)
-						if err != nil {
-							return nil, nil, err
-						}
+					err = locEncoder.Add(docNum, locarraypos[locOffset]...)
+					if err != nil {
+						return nil, nil, err
 					}
 				}
 				locOffset++
@@ -417,6 +381,7 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 
 		// record where this postings loc info starts
 		locOffsets = append(locOffsets, uint64(w.Count()))
+
 		locEncoder.Close()
 		_, err := locEncoder.Write(w)
 		if err != nil {
