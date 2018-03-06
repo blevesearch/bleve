@@ -280,11 +280,8 @@ func (i *PostingsIterator) readLocation(l *Location) error {
 // Next returns the next posting on the postings list, or nil at the end
 func (i *PostingsIterator) Next() (segment.Posting, error) {
 	docNum, exists, err := i.nextDocNum()
-	if err != nil {
+	if err != nil || !exists {
 		return nil, err
-	}
-	if !exists {
-		return nil, nil
 	}
 
 	reuseLocs := i.next.locs // hold for reuse before struct clearing
@@ -320,6 +317,45 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 	}
 
 	return rv, nil
+}
+
+// nextBytes returns the docNum and the encoded freq & loc bytes for
+// the next posting
+func (i *PostingsIterator) nextBytes() (uint64, []byte, []byte, error) {
+	docNum, exists, err := i.nextDocNum()
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	if !exists {
+		return 0, nil, nil, nil
+	}
+
+	startFreqNorm := len(i.currChunkFreqNorm) - i.freqNormReader.Len()
+
+	freq, _, err := i.readFreqNorm()
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	endFreqNorm := len(i.currChunkFreqNorm) - i.freqNormReader.Len()
+	bytesFreqNorm := i.currChunkFreqNorm[startFreqNorm:endFreqNorm]
+
+	var bytesLoc []byte
+	if i.locBitmap.Contains(uint32(docNum)) {
+		startLoc := len(i.currChunkLoc) - i.locReader.Len()
+
+		for j := uint64(0); j < freq; j++ {
+			err := i.readLocation(nil)
+			if err != nil {
+				return 0, nil, nil, err
+			}
+		}
+
+		endLoc := len(i.currChunkLoc) - i.locReader.Len()
+		bytesLoc = i.currChunkLoc[startLoc:endLoc]
+	}
+
+	return docNum, bytesFreqNorm, bytesLoc, nil
 }
 
 // nextDocNum returns the next docNum on the postings list, and also
