@@ -266,21 +266,34 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 			locationBS := s.PostingsLocs[pid]
 			if len(tokenFreq.Locations) > 0 {
 				locationBS.AddInt(int(docNum))
+
+				locfields := s.Locfields[pid]
+				locstarts := s.Locstarts[pid]
+				locends := s.Locends[pid]
+				locpos := s.Locpos[pid]
+				locarraypos := s.Locarraypos[pid]
+
 				for _, loc := range tokenFreq.Locations {
 					var locf = fieldID
 					if loc.Field != "" {
 						locf = uint16(s.getOrDefineField(loc.Field))
 					}
-					s.Locfields[pid] = append(s.Locfields[pid], locf)
-					s.Locstarts[pid] = append(s.Locstarts[pid], uint64(loc.Start))
-					s.Locends[pid] = append(s.Locends[pid], uint64(loc.End))
-					s.Locpos[pid] = append(s.Locpos[pid], uint64(loc.Position))
+					locfields = append(locfields, locf)
+					locstarts = append(locstarts, uint64(loc.Start))
+					locends = append(locends, uint64(loc.End))
+					locpos = append(locpos, uint64(loc.Position))
 					if len(loc.ArrayPositions) > 0 {
-						s.Locarraypos[pid] = append(s.Locarraypos[pid], loc.ArrayPositions)
+						locarraypos = append(locarraypos, loc.ArrayPositions)
 					} else {
-						s.Locarraypos[pid] = append(s.Locarraypos[pid], nil)
+						locarraypos = append(locarraypos, nil)
 					}
 				}
+
+				s.Locfields[pid] = locfields
+				s.Locstarts[pid] = locstarts
+				s.Locends[pid] = locends
+				s.Locpos[pid] = locpos
+				s.Locarraypos[pid] = locarraypos
 			}
 		}
 	}
