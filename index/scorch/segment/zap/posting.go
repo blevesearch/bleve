@@ -506,10 +506,6 @@ type Posting struct {
 func (p *Posting) Size() int {
 	sizeInBytes := reflectStaticSizePosting
 
-	if p.iterator != nil {
-		sizeInBytes += p.iterator.Size()
-	}
-
 	for _, entry := range p.locs {
 		sizeInBytes += entry.Size()
 	}
