@@ -45,7 +45,25 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 	if rv == nil {
 		rv = &PostingsIterator{}
 	} else {
+		freqNormReader := rv.freqNormReader
+		if freqNormReader != nil {
+			freqNormReader.Reset([]byte(nil))
+		}
+		freqNormDecoder := rv.freqNormDecoder
+
+		locReader := rv.locReader
+		if locReader != nil {
+			locReader.Reset([]byte(nil))
+		}
+		locDecoder := rv.locDecoder
+
 		*rv = PostingsIterator{} // clear the struct
+
+		rv.freqNormReader = freqNormReader
+		rv.freqNormDecoder = freqNormDecoder
+
+		rv.locReader = locReader
+		rv.locDecoder = locDecoder
 	}
 	rv.postings = p
 
