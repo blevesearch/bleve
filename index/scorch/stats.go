@@ -87,6 +87,7 @@ type Stats struct {
 
 	TotFileMergeSegmentsEmpty uint64
 	TotFileMergeSegments      uint64
+	TotFileMergeWrittenBytes  uint64
 
 	TotFileMergeZapBeg  uint64
 	TotFileMergeZapEnd  uint64
