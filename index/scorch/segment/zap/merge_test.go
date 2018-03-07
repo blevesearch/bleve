@@ -20,7 +20,6 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	"github.com/RoaringBitmap/roaring"
@@ -73,7 +72,7 @@ func TestMerge(t *testing.T) {
 	segsToMerge[0] = segment.(*Segment)
 	segsToMerge[1] = segment2.(*Segment)
 
-	_, err = Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/scorch3.zap", 1024, nil)
+	_, _, err = Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/scorch3.zap", 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +176,7 @@ func testMergeWithEmptySegments(t *testing.T, before bool, numEmptySegments int)
 
 	drops := make([]*roaring.Bitmap, len(segsToMerge))
 
-	_, err = Merge(segsToMerge, drops, "/tmp/scorch3.zap", 1024, nil)
+	_, _, err = Merge(segsToMerge, drops, "/tmp/scorch3.zap", 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +218,7 @@ func testMergeWithSelf(t *testing.T, segCur *Segment, expectedCount uint64) {
 		segsToMerge := make([]*Segment, 1)
 		segsToMerge[0] = segCur
 
-		_, err := Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/"+fname, 1024, nil)
+		_, _, err := Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/"+fname, 1024)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -591,7 +590,7 @@ func testMergeWithUpdates(t *testing.T, segmentDocIds [][]string, docsToDrop []*
 func testMergeAndDropSegments(t *testing.T, segsToMerge []*Segment, docsToDrop []*roaring.Bitmap, expectedNumDocs uint64) {
 	_ = os.RemoveAll("/tmp/scorch-merged.zap")
 
-	_, err := Merge(segsToMerge, docsToDrop, "/tmp/scorch-merged.zap", 1024, nil)
+	_, _, err := Merge(segsToMerge, docsToDrop, "/tmp/scorch-merged.zap", 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -784,14 +783,6 @@ func buildMemSegmentMultiHelper(docIds []string) *mem.Segment {
 	return segment
 }
 
-type statTest struct {
-	totalWrittenBytes uint64
-}
-
-func (s *statTest) ReportBytesWritten(numBytesWritten uint64) {
-	atomic.AddUint64(&s.totalWrittenBytes, numBytesWritten)
-}
-
 func TestMergeBytesWritten(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 	_ = os.RemoveAll("/tmp/scorch2.zap")
@@ -835,14 +826,12 @@ func TestMergeBytesWritten(t *testing.T) {
 	segsToMerge[0] = segment.(*Segment)
 	segsToMerge[1] = segment2.(*Segment)
 
-	reporter := &statTest{}
-
-	_, err = Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/scorch3.zap", 1024, reporter)
+	_, nBytes, err := Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/scorch3.zap", 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if reporter.totalWrittenBytes == 0 {
+	if nBytes == 0 {
 		t.Fatalf("expected a non zero total_compaction_written_bytes")
 	}
 

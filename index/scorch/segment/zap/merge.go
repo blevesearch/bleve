@@ -31,22 +31,17 @@ import (
 
 const docDropped = math.MaxUint64 // sentinel docNum to represent a deleted doc
 
-// StatsReporter interface represents stats reporting methods.
-type StatsReporter interface {
-	ReportBytesWritten(numBytesWritten uint64)
-}
-
 // Merge takes a slice of zap segments and bit masks describing which
 // documents may be dropped, and creates a new segment containing the
 // remaining data.  This new segment is built at the specified path,
 // with the provided chunkFactor.
 func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
-	chunkFactor uint32, stats StatsReporter) ([][]uint64, error) {
+	chunkFactor uint32) ([][]uint64, uint64, error) {
 	flag := os.O_RDWR | os.O_CREATE
 
 	f, err := os.OpenFile(path, flag, 0600)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	cleanup := func() {
@@ -69,39 +64,35 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 		MergeToWriter(segmentBases, drops, chunkFactor, cr)
 	if err != nil {
 		cleanup()
-		return nil, err
+		return nil, 0, err
 	}
 
 	err = persistFooter(numDocs, storedIndexOffset, fieldsIndexOffset,
 		docValueOffset, chunkFactor, cr.Sum32(), cr)
 	if err != nil {
 		cleanup()
-		return nil, err
+		return nil, 0, err
 	}
 
 	err = br.Flush()
 	if err != nil {
 		cleanup()
-		return nil, err
+		return nil, 0, err
 	}
 
 	err = f.Sync()
 	if err != nil {
 		cleanup()
-		return nil, err
+		return nil, 0, err
 	}
 
 	err = f.Close()
 	if err != nil {
 		cleanup()
-		return nil, err
+		return nil, 0, err
 	}
 
-	if stats != nil {
-		stats.ReportBytesWritten(uint64(cr.Count()))
-	}
-
-	return newDocNums, nil
+	return newDocNums, uint64(cr.Count()), nil
 }
 
 func MergeToWriter(segments []*SegmentBase, drops []*roaring.Bitmap,
