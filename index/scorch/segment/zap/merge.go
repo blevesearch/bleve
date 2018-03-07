@@ -162,7 +162,6 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 
 	var bufReuse bytes.Buffer
 	var bufMaxVarintLen64 []byte = make([]byte, binary.MaxVarintLen64)
-	var bufLoc []uint64
 
 	var postings *PostingsList
 	var postItr *PostingsIterator
@@ -316,45 +315,32 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 			newDocNumsI := newDocNums[itrI]
 
 			postItr = postings.iterator(postItr)
-			next, err2 := postItr.Next()
-			for next != nil && err2 == nil {
-				hitNewDocNum := newDocNumsI[next.Number()]
+
+			nextDocNum, nextFreqNormBytes, nextLocBytes, err2 := postItr.nextBytes()
+			for err2 == nil && len(nextFreqNormBytes) > 0 {
+				hitNewDocNum := newDocNumsI[nextDocNum]
 				if hitNewDocNum == docDropped {
 					return nil, 0, fmt.Errorf("see hit with dropped doc num")
 				}
+
 				newRoaring.Add(uint32(hitNewDocNum))
-				// encode norm bits
-				norm := next.Norm()
-				normBits := math.Float32bits(float32(norm))
-				err = tfEncoder.Add(hitNewDocNum, next.Frequency(), uint64(normBits))
-				if err != nil {
-					return nil, 0, err
+				err2 = tfEncoder.AddBytes(hitNewDocNum, nextFreqNormBytes)
+				if err2 != nil {
+					return nil, 0, err2
 				}
-				locs := next.Locations()
-				if len(locs) > 0 {
+
+				if len(nextLocBytes) > 0 {
 					newRoaringLocs.Add(uint32(hitNewDocNum))
-					for _, loc := range locs {
-						if cap(bufLoc) < 5+len(loc.ArrayPositions()) {
-							bufLoc = make([]uint64, 0, 5+len(loc.ArrayPositions()))
-						}
-						args := bufLoc[0:5]
-						args[0] = uint64(fieldsMap[loc.Field()] - 1)
-						args[1] = loc.Pos()
-						args[2] = loc.Start()
-						args[3] = loc.End()
-						args[4] = uint64(len(loc.ArrayPositions()))
-						args = append(args, loc.ArrayPositions()...)
-						err = locEncoder.Add(hitNewDocNum, args...)
-						if err != nil {
-							return nil, 0, err
-						}
+					err2 = locEncoder.AddBytes(hitNewDocNum, nextLocBytes)
+					if err2 != nil {
+						return nil, 0, err2
 					}
 				}
 
 				docTermMap[hitNewDocNum] =
 					append(append(docTermMap[hitNewDocNum], term...), termSeparator)
 
-				next, err2 = postItr.Next()
+				nextDocNum, nextFreqNormBytes, nextLocBytes, err2 = postItr.nextBytes()
 			}
 			if err2 != nil {
 				return nil, 0, err2

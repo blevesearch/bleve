@@ -15,9 +15,28 @@
 package mem
 
 import (
+	"reflect"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizePostingsList int
+var reflectStaticSizePostingsIterator int
+var reflectStaticSizePosting int
+var reflectStaticSizeLocation int
+
+func init() {
+	var pl PostingsList
+	reflectStaticSizePostingsList = int(reflect.TypeOf(pl).Size())
+	var pi PostingsIterator
+	reflectStaticSizePostingsIterator = int(reflect.TypeOf(pi).Size())
+	var p Posting
+	reflectStaticSizePosting = int(reflect.TypeOf(p).Size())
+	var l Location
+	reflectStaticSizeLocation = int(reflect.TypeOf(l).Size())
+}
 
 // PostingsList is an in-memory represenation of a postings list
 type PostingsList struct {
@@ -25,6 +44,20 @@ type PostingsList struct {
 	term       string
 	postingsID uint64
 	except     *roaring.Bitmap
+}
+
+func (p *PostingsList) Size() int {
+	sizeInBytes := reflectStaticSizePostingsList + size.SizeOfPtr
+
+	if p.dictionary != nil {
+		sizeInBytes += p.dictionary.Size()
+	}
+
+	if p.except != nil {
+		sizeInBytes += int(p.except.GetSizeInBytes())
+	}
+
+	return sizeInBytes
 }
 
 // Count returns the number of items on this postings list
@@ -46,9 +79,16 @@ func (p *PostingsList) Count() uint64 {
 
 // Iterator returns an iterator for this postings list
 func (p *PostingsList) Iterator() segment.PostingsIterator {
-	rv := &PostingsIterator{
-		postings: p,
+	return p.InitIterator(nil)
+}
+func (p *PostingsList) InitIterator(prealloc *PostingsIterator) *PostingsIterator {
+	rv := prealloc
+	if rv == nil {
+		rv = &PostingsIterator{postings: p}
+	} else {
+		*rv = PostingsIterator{postings: p}
 	}
+
 	if p.postingsID > 0 {
 		allbits := p.dictionary.segment.Postings[p.postingsID-1]
 		rv.locations = p.dictionary.segment.PostingsLocs[p.postingsID-1]
@@ -73,6 +113,17 @@ type PostingsIterator struct {
 	offset    int
 	locoffset int
 	actual    roaring.IntIterable
+	reuse     Posting
+}
+
+func (i *PostingsIterator) Size() int {
+	sizeInBytes := reflectStaticSizePostingsIterator + size.SizeOfPtr
+
+	if i.locations != nil {
+		sizeInBytes += int(i.locations.GetSizeInBytes())
+	}
+
+	return sizeInBytes
 }
 
 // Next returns the next posting on the postings list, or nil at the end
@@ -92,17 +143,16 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 		i.offset++
 		allN = i.all.Next()
 	}
-	rv := &Posting{
+	i.reuse = Posting{
 		iterator:  i,
 		docNum:    uint64(n),
 		offset:    i.offset,
 		locoffset: i.locoffset,
 		hasLoc:    i.locations.Contains(n),
 	}
-
 	i.locoffset += int(i.postings.dictionary.segment.Freqs[i.postings.postingsID-1][i.offset])
 	i.offset++
-	return rv, nil
+	return &i.reuse, nil
 }
 
 // Posting is a single entry in a postings list
@@ -112,6 +162,16 @@ type Posting struct {
 	offset    int
 	locoffset int
 	hasLoc    bool
+}
+
+func (p *Posting) Size() int {
+	sizeInBytes := reflectStaticSizePosting + size.SizeOfPtr
+
+	if p.iterator != nil {
+		sizeInBytes += p.iterator.Size()
+	}
+
+	return sizeInBytes
 }
 
 // Number returns the document number of this posting in this segment
@@ -149,6 +209,15 @@ func (p *Posting) Locations() []segment.Location {
 type Location struct {
 	p      *Posting
 	offset int
+}
+
+func (l *Location) Size() int {
+	sizeInBytes := reflectStaticSizeLocation
+	if l.p != nil {
+		sizeInBytes += l.p.Size()
+	}
+
+	return sizeInBytes
 }
 
 // Field returns the name of the field (useful in composite fields to know

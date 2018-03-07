@@ -179,11 +179,21 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 			filename := zapFileName(newSegmentID)
 			s.markIneligibleForRemoval(filename)
 			path := s.path + string(os.PathSeparator) + filename
+
+			fileMergeZapStartTime := time.Now()
+
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			newDocNums, nBytes, err := zap.Merge(segmentsToMerge, docsToDrop, path, 1024)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
-			atomic.AddUint64(&s.stats.TotFileMergeWrittenBytes, nBytes)
-			if err != nil {
+      atomic.AddUint64(&s.stats.TotFileMergeWrittenBytes, nBytes)
+      
+			fileMergeZapTime := uint64(time.Since(fileMergeZapStartTime))
+			atomic.AddUint64(&s.stats.TotFileMergeZapTime, fileMergeZapTime)
+			if atomic.LoadUint64(&s.stats.MaxFileMergeZapTime) < fileMergeZapTime {
+				atomic.StoreUint64(&s.stats.MaxFileMergeZapTime, fileMergeZapTime)
+			}
+      
+      if err != nil {
 				s.unmarkIneligibleForRemoval(filename)
 				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
 				return fmt.Errorf("merging failed: %v", err)
@@ -259,11 +269,20 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 
 	cr := zap.NewCountHashWriter(&br)
 
+	memMergeZapStartTime := time.Now()
+
 	atomic.AddUint64(&s.stats.TotMemMergeZapBeg, 1)
 	newDocNums, numDocs, storedIndexOffset, fieldsIndexOffset,
 		docValueOffset, dictLocs, fieldsInv, fieldsMap, err :=
 		zap.MergeToWriter(sbs, sbsDrops, chunkFactor, cr)
 	atomic.AddUint64(&s.stats.TotMemMergeZapEnd, 1)
+
+	memMergeZapTime := uint64(time.Since(memMergeZapStartTime))
+	atomic.AddUint64(&s.stats.TotMemMergeZapTime, memMergeZapTime)
+	if atomic.LoadUint64(&s.stats.MaxMemMergeZapTime) < memMergeZapTime {
+		atomic.StoreUint64(&s.stats.MaxMemMergeZapTime, memMergeZapTime)
+	}
+
 	if err != nil {
 		atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
 		return 0, nil, 0, err

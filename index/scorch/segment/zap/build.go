@@ -308,7 +308,7 @@ func persistStoredFieldValues(fieldID int,
 }
 
 func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFactor uint32) ([]uint64, []uint64, error) {
-	var freqOffsets, locOfffsets []uint64
+	freqOffsets := make([]uint64, 0, len(memSegment.Postings))
 	tfEncoder := newChunkedIntCoder(uint64(chunkFactor), uint64(len(memSegment.Stored)-1))
 	for postingID := range memSegment.Postings {
 		if postingID != 0 {
@@ -319,19 +319,10 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 		postingsListItr := memSegment.Postings[postingID].Iterator()
 		var offset int
 		for postingsListItr.HasNext() {
-
 			docNum := uint64(postingsListItr.Next())
 
-			// put freq
-			err := tfEncoder.Add(docNum, freqs[offset])
-			if err != nil {
-				return nil, nil, err
-			}
-
-			// put norm
-			norm := norms[offset]
-			normBits := math.Float32bits(norm)
-			err = tfEncoder.Add(docNum, uint64(normBits))
+			// put freq & norm
+			err := tfEncoder.Add(docNum, freqs[offset], uint64(math.Float32bits(norms[offset])))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -347,10 +338,10 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 		if err != nil {
 			return nil, nil, err
 		}
-
 	}
 
 	// now do it again for the locations
+	locOffsets := make([]uint64, 0, len(memSegment.Postings))
 	locEncoder := newChunkedIntCoder(uint64(chunkFactor), uint64(len(memSegment.Stored)-1))
 	for postingID := range memSegment.Postings {
 		if postingID != 0 {
@@ -367,45 +358,20 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 		var locOffset int
 		for postingsListItr.HasNext() {
 			docNum := uint64(postingsListItr.Next())
-			for i := 0; i < int(freqs[offset]); i++ {
+			n := int(freqs[offset])
+			for i := 0; i < n; i++ {
 				if len(locfields) > 0 {
-					// put field
-					err := locEncoder.Add(docNum, uint64(locfields[locOffset]))
-					if err != nil {
-						return nil, nil, err
-					}
-
-					// put pos
-					err = locEncoder.Add(docNum, locpos[locOffset])
-					if err != nil {
-						return nil, nil, err
-					}
-
-					// put start
-					err = locEncoder.Add(docNum, locstarts[locOffset])
-					if err != nil {
-						return nil, nil, err
-					}
-
-					// put end
-					err = locEncoder.Add(docNum, locends[locOffset])
-					if err != nil {
-						return nil, nil, err
-					}
-
-					// put the number of array positions to follow
-					num := len(locarraypos[locOffset])
-					err = locEncoder.Add(docNum, uint64(num))
+					err := locEncoder.Add(docNum, uint64(locfields[locOffset]),
+						locpos[locOffset], locstarts[locOffset], locends[locOffset],
+						uint64(len(locarraypos[locOffset])))
 					if err != nil {
 						return nil, nil, err
 					}
 
 					// put each array position
-					for _, pos := range locarraypos[locOffset] {
-						err = locEncoder.Add(docNum, pos)
-						if err != nil {
-							return nil, nil, err
-						}
+					err = locEncoder.Add(docNum, locarraypos[locOffset]...)
+					if err != nil {
+						return nil, nil, err
 					}
 				}
 				locOffset++
@@ -414,14 +380,16 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 		}
 
 		// record where this postings loc info starts
-		locOfffsets = append(locOfffsets, uint64(w.Count()))
+		locOffsets = append(locOffsets, uint64(w.Count()))
+
 		locEncoder.Close()
 		_, err := locEncoder.Write(w)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
-	return freqOffsets, locOfffsets, nil
+
+	return freqOffsets, locOffsets, nil
 }
 
 func persistPostingsLocs(memSegment *mem.Segment, w *CountHashWriter) (rv []uint64, err error) {
@@ -532,6 +500,9 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 	fieldChunkOffsets := make(map[uint16]uint64, len(memSegment.FieldsInv))
 	fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), uint64(len(memSegment.Stored)-1))
 
+	var postings *mem.PostingsList
+	var postingsItr *mem.PostingsIterator
+
 	for fieldID := range memSegment.DocValueFields {
 		field := memSegment.FieldsInv[fieldID]
 		docTermMap := make(map[uint64][]byte, 0)
@@ -543,17 +514,17 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 		dictItr := dict.Iterator()
 		next, err := dictItr.Next()
 		for err == nil && next != nil {
-			postings, err1 := dict.PostingsList(next.Term, nil)
+			var err1 error
+			postings, err1 = dict.(*mem.Dictionary).InitPostingsList(next.Term, nil, postings)
 			if err1 != nil {
 				return nil, err
 			}
 
-			postingsItr := postings.Iterator()
+			postingsItr = postings.InitIterator(postingsItr)
 			nextPosting, err2 := postingsItr.Next()
 			for err2 == nil && nextPosting != nil {
 				docNum := nextPosting.Number()
-				docTermMap[docNum] = append(docTermMap[docNum], []byte(next.Term)...)
-				docTermMap[docNum] = append(docTermMap[docNum], termSeparator)
+				docTermMap[docNum] = append(append(docTermMap[docNum], []byte(next.Term)...), termSeparator)
 				nextPosting, err2 = postingsItr.Next()
 			}
 			if err2 != nil {
@@ -562,12 +533,12 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 
 			next, err = dictItr.Next()
 		}
-
 		if err != nil {
 			return nil, err
 		}
+
 		// sort wrt to docIDs
-		var docNumbers docIDRange
+		docNumbers := make(docIDRange, 0, len(docTermMap))
 		for k := range docTermMap {
 			docNumbers = append(docNumbers, k)
 		}

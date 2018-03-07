@@ -15,13 +15,22 @@
 package mem
 
 import (
+	"reflect"
 	"sort"
 	"strings"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizeDictionary int
+
+func init() {
+	var d Dictionary
+	reflectStaticSizeDictionary = int(reflect.TypeOf(d).Size())
+}
 
 // Dictionary is the in-memory representation of the term dictionary
 type Dictionary struct {
@@ -30,15 +39,34 @@ type Dictionary struct {
 	fieldID uint16
 }
 
+func (d *Dictionary) Size() int {
+	sizeInBytes := reflectStaticSizeDictionary + size.SizeOfPtr +
+		len(d.field)
+
+	if d.segment != nil {
+		sizeInBytes += int(d.segment.Size())
+	}
+
+	return sizeInBytes
+}
+
 // PostingsList returns the postings list for the specified term
 func (d *Dictionary) PostingsList(term string,
 	except *roaring.Bitmap) (segment.PostingsList, error) {
-	return &PostingsList{
-		dictionary: d,
-		term:       term,
-		postingsID: d.segment.Dicts[d.fieldID][term],
-		except:     except,
-	}, nil
+	return d.InitPostingsList(term, except, nil)
+}
+
+func (d *Dictionary) InitPostingsList(term string, except *roaring.Bitmap,
+	prealloc *PostingsList) (*PostingsList, error) {
+	rv := prealloc
+	if rv == nil {
+		rv = &PostingsList{}
+	}
+	rv.dictionary = d
+	rv.term = term
+	rv.postingsID = d.segment.Dicts[d.fieldID][term]
+	rv.except = except
+	return rv, nil
 }
 
 // Iterator returns an iterator for this dictionary

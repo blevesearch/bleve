@@ -16,12 +16,25 @@ package scorer
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizeDisjunctionQueryScorer int
+
+func init() {
+	var dqs DisjunctionQueryScorer
+	reflectStaticSizeDisjunctionQueryScorer = int(reflect.TypeOf(dqs).Size())
+}
 
 type DisjunctionQueryScorer struct {
 	options search.SearcherOptions
+}
+
+func (s *DisjunctionQueryScorer) Size() int {
+	return reflectStaticSizeDisjunctionQueryScorer + size.SizeOfPtr
 }
 
 func NewDisjunctionQueryScorer(options search.SearcherOptions) *DisjunctionQueryScorer {

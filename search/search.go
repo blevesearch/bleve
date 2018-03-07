@@ -16,10 +16,25 @@ package search
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizeDocumentMatch int
+var reflectStaticSizeSearchContext int
+var reflectStaticSizeLocation int
+
+func init() {
+	var dm DocumentMatch
+	reflectStaticSizeDocumentMatch = int(reflect.TypeOf(dm).Size())
+	var sc SearchContext
+	reflectStaticSizeSearchContext = int(reflect.TypeOf(sc).Size())
+	var l Location
+	reflectStaticSizeLocation = int(reflect.TypeOf(l).Size())
+}
 
 type ArrayPositions []uint64
 
@@ -45,6 +60,11 @@ type Location struct {
 
 	// ArrayPositions contains the positions of the term within any elements.
 	ArrayPositions ArrayPositions `json:"array_positions"`
+}
+
+func (l *Location) Size() int {
+	return reflectStaticSizeLocation + size.SizeOfPtr +
+		len(l.ArrayPositions)*size.SizeOfUint64
 }
 
 type Locations []*Location
@@ -117,6 +137,52 @@ func (dm *DocumentMatch) Reset() *DocumentMatch {
 	return dm
 }
 
+func (dm *DocumentMatch) Size() int {
+	sizeInBytes := reflectStaticSizeDocumentMatch + size.SizeOfPtr +
+		len(dm.Index) +
+		len(dm.ID) +
+		len(dm.IndexInternalID)
+
+	if dm.Expl != nil {
+		sizeInBytes += dm.Expl.Size()
+	}
+
+	for k, v := range dm.Locations {
+		sizeInBytes += size.SizeOfString + len(k)
+		for k1, v1 := range v {
+			sizeInBytes += size.SizeOfString + len(k1) +
+				size.SizeOfSlice
+			for _, entry := range v1 {
+				sizeInBytes += entry.Size()
+			}
+		}
+	}
+
+	for k, v := range dm.Fragments {
+		sizeInBytes += size.SizeOfString + len(k) +
+			size.SizeOfSlice
+
+		for _, entry := range v {
+			sizeInBytes += size.SizeOfString + len(entry)
+		}
+	}
+
+	for _, entry := range dm.Sort {
+		sizeInBytes += size.SizeOfString + len(entry)
+	}
+
+	for k, _ := range dm.Fields {
+		sizeInBytes += size.SizeOfString + len(k) +
+			size.SizeOfPtr
+	}
+
+	if dm.Document != nil {
+		sizeInBytes += dm.Document.Size()
+	}
+
+	return sizeInBytes
+}
+
 func (dm *DocumentMatch) String() string {
 	return fmt.Sprintf("[%s-%f]", string(dm.IndexInternalID), dm.Score)
 }
@@ -135,6 +201,7 @@ type Searcher interface {
 	SetQueryNorm(float64)
 	Count() uint64
 	Min() int
+	Size() int
 
 	DocumentMatchPoolSize() int
 }
@@ -147,4 +214,19 @@ type SearcherOptions struct {
 // SearchContext represents the context around a single search
 type SearchContext struct {
 	DocumentMatchPool *DocumentMatchPool
+}
+
+func (sc *SearchContext) Size() int {
+	sizeInBytes := reflectStaticSizeSearchContext + size.SizeOfPtr +
+		reflectStaticSizeDocumentMatchPool + size.SizeOfPtr
+
+	if sc.DocumentMatchPool != nil {
+		for _, entry := range sc.DocumentMatchPool.avail {
+			if entry != nil {
+				sizeInBytes += entry.Size()
+			}
+		}
+	}
+
+	return sizeInBytes
 }

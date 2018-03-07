@@ -82,6 +82,19 @@ func (c *chunkedIntCoder) Add(docNum uint64, vals ...uint64) error {
 	return nil
 }
 
+func (c *chunkedIntCoder) AddBytes(docNum uint64, buf []byte) error {
+	chunk := docNum / c.chunkSize
+	if chunk != c.currChunk {
+		// starting a new chunk
+		c.Close()
+		c.chunkBuf.Reset()
+		c.currChunk = chunk
+	}
+
+	_, err := c.chunkBuf.Write(buf)
+	return err
+}
+
 // Close indicates you are done calling Add() this allows the final chunk
 // to be encoded.
 func (c *chunkedIntCoder) Close() {

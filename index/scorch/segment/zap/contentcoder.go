@@ -18,9 +18,17 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"reflect"
 
 	"github.com/golang/snappy"
 )
+
+var reflectStaticSizeMetaData int
+
+func init() {
+	var md MetaData
+	reflectStaticSizeMetaData = int(reflect.TypeOf(md).Size())
+}
 
 var termSeparator byte = 0xff
 var termSeparatorSplitSlice = []byte{termSeparator}

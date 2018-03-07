@@ -45,7 +45,7 @@ func NewFromAnalyzedDocs(results []*index.AnalysisResult) *Segment {
 	}
 
 	// compute memory usage of segment
-	s.updateSizeInBytes()
+	s.updateSize()
 
 	// professional debugging
 	//
@@ -222,18 +222,16 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 		}
 	}
 
-	storeField := func(docNum uint64, field uint16, typ byte, val []byte, pos []uint64) {
-		s.Stored[docNum][field] = append(s.Stored[docNum][field], val)
-		s.StoredTypes[docNum][field] = append(s.StoredTypes[docNum][field], typ)
-		s.StoredPos[docNum][field] = append(s.StoredPos[docNum][field], pos)
-	}
-
 	// walk each composite field
 	for _, field := range result.Document.CompositeFields {
 		fieldID := uint16(s.getOrDefineField(field.Name()))
 		l, tf := field.Analyze()
 		processField(fieldID, field.Name(), l, tf)
 	}
+
+	docStored := s.Stored[docNum]
+	docStoredTypes := s.StoredTypes[docNum]
+	docStoredPos := s.StoredPos[docNum]
 
 	// walk each field
 	for i, field := range result.Document.Fields {
@@ -242,7 +240,9 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 		tf := result.Analyzed[i]
 		processField(fieldID, field.Name(), l, tf)
 		if field.Options().IsStored() {
-			storeField(docNum, fieldID, encodeFieldType(field), field.Value(), field.ArrayPositions())
+			docStored[fieldID] = append(docStored[fieldID], field.Value())
+			docStoredTypes[fieldID] = append(docStoredTypes[fieldID], encodeFieldType(field))
+			docStoredPos[fieldID] = append(docStoredPos[fieldID], field.ArrayPositions())
 		}
 
 		if field.Options().IncludeDocValues() {
@@ -252,12 +252,14 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 
 	// now that its been rolled up into docMap, walk that
 	for fieldID, tokenFrequencies := range docMap {
+		dict := s.Dicts[fieldID]
+		norm := float32(1.0 / math.Sqrt(float64(fieldLens[fieldID])))
 		for term, tokenFreq := range tokenFrequencies {
-			pid := s.Dicts[fieldID][term] - 1
+			pid := dict[term] - 1
 			bs := s.Postings[pid]
 			bs.AddInt(int(docNum))
 			s.Freqs[pid] = append(s.Freqs[pid], uint64(tokenFreq.Frequency()))
-			s.Norms[pid] = append(s.Norms[pid], float32(1.0/math.Sqrt(float64(fieldLens[fieldID]))))
+			s.Norms[pid] = append(s.Norms[pid], norm)
 			locationBS := s.PostingsLocs[pid]
 			if len(tokenFreq.Locations) > 0 {
 				locationBS.AddInt(int(docNum))

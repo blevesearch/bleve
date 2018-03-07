@@ -50,6 +50,10 @@ const storePath = "store"
 
 var mappingInternalKey = []byte("_mapping")
 
+const SearchMemCheckCallbackKey = "_search_mem_callback_key"
+
+type SearchMemCheckCallbackFn func(size uint64) error
+
 func indexStorePath(path string) string {
 	return path + string(os.PathSeparator) + storePath
 }
@@ -362,8 +366,59 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 	return i.SearchInContext(context.Background(), req)
 }
 
+// memNeededForSearch is a helper function that returns an estimate of RAM
+// needed to execute a search request.
+func memNeededForSearch(req *SearchRequest,
+	searcher search.Searcher,
+	topnCollector *collector.TopNCollector) uint64 {
+
+	backingSize := req.Size + req.From + 1
+	if req.Size+req.From > collector.PreAllocSizeSkipCap {
+		backingSize = collector.PreAllocSizeSkipCap + 1
+	}
+	numDocMatches := backingSize + searcher.DocumentMatchPoolSize()
+
+	estimate := 0
+
+	// overhead, size in bytes from collector
+	estimate += topnCollector.Size()
+
+	var dm search.DocumentMatch
+	sizeOfDocumentMatch := dm.Size()
+
+	// pre-allocing DocumentMatchPool
+	var sc search.SearchContext
+	estimate += sc.Size() + numDocMatches*sizeOfDocumentMatch
+
+	// searcher overhead
+	estimate += searcher.Size()
+
+	// overhead from results, lowestMatchOutsideResults
+	estimate += (numDocMatches + 1) * sizeOfDocumentMatch
+
+	// additional overhead from SearchResult
+	var sr SearchResult
+	estimate += sr.Size()
+
+	// overhead from facet results
+	if req.Facets != nil {
+		var fr search.FacetResult
+		estimate += len(req.Facets) * fr.Size()
+	}
+
+	// highlighting, store
+	var d document.Document
+	if len(req.Fields) > 0 || req.Highlight != nil {
+		for i := 0; i < (req.Size + req.From); i++ { // size + from => number of hits
+			estimate += (req.Size + req.From) * d.Size()
+		}
+	}
+
+	return uint64(estimate)
+}
+
 // SearchInContext executes a search request operation within the provided
-// Context.  Returns a SearchResult object or an error.
+// Context. Returns a SearchResult object or an error.
 func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr *SearchResult, err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -426,6 +481,15 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			}
 		}
 		collector.SetFacetsBuilder(facetsBuilder)
+	}
+
+	if memCb := ctx.Value(SearchMemCheckCallbackKey); memCb != nil {
+		if memCbFn, ok := memCb.(SearchMemCheckCallbackFn); ok {
+			err = memCbFn(memNeededForSearch(req, searcher, collector))
+		}
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	err = collector.Collect(ctx, searcher, indexReader)

@@ -19,11 +19,29 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"reflect"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/Smerity/govarint"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizePostingsList int
+var reflectStaticSizePostingsIterator int
+var reflectStaticSizePosting int
+var reflectStaticSizeLocation int
+
+func init() {
+	var pl PostingsList
+	reflectStaticSizePostingsList = int(reflect.TypeOf(pl).Size())
+	var pi PostingsIterator
+	reflectStaticSizePostingsIterator = int(reflect.TypeOf(pi).Size())
+	var p Posting
+	reflectStaticSizePosting = int(reflect.TypeOf(p).Size())
+	var l Location
+	reflectStaticSizeLocation = int(reflect.TypeOf(l).Size())
+}
 
 // PostingsList is an in-memory represenation of a postings list
 type PostingsList struct {
@@ -36,6 +54,28 @@ type PostingsList struct {
 	except         *roaring.Bitmap
 }
 
+func (p *PostingsList) Size() int {
+	sizeInBytes := reflectStaticSizePostingsList + size.SizeOfPtr
+
+	if p.sb != nil {
+		sizeInBytes += (p.sb.Size() - len(p.sb.mem)) // do not include the mmap'ed part
+	}
+
+	if p.locBitmap != nil {
+		sizeInBytes += int(p.locBitmap.GetSizeInBytes())
+	}
+
+	if p.postings != nil {
+		sizeInBytes += int(p.postings.GetSizeInBytes())
+	}
+
+	if p.except != nil {
+		sizeInBytes += int(p.except.GetSizeInBytes())
+	}
+
+	return sizeInBytes
+}
+
 // Iterator returns an iterator for this postings list
 func (p *PostingsList) Iterator() segment.PostingsIterator {
 	return p.iterator(nil)
@@ -45,7 +85,25 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 	if rv == nil {
 		rv = &PostingsIterator{}
 	} else {
+		freqNormReader := rv.freqNormReader
+		if freqNormReader != nil {
+			freqNormReader.Reset([]byte(nil))
+		}
+		freqNormDecoder := rv.freqNormDecoder
+
+		locReader := rv.locReader
+		if locReader != nil {
+			locReader.Reset([]byte(nil))
+		}
+		locDecoder := rv.locDecoder
+
 		*rv = PostingsIterator{} // clear the struct
+
+		rv.freqNormReader = freqNormReader
+		rv.freqNormDecoder = freqNormDecoder
+
+		rv.locReader = locReader
+		rv.locDecoder = locDecoder
 	}
 	rv.postings = p
 
@@ -175,6 +233,25 @@ type PostingsIterator struct {
 	nextLocs []Location // reused across Next() calls
 }
 
+func (i *PostingsIterator) Size() int {
+	sizeInBytes := reflectStaticSizePostingsIterator + size.SizeOfPtr +
+		len(i.currChunkFreqNorm) +
+		len(i.currChunkLoc) +
+		len(i.freqChunkLens)*size.SizeOfUint64 +
+		len(i.locChunkLens)*size.SizeOfUint64 +
+		i.next.Size()
+
+	if i.locBitmap != nil {
+		sizeInBytes += int(i.locBitmap.GetSizeInBytes())
+	}
+
+	for _, entry := range i.nextLocs {
+		sizeInBytes += entry.Size()
+	}
+
+	return sizeInBytes
+}
+
 func (i *PostingsIterator) loadChunk(chunk int) error {
 	if chunk >= len(i.freqChunkLens) || chunk >= len(i.locChunkLens) {
 		return fmt.Errorf("tried to load chunk that doesn't exist %d/(%d %d)", chunk, len(i.freqChunkLens), len(i.locChunkLens))
@@ -279,75 +356,23 @@ func (i *PostingsIterator) readLocation(l *Location) error {
 
 // Next returns the next posting on the postings list, or nil at the end
 func (i *PostingsIterator) Next() (segment.Posting, error) {
-	if i.actual == nil || !i.actual.HasNext() {
-		return nil, nil
-	}
-	n := i.actual.Next()
-	nChunk := n / i.postings.sb.chunkFactor
-	allN := i.all.Next()
-	allNChunk := allN / i.postings.sb.chunkFactor
-
-	// n is the next actual hit (excluding some postings)
-	// allN is the next hit in the full postings
-	// if they don't match, adjust offsets to factor in item we're skipping over
-	// incr the all iterator, and check again
-	for allN != n {
-
-		// in different chunks, reset offsets
-		if allNChunk != nChunk {
-			i.locoffset = 0
-			i.offset = 0
-		} else {
-
-			if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
-				err := i.loadChunk(int(nChunk))
-				if err != nil {
-					return nil, fmt.Errorf("error loading chunk: %v", err)
-				}
-			}
-
-			// read off freq/offsets even though we don't care about them
-			freq, _, err := i.readFreqNorm()
-			if err != nil {
-				return nil, err
-			}
-			if i.locBitmap.Contains(allN) {
-				for j := 0; j < int(freq); j++ {
-					err := i.readLocation(nil)
-					if err != nil {
-						return nil, err
-					}
-				}
-			}
-
-			// in same chunk, need to account for offsets
-			i.offset++
-		}
-
-		allN = i.all.Next()
-	}
-
-	if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
-		err := i.loadChunk(int(nChunk))
-		if err != nil {
-			return nil, fmt.Errorf("error loading chunk: %v", err)
-		}
+	docNum, exists, err := i.nextDocNum()
+	if err != nil || !exists {
+		return nil, err
 	}
 
 	reuseLocs := i.next.locs // hold for reuse before struct clearing
 	i.next = Posting{}       // clear the struct
 	rv := &i.next
-	rv.iterator = i
-	rv.docNum = uint64(n)
+	rv.docNum = docNum
 
-	var err error
 	var normBits uint64
 	rv.freq, normBits, err = i.readFreqNorm()
 	if err != nil {
 		return nil, err
 	}
 	rv.norm = math.Float32frombits(uint32(normBits))
-	if i.locBitmap.Contains(n) {
+	if i.locBitmap.Contains(uint32(docNum)) {
 		// read off 'freq' locations, into reused slices
 		if cap(i.nextLocs) >= int(rv.freq) {
 			i.nextLocs = i.nextLocs[0:rv.freq]
@@ -371,14 +396,121 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 	return rv, nil
 }
 
+// nextBytes returns the docNum and the encoded freq & loc bytes for
+// the next posting
+func (i *PostingsIterator) nextBytes() (uint64, []byte, []byte, error) {
+	docNum, exists, err := i.nextDocNum()
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	if !exists {
+		return 0, nil, nil, nil
+	}
+
+	startFreqNorm := len(i.currChunkFreqNorm) - i.freqNormReader.Len()
+
+	freq, _, err := i.readFreqNorm()
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	endFreqNorm := len(i.currChunkFreqNorm) - i.freqNormReader.Len()
+	bytesFreqNorm := i.currChunkFreqNorm[startFreqNorm:endFreqNorm]
+
+	var bytesLoc []byte
+	if i.locBitmap.Contains(uint32(docNum)) {
+		startLoc := len(i.currChunkLoc) - i.locReader.Len()
+
+		for j := uint64(0); j < freq; j++ {
+			err := i.readLocation(nil)
+			if err != nil {
+				return 0, nil, nil, err
+			}
+		}
+
+		endLoc := len(i.currChunkLoc) - i.locReader.Len()
+		bytesLoc = i.currChunkLoc[startLoc:endLoc]
+	}
+
+	return docNum, bytesFreqNorm, bytesLoc, nil
+}
+
+// nextDocNum returns the next docNum on the postings list, and also
+// sets up the currChunk / loc related fields of the iterator.
+func (i *PostingsIterator) nextDocNum() (uint64, bool, error) {
+	if i.actual == nil || !i.actual.HasNext() {
+		return 0, false, nil
+	}
+
+	n := i.actual.Next()
+	nChunk := n / i.postings.sb.chunkFactor
+	allN := i.all.Next()
+	allNChunk := allN / i.postings.sb.chunkFactor
+
+	// n is the next actual hit (excluding some postings)
+	// allN is the next hit in the full postings
+	// if they don't match, adjust offsets to factor in item we're skipping over
+	// incr the all iterator, and check again
+	for allN != n {
+		// in different chunks, reset offsets
+		if allNChunk != nChunk {
+			i.locoffset = 0
+			i.offset = 0
+		} else {
+			if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
+				err := i.loadChunk(int(nChunk))
+				if err != nil {
+					return 0, false, fmt.Errorf("error loading chunk: %v", err)
+				}
+			}
+
+			// read off freq/offsets even though we don't care about them
+			freq, _, err := i.readFreqNorm()
+			if err != nil {
+				return 0, false, err
+			}
+			if i.locBitmap.Contains(allN) {
+				for j := 0; j < int(freq); j++ {
+					err := i.readLocation(nil)
+					if err != nil {
+						return 0, false, err
+					}
+				}
+			}
+
+			// in same chunk, need to account for offsets
+			i.offset++
+		}
+
+		allN = i.all.Next()
+	}
+
+	if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
+		err := i.loadChunk(int(nChunk))
+		if err != nil {
+			return 0, false, fmt.Errorf("error loading chunk: %v", err)
+		}
+	}
+
+	return uint64(n), true, nil
+}
+
 // Posting is a single entry in a postings list
 type Posting struct {
-	iterator *PostingsIterator
-	docNum   uint64
+	docNum uint64
+	freq   uint64
+	norm   float32
+	locs   []segment.Location
+}
 
-	freq uint64
-	norm float32
-	locs []segment.Location
+func (p *Posting) Size() int {
+	sizeInBytes := reflectStaticSizePosting
+
+	for _, entry := range p.locs {
+		sizeInBytes += entry.Size()
+	}
+
+	return sizeInBytes
 }
 
 // Number returns the document number of this posting in this segment
@@ -408,6 +540,12 @@ type Location struct {
 	start uint64
 	end   uint64
 	ap    []uint64
+}
+
+func (l *Location) Size() int {
+	return reflectStaticSizeLocation +
+		len(l.field) +
+		len(l.ap)*size.SizeOfUint64
 }
 
 // Field returns the name of the field (useful in composite fields to know

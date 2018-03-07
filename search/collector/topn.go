@@ -16,11 +16,20 @@ package collector
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/size"
 )
+
+var reflectStaticSizeTopNCollector int
+
+func init() {
+	var coll TopNCollector
+	reflectStaticSizeTopNCollector = int(reflect.TypeOf(coll).Size())
+}
 
 type collectorStore interface {
 	// Add the document, and if the new store size exceeds the provided size
@@ -96,6 +105,22 @@ func NewTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector 
 	hc.cachedDesc = sort.CacheDescending()
 
 	return hc
+}
+
+func (hc *TopNCollector) Size() int {
+	sizeInBytes := reflectStaticSizeTopNCollector + size.SizeOfPtr
+
+	if hc.facetsBuilder != nil {
+		sizeInBytes += hc.facetsBuilder.Size()
+	}
+
+	for _, entry := range hc.neededFields {
+		sizeInBytes += len(entry) + size.SizeOfString
+	}
+
+	sizeInBytes += len(hc.cachedScoring) + len(hc.cachedDesc)
+
+	return sizeInBytes
 }
 
 // Collect goes to the index to find the matching documents
