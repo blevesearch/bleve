@@ -399,3 +399,18 @@ func TestSearchResultFacetsMerge(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", expected, l)
 	}
 }
+
+func TestMemoryNeededForSearchResult(t *testing.T) {
+	query := NewTermQuery("blah")
+	req := NewSearchRequest(query)
+
+	var sr SearchResult
+	expect := sr.Size()
+	var dm search.DocumentMatch
+	expect += 10 * dm.Size()
+
+	estimate := MemoryNeededForSearchResult(req)
+	if estimate != uint64(expect) {
+		t.Errorf("estimate not what is expected: %v != %v", estimate, expect)
+	}
+}
