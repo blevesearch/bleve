@@ -515,7 +515,7 @@ func persistDocValues(memSegment *mem.Segment, w *CountHashWriter,
 			var err1 error
 			postings, err1 = dict.(*mem.Dictionary).InitPostingsList(next.Term, nil, postings)
 			if err1 != nil {
-				return nil, err
+				return nil, err1
 			}
 
 			postingsItr = postings.InitIterator(postingsItr)
