@@ -394,13 +394,12 @@ func persistPostingDetails(memSegment *mem.Segment, w *CountHashWriter, chunkFac
 
 func persistPostingsLocs(memSegment *mem.Segment, w *CountHashWriter) (rv []uint64, err error) {
 	rv = make([]uint64, 0, len(memSegment.PostingsLocs))
-	var reuseBuf bytes.Buffer
 	reuseBufVarint := make([]byte, binary.MaxVarintLen64)
 	for postingID := range memSegment.PostingsLocs {
 		// record where we start this posting loc
 		rv = append(rv, uint64(w.Count()))
 		// write out the length and bitmap
-		_, err = writeRoaringWithLen(memSegment.PostingsLocs[postingID], w, &reuseBuf, reuseBufVarint)
+		_, err = writeRoaringWithLen(memSegment.PostingsLocs[postingID], w, reuseBufVarint)
 		if err != nil {
 			return nil, err
 		}
@@ -411,7 +410,6 @@ func persistPostingsLocs(memSegment *mem.Segment, w *CountHashWriter) (rv []uint
 func persistPostingsLists(memSegment *mem.Segment, w *CountHashWriter,
 	postingsListLocs, freqOffsets, locOffsets []uint64) (rv []uint64, err error) {
 	rv = make([]uint64, 0, len(memSegment.Postings))
-	var reuseBuf bytes.Buffer
 	reuseBufVarint := make([]byte, binary.MaxVarintLen64)
 	for postingID := range memSegment.Postings {
 		// record where we start this posting list
@@ -425,7 +423,7 @@ func persistPostingsLists(memSegment *mem.Segment, w *CountHashWriter,
 		}
 
 		// write out the length and bitmap
-		_, err = writeRoaringWithLen(memSegment.Postings[postingID], w, &reuseBuf, reuseBufVarint)
+		_, err = writeRoaringWithLen(memSegment.Postings[postingID], w, reuseBufVarint)
 		if err != nil {
 			return nil, err
 		}

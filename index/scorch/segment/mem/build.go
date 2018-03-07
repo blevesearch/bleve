@@ -111,13 +111,15 @@ func (s *Segment) initializeDict(results []*index.AnalysisResult) {
 	}
 
 	processField := func(fieldID uint16, tfs analysis.TokenFrequencies) {
+		dict := s.Dicts[fieldID]
+		dictKeys := s.DictKeys[fieldID]
 		for term, tf := range tfs {
-			pidPlus1, exists := s.Dicts[fieldID][term]
+			pidPlus1, exists := dict[term]
 			if !exists {
 				numPostingsLists++
 				pidPlus1 = uint64(numPostingsLists)
-				s.Dicts[fieldID][term] = pidPlus1
-				s.DictKeys[fieldID] = append(s.DictKeys[fieldID], term)
+				dict[term] = pidPlus1
+				dictKeys = append(dictKeys, term)
 				numTermsPerPostingsList = append(numTermsPerPostingsList, 0)
 				numLocsPerPostingsList = append(numLocsPerPostingsList, 0)
 			}
@@ -127,6 +129,7 @@ func (s *Segment) initializeDict(results []*index.AnalysisResult) {
 			totLocs += len(tf.Locations)
 		}
 		numTokenFrequencies += len(tfs)
+		s.DictKeys[fieldID] = dictKeys
 	}
 
 	for _, result := range results {
