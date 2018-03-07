@@ -28,7 +28,7 @@ import (
 	"github.com/golang/snappy"
 )
 
-const version uint32 = 3
+const version uint32 = 4
 
 const fieldNotUninverted = math.MaxUint64
 

@@ -18,7 +18,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"math"
 
+	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 	"github.com/couchbase/vellum"
 	"github.com/spf13/cobra"
 )
@@ -57,7 +59,19 @@ var exploreCmd = &cobra.Command{
 					return fmt.Errorf("error looking for term : %v", err)
 				}
 				if exists {
-					fmt.Printf("postings list begins at %d (%x)\n", postingsAddr, postingsAddr)
+					fmt.Printf("fst val is %d (%x)\n", postingsAddr, postingsAddr)
+
+					if postingsAddr&zap.FSTValEncodingMask == zap.FSTValEncoding1Hit {
+						docNum, normBits := zap.FSTValDecode1Hit(postingsAddr)
+						norm := math.Float32frombits(uint32(normBits))
+						fmt.Printf("Posting List is 1-hit encoded, docNum: %d, norm: %f\n",
+							docNum, norm)
+						return nil
+					}
+
+					if postingsAddr&zap.FSTValEncodingMask != zap.FSTValEncodingGeneral {
+						return fmt.Errorf("unknown fst val encoding")
+					}
 
 					var n uint64
 					freqAddr, read := binary.Uvarint(data[postingsAddr : postingsAddr+binary.MaxVarintLen64])

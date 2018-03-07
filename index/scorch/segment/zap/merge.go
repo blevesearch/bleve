@@ -225,6 +225,21 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 		newRoaring := roaring.NewBitmap()
 		newRoaringLocs := roaring.NewBitmap()
 
+		var lastDocNum, lastFreq, lastNorm uint64
+
+		// determines whether to use "1-hit" encoding optimization
+		// when a term appears in only 1 doc, with no loc info,
+		// has freq of 1, and the docNum fits into 31-bits
+		use1HitEncoding := func(termCardinality uint64) (bool, uint64, uint64) {
+			if termCardinality == uint64(1) && locEncoder.FinalSize() <= 0 {
+				docNum := uint64(newRoaring.Minimum())
+				if under32Bits(docNum) && docNum == lastDocNum && lastFreq == 1 {
+					return true, docNum, lastNorm
+				}
+			}
+			return false, 0, 0
+		}
+
 		finishTerm := func(term []byte) error {
 			if term == nil {
 				return nil
@@ -233,8 +248,16 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 			tfEncoder.Close()
 			locEncoder.Close()
 
-			if newRoaring.GetCardinality() > 0 {
-				// this field/term actually has hits in the new segment, lets write it down
+			termCardinality := newRoaring.GetCardinality()
+
+			encodeAs1Hit, docNum1Hit, normBits1Hit := use1HitEncoding(termCardinality)
+			if encodeAs1Hit {
+				err = newVellum.Insert(term, FSTValEncode1Hit(docNum1Hit, normBits1Hit))
+				if err != nil {
+					return err
+				}
+			} else if termCardinality > 0 {
+				// this field/term has hits in the new segment
 				freqOffset := uint64(w.Count())
 				_, err := tfEncoder.Write(w)
 				if err != nil {
@@ -251,7 +274,6 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 					return err
 				}
 				postingOffset := uint64(w.Count())
-
 				// write out the start of the term info
 				n := binary.PutUvarint(bufMaxVarintLen64, freqOffset)
 				_, err = w.Write(bufMaxVarintLen64[:n])
@@ -287,6 +309,10 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 			tfEncoder.Reset()
 			locEncoder.Reset()
 
+			lastDocNum = 0
+			lastFreq = 0
+			lastNorm = 0
+
 			return nil
 		}
 
@@ -315,7 +341,8 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 
 			postItr = postings.iterator(postItr)
 
-			nextDocNum, nextFreqNormBytes, nextLocBytes, err2 := postItr.nextBytes()
+			nextDocNum, nextFreq, nextNorm, nextFreqNormBytes, nextLocBytes, err2 :=
+				postItr.nextBytes()
 			for err2 == nil && len(nextFreqNormBytes) > 0 {
 				hitNewDocNum := newDocNumsI[nextDocNum]
 				if hitNewDocNum == docDropped {
@@ -339,7 +366,12 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				docTermMap[hitNewDocNum] =
 					append(append(docTermMap[hitNewDocNum], term...), termSeparator)
 
-				nextDocNum, nextFreqNormBytes, nextLocBytes, err2 = postItr.nextBytes()
+				lastDocNum = hitNewDocNum
+				lastFreq = nextFreq
+				lastNorm = nextNorm
+
+				nextDocNum, nextFreq, nextNorm, nextFreqNormBytes, nextLocBytes, err2 =
+					postItr.nextBytes()
 			}
 			if err2 != nil {
 				return nil, 0, err2

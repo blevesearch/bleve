@@ -130,3 +130,7 @@ func (c *chunkedIntCoder) Write(w io.Writer) (int, error) {
 	}
 	return tw, nil
 }
+
+func (c *chunkedIntCoder) FinalSize() int {
+	return len(c.final)
+}

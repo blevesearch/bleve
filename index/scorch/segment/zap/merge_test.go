@@ -859,3 +859,12 @@ func TestMergeBytesWritten(t *testing.T) {
 
 	testMergeWithSelf(t, seg3, 4)
 }
+
+func TestUnder32Bits(t *testing.T) {
+	if !under32Bits(0) || !under32Bits(uint64(0x7fffffff)) {
+		t.Errorf("under32Bits bad")
+	}
+	if under32Bits(uint64(0x80000000)) || under32Bits(uint64(0x80000001)) {
+		t.Errorf("under32Bits wrong")
+	}
+}
