@@ -633,19 +633,14 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 		return 0, err
 	}
 
-	numSnapshotsToKeep := NumSnapshotsToKeep
-	if val, ok := s.config["numSnapshotsToKeep"].(float64); ok && val > 0 {
-		numSnapshotsToKeep = int(val)
-	}
-
-	if len(persistedEpochs) <= numSnapshotsToKeep {
+	if len(persistedEpochs) <= s.numSnapshotsToKeep {
 		// we need to keep everything
 		return 0, nil
 	}
 
 	// make a map of epochs to protect from deletion
-	protectedEpochs := make(map[uint64]struct{}, numSnapshotsToKeep)
-	for _, epoch := range persistedEpochs[0:numSnapshotsToKeep] {
+	protectedEpochs := make(map[uint64]struct{}, s.numSnapshotsToKeep)
+	for _, epoch := range persistedEpochs[0:s.numSnapshotsToKeep] {
 		protectedEpochs[epoch] = struct{}{}
 	}
 
