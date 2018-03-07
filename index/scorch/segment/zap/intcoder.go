@@ -24,7 +24,6 @@ import (
 
 type chunkedIntCoder struct {
 	final     []byte
-	maxDocNum uint64
 	chunkSize uint64
 	chunkBuf  bytes.Buffer
 	encoder   *govarint.Base128Encoder
@@ -41,7 +40,6 @@ func newChunkedIntCoder(chunkSize uint64, maxDocNum uint64) *chunkedIntCoder {
 	total := maxDocNum/chunkSize + 1
 	rv := &chunkedIntCoder{
 		chunkSize: chunkSize,
-		maxDocNum: maxDocNum,
 		chunkLens: make([]uint64, total),
 		final:     make([]byte, 0, 64),
 	}
