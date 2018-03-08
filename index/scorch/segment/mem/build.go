@@ -35,8 +35,10 @@ func NewFromAnalyzedDocs(results []*index.AnalysisResult) *Segment {
 	s.initializeDict(results)
 
 	// walk each doc
+	fieldLensReuse := make([]int, len(s.FieldsMap))
+	docMapReuse := make([]analysis.TokenFrequencies, len(s.FieldsMap))
 	for _, result := range results {
-		s.processDocument(result)
+		s.processDocument(result, fieldLensReuse, docMapReuse)
 	}
 
 	// go back and sort the dictKeys
@@ -209,19 +211,25 @@ func (s *Segment) initializeDict(results []*index.AnalysisResult) {
 	}
 }
 
-func (s *Segment) processDocument(result *index.AnalysisResult) {
-	// used to collate information across fields
-	docMap := make(map[uint16]analysis.TokenFrequencies, len(s.FieldsMap))
-	fieldLens := make(map[uint16]int, len(s.FieldsMap))
+func (s *Segment) processDocument(result *index.AnalysisResult,
+	fieldLens []int, docMap []analysis.TokenFrequencies) {
+	// clear the fieldLens and docMap for reuse
+	n := len(s.FieldsMap)
+	for i := 0; i < n; i++ {
+		fieldLens[i] = 0
+		docMap[i] = nil
+	}
 
 	docNum := uint64(s.addDocument())
 
-	processField := func(field uint16, name string, l int, tf analysis.TokenFrequencies) {
-		fieldLens[field] += l
-		if existingFreqs, ok := docMap[field]; ok {
+	processField := func(fieldID uint16, name string, l int, tf analysis.TokenFrequencies) {
+		fieldLens[fieldID] += l
+
+		existingFreqs := docMap[fieldID]
+		if existingFreqs != nil {
 			existingFreqs.MergeAll(name, tf)
 		} else {
-			docMap[field] = tf
+			docMap[fieldID] = tf
 		}
 	}
 
@@ -274,7 +282,7 @@ func (s *Segment) processDocument(result *index.AnalysisResult) {
 				locarraypos := s.Locarraypos[pid]
 
 				for _, loc := range tokenFreq.Locations {
-					var locf = fieldID
+					var locf = uint16(fieldID)
 					if loc.Field != "" {
 						locf = uint16(s.getOrDefineField(loc.Field))
 					}
