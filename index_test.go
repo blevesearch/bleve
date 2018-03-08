@@ -1871,7 +1871,7 @@ func BenchmarkScorchSearchOverhead(b *testing.B) {
 	benchmarkSearchOverhead(scorch.Name, b)
 }
 
-func TestSearchMemCheckCallback(t *testing.T) {
+func TestSearchQueryCallback(t *testing.T) {
 	defer func() {
 		err := os.RemoveAll("testidx")
 		if err != nil {
@@ -1910,8 +1910,8 @@ func TestSearchMemCheckCallback(t *testing.T) {
 		return nil
 	}
 
-	ctx := context.WithValue(context.Background(), SearchMemCheckCallbackKey,
-		SearchMemCheckCallbackFn(f))
+	ctx := context.WithValue(context.Background(), SearchQueryStartCallbackKey,
+		SearchQueryStartCallbackFn(f))
 	_, err = index.SearchInContext(ctx, req)
 	if err != expErr {
 		t.Fatalf("Expected: %v, Got: %v", expErr, err)

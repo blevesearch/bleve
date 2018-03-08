@@ -50,9 +50,11 @@ const storePath = "store"
 
 var mappingInternalKey = []byte("_mapping")
 
-const SearchMemCheckCallbackKey = "_search_mem_callback_key"
+const SearchQueryStartCallbackKey = "_search_query_start_callback_key"
+const SearchQueryEndCallbackKey = "_search_query_end_callback_key"
 
-type SearchMemCheckCallbackFn func(size uint64) error
+type SearchQueryStartCallbackFn func(size uint64) error
+type SearchQueryEndCallbackFn func(size uint64) error
 
 func indexStorePath(path string) string {
 	return path + string(os.PathSeparator) + storePath
@@ -483,13 +485,22 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		collector.SetFacetsBuilder(facetsBuilder)
 	}
 
-	if memCb := ctx.Value(SearchMemCheckCallbackKey); memCb != nil {
-		if memCbFn, ok := memCb.(SearchMemCheckCallbackFn); ok {
-			err = memCbFn(memNeededForSearch(req, searcher, collector))
+	memNeeded := memNeededForSearch(req, searcher, collector)
+	if cb := ctx.Value(SearchQueryStartCallbackKey); cb != nil {
+		if cbF, ok := cb.(SearchQueryStartCallbackFn); ok {
+			err = cbF(memNeeded)
 		}
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	if cb := ctx.Value(SearchQueryEndCallbackKey); cb != nil {
+		if cbF, ok := cb.(SearchQueryEndCallbackFn); ok {
+			defer func() {
+				_ = cbF(memNeeded)
+			}()
+		}
 	}
 
 	err = collector.Collect(ctx, searcher, indexReader)
