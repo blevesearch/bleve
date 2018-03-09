@@ -71,3 +71,215 @@ func TestChunkIntCoder(t *testing.T) {
 		}
 	}
 }
+
+func TestChunkLengthToOffsets(t *testing.T) {
+
+	tests := []struct {
+		lengths         []uint64
+		expectedOffsets []uint64
+	}{
+		{
+			lengths:         []uint64{5, 5, 5, 5, 5},
+			expectedOffsets: []uint64{5, 5, 10, 15, 20},
+		},
+		{
+			lengths:         []uint64{0, 5, 0, 5, 0},
+			expectedOffsets: []uint64{0, 0, 5, 5, 10},
+		},
+		{
+			lengths:         []uint64{0, 0, 0, 0, 5},
+			expectedOffsets: []uint64{5, 0, 0, 0, 0},
+		},
+		{
+			lengths:         []uint64{5, 0, 0, 0, 0},
+			expectedOffsets: []uint64{0, 5, 5, 5, 5},
+		},
+		{
+			lengths:         []uint64{0, 5, 0, 0, 0},
+			expectedOffsets: []uint64{0, 0, 5, 5, 5},
+		},
+		{
+			lengths:         []uint64{0, 0, 0, 5, 0},
+			expectedOffsets: []uint64{0, 0, 0, 0, 5},
+		},
+		{
+			lengths:         []uint64{0, 0, 0, 5, 5},
+			expectedOffsets: []uint64{5, 0, 0, 0, 5},
+		},
+		{
+			lengths:         []uint64{5, 5, 5, 0, 0},
+			expectedOffsets: []uint64{0, 5, 10, 15, 15},
+		},
+	}
+
+	for i, test := range tests {
+		chunkLengthsToOffsets(test.lengths)
+		if !reflect.DeepEqual(test.expectedOffsets, test.lengths) {
+			t.Errorf("Test: %d failed, got %+v, expected %+v", i, test.lengths, test.expectedOffsets)
+		}
+	}
+}
+
+func TestChunkReadBoundaryFromOffsets(t *testing.T) {
+
+	tests := []struct {
+		chunkNumber   int
+		offsets       []uint64
+		expectedStart uint64
+		expectedEnd   uint64
+	}{
+		{
+			offsets:       []uint64{5, 5, 10, 15, 20},
+			chunkNumber:   4,
+			expectedStart: 20,
+			expectedEnd:   25,
+		},
+		{
+			offsets:       []uint64{5, 5, 10, 15, 20},
+			chunkNumber:   0,
+			expectedStart: 0,
+			expectedEnd:   5,
+		},
+		{
+			offsets:       []uint64{5, 5, 10, 15, 20},
+			chunkNumber:   2,
+			expectedStart: 10,
+			expectedEnd:   15,
+		},
+		{
+			offsets:       []uint64{0, 0, 5, 5, 10},
+			chunkNumber:   4,
+			expectedStart: 10,
+			expectedEnd:   10,
+		},
+		{
+			offsets:       []uint64{0, 0, 5, 5, 10},
+			chunkNumber:   1,
+			expectedStart: 0,
+			expectedEnd:   5,
+		},
+		{
+			offsets:       []uint64{5, 0, 0, 0, 0},
+			chunkNumber:   0,
+			expectedStart: 0,
+			expectedEnd:   0,
+		},
+		{
+			offsets:       []uint64{5, 0, 0, 0, 0},
+			chunkNumber:   4,
+			expectedStart: 0,
+			expectedEnd:   5,
+		},
+		{
+			offsets:       []uint64{5, 0, 0, 0, 0},
+			chunkNumber:   1,
+			expectedStart: 0,
+			expectedEnd:   0,
+		},
+		{
+			offsets:       []uint64{0, 5, 5, 5, 5},
+			chunkNumber:   1,
+			expectedStart: 5,
+			expectedEnd:   5,
+		},
+		{
+			offsets:       []uint64{0, 5, 5, 5, 5},
+			chunkNumber:   0,
+			expectedStart: 0,
+			expectedEnd:   5,
+		},
+		{
+			offsets:       []uint64{0, 0, 5, 5, 5},
+			chunkNumber:   2,
+			expectedStart: 5,
+			expectedEnd:   5,
+		},
+		{
+			offsets:       []uint64{0, 0, 5, 5, 5},
+			chunkNumber:   1,
+			expectedStart: 0,
+			expectedEnd:   5,
+		},
+		{
+			offsets:       []uint64{0, 0, 0, 0, 5},
+			chunkNumber:   4,
+			expectedStart: 5,
+			expectedEnd:   5,
+		},
+		{
+			offsets:       []uint64{0, 0, 0, 0, 5},
+			chunkNumber:   3,
+			expectedStart: 0,
+			expectedEnd:   5,
+		},
+		{
+			offsets:       []uint64{0, 0, 0, 0, 5},
+			chunkNumber:   2,
+			expectedStart: 0,
+			expectedEnd:   0,
+		},
+		{
+			offsets:       []uint64{5, 0, 0, 0, 5},
+			chunkNumber:   0,
+			expectedStart: 0,
+			expectedEnd:   0,
+		},
+		{
+			offsets:       []uint64{5, 0, 0, 0, 5},
+			chunkNumber:   1,
+			expectedStart: 0,
+			expectedEnd:   0,
+		},
+		{
+			offsets:       []uint64{5, 0, 0, 0, 5},
+			chunkNumber:   3,
+			expectedStart: 0,
+			expectedEnd:   5,
+		},
+		{
+			offsets:       []uint64{5, 0, 0, 0, 5},
+			chunkNumber:   4,
+			expectedStart: 5,
+			expectedEnd:   10,
+		},
+		{
+			offsets:       []uint64{0, 5, 10, 15, 15},
+			chunkNumber:   0,
+			expectedStart: 0,
+			expectedEnd:   5,
+		},
+		{
+			offsets:       []uint64{0, 5, 10, 15, 15},
+			chunkNumber:   1,
+			expectedStart: 5,
+			expectedEnd:   10,
+		},
+		{
+			offsets:       []uint64{0, 5, 10, 15, 15},
+			chunkNumber:   2,
+			expectedStart: 10,
+			expectedEnd:   15,
+		},
+		{
+			offsets:       []uint64{0, 5, 10, 15, 15},
+			chunkNumber:   3,
+			expectedStart: 15,
+			expectedEnd:   15,
+		},
+		{
+			offsets:       []uint64{0, 5, 10, 15, 15},
+			chunkNumber:   4,
+			expectedStart: 15,
+			expectedEnd:   15,
+		},
+	}
+
+	for i, test := range tests {
+		s, e := readChunkBoundary(test.chunkNumber, test.offsets)
+		if test.expectedStart != s || test.expectedEnd != e {
+			t.Errorf("Test: %d failed for chunkNumber: %d got start: %d end: %d,"+
+				" expected start: %d end: %d", i, test.chunkNumber, s, e,
+				test.expectedStart, test.expectedEnd)
+		}
+	}
+}

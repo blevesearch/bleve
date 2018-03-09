@@ -156,7 +156,12 @@ func (c *chunkedContentCoder) Write(w io.Writer) (int, error) {
 	if err != nil {
 		return tw, err
 	}
-	// write out the chunk lens
+
+	if len(c.chunkLens) > 1 {
+		chunkLengthsToOffsets(c.chunkLens)
+	}
+
+	// write out the chunk starting offsets
 	for _, chunkLen := range c.chunkLens {
 		n := binary.PutUvarint(buf, uint64(chunkLen))
 		nw, err = w.Write(buf[:n])
