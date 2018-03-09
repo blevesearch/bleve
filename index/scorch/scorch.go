@@ -28,7 +28,6 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
-	"github.com/blevesearch/bleve/index/scorch/segment/mem"
 	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
@@ -289,7 +288,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 
 	var newSegment segment.Segment
 	if len(analysisResults) > 0 {
-		newSegment, err = zap.NewSegmentBase(mem.NewFromAnalyzedDocs(analysisResults), DefaultChunkFactor)
+		newSegment, err = zap.AnalysisResultsToSegmentBase(analysisResults, DefaultChunkFactor)
 		if err != nil {
 			return err
 		}
