@@ -1329,8 +1329,10 @@ func TestIndexDocumentVisitFieldTerms(t *testing.T) {
 	}()
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.IndexField|document.StoreField|document.IncludeTermVectors))
-	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("mister"), document.IndexField|document.StoreField|document.IncludeTermVectors))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"),
+		document.IndexField|document.StoreField|document.IncludeTermVectors|document.DocValues))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("mister"),
+		document.IndexField|document.StoreField|document.IncludeTermVectors|document.DocValues))
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -1512,8 +1514,10 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 	}()
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.IndexField|document.StoreField|document.IncludeTermVectors))
-	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("mister"), document.IndexField|document.StoreField|document.IncludeTermVectors))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"),
+		document.IndexField|document.StoreField|document.IncludeTermVectors|document.DocValues))
+	doc.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("mister"),
+		document.IndexField|document.StoreField|document.IncludeTermVectors|document.DocValues))
 
 	err = idx.Update(doc)
 	if err != nil {
@@ -1549,8 +1553,10 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 	}
 
 	doc2 := document.NewDocument("2")
-	doc2.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test2"), document.IndexField|document.StoreField|document.IncludeTermVectors))
-	doc2.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("mister2"), document.IndexField|document.StoreField|document.IncludeTermVectors))
+	doc2.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test2"),
+		document.IndexField|document.StoreField|document.IncludeTermVectors|document.DocValues))
+	doc2.AddField(document.NewTextFieldWithIndexingOptions("title", []uint64{}, []byte("mister2"),
+		document.IndexField|document.StoreField|document.IncludeTermVectors|document.DocValues))
 	err = idx.Update(doc2)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -1584,8 +1590,10 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 	}
 
 	doc3 := document.NewDocument("3")
-	doc3.AddField(document.NewTextFieldWithIndexingOptions("name3", []uint64{}, []byte("test3"), document.IndexField|document.StoreField|document.IncludeTermVectors))
-	doc3.AddField(document.NewTextFieldWithIndexingOptions("title3", []uint64{}, []byte("mister3"), document.IndexField|document.StoreField|document.IncludeTermVectors))
+	doc3.AddField(document.NewTextFieldWithIndexingOptions("name3", []uint64{}, []byte("test3"),
+		document.IndexField|document.StoreField|document.IncludeTermVectors|document.DocValues))
+	doc3.AddField(document.NewTextFieldWithIndexingOptions("title3", []uint64{}, []byte("mister3"),
+		document.IndexField|document.StoreField|document.IncludeTermVectors)) // no doc values for title3
 	err = idx.Update(doc3)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
@@ -1607,8 +1615,7 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 		t.Error(err)
 	}
 	expectedFieldTerms = index.FieldTerms{
-		"name3":  []string{"test3"},
-		"title3": []string{"mister3"},
+		"name3": []string{"test3"},
 	}
 	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
 		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
@@ -1665,7 +1672,7 @@ func TestIndexDocumentVisitFieldTermsWithMultipleFieldOptions(t *testing.T) {
 
 	// mix of field options, this exercises the run time/ on the fly un inverting of
 	// doc values for custom options enabled field like designation, dept.
-	options := document.IndexField | document.StoreField | document.IncludeTermVectors
+	options := document.IndexField | document.StoreField | document.IncludeTermVectors | document.DocValues
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))    // default doc value persisted
 	doc.AddField(document.NewTextField("title", []uint64{}, []byte("mister"))) // default doc value persisted
