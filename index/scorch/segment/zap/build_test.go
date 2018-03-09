@@ -21,20 +21,22 @@ import (
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment/mem"
 )
 
 func TestBuild(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	memSegment := buildMemSegment()
-	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1024)
+	sb, err := buildTestSegment()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = PersistSegmentBase(sb, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-func buildMemSegment() *mem.Segment {
+func buildTestSegment() (*SegmentBase, error) {
 	doc := &document.Document{
 		ID: "a",
 		Fields: []document.Field{
@@ -120,11 +122,22 @@ func buildMemSegment() *mem.Segment {
 		}
 	}
 
-	return mem.NewFromAnalyzedDocs(results)
+	return AnalysisResultsToSegmentBase(results, 1024)
 }
 
-func buildMemSegmentMulti() *mem.Segment {
+func buildTestSegmentMulti() (*SegmentBase, error) {
+	results := buildTestAnalysisResultsMulti()
 
+	return AnalysisResultsToSegmentBase(results, 1024)
+}
+
+func buildTestSegmentMultiWithChunkFactor(chunkFactor uint32) (*SegmentBase, error) {
+	results := buildTestAnalysisResultsMulti()
+
+	return AnalysisResultsToSegmentBase(results, chunkFactor)
+}
+
+func buildTestAnalysisResultsMulti() []*index.AnalysisResult {
 	doc := &document.Document{
 		ID: "a",
 		Fields: []document.Field{
@@ -282,13 +295,11 @@ func buildMemSegmentMulti() *mem.Segment {
 		}
 	}
 
-	segment := mem.NewFromAnalyzedDocs(results)
-
-	return segment
+	return results
 }
 
-func buildMemSegmentWithDefaultFieldMapping() (*mem.Segment, []string) {
-
+func buildTestSegmentWithDefaultFieldMapping(chunkFactor uint32) (
+	*SegmentBase, []string, error) {
 	doc := &document.Document{
 		ID: "a",
 		Fields: []document.Field{
@@ -371,5 +382,7 @@ func buildMemSegmentWithDefaultFieldMapping() (*mem.Segment, []string) {
 		}
 	}
 
-	return mem.NewFromAnalyzedDocs(results), fields
+	sb, err := AnalysisResultsToSegmentBase(results, chunkFactor)
+
+	return sb, fields, err
 }
