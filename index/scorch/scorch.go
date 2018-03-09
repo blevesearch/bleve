@@ -516,33 +516,14 @@ func init() {
 	registry.RegisterIndexType(Name, NewScorch)
 }
 
-func parseToInteger(v interface{}) (int, error) {
-	switch v.(type) {
-	case float32:
-		return int(v.(float32)), nil
+func parseToInteger(i interface{}) (int, error) {
+	switch v := i.(type) {
 	case float64:
-		return int(v.(float64)), nil
+		return int(v), nil
 	case int:
-		return v.(int), nil
-	case int8:
-		return int(v.(int8)), nil
-	case int16:
-		return int(v.(int16)), nil
-	case int32:
-		return int(v.(int32)), nil
-	case int64:
-		return int(v.(int64)), nil
-	case uint:
-		return int(v.(uint)), nil
-	case uint8:
-		return int(v.(uint8)), nil
-	case uint16:
-		return int(v.(uint16)), nil
-	case uint32:
-		return int(v.(uint32)), nil
-	case uint64:
-		return int(v.(uint64)), nil
+		return v, nil
+
 	default:
-		return 0, fmt.Errorf("expects a numeric value")
+		return 0, fmt.Errorf("expects int or float64 value")
 	}
 }
