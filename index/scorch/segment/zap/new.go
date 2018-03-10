@@ -84,11 +84,11 @@ type interim struct {
 	//  field id -> bool
 	IncludeDocValues []bool
 
-	// postings id -> bitmap of docNums
-	Postings []*roaring.Bitmap
+	// postings id -> bitset of docNums
+	Postings []*interimDocNums
 
-	// postings id -> bitmap of docNums that have locations
-	PostingsLocs []*roaring.Bitmap
+	// postings id -> bitset of docNums that have locations
+	PostingsLocs []*interimDocNums
 
 	// postings id -> freq/norm's, one for each docNum in postings
 	FreqNorms [][]interimFreqNorm
@@ -127,6 +127,54 @@ type interimLoc struct {
 	start     uint64
 	end       uint64
 	arrayposs []uint64
+}
+
+// interimDocNums is a wrapper around a roaring Bitmap, and helps as a
+// single roaring.AddRange(0, N) method call is faster than N
+// separate, sequential Add() calls.  This helps with low cardinality
+// fields (e.g., "type" field, or "gender" field), where there are
+// commons runs of sequential docNum's.  The last range of docNum's is
+// tracked as "plus 1" to leverage zero value convention.
+type interimDocNums struct {
+	bs *roaring.Bitmap // may be nil
+
+	lastRangeBegDocNumPlus1 uint64 // inclusive
+	lastRangeEndDocNumPlus1 uint64 // inclusive
+}
+
+func (d *interimDocNums) add(docNum uint64) {
+	docNumPlus1 := docNum + 1
+
+	if d.lastRangeEndDocNumPlus1 != 0 &&
+		d.lastRangeEndDocNumPlus1+1 == docNumPlus1 {
+		d.lastRangeEndDocNumPlus1 = docNumPlus1 // extend the last range
+		return
+	}
+
+	d.incorporateLastRange()
+
+	d.lastRangeBegDocNumPlus1 = docNumPlus1 // start a new last range
+	d.lastRangeEndDocNumPlus1 = docNumPlus1
+}
+
+func (d *interimDocNums) incorporateLastRange() {
+	if d.bs == nil {
+		d.bs = roaring.New()
+	}
+
+	if d.lastRangeBegDocNumPlus1 == 0 {
+		return // there's no last range
+	}
+
+	if d.lastRangeBegDocNumPlus1 == d.lastRangeEndDocNumPlus1 {
+		d.bs.Add(uint32(d.lastRangeBegDocNumPlus1 - 1))
+	} else {
+		// AddRange() params represent [rangeStart, rangeEnd).
+		d.bs.AddRange(d.lastRangeBegDocNumPlus1-1, d.lastRangeEndDocNumPlus1)
+	}
+
+	d.lastRangeBegDocNumPlus1 = 0
+	d.lastRangeEndDocNumPlus1 = 0
 }
 
 func (s *interim) convert() (uint64, uint64, uint64, []uint64, error) {
@@ -253,15 +301,14 @@ func (s *interim) prepareDicts() {
 
 	numPostingsLists := pidNext
 
-	s.Postings = make([]*roaring.Bitmap, numPostingsLists)
-	for i := 0; i < numPostingsLists; i++ {
-		s.Postings[i] = roaring.New()
+	idns := make([]*interimDocNums, numPostingsLists*2)
+	idnsBacking := make([]interimDocNums, numPostingsLists*2)
+	for i := range idns {
+		idns[i] = &idnsBacking[i]
 	}
 
-	s.PostingsLocs = make([]*roaring.Bitmap, numPostingsLists)
-	for i := 0; i < numPostingsLists; i++ {
-		s.PostingsLocs[i] = roaring.New()
-	}
+	s.Postings = idns[0:numPostingsLists]
+	s.PostingsLocs = idns[numPostingsLists:]
 
 	s.FreqNorms = make([][]interimFreqNorm, numPostingsLists)
 
@@ -333,8 +380,8 @@ func (s *interim) processDocument(docNum uint64,
 
 		for term, tf := range tfs {
 			pid := dict[term] - 1
-			bs := s.Postings[pid]
-			bs.AddInt(int(docNum))
+
+			s.Postings[pid].add(docNum)
 
 			s.FreqNorms[pid] = append(s.FreqNorms[pid],
 				interimFreqNorm{
@@ -343,8 +390,7 @@ func (s *interim) processDocument(docNum uint64,
 				})
 
 			if len(tf.Locations) > 0 {
-				locBS := s.PostingsLocs[pid]
-				locBS.AddInt(int(docNum))
+				s.PostingsLocs[pid].add(docNum)
 
 				locs := s.Locs[pid]
 
@@ -498,8 +544,11 @@ func (s *interim) writeDicts() (uint64, []uint64, error) {
 		for _, term := range terms { // terms are already sorted
 			pid := dict[term] - 1
 
-			postingsBS := s.Postings[pid]
-			postingsLocsBS := s.PostingsLocs[pid]
+			postings := s.Postings[pid]
+			postings.incorporateLastRange()
+
+			postingsLocs := s.PostingsLocs[pid]
+			postingsLocs.incorporateLastRange()
 
 			freqNorms := s.FreqNorms[pid]
 			freqNormOffset := 0
@@ -507,7 +556,7 @@ func (s *interim) writeDicts() (uint64, []uint64, error) {
 			locs := s.Locs[pid]
 			locOffset := 0
 
-			postingsItr := postingsBS.Iterator()
+			postingsItr := postings.bs.Iterator()
 			for postingsItr.HasNext() {
 				docNum := uint64(postingsItr.Next())
 
@@ -550,7 +599,7 @@ func (s *interim) writeDicts() (uint64, []uint64, error) {
 			locEncoder.Close()
 
 			postingsOffset, err := writePostings(
-				postingsBS, postingsLocsBS, tfEncoder, locEncoder,
+				postings.bs, postingsLocs.bs, tfEncoder, locEncoder,
 				nil, s.w, buf)
 			if err != nil {
 				return 0, nil, err
