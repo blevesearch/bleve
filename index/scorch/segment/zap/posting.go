@@ -92,6 +92,8 @@ func under32Bits(x uint64) bool {
 	return x <= mask31Bits
 }
 
+const docNum1HitFinished = math.MaxUint64
+
 // PostingsList is an in-memory represenation of a postings list
 type PostingsList struct {
 	sb             *SegmentBase
@@ -102,8 +104,9 @@ type PostingsList struct {
 	postings       *roaring.Bitmap
 	except         *roaring.Bitmap
 
-	// when postingsOffset == freqOffset == 0, then the postings list
-	// represents a "1-hit" encoding, and has the following norm
+	// when normBits1Hit != 0, then this postings list came from a
+	// 1-hit encoding, and only the docNum1Hit & normBits1Hit apply
+	docNum1Hit   uint64
 	normBits1Hit uint64
 }
 
@@ -115,6 +118,17 @@ func (p *PostingsList) Size() int {
 	}
 
 	return sizeInBytes
+}
+
+func (p *PostingsList) OrInto(receiver *roaring.Bitmap) {
+	if p.normBits1Hit != 0 {
+		receiver.Add(uint32(p.docNum1Hit))
+		return
+	}
+
+	if p.postings != nil {
+		receiver.Or(p.postings)
+	}
 }
 
 // Iterator returns an iterator for this postings list
@@ -152,39 +166,47 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 	}
 	rv.postings = p
 
+	if p.normBits1Hit != 0 {
+		// "1-hit" encoding
+		rv.docNum1Hit = p.docNum1Hit
+		rv.normBits1Hit = p.normBits1Hit
+
+		if p.except != nil && p.except.Contains(uint32(rv.docNum1Hit)) {
+			rv.docNum1Hit = docNum1HitFinished
+		}
+
+		return rv
+	}
+
+	// "general" encoding, check if empty
 	if p.postings == nil {
 		return rv
 	}
 
-	if p.freqOffset > 0 && p.locOffset > 0 {
-		// "general" encoding, so prepare the freq chunk details
-		var n uint64
-		var read int
-		var numFreqChunks uint64
-		numFreqChunks, read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
+	// prepare the freq chunk details
+	var n uint64
+	var read int
+	var numFreqChunks uint64
+	numFreqChunks, read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
+	n += uint64(read)
+	rv.freqChunkLens = make([]uint64, int(numFreqChunks))
+	for i := 0; i < int(numFreqChunks); i++ {
+		rv.freqChunkLens[i], read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
 		n += uint64(read)
-		rv.freqChunkLens = make([]uint64, int(numFreqChunks))
-		for i := 0; i < int(numFreqChunks); i++ {
-			rv.freqChunkLens[i], read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
-			n += uint64(read)
-		}
-		rv.freqChunkStart = p.freqOffset + n
-
-		// prepare the loc chunk details
-		n = 0
-		var numLocChunks uint64
-		numLocChunks, read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
-		n += uint64(read)
-		rv.locChunkLens = make([]uint64, int(numLocChunks))
-		for i := 0; i < int(numLocChunks); i++ {
-			rv.locChunkLens[i], read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
-			n += uint64(read)
-		}
-		rv.locChunkStart = p.locOffset + n
-	} else {
-		// "1-hit" encoding
-		rv.normBits1Hit = p.normBits1Hit
 	}
+	rv.freqChunkStart = p.freqOffset + n
+
+	// prepare the loc chunk details
+	n = 0
+	var numLocChunks uint64
+	numLocChunks, read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
+	n += uint64(read)
+	rv.locChunkLens = make([]uint64, int(numLocChunks))
+	for i := 0; i < int(numLocChunks); i++ {
+		rv.locChunkLens[i], read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
+		n += uint64(read)
+	}
+	rv.locChunkStart = p.locOffset + n
 
 	rv.locBitmap = p.locBitmap
 
@@ -201,18 +223,20 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 
 // Count returns the number of items on this postings list
 func (p *PostingsList) Count() uint64 {
-	if p.postings != nil {
-		n := p.postings.GetCardinality()
-		if p.except != nil {
-			e := p.except.GetCardinality()
-			if e > n {
-				e = n
-			}
-			return n - e
-		}
-		return n
+	var n uint64
+	if p.normBits1Hit != 0 {
+		n = 1
+	} else if p.postings != nil {
+		n = p.postings.GetCardinality()
 	}
-	return 0
+	var e uint64
+	if p.except != nil {
+		e = p.except.GetCardinality()
+	}
+	if n <= e {
+		return 0
+	}
+	return n - e
 }
 
 func (rv *PostingsList) read(postingsOffset uint64, d *Dictionary) error {
@@ -263,19 +287,10 @@ func (rv *PostingsList) read(postingsOffset uint64, d *Dictionary) error {
 	return nil
 }
 
-var emptyRoaring = roaring.NewBitmap()
-
 func (rv *PostingsList) init1Hit(fstVal uint64) error {
 	docNum, normBits := FSTValDecode1Hit(fstVal)
 
-	rv.locBitmap = emptyRoaring
-
-	rv.postings = roaring.NewBitmap()
-	rv.postings.Add(uint32(docNum))
-
-	// TODO: we can likely do better than allocating a roaring bitmap
-	// with just 1 entry, but for now reuse existing machinery
-
+	rv.docNum1Hit = docNum
 	rv.normBits1Hit = normBits
 
 	return nil
@@ -308,6 +323,7 @@ type PostingsIterator struct {
 	next     Posting    // reused across Next() calls
 	nextLocs []Location // reused across Next() calls
 
+	docNum1Hit   uint64
 	normBits1Hit uint64
 
 	buf []byte
@@ -460,7 +476,7 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 	}
 	rv.norm = math.Float32frombits(uint32(normBits))
 
-	if i.locBitmap.Contains(uint32(docNum)) {
+	if i.locBitmap != nil && i.locBitmap.Contains(uint32(docNum)) {
 		// read off 'freq' locations, into reused slices
 		if cap(i.nextLocs) >= int(rv.freq) {
 			i.nextLocs = i.nextLocs[0:rv.freq]
@@ -513,7 +529,7 @@ func (i *PostingsIterator) nextBytes() (
 	endFreqNorm := len(i.currChunkFreqNorm) - i.freqNormReader.Len()
 	bytesFreqNorm = i.currChunkFreqNorm[startFreqNorm:endFreqNorm]
 
-	if i.locBitmap.Contains(uint32(docNum)) {
+	if i.locBitmap != nil && i.locBitmap.Contains(uint32(docNum)) {
 		startLoc := len(i.currChunkLoc) - i.locReader.Len()
 
 		for j := uint64(0); j < freq; j++ {
@@ -533,16 +549,21 @@ func (i *PostingsIterator) nextBytes() (
 // nextDocNum returns the next docNum on the postings list, and also
 // sets up the currChunk / loc related fields of the iterator.
 func (i *PostingsIterator) nextDocNum() (uint64, bool, error) {
+	if i.normBits1Hit != 0 {
+		if i.docNum1Hit == docNum1HitFinished {
+			return 0, false, nil
+		}
+		docNum := i.docNum1Hit
+		i.docNum1Hit = docNum1HitFinished // consume our 1-hit docNum
+		return docNum, true, nil
+	}
+
 	if i.actual == nil || !i.actual.HasNext() {
 		return 0, false, nil
 	}
 
 	n := i.actual.Next()
 	allN := i.all.Next()
-
-	if i.normBits1Hit != 0 {
-		return uint64(n), true, nil
-	}
 
 	nChunk := n / i.postings.sb.chunkFactor
 	allNChunk := allN / i.postings.sb.chunkFactor
