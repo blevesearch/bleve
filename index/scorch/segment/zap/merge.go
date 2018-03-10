@@ -222,8 +222,8 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 
 		var prevTerm []byte
 
-		newRoaring := roaring.NewBitmap()
-		newRoaringLocs := roaring.NewBitmap()
+		var newPostings interimDocNums
+		var newPostingsLocs interimDocNums
 
 		var lastDocNum, lastFreq, lastNorm uint64
 
@@ -232,7 +232,7 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 		// has freq of 1, and the docNum fits into 31-bits
 		use1HitEncoding := func(termCardinality uint64) (bool, uint64, uint64) {
 			if termCardinality == uint64(1) && locEncoder.FinalSize() <= 0 {
-				docNum := uint64(newRoaring.Minimum())
+				docNum := uint64(newPostings.bs.Minimum())
 				if under32Bits(docNum) && docNum == lastDocNum && lastFreq == 1 {
 					return true, docNum, lastNorm
 				}
@@ -248,8 +248,11 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 			tfEncoder.Close()
 			locEncoder.Close()
 
+			newPostings.incorporateLastRange()
+			newPostingsLocs.incorporateLastRange()
+
 			postingsOffset, err := writePostings(
-				newRoaring, newRoaringLocs, tfEncoder, locEncoder,
+				newPostings.bs, newPostingsLocs.bs, tfEncoder, locEncoder,
 				use1HitEncoding, w, bufMaxVarintLen64)
 			if err != nil {
 				return err
@@ -262,8 +265,8 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				}
 			}
 
-			newRoaring = roaring.NewBitmap()
-			newRoaringLocs = roaring.NewBitmap()
+			newPostings = interimDocNums{} // clear for reuse
+			newPostingsLocs = interimDocNums{}
 
 			tfEncoder.Reset()
 			locEncoder.Reset()
@@ -308,14 +311,14 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 					return nil, 0, fmt.Errorf("see hit with dropped doc num")
 				}
 
-				newRoaring.Add(uint32(hitNewDocNum))
+				newPostings.add(hitNewDocNum)
 				err2 = tfEncoder.AddBytes(hitNewDocNum, nextFreqNormBytes)
 				if err2 != nil {
 					return nil, 0, err2
 				}
 
 				if len(nextLocBytes) > 0 {
-					newRoaringLocs.Add(uint32(hitNewDocNum))
+					newPostingsLocs.add(hitNewDocNum)
 					err2 = locEncoder.AddBytes(hitNewDocNum, nextLocBytes)
 					if err2 != nil {
 						return nil, 0, err2
