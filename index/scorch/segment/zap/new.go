@@ -334,7 +334,7 @@ func (s *interim) processDocument(docNum uint64,
 		for term, tf := range tfs {
 			pid := dict[term] - 1
 			bs := s.Postings[pid]
-			bs.AddInt(int(docNum))
+			bs.Add(uint32(docNum))
 
 			s.FreqNorms[pid] = append(s.FreqNorms[pid],
 				interimFreqNorm{
@@ -344,7 +344,7 @@ func (s *interim) processDocument(docNum uint64,
 
 			if len(tf.Locations) > 0 {
 				locBS := s.PostingsLocs[pid]
-				locBS.AddInt(int(docNum))
+				locBS.Add(uint32(docNum))
 
 				locs := s.Locs[pid]
 
