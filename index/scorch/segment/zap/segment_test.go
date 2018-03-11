@@ -28,8 +28,8 @@ import (
 func TestOpen(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	memSegment := buildMemSegment()
-	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1024)
+	testSeg, _ := buildTestSegment()
+	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
 	}
@@ -328,8 +328,8 @@ func TestOpen(t *testing.T) {
 func TestOpenMulti(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	memSegment := buildMemSegmentMulti()
-	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1024)
+	testSeg, _ := buildTestSegmentMulti()
+	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
 	}
@@ -428,8 +428,8 @@ func TestOpenMulti(t *testing.T) {
 func TestOpenMultiWithTwoChunks(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	memSegment := buildMemSegmentMulti()
-	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1)
+	testSeg, _ := buildTestSegmentMultiWithChunkFactor(1)
+	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
 	}
@@ -523,8 +523,8 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	memSegment := buildMemSegmentMulti()
-	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1)
+	testSeg, _ := buildTestSegmentMultiWithChunkFactor(1)
+	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
 	}
@@ -551,8 +551,8 @@ func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 	}
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	memSegment, expectedFields := buildMemSegmentWithDefaultFieldMapping()
-	err = PersistSegment(memSegment, "/tmp/scorch.zap", 1)
+	testSeg, expectedFields, _ := buildTestSegmentWithDefaultFieldMapping(1)
+	err = PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
 	}
