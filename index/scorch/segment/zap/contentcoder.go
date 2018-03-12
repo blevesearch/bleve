@@ -47,9 +47,8 @@ type chunkedContentCoder struct {
 // MetaData represents the data information inside a
 // chunk.
 type MetaData struct {
-	DocNum   uint64 // docNum of the data inside the chunk
-	DocDvLoc uint64 // starting offset for a given docid
-	DocDvLen uint64 // length of data inside the chunk for the given docid
+	DocNum      uint64 // docNum of the data inside the chunk
+	DocDvOffset uint64 // offset of data inside the chunk for the given docid
 }
 
 // newChunkedContentCoder returns a new chunk content coder which
@@ -94,9 +93,20 @@ func (c *chunkedContentCoder) flushContents() error {
 		return err
 	}
 
+	// convert the document data lens to data offsets
+	if len(c.chunkMeta) > 1 {
+		c.chunkMeta[1].DocDvOffset, c.chunkMeta[0].DocDvOffset =
+			c.chunkMeta[0].DocDvOffset, c.chunkMeta[1].DocDvOffset
+		for i := 2; i < len(c.chunkMeta); i++ {
+			cur := c.chunkMeta[i].DocDvOffset
+			c.chunkMeta[i].DocDvOffset = c.chunkMeta[i-1].DocDvOffset + c.chunkMeta[0].DocDvOffset
+			c.chunkMeta[0].DocDvOffset = cur
+		}
+	}
+
 	// write out the metaData slice
 	for _, meta := range c.chunkMeta {
-		_, err := writeUvarints(&c.chunkMetaBuf, meta.DocNum, meta.DocDvLoc, meta.DocDvLen)
+		_, err := writeUvarints(&c.chunkMetaBuf, meta.DocNum, meta.DocDvOffset)
 		if err != nil {
 			return err
 		}
@@ -130,17 +140,15 @@ func (c *chunkedContentCoder) Add(docNum uint64, vals []byte) error {
 		c.currChunk = chunk
 	}
 
-	// mark the starting offset for this doc
-	dvOffset := c.chunkBuf.Len()
+	// mark the data length for this doc
 	dvSize, err := c.chunkBuf.Write(vals)
 	if err != nil {
 		return err
 	}
 
 	c.chunkMeta = append(c.chunkMeta, MetaData{
-		DocNum:   docNum,
-		DocDvLoc: uint64(dvOffset),
-		DocDvLen: uint64(dvSize),
+		DocNum:      docNum,
+		DocDvOffset: uint64(dvSize),
 	})
 	return nil
 }
