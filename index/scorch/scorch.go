@@ -57,6 +57,7 @@ type Scorch struct {
 	nextSnapshotEpoch    uint64
 	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
+	numSnapshotsToKeep   int
 
 	closeCh            chan struct{}
 	introductions      chan *segmentIntroduction
@@ -187,6 +188,17 @@ func (s *Scorch) openBolt() error {
 		if err != nil {
 			_ = s.Close()
 			return err
+		}
+	}
+
+	s.numSnapshotsToKeep = NumSnapshotsToKeep
+	if v, ok := s.config["numSnapshotsToKeep"]; ok {
+		var t int
+		if t, err = parseToInteger(v); err != nil {
+			return fmt.Errorf("numSnapshotsToKeep parse err: %v", err)
+		}
+		if t > 0 {
+			s.numSnapshotsToKeep = t
 		}
 	}
 
@@ -502,4 +514,16 @@ func (s *Scorch) unmarkIneligibleForRemoval(filename string) {
 
 func init() {
 	registry.RegisterIndexType(Name, NewScorch)
+}
+
+func parseToInteger(i interface{}) (int, error) {
+	switch v := i.(type) {
+	case float64:
+		return int(v), nil
+	case int:
+		return v, nil
+
+	default:
+		return 0, fmt.Errorf("expects int or float64 value")
+	}
 }
