@@ -19,6 +19,7 @@ import (
 	"encoding/binary"
 	"math"
 	"sort"
+	"sync"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/Smerity/govarint"
@@ -35,12 +36,11 @@ func AnalysisResultsToSegmentBase(results []*index.AnalysisResult,
 	chunkFactor uint32) (*SegmentBase, error) {
 	var br bytes.Buffer
 
-	s := interim{
-		results:     results,
-		chunkFactor: chunkFactor,
-		w:           NewCountHashWriter(&br),
-		FieldsMap:   map[string]uint16{},
-	}
+	s := interimPool.Get().(*interim)
+
+	s.results = results
+	s.chunkFactor = chunkFactor
+	s.w = NewCountHashWriter(&br)
 
 	storedIndexOffset, fieldsIndexOffset, fdvIndexOffset, dictOffsets,
 		err := s.convert()
@@ -52,8 +52,12 @@ func AnalysisResultsToSegmentBase(results []*index.AnalysisResult,
 		s.FieldsMap, s.FieldsInv, uint64(len(results)),
 		storedIndexOffset, fieldsIndexOffset, fdvIndexOffset, dictOffsets)
 
+	interimPool.Put(s.cleanse())
+
 	return sb, err
 }
+
+var interimPool = sync.Pool{New: func() interface{} { return &interim{} }}
 
 // interim holds temporary working data used while converting from
 // analysis results to a zap-encoded segment
@@ -91,14 +95,64 @@ type interim struct {
 	PostingsLocs []*roaring.Bitmap
 
 	// postings id -> freq/norm's, one for each docNum in postings
-	FreqNorms [][]interimFreqNorm
+	FreqNorms        [][]interimFreqNorm
+	freqNormsBacking []interimFreqNorm
 
 	// postings id -> locs, one for each freq
-	Locs [][]interimLoc
+	Locs        [][]interimLoc
+	locsBacking []interimLoc
+
+	numTermsPerPostingsList []int // key is postings list id
+	numLocsPerPostingsList  []int // key is postings list id
 
 	buf0 bytes.Buffer
 	tmp0 []byte
 	tmp1 []byte
+}
+
+func (s *interim) cleanse() *interim {
+	s.results = nil
+	s.chunkFactor = 0
+	s.w = nil
+	s.FieldsMap = nil
+	s.FieldsInv = s.FieldsInv[:0]
+	for i := range s.Dicts {
+		s.Dicts[i] = nil
+	}
+	s.Dicts = s.Dicts[:0]
+	for i := range s.DictKeys {
+		s.DictKeys[i] = s.DictKeys[i][:0]
+	}
+	s.DictKeys = s.DictKeys[:0]
+	for i := range s.IncludeDocValues {
+		s.IncludeDocValues[i] = false
+	}
+	s.IncludeDocValues = s.IncludeDocValues[:0]
+	for _, idn := range s.Postings {
+		idn.Clear()
+	}
+	s.Postings = s.Postings[:0]
+	for _, idn := range s.PostingsLocs {
+		idn.Clear()
+	}
+	s.PostingsLocs = s.PostingsLocs[:0]
+	s.FreqNorms = s.FreqNorms[:0]
+	for i := range s.freqNormsBacking {
+		s.freqNormsBacking[i] = interimFreqNorm{}
+	}
+	s.freqNormsBacking = s.freqNormsBacking[:0]
+	s.Locs = s.Locs[:0]
+	for i := range s.locsBacking {
+		s.locsBacking[i] = interimLoc{}
+	}
+	s.locsBacking = s.locsBacking[:0]
+	s.numTermsPerPostingsList = s.numTermsPerPostingsList[:0]
+	s.numLocsPerPostingsList = s.numLocsPerPostingsList[:0]
+	s.buf0.Reset()
+	s.tmp0 = s.tmp0[:0]
+	s.tmp1 = s.tmp1[:0]
+
+	return s
 }
 
 func (s *interim) grabBuf(size int) []byte {
@@ -130,6 +184,8 @@ type interimLoc struct {
 }
 
 func (s *interim) convert() (uint64, uint64, uint64, []uint64, error) {
+	s.FieldsMap = map[string]uint16{}
+
 	s.getOrDefineField("_id") // _id field is fieldID 0
 
 	for _, result := range s.results {
@@ -143,12 +199,15 @@ func (s *interim) convert() (uint64, uint64, uint64, []uint64, error) {
 
 	sort.Strings(s.FieldsInv[1:]) // keep _id as first field
 
-	s.FieldsMap = make(map[string]uint16, len(s.FieldsInv))
 	for fieldID, fieldName := range s.FieldsInv {
 		s.FieldsMap[fieldName] = uint16(fieldID + 1)
 	}
 
-	s.IncludeDocValues = make([]bool, len(s.FieldsInv))
+	if cap(s.IncludeDocValues) >= len(s.FieldsInv) {
+		s.IncludeDocValues = s.IncludeDocValues[:len(s.FieldsInv)]
+	} else {
+		s.IncludeDocValues = make([]bool, len(s.FieldsInv))
+	}
 
 	s.prepareDicts()
 
@@ -189,18 +248,24 @@ func (s *interim) getOrDefineField(fieldName string) int {
 		fieldIDPlus1 = uint16(len(s.FieldsInv) + 1)
 		s.FieldsMap[fieldName] = fieldIDPlus1
 		s.FieldsInv = append(s.FieldsInv, fieldName)
+
 		s.Dicts = append(s.Dicts, make(map[string]uint64))
-		s.DictKeys = append(s.DictKeys, make([]string, 0))
+
+		n := len(s.DictKeys)
+		if n < cap(s.DictKeys) {
+			s.DictKeys = s.DictKeys[:n+1]
+			s.DictKeys[n] = s.DictKeys[n][:0]
+		} else {
+			s.DictKeys = append(s.DictKeys, []string(nil))
+		}
 	}
+
 	return int(fieldIDPlus1 - 1)
 }
 
 // fill Dicts and DictKeys from analysis results
 func (s *interim) prepareDicts() {
 	var pidNext int
-
-	numTermsPerPostingsList := make([]int, 0, 64) // key is postings list id
-	numLocsPerPostingsList := make([]int, 0, 64)  // key is postings list id
 
 	var totTFs int
 	var totLocs int
@@ -218,14 +283,14 @@ func (s *interim) prepareDicts() {
 				dict[term] = pidPlus1
 				dictKeys = append(dictKeys, term)
 
-				numTermsPerPostingsList = append(numTermsPerPostingsList, 0)
-				numLocsPerPostingsList = append(numLocsPerPostingsList, 0)
+				s.numTermsPerPostingsList = append(s.numTermsPerPostingsList, 0)
+				s.numLocsPerPostingsList = append(s.numLocsPerPostingsList, 0)
 			}
 
 			pid := pidPlus1 - 1
 
-			numTermsPerPostingsList[pid] += 1
-			numLocsPerPostingsList[pid] += len(tf.Locations)
+			s.numTermsPerPostingsList[pid] += 1
+			s.numLocsPerPostingsList[pid] += len(tf.Locations)
 
 			totLocs += len(tf.Locations)
 		}
@@ -253,28 +318,64 @@ func (s *interim) prepareDicts() {
 
 	numPostingsLists := pidNext
 
-	s.Postings = make([]*roaring.Bitmap, numPostingsLists)
-	for i := 0; i < numPostingsLists; i++ {
-		s.Postings[i] = roaring.New()
+	if cap(s.Postings) >= numPostingsLists {
+		s.Postings = s.Postings[:numPostingsLists]
+	} else {
+		postings := make([]*roaring.Bitmap, numPostingsLists)
+		copy(postings, s.Postings[:cap(s.Postings)])
+		for i := 0; i < numPostingsLists; i++ {
+			if postings[i] == nil {
+				postings[i] = roaring.New()
+			}
+		}
+		s.Postings = postings
 	}
 
-	s.PostingsLocs = make([]*roaring.Bitmap, numPostingsLists)
-	for i := 0; i < numPostingsLists; i++ {
-		s.PostingsLocs[i] = roaring.New()
+	if cap(s.PostingsLocs) >= numPostingsLists {
+		s.PostingsLocs = s.PostingsLocs[:numPostingsLists]
+	} else {
+		postingsLocs := make([]*roaring.Bitmap, numPostingsLists)
+		copy(postingsLocs, s.PostingsLocs[:cap(s.PostingsLocs)])
+		for i := 0; i < numPostingsLists; i++ {
+			if postingsLocs[i] == nil {
+				postingsLocs[i] = roaring.New()
+			}
+		}
+		s.PostingsLocs = postingsLocs
 	}
 
-	s.FreqNorms = make([][]interimFreqNorm, numPostingsLists)
+	if cap(s.FreqNorms) >= numPostingsLists {
+		s.FreqNorms = s.FreqNorms[:numPostingsLists]
+	} else {
+		s.FreqNorms = make([][]interimFreqNorm, numPostingsLists)
+	}
 
-	freqNormsBacking := make([]interimFreqNorm, totTFs)
-	for pid, numTerms := range numTermsPerPostingsList {
+	if cap(s.freqNormsBacking) >= totTFs {
+		s.freqNormsBacking = s.freqNormsBacking[:totTFs]
+	} else {
+		s.freqNormsBacking = make([]interimFreqNorm, totTFs)
+	}
+
+	freqNormsBacking := s.freqNormsBacking
+	for pid, numTerms := range s.numTermsPerPostingsList {
 		s.FreqNorms[pid] = freqNormsBacking[0:0]
 		freqNormsBacking = freqNormsBacking[numTerms:]
 	}
 
-	s.Locs = make([][]interimLoc, numPostingsLists)
+	if cap(s.Locs) >= numPostingsLists {
+		s.Locs = s.Locs[:numPostingsLists]
+	} else {
+		s.Locs = make([][]interimLoc, numPostingsLists)
+	}
 
-	locsBacking := make([]interimLoc, totLocs)
-	for pid, numLocs := range numLocsPerPostingsList {
+	if cap(s.locsBacking) >= totLocs {
+		s.locsBacking = s.locsBacking[:totLocs]
+	} else {
+		s.locsBacking = make([]interimLoc, totLocs)
+	}
+
+	locsBacking := s.locsBacking
+	for pid, numLocs := range s.numLocsPerPostingsList {
 		s.Locs[pid] = locsBacking[0:0]
 		locsBacking = locsBacking[numLocs:]
 	}
@@ -334,7 +435,7 @@ func (s *interim) processDocument(docNum uint64,
 		for term, tf := range tfs {
 			pid := dict[term] - 1
 			bs := s.Postings[pid]
-			bs.AddInt(int(docNum))
+			bs.Add(uint32(docNum))
 
 			s.FreqNorms[pid] = append(s.FreqNorms[pid],
 				interimFreqNorm{
@@ -344,7 +445,7 @@ func (s *interim) processDocument(docNum uint64,
 
 			if len(tf.Locations) > 0 {
 				locBS := s.PostingsLocs[pid]
-				locBS.AddInt(int(docNum))
+				locBS.Add(uint32(docNum))
 
 				locs := s.Locs[pid]
 

@@ -183,6 +183,9 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 		return nil, 0, err
 	}
 
+	newRoaring := roaring.NewBitmap()
+	newRoaringLocs := roaring.NewBitmap()
+
 	// for each field
 	for fieldID, fieldName := range fieldsInv {
 
@@ -222,8 +225,8 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 
 		var prevTerm []byte
 
-		newRoaring := roaring.NewBitmap()
-		newRoaringLocs := roaring.NewBitmap()
+		newRoaring.Clear()
+		newRoaringLocs.Clear()
 
 		var lastDocNum, lastFreq, lastNorm uint64
 
@@ -262,8 +265,8 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				}
 			}
 
-			newRoaring = roaring.NewBitmap()
-			newRoaringLocs = roaring.NewBitmap()
+			newRoaring.Clear()
+			newRoaringLocs.Clear()
 
 			tfEncoder.Reset()
 			locEncoder.Reset()

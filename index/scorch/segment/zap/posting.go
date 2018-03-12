@@ -266,7 +266,9 @@ func (rv *PostingsList) read(postingsOffset uint64, d *Dictionary) error {
 
 	locRoaringBytes := d.sb.mem[locBitmapOffset+uint64(read) : locBitmapOffset+uint64(read)+locBitmapLen]
 
-	rv.locBitmap = roaring.NewBitmap()
+	if rv.locBitmap == nil {
+		rv.locBitmap = roaring.NewBitmap()
+	}
 	_, err := rv.locBitmap.FromBuffer(locRoaringBytes)
 	if err != nil {
 		return fmt.Errorf("error loading roaring bitmap of locations with hits: %v", err)
@@ -278,7 +280,9 @@ func (rv *PostingsList) read(postingsOffset uint64, d *Dictionary) error {
 
 	roaringBytes := d.sb.mem[postingsOffset+n : postingsOffset+n+postingsLen]
 
-	rv.postings = roaring.NewBitmap()
+	if rv.postings == nil {
+		rv.postings = roaring.NewBitmap()
+	}
 	_, err = rv.postings.FromBuffer(roaringBytes)
 	if err != nil {
 		return fmt.Errorf("error loading roaring bitmap: %v", err)
