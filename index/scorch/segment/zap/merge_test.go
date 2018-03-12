@@ -26,7 +26,6 @@ import (
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment/mem"
 )
 
 func TestMerge(t *testing.T) {
@@ -34,14 +33,14 @@ func TestMerge(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch2.zap")
 	_ = os.RemoveAll("/tmp/scorch3.zap")
 
-	memSegment := buildMemSegmentMulti()
-	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1024)
+	testSeg, _ := buildTestSegmentMulti()
+	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	memSegment2 := buildMemSegmentMulti2()
-	err = PersistSegment(memSegment2, "/tmp/scorch2.zap", 1024)
+	testSeg2, _ := buildTestSegmentMulti2()
+	err = PersistSegmentBase(testSeg2, "/tmp/scorch2.zap")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,8 +120,8 @@ func TestMergeWithEmptySegmentsFirst(t *testing.T) {
 func testMergeWithEmptySegments(t *testing.T, before bool, numEmptySegments int) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	memSegment := buildMemSegmentMulti()
-	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1024)
+	testSeg, _ := buildTestSegmentMulti()
+	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,8 +147,8 @@ func testMergeWithEmptySegments(t *testing.T, before bool, numEmptySegments int)
 
 		_ = os.RemoveAll("/tmp/" + fname)
 
-		emptySegment := mem.NewFromAnalyzedDocs([]*index.AnalysisResult{})
-		err = PersistSegment(emptySegment, "/tmp/"+fname, 1024)
+		emptySegment, _ := AnalysisResultsToSegmentBase([]*index.AnalysisResult{}, 1024)
+		err = PersistSegmentBase(emptySegment, "/tmp/"+fname)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -462,8 +461,8 @@ func testMergeAndDrop(t *testing.T, docsToDrop []*roaring.Bitmap) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 	_ = os.RemoveAll("/tmp/scorch2.zap")
 
-	memSegment := buildMemSegmentMulti()
-	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1024)
+	testSeg, _ := buildTestSegmentMulti()
+	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -478,8 +477,8 @@ func testMergeAndDrop(t *testing.T, docsToDrop []*roaring.Bitmap) {
 		}
 	}()
 
-	memSegment2 := buildMemSegmentMulti2()
-	err = PersistSegment(memSegment2, "/tmp/scorch2.zap", 1024)
+	testSeg2, _ := buildTestSegmentMulti2()
+	err = PersistSegmentBase(testSeg2, "/tmp/scorch2.zap")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -565,8 +564,8 @@ func testMergeWithUpdates(t *testing.T, segmentDocIds [][]string, docsToDrop []*
 
 		_ = os.RemoveAll("/tmp/" + fname)
 
-		memSegment := buildMemSegmentMultiHelper(docIds)
-		err := PersistSegment(memSegment, "/tmp/"+fname, 1024)
+		testSeg, _ := buildTestSegmentMultiHelper(docIds)
+		err := PersistSegmentBase(testSeg, "/tmp/"+fname)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -616,11 +615,11 @@ func testMergeAndDropSegments(t *testing.T, segsToMerge []*Segment, docsToDrop [
 	testMergeWithSelf(t, segm.(*Segment), expectedNumDocs)
 }
 
-func buildMemSegmentMulti2() *mem.Segment {
-	return buildMemSegmentMultiHelper([]string{"c", "d"})
+func buildTestSegmentMulti2() (*SegmentBase, error) {
+	return buildTestSegmentMultiHelper([]string{"c", "d"})
 }
 
-func buildMemSegmentMultiHelper(docIds []string) *mem.Segment {
+func buildTestSegmentMultiHelper(docIds []string) (*SegmentBase, error) {
 	doc := &document.Document{
 		ID: "c",
 		Fields: []document.Field{
@@ -778,9 +777,7 @@ func buildMemSegmentMultiHelper(docIds []string) *mem.Segment {
 		}
 	}
 
-	segment := mem.NewFromAnalyzedDocs(results)
-
-	return segment
+	return AnalysisResultsToSegmentBase(results, 1024)
 }
 
 func TestMergeBytesWritten(t *testing.T) {
@@ -788,14 +785,14 @@ func TestMergeBytesWritten(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch2.zap")
 	_ = os.RemoveAll("/tmp/scorch3.zap")
 
-	memSegment := buildMemSegmentMulti()
-	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1024)
+	testSeg, _ := buildTestSegmentMulti()
+	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	memSegment2 := buildMemSegmentMulti2()
-	err = PersistSegment(memSegment2, "/tmp/scorch2.zap", 1024)
+	testSeg2, _ := buildTestSegmentMulti2()
+	err = PersistSegmentBase(testSeg2, "/tmp/scorch2.zap")
 	if err != nil {
 		t.Fatal(err)
 	}

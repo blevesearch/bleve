@@ -22,10 +22,9 @@ import (
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment/mem"
 )
 
-func buildMemSegmentForDict() *mem.Segment {
+func buildTestSegmentForDict() (*SegmentBase, error) {
 	doc := &document.Document{
 		ID: "a",
 		Fields: []document.Field{
@@ -99,17 +98,15 @@ func buildMemSegmentForDict() *mem.Segment {
 		},
 	}
 
-	segment := mem.NewFromAnalyzedDocs(results)
-
-	return segment
+	return AnalysisResultsToSegmentBase(results, 1024)
 }
 
 func TestDictionary(t *testing.T) {
 
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	memSegment := buildMemSegmentForDict()
-	err := PersistSegment(memSegment, "/tmp/scorch.zap", 1024)
+	testSeg, _ := buildTestSegmentForDict()
+	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
 	}
