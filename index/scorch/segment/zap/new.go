@@ -95,10 +95,15 @@ type interim struct {
 	PostingsLocs []*roaring.Bitmap
 
 	// postings id -> freq/norm's, one for each docNum in postings
-	FreqNorms [][]interimFreqNorm
+	FreqNorms        [][]interimFreqNorm
+	freqNormsBacking []interimFreqNorm
 
 	// postings id -> locs, one for each freq
-	Locs [][]interimLoc
+	Locs        [][]interimLoc
+	locsBacking []interimLoc
+
+	numTermsPerPostingsList []int // key is postings list id
+	numLocsPerPostingsList  []int // key is postings list id
 
 	buf0 bytes.Buffer
 	tmp0 []byte
@@ -131,8 +136,18 @@ func (s *interim) cleanse() *interim {
 		idn.Clear()
 	}
 	s.PostingsLocs = s.PostingsLocs[:0]
-	s.FreqNorms = nil
-	s.Locs = nil
+	s.FreqNorms = s.FreqNorms[:0]
+	for i := range s.freqNormsBacking {
+		s.freqNormsBacking[i] = interimFreqNorm{}
+	}
+	s.freqNormsBacking = s.freqNormsBacking[:0]
+	s.Locs = s.Locs[:0]
+	for i := range s.locsBacking {
+		s.locsBacking[i] = interimLoc{}
+	}
+	s.locsBacking = s.locsBacking[:0]
+	s.numTermsPerPostingsList = s.numTermsPerPostingsList[:0]
+	s.numLocsPerPostingsList = s.numLocsPerPostingsList[:0]
 	s.buf0.Reset()
 	s.tmp0 = s.tmp0[:0]
 	s.tmp1 = s.tmp1[:0]
@@ -252,9 +267,6 @@ func (s *interim) getOrDefineField(fieldName string) int {
 func (s *interim) prepareDicts() {
 	var pidNext int
 
-	numTermsPerPostingsList := make([]int, 0, 64) // key is postings list id
-	numLocsPerPostingsList := make([]int, 0, 64)  // key is postings list id
-
 	var totTFs int
 	var totLocs int
 
@@ -271,14 +283,14 @@ func (s *interim) prepareDicts() {
 				dict[term] = pidPlus1
 				dictKeys = append(dictKeys, term)
 
-				numTermsPerPostingsList = append(numTermsPerPostingsList, 0)
-				numLocsPerPostingsList = append(numLocsPerPostingsList, 0)
+				s.numTermsPerPostingsList = append(s.numTermsPerPostingsList, 0)
+				s.numLocsPerPostingsList = append(s.numLocsPerPostingsList, 0)
 			}
 
 			pid := pidPlus1 - 1
 
-			numTermsPerPostingsList[pid] += 1
-			numLocsPerPostingsList[pid] += len(tf.Locations)
+			s.numTermsPerPostingsList[pid] += 1
+			s.numLocsPerPostingsList[pid] += len(tf.Locations)
 
 			totLocs += len(tf.Locations)
 		}
@@ -332,20 +344,38 @@ func (s *interim) prepareDicts() {
 		s.PostingsLocs = postingsLocs
 	}
 
-	// TODO: reuse this.
-	s.FreqNorms = make([][]interimFreqNorm, numPostingsLists)
+	if cap(s.FreqNorms) >= numPostingsLists {
+		s.FreqNorms = s.FreqNorms[:numPostingsLists]
+	} else {
+		s.FreqNorms = make([][]interimFreqNorm, numPostingsLists)
+	}
 
-	freqNormsBacking := make([]interimFreqNorm, totTFs)
-	for pid, numTerms := range numTermsPerPostingsList {
+	if cap(s.freqNormsBacking) >= totTFs {
+		s.freqNormsBacking = s.freqNormsBacking[:totTFs]
+	} else {
+		s.freqNormsBacking = make([]interimFreqNorm, totTFs)
+	}
+
+	freqNormsBacking := s.freqNormsBacking
+	for pid, numTerms := range s.numTermsPerPostingsList {
 		s.FreqNorms[pid] = freqNormsBacking[0:0]
 		freqNormsBacking = freqNormsBacking[numTerms:]
 	}
 
-	// TODO: reuse this.
-	s.Locs = make([][]interimLoc, numPostingsLists)
+	if cap(s.Locs) >= numPostingsLists {
+		s.Locs = s.Locs[:numPostingsLists]
+	} else {
+		s.Locs = make([][]interimLoc, numPostingsLists)
+	}
 
-	locsBacking := make([]interimLoc, totLocs)
-	for pid, numLocs := range numLocsPerPostingsList {
+	if cap(s.locsBacking) >= totLocs {
+		s.locsBacking = s.locsBacking[:totLocs]
+	} else {
+		s.locsBacking = make([]interimLoc, totLocs)
+	}
+
+	locsBacking := s.locsBacking
+	for pid, numLocs := range s.numLocsPerPostingsList {
 		s.Locs[pid] = locsBacking[0:0]
 		locsBacking = locsBacking[numLocs:]
 	}
