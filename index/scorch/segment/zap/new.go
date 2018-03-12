@@ -309,19 +309,27 @@ func (s *interim) prepareDicts() {
 	if cap(s.Postings) >= numPostingsLists {
 		s.Postings = s.Postings[:numPostingsLists]
 	} else {
-		s.Postings = make([]*roaring.Bitmap, numPostingsLists)
+		postings := make([]*roaring.Bitmap, numPostingsLists)
+		copy(postings, s.Postings[:cap(s.Postings)])
 		for i := 0; i < numPostingsLists; i++ {
-			s.Postings[i] = roaring.New()
+			if postings[i] == nil {
+				postings[i] = roaring.New()
+			}
 		}
+		s.Postings = postings
 	}
 
 	if cap(s.PostingsLocs) >= numPostingsLists {
 		s.PostingsLocs = s.PostingsLocs[:numPostingsLists]
 	} else {
-		s.PostingsLocs = make([]*roaring.Bitmap, numPostingsLists)
+		postingsLocs := make([]*roaring.Bitmap, numPostingsLists)
+		copy(postingsLocs, s.PostingsLocs[:cap(s.PostingsLocs)])
 		for i := 0; i < numPostingsLists; i++ {
-			s.PostingsLocs[i] = roaring.New()
+			if postingsLocs[i] == nil {
+				postingsLocs[i] = roaring.New()
+			}
 		}
+		s.PostingsLocs = postingsLocs
 	}
 
 	// TODO: reuse this.
