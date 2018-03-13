@@ -111,6 +111,11 @@ func (s *Scorch) parseMergePlannerOptions() (*mergeplan.MergePlanOptions,
 		if err != nil {
 			return &mergePlannerOptions, err
 		}
+
+		err = mergeplan.ValidateMergePlannerOptions(&mergePlannerOptions)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &mergePlannerOptions, nil
 }
