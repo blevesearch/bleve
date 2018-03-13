@@ -34,9 +34,17 @@ import (
 // SegmentBase from analysis results
 func AnalysisResultsToSegmentBase(results []*index.AnalysisResult,
 	chunkFactor uint32) (*SegmentBase, error) {
-	var br bytes.Buffer
-
 	s := interimPool.Get().(*interim)
+
+	var br bytes.Buffer
+	if s.lastNumDocs > 0 {
+		// use previous results to initialize the buf with an estimate
+		// size, but note that the interim instance comes from a
+		// global interimPool, so multiple scorch instances indexing
+		// different docs can lead to low quality estimates
+		avgBytesPerDoc := s.lastOutSize / s.lastNumDocs
+		br.Grow(avgBytesPerDoc * (len(results) + 1))
+	}
 
 	s.results = results
 	s.chunkFactor = chunkFactor
@@ -53,6 +61,8 @@ func AnalysisResultsToSegmentBase(results []*index.AnalysisResult,
 		storedIndexOffset, fieldsIndexOffset, fdvIndexOffset, dictOffsets)
 
 	if err == nil && s.reset() == nil {
+		s.lastNumDocs = len(results)
+		s.lastOutSize = len(br.Bytes())
 		interimPool.Put(s)
 	}
 
@@ -114,6 +124,9 @@ type interim struct {
 
 	tmp0 []byte
 	tmp1 []byte
+
+	lastNumDocs int
+	lastOutSize int
 }
 
 func (s *interim) reset() (err error) {
@@ -161,6 +174,8 @@ func (s *interim) reset() (err error) {
 	s.metaBuf.Reset()
 	s.tmp0 = s.tmp0[:0]
 	s.tmp1 = s.tmp1[:0]
+	s.lastNumDocs = 0
+	s.lastOutSize = 0
 
 	return err
 }
