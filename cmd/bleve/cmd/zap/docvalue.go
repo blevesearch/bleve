@@ -253,19 +253,7 @@ func getDocValueLocs(docNum uint64, metaHeader []zap.MetaData) (uint64, uint64) 
 		return metaHeader[i].DocNum >= docNum
 	})
 	if i < len(metaHeader) && metaHeader[i].DocNum == docNum {
-		var start, end uint64
-		if i > 0 {
-			start = metaHeader[i].DocDvOffset
-		}
-		// single element case
-		if i == 0 && len(metaHeader) == 1 {
-			end = metaHeader[i].DocDvOffset
-		} else if i < len(metaHeader)-1 {
-			end = metaHeader[i+1].DocDvOffset
-		} else { // for last element
-			end = start + metaHeader[0].DocDvOffset
-		}
-		return start, end
+		return zap.ReadDocValueBoundary(i, metaHeader)
 	}
 	return math.MaxUint64, math.MaxUint64
 }

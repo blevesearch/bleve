@@ -161,19 +161,7 @@ func (di *docValueIterator) getDocValueLocs(docNum uint64) (uint64, uint64) {
 		return di.curChunkHeader[i].DocNum >= docNum
 	})
 	if i < len(di.curChunkHeader) && di.curChunkHeader[i].DocNum == docNum {
-		var start, end uint64
-		if i > 0 {
-			start = di.curChunkHeader[i].DocDvOffset
-		}
-		// single element case
-		if i == 0 && len(di.curChunkHeader) == 1 {
-			end = di.curChunkHeader[i].DocDvOffset
-		} else if i < len(di.curChunkHeader)-1 {
-			end = di.curChunkHeader[i+1].DocDvOffset
-		} else { // for last element
-			end = start + di.curChunkHeader[0].DocDvOffset
-		}
-		return start, end
+		return ReadDocValueBoundary(i, di.curChunkHeader)
 	}
 	return math.MaxUint64, math.MaxUint64
 }

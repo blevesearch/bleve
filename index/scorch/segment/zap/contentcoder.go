@@ -95,13 +95,14 @@ func (c *chunkedContentCoder) flushContents() error {
 
 	// convert the document data lens to data offsets
 	if len(c.chunkMeta) > 1 {
-		c.chunkMeta[1].DocDvOffset, c.chunkMeta[0].DocDvOffset =
-			c.chunkMeta[0].DocDvOffset, c.chunkMeta[1].DocDvOffset
-		for i := 2; i < len(c.chunkMeta); i++ {
-			cur := c.chunkMeta[i].DocDvOffset
-			c.chunkMeta[i].DocDvOffset = c.chunkMeta[i-1].DocDvOffset + c.chunkMeta[0].DocDvOffset
-			c.chunkMeta[0].DocDvOffset = cur
+		var runningOffset uint64
+		var index, i int
+		for i = 1; i < len(c.chunkMeta); i++ {
+			runningOffset += c.chunkMeta[i-1].DocDvOffset
+			c.chunkMeta[index].DocDvOffset = runningOffset
+			index++
 		}
+		c.chunkMeta[index].DocDvOffset = c.chunkMeta[i-1].DocDvOffset
 	}
 
 	// write out the metaData slice
@@ -140,7 +141,7 @@ func (c *chunkedContentCoder) Add(docNum uint64, vals []byte) error {
 		c.currChunk = chunk
 	}
 
-	// mark the data length for this doc
+	// mark the data size for this doc
 	dvSize, err := c.chunkBuf.Write(vals)
 	if err != nil {
 		return err
@@ -180,4 +181,25 @@ func (c *chunkedContentCoder) Write(w io.Writer) (int, error) {
 		return tw, err
 	}
 	return tw, nil
+}
+
+// ReadDocValueBoundary elicits the start, end offsets from a
+// starting offset based metaData header slice
+func ReadDocValueBoundary(chunk int, metaHeaders []MetaData) (uint64, uint64) {
+	var start, end uint64
+	if chunk > len(metaHeaders) {
+		return start, end
+	}
+
+	if chunk > 0 {
+		start = metaHeaders[chunk-1].DocDvOffset
+	}
+
+	if chunk < len(metaHeaders)-1 {
+		end = metaHeaders[chunk].DocDvOffset
+	} else {
+		end = start + metaHeaders[chunk].DocDvOffset
+	}
+
+	return start, end
 }
