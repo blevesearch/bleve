@@ -75,6 +75,14 @@
 			"notests": true
 		},
 		{
+			"importpath": "github.com/RoaringBitmap/roaring",
+			"repository": "https://github.com/RoaringBitmap/roaring",
+			"vcs": "",
+			"revision": "01d244c43a7e8d1191a4f369f5908ea9eb9bc9ac",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/seiflotfy/cuckoofilter",
 			"repository": "https://github.com/seiflotfy/cuckoofilter",
 			"vcs": "git",

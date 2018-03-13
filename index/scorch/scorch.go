@@ -28,7 +28,6 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
-	"github.com/blevesearch/bleve/index/scorch/segment/mem"
 	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
@@ -58,6 +57,7 @@ type Scorch struct {
 	nextSnapshotEpoch    uint64
 	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
+	numSnapshotsToKeep   int
 
 	closeCh            chan struct{}
 	introductions      chan *segmentIntroduction
@@ -191,6 +191,17 @@ func (s *Scorch) openBolt() error {
 		}
 	}
 
+	s.numSnapshotsToKeep = NumSnapshotsToKeep
+	if v, ok := s.config["numSnapshotsToKeep"]; ok {
+		var t int
+		if t, err = parseToInteger(v); err != nil {
+			return fmt.Errorf("numSnapshotsToKeep parse err: %v", err)
+		}
+		if t > 0 {
+			s.numSnapshotsToKeep = t
+		}
+	}
+
 	return nil
 }
 
@@ -289,7 +300,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 
 	var newSegment segment.Segment
 	if len(analysisResults) > 0 {
-		newSegment, err = zap.NewSegmentBase(mem.NewFromAnalyzedDocs(analysisResults), DefaultChunkFactor)
+		newSegment, err = zap.AnalysisResultsToSegmentBase(analysisResults, DefaultChunkFactor)
 		if err != nil {
 			return err
 		}
@@ -503,4 +514,16 @@ func (s *Scorch) unmarkIneligibleForRemoval(filename string) {
 
 func init() {
 	registry.RegisterIndexType(Name, NewScorch)
+}
+
+func parseToInteger(i interface{}) (int, error) {
+	switch v := i.(type) {
+	case float64:
+		return int(v), nil
+	case int:
+		return v, nil
+
+	default:
+		return 0, fmt.Errorf("expects int or float64 value")
+	}
 }
