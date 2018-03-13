@@ -52,7 +52,9 @@ func AnalysisResultsToSegmentBase(results []*index.AnalysisResult,
 		s.FieldsMap, s.FieldsInv, uint64(len(results)),
 		storedIndexOffset, fieldsIndexOffset, fdvIndexOffset, dictOffsets)
 
-	interimPool.Put(s.cleanse())
+	if err == nil && s.reset() == nil {
+		interimPool.Put(s)
+	}
 
 	return sb, err
 }
@@ -105,12 +107,16 @@ type interim struct {
 	numTermsPerPostingsList []int // key is postings list id
 	numLocsPerPostingsList  []int // key is postings list id
 
-	buf0 bytes.Buffer
+	builder    *vellum.Builder
+	builderBuf bytes.Buffer
+
+	metaBuf bytes.Buffer
+
 	tmp0 []byte
 	tmp1 []byte
 }
 
-func (s *interim) cleanse() *interim {
+func (s *interim) reset() (err error) {
 	s.results = nil
 	s.chunkFactor = 0
 	s.w = nil
@@ -148,11 +154,15 @@ func (s *interim) cleanse() *interim {
 	s.locsBacking = s.locsBacking[:0]
 	s.numTermsPerPostingsList = s.numTermsPerPostingsList[:0]
 	s.numLocsPerPostingsList = s.numLocsPerPostingsList[:0]
-	s.buf0.Reset()
+	s.builderBuf.Reset()
+	if s.builder != nil {
+		err = s.builder.Reset(&s.builderBuf)
+	}
+	s.metaBuf.Reset()
 	s.tmp0 = s.tmp0[:0]
 	s.tmp1 = s.tmp1[:0]
 
-	return s
+	return err
 }
 
 func (s *interim) grabBuf(size int) []byte {
@@ -475,8 +485,7 @@ func (s *interim) processDocument(docNum uint64,
 
 func (s *interim) writeStoredFields() (
 	storedIndexOffset uint64, err error) {
-	metaBuf := &s.buf0
-	metaEncoder := govarint.NewU64Base128Encoder(metaBuf)
+	metaEncoder := govarint.NewU64Base128Encoder(&s.metaBuf)
 
 	data, compressed := s.tmp0[:0], s.tmp1[:0]
 	defer func() { s.tmp0, s.tmp1 = data, compressed }()
@@ -512,7 +521,7 @@ func (s *interim) writeStoredFields() (
 
 		var curr int
 
-		metaBuf.Reset()
+		s.metaBuf.Reset()
 		data = data[:0]
 		compressed = compressed[:0]
 
@@ -529,7 +538,7 @@ func (s *interim) writeStoredFields() (
 		}
 
 		metaEncoder.Close()
-		metaBytes := metaBuf.Bytes()
+		metaBytes := s.metaBuf.Bytes()
 
 		compressed = snappy.Encode(compressed, data)
 
@@ -565,8 +574,8 @@ func (s *interim) writeStoredFields() (
 	return storedIndexOffset, nil
 }
 
-func (s *interim) writeDicts() (uint64, []uint64, error) {
-	dictOffsets := make([]uint64, len(s.FieldsInv))
+func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err error) {
+	dictOffsets = make([]uint64, len(s.FieldsInv))
 
 	fdvOffsets := make([]uint64, len(s.FieldsInv))
 
@@ -578,10 +587,11 @@ func (s *interim) writeDicts() (uint64, []uint64, error) {
 
 	var docTermMap [][]byte
 
-	s.buf0.Reset()
-	builder, err := vellum.New(&s.buf0, nil)
-	if err != nil {
-		return 0, nil, err
+	if s.builder == nil {
+		s.builder, err = vellum.New(&s.builderBuf, nil)
+		if err != nil {
+			return 0, nil, err
+		}
 	}
 
 	for fieldID, terms := range s.DictKeys {
@@ -658,7 +668,7 @@ func (s *interim) writeDicts() (uint64, []uint64, error) {
 			}
 
 			if postingsOffset > uint64(0) {
-				err = builder.Insert([]byte(term), postingsOffset)
+				err = s.builder.Insert([]byte(term), postingsOffset)
 				if err != nil {
 					return 0, nil, err
 				}
@@ -668,7 +678,7 @@ func (s *interim) writeDicts() (uint64, []uint64, error) {
 			locEncoder.Reset()
 		}
 
-		err = builder.Close()
+		err = s.builder.Close()
 		if err != nil {
 			return 0, nil, err
 		}
@@ -676,7 +686,7 @@ func (s *interim) writeDicts() (uint64, []uint64, error) {
 		// record where this dictionary starts
 		dictOffsets[fieldID] = uint64(s.w.Count())
 
-		vellumData := s.buf0.Bytes()
+		vellumData := s.builderBuf.Bytes()
 
 		// write out the length of the vellum data
 		n := binary.PutUvarint(buf, uint64(len(vellumData)))
@@ -692,9 +702,9 @@ func (s *interim) writeDicts() (uint64, []uint64, error) {
 		}
 
 		// reset vellum for reuse
-		s.buf0.Reset()
+		s.builderBuf.Reset()
 
-		err = builder.Reset(&s.buf0)
+		err = s.builder.Reset(&s.builderBuf)
 		if err != nil {
 			return 0, nil, err
 		}
@@ -727,7 +737,7 @@ func (s *interim) writeDicts() (uint64, []uint64, error) {
 		}
 	}
 
-	fdvIndexOffset := uint64(s.w.Count())
+	fdvIndexOffset = uint64(s.w.Count())
 
 	for _, fdvOffset := range fdvOffsets {
 		n := binary.PutUvarint(buf, fdvOffset)
