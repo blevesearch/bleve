@@ -111,15 +111,13 @@ func (c *chunkedIntCoder) Write(w io.Writer) (int, error) {
 	}
 	buf := c.buf
 
-	// convert the chunk lengths into starting chunk offsets
-	if len(c.chunkLens) > 1 {
-		chunkLengthsToOffsets(c.chunkLens)
-	}
+	// convert the chunk lengths into chunk offsets
+	chunkOffsets := modifyLengthsToEndOffsets(c.chunkLens)
 
-	// write out the number of chunks & each chunk starting offsets
-	n := binary.PutUvarint(buf, uint64(len(c.chunkLens)))
-	for _, chunkLen := range c.chunkLens {
-		n += binary.PutUvarint(buf[n:], uint64(chunkLen))
+	// write out the number of chunks & each chunk offsets
+	n := binary.PutUvarint(buf, uint64(len(chunkOffsets)))
+	for _, chunkOffset := range chunkOffsets {
+		n += binary.PutUvarint(buf[n:], chunkOffset)
 	}
 
 	tw, err := w.Write(buf[:n])
@@ -140,41 +138,35 @@ func (c *chunkedIntCoder) FinalSize() int {
 	return len(c.final)
 }
 
-// chunkLengthsToOffsets converts the chunk length array
-// to a chunk starting offset array. The readChunkBoundary
+// modifyLengthsToEndOffsets converts the chunk length array
+// to a chunk offset array. The readChunkBoundary
 // will figure out the start and end of every chunk from
-// these offsets. The starting offset of the first/single
-// array element will always be zero and this position is
-// used for storing the size of the current last item in
-// the array at any given point.
-// For eg:
-// Lens ->  5 5 5 5 => 5 5 10 15
-// Lens ->  0 5 0 5 => 5 0 5 5
-// Lens ->  0 0 0 5 => 5 0 0 0
-// Lens ->  5 0 0 0 => 0 5 5 5
-// Lens ->  0 5 0 0 => 0 0 5 5
-// Lens ->  0 0 5 0 => 0 0 0 5
-func chunkLengthsToOffsets(lengths []uint64) {
-	lengths[1], lengths[0] = lengths[0], lengths[1]
-	for i := 2; i < len(lengths); i++ {
-		cur := lengths[i]
-		lengths[i] = lengths[i-1] + lengths[0]
-		lengths[0] = cur
+// these offsets. Starting offset of i'th index is stored
+// in i-1'th position except for 0'th index and ending offset
+// is stored at i'th index position.
+// For 0'th element, starting position is always zero.
+// eg:
+// Lens ->  5 5 5 5 => 5 10 15 20
+// Lens ->  0 5 0 5 => 0 5 5 10
+// Lens ->  0 0 0 5 => 0 0 0 5
+// Lens ->  5 0 0 0 => 5 5 5 5
+// Lens ->  0 5 0 0 => 0 5 5 5
+// Lens ->  0 0 5 0 => 0 0 5 5
+func modifyLengthsToEndOffsets(lengths []uint64) []uint64 {
+	var runningOffset uint64
+	var index, i int
+	for i = 1; i <= len(lengths); i++ {
+		runningOffset += lengths[i-1]
+		lengths[index] = runningOffset
+		index++
 	}
+	return lengths
 }
 
 func readChunkBoundary(chunk int, offsets []uint64) (uint64, uint64) {
-	var start, end uint64
+	var start uint64
 	if chunk > 0 {
-		start = offsets[chunk]
+		start = offsets[chunk-1]
 	}
-	// single element case
-	if chunk == 0 && len(offsets) == 1 {
-		end = offsets[chunk]
-	} else if chunk < len(offsets)-1 {
-		end = offsets[chunk+1]
-	} else { // for last element
-		end = start + offsets[0]
-	}
-	return start, end
+	return start, offsets[chunk]
 }

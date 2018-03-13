@@ -69,7 +69,7 @@ func (s *SegmentBase) loadFieldDocValueIterator(field string,
 	}
 
 	// read the number of chunks, chunk lengths
-	var offset, clen uint64
+	var offset, loc uint64
 	numChunks, read := binary.Uvarint(s.mem[fieldDvLoc : fieldDvLoc+binary.MaxVarintLen64])
 	if read <= 0 {
 		return nil, fmt.Errorf("failed to read the field "+
@@ -83,11 +83,11 @@ func (s *SegmentBase) loadFieldDocValueIterator(field string,
 		chunkOffsets: make([]uint64, int(numChunks)),
 	}
 	for i := 0; i < int(numChunks); i++ {
-		clen, read = binary.Uvarint(s.mem[fieldDvLoc+offset : fieldDvLoc+offset+binary.MaxVarintLen64])
+		loc, read = binary.Uvarint(s.mem[fieldDvLoc+offset : fieldDvLoc+offset+binary.MaxVarintLen64])
 		if read <= 0 {
-			return nil, fmt.Errorf("corrupted chunk length during segment load")
+			return nil, fmt.Errorf("corrupted chunk offset during segment load")
 		}
-		fdvIter.chunkOffsets[i] = clen
+		fdvIter.chunkOffsets[i] = loc
 		offset += uint64(read)
 	}
 

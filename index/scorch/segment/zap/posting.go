@@ -189,9 +189,9 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 	var numFreqChunks uint64
 	numFreqChunks, read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
 	n += uint64(read)
-	rv.freqChunkLens = make([]uint64, int(numFreqChunks))
+	rv.freqChunkOffsets = make([]uint64, int(numFreqChunks))
 	for i := 0; i < int(numFreqChunks); i++ {
-		rv.freqChunkLens[i], read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
+		rv.freqChunkOffsets[i], read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
 		n += uint64(read)
 	}
 	rv.freqChunkStart = p.freqOffset + n
@@ -201,9 +201,9 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 	var numLocChunks uint64
 	numLocChunks, read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
 	n += uint64(read)
-	rv.locChunkLens = make([]uint64, int(numLocChunks))
+	rv.locChunkOffsets = make([]uint64, int(numLocChunks))
 	for i := 0; i < int(numLocChunks); i++ {
-		rv.locChunkLens[i], read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
+		rv.locChunkOffsets[i], read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
 		n += uint64(read)
 	}
 	rv.locChunkStart = p.locOffset + n

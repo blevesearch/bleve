@@ -46,8 +46,8 @@ func TestChunkIntCoder(t *testing.T) {
 				[]uint64{3},
 				[]uint64{7},
 			},
-			// 2 chunks, chunk-0 length 1, chunk-1 length 1, value 3, value 7
-			expected: []byte{0x2, 0x1, 0x1, 0x3, 0x7},
+			// 2 chunks, chunk-0 offset 1, chunk-1 offset 2, value 3, value 7
+			expected: []byte{0x2, 0x1, 0x2, 0x3, 0x7},
 		},
 	}
 
@@ -80,40 +80,48 @@ func TestChunkLengthToOffsets(t *testing.T) {
 	}{
 		{
 			lengths:         []uint64{5, 5, 5, 5, 5},
-			expectedOffsets: []uint64{5, 5, 10, 15, 20},
+			expectedOffsets: []uint64{5, 10, 15, 20, 25},
 		},
 		{
 			lengths:         []uint64{0, 5, 0, 5, 0},
-			expectedOffsets: []uint64{0, 0, 5, 5, 10},
+			expectedOffsets: []uint64{0, 5, 5, 10, 10},
 		},
 		{
 			lengths:         []uint64{0, 0, 0, 0, 5},
-			expectedOffsets: []uint64{5, 0, 0, 0, 0},
-		},
-		{
-			lengths:         []uint64{5, 0, 0, 0, 0},
-			expectedOffsets: []uint64{0, 5, 5, 5, 5},
-		},
-		{
-			lengths:         []uint64{0, 5, 0, 0, 0},
-			expectedOffsets: []uint64{0, 0, 5, 5, 5},
-		},
-		{
-			lengths:         []uint64{0, 0, 0, 5, 0},
 			expectedOffsets: []uint64{0, 0, 0, 0, 5},
 		},
 		{
+			lengths:         []uint64{5, 0, 0, 0, 0},
+			expectedOffsets: []uint64{5, 5, 5, 5, 5},
+		},
+		{
+			lengths:         []uint64{0, 5, 0, 0, 0},
+			expectedOffsets: []uint64{0, 5, 5, 5, 5},
+		},
+		{
+			lengths:         []uint64{0, 0, 0, 5, 0},
+			expectedOffsets: []uint64{0, 0, 0, 5, 5},
+		},
+		{
 			lengths:         []uint64{0, 0, 0, 5, 5},
-			expectedOffsets: []uint64{5, 0, 0, 0, 5},
+			expectedOffsets: []uint64{0, 0, 0, 5, 10},
 		},
 		{
 			lengths:         []uint64{5, 5, 5, 0, 0},
-			expectedOffsets: []uint64{0, 5, 10, 15, 15},
+			expectedOffsets: []uint64{5, 10, 15, 15, 15},
+		},
+		{
+			lengths:         []uint64{5},
+			expectedOffsets: []uint64{5},
+		},
+		{
+			lengths:         []uint64{5, 5},
+			expectedOffsets: []uint64{5, 10},
 		},
 	}
 
 	for i, test := range tests {
-		chunkLengthsToOffsets(test.lengths)
+		modifyLengthsToEndOffsets(test.lengths)
 		if !reflect.DeepEqual(test.expectedOffsets, test.lengths) {
 			t.Errorf("Test: %d failed, got %+v, expected %+v", i, test.lengths, test.expectedOffsets)
 		}
@@ -129,148 +137,124 @@ func TestChunkReadBoundaryFromOffsets(t *testing.T) {
 		expectedEnd   uint64
 	}{
 		{
-			offsets:       []uint64{5, 5, 10, 15, 20},
+			offsets:       []uint64{5, 10, 15, 20, 25},
 			chunkNumber:   4,
 			expectedStart: 20,
 			expectedEnd:   25,
 		},
 		{
-			offsets:       []uint64{5, 5, 10, 15, 20},
+			offsets:       []uint64{5, 10, 15, 20, 25},
 			chunkNumber:   0,
 			expectedStart: 0,
 			expectedEnd:   5,
 		},
 		{
-			offsets:       []uint64{5, 5, 10, 15, 20},
+			offsets:       []uint64{5, 10, 15, 20, 25},
 			chunkNumber:   2,
 			expectedStart: 10,
 			expectedEnd:   15,
 		},
 		{
-			offsets:       []uint64{0, 0, 5, 5, 10},
+			offsets:       []uint64{0, 5, 5, 10, 10},
 			chunkNumber:   4,
 			expectedStart: 10,
 			expectedEnd:   10,
 		},
 		{
-			offsets:       []uint64{0, 0, 5, 5, 10},
+			offsets:       []uint64{0, 5, 5, 10, 10},
 			chunkNumber:   1,
 			expectedStart: 0,
 			expectedEnd:   5,
 		},
 		{
-			offsets:       []uint64{5, 0, 0, 0, 0},
+			offsets:       []uint64{5, 5, 5, 5, 5},
 			chunkNumber:   0,
 			expectedStart: 0,
-			expectedEnd:   0,
-		},
-		{
-			offsets:       []uint64{5, 0, 0, 0, 0},
-			chunkNumber:   4,
-			expectedStart: 0,
 			expectedEnd:   5,
 		},
 		{
-			offsets:       []uint64{5, 0, 0, 0, 0},
-			chunkNumber:   1,
-			expectedStart: 0,
-			expectedEnd:   0,
+			offsets:       []uint64{5, 5, 5, 5, 5},
+			chunkNumber:   4,
+			expectedStart: 5,
+			expectedEnd:   5,
 		},
 		{
-			offsets:       []uint64{0, 5, 5, 5, 5},
+			offsets:       []uint64{5, 5, 5, 5, 5},
 			chunkNumber:   1,
 			expectedStart: 5,
 			expectedEnd:   5,
 		},
 		{
 			offsets:       []uint64{0, 5, 5, 5, 5},
-			chunkNumber:   0,
-			expectedStart: 0,
-			expectedEnd:   5,
-		},
-		{
-			offsets:       []uint64{0, 0, 5, 5, 5},
-			chunkNumber:   2,
-			expectedStart: 5,
-			expectedEnd:   5,
-		},
-		{
-			offsets:       []uint64{0, 0, 5, 5, 5},
 			chunkNumber:   1,
 			expectedStart: 0,
 			expectedEnd:   5,
 		},
 		{
-			offsets:       []uint64{0, 0, 0, 0, 5},
-			chunkNumber:   4,
-			expectedStart: 5,
-			expectedEnd:   5,
-		},
-		{
-			offsets:       []uint64{0, 0, 0, 0, 5},
-			chunkNumber:   3,
+			offsets:       []uint64{0, 5, 5, 5, 5},
+			chunkNumber:   0,
 			expectedStart: 0,
-			expectedEnd:   5,
+			expectedEnd:   0,
 		},
 		{
-			offsets:       []uint64{0, 0, 0, 0, 5},
+			offsets:       []uint64{0, 0, 0, 5, 5},
 			chunkNumber:   2,
 			expectedStart: 0,
 			expectedEnd:   0,
 		},
 		{
-			offsets:       []uint64{5, 0, 0, 0, 5},
-			chunkNumber:   0,
-			expectedStart: 0,
-			expectedEnd:   0,
-		},
-		{
-			offsets:       []uint64{5, 0, 0, 0, 5},
+			offsets:       []uint64{0, 0, 0, 5, 5},
 			chunkNumber:   1,
 			expectedStart: 0,
 			expectedEnd:   0,
 		},
 		{
-			offsets:       []uint64{5, 0, 0, 0, 5},
-			chunkNumber:   3,
-			expectedStart: 0,
-			expectedEnd:   5,
-		},
-		{
-			offsets:       []uint64{5, 0, 0, 0, 5},
+			offsets:       []uint64{0, 0, 0, 0, 5},
 			chunkNumber:   4,
-			expectedStart: 5,
-			expectedEnd:   10,
+			expectedStart: 0,
+			expectedEnd:   5,
 		},
 		{
-			offsets:       []uint64{0, 5, 10, 15, 15},
+			offsets:       []uint64{0, 0, 0, 0, 5},
+			chunkNumber:   2,
+			expectedStart: 0,
+			expectedEnd:   0,
+		},
+		{
+			offsets:       []uint64{5, 10, 15, 15, 15},
 			chunkNumber:   0,
 			expectedStart: 0,
 			expectedEnd:   5,
 		},
 		{
-			offsets:       []uint64{0, 5, 10, 15, 15},
+			offsets:       []uint64{5, 10, 15, 15, 15},
 			chunkNumber:   1,
 			expectedStart: 5,
 			expectedEnd:   10,
 		},
 		{
-			offsets:       []uint64{0, 5, 10, 15, 15},
+			offsets:       []uint64{5, 10, 15, 15, 15},
 			chunkNumber:   2,
 			expectedStart: 10,
 			expectedEnd:   15,
 		},
 		{
-			offsets:       []uint64{0, 5, 10, 15, 15},
+			offsets:       []uint64{5, 10, 15, 15, 15},
 			chunkNumber:   3,
 			expectedStart: 15,
 			expectedEnd:   15,
 		},
 		{
-			offsets:       []uint64{0, 5, 10, 15, 15},
+			offsets:       []uint64{5, 10, 15, 15, 15},
 			chunkNumber:   4,
 			expectedStart: 15,
 			expectedEnd:   15,
+		},
+		{
+			offsets:       []uint64{5},
+			chunkNumber:   0,
+			expectedStart: 0,
+			expectedEnd:   5,
 		},
 	}
 
