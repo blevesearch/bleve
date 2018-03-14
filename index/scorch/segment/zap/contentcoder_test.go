@@ -69,7 +69,7 @@ func TestChunkContentCoder(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(test.expected, string(actual.Bytes())) {
-			t.Errorf("got % s, expected % s", string(actual.Bytes()), test.expected)
+			t.Errorf("got:%s, expected:%s", string(actual.Bytes()), test.expected)
 		}
 	}
 }
