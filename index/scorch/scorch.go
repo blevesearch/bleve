@@ -397,11 +397,15 @@ func (s *Scorch) DeleteInternal(key []byte) error {
 // Reader returns a low-level accessor on the index data. Close it to
 // release associated resources.
 func (s *Scorch) Reader() (index.IndexReader, error) {
+	return s.currentSnapshot(), nil
+}
+
+func (s *Scorch) currentSnapshot() *IndexSnapshot {
 	s.rootLock.RLock()
 	rv := s.root
 	rv.AddRef()
 	s.rootLock.RUnlock()
-	return rv, nil
+	return rv
 }
 
 func (s *Scorch) Stats() json.Marshaler {
@@ -484,20 +488,11 @@ func (s *Scorch) AddEligibleForRemoval(epoch uint64) {
 }
 
 func (s *Scorch) MemoryUsed() uint64 {
-	var memUsed int
-	s.rootLock.RLock()
-	if s.root != nil {
-		for _, segmentSnapshot := range s.root.segment {
-			memUsed += 8 /* size of id -> uint64 */ +
-				segmentSnapshot.segment.Size()
-			if segmentSnapshot.deleted != nil {
-				memUsed += int(segmentSnapshot.deleted.GetSizeInBytes())
-			}
-			memUsed += segmentSnapshot.cachedDocs.size()
-		}
-	}
-	s.rootLock.RUnlock()
-	return uint64(memUsed)
+	indexSnapshot := s.currentSnapshot()
+	defer func() {
+		_ = indexSnapshot.Close()
+	}()
+	return uint64(indexSnapshot.SizeFull())
 }
 
 func (s *Scorch) markIneligibleForRemoval(filename string) {

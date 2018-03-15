@@ -19,6 +19,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/size"
 )
 
 var TermSeparator byte = 0xff
@@ -128,15 +129,26 @@ func (s *SegmentSnapshot) Fields() []string {
 	return s.segment.Fields()
 }
 
+func (s *SegmentSnapshot) Size() (rv int) {
+	rv = s.segment.Size()
+	if s.deleted != nil {
+		rv += int(s.deleted.GetSizeInBytes())
+	}
+	rv += s.cachedDocs.Size()
+	return
+}
+
 type cachedFieldDocs struct {
 	readyCh chan struct{}     // closed when the cachedFieldDocs.docs is ready to be used.
 	err     error             // Non-nil if there was an error when preparing this cachedFieldDocs.
 	docs    map[uint64][]byte // Keyed by localDocNum, value is a list of terms delimited by 0xFF.
+	size    uint64
 }
 
 func (cfd *cachedFieldDocs) prepareFields(field string, ss *SegmentSnapshot) {
 	defer close(cfd.readyCh)
 
+	cfd.size += uint64(size.SizeOfUint64) /* size field */
 	dict, err := ss.segment.Dictionary(field)
 	if err != nil {
 		cfd.err = err
@@ -152,12 +164,14 @@ func (cfd *cachedFieldDocs) prepareFields(field string, ss *SegmentSnapshot) {
 			return
 		}
 
+		cfd.size += uint64(size.SizeOfUint64) /* map key */
 		postingsItr := postings.Iterator()
 		nextPosting, err2 := postingsItr.Next()
 		for err2 == nil && nextPosting != nil {
 			docNum := nextPosting.Number()
 			cfd.docs[docNum] = append(cfd.docs[docNum], []byte(next.Term)...)
 			cfd.docs[docNum] = append(cfd.docs[docNum], TermSeparator)
+			cfd.size += uint64(len(next.Term) + 1) // map value
 			nextPosting, err2 = postingsItr.Next()
 		}
 
@@ -178,6 +192,7 @@ func (cfd *cachedFieldDocs) prepareFields(field string, ss *SegmentSnapshot) {
 type cachedDocs struct {
 	m     sync.Mutex                  // As the cache is asynchronously prepared, need a lock
 	cache map[string]*cachedFieldDocs // Keyed by field
+	size  uint64
 }
 
 func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) error {
@@ -208,14 +223,18 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 		}
 		c.m.Lock()
 	}
+	c.updateSizeLOCKED()
 
 	c.m.Unlock()
 	return nil
 }
 
-func (c *cachedDocs) size() int {
+func (c *cachedDocs) Size() int {
+	return int(c.size)
+}
+
+func (c *cachedDocs) updateSizeLOCKED() {
 	sizeInBytes := 0
-	c.m.Lock()
 	for k, v := range c.cache { // cachedFieldDocs
 		sizeInBytes += len(k)
 		if v != nil {
@@ -224,6 +243,5 @@ func (c *cachedDocs) size() int {
 			}
 		}
 	}
-	c.m.Unlock()
-	return sizeInBytes
+	c.size = uint64(sizeInBytes)
 }

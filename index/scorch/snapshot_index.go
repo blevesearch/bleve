@@ -19,6 +19,7 @@ import (
 	"container/heap"
 	"encoding/binary"
 	"fmt"
+	"reflect"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -41,12 +42,20 @@ type asynchSegmentResult struct {
 	err error
 }
 
+var reflectStaticSizeIndexSnapshot int
+
+func init() {
+	var is interface{} = IndexSnapshot{}
+	reflectStaticSizeIndexSnapshot = int(reflect.TypeOf(is).Size())
+}
+
 type IndexSnapshot struct {
 	parent   *Scorch
 	segment  []*SegmentSnapshot
 	offsets  []uint64
 	internal map[string][]byte
 	epoch    uint64
+	size     uint64
 
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
@@ -94,6 +103,17 @@ func (i *IndexSnapshot) Size() int {
 	// Just return the size of the pointer for estimating the overhead
 	// during Search, a reference of the IndexSnapshot serves as the reader.
 	return size.SizeOfPtr
+}
+
+func (i *IndexSnapshot) SizeFull() int {
+	return int(i.size)
+}
+
+func (i *IndexSnapshot) updateSize() {
+	i.size += uint64(reflectStaticSizeIndexSnapshot)
+	for _, s := range i.segment {
+		i.size += uint64(s.Size())
+	}
 }
 
 func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string, makeItr func(i segment.TermDictionary) segment.DictionaryIterator) (*IndexSnapshotFieldDict, error) {
