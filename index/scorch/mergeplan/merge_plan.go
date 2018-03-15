@@ -117,14 +117,14 @@ func (o *MergePlanOptions) RaiseToFloorSegmentSize(s int64) int64 {
 }
 
 // MaxSegmentSizeLimit represents the maximum size of a segment,
-// this limit comes as the roaring lib supports uint32.
-const MaxSegmentSizeLimit = 1<<32 - 1
+// this limit comes with hit-1 optimisation/max encoding limit uint31.
+const MaxSegmentSizeLimit = 1<<31 - 1
 
 // ErrMaxSegmentSizeTooLarge is returned when the size of the segment
 // exceeds the MaxSegmentSizeLimit
 var ErrMaxSegmentSizeTooLarge = errors.New("MaxSegmentSize exceeds the size limit")
 
-// Suggested default options.
+// DefaultMergePlanOptions suggests the default options.
 var DefaultMergePlanOptions = MergePlanOptions{
 	MaxSegmentsPerTier:   10,
 	MaxSegmentSize:       5000000,
