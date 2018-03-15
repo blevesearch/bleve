@@ -203,7 +203,7 @@ type UpsideDownCouchDocIDReader struct {
 
 func (r *UpsideDownCouchDocIDReader) Size() int {
 	sizeInBytes := reflectStaticSizeUpsideDownCouchDocIDReader +
-		r.indexReader.Size()
+		reflectStaticSizeIndexReader + size.SizeOfPtr
 
 	for _, entry := range r.only {
 		sizeInBytes += size.SizeOfString + len(entry)

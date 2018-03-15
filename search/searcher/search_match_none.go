@@ -40,8 +40,7 @@ func NewMatchNoneSearcher(indexReader index.IndexReader) (*MatchNoneSearcher, er
 }
 
 func (s *MatchNoneSearcher) Size() int {
-	return reflectStaticSizeMatchNoneSearcher + size.SizeOfPtr +
-		s.indexReader.Size()
+	return reflectStaticSizeMatchNoneSearcher + size.SizeOfPtr
 }
 
 func (s *MatchNoneSearcher) Count() uint64 {
