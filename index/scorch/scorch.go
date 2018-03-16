@@ -492,7 +492,7 @@ func (s *Scorch) MemoryUsed() uint64 {
 	defer func() {
 		_ = indexSnapshot.Close()
 	}()
-	return uint64(indexSnapshot.SizeFull())
+	return uint64(indexSnapshot.Size())
 }
 
 func (s *Scorch) markIneligibleForRemoval(filename string) {
