@@ -98,7 +98,7 @@ func (i *IndexSnapshot) Close() error {
 	return i.DecRef()
 }
 
-func (i *IndexSnapshot) SizeFull() int {
+func (i *IndexSnapshot) Size() int {
 	return int(i.size)
 }
 
