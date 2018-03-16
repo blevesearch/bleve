@@ -209,9 +209,7 @@ var docvalueCmd = &cobra.Command{
 		for i := 0; i < int(numDocs); i++ {
 			curChunkHeader[i].DocNum, nread = binary.Uvarint(data[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
 			offset += uint64(nread)
-			curChunkHeader[i].DocDvLoc, nread = binary.Uvarint(data[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
-			offset += uint64(nread)
-			curChunkHeader[i].DocDvLen, nread = binary.Uvarint(data[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
+			curChunkHeader[i].DocDvOffset, nread = binary.Uvarint(data[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
 			offset += uint64(nread)
 		}
 
@@ -255,7 +253,7 @@ func getDocValueLocs(docNum uint64, metaHeader []zap.MetaData) (uint64, uint64) 
 		return metaHeader[i].DocNum >= docNum
 	})
 	if i < len(metaHeader) && metaHeader[i].DocNum == docNum {
-		return metaHeader[i].DocDvLoc, metaHeader[i].DocDvLen
+		return zap.ReadDocValueBoundary(i, metaHeader)
 	}
 	return math.MaxUint64, math.MaxUint64
 }

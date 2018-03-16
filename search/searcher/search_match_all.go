@@ -58,7 +58,6 @@ func NewMatchAllSearcher(indexReader index.IndexReader, boost float64, options s
 
 func (s *MatchAllSearcher) Size() int {
 	return reflectStaticSizeMatchAllSearcher + size.SizeOfPtr +
-		s.indexReader.Size() +
 		s.reader.Size() +
 		s.scorer.Size()
 }

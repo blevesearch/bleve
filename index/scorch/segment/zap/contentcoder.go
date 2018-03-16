@@ -47,9 +47,8 @@ type chunkedContentCoder struct {
 // MetaData represents the data information inside a
 // chunk.
 type MetaData struct {
-	DocNum   uint64 // docNum of the data inside the chunk
-	DocDvLoc uint64 // starting offset for a given docid
-	DocDvLen uint64 // length of data inside the chunk for the given docid
+	DocNum      uint64 // docNum of the data inside the chunk
+	DocDvOffset uint64 // offset of data inside the chunk for the given docid
 }
 
 // newChunkedContentCoder returns a new chunk content coder which
@@ -96,7 +95,7 @@ func (c *chunkedContentCoder) flushContents() error {
 
 	// write out the metaData slice
 	for _, meta := range c.chunkMeta {
-		_, err := writeUvarints(&c.chunkMetaBuf, meta.DocNum, meta.DocDvLoc, meta.DocDvLen)
+		_, err := writeUvarints(&c.chunkMetaBuf, meta.DocNum, meta.DocDvOffset)
 		if err != nil {
 			return err
 		}
@@ -130,7 +129,7 @@ func (c *chunkedContentCoder) Add(docNum uint64, vals []byte) error {
 		c.currChunk = chunk
 	}
 
-	// mark the starting offset for this doc
+	// get the starting offset for this doc
 	dvOffset := c.chunkBuf.Len()
 	dvSize, err := c.chunkBuf.Write(vals)
 	if err != nil {
@@ -138,9 +137,8 @@ func (c *chunkedContentCoder) Add(docNum uint64, vals []byte) error {
 	}
 
 	c.chunkMeta = append(c.chunkMeta, MetaData{
-		DocNum:   docNum,
-		DocDvLoc: uint64(dvOffset),
-		DocDvLen: uint64(dvSize),
+		DocNum:      docNum,
+		DocDvOffset: uint64(dvOffset + dvSize),
 	})
 	return nil
 }
@@ -156,9 +154,11 @@ func (c *chunkedContentCoder) Write(w io.Writer) (int, error) {
 	if err != nil {
 		return tw, err
 	}
-	// write out the chunk lens
-	for _, chunkLen := range c.chunkLens {
-		n := binary.PutUvarint(buf, uint64(chunkLen))
+
+	chunkOffsets := modifyLengthsToEndOffsets(c.chunkLens)
+	// write out the chunk offsets
+	for _, chunkOffset := range chunkOffsets {
+		n := binary.PutUvarint(buf, chunkOffset)
 		nw, err = w.Write(buf[:n])
 		tw += nw
 		if err != nil {
@@ -172,4 +172,14 @@ func (c *chunkedContentCoder) Write(w io.Writer) (int, error) {
 		return tw, err
 	}
 	return tw, nil
+}
+
+// ReadDocValueBoundary elicits the start, end offsets from a
+// metaData header slice
+func ReadDocValueBoundary(chunk int, metaHeaders []MetaData) (uint64, uint64) {
+	var start uint64
+	if chunk > 0 {
+		start = metaHeaders[chunk-1].DocDvOffset
+	}
+	return start, metaHeaders[chunk].DocDvOffset
 }

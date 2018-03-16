@@ -94,8 +94,6 @@ type IndexReader interface {
 	DumpFields() chan interface{}
 
 	Close() error
-
-	Size() int
 }
 
 // FieldTerms contains the terms used by a document, keyed by field

@@ -101,7 +101,6 @@ func newDisjunctionSearcher(indexReader index.IndexReader,
 
 func (s *DisjunctionSearcher) Size() int {
 	sizeInBytes := reflectStaticSizeDisjunctionSearcher + size.SizeOfPtr +
-		s.indexReader.Size() +
 		s.scorer.Size()
 
 	for _, entry := range s.searchers {

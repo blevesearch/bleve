@@ -75,7 +75,6 @@ func NewTermSearcherBytes(indexReader index.IndexReader, term []byte, field stri
 
 func (s *TermSearcher) Size() int {
 	return reflectStaticSizeTermSearcher + size.SizeOfPtr +
-		s.indexReader.Size() +
 		s.reader.Size() +
 		s.tfd.Size() +
 		s.scorer.Size()
