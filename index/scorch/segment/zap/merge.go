@@ -29,6 +29,8 @@ import (
 	"github.com/golang/snappy"
 )
 
+var DefaultFileMergerBufferSize = 1024 * 1024
+
 const docDropped = math.MaxUint64 // sentinel docNum to represent a deleted doc
 
 // Merge takes a slice of zap segments and bit masks describing which
@@ -55,7 +57,7 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 	}
 
 	// buffer the output
-	br := bufio.NewWriter(f)
+	br := bufio.NewWriterSize(f, DefaultFileMergerBufferSize)
 
 	// wrap it for counting (tracking offsets)
 	cr := NewCountHashWriter(br)
