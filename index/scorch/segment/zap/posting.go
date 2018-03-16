@@ -189,9 +189,9 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 	var numFreqChunks uint64
 	numFreqChunks, read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
 	n += uint64(read)
-	rv.freqChunkLens = make([]uint64, int(numFreqChunks))
+	rv.freqChunkOffsets = make([]uint64, int(numFreqChunks))
 	for i := 0; i < int(numFreqChunks); i++ {
-		rv.freqChunkLens[i], read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
+		rv.freqChunkOffsets[i], read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
 		n += uint64(read)
 	}
 	rv.freqChunkStart = p.freqOffset + n
@@ -201,9 +201,9 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 	var numLocChunks uint64
 	numLocChunks, read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
 	n += uint64(read)
-	rv.locChunkLens = make([]uint64, int(numLocChunks))
+	rv.locChunkOffsets = make([]uint64, int(numLocChunks))
 	for i := 0; i < int(numLocChunks); i++ {
-		rv.locChunkLens[i], read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
+		rv.locChunkOffsets[i], read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
 		n += uint64(read)
 	}
 	rv.locChunkStart = p.locOffset + n
@@ -316,11 +316,11 @@ type PostingsIterator struct {
 	locDecoder        *govarint.Base128Decoder
 	locReader         *bytes.Reader
 
-	freqChunkLens  []uint64
-	freqChunkStart uint64
+	freqChunkOffsets []uint64
+	freqChunkStart   uint64
 
-	locChunkLens  []uint64
-	locChunkStart uint64
+	locChunkOffsets []uint64
+	locChunkStart   uint64
 
 	locBitmap *roaring.Bitmap
 
@@ -337,8 +337,8 @@ func (i *PostingsIterator) Size() int {
 	sizeInBytes := reflectStaticSizePostingsIterator + size.SizeOfPtr +
 		len(i.currChunkFreqNorm) +
 		len(i.currChunkLoc) +
-		len(i.freqChunkLens)*size.SizeOfUint64 +
-		len(i.locChunkLens)*size.SizeOfUint64 +
+		len(i.freqChunkOffsets)*size.SizeOfUint64 +
+		len(i.locChunkOffsets)*size.SizeOfUint64 +
 		i.next.Size()
 
 	if i.locBitmap != nil {
@@ -353,16 +353,14 @@ func (i *PostingsIterator) Size() int {
 }
 
 func (i *PostingsIterator) loadChunk(chunk int) error {
-	if chunk >= len(i.freqChunkLens) || chunk >= len(i.locChunkLens) {
-		return fmt.Errorf("tried to load chunk that doesn't exist %d/(%d %d)", chunk, len(i.freqChunkLens), len(i.locChunkLens))
+	if chunk >= len(i.freqChunkOffsets) || chunk >= len(i.locChunkOffsets) {
+		return fmt.Errorf("tried to load chunk that doesn't exist %d/(%d %d)", chunk, len(i.freqChunkOffsets), len(i.locChunkOffsets))
 	}
 
-	// load freq chunk bytes
-	start := i.freqChunkStart
-	for j := 0; j < chunk; j++ {
-		start += i.freqChunkLens[j]
-	}
-	end := start + i.freqChunkLens[chunk]
+	end, start := i.freqChunkStart, i.freqChunkStart
+	s, e := readChunkBoundary(chunk, i.freqChunkOffsets)
+	start += s
+	end += e
 	i.currChunkFreqNorm = i.postings.sb.mem[start:end]
 	if i.freqNormReader == nil {
 		i.freqNormReader = bytes.NewReader(i.currChunkFreqNorm)
@@ -371,12 +369,10 @@ func (i *PostingsIterator) loadChunk(chunk int) error {
 		i.freqNormReader.Reset(i.currChunkFreqNorm)
 	}
 
-	// load loc chunk bytes
-	start = i.locChunkStart
-	for j := 0; j < chunk; j++ {
-		start += i.locChunkLens[j]
-	}
-	end = start + i.locChunkLens[chunk]
+	end, start = i.locChunkStart, i.locChunkStart
+	s, e = readChunkBoundary(chunk, i.locChunkOffsets)
+	start += s
+	end += e
 	i.currChunkLoc = i.postings.sb.mem[start:end]
 	if i.locReader == nil {
 		i.locReader = bytes.NewReader(i.currChunkLoc)
