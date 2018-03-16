@@ -152,6 +152,9 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 		}
 		locDecoder := rv.locDecoder
 
+		freqChunkOffsets := rv.freqChunkOffsets[:0]
+		locChunkOffsets := rv.locChunkOffsets[:0]
+
 		buf := rv.buf
 
 		*rv = PostingsIterator{} // clear the struct
@@ -161,6 +164,9 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 
 		rv.locReader = locReader
 		rv.locDecoder = locDecoder
+
+		rv.freqChunkOffsets = freqChunkOffsets
+		rv.locChunkOffsets = locChunkOffsets
 
 		rv.buf = buf
 	}
@@ -189,7 +195,11 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 	var numFreqChunks uint64
 	numFreqChunks, read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
 	n += uint64(read)
-	rv.freqChunkOffsets = make([]uint64, int(numFreqChunks))
+	if cap(rv.freqChunkOffsets) >= int(numFreqChunks) {
+		rv.freqChunkOffsets = rv.freqChunkOffsets[:int(numFreqChunks)]
+	} else {
+		rv.freqChunkOffsets = make([]uint64, int(numFreqChunks))
+	}
 	for i := 0; i < int(numFreqChunks); i++ {
 		rv.freqChunkOffsets[i], read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
 		n += uint64(read)
@@ -201,7 +211,11 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 	var numLocChunks uint64
 	numLocChunks, read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
 	n += uint64(read)
-	rv.locChunkOffsets = make([]uint64, int(numLocChunks))
+	if cap(rv.locChunkOffsets) >= int(numLocChunks) {
+		rv.locChunkOffsets = rv.locChunkOffsets[:int(numLocChunks)]
+	} else {
+		rv.locChunkOffsets = make([]uint64, int(numLocChunks))
+	}
 	for i := 0; i < int(numLocChunks); i++ {
 		rv.locChunkOffsets[i], read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
 		n += uint64(read)

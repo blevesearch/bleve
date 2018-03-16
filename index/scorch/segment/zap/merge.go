@@ -207,7 +207,11 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				}
 				if itr != nil {
 					newDocNums = append(newDocNums, newDocNumsIn[segmentI])
-					drops = append(drops, dropsIn[segmentI])
+					if dropsIn[segmentI] != nil && !dropsIn[segmentI].IsEmpty() {
+						drops = append(drops, dropsIn[segmentI])
+					} else {
+						drops = append(drops, nil)
+					}
 					dicts = append(dicts, dict)
 					itrs = append(itrs, itr)
 				}
