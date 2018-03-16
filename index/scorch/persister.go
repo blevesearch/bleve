@@ -514,7 +514,7 @@ func (s *Scorch) LoadSnapshot(epoch uint64) (rv *IndexSnapshot, err error) {
 		snapshotKey := segment.EncodeUvarintAscending(nil, epoch)
 		snapshot := snapshots.Bucket(snapshotKey)
 		if snapshot == nil {
-			return nil
+			return fmt.Errorf("snapshot with epoch: %v - doesn't exist", epoch)
 		}
 		rv, err = s.loadSnapshot(snapshot)
 		return err
