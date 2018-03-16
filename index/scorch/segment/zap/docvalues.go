@@ -116,9 +116,7 @@ func (di *docValueIterator) loadDvChunk(chunkNumber,
 	for i := 0; i < int(numDocs); i++ {
 		di.curChunkHeader[i].DocNum, read = binary.Uvarint(s.mem[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
 		offset += uint64(read)
-		di.curChunkHeader[i].DocDvLoc, read = binary.Uvarint(s.mem[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
-		offset += uint64(read)
-		di.curChunkHeader[i].DocDvLen, read = binary.Uvarint(s.mem[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
+		di.curChunkHeader[i].DocDvOffset, read = binary.Uvarint(s.mem[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
 		offset += uint64(read)
 	}
 
@@ -132,8 +130,8 @@ func (di *docValueIterator) loadDvChunk(chunkNumber,
 func (di *docValueIterator) visitDocValues(docNum uint64,
 	visitor index.DocumentFieldTermVisitor) error {
 	// binary search the term locations for the docNum
-	start, length := di.getDocValueLocs(docNum)
-	if start == math.MaxUint64 || length == math.MaxUint64 {
+	start, end := di.getDocValueLocs(docNum)
+	if start == math.MaxUint64 || end == math.MaxUint64 {
 		return nil
 	}
 	// uncompress the already loaded data
@@ -143,7 +141,7 @@ func (di *docValueIterator) visitDocValues(docNum uint64,
 	}
 
 	// pick the terms for the given docNum
-	uncompressed = uncompressed[start : start+length]
+	uncompressed = uncompressed[start:end]
 	for {
 		i := bytes.Index(uncompressed, termSeparatorSplitSlice)
 		if i < 0 {
@@ -162,7 +160,7 @@ func (di *docValueIterator) getDocValueLocs(docNum uint64) (uint64, uint64) {
 		return di.curChunkHeader[i].DocNum >= docNum
 	})
 	if i < len(di.curChunkHeader) && di.curChunkHeader[i].DocNum == docNum {
-		return di.curChunkHeader[i].DocDvLoc, di.curChunkHeader[i].DocDvLen
+		return ReadDocValueBoundary(i, di.curChunkHeader)
 	}
 	return math.MaxUint64, math.MaxUint64
 }

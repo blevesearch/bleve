@@ -22,7 +22,7 @@ import (
 	"github.com/Smerity/govarint"
 )
 
-const version uint32 = 5
+const version uint32 = 6
 
 const fieldNotUninverted = math.MaxUint64
 
