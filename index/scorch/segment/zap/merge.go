@@ -183,6 +183,9 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 		return nil, 0, err
 	}
 
+	newRoaring := roaring.NewBitmap()
+	newRoaringLocs := roaring.NewBitmap()
+
 	// for each field
 	for fieldID, fieldName := range fieldsInv {
 
@@ -222,8 +225,8 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 
 		var prevTerm []byte
 
-		newRoaring := roaring.NewBitmap()
-		newRoaringLocs := roaring.NewBitmap()
+		newRoaring.Clear()
+		newRoaringLocs.Clear()
 
 		var lastDocNum, lastFreq, lastNorm uint64
 
@@ -248,63 +251,22 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 			tfEncoder.Close()
 			locEncoder.Close()
 
-			termCardinality := newRoaring.GetCardinality()
+			postingsOffset, err := writePostings(
+				newRoaring, newRoaringLocs, tfEncoder, locEncoder,
+				use1HitEncoding, w, bufMaxVarintLen64)
+			if err != nil {
+				return err
+			}
 
-			encodeAs1Hit, docNum1Hit, normBits1Hit := use1HitEncoding(termCardinality)
-			if encodeAs1Hit {
-				err = newVellum.Insert(term, FSTValEncode1Hit(docNum1Hit, normBits1Hit))
-				if err != nil {
-					return err
-				}
-			} else if termCardinality > 0 {
-				// this field/term has hits in the new segment
-				freqOffset := uint64(w.Count())
-				_, err := tfEncoder.Write(w)
-				if err != nil {
-					return err
-				}
-				locOffset := uint64(w.Count())
-				_, err = locEncoder.Write(w)
-				if err != nil {
-					return err
-				}
-				postingLocOffset := uint64(w.Count())
-				_, err = writeRoaringWithLen(newRoaringLocs, w, bufMaxVarintLen64)
-				if err != nil {
-					return err
-				}
-				postingOffset := uint64(w.Count())
-				// write out the start of the term info
-				n := binary.PutUvarint(bufMaxVarintLen64, freqOffset)
-				_, err = w.Write(bufMaxVarintLen64[:n])
-				if err != nil {
-					return err
-				}
-				// write out the start of the loc info
-				n = binary.PutUvarint(bufMaxVarintLen64, locOffset)
-				_, err = w.Write(bufMaxVarintLen64[:n])
-				if err != nil {
-					return err
-				}
-				// write out the start of the posting locs
-				n = binary.PutUvarint(bufMaxVarintLen64, postingLocOffset)
-				_, err = w.Write(bufMaxVarintLen64[:n])
-				if err != nil {
-					return err
-				}
-				_, err = writeRoaringWithLen(newRoaring, w, bufMaxVarintLen64)
-				if err != nil {
-					return err
-				}
-
-				err = newVellum.Insert(term, postingOffset)
+			if postingsOffset > 0 {
+				err = newVellum.Insert(term, postingsOffset)
 				if err != nil {
 					return err
 				}
 			}
 
-			newRoaring = roaring.NewBitmap()
-			newRoaringLocs = roaring.NewBitmap()
+			newRoaring.Clear()
+			newRoaringLocs.Clear()
 
 			tfEncoder.Reset()
 			locEncoder.Reset()
@@ -458,6 +420,69 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 	}
 
 	return rv, fieldDvLocsOffset, nil
+}
+
+func writePostings(postings, postingLocs *roaring.Bitmap,
+	tfEncoder, locEncoder *chunkedIntCoder,
+	use1HitEncoding func(uint64) (bool, uint64, uint64),
+	w *CountHashWriter, bufMaxVarintLen64 []byte) (
+	offset uint64, err error) {
+	termCardinality := postings.GetCardinality()
+	if termCardinality <= 0 {
+		return 0, nil
+	}
+
+	if use1HitEncoding != nil {
+		encodeAs1Hit, docNum1Hit, normBits1Hit := use1HitEncoding(termCardinality)
+		if encodeAs1Hit {
+			return FSTValEncode1Hit(docNum1Hit, normBits1Hit), nil
+		}
+	}
+
+	tfOffset := uint64(w.Count())
+	_, err = tfEncoder.Write(w)
+	if err != nil {
+		return 0, err
+	}
+
+	locOffset := uint64(w.Count())
+	_, err = locEncoder.Write(w)
+	if err != nil {
+		return 0, err
+	}
+
+	postingLocsOffset := uint64(w.Count())
+	_, err = writeRoaringWithLen(postingLocs, w, bufMaxVarintLen64)
+	if err != nil {
+		return 0, err
+	}
+
+	postingsOffset := uint64(w.Count())
+
+	n := binary.PutUvarint(bufMaxVarintLen64, tfOffset)
+	_, err = w.Write(bufMaxVarintLen64[:n])
+	if err != nil {
+		return 0, err
+	}
+
+	n = binary.PutUvarint(bufMaxVarintLen64, locOffset)
+	_, err = w.Write(bufMaxVarintLen64[:n])
+	if err != nil {
+		return 0, err
+	}
+
+	n = binary.PutUvarint(bufMaxVarintLen64, postingLocsOffset)
+	_, err = w.Write(bufMaxVarintLen64[:n])
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = writeRoaringWithLen(postings, w, bufMaxVarintLen64)
+	if err != nil {
+		return 0, err
+	}
+
+	return postingsOffset, nil
 }
 
 func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,

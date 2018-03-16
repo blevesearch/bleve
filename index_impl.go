@@ -534,7 +534,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			doc, err := indexReader.Document(hit.ID)
 			if err == nil && doc != nil {
 				if len(req.Fields) > 0 {
-					for _, f := range req.Fields {
+					fieldsToLoad := deDuplicate(req.Fields)
+					for _, f := range fieldsToLoad {
 						for _, docF := range doc.Fields {
 							if f == "*" || docF.Name() == f {
 								var value interface{}
@@ -829,4 +830,17 @@ func (f *indexImplFieldDict) Close() error {
 		return err
 	}
 	return f.indexReader.Close()
+}
+
+// helper function to remove duplicate entries from slice of strings
+func deDuplicate(fields []string) []string {
+	entries := make(map[string]struct{})
+	ret := []string{}
+	for _, entry := range fields {
+		if _, exists := entries[entry]; !exists {
+			entries[entry] = struct{}{}
+			ret = append(ret, entry)
+		}
+	}
+	return ret
 }

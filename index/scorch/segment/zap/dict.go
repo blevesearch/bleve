@@ -68,7 +68,19 @@ func (d *Dictionary) postingsListInit(rv *PostingsList, except *roaring.Bitmap) 
 	if rv == nil {
 		rv = &PostingsList{}
 	} else {
+		postings := rv.postings
+		if postings != nil {
+			postings.Clear()
+		}
+		locBitmap := rv.locBitmap
+		if locBitmap != nil {
+			locBitmap.Clear()
+		}
+
 		*rv = PostingsList{} // clear the struct
+
+		rv.postings = postings
+		rv.locBitmap = locBitmap
 	}
 	rv.sb = d.sb
 	rv.except = except
