@@ -138,6 +138,7 @@ func InitSegmentBase(mem []byte, memCRC uint32, chunkFactor uint32,
 		dictLocs:          dictLocs,
 		fieldDvIterMap:    make(map[uint16]*docValueIterator),
 	}
+	sb.updateSize()
 
 	err := sb.loadDvIterators()
 	if err != nil {

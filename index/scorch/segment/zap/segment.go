@@ -63,6 +63,7 @@ func Open(path string) (segment.Segment, error) {
 		path: path,
 		refs: 1,
 	}
+	rv.SegmentBase.updateSize()
 
 	err = rv.loadConfig()
 	if err != nil {
@@ -99,9 +100,14 @@ type SegmentBase struct {
 	docValueOffset    uint64
 	dictLocs          []uint64
 	fieldDvIterMap    map[uint16]*docValueIterator // naive chunk cache per field
+	size              uint64
 }
 
 func (sb *SegmentBase) Size() int {
+	return int(sb.size)
+}
+
+func (sb *SegmentBase) updateSize() {
 	sizeInBytes := reflectStaticSizeSegmentBase +
 		len(sb.mem)
 
@@ -124,7 +130,7 @@ func (sb *SegmentBase) Size() int {
 		}
 	}
 
-	return sizeInBytes
+	sb.size = uint64(sizeInBytes)
 }
 
 func (sb *SegmentBase) AddRef()             {}

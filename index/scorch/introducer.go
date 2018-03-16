@@ -186,6 +186,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		}
 	}
 
+	newSnapshot.updateSize()
 	s.rootLock.Lock()
 	if next.persisted != nil {
 		s.rootPersisted = append(s.rootPersisted, next.persisted)
@@ -251,6 +252,7 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 		newIndexSnapshot.internal[k] = v
 	}
 
+	newIndexSnapshot.updateSize()
 	s.rootLock.Lock()
 	rootPrev := s.root
 	s.root = newIndexSnapshot
@@ -348,6 +350,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 
 	newSnapshot.AddRef() // 1 ref for the nextMerge.notify response
 
+	newSnapshot.updateSize()
 	s.rootLock.Lock()
 	// swap in new index snapshot
 	newSnapshot.epoch = s.nextSnapshotEpoch
@@ -409,6 +412,7 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 		s.rootPersisted = append(s.rootPersisted, revertTo.persisted)
 	}
 
+	newSnapshot.updateSize()
 	// swap in new snapshot
 	rootPrev := s.root
 	s.root = newSnapshot
