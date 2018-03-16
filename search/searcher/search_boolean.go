@@ -62,8 +62,7 @@ func NewBooleanSearcher(indexReader index.IndexReader, mustSearcher search.Searc
 }
 
 func (s *BooleanSearcher) Size() int {
-	sizeInBytes := reflectStaticSizeBooleanSearcher + size.SizeOfPtr +
-		s.indexReader.Size()
+	sizeInBytes := reflectStaticSizeBooleanSearcher + size.SizeOfPtr
 
 	if s.mustSearcher != nil {
 		sizeInBytes += s.mustSearcher.Size()

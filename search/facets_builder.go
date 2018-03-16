@@ -66,8 +66,7 @@ func NewFacetsBuilder(indexReader index.IndexReader) *FacetsBuilder {
 }
 
 func (fb *FacetsBuilder) Size() int {
-	sizeInBytes := reflectStaticSizeFacetsBuilder + size.SizeOfPtr +
-		fb.indexReader.Size()
+	sizeInBytes := reflectStaticSizeFacetsBuilder + size.SizeOfPtr
 
 	for k, v := range fb.facets {
 		sizeInBytes += size.SizeOfString + len(k) +

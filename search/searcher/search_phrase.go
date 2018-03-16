@@ -42,8 +42,7 @@ type PhraseSearcher struct {
 }
 
 func (s *PhraseSearcher) Size() int {
-	sizeInBytes := reflectStaticSizePhraseSearcher + size.SizeOfPtr +
-		s.indexReader.Size()
+	sizeInBytes := reflectStaticSizePhraseSearcher + size.SizeOfPtr
 
 	if s.mustSearcher != nil {
 		sizeInBytes += s.mustSearcher.Size()
