@@ -604,7 +604,6 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 			curr = 0
 			metaBuf.Reset()
 			data = data[:0]
-			compressed = compressed[:0]
 
 			// collect all the data
 			for i := 0; i < len(fieldsInv); i++ {
@@ -641,7 +640,7 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 			metaEncoder.Close()
 			metaBytes := metaBuf.Bytes()
 
-			compressed = snappy.Encode(compressed, data)
+			compressed = snappy.Encode(compressed[:cap(compressed)], data)
 
 			// record where we're about to start writing
 			docNumOffsets[newDocNum] = uint64(w.Count())

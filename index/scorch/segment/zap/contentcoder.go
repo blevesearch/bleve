@@ -42,6 +42,8 @@ type chunkedContentCoder struct {
 	chunkBuf     bytes.Buffer
 
 	chunkMeta []MetaData
+
+	compressed []byte // temp buf for snappy compression
 }
 
 // MetaData represents the data information inside a
@@ -105,10 +107,10 @@ func (c *chunkedContentCoder) flushContents() error {
 	metaData := c.chunkMetaBuf.Bytes()
 	c.final = append(c.final, c.chunkMetaBuf.Bytes()...)
 	// write the compressed data to the final data
-	compressedData := snappy.Encode(nil, c.chunkBuf.Bytes())
-	c.final = append(c.final, compressedData...)
+	c.compressed = snappy.Encode(c.compressed[:cap(c.compressed)], c.chunkBuf.Bytes())
+	c.final = append(c.final, c.compressed...)
 
-	c.chunkLens[c.currChunk] = uint64(len(compressedData) + len(metaData))
+	c.chunkLens[c.currChunk] = uint64(len(c.compressed) + len(metaData))
 	return nil
 }
 
