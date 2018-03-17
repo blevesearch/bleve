@@ -154,6 +154,9 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 		freqChunkOffsets := rv.freqChunkOffsets[:0]
 		locChunkOffsets := rv.locChunkOffsets[:0]
 
+		nextLocs := rv.nextLocs[:0]
+		nextSegmentLocs := rv.nextSegmentLocs[:0]
+
 		buf := rv.buf
 
 		*rv = PostingsIterator{} // clear the struct
@@ -166,6 +169,9 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 
 		rv.freqChunkOffsets = freqChunkOffsets
 		rv.locChunkOffsets = locChunkOffsets
+
+		rv.nextLocs = nextLocs
+		rv.nextSegmentLocs = nextSegmentLocs
 
 		rv.buf = buf
 	}
@@ -314,8 +320,9 @@ type PostingsIterator struct {
 	locChunkOffsets []uint64
 	locChunkStart   uint64
 
-	next     Posting    // reused across Next() calls
-	nextLocs []Location // reused across Next() calls
+	next            Posting            // reused across Next() calls
+	nextLocs        []Location         // reused across Next() calls
+	nextSegmentLocs []segment.Location // reused across Next() calls
 
 	docNum1Hit   uint64
 	normBits1Hit uint64
@@ -469,8 +476,7 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 		return nil, err
 	}
 
-	reuseLocs := i.next.locs // hold for reuse before struct clearing
-	i.next = Posting{}       // clear the struct
+	i.next = Posting{} // clear the struct
 	rv := &i.next
 	rv.docNum = docNum
 
@@ -491,11 +497,10 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 		} else {
 			i.nextLocs = make([]Location, rv.freq)
 		}
-		if cap(reuseLocs) >= int(rv.freq) {
-			rv.locs = reuseLocs[0:rv.freq]
-		} else {
-			rv.locs = make([]segment.Location, rv.freq)
+		if cap(i.nextSegmentLocs) < int(rv.freq) {
+			i.nextSegmentLocs = make([]segment.Location, rv.freq)
 		}
+		rv.locs = i.nextSegmentLocs[0:rv.freq]
 		for j := 0; j < int(rv.freq); j++ {
 			err := i.readLocation(&i.nextLocs[j])
 			if err != nil {
