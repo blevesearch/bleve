@@ -154,7 +154,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			newSnapshot.segment = append(newSnapshot.segment, newss)
 			root.segment[i].segment.AddRef()
 			newSnapshot.offsets = append(newSnapshot.offsets, running)
-			running += root.segment[i].Count()
+			running += newss.segment.Count()
 		}
 	}
 
@@ -315,7 +315,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			})
 			root.segment[i].segment.AddRef()
 			newSnapshot.offsets = append(newSnapshot.offsets, running)
-			running += root.segment[i].Count()
+			running += root.segment[i].segment.Count()
 		}
 	}
 
