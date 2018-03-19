@@ -17,7 +17,9 @@ package zap
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 
+	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 	"github.com/couchbase/vellum"
 	"github.com/spf13/cobra"
 )
@@ -54,7 +56,14 @@ var dictCmd = &cobra.Command{
 			itr, err := fst.Iterator(nil, nil)
 			for err == nil {
 				currTerm, currVal := itr.Current()
-				fmt.Printf("%s - %d (%x)\n", currTerm, currVal, currVal)
+				extra := ""
+				if currVal&zap.FSTValEncodingMask == zap.FSTValEncoding1Hit {
+					docNum, normBits := zap.FSTValDecode1Hit(currVal)
+					norm := math.Float32frombits(uint32(normBits))
+					extra = fmt.Sprintf("-- docNum: %d, norm: %f", docNum, norm)
+				}
+
+				fmt.Printf("%s - %d (%x) %s\n", currTerm, currVal, currVal, extra)
 				err = itr.Next()
 			}
 			if err != nil && err != vellum.ErrIteratorDone {
