@@ -48,6 +48,8 @@ type TermDictionary interface {
 	Iterator() DictionaryIterator
 	PrefixIterator(prefix string) DictionaryIterator
 	RangeIterator(start, end string) DictionaryIterator
+	RegexIterator(regex string) DictionaryIterator
+	FuzzyIterator(term string, fuzziness int) DictionaryIterator
 }
 
 type DictionaryIterator interface {

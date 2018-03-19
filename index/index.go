@@ -96,6 +96,13 @@ type IndexReader interface {
 	Close() error
 }
 
+// IndexReaderAdv is an optional interface for advanced users
+// Hope to have a better name here...
+type IndexReaderAdv interface {
+	FieldDictRegex(field string, regex []byte) (FieldDict, error)
+	FieldDictFuzzy(field string, term []byte, fuzziness int) (FieldDict, error)
+}
+
 // FieldTerms contains the terms used by a document, keyed by field
 type FieldTerms map[string][]string
 

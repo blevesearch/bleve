@@ -15,7 +15,9 @@
 package searcher
 
 import (
+	"log"
 	"regexp"
+	"time"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
@@ -29,19 +31,40 @@ import (
 func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp,
 	field string, boost float64, options search.SearcherOptions) (
 	search.Searcher, error) {
-
-	prefixTerm, complete := pattern.LiteralPrefix()
 	var candidateTerms []string
-	if complete {
-		// there is no pattern
-		candidateTerms = []string{prefixTerm}
-	} else {
-		var err error
-		candidateTerms, err = findRegexpCandidateTerms(indexReader, pattern, field,
-			prefixTerm)
+	t := time.Now()
+	if ir, ok := indexReader.(index.IndexReaderAdv); ok {
+		fieldDict, err := ir.FieldDictRegex(field, []byte(pattern.String()))
 		if err != nil {
 			return nil, err
 		}
+		defer func() {
+			if cerr := fieldDict.Close(); cerr != nil && err == nil {
+				err = cerr
+			}
+		}()
+
+		// enumerate the terms and check against regexp
+		tfd, err := fieldDict.Next()
+		for err == nil && tfd != nil {
+			candidateTerms = append(candidateTerms, tfd.Term)
+			tfd, err = fieldDict.Next()
+		}
+		log.Printf("fsa time took-> %f", time.Since(t).Seconds())
+	} else {
+		prefixTerm, complete := pattern.LiteralPrefix()
+		if complete {
+			// there is no pattern
+			candidateTerms = []string{prefixTerm}
+		} else {
+			var err error
+			candidateTerms, err = findRegexpCandidateTerms(indexReader, pattern, field,
+				prefixTerm)
+			if err != nil {
+				return nil, err
+			}
+		}
+		log.Printf("time took-> %f", time.Since(t).Seconds())
 	}
 
 	return NewMultiTermSearcher(indexReader, candidateTerms, field, boost,

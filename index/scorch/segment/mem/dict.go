@@ -98,6 +98,30 @@ func (d *Dictionary) RangeIterator(start, end string) segment.DictionaryIterator
 	}
 }
 
+// RegexIterator returns an iterator which only visits terms matching
+// the given regex expression.
+// TODO complete the implementation
+func (d *Dictionary) RegexIterator(regex string) segment.DictionaryIterator {
+	offset := sort.SearchStrings(d.segment.DictKeys[d.fieldID], regex)
+	return &DictionaryIterator{
+		d:      d,
+		offset: offset,
+		prefix: regex,
+	}
+}
+
+// FuzzyIterator returns an iterator which only visits terms matching
+// the given edit distance.
+// TODO complete the implementation
+func (d *Dictionary) FuzzyIterator(term string, fuzziness int) segment.DictionaryIterator {
+	offset := sort.SearchStrings(d.segment.DictKeys[d.fieldID], term)
+	return &DictionaryIterator{
+		d:      d,
+		offset: offset,
+		prefix: term,
+	}
+}
+
 // DictionaryIterator is an iterator for term dictionary
 type DictionaryIterator struct {
 	d      *Dictionary

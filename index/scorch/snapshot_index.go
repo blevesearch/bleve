@@ -175,6 +175,20 @@ func (i *IndexSnapshot) FieldDictPrefix(field string,
 	})
 }
 
+func (i *IndexSnapshot) FieldDictRegex(field string,
+	termRegex []byte) (index.FieldDict, error) {
+	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
+		return i.RegexIterator(string(termRegex))
+	})
+}
+
+func (i *IndexSnapshot) FieldDictFuzzy(field string,
+	term []byte, fuzziness int) (index.FieldDict, error) {
+	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
+		return i.FuzzyIterator(string(term), fuzziness)
+	})
+}
+
 func (i *IndexSnapshot) DocIDReaderAll() (index.DocIDReader, error) {
 	results := make(chan *asynchSegmentResult)
 	for index, segment := range i.segment {
