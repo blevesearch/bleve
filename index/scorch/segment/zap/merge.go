@@ -117,7 +117,8 @@ func MergeToWriter(segments []*SegmentBase, drops []*roaring.Bitmap,
 			return nil, 0, 0, 0, 0, nil, nil, nil, err
 		}
 
-		dictLocs, docValueOffset, err = persistMergedRest(segments, drops, fieldsInv, fieldsMap,
+		dictLocs, docValueOffset, err = persistMergedRest(segments, drops,
+			fieldsInv, fieldsMap, fieldsSame,
 			newDocNums, numDocs, chunkFactor, cr)
 		if err != nil {
 			return nil, 0, 0, 0, 0, nil, nil, nil, err
@@ -158,11 +159,12 @@ func computeNewDocCount(segments []*SegmentBase, drops []*roaring.Bitmap) uint64
 }
 
 func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
-	fieldsInv []string, fieldsMap map[string]uint16, newDocNumsIn [][]uint64,
-	newSegDocCount uint64, chunkFactor uint32,
+	fieldsInv []string, fieldsMap map[string]uint16, fieldsSame bool,
+	newDocNumsIn [][]uint64, newSegDocCount uint64, chunkFactor uint32,
 	w *CountHashWriter) ([]uint64, uint64, error) {
 
 	var bufMaxVarintLen64 []byte = make([]byte, binary.MaxVarintLen64)
+	var bufLoc []uint64
 
 	var postings *PostingsList
 	var postItr *PostingsIterator
@@ -305,44 +307,20 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				return nil, 0, err2
 			}
 
-			newDocNumsI := newDocNums[itrI]
-
 			postItr = postings.iterator(postItr)
 
-			nextDocNum, nextFreq, nextNorm, nextFreqNormBytes, nextLocBytes, err2 :=
-				postItr.nextBytes()
-			for err2 == nil && len(nextFreqNormBytes) > 0 {
-				hitNewDocNum := newDocNumsI[nextDocNum]
-				if hitNewDocNum == docDropped {
-					return nil, 0, fmt.Errorf("see hit with dropped doc num")
-				}
-
-				newRoaring.Add(uint32(hitNewDocNum))
-				err2 = tfEncoder.AddBytes(hitNewDocNum, nextFreqNormBytes)
-				if err2 != nil {
-					return nil, 0, err2
-				}
-
-				if len(nextLocBytes) > 0 {
-					newRoaringLocs.Add(uint32(hitNewDocNum))
-					err2 = locEncoder.AddBytes(hitNewDocNum, nextLocBytes)
-					if err2 != nil {
-						return nil, 0, err2
-					}
-				}
-
-				docTermMap[hitNewDocNum] =
-					append(append(docTermMap[hitNewDocNum], term...), termSeparator)
-
-				lastDocNum = hitNewDocNum
-				lastFreq = nextFreq
-				lastNorm = nextNorm
-
-				nextDocNum, nextFreq, nextNorm, nextFreqNormBytes, nextLocBytes, err2 =
-					postItr.nextBytes()
+			if fieldsSame {
+				// can optimize by copying freq/norm/loc bytes directly
+				lastDocNum, lastFreq, lastNorm, err = mergeTermFreqNormLocsByCopying(
+					term, postItr, newDocNums[itrI], newRoaring, newRoaringLocs,
+					tfEncoder, locEncoder, docTermMap)
+			} else {
+				lastDocNum, lastFreq, lastNorm, bufLoc, err = mergeTermFreqNormLocs(
+					fieldsMap, term, postItr, newDocNums[itrI], newRoaring, newRoaringLocs,
+					tfEncoder, locEncoder, docTermMap, bufLoc)
 			}
-			if err2 != nil {
-				return nil, 0, err2
+			if err != nil {
+				return nil, 0, err
 			}
 
 			prevTerm = prevTerm[:0] // copy to prevTerm in case Next() reuses term mem
@@ -426,6 +404,103 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 	}
 
 	return rv, fieldDvLocsOffset, nil
+}
+
+func mergeTermFreqNormLocs(fieldsMap map[string]uint16, term []byte, postItr *PostingsIterator,
+	newDocNums []uint64, newRoaring *roaring.Bitmap, newRoaringLocs *roaring.Bitmap,
+	tfEncoder *chunkedIntCoder, locEncoder *chunkedIntCoder, docTermMap [][]byte,
+	bufLoc []uint64) (
+	lastDocNum uint64, lastFreq uint64, lastNorm uint64, bufLocOut []uint64, err error) {
+	next, err := postItr.Next()
+	for next != nil && err == nil {
+		hitNewDocNum := newDocNums[next.Number()]
+		if hitNewDocNum == docDropped {
+			return 0, 0, 0, nil, fmt.Errorf("see hit with dropped docNum")
+		}
+
+		newRoaring.Add(uint32(hitNewDocNum))
+
+		nextFreq := next.Frequency()
+		nextNorm := uint64(math.Float32bits(float32(next.Norm())))
+
+		err = tfEncoder.Add(hitNewDocNum, nextFreq, nextNorm)
+		if err != nil {
+			return 0, 0, 0, nil, err
+		}
+
+		locs := next.Locations()
+		if len(locs) > 0 {
+			newRoaringLocs.Add(uint32(hitNewDocNum))
+
+			for _, loc := range locs {
+				if cap(bufLoc) < 5+len(loc.ArrayPositions()) {
+					bufLoc = make([]uint64, 0, 5+len(loc.ArrayPositions()))
+				}
+				args := bufLoc[0:5]
+				args[0] = uint64(fieldsMap[loc.Field()] - 1)
+				args[1] = loc.Pos()
+				args[2] = loc.Start()
+				args[3] = loc.End()
+				args[4] = uint64(len(loc.ArrayPositions()))
+				args = append(args, loc.ArrayPositions()...)
+				err = locEncoder.Add(hitNewDocNum, args...)
+				if err != nil {
+					return 0, 0, 0, nil, err
+				}
+			}
+		}
+
+		docTermMap[hitNewDocNum] =
+			append(append(docTermMap[hitNewDocNum], term...), termSeparator)
+
+		lastDocNum = hitNewDocNum
+		lastFreq = nextFreq
+		lastNorm = nextNorm
+
+		next, err = postItr.Next()
+	}
+
+	return lastDocNum, lastFreq, lastNorm, bufLoc, err
+}
+
+func mergeTermFreqNormLocsByCopying(term []byte, postItr *PostingsIterator,
+	newDocNums []uint64, newRoaring *roaring.Bitmap, newRoaringLocs *roaring.Bitmap,
+	tfEncoder *chunkedIntCoder, locEncoder *chunkedIntCoder, docTermMap [][]byte) (
+	lastDocNum uint64, lastFreq uint64, lastNorm uint64, err error) {
+	nextDocNum, nextFreq, nextNorm, nextFreqNormBytes, nextLocBytes, err :=
+		postItr.nextBytes()
+	for err == nil && len(nextFreqNormBytes) > 0 {
+		hitNewDocNum := newDocNums[nextDocNum]
+		if hitNewDocNum == docDropped {
+			return 0, 0, 0, fmt.Errorf("see hit with dropped doc num")
+		}
+
+		newRoaring.Add(uint32(hitNewDocNum))
+		err = tfEncoder.AddBytes(hitNewDocNum, nextFreqNormBytes)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+
+		if len(nextLocBytes) > 0 {
+			newRoaringLocs.Add(uint32(hitNewDocNum))
+			err = locEncoder.AddBytes(hitNewDocNum, nextLocBytes)
+			if err != nil {
+				return 0, 0, 0, err
+			}
+		}
+
+		docTermMap[hitNewDocNum] =
+			append(append(docTermMap[hitNewDocNum], term...), termSeparator)
+
+		lastDocNum = hitNewDocNum
+		lastFreq = nextFreq
+		lastNorm = nextNorm
+
+		nextDocNum, nextFreq, nextNorm, nextFreqNormBytes, nextLocBytes, err =
+			postItr.nextBytes()
+	}
+
+	return lastDocNum, lastFreq, lastNorm, err
 }
 
 func writePostings(postings, postingLocs *roaring.Bitmap,
