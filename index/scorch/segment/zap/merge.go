@@ -305,44 +305,13 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				return nil, 0, err2
 			}
 
-			newDocNumsI := newDocNums[itrI]
-
 			postItr = postings.iterator(postItr)
 
-			nextDocNum, nextFreq, nextNorm, nextFreqNormBytes, nextLocBytes, err2 :=
-				postItr.nextBytes()
-			for err2 == nil && len(nextFreqNormBytes) > 0 {
-				hitNewDocNum := newDocNumsI[nextDocNum]
-				if hitNewDocNum == docDropped {
-					return nil, 0, fmt.Errorf("see hit with dropped doc num")
-				}
-
-				newRoaring.Add(uint32(hitNewDocNum))
-				err2 = tfEncoder.AddBytes(hitNewDocNum, nextFreqNormBytes)
-				if err2 != nil {
-					return nil, 0, err2
-				}
-
-				if len(nextLocBytes) > 0 {
-					newRoaringLocs.Add(uint32(hitNewDocNum))
-					err2 = locEncoder.AddBytes(hitNewDocNum, nextLocBytes)
-					if err2 != nil {
-						return nil, 0, err2
-					}
-				}
-
-				docTermMap[hitNewDocNum] =
-					append(append(docTermMap[hitNewDocNum], term...), termSeparator)
-
-				lastDocNum = hitNewDocNum
-				lastFreq = nextFreq
-				lastNorm = nextNorm
-
-				nextDocNum, nextFreq, nextNorm, nextFreqNormBytes, nextLocBytes, err2 =
-					postItr.nextBytes()
-			}
-			if err2 != nil {
-				return nil, 0, err2
+			lastDocNum, lastFreq, lastNorm, err = mergeTermFreqNormLocsByCopying(
+				term, postItr, newDocNums[itrI], newRoaring, newRoaringLocs,
+				tfEncoder, locEncoder, docTermMap)
+			if err != nil {
+				return nil, 0, err
 			}
 
 			prevTerm = prevTerm[:0] // copy to prevTerm in case Next() reuses term mem
@@ -426,6 +395,46 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 	}
 
 	return rv, fieldDvLocsOffset, nil
+}
+
+func mergeTermFreqNormLocsByCopying(term []byte, postItr *PostingsIterator,
+	newDocNums []uint64, newRoaring *roaring.Bitmap, newRoaringLocs *roaring.Bitmap,
+	tfEncoder *chunkedIntCoder, locEncoder *chunkedIntCoder, docTermMap [][]byte) (
+	lastDocNum uint64, lastFreq uint64, lastNorm uint64, err error) {
+	nextDocNum, nextFreq, nextNorm, nextFreqNormBytes, nextLocBytes, err :=
+		postItr.nextBytes()
+	for err == nil && len(nextFreqNormBytes) > 0 {
+		hitNewDocNum := newDocNums[nextDocNum]
+		if hitNewDocNum == docDropped {
+			return 0, 0, 0, fmt.Errorf("see hit with dropped doc num")
+		}
+
+		newRoaring.Add(uint32(hitNewDocNum))
+		err = tfEncoder.AddBytes(hitNewDocNum, nextFreqNormBytes)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+
+		if len(nextLocBytes) > 0 {
+			newRoaringLocs.Add(uint32(hitNewDocNum))
+			err = locEncoder.AddBytes(hitNewDocNum, nextLocBytes)
+			if err != nil {
+				return 0, 0, 0, err
+			}
+		}
+
+		docTermMap[hitNewDocNum] =
+			append(append(docTermMap[hitNewDocNum], term...), termSeparator)
+
+		lastDocNum = hitNewDocNum
+		lastFreq = nextFreq
+		lastNorm = nextNorm
+
+		nextDocNum, nextFreq, nextNorm, nextFreqNormBytes, nextLocBytes, err =
+			postItr.nextBytes()
+	}
+
+	return lastDocNum, lastFreq, lastNorm, err
 }
 
 func writePostings(postings, postingLocs *roaring.Bitmap,
