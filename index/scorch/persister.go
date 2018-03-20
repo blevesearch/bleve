@@ -218,6 +218,8 @@ var DefaultMinSegmentsForInMemoryMerge = 2
 // persist the in-memory zap segments if there are enough of them
 func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	bool, error) {
+	return false, nil // #A DISABLE IN-MEMORY MERGING FOR PERSISTER
+
 	// collect the in-memory zap segments (SegmentBase instances)
 	var sbs []*zap.SegmentBase
 	var sbsDrops []*roaring.Bitmap

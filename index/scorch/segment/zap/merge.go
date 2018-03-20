@@ -309,7 +309,7 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 
 			postItr = postings.iterator(postItr)
 
-			if fieldsSame {
+			if false && fieldsSame { // #1 DISABLE OPTIMIZATION TO COPY FREQ-NORM-LOC BYTES
 				// can optimize by copying freq/norm/loc bytes directly
 				lastDocNum, lastFreq, lastNorm, err = mergeTermFreqNormLocsByCopying(
 					term, postItr, newDocNums[itrI], newRoaring, newRoaringLocs,
@@ -513,7 +513,7 @@ func writePostings(postings, postingLocs *roaring.Bitmap,
 		return 0, nil
 	}
 
-	if use1HitEncoding != nil {
+	if false && use1HitEncoding != nil { // #2 DISABLE 1-HIT ENCODING OPTIMIZATION
 		encodeAs1Hit, docNum1Hit, normBits1Hit := use1HitEncoding(termCardinality)
 		if encodeAs1Hit {
 			return FSTValEncode1Hit(docNum1Hit, normBits1Hit), nil
@@ -594,7 +594,7 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 		// optimize when the field mapping is the same across all
 		// segments and there are no deletions, via byte-copying
 		// of stored docs bytes directly to the writer
-		if fieldsSame && (dropsI == nil || dropsI.GetCardinality() == 0) {
+		if false && fieldsSame && (dropsI == nil || dropsI.GetCardinality() == 0) { // #3 DISABLE COPY-STORED-DOCS OPTIMIZATION
 			err := segment.copyStoredDocs(newDocNum, docNumOffsets, w)
 			if err != nil {
 				return 0, nil, err
