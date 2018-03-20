@@ -61,7 +61,7 @@ func AnalysisResultsToSegmentBase(results []*index.AnalysisResult,
 		s.FieldsMap, s.FieldsInv, uint64(len(results)),
 		storedIndexOffset, fieldsIndexOffset, fdvIndexOffset, dictOffsets)
 
-	if err == nil && s.reset() == nil {
+	if false && err == nil && s.reset() == nil { // #4 DISABLE INTERIM REUSE OPTIMIZATION
 		s.lastNumDocs = len(results)
 		s.lastOutSize = len(br.Bytes())
 		interimPool.Put(s)
