@@ -135,7 +135,7 @@ func (s *interim) reset() (err error) {
 	s.chunkFactor = 0
 	s.w = nil
 	s.FieldsMap = nil
-	s.FieldsInv = s.FieldsInv[:0]
+	s.FieldsInv = nil
 	for i := range s.Dicts {
 		s.Dicts[i] = nil
 	}
