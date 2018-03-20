@@ -755,6 +755,10 @@ func mergeFields(segments []*SegmentBase) (bool, []string) {
 			if len(segment0Fields) != len(fields) || segment0Fields[fieldi] != field {
 				fieldsSame = false
 			}
+
+			if fieldi > 1 && field <= fields[fieldi-1] {
+				panic(fmt.Sprintf("mergeFields on unsorted fields: %#v", fields))
+			}
 		}
 	}
 
