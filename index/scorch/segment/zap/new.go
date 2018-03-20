@@ -17,7 +17,6 @@ package zap
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"math"
 	"sort"
 	"sync"
@@ -289,16 +288,6 @@ func (s *interim) getOrDefineField(fieldName string) int {
 	return int(fieldIDPlus1 - 1)
 }
 
-// the fieldName must be for a known field
-func (s *interim) getField(fieldName string) int {
-	fieldIDPlus1, exists := s.FieldsMap[fieldName]
-	if !exists || fieldIDPlus1 <= 0 {
-		panic(fmt.Sprintf("getField saw unknown fieldName: %s, fieldsMap: %#v",
-			fieldName, s.FieldsMap))
-	}
-	return int(fieldIDPlus1 - 1)
-}
-
 // fill Dicts and DictKeys from analysis results
 func (s *interim) prepareDicts() {
 	var pidNext int
@@ -339,14 +328,14 @@ func (s *interim) prepareDicts() {
 	for _, result := range s.results {
 		// walk each composite field
 		for _, field := range result.Document.CompositeFields {
-			fieldID := uint16(s.getField(field.Name()))
+			fieldID := uint16(s.getOrDefineField(field.Name()))
 			_, tf := field.Analyze()
 			visitField(fieldID, tf)
 		}
 
 		// walk each field
 		for i, field := range result.Document.Fields {
-			fieldID := uint16(s.getField(field.Name()))
+			fieldID := uint16(s.getOrDefineField(field.Name()))
 			tf := result.Analyzed[i]
 			visitField(fieldID, tf)
 		}
@@ -450,14 +439,14 @@ func (s *interim) processDocument(docNum uint64,
 
 	// walk each composite field
 	for _, field := range result.Document.CompositeFields {
-		fieldID := uint16(s.getField(field.Name()))
+		fieldID := uint16(s.getOrDefineField(field.Name()))
 		ln, tf := field.Analyze()
 		visitField(fieldID, field.Name(), ln, tf)
 	}
 
 	// walk each field
 	for i, field := range result.Document.Fields {
-		fieldID := uint16(s.getField(field.Name()))
+		fieldID := uint16(s.getOrDefineField(field.Name()))
 		ln := result.Length[i]
 		tf := result.Analyzed[i]
 		visitField(fieldID, field.Name(), ln, tf)
@@ -488,7 +477,7 @@ func (s *interim) processDocument(docNum uint64,
 				for _, loc := range tf.Locations {
 					var locf = uint16(fieldID)
 					if loc.Field != "" {
-						locf = uint16(s.getField(loc.Field))
+						locf = uint16(s.getOrDefineField(loc.Field))
 					}
 					var arrayposs []uint64
 					if len(loc.ArrayPositions) > 0 {
@@ -528,7 +517,7 @@ func (s *interim) writeStoredFields() (
 		}
 
 		for _, field := range result.Document.Fields {
-			fieldID := uint16(s.getField(field.Name()))
+			fieldID := uint16(s.getOrDefineField(field.Name()))
 
 			opts := field.Options()
 
