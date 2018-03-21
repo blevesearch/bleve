@@ -448,10 +448,10 @@ func (i *PostingsIterator) readLocation(l *Location) error {
 		l.pos = pos
 		l.start = start
 		l.end = end
-		if numArrayPos > 0 {
+		if cap(l.ap) < int(numArrayPos) {
 			l.ap = make([]uint64, int(numArrayPos))
 		} else {
-			l.ap = l.ap[:0]
+			l.ap = l.ap[:int(numArrayPos)]
 		}
 	}
 
