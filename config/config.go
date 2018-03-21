@@ -75,6 +75,7 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/lang/cjk"
 	_ "github.com/blevesearch/bleve/analysis/lang/ckb"
 	_ "github.com/blevesearch/bleve/analysis/lang/cs"
+	_ "github.com/blevesearch/bleve/analysis/lang/cn"
 	_ "github.com/blevesearch/bleve/analysis/lang/da"
 	_ "github.com/blevesearch/bleve/analysis/lang/de"
 	_ "github.com/blevesearch/bleve/analysis/lang/el"
