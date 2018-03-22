@@ -316,11 +316,9 @@ func (rv *PostingsList) init1Hit(fstVal uint64) error {
 
 // PostingsIterator provides a way to iterate through the postings list
 type PostingsIterator struct {
-	postings  *PostingsList
-	all       roaring.IntIterable
-	offset    int
-	locoffset int
-	actual    roaring.IntIterable
+	postings *PostingsList
+	all      roaring.IntIterable
+	actual   roaring.IntIterable
 
 	currChunk         uint32
 	currChunkFreqNorm []byte
@@ -584,16 +582,12 @@ func (i *PostingsIterator) nextDocNum() (uint64, bool, error) {
 	nChunk := n / i.postings.sb.chunkFactor
 	allNChunk := allN / i.postings.sb.chunkFactor
 
-	// n is the next actual hit (excluding some postings)
-	// allN is the next hit in the full postings
-	// if they don't match, adjust offsets to factor in item we're skipping over
-	// incr the all iterator, and check again
+	// n is the next actual hit (excluding some postings), and
+	// allN is the next hit in the full postings, and
+	// if they don't match, move 'all' forwards until they do
 	for allN != n {
-		// in different chunks, reset offsets
-		if allNChunk != nChunk {
-			i.locoffset = 0
-			i.offset = 0
-		} else {
+		// in the same chunk, so move the freq/norm/loc decoders forward
+		if allNChunk == nChunk {
 			if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
 				err := i.loadChunk(int(nChunk))
 				if err != nil {
@@ -614,12 +608,10 @@ func (i *PostingsIterator) nextDocNum() (uint64, bool, error) {
 					}
 				}
 			}
-
-			// in same chunk, need to account for offsets
-			i.offset++
 		}
 
 		allN = i.all.Next()
+		allNChunk = allN / i.postings.sb.chunkFactor
 	}
 
 	if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
