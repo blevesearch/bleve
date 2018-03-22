@@ -620,6 +620,7 @@ func (i *PostingsIterator) nextDocNum() (uint64, bool, error) {
 		}
 
 		allN = i.all.Next()
+		allNChunk = allN / i.postings.sb.chunkFactor
 	}
 
 	if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
