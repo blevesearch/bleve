@@ -525,7 +525,7 @@ func (i *PostingsIterator) nextBytes() (
 			i.buf = make([]byte, binary.MaxVarintLen64*2)
 		}
 		n := binary.PutUvarint(i.buf, freqHasLocs1Hit)
-		n += binary.PutUvarint(i.buf, i.normBits1Hit)
+		n += binary.PutUvarint(i.buf[n:], i.normBits1Hit)
 		return docNum, uint64(1), i.normBits1Hit, i.buf[:n], nil, nil
 	}
 
