@@ -81,6 +81,10 @@ var exploreCmd = &cobra.Command{
 					locAddr, read = binary.Uvarint(data[postingsAddr+n : postingsAddr+n+binary.MaxVarintLen64])
 					n += uint64(read)
 
+					var locBitmapAddr uint64
+					locBitmapAddr, read = binary.Uvarint(data[postingsAddr+n : postingsAddr+n+binary.MaxVarintLen64])
+					n += uint64(read)
+
 					var postingListLen uint64
 					postingListLen, read = binary.Uvarint(data[postingsAddr+n : postingsAddr+n+binary.MaxVarintLen64])
 					n += uint64(read)
@@ -126,6 +130,8 @@ var exploreCmd = &cobra.Command{
 						fmt.Printf("loc chunk: %d, len %d(%x), start at %d (%x) end %d (%x)\n", k, offset, offset, running2, running2, running2+offset, running2+offset)
 						running2 += offset
 					}
+
+					fmt.Printf("Loc Bitmap at: %d (%x)\n", locBitmapAddr, locBitmapAddr)
 
 				} else {
 					fmt.Printf("dictionary does not contain term '%s'\n", args[2])

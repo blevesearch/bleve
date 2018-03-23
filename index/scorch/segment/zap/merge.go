@@ -259,8 +259,9 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 			tfEncoder.Close()
 			locEncoder.Close()
 
-			postingsOffset, err := writePostings(newRoaring,
-				tfEncoder, locEncoder, use1HitEncoding, w, bufMaxVarintLen64)
+			postingsOffset, err := writePostings(
+				newRoaring, newRoaringLocs, tfEncoder, locEncoder,
+				use1HitEncoding, w, bufMaxVarintLen64)
 			if err != nil {
 				return err
 			}
@@ -422,14 +423,12 @@ func mergeTermFreqNormLocs(fieldsMap map[string]uint16, term []byte, postItr *Po
 		nextFreq := next.Frequency()
 		nextNorm := uint64(math.Float32bits(float32(next.Norm())))
 
-		locs := next.Locations()
-
-		err = tfEncoder.Add(hitNewDocNum,
-			encodeFreqHasLocs(nextFreq, len(locs) > 0), nextNorm)
+		err = tfEncoder.Add(hitNewDocNum, nextFreq, nextNorm)
 		if err != nil {
 			return 0, 0, 0, nil, err
 		}
 
+		locs := next.Locations()
 		if len(locs) > 0 {
 			newRoaringLocs.Add(uint32(hitNewDocNum))
 
@@ -504,7 +503,8 @@ func mergeTermFreqNormLocsByCopying(term []byte, postItr *PostingsIterator,
 	return lastDocNum, lastFreq, lastNorm, err
 }
 
-func writePostings(postings *roaring.Bitmap, tfEncoder, locEncoder *chunkedIntCoder,
+func writePostings(postings, postingLocs *roaring.Bitmap,
+	tfEncoder, locEncoder *chunkedIntCoder,
 	use1HitEncoding func(uint64) (bool, uint64, uint64),
 	w *CountHashWriter, bufMaxVarintLen64 []byte) (
 	offset uint64, err error) {
@@ -532,6 +532,12 @@ func writePostings(postings *roaring.Bitmap, tfEncoder, locEncoder *chunkedIntCo
 		return 0, err
 	}
 
+	postingLocsOffset := uint64(w.Count())
+	_, err = writeRoaringWithLen(postingLocs, w, bufMaxVarintLen64)
+	if err != nil {
+		return 0, err
+	}
+
 	postingsOffset := uint64(w.Count())
 
 	n := binary.PutUvarint(bufMaxVarintLen64, tfOffset)
@@ -541,6 +547,12 @@ func writePostings(postings *roaring.Bitmap, tfEncoder, locEncoder *chunkedIntCo
 	}
 
 	n = binary.PutUvarint(bufMaxVarintLen64, locOffset)
+	_, err = w.Write(bufMaxVarintLen64[:n])
+	if err != nil {
+		return 0, err
+	}
+
+	n = binary.PutUvarint(bufMaxVarintLen64, postingLocsOffset)
 	_, err = w.Write(bufMaxVarintLen64[:n])
 	if err != nil {
 		return 0, err

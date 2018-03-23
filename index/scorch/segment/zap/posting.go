@@ -100,6 +100,7 @@ type PostingsList struct {
 	postingsOffset uint64
 	freqOffset     uint64
 	locOffset      uint64
+	locBitmap      *roaring.Bitmap
 	postings       *roaring.Bitmap
 	except         *roaring.Bitmap
 
@@ -221,6 +222,8 @@ func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
 	}
 	rv.locChunkStart = p.locOffset + n
 
+	rv.locBitmap = p.locBitmap
+
 	rv.all = p.postings.Iterator()
 	if p.except != nil {
 		allExcept := roaring.AndNot(p.postings, p.except)
@@ -268,6 +271,23 @@ func (rv *PostingsList) read(postingsOffset uint64, d *Dictionary) error {
 	rv.locOffset, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
 	n += uint64(read)
 
+	var locBitmapOffset uint64
+	locBitmapOffset, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
+	n += uint64(read)
+
+	var locBitmapLen uint64
+	locBitmapLen, read = binary.Uvarint(d.sb.mem[locBitmapOffset : locBitmapOffset+binary.MaxVarintLen64])
+
+	locRoaringBytes := d.sb.mem[locBitmapOffset+uint64(read) : locBitmapOffset+uint64(read)+locBitmapLen]
+
+	if rv.locBitmap == nil {
+		rv.locBitmap = roaring.NewBitmap()
+	}
+	_, err := rv.locBitmap.FromBuffer(locRoaringBytes)
+	if err != nil {
+		return fmt.Errorf("error loading roaring bitmap of locations with hits: %v", err)
+	}
+
 	var postingsLen uint64
 	postingsLen, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
 	n += uint64(read)
@@ -277,7 +297,7 @@ func (rv *PostingsList) read(postingsOffset uint64, d *Dictionary) error {
 	if rv.postings == nil {
 		rv.postings = roaring.NewBitmap()
 	}
-	_, err := rv.postings.FromBuffer(roaringBytes)
+	_, err = rv.postings.FromBuffer(roaringBytes)
 	if err != nil {
 		return fmt.Errorf("error loading roaring bitmap: %v", err)
 	}
@@ -314,6 +334,8 @@ type PostingsIterator struct {
 	locChunkOffsets []uint64
 	locChunkStart   uint64
 
+	locBitmap *roaring.Bitmap
+
 	next     Posting    // reused across Next() calls
 	nextLocs []Location // reused across Next() calls
 
@@ -330,6 +352,10 @@ func (i *PostingsIterator) Size() int {
 		len(i.freqChunkOffsets)*size.SizeOfUint64 +
 		len(i.locChunkOffsets)*size.SizeOfUint64 +
 		i.next.Size()
+
+	if i.locBitmap != nil {
+		sizeInBytes += int(i.locBitmap.GetSizeInBytes())
+	}
 
 	for _, entry := range i.nextLocs {
 		sizeInBytes += entry.Size()
@@ -371,37 +397,20 @@ func (i *PostingsIterator) loadChunk(chunk int) error {
 	return nil
 }
 
-func (i *PostingsIterator) readFreqNormHasLocs() (uint64, uint64, bool, error) {
+func (i *PostingsIterator) readFreqNorm() (uint64, uint64, error) {
 	if i.normBits1Hit != 0 {
-		return 1, i.normBits1Hit, false, nil
+		return 1, i.normBits1Hit, nil
 	}
 
-	freqHasLocs, err := i.freqNormDecoder.GetU64()
+	freq, err := i.freqNormDecoder.GetU64()
 	if err != nil {
-		return 0, 0, false, fmt.Errorf("error reading frequency: %v", err)
+		return 0, 0, fmt.Errorf("error reading frequency: %v", err)
 	}
-	freq, hasLocs := decodeFreqHasLocs(freqHasLocs)
-
 	normBits, err := i.freqNormDecoder.GetU64()
 	if err != nil {
-		return 0, 0, false, fmt.Errorf("error reading norm: %v", err)
+		return 0, 0, fmt.Errorf("error reading norm: %v", err)
 	}
-
-	return freq, normBits, hasLocs, err
-}
-
-func encodeFreqHasLocs(freq uint64, hasLocs bool) uint64 {
-	rv := freq << 1
-	if hasLocs {
-		rv = rv | 0x01 // 0'th LSB encodes whether there are locations
-	}
-	return rv
-}
-
-func decodeFreqHasLocs(freqHasLocs uint64) (uint64, bool) {
-	freq := freqHasLocs >> 1
-	hasLocs := freqHasLocs&0x01 != 0
-	return freq, hasLocs
+	return freq, normBits, err
 }
 
 // readLocation processes all the integers on the stream representing a single
@@ -475,16 +484,13 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 	rv.docNum = docNum
 
 	var normBits uint64
-	var hasLocs bool
-
-	rv.freq, normBits, hasLocs, err = i.readFreqNormHasLocs()
+	rv.freq, normBits, err = i.readFreqNorm()
 	if err != nil {
 		return nil, err
 	}
-
 	rv.norm = math.Float32frombits(uint32(normBits))
 
-	if hasLocs {
+	if i.locBitmap != nil && i.locBitmap.Contains(uint32(docNum)) {
 		// read off 'freq' locations, into reused slices
 		if cap(i.nextLocs) >= int(rv.freq) {
 			i.nextLocs = i.nextLocs[0:rv.freq]
@@ -508,8 +514,6 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 	return rv, nil
 }
 
-var freqHasLocs1Hit = encodeFreqHasLocs(1, false)
-
 // nextBytes returns the docNum and the encoded freq & loc bytes for
 // the next posting
 func (i *PostingsIterator) nextBytes() (
@@ -524,16 +528,14 @@ func (i *PostingsIterator) nextBytes() (
 		if i.buf == nil {
 			i.buf = make([]byte, binary.MaxVarintLen64*2)
 		}
-		n := binary.PutUvarint(i.buf, freqHasLocs1Hit)
+		n := binary.PutUvarint(i.buf, uint64(1))
 		n += binary.PutUvarint(i.buf, i.normBits1Hit)
 		return docNum, uint64(1), i.normBits1Hit, i.buf[:n], nil, nil
 	}
 
 	startFreqNorm := len(i.currChunkFreqNorm) - i.freqNormReader.Len()
 
-	var hasLocs bool
-
-	freq, normBits, hasLocs, err = i.readFreqNormHasLocs()
+	freq, normBits, err = i.readFreqNorm()
 	if err != nil {
 		return 0, 0, 0, nil, nil, err
 	}
@@ -541,7 +543,7 @@ func (i *PostingsIterator) nextBytes() (
 	endFreqNorm := len(i.currChunkFreqNorm) - i.freqNormReader.Len()
 	bytesFreqNorm = i.currChunkFreqNorm[startFreqNorm:endFreqNorm]
 
-	if hasLocs {
+	if i.locBitmap != nil && i.locBitmap.Contains(uint32(docNum)) {
 		startLoc := len(i.currChunkLoc) - i.locReader.Len()
 
 		for j := uint64(0); j < freq; j++ {
@@ -594,12 +596,11 @@ func (i *PostingsIterator) nextDocNum() (uint64, bool, error) {
 			}
 
 			// read off freq/offsets even though we don't care about them
-			freq, _, hasLocs, err := i.readFreqNormHasLocs()
+			freq, _, err := i.readFreqNorm()
 			if err != nil {
 				return 0, false, err
 			}
-
-			if hasLocs {
+			if i.locBitmap.Contains(allN) {
 				for j := 0; j < int(freq); j++ {
 					err := i.readLocation(nil)
 					if err != nil {
