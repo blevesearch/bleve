@@ -558,6 +558,37 @@ func (i *PostingsIterator) nextBytes() (
 	return docNum, freq, normBits, bytesFreqNorm, bytesLoc, nil
 }
 
+func (i *PostingsIterator) Advance(docNumber uint64) (segment.Posting, error) {
+	// check if we are already there
+	if i.next.Number() == docNumber {
+		return &i.next, nil
+	}
+
+	nChunk := uint32(docNumber) / i.postings.sb.chunkFactor
+	if i.currChunk != nChunk {
+		err := i.loadChunk(int(nChunk))
+		if err != nil {
+			return nil, fmt.Errorf("Advance, error loading chunk: %v", err)
+		}
+	}
+
+	next, err := i.Next()
+	if err != nil || next == nil {
+		return nil, err
+	}
+
+	nnum := next.Number()
+	for nnum < docNumber {
+		next, err = i.Next()
+		if err != nil || next == nil {
+			return next, err
+		}
+		nnum = next.Number()
+	}
+
+	return next, nil
+}
+
 // nextDocNum returns the next docNum on the postings list, and also
 // sets up the currChunk / loc related fields of the iterator.
 func (i *PostingsIterator) nextDocNum() (uint64, bool, error) {
