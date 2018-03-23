@@ -173,6 +173,22 @@ func NewPrefixQuery(prefix string) *query.PrefixQuery {
 	return query.NewPrefixQuery(prefix)
 }
 
+// NewMatchPhrasePrefixQuery creates a new Query which finds
+// documents containing phrases that start with the
+// specified phrase prefix.
+
+// NewMatchPhrasePrefixQuery creates a new Query
+// for matching phrase prefix in the index.
+// An Analyzer is chosen based on the field.
+// Input text is analyzed using this analyzer.
+// Token terms resulting from this analysis are
+// used to build a search phrase.  Result documents
+// must match this phrase prefix. Queried field must have been indexed with
+// IncludeTermVectors set to true.
+func NewMatchPhrasePrefixQuery(matchPhrasePrefix string) *query.MatchPhrasePrefixQuery {
+	return query.NewMatchPhrasePrefixQuery(matchPhrasePrefix)
+}
+
 // NewRegexpQuery creates a new Query which finds
 // documents containing terms that match the
 // specified regular expression.
