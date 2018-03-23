@@ -495,10 +495,10 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 		if cap(i.nextLocs) >= int(rv.freq) {
 			i.nextLocs = i.nextLocs[0:rv.freq]
 		} else {
-			i.nextLocs = make([]Location, rv.freq)
+			i.nextLocs = make([]Location, rv.freq, rv.freq * 2)
 		}
 		if cap(i.nextSegmentLocs) < int(rv.freq) {
-			i.nextSegmentLocs = make([]segment.Location, rv.freq)
+			i.nextSegmentLocs = make([]segment.Location, rv.freq, rv.freq * 2)
 		}
 		rv.locs = i.nextSegmentLocs[0:rv.freq]
 		for j := 0; j < int(rv.freq); j++ {
