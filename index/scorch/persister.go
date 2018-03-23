@@ -94,6 +94,11 @@ OUTER:
 				close(ch)
 			}
 			if err != nil {
+				if err == ErrClosed {
+					// index has been closed
+					_ = ourSnapshot.DecRef()
+					break OUTER
+				}
 				s.fireAsyncError(fmt.Errorf("got err persisting snapshot: %v", err))
 				_ = ourSnapshot.DecRef()
 				atomic.AddUint64(&s.stats.TotPersistLoopErr, 1)
