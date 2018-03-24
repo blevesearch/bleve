@@ -332,8 +332,8 @@ func compareSegments(a, b *Segment) string {
 						fieldName, next.Term, aplist.Count(), bplist.Count()))
 				}
 
-				apitr := aplist.Iterator()
-				bpitr := bplist.Iterator()
+				apitr := aplist.Iterator(true, true, true)
+				bpitr := bplist.Iterator(true, true, true)
 				if (apitr != nil) != (bpitr != nil) {
 					rv = append(rv, fmt.Sprintf("field %s, term: %s, postingsList.Iterator() results different: %v %v",
 						fieldName, next.Term, apitr, bpitr))

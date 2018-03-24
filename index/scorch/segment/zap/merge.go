@@ -303,7 +303,7 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				return nil, 0, err2
 			}
 
-			postItr = postings.iterator(postItr)
+			postItr = postings.iterator(true, true, true, postItr)
 
 			if fieldsSame {
 				// can optimize by copying freq/norm/loc bytes directly

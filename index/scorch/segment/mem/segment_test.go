@@ -48,7 +48,7 @@ func TestEmpty(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr := postingsList.Iterator()
+	postingsItr := postingsList.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -211,7 +211,7 @@ func TestSingle(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr := postingsList.Iterator()
+	postingsItr := postingsList.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -257,7 +257,7 @@ func TestSingle(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr = postingsList.Iterator()
+	postingsItr = postingsList.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -325,7 +325,7 @@ func TestSingle(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr = postingsList.Iterator()
+	postingsItr = postingsList.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -394,7 +394,7 @@ func TestSingle(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr = postingsList.Iterator()
+	postingsItr = postingsList.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -638,7 +638,7 @@ func TestMultiple(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr := postingsList.Iterator()
+	postingsItr := postingsList.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -677,7 +677,7 @@ func TestMultiple(t *testing.T) {
 		t.Errorf("expected count from postings list to be 1, got %d", postingsListExcludingCount)
 	}
 
-	postingsItrExcluding := postingsListExcluding.Iterator()
+	postingsItrExcluding := postingsListExcluding.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}

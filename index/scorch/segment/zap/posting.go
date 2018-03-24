@@ -131,11 +131,12 @@ func (p *PostingsList) OrInto(receiver *roaring.Bitmap) {
 }
 
 // Iterator returns an iterator for this postings list
-func (p *PostingsList) Iterator() segment.PostingsIterator {
-	return p.iterator(nil)
+func (p *PostingsList) Iterator(includeFreq, includeNorm, includeLocations bool) segment.PostingsIterator {
+	return p.iterator(includeFreq, includeNorm, includeLocations, nil)
 }
 
-func (p *PostingsList) iterator(rv *PostingsIterator) *PostingsIterator {
+func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocations bool,
+	rv *PostingsIterator) *PostingsIterator {
 	if rv == nil {
 		rv = &PostingsIterator{}
 	} else {
@@ -495,10 +496,10 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 		if cap(i.nextLocs) >= int(rv.freq) {
 			i.nextLocs = i.nextLocs[0:rv.freq]
 		} else {
-			i.nextLocs = make([]Location, rv.freq, rv.freq * 2)
+			i.nextLocs = make([]Location, rv.freq, rv.freq*2)
 		}
 		if cap(i.nextSegmentLocs) < int(rv.freq) {
-			i.nextSegmentLocs = make([]segment.Location, rv.freq, rv.freq * 2)
+			i.nextSegmentLocs = make([]segment.Location, rv.freq, rv.freq*2)
 		}
 		rv.locs = i.nextSegmentLocs[0:rv.freq]
 		for j := 0; j < int(rv.freq); j++ {
