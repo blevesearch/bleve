@@ -55,7 +55,7 @@ type DictionaryIterator interface {
 }
 
 type PostingsList interface {
-	Iterator() PostingsIterator
+	Iterator(includeFreq, includeNorm, includeLocations bool) PostingsIterator
 
 	Size() int
 

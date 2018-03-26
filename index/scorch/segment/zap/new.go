@@ -517,7 +517,6 @@ func (s *interim) writeStoredFields() (
 
 		s.metaBuf.Reset()
 		data = data[:0]
-		compressed = compressed[:0]
 
 		for fieldID := range s.FieldsInv {
 			isf, exists := docStoredFields[uint16(fieldID)]
@@ -534,7 +533,7 @@ func (s *interim) writeStoredFields() (
 		metaEncoder.Close()
 		metaBytes := s.metaBuf.Bytes()
 
-		compressed = snappy.Encode(compressed, data)
+		compressed = snappy.Encode(compressed[:cap(compressed)], data)
 
 		docStoredOffsets[docNum] = uint64(s.w.Count())
 

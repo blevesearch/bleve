@@ -78,7 +78,7 @@ func (p *PostingsList) Count() uint64 {
 }
 
 // Iterator returns an iterator for this postings list
-func (p *PostingsList) Iterator() segment.PostingsIterator {
+func (p *PostingsList) Iterator(includeFreq, includeNorm, includeLocations bool) segment.PostingsIterator {
 	return p.InitIterator(nil)
 }
 func (p *PostingsList) InitIterator(prealloc *PostingsIterator) *PostingsIterator {

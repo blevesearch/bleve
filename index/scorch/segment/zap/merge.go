@@ -303,7 +303,7 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				return nil, 0, err2
 			}
 
-			postItr = postings.iterator(postItr)
+			postItr = postings.iterator(true, true, true, postItr)
 
 			if fieldsSame {
 				// can optimize by copying freq/norm/loc bytes directly
@@ -604,7 +604,6 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 			curr = 0
 			metaBuf.Reset()
 			data = data[:0]
-			compressed = compressed[:0]
 
 			// collect all the data
 			for i := 0; i < len(fieldsInv); i++ {
@@ -641,7 +640,7 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 			metaEncoder.Close()
 			metaBytes := metaBuf.Bytes()
 
-			compressed = snappy.Encode(compressed, data)
+			compressed = snappy.Encode(compressed[:cap(compressed)], data)
 
 			// record where we're about to start writing
 			docNumOffsets[newDocNum] = uint64(w.Count())
