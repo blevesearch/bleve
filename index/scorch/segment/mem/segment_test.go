@@ -697,3 +697,180 @@ func TestMultiple(t *testing.T) {
 	}
 
 }
+
+func TestMultipleWithNonOverlappingFields(t *testing.T) {
+	doc1 := &document.Document{
+		ID: "a",
+		Fields: []document.Field{
+			document.NewTextField("_id", []uint64{}, []byte("a")),
+			document.NewTextField("name", []uint64{}, []byte("ABC")),
+			document.NewTextField("dept", []uint64{}, []byte("ABC dept")),
+			document.NewTextField("manages.id", []uint64{}, []byte("XYZ")),
+			document.NewTextField("manages.count", []uint64{}, []byte("1")),
+		},
+		CompositeFields: []*document.CompositeField{
+			document.NewCompositeField("_all", true, nil, []string{"_id"}),
+		},
+	}
+
+	doc2 := &document.Document{
+		ID: "b",
+		Fields: []document.Field{
+			document.NewTextField("_id", []uint64{}, []byte("b")),
+			document.NewTextField("name", []uint64{}, []byte("XYZ")),
+			document.NewTextField("dept", []uint64{}, []byte("ABC dept")),
+			document.NewTextField("reportsTo.id", []uint64{}, []byte("ABC")),
+		},
+		CompositeFields: []*document.CompositeField{
+			document.NewCompositeField("_all", true, nil, []string{"_id"}),
+		},
+	}
+
+	results := []*index.AnalysisResult{
+		&index.AnalysisResult{
+			Document: doc1,
+			Analyzed: []analysis.TokenFrequencies{
+				analysis.TokenFrequency(analysis.TokenStream{
+					&analysis.Token{
+						Start:    0,
+						End:      1,
+						Position: 1,
+						Term:     []byte("a"),
+					},
+				}, nil, false),
+				analysis.TokenFrequency(analysis.TokenStream{
+					&analysis.Token{
+						Start:    0,
+						End:      3,
+						Position: 1,
+						Term:     []byte("ABC"),
+					},
+				}, nil, true),
+				analysis.TokenFrequency(analysis.TokenStream{
+					&analysis.Token{
+						Start:    0,
+						End:      3,
+						Position: 1,
+						Term:     []byte("ABC"),
+					},
+					&analysis.Token{
+						Start:    4,
+						End:      8,
+						Position: 2,
+						Term:     []byte("dept"),
+					},
+				}, nil, true),
+				analysis.TokenFrequency(analysis.TokenStream{
+					&analysis.Token{
+						Start:    0,
+						End:      3,
+						Position: 1,
+						Term:     []byte("XYZ"),
+					},
+				}, []uint64{0}, true),
+				analysis.TokenFrequency(analysis.TokenStream{
+					&analysis.Token{
+						Start:    0,
+						End:      1,
+						Position: 1,
+						Term:     []byte("1"),
+					},
+				}, []uint64{1}, true),
+			},
+			Length: []int{
+				1,
+				1,
+				2,
+				1,
+				1,
+			},
+		},
+		&index.AnalysisResult{
+			Document: doc2,
+			Analyzed: []analysis.TokenFrequencies{
+				analysis.TokenFrequency(analysis.TokenStream{
+					&analysis.Token{
+						Start:    0,
+						End:      1,
+						Position: 1,
+						Term:     []byte("b"),
+					},
+				}, nil, false),
+				analysis.TokenFrequency(analysis.TokenStream{
+					&analysis.Token{
+						Start:    0,
+						End:      3,
+						Position: 1,
+						Term:     []byte("XYZ"),
+					},
+				}, nil, true),
+				analysis.TokenFrequency(analysis.TokenStream{
+					&analysis.Token{
+						Start:    0,
+						End:      3,
+						Position: 1,
+						Term:     []byte("ABC"),
+					},
+					&analysis.Token{
+						Start:    4,
+						End:      8,
+						Position: 2,
+						Term:     []byte("dept"),
+					},
+				}, nil, true),
+				analysis.TokenFrequency(analysis.TokenStream{
+					&analysis.Token{
+						Start:    0,
+						End:      3,
+						Position: 1,
+						Term:     []byte("ABC"),
+					},
+				}, []uint64{0}, true),
+			},
+			Length: []int{
+				1,
+				1,
+				2,
+				1,
+			},
+		},
+	}
+
+	// fix up composite fields
+	for _, ar := range results {
+		for i, f := range ar.Document.Fields {
+			for _, cf := range ar.Document.CompositeFields {
+				cf.Compose(f.Name(), ar.Length[i], ar.Analyzed[i])
+			}
+		}
+	}
+
+	segment := NewFromAnalyzedDocs(results)
+	if segment == nil {
+		t.Fatalf("segment nil, not expected")
+	}
+
+	if segment.Count() != 2 {
+		t.Errorf("expected count 2, got %d", segment.Count())
+	}
+
+	expectFields := map[string]struct{}{
+		"_id":           struct{}{},
+		"_all":          struct{}{},
+		"name":          struct{}{},
+		"dept":          struct{}{},
+		"manages.id":    struct{}{},
+		"manages.count": struct{}{},
+		"reportsTo.id":  struct{}{},
+	}
+
+	fields := segment.Fields()
+	if len(fields) != len(expectFields) {
+		t.Errorf("expected %d fields, only got %d", len(expectFields), len(fields))
+	}
+	for _, field := range fields {
+		if _, ok := expectFields[field]; !ok {
+			t.Errorf("got unexpected field: %s", field)
+		}
+	}
+}
