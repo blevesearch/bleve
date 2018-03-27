@@ -103,9 +103,6 @@ type interim struct {
 	// postings id -> bitmap of docNums
 	Postings []*roaring.Bitmap
 
-	// postings id -> bitmap of docNums that have locations
-	PostingsLocs []*roaring.Bitmap
-
 	// postings id -> freq/norm's, one for each docNum in postings
 	FreqNorms        [][]interimFreqNorm
 	freqNormsBacking []interimFreqNorm
@@ -151,10 +148,6 @@ func (s *interim) reset() (err error) {
 		idn.Clear()
 	}
 	s.Postings = s.Postings[:0]
-	for _, idn := range s.PostingsLocs {
-		idn.Clear()
-	}
-	s.PostingsLocs = s.PostingsLocs[:0]
 	s.FreqNorms = s.FreqNorms[:0]
 	for i := range s.freqNormsBacking {
 		s.freqNormsBacking[i] = interimFreqNorm{}
@@ -196,8 +189,9 @@ type interimStoredField struct {
 }
 
 type interimFreqNorm struct {
-	freq uint64
-	norm float32
+	freq    uint64
+	norm    float32
+	hasLocs bool
 }
 
 type interimLoc struct {
@@ -356,19 +350,6 @@ func (s *interim) prepareDicts() {
 		s.Postings = postings
 	}
 
-	if cap(s.PostingsLocs) >= numPostingsLists {
-		s.PostingsLocs = s.PostingsLocs[:numPostingsLists]
-	} else {
-		postingsLocs := make([]*roaring.Bitmap, numPostingsLists)
-		copy(postingsLocs, s.PostingsLocs[:cap(s.PostingsLocs)])
-		for i := 0; i < numPostingsLists; i++ {
-			if postingsLocs[i] == nil {
-				postingsLocs[i] = roaring.New()
-			}
-		}
-		s.PostingsLocs = postingsLocs
-	}
-
 	if cap(s.FreqNorms) >= numPostingsLists {
 		s.FreqNorms = s.FreqNorms[:numPostingsLists]
 	} else {
@@ -464,14 +445,12 @@ func (s *interim) processDocument(docNum uint64,
 
 			s.FreqNorms[pid] = append(s.FreqNorms[pid],
 				interimFreqNorm{
-					freq: uint64(tf.Frequency()),
-					norm: norm,
+					freq:    uint64(tf.Frequency()),
+					norm:    norm,
+					hasLocs: len(tf.Locations) > 0,
 				})
 
 			if len(tf.Locations) > 0 {
-				locBS := s.PostingsLocs[pid]
-				locBS.Add(uint32(docNum))
-
 				locs := s.Locs[pid]
 
 				for _, loc := range tf.Locations {
@@ -538,7 +517,6 @@ func (s *interim) writeStoredFields() (
 
 		s.metaBuf.Reset()
 		data = data[:0]
-		compressed = compressed[:0]
 
 		for fieldID := range s.FieldsInv {
 			isf, exists := docStoredFields[uint16(fieldID)]
@@ -555,7 +533,7 @@ func (s *interim) writeStoredFields() (
 		metaEncoder.Close()
 		metaBytes := s.metaBuf.Bytes()
 
-		compressed = snappy.Encode(compressed, data)
+		compressed = snappy.Encode(compressed[:cap(compressed)], data)
 
 		docStoredOffsets[docNum] = uint64(s.w.Count())
 
@@ -625,7 +603,6 @@ func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err
 			pid := dict[term] - 1
 
 			postingsBS := s.Postings[pid]
-			postingsLocsBS := s.PostingsLocs[pid]
 
 			freqNorms := s.FreqNorms[pid]
 			freqNormOffset := 0
@@ -639,7 +616,8 @@ func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err
 
 				freqNorm := freqNorms[freqNormOffset]
 
-				err = tfEncoder.Add(docNum, freqNorm.freq,
+				err = tfEncoder.Add(docNum,
+					encodeFreqHasLocs(freqNorm.freq, freqNorm.hasLocs),
 					uint64(math.Float32bits(freqNorm.norm)))
 				if err != nil {
 					return 0, nil, err
@@ -675,9 +653,8 @@ func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err
 			tfEncoder.Close()
 			locEncoder.Close()
 
-			postingsOffset, err := writePostings(
-				postingsBS, postingsLocsBS, tfEncoder, locEncoder,
-				nil, s.w, buf)
+			postingsOffset, err :=
+				writePostings(postingsBS, tfEncoder, locEncoder, nil, s.w, buf)
 			if err != nil {
 				return 0, nil, err
 			}

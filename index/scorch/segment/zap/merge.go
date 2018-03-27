@@ -188,7 +188,6 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 	}
 
 	newRoaring := roaring.NewBitmap()
-	newRoaringLocs := roaring.NewBitmap()
 
 	// for each field
 	for fieldID, fieldName := range fieldsInv {
@@ -234,7 +233,6 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 		var prevTerm []byte
 
 		newRoaring.Clear()
-		newRoaringLocs.Clear()
 
 		var lastDocNum, lastFreq, lastNorm uint64
 
@@ -259,9 +257,8 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 			tfEncoder.Close()
 			locEncoder.Close()
 
-			postingsOffset, err := writePostings(
-				newRoaring, newRoaringLocs, tfEncoder, locEncoder,
-				use1HitEncoding, w, bufMaxVarintLen64)
+			postingsOffset, err := writePostings(newRoaring,
+				tfEncoder, locEncoder, use1HitEncoding, w, bufMaxVarintLen64)
 			if err != nil {
 				return err
 			}
@@ -274,7 +271,6 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 			}
 
 			newRoaring.Clear()
-			newRoaringLocs.Clear()
 
 			tfEncoder.Reset()
 			locEncoder.Reset()
@@ -307,16 +303,16 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				return nil, 0, err2
 			}
 
-			postItr = postings.iterator(postItr)
+			postItr = postings.iterator(true, true, true, postItr)
 
 			if fieldsSame {
 				// can optimize by copying freq/norm/loc bytes directly
 				lastDocNum, lastFreq, lastNorm, err = mergeTermFreqNormLocsByCopying(
-					term, postItr, newDocNums[itrI], newRoaring, newRoaringLocs,
+					term, postItr, newDocNums[itrI], newRoaring,
 					tfEncoder, locEncoder, docTermMap)
 			} else {
 				lastDocNum, lastFreq, lastNorm, bufLoc, err = mergeTermFreqNormLocs(
-					fieldsMap, term, postItr, newDocNums[itrI], newRoaring, newRoaringLocs,
+					fieldsMap, term, postItr, newDocNums[itrI], newRoaring,
 					tfEncoder, locEncoder, docTermMap, bufLoc)
 			}
 			if err != nil {
@@ -407,7 +403,7 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 }
 
 func mergeTermFreqNormLocs(fieldsMap map[string]uint16, term []byte, postItr *PostingsIterator,
-	newDocNums []uint64, newRoaring *roaring.Bitmap, newRoaringLocs *roaring.Bitmap,
+	newDocNums []uint64, newRoaring *roaring.Bitmap,
 	tfEncoder *chunkedIntCoder, locEncoder *chunkedIntCoder, docTermMap [][]byte,
 	bufLoc []uint64) (
 	lastDocNum uint64, lastFreq uint64, lastNorm uint64, bufLocOut []uint64, err error) {
@@ -423,15 +419,15 @@ func mergeTermFreqNormLocs(fieldsMap map[string]uint16, term []byte, postItr *Po
 		nextFreq := next.Frequency()
 		nextNorm := uint64(math.Float32bits(float32(next.Norm())))
 
-		err = tfEncoder.Add(hitNewDocNum, nextFreq, nextNorm)
+		locs := next.Locations()
+
+		err = tfEncoder.Add(hitNewDocNum,
+			encodeFreqHasLocs(nextFreq, len(locs) > 0), nextNorm)
 		if err != nil {
 			return 0, 0, 0, nil, err
 		}
 
-		locs := next.Locations()
 		if len(locs) > 0 {
-			newRoaringLocs.Add(uint32(hitNewDocNum))
-
 			for _, loc := range locs {
 				if cap(bufLoc) < 5+len(loc.ArrayPositions()) {
 					bufLoc = make([]uint64, 0, 5+len(loc.ArrayPositions()))
@@ -464,7 +460,7 @@ func mergeTermFreqNormLocs(fieldsMap map[string]uint16, term []byte, postItr *Po
 }
 
 func mergeTermFreqNormLocsByCopying(term []byte, postItr *PostingsIterator,
-	newDocNums []uint64, newRoaring *roaring.Bitmap, newRoaringLocs *roaring.Bitmap,
+	newDocNums []uint64, newRoaring *roaring.Bitmap,
 	tfEncoder *chunkedIntCoder, locEncoder *chunkedIntCoder, docTermMap [][]byte) (
 	lastDocNum uint64, lastFreq uint64, lastNorm uint64, err error) {
 	nextDocNum, nextFreq, nextNorm, nextFreqNormBytes, nextLocBytes, err :=
@@ -482,7 +478,6 @@ func mergeTermFreqNormLocsByCopying(term []byte, postItr *PostingsIterator,
 		}
 
 		if len(nextLocBytes) > 0 {
-			newRoaringLocs.Add(uint32(hitNewDocNum))
 			err = locEncoder.AddBytes(hitNewDocNum, nextLocBytes)
 			if err != nil {
 				return 0, 0, 0, err
@@ -503,8 +498,7 @@ func mergeTermFreqNormLocsByCopying(term []byte, postItr *PostingsIterator,
 	return lastDocNum, lastFreq, lastNorm, err
 }
 
-func writePostings(postings, postingLocs *roaring.Bitmap,
-	tfEncoder, locEncoder *chunkedIntCoder,
+func writePostings(postings *roaring.Bitmap, tfEncoder, locEncoder *chunkedIntCoder,
 	use1HitEncoding func(uint64) (bool, uint64, uint64),
 	w *CountHashWriter, bufMaxVarintLen64 []byte) (
 	offset uint64, err error) {
@@ -532,12 +526,6 @@ func writePostings(postings, postingLocs *roaring.Bitmap,
 		return 0, err
 	}
 
-	postingLocsOffset := uint64(w.Count())
-	_, err = writeRoaringWithLen(postingLocs, w, bufMaxVarintLen64)
-	if err != nil {
-		return 0, err
-	}
-
 	postingsOffset := uint64(w.Count())
 
 	n := binary.PutUvarint(bufMaxVarintLen64, tfOffset)
@@ -547,12 +535,6 @@ func writePostings(postings, postingLocs *roaring.Bitmap,
 	}
 
 	n = binary.PutUvarint(bufMaxVarintLen64, locOffset)
-	_, err = w.Write(bufMaxVarintLen64[:n])
-	if err != nil {
-		return 0, err
-	}
-
-	n = binary.PutUvarint(bufMaxVarintLen64, postingLocsOffset)
 	_, err = w.Write(bufMaxVarintLen64[:n])
 	if err != nil {
 		return 0, err
@@ -622,7 +604,6 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 			curr = 0
 			metaBuf.Reset()
 			data = data[:0]
-			compressed = compressed[:0]
 
 			// collect all the data
 			for i := 0; i < len(fieldsInv); i++ {
@@ -659,7 +640,7 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 			metaEncoder.Close()
 			metaBytes := metaBuf.Bytes()
 
-			compressed = snappy.Encode(compressed, data)
+			compressed = snappy.Encode(compressed[:cap(compressed)], data)
 
 			// record where we're about to start writing
 			docNumOffsets[newDocNum] = uint64(w.Count())

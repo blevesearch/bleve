@@ -21,6 +21,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 )
@@ -84,7 +85,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr := postingsList.Iterator()
+	postingsItr := postingsList.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -130,7 +131,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr = postingsList.Iterator()
+	postingsItr = postingsList.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -198,7 +199,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr = postingsList.Iterator()
+	postingsItr = postingsList.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -267,7 +268,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr = postingsList.Iterator()
+	postingsItr = postingsList.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -366,7 +367,7 @@ func TestOpenMulti(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr := postingsList.Iterator()
+	postingsItr := postingsList.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -405,7 +406,7 @@ func TestOpenMulti(t *testing.T) {
 		t.Errorf("expected count from postings list to be 1, got %d", postingsListExcludingCount)
 	}
 
-	postingsItrExcluding := postingsListExcluding.Iterator()
+	postingsItrExcluding := postingsListExcluding.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -466,7 +467,7 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr := postingsList.Iterator()
+	postingsItr := postingsList.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -500,7 +501,7 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItrExcluding := postingsListExcluding.Iterator()
+	postingsItrExcluding := postingsListExcluding.Iterator(true, true, true)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -598,5 +599,141 @@ func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 			t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
 		}
 
+	}
+}
+
+func TestSegmentDocsWithNonOverlappingFields(t *testing.T) {
+	_ = os.RemoveAll("/tmp/scorch.zap")
+
+	testSeg, err := buildTestSegmentMultiWithDifferentFields(true, true)
+	if err != nil {
+		t.Fatalf("error building segment: %v", err)
+	}
+	err = PersistSegmentBase(testSeg, "/tmp/scorch.zap")
+	if err != nil {
+		t.Fatalf("error persisting segment: %v", err)
+	}
+
+	segment, err := Open("/tmp/scorch.zap")
+	if err != nil {
+		t.Fatalf("error opening segment: %v", err)
+	}
+	defer func() {
+		cerr := segment.Close()
+		if cerr != nil {
+			t.Fatalf("error closing segment: %v", cerr)
+		}
+	}()
+
+	if segment.Count() != 2 {
+		t.Errorf("expected 2, got %d", segment.Count())
+	}
+
+	expectFields := map[string]struct{}{
+		"_id":           struct{}{},
+		"_all":          struct{}{},
+		"name":          struct{}{},
+		"dept":          struct{}{},
+		"manages.id":    struct{}{},
+		"manages.count": struct{}{},
+		"reportsTo.id":  struct{}{},
+	}
+
+	fields := segment.Fields()
+	if len(fields) != len(expectFields) {
+		t.Errorf("expected %d fields, only got %d", len(expectFields), len(fields))
+	}
+	for _, field := range fields {
+		if _, ok := expectFields[field]; !ok {
+			t.Errorf("got unexpected field: %s", field)
+		}
+	}
+}
+
+func TestMergedSegmentDocsWithNonOverlappingFields(t *testing.T) {
+	_ = os.RemoveAll("/tmp/scorch1.zap")
+	_ = os.RemoveAll("/tmp/scorch2.zap")
+	_ = os.RemoveAll("/tmp/scorch3.zap")
+
+	testSeg1, _ := buildTestSegmentMultiWithDifferentFields(true, false)
+	err := PersistSegmentBase(testSeg1, "/tmp/scorch1.zap")
+	if err != nil {
+		t.Fatalf("error persisting segment: %v", err)
+	}
+
+	testSeg2, _ := buildTestSegmentMultiWithDifferentFields(false, true)
+	err = PersistSegmentBase(testSeg2, "/tmp/scorch2.zap")
+	if err != nil {
+		t.Fatalf("error persisting segment: %v", err)
+	}
+
+	segment1, err := Open("/tmp/scorch1.zap")
+	if err != nil {
+		t.Fatalf("error opening segment: %v", err)
+	}
+	defer func() {
+		cerr := segment1.Close()
+		if cerr != nil {
+			t.Fatalf("error closing segment: %v", cerr)
+		}
+	}()
+
+	segment2, err := Open("/tmp/scorch2.zap")
+	if err != nil {
+		t.Fatalf("error opening segment: %v", err)
+	}
+	defer func() {
+		cerr := segment2.Close()
+		if cerr != nil {
+			t.Fatalf("error closing segment: %v", cerr)
+		}
+	}()
+
+	segsToMerge := make([]*Segment, 2)
+	segsToMerge[0] = segment1.(*Segment)
+	segsToMerge[1] = segment2.(*Segment)
+
+	_, nBytes, err := Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/scorch3.zap", 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if nBytes == 0 {
+		t.Fatalf("expected a non zero total_compaction_written_bytes")
+	}
+
+	segmentM, err := Open("/tmp/scorch3.zap")
+	if err != nil {
+		t.Fatalf("error opening merged segment: %v", err)
+	}
+	defer func() {
+		cerr := segmentM.Close()
+		if cerr != nil {
+			t.Fatalf("error closing segment: %v", cerr)
+		}
+	}()
+
+	if segmentM.Count() != 2 {
+		t.Errorf("expected 2, got %d", segmentM.Count())
+	}
+
+	expectFields := map[string]struct{}{
+		"_id":           struct{}{},
+		"_all":          struct{}{},
+		"name":          struct{}{},
+		"dept":          struct{}{},
+		"manages.id":    struct{}{},
+		"manages.count": struct{}{},
+		"reportsTo.id":  struct{}{},
+	}
+
+	fields := segmentM.Fields()
+	if len(fields) != len(expectFields) {
+		t.Errorf("expected %d fields, only got %d", len(expectFields), len(fields))
+	}
+	for _, field := range fields {
+		if _, ok := expectFields[field]; !ok {
+			t.Errorf("got unexpected field: %s", field)
+		}
 	}
 }

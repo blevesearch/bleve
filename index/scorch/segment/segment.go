@@ -55,7 +55,7 @@ type DictionaryIterator interface {
 }
 
 type PostingsList interface {
-	Iterator() PostingsIterator
+	Iterator(includeFreq, includeNorm, includeLocations bool) PostingsIterator
 
 	Size() int
 
@@ -75,6 +75,10 @@ type PostingsIterator interface {
 	Next() (Posting, error)
 
 	Size() int
+
+	// Advance will return the respective posting of the
+	// sepcified doc number or its immediate follower.
+	Advance(docNum uint64) (Posting, error)
 }
 
 type Posting interface {

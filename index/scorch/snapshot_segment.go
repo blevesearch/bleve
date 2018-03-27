@@ -165,7 +165,7 @@ func (cfd *cachedFieldDocs) prepareFields(field string, ss *SegmentSnapshot) {
 		}
 
 		cfd.size += uint64(size.SizeOfUint64) /* map key */
-		postingsItr := postings.Iterator()
+		postingsItr := postings.Iterator(false, false, false)
 		nextPosting, err2 := postingsItr.Next()
 		for err2 == nil && nextPosting != nil {
 			docNum := nextPosting.Number()

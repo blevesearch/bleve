@@ -78,7 +78,7 @@ func (p *PostingsList) Count() uint64 {
 }
 
 // Iterator returns an iterator for this postings list
-func (p *PostingsList) Iterator() segment.PostingsIterator {
+func (p *PostingsList) Iterator(includeFreq, includeNorm, includeLocations bool) segment.PostingsIterator {
 	return p.InitIterator(nil)
 }
 func (p *PostingsList) InitIterator(prealloc *PostingsIterator) *PostingsIterator {
@@ -153,6 +153,27 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 	i.locoffset += int(i.postings.dictionary.segment.Freqs[i.postings.postingsID-1][i.offset])
 	i.offset++
 	return &i.reuse, nil
+}
+
+func (i *PostingsIterator) Advance(docNumber uint64) (segment.Posting, error) {
+	if i.reuse.Number() == docNumber {
+		return &i.reuse, nil
+	}
+	next, err := i.Next()
+	if err != nil || next == nil {
+		return next, err
+	}
+
+	nnum := next.Number()
+	for nnum < docNumber {
+		next, err = i.Next()
+		if err != nil || next == nil {
+			return next, err
+		}
+		nnum = next.Number()
+	}
+
+	return next, nil
 }
 
 // Posting is a single entry in a postings list

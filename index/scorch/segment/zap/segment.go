@@ -273,19 +273,39 @@ func (sb *SegmentBase) dictionary(field string) (rv *Dictionary, err error) {
 	return rv, nil
 }
 
+// visitDocumentCtx holds data structures that are reusable across
+// multiple VisitDocument() calls to avoid memory allocations
+type visitDocumentCtx struct {
+	buf      []byte
+	reader   bytes.Reader
+	decoder  *govarint.Base128Decoder
+	arrayPos []uint64
+}
+
+var visitDocumentCtxPool = sync.Pool{
+	New: func() interface{} {
+		reuse := &visitDocumentCtx{}
+		reuse.decoder = govarint.NewU64Base128Decoder(&reuse.reader)
+		return reuse
+	},
+}
+
 // VisitDocument invokes the DocFieldValueVistor for each stored field
 // for the specified doc number
 func (s *SegmentBase) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
 	// first make sure this is a valid number in this segment
 	if num < s.numDocs {
+		vdc := visitDocumentCtxPool.Get().(*visitDocumentCtx)
+
 		meta, compressed := s.getDocStoredMetaAndCompressed(num)
-		uncompressed, err := snappy.Decode(nil, compressed)
+		uncompressed, err := snappy.Decode(vdc.buf[:cap(vdc.buf)], compressed)
 		if err != nil {
 			return err
 		}
+
 		// now decode meta and process
-		reader := bytes.NewReader(meta)
-		decoder := govarint.NewU64Base128Decoder(reader)
+		vdc.reader.Reset(meta)
+		decoder := vdc.decoder
 
 		keepGoing := true
 		for keepGoing {
@@ -314,7 +334,10 @@ func (s *SegmentBase) VisitDocument(num uint64, visitor segment.DocumentFieldVal
 			}
 			var arrayPos []uint64
 			if numap > 0 {
-				arrayPos = make([]uint64, numap)
+				if cap(vdc.arrayPos) < int(numap) {
+					vdc.arrayPos = make([]uint64, numap)
+				}
+				arrayPos = vdc.arrayPos[:numap]
 				for i := 0; i < int(numap); i++ {
 					ap, err := decoder.GetU64()
 					if err != nil {
@@ -327,6 +350,9 @@ func (s *SegmentBase) VisitDocument(num uint64, visitor segment.DocumentFieldVal
 			value := uncompressed[offset : offset+l]
 			keepGoing = visitor(s.fieldsInv[field], byte(typ), value, arrayPos)
 		}
+
+		vdc.buf = uncompressed
+		visitDocumentCtxPool.Put(vdc)
 	}
 	return nil
 }

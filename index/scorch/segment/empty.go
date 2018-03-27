@@ -84,7 +84,7 @@ func (e *EmptyDictionaryIterator) Next() (*index.DictEntry, error) {
 
 type EmptyPostingsList struct{}
 
-func (e *EmptyPostingsList) Iterator() PostingsIterator {
+func (e *EmptyPostingsList) Iterator(includeFreq, includeNorm, includeLocations bool) PostingsIterator {
 	return &EmptyPostingsIterator{}
 }
 
@@ -104,4 +104,8 @@ func (e *EmptyPostingsIterator) Next() (Posting, error) {
 
 func (e *EmptyPostingsIterator) Size() int {
 	return 0
+}
+
+func (e *EmptyPostingsIterator) Advance(uint64) (Posting, error) {
+	return nil, nil
 }
