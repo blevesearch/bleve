@@ -160,7 +160,7 @@ func (i *PostingsIterator) Advance(docNumber uint64) (segment.Posting, error) {
 		return &i.reuse, nil
 	}
 	next, err := i.Next()
-	if err != nil {
+	if err != nil || next == nil {
 		return next, err
 	}
 
