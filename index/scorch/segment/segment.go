@@ -75,6 +75,10 @@ type PostingsIterator interface {
 	Next() (Posting, error)
 
 	Size() int
+
+	// Advance will return the respective posting of the
+	// sepcified doc number or its immediate follower.
+	Advance(docNum uint64) (Posting, error)
 }
 
 type Posting interface {

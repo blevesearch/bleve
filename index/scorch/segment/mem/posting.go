@@ -155,6 +155,27 @@ func (i *PostingsIterator) Next() (segment.Posting, error) {
 	return &i.reuse, nil
 }
 
+func (i *PostingsIterator) Advance(docNumber uint64) (segment.Posting, error) {
+	if i.reuse.Number() == docNumber {
+		return &i.reuse, nil
+	}
+	next, err := i.Next()
+	if err != nil || next == nil {
+		return next, err
+	}
+
+	nnum := next.Number()
+	for nnum < docNumber {
+		next, err = i.Next()
+		if err != nil || next == nil {
+			return next, err
+		}
+		nnum = next.Number()
+	}
+
+	return next, nil
+}
+
 // Posting is a single entry in a postings list
 type Posting struct {
 	iterator  *PostingsIterator
