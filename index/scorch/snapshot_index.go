@@ -373,7 +373,7 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 
 func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
-
+	termStr := string(term)
 	rv := &IndexSnapshotTermFieldReader{
 		term:               term,
 		field:              field,
@@ -389,7 +389,7 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		if err != nil {
 			return nil, err
 		}
-		pl, err := dict.PostingsList(string(term), nil)
+		pl, err := dict.PostingsList(termStr, nil)
 		if err != nil {
 			return nil, err
 		}

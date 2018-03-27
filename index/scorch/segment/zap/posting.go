@@ -109,6 +109,9 @@ type PostingsList struct {
 	normBits1Hit uint64
 }
 
+// represents an immutable, empty postings list
+var emptyPostingsList = &PostingsList{}
+
 func (p *PostingsList) Size() int {
 	sizeInBytes := reflectStaticSizePostingsList + size.SizeOfPtr
 
@@ -132,6 +135,10 @@ func (p *PostingsList) OrInto(receiver *roaring.Bitmap) {
 
 // Iterator returns an iterator for this postings list
 func (p *PostingsList) Iterator(includeFreq, includeNorm, includeLocs bool) segment.PostingsIterator {
+	if p.normBits1Hit == 0 && p.postings == nil {
+		return emptyPostingsIterator
+	}
+
 	return p.iterator(includeFreq, includeNorm, includeLocs, nil)
 }
 
@@ -340,6 +347,8 @@ type PostingsIterator struct {
 	includeFreqNorm bool
 	includeLocs     bool
 }
+
+var emptyPostingsIterator = &PostingsIterator{}
 
 func (i *PostingsIterator) Size() int {
 	sizeInBytes := reflectStaticSizePostingsIterator + size.SizeOfPtr +
@@ -589,6 +598,10 @@ func (i *PostingsIterator) nextBytes() (
 }
 
 func (i *PostingsIterator) Advance(docNumber uint64) (segment.Posting, error) {
+	if i.postings == nil {
+		return nil, nil
+	}
+
 	// check if we are already there
 	if i.next.Number() == docNumber {
 		return &i.next, nil

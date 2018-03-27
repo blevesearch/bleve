@@ -39,6 +39,9 @@ func (d *Dictionary) PostingsList(term string, except *roaring.Bitmap) (segment.
 
 func (d *Dictionary) postingsList(term []byte, except *roaring.Bitmap, rv *PostingsList) (*PostingsList, error) {
 	if d.fst == nil {
+		if rv == nil || rv == emptyPostingsList {
+			return emptyPostingsList, nil
+		}
 		return d.postingsListInit(rv, except), nil
 	}
 
@@ -47,6 +50,9 @@ func (d *Dictionary) postingsList(term []byte, except *roaring.Bitmap, rv *Posti
 		return nil, fmt.Errorf("vellum err: %v", err)
 	}
 	if !exists {
+		if rv == nil || rv == emptyPostingsList {
+			return emptyPostingsList, nil
+		}
 		return d.postingsListInit(rv, except), nil
 	}
 
@@ -65,7 +71,7 @@ func (d *Dictionary) postingsListFromOffset(postingsOffset uint64, except *roari
 }
 
 func (d *Dictionary) postingsListInit(rv *PostingsList, except *roaring.Bitmap) *PostingsList {
-	if rv == nil {
+	if rv == nil || rv == emptyPostingsList {
 		rv = &PostingsList{}
 	} else {
 		postings := rv.postings
