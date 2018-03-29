@@ -272,3 +272,19 @@ func (b *Batch) Reset() {
 	b.IndexOps = make(map[string]*document.Document)
 	b.InternalOps = make(map[string][]byte)
 }
+
+// Optimizable represents an optional interface that implementable by
+// optimizable resources (e.g., TermFieldReaders, Searchers).  These
+// optimizable resources are provided the same OptimizableContext
+// instance, so that they can coordinate via dynamic interface
+// casting.
+type Optimizable interface {
+	Optimize(kind string, octx OptimizableContext) (OptimizableContext, error)
+}
+
+type OptimizableContext interface {
+	// Once all the optimzable resources have been provided the same
+	// OptimizableContext instance, the optimization preparations are
+	// finished or completed via the Finish() method.
+	Finish() error
+}

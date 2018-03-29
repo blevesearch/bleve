@@ -60,6 +60,30 @@ func NewConjunctionSearcher(indexReader index.IndexReader, qsearchers []search.S
 		scorer:      scorer.NewConjunctionQueryScorer(options),
 	}
 	rv.computeQueryNorm()
+
+	// attempt push-down conjunction optimization when there's >1 searchers
+	if len(searchers) > 1 {
+		var octx index.OptimizableContext
+
+		for _, searcher := range searchers {
+			o, ok := searcher.(index.Optimizable)
+			if ok {
+				var err error
+				octx, err = o.Optimize("conjunction", octx)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		if octx != nil {
+			err := octx.Finish()
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return &rv, nil
 }
 
