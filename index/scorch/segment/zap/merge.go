@@ -24,7 +24,6 @@ import (
 	"sort"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/Smerity/govarint"
 	"github.com/couchbase/vellum"
 	"github.com/golang/snappy"
 )
@@ -548,6 +547,8 @@ func writePostings(postings *roaring.Bitmap, tfEncoder, locEncoder *chunkedIntCo
 	return postingsOffset, nil
 }
 
+type VarintEncoder func(uint64) (int, error)
+
 func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	fieldsMap map[string]uint16, fieldsInv []string, fieldsSame bool, newSegDocCount uint64,
 	w *CountHashWriter) (uint64, [][]uint64, error) {
@@ -556,10 +557,13 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	var newDocNum uint64
 
 	var curr int
-	var metaBuf bytes.Buffer
 	var data, compressed []byte
-
-	metaEncoder := govarint.NewU64Base128Encoder(&metaBuf)
+	var metaBuf bytes.Buffer
+	varBuf := make([]byte, binary.MaxVarintLen64)
+	metaEncoder := func(val uint64) (int, error) {
+		wb := binary.PutUvarint(varBuf, val)
+		return metaBuf.Write(varBuf[:wb])
+	}
 
 	vals := make([][][]byte, len(fieldsInv))
 	typs := make([][]byte, len(fieldsInv))
@@ -637,7 +641,6 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 				}
 			}
 
-			metaEncoder.Close()
 			metaBytes := metaBuf.Bytes()
 
 			compressed = snappy.Encode(compressed[:cap(compressed)], data)

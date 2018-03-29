@@ -22,7 +22,6 @@ import (
 	"sync"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/Smerity/govarint"
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
@@ -479,7 +478,11 @@ func (s *interim) processDocument(docNum uint64,
 
 func (s *interim) writeStoredFields() (
 	storedIndexOffset uint64, err error) {
-	metaEncoder := govarint.NewU64Base128Encoder(&s.metaBuf)
+	varBuf := make([]byte, binary.MaxVarintLen64)
+	metaEncoder := func(val uint64) (int, error) {
+		wb := binary.PutUvarint(varBuf, val)
+		return s.metaBuf.Write(varBuf[:wb])
+	}
 
 	data, compressed := s.tmp0[:0], s.tmp1[:0]
 	defer func() { s.tmp0, s.tmp1 = data, compressed }()
@@ -530,7 +533,6 @@ func (s *interim) writeStoredFields() (
 			}
 		}
 
-		metaEncoder.Close()
 		metaBytes := s.metaBuf.Bytes()
 
 		compressed = snappy.Encode(compressed[:cap(compressed)], data)
