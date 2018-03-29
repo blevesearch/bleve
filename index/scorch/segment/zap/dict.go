@@ -151,10 +151,11 @@ func (d *Dictionary) RangeIterator(start, end string) segment.DictionaryIterator
 
 // DictionaryIterator is an iterator for term dictionary
 type DictionaryIterator struct {
-	d   *Dictionary
-	itr vellum.Iterator
-	err error
-	tmp PostingsList
+	d     *Dictionary
+	itr   vellum.Iterator
+	err   error
+	tmp   PostingsList
+	entry index.DictEntry
 }
 
 // Next returns the next entry in the dictionary
@@ -169,10 +170,8 @@ func (i *DictionaryIterator) Next() (*index.DictEntry, error) {
 	if i.err != nil {
 		return nil, i.err
 	}
-	rv := &index.DictEntry{
-		Term:  string(term),
-		Count: i.tmp.Count(),
-	}
+	i.entry.Term = string(term)
+	i.entry.Count = i.tmp.Count()
 	i.err = i.itr.Next()
-	return rv, nil
+	return &i.entry, nil
 }
