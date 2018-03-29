@@ -518,7 +518,15 @@ func (s *interim) writeStoredFields() (
 		s.metaBuf.Reset()
 		data = data[:0]
 
-		for fieldID := range s.FieldsInv {
+		// _id field special case optimizes ExternalID() lookups
+		idFieldVal := docStoredFields[uint16(0)].vals[0]
+		_, err = metaEncoder.PutU64(uint64(len(idFieldVal)))
+		if err != nil {
+			return 0, err
+		}
+
+		// handle non-"_id" fields
+		for fieldID := 1; fieldID < len(s.FieldsInv); fieldID++ {
 			isf, exists := docStoredFields[uint16(fieldID)]
 			if exists {
 				curr, data, err = persistStoredFieldValues(
@@ -539,12 +547,17 @@ func (s *interim) writeStoredFields() (
 
 		_, err := writeUvarints(s.w,
 			uint64(len(metaBytes)),
-			uint64(len(compressed)))
+			uint64(len(idFieldVal)+len(compressed)))
 		if err != nil {
 			return 0, err
 		}
 
 		_, err = s.w.Write(metaBytes)
+		if err != nil {
+			return 0, err
+		}
+
+		_, err = s.w.Write(idFieldVal)
 		if err != nil {
 			return 0, err
 		}

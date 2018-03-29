@@ -18,7 +18,6 @@ import (
 	"math"
 	"os"
 	"reflect"
-	"sort"
 	"testing"
 
 	"github.com/RoaringBitmap/roaring"
@@ -552,7 +551,7 @@ func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 	}
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	testSeg, expectedFields, _ := buildTestSegmentWithDefaultFieldMapping(1)
+	testSeg, _, _ = buildTestSegmentWithDefaultFieldMapping(1)
 	err = PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
@@ -576,7 +575,7 @@ func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 			t.Fatalf("segment VisitableDocValueFields err: %v", err)
 		}
 
-		sort.Strings(expectedFields[1:]) // keep _id as first field
+		expectedFields := []string{"desc", "name", "tag"}
 		if !reflect.DeepEqual(fields, expectedFields) {
 			t.Errorf("expected field terms: %#v, got: %#v", expectedFields, fields)
 		}
@@ -593,7 +592,6 @@ func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 			"name": []string{"wow"},
 			"desc": []string{"some", "thing"},
 			"tag":  []string{"cold"},
-			"_id":  []string{"a"},
 		}
 		if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
 			t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
