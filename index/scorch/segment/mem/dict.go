@@ -15,7 +15,9 @@
 package mem
 
 import (
+	"math"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -98,36 +100,42 @@ func (d *Dictionary) RangeIterator(start, end string) segment.DictionaryIterator
 	}
 }
 
-// RegexIterator returns an iterator which only visits terms matching
+// RegexpIterator returns an iterator which only visits terms matching
 // the given regex expression.
-// TODO complete the implementation
-func (d *Dictionary) RegexIterator(regex string) segment.DictionaryIterator {
-	offset := sort.SearchStrings(d.segment.DictKeys[d.fieldID], regex)
+func (d *Dictionary) RegexpIterator(pattern string) segment.DictionaryIterator {
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		// invalid regexp, so set offset to the end
+		return &DictionaryIterator{
+			d:      d,
+			offset: len(d.segment.DictKeys[d.fieldID]),
+		}
+	}
 	return &DictionaryIterator{
-		d:      d,
-		offset: offset,
-		prefix: regex,
+		d:     d,
+		regex: regex,
 	}
 }
 
 // FuzzyIterator returns an iterator which only visits terms matching
 // the given edit distance.
-// TODO complete the implementation
 func (d *Dictionary) FuzzyIterator(term string, fuzziness int) segment.DictionaryIterator {
-	offset := sort.SearchStrings(d.segment.DictKeys[d.fieldID], term)
 	return &DictionaryIterator{
-		d:      d,
-		offset: offset,
-		prefix: term,
+		d:         d,
+		fuzzyTerm: term,
+		fuzziness: fuzziness,
 	}
 }
 
 // DictionaryIterator is an iterator for term dictionary
 type DictionaryIterator struct {
-	d      *Dictionary
-	prefix string
-	end    string
-	offset int
+	d         *Dictionary
+	prefix    string
+	end       string
+	offset    int
+	regex     *regexp.Regexp
+	fuzzyTerm string
+	fuzziness int
 
 	dictEntry index.DictEntry // reused across Next()'s
 }
@@ -146,10 +154,85 @@ func (d *DictionaryIterator) Next() (*index.DictEntry, error) {
 	if d.end != "" && next > d.end {
 		return nil, nil
 	}
+	// check regexp
+	if d.regex != nil {
+		// keep going until we find a match, mindful of the end of the slice
+		for !d.regex.MatchString(next) {
+			d.offset++
+			if d.offset > len(d.d.segment.DictKeys[d.d.fieldID])-1 {
+				return nil, nil
+			}
+			next = d.d.segment.DictKeys[d.d.fieldID][d.offset]
+		}
+	}
+	if d.fuzzyTerm != "" {
+		_, exceeded := LevenshteinDistanceMax(d.fuzzyTerm, next, d.fuzziness)
+		for exceeded {
+			d.offset++
+			if d.offset > len(d.d.segment.DictKeys[d.d.fieldID])-1 {
+				return nil, nil
+			}
+			next = d.d.segment.DictKeys[d.d.fieldID][d.offset]
+			_, exceeded = LevenshteinDistanceMax(d.fuzzyTerm, next, d.fuzziness)
+		}
+	}
 
 	d.offset++
 	postingID := d.d.segment.Dicts[d.d.fieldID][next]
 	d.dictEntry.Term = next
 	d.dictEntry.Count = d.d.segment.Postings[postingID-1].GetCardinality()
 	return &d.dictEntry, nil
+}
+
+// LevenshteinDistanceMax same as LevenshteinDistance but
+// attempts to bail early once we know the distance
+// will be greater than max
+// in which case the first return val will be the max
+// and the second will be true, indicating max was exceeded
+func LevenshteinDistanceMax(a, b string, max int) (int, bool) {
+	la := len(a)
+	lb := len(b)
+
+	ld := int(math.Abs(float64(la - lb)))
+	if ld > max {
+		return max, true
+	}
+
+	d := make([]int, la+1)
+	var lastdiag, olddiag, temp int
+
+	for i := 1; i <= la; i++ {
+		d[i] = i
+	}
+	for i := 1; i <= lb; i++ {
+		d[0] = i
+		lastdiag = i - 1
+		rowmin := max + 1
+		for j := 1; j <= la; j++ {
+			olddiag = d[j]
+			min := d[j] + 1
+			if (d[j-1] + 1) < min {
+				min = d[j-1] + 1
+			}
+			if a[j-1] == b[i-1] {
+				temp = 0
+			} else {
+				temp = 1
+			}
+			if (lastdiag + temp) < min {
+				min = lastdiag + temp
+			}
+			if min < rowmin {
+				rowmin = min
+			}
+			d[j] = min
+
+			lastdiag = olddiag
+		}
+		// after each row if rowmin isn't less than max stop
+		if rowmin > max {
+			return max, true
+		}
+	}
+	return d[la], false
 }

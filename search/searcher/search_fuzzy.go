@@ -15,9 +15,6 @@
 package searcher
 
 import (
-	"log"
-	"time"
-
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
@@ -34,10 +31,8 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string,
 			break
 		}
 	}
-	t := time.Now()
 	candidateTerms, err := findFuzzyCandidateTerms(indexReader, term, fuzziness,
 		field, prefixTerm)
-	log.Printf("time taken-> %f", time.Since(t).Seconds())
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +51,7 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 		// in case of advanced reader implementations directly call
 		// the levenshtein automaton based iterator to collect the
 		// candidate terms
-		if ir, ok := indexReader.(index.IndexReaderAdv); ok {
+		if ir, ok := indexReader.(index.IndexReaderFuzzy); ok {
 			fieldDict, err = ir.FieldDictFuzzy(field, []byte(term), fuzziness)
 			if err != nil {
 				return rv, err
@@ -66,7 +61,6 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 				rv = append(rv, tfd.Term)
 				tfd, err = fieldDict.Next()
 			}
-			log.Printf("candidate FSA fuzzy terms: %+v", rv)
 			return rv, nil
 		}
 		fieldDict, err = indexReader.FieldDict(field)

@@ -76,7 +76,7 @@ func (e *EmptyDictionary) RangeIterator(start, end string) DictionaryIterator {
 	return &EmptyDictionaryIterator{}
 }
 
-func (e *EmptyDictionary) RegexIterator(start string) DictionaryIterator {
+func (e *EmptyDictionary) RegexpIterator(start string) DictionaryIterator {
 	return &EmptyDictionaryIterator{}
 }
 

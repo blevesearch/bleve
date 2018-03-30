@@ -49,8 +49,8 @@ func (s *SegmentDictionarySnapshot) RangeIterator(start, end string) segment.Dic
 	return s.d.RangeIterator(start, end)
 }
 
-func (s *SegmentDictionarySnapshot) RegexIterator(regex string) segment.DictionaryIterator {
-	return s.d.RegexIterator(regex)
+func (s *SegmentDictionarySnapshot) RegexpIterator(regex string) segment.DictionaryIterator {
+	return s.d.RegexpIterator(regex)
 }
 
 func (s *SegmentDictionarySnapshot) FuzzyIterator(term string,

@@ -15,9 +15,7 @@
 package searcher
 
 import (
-	"log"
 	"regexp"
-	"time"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
@@ -32,9 +30,8 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp,
 	field string, boost float64, options search.SearcherOptions) (
 	search.Searcher, error) {
 	var candidateTerms []string
-	t := time.Now()
-	if ir, ok := indexReader.(index.IndexReaderAdv); ok {
-		fieldDict, err := ir.FieldDictRegex(field, []byte(pattern.String()))
+	if ir, ok := indexReader.(index.IndexReaderRegexp); ok {
+		fieldDict, err := ir.FieldDictRegexp(field, []byte(pattern.String()))
 		if err != nil {
 			return nil, err
 		}
@@ -50,7 +47,6 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp,
 			candidateTerms = append(candidateTerms, tfd.Term)
 			tfd, err = fieldDict.Next()
 		}
-		log.Printf("fsa time took-> %f", time.Since(t).Seconds())
 	} else {
 		prefixTerm, complete := pattern.LiteralPrefix()
 		if complete {
@@ -64,7 +60,6 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp,
 				return nil, err
 			}
 		}
-		log.Printf("time took-> %f", time.Since(t).Seconds())
 	}
 
 	return NewMultiTermSearcher(indexReader, candidateTerms, field, boost,

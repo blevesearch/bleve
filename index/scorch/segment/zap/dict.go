@@ -152,7 +152,7 @@ func (d *Dictionary) RangeIterator(start, end string) segment.DictionaryIterator
 
 // RegexIterator returns an iterator which only visits terms having the
 // the specified regex
-func (d *Dictionary) RegexIterator(regex string) segment.DictionaryIterator {
+func (d *Dictionary) RegexpIterator(regex string) segment.DictionaryIterator {
 	rv := &DictionaryIterator{
 		d: d,
 	}

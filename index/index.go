@@ -96,10 +96,11 @@ type IndexReader interface {
 	Close() error
 }
 
-// IndexReaderAdv is an optional interface for advanced users
-// Hope to have a better name here...
-type IndexReaderAdv interface {
-	FieldDictRegex(field string, regex []byte) (FieldDict, error)
+type IndexReaderRegexp interface {
+	FieldDictRegexp(field string, regex []byte) (FieldDict, error)
+}
+
+type IndexReaderFuzzy interface {
 	FieldDictFuzzy(field string, term []byte, fuzziness int) (FieldDict, error)
 }
 

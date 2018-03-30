@@ -175,10 +175,10 @@ func (i *IndexSnapshot) FieldDictPrefix(field string,
 	})
 }
 
-func (i *IndexSnapshot) FieldDictRegex(field string,
+func (i *IndexSnapshot) FieldDictRegexp(field string,
 	termRegex []byte) (index.FieldDict, error) {
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.RegexIterator(string(termRegex))
+		return i.RegexpIterator(string(termRegex))
 	})
 }
 
