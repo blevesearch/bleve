@@ -495,8 +495,8 @@ func (s *Scorch) loadFromBolt() error {
 				return err
 			}
 			s.nextSegmentID++
-			s.nextSnapshotEpoch = snapshotEpoch + 1
 			s.rootLock.Lock()
+			s.nextSnapshotEpoch = snapshotEpoch + 1
 			if s.root != nil {
 				_ = s.root.DecRef()
 			}
