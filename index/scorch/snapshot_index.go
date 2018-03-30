@@ -140,7 +140,7 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string, makeItr func(i s
 			if next != nil {
 				rv.cursors = append(rv.cursors, &segmentDictCursor{
 					itr:  asr.dictItr,
-					curr: next,
+					curr: *next,
 				})
 			}
 		}
