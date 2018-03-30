@@ -473,19 +473,19 @@ func (s *Scorch) loadFromBolt() error {
 				continue
 			}
 			if foundRoot {
-				s.eligibleForRemoval = append(s.eligibleForRemoval, snapshotEpoch)
+				s.AddEligibleForRemoval(snapshotEpoch)
 				continue
 			}
 			snapshot := snapshots.Bucket(k)
 			if snapshot == nil {
 				log.Printf("snapshot key, but bucket missing %x, continuing", k)
-				s.eligibleForRemoval = append(s.eligibleForRemoval, snapshotEpoch)
+				s.AddEligibleForRemoval(snapshotEpoch)
 				continue
 			}
 			indexSnapshot, err := s.loadSnapshot(snapshot)
 			if err != nil {
 				log.Printf("unable to load snapshot, %v, continuing", err)
-				s.eligibleForRemoval = append(s.eligibleForRemoval, snapshotEpoch)
+				s.AddEligibleForRemoval(snapshotEpoch)
 				continue
 			}
 			indexSnapshot.epoch = snapshotEpoch
