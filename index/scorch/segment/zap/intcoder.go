@@ -18,15 +18,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-
-	"github.com/Smerity/govarint"
 )
 
 type chunkedIntCoder struct {
 	final     []byte
 	chunkSize uint64
 	chunkBuf  bytes.Buffer
-	encoder   *govarint.Base128Encoder
 	chunkLens []uint64
 	currChunk uint64
 
@@ -43,7 +40,6 @@ func newChunkedIntCoder(chunkSize uint64, maxDocNum uint64) *chunkedIntCoder {
 		chunkLens: make([]uint64, total),
 		final:     make([]byte, 0, 64),
 	}
-	rv.encoder = govarint.NewU64Base128Encoder(&rv.chunkBuf)
 
 	return rv
 }
@@ -70,8 +66,13 @@ func (c *chunkedIntCoder) Add(docNum uint64, vals ...uint64) error {
 		c.currChunk = chunk
 	}
 
+	if len(c.buf) < binary.MaxVarintLen64 {
+		c.buf = make([]byte, binary.MaxVarintLen64)
+	}
+
 	for _, val := range vals {
-		_, err := c.encoder.PutU64(val)
+		wb := binary.PutUvarint(c.buf, val)
+		_, err := c.chunkBuf.Write(c.buf[:wb])
 		if err != nil {
 			return err
 		}
@@ -96,7 +97,6 @@ func (c *chunkedIntCoder) AddBytes(docNum uint64, buf []byte) error {
 // Close indicates you are done calling Add() this allows the final chunk
 // to be encoded.
 func (c *chunkedIntCoder) Close() {
-	c.encoder.Close()
 	encodingBytes := c.chunkBuf.Bytes()
 	c.chunkLens[c.currChunk] = uint64(len(encodingBytes))
 	c.final = append(c.final, encodingBytes...)

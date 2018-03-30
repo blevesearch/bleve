@@ -24,7 +24,6 @@ import (
 	"sync"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/Smerity/govarint"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/blevesearch/bleve/size"
 	"github.com/couchbase/vellum"
@@ -278,14 +277,12 @@ func (sb *SegmentBase) dictionary(field string) (rv *Dictionary, err error) {
 type visitDocumentCtx struct {
 	buf      []byte
 	reader   bytes.Reader
-	decoder  *govarint.Base128Decoder
 	arrayPos []uint64
 }
 
 var visitDocumentCtxPool = sync.Pool{
 	New: func() interface{} {
 		reuse := &visitDocumentCtx{}
-		reuse.decoder = govarint.NewU64Base128Decoder(&reuse.reader)
 		return reuse
 	},
 }
@@ -300,10 +297,9 @@ func (s *SegmentBase) VisitDocument(num uint64, visitor segment.DocumentFieldVal
 		meta, compressed := s.getDocStoredMetaAndCompressed(num)
 
 		vdc.reader.Reset(meta)
-		decoder := vdc.decoder
 
 		// handle _id field special case
-		idFieldValLen, err := decoder.GetU64()
+		idFieldValLen, err := binary.ReadUvarint(&vdc.reader)
 		if err != nil {
 			return err
 		}
@@ -324,26 +320,26 @@ func (s *SegmentBase) VisitDocument(num uint64, visitor segment.DocumentFieldVal
 		}
 
 		for keepGoing {
-			field, err := decoder.GetU64()
+			field, err := binary.ReadUvarint(&vdc.reader)
 			if err == io.EOF {
 				break
 			}
 			if err != nil {
 				return err
 			}
-			typ, err := decoder.GetU64()
+			typ, err := binary.ReadUvarint(&vdc.reader)
 			if err != nil {
 				return err
 			}
-			offset, err := decoder.GetU64()
+			offset, err := binary.ReadUvarint(&vdc.reader)
 			if err != nil {
 				return err
 			}
-			l, err := decoder.GetU64()
+			l, err := binary.ReadUvarint(&vdc.reader)
 			if err != nil {
 				return err
 			}
-			numap, err := decoder.GetU64()
+			numap, err := binary.ReadUvarint(&vdc.reader)
 			if err != nil {
 				return err
 			}
@@ -354,7 +350,7 @@ func (s *SegmentBase) VisitDocument(num uint64, visitor segment.DocumentFieldVal
 				}
 				arrayPos = vdc.arrayPos[:numap]
 				for i := 0; i < int(numap); i++ {
-					ap, err := decoder.GetU64()
+					ap, err := binary.ReadUvarint(&vdc.reader)
 					if err != nil {
 						return err
 					}
