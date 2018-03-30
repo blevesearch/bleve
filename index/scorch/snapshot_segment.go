@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
@@ -230,7 +231,7 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 }
 
 func (c *cachedDocs) Size() int {
-	return int(c.size)
+	return int(atomic.LoadUint64(&c.size))
 }
 
 func (c *cachedDocs) updateSizeLOCKED() {
@@ -243,5 +244,5 @@ func (c *cachedDocs) updateSizeLOCKED() {
 			}
 		}
 	}
-	c.size = uint64(sizeInBytes)
+	atomic.StoreUint64(&c.size, uint64(sizeInBytes))
 }
