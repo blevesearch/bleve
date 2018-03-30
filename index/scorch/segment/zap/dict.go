@@ -21,6 +21,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/couchbase/vellum"
+	"github.com/couchbase/vellum/levenshtein"
 	"github.com/couchbase/vellum/regexp"
 )
 
@@ -143,6 +144,47 @@ func (d *Dictionary) RangeIterator(start, end string) segment.DictionaryIterator
 		itr, err := d.fst.Iterator([]byte(start), endBytes)
 		if err == nil {
 			rv.itr = itr
+		}
+	}
+
+	return rv
+}
+
+// RegexIterator returns an iterator which only visits terms having the
+// the specified regex
+func (d *Dictionary) RegexpIterator(regex string) segment.DictionaryIterator {
+	rv := &DictionaryIterator{
+		d: d,
+	}
+
+	if d.fst != nil {
+		r, err := regexp.New(regex)
+		if err == nil {
+			itr, err := d.fst.Search(r, nil, nil)
+			if err == nil {
+				rv.itr = itr
+			}
+		}
+	}
+
+	return rv
+}
+
+// FuzzyIterator returns an iterator which only visits terms having the
+// the specified edit/levenshtein distance
+func (d *Dictionary) FuzzyIterator(term string,
+	fuzziness int) segment.DictionaryIterator {
+	rv := &DictionaryIterator{
+		d: d,
+	}
+
+	if d.fst != nil {
+		la, err := levenshtein.New(term, fuzziness)
+		if err == nil {
+			itr, err := d.fst.Search(la, nil, nil)
+			if err == nil {
+				rv.itr = itr
+			}
 		}
 	}
 

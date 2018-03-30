@@ -49,6 +49,15 @@ func (s *SegmentDictionarySnapshot) RangeIterator(start, end string) segment.Dic
 	return s.d.RangeIterator(start, end)
 }
 
+func (s *SegmentDictionarySnapshot) RegexpIterator(regex string) segment.DictionaryIterator {
+	return s.d.RegexpIterator(regex)
+}
+
+func (s *SegmentDictionarySnapshot) FuzzyIterator(term string,
+	fuzziness int) segment.DictionaryIterator {
+	return s.d.FuzzyIterator(term, fuzziness)
+}
+
 type SegmentSnapshot struct {
 	id      uint64
 	segment segment.Segment

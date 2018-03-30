@@ -31,7 +31,6 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string,
 			break
 		}
 	}
-
 	candidateTerms, err := findFuzzyCandidateTerms(indexReader, term, fuzziness,
 		field, prefixTerm)
 	if err != nil {
@@ -49,6 +48,21 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 	if len(prefixTerm) > 0 {
 		fieldDict, err = indexReader.FieldDictPrefix(field, []byte(prefixTerm))
 	} else {
+		// in case of advanced reader implementations directly call
+		// the levenshtein automaton based iterator to collect the
+		// candidate terms
+		if ir, ok := indexReader.(index.IndexReaderFuzzy); ok {
+			fieldDict, err = ir.FieldDictFuzzy(field, []byte(term), fuzziness)
+			if err != nil {
+				return rv, err
+			}
+			tfd, err := fieldDict.Next()
+			for err == nil && tfd != nil {
+				rv = append(rv, tfd.Term)
+				tfd, err = fieldDict.Next()
+			}
+			return rv, nil
+		}
 		fieldDict, err = indexReader.FieldDict(field)
 	}
 	defer func() {

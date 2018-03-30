@@ -157,4 +157,55 @@ func TestDictionary(t *testing.T) {
 	if !reflect.DeepEqual(expected, got) {
 		t.Errorf("expected: %v, got: %v", expected, got)
 	}
+
+	// test regexp iterator
+	expected = []string{"ball", "bat"}
+	got = got[:0]
+	itr = dict.RegexpIterator("ba.*")
+	next, err = itr.Next()
+	for next != nil && err == nil {
+		got = append(got, next.Term)
+		next, err = itr.Next()
+	}
+	if err != nil {
+		t.Fatalf("dict itr error: %v", err)
+	}
+
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+
+	// test regexp iterator with invalid regexp
+	expected = []string{}
+	got = got[:0]
+	itr = dict.RegexpIterator(string([]byte{0xff}))
+	next, err = itr.Next()
+	for next != nil && err == nil {
+		got = append(got, next.Term)
+		next, err = itr.Next()
+	}
+	if err != nil {
+		t.Fatalf("dict itr error: %v", err)
+	}
+
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+
+	// test fuzzy iterator
+	expected = []string{"bat", "cat"}
+	got = got[:0]
+	itr = dict.FuzzyIterator("vat", 1)
+	next, err = itr.Next()
+	for next != nil && err == nil {
+		got = append(got, next.Term)
+		next, err = itr.Next()
+	}
+	if err != nil {
+		t.Fatalf("dict itr error: %v", err)
+	}
+
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
 }

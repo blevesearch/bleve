@@ -96,6 +96,14 @@ type IndexReader interface {
 	Close() error
 }
 
+type IndexReaderRegexp interface {
+	FieldDictRegexp(field string, regex []byte) (FieldDict, error)
+}
+
+type IndexReaderFuzzy interface {
+	FieldDictFuzzy(field string, term []byte, fuzziness int) (FieldDict, error)
+}
+
 // FieldTerms contains the terms used by a document, keyed by field
 type FieldTerms map[string][]string
 
