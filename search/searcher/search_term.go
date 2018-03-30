@@ -137,3 +137,13 @@ func (s *TermSearcher) Min() int {
 func (s *TermSearcher) DocumentMatchPoolSize() int {
 	return 1
 }
+
+func (s *TermSearcher) Optimize(kind string, octx index.OptimizableContext) (
+	index.OptimizableContext, error) {
+	o, ok := s.reader.(index.Optimizable)
+	if ok {
+		return o.Optimize(kind, octx)
+	}
+
+	return octx, nil
+}

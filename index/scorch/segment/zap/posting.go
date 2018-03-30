@@ -244,10 +244,11 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 
 	rv.all = p.postings.Iterator()
 	if p.except != nil {
-		allExcept := roaring.AndNot(p.postings, p.except)
-		rv.actual = allExcept.Iterator()
+		rv.ActualBM = roaring.AndNot(p.postings, p.except)
+		rv.Actual = rv.ActualBM.Iterator()
 	} else {
-		rv.actual = p.postings.Iterator()
+		rv.ActualBM = p.postings
+		rv.Actual = p.postings.Iterator()
 	}
 
 	return rv
@@ -319,7 +320,8 @@ func (rv *PostingsList) init1Hit(fstVal uint64) error {
 type PostingsIterator struct {
 	postings *PostingsList
 	all      roaring.IntIterable
-	actual   roaring.IntIterable
+	Actual   roaring.IntIterable
+	ActualBM *roaring.Bitmap
 
 	currChunk         uint32
 	currChunkFreqNorm []byte
@@ -644,11 +646,11 @@ func (i *PostingsIterator) nextDocNum() (uint64, bool, error) {
 		return docNum, true, nil
 	}
 
-	if i.actual == nil || !i.actual.HasNext() {
+	if i.Actual == nil || !i.Actual.HasNext() {
 		return 0, false, nil
 	}
 
-	n := i.actual.Next()
+	n := i.Actual.Next()
 	allN := i.all.Next()
 
 	nChunk := n / i.postings.sb.chunkFactor
