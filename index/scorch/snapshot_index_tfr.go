@@ -103,14 +103,16 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 	if i.includeTermVectors {
 		locs := next.Locations()
 		rv.Vectors = make([]*index.TermFieldVector, len(locs))
+		backing := make([]index.TermFieldVector, len(locs))
 		for i, loc := range locs {
-			rv.Vectors[i] = &index.TermFieldVector{
+			backing[i] = index.TermFieldVector{
 				Start:          loc.Start(),
 				End:            loc.End(),
 				Pos:            loc.Pos(),
 				ArrayPositions: loc.ArrayPositions(),
 				Field:          loc.Field(),
 			}
+			rv.Vectors[i] = &backing[i]
 		}
 	}
 }
