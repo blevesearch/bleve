@@ -626,12 +626,19 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 				return 0, nil, err
 			}
 
-			// now walk the fields in order
-			for fieldID := range fieldsInv {
-				storedFieldValues := vals[int(fieldID)]
+			// _id field special case optimizes ExternalID() lookups
+			idFieldVal := vals[uint16(0)][0]
+			_, err = metaEncoder.PutU64(uint64(len(idFieldVal)))
+			if err != nil {
+				return 0, nil, err
+			}
 
-				stf := typs[int(fieldID)]
-				spf := poss[int(fieldID)]
+			// now walk the non-"_id" fields in order
+			for fieldID := 1; fieldID < len(fieldsInv); fieldID++ {
+				storedFieldValues := vals[fieldID]
+
+				stf := typs[fieldID]
+				spf := poss[fieldID]
 
 				var err2 error
 				curr, data, err2 = persistStoredFieldValues(fieldID,
@@ -649,12 +656,19 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 			docNumOffsets[newDocNum] = uint64(w.Count())
 
 			// write out the meta len and compressed data len
-			_, err = writeUvarints(w, uint64(len(metaBytes)), uint64(len(compressed)))
+			_, err = writeUvarints(w,
+				uint64(len(metaBytes)),
+				uint64(len(idFieldVal)+len(compressed)))
 			if err != nil {
 				return 0, nil, err
 			}
 			// now write the meta
 			_, err = w.Write(metaBytes)
+			if err != nil {
+				return 0, nil, err
+			}
+			// now write the _id field val (counted as part of the 'compressed' data)
+			_, err = w.Write(idFieldVal)
 			if err != nil {
 				return 0, nil, err
 			}

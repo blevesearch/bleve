@@ -295,15 +295,30 @@ func (s *SegmentBase) VisitDocument(num uint64, visitor segment.DocumentFieldVal
 		vdc := visitDocumentCtxPool.Get().(*visitDocumentCtx)
 
 		meta, compressed := s.getDocStoredMetaAndCompressed(num)
+
+		vdc.reader.Reset(meta)
+
+		// handle _id field special case
+		idFieldValLen, err := binary.ReadUvarint(&vdc.reader)
+		if err != nil {
+			return err
+		}
+		idFieldVal := compressed[:idFieldValLen]
+
+		keepGoing := visitor("_id", byte('t'), idFieldVal, nil)
+		if !keepGoing {
+			visitDocumentCtxPool.Put(vdc)
+			return nil
+		}
+
+		// handle non-"_id" fields
+		compressed = compressed[idFieldValLen:]
+
 		uncompressed, err := snappy.Decode(vdc.buf[:cap(vdc.buf)], compressed)
 		if err != nil {
 			return err
 		}
 
-		// now decode meta and process
-		vdc.reader.Reset(meta)
-
-		keepGoing := true
 		for keepGoing {
 			field, err := binary.ReadUvarint(&vdc.reader)
 			if err == io.EOF {
