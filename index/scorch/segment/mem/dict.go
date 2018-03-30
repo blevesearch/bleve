@@ -165,6 +165,7 @@ func (d *DictionaryIterator) Next() (*index.DictEntry, error) {
 			next = d.d.segment.DictKeys[d.d.fieldID][d.offset]
 		}
 	}
+	// check fuzziness
 	if d.fuzzyTerm != "" {
 		_, exceeded := LevenshteinDistanceMax(d.fuzzyTerm, next, d.fuzziness)
 		for exceeded {
