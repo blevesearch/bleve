@@ -42,6 +42,7 @@ type docValueIterator struct {
 	dvDataLoc      uint64
 	curChunkHeader []MetaData
 	curChunkData   []byte // compressed data cache
+	uncompressed   []byte // temp buf for snappy decompression
 }
 
 func (di *docValueIterator) size() int {
@@ -135,10 +136,11 @@ func (di *docValueIterator) visitDocValues(docNum uint64,
 		return nil
 	}
 	// uncompress the already loaded data
-	uncompressed, err := snappy.Decode(nil, di.curChunkData)
+	uncompressed, err := snappy.Decode(di.uncompressed[:cap(di.uncompressed)], di.curChunkData)
 	if err != nil {
 		return err
 	}
+	di.uncompressed = uncompressed
 
 	// pick the terms for the given docNum
 	uncompressed = uncompressed[start:end]

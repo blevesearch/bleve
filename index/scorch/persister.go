@@ -94,6 +94,11 @@ OUTER:
 				close(ch)
 			}
 			if err != nil {
+				if err == ErrClosed {
+					// index has been closed
+					_ = ourSnapshot.DecRef()
+					break OUTER
+				}
 				s.fireAsyncError(fmt.Errorf("got err persisting snapshot: %v", err))
 				_ = ourSnapshot.DecRef()
 				atomic.AddUint64(&s.stats.TotPersistLoopErr, 1)
@@ -468,19 +473,19 @@ func (s *Scorch) loadFromBolt() error {
 				continue
 			}
 			if foundRoot {
-				s.eligibleForRemoval = append(s.eligibleForRemoval, snapshotEpoch)
+				s.AddEligibleForRemoval(snapshotEpoch)
 				continue
 			}
 			snapshot := snapshots.Bucket(k)
 			if snapshot == nil {
 				log.Printf("snapshot key, but bucket missing %x, continuing", k)
-				s.eligibleForRemoval = append(s.eligibleForRemoval, snapshotEpoch)
+				s.AddEligibleForRemoval(snapshotEpoch)
 				continue
 			}
 			indexSnapshot, err := s.loadSnapshot(snapshot)
 			if err != nil {
 				log.Printf("unable to load snapshot, %v, continuing", err)
-				s.eligibleForRemoval = append(s.eligibleForRemoval, snapshotEpoch)
+				s.AddEligibleForRemoval(snapshotEpoch)
 				continue
 			}
 			indexSnapshot.epoch = snapshotEpoch
@@ -490,8 +495,8 @@ func (s *Scorch) loadFromBolt() error {
 				return err
 			}
 			s.nextSegmentID++
-			s.nextSnapshotEpoch = snapshotEpoch + 1
 			s.rootLock.Lock()
+			s.nextSnapshotEpoch = snapshotEpoch + 1
 			if s.root != nil {
 				_ = s.root.DecRef()
 			}
@@ -514,7 +519,7 @@ func (s *Scorch) LoadSnapshot(epoch uint64) (rv *IndexSnapshot, err error) {
 		snapshotKey := segment.EncodeUvarintAscending(nil, epoch)
 		snapshot := snapshots.Bucket(snapshotKey)
 		if snapshot == nil {
-			return nil
+			return fmt.Errorf("snapshot with epoch: %v - doesn't exist", epoch)
 		}
 		rv, err = s.loadSnapshot(snapshot)
 		return err

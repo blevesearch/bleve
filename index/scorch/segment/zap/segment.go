@@ -24,7 +24,6 @@ import (
 	"sync"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/Smerity/govarint"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/blevesearch/bleve/size"
 	"github.com/couchbase/vellum"
@@ -273,50 +272,85 @@ func (sb *SegmentBase) dictionary(field string) (rv *Dictionary, err error) {
 	return rv, nil
 }
 
+// visitDocumentCtx holds data structures that are reusable across
+// multiple VisitDocument() calls to avoid memory allocations
+type visitDocumentCtx struct {
+	buf      []byte
+	reader   bytes.Reader
+	arrayPos []uint64
+}
+
+var visitDocumentCtxPool = sync.Pool{
+	New: func() interface{} {
+		reuse := &visitDocumentCtx{}
+		return reuse
+	},
+}
+
 // VisitDocument invokes the DocFieldValueVistor for each stored field
 // for the specified doc number
 func (s *SegmentBase) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
 	// first make sure this is a valid number in this segment
 	if num < s.numDocs {
+		vdc := visitDocumentCtxPool.Get().(*visitDocumentCtx)
+
 		meta, compressed := s.getDocStoredMetaAndCompressed(num)
-		uncompressed, err := snappy.Decode(nil, compressed)
+
+		vdc.reader.Reset(meta)
+
+		// handle _id field special case
+		idFieldValLen, err := binary.ReadUvarint(&vdc.reader)
 		if err != nil {
 			return err
 		}
-		// now decode meta and process
-		reader := bytes.NewReader(meta)
-		decoder := govarint.NewU64Base128Decoder(reader)
+		idFieldVal := compressed[:idFieldValLen]
 
-		keepGoing := true
+		keepGoing := visitor("_id", byte('t'), idFieldVal, nil)
+		if !keepGoing {
+			visitDocumentCtxPool.Put(vdc)
+			return nil
+		}
+
+		// handle non-"_id" fields
+		compressed = compressed[idFieldValLen:]
+
+		uncompressed, err := snappy.Decode(vdc.buf[:cap(vdc.buf)], compressed)
+		if err != nil {
+			return err
+		}
+
 		for keepGoing {
-			field, err := decoder.GetU64()
+			field, err := binary.ReadUvarint(&vdc.reader)
 			if err == io.EOF {
 				break
 			}
 			if err != nil {
 				return err
 			}
-			typ, err := decoder.GetU64()
+			typ, err := binary.ReadUvarint(&vdc.reader)
 			if err != nil {
 				return err
 			}
-			offset, err := decoder.GetU64()
+			offset, err := binary.ReadUvarint(&vdc.reader)
 			if err != nil {
 				return err
 			}
-			l, err := decoder.GetU64()
+			l, err := binary.ReadUvarint(&vdc.reader)
 			if err != nil {
 				return err
 			}
-			numap, err := decoder.GetU64()
+			numap, err := binary.ReadUvarint(&vdc.reader)
 			if err != nil {
 				return err
 			}
 			var arrayPos []uint64
 			if numap > 0 {
-				arrayPos = make([]uint64, numap)
+				if cap(vdc.arrayPos) < int(numap) {
+					vdc.arrayPos = make([]uint64, numap)
+				}
+				arrayPos = vdc.arrayPos[:numap]
 				for i := 0; i < int(numap); i++ {
-					ap, err := decoder.GetU64()
+					ap, err := binary.ReadUvarint(&vdc.reader)
 					if err != nil {
 						return err
 					}
@@ -327,6 +361,9 @@ func (s *SegmentBase) VisitDocument(num uint64, visitor segment.DocumentFieldVal
 			value := uncompressed[offset : offset+l]
 			keepGoing = visitor(s.fieldsInv[field], byte(typ), value, arrayPos)
 		}
+
+		vdc.buf = uncompressed
+		visitDocumentCtxPool.Put(vdc)
 	}
 	return nil
 }
@@ -347,7 +384,7 @@ func (s *SegmentBase) DocNumbers(ids []string) (*roaring.Bitmap, error) {
 			return nil, err
 		}
 
-		var postingsList *PostingsList
+		postingsList := emptyPostingsList
 		for _, id := range ids {
 			postingsList, err = idDict.postingsList([]byte(id), nil, postingsList)
 			if err != nil {

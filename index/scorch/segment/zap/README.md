@@ -28,7 +28,7 @@ Current usage:
     - produce a slice of metadata bytes and data bytes
     - produce these slices in field id order
     - field value is appended to the data slice
-    - metadata slice is govarint encoded with the following values for each field value
+    - metadata slice is varint encoded with the following values for each field value
       - field id (uint16)
       - field type (byte)
       - field value start offset in uncompressed data slice (uint64)
@@ -53,7 +53,7 @@ With this index and a known document number, we have direct access to all the st
 ## posting details (freq/norm) section
 
 - for each posting list
-  - produce a slice containing multiple consecutive chunks (each chunk is govarint stream)
+  - produce a slice containing multiple consecutive chunks (each chunk is varint stream)
   - produce a slice remembering offsets of where each chunk starts
   - preparation phase:
     - for each hit in the posting list
@@ -71,7 +71,7 @@ If you know the doc number you're interested in, this format lets you jump to th
 ## posting details (location) section
 
 - for each posting list
-  - produce a slice containing multiple consecutive chunks (each chunk is govarint stream)
+  - produce a slice containing multiple consecutive chunks (each chunk is varint stream)
   - produce a slice remembering offsets of where each chunk starts
   - preparation phase:
     - for each hit in the posting list

@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
@@ -174,7 +175,7 @@ func (cfd *cachedFieldDocs) prepareFields(field string, ss *SegmentSnapshot) {
 		}
 
 		cfd.size += uint64(size.SizeOfUint64) /* map key */
-		postingsItr := postings.Iterator()
+		postingsItr := postings.Iterator(false, false, false)
 		nextPosting, err2 := postingsItr.Next()
 		for err2 == nil && nextPosting != nil {
 			docNum := nextPosting.Number()
@@ -239,7 +240,7 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 }
 
 func (c *cachedDocs) Size() int {
-	return int(c.size)
+	return int(atomic.LoadUint64(&c.size))
 }
 
 func (c *cachedDocs) updateSizeLOCKED() {
@@ -252,5 +253,5 @@ func (c *cachedDocs) updateSizeLOCKED() {
 			}
 		}
 	}
-	c.size = uint64(sizeInBytes)
+	atomic.StoreUint64(&c.size, uint64(sizeInBytes))
 }

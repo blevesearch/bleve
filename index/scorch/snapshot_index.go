@@ -387,7 +387,7 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 
 func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
-
+	termStr := string(term)
 	rv := &IndexSnapshotTermFieldReader{
 		term:               term,
 		field:              field,
@@ -403,12 +403,12 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		if err != nil {
 			return nil, err
 		}
-		pl, err := dict.PostingsList(string(term), nil)
+		pl, err := dict.PostingsList(termStr, nil)
 		if err != nil {
 			return nil, err
 		}
 		rv.postings[i] = pl
-		rv.iterators[i] = pl.Iterator()
+		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors)
 	}
 	atomic.AddUint64(&i.parent.stats.TotTermSearchersStarted, uint64(1))
 	return rv, nil
@@ -427,12 +427,10 @@ func docNumberToBytes(buf []byte, in uint64) []byte {
 }
 
 func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
-	var res uint64
-	err := binary.Read(bytes.NewReader(in), binary.BigEndian, &res)
-	if err != nil {
-		return 0, err
+	if len(in) != 8 {
+		return 0, fmt.Errorf("wrong len for IndexInternalID: %q", in)
 	}
-	return res, nil
+	return binary.BigEndian.Uint64(in), nil
 }
 
 func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,

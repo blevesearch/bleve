@@ -17,9 +17,9 @@ package zap
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
 	"math"
 
+	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 	"github.com/couchbase/vellum"
 	"github.com/spf13/cobra"
@@ -59,7 +59,7 @@ var exploreCmd = &cobra.Command{
 					return fmt.Errorf("error looking for term : %v", err)
 				}
 				if exists {
-					fmt.Printf("fst val is %d (%x)\n", postingsAddr, postingsAddr)
+					fmt.Printf("FST val is %d (%x)\n", postingsAddr, postingsAddr)
 
 					if postingsAddr&zap.FSTValEncodingMask == zap.FSTValEncoding1Hit {
 						docNum, normBits := zap.FSTValDecode1Hit(postingsAddr)
@@ -82,9 +82,16 @@ var exploreCmd = &cobra.Command{
 					n += uint64(read)
 
 					var postingListLen uint64
-					postingListLen, _ = binary.Uvarint(data[postingsAddr+n : postingsAddr+n+binary.MaxVarintLen64])
+					postingListLen, read = binary.Uvarint(data[postingsAddr+n : postingsAddr+n+binary.MaxVarintLen64])
+					n += uint64(read)
 
 					fmt.Printf("Posting List Length: %d\n", postingListLen)
+					bitmap := roaring.New()
+					_, err = bitmap.FromBuffer(data[postingsAddr+n : postingsAddr+n+postingListLen])
+					if err != nil {
+						return err
+					}
+					fmt.Printf("Posting List: %v\n", bitmap)
 
 					fmt.Printf("Freq details at: %d (%x)\n", freqAddr, freqAddr)
 					numChunks, r2 := binary.Uvarint(data[freqAddr : freqAddr+binary.MaxVarintLen64])
@@ -109,11 +116,8 @@ var exploreCmd = &cobra.Command{
 
 					var locOffsets []uint64
 					for j := uint64(0); j < numLChunks; j++ {
-						log.Printf("reading from %d(%x)\n", locAddr+n, locAddr+n)
-						log.Printf("data i see here: % x\n", data[locAddr+n:locAddr+n+binary.MaxVarintLen64])
 						lchunkLen, r4 := binary.Uvarint(data[locAddr+n : locAddr+n+binary.MaxVarintLen64])
 						n += uint64(r4)
-						log.Printf("see chunk len %d(%x)\n", lchunkLen, lchunkLen)
 						locOffsets = append(locOffsets, lchunkLen)
 					}
 

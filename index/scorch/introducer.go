@@ -154,7 +154,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			newSnapshot.segment = append(newSnapshot.segment, newss)
 			root.segment[i].segment.AddRef()
 			newSnapshot.offsets = append(newSnapshot.offsets, running)
-			running += root.segment[i].Count()
+			running += newss.segment.Count()
 		}
 	}
 
@@ -212,19 +212,20 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 	atomic.AddUint64(&s.stats.TotIntroducePersistBeg, 1)
 	defer atomic.AddUint64(&s.stats.TotIntroducePersistEnd, 1)
 
-	s.rootLock.RLock()
+	s.rootLock.Lock()
 	root := s.root
-	s.rootLock.RUnlock()
+	nextSnapshotEpoch := s.nextSnapshotEpoch
+	s.nextSnapshotEpoch++
+	s.rootLock.Unlock()
 
 	newIndexSnapshot := &IndexSnapshot{
 		parent:   s,
-		epoch:    s.nextSnapshotEpoch,
+		epoch:    nextSnapshotEpoch,
 		segment:  make([]*SegmentSnapshot, len(root.segment)),
 		offsets:  make([]uint64, len(root.offsets)),
 		internal: make(map[string][]byte, len(root.internal)),
 		refs:     1,
 	}
-	s.nextSnapshotEpoch++
 
 	for i, segmentSnapshot := range root.segment {
 		// see if this segment has been replaced
@@ -315,7 +316,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			})
 			root.segment[i].segment.AddRef()
 			newSnapshot.offsets = append(newSnapshot.offsets, running)
-			running += root.segment[i].Count()
+			running += root.segment[i].segment.Count()
 		}
 	}
 

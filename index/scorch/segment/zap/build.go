@@ -18,11 +18,9 @@ import (
 	"bufio"
 	"math"
 	"os"
-
-	"github.com/Smerity/govarint"
 )
 
-const version uint32 = 6
+const version uint32 = 9
 
 const fieldNotUninverted = math.MaxUint64
 
@@ -78,37 +76,37 @@ func PersistSegmentBase(sb *SegmentBase, path string) error {
 
 func persistStoredFieldValues(fieldID int,
 	storedFieldValues [][]byte, stf []byte, spf [][]uint64,
-	curr int, metaEncoder *govarint.Base128Encoder, data []byte) (
+	curr int, metaEncode varintEncoder, data []byte) (
 	int, []byte, error) {
 	for i := 0; i < len(storedFieldValues); i++ {
 		// encode field
-		_, err := metaEncoder.PutU64(uint64(fieldID))
+		_, err := metaEncode(uint64(fieldID))
 		if err != nil {
 			return 0, nil, err
 		}
 		// encode type
-		_, err = metaEncoder.PutU64(uint64(stf[i]))
+		_, err = metaEncode(uint64(stf[i]))
 		if err != nil {
 			return 0, nil, err
 		}
 		// encode start offset
-		_, err = metaEncoder.PutU64(uint64(curr))
+		_, err = metaEncode(uint64(curr))
 		if err != nil {
 			return 0, nil, err
 		}
 		// end len
-		_, err = metaEncoder.PutU64(uint64(len(storedFieldValues[i])))
+		_, err = metaEncode(uint64(len(storedFieldValues[i])))
 		if err != nil {
 			return 0, nil, err
 		}
 		// encode number of array pos
-		_, err = metaEncoder.PutU64(uint64(len(spf[i])))
+		_, err = metaEncode(uint64(len(spf[i])))
 		if err != nil {
 			return 0, nil, err
 		}
 		// encode all array positions
 		for _, pos := range spf[i] {
-			_, err = metaEncoder.PutU64(pos)
+			_, err = metaEncode(pos)
 			if err != nil {
 				return 0, nil, err
 			}
