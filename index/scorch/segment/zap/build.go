@@ -76,7 +76,7 @@ func PersistSegmentBase(sb *SegmentBase, path string) error {
 
 func persistStoredFieldValues(fieldID int,
 	storedFieldValues [][]byte, stf []byte, spf [][]uint64,
-	curr int, metaEncode VarintEncoder, data []byte) (
+	curr int, metaEncode varintEncoder, data []byte) (
 	int, []byte, error) {
 	for i := 0; i < len(storedFieldValues); i++ {
 		// encode field

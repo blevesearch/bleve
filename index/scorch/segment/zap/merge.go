@@ -547,7 +547,7 @@ func writePostings(postings *roaring.Bitmap, tfEncoder, locEncoder *chunkedIntCo
 	return postingsOffset, nil
 }
 
-type VarintEncoder func(uint64) (int, error)
+type varintEncoder func(uint64) (int, error)
 
 func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	fieldsMap map[string]uint16, fieldsInv []string, fieldsSame bool, newSegDocCount uint64,
@@ -560,7 +560,7 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	var data, compressed []byte
 	var metaBuf bytes.Buffer
 	varBuf := make([]byte, binary.MaxVarintLen64)
-	metaEncoder := func(val uint64) (int, error) {
+	metaEncode := func(val uint64) (int, error) {
 		wb := binary.PutUvarint(varBuf, val)
 		return metaBuf.Write(varBuf[:wb])
 	}
@@ -628,7 +628,7 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 
 			// _id field special case optimizes ExternalID() lookups
 			idFieldVal := vals[uint16(0)][0]
-			_, err = metaEncoder.PutU64(uint64(len(idFieldVal)))
+			_, err = metaEncode(uint64(len(idFieldVal)))
 			if err != nil {
 				return 0, nil, err
 			}
@@ -642,7 +642,7 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 
 				var err2 error
 				curr, data, err2 = persistStoredFieldValues(fieldID,
-					storedFieldValues, stf, spf, curr, metaEncoder, data)
+					storedFieldValues, stf, spf, curr, metaEncode, data)
 				if err2 != nil {
 					return 0, nil, err2
 				}

@@ -479,7 +479,7 @@ func (s *interim) processDocument(docNum uint64,
 func (s *interim) writeStoredFields() (
 	storedIndexOffset uint64, err error) {
 	varBuf := make([]byte, binary.MaxVarintLen64)
-	metaEncoder := func(val uint64) (int, error) {
+	metaEncode := func(val uint64) (int, error) {
 		wb := binary.PutUvarint(varBuf, val)
 		return s.metaBuf.Write(varBuf[:wb])
 	}
@@ -523,7 +523,7 @@ func (s *interim) writeStoredFields() (
 
 		// _id field special case optimizes ExternalID() lookups
 		idFieldVal := docStoredFields[uint16(0)].vals[0]
-		_, err = metaEncoder.PutU64(uint64(len(idFieldVal)))
+		_, err = metaEncode(uint64(len(idFieldVal)))
 		if err != nil {
 			return 0, err
 		}
@@ -534,7 +534,7 @@ func (s *interim) writeStoredFields() (
 			if exists {
 				curr, data, err = persistStoredFieldValues(
 					fieldID, isf.vals, isf.typs, isf.arrayposs,
-					curr, metaEncoder, data)
+					curr, metaEncode, data)
 				if err != nil {
 					return 0, err
 				}
