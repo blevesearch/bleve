@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -317,6 +318,22 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 		return err
 	}
 
+	// persist meta values
+	metaBucket, err := snapshotBucket.CreateBucketIfNotExists(boltMetaDataKey)
+	if err != nil {
+		return err
+	}
+	err = metaBucket.Put([]byte("type"), []byte(zap.Type))
+	if err != nil {
+		return err
+	}
+	buf := make([]byte, binary.MaxVarintLen32)
+	binary.BigEndian.PutUint32(buf, zap.Version)
+	err = metaBucket.Put([]byte("version"), buf)
+	if err != nil {
+		return err
+	}
+
 	// persist internal values
 	internalBucket, err := snapshotBucket.CreateBucketIfNotExists(boltInternalKey)
 	if err != nil {
@@ -457,6 +474,7 @@ var boltSnapshotsBucket = []byte{'s'}
 var boltPathKey = []byte{'p'}
 var boltDeletedKey = []byte{'d'}
 var boltInternalKey = []byte{'i'}
+var boltMetaDataKey = []byte{'m'}
 
 func (s *Scorch) loadFromBolt() error {
 	return s.rootBolt.View(func(tx *bolt.Tx) error {
@@ -551,7 +569,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 				_ = rv.DecRef()
 				return nil, err
 			}
-		} else {
+		} else if k[0] != boltMetaDataKey[0] {
 			segmentBucket := snapshot.Bucket(k)
 			if segmentBucket == nil {
 				_ = rv.DecRef()
