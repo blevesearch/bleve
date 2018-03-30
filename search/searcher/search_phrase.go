@@ -160,6 +160,9 @@ func (s *PhraseSearcher) advanceNextMust(ctx *search.SearchContext) error {
 	var err error
 
 	if s.mustSearcher != nil {
+		if s.currMust != nil {
+			ctx.DocumentMatchPool.Put(s.currMust)
+		}
 		s.currMust, err = s.mustSearcher.Next(ctx)
 		if err != nil {
 			return err
@@ -227,6 +230,7 @@ func (s *PhraseSearcher) checkCurrMustMatch(ctx *search.SearchContext) *search.D
 	if freq > 0 {
 		// return match
 		rv := s.currMust
+		s.currMust = nil
 		rv.Locations = rvftlm
 		return rv
 	}
