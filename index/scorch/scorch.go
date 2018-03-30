@@ -57,8 +57,8 @@ type Scorch struct {
 	nextSnapshotEpoch    uint64
 	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
-	numSnapshotsToKeep   int
 
+	numSnapshotsToKeep int
 	closeCh            chan struct{}
 	introductions      chan *segmentIntroduction
 	persists           chan *persistIntroduction
