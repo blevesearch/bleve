@@ -32,11 +32,9 @@ func init() {
 }
 
 type PhraseSearcher struct {
-	indexReader  index.IndexReader
 	mustSearcher *ConjunctionSearcher
 	queryNorm    float64
 	currMust     *search.DocumentMatch
-	slop         int
 	terms        [][]string
 	initialized  bool
 }
@@ -126,7 +124,6 @@ func NewMultiPhraseSearcher(indexReader index.IndexReader, terms [][]string, fie
 
 	// build our searcher
 	rv := PhraseSearcher{
-		indexReader:  indexReader,
 		mustSearcher: mustSearcher,
 		terms:        terms,
 	}
