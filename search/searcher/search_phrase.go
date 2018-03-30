@@ -243,7 +243,8 @@ func (s *PhraseSearcher) checkCurrMustMatch(ctx *search.SearchContext) *search.D
 // constraints (possibly more than once).  if so, the number of times it was
 // satisfied, and these locations are returned.  otherwise 0 and either
 // a nil or empty TermLocationMap
-func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext, tlm search.TermLocationMap) (int, search.TermLocationMap) {
+func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext, tlm search.TermLocationMap) (
+	int, search.TermLocationMap) {
 	paths := findPhrasePaths(0, nil, s.terms, tlm, nil, 0)
 	rv := make(search.TermLocationMap, len(s.terms))
 	for _, p := range paths {
@@ -261,7 +262,7 @@ func (p *phrasePart) String() string {
 	return fmt.Sprintf("[%s %v]", p.term, p.loc)
 }
 
-type phrasePath []*phrasePart
+type phrasePath []phrasePart
 
 func (p phrasePath) MergeInto(in search.TermLocationMap) {
 	for _, pp := range p {
@@ -282,7 +283,8 @@ func (p phrasePath) MergeInto(in search.TermLocationMap) {
 //     this is the primary state being built during the traversal
 //
 // returns slice of paths, or nil if invocation did not find any successul paths
-func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]string, tlm search.TermLocationMap, p phrasePath, remainingSlop int) []phrasePath {
+func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]string,
+	tlm search.TermLocationMap, p phrasePath, remainingSlop int) []phrasePath {
 
 	// no more terms
 	if len(phraseTerms) < 1 {
@@ -321,7 +323,7 @@ func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]s
 			// if enough slop reamining, continue recursively
 			if prevPos == 0 || (remainingSlop-dist) >= 0 {
 				// this location works, add it to the path (but not for empty term)
-				px := append(p, &phrasePart{term: carTerm, loc: loc})
+				px := append(p, phrasePart{term: carTerm, loc: loc})
 				rv = append(rv, findPhrasePaths(loc.Pos, loc.ArrayPositions, cdr, tlm, px, remainingSlop-dist)...)
 			}
 		}
