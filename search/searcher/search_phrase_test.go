@@ -494,6 +494,64 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 				},
 			},
 		},
+		// test that we don't see multiple hits from the same location
+		{
+			phrase: [][]string{
+				[]string{"cat"}, []string{"dog"}, []string{"dog"},
+			},
+			slop: 1,
+			paths: []phrasePath{
+				phrasePath{
+					phrasePart{"cat", &search.Location{Pos: 1}},
+					phrasePart{"dog", &search.Location{Pos: 2}},
+					phrasePart{"dog", &search.Location{Pos: 3}},
+				},
+			},
+			tlm: search.TermLocationMap{ // cat dog dog
+				"cat": search.Locations{
+					&search.Location{Pos: 1},
+				},
+				"dog": search.Locations{
+					&search.Location{Pos: 2},
+					&search.Location{Pos: 3},
+				},
+			},
+		},
+		// test that we don't see multiple hits from the same location
+		{
+			phrase: [][]string{
+				[]string{"cat"}, []string{"dog"},
+			},
+			slop: 10,
+			paths: []phrasePath{
+				phrasePath{
+					phrasePart{"cat", &search.Location{Pos: 1}},
+					phrasePart{"dog", &search.Location{Pos: 2}},
+				},
+				phrasePath{
+					phrasePart{"cat", &search.Location{Pos: 1}},
+					phrasePart{"dog", &search.Location{Pos: 4}},
+				},
+				phrasePath{
+					phrasePart{"cat", &search.Location{Pos: 3}},
+					phrasePart{"dog", &search.Location{Pos: 2}},
+				},
+				phrasePath{
+					phrasePart{"cat", &search.Location{Pos: 3}},
+					phrasePart{"dog", &search.Location{Pos: 4}},
+				},
+			},
+			tlm: search.TermLocationMap{ // cat dog cat dog
+				"cat": search.Locations{
+					&search.Location{Pos: 1},
+					&search.Location{Pos: 3},
+				},
+				"dog": search.Locations{
+					&search.Location{Pos: 2},
+					&search.Location{Pos: 4},
+				},
+			},
+		},
 	}
 
 	for i, test := range tests {
