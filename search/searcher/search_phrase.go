@@ -288,7 +288,7 @@ func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]s
 
 	// no more terms
 	if len(phraseTerms) < 1 {
-		return []phrasePath{p}
+		return []phrasePath{append(phrasePath(nil), p...)}
 	}
 
 	car := phraseTerms[0]
@@ -320,7 +320,7 @@ func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]s
 				dist = editDistance(prevPos+1, loc.Pos)
 			}
 
-			// if enough slop reamining, continue recursively
+			// if enough slop remaining, continue recursively
 			if prevPos == 0 || (remainingSlop-dist) >= 0 {
 				// this location works, add it to the path (but not for empty term)
 				px := append(p, phrasePart{term: carTerm, loc: loc})

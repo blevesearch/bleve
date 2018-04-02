@@ -360,6 +360,7 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		phrase [][]string
 		paths  []phrasePath
 		slop   int
+		tlm    search.TermLocationMap
 	}{
 		// no match
 		{
@@ -454,10 +455,53 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 				},
 			},
 		},
+		// test an append() related edge case, where append()'s
+		// current behavior needs to be called 3 times starting from a
+		// nil slice before it grows to a slice with extra capacity --
+		// hence, 3 initial terms of ark, bat, cat
+		{
+			phrase: [][]string{
+				[]string{"ark"}, []string{"bat"}, []string{"cat"}, []string{"dog"},
+			},
+			slop: 1,
+			paths: []phrasePath{
+				phrasePath{
+					phrasePart{"ark", &search.Location{Pos: 1}},
+					phrasePart{"bat", &search.Location{Pos: 2}},
+					phrasePart{"cat", &search.Location{Pos: 3}},
+					phrasePart{"dog", &search.Location{Pos: 4}},
+				},
+				phrasePath{
+					phrasePart{"ark", &search.Location{Pos: 1}},
+					phrasePart{"bat", &search.Location{Pos: 2}},
+					phrasePart{"cat", &search.Location{Pos: 3}},
+					phrasePart{"dog", &search.Location{Pos: 5}},
+				},
+			},
+			tlm: search.TermLocationMap{ // ark bat cat dog dog
+				"ark": search.Locations{
+					&search.Location{Pos: 1},
+				},
+				"bat": search.Locations{
+					&search.Location{Pos: 2},
+				},
+				"cat": search.Locations{
+					&search.Location{Pos: 3},
+				},
+				"dog": search.Locations{
+					&search.Location{Pos: 4},
+					&search.Location{Pos: 5},
+				},
+			},
+		},
 	}
 
 	for i, test := range tests {
-		actualPaths := findPhrasePaths(0, nil, test.phrase, tlm, nil, test.slop)
+		tlmToUse := test.tlm
+		if tlmToUse == nil {
+			tlmToUse = tlm
+		}
+		actualPaths := findPhrasePaths(0, nil, test.phrase, tlmToUse, nil, test.slop)
 		if !reflect.DeepEqual(actualPaths, test.paths) {
 			t.Fatalf("expected: %v got %v for test %d", test.paths, actualPaths, i)
 		}
