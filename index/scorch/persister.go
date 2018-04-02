@@ -80,6 +80,8 @@ OUTER:
 			ourSnapshot.AddRef()
 			ourPersisted = s.rootPersisted
 			s.rootPersisted = nil
+			atomic.StoreUint64(&s.iStats.persistSnapshotSize, uint64(ourSnapshot.Size()))
+			atomic.StoreUint64(&s.iStats.persistEpoch, ourSnapshot.epoch)
 		}
 		s.rootLock.Unlock()
 
@@ -94,6 +96,7 @@ OUTER:
 				close(ch)
 			}
 			if err != nil {
+				atomic.StoreUint64(&s.iStats.persistEpoch, 0)
 				if err == ErrClosed {
 					// index has been closed
 					_ = ourSnapshot.DecRef()
