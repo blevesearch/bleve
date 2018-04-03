@@ -72,9 +72,12 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 	}()
 
 	// enumerate terms and check levenshtein distance
+	var reuse []int
 	tfd, err := fieldDict.Next()
 	for err == nil && tfd != nil {
-		ld, exceeded := search.LevenshteinDistanceMax(term, tfd.Term, fuzziness)
+		var ld int
+		var exceeded bool
+		ld, exceeded, reuse = search.LevenshteinDistanceMaxReuseSlice(term, tfd.Term, fuzziness, reuse)
 		if !exceeded && ld <= fuzziness {
 			rv = append(rv, tfd.Term)
 			if tooManyClauses(len(rv)) {
