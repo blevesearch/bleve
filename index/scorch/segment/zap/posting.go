@@ -133,12 +133,22 @@ func (p *PostingsList) OrInto(receiver *roaring.Bitmap) {
 }
 
 // Iterator returns an iterator for this postings list
-func (p *PostingsList) Iterator(includeFreq, includeNorm, includeLocs bool) segment.PostingsIterator {
+func (p *PostingsList) Iterator(includeFreq, includeNorm, includeLocs bool,
+	prealloc segment.PostingsIterator) segment.PostingsIterator {
 	if p.normBits1Hit == 0 && p.postings == nil {
 		return emptyPostingsIterator
 	}
 
-	return p.iterator(includeFreq, includeNorm, includeLocs, nil)
+	var preallocPI *PostingsIterator
+	pi, ok := prealloc.(*PostingsIterator)
+	if ok && pi != nil {
+		preallocPI = pi
+	}
+	if preallocPI == emptyPostingsIterator {
+		preallocPI = nil
+	}
+
+	return p.iterator(includeFreq, includeNorm, includeLocs, preallocPI)
 }
 
 func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,

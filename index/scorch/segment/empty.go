@@ -60,7 +60,7 @@ func (e *EmptySegment) DecRef() error {
 type EmptyDictionary struct{}
 
 func (e *EmptyDictionary) PostingsList(term string,
-	except *roaring.Bitmap) (PostingsList, error) {
+	except *roaring.Bitmap, prealloc PostingsList) (PostingsList, error) {
 	return &EmptyPostingsList{}, nil
 }
 
@@ -98,7 +98,8 @@ func (e *EmptyDictionaryIterator) Next() (*index.DictEntry, error) {
 
 type EmptyPostingsList struct{}
 
-func (e *EmptyPostingsList) Iterator(includeFreq, includeNorm, includeLocations bool) PostingsIterator {
+func (e *EmptyPostingsList) Iterator(includeFreq, includeNorm, includeLocations bool,
+	prealloc PostingsIterator) PostingsIterator {
 	return &EmptyPostingsIterator{}
 }
 

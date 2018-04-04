@@ -59,6 +59,9 @@ type IndexSnapshot struct {
 
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
+
+	tfrsm sync.Mutex                                 // Protects the fields that follow.
+	tfrs  map[string][]*IndexSnapshotTermFieldReader // keyed by field, recycled TFR's
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
@@ -394,32 +397,73 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 }
 
 func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
-	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
-	termStr := string(term)
-	rv := &IndexSnapshotTermFieldReader{
-		term:               term,
-		field:              field,
-		snapshot:           i,
-		postings:           make([]segment.PostingsList, len(i.segment)),
-		iterators:          make([]segment.PostingsIterator, len(i.segment)),
-		includeFreq:        includeFreq,
-		includeNorm:        includeNorm,
-		includeTermVectors: includeTermVectors,
+	includeNorm, includeTermVectors bool) (tfr index.TermFieldReader, err error) {
+	rv := i.allocTermFieldReader(field)
+	rv.term = term
+	rv.field = field
+	rv.snapshot = i
+	if rv.dicts == nil {
+		rv.dicts = make([]segment.TermDictionary, len(i.segment))
 	}
+	if rv.postings == nil {
+		rv.postings = make([]segment.PostingsList, len(i.segment))
+	}
+	if rv.iterators == nil {
+		rv.iterators = make([]segment.PostingsIterator, len(i.segment))
+	}
+	rv.segmentOffset = 0
+	rv.includeFreq = includeFreq
+	rv.includeNorm = includeNorm
+	rv.includeTermVectors = includeTermVectors
+	rv.currPosting = nil
+	rv.currID = rv.currID[:0]
+
+	termStr := string(term)
+
 	for i, segment := range i.segment {
-		dict, err := segment.Dictionary(field)
-		if err != nil {
-			return nil, err
+		dict := rv.dicts[i]
+		if dict == nil {
+			dict, err = segment.Dictionary(field)
+			if err != nil {
+				return nil, err
+			}
+			rv.dicts[i] = dict
 		}
-		pl, err := dict.PostingsList(termStr, nil)
+		pl, err := dict.PostingsList(termStr, nil, rv.postings[i])
 		if err != nil {
 			return nil, err
 		}
 		rv.postings[i] = pl
-		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors)
+		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, rv.iterators[i])
 	}
 	atomic.AddUint64(&i.parent.stats.TotTermSearchersStarted, uint64(1))
 	return rv, nil
+}
+
+func (i *IndexSnapshot) allocTermFieldReader(field string) *IndexSnapshotTermFieldReader {
+	i.tfrsm.Lock()
+	if i.tfrs != nil {
+		tfrs := i.tfrs[field]
+		last := len(tfrs) - 1
+		if last >= 0 {
+			rv := tfrs[last]
+			tfrs[last] = nil
+			i.tfrs[field] = tfrs[:last]
+			i.tfrsm.Unlock()
+			return rv
+		}
+	}
+	i.tfrsm.Unlock()
+	return &IndexSnapshotTermFieldReader{}
+}
+
+func (i *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader) {
+	i.tfrsm.Lock()
+	if i.tfrs == nil {
+		i.tfrs = map[string][]*IndexSnapshotTermFieldReader{}
+	}
+	i.tfrs[tfr.field] = append(i.tfrs[tfr.field], tfr)
+	i.tfrsm.Unlock()
 }
 
 func docNumberToBytes(buf []byte, in uint64) []byte {
