@@ -84,7 +84,7 @@ func NewScorch(storeName string,
 		closeCh:              make(chan struct{}),
 		ineligibleForRemoval: map[string]bool{},
 	}
-	rv.root = &IndexSnapshot{parent: rv, refs: 1}
+	rv.root = &IndexSnapshot{parent: rv, refs: 1, creator: "NewScorch"}
 	ro, ok := config["read_only"].(bool)
 	if ok {
 		rv.readOnly = ro

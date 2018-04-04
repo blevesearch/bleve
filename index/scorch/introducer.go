@@ -118,6 +118,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		offsets:  make([]uint64, 0, nsegs+1),
 		internal: make(map[string][]byte, len(root.internal)),
 		refs:     1,
+		creator:  "introduceSegment",
 	}
 
 	// iterate through current segments
@@ -140,6 +141,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			id:         root.segment[i].id,
 			segment:    root.segment[i].segment,
 			cachedDocs: root.segment[i].cachedDocs,
+			creator:    root.segment[i].creator,
 		}
 
 		// apply new obsoletions
@@ -164,6 +166,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			id:         next.id,
 			segment:    next.data, // take ownership of next.data's ref-count
 			cachedDocs: &cachedDocs{cache: nil},
+			creator:    "introduceSegment",
 		}
 		newSnapshot.segment = append(newSnapshot.segment, newSegmentSnapshot)
 		newSnapshot.offsets = append(newSnapshot.offsets, running)
@@ -225,6 +228,7 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 		offsets:  make([]uint64, len(root.offsets)),
 		internal: make(map[string][]byte, len(root.internal)),
 		refs:     1,
+		creator:  "introducePersist",
 	}
 
 	for i, segmentSnapshot := range root.segment {
@@ -235,6 +239,7 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 				segment:    replacement,
 				deleted:    segmentSnapshot.deleted,
 				cachedDocs: segmentSnapshot.cachedDocs,
+				creator:    "introducePersist",
 			}
 			newIndexSnapshot.segment[i] = newSegmentSnapshot
 			delete(persist.persisted, segmentSnapshot.id)
@@ -278,6 +283,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 		parent:   s,
 		internal: root.internal,
 		refs:     1,
+		creator:  "introduceMerge",
 	}
 
 	// iterate through current segments
@@ -313,6 +319,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 				segment:    root.segment[i].segment,
 				deleted:    root.segment[i].deleted,
 				cachedDocs: root.segment[i].cachedDocs,
+				creator:    root.segment[i].creator,
 			})
 			root.segment[i].segment.AddRef()
 			newSnapshot.offsets = append(newSnapshot.offsets, running)
@@ -344,6 +351,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			segment:    nextMerge.new, // take ownership for nextMerge.new's ref-count
 			deleted:    newSegmentDeleted,
 			cachedDocs: &cachedDocs{cache: nil},
+			creator:    "introduceMerge",
 		})
 		newSnapshot.offsets = append(newSnapshot.offsets, running)
 		atomic.AddUint64(&s.stats.TotIntroducedSegmentsMerge, 1)
@@ -391,6 +399,7 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 		internal: revertTo.snapshot.internal,
 		epoch:    s.nextSnapshotEpoch,
 		refs:     1,
+		creator:  "revertToSnapshot",
 	}
 	s.nextSnapshotEpoch++
 
@@ -401,6 +410,7 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 			segment:    segmentSnapshot.segment,
 			deleted:    segmentSnapshot.deleted,
 			cachedDocs: segmentSnapshot.cachedDocs,
+			creator:    segmentSnapshot.creator,
 		}
 		newSnapshot.segment[i].segment.AddRef()
 
