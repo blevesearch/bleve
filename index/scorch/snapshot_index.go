@@ -60,8 +60,9 @@ type IndexSnapshot struct {
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
 
-	tfrsm sync.Mutex                                 // Protects the fields that follow.
-	tfrs  map[string][]*IndexSnapshotTermFieldReader // keyed by field, recycled TFR's
+	m2         sync.Mutex                                 // Protects the fields that follow.
+	fieldTFRs  map[string][]*IndexSnapshotTermFieldReader // keyed by field, recycled TFR's
+	fieldDicts map[string][]segment.TermDictionary        // keyed by field, recycled dicts
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
@@ -398,13 +399,11 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 
 func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	includeNorm, includeTermVectors bool) (tfr index.TermFieldReader, err error) {
-	rv := i.allocTermFieldReader(field)
+	rv, dicts := i.allocTermFieldReaderDicts(field)
+
 	rv.term = term
 	rv.field = field
 	rv.snapshot = i
-	if rv.dicts == nil {
-		rv.dicts = make([]segment.TermDictionary, len(i.segment))
-	}
 	if rv.postings == nil {
 		rv.postings = make([]segment.PostingsList, len(i.segment))
 	}
@@ -418,18 +417,22 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	rv.currPosting = nil
 	rv.currID = rv.currID[:0]
 
-	termStr := string(term)
-
-	for i, segment := range i.segment {
-		dict := rv.dicts[i]
-		if dict == nil {
-			dict, err = segment.Dictionary(field)
+	if dicts == nil {
+		dicts = make([]segment.TermDictionary, len(i.segment))
+		for i, segment := range i.segment {
+			dict, err := segment.Dictionary(field)
 			if err != nil {
 				return nil, err
 			}
-			rv.dicts[i] = dict
+			dicts[i] = dict
 		}
-		pl, err := dict.PostingsList(termStr, nil, rv.postings[i])
+	}
+	rv.dicts = dicts
+
+	termStr := string(term)
+
+	for i := range i.segment {
+		pl, err := dicts[i].PostingsList(termStr, nil, rv.postings[i])
 		if err != nil {
 			return nil, err
 		}
@@ -440,30 +443,38 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	return rv, nil
 }
 
-func (i *IndexSnapshot) allocTermFieldReader(field string) *IndexSnapshotTermFieldReader {
-	i.tfrsm.Lock()
-	if i.tfrs != nil {
-		tfrs := i.tfrs[field]
+func (i *IndexSnapshot) allocTermFieldReaderDicts(field string) (
+	tfr *IndexSnapshotTermFieldReader, dicts []segment.TermDictionary) {
+	i.m2.Lock()
+	if i.fieldDicts != nil {
+		dicts = i.fieldDicts[field]
+	}
+	if i.fieldTFRs != nil {
+		tfrs := i.fieldTFRs[field]
 		last := len(tfrs) - 1
 		if last >= 0 {
 			rv := tfrs[last]
 			tfrs[last] = nil
-			i.tfrs[field] = tfrs[:last]
-			i.tfrsm.Unlock()
-			return rv
+			i.fieldTFRs[field] = tfrs[:last]
+			i.m2.Unlock()
+			return rv, dicts
 		}
 	}
-	i.tfrsm.Unlock()
-	return &IndexSnapshotTermFieldReader{}
+	i.m2.Unlock()
+	return &IndexSnapshotTermFieldReader{}, dicts
 }
 
 func (i *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader) {
-	i.tfrsm.Lock()
-	if i.tfrs == nil {
-		i.tfrs = map[string][]*IndexSnapshotTermFieldReader{}
+	i.m2.Lock()
+	if i.fieldTFRs == nil {
+		i.fieldTFRs = map[string][]*IndexSnapshotTermFieldReader{}
 	}
-	i.tfrs[tfr.field] = append(i.tfrs[tfr.field], tfr)
-	i.tfrsm.Unlock()
+	i.fieldTFRs[tfr.field] = append(i.fieldTFRs[tfr.field], tfr)
+	if i.fieldDicts == nil {
+		i.fieldDicts = map[string][]segment.TermDictionary{}
+	}
+	i.fieldDicts[tfr.field] = tfr.dicts
+	i.m2.Unlock()
 }
 
 func docNumberToBytes(buf []byte, in uint64) []byte {
