@@ -76,7 +76,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList, err := dict.PostingsList("a", nil)
+	postingsList, err := dict.PostingsList("a", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr := postingsList.Iterator(true, true, true)
+	postingsItr := postingsList.Iterator(true, true, true, nil)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -122,7 +122,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList, err = dict.PostingsList("wow", nil)
+	postingsList, err = dict.PostingsList("wow", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr = postingsList.Iterator(true, true, true)
+	postingsItr = postingsList.Iterator(true, true, true, nil)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -190,7 +190,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList, err = dict.PostingsList("wow", nil)
+	postingsList, err = dict.PostingsList("wow", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr = postingsList.Iterator(true, true, true)
+	postingsItr = postingsList.Iterator(true, true, true, nil)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -259,7 +259,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList, err = dict.PostingsList("dark", nil)
+	postingsList, err = dict.PostingsList("dark", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +267,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr = postingsList.Iterator(true, true, true)
+	postingsItr = postingsList.Iterator(true, true, true, nil)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -358,7 +358,7 @@ func TestOpenMulti(t *testing.T) {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList, err := dict.PostingsList("thing", nil)
+	postingsList, err := dict.PostingsList("thing", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,7 +366,7 @@ func TestOpenMulti(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr := postingsList.Iterator(true, true, true)
+	postingsItr := postingsList.Iterator(true, true, true, nil)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -392,7 +392,7 @@ func TestOpenMulti(t *testing.T) {
 	}
 
 	// look for term 'thing' excluding doc 'a'
-	postingsListExcluding, err := dict.PostingsList("thing", exclude)
+	postingsListExcluding, err := dict.PostingsList("thing", exclude, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +405,7 @@ func TestOpenMulti(t *testing.T) {
 		t.Errorf("expected count from postings list to be 1, got %d", postingsListExcludingCount)
 	}
 
-	postingsItrExcluding := postingsListExcluding.Iterator(true, true, true)
+	postingsItrExcluding := postingsListExcluding.Iterator(true, true, true, nil)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -458,7 +458,7 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList, err := dict.PostingsList("thing", nil)
+	postingsList, err := dict.PostingsList("thing", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -466,7 +466,7 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItr := postingsList.Iterator(true, true, true)
+	postingsItr := postingsList.Iterator(true, true, true, nil)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}
@@ -492,7 +492,7 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 	}
 
 	// look for term 'thing' excluding doc 'a'
-	postingsListExcluding, err := dict.PostingsList("thing", exclude)
+	postingsListExcluding, err := dict.PostingsList("thing", exclude, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -500,7 +500,7 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 		t.Fatal("got nil postings list, expected non-nil")
 	}
 
-	postingsItrExcluding := postingsListExcluding.Iterator(true, true, true)
+	postingsItrExcluding := postingsListExcluding.Iterator(true, true, true, nil)
 	if postingsItr == nil {
 		t.Fatal("got nil iterator, expected non-nil")
 	}

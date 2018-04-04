@@ -32,9 +32,10 @@ type SegmentDictionarySnapshot struct {
 	d segment.TermDictionary
 }
 
-func (s *SegmentDictionarySnapshot) PostingsList(term string, except *roaring.Bitmap) (segment.PostingsList, error) {
+func (s *SegmentDictionarySnapshot) PostingsList(term string, except *roaring.Bitmap,
+	prealloc segment.PostingsList) (segment.PostingsList, error) {
 	// TODO: if except is non-nil, perhaps need to OR it with s.s.deleted?
-	return s.d.PostingsList(term, s.s.deleted)
+	return s.d.PostingsList(term, s.s.deleted, prealloc)
 }
 
 func (s *SegmentDictionarySnapshot) Iterator() segment.DictionaryIterator {
@@ -171,17 +172,21 @@ func (cfd *cachedFieldDocs) prepareFields(field string, ss *SegmentSnapshot) {
 		return
 	}
 
+	var postings segment.PostingsList
+	var postingsItr segment.PostingsIterator
+
 	dictItr := dict.Iterator()
 	next, err := dictItr.Next()
 	for err == nil && next != nil {
-		postings, err1 := dict.PostingsList(next.Term, nil)
+		var err1 error
+		postings, err1 = dict.PostingsList(next.Term, nil, postings)
 		if err1 != nil {
 			cfd.err = err1
 			return
 		}
 
 		cfd.size += uint64(size.SizeOfUint64) /* map key */
-		postingsItr := postings.Iterator(false, false, false)
+		postingsItr = postings.Iterator(false, false, false, postingsItr)
 		nextPosting, err2 := postingsItr.Next()
 		for err2 == nil && nextPosting != nil {
 			docNum := nextPosting.Number()
