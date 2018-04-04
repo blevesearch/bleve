@@ -114,7 +114,3 @@ func (e *EmptyPostingsIterator) Next() (Posting, error) {
 func (e *EmptyPostingsIterator) Size() int {
 	return 0
 }
-
-func (e *EmptyPostingsIterator) Advance(uint64) (Posting, error) {
-	return nil, nil
-}
