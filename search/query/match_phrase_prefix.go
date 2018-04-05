@@ -94,7 +94,9 @@ func (q *MatchPhrasePrefixQuery) Searcher(i index.IndexReader, m mapping.IndexMa
 					tfd, err = fieldDict.Next()
 				}
 			}
-			phrase[len(phrase)-1] = terms
+			if len(terms) > 0 {
+				phrase[len(phrase)-1] = terms
+			}
 		}
 		phraseQuery := NewMultiPhraseQuery(phrase, field)
 		phraseQuery.SetBoost(q.BoostVal.Value())
