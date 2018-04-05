@@ -20,7 +20,9 @@ import (
 	"os"
 )
 
-const version uint32 = 9
+const Version uint32 = 9
+
+const Type string = "zap"
 
 const fieldNotUninverted = math.MaxUint64
 
