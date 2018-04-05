@@ -148,6 +148,9 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		} else {
 			newss.deleted = roaring.Or(root.segment[i].deleted, delta)
 		}
+		if newss.deleted.IsEmpty() {
+			newss.deleted = nil
+		}
 
 		// check for live size before copying
 		if newss.LiveSize() > 0 {
