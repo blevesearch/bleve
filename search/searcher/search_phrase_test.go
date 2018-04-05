@@ -320,7 +320,7 @@ func TestFindPhrasePaths(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		actualPaths := findPhrasePaths(0, nil, test.phrase, test.tlm, nil, 0)
+		actualPaths := findPhrasePaths(test.phrase, test.tlm, 0)
 		if !reflect.DeepEqual(actualPaths, test.paths) {
 			t.Fatalf("expected: %v got %v for test %d", test.paths, actualPaths, i)
 		}
@@ -559,7 +559,7 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		if tlmToUse == nil {
 			tlmToUse = tlm
 		}
-		actualPaths := findPhrasePaths(0, nil, test.phrase, tlmToUse, nil, test.slop)
+		actualPaths := findPhrasePaths(test.phrase, tlmToUse, test.slop)
 		if !reflect.DeepEqual(actualPaths, test.paths) {
 			t.Fatalf("expected: %v got %v for test %d", test.paths, actualPaths, i)
 		}
@@ -640,7 +640,7 @@ func TestFindPhrasePathsSloppyPalyndrome(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		actualPaths := findPhrasePaths(0, nil, test.phrase, tlm, nil, test.slop)
+		actualPaths := findPhrasePaths(test.phrase, tlm, test.slop)
 		if !reflect.DeepEqual(actualPaths, test.paths) {
 			t.Fatalf("expected: %v got %v for test %d", test.paths, actualPaths, i)
 		}
@@ -736,7 +736,7 @@ func TestFindMultiPhrasePaths(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		actualPaths := findPhrasePaths(0, nil, test.phrase, tlm, nil, 0)
+		actualPaths := findPhrasePaths(test.phrase, tlm, 0)
 		if !reflect.DeepEqual(actualPaths, test.paths) {
 			t.Fatalf("expected: %v got %v for test %d", test.paths, actualPaths, i)
 		}

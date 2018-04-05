@@ -245,7 +245,7 @@ func (s *PhraseSearcher) checkCurrMustMatch(ctx *search.SearchContext) *search.D
 // a nil or empty TermLocationMap
 func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext, tlm search.TermLocationMap) (
 	int, search.TermLocationMap) {
-	paths := findPhrasePaths(0, nil, s.terms, tlm, nil, 0)
+	paths := findPhrasePaths(s.terms, tlm, 0)
 	rv := make(search.TermLocationMap, len(s.terms))
 	for _, p := range paths {
 		p.MergeInto(rv)
@@ -282,24 +282,39 @@ func (p phrasePath) String() string {
 	return rv
 }
 
-// findPhrasePaths is a function to identify phase matches from a set of known
-// term locations.  the implementation is recursive, so care must be taken
-// with arguments and return values.
+// findPhrasePaths is a function to identify phase matches from a set
+// of known term locations.
 //
-// prev - the previous location, nil on first invocation
+// phraseTerms - slice containing the phrase terms,
+//               may contain empty string as placeholder (don't care)
+// tlm - the Term Location Map containing all relevant term locations
+// slop - amount of sloppiness that's allowed, which is the cummulative
+//        sum of the editDistances of each matching phrase part,
+//        where 0 means no sloppiness allowed (all editDistances must be 0)
+//
+// returns slice of paths, or nil if invocation did not find any successul paths
+func findPhrasePaths(phraseTerms [][]string,
+	tlm search.TermLocationMap, slop int) []phrasePath {
+	return findPhrasePathsRecur(0, nil, phraseTerms, tlm, nil, slop, nil)
+}
+
+// findPhrasePathsRecur is the recursive implementation of
+// findPhrasePaths, so care must be taken with arguments and return
+// values.
+//
+// prevPos - the previous location, 0 on first invocation
+// ap - array positions of the first candidate phrase part to
+//      which further recursive phrase parts must match,
+//      nil on initial invocation or when there are no array positions
 // phraseTerms - slice containing the phrase terms themselves
 //               may contain empty string as placeholder (don't care)
 // tlm - the Term Location Map containing all relevant term locations
-// offset - the offset from the previous that this next term must match
 // p - the current path being explored (appended to in recursive calls)
 //     this is the primary state being built during the traversal
+// remainingSlop - decremented during recursion
+// rv - the final result being appended to by all the recursive calls
 //
 // returns slice of paths, or nil if invocation did not find any successul paths
-func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]string,
-	tlm search.TermLocationMap, p phrasePath, remainingSlop int) []phrasePath {
-	return findPhrasePathsRecur(prevPos, ap, phraseTerms, tlm, p, remainingSlop, nil)
-}
-
 func findPhrasePathsRecur(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]string,
 	tlm search.TermLocationMap, p phrasePath, remainingSlop int, rv []phrasePath) []phrasePath {
 	// no more terms
@@ -338,6 +353,7 @@ func findPhrasePathsRecur(prevPos uint64, ap search.ArrayPositions, phraseTerms 
 
 			// if enough slop remaining, continue recursively
 			if prevPos == 0 || (remainingSlop-dist) >= 0 {
+				// skip if we've already used this term+loc already
 				for _, ppart := range p {
 					if ppart.term == carTerm && ppart.loc == loc {
 						continue LOCATIONS_LOOP
