@@ -270,6 +270,18 @@ func (p phrasePath) MergeInto(in search.TermLocationMap) {
 	}
 }
 
+func (p phrasePath) String() string {
+	rv := "["
+	for i, pp := range p {
+		if i > 0 {
+			rv += ", "
+		}
+		rv += pp.String()
+	}
+	rv += "]"
+	return rv
+}
+
 // findPhrasePaths is a function to identify phase matches from a set of known
 // term locations.  the implementation is recursive, so care must be taken
 // with arguments and return values.
@@ -285,10 +297,14 @@ func (p phrasePath) MergeInto(in search.TermLocationMap) {
 // returns slice of paths, or nil if invocation did not find any successul paths
 func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]string,
 	tlm search.TermLocationMap, p phrasePath, remainingSlop int) []phrasePath {
+	return findPhrasePathsRecur(prevPos, ap, phraseTerms, tlm, p, remainingSlop, nil)
+}
 
+func findPhrasePathsRecur(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]string,
+	tlm search.TermLocationMap, p phrasePath, remainingSlop int, rv []phrasePath) []phrasePath {
 	// no more terms
 	if len(phraseTerms) < 1 {
-		return []phrasePath{append(phrasePath(nil), p...)}
+		return append(rv, append(phrasePath(nil), p...))
 	}
 
 	car := phraseTerms[0]
@@ -301,13 +317,13 @@ func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]s
 			// if prevPos was 0, don't set it to 1 (as thats not a real abs pos)
 			nextPos = 0 // don't advance nextPos if prevPos was 0
 		}
-		return findPhrasePaths(nextPos, ap, cdr, tlm, p, remainingSlop)
+		return findPhrasePathsRecur(nextPos, ap, cdr, tlm, p, remainingSlop, rv)
 	}
 
-	var rv []phrasePath
 	// locations for this term
 	for _, carTerm := range car {
 		locations := tlm[carTerm]
+	LOCATIONS_LOOP:
 		for _, loc := range locations {
 			if prevPos != 0 && !loc.ArrayPositions.Equals(ap) {
 				// if the array positions are wrong, can't match, try next location
@@ -322,9 +338,15 @@ func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]s
 
 			// if enough slop remaining, continue recursively
 			if prevPos == 0 || (remainingSlop-dist) >= 0 {
+				for _, ppart := range p {
+					if ppart.term == carTerm && ppart.loc == loc {
+						continue LOCATIONS_LOOP
+					}
+				}
+
 				// this location works, add it to the path (but not for empty term)
 				px := append(p, phrasePart{term: carTerm, loc: loc})
-				rv = append(rv, findPhrasePaths(loc.Pos, loc.ArrayPositions, cdr, tlm, px, remainingSlop-dist)...)
+				rv = findPhrasePathsRecur(loc.Pos, loc.ArrayPositions, cdr, tlm, px, remainingSlop-dist, rv)
 			}
 		}
 	}
