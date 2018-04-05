@@ -55,6 +55,7 @@ type IndexSnapshot struct {
 	internal map[string][]byte
 	epoch    uint64
 	size     uint64
+	creator  string
 
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
@@ -140,7 +141,7 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string, makeItr func(i s
 			if next != nil {
 				rv.cursors = append(rv.cursors, &segmentDictCursor{
 					itr:  asr.dictItr,
-					curr: next,
+					curr: *next,
 				})
 			}
 		}
@@ -172,6 +173,20 @@ func (i *IndexSnapshot) FieldDictPrefix(field string,
 	termPrefix []byte) (index.FieldDict, error) {
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
 		return i.PrefixIterator(string(termPrefix))
+	})
+}
+
+func (i *IndexSnapshot) FieldDictRegexp(field string,
+	termRegex []byte) (index.FieldDict, error) {
+	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
+		return i.RegexpIterator(string(termRegex))
+	})
+}
+
+func (i *IndexSnapshot) FieldDictFuzzy(field string,
+	term []byte, fuzziness int) (index.FieldDict, error) {
+	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
+		return i.FuzzyIterator(string(term), fuzziness)
 	})
 }
 
@@ -373,7 +388,7 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 
 func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
-
+	termStr := string(term)
 	rv := &IndexSnapshotTermFieldReader{
 		term:               term,
 		field:              field,
@@ -389,7 +404,7 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		if err != nil {
 			return nil, err
 		}
-		pl, err := dict.PostingsList(string(term), nil)
+		pl, err := dict.PostingsList(termStr, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -413,12 +428,10 @@ func docNumberToBytes(buf []byte, in uint64) []byte {
 }
 
 func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
-	var res uint64
-	err := binary.Read(bytes.NewReader(in), binary.BigEndian, &res)
-	if err != nil {
-		return 0, err
+	if len(in) != 8 {
+		return 0, fmt.Errorf("wrong len for IndexInternalID: %q", in)
 	}
-	return res, nil
+	return binary.BigEndian.Uint64(in), nil
 }
 
 func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,

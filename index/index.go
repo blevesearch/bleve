@@ -96,6 +96,14 @@ type IndexReader interface {
 	Close() error
 }
 
+type IndexReaderRegexp interface {
+	FieldDictRegexp(field string, regex []byte) (FieldDict, error)
+}
+
+type IndexReaderFuzzy interface {
+	FieldDictFuzzy(field string, term []byte, fuzziness int) (FieldDict, error)
+}
+
 // FieldTerms contains the terms used by a document, keyed by field
 type FieldTerms map[string][]string
 
@@ -271,4 +279,20 @@ func (b *Batch) String() string {
 func (b *Batch) Reset() {
 	b.IndexOps = make(map[string]*document.Document)
 	b.InternalOps = make(map[string][]byte)
+}
+
+// Optimizable represents an optional interface that implementable by
+// optimizable resources (e.g., TermFieldReaders, Searchers).  These
+// optimizable resources are provided the same OptimizableContext
+// instance, so that they can coordinate via dynamic interface
+// casting.
+type Optimizable interface {
+	Optimize(kind string, octx OptimizableContext) (OptimizableContext, error)
+}
+
+type OptimizableContext interface {
+	// Once all the optimzable resources have been provided the same
+	// OptimizableContext instance, the optimization preparations are
+	// finished or completed via the Finish() method.
+	Finish() error
 }

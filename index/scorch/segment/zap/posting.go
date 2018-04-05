@@ -22,7 +22,6 @@ import (
 	"reflect"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/Smerity/govarint"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/blevesearch/bleve/size"
 )
@@ -109,6 +108,9 @@ type PostingsList struct {
 	normBits1Hit uint64
 }
 
+// represents an immutable, empty postings list
+var emptyPostingsList = &PostingsList{}
+
 func (p *PostingsList) Size() int {
 	sizeInBytes := reflectStaticSizePostingsList + size.SizeOfPtr
 
@@ -132,6 +134,10 @@ func (p *PostingsList) OrInto(receiver *roaring.Bitmap) {
 
 // Iterator returns an iterator for this postings list
 func (p *PostingsList) Iterator(includeFreq, includeNorm, includeLocs bool) segment.PostingsIterator {
+	if p.normBits1Hit == 0 && p.postings == nil {
+		return emptyPostingsIterator
+	}
+
 	return p.iterator(includeFreq, includeNorm, includeLocs, nil)
 }
 
@@ -144,13 +150,11 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 		if freqNormReader != nil {
 			freqNormReader.Reset([]byte(nil))
 		}
-		freqNormDecoder := rv.freqNormDecoder
 
 		locReader := rv.locReader
 		if locReader != nil {
 			locReader.Reset([]byte(nil))
 		}
-		locDecoder := rv.locDecoder
 
 		freqChunkOffsets := rv.freqChunkOffsets[:0]
 		locChunkOffsets := rv.locChunkOffsets[:0]
@@ -163,10 +167,7 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 		*rv = PostingsIterator{} // clear the struct
 
 		rv.freqNormReader = freqNormReader
-		rv.freqNormDecoder = freqNormDecoder
-
 		rv.locReader = locReader
-		rv.locDecoder = locDecoder
 
 		rv.freqChunkOffsets = freqChunkOffsets
 		rv.locChunkOffsets = locChunkOffsets
@@ -237,10 +238,11 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 
 	rv.all = p.postings.Iterator()
 	if p.except != nil {
-		allExcept := roaring.AndNot(p.postings, p.except)
-		rv.actual = allExcept.Iterator()
+		rv.ActualBM = roaring.AndNot(p.postings, p.except)
+		rv.Actual = rv.ActualBM.Iterator()
 	} else {
-		rv.actual = p.postings.Iterator()
+		rv.ActualBM = p.postings
+		rv.Actual = p.postings.Iterator()
 	}
 
 	return rv
@@ -312,15 +314,15 @@ func (rv *PostingsList) init1Hit(fstVal uint64) error {
 type PostingsIterator struct {
 	postings *PostingsList
 	all      roaring.IntIterable
-	actual   roaring.IntIterable
+	Actual   roaring.IntIterable
+	ActualBM *roaring.Bitmap
 
 	currChunk         uint32
 	currChunkFreqNorm []byte
 	currChunkLoc      []byte
-	freqNormDecoder   *govarint.Base128Decoder
-	freqNormReader    *bytes.Reader
-	locDecoder        *govarint.Base128Decoder
-	locReader         *bytes.Reader
+
+	freqNormReader *bytes.Reader
+	locReader      *bytes.Reader
 
 	freqChunkOffsets []uint64
 	freqChunkStart   uint64
@@ -340,6 +342,8 @@ type PostingsIterator struct {
 	includeFreqNorm bool
 	includeLocs     bool
 }
+
+var emptyPostingsIterator = &PostingsIterator{}
 
 func (i *PostingsIterator) Size() int {
 	sizeInBytes := reflectStaticSizePostingsIterator + size.SizeOfPtr +
@@ -370,7 +374,6 @@ func (i *PostingsIterator) loadChunk(chunk int) error {
 		i.currChunkFreqNorm = i.postings.sb.mem[start:end]
 		if i.freqNormReader == nil {
 			i.freqNormReader = bytes.NewReader(i.currChunkFreqNorm)
-			i.freqNormDecoder = govarint.NewU64Base128Decoder(i.freqNormReader)
 		} else {
 			i.freqNormReader.Reset(i.currChunkFreqNorm)
 		}
@@ -389,7 +392,6 @@ func (i *PostingsIterator) loadChunk(chunk int) error {
 		i.currChunkLoc = i.postings.sb.mem[start:end]
 		if i.locReader == nil {
 			i.locReader = bytes.NewReader(i.currChunkLoc)
-			i.locDecoder = govarint.NewU64Base128Decoder(i.locReader)
 		} else {
 			i.locReader.Reset(i.currChunkLoc)
 		}
@@ -404,13 +406,13 @@ func (i *PostingsIterator) readFreqNormHasLocs() (uint64, uint64, bool, error) {
 		return 1, i.normBits1Hit, false, nil
 	}
 
-	freqHasLocs, err := i.freqNormDecoder.GetU64()
+	freqHasLocs, err := binary.ReadUvarint(i.freqNormReader)
 	if err != nil {
 		return 0, 0, false, fmt.Errorf("error reading frequency: %v", err)
 	}
 	freq, hasLocs := decodeFreqHasLocs(freqHasLocs)
 
-	normBits, err := i.freqNormDecoder.GetU64()
+	normBits, err := binary.ReadUvarint(i.freqNormReader)
 	if err != nil {
 		return 0, 0, false, fmt.Errorf("error reading norm: %v", err)
 	}
@@ -438,27 +440,27 @@ func decodeFreqHasLocs(freqHasLocs uint64) (uint64, bool) {
 // the contents.
 func (i *PostingsIterator) readLocation(l *Location) error {
 	// read off field
-	fieldID, err := i.locDecoder.GetU64()
+	fieldID, err := binary.ReadUvarint(i.locReader)
 	if err != nil {
 		return fmt.Errorf("error reading location field: %v", err)
 	}
 	// read off pos
-	pos, err := i.locDecoder.GetU64()
+	pos, err := binary.ReadUvarint(i.locReader)
 	if err != nil {
 		return fmt.Errorf("error reading location pos: %v", err)
 	}
 	// read off start
-	start, err := i.locDecoder.GetU64()
+	start, err := binary.ReadUvarint(i.locReader)
 	if err != nil {
 		return fmt.Errorf("error reading location start: %v", err)
 	}
 	// read off end
-	end, err := i.locDecoder.GetU64()
+	end, err := binary.ReadUvarint(i.locReader)
 	if err != nil {
 		return fmt.Errorf("error reading location end: %v", err)
 	}
 	// read off num array pos
-	numArrayPos, err := i.locDecoder.GetU64()
+	numArrayPos, err := binary.ReadUvarint(i.locReader)
 	if err != nil {
 		return fmt.Errorf("error reading location num array pos: %v", err)
 	}
@@ -478,7 +480,7 @@ func (i *PostingsIterator) readLocation(l *Location) error {
 
 	// read off array positions
 	for k := 0; k < int(numArrayPos); k++ {
-		ap, err := i.locDecoder.GetU64()
+		ap, err := binary.ReadUvarint(i.locReader)
 		if err != nil {
 			return fmt.Errorf("error reading array position: %v", err)
 		}
@@ -588,37 +590,6 @@ func (i *PostingsIterator) nextBytes() (
 	return docNum, freq, normBits, bytesFreqNorm, bytesLoc, nil
 }
 
-func (i *PostingsIterator) Advance(docNumber uint64) (segment.Posting, error) {
-	// check if we are already there
-	if i.next.Number() == docNumber {
-		return &i.next, nil
-	}
-
-	nChunk := uint32(docNumber) / i.postings.sb.chunkFactor
-	if i.currChunk != nChunk {
-		err := i.loadChunk(int(nChunk))
-		if err != nil {
-			return nil, fmt.Errorf("Advance, error loading chunk: %v", err)
-		}
-	}
-
-	next, err := i.Next()
-	if err != nil || next == nil {
-		return nil, err
-	}
-
-	nnum := next.Number()
-	for nnum < docNumber {
-		next, err = i.Next()
-		if err != nil || next == nil {
-			return next, err
-		}
-		nnum = next.Number()
-	}
-
-	return next, nil
-}
-
 // nextDocNum returns the next docNum on the postings list, and also
 // sets up the currChunk / loc related fields of the iterator.
 func (i *PostingsIterator) nextDocNum() (uint64, bool, error) {
@@ -631,11 +602,11 @@ func (i *PostingsIterator) nextDocNum() (uint64, bool, error) {
 		return docNum, true, nil
 	}
 
-	if i.actual == nil || !i.actual.HasNext() {
+	if i.Actual == nil || !i.Actual.HasNext() {
 		return 0, false, nil
 	}
 
-	n := i.actual.Next()
+	n := i.Actual.Next()
 	allN := i.all.Next()
 
 	nChunk := n / i.postings.sb.chunkFactor

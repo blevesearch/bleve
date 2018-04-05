@@ -76,6 +76,15 @@ func (e *EmptyDictionary) RangeIterator(start, end string) DictionaryIterator {
 	return &EmptyDictionaryIterator{}
 }
 
+func (e *EmptyDictionary) RegexpIterator(start string) DictionaryIterator {
+	return &EmptyDictionaryIterator{}
+}
+
+func (e *EmptyDictionary) FuzzyIterator(term string,
+	fuzziness int) DictionaryIterator {
+	return &EmptyDictionaryIterator{}
+}
+
 type EmptyDictionaryIterator struct{}
 
 func (e *EmptyDictionaryIterator) Next() (*index.DictEntry, error) {
@@ -104,8 +113,4 @@ func (e *EmptyPostingsIterator) Next() (Posting, error) {
 
 func (e *EmptyPostingsIterator) Size() int {
 	return 0
-}
-
-func (e *EmptyPostingsIterator) Advance(uint64) (Posting, error) {
-	return nil, nil
 }

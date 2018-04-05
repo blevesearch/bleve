@@ -185,8 +185,8 @@ func TestFindPhrasePaths(t *testing.T) {
 			},
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"cat", &search.Location{Pos: 1}},
-					&phrasePart{"dog", &search.Location{Pos: 2}},
+					phrasePart{"cat", &search.Location{Pos: 1}},
+					phrasePart{"dog", &search.Location{Pos: 2}},
 				},
 			},
 		},
@@ -242,12 +242,12 @@ func TestFindPhrasePaths(t *testing.T) {
 			},
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"cat", &search.Location{Pos: 1}},
-					&phrasePart{"dog", &search.Location{Pos: 2}},
+					phrasePart{"cat", &search.Location{Pos: 1}},
+					phrasePart{"dog", &search.Location{Pos: 2}},
 				},
 				phrasePath{
-					&phrasePart{"cat", &search.Location{Pos: 8}},
-					&phrasePart{"dog", &search.Location{Pos: 9}},
+					phrasePart{"cat", &search.Location{Pos: 8}},
+					phrasePart{"dog", &search.Location{Pos: 9}},
 				},
 			},
 		},
@@ -268,8 +268,8 @@ func TestFindPhrasePaths(t *testing.T) {
 			},
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"cat", &search.Location{Pos: 1}},
-					&phrasePart{"dog", &search.Location{Pos: 3}},
+					phrasePart{"cat", &search.Location{Pos: 1}},
+					phrasePart{"dog", &search.Location{Pos: 3}},
 				},
 			},
 		},
@@ -290,8 +290,8 @@ func TestFindPhrasePaths(t *testing.T) {
 			},
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"cat", &search.Location{Pos: 2}},
-					&phrasePart{"dog", &search.Location{Pos: 3}},
+					phrasePart{"cat", &search.Location{Pos: 2}},
+					phrasePart{"dog", &search.Location{Pos: 3}},
 				},
 			},
 		},
@@ -312,8 +312,8 @@ func TestFindPhrasePaths(t *testing.T) {
 			},
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"cat", &search.Location{Pos: 2}},
-					&phrasePart{"dog", &search.Location{Pos: 3}},
+					phrasePart{"cat", &search.Location{Pos: 2}},
+					phrasePart{"dog", &search.Location{Pos: 3}},
 				},
 			},
 		},
@@ -360,6 +360,7 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 		phrase [][]string
 		paths  []phrasePath
 		slop   int
+		tlm    search.TermLocationMap
 	}{
 		// no match
 		{
@@ -372,8 +373,8 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 			slop:   3,
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"one", &search.Location{Pos: 1}},
-					&phrasePart{"five", &search.Location{Pos: 5}},
+					phrasePart{"one", &search.Location{Pos: 1}},
+					phrasePart{"five", &search.Location{Pos: 5}},
 				},
 			},
 		},
@@ -383,8 +384,8 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 			slop:   0,
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"four", &search.Location{Pos: 4}},
-					&phrasePart{"five", &search.Location{Pos: 5}},
+					phrasePart{"four", &search.Location{Pos: 4}},
+					phrasePart{"five", &search.Location{Pos: 5}},
 				},
 			},
 		},
@@ -399,8 +400,8 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 			slop:   1,
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"one", &search.Location{Pos: 1}},
-					&phrasePart{"two", &search.Location{Pos: 2}},
+					phrasePart{"one", &search.Location{Pos: 1}},
+					phrasePart{"two", &search.Location{Pos: 2}},
 				},
 			},
 		},
@@ -415,8 +416,8 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 			slop:   2,
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"two", &search.Location{Pos: 2}},
-					&phrasePart{"one", &search.Location{Pos: 1}},
+					phrasePart{"two", &search.Location{Pos: 2}},
+					phrasePart{"one", &search.Location{Pos: 1}},
 				},
 			},
 		},
@@ -431,9 +432,9 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 			slop:   2,
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"one", &search.Location{Pos: 1}},
-					&phrasePart{"three", &search.Location{Pos: 3}},
-					&phrasePart{"five", &search.Location{Pos: 5}},
+					phrasePart{"one", &search.Location{Pos: 1}},
+					phrasePart{"three", &search.Location{Pos: 3}},
+					phrasePart{"five", &search.Location{Pos: 5}},
 				},
 			},
 		},
@@ -448,16 +449,59 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 			slop:   6,
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"five", &search.Location{Pos: 5}},
-					&phrasePart{"three", &search.Location{Pos: 3}},
-					&phrasePart{"one", &search.Location{Pos: 1}},
+					phrasePart{"five", &search.Location{Pos: 5}},
+					phrasePart{"three", &search.Location{Pos: 3}},
+					phrasePart{"one", &search.Location{Pos: 1}},
+				},
+			},
+		},
+		// test an append() related edge case, where append()'s
+		// current behavior needs to be called 3 times starting from a
+		// nil slice before it grows to a slice with extra capacity --
+		// hence, 3 initial terms of ark, bat, cat
+		{
+			phrase: [][]string{
+				[]string{"ark"}, []string{"bat"}, []string{"cat"}, []string{"dog"},
+			},
+			slop: 1,
+			paths: []phrasePath{
+				phrasePath{
+					phrasePart{"ark", &search.Location{Pos: 1}},
+					phrasePart{"bat", &search.Location{Pos: 2}},
+					phrasePart{"cat", &search.Location{Pos: 3}},
+					phrasePart{"dog", &search.Location{Pos: 4}},
+				},
+				phrasePath{
+					phrasePart{"ark", &search.Location{Pos: 1}},
+					phrasePart{"bat", &search.Location{Pos: 2}},
+					phrasePart{"cat", &search.Location{Pos: 3}},
+					phrasePart{"dog", &search.Location{Pos: 5}},
+				},
+			},
+			tlm: search.TermLocationMap{ // ark bat cat dog dog
+				"ark": search.Locations{
+					&search.Location{Pos: 1},
+				},
+				"bat": search.Locations{
+					&search.Location{Pos: 2},
+				},
+				"cat": search.Locations{
+					&search.Location{Pos: 3},
+				},
+				"dog": search.Locations{
+					&search.Location{Pos: 4},
+					&search.Location{Pos: 5},
 				},
 			},
 		},
 	}
 
 	for i, test := range tests {
-		actualPaths := findPhrasePaths(0, nil, test.phrase, tlm, nil, test.slop)
+		tlmToUse := test.tlm
+		if tlmToUse == nil {
+			tlmToUse = tlm
+		}
+		actualPaths := findPhrasePaths(0, nil, test.phrase, tlmToUse, nil, test.slop)
 		if !reflect.DeepEqual(actualPaths, test.paths) {
 			t.Fatalf("expected: %v got %v for test %d", test.paths, actualPaths, i)
 		}
@@ -500,8 +544,8 @@ func TestFindPhrasePathsSloppyPalyndrome(t *testing.T) {
 			slop:   0,
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"two", &search.Location{Pos: 2}},
-					&phrasePart{"three", &search.Location{Pos: 3}},
+					phrasePart{"two", &search.Location{Pos: 2}},
+					phrasePart{"three", &search.Location{Pos: 3}},
 				},
 			},
 		},
@@ -511,12 +555,12 @@ func TestFindPhrasePathsSloppyPalyndrome(t *testing.T) {
 			slop:   2,
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"two", &search.Location{Pos: 2}},
-					&phrasePart{"three", &search.Location{Pos: 3}},
+					phrasePart{"two", &search.Location{Pos: 2}},
+					phrasePart{"three", &search.Location{Pos: 3}},
 				},
 				phrasePath{
-					&phrasePart{"two", &search.Location{Pos: 4}},
-					&phrasePart{"three", &search.Location{Pos: 3}},
+					phrasePart{"two", &search.Location{Pos: 4}},
+					phrasePart{"three", &search.Location{Pos: 3}},
 				},
 			},
 		},
@@ -526,12 +570,12 @@ func TestFindPhrasePathsSloppyPalyndrome(t *testing.T) {
 			slop:   2,
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"three", &search.Location{Pos: 3}},
-					&phrasePart{"two", &search.Location{Pos: 2}},
+					phrasePart{"three", &search.Location{Pos: 3}},
+					phrasePart{"two", &search.Location{Pos: 2}},
 				},
 				phrasePath{
-					&phrasePart{"three", &search.Location{Pos: 3}},
-					&phrasePart{"two", &search.Location{Pos: 4}},
+					phrasePart{"three", &search.Location{Pos: 3}},
+					phrasePart{"two", &search.Location{Pos: 4}},
 				},
 			},
 		},
@@ -574,8 +618,8 @@ func TestFindMultiPhrasePaths(t *testing.T) {
 			phrase: [][]string{[]string{"cat", "rat"}, []string{"dog"}},
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"cat", &search.Location{Pos: 1}},
-					&phrasePart{"dog", &search.Location{Pos: 2}},
+					phrasePart{"cat", &search.Location{Pos: 1}},
+					phrasePart{"dog", &search.Location{Pos: 2}},
 				},
 			},
 		},
@@ -592,12 +636,12 @@ func TestFindMultiPhrasePaths(t *testing.T) {
 			phrase: [][]string{[]string{"cat", "dog"}, []string{"dog", "frog"}},
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"cat", &search.Location{Pos: 1}},
-					&phrasePart{"dog", &search.Location{Pos: 2}},
+					phrasePart{"cat", &search.Location{Pos: 1}},
+					phrasePart{"dog", &search.Location{Pos: 2}},
 				},
 				phrasePath{
-					&phrasePart{"dog", &search.Location{Pos: 2}},
-					&phrasePart{"frog", &search.Location{Pos: 3}},
+					phrasePart{"dog", &search.Location{Pos: 2}},
+					phrasePart{"frog", &search.Location{Pos: 3}},
 				},
 			},
 		},
@@ -606,8 +650,8 @@ func TestFindMultiPhrasePaths(t *testing.T) {
 			phrase: [][]string{[]string{"cat", "rat"}, []string{""}, []string{"frog"}},
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"cat", &search.Location{Pos: 1}},
-					&phrasePart{"frog", &search.Location{Pos: 3}},
+					phrasePart{"cat", &search.Location{Pos: 1}},
+					phrasePart{"frog", &search.Location{Pos: 3}},
 				},
 			},
 		},
@@ -616,8 +660,8 @@ func TestFindMultiPhrasePaths(t *testing.T) {
 			phrase: [][]string{[]string{"cat", "rat"}, []string{}, []string{"frog"}},
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"cat", &search.Location{Pos: 1}},
-					&phrasePart{"frog", &search.Location{Pos: 3}},
+					phrasePart{"cat", &search.Location{Pos: 1}},
+					phrasePart{"frog", &search.Location{Pos: 3}},
 				},
 			},
 		},
@@ -626,8 +670,8 @@ func TestFindMultiPhrasePaths(t *testing.T) {
 			phrase: [][]string{[]string{"cat", "rat"}, nil, []string{"frog"}},
 			paths: []phrasePath{
 				phrasePath{
-					&phrasePart{"cat", &search.Location{Pos: 1}},
-					&phrasePart{"frog", &search.Location{Pos: 3}},
+					phrasePart{"cat", &search.Location{Pos: 1}},
+					phrasePart{"frog", &search.Location{Pos: 3}},
 				},
 			},
 		},

@@ -57,8 +57,8 @@ type Scorch struct {
 	nextSnapshotEpoch    uint64
 	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
-	numSnapshotsToKeep   int
 
+	numSnapshotsToKeep int
 	closeCh            chan struct{}
 	introductions      chan *segmentIntroduction
 	persists           chan *persistIntroduction
@@ -84,7 +84,7 @@ func NewScorch(storeName string,
 		closeCh:              make(chan struct{}),
 		ineligibleForRemoval: map[string]bool{},
 	}
-	rv.root = &IndexSnapshot{parent: rv, refs: 1}
+	rv.root = &IndexSnapshot{parent: rv, refs: 1, creator: "NewScorch"}
 	ro, ok := config["read_only"].(bool)
 	if ok {
 		rv.readOnly = ro

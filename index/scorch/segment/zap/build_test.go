@@ -311,7 +311,8 @@ func buildTestAnalysisResultsMultiWithDifferentFields(includeDocA, includeDocB b
 		doc := &document.Document{
 			ID: "a",
 			Fields: []document.Field{
-				document.NewTextField("_id", []uint64{}, []byte("a")),
+				document.NewTextFieldCustom("_id", nil, []byte("a"),
+					document.IndexField|document.StoreField, nil),
 				document.NewTextField("name", []uint64{}, []byte("ABC")),
 				document.NewTextField("dept", []uint64{}, []byte("ABC dept")),
 				document.NewTextField("manages.id", []uint64{}, []byte("XYZ")),
@@ -388,7 +389,8 @@ func buildTestAnalysisResultsMultiWithDifferentFields(includeDocA, includeDocB b
 		doc := &document.Document{
 			ID: "b",
 			Fields: []document.Field{
-				document.NewTextField("_id", []uint64{}, []byte("b")),
+				document.NewTextFieldCustom("_id", nil, []byte("b"),
+					document.IndexField|document.StoreField, nil),
 				document.NewTextField("name", []uint64{}, []byte("XYZ")),
 				document.NewTextField("dept", []uint64{}, []byte("ABC dept")),
 				document.NewTextField("reportsTo.id", []uint64{}, []byte("ABC")),
@@ -468,7 +470,8 @@ func buildTestSegmentWithDefaultFieldMapping(chunkFactor uint32) (
 	doc := &document.Document{
 		ID: "a",
 		Fields: []document.Field{
-			document.NewTextField("_id", nil, []byte("a")),
+			document.NewTextFieldCustom("_id", nil, []byte("a"),
+				document.IndexField|document.StoreField, nil),
 			document.NewTextField("name", nil, []byte("wow")),
 			document.NewTextField("desc", nil, []byte("some thing")),
 			document.NewTextField("tag", []uint64{0}, []byte("cold")),

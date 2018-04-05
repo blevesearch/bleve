@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
@@ -48,10 +49,20 @@ func (s *SegmentDictionarySnapshot) RangeIterator(start, end string) segment.Dic
 	return s.d.RangeIterator(start, end)
 }
 
+func (s *SegmentDictionarySnapshot) RegexpIterator(regex string) segment.DictionaryIterator {
+	return s.d.RegexpIterator(regex)
+}
+
+func (s *SegmentDictionarySnapshot) FuzzyIterator(term string,
+	fuzziness int) segment.DictionaryIterator {
+	return s.d.FuzzyIterator(term, fuzziness)
+}
+
 type SegmentSnapshot struct {
 	id      uint64
 	segment segment.Segment
 	deleted *roaring.Bitmap
+	creator string
 
 	cachedDocs *cachedDocs
 }
@@ -230,7 +241,7 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 }
 
 func (c *cachedDocs) Size() int {
-	return int(c.size)
+	return int(atomic.LoadUint64(&c.size))
 }
 
 func (c *cachedDocs) updateSizeLOCKED() {
@@ -243,5 +254,5 @@ func (c *cachedDocs) updateSizeLOCKED() {
 			}
 		}
 	}
-	c.size = uint64(sizeInBytes)
+	atomic.StoreUint64(&c.size, uint64(sizeInBytes))
 }

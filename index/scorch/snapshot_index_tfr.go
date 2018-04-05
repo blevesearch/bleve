@@ -103,20 +103,21 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 	if i.includeTermVectors {
 		locs := next.Locations()
 		rv.Vectors = make([]*index.TermFieldVector, len(locs))
+		backing := make([]index.TermFieldVector, len(locs))
 		for i, loc := range locs {
-			rv.Vectors[i] = &index.TermFieldVector{
+			backing[i] = index.TermFieldVector{
 				Start:          loc.Start(),
 				End:            loc.End(),
 				Pos:            loc.Pos(),
 				ArrayPositions: loc.ArrayPositions(),
 				Field:          loc.Field(),
 			}
+			rv.Vectors[i] = &backing[i]
 		}
 	}
 }
 
-func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID,
-	preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
+func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
 	// FIXME do something better
 	// for now, if we need to seek backwards, then restart from the beginning
 	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
@@ -127,30 +128,24 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID,
 		}
 		*i = *(i2.(*IndexSnapshotTermFieldReader))
 	}
-
-	num, err := docInternalToNumber(ID)
+	// FIXME do something better
+	next, err := i.Next(preAlloced)
 	if err != nil {
-		return nil, nil
-	}
-	segIndex, ldocNum := i.snapshot.segmentIndexAndLocalDocNumFromGlobal(num)
-	if segIndex > len(i.snapshot.segment) {
-		return nil, nil
-	}
-	// skip directly to the target segment
-	next, err := i.iterators[segIndex].Advance(ldocNum)
-	if err != nil || next == nil {
 		return nil, err
 	}
-
-	if preAlloced == nil {
-		preAlloced = &index.TermFieldDoc{}
+	if next == nil {
+		return nil, nil
 	}
-	preAlloced.ID = docNumberToBytes(preAlloced.ID, next.Number()+
-		i.snapshot.offsets[segIndex])
-	i.postingToTermFieldDoc(next, preAlloced)
-	i.currID = preAlloced.ID
-	i.currPosting = next
-	return preAlloced, nil
+	for bytes.Compare(next.ID, ID) < 0 {
+		next, err = i.Next(preAlloced)
+		if err != nil {
+			return nil, err
+		}
+		if next == nil {
+			break
+		}
+	}
+	return next, nil
 }
 
 func (i *IndexSnapshotTermFieldReader) Count() uint64 {

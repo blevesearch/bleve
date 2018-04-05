@@ -118,7 +118,7 @@ func persistFooter(numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset
 		return err
 	}
 	// write out 32-bit version
-	err = binary.Write(w, binary.BigEndian, version)
+	err = binary.Write(w, binary.BigEndian, Version)
 	if err != nil {
 		return err
 	}

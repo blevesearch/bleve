@@ -24,7 +24,6 @@ import (
 	"sort"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/Smerity/govarint"
 	"github.com/couchbase/vellum"
 	"github.com/golang/snappy"
 )
@@ -548,6 +547,8 @@ func writePostings(postings *roaring.Bitmap, tfEncoder, locEncoder *chunkedIntCo
 	return postingsOffset, nil
 }
 
+type varintEncoder func(uint64) (int, error)
+
 func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	fieldsMap map[string]uint16, fieldsInv []string, fieldsSame bool, newSegDocCount uint64,
 	w *CountHashWriter) (uint64, [][]uint64, error) {
@@ -556,10 +557,13 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	var newDocNum uint64
 
 	var curr int
-	var metaBuf bytes.Buffer
 	var data, compressed []byte
-
-	metaEncoder := govarint.NewU64Base128Encoder(&metaBuf)
+	var metaBuf bytes.Buffer
+	varBuf := make([]byte, binary.MaxVarintLen64)
+	metaEncode := func(val uint64) (int, error) {
+		wb := binary.PutUvarint(varBuf, val)
+		return metaBuf.Write(varBuf[:wb])
+	}
 
 	vals := make([][][]byte, len(fieldsInv))
 	typs := make([][]byte, len(fieldsInv))
@@ -622,22 +626,28 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 				return 0, nil, err
 			}
 
-			// now walk the fields in order
-			for fieldID := range fieldsInv {
-				storedFieldValues := vals[int(fieldID)]
+			// _id field special case optimizes ExternalID() lookups
+			idFieldVal := vals[uint16(0)][0]
+			_, err = metaEncode(uint64(len(idFieldVal)))
+			if err != nil {
+				return 0, nil, err
+			}
 
-				stf := typs[int(fieldID)]
-				spf := poss[int(fieldID)]
+			// now walk the non-"_id" fields in order
+			for fieldID := 1; fieldID < len(fieldsInv); fieldID++ {
+				storedFieldValues := vals[fieldID]
+
+				stf := typs[fieldID]
+				spf := poss[fieldID]
 
 				var err2 error
 				curr, data, err2 = persistStoredFieldValues(fieldID,
-					storedFieldValues, stf, spf, curr, metaEncoder, data)
+					storedFieldValues, stf, spf, curr, metaEncode, data)
 				if err2 != nil {
 					return 0, nil, err2
 				}
 			}
 
-			metaEncoder.Close()
 			metaBytes := metaBuf.Bytes()
 
 			compressed = snappy.Encode(compressed[:cap(compressed)], data)
@@ -646,12 +656,19 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 			docNumOffsets[newDocNum] = uint64(w.Count())
 
 			// write out the meta len and compressed data len
-			_, err = writeUvarints(w, uint64(len(metaBytes)), uint64(len(compressed)))
+			_, err = writeUvarints(w,
+				uint64(len(metaBytes)),
+				uint64(len(idFieldVal)+len(compressed)))
 			if err != nil {
 				return 0, nil, err
 			}
 			// now write the meta
 			_, err = w.Write(metaBytes)
+			if err != nil {
+				return 0, nil, err
+			}
+			// now write the _id field val (counted as part of the 'compressed' data)
+			_, err = w.Write(idFieldVal)
 			if err != nil {
 				return 0, nil, err
 			}

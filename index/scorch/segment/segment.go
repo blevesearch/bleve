@@ -48,6 +48,8 @@ type TermDictionary interface {
 	Iterator() DictionaryIterator
 	PrefixIterator(prefix string) DictionaryIterator
 	RangeIterator(start, end string) DictionaryIterator
+	RegexpIterator(regex string) DictionaryIterator
+	FuzzyIterator(term string, fuzziness int) DictionaryIterator
 }
 
 type DictionaryIterator interface {
@@ -75,10 +77,6 @@ type PostingsIterator interface {
 	Next() (Posting, error)
 
 	Size() int
-
-	// Advance will return the respective posting of the
-	// sepcified doc number or its immediate follower.
-	Advance(docNum uint64) (Posting, error)
 }
 
 type Posting interface {

@@ -21,6 +21,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/couchbase/vellum"
+	"github.com/couchbase/vellum/levenshtein"
 	"github.com/couchbase/vellum/regexp"
 )
 
@@ -39,6 +40,9 @@ func (d *Dictionary) PostingsList(term string, except *roaring.Bitmap) (segment.
 
 func (d *Dictionary) postingsList(term []byte, except *roaring.Bitmap, rv *PostingsList) (*PostingsList, error) {
 	if d.fst == nil {
+		if rv == nil || rv == emptyPostingsList {
+			return emptyPostingsList, nil
+		}
 		return d.postingsListInit(rv, except), nil
 	}
 
@@ -47,6 +51,9 @@ func (d *Dictionary) postingsList(term []byte, except *roaring.Bitmap, rv *Posti
 		return nil, fmt.Errorf("vellum err: %v", err)
 	}
 	if !exists {
+		if rv == nil || rv == emptyPostingsList {
+			return emptyPostingsList, nil
+		}
 		return d.postingsListInit(rv, except), nil
 	}
 
@@ -65,7 +72,7 @@ func (d *Dictionary) postingsListFromOffset(postingsOffset uint64, except *roari
 }
 
 func (d *Dictionary) postingsListInit(rv *PostingsList, except *roaring.Bitmap) *PostingsList {
-	if rv == nil {
+	if rv == nil || rv == emptyPostingsList {
 		rv = &PostingsList{}
 	} else {
 		postings := rv.postings
@@ -143,12 +150,54 @@ func (d *Dictionary) RangeIterator(start, end string) segment.DictionaryIterator
 	return rv
 }
 
+// RegexIterator returns an iterator which only visits terms having the
+// the specified regex
+func (d *Dictionary) RegexpIterator(regex string) segment.DictionaryIterator {
+	rv := &DictionaryIterator{
+		d: d,
+	}
+
+	if d.fst != nil {
+		r, err := regexp.New(regex)
+		if err == nil {
+			itr, err := d.fst.Search(r, nil, nil)
+			if err == nil {
+				rv.itr = itr
+			}
+		}
+	}
+
+	return rv
+}
+
+// FuzzyIterator returns an iterator which only visits terms having the
+// the specified edit/levenshtein distance
+func (d *Dictionary) FuzzyIterator(term string,
+	fuzziness int) segment.DictionaryIterator {
+	rv := &DictionaryIterator{
+		d: d,
+	}
+
+	if d.fst != nil {
+		la, err := levenshtein.New(term, fuzziness)
+		if err == nil {
+			itr, err := d.fst.Search(la, nil, nil)
+			if err == nil {
+				rv.itr = itr
+			}
+		}
+	}
+
+	return rv
+}
+
 // DictionaryIterator is an iterator for term dictionary
 type DictionaryIterator struct {
-	d   *Dictionary
-	itr vellum.Iterator
-	err error
-	tmp PostingsList
+	d     *Dictionary
+	itr   vellum.Iterator
+	err   error
+	tmp   PostingsList
+	entry index.DictEntry
 }
 
 // Next returns the next entry in the dictionary
@@ -163,10 +212,8 @@ func (i *DictionaryIterator) Next() (*index.DictEntry, error) {
 	if i.err != nil {
 		return nil, i.err
 	}
-	rv := &index.DictEntry{
-		Term:  string(term),
-		Count: i.tmp.Count(),
-	}
+	i.entry.Term = string(term)
+	i.entry.Count = i.tmp.Count()
 	i.err = i.itr.Next()
-	return rv, nil
+	return &i.entry, nil
 }
