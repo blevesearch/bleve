@@ -266,6 +266,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 		segment:  make([]*SegmentSnapshot, 0, len(snapshot.segment)),
 		internal: snapshot.internal,
 		epoch:    snapshot.epoch,
+		creator:  "persistSnapshotMaybeMerge",
 	}
 
 	// copy to the equiv the segments that weren't replaced
@@ -554,6 +555,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 		parent:   s,
 		internal: make(map[string][]byte),
 		refs:     1,
+		creator:  "loadSnapshot",
 	}
 	var running uint64
 	c := snapshot.Cursor()

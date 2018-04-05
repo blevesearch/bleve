@@ -62,6 +62,7 @@ type SegmentSnapshot struct {
 	id      uint64
 	segment segment.Segment
 	deleted *roaring.Bitmap
+	creator string
 
 	cachedDocs *cachedDocs
 }
