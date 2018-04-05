@@ -71,6 +71,15 @@ type Scorch struct {
 
 	onEvent      func(event Event)
 	onAsyncError func(err error)
+
+	iStats internalStats
+}
+
+type internalStats struct {
+	persistEpoch        uint64
+	persistSnapshotSize uint64
+	mergeEpoch          uint64
+	mergeSnapshotSize   uint64
 }
 
 func NewScorch(storeName string,
@@ -492,7 +501,29 @@ func (s *Scorch) MemoryUsed() uint64 {
 	defer func() {
 		_ = indexSnapshot.Close()
 	}()
-	return uint64(indexSnapshot.Size())
+
+	// Account for current root snapshot overhead
+	memUsed := uint64(indexSnapshot.Size())
+
+	// Account for snapshot that the persister may be working on
+	persistEpoch := atomic.LoadUint64(&s.iStats.persistEpoch)
+	persistSnapshotSize := atomic.LoadUint64(&s.iStats.persistSnapshotSize)
+	if persistEpoch != 0 && indexSnapshot.epoch > persistEpoch {
+		// the snapshot that the persister is working on isn't the same as
+		// the current snapshot
+		memUsed += persistSnapshotSize
+	}
+
+	// Account for snapshot that the merger may be working on
+	mergeEpoch := atomic.LoadUint64(&s.iStats.mergeEpoch)
+	mergeSnapshotSize := atomic.LoadUint64(&s.iStats.mergeSnapshotSize)
+	if mergeEpoch != 0 && indexSnapshot.epoch > mergeEpoch {
+		// the snapshot that the merger is working on isn't the same as
+		// the current snapshot
+		memUsed += mergeSnapshotSize
+	}
+
+	return memUsed
 }
 
 func (s *Scorch) markIneligibleForRemoval(filename string) {

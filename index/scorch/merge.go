@@ -50,6 +50,8 @@ OUTER:
 			s.rootLock.RLock()
 			ourSnapshot := s.root
 			ourSnapshot.AddRef()
+			atomic.StoreUint64(&s.iStats.mergeSnapshotSize, uint64(ourSnapshot.Size()))
+			atomic.StoreUint64(&s.iStats.mergeEpoch, ourSnapshot.epoch)
 			s.rootLock.RUnlock()
 
 			if ourSnapshot.epoch != lastEpochMergePlanned {
@@ -58,6 +60,7 @@ OUTER:
 				// lets get started
 				err := s.planMergeAtSnapshot(ourSnapshot, mergePlannerOptions)
 				if err != nil {
+					atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
 					if err == ErrClosed {
 						// index has been closed
 						_ = ourSnapshot.DecRef()
