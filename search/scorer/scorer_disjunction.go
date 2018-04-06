@@ -50,14 +50,10 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 		childrenExplanations = make([]*search.Explanation, len(constituents))
 	}
 
-	var locations []search.FieldTermLocationMap
 	for i, docMatch := range constituents {
 		sum += docMatch.Score
 		if s.options.Explain {
 			childrenExplanations[i] = docMatch.Expl
-		}
-		if docMatch.Locations != nil {
-			locations = append(locations, docMatch.Locations)
 		}
 	}
 
@@ -80,11 +76,8 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	rv := constituents[0]
 	rv.Score = newScore
 	rv.Expl = newExpl
-	if len(locations) == 1 {
-		rv.Locations = locations[0]
-	} else if len(locations) > 1 {
-		rv.Locations = search.MergeLocations(locations)
-	}
+	rv.FieldTermLocations = search.MergeFieldTermLocations(
+		rv.FieldTermLocations, constituents[1:])
 
 	return rv
 }

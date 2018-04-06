@@ -74,6 +74,7 @@ func TestPhraseSearch(t *testing.T) {
 		next, err := test.searcher.Next(ctx)
 		i := 0
 		for err == nil && next != nil {
+			next.Complete(nil)
 			if i < len(test.results) {
 				if !next.IndexInternalID.Equals(test.results[i].IndexInternalID) {
 					t.Errorf("expected result %d to have id %s got %s for test %d\n", i, test.results[i].IndexInternalID, next.IndexInternalID, testIndex)
