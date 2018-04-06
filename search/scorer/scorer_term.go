@@ -165,6 +165,10 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 	}
 
 	if len(termMatch.Vectors) > 0 {
+		if cap(rv.FieldTermLocations) < len(termMatch.Vectors) {
+			rv.FieldTermLocations = make([]search.FieldTermLocation, 0, len(termMatch.Vectors))
+		}
+
 		for _, v := range termMatch.Vectors {
 			var ap search.ArrayPositions
 			if len(v.ArrayPositions) > 0 {
