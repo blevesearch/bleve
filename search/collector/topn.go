@@ -282,6 +282,7 @@ func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
 				return err
 			}
 		}
+		doc.Complete()
 		return nil
 	})
 
@@ -313,5 +314,5 @@ func (hc *TopNCollector) FacetResults() search.FacetResults {
 	if hc.facetsBuilder != nil {
 		return hc.facetsBuilder.Results()
 	}
-	return search.FacetResults{}
+	return nil
 }
