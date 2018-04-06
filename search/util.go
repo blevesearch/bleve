@@ -42,6 +42,14 @@ func MergeTermLocationMaps(rv, other TermLocationMap) TermLocationMap {
 }
 
 func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch) []FieldTermLocation {
+	n := len(dest)
+	for _, dm := range matches {
+		n += len(dm.FieldTermLocations)
+	}
+	if cap(dest) < n {
+		dest = append(make([]FieldTermLocation, 0, n), dest...)
+	}
+
 	for _, dm := range matches {
 		for _, ftl := range dm.FieldTermLocations {
 			dest = append(dest, FieldTermLocation{
