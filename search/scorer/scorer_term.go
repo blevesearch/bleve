@@ -164,41 +164,28 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 		rv.Expl = scoreExplanation
 	}
 
-	if termMatch.Vectors != nil && len(termMatch.Vectors) > 0 {
-		locs := make([]search.Location, len(termMatch.Vectors))
-		locsUsed := 0
-
-		totalPositions := 0
+	if len(termMatch.Vectors) > 0 {
+		term := string(s.queryTerm)
 		for _, v := range termMatch.Vectors {
-			totalPositions += len(v.ArrayPositions)
-		}
-		positions := make(search.ArrayPositions, totalPositions)
-		positionsUsed := 0
-
-		rv.Locations = make(search.FieldTermLocationMap)
-		for _, v := range termMatch.Vectors {
-			tlm := rv.Locations[v.Field]
-			if tlm == nil {
-				tlm = make(search.TermLocationMap)
-				rv.Locations[v.Field] = tlm
-			}
-
-			loc := &locs[locsUsed]
-			locsUsed++
-
-			loc.Pos = v.Pos
-			loc.Start = v.Start
-			loc.End = v.End
-
+			var ap search.ArrayPositions
 			if len(v.ArrayPositions) > 0 {
-				loc.ArrayPositions = positions[positionsUsed : positionsUsed+len(v.ArrayPositions)]
-				for i, ap := range v.ArrayPositions {
-					loc.ArrayPositions[i] = ap
+				n := len(rv.FieldTermLocations)
+				if n < cap(rv.FieldTermLocations) { // reuse ap slice if available
+					ap = rv.FieldTermLocations[:n+1][n].Location.ArrayPositions[:0]
 				}
-				positionsUsed += len(v.ArrayPositions)
+				ap = append(ap, v.ArrayPositions...)
 			}
-
-			tlm[string(s.queryTerm)] = append(tlm[string(s.queryTerm)], loc)
+			rv.FieldTermLocations =
+				append(rv.FieldTermLocations, search.FieldTermLocation{
+					Field: v.Field,
+					Term:  term,
+					Location: search.Location{
+						Pos:            v.Pos,
+						Start:          v.Start,
+						End:            v.End,
+						ArrayPositions: ap,
+					},
+				})
 		}
 	}
 

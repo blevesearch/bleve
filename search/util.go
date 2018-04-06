@@ -40,3 +40,22 @@ func MergeTermLocationMaps(rv, other TermLocationMap) TermLocationMap {
 	}
 	return rv
 }
+
+func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch) []FieldTermLocation {
+	for _, dm := range matches {
+		for _, ftl := range dm.FieldTermLocations {
+			dest = append(dest, FieldTermLocation{
+				Field: ftl.Field,
+				Term:  ftl.Term,
+				Location: Location{
+					Pos:            ftl.Location.Pos,
+					Start:          ftl.Location.Start,
+					End:            ftl.Location.End,
+					ArrayPositions: append(ArrayPositions(nil), ftl.Location.ArrayPositions...),
+				},
+			})
+		}
+	}
+
+	return dest
+}

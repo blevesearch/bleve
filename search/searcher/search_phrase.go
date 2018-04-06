@@ -214,48 +214,59 @@ func (s *PhraseSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch,
 // also satisfies the phase constraints.  if so, it returns a DocumentMatch
 // for this document, otherwise nil
 func (s *PhraseSearcher) checkCurrMustMatch(ctx *search.SearchContext) *search.DocumentMatch {
-	rvftlm := make(search.FieldTermLocationMap, 0)
-	freq := 0
+	s.currMust.Complete()
+
+	locations := s.currMust.Locations
+	s.currMust.Locations = nil
+
+	ftls := s.currMust.FieldTermLocations
+
 	// typically we would expect there to only actually be results in
 	// one field, but we allow for this to not be the case
 	// but, we note that phrase constraints can only be satisfied within
 	// a single field, so we can check them each independently
-	for field, tlm := range s.currMust.Locations {
-
-		f, rvtlm := s.checkCurrMustMatchField(ctx, tlm)
-		if f > 0 {
-			freq += f
-			rvftlm[field] = rvtlm
-		}
+	for field, tlm := range locations {
+		ftls = s.checkCurrMustMatchField(ctx, field, tlm, ftls)
 	}
 
-	if freq > 0 {
+	if len(ftls) > 0 {
 		// return match
 		rv := s.currMust
 		s.currMust = nil
-		rv.Locations = rvftlm
+		rv.FieldTermLocations = ftls
 		return rv
 	}
 
 	return nil
 }
 
-// checkCurrMustMatchField is soley concerned with determining if one particular
-// field within the currMust DocumentMatch Locations satisfies the phase
-// constraints (possibly more than once).  if so, the number of times it was
-// satisfied, and these locations are returned.  otherwise 0 and either
-// a nil or empty TermLocationMap
-func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext, tlm search.TermLocationMap) (
-	int, search.TermLocationMap) {
+// checkCurrMustMatchField is soley concerned with determining if one
+// particular field within the currMust DocumentMatch Locations
+// satisfies the phase constraints (possibly more than once).  if so,
+// the matching field term locations are appended to the provided
+// slice
+func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext,
+	field string, tlm search.TermLocationMap,
+	ftls []search.FieldTermLocation) []search.FieldTermLocation {
 	if s.path == nil {
 		s.path = make(phrasePath, 0, 4)
 	}
 	s.paths = findPhrasePaths(0, nil, s.terms, tlm, s.path[:0], 0, s.paths[:0])
-	rv := make(search.TermLocationMap, len(s.terms))
 	for _, p := range s.paths {
-		p.MergeInto(rv)
+		for _, pp := range p {
+			ftls = append(ftls, search.FieldTermLocation{
+				Field: field,
+				Term:  pp.term,
+				Location: search.Location{
+					Pos:            pp.loc.Pos,
+					Start:          pp.loc.Start,
+					End:            pp.loc.End,
+					ArrayPositions: pp.loc.ArrayPositions,
+				},
+			})
+		}
 	}
-	return len(s.paths), rv
+	return ftls
 }
 
 type phrasePart struct {
