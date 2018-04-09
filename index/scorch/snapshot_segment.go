@@ -58,6 +58,11 @@ func (s *SegmentDictionarySnapshot) FuzzyIterator(term string,
 	return s.d.FuzzyIterator(term, fuzziness)
 }
 
+func (s *SegmentDictionarySnapshot) OnlyIterator(onlyTerms [][]byte,
+	includeCount bool) segment.DictionaryIterator {
+	return s.d.OnlyIterator(onlyTerms, includeCount)
+}
+
 type SegmentSnapshot struct {
 	id      uint64
 	segment segment.Segment

@@ -190,6 +190,13 @@ func (i *IndexSnapshot) FieldDictFuzzy(field string,
 	})
 }
 
+func (i *IndexSnapshot) FieldDictOnly(field string,
+	onlyTerms [][]byte, includeCount bool) (index.FieldDict, error) {
+	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
+		return i.OnlyIterator(onlyTerms, includeCount)
+	})
+}
+
 func (i *IndexSnapshot) DocIDReaderAll() (index.DocIDReader, error) {
 	results := make(chan *asynchSegmentResult)
 	for index, segment := range i.segment {

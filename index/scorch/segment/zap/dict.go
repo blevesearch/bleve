@@ -15,6 +15,7 @@
 package zap
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/RoaringBitmap/roaring"
@@ -191,13 +192,55 @@ func (d *Dictionary) FuzzyIterator(term string,
 	return rv
 }
 
+func (d *Dictionary) OnlyIterator(onlyTerms [][]byte,
+	includeCount bool) segment.DictionaryIterator {
+
+	rv := &DictionaryIterator{
+		d:         d,
+		omitCount: !includeCount,
+	}
+
+	var buf bytes.Buffer
+	builder, err := vellum.New(&buf, nil)
+	if err != nil {
+		rv.err = err
+		return rv
+	}
+	for _, term := range onlyTerms {
+		err = builder.Insert(term, 0)
+		if err != nil {
+			rv.err = err
+			return rv
+		}
+	}
+	err = builder.Close()
+	if err != nil {
+		rv.err = err
+		return rv
+	}
+
+	onlyFST, err := vellum.Load(buf.Bytes())
+	if err != nil {
+		rv.err = err
+		return rv
+	}
+
+	itr, err := d.fst.Search(onlyFST, nil, nil)
+	if err == nil {
+		rv.itr = itr
+	}
+
+	return rv
+}
+
 // DictionaryIterator is an iterator for term dictionary
 type DictionaryIterator struct {
-	d     *Dictionary
-	itr   vellum.Iterator
-	err   error
-	tmp   PostingsList
-	entry index.DictEntry
+	d         *Dictionary
+	itr       vellum.Iterator
+	err       error
+	tmp       PostingsList
+	entry     index.DictEntry
+	omitCount bool
 }
 
 // Next returns the next entry in the dictionary
@@ -208,12 +251,14 @@ func (i *DictionaryIterator) Next() (*index.DictEntry, error) {
 		return nil, i.err
 	}
 	term, postingsOffset := i.itr.Current()
-	i.err = i.tmp.read(postingsOffset, i.d)
-	if i.err != nil {
-		return nil, i.err
-	}
 	i.entry.Term = string(term)
-	i.entry.Count = i.tmp.Count()
+	if !i.omitCount {
+		i.err = i.tmp.read(postingsOffset, i.d)
+		if i.err != nil {
+			return nil, i.err
+		}
+		i.entry.Count = i.tmp.Count()
+	}
 	i.err = i.itr.Next()
 	return &i.entry, nil
 }
