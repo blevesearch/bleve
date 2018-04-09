@@ -76,7 +76,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList, err := dict.PostingsList("a", nil, nil)
+	postingsList, err := dict.PostingsList([]byte("a"), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList, err = dict.PostingsList("wow", nil, nil)
+	postingsList, err = dict.PostingsList([]byte("wow"), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList, err = dict.PostingsList("wow", nil, nil)
+	postingsList, err = dict.PostingsList([]byte("wow"), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +259,7 @@ func TestOpen(t *testing.T) {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList, err = dict.PostingsList("dark", nil, nil)
+	postingsList, err = dict.PostingsList([]byte("dark"), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,7 @@ func TestOpenMulti(t *testing.T) {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList, err := dict.PostingsList("thing", nil, nil)
+	postingsList, err := dict.PostingsList([]byte("thing"), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -392,7 +392,7 @@ func TestOpenMulti(t *testing.T) {
 	}
 
 	// look for term 'thing' excluding doc 'a'
-	postingsListExcluding, err := dict.PostingsList("thing", exclude, nil)
+	postingsListExcluding, err := dict.PostingsList([]byte("thing"), exclude, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -458,7 +458,7 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 		t.Fatal("got nil dict, expected non-nil")
 	}
 
-	postingsList, err := dict.PostingsList("thing", nil, nil)
+	postingsList, err := dict.PostingsList([]byte("thing"), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -492,7 +492,7 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 	}
 
 	// look for term 'thing' excluding doc 'a'
-	postingsListExcluding, err := dict.PostingsList("thing", exclude, nil)
+	postingsListExcluding, err := dict.PostingsList([]byte("thing"), exclude, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

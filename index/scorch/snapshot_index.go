@@ -429,10 +429,8 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	}
 	rv.dicts = dicts
 
-	termStr := string(term)
-
 	for i := range i.segment {
-		pl, err := dicts[i].PostingsList(termStr, nil, rv.postings[i])
+		pl, err := dicts[i].PostingsList(term, nil, rv.postings[i])
 		if err != nil {
 			return nil, err
 		}

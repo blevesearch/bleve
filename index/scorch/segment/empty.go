@@ -59,7 +59,7 @@ func (e *EmptySegment) DecRef() error {
 
 type EmptyDictionary struct{}
 
-func (e *EmptyDictionary) PostingsList(term string,
+func (e *EmptyDictionary) PostingsList(term []byte,
 	except *roaring.Bitmap, prealloc PostingsList) (PostingsList, error) {
 	return &EmptyPostingsList{}, nil
 }
