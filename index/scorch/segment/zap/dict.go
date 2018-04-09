@@ -100,6 +100,8 @@ func (d *Dictionary) Iterator() segment.DictionaryIterator {
 		itr, err := d.fst.Iterator(nil, nil)
 		if err == nil {
 			rv.itr = itr
+		} else if err != nil && err != vellum.ErrIteratorDone {
+			rv.err = err
 		}
 	}
 
@@ -119,7 +121,11 @@ func (d *Dictionary) PrefixIterator(prefix string) segment.DictionaryIterator {
 			itr, err := d.fst.Search(r, nil, nil)
 			if err == nil {
 				rv.itr = itr
+			} else if err != nil && err != vellum.ErrIteratorDone {
+				rv.err = err
 			}
+		} else {
+			rv.err = err
 		}
 	}
 
@@ -145,13 +151,15 @@ func (d *Dictionary) RangeIterator(start, end string) segment.DictionaryIterator
 		itr, err := d.fst.Iterator([]byte(start), endBytes)
 		if err == nil {
 			rv.itr = itr
+		} else if err != nil && err != vellum.ErrIteratorDone {
+			rv.err = err
 		}
 	}
 
 	return rv
 }
 
-// RegexIterator returns an iterator which only visits terms having the
+// RegexpIterator returns an iterator which only visits terms having the
 // the specified regex
 func (d *Dictionary) RegexpIterator(regex string) segment.DictionaryIterator {
 	rv := &DictionaryIterator{
@@ -161,10 +169,14 @@ func (d *Dictionary) RegexpIterator(regex string) segment.DictionaryIterator {
 	if d.fst != nil {
 		r, err := regexp.New(regex)
 		if err == nil {
-			itr, err := d.fst.Search(r, nil, nil)
-			if err == nil {
+			itr, err2 := d.fst.Search(r, nil, nil)
+			if err2 == nil {
 				rv.itr = itr
+			} else if err2 != nil && err2 != vellum.ErrIteratorDone {
+				rv.err = err2
 			}
+		} else {
+			rv.err = err
 		}
 	}
 
@@ -182,10 +194,14 @@ func (d *Dictionary) FuzzyIterator(term string,
 	if d.fst != nil {
 		la, err := levenshtein.New(term, fuzziness)
 		if err == nil {
-			itr, err := d.fst.Search(la, nil, nil)
-			if err == nil {
+			itr, err2 := d.fst.Search(la, nil, nil)
+			if err2 == nil {
 				rv.itr = itr
+			} else if err2 != nil && err2 != vellum.ErrIteratorDone {
+				rv.err = err2
 			}
+		} else {
+			rv.err = err
 		}
 	}
 
@@ -228,6 +244,8 @@ func (d *Dictionary) OnlyIterator(onlyTerms [][]byte,
 	itr, err := d.fst.Search(onlyFST, nil, nil)
 	if err == nil {
 		rv.itr = itr
+	} else if err != nil && err != vellum.ErrIteratorDone {
+		rv.err = err
 	}
 
 	return rv
