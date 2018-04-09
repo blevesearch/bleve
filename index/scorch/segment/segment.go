@@ -43,7 +43,7 @@ type Segment interface {
 }
 
 type TermDictionary interface {
-	PostingsList(term string, except *roaring.Bitmap, prealloc PostingsList) (PostingsList, error)
+	PostingsList(term []byte, except *roaring.Bitmap, prealloc PostingsList) (PostingsList, error)
 
 	Iterator() DictionaryIterator
 	PrefixIterator(prefix string) DictionaryIterator

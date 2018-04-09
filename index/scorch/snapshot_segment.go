@@ -32,7 +32,7 @@ type SegmentDictionarySnapshot struct {
 	d segment.TermDictionary
 }
 
-func (s *SegmentDictionarySnapshot) PostingsList(term string, except *roaring.Bitmap,
+func (s *SegmentDictionarySnapshot) PostingsList(term []byte, except *roaring.Bitmap,
 	prealloc segment.PostingsList) (segment.PostingsList, error) {
 	// TODO: if except is non-nil, perhaps need to OR it with s.s.deleted?
 	return s.d.PostingsList(term, s.s.deleted, prealloc)
@@ -179,7 +179,7 @@ func (cfd *cachedFieldDocs) prepareFields(field string, ss *SegmentSnapshot) {
 	next, err := dictItr.Next()
 	for err == nil && next != nil {
 		var err1 error
-		postings, err1 = dict.PostingsList(next.Term, nil, postings)
+		postings, err1 = dict.PostingsList([]byte(next.Term), nil, postings)
 		if err1 != nil {
 			cfd.err = err1
 			return
