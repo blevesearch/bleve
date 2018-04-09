@@ -622,7 +622,9 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 			_ = segment.Close()
 			return nil, fmt.Errorf("error reading deleted bytes: %v", err)
 		}
-		rv.deleted = deletedBitmap
+		if !deletedBitmap.IsEmpty() {
+			rv.deleted = deletedBitmap
+		}
 	}
 
 	return rv, nil
