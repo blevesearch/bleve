@@ -36,7 +36,7 @@ import (
 
 const Name = "scorch"
 
-const Version uint8 = 1
+const Version uint8 = 2
 
 var ErrClosed = fmt.Errorf("scorch closed")
 
