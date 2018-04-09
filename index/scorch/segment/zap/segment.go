@@ -55,7 +55,7 @@ func Open(path string) (segment.Segment, error) {
 		SegmentBase: SegmentBase{
 			mem:            mm[0 : len(mm)-FooterSize],
 			fieldsMap:      make(map[string]uint16),
-			fieldDvIterMap: make(map[uint16]*docValueIterator),
+			fieldDvReaders: make(map[uint16]*docValueReader),
 		},
 		f:    f,
 		mm:   mm,
@@ -76,7 +76,7 @@ func Open(path string) (segment.Segment, error) {
 		return nil, err
 	}
 
-	err = rv.loadDvIterators()
+	err = rv.loadDvReaders()
 	if err != nil {
 		_ = rv.Close()
 		return nil, err
@@ -98,7 +98,7 @@ type SegmentBase struct {
 	fieldsIndexOffset uint64
 	docValueOffset    uint64
 	dictLocs          []uint64
-	fieldDvIterMap    map[uint16]*docValueIterator // naive chunk cache per field
+	fieldDvReaders    map[uint16]*docValueReader // naive chunk cache per field
 	size              uint64
 }
 
@@ -121,8 +121,8 @@ func (sb *SegmentBase) updateSize() {
 	}
 	sizeInBytes += len(sb.dictLocs) * size.SizeOfUint64
 
-	// fieldDvIterMap
-	for _, v := range sb.fieldDvIterMap {
+	// fieldDvReaders
+	for _, v := range sb.fieldDvReaders {
 		sizeInBytes += size.SizeOfUint16 + size.SizeOfPtr
 		if v != nil {
 			sizeInBytes += v.size()
@@ -480,7 +480,7 @@ func (s *Segment) DictAddr(field string) (uint64, error) {
 	return s.dictLocs[fieldIDPlus1-1], nil
 }
 
-func (s *SegmentBase) loadDvIterators() error {
+func (s *SegmentBase) loadDvReaders() error {
 	if s.docValueOffset == fieldNotUninverted {
 		return nil
 	}
@@ -489,9 +489,9 @@ func (s *SegmentBase) loadDvIterators() error {
 	for fieldID, field := range s.fieldsInv {
 		fieldLoc, n := binary.Uvarint(s.mem[s.docValueOffset+read : s.docValueOffset+read+binary.MaxVarintLen64])
 		if n <= 0 {
-			return fmt.Errorf("loadDvIterators: failed to read the docvalue offsets for field %d", fieldID)
+			return fmt.Errorf("loadDvReaders: failed to read the docvalue offsets for field %d", fieldID)
 		}
-		s.fieldDvIterMap[uint16(fieldID)], _ = s.loadFieldDocValueIterator(field, fieldLoc)
+		s.fieldDvReaders[uint16(fieldID)], _ = s.loadFieldDocValueReader(field, fieldLoc)
 		read += uint64(n)
 	}
 	return nil

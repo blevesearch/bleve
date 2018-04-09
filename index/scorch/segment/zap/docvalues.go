@@ -27,14 +27,14 @@ import (
 	"github.com/golang/snappy"
 )
 
-var reflectStaticSizedocValueIterator int
+var reflectStaticSizedocValueReader int
 
 func init() {
-	var dvi docValueIterator
-	reflectStaticSizedocValueIterator = int(reflect.TypeOf(dvi).Size())
+	var dvi docValueReader
+	reflectStaticSizedocValueReader = int(reflect.TypeOf(dvi).Size())
 }
 
-type docValueIterator struct {
+type docValueReader struct {
 	field          string
 	curChunkNum    uint64
 	numChunks      uint64
@@ -45,27 +45,27 @@ type docValueIterator struct {
 	uncompressed   []byte // temp buf for snappy decompression
 }
 
-func (di *docValueIterator) size() int {
-	return reflectStaticSizedocValueIterator + size.SizeOfPtr +
+func (di *docValueReader) size() int {
+	return reflectStaticSizedocValueReader + size.SizeOfPtr +
 		len(di.field) +
 		len(di.chunkOffsets)*size.SizeOfUint64 +
 		len(di.curChunkHeader)*reflectStaticSizeMetaData +
 		len(di.curChunkData)
 }
 
-func (di *docValueIterator) fieldName() string {
+func (di *docValueReader) fieldName() string {
 	return di.field
 }
 
-func (di *docValueIterator) curChunkNumber() uint64 {
+func (di *docValueReader) curChunkNumber() uint64 {
 	return di.curChunkNum
 }
 
-func (s *SegmentBase) loadFieldDocValueIterator(field string,
-	fieldDvLoc uint64) (*docValueIterator, error) {
+func (s *SegmentBase) loadFieldDocValueReader(field string,
+	fieldDvLoc uint64) (*docValueReader, error) {
 	// get the docValue offset for the given fields
 	if fieldDvLoc == fieldNotUninverted {
-		return nil, fmt.Errorf("loadFieldDocValueIterator: "+
+		return nil, fmt.Errorf("loadFieldDocValueReader: "+
 			"no docValues found for field: %s", field)
 	}
 
@@ -78,7 +78,7 @@ func (s *SegmentBase) loadFieldDocValueIterator(field string,
 	}
 	offset += uint64(read)
 
-	fdvIter := &docValueIterator{
+	fdvIter := &docValueReader{
 		curChunkNum:  math.MaxUint64,
 		field:        field,
 		chunkOffsets: make([]uint64, int(numChunks)),
@@ -96,7 +96,7 @@ func (s *SegmentBase) loadFieldDocValueIterator(field string,
 	return fdvIter, nil
 }
 
-func (di *docValueIterator) loadDvChunk(chunkNumber,
+func (di *docValueReader) loadDvChunk(chunkNumber,
 	localDocNum uint64, s *SegmentBase) error {
 	// advance to the chunk where the docValues
 	// reside for the given docNum
@@ -128,7 +128,7 @@ func (di *docValueIterator) loadDvChunk(chunkNumber,
 	return nil
 }
 
-func (di *docValueIterator) visitDocValues(docNum uint64,
+func (di *docValueReader) visitDocValues(docNum uint64,
 	visitor index.DocumentFieldTermVisitor) error {
 	// binary search the term locations for the docNum
 	start, end := di.getDocValueLocs(docNum)
@@ -157,7 +157,7 @@ func (di *docValueIterator) visitDocValues(docNum uint64,
 	return nil
 }
 
-func (di *docValueIterator) getDocValueLocs(docNum uint64) (uint64, uint64) {
+func (di *docValueReader) getDocValueLocs(docNum uint64) (uint64, uint64) {
 	i := sort.Search(len(di.curChunkHeader), func(i int) bool {
 		return di.curChunkHeader[i].DocNum >= docNum
 	})
@@ -180,7 +180,7 @@ func (s *SegmentBase) VisitDocumentFieldTerms(localDocNum uint64, fields []strin
 		// find the chunkNumber where the docValues are stored
 		docInChunk := localDocNum / uint64(s.chunkFactor)
 
-		if dvIter, exists := s.fieldDvIterMap[fieldIDPlus1-1]; exists &&
+		if dvIter, exists := s.fieldDvReaders[fieldIDPlus1-1]; exists &&
 			dvIter != nil {
 			// check if the chunk is already loaded
 			if docInChunk != dvIter.curChunkNumber() {
@@ -202,7 +202,7 @@ func (s *SegmentBase) VisitDocumentFieldTerms(localDocNum uint64, fields []strin
 func (s *Segment) VisitableDocValueFields() ([]string, error) {
 	var rv []string
 	for fieldID, field := range s.fieldsInv {
-		if dvIter, ok := s.fieldDvIterMap[uint16(fieldID)]; ok &&
+		if dvIter, ok := s.fieldDvReaders[uint16(fieldID)]; ok &&
 			dvIter != nil {
 			rv = append(rv, field)
 		}
