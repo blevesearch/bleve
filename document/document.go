@@ -43,10 +43,18 @@ func NewDocument(id string) *Document {
 }
 
 func (d *Document) Size() int {
-	return reflectStaticSizeDocument + size.SizeOfPtr +
-		len(d.ID) +
-		len(d.Fields)*size.SizeOfPtr +
-		len(d.CompositeFields)*(size.SizeOfPtr+reflectStaticSizeCompositeField)
+	sizeInBytes := reflectStaticSizeDocument + size.SizeOfPtr +
+		len(d.ID)
+
+	for _, entry := range d.Fields {
+		sizeInBytes += entry.Size()
+	}
+
+	for _, entry := range d.CompositeFields {
+		sizeInBytes += entry.Size()
+	}
+
+	return sizeInBytes
 }
 
 func (d *Document) AddField(f Field) *Document {
