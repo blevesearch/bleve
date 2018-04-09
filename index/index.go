@@ -174,10 +174,12 @@ func (tfd *TermFieldDoc) Size() int {
 func (tfd *TermFieldDoc) Reset() *TermFieldDoc {
 	// remember the []byte used for the ID
 	id := tfd.ID
+	vectors := tfd.Vectors
 	// idiom to copy over from empty TermFieldDoc (0 allocations)
 	*tfd = TermFieldDoc{}
 	// reuse the []byte already allocated (and reset len to 0)
 	tfd.ID = id[:0]
+	tfd.Vectors = vectors[:0]
 	return tfd
 }
 

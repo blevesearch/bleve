@@ -36,6 +36,9 @@ type PhraseSearcher struct {
 	queryNorm    float64
 	currMust     *search.DocumentMatch
 	terms        [][]string
+	path         phrasePath
+	paths        []phrasePath
+	locations    []search.Location
 	initialized  bool
 }
 
@@ -212,45 +215,59 @@ func (s *PhraseSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch,
 // also satisfies the phase constraints.  if so, it returns a DocumentMatch
 // for this document, otherwise nil
 func (s *PhraseSearcher) checkCurrMustMatch(ctx *search.SearchContext) *search.DocumentMatch {
-	rvftlm := make(search.FieldTermLocationMap, 0)
-	freq := 0
+	s.locations = s.currMust.Complete(s.locations)
+
+	locations := s.currMust.Locations
+	s.currMust.Locations = nil
+
+	ftls := s.currMust.FieldTermLocations
+
 	// typically we would expect there to only actually be results in
 	// one field, but we allow for this to not be the case
 	// but, we note that phrase constraints can only be satisfied within
 	// a single field, so we can check them each independently
-	for field, tlm := range s.currMust.Locations {
-
-		f, rvtlm := s.checkCurrMustMatchField(ctx, tlm)
-		if f > 0 {
-			freq += f
-			rvftlm[field] = rvtlm
-		}
+	for field, tlm := range locations {
+		ftls = s.checkCurrMustMatchField(ctx, field, tlm, ftls)
 	}
 
-	if freq > 0 {
+	if len(ftls) > 0 {
 		// return match
 		rv := s.currMust
 		s.currMust = nil
-		rv.Locations = rvftlm
+		rv.FieldTermLocations = ftls
 		return rv
 	}
 
 	return nil
 }
 
-// checkCurrMustMatchField is soley concerned with determining if one particular
-// field within the currMust DocumentMatch Locations satisfies the phase
-// constraints (possibly more than once).  if so, the number of times it was
-// satisfied, and these locations are returned.  otherwise 0 and either
-// a nil or empty TermLocationMap
-func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext, tlm search.TermLocationMap) (
-	int, search.TermLocationMap) {
-	paths := findPhrasePaths(s.terms, tlm, 0)
-	rv := make(search.TermLocationMap, len(s.terms))
-	for _, p := range paths {
-		p.MergeInto(rv)
+// checkCurrMustMatchField is soley concerned with determining if one
+// particular field within the currMust DocumentMatch Locations
+// satisfies the phase constraints (possibly more than once).  if so,
+// the matching field term locations are appended to the provided
+// slice
+func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext,
+	field string, tlm search.TermLocationMap,
+	ftls []search.FieldTermLocation) []search.FieldTermLocation {
+	if s.path == nil {
+		s.path = make(phrasePath, 0, len(s.terms))
 	}
-	return len(paths), rv
+	s.paths = findPhrasePaths(0, nil, s.terms, tlm, s.path[:0], 0, s.paths[:0])
+	for _, p := range s.paths {
+		for _, pp := range p {
+			ftls = append(ftls, search.FieldTermLocation{
+				Field: field,
+				Term:  pp.term,
+				Location: search.Location{
+					Pos:            pp.loc.Pos,
+					Start:          pp.loc.Start,
+					End:            pp.loc.End,
+					ArrayPositions: pp.loc.ArrayPositions,
+				},
+			})
+		}
+	}
+	return ftls
 }
 
 type phrasePart struct {
@@ -283,43 +300,38 @@ func (p phrasePath) String() string {
 }
 
 // findPhrasePaths is a function to identify phase matches from a set
-// of known term locations.
-//
-// phraseTerms - slice containing the phrase terms,
-//               may contain empty string as placeholder (don't care)
-// tlm - the Term Location Map containing all relevant term locations
-// slop - amount of sloppiness that's allowed, which is the cummulative
-//        sum of the editDistances of each matching phrase part,
-//        where 0 means no sloppiness allowed (all editDistances must be 0)
-//
-// returns slice of paths, or nil if invocation did not find any successul paths
-func findPhrasePaths(phraseTerms [][]string,
-	tlm search.TermLocationMap, slop int) []phrasePath {
-	return findPhrasePathsRecur(0, nil, phraseTerms, tlm, nil, slop, nil)
-}
-
-// findPhrasePathsRecur is the recursive implementation of
-// findPhrasePaths, so care must be taken with arguments and return
-// values.
+// of known term locations.  it recursive so care must be taken with
+// arguments and return values.
 //
 // prevPos - the previous location, 0 on first invocation
 // ap - array positions of the first candidate phrase part to
 //      which further recursive phrase parts must match,
 //      nil on initial invocation or when there are no array positions
-// phraseTerms - slice containing the phrase terms themselves
+// phraseTerms - slice containing the phrase terms,
 //               may contain empty string as placeholder (don't care)
 // tlm - the Term Location Map containing all relevant term locations
 // p - the current path being explored (appended to in recursive calls)
 //     this is the primary state being built during the traversal
-// remainingSlop - decremented during recursion
+// remainingSlop - amount of sloppiness that's allowed, which is the
+//        sum of the editDistances from each matching phrase part,
+//        where 0 means no sloppiness allowed (all editDistances must be 0),
+//        decremented during recursion
 // rv - the final result being appended to by all the recursive calls
 //
 // returns slice of paths, or nil if invocation did not find any successul paths
-func findPhrasePathsRecur(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]string,
+func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]string,
 	tlm search.TermLocationMap, p phrasePath, remainingSlop int, rv []phrasePath) []phrasePath {
 	// no more terms
 	if len(phraseTerms) < 1 {
-		return append(rv, append(phrasePath(nil), p...))
+		// snapshot or copy the recursively built phrasePath p and
+		// append it to the rv, also optimizing by checking if next
+		// phrasePath item in the rv (which we're about to overwrite)
+		// is available for reuse
+		var pcopy phrasePath
+		if len(rv) < cap(rv) {
+			pcopy = rv[:len(rv)+1][len(rv)][:0]
+		}
+		return append(rv, append(pcopy, p...))
 	}
 
 	car := phraseTerms[0]
@@ -332,7 +344,7 @@ func findPhrasePathsRecur(prevPos uint64, ap search.ArrayPositions, phraseTerms 
 			// if prevPos was 0, don't set it to 1 (as thats not a real abs pos)
 			nextPos = 0 // don't advance nextPos if prevPos was 0
 		}
-		return findPhrasePathsRecur(nextPos, ap, cdr, tlm, p, remainingSlop, rv)
+		return findPhrasePaths(nextPos, ap, cdr, tlm, p, remainingSlop, rv)
 	}
 
 	// locations for this term
@@ -362,7 +374,7 @@ func findPhrasePathsRecur(prevPos uint64, ap search.ArrayPositions, phraseTerms 
 
 				// this location works, add it to the path (but not for empty term)
 				px := append(p, phrasePart{term: carTerm, loc: loc})
-				rv = findPhrasePathsRecur(loc.Pos, loc.ArrayPositions, cdr, tlm, px, remainingSlop-dist, rv)
+				rv = findPhrasePaths(loc.Pos, loc.ArrayPositions, cdr, tlm, px, remainingSlop-dist, rv)
 			}
 		}
 	}

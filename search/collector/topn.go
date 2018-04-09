@@ -282,6 +282,7 @@ func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
 				return err
 			}
 		}
+		doc.Complete(nil)
 		return nil
 	})
 
