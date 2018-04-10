@@ -29,6 +29,10 @@ func (e *EmptySegment) VisitDocument(num uint64, visitor DocumentFieldValueVisit
 	return nil
 }
 
+func (e *EmptySegment) DocID(num uint64) ([]byte, error) {
+	return nil, nil
+}
+
 func (e *EmptySegment) Count() uint64 {
 	return 0
 }

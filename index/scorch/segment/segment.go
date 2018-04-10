@@ -28,6 +28,9 @@ type Segment interface {
 	Dictionary(field string) (TermDictionary, error)
 
 	VisitDocument(num uint64, visitor DocumentFieldValueVisitor) error
+
+	DocID(num uint64) ([]byte, error)
+
 	Count() uint64
 
 	DocNumbers([]string) (*roaring.Bitmap, error)

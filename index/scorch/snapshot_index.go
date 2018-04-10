@@ -357,24 +357,15 @@ func (i *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
 	}
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
-	var found bool
-	var rv string
-	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(field string, typ byte, value []byte, pos []uint64) bool {
-		if field == "_id" {
-			found = true
-			rv = string(value)
-			return false
-		}
-		return true
-	})
+	v, err := i.segment[segmentIndex].DocID(localDocNum)
 	if err != nil {
 		return "", err
 	}
-
-	if found {
-		return rv, nil
+	if v == nil {
+		return "", fmt.Errorf("document number %d not found", docNum)
 	}
-	return "", fmt.Errorf("document number %d not found", docNum)
+
+	return string(v), nil
 }
 
 func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err error) {

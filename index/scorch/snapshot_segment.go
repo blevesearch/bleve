@@ -101,6 +101,10 @@ func (s *SegmentSnapshot) VisitDocument(num uint64, visitor segment.DocumentFiel
 	return s.segment.VisitDocument(num, visitor)
 }
 
+func (s *SegmentSnapshot) DocID(num uint64) ([]byte, error) {
+	return s.segment.DocID(num)
+}
+
 func (s *SegmentSnapshot) Count() uint64 {
 
 	rv := s.segment.Count()
