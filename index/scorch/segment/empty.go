@@ -85,6 +85,11 @@ func (e *EmptyDictionary) FuzzyIterator(term string,
 	return &EmptyDictionaryIterator{}
 }
 
+func (e *EmptyDictionary) OnlyIterator(onlyTerms [][]byte,
+	includeCount bool) DictionaryIterator {
+	return &EmptyDictionaryIterator{}
+}
+
 type EmptyDictionaryIterator struct{}
 
 func (e *EmptyDictionaryIterator) Next() (*index.DictEntry, error) {

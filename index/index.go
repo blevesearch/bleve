@@ -104,6 +104,10 @@ type IndexReaderFuzzy interface {
 	FieldDictFuzzy(field string, term []byte, fuzziness int) (FieldDict, error)
 }
 
+type IndexReaderOnly interface {
+	FieldDictOnly(field string, onlyTerms [][]byte, includeCount bool) (FieldDict, error)
+}
+
 // FieldTerms contains the terms used by a document, keyed by field
 type FieldTerms map[string][]string
 
