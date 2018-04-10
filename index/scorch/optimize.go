@@ -84,7 +84,7 @@ func (o *OptimizeTFRConjunction) Finish() error {
 			itr, ok := tfr.iterators[i].(*zap.PostingsIterator)
 			if ok && itr.ActualBM != nil {
 				itr.ActualBM = bm
-				itr.Actual = bm.Iterator()
+				itr.Actual = bm.IteratorReuse(itr.Actual)
 			}
 		}
 	}

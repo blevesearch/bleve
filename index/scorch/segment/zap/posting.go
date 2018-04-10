@@ -153,6 +153,9 @@ func (p *PostingsList) Iterator(includeFreq, includeNorm, includeLocs bool,
 
 func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 	rv *PostingsIterator) *PostingsIterator {
+	var reuseAll roaring.IntIterable
+	var reuseActual roaring.IntIterable
+
 	if rv == nil {
 		rv = &PostingsIterator{}
 	} else {
@@ -173,6 +176,9 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 		nextSegmentLocs := rv.nextSegmentLocs[:0]
 
 		buf := rv.buf
+
+		reuseAll = rv.all
+		reuseActual = rv.Actual
 
 		*rv = PostingsIterator{} // clear the struct
 
@@ -246,13 +252,13 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 		rv.locChunkStart = p.locOffset + n
 	}
 
-	rv.all = p.postings.Iterator()
+	rv.all = p.postings.IteratorReuse(reuseAll)
 	if p.except != nil {
 		rv.ActualBM = roaring.AndNot(p.postings, p.except)
-		rv.Actual = rv.ActualBM.Iterator()
+		rv.Actual = rv.ActualBM.IteratorReuse(reuseActual)
 	} else {
 		rv.ActualBM = p.postings
-		rv.Actual = p.postings.Iterator()
+		rv.Actual = p.postings.IteratorReuse(reuseActual)
 	}
 
 	return rv
