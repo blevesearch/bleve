@@ -35,6 +35,7 @@ type IndexSnapshotTermFieldReader struct {
 	term               []byte
 	field              string
 	snapshot           *IndexSnapshot
+	dicts              []segment.TermDictionary
 	postings           []segment.PostingsList
 	iterators          []segment.PostingsIterator
 	segmentOffset      int
@@ -164,6 +165,7 @@ func (i *IndexSnapshotTermFieldReader) Count() uint64 {
 func (i *IndexSnapshotTermFieldReader) Close() error {
 	if i.snapshot != nil {
 		atomic.AddUint64(&i.snapshot.parent.stats.TotTermSearchersFinished, uint64(1))
+		i.snapshot.recycleTermFieldReader(i)
 	}
 	return nil
 }
