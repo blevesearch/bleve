@@ -532,7 +532,7 @@ func visitDocumentFieldCacheTerms(localDocNum uint64, fields []string,
 }
 
 func extractDvPendingFields(requestedFields, persistedFields []string) []string {
-	removeMap := map[string]struct{}{}
+	removeMap := make(map[string]struct{}, len(persistedFields))
 	for _, str := range persistedFields {
 		removeMap[str] = struct{}{}
 	}

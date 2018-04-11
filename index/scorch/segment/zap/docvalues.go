@@ -125,6 +125,7 @@ func (di *docValueReader) loadDvChunk(chunkNumber,
 	dataLength := curChunkEnd - compressedDataLoc
 	di.curChunkData = s.mem[compressedDataLoc : compressedDataLoc+dataLength]
 	di.curChunkNum = chunkNumber
+	di.uncompressed = di.uncompressed[:0]
 	return nil
 }
 
@@ -135,12 +136,20 @@ func (di *docValueReader) visitDocValues(docNum uint64,
 	if start == math.MaxUint64 || end == math.MaxUint64 {
 		return nil
 	}
-	// uncompress the already loaded data
-	uncompressed, err := snappy.Decode(di.uncompressed[:cap(di.uncompressed)], di.curChunkData)
-	if err != nil {
-		return err
+
+	var uncompressed []byte
+	var err error
+	// use the uncompressed copy if available
+	if len(di.uncompressed) > 0 {
+		uncompressed = di.uncompressed
+	} else {
+		// uncompress the already loaded data
+		uncompressed, err = snappy.Decode(di.uncompressed[:cap(di.uncompressed)], di.curChunkData)
+		if err != nil {
+			return err
+		}
+		di.uncompressed = uncompressed
 	}
-	di.uncompressed = uncompressed
 
 	// pick the terms for the given docNum
 	uncompressed = uncompressed[start:end]
@@ -200,7 +209,7 @@ func (s *SegmentBase) VisitDocumentFieldTerms(localDocNum uint64, fields []strin
 // persisted doc value terms ready to be visitable using the
 // VisitDocumentFieldTerms method.
 func (s *Segment) VisitableDocValueFields() ([]string, error) {
-	var rv []string
+	rv := make([]string, 0, len(s.fieldDvReaders))
 	for fieldID, field := range s.fieldsInv {
 		if dvIter, ok := s.fieldDvReaders[uint16(fieldID)]; ok &&
 			dvIter != nil {
