@@ -356,8 +356,11 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 
 		rv[fieldID] = dictOffset
 
+		// get the field doc value offset (start)
+		fieldDvLocsStart[fieldID] = uint64(w.Count())
+
 		// update the field doc values
-		fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), newSegDocCount-1)
+		fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), newSegDocCount-1, w, true)
 		for docNum, docTerms := range docTermMap {
 			if len(docTerms) > 0 {
 				err = fdvEncoder.Add(uint64(docNum), docTerms)
@@ -371,11 +374,8 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 			return nil, 0, err
 		}
 
-		// get the field doc value offset (start)
-		fieldDvLocsStart[fieldID] = uint64(w.Count())
-
 		// persist the doc value details for this field
-		_, err = fdvEncoder.Write(w)
+		_, err = fdvEncoder.Write()
 		if err != nil {
 			return nil, 0, err
 		}

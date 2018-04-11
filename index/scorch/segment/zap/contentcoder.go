@@ -34,10 +34,14 @@ var termSeparator byte = 0xff
 var termSeparatorSplitSlice = []byte{termSeparator}
 
 type chunkedContentCoder struct {
-	final        []byte
-	chunkSize    uint64
-	currChunk    uint64
-	chunkLens    []uint64
+	final     []byte
+	chunkSize uint64
+	currChunk uint64
+	chunkLens []uint64
+
+	w                io.Writer
+	progressiveWrite bool
+
 	chunkMetaBuf bytes.Buffer
 	chunkBuf     bytes.Buffer
 
@@ -55,13 +59,15 @@ type MetaData struct {
 
 // newChunkedContentCoder returns a new chunk content coder which
 // packs data into chunks based on the provided chunkSize
-func newChunkedContentCoder(chunkSize uint64,
-	maxDocNum uint64) *chunkedContentCoder {
+func newChunkedContentCoder(chunkSize uint64, maxDocNum uint64,
+	w io.Writer, progressiveWrite bool) *chunkedContentCoder {
 	total := maxDocNum/chunkSize + 1
 	rv := &chunkedContentCoder{
-		chunkSize: chunkSize,
-		chunkLens: make([]uint64, total),
-		chunkMeta: make([]MetaData, 0, total),
+		chunkSize:        chunkSize,
+		chunkLens:        make([]uint64, total),
+		chunkMeta:        make([]MetaData, 0, total),
+		w:                w,
+		progressiveWrite: progressiveWrite,
 	}
 
 	return rv
@@ -111,6 +117,15 @@ func (c *chunkedContentCoder) flushContents() error {
 	c.final = append(c.final, c.compressed...)
 
 	c.chunkLens[c.currChunk] = uint64(len(c.compressed) + len(metaData))
+
+	if c.progressiveWrite {
+		_, err := c.w.Write(c.final)
+		if err != nil {
+			return err
+		}
+		c.final = c.final[:0]
+	}
+
 	return nil
 }
 
@@ -150,14 +165,16 @@ func (c *chunkedContentCoder) Add(docNum uint64, vals []byte) error {
 // | ..... data ..... | chunk offsets (varints)
 // | position of chunk offsets (uint64) | number of offsets (uint64) |
 //
-func (c *chunkedContentCoder) Write(w io.Writer) (int, error) {
+func (c *chunkedContentCoder) Write() (int, error) {
 	var tw int
 
-	// write out the data section first
-	nw, err := w.Write(c.final)
-	tw += nw
-	if err != nil {
-		return tw, err
+	if c.final != nil {
+		// write out the data section first
+		nw, err := c.w.Write(c.final)
+		tw += nw
+		if err != nil {
+			return tw, err
+		}
 	}
 
 	chunkOffsetsStart := uint64(tw)
@@ -171,7 +188,7 @@ func (c *chunkedContentCoder) Write(w io.Writer) (int, error) {
 	// write out the chunk offsets
 	for _, chunkOffset := range chunkOffsets {
 		n := binary.PutUvarint(c.final, chunkOffset)
-		nw, err = w.Write(c.final[:n])
+		nw, err := c.w.Write(c.final[:n])
 		tw += nw
 		if err != nil {
 			return tw, err
@@ -183,7 +200,7 @@ func (c *chunkedContentCoder) Write(w io.Writer) (int, error) {
 	c.final = c.final[0:8]
 	// write out the length of chunk offsets
 	binary.BigEndian.PutUint64(c.final, chunkOffsetsLen)
-	nw, err = w.Write(c.final)
+	nw, err := c.w.Write(c.final)
 	tw += nw
 	if err != nil {
 		return tw, err
@@ -191,7 +208,7 @@ func (c *chunkedContentCoder) Write(w io.Writer) (int, error) {
 
 	// write out the number of chunks
 	binary.BigEndian.PutUint64(c.final, uint64(len(c.chunkLens)))
-	nw, err = w.Write(c.final)
+	nw, err = c.w.Write(c.final)
 	tw += nw
 	if err != nil {
 		return tw, err

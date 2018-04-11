@@ -592,7 +592,7 @@ func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err
 
 	tfEncoder := newChunkedIntCoder(uint64(s.chunkFactor), uint64(len(s.results)-1))
 	locEncoder := newChunkedIntCoder(uint64(s.chunkFactor), uint64(len(s.results)-1))
-	fdvEncoder := newChunkedContentCoder(uint64(s.chunkFactor), uint64(len(s.results)-1))
+	fdvEncoder := newChunkedContentCoder(uint64(s.chunkFactor), uint64(len(s.results)-1), s.w, false)
 
 	var docTermMap [][]byte
 
@@ -744,7 +744,7 @@ func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err
 
 			fdvOffsetsStart[fieldID] = uint64(s.w.Count())
 
-			_, err = fdvEncoder.Write(s.w)
+			_, err = fdvEncoder.Write()
 			if err != nil {
 				return 0, nil, err
 			}
