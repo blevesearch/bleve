@@ -146,33 +146,59 @@ func (c *chunkedContentCoder) Add(docNum uint64, vals []byte) error {
 }
 
 // Write commits all the encoded chunked contents to the provided writer.
+//
+// | ..... data ..... | chunk offsets (varints)
+// | position of chunk offsets (uint64) | number of offsets (uint64) |
+//
 func (c *chunkedContentCoder) Write(w io.Writer) (int, error) {
 	var tw int
-	buf := make([]byte, binary.MaxVarintLen64)
-	// write out the number of chunks
-	n := binary.PutUvarint(buf, uint64(len(c.chunkLens)))
-	nw, err := w.Write(buf[:n])
+
+	// write out the data section first
+	nw, err := w.Write(c.final)
 	tw += nw
 	if err != nil {
 		return tw, err
 	}
 
+	chunkOffsetsStart := uint64(tw)
+
+	if cap(c.final) < binary.MaxVarintLen64 {
+		c.final = make([]byte, binary.MaxVarintLen64)
+	} else {
+		c.final = c.final[0:binary.MaxVarintLen64]
+	}
 	chunkOffsets := modifyLengthsToEndOffsets(c.chunkLens)
 	// write out the chunk offsets
 	for _, chunkOffset := range chunkOffsets {
-		n := binary.PutUvarint(buf, chunkOffset)
-		nw, err = w.Write(buf[:n])
+		n := binary.PutUvarint(c.final, chunkOffset)
+		nw, err = w.Write(c.final[:n])
 		tw += nw
 		if err != nil {
 			return tw, err
 		}
 	}
-	// write out the data
+
+	chunkOffsetsLen := uint64(tw) - chunkOffsetsStart
+
+	c.final = c.final[0:8]
+	// write out the length of chunk offsets
+	binary.BigEndian.PutUint64(c.final, chunkOffsetsLen)
 	nw, err = w.Write(c.final)
 	tw += nw
 	if err != nil {
 		return tw, err
 	}
+
+	// write out the number of chunks
+	binary.BigEndian.PutUint64(c.final, uint64(len(c.chunkLens)))
+	nw, err = w.Write(c.final)
+	tw += nw
+	if err != nil {
+		return tw, err
+	}
+
+	c.final = c.final[:0]
+
 	return tw, nil
 }
 

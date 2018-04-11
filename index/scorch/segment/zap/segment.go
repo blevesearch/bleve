@@ -487,12 +487,20 @@ func (s *SegmentBase) loadDvReaders() error {
 
 	var read uint64
 	for fieldID, field := range s.fieldsInv {
-		fieldLoc, n := binary.Uvarint(s.mem[s.docValueOffset+read : s.docValueOffset+read+binary.MaxVarintLen64])
+		var fieldLocStart, fieldLocEnd uint64
+		var n int
+		fieldLocStart, n = binary.Uvarint(s.mem[s.docValueOffset+read : s.docValueOffset+read+binary.MaxVarintLen64])
 		if n <= 0 {
-			return fmt.Errorf("loadDvReaders: failed to read the docvalue offsets for field %d", fieldID)
+			return fmt.Errorf("loadDvReaders: failed to read the docvalue offset start for field %d", fieldID)
 		}
-		s.fieldDvReaders[uint16(fieldID)], _ = s.loadFieldDocValueReader(field, fieldLoc)
 		read += uint64(n)
+		fieldLocEnd, n = binary.Uvarint(s.mem[s.docValueOffset+read : s.docValueOffset+read+binary.MaxVarintLen64])
+		if n <= 0 {
+			return fmt.Errorf("loadDvReaders: failed to read the docvalue offset end for field %d", fieldID)
+		}
+		read += uint64(n)
+
+		s.fieldDvReaders[uint16(fieldID)], _ = s.loadFieldDocValueReader(field, fieldLocStart, fieldLocEnd)
 	}
 	return nil
 }

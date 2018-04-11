@@ -585,7 +585,8 @@ func (s *interim) writeStoredFields() (
 func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err error) {
 	dictOffsets = make([]uint64, len(s.FieldsInv))
 
-	fdvOffsets := make([]uint64, len(s.FieldsInv))
+	fdvOffsetsStart := make([]uint64, len(s.FieldsInv))
+	fdvOffsetsEnd := make([]uint64, len(s.FieldsInv))
 
 	buf := s.grabBuf(binary.MaxVarintLen64)
 
@@ -741,24 +742,32 @@ func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err
 				return 0, nil, err
 			}
 
-			fdvOffsets[fieldID] = uint64(s.w.Count())
+			fdvOffsetsStart[fieldID] = uint64(s.w.Count())
 
 			_, err = fdvEncoder.Write(s.w)
 			if err != nil {
 				return 0, nil, err
 			}
 
+			fdvOffsetsEnd[fieldID] = uint64(s.w.Count())
+
 			fdvEncoder.Reset()
 		} else {
-			fdvOffsets[fieldID] = fieldNotUninverted
+			fdvOffsetsStart[fieldID] = fieldNotUninverted
+			fdvOffsetsEnd[fieldID] = fieldNotUninverted
 		}
 	}
 
 	fdvIndexOffset = uint64(s.w.Count())
 
-	for _, fdvOffset := range fdvOffsets {
-		n := binary.PutUvarint(buf, fdvOffset)
+	for i := 0; i < len(fdvOffsetsStart); i++ {
+		n := binary.PutUvarint(buf, fdvOffsetsStart[i])
 		_, err := s.w.Write(buf[:n])
+		if err != nil {
+			return 0, nil, err
+		}
+		n = binary.PutUvarint(buf, fdvOffsetsEnd[i])
+		_, err = s.w.Write(buf[:n])
 		if err != nil {
 			return 0, nil, err
 		}
