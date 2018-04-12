@@ -96,8 +96,7 @@ func (s *SegmentBase) loadFieldDocValueReader(field string,
 	return fdvIter, nil
 }
 
-func (di *docValueReader) loadDvChunk(chunkNumber,
-	localDocNum uint64, s *SegmentBase) error {
+func (di *docValueReader) loadDvChunk(chunkNumber uint64, s *SegmentBase) error {
 	// advance to the chunk where the docValues
 	// reside for the given docNum
 	destChunkDataLoc, curChunkEnd := di.dvDataLoc, di.dvDataLoc
@@ -193,7 +192,7 @@ func (s *SegmentBase) VisitDocumentFieldTerms(localDocNum uint64, fields []strin
 			dvIter != nil {
 			// check if the chunk is already loaded
 			if docInChunk != dvIter.curChunkNumber() {
-				err := dvIter.loadDvChunk(docInChunk, localDocNum, s)
+				err := dvIter.loadDvChunk(docInChunk, s)
 				if err != nil {
 					continue
 				}
