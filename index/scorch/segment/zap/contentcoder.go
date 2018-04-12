@@ -106,11 +106,25 @@ func (c *chunkedContentCoder) flushContents() error {
 	// write the metadata to final data
 	metaData := c.chunkMetaBuf.Bytes()
 	c.final = append(c.final, c.chunkMetaBuf.Bytes()...)
-	// write the compressed data to the final data
-	c.compressed = snappy.Encode(c.compressed[:cap(c.compressed)], c.chunkBuf.Bytes())
-	c.final = append(c.final, c.compressed...)
 
-	c.chunkLens[c.currChunk] = uint64(len(c.compressed) + len(metaData))
+	// if compression is not helping in reducing the size by atleast 20%
+	// then persist data without compression and mark whether the chunk
+	// data is compressed or not.
+	var dl int
+	c.compressed = snappy.Encode(c.compressed[:cap(c.compressed)], c.chunkBuf.Bytes())
+	if len(c.compressed) >= int(float64(.8)*float64(len(c.chunkBuf.Bytes()))) {
+		n = binary.PutUvarint(buf, 0)
+		c.final = append(c.final, buf[:n]...)
+		c.final = append(c.final, c.chunkBuf.Bytes()...)
+		dl = len(c.chunkBuf.Bytes())
+	} else {
+		n = binary.PutUvarint(buf, 1)
+		c.final = append(c.final, buf[:n]...)
+		c.final = append(c.final, c.compressed...)
+		dl = len(c.compressed)
+	}
+
+	c.chunkLens[c.currChunk] = uint64(dl + n + len(metaData))
 	return nil
 }
 

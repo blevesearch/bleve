@@ -41,6 +41,7 @@ type docValueReader struct {
 	chunkOffsets   []uint64
 	dvDataLoc      uint64
 	curChunkHeader []MetaData
+	isCompressed   bool
 	curChunkData   []byte // compressed data cache
 	uncompressed   []byte // temp buf for snappy decompression
 }
@@ -120,9 +121,16 @@ func (di *docValueReader) loadDvChunk(chunkNumber uint64, s *SegmentBase) error 
 		offset += uint64(read)
 	}
 
+	v, read := binary.Uvarint(s.mem[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
+	offset += uint64(read)
+	if v == 1 {
+		di.isCompressed = true
+	}
+
 	compressedDataLoc := chunkMetaLoc + offset
 	dataLength := curChunkEnd - compressedDataLoc
-	di.curChunkData = s.mem[compressedDataLoc : compressedDataLoc+dataLength]
+	di.curChunkData = append([]byte(nil), s.mem[compressedDataLoc:compressedDataLoc+dataLength]...)
+	//di.curChunkData = s.mem[compressedDataLoc : compressedDataLoc+dataLength]
 	di.curChunkNum = chunkNumber
 	di.uncompressed = di.uncompressed[:0]
 	return nil
@@ -143,11 +151,16 @@ func (di *docValueReader) visitDocValues(docNum uint64,
 		uncompressed = di.uncompressed
 	} else {
 		// uncompress the already loaded data
-		uncompressed, err = snappy.Decode(di.uncompressed[:cap(di.uncompressed)], di.curChunkData)
-		if err != nil {
-			return err
+		if di.isCompressed {
+			uncompressed, err = snappy.Decode(di.uncompressed[:cap(di.uncompressed)], di.curChunkData)
+			if err != nil {
+				return err
+			}
+			di.uncompressed = uncompressed
+		} else {
+			di.uncompressed = di.curChunkData
+			uncompressed = di.curChunkData
 		}
-		di.uncompressed = uncompressed
 	}
 
 	// pick the terms for the given docNum
