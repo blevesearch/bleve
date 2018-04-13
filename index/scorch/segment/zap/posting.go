@@ -504,7 +504,18 @@ func (i *PostingsIterator) readLocation(l *Location) error {
 
 // Next returns the next posting on the postings list, or nil at the end
 func (i *PostingsIterator) Next() (segment.Posting, error) {
-	docNum, exists, err := i.nextDocNum()
+	return i.nextAtOrAfter(0)
+}
+
+// Advance returns the posting at the specified docNum or it is not present
+// the next posting, or if the end is reached, nil
+func (i *PostingsIterator) Advance(docNum uint64) (segment.Posting, error) {
+	return i.nextAtOrAfter(docNum)
+}
+
+// Next returns the next posting on the postings list, or nil at the end
+func (i *PostingsIterator) nextAtOrAfter(atOrAfter uint64) (segment.Posting, error) {
+	docNum, exists, err := i.nextDocNumAtOrAfter(atOrAfter)
 	if err != nil || !exists {
 		return nil, err
 	}
@@ -557,7 +568,7 @@ var freqHasLocs1Hit = encodeFreqHasLocs(1, false)
 func (i *PostingsIterator) nextBytes() (
 	docNumOut uint64, freq uint64, normBits uint64,
 	bytesFreqNorm []byte, bytesLoc []byte, err error) {
-	docNum, exists, err := i.nextDocNum()
+	docNum, exists, err := i.nextDocNumAtOrAfter(0)
 	if err != nil || !exists {
 		return 0, 0, 0, nil, nil, err
 	}
@@ -602,9 +613,14 @@ func (i *PostingsIterator) nextBytes() (
 
 // nextDocNum returns the next docNum on the postings list, and also
 // sets up the currChunk / loc related fields of the iterator.
-func (i *PostingsIterator) nextDocNum() (uint64, bool, error) {
+func (i *PostingsIterator) nextDocNumAtOrAfter(atOrAfter uint64) (uint64, bool, error) {
 	if i.normBits1Hit != 0 {
 		if i.docNum1Hit == docNum1HitFinished {
+			return 0, false, nil
+		}
+		if i.docNum1Hit < atOrAfter {
+			// advanced past our 1-hit
+			i.docNum1Hit = docNum1HitFinished // consume our 1-hit docNum
 			return 0, false, nil
 		}
 		docNum := i.docNum1Hit
@@ -617,6 +633,13 @@ func (i *PostingsIterator) nextDocNum() (uint64, bool, error) {
 	}
 
 	n := i.Actual.Next()
+	for uint64(n) < atOrAfter && i.Actual.HasNext() {
+		n = i.Actual.Next()
+	}
+	if uint64(n) < atOrAfter {
+		// couldn't find anything
+		return 0, false, nil
+	}
 	allN := i.all.Next()
 
 	nChunk := n / i.postings.sb.chunkFactor

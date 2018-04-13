@@ -96,6 +96,10 @@ func (e *EmptyDictionaryIterator) Next() (*index.DictEntry, error) {
 	return nil, nil
 }
 
+func (e *EmptyPostingsIterator) Advance(uint64) (Posting, error) {
+	return nil, nil
+}
+
 type EmptyPostingsList struct{}
 
 func (e *EmptyPostingsList) Iterator(includeFreq, includeNorm, includeLocations bool,

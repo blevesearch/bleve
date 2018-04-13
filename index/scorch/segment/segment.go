@@ -77,6 +77,12 @@ type PostingsIterator interface {
 	// allocations.
 	Next() (Posting, error)
 
+	// Advance will return the posting with the specified doc number
+	// or if there is no such posting, the next posting.
+	// Callers MUST NOT attempt to pass a docNum that is less than or
+	// equal to the currently visited posting doc Num.
+	Advance(docNum uint64) (Posting, error)
+
 	Size() int
 }
 
