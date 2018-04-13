@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"sync/atomic"
 
@@ -134,24 +135,37 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 		}
 		*i = *(i2.(*IndexSnapshotTermFieldReader))
 	}
-	// FIXME do something better
-	next, err := i.Next(preAlloced)
+	num, err := docInternalToNumber(ID)
+	if err != nil {
+		return nil, fmt.Errorf("error converting to doc number % x - %v", ID, err)
+	}
+	segIndex, ldocNum := i.snapshot.segmentIndexAndLocalDocNumFromGlobal(num)
+	if segIndex >= len(i.snapshot.segment) {
+		return nil, fmt.Errorf("computed segment index %d out of bounds %d",
+			segIndex, len(i.snapshot.segment))
+	}
+	// skip directly to the target segment
+	i.segmentOffset = segIndex
+	next, err := i.iterators[i.segmentOffset].Advance(ldocNum)
 	if err != nil {
 		return nil, err
 	}
 	if next == nil {
-		return nil, nil
+		// we jumped directly to the segment that should have contained it
+		// but it wasn't there, so reuse Next() which should correctly
+		// get the next hit after it (we moved i.segmentOffset)
+		return i.Next(preAlloced)
 	}
-	for bytes.Compare(next.ID, ID) < 0 {
-		next, err = i.Next(preAlloced)
-		if err != nil {
-			return nil, err
-		}
-		if next == nil {
-			break
-		}
+
+	if preAlloced == nil {
+		preAlloced = &index.TermFieldDoc{}
 	}
-	return next, nil
+	preAlloced.ID = docNumberToBytes(preAlloced.ID, next.Number()+
+		i.snapshot.offsets[segIndex])
+	i.postingToTermFieldDoc(next, preAlloced)
+	i.currID = preAlloced.ID
+	i.currPosting = next
+	return preAlloced, nil
 }
 
 func (i *IndexSnapshotTermFieldReader) Count() uint64 {
