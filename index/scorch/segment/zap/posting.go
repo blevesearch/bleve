@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
 	"reflect"
 
@@ -539,7 +540,10 @@ func (i *PostingsIterator) nextAtOrAfter(atOrAfter uint64) (segment.Posting, err
 	rv.norm = math.Float32frombits(uint32(normBits))
 
 	if i.includeLocs && hasLocs {
-		// read off 'freq' locations, into reused slices
+		// prepare locations into reused slices, where we assume
+		// rv.freq >= "number of locs", since in a composite field,
+		// some component fields might have their IncludeTermVector
+		// flags disabled while other component fields are enabled
 		if cap(i.nextLocs) >= int(rv.freq) {
 			i.nextLocs = i.nextLocs[0:rv.freq]
 		} else {
@@ -548,13 +552,22 @@ func (i *PostingsIterator) nextAtOrAfter(atOrAfter uint64) (segment.Posting, err
 		if cap(i.nextSegmentLocs) < int(rv.freq) {
 			i.nextSegmentLocs = make([]segment.Location, rv.freq, rv.freq*2)
 		}
-		rv.locs = i.nextSegmentLocs[0:rv.freq]
-		for j := 0; j < int(rv.freq); j++ {
+		rv.locs = i.nextSegmentLocs[:0]
+
+		numLocsBytes, err := binary.ReadUvarint(i.locReader)
+		if err != nil {
+			return nil, fmt.Errorf("error reading location numLocsBytes: %v", err)
+		}
+
+		j := 0
+		startBytesRemaining := i.locReader.Len() // # bytes remaining in the locReader
+		for startBytesRemaining-i.locReader.Len() < int(numLocsBytes) {
 			err := i.readLocation(&i.nextLocs[j])
 			if err != nil {
 				return nil, err
 			}
-			rv.locs[j] = &i.nextLocs[j]
+			rv.locs = append(rv.locs, &i.nextLocs[j])
+			j++
 		}
 	}
 
@@ -597,11 +610,16 @@ func (i *PostingsIterator) nextBytes() (
 	if hasLocs {
 		startLoc := len(i.currChunkLoc) - i.locReader.Len()
 
-		for j := uint64(0); j < freq; j++ {
-			err := i.readLocation(nil)
-			if err != nil {
-				return 0, 0, 0, nil, nil, err
-			}
+		numLocsBytes, err := binary.ReadUvarint(i.locReader)
+		if err != nil {
+			return 0, 0, 0, nil, nil,
+				fmt.Errorf("error reading location nextBytes numLocs: %v", err)
+		}
+
+		// skip over all the location bytes
+		_, err = i.locReader.Seek(int64(numLocsBytes), io.SeekCurrent)
+		if err != nil {
+			return 0, 0, 0, nil, nil, err
 		}
 
 		endLoc := len(i.currChunkLoc) - i.locReader.Len()
@@ -659,17 +677,21 @@ func (i *PostingsIterator) nextDocNumAtOrAfter(atOrAfter uint64) (uint64, bool, 
 			}
 
 			// read off freq/offsets even though we don't care about them
-			freq, _, hasLocs, err := i.readFreqNormHasLocs()
+			_, _, hasLocs, err := i.readFreqNormHasLocs()
 			if err != nil {
 				return 0, false, err
 			}
 
 			if i.includeLocs && hasLocs {
-				for j := 0; j < int(freq); j++ {
-					err := i.readLocation(nil)
-					if err != nil {
-						return 0, false, err
-					}
+				numLocsBytes, err := binary.ReadUvarint(i.locReader)
+				if err != nil {
+					return 0, false, fmt.Errorf("error reading location numLocsBytes: %v", err)
+				}
+
+				// skip over all the location bytes
+				_, err = i.locReader.Seek(int64(numLocsBytes), io.SeekCurrent)
+				if err != nil {
+					return 0, false, err
 				}
 			}
 		}

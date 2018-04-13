@@ -190,7 +190,7 @@ type interimStoredField struct {
 type interimFreqNorm struct {
 	freq    uint64
 	norm    float32
-	hasLocs bool
+	numLocs int
 }
 
 type interimLoc struct {
@@ -446,7 +446,7 @@ func (s *interim) processDocument(docNum uint64,
 				interimFreqNorm{
 					freq:    uint64(tf.Frequency()),
 					norm:    norm,
-					hasLocs: len(tf.Locations) > 0,
+					numLocs: len(tf.Locations),
 				})
 
 			if len(tf.Locations) > 0 {
@@ -632,18 +632,28 @@ func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err
 				freqNorm := freqNorms[freqNormOffset]
 
 				err = tfEncoder.Add(docNum,
-					encodeFreqHasLocs(freqNorm.freq, freqNorm.hasLocs),
+					encodeFreqHasLocs(freqNorm.freq, freqNorm.numLocs > 0),
 					uint64(math.Float32bits(freqNorm.norm)))
 				if err != nil {
 					return 0, nil, err
 				}
 
-				for i := uint64(0); i < freqNorm.freq; i++ {
-					if len(locs) > 0 {
-						loc := locs[locOffset]
+				if freqNorm.numLocs > 0 {
+					numBytesLocs := 0
+					for _, loc := range locs[locOffset : locOffset+freqNorm.numLocs] {
+						numBytesLocs += totalUvarintBytes(
+							uint64(loc.fieldID), loc.pos, loc.start, loc.end,
+							uint64(len(loc.arrayposs)), loc.arrayposs)
+					}
 
-						err = locEncoder.Add(docNum, uint64(loc.fieldID),
-							loc.pos, loc.start, loc.end,
+					err = locEncoder.Add(docNum, uint64(numBytesLocs))
+					if err != nil {
+						return 0, nil, err
+					}
+
+					for _, loc := range locs[locOffset : locOffset+freqNorm.numLocs] {
+						err = locEncoder.Add(docNum,
+							uint64(loc.fieldID), loc.pos, loc.start, loc.end,
 							uint64(len(loc.arrayposs)))
 						if err != nil {
 							return 0, nil, err
@@ -655,7 +665,7 @@ func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err
 						}
 					}
 
-					locOffset++
+					locOffset += freqNorm.numLocs
 				}
 
 				freqNormOffset++
@@ -774,4 +784,27 @@ func encodeFieldType(f document.Field) byte {
 		fieldType = 'c'
 	}
 	return fieldType
+}
+
+// returns the total # of bytes needed to encode the given uint64's
+// into binary.PutUVarint() encoding
+func totalUvarintBytes(a, b, c, d, e uint64, more []uint64) (n int) {
+	n = numUvarintBytes(a)
+	n += numUvarintBytes(b)
+	n += numUvarintBytes(c)
+	n += numUvarintBytes(d)
+	n += numUvarintBytes(e)
+	for _, v := range more {
+		n += numUvarintBytes(v)
+	}
+	return n
+}
+
+// returns # of bytes needed to encode x in binary.PutUvarint() encoding
+func numUvarintBytes(x uint64) (n int) {
+	for x >= 0x80 {
+		x >>= 7
+		n++
+	}
+	return n + 1
 }

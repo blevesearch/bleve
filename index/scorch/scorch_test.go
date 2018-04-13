@@ -25,9 +25,12 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
+	"github.com/blevesearch/bleve/analysis/analyzer/standard"
 	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizer/regexp"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/mapping"
 )
 
 func DestroyTest() error {
@@ -1706,4 +1709,56 @@ func TestIndexDocumentVisitFieldTermsWithMultipleFieldOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 
+}
+
+func TestAllFieldWithDifferentTermVectorsEnabled(t *testing.T) {
+	// Based on https://github.com/blevesearch/bleve/issues/895 from xeizmendi
+	mp := mapping.NewIndexMapping()
+
+	keywordMapping := mapping.NewTextFieldMapping()
+	keywordMapping.Analyzer = keyword.Name
+	keywordMapping.IncludeTermVectors = false
+	keywordMapping.IncludeInAll = true
+
+	textMapping := mapping.NewTextFieldMapping()
+	textMapping.Analyzer = standard.Name
+	textMapping.IncludeTermVectors = true
+	textMapping.IncludeInAll = true
+
+	docMapping := mapping.NewDocumentStaticMapping()
+	docMapping.AddFieldMappingsAt("keyword", keywordMapping)
+	docMapping.AddFieldMappingsAt("text", textMapping)
+
+	mp.DefaultMapping = docMapping
+
+	_ = os.RemoveAll(testConfig["path"].(string))
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch("storeName", testConfig, analysisQueue)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+	defer func() {
+		_ = idx.Close()
+		_ = os.RemoveAll(testConfig["path"].(string))
+	}()
+
+	data := map[string]string{
+		"keyword": "something",
+		"text":    "A sentence that includes something within.",
+	}
+
+	doc := document.NewDocument("1")
+	err = mp.MapDocument(doc, data)
+	if err != nil {
+		t.Errorf("error mapping doc: %v", err)
+	}
+
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
 }
