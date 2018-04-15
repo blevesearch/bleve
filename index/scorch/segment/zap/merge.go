@@ -427,17 +427,30 @@ func mergeTermFreqNormLocs(fieldsMap map[string]uint16, term []byte, postItr *Po
 		}
 
 		if len(locs) > 0 {
+			numBytesLocs := 0
 			for _, loc := range locs {
-				if cap(bufLoc) < 5+len(loc.ArrayPositions()) {
-					bufLoc = make([]uint64, 0, 5+len(loc.ArrayPositions()))
+				ap := loc.ArrayPositions()
+				numBytesLocs += totalUvarintBytes(uint64(fieldsMap[loc.Field()]-1),
+					loc.Pos(), loc.Start(), loc.End(), uint64(len(ap)), ap)
+			}
+
+			err = locEncoder.Add(hitNewDocNum, uint64(numBytesLocs))
+			if err != nil {
+				return 0, 0, 0, nil, err
+			}
+
+			for _, loc := range locs {
+				ap := loc.ArrayPositions()
+				if cap(bufLoc) < 5+len(ap) {
+					bufLoc = make([]uint64, 0, 5+len(ap))
 				}
 				args := bufLoc[0:5]
 				args[0] = uint64(fieldsMap[loc.Field()] - 1)
 				args[1] = loc.Pos()
 				args[2] = loc.Start()
 				args[3] = loc.End()
-				args[4] = uint64(len(loc.ArrayPositions()))
-				args = append(args, loc.ArrayPositions()...)
+				args[4] = uint64(len(ap))
+				args = append(args, ap...)
 				err = locEncoder.Add(hitNewDocNum, args...)
 				if err != nil {
 					return 0, 0, 0, nil, err
