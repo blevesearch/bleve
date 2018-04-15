@@ -213,6 +213,10 @@ var docvalueCmd = &cobra.Command{
 			offset += uint64(nread)
 		}
 
+		// check whether the chunk data is compressed
+		v, nread := binary.Uvarint(data[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
+		offset += uint64(nread)
+
 		compressedDataLoc := chunkMetaLoc + offset
 		dataLength := destChunkDataLoc + curChunkSize - compressedDataLoc
 		curChunkData := data[compressedDataLoc : compressedDataLoc+dataLength]
@@ -223,11 +227,17 @@ var docvalueCmd = &cobra.Command{
 			fmt.Printf("Try docNums present in chunk: %s\n", metaDataDocNums(curChunkHeader))
 			return nil
 		}
-		// uncompress the already loaded data
-		uncompressed, err := snappy.Decode(nil, curChunkData)
-		if err != nil {
-			log.Printf("snappy err %+v ", err)
-			return err
+
+		var uncompressed []byte
+		if v == 1 {
+			// uncompress the already loaded data
+			uncompressed, err = snappy.Decode(nil, curChunkData)
+			if err != nil {
+				log.Printf("snappy err %+v ", err)
+				return err
+			}
+		} else {
+			uncompressed = curChunkData
 		}
 
 		var termSeparator byte = 0xff
