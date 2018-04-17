@@ -20,7 +20,7 @@ import (
 	"os"
 )
 
-const Version uint32 = 10
+const Version uint32 = 11
 
 const Type string = "zap"
 

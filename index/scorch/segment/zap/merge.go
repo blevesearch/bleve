@@ -169,7 +169,8 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 	var postItr *PostingsIterator
 
 	rv := make([]uint64, len(fieldsInv))
-	fieldDvLocs := make([]uint64, len(fieldsInv))
+	fieldDvLocsStart := make([]uint64, len(fieldsInv))
+	fieldDvLocsEnd := make([]uint64, len(fieldsInv))
 
 	tfEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
 	locEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
@@ -355,8 +356,11 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 
 		rv[fieldID] = dictOffset
 
+		// get the field doc value offset (start)
+		fieldDvLocsStart[fieldID] = uint64(w.Count())
+
 		// update the field doc values
-		fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), newSegDocCount-1)
+		fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), newSegDocCount-1, w, true)
 		for docNum, docTerms := range docTermMap {
 			if len(docTerms) > 0 {
 				err = fdvEncoder.Add(uint64(docNum), docTerms)
@@ -370,14 +374,14 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 			return nil, 0, err
 		}
 
-		// get the field doc value offset
-		fieldDvLocs[fieldID] = uint64(w.Count())
-
 		// persist the doc value details for this field
-		_, err = fdvEncoder.Write(w)
+		_, err = fdvEncoder.Write()
 		if err != nil {
 			return nil, 0, err
 		}
+
+		// get the field doc value offset (end)
+		fieldDvLocsEnd[fieldID] = uint64(w.Count())
 
 		// reset vellum buffer and vellum builder
 		vellumBuf.Reset()
@@ -390,9 +394,14 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 	fieldDvLocsOffset := uint64(w.Count())
 
 	buf := bufMaxVarintLen64
-	for _, offset := range fieldDvLocs {
-		n := binary.PutUvarint(buf, uint64(offset))
+	for i := 0; i < len(fieldDvLocsStart); i++ {
+		n := binary.PutUvarint(buf, fieldDvLocsStart[i])
 		_, err := w.Write(buf[:n])
+		if err != nil {
+			return nil, 0, err
+		}
+		n = binary.PutUvarint(buf, fieldDvLocsEnd[i])
+		_, err = w.Write(buf[:n])
 		if err != nil {
 			return nil, 0, err
 		}

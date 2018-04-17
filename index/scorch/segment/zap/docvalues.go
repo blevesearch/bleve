@@ -62,29 +62,34 @@ func (di *docValueReader) curChunkNumber() uint64 {
 }
 
 func (s *SegmentBase) loadFieldDocValueReader(field string,
-	fieldDvLoc uint64) (*docValueReader, error) {
+	fieldDvLocStart, fieldDvLocEnd uint64) (*docValueReader, error) {
 	// get the docValue offset for the given fields
-	if fieldDvLoc == fieldNotUninverted {
+	if fieldDvLocStart == fieldNotUninverted {
 		return nil, fmt.Errorf("loadFieldDocValueReader: "+
 			"no docValues found for field: %s", field)
 	}
 
-	// read the number of chunks, chunk lengths
-	var offset, loc uint64
-	numChunks, read := binary.Uvarint(s.mem[fieldDvLoc : fieldDvLoc+binary.MaxVarintLen64])
-	if read <= 0 {
-		return nil, fmt.Errorf("failed to read the field "+
-			"doc values for field %s", field)
+	// read the number of chunks, and chunk offsets position
+	var numChunks, chunkOffsetsPosition uint64
+
+	if fieldDvLocEnd-fieldDvLocStart > 16 {
+		numChunks = binary.BigEndian.Uint64(s.mem[fieldDvLocEnd-8 : fieldDvLocEnd])
+		// read the length of chunk offsets
+		chunkOffsetsLen := binary.BigEndian.Uint64(s.mem[fieldDvLocEnd-16 : fieldDvLocEnd-8])
+		// acquire position of chunk offsets
+		chunkOffsetsPosition = (fieldDvLocEnd - 16) - chunkOffsetsLen
 	}
-	offset += uint64(read)
 
 	fdvIter := &docValueReader{
 		curChunkNum:  math.MaxUint64,
 		field:        field,
 		chunkOffsets: make([]uint64, int(numChunks)),
 	}
+
+	// read the chunk offsets
+	var offset uint64
 	for i := 0; i < int(numChunks); i++ {
-		loc, read = binary.Uvarint(s.mem[fieldDvLoc+offset : fieldDvLoc+offset+binary.MaxVarintLen64])
+		loc, read := binary.Uvarint(s.mem[chunkOffsetsPosition+offset : chunkOffsetsPosition+offset+binary.MaxVarintLen64])
 		if read <= 0 {
 			return nil, fmt.Errorf("corrupted chunk offset during segment load")
 		}
@@ -92,7 +97,9 @@ func (s *SegmentBase) loadFieldDocValueReader(field string,
 		offset += uint64(read)
 	}
 
-	fdvIter.dvDataLoc = fieldDvLoc + offset
+	// set the data offset
+	fdvIter.dvDataLoc = fieldDvLocStart
+
 	return fdvIter, nil
 }
 
