@@ -175,12 +175,6 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 	tfEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
 	locEncoder := newChunkedIntCoder(uint64(chunkFactor), newSegDocCount-1)
 
-	// docTermMap is keyed by docNum, where the array impl provides
-	// better memory usage behavior than a sparse-friendlier hashmap
-	// for when docs have much structural similarity (i.e., every doc
-	// has a given field)
-	var docTermMap [][]byte
-
 	var vellumBuf bytes.Buffer
 	newVellum, err := vellum.New(&vellumBuf, nil)
 	if err != nil {
@@ -197,6 +191,8 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 		var drops []*roaring.Bitmap
 		var dicts []*Dictionary
 		var itrs []vellum.Iterator
+
+		var segmentsInFocus []*SegmentBase
 
 		for segmentI, segment := range segments {
 			dict, err2 := segment.dictionary(fieldName)
@@ -217,16 +213,8 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 					}
 					dicts = append(dicts, dict)
 					itrs = append(itrs, itr)
+					segmentsInFocus = append(segmentsInFocus, segment)
 				}
-			}
-		}
-
-		if uint64(cap(docTermMap)) < newSegDocCount {
-			docTermMap = make([][]byte, newSegDocCount)
-		} else {
-			docTermMap = docTermMap[0:newSegDocCount]
-			for docNum := range docTermMap { // reset the docTermMap
-				docTermMap[docNum] = docTermMap[docNum][:0]
 			}
 		}
 
@@ -309,11 +297,11 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				// can optimize by copying freq/norm/loc bytes directly
 				lastDocNum, lastFreq, lastNorm, err = mergeTermFreqNormLocsByCopying(
 					term, postItr, newDocNums[itrI], newRoaring,
-					tfEncoder, locEncoder, docTermMap)
+					tfEncoder, locEncoder)
 			} else {
 				lastDocNum, lastFreq, lastNorm, bufLoc, err = mergeTermFreqNormLocs(
 					fieldsMap, term, postItr, newDocNums[itrI], newRoaring,
-					tfEncoder, locEncoder, docTermMap, bufLoc)
+					tfEncoder, locEncoder, bufLoc)
 			}
 			if err != nil {
 				return nil, 0, err
@@ -361,27 +349,49 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 
 		// update the field doc values
 		fdvEncoder := newChunkedContentCoder(uint64(chunkFactor), newSegDocCount-1, w, true)
-		for docNum, docTerms := range docTermMap {
-			if len(docTerms) > 0 {
-				err = fdvEncoder.Add(uint64(docNum), docTerms)
+
+		fdvReadersAvailable := false
+		var dvIterClone *docValueReader
+		for segmentI, segment := range segmentsInFocus {
+			fieldIDPlus1 := uint16(segment.fieldsMap[fieldName])
+			if dvIter, exists := segment.fieldDvReaders[fieldIDPlus1-1]; exists &&
+				dvIter != nil {
+				fdvReadersAvailable = true
+				dvIterClone = dvIter.cloneInto(dvIterClone)
+				err = dvIterClone.iterateAllDocValues(segment, func(docNum uint64, terms []byte) error {
+					if newDocNums[segmentI][docNum] == docDropped {
+						return nil
+					}
+					err := fdvEncoder.Add(newDocNums[segmentI][docNum], terms)
+					if err != nil {
+						return err
+					}
+					return nil
+				})
 				if err != nil {
 					return nil, 0, err
 				}
 			}
 		}
-		err = fdvEncoder.Close()
-		if err != nil {
-			return nil, 0, err
-		}
 
-		// persist the doc value details for this field
-		_, err = fdvEncoder.Write()
-		if err != nil {
-			return nil, 0, err
-		}
+		if fdvReadersAvailable {
+			err = fdvEncoder.Close()
+			if err != nil {
+				return nil, 0, err
+			}
 
-		// get the field doc value offset (end)
-		fieldDvLocsEnd[fieldID] = uint64(w.Count())
+			// persist the doc value details for this field
+			_, err = fdvEncoder.Write()
+			if err != nil {
+				return nil, 0, err
+			}
+
+			// get the field doc value offset (end)
+			fieldDvLocsEnd[fieldID] = uint64(w.Count())
+		} else {
+			fieldDvLocsStart[fieldID] = fieldNotUninverted
+			fieldDvLocsEnd[fieldID] = fieldNotUninverted
+		}
 
 		// reset vellum buffer and vellum builder
 		vellumBuf.Reset()
@@ -412,8 +422,7 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 
 func mergeTermFreqNormLocs(fieldsMap map[string]uint16, term []byte, postItr *PostingsIterator,
 	newDocNums []uint64, newRoaring *roaring.Bitmap,
-	tfEncoder *chunkedIntCoder, locEncoder *chunkedIntCoder, docTermMap [][]byte,
-	bufLoc []uint64) (
+	tfEncoder *chunkedIntCoder, locEncoder *chunkedIntCoder, bufLoc []uint64) (
 	lastDocNum uint64, lastFreq uint64, lastNorm uint64, bufLocOut []uint64, err error) {
 	next, err := postItr.Next()
 	for next != nil && err == nil {
@@ -467,9 +476,6 @@ func mergeTermFreqNormLocs(fieldsMap map[string]uint16, term []byte, postItr *Po
 			}
 		}
 
-		docTermMap[hitNewDocNum] =
-			append(append(docTermMap[hitNewDocNum], term...), termSeparator)
-
 		lastDocNum = hitNewDocNum
 		lastFreq = nextFreq
 		lastNorm = nextNorm
@@ -482,7 +488,7 @@ func mergeTermFreqNormLocs(fieldsMap map[string]uint16, term []byte, postItr *Po
 
 func mergeTermFreqNormLocsByCopying(term []byte, postItr *PostingsIterator,
 	newDocNums []uint64, newRoaring *roaring.Bitmap,
-	tfEncoder *chunkedIntCoder, locEncoder *chunkedIntCoder, docTermMap [][]byte) (
+	tfEncoder *chunkedIntCoder, locEncoder *chunkedIntCoder) (
 	lastDocNum uint64, lastFreq uint64, lastNorm uint64, err error) {
 	nextDocNum, nextFreq, nextNorm, nextFreqNormBytes, nextLocBytes, err :=
 		postItr.nextBytes()
@@ -504,9 +510,6 @@ func mergeTermFreqNormLocsByCopying(term []byte, postItr *PostingsIterator,
 				return 0, 0, 0, err
 			}
 		}
-
-		docTermMap[hitNewDocNum] =
-			append(append(docTermMap[hitNewDocNum], term...), termSeparator)
 
 		lastDocNum = hitNewDocNum
 		lastFreq = nextFreq
