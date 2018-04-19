@@ -53,6 +53,22 @@ func (di *docValueReader) size() int {
 		len(di.curChunkData)
 }
 
+func (di *docValueReader) cloneInto(rv *docValueReader) *docValueReader {
+	if rv == nil {
+		rv = &docValueReader{}
+	}
+
+	rv.field = di.field
+	rv.curChunkNum = math.MaxUint64
+	rv.chunkOffsets = di.chunkOffsets // immutable, so it's sharable
+	rv.dvDataLoc = di.dvDataLoc
+	rv.curChunkHeader = nil
+	rv.curChunkData = nil
+	rv.uncompressed = nil
+
+	return rv
+}
+
 func (di *docValueReader) fieldName() string {
 	return di.field
 }
@@ -186,6 +202,7 @@ func (di *docValueReader) getDocValueLocs(docNum uint64) (uint64, uint64) {
 // DocumentFieldTermVisitable interface
 func (s *SegmentBase) VisitDocumentFieldTerms(localDocNum uint64, fields []string,
 	visitor index.DocumentFieldTermVisitor) error {
+	var dvIterClone *docValueReader
 	fieldIDPlus1 := uint16(0)
 	ok := true
 	for _, field := range fields {
@@ -197,15 +214,17 @@ func (s *SegmentBase) VisitDocumentFieldTerms(localDocNum uint64, fields []strin
 
 		if dvIter, exists := s.fieldDvReaders[fieldIDPlus1-1]; exists &&
 			dvIter != nil {
+			dvIterClone = dvIter.cloneInto(dvIterClone)
+
 			// check if the chunk is already loaded
-			if docInChunk != dvIter.curChunkNumber() {
-				err := dvIter.loadDvChunk(docInChunk, s)
+			if docInChunk != dvIterClone.curChunkNumber() {
+				err := dvIterClone.loadDvChunk(docInChunk, s)
 				if err != nil {
 					continue
 				}
 			}
 
-			_ = dvIter.visitDocValues(localDocNum, visitor)
+			_ = dvIterClone.visitDocValues(localDocNum, visitor)
 		}
 	}
 	return nil
