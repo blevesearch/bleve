@@ -38,6 +38,16 @@ const docDropped = math.MaxUint64 // sentinel docNum to represent a deleted doc
 // with the provided chunkFactor.
 func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 	chunkFactor uint32) ([][]uint64, uint64, error) {
+	segmentBases := make([]*SegmentBase, len(segments))
+	for segmenti, segment := range segments {
+		segmentBases[segmenti] = &segment.SegmentBase
+	}
+
+	return MergeSegmentBases(segmentBases, drops, path, chunkFactor)
+}
+
+func MergeSegmentBases(segmentBases []*SegmentBase, drops []*roaring.Bitmap, path string,
+	chunkFactor uint32) ([][]uint64, uint64, error) {
 	flag := os.O_RDWR | os.O_CREATE
 
 	f, err := os.OpenFile(path, flag, 0600)
@@ -48,11 +58,6 @@ func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
 	cleanup := func() {
 		_ = f.Close()
 		_ = os.Remove(path)
-	}
-
-	segmentBases := make([]*SegmentBase, len(segments))
-	for segmenti, segment := range segments {
-		segmentBases[segmenti] = &segment.SegmentBase
 	}
 
 	// buffer the output

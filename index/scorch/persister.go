@@ -244,7 +244,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 		return false, nil
 	}
 
-	_, newSnapshot, newSegmentID, err := s.mergeSegmentBases(
+	newSnapshot, newSegmentID, err := s.mergeSegmentBases(
 		snapshot, sbs, sbsDrops, sbsIndexes, DefaultChunkFactor)
 	if err != nil {
 		return false, err
