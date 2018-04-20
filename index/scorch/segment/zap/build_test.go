@@ -26,7 +26,7 @@ import (
 func TestBuild(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	sb, err := buildTestSegment()
+	sb, _, err := buildTestSegment()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestBuild(t *testing.T) {
 	}
 }
 
-func buildTestSegment() (*SegmentBase, error) {
+func buildTestSegment() (*SegmentBase, uint64, error) {
 	doc := &document.Document{
 		ID: "a",
 		Fields: []document.Field{
@@ -125,19 +125,19 @@ func buildTestSegment() (*SegmentBase, error) {
 	return AnalysisResultsToSegmentBase(results, 1024)
 }
 
-func buildTestSegmentMulti() (*SegmentBase, error) {
+func buildTestSegmentMulti() (*SegmentBase, uint64, error) {
 	results := buildTestAnalysisResultsMulti()
 
 	return AnalysisResultsToSegmentBase(results, 1024)
 }
 
-func buildTestSegmentMultiWithChunkFactor(chunkFactor uint32) (*SegmentBase, error) {
+func buildTestSegmentMultiWithChunkFactor(chunkFactor uint32) (*SegmentBase, uint64, error) {
 	results := buildTestAnalysisResultsMulti()
 
 	return AnalysisResultsToSegmentBase(results, chunkFactor)
 }
 
-func buildTestSegmentMultiWithDifferentFields(includeDocA, includeDocB bool) (*SegmentBase, error) {
+func buildTestSegmentMultiWithDifferentFields(includeDocA, includeDocB bool) (*SegmentBase, uint64, error) {
 	results := buildTestAnalysisResultsMultiWithDifferentFields(includeDocA, includeDocB)
 
 	return AnalysisResultsToSegmentBase(results, 1024)
@@ -550,7 +550,7 @@ func buildTestSegmentWithDefaultFieldMapping(chunkFactor uint32) (
 		}
 	}
 
-	sb, err := AnalysisResultsToSegmentBase(results, chunkFactor)
+	sb, _, err := AnalysisResultsToSegmentBase(results, chunkFactor)
 
 	return sb, fields, err
 }
