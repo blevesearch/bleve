@@ -34,10 +34,11 @@ func init() {
 	reflectStaticSizedocValueReader = int(reflect.TypeOf(dvi).Size())
 }
 
+type docNumTermsVisitor func(docNum uint64, terms []byte) error
+
 type docValueReader struct {
 	field          string
 	curChunkNum    uint64
-	numChunks      uint64
 	chunkOffsets   []uint64
 	dvDataLoc      uint64
 	curChunkHeader []MetaData
@@ -124,6 +125,14 @@ func (di *docValueReader) loadDvChunk(chunkNumber uint64, s *SegmentBase) error 
 	// reside for the given docNum
 	destChunkDataLoc, curChunkEnd := di.dvDataLoc, di.dvDataLoc
 	start, end := readChunkBoundary(int(chunkNumber), di.chunkOffsets)
+    if start >= end {
+        di.curChunkHeader = di.curChunkHeader[:0]
+        di.curChunkData = nil
+        di.curChunkNum = chunkNumber
+        di.uncompressed = di.uncompressed[:0]
+        return nil
+    }
+
 	destChunkDataLoc += start
 	curChunkEnd += end
 
@@ -151,11 +160,42 @@ func (di *docValueReader) loadDvChunk(chunkNumber uint64, s *SegmentBase) error 
 	return nil
 }
 
+func (di *docValueReader) iterateAllDocValues(s *SegmentBase, visitor docNumTermsVisitor) error {
+	for i := 0; i < len(di.chunkOffsets); i++ {
+		err := di.loadDvChunk(uint64(i), s)
+		if err != nil {
+			return err
+		}
+        if di.curChunkData == nil || len(di.curChunkHeader) <= 0 {
+            continue
+        }
+
+		// uncompress the already loaded data
+		uncompressed, err := snappy.Decode(di.uncompressed[:cap(di.uncompressed)], di.curChunkData)
+		if err != nil {
+			return err
+		}
+		di.uncompressed = uncompressed
+
+		start := uint64(0)
+		for _, entry := range di.curChunkHeader {
+			err = visitor(entry.DocNum, uncompressed[start:entry.DocDvOffset])
+			if err != nil {
+				return err
+			}
+
+			start = entry.DocDvOffset
+		}
+	}
+
+	return nil
+}
+
 func (di *docValueReader) visitDocValues(docNum uint64,
 	visitor index.DocumentFieldTermVisitor) error {
 	// binary search the term locations for the docNum
 	start, end := di.getDocValueLocs(docNum)
-	if start == math.MaxUint64 || end == math.MaxUint64 {
+    if start == math.MaxUint64 || end == math.MaxUint64 || start == end {
 		return nil
 	}
 
