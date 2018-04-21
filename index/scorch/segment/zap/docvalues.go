@@ -125,6 +125,14 @@ func (di *docValueReader) loadDvChunk(chunkNumber uint64, s *SegmentBase) error 
 	// reside for the given docNum
 	destChunkDataLoc, curChunkEnd := di.dvDataLoc, di.dvDataLoc
 	start, end := readChunkBoundary(int(chunkNumber), di.chunkOffsets)
+    if start >= end {
+        di.curChunkHeader = di.curChunkHeader[:0]
+        di.curChunkData = nil
+        di.curChunkNum = chunkNumber
+        di.uncompressed = di.uncompressed[:0]
+        return nil
+    }
+
 	destChunkDataLoc += start
 	curChunkEnd += end
 
@@ -158,6 +166,9 @@ func (di *docValueReader) iterateAllDocValues(s *SegmentBase, visitor docNumTerm
 		if err != nil {
 			return err
 		}
+        if di.curChunkData == nil || len(di.curChunkHeader) <= 0 {
+            continue
+        }
 
 		// uncompress the already loaded data
 		uncompressed, err := snappy.Decode(di.uncompressed[:cap(di.uncompressed)], di.curChunkData)
@@ -184,7 +195,7 @@ func (di *docValueReader) visitDocValues(docNum uint64,
 	visitor index.DocumentFieldTermVisitor) error {
 	// binary search the term locations for the docNum
 	start, end := di.getDocValueLocs(docNum)
-	if start == math.MaxUint64 || end == math.MaxUint64 {
+    if start == math.MaxUint64 || end == math.MaxUint64 || start == end {
 		return nil
 	}
 
