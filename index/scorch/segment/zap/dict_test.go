@@ -24,7 +24,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 )
 
-func buildTestSegmentForDict() (*SegmentBase, error) {
+func buildTestSegmentForDict() (*SegmentBase, uint64, error) {
 	doc := &document.Document{
 		ID: "a",
 		Fields: []document.Field{
@@ -105,7 +105,7 @@ func TestDictionary(t *testing.T) {
 
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	testSeg, _ := buildTestSegmentForDict()
+	testSeg, _, _ := buildTestSegmentForDict()
 	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)

@@ -32,7 +32,7 @@ import (
 // AnalysisResultsToSegmentBase produces an in-memory zap-encoded
 // SegmentBase from analysis results
 func AnalysisResultsToSegmentBase(results []*index.AnalysisResult,
-	chunkFactor uint32) (*SegmentBase, error) {
+	chunkFactor uint32) (*SegmentBase, uint64, error) {
 	s := interimPool.Get().(*interim)
 
 	var br bytes.Buffer
@@ -52,7 +52,7 @@ func AnalysisResultsToSegmentBase(results []*index.AnalysisResult,
 	storedIndexOffset, fieldsIndexOffset, fdvIndexOffset, dictOffsets,
 		err := s.convert()
 	if err != nil {
-		return nil, err
+		return nil, uint64(0), err
 	}
 
 	sb, err := InitSegmentBase(br.Bytes(), s.w.Sum32(), chunkFactor,
@@ -65,7 +65,7 @@ func AnalysisResultsToSegmentBase(results []*index.AnalysisResult,
 		interimPool.Put(s)
 	}
 
-	return sb, err
+	return sb, uint64(len(br.Bytes())), err
 }
 
 var interimPool = sync.Pool{New: func() interface{} { return &interim{} }}

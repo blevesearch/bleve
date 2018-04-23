@@ -33,13 +33,13 @@ func TestMerge(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch2.zap")
 	_ = os.RemoveAll("/tmp/scorch3.zap")
 
-	testSeg, _ := buildTestSegmentMulti()
+	testSeg, _, _ := buildTestSegmentMulti()
 	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testSeg2, _ := buildTestSegmentMulti2()
+	testSeg2, _, _ := buildTestSegmentMulti2()
 	err = PersistSegmentBase(testSeg2, "/tmp/scorch2.zap")
 	if err != nil {
 		t.Fatal(err)
@@ -120,7 +120,7 @@ func TestMergeWithEmptySegmentsFirst(t *testing.T) {
 func testMergeWithEmptySegments(t *testing.T, before bool, numEmptySegments int) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	testSeg, _ := buildTestSegmentMulti()
+	testSeg, _, _ := buildTestSegmentMulti()
 	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatal(err)
@@ -147,7 +147,7 @@ func testMergeWithEmptySegments(t *testing.T, before bool, numEmptySegments int)
 
 		_ = os.RemoveAll("/tmp/" + fname)
 
-		emptySegment, _ := AnalysisResultsToSegmentBase([]*index.AnalysisResult{}, 1024)
+		emptySegment, _, _ := AnalysisResultsToSegmentBase([]*index.AnalysisResult{}, 1024)
 		err = PersistSegmentBase(emptySegment, "/tmp/"+fname)
 		if err != nil {
 			t.Fatal(err)
@@ -461,7 +461,7 @@ func testMergeAndDrop(t *testing.T, docsToDrop []*roaring.Bitmap) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 	_ = os.RemoveAll("/tmp/scorch2.zap")
 
-	testSeg, _ := buildTestSegmentMulti()
+	testSeg, _, _ := buildTestSegmentMulti()
 	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatal(err)
@@ -477,7 +477,7 @@ func testMergeAndDrop(t *testing.T, docsToDrop []*roaring.Bitmap) {
 		}
 	}()
 
-	testSeg2, _ := buildTestSegmentMulti2()
+	testSeg2, _, _ := buildTestSegmentMulti2()
 	err = PersistSegmentBase(testSeg2, "/tmp/scorch2.zap")
 	if err != nil {
 		t.Fatal(err)
@@ -564,7 +564,7 @@ func testMergeWithUpdates(t *testing.T, segmentDocIds [][]string, docsToDrop []*
 
 		_ = os.RemoveAll("/tmp/" + fname)
 
-		testSeg, _ := buildTestSegmentMultiHelper(docIds)
+		testSeg, _, _ := buildTestSegmentMultiHelper(docIds)
 		err := PersistSegmentBase(testSeg, "/tmp/"+fname)
 		if err != nil {
 			t.Fatal(err)
@@ -615,11 +615,11 @@ func testMergeAndDropSegments(t *testing.T, segsToMerge []*Segment, docsToDrop [
 	testMergeWithSelf(t, segm.(*Segment), expectedNumDocs)
 }
 
-func buildTestSegmentMulti2() (*SegmentBase, error) {
+func buildTestSegmentMulti2() (*SegmentBase, uint64, error) {
 	return buildTestSegmentMultiHelper([]string{"c", "d"})
 }
 
-func buildTestSegmentMultiHelper(docIds []string) (*SegmentBase, error) {
+func buildTestSegmentMultiHelper(docIds []string) (*SegmentBase, uint64, error) {
 	doc := &document.Document{
 		ID: "c",
 		Fields: []document.Field{
@@ -785,13 +785,13 @@ func TestMergeBytesWritten(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch2.zap")
 	_ = os.RemoveAll("/tmp/scorch3.zap")
 
-	testSeg, _ := buildTestSegmentMulti()
+	testSeg, _, _ := buildTestSegmentMulti()
 	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testSeg2, _ := buildTestSegmentMulti2()
+	testSeg2, _, _ := buildTestSegmentMulti2()
 	err = PersistSegmentBase(testSeg2, "/tmp/scorch2.zap")
 	if err != nil {
 		t.Fatal(err)

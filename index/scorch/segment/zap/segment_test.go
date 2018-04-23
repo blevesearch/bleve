@@ -28,7 +28,7 @@ import (
 func TestOpen(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	testSeg, _ := buildTestSegment()
+	testSeg, _, _ := buildTestSegment()
 	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
@@ -328,7 +328,7 @@ func TestOpen(t *testing.T) {
 func TestOpenMulti(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	testSeg, _ := buildTestSegmentMulti()
+	testSeg, _, _ := buildTestSegmentMulti()
 	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
@@ -428,7 +428,7 @@ func TestOpenMulti(t *testing.T) {
 func TestOpenMultiWithTwoChunks(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	testSeg, _ := buildTestSegmentMultiWithChunkFactor(1)
+	testSeg, _, _ := buildTestSegmentMultiWithChunkFactor(1)
 	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
@@ -523,7 +523,7 @@ func TestOpenMultiWithTwoChunks(t *testing.T) {
 func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	testSeg, _ := buildTestSegmentMultiWithChunkFactor(1)
+	testSeg, _, _ := buildTestSegmentMultiWithChunkFactor(1)
 	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
@@ -603,7 +603,7 @@ func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 func TestSegmentDocsWithNonOverlappingFields(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
-	testSeg, err := buildTestSegmentMultiWithDifferentFields(true, true)
+	testSeg, _, err := buildTestSegmentMultiWithDifferentFields(true, true)
 	if err != nil {
 		t.Fatalf("error building segment: %v", err)
 	}
@@ -653,13 +653,13 @@ func TestMergedSegmentDocsWithNonOverlappingFields(t *testing.T) {
 	_ = os.RemoveAll("/tmp/scorch2.zap")
 	_ = os.RemoveAll("/tmp/scorch3.zap")
 
-	testSeg1, _ := buildTestSegmentMultiWithDifferentFields(true, false)
+	testSeg1, _, _ := buildTestSegmentMultiWithDifferentFields(true, false)
 	err := PersistSegmentBase(testSeg1, "/tmp/scorch1.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)
 	}
 
-	testSeg2, _ := buildTestSegmentMultiWithDifferentFields(false, true)
+	testSeg2, _, _ := buildTestSegmentMultiWithDifferentFields(false, true)
 	err = PersistSegmentBase(testSeg2, "/tmp/scorch2.zap")
 	if err != nil {
 		t.Fatalf("error persisting segment: %v", err)

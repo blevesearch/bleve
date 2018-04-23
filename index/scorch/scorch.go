@@ -76,10 +76,12 @@ type Scorch struct {
 }
 
 type internalStats struct {
-	persistEpoch        uint64
-	persistSnapshotSize uint64
-	mergeEpoch          uint64
-	mergeSnapshotSize   uint64
+	persistEpoch          uint64
+	persistSnapshotSize   uint64
+	mergeEpoch            uint64
+	mergeSnapshotSize     uint64
+	newSegBufBytesAdded   uint64
+	newSegBufBytesRemoved uint64
 }
 
 func NewScorch(storeName string,
@@ -308,11 +310,13 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	s.fireEvent(EventKindBatchIntroductionStart, 0)
 
 	var newSegment segment.Segment
+	var bufBytes uint64
 	if len(analysisResults) > 0 {
-		newSegment, err = zap.AnalysisResultsToSegmentBase(analysisResults, DefaultChunkFactor)
+		newSegment, bufBytes, err = zap.AnalysisResultsToSegmentBase(analysisResults, DefaultChunkFactor)
 		if err != nil {
 			return err
 		}
+		atomic.AddUint64(&s.iStats.newSegBufBytesAdded, bufBytes)
 	} else {
 		atomic.AddUint64(&s.stats.TotBatchesEmpty, 1)
 	}
@@ -330,6 +334,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		atomic.AddUint64(&s.stats.TotIndexedPlainTextBytes, numPlainTextBytes)
 	}
 
+	atomic.AddUint64(&s.iStats.newSegBufBytesRemoved, bufBytes)
 	atomic.AddUint64(&s.stats.TotIndexTime, uint64(time.Since(indexStart)))
 
 	return err
@@ -522,6 +527,9 @@ func (s *Scorch) MemoryUsed() uint64 {
 		// the current snapshot
 		memUsed += mergeSnapshotSize
 	}
+
+	memUsed += (atomic.LoadUint64(&s.iStats.newSegBufBytesAdded) -
+		atomic.LoadUint64(&s.iStats.newSegBufBytesRemoved))
 
 	return memUsed
 }
