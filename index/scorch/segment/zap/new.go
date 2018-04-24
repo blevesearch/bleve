@@ -29,6 +29,10 @@ import (
 	"github.com/golang/snappy"
 )
 
+var NewSegmentBufferNumResultsBump int = 100
+var NewSegmentBufferNumResultsFactor float64 = 1.0
+var NewSegmentBufferAvgBytesPerDocFactor float64 = 1.0
+
 // AnalysisResultsToSegmentBase produces an in-memory zap-encoded
 // SegmentBase from analysis results
 func AnalysisResultsToSegmentBase(results []*index.AnalysisResult,
@@ -41,8 +45,11 @@ func AnalysisResultsToSegmentBase(results []*index.AnalysisResult,
 		// size, but note that the interim instance comes from a
 		// global interimPool, so multiple scorch instances indexing
 		// different docs can lead to low quality estimates
-		avgBytesPerDoc := s.lastOutSize / s.lastNumDocs
-		br.Grow(avgBytesPerDoc * (len(results) + 1))
+		estimateAvgBytesPerDoc := int(float64(s.lastOutSize/s.lastNumDocs) *
+			NewSegmentBufferNumResultsFactor)
+		estimateNumResults := int(float64(len(results)+NewSegmentBufferNumResultsBump) *
+			NewSegmentBufferAvgBytesPerDocFactor)
+		br.Grow(estimateAvgBytesPerDoc * estimateNumResults)
 	}
 
 	s.results = results
