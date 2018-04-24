@@ -108,7 +108,7 @@ func (sb *SegmentBase) Size() int {
 
 func (sb *SegmentBase) updateSize() {
 	sizeInBytes := reflectStaticSizeSegmentBase +
-		len(sb.mem)
+		cap(sb.mem)
 
 	// fieldsMap
 	for k, _ := range sb.fieldsMap {
@@ -163,7 +163,7 @@ func (s *Segment) Size() int {
 	sizeInBytes += 16
 
 	// do not include the mmap'ed part
-	return sizeInBytes + s.SegmentBase.Size() - len(s.mem)
+	return sizeInBytes + s.SegmentBase.Size() - cap(s.mem)
 }
 
 func (s *Segment) AddRef() {
