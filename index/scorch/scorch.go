@@ -82,6 +82,8 @@ type internalStats struct {
 	mergeSnapshotSize     uint64
 	newSegBufBytesAdded   uint64
 	newSegBufBytesRemoved uint64
+	analysisBytesAdded    uint64
+	analysisBytesRemoved  uint64
 }
 
 func NewScorch(storeName string,
@@ -295,12 +297,17 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	// wait for analysis result
 	analysisResults := make([]*index.AnalysisResult, int(numUpdates))
 	var itemsDeQueued uint64
+	var totalAnalysisSize int
 	for itemsDeQueued < numUpdates {
 		result := <-resultChan
+		resultSize := result.Size()
+		atomic.AddUint64(&s.iStats.analysisBytesAdded, uint64(resultSize))
+		totalAnalysisSize += resultSize
 		analysisResults[itemsDeQueued] = result
 		itemsDeQueued++
 	}
 	close(resultChan)
+	defer atomic.AddUint64(&s.iStats.analysisBytesRemoved, uint64(totalAnalysisSize))
 
 	atomic.AddUint64(&s.stats.TotAnalysisTime, uint64(time.Since(start)))
 
@@ -530,6 +537,9 @@ func (s *Scorch) MemoryUsed() uint64 {
 
 	memUsed += (atomic.LoadUint64(&s.iStats.newSegBufBytesAdded) -
 		atomic.LoadUint64(&s.iStats.newSegBufBytesRemoved))
+
+	memUsed += (atomic.LoadUint64(&s.iStats.analysisBytesAdded) -
+		atomic.LoadUint64(&s.iStats.analysisBytesRemoved))
 
 	return memUsed
 }
