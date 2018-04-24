@@ -265,6 +265,10 @@ func (sb *SegmentBase) dictionary(field string) (rv *Dictionary, err error) {
 				if err != nil {
 					return nil, fmt.Errorf("dictionary field %s vellum err: %v", field, err)
 				}
+				rv.fstReader, err = rv.fst.Reader()
+				if err != nil {
+					return nil, fmt.Errorf("dictionary field %s vellum Reader err: %v", field, err)
+				}
 			}
 		}
 	}
@@ -366,6 +370,30 @@ func (s *SegmentBase) VisitDocument(num uint64, visitor segment.DocumentFieldVal
 		visitDocumentCtxPool.Put(vdc)
 	}
 	return nil
+}
+
+// DocID returns the value of the _id field for the given docNum
+func (s *SegmentBase) DocID(num uint64) ([]byte, error) {
+	if num >= s.numDocs {
+		return nil, nil
+	}
+
+	vdc := visitDocumentCtxPool.Get().(*visitDocumentCtx)
+
+	meta, compressed := s.getDocStoredMetaAndCompressed(num)
+
+	vdc.reader.Reset(meta)
+
+	// handle _id field special case
+	idFieldValLen, err := binary.ReadUvarint(&vdc.reader)
+	if err != nil {
+		return nil, err
+	}
+	idFieldVal := compressed[:idFieldValLen]
+
+	visitDocumentCtxPool.Put(vdc)
+
+	return idFieldVal, nil
 }
 
 // Count returns the number of documents in this segment.
