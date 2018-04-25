@@ -67,6 +67,7 @@ type TopNCollector struct {
 	cachedDesc    []bool
 
 	lowestMatchOutsideResults *search.DocumentMatch
+	updateFieldVisitor        index.DocumentFieldTermVisitor
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
@@ -248,13 +249,16 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 		hc.facetsBuilder.StartDoc()
 	}
 
-	err := reader.DocumentVisitFieldTerms(d.IndexInternalID, hc.neededFields, func(field string, term []byte) {
-		if hc.facetsBuilder != nil {
-			hc.facetsBuilder.UpdateVisitor(field, term)
+	if hc.updateFieldVisitor == nil {
+		hc.updateFieldVisitor = func(field string, term []byte) {
+			if hc.facetsBuilder != nil {
+				hc.facetsBuilder.UpdateVisitor(field, term)
+			}
+			hc.sort.UpdateVisitor(field, term)
 		}
-		hc.sort.UpdateVisitor(field, term)
-	})
+	}
 
+	err := reader.DocumentVisitFieldTerms(d.IndexInternalID, hc.neededFields, hc.updateFieldVisitor)
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.EndDoc()
 	}
