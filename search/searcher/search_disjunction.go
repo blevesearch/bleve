@@ -16,7 +16,6 @@ package searcher
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
@@ -30,7 +29,7 @@ var DisjunctionMaxClauseCount = 0
 // DisjunctionHeapTakeover is a compile time setting that applications can
 // adjust to control when the DisjunctionSearcher will switch from a simple
 // slice implementation to a heap implementation.
-var DisjunctionHeapTakeover = math.MaxInt64
+var DisjunctionHeapTakeover = 10
 
 func NewDisjunctionSearcher(indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions) (

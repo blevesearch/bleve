@@ -238,25 +238,26 @@ func (s *DisjunctionHeapSearcher) Advance(ctx *search.SearchContext,
 	s.matching = s.matching[:0]
 	s.matchingCurrs = s.matchingCurrs[:0]
 
-	// get all searchers pointing at their first match
-	for i, searcherCurr := range s.heap {
-		if searcherCurr.searcher != nil {
-			if searcherCurr.curr.IndexInternalID.Compare(ID) >= 0 {
-				continue
-			}
-			ctx.DocumentMatchPool.Put(searcherCurr.curr)
-		}
+	// find all searchers that actually need to be advanced
+	// advance them, using s.matchingCurrs as temp storage
+	for len(s.heap) > 0 && bytes.Compare(s.heap[0].curr.IndexInternalID, ID) < 0 {
+		searcherCurr := heap.Pop(s).(*SearcherCurr)
+		ctx.DocumentMatchPool.Put(searcherCurr.curr)
 		curr, err := searcherCurr.searcher.Advance(ctx, ID)
 		if err != nil {
 			return nil, err
 		}
-		searcherCurr.curr = curr
-		heap.Fix(s, i)
+		if curr != nil {
+			searcherCurr.curr = curr
+			s.matchingCurrs = append(s.matchingCurrs, searcherCurr)
+		}
 	}
-	// now remove any nil values (at top of heap)
-	for len(s.heap) > 0 && s.heap[0].curr == nil {
-		heap.Pop(s)
+	// now all of the searchers that we advanced have to be pushed back
+	for _, matchingCurr := range s.matchingCurrs {
+		heap.Push(s, matchingCurr)
 	}
+	// reset our temp space
+	s.matchingCurrs = s.matchingCurrs[:0]
 
 	err := s.updateMatches()
 	if err != nil {
