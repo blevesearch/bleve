@@ -67,6 +67,8 @@ type TopNCollector struct {
 	cachedDesc    []bool
 
 	lowestMatchOutsideResults *search.DocumentMatch
+	updateFieldVisitor        index.DocumentFieldTermVisitor
+	dvReader                  index.DocValueReader
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
@@ -138,6 +140,11 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 	searchContext := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(backingSize+searcher.DocumentMatchPoolSize(), len(hc.sort)),
+	}
+
+	hc.dvReader, err = reader.DocValueReader(hc.neededFields)
+	if err != nil {
+		return err
 	}
 
 	select {
@@ -248,13 +255,16 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 		hc.facetsBuilder.StartDoc()
 	}
 
-	err := reader.DocumentVisitFieldTerms(d.IndexInternalID, hc.neededFields, func(field string, term []byte) {
-		if hc.facetsBuilder != nil {
-			hc.facetsBuilder.UpdateVisitor(field, term)
+	if hc.updateFieldVisitor == nil {
+		hc.updateFieldVisitor = func(field string, term []byte) {
+			if hc.facetsBuilder != nil {
+				hc.facetsBuilder.UpdateVisitor(field, term)
+			}
+			hc.sort.UpdateVisitor(field, term)
 		}
-		hc.sort.UpdateVisitor(field, term)
-	})
+	}
 
+	err := hc.dvReader.VisitDocValues(d.IndexInternalID, hc.updateFieldVisitor)
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.EndDoc()
 	}

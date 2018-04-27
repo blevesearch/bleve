@@ -496,30 +496,64 @@ func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
 
 func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 	fields []string, visitor index.DocumentFieldTermVisitor) error {
+	_, err := i.documentVisitFieldTerms(id, fields, visitor, nil)
+	return err
+}
+
+func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
+	fields []string, visitor index.DocumentFieldTermVisitor, dvs segment.DocVisitState) (
+	segment.DocVisitState, error) {
 
 	docNum, err := docInternalToNumber(id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 	if segmentIndex >= len(i.segment) {
-		return nil
+		return nil, nil
 	}
 
 	ss := i.segment[segmentIndex]
 
 	if zaps, ok := ss.segment.(segment.DocumentFieldTermVisitable); ok {
+		var dvState *segment.FieldDocValueState
+		if dvs == nil {
+			dvState = &segment.FieldDocValueState{}
+		} else {
+			dvState = dvs.State()
+			// for a new segment, need to recheck the dvCache preparations
+			if zaps != dvState.CurrentSegment() {
+				dvState = &segment.FieldDocValueState{}
+			}
+		}
+
+		// if all fields are dv persisted
+		if dvState.DvFieldsAllPersisted {
+			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
+		}
+
+		// if the dvCache is already prepared for pending fields
+		if dvState.DvCachePrepared {
+			visitDocumentFieldCacheTerms(localDocNum, dvState.DvFieldsPending, ss, visitor)
+			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
+		}
+
 		// get the list of doc value persisted fields
 		pFields, err := zaps.VisitableDocValueFields()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		// assort the fields for which terms look up have to
 		// be performed runtime
 		dvPendingFields := extractDvPendingFields(fields, pFields)
+		// all fields are doc value persisted
 		if len(dvPendingFields) == 0 {
-			// all fields are doc value persisted
-			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+			dvs, err = zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
+			state := dvs.State()
+			state.DvFieldsAllPersisted = true
+			state.DvFieldsPending = nil
+			dvs.SetState(state)
+			return dvs, err
 		}
 
 		// concurrently trigger the runtime doc value preparations for
@@ -528,29 +562,33 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 
 		go func() {
 			defer close(errCh)
-			err := ss.cachedDocs.prepareFields(fields, ss)
+			err := ss.cachedDocs.prepareFields(dvPendingFields, ss)
 			if err != nil {
 				errCh <- err
 			}
 		}()
 
-		// visit the persisted dv while the cache preparation is in progress
-		err = zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+		// visit the requested persisted dv while the cache preparation in progress
+		dvs, err = zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// err out if fieldCache preparation failed
 		err = <-errCh
 		if err != nil {
-			return err
+			return nil, err
 		}
+		state := dvs.State()
+		state.DvCachePrepared = true
+		state.DvFieldsPending = dvPendingFields
+		dvs.SetState(state)
 
 		visitDocumentFieldCacheTerms(localDocNum, dvPendingFields, ss, visitor)
-		return nil
+		return dvs, nil
 	}
 
-	return prepareCacheVisitDocumentFieldTerms(localDocNum, fields, ss, visitor)
+	return dvs, prepareCacheVisitDocumentFieldTerms(localDocNum, fields, ss, visitor)
 }
 
 func prepareCacheVisitDocumentFieldTerms(localDocNum uint64, fields []string,
@@ -597,6 +635,22 @@ func extractDvPendingFields(requestedFields, persistedFields []string) []string 
 		}
 	}
 	return rv
+}
+
+func (i *IndexSnapshot) DocValueReader(fields []string) (index.DocValueReader, error) {
+	return &DocValueReader{i: i, fields: fields}, nil
+}
+
+type DocValueReader struct {
+	i      *IndexSnapshot
+	fields []string
+	dvs    segment.DocVisitState
+}
+
+func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
+	visitor index.DocumentFieldTermVisitor) (err error) {
+	dvr.dvs, err = dvr.i.documentVisitFieldTerms(id, dvr.fields, visitor, dvr.dvs)
+	return err
 }
 
 func (i *IndexSnapshot) DumpAll() chan interface{} {

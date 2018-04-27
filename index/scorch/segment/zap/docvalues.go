@@ -23,6 +23,7 @@ import (
 	"sort"
 
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/blevesearch/bleve/size"
 	"github.com/golang/snappy"
 )
@@ -35,6 +36,19 @@ func init() {
 }
 
 type docNumTermsVisitor func(docNum uint64, terms []byte) error
+
+type docVisitState struct {
+	dvrs  map[uint16]*docValueReader
+	state *segment.FieldDocValueState
+}
+
+func (dvs *docVisitState) SetState(state *segment.FieldDocValueState) {
+	dvs.state = state
+}
+
+func (dvs *docVisitState) State() *segment.FieldDocValueState {
+	return dvs.state
+}
 
 type docValueReader struct {
 	field          string
@@ -238,13 +252,29 @@ func (di *docValueReader) getDocValueLocs(docNum uint64) (uint64, uint64) {
 	return math.MaxUint64, math.MaxUint64
 }
 
+func (s *Segment) CurrentSegment() segment.DocumentFieldTermVisitable {
+	return s
+}
+
 // VisitDocumentFieldTerms is an implementation of the
 // DocumentFieldTermVisitable interface
-func (s *SegmentBase) VisitDocumentFieldTerms(localDocNum uint64, fields []string,
-	visitor index.DocumentFieldTermVisitor) error {
-	var dvIterClone *docValueReader
-	fieldIDPlus1 := uint16(0)
-	ok := true
+func (s *Segment) VisitDocumentFieldTerms(localDocNum uint64, fields []string,
+	visitor index.DocumentFieldTermVisitor, dvsIn segment.DocVisitState) (
+	segment.DocVisitState, error) {
+	dvs, ok := dvsIn.(*docVisitState)
+	if !ok || dvs == nil {
+		dvs = &docVisitState{
+			dvrs:  make(map[uint16]*docValueReader, len(fields)),
+			state: &segment.FieldDocValueState{DvSegment: s},
+		}
+	} else {
+		if dvs.state.DvSegment != s {
+			dvs.state = &segment.FieldDocValueState{DvSegment: s}
+			dvs.dvrs = make(map[uint16]*docValueReader, len(fields))
+		}
+	}
+
+	var fieldIDPlus1 uint16
 	for _, field := range fields {
 		if fieldIDPlus1, ok = s.fieldsMap[field]; !ok {
 			continue
@@ -254,20 +284,22 @@ func (s *SegmentBase) VisitDocumentFieldTerms(localDocNum uint64, fields []strin
 
 		if dvIter, exists := s.fieldDvReaders[fieldIDPlus1-1]; exists &&
 			dvIter != nil {
-			dvIterClone = dvIter.cloneInto(dvIterClone)
+			if _, ok := dvs.dvrs[fieldIDPlus1-1]; !ok {
+				dvs.dvrs[fieldIDPlus1-1] = dvIter.cloneInto(dvs.dvrs[fieldIDPlus1-1])
+			}
 
 			// check if the chunk is already loaded
-			if docInChunk != dvIterClone.curChunkNumber() {
-				err := dvIterClone.loadDvChunk(docInChunk, s)
+			if docInChunk != dvs.dvrs[fieldIDPlus1-1].curChunkNumber() {
+				err := dvs.dvrs[fieldIDPlus1-1].loadDvChunk(docInChunk, &s.SegmentBase)
 				if err != nil {
 					continue
 				}
 			}
 
-			_ = dvIterClone.visitDocValues(localDocNum, visitor)
+			_ = dvs.dvrs[fieldIDPlus1-1].visitDocValues(localDocNum, visitor)
 		}
 	}
-	return nil
+	return dvs, nil
 }
 
 // VisitableDocValueFields returns the list of fields with

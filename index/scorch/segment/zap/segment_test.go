@@ -581,9 +581,9 @@ func TestSegmentVisitableDocValueFieldsList(t *testing.T) {
 		}
 
 		fieldTerms := make(index.FieldTerms)
-		err = zaps.VisitDocumentFieldTerms(0, fields, func(field string, term []byte) {
+		_, err = zaps.VisitDocumentFieldTerms(0, fields, func(field string, term []byte) {
 			fieldTerms[field] = append(fieldTerms[field], string(term))
-		})
+		}, nil)
 		if err != nil {
 			t.Error(err)
 		}

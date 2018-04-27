@@ -80,6 +80,8 @@ type IndexReader interface {
 	Document(id string) (*document.Document, error)
 	DocumentVisitFieldTerms(id IndexInternalID, fields []string, visitor DocumentFieldTermVisitor) error
 
+	DocValueReader(fields []string) (DocValueReader, error)
+
 	Fields() ([]string, error)
 
 	GetInternal(key []byte) ([]byte, error)
@@ -301,4 +303,8 @@ type OptimizableContext interface {
 	// OptimizableContext instance, the optimization preparations are
 	// finished or completed via the Finish() method.
 	Finish() error
+}
+
+type DocValueReader interface {
+	VisitDocValues(id IndexInternalID, visitor DocumentFieldTermVisitor) error
 }
