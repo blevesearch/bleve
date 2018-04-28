@@ -42,10 +42,10 @@ func newDisjunctionSearcher(indexReader index.IndexReader,
 	limit bool) (search.Searcher, error) {
 	if len(qsearchers) > DisjunctionHeapTakeover {
 		return newDisjunctionHeapSearcher(indexReader, qsearchers, min, options,
-			true)
+			limit)
 	}
 	return newDisjunctionSliceSearcher(indexReader, qsearchers, min, options,
-		true)
+		limit)
 }
 
 func tooManyClauses(count int) bool {
