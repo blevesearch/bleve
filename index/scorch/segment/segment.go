@@ -120,19 +120,4 @@ type DocumentFieldTermVisitable interface {
 }
 
 type DocVisitState interface {
-	State() *FieldDocValueState
-	SetState(*FieldDocValueState)
-}
-
-// FieldDocValueState represents the state details,
-// which intents to save the redundant dvCache preparations
-type FieldDocValueState struct {
-	DvFieldsAllPersisted bool
-	DvFieldsPending      []string
-	DvCachePrepared      bool
-	DvSegment            DocumentFieldTermVisitable
-}
-
-func (fdvs *FieldDocValueState) CurrentSegment() DocumentFieldTermVisitable {
-	return fdvs.DvSegment
 }

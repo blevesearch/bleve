@@ -516,28 +516,6 @@ func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
 	ss := i.segment[segmentIndex]
 
 	if zaps, ok := ss.segment.(segment.DocumentFieldTermVisitable); ok {
-		var dvState *segment.FieldDocValueState
-		if dvs == nil {
-			dvState = &segment.FieldDocValueState{}
-		} else {
-			dvState = dvs.State()
-			// for a new segment, need to recheck the dvCache preparations
-			if zaps != dvState.CurrentSegment() {
-				dvState = &segment.FieldDocValueState{}
-			}
-		}
-
-		// if all fields are dv persisted
-		if dvState.DvFieldsAllPersisted {
-			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
-		}
-
-		// if the dvCache is already prepared for pending fields
-		if dvState.DvCachePrepared {
-			visitDocumentFieldCacheTerms(localDocNum, dvState.DvFieldsPending, ss, visitor)
-			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
-		}
-
 		// get the list of doc value persisted fields
 		pFields, err := zaps.VisitableDocValueFields()
 		if err != nil {
@@ -548,12 +526,7 @@ func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
 		dvPendingFields := extractDvPendingFields(fields, pFields)
 		// all fields are doc value persisted
 		if len(dvPendingFields) == 0 {
-			dvs, err = zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
-			state := dvs.State()
-			state.DvFieldsAllPersisted = true
-			state.DvFieldsPending = nil
-			dvs.SetState(state)
-			return dvs, err
+			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
 		}
 
 		// concurrently trigger the runtime doc value preparations for
@@ -579,10 +552,6 @@ func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
 		if err != nil {
 			return nil, err
 		}
-		state := dvs.State()
-		state.DvCachePrepared = true
-		state.DvFieldsPending = dvPendingFields
-		dvs.SetState(state)
 
 		visitDocumentFieldCacheTerms(localDocNum, dvPendingFields, ss, visitor)
 		return dvs, nil

@@ -147,6 +147,13 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		return err
 	}
 
+	hc.updateFieldVisitor = func(field string, term []byte) {
+		if hc.facetsBuilder != nil {
+			hc.facetsBuilder.UpdateVisitor(field, term)
+		}
+		hc.sort.UpdateVisitor(field, term)
+	}
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -253,15 +260,6 @@ func (hc *TopNCollector) collectSingle(ctx *search.SearchContext, reader index.I
 func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.DocumentMatch) error {
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.StartDoc()
-	}
-
-	if hc.updateFieldVisitor == nil {
-		hc.updateFieldVisitor = func(field string, term []byte) {
-			if hc.facetsBuilder != nil {
-				hc.facetsBuilder.UpdateVisitor(field, term)
-			}
-			hc.sort.UpdateVisitor(field, term)
-		}
 	}
 
 	err := hc.dvReader.VisitDocValues(d.IndexInternalID, hc.updateFieldVisitor)

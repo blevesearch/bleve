@@ -38,16 +38,8 @@ func init() {
 type docNumTermsVisitor func(docNum uint64, terms []byte) error
 
 type docVisitState struct {
-	dvrs  map[uint16]*docValueReader
-	state *segment.FieldDocValueState
-}
-
-func (dvs *docVisitState) SetState(state *segment.FieldDocValueState) {
-	dvs.state = state
-}
-
-func (dvs *docVisitState) State() *segment.FieldDocValueState {
-	return dvs.state
+	dvrs    map[uint16]*docValueReader
+	segment *Segment
 }
 
 type docValueReader struct {
@@ -252,10 +244,6 @@ func (di *docValueReader) getDocValueLocs(docNum uint64) (uint64, uint64) {
 	return math.MaxUint64, math.MaxUint64
 }
 
-func (s *Segment) CurrentSegment() segment.DocumentFieldTermVisitable {
-	return s
-}
-
 // VisitDocumentFieldTerms is an implementation of the
 // DocumentFieldTermVisitable interface
 func (s *Segment) VisitDocumentFieldTerms(localDocNum uint64, fields []string,
@@ -263,40 +251,47 @@ func (s *Segment) VisitDocumentFieldTerms(localDocNum uint64, fields []string,
 	segment.DocVisitState, error) {
 	dvs, ok := dvsIn.(*docVisitState)
 	if !ok || dvs == nil {
-		dvs = &docVisitState{
-			dvrs:  make(map[uint16]*docValueReader, len(fields)),
-			state: &segment.FieldDocValueState{DvSegment: s},
-		}
+		dvs = &docVisitState{}
 	} else {
-		if dvs.state.DvSegment != s {
-			dvs.state = &segment.FieldDocValueState{DvSegment: s}
-			dvs.dvrs = make(map[uint16]*docValueReader, len(fields))
+		if dvs.segment != s {
+			dvs.segment = s
+			dvs.dvrs = nil
 		}
 	}
 
 	var fieldIDPlus1 uint16
+	if dvs.dvrs == nil {
+		dvs.dvrs = make(map[uint16]*docValueReader, len(fields))
+		for _, field := range fields {
+			if fieldIDPlus1, ok = s.fieldsMap[field]; !ok {
+				continue
+			}
+			fieldID := fieldIDPlus1 - 1
+			if dvIter, exists := s.fieldDvReaders[fieldID]; exists &&
+				dvIter != nil {
+				dvs.dvrs[fieldID] = dvIter.cloneInto(dvs.dvrs[fieldID])
+			}
+		}
+	}
+
+	// find the chunkNumber where the docValues are stored
+	docInChunk := localDocNum / uint64(s.chunkFactor)
+	var dvr *docValueReader
 	for _, field := range fields {
 		if fieldIDPlus1, ok = s.fieldsMap[field]; !ok {
 			continue
 		}
-		// find the chunkNumber where the docValues are stored
-		docInChunk := localDocNum / uint64(s.chunkFactor)
-
-		if dvIter, exists := s.fieldDvReaders[fieldIDPlus1-1]; exists &&
-			dvIter != nil {
-			if _, ok := dvs.dvrs[fieldIDPlus1-1]; !ok {
-				dvs.dvrs[fieldIDPlus1-1] = dvIter.cloneInto(dvs.dvrs[fieldIDPlus1-1])
-			}
-
+		fieldID := fieldIDPlus1 - 1
+		if dvr, ok = dvs.dvrs[fieldID]; ok && dvr != nil {
 			// check if the chunk is already loaded
-			if docInChunk != dvs.dvrs[fieldIDPlus1-1].curChunkNumber() {
-				err := dvs.dvrs[fieldIDPlus1-1].loadDvChunk(docInChunk, &s.SegmentBase)
+			if docInChunk != dvr.curChunkNumber() {
+				err := dvr.loadDvChunk(docInChunk, &s.SegmentBase)
 				if err != nil {
-					continue
+					return dvs, err
 				}
 			}
 
-			_ = dvs.dvrs[fieldIDPlus1-1].visitDocValues(localDocNum, visitor)
+			_ = dvr.visitDocValues(localDocNum, visitor)
 		}
 	}
 	return dvs, nil
