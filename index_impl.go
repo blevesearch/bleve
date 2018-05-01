@@ -368,6 +368,25 @@ func (i *indexImpl) Search(req *SearchRequest) (sr *SearchResult, err error) {
 	return i.SearchInContext(context.Background(), req)
 }
 
+var documentMatchEmptySize int
+var searchContextEmptySize int
+var facetResultEmptySize int
+var documentEmptySize int
+
+func init() {
+	var dm search.DocumentMatch
+	documentMatchEmptySize = dm.Size()
+
+	var sc search.SearchContext
+	searchContextEmptySize = sc.Size()
+
+	var fr search.FacetResult
+	facetResultEmptySize = fr.Size()
+
+	var d document.Document
+	documentEmptySize = d.Size()
+}
+
 // memNeededForSearch is a helper function that returns an estimate of RAM
 // needed to execute a search request.
 func memNeededForSearch(req *SearchRequest,
@@ -385,35 +404,27 @@ func memNeededForSearch(req *SearchRequest,
 	// overhead, size in bytes from collector
 	estimate += topnCollector.Size()
 
-	var dm search.DocumentMatch
-	sizeOfDocumentMatch := dm.Size()
-
 	// pre-allocing DocumentMatchPool
-	var sc search.SearchContext
-	estimate += sc.Size() + numDocMatches*sizeOfDocumentMatch
+	estimate += searchContextEmptySize + numDocMatches*documentMatchEmptySize
 
 	// searcher overhead
 	estimate += searcher.Size()
 
 	// overhead from results, lowestMatchOutsideResults
-	estimate += (numDocMatches + 1) * sizeOfDocumentMatch
+	estimate += (numDocMatches + 1) * documentMatchEmptySize
 
 	// additional overhead from SearchResult
-	var sr SearchResult
-	estimate += sr.Size()
+	estimate += reflectStaticSizeSearchResult + reflectStaticSizeSearchStatus
 
 	// overhead from facet results
 	if req.Facets != nil {
-		var fr search.FacetResult
-		estimate += len(req.Facets) * fr.Size()
+		estimate += len(req.Facets) * facetResultEmptySize
 	}
 
 	// highlighting, store
-	var d document.Document
 	if len(req.Fields) > 0 || req.Highlight != nil {
-		for i := 0; i < (req.Size + req.From); i++ { // size + from => number of hits
-			estimate += (req.Size + req.From) * d.Size()
-		}
+		// Size + From => number of hits
+		estimate += (req.Size + req.From) * documentEmptySize
 	}
 
 	return uint64(estimate)
