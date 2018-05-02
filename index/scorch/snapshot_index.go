@@ -500,6 +500,19 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 	ss := i.segment[segmentIndex]
 
 	if zaps, ok := ss.segment.(segment.DocumentFieldTermVisitable); ok {
+		cds := ss.cachedDocs.state()
+
+		// if all fields are dv persisted
+		if cds.dvFieldsAllPersisted {
+			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+		}
+
+		// if the dvCache is already prepared for pending fields
+		if cds.dvCachePrepared {
+			visitDocumentFieldCacheTerms(localDocNum, cds.dvFieldsPending, ss, visitor)
+			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+		}
+
 		// get the list of doc value persisted fields
 		pFields, err := zaps.VisitableDocValueFields()
 		if err != nil {
@@ -508,9 +521,13 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 		// assort the fields for which terms look up have to
 		// be performed runtime
 		dvPendingFields := extractDvPendingFields(fields, pFields)
+		// all fields are doc value persisted
 		if len(dvPendingFields) == 0 {
-			// all fields are doc value persisted
-			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+			err = zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor)
+			cds.dvFieldsAllPersisted = true
+			cds.dvFieldsPending = nil
+			ss.cachedDocs.setState(&cds)
+			return err
 		}
 
 		// concurrently trigger the runtime doc value preparations for
@@ -519,7 +536,7 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 
 		go func() {
 			defer close(errCh)
-			err := ss.cachedDocs.prepareFields(fields, ss)
+			err := ss.cachedDocs.prepareFields(dvPendingFields, ss)
 			if err != nil {
 				errCh <- err
 			}

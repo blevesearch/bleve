@@ -214,10 +214,34 @@ func (cfd *cachedFieldDocs) prepareFields(field string, ss *SegmentSnapshot) {
 	}
 }
 
+// dvState intents to save the redundant computations on finding
+// the non persisted fields for doc values and the related maneuvers
+type dvState struct {
+	dvFieldsAllPersisted bool
+	dvFieldsPending      []string
+	dvCachePrepared      bool
+}
+
 type cachedDocs struct {
-	m     sync.Mutex                  // As the cache is asynchronously prepared, need a lock
-	cache map[string]*cachedFieldDocs // Keyed by field
-	size  uint64
+	m       sync.Mutex                  // As the cache is asynchronously prepared, need a lock
+	cache   map[string]*cachedFieldDocs // Keyed by field
+	size    uint64
+	dvState *dvState
+}
+
+func (c *cachedDocs) state() dvState {
+	c.m.Lock()
+	if c.dvState == nil {
+		c.dvState = &dvState{}
+	}
+	c.m.Unlock()
+	return *c.dvState
+}
+
+func (c *cachedDocs) setState(v *dvState) {
+	c.m.Lock()
+	c.dvState = v
+	c.m.Unlock()
 }
 
 func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) error {
@@ -250,6 +274,11 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 	}
 	c.updateSizeLOCKED()
 
+	if c.dvState != nil {
+		c.dvState.dvCachePrepared = true
+		c.dvState.dvFieldsPending = wantedFields
+	}
+
 	c.m.Unlock()
 	return nil
 }
@@ -266,6 +295,13 @@ func (c *cachedDocs) updateSizeLOCKED() {
 			for _, entry := range v.docs { // docs
 				sizeInBytes += 8 /* size of uint64 */ + len(entry)
 			}
+		}
+	}
+
+	if c.dvState != nil {
+		sizeInBytes += 2 // 2 bools
+		for _, s := range c.dvState.dvFieldsPending {
+			sizeInBytes += len(s)
 		}
 	}
 	atomic.StoreUint64(&c.size, uint64(sizeInBytes))
