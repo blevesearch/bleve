@@ -15,13 +15,22 @@
 package searcher
 
 import (
+	"fmt"
+
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
 
+var MaxFuzziness = 2
+
 func NewFuzzySearcher(indexReader index.IndexReader, term string,
 	prefix, fuzziness int, field string, boost float64,
 	options search.SearcherOptions) (search.Searcher, error) {
+
+	if fuzziness > MaxFuzziness {
+		return nil, fmt.Errorf("fuzziness exceeds max (%d)", MaxFuzziness)
+	}
+
 	// Note: we don't byte slice the term for a prefix because of runes.
 	prefixTerm := ""
 	for i, r := range term {
@@ -56,12 +65,17 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 			if err != nil {
 				return rv, err
 			}
+			defer func() {
+				if cerr := fieldDict.Close(); cerr != nil && err == nil {
+					err = cerr
+				}
+			}()
 			tfd, err := fieldDict.Next()
 			for err == nil && tfd != nil {
 				rv = append(rv, tfd.Term)
 				tfd, err = fieldDict.Next()
 			}
-			return rv, nil
+			return rv, err
 		}
 		fieldDict, err = indexReader.FieldDict(field)
 	}

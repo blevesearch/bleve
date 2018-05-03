@@ -47,6 +47,9 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp,
 			candidateTerms = append(candidateTerms, tfd.Term)
 			tfd, err = fieldDict.Next()
 		}
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		prefixTerm, complete := pattern.LiteralPrefix()
 		if complete {
