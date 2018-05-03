@@ -161,3 +161,16 @@ func (sr *stubReader) DumpFields() chan interface{} {
 func (sr *stubReader) Close() error {
 	return nil
 }
+
+func (sr *stubReader) DocValueReader(fields []string) (index.DocValueReader, error) {
+	return &DocValueReader{i: sr, fields: fields}, nil
+}
+
+type DocValueReader struct {
+	i      *stubReader
+	fields []string
+}
+
+func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID, visitor index.DocumentFieldTermVisitor) error {
+	return dvr.i.DocumentVisitFieldTerms(id, dvr.fields, visitor)
+}

@@ -210,3 +210,17 @@ func incrementBytes(in []byte) []byte {
 	}
 	return rv
 }
+
+func (i *IndexReader) DocValueReader(fields []string) (index.DocValueReader, error) {
+	return &DocValueReader{i: i, fields: fields}, nil
+}
+
+type DocValueReader struct {
+	i      *IndexReader
+	fields []string
+}
+
+func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
+	visitor index.DocumentFieldTermVisitor) error {
+	return dvr.i.DocumentVisitFieldTerms(id, dvr.fields, visitor)
+}

@@ -114,10 +114,13 @@ type Location interface {
 // postings or other indexed values.
 type DocumentFieldTermVisitable interface {
 	VisitDocumentFieldTerms(localDocNum uint64, fields []string,
-		visitor index.DocumentFieldTermVisitor) error
+		visitor index.DocumentFieldTermVisitor, optional DocVisitState) (DocVisitState, error)
 
 	// VisitableDocValueFields implementation should return
 	// the list of fields which are document value persisted and
 	// therefore visitable by the above VisitDocumentFieldTerms method.
 	VisitableDocValueFields() ([]string, error)
+}
+
+type DocVisitState interface {
 }
