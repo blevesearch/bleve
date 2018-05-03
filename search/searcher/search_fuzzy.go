@@ -65,12 +65,17 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 			if err != nil {
 				return rv, err
 			}
+			defer func() {
+				if cerr := fieldDict.Close(); cerr != nil && err == nil {
+					err = cerr
+				}
+			}()
 			tfd, err := fieldDict.Next()
 			for err == nil && tfd != nil {
 				rv = append(rv, tfd.Term)
 				tfd, err = fieldDict.Next()
 			}
-			return rv, nil
+			return rv, err
 		}
 		fieldDict, err = indexReader.FieldDict(field)
 	}
