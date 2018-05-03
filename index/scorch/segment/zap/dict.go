@@ -270,10 +270,10 @@ type DictionaryIterator struct {
 
 // Next returns the next entry in the dictionary
 func (i *DictionaryIterator) Next() (*index.DictEntry, error) {
-	if i.itr == nil || i.err == vellum.ErrIteratorDone {
-		return nil, nil
-	} else if i.err != nil {
+	if i.err != nil && i.err != vellum.ErrIteratorDone {
 		return nil, i.err
+	} else if i.itr == nil || i.err == vellum.ErrIteratorDone {
+		return nil, nil
 	}
 	term, postingsOffset := i.itr.Current()
 	i.entry.Term = string(term)
