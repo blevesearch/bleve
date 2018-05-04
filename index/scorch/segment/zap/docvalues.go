@@ -301,12 +301,5 @@ func (s *Segment) VisitDocumentFieldTerms(localDocNum uint64, fields []string,
 // persisted doc value terms ready to be visitable using the
 // VisitDocumentFieldTerms method.
 func (s *Segment) VisitableDocValueFields() ([]string, error) {
-	rv := make([]string, 0, len(s.fieldDvReaders))
-	for fieldID, field := range s.fieldsInv {
-		if dvIter, ok := s.fieldDvReaders[uint16(fieldID)]; ok &&
-			dvIter != nil {
-			rv = append(rv, field)
-		}
-	}
-	return rv, nil
+	return s.fieldDvNames, nil
 }

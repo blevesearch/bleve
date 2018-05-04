@@ -99,6 +99,7 @@ type SegmentBase struct {
 	docValueOffset    uint64
 	dictLocs          []uint64
 	fieldDvReaders    map[uint16]*docValueReader // naive chunk cache per field
+	fieldDvNames      []string                   // field names cached in fieldDvReaders
 	size              uint64
 }
 
@@ -528,7 +529,12 @@ func (s *SegmentBase) loadDvReaders() error {
 		}
 		read += uint64(n)
 
-		s.fieldDvReaders[uint16(fieldID)], _ = s.loadFieldDocValueReader(field, fieldLocStart, fieldLocEnd)
+		fieldDvReader, _ := s.loadFieldDocValueReader(field, fieldLocStart, fieldLocEnd)
+		if fieldDvReader != nil {
+			s.fieldDvReaders[uint16(fieldID)] = fieldDvReader
+			s.fieldDvNames = append(s.fieldDvNames, field)
+		}
 	}
+
 	return nil
 }
