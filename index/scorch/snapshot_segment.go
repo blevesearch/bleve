@@ -168,7 +168,7 @@ type cachedFieldDocs struct {
 	size    uint64
 }
 
-func (cfd *cachedFieldDocs) prepareFields(field string, ss *SegmentSnapshot) {
+func (cfd *cachedFieldDocs) prepareField(field string, ss *SegmentSnapshot) {
 	defer close(cfd.readyCh)
 
 	cfd.size += uint64(size.SizeOfUint64) /* size field */
@@ -224,6 +224,7 @@ type cachedDocs struct {
 
 func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) error {
 	c.m.Lock()
+
 	if c.cache == nil {
 		c.cache = make(map[string]*cachedFieldDocs, len(ss.Fields()))
 	}
@@ -236,7 +237,7 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 				docs:    make(map[uint64][]byte),
 			}
 
-			go c.cache[field].prepareFields(field, ss)
+			go c.cache[field].prepareField(field, ss)
 		}
 	}
 
@@ -250,6 +251,7 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 		}
 		c.m.Lock()
 	}
+
 	c.updateSizeLOCKED()
 
 	c.m.Unlock()
