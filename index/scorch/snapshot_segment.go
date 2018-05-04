@@ -215,9 +215,32 @@ func (cfd *cachedFieldDocs) prepareFields(field string, ss *SegmentSnapshot) {
 }
 
 type cachedDocs struct {
-	m     sync.Mutex                  // As the cache is asynchronously prepared, need a lock
-	cache map[string]*cachedFieldDocs // Keyed by field
-	size  uint64
+	m       sync.Mutex                  // As the cache is asynchronously prepared, need a lock
+	cache   map[string]*cachedFieldDocs // Keyed by field
+	size    uint64
+	pfields []string
+}
+
+func (c *cachedDocs) getCachedFields() []string {
+	rv := make([]string, len(c.cache))
+	c.m.Lock()
+	for k, _ := range c.cache {
+		rv = append(rv, k)
+	}
+	c.m.Unlock()
+	return rv
+}
+
+func (c *cachedDocs) getPersistedFields() []string {
+	c.m.Lock()
+	defer c.m.Unlock()
+	return c.pfields
+}
+
+func (c *cachedDocs) setPersistedFields(fields []string) {
+	c.m.Lock()
+	c.pfields = fields
+	c.m.Unlock()
 }
 
 func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) error {
@@ -268,5 +291,6 @@ func (c *cachedDocs) updateSizeLOCKED() {
 			}
 		}
 	}
+
 	atomic.StoreUint64(&c.size, uint64(sizeInBytes))
 }

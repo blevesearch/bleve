@@ -491,6 +491,22 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 	return err
 }
 
+func checkSubset(set, subset []string) bool {
+OUTER:
+	for _, f1 := range subset {
+		found := false
+		for _, f2 := range set {
+			if f1 == f2 {
+				continue OUTER
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
 func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
 	fields []string, visitor index.DocumentFieldTermVisitor, dvs segment.DocVisitState) (
 	segment.DocVisitState, error) {
@@ -507,11 +523,29 @@ func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
 	ss := i.segment[segmentIndex]
 
 	if zaps, ok := ss.segment.(segment.DocumentFieldTermVisitable); ok {
-		// get the list of doc value persisted fields
-		pFields, err := zaps.VisitableDocValueFields()
-		if err != nil {
-			return nil, err
+		pFields := ss.cachedDocs.getPersistedFields()
+		// if all fields are dv presisted
+		if len(pFields) > 0 && checkSubset(pFields, fields) {
+			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
 		}
+
+		cFields := ss.cachedDocs.getCachedFields()
+		// if all fields are already in dvCache or persisted
+		if len(cFields) > 0 && checkSubset(append(pFields, cFields...), fields) {
+			dvPendingFields := extractDvPendingFields(fields, pFields)
+			visitDocumentFieldCacheTerms(localDocNum, dvPendingFields, ss, visitor)
+			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
+		}
+
+		// first time or there is no persisted dv fields
+		if len(pFields) == 0 {
+			// get the list of doc value persisted fields
+			pFields, err = zaps.VisitableDocValueFields()
+			if err != nil {
+				return nil, err
+			}
+		}
+		ss.cachedDocs.setPersistedFields(pFields)
 		// assort the fields for which terms look up have to
 		// be performed runtime
 		dvPendingFields := extractDvPendingFields(fields, pFields)
@@ -532,7 +566,7 @@ func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
 			}
 		}()
 
-		// visit the requested persisted dv while the cache preparation in progress
+		// visit the persisted dv while the cache preparation is in progress
 		dvs, err = zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
 		if err != nil {
 			return nil, err
