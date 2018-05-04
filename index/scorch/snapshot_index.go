@@ -503,6 +503,16 @@ func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
 		return nil, nil
 	}
 
+	_, dvs, err = i.documentVisitFieldTermsOnSegment(
+		segmentIndex, localDocNum, fields, nil, visitor, dvs)
+
+	return dvs, err
+}
+
+func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
+	segmentIndex int, localDocNum uint64, fields []string, cFields []string,
+	visitor index.DocumentFieldTermVisitor, dvs segment.DocVisitState) (
+	cFieldsOut []string, dvsOut segment.DocVisitState, err error) {
 	ss := i.segment[segmentIndex]
 
 	var vFields []string // fields that are visitable via the segment
@@ -511,59 +521,85 @@ func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
 	if ssvOk && ssv != nil {
 		vFields, err = ssv.VisitableDocValueFields()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	// cFields represents the fields that we'll need from the cachedDocs
-	cFields := subtractStrings(fields, vFields)
-
 	var errCh chan error
 
-	if !ss.cachedDocs.hasFields(cFields) {
-		errCh = make(chan error, 1)
+	// cFields represents the fields that we'll need from the
+	// cachedDocs, and might be optionally be provided by the caller,
+	// if the caller happens to know we're on the same segmentIndex
+	// from a previous invocation
+	if cFields == nil {
+		cFields = subtractStrings(fields, vFields)
 
-		go func() {
-			err := ss.cachedDocs.prepareFields(cFields, ss)
-			if err != nil {
-				errCh <- err
-			}
-			close(errCh)
-		}()
+		if !ss.cachedDocs.hasFields(cFields) {
+			errCh = make(chan error, 1)
+
+			go func() {
+				err := ss.cachedDocs.prepareFields(cFields, ss)
+				if err != nil {
+					errCh <- err
+				}
+				close(errCh)
+			}()
+		}
 	}
 
 	if ssvOk && ssv != nil && len(vFields) > 0 {
 		dvs, err = ssv.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	if errCh != nil {
 		err = <-errCh
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	ss.cachedDocs.visitDoc(localDocNum, cFields, visitor)
 
-	return dvs, nil
+	return cFields, dvs, nil
 }
 
-func (i *IndexSnapshot) DocValueReader(fields []string) (index.DocValueReader, error) {
-	return &DocValueReader{i: i, fields: fields}, nil
+func (i *IndexSnapshot) DocValueReader(fields []string) (
+	index.DocValueReader, error) {
+	return &DocValueReader{i: i, fields: fields, currSegmentIndex: -1}, nil
 }
 
 type DocValueReader struct {
 	i      *IndexSnapshot
 	fields []string
 	dvs    segment.DocVisitState
+
+	currSegmentIndex int
+	currCachedFields []string
 }
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	visitor index.DocumentFieldTermVisitor) (err error) {
-	dvr.dvs, err = dvr.i.documentVisitFieldTerms(id, dvr.fields, visitor, dvr.dvs)
+	docNum, err := docInternalToNumber(id)
+	if err != nil {
+		return err
+	}
+
+	segmentIndex, localDocNum := dvr.i.segmentIndexAndLocalDocNumFromGlobal(docNum)
+	if segmentIndex >= len(dvr.i.segment) {
+		return nil
+	}
+
+	if dvr.currSegmentIndex != segmentIndex {
+		dvr.currSegmentIndex = segmentIndex
+		dvr.currCachedFields = nil
+	}
+
+	dvr.currCachedFields, dvr.dvs, err = dvr.i.documentVisitFieldTermsOnSegment(
+		dvr.currSegmentIndex, localDocNum, dvr.fields, dvr.currCachedFields, visitor, dvr.dvs)
+
 	return err
 }
 
