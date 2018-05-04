@@ -15,7 +15,6 @@
 package scorch
 
 import (
-	"bytes"
 	"container/heap"
 	"encoding/binary"
 	"fmt"
@@ -544,7 +543,7 @@ func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
 			return nil, err
 		}
 
-		visitDocumentFieldCacheTerms(localDocNum, dvPendingFields, ss, visitor)
+		ss.cachedDocs.visitDoc(localDocNum, dvPendingFields, visitor)
 		return dvs, nil
 	}
 
@@ -558,28 +557,8 @@ func prepareCacheVisitDocumentFieldTerms(localDocNum uint64, fields []string,
 		return err
 	}
 
-	visitDocumentFieldCacheTerms(localDocNum, fields, ss, visitor)
+	ss.cachedDocs.visitDoc(localDocNum, fields, visitor)
 	return nil
-}
-
-func visitDocumentFieldCacheTerms(localDocNum uint64, fields []string,
-	ss *SegmentSnapshot, visitor index.DocumentFieldTermVisitor) {
-
-	for _, field := range fields {
-		if cachedFieldDocs, exists := ss.cachedDocs.cache[field]; exists {
-			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
-				for {
-					i := bytes.Index(tlist, TermSeparatorSplitSlice)
-					if i < 0 {
-						break
-					}
-					visitor(field, tlist[0:i])
-					tlist = tlist[i+1:]
-				}
-			}
-		}
-	}
-
 }
 
 func extractDvPendingFields(requestedFields, persistedFields []string) []string {

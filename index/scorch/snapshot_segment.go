@@ -15,10 +15,12 @@
 package scorch
 
 import (
+	"bytes"
 	"sync"
 	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/blevesearch/bleve/size"
 )
@@ -269,4 +271,26 @@ func (c *cachedDocs) updateSizeLOCKED() {
 		}
 	}
 	atomic.StoreUint64(&c.size, uint64(sizeInBytes))
+}
+
+func (c *cachedDocs) visitDoc(localDocNum uint64,
+	fields []string, visitor index.DocumentFieldTermVisitor) {
+	c.m.Lock()
+
+	for _, field := range fields {
+		if cachedFieldDocs, exists := c.cache[field]; exists {
+			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
+				for {
+					i := bytes.Index(tlist, TermSeparatorSplitSlice)
+					if i < 0 {
+						break
+					}
+					visitor(field, tlist[0:i])
+					tlist = tlist[i+1:]
+				}
+			}
+		}
+	}
+
+	c.m.Unlock()
 }
