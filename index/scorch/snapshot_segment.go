@@ -108,7 +108,6 @@ func (s *SegmentSnapshot) DocID(num uint64) ([]byte, error) {
 }
 
 func (s *SegmentSnapshot) Count() uint64 {
-
 	rv := s.segment.Count()
 	if s.deleted != nil {
 		rv -= s.deleted.GetCardinality()
@@ -256,6 +255,23 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 
 	c.m.Unlock()
 	return nil
+}
+
+// hasFields returns true if the cache has all the given fields
+func (c *cachedDocs) hasFields(fields []string) bool {
+	c.m.Lock()
+OUTER:
+	for _, field := range fields {
+		for f := range c.cache {
+			if f == field {
+				continue OUTER
+			}
+		}
+		c.m.Unlock()
+		return false // found a field not in cache
+	}
+	c.m.Unlock()
+	return true
 }
 
 func (c *cachedDocs) Size() int {
