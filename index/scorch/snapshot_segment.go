@@ -260,15 +260,11 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 // hasFields returns true if the cache has all the given fields
 func (c *cachedDocs) hasFields(fields []string) bool {
 	c.m.Lock()
-OUTER:
 	for _, field := range fields {
-		for f := range c.cache {
-			if f == field {
-				continue OUTER
-			}
+		if _, exists := c.cache[field]; !exists {
+			c.m.Unlock()
+			return false // found a field not in cache
 		}
-		c.m.Unlock()
-		return false // found a field not in cache
 	}
 	c.m.Unlock()
 	return true
