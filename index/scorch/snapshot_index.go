@@ -561,7 +561,9 @@ func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		}
 	}
 
-	ss.cachedDocs.visitDoc(localDocNum, cFields, visitor)
+	if len(cFields) > 0 {
+		ss.cachedDocs.visitDoc(localDocNum, cFields, visitor)
+	}
 
 	return cFields, dvs, nil
 }
