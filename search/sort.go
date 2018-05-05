@@ -359,7 +359,7 @@ func (s *SortField) UpdateVisitor(field string, term []byte) {
 func (s *SortField) Value(i *DocumentMatch) string {
 	iTerms := s.filterTermsByType(s.values)
 	iTerm := s.filterTermsByMode(iTerms)
-	s.values = nil
+	s.values = s.values[:0]
 	return iTerm
 }
 
@@ -619,7 +619,7 @@ func (s *SortGeoDistance) UpdateVisitor(field string, term []byte) {
 func (s *SortGeoDistance) Value(i *DocumentMatch) string {
 	iTerms := s.filterTermsByType(s.values)
 	iTerm := s.filterTermsByMode(iTerms)
-	s.values = nil
+	s.values = s.values[:0]
 
 	if iTerm == "" {
 		return maxDistance
