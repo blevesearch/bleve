@@ -344,6 +344,7 @@ type SortField struct {
 	Mode    SortFieldMode
 	Missing SortFieldMissing
 	values  [][]byte
+	tmp     [][]byte
 }
 
 // UpdateVisitor notifies this sort field that in this document
@@ -405,7 +406,7 @@ func (s *SortField) filterTermsByType(terms [][]byte) [][]byte {
 	stype := s.Type
 	if stype == SortFieldAuto {
 		allTermsPrefixCoded := true
-		var termsWithShiftZero [][]byte
+		termsWithShiftZero := s.tmp[:0]
 		for _, term := range terms {
 			valid, shift := numeric.ValidPrefixCodedTermBytes(term)
 			if valid && shift == 0 {
@@ -416,9 +417,10 @@ func (s *SortField) filterTermsByType(terms [][]byte) [][]byte {
 		}
 		if allTermsPrefixCoded {
 			terms = termsWithShiftZero
+			s.tmp = termsWithShiftZero[:0]
 		}
 	} else if stype == SortFieldAsNumber || stype == SortFieldAsDate {
-		var termsWithShiftZero [][]byte
+		termsWithShiftZero := s.tmp[:0]
 		for _, term := range terms {
 			valid, shift := numeric.ValidPrefixCodedTermBytes(term)
 			if valid && shift == 0 {
@@ -426,6 +428,7 @@ func (s *SortField) filterTermsByType(terms [][]byte) [][]byte {
 			}
 		}
 		terms = termsWithShiftZero
+		s.tmp = termsWithShiftZero[:0]
 	}
 	return terms
 }
