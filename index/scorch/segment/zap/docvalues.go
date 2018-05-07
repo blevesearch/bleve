@@ -69,9 +69,9 @@ func (di *docValueReader) cloneInto(rv *docValueReader) *docValueReader {
 	rv.curChunkNum = math.MaxUint64
 	rv.chunkOffsets = di.chunkOffsets // immutable, so it's sharable
 	rv.dvDataLoc = di.dvDataLoc
-	rv.curChunkHeader = nil
+	rv.curChunkHeader = rv.curChunkHeader[:0]
 	rv.curChunkData = nil
-	rv.uncompressed = nil
+	rv.uncompressed = rv.uncompressed[:0]
 
 	return rv
 }
@@ -150,7 +150,11 @@ func (di *docValueReader) loadDvChunk(chunkNumber uint64, s *SegmentBase) error 
 	chunkMetaLoc := destChunkDataLoc + uint64(read)
 
 	offset := uint64(0)
-	di.curChunkHeader = make([]MetaData, int(numDocs))
+	if cap(di.curChunkHeader) < int(numDocs) {
+		di.curChunkHeader = make([]MetaData, int(numDocs))
+	} else {
+		di.curChunkHeader = di.curChunkHeader[:int(numDocs)]
+	}
 	for i := 0; i < int(numDocs); i++ {
 		di.curChunkHeader[i].DocNum, read = binary.Uvarint(s.mem[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
 		offset += uint64(read)
@@ -301,12 +305,5 @@ func (s *Segment) VisitDocumentFieldTerms(localDocNum uint64, fields []string,
 // persisted doc value terms ready to be visitable using the
 // VisitDocumentFieldTerms method.
 func (s *Segment) VisitableDocValueFields() ([]string, error) {
-	rv := make([]string, 0, len(s.fieldDvReaders))
-	for fieldID, field := range s.fieldsInv {
-		if dvIter, ok := s.fieldDvReaders[uint16(fieldID)]; ok &&
-			dvIter != nil {
-			rv = append(rv, field)
-		}
-	}
-	return rv, nil
+	return s.fieldDvNames, nil
 }

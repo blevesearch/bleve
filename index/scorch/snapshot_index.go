@@ -15,7 +15,6 @@
 package scorch
 
 import (
-	"bytes"
 	"container/heap"
 	"encoding/binary"
 	"fmt"
@@ -492,124 +491,117 @@ func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
 }
 
 func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
-	fields []string, visitor index.DocumentFieldTermVisitor, dvs segment.DocVisitState) (
-	segment.DocVisitState, error) {
-
+	fields []string, visitor index.DocumentFieldTermVisitor,
+	dvs segment.DocVisitState) (segment.DocVisitState, error) {
 	docNum, err := docInternalToNumber(id)
 	if err != nil {
 		return nil, err
 	}
+
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 	if segmentIndex >= len(i.segment) {
 		return nil, nil
 	}
 
+	_, dvs, err = i.documentVisitFieldTermsOnSegment(
+		segmentIndex, localDocNum, fields, nil, visitor, dvs)
+
+	return dvs, err
+}
+
+func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
+	segmentIndex int, localDocNum uint64, fields []string, cFields []string,
+	visitor index.DocumentFieldTermVisitor, dvs segment.DocVisitState) (
+	cFieldsOut []string, dvsOut segment.DocVisitState, err error) {
 	ss := i.segment[segmentIndex]
 
-	if zaps, ok := ss.segment.(segment.DocumentFieldTermVisitable); ok {
-		// get the list of doc value persisted fields
-		pFields, err := zaps.VisitableDocValueFields()
+	var vFields []string // fields that are visitable via the segment
+
+	ssv, ssvOk := ss.segment.(segment.DocumentFieldTermVisitable)
+	if ssvOk && ssv != nil {
+		vFields, err = ssv.VisitableDocValueFields()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		// assort the fields for which terms look up have to
-		// be performed runtime
-		dvPendingFields := extractDvPendingFields(fields, pFields)
-		// all fields are doc value persisted
-		if len(dvPendingFields) == 0 {
-			return zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
+	}
+
+	var errCh chan error
+
+	// cFields represents the fields that we'll need from the
+	// cachedDocs, and might be optionally be provided by the caller,
+	// if the caller happens to know we're on the same segmentIndex
+	// from a previous invocation
+	if cFields == nil {
+		cFields = subtractStrings(fields, vFields)
+
+		if !ss.cachedDocs.hasFields(cFields) {
+			errCh = make(chan error, 1)
+
+			go func() {
+				err := ss.cachedDocs.prepareFields(cFields, ss)
+				if err != nil {
+					errCh <- err
+				}
+				close(errCh)
+			}()
 		}
+	}
 
-		// concurrently trigger the runtime doc value preparations for
-		// pending fields as well as the visit of the persisted doc values
-		errCh := make(chan error, 1)
-
-		go func() {
-			defer close(errCh)
-			err := ss.cachedDocs.prepareFields(dvPendingFields, ss)
-			if err != nil {
-				errCh <- err
-			}
-		}()
-
-		// visit the requested persisted dv while the cache preparation in progress
-		dvs, err = zaps.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
+	if ssvOk && ssv != nil && len(vFields) > 0 {
+		dvs, err = ssv.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+	}
 
-		// err out if fieldCache preparation failed
+	if errCh != nil {
 		err = <-errCh
 		if err != nil {
-			return nil, err
-		}
-
-		visitDocumentFieldCacheTerms(localDocNum, dvPendingFields, ss, visitor)
-		return dvs, nil
-	}
-
-	return dvs, prepareCacheVisitDocumentFieldTerms(localDocNum, fields, ss, visitor)
-}
-
-func prepareCacheVisitDocumentFieldTerms(localDocNum uint64, fields []string,
-	ss *SegmentSnapshot, visitor index.DocumentFieldTermVisitor) error {
-	err := ss.cachedDocs.prepareFields(fields, ss)
-	if err != nil {
-		return err
-	}
-
-	visitDocumentFieldCacheTerms(localDocNum, fields, ss, visitor)
-	return nil
-}
-
-func visitDocumentFieldCacheTerms(localDocNum uint64, fields []string,
-	ss *SegmentSnapshot, visitor index.DocumentFieldTermVisitor) {
-
-	for _, field := range fields {
-		if cachedFieldDocs, exists := ss.cachedDocs.cache[field]; exists {
-			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
-				for {
-					i := bytes.Index(tlist, TermSeparatorSplitSlice)
-					if i < 0 {
-						break
-					}
-					visitor(field, tlist[0:i])
-					tlist = tlist[i+1:]
-				}
-			}
+			return nil, nil, err
 		}
 	}
 
-}
-
-func extractDvPendingFields(requestedFields, persistedFields []string) []string {
-	removeMap := make(map[string]struct{}, len(persistedFields))
-	for _, str := range persistedFields {
-		removeMap[str] = struct{}{}
+	if len(cFields) > 0 {
+		ss.cachedDocs.visitDoc(localDocNum, cFields, visitor)
 	}
 
-	rv := make([]string, 0, len(requestedFields))
-	for _, s := range requestedFields {
-		if _, ok := removeMap[s]; !ok {
-			rv = append(rv, s)
-		}
-	}
-	return rv
+	return cFields, dvs, nil
 }
 
-func (i *IndexSnapshot) DocValueReader(fields []string) (index.DocValueReader, error) {
-	return &DocValueReader{i: i, fields: fields}, nil
+func (i *IndexSnapshot) DocValueReader(fields []string) (
+	index.DocValueReader, error) {
+	return &DocValueReader{i: i, fields: fields, currSegmentIndex: -1}, nil
 }
 
 type DocValueReader struct {
 	i      *IndexSnapshot
 	fields []string
 	dvs    segment.DocVisitState
+
+	currSegmentIndex int
+	currCachedFields []string
 }
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	visitor index.DocumentFieldTermVisitor) (err error) {
-	dvr.dvs, err = dvr.i.documentVisitFieldTerms(id, dvr.fields, visitor, dvr.dvs)
+	docNum, err := docInternalToNumber(id)
+	if err != nil {
+		return err
+	}
+
+	segmentIndex, localDocNum := dvr.i.segmentIndexAndLocalDocNumFromGlobal(docNum)
+	if segmentIndex >= len(dvr.i.segment) {
+		return nil
+	}
+
+	if dvr.currSegmentIndex != segmentIndex {
+		dvr.currSegmentIndex = segmentIndex
+		dvr.currCachedFields = nil
+	}
+
+	dvr.currCachedFields, dvr.dvs, err = dvr.i.documentVisitFieldTermsOnSegment(
+		dvr.currSegmentIndex, localDocNum, dvr.fields, dvr.currCachedFields, visitor, dvr.dvs)
+
 	return err
 }
 
@@ -634,5 +626,24 @@ func (i *IndexSnapshot) DumpFields() chan interface{} {
 	go func() {
 		close(rv)
 	}()
+	return rv
+}
+
+// subtractStrings returns set a minus elements of set b.
+func subtractStrings(a, b []string) []string {
+	if len(b) <= 0 {
+		return a
+	}
+
+	rv := make([]string, 0, len(a))
+OUTER:
+	for _, as := range a {
+		for _, bs := range b {
+			if as == bs {
+				continue OUTER
+			}
+		}
+		rv = append(rv, as)
+	}
 	return rv
 }

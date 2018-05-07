@@ -15,10 +15,12 @@
 package scorch
 
 import (
+	"bytes"
 	"sync"
 	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/blevesearch/bleve/size"
 )
@@ -106,7 +108,6 @@ func (s *SegmentSnapshot) DocID(num uint64) ([]byte, error) {
 }
 
 func (s *SegmentSnapshot) Count() uint64 {
-
 	rv := s.segment.Count()
 	if s.deleted != nil {
 		rv -= s.deleted.GetCardinality()
@@ -166,7 +167,7 @@ type cachedFieldDocs struct {
 	size    uint64
 }
 
-func (cfd *cachedFieldDocs) prepareFields(field string, ss *SegmentSnapshot) {
+func (cfd *cachedFieldDocs) prepareField(field string, ss *SegmentSnapshot) {
 	defer close(cfd.readyCh)
 
 	cfd.size += uint64(size.SizeOfUint64) /* size field */
@@ -222,6 +223,7 @@ type cachedDocs struct {
 
 func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) error {
 	c.m.Lock()
+
 	if c.cache == nil {
 		c.cache = make(map[string]*cachedFieldDocs, len(ss.Fields()))
 	}
@@ -234,7 +236,7 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 				docs:    make(map[uint64][]byte),
 			}
 
-			go c.cache[field].prepareFields(field, ss)
+			go c.cache[field].prepareField(field, ss)
 		}
 	}
 
@@ -248,10 +250,24 @@ func (c *cachedDocs) prepareFields(wantedFields []string, ss *SegmentSnapshot) e
 		}
 		c.m.Lock()
 	}
+
 	c.updateSizeLOCKED()
 
 	c.m.Unlock()
 	return nil
+}
+
+// hasFields returns true if the cache has all the given fields
+func (c *cachedDocs) hasFields(fields []string) bool {
+	c.m.Lock()
+	for _, field := range fields {
+		if _, exists := c.cache[field]; !exists {
+			c.m.Unlock()
+			return false // found a field not in cache
+		}
+	}
+	c.m.Unlock()
+	return true
 }
 
 func (c *cachedDocs) Size() int {
@@ -269,4 +285,26 @@ func (c *cachedDocs) updateSizeLOCKED() {
 		}
 	}
 	atomic.StoreUint64(&c.size, uint64(sizeInBytes))
+}
+
+func (c *cachedDocs) visitDoc(localDocNum uint64,
+	fields []string, visitor index.DocumentFieldTermVisitor) {
+	c.m.Lock()
+
+	for _, field := range fields {
+		if cachedFieldDocs, exists := c.cache[field]; exists {
+			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
+				for {
+					i := bytes.Index(tlist, TermSeparatorSplitSlice)
+					if i < 0 {
+						break
+					}
+					visitor(field, tlist[0:i])
+					tlist = tlist[i+1:]
+				}
+			}
+		}
+	}
+
+	c.m.Unlock()
 }
