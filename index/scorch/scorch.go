@@ -424,7 +424,9 @@ func (s *Scorch) Reader() (index.IndexReader, error) {
 func (s *Scorch) currentSnapshot() *IndexSnapshot {
 	s.rootLock.RLock()
 	rv := s.root
-	rv.AddRef()
+	if rv != nil {
+		rv.AddRef()
+	}
 	s.rootLock.RUnlock()
 	return rv
 }
@@ -508,14 +510,18 @@ func (s *Scorch) AddEligibleForRemoval(epoch uint64) {
 	s.rootLock.Unlock()
 }
 
-func (s *Scorch) MemoryUsed() uint64 {
+func (s *Scorch) MemoryUsed() (memUsed uint64) {
 	indexSnapshot := s.currentSnapshot()
+	if indexSnapshot == nil {
+		return
+	}
+
 	defer func() {
 		_ = indexSnapshot.Close()
 	}()
 
 	// Account for current root snapshot overhead
-	memUsed := uint64(indexSnapshot.Size())
+	memUsed += uint64(indexSnapshot.Size())
 
 	// Account for snapshot that the persister may be working on
 	persistEpoch := atomic.LoadUint64(&s.iStats.persistEpoch)
