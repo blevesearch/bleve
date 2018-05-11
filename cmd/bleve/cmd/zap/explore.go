@@ -46,7 +46,7 @@ var exploreCmd = &cobra.Command{
 		vellumLen, read := binary.Uvarint(data[addr : addr+binary.MaxVarintLen64])
 		fmt.Printf("vellum length: %d\n", vellumLen)
 		fstBytes := data[addr+uint64(read) : addr+uint64(read)+vellumLen]
-		fmt.Printf("raw vellum data % x\n", fstBytes)
+		fmt.Printf("raw vellum data:\n % x\n", fstBytes)
 
 		if len(args) >= 3 {
 			if fstBytes != nil {
