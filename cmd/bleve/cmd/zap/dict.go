@@ -45,8 +45,8 @@ var dictCmd = &cobra.Command{
 		vellumLen, read := binary.Uvarint(data[addr : addr+binary.MaxVarintLen64])
 		fmt.Printf("vellum length: %d\n", vellumLen)
 		fstBytes := data[addr+uint64(read) : addr+uint64(read)+vellumLen]
-		fmt.Printf("raw vellum data % x\n", fstBytes)
-		fmt.Printf("dictionary:\n\n")
+		fmt.Printf("raw vellum data:\n % x\n", fstBytes)
+		fmt.Printf("dictionary:\n")
 		if fstBytes != nil {
 			fst, err := vellum.Load(fstBytes)
 			if err != nil {
@@ -63,7 +63,7 @@ var dictCmd = &cobra.Command{
 					extra = fmt.Sprintf("-- docNum: %d, norm: %f", docNum, norm)
 				}
 
-				fmt.Printf("%s - %d (%x) %s\n", currTerm, currVal, currVal, extra)
+				fmt.Printf(" %s - %d (%x) %s\n", currTerm, currVal, currVal, extra)
 				err = itr.Next()
 			}
 			if err != nil && err != vellum.ErrIteratorDone {
