@@ -601,6 +601,9 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 
 	docNumOffsets := make([]uint64, newSegDocCount)
 
+	vdc := visitDocumentCtxPool.Get().(*visitDocumentCtx)
+	defer visitDocumentCtxPool.Put(vdc)
+
 	// for each segment
 	for segI, segment := range segments {
 		segNewDocNums := make([]uint64, segment.numDocs)
@@ -645,11 +648,14 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 				typs[i] = typs[i][:0]
 				poss[i] = poss[i][:0]
 			}
-			err := segment.VisitDocument(docNum, func(field string, typ byte, value []byte, pos []uint64) bool {
+			err := segment.visitDocument(vdc, docNum, func(field string, typ byte, value []byte, pos []uint64) bool {
 				fieldID := int(fieldsMap[field]) - 1
 				vals[fieldID] = append(vals[fieldID], value)
 				typs[fieldID] = append(typs[fieldID], typ)
-				poss[fieldID] = append(poss[fieldID], pos)
+
+				// MB-29654: copy array positions to preserve them beyond the scope of this callback
+				poss[fieldID] = append(poss[fieldID], append([]uint64(nil), pos...))
+
 				return true
 			})
 			if err != nil {

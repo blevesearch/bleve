@@ -406,8 +406,8 @@ func compareSegments(a, b *Segment) string {
 						err = a.VisitDocument(apitrn.Number(),
 							func(field string, typ byte, value []byte, pos []uint64) bool {
 								afields[field+"-typ"] = typ
-								afields[field+"-value"] = value
-								afields[field+"-pos"] = pos
+								afields[field+"-value"] = append([]byte(nil), value...)
+								afields[field+"-pos"] = append([]uint64(nil), pos...)
 								return true
 							})
 						if err != nil {
@@ -417,8 +417,8 @@ func compareSegments(a, b *Segment) string {
 						err = b.VisitDocument(bpitrn.Number(),
 							func(field string, typ byte, value []byte, pos []uint64) bool {
 								bfields[field+"-typ"] = typ
-								bfields[field+"-value"] = value
-								bfields[field+"-pos"] = pos
+								bfields[field+"-value"] = append([]byte(nil), value...)
+								bfields[field+"-pos"] = append([]uint64(nil), pos...)
 								return true
 							})
 						if err != nil {

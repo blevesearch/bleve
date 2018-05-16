@@ -313,21 +313,26 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
 	rv = document.NewDocument(id)
-	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, value []byte, pos []uint64) bool {
+	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, val []byte, pos []uint64) bool {
 		if name == "_id" {
 			return true
 		}
+
+		// MB-29654: copy value, array positions to preserve them beyond the scope of this callback
+		value := append([]byte(nil), val...)
+		arrayPos := append([]uint64(nil), pos...)
+
 		switch typ {
 		case 't':
-			rv.AddField(document.NewTextField(name, pos, value))
+			rv.AddField(document.NewTextField(name, arrayPos, value))
 		case 'n':
-			rv.AddField(document.NewNumericFieldFromBytes(name, pos, value))
+			rv.AddField(document.NewNumericFieldFromBytes(name, arrayPos, value))
 		case 'd':
-			rv.AddField(document.NewDateTimeFieldFromBytes(name, pos, value))
+			rv.AddField(document.NewDateTimeFieldFromBytes(name, arrayPos, value))
 		case 'b':
-			rv.AddField(document.NewBooleanFieldFromBytes(name, pos, value))
+			rv.AddField(document.NewBooleanFieldFromBytes(name, arrayPos, value))
 		case 'g':
-			rv.AddField(document.NewGeoPointFieldFromBytes(name, pos, value))
+			rv.AddField(document.NewGeoPointFieldFromBytes(name, arrayPos, value))
 		}
 
 		return true
