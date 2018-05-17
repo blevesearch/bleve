@@ -599,7 +599,12 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	typs := make([][]byte, len(fieldsInv))
 	poss := make([][][]uint64, len(fieldsInv))
 
+	var posBuf []uint64
+
 	docNumOffsets := make([]uint64, newSegDocCount)
+
+	vdc := visitDocumentCtxPool.Get().(*visitDocumentCtx)
+	defer visitDocumentCtxPool.Put(vdc)
 
 	// for each segment
 	for segI, segment := range segments {
@@ -639,17 +644,32 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 			metaBuf.Reset()
 			data = data[:0]
 
+			posTemp := posBuf
+
 			// collect all the data
 			for i := 0; i < len(fieldsInv); i++ {
 				vals[i] = vals[i][:0]
 				typs[i] = typs[i][:0]
 				poss[i] = poss[i][:0]
 			}
-			err := segment.VisitDocument(docNum, func(field string, typ byte, value []byte, pos []uint64) bool {
+			err := segment.visitDocument(vdc, docNum, func(field string, typ byte, value []byte, pos []uint64) bool {
 				fieldID := int(fieldsMap[field]) - 1
 				vals[fieldID] = append(vals[fieldID], value)
 				typs[fieldID] = append(typs[fieldID], typ)
-				poss[fieldID] = append(poss[fieldID], pos)
+
+				// copy array positions to preserve them beyond the scope of this callback
+				var curPos []uint64
+				if len(pos) > 0 {
+					if cap(posTemp) < len(pos) {
+						posBuf = make([]uint64, len(pos)*len(fieldsInv))
+						posTemp = posBuf
+					}
+					curPos = posTemp[0:len(pos)]
+					copy(curPos, pos)
+					posTemp = posTemp[len(pos):]
+				}
+				poss[fieldID] = append(poss[fieldID], curPos)
+
 				return true
 			})
 			if err != nil {
