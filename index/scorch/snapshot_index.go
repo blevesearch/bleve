@@ -318,7 +318,7 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 			return true
 		}
 
-		// MB-29654: copy value, array positions to preserve them beyond the scope of this callback
+		// copy value, array positions to preserve them beyond the scope of this callback
 		value := append([]byte(nil), val...)
 		arrayPos := append([]uint64(nil), pos...)
 

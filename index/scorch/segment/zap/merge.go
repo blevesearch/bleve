@@ -657,7 +657,7 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 				vals[fieldID] = append(vals[fieldID], value)
 				typs[fieldID] = append(typs[fieldID], typ)
 
-				// MB-29654: copy array positions to preserve them beyond the scope of this callback
+				// copy array positions to preserve them beyond the scope of this callback
 				var curPos []uint64
 				if len(pos) > 0 {
 					if cap(posTemp) < len(pos) {
