@@ -599,6 +599,8 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	typs := make([][]byte, len(fieldsInv))
 	poss := make([][][]uint64, len(fieldsInv))
 
+	var posBuf []uint64
+
 	docNumOffsets := make([]uint64, newSegDocCount)
 
 	vdc := visitDocumentCtxPool.Get().(*visitDocumentCtx)
@@ -642,6 +644,8 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 			metaBuf.Reset()
 			data = data[:0]
 
+			posTemp := posBuf
+
 			// collect all the data
 			for i := 0; i < len(fieldsInv); i++ {
 				vals[i] = vals[i][:0]
@@ -654,7 +658,17 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 				typs[fieldID] = append(typs[fieldID], typ)
 
 				// MB-29654: copy array positions to preserve them beyond the scope of this callback
-				poss[fieldID] = append(poss[fieldID], append([]uint64(nil), pos...))
+				var curPos []uint64
+				if len(pos) > 0 {
+					if cap(posTemp) < len(pos) {
+						posBuf = make([]uint64, len(pos)*len(fieldsInv))
+						posTemp = posBuf
+					}
+					curPos = posTemp[0:len(pos)]
+					copy(curPos, pos)
+					posTemp = posTemp[len(pos):]
+				}
+				poss[fieldID] = append(poss[fieldID], curPos)
 
 				return true
 			})
