@@ -202,6 +202,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	s.nextSnapshotEpoch++
 	rootPrev := s.root
 	s.root = newSnapshot
+	atomic.StoreUint64(&s.stats.CurRootEpoch, s.root.epoch)
 	// release lock
 	s.rootLock.Unlock()
 
@@ -265,6 +266,7 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 	s.rootLock.Lock()
 	rootPrev := s.root
 	s.root = newIndexSnapshot
+	atomic.StoreUint64(&s.stats.CurRootEpoch, s.root.epoch)
 	s.rootLock.Unlock()
 
 	if rootPrev != nil {
@@ -369,6 +371,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	s.nextSnapshotEpoch++
 	rootPrev := s.root
 	s.root = newSnapshot
+	atomic.StoreUint64(&s.stats.CurRootEpoch, s.root.epoch)
 	// release lock
 	s.rootLock.Unlock()
 
@@ -430,6 +433,8 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 	// swap in new snapshot
 	rootPrev := s.root
 	s.root = newSnapshot
+
+	atomic.StoreUint64(&s.stats.CurRootEpoch, s.root.epoch)
 	// release lock
 	s.rootLock.Unlock()
 
