@@ -266,10 +266,6 @@ func (sb *SegmentBase) dictionary(field string) (rv *Dictionary, err error) {
 				if err != nil {
 					return nil, fmt.Errorf("dictionary field %s vellum err: %v", field, err)
 				}
-				rv.fstReader, err = rv.fst.Reader()
-				if err != nil {
-					return nil, fmt.Errorf("dictionary field %s vellum Reader err: %v", field, err)
-				}
 			}
 		}
 	}
