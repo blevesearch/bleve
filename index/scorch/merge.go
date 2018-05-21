@@ -72,6 +72,8 @@ OUTER:
 				}
 				lastEpochMergePlanned = ourSnapshot.epoch
 
+				atomic.StoreUint64(&s.stats.LastMergedEpoch, ourSnapshot.epoch)
+
 				s.fireEvent(EventKindMergerProgress, time.Since(startTime))
 			}
 			_ = ourSnapshot.DecRef()

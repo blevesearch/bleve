@@ -109,6 +109,8 @@ OUTER:
 				continue OUTER
 			}
 
+			atomic.StoreUint64(&s.stats.LastPersistedEpoch, ourSnapshot.epoch)
+
 			lastPersistedEpoch = ourSnapshot.epoch
 			for _, ew := range persistWatchers {
 				close(ew.notifyCh)
