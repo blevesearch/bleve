@@ -28,11 +28,10 @@ import (
 
 // Dictionary is the zap representation of the term dictionary
 type Dictionary struct {
-	sb        *SegmentBase
-	field     string
-	fieldID   uint16
-	fst       *vellum.FST
-	fstReader *vellum.Reader
+	sb      *SegmentBase
+	field   string
+	fieldID uint16
+	fst     *vellum.FST
 }
 
 // PostingsList returns the postings list for the specified term
@@ -47,14 +46,14 @@ func (d *Dictionary) PostingsList(term []byte, except *roaring.Bitmap,
 }
 
 func (d *Dictionary) postingsList(term []byte, except *roaring.Bitmap, rv *PostingsList) (*PostingsList, error) {
-	if d.fstReader == nil {
+	if d.fst == nil {
 		if rv == nil || rv == emptyPostingsList {
 			return emptyPostingsList, nil
 		}
 		return d.postingsListInit(rv, except), nil
 	}
 
-	postingsOffset, exists, err := d.fstReader.Get(term)
+	postingsOffset, exists, err := d.fst.Get(term)
 	if err != nil {
 		return nil, fmt.Errorf("vellum err: %v", err)
 	}
