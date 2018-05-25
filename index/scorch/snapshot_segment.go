@@ -293,6 +293,10 @@ func (c *cachedDocs) visitDoc(localDocNum uint64,
 
 	for _, field := range fields {
 		if cachedFieldDocs, exists := c.cache[field]; exists {
+			c.m.Unlock()
+			<-cachedFieldDocs.readyCh
+			c.m.Lock()
+
 			if tlist, exists := cachedFieldDocs.docs[localDocNum]; exists {
 				for {
 					i := bytes.Index(tlist, TermSeparatorSplitSlice)
