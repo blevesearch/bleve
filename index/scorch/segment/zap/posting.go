@@ -94,7 +94,7 @@ func under32Bits(x uint64) bool {
 
 const docNum1HitFinished = math.MaxUint64
 
-// PostingsList is an in-memory represenation of a postings list
+// PostingsList is an in-memory representation of a postings list
 type PostingsList struct {
 	sb             *SegmentBase
 	postingsOffset uint64
@@ -733,7 +733,7 @@ func (p *Posting) Number() uint64 {
 	return p.docNum
 }
 
-// Frequency returns the frequence of occurance of this term in this doc/field
+// Frequency returns the frequencies of occurrence of this term in this doc/field
 func (p *Posting) Frequency() uint64 {
 	return p.freq
 }
@@ -743,12 +743,12 @@ func (p *Posting) Norm() float64 {
 	return float64(p.norm)
 }
 
-// Locations returns the location information for each occurance
+// Locations returns the location information for each occurrence
 func (p *Posting) Locations() []segment.Location {
 	return p.locs
 }
 
-// Location represents the location of a single occurance
+// Location represents the location of a single occurrence
 type Location struct {
 	field string
 	pos   uint64
@@ -769,22 +769,22 @@ func (l *Location) Field() string {
 	return l.field
 }
 
-// Start returns the start byte offset of this occurance
+// Start returns the start byte offset of this occurrence
 func (l *Location) Start() uint64 {
 	return l.start
 }
 
-// End returns the end byte offset of this occurance
+// End returns the end byte offset of this occurrence
 func (l *Location) End() uint64 {
 	return l.end
 }
 
-// Pos returns the 1-based phrase position of this occurance
+// Pos returns the 1-based phrase position of this occurrence
 func (l *Location) Pos() uint64 {
 	return l.pos
 }
 
-// ArrayPositions returns the array position vector associated with this occurance
+// ArrayPositions returns the array position vector associated with this occurrence
 func (l *Location) ArrayPositions() []uint64 {
 	return l.ap
 }

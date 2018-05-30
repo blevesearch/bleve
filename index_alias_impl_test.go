@@ -515,7 +515,7 @@ func TestIndexAliasMulti(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	// cheat and ensure that Took field matches since it invovles time
+	// cheat and ensure that Took field matches since it involves time
 	expected.Took = results.Took
 	if !reflect.DeepEqual(results, expected) {
 		t.Errorf("expected %#v, got %#v", expected, results)
@@ -599,7 +599,7 @@ func TestMultiSearchNoError(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	// cheat and ensure that Took field matches since it invovles time
+	// cheat and ensure that Took field matches since it involves time
 	expected.Took = results.Took
 	if !reflect.DeepEqual(results, expected) {
 		t.Errorf("expected %#v, got %#v", expected, results)
@@ -1229,7 +1229,7 @@ func TestMultiSearchCustomSort(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	// cheat and ensure that Took field matches since it invovles time
+	// cheat and ensure that Took field matches since it involves time
 	expected.Took = results.Took
 	if !reflect.DeepEqual(results, expected) {
 		t.Errorf("expected %v, got %v", expected, results)

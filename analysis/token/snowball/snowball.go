@@ -26,12 +26,12 @@ import (
 const Name = "stemmer_snowball"
 
 type SnowballStemmer struct {
-	langauge string
+	language string
 }
 
 func NewSnowballStemmer(language string) *SnowballStemmer {
 	return &SnowballStemmer{
-		langauge: language,
+		language: language,
 	}
 }
 

@@ -211,7 +211,7 @@ func (s *Segment) loadConfig() error {
 }
 
 func (s *SegmentBase) loadFields() error {
-	// NOTE for now we assume the fields index immediately preceeds
+	// NOTE for now we assume the fields index immediately precedes
 	// the footer, and if this changes, need to adjust accordingly (or
 	// store explicit length), where s.mem was sliced from s.mm in Open().
 	fieldsIndexEnd := uint64(len(s.mem))

@@ -1509,7 +1509,7 @@ func TestSearchTimeout(t *testing.T) {
 		}
 	}()
 
-	// first run a search with an absurdly long timeout (should succeeed)
+	// first run a search with an absurdly long timeout (should succeed)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	query := NewTermQuery("water")

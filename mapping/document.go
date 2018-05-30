@@ -324,7 +324,7 @@ func (dm *DocumentMapping) defaultAnalyzerName(path []string) string {
 }
 
 func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes []uint64, context *walkContext) {
-	// allow default "json" tag to be overriden
+	// allow default "json" tag to be overridden
 	structTagKey := dm.StructTagKey
 	if structTagKey == "" {
 		structTagKey = "json"

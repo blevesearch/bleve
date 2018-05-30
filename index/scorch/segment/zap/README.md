@@ -109,7 +109,7 @@ If you know the doc number you're interested in, this format lets you jump to th
     - remember the start position for this posting list
     - write freq/norm details offset (remembered from previous, as varint uint64)
     - write location details offset (remembered from previous, as varint uint64)
-    - write location bitmap offset (remembered from pervious, as varint uint64)
+    - write location bitmap offset (remembered from previous, as varint uint64)
     - write length of encoded roaring bitmap
     - write the serialized roaring bitmap data
 
