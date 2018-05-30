@@ -210,7 +210,7 @@ func (s *PhraseSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch,
 	return nil, nil
 }
 
-// checkCurrMustMatch is soley concerned with determining if the DocumentMatch
+// checkCurrMustMatch is solely concerned with determining if the DocumentMatch
 // pointed to by s.currMust (which satisifies the pre-condition searcher)
 // also satisfies the phase constraints.  if so, it returns a DocumentMatch
 // for this document, otherwise nil
@@ -241,7 +241,7 @@ func (s *PhraseSearcher) checkCurrMustMatch(ctx *search.SearchContext) *search.D
 	return nil
 }
 
-// checkCurrMustMatchField is soley concerned with determining if one
+// checkCurrMustMatchField is solely concerned with determining if one
 // particular field within the currMust DocumentMatch Locations
 // satisfies the phase constraints (possibly more than once).  if so,
 // the matching field term locations are appended to the provided

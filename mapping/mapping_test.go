@@ -950,7 +950,7 @@ func TestMappingForTextMarshaler(t *testing.T) {
 		},
 	}
 
-	// first verify that when using a mapping that doesn't explicity
+	// first verify that when using a mapping that doesn't explicitly
 	// map the stuct field as text, then we traverse inside the struct
 	// and do our best
 	m := NewIndexMapping()
@@ -970,7 +970,7 @@ func TestMappingForTextMarshaler(t *testing.T) {
 		t.Errorf("expected field value to be '%s', got: '%s'", tm.Marshalable.Extra, string(doc.Fields[0].Value()))
 	}
 
-	// now verify that when a mapping explicity
+	// now verify that when a mapping explicitly
 	m = NewIndexMapping()
 	txt := NewTextFieldMapping()
 	m.DefaultMapping.AddFieldMappingsAt("Marshalable", txt)
@@ -1004,7 +1004,7 @@ func TestMappingForNilTextMarshaler(t *testing.T) {
 		Marshalable: nil,
 	}
 
-	// now verify that when a mapping explicity
+	// now verify that when a mapping explicitly
 	m := NewIndexMapping()
 	txt := NewTextFieldMapping()
 	m.DefaultMapping.AddFieldMappingsAt("Marshalable", txt)
