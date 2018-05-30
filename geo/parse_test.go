@@ -87,7 +87,7 @@ func TestExtractGeoPoint(t *testing.T) {
 			lat:     7.5,
 			success: true,
 		},
-		// struct with lng alterante
+		// struct with lng alternate
 		{
 			in: struct {
 				Lng float64

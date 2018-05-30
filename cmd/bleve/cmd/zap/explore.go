@@ -39,7 +39,7 @@ var exploreCmd = &cobra.Command{
 
 		addr, err := segment.DictAddr(args[1])
 		if err != nil {
-			return fmt.Errorf("error determing address: %v", err)
+			return fmt.Errorf("error determining address: %v", err)
 		}
 		fmt.Printf("dictionary for field starts at %d (%x)\n", addr, addr)
 
