@@ -156,7 +156,7 @@ OUTER:
 		if i == len(pathElements)-1 {
 			for _, field := range current.Fields {
 				if field.Name == pathElement {
-					break
+					break OUTER
 				}
 			}
 		}
@@ -419,8 +419,11 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		propertyValueString := propertyValue.String()
 		if subDocMapping != nil {
 			// index by explicit mapping
+			lastName := path[len(path) - 1]
 			for _, fieldMapping := range subDocMapping.Fields {
-				fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
+				if lastName == fieldMapping.Name {
+					fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
+				}
 			}
 		} else if closestDocMapping.Dynamic {
 			// automatic indexing behavior
@@ -450,8 +453,11 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		propertyValFloat := propertyValue.Float()
 		if subDocMapping != nil {
 			// index by explicit mapping
+			lastName := path[len(path) - 1]
 			for _, fieldMapping := range subDocMapping.Fields {
-				fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
+				if lastName == fieldMapping.Name {
+					fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
+				}
 			}
 		} else if closestDocMapping.Dynamic {
 			// automatic indexing behavior
@@ -462,8 +468,11 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		propertyValBool := propertyValue.Bool()
 		if subDocMapping != nil {
 			// index by explicit mapping
+			lastName := path[len(path) - 1]
 			for _, fieldMapping := range subDocMapping.Fields {
-				fieldMapping.processBoolean(propertyValBool, pathString, path, indexes, context)
+				if lastName == fieldMapping.Name {
+					fieldMapping.processBoolean(propertyValBool, pathString, path, indexes, context)
+				}
 			}
 		} else if closestDocMapping.Dynamic {
 			// automatic indexing behavior
@@ -476,8 +485,11 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			// don't descend into the time struct
 			if subDocMapping != nil {
 				// index by explicit mapping
+				lastName := path[len(path) - 1]
 				for _, fieldMapping := range subDocMapping.Fields {
-					fieldMapping.processTime(property, pathString, path, indexes, context)
+					if lastName == fieldMapping.Name {
+						fieldMapping.processTime(property, pathString, path, indexes, context)
+					}
 				}
 			} else if closestDocMapping.Dynamic {
 				fieldMapping := newDateTimeFieldMappingDynamic(context.im)
