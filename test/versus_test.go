@@ -35,6 +35,11 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
+func init() {
+	// override for tests
+	scorch.DefaultDeferPersistence = 1
+}
+
 // Tests scorch indexer versus upsidedown/bolt indexer against various
 // templated queries.  Example usage from the bleve top-level directory...
 //

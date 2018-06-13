@@ -17,6 +17,8 @@ package scorch
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -35,16 +37,20 @@ import (
 
 var DefaultChunkFactor uint32 = 1024
 
-// Arbitrary number, need to make it configurable.
-// Lower values like 10/making persister really slow
-// doesn't work well as it is creating more files to
-// persist for in next persist iteration and spikes the # FDs.
-// Ideal value should let persister also proceed at
-// an optimum pace so that the merger can skip
-// many intermediate snapshots.
-// This needs to be based on empirical data.
-// TODO - may need to revisit this approach/value.
-var epochDistance = uint64(5)
+var DefaultDeferPersistence int = 2000 // ms
+
+var MaxDeferPersistence int = 10000 // ms
+
+// ErrMaxDeferPersistence is returned when the persistence delay given is
+// is more than the maximum limit
+var ErrMaxDeferPersistence = errors.New("DeferPersistence exceeds the max defer limit")
+
+type persisterOptions struct {
+	// DeferPersistence controls the delay injected into
+	// persistence workloop to improve the chances for
+	// a healthier and rich in-memory merging
+	DeferPersistence int
+}
 
 type notificationChan chan struct{}
 
@@ -52,11 +58,24 @@ func (s *Scorch) persisterLoop() {
 	defer s.asyncTasks.Done()
 
 	var persistWatchers []*epochWatcher
-	var lastPersistedEpoch, lastMergedEpoch uint64
+	var lastPersistedEpoch uint64
 	var ew *epochWatcher
+	po, err := s.parsePersisterOptions()
+	if err != nil {
+		s.fireAsyncError(fmt.Errorf("persisterOptions json parsing err: %v", err))
+		s.asyncTasks.Done()
+		return
+	}
+	timeOut := time.NewTimer(time.Millisecond * time.Duration(po.DeferPersistence))
+	var expired bool
+
 OUTER:
 	for {
 		atomic.AddUint64(&s.stats.TotPersistLoopBeg, 1)
+		if !timeOut.Stop() && !expired {
+			<-timeOut.C
+		}
+		timeOut.Reset(time.Millisecond * time.Duration(po.DeferPersistence))
 
 		select {
 		case <-s.closeCh:
@@ -64,12 +83,8 @@ OUTER:
 		case ew = <-s.persisterNotifier:
 			persistWatchers = append(persistWatchers, ew)
 		default:
+			_, expired = <-timeOut.C
 		}
-		if ew != nil && ew.epoch > lastMergedEpoch {
-			lastMergedEpoch = ew.epoch
-		}
-		lastMergedEpoch, persistWatchers = s.pausePersisterForMergerCatchUp(lastPersistedEpoch,
-			lastMergedEpoch, persistWatchers)
 
 		var ourSnapshot *IndexSnapshot
 		var ourPersisted []chan error
@@ -164,6 +179,11 @@ OUTER:
 
 		atomic.AddUint64(&s.stats.TotPersistLoopEnd, 1)
 	}
+
+	if !timeOut.Stop() && !expired {
+		<-timeOut.C
+	}
+
 }
 
 func notifyMergeWatchers(lastPersistedEpoch uint64,
@@ -179,32 +199,34 @@ func notifyMergeWatchers(lastPersistedEpoch uint64,
 	return watchersNext
 }
 
-func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64, lastMergedEpoch uint64,
-	persistWatchers []*epochWatcher) (uint64, []*epochWatcher) {
+func validatePersisterOptions(po *persisterOptions) error {
+	if po.DeferPersistence >= MaxDeferPersistence {
+		return ErrMaxDeferPersistence
+	}
+	return nil
+}
 
-	// first, let the watchers proceed if they lag behind
-	persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
-
-OUTER:
-	// check for slow merger and await until the merger catch up
-	for lastPersistedEpoch > lastMergedEpoch+epochDistance {
-		atomic.AddUint64(&s.stats.TotPersisterSlowMergerPause, 1)
-
-		select {
-		case <-s.closeCh:
-			break OUTER
-		case ew := <-s.persisterNotifier:
-			persistWatchers = append(persistWatchers, ew)
-			lastMergedEpoch = ew.epoch
+func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
+	po := persisterOptions{
+		DeferPersistence: DefaultDeferPersistence,
+	}
+	if v, ok := s.config["scorchPersisterOptions"]; ok {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return &po, err
 		}
 
-		atomic.AddUint64(&s.stats.TotPersisterSlowMergerResume, 1)
+		err = json.Unmarshal(b, &po)
+		if err != nil {
+			return &po, err
+		}
 
-		// let the watchers proceed if they lag behind
-		persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
+		err = validatePersisterOptions(&po)
+		if err != nil {
+			return nil, err
+		}
 	}
-
-	return lastMergedEpoch, persistWatchers
+	return &po, nil
 }
 
 func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {

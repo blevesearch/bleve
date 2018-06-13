@@ -33,6 +33,11 @@ import (
 	"github.com/blevesearch/bleve/mapping"
 )
 
+func init() {
+	// override for tests
+	DefaultDeferPersistence = 1
+}
+
 func DestroyTest() error {
 	return os.RemoveAll("/tmp/bleve-scorch-test")
 }
