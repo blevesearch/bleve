@@ -42,7 +42,7 @@ type DocumentMapping struct {
 	Dynamic         bool                        `json:"dynamic"`
 	Properties      map[string]*DocumentMapping `json:"properties,omitempty"`
 	Fields          []*FieldMapping             `json:"fields,omitempty"`
-	DefaultAnalyzer string                      `json:"default_analyzer"`
+	DefaultAnalyzer string                      `json:"default_analyzer,omitempty"`
 
 	// StructTagKey overrides "json" when looking for field names in struct tags
 	StructTagKey string `json:"struct_tag_key,omitempty"`
