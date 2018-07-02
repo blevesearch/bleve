@@ -18,8 +18,11 @@
 package gtreap
 
 import (
+	"io"
+
 	"github.com/blevesearch/bleve/index/store"
 
+	"errors"
 	"github.com/steveyen/gtreap"
 )
 
@@ -59,6 +62,10 @@ func (w *Reader) RangeIterator(start, end []byte) store.KVIterator {
 	}
 	rv.restart(&Item{k: start})
 	return &rv
+}
+
+func (r *Reader) WriteTo(w io.Writer) error {
+	return errors.New("WriteTo not implemented for gtreap")
 }
 
 func (w *Reader) Close() error {

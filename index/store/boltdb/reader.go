@@ -15,6 +15,8 @@
 package boltdb
 
 import (
+	"io"
+
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/boltdb/bolt"
 )
@@ -66,6 +68,11 @@ func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
 
 	rv.Seek(start)
 	return rv
+}
+
+func (r *Reader) WriteTo(w io.Writer) error {
+	_, err := r.tx.WriteTo(w)
+	return err
 }
 
 func (r *Reader) Close() error {

@@ -14,7 +14,10 @@
 
 package store
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"io"
+)
 
 // KVStore is an abstraction for working with KV stores.  Note that
 // in order to be used with the bleve.registry, it must also implement
@@ -59,6 +62,8 @@ type KVReader interface {
 	// RangeIterator returns a KVIterator that will
 	// visit all K/V pairs >= start AND < end
 	RangeIterator(start, end []byte) KVIterator
+
+	WriteTo(w io.Writer) error
 
 	// Close closes the iterator
 	Close() error
