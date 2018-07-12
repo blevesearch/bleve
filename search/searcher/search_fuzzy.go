@@ -53,6 +53,7 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string,
 func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 	fuzziness int, field, prefixTerm string) (rv []string, err error) {
 	rv = make([]string, 0)
+
 	var fieldDict index.FieldDict
 	if len(prefixTerm) > 0 {
 		fieldDict, err = indexReader.FieldDictPrefix(field, []byte(prefixTerm))
@@ -63,7 +64,7 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 		if ir, ok := indexReader.(index.IndexReaderFuzzy); ok {
 			fieldDict, err = ir.FieldDictFuzzy(field, []byte(term), fuzziness)
 			if err != nil {
-				return rv, err
+				return nil, err
 			}
 			defer func() {
 				if cerr := fieldDict.Close(); cerr != nil && err == nil {
@@ -73,11 +74,18 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 			tfd, err := fieldDict.Next()
 			for err == nil && tfd != nil {
 				rv = append(rv, tfd.Term)
+				if tooManyClauses(len(rv)) {
+					return nil, tooManyClausesErr()
+				}
 				tfd, err = fieldDict.Next()
 			}
 			return rv, err
 		}
+
 		fieldDict, err = indexReader.FieldDict(field)
+	}
+	if err != nil {
+		return nil, err
 	}
 	defer func() {
 		if cerr := fieldDict.Close(); cerr != nil && err == nil {
@@ -95,7 +103,7 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 		if !exceeded && ld <= fuzziness {
 			rv = append(rv, tfd.Term)
 			if tooManyClauses(len(rv)) {
-				return rv, tooManyClausesErr()
+				return nil, tooManyClausesErr()
 			}
 		}
 		tfd, err = fieldDict.Next()
