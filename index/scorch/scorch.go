@@ -370,6 +370,8 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 	root.AddRef()
 	s.rootLock.RUnlock()
 
+	defer func() { _ = root.DecRef() }()
+
 	for _, seg := range root.segment {
 		delta, err := seg.segment.DocNumbers(ids)
 		if err != nil {
@@ -377,8 +379,6 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 		}
 		introduction.obsoletes[seg.id] = delta
 	}
-
-	_ = root.DecRef()
 
 	introStartTime := time.Now()
 

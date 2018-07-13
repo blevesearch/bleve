@@ -46,12 +46,12 @@ OUTER:
 
 		default:
 			// check to see if there is a new snapshot to persist
-			s.rootLock.RLock()
+			s.rootLock.Lock()
 			ourSnapshot := s.root
 			ourSnapshot.AddRef()
 			atomic.StoreUint64(&s.iStats.mergeSnapshotSize, uint64(ourSnapshot.Size()))
 			atomic.StoreUint64(&s.iStats.mergeEpoch, ourSnapshot.epoch)
-			s.rootLock.RUnlock()
+			s.rootLock.Unlock()
 
 			if ourSnapshot.epoch != lastEpochMergePlanned {
 				startTime := time.Now()
