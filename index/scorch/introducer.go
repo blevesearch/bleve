@@ -107,7 +107,10 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 
 	s.rootLock.RLock()
 	root := s.root
+	root.AddRef()
 	s.rootLock.RUnlock()
+
+	defer func() { _ = root.DecRef() }()
 
 	nsegs := len(root.segment)
 
@@ -221,9 +224,12 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 
 	s.rootLock.Lock()
 	root := s.root
+	root.AddRef()
 	nextSnapshotEpoch := s.nextSnapshotEpoch
 	s.nextSnapshotEpoch++
 	s.rootLock.Unlock()
+
+	defer func() { _ = root.DecRef() }()
 
 	newIndexSnapshot := &IndexSnapshot{
 		parent:   s,
@@ -282,7 +288,10 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 
 	s.rootLock.RLock()
 	root := s.root
+	root.AddRef()
 	s.rootLock.RUnlock()
+
+	defer func() { _ = root.DecRef() }()
 
 	newSnapshot := &IndexSnapshot{
 		parent:   s,
