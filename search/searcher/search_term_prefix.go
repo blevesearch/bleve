@@ -27,12 +27,20 @@ func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string,
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if cerr := fieldDict.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	var terms []string
 	tfd, err := fieldDict.Next()
 	for err == nil && tfd != nil {
 		terms = append(terms, tfd.Term)
 		tfd, err = fieldDict.Next()
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	return NewMultiTermSearcher(indexReader, terms, field, boost, options, true)
