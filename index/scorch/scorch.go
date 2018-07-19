@@ -434,9 +434,9 @@ func (s *Scorch) currentSnapshot() *IndexSnapshot {
 func (s *Scorch) Stats() json.Marshaler {
 	return &s.stats
 }
-func (s *Scorch) StatsMap() map[string]interface{} {
-	m := s.stats.ToMap()
 
+func (s *Scorch) diskFileStats() (uint64, uint64) {
+	var numFilesOnDisk, numBytesUsedDisk uint64
 	if s.path != "" {
 		finfos, err := ioutil.ReadDir(s.path)
 		if err == nil {
@@ -447,10 +447,18 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 					numFilesOnDisk++
 				}
 			}
-
-			m["CurOnDiskBytes"] = numBytesUsedDisk
-			m["CurOnDiskFiles"] = numFilesOnDisk
 		}
+	}
+	return numFilesOnDisk, numBytesUsedDisk
+}
+
+func (s *Scorch) StatsMap() map[string]interface{} {
+	m := s.stats.ToMap()
+
+	numFilesOnDisk, numBytesUsedDisk := s.diskFileStats()
+	if numFilesOnDisk > 0 || numBytesUsedDisk > 0 {
+		m["CurOnDiskBytes"] = numBytesUsedDisk
+		m["CurOnDiskFiles"] = numFilesOnDisk
 	}
 
 	// TODO: consider one day removing these backwards compatible
