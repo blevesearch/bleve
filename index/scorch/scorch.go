@@ -440,7 +440,6 @@ func (s *Scorch) diskFileStats() (uint64, uint64) {
 	if s.path != "" {
 		finfos, err := ioutil.ReadDir(s.path)
 		if err == nil {
-			var numFilesOnDisk, numBytesUsedDisk uint64
 			for _, finfo := range finfos {
 				if !finfo.IsDir() {
 					numBytesUsedDisk += uint64(finfo.Size())
