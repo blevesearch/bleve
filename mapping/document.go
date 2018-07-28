@@ -331,6 +331,10 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 	}
 
 	val := reflect.ValueOf(data)
+	if !val.IsValid() {
+		return
+	}
+
 	typ := val.Type()
 	switch typ.Kind() {
 	case reflect.Map:
