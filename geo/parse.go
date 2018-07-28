@@ -113,6 +113,9 @@ func ExtractGeoPoint(thing interface{}) (lon, lat float64, success bool) {
 // extract numeric value (if possible) and returns a float64
 func extractNumericVal(v interface{}) (float64, bool) {
 	val := reflect.ValueOf(v)
+	if !val.IsValid() {
+		return 0, false
+	}
 	typ := val.Type()
 	switch typ.Kind() {
 	case reflect.Float32, reflect.Float64:
