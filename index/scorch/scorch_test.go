@@ -33,11 +33,6 @@ import (
 	"github.com/blevesearch/bleve/mapping"
 )
 
-func init() {
-	// override for tests
-	DefaultPersisterNapTimeMSec = 1
-}
-
 func DestroyTest() error {
 	return os.RemoveAll("/tmp/bleve-scorch-test")
 }

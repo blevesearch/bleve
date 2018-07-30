@@ -17,7 +17,6 @@ package scorch
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -36,22 +35,16 @@ import (
 
 var DefaultChunkFactor uint32 = 1024
 
-var DefaultPersisterNapTimeMSec int = 2000 // ms
-
-var DefaultPersisterNapUnderNumFiles int = 1000
-
-type persisterOptions struct {
-	// PersisterNapTimeMSec controls the wait/delay injected into
-	// persistence workloop to improve the chances for
-	// a healthier and heavier in-memory merging
-	PersisterNapTimeMSec int
-
-	// PersisterNapTimeMSec > 0, and the number of files is less than
-	// PersisterNapUnderNumFiles, then the persister will sleep
-	// PersisterNapTimeMSec amount of time to improve the chances for
-	// a healthier and heavier in-memory merging
-	PersisterNapUnderNumFiles int
-}
+// Arbitrary number, need to make it configurable.
+// Lower values like 10/making persister really slow
+// doesn't work well as it is creating more files to
+// persist for in next persist iteration and spikes the # FDs.
+// Ideal value should let persister also proceed at
+// an optimum pace so that the merger can skip
+// many intermediate snapshots.
+// This needs to be based on empirical data.
+// TODO - may need to revisit this approach/value.
+var epochDistance = uint64(5)
 
 type notificationChan chan struct{}
 
@@ -61,13 +54,6 @@ func (s *Scorch) persisterLoop() {
 	var persistWatchers []*epochWatcher
 	var lastPersistedEpoch, lastMergedEpoch uint64
 	var ew *epochWatcher
-	po, err := s.parsePersisterOptions()
-	if err != nil {
-		s.fireAsyncError(fmt.Errorf("persisterOptions json parsing err: %v", err))
-		s.asyncTasks.Done()
-		return
-	}
-
 OUTER:
 	for {
 		atomic.AddUint64(&s.stats.TotPersistLoopBeg, 1)
@@ -83,7 +69,7 @@ OUTER:
 			lastMergedEpoch = ew.epoch
 		}
 		lastMergedEpoch, persistWatchers = s.pausePersisterForMergerCatchUp(lastPersistedEpoch,
-			lastMergedEpoch, persistWatchers, po)
+			lastMergedEpoch, persistWatchers)
 
 		var ourSnapshot *IndexSnapshot
 		var ourPersisted []chan error
@@ -194,26 +180,14 @@ func notifyMergeWatchers(lastPersistedEpoch uint64,
 }
 
 func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64, lastMergedEpoch uint64,
-	persistWatchers []*epochWatcher, po *persisterOptions) (uint64, []*epochWatcher) {
+	persistWatchers []*epochWatcher) (uint64, []*epochWatcher) {
 
 	// first, let the watchers proceed if they lag behind
 	persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
 
-	// check the merger lag by counting the segment files on disk,
-	// On finding fewer files on disk, persister takes a short pause
-	// for sufficient in-memory segments to pile up for the next
-	// memory merge cum persist loop.
-	// On finding too many files on disk, persister pause until the merger
-	// catches up to reduce the segment file count under the threshold.
-	numFilesOnDisk, _ := s.diskFileStats()
-	if numFilesOnDisk < uint64(po.PersisterNapUnderNumFiles) &&
-		po.PersisterNapTimeMSec > 0 {
-		time.Sleep(time.Millisecond * time.Duration(po.PersisterNapTimeMSec))
-		return lastMergedEpoch, persistWatchers
-	}
-
 OUTER:
-	for numFilesOnDisk > uint64(po.PersisterNapUnderNumFiles) {
+	// check for slow merger and await until the merger catch up
+	for lastPersistedEpoch > lastMergedEpoch+epochDistance {
 		atomic.AddUint64(&s.stats.TotPersisterSlowMergerPause, 1)
 
 		select {
@@ -228,30 +202,9 @@ OUTER:
 
 		// let the watchers proceed if they lag behind
 		persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
-
-		numFilesOnDisk, _ = s.diskFileStats()
 	}
 
 	return lastMergedEpoch, persistWatchers
-}
-
-func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
-	po := persisterOptions{
-		PersisterNapTimeMSec:      DefaultPersisterNapTimeMSec,
-		PersisterNapUnderNumFiles: DefaultPersisterNapUnderNumFiles,
-	}
-	if v, ok := s.config["scorchPersisterOptions"]; ok {
-		b, err := json.Marshal(v)
-		if err != nil {
-			return &po, err
-		}
-
-		err = json.Unmarshal(b, &po)
-		if err != nil {
-			return &po, err
-		}
-	}
-	return &po, nil
 }
 
 func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
