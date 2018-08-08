@@ -41,6 +41,12 @@ import (
 //     go test -v -run TestScorchVersusUpsideDownBolt ./test
 //     VERBOSE=1 FOCUS=Trista go test -v -run TestScorchVersusUpsideDownBolt ./test
 //
+
+func init() {
+	// override for tests
+	scorch.DefaultPersisterNapTimeMSec = 1
+}
+
 func TestScorchVersusUpsideDownBoltAll(t *testing.T) {
 	(&VersusTest{
 		t:                    t,
