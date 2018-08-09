@@ -122,21 +122,31 @@ func (d *Dictionary) PrefixIterator(prefix string) segment.DictionaryIterator {
 		d: d,
 	}
 
+	kBeg := []byte(prefix)
+	kEnd := incrementBytes(kBeg)
+
 	if d.fst != nil {
-		r, err := regexp.New(prefix + ".*")
+		itr, err := d.fst.Iterator(kBeg, kEnd)
 		if err == nil {
-			itr, err := d.fst.Search(r, nil, nil)
-			if err == nil {
-				rv.itr = itr
-			} else if err != nil && err != vellum.ErrIteratorDone {
-				rv.err = err
-			}
-		} else {
+			rv.itr = itr
+		} else if err != nil && err != vellum.ErrIteratorDone {
 			rv.err = err
 		}
 	}
 
 	return rv
+}
+
+func incrementBytes(in []byte) []byte {
+	rv := make([]byte, len(in))
+	copy(rv, in)
+	for i := len(rv) - 1; i >= 0; i-- {
+		rv[i] = rv[i] + 1
+		if rv[i] != 0 {
+			return rv // didn't overflow, so stop
+		}
+	}
+	return nil // overflowed
 }
 
 // RangeIterator returns an iterator which only visits terms between the
