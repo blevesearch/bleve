@@ -80,7 +80,7 @@ func (e *EmptyDictionary) RangeIterator(start, end string) DictionaryIterator {
 	return &EmptyDictionaryIterator{}
 }
 
-func (e *EmptyDictionary) RegexpIterator(start string) DictionaryIterator {
+func (e *EmptyDictionary) RegexpIterator(r index.Regexp) DictionaryIterator {
 	return &EmptyDictionaryIterator{}
 }
 

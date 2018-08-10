@@ -178,15 +178,26 @@ func (d *Dictionary) RangeIterator(start, end string) segment.DictionaryIterator
 
 // RegexpIterator returns an iterator which only visits terms having the
 // the specified regex
-func (d *Dictionary) RegexpIterator(regex string) segment.DictionaryIterator {
+func (d *Dictionary) RegexpIterator(rIn index.Regexp) segment.DictionaryIterator {
+	prefixTerm, complete := rIn.LiteralPrefix()
+	if complete {
+		return d.PrefixIterator(prefixTerm)
+	}
+
 	rv := &DictionaryIterator{
 		d: d,
 	}
 
 	if d.fst != nil {
-		r, err := regexp.New(regex)
+		r, err := regexp.New(rIn.String())
 		if err == nil {
-			itr, err2 := d.fst.Search(r, nil, nil)
+			var prefixBeg, prefixEnd []byte
+			if prefixTerm != "" {
+				prefixBeg = []byte(prefixTerm)
+				prefixEnd = incrementBytes(prefixEnd)
+			}
+
+			itr, err2 := d.fst.Search(r, prefixBeg, prefixEnd)
 			if err2 == nil {
 				rv.itr = itr
 			} else if err2 != nil && err2 != vellum.ErrIteratorDone {

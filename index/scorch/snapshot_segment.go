@@ -52,7 +52,7 @@ func (s *SegmentDictionarySnapshot) RangeIterator(start, end string) segment.Dic
 	return s.d.RangeIterator(start, end)
 }
 
-func (s *SegmentDictionarySnapshot) RegexpIterator(regex string) segment.DictionaryIterator {
+func (s *SegmentDictionarySnapshot) RegexpIterator(regex index.Regexp) segment.DictionaryIterator {
 	return s.d.RegexpIterator(regex)
 }
 

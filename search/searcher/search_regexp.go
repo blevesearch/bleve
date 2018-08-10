@@ -29,7 +29,7 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern index.Regexp,
 	search.Searcher, error) {
 	var candidateTerms []string
 	if ir, ok := indexReader.(index.IndexReaderRegexp); ok {
-		fieldDict, err := ir.FieldDictRegexp(field, []byte(pattern.String()))
+		fieldDict, err := ir.FieldDictRegexp(field, pattern)
 		if err != nil {
 			return nil, err
 		}
