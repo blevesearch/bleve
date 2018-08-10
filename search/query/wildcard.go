@@ -15,8 +15,9 @@
 package query
 
 import (
-	"regexp"
 	"strings"
+
+	"github.com/couchbase/go-regexp/regexp"
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/mapping"

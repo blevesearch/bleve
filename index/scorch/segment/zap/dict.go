@@ -17,6 +17,7 @@ package zap
 import (
 	"bytes"
 	"fmt"
+	"regexp/syntax"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index"
@@ -189,7 +190,14 @@ func (d *Dictionary) RegexpIterator(rIn index.Regexp) segment.DictionaryIterator
 	}
 
 	if d.fst != nil {
-		r, err := regexp.New(rIn.String())
+		var r *regexp.Regexp
+		var err error
+		if sr, ok := rIn.(SyntaxRegexp); ok {
+			r, err = regexp.NewParsedWithLimit(rIn.String(), sr.SyntaxRegexp(),
+				regexp.DefaultLimit)
+		} else {
+			r, err = regexp.New(rIn.String())
+		}
 		if err == nil {
 			var prefixBeg, prefixEnd []byte
 			if prefixTerm != "" {
@@ -209,6 +217,10 @@ func (d *Dictionary) RegexpIterator(rIn index.Regexp) segment.DictionaryIterator
 	}
 
 	return rv
+}
+
+type SyntaxRegexp interface {
+	SyntaxRegexp() *syntax.Regexp
 }
 
 // FuzzyIterator returns an iterator which only visits terms having the
