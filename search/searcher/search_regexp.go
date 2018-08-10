@@ -15,8 +15,6 @@
 package searcher
 
 import (
-	"regexp"
-
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
@@ -26,7 +24,7 @@ import (
 // matching the entire term.  The provided regexp SHOULD NOT start with ^
 // or end with $ as this can intefere with the implementation.  Separately,
 // matches will be checked to ensure they match the entire term.
-func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp,
+func NewRegexpSearcher(indexReader index.IndexReader, pattern index.Regexp,
 	field string, boost float64, options search.SearcherOptions) (
 	search.Searcher, error) {
 	var candidateTerms []string
@@ -70,7 +68,7 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern *regexp.Regexp,
 }
 
 func findRegexpCandidateTerms(indexReader index.IndexReader,
-	pattern *regexp.Regexp, field, prefixTerm string) (rv []string, err error) {
+	pattern index.Regexp, field, prefixTerm string) (rv []string, err error) {
 	rv = make([]string, 0)
 	var fieldDict index.FieldDict
 	if len(prefixTerm) > 0 {
