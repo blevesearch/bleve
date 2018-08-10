@@ -19,7 +19,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	
+
 	"github.com/blevesearch/bleve/index/upsidedown"
 )
 

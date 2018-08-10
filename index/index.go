@@ -98,8 +98,19 @@ type IndexReader interface {
 	Close() error
 }
 
+// The Regexp interface defines the subset of the regexp.Regexp API
+// methods that are used by bleve indexes, allowing callers to pass in
+// alternate implementations.
+type Regexp interface {
+	FindStringIndex(s string) (loc []int)
+
+	LiteralPrefix() (prefix string, complete bool)
+
+	String() string
+}
+
 type IndexReaderRegexp interface {
-	FieldDictRegexp(field string, regex []byte) (FieldDict, error)
+	FieldDictRegexp(field string, regex Regexp) (FieldDict, error)
 }
 
 type IndexReaderFuzzy interface {
