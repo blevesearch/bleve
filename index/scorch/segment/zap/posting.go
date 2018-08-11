@@ -188,7 +188,10 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 
 		rv.buf = buf
 	}
+
 	rv.postings = p
+	rv.includeFreqNorm = includeFreq || includeNorm
+	rv.includeLocs = includeLocs
 
 	if p.normBits1Hit != 0 {
 		// "1-hit" encoding
@@ -211,7 +214,6 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 	var read int
 
 	// prepare the freq chunk details
-	rv.includeFreqNorm = includeFreq || includeNorm
 	if rv.includeFreqNorm {
 		var numFreqChunks uint64
 		numFreqChunks, read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
@@ -229,7 +231,6 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 	}
 
 	// prepare the loc chunk details
-	rv.includeLocs = includeLocs
 	if rv.includeLocs {
 		n = 0
 		var numLocChunks uint64
