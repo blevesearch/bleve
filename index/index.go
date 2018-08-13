@@ -110,7 +110,7 @@ type Regexp interface {
 }
 
 type IndexReaderRegexp interface {
-	FieldDictRegexp(field string, regex Regexp) (FieldDict, error)
+	FieldDictRegexp(field string, regex string) (FieldDict, error)
 }
 
 type IndexReaderFuzzy interface {

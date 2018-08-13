@@ -51,7 +51,7 @@ type TermDictionary interface {
 	Iterator() DictionaryIterator
 	PrefixIterator(prefix string) DictionaryIterator
 	RangeIterator(start, end string) DictionaryIterator
-	RegexpIterator(regex index.Regexp) DictionaryIterator
+	RegexpIterator(regex string) DictionaryIterator
 	FuzzyIterator(term string, fuzziness int) DictionaryIterator
 	OnlyIterator(onlyTerms [][]byte, includeCount bool) DictionaryIterator
 }

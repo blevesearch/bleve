@@ -17,6 +17,7 @@ package zap
 import (
 	"bytes"
 	"fmt"
+	"regexp/syntax"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index"
@@ -178,18 +179,30 @@ func (d *Dictionary) RangeIterator(start, end string) segment.DictionaryIterator
 
 // RegexpIterator returns an iterator which only visits terms having the
 // the specified regex
-func (d *Dictionary) RegexpIterator(rIn index.Regexp) segment.DictionaryIterator {
-	prefixTerm, complete := rIn.LiteralPrefix()
-	if complete {
-		return d.PrefixIterator(prefixTerm)
-	}
-
+func (d *Dictionary) RegexpIterator(expr string) segment.DictionaryIterator {
 	rv := &DictionaryIterator{
 		d: d,
 	}
 
+	parsed, err := syntax.Parse(expr, syntax.Perl)
+	if err != nil {
+		rv.err = err
+		return rv
+	}
+
+	// TODO: potential optimization where syntax.Regexp supports a Simplify() API?
+
+	var prefixTerm string
+	/*  TODO: potential optimization of (re-)supporting LiteralPrefix(),
+	          even perhaps a brute-force, naive prefix detection?
+	    prefixTerm, complete := rIn.LiteralPrefix()
+		if complete {
+			return d.PrefixIterator(prefixTerm)
+		}
+	*/
+
 	if d.fst != nil {
-		r, err := regexp.New(rIn.String())
+		r, err := regexp.NewParsedWithLimit(expr, parsed, regexp.DefaultLimit)
 		if err == nil {
 			var prefixBeg, prefixEnd []byte
 			if prefixTerm != "" {
