@@ -191,15 +191,10 @@ func (d *Dictionary) RegexpIterator(expr string) segment.DictionaryIterator {
 	}
 
 	// TODO: potential optimization where syntax.Regexp supports a Simplify() API?
+	// TODO: potential optimization where the literal prefix represents the,
+	//       entire regexp, allowing us to use PrefixIterator(prefixTerm)?
 
-	var prefixTerm string
-	/*  TODO: potential optimization of (re-)supporting LiteralPrefix(),
-	          even perhaps a brute-force, naive prefix detection?
-	    prefixTerm, complete := rIn.LiteralPrefix()
-		if complete {
-			return d.PrefixIterator(prefixTerm)
-		}
-	*/
+	prefixTerm := LiteralPrefix(parsed)
 
 	if d.fst != nil {
 		r, err := regexp.NewParsedWithLimit(expr, parsed, regexp.DefaultLimit)
