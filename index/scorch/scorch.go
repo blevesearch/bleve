@@ -73,6 +73,10 @@ type Scorch struct {
 	onAsyncError func(err error)
 
 	iStats internalStats
+
+	pauseLock sync.RWMutex
+
+	pauseCount uint64
 }
 
 type internalStats struct {
@@ -117,9 +121,30 @@ func NewScorch(storeName string,
 	return rv, nil
 }
 
+func (s *Scorch) paused() uint64 {
+	s.pauseLock.Lock()
+	pc := s.pauseCount
+	s.pauseLock.Unlock()
+	return pc
+}
+
+func (s *Scorch) incrPause() {
+	s.pauseLock.Lock()
+	s.pauseCount++
+	s.pauseLock.Unlock()
+}
+
+func (s *Scorch) decrPause() {
+	s.pauseLock.Lock()
+	s.pauseCount--
+	s.pauseLock.Unlock()
+}
+
 func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) {
 	if s.onEvent != nil {
+		s.incrPause()
 		s.onEvent(Event{Kind: kind, Scorch: s, Duration: dur})
+		s.decrPause()
 	}
 }
 
@@ -434,24 +459,30 @@ func (s *Scorch) currentSnapshot() *IndexSnapshot {
 func (s *Scorch) Stats() json.Marshaler {
 	return &s.stats
 }
-func (s *Scorch) StatsMap() map[string]interface{} {
-	m := s.stats.ToMap()
 
+func (s *Scorch) diskFileStats() (uint64, uint64) {
+	var numFilesOnDisk, numBytesUsedDisk uint64
 	if s.path != "" {
 		finfos, err := ioutil.ReadDir(s.path)
 		if err == nil {
-			var numFilesOnDisk, numBytesUsedDisk uint64
 			for _, finfo := range finfos {
 				if !finfo.IsDir() {
 					numBytesUsedDisk += uint64(finfo.Size())
 					numFilesOnDisk++
 				}
 			}
-
-			m["CurOnDiskBytes"] = numBytesUsedDisk
-			m["CurOnDiskFiles"] = numFilesOnDisk
 		}
 	}
+	return numFilesOnDisk, numBytesUsedDisk
+}
+
+func (s *Scorch) StatsMap() map[string]interface{} {
+	m := s.stats.ToMap()
+
+	numFilesOnDisk, numBytesUsedDisk := s.diskFileStats()
+
+	m["CurOnDiskBytes"] = numBytesUsedDisk
+	m["CurOnDiskFiles"] = numFilesOnDisk
 
 	// TODO: consider one day removing these backwards compatible
 	// names for apps using the old names
