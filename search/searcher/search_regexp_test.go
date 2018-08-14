@@ -26,26 +26,66 @@ import (
 
 func TestRegexpSearchUpsideDown(t *testing.T) {
 	twoDocIndex := initTwoDocUpsideDown()
-	testRegexpSearch(t, twoDocIndex,
-		func(id int) index.IndexInternalID {
-			return index.IndexInternalID(fmt.Sprintf("%d", id))
-		})
+	testRegexpSearch(t, twoDocIndex, internalIDMakerUpsideDown, searcherMaker)
+	_ = twoDocIndex.Close()
+}
+
+func TestRegexpStringSearchUpsideDown(t *testing.T) {
+	twoDocIndex := initTwoDocUpsideDown()
+	testRegexpSearch(t, twoDocIndex, internalIDMakerUpsideDown, searcherStringMaker)
 	_ = twoDocIndex.Close()
 }
 
 func TestRegexpSearchScorch(t *testing.T) {
 	twoDocIndex := initTwoDocScorch()
-	testRegexpSearch(t, twoDocIndex,
-		func(id int) index.IndexInternalID {
-			buf := make([]byte, 8)
-			binary.BigEndian.PutUint64(buf, uint64(id))
-			return index.IndexInternalID(buf)
-		})
+	testRegexpSearch(t, twoDocIndex, internalIDMakerScorch, searcherMaker)
 	_ = twoDocIndex.Close()
 }
 
+func TestRegexpStringSearchScorch(t *testing.T) {
+	twoDocIndex := initTwoDocScorch()
+	testRegexpSearch(t, twoDocIndex, internalIDMakerScorch, searcherStringMaker)
+	_ = twoDocIndex.Close()
+}
+
+func internalIDMakerUpsideDown(id int) index.IndexInternalID {
+	return index.IndexInternalID(fmt.Sprintf("%d", id))
+}
+
+func internalIDMakerScorch(id int) index.IndexInternalID {
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, uint64(id))
+	return index.IndexInternalID(buf)
+}
+
+func searcherMaker(t *testing.T, ir index.IndexReader, re, field string) search.Searcher {
+	pattern, err := regexp.Compile(re)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	regexpSearcher, err := NewRegexpSearcher(ir, pattern, field, 1.0,
+		search.SearcherOptions{Explain: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return regexpSearcher
+}
+
+func searcherStringMaker(t *testing.T, ir index.IndexReader, re, field string) search.Searcher {
+	regexpSearcher, err := NewRegexpStringSearcher(ir, re, field, 1.0,
+		search.SearcherOptions{Explain: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return regexpSearcher
+}
+
 func testRegexpSearch(t *testing.T, twoDocIndex index.Index,
-	internalIDMaker func(int) index.IndexInternalID) {
+	internalIDMaker func(int) index.IndexInternalID,
+	searcherMaker func(t *testing.T, ir index.IndexReader, re, field string) search.Searcher) {
 	twoDocIndexReader, err := twoDocIndex.Reader()
 	if err != nil {
 		t.Error(err)
@@ -57,27 +97,8 @@ func testRegexpSearch(t *testing.T, twoDocIndex index.Index,
 		}
 	}()
 
-	explainTrue := search.SearcherOptions{Explain: true}
-
-	pattern, err := regexp.Compile("ma.*")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	regexpSearcher, err := NewRegexpSearcher(twoDocIndexReader, pattern, "name", 1.0, explainTrue)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	patternCo, err := regexp.Compile("co.*")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	regexpSearcherCo, err := NewRegexpSearcher(twoDocIndexReader, patternCo, "desc", 1.0, explainTrue)
-	if err != nil {
-		t.Fatal(err)
-	}
+	regexpSearcher := searcherMaker(t, twoDocIndexReader, "ma.*", "name")
+	regexpSearcherCo := searcherMaker(t, twoDocIndexReader, "co.*", "desc")
 
 	tests := []struct {
 		searcher  search.Searcher
