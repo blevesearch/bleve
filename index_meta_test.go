@@ -29,13 +29,13 @@ func TestIndexMeta(t *testing.T) {
 	}()
 
 	// open non-existent meta should give an error
-	_, err := openIndexMeta(testIndexPath)
+	_, err := OpenIndexMeta(testIndexPath)
 	if err == nil {
 		t.Errorf("expected error, got nil")
 	}
 
 	// create meta
-	im := &indexMeta{Storage: "boltdb"}
+	im := &IndexMeta{Storage: "boltdb"}
 	err = im.Save(testIndexPath)
 	if err != nil {
 		t.Error(err)
@@ -43,7 +43,7 @@ func TestIndexMeta(t *testing.T) {
 	im = nil
 
 	// open a meta that exists
-	im, err = openIndexMeta(testIndexPath)
+	im, err = OpenIndexMeta(testIndexPath)
 	if err != nil {
 		t.Error(err)
 	}

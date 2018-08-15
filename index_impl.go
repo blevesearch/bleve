@@ -38,7 +38,7 @@ import (
 type indexImpl struct {
 	path  string
 	name  string
-	meta  *indexMeta
+	meta  *IndexMeta
 	i     index.Index
 	m     mapping.IndexMapping
 	mutex sync.RWMutex
@@ -79,7 +79,7 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 		path: path,
 		name: path,
 		m:    mapping,
-		meta: newIndexMeta(indexType, kvstore, kvconfig),
+		meta: NewIndexMeta(indexType, kvstore, kvconfig),
 	}
 	rv.stats = &IndexStat{i: &rv}
 	// at this point there is hope that we can be successful, so save index meta
@@ -138,7 +138,7 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	}
 	rv.stats = &IndexStat{i: rv}
 
-	rv.meta, err = openIndexMeta(path)
+	rv.meta, err = OpenIndexMeta(path)
 	if err != nil {
 		return nil, err
 	}
