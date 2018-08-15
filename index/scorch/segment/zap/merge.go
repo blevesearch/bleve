@@ -243,10 +243,6 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 		}
 
 		finishTerm := func(term []byte) error {
-			if term == nil {
-				return nil
-			}
-
 			tfEncoder.Close()
 			locEncoder.Close()
 
@@ -283,17 +279,16 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 			if !bytes.Equal(prevTerm, term) {
 				// if the term changed, write out the info collected
 				// for the previous term
-				err2 := finishTerm(prevTerm)
-				if err2 != nil {
-					return nil, 0, err2
+				err = finishTerm(prevTerm)
+				if err != nil {
+					return nil, 0, err
 				}
 			}
 
-			var err2 error
-			postings, err2 = dicts[itrI].postingsListFromOffset(
+			postings, err = dicts[itrI].postingsListFromOffset(
 				postingsOffset, drops[itrI], postings)
-			if err2 != nil {
-				return nil, 0, err2
+			if err != nil {
+				return nil, 0, err
 			}
 
 			postItr = postings.iterator(true, true, true, postItr)
