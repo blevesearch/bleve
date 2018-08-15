@@ -26,10 +26,14 @@ import (
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/analysis/analyzer/custom"
+	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
+	"github.com/blevesearch/bleve/analysis/analyzer/standard"
 	"github.com/blevesearch/bleve/analysis/token/lowercase"
 	"github.com/blevesearch/bleve/analysis/tokenizer/single"
 	"github.com/blevesearch/bleve/analysis/tokenizer/whitespace"
 	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index/scorch"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/query"
 )
@@ -540,5 +544,64 @@ func TestNestedBooleanSearchers(t *testing.T) {
 	}
 	if matches != len(searchResults.Hits) {
 		t.Fatalf("Unexpected result set, %v != %v", matches, len(searchResults.Hits))
+	}
+}
+
+func TestSearchScorchOverEmptyKeyword(t *testing.T) {
+	defaultIndexType := Config.DefaultIndexType
+
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+		Config.DefaultIndexType = defaultIndexType
+	}()
+
+	Config.DefaultIndexType = scorch.Name
+
+	dmap := mapping.NewDocumentMapping()
+	dmap.DefaultAnalyzer = standard.Name
+
+	fm := mapping.NewTextFieldMapping()
+	fm.Analyzer = keyword.Name
+
+	fm1 := mapping.NewTextFieldMapping()
+	fm1.Analyzer = standard.Name
+
+	dmap.AddFieldMappingsAt("id", fm)
+	dmap.AddFieldMappingsAt("name", fm1)
+
+	imap := mapping.NewIndexMapping()
+	imap.DefaultMapping = dmap
+	imap.DefaultAnalyzer = standard.Name
+
+	idx, err := New("testidx", imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 10; i++ {
+		err = idx.Index(fmt.Sprint(i), map[string]string{"name": fmt.Sprintf("test%d", i), "id": ""})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	count, err := idx.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 10 {
+		t.Fatalf("Unexpected doc count: %v, expected 10", count)
+	}
+
+	q := query.NewWildcardQuery("test*")
+	sr := NewSearchRequestOptions(q, 40, 0, false)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 10 {
+		t.Fatalf("Unexpected search hits: %v, expected 10", res.Total)
 	}
 }
