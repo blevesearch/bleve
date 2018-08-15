@@ -114,7 +114,7 @@ type IndexReaderRegexp interface {
 }
 
 type IndexReaderFuzzy interface {
-	FieldDictFuzzy(field string, term []byte, fuzziness int) (FieldDict, error)
+	FieldDictFuzzy(field string, term string, fuzziness int, prefix string) (FieldDict, error)
 }
 
 type IndexReaderOnly interface {

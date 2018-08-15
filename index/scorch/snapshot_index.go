@@ -195,14 +195,20 @@ func (i *IndexSnapshot) FieldDictRegexp(field string,
 }
 
 func (i *IndexSnapshot) FieldDictFuzzy(field string,
-	term []byte, fuzziness int) (index.FieldDict, error) {
-	a, err := levenshtein.New(string(term), fuzziness)
+	term string, fuzziness int, prefix string) (index.FieldDict, error) {
+	a, err := levenshtein.New(term, fuzziness)
 	if err != nil {
 		return nil, err
 	}
 
+	var prefixBeg, prefixEnd []byte
+	if prefix != "" {
+		prefixBeg = []byte(prefix)
+		prefixEnd = segment.IncrementBytes(prefixBeg)
+	}
+
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.AutomatonIterator(a, nil, nil)
+		return i.AutomatonIterator(a, prefixBeg, prefixEnd)
 	})
 }
 
