@@ -23,6 +23,7 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/blevesearch/bleve/size"
+	"github.com/couchbase/vellum"
 )
 
 var TermSeparator byte = 0xff
@@ -52,13 +53,9 @@ func (s *SegmentDictionarySnapshot) RangeIterator(start, end string) segment.Dic
 	return s.d.RangeIterator(start, end)
 }
 
-func (s *SegmentDictionarySnapshot) RegexpIterator(regex string) segment.DictionaryIterator {
-	return s.d.RegexpIterator(regex)
-}
-
-func (s *SegmentDictionarySnapshot) FuzzyIterator(term string,
-	fuzziness int) segment.DictionaryIterator {
-	return s.d.FuzzyIterator(term, fuzziness)
+func (s *SegmentDictionarySnapshot) AutomatonIterator(a vellum.Automaton,
+	startKeyInclusive, endKeyExclusive []byte) segment.DictionaryIterator {
+	return s.d.AutomatonIterator(a, startKeyInclusive, endKeyExclusive)
 }
 
 func (s *SegmentDictionarySnapshot) OnlyIterator(onlyTerms [][]byte,

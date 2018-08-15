@@ -27,6 +27,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/couchbase/vellum/levenshtein"
 )
 
 type asynchSegmentResult struct {
@@ -180,15 +181,28 @@ func (i *IndexSnapshot) FieldDictPrefix(field string,
 
 func (i *IndexSnapshot) FieldDictRegexp(field string,
 	termRegex string) (index.FieldDict, error) {
+	// TODO: potential optimization where the literal prefix represents the,
+	//       entire regexp, allowing us to use PrefixIterator(prefixTerm)?
+
+	a, prefixBeg, prefixEnd, err := segment.ParseRegexp(termRegex)
+	if err != nil {
+		return nil, err
+	}
+
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.RegexpIterator(termRegex)
+		return i.AutomatonIterator(a, prefixBeg, prefixEnd)
 	})
 }
 
 func (i *IndexSnapshot) FieldDictFuzzy(field string,
 	term []byte, fuzziness int) (index.FieldDict, error) {
+	a, err := levenshtein.New(string(term), fuzziness)
+	if err != nil {
+		return nil, err
+	}
+
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.FuzzyIterator(string(term), fuzziness)
+		return i.AutomatonIterator(a, nil, nil)
 	})
 }
 

@@ -22,6 +22,7 @@ import (
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
+	"github.com/couchbase/vellum/levenshtein"
 )
 
 func buildTestSegmentForDict() (*SegmentBase, uint64, error) {
@@ -205,7 +206,11 @@ func TestDictionaryError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	itr := dict.FuzzyIterator("summer", 5)
+	a, err := levenshtein.New("summer", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	itr := dict.AutomatonIterator(a, nil, nil)
 	if itr == nil {
 		t.Fatalf("got nil itr")
 	}
@@ -213,8 +218,64 @@ func TestDictionaryError(t *testing.T) {
 	if nxt != nil {
 		t.Fatalf("expected nil next")
 	}
-	if err == nil {
-		t.Fatalf("expected error from iterator")
+	if err != nil {
+		t.Fatalf("expected nil error from iterator, got: %v", err)
 	}
 
+	a, err = levenshtein.New("cat", 1) // cat & bat
+	if err != nil {
+		t.Fatal(err)
+	}
+	itr = dict.AutomatonIterator(a, nil, nil)
+	if itr == nil {
+		t.Fatalf("got nil itr")
+	}
+	for i := 0; i < 2; i++ {
+		nxt, err = itr.Next()
+		if nxt == nil || err != nil {
+			t.Fatalf("expected non-nil next and nil err, got: %v, %v", nxt, err)
+		}
+	}
+	nxt, err = itr.Next()
+	if nxt != nil || err != nil {
+		t.Fatalf("expected nil next and nil err, got: %v, %v", nxt, err)
+	}
+
+	a, err = levenshtein.New("cat", 2) // cat & bat
+	if err != nil {
+		t.Fatal(err)
+	}
+	itr = dict.AutomatonIterator(a, nil, nil)
+	if itr == nil {
+		t.Fatalf("got nil itr")
+	}
+	for i := 0; i < 2; i++ {
+		nxt, err = itr.Next()
+		if nxt == nil || err != nil {
+			t.Fatalf("expected non-nil next and nil err, got: %v, %v", nxt, err)
+		}
+	}
+	nxt, err = itr.Next()
+	if nxt != nil || err != nil {
+		t.Fatalf("expected nil next and nil err, got: %v, %v", nxt, err)
+	}
+
+	a, err = levenshtein.New("cat", 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	itr = dict.AutomatonIterator(a, nil, nil)
+	if itr == nil {
+		t.Fatalf("got nil itr")
+	}
+	for i := 0; i < 5; i++ {
+		nxt, err = itr.Next()
+		if nxt == nil || err != nil {
+			t.Fatalf("expected non-nil next and nil err, got: %v, %v", nxt, err)
+		}
+	}
+	nxt, err = itr.Next()
+	if nxt != nil || err != nil {
+		t.Fatalf("expected nil next and nil err, got: %v, %v", nxt, err)
+	}
 }

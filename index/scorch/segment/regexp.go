@@ -12,11 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package zap
+package segment
 
 import (
 	"regexp/syntax"
+
+	"github.com/couchbase/vellum/regexp"
 )
+
+func ParseRegexp(pattern string) (a *regexp.Regexp, prefixBeg, prefixEnd []byte, err error) {
+	// TODO: potential optimization where syntax.Regexp supports a Simplify() API?
+
+	parsed, err := syntax.Parse(pattern, syntax.Perl)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	re, err := regexp.NewParsedWithLimit(pattern, parsed, regexp.DefaultLimit)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	prefix := LiteralPrefix(parsed)
+	if prefix != "" {
+		prefixBeg := []byte(prefix)
+		prefixEnd := IncrementBytes(prefixBeg)
+		return re, prefixBeg, prefixEnd, nil
+	}
+
+	return re, nil, nil, nil
+}
 
 // Returns the literal prefix given the parse tree for a regexp
 func LiteralPrefix(s *syntax.Regexp) string {
@@ -35,4 +60,16 @@ func LiteralPrefix(s *syntax.Regexp) string {
 	}
 
 	return "" // no literal prefix
+}
+
+func IncrementBytes(in []byte) []byte {
+	rv := make([]byte, len(in))
+	copy(rv, in)
+	for i := len(rv) - 1; i >= 0; i-- {
+		rv[i] = rv[i] + 1
+		if rv[i] != 0 {
+			return rv // didn't overflow, so stop
+		}
+	}
+	return nil // overflowed
 }
