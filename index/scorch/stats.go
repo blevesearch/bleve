@@ -74,6 +74,9 @@ type Stats struct {
 	TotPersisterSlowMergerPause  uint64
 	TotPersisterSlowMergerResume uint64
 
+	TotPersisterNapPauseCompleted uint64
+	TotPersisterMergerNapBreak    uint64
+
 	TotFileMergeLoopBeg uint64
 	TotFileMergeLoopErr uint64
 	TotFileMergeLoopEnd uint64
