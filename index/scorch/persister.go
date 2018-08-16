@@ -205,19 +205,28 @@ func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64, lastM
 	// memory merge cum persist loop.
 	// On finding too many files on disk, persister pause until the merger
 	// catches up to reduce the segment file count under the threshold.
-	// But if there is a memory pressue, then skip this sleep maneuver.
+	// But if there is memory pressure, then skip this sleep maneuvers.
 	numFilesOnDisk, _ := s.diskFileStats()
 	if numFilesOnDisk < uint64(po.PersisterNapUnderNumFiles) &&
 		po.PersisterNapTimeMSec > 0 && s.paused() == 0 {
 		select {
 		case <-s.closeCh:
 		case <-time.After(time.Millisecond * time.Duration(po.PersisterNapTimeMSec)):
+			atomic.AddUint64(&s.stats.TotPersisterNapPauseCompleted, 1)
+
+		case ew := <-s.persisterNotifier:
+			// unblock the merger in meantime
+			persistWatchers = append(persistWatchers, ew)
+			lastMergedEpoch = ew.epoch
+			persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
+			atomic.AddUint64(&s.stats.TotPersisterMergerNapBreak, 1)
 		}
 		return lastMergedEpoch, persistWatchers
 	}
 
 OUTER:
-	for numFilesOnDisk > uint64(po.PersisterNapUnderNumFiles) &&
+	for po.PersisterNapUnderNumFiles > 0 &&
+		numFilesOnDisk >= uint64(po.PersisterNapUnderNumFiles) &&
 		lastMergedEpoch < lastPersistedEpoch {
 		atomic.AddUint64(&s.stats.TotPersisterSlowMergerPause, 1)
 
