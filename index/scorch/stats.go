@@ -61,6 +61,8 @@ type Stats struct {
 	TotIntroducedSegmentsBatch uint64
 	TotIntroducedSegmentsMerge uint64
 
+	TotItemsToPersist       uint64
+
 	TotPersistLoopBeg          uint64
 	TotPersistLoopErr          uint64
 	TotPersistLoopProgress     uint64

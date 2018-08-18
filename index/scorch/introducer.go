@@ -20,6 +20,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 )
 
 type segmentIntroduction struct {
@@ -126,6 +127,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 
 	// iterate through current segments
 	var running uint64
+	var docsToPersistCount uint64
 	for i := range root.segment {
 		// see if optimistic work included this segment
 		delta, ok := next.obsoletes[root.segment[i].id]
@@ -164,7 +166,13 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			newSnapshot.offsets = append(newSnapshot.offsets, running)
 			running += newss.segment.Count()
 		}
+
+		if isMemorySegment(root.segment[i]) {
+			docsToPersistCount += root.segment[i].Count()
+		}
 	}
+
+	atomic.StoreUint64(&s.stats.TotItemsToPersist, docsToPersistCount)
 
 	// append new segment, if any, to end of the new index snapshot
 	if next.data != nil {
@@ -241,6 +249,7 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 		creator:  "introducePersist",
 	}
 
+	var docsToPersistCount uint64
 	for i, segmentSnapshot := range root.segment {
 		// see if this segment has been replaced
 		if replacement, ok := persist.persisted[segmentSnapshot.id]; ok {
@@ -260,6 +269,10 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 		} else {
 			newIndexSnapshot.segment[i] = root.segment[i]
 			newIndexSnapshot.segment[i].segment.AddRef()
+
+			if isMemorySegment(root.segment[i]) {
+				docsToPersistCount += root.segment[i].Count()
+			}
 		}
 		newIndexSnapshot.offsets[i] = root.offsets[i]
 	}
@@ -267,6 +280,8 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 	for k, v := range root.internal {
 		newIndexSnapshot.internal[k] = v
 	}
+
+	atomic.StoreUint64(&s.stats.TotItemsToPersist, docsToPersistCount)
 
 	newIndexSnapshot.updateSize()
 	s.rootLock.Lock()
@@ -302,7 +317,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 
 	// iterate through current segments
 	newSegmentDeleted := roaring.NewBitmap()
-	var running uint64
+	var running, docsToPersistCount uint64
 	for i := range root.segment {
 		segmentID := root.segment[i].id
 		if segSnapAtMerge, ok := nextMerge.old[segmentID]; ok {
@@ -338,7 +353,12 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			root.segment[i].segment.AddRef()
 			newSnapshot.offsets = append(newSnapshot.offsets, running)
 			running += root.segment[i].segment.Count()
+
+			if isMemorySegment(root.segment[i]) {
+				docsToPersistCount += root.segment[i].Count()
+			}
 		}
+
 	}
 
 	// before the newMerge introduction, need to clean the newly
@@ -369,7 +389,14 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 		})
 		newSnapshot.offsets = append(newSnapshot.offsets, running)
 		atomic.AddUint64(&s.stats.TotIntroducedSegmentsMerge, 1)
+
+		switch nextMerge.new.(type) {
+		case *zap.SegmentBase:
+			docsToPersistCount += nextMerge.new.Count() - newSegmentDeleted.GetCardinality()
+		}
 	}
+
+	atomic.StoreUint64(&s.stats.TotItemsToPersist, docsToPersistCount)
 
 	newSnapshot.AddRef() // 1 ref for the nextMerge.notify response
 
@@ -391,6 +418,14 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	// notify requester that we incorporated this
 	nextMerge.notify <- newSnapshot
 	close(nextMerge.notify)
+}
+
+func isMemorySegment(s *SegmentSnapshot) bool {
+	switch s.segment.(type) {
+	case *zap.SegmentBase:
+		return true
+	}
+	return false
 }
 
 func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
