@@ -214,6 +214,8 @@ func (s *Scorch) openBolt() error {
 		}
 	}
 
+	atomic.StoreUint64(&s.stats.TotFileSegmentsAtRoot, uint64(len(s.root.segment)))
+
 	s.introductions = make(chan *segmentIntroduction)
 	s.persists = make(chan *persistIntroduction)
 	s.merges = make(chan *segmentMerge)
