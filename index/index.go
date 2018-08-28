@@ -300,6 +300,26 @@ func (b *Batch) Reset() {
 	b.InternalOps = make(map[string][]byte)
 }
 
+func (b *Batch) Merge(o *Batch) {
+	for k, v := range o.IndexOps {
+		b.IndexOps[k] = v
+	}
+	for k, v := range o.InternalOps {
+		b.InternalOps[k] = v
+	}
+}
+
+func (b *Batch) TotalDocSize() int {
+	var s int
+	for k, v := range b.IndexOps {
+		if v != nil {
+			s += v.Size() + size.SizeOfString
+		}
+		s += len(k)
+	}
+	return s
+}
+
 // Optimizable represents an optional interface that implementable by
 // optimizable resources (e.g., TermFieldReaders, Searchers).  These
 // optimizable resources are provided the same OptimizableContext

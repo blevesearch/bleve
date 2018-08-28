@@ -1917,3 +1917,159 @@ func TestSearchQueryCallback(t *testing.T) {
 		t.Fatalf("Expected: %v, Got: %v", expErr, err)
 	}
 }
+
+func TestBatchMerge(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	doca := map[string]interface{}{
+		"name":   "scorch",
+		"desc":   "gophercon india",
+		"nation": "india",
+	}
+
+	batchA := index.NewBatch()
+	err = batchA.Index("a", doca)
+	if err != nil {
+		t.Error(err)
+	}
+	batchA.SetInternal([]byte("batchkA"), []byte("batchvA"))
+
+	docb := map[string]interface{}{
+		"name": "moss",
+		"desc": "gophercon MV",
+	}
+
+	batchB := index.NewBatch()
+	err = batchB.Index("b", docb)
+	if err != nil {
+		t.Error(err)
+	}
+	batchB.SetInternal([]byte("batchkB"), []byte("batchvB"))
+
+	docC := map[string]interface{}{
+		"name":    "blahblah",
+		"desc":    "inProgress",
+		"country": "usa",
+	}
+
+	batchC := index.NewBatch()
+	err = batchC.Index("c", docC)
+	if err != nil {
+		t.Error(err)
+	}
+	batchC.SetInternal([]byte("batchkC"), []byte("batchvC"))
+	batchC.SetInternal([]byte("batchkB"), []byte("batchvBNew"))
+	batchC.Delete("a")
+	batchC.DeleteInternal([]byte("batchkA"))
+
+	batchA.Merge(batchB)
+
+	if batchA.Size() != 4 {
+		t.Errorf("expected batch size 4, got %d", batchA.Size())
+	}
+
+	batchA.Merge(batchC)
+
+	if batchA.Size() != 6 {
+		t.Errorf("expected batch size 6, got %d", batchA.Size())
+	}
+
+	err = index.Batch(batchA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// close the index, open it again, and try some more things
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	index, err = Open("testidx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	count, err := index.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Errorf("expected doc count 2, got %d", count)
+	}
+
+	doc, err := index.Document("c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc == nil {
+		t.Errorf("expected doc not nil, got nil")
+	}
+
+	val, err := index.GetInternal([]byte("batchkB"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val == nil || string(val) != "batchvBNew" {
+		t.Errorf("expected val: batchvBNew , got %s", val)
+	}
+
+	val, err = index.GetInternal([]byte("batchkA"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != nil {
+		t.Errorf("expected nil, got %s", val)
+	}
+
+	foundNameField := false
+	for _, field := range doc.Fields {
+		if field.Name() == "name" && string(field.Value()) == "blahblah" {
+			foundNameField = true
+		}
+	}
+	if !foundNameField {
+		t.Errorf("expected to find field named 'name' with value 'blahblah'")
+	}
+
+	fields, err := index.Fields()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedFields := map[string]bool{
+		"_all":    false,
+		"name":    false,
+		"desc":    false,
+		"country": false,
+	}
+	if len(fields) < len(expectedFields) {
+		t.Fatalf("expected %d fields got %d", len(expectedFields), len(fields))
+	}
+
+	for _, f := range fields {
+		expectedFields[f] = true
+	}
+
+	for ef, efp := range expectedFields {
+		if !efp {
+			t.Errorf("field %s is missing", ef)
+		}
+	}
+
+}
