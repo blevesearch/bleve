@@ -757,7 +757,7 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 	s.eligibleForRemoval = newEligible
 	s.rootLock.Unlock()
 
-	if len(epochsToRemove) <= 0 {
+	if len(epochsToRemove) == 0 {
 		return 0, nil
 	}
 

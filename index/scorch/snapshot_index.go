@@ -654,7 +654,7 @@ func (i *IndexSnapshot) DumpFields() chan interface{} {
 
 // subtractStrings returns set a minus elements of set b.
 func subtractStrings(a, b []string) []string {
-	if len(b) <= 0 {
+	if len(b) == 0 {
 		return a
 	}
 
