@@ -502,6 +502,10 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["num_recs_to_persist"] = m["TotItemsToPersist"]
 	m["num_bytes_used_disk"] = m["CurOnDiskBytes"]
 	m["num_files_on_disk"] = m["CurOnDiskFiles"]
+	m["num_root_memorysegments"] = m["TotMemorySegmentsAtRoot"]
+	m["num_root_filesegments"] = m["TotFileSegmentsAtRoot"]
+	m["num_persister_nap_pause_completed"] = m["TotPersisterNapPauseCompleted"]
+	m["num_persister_nap_merger_break"] = m["TotPersisterMergerNapBreak"]
 	m["total_compaction_written_bytes"] = m["TotFileMergeWrittenBytes"]
 
 	return m
