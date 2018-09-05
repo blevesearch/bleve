@@ -250,11 +250,10 @@ func (s *SegmentBase) Dictionary(field string) (segment.TermDictionary, error) {
 func (sb *SegmentBase) dictionary(field string) (rv *Dictionary, err error) {
 	fieldIDPlus1 := sb.fieldsMap[field]
 	if fieldIDPlus1 > 0 {
-		rv = &Dictionary{
-			sb:      sb,
-			field:   field,
-			fieldID: fieldIDPlus1 - 1,
-		}
+		rv = dictionaryPool.Get().(*Dictionary)
+		rv.sb = sb
+		rv.field = field
+		rv.fieldID = fieldIDPlus1 - 1
 
 		dictStart := sb.dictLocs[rv.fieldID]
 		if dictStart > 0 {

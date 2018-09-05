@@ -178,8 +178,43 @@ func (i *IndexSnapshotTermFieldReader) Count() uint64 {
 
 func (i *IndexSnapshotTermFieldReader) Close() error {
 	if i.snapshot != nil {
-		atomic.AddUint64(&i.snapshot.parent.stats.TotTermSearchersFinished, uint64(1))
-		i.snapshot.recycleTermFieldReader(i)
+		stats := &i.snapshot.parent.stats
+
+		atomic.AddUint64(&stats.TotTermSearchersFinished, uint64(1))
+
+		if i.snapshot.recycleTermFieldReader(i) {
+			atomic.AddUint64(&stats.TotTermFieldReadersRecycled, uint64(1))
+		} else {
+			atomic.AddUint64(&stats.TotTermFieldReadersGarbaged, uint64(1))
+
+			// the snapshot couldn't recycle the TFR (it was too
+			// obsolete), so recycle its constituent parts
+
+			for _, x := range i.iterators {
+				recycle(x)
+			}
+			atomic.AddUint64(&stats.TotPostingsIteratorsRecycled, uint64(len(i.iterators)))
+
+			for _, x := range i.postings {
+				recycle(x)
+			}
+			atomic.AddUint64(&stats.TotPostingsListsRecycled, uint64(len(i.postings)))
+
+			for _, x := range i.dicts {
+				recycle(x)
+			}
+			atomic.AddUint64(&stats.TotTermDictionariesRecycled, uint64(len(i.dicts)))
+		}
 	}
 	return nil
+}
+
+type Recycler interface {
+	Recycle()
+}
+
+func recycle(x interface{}) {
+	if r, ok := x.(Recycler); ok {
+		r.Recycle()
+	}
 }

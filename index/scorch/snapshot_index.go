@@ -471,13 +471,13 @@ func (i *IndexSnapshot) allocTermFieldReaderDicts(field string) (tfr *IndexSnaps
 	return &IndexSnapshotTermFieldReader{}
 }
 
-func (i *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader) {
+func (i *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader) bool {
 	i.parent.rootLock.RLock()
 	obsolete := i.parent.root != i
 	i.parent.rootLock.RUnlock()
 	if obsolete {
 		// if we're not the current root (mutations happened), don't bother recycling
-		return
+		return false
 	}
 
 	i.m2.Lock()
@@ -486,6 +486,8 @@ func (i *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader
 	}
 	i.fieldTFRs[tfr.field] = append(i.fieldTFRs[tfr.field], tfr)
 	i.m2.Unlock()
+
+	return true
 }
 
 func docNumberToBytes(buf []byte, in uint64) []byte {
