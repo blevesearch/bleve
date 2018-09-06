@@ -37,6 +37,9 @@ func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string,
 	tfd, err := fieldDict.Next()
 	for err == nil && tfd != nil {
 		terms = append(terms, tfd.Term)
+		if tooManyClauses(len(terms)) {
+			return nil, tooManyClausesErr()
+		}
 		tfd, err = fieldDict.Next()
 	}
 	if err != nil {
