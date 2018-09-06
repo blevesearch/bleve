@@ -229,10 +229,14 @@ func (d *Dictionary) OnlyIterator(onlyTerms [][]byte,
 }
 
 func (d *Dictionary) Recycle() {
+	if d.fst != nil {
+		_ = d.fst.Close()
+	}
+	if d.fstReader != nil {
+		d.fstReader.Close()
+	}
+
 	*d = Dictionary{} // clear fields
-
-	// TODO: need vellum API's to allow for recycled or prealloc'ed FST's
-
 	dictionaryPool.Put(d)
 }
 
