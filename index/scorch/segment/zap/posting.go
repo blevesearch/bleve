@@ -111,7 +111,7 @@ type PostingsList struct {
 }
 
 // represents an immutable, empty postings list
-var emptyPostingsList = &PostingsList{}
+var emptyPostingsList = PostingsList{}
 
 var postingsListPool = sync.Pool{New: func() interface{} { return &PostingsList{} }}
 
@@ -140,7 +140,7 @@ func (p *PostingsList) OrInto(receiver *roaring.Bitmap) {
 func (p *PostingsList) Iterator(includeFreq, includeNorm, includeLocs bool,
 	prealloc segment.PostingsIterator) segment.PostingsIterator {
 	if p.normBits1Hit == 0 && p.postings == nil {
-		return emptyPostingsIterator
+		return &emptyPostingsIterator
 	}
 
 	var preallocPI *PostingsIterator
@@ -148,7 +148,7 @@ func (p *PostingsList) Iterator(includeFreq, includeNorm, includeLocs bool,
 	if ok && pi != nil {
 		preallocPI = pi
 	}
-	if preallocPI == emptyPostingsIterator {
+	if preallocPI != nil && reflect.DeepEqual(*preallocPI, emptyPostingsIterator) {
 		preallocPI = nil
 	}
 
@@ -297,7 +297,7 @@ func (rv *PostingsList) init1Hit(fstVal uint64) error {
 }
 
 func (rv *PostingsList) Recycle() {
-	if rv != emptyPostingsList {
+	if *rv != emptyPostingsList {
 		*rv = PostingsList{}
 		// TODO: can we also recycle the roaring bitmaps?
 		postingsListPool.Put(rv)
@@ -337,7 +337,7 @@ type PostingsIterator struct {
 	includeLocs     bool
 }
 
-var emptyPostingsIterator = &PostingsIterator{}
+var emptyPostingsIterator = PostingsIterator{}
 
 var postingsIteratorPool = sync.Pool{New: func() interface{} { return &PostingsIterator{} }}
 
@@ -729,7 +729,7 @@ func (rv *PostingsIterator) Clear() {
 }
 
 func (i *PostingsIterator) Recycle() {
-	if i != emptyPostingsIterator {
+	if !reflect.DeepEqual(*i, emptyPostingsIterator) {
 		i.Clear()
 
 		postingsIteratorPool.Put(i)
