@@ -452,6 +452,9 @@ func TestStoredFieldPreserved(t *testing.T) {
 		"desc": "GopherCON India",
 		"bool": true,
 		"num":  float64(1),
+		"nested": map[string]interface{}{
+			"values": []string{"a", "b", "c"},
+		},
 	}
 	err = index.Index("a", doca)
 	if err != nil {
@@ -460,7 +463,7 @@ func TestStoredFieldPreserved(t *testing.T) {
 
 	q := NewTermQuery("marty")
 	req := NewSearchRequest(q)
-	req.Fields = []string{"name", "desc", "bool", "num"}
+	req.Fields = []string{"name", "desc", "bool", "num", "nested.values"}
 	res, err := index.Search(req)
 	if err != nil {
 		t.Error(err)
@@ -469,18 +472,35 @@ func TestStoredFieldPreserved(t *testing.T) {
 	if len(res.Hits) != 1 {
 		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
 	}
-	if res.Hits[0].Fields["name"] != "Marty" {
-		t.Errorf("expected 'Marty' got '%s'", res.Hits[0].Fields["name"])
+
+	hit := res.Hits[0]
+	for fieldName, expectedValue := range map[string]interface{}{
+		"name": "Marty",
+		"desc": "GopherCON India",
+		"num":  float64(1),
+		"bool": true,
+	} {
+		fieldValue := hit.Fields[fieldName]
+		if hit.Fields[fieldName] != expectedValue {
+			t.Errorf("Expected '%s', but got %s for field %s", expectedValue, fieldValue, fieldName)
+		}
+		arrayPositionsSlice := hit.FieldArrayPositions[fieldName]
+		if len(arrayPositionsSlice) != 1 {
+			t.Errorf("Got unexpected number of array positions %d, expected 1", len(arrayPositionsSlice))
+			continue
+		}
+		if !arrayPositionsSlice[0].Equals(search.ArrayPositions{}) {
+			t.Errorf("Got unexpected array position: %+v", arrayPositionsSlice)
+		}
 	}
-	if res.Hits[0].Fields["desc"] != "GopherCON India" {
-		t.Errorf("expected 'GopherCON India' got '%s'", res.Hits[0].Fields["desc"])
+
+	if !reflect.DeepEqual(hit.Fields["nested.values"], []interface{}{"a", "b", "c"}) {
+		t.Errorf("Unexpected value for nested.values, got %+v", hit.Fields["nested.values"])
 	}
-	if res.Hits[0].Fields["num"] != float64(1) {
-		t.Errorf("expected '1' got '%v'", res.Hits[0].Fields["num"])
+	if !reflect.DeepEqual(hit.FieldArrayPositions["nested.values"], []search.ArrayPositions{{0}, {1}, {2}}) {
+		t.Errorf("Unexpected array position values, got %+v", hit.FieldArrayPositions["nested.values"])
 	}
-	if res.Hits[0].Fields["bool"] != true {
-		t.Errorf("expected 'true' got '%v'", res.Hits[0].Fields["bool"])
-	}
+
 }
 
 func TestDict(t *testing.T) {

@@ -578,7 +578,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 									}
 								}
 								if value != nil {
-									hit.AddFieldValue(docF.Name(), value)
+									hit.AddFieldValue(docF.Name(), value, docF.ArrayPositions())
 								}
 							}
 						}
