@@ -17,7 +17,6 @@ package zap
 import (
 	"bytes"
 	"fmt"
-	"sync"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index"
@@ -33,8 +32,6 @@ type Dictionary struct {
 	fst       *vellum.FST
 	fstReader *vellum.Reader
 }
-
-var dictionaryPool = sync.Pool{New: func() interface{} { return &Dictionary{} }}
 
 // PostingsList returns the postings list for the specified term
 func (d *Dictionary) PostingsList(term []byte, except *roaring.Bitmap,
@@ -82,7 +79,7 @@ func (d *Dictionary) postingsListFromOffset(postingsOffset uint64, except *roari
 
 func (d *Dictionary) postingsListInit(rv *PostingsList, except *roaring.Bitmap) *PostingsList {
 	if rv == nil || rv == emptyPostingsList {
-		rv = postingsListPool.Get().(*PostingsList)
+		rv = &PostingsList{}
 	} else {
 		postings := rv.postings
 		if postings != nil {
@@ -226,14 +223,6 @@ func (d *Dictionary) OnlyIterator(onlyTerms [][]byte,
 	}
 
 	return rv
-}
-
-func (d *Dictionary) Recycle() {
-	*d = Dictionary{} // clear fields
-
-	// TODO: need vellum API's to allow for recycled or prealloc'ed FST's
-
-	dictionaryPool.Put(d)
 }
 
 // DictionaryIterator is an iterator for term dictionary

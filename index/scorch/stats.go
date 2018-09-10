@@ -115,13 +115,6 @@ type Stats struct {
 	MaxMemMergeZapTime      uint64
 	TotMemMergeSegments     uint64
 	TotMemorySegmentsAtRoot uint64
-
-	TotTermFieldReadersGarbaged uint64
-	TotTermFieldReadersRecycled uint64
-
-	TotTermDictionariesRecycled  uint64
-	TotPostingsListsRecycled     uint64
-	TotPostingsIteratorsRecycled uint64
 }
 
 // atomically populates the returned map

@@ -91,8 +91,6 @@ func (e *EmptyDictionary) OnlyIterator(onlyTerms [][]byte,
 	return &EmptyDictionaryIterator{}
 }
 
-func (e *EmptyDictionary) Recycle() {}
-
 type EmptyDictionaryIterator struct{}
 
 func (e *EmptyDictionaryIterator) Next() (*index.DictEntry, error) {
@@ -118,8 +116,6 @@ func (e *EmptyPostingsList) Count() uint64 {
 	return 0
 }
 
-func (e *EmptyPostingsList) Recycle() {}
-
 type EmptyPostingsIterator struct{}
 
 func (e *EmptyPostingsIterator) Next() (Posting, error) {
@@ -129,5 +125,3 @@ func (e *EmptyPostingsIterator) Next() (Posting, error) {
 func (e *EmptyPostingsIterator) Size() int {
 	return 0
 }
-
-func (e *EmptyPostingsIterator) Recycle() {}
