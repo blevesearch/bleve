@@ -21,7 +21,6 @@ import (
 	"io"
 	"math"
 	"reflect"
-	"sync"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
@@ -113,8 +112,6 @@ type PostingsList struct {
 // represents an immutable, empty postings list
 var emptyPostingsList = &PostingsList{}
 
-var postingsListPool = sync.Pool{New: func() interface{} { return &PostingsList{} }}
-
 func (p *PostingsList) Size() int {
 	sizeInBytes := reflectStaticSizePostingsList + size.SizeOfPtr
 
@@ -158,9 +155,38 @@ func (p *PostingsList) Iterator(includeFreq, includeNorm, includeLocs bool,
 func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 	rv *PostingsIterator) *PostingsIterator {
 	if rv == nil {
-		rv = postingsIteratorPool.Get().(*PostingsIterator)
+		rv = &PostingsIterator{}
 	} else {
-		rv.Clear()
+		freqNormReader := rv.freqNormReader
+		if freqNormReader != nil {
+			freqNormReader.Reset([]byte(nil))
+		}
+
+		locReader := rv.locReader
+		if locReader != nil {
+			locReader.Reset([]byte(nil))
+		}
+
+		freqChunkOffsets := rv.freqChunkOffsets[:0]
+		locChunkOffsets := rv.locChunkOffsets[:0]
+
+		nextLocs := rv.nextLocs[:0]
+		nextSegmentLocs := rv.nextSegmentLocs[:0]
+
+		buf := rv.buf
+
+		*rv = PostingsIterator{} // clear the struct
+
+		rv.freqNormReader = freqNormReader
+		rv.locReader = locReader
+
+		rv.freqChunkOffsets = freqChunkOffsets
+		rv.locChunkOffsets = locChunkOffsets
+
+		rv.nextLocs = nextLocs
+		rv.nextSegmentLocs = nextSegmentLocs
+
+		rv.buf = buf
 	}
 
 	rv.postings = p
@@ -296,14 +322,6 @@ func (rv *PostingsList) init1Hit(fstVal uint64) error {
 	return nil
 }
 
-func (rv *PostingsList) Recycle() {
-	if rv != emptyPostingsList {
-		*rv = PostingsList{}
-		// TODO: can we also recycle the roaring bitmaps?
-		postingsListPool.Put(rv)
-	}
-}
-
 // PostingsIterator provides a way to iterate through the postings list
 type PostingsIterator struct {
 	postings *PostingsList
@@ -338,8 +356,6 @@ type PostingsIterator struct {
 }
 
 var emptyPostingsIterator = &PostingsIterator{}
-
-var postingsIteratorPool = sync.Pool{New: func() interface{} { return &PostingsIterator{} }}
 
 func (i *PostingsIterator) Size() int {
 	sizeInBytes := reflectStaticSizePostingsIterator + size.SizeOfPtr +
@@ -693,47 +709,6 @@ func (i *PostingsIterator) nextDocNumAtOrAfter(atOrAfter uint64) (uint64, bool, 
 	}
 
 	return uint64(n), true, nil
-}
-
-func (rv *PostingsIterator) Clear() {
-	freqNormReader := rv.freqNormReader
-	if freqNormReader != nil {
-		freqNormReader.Reset([]byte(nil))
-	}
-
-	locReader := rv.locReader
-	if locReader != nil {
-		locReader.Reset([]byte(nil))
-	}
-
-	freqChunkOffsets := rv.freqChunkOffsets[:0]
-	locChunkOffsets := rv.locChunkOffsets[:0]
-
-	nextLocs := rv.nextLocs[:0]
-	nextSegmentLocs := rv.nextSegmentLocs[:0]
-
-	buf := rv.buf
-
-	*rv = PostingsIterator{} // clear the struct
-
-	rv.freqNormReader = freqNormReader
-	rv.locReader = locReader
-
-	rv.freqChunkOffsets = freqChunkOffsets
-	rv.locChunkOffsets = locChunkOffsets
-
-	rv.nextLocs = nextLocs
-	rv.nextSegmentLocs = nextSegmentLocs
-
-	rv.buf = buf
-}
-
-func (i *PostingsIterator) Recycle() {
-	if i != emptyPostingsIterator {
-		i.Clear()
-
-		postingsIteratorPool.Put(i)
-	}
 }
 
 // Posting is a single entry in a postings list
