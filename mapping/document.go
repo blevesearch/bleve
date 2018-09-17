@@ -424,7 +424,11 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		if subDocMapping != nil {
 			// index by explicit mapping
 			for _, fieldMapping := range subDocMapping.Fields {
-				fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
+				if fieldMapping.Type == "geopoint" {
+					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
+				} else {
+					fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
+				}
 			}
 		} else if closestDocMapping.Dynamic {
 			// automatic indexing behavior
