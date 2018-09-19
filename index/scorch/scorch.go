@@ -73,6 +73,10 @@ type Scorch struct {
 	onAsyncError func(err error)
 
 	iStats internalStats
+
+	pauseLock sync.RWMutex
+
+	pauseCount uint64
 }
 
 type internalStats struct {
@@ -117,9 +121,30 @@ func NewScorch(storeName string,
 	return rv, nil
 }
 
+func (s *Scorch) paused() uint64 {
+	s.pauseLock.Lock()
+	pc := s.pauseCount
+	s.pauseLock.Unlock()
+	return pc
+}
+
+func (s *Scorch) incrPause() {
+	s.pauseLock.Lock()
+	s.pauseCount++
+	s.pauseLock.Unlock()
+}
+
+func (s *Scorch) decrPause() {
+	s.pauseLock.Lock()
+	s.pauseCount--
+	s.pauseLock.Unlock()
+}
+
 func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) {
 	if s.onEvent != nil {
+		s.incrPause()
 		s.onEvent(Event{Kind: kind, Scorch: s, Duration: dur})
+		s.decrPause()
 	}
 }
 
@@ -188,6 +213,8 @@ func (s *Scorch) openBolt() error {
 			return err
 		}
 	}
+
+	atomic.StoreUint64(&s.stats.TotFileSegmentsAtRoot, uint64(len(s.root.segment)))
 
 	s.introductions = make(chan *segmentIntroduction)
 	s.persists = make(chan *persistIntroduction)
@@ -370,6 +397,8 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 	root.AddRef()
 	s.rootLock.RUnlock()
 
+	defer func() { _ = root.DecRef() }()
+
 	for _, seg := range root.segment {
 		delta, err := seg.segment.DocNumbers(ids)
 		if err != nil {
@@ -377,8 +406,6 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 		}
 		introduction.obsoletes[seg.id] = delta
 	}
-
-	_ = root.DecRef()
 
 	introStartTime := time.Now()
 
@@ -434,24 +461,30 @@ func (s *Scorch) currentSnapshot() *IndexSnapshot {
 func (s *Scorch) Stats() json.Marshaler {
 	return &s.stats
 }
-func (s *Scorch) StatsMap() map[string]interface{} {
-	m := s.stats.ToMap()
 
+func (s *Scorch) diskFileStats() (uint64, uint64) {
+	var numFilesOnDisk, numBytesUsedDisk uint64
 	if s.path != "" {
 		finfos, err := ioutil.ReadDir(s.path)
 		if err == nil {
-			var numFilesOnDisk, numBytesUsedDisk uint64
 			for _, finfo := range finfos {
 				if !finfo.IsDir() {
 					numBytesUsedDisk += uint64(finfo.Size())
 					numFilesOnDisk++
 				}
 			}
-
-			m["CurOnDiskBytes"] = numBytesUsedDisk
-			m["CurOnDiskFiles"] = numFilesOnDisk
 		}
 	}
+	return numFilesOnDisk, numBytesUsedDisk
+}
+
+func (s *Scorch) StatsMap() map[string]interface{} {
+	m := s.stats.ToMap()
+
+	numFilesOnDisk, numBytesUsedDisk := s.diskFileStats()
+
+	m["CurOnDiskBytes"] = numBytesUsedDisk
+	m["CurOnDiskFiles"] = numFilesOnDisk
 
 	// TODO: consider one day removing these backwards compatible
 	// names for apps using the old names
@@ -466,8 +499,13 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["num_plain_text_bytes_indexed"] = m["TotIndexedPlainTextBytes"]
 	m["num_items_introduced"] = m["TotIntroducedItems"]
 	m["num_items_persisted"] = m["TotPersistedItems"]
+	m["num_recs_to_persist"] = m["TotItemsToPersist"]
 	m["num_bytes_used_disk"] = m["CurOnDiskBytes"]
 	m["num_files_on_disk"] = m["CurOnDiskFiles"]
+	m["num_root_memorysegments"] = m["TotMemorySegmentsAtRoot"]
+	m["num_root_filesegments"] = m["TotFileSegmentsAtRoot"]
+	m["num_persister_nap_pause_completed"] = m["TotPersisterNapPauseCompleted"]
+	m["num_persister_nap_merger_break"] = m["TotPersisterMergerNapBreak"]
 	m["total_compaction_written_bytes"] = m["TotFileMergeWrittenBytes"]
 
 	return m

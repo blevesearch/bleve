@@ -54,14 +54,14 @@ type FacetBuilder interface {
 
 type FacetsBuilder struct {
 	indexReader index.IndexReader
-	facets      map[string]FacetBuilder
+	facetNames  []string
+	facets      []FacetBuilder
 	fields      []string
 }
 
 func NewFacetsBuilder(indexReader index.IndexReader) *FacetsBuilder {
 	return &FacetsBuilder{
 		indexReader: indexReader,
-		facets:      make(map[string]FacetBuilder, 0),
 	}
 }
 
@@ -69,8 +69,7 @@ func (fb *FacetsBuilder) Size() int {
 	sizeInBytes := reflectStaticSizeFacetsBuilder + size.SizeOfPtr
 
 	for k, v := range fb.facets {
-		sizeInBytes += size.SizeOfString + len(k) +
-			v.Size()
+		sizeInBytes += size.SizeOfString + v.Size() + len(fb.facetNames[k])
 	}
 
 	for _, entry := range fb.fields {
@@ -81,7 +80,8 @@ func (fb *FacetsBuilder) Size() int {
 }
 
 func (fb *FacetsBuilder) Add(name string, facetBuilder FacetBuilder) {
-	fb.facets[name] = facetBuilder
+	fb.facetNames = append(fb.facetNames, name)
+	fb.facets = append(fb.facets, facetBuilder)
 	fb.fields = append(fb.fields, facetBuilder.Field())
 }
 
@@ -333,9 +333,9 @@ func (fr FacetResults) Fixup(name string, size int) {
 
 func (fb *FacetsBuilder) Results() FacetResults {
 	fr := make(FacetResults)
-	for facetName, facetBuilder := range fb.facets {
+	for i, facetBuilder := range fb.facets {
 		facetResult := facetBuilder.Result()
-		fr[facetName] = facetResult
+		fr[fb.facetNames[i]] = facetResult
 	}
 	return fr
 }

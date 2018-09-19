@@ -141,6 +141,23 @@ func TestExtractGeoPoint(t *testing.T) {
 			lat:     5.9,
 			success: true,
 		},
+		// values are nil (not supported)
+		{
+			in: map[string]interface{}{
+				"lat": nil,
+				"lon": nil,
+			},
+			lon:     0,
+			lat:     0,
+			success: false,
+		},
+		// input is nil
+		{
+			in:      nil,
+			lon:     0,
+			lat:     0,
+			success: false,
+		},
 	}
 
 	for _, test := range tests {

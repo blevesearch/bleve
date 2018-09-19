@@ -29,43 +29,6 @@ var TermSeparator byte = 0xff
 
 var TermSeparatorSplitSlice = []byte{TermSeparator}
 
-type SegmentDictionarySnapshot struct {
-	s *SegmentSnapshot
-	d segment.TermDictionary
-}
-
-func (s *SegmentDictionarySnapshot) PostingsList(term []byte, except *roaring.Bitmap,
-	prealloc segment.PostingsList) (segment.PostingsList, error) {
-	// TODO: if except is non-nil, perhaps need to OR it with s.s.deleted?
-	return s.d.PostingsList(term, s.s.deleted, prealloc)
-}
-
-func (s *SegmentDictionarySnapshot) Iterator() segment.DictionaryIterator {
-	return s.d.Iterator()
-}
-
-func (s *SegmentDictionarySnapshot) PrefixIterator(prefix string) segment.DictionaryIterator {
-	return s.d.PrefixIterator(prefix)
-}
-
-func (s *SegmentDictionarySnapshot) RangeIterator(start, end string) segment.DictionaryIterator {
-	return s.d.RangeIterator(start, end)
-}
-
-func (s *SegmentDictionarySnapshot) RegexpIterator(regex string) segment.DictionaryIterator {
-	return s.d.RegexpIterator(regex)
-}
-
-func (s *SegmentDictionarySnapshot) FuzzyIterator(term string,
-	fuzziness int) segment.DictionaryIterator {
-	return s.d.FuzzyIterator(term, fuzziness)
-}
-
-func (s *SegmentDictionarySnapshot) OnlyIterator(onlyTerms [][]byte,
-	includeCount bool) segment.DictionaryIterator {
-	return s.d.OnlyIterator(onlyTerms, includeCount)
-}
-
 type SegmentSnapshot struct {
 	id      uint64
 	segment segment.Segment
@@ -113,17 +76,6 @@ func (s *SegmentSnapshot) Count() uint64 {
 		rv -= s.deleted.GetCardinality()
 	}
 	return rv
-}
-
-func (s *SegmentSnapshot) Dictionary(field string) (segment.TermDictionary, error) {
-	d, err := s.segment.Dictionary(field)
-	if err != nil {
-		return nil, err
-	}
-	return &SegmentDictionarySnapshot{
-		s: s,
-		d: d,
-	}, nil
 }
 
 func (s *SegmentSnapshot) DocNumbers(docIDs []string) (*roaring.Bitmap, error) {

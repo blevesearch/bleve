@@ -332,31 +332,38 @@ func (s *BooleanSearcher) Advance(ctx *search.SearchContext, ID index.IndexInter
 	}
 
 	var err error
+	// Advance nested searcher(s) only if the cursor is trailing the lookup ID
 	if s.mustSearcher != nil {
-		if s.currMust != nil {
-			ctx.DocumentMatchPool.Put(s.currMust)
-		}
-		s.currMust, err = s.mustSearcher.Advance(ctx, ID)
-		if err != nil {
-			return nil, err
+		if s.currMust == nil || s.currMust.IndexInternalID.Compare(ID) < 0 {
+			if s.currMust != nil {
+				ctx.DocumentMatchPool.Put(s.currMust)
+			}
+			s.currMust, err = s.mustSearcher.Advance(ctx, ID)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	if s.shouldSearcher != nil {
-		if s.currShould != nil {
-			ctx.DocumentMatchPool.Put(s.currShould)
-		}
-		s.currShould, err = s.shouldSearcher.Advance(ctx, ID)
-		if err != nil {
-			return nil, err
+		if s.currShould == nil || s.currShould.IndexInternalID.Compare(ID) < 0 {
+			if s.currShould != nil {
+				ctx.DocumentMatchPool.Put(s.currShould)
+			}
+			s.currShould, err = s.shouldSearcher.Advance(ctx, ID)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	if s.mustNotSearcher != nil {
-		if s.currMustNot != nil {
-			ctx.DocumentMatchPool.Put(s.currMustNot)
-		}
-		s.currMustNot, err = s.mustNotSearcher.Advance(ctx, ID)
-		if err != nil {
-			return nil, err
+		if s.currMustNot == nil || s.currMustNot.IndexInternalID.Compare(ID) < 0 {
+			if s.currMustNot != nil {
+				ctx.DocumentMatchPool.Put(s.currMustNot)
+			}
+			s.currMustNot, err = s.mustNotSearcher.Advance(ctx, ID)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

@@ -27,6 +27,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/couchbase/vellum/levenshtein"
 )
 
 type asynchSegmentResult struct {
@@ -59,9 +60,8 @@ type IndexSnapshot struct {
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
 
-	m2         sync.Mutex                                 // Protects the fields that follow.
-	fieldTFRs  map[string][]*IndexSnapshotTermFieldReader // keyed by field, recycled TFR's
-	fieldDicts map[string][]segment.TermDictionary        // keyed by field, recycled dicts
+	m2        sync.Mutex                                 // Protects the fields that follow.
+	fieldTFRs map[string][]*IndexSnapshotTermFieldReader // keyed by field, recycled TFR's
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
@@ -118,7 +118,7 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string, makeItr func(i s
 	results := make(chan *asynchSegmentResult)
 	for index, segment := range i.segment {
 		go func(index int, segment *SegmentSnapshot) {
-			dict, err := segment.Dictionary(field)
+			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				results <- &asynchSegmentResult{err: err}
 			} else {
@@ -180,16 +180,35 @@ func (i *IndexSnapshot) FieldDictPrefix(field string,
 }
 
 func (i *IndexSnapshot) FieldDictRegexp(field string,
-	termRegex []byte) (index.FieldDict, error) {
+	termRegex string) (index.FieldDict, error) {
+	// TODO: potential optimization where the literal prefix represents the,
+	//       entire regexp, allowing us to use PrefixIterator(prefixTerm)?
+
+	a, prefixBeg, prefixEnd, err := segment.ParseRegexp(termRegex)
+	if err != nil {
+		return nil, err
+	}
+
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.RegexpIterator(string(termRegex))
+		return i.AutomatonIterator(a, prefixBeg, prefixEnd)
 	})
 }
 
 func (i *IndexSnapshot) FieldDictFuzzy(field string,
-	term []byte, fuzziness int) (index.FieldDict, error) {
+	term string, fuzziness int, prefix string) (index.FieldDict, error) {
+	a, err := levenshtein.New(term, fuzziness)
+	if err != nil {
+		return nil, err
+	}
+
+	var prefixBeg, prefixEnd []byte
+	if prefix != "" {
+		prefixBeg = []byte(prefix)
+		prefixEnd = segment.IncrementBytes(prefixBeg)
+	}
+
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.FuzzyIterator(string(term), fuzziness)
+		return i.AutomatonIterator(a, prefixBeg, prefixEnd)
 	})
 }
 
@@ -394,7 +413,7 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 
 func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	includeNorm, includeTermVectors bool) (tfr index.TermFieldReader, err error) {
-	rv, dicts := i.allocTermFieldReaderDicts(field)
+	rv := i.allocTermFieldReaderDicts(field)
 
 	rv.term = term
 	rv.field = field
@@ -412,20 +431,19 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	rv.currPosting = nil
 	rv.currID = rv.currID[:0]
 
-	if dicts == nil {
-		dicts = make([]segment.TermDictionary, len(i.segment))
+	if rv.dicts == nil {
+		rv.dicts = make([]segment.TermDictionary, len(i.segment))
 		for i, segment := range i.segment {
-			dict, err := segment.Dictionary(field)
+			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				return nil, err
 			}
-			dicts[i] = dict
+			rv.dicts[i] = dict
 		}
 	}
-	rv.dicts = dicts
 
-	for i := range i.segment {
-		pl, err := dicts[i].PostingsList(term, nil, rv.postings[i])
+	for i, segment := range i.segment {
+		pl, err := rv.dicts[i].PostingsList(term, segment.deleted, rv.postings[i])
 		if err != nil {
 			return nil, err
 		}
@@ -436,37 +454,37 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	return rv, nil
 }
 
-func (i *IndexSnapshot) allocTermFieldReaderDicts(field string) (
-	tfr *IndexSnapshotTermFieldReader, dicts []segment.TermDictionary) {
+func (i *IndexSnapshot) allocTermFieldReaderDicts(field string) (tfr *IndexSnapshotTermFieldReader) {
 	i.m2.Lock()
-	if i.fieldDicts != nil {
-		dicts = i.fieldDicts[field]
-	}
 	if i.fieldTFRs != nil {
 		tfrs := i.fieldTFRs[field]
 		last := len(tfrs) - 1
 		if last >= 0 {
-			rv := tfrs[last]
+			tfr = tfrs[last]
 			tfrs[last] = nil
 			i.fieldTFRs[field] = tfrs[:last]
 			i.m2.Unlock()
-			return rv, dicts
+			return
 		}
 	}
 	i.m2.Unlock()
-	return &IndexSnapshotTermFieldReader{}, dicts
+	return &IndexSnapshotTermFieldReader{}
 }
 
 func (i *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader) {
+	i.parent.rootLock.RLock()
+	obsolete := i.parent.root != i
+	i.parent.rootLock.RUnlock()
+	if obsolete {
+		// if we're not the current root (mutations happened), don't bother recycling
+		return
+	}
+
 	i.m2.Lock()
 	if i.fieldTFRs == nil {
 		i.fieldTFRs = map[string][]*IndexSnapshotTermFieldReader{}
 	}
 	i.fieldTFRs[tfr.field] = append(i.fieldTFRs[tfr.field], tfr)
-	if i.fieldDicts == nil {
-		i.fieldDicts = map[string][]segment.TermDictionary{}
-	}
-	i.fieldDicts[tfr.field] = tfr.dicts
 	i.m2.Unlock()
 }
 

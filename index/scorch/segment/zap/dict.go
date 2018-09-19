@@ -22,16 +22,15 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/couchbase/vellum"
-	"github.com/couchbase/vellum/levenshtein"
-	"github.com/couchbase/vellum/regexp"
 )
 
 // Dictionary is the zap representation of the term dictionary
 type Dictionary struct {
-	sb      *SegmentBase
-	field   string
-	fieldID uint16
-	fst     *vellum.FST
+	sb        *SegmentBase
+	field     string
+	fieldID   uint16
+	fst       *vellum.FST
+	fstReader *vellum.Reader
 }
 
 // PostingsList returns the postings list for the specified term
@@ -46,14 +45,14 @@ func (d *Dictionary) PostingsList(term []byte, except *roaring.Bitmap,
 }
 
 func (d *Dictionary) postingsList(term []byte, except *roaring.Bitmap, rv *PostingsList) (*PostingsList, error) {
-	if d.fst == nil {
+	if d.fstReader == nil {
 		if rv == nil || rv == emptyPostingsList {
 			return emptyPostingsList, nil
 		}
 		return d.postingsListInit(rv, except), nil
 	}
 
-	postingsOffset, exists, err := d.fst.Get(term)
+	postingsOffset, exists, err := d.fstReader.Get(term)
 	if err != nil {
 		return nil, fmt.Errorf("vellum err: %v", err)
 	}
@@ -121,16 +120,14 @@ func (d *Dictionary) PrefixIterator(prefix string) segment.DictionaryIterator {
 		d: d,
 	}
 
+	kBeg := []byte(prefix)
+	kEnd := segment.IncrementBytes(kBeg)
+
 	if d.fst != nil {
-		r, err := regexp.New(prefix + ".*")
+		itr, err := d.fst.Iterator(kBeg, kEnd)
 		if err == nil {
-			itr, err := d.fst.Search(r, nil, nil)
-			if err == nil {
-				rv.itr = itr
-			} else if err != nil && err != vellum.ErrIteratorDone {
-				rv.err = err
-			}
-		} else {
+			rv.itr = itr
+		} else if err != nil && err != vellum.ErrIteratorDone {
 			rv.err = err
 		}
 	}
@@ -165,48 +162,19 @@ func (d *Dictionary) RangeIterator(start, end string) segment.DictionaryIterator
 	return rv
 }
 
-// RegexpIterator returns an iterator which only visits terms having the
-// the specified regex
-func (d *Dictionary) RegexpIterator(regex string) segment.DictionaryIterator {
+// AutomatonIterator returns an iterator which only visits terms
+// having the the vellum automaton and start/end key range
+func (d *Dictionary) AutomatonIterator(a vellum.Automaton,
+	startKeyInclusive, endKeyExclusive []byte) segment.DictionaryIterator {
 	rv := &DictionaryIterator{
 		d: d,
 	}
 
 	if d.fst != nil {
-		r, err := regexp.New(regex)
+		itr, err := d.fst.Search(a, startKeyInclusive, endKeyExclusive)
 		if err == nil {
-			itr, err2 := d.fst.Search(r, nil, nil)
-			if err2 == nil {
-				rv.itr = itr
-			} else if err2 != nil && err2 != vellum.ErrIteratorDone {
-				rv.err = err2
-			}
-		} else {
-			rv.err = err
-		}
-	}
-
-	return rv
-}
-
-// FuzzyIterator returns an iterator which only visits terms having the
-// the specified edit/levenshtein distance
-func (d *Dictionary) FuzzyIterator(term string,
-	fuzziness int) segment.DictionaryIterator {
-	rv := &DictionaryIterator{
-		d: d,
-	}
-
-	if d.fst != nil {
-		la, err := levenshtein.New(term, fuzziness)
-		if err == nil {
-			itr, err2 := d.fst.Search(la, nil, nil)
-			if err2 == nil {
-				rv.itr = itr
-			} else if err2 != nil && err2 != vellum.ErrIteratorDone {
-				rv.err = err2
-			}
-		} else {
+			rv.itr = itr
+		} else if err != nil && err != vellum.ErrIteratorDone {
 			rv.err = err
 		}
 	}

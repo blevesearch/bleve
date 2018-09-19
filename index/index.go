@@ -98,12 +98,23 @@ type IndexReader interface {
 	Close() error
 }
 
+// The Regexp interface defines the subset of the regexp.Regexp API
+// methods that are used by bleve indexes, allowing callers to pass in
+// alternate implementations.
+type Regexp interface {
+	FindStringIndex(s string) (loc []int)
+
+	LiteralPrefix() (prefix string, complete bool)
+
+	String() string
+}
+
 type IndexReaderRegexp interface {
-	FieldDictRegexp(field string, regex []byte) (FieldDict, error)
+	FieldDictRegexp(field string, regex string) (FieldDict, error)
 }
 
 type IndexReaderFuzzy interface {
-	FieldDictFuzzy(field string, term []byte, fuzziness int) (FieldDict, error)
+	FieldDictFuzzy(field string, term string, fuzziness int, prefix string) (FieldDict, error)
 }
 
 type IndexReaderOnly interface {
@@ -287,6 +298,26 @@ func (b *Batch) String() string {
 func (b *Batch) Reset() {
 	b.IndexOps = make(map[string]*document.Document)
 	b.InternalOps = make(map[string][]byte)
+}
+
+func (b *Batch) Merge(o *Batch) {
+	for k, v := range o.IndexOps {
+		b.IndexOps[k] = v
+	}
+	for k, v := range o.InternalOps {
+		b.InternalOps[k] = v
+	}
+}
+
+func (b *Batch) TotalDocSize() int {
+	var s int
+	for k, v := range b.IndexOps {
+		if v != nil {
+			s += v.Size() + size.SizeOfString
+		}
+		s += len(k)
+	}
+	return s
 }
 
 // Optimizable represents an optional interface that implementable by

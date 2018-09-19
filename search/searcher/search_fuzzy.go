@@ -53,31 +53,39 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string,
 func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 	fuzziness int, field, prefixTerm string) (rv []string, err error) {
 	rv = make([]string, 0)
+
+	// in case of advanced reader implementations directly call
+	// the levenshtein automaton based iterator to collect the
+	// candidate terms
+	if ir, ok := indexReader.(index.IndexReaderFuzzy); ok {
+		fieldDict, err := ir.FieldDictFuzzy(field, term, fuzziness, prefixTerm)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if cerr := fieldDict.Close(); cerr != nil && err == nil {
+				err = cerr
+			}
+		}()
+		tfd, err := fieldDict.Next()
+		for err == nil && tfd != nil {
+			rv = append(rv, tfd.Term)
+			if tooManyClauses(len(rv)) {
+				return nil, tooManyClausesErr()
+			}
+			tfd, err = fieldDict.Next()
+		}
+		return rv, err
+	}
+
 	var fieldDict index.FieldDict
 	if len(prefixTerm) > 0 {
 		fieldDict, err = indexReader.FieldDictPrefix(field, []byte(prefixTerm))
 	} else {
-		// in case of advanced reader implementations directly call
-		// the levenshtein automaton based iterator to collect the
-		// candidate terms
-		if ir, ok := indexReader.(index.IndexReaderFuzzy); ok {
-			fieldDict, err = ir.FieldDictFuzzy(field, []byte(term), fuzziness)
-			if err != nil {
-				return rv, err
-			}
-			defer func() {
-				if cerr := fieldDict.Close(); cerr != nil && err == nil {
-					err = cerr
-				}
-			}()
-			tfd, err := fieldDict.Next()
-			for err == nil && tfd != nil {
-				rv = append(rv, tfd.Term)
-				tfd, err = fieldDict.Next()
-			}
-			return rv, err
-		}
 		fieldDict, err = indexReader.FieldDict(field)
+	}
+	if err != nil {
+		return nil, err
 	}
 	defer func() {
 		if cerr := fieldDict.Close(); cerr != nil && err == nil {
@@ -95,7 +103,7 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 		if !exceeded && ld <= fuzziness {
 			rv = append(rv, tfd.Term)
 			if tooManyClauses(len(rv)) {
-				return rv, tooManyClausesErr()
+				return nil, tooManyClausesErr()
 			}
 		}
 		tfd, err = fieldDict.Next()

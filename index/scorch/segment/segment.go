@@ -17,6 +17,7 @@ package segment
 import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index"
+	"github.com/couchbase/vellum"
 )
 
 // DocumentFieldValueVisitor defines a callback to be visited for each
@@ -51,8 +52,8 @@ type TermDictionary interface {
 	Iterator() DictionaryIterator
 	PrefixIterator(prefix string) DictionaryIterator
 	RangeIterator(start, end string) DictionaryIterator
-	RegexpIterator(regex string) DictionaryIterator
-	FuzzyIterator(term string, fuzziness int) DictionaryIterator
+	AutomatonIterator(a vellum.Automaton,
+		startKeyInclusive, endKeyExclusive []byte) DictionaryIterator
 	OnlyIterator(onlyTerms [][]byte, includeCount bool) DictionaryIterator
 }
 
