@@ -22,13 +22,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"errors"
+	"container/list"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
-	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/boltdb/bolt"
@@ -50,6 +51,10 @@ type Scorch struct {
 	path          string
 
 	unsafeBatch bool
+	memLock        sync.RWMutex
+	activeMemTable *MemTable
+	immutableMemTables *list.List
+	memTableQueue  chan *MemTable
 
 	rootLock             sync.RWMutex
 	root                 *IndexSnapshot // holds 1 ref-count on the root
@@ -98,6 +103,9 @@ func NewScorch(storeName string,
 		config:               config,
 		analysisQueue:        analysisQueue,
 		nextSnapshotEpoch:    1,
+		activeMemTable:       getMemTable(),
+		immutableMemTables:   list.New(),
+		memTableQueue:        make(chan *MemTable, 100000),
 		closeCh:              make(chan struct{}),
 		ineligibleForRemoval: map[string]bool{},
 	}
@@ -169,6 +177,10 @@ func (s *Scorch) Open() error {
 		go s.persisterLoop()
 		s.asyncTasks.Add(1)
 		go s.mergerLoop()
+		s.asyncTasks.Add(1)
+		go s.flushLoop()
+		s.asyncTasks.Add(1)
+		go s.writeLoop()
 	}
 
 	return nil
@@ -337,39 +349,48 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	defer atomic.AddUint64(&s.iStats.analysisBytesRemoved, uint64(totalAnalysisSize))
 
 	atomic.AddUint64(&s.stats.TotAnalysisTime, uint64(time.Since(start)))
-
-	indexStart := time.Now()
-
-	// notify handlers that we're about to introduce a segment
-	s.fireEvent(EventKindBatchIntroductionStart, 0)
-
-	var newSegment segment.Segment
-	var bufBytes uint64
-	if len(analysisResults) > 0 {
-		newSegment, bufBytes, err = zap.AnalysisResultsToSegmentBase(analysisResults, DefaultChunkFactor)
-		if err != nil {
-			return err
-		}
-		atomic.AddUint64(&s.iStats.newSegBufBytesAdded, bufBytes)
-	} else {
-		atomic.AddUint64(&s.stats.TotBatchesEmpty, 1)
+	memTable := getMemTable()
+	if !memTable.AddDocuments(ids, analysisResults, batch.InternalOps, numUpdates, numDeletes, numPlainTextBytes, uint64(totalAnalysisSize)) {
+		return errors.New("write documents failed")
 	}
-
-	err = s.prepareSegment(newSegment, ids, batch.InternalOps)
-	if err != nil {
-		if newSegment != nil {
-			_ = newSegment.Close()
-		}
-		atomic.AddUint64(&s.stats.TotOnErrors, 1)
-	} else {
-		atomic.AddUint64(&s.stats.TotUpdates, numUpdates)
-		atomic.AddUint64(&s.stats.TotDeletes, numDeletes)
-		atomic.AddUint64(&s.stats.TotBatches, 1)
-		atomic.AddUint64(&s.stats.TotIndexedPlainTextBytes, numPlainTextBytes)
-	}
-
-	atomic.AddUint64(&s.iStats.newSegBufBytesRemoved, bufBytes)
-	atomic.AddUint64(&s.stats.TotIndexTime, uint64(time.Since(indexStart)))
+    select {
+    case s.memTableQueue <- memTable:
+    case <-time.After(time.Millisecond * 10):
+    	err = errors.New("memtable full!!!!!!")
+    	return
+    }
+	//indexStart := time.Now()
+	//
+	//// notify handlers that we're about to introduce a segment
+	//s.fireEvent(EventKindBatchIntroductionStart, 0)
+	//
+	//var newSegment segment.Segment
+	//var bufBytes uint64
+	//if len(analysisResults) > 0 {
+	//	newSegment, bufBytes, err = zap.AnalysisResultsToSegmentBase(analysisResults, DefaultChunkFactor)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	atomic.AddUint64(&s.iStats.newSegBufBytesAdded, bufBytes)
+	//} else {
+	//	atomic.AddUint64(&s.stats.TotBatchesEmpty, 1)
+	//}
+	//
+	//err = s.prepareSegment(newSegment, ids, batch.InternalOps)
+	//if err != nil {
+	//	if newSegment != nil {
+	//		_ = newSegment.Close()
+	//	}
+	//	atomic.AddUint64(&s.stats.TotOnErrors, 1)
+	//} else {
+	//	atomic.AddUint64(&s.stats.TotUpdates, numUpdates)
+	//	atomic.AddUint64(&s.stats.TotDeletes, numDeletes)
+	//	atomic.AddUint64(&s.stats.TotBatches, 1)
+	//	atomic.AddUint64(&s.stats.TotIndexedPlainTextBytes, numPlainTextBytes)
+	//}
+	//
+	//atomic.AddUint64(&s.iStats.newSegBufBytesRemoved, bufBytes)
+	//atomic.AddUint64(&s.stats.TotIndexTime, uint64(time.Since(indexStart)))
 
 	return err
 }

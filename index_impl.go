@@ -242,8 +242,8 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 		return ErrorEmptyID
 	}
 
-	i.mutex.RLock()
-	defer i.mutex.RUnlock()
+	//i.mutex.RLock()
+	//defer i.mutex.RUnlock()
 
 	if !i.open {
 		return ErrorIndexClosed
