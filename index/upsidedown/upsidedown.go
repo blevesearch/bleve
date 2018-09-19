@@ -427,8 +427,8 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	close(resultChan)
 	atomic.AddUint64(&udc.stats.analysisTime, uint64(time.Since(analysisStart)))
 
-	udc.writeMutex.Lock()
-	defer udc.writeMutex.Unlock()
+	//udc.writeMutex.Lock()
+	//defer udc.writeMutex.Unlock()
 
 	// open a reader for backindex lookup
 	var kvreader store.KVReader
@@ -824,8 +824,8 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	docBackIndexRowErr := error(nil)
 	docBackIndexRowCh := make(chan *docBackIndexRow, len(batch.IndexOps))
 
-	udc.writeMutex.Lock()
-	defer udc.writeMutex.Unlock()
+	//udc.writeMutex.Lock()
+	//defer udc.writeMutex.Unlock()
 
 	go func() {
 		defer close(docBackIndexRowCh)
