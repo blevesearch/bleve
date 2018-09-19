@@ -36,3 +36,4 @@ func (w *Writer) Close() error {
 	//w.options.Destroy()
 	return nil
 }
+

@@ -128,6 +128,7 @@ func (s *Store) Writer() (store.KVWriter, error) {
 }
 
 func (s *Store) Compact() error {
+	// TODO
 	s.db.CompactRange(gorocksdb.Range{})
 	return nil
 }

@@ -73,6 +73,11 @@ func applyConfig(o *gorocksdb.Options, config map[string]interface{}) (
 		o.SetCompression(gorocksdb.CompressionType(int(c)))
 	}
 
+	disComp, ok := config["disable_auto_compactions"].(bool)
+	if ok {
+		o.SetDisableAutoCompactions(disComp)
+	}
+
 	mltc, ok := config["min_level_to_compress"].(float64)
 	if ok {
 		o.SetMinLevelToCompress(int(mltc))
