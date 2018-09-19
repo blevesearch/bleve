@@ -22,7 +22,6 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/blevesearch/bleve/index/scorch/segment/zap"
-	"fmt"
 )
 
 var defaultMaxSize uint64 = 64 * 1000 * 1000   // 64M
@@ -131,7 +130,6 @@ func (s *Scorch) pushToFlushList(m *MemTable) {
 		s.memLock.Lock()
 		if s.immutableMemTables.Len() > 10 {
 			s.memLock.Unlock()
-			fmt.Println("memtbale full !!!!, need flush")
 			time.Sleep(time.Millisecond * 10)
 			continue
 		}
