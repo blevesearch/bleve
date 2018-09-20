@@ -440,12 +440,13 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	// first we lookup the backindex row for the doc id if it exists
 	// lookup the back index row
 	var backIndexRow *BackIndexRow
-	backIndexRow, err = backIndexRowForDoc(kvreader, index.IndexInternalID(doc.ID))
-	if err != nil {
-		_ = kvreader.Close()
-		atomic.AddUint64(&udc.stats.errors, 1)
-		return
-	}
+	// For Test
+	//backIndexRow, err = backIndexRowForDoc(kvreader, index.IndexInternalID(doc.ID))
+	//if err != nil {
+	//	_ = kvreader.Close()
+	//	atomic.AddUint64(&udc.stats.errors, 1)
+	//	return
+	//}
 
 	err = kvreader.Close()
 	if err != nil {
