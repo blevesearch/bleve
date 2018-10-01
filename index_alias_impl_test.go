@@ -1253,6 +1253,10 @@ func (i *stubIndex) Index(id string, data interface{}) error {
 	return i.err
 }
 
+func (i *stubIndex) IndexAdvanced(doc *document.Document) error {
+	return i.err
+}
+
 func (i *stubIndex) Delete(id string) error {
 	return i.err
 }

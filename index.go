@@ -199,6 +199,10 @@ type Index interface {
 	// requests. See Index interface documentation for details about mapping
 	// rules.
 	Index(id string, data interface{}) error
+	// IndexAdvanced takes a document.Document object skips the mapping and
+	// indexes it without further analysis.
+	IndexAdvanced(doc *document.Document) error
+
 	Delete(id string) error
 
 	NewBatch() *Batch
