@@ -41,18 +41,20 @@ const defaultDateTimeParser = optional.Name
 // If no mapping was determined for that type,
 // a DefaultMapping will be used.
 type IndexMappingImpl struct {
-	TypeMapping           map[string]*DocumentMapping `json:"types,omitempty"`
-	DefaultMapping        *DocumentMapping            `json:"default_mapping"`
-	TypeField             string                      `json:"type_field"`
-	DefaultType           string                      `json:"default_type"`
-	DefaultAnalyzer       string                      `json:"default_analyzer"`
-	DefaultDateTimeParser string                      `json:"default_datetime_parser"`
-	DefaultField          string                      `json:"default_field"`
-	StoreDynamic          bool                        `json:"store_dynamic"`
-	IndexDynamic          bool                        `json:"index_dynamic"`
-	DocValuesDynamic      bool                        `json:"docvalues_dynamic,omitempty"`
-	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
-	cache                 *registry.Cache
+	TypeMapping               map[string]*DocumentMapping `json:"types,omitempty"`
+	DefaultMapping            *DocumentMapping            `json:"default_mapping"`
+	TypeField                 string                      `json:"type_field"`
+	DefaultType               string                      `json:"default_type"`
+	DefaultAnalyzer           string                      `json:"default_analyzer"`
+	DefaultDateTimeParser     string                      `json:"default_datetime_parser"`
+	DefaultField              string                      `json:"default_field"`
+	StoreDynamic              bool                        `json:"store_dynamic"`
+	IndexDynamic              bool                        `json:"index_dynamic"`
+	IncludeTermVectorsDynamic bool                        `json:"include_term_vectors_dynamic"`
+	IncludeInAllDynamic       bool                        `json:"include_in_all_dynamic"`
+	DocValuesDynamic          bool                        `json:"docvalues_dynamic,omitempty"`
+	CustomAnalysis            *customAnalysis             `json:"analysis,omitempty"`
+	cache                     *registry.Cache
 }
 
 // AddCustomCharFilter defines a custom char filter for use in this mapping
