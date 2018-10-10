@@ -669,7 +669,42 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				},
 				nil),
 		},
-
+		{
+			input:   `somevalue:true`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					func() Query {
+						q := NewBoolFieldQuery(true)
+						q.SetField("somevalue")
+						return q
+					}(),
+				}, nil),
+		},
+		{
+			input:   `anothervalue:false`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					func() Query {
+						q := NewBoolFieldQuery(false)
+						q.SetField("anothervalue")
+						return q
+					}(),
+				}, nil),
+		},
+		{
+			input:   `true`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					NewMatchQuery("true"),
+				},
+				nil),
+		},
 		// tests for escaping
 
 		// escape : as field delimeter

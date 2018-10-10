@@ -114,6 +114,9 @@ func startState(l *queryStringLex, next rune, eof bool) (lexState, bool) {
 		return inBoostState, true
 	case '~':
 		return inTildeState, true
+	case 't', 'f': // true, or false
+		l.buf += string(next)
+		return inBoolOrStrState, true
 	}
 
 	switch {
@@ -245,6 +248,23 @@ func inTildeState(l *queryStringLex, next rune, eof bool) (lexState, bool) {
 	}
 
 	return inTildeState, true
+}
+
+func inBoolOrStrState(l *queryStringLex, next rune, eof bool) (lexState, bool) {
+	l.buf += string(next)
+	if l.buf == "false" || l.buf == "true" {
+		l.nextTokenType = tBOOLEAN
+		l.nextToken = &yySymType{
+			s: l.buf,
+			b: l.buf == "true",
+		}
+		logDebugTokens("BOOL - '%s'", l.nextToken.s)
+		l.reset()
+		return startState, true
+	} else if strings.HasPrefix("false", l.buf) || strings.HasPrefix("true", l.buf) {
+		return inBoolOrStrState, true
+	}
+	return inStrState, true
 }
 
 func inNumOrStrState(l *queryStringLex, next rune, eof bool) (lexState, bool) {

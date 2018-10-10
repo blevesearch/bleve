@@ -19,10 +19,11 @@ s string
 n int
 f float64
 q Query
+b bool
 pf *float64}
 
 %token tSTRING tPHRASE tPLUS tMINUS tCOLON tBOOST tNUMBER tSTRING tGREATER tLESS
-tEQUAL tTILDE
+tEQUAL tTILDE tBOOLEAN
 
 %type <s>                tSTRING
 %type <s>                tPHRASE
@@ -30,6 +31,7 @@ tEQUAL tTILDE
 %type <s>                posOrNegNumber
 %type <s>                tTILDE
 %type <s>                tBOOST
+%type <b>                tBOOLEAN
 %type <q>                searchBase
 %type <pf>                searchSuffix
 %type <n>                searchPrefix
@@ -140,6 +142,17 @@ tNUMBER {
 	$$ = q
 }
 |
+tBOOLEAN {
+	// parsing true/false token outside of a field context, 
+	// turns back into a plain string match
+	logDebugGrammar("STRING - %v", $1)
+	if $1 {
+		$$ = NewMatchQuery("true")
+	} else {
+		$$ = NewMatchQuery("false")
+	}
+}
+|
 tPHRASE {
 	phrase := $1
 	logDebugGrammar("PHRASE - %s", phrase)
@@ -178,6 +191,15 @@ tSTRING tCOLON posOrNegNumber {
 	q2.SetField(field)
 	q := NewDisjunctionQuery([]Query{q1,q2})
 	q.queryStringMode = true
+	$$ = q
+}
+|
+tSTRING tCOLON tBOOLEAN {
+	field := $1
+	value := $3
+	logDebugGrammar("FIELD - %s BOOL - %v", field, value)
+	q := NewBoolFieldQuery(value)
+	q.SetField(field);
 	$$ = q
 }
 |
