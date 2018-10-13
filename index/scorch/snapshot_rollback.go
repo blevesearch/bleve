@@ -19,7 +19,7 @@ import (
 	"log"
 
 	"github.com/blevesearch/bleve/index/scorch/segment"
-	"github.com/boltdb/bolt"
+	bolt "go.etcd.io/bbolt"
 )
 
 type RollbackPoint struct {
