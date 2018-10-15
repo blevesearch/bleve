@@ -52,7 +52,7 @@ func (i *IndexSnapshotFieldDict) Pop() interface{} {
 }
 
 func (i *IndexSnapshotFieldDict) Next() (*index.DictEntry, error) {
-	if len(i.cursors) <= 0 {
+	if len(i.cursors) == 0 {
 		return nil, nil
 	}
 	i.entry = i.cursors[0].curr

@@ -584,7 +584,7 @@ func (tfr *TermFrequencyRow) parseK(key []byte) error {
 
 func (tfr *TermFrequencyRow) parseKDoc(key []byte, term []byte) error {
 	tfr.doc = key[3+len(term)+1:]
-	if len(tfr.doc) <= 0 {
+	if len(tfr.doc) == 0 {
 		return fmt.Errorf("invalid term frequency key, empty docid")
 	}
 

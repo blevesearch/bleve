@@ -253,7 +253,7 @@ func testVersusSearches(vt *VersusTest, searchTemplates []string, idxA, idxB ble
 		// definitely find at least one document.
 		"bodyWord": func(i int) string {
 			body := vt.Bodies[vt.CurAttempt%len(vt.Bodies)]
-			if len(body) <= 0 {
+			if len(body) == 0 {
 				return ""
 			}
 			return body[i%len(body)]
@@ -324,10 +324,10 @@ func testVersusSearches(vt *VersusTest, searchTemplates []string, idxA, idxB ble
 			hitsB := hitsById(resB)
 			for id, hitA := range hitsA {
 				hitB := hitsB[id]
-				if len(hitA.FieldTermLocations) <= 0 {
+				if len(hitA.FieldTermLocations) == 0 {
 					hitA.FieldTermLocations = nil
 				}
-				if len(hitB.FieldTermLocations) <= 0 {
+				if len(hitB.FieldTermLocations) == 0 {
 					hitB.FieldTermLocations = nil
 				}
 				if !reflect.DeepEqual(hitA, hitB) {
@@ -338,10 +338,10 @@ func testVersusSearches(vt *VersusTest, searchTemplates []string, idxA, idxB ble
 			}
 			for id, hitB := range hitsB {
 				hitA := hitsA[id]
-				if len(hitA.FieldTermLocations) <= 0 {
+				if len(hitA.FieldTermLocations) == 0 {
 					hitA.FieldTermLocations = nil
 				}
-				if len(hitB.FieldTermLocations) <= 0 {
+				if len(hitB.FieldTermLocations) == 0 {
 					hitB.FieldTermLocations = nil
 				}
 				if !reflect.DeepEqual(hitA, hitB) {
