@@ -269,15 +269,12 @@ func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
 }
 
 func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
-	// perform in-memory merging only when there is no memory pressure
-	if s.paused() == 0 {
-		persisted, err := s.persistSnapshotMaybeMerge(snapshot)
-		if err != nil {
-			return err
-		}
-		if persisted {
-			return nil
-		}
+	persisted, err := s.persistSnapshotMaybeMerge(snapshot)
+	if err != nil {
+		return err
+	}
+	if persisted {
+		return nil
 	}
 
 	return s.persistSnapshotDirect(snapshot)
