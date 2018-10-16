@@ -40,6 +40,10 @@ var DefaultPersisterNapTimeMSec int = 2000 // ms
 
 var DefaultPersisterNapUnderNumFiles int = 1000
 
+var DefaultActiveMergeMemorySegments bool = true
+
+var DefaultMemoryPressurePauseThreshold int = 0
+
 type persisterOptions struct {
 	// PersisterNapTimeMSec controls the wait/delay injected into
 	// persistence workloop to improve the chances for
@@ -51,6 +55,22 @@ type persisterOptions struct {
 	// PersisterNapTimeMSec amount of time to improve the chances for
 	// a healthier and heavier in-memory merging
 	PersisterNapUnderNumFiles int
+
+	// ActiveMergeMemorySegments controls the merge behavior of the
+	// persister for memory segments. If enabled, the persister will always
+	// merge the memory segments at root before flushing to disk.
+	// Once disabled, the persister will skip the merge of memory segments
+	// when there is a memory pressure detected at the application level.
+	// This helps in better adherence to the set memory quota.
+	ActiveMergeMemorySegments bool
+
+	// MemoryPressurePauseThreshold let persister to have a better leeway
+	// for prudently performing the memory merge of segments on a memory
+	// pressure situtation. Here the pause config value is an upper threshold
+	// for the number of paused application threads. The default value would
+	// be zero to favour the total skipping of memory segments merge during
+	// such a situation.
+	MemoryPressurePauseThreshold int
 }
 
 type notificationChan chan struct{}
@@ -103,7 +123,7 @@ OUTER:
 		if ourSnapshot != nil {
 			startTime := time.Now()
 
-			err := s.persistSnapshot(ourSnapshot)
+			err := s.persistSnapshot(ourSnapshot, po)
 			for _, ch := range ourPersisted {
 				if err != nil {
 					ch <- err
@@ -251,8 +271,10 @@ OUTER:
 
 func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
 	po := persisterOptions{
-		PersisterNapTimeMSec:      DefaultPersisterNapTimeMSec,
-		PersisterNapUnderNumFiles: DefaultPersisterNapUnderNumFiles,
+		PersisterNapTimeMSec:         DefaultPersisterNapTimeMSec,
+		PersisterNapUnderNumFiles:    DefaultPersisterNapUnderNumFiles,
+		ActiveMergeMemorySegments:    DefaultActiveMergeMemorySegments,
+		MemoryPressurePauseThreshold: DefaultMemoryPressurePauseThreshold,
 	}
 	if v, ok := s.config["scorchPersisterOptions"]; ok {
 		b, err := json.Marshal(v)
@@ -268,13 +290,21 @@ func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
 	return &po, nil
 }
 
-func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
-	persisted, err := s.persistSnapshotMaybeMerge(snapshot)
-	if err != nil {
-		return err
-	}
-	if persisted {
-		return nil
+func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
+	po *persisterOptions) error {
+	// With ActiveMergeMemorySegments disabled, perform in-memory segment
+	// merging only when the memory pressure is below the configured,
+	// threshold else persister always performs the memory segments merge
+	// before persistence.
+	if po.ActiveMergeMemorySegments ||
+		s.paused() <= uint64(po.MemoryPressurePauseThreshold) {
+		persisted, err := s.persistSnapshotMaybeMerge(snapshot)
+		if err != nil {
+			return err
+		}
+		if persisted {
+			return nil
+		}
 	}
 
 	return s.persistSnapshotDirect(snapshot)
