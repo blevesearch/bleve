@@ -112,7 +112,7 @@ OUTER:
 			}
 			if err != nil {
 				atomic.StoreUint64(&s.iStats.persistEpoch, 0)
-				if err == ErrClosed {
+				if err == segment.ErrClosed {
 					// index has been closed
 					_ = ourSnapshot.DecRef()
 					break OUTER
@@ -497,15 +497,13 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 
 		select {
 		case <-s.closeCh:
-			err = ErrClosed
-			return err
+			return segment.ErrClosed
 		case s.persists <- persist:
 		}
 
 		select {
 		case <-s.closeCh:
-			err = ErrClosed
-			return err
+			return segment.ErrClosed
 		case <-persist.applied:
 		}
 	}

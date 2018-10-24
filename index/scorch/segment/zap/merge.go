@@ -24,6 +24,7 @@ import (
 	"sort"
 
 	"github.com/RoaringBitmap/roaring"
+	seg "github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/couchbase/vellum"
 	"github.com/golang/snappy"
 )
@@ -37,17 +38,17 @@ const docDropped = math.MaxUint64 // sentinel docNum to represent a deleted doc
 // remaining data.  This new segment is built at the specified path,
 // with the provided chunkFactor.
 func Merge(segments []*Segment, drops []*roaring.Bitmap, path string,
-	chunkFactor uint32) ([][]uint64, uint64, error) {
+	chunkFactor uint32, closeCh chan struct{}) ([][]uint64, uint64, error) {
 	segmentBases := make([]*SegmentBase, len(segments))
 	for segmenti, segment := range segments {
 		segmentBases[segmenti] = &segment.SegmentBase
 	}
 
-	return MergeSegmentBases(segmentBases, drops, path, chunkFactor)
+	return MergeSegmentBases(segmentBases, drops, path, chunkFactor, closeCh)
 }
 
 func MergeSegmentBases(segmentBases []*SegmentBase, drops []*roaring.Bitmap, path string,
-	chunkFactor uint32) ([][]uint64, uint64, error) {
+	chunkFactor uint32, closeCh chan struct{}) ([][]uint64, uint64, error) {
 	flag := os.O_RDWR | os.O_CREATE
 
 	f, err := os.OpenFile(path, flag, 0600)
@@ -67,7 +68,7 @@ func MergeSegmentBases(segmentBases []*SegmentBase, drops []*roaring.Bitmap, pat
 	cr := NewCountHashWriter(br)
 
 	newDocNums, numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset, _, _, _, err :=
-		MergeToWriter(segmentBases, drops, chunkFactor, cr)
+		MergeToWriter(segmentBases, drops, chunkFactor, cr, closeCh)
 	if err != nil {
 		cleanup()
 		return nil, 0, err
@@ -102,7 +103,7 @@ func MergeSegmentBases(segmentBases []*SegmentBase, drops []*roaring.Bitmap, pat
 }
 
 func MergeToWriter(segments []*SegmentBase, drops []*roaring.Bitmap,
-	chunkFactor uint32, cr *CountHashWriter) (
+	chunkFactor uint32, cr *CountHashWriter, closeCh chan struct{}) (
 	newDocNums [][]uint64,
 	numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset uint64,
 	dictLocs []uint64, fieldsInv []string, fieldsMap map[string]uint16,
@@ -114,16 +115,21 @@ func MergeToWriter(segments []*SegmentBase, drops []*roaring.Bitmap,
 	fieldsMap = mapFields(fieldsInv)
 
 	numDocs = computeNewDocCount(segments, drops)
+
+	if isClosed(closeCh) {
+		return nil, 0, 0, 0, 0, nil, nil, nil, seg.ErrClosed
+	}
+
 	if numDocs > 0 {
 		storedIndexOffset, newDocNums, err = mergeStoredAndRemap(segments, drops,
-			fieldsMap, fieldsInv, fieldsSame, numDocs, cr)
+			fieldsMap, fieldsInv, fieldsSame, numDocs, cr, closeCh)
 		if err != nil {
 			return nil, 0, 0, 0, 0, nil, nil, nil, err
 		}
 
 		dictLocs, docValueOffset, err = persistMergedRest(segments, drops,
 			fieldsInv, fieldsMap, fieldsSame,
-			newDocNums, numDocs, chunkFactor, cr)
+			newDocNums, numDocs, chunkFactor, cr, closeCh)
 		if err != nil {
 			return nil, 0, 0, 0, 0, nil, nil, nil, err
 		}
@@ -165,7 +171,7 @@ func computeNewDocCount(segments []*SegmentBase, drops []*roaring.Bitmap) uint64
 func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 	fieldsInv []string, fieldsMap map[string]uint16, fieldsSame bool,
 	newDocNumsIn [][]uint64, newSegDocCount uint64, chunkFactor uint32,
-	w *CountHashWriter) ([]uint64, uint64, error) {
+	w *CountHashWriter, closeCh chan struct{}) ([]uint64, uint64, error) {
 
 	var bufMaxVarintLen64 []byte = make([]byte, binary.MaxVarintLen64)
 	var bufLoc []uint64
@@ -200,6 +206,12 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 		var segmentsInFocus []*SegmentBase
 
 		for segmentI, segment := range segments {
+
+			// check for the closure in meantime
+			if isClosed(closeCh) {
+				return nil, 0, seg.ErrClosed
+			}
+
 			dict, err2 := segment.dictionary(fieldName)
 			if err2 != nil {
 				return nil, 0, err2
@@ -277,6 +289,11 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 			term, itrI, postingsOffset := enumerator.Current()
 
 			if !bytes.Equal(prevTerm, term) {
+				// check for the closure in meantime
+				if isClosed(closeCh) {
+					return nil, 0, seg.ErrClosed
+				}
+
 				// if the term changed, write out the info collected
 				// for the previous term
 				err = finishTerm(prevTerm)
@@ -353,6 +370,11 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 		fdvReadersAvailable := false
 		var dvIterClone *docValueReader
 		for segmentI, segment := range segmentsInFocus {
+			// check for the closure in meantime
+			if isClosed(closeCh) {
+				return nil, 0, seg.ErrClosed
+			}
+
 			fieldIDPlus1 := uint16(segment.fieldsMap[fieldName])
 			if dvIter, exists := segment.fieldDvReaders[fieldIDPlus1-1]; exists &&
 				dvIter != nil {
@@ -576,7 +598,7 @@ type varintEncoder func(uint64) (int, error)
 
 func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 	fieldsMap map[string]uint16, fieldsInv []string, fieldsSame bool, newSegDocCount uint64,
-	w *CountHashWriter) (uint64, [][]uint64, error) {
+	w *CountHashWriter, closeCh chan struct{}) (uint64, [][]uint64, error) {
 	var rv [][]uint64 // The remapped or newDocNums for each segment.
 
 	var newDocNum uint64
@@ -603,6 +625,11 @@ func mergeStoredAndRemap(segments []*SegmentBase, drops []*roaring.Bitmap,
 
 	// for each segment
 	for segI, segment := range segments {
+		// check for the closure in meantime
+		if isClosed(closeCh) {
+			return 0, nil, seg.ErrClosed
+		}
+
 		segNewDocNums := make([]uint64, segment.numDocs)
 
 		dropsI := drops[segI]
@@ -813,4 +840,13 @@ func mergeFields(segments []*SegmentBase) (bool, []string) {
 	sort.Strings(rv[1:]) // leave _id as first
 
 	return fieldsSame, rv
+}
+
+func isClosed(closeCh chan struct{}) bool {
+	select {
+	case <-closeCh:
+		return true
+	default:
+		return false
+	}
 }

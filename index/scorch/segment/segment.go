@@ -15,10 +15,14 @@
 package segment
 
 import (
+	"fmt"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index"
 	"github.com/couchbase/vellum"
 )
+
+var ErrClosed = fmt.Errorf("index closed")
 
 // DocumentFieldValueVisitor defines a callback to be visited for each
 // stored field value.  The return value determines if the visitor
