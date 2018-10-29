@@ -97,7 +97,7 @@ type DocumentMatch struct {
 
 	// Fields contains the values for document fields listed in
 	// SearchRequest.Fields. Text fields are returned as strings, numeric
-	// fields as float64s, boolean fiels as bools, and date fields as
+	// fields as float64s, boolean fields as bools, and date fields as
 	// time.RFC3339 formatted strings.
 	// If there is more than one value for a field,
 	// Fields will return a []interface{}, and the client will have to cast each
@@ -106,7 +106,7 @@ type DocumentMatch struct {
 
 	// FieldArrayPositions is a companion map to Fields which returns the array positions
 	// corresponding to each element in Fields.
-	FieldArrayPositions map[string][]ArrayPositions
+	FieldArrayPositions map[string][]ArrayPositions `json:"field_array_positions,omitempty"`
 
 	// if we load the document for this hit, remember it so we dont load again
 	Document *document.Document `json:"-"`
