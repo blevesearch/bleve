@@ -104,7 +104,7 @@ func (b *Batch) DeleteInternal(key []byte) {
 // Size returns the total number of operations inside the batch
 // including normal index operations and internal operations.
 func (b *Batch) Size() int {
-	return len(b.internal.IndexOps) + len(b.internal.InternalOps)
+	return b.internal.IndexOps.Len() + b.internal.InternalOps.Len()
 }
 
 // String prints a user friendly string representation of what

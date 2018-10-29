@@ -115,7 +115,7 @@ func CommonBenchmarkIndexBatch(b *testing.B, storeName string, storeConfig map[s
 		batch := index.NewBatch()
 		for j := 0; j < 1000; j++ {
 			if j%batchSize == 0 {
-				if len(batch.IndexOps) > 0 {
+				if batch.IndexOps.Len() > 0 {
 					err := idx.Batch(batch)
 					if err != nil {
 						b.Fatal(err)
@@ -129,7 +129,7 @@ func CommonBenchmarkIndexBatch(b *testing.B, storeName string, storeConfig map[s
 			batch.Update(indexDocument)
 		}
 		// close last batch
-		if len(batch.IndexOps) > 0 {
+		if batch.IndexOps.Len() > 0 {
 			err := idx.Batch(batch)
 			if err != nil {
 				b.Fatal(err)

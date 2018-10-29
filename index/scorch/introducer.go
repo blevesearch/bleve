@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 )
@@ -28,7 +29,7 @@ type segmentIntroduction struct {
 	data      segment.Segment
 	obsoletes map[uint64]*roaring.Bitmap
 	ids       []string
-	internal  map[string][]byte
+	internal  *index.InternalOpsMap
 
 	applied   chan error
 	persisted chan error
@@ -200,13 +201,14 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		newSnapshot.internal[key] = oldVal
 	}
 	// set new values and apply deletes
-	for key, newVal := range next.internal {
+	next.internal.Range(func(key string, newVal []byte) bool {
 		if newVal != nil {
 			newSnapshot.internal[key] = newVal
 		} else {
 			delete(newSnapshot.internal, key)
 		}
-	}
+		return true
+	})
 
 	newSnapshot.updateSize()
 	s.rootLock.Lock()

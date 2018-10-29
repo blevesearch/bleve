@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index/store"
@@ -248,75 +249,189 @@ type DocIDReader interface {
 	Close() error
 }
 
+type IndexOpsMap struct {
+	sync.RWMutex
+	m map[string]*document.Document
+}
+
+func (m *IndexOpsMap) Delete(key string) {
+	m.Lock()
+	defer m.Unlock()
+	delete(m.m, key)
+}
+
+func (m *IndexOpsMap) Load(key string) (*document.Document, bool) {
+	m.RLock()
+	defer m.RUnlock()
+
+	v, ok := m.m[key]
+	return v, ok
+}
+
+func (m *IndexOpsMap) Range(f func(key string, value *document.Document) bool) {
+	m.RLock()
+	_m := m.m
+	m.RUnlock()
+
+	for k, v := range _m {
+		if f(k, v) == false {
+			break
+		}
+	}
+}
+
+func (m *IndexOpsMap) Store(key string, value *document.Document) {
+	m.Lock()
+	defer m.Unlock()
+
+	m.m[key] = value
+}
+
+func (m *IndexOpsMap) Len() int {
+	m.RLock()
+	defer m.RUnlock()
+
+	return len(m.m)
+}
+
+func (m *IndexOpsMap) reset() {
+	m.Lock()
+	defer m.Unlock()
+
+	m.m = make(map[string]*document.Document)
+}
+
+type InternalOpsMap struct {
+	sync.RWMutex
+	m map[string][]byte
+}
+
+func (m *InternalOpsMap) Delete(key string) {
+	m.Lock()
+	defer m.Unlock()
+
+	delete(m.m, key)
+}
+
+func (m *InternalOpsMap) Load(key string) ([]byte, bool) {
+	m.RLock()
+	defer m.RUnlock()
+
+	v, ok := m.m[key]
+	return v, ok
+}
+
+func (m *InternalOpsMap) Range(f func(key string, value []byte) bool) {
+	m.RLock()
+	_m := m.m
+	m.RUnlock()
+
+	for k, v := range _m {
+		if f(k, v) == false {
+			break
+		}
+	}
+}
+func (m *InternalOpsMap) Store(key string, value []byte) {
+	m.Lock()
+	defer m.Unlock()
+
+	m.m[key] = value
+}
+
+func (m *InternalOpsMap) Len() int {
+	m.RLock()
+	defer m.RUnlock()
+
+	return len(m.m)
+}
+
+func (m *InternalOpsMap) reset() {
+	m.Lock()
+	defer m.Unlock()
+
+	m.m = make(map[string][]byte)
+}
+
 type Batch struct {
-	IndexOps    map[string]*document.Document
-	InternalOps map[string][]byte
+	IndexOps    IndexOpsMap
+	InternalOps InternalOpsMap
 }
 
 func NewBatch() *Batch {
 	return &Batch{
-		IndexOps:    make(map[string]*document.Document),
-		InternalOps: make(map[string][]byte),
+		IndexOps: IndexOpsMap{
+			m: make(map[string]*document.Document),
+		},
+		InternalOps: InternalOpsMap{
+			m: make(map[string][]byte),
+		},
 	}
 }
 
 func (b *Batch) Update(doc *document.Document) {
-	b.IndexOps[doc.ID] = doc
+	b.IndexOps.Store(doc.ID, doc)
 }
 
 func (b *Batch) Delete(id string) {
-	b.IndexOps[id] = nil
+	b.IndexOps.Store(id, nil)
 }
 
 func (b *Batch) SetInternal(key, val []byte) {
-	b.InternalOps[string(key)] = val
+	b.InternalOps.Store(string(key), val)
 }
 
 func (b *Batch) DeleteInternal(key []byte) {
-	b.InternalOps[string(key)] = nil
+	b.InternalOps.Store(string(key), nil)
 }
 
 func (b *Batch) String() string {
-	rv := fmt.Sprintf("Batch (%d ops, %d internal ops)\n", len(b.IndexOps), len(b.InternalOps))
-	for k, v := range b.IndexOps {
+	rv := fmt.Sprintf("Batch (%d ops, %d internal ops)\n", b.IndexOps.Len(), b.InternalOps.Len())
+
+	b.IndexOps.Range(func(k string, v *document.Document) bool {
 		if v != nil {
 			rv += fmt.Sprintf("\tINDEX - '%s'\n", k)
 		} else {
 			rv += fmt.Sprintf("\tDELETE - '%s'\n", k)
 		}
-	}
-	for k, v := range b.InternalOps {
+		return true
+	})
+	b.InternalOps.Range(func(k string, v []byte) bool {
 		if v != nil {
 			rv += fmt.Sprintf("\tSET INTERNAL - '%s'\n", k)
 		} else {
 			rv += fmt.Sprintf("\tDELETE INTERNAL - '%s'\n", k)
 		}
-	}
+		return true
+	})
 	return rv
 }
 
 func (b *Batch) Reset() {
-	b.IndexOps = make(map[string]*document.Document)
-	b.InternalOps = make(map[string][]byte)
+	b.IndexOps.reset()
+	b.InternalOps.reset()
 }
 
 func (b *Batch) Merge(o *Batch) {
-	for k, v := range o.IndexOps {
-		b.IndexOps[k] = v
-	}
-	for k, v := range o.InternalOps {
-		b.InternalOps[k] = v
-	}
+	o.IndexOps.Range(func(k string, v *document.Document) bool {
+		b.IndexOps.Store(k, v)
+		return true
+	})
+	o.InternalOps.Range(func(k string, v []byte) bool {
+		b.InternalOps.Store(k, v)
+		return true
+	})
 }
 
 func (b *Batch) TotalDocSize() int {
 	var s int
-	for k, v := range b.IndexOps {
+	b.IndexOps.Range(func(k string, v *document.Document) bool {
 		if v != nil {
 			s += v.Size() + size.SizeOfString
 		}
 		s += len(k)
-	}
+		return true
+	})
 	return s
 }
 

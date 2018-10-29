@@ -291,13 +291,13 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		s.fireEvent(EventKindBatchIntroduction, time.Since(start))
 	}()
 
-	resultChan := make(chan *index.AnalysisResult, len(batch.IndexOps))
+	resultChan := make(chan *index.AnalysisResult, batch.IndexOps.Len())
 
 	var numUpdates uint64
 	var numDeletes uint64
 	var numPlainTextBytes uint64
 	var ids []string
-	for docID, doc := range batch.IndexOps {
+	batch.IndexOps.Range(func(docID string, doc *document.Document) bool {
 		if doc != nil {
 			// insert _id field
 			doc.AddField(document.NewTextFieldCustom("_id", nil, []byte(doc.ID), document.IndexField|document.StoreField, nil))
@@ -307,18 +307,20 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 			numDeletes++
 		}
 		ids = append(ids, docID)
-	}
+		return true
+	})
 
 	// FIXME could sort ids list concurrent with analysis?
 
 	go func() {
-		for _, doc := range batch.IndexOps {
+		batch.IndexOps.Range(func(_ string, doc *document.Document) bool {
 			if doc != nil {
 				aw := index.NewAnalysisWork(s, doc, resultChan)
 				// put the work on the queue
 				s.analysisQueue.Queue(aw)
 			}
-		}
+			return true
+		})
 	}()
 
 	// wait for analysis result
@@ -355,7 +357,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		atomic.AddUint64(&s.stats.TotBatchesEmpty, 1)
 	}
 
-	err = s.prepareSegment(newSegment, ids, batch.InternalOps)
+	err = s.prepareSegment(newSegment, ids, &batch.InternalOps)
 	if err != nil {
 		if newSegment != nil {
 			_ = newSegment.Close()
@@ -375,7 +377,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
-	internalOps map[string][]byte) error {
+	internalOps *index.InternalOpsMap) error {
 
 	// new introduction
 	introduction := &segmentIntroduction{
