@@ -331,10 +331,10 @@ func (s *BooleanSearcher) Advance(ctx *search.SearchContext, ID index.IndexInter
 		}
 	}
 
-	var err error
-	// Advance nested searcher(s) only if the cursor is trailing the lookup ID
-	if s.mustSearcher != nil {
-		if s.currMust == nil || s.currMust.IndexInternalID.Compare(ID) < 0 {
+	// Advance the searcher only if the cursor is trailing the lookup ID
+	if s.currentID == nil || s.currentID.Compare(ID) < 0 {
+		var err error
+		if s.mustSearcher != nil {
 			if s.currMust != nil {
 				ctx.DocumentMatchPool.Put(s.currMust)
 			}
@@ -343,9 +343,7 @@ func (s *BooleanSearcher) Advance(ctx *search.SearchContext, ID index.IndexInter
 				return nil, err
 			}
 		}
-	}
-	if s.shouldSearcher != nil {
-		if s.currShould == nil || s.currShould.IndexInternalID.Compare(ID) < 0 {
+		if s.shouldSearcher != nil {
 			if s.currShould != nil {
 				ctx.DocumentMatchPool.Put(s.currShould)
 			}
@@ -354,9 +352,8 @@ func (s *BooleanSearcher) Advance(ctx *search.SearchContext, ID index.IndexInter
 				return nil, err
 			}
 		}
-	}
-	if s.mustNotSearcher != nil {
-		if s.currMustNot == nil || s.currMustNot.IndexInternalID.Compare(ID) < 0 {
+
+		if s.mustNotSearcher != nil {
 			if s.currMustNot != nil {
 				ctx.DocumentMatchPool.Put(s.currMustNot)
 			}
@@ -365,14 +362,14 @@ func (s *BooleanSearcher) Advance(ctx *search.SearchContext, ID index.IndexInter
 				return nil, err
 			}
 		}
-	}
 
-	if s.mustSearcher != nil && s.currMust != nil {
-		s.currentID = s.currMust.IndexInternalID
-	} else if s.mustSearcher == nil && s.currShould != nil {
-		s.currentID = s.currShould.IndexInternalID
-	} else {
-		s.currentID = nil
+		if s.mustSearcher != nil && s.currMust != nil {
+			s.currentID = s.currMust.IndexInternalID
+		} else if s.mustSearcher == nil && s.currShould != nil {
+			s.currentID = s.currShould.IndexInternalID
+		} else {
+			s.currentID = nil
+		}
 	}
 
 	return s.Next(ctx)

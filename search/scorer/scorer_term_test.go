@@ -157,7 +157,7 @@ func TestTermScorer(t *testing.T) {
 		}
 		actual := scorer.Score(ctx, test.termMatch)
 		actual.Complete(nil)
-		if len(actual.FieldTermLocations) <= 0 {
+		if len(actual.FieldTermLocations) == 0 {
 			actual.FieldTermLocations = nil
 		}
 

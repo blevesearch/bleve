@@ -112,7 +112,7 @@ OUTER:
 			}
 			if err != nil {
 				atomic.StoreUint64(&s.iStats.persistEpoch, 0)
-				if err == ErrClosed {
+				if err == segment.ErrClosed {
 					// index has been closed
 					_ = ourSnapshot.DecRef()
 					break OUTER
@@ -269,15 +269,12 @@ func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
 }
 
 func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
-	// perform in-memory merging only when there is no memory pressure
-	if s.paused() == 0 {
-		persisted, err := s.persistSnapshotMaybeMerge(snapshot)
-		if err != nil {
-			return err
-		}
-		if persisted {
-			return nil
-		}
+	persisted, err := s.persistSnapshotMaybeMerge(snapshot)
+	if err != nil {
+		return err
+	}
+	if persisted {
+		return nil
 	}
 
 	return s.persistSnapshotDirect(snapshot)
@@ -500,15 +497,13 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 
 		select {
 		case <-s.closeCh:
-			err = ErrClosed
-			return err
+			return segment.ErrClosed
 		case s.persists <- persist:
 		}
 
 		select {
 		case <-s.closeCh:
-			err = ErrClosed
-			return err
+			return segment.ErrClosed
 		case <-persist.applied:
 		}
 	}
@@ -757,7 +752,7 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 	s.eligibleForRemoval = newEligible
 	s.rootLock.Unlock()
 
-	if len(epochsToRemove) <= 0 {
+	if len(epochsToRemove) == 0 {
 		return 0, nil
 	}
 

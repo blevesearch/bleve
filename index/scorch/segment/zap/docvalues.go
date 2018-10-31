@@ -176,7 +176,7 @@ func (di *docValueReader) iterateAllDocValues(s *SegmentBase, visitor docNumTerm
 		if err != nil {
 			return err
 		}
-		if di.curChunkData == nil || len(di.curChunkHeader) <= 0 {
+		if di.curChunkData == nil || len(di.curChunkHeader) == 0 {
 			continue
 		}
 

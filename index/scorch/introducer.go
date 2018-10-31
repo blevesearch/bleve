@@ -517,6 +517,7 @@ func isMemorySegment(s *SegmentSnapshot) bool {
 	switch s.segment.(type) {
 	case *zap.SegmentBase:
 		return true
+	default:
+		return false
 	}
-	return false
 }

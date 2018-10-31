@@ -217,14 +217,14 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 			if len(roster) > 0 {
 				rosterScore := scoreSegments(roster, o)
 
-				if len(bestRoster) <= 0 || rosterScore < bestRosterScore {
+				if len(bestRoster) == 0 || rosterScore < bestRosterScore {
 					bestRoster = roster
 					bestRosterScore = rosterScore
 				}
 			}
 		}
 
-		if len(bestRoster) <= 0 {
+		if len(bestRoster) == 0 {
 			return rv, nil
 		}
 

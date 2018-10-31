@@ -547,6 +547,129 @@ func TestNestedBooleanSearchers(t *testing.T) {
 	}
 }
 
+func TestNestedBooleanMustNotSearcher(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// create an index with default settings
+	idxMapping := NewIndexMapping()
+	idx, err := New("testidx", idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create and insert documents as a batch
+	batch := idx.NewBatch()
+
+	docs := []struct {
+		id              string
+		hasRole         bool
+		investigationId string
+	}{
+		{
+			id:              "1@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+		{
+			id:              "1@2",
+			hasRole:         false,
+			investigationId: "2",
+		},
+		{
+			id:              "2@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+		{
+			id:              "2@2",
+			hasRole:         false,
+			investigationId: "2",
+		},
+		{
+			id:              "3@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+		{
+			id:              "3@2",
+			hasRole:         false,
+			investigationId: "2",
+		},
+		{
+			id:              "4@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+		{
+			id:              "5@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+		{
+			id:              "6@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+		{
+			id:              "7@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+	}
+
+	for i := 0; i < len(docs); i++ {
+		doc := document.NewDocument(docs[i].id)
+		doc.Fields = []document.Field{
+			document.NewTextField("id", []uint64{}, []byte(docs[i].id)),
+			document.NewBooleanField("hasRole", []uint64{}, docs[i].hasRole),
+			document.NewTextField("investigationId", []uint64{}, []byte(docs[i].investigationId)),
+		}
+
+		doc.CompositeFields = []*document.CompositeField{
+			document.NewCompositeFieldWithIndexingOptions(
+				"_all", true, []string{"text"}, []string{},
+				document.IndexField|document.IncludeTermVectors),
+		}
+
+		if err = batch.IndexAdvanced(doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	tq := NewTermQuery("1")
+	tq.SetField("investigationId")
+	// using must not, for cases that the field did not exists at all
+	hasRole := NewBoolFieldQuery(true)
+	hasRole.SetField("hasRole")
+	noRole := NewBooleanQuery()
+	noRole.AddMustNot(hasRole)
+	oneRolesOrNoRoles := NewBooleanQuery()
+	oneRolesOrNoRoles.AddShould(noRole)
+	oneRolesOrNoRoles.SetMinShould(1)
+	q := NewConjunctionQuery(tq, oneRolesOrNoRoles)
+
+	sr := NewSearchRequestOptions(q, 100, 0, false)
+	sr.Fields = []string{"hasRole"}
+	sr.Highlight = NewHighlight()
+
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 0 {
+		t.Fatalf("Unexpected result, %v != 0", res.Total)
+	}
+}
+
 func TestSearchScorchOverEmptyKeyword(t *testing.T) {
 	defaultIndexType := Config.DefaultIndexType
 
