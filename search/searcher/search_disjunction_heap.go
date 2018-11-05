@@ -62,7 +62,7 @@ func newDisjunctionHeapSearcher(indexReader index.IndexReader,
 	limit bool) (
 	*DisjunctionHeapSearcher, error) {
 	if limit && tooManyClauses(len(searchers)) {
-		return nil, tooManyClausesErr()
+		return nil, tooManyClausesErr(len(searchers))
 	}
 
 	// build our searcher
