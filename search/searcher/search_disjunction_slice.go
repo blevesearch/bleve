@@ -50,7 +50,7 @@ func newDisjunctionSliceSearcher(indexReader index.IndexReader,
 	limit bool) (
 	*DisjunctionSliceSearcher, error) {
 	if limit && tooManyClauses(len(qsearchers)) {
-		return nil, tooManyClausesErr()
+		return nil, tooManyClausesErr(len(qsearchers))
 	}
 	// build the downstream searchers
 	searchers := make(OrderedSearcherList, len(qsearchers))
