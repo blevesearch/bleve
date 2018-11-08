@@ -728,3 +728,144 @@ func TestSearchScorchOverEmptyKeyword(t *testing.T) {
 		t.Fatalf("Unexpected search hits: %v, expected 10", res.Total)
 	}
 }
+
+func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
+	defaultIndexType := Config.DefaultIndexType
+
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+		Config.DefaultIndexType = defaultIndexType
+	}()
+
+	Config.DefaultIndexType = scorch.Name
+
+	// create an index with default settings
+	idxMapping := NewIndexMapping()
+	idx, err := New("testidx", idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create and insert documents as a batch
+	batch := idx.NewBatch()
+
+	doc := document.NewDocument("1-child-0")
+	doc.Fields = []document.Field{
+		document.NewTextField("id", []uint64{}, []byte("1-child-0")),
+		document.NewBooleanField("hasRole", []uint64{}, false),
+		document.NewTextField("roles", []uint64{}, []byte("R1")),
+		document.NewNumericField("type", []uint64{}, 0),
+	}
+	doc.CompositeFields = []*document.CompositeField{
+		document.NewCompositeFieldWithIndexingOptions(
+			"_all", true, []string{"text"}, []string{},
+			document.IndexField|document.IncludeTermVectors),
+	}
+
+	if err = batch.IndexAdvanced(doc); err != nil {
+		t.Fatal(err)
+	}
+
+	docs := []struct {
+		id      string
+		hasRole bool
+		typ     int
+	}{
+		{
+			id:      "16d6fa37-48fd-4dea-8b3d-a52bddf73951",
+			hasRole: false,
+			typ:     9,
+		},
+		{
+			id:      "18fa9eb2-8b1f-46f0-8b56-b4c551213f78",
+			hasRole: false,
+			typ:     9,
+		},
+		{
+			id:      "3085855b-d74b-474a-86c3-9bf3e4504382",
+			hasRole: false,
+			typ:     9,
+		},
+		{
+			id:      "38ef5d28-0f85-4fb0-8a94-dd20751c3364",
+			hasRole: false,
+			typ:     9,
+		},
+	}
+
+	for i := 0; i < len(docs); i++ {
+		doc := document.NewDocument(docs[i].id)
+		doc.Fields = []document.Field{
+			document.NewTextField("id", []uint64{}, []byte(docs[i].id)),
+			document.NewBooleanField("hasRole", []uint64{}, docs[i].hasRole),
+			document.NewNumericField("type", []uint64{}, float64(docs[i].typ)),
+		}
+
+		doc.CompositeFields = []*document.CompositeField{
+			document.NewCompositeFieldWithIndexingOptions(
+				"_all", true, []string{"text"}, []string{},
+				document.IndexField|document.IncludeTermVectors),
+		}
+
+		if err = batch.IndexAdvanced(doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	batch = idx.NewBatch()
+
+	// Update 1st doc
+	doc = document.NewDocument("1-child-0")
+	doc.Fields = []document.Field{
+		document.NewTextField("id", []uint64{}, []byte("1-child-0")),
+		document.NewBooleanField("hasRole", []uint64{}, false),
+		document.NewNumericField("type", []uint64{}, 0),
+	}
+	doc.CompositeFields = []*document.CompositeField{
+		document.NewCompositeFieldWithIndexingOptions(
+			"_all", true, []string{"text"}, []string{},
+			document.IndexField|document.IncludeTermVectors),
+	}
+
+	if err = batch.IndexAdvanced(doc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	inclusive := true
+	val := float64(9)
+	q := query.NewNumericRangeInclusiveQuery(&val, &val, &inclusive, &inclusive)
+	q.SetField("type")
+	initialQuery := query.NewBooleanQuery(nil, nil, []query.Query{q})
+
+	// using must not, for cases that the field did not exists at all
+	hasRole := NewBoolFieldQuery(true)
+	hasRole.SetField("hasRole")
+	noRole := NewBooleanQuery()
+	noRole.AddMustNot(hasRole)
+
+	rq := query.NewBooleanQuery([]query.Query{initialQuery, noRole}, nil, nil)
+
+	sr := NewSearchRequestOptions(rq, 100, 0, false)
+	sr.Fields = []string{"id", "hasRole", "type"}
+	sr.Highlight = NewHighlight()
+
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 1 {
+		t.Fatalf("Unexpected result, %v != 1", res.Total)
+	}
+}
