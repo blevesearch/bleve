@@ -37,8 +37,26 @@ import (
 
 var DefaultChunkFactor uint32 = 1024
 
-var DefaultPersisterNapTimeMSec int = 2000 // ms
+// DefaultPersisterNapTimeMSec is kept to zero as this helps in direct
+// persistence of segments with the default safe batch option.
+// If the default safe batch option results in high number of
+// files on disk, then users may initialise this configuration parameter
+// with higher values so that the persister will nap a bit within it's
+// work loop to favour better in-memory merging of segments to result
+// in fewer segment files on disk. But that may come with an indexing
+// performance overhead.
+// Unsafe batch users are advised to override this to higher value
+// for better performance especially with high data density.
+var DefaultPersisterNapTimeMSec int = 0 // ms
 
+// DefaultPersisterNapUnderNumFiles helps in controlling the pace of
+// persister. At times of a slow merger progress with heavy file merging
+// operations, its better to pace down the persister for letting the merger
+// to catch up within a range defined by this parameter.
+// Fewer files on disk (as per the merge plan) would result in keeping the
+// file handle usage under limit, faster disk merger and a healthier index.
+// Its been observed that such a loosely sync'ed introducer-persister-merger
+// trio results in better overall performance.
 var DefaultPersisterNapUnderNumFiles int = 1000
 
 var DefaultMemoryPressurePauseThreshold uint64 = math.MaxUint64
