@@ -68,7 +68,7 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 		return nil, err
 	}
 	if tooManyClauses(len(terms)) {
-		return nil, tooManyClausesErr()
+		return nil, tooManyClausesErr(len(terms))
 	}
 
 	return NewMultiTermSearcherBytes(indexReader, terms, field, boost, options,

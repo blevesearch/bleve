@@ -319,6 +319,7 @@ func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch
 			return nil, err
 		}
 	}
+
 	return rv, nil
 }
 
@@ -343,6 +344,7 @@ func (s *BooleanSearcher) Advance(ctx *search.SearchContext, ID index.IndexInter
 				return nil, err
 			}
 		}
+
 		if s.shouldSearcher != nil {
 			if s.currShould != nil {
 				ctx.DocumentMatchPool.Put(s.currShould)
@@ -354,12 +356,17 @@ func (s *BooleanSearcher) Advance(ctx *search.SearchContext, ID index.IndexInter
 		}
 
 		if s.mustNotSearcher != nil {
-			if s.currMustNot != nil {
-				ctx.DocumentMatchPool.Put(s.currMustNot)
-			}
-			s.currMustNot, err = s.mustNotSearcher.Advance(ctx, ID)
-			if err != nil {
-				return nil, err
+			// Additional check for mustNotSearcher whose cursor isn't tracked by
+			// currentID to prevent it from moving when the searcher's already
+			// where it should be.
+			if s.currMustNot == nil || !s.currMustNot.IndexInternalID.Equals(ID) {
+				if s.currMustNot != nil {
+					ctx.DocumentMatchPool.Put(s.currMustNot)
+				}
+				s.currMustNot, err = s.mustNotSearcher.Advance(ctx, ID)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 
