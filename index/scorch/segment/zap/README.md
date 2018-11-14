@@ -1,5 +1,7 @@
 # zap file format
 
+Advanced ZAP File Format Documentation is [here](zap.md).
+
 The file is written in the reverse order that we typically access data.  This helps us write in one pass since later sections of the file require file offsets of things we've already written.
 
 Current usage:
@@ -90,16 +92,6 @@ If you know the doc number you're interested in, this format lets you jump to th
 
 If you know the doc number you're interested in, this format lets you jump to the correct chunk (docNum/chunkFactor) directly and then seek within that chunk until you find it.
 
-## bitmaps of hits with location info
-
-- for each posting list
-  - preparation phase:
-    - encode roaring bitmap (inidicating which hits have location details indexed) posting list to bytes (so we know the length)
-  - file writing phase:
-    - remember the start position for this bitmap
-    - write length of encoded roaring bitmap
-    - write the serialized roaring bitmap data
-
 ## postings list section
 
 - for each posting list
@@ -109,7 +101,6 @@ If you know the doc number you're interested in, this format lets you jump to th
     - remember the start position for this posting list
     - write freq/norm details offset (remembered from previous, as varint uint64)
     - write location details offset (remembered from previous, as varint uint64)
-    - write location bitmap offset (remembered from previous, as varint uint64)
     - write length of encoded roaring bitmap
     - write the serialized roaring bitmap data
 
