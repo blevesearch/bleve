@@ -20,7 +20,7 @@
     |        | varint(up to uint64)
     |~~~~~~~~|
 
-### Arbitary-length fields
+### Arbitrary-length fields
 
     |--------...---|
     |              | arbitrary-length field (string, vellum, roaring bitmap)
@@ -34,7 +34,7 @@
 
 ## Overview
 
-Footer sectrion describes the configuration of particular ZAP file. The format of footer is version-dependent, so it is necessary to check `V` field before the parsing.
+Footer section describes the configuration of particular ZAP file. The format of footer is version-dependent, so it is necessary to check `V` field before the parsing.
 
             |==================================================|
             | Stored Fields                                    |
