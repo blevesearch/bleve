@@ -90,6 +90,9 @@ func (q *MatchPhrasePrefixQuery) Searcher(i index.IndexReader, m mapping.IndexMa
 		if err != nil {
 			return nil, err
 		}
+		if phrase == nil {
+			return NewMatchNoneQuery().Searcher(i, m, options)
+		}
 		phraseQuery := NewMultiPhraseQuery(phrase, field)
 		phraseQuery.SetBoost(q.BoostVal.Value())
 		return phraseQuery.Searcher(i, m, options)
@@ -132,11 +135,13 @@ func tokenStreamToPhrasePrefix(indexReader index.IndexReader, field string, me i
 		}()
 
 		tfd, err := fieldDict.Next()
+
+		var terms []string
 		for err == nil && tfd != nil {
-			if len(prefix) < len(tfd.Term) && (me == 0 || maxExpansions(prefix, tfd.Term, me)) {
-				rv[lastIndex] = append(rv[lastIndex], tfd.Term)
-				if tooManyClauses(len(rv[lastIndex])) {
-					return nil, tooManyClausesErr(len(rv[lastIndex]))
+			if me == 0 || maxExpansions(prefix, tfd.Term, me) {
+				terms = append(terms, tfd.Term)
+				if tooManyClauses(len(terms)) {
+					return nil, tooManyClausesErr(len(terms))
 				}
 			}
 			tfd, err = fieldDict.Next()
@@ -144,7 +149,10 @@ func tokenStreamToPhrasePrefix(indexReader index.IndexReader, field string, me i
 		if err != nil {
 			return nil, err
 		}
-
+		if len(terms) == 0 {
+			return nil, nil
+		}
+		rv[lastIndex] = terms
 		return rv, nil
 	}
 	return nil, nil
