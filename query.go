@@ -112,6 +112,18 @@ func NewMatchPhraseQuery(matchPhrase string) *query.MatchPhraseQuery {
 	return query.NewMatchPhraseQuery(matchPhrase)
 }
 
+// NewMatchPhrasePrefixQuery creates a new Query object
+// for matching phrases in the index.
+// An Analyzer is chosen based on the field.
+// Input text is analyzed using this analyzer.
+// Token terms resulting from this analysis are
+// used to build a search phrase.  Result documents
+// must match this phrase.and last term is prefix or eq, Queried field must have been indexed with
+// IncludeTermVectors set to true.
+func NewMatchPhrasePrefixQuery(matchPhrase string) *query.MatchPhrasePrefixQuery {
+	return query.NewMatchPhrasePrefixQuery(matchPhrase)
+}
+
 // NewMatchQuery creates a Query for matching text.
 // An Analyzer is chosen based on the field.
 // Input text is analyzed using this analyzer.
