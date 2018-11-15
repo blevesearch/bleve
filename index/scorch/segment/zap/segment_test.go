@@ -691,7 +691,7 @@ func TestMergedSegmentDocsWithNonOverlappingFields(t *testing.T) {
 	segsToMerge[0] = segment1.(*Segment)
 	segsToMerge[1] = segment2.(*Segment)
 
-	_, nBytes, err := Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/scorch3.zap", 1024)
+	_, nBytes, err := Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/scorch3.zap", 1024, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

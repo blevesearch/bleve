@@ -60,7 +60,7 @@ OUTER:
 				err := s.planMergeAtSnapshot(ourSnapshot, mergePlannerOptions)
 				if err != nil {
 					atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
-					if err == ErrClosed {
+					if err == segment.ErrClosed {
 						// index has been closed
 						_ = ourSnapshot.DecRef()
 						break OUTER
@@ -187,7 +187,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 		}
 
 		var oldNewDocNums map[uint64][]uint64
-		var segment segment.Segment
+		var seg segment.Segment
 		if len(segmentsToMerge) > 0 {
 			filename := zapFileName(newSegmentID)
 			s.markIneligibleForRemoval(filename)
@@ -196,7 +196,8 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 			fileMergeZapStartTime := time.Now()
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
-			newDocNums, nBytes, err := zap.Merge(segmentsToMerge, docsToDrop, path, DefaultChunkFactor)
+			newDocNums, nBytes, err := zap.Merge(segmentsToMerge, docsToDrop, path,
+				DefaultChunkFactor, s.closeCh)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
 			atomic.AddUint64(&s.stats.TotFileMergeWrittenBytes, nBytes)
 
@@ -209,10 +210,13 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 			if err != nil {
 				s.unmarkIneligibleForRemoval(filename)
 				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
+				if err == segment.ErrClosed {
+					return err
+				}
 				return fmt.Errorf("merging failed: %v", err)
 			}
 
-			segment, err = zap.Open(path)
+			seg, err = zap.Open(path)
 			if err != nil {
 				s.unmarkIneligibleForRemoval(filename)
 				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
@@ -230,7 +234,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 			id:            newSegmentID,
 			old:           oldMap,
 			oldNewDocNums: oldNewDocNums,
-			new:           segment,
+			new:           seg,
 			notify:        make(chan *IndexSnapshot, 1),
 		}
 		notifications = append(notifications, sm.notify)
@@ -238,8 +242,8 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 		// give it to the introducer
 		select {
 		case <-s.closeCh:
-			_ = segment.Close()
-			return ErrClosed
+			_ = seg.Close()
+			return segment.ErrClosed
 		case s.merges <- sm:
 			atomic.AddUint64(&s.stats.TotFileMergeIntroductions, 1)
 		}
@@ -250,7 +254,8 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 	for _, notification := range notifications {
 		select {
 		case <-s.closeCh:
-			return ErrClosed
+			atomic.AddUint64(&s.stats.TotFileMergeIntroductionsSkipped, 1)
+			return segment.ErrClosed
 		case newSnapshot := <-notification:
 			atomic.AddUint64(&s.stats.TotFileMergeIntroductionsDone, 1)
 			if newSnapshot != nil {
@@ -287,7 +292,7 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	path := s.path + string(os.PathSeparator) + filename
 
 	newDocNums, _, err :=
-		zap.MergeSegmentBases(sbs, sbsDrops, path, chunkFactor)
+		zap.MergeSegmentBases(sbs, sbsDrops, path, chunkFactor, s.closeCh)
 
 	atomic.AddUint64(&s.stats.TotMemMergeZapEnd, 1)
 
@@ -302,21 +307,21 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 		return nil, 0, err
 	}
 
-	segment, err := zap.Open(path)
+	seg, err := zap.Open(path)
 	if err != nil {
 		atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
 		return nil, 0, err
 	}
 
 	// update persisted stats
-	atomic.AddUint64(&s.stats.TotPersistedItems, segment.Count())
+	atomic.AddUint64(&s.stats.TotPersistedItems, seg.Count())
 	atomic.AddUint64(&s.stats.TotPersistedSegments, 1)
 
 	sm := &segmentMerge{
 		id:            newSegmentID,
 		old:           make(map[uint64]*SegmentSnapshot),
 		oldNewDocNums: make(map[uint64][]uint64),
-		new:           segment,
+		new:           seg,
 		notify:        make(chan *IndexSnapshot, 1),
 	}
 
@@ -328,14 +333,14 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 
 	select { // send to introducer
 	case <-s.closeCh:
-		_ = segment.DecRef()
-		return nil, 0, ErrClosed
+		_ = seg.DecRef()
+		return nil, 0, segment.ErrClosed
 	case s.merges <- sm:
 	}
 
 	select { // wait for introduction to complete
 	case <-s.closeCh:
-		return nil, 0, ErrClosed
+		return nil, 0, segment.ErrClosed
 	case newSnapshot := <-sm.notify:
 		atomic.AddUint64(&s.stats.TotMemMergeSegments, uint64(len(sbs)))
 		atomic.AddUint64(&s.stats.TotMemMergeDone, 1)
