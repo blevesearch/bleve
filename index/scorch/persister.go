@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -38,7 +39,17 @@ var DefaultChunkFactor uint32 = 1024
 
 var DefaultPersisterNapTimeMSec int = 2000 // ms
 
+// DefaultPersisterNapUnderNumFiles helps in controlling the pace of
+// persister. At times of a slow merger progress with heavy file merging
+// operations, its better to pace down the persister for letting the merger
+// to catch up within a range defined by this parameter.
+// Fewer files on disk (as per the merge plan) would result in keeping the
+// file handle usage under limit, faster disk merger and a healthier index.
+// Its been observed that such a loosely sync'ed introducer-persister-merger
+// trio results in better overall performance.
 var DefaultPersisterNapUnderNumFiles int = 1000
+
+var DefaultMemoryPressurePauseThreshold uint64 = math.MaxUint64
 
 type persisterOptions struct {
 	// PersisterNapTimeMSec controls the wait/delay injected into
@@ -51,6 +62,13 @@ type persisterOptions struct {
 	// PersisterNapTimeMSec amount of time to improve the chances for
 	// a healthier and heavier in-memory merging
 	PersisterNapUnderNumFiles int
+
+	// MemoryPressurePauseThreshold let persister to have a better leeway
+	// for prudently performing the memory merge of segments on a memory
+	// pressure situation. Here the config value is an upper threshold
+	// for the number of paused application threads. The default value would
+	// be a very high number to always favour the merging of memory segments.
+	MemoryPressurePauseThreshold uint64
 }
 
 type notificationChan chan struct{}
@@ -103,7 +121,7 @@ OUTER:
 		if ourSnapshot != nil {
 			startTime := time.Now()
 
-			err := s.persistSnapshot(ourSnapshot)
+			err := s.persistSnapshot(ourSnapshot, po)
 			for _, ch := range ourPersisted {
 				if err != nil {
 					ch <- err
@@ -112,7 +130,7 @@ OUTER:
 			}
 			if err != nil {
 				atomic.StoreUint64(&s.iStats.persistEpoch, 0)
-				if err == ErrClosed {
+				if err == segment.ErrClosed {
 					// index has been closed
 					_ = ourSnapshot.DecRef()
 					break OUTER
@@ -251,8 +269,9 @@ OUTER:
 
 func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
 	po := persisterOptions{
-		PersisterNapTimeMSec:      DefaultPersisterNapTimeMSec,
-		PersisterNapUnderNumFiles: DefaultPersisterNapUnderNumFiles,
+		PersisterNapTimeMSec:         DefaultPersisterNapTimeMSec,
+		PersisterNapUnderNumFiles:    DefaultPersisterNapUnderNumFiles,
+		MemoryPressurePauseThreshold: DefaultMemoryPressurePauseThreshold,
 	}
 	if v, ok := s.config["scorchPersisterOptions"]; ok {
 		b, err := json.Marshal(v)
@@ -268,9 +287,12 @@ func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
 	return &po, nil
 }
 
-func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot) error {
-	// perform in-memory merging only when there is no memory pressure
-	if s.paused() == 0 {
+func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
+	po *persisterOptions) error {
+	// Perform in-memory segment merging only when the memory pressure is
+	// below the configured threshold, else the persister performs the
+	// direct persistence of segments.
+	if s.paused() < po.MemoryPressurePauseThreshold {
 		persisted, err := s.persistSnapshotMaybeMerge(snapshot)
 		if err != nil {
 			return err
@@ -500,15 +522,13 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 
 		select {
 		case <-s.closeCh:
-			err = ErrClosed
-			return err
+			return segment.ErrClosed
 		case s.persists <- persist:
 		}
 
 		select {
 		case <-s.closeCh:
-			err = ErrClosed
-			return err
+			return segment.ErrClosed
 		case <-persist.applied:
 		}
 	}
