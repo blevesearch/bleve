@@ -105,7 +105,7 @@ func (d *Dictionary) Iterator() segment.DictionaryIterator {
 		itr, err := d.fst.Iterator(nil, nil)
 		if err == nil {
 			rv.itr = itr
-		} else if err != nil && err != vellum.ErrIteratorDone {
+		} else if err != vellum.ErrIteratorDone {
 			rv.err = err
 		}
 	}
@@ -127,7 +127,7 @@ func (d *Dictionary) PrefixIterator(prefix string) segment.DictionaryIterator {
 		itr, err := d.fst.Iterator(kBeg, kEnd)
 		if err == nil {
 			rv.itr = itr
-		} else if err != nil && err != vellum.ErrIteratorDone {
+		} else if err != vellum.ErrIteratorDone {
 			rv.err = err
 		}
 	}
@@ -154,7 +154,7 @@ func (d *Dictionary) RangeIterator(start, end string) segment.DictionaryIterator
 		itr, err := d.fst.Iterator([]byte(start), endBytes)
 		if err == nil {
 			rv.itr = itr
-		} else if err != nil && err != vellum.ErrIteratorDone {
+		} else if err != vellum.ErrIteratorDone {
 			rv.err = err
 		}
 	}
@@ -174,7 +174,7 @@ func (d *Dictionary) AutomatonIterator(a vellum.Automaton,
 		itr, err := d.fst.Search(a, startKeyInclusive, endKeyExclusive)
 		if err == nil {
 			rv.itr = itr
-		} else if err != nil && err != vellum.ErrIteratorDone {
+		} else if err != vellum.ErrIteratorDone {
 			rv.err = err
 		}
 	}
@@ -218,7 +218,7 @@ func (d *Dictionary) OnlyIterator(onlyTerms [][]byte,
 	itr, err := d.fst.Search(onlyFST, nil, nil)
 	if err == nil {
 		rv.itr = itr
-	} else if err != nil && err != vellum.ErrIteratorDone {
+	} else if err != vellum.ErrIteratorDone {
 		rv.err = err
 	}
 
