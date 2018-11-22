@@ -960,8 +960,8 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	}
 
 	// For sake of completeness
-	for i := range batch.Callback() {
-		batch.Callback()[i](err)
+	for i := range batch.Callbacks() {
+		batch.Callbacks()[i](err)
 	}
 	return
 }
