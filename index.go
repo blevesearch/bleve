@@ -129,12 +129,12 @@ func (b *Batch) Merge(o *Batch) {
 	}
 }
 
-func (b *Batch) AddCallback(f index.BatchCallbackFunction) {
+func (b *Batch) AddCallback(f index.BatchCallback) {
 	b.internal.AddCallback(f)
 }
 
-func (b *Batch) Callback() []index.BatchCallbackFunction {
-	return b.internal.Callback()
+func (b *Batch) Callbacks() []index.BatchCallback {
+	return b.internal.Callbacks()
 }
 
 // An Index implements all the indexing and searching

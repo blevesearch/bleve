@@ -116,7 +116,7 @@ OUTER:
 
 		var ourSnapshot *IndexSnapshot
 		var ourPersisted []chan error
-		var ourCallbacks []index.BatchCallbackFunction
+		var ourCallbacks []index.BatchCallback
 
 		// check to see if there is a new snapshot to persist
 		s.rootLock.Lock()

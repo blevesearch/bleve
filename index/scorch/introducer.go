@@ -33,7 +33,7 @@ type segmentIntroduction struct {
 
 	applied   chan error
 	persisted chan error
-	callbacks []index.BatchCallbackFunction
+	callbacks []index.BatchCallback
 }
 
 type persistIntroduction struct {
@@ -50,6 +50,7 @@ type snapshotReversion struct {
 	snapshot  *IndexSnapshot
 	applied   chan error
 	persisted chan error
+	callbacks []index.BatchCallback
 }
 
 func (s *Scorch) mainLoop() {
@@ -218,6 +219,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	if next.callbacks != nil {
 		s.callbacks = append(s.callbacks, next.callbacks...)
 	}
+	s.callbacks = append(s.callbacks, next.callbacks...)
 	// swap in new index snapshot
 	newSnapshot.epoch = s.nextSnapshotEpoch
 	s.nextSnapshotEpoch++
