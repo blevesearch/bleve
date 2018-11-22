@@ -885,6 +885,7 @@ func TestIndexBatch(t *testing.T) {
 }
 
 func TestIndexBatchWithCallbacks(t *testing.T) {
+
 	defer func() {
 		err := DestroyTest()
 		if err != nil {
