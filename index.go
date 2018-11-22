@@ -129,6 +129,14 @@ func (b *Batch) Merge(o *Batch) {
 	}
 }
 
+func (b *Batch) AddCallback(f index.BatchCallbackFunction) {
+	b.internal.AddCallback(f)
+}
+
+func (b *Batch) Callback() []index.BatchCallbackFunction {
+	return b.internal.Callback()
+}
+
 // An Index implements all the indexing and searching
 // capabilities of bleve.  An Index can be created
 // using the New() and Open() methods.
