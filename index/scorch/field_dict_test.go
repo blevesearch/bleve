@@ -23,15 +23,20 @@ import (
 )
 
 func TestIndexFieldDict(t *testing.T) {
+	err := InitTest(t)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(t)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
+
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, CreateConfig(t), analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
