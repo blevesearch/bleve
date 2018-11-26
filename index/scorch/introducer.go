@@ -216,9 +216,6 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	if next.persisted != nil {
 		s.rootPersisted = append(s.rootPersisted, next.persisted)
 	}
-	if next.callbacks != nil {
-		s.callbacks = append(s.callbacks, next.callbacks...)
-	}
 	s.callbacks = append(s.callbacks, next.callbacks...)
 	// swap in new index snapshot
 	newSnapshot.epoch = s.nextSnapshotEpoch
