@@ -19,6 +19,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"runtime"
 	"strconv"
 	"sync"
 	"testing"
@@ -38,17 +39,36 @@ func init() {
 	DefaultPersisterNapTimeMSec = 1
 }
 
+var testNameRegexp = regexp.MustCompile(`\.(Test[\p{L}_\p{N}]*)`)
+
+func GetTestName() string {
+	pc := make([]uintptr, 32)
+	n := runtime.Callers(0, pc)
+	for i := 0; i < n; i++ {
+		name := runtime.FuncForPC(pc[i]).Name()
+		ms := testNameRegexp.FindStringSubmatch(name)
+		if ms == nil {
+			continue
+		}
+		return ms[1]
+	}
+	panic("test name could not be recovered")
+}
+
 func InitTest(t *testing.T) error {
-	return os.RemoveAll(os.TempDir() + "/bleve-scorch-test-" + t.Name())
+	// TODO: Use t.Name() when Go 1.7 support terminates.
+	return os.RemoveAll(os.TempDir() + "/bleve-scorch-test-" + GetTestName())
 }
 
 func DestroyTest(t *testing.T) error {
-	return os.RemoveAll(os.TempDir() + "/bleve-scorch-test-" + t.Name())
+	// TODO: Use t.Name() when Go 1.7 support terminates.
+	return os.RemoveAll(os.TempDir() + "/bleve-scorch-test-" + GetTestName())
 }
 
 func CreateConfig(t *testing.T) map[string]interface{} {
+	// TODO: Use t.Name() when Go 1.7 support terminates.
 	rv := make(map[string]interface{})
-	rv["path"] = os.TempDir() + "/bleve-scorch-test-" + t.Name()
+	rv["path"] = os.TempDir() + "/bleve-scorch-test-" + GetTestName()
 	return rv
 }
 
