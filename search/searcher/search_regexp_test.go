@@ -17,6 +17,8 @@ package searcher
 import (
 	"encoding/binary"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"regexp"
 	"testing"
 
@@ -37,13 +39,19 @@ func TestRegexpStringSearchUpsideDown(t *testing.T) {
 }
 
 func TestRegexpSearchScorch(t *testing.T) {
-	twoDocIndex := initTwoDocScorch()
+	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
+	defer os.RemoveAll(dir)
+
+	twoDocIndex := initTwoDocScorch(dir)
 	testRegexpSearch(t, twoDocIndex, internalIDMakerScorch, searcherMaker)
 	_ = twoDocIndex.Close()
 }
 
 func TestRegexpStringSearchScorch(t *testing.T) {
-	twoDocIndex := initTwoDocScorch()
+	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
+	defer os.RemoveAll(dir)
+
+	twoDocIndex := initTwoDocScorch(dir)
 	testRegexpSearch(t, twoDocIndex, internalIDMakerScorch, searcherStringMaker)
 	_ = twoDocIndex.Close()
 }
@@ -144,7 +152,7 @@ func testRegexpSearch(t *testing.T, twoDocIndex index.Index,
 		for err == nil && next != nil {
 			if i < len(test.expecteds) {
 				if !next.IndexInternalID.Equals(test.expecteds[i].IndexInternalID) {
-					t.Errorf("test %d, expected result %d to have id %s got %s, next: %#v",
+					t.Errorf("test %d, expected result %d to have id %v got %v, next: %#v",
 						testIndex, i, test.expecteds[i].IndexInternalID, next.IndexInternalID, next)
 				}
 				if next.Score != test.expecteds[i].Score {
