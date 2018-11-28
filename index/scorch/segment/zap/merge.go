@@ -329,7 +329,7 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 
 			err = enumerator.Next()
 		}
-		if err != nil && err != vellum.ErrIteratorDone {
+		if err != vellum.ErrIteratorDone {
 			return nil, 0, err
 		}
 
