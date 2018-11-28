@@ -22,24 +22,25 @@ import (
 )
 
 func TestIndexRollback(t *testing.T) {
+	cfg := CreateConfig("TestIndexRollback")
 	numSnapshotsToKeepOrig := NumSnapshotsToKeep
 	NumSnapshotsToKeep = 1000
 
-	err := InitTest(t)
+	err := InitTest(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
 		NumSnapshotsToKeep = numSnapshotsToKeepOrig
 
-		err := DestroyTest(t)
+		err := DestroyTest(cfg)
 		if err != nil {
 			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, CreateConfig(t), analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}

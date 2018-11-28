@@ -22,18 +22,17 @@ import (
 )
 
 func TestEventBatchIntroductionStart(t *testing.T) {
-	err := InitTest(t)
+	testConfig := CreateConfig("TestEventBatchIntroductionStart")
+	err := InitTest(testConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		err := DestroyTest(t)
+		err := DestroyTest(testConfig)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
-
-	testConfig := CreateConfig(t)
 
 	var count int
 	RegistryEventCallbacks["test"] = func(e Event) {
