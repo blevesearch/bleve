@@ -196,6 +196,10 @@ var docvalueCmd = &cobra.Command{
 		}
 		curChunkSize := chunkLens[docInChunk]
 
+		if curChunkSize == 0 {
+			return nil
+		}
+
 		// read the number of docs reside in the chunk
 		numDocs := uint64(0)
 		numDocs, nread = binary.Uvarint(data[destChunkDataLoc : destChunkDataLoc+binary.MaxVarintLen64])

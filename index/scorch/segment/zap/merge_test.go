@@ -342,7 +342,7 @@ func compareSegments(a, b *Segment) string {
 
 				for {
 					apitrn, aerr := apitr.Next()
-					bpitrn, aerr := bpitr.Next()
+					bpitrn, berr := bpitr.Next()
 					if aerr != berr {
 						rv = append(rv, fmt.Sprintf("field %s, term: %s, postingsListIterator Next() errors different: %v %v",
 							fieldName, next.Term, aerr, berr))

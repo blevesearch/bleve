@@ -55,7 +55,7 @@ func tooManyClauses(count int) bool {
 	return false
 }
 
-func tooManyClausesErr() error {
-	return fmt.Errorf("TooManyClauses[maxClauseCount is set to %d]",
-		DisjunctionMaxClauseCount)
+func tooManyClausesErr(count int) error {
+	return fmt.Errorf("TooManyClauses[%d > maxClauseCount, which is set to %d]",
+		count, DisjunctionMaxClauseCount)
 }
