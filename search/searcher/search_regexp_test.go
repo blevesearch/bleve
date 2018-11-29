@@ -40,7 +40,9 @@ func TestRegexpStringSearchUpsideDown(t *testing.T) {
 
 func TestRegexpSearchScorch(t *testing.T) {
 	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
-	defer os.RemoveAll(dir)
+	defer func(){
+		_ = os.RemoveAll(dir)
+	}()
 
 	twoDocIndex := initTwoDocScorch(dir)
 	testRegexpSearch(t, twoDocIndex, internalIDMakerScorch, searcherMaker)
@@ -49,7 +51,9 @@ func TestRegexpSearchScorch(t *testing.T) {
 
 func TestRegexpStringSearchScorch(t *testing.T) {
 	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
-	defer os.RemoveAll(dir)
+	defer func(){
+		_ = os.RemoveAll(dir)
+	}()
 
 	twoDocIndex := initTwoDocScorch(dir)
 	testRegexpSearch(t, twoDocIndex, internalIDMakerScorch, searcherStringMaker)
