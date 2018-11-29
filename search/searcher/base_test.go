@@ -66,11 +66,13 @@ func initTwoDocs(twoDocIndex index.Index) {
 	if err != nil {
 		panic(err)
 	}
+	batch := index.NewBatch()
 	for _, doc := range twoDocIndexDocs {
-		err := twoDocIndex.Update(doc)
-		if err != nil {
-			panic(err)
-		}
+		batch.Update(doc)
+	}
+	err = twoDocIndex.Batch(batch)
+	if err != nil {
+		panic(err)
 	}
 }
 
