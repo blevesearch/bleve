@@ -40,7 +40,7 @@ func TestRegexpStringSearchUpsideDown(t *testing.T) {
 
 func TestRegexpSearchScorch(t *testing.T) {
 	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
-	defer func(){
+	defer func() {
 		_ = os.RemoveAll(dir)
 	}()
 
@@ -51,7 +51,7 @@ func TestRegexpSearchScorch(t *testing.T) {
 
 func TestRegexpStringSearchScorch(t *testing.T) {
 	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
-	defer func(){
+	defer func() {
 		_ = os.RemoveAll(dir)
 	}()
 
@@ -118,16 +118,18 @@ func testRegexpSearch(t *testing.T, twoDocIndex index.Index,
 	}{
 		{
 			searcher: regexpSearcher,
-			id2score: make(map[string]float64),
+			id2score: map[string]float64{
+				"1": 1.916290731874155,
+			},
 		},
 		{
 			searcher: regexpSearcherCo,
-			id2score: make(map[string]float64),
+			id2score: map[string]float64{
+				"2": 0.33875554280828685,
+				"3": 0.33875554280828685,
+			},
 		},
 	}
-	tests[0].id2score["1"] = 1.916290731874155
-	tests[1].id2score["2"] = 0.33875554280828685
-	tests[1].id2score["3"] = 0.33875554280828685
 
 	for testIndex, test := range tests {
 		defer func() {
