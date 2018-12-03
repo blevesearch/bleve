@@ -31,6 +31,10 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string,
 		return nil, fmt.Errorf("fuzziness exceeds max (%d)", MaxFuzziness)
 	}
 
+	if fuzziness < 0 {
+		return nil, fmt.Errorf("invalid fuzziness, negative")
+	}
+
 	// Note: we don't byte slice the term for a prefix because of runes.
 	prefixTerm := ""
 	for i, r := range term {
