@@ -545,6 +545,11 @@ func TestNestedBooleanSearchers(t *testing.T) {
 	if matches != len(searchResults.Hits) {
 		t.Fatalf("Unexpected result set, %v != %v", matches, len(searchResults.Hits))
 	}
+
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestNestedBooleanMustNotSearcher(t *testing.T) {
@@ -668,6 +673,11 @@ func TestNestedBooleanMustNotSearcher(t *testing.T) {
 	if res.Total != 0 {
 		t.Fatalf("Unexpected result, %v != 0", res.Total)
 	}
+
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestSearchScorchOverEmptyKeyword(t *testing.T) {
@@ -726,6 +736,11 @@ func TestSearchScorchOverEmptyKeyword(t *testing.T) {
 	}
 	if res.Total != 10 {
 		t.Fatalf("Unexpected search hits: %v, expected 10", res.Total)
+	}
+
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -867,5 +882,10 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 
 	if res.Total != 1 {
 		t.Fatalf("Unexpected result, %v != 1", res.Total)
+	}
+
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
