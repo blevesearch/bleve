@@ -36,7 +36,6 @@ func TestIndexReader(t *testing.T) {
 		}
 	}()
 
-
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
