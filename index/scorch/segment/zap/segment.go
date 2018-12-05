@@ -418,13 +418,28 @@ func (s *SegmentBase) DocNumbers(ids []string) (*roaring.Bitmap, error) {
 		}
 
 		postingsList := emptyPostingsList
+		filteredIds := make([]string, 0, len(ids))
+		sMax := ""
+
+		sMaxB, err := idDict.fst.GetMaxKey()
+		if err != nil {
+			return nil, err
+		}
+		sMax = string(sMaxB)
 		for _, id := range ids {
+			if id <= sMax {
+				filteredIds = append(filteredIds, id)
+			}
+		}
+
+		for _, id := range filteredIds {
 			postingsList, err = idDict.postingsList([]byte(id), nil, postingsList)
 			if err != nil {
 				return nil, err
 			}
 			postingsList.OrInto(rv)
 		}
+
 	}
 
 	return rv, nil
