@@ -33,6 +33,7 @@ import (
 	"github.com/blevesearch/bleve/analysis/tokenizer/whitespace"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index/scorch"
+	"github.com/blevesearch/bleve/index/upsidedown"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/query"
@@ -887,4 +888,107 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 	if res.Total != 1 {
 		t.Fatalf("Unexpected result, %v != 1", res.Total)
 	}
+}
+
+func testBooleanMustNotSearcher(t *testing.T, indexName string) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	im := NewIndexMapping()
+	idx, err := NewUsing("testidx", im, indexName, Config.DefaultKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	docs := []struct {
+		Name    string
+		HasRole bool
+	}{
+		{
+			Name: "13900",
+		},
+		{
+			Name: "13901",
+		},
+		{
+			Name: "13965",
+		},
+		{
+			Name:    "13966",
+			HasRole: true,
+		},
+		{
+			Name:    "13967",
+			HasRole: true,
+		},
+	}
+
+	for _, doc := range docs {
+		err := idx.Index(doc.Name, doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	lhs := NewDocIDQuery([]string{"13965", "13966", "13967"})
+	hasRole := NewBoolFieldQuery(true)
+	hasRole.SetField("HasRole")
+	rhs := NewBooleanQuery()
+	rhs.AddMustNot(hasRole)
+
+	var compareLeftRightAndConjunction = func(idx Index, left, right query.Query) error {
+		// left
+		lr := NewSearchRequestOptions(left, 100, 0, false)
+		lres, err := idx.Search(lr)
+		if err != nil {
+			return fmt.Errorf("error left: %v", err)
+		}
+		lresIds := map[string]struct{}{}
+		for i := range lres.Hits {
+			lresIds[lres.Hits[i].ID] = struct{}{}
+		}
+		// right
+		rr := NewSearchRequestOptions(right, 100, 0, false)
+		rres, err := idx.Search(rr)
+		if err != nil {
+			return fmt.Errorf("error right: %v", err)
+		}
+		rresIds := map[string]struct{}{}
+		for i := range rres.Hits {
+			rresIds[rres.Hits[i].ID] = struct{}{}
+		}
+		// conjunction
+		cr := NewSearchRequestOptions(NewConjunctionQuery(left, right), 100, 0, false)
+		cres, err := idx.Search(cr)
+		if err != nil {
+			return fmt.Errorf("error conjunction: %v", err)
+		}
+		for i := range cres.Hits {
+			if _, ok := lresIds[cres.Hits[i].ID]; ok {
+				if _, ok := rresIds[cres.Hits[i].ID]; !ok {
+					return fmt.Errorf("error id %s missing from right", cres.Hits[i].ID)
+				}
+			} else {
+				return fmt.Errorf("error id %s missing from left", cres.Hits[i].ID)
+			}
+		}
+		return nil
+	}
+
+	err = compareLeftRightAndConjunction(idx, lhs, rhs)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBooleanMustNotSearcherUpsidedown(t *testing.T) {
+	testBooleanMustNotSearcher(t, upsidedown.Name)
+}
+
+func TestBooleanMustNotSearcherScorch(t *testing.T) {
+	testBooleanMustNotSearcher(t, scorch.Name)
 }

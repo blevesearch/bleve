@@ -356,10 +356,10 @@ func (s *BooleanSearcher) Advance(ctx *search.SearchContext, ID index.IndexInter
 		}
 
 		if s.mustNotSearcher != nil {
-			// Additional check for mustNotSearcher whose cursor isn't tracked by
-			// currentID to prevent it from moving when the searcher's already
-			// where it should be.
-			if s.currMustNot == nil || !s.currMustNot.IndexInternalID.Equals(ID) {
+			// Additional check for mustNotSearcher, whose cursor isn't tracked by
+			// currentID to prevent it from moving when the searcher's tracked
+			// position is already ahead of or at the requested ID.
+			if s.currMustNot == nil || s.currMustNot.IndexInternalID.Compare(ID) < 0 {
 				if s.currMustNot != nil {
 					ctx.DocumentMatchPool.Put(s.currMustNot)
 				}
