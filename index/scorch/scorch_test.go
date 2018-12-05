@@ -39,12 +39,19 @@ func init() {
 	DefaultPersisterNapTimeMSec = 1
 }
 
-func DestroyTest() error {
-	return os.RemoveAll("/tmp/bleve-scorch-test")
+func InitTest(cfg map[string]interface{}) error {
+	return os.RemoveAll(cfg["path"].(string))
 }
 
-var testConfig = map[string]interface{}{
-	"path": "/tmp/bleve-scorch-test",
+func DestroyTest(cfg map[string]interface{}) error {
+	return os.RemoveAll(cfg["path"].(string))
+}
+
+func CreateConfig(name string) map[string]interface{} {
+	// TODO: Use t.Name() when Go 1.7 support terminates.
+	rv := make(map[string]interface{})
+	rv["path"] = os.TempDir() + "/bleve-scorch-test-" + name
+	return rv
 }
 
 var testAnalyzer = &analysis.Analyzer{
@@ -52,15 +59,20 @@ var testAnalyzer = &analysis.Analyzer{
 }
 
 func TestIndexOpenReopen(t *testing.T) {
+	cfg := CreateConfig("TestIndexOpenReopen")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +129,7 @@ func TestIndexOpenReopen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	idx, err = NewScorch(Name, testConfig, analysisQueue)
+	idx, err = NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,15 +163,20 @@ func TestIndexOpenReopen(t *testing.T) {
 }
 
 func TestIndexInsert(t *testing.T) {
+	cfg := CreateConfig("TestIndexInsert")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,15 +234,20 @@ func TestIndexInsert(t *testing.T) {
 }
 
 func TestIndexInsertThenDelete(t *testing.T) {
+	cfg := CreateConfig("TestIndexInsertThenDelete")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +365,7 @@ func TestIndexInsertThenDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	idx, err = NewScorch(Name, testConfig, analysisQueue) // reopen
+	idx, err = NewScorch(Name, cfg, analysisQueue) // reopen
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,15 +450,20 @@ func TestIndexInsertThenDelete(t *testing.T) {
 }
 
 func TestIndexInsertThenUpdate(t *testing.T) {
+	cfg := CreateConfig("TestIndexInsertThenUpdate")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -495,15 +522,20 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 }
 
 func TestIndexInsertMultiple(t *testing.T) {
+	cfg := CreateConfig("TestIndexInsertMultiple")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -562,15 +594,20 @@ func TestIndexInsertMultiple(t *testing.T) {
 }
 
 func TestIndexInsertWithStore(t *testing.T) {
+	cfg := CreateConfig("TestIndexInsertWithStore")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -579,9 +616,9 @@ func TestIndexInsertWithStore(t *testing.T) {
 		t.Fatalf("error opening index: %v", err)
 	}
 	defer func() {
-		cerr := idx.Close()
+		err := idx.Close()
 		if err != nil {
-			t.Fatal(cerr)
+			t.Fatal(err)
 		}
 	}()
 
@@ -661,15 +698,20 @@ func TestIndexInsertWithStore(t *testing.T) {
 }
 
 func TestIndexInternalCRUD(t *testing.T) {
+	cfg := CreateConfig("TestIndexInternalCRUD")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -767,15 +809,20 @@ func TestIndexInternalCRUD(t *testing.T) {
 }
 
 func TestIndexBatch(t *testing.T) {
+	cfg := CreateConfig("TestIndexBatch")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -885,15 +932,20 @@ func TestIndexBatch(t *testing.T) {
 }
 
 func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
+	cfg := CreateConfig("TestIndexInsertUpdateDeleteWithMultipleTypesStored")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1103,15 +1155,20 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 }
 
 func TestIndexInsertFields(t *testing.T) {
+	cfg := CreateConfig("TestIndexInsertFields")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1172,15 +1229,20 @@ func TestIndexInsertFields(t *testing.T) {
 }
 
 func TestIndexUpdateComposites(t *testing.T) {
+	cfg := CreateConfig("TestIndexUpdateComposites")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1249,15 +1311,20 @@ func TestIndexUpdateComposites(t *testing.T) {
 }
 
 func TestIndexTermReaderCompositeFields(t *testing.T) {
+	cfg := CreateConfig("TestIndexTermReaderCompositeFields")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1314,15 +1381,20 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 }
 
 func TestIndexDocumentVisitFieldTerms(t *testing.T) {
+	cfg := CreateConfig("TestIndexDocumentVisitFieldTerms")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1463,15 +1535,20 @@ func TestFieldTermsConcurrent(t *testing.T) {
 }
 
 func TestConcurrentUpdate(t *testing.T) {
+	cfg := CreateConfig("TestConcurrentUpdate")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1507,6 +1584,12 @@ func TestConcurrentUpdate(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer func() {
+		err := r.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	doc, err := r.Document("1")
 	if err != nil {
@@ -1519,15 +1602,20 @@ func TestConcurrentUpdate(t *testing.T) {
 }
 
 func TestLargeField(t *testing.T) {
+	cfg := CreateConfig("TestLargeField")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1581,15 +1669,20 @@ This section needs additional citations for verification. Please help improve th
 There are three characteristics of liquids which are relevant to the discussion of a BLEVE:`)
 
 func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
+	cfg := CreateConfig("TestIndexDocumentVisitFieldTermsWithMultipleDocs")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1733,15 +1826,20 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 }
 
 func TestIndexDocumentVisitFieldTermsWithMultipleFieldOptions(t *testing.T) {
+	cfg := CreateConfig("TestIndexDocumentVisitFieldTermsWithMultipleFieldOptions")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
-			t.Fatal(err)
+			t.Log(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1803,6 +1901,19 @@ func TestIndexDocumentVisitFieldTermsWithMultipleFieldOptions(t *testing.T) {
 
 func TestAllFieldWithDifferentTermVectorsEnabled(t *testing.T) {
 	// Based on https://github.com/blevesearch/bleve/issues/895 from xeizmendi
+	cfg := CreateConfig("TestAllFieldWithDifferentTermVectorsEnabled")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	testConfig := cfg
 	mp := mapping.NewIndexMapping()
 
 	keywordMapping := mapping.NewTextFieldMapping()
@@ -1821,7 +1932,6 @@ func TestAllFieldWithDifferentTermVectorsEnabled(t *testing.T) {
 
 	mp.DefaultMapping = docMapping
 
-	_ = os.RemoveAll(testConfig["path"].(string))
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewScorch("storeName", testConfig, analysisQueue)
 	if err != nil {
@@ -1832,8 +1942,10 @@ func TestAllFieldWithDifferentTermVectorsEnabled(t *testing.T) {
 		t.Errorf("error opening index: %v", err)
 	}
 	defer func() {
-		_ = idx.Close()
-		_ = os.RemoveAll(testConfig["path"].(string))
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	data := map[string]string{
