@@ -27,8 +27,12 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
-	"github.com/couchbase/vellum/levenshtein"
+	"github.com/couchbase/vellum"
+	lev2 "github.com/couchbase/vellum/levenshtein2"
 )
+
+// re usable, threadsafe levenshtein builders
+var lb1, lb2 *lev2.LevenshteinAutomatonBuilder
 
 type asynchSegmentResult struct {
 	dictItr segment.DictionaryIterator
@@ -46,6 +50,15 @@ var reflectStaticSizeIndexSnapshot int
 func init() {
 	var is interface{} = IndexSnapshot{}
 	reflectStaticSizeIndexSnapshot = int(reflect.TypeOf(is).Size())
+	var err error
+	lb1, err = lev2.NewLevenshteinAutomatonBuilder(1, true)
+	if err != nil {
+		panic(fmt.Errorf("Levenshtein automaton ed1 builder err: %v", err))
+	}
+	lb2, err = lev2.NewLevenshteinAutomatonBuilder(2, true)
+	if err != nil {
+		panic(fmt.Errorf("Levenshtein automaton ed2 builder err: %v", err))
+	}
 }
 
 type IndexSnapshot struct {
@@ -194,9 +207,19 @@ func (i *IndexSnapshot) FieldDictRegexp(field string,
 	})
 }
 
+func (i *IndexSnapshot) getLevAutomaton(term string,
+	fuzziness uint8) (vellum.Automaton, error) {
+	if fuzziness == 1 {
+		return lb1.BuildDfa(term, fuzziness)
+	} else if fuzziness == 2 {
+		return lb2.BuildDfa(term, fuzziness)
+	}
+	return nil, fmt.Errorf("fuzziness exceeds the max limit")
+}
+
 func (i *IndexSnapshot) FieldDictFuzzy(field string,
 	term string, fuzziness int, prefix string) (index.FieldDict, error) {
-	a, err := levenshtein.New(term, fuzziness)
+	a, err := i.getLevAutomaton(term, uint8(fuzziness))
 	if err != nil {
 		return nil, err
 	}
