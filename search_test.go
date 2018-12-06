@@ -430,13 +430,6 @@ func TestMemoryNeededForSearchResult(t *testing.T) {
 
 // https://github.com/blevesearch/bleve/issues/954
 func TestNestedBooleanSearchers(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
 	// create an index with a custom analyzer
 	idxMapping := NewIndexMapping()
 	if err := idxMapping.AddCustomAnalyzer("3xbla", map[string]interface{}{
@@ -452,6 +445,18 @@ func TestNestedBooleanSearchers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// create and insert documents as a batch
 	batch := idx.NewBatch()
@@ -545,27 +550,27 @@ func TestNestedBooleanSearchers(t *testing.T) {
 	if matches != len(searchResults.Hits) {
 		t.Fatalf("Unexpected result set, %v != %v", matches, len(searchResults.Hits))
 	}
-
-	err = idx.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
 }
 
 func TestNestedBooleanMustNotSearcher(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
 	// create an index with default settings
 	idxMapping := NewIndexMapping()
 	idx, err := New("testidx", idxMapping)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// create and insert documents as a batch
 	batch := idx.NewBatch()
@@ -673,24 +678,10 @@ func TestNestedBooleanMustNotSearcher(t *testing.T) {
 	if res.Total != 0 {
 		t.Fatalf("Unexpected result, %v != 0", res.Total)
 	}
-
-	err = idx.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
 }
 
 func TestSearchScorchOverEmptyKeyword(t *testing.T) {
 	defaultIndexType := Config.DefaultIndexType
-
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-		Config.DefaultIndexType = defaultIndexType
-	}()
-
 	Config.DefaultIndexType = scorch.Name
 
 	dmap := mapping.NewDocumentMapping()
@@ -713,6 +704,20 @@ func TestSearchScorchOverEmptyKeyword(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+		Config.DefaultIndexType = defaultIndexType
+	}()
+
 	for i := 0; i < 10; i++ {
 		err = idx.Index(fmt.Sprint(i), map[string]string{"name": fmt.Sprintf("test%d", i), "id": ""})
 		if err != nil {
@@ -737,24 +742,10 @@ func TestSearchScorchOverEmptyKeyword(t *testing.T) {
 	if res.Total != 10 {
 		t.Fatalf("Unexpected search hits: %v, expected 10", res.Total)
 	}
-
-	err = idx.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
 }
 
 func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 	defaultIndexType := Config.DefaultIndexType
-
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-		Config.DefaultIndexType = defaultIndexType
-	}()
-
 	Config.DefaultIndexType = scorch.Name
 
 	// create an index with default settings
@@ -763,6 +754,19 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+		Config.DefaultIndexType = defaultIndexType
+	}()
 
 	// create and insert documents as a batch
 	batch := idx.NewBatch()
@@ -882,10 +886,5 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 
 	if res.Total != 1 {
 		t.Fatalf("Unexpected result, %v != 1", res.Total)
-	}
-
-	err = idx.Close()
-	if err != nil {
-		t.Fatal(err)
 	}
 }
