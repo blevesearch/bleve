@@ -1462,7 +1462,7 @@ func TestConcurrentUpdate(t *testing.T) {
 		}
 	}()
 
-	analysisQueue := index.NewAnalysisQueue(1)
+	analysisQueue := index.NewAnalysisQueue(10)
 	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
