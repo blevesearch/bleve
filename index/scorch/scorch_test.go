@@ -1477,23 +1477,23 @@ func TestConcurrentUpdate(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-
+/*
 	// do some concurrent updates
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func(i int) {
-			/*doc := document.NewDocument("1")
+			doc := document.NewDocument("1")
 			doc.AddField(document.NewTextFieldWithIndexingOptions(strconv.Itoa(i), []uint64{}, []byte(strconv.Itoa(i)), document.StoreField))
 			err := idx.Update(doc)
 			if err != nil {
 				t.Errorf("Error updating index: %v", err)
-			}*/
+			}
 			wg.Done()
 		}(i)
 	}
 	wg.Wait()
-
+*/
 	// now load the name field and see what we get
 	r, err := idx.Reader()
 	if err != nil {
