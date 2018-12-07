@@ -15,7 +15,6 @@
 package searcher
 
 import (
-	"io/ioutil"
 	"math"
 	"regexp"
 
@@ -48,9 +47,8 @@ func initTwoDocUpsideDown() index.Index {
 	return twoDocIndex
 }
 
-func initTwoDocScorch() index.Index {
+func initTwoDocScorch(dir string) index.Index {
 	analysisQueue := index.NewAnalysisQueue(1)
-	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
 	twoDocIndex, err := scorch.NewScorch(
 		scorch.Name,
 		map[string]interface{}{
@@ -68,11 +66,13 @@ func initTwoDocs(twoDocIndex index.Index) {
 	if err != nil {
 		panic(err)
 	}
+	batch := index.NewBatch()
 	for _, doc := range twoDocIndexDocs {
-		err := twoDocIndex.Update(doc)
-		if err != nil {
-			panic(err)
-		}
+		batch.Update(doc)
+	}
+	err = twoDocIndex.Batch(batch)
+	if err != nil {
+		panic(err)
 	}
 }
 

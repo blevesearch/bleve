@@ -17,6 +17,8 @@ package searcher
 import (
 	"encoding/binary"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"regexp"
 	"testing"
 
@@ -37,13 +39,23 @@ func TestRegexpStringSearchUpsideDown(t *testing.T) {
 }
 
 func TestRegexpSearchScorch(t *testing.T) {
-	twoDocIndex := initTwoDocScorch()
+	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
+
+	twoDocIndex := initTwoDocScorch(dir)
 	testRegexpSearch(t, twoDocIndex, internalIDMakerScorch, searcherMaker)
 	_ = twoDocIndex.Close()
 }
 
 func TestRegexpStringSearchScorch(t *testing.T) {
-	twoDocIndex := initTwoDocScorch()
+	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
+
+	twoDocIndex := initTwoDocScorch(dir)
 	testRegexpSearch(t, twoDocIndex, internalIDMakerScorch, searcherStringMaker)
 	_ = twoDocIndex.Close()
 }
@@ -101,29 +113,20 @@ func testRegexpSearch(t *testing.T, twoDocIndex index.Index,
 	regexpSearcherCo := searcherMaker(t, twoDocIndexReader, "co.*", "desc")
 
 	tests := []struct {
-		searcher  search.Searcher
-		expecteds []*search.DocumentMatch
+		searcher search.Searcher
+		id2score map[string]float64
 	}{
 		{
 			searcher: regexpSearcher,
-			expecteds: []*search.DocumentMatch{
-				{
-					IndexInternalID: internalIDMaker(1),
-					Score:           1.916290731874155,
-				},
+			id2score: map[string]float64{
+				"1": 1.916290731874155,
 			},
 		},
 		{
 			searcher: regexpSearcherCo,
-			expecteds: []*search.DocumentMatch{
-				{
-					IndexInternalID: internalIDMaker(2),
-					Score:           0.33875554280828685,
-				},
-				{
-					IndexInternalID: internalIDMaker(3),
-					Score:           0.33875554280828685,
-				},
+			id2score: map[string]float64{
+				"2": 0.33875554280828685,
+				"3": 0.33875554280828685,
 			},
 		},
 	}
@@ -142,14 +145,14 @@ func testRegexpSearch(t *testing.T, twoDocIndex index.Index,
 		next, err := test.searcher.Next(ctx)
 		i := 0
 		for err == nil && next != nil {
-			if i < len(test.expecteds) {
-				if !next.IndexInternalID.Equals(test.expecteds[i].IndexInternalID) {
-					t.Errorf("test %d, expected result %d to have id %s got %s, next: %#v",
-						testIndex, i, test.expecteds[i].IndexInternalID, next.IndexInternalID, next)
-				}
-				if next.Score != test.expecteds[i].Score {
+			exID, _ := twoDocIndexReader.ExternalID(next.IndexInternalID)
+			if _, ok := test.id2score[exID]; !ok {
+				t.Errorf("test %d, found unexpected docID = %v, next = %v", testIndex, exID, next)
+			} else {
+				score := test.id2score[exID]
+				if next.Score != score {
 					t.Errorf("test %d, expected result %d to have score %v got %v,next: %#v",
-						testIndex, i, test.expecteds[i].Score, next.Score, next)
+						testIndex, i, score, next.Score, next)
 					t.Logf("scoring explanation: %s", next.Expl)
 				}
 			}
@@ -160,8 +163,8 @@ func testRegexpSearch(t *testing.T, twoDocIndex index.Index,
 		if err != nil {
 			t.Fatalf("error iterating searcher: %v for test %d", err, testIndex)
 		}
-		if len(test.expecteds) != i {
-			t.Errorf("expected %d results got %d for test %d", len(test.expecteds), i, testIndex)
+		if len(test.id2score) != i {
+			t.Errorf("expected %d results got %d for test %d", len(test.id2score), i, testIndex)
 		}
 	}
 }
