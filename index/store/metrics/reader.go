@@ -14,7 +14,12 @@
 
 package metrics
 
-import "github.com/blevesearch/bleve/index/store"
+import (
+	"errors"
+	"io"
+
+	"github.com/blevesearch/bleve/index/store"
+)
 
 type Reader struct {
 	s *Store
@@ -53,6 +58,10 @@ func (r *Reader) RangeIterator(start, end []byte) (i store.KVIterator) {
 		i = &Iterator{s: r.s, o: r.o.RangeIterator(start, end)}
 	})
 	return
+}
+
+func (r *Reader) WriteTo(w io.Writer) error {
+	return errors.New("WriteTo not implemented for metrics")
 }
 
 func (r *Reader) Close() error {

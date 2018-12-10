@@ -15,6 +15,9 @@
 package moss
 
 import (
+	"errors"
+	"io"
+
 	"github.com/couchbase/moss"
 
 	"github.com/blevesearch/bleve/index/store"
