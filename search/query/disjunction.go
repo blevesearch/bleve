@@ -76,9 +76,14 @@ func (q *DisjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 		}
 		ss = append(ss, sr)
 	}
+
 	if len(ss) < 1 {
 		return searcher.NewMatchNoneSearcher(i)
+	} else if len(ss) == 1 {
+		// return the single nested searcher as is
+		return ss[0], nil
 	}
+
 	return searcher.NewDisjunctionSearcher(i, ss, q.Min, options)
 }
 
