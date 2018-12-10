@@ -83,8 +83,8 @@ func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
 	return rv
 }
 
-func (r *Reader) WriteTo(w io.Writer) error {
-	return errors.New("WriteTo not implemented for moss")
+func (r *Reader) WriteTo(w io.Writer) (int64, error) {
+	return 0, errors.New("WriteTo not implemented for moss")
 }
 
 func (r *Reader) Close() error {

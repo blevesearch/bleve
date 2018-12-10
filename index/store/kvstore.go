@@ -65,7 +65,7 @@ type KVReader interface {
 
 	// WriteTo uses an io.Writer to write in the store.
 	// For now, it is only supported for boltdb store.
-	WriteTo(w io.Writer) error
+	WriteTo(w io.Writer) (int64, error)
 
 	// Close closes the iterator
 	Close() error

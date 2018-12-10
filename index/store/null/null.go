@@ -59,8 +59,8 @@ func (r *reader) RangeIterator(start, end []byte) store.KVIterator {
 	return &iterator{}
 }
 
-func (r *reader) WriteTo(w io.Writer) error {
-	return nil
+func (r *reader) WriteTo(w io.Writer) (int64, error) {
+	return 0, nil
 }
 
 func (r *reader) Close() error {

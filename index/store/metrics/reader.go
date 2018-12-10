@@ -60,8 +60,8 @@ func (r *Reader) RangeIterator(start, end []byte) (i store.KVIterator) {
 	return
 }
 
-func (r *Reader) WriteTo(w io.Writer) error {
-	return errors.New("WriteTo not implemented for metrics")
+func (r *Reader) WriteTo(w io.Writer) (int64, error) {
+	return 0, errors.New("WriteTo not implemented for metrics")
 }
 
 func (r *Reader) Close() error {

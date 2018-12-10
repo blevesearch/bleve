@@ -76,9 +76,8 @@ func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
 // If you call this from a read-only transaction,
 // it will perform a hot backup and not block
 // your other database reads and writes.
-func (r *Reader) WriteTo(w io.Writer) error {
-	_, err := r.tx.WriteTo(w)
-	return err
+func (r *Reader) WriteTo(w io.Writer) (int64, error) {
+	return r.tx.WriteTo(w)
 }
 
 func (r *Reader) Close() error {
