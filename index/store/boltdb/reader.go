@@ -70,6 +70,12 @@ func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
 	return rv
 }
 
+// As said in the BoltDB documentation:
+// You can use the Tx.WriteTo() function to write
+// a consistent view of the database to a writer.
+// If you call this from a read-only transaction,
+// it will perform a hot backup and not block
+// your other database reads and writes.
 func (r *Reader) WriteTo(w io.Writer) error {
 	_, err := r.tx.WriteTo(w)
 	return err

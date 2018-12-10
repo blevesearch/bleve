@@ -63,6 +63,8 @@ type KVReader interface {
 	// visit all K/V pairs >= start AND < end
 	RangeIterator(start, end []byte) KVIterator
 
+	// WriteTo uses an io.Writer to write in the store.
+	// For now, it is only supported for boltdb store.
 	WriteTo(w io.Writer) error
 
 	// Close closes the iterator
