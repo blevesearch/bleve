@@ -66,7 +66,7 @@ func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
 }
 
 func (r *Reader) WriteTo(w io.Writer) error {
-	return errors.New("WriteTo ot implemented for goleveldb")
+	return errors.New("WriteTo not implemented for goleveldb")
 }
 
 func (r *Reader) Close() error {
