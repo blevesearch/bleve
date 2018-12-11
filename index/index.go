@@ -251,16 +251,15 @@ type DocIDReader interface {
 type BatchCallback func(error)
 
 type Batch struct {
-	IndexOps    map[string]*document.Document
-	InternalOps map[string][]byte
-	callbacks   []BatchCallback
+	IndexOps          map[string]*document.Document
+	InternalOps       map[string][]byte
+	persistedCallback BatchCallback
 }
 
 func NewBatch() *Batch {
 	return &Batch{
 		IndexOps:    make(map[string]*document.Document),
 		InternalOps: make(map[string][]byte),
-		callbacks:   nil,
 	}
 }
 
@@ -280,12 +279,12 @@ func (b *Batch) DeleteInternal(key []byte) {
 	b.InternalOps[string(key)] = nil
 }
 
-func (b *Batch) AddCallback(f BatchCallback) {
-	b.callbacks = append(b.callbacks, f)
+func (b *Batch) SetPersistedCallback(f BatchCallback) {
+	b.persistedCallback = f
 }
 
-func (b *Batch) Callbacks() []BatchCallback {
-	return b.callbacks
+func (b *Batch) PersistedCallback() BatchCallback {
+	return b.persistedCallback
 }
 
 func (b *Batch) String() string {
@@ -310,7 +309,7 @@ func (b *Batch) String() string {
 func (b *Batch) Reset() {
 	b.IndexOps = make(map[string]*document.Document)
 	b.InternalOps = make(map[string][]byte)
-	b.callbacks = nil
+	b.persistedCallback = nil
 }
 
 func (b *Batch) Merge(o *Batch) {

@@ -116,7 +116,7 @@ OUTER:
 
 		var ourSnapshot *IndexSnapshot
 		var ourPersisted []chan error
-		var ourCallbacks []index.BatchCallback
+		var ourPersistedCallbacks []index.BatchCallback
 
 		// check to see if there is a new snapshot to persist
 		s.rootLock.Lock()
@@ -125,8 +125,8 @@ OUTER:
 			ourSnapshot.AddRef()
 			ourPersisted = s.rootPersisted
 			s.rootPersisted = nil
-			ourCallbacks = s.callbacks
-			s.callbacks = nil
+			ourPersistedCallbacks = s.persistedCallbacks
+			s.persistedCallbacks = nil
 			atomic.StoreUint64(&s.iStats.persistSnapshotSize, uint64(ourSnapshot.Size()))
 			atomic.StoreUint64(&s.iStats.persistEpoch, ourSnapshot.epoch)
 		}
@@ -154,8 +154,8 @@ OUTER:
 				atomic.AddUint64(&s.stats.TotPersistLoopErr, 1)
 				continue OUTER
 			}
-			for i := range ourCallbacks {
-				ourCallbacks[i](err)
+			for i := range ourPersistedCallbacks {
+				ourPersistedCallbacks[i](err)
 			}
 
 			atomic.StoreUint64(&s.stats.LastPersistedEpoch, ourSnapshot.epoch)

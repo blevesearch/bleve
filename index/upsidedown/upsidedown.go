@@ -959,9 +959,9 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 		atomic.AddUint64(&udc.stats.errors, 1)
 	}
 
-	// For sake of completeness
-	for i := range batch.Callbacks() {
-		batch.Callbacks()[i](err)
+	persistedCallback := batch.PersistedCallback()
+	if persistedCallback != nil {
+		persistedCallback(err)
 	}
 	return
 }
