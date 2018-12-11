@@ -933,16 +933,16 @@ func TestIndexBatch(t *testing.T) {
 }
 
 func TestIndexBatchWithCallbacks(t *testing.T) {
-
+	cfg := CreateConfig("TestIndexBatchWithCallbacks")
 	defer func() {
-		err := DestroyTest()
+		err := DestroyTest(cfg)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewScorch(Name, testConfig, analysisQueue)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -965,7 +965,7 @@ func TestIndexBatchWithCallbacks(t *testing.T) {
 	doc := document.NewDocument("3")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test3")))
 	batch.Update(doc)
-	batch.AddCallback(func(e error) {
+	batch.SetPersistedCallback(func(e error) {
 		updated = true
 		cbErr = e
 
