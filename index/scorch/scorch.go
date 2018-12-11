@@ -54,6 +54,7 @@ type Scorch struct {
 	rootLock             sync.RWMutex
 	root                 *IndexSnapshot // holds 1 ref-count on the root
 	rootPersisted        []chan error   // closed when root is persisted
+	callbacks            []index.BatchCallback
 	nextSnapshotEpoch    uint64
 	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
@@ -355,7 +356,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		atomic.AddUint64(&s.stats.TotBatchesEmpty, 1)
 	}
 
-	err = s.prepareSegment(newSegment, ids, batch.InternalOps)
+	err = s.prepareSegment(newSegment, ids, batch.InternalOps, batch.Callbacks())
 	if err != nil {
 		if newSegment != nil {
 			_ = newSegment.Close()
@@ -375,7 +376,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
-	internalOps map[string][]byte) error {
+	internalOps map[string][]byte, callbacks []index.BatchCallback) error {
 
 	// new introduction
 	introduction := &segmentIntroduction{
@@ -385,6 +386,7 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 		obsoletes: make(map[uint64]*roaring.Bitmap),
 		internal:  internalOps,
 		applied:   make(chan error),
+		callbacks: callbacks,
 	}
 
 	if !s.unsafeBatch {
