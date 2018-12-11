@@ -158,7 +158,7 @@ func (s *ConjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentM
 	var rv *search.DocumentMatch
 	var err error
 OUTER:
-	for s.currs[s.maxIDIdx] != nil {
+	for s.maxIDIdx < len(s.currs) && s.currs[s.maxIDIdx] != nil {
 		maxID := s.currs[s.maxIDIdx].IndexInternalID
 
 		i := 0

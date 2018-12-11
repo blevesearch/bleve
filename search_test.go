@@ -997,3 +997,20 @@ func TestBooleanMustNotSearcherUpsidedown(t *testing.T) {
 func TestBooleanMustNotSearcherScorch(t *testing.T) {
 	testBooleanMustNotSearcher(t, scorch.Name)
 }
+
+func TestQueryStringEmptyConjunctionSearcher(t *testing.T) {
+	mapping := NewIndexMapping()
+	mapping.DefaultAnalyzer = keyword.Name
+	index, err := NewMemOnly(mapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = index.Close()
+	}()
+
+	query := NewQueryStringQuery("foo:bar +baz:\"\"")
+	searchReq := NewSearchRequest(query)
+
+    _, _ = index.Search(searchReq)
+}
