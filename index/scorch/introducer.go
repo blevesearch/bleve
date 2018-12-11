@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
+	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 )
@@ -32,6 +33,7 @@ type segmentIntroduction struct {
 
 	applied   chan error
 	persisted chan error
+	callbacks []index.BatchCallback
 }
 
 type persistIntroduction struct {
@@ -48,6 +50,7 @@ type snapshotReversion struct {
 	snapshot  *IndexSnapshot
 	applied   chan error
 	persisted chan error
+	callbacks []index.BatchCallback
 }
 
 func (s *Scorch) mainLoop() {
@@ -213,6 +216,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	if next.persisted != nil {
 		s.rootPersisted = append(s.rootPersisted, next.persisted)
 	}
+	s.callbacks = append(s.callbacks, next.callbacks...)
 	// swap in new index snapshot
 	newSnapshot.epoch = s.nextSnapshotEpoch
 	s.nextSnapshotEpoch++
