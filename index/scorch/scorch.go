@@ -526,7 +526,7 @@ func (s *Scorch) Analyze(d *document.Document) *index.AnalysisResult {
 			rv.Analyzed[i] = tokenFreqs
 			rv.Length[i] = fieldLength
 
-			if len(d.CompositeFields) > 0 {
+			if len(d.CompositeFields) > 0 && field.Name() != "_id" {
 				// see if any of the composite fields need this
 				for _, compositeField := range d.CompositeFields {
 					compositeField.Compose(field.Name(), fieldLength, tokenFreqs)
