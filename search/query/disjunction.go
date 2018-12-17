@@ -79,8 +79,8 @@ func (q *DisjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 
 	if len(ss) < 1 {
 		return searcher.NewMatchNoneSearcher(i)
-	} else if len(ss) == 1 {
-		// return the single nested searcher as is
+	} else if len(ss) == 1 && q.Min <= 1 {
+		// return the single nested searcher as is; only if min clauses is not greater than 1;
 		return ss[0], nil
 	}
 

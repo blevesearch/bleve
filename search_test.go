@@ -1012,5 +1012,74 @@ func TestQueryStringEmptyConjunctionSearcher(t *testing.T) {
 	query := NewQueryStringQuery("foo:bar +baz:\"\"")
 	searchReq := NewSearchRequest(query)
 
-    _, _ = index.Search(searchReq)
+	_, _ = index.Search(searchReq)
+}
+
+func TestDisjunctionQueryIncorrectMin(t *testing.T) {
+	// create an index with default settings
+	idxMapping := NewIndexMapping()
+	idx, err := New("testidx", idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// create and insert documents as a batch
+	batch := idx.NewBatch()
+	docs := []struct {
+		field1 string
+		field2 int
+	}{
+		{
+			field1: "one",
+			field2: 1,
+		},
+		{
+			field1: "two",
+			field2: 2,
+		},
+	}
+
+	for i := 0; i < len(docs); i++ {
+		doc := document.NewDocument(strconv.Itoa(docs[i].field2))
+		doc.Fields = []document.Field{
+			document.NewTextField("field1", []uint64{}, []byte(docs[i].field1)),
+			document.NewNumericField("field2", []uint64{}, float64(docs[i].field2)),
+		}
+		doc.CompositeFields = []*document.CompositeField{
+			document.NewCompositeFieldWithIndexingOptions(
+				"_all", true, []string{"text"}, []string{},
+				document.IndexField|document.IncludeTermVectors),
+		}
+		if err = batch.IndexAdvanced(doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	tq := NewTermQuery("one")
+	dq := NewDisjunctionQuery(tq)
+	dq.SetMin(2)
+	sr := NewSearchRequestOptions(dq, 1, 0, false)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total > 0 {
+		t.Fatalf("Expected 0 matches as disjunction query contains a single clause"+
+			" but got: %v", res.Total)
+	}
 }
