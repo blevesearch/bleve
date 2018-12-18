@@ -18,10 +18,18 @@
 			"notests": true
 		},
 		{
+			"importpath": "github.com/blevesearch/snowballstem",
+			"repository": "https://github.com/blevesearch/snowballstem",
+			"vcs": "",
+			"revision": "26b06a2c243d4f8ca5db3486f94409dd5b2a7467",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/boltdb/bolt",
 			"repository": "https://github.com/boltdb/bolt",
 			"vcs": "",
-			"revision": "144418e1475d8bf7abbdc48583500f1a20c62ea7",
+			"revision": "9da31745363232bc1e27dbab3569e77383a51585",
 			"branch": "master",
 			"notests": true
 		},
@@ -29,7 +37,7 @@
 			"importpath": "github.com/couchbase/moss",
 			"repository": "https://github.com/couchbase/moss",
 			"vcs": "git",
-			"revision": "fc637b3f82ec5b8139b0d295f6588c6a2bea5a16",
+			"revision": "013a19c55df3e689a66b632c7c8074e37162217d",
 			"branch": "master",
 			"notests": true
 		},
@@ -67,6 +75,14 @@
 			"notests": true
 		},
 		{
+			"importpath": "github.com/RoaringBitmap/roaring",
+			"repository": "https://github.com/RoaringBitmap/roaring",
+			"vcs": "",
+			"revision": "01d244c43a7e8d1191a4f369f5908ea9eb9bc9ac",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/seiflotfy/cuckoofilter",
 			"repository": "https://github.com/seiflotfy/cuckoofilter",
 			"vcs": "git",
@@ -100,15 +116,6 @@
 			"notests": true
 		},
 		{
-			"importpath": "golang.org/x/net/context",
-			"repository": "https://go.googlesource.com/net",
-			"vcs": "",
-			"revision": "e45385e9b226f570b1f086bf287b25d3d4117776",
-			"branch": "master",
-			"path": "/context",
-			"notests": true
-		},
-		{
 			"importpath": "golang.org/x/text/transform",
 			"repository": "https://go.googlesource.com/text",
 			"vcs": "",
@@ -124,6 +131,14 @@
 			"revision": "5ee49cfe751141f8017047bab800d1f528ee3be1",
 			"branch": "master",
 			"path": "/unicode/norm",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/couchbase/vellum",
+			"repository": "https://github.com/couchbase/vellum",
+			"vcs": "git",
+			"revision": "f377ee3282b954c46915d89482bf93288ee7dd12",
+			"branch": "master",
 			"notests": true
 		}
 	]
