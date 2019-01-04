@@ -423,21 +423,17 @@ func (s *SegmentBase) DocNumbers(ids []string) (*roaring.Bitmap, error) {
 		sMax := ""
 		iMin := ""
 
-		if len(ids) > 0 {
-			sMaxB, err := idDict.fst.GetMaxKey()
-			if err != nil {
-				skipCheck = true
-			} else {
-				sMax = string(sMaxB)
-				iMin = ids[0]
-				for i := 1; i < len(ids); i++ {
-					if ids[i] < iMin {
-						iMin = ids[i]
-					}
+		sMaxB, err := idDict.fst.GetMaxKey()
+		if err != nil {
+			skipCheck = true
+		} else {
+			sMax = string(sMaxB)
+			iMin = ids[0]
+			for i := 1; i < len(ids); i++ {
+				if ids[i] < iMin {
+					iMin = ids[i]
 				}
 			}
-		} else {
-			skipCheck = true
 		}
 		if skipCheck || (iMin <= sMax) {
 			for _, id := range ids {
