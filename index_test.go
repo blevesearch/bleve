@@ -2073,3 +2073,79 @@ func TestBatchMerge(t *testing.T) {
 	}
 
 }
+
+func TestBug1096(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// use default mapping
+	mapping := NewIndexMapping()
+
+	// create a scorch index with default SAFE batches
+	var idx Index
+	idx, err = NewUsing("testidx", mapping, "scorch", "scorch", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// create a single batch instance that we will reuse
+	// this should be safe because we have single goroutine
+	// and we always wait for batch execution to finish
+	batch := idx.NewBatch()
+
+	// number of batches to execute
+	for i := 0; i < 10; i++ {
+
+		// number of documents to put into the batch
+		for j := 0; j < 91; j++ {
+
+			// create a doc id 0-90 (important so that we get id's 9 and 90)
+			// this could duplicate something already in the index
+			//   this too should be OK and update the item in the index
+			id := fmt.Sprintf("%d", j)
+
+			err = batch.Index(id, map[string]interface{}{
+				"name":  id,
+				"batch": fmt.Sprintf("%d", i),
+			})
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		// execute the batch
+		err = idx.Batch(batch)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// reset the batch before reusing it
+		batch.Reset()
+	}
+
+	// search for docs having name starting with the number 9
+	q := NewWildcardQuery("9*")
+	q.SetField("name")
+	req := NewSearchRequestOptions(q, 1000, 0, false)
+	req.Fields = []string{"*"}
+	var res *SearchResult
+	res, err = idx.Search(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// we expect only 2 hits, for docs 9 and 90
+	if res.Total > 2 {
+		t.Fatalf("expected only 2 hits '9' and '90', got %v", res)
+	}
+}
