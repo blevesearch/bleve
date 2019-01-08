@@ -137,7 +137,7 @@
 			"importpath": "github.com/couchbase/vellum",
 			"repository": "https://github.com/couchbase/vellum",
 			"vcs": "git",
-			"revision": "f377ee3282b954c46915d89482bf93288ee7dd12",
+			"revision": "28880ab96d9361ab5a74f0e12000f8fe0cd20712",
 			"branch": "master",
 			"notests": true
 		}
