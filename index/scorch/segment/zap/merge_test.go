@@ -71,7 +71,7 @@ func TestMerge(t *testing.T) {
 	segsToMerge[0] = segment.(*Segment)
 	segsToMerge[1] = segment2.(*Segment)
 
-	_, _, err = Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/scorch3.zap", 1024, nil)
+	_, _, err = Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/scorch3.zap", 1024, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func testMergeWithEmptySegments(t *testing.T, before bool, numEmptySegments int)
 
 	drops := make([]*roaring.Bitmap, len(segsToMerge))
 
-	_, _, err = Merge(segsToMerge, drops, "/tmp/scorch3.zap", 1024, nil)
+	_, _, err = Merge(segsToMerge, drops, "/tmp/scorch3.zap", 1024, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func testMergeWithSelf(t *testing.T, segCur *Segment, expectedCount uint64) {
 		segsToMerge := make([]*Segment, 1)
 		segsToMerge[0] = segCur
 
-		_, _, err := Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/"+fname, 1024, nil)
+		_, _, err := Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/"+fname, 1024, nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -589,7 +589,7 @@ func testMergeWithUpdates(t *testing.T, segmentDocIds [][]string, docsToDrop []*
 func testMergeAndDropSegments(t *testing.T, segsToMerge []*Segment, docsToDrop []*roaring.Bitmap, expectedNumDocs uint64) {
 	_ = os.RemoveAll("/tmp/scorch-merged.zap")
 
-	_, _, err := Merge(segsToMerge, docsToDrop, "/tmp/scorch-merged.zap", 1024, nil)
+	_, _, err := Merge(segsToMerge, docsToDrop, "/tmp/scorch-merged.zap", 1024, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -823,7 +823,7 @@ func TestMergeBytesWritten(t *testing.T) {
 	segsToMerge[0] = segment.(*Segment)
 	segsToMerge[1] = segment2.(*Segment)
 
-	_, nBytes, err := Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/scorch3.zap", 1024, nil)
+	_, nBytes, err := Merge(segsToMerge, []*roaring.Bitmap{nil, nil}, "/tmp/scorch3.zap", 1024, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
