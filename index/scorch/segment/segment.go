@@ -129,3 +129,7 @@ type DocumentFieldTermVisitable interface {
 
 type DocVisitState interface {
 }
+
+type StatsReporter interface {
+	ReportBytesWritten(bytesWritten uint64)
+}
