@@ -254,7 +254,7 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 		rv.Actual = rv.ActualBM.Iterator()
 	} else {
 		rv.ActualBM = p.postings
-		rv.Actual = p.postings.Iterator()
+		rv.Actual = rv.all // Optimize to use same iterator for all & Actual.
 	}
 
 	return rv
@@ -651,6 +651,10 @@ func (i *PostingsIterator) nextDocNumAtOrAfter(atOrAfter uint64) (uint64, bool, 
 		return 0, false, nil
 	}
 
+	if i.postings.postings == i.ActualBM {
+		return i.nextDocNumAtOrAfterClean(atOrAfter)
+	}
+
 	n := i.Actual.Next()
 	for uint64(n) < atOrAfter && i.Actual.HasNext() {
 		n = i.Actual.Next()
@@ -670,30 +674,9 @@ func (i *PostingsIterator) nextDocNumAtOrAfter(atOrAfter uint64) (uint64, bool, 
 	for allN != n {
 		// in the same chunk, so move the freq/norm/loc decoders forward
 		if i.includeFreqNorm && allNChunk == nChunk {
-			if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
-				err := i.loadChunk(int(nChunk))
-				if err != nil {
-					return 0, false, fmt.Errorf("error loading chunk: %v", err)
-				}
-			}
-
-			// read off freq/offsets even though we don't care about them
-			_, _, hasLocs, err := i.readFreqNormHasLocs()
+			err := i.currChunkNext(nChunk)
 			if err != nil {
 				return 0, false, err
-			}
-
-			if i.includeLocs && hasLocs {
-				numLocsBytes, err := binary.ReadUvarint(i.locReader)
-				if err != nil {
-					return 0, false, fmt.Errorf("error reading location numLocsBytes: %v", err)
-				}
-
-				// skip over all the location bytes
-				_, err = i.locReader.Seek(int64(numLocsBytes), io.SeekCurrent)
-				if err != nil {
-					return 0, false, err
-				}
 			}
 		}
 
@@ -709,6 +692,83 @@ func (i *PostingsIterator) nextDocNumAtOrAfter(atOrAfter uint64) (uint64, bool, 
 	}
 
 	return uint64(n), true, nil
+}
+
+// optimization when the postings list is "clean" (e.g., no updates &
+// no deletions) where the all bitmap is the same as the actual bitmap
+func (i *PostingsIterator) nextDocNumAtOrAfterClean(
+	atOrAfter uint64) (uint64, bool, error) {
+	sameChunkNexts := 0 // # of times we called Next() in the same chunk
+
+	n := i.Actual.Next()
+
+	nChunk := n / i.postings.sb.chunkFactor
+
+	for uint64(n) < atOrAfter && i.Actual.HasNext() {
+		n = i.Actual.Next()
+
+		nChunkPrev := nChunk
+		nChunk = n / i.postings.sb.chunkFactor
+
+		if nChunk != nChunkPrev {
+			sameChunkNexts = 0
+		} else {
+			sameChunkNexts += 1
+		}
+	}
+
+	if uint64(n) < atOrAfter {
+		// couldn't find anything
+		return 0, false, nil
+	}
+
+	if i.includeFreqNorm {
+		for j := 0; j < sameChunkNexts; j++ {
+			err := i.currChunkNext(nChunk)
+			if err != nil {
+				return 0, false, fmt.Errorf("error optimized currChunkNext: %v", err)
+			}
+		}
+
+		if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
+			err := i.loadChunk(int(nChunk))
+			if err != nil {
+				return 0, false, fmt.Errorf("error loading chunk: %v", err)
+			}
+		}
+	}
+
+	return uint64(n), true, nil
+}
+
+func (i *PostingsIterator) currChunkNext(nChunk uint32) error {
+	if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
+		err := i.loadChunk(int(nChunk))
+		if err != nil {
+			return fmt.Errorf("error loading chunk: %v", err)
+		}
+	}
+
+	// read off freq/offsets even though we don't care about them
+	_, _, hasLocs, err := i.readFreqNormHasLocs()
+	if err != nil {
+		return err
+	}
+
+	if i.includeLocs && hasLocs {
+		numLocsBytes, err := binary.ReadUvarint(i.locReader)
+		if err != nil {
+			return fmt.Errorf("error reading location numLocsBytes: %v", err)
+		}
+
+		// skip over all the location bytes
+		_, err = i.locReader.Seek(int64(numLocsBytes), io.SeekCurrent)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Posting is a single entry in a postings list
