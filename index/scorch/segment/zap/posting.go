@@ -666,14 +666,16 @@ func (i *PostingsIterator) nextDocNumAtOrAfter(atOrAfter uint64) (uint64, bool, 
 	allN := i.all.Next()
 
 	nChunk := n / i.postings.sb.chunkFactor
-	allNChunk := allN / i.postings.sb.chunkFactor
+
+	// when allN becomes >= to here, then allN is in the same chunk as nChunk.
+	allNReachesNChunk := nChunk * i.postings.sb.chunkFactor
 
 	// n is the next actual hit (excluding some postings), and
 	// allN is the next hit in the full postings, and
 	// if they don't match, move 'all' forwards until they do
 	for allN != n {
-		// in the same chunk, so move the freq/norm/loc decoders forward
-		if i.includeFreqNorm && allNChunk == nChunk {
+		// we've reached same chunk, so move the freq/norm/loc decoders forward
+		if i.includeFreqNorm && allN >= allNReachesNChunk {
 			err := i.currChunkNext(nChunk)
 			if err != nil {
 				return 0, false, err
@@ -681,7 +683,6 @@ func (i *PostingsIterator) nextDocNumAtOrAfter(atOrAfter uint64) (uint64, bool, 
 		}
 
 		allN = i.all.Next()
-		allNChunk = allN / i.postings.sb.chunkFactor
 	}
 
 	if i.includeFreqNorm && (i.currChunk != nChunk || i.currChunkFreqNorm == nil) {
