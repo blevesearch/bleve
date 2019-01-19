@@ -53,9 +53,9 @@ type OptimizeTFRConjunction struct {
 	tfrs []*IndexSnapshotTermFieldReader
 }
 
-func (o *OptimizeTFRConjunction) Finish() error {
+func (o *OptimizeTFRConjunction) Finish() (index.Optimized, error) {
 	if len(o.tfrs) <= 1 {
-		return nil
+		return nil, nil
 	}
 
 	for i := range o.snapshot.segment {
@@ -89,5 +89,5 @@ func (o *OptimizeTFRConjunction) Finish() error {
 		}
 	}
 
-	return nil
+	return nil, nil
 }

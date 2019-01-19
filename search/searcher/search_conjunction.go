@@ -77,7 +77,7 @@ func NewConjunctionSearcher(indexReader index.IndexReader, qsearchers []search.S
 		}
 
 		if octx != nil {
-			err := octx.Finish()
+			_, err := octx.Finish()
 			if err != nil {
 				return nil, err
 			}

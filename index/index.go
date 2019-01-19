@@ -341,11 +341,19 @@ type Optimizable interface {
 	Optimize(kind string, octx OptimizableContext) (OptimizableContext, error)
 }
 
+// Represents a result of optimization -- see the Finish() method.
+type Optimized interface{}
+
 type OptimizableContext interface {
 	// Once all the optimzable resources have been provided the same
 	// OptimizableContext instance, the optimization preparations are
 	// finished or completed via the Finish() method.
-	Finish() error
+	//
+	// Depending on the optimization being performed, the Finish()
+	// method might return a non-nil Optimized instance.  For example,
+	// the Optimized instance might represent an optimized
+	// TermFieldReader instance.
+	Finish() (Optimized, error)
 }
 
 type DocValueReader interface {
