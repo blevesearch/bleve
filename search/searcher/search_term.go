@@ -39,7 +39,8 @@ type TermSearcher struct {
 
 func NewTermSearcher(indexReader index.IndexReader, term string, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
 	termBytes := []byte(term)
-	reader, err := indexReader.TermFieldReader(termBytes, field, true, true, options.IncludeTermVectors)
+	needFreqNorm := !options.NoScore
+	reader, err := indexReader.TermFieldReader(termBytes, field, needFreqNorm, needFreqNorm, options.IncludeTermVectors)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +58,8 @@ func NewTermSearcher(indexReader index.IndexReader, term string, field string, b
 }
 
 func NewTermSearcherBytes(indexReader index.IndexReader, term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
-	reader, err := indexReader.TermFieldReader(term, field, true, true, options.IncludeTermVectors)
+	needFreqNorm := !options.NoScore
+	reader, err := indexReader.TermFieldReader(term, field, needFreqNorm, needFreqNorm, options.IncludeTermVectors)
 	if err != nil {
 		return nil, err
 	}

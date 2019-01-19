@@ -273,6 +273,7 @@ type SearchRequest struct {
 	Explain          bool              `json:"explain"`
 	Sort             search.SortOrder  `json:"sort"`
 	IncludeLocations bool              `json:"includeLocations"`
+	NoScore          bool              `json:"noScore"`
 }
 
 func (r *SearchRequest) Validate() error {
