@@ -651,7 +651,7 @@ func (i *PostingsIterator) nextDocNumAtOrAfter(atOrAfter uint64) (uint64, bool, 
 		return 0, false, nil
 	}
 
-	if i.postings.postings == i.ActualBM {
+	if i.postings == nil || i.postings.postings == i.ActualBM {
 		return i.nextDocNumAtOrAfterClean(atOrAfter)
 	}
 
@@ -699,9 +699,22 @@ func (i *PostingsIterator) nextDocNumAtOrAfter(atOrAfter uint64) (uint64, bool, 
 // no deletions) where the all bitmap is the same as the actual bitmap
 func (i *PostingsIterator) nextDocNumAtOrAfterClean(
 	atOrAfter uint64) (uint64, bool, error) {
-	sameChunkNexts := 0 // # of times we called Next() in the same chunk
-
 	n := i.Actual.Next()
+
+	if !i.includeFreqNorm {
+		for uint64(n) < atOrAfter && i.Actual.HasNext() {
+			n = i.Actual.Next()
+		}
+
+		if uint64(n) < atOrAfter {
+			return 0, false, nil // couldn't find anything
+		}
+
+		return uint64(n), true, nil
+	}
+
+	// freq-norm's needed, so maintain freq-norm chunk reader
+	sameChunkNexts := 0 // # of times we called Next() in the same chunk
 
 	nChunk := n / i.postings.sb.chunkFactor
 
@@ -723,19 +736,17 @@ func (i *PostingsIterator) nextDocNumAtOrAfterClean(
 		return 0, false, nil
 	}
 
-	if i.includeFreqNorm {
-		for j := 0; j < sameChunkNexts; j++ {
-			err := i.currChunkNext(nChunk)
-			if err != nil {
-				return 0, false, fmt.Errorf("error optimized currChunkNext: %v", err)
-			}
+	for j := 0; j < sameChunkNexts; j++ {
+		err := i.currChunkNext(nChunk)
+		if err != nil {
+			return 0, false, fmt.Errorf("error optimized currChunkNext: %v", err)
 		}
+	}
 
-		if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
-			err := i.loadChunk(int(nChunk))
-			if err != nil {
-				return 0, false, fmt.Errorf("error loading chunk: %v", err)
-			}
+	if i.currChunk != nChunk || i.currChunkFreqNorm == nil {
+		err := i.loadChunk(int(nChunk))
+		if err != nil {
+			return 0, false, fmt.Errorf("error loading chunk: %v", err)
 		}
 	}
 
@@ -770,6 +781,27 @@ func (i *PostingsIterator) currChunkNext(nChunk uint32) error {
 	}
 
 	return nil
+}
+
+// DocNum1Hit returns the docNum and true if this is "1-hit" optimized
+// and the docNum is available.
+func (p *PostingsIterator) DocNum1Hit() (uint64, bool) {
+	if p.normBits1Hit != 0 && p.docNum1Hit != docNum1HitFinished {
+		return p.docNum1Hit, true
+	}
+	return 0, false
+}
+
+// PostingsIteratorFromBitmap constructs a PostingsIterator given an
+// "actual" bitmap.
+func PostingsIteratorFromBitmap(bm *roaring.Bitmap,
+	includeFreqNorm, includeLocs bool) (*PostingsIterator, error) {
+	return &PostingsIterator{
+		ActualBM:        bm,
+		Actual:          bm.Iterator(),
+		includeFreqNorm: includeFreqNorm,
+		includeLocs:     includeLocs,
+	}, nil
 }
 
 // Posting is a single entry in a postings list

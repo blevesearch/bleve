@@ -40,12 +40,63 @@ func NewDisjunctionSearcher(indexReader index.IndexReader,
 func newDisjunctionSearcher(indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
 	limit bool) (search.Searcher, error) {
+	rv, err := optimizeDisjunctionSearcher(indexReader, qsearchers, min, options)
+	if err != nil || rv != nil {
+		return rv, err
+	}
+
 	if len(qsearchers) > DisjunctionHeapTakeover {
 		return newDisjunctionHeapSearcher(indexReader, qsearchers, min, options,
 			limit)
 	}
 	return newDisjunctionSliceSearcher(indexReader, qsearchers, min, options,
 		limit)
+}
+
+// optimizeDisjunctionSearcher might return an optimized searcher that
+// represents the disjunction, especially in the edge case of a
+// non-scoring, no-term-vectors disjunction
+func optimizeDisjunctionSearcher(indexReader index.IndexReader,
+	qsearchers []search.Searcher, min float64, options search.SearcherOptions) (
+	search.Searcher, error) {
+	// we cannot use the "unadorned" disjunction optimization if the
+	// caller wants extra information like freq-norm's for scoring or
+	// term vectors
+	if len(qsearchers) <= 1 || !options.NoScore || options.IncludeTermVectors {
+		return nil, nil
+	}
+
+	var octx index.OptimizableContext
+
+	for _, searcher := range qsearchers {
+		o, ok := searcher.(index.Optimizable)
+		if !ok {
+			return nil, nil
+		}
+
+		var err error
+		octx, err = o.Optimize("disjunction:unadorned", octx)
+		if err != nil {
+			return nil, err
+		}
+
+		if octx == nil {
+			return nil, nil
+		}
+	}
+
+	optimized, err := octx.Finish()
+	if err != nil || optimized == nil {
+		return nil, err
+	}
+
+	tfr, ok := optimized.(index.TermFieldReader)
+	if !ok {
+		return nil, nil
+	}
+
+	return newTermSearcherFromReader(indexReader, tfr,
+		[]byte("<disjunction:unadorned>"), "*", 1.0, options)
 }
 
 func tooManyClauses(count int) bool {

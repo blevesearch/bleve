@@ -38,23 +38,7 @@ type TermSearcher struct {
 }
 
 func NewTermSearcher(indexReader index.IndexReader, term string, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
-	termBytes := []byte(term)
-	needFreqNorm := !options.NoScore
-	reader, err := indexReader.TermFieldReader(termBytes, field, needFreqNorm, needFreqNorm, options.IncludeTermVectors)
-	if err != nil {
-		return nil, err
-	}
-	count, err := indexReader.DocCount()
-	if err != nil {
-		_ = reader.Close()
-		return nil, err
-	}
-	scorer := scorer.NewTermQueryScorer(termBytes, field, boost, count, reader.Count(), options)
-	return &TermSearcher{
-		indexReader: indexReader,
-		reader:      reader,
-		scorer:      scorer,
-	}, nil
+	return NewTermSearcherBytes(indexReader, []byte(term), field, boost, options)
 }
 
 func NewTermSearcherBytes(indexReader index.IndexReader, term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
@@ -63,6 +47,11 @@ func NewTermSearcherBytes(indexReader index.IndexReader, term []byte, field stri
 	if err != nil {
 		return nil, err
 	}
+	return newTermSearcherFromReader(indexReader, reader, term, field, boost, options)
+}
+
+func newTermSearcherFromReader(indexReader index.IndexReader, reader index.TermFieldReader,
+	term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
 	count, err := indexReader.DocCount()
 	if err != nil {
 		_ = reader.Close()
