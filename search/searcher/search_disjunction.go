@@ -61,8 +61,8 @@ func optimizeDisjunctionSearcher(indexReader index.IndexReader,
 	search.Searcher, error) {
 	// we cannot use the "unadorned" disjunction optimization if the
 	// caller wants extra information like freq-norm's for scoring or
-	// term vectors
-	if len(qsearchers) <= 1 || !options.NoScore || options.IncludeTermVectors {
+	// term vectors, or leverages the min feature
+	if len(qsearchers) <= 1 || min > 1 || !options.NoScore || options.IncludeTermVectors {
 		return nil, nil
 	}
 
