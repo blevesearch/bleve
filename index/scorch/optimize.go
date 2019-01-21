@@ -37,6 +37,8 @@ func (s *IndexSnapshotTermFieldReader) Optimize(kind string,
 	return octx, nil
 }
 
+var OptimizeDisjunctionUnadornedMinChildCardinality = uint64(256)
+
 // ----------------------------------------------------------------
 
 func (s *IndexSnapshotTermFieldReader) optimizeConjunction(
@@ -148,6 +150,31 @@ var OptimizeTFRDisjunctionUnadornedField = "*"
 func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err error) {
 	if len(o.tfrs) <= 1 {
 		return nil, nil
+	}
+
+	for i := range o.snapshot.segment {
+		var cMax uint64
+
+		for _, tfr := range o.tfrs {
+			itr, ok := tfr.iterators[i].(*zap.PostingsIterator)
+			if !ok {
+				return nil, nil
+			}
+
+			if itr.ActualBM != nil {
+				c := itr.ActualBM.GetCardinality()
+				if cMax < c {
+					cMax = c
+				}
+			}
+		}
+
+		// Heuristic to skip the optimization if all the constituent
+		// bitmaps are too small, where the processing & resource
+		// overhead to create the OR'ed bitmap outweighs the benefit.
+		if cMax < OptimizeDisjunctionUnadornedMinChildCardinality {
+			return nil, nil
+		}
 	}
 
 	// We use an artificial term and field because the optimized
