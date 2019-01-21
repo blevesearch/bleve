@@ -40,9 +40,16 @@ func NewDisjunctionSearcher(indexReader index.IndexReader,
 func newDisjunctionSearcher(indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
 	limit bool) (search.Searcher, error) {
-	rv, err := optimizeDisjunctionSearcher(indexReader, qsearchers, min, options)
-	if err != nil || rv != nil {
-		return rv, err
+	// attempt the "unadorned" disjunction optimization only when we
+	// do not need extra information like freq-norm's or term vectors
+	// and the requested min is simple
+	if len(qsearchers) > 1 && min <= 1 &&
+		options.NoScore && !options.IncludeTermVectors {
+		rv, err := optimizeCompositeSearcher("disjunction:unadorned",
+			indexReader, qsearchers, options)
+		if err != nil || rv != nil {
+			return rv, err
+		}
 	}
 
 	if len(qsearchers) > DisjunctionHeapTakeover {
@@ -53,19 +60,9 @@ func newDisjunctionSearcher(indexReader index.IndexReader,
 		limit)
 }
 
-// optimizeDisjunctionSearcher might return an optimized searcher that
-// represents the disjunction, especially in the edge case of a
-// non-scoring, no-term-vectors disjunction
-func optimizeDisjunctionSearcher(indexReader index.IndexReader,
-	qsearchers []search.Searcher, min float64, options search.SearcherOptions) (
-	search.Searcher, error) {
-	// we cannot use the "unadorned" disjunction optimization if the
-	// caller wants extra information like freq-norm's for scoring or
-	// term vectors, or leverages the min feature
-	if len(qsearchers) <= 1 || min > 1 || !options.NoScore || options.IncludeTermVectors {
-		return nil, nil
-	}
-
+func optimizeCompositeSearcher(optimizationKind string,
+	indexReader index.IndexReader, qsearchers []search.Searcher,
+	options search.SearcherOptions) (search.Searcher, error) {
 	var octx index.OptimizableContext
 
 	for _, searcher := range qsearchers {
@@ -75,7 +72,7 @@ func optimizeDisjunctionSearcher(indexReader index.IndexReader,
 		}
 
 		var err error
-		octx, err = o.Optimize("disjunction:unadorned", octx)
+		octx, err = o.Optimize(optimizationKind, octx)
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +93,7 @@ func optimizeDisjunctionSearcher(indexReader index.IndexReader,
 	}
 
 	return newTermSearcherFromReader(indexReader, tfr,
-		[]byte("<disjunction:unadorned>"), "*", 1.0, options)
+		[]byte(optimizationKind), "*", 1.0, options)
 }
 
 func tooManyClauses(count int) bool {

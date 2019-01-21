@@ -125,3 +125,5 @@ func (e *EmptyPostingsIterator) Next() (Posting, error) {
 func (e *EmptyPostingsIterator) Size() int {
 	return 0
 }
+
+var AnEmptyPostingsIterator = &EmptyPostingsIterator{}

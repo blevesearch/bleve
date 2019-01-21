@@ -92,7 +92,9 @@ func under32Bits(x uint64) bool {
 	return x <= mask31Bits
 }
 
-const docNum1HitFinished = math.MaxUint64
+const DocNum1HitFinished = math.MaxUint64
+
+var NormBits1Hit = uint64(math.Float32bits(float32(1)))
 
 // PostingsList is an in-memory representation of a postings list
 type PostingsList struct {
@@ -199,7 +201,7 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 		rv.normBits1Hit = p.normBits1Hit
 
 		if p.except != nil && p.except.Contains(uint32(rv.docNum1Hit)) {
-			rv.docNum1Hit = docNum1HitFinished
+			rv.docNum1Hit = DocNum1HitFinished
 		}
 
 		return rv
@@ -634,16 +636,16 @@ func (i *PostingsIterator) nextBytes() (
 // sets up the currChunk / loc related fields of the iterator.
 func (i *PostingsIterator) nextDocNumAtOrAfter(atOrAfter uint64) (uint64, bool, error) {
 	if i.normBits1Hit != 0 {
-		if i.docNum1Hit == docNum1HitFinished {
+		if i.docNum1Hit == DocNum1HitFinished {
 			return 0, false, nil
 		}
 		if i.docNum1Hit < atOrAfter {
 			// advanced past our 1-hit
-			i.docNum1Hit = docNum1HitFinished // consume our 1-hit docNum
+			i.docNum1Hit = DocNum1HitFinished // consume our 1-hit docNum
 			return 0, false, nil
 		}
 		docNum := i.docNum1Hit
-		i.docNum1Hit = docNum1HitFinished // consume our 1-hit docNum
+		i.docNum1Hit = DocNum1HitFinished // consume our 1-hit docNum
 		return docNum, true, nil
 	}
 
@@ -786,7 +788,7 @@ func (i *PostingsIterator) currChunkNext(nChunk uint32) error {
 // DocNum1Hit returns the docNum and true if this is "1-hit" optimized
 // and the docNum is available.
 func (p *PostingsIterator) DocNum1Hit() (uint64, bool) {
-	if p.normBits1Hit != 0 && p.docNum1Hit != docNum1HitFinished {
+	if p.normBits1Hit != 0 && p.docNum1Hit != DocNum1HitFinished {
 		return p.docNum1Hit, true
 	}
 	return 0, false
@@ -799,6 +801,18 @@ func PostingsIteratorFromBitmap(bm *roaring.Bitmap,
 	return &PostingsIterator{
 		ActualBM:        bm,
 		Actual:          bm.Iterator(),
+		includeFreqNorm: includeFreqNorm,
+		includeLocs:     includeLocs,
+	}, nil
+}
+
+// PostingsIteratorFrom1Hit constructs a PostingsIterator given a
+// 1-hit docNum.
+func PostingsIteratorFrom1Hit(docNum1Hit, normBits1Hit uint64,
+	includeFreqNorm, includeLocs bool) (*PostingsIterator, error) {
+	return &PostingsIterator{
+		docNum1Hit:      docNum1Hit,
+		normBits1Hit:    normBits1Hit,
 		includeFreqNorm: includeFreqNorm,
 		includeLocs:     includeLocs,
 	}, nil
