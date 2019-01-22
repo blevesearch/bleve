@@ -261,6 +261,7 @@ func (h *HighlightRequest) AddField(field string) {
 // Explain triggers inclusion of additional search
 // result score explanations.
 // Sort describes the desired order for the results to be returned.
+// Score controls the kind of scoring performed
 //
 // A special field named "*" can be used to return all fields.
 type SearchRequest struct {
@@ -273,7 +274,7 @@ type SearchRequest struct {
 	Explain          bool              `json:"explain"`
 	Sort             search.SortOrder  `json:"sort"`
 	IncludeLocations bool              `json:"includeLocations"`
-	NoScore          bool              `json:"noScore"`
+	Score            string            `json:"score,omitempty"`
 }
 
 func (r *SearchRequest) Validate() error {
@@ -323,6 +324,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Explain          bool              `json:"explain"`
 		Sort             []json.RawMessage `json:"sort"`
 		IncludeLocations bool              `json:"includeLocations"`
+		Score            string            `json:"score"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -349,6 +351,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Fields = temp.Fields
 	r.Facets = temp.Facets
 	r.IncludeLocations = temp.IncludeLocations
+	r.Score = temp.Score
 	r.Query, err = query.ParseQuery(temp.Q)
 	if err != nil {
 		return err

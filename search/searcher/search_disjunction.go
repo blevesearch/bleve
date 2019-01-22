@@ -44,7 +44,7 @@ func newDisjunctionSearcher(indexReader index.IndexReader,
 	// do not need extra information like freq-norm's or term vectors
 	// and the requested min is simple
 	if len(qsearchers) > 1 && min <= 1 &&
-		options.NoScore && !options.IncludeTermVectors {
+		options.Score == "none" && !options.IncludeTermVectors {
 		rv, err := optimizeCompositeSearcher("disjunction:unadorned",
 			indexReader, qsearchers, options)
 		if err != nil || rv != nil {

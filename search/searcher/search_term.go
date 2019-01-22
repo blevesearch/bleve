@@ -42,7 +42,7 @@ func NewTermSearcher(indexReader index.IndexReader, term string, field string, b
 }
 
 func NewTermSearcherBytes(indexReader index.IndexReader, term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
-	needFreqNorm := !options.NoScore
+	needFreqNorm := options.Score != "none"
 	reader, err := indexReader.TermFieldReader(term, field, needFreqNorm, needFreqNorm, options.IncludeTermVectors)
 	if err != nil {
 		return nil, err

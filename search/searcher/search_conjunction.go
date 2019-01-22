@@ -55,7 +55,8 @@ func NewConjunctionSearcher(indexReader index.IndexReader,
 
 	// attempt the "unadorned" conjunction optimization only when we
 	// do not need extra information like freq-norm's or term vectors
-	if len(searchers) > 1 && options.NoScore && !options.IncludeTermVectors {
+	if len(searchers) > 1 &&
+		options.Score == "none" && !options.IncludeTermVectors {
 		rv, err := optimizeCompositeSearcher("conjunction:unadorned",
 			indexReader, searchers, options)
 		if err != nil || rv != nil {

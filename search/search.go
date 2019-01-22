@@ -280,7 +280,7 @@ type Searcher interface {
 type SearcherOptions struct {
 	Explain            bool
 	IncludeTermVectors bool
-	NoScore            bool
+	Score              string
 }
 
 // SearchContext represents the context around a single search
