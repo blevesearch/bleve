@@ -27,7 +27,7 @@ import (
 	"github.com/blevesearch/bleve/index/upsidedown"
 )
 
-var twoDocIndex index.Index //= upside_down.NewUpsideDownCouch(inmem.MustOpen())
+var twoDocIndex index.Index
 
 func init() {
 	twoDocIndex = initTwoDocUpsideDown()

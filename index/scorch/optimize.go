@@ -24,17 +24,21 @@ import (
 	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 )
 
+var OptimizeConjunction = true
+var OptimizeConjunctionUnadorned = true
+var OptimizeDisjunctionUnadorned = true
+
 func (s *IndexSnapshotTermFieldReader) Optimize(kind string,
 	octx index.OptimizableContext) (index.OptimizableContext, error) {
-	if kind == "conjunction" {
+	if OptimizeConjunction && kind == "conjunction" {
 		return s.optimizeConjunction(octx)
 	}
 
-	if kind == "conjunction:unadorned" {
+	if OptimizeConjunctionUnadorned && kind == "conjunction:unadorned" {
 		return s.optimizeConjunctionUnadorned(octx)
 	}
 
-	if kind == "disjunction:unadorned" {
+	if OptimizeDisjunctionUnadorned && kind == "disjunction:unadorned" {
 		return s.optimizeDisjunctionUnadorned(octx)
 	}
 
