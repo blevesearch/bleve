@@ -111,6 +111,7 @@ OUTER:
 		if ew != nil && ew.epoch > lastMergedEpoch {
 			lastMergedEpoch = ew.epoch
 		}
+
 		lastMergedEpoch, persistWatchers = s.pausePersisterForMergerCatchUp(lastPersistedEpoch,
 			lastMergedEpoch, persistWatchers, po)
 
@@ -178,6 +179,7 @@ OUTER:
 			s.fireEvent(EventKindPersisterProgress, time.Since(startTime))
 
 			if changed {
+				s.removeOldData()
 				atomic.AddUint64(&s.stats.TotPersistLoopProgress, 1)
 				continue OUTER
 			}
@@ -659,13 +661,13 @@ func (s *Scorch) LoadSnapshot(epoch uint64) (rv *IndexSnapshot, err error) {
 }
 
 func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
-
 	rv := &IndexSnapshot{
 		parent:   s,
 		internal: make(map[string][]byte),
 		refs:     1,
 		creator:  "loadSnapshot",
 	}
+
 	var running uint64
 	c := snapshot.Cursor()
 	for k, _ := c.First(); k != nil; k, _ = c.Next() {
@@ -701,6 +703,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 			running += segmentSnapshot.segment.Count()
 		}
 	}
+
 	return rv, nil
 }
 
