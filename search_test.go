@@ -1083,3 +1083,66 @@ func TestDisjunctionQueryIncorrectMin(t *testing.T) {
 			" but got: %v", res.Total)
 	}
 }
+
+func TestBooleanShouldMinPropagation(t *testing.T) {
+	idx, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc1 := map[string]interface{}{
+		"dept":  "finance",
+		"name":  "alvita",
+		"email": "alvita@domain.com",
+	}
+
+	doc2 := map[string]interface{}{
+		"dept":  "dev-ops",
+		"name":  "keelia",
+		"email": "keelia@domain.com",
+	}
+
+	batch := idx.NewBatch()
+
+	if err = batch.Index("doc1", doc1); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = batch.Index("doc2", doc2); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	mq1 := NewMatchQuery("dev-ops")
+	mq1.SetField("dept")
+	mq2 := NewMatchQuery("keelia@domain.com")
+	mq2.SetField("email")
+	bq := NewBooleanQuery()
+	bq.AddShould(mq1)
+	bq.AddMust(mq2)
+	sr := NewSearchRequest(bq)
+
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 2 {
+		t.Errorf("Expected 2 results, but got: %v", res.Total)
+	}
+}

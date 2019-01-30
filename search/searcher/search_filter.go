@@ -98,6 +98,12 @@ func (f *FilteringSearcher) Min() int {
 	return f.child.Min()
 }
 
+func (f *FilteringSearcher) SetMin(to int) {
+	if searcher, ok := f.child.(search.MinApplicableSearcher); ok {
+		searcher.SetMin(to)
+	}
+}
+
 func (f *FilteringSearcher) DocumentMatchPoolSize() int {
 	return f.child.DocumentMatchPoolSize()
 }

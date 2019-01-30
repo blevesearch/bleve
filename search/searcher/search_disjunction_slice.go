@@ -274,6 +274,10 @@ func (s *DisjunctionSliceSearcher) Min() int {
 	return s.min
 }
 
+func (s *DisjunctionSliceSearcher) SetMin(to int) {
+	s.min = to
+}
+
 func (s *DisjunctionSliceSearcher) DocumentMatchPoolSize() int {
 	rv := len(s.currs)
 	for _, s := range s.searchers {
