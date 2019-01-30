@@ -1103,15 +1103,13 @@ func TestBooleanShouldMinPropagation(t *testing.T) {
 	}()
 
 	doc1 := map[string]interface{}{
-		"dept":  "finance",
-		"name":  "alvita",
-		"email": "alvita@domain.com",
+		"dept": "queen",
+		"name": "cersei lannister",
 	}
 
 	doc2 := map[string]interface{}{
-		"dept":  "dev-ops",
-		"name":  "keelia",
-		"email": "keelia@domain.com",
+		"dept": "kings guard",
+		"name": "jaime lannister",
 	}
 
 	batch := idx.NewBatch()
@@ -1128,15 +1126,24 @@ func TestBooleanShouldMinPropagation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mq1 := NewMatchQuery("dev-ops")
+	// term dictionaries in the index for field..
+	//  dept: queen kings guard
+	//  name: cersei jaime lannister
+
+	// the following match query would match doc2
+	mq1 := NewMatchQuery("kings guard")
 	mq1.SetField("dept")
-	mq2 := NewMatchQuery("keelia@domain.com")
-	mq2.SetField("email")
+
+	// the following match query would match both doc1 and doc2,
+	// as both docs share common lastname
+	mq2 := NewMatchQuery("jaime lannister")
+	mq2.SetField("name")
+
 	bq := NewBooleanQuery()
 	bq.AddShould(mq1)
 	bq.AddMust(mq2)
-	sr := NewSearchRequest(bq)
 
+	sr := NewSearchRequest(bq)
 	res, err := idx.Search(sr)
 	if err != nil {
 		t.Fatal(err)

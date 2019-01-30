@@ -81,12 +81,12 @@ func (q *DisjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 	if len(ss) < 1 {
 		return searcher.NewMatchNoneSearcher(i)
 	} else if len(ss) == 1 && q.Min <= 1 {
-		// update min setting of child searcher if supported
+		// update min setting of child searcher if supported; and return the
+		// single child searcher as is when min is not greater than 1.
 		if searcher, ok := ss[0].(search.MinApplicableSearcher); ok {
 			searcher.SetMin(int(q.Min))
 		}
 
-		// return the single nested searcher as is; only if min clauses is not greater than 1;
 		return ss[0], nil
 	}
 
