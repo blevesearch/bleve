@@ -32,6 +32,7 @@ import (
 	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/store/boltdb"
 	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
@@ -2147,5 +2148,39 @@ func TestBug1096(t *testing.T) {
 	// we expect only 2 hits, for docs 9 and 90
 	if res.Total > 2 {
 		t.Fatalf("expected only 2 hits '9' and '90', got %v", res)
+	}
+}
+
+func TestDataRaceBug1092(t *testing.T) {
+	defer func() {
+		rerr := os.RemoveAll("testidx")
+		if rerr != nil {
+			t.Fatal(rerr)
+		}
+	}()
+
+	// use default mapping
+	mapping := NewIndexMapping()
+
+	var idx Index
+	idx, err = NewUsing("testidx", mapping, upsidedown.Name, boltdb.Name, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		cerr := idx.Close()
+		if cerr != nil {
+			t.Fatal(cerr)
+		}
+	}()
+
+	batch := idx.NewBatch()
+	for i := 0; i < 10; i++ {
+		err = idx.Batch(batch)
+		if err != nil {
+			t.Error(err)
+		}
+
+		batch.Reset()
 	}
 }
