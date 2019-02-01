@@ -15,7 +15,6 @@
 package scorch
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"reflect"
@@ -950,24 +949,22 @@ func TestIndexBatchWithCallbacks(t *testing.T) {
 		t.Fatalf("error opening index: %v", err)
 	}
 	defer func() {
-		err := idx.Close()
-		if err != nil {
-			t.Fatal(err)
+		cerr := idx.Close()
+		if cerr != nil {
+			t.Fatal(cerr)
 		}
 	}()
 
 	// Check that callback function works
-	updated := false
-	cbErr := fmt.Errorf("")
+	var wg sync.WaitGroup
+	wg.Add(1)
 
 	batch := index.NewBatch()
 	doc := document.NewDocument("3")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test3")))
 	batch.Update(doc)
 	batch.SetPersistedCallback(func(e error) {
-		updated = true
-		cbErr = e
-
+		wg.Done()
 	})
 
 	err = idx.Batch(batch)
@@ -975,19 +972,8 @@ func TestIndexBatchWithCallbacks(t *testing.T) {
 		t.Error(err)
 	}
 
-	for i := 0; i < 30; i++ {
-		if updated {
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	if !updated {
-		t.Fatal("Callback function wasn't called")
-	}
-	if cbErr != nil {
-		t.Fatal("Error wasn't updated properly on callback function")
-	}
-
+	wg.Wait()
+	// test has no assertion but will timeout if callback doesn't fire
 }
 
 func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
