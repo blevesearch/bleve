@@ -83,7 +83,7 @@ func (q *DisjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 	} else if len(ss) == 1 && q.Min <= 1 {
 		// update min setting of child searcher if supported; and return the
 		// single child searcher as is when min is not greater than 1.
-		if searcher, ok := ss[0].(search.MinApplicableSearcher); ok {
+		if searcher, ok := ss[0].(minApplicableSearcher); ok {
 			searcher.SetMin(int(q.Min))
 		}
 

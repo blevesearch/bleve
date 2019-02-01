@@ -277,11 +277,6 @@ type Searcher interface {
 	DocumentMatchPoolSize() int
 }
 
-type MinApplicableSearcher interface {
-	Searcher
-	SetMin(to int)
-}
-
 type SearcherOptions struct {
 	Explain            bool
 	IncludeTermVectors bool
