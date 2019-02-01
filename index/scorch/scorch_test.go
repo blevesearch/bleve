@@ -15,7 +15,9 @@
 package scorch
 
 import (
+	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"reflect"
 	"regexp"
@@ -23,7 +25,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-	"math/rand"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
