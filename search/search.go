@@ -285,6 +285,7 @@ type SearcherOptions struct {
 // SearchContext represents the context around a single search
 type SearchContext struct {
 	DocumentMatchPool *DocumentMatchPool
+	Collector Collector
 }
 
 func (sc *SearchContext) Size() int {
