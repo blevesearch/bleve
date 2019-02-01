@@ -1083,3 +1083,73 @@ func TestDisjunctionQueryIncorrectMin(t *testing.T) {
 			" but got: %v", res.Total)
 	}
 }
+
+func TestBooleanShouldMinPropagation(t *testing.T) {
+	idx, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc1 := map[string]interface{}{
+		"dept": "queen",
+		"name": "cersei lannister",
+	}
+
+	doc2 := map[string]interface{}{
+		"dept": "kings guard",
+		"name": "jaime lannister",
+	}
+
+	batch := idx.NewBatch()
+
+	if err = batch.Index("doc1", doc1); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = batch.Index("doc2", doc2); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	// term dictionaries in the index for field..
+	//  dept: queen kings guard
+	//  name: cersei jaime lannister
+
+	// the following match query would match doc2
+	mq1 := NewMatchQuery("kings guard")
+	mq1.SetField("dept")
+
+	// the following match query would match both doc1 and doc2,
+	// as both docs share common lastname
+	mq2 := NewMatchQuery("jaime lannister")
+	mq2.SetField("name")
+
+	bq := NewBooleanQuery()
+	bq.AddShould(mq1)
+	bq.AddMust(mq2)
+
+	sr := NewSearchRequest(bq)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 2 {
+		t.Errorf("Expected 2 results, but got: %v", res.Total)
+	}
+}
