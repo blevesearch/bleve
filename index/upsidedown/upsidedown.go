@@ -810,15 +810,17 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 		}
 	}
 
-	go func() {
-		for _, doc := range batch.IndexOps {
-			if doc != nil {
-				aw := index.NewAnalysisWork(udc, doc, resultChan)
-				// put the work on the queue
-				udc.analysisQueue.Queue(aw)
+	if len(batch.IndexOps) > 0 {
+		go func() {
+			for _, doc := range batch.IndexOps {
+				if doc != nil {
+					aw := index.NewAnalysisWork(udc, doc, resultChan)
+					// put the work on the queue
+					udc.analysisQueue.Queue(aw)
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	// retrieve back index rows concurrent with analysis
 	docBackIndexRowErr := error(nil)
