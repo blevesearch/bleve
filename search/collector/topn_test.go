@@ -15,6 +15,7 @@
 package collector
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -464,6 +465,262 @@ func TestPaginationSameScores(t *testing.T) {
 		if _, ok := firstResults[hit.ID]; ok {
 			t.Errorf("doc ID %s is in top 5 and next 5 result sets", hit.ID)
 		}
+	}
+}
+
+// TestStreamResults verifies the search.DocumentMatchHandler
+func TestStreamResults(t *testing.T) {
+	matches := []*search.DocumentMatch{
+		{
+			IndexInternalID: index.IndexInternalID("a"),
+			Score:           11,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("b"),
+			Score:           1,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("c"),
+			Score:           11,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("d"),
+			Score:           999,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("e"),
+			Score:           11,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("f"),
+			Score:           9,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("g"),
+			Score:           11,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("h"),
+			Score:           89,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("i"),
+			Score:           101,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("j"),
+			Score:           112,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("k"),
+			Score:           10,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("l"),
+			Score:           99,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("m"),
+			Score:           11,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("n"),
+			Score:           111,
+		},
+	}
+
+	searcher := &stubSearcher{
+		matches: matches,
+	}
+	ind := 0
+	docMatchHandler := func(hit *search.DocumentMatch) error {
+		if hit == nil {
+			return nil // search completed
+		}
+		if !bytes.Equal(hit.IndexInternalID, matches[ind].IndexInternalID) {
+			t.Errorf("%d hit IndexInternalID actual: %s, expected: %s",
+				ind, hit.IndexInternalID, matches[ind].IndexInternalID)
+		}
+		if hit.Score != matches[ind].Score {
+			t.Errorf("%d hit Score actual: %s, expected: %s",
+				ind, hit.IndexInternalID, matches[ind].IndexInternalID)
+		}
+		ind++
+		return nil
+	}
+
+	var handlerMaker search.MakeDocumentMatchHandler
+	handlerMaker = func(ctx *search.SearchContext) (search.DocumentMatchHandler,
+		bool, error) {
+		return docMatchHandler, false, nil
+	}
+
+	ctx := context.WithValue(context.Background(), search.MakeDocumentMatchHandlerKey,
+		handlerMaker)
+
+	collector := NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	err := collector.Collect(ctx, searcher, &stubReader{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	maxScore := collector.MaxScore()
+	if maxScore != 999.0 {
+		t.Errorf("expected max score 99.0, got %f", maxScore)
+	}
+
+	total := collector.Total()
+	if int(total) != ind {
+		t.Errorf("expected 14 total results, got %d", total)
+	}
+
+	results := collector.Results()
+
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results, got %d", len(results))
+	}
+}
+
+// TestCollectorChaining verifies the chaining of collectors.
+// The custom DocumentMatchHandler can process every hit for
+// the search query and then pass the hit to the topn collector
+// to eventually have the sorted top `N` results.
+func TestCollectorChaining(t *testing.T) {
+	matches := []*search.DocumentMatch{
+		{
+			IndexInternalID: index.IndexInternalID("a"),
+			Score:           11,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("b"),
+			Score:           1,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("c"),
+			Score:           11,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("d"),
+			Score:           999,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("e"),
+			Score:           11,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("f"),
+			Score:           9,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("g"),
+			Score:           11,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("h"),
+			Score:           89,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("i"),
+			Score:           101,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("j"),
+			Score:           112,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("k"),
+			Score:           10,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("l"),
+			Score:           99,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("m"),
+			Score:           11,
+		},
+		{
+			IndexInternalID: index.IndexInternalID("n"),
+			Score:           111,
+		},
+	}
+
+	searcher := &stubSearcher{
+		matches: matches,
+	}
+
+	var topNHandler search.DocumentMatchHandler
+	ind := 0
+	docMatchHandler := func(hit *search.DocumentMatch) error {
+		if hit == nil {
+			return nil // search completed
+		}
+		if !bytes.Equal(hit.IndexInternalID, matches[ind].IndexInternalID) {
+			t.Errorf("%d hit IndexInternalID actual: %s, expected: %s",
+				ind, hit.IndexInternalID, matches[ind].IndexInternalID)
+		}
+		if hit.Score != matches[ind].Score {
+			t.Errorf("%d hit Score actual: %s, expected: %s",
+				ind, hit.IndexInternalID, matches[ind].IndexInternalID)
+		}
+		ind++
+		// give the hit back to the topN collector
+		err := topNHandler(hit)
+		if err != nil {
+			t.Errorf("unexpected err: %v", err)
+		}
+		return nil
+	}
+
+	var handlerMaker search.MakeDocumentMatchHandler
+	handlerMaker = func(ctx *search.SearchContext) (search.DocumentMatchHandler,
+		bool, error) {
+		topNHandler, _, _ = MakeTopNDocumentMatchHandler(ctx)
+		return docMatchHandler, false, nil
+	}
+
+	ctx := context.WithValue(context.Background(), search.MakeDocumentMatchHandlerKey,
+		handlerMaker)
+
+	collector := NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
+	err := collector.Collect(ctx, searcher, &stubReader{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	maxScore := collector.MaxScore()
+	if maxScore != 999.0 {
+		t.Errorf("expected max score 99.0, got %f", maxScore)
+	}
+
+	total := collector.Total()
+	if int(total) != ind {
+		t.Errorf("expected 14 total results, got %d", total)
+	}
+
+	results := collector.Results()
+
+	if len(results) != 10 { // as it is paged
+		t.Fatalf("expected 0 results, got %d", len(results))
+	}
+
+	if results[0].ID != "d" {
+		t.Errorf("expected first result to have ID 'l', got %s", results[0].ID)
+	}
+
+	if results[0].Score != 999.0 {
+		t.Errorf("expected highest score to be 999.0, got %f", results[0].Score)
+	}
+
+	minScore := 1000.0
+	for _, result := range results {
+		if result.Score < minScore {
+			minScore = result.Score
+		}
+	}
+
+	if minScore < 10 {
+		t.Errorf("expected minimum score to be higher than 10, got %f", minScore)
 	}
 }
 
