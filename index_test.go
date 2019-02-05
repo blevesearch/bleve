@@ -1902,7 +1902,7 @@ func TestSearchQueryCallback(t *testing.T) {
 	query := NewTermQuery("water")
 	req := NewSearchRequest(query)
 
-	expErr := fmt.Errorf("MEM_LIMIT_EXCEEDED")
+	expErr := fmt.Errorf("mEM_LIMIT_EXCEEDED")
 	f := func(size uint64) error {
 		if size > 1000 {
 			return expErr

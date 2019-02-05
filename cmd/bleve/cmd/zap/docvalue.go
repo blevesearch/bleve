@@ -116,7 +116,7 @@ var docvalueCmd = &cobra.Command{
 					data[chunkOffsetsPosition+offset : chunkOffsetsPosition+offset+
 						binary.MaxVarintLen64])
 				if read <= 0 {
-					return fmt.Errorf("Corrupted chunk offset during segment load")
+					return fmt.Errorf("corrupted chunk offset during segment load")
 				}
 
 				offset += uint64(read)
@@ -156,7 +156,7 @@ var docvalueCmd = &cobra.Command{
 		}
 
 		if fieldName == "" || fieldDvEnd == 0 {
-			return fmt.Errorf("No docvalue persisted for given field arg: %s",
+			return fmt.Errorf("no docvalue persisted for given field arg: %s",
 				args[1])
 		}
 
@@ -170,11 +170,11 @@ var docvalueCmd = &cobra.Command{
 
 		localDocNum, err := strconv.Atoi(args[2])
 		if err != nil {
-			return fmt.Errorf("Unable to parse doc number: %v", err)
+			return fmt.Errorf("unable to parse doc number: %v", err)
 		}
 
 		if localDocNum >= int(segment.NumDocs()) {
-			return fmt.Errorf("Invalid doc number %d (valid 0 - %d)",
+			return fmt.Errorf("invalid doc number %d (valid 0 - %d)",
 				localDocNum, segment.NumDocs()-1)
 		}
 
@@ -196,7 +196,7 @@ var docvalueCmd = &cobra.Command{
 		numDocs, nr = binary.Uvarint(
 			data[destChunkDataLoc : destChunkDataLoc+binary.MaxVarintLen64])
 		if nr <= 0 {
-			return fmt.Errorf("Failed to read the chunk")
+			return fmt.Errorf("failed to read the chunk")
 		}
 
 		chunkMetaLoc := destChunkDataLoc + uint64(nr)

@@ -88,9 +88,9 @@ func TestErrors(t *testing.T) {
 		t.Errorf("expecting a Store")
 	}
 
-	x.AddError("foo", fmt.Errorf("Foo"), []byte("fooKey"))
-	x.AddError("bar", fmt.Errorf("Bar"), nil)
-	x.AddError("baz", fmt.Errorf("Baz"), []byte("bazKey"))
+	x.AddError("foo", fmt.Errorf("foo"), []byte("fooKey"))
+	x.AddError("bar", fmt.Errorf("bar"), nil)
+	x.AddError("baz", fmt.Errorf("baz"), []byte("bazKey"))
 
 	b := bytes.NewBuffer(nil)
 	err = x.WriteJSON(b)

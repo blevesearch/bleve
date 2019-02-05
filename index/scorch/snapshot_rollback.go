@@ -36,7 +36,7 @@ func (r *RollbackPoint) GetInternal(key []byte) []byte {
 // (higher epochs) coming first.
 func (s *Scorch) RollbackPoints() ([]*RollbackPoint, error) {
 	if s.rootBolt == nil {
-		return nil, fmt.Errorf("RollbackPoints: root is nil")
+		return nil, fmt.Errorf("rollbackPoints: root is nil")
 	}
 
 	// start a read-only bolt transaction
@@ -111,11 +111,11 @@ func (s *Scorch) RollbackPoints() ([]*RollbackPoint, error) {
 // that came from the same store using the RollbackPoints() API.
 func (s *Scorch) Rollback(to *RollbackPoint) error {
 	if to == nil {
-		return fmt.Errorf("Rollback: RollbackPoint is nil")
+		return fmt.Errorf("rollback: RollbackPoint is nil")
 	}
 
 	if s.rootBolt == nil {
-		return fmt.Errorf("Rollback: root is nil")
+		return fmt.Errorf("rollback: root is nil")
 	}
 
 	revert := &snapshotReversion{}
@@ -125,19 +125,19 @@ func (s *Scorch) Rollback(to *RollbackPoint) error {
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(boltSnapshotsBucket)
 		if snapshots == nil {
-			return fmt.Errorf("Rollback: no snapshots available")
+			return fmt.Errorf("rollback: no snapshots available")
 		}
 
 		pos := segment.EncodeUvarintAscending(nil, to.epoch)
 
 		snapshot := snapshots.Bucket(pos)
 		if snapshot == nil {
-			return fmt.Errorf("Rollback: snapshot not found")
+			return fmt.Errorf("rollback: snapshot not found")
 		}
 
 		indexSnapshot, err := s.loadSnapshot(snapshot)
 		if err != nil {
-			return fmt.Errorf("Rollback: unable to load snapshot: %v", err)
+			return fmt.Errorf("rollback: unable to load snapshot: %v", err)
 		}
 
 		// add segments referenced by loaded index snapshot to the
@@ -166,7 +166,7 @@ func (s *Scorch) Rollback(to *RollbackPoint) error {
 	// block until this snapshot is applied
 	err = <-revert.applied
 	if err != nil {
-		return fmt.Errorf("Rollback: failed with err: %v", err)
+		return fmt.Errorf("rollback: failed with err: %v", err)
 	}
 
 	return <-revert.persisted

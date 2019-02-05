@@ -449,7 +449,7 @@ func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
 	defer atomic.AddUint64(&s.stats.TotIntroduceRevertEnd, 1)
 
 	if revertTo.snapshot == nil {
-		err := fmt.Errorf("Cannot revert to a nil snapshot")
+		err := fmt.Errorf("cannot revert to a nil snapshot")
 		revertTo.applied <- err
 		return err
 	}

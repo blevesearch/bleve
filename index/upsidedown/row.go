@@ -67,9 +67,9 @@ func ParseFromKeyValue(key, value []byte) (UpsideDownCouchRow, error) {
 		case 'i':
 			return NewInternalRowKV(key, value)
 		}
-		return nil, fmt.Errorf("Unknown field type '%s'", string(key[0]))
+		return nil, fmt.Errorf("unknown field type '%s'", string(key[0]))
 	}
-	return nil, fmt.Errorf("Invalid empty key")
+	return nil, fmt.Errorf("invalid empty key")
 }
 
 // VERSION
@@ -355,7 +355,7 @@ func (dr *DictionaryRow) parseDictionaryV(value []byte) error {
 func dictionaryRowParseV(value []byte) (uint64, error) {
 	count, nread := binary.Uvarint(value)
 	if nread <= 0 {
-		return 0, fmt.Errorf("DictionaryRow parse Uvarint error, nread: %d", nread)
+		return 0, fmt.Errorf("dictionaryRow parse Uvarint error, nread: %d", nread)
 	}
 	return count, nil
 }
