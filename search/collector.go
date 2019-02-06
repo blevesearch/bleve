@@ -48,5 +48,5 @@ var MakeDocumentMatchHandlerKey = MakeDocumentMatchHandlerKeyType(
 // builder function which the applications can pass to bleve.
 // These builder methods gives a DocumentMatchHandler function
 // to bleve, which it will invoke on every document matches.
-type MakeDocumentMatchHandler  func(ctx *SearchContext) (
+type MakeDocumentMatchHandler func(ctx *SearchContext) (
 	callback DocumentMatchHandler, loadID bool, err error)

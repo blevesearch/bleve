@@ -113,7 +113,7 @@ func (s *SegmentSnapshot) Size() (rv int) {
 }
 
 type cachedFieldDocs struct {
-	m sync.Mutex
+	m       sync.Mutex
 	readyCh chan struct{}     // closed when the cachedFieldDocs.docs is ready to be used.
 	err     error             // Non-nil if there was an error when preparing this cachedFieldDocs.
 	docs    map[uint64][]byte // Keyed by localDocNum, value is a list of terms delimited by 0xFF.

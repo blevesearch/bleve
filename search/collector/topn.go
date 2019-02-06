@@ -140,7 +140,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 	searchContext := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(backingSize+searcher.DocumentMatchPoolSize(), len(hc.sort)),
-		Collector: hc,
+		Collector:         hc,
 	}
 
 	hc.dvReader, err = reader.DocValueReader(hc.neededFields)
@@ -166,7 +166,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		return err
 	}
 
- 	hc.needDocIds = hc.needDocIds||loadID
+	hc.needDocIds = hc.needDocIds || loadID
 
 	select {
 	case <-ctx.Done():
@@ -188,7 +188,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			break
 		}
 
- 		err = dmHandler(next)
+		err = dmHandler(next)
 		if err != nil {
 			break
 		}
@@ -196,7 +196,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		next, err = searcher.Next(searchContext)
 	}
 
- 	// help finalize/flush the results in case
+	// help finalize/flush the results in case
 	// of custom document match handlers.
 	err = dmHandler(nil)
 	if err != nil {
@@ -219,7 +219,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 var sortByScoreOpt = []string{"_score"}
 
 func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
-	reader index.IndexReader, d *search.DocumentMatch ) (err error) {
+	reader index.IndexReader, d *search.DocumentMatch) (err error) {
 
 	// visit field terms for features that require it (sort, facets)
 	if len(hc.neededFields) > 0 {
@@ -297,7 +297,6 @@ func MakeTopNDocumentMatchHandler(
 	}
 	return nil, false, nil
 }
-
 
 // visitFieldTerms is responsible for visiting the field terms of the
 // search hit, and passing visited terms to the sort and facet builder
