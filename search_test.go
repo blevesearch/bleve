@@ -1153,3 +1153,73 @@ func TestBooleanShouldMinPropagation(t *testing.T) {
 		t.Errorf("Expected 2 results, but got: %v", res.Total)
 	}
 }
+
+func TestDisjunctionMinPropagation(t *testing.T) {
+	idx, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc1 := map[string]interface{}{
+		"dept": "finance",
+		"name": "xyz",
+	}
+
+	doc2 := map[string]interface{}{
+		"dept": "marketing",
+		"name": "xyz",
+	}
+
+	doc3 := map[string]interface{}{
+		"dept": "engineering",
+		"name": "abc",
+	}
+
+	batch := idx.NewBatch()
+
+	if err = batch.Index("doc1", doc1); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = batch.Index("doc2", doc2); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = batch.Index("doc3", doc3); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	mq1 := NewMatchQuery("finance")
+	mq2 := NewMatchQuery("marketing")
+	dq := NewDisjunctionQuery(mq1, mq2)
+	dq.SetMin(3)
+
+	dq2 := NewDisjunctionQuery(dq)
+	dq2.SetMin(1)
+
+	sr := NewSearchRequest(dq2)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 0 {
+		t.Fatalf("Expect 0 results, but got: %v", res.Total)
+	}
+}

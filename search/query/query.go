@@ -63,13 +63,6 @@ type ValidatableQuery interface {
 	Validate() error
 }
 
-// A Searcher to which the "min" setting is applicable, and supports
-// updates to the setting.
-type minApplicableSearcher interface {
-	search.Searcher
-	SetMin(int)
-}
-
 // ParseQuery deserializes a JSON representation of
 // a Query object.
 func ParseQuery(input []byte) (Query, error) {
