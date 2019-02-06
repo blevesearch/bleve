@@ -290,10 +290,6 @@ func (s *DisjunctionHeapSearcher) Min() int {
 	return s.min
 }
 
-func (s *DisjunctionHeapSearcher) SetMin(to int) {
-	s.min = to
-}
-
 func (s *DisjunctionHeapSearcher) DocumentMatchPoolSize() int {
 	rv := len(s.searchers)
 	for _, s := range s.searchers {
