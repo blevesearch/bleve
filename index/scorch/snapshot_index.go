@@ -435,7 +435,7 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 }
 
 func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
-	includeNorm, includeTermVectors bool) (tfr index.TermFieldReader, err error) {
+	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
 	rv := i.allocTermFieldReaderDicts(field)
 
 	rv.term = term
