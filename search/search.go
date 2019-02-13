@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/size"
 )
@@ -99,9 +98,6 @@ type DocumentMatch struct {
 	// SearchRequest.Fields. Text fields are returned as strings, numeric
 	// fields as float64s and date fields as time.RFC3339 formatted strings.
 	Fields map[string]interface{} `json:"fields,omitempty"`
-
-	// if we load the document for this hit, remember it so we dont load again
-	Document *document.Document `json:"-"`
 
 	// used to maintain natural index order
 	HitNumber uint64 `json:"-"`
@@ -193,10 +189,6 @@ func (dm *DocumentMatch) Size() int {
 	for k, _ := range dm.Fields {
 		sizeInBytes += size.SizeOfString + len(k) +
 			size.SizeOfPtr
-	}
-
-	if dm.Document != nil {
-		sizeInBytes += dm.Document.Size()
 	}
 
 	return sizeInBytes
