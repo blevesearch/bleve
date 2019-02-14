@@ -73,6 +73,16 @@ func (q *ConjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 
 	if len(ss) < 1 {
 		return searcher.NewMatchNoneSearcher(i)
+	} else if len(ss) == 1 {
+		// If the single searcher within this conjunction query happens to
+		// be a match none, do not apply this optimization - as in the case
+		// where this conjunction query is a boolean query's must, when the
+		// boolean searcher is being initialized, it's must searcher would
+		// be reset to nil - there by dropping what could have played a
+		// relevant role.
+		if _, ok := ss[0].(*searcher.MatchNoneSearcher); !ok {
+			return ss[0], nil
+		}
 	}
 
 	return searcher.NewConjunctionSearcher(i, ss, options)
