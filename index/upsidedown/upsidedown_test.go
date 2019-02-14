@@ -1401,6 +1401,11 @@ func TestConcurrentUpdate(t *testing.T) {
 	if len(doc.Fields) > 1 {
 		t.Errorf("expected single field, found %d", len(doc.Fields))
 	}
+
+	err = r.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestLargeField(t *testing.T) {
