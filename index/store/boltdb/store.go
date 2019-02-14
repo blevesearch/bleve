@@ -74,6 +74,12 @@ func New(mo store.MergeOperator, config map[string]interface{}) (store.KVStore, 
 		bo.ReadOnly = ro
 	}
 
+	if initialMmapSize, ok := config["initialMmapSize"].(int); ok {
+		bo.InitialMmapSize = initialMmapSize
+	} else if initialMmapSize, ok := config["initialMmapSize"].(float64); ok {
+		bo.InitialMmapSize = int(initialMmapSize)
+	}
+
 	db, err := bolt.Open(path, 0600, bo)
 	if err != nil {
 		return nil, err
