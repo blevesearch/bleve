@@ -1594,7 +1594,7 @@ func TestConcurrentUpdate(t *testing.T) {
 		}
 	}()
 
-	analysisQueue := index.NewAnalysisQueue(10)
+	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
 		t.Fatal(err)
@@ -1609,7 +1609,7 @@ func TestConcurrentUpdate(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-/*
+
 	// do some concurrent updates
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
@@ -1625,7 +1625,7 @@ func TestConcurrentUpdate(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
-*/
+
 	// now load the name field and see what we get
 	r, err := idx.Reader()
 	if err != nil {
