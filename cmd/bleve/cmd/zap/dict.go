@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 	"github.com/couchbase/vellum"
 	"github.com/spf13/cobra"
@@ -47,6 +48,7 @@ var dictCmd = &cobra.Command{
 		fstBytes := data[addr+uint64(read) : addr+uint64(read)+vellumLen]
 		fmt.Printf("raw vellum data:\n % x\n", fstBytes)
 		fmt.Printf("dictionary:\n")
+		var termsCount, hit1Count int64
 		if fstBytes != nil {
 			fst, err := vellum.Load(fstBytes)
 			if err != nil {
@@ -61,15 +63,21 @@ var dictCmd = &cobra.Command{
 					docNum, normBits := zap.FSTValDecode1Hit(currVal)
 					norm := math.Float32frombits(uint32(normBits))
 					extra = fmt.Sprintf("-- docNum: %d, norm: %f", docNum, norm)
+					fmt.Printf(" %s - %d (%x) %s\n", currTerm, currVal, currVal, extra)
+					hit1Count++
+				} else {
+					// fetch the postings size, cardinality in case of non 1 hits
+					l, c := readPostingCardinality(currVal, data)
+					fmt.Printf(" %s - %d (%x) posting byteSize: %d cardinality: %d\n",
+						currTerm, currVal, currVal, l, c)
 				}
-
-				fmt.Printf(" %s - %d (%x) %s\n", currTerm, currVal, currVal, extra)
+				termsCount++
 				err = itr.Next()
 			}
 			if err != nil && err != vellum.ErrIteratorDone {
 				return fmt.Errorf("error iterating dictionary: %v", err)
 			}
-
+			fmt.Printf("Total terms in dictionary : %d 1hit count: %d\n", termsCount, hit1Count)
 		}
 
 		return nil
@@ -78,4 +86,31 @@ var dictCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(dictCmd)
+}
+
+func readPostingCardinality(postingsOffset uint64, data []byte) (int, uint64) {
+	// read the location of the freq/norm details
+	var n uint64
+	var read int
+
+	_, read = binary.Uvarint(data[postingsOffset+n : postingsOffset+binary.MaxVarintLen64])
+	n += uint64(read)
+
+	_, read = binary.Uvarint(data[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
+	n += uint64(read)
+
+	var postingsLen uint64
+	postingsLen, read = binary.Uvarint(data[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
+	n += uint64(read)
+
+	roaringBytes := data[postingsOffset+n : postingsOffset+n+postingsLen]
+
+	r := roaring.NewBitmap()
+
+	_, err := r.FromBuffer(roaringBytes)
+	if err != nil {
+		fmt.Printf("error loading roaring bitmap: %v", err)
+	}
+
+	return len(roaringBytes), r.GetCardinality()
 }
