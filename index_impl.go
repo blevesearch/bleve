@@ -542,70 +542,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	for _, hit := range hits {
-		if len(req.Fields) > 0 || highlighter != nil {
-			doc, err := indexReader.Document(hit.ID)
-			if err == nil && doc != nil {
-				if len(req.Fields) > 0 {
-					fieldsToLoad := deDuplicate(req.Fields)
-					for _, f := range fieldsToLoad {
-						for _, docF := range doc.Fields {
-							if f == "*" || docF.Name() == f {
-								var value interface{}
-								switch docF := docF.(type) {
-								case *document.TextField:
-									value = string(docF.Value())
-								case *document.NumericField:
-									num, err := docF.Number()
-									if err == nil {
-										value = num
-									}
-								case *document.DateTimeField:
-									datetime, err := docF.DateTime()
-									if err == nil {
-										value = datetime.Format(time.RFC3339)
-									}
-								case *document.BooleanField:
-									boolean, err := docF.Boolean()
-									if err == nil {
-										value = boolean
-									}
-								case *document.GeoPointField:
-									lon, err := docF.Lon()
-									if err == nil {
-										lat, err := docF.Lat()
-										if err == nil {
-											value = []float64{lon, lat}
-										}
-									}
-								}
-								if value != nil {
-									hit.AddFieldValue(docF.Name(), value)
-								}
-							}
-						}
-					}
-				}
-				if highlighter != nil {
-					highlightFields := req.Highlight.Fields
-					if highlightFields == nil {
-						// add all fields with matches
-						highlightFields = make([]string, 0, len(hit.Locations))
-						for k := range hit.Locations {
-							highlightFields = append(highlightFields, k)
-						}
-					}
-					for _, hf := range highlightFields {
-						highlighter.BestFragmentsInField(hit, doc, hf, 1)
-					}
-				}
-			} else if doc == nil {
-				// unexpected case, a doc ID that was found as a search hit
-				// was unable to be found during document lookup
-				return nil, ErrorIndexReadInconsistency
-			}
-		}
 		if i.name != "" {
 			hit.Index = i.name
+		}
+		err = LoadAndHighlightFields(hit, req, i.name, indexReader, highlighter)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -630,6 +572,75 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		Took:     searchDuration,
 		Facets:   collector.FacetResults(),
 	}, nil
+}
+
+func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
+	indexName string, r index.IndexReader,
+	highlighter highlight.Highlighter) error {
+	if len(req.Fields) > 0 || highlighter != nil {
+		doc, err := r.Document(hit.ID)
+		if err == nil && doc != nil {
+			if len(req.Fields) > 0 {
+				fieldsToLoad := deDuplicate(req.Fields)
+				for _, f := range fieldsToLoad {
+					for _, docF := range doc.Fields {
+						if f == "*" || docF.Name() == f {
+							var value interface{}
+							switch docF := docF.(type) {
+							case *document.TextField:
+								value = string(docF.Value())
+							case *document.NumericField:
+								num, err := docF.Number()
+								if err == nil {
+									value = num
+								}
+							case *document.DateTimeField:
+								datetime, err := docF.DateTime()
+								if err == nil {
+									value = datetime.Format(time.RFC3339)
+								}
+							case *document.BooleanField:
+								boolean, err := docF.Boolean()
+								if err == nil {
+									value = boolean
+								}
+							case *document.GeoPointField:
+								lon, err := docF.Lon()
+								if err == nil {
+									lat, err := docF.Lat()
+									if err == nil {
+										value = []float64{lon, lat}
+									}
+								}
+							}
+							if value != nil {
+								hit.AddFieldValue(docF.Name(), value)
+							}
+						}
+					}
+				}
+			}
+			if highlighter != nil {
+				highlightFields := req.Highlight.Fields
+				if highlightFields == nil {
+					// add all fields with matches
+					highlightFields = make([]string, 0, len(hit.Locations))
+					for k := range hit.Locations {
+						highlightFields = append(highlightFields, k)
+					}
+				}
+				for _, hf := range highlightFields {
+					highlighter.BestFragmentsInField(hit, doc, hf, 1)
+				}
+			}
+		} else if doc == nil {
+			// unexpected case, a doc ID that was found as a search hit
+			// was unable to be found during document lookup
+			return ErrorIndexReadInconsistency
+		}
+	}
+
+	return nil
 }
 
 // Fields returns the name of all the fields this

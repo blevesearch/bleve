@@ -279,6 +279,7 @@ type SearcherOptions struct {
 type SearchContext struct {
 	DocumentMatchPool *DocumentMatchPool
 	Collector         Collector
+	IndexReader       index.IndexReader
 }
 
 func (sc *SearchContext) Size() int {
