@@ -570,19 +570,14 @@ func writePostings(postings *roaring.Bitmap, tfEncoder, locEncoder *chunkedIntCo
 		}
 	}
 
-	var bw int
-	tfOffset := uint64(w.Count())
-	if bw, err = tfEncoder.Write(w); bw == 0 {
-		tfOffset = termNotEncoded
-	}
+	var tfOffset uint64
+	tfOffset, _, err = tfEncoder.writeAt(w)
 	if err != nil {
 		return 0, err
 	}
 
-	locOffset := uint64(w.Count())
-	if bw, err = locEncoder.Write(w); bw == 0 {
-		locOffset = termNotEncoded
-	}
+	var locOffset uint64
+	locOffset, _, err = locEncoder.writeAt(w)
 	if err != nil {
 		return 0, err
 	}
