@@ -15,6 +15,7 @@
 package zap
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -216,7 +217,12 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 	// prepare the freq chunk details
 	if rv.includeFreqNorm {
 		var numFreqChunks uint64
-		numFreqChunks, read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
+		if p.freqOffset == termNotEncoded {
+			numFreqChunks = 0
+		} else {
+			numFreqChunks, read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
+		}
+
 		n += uint64(read)
 		if cap(rv.freqChunkOffsets) >= int(numFreqChunks) {
 			rv.freqChunkOffsets = rv.freqChunkOffsets[:int(numFreqChunks)]
@@ -234,7 +240,12 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 	if rv.includeLocs {
 		n = 0
 		var numLocChunks uint64
-		numLocChunks, read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
+		if p.locOffset == termNotEncoded {
+			numLocChunks = 0
+		} else {
+			numLocChunks, read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
+		}
+
 		n += uint64(read)
 		if cap(rv.locChunkOffsets) >= int(numLocChunks) {
 			rv.locChunkOffsets = rv.locChunkOffsets[:int(numLocChunks)]
@@ -373,38 +384,46 @@ func (i *PostingsIterator) Size() int {
 
 func (i *PostingsIterator) loadChunk(chunk int) error {
 	if i.includeFreqNorm {
-		if chunk >= len(i.freqChunkOffsets) {
-			return fmt.Errorf("tried to load freq chunk that doesn't exist %d/(%d)",
-				chunk, len(i.freqChunkOffsets))
-		}
-
-		end, start := i.freqChunkStart, i.freqChunkStart
-		s, e := readChunkBoundary(chunk, i.freqChunkOffsets)
-		start += s
-		end += e
-		i.currChunkFreqNorm = i.postings.sb.mem[start:end]
-		if i.freqNormReader == nil {
-			i.freqNormReader = segment.NewMemUvarintReader(i.currChunkFreqNorm)
+		if i.postings.freqOffset == termNotEncoded {
+			i.freqNormReader = bytes.NewReader([]byte(nil))
 		} else {
-			i.freqNormReader.Reset(i.currChunkFreqNorm)
+			if chunk >= len(i.freqChunkOffsets) {
+				return fmt.Errorf("tried to load freq chunk that doesn't exist %d/(%d)",
+					chunk, len(i.freqChunkOffsets))
+			}
+
+			end, start := i.freqChunkStart, i.freqChunkStart
+			s, e := readChunkBoundary(chunk, i.freqChunkOffsets)
+			start += s
+			end += e
+			i.currChunkFreqNorm = i.postings.sb.mem[start:end]
+			if i.freqNormReader == nil {
+				i.freqNormReader = bytes.NewReader(i.currChunkFreqNorm)
+			} else {
+				i.freqNormReader.Reset(i.currChunkFreqNorm)
+			}
 		}
 	}
 
 	if i.includeLocs {
-		if chunk >= len(i.locChunkOffsets) {
-			return fmt.Errorf("tried to load loc chunk that doesn't exist %d/(%d)",
-				chunk, len(i.locChunkOffsets))
-		}
-
-		end, start := i.locChunkStart, i.locChunkStart
-		s, e := readChunkBoundary(chunk, i.locChunkOffsets)
-		start += s
-		end += e
-		i.currChunkLoc = i.postings.sb.mem[start:end]
-		if i.locReader == nil {
-			i.locReader = segment.NewMemUvarintReader(i.currChunkLoc)
+		if i.postings.locOffset == termNotEncoded {
+			i.locReader = bytes.NewReader([]byte(nil))
 		} else {
-			i.locReader.Reset(i.currChunkLoc)
+			if chunk >= len(i.locChunkOffsets) {
+				return fmt.Errorf("tried to load loc chunk that doesn't exist %d/(%d)",
+					chunk, len(i.locChunkOffsets))
+			}
+
+			end, start := i.locChunkStart, i.locChunkStart
+			s, e := readChunkBoundary(chunk, i.locChunkOffsets)
+			start += s
+			end += e
+			i.currChunkLoc = i.postings.sb.mem[start:end]
+			if i.locReader == nil {
+				i.locReader = bytes.NewReader(i.currChunkLoc)
+			} else {
+				i.locReader.Reset(i.currChunkLoc)
+			}
 		}
 	}
 

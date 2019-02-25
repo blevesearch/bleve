@@ -18,7 +18,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"math"
 )
+
+const termNotEncoded = math.MaxUint64
 
 type chunkedIntCoder struct {
 	final     []byte
@@ -105,6 +108,10 @@ func (c *chunkedIntCoder) Close() {
 
 // Write commits all the encoded chunked integers to the provided writer.
 func (c *chunkedIntCoder) Write(w io.Writer) (int, error) {
+	if len(c.final) <= 0 {
+		return 0, nil
+	}
+
 	bufNeeded := binary.MaxVarintLen64 * (1 + len(c.chunkLens))
 	if len(c.buf) < bufNeeded {
 		c.buf = make([]byte, bufNeeded)
