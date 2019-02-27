@@ -218,6 +218,10 @@ func (s *Store) LowerLevelStore() store.KVStore {
 	return s.llstore
 }
 
+func (s *Store) Collection() moss.Collection {
+	return s.ms
+}
+
 func init() {
 	registry.RegisterKVStore(Name, New)
 }
