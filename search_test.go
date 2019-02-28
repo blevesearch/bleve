@@ -28,6 +28,7 @@ import (
 	"github.com/blevesearch/bleve/analysis/analyzer/custom"
 	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/analysis/analyzer/standard"
+	"github.com/blevesearch/bleve/analysis/token/length"
 	"github.com/blevesearch/bleve/analysis/token/lowercase"
 	"github.com/blevesearch/bleve/analysis/tokenizer/single"
 	"github.com/blevesearch/bleve/analysis/tokenizer/whitespace"
@@ -1221,5 +1222,78 @@ func TestDisjunctionMinPropagation(t *testing.T) {
 
 	if res.Total != 0 {
 		t.Fatalf("Expect 0 results, but got: %v", res.Total)
+	}
+}
+
+func TestBooleanMustSingleMatchNone(t *testing.T) {
+	idxMapping := NewIndexMapping()
+	if err := idxMapping.AddCustomTokenFilter(length.Name, map[string]interface{}{
+		"min":  3.0,
+		"max":  5.0,
+		"type": length.Name,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idxMapping.AddCustomAnalyzer("custom1", map[string]interface{}{
+		"type":          "custom",
+		"tokenizer":     "single",
+		"token_filters": []interface{}{length.Name},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	idxMapping.DefaultAnalyzer = "custom1"
+	idx, err := New("testidx", idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := map[string]interface{}{
+		"languages_known": "Dutch",
+		"dept":            "Sales",
+	}
+
+	batch := idx.NewBatch()
+	if err = batch.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	// this is a successful match
+	matchSales := NewMatchQuery("Sales")
+	matchSales.SetField("dept")
+
+	// this would spin off a MatchNoneSearcher as the
+	// token filter rules out the word "French"
+	matchFrench := NewMatchQuery("French")
+	matchFrench.SetField("languages_known")
+
+	bq := NewBooleanQuery()
+	bq.AddShould(matchSales)
+	bq.AddMust(matchFrench)
+
+	sr := NewSearchRequest(bq)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 0 {
+		t.Fatalf("Expected 0 results but got: %v", res.Total)
 	}
 }
