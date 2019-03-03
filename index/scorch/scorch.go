@@ -312,7 +312,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 
 	// FIXME could sort ids list concurrent with analysis?
 
-	if len(batch.IndexOps) > 0 {
+	if numUpdates > 0 {
 		go func() {
 			for _, doc := range batch.IndexOps {
 				if doc != nil {

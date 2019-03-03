@@ -810,7 +810,7 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 		}
 	}
 
-	if len(batch.IndexOps) > 0 {
+	if numUpdates > 0 {
 		go func() {
 			for _, doc := range batch.IndexOps {
 				if doc != nil {
