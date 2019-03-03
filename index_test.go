@@ -2184,3 +2184,35 @@ func TestDataRaceBug1092(t *testing.T) {
 		batch.Reset()
 	}
 }
+
+func TestBatchRaceBug1149(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	i, err := New("testidx", NewIndexMapping())
+	//i, err := NewUsing("testidx", NewIndexMapping(), "scorch", "scorch", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	b := i.NewBatch()
+	b.Delete("1")
+	err = i.Batch(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.Reset()
+	err = i.Batch(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.Reset()
+}
