@@ -264,18 +264,17 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 
 // Count returns the number of items on this postings list
 func (p *PostingsList) Count() uint64 {
-	var n uint64
+	var n, e uint64
 	if p.normBits1Hit != 0 {
 		n = 1
+		if p.except != nil && p.except.Contains(uint32(p.docNum1Hit)) {
+			e = 1
+		}
 	} else if p.postings != nil {
 		n = p.postings.GetCardinality()
-	}
-	var e uint64
-	if p.except != nil {
-		e = p.except.GetCardinality()
-	}
-	if n <= e {
-		return 0
+		if p.except != nil {
+			e = p.postings.AndCardinality(p.except)
+		}
 	}
 	return n - e
 }
