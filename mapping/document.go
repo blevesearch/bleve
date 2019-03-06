@@ -533,12 +533,14 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 					for _, fieldMapping := range subDocMapping.Fields {
 						if fieldMapping.Type != "text" {
 							allFieldsText = false
+							break
 						}
 					}
 					txt, err := property.MarshalText()
 					if err == nil && allFieldsText {
+						txtStr := string(txt)
 						for _, fieldMapping := range subDocMapping.Fields {
-							fieldMapping.processString(string(txt), pathString, path, indexes, context)
+							fieldMapping.processString(txtStr, pathString, path, indexes, context)
 						}
 						return
 					}
