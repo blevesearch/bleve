@@ -1109,3 +1109,35 @@ func TestClosestDocDynamicMapping(t *testing.T) {
 		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
 	}
 }
+
+func TestMappingPointerToTimeBug1152(t *testing.T) {
+
+	when, err := time.Parse(time.RFC3339, "2019-03-06T15:04:05Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	thing := struct {
+		When *time.Time
+	}{
+		When: &when,
+	}
+
+	// this case tests when there WAS an explicit mapping, but it was NOT type text
+	// as this was the specific case that was problematic
+	m := NewIndexMapping()
+	dtf := NewDateTimeFieldMapping()
+	m.DefaultMapping.AddFieldMappingsAt("When", dtf)
+	doc := document.NewDocument("x")
+	err = m.MapDocument(doc, thing)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(doc.Fields) != 1 {
+		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
+	}
+	if _, ok := doc.Fields[0].(*document.DateTimeField); !ok {
+		t.Fatalf("expected field to be type *document.DateTimeField, got %T", doc.Fields[0])
+	}
+}
