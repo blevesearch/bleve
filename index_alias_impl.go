@@ -28,19 +28,27 @@ import (
 )
 
 type indexAliasImpl struct {
-	name    string
-	indexes []Index
-	mutex   sync.RWMutex
-	open    bool
+	name     string
+	indexes  []Index
+	mutex    sync.RWMutex
+	open     bool
+	strategy MultiSearchExecutionStrategy
 }
 
 // NewIndexAlias creates a new IndexAlias over the provided
 // Index objects.
 func NewIndexAlias(indexes ...Index) *indexAliasImpl {
+	return NewIndexAliasWithStrategy(nil, indexes...)
+}
+
+// NewIndexAlias creates a new IndexAlias over the provided
+// Index objects.
+func NewIndexAliasWithStrategy(strategy MultiSearchExecutionStrategy, indexes ...Index) *indexAliasImpl {
 	return &indexAliasImpl{
-		name:    "alias",
-		indexes: indexes,
-		open:    true,
+		name:     "alias",
+		indexes:  indexes,
+		open:     true,
+		strategy: strategy,
 	}
 }
 
@@ -159,7 +167,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		return i.indexes[0].SearchInContext(ctx, req)
 	}
 
-	return MultiSearch(ctx, req, i.indexes...)
+	return MultiSearchWithStrategy(ctx, req, i.strategy, i.indexes...)
 }
 
 func (i *indexAliasImpl) Fields() ([]string, error) {
@@ -447,30 +455,20 @@ type asyncSearchResult struct {
 // MultiSearch executes a SearchRequest across multiple Index objects,
 // then merges the results.  The indexes must honor any ctx deadline.
 func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*SearchResult, error) {
+	return MultiSearchWithStrategy(ctx, req, nil, indexes...)
+}
+
+// MultiSearch executes a SearchRequest across multiple Index objects,
+// then merges the results.  The indexes must honor any ctx deadline.
+func MultiSearchWithStrategy(ctx context.Context, req *SearchRequest, strategy MultiSearchExecutionStrategy, indexes ...Index) (*SearchResult, error) {
+	if strategy == nil {
+		strategy = &fullConcurrencyMultiSearchExecutionStrategy{}
+	}
 
 	searchStart := time.Now()
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
 
-	// run search on each index in separate go routine
-	var waitGroup sync.WaitGroup
-
-	var searchChildIndex = func(in Index, childReq *SearchRequest) {
-		rv := asyncSearchResult{Name: in.Name()}
-		rv.Result, rv.Err = in.SearchInContext(ctx, childReq)
-		asyncResults <- &rv
-		waitGroup.Done()
-	}
-
-	waitGroup.Add(len(indexes))
-	for _, in := range indexes {
-		go searchChildIndex(in, createChildSearchRequest(req))
-	}
-
-	// on another go routine, close after finished
-	go func() {
-		waitGroup.Wait()
-		close(asyncResults)
-	}()
+	strategy.Execute(ctx, req, asyncResults, indexes...)
 
 	var sr *SearchResult
 	indexErrors := make(map[string]error)
@@ -603,4 +601,81 @@ func (m *multiSearchHitSorter) Swap(i, j int) { m.hits[i], m.hits[j] = m.hits[j]
 func (m *multiSearchHitSorter) Less(i, j int) bool {
 	c := m.sort.Compare(m.cachedScoring, m.cachedDesc, m.hits[i], m.hits[j])
 	return c < 0
+}
+
+type MultiSearchExecutionStrategy interface {
+	Execute(ctx context.Context, req *SearchRequest, res chan *asyncSearchResult, indexes ...Index)
+}
+
+type fullConcurrencyMultiSearchExecutionStrategy struct{}
+
+func (s *fullConcurrencyMultiSearchExecutionStrategy) Execute(ctx context.Context, req *SearchRequest, res chan *asyncSearchResult, indexes ...Index) {
+	// run search on each index in separate go routine
+	var waitGroup sync.WaitGroup
+
+	var searchChildIndex = func(in Index, childReq *SearchRequest) {
+		rv := asyncSearchResult{Name: in.Name()}
+		rv.Result, rv.Err = in.SearchInContext(ctx, childReq)
+		res <- &rv
+		waitGroup.Done()
+	}
+
+	waitGroup.Add(len(indexes))
+	for _, in := range indexes {
+		go searchChildIndex(in, createChildSearchRequest(req))
+	}
+
+	// on another go routine, close after finished
+	go func() {
+		waitGroup.Wait()
+		close(res)
+	}()
+}
+
+type PooledMultiSearchExecutionStrategy struct {
+	MaxConcurrent int
+}
+
+func (s *PooledMultiSearchExecutionStrategy) Execute(ctx context.Context, req *SearchRequest, res chan *asyncSearchResult, indexes ...Index) {
+
+	// track the workers
+	var waitGroup sync.WaitGroup
+
+	// search workers read from the work channel looking an index to search
+	// search that index, then try again
+	// when there is no more work to be done, the worker goroutine ends
+	var searchWorker = func(work chan Index) {
+		for in := range work {
+			childReq := createChildSearchRequest(req)
+			rv := asyncSearchResult{Name: in.Name()}
+			rv.Result, rv.Err = in.SearchInContext(ctx, childReq)
+			res <- &rv
+		}
+		waitGroup.Done()
+	}
+
+	// buffered channel so we can fill it before we start
+	workChan := make(chan Index, len(indexes))
+	for _, in := range indexes {
+		workChan <- in
+	}
+	close(workChan)
+
+	// set numWorkers to lesser of maxConcurrent or number of indexes
+	numWorkers := len(indexes)
+	if s.MaxConcurrent > 0 && s.MaxConcurrent < len(indexes) {
+		numWorkers = s.MaxConcurrent
+	}
+
+	// start the workers
+	waitGroup.Add(numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		go searchWorker(workChan)
+	}
+
+	// on another go routine, close after finished
+	go func() {
+		waitGroup.Wait()
+		close(res)
+	}()
 }
