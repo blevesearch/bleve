@@ -143,7 +143,7 @@ func (d *Dictionary) RangeIterator(start, end string) segment.DictionaryIterator
 	}
 
 	// need to increment the end position to be inclusive
-	var endBytes []byte = nil
+	var endBytes []byte
 	if len(end) > 0 {
 		endBytes = []byte(end)
 		if endBytes[len(endBytes)-1] < 0xff {

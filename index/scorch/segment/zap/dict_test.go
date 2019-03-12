@@ -279,3 +279,47 @@ func TestDictionaryError(t *testing.T) {
 		t.Fatalf("expected nil next and nil err, got: %v, %v", nxt, err)
 	}
 }
+
+func TestDictionaryBug1156(t *testing.T) {
+
+	_ = os.RemoveAll("/tmp/scorch.zap")
+
+	testSeg, _, _ := buildTestSegmentForDict()
+	err := PersistSegmentBase(testSeg, "/tmp/scorch.zap")
+	if err != nil {
+		t.Fatalf("error persisting segment: %v", err)
+	}
+
+	segment, err := Open("/tmp/scorch.zap")
+	if err != nil {
+		t.Fatalf("error opening segment: %v", err)
+	}
+	defer func() {
+		cerr := segment.Close()
+		if cerr != nil {
+			t.Fatalf("error closing segment: %v", err)
+		}
+	}()
+
+	dict, err := segment.Dictionary("desc")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// test range iterator
+	expected := []string{"cat", "dog", "egg", "fish"}
+	var got []string
+	itr := dict.RangeIterator("cat", "")
+	next, err := itr.Next()
+	for next != nil && err == nil {
+		got = append(got, next.Term)
+		next, err = itr.Next()
+	}
+	if err != nil {
+		t.Fatalf("dict itr error: %v", err)
+	}
+
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf("expected: %v, got: %v", expected, got)
+	}
+}
