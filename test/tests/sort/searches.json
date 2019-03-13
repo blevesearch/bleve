@@ -1,37 +1,4 @@
 [
-	{
-    "comment": "default order, all have same score, then by natural index order",
-		"search": {
-			"from": 0,
-			"size": 10,
-			"query": {
-				"match_all":{}
-			}
-		},
-		"result": {
-			"total_hits": 6,
-			"hits": [
-				{
-					"id": "a"
-				},
-        {
-          "id": "b"
-        },
-        {
-          "id": "c"
-        },
-        {
-          "id": "d"
-        },
-        {
-          "id": "e"
-        },
-        {
-          "id": "f"
-        }
-			]
-		}
-	},
   {
     "comment": "sort by name, ascending",
 		"search": {

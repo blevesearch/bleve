@@ -189,6 +189,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["_id"],
 			"query": {
 				"field": "birthday",
 				"start": "2010-01-01"
@@ -408,6 +409,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["_id"],
 			"query": {
 				"query": "-title:mista"
 			}
@@ -516,6 +518,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["_id"],
 			"query": {
 				"match_all": {}
 			}
@@ -543,6 +546,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["_id"],
 			"query": {
 				"ids": ["b", "c"]
 			}
@@ -564,6 +568,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["_id"],
 			"query": {
 				"query": "+age:>20 missess"
 			}

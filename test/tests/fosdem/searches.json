@@ -3,6 +3,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["_id"],
 			"query": {
 				"field": "category",
 				"match_phrase": "Perl"
