@@ -3,6 +3,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Twenty"
@@ -21,6 +22,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Twenty Thousand"
@@ -39,6 +41,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Twenty Thousand Leagues"
@@ -57,6 +60,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Twenty Thousand Leagues Under"
@@ -75,6 +79,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Twenty Thousand Leagues Under the"
@@ -93,6 +98,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Twenty Thousand Leagues Under the Sea"
@@ -111,6 +117,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Thousand"
@@ -129,6 +136,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Thousand Leagues"
@@ -147,6 +155,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Thousand Leagues Under"
@@ -165,6 +174,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Thousand Leagues Under the"
@@ -183,6 +193,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Thousand Leagues Under the Sea"
@@ -201,6 +212,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Leagues"
@@ -219,6 +231,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Leagues Under"
@@ -237,6 +250,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Leagues Under the"
@@ -255,6 +269,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Leagues Under the Sea"
@@ -273,6 +288,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Under the Sea"
@@ -291,6 +307,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "the Sea"
@@ -309,6 +326,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "Sea"
@@ -327,6 +345,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "bad call"
@@ -345,6 +364,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "defenseless receiver"
@@ -363,6 +383,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"match_phrase": "bad receiver"
@@ -378,6 +399,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "body",
 				"terms": [["twenti","thirti"],["thousand"]]

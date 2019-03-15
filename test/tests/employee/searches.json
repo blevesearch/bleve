@@ -1,8 +1,10 @@
 [
 	{
+		"comment": "test array position output",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "manages.reports",
 				"term": "julián"
