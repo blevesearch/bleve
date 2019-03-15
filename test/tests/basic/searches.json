@@ -1,8 +1,10 @@
 [
 	{
+		"comment": "test term search, exact match",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "name",
 				"term": "marti"
@@ -18,9 +20,11 @@
 		}
 	},
 	{
+		"comment": "test term search, no match",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "name",
 				"term": "noone"
@@ -32,9 +36,11 @@
 		}
 	},
 	{
+		"comment": "test match phrase search",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"match_phrase": "long name"
 			}
@@ -49,9 +55,11 @@
 		}
 	},
 	{
+		"comment": "test term search, no match",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "name",
 				"term": "walking"
@@ -63,9 +71,11 @@
 		}
 	},
 	{
+		"comment": "test match search, matching due to analysis",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"fuzziness": 0,
 				"prefix_length": 0,
@@ -83,9 +93,11 @@
 		}
 	},
 	{
+		"comment": "test term prefix search",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "name",
 				"prefix": "bobble"
@@ -101,9 +113,11 @@
 		}
 	},
 	{
+		"comment": "test simple query string",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"query": "+name:phone"
 			}
@@ -118,9 +132,11 @@
 		}
 	},
 	{
+		"comment": "test numeric range, no lower bound",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "age",
 				"max": 30
@@ -139,9 +155,11 @@
 		}
 	},
 	{
+		"comment": "test numeric range, upper and lower bounds",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "age",
 				"max": 30,
@@ -158,9 +176,11 @@
 		}
 	},
 	{
+		"comment": "test conjunction of numeric range, upper and lower bounds",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"conjuncts": [
 					{
@@ -186,10 +206,11 @@
 		}
 	},
 	{
+		"comment": "test date range, no upper bound",
 		"search": {
 			"from": 0,
 			"size": 10,
-			"sort": ["_id"],
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "birthday",
 				"start": "2010-01-01"
@@ -208,9 +229,11 @@
 		}
 	},
 	{
+		"comment": "test numeric range, no lower bound",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "birthday",
 				"end": "2010-01-01"
@@ -226,9 +249,11 @@
 		}
 	},
 	{
+		"comment": "test term search, matching inside an array",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "tags",
 				"term": "gopher"
@@ -244,9 +269,11 @@
 		}
 	},
 	{
+		"comment": "test term search, matching another element inside array",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "tags",
 				"term": "belieber"
@@ -262,9 +289,11 @@
 		}
 	},
 	{
+		"comment": "test term search, not present in array",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "tags",
 				"term": "notintagsarray"
@@ -280,6 +309,7 @@
 		"search": {
 			"from": 0,
 			"size": 0,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "name",
 				"term": "marti"
@@ -295,6 +325,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"fields": ["tags"],
 			"query": {
 				"field": "name",
@@ -314,9 +345,11 @@
 		}
 	},
 	{
+		"comment": "test fuzzy search, fuzziness 1 with match",
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "name",
 				"term": "msrti",
@@ -337,6 +370,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "name",
 				"match": "long"
@@ -362,6 +396,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "name",
 				"match": "long"
@@ -385,6 +420,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"fields": ["age","birthday"],
 			"query": {
 				"field": "name",
@@ -409,7 +445,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
-			"sort": ["_id"],
+			"sort": ["-_score", "_id"],
 			"query": {
 				"query": "-title:mista"
 			}
@@ -434,6 +470,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "name",
 				"match": "long"
@@ -460,6 +497,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "tags",
 				"match": "gopher"
@@ -485,6 +523,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "title",
 				"prefix": "miss"
@@ -504,6 +543,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"match_none": {}
 			}
@@ -518,7 +558,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
-			"sort": ["_id"],
+			"sort": ["-_score", "_id"],
 			"query": {
 				"match_all": {}
 			}
@@ -546,7 +586,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
-			"sort": ["_id"],
+			"sort": ["-_score", "_id"],
 			"query": {
 				"ids": ["b", "c"]
 			}
@@ -568,7 +608,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
-			"sort": ["_id"],
+			"sort": ["-_score", "_id"],
 			"query": {
 				"query": "+age:>20 missess"
 			}
@@ -593,6 +633,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "name",
 				"regexp": "mar.*"
@@ -612,6 +653,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "name",
 				"regexp": "mar."
@@ -627,6 +669,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "name",
 				"wildcard": "mar*"
@@ -646,6 +689,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"disjuncts": [
 					{
@@ -678,6 +722,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"disjuncts": [
 					{
@@ -711,6 +756,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"disjuncts": [
 					{
@@ -744,6 +790,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"disjuncts": [
 					{
@@ -776,6 +823,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"query": "name:mar*"
 			}
@@ -794,6 +842,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"query": "name:/mar.*/"
 			}
@@ -812,6 +861,7 @@
 		"search": {
 			"from": 0,
 			"size": 10,
+			"sort": ["-_score", "_id"],
 			"query": {
 				"field": "title",
 				"max": "miz",
