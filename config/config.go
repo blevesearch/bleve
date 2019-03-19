@@ -31,6 +31,7 @@ import (
 	_ "github.com/blevesearch/bleve/search/highlight/highlighter/simple"
 
 	// char filters
+	_ "github.com/blevesearch/bleve/analysis/char/asciifolding"
 	_ "github.com/blevesearch/bleve/analysis/char/html"
 	_ "github.com/blevesearch/bleve/analysis/char/regexp"
 	_ "github.com/blevesearch/bleve/analysis/char/zerowidthnonjoiner"
