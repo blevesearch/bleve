@@ -141,7 +141,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	searchContext := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(backingSize+searcher.DocumentMatchPoolSize(), len(hc.sort)),
 		Collector:         hc,
-		IndexReader:	   reader,
+		IndexReader:       reader,
 	}
 
 	hc.dvReader, err = reader.DocValueReader(hc.neededFields)
