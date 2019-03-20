@@ -415,7 +415,6 @@ func (udc *UpsideDownCouch) Close() error {
 func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	// do analysis before acquiring write lock
 	analysisStart := time.Now()
-	numPlainTextBytes := doc.NumPlainTextBytes()
 	resultChan := make(chan *index.AnalysisResult)
 	aw := index.NewAnalysisWork(udc, doc, resultChan)
 
@@ -452,6 +451,11 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 		return
 	}
 
+	return udc.UpdateWithAnalysis(doc, result, backIndexRow)
+}
+
+func (udc *UpsideDownCouch) UpdateWithAnalysis(doc *document.Document,
+	result *index.AnalysisResult, backIndexRow *BackIndexRow) (err error) {
 	// start a writer for this update
 	indexStart := time.Now()
 	var kvwriter store.KVWriter
@@ -490,7 +494,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	atomic.AddUint64(&udc.stats.indexTime, uint64(time.Since(indexStart)))
 	if err == nil {
 		atomic.AddUint64(&udc.stats.updates, 1)
-		atomic.AddUint64(&udc.stats.numPlainTextBytesIndexed, numPlainTextBytes)
+		atomic.AddUint64(&udc.stats.numPlainTextBytesIndexed, doc.NumPlainTextBytes())
 	} else {
 		atomic.AddUint64(&udc.stats.errors, 1)
 	}

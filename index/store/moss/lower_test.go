@@ -27,7 +27,7 @@ func openWithLower(t *testing.T, mo store.MergeOperator) (string, store.KVStore)
 	tmpDir, _ := ioutil.TempDir("", "mossStore")
 
 	config := map[string]interface{}{
-		"path":                    tmpDir,
+		"path": tmpDir,
 		"mossLowerLevelStoreName": "mossStore",
 	}
 
