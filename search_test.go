@@ -36,6 +36,7 @@ import (
 	"github.com/blevesearch/bleve/index/upsidedown"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/highlight/highlighter/html"
 	"github.com/blevesearch/bleve/search/query"
 )
 
@@ -1221,5 +1222,45 @@ func TestDisjunctionMinPropagation(t *testing.T) {
 
 	if res.Total != 0 {
 		t.Fatalf("Expect 0 results, but got: %v", res.Total)
+	}
+}
+
+func TestDuplicateLocationsIssue1168(t *testing.T) {
+	fm1 := NewTextFieldMapping()
+	fm1.Analyzer = keyword.Name
+	fm1.Name = "name1"
+
+	dm := NewDocumentStaticMapping()
+	dm.AddFieldMappingsAt("name", fm1)
+
+	m := NewIndexMapping()
+	m.DefaultMapping = dm
+
+	idx, err := NewMemOnly(m)
+	if err != nil {
+		t.Fatalf("bleve new err: %v", err)
+	}
+
+	err = idx.Index("x", map[string]interface{}{
+		"name": "marty",
+	})
+	if err != nil {
+		t.Fatalf("bleve index err: %v", err)
+	}
+
+	q1 := NewTermQuery("marty")
+	q2 := NewTermQuery("marty")
+	dq := NewDisjunctionQuery(q1, q2)
+
+	sreq := NewSearchRequest(dq)
+	sreq.Fields = []string{"*"}
+	sreq.Highlight = NewHighlightWithStyle(html.Name)
+
+	sres, err := idx.Search(sreq)
+	if err != nil {
+		t.Fatalf("bleve search err: %v", err)
+	}
+	if len(sres.Hits[0].Locations["name1"]["marty"]) != 1 {
+		t.Fatalf("duplicate marty")
 	}
 }

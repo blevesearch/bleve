@@ -187,7 +187,7 @@ func runTestDir(t *testing.T, dir, datasetName string) {
 				if hit.Locations != nil {
 					if !reflect.DeepEqual(hit.Locations, res.Hits[hi].Locations) {
 						t.Errorf("test error - %s", search.Comment)
-						t.Errorf("test %d - expected hit %d to have locations %v got %v", testNum, hi, hit.Locations, res.Hits[hi].Locations)
+						t.Errorf("test %d - expected hit %d to have locations %#v got %#v", testNum, hi, hit.Locations, res.Hits[hi].Locations)
 					}
 				}
 				// assert that none of the scores were NaN,+Inf,-Inf
