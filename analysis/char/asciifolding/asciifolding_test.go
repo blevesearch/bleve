@@ -43,6 +43,10 @@ func TestAsciiFoldingFilter(t *testing.T) {
 			// composite unicode runes are folded to more than one ASCII rune
 			input:  []byte(`ÆꜴ`),
 			output: []byte(`AEAO`),
+		}, {
+			// apples from https://issues.couchbase.com/browse/MB-33486
+			input:  []byte(`Ápple Àpple Äpple Âpple Ãpple Åpple`),
+			output: []byte(`Apple Apple Apple Apple Apple Apple`),
 		},
 	}
 
