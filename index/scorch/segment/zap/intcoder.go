@@ -18,7 +18,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"math"
 )
+
+const termNotEncoded = math.MaxUint64
 
 type chunkedIntCoder struct {
 	final     []byte
@@ -132,6 +135,22 @@ func (c *chunkedIntCoder) Write(w io.Writer) (int, error) {
 		return tw, err
 	}
 	return tw, nil
+}
+
+// writeAt commits all the encoded chunked integers to the provided writer
+// and returns the starting offset, total bytes written and an error
+func (c *chunkedIntCoder) writeAt(w io.Writer) (uint64, int, error) {
+	startOffset := uint64(termNotEncoded)
+	if len(c.final) <= 0 {
+		return startOffset, 0, nil
+	}
+
+	if chw := w.(*CountHashWriter); chw != nil {
+		startOffset = uint64(chw.Count())
+	}
+
+	tw, err := c.Write(w)
+	return startOffset, tw, err
 }
 
 func (c *chunkedIntCoder) FinalSize() int {
