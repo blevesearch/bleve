@@ -198,3 +198,46 @@ func setupGeo(t *testing.T) index.Index {
 
 	return i
 }
+
+// --------------------------------------------------------------------
+
+func BenchmarkComputeGeoRangePt01(b *testing.B) {
+	onBoundary := 4
+	offBoundary := 0
+	benchmarkComputeGeoRange(b, -0.01, -0.01, 0.01, 0.01, onBoundary, offBoundary)
+}
+
+func BenchmarkComputeGeoRangePt1(b *testing.B) {
+	onBoundary := 56
+	offBoundary := 144
+	benchmarkComputeGeoRange(b, -0.1, -0.1, 0.1, 0.1, onBoundary, offBoundary)
+}
+
+func BenchmarkComputeGeoRange10(b *testing.B) {
+	onBoundary := 5464
+	offBoundary := 53704
+	benchmarkComputeGeoRange(b, -10.0, -10.0, 10.0, 10.0, onBoundary, offBoundary)
+}
+
+func BenchmarkComputeGeoRange100(b *testing.B) {
+	onBoundary := 32768
+	offBoundary := 258560
+	benchmarkComputeGeoRange(b, -100.0, -100.0, 100.0, 100.0, onBoundary, offBoundary)
+}
+
+// --------------------------------------------------------------------
+
+func benchmarkComputeGeoRange(b *testing.B,
+	minLon, minLat, maxLon, maxLat float64, onBoundary, offBoundary int) {
+	checkBoundaries := true
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		onBoundaryRes, offBoundaryRes :=
+			ComputeGeoRange(0, GeoBitsShift1Minus1, minLon, minLat, maxLon, maxLat, checkBoundaries)
+		if len(onBoundaryRes) != onBoundary || len(offBoundaryRes) != offBoundary {
+			b.Fatalf("boundaries not matching")
+		}
+	}
+}
