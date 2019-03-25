@@ -10,7 +10,7 @@ go:
 script:
   - go get golang.org/x/tools/cmd/cover
   - go get github.com/mattn/goveralls
-  - go get github.com/kisielk/errcheck
+  - go get -t github.com/kisielk/errcheck
   - go get -u github.com/FiloSottile/gvt
   - gvt restore
   - go test -race -v $(go list ./... | grep -v vendor/)
