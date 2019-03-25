@@ -143,10 +143,20 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 	min := math.Inf(-1)
 	max := math.Inf(1)
 	if !q.Start.IsZero() {
-		min = numeric.Int64ToFloat64(q.Start.UnixNano())
+		startInt64 := q.Start.UnixNano()
+		if startInt64 < 0 {
+			// overflow
+			return nil, nil, fmt.Errorf("invalid/unsupported date range, start: %v", q.Start)
+		}
+		min = numeric.Int64ToFloat64(startInt64)
 	}
 	if !q.End.IsZero() {
-		max = numeric.Int64ToFloat64(q.End.UnixNano())
+		endInt64 := q.End.UnixNano()
+		if endInt64 < 0 {
+			// overflow
+			return nil, nil, fmt.Errorf("invalid/unsupported date range, end: %v", q.End)
+		}
+		max = numeric.Int64ToFloat64(endInt64)
 	}
 
 	return &min, &max, nil
