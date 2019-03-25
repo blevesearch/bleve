@@ -39,8 +39,11 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 	}
 
 	// do math to produce list of terms needed for this search
-	onBoundaryTerms, notOnBoundaryTerms := ComputeGeoRange(0, GeoBitsShift1Minus1,
-		minLon, minLat, maxLon, maxLat, checkBoundaries)
+	onBoundaryTerms, notOnBoundaryTerms, err := ComputeGeoRange(0, GeoBitsShift1Minus1,
+		minLon, minLat, maxLon, maxLat, checkBoundaries, DisjunctionMaxClauseCount)
+	if err != nil {
+		return nil, err
+	}
 
 	var onBoundarySearcher search.Searcher
 	dvReader, err := indexReader.DocValueReader([]string{field})
@@ -97,8 +100,8 @@ var geoMaxShift = document.GeoPrecisionStep * 4
 var geoDetailLevel = ((geo.GeoBits << 1) - geoMaxShift) / 2
 
 func ComputeGeoRange(term uint64, shift uint,
-	sminLon, sminLat, smaxLon, smaxLat float64, checkBoundaries bool) (
-	onBoundary [][]byte, notOnBoundary [][]byte) {
+	sminLon, sminLat, smaxLon, smaxLat float64, checkBoundaries bool, maxTerms int) (
+	onBoundary [][]byte, notOnBoundary [][]byte, err error) {
 	preallocBytesLen := 32
 	preallocBytes := make([]byte, preallocBytesLen)
 
@@ -108,12 +111,9 @@ func ComputeGeoRange(term uint64, shift uint,
 			preallocBytes = make([]byte, preallocBytesLen)
 		}
 
-		var err error
 		rv, preallocBytes, err =
 			numeric.NewPrefixCodedInt64Prealloc(in, shift, preallocBytes)
-		if err != nil {
-			panic(err)
-		}
+
 		return rv
 	}
 
@@ -144,6 +144,17 @@ func ComputeGeoRange(term uint64, shift uint,
 	}
 
 	computeGeoRange = func(term uint64, shift uint) {
+		if maxTerms > 0 {
+			if len(onBoundary) > maxTerms {
+				err = tooManyClausesErr(len(onBoundary))
+			} else if len(notOnBoundary) > maxTerms {
+				err = tooManyClausesErr(len(notOnBoundary))
+			}
+		}
+		if err != nil {
+			return
+		}
+
 		split := term | uint64(0x1)<<shift
 		var upperMax uint64
 		if shift < 63 {
@@ -162,7 +173,11 @@ func ComputeGeoRange(term uint64, shift uint,
 
 	computeGeoRange(term, shift)
 
-	return onBoundary, notOnBoundary
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return onBoundary, notOnBoundary, err
 }
 
 func buildRectFilter(dvReader index.DocValueReader, field string,

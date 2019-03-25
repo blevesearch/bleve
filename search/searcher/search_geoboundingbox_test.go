@@ -199,6 +199,35 @@ func setupGeo(t *testing.T) index.Index {
 	return i
 }
 
+func TestComputeGeoRange(t *testing.T) {
+	tests := []struct {
+		degs        float64
+		maxTerms    int
+		onBoundary  int
+		offBoundary int
+		err         string
+	}{
+		{0.01, 0, 4, 0, ""},
+		{0.1, 0, 56, 144, ""},
+		{100.0, 0, 32768, 258560, ""},
+		{100.0, 1024, 0, 0, "geo range produces too many terms, so should have error"},
+	}
+
+	for _, test := range tests {
+		onBoundaryRes, offBoundaryRes, err := ComputeGeoRange(0, GeoBitsShift1Minus1,
+			-1.0*test.degs, -1.0*test.degs, test.degs, test.degs, true, test.maxTerms)
+		if (err != nil) != (test.err != "") {
+			t.Errorf("test: %+v, err: %v", test, err)
+		}
+		if len(onBoundaryRes) != test.onBoundary {
+			t.Errorf("test: %+v, onBoundaryRes: %v", test, len(onBoundaryRes))
+		}
+		if len(offBoundaryRes) != test.offBoundary {
+			t.Errorf("test: %+v, offBoundaryRes: %v", test, len(offBoundaryRes))
+		}
+	}
+}
+
 // --------------------------------------------------------------------
 
 func BenchmarkComputeGeoRangePt01(b *testing.B) {
@@ -234,8 +263,11 @@ func benchmarkComputeGeoRange(b *testing.B,
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		onBoundaryRes, offBoundaryRes :=
-			ComputeGeoRange(0, GeoBitsShift1Minus1, minLon, minLat, maxLon, maxLat, checkBoundaries)
+		onBoundaryRes, offBoundaryRes, err :=
+			ComputeGeoRange(0, GeoBitsShift1Minus1, minLon, minLat, maxLon, maxLat, checkBoundaries, 0)
+		if err != nil {
+			b.Fatalf("expected no err")
+		}
 		if len(onBoundaryRes) != onBoundary || len(offBoundaryRes) != offBoundary {
 			b.Fatalf("boundaries not matching")
 		}
