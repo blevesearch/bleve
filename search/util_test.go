@@ -89,3 +89,235 @@ func TestMergeLocations(t *testing.T) {
 		t.Errorf("expected %v, got %v", expectedMerge, mergedLocations)
 	}
 }
+
+
+func TestMergeFieldTermLocations(t *testing.T) {
+	ftls := []FieldTermLocation {
+		FieldTermLocation{
+			Field: "a",
+			Term:  "a",
+			Location: Location{
+				Pos: 10,
+				Start: 1,
+				End: 2,
+			},
+		},
+		FieldTermLocation{
+			Field: "a",
+			Term:  "b",
+			Location: Location{
+				Pos: 12,
+				Start: 1,
+				End: 2,
+			},
+		},
+		FieldTermLocation{
+			Field: "b",
+			Term:  "a",
+			Location: Location{
+				Pos: 1,
+				Start: 1,
+				End: 2,
+			},
+		},
+		FieldTermLocation{
+			Field: "a",
+			Term:  "b",
+			Location: Location{
+				Pos: 1,
+				Start: 1,
+				End: 2,
+			},
+		},
+		FieldTermLocation{
+			Field: "a",
+			Term:  "a",
+			Location: Location{
+				Pos: 1,
+				Start: 1,
+				End: 2,
+			},
+		},
+		FieldTermLocation{
+			Field: "e",
+			Term:  "c",
+			Location: Location{
+				Pos: 1,
+				Start: 1,
+				End: 2,
+				ArrayPositions: []uint64{0,1},
+			},
+		},
+		FieldTermLocation{
+			Field: "e",
+			Term:  "c",
+			Location: Location{
+				Pos: 1,
+				Start: 1,
+				End: 2,
+				ArrayPositions: []uint64{1,0},
+			},
+		},
+		FieldTermLocation{
+			Field: "a",
+			Term:  "b",
+			Location: Location{
+				Pos: 1,
+				Start: 1,
+				End: 2,
+			},
+		},
+	}
+	dms := []*DocumentMatch {
+		&DocumentMatch{
+			FieldTermLocations: []FieldTermLocation {
+				FieldTermLocation{
+					Field: "a",
+					Term:  "a",
+					Location: Location{
+						Pos: 10,
+						Start: 1,
+						End: 2,
+					},
+				},
+			},
+		},
+		&DocumentMatch{
+			FieldTermLocations: []FieldTermLocation {
+				FieldTermLocation{
+					Field: "a",
+					Term:  "b",
+					Location: Location{
+						Pos: 12,
+						Start: 1,
+						End: 2,
+					},
+				},
+			},
+		},
+		&DocumentMatch{
+			FieldTermLocations: []FieldTermLocation {
+				FieldTermLocation{
+					Field: "b",
+					Term:  "a",
+					Location: Location{
+						Pos: 1,
+						Start: 1,
+						End: 2,
+					},
+				},
+			},
+		},
+		&DocumentMatch{
+			FieldTermLocations: []FieldTermLocation {
+				FieldTermLocation{
+					Field: "a",
+					Term:  "b",
+					Location: Location{
+						Pos: 1,
+						Start: 1,
+						End: 2,
+					},
+				},
+			},
+		},
+		&DocumentMatch{
+			FieldTermLocations: []FieldTermLocation {
+				FieldTermLocation{
+					Field: "a",
+					Term:  "b",
+					Location: Location{
+						Pos: 1,
+						Start: 1,
+						End: 2,
+					},
+				},
+			},
+		},
+		&DocumentMatch{
+			FieldTermLocations: []FieldTermLocation {
+				FieldTermLocation{
+					Field: "a",
+					Term:  "a",
+					Location: Location{
+						Pos: 1,
+						Start: 1,
+						End: 2,
+					},
+				},
+			},
+		},
+	}
+    expectedFtls := []FieldTermLocation {
+	    FieldTermLocation{
+		    Field: "a",
+		    Term:  "a",
+		    Location: Location{
+			    Pos: 1,
+			    Start: 1,
+			    End: 2,
+		    },
+	    },
+	    FieldTermLocation{
+		    Field: "a",
+		    Term:  "a",
+		    Location: Location{
+			    Pos: 10,
+			    Start: 1,
+			    End: 2,
+		    },
+	    },
+	    FieldTermLocation{
+		    Field: "a",
+		    Term:  "b",
+		    Location: Location{
+			    Pos: 1,
+			    Start: 1,
+			    End: 2,
+		    },
+	    },
+	    FieldTermLocation{
+		    Field: "a",
+		    Term:  "b",
+		    Location: Location{
+			    Pos: 12,
+			    Start: 1,
+			    End: 2,
+		    },
+	    },
+	    FieldTermLocation{
+		    Field: "b",
+		    Term:  "a",
+		    Location: Location{
+			    Pos: 1,
+			    Start: 1,
+			    End: 2,
+		    },
+	    },
+	    FieldTermLocation{
+		    Field: "e",
+		    Term:  "c",
+		    Location: Location{
+			    Pos: 1,
+			    Start: 1,
+			    End: 2,
+			    ArrayPositions: []uint64{0,1},
+		    },
+	    },
+	    FieldTermLocation{
+		    Field: "e",
+		    Term:  "c",
+		    Location: Location{
+			    Pos: 1,
+			    Start: 1,
+			    End: 2,
+			    ArrayPositions: []uint64{1,0},
+		    },
+	    },
+
+    }
+	ftls = MergeFieldTermLocations(ftls, dms)
+	if !reflect.DeepEqual(ftls, expectedFtls) {
+		t.Errorf("expected %v, got %v", expectedFtls, ftls)
+	}
+}

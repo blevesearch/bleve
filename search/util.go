@@ -14,6 +14,8 @@
 
 package search
 
+import "sort"
+
 func MergeLocations(locations []FieldTermLocationMap) FieldTermLocationMap {
 	rv := locations[0]
 
@@ -64,6 +66,18 @@ func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch)
 			})
 		}
 	}
-
-	return dest
+	if len(dest) < 2 {
+		return dest
+	}
+	sort.Sort(FieldTermLocations(dest))
+	var index int
+	index = 1
+	// remove duplicate location
+	for i :=0; i < (len(dest) - 1); i++ {
+		if FieldTermLocationCompare(&dest[i], &dest[i+1]) != 0 {
+			dest[index] = dest[i+1]
+			index++
+		}
+	}
+	return dest[:index]
 }
