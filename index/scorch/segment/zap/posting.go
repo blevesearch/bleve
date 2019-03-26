@@ -15,10 +15,8 @@
 package zap
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"math"
 	"reflect"
 
@@ -334,8 +332,8 @@ type PostingsIterator struct {
 	currChunkFreqNorm []byte
 	currChunkLoc      []byte
 
-	freqNormReader *bytes.Reader
-	locReader      *bytes.Reader
+	freqNormReader *segment.MemUvarintReader
+	locReader      *segment.MemUvarintReader
 
 	freqChunkOffsets []uint64
 	freqChunkStart   uint64
@@ -386,7 +384,7 @@ func (i *PostingsIterator) loadChunk(chunk int) error {
 		end += e
 		i.currChunkFreqNorm = i.postings.sb.mem[start:end]
 		if i.freqNormReader == nil {
-			i.freqNormReader = bytes.NewReader(i.currChunkFreqNorm)
+			i.freqNormReader = segment.NewMemUvarintReader(i.currChunkFreqNorm)
 		} else {
 			i.freqNormReader.Reset(i.currChunkFreqNorm)
 		}
@@ -404,7 +402,7 @@ func (i *PostingsIterator) loadChunk(chunk int) error {
 		end += e
 		i.currChunkLoc = i.postings.sb.mem[start:end]
 		if i.locReader == nil {
-			i.locReader = bytes.NewReader(i.currChunkLoc)
+			i.locReader = segment.NewMemUvarintReader(i.currChunkLoc)
 		} else {
 			i.locReader.Reset(i.currChunkLoc)
 		}
@@ -419,18 +417,34 @@ func (i *PostingsIterator) readFreqNormHasLocs() (uint64, uint64, bool, error) {
 		return 1, i.normBits1Hit, false, nil
 	}
 
-	freqHasLocs, err := binary.ReadUvarint(i.freqNormReader)
+	freqHasLocs, err := i.freqNormReader.ReadUvarint()
 	if err != nil {
 		return 0, 0, false, fmt.Errorf("error reading frequency: %v", err)
 	}
+
 	freq, hasLocs := decodeFreqHasLocs(freqHasLocs)
 
-	normBits, err := binary.ReadUvarint(i.freqNormReader)
+	normBits, err := i.freqNormReader.ReadUvarint()
 	if err != nil {
 		return 0, 0, false, fmt.Errorf("error reading norm: %v", err)
 	}
 
-	return freq, normBits, hasLocs, err
+	return freq, normBits, hasLocs, nil
+}
+
+func (i *PostingsIterator) skipFreqNormReadHasLocs() (bool, error) {
+	if i.normBits1Hit != 0 {
+		return false, nil
+	}
+
+	freqHasLocs, err := i.freqNormReader.ReadUvarint()
+	if err != nil {
+		return false, fmt.Errorf("error reading freqHasLocs: %v", err)
+	}
+
+	i.freqNormReader.SkipUvarint() // Skip normBits.
+
+	return freqHasLocs&0x01 != 0, nil // See decodeFreqHasLocs() / hasLocs.
 }
 
 func encodeFreqHasLocs(freq uint64, hasLocs bool) uint64 {
@@ -448,58 +462,53 @@ func decodeFreqHasLocs(freqHasLocs uint64) (uint64, bool) {
 }
 
 // readLocation processes all the integers on the stream representing a single
-// location.  if you care about it, pass in a non-nil location struct, and we
-// will fill it.  if you don't care about it, pass in nil and we safely consume
-// the contents.
+// location.
 func (i *PostingsIterator) readLocation(l *Location) error {
 	// read off field
-	fieldID, err := binary.ReadUvarint(i.locReader)
+	fieldID, err := i.locReader.ReadUvarint()
 	if err != nil {
 		return fmt.Errorf("error reading location field: %v", err)
 	}
 	// read off pos
-	pos, err := binary.ReadUvarint(i.locReader)
+	pos, err := i.locReader.ReadUvarint()
 	if err != nil {
 		return fmt.Errorf("error reading location pos: %v", err)
 	}
 	// read off start
-	start, err := binary.ReadUvarint(i.locReader)
+	start, err := i.locReader.ReadUvarint()
 	if err != nil {
 		return fmt.Errorf("error reading location start: %v", err)
 	}
 	// read off end
-	end, err := binary.ReadUvarint(i.locReader)
+	end, err := i.locReader.ReadUvarint()
 	if err != nil {
 		return fmt.Errorf("error reading location end: %v", err)
 	}
 	// read off num array pos
-	numArrayPos, err := binary.ReadUvarint(i.locReader)
+	numArrayPos, err := i.locReader.ReadUvarint()
 	if err != nil {
 		return fmt.Errorf("error reading location num array pos: %v", err)
 	}
 
-	// group these together for less branching
-	if l != nil {
-		l.field = i.postings.sb.fieldsInv[fieldID]
-		l.pos = pos
-		l.start = start
-		l.end = end
-		if cap(l.ap) < int(numArrayPos) {
-			l.ap = make([]uint64, int(numArrayPos))
-		} else {
-			l.ap = l.ap[:int(numArrayPos)]
-		}
+	l.field = i.postings.sb.fieldsInv[fieldID]
+	l.pos = pos
+	l.start = start
+	l.end = end
+
+	if cap(l.ap) < int(numArrayPos) {
+		l.ap = make([]uint64, int(numArrayPos))
+	} else {
+		l.ap = l.ap[:int(numArrayPos)]
 	}
 
 	// read off array positions
 	for k := 0; k < int(numArrayPos); k++ {
-		ap, err := binary.ReadUvarint(i.locReader)
+		ap, err := i.locReader.ReadUvarint()
 		if err != nil {
 			return fmt.Errorf("error reading array position: %v", err)
 		}
-		if l != nil {
-			l.ap[k] = ap
-		}
+
+		l.ap[k] = ap
 	}
 
 	return nil
@@ -556,7 +565,7 @@ func (i *PostingsIterator) nextAtOrAfter(atOrAfter uint64) (segment.Posting, err
 		}
 		rv.locs = i.nextSegmentLocs[:0]
 
-		numLocsBytes, err := binary.ReadUvarint(i.locReader)
+		numLocsBytes, err := i.locReader.ReadUvarint()
 		if err != nil {
 			return nil, fmt.Errorf("error reading location numLocsBytes: %v", err)
 		}
@@ -612,17 +621,14 @@ func (i *PostingsIterator) nextBytes() (
 	if hasLocs {
 		startLoc := len(i.currChunkLoc) - i.locReader.Len()
 
-		numLocsBytes, err := binary.ReadUvarint(i.locReader)
+		numLocsBytes, err := i.locReader.ReadUvarint()
 		if err != nil {
 			return 0, 0, 0, nil, nil,
 				fmt.Errorf("error reading location nextBytes numLocs: %v", err)
 		}
 
 		// skip over all the location bytes
-		_, err = i.locReader.Seek(int64(numLocsBytes), io.SeekCurrent)
-		if err != nil {
-			return 0, 0, 0, nil, nil, err
-		}
+		i.locReader.SkipBytes(int64(numLocsBytes))
 
 		endLoc := len(i.currChunkLoc) - i.locReader.Len()
 		bytesLoc = i.currChunkLoc[startLoc:endLoc]
@@ -763,22 +769,19 @@ func (i *PostingsIterator) currChunkNext(nChunk uint32) error {
 	}
 
 	// read off freq/offsets even though we don't care about them
-	_, _, hasLocs, err := i.readFreqNormHasLocs()
+	hasLocs, err := i.skipFreqNormReadHasLocs()
 	if err != nil {
 		return err
 	}
 
 	if i.includeLocs && hasLocs {
-		numLocsBytes, err := binary.ReadUvarint(i.locReader)
+		numLocsBytes, err := i.locReader.ReadUvarint()
 		if err != nil {
 			return fmt.Errorf("error reading location numLocsBytes: %v", err)
 		}
 
 		// skip over all the location bytes
-		_, err = i.locReader.Seek(int64(numLocsBytes), io.SeekCurrent)
-		if err != nil {
-			return err
-		}
+		i.locReader.SkipBytes(int64(numLocsBytes))
 	}
 
 	return nil
