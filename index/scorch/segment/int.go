@@ -99,7 +99,7 @@ func DecodeUvarintAscending(b []byte) ([]byte, uint64, error) {
 // ------------------------------------------------------------
 
 type MemUvarintReader struct {
-	C int64 // index of next byte to read from S
+	C int // index of next byte to read from S
 	S []byte
 }
 
@@ -109,7 +109,7 @@ func NewMemUvarintReader(s []byte) *MemUvarintReader {
 
 // Len returns the number of unread bytes.
 func (r *MemUvarintReader) Len() int {
-	n := int(int64(len(r.S)) - r.C)
+	n := len(r.S) - r.C
 	if n < 0 {
 		return 0
 	}
@@ -168,7 +168,7 @@ func (r *MemUvarintReader) SkipUvarint() {
 }
 
 // SkipBytes skips a count number of bytes.
-func (r *MemUvarintReader) SkipBytes(count int64) {
+func (r *MemUvarintReader) SkipBytes(count int) {
 	r.C = r.C + count
 }
 

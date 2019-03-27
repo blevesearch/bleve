@@ -628,7 +628,7 @@ func (i *PostingsIterator) nextBytes() (
 		}
 
 		// skip over all the location bytes
-		i.locReader.SkipBytes(int64(numLocsBytes))
+		i.locReader.SkipBytes(int(numLocsBytes))
 
 		endLoc := len(i.currChunkLoc) - i.locReader.Len()
 		bytesLoc = i.currChunkLoc[startLoc:endLoc]
@@ -781,7 +781,7 @@ func (i *PostingsIterator) currChunkNext(nChunk uint32) error {
 		}
 
 		// skip over all the location bytes
-		i.locReader.SkipBytes(int64(numLocsBytes))
+		i.locReader.SkipBytes(int(numLocsBytes))
 	}
 
 	return nil
