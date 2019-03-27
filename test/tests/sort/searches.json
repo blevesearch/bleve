@@ -406,5 +406,31 @@
           }
   			]
   		}
-  	}
+  	},
+  {
+    "comment": "sort by name, ascending, after marty",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "match_all":{}
+      },
+      "sort": ["name"],
+      "search_after": ["marty"]
+    },
+    "result": {
+      "total_hits": 6,
+      "hits": [
+        {
+          "id": "e"
+        },
+        {
+          "id": "b"
+        },
+        {
+          "id": "d"
+        }
+      ]
+    }
+  }
 ]

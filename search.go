@@ -262,6 +262,7 @@ func (h *HighlightRequest) AddField(field string) {
 // result score explanations.
 // Sort describes the desired order for the results to be returned.
 // Score controls the kind of scoring performed
+// SearchAfter supports deep paging by providing a minimum sort key
 //
 // A special field named "*" can be used to return all fields.
 type SearchRequest struct {
@@ -275,6 +276,7 @@ type SearchRequest struct {
 	Sort             search.SortOrder  `json:"sort"`
 	IncludeLocations bool              `json:"includeLocations"`
 	Score            string            `json:"score,omitempty"`
+	SearchAfter      []string          `json:"search_after"`
 }
 
 func (r *SearchRequest) Validate() error {
@@ -282,6 +284,15 @@ func (r *SearchRequest) Validate() error {
 		err := srq.Validate()
 		if err != nil {
 			return err
+		}
+	}
+
+	if r.SearchAfter != nil {
+		if r.From != 0 {
+			return fmt.Errorf("cannot use search after with from !=0")
+		}
+		if len(r.SearchAfter) != len(r.Sort) {
+			return fmt.Errorf("search after must have same size as sort order")
 		}
 	}
 
@@ -311,6 +322,12 @@ func (r *SearchRequest) SortByCustom(order search.SortOrder) {
 	r.Sort = order
 }
 
+// SetSortAfter sets the request to skip over hits with a sort
+// value less than the provided sort after key
+func (r SearchRequest) SetSortAfter(after []string) {
+	r.SearchAfter = after
+}
+
 // UnmarshalJSON deserializes a JSON representation of
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
@@ -325,6 +342,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Sort             []json.RawMessage `json:"sort"`
 		IncludeLocations bool              `json:"includeLocations"`
 		Score            string            `json:"score"`
+		SearchAfter      []string          `json:"search_after"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -352,6 +370,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Facets = temp.Facets
 	r.IncludeLocations = temp.IncludeLocations
 	r.Score = temp.Score
+	r.SearchAfter = temp.SearchAfter
 	r.Query, err = query.ParseQuery(temp.Q)
 	if err != nil {
 		return err

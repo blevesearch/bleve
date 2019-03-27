@@ -442,7 +442,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		return nil, ErrorIndexClosed
 	}
 
-	collector := collector.NewTopNCollector(req.Size, req.From, req.Sort)
+	var coll *collector.TopNCollector
+	if req.SearchAfter != nil {
+		coll = collector.NewTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter)
+	} else {
+		coll = collector.NewTopNCollector(req.Size, req.From, req.Sort)
+	}
 
 	// open a reader for this search
 	indexReader, err := i.i.Reader()
@@ -494,10 +499,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				facetsBuilder.Add(facetName, facetBuilder)
 			}
 		}
-		collector.SetFacetsBuilder(facetsBuilder)
+		coll.SetFacetsBuilder(facetsBuilder)
 	}
 
-	memNeeded := memNeededForSearch(req, searcher, collector)
+	memNeeded := memNeededForSearch(req, searcher, coll)
 	if cb := ctx.Value(SearchQueryStartCallbackKey); cb != nil {
 		if cbF, ok := cb.(SearchQueryStartCallbackFn); ok {
 			err = cbF(memNeeded)
@@ -515,12 +520,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}
 
-	err = collector.Collect(ctx, searcher, indexReader)
+	err = coll.Collect(ctx, searcher, indexReader)
 	if err != nil {
 		return nil, err
 	}
 
-	hits := collector.Results()
+	hits := coll.Results()
 
 	var highlighter highlight.Highlighter
 
@@ -567,10 +572,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		},
 		Request:  req,
 		Hits:     hits,
-		Total:    collector.Total(),
-		MaxScore: collector.MaxScore(),
+		Total:    coll.Total(),
+		MaxScore: coll.MaxScore(),
 		Took:     searchDuration,
-		Facets:   collector.FacetResults(),
+		Facets:   coll.FacetResults(),
 	}, nil
 }
 
