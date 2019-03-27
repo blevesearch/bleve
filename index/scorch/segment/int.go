@@ -126,7 +126,7 @@ func (r *MemUvarintReader) ReadUvarint() (uint64, error) {
 	var C = r.C
 	var S = r.S
 
-	for true {
+	for {
 		b := S[C]
 		C++
 
@@ -151,13 +151,11 @@ func (r *MemUvarintReader) ReadUvarint() (uint64, error) {
 		x |= uint64(b&0x7f) << s
 		s += 7
 	}
-
-	return 0, nil // never reached, but compiler wants this
 }
 
 // SkipUvarint skips ahead one encoded uint64.
 func (r *MemUvarintReader) SkipUvarint() {
-	for true {
+	for {
 		b := r.S[r.C]
 		r.C++
 
