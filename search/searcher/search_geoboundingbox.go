@@ -22,6 +22,9 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
+var GeoBitsShift1 = (geo.GeoBits << 1)
+var GeoBitsShift1Minus1 = GeoBitsShift1 - 1
+
 func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 	maxLon, maxLat float64, field string, boost float64,
 	options search.SearcherOptions, checkBoundaries bool) (
@@ -36,8 +39,11 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 	}
 
 	// do math to produce list of terms needed for this search
-	onBoundaryTerms, notOnBoundaryTerms := ComputeGeoRange(0, (geo.GeoBits<<1)-1,
-		minLon, minLat, maxLon, maxLat, checkBoundaries)
+	onBoundaryTerms, notOnBoundaryTerms, err := ComputeGeoRange(0, GeoBitsShift1Minus1,
+		minLon, minLat, maxLon, maxLat, checkBoundaries, DisjunctionMaxClauseCount)
+	if err != nil {
+		return nil, err
+	}
 
 	var onBoundarySearcher search.Searcher
 	dvReader, err := indexReader.DocValueReader([]string{field})
@@ -94,59 +100,84 @@ var geoMaxShift = document.GeoPrecisionStep * 4
 var geoDetailLevel = ((geo.GeoBits << 1) - geoMaxShift) / 2
 
 func ComputeGeoRange(term uint64, shift uint,
-	sminLon, sminLat, smaxLon, smaxLat float64,
-	checkBoundaries bool) (
-	onBoundary [][]byte, notOnBoundary [][]byte) {
-	split := term | uint64(0x1)<<shift
-	var upperMax uint64
-	if shift < 63 {
-		upperMax = term | ((uint64(1) << (shift + 1)) - 1)
-	} else {
-		upperMax = 0xffffffffffffffff
-	}
-	lowerMax := split - 1
-	onBoundary, notOnBoundary = relateAndRecurse(term, lowerMax, shift,
-		sminLon, sminLat, smaxLon, smaxLat, checkBoundaries)
-	plusOnBoundary, plusNotOnBoundary := relateAndRecurse(split, upperMax, shift,
-		sminLon, sminLat, smaxLon, smaxLat, checkBoundaries)
-	onBoundary = append(onBoundary, plusOnBoundary...)
-	notOnBoundary = append(notOnBoundary, plusNotOnBoundary...)
-	return
-}
+	sminLon, sminLat, smaxLon, smaxLat float64, checkBoundaries bool, maxTerms int) (
+	onBoundary [][]byte, notOnBoundary [][]byte, err error) {
+	preallocBytesLen := 32
+	preallocBytes := make([]byte, preallocBytesLen)
 
-func relateAndRecurse(start, end uint64, res uint,
-	sminLon, sminLat, smaxLon, smaxLat float64,
-	checkBoundaries bool) (
-	onBoundary [][]byte, notOnBoundary [][]byte) {
-	minLon := geo.MortonUnhashLon(start)
-	minLat := geo.MortonUnhashLat(start)
-	maxLon := geo.MortonUnhashLon(end)
-	maxLat := geo.MortonUnhashLat(end)
-
-	level := ((geo.GeoBits << 1) - res) >> 1
-
-	within := res%document.GeoPrecisionStep == 0 &&
-		geo.RectWithin(minLon, minLat, maxLon, maxLat,
-			sminLon, sminLat, smaxLon, smaxLat)
-	if within || (level == geoDetailLevel &&
-		geo.RectIntersects(minLon, minLat, maxLon, maxLat,
-			sminLon, sminLat, smaxLon, smaxLat)) {
-		if !within && checkBoundaries {
-			return [][]byte{
-				numeric.MustNewPrefixCodedInt64(int64(start), res),
-			}, nil
+	makePrefixCoded := func(in int64, shift uint) (rv numeric.PrefixCoded) {
+		if len(preallocBytes) <= 0 {
+			preallocBytesLen = preallocBytesLen * 2
+			preallocBytes = make([]byte, preallocBytesLen)
 		}
-		return nil,
-			[][]byte{
-				numeric.MustNewPrefixCodedInt64(int64(start), res),
-			}
-	} else if level < geoDetailLevel &&
-		geo.RectIntersects(minLon, minLat, maxLon, maxLat,
-			sminLon, sminLat, smaxLon, smaxLat) {
-		return ComputeGeoRange(start, res-1, sminLon, sminLat, smaxLon, smaxLat,
-			checkBoundaries)
+
+		rv, preallocBytes, err =
+			numeric.NewPrefixCodedInt64Prealloc(in, shift, preallocBytes)
+
+		return rv
 	}
-	return nil, nil
+
+	var computeGeoRange func(term uint64, shift uint) // declare for recursion
+
+	relateAndRecurse := func(start, end uint64, res, level uint) {
+		minLon := geo.MortonUnhashLon(start)
+		minLat := geo.MortonUnhashLat(start)
+		maxLon := geo.MortonUnhashLon(end)
+		maxLat := geo.MortonUnhashLat(end)
+
+		within := res%document.GeoPrecisionStep == 0 &&
+			geo.RectWithin(minLon, minLat, maxLon, maxLat,
+				sminLon, sminLat, smaxLon, smaxLat)
+		if within || (level == geoDetailLevel &&
+			geo.RectIntersects(minLon, minLat, maxLon, maxLat,
+				sminLon, sminLat, smaxLon, smaxLat)) {
+			if !within && checkBoundaries {
+				onBoundary = append(onBoundary, makePrefixCoded(int64(start), res))
+			} else {
+				notOnBoundary = append(notOnBoundary, makePrefixCoded(int64(start), res))
+			}
+		} else if level < geoDetailLevel &&
+			geo.RectIntersects(minLon, minLat, maxLon, maxLat,
+				sminLon, sminLat, smaxLon, smaxLat) {
+			computeGeoRange(start, res-1)
+		}
+	}
+
+	computeGeoRange = func(term uint64, shift uint) {
+		if maxTerms > 0 {
+			if len(onBoundary) > maxTerms {
+				err = tooManyClausesErr(len(onBoundary))
+			} else if len(notOnBoundary) > maxTerms {
+				err = tooManyClausesErr(len(notOnBoundary))
+			}
+		}
+		if err != nil {
+			return
+		}
+
+		split := term | uint64(0x1)<<shift
+		var upperMax uint64
+		if shift < 63 {
+			upperMax = term | ((uint64(1) << (shift + 1)) - 1)
+		} else {
+			upperMax = 0xffffffffffffffff
+		}
+
+		lowerMax := split - 1
+
+		level := (GeoBitsShift1 - shift) >> 1
+
+		relateAndRecurse(term, lowerMax, shift, level)
+		relateAndRecurse(split, upperMax, shift, level)
+	}
+
+	computeGeoRange(term, shift)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return onBoundary, notOnBoundary, err
 }
 
 func buildRectFilter(dvReader index.DocValueReader, field string,
