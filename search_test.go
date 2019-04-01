@@ -1414,5 +1414,137 @@ func TestBooleanMustNotSingleMatchNone(t *testing.T) {
 	if res.Total != 0 {
 		t.Fatalf("Expected 0 results but got: %v", res.Total)
 	}
+}
 
+func TestBooleanSearchBug1185(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	of := NewTextFieldMapping()
+	of.Analyzer = keyword.Name
+	of.Name = "owner"
+
+	dm := NewDocumentMapping()
+	dm.AddFieldMappingsAt("owner", of)
+
+	m := NewIndexMapping()
+	m.DefaultMapping = dm
+
+	idx, err := NewUsing("testidx", m, "scorch", "scorch", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	err = idx.Index("17112", map[string]interface{}{
+		"owner": "marty",
+		"type":  "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17139", map[string]interface{}{
+		"type": "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("177777", map[string]interface{}{
+		"type": "x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Index("177778", map[string]interface{}{
+		"type": "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17140", map[string]interface{}{
+		"type": "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17000", map[string]interface{}{
+		"owner": "marty",
+		"type":  "x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17141", map[string]interface{}{
+		"type": "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17428", map[string]interface{}{
+		"owner": "marty",
+		"type":  "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17113", map[string]interface{}{
+		"owner": "marty",
+		"type":  "x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	matchTypeQ := NewMatchPhraseQuery("A Demo Type")
+	matchTypeQ.SetField("type")
+
+	matchAnyOwnerRegQ := NewRegexpQuery(".+")
+	matchAnyOwnerRegQ.SetField("owner")
+
+	matchNoOwner := NewBooleanQuery()
+	matchNoOwner.AddMustNot(matchAnyOwnerRegQ)
+
+	notNoOwner := NewBooleanQuery()
+	notNoOwner.AddMustNot(matchNoOwner)
+
+	matchTypeAndNoOwner := NewConjunctionQuery()
+	matchTypeAndNoOwner.AddQuery(matchTypeQ)
+	matchTypeAndNoOwner.AddQuery(notNoOwner)
+
+	req := NewSearchRequest(matchTypeAndNoOwner)
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// query 2
+	matchTypeAndNoOwnerBoolean := NewBooleanQuery()
+	matchTypeAndNoOwnerBoolean.AddMust(matchTypeQ)
+	matchTypeAndNoOwnerBoolean.AddMustNot(matchNoOwner)
+
+	req2 := NewSearchRequest(matchTypeAndNoOwnerBoolean)
+	res2, err := idx.Search(req2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) != len(res2.Hits) {
+		t.Fatalf("expected same number of hits, got: %d and %d", len(res.Hits), len(res2.Hits))
+	}
 }
