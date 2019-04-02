@@ -553,7 +553,7 @@ func TestNestedBooleanSearchers(t *testing.T) {
 	}
 }
 
-func TestNestedBooleanMustNotSearcherUpsidedown(t *testing.T) {
+func TestNestedBooleanMustNotSearcher(t *testing.T) {
 	// create an index with default settings
 	idxMapping := NewIndexMapping()
 	idx, err := New("testidx", idxMapping)
@@ -891,23 +891,18 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 }
 
 func testBooleanMustNotSearcher(t *testing.T, indexName string) {
-	im := NewIndexMapping()
-	idx, err := NewUsing("testidx", im, indexName, Config.DefaultKVStore, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	defer func() {
-		err = idx.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		err := os.RemoveAll("testidx")
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
+
+	im := NewIndexMapping()
+	idx, err := NewUsing("testidx", im, indexName, Config.DefaultKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	docs := []struct {
 		Name    string
