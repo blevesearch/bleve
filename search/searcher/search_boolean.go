@@ -45,6 +45,7 @@ type BooleanSearcher struct {
 	scorer          *scorer.ConjunctionQueryScorer
 	matches         []*search.DocumentMatch
 	initialized     bool
+	done            bool
 }
 
 func NewBooleanSearcher(indexReader index.IndexReader, mustSearcher search.Searcher, shouldSearcher search.Searcher, mustNotSearcher search.Searcher, options search.SearcherOptions) (*BooleanSearcher, error) {
@@ -207,6 +208,10 @@ func (s *BooleanSearcher) SetQueryNorm(qnorm float64) {
 
 func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 
+	if s.done {
+		return nil, nil
+	}
+
 	if !s.initialized {
 		err := s.initSearchers(ctx)
 		if err != nil {
@@ -320,10 +325,18 @@ func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch
 		}
 	}
 
+	if rv == nil {
+		s.done = true
+	}
+
 	return rv, nil
 }
 
 func (s *BooleanSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
+
+	if s.done {
+		return nil, nil
+	}
 
 	if !s.initialized {
 		err := s.initSearchers(ctx)
