@@ -49,6 +49,20 @@ func TestDisjunctionSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	steveTermSearcher, err := NewTermSearcher(twoDocIndexReader, "steve", "name", 1.0, explainTrue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bobertTermSearcher, err := NewTermSearcher(twoDocIndexReader, "bobert", "name", 1.0, explainTrue)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	steveOrBobertUncoordSearcher, err := NewUncoordDisjunctionSearcher(twoDocIndexReader, []search.Searcher{steveTermSearcher, bobertTermSearcher}, 0, explainTrue)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	martyTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
@@ -85,6 +99,19 @@ func TestDisjunctionSearch(t *testing.T) {
 				{
 					IndexInternalID: index.IndexInternalID("3"),
 					Score:           0.6775110856165737,
+				},
+			},
+		},
+		{
+			searcher: steveOrBobertUncoordSearcher,
+			results: []*search.DocumentMatch{
+				{
+					IndexInternalID: index.IndexInternalID("2"),
+					Score:           1.3550221712331474,
+				},
+				{
+					IndexInternalID: index.IndexInternalID("5"),
+					Score:           1.3550221712331474,
 				},
 			},
 		},

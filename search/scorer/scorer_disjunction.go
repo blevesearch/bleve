@@ -30,7 +30,8 @@ func init() {
 }
 
 type DisjunctionQueryScorer struct {
-	options search.SearcherOptions
+	options      search.SearcherOptions
+	coordEnabled bool
 }
 
 func (s *DisjunctionQueryScorer) Size() int {
@@ -39,43 +40,55 @@ func (s *DisjunctionQueryScorer) Size() int {
 
 func NewDisjunctionQueryScorer(options search.SearcherOptions) *DisjunctionQueryScorer {
 	return &DisjunctionQueryScorer{
-		options: options,
+		options:      options,
+		coordEnabled: true,
 	}
 }
 
+func NewUncoordDisjunctionQueryScorer(options search.SearcherOptions) *DisjunctionQueryScorer {
+	q := NewDisjunctionQueryScorer(options)
+	q.coordEnabled = false
+	return q
+}
+
 func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
-	var sum float64
+	var score float64
 	var childrenExplanations []*search.Explanation
 	if s.options.Explain {
 		childrenExplanations = make([]*search.Explanation, len(constituents))
 	}
 
 	for i, docMatch := range constituents {
-		sum += docMatch.Score
+		score += docMatch.Score
 		if s.options.Explain {
 			childrenExplanations[i] = docMatch.Expl
 		}
 	}
 
-	var rawExpl *search.Explanation
+	var expl *search.Explanation
 	if s.options.Explain {
-		rawExpl = &search.Explanation{Value: sum, Message: "sum of:", Children: childrenExplanations}
+		expl = &search.Explanation{Value: score, Message: "sum of:", Children: childrenExplanations}
 	}
 
-	coord := float64(countMatch) / float64(countTotal)
-	newScore := sum * coord
-	var newExpl *search.Explanation
-	if s.options.Explain {
-		ce := make([]*search.Explanation, 2)
-		ce[0] = rawExpl
-		ce[1] = &search.Explanation{Value: coord, Message: fmt.Sprintf("coord(%d/%d)", countMatch, countTotal)}
-		newExpl = &search.Explanation{Value: newScore, Message: "product of:", Children: ce}
+	if s.coordEnabled {
+		coord := float64(countMatch) / float64(countTotal)
+		score = score * coord
+		if s.options.Explain {
+			expl = &search.Explanation{
+				Value:   score,
+				Message: "product of:",
+				Children: []*search.Explanation{
+					expl,
+					&search.Explanation{Value: coord, Message: fmt.Sprintf("coord(%d/%d)", countMatch, countTotal)},
+				},
+			}
+		}
 	}
 
 	// reuse constituents[0] as the return value
 	rv := constituents[0]
-	rv.Score = newScore
-	rv.Expl = newExpl
+	rv.Score = score
+	rv.Expl = expl
 	rv.FieldTermLocations = search.MergeFieldTermLocations(
 		rv.FieldTermLocations, constituents[1:])
 

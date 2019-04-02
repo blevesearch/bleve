@@ -31,14 +31,26 @@ var DisjunctionMaxClauseCount = 0
 // slice implementation to a heap implementation.
 var DisjunctionHeapTakeover = 10
 
-func NewDisjunctionSearcher(indexReader index.IndexReader,
-	qsearchers []search.Searcher, min float64, options search.SearcherOptions) (
-	search.Searcher, error) {
-	return newDisjunctionSearcher(indexReader, qsearchers, min, options, true)
+func NewDisjunctionSearcher(
+	indexReader index.IndexReader,
+	qsearchers []search.Searcher,
+	min float64,
+	options search.SearcherOptions,
+) (search.Searcher, error) {
+	return newDisjunctionSearcher(indexReader, qsearchers, min, true, options, true)
+}
+
+func NewUncoordDisjunctionSearcher(
+	indexReader index.IndexReader,
+	qsearchers []search.Searcher,
+	min float64,
+	options search.SearcherOptions,
+) (search.Searcher, error) {
+	return newDisjunctionSearcher(indexReader, qsearchers, min, false, options, true)
 }
 
 func newDisjunctionSearcher(indexReader index.IndexReader,
-	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
+	qsearchers []search.Searcher, min float64, enableCoord bool, options search.SearcherOptions,
 	limit bool) (search.Searcher, error) {
 	// attempt the "unadorned" disjunction optimization only when we
 	// do not need extra information like freq-norm's or term vectors
@@ -53,11 +65,10 @@ func newDisjunctionSearcher(indexReader index.IndexReader,
 	}
 
 	if len(qsearchers) > DisjunctionHeapTakeover {
-		return newDisjunctionHeapSearcher(indexReader, qsearchers, min, options,
-			limit)
+		return newDisjunctionHeapSearcher(indexReader, qsearchers, min, enableCoord, options, limit)
 	}
-	return newDisjunctionSliceSearcher(indexReader, qsearchers, min, options,
-		limit)
+
+	return newDisjunctionSliceSearcher(indexReader, qsearchers, min, enableCoord, options, limit)
 }
 
 func optimizeCompositeSearcher(optimizationKind string,

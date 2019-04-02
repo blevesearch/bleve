@@ -58,11 +58,16 @@ type DisjunctionHeapSearcher struct {
 }
 
 func newDisjunctionHeapSearcher(indexReader index.IndexReader,
-	searchers []search.Searcher, min float64, options search.SearcherOptions,
+	searchers []search.Searcher, min float64, enableCoord bool, options search.SearcherOptions,
 	limit bool) (
 	*DisjunctionHeapSearcher, error) {
 	if limit && tooManyClauses(len(searchers)) {
 		return nil, tooManyClausesErr(len(searchers))
+	}
+
+	buildScorer := scorer.NewUncoordDisjunctionQueryScorer
+	if enableCoord {
+		buildScorer = scorer.NewDisjunctionQueryScorer
 	}
 
 	// build our searcher
@@ -70,7 +75,7 @@ func newDisjunctionHeapSearcher(indexReader index.IndexReader,
 		indexReader:   indexReader,
 		searchers:     searchers,
 		numSearchers:  len(searchers),
-		scorer:        scorer.NewDisjunctionQueryScorer(options),
+		scorer:        buildScorer(options),
 		min:           int(min),
 		matching:      make([]*search.DocumentMatch, len(searchers)),
 		matchingCurrs: make([]*SearcherCurr, len(searchers)),

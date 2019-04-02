@@ -80,8 +80,7 @@ func newMultiTermSearcherBytes(indexReader index.IndexReader,
 	search.Searcher, error) {
 
 	// build disjunction searcher of these ranges
-	searcher, err := newDisjunctionSearcher(indexReader, searchers, 0, options,
-		limit)
+	searcher, err := newDisjunctionSearcher(indexReader, searchers, 0, true, options, limit)
 	if err != nil {
 		for _, s := range searchers {
 			_ = s.Close()
