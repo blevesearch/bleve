@@ -81,6 +81,41 @@ func TestValidateDatetimeRanges(t *testing.T) {
 			end:    "1960-02-21T15:23:34Z",
 			expect: true,
 		},
+		{
+			start:  "0001-01-01T00:00:00Z",
+			end:    "0001-01-01T00:00:00Z",
+			expect: false,
+		},
+		{
+			start:  "0001-01-01T00:00:00Z",
+			end:    "2000-01-01T00:00:00Z",
+			expect: true,
+		},
+		{
+			start:  "1677-11-30T11:59:59Z",
+			end:    "2262-04-11T11:59:59Z",
+			expect: false,
+		},
+		{
+			start:  "2262-04-12T00:00:00Z",
+			end:    "2262-04-11T11:59:59Z",
+			expect: false,
+		},
+		{
+			start:  "1677-12-01T00:00:00Z",
+			end:    "2262-04-12T00:00:00Z",
+			expect: false,
+		},
+		{
+			start:  "1677-12-01T00:00:00Z",
+			end:    "1677-11-30T11:59:59Z",
+			expect: false,
+		},
+		{
+			start:  "1677-12-01T00:00:00Z",
+			end:    "2262-04-11T11:59:59Z",
+			expect: true,
+		},
 	}
 
 	for _, test := range tests {

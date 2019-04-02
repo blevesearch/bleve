@@ -41,11 +41,12 @@ type BleveQueryTime struct {
 	time.Time
 }
 
-var epochTime time.Time
+var minValidTime time.Time
+var maxValidTime time.Time
 
 func init() {
-	unixEpochTime := "1970-01-01T00:00:00Z"
-	epochTime, _ = time.Parse(time.RFC3339, unixEpochTime)
+	minValidTime, _ = time.Parse(time.RFC3339, "1677-12-01T00:00:00Z")
+	maxValidTime, _ = time.Parse(time.RFC3339, "2262-04-11T11:59:59Z")
 }
 
 func queryTimeFromString(t string) (time.Time, error) {
@@ -150,19 +151,19 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 	min := math.Inf(-1)
 	max := math.Inf(1)
 	if !q.Start.IsZero() {
-		startInt64 := q.Start.UnixNano()
-		if startInt64 < 0 && q.Start.After(epochTime) {
+		if q.Start.Before(minValidTime) || q.Start.After(maxValidTime) {
 			// overflow
 			return nil, nil, fmt.Errorf("invalid/unsupported date range, start: %v", q.Start)
 		}
+		startInt64 := q.Start.UnixNano()
 		min = numeric.Int64ToFloat64(startInt64)
 	}
 	if !q.End.IsZero() {
-		endInt64 := q.End.UnixNano()
-		if endInt64 < 0 && q.End.After(epochTime) {
+		if q.End.Before(minValidTime) || q.End.After(maxValidTime) {
 			// overflow
 			return nil, nil, fmt.Errorf("invalid/unsupported date range, end: %v", q.End)
 		}
+		endInt64 := q.End.UnixNano()
 		max = numeric.Int64ToFloat64(endInt64)
 	}
 
