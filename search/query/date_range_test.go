@@ -76,6 +76,11 @@ func TestValidateDatetimeRanges(t *testing.T) {
 			end:    "2262-04-12T00:00:00Z",
 			expect: false,
 		},
+		{
+			start:  "1950-03-22T12:23:23Z",
+			end:    "1960-02-21T15:23:34Z",
+			expect: true,
+		},
 	}
 
 	for _, test := range tests {

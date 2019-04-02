@@ -41,6 +41,13 @@ type BleveQueryTime struct {
 	time.Time
 }
 
+var epochTime time.Time
+
+func init() {
+	unixEpochTime := "1970-01-01T00:00:00Z"
+	epochTime, _ = time.Parse(time.RFC3339, unixEpochTime)
+}
+
 func queryTimeFromString(t string) (time.Time, error) {
 	dateTimeParser, err := cache.DateTimeParserNamed(QueryDateTimeParser)
 	if err != nil {
@@ -144,7 +151,7 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 	max := math.Inf(1)
 	if !q.Start.IsZero() {
 		startInt64 := q.Start.UnixNano()
-		if startInt64 < 0 {
+		if startInt64 < 0 && q.Start.After(epochTime) {
 			// overflow
 			return nil, nil, fmt.Errorf("invalid/unsupported date range, start: %v", q.Start)
 		}
@@ -152,7 +159,7 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 	}
 	if !q.End.IsZero() {
 		endInt64 := q.End.UnixNano()
-		if endInt64 < 0 {
+		if endInt64 < 0 && q.End.After(epochTime) {
 			// overflow
 			return nil, nil, fmt.Errorf("invalid/unsupported date range, end: %v", q.End)
 		}
