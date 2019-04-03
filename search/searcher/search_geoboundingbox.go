@@ -40,7 +40,7 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 
 	// do math to produce list of terms needed for this search
 	onBoundaryTerms, notOnBoundaryTerms, err := ComputeGeoRange(0, GeoBitsShift1Minus1,
-		minLon, minLat, maxLon, maxLat, checkBoundaries, DisjunctionMaxClauseCount)
+		minLon, minLat, maxLon, maxLat, checkBoundaries)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ var geoMaxShift = document.GeoPrecisionStep * 4
 var geoDetailLevel = ((geo.GeoBits << 1) - geoMaxShift) / 2
 
 func ComputeGeoRange(term uint64, shift uint,
-	sminLon, sminLat, smaxLon, smaxLat float64, checkBoundaries bool, maxTerms int) (
+	sminLon, sminLat, smaxLon, smaxLat float64, checkBoundaries bool) (
 	onBoundary [][]byte, notOnBoundary [][]byte, err error) {
 	preallocBytesLen := 32
 	preallocBytes := make([]byte, preallocBytesLen)
@@ -144,13 +144,6 @@ func ComputeGeoRange(term uint64, shift uint,
 	}
 
 	computeGeoRange = func(term uint64, shift uint) {
-		if maxTerms > 0 {
-			if len(onBoundary) > maxTerms {
-				err = tooManyClausesErr(len(onBoundary))
-			} else if len(notOnBoundary) > maxTerms {
-				err = tooManyClausesErr(len(notOnBoundary))
-			}
-		}
 		if err != nil {
 			return
 		}
