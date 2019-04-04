@@ -1548,3 +1548,49 @@ func TestBooleanSearchBug1185(t *testing.T) {
 		t.Fatalf("expected same number of hits, got: %d and %d", len(res.Hits), len(res2.Hits))
 	}
 }
+
+func TestSearchScoreNone(t *testing.T) {
+	idx, err := NewUsing("testidx", NewIndexMapping(), scorch.Name, Config.DefaultKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := map[string]interface{}{
+		"field1": "asd fgh jkl",
+		"field2": "more content blah blah",
+		"id":     "doc",
+	}
+
+	if err = idx.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	q := NewQueryStringQuery("content")
+	sr := NewSearchRequest(q)
+	sr.IncludeLocations = true
+	sr.Score = "none"
+
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) != 1 {
+		t.Fatal("unexpected number of hits")
+	}
+
+	if len(res.Hits[0].Locations) != 1 {
+		t.Fatal("unexpected locations for the hit")
+	}
+
+	if res.Hits[0].Score != 0 {
+		t.Fatal("unexpected score for the hit")
+	}
+}

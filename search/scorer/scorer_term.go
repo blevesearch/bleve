@@ -159,7 +159,9 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 
 	rv := ctx.DocumentMatchPool.Get()
 	rv.IndexInternalID = append(rv.IndexInternalID, termMatch.ID...)
-	rv.Score = score
+	if s.options.Score != "none" {
+		rv.Score = score
+	}
 	if s.options.Explain {
 		rv.Expl = scoreExplanation
 	}
