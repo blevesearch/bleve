@@ -182,8 +182,9 @@ var docvalueCmd = &cobra.Command{
 		docInChunk := uint64(localDocNum) / uint64(segment.ChunkFactor())
 
 		if fieldChunkCount <= docInChunk {
-			return fmt.Errorf("No chunk exists for chunk number: %d for "+
-				"localDocNum: %d", docInChunk, localDocNum)
+			fmt.Printf("No chunk exists for chunk number: %d for "+
+				"localDocNum: %d\n", docInChunk, localDocNum)
+			return nil
 		}
 
 		start, end := readChunkBoundary(int(docInChunk), fieldChunkLens)
@@ -241,7 +242,7 @@ var docvalueCmd = &cobra.Command{
 				break
 			}
 
-			fmt.Printf(" %s ", uncompressed[0:i])
+			fmt.Printf(" %x ", uncompressed[0:i])
 			uncompressed = uncompressed[i+1:]
 		}
 		fmt.Printf(" \n ")
