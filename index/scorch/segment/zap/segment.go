@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"reflect"
 	"sync"
+	"unsafe"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index/scorch/segment"
@@ -35,7 +35,7 @@ var reflectStaticSizeSegmentBase int
 
 func init() {
 	var sb SegmentBase
-	reflectStaticSizeSegmentBase = int(reflect.TypeOf(sb).Size())
+	reflectStaticSizeSegmentBase = int(unsafe.Sizeof(sb))
 }
 
 // Open returns a zap impl of a segment
