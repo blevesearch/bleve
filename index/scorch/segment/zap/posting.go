@@ -190,7 +190,7 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 	}
 
 	rv.postings = p
-	rv.includeFreqNorm = includeFreq || includeNorm
+	rv.includeFreqNorm = includeFreq || includeNorm || includeLocs
 	rv.includeLocs = includeLocs
 
 	if p.normBits1Hit != 0 {
