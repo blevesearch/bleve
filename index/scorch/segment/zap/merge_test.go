@@ -147,7 +147,10 @@ func testMergeWithEmptySegments(t *testing.T, before bool, numEmptySegments int)
 
 		_ = os.RemoveAll("/tmp/" + fname)
 
-		emptySegment, _, _ := AnalysisResultsToSegmentBase([]*index.AnalysisResult{}, 1024)
+		emptySegment, _, err := AnalysisResultsToSegmentBase([]*index.AnalysisResult{}, 1024)
+		if err != nil {
+			t.Fatal(err)
+		}
 		err = PersistSegmentBase(emptySegment, "/tmp/"+fname)
 		if err != nil {
 			t.Fatal(err)

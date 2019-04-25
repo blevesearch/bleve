@@ -88,8 +88,8 @@ func (s *SegmentBase) loadFieldDocValueReader(field string,
 	fieldDvLocStart, fieldDvLocEnd uint64) (*docValueReader, error) {
 	// get the docValue offset for the given fields
 	if fieldDvLocStart == fieldNotUninverted {
-		return nil, fmt.Errorf("loadFieldDocValueReader: "+
-			"no docValues found for field: %s", field)
+		// no docValues found, nothing to do
+		return nil, nil
 	}
 
 	// read the number of chunks, and chunk offsets position
@@ -101,6 +101,8 @@ func (s *SegmentBase) loadFieldDocValueReader(field string,
 		chunkOffsetsLen := binary.BigEndian.Uint64(s.mem[fieldDvLocEnd-16 : fieldDvLocEnd-8])
 		// acquire position of chunk offsets
 		chunkOffsetsPosition = (fieldDvLocEnd - 16) - chunkOffsetsLen
+	} else {
+		return nil, fmt.Errorf("loadFieldDocValueReader: fieldDvLoc too small: %d-%d", fieldDvLocEnd, fieldDvLocStart)
 	}
 
 	fdvIter := &docValueReader{

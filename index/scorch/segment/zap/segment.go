@@ -539,7 +539,7 @@ func (s *Segment) DictAddr(field string) (uint64, error) {
 }
 
 func (s *SegmentBase) loadDvReaders() error {
-	if s.docValueOffset == fieldNotUninverted {
+	if s.docValueOffset == fieldNotUninverted || s.numDocs == 0 {
 		return nil
 	}
 
@@ -558,7 +558,10 @@ func (s *SegmentBase) loadDvReaders() error {
 		}
 		read += uint64(n)
 
-		fieldDvReader, _ := s.loadFieldDocValueReader(field, fieldLocStart, fieldLocEnd)
+		fieldDvReader, err := s.loadFieldDocValueReader(field, fieldLocStart, fieldLocEnd)
+		if err != nil {
+			return err
+		}
 		if fieldDvReader != nil {
 			s.fieldDvReaders[uint16(fieldID)] = fieldDvReader
 			s.fieldDvNames = append(s.fieldDvNames, field)
