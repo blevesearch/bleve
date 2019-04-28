@@ -221,6 +221,10 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
 				return err
 			}
+			err = zap.ValidateMerge(segmentsToMerge, docsToDrop, seg.(*zap.Segment))
+			if err != nil {
+				return fmt.Errorf("merge validation failed: %v")
+			}
 			oldNewDocNums = make(map[uint64][]uint64)
 			for i, segNewDocNums := range newDocNums {
 				oldNewDocNums[task.Segments[i].Id()] = segNewDocNums
