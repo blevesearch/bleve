@@ -223,7 +223,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 			}
 			err = zap.ValidateMerge(segmentsToMerge, docsToDrop, seg.(*zap.Segment))
 			if err != nil {
-				return fmt.Errorf("merge validation failed: %v")
+				return fmt.Errorf("merge validation failed: %v", err)
 			}
 			oldNewDocNums = make(map[uint64][]uint64)
 			for i, segNewDocNums := range newDocNums {
