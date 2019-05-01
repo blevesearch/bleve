@@ -151,7 +151,6 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 		atomic.AddUint64(&s.stats.TotFileMergePlanNone, 1)
 		return nil
 	}
-
 	atomic.AddUint64(&s.stats.TotFileMergePlanOk, 1)
 
 	atomic.AddUint64(&s.stats.TotFileMergePlanTasks, uint64(len(resultMergePlan.Tasks)))
@@ -221,7 +220,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
 				return err
 			}
-			err = zap.ValidateMerge(segmentsToMerge, docsToDrop, seg.(*zap.Segment))
+			err = zap.ValidateMerge(segmentsToMerge, nil, docsToDrop, seg.(*zap.Segment))
 			if err != nil {
 				return fmt.Errorf("merge validation failed: %v", err)
 			}
@@ -314,6 +313,10 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	if err != nil {
 		atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
 		return nil, 0, err
+	}
+	err = zap.ValidateMerge(nil, sbs, sbsDrops, seg.(*zap.Segment))
+	if err != nil {
+		return nil, 0, fmt.Errorf("merge validation failed: %v", err)
 	}
 
 	// update persisted stats
