@@ -316,7 +316,7 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	}
 	err = zap.ValidateMerge(nil, sbs, sbsDrops, seg.(*zap.Segment))
 	if err != nil {
-		return nil, 0, fmt.Errorf("merge validation failed: %v", err)
+		return nil, 0, fmt.Errorf("in-memory merge validation failed: %v", err)
 	}
 
 	// update persisted stats
