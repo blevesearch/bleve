@@ -172,3 +172,74 @@ func GeoHashDecode(hash string) (lat, lng float64) {
 	box := geoBoundingBox(hash)
 	return box.round()
 }
+
+var masks = []uint64{16, 8, 4, 2, 1}
+
+// DecodeGeoHash decodes the string geohash faster with
+// higher precision. This api is in experimental phase.
+func DecodeGeoHash(geoHash string) (float64, float64) {
+	even := true
+	lat := []float64{-90.0, 90.0}
+	lon := []float64{-180.0, 180.0}
+
+	for i := 0; i < len(geoHash); i++ {
+		cd := uint64(base32encoding.dec[geoHash[i]])
+		for j := 0; j < 5; j++ {
+			if even {
+				if cd&masks[j] > 0 {
+					lon[0] = (lon[0] + lon[1]) / 2
+				} else {
+					lon[1] = (lon[0] + lon[1]) / 2
+				}
+			} else {
+				if cd&masks[j] > 0 {
+					lat[0] = (lat[0] + lat[1]) / 2
+				} else {
+					lat[1] = (lat[0] + lat[1]) / 2
+				}
+			}
+			even = !even
+		}
+	}
+
+	return (lat[0] + lat[1]) / 2, (lon[0] + lon[1]) / 2
+}
+
+func EncodeGeoHash(lat, lon float64) string {
+	even := true
+	lats := []float64{-90.0, 90.0}
+	lons := []float64{-180.0, 180.0}
+	precision := 12
+	var ch, bit uint64
+	var geoHash string
+
+	for len(geoHash) < precision {
+		if even {
+			mid := (lons[0] + lons[1]) / 2
+			if lon > mid {
+				ch |= masks[bit]
+				lons[0] = mid
+			} else {
+				lons[1] = mid
+			}
+		} else {
+			mid := (lats[0] + lats[1]) / 2
+			if lat > mid {
+				ch |= masks[bit]
+				lats[0] = mid
+			} else {
+				lats[1] = mid
+			}
+		}
+		even = !even
+		if bit < 4 {
+			bit++
+		} else {
+			geoHash += string(base32encoding.enc[ch])
+			ch = 0
+			bit = 0
+		}
+	}
+
+	return geoHash
+}
