@@ -20,7 +20,7 @@ import (
 
 // This test basically confirms the dimensions of the
 // bounded box computed between the DecodeGeoHash method
-// and the existing original implementation from
+// and the popular implementation from
 // https://github.com/mmcloughlin/geohash.
 // DecodeGeoHash method returns the centre of the rectangle
 // than returning the box dimensions.

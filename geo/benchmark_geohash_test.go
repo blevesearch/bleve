@@ -18,14 +18,6 @@ import (
 	"testing"
 )
 
-func BenchmarkGeoHashLen5Decode(b *testing.B) {
-	b.ResetTimer()
-	hash := "d3hn3"
-	for i := 0; i < b.N; i++ {
-		_, _ = GeoHashDecode(hash)
-	}
-}
-
 func BenchmarkGeoHashLen5NewDecode(b *testing.B) {
 	b.ResetTimer()
 	hash := "d3hn3"
@@ -34,27 +26,11 @@ func BenchmarkGeoHashLen5NewDecode(b *testing.B) {
 	}
 }
 
-func BenchmarkGeoHashLen6Decode(b *testing.B) {
-	b.ResetTimer()
-	hash := "u4pruy"
-	for i := 0; i < b.N; i++ {
-		_, _ = GeoHashDecode(hash)
-	}
-}
-
 func BenchmarkGeoHashLen6NewDecode(b *testing.B) {
 	b.ResetTimer()
 	hash := "u4pruy"
 	for i := 0; i < b.N; i++ {
 		_, _ = DecodeGeoHash(hash)
-	}
-}
-
-func BenchmarkGeoHashLen7Decode(b *testing.B) {
-	b.ResetTimer()
-	hash := "u4pruyd"
-	for i := 0; i < b.N; i++ {
-		_, _ = GeoHashDecode(hash)
 	}
 }
 
