@@ -15,30 +15,50 @@
 package geo
 
 import (
+	"strings"
 	"testing"
 )
 
-func TestGeoHash(t *testing.T) {
+func TestDecodeGeoHash(t *testing.T) {
 	tests := []struct {
 		hash string
 		lon  float64
 		lat  float64
 	}{
-		{"d3hn3", -73.080000, 6.730000},     // -73.05908203, 6.74560547 as per http://geohash.co/
-		{"u4pru", 10.380000, 57.620000},     // 10.39306641, 57.63427734
-		{"u4pruy", 10.410000, 57.646000},    // 10.40954590, 57.64801025
-		{"u4pruyd", 10.407000, 57.649000},   // 10.40748596, 57.64869690
+		{"d3hn3", -73.059082, 6.745605},     // -73.05908203, 6.74560547 as per http://geohash.co/
+		{"u4pru", 10.393066, 57.634277},     // 10.39306641, 57.63427734
+		{"u4pruy", 10.409546, 57.648010},    // 10.40954590, 57.64801025
+		{"u4pruyd", 10.407486, 57.648697},   // 10.40748596, 57.64869690
 		{"u4pruydqqvj", 10.40744, 57.64911}, // 10.40743969, 57.64911063
 	}
 
 	for _, test := range tests {
-		lat, lon := GeoHashDecode(test.hash)
+		lat, lon := DecodeGeoHash(test.hash)
 
 		if compareGeo(test.lon, lon) != 0 {
 			t.Errorf("expected lon %f, got %f, hash %s", test.lon, lon, test.hash)
 		}
 		if compareGeo(test.lat, lat) != 0 {
 			t.Errorf("expected lat %f, got %f, hash %s", test.lat, lat, test.hash)
+		}
+	}
+}
+
+func TestEncodeGeoHash(t *testing.T) {
+	tests := []struct {
+		lon  float64
+		lat  float64
+		hash string
+	}{
+		{2.29449034, 48.85841131, "u09tunquc"},
+		{76.491540, 10.060349, "t9y3hx7my0fp"},
+	}
+
+	for _, test := range tests {
+		hash := EncodeGeoHash(test.lat, test.lon)
+
+		if !strings.HasPrefix(hash, test.hash) {
+			t.Errorf("expected hash %s, got %s", test.hash, hash)
 		}
 	}
 }
