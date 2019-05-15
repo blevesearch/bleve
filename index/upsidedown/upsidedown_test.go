@@ -1491,5 +1491,4 @@ func TestIndexBatchPersistedCallbackWithErrorUpsideDown(t *testing.T) {
 	if !callbackExecuted {
 		t.Fatal("expected callback to fire, it did not")
 	}
-
 }

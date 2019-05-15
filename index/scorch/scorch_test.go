@@ -2011,3 +2011,64 @@ func TestAllFieldWithDifferentTermVectorsEnabled(t *testing.T) {
 		t.Errorf("Error updating index: %v", err)
 	}
 }
+
+func TestIndexBatchPersistedCallbackWithErrorScorch(t *testing.T) {
+	cfg := CreateConfig("TestIndexBatchPersistedCallbackWithErrorScorch")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s, _ := idx.(*Scorch)
+
+	/***** Scorch's Open() API *****/
+	// The following code simulates Scorch's Open() api, with one
+	// extra piece of setting a malignant path for the index midway.
+	err = s.openBolt()
+	if err != nil {
+		t.Fatalf("error opening index: %v", err)
+	}
+
+	s.path = "badpath/crap"
+
+	s.asyncTasks.Add(3)
+	go s.mainLoop()
+	go s.persisterLoop()
+	go s.mergerLoop()
+	/***** END of Scorch's Open() API *****/
+
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var callbackExecuted bool
+	batch := index.NewBatch()
+	batch.SetPersistedCallback(func(e error) {
+		callbackExecuted = true
+	})
+	doc := document.NewDocument("x")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("TEST")))
+	batch.Update(doc)
+
+	_ = idx.Batch(batch)
+	// don't fail on this error, that isn't what we're testing
+
+	if !callbackExecuted {
+		t.Fatal("expected callback to fire, it did not")
+	}
+}
