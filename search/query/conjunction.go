@@ -26,6 +26,7 @@ import (
 type ConjunctionQuery struct {
 	Conjuncts       []Query `json:"conjuncts"`
 	BoostVal        *Boost  `json:"boost,omitempty"`
+	ArrayDepth      int     `json:"arraydepth,omitempty"`
 	queryStringMode bool
 }
 
@@ -54,6 +55,11 @@ func (q *ConjunctionQuery) AddQuery(aq ...Query) {
 
 func (q *ConjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	ss := make([]search.Searcher, 0, len(q.Conjuncts))
+	// load locations if its an array/nested search
+	if q.ArrayDepth > 0 {
+		options.IncludeTermVectors = true
+	}
+
 	for _, conjunct := range q.Conjuncts {
 		sr, err := conjunct.Searcher(i, m, options)
 		if err != nil {
@@ -75,6 +81,10 @@ func (q *ConjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 		return searcher.NewMatchNoneSearcher(i)
 	}
 
+	if q.ArrayDepth > 0 {
+		return searcher.NewNestedArraySearcher(i, q.ArrayDepth, ss, options)
+	}
+
 	return searcher.NewConjunctionSearcher(i, ss, options)
 }
 
@@ -92,8 +102,9 @@ func (q *ConjunctionQuery) Validate() error {
 
 func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
-		Conjuncts []json.RawMessage `json:"conjuncts"`
-		Boost     *Boost            `json:"boost,omitempty"`
+		Conjuncts  []json.RawMessage `json:"conjuncts"`
+		Boost      *Boost            `json:"boost,omitempty"`
+		ArrayDepth int               `json:"arraydepth,omitempty"`
 	}{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
@@ -108,5 +119,6 @@ func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 		q.Conjuncts[i] = query
 	}
 	q.BoostVal = tmp.Boost
+	q.ArrayDepth = tmp.ArrayDepth
 	return nil
 }

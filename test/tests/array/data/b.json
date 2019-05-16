@@ -1,0 +1,16 @@
+{
+    "tshirts": [
+    {
+        "size": "large",
+        "color": "red"
+    },
+    {
+        "size": "small",
+        "color": "blue"
+    },
+    {
+        "size": "medium",
+        "color": "green"
+    }
+    ]
+}
