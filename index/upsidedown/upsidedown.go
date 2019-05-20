@@ -801,6 +801,10 @@ func (udc *UpsideDownCouch) termFieldVectorsFromTermVectors(in []*TermVector) []
 }
 
 func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
+	persistedCallback := batch.PersistedCallback()
+	if persistedCallback != nil {
+		defer persistedCallback(err)
+	}
 	analysisStart := time.Now()
 
 	resultChan := make(chan *index.AnalysisResult, len(batch.IndexOps))
@@ -965,10 +969,6 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 		atomic.AddUint64(&udc.stats.errors, 1)
 	}
 
-	persistedCallback := batch.PersistedCallback()
-	if persistedCallback != nil {
-		persistedCallback(err)
-	}
 	return
 }
 

@@ -28,7 +28,9 @@ import (
 	"github.com/blevesearch/bleve/analysis/analyzer/custom"
 	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/analysis/analyzer/standard"
+	"github.com/blevesearch/bleve/analysis/token/length"
 	"github.com/blevesearch/bleve/analysis/token/lowercase"
+	"github.com/blevesearch/bleve/analysis/token/shingle"
 	"github.com/blevesearch/bleve/analysis/tokenizer/single"
 	"github.com/blevesearch/bleve/analysis/tokenizer/whitespace"
 	"github.com/blevesearch/bleve/document"
@@ -1262,5 +1264,333 @@ func TestDuplicateLocationsIssue1168(t *testing.T) {
 	}
 	if len(sres.Hits[0].Locations["name1"]["marty"]) != 1 {
 		t.Fatalf("duplicate marty")
+	}
+}
+
+func TestBooleanMustSingleMatchNone(t *testing.T) {
+	idxMapping := NewIndexMapping()
+	if err := idxMapping.AddCustomTokenFilter(length.Name, map[string]interface{}{
+		"min":  3.0,
+		"max":  5.0,
+		"type": length.Name,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idxMapping.AddCustomAnalyzer("custom1", map[string]interface{}{
+		"type":          "custom",
+		"tokenizer":     "single",
+		"token_filters": []interface{}{length.Name},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	idxMapping.DefaultAnalyzer = "custom1"
+	idx, err := New("testidx", idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := map[string]interface{}{
+		"languages_known": "Dutch",
+		"dept":            "Sales",
+	}
+
+	batch := idx.NewBatch()
+	if err = batch.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	// this is a successful match
+	matchSales := NewMatchQuery("Sales")
+	matchSales.SetField("dept")
+
+	// this would spin off a MatchNoneSearcher as the
+	// token filter rules out the word "French"
+	matchFrench := NewMatchQuery("French")
+	matchFrench.SetField("languages_known")
+
+	bq := NewBooleanQuery()
+	bq.AddShould(matchSales)
+	bq.AddMust(matchFrench)
+
+	sr := NewSearchRequest(bq)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 0 {
+		t.Fatalf("Expected 0 results but got: %v", res.Total)
+	}
+}
+
+func TestBooleanMustNotSingleMatchNone(t *testing.T) {
+	idxMapping := NewIndexMapping()
+	if err := idxMapping.AddCustomTokenFilter(shingle.Name, map[string]interface{}{
+		"min":  3.0,
+		"max":  5.0,
+		"type": shingle.Name,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idxMapping.AddCustomAnalyzer("custom1", map[string]interface{}{
+		"type":          "custom",
+		"tokenizer":     "unicode",
+		"token_filters": []interface{}{shingle.Name},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	idxMapping.DefaultAnalyzer = "custom1"
+	idx, err := New("testidx", idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := map[string]interface{}{
+		"languages_known": "Dutch",
+		"dept":            "Sales",
+	}
+
+	batch := idx.NewBatch()
+	if err = batch.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	// this is a successful match
+	matchSales := NewMatchQuery("Sales")
+	matchSales.SetField("dept")
+
+	// this would spin off a MatchNoneSearcher as the
+	// token filter rules out the word "Dutch"
+	matchDutch := NewMatchQuery("Dutch")
+	matchDutch.SetField("languages_known")
+
+	matchEngineering := NewMatchQuery("Engineering")
+	matchEngineering.SetField("dept")
+
+	bq := NewBooleanQuery()
+	bq.AddShould(matchSales)
+	bq.AddMustNot(matchDutch, matchEngineering)
+
+	sr := NewSearchRequest(bq)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 0 {
+		t.Fatalf("Expected 0 results but got: %v", res.Total)
+	}
+}
+
+func TestBooleanSearchBug1185(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	of := NewTextFieldMapping()
+	of.Analyzer = keyword.Name
+	of.Name = "owner"
+
+	dm := NewDocumentMapping()
+	dm.AddFieldMappingsAt("owner", of)
+
+	m := NewIndexMapping()
+	m.DefaultMapping = dm
+
+	idx, err := NewUsing("testidx", m, "scorch", "scorch", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	err = idx.Index("17112", map[string]interface{}{
+		"owner": "marty",
+		"type":  "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17139", map[string]interface{}{
+		"type": "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("177777", map[string]interface{}{
+		"type": "x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Index("177778", map[string]interface{}{
+		"type": "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17140", map[string]interface{}{
+		"type": "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17000", map[string]interface{}{
+		"owner": "marty",
+		"type":  "x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17141", map[string]interface{}{
+		"type": "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17428", map[string]interface{}{
+		"owner": "marty",
+		"type":  "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17113", map[string]interface{}{
+		"owner": "marty",
+		"type":  "x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	matchTypeQ := NewMatchPhraseQuery("A Demo Type")
+	matchTypeQ.SetField("type")
+
+	matchAnyOwnerRegQ := NewRegexpQuery(".+")
+	matchAnyOwnerRegQ.SetField("owner")
+
+	matchNoOwner := NewBooleanQuery()
+	matchNoOwner.AddMustNot(matchAnyOwnerRegQ)
+
+	notNoOwner := NewBooleanQuery()
+	notNoOwner.AddMustNot(matchNoOwner)
+
+	matchTypeAndNoOwner := NewConjunctionQuery()
+	matchTypeAndNoOwner.AddQuery(matchTypeQ)
+	matchTypeAndNoOwner.AddQuery(notNoOwner)
+
+	req := NewSearchRequest(matchTypeAndNoOwner)
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// query 2
+	matchTypeAndNoOwnerBoolean := NewBooleanQuery()
+	matchTypeAndNoOwnerBoolean.AddMust(matchTypeQ)
+	matchTypeAndNoOwnerBoolean.AddMustNot(matchNoOwner)
+
+	req2 := NewSearchRequest(matchTypeAndNoOwnerBoolean)
+	res2, err := idx.Search(req2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) != len(res2.Hits) {
+		t.Fatalf("expected same number of hits, got: %d and %d", len(res.Hits), len(res2.Hits))
+	}
+}
+
+func TestSearchScoreNone(t *testing.T) {
+	idx, err := NewUsing("testidx", NewIndexMapping(), scorch.Name, Config.DefaultKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := map[string]interface{}{
+		"field1": "asd fgh jkl",
+		"field2": "more content blah blah",
+		"id":     "doc",
+	}
+
+	if err = idx.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	q := NewQueryStringQuery("content")
+	sr := NewSearchRequest(q)
+	sr.IncludeLocations = true
+	sr.Score = "none"
+
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) != 1 {
+		t.Fatal("unexpected number of hits")
+	}
+
+	if len(res.Hits[0].Locations) != 1 {
+		t.Fatal("unexpected locations for the hit")
+	}
+
+	if res.Hits[0].Score != 0 {
+		t.Fatal("unexpected score for the hit")
 	}
 }

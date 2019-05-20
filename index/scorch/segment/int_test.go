@@ -21,6 +21,7 @@ package segment
 
 import (
 	"bytes"
+	"encoding/binary"
 	"math"
 	"testing"
 )
@@ -93,4 +94,74 @@ func testCustomEncodeUint64(
 			t.Errorf("expected [% x]; got [% x] (value: %d)", test.expEnc, enc, test.value)
 		}
 	}
+}
+
+func BenchmarkUvarint(b *testing.B) {
+	n, buf := generateCommonUvarints(64, 512)
+
+	reader := bytes.NewReader(buf)
+	seen := 0
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i = i + 1 {
+		if seen >= n {
+			reader.Reset(buf)
+			seen = 0
+		}
+
+		_, _ = binary.ReadUvarint(reader)
+		seen = seen + 1
+	}
+}
+
+func BenchmarkMemUvarintReader(b *testing.B) {
+	n, buf := generateCommonUvarints(64, 512)
+
+	reader := &MemUvarintReader{S: buf}
+	seen := 0
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i = i + 1 {
+		if seen >= n {
+			reader.Reset(buf)
+			seen = 0
+		}
+
+		_, _ = reader.ReadUvarint()
+		seen = seen + 1
+	}
+}
+
+// generate some common, encoded uvarint's that we might see as
+// freq-norm's or locations.
+func generateCommonUvarints(maxFreq, maxFieldLen int) (n int, rv []byte) {
+	buf := make([]byte, binary.MaxVarintLen64)
+
+	var out bytes.Buffer
+
+	encode := func(val uint64) {
+		bufLen := binary.PutUvarint(buf, val)
+		out.Write(buf[:bufLen])
+		n = n + 1
+	}
+
+	for i := 1; i < maxFreq; i = i * 2 { // Common freqHasLoc's.
+		freqHasLocs := uint64(i << 1)
+		encode(freqHasLocs)
+		encode(freqHasLocs | 0x01) // 0'th LSB encodes whether there are locations.
+	}
+
+	encodeNorm := func(fieldLen int) {
+		norm := float32(1.0 / math.Sqrt(float64(fieldLen)))
+		normUint64 := uint64(math.Float32bits(float32(norm)))
+		encode(normUint64)
+	}
+
+	for i := 1; i < maxFieldLen; i = i * 2 { // Common norm's.
+		encodeNorm(i)
+	}
+
+	return n, out.Bytes()
 }
