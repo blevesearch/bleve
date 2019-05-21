@@ -263,6 +263,7 @@ func (h *HighlightRequest) AddField(field string) {
 // Sort describes the desired order for the results to be returned.
 // Score controls the kind of scoring performed
 // SearchAfter supports deep paging by providing a minimum sort key
+// SearchBefore supports deep paging by providing a maximum sort key
 //
 // A special field named "*" can be used to return all fields.
 type SearchRequest struct {
@@ -277,6 +278,7 @@ type SearchRequest struct {
 	IncludeLocations bool              `json:"includeLocations"`
 	Score            string            `json:"score,omitempty"`
 	SearchAfter      []string          `json:"search_after"`
+	SearchBefore     []string          `json:"search_before"`
 }
 
 func (r *SearchRequest) Validate() error {
@@ -287,12 +289,24 @@ func (r *SearchRequest) Validate() error {
 		}
 	}
 
+	if r.SearchAfter != nil && r.SearchBefore != nil {
+		return fmt.Errorf("cannot use search after and search before together")
+	}
+
 	if r.SearchAfter != nil {
 		if r.From != 0 {
 			return fmt.Errorf("cannot use search after with from !=0")
 		}
 		if len(r.SearchAfter) != len(r.Sort) {
 			return fmt.Errorf("search after must have same size as sort order")
+		}
+	}
+	if r.SearchBefore != nil {
+		if r.From != 0 {
+			return fmt.Errorf("cannot use search before with from !=0")
+		}
+		if len(r.SearchBefore) != len(r.Sort) {
+			return fmt.Errorf("search before must have same size as sort order")
 		}
 	}
 
@@ -343,6 +357,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		IncludeLocations bool              `json:"includeLocations"`
 		Score            string            `json:"score"`
 		SearchAfter      []string          `json:"search_after"`
+		SearchBefore     []string          `json:"search_before"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -371,6 +386,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.IncludeLocations = temp.IncludeLocations
 	r.Score = temp.Score
 	r.SearchAfter = temp.SearchAfter
+	r.SearchBefore = temp.SearchBefore
 	r.Query, err = query.ParseQuery(temp.Q)
 	if err != nil {
 		return err

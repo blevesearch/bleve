@@ -432,5 +432,31 @@
         }
       ]
     }
+  },
+  {
+    "comment": "sort by name, ascending, before nancy",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "match_all":{}
+      },
+      "sort": ["name"],
+      "search_before": ["nancy"]
+    },
+    "result": {
+      "total_hits": 6,
+      "hits": [
+        {
+          "id": "c"
+        },
+        {
+          "id": "f"
+        },
+        {
+          "id": "a"
+        }
+      ]
+    }
   }
 ]

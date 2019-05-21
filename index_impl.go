@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -442,6 +443,14 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		return nil, ErrorIndexClosed
 	}
 
+	var reverseQueryExecution bool
+	if req.SearchBefore != nil {
+		reverseQueryExecution = true
+		req.Sort.Reverse()
+		req.SearchAfter = req.SearchBefore
+		req.SearchBefore = nil
+	}
+
 	var coll *collector.TopNCollector
 	if req.SearchAfter != nil {
 		coll = collector.NewTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter)
@@ -563,6 +572,14 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	if Config.SlowSearchLogThreshold > 0 &&
 		searchDuration > Config.SlowSearchLogThreshold {
 		logger.Printf("slow search took %s - %v", searchDuration, req)
+	}
+
+	if reverseQueryExecution {
+		// reserve the sort back to the original
+		req.Sort.Reverse()
+		// resort using the original order
+		mhs := newSearchHitSorter(req.Sort, hits)
+		sort.Sort(mhs)
 	}
 
 	return &SearchResult{
@@ -869,4 +886,27 @@ func deDuplicate(fields []string) []string {
 		}
 	}
 	return ret
+}
+
+type searchHitSorter struct {
+	hits          search.DocumentMatchCollection
+	sort          search.SortOrder
+	cachedScoring []bool
+	cachedDesc    []bool
+}
+
+func newSearchHitSorter(sort search.SortOrder, hits search.DocumentMatchCollection) *searchHitSorter {
+	return &searchHitSorter{
+		sort:          sort,
+		hits:          hits,
+		cachedScoring: sort.CacheIsScore(),
+		cachedDesc:    sort.CacheDescending(),
+	}
+}
+
+func (m *searchHitSorter) Len() int      { return len(m.hits) }
+func (m *searchHitSorter) Swap(i, j int) { m.hits[i], m.hits[j] = m.hits[j], m.hits[i] }
+func (m *searchHitSorter) Less(i, j int) bool {
+	c := m.sort.Compare(m.cachedScoring, m.cachedDesc, m.hits[i], m.hits[j])
+	return c < 0
 }
