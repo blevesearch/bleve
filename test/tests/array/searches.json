@@ -1,62 +1,168 @@
 [
-    {
-		"comment": "test search on array depth - 1",
-		"search": {
-			"from": 0,
-			"size": 10,
-			"query": {
-                "conjuncts" : [
-                    { "term": "green", "field" : "tshirts.color"},
-                    { "term": "medium", "field" : "tshirts.size"}
-                ],
-				"arraydepth": 1
-			}
-		},
-		"result": {
-			"total_hits": 1,
-			"hits": [{
-                "id": "b"
-            }]
-		}
-    },
 	{
-		"comment": "test search on array depth - 2",
-		"search": {
-			"from": 0,
-			"size": 10,
-			"query": {
-                "conjuncts" : [
-                    { "term": "blue", "field" : "apparels.tshirts.color"},
-                    { "term": "small", "field" : "apparels.tshirts.size"}
-                ],
-				"arraydepth": 2
+	  "comment": "test search on array depth - 1",
+	  "search": {
+		"from": 0,
+		"size": 10,
+		"query": {
+		  "conjuncts": [
+			{
+			  "term": "green",
+			  "field": "tshirts.color"
+			},
+			{
+			  "term": "medium",
+			  "field": "tshirts.size"
 			}
-		},
-		"result": {
-			"total_hits": 1,
-			"hits": [
-				{
-					"id": "a"
-				}
+		  ],
+		  "array_depth": 1
+		}
+	  },
+	  "result": {
+		"total_hits": 1,
+		"hits": [
+		  {
+			"id": "b"
+		  }
+		]
+	  }
+	},
+	{
+	  "comment": "hit should be from chapter (doc c) for array depth - 1",
+	  "search": {
+		"from": 0,
+		"size": 10,
+		"query": {
+		  "conjuncts": [
+			{
+			  "match": "hillary clinton"
+			}
+		  ],
+		  "array_depth": 1
+		}
+	  },
+	  "result": {
+		"total_hits": 1,
+		"hits": [
+		  {
+			"id": "c"
+		  }
+		]
+	  }
+	},
+	{
+	  "comment": "hit should be from pages (doc d) for array depth - 2",
+	  "search": {
+		"from": 0,
+		"size": 10,
+		"query": {
+		  "conjuncts": [
+			{
+			  "match": "hillary clinton"
+			}
+		  ],
+		  "array_depth": 2
+		}
+	  },
+	  "result": {
+		"total_hits": 1,
+		"hits": [
+		  {
+			"id": "d"
+		  }
+		]
+	  }
+	},
+	{
+	  "comment": "hit should be empty for array depth - 3",
+	  "search": {
+		"from": 0,
+		"size": 10,
+		"query": {
+		  "conjuncts": [
+			{
+			  "match": "hillary clinton"
+			}
+		  ],
+		  "array_depth": 3
+		}
+	  },
+	  "result": {
+		"total_hits": 0,
+		"hits": []
+	  }
+	},
+	{
+		"comment": "hit should be two (doc c & d) for array depth - 0",
+		"search": {
+		  "from": 0,
+		  "size": 10,
+		  "query": {
+			"conjuncts": [
+			  {
+				"match": "hillary clinton"
+			  }
 			]
-		}
-    },
-    {
-		"comment": "test empty results on array depth search",
-		"search": {
-			"from": 0,
-			"size": 10,
-			"query": {
-                "conjuncts" : [
-                    { "term": "blue", "field" : "apparels.tshirts.color"},
-                    { "term": "large", "field" : "apparels.tshirts.size"}
-                ],
-				"arraydepth": 2
-			}
+		  }
 		},
 		"result": {
-			"total_hits": 0,
-			"hits": []
+		  "total_hits": 2,
+		  "hits": [
+			{"id": "d"},
+			{"id": "c"}
+		  ]
 		}
-    }
-]
+	  },
+	{
+	  "comment": "test search on array depth - 2",
+	  "search": {
+		"from": 0,
+		"size": 10,
+		"query": {
+		  "conjuncts": [
+			{
+			  "term": "blue",
+			  "field": "apparels.tshirts.color"
+			},
+			{
+			  "term": "small",
+			  "field": "apparels.tshirts.size"
+			}
+		  ],
+		  "array_depth": 2
+		}
+	  },
+	  "result": {
+		"total_hits": 1,
+		"hits": [
+		  {
+			"id": "a"
+		  }
+		]
+	  }
+	},
+	{
+	  "comment": "test empty results on array depth search",
+	  "search": {
+		"from": 0,
+		"size": 10,
+		"query": {
+		  "conjuncts": [
+			{
+			  "term": "blue",
+			  "field": "apparels.tshirts.color"
+			},
+			{
+			  "term": "large",
+			  "field": "apparels.tshirts.size"
+			}
+		  ],
+		  "array_depth": 2
+		}
+	  },
+	  "result": {
+		"total_hits": 0,
+		"hits": []
+	  }
+	}
+  ]

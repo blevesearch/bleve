@@ -1,0 +1,32 @@
+{
+  "book": {
+    "title": "melange",
+    "author": "dummy",
+    "chapters": [
+      {
+        "number": 1,
+        "title": "bill clinton circle",
+        "pages": [
+          {
+            "page": {
+              "contents": "bill clinton",
+              "number": 1
+            }
+          },
+          {
+            "page": {
+              "contents": "hillary clinton",
+              "number": 2
+            }
+          },
+          {
+            "page": {
+              "contents": "chelsea clinton",
+              "number": 3
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

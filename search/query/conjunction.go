@@ -26,7 +26,7 @@ import (
 type ConjunctionQuery struct {
 	Conjuncts       []Query `json:"conjuncts"`
 	BoostVal        *Boost  `json:"boost,omitempty"`
-	ArrayDepth      int     `json:"arraydepth,omitempty"`
+	ArrayDepth      int     `json:"array_depth,omitempty"`
 	queryStringMode bool
 }
 
@@ -104,7 +104,7 @@ func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
 		Conjuncts  []json.RawMessage `json:"conjuncts"`
 		Boost      *Boost            `json:"boost,omitempty"`
-		ArrayDepth int               `json:"arraydepth,omitempty"`
+		ArrayDepth int               `json:"array_depth,omitempty"`
 	}{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
