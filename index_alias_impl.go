@@ -540,6 +540,9 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 		// resort using the original order
 		mhs := newSearchHitSorter(req.Sort, sr.Hits)
 		sort.Sort(mhs)
+		// reset request
+		req.SearchBefore = req.SearchAfter
+		req.SearchAfter = nil
 	}
 
 	// fix up original request

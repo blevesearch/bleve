@@ -580,6 +580,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		// resort using the original order
 		mhs := newSearchHitSorter(req.Sort, hits)
 		sort.Sort(mhs)
+		// reset request
+		req.SearchBefore = req.SearchAfter
+		req.SearchAfter = nil
 	}
 
 	return &SearchResult{
