@@ -575,7 +575,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	if reverseQueryExecution {
-		// reserve the sort back to the original
+		// reverse the sort back to the original
 		req.Sort.Reverse()
 		// resort using the original order
 		mhs := newSearchHitSorter(req.Sort, hits)
