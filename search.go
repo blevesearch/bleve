@@ -338,7 +338,7 @@ func (r *SearchRequest) SortByCustom(order search.SortOrder) {
 
 // SetSearchAfter sets the request to skip over hits with a sort
 // value less than the provided sort after key
-func (r SearchRequest) SetSearchAfter(after []string) {
+func (r *SearchRequest) SetSearchAfter(after []string) {
 	r.SearchAfter = after
 }
 
