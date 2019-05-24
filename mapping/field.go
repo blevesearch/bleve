@@ -161,7 +161,8 @@ func (fm *FieldMapping) Options() document.IndexingOptions {
 	if fm.IncludeTermVectors {
 		rv |= document.IncludeTermVectors
 	}
-	if fm.DocValues {
+	// always enable docvalue options for geopoint
+	if fm.DocValues || fm.Type == "geopoint" {
 		rv |= document.DocValues
 	}
 	return rv
