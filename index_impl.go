@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -442,7 +443,20 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		return nil, ErrorIndexClosed
 	}
 
-	collector := collector.NewTopNCollector(req.Size, req.From, req.Sort)
+	var reverseQueryExecution bool
+	if req.SearchBefore != nil {
+		reverseQueryExecution = true
+		req.Sort.Reverse()
+		req.SearchAfter = req.SearchBefore
+		req.SearchBefore = nil
+	}
+
+	var coll *collector.TopNCollector
+	if req.SearchAfter != nil {
+		coll = collector.NewTopNCollectorAfter(req.Size, req.Sort, req.SearchAfter)
+	} else {
+		coll = collector.NewTopNCollector(req.Size, req.From, req.Sort)
+	}
 
 	// open a reader for this search
 	indexReader, err := i.i.Reader()
@@ -494,10 +508,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				facetsBuilder.Add(facetName, facetBuilder)
 			}
 		}
-		collector.SetFacetsBuilder(facetsBuilder)
+		coll.SetFacetsBuilder(facetsBuilder)
 	}
 
-	memNeeded := memNeededForSearch(req, searcher, collector)
+	memNeeded := memNeededForSearch(req, searcher, coll)
 	if cb := ctx.Value(SearchQueryStartCallbackKey); cb != nil {
 		if cbF, ok := cb.(SearchQueryStartCallbackFn); ok {
 			err = cbF(memNeeded)
@@ -515,12 +529,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}
 
-	err = collector.Collect(ctx, searcher, indexReader)
+	err = coll.Collect(ctx, searcher, indexReader)
 	if err != nil {
 		return nil, err
 	}
 
-	hits := collector.Results()
+	hits := coll.Results()
 
 	var highlighter highlight.Highlighter
 
@@ -560,6 +574,17 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		logger.Printf("slow search took %s - %v", searchDuration, req)
 	}
 
+	if reverseQueryExecution {
+		// reverse the sort back to the original
+		req.Sort.Reverse()
+		// resort using the original order
+		mhs := newSearchHitSorter(req.Sort, hits)
+		sort.Sort(mhs)
+		// reset request
+		req.SearchBefore = req.SearchAfter
+		req.SearchAfter = nil
+	}
+
 	return &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
@@ -567,10 +592,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		},
 		Request:  req,
 		Hits:     hits,
-		Total:    collector.Total(),
-		MaxScore: collector.MaxScore(),
+		Total:    coll.Total(),
+		MaxScore: coll.MaxScore(),
 		Took:     searchDuration,
-		Facets:   collector.FacetResults(),
+		Facets:   coll.FacetResults(),
 	}, nil
 }
 
@@ -864,4 +889,27 @@ func deDuplicate(fields []string) []string {
 		}
 	}
 	return ret
+}
+
+type searchHitSorter struct {
+	hits          search.DocumentMatchCollection
+	sort          search.SortOrder
+	cachedScoring []bool
+	cachedDesc    []bool
+}
+
+func newSearchHitSorter(sort search.SortOrder, hits search.DocumentMatchCollection) *searchHitSorter {
+	return &searchHitSorter{
+		sort:          sort,
+		hits:          hits,
+		cachedScoring: sort.CacheIsScore(),
+		cachedDesc:    sort.CacheDescending(),
+	}
+}
+
+func (m *searchHitSorter) Len() int      { return len(m.hits) }
+func (m *searchHitSorter) Swap(i, j int) { m.hits[i], m.hits[j] = m.hits[j], m.hits[i] }
+func (m *searchHitSorter) Less(i, j int) bool {
+	c := m.sort.Compare(m.cachedScoring, m.cachedDesc, m.hits[i], m.hits[j])
+	return c < 0
 }
