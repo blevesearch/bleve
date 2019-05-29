@@ -228,6 +228,24 @@ func (d *Dictionary) OnlyIterator(onlyTerms [][]byte,
 	return rv
 }
 
+// ExistsIterator returns an exists iterator for this dictionary
+func (d *Dictionary) ExistsIterator() segment.AdvDictionaryIterator {
+	rv := &DictionaryIterator{
+		d: d,
+	}
+
+	if d.fst != nil {
+		itr, err := d.fst.Iterator(nil, nil)
+		if err == nil {
+			rv.itr = itr
+		} else if err != vellum.ErrIteratorDone {
+			rv.err = err
+		}
+	}
+
+	return rv
+}
+
 // DictionaryIterator is an iterator for term dictionary
 type DictionaryIterator struct {
 	d         *Dictionary
@@ -256,4 +274,17 @@ func (i *DictionaryIterator) Next() (*index.DictEntry, error) {
 	}
 	i.err = i.itr.Next()
 	return &i.entry, nil
+}
+
+func (i *DictionaryIterator) Exists(key []byte) (error, bool) {
+	if i.err != nil && i.err != vellum.ErrIteratorDone {
+		return i.err, false
+	} else if i.itr == nil || i.err == vellum.ErrIteratorDone {
+		return nil, false
+	}
+	if advItr, ok := i.itr.(vellum.AdvIterator); ok {
+		return advItr.Exists(key)
+	}
+
+	return fmt.Errorf("no implementation found"), false
 }

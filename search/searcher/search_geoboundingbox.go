@@ -40,7 +40,7 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 
 	// do math to produce list of terms needed for this search
 	onBoundaryTerms, notOnBoundaryTerms, err := ComputeGeoRange(0, GeoBitsShift1Minus1,
-		minLon, minLat, maxLon, maxLat, checkBoundaries)
+		minLon, minLat, maxLon, maxLat, checkBoundaries, indexReader, field)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,8 @@ var geoMaxShift = document.GeoPrecisionStep * 4
 var geoDetailLevel = ((geo.GeoBits << 1) - geoMaxShift) / 2
 
 func ComputeGeoRange(term uint64, shift uint,
-	sminLon, sminLat, smaxLon, smaxLat float64, checkBoundaries bool) (
+	sminLon, sminLat, smaxLon, smaxLat float64, checkBoundaries bool,
+	indexReader index.IndexReader, field string) (
 	onBoundary [][]byte, notOnBoundary [][]byte, err error) {
 	preallocBytesLen := 32
 	preallocBytes := make([]byte, preallocBytesLen)
@@ -117,6 +118,27 @@ func ComputeGeoRange(term uint64, shift uint,
 		return rv
 	}
 
+	var fieldDict index.AdvFieldDict
+	if irr, ok := indexReader.(index.IndexReaderRandom); ok {
+		fieldDict, err = irr.FieldDictRandom(field)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	defer func() {
+		_ = fieldDict.Close()
+	}()
+
+	isIndexed := func(term []byte) bool {
+		if fieldDict != nil {
+			if err, found := fieldDict.Exists(term); found && err == nil {
+				return true
+			}
+		}
+		return false
+	}
+
 	var computeGeoRange func(term uint64, shift uint) // declare for recursion
 
 	relateAndRecurse := func(start, end uint64, res, level uint) {
@@ -131,10 +153,13 @@ func ComputeGeoRange(term uint64, shift uint,
 		if within || (level == geoDetailLevel &&
 			geo.RectIntersects(minLon, minLat, maxLon, maxLat,
 				sminLon, sminLat, smaxLon, smaxLat)) {
-			if !within && checkBoundaries {
-				onBoundary = append(onBoundary, makePrefixCoded(int64(start), res))
-			} else {
-				notOnBoundary = append(notOnBoundary, makePrefixCoded(int64(start), res))
+			codedTerm := makePrefixCoded(int64(start), res)
+			if isIndexed(codedTerm) {
+				if !within && checkBoundaries {
+					onBoundary = append(onBoundary, makePrefixCoded(int64(start), res))
+				} else {
+					notOnBoundary = append(notOnBoundary, makePrefixCoded(int64(start), res))
+				}
 			}
 		} else if level < geoDetailLevel &&
 			geo.RectIntersects(minLon, minLat, maxLon, maxLat,
