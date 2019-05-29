@@ -215,7 +215,7 @@ func TestComputeGeoRange(t *testing.T) {
 
 	for testi, test := range tests {
 		onBoundaryRes, offBoundaryRes, err := ComputeGeoRange(0, GeoBitsShift1Minus1,
-			-1.0*test.degs, -1.0*test.degs, test.degs, test.degs, true)
+			-1.0*test.degs, -1.0*test.degs, test.degs, test.degs, true, nil, "")
 		if (err != nil) != (test.err != "") {
 			t.Errorf("test: %+v, err: %v", test, err)
 		}
@@ -275,7 +275,7 @@ func benchmarkComputeGeoRange(b *testing.B,
 
 	for i := 0; i < b.N; i++ {
 		onBoundaryRes, offBoundaryRes, err :=
-			ComputeGeoRange(0, GeoBitsShift1Minus1, minLon, minLat, maxLon, maxLat, checkBoundaries)
+			ComputeGeoRange(0, GeoBitsShift1Minus1, minLon, minLat, maxLon, maxLat, checkBoundaries, nil, "")
 		if err != nil {
 			b.Fatalf("expected no err")
 		}

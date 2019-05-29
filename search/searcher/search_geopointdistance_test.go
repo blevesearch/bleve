@@ -113,7 +113,7 @@ func TestGeoPointDistanceCompare(t *testing.T) {
 			minLon, minLat, maxLon, maxLat float64, checkBoundaries bool) {
 			// do math to produce list of terms needed for this search
 			onBoundaryRes, offBoundaryRes, err := ComputeGeoRange(0, GeoBitsShift1Minus1,
-				minLon, minLat, maxLon, maxLat, checkBoundaries)
+				minLon, minLat, maxLon, maxLat, checkBoundaries, nil, "")
 			if err != nil {
 				t.Fatal(err)
 			}
