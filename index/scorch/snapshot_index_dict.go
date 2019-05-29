@@ -91,3 +91,18 @@ func (i *IndexSnapshotFieldDict) Next() (*index.DictEntry, error) {
 func (i *IndexSnapshotFieldDict) Close() error {
 	return nil
 }
+
+func (i *IndexSnapshotFieldDict) Exists(key []byte) (error, bool) {
+	if len(i.cursors) == 0 {
+		return nil, false
+	}
+
+	for _, cursor := range i.cursors {
+		if itr, ok := cursor.itr.(segment.AdvDictionaryIterator); ok {
+			if _, found := itr.Exists(key); found {
+				return nil, true
+			}
+		}
+	}
+	return nil, false
+}
