@@ -91,10 +91,24 @@ func (e *EmptyDictionary) OnlyIterator(onlyTerms [][]byte,
 	return &EmptyDictionaryIterator{}
 }
 
+func (e *EmptyDictionary) ExistsIterator() AdvDictionaryIterator {
+	return &EmptyDictionaryLookupIterator{}
+}
+
 type EmptyDictionaryIterator struct{}
 
 func (e *EmptyDictionaryIterator) Next() (*index.DictEntry, error) {
 	return nil, nil
+}
+
+type EmptyDictionaryLookupIterator struct{}
+
+func (e *EmptyDictionaryLookupIterator) Next() (*index.DictEntry, error) {
+	return nil, nil
+}
+
+func (e *EmptyDictionaryLookupIterator) Exists(key []byte) (error, bool) {
+	return nil, false
 }
 
 func (e *EmptyPostingsIterator) Advance(uint64) (Posting, error) {
