@@ -150,9 +150,9 @@ func ComputeGeoRange(term uint64, shift uint,
 			codedTerm := makePrefixCoded(int64(start), res)
 			if isIndexed(codedTerm) {
 				if !within && checkBoundaries {
-					onBoundary = append(onBoundary, makePrefixCoded(int64(start), res))
+					onBoundary = append(onBoundary, codedTerm)
 				} else {
-					notOnBoundary = append(notOnBoundary, makePrefixCoded(int64(start), res))
+					notOnBoundary = append(notOnBoundary, codedTerm)
 				}
 			}
 		} else if level < geoDetailLevel &&
