@@ -52,6 +52,7 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/token/length"
 	_ "github.com/blevesearch/bleve/analysis/token/lowercase"
 	_ "github.com/blevesearch/bleve/analysis/token/ngram"
+	_ "github.com/blevesearch/bleve/analysis/token/reverse"
 	_ "github.com/blevesearch/bleve/analysis/token/shingle"
 	_ "github.com/blevesearch/bleve/analysis/token/stop"
 	_ "github.com/blevesearch/bleve/analysis/token/truncate"
