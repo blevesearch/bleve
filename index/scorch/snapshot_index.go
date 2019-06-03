@@ -126,7 +126,9 @@ func (i *IndexSnapshot) updateSize() {
 	}
 }
 
-func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string, makeItr func(i segment.TermDictionary) segment.DictionaryIterator) (*IndexSnapshotFieldDict, error) {
+func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
+	makeItr func(i segment.TermDictionary) segment.DictionaryIterator,
+	randomLookup bool) (*IndexSnapshotFieldDict, error) {
 
 	results := make(chan *asynchSegmentResult)
 	for index, segment := range i.segment {
@@ -150,14 +152,20 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string, makeItr func(i s
 		if asr.err != nil && err == nil {
 			err = asr.err
 		} else {
-			next, err2 := asr.dictItr.Next()
-			if err2 != nil && err == nil {
-				err = err2
-			}
-			if next != nil {
+			if !randomLookup {
+				next, err2 := asr.dictItr.Next()
+				if err2 != nil && err == nil {
+					err = err2
+				}
+				if next != nil {
+					rv.cursors = append(rv.cursors, &segmentDictCursor{
+						itr:  asr.dictItr,
+						curr: *next,
+					})
+				}
+			} else {
 				rv.cursors = append(rv.cursors, &segmentDictCursor{
-					itr:  asr.dictItr,
-					curr: *next,
+					itr: asr.dictItr,
 				})
 			}
 		}
@@ -166,44 +174,10 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string, makeItr func(i s
 	if err != nil {
 		return nil, err
 	}
-	// prepare heap
-	heap.Init(rv)
 
-	return rv, nil
-}
-
-func (i *IndexSnapshot) newIndexSnapshotFieldDictRandom(field string, makeItr func(i segment.TermDictionary) segment.AdvDictionaryIterator) (*IndexSnapshotFieldDict, error) {
-	results := make(chan *asynchSegmentResult)
-	for index, segment := range i.segment {
-		go func(index int, segment *SegmentSnapshot) {
-			dict, err := segment.segment.Dictionary(field)
-			if err != nil {
-				results <- &asynchSegmentResult{err: err}
-			} else {
-				results <- &asynchSegmentResult{dictItr: makeItr(dict)}
-			}
-		}(index, segment)
-	}
-
-	var err error
-	rv := &IndexSnapshotFieldDict{
-		snapshot: i,
-		cursors:  make([]*segmentDictCursor, 0, len(i.segment)),
-	}
-	for count := 0; count < len(i.segment); count++ {
-		asr := <-results
-		if asr.err != nil && err == nil {
-			err = asr.err
-		} else {
-			rv.cursors = append(rv.cursors, &segmentDictCursor{
-				itr: asr.dictItr,
-			})
-		}
-
-	}
-	// after ensuring we've read all items on channel
-	if err != nil {
-		return nil, err
+	if !randomLookup {
+		// prepare heap
+		heap.Init(rv)
 	}
 
 	return rv, nil
@@ -212,21 +186,21 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDictRandom(field string, makeItr fu
 func (i *IndexSnapshot) FieldDict(field string) (index.FieldDict, error) {
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
 		return i.Iterator()
-	})
+	}, false)
 }
 
 func (i *IndexSnapshot) FieldDictRange(field string, startTerm []byte,
 	endTerm []byte) (index.FieldDict, error) {
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
 		return i.RangeIterator(string(startTerm), string(endTerm))
-	})
+	}, false)
 }
 
 func (i *IndexSnapshot) FieldDictPrefix(field string,
 	termPrefix []byte) (index.FieldDict, error) {
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
 		return i.PrefixIterator(string(termPrefix))
-	})
+	}, false)
 }
 
 func (i *IndexSnapshot) FieldDictRegexp(field string,
@@ -241,7 +215,7 @@ func (i *IndexSnapshot) FieldDictRegexp(field string,
 
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
 		return i.AutomatonIterator(a, prefixBeg, prefixEnd)
-	})
+	}, false)
 }
 
 func (i *IndexSnapshot) getLevAutomaton(term string,
@@ -269,20 +243,20 @@ func (i *IndexSnapshot) FieldDictFuzzy(field string,
 
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
 		return i.AutomatonIterator(a, prefixBeg, prefixEnd)
-	})
+	}, false)
 }
 
 func (i *IndexSnapshot) FieldDictOnly(field string,
 	onlyTerms [][]byte, includeCount bool) (index.FieldDict, error) {
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
 		return i.OnlyIterator(onlyTerms, includeCount)
-	})
+	}, false)
 }
 
 func (i *IndexSnapshot) FieldDictRandom(field string) (index.AdvFieldDict, error) {
-	return i.newIndexSnapshotFieldDictRandom(field, func(i segment.TermDictionary) segment.AdvDictionaryIterator {
+	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
 		return i.ExistsIterator()
-	})
+	}, true)
 }
 
 func (i *IndexSnapshot) DocIDReaderAll() (index.DocIDReader, error) {

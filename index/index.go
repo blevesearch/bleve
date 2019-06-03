@@ -121,7 +121,6 @@ type IndexReaderOnly interface {
 	FieldDictOnly(field string, onlyTerms [][]byte, includeCount bool) (FieldDict, error)
 }
 
-// better naming everywhere
 type IndexReaderRandom interface {
 	FieldDictRandom(field string) (AdvFieldDict, error)
 }

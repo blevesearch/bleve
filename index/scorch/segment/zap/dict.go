@@ -229,9 +229,10 @@ func (d *Dictionary) OnlyIterator(onlyTerms [][]byte,
 }
 
 // ExistsIterator returns an exists iterator for this dictionary
-func (d *Dictionary) ExistsIterator() segment.AdvDictionaryIterator {
+func (d *Dictionary) ExistsIterator() segment.DictionaryIterator {
 	rv := &DictionaryIterator{
-		d: d,
+		d:         d,
+		omitCount: true,
 	}
 
 	if d.fst != nil {
@@ -279,12 +280,9 @@ func (i *DictionaryIterator) Next() (*index.DictEntry, error) {
 func (i *DictionaryIterator) Exists(key []byte) (error, bool) {
 	if i.err != nil && i.err != vellum.ErrIteratorDone {
 		return i.err, false
-	} else if i.itr == nil || i.err == vellum.ErrIteratorDone {
+	}
+	if i.itr == nil || i.err == vellum.ErrIteratorDone {
 		return nil, false
 	}
-	if advItr, ok := i.itr.(vellum.AdvIterator); ok {
-		return advItr.Exists(key)
-	}
-
-	return fmt.Errorf("no implementation found"), false
+	return i.itr.Exists(key)
 }
