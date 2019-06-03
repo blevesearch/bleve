@@ -15,6 +15,7 @@
 package reverse
 
 import (
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -47,20 +48,28 @@ func init() {
 }
 
 // reverse(..) will generate a reversed version of the provided
-// utf-8 encoded byte array and return it back to its caller.
+// unicode array and return it back to its caller.
 func reverse(s []byte) []byte {
-	j := len(s)
-	rv := make([]byte, len(s))
-	for i := 0; i < len(s); {
-		wid := 1
-		r := rune(s[i])
-		if r >= utf8.RuneSelf {
-			r, wid = utf8.DecodeRune(s[i:])
+	cursorIn := 0
+	inputRunes := []rune(string(s))
+	cursorOut := len(s)
+	output := make([]byte, len(s))
+	for i := 0; i < len(inputRunes); {
+		wid := utf8.RuneLen(inputRunes[i])
+		i++
+		for i < len(inputRunes) {
+			r := inputRunes[i]
+			if unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r) || unicode.Is(unicode.Mc, r) {
+				wid += utf8.RuneLen(r)
+				i++
+			} else {
+				break
+			}
 		}
-
-		copy(rv[j-wid:j], s[i:i+wid])
-		i += wid
-		j -= wid
+		copy(output[cursorOut-wid:cursorOut], s[cursorIn:cursorIn+wid])
+		cursorIn += wid
+		cursorOut -= wid
 	}
-	return rv
+
+	return output
 }
