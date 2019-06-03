@@ -98,11 +98,10 @@ func (i *IndexSnapshotFieldDict) Exists(key []byte) (error, bool) {
 	}
 
 	for _, cursor := range i.cursors {
-		if itr, ok := cursor.itr.(segment.AdvDictionaryIterator); ok {
-			if _, found := itr.Exists(key); found {
-				return nil, true
-			}
+		if _, found := cursor.itr.Exists(key); found {
+			return nil, true
 		}
 	}
+
 	return nil, false
 }

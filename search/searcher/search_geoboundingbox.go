@@ -118,19 +118,30 @@ func ComputeGeoRange(term uint64, shift uint,
 		return rv
 	}
 
-	isIndexed := func(term []byte) bool {
-		if indexReader != nil {
-			reader, err := indexReader.TermFieldReader(term, field, false, false, false)
-			if err != nil || reader == nil {
-				return false
-			}
-			if reader.Count() == 0 {
-				_ = reader.Close()
-				return false
-			}
-			_ = reader.Close()
+	var fieldDict index.AdvFieldDict
+	if irr, ok := indexReader.(index.IndexReaderRandom); ok {
+		fieldDict, err = irr.FieldDictRandom(field)
+		if err != nil {
+			return nil, nil, err
 		}
-		return true
+	}
+
+	defer func() {
+		if fieldDict != nil {
+			cerr := fieldDict.Close()
+			if cerr != nil {
+				err = cerr
+			}
+		}
+	}()
+
+	isIndexed := func(term []byte) bool {
+		if fieldDict != nil {
+			if err, found := fieldDict.Exists(term); found && err == nil {
+				return true
+			}
+		}
+		return false
 	}
 
 	var computeGeoRange func(term uint64, shift uint) // declare for recursion

@@ -229,9 +229,10 @@ func (d *Dictionary) OnlyIterator(onlyTerms [][]byte,
 }
 
 // ExistsIterator returns an exists iterator for this dictionary
-func (d *Dictionary) ExistsIterator() segment.AdvDictionaryIterator {
+func (d *Dictionary) ExistsIterator() segment.DictionaryIterator {
 	rv := &DictionaryIterator{
-		d: d,
+		d:         d,
+		omitCount: true,
 	}
 
 	if d.fst != nil {
