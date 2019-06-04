@@ -23,6 +23,7 @@ import (
 
 func TestReverseFilter(t *testing.T) {
 	inputTokenStream := analysis.TokenStream{
+		&analysis.Token{},
 		&analysis.Token{
 			Term: []byte("one"),
 		},
@@ -47,10 +48,19 @@ func TestReverseFilter(t *testing.T) {
 		&analysis.Token{
 			Term: []byte("!@#$%^&*()"),
 		},
-		&analysis.Token{},
+		&analysis.Token{
+			Term: []byte("cafés"),
+		},
+		&analysis.Token{
+			Term: []byte("¿Dónde estás?"),
+		},
+		&analysis.Token{
+			Term: []byte("Me gustaría una cerveza."),
+		},
 	}
 
 	expectedTokenStream := analysis.TokenStream{
+		&analysis.Token{},
 		&analysis.Token{
 			Term: []byte("eno"),
 		},
@@ -75,7 +85,15 @@ func TestReverseFilter(t *testing.T) {
 		&analysis.Token{
 			Term: []byte(")(*&^%$#@!"),
 		},
-		&analysis.Token{},
+		&analysis.Token{
+			Term: []byte("séfac"),
+		},
+		&analysis.Token{
+			Term: []byte("?sátse ednóD¿"),
+		},
+		&analysis.Token{
+			Term: []byte(".azevrec anu aíratsug eM"),
+		},
 	}
 
 	filter := NewReverseFilter()
@@ -152,6 +170,9 @@ func BenchmarkReverseFilter(b *testing.B) {
 		},
 		&analysis.Token{
 			Term: []byte("İȺȾCAT"),
+		},
+		&analysis.Token{
+			Term: []byte("Me gustaría una cerveza."),
 		},
 	}
 	filter := NewReverseFilter()
