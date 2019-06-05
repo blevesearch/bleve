@@ -342,6 +342,12 @@ func (r *SearchRequest) SetSearchAfter(after []string) {
 	r.SearchAfter = after
 }
 
+// SetSearchBefore sets the request to skip over hits with a sort
+// value greater than the provided sort before key
+func (r *SearchRequest) SetSearchBefore(before []string) {
+	r.SearchBefore = before
+}
+
 // UnmarshalJSON deserializes a JSON representation of
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
