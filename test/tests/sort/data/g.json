@@ -1,0 +1,8 @@
+{
+	"id": "g",
+	"name": "marty",
+	"age": 27,
+  "born": "2012-09-21",
+	"title": "mista",
+	"tags": ["foo", "bar"]
+}

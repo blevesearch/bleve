@@ -10,7 +10,7 @@
       "sort": ["name"]
 		},
 		"result": {
-			"total_hits": 6,
+			"total_hits": 7,
 			"hits": [
 				{
 					"id": "c"
@@ -20,6 +20,9 @@
         },
         {
           "id": "a"
+        },
+        {
+          "id": "g"
         },
         {
           "id": "e"
@@ -44,7 +47,7 @@
       "sort": ["-name"]
 		},
 		"result": {
-			"total_hits": 6,
+			"total_hits": 7,
 			"hits": [
         {
           "id": "b"
@@ -54,6 +57,9 @@
         },
         {
           "id": "a"
+        },
+        {
+          "id": "g"
         },
         {
           "id": "f"
@@ -78,7 +84,7 @@
       "sort": [{"by":"field","field":"name","missing":"first","desc":true}]
 		},
 		"result": {
-			"total_hits": 6,
+			"total_hits": 7,
 			"hits": [
         {
           "id": "d"
@@ -91,6 +97,9 @@
         },
         {
           "id": "a"
+        },
+        {
+          "id": "g"
         },
         {
           "id": "f"
@@ -112,7 +121,7 @@
       "sort": ["age"]
 		},
 		"result": {
-			"total_hits": 6,
+			"total_hits": 7,
 			"hits": [
 				{
 					"id": "f"
@@ -125,6 +134,9 @@
         },
         {
           "id": "c"
+        },
+        {
+          "id": "g"
         },
         {
           "id": "d"
@@ -146,11 +158,14 @@
       "sort": ["-age"]
 		},
 		"result": {
-			"total_hits": 6,
+			"total_hits": 7,
 			"hits": [
 				{
 					"id": "d"
 				},
+        {
+          "id": "g"
+        },
         {
           "id": "b"
         },
@@ -180,13 +195,16 @@
       "sort": [{"by":"field","field":"age","missing":"first","desc":true}]
 		},
 		"result": {
-			"total_hits": 6,
+			"total_hits": 7,
 			"hits": [
         {
           "id": "e"
         },
 				{
 					"id": "d"
+				},
+				{
+					"id": "g"
 				},
         {
           "id": "b"
@@ -214,7 +232,7 @@
       "sort": ["born"]
 		},
 		"result": {
-			"total_hits": 6,
+			"total_hits": 7,
 			"hits": [
 				{
 					"id": "c"
@@ -227,6 +245,9 @@
         },
         {
           "id": "b"
+        },
+        {
+          "id": "g"
         },
         {
           "id": "a"
@@ -248,11 +269,14 @@
       "sort": ["-born"]
 		},
 		"result": {
-			"total_hits": 6,
+			"total_hits": 7,
 			"hits": [
 				{
 					"id": "a"
 				},
+        {
+          "id": "g"
+        },
         {
           "id": "b"
         },
@@ -282,7 +306,7 @@
       "sort": [{"by":"field","field":"born","missing":"first","desc":true}]
 		},
 		"result": {
-			"total_hits": 6,
+			"total_hits": 7,
 			"hits": [
         {
           "id": "f"
@@ -290,6 +314,9 @@
 				{
 					"id": "a"
 				},
+        {
+          "id": "g"
+        },
         {
           "id": "b"
         },
@@ -316,8 +343,11 @@
       "sort": [{"by":"field","field":"tags","mode":"min"}]
     },
     "result": {
-      "total_hits": 6,
+      "total_hits": 7,
       "hits": [
+        {
+          "id": "g"
+        },
         {
           "id": "a"
         },
@@ -350,7 +380,7 @@
       "sort": ["age", "name"]
 		},
 		"result": {
-			"total_hits": 6,
+			"total_hits": 7,
 			"hits": [
 				{
 					"id": "f"
@@ -365,6 +395,9 @@
           "id": "b"
         },
         {
+          "id": "g"
+        },
+        {
           "id": "d"
         },
         {
@@ -374,39 +407,42 @@
 		}
 	},
   {
-      "comment": "sort by docid descending",
-  		"search": {
-  			"from": 0,
-  			"size": 10,
-  			"query": {
-  				"match_all":{}
-  			},
-        "sort": ["-_id"]
-  		},
-  		"result": {
-  			"total_hits": 6,
-  			"hits": [
-  				{
-  					"id": "f"
-  				},
-          {
-            "id": "e"
-          },
-          {
-            "id": "d"
-          },
-          {
-            "id": "c"
-          },
-          {
-            "id": "b"
-          },
-          {
-            "id": "a"
-          }
-  			]
-  		}
-  	},
+    "comment": "sort by docid descending",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "match_all":{}
+      },
+      "sort": ["-_id"]
+    },
+    "result": {
+      "total_hits": 7,
+      "hits": [
+        {
+          "id": "g"
+        },
+        {
+          "id": "f"
+        },
+        {
+          "id": "e"
+        },
+        {
+          "id": "d"
+        },
+        {
+          "id": "c"
+        },
+        {
+          "id": "b"
+        },
+        {
+          "id": "a"
+        }
+      ]
+    }
+  },
   {
     "comment": "sort by name, ascending, after marty",
     "search": {
@@ -419,8 +455,40 @@
       "search_after": ["marty"]
     },
     "result": {
-      "total_hits": 6,
+      "total_hits": 7,
       "hits": [
+        {
+          "id": "e"
+        },
+        {
+          "id": "b"
+        },
+        {
+          "id": "d"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "multi-valued sort by name, _id (both ascending), after frank",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "match_all":{}
+      },
+      "sort": ["name", "_id"],
+      "search_after": ["frank", "f"]
+    },
+    "result": {
+      "total_hits": 7,
+      "hits": [
+        {
+          "id": "a"
+        },
+        {
+          "id": "g"
+        },
         {
           "id": "e"
         },
@@ -445,7 +513,7 @@
       "search_before": ["nancy"]
     },
     "result": {
-      "total_hits": 6,
+      "total_hits": 7,
       "hits": [
         {
           "id": "c"
@@ -455,6 +523,38 @@
         },
         {
           "id": "a"
+        },
+        {
+          "id": "g"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "multi-valued sort by name, _id (both ascending), before nancy",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "match_all":{}
+      },
+      "sort": ["name", "_id"],
+      "search_before": ["nancy", "e"]
+    },
+    "result": {
+      "total_hits": 7,
+      "hits": [
+        {
+          "id": "c"
+        },
+        {
+          "id": "f"
+        },
+        {
+          "id": "a"
+        },
+        {
+          "id": "g"
         }
       ]
     }
