@@ -231,3 +231,7 @@ func (m *testIterator) Close() error {
 	m.curr = 654321
 	return nil
 }
+
+func (m *testIterator) Exists(key []byte) (bool, error) {
+	return false, fmt.Errorf("not implemented for enumerator unit tests")
+}
