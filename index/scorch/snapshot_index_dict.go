@@ -92,16 +92,16 @@ func (i *IndexSnapshotFieldDict) Close() error {
 	return nil
 }
 
-func (i *IndexSnapshotFieldDict) Exists(key []byte) (error, bool) {
+func (i *IndexSnapshotFieldDict) Exists(key []byte) (bool, error) {
 	if len(i.cursors) == 0 {
-		return nil, false
+		return false, nil
 	}
 
 	for _, cursor := range i.cursors {
-		if _, found := cursor.itr.Exists(key); found {
-			return nil, true
+		if found, _ := cursor.itr.Exists(key); found {
+			return true, nil
 		}
 	}
 
-	return nil, false
+	return false, nil
 }

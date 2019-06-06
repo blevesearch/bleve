@@ -277,12 +277,12 @@ func (i *DictionaryIterator) Next() (*index.DictEntry, error) {
 	return &i.entry, nil
 }
 
-func (i *DictionaryIterator) Exists(key []byte) (error, bool) {
+func (i *DictionaryIterator) Exists(key []byte) (bool, error) {
 	if i.err != nil && i.err != vellum.ErrIteratorDone {
-		return i.err, false
+		return false, i.err
 	}
 	if i.itr == nil || i.err == vellum.ErrIteratorDone {
-		return nil, false
+		return false, nil
 	}
 	return i.itr.Exists(key)
 }

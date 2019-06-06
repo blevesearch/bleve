@@ -22,6 +22,8 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
+type filterFunc func(key []byte) bool
+
 var GeoBitsShift1 = (geo.GeoBits << 1)
 var GeoBitsShift1Minus1 = GeoBitsShift1 - 1
 
@@ -118,30 +120,46 @@ func ComputeGeoRange(term uint64, shift uint,
 		return rv
 	}
 
-	var fieldDict index.AdvFieldDict
-	if irr, ok := indexReader.(index.IndexReaderRandom); ok {
-		fieldDict, err = irr.FieldDictRandom(field)
+	var fieldDict index.FieldDictExists
+	var isIndexed filterFunc
+	if irr, ok := indexReader.(index.IndexReaderExists); ok {
+		fieldDict, err = irr.FieldDictExists(field)
 		if err != nil {
 			return nil, nil, err
+		}
+
+		isIndexed = func(term []byte) bool {
+			found, err := fieldDict.Exists(term)
+			return err == nil && found
 		}
 	}
 
 	defer func() {
 		if fieldDict != nil {
-			cerr := fieldDict.Close()
-			if cerr != nil {
-				err = cerr
+			if fd, ok := fieldDict.(index.FieldDict); ok {
+				cerr := fd.Close()
+				if cerr != nil {
+					err = cerr
+				}
 			}
 		}
 	}()
 
-	isIndexed := func(term []byte) bool {
-		if fieldDict != nil {
-			if err, found := fieldDict.Exists(term); found && err == nil {
-				return true
+	if isIndexed == nil {
+		isIndexed = func(term []byte) bool {
+			if indexReader != nil {
+				reader, err := indexReader.TermFieldReader(term, field, false, false, false)
+				if err != nil || reader == nil {
+					return false
+				}
+				if reader.Count() == 0 {
+					_ = reader.Close()
+					return false
+				}
+				_ = reader.Close()
 			}
+			return true
 		}
-		return false
 	}
 
 	var computeGeoRange func(term uint64, shift uint) // declare for recursion

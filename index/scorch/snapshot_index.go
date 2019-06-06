@@ -253,7 +253,7 @@ func (i *IndexSnapshot) FieldDictOnly(field string,
 	}, false)
 }
 
-func (i *IndexSnapshot) FieldDictRandom(field string) (index.AdvFieldDict, error) {
+func (i *IndexSnapshot) FieldDictExists(field string) (index.FieldDictExists, error) {
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
 		return i.ExistsIterator()
 	}, true)

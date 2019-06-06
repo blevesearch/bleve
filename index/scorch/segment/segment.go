@@ -64,7 +64,7 @@ type TermDictionary interface {
 
 type DictionaryIterator interface {
 	Next() (*index.DictEntry, error)
-	Exists(key []byte) (error, bool)
+	Exists(key []byte) (bool, error)
 }
 
 type PostingsList interface {

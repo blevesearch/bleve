@@ -101,8 +101,8 @@ func (e *EmptyDictionaryIterator) Next() (*index.DictEntry, error) {
 	return nil, nil
 }
 
-func (e *EmptyDictionaryIterator) Exists(key []byte) (error, bool) {
-	return nil, false
+func (e *EmptyDictionaryIterator) Exists(key []byte) (bool, error) {
+	return false, nil
 }
 
 func (e *EmptyPostingsIterator) Advance(uint64) (Posting, error) {

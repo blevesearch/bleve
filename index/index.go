@@ -121,8 +121,8 @@ type IndexReaderOnly interface {
 	FieldDictOnly(field string, onlyTerms [][]byte, includeCount bool) (FieldDict, error)
 }
 
-type IndexReaderRandom interface {
-	FieldDictRandom(field string) (AdvFieldDict, error)
+type IndexReaderExists interface {
+	FieldDictExists(field string) (FieldDictExists, error)
 }
 
 // FieldTerms contains the terms used by a document, keyed by field
@@ -234,9 +234,8 @@ type FieldDict interface {
 	Close() error
 }
 
-type AdvFieldDict interface {
-	FieldDict
-	Exists(key []byte) (error, bool)
+type FieldDictExists interface {
+	Exists(key []byte) (bool, error)
 }
 
 // DocIDReader is the interface exposing enumeration of documents identifiers.
