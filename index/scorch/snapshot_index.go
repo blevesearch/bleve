@@ -35,6 +35,7 @@ import (
 var lb1, lb2 *lev2.LevenshteinAutomatonBuilder
 
 type asynchSegmentResult struct {
+	dict    segment.TermDictionary
 	dictItr segment.DictionaryIterator
 
 	index int
@@ -137,7 +138,11 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 			if err != nil {
 				results <- &asynchSegmentResult{err: err}
 			} else {
-				results <- &asynchSegmentResult{dictItr: makeItr(dict)}
+				if randomLookup {
+					results <- &asynchSegmentResult{dict: dict}
+				} else {
+					results <- &asynchSegmentResult{dictItr: makeItr(dict)}
+				}
 			}
 		}(index, segment)
 	}
@@ -165,7 +170,7 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 				}
 			} else {
 				rv.cursors = append(rv.cursors, &segmentDictCursor{
-					itr: asr.dictItr,
+					dict: asr.dict,
 				})
 			}
 		}
@@ -253,10 +258,8 @@ func (i *IndexSnapshot) FieldDictOnly(field string,
 	}, false)
 }
 
-func (i *IndexSnapshot) FieldDictExists(field string) (index.FieldDictExists, error) {
-	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.ExistsIterator()
-	}, true)
+func (i *IndexSnapshot) FieldDictContains(field string) (index.FieldDictContains, error) {
+	return i.newIndexSnapshotFieldDict(field, nil, true)
 }
 
 func (i *IndexSnapshot) DocIDReaderAll() (index.DocIDReader, error) {
