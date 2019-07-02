@@ -75,6 +75,10 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 				return err
 			}
 		}
+		if field.Type == "geopoint" && !field.DocValues {
+			return fmt.Errorf("DocValues option should be enabled "+
+				"for field type: '%s'", field.Type)
+		}
 		switch field.Type {
 		case "text", "datetime", "number", "boolean", "geopoint":
 		default:
