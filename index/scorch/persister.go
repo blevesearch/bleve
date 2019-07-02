@@ -91,7 +91,6 @@ func (s *Scorch) persisterLoop() {
 	var lastPersistedEpoch, lastMergedEpoch uint64
 	var ew *epochWatcher
 
-	var lastUnpersistedEpoch uint64
 	var unpersistedCallbacks []index.BatchCallback
 
 	po, err := s.parsePersisterOptions()
@@ -154,10 +153,9 @@ OUTER:
 					break OUTER
 				}
 
-				// save this current snapshot's epoch and persistedCallbacks, for
-				// a possible retry attempt in persisting the same snapshot again.
-				lastUnpersistedEpoch = ourSnapshot.epoch
-				unpersistedCallbacks = ourPersistedCallbacks
+				// save this current snapshot's persistedCallbacks, to invoke during
+				// the retry attempt
+				unpersistedCallbacks = append(unpersistedCallbacks, ourPersistedCallbacks...)
 
 				s.fireAsyncError(fmt.Errorf("got err persisting snapshot: %v", err))
 				_ = ourSnapshot.DecRef()
@@ -165,13 +163,11 @@ OUTER:
 				continue OUTER
 			}
 
-			if ourPersistedCallbacks == nil &&
-				lastUnpersistedEpoch == ourSnapshot.epoch {
+			if unpersistedCallbacks != nil {
 				// in the event of this being a retry attempt for persisting a snapshot
-				// that had earlier failed, retrieve the persistedCallbacks associated
-				// with that snapshot.
-				ourPersistedCallbacks = unpersistedCallbacks
-				lastUnpersistedEpoch = 0
+				// that had earlier failed, prepend the persistedCallbacks associated
+				// with earlier segment(s) to the latest persistedCallbacks
+				ourPersistedCallbacks = append(unpersistedCallbacks, ourPersistedCallbacks...)
 				unpersistedCallbacks = nil
 			}
 
