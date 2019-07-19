@@ -413,7 +413,7 @@ func (i *IndexSnapshot) segmentIndexAndLocalDocNumFromGlobal(docNum uint64) (int
 		}) - 1
 
 	localDocNum := docNum - i.offsets[segmentIndex]
-	return int(segmentIndex), localDocNum
+	return segmentIndex, localDocNum
 }
 
 func (i *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
