@@ -40,6 +40,7 @@ func TestLiteralPrefix(t *testing.T) {
 		{`^hello`, ""},
 		{`^`, ""},
 		{`$`, ""},
+		{`(?i)mArTy`, ""},
 	}
 
 	for i, test := range tests {

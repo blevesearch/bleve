@@ -95,6 +95,10 @@ func (d *Dictionary) postingsListInit(rv *PostingsList, except *roaring.Bitmap) 
 	return rv
 }
 
+func (d *Dictionary) Contains(key []byte) (bool, error) {
+	return d.fst.Contains(key)
+}
+
 // Iterator returns an iterator for this dictionary
 func (d *Dictionary) Iterator() segment.DictionaryIterator {
 	rv := &DictionaryIterator{
