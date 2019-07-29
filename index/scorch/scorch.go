@@ -41,12 +41,14 @@ const Version uint8 = 2
 var ErrClosed = fmt.Errorf("scorch closed")
 
 type Scorch struct {
+	nextSegmentID uint64
+	stats         Stats
+	iStats        internalStats
+
 	readOnly      bool
 	version       uint8
 	config        map[string]interface{}
 	analysisQueue *index.AnalysisQueue
-	stats         Stats
-	nextSegmentID uint64
 	path          string
 
 	unsafeBatch bool
@@ -72,8 +74,6 @@ type Scorch struct {
 
 	onEvent      func(event Event)
 	onAsyncError func(err error)
-
-	iStats internalStats
 
 	pauseLock sync.RWMutex
 
