@@ -245,20 +245,19 @@ func notifyMergeWatchers(lastPersistedEpoch uint64,
 	return watchersNext
 }
 
-func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64, lastMergedEpoch uint64,
-	persistWatchers []*epochWatcher, po *persisterOptions) (uint64, []*epochWatcher) {
+func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
+	lastMergedEpoch uint64, persistWatchers []*epochWatcher,
+	po *persisterOptions) (uint64, []*epochWatcher) {
 
-	// first, let the watchers proceed if they lag behind
+	// First, let the watchers proceed if they lag behind
 	persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
 
-	// check the merger lag by counting the segment files on disk,
+	// Check the merger lag by counting the segment files on disk,
+	numFilesOnDisk, _ := s.diskFileStats()
+
 	// On finding fewer files on disk, persister takes a short pause
 	// for sufficient in-memory segments to pile up for the next
 	// memory merge cum persist loop.
-	// On finding too many files on disk, persister pause until the merger
-	// catches up to reduce the segment file count under the threshold.
-	// But if there is memory pressure, then skip this sleep maneuvers.
-	numFilesOnDisk, _ := s.diskFileStats()
 	if numFilesOnDisk < uint64(po.PersisterNapUnderNumFiles) &&
 		po.PersisterNapTimeMSec > 0 && s.paused() == 0 {
 		select {
@@ -276,6 +275,17 @@ func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64, lastM
 		return lastMergedEpoch, persistWatchers
 	}
 
+	// Finding too many files on disk could be due to two reasons.
+	// 1. Too many older snapshots awaiting the clean up.
+	// 2. The merger could be lagging behind on merging the disk files.
+	if numFilesOnDisk > uint64(po.PersisterNapUnderNumFiles) {
+		s.removeOldData()
+		numFilesOnDisk, _ = s.diskFileStats()
+	}
+
+	// Persister pause until the merger catches up to reduce the segment
+	// file count under the threshold.
+	// But if there is memory pressure, then skip this sleep maneuvers.
 OUTER:
 	for po.PersisterNapUnderNumFiles > 0 &&
 		numFilesOnDisk >= uint64(po.PersisterNapUnderNumFiles) &&
