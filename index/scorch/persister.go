@@ -764,12 +764,11 @@ func (s *Scorch) removeOldData() {
 	if err != nil {
 		s.fireAsyncError(fmt.Errorf("got err removing old bolt snapshots: %v", err))
 	}
+	atomic.AddUint64(&s.stats.TotSnapshotsRemovedFromMetaStore, uint64(removed))
 
-	if removed > 0 {
-		err = s.removeOldZapFiles()
-		if err != nil {
-			s.fireAsyncError(fmt.Errorf("got err removing old zap files: %v", err))
-		}
+	err = s.removeOldZapFiles()
+	if err != nil {
+		s.fireAsyncError(fmt.Errorf("got err removing old zap files: %v", err))
 	}
 }
 
