@@ -490,6 +490,9 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["CurOnDiskBytes"] = numBytesUsedDisk
 	m["CurOnDiskFiles"] = numFilesOnDisk
 
+	s.rootLock.RLock()
+	m["CurFilesIneligibleForRemoval"] = uint64(len(s.ineligibleForRemoval))
+	s.rootLock.RUnlock()
 	// TODO: consider one day removing these backwards compatible
 	// names for apps using the old names
 	m["updates"] = m["TotUpdates"]
