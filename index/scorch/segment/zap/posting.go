@@ -294,24 +294,9 @@ type PostingsIterator struct {
 	Actual   roaring.IntIterable
 	ActualBM *roaring.Bitmap
 
-<<<<<<< HEAD
-	currChunk         uint32
-	currChunkFreqNorm []byte
-	currChunkLoc      []byte
-
-	freqNormReader *segment.MemUvarintReader
-	locReader      *segment.MemUvarintReader
-
-	freqChunkOffsets []uint64
-	freqChunkStart   uint64
-
-	locChunkOffsets []uint64
-	locChunkStart   uint64
-=======
 	currChunk      uint32
 	freqNormReader *chunkedIntDecoder
 	locReader      *chunkedIntDecoder
->>>>>>> refactoring chunkedIntDecoder
 
 	next            Posting            // reused across Next() calls
 	nextLocs        []Location         // reused across Next() calls
@@ -363,22 +348,14 @@ func (i *PostingsIterator) readFreqNormHasLocs() (uint64, uint64, bool, error) {
 		return 1, i.normBits1Hit, false, nil
 	}
 
-<<<<<<< HEAD
-	freqHasLocs, err := i.freqNormReader.ReadUvarint()
-=======
 	freqHasLocs, err := i.freqNormReader.readUvarint()
->>>>>>> refactoring chunkedIntDecoder
 	if err != nil {
 		return 0, 0, false, fmt.Errorf("error reading frequency: %v", err)
 	}
 
 	freq, hasLocs := decodeFreqHasLocs(freqHasLocs)
 
-<<<<<<< HEAD
-	normBits, err := i.freqNormReader.ReadUvarint()
-=======
 	normBits, err := i.freqNormReader.readUvarint()
->>>>>>> refactoring chunkedIntDecoder
 	if err != nil {
 		return 0, 0, false, fmt.Errorf("error reading norm: %v", err)
 	}
@@ -391,7 +368,7 @@ func (i *PostingsIterator) skipFreqNormReadHasLocs() (bool, error) {
 		return false, nil
 	}
 
-	freqHasLocs, err := i.freqNormReader.ReadUvarint()
+	freqHasLocs, err := i.freqNormReader.readUvarint()
 	if err != nil {
 		return false, fmt.Errorf("error reading freqHasLocs: %v", err)
 	}

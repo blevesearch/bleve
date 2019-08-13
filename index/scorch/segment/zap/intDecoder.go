@@ -15,9 +15,10 @@
 package zap
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
+
+	"github.com/blevesearch/bleve/index/scorch/segment"
 )
 
 type chunkedIntDecoder struct {
@@ -26,7 +27,7 @@ type chunkedIntDecoder struct {
 	chunkOffsets    []uint64
 	curChunkBytes   []byte
 	data            []byte
-	r               *bytes.Reader
+	r               *segment.MemUvarintReader
 }
 
 func newChunkedIntDecoder(buf []byte, offset uint64) *chunkedIntDecoder {
@@ -55,7 +56,7 @@ func newChunkedIntDecoder(buf []byte, offset uint64) *chunkedIntDecoder {
 
 func (d *chunkedIntDecoder) loadChunk(chunk int) error {
 	if d.startOffset == termNotEncoded {
-		d.r = bytes.NewReader([]byte(nil))
+		d.r = segment.NewMemUvarintReader([]byte(nil))
 		return nil
 	}
 
@@ -70,7 +71,7 @@ func (d *chunkedIntDecoder) loadChunk(chunk int) error {
 	end += e
 	d.curChunkBytes = d.data[start:end]
 	if d.r == nil {
-		d.r = bytes.NewReader(d.curChunkBytes)
+		d.r = segment.NewMemUvarintReader(d.curChunkBytes)
 	} else {
 		d.r.Reset(d.curChunkBytes)
 	}
@@ -94,15 +95,19 @@ func (d *chunkedIntDecoder) isNil() bool {
 }
 
 func (d *chunkedIntDecoder) readUvarint() (uint64, error) {
-	return binary.ReadUvarint(d.r)
+	return d.r.ReadUvarint()
 }
 
 func (d *chunkedIntDecoder) readBytes(start, end int) []byte {
 	return d.curChunkBytes[start:end]
 }
 
-func (d *chunkedIntDecoder) Seek(offset int64, whence int) (int64, error) {
-	return d.r.Seek(offset, whence)
+func (d *chunkedIntDecoder) SkipUvarint() {
+	d.r.SkipUvarint()
+}
+
+func (d *chunkedIntDecoder) SkipBytes(count int) {
+	d.r.SkipBytes(count)
 }
 
 func (d *chunkedIntDecoder) Len() int {
