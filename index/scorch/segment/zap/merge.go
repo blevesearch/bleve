@@ -294,7 +294,6 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 		}
 
 		enumerator, err := newEnumerator(itrs)
-		var newCard uint64
 
 		for err == nil {
 			term, itrI, postingsOffset := enumerator.Current()
@@ -313,9 +312,9 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				}
 
 				// compute cardinality of field-term in new seg
+				var newCard uint64
 				lowItrIdxs, lowItrVals := enumerator.GetLowIdxsAndValues()
 				for i, idx := range lowItrIdxs {
-					//log.Printf("field: %s, term: %s, i: %d idx: %d, val: %d", fieldName, string(term), i, idx, lowItrVals[i])
 					pl, err := dicts[idx].postingsListFromOffset(lowItrVals[i], drops[idx], nil)
 					if err != nil {
 						return nil, 0, err
