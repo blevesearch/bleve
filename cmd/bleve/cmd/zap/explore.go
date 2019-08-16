@@ -109,22 +109,24 @@ var exploreCmd = &cobra.Command{
 						running += offset
 					}
 
-					fmt.Printf("Loc details at: %d (%x)\n", locAddr, locAddr)
-					numLChunks, r4 := binary.Uvarint(data[locAddr : locAddr+binary.MaxVarintLen64])
-					n = uint64(r4)
-					fmt.Printf("there are %d loc chunks\n", numLChunks)
+					if locAddr != math.MaxUint64 {
+						fmt.Printf("Loc details at: %d (%x)\n", locAddr, locAddr)
+						numLChunks, r4 := binary.Uvarint(data[locAddr : locAddr+binary.MaxVarintLen64])
+						n = uint64(r4)
+						fmt.Printf("there are %d loc chunks\n", numLChunks)
 
-					var locOffsets []uint64
-					for j := uint64(0); j < numLChunks; j++ {
-						lchunkLen, r4 := binary.Uvarint(data[locAddr+n : locAddr+n+binary.MaxVarintLen64])
-						n += uint64(r4)
-						locOffsets = append(locOffsets, lchunkLen)
-					}
+						var locOffsets []uint64
+						for j := uint64(0); j < numLChunks; j++ {
+							lchunkLen, r4 := binary.Uvarint(data[locAddr+n : locAddr+n+binary.MaxVarintLen64])
+							n += uint64(r4)
+							locOffsets = append(locOffsets, lchunkLen)
+						}
 
-					running2 := locAddr + n
-					for k, offset := range locOffsets {
-						fmt.Printf("loc chunk: %d, len %d(%x), start at %d (%x) end %d (%x)\n", k, offset, offset, running2, running2, running2+offset, running2+offset)
-						running2 += offset
+						running2 := locAddr + n
+						for k, offset := range locOffsets {
+							fmt.Printf("loc chunk: %d, len %d(%x), start at %d (%x) end %d (%x)\n", k, offset, offset, running2, running2, running2+offset, running2+offset)
+							running2 += offset
+						}
 					}
 
 				} else {
