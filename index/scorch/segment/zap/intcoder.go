@@ -58,6 +58,18 @@ func (c *chunkedIntCoder) Reset() {
 	}
 }
 
+// SetChunkSize changes the chunk size.  It is only valid to do so
+// with a new chunkedIntCoder, or immediately after calling Reset()
+func (c *chunkedIntCoder) SetChunkSize(chunkSize uint64, maxDocNum uint64) {
+	total := int(maxDocNum/chunkSize + 1)
+	c.chunkSize = chunkSize
+	if cap(c.chunkLens) < total {
+		c.chunkLens = make([]uint64, total)
+	} else {
+		c.chunkLens = c.chunkLens[:total]
+	}
+}
+
 // Add encodes the provided integers into the correct chunk for the provided
 // doc num.  You MUST call Add() with increasing docNums.
 func (c *chunkedIntCoder) Add(docNum uint64, vals ...uint64) error {

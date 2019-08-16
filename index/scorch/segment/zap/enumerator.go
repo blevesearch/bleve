@@ -90,6 +90,16 @@ func (m *enumerator) Current() ([]byte, int, uint64) {
 	return m.lowK, i, v
 }
 
+func (m *enumerator) GetLowIdxsAndValues() ([]int, []uint64) {
+	//log.Printf("%#v", m.currVs)
+	values := make([]uint64, 0, len(m.lowIdxs))
+	for _, idx := range m.lowIdxs {
+		values = append(values, m.currVs[idx])
+	}
+	//log.Printf("returning %#v", values)
+	return m.lowIdxs, values
+}
+
 // Next advances the enumerator to the next key/iterator/value result,
 // else vellum.ErrIteratorDone is returned.
 func (m *enumerator) Next() error {

@@ -603,10 +603,14 @@ func (i *PostingsIterator) nextDocNumAtOrAfter(atOrAfter uint64) (uint64, bool, 
 	n := i.Actual.Next()
 	allN := i.all.Next()
 
-	nChunk := n / i.postings.sb.chunkFactor
+	chunkSize, err := getChunkSize(i.postings.sb.chunkMode, i.postings.postings.GetCardinality(), i.postings.sb.numDocs)
+	if err != nil {
+		return 0, false, err
+	}
+	nChunk := n / uint32(chunkSize)
 
 	// when allN becomes >= to here, then allN is in the same chunk as nChunk.
-	allNReachesNChunk := nChunk * i.postings.sb.chunkFactor
+	allNReachesNChunk := nChunk * uint32(chunkSize)
 
 	// n is the next actual hit (excluding some postings), and
 	// allN is the next hit in the full postings, and
@@ -648,16 +652,21 @@ func (i *PostingsIterator) nextDocNumAtOrAfterClean(
 		return uint64(i.Actual.Next()), true, nil
 	}
 
+	chunkSize, err := getChunkSize(i.postings.sb.chunkMode, i.postings.postings.GetCardinality(), i.postings.sb.numDocs)
+	if err != nil {
+		return 0, false, err
+	}
+
 	// freq-norm's needed, so maintain freq-norm chunk reader
 	sameChunkNexts := 0 // # of times we called Next() in the same chunk
 	n := i.Actual.Next()
-	nChunk := n / i.postings.sb.chunkFactor
+	nChunk := n / uint32(chunkSize)
 
 	for uint64(n) < atOrAfter && i.Actual.HasNext() {
 		n = i.Actual.Next()
 
 		nChunkPrev := nChunk
-		nChunk = n / i.postings.sb.chunkFactor
+		nChunk = n / uint32(chunkSize)
 
 		if nChunk != nChunkPrev {
 			sameChunkNexts = 0

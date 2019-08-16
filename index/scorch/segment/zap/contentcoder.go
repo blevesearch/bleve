@@ -86,6 +86,19 @@ func (c *chunkedContentCoder) Reset() {
 	c.chunkMeta = c.chunkMeta[:0]
 }
 
+func (c *chunkedContentCoder) SetChunkSize(chunkSize uint64, maxDocNum uint64) {
+	total := int(maxDocNum/chunkSize + 1)
+	c.chunkSize = chunkSize
+	if cap(c.chunkLens) < total {
+		c.chunkLens = make([]uint64, total)
+	} else {
+		c.chunkLens = c.chunkLens[:total]
+	}
+	if cap(c.chunkMeta) < total {
+		c.chunkMeta = make([]MetaData, 0, total)
+	}
+}
+
 // Close indicates you are done calling Add() this allows
 // the final chunk to be encoded.
 func (c *chunkedContentCoder) Close() error {

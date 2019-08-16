@@ -88,7 +88,7 @@ func persistFields(fieldsInv []string, w *CountHashWriter, dictLocs []uint64) (u
 const FooterSize = 4 + 4 + 4 + 8 + 8 + 8 + 8
 
 func persistFooter(numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset uint64,
-	chunkFactor uint32, crcBeforeFooter uint32, writerIn io.Writer) error {
+	chunkMode uint32, crcBeforeFooter uint32, writerIn io.Writer) error {
 	w := NewCountHashWriter(writerIn)
 	w.crc = crcBeforeFooter
 
@@ -113,7 +113,7 @@ func persistFooter(numDocs, storedIndexOffset, fieldsIndexOffset, docValueOffset
 		return err
 	}
 	// write out 32-bit chunk factor
-	err = binary.Write(w, binary.BigEndian, chunkFactor)
+	err = binary.Write(w, binary.BigEndian, chunkMode)
 	if err != nil {
 		return err
 	}

@@ -36,7 +36,7 @@ import (
 	bolt "github.com/etcd-io/bbolt"
 )
 
-var DefaultChunkFactor uint32 = 1024
+//var DefaultChunkFactor uint32 = 1024
 
 // DefaultPersisterNapTimeMSec is kept to zero as this helps in direct
 // persistence of segments with the default safe batch option.
@@ -377,7 +377,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	}
 
 	newSnapshot, newSegmentID, err := s.mergeSegmentBases(
-		snapshot, sbs, sbsDrops, sbsIndexes, DefaultChunkFactor)
+		snapshot, sbs, sbsDrops, sbsIndexes, 0)
 	if err != nil {
 		return false, err
 	}

@@ -204,7 +204,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			newDocNums, _, err := zap.Merge(segmentsToMerge, docsToDrop, path,
-				DefaultChunkFactor, s.closeCh, s)
+				0, s.closeCh, s)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
 
 			fileMergeZapTime := uint64(time.Since(fileMergeZapStartTime))
@@ -298,7 +298,7 @@ type segmentMerge struct {
 // into the root
 func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	sbs []*zap.SegmentBase, sbsDrops []*roaring.Bitmap, sbsIndexes []int,
-	chunkFactor uint32) (*IndexSnapshot, uint64, error) {
+	chunkMode uint32) (*IndexSnapshot, uint64, error) {
 	atomic.AddUint64(&s.stats.TotMemMergeBeg, 1)
 
 	memMergeZapStartTime := time.Now()
@@ -310,7 +310,7 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	path := s.path + string(os.PathSeparator) + filename
 
 	newDocNums, _, err :=
-		zap.MergeSegmentBases(sbs, sbsDrops, path, chunkFactor, s.closeCh, s)
+		zap.MergeSegmentBases(sbs, sbsDrops, path, chunkMode, s.closeCh, s)
 
 	atomic.AddUint64(&s.stats.TotMemMergeZapEnd, 1)
 

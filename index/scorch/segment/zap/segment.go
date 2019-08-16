@@ -91,7 +91,7 @@ func Open(path string) (segment.Segment, error) {
 type SegmentBase struct {
 	mem               []byte
 	memCRC            uint32
-	chunkFactor       uint32
+	chunkMode         uint32
 	fieldsMap         map[string]uint16 // fieldName -> fieldID+1
 	fieldsInv         []string          // fieldID -> fieldName
 	numDocs           uint64
@@ -194,11 +194,11 @@ func (s *Segment) loadConfig() error {
 	verOffset := crcOffset - 4
 	s.version = binary.BigEndian.Uint32(s.mm[verOffset : verOffset+4])
 	if s.version != Version {
-		return fmt.Errorf("unsupported version %d", s.version)
+		return fmt.Errorf("xunsupported version %d", s.version)
 	}
 
 	chunkOffset := verOffset - 4
-	s.chunkFactor = binary.BigEndian.Uint32(s.mm[chunkOffset : chunkOffset+4])
+	s.chunkMode = binary.BigEndian.Uint32(s.mm[chunkOffset : chunkOffset+4])
 
 	docValueOffset := chunkOffset - 8
 	s.docValueOffset = binary.BigEndian.Uint64(s.mm[docValueOffset : docValueOffset+8])
@@ -503,8 +503,8 @@ func (s *Segment) Version() uint32 {
 }
 
 // ChunkFactor returns the chunk factor in the file footer
-func (s *Segment) ChunkFactor() uint32 {
-	return s.chunkFactor
+func (s *Segment) ChunkMode() uint32 {
+	return s.chunkMode
 }
 
 // FieldsIndexOffset returns the fields index offset in the file footer

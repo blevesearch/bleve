@@ -349,7 +349,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	var newSegment segment.Segment
 	var bufBytes uint64
 	if len(analysisResults) > 0 {
-		newSegment, bufBytes, err = zap.AnalysisResultsToSegmentBase(analysisResults, DefaultChunkFactor)
+		newSegment, bufBytes, err = zap.AnalysisResultsToSegmentBase(analysisResults, 0)
 		if err != nil {
 			return err
 		}
