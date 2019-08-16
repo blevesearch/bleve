@@ -122,13 +122,13 @@ func buildTestSegment() (*SegmentBase, uint64, error) {
 		}
 	}
 
-	return AnalysisResultsToSegmentBase(results, 0)
+	return AnalysisResultsToSegmentBase(results, DefaultChunkMode)
 }
 
 func buildTestSegmentMulti() (*SegmentBase, uint64, error) {
 	results := buildTestAnalysisResultsMulti()
 
-	return AnalysisResultsToSegmentBase(results, 0)
+	return AnalysisResultsToSegmentBase(results, DefaultChunkMode)
 }
 
 func buildTestSegmentMultiWithChunkFactor(chunkFactor uint32) (*SegmentBase, uint64, error) {
@@ -140,7 +140,7 @@ func buildTestSegmentMultiWithChunkFactor(chunkFactor uint32) (*SegmentBase, uin
 func buildTestSegmentMultiWithDifferentFields(includeDocA, includeDocB bool) (*SegmentBase, uint64, error) {
 	results := buildTestAnalysisResultsMultiWithDifferentFields(includeDocA, includeDocB)
 
-	return AnalysisResultsToSegmentBase(results, 0)
+	return AnalysisResultsToSegmentBase(results, DefaultChunkMode)
 }
 
 func buildTestAnalysisResultsMulti() []*index.AnalysisResult {

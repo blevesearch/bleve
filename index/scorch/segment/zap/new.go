@@ -610,6 +610,9 @@ func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err
 
 	buf := s.grabBuf(binary.MaxVarintLen64)
 
+	// these int coders are initialized with chunk size 1024
+	// however this will be reset to the correct chunk size
+	// while processing each individual field-term section
 	tfEncoder := newChunkedIntCoder(1024, uint64(len(s.results)-1))
 	locEncoder := newChunkedIntCoder(1024, uint64(len(s.results)-1))
 
@@ -754,8 +757,12 @@ func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err
 		}
 
 		// write the field doc values
-		// FIXME: for now i'm hard coding the doc values to size 1024
-		fdvEncoder := newChunkedContentCoder(1024, uint64(len(s.results)-1), s.w, false)
+		// NOTE: doc values continue to use legacy chunk mode
+		chunkSize, err := getChunkSize(LegacyChunkMode, 0, 0)
+		if err != nil {
+			return 0, nil, err
+		}
+		fdvEncoder := newChunkedContentCoder(chunkSize, uint64(len(s.results)-1), s.w, false)
 		if s.IncludeDocValues[fieldID] {
 			for docNum, docTerms := range docTermMap {
 				if len(docTerms) > 0 {

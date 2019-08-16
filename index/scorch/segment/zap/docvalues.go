@@ -281,8 +281,12 @@ func (s *SegmentBase) VisitDocumentFieldTerms(localDocNum uint64, fields []strin
 	}
 
 	// find the chunkNumber where the docValues are stored
-	chunkFactor := 1024 // fixme hard-coded for doc values right now
-	docInChunk := localDocNum / uint64(chunkFactor)
+	// NOTE: doc values continue to use legacy chunk mode
+	chunkFactor, err := getChunkSize(LegacyChunkMode, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	docInChunk := localDocNum / chunkFactor
 	var dvr *docValueReader
 	for _, field := range fields {
 		if fieldIDPlus1, ok = s.fieldsMap[field]; !ok {

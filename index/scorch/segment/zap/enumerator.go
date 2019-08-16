@@ -90,13 +90,15 @@ func (m *enumerator) Current() ([]byte, int, uint64) {
 	return m.lowK, i, v
 }
 
+// GetLowIdxsAndValues will return all of the iterator indices
+// which point to the current key, and their corresponding
+// values.  This can be used by advanced caller which may need
+// to peek into these other sets of data before processing.
 func (m *enumerator) GetLowIdxsAndValues() ([]int, []uint64) {
-	//log.Printf("%#v", m.currVs)
 	values := make([]uint64, 0, len(m.lowIdxs))
 	for _, idx := range m.lowIdxs {
 		values = append(values, m.currVs[idx])
 	}
-	//log.Printf("returning %#v", values)
 	return m.lowIdxs, values
 }
 

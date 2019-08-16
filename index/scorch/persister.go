@@ -36,7 +36,13 @@ import (
 	bolt "github.com/etcd-io/bbolt"
 )
 
-//var DefaultChunkFactor uint32 = 1024
+// LegacyChunkMode was the original chunk mode (always chunk size 1024)
+// this mode is still used for chunking doc values.
+var LegacyChunkMode uint32 = zap.LegacyChunkMode
+
+// DefaultChunkMode is the most recent improvement to chunking and should
+// be used by default.
+var DefaultChunkMode uint32 = zap.DefaultChunkMode
 
 // DefaultPersisterNapTimeMSec is kept to zero as this helps in direct
 // persistence of segments with the default safe batch option.
@@ -377,7 +383,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	}
 
 	newSnapshot, newSegmentID, err := s.mergeSegmentBases(
-		snapshot, sbs, sbsDrops, sbsIndexes, 0)
+		snapshot, sbs, sbsDrops, sbsIndexes, DefaultChunkMode)
 	if err != nil {
 		return false, err
 	}
