@@ -78,7 +78,7 @@
 			"importpath": "github.com/RoaringBitmap/roaring",
 			"repository": "https://github.com/RoaringBitmap/roaring",
 			"vcs": "",
-			"revision": "d0ce1763c3526f65703c395da50da7a7fb2138d5",
+			"revision": "bbe4f2294041c4a33ed31f5bc61c19507acd9cb7",
 			"branch": "master",
 			"notests": true
 		},
