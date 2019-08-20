@@ -59,9 +59,13 @@ func TestBuilder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// now open it, see
+	checkIndex(t, tmpDir, []byte("hello"), "name", 10)
+
+}
+
+func checkIndex(t *testing.T, path string, term []byte, field string, expectCount int) {
 	cfg := make(map[string]interface{})
-	cfg["path"] = tmpDir
+	cfg["path"] = path
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
@@ -81,12 +85,12 @@ func TestBuilder(t *testing.T) {
 	count, err := r.DocCount()
 	if err != nil {
 		t.Errorf("error accessing index doc count: %v", err)
-	} else if count != 10 {
-		t.Errorf("expected 10 docs, got %d", count)
+	} else if count != uint64(expectCount) {
+		t.Errorf("expected %d docs, got %d", expectCount, count)
 	}
 
 	// run a search for hello
-	tfr, err := r.TermFieldReader([]byte("hello"), "name", false, false, false)
+	tfr, err := r.TermFieldReader(term, field, false, false, false)
 	if err != nil {
 		t.Errorf("error accessing term field reader: %v", err)
 	} else {
@@ -99,8 +103,8 @@ func TestBuilder(t *testing.T) {
 		if err != nil {
 			t.Errorf("error calling next on term field reader: %v", err)
 		}
-		if rows != 10 {
-			t.Errorf("expected 10 rows for term hello, field name, got %d", rows)
+		if rows != expectCount {
+			t.Errorf("expected %d rows for term hello, field name, got %d", expectCount, rows)
 		}
 	}
 
@@ -108,4 +112,42 @@ func TestBuilder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error closing index: %v", err)
 	}
+}
+
+func TestBuilderFlushFinalBatch(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "scorch-builder-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = os.RemoveAll(tmpDir)
+		if err != nil {
+			t.Fatalf("error cleaning up test index")
+		}
+	}()
+	options := map[string]interface{}{
+		"path":      tmpDir,
+		"batchSize": 2,
+		"maxMerge":  2,
+	}
+	b, err := NewBuilder(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 9; i++ {
+		doc := document.NewDocument(fmt.Sprintf("%d", i))
+		doc.AddField(document.NewTextField("name", nil, []byte("hello")))
+		err = b.Index(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = b.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkIndex(t, tmpDir, []byte("hello"), "name", 9)
 }

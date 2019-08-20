@@ -108,11 +108,11 @@ func (o *Builder) Index(doc *document.Document) error {
 
 	o.batch.Update(doc)
 
-	return o.maybeFlushBatchLOCKED()
+	return o.maybeFlushBatchLOCKED(o.batchSize)
 }
 
-func (o *Builder) maybeFlushBatchLOCKED() error {
-	if len(o.batch.IndexOps) >= o.batchSize {
+func (o *Builder) maybeFlushBatchLOCKED(moreThan int) error {
+	if len(o.batch.IndexOps) >= moreThan {
 		defer o.batch.Reset()
 		return o.executeBatchLOCKED(o.batch)
 	}
@@ -210,7 +210,7 @@ func (o *Builder) Close() error {
 	defer o.m.Unlock()
 
 	// see if there is a partial batch
-	err := o.maybeFlushBatchLOCKED()
+	err := o.maybeFlushBatchLOCKED(1)
 	if err != nil {
 		return fmt.Errorf("error flushing batch before close: %v", err)
 	}
