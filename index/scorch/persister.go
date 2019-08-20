@@ -431,6 +431,99 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	return true, nil
 }
 
+func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string) ([]string, map[uint64]string, error) {
+	snapshotsBucket, err := tx.CreateBucketIfNotExists(boltSnapshotsBucket)
+	if err != nil {
+		return nil, nil, err
+	}
+	newSnapshotKey := segment.EncodeUvarintAscending(nil, snapshot.epoch)
+	snapshotBucket, err := snapshotsBucket.CreateBucketIfNotExists(newSnapshotKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// persist meta values
+	metaBucket, err := snapshotBucket.CreateBucketIfNotExists(boltMetaDataKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = metaBucket.Put([]byte("type"), []byte(zap.Type))
+	if err != nil {
+		return nil, nil, err
+	}
+	buf := make([]byte, binary.MaxVarintLen32)
+	binary.BigEndian.PutUint32(buf, zap.Version)
+	err = metaBucket.Put([]byte("version"), buf)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// persist internal values
+	internalBucket, err := snapshotBucket.CreateBucketIfNotExists(boltInternalKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	// TODO optimize writing these in order?
+	for k, v := range snapshot.internal {
+		err = internalBucket.Put([]byte(k), v)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	var filenames []string
+	newSegmentPaths := make(map[uint64]string)
+
+	// first ensure that each segment in this snapshot has been persisted
+	for _, segmentSnapshot := range snapshot.segment {
+		snapshotSegmentKey := segment.EncodeUvarintAscending(nil, segmentSnapshot.id)
+		snapshotSegmentBucket, err := snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
+		if err != nil {
+			return nil, nil, err
+		}
+		switch seg := segmentSnapshot.segment.(type) {
+		case *zap.SegmentBase:
+			// need to persist this to disk
+			filename := zapFileName(segmentSnapshot.id)
+			path := path + string(os.PathSeparator) + filename
+			err = zap.PersistSegmentBase(seg, path)
+			if err != nil {
+				return nil, nil, fmt.Errorf("error persisting segment: %v", err)
+			}
+			newSegmentPaths[segmentSnapshot.id] = path
+			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
+			if err != nil {
+				return nil, nil, err
+			}
+			filenames = append(filenames, filename)
+		case *zap.Segment:
+			segPath := seg.Path()
+			filename := strings.TrimPrefix(segPath, path+string(os.PathSeparator))
+			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
+			if err != nil {
+				return nil, nil, err
+			}
+			filenames = append(filenames, filename)
+		default:
+			return nil, nil, fmt.Errorf("unknown segment type: %T", seg)
+		}
+		// store current deleted bits
+		var roaringBuf bytes.Buffer
+		if segmentSnapshot.deleted != nil {
+			_, err = segmentSnapshot.deleted.WriteTo(&roaringBuf)
+			if err != nil {
+				return nil, nil, fmt.Errorf("error persisting roaring bytes: %v", err)
+			}
+			err = snapshotSegmentBucket.Put(boltDeletedKey, roaringBuf.Bytes())
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+
+	return filenames, newSegmentPaths, nil
+}
+
 func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 	// start a write transaction
 	tx, err := s.rootBolt.Begin(true)
@@ -444,93 +537,9 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 		}
 	}()
 
-	snapshotsBucket, err := tx.CreateBucketIfNotExists(boltSnapshotsBucket)
+	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path)
 	if err != nil {
 		return err
-	}
-	newSnapshotKey := segment.EncodeUvarintAscending(nil, snapshot.epoch)
-	snapshotBucket, err := snapshotsBucket.CreateBucketIfNotExists(newSnapshotKey)
-	if err != nil {
-		return err
-	}
-
-	// persist meta values
-	metaBucket, err := snapshotBucket.CreateBucketIfNotExists(boltMetaDataKey)
-	if err != nil {
-		return err
-	}
-	err = metaBucket.Put([]byte("type"), []byte(zap.Type))
-	if err != nil {
-		return err
-	}
-	buf := make([]byte, binary.MaxVarintLen32)
-	binary.BigEndian.PutUint32(buf, zap.Version)
-	err = metaBucket.Put([]byte("version"), buf)
-	if err != nil {
-		return err
-	}
-
-	// persist internal values
-	internalBucket, err := snapshotBucket.CreateBucketIfNotExists(boltInternalKey)
-	if err != nil {
-		return err
-	}
-	// TODO optimize writing these in order?
-	for k, v := range snapshot.internal {
-		err = internalBucket.Put([]byte(k), v)
-		if err != nil {
-			return err
-		}
-	}
-
-	var filenames []string
-	newSegmentPaths := make(map[uint64]string)
-
-	// first ensure that each segment in this snapshot has been persisted
-	for _, segmentSnapshot := range snapshot.segment {
-		snapshotSegmentKey := segment.EncodeUvarintAscending(nil, segmentSnapshot.id)
-		snapshotSegmentBucket, err := snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
-		if err != nil {
-			return err
-		}
-		switch seg := segmentSnapshot.segment.(type) {
-		case *zap.SegmentBase:
-			// need to persist this to disk
-			filename := zapFileName(segmentSnapshot.id)
-			path := s.path + string(os.PathSeparator) + filename
-			err = zap.PersistSegmentBase(seg, path)
-			if err != nil {
-				return fmt.Errorf("error persisting segment: %v", err)
-			}
-			newSegmentPaths[segmentSnapshot.id] = path
-			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
-			if err != nil {
-				return err
-			}
-			filenames = append(filenames, filename)
-		case *zap.Segment:
-			path := seg.Path()
-			filename := strings.TrimPrefix(path, s.path+string(os.PathSeparator))
-			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
-			if err != nil {
-				return err
-			}
-			filenames = append(filenames, filename)
-		default:
-			return fmt.Errorf("unknown segment type: %T", seg)
-		}
-		// store current deleted bits
-		var roaringBuf bytes.Buffer
-		if segmentSnapshot.deleted != nil {
-			_, err = segmentSnapshot.deleted.WriteTo(&roaringBuf)
-			if err != nil {
-				return fmt.Errorf("error persisting roaring bytes: %v", err)
-			}
-			err = snapshotSegmentBucket.Put(boltDeletedKey, roaringBuf.Bytes())
-			if err != nil {
-				return err
-			}
-		}
 	}
 
 	// we need to swap in a new root only when we've persisted 1 or

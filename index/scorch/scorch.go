@@ -519,6 +519,10 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 }
 
 func (s *Scorch) Analyze(d *document.Document) *index.AnalysisResult {
+	return analyze(d)
+}
+
+func analyze(d *document.Document) *index.AnalysisResult {
 	rv := &index.AnalysisResult{
 		Document: d,
 		Analyzed: make([]analysis.TokenFrequencies, len(d.Fields)+len(d.CompositeFields)),
