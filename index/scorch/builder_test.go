@@ -38,7 +38,7 @@ func TestBuilder(t *testing.T) {
 	options := map[string]interface{}{
 		"path":      tmpDir,
 		"batchSize": 2,
-		"maxMerge":  2,
+		"mergeMax":  2,
 	}
 	b, err := NewBuilder(options)
 	if err != nil {
@@ -128,7 +128,7 @@ func TestBuilderFlushFinalBatch(t *testing.T) {
 	options := map[string]interface{}{
 		"path":      tmpDir,
 		"batchSize": 2,
-		"maxMerge":  2,
+		"mergeMax":  2,
 	}
 	b, err := NewBuilder(options)
 	if err != nil {

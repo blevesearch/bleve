@@ -35,7 +35,7 @@ func TestBuilder(t *testing.T) {
 
 	conf := map[string]interface{}{
 		"batchSize": 2,
-		"maxMerge":  2,
+		"mergeMax":  2,
 	}
 	b, err := NewBuilder(tmpDir, NewIndexMapping(), conf)
 	if err != nil {
