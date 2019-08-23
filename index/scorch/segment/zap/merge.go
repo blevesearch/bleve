@@ -313,7 +313,8 @@ func persistMergedRest(segments []*SegmentBase, dropsIn []*roaring.Bitmap,
 				if err != nil {
 					return nil, 0, err
 				}
-
+			}
+			if !bytes.Equal(prevTerm, term) || prevTerm == nil {
 				// compute cardinality of field-term in new seg
 				var newCard uint64
 				lowItrIdxs, lowItrVals := enumerator.GetLowIdxsAndValues()
