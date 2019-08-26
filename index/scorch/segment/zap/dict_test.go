@@ -181,6 +181,14 @@ func TestDictionary(t *testing.T) {
 }
 
 func TestDictionaryError(t *testing.T) {
+	hash := make(map[uint8]levenshtein.LevenshteinAutomatonBuilder, 4)
+	for i := 1; i <= 3; i++ {
+		lb, err := levenshtein.NewLevenshteinAutomatonBuilder(uint8(i), false)
+		if err != nil {
+			t.Errorf("NewLevenshteinAutomatonBuilder(%d, false) failed, err: %v", i, err)
+		}
+		hash[uint8(i)] = *lb
+	}
 
 	_ = os.RemoveAll("/tmp/scorch.zap")
 
@@ -206,7 +214,8 @@ func TestDictionaryError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a, err := levenshtein.New("summer", 2)
+	lb := hash[uint8(2)]
+	a, err := lb.BuildDfa("summer", 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +231,8 @@ func TestDictionaryError(t *testing.T) {
 		t.Fatalf("expected nil error from iterator, got: %v", err)
 	}
 
-	a, err = levenshtein.New("cat", 1) // cat & bat
+	lb = hash[uint8(1)]
+	a, err = lb.BuildDfa("cat", 1) // cat & bat
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +251,8 @@ func TestDictionaryError(t *testing.T) {
 		t.Fatalf("expected nil next and nil err, got: %v, %v", nxt, err)
 	}
 
-	a, err = levenshtein.New("cat", 2) // cat & bat
+	lb = hash[uint8(2)]
+	a, err = lb.BuildDfa("cat", 2) // cat & bat
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +271,8 @@ func TestDictionaryError(t *testing.T) {
 		t.Fatalf("expected nil next and nil err, got: %v, %v", nxt, err)
 	}
 
-	a, err = levenshtein.New("cat", 3)
+	lb = hash[uint8(3)]
+	a, err = lb.BuildDfa("cat", 3)
 	if err != nil {
 		t.Fatal(err)
 	}
