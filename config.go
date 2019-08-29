@@ -43,6 +43,9 @@ type configuration struct {
 }
 
 func (c *configuration) SetAnalysisQueueSize(n int) {
+	if c.analysisQueue != nil {
+		c.analysisQueue.Close()
+	}
 	c.analysisQueue = index.NewAnalysisQueue(n)
 }
 
