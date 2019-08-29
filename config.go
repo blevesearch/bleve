@@ -20,14 +20,14 @@ import (
 	"log"
 	"time"
 
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/gtreap"
-	"github.com/blevesearch/bleve/index/upsidedown"
-	"github.com/blevesearch/bleve/registry"
-	"github.com/blevesearch/bleve/search/highlight/highlighter/html"
+	"github.com/blugelabs/bleve/index"
+	"github.com/blugelabs/bleve/index/store/gtreap"
+	"github.com/blugelabs/bleve/index/upsidedown"
+	"github.com/blugelabs/bleve/registry"
+	"github.com/blugelabs/bleve/search/highlight/highlighter/html"
 
 	// force import of scorch so its accessible by default
-	_ "github.com/blevesearch/bleve/index/scorch"
+	_ "github.com/blugelabs/bleve/index/scorch"
 )
 
 var bleveExpVar = expvar.NewMap("bleve")

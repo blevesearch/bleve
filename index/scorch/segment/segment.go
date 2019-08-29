@@ -18,8 +18,8 @@ import (
 	"fmt"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/blevesearch/bleve/index"
-	"github.com/couchbase/vellum"
+	"github.com/blugelabs/bleve/index"
+	"github.com/blugelabs/vellum"
 )
 
 var ErrClosed = fmt.Errorf("index closed")
@@ -48,6 +48,16 @@ type Segment interface {
 
 	AddRef()
 	DecRef() error
+}
+
+type UnpersistedSegment interface {
+	Segment
+	Persist(path string) error
+}
+
+type PersistedSegment interface {
+	Segment
+	Path() string
 }
 
 type TermDictionary interface {
@@ -94,6 +104,12 @@ type PostingsIterator interface {
 	Advance(docNum uint64) (Posting, error)
 
 	Size() int
+}
+
+type OptimizablePostingsIterator interface {
+	ActualBitmap() *roaring.Bitmap
+	DocNum1Hit() (uint64, bool)
+	ReplaceActual(*roaring.Bitmap)
 }
 
 type Posting interface {

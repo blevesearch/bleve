@@ -29,17 +29,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/boltdb"
-	"github.com/blevesearch/bleve/index/store/null"
-	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/search/query"
+	"github.com/blugelabs/bleve/analysis/analyzer/keyword"
+	"github.com/blugelabs/bleve/document"
+	"github.com/blugelabs/bleve/index"
+	"github.com/blugelabs/bleve/index/store/boltdb"
+	"github.com/blugelabs/bleve/index/store/null"
+	"github.com/blugelabs/bleve/mapping"
+	"github.com/blugelabs/bleve/search"
+	"github.com/blugelabs/bleve/search/query"
 
-	"github.com/blevesearch/bleve/index/scorch"
-	"github.com/blevesearch/bleve/index/upsidedown"
+	"github.com/blugelabs/bleve/index/scorch"
+	"github.com/blugelabs/bleve/index/upsidedown"
 )
 
 func TestCrud(t *testing.T) {

@@ -17,8 +17,8 @@ package fa
 import (
 	"bytes"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blugelabs/bleve/analysis"
+	"github.com/blugelabs/bleve/registry"
 )
 
 const NormalizeName = "normalize_fa"

@@ -18,9 +18,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blugelabs/bleve/index"
+	"github.com/blugelabs/bleve/search"
+	"github.com/blugelabs/bleve/size"
 )
 
 var reflectStaticSizeConstantScorer int

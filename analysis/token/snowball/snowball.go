@@ -17,8 +17,8 @@ package snowball
 import (
 	"fmt"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blugelabs/bleve/analysis"
+	"github.com/blugelabs/bleve/registry"
 
 	"github.com/kljensen/snowball"
 )

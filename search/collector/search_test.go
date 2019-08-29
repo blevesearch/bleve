@@ -17,9 +17,9 @@ package collector
 import (
 	"reflect"
 
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blugelabs/bleve/document"
+	"github.com/blugelabs/bleve/index"
+	"github.com/blugelabs/bleve/search"
 )
 
 type stubSearcher struct {

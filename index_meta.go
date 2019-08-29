@@ -20,7 +20,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/blevesearch/bleve/index/upsidedown"
+	"github.com/blugelabs/bleve/index/upsidedown"
 )
 
 const metaFilename = "index_meta.json"

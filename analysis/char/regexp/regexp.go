@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blugelabs/bleve/analysis"
+	"github.com/blugelabs/bleve/registry"
 )
 
 const Name = "regexp"

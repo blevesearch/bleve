@@ -15,12 +15,12 @@
 package hi
 
 import (
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blugelabs/bleve/analysis"
+	"github.com/blugelabs/bleve/registry"
 
-	"github.com/blevesearch/bleve/analysis/lang/in"
-	"github.com/blevesearch/bleve/analysis/token/lowercase"
-	"github.com/blevesearch/bleve/analysis/tokenizer/unicode"
+	"github.com/blugelabs/bleve/analysis/lang/in"
+	"github.com/blugelabs/bleve/analysis/token/lowercase"
+	"github.com/blugelabs/bleve/analysis/tokenizer/unicode"
 )
 
 const AnalyzerName = "hi"

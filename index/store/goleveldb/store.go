@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/blevesearch/bleve/index/store"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blugelabs/bleve/index/store"
+	"github.com/blugelabs/bleve/registry"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"

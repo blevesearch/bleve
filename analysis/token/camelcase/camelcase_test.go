@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blevesearch/bleve/analysis"
+	"github.com/blugelabs/bleve/analysis"
 )
 
 func TestCamelCaseFilter(t *testing.T) {

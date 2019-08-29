@@ -19,8 +19,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blugelabs/bleve/index"
+	"github.com/blugelabs/bleve/search"
 )
 
 func TestTop10Scores(t *testing.T) {

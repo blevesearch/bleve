@@ -18,11 +18,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/analyzer/standard"
-	"github.com/blevesearch/bleve/analysis/datetime/optional"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blugelabs/bleve/analysis"
+	"github.com/blugelabs/bleve/analysis/analyzer/standard"
+	"github.com/blugelabs/bleve/analysis/datetime/optional"
+	"github.com/blugelabs/bleve/document"
+	"github.com/blugelabs/bleve/registry"
 )
 
 var MappingJSONStrict = false

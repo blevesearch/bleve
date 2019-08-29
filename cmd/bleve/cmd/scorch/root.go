@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/blevesearch/bleve/index/scorch"
+	"github.com/blugelabs/bleve/index/scorch"
 	"github.com/spf13/cobra"
 )
 

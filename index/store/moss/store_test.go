@@ -17,8 +17,8 @@ package moss
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/index/store"
-	"github.com/blevesearch/bleve/index/store/test"
+	"github.com/blugelabs/bleve/index/store"
+	"github.com/blugelabs/bleve/index/store/test"
 )
 
 func open(t *testing.T, mo store.MergeOperator) store.KVStore {

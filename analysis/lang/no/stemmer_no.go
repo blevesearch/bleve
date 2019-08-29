@@ -15,8 +15,8 @@
 package no
 
 import (
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blugelabs/bleve/analysis"
+	"github.com/blugelabs/bleve/registry"
 
 	"github.com/blevesearch/snowballstem"
 	"github.com/blevesearch/snowballstem/norwegian"

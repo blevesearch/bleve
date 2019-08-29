@@ -17,7 +17,7 @@ package upsidedown
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/index/store/goleveldb"
+	"github.com/blugelabs/bleve/index/store/goleveldb"
 )
 
 var goLevelDBTestOptions = map[string]interface{}{

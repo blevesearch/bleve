@@ -18,11 +18,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/blevesearch/bleve/geo"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/search/searcher"
+	"github.com/blugelabs/bleve/geo"
+	"github.com/blugelabs/bleve/index"
+	"github.com/blugelabs/bleve/mapping"
+	"github.com/blugelabs/bleve/search"
+	"github.com/blugelabs/bleve/search/searcher"
 )
 
 type GeoBoundingBoxQuery struct {

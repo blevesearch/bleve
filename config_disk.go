@@ -16,7 +16,7 @@
 
 package bleve
 
-import "github.com/blevesearch/bleve/index/store/boltdb"
+import "github.com/blugelabs/bleve/index/store/boltdb"
 
 // in normal environments we configure boltdb as the default storage
 func initDisk() {

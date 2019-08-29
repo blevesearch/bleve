@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/blevesearch/bleve/index/scorch/mergeplan"
+	"github.com/blugelabs/bleve/index/scorch/mergeplan"
 	"github.com/spf13/cobra"
 )
 

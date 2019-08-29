@@ -17,7 +17,7 @@ package goleveldb
 import (
 	"fmt"
 
-	"github.com/blevesearch/bleve/index/store"
+	"github.com/blugelabs/bleve/index/store"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 

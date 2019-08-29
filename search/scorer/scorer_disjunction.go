@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blugelabs/bleve/search"
+	"github.com/blugelabs/bleve/size"
 )
 
 var reflectStaticSizeDisjunctionQueryScorer int

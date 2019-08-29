@@ -15,9 +15,9 @@
 package query
 
 import (
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blugelabs/bleve/index"
+	"github.com/blugelabs/bleve/mapping"
+	"github.com/blugelabs/bleve/search"
 )
 
 type QueryStringQuery struct {

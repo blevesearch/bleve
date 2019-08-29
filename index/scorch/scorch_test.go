@@ -26,13 +26,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
-	"github.com/blevesearch/bleve/analysis/analyzer/standard"
-	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizer/regexp"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/mapping"
+	"github.com/blugelabs/bleve/analysis"
+	"github.com/blugelabs/bleve/analysis/analyzer/keyword"
+	"github.com/blugelabs/bleve/analysis/analyzer/standard"
+	regexpTokenizer "github.com/blugelabs/bleve/analysis/tokenizer/regexp"
+	"github.com/blugelabs/bleve/document"
+	"github.com/blugelabs/bleve/index"
+	"github.com/blugelabs/bleve/mapping"
 )
 
 func init() {
@@ -2009,5 +2009,34 @@ func TestAllFieldWithDifferentTermVectorsEnabled(t *testing.T) {
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
+	}
+}
+
+func TestForceVersion(t *testing.T) {
+	cfg := map[string]interface{}{}
+	cfg["forceSegmentType"] = "zap"
+	cfg["forceSegmentVersion"] = 11
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("error opening a supported vesion: %v", err)
+	}
+	s := idx.(*Scorch)
+	if s.segPlugin.Version() != 11 {
+		t.Fatalf("wrong segment wrapper version loaded, expected %d got %d", 11, s.segPlugin.Version())
+	}
+	cfg["forceSegmentVersion"] = 12
+	idx, err = NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("error opening a supported vesion: %v", err)
+	}
+	s = idx.(*Scorch)
+	if s.segPlugin.Version() != 12 {
+		t.Fatalf("wrong segment wrapper version loaded, expected %d got %d", 12, s.segPlugin.Version())
+	}
+	cfg["forceSegmentVersion"] = 10
+	idx, err = NewScorch(Name, cfg, analysisQueue)
+	if err == nil {
+		t.Fatalf("expected an error opening an unsupported vesion, got nil")
 	}
 }

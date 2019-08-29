@@ -18,8 +18,8 @@ import (
 	"bytes"
 	"unicode/utf8"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blugelabs/bleve/analysis"
+	"github.com/blugelabs/bleve/registry"
 )
 
 const WidthName = "cjk_width"

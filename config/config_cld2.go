@@ -17,5 +17,5 @@
 package config
 
 import (
-	_ "github.com/blevesearch/blevex/detectlang"
+	_ "github.com/blugelabs/blevex/detectlang"
 )

@@ -17,8 +17,8 @@ package fr
 import (
 	"bytes"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blugelabs/bleve/analysis"
+	"github.com/blugelabs/bleve/registry"
 )
 
 const MinimalStemmerName = "stemmer_fr_min"
