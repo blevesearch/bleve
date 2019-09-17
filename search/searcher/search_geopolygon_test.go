@@ -83,6 +83,10 @@ func TestRealGeoPolygons(t *testing.T) {
 		{[]geo.Point{{Lon: -80.304, Lat: 40.740}, {Lon: -80.038, Lat: 40.239}, {Lon: -79.562, Lat: 40.786}, {Lon: -80.018, Lat: 40.328}}, "loc", []string{"p"}},
 		{[]geo.Point{{Lon: -111.918, Lat: 33.515}, {Lon: -111.938, Lat: 33.494}, {Lon: -111.944, Lat: 33.481}, {Lon: -111.886, Lat: 33.517},
 			{Lon: -111.919, Lat: 33.468}, {Lon: -111.929, Lat: 33.508}}, "loc", []string{"q"}},
+		// real points near cb bangalore
+		{[]geo.Point{{Lat: 12.974872, Lon: 77.607749}, {Lat: 12.971725, Lon: 77.610110},
+			{Lat: 12.972530, Lon: 77.606912}, {Lat: 12.975112, Lon: 77.603780},
+		}, "loc", []string{"amoeba", "communiti"}},
 	}
 
 	i := setupGeoPolygonPoints(t)
@@ -287,5 +291,26 @@ func setupGeoPolygonPoints(t *testing.T) index.Index {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = i.Update(&document.Document{
+		ID: "amoeba",
+		Fields: []document.Field{
+			document.NewGeoPointField("loc", []uint64{}, 77.60490, 12.97467),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = i.Update(&document.Document{
+		ID: "communiti",
+		Fields: []document.Field{
+			document.NewGeoPointField("loc", []uint64{}, 77.608237, 12.97237),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	return i
 }
