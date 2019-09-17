@@ -273,7 +273,7 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
-	_, hasPoints := tmp["points"]
+	_, hasPoints := tmp["polygon_points"]
 	if hasPoints {
 		var rv GeoBoundingPolygonQuery
 		err := json.Unmarshal(input, &rv)

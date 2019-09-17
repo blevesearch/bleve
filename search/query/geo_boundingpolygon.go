@@ -26,7 +26,7 @@ import (
 )
 
 type GeoBoundingPolygonQuery struct {
-	Points   []geo.Point `json:"points"`
+	Points   []geo.Point `json:"polygon_points"`
 	FieldVal string      `json:"field,omitempty"`
 	BoostVal *Boost      `json:"boost,omitempty"`
 }
@@ -69,7 +69,7 @@ func (q *GeoBoundingPolygonQuery) Validate() error {
 
 func (q *GeoBoundingPolygonQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
-		Points   []interface{} `json:"points"`
+		Points   []interface{} `json:"polygon_points"`
 		FieldVal string        `json:"field,omitempty"`
 		BoostVal *Boost        `json:"boost,omitempty"`
 	}{}
