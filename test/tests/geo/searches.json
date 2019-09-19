@@ -220,5 +220,107 @@
         }
       ]
     }
+  },
+  {
+    "comment": "polygon around cb office area, using GeoJSON lat/lon as array",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "polygon_points": [[77.607749,12.974872],[77.6101101,12.971725],[77.606912,12.972530],[77.603780,12.975112]],
+        "field": "geo"
+      },
+      "sort": [
+        "name"
+      ]
+    },
+    "result": {
+      "total_hits": 2,
+      "hits": [
+        {
+          "id": "amoeba_brewery"
+        },
+        {
+          "id": "communiti_brewery"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "polygon around cb office area, using GeoJSON lat/lon as string",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "polygon_points": ["12.974872, 77.607749","12.971725, 77.6101101","12.972530, 77.606912","12.975112, 77.603780"],
+        "field": "geo"
+      },
+      "sort": [
+        "name"
+      ]
+    },
+    "result": {
+      "total_hits": 2,
+      "hits": [
+        {
+          "id": "amoeba_brewery"
+        },
+        {
+          "id": "communiti_brewery"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "polygon around cb office area",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "polygon_points": [{"lat":12.974872, "lon":77.607749}, {"lat":12.971725, "lon":77.6101101},
+          {"lat":12.972530, "lon":77.606912}, {"lat":12.975112, "lon":77.603780}],
+        "field": "geo"
+      },
+      "sort": [
+        "name"
+      ]
+    },
+    "result": {
+      "total_hits": 2,
+      "hits": [
+        {
+          "id": "amoeba_brewery"
+        },
+        {
+          "id": "communiti_brewery"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "polygon around cb office area as geohash",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "polygon_points": ["tdr1y40", "tdr1y13", "tdr1vcx", "tdr1vfj"],
+        "field": "geo"
+      },
+      "sort": [
+        "name"
+      ]
+    },
+    "result": {
+      "total_hits": 2,
+      "hits": [
+        {
+          "id": "amoeba_brewery"
+        },
+        {
+          "id": "communiti_brewery"
+        }
+      ]
+    }
   }
 ]
+
