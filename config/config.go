@@ -109,6 +109,7 @@ import (
 	_ "github.com/blevesearch/bleve/index/store/goleveldb"
 	_ "github.com/blevesearch/bleve/index/store/gtreap"
 	_ "github.com/blevesearch/bleve/index/store/moss"
+	_ "github.com/blevesearch/bleve/index/store/postgresql"
 
 	// index types
 	_ "github.com/blevesearch/bleve/index/upsidedown"
