@@ -1,0 +1,212 @@
+package postgresql
+
+import (
+	"bytes"
+	"context"
+	"database/sql"
+	"fmt"
+	"log"
+)
+
+// Iterator is an abstraction around key iteration
+type Iterator struct {
+	tx *sql.Tx
+
+	table  string
+	keyCol string
+	valCol string
+
+	prefix []byte
+	start  []byte
+	end    []byte
+
+	key []byte
+	val []byte
+
+	err error
+}
+
+func (i *Iterator) seekQueryRow(ctx context.Context, key []byte) *sql.Row {
+	if i.prefix != nil && i.end != nil {
+		query := fmt.Sprintf(
+			"SELECT %s, %s FROM %s WHERE %s >= $1 AND %s LIKE $2 AND %s < $3 ORDER BY %s LIMIT 1;",
+			i.keyCol,
+			i.valCol,
+			i.table,
+			i.keyCol,
+			i.keyCol,
+			i.keyCol,
+			i.keyCol,
+		)
+
+		prefix := i.prefix
+		prefix = append(prefix, '%')
+
+		return i.tx.QueryRow(query, key, prefix, i.end)
+	}
+
+	if i.prefix != nil {
+		query := fmt.Sprintf(
+			"SELECT %s, %s FROM %s WHERE %s >= $1 AND %s LIKE $2 ORDER BY %s LIMIT 1;",
+			i.keyCol,
+			i.valCol,
+			i.table,
+			i.keyCol,
+			i.keyCol,
+			i.keyCol,
+		)
+
+		prefix := i.prefix
+		prefix = append(prefix, '%')
+
+		return i.tx.QueryRow(query, key, prefix)
+	}
+
+	if i.end != nil {
+		query := fmt.Sprintf(
+			"SELECT %s, %s FROM %s WHERE %s >= $1 AND %s < $2 ORDER BY %s LIMIT 1;",
+			i.keyCol,
+			i.valCol,
+			i.table,
+			i.keyCol,
+			i.keyCol,
+			i.keyCol,
+		)
+		return i.tx.QueryRow(query, key, i.end)
+	}
+
+	query := fmt.Sprintf(
+		"SELECT %s, %s FROM %s WHERE %s >= $1 ORDER BY %s LIMIT 1;",
+		i.keyCol,
+		i.valCol,
+		i.table,
+		i.keyCol,
+		i.keyCol,
+	)
+	return i.tx.QueryRow(query, key)
+}
+
+// Seek will advance the iterator to the specified key
+func (i *Iterator) Seek(key []byte) {
+	ctx := context.Background()
+
+	if key == nil {
+		key = []byte{0}
+	}
+	if i.start != nil && bytes.Compare(key, i.start) < 0 {
+		key = i.start
+	}
+
+	i.err = i.seekQueryRow(ctx, key).Scan(&i.key, &i.val)
+	if i.err != nil && i.err != sql.ErrNoRows {
+		log.Printf("could not query row for Seek: %v", i.err)
+	}
+}
+
+func (i *Iterator) nextQueryRow(ctx context.Context) *sql.Row {
+	if i.prefix != nil && i.end != nil {
+		query := fmt.Sprintf(
+			"SELECT %s, %s FROM %s WHERE %s > $1 AND %s LIKE $2 AND %s < $3 ORDER BY %s LIMIT 1;",
+			i.keyCol,
+			i.valCol,
+			i.table,
+			i.keyCol,
+			i.keyCol,
+			i.keyCol,
+			i.keyCol,
+		)
+
+		prefix := i.prefix
+		prefix = append(prefix, '%')
+
+		return i.tx.QueryRow(query, i.key, prefix, i.end)
+	}
+
+	if i.prefix != nil {
+		query := fmt.Sprintf(
+			"SELECT %s, %s FROM %s WHERE %s > $1 AND %s LIKE $2 ORDER BY %s LIMIT 1;",
+			i.keyCol,
+			i.valCol,
+			i.table,
+			i.keyCol,
+			i.keyCol,
+			i.keyCol,
+		)
+
+		prefix := i.prefix
+		prefix = append(prefix, '%')
+
+		return i.tx.QueryRow(query, i.key, prefix)
+	}
+
+	if i.end != nil {
+		query := fmt.Sprintf(
+			"SELECT %s, %s FROM %s WHERE %s > $1 AND %s < $2 ORDER BY %s LIMIT 1;",
+			i.keyCol,
+			i.valCol,
+			i.table,
+			i.keyCol,
+			i.keyCol,
+			i.keyCol,
+		)
+		return i.tx.QueryRow(query, i.key, i.end)
+	}
+
+	query := fmt.Sprintf(
+		"SELECT %s, %s FROM %s WHERE %s > $1 ORDER BY %s LIMIT 1;",
+		i.keyCol,
+		i.valCol,
+		i.table,
+		i.keyCol,
+		i.keyCol,
+	)
+	return i.tx.QueryRow(query, i.key)
+}
+
+// Next will advance the iterator to the next key
+func (i *Iterator) Next() {
+	ctx := context.Background()
+
+	i.err = i.nextQueryRow(ctx).Scan(&i.key, &i.val)
+	if i.err != nil && i.err != sql.ErrNoRows {
+		log.Printf("could not query row for Next: %v", i.err)
+	}
+}
+
+// Key returns the key pointed to by the iterator
+// The bytes returned are **ONLY** valid until the next call to Seek/Next/Close
+// Continued use after that requires that they be copied.
+func (i *Iterator) Key() []byte {
+	if i.err != nil {
+		return nil
+	}
+	return i.key
+}
+
+// Value returns the value pointed to by the iterator
+// The bytes returned are **ONLY** valid until the next call to Seek/Next/Close
+// Continued use after that requires that they be copied.
+func (i *Iterator) Value() []byte {
+	if i.err != nil {
+		return nil
+	}
+	return i.val
+}
+
+// Valid returns whether or not the iterator is in a valid state
+func (i *Iterator) Valid() bool {
+	return i.err == nil
+}
+
+// Current returns Key(),Value(),Valid() in a single operation
+func (i *Iterator) Current() ([]byte, []byte, bool) {
+	return i.Key(), i.Value(), i.Valid()
+}
+
+// Close closes the iterator
+func (i *Iterator) Close() error {
+	// ctx := context.Background()
+
+	// return i.tx.Rollback(ctx)
+	return nil
+}

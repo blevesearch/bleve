@@ -140,6 +140,14 @@
 			"revision": "dc222902e86f298bfae0b3dec6ba8b9d874ad5f8",
 			"branch": "master",
 			"notests": true
+		},
+		{
+			"importpath": "github.com/lib/pq",
+			"repository": "https://github.com/lib/pq",
+			"vcs": "git",
+			"revision": "v1.2.0",
+			"branch": "master",
+			"notests": true
 		}
 	]
 }
