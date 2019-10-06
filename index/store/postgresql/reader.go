@@ -20,6 +20,7 @@ import (
 	"log"
 
 	"github.com/blevesearch/bleve/index/store"
+	"github.com/lib/pq"
 )
 
 // Reader is an abstraction of an **ISOLATED** reader
@@ -68,13 +69,13 @@ func (r *Reader) Get(key []byte) ([]byte, error) {
 // MultiGet retrieves multiple values in one call.
 func (r *Reader) MultiGet(keys [][]byte) ([][]byte, error) {
 	query := fmt.Sprintf(
-		"SELECT %s FROM %s WHERE %s = ANY $1;",
+		"SELECT %s FROM %s WHERE %s = ANY($1);",
 		r.valCol,
 		r.table,
 		r.keyCol,
 	)
 
-	rows, err := r.tx.Query(query, keys)
+	rows, err := r.tx.Query(query, pq.Array(keys))
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
