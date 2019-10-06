@@ -271,8 +271,5 @@ func (i *Iterator) Current() ([]byte, []byte, bool) {
 
 // Close closes the iterator
 func (i *Iterator) Close() error {
-	// ctx := context.Background()
-
-	// return i.tx.Rollback(ctx)
 	return nil
 }
