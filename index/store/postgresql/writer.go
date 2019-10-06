@@ -86,8 +86,14 @@ func (w *Writer) ExecuteBatch(b store.KVBatch) error {
 			w.keyCol,
 		)
 
+		stmt, err := w.db.Prepare(existingValQuery)
+		if err != nil {
+			log.Printf("could not prepare statement for current value in ExecuteBatch: %v", err)
+			return err
+		}
+
 		var existingVal []byte
-		err := w.db.QueryRow(existingValQuery, kb).Scan(&existingVal)
+		err = stmt.QueryRow(kb).Scan(&existingVal)
 		if err != nil && err != sql.ErrNoRows {
 			return err
 		}

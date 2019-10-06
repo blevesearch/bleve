@@ -53,10 +53,16 @@ func (i *Iterator) seekQueryRow(ctx context.Context, key []byte) *sql.Row {
 			i.keyCol,
 		)
 
+		stmt, err := i.tx.Prepare(query)
+		if err != nil {
+			log.Printf("could not prepare statement for seek: %v", err)
+			return nil
+		}
+
 		prefix := i.prefix
 		prefix = append(prefix, '%')
 
-		return i.tx.QueryRow(query, key, prefix, i.end)
+		return stmt.QueryRow(key, prefix, i.end)
 	}
 
 	if i.prefix != nil {
@@ -70,10 +76,16 @@ func (i *Iterator) seekQueryRow(ctx context.Context, key []byte) *sql.Row {
 			i.keyCol,
 		)
 
+		stmt, err := i.tx.Prepare(query)
+		if err != nil {
+			log.Printf("could not prepare statement for seek: %v", err)
+			return nil
+		}
+
 		prefix := i.prefix
 		prefix = append(prefix, '%')
 
-		return i.tx.QueryRow(query, key, prefix)
+		return stmt.QueryRow(key, prefix)
 	}
 
 	if i.end != nil {
@@ -86,7 +98,14 @@ func (i *Iterator) seekQueryRow(ctx context.Context, key []byte) *sql.Row {
 			i.keyCol,
 			i.keyCol,
 		)
-		return i.tx.QueryRow(query, key, i.end)
+
+		stmt, err := i.tx.Prepare(query)
+		if err != nil {
+			log.Printf("could not prepare statement for seek: %v", err)
+			return nil
+		}
+
+		return stmt.QueryRow(key, i.end)
 	}
 
 	query := fmt.Sprintf(
@@ -97,7 +116,14 @@ func (i *Iterator) seekQueryRow(ctx context.Context, key []byte) *sql.Row {
 		i.keyCol,
 		i.keyCol,
 	)
-	return i.tx.QueryRow(query, key)
+
+	stmt, err := i.tx.Prepare(query)
+	if err != nil {
+		log.Printf("could not prepare statement for seek: %v", err)
+		return nil
+	}
+
+	return stmt.QueryRow(key)
 }
 
 // Seek will advance the iterator to the specified key
@@ -133,7 +159,13 @@ func (i *Iterator) nextQueryRow(ctx context.Context) *sql.Row {
 		prefix := i.prefix
 		prefix = append(prefix, '%')
 
-		return i.tx.QueryRow(query, i.key, prefix, i.end)
+		stmt, err := i.tx.Prepare(query)
+		if err != nil {
+			log.Printf("could not prepare statement for seek: %v", err)
+			return nil
+		}
+
+		return stmt.QueryRow(i.key, prefix, i.end)
 	}
 
 	if i.prefix != nil {
@@ -150,7 +182,13 @@ func (i *Iterator) nextQueryRow(ctx context.Context) *sql.Row {
 		prefix := i.prefix
 		prefix = append(prefix, '%')
 
-		return i.tx.QueryRow(query, i.key, prefix)
+		stmt, err := i.tx.Prepare(query)
+		if err != nil {
+			log.Printf("could not prepare statement for seek: %v", err)
+			return nil
+		}
+
+		return stmt.QueryRow(i.key, prefix)
 	}
 
 	if i.end != nil {
@@ -163,7 +201,14 @@ func (i *Iterator) nextQueryRow(ctx context.Context) *sql.Row {
 			i.keyCol,
 			i.keyCol,
 		)
-		return i.tx.QueryRow(query, i.key, i.end)
+
+		stmt, err := i.tx.Prepare(query)
+		if err != nil {
+			log.Printf("could not prepare statement for seek: %v", err)
+			return nil
+		}
+
+		return stmt.QueryRow(i.key, i.end)
 	}
 
 	query := fmt.Sprintf(
@@ -174,7 +219,14 @@ func (i *Iterator) nextQueryRow(ctx context.Context) *sql.Row {
 		i.keyCol,
 		i.keyCol,
 	)
-	return i.tx.QueryRow(query, i.key)
+
+	stmt, err := i.tx.Prepare(query)
+	if err != nil {
+		log.Printf("could not prepare statement for seek: %v", err)
+		return nil
+	}
+
+	return stmt.QueryRow(i.key)
 }
 
 // Next will advance the iterator to the next key

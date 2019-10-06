@@ -49,9 +49,16 @@ func (b *Batch) Set(key, val []byte) {
 		b.valCol,
 		b.valCol,
 	)
-	_, b.err = b.tx.Exec(insertQuery, key, val)
+
+	var stmt *sql.Stmt
+	stmt, b.err = b.tx.Prepare(insertQuery)
 	if b.err != nil {
-		log.Printf("could not add Set op to batch: %v", b.err)
+		log.Printf("could not prepare statement for Set operation in batch: %v", b.err)
+	}
+
+	_, b.err = stmt.Exec(key, val)
+	if b.err != nil {
+		log.Printf("could not add Set operation to batch: %v", b.err)
 	}
 }
 
@@ -64,9 +71,15 @@ func (b *Batch) Delete(key []byte) {
 		b.keyCol,
 	)
 
-	_, b.err = b.tx.Exec(deleteQuery, key)
+	var stmt *sql.Stmt
+	stmt, b.err = b.tx.Prepare(deleteQuery)
 	if b.err != nil {
-		log.Printf("could not add Delete op to batch: %v", b.err)
+		log.Printf("could not prepare statement for Delete operation in batch: %v", b.err)
+	}
+
+	_, b.err = stmt.Exec(key)
+	if b.err != nil {
+		log.Printf("could not add Delete operation to batch: %v", b.err)
 	}
 }
 

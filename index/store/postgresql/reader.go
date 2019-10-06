@@ -51,7 +51,13 @@ func (r *Reader) Get(key []byte) ([]byte, error) {
 
 	var bts []byte
 
-	err := r.tx.QueryRow(query, key).Scan(&bts)
+	stmt, err := r.tx.Prepare(query)
+	if err != nil {
+		log.Printf("could not prepare statement for Get: %v", err)
+		return nil, err
+	}
+
+	err = stmt.QueryRow(key).Scan(&bts)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -75,7 +81,13 @@ func (r *Reader) MultiGet(keys [][]byte) ([][]byte, error) {
 		r.keyCol,
 	)
 
-	rows, err := r.tx.Query(query, pq.Array(keys))
+	stmt, err := r.tx.Prepare(query)
+	if err != nil {
+		log.Printf("could not prepare statement for MultiGet: %v", err)
+		return nil, err
+	}
+
+	rows, err := stmt.Query(pq.Array(keys))
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
