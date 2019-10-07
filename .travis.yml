@@ -7,6 +7,23 @@ go:
  - "1.11.x"
  - "1.12.x"
 
+services:
+  - postgresql
+
+addons:
+  postgresql: "9.6"
+
+env:
+  - POSTGRES_HOST=localhost
+  - POSTGRES_PORT=5432
+  - POSTGRES_USER=postgres
+  - POSTGRES_PASSWORD=mysupersecretpassword
+  - POSTGRES_DATABASE=travis_ci_test
+
+before_script:
+  - psql -c "CREATE DATABASE travis_ci_test;" -U postgres
+  - psql -c "ALTER USER postgres WITH PASSWORD 'mysupersecretpassword';" -U postgres
+
 script:
   - go get golang.org/x/tools/cmd/cover
   - go get github.com/mattn/goveralls
