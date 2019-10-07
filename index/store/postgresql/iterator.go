@@ -16,7 +16,6 @@ package postgresql
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -40,7 +39,7 @@ type Iterator struct {
 	err error
 }
 
-func (i *Iterator) seekQueryRow(ctx context.Context, key []byte) *sql.Row {
+func (i *Iterator) seekQueryRow(key []byte) *sql.Row {
 	if i.prefix != nil && i.end != nil {
 		query := fmt.Sprintf(
 			"SELECT %s, %s FROM %s WHERE %s >= $1 AND %s LIKE $2 AND %s < $3 ORDER BY %s LIMIT 1;",
@@ -128,8 +127,6 @@ func (i *Iterator) seekQueryRow(ctx context.Context, key []byte) *sql.Row {
 
 // Seek will advance the iterator to the specified key
 func (i *Iterator) Seek(key []byte) {
-	ctx := context.Background()
-
 	if key == nil {
 		key = []byte{0}
 	}
@@ -137,13 +134,13 @@ func (i *Iterator) Seek(key []byte) {
 		key = i.start
 	}
 
-	i.err = i.seekQueryRow(ctx, key).Scan(&i.key, &i.val)
+	i.err = i.seekQueryRow(key).Scan(&i.key, &i.val)
 	if i.err != nil && i.err != sql.ErrNoRows {
 		log.Printf("could not query row for Seek: %v", i.err)
 	}
 }
 
-func (i *Iterator) nextQueryRow(ctx context.Context) *sql.Row {
+func (i *Iterator) nextQueryRow() *sql.Row {
 	if i.prefix != nil && i.end != nil {
 		query := fmt.Sprintf(
 			"SELECT %s, %s FROM %s WHERE %s > $1 AND %s LIKE $2 AND %s < $3 ORDER BY %s LIMIT 1;",
@@ -231,9 +228,7 @@ func (i *Iterator) nextQueryRow(ctx context.Context) *sql.Row {
 
 // Next will advance the iterator to the next key
 func (i *Iterator) Next() {
-	ctx := context.Background()
-
-	i.err = i.nextQueryRow(ctx).Scan(&i.key, &i.val)
+	i.err = i.nextQueryRow().Scan(&i.key, &i.val)
 	if i.err != nil && i.err != sql.ErrNoRows {
 		log.Printf("could not query row for Next: %v", i.err)
 	}
