@@ -14,11 +14,7 @@ addons:
   postgresql: "9.6"
 
 env:
-  - POSTGRES_HOST=localhost
-  - POSTGRES_PORT=5432
-  - POSTGRES_USER=postgres
-  - POSTGRES_PASSWORD=mysupersecretpassword
-  - POSTGRES_DATABASE=travis_ci_test
+  - POSTGRES_HOST=localhost POSTGRES_PORT=5432 POSTGRES_USER=postgres POSTGRES_PASSWORD=mysupersecretpassword POSTGRES_DATABASE=travis_ci_test
 
 before_script:
   - psql -c "CREATE DATABASE travis_ci_test;" -U postgres
