@@ -62,7 +62,7 @@ func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 		}, nil
 	case "random":
 		return &SortRandom{
-			r: rand.New(rand.NewSource(time.Now().Unix())),
+			Rand: rand.New(rand.NewSource(time.Now().Unix())),
 		}, nil
 	case "geo_distance":
 		field, ok := input["field"].(string)
@@ -161,7 +161,7 @@ func ParseSearchSortString(input string) SearchSort {
 		}
 	} else if input == "_random" {
 		return &SortRandom{
-			r: rand.New(rand.NewSource(time.Now().Unix())),
+			Rand: rand.New(rand.NewSource(time.Now().Unix())),
 		}
 	}
 	return &SortField{
@@ -631,9 +631,9 @@ func NewSortGeoDistance(field, unit string, lon, lat float64, desc bool) (
 }
 
 // SortRandom will sort results randomly
-//   r is the source of the rand numbers.
+//  Rand is the source of the rand numbers.
 type SortRandom struct {
-	r *rand.Rand
+	Rand *rand.Rand
 }
 
 // UpdateVisitor does nothing for random sort
@@ -646,7 +646,7 @@ const alphaNumTable = "abcdefghijklmnopqrstuvwxyz01234567890"
 // for random sort it resets the state for processing
 // the each next document
 func (s *SortRandom) Value(i *DocumentMatch) string {
-	return string(alphaNumTable[s.r.Intn(len(alphaNumTable))])
+	return string(alphaNumTable[s.Rand.Intn(len(alphaNumTable))])
 }
 
 // Descending determines the order of the sort
