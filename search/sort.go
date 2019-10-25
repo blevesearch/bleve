@@ -609,27 +609,6 @@ func (s *SortScore) Reverse() {
 	s.Desc = !s.Desc
 }
 
-var maxDistance = string(numeric.MustNewPrefixCodedInt64(math.MaxInt64, 0))
-
-// NewSortGeoDistance creates SearchSort instance for sorting documents by
-// their distance from the specified point.
-func NewSortGeoDistance(field, unit string, lon, lat float64, desc bool) (
-	*SortGeoDistance, error) {
-	rv := &SortGeoDistance{
-		Field: field,
-		Desc:  desc,
-		Unit:  unit,
-		Lon:   lon,
-		Lat:   lat,
-	}
-	var err error
-	rv.unitMult, err = geo.ParseDistanceUnit(unit)
-	if err != nil {
-		return nil, err
-	}
-	return rv, nil
-}
-
 // SortRandom will sort results randomly
 //  Rand is the source of the rand numbers.
 type SortRandom struct {
@@ -674,6 +653,27 @@ func (s *SortRandom) Copy() SearchSort {
 }
 
 func (s *SortRandom) Reverse() {
+}
+
+var maxDistance = string(numeric.MustNewPrefixCodedInt64(math.MaxInt64, 0))
+
+// NewSortGeoDistance creates SearchSort instance for sorting documents by
+// their distance from the specified point.
+func NewSortGeoDistance(field, unit string, lon, lat float64, desc bool) (
+	*SortGeoDistance, error) {
+	rv := &SortGeoDistance{
+		Field: field,
+		Desc:  desc,
+		Unit:  unit,
+		Lon:   lon,
+		Lat:   lat,
+	}
+	var err error
+	rv.unitMult, err = geo.ParseDistanceUnit(unit)
+	if err != nil {
+		return nil, err
+	}
+	return rv, nil
 }
 
 // SortGeoDistance will sort results by the distance of an
