@@ -19,8 +19,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/rand"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/blevesearch/bleve/geo"
 	"github.com/blevesearch/bleve/numeric"
@@ -57,6 +59,10 @@ func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 	case "score":
 		return &SortScore{
 			Desc: descending,
+		}, nil
+	case "random":
+		return &SortRandom{
+			r: rand.New(rand.NewSource(time.Now().Unix())),
 		}, nil
 	case "geo_distance":
 		field, ok := input["field"].(string)
@@ -152,6 +158,10 @@ func ParseSearchSortString(input string) SearchSort {
 	} else if input == "_score" {
 		return &SortScore{
 			Desc: descending,
+		}
+	} else if input == "_random" {
+		return &SortRandom{
+			r: rand.New(rand.NewSource(time.Now().Unix())),
 		}
 	}
 	return &SortField{
@@ -618,6 +628,52 @@ func NewSortGeoDistance(field, unit string, lon, lat float64, desc bool) (
 		return nil, err
 	}
 	return rv, nil
+}
+
+// SortRandom will sort results randomly
+//   r is the source of the rand numbers.
+type SortRandom struct {
+	r *rand.Rand
+}
+
+// UpdateVisitor does nothing for random sort
+func (s *SortRandom) UpdateVisitor(field string, term []byte) {
+}
+
+const alphaNumTable = "abcdefghijklmnopqrstuvwxyz01234567890"
+
+// Value returns the sort value of the DocumentMatch
+// for random sort it resets the state for processing
+// the each next document
+func (s *SortRandom) Value(i *DocumentMatch) string {
+	return string(alphaNumTable[s.r.Intn(len(alphaNumTable))])
+}
+
+// Descending determines the order of the sort
+// for random sort it is always false
+func (s *SortRandom) Descending() bool {
+	return false
+}
+
+// RequiresDocID says random sort does not require the DocID be loaded
+func (s *SortRandom) RequiresDocID() bool { return false }
+
+// RequiresScoring says random sort does not require scoring
+func (s *SortRandom) RequiresScoring() bool { return false }
+
+// RequiresFields says random sort does not require any store fields
+func (s *SortRandom) RequiresFields() []string { return nil }
+
+func (s *SortRandom) MarshalJSON() ([]byte, error) {
+	return json.Marshal("_random")
+}
+
+func (s *SortRandom) Copy() SearchSort {
+	rv := *s
+	return &rv
+}
+
+func (s *SortRandom) Reverse() {
 }
 
 // SortGeoDistance will sort results by the distance of an
