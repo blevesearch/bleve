@@ -232,6 +232,45 @@ func TestCalcBudget(t *testing.T) {
 	}
 }
 
+func TestCalcBudgetForSingleSegmentMergePolicy(t *testing.T) {
+	mpolicy := MergePlanOptions{
+		MaxSegmentsPerTier:   1,
+		MaxSegmentSize:       1 << 30, // ~ 1 Billion
+		SegmentsPerMergeTask: 10,
+		FloorSegmentSize:     1 << 30,
+	}
+
+	tests := []struct {
+		totalSize     int64
+		firstTierSize int64
+		o             MergePlanOptions
+		expect        int
+	}{
+		{0, mpolicy.RaiseToFloorSegmentSize(0), mpolicy, 0},
+		{1, mpolicy.RaiseToFloorSegmentSize(1), mpolicy, 1},
+		{9, mpolicy.RaiseToFloorSegmentSize(0), mpolicy, 1},
+		{1, mpolicy.RaiseToFloorSegmentSize(1), mpolicy, 1},
+		{21, mpolicy.RaiseToFloorSegmentSize(21), mpolicy, 1},
+		{21, mpolicy.RaiseToFloorSegmentSize(21), mpolicy, 1},
+		{1000, mpolicy.RaiseToFloorSegmentSize(2000), mpolicy, 1},
+		{5000, mpolicy.RaiseToFloorSegmentSize(5000), mpolicy, 1},
+		{10000, mpolicy.RaiseToFloorSegmentSize(10000), mpolicy, 1},
+		{30000, mpolicy.RaiseToFloorSegmentSize(30000), mpolicy, 1},
+		{1000000, mpolicy.RaiseToFloorSegmentSize(1000000), mpolicy, 1},
+		{1000000000, 1 << 30, mpolicy, 1},
+		{1013423541, 1 << 30, mpolicy, 1},
+		{98765442, 1 << 30, mpolicy, 1},
+	}
+
+	for testi, test := range tests {
+		res := CalcBudget(test.totalSize, test.firstTierSize, &test.o)
+		if res != test.expect {
+			t.Errorf("testi: %d, test: %#v, res: %v",
+				testi, test, res)
+		}
+	}
+}
+
 // ----------------------------------------
 
 func TestInsert1SameSizedSegmentBetweenMerges(t *testing.T) {
