@@ -1622,9 +1622,9 @@ func TestGeoDistanceIssue1301(t *testing.T) {
 		}
 	}
 
-	// Not setting "Field" for the following query is returning inconsistent
-	// results, when there's another field indexed which is numeric and both
-	// these fields are included within _all.
+	// Not setting "Field" for the following query, targets it against the _all
+	// field and this is returning inconsistent results, when there's another
+	// field indexed along with the geopoint which is numeric.
 	// As reported in: https://github.com/blevesearch/bleve/issues/1301
 	lat, lon := 22.371154, 114.112603
 	q := NewGeoDistanceQuery(lon, lat, "1km")
