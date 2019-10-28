@@ -1594,3 +1594,48 @@ func TestSearchScoreNone(t *testing.T) {
 		t.Fatal("unexpected score for the hit")
 	}
 }
+
+func TestGeoDistanceIssue1301(t *testing.T) {
+	shopMapping := NewDocumentMapping()
+	shopMapping.AddFieldMappingsAt("GEO", NewGeoPointFieldMapping())
+	shopIndexMapping := NewIndexMapping()
+	shopIndexMapping.DefaultMapping = shopMapping
+
+	idx, err := NewUsing("testidx", shopIndexMapping, scorch.Name, Config.DefaultKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	for i, g := range []string{"wecpkbeddsmf", "wecpk8tne453", "wecpkb80s09t"} {
+		if err = idx.Index(strconv.Itoa(i), map[string]interface{}{
+			"ID":  i,
+			"GEO": g,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Not setting "Field" for the following query is returning inconsistent
+	// results, when there's another field indexed which is numeric and both
+	// these fields are included within _all.
+	// As reported in: https://github.com/blevesearch/bleve/issues/1301
+	lat, lon := 22.371154, 114.112603
+	q := NewGeoDistanceQuery(lon, lat, "1km")
+
+	req := NewSearchRequest(q)
+	sr, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if sr.Total != 3 {
+		t.Fatalf("Size expected: 3, actual %d\n", sr.Total)
+	}
+}
