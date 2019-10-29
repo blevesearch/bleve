@@ -63,7 +63,8 @@ func almostEqual(a, b float64) bool {
 func buildPolygonFilter(dvReader index.DocValueReader, field string,
 	polygon []geo.Point) FilterFunc {
 	return func(d *search.DocumentMatch) bool {
-		var lon, lat float64
+		// check geo matches against all numeric type terms indexed
+		var lons, lats []float64
 		var found bool
 
 		err := dvReader.VisitDocValues(d.IndexInternalID, func(field string, term []byte) {
@@ -73,8 +74,8 @@ func buildPolygonFilter(dvReader index.DocValueReader, field string,
 			if err == nil && shift == 0 {
 				i64, err := prefixCoded.Int64()
 				if err == nil {
-					lon = geo.MortonUnhashLon(uint64(i64))
-					lat = geo.MortonUnhashLat(uint64(i64))
+					lons = append(lons, geo.MortonUnhashLon(uint64(i64)))
+					lats = append(lats, geo.MortonUnhashLat(uint64(i64)))
 					found = true
 				}
 			}
@@ -84,26 +85,29 @@ func buildPolygonFilter(dvReader index.DocValueReader, field string,
 		// the polygon. ie it might fail for certain points on the polygon boundaries.
 		if err == nil && found {
 			nVertices := len(polygon)
-			var inside bool
-			// check for a direct vertex match
-			if almostEqual(polygon[0].Lat, lat) &&
-				almostEqual(polygon[0].Lon, lon) {
-				return true
-			}
-
-			for i := 1; i < nVertices; i++ {
-				if almostEqual(polygon[i].Lat, lat) &&
-					almostEqual(polygon[i].Lon, lon) {
+			for i := range lons {
+				var inside bool
+				// check for a direct vertex match
+				if almostEqual(polygon[0].Lat, lats[i]) &&
+					almostEqual(polygon[0].Lon, lons[i]) {
 					return true
 				}
-				if (polygon[i].Lat > lat) != (polygon[i-1].Lat > lat) &&
-					lon < (polygon[i-1].Lon-polygon[i].Lon)*(lat-polygon[i].Lat)/
-						(polygon[i-1].Lat-polygon[i].Lat)+polygon[i].Lon {
-					inside = !inside
+
+				for j := 1; j < nVertices; j++ {
+					if almostEqual(polygon[j].Lat, lats[i]) &&
+						almostEqual(polygon[j].Lon, lons[i]) {
+						return true
+					}
+					if (polygon[j].Lat > lats[i]) != (polygon[j-1].Lat > lats[i]) &&
+						lons[i] < (polygon[j-1].Lon-polygon[j].Lon)*(lats[i]-polygon[j].Lat)/
+							(polygon[j-1].Lat-polygon[j].Lat)+polygon[j].Lon {
+						inside = !inside
+					}
+				}
+				if inside {
+					return true
 				}
 			}
-			return inside
-
 		}
 		return false
 	}
