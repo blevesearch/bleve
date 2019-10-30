@@ -83,7 +83,7 @@ func boxSearcher(indexReader index.IndexReader,
 		return boxSearcher, nil
 	}
 
-	// build geoboundinggox searcher for that bounding box
+	// build geoboundingbox searcher for that bounding box
 	boxSearcher, err := NewGeoBoundingBoxSearcher(indexReader,
 		topLeftLon, bottomRightLat, bottomRightLon, topLeftLat, field, boost,
 		options, checkBoundaries)
