@@ -62,7 +62,7 @@ func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 		}, nil
 	case "random":
 		return &SortRandom{
-			Rand: rand.New(rand.NewSource(time.Now().Unix())),
+			Rand: rand.New(rand.NewSource(time.Now().UnixNano())),
 		}, nil
 	case "geo_distance":
 		field, ok := input["field"].(string)
@@ -161,7 +161,7 @@ func ParseSearchSortString(input string) SearchSort {
 		}
 	} else if input == "_random" {
 		return &SortRandom{
-			Rand: rand.New(rand.NewSource(time.Now().Unix())),
+			Rand: rand.New(rand.NewSource(time.Now().UnixNano())),
 		}
 	}
 	return &SortField{
