@@ -553,10 +553,11 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 			}
 		}()
 		for segmentID, path := range newSegmentPaths {
-			newSegments[segmentID], err = zap.Open(path)
+			seg, err := zap.Open(path)
 			if err != nil {
 				return fmt.Errorf("error opening new segment at %s, %v", path, err)
 			}
+			newSegments[segmentID] = seg
 		}
 
 		persist := &persistIntroduction{
