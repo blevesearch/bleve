@@ -30,6 +30,8 @@ import (
 
 func (s *Scorch) mergerLoop() {
 	var lastEpochMergePlanned uint64
+	var activeMergeOptions *mergeplan.MergePlanOptions
+	var kickMsg *mergerKick
 	mergePlannerOptions, err := s.parseMergePlannerOptions()
 	if err != nil {
 		s.fireAsyncError(fmt.Errorf("mergePlannerOption json parsing err: %v", err))
@@ -54,11 +56,17 @@ OUTER:
 			atomic.StoreUint64(&s.iStats.mergeEpoch, ourSnapshot.epoch)
 			s.rootLock.Unlock()
 
-			if ourSnapshot.epoch != lastEpochMergePlanned {
+			if ourSnapshot.epoch != lastEpochMergePlanned || kickMsg != nil {
+				if kickMsg == nil {
+					activeMergeOptions = mergePlannerOptions
+				} else {
+					activeMergeOptions = kickMsg.moptions
+				}
+
 				startTime := time.Now()
 
 				// lets get started
-				err := s.planMergeAtSnapshot(ourSnapshot, mergePlannerOptions)
+				err := s.planMergeAtSnapshot(ourSnapshot, activeMergeOptions, (kickMsg != nil))
 				if err != nil {
 					atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
 					if err == segment.ErrClosed {
@@ -71,6 +79,12 @@ OUTER:
 					atomic.AddUint64(&s.stats.TotFileMergeLoopErr, 1)
 					continue OUTER
 				}
+
+				if kickMsg != nil {
+					close(kickMsg.doneCh)
+					kickMsg = nil
+				}
+
 				lastEpochMergePlanned = ourSnapshot.epoch
 
 				atomic.StoreUint64(&s.stats.LastMergedEpoch, ourSnapshot.epoch)
@@ -91,6 +105,8 @@ OUTER:
 			case <-s.closeCh:
 				break OUTER
 			case s.persisterNotifier <- ew:
+			case kickMsg = <-s.mergerKickCh:
+				continue OUTER
 			}
 
 			// now wait for persister (but also detect close)
@@ -98,6 +114,7 @@ OUTER:
 			case <-s.closeCh:
 				break OUTER
 			case <-ew.notifyCh:
+			case kickMsg = <-s.mergerKickCh:
 			}
 		}
 
@@ -129,8 +146,65 @@ func (s *Scorch) parseMergePlannerOptions() (*mergeplan.MergePlanOptions,
 	return &mergePlannerOptions, nil
 }
 
+type mergerKick struct {
+	moptions *mergeplan.MergePlanOptions
+	doneCh   chan struct{}
+}
+
+func (s *Scorch) RequestMerge(mo *mergeplan.MergePlanOptions) error {
+	// check whether force merge is already under processing
+	s.rootLock.Lock()
+	if atomic.LoadUint64(&s.stats.TotFileMergeForceOpsStarted) >
+		atomic.LoadUint64(&s.stats.TotFileMergeForceOpsCompleted) {
+		s.rootLock.Unlock()
+		return fmt.Errorf("compaction already in progress")
+	}
+	s.rootLock.Unlock()
+
+	go func() {
+		atomic.AddUint64(&s.stats.TotFileMergeForceOpsStarted, 1)
+		for {
+			msg := &mergerKick{moptions: mo, doneCh: make(chan struct{})}
+			// kick the merger
+			select {
+			case s.mergerKickCh <- msg:
+			case <-s.closeCh:
+				return
+			}
+			// stats before the merge cycle
+			totalNonePlans := atomic.LoadUint64(&s.stats.TotFileMergePlanNone)
+			totalOkPlans := atomic.LoadUint64(&s.stats.TotFileMergePlanOk)
+			totalBatchInro := atomic.LoadUint64(&s.stats.TotIntroducedSegmentsBatch)
+
+			// wait for the next merge loop completion
+			select {
+			case <-msg.doneCh:
+			case <-s.closeCh:
+				return
+			}
+			// with incoming mutations in place, bail out early than recursively
+			// applying the merge operations until the merge plan is met
+			// as that might turn out to be very resource intensive
+			if totalBatchInro != atomic.LoadUint64(&s.stats.TotIntroducedSegmentsBatch) {
+				atomic.AddUint64(&s.stats.TotFileMergeForceOpsSkipped, 1)
+				atomic.AddUint64(&s.stats.TotFileMergeForceOpsCompleted, 1)
+				return
+			}
+			// check whether merger has completed merging as per the given
+			// merge plan
+			if totalNonePlans != atomic.LoadUint64(&s.stats.TotFileMergePlanNone) &&
+				totalOkPlans == atomic.LoadUint64(&s.stats.TotFileMergePlanOk) {
+				atomic.AddUint64(&s.stats.TotFileMergeForceOpsCompleted, 1)
+				return
+			}
+		}
+	}()
+
+	return nil
+}
+
 func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
-	options *mergeplan.MergePlanOptions) error {
+	options *mergeplan.MergePlanOptions, forceCompact bool) error {
 	// build list of zap segments in this snapshot
 	var onlyZapSnapshots []mergeplan.Segment
 	for _, segmentSnapshot := range ourSnapshot.segment {
@@ -248,6 +322,10 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 			new:           seg,
 			notify:        make(chan *IndexSnapshot, 1),
 		}
+		if forceCompact {
+			sm.creator = "introduceForceMerge"
+		}
+
 		notifications = append(notifications, sm.notify)
 
 		// give it to the introducer
@@ -291,6 +369,7 @@ type segmentMerge struct {
 	oldNewDocNums map[uint64][]uint64
 	new           segment.Segment
 	notify        chan *IndexSnapshot
+	creator       string
 }
 
 // perform a merging of the given SegmentBase instances into a new,

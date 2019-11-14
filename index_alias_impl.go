@@ -44,6 +44,13 @@ func NewIndexAlias(indexes ...Index) *indexAliasImpl {
 	}
 }
 
+func (i *indexAliasImpl) Indexes() []Index {
+	i.mutex.RLock()
+	rv := i.indexes
+	i.mutex.RUnlock()
+	return rv
+}
+
 func (i *indexAliasImpl) isAliasToSingleIndex() error {
 	if len(i.indexes) < 1 {
 		return ErrorAliasEmpty
