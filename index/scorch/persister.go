@@ -100,6 +100,7 @@ func (s *Scorch) persisterLoop() {
 		return
 	}
 
+	var errBackoff time.Duration
 OUTER:
 	for {
 		atomic.AddUint64(&s.stats.TotPersistLoopBeg, 1)
@@ -157,11 +158,24 @@ OUTER:
 				// the retry attempt
 				unpersistedCallbacks = append(unpersistedCallbacks, ourPersistedCallbacks...)
 
-				s.fireAsyncError(fmt.Errorf("got err persisting snapshot: %v", err))
 				_ = ourSnapshot.DecRef()
 				atomic.AddUint64(&s.stats.TotPersistLoopErr, 1)
+
+				if errBackoff == 0 {
+					errBackoff = 500 * time.Millisecond
+				} else if errBackoff < 60*time.Second {
+					errBackoff *= 2
+				}
+				s.fireAsyncError(fmt.Errorf("err persisting snapshot: %v (waiting %v to try again)", err, errBackoff))
+				select {
+				case <-s.closeCh:
+					break OUTER
+				case <-time.After(errBackoff):
+				}
+
 				continue OUTER
 			}
+			errBackoff = 0
 
 			if unpersistedCallbacks != nil {
 				// in the event of this being a retry attempt for persisting a snapshot
