@@ -226,6 +226,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 			if err != nil {
 				s.unmarkIneligibleForRemoval(filename)
 				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
+				_ = os.Remove(path) // cleanup failed merge
 				return err
 			}
 			err = zap.ValidateMerge(segmentsToMerge, nil, docsToDrop, seg.(*zap.Segment))
@@ -328,6 +329,7 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	seg, err := zap.Open(path)
 	if err != nil {
 		atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
+		_ = os.Remove(path) // cleanup failed merge
 		return nil, 0, err
 	}
 	err = zap.ValidateMerge(nil, sbs, sbsDrops, seg.(*zap.Segment))
