@@ -71,8 +71,8 @@ OUTER:
 					atomic.AddUint64(&s.stats.TotFileMergeLoopErr, 1)
 
 					if errBackoff == 0 {
-						errBackoff = 500 * time.Millisecond
-					} else if errBackoff < 60*time.Second {
+						errBackoff = backoffMinimum
+					} else if errBackoff < backoffMaximum {
 						errBackoff *= 2
 					}
 					s.fireAsyncError(fmt.Errorf("merging err: %v (waiting %v to try again)", err, errBackoff))

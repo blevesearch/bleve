@@ -84,6 +84,11 @@ type persisterOptions struct {
 
 type notificationChan chan struct{}
 
+var (
+	backoffMinimum = 500*time.Millisecond
+	backoffMaximum = 1*time.Hour
+)
+
 func (s *Scorch) persisterLoop() {
 	defer s.asyncTasks.Done()
 
@@ -162,8 +167,8 @@ OUTER:
 				atomic.AddUint64(&s.stats.TotPersistLoopErr, 1)
 
 				if errBackoff == 0 {
-					errBackoff = 500 * time.Millisecond
-				} else if errBackoff < 60*time.Second {
+					errBackoff = backoffMinimum
+				} else if errBackoff < backoffMaximum {
 					errBackoff *= 2
 				}
 				s.fireAsyncError(fmt.Errorf("err persisting snapshot: %v (waiting %v to try again)", err, errBackoff))
