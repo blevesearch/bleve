@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/RoaringBitmap/roaring"
@@ -57,9 +58,20 @@ func Open(path string) (segment.Segment, error) {
 
 	var mm mmap.MMap
 	var mem []byte
-	if ptrSize == 8 {
-		// Skip mmap on 32-bit systems due to limited virtual address space
+	var skipMmap bool
+
+	if MmapMaxBytes > 0 {
+		if atomic.LoadInt64(&mmapCurrentBytes)+int64(mmSize) > MmapMaxBytes {
+			skipMmap = true
+		}
+	}
+	if !skipMmap {
 		mm, err = mmap.Map(f, mmap.RDONLY, 0)
+		if err == nil {
+			atomic.AddInt64(&mmapCurrentBytes, int64(mmSize))
+		} else if !MmapIgnoreErrors {
+			return nil, err
+		}
 	}
 	if mm != nil {
 		mem = mm[0 : mmSize-FooterSize]
@@ -492,6 +504,9 @@ func (s *Segment) Close() (err error) {
 func (s *Segment) closeActual() (err error) {
 	if s.mm != nil {
 		err = s.mm.Unmap()
+		if err == nil {
+			atomic.AddInt64(&mmapCurrentBytes, -int64(s.mmSize))
+		}
 	}
 	// try to close file even if unmap failed
 	if s.f != nil {

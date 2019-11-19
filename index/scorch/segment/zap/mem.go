@@ -17,7 +17,29 @@ package zap
 import (
 	"io"
 	"io/ioutil"
+	"sync/atomic"
 )
+
+var (
+	mmapCurrentBytes int64
+
+	// Ignore mmap failures and fallback to regular file access.
+	MmapIgnoreErrors bool
+
+	// Optional, maximum number of bytes to mmap before fallback to regular file access.
+	MmapMaxBytes int64
+)
+
+type zapStats struct {
+	// Total number of bytes mapped into memory with mmap.
+	MmapCurrentBytes int64
+}
+
+func Stats() zapStats {
+	return zapStats{
+		MmapCurrentBytes: atomic.LoadInt64(&mmapCurrentBytes),
+	}
+}
 
 func (s *SegmentBase) readMem(x, y uint64) []byte {
 	if s.mem == nil {
