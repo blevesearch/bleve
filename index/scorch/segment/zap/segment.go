@@ -32,16 +32,11 @@ import (
 	"github.com/golang/snappy"
 )
 
-var (
-	reflectStaticSizeSegmentBase int
-	ptrSize                      int
-)
+var reflectStaticSizeSegmentBase int
 
 func init() {
 	var sb SegmentBase
 	reflectStaticSizeSegmentBase = int(unsafe.Sizeof(sb))
-	var p *int
-	ptrSize = int(unsafe.Sizeof(p))
 }
 
 // Open returns a zap impl of a segment
