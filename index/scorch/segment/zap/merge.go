@@ -797,7 +797,7 @@ func (s *SegmentBase) copyStoredDocs(newDocNum uint64, newDocNumOffsets []uint64
 
 	storedOffset0New := uint64(w.Count())
 
-	storedBytes := s.mem[storedOffset0 : storedOffsetN+readN+metaLenN+dataLenN]
+	storedBytes := s.readMem(storedOffset0, storedOffsetN+readN+metaLenN+dataLenN)
 	_, err := w.Write(storedBytes)
 	if err != nil {
 		return err
@@ -806,7 +806,7 @@ func (s *SegmentBase) copyStoredDocs(newDocNum uint64, newDocNumOffsets []uint64
 	// remap the storedOffset's for the docs into new offsets relative
 	// to storedOffset0New, filling the given docNumOffsetsOut array
 	for indexOffset := indexOffset0; indexOffset <= indexOffsetN; indexOffset += 8 {
-		storedOffset := binary.BigEndian.Uint64(s.mem[indexOffset : indexOffset+8])
+		storedOffset := binary.BigEndian.Uint64(s.readMem(indexOffset, indexOffset+8))
 		storedOffsetNew := storedOffset - storedOffset0 + storedOffset0New
 		newDocNumOffsets[newDocNum] = storedOffsetNew
 		newDocNum += 1

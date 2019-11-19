@@ -96,9 +96,9 @@ func (s *SegmentBase) loadFieldDocValueReader(field string,
 	var numChunks, chunkOffsetsPosition uint64
 
 	if fieldDvLocEnd-fieldDvLocStart > 16 {
-		numChunks = binary.BigEndian.Uint64(s.mem[fieldDvLocEnd-8 : fieldDvLocEnd])
+		numChunks = binary.BigEndian.Uint64(s.readMem(fieldDvLocEnd-8, fieldDvLocEnd))
 		// read the length of chunk offsets
-		chunkOffsetsLen := binary.BigEndian.Uint64(s.mem[fieldDvLocEnd-16 : fieldDvLocEnd-8])
+		chunkOffsetsLen := binary.BigEndian.Uint64(s.readMem(fieldDvLocEnd-16, fieldDvLocEnd-8))
 		// acquire position of chunk offsets
 		chunkOffsetsPosition = (fieldDvLocEnd - 16) - chunkOffsetsLen
 	} else {
@@ -114,7 +114,7 @@ func (s *SegmentBase) loadFieldDocValueReader(field string,
 	// read the chunk offsets
 	var offset uint64
 	for i := 0; i < int(numChunks); i++ {
-		loc, read := binary.Uvarint(s.mem[chunkOffsetsPosition+offset : chunkOffsetsPosition+offset+binary.MaxVarintLen64])
+		loc, read := binary.Uvarint(s.readMem(chunkOffsetsPosition+offset, chunkOffsetsPosition+offset+binary.MaxVarintLen64))
 		if read <= 0 {
 			return nil, fmt.Errorf("corrupted chunk offset during segment load")
 		}
@@ -145,7 +145,7 @@ func (di *docValueReader) loadDvChunk(chunkNumber uint64, s *SegmentBase) error 
 	curChunkEnd += end
 
 	// read the number of docs reside in the chunk
-	numDocs, read := binary.Uvarint(s.mem[destChunkDataLoc : destChunkDataLoc+binary.MaxVarintLen64])
+	numDocs, read := binary.Uvarint(s.readMem(destChunkDataLoc, destChunkDataLoc+binary.MaxVarintLen64))
 	if read <= 0 {
 		return fmt.Errorf("failed to read the chunk")
 	}
@@ -158,15 +158,15 @@ func (di *docValueReader) loadDvChunk(chunkNumber uint64, s *SegmentBase) error 
 		di.curChunkHeader = di.curChunkHeader[:int(numDocs)]
 	}
 	for i := 0; i < int(numDocs); i++ {
-		di.curChunkHeader[i].DocNum, read = binary.Uvarint(s.mem[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
+		di.curChunkHeader[i].DocNum, read = binary.Uvarint(s.readMem(chunkMetaLoc+offset, chunkMetaLoc+offset+binary.MaxVarintLen64))
 		offset += uint64(read)
-		di.curChunkHeader[i].DocDvOffset, read = binary.Uvarint(s.mem[chunkMetaLoc+offset : chunkMetaLoc+offset+binary.MaxVarintLen64])
+		di.curChunkHeader[i].DocDvOffset, read = binary.Uvarint(s.readMem(chunkMetaLoc+offset, chunkMetaLoc+offset+binary.MaxVarintLen64))
 		offset += uint64(read)
 	}
 
 	compressedDataLoc := chunkMetaLoc + offset
 	dataLength := curChunkEnd - compressedDataLoc
-	di.curChunkData = s.mem[compressedDataLoc : compressedDataLoc+dataLength]
+	di.curChunkData = s.readMem(compressedDataLoc, compressedDataLoc+dataLength)
 	di.curChunkNum = chunkNumber
 	di.uncompressed = di.uncompressed[:0]
 	return nil
