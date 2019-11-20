@@ -35,6 +35,7 @@ type zapStats struct {
 	MmapCurrentBytes int64
 }
 
+// Stats returns memory usage details for open zap segments in this process.
 func Stats() zapStats {
 	return zapStats{
 		MmapCurrentBytes: atomic.LoadInt64(&mmapCurrentBytes),
