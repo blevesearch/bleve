@@ -18,6 +18,8 @@ import (
 	"io"
 	"io/ioutil"
 	"sync/atomic"
+
+	mmap "github.com/edsrzf/mmap-go"
 )
 
 var (
@@ -56,4 +58,39 @@ func (s *Segment) readMM(x, y int) []byte {
 		return data
 	}
 	return s.mm[x:y]
+}
+
+func (s *Segment) loadMmap() error {
+	if MmapMaxBytes > 0 &&
+		atomic.LoadInt64(&mmapCurrentBytes)+int64(s.mmSize) > MmapMaxBytes {
+		return nil
+	}
+
+	if s.mm != nil {
+		return nil
+	}
+
+	mm, err := mmap.Map(s.f, mmap.RDONLY, 0)
+	if err == nil {
+		atomic.AddInt64(&mmapCurrentBytes, int64(s.mmSize))
+	} else if MmapIgnoreErrors {
+		return nil
+	} else {
+		return err
+	}
+
+	s.mm = mm
+	s.SegmentBase.mem = mm[0 : s.mmSize-FooterSize]
+	return nil
+}
+
+func (s *Segment) unloadMmap() error {
+	if s.mm == nil {
+		return nil
+	}
+	err := s.mm.Unmap()
+	if err == nil {
+		atomic.AddInt64(&mmapCurrentBytes, -int64(s.mmSize))
+	}
+	return err
 }

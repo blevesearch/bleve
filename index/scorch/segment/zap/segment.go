@@ -21,7 +21,6 @@ import (
 	"io"
 	"os"
 	"sync"
-	"sync/atomic"
 	"unsafe"
 
 	"github.com/RoaringBitmap/roaring"
@@ -51,42 +50,26 @@ func Open(path string) (segment.Segment, error) {
 	}
 	mmSize := int(stat.Size())
 
-	var mm mmap.MMap
-	var mem []byte
-	var skipMmap bool
-
-	if MmapMaxBytes > 0 {
-		if atomic.LoadInt64(&mmapCurrentBytes)+int64(mmSize) > MmapMaxBytes {
-			skipMmap = true
-		}
-	}
-	if !skipMmap {
-		mm, err = mmap.Map(f, mmap.RDONLY, 0)
-		if err == nil {
-			atomic.AddInt64(&mmapCurrentBytes, int64(mmSize))
-		} else if !MmapIgnoreErrors {
-			return nil, err
-		}
-	}
-	if mm != nil {
-		mem = mm[0 : mmSize-FooterSize]
-	}
-
 	rv := &Segment{
 		SegmentBase: SegmentBase{
 			f:              f,
-			mem:            mem,
 			memSize:        mmSize - FooterSize,
 			fieldsMap:      make(map[string]uint16),
 			fieldDvReaders: make(map[uint16]*docValueReader),
 			fieldFSTs:      make(map[uint16]*vellum.FST),
 		},
 		f:      f,
-		mm:     mm,
 		mmSize: mmSize,
 		path:   path,
 		refs:   1,
 	}
+
+	err = rv.loadMmap()
+	if err != nil {
+		_ = rv.Close()
+		return nil, err
+	}
+
 	rv.SegmentBase.updateSize()
 
 	err = rv.loadConfig()
@@ -497,12 +480,8 @@ func (s *Segment) Close() (err error) {
 }
 
 func (s *Segment) closeActual() (err error) {
-	if s.mm != nil {
-		err = s.mm.Unmap()
-		if err == nil {
-			atomic.AddInt64(&mmapCurrentBytes, -int64(s.mmSize))
-		}
-	}
+	err = s.unloadMmap()
+
 	// try to close file even if unmap failed
 	if s.f != nil {
 		err2 := s.f.Close()
