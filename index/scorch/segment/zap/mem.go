@@ -37,6 +37,10 @@ type zapStats struct {
 	MmapCurrentBytes int64
 }
 
+type mmapOwner interface {
+	readMM(int64, int64) []byte
+}
+
 // Stats returns memory usage details for open zap segments in this process.
 func Stats() zapStats {
 	return zapStats{
@@ -46,15 +50,14 @@ func Stats() zapStats {
 
 func (s *SegmentBase) readMem(x, y uint64) []byte {
 	if s.mem == nil {
-		data, _ := ioutil.ReadAll(io.NewSectionReader(s.f, int64(x), int64(y-x)))
-		return data
+		return s.mmapOwner.readMM(int64(x), int64(y))
 	}
 	return s.mem[x:y]
 }
 
-func (s *Segment) readMM(x, y int) []byte {
+func (s *Segment) readMM(x, y int64) []byte {
 	if s.mm == nil {
-		data, _ := ioutil.ReadAll(io.NewSectionReader(s.f, int64(x), int64(y-x)))
+		data, _ := ioutil.ReadAll(io.NewSectionReader(s.f, x, y-x))
 		return data
 	}
 	return s.mm[x:y]

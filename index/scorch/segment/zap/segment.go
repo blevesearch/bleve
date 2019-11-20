@@ -48,12 +48,11 @@ func Open(path string) (segment.Segment, error) {
 	if err != nil {
 		return nil, err
 	}
-	mmSize := int(stat.Size())
+	mmSize := stat.Size()
 
 	rv := &Segment{
 		SegmentBase: SegmentBase{
-			f:              f,
-			memSize:        mmSize - FooterSize,
+			memSize:        int(mmSize - FooterSize),
 			fieldsMap:      make(map[string]uint16),
 			fieldDvReaders: make(map[uint16]*docValueReader),
 			fieldFSTs:      make(map[uint16]*vellum.FST),
@@ -63,6 +62,7 @@ func Open(path string) (segment.Segment, error) {
 		path:   path,
 		refs:   1,
 	}
+	rv.SegmentBase.mmapOwner = rv
 
 	err = rv.loadMmap()
 	if err != nil {
@@ -96,7 +96,7 @@ func Open(path string) (segment.Segment, error) {
 // SegmentBase is a memory only, read-only implementation of the
 // segment.Segment interface, using zap's data representation.
 type SegmentBase struct {
-	f                 *os.File
+	mmapOwner
 	mem               []byte
 	memSize           int
 	memCRC            uint32
@@ -157,7 +157,7 @@ type Segment struct {
 
 	f       *os.File
 	mm      mmap.MMap
-	mmSize  int
+	mmSize  int64
 	path    string
 	version uint32
 	crc     uint32
