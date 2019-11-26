@@ -32,7 +32,7 @@ type MergeOperator interface {
 	// DecodeMergeVal decodes a merged value.
 	DecodeMergedVal(val []byte) (uint64, error)
 
-	// Name returns an identifier for the operator. Try.
+	// Name returns an identifier for the operator
 	Name() string
 }
 
