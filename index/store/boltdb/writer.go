@@ -68,9 +68,22 @@ func (w *Writer) ExecuteBatch(batch store.KVBatch) (err error) {
 			err = fmt.Errorf("merge operator returned failure")
 			return
 		}
-		err = bucket.Put(kb, mergedVal)
+
+		var decodedVal uint64
+		decodedVal, err = w.store.mo.DecodeMergedVal(mergedVal)
 		if err != nil {
 			return
+		}
+
+		if decodedVal > 0 {
+			if err = bucket.Put(kb, mergedVal); err != nil {
+				return
+			}
+		} else {
+			// Delete the shared node when its count reaches 0.
+			if err = bucket.Delete(kb); err != nil {
+				return
+			}
 		}
 	}
 

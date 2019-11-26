@@ -16,6 +16,7 @@ package upsidedown
 
 import (
 	"log"
+	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -30,12 +31,23 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store/boltdb"
+	"github.com/blevesearch/bleve/index/store/goleveldb"
+	"github.com/blevesearch/bleve/index/store/gtreap"
 	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/registry"
 )
 
 var testAnalyzer = &analysis.Analyzer{
 	Tokenizer: regexpTokenizer.NewRegexpTokenizer(regexp.MustCompile(`\w+`)),
+}
+
+var gtreapTestConfig = map[string]interface{}{
+	"path": "",
+}
+
+var levelTestConfig = map[string]interface{}{
+	"path":              "test_dir",
+	"create_if_missing": true,
 }
 
 func TestIndexOpenReopen(t *testing.T) {
@@ -187,17 +199,41 @@ func TestIndexInsertThenDelete(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		if err := os.RemoveAll("test_dir"); err != nil {
+			t.Fatal(err)
+		}
 	}()
 
 	analysisQueue := index.NewAnalysisQueue(1)
-	idx, err := NewUpsideDownCouch(boltdb.Name, boltTestConfig, analysisQueue)
-	if err != nil {
-		t.Fatal(err)
+
+	tests := []struct {
+		desc string
+		idx  index.Index
+	}{
+		{
+			desc: "gtreap",
+			idx:  openIndex(t, gtreap.Name, gtreapTestConfig, analysisQueue),
+		},
+		{
+			desc: "boltdb",
+			idx:  openIndex(t, boltdb.Name, boltTestConfig, analysisQueue),
+		},
+		{
+			desc: "leveldb",
+			idx:  openIndex(t, goleveldb.Name, levelTestConfig, analysisQueue),
+		},
 	}
-	err = idx.Open()
-	if err != nil {
-		t.Errorf("error opening index: %v", err)
+
+	for _, test := range tests {
+		idx := test.idx
+		t.Run(test.desc, func(t *testing.T) {
+			testIndexInsertThenDelete(t, idx)
+		})
 	}
+}
+
+func testIndexInsertThenDelete(t *testing.T, idx index.Index) {
 	defer func() {
 		err := idx.Close()
 		if err != nil {
@@ -205,108 +241,77 @@ func TestIndexInsertThenDelete(t *testing.T) {
 		}
 	}()
 
-	var expectedCount uint64
-	reader, err := idx.Reader()
-	if err != nil {
-		t.Fatal(err)
-	}
-	docCount, err := reader.DocCount()
-	if err != nil {
-		t.Error(err)
-	}
-	if docCount != expectedCount {
-		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
-	}
-	err = reader.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	expectedCount := uint64(0)
+	validateDocCount(t, idx, expectedCount)
+	// 1 for version.
+	expectedRows := uint64(1)
+	validateRowCount(t, idx, expectedRows)
 
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
-	err = idx.Update(doc)
+	doc.AddField(document.NewTextField("name1", []uint64{}, []byte("test1")))
+	err := idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
+
 	expectedCount++
+	validateDocCount(t, idx, expectedCount)
+	// 1 for version, 1 for back-index, 2 for schema fields, 2 for terms, 2 for unique dictionary words.
+	expectedRows = 1 + 1 + 2 + 2 + 2
+	validateRowCount(t, idx, expectedRows)
 
 	doc2 := document.NewDocument("2")
 	doc2.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
+	doc2.AddField(document.NewTextField("name2", []uint64{}, []byte("test2")))
 	err = idx.Update(doc2)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
 	}
-	expectedCount++
 
-	reader, err = idx.Reader()
-	if err != nil {
-		t.Fatal(err)
-	}
-	docCount, err = reader.DocCount()
-	if err != nil {
-		t.Error(err)
-	}
-	if docCount != expectedCount {
-		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
-	}
-	err = reader.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	expectedCount++
+	validateDocCount(t, idx, expectedCount)
+	// 1 for version, 3 for schema fields, 2 for back-index, 4 for terms, and 3 for unique dictionary words.
+	expectedRows = 1 + 3 + 2 + 4 + 3
+	validateRowCount(t, idx, expectedRows)
 
 	err = idx.Delete("1")
 	if err != nil {
 		t.Errorf("Error deleting entry from index: %v", err)
 	}
 	expectedCount--
-
-	reader, err = idx.Reader()
-	if err != nil {
-		t.Fatal(err)
-	}
-	docCount, err = reader.DocCount()
-	if err != nil {
-		t.Error(err)
-	}
-	if docCount != expectedCount {
-		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
-	}
-	err = reader.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	validateDocCount(t, idx, expectedCount)
+	// 1 for version, 3 for schema fields, 1 for back-index, 2 for terms, and 2 for dictionary words in doc2.
+	// NOTE: This validates specially that "test" still exists after doc1 containing it is deleted; this is because
+	// doc2 still contains this word.
+	expectedRows = 1 + 3 + 1 + 2 + 2
+	validateRowCount(t, idx, expectedRows)
 
 	err = idx.Delete("2")
 	if err != nil {
 		t.Errorf("Error deleting entry from index: %v", err)
 	}
+
 	expectedCount--
+	validateDocCount(t, idx, expectedCount)
+	// 1 for version, 3 for schema fields.
+	expectedRows = 1 + 3
+	validateRowCount(t, idx, expectedRows)
 
-	reader, err = idx.Reader()
+	// Add back document 1
+	doc = document.NewDocument("1")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
+	doc.AddField(document.NewTextField("name1", []uint64{}, []byte("test1")))
+	err = idx.Update(doc)
 	if err != nil {
-		t.Fatal(err)
-	}
-	docCount, err = reader.DocCount()
-	if err != nil {
-		t.Error(err)
-	}
-	if docCount != expectedCount {
-		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
-	}
-	err = reader.Close()
-	if err != nil {
-		t.Fatal(err)
+		t.Errorf("Error updating index: %v", err)
 	}
 
-	// should have 2 rows (1 for version, 1 for schema field, 1 for dictionary row garbage)
-	expectedLength := uint64(1 + 1 + 1)
-	rowCount, err := idx.(*UpsideDownCouch).rowCount()
-	if err != nil {
-		t.Error(err)
-	}
-	if rowCount != expectedLength {
-		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
-	}
+	expectedCount++
+	validateDocCount(t, idx, expectedCount)
+	// 1 for version, 3 for schema fields, 1 for back-index, 2 for terms, and 2 for dictionary words in doc2.
+	expectedRows = 1 + 3 + 1 + 2 + 2
+	validateRowCount(t, idx, expectedRows)
 }
 
 func TestIndexInsertThenUpdate(t *testing.T) {
@@ -366,8 +371,10 @@ func TestIndexInsertThenUpdate(t *testing.T) {
 		t.Errorf("Error deleting entry from index: %v", err)
 	}
 
-	// should have 2 rows (1 for version, 1 for schema field, and 1 for the remaining term, and 2 for the term diciontary, and 1 for the back index entry)
-	expectedLength = uint64(1 + 1 + 1 + 2 + 1)
+	// should have 2 rows (1 for version, 1 for schema field, and 1 for the remaining term, and 1 for the term dictionary, and 1 for the back index entry)
+	// We expect a single dictionary word as the old dictionary word "test" is not longer present in document after update,
+	// and should be deleted.
+	expectedLength = uint64(1 + 1 + 1 + 1 + 1)
 	rowCount, err = idx.(*UpsideDownCouch).rowCount()
 	if err != nil {
 		t.Error(err)
@@ -1133,12 +1140,11 @@ func TestIndexUpdateComposites(t *testing.T) {
 		t.Errorf("expected field content 'test', got '%s'", string(textField.Value()))
 	}
 
-	// should have the same row count as before, plus 4 term dictionary garbage rows
-	expectedLength += 4
 	rowCount, err = idx.(*UpsideDownCouch).rowCount()
 	if err != nil {
 		t.Error(err)
 	}
+	// rowCount should stay the same as old dictionary rows are replaced with the new dictionary rows.
 	if rowCount != expectedLength {
 		t.Errorf("expected %d rows, got: %d", expectedLength, rowCount)
 	}
@@ -1492,4 +1498,53 @@ func TestIndexBatchPersistedCallbackWithErrorUpsideDown(t *testing.T) {
 		t.Fatal("expected callback to fire, it did not")
 	}
 
+}
+
+func openIndex(t *testing.T, storeName string, storeConfig map[string]interface{}, analysisQueue *index.AnalysisQueue) index.Index {
+	idx, err := NewUpsideDownCouch(storeName, storeConfig, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return idx
+}
+
+func validateDocCount(t *testing.T, idx index.Index, expected uint64) {
+	reader, err := idx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	docCount, err := reader.DocCount()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if docCount != expected {
+		t.Errorf("Expected document count to be %d got %d", expected, docCount)
+	}
+}
+
+func validateRowCount(t *testing.T, idx index.Index, expected uint64) {
+	rowCount, err := idx.(*UpsideDownCouch).rowCount()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if rowCount != expected {
+		t.Errorf("expected %d rows, got: %d", expected, rowCount)
+	}
 }

@@ -29,6 +29,9 @@ type MergeOperator interface {
 	// all processing until the FullMerge is done.
 	PartialMerge(key, leftOperand, rightOperand []byte) ([]byte, bool)
 
+	// DecodeMergeVal decodes a merged value.
+	DecodeMergedVal(val []byte) (uint64, error)
+
 	// Name returns an identifier for the operator
 	Name() string
 }

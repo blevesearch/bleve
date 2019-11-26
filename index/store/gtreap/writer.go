@@ -55,7 +55,18 @@ func (w *Writer) ExecuteBatch(batch store.KVBatch) error {
 		if !fullMergeOk {
 			return fmt.Errorf("merge operator returned failure")
 		}
-		w.s.t = w.s.t.Upsert(&Item{k: kb, v: mergedVal}, rand.Int())
+
+		decodedVal, err := w.s.mo.DecodeMergedVal(mergedVal)
+		if err != nil {
+			return err
+		}
+
+		if decodedVal > 0 {
+			w.s.t = w.s.t.Upsert(&Item{k: kb, v: mergedVal}, rand.Int())
+		} else {
+			// Delete the shared node when its count reaches 0.
+			w.s.t = w.s.t.Delete(&Item{k: kb})
+		}
 	}
 
 	for _, op := range emulatedBatch.Ops {
