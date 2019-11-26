@@ -38,7 +38,7 @@ type zapStats struct {
 }
 
 type mmapOwner interface {
-	readMM(start uint64, end uint64) []byte
+	readMM(start, end uint64) []byte
 }
 
 // Stats returns memory usage details for open zap segments in this process.
