@@ -58,7 +58,7 @@ func Open(path string) (segment.Segment, error) {
 			fieldFSTs:      make(map[uint16]*vellum.FST),
 		},
 		f:      f,
-		mmSize: mmSize,
+		mmSize: uint64(mmSize),
 		path:   path,
 		refs:   1,
 	}
@@ -157,7 +157,7 @@ type Segment struct {
 
 	f       *os.File
 	mm      mmap.MMap
-	mmSize  int64
+	mmSize  uint64
 	path    string
 	version uint32
 	crc     uint32
