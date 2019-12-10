@@ -77,6 +77,41 @@ func (s *Store) Writer() (store.KVWriter, error) {
 	return &Writer{s: s}, nil
 }
 
+// Compact removes DictionaryTerm entries with a count of zero.
+// This is a workaround for github issue #374.
+func (s *Store) Compact() (err error) {
+	kvreader, err := s.Reader()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if cerr := kvreader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	prefix := []byte("d")
+
+	s.m.Lock()
+	defer s.m.Unlock()
+	it := kvreader.PrefixIterator(prefix)
+	defer func() {
+		if cerr := it.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	for ; it.Valid(); it.Next() {
+		k, v, _ := it.Current()
+		if bytes.Equal(v, []byte{0}) {
+			s.t = s.t.Delete(&Item{k: k})
+		}
+	}
+
+	return
+}
+
 func init() {
 	registry.RegisterKVStore(Name, New)
 }

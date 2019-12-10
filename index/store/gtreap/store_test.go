@@ -15,6 +15,7 @@
 package gtreap
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/blevesearch/bleve/index/store"
@@ -90,4 +91,68 @@ func TestGTreapMerge(t *testing.T) {
 	s := open(t, &test.TestMergeCounter{})
 	defer cleanup(t, s)
 	test.CommonTestMerge(t, s)
+}
+
+func TestGTreapCompact(t *testing.T) {
+	s := open(t, nil)
+	defer cleanup(t, s)
+
+	writer, err := s.Writer()
+	if err != nil {
+		t.Error(err)
+	}
+
+	batch := writer.NewBatch()
+	// Should preserve non-dictionary row (key doesn't start with 'd').
+	batch.Set([]byte("a1"), []byte{0})
+	// Should delete for dictionary row with zero reference.
+	batch.Set([]byte("d1"), []byte{0})
+	batch.Set([]byte("d2"), []byte{0})
+	// Should preserve for dictionary row with non-zero reference.
+	batch.Set([]byte("d3"), []byte{1})
+
+	err = writer.ExecuteBatch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = writer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	validate(t, s, []byte("a1"), []byte{0})
+	validate(t, s, []byte("d1"), []byte{0})
+	validate(t, s, []byte("d2"), []byte{0})
+	validate(t, s, []byte("d3"), []byte{1})
+
+	if err := s.(*Store).Compact(); err != nil {
+		t.Fatal(err)
+	}
+
+	validate(t, s, []byte("a1"), []byte{0})
+	validate(t, s, []byte("d1"), nil)
+	validate(t, s, []byte("d2"), nil)
+	validate(t, s, []byte("d3"), []byte{1})
+}
+
+func validate(t *testing.T, s store.KVStore, key []byte, value []byte) {
+	reader, err := s.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	got, err := reader.Get(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, value) {
+		t.Errorf("key %v value got %v, want %v", string(key), got, value)
+	}
 }
