@@ -212,8 +212,7 @@ OUTER:
 		case s.introducerNotifier <- w:
 		}
 
-		forceCompact := s.isForceCompacted(ourSnapshot)
-		s.removeOldData(forceCompact) // might as well cleanup while waiting
+		s.removeOldData(s.getNumSnapshotsToKeep(ourSnapshot)) // might as well cleanup while waiting
 
 		atomic.AddUint64(&s.stats.TotPersistLoopWait, 1)
 
@@ -246,14 +245,12 @@ func notifyMergeWatchers(lastPersistedEpoch uint64,
 	return watchersNext
 }
 
-func (s *Scorch) isForceCompacted(ourSnapshot *IndexSnapshot) bool {
-	var rv bool
-	if ourSnapshot != nil {
-		s.rootLock.RLock()
-		rv = ourSnapshot.creator == "introduceForceMerge"
-		s.rootLock.RUnlock()
+func (s *Scorch) getNumSnapshotsToKeep(ourSnapshot *IndexSnapshot) int {
+	if ourSnapshot != nil &&
+		ourSnapshot.creator != forceMergeCreator {
+		return s.numSnapshotsToKeep
 	}
-	return rv
+	return 1
 }
 
 func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
@@ -290,7 +287,7 @@ func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
 	// 1. Too many older snapshots awaiting the clean up.
 	// 2. The merger could be lagging behind on merging the disk files.
 	if numFilesOnDisk > uint64(po.PersisterNapUnderNumFiles) {
-		s.removeOldData(false)
+		s.removeOldData(s.numSnapshotsToKeep)
 		numFilesOnDisk, _, _ = s.diskFileStats(nil)
 	}
 
@@ -780,8 +777,8 @@ func (p uint64Descending) Len() int           { return len(p) }
 func (p uint64Descending) Less(i, j int) bool { return p[i] > p[j] }
 func (p uint64Descending) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
-func (s *Scorch) removeOldData(forceCompact bool) {
-	removed, err := s.removeOldBoltSnapshots(forceCompact)
+func (s *Scorch) removeOldData(numSnapshotsToKeep int) {
+	removed, err := s.removeOldBoltSnapshots(numSnapshotsToKeep)
 	if err != nil {
 		s.fireAsyncError(fmt.Errorf("got err removing old bolt snapshots: %v", err))
 	}
@@ -800,16 +797,13 @@ var NumSnapshotsToKeep = 1
 
 // Removes enough snapshots from the rootBolt so that the
 // s.eligibleForRemoval stays under the NumSnapshotsToKeep policy.
-func (s *Scorch) removeOldBoltSnapshots(forceCompact bool) (numRemoved int, err error) {
+func (s *Scorch) removeOldBoltSnapshots(numSnapshotsToKeep int) (
+	numRemoved int, err error) {
 	persistedEpochs, err := s.RootBoltSnapshotEpochs()
 	if err != nil {
 		return 0, err
 	}
 
-	numSnapshotsToKeep := s.numSnapshotsToKeep
-	if forceCompact {
-		numSnapshotsToKeep = 1
-	}
 	if len(persistedEpochs) <= numSnapshotsToKeep {
 		// we need to keep everything
 		return 0, nil

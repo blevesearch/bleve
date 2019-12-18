@@ -79,7 +79,7 @@ type Scorch struct {
 
 	pauseCount uint64
 
-	mergerKickCh chan *mergerKick
+	mergerKickCh chan *mergerCtrl
 }
 
 type internalStats struct {
@@ -103,7 +103,7 @@ func NewScorch(storeName string,
 		nextSnapshotEpoch:    1,
 		closeCh:              make(chan struct{}),
 		ineligibleForRemoval: map[string]bool{},
-		mergerKickCh:         make(chan *mergerKick, 1),
+		mergerKickCh:         make(chan *mergerCtrl, 1),
 	}
 	rv.root = &IndexSnapshot{parent: rv, refs: 1, creator: "NewScorch"}
 	ro, ok := config["read_only"].(bool)

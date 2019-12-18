@@ -28,16 +28,18 @@ import (
 	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 )
 
+var forceMergeCreator = "introduceForceMerge"
+
 func (s *Scorch) mergerLoop() {
 	var lastEpochMergePlanned uint64
-	var activeMergeOptions *mergeplan.MergePlanOptions
-	var kickMsg *mergerKick
+	var ctrlMsg *mergerCtrl
 	mergePlannerOptions, err := s.parseMergePlannerOptions()
 	if err != nil {
 		s.fireAsyncError(fmt.Errorf("mergePlannerOption json parsing err: %v", err))
 		s.asyncTasks.Done()
 		return
 	}
+	ctrlMsgDflt := &mergerCtrl{options: mergePlannerOptions, doneCh: nil}
 
 OUTER:
 	for {
@@ -56,17 +58,15 @@ OUTER:
 			atomic.StoreUint64(&s.iStats.mergeEpoch, ourSnapshot.epoch)
 			s.rootLock.Unlock()
 
-			if ourSnapshot.epoch != lastEpochMergePlanned || kickMsg != nil {
-				if kickMsg == nil {
-					activeMergeOptions = mergePlannerOptions
-				} else {
-					activeMergeOptions = kickMsg.moptions
-				}
-
+			if ctrlMsg == nil && ourSnapshot.epoch != lastEpochMergePlanned {
+				ctrlMsg = ctrlMsgDflt
+			}
+			if ctrlMsg != nil {
 				startTime := time.Now()
 
 				// lets get started
-				err := s.planMergeAtSnapshot(ourSnapshot, activeMergeOptions, (kickMsg != nil))
+				err := s.planMergeAtSnapshot(ourSnapshot, ctrlMsg.options,
+					ctrlMsg.creator)
 				if err != nil {
 					atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
 					if err == segment.ErrClosed {
@@ -80,10 +80,11 @@ OUTER:
 					continue OUTER
 				}
 
-				if kickMsg != nil {
-					close(kickMsg.doneCh)
-					kickMsg = nil
+				if ctrlMsg.doneCh != nil {
+					close(ctrlMsg.doneCh)
 				}
+
+				ctrlMsg = nil
 
 				lastEpochMergePlanned = ourSnapshot.epoch
 
@@ -105,7 +106,7 @@ OUTER:
 			case <-s.closeCh:
 				break OUTER
 			case s.persisterNotifier <- ew:
-			case kickMsg = <-s.mergerKickCh:
+			case ctrlMsg = <-s.mergerKickCh:
 				continue OUTER
 			}
 
@@ -114,7 +115,7 @@ OUTER:
 			case <-s.closeCh:
 				break OUTER
 			case <-ew.notifyCh:
-			case kickMsg = <-s.mergerKickCh:
+			case ctrlMsg = <-s.mergerKickCh:
 			}
 		}
 
@@ -146,25 +147,39 @@ func (s *Scorch) parseMergePlannerOptions() (*mergeplan.MergePlanOptions,
 	return &mergePlannerOptions, nil
 }
 
-type mergerKick struct {
-	moptions *mergeplan.MergePlanOptions
-	doneCh   chan struct{}
+type mergerCtrl struct {
+	creator string
+	options *mergeplan.MergePlanOptions
+	doneCh  chan struct{}
 }
 
-func (s *Scorch) RequestMerge(mo *mergeplan.MergePlanOptions) error {
+func (s *Scorch) RequestMerge(mo *mergeplan.MergePlanOptions,
+	doneCh chan struct{}) error {
 	// check whether force merge is already under processing
-	s.rootLock.Lock()
 	if atomic.LoadUint64(&s.stats.TotFileMergeForceOpsStarted) >
 		atomic.LoadUint64(&s.stats.TotFileMergeForceOpsCompleted) {
-		s.rootLock.Unlock()
+		if doneCh != nil {
+			close(doneCh)
+		}
 		return fmt.Errorf("compaction already in progress")
 	}
-	s.rootLock.Unlock()
 
 	go func() {
+		defer func() {
+			// doneCh for the caller to track the async merge completion
+			if doneCh != nil {
+				close(doneCh)
+			}
+		}()
+
+		if atomic.LoadUint64(&s.stats.TotFileMergeForceOpsStarted) >
+			atomic.LoadUint64(&s.stats.TotFileMergeForceOpsCompleted) {
+			return
+		}
 		atomic.AddUint64(&s.stats.TotFileMergeForceOpsStarted, 1)
 		for {
-			msg := &mergerKick{moptions: mo, doneCh: make(chan struct{})}
+			msg := &mergerCtrl{creator: forceMergeCreator,
+				options: mo, doneCh: make(chan struct{})}
 			// kick the merger
 			select {
 			case s.mergerKickCh <- msg:
@@ -204,7 +219,7 @@ func (s *Scorch) RequestMerge(mo *mergeplan.MergePlanOptions) error {
 }
 
 func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
-	options *mergeplan.MergePlanOptions, forceCompact bool) error {
+	options *mergeplan.MergePlanOptions, creator string) error {
 	// build list of zap segments in this snapshot
 	var onlyZapSnapshots []mergeplan.Segment
 	for _, segmentSnapshot := range ourSnapshot.segment {
@@ -321,11 +336,8 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 			oldNewDocNums: oldNewDocNums,
 			new:           seg,
 			notify:        make(chan *IndexSnapshot, 1),
+			creator:       creator,
 		}
-		if forceCompact {
-			sm.creator = "introduceForceMerge"
-		}
-
 		notifications = append(notifications, sm.notify)
 
 		// give it to the introducer

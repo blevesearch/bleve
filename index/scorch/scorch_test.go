@@ -32,6 +32,7 @@ import (
 	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizer/regexp"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/scorch/mergeplan"
 	"github.com/blevesearch/bleve/mapping"
 )
 
@@ -2009,5 +2010,116 @@ func TestAllFieldWithDifferentTermVectorsEnabled(t *testing.T) {
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
+	}
+}
+
+func TestIndexForceMerge(t *testing.T) {
+	cfg := CreateConfig("TestIndexBatch")
+	err := InitTest(cfg)
+	tmp := struct {
+		MaxSegmentsPerTier   int   `json:"maxSegmentsPerTier"`
+		SegmentsPerMergeTask int   `json:"segmentsPerMergeTask"`
+		FloorSegmentSize     int64 `json:"floorSegmentSize"`
+	}{
+		int(1),
+		int(1),
+		int64(2),
+	}
+	cfg["scorchMergePlanOptions"] = &tmp
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Fatalf("error opening index: %v", err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var expectedCount uint64
+	batch := index.NewBatch()
+	for i := 0; i < 10; i++ {
+		doc := document.NewDocument(fmt.Sprintf("doc1-%d", i))
+		doc.AddField(document.NewTextField("name", []uint64{}, []byte(fmt.Sprintf("text1-%d", i))))
+		batch.Update(doc)
+		doc = document.NewDocument(fmt.Sprintf("doc2-%d", i))
+		doc.AddField(document.NewTextField("name", []uint64{}, []byte(fmt.Sprintf("text2-%d", i))))
+		batch.Update(doc)
+		err = idx.Batch(batch)
+		if err != nil {
+			t.Error(err)
+		}
+		batch.Reset()
+		expectedCount += 2
+	}
+
+	// verify doc count
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	docCount, err := indexReader.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+	err = indexReader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// verify segment count
+	if ns, ok := idx.StatsMap()["TotFileSegmentsAtRoot"].(uint64); ok &&
+		ns != 10 {
+		t.Errorf("expected 10 root file segments, got: %d", ns)
+	}
+
+	doneCh := make(chan struct{})
+	if si, ok := idx.(*Scorch); ok {
+		err := si.RequestMerge(&mergeplan.MergePlanOptions{
+			MaxSegmentsPerTier:   1,
+			MaxSegmentSize:       10000,
+			SegmentsPerMergeTask: 100,
+			FloorSegmentSize:     10000,
+		}, doneCh)
+		if err != nil {
+			t.Errorf("RequestMerge failed, err: %v", err)
+		}
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// wait until the forceMerge is complete
+		select {
+		case <-doneCh:
+		}
+	}()
+	wg.Wait()
+
+	// verify the final root segment count
+	if ns, ok := idx.StatsMap()["TotFileSegmentsAtRoot"].(uint64); ok &&
+		ns != 1 {
+		t.Errorf("expected a single root file segments, got: %d", ns)
 	}
 }
