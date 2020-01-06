@@ -93,6 +93,68 @@ func TestLithuanianAnalyzer(t *testing.T) {
 				},
 			},
 		},
+		{
+			input: []byte("Visą savaitę prognozuojami klastingi reiškiniai"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("vis"),
+				},
+				&analysis.Token{
+					Term: []byte("savait"),
+				},
+				&analysis.Token{
+					// verb. "prognozuo-ti"
+					Term: []byte("prognozuo"),
+				},
+				&analysis.Token{
+					Term: []byte("klast"),
+				},
+				&analysis.Token{
+					Term: []byte("reiškin"),
+				},
+			},
+		},
+		{
+			input: []byte("Susirgęs Arūnas gyvenimui pasirinko šalį, kurioje įteisinta eutanazija: silpsta visos jo organizmo funkcijos"),
+			output: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("susirg"),
+				},
+				&analysis.Token{
+					Term: []byte("arūn"),
+				},
+				&analysis.Token{
+					Term: []byte("gyvenim"),
+				},
+				&analysis.Token{
+					Term: []byte("pasirink"),
+				},
+				&analysis.Token{
+					Term: []byte("šal"),
+				},
+				&analysis.Token{
+					Term: []byte("kur"),
+				},
+				&analysis.Token{
+					Term: []byte("įteis"),
+				},
+				&analysis.Token{
+					Term: []byte("eutanazij"),
+				},
+				&analysis.Token{
+					Term: []byte("silpst"),
+				},
+				&analysis.Token{
+					Term: []byte("vis"),
+				},
+				&analysis.Token{
+					Term: []byte("organizm"),
+				},
+				&analysis.Token{
+					Term: []byte("funkcij"),
+				},
+			},
+		},
 	}
 
 	cache := registry.NewCache()

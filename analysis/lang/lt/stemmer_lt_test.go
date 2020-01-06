@@ -51,6 +51,19 @@ func TestSnowballLithuanianStemmer(t *testing.T) {
 				},
 			},
 		},
+		{
+			input: analysis.TokenStream{
+				&analysis.Token{
+					Term: []byte("prognozuojami"),
+				},
+			},
+			output: analysis.TokenStream{
+				&analysis.Token{
+					// verb. "prognozuo-ti"
+					Term: []byte("prognozuo"),
+				},
+			},
+		},
 	}
 
 	cache := registry.NewCache()
