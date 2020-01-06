@@ -85,8 +85,17 @@ func buildPolygonFilter(dvReader index.DocValueReader, field string,
 		// the polygon. ie it might fail for certain points on the polygon boundaries.
 		if err == nil && found {
 			nVertices := len(polygon)
+			if len(polygon) < 3 {
+				return false
+			}
+			rayIntersectsSegment := func(point, a, b geo.Point) bool {
+				return (a.Lat > point.Lat) != (b.Lat > point.Lat) &&
+					point.Lon < (b.Lon-a.Lon)*(point.Lat-a.Lat)/(b.Lat-a.Lat)+a.Lon
+			}
+
 			for i := range lons {
-				var inside bool
+				pt := geo.Point{Lon: lons[i], Lat: lats[i]}
+				inside := rayIntersectsSegment(pt, polygon[len(polygon)-1], polygon[0])
 				// check for a direct vertex match
 				if almostEqual(polygon[0].Lat, lats[i]) &&
 					almostEqual(polygon[0].Lon, lons[i]) {
@@ -98,9 +107,7 @@ func buildPolygonFilter(dvReader index.DocValueReader, field string,
 						almostEqual(polygon[j].Lon, lons[i]) {
 						return true
 					}
-					if (polygon[j].Lat > lats[i]) != (polygon[j-1].Lat > lats[i]) &&
-						lons[i] < (polygon[j-1].Lon-polygon[j].Lon)*(lats[i]-polygon[j].Lat)/
-							(polygon[j-1].Lat-polygon[j].Lat)+polygon[j].Lon {
+					if rayIntersectsSegment(pt, polygon[j-1], polygon[j]) {
 						inside = !inside
 					}
 				}
