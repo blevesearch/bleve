@@ -119,8 +119,9 @@ func TestGeoRectanglePolygon(t *testing.T) {
 		field   string
 		want    []string
 	}{
-		{[]geo.Point{{Lon: 0.001, Lat: 0.001}, {Lon: 85.002, Lat: 38.002}}, "loc",
-			[]string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}},
+		{[]geo.Point{{Lon: 0, Lat: 0}, {Lon: 0, Lat: 50}, {Lon: 50, Lat: 50}, {Lon: 50, Lat: 0}, {Lon: 0, Lat: 0}}, "loc",
+			[]string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"},
+		},
 	}
 
 	i := setupGeo(t)
