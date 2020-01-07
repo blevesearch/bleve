@@ -314,3 +314,93 @@ func setupGeoPolygonPoints(t *testing.T) index.Index {
 
 	return i
 }
+
+type geoPoint struct {
+	title string
+	lon   float64
+	lat   float64
+}
+
+// Test points inside a complex self intersecting polygon
+func TestComplexGeoPolygons(t *testing.T) {
+
+	tests := []struct {
+		polygon []geo.Point
+		points  []geoPoint
+		field   string
+		want    []string
+	}{
+		/*
+			 /\      /\
+			/__\____/__\
+			    \  /
+			     \/
+		*/
+		// a, b, c - inside and d - on vertices.
+		{[]geo.Point{{Lon: 6.0, Lat: 2.0}, {Lon: 3.0, Lat: 4.0}, {Lon: 9.0, Lat: 6.0},
+			{Lon: 3.0, Lat: 8.0}, {Lon: 6.0, Lat: 10.0}, {Lon: 6.0, Lat: 2.0}},
+			[]geoPoint{{title: "a", lon: 3, lat: 4}, {title: "b", lon: 7, lat: 6}, {title: "c", lon: 4, lat: 8.1},
+				{title: "d", lon: 6, lat: 10.0}, {title: "e", lon: 5, lat: 6}, {title: "f", lon: 7, lat: 5}},
+			"loc", []string{"a", "b", "c", "d"}},
+		/*
+			____
+			\  /
+			 \/
+			 /\
+			/__\
+		*/
+		{[]geo.Point{{Lon: 7.0, Lat: 2.0}, {Lon: 1.0, Lat: 8.0}, {Lon: 1.0, Lat: 2.0},
+			{Lon: 7.0, Lat: 8.0}, {Lon: 7.0, Lat: 2.0}},
+			[]geoPoint{{title: "a", lon: 6, lat: 5}, {title: "b", lon: 5, lat: 5}, {title: "c", lon: 3, lat: 5.0},
+				{title: "d", lon: 2, lat: 4.0}, {title: "e", lon: 5, lat: 3}, {title: "f", lon: 4, lat: 4}},
+			"loc", []string{"a", "b", "c", "d"}},
+	}
+
+	for _, test := range tests {
+		i := setupComplexGeoPolygonPoints(t, test.points)
+		indexReader, err := i.Reader()
+		if err != nil {
+			t.Error(err)
+		}
+		got, err := testGeoPolygonSearch(indexReader, test.polygon, test.field)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("expected %v, got %v for polygon: %+v", test.want, got, test.polygon)
+		}
+		err = indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func setupComplexGeoPolygonPoints(t *testing.T, points []geoPoint) index.Index {
+	analysisQueue := index.NewAnalysisQueue(1)
+	i, err := upsidedown.NewUpsideDownCouch(
+		gtreap.Name,
+		map[string]interface{}{
+			"path": "",
+		},
+		analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, point := range points {
+		err = i.Update(&document.Document{
+			ID: point.title,
+			Fields: []document.Field{
+				document.NewGeoPointField("loc", []uint64{}, point.lon, point.lat),
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return i
+}

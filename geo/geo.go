@@ -39,8 +39,8 @@ var latScale = float64((uint64(0x1)<<GeoBits)-1) / 180.0
 
 // Point represents a geo point.
 type Point struct {
-	Lon float64
-	Lat float64
+	Lon float64 `json:"lon"`
+	Lat float64 `json:"lat"`
 }
 
 // MortonHash computes the morton hash value for the provided geo point
