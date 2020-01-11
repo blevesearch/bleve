@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"fmt"
 	"github.com/blevesearch/bleve/geo"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/numeric"
@@ -25,6 +26,10 @@ import (
 func NewGeoBoundedPolygonSearcher(indexReader index.IndexReader,
 	polygon []geo.Point, field string, boost float64,
 	options search.SearcherOptions) (search.Searcher, error) {
+
+	if len(polygon) < 3 {
+		return nil, fmt.Errorf("Too few points specified for the polygon boundary")
+	}
 
 	// compute the bounding box enclosing the polygon
 	topLeftLon, topLeftLat, bottomRightLon, bottomRightLat, err :=
