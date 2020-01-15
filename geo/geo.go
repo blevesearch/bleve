@@ -37,6 +37,8 @@ var geoTolerance = 1E-6
 var lonScale = float64((uint64(0x1)<<GeoBits)-1) / 360.0
 var latScale = float64((uint64(0x1)<<GeoBits)-1) / 180.0
 
+var geoHashMaxLength = 12
+
 // Point represents a geo point.
 type Point struct {
 	Lon float64 `json:"lon"`
