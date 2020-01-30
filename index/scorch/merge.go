@@ -161,8 +161,10 @@ func (s *Scorch) RequestMerge(mo *mergeplan.MergePlanOptions,
 		if doneCh != nil {
 			close(doneCh)
 		}
-		return fmt.Errorf("compaction already in progress")
+		return fmt.Errorf("force merge already in progress")
 	}
+
+	errCh := make(chan error, 1)
 
 	go func() {
 		defer func() {
@@ -172,11 +174,17 @@ func (s *Scorch) RequestMerge(mo *mergeplan.MergePlanOptions,
 			}
 		}()
 
-		if atomic.LoadUint64(&s.stats.TotFileMergeForceOpsStarted) >
-			atomic.LoadUint64(&s.stats.TotFileMergeForceOpsCompleted) {
+		s.rootLock.Lock()
+		if s.stats.TotFileMergeForceOpsStarted >
+			s.stats.TotFileMergeForceOpsCompleted {
+			errCh <- fmt.Errorf("force merge already in progress")
+			s.rootLock.Unlock()
 			return
 		}
-		atomic.AddUint64(&s.stats.TotFileMergeForceOpsStarted, 1)
+		s.stats.TotFileMergeForceOpsStarted++
+		close(errCh)
+		s.rootLock.Unlock()
+
 		for {
 			msg := &mergerCtrl{creator: forceMergeCreator,
 				options: mo, doneCh: make(chan struct{})}
@@ -214,6 +222,12 @@ func (s *Scorch) RequestMerge(mo *mergeplan.MergePlanOptions,
 			}
 		}
 	}()
+
+	// look for any raciness errors
+	if err, found := <-errCh; found {
+		close(errCh)
+		return err
+	}
 
 	return nil
 }
