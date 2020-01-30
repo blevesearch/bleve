@@ -247,7 +247,7 @@ func notifyMergeWatchers(lastPersistedEpoch uint64,
 
 func (s *Scorch) getNumSnapshotsToKeep(ourSnapshot *IndexSnapshot) int {
 	if ourSnapshot != nil &&
-		ourSnapshot.creator != forceMergeCreator {
+		ourSnapshot.creator != numSnapShotsToKeepOverRuler {
 		return s.numSnapshotsToKeep
 	}
 	return 1

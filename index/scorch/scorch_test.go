@@ -2095,12 +2095,13 @@ func TestIndexForceMerge(t *testing.T) {
 
 	doneCh := make(chan struct{})
 	if si, ok := idx.(*Scorch); ok {
-		err := si.RequestMerge(&mergeplan.MergePlanOptions{
-			MaxSegmentsPerTier:   1,
-			MaxSegmentSize:       10000,
-			SegmentsPerMergeTask: 100,
-			FloorSegmentSize:     10000,
-		}, doneCh)
+		err := si.RequestMerge(&MergeRequest{
+			MergeOptions: &mergeplan.MergePlanOptions{
+				MaxSegmentsPerTier:   1,
+				MaxSegmentSize:       10000,
+				SegmentsPerMergeTask: 100,
+				FloorSegmentSize:     10000},
+			DoneCh: doneCh, OverrideNumSnapshotsToKeep: true})
 		if err != nil {
 			t.Errorf("RequestMerge failed, err: %v", err)
 		}

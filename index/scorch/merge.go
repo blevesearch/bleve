@@ -28,7 +28,7 @@ import (
 	"github.com/blevesearch/bleve/index/scorch/segment/zap"
 )
 
-var forceMergeCreator = "introduceForceMerge"
+var numSnapShotsToKeepOverRuler = "introduceForceMerge"
 
 func (s *Scorch) mergerLoop() {
 	var lastEpochMergePlanned uint64
@@ -153,41 +153,54 @@ type mergerCtrl struct {
 	doneCh  chan struct{}
 }
 
-func (s *Scorch) RequestMerge(mo *mergeplan.MergePlanOptions,
-	doneCh chan struct{}) error {
+// MergeRequest represents various control
+// parameters for the RequestMerge API.
+type MergeRequest struct {
+	// MergeOptions specify the merge policy applied during
+	// the forced merge cycles. This doesn't override the
+	// index's original merge policy.
+	MergeOptions *mergeplan.MergePlanOptions
+
+	// OverrideNumSnapshotsToKeep specify whether to retain
+	// a number of older snapshots dictated by numSnapshotsToKeep
+	// during a forced merge cycle. Enabling this reduces the
+	// disk space requirements during a forced merge operation.
+	OverrideNumSnapshotsToKeep bool
+
+	// DoneCh indicates the completion of the asynchronous
+	// forced merge operation.
+	DoneCh chan struct{}
+}
+
+func (s *Scorch) RequestMerge(mr *MergeRequest) error {
 	// check whether force merge is already under processing
-	if atomic.LoadUint64(&s.stats.TotFileMergeForceOpsStarted) >
-		atomic.LoadUint64(&s.stats.TotFileMergeForceOpsCompleted) {
-		if doneCh != nil {
-			close(doneCh)
+	s.rootLock.Lock()
+	if s.stats.TotFileMergeForceOpsStarted >
+		s.stats.TotFileMergeForceOpsCompleted {
+		s.rootLock.Unlock()
+		if mr.DoneCh != nil {
+			close(mr.DoneCh)
 		}
 		return fmt.Errorf("force merge already in progress")
 	}
 
-	errCh := make(chan error, 1)
-
+	s.stats.TotFileMergeForceOpsStarted++
 	go func() {
 		defer func() {
-			// doneCh for the caller to track the async merge completion
-			if doneCh != nil {
-				close(doneCh)
+			// mr.DoneCh for the caller to track the async merge completion
+			if mr.DoneCh != nil {
+				close(mr.DoneCh)
 			}
 		}()
 
-		s.rootLock.Lock()
-		if s.stats.TotFileMergeForceOpsStarted >
-			s.stats.TotFileMergeForceOpsCompleted {
-			errCh <- fmt.Errorf("force merge already in progress")
-			s.rootLock.Unlock()
-			return
+		var ssCreator string
+		if mr.OverrideNumSnapshotsToKeep {
+			ssCreator = numSnapShotsToKeepOverRuler
 		}
-		s.stats.TotFileMergeForceOpsStarted++
-		close(errCh)
-		s.rootLock.Unlock()
 
 		for {
-			msg := &mergerCtrl{creator: forceMergeCreator,
-				options: mo, doneCh: make(chan struct{})}
+			msg := &mergerCtrl{creator: ssCreator,
+				options: mr.MergeOptions, doneCh: make(chan struct{})}
 			// kick the merger
 			select {
 			case s.mergerKickCh <- msg:
@@ -223,12 +236,7 @@ func (s *Scorch) RequestMerge(mo *mergeplan.MergePlanOptions,
 		}
 	}()
 
-	// look for any raciness errors
-	if err, found := <-errCh; found {
-		close(errCh)
-		return err
-	}
-
+	s.rootLock.Unlock()
 	return nil
 }
 
