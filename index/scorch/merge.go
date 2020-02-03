@@ -159,7 +159,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 	// process tasks in serial for now
 	var notifications []chan *IndexSnapshot
 	var filenames []string
-	for _, task := range resultMergePlan.Tasks {
+	for tnum, task := range resultMergePlan.Tasks {
 		if len(task.Segments) == 0 {
 			atomic.AddUint64(&s.stats.TotFileMergePlanTasksSegmentsEmpty, 1)
 			continue
@@ -239,6 +239,11 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 			}
 
 			atomic.AddUint64(&s.stats.TotFileMergeSegments, uint64(len(segmentsToMerge)))
+		}
+
+		// update stats before the first introduction from the merge
+		if tnum == 0 {
+			atomic.StoreUint64(&s.stats.RecentMergeInProgEpoch, ourSnapshot.epoch)
 		}
 
 		sm := &segmentMerge{

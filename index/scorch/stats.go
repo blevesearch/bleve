@@ -33,9 +33,10 @@ type Stats struct {
 	TotBatchIntroTime uint64
 	MaxBatchIntroTime uint64
 
-	CurRootEpoch       uint64
-	LastPersistedEpoch uint64
-	LastMergedEpoch    uint64
+	CurRootEpoch           uint64
+	LastPersistedEpoch     uint64
+	LastMergedEpoch        uint64
+	RecentMergeInProgEpoch uint64
 
 	TotOnErrors uint64
 

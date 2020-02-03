@@ -801,9 +801,21 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 	}
 
 	// make a map of epochs to protect from deletion
-	protectedEpochs := make(map[uint64]struct{}, s.numSnapshotsToKeep)
-	for _, epoch := range persistedEpochs[0:s.numSnapshotsToKeep] {
+	numSnapshotsToKeep := s.numSnapshotsToKeep
+	protectedEpochs := make(map[uint64]struct{}, numSnapshotsToKeep)
+	rme := atomic.LoadUint64(&s.stats.RecentMergeInProgEpoch)
+	for _, epoch := range persistedEpochs {
+		if numSnapshotsToKeep == 0 {
+			break
+		}
+		if epoch <= rme {
+			// drop snapshots which are older than the last merge
+			// (in-progress too) operation as that would result in
+			// segment data duplication across old and new snapshots.
+			continue
+		}
 		protectedEpochs[epoch] = struct{}{}
+		numSnapshotsToKeep--
 	}
 
 	var epochsToRemove []uint64
