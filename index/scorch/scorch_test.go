@@ -2011,3 +2011,156 @@ func TestAllFieldWithDifferentTermVectorsEnabled(t *testing.T) {
 		t.Errorf("Error updating index: %v", err)
 	}
 }
+
+func TestIndexNumSnapshotsToKeepWithMergeOps(t *testing.T) {
+	cfg := CreateConfig("TestIndexBatch")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := struct {
+		MaxSegmentsPerTier   int   `json:"maxSegmentsPerTier"`
+		SegmentsPerMergeTask int   `json:"segmentsPerMergeTask"`
+		FloorSegmentSize     int64 `json:"floorSegmentSize"`
+	}{
+		int(1),
+		int(10),
+		int64(100),
+	}
+	cfg["scorchMergePlanOptions"] = &tmp
+	cfg["numSnapshotsToKeep"] = 2
+	defer func() {
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Fatalf("error opening index: %v", err)
+	}
+
+	var expectedCount uint64
+	batch := index.NewBatch()
+	for i := 0; i < 3; i++ {
+		doc := document.NewDocument(fmt.Sprintf("doc1-%d", i))
+		doc.AddField(document.NewTextField("name", []uint64{}, []byte(fmt.Sprintf("text1-%d", i))))
+		batch.Update(doc)
+		doc = document.NewDocument(fmt.Sprintf("doc2-%d", i))
+		doc.AddField(document.NewTextField("name", []uint64{}, []byte(fmt.Sprintf("text2-%d", i))))
+		batch.Update(doc)
+		err = idx.Batch(batch)
+		if err != nil {
+			t.Error(err)
+		}
+		batch.Reset()
+		expectedCount += 2
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for {
+			var lpe uint64
+			var ok bool
+			// wait until the persister catches up as the removeOldData code paths
+			// are triggered by the persister.
+			if lpe, ok = idx.StatsMap()["LastPersistedEpoch"].(uint64); ok &&
+				lpe == 8 {
+				wg.Done()
+				return
+			}
+			time.Sleep(time.Millisecond * 5)
+		}
+	}()
+	wg.Wait()
+
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	docCount, err := indexReader.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// verify doc count
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+	// verify the final root segment count
+	if ns, ok := idx.StatsMap()["TotFileSegmentsAtRoot"].(uint64); ok && ns != 1 {
+		t.Errorf("Expected a single file segment at root, but got %d segments", ns)
+	}
+	/*
+		scorch workflow
+
+		1 M - single memory segment
+		1 D - single disk segment
+		1 FM - new file merged segment
+
+		Chronological order of operations			Segments at root
+		=====================================================================
+		introduction done for 1st batch root epochID: 1			1 M
+		persist intro done for 1st batch root epochID: 2		1 D
+
+		introduction done for 2nd batch root epochID: 3			1 M + 1 D
+		persist intro done for 2nd batch root epochID: 4		1 D + 1 D
+
+		introduction done for 3rd batch root epochID: 5			1 M + 1 D + 1 D
+		merge(on epoch4) intro done for root epochID: 6			1 FM + 1 M
+
+		persist intro done for 3rd batch root epochID: 7		1 D + 1 FM
+
+		merge(on epoch7) intro done for root epochID: 8			1 FM
+	*/
+
+	var ok bool
+	var recentMergeInProgEpoch uint64
+	if recentMergeInProgEpoch, ok = idx.StatsMap()["RecentMergeInProgEpoch"].(uint64); !ok ||
+		recentMergeInProgEpoch != 7 {
+		t.Errorf("Expected recentMergeInProgEpoch is 7, but got %d", recentMergeInProgEpoch)
+	}
+
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idx, err = NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// verify the rollback points.
+	if si, ok := idx.(*Scorch); ok {
+		rollbackPoints, err := si.RollbackPoints()
+		if err != nil {
+			t.Fatalf("expected no err, got: %v, %d", err, len(rollbackPoints))
+		}
+
+		// It shouldn't include any epochs older than recentMergeInProgEpoch (7)
+		for _, r := range rollbackPoints {
+			if r.epoch <= recentMergeInProgEpoch {
+				t.Fatalf("rollback points include epoch: %d older than :"+
+					"recentMergeInProgEpoch %d", r.epoch, recentMergeInProgEpoch)
+			}
+		}
+	}
+
+}
