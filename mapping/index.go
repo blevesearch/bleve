@@ -161,6 +161,10 @@ func NewIndexMapping() *IndexMappingImpl {
 	}
 }
 
+func (im *IndexMappingImpl) TypeMappings() map[string]*DocumentMapping {
+	return im.TypeMapping
+}
+
 // Validate will walk the entire structure ensuring the following
 // explicitly named and default analyzers can be built
 func (im *IndexMappingImpl) Validate() error {
