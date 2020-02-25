@@ -485,8 +485,9 @@ func (s *Scorch) Stats() json.Marshaler {
 	return &s.stats
 }
 
-func (s *Scorch) diskFileStats() (uint64, uint64) {
-	var numFilesOnDisk, numBytesUsedDisk uint64
+func (s *Scorch) diskFileStats(rootSegmentPaths map[string]struct{}) (uint64,
+	uint64, uint64) {
+	var numFilesOnDisk, numBytesUsedDisk, numBytesOnDiskByRoot uint64
 	if s.path != "" {
 		finfos, err := ioutil.ReadDir(s.path)
 		if err == nil {
@@ -494,24 +495,48 @@ func (s *Scorch) diskFileStats() (uint64, uint64) {
 				if !finfo.IsDir() {
 					numBytesUsedDisk += uint64(finfo.Size())
 					numFilesOnDisk++
+					if rootSegmentPaths != nil {
+						fname := s.path + string(os.PathSeparator) + finfo.Name()
+						if _, fileAtRoot := rootSegmentPaths[fname]; fileAtRoot {
+							numBytesOnDiskByRoot += uint64(finfo.Size())
+						}
+					}
 				}
 			}
 		}
 	}
-	return numFilesOnDisk, numBytesUsedDisk
+	// if no root files path given, then consider all disk files.
+	if rootSegmentPaths == nil {
+		return numFilesOnDisk, numBytesUsedDisk, numBytesUsedDisk
+	}
+
+	return numFilesOnDisk, numBytesUsedDisk, numBytesOnDiskByRoot
+}
+
+func (s *Scorch) rootDiskSegmentsPaths() map[string]struct{} {
+	rv := make(map[string]struct{}, len(s.root.segment))
+	for _, segmentSnapshot := range s.root.segment {
+		switch seg := segmentSnapshot.segment.(type) {
+		case *zap.Segment:
+			rv[seg.Path()] = struct{}{}
+		}
+	}
+	return rv
 }
 
 func (s *Scorch) StatsMap() map[string]interface{} {
 	m := s.stats.ToMap()
 
-	numFilesOnDisk, numBytesUsedDisk := s.diskFileStats()
+	s.rootLock.RLock()
+	rootSegPaths := s.rootDiskSegmentsPaths()
+	m["CurFilesIneligibleForRemoval"] = uint64(len(s.ineligibleForRemoval))
+	s.rootLock.RUnlock()
+
+	numFilesOnDisk, numBytesUsedDisk, numBytesOnDiskByRoot := s.diskFileStats(rootSegPaths)
 
 	m["CurOnDiskBytes"] = numBytesUsedDisk
 	m["CurOnDiskFiles"] = numFilesOnDisk
 
-	s.rootLock.RLock()
-	m["CurFilesIneligibleForRemoval"] = uint64(len(s.ineligibleForRemoval))
-	s.rootLock.RUnlock()
 	// TODO: consider one day removing these backwards compatible
 	// names for apps using the old names
 	m["updates"] = m["TotUpdates"]
@@ -526,8 +551,11 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["num_items_introduced"] = m["TotIntroducedItems"]
 	m["num_items_persisted"] = m["TotPersistedItems"]
 	m["num_recs_to_persist"] = m["TotItemsToPersist"]
-	m["num_bytes_used_disk"] = m["CurOnDiskBytes"]
-	m["num_files_on_disk"] = m["CurOnDiskFiles"]
+	// total disk bytes found in index directory inclusive of older snapshots
+	m["num_bytes_used_disk"] = numBytesUsedDisk
+	// total disk bytes by the latest root index, exclusive of older snapshots
+	m["num_bytes_used_disk_by_root"] = numBytesOnDiskByRoot
+	m["num_files_on_disk"] = numFilesOnDisk
 	m["num_root_memorysegments"] = m["TotMemorySegmentsAtRoot"]
 	m["num_root_filesegments"] = m["TotFileSegmentsAtRoot"]
 	m["num_persister_nap_pause_completed"] = m["TotPersisterNapPauseCompleted"]
