@@ -20,10 +20,10 @@ import (
 	"math"
 	"reflect"
 
-	"github.com/blugelabs/bleve/index"
-	"github.com/blugelabs/bleve/search"
-	"github.com/blugelabs/bleve/search/scorer"
-	"github.com/blugelabs/bleve/size"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/scorer"
+	"github.com/blevesearch/bleve/size"
 )
 
 var reflectStaticSizeDisjunctionHeapSearcher int

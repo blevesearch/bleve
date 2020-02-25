@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/blugelabs/bleve/search"
+	"github.com/blevesearch/bleve/search"
 )
 
 type TermLocation struct {

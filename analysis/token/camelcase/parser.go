@@ -15,7 +15,7 @@
 package camelcase
 
 import (
-	"github.com/blugelabs/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis"
 )
 
 func (p *Parser) buildTokenFromTerm(buffer []rune) *analysis.Token {

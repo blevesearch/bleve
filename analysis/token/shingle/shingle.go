@@ -18,8 +18,8 @@ import (
 	"container/ring"
 	"fmt"
 
-	"github.com/blugelabs/bleve/analysis"
-	"github.com/blugelabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/registry"
 )
 
 const Name = "shingle"

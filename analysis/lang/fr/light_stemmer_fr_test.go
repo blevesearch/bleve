@@ -18,8 +18,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blugelabs/bleve/analysis"
-	"github.com/blugelabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/registry"
 )
 
 func TestFrenchLightStemmer(t *testing.T) {

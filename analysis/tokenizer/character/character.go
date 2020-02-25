@@ -17,7 +17,7 @@ package character
 import (
 	"unicode/utf8"
 
-	"github.com/blugelabs/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis"
 )
 
 type IsTokenRune func(r rune) bool

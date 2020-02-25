@@ -17,7 +17,7 @@ package moss
 import (
 	"github.com/couchbase/moss"
 
-	"github.com/blugelabs/bleve/index/store"
+	"github.com/blevesearch/bleve/index/store"
 )
 
 type Reader struct {

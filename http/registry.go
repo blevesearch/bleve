@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/blugelabs/bleve"
+	"github.com/blevesearch/bleve"
 )
 
 var indexNameMapping map[string]bleve.Index

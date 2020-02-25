@@ -17,5 +17,5 @@
 package config
 
 import (
-	_ "github.com/blugelabs/blevex/cznicb"
+	_ "github.com/blevesearch/blevex/cznicb"
 )

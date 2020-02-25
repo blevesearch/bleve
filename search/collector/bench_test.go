@@ -20,8 +20,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/blugelabs/bleve/index"
-	"github.com/blugelabs/bleve/search"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/search"
 )
 
 type createCollector func() search.Collector

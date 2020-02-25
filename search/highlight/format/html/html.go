@@ -15,8 +15,8 @@
 package html
 
 import (
-	"github.com/blugelabs/bleve/registry"
-	"github.com/blugelabs/bleve/search/highlight"
+	"github.com/blevesearch/bleve/registry"
+	"github.com/blevesearch/bleve/search/highlight"
 )
 
 const Name = "html"

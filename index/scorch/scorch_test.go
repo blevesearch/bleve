@@ -26,13 +26,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blugelabs/bleve/analysis"
-	"github.com/blugelabs/bleve/analysis/analyzer/keyword"
-	"github.com/blugelabs/bleve/analysis/analyzer/standard"
-	regexpTokenizer "github.com/blugelabs/bleve/analysis/tokenizer/regexp"
-	"github.com/blugelabs/bleve/document"
-	"github.com/blugelabs/bleve/index"
-	"github.com/blugelabs/bleve/mapping"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
+	"github.com/blevesearch/bleve/analysis/analyzer/standard"
+	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizer/regexp"
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/mapping"
 )
 
 func init() {

@@ -1,8 +1,8 @@
 package ca
 
 import (
-	"github.com/blugelabs/bleve/analysis"
-	"github.com/blugelabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/registry"
 )
 
 const ArticlesName = "articles_ca"

@@ -19,8 +19,8 @@ import (
 	"reflect"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/blugelabs/bleve/index"
-	"github.com/blugelabs/bleve/size"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/size"
 )
 
 var reflectStaticSizeIndexSnapshotDocIDReader int

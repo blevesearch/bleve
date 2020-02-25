@@ -16,10 +16,10 @@ package scorch
 
 import (
 	"fmt"
-	"github.com/blugelabs/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/index/scorch/segment"
 
-	zapv11 "github.com/blugelabs/zap/v11"
-	zapv12 "github.com/blugelabs/zap/v12"
+	zapv11 "github.com/blevesearch/zap/v11"
+	zapv12 "github.com/blevesearch/zap/v12"
 )
 
 var supportedSegmentPlugins map[string]map[uint32]segment.Plugin

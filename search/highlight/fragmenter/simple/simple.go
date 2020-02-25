@@ -17,8 +17,8 @@ package simple
 import (
 	"unicode/utf8"
 
-	"github.com/blugelabs/bleve/registry"
-	"github.com/blugelabs/bleve/search/highlight"
+	"github.com/blevesearch/bleve/registry"
+	"github.com/blevesearch/bleve/search/highlight"
 )
 
 const Name = "simple"

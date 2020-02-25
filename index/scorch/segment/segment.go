@@ -18,8 +18,8 @@ import (
 	"fmt"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/blugelabs/bleve/index"
-	"github.com/blugelabs/vellum"
+	"github.com/blevesearch/bleve/index"
+	"github.com/couchbase/vellum"
 )
 
 var ErrClosed = fmt.Errorf("index closed")

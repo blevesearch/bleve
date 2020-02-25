@@ -17,7 +17,7 @@ package segment
 import (
 	"regexp/syntax"
 
-	"github.com/blugelabs/vellum/regexp"
+	"github.com/couchbase/vellum/regexp"
 )
 
 func ParseRegexp(pattern string) (a *regexp.Regexp, prefixBeg, prefixEnd []byte, err error) {

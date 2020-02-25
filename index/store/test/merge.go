@@ -18,7 +18,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/blugelabs/bleve/index/store"
+	"github.com/blevesearch/bleve/index/store"
 )
 
 // test merge behavior

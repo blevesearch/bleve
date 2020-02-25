@@ -17,8 +17,8 @@ package upsidedown
 import (
 	"fmt"
 
-	"github.com/blugelabs/bleve/index"
-	"github.com/blugelabs/bleve/index/store"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/store"
 )
 
 type UpsideDownCouchFieldDict struct {

@@ -18,8 +18,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blugelabs/bleve/document"
-	"github.com/blugelabs/bleve/index"
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index"
 )
 
 func TestIndexFieldDict(t *testing.T) {

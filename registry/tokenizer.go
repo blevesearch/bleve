@@ -17,7 +17,7 @@ package registry
 import (
 	"fmt"
 
-	"github.com/blugelabs/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis"
 )
 
 func RegisterTokenizer(name string, constructor TokenizerConstructor) {

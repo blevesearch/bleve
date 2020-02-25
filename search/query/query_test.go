@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blugelabs/bleve/mapping"
+	"github.com/blevesearch/bleve/mapping"
 )
 
 var minNum = 5.1

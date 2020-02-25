@@ -15,8 +15,8 @@
 package searcher
 
 import (
-	"github.com/blugelabs/bleve/index"
-	"github.com/blugelabs/bleve/search"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/search"
 )
 
 func NewMultiTermSearcher(indexReader index.IndexReader, terms []string,

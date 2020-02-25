@@ -14,7 +14,7 @@
 
 package collector
 
-import "github.com/blugelabs/bleve/search"
+import "github.com/blevesearch/bleve/search"
 
 type collectStoreSlice struct {
 	slice   search.DocumentMatchCollection

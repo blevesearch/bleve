@@ -15,9 +15,9 @@
 package tr
 
 import (
-	"github.com/blugelabs/bleve/analysis"
-	"github.com/blugelabs/bleve/analysis/token/stop"
-	"github.com/blugelabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/token/stop"
+	"github.com/blevesearch/bleve/registry"
 )
 
 func StopTokenFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {

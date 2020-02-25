@@ -15,9 +15,9 @@
 package upsidedown
 
 import (
-	"github.com/blugelabs/bleve/analysis"
-	"github.com/blugelabs/bleve/document"
-	"github.com/blugelabs/bleve/index"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index"
 )
 
 func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult {

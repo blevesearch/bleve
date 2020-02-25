@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/blugelabs/bleve"
+	"github.com/blevesearch/bleve"
 )
 
 type CreateIndexHandler struct {

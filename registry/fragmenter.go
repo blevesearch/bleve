@@ -17,7 +17,7 @@ package registry
 import (
 	"fmt"
 
-	"github.com/blugelabs/bleve/search/highlight"
+	"github.com/blevesearch/bleve/search/highlight"
 )
 
 func RegisterFragmenter(name string, constructor FragmenterConstructor) {

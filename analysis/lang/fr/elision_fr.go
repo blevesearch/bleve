@@ -17,9 +17,9 @@ package fr
 import (
 	"fmt"
 
-	"github.com/blugelabs/bleve/analysis"
-	"github.com/blugelabs/bleve/analysis/token/elision"
-	"github.com/blugelabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/token/elision"
+	"github.com/blevesearch/bleve/registry"
 )
 
 const ElisionName = "elision_fr"

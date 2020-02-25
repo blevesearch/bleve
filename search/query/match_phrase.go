@@ -17,10 +17,10 @@ package query
 import (
 	"fmt"
 
-	"github.com/blugelabs/bleve/analysis"
-	"github.com/blugelabs/bleve/index"
-	"github.com/blugelabs/bleve/mapping"
-	"github.com/blugelabs/bleve/search"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/mapping"
+	"github.com/blevesearch/bleve/search"
 )
 
 type MatchPhraseQuery struct {

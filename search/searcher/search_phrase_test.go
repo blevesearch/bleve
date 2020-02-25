@@ -18,8 +18,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blugelabs/bleve/index"
-	"github.com/blugelabs/bleve/search"
+	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/search"
 )
 
 func TestPhraseSearch(t *testing.T) {

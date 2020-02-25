@@ -17,8 +17,8 @@ package keyword
 import (
 	"fmt"
 
-	"github.com/blugelabs/bleve/analysis"
-	"github.com/blugelabs/bleve/registry"
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/registry"
 )
 
 const Name = "keyword_marker"

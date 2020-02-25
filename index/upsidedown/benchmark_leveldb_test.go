@@ -19,7 +19,7 @@ package upsidedown
 import (
 	"testing"
 
-	"github.com/blugelabs/blevex/leveldb"
+	"github.com/blevesearch/blevex/leveldb"
 )
 
 var leveldbTestOptions = map[string]interface{}{
