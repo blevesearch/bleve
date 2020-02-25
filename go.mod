@@ -6,14 +6,14 @@ require (
 	github.com/RoaringBitmap/roaring v0.4.21
 	github.com/blevesearch/cld2 v0.0.0-20150916130542-10f17c049ec9 // indirect
 	github.com/blevesearch/snowballstem v0.0.0-20180110192139-26b06a2c243d
-	github.com/blugelabs/blevex v0.0.0-20200217235338-e3f88a9f0c70
-	github.com/blugelabs/go-porterstemmer v1.0.3
-	github.com/blugelabs/segment v1.0.0
-	github.com/blugelabs/vellum v1.0.2
-	github.com/blugelabs/zap/v11 v11.0.1
-	github.com/blugelabs/zap/v12 v12.0.1
+	github.com/blevesearch/blevex v0.0.0-20200217235338-e3f88a9f0c70
+	github.com/blevesearch/go-porterstemmer v1.0.3
+	github.com/blevesearch/segment v1.0.0
+	github.com/blevesearch/zap/v11 v11.0.0
+	github.com/blevesearch/zap/v12 v12.0.0
 	github.com/couchbase/ghistogram v0.0.1-0.20170308220240-d910dd063dd6 // indirect
 	github.com/couchbase/moss v0.0.0-20190322010551-a0cae174c498
+	github.com/couchbase/vellum v0.0.0-20190829182332-ef2e028c01fd // indirect
 	github.com/cznic/b v0.0.0-20181122101859-a26611c4d92d // indirect
 	github.com/cznic/mathutil v0.0.0-20181122101859-297441e03548 // indirect
 	github.com/cznic/strutil v0.0.0-20181122101858-275e90344537 // indirect
