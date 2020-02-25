@@ -516,8 +516,7 @@ func (s *Scorch) diskFileStats(rootSegmentPaths map[string]struct{}) (uint64,
 func (s *Scorch) rootDiskSegmentsPaths() map[string]struct{} {
 	rv := make(map[string]struct{}, len(s.root.segment))
 	for _, segmentSnapshot := range s.root.segment {
-		switch seg := segmentSnapshot.segment.(type) {
-		case *zap.Segment:
+		if seg, ok := segmentSnapshot.segment.(segment.PersistedSegment); ok {
 			rv[seg.Path()] = struct{}{}
 		}
 	}
