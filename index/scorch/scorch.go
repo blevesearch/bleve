@@ -102,7 +102,7 @@ func NewScorch(storeName string,
 		nextSnapshotEpoch:    1,
 		closeCh:              make(chan struct{}),
 		ineligibleForRemoval: map[string]bool{},
-		segPlugin:            defaultSegmentSegmentPlugin,
+		segPlugin:            defaultSegmentPlugin,
 	}
 
 	// check if the caller has requested a specific segment type/version

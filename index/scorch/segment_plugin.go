@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"fmt"
+
 	"github.com/blevesearch/bleve/index/scorch/segment"
 
 	zapv11 "github.com/blevesearch/zap/v11"
@@ -23,7 +24,7 @@ import (
 )
 
 var supportedSegmentPlugins map[string]map[uint32]segment.Plugin
-var defaultSegmentSegmentPlugin segment.Plugin
+var defaultSegmentPlugin segment.Plugin
 
 func init() {
 	ResetPlugins()
@@ -41,7 +42,7 @@ func RegisterPlugin(plugin segment.Plugin, makeDefault bool) {
 	}
 	supportedSegmentPlugins[plugin.Type()][plugin.Version()] = plugin
 	if makeDefault {
-		defaultSegmentSegmentPlugin = plugin
+		defaultSegmentPlugin = plugin
 	}
 }
 
