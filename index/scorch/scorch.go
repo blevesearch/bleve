@@ -111,7 +111,7 @@ func NewScorch(storeName string,
 		forcedSegmentType, ok2 := config["forceSegmentType"].(string)
 		if !ok2 {
 			return nil, fmt.Errorf(
-				"to forceSegementVersion, must also forceSegmentType")
+				"forceSegementVersion set to %d, must also specify forceSegmentType", forcedSegmentVersion)
 		}
 
 		err := rv.loadSegmentPlugin(forcedSegmentType,
