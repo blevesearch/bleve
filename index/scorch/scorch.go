@@ -263,7 +263,7 @@ func (s *Scorch) Close() (err error) {
 		err = s.rootBolt.Close()
 		s.rootLock.Lock()
 		if s.root != nil {
-			_ = s.root.DecRef()
+			err = s.root.DecRef()
 		}
 		s.root = nil
 		s.rootLock.Unlock()
