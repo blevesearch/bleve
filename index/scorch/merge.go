@@ -159,6 +159,21 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 	// process tasks in serial for now
 	var notifications []chan *IndexSnapshot
 	var filenames []string
+	// clean up any pending notifications from introducer on exit
+	// from an index closure.
+	defer func() {
+		for _, notification := range notifications {
+			select {
+			case newSnapshot := <-notification:
+				atomic.AddUint64(&s.stats.TotFileMergeIntroductionsDone, 1)
+				if newSnapshot != nil {
+					_ = newSnapshot.DecRef()
+				}
+			default:
+			}
+		}
+	}()
+
 	for _, task := range resultMergePlan.Tasks {
 		if len(task.Segments) == 0 {
 			atomic.AddUint64(&s.stats.TotFileMergePlanTasksSegmentsEmpty, 1)
@@ -217,6 +232,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 				s.unmarkIneligibleForRemoval(filename)
 				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
 				if err == segment.ErrClosed {
+					// handle any pending index snapshot introduction notifications on exit
 					return err
 				}
 				return fmt.Errorf("merging failed: %v", err)
@@ -253,6 +269,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 		// give it to the introducer
 		select {
 		case <-s.closeCh:
+			// handle any pending index snapshot introduction notifications on exit
 			_ = seg.Close()
 			return segment.ErrClosed
 		case s.merges <- sm:
@@ -265,6 +282,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 	for _, notification := range notifications {
 		select {
 		case <-s.closeCh:
+			// handle any pending index snapshot introduction notifications on exit
 			atomic.AddUint64(&s.stats.TotFileMergeIntroductionsSkipped, 1)
 			return segment.ErrClosed
 		case newSnapshot := <-notification:
