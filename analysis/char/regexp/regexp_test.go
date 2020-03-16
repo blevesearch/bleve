@@ -21,7 +21,6 @@ import (
 )
 
 func TestRegexpCharFilter(t *testing.T) {
-
 	htmlTagPattern := `</?[!\w]+((\s+\w+(\s*=\s*(?:".*?"|'.*?'|[^'">\s]+))?)+\s*|\s*)/?>`
 	htmlRegex := regexp.MustCompile(htmlTagPattern)
 
@@ -31,7 +30,7 @@ func TestRegexpCharFilter(t *testing.T) {
 	}{
 		{
 			input:  []byte(`<html>test</html>`),
-			output: []byte(`      test       `),
+			output: []byte(` test `),
 		},
 	}
 
@@ -45,7 +44,6 @@ func TestRegexpCharFilter(t *testing.T) {
 }
 
 func TestZeroWidthNonJoinerCharFilter(t *testing.T) {
-
 	zeroWidthNonJoinerPattern := `\x{200C}`
 	zeroWidthNonJoinerRegex := regexp.MustCompile(zeroWidthNonJoinerPattern)
 
@@ -55,7 +53,7 @@ func TestZeroWidthNonJoinerCharFilter(t *testing.T) {
 	}{
 		{
 			input:  []byte("water\u200Cunder\u200Cthe\u200Cbridge"),
-			output: []byte("water   under   the   bridge"),
+			output: []byte("water under the bridge"),
 		},
 	}
 
@@ -65,5 +63,21 @@ func TestZeroWidthNonJoinerCharFilter(t *testing.T) {
 		if !reflect.DeepEqual(output, test.output) {
 			t.Errorf("Expected:\n`%s`\ngot:\n`%s`\nfor:\n`%s`\n", string(test.output), string(output), string(test.input))
 		}
+	}
+}
+
+func TestRegexpCustomReplace(t *testing.T) {
+	regexStr := `([a-z])\s+(\d)`
+	replace := []byte(`$1-$2`)
+
+	regex := regexp.MustCompile(regexStr)
+	filter := New(regex, replace)
+
+	input := []byte("temp 1")
+	expectOutput := []byte("temp-1")
+
+	output := filter.Filter(input)
+	if !reflect.DeepEqual(output, expectOutput) {
+		t.Errorf("Expected: %s, Got: %s\n", string(expectOutput), string(output))
 	}
 }
