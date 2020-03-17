@@ -67,17 +67,51 @@ func TestZeroWidthNonJoinerCharFilter(t *testing.T) {
 }
 
 func TestRegexpCustomReplace(t *testing.T) {
-	regexStr := `([a-z])\s+(\d)`
-	replace := []byte(`$1-$2`)
+	tests := []struct {
+		regexStr string
+		replace  []byte
+		input    []byte
+		output   []byte
+	}{
+		{
+			regexStr: `([a-z])\s+(\d)`,
+			replace:  []byte(`$1-$2`),
+			input:    []byte(`temp 1`),
+			output:   []byte(`temp-1`),
+		},
+		{
+			regexStr: `foo.?`,
+			replace:  []byte(`X`),
+			input:    []byte(`seafood, fool`),
+			output:   []byte(`seaX, X`),
+		},
+		{
+			regexStr: `def`,
+			replace:  []byte(`_`),
+			input:    []byte(`abcdefghi`),
+			output:   []byte(`abc_ghi`),
+		},
+		{
+			regexStr: `456`,
+			replace:  []byte(`000000`),
+			input:    []byte(`123456789`),
+			output:   []byte(`123000000789`),
+		},
+		{
+			regexStr: `“|”`,
+			replace:  []byte(`"`),
+			input:    []byte(`“hello”`),
+			output:   []byte(`"hello"`),
+		},
+	}
 
-	regex := regexp.MustCompile(regexStr)
-	filter := New(regex, replace)
+	for i := range tests {
+		regex := regexp.MustCompile(tests[i].regexStr)
+		filter := New(regex, tests[i].replace)
 
-	input := []byte("temp 1")
-	expectOutput := []byte("temp-1")
-
-	output := filter.Filter(input)
-	if !reflect.DeepEqual(output, expectOutput) {
-		t.Errorf("Expected: %s, Got: %s\n", string(expectOutput), string(output))
+		output := filter.Filter(tests[i].input)
+		if !reflect.DeepEqual(tests[i].output, output) {
+			t.Errorf("[%d] Expected: `%s`, Got: `%s`\n", i, string(tests[i].output), string(output))
+		}
 	}
 }
