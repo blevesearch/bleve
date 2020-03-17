@@ -223,6 +223,7 @@ func (s *Scorch) openBolt() error {
 	s.introducerNotifier = make(chan *epochWatcher, 1)
 	s.revertToSnapshots = make(chan *snapshotReversion)
 	s.persisterNotifier = make(chan *epochWatcher, 1)
+	s.closeCh = make(chan struct{})
 
 	if !s.readOnly && s.path != "" {
 		err := s.removeOldZapFiles() // Before persister or merger create any new files.
