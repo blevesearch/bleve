@@ -163,6 +163,116 @@ func TestIndexOpenReopen(t *testing.T) {
 	}
 }
 
+func TestIndexOpenReopenWithInsert(t *testing.T) {
+	cfg := CreateConfig("TestIndexOpenReopen")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+
+	var expectedCount uint64
+	reader, err := idx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	docCount, err := reader.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// insert a doc
+	doc := document.NewDocument("1")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+	expectedCount++
+
+	reader, err = idx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	docCount, err = reader.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// now close it
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// try to open the index and insert data
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+
+	// insert a doc
+	doc = document.NewDocument("2")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+	expectedCount++
+
+	// check the doc count again after reopening it
+	reader, err = idx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	docCount, err = reader.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// now close it
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestIndexInsert(t *testing.T) {
 	cfg := CreateConfig("TestIndexInsert")
 	err := InitTest(cfg)
