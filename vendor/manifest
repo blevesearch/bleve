@@ -26,8 +26,8 @@
 			"notests": true
 		},
 		{
-			"importpath": "github.com/etcd-io/bbolt",
-			"repository": "https://github.com/etcd-io/bbolt",
+			"importpath": "go.etcd.io/bbolt",
+			"repository": "https://go.etcd.io/bbolt",
 			"vcs": "",
 			"revision": "7ee3ded59d4835e10f3e7d0f7603c42aa5e83820",
 			"branch": "master",
