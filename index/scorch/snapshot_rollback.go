@@ -143,16 +143,17 @@ func Rollback(path string, to *RollbackPoint) error {
 		}
 	}()
 
-	// pick all the persisted epochs in bolt store
+	// pick all the younger persisted epochs in bolt store
+	// including the target one.
 	var found bool
-	var persistedEpochs []uint64
+	var eligibleEpochs []uint64
 	err = rootBolt.View(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(boltSnapshotsBucket)
 		if snapshots == nil {
 			return nil
 		}
 		sc := snapshots.Cursor()
-		for sk, _ := sc.Last(); sk != nil; sk, _ = sc.Prev() {
+		for sk, _ := sc.Last(); sk != nil && !found; sk, _ = sc.Prev() {
 			_, snapshotEpoch, err := segment.DecodeUvarintAscending(sk)
 			if err != nil {
 				continue
@@ -160,12 +161,12 @@ func Rollback(path string, to *RollbackPoint) error {
 			if snapshotEpoch == to.epoch {
 				found = true
 			}
-			persistedEpochs = append(persistedEpochs, snapshotEpoch)
+			eligibleEpochs = append(eligibleEpochs, snapshotEpoch)
 		}
 		return nil
 	})
 
-	if len(persistedEpochs) == 0 {
+	if len(eligibleEpochs) == 0 {
 		return fmt.Errorf("Rollback: no persisted epochs found in bolt")
 	}
 	if !found {
@@ -193,7 +194,7 @@ func Rollback(path string, to *RollbackPoint) error {
 	if snapshots == nil {
 		return nil
 	}
-	for _, epoch := range persistedEpochs {
+	for _, epoch := range eligibleEpochs {
 		k := segment.EncodeUvarintAscending(nil, epoch)
 		if err != nil {
 			continue
