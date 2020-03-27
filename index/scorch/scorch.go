@@ -67,7 +67,6 @@ type Scorch struct {
 	persists           chan *persistIntroduction
 	merges             chan *segmentMerge
 	introducerNotifier chan *epochWatcher
-	revertToSnapshots  chan *snapshotReversion
 	persisterNotifier  chan *epochWatcher
 	rootBolt           *bolt.DB
 	asyncTasks         sync.WaitGroup
@@ -221,7 +220,6 @@ func (s *Scorch) openBolt() error {
 	s.persists = make(chan *persistIntroduction)
 	s.merges = make(chan *segmentMerge)
 	s.introducerNotifier = make(chan *epochWatcher, 1)
-	s.revertToSnapshots = make(chan *snapshotReversion)
 	s.persisterNotifier = make(chan *epochWatcher, 1)
 	s.closeCh = make(chan struct{})
 
