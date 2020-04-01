@@ -44,38 +44,26 @@ func TestIndexRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		err := idx.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
 
-	sh, ok := idx.(*Scorch)
+	_, ok := idx.(*Scorch)
 	if !ok {
 		t.Fatalf("Not a scorch index?")
 	}
 
-	err = sh.openBolt()
-	if err != nil {
-		t.Fatalf("error opening index: %v", err)
-	}
-
-	// start background goroutines except for the merger, which
-	// simulates a super slow merger
-	sh.asyncTasks.Add(2)
-	go sh.mainLoop()
-	go sh.persisterLoop()
-
+	indexPath, _ := cfg["path"].(string)
 	// should have no rollback points initially
-	rollbackPoints, err := sh.RollbackPoints()
-	if err != nil {
+	rollbackPoints, err := RollbackPoints(indexPath)
+	if err == nil {
 		t.Fatalf("expected no err, got: %v, %d", err, len(rollbackPoints))
 	}
 	if len(rollbackPoints) != 0 {
 		t.Fatalf("expected no rollbackPoints, got %d", len(rollbackPoints))
 	}
 
+	err = idx.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// create a batch, insert 2 new documents
 	batch := index.NewBatch()
 	doc := document.NewDocument("1")
@@ -98,8 +86,13 @@ func TestIndexRollback(t *testing.T) {
 		_ = readerSlow.Close()
 	}()
 
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// fetch rollback points after first batch
-	rollbackPoints, err = sh.RollbackPoints()
+	rollbackPoints, err = RollbackPoints(indexPath)
 	if err != nil {
 		t.Fatalf("expected no err, got: %v, %d", err, len(rollbackPoints))
 	}
@@ -110,6 +103,10 @@ func TestIndexRollback(t *testing.T) {
 	// set this as a rollback point for the future
 	rollbackPoint := rollbackPoints[0]
 
+	err = idx.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// create another batch, insert 2 new documents, and delete an existing one
 	batch = index.NewBatch()
 	doc = document.NewDocument("3")
@@ -125,7 +122,12 @@ func TestIndexRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rollbackPointsB, err := sh.RollbackPoints()
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rollbackPointsB, err := RollbackPoints(indexPath)
 	if err != nil || len(rollbackPointsB) <= len(rollbackPoints) {
 		t.Fatalf("expected no err, got: %v, %d", err, len(rollbackPointsB))
 	}
@@ -138,6 +140,11 @@ func TestIndexRollback(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected rollbackPoint epoch to still be available")
+	}
+
+	err = idx.Open()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	reader, err := idx.Reader()
@@ -176,8 +183,24 @@ func TestIndexRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// rollback to a non existing rollback point
+	err = Rollback(indexPath, &RollbackPoint{epoch: 100})
+	if err == nil {
+		t.Fatalf("expected err: Rollback: target epoch 100 not found in bolt")
+	}
+
 	// rollback to the selected rollback point
-	err = sh.Rollback(rollbackPoint)
+	err = Rollback(indexPath, rollbackPoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Open()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,6 +237,11 @@ func TestIndexRollback(t *testing.T) {
 	}
 
 	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
