@@ -11,9 +11,9 @@ require (
 	github.com/blevesearch/snowballstem v0.0.0-20180110192139-26b06a2c243d
 	github.com/blevesearch/zap/v11 v11.0.1
 	github.com/blevesearch/zap/v12 v12.0.1
+	github.com/couchbase/ghistogram v0.1.0 // indirect
 	github.com/couchbase/moss v0.0.0-20190322010551-a0cae174c498
 	github.com/couchbase/vellum v0.0.0-20190829182332-ef2e028c01fd
-	github.com/etcd-io/bbolt v1.3.3
 	github.com/golang/protobuf v1.3.2
 	github.com/kljensen/snowball v0.6.0
 	github.com/rcrowley/go-metrics v0.0.0-20190826022208-cac0b30c2563
@@ -21,5 +21,6 @@ require (
 	github.com/steveyen/gtreap v0.0.0-20150807155958-0abe01ef9be2
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/willf/bitset v1.1.10
+	go.etcd.io/bbolt v1.3.4
 	golang.org/x/text v0.3.0
 )
