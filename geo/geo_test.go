@@ -89,10 +89,10 @@ func TestRectFromPointDistance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if math.Abs(upperLeftLat-1) > 1E-2 {
+	if math.Abs(upperLeftLat-1) > 1e-2 {
 		t.Errorf("expected bounding box upper left lat to be almost 1, got %f", upperLeftLat)
 	}
-	if math.Abs(lowerRightLat+1) > 1E-2 {
+	if math.Abs(lowerRightLat+1) > 1e-2 {
 		t.Errorf("expected bounding box lower right lat to be almost -1, got %f", lowerRightLat)
 	}
 }
