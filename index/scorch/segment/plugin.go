@@ -48,7 +48,7 @@ type Plugin interface {
 	// made during the merge is reported while operation continues.
 	// Returns:
 	// A slice of new document numbers (one for each input segment),
-	// this allows the caller to know a particular documents new
+	// this allows the caller to know a particular document's new
 	// document number in the newly merged segment.
 	// The number of bytes written to the new segment file.
 	// An error, if any occurred.
