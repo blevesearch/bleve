@@ -646,11 +646,15 @@ func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err
 			locs := s.Locs[pid]
 			locOffset := 0
 
+			var lastDocNum, lastFreq, lastNorm uint64
 			postingsItr := postingsBS.Iterator()
 			for postingsItr.HasNext() {
 				docNum := uint64(postingsItr.Next())
+				lastDocNum = docNum
 
 				freqNorm := freqNorms[freqNormOffset]
+				lastFreq = freqNorm.freq
+				lastNorm = uint64(math.Float32bits(freqNorm.norm))
 
 				err = tfEncoder.Add(docNum,
 					encodeFreqHasLocs(freqNorm.freq, freqNorm.numLocs > 0),
@@ -699,8 +703,21 @@ func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err
 			tfEncoder.Close()
 			locEncoder.Close()
 
+			// determines whether to use "1-hit" encoding optimization
+			// when a term appears in only 1 doc, with no loc info,
+			// has freq of 1, and the docNum fits into 31-bits
+			use1HitEncoding := func(termCardinality uint64) (bool, uint64, uint64) {
+				if termCardinality == uint64(1) && locEncoder.FinalSize() <= 0 {
+					docNum := uint64(postingsBS.Minimum())
+					if under32Bits(docNum) && docNum == lastDocNum && lastFreq == 1 {
+						return true, docNum, lastNorm
+					}
+				}
+				return false, 0, 0
+			}
+
 			postingsOffset, err :=
-				writePostings(postingsBS, tfEncoder, locEncoder, nil, s.w, buf)
+				writePostings(postingsBS, tfEncoder, locEncoder, use1HitEncoding, s.w, buf)
 			if err != nil {
 				return 0, nil, err
 			}
@@ -714,6 +731,9 @@ func (s *interim) writeDicts() (fdvIndexOffset uint64, dictOffsets []uint64, err
 
 			tfEncoder.Reset()
 			locEncoder.Reset()
+			lastDocNum = 0
+			lastFreq = 0
+			lastNorm = 0
 		}
 
 		err = s.builder.Close()
