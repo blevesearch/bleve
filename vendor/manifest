@@ -29,7 +29,7 @@
 			"importpath": "go.etcd.io/bbolt",
 			"repository": "https://github.com/etcd-io/bbolt",
 			"vcs": "",
-			"revision": "7ee3ded59d4835e10f3e7d0f7603c42aa5e83820",
+			"revision": "68cc10a767ea1c6b9e8dcb9847317ff192d6d974",
 			"branch": "master",
 			"notests": true
 		},
