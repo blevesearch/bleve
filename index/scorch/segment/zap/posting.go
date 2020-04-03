@@ -216,7 +216,7 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 	// prepare the freq chunk details
 	if rv.includeFreqNorm {
 		var numFreqChunks uint64
-		numFreqChunks, read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
+		numFreqChunks, read = binary.Uvarint(p.sb.readMem(p.freqOffset+n, p.freqOffset+n+binary.MaxVarintLen64))
 		n += uint64(read)
 		if cap(rv.freqChunkOffsets) >= int(numFreqChunks) {
 			rv.freqChunkOffsets = rv.freqChunkOffsets[:int(numFreqChunks)]
@@ -224,7 +224,7 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 			rv.freqChunkOffsets = make([]uint64, int(numFreqChunks))
 		}
 		for i := 0; i < int(numFreqChunks); i++ {
-			rv.freqChunkOffsets[i], read = binary.Uvarint(p.sb.mem[p.freqOffset+n : p.freqOffset+n+binary.MaxVarintLen64])
+			rv.freqChunkOffsets[i], read = binary.Uvarint(p.sb.readMem(p.freqOffset+n, p.freqOffset+n+binary.MaxVarintLen64))
 			n += uint64(read)
 		}
 		rv.freqChunkStart = p.freqOffset + n
@@ -234,7 +234,7 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 	if rv.includeLocs {
 		n = 0
 		var numLocChunks uint64
-		numLocChunks, read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
+		numLocChunks, read = binary.Uvarint(p.sb.readMem(p.locOffset+n, p.locOffset+n+binary.MaxVarintLen64))
 		n += uint64(read)
 		if cap(rv.locChunkOffsets) >= int(numLocChunks) {
 			rv.locChunkOffsets = rv.locChunkOffsets[:int(numLocChunks)]
@@ -242,7 +242,7 @@ func (p *PostingsList) iterator(includeFreq, includeNorm, includeLocs bool,
 			rv.locChunkOffsets = make([]uint64, int(numLocChunks))
 		}
 		for i := 0; i < int(numLocChunks); i++ {
-			rv.locChunkOffsets[i], read = binary.Uvarint(p.sb.mem[p.locOffset+n : p.locOffset+n+binary.MaxVarintLen64])
+			rv.locChunkOffsets[i], read = binary.Uvarint(p.sb.readMem(p.locOffset+n, p.locOffset+n+binary.MaxVarintLen64))
 			n += uint64(read)
 		}
 		rv.locChunkStart = p.locOffset + n
@@ -289,17 +289,17 @@ func (rv *PostingsList) read(postingsOffset uint64, d *Dictionary) error {
 	var n uint64
 	var read int
 
-	rv.freqOffset, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+binary.MaxVarintLen64])
+	rv.freqOffset, read = binary.Uvarint(d.sb.readMem(postingsOffset+n, postingsOffset+binary.MaxVarintLen64))
 	n += uint64(read)
 
-	rv.locOffset, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
+	rv.locOffset, read = binary.Uvarint(d.sb.readMem(postingsOffset+n, postingsOffset+n+binary.MaxVarintLen64))
 	n += uint64(read)
 
 	var postingsLen uint64
-	postingsLen, read = binary.Uvarint(d.sb.mem[postingsOffset+n : postingsOffset+n+binary.MaxVarintLen64])
+	postingsLen, read = binary.Uvarint(d.sb.readMem(postingsOffset+n, postingsOffset+n+binary.MaxVarintLen64))
 	n += uint64(read)
 
-	roaringBytes := d.sb.mem[postingsOffset+n : postingsOffset+n+postingsLen]
+	roaringBytes := d.sb.readMem(postingsOffset+n, postingsOffset+n+postingsLen)
 
 	if rv.postings == nil {
 		rv.postings = roaring.NewBitmap()
@@ -382,7 +382,7 @@ func (i *PostingsIterator) loadChunk(chunk int) error {
 		s, e := readChunkBoundary(chunk, i.freqChunkOffsets)
 		start += s
 		end += e
-		i.currChunkFreqNorm = i.postings.sb.mem[start:end]
+		i.currChunkFreqNorm = i.postings.sb.readMem(start, end)
 		if i.freqNormReader == nil {
 			i.freqNormReader = segment.NewMemUvarintReader(i.currChunkFreqNorm)
 		} else {
@@ -400,7 +400,7 @@ func (i *PostingsIterator) loadChunk(chunk int) error {
 		s, e := readChunkBoundary(chunk, i.locChunkOffsets)
 		start += s
 		end += e
-		i.currChunkLoc = i.postings.sb.mem[start:end]
+		i.currChunkLoc = i.postings.sb.readMem(start, end)
 		if i.locReader == nil {
 			i.locReader = segment.NewMemUvarintReader(i.currChunkLoc)
 		} else {

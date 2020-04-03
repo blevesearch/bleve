@@ -44,25 +44,32 @@ func Open(path string) (segment.Segment, error) {
 	if err != nil {
 		return nil, err
 	}
-	mm, err := mmap.Map(f, mmap.RDONLY, 0)
+	stat, err := f.Stat()
 	if err != nil {
-		// mmap failed, try to close the file
-		_ = f.Close()
 		return nil, err
 	}
+	mmSize := stat.Size()
 
 	rv := &Segment{
 		SegmentBase: SegmentBase{
-			mem:            mm[0 : len(mm)-FooterSize],
+			memSize:        int(mmSize - FooterSize),
 			fieldsMap:      make(map[string]uint16),
 			fieldDvReaders: make(map[uint16]*docValueReader),
 			fieldFSTs:      make(map[uint16]*vellum.FST),
 		},
-		f:    f,
-		mm:   mm,
-		path: path,
-		refs: 1,
+		f:      f,
+		mmSize: uint64(mmSize),
+		path:   path,
+		refs:   1,
 	}
+	rv.SegmentBase.mmapOwner = rv
+
+	err = rv.loadMmap()
+	if err != nil {
+		_ = rv.Close()
+		return nil, err
+	}
+
 	rv.SegmentBase.updateSize()
 
 	err = rv.loadConfig()
@@ -89,7 +96,9 @@ func Open(path string) (segment.Segment, error) {
 // SegmentBase is a memory only, read-only implementation of the
 // segment.Segment interface, using zap's data representation.
 type SegmentBase struct {
+	mmapOwner
 	mem               []byte
+	memSize           int
 	memCRC            uint32
 	chunkFactor       uint32
 	fieldsMap         map[string]uint16 // fieldName -> fieldID+1
@@ -113,7 +122,7 @@ func (sb *SegmentBase) Size() int {
 
 func (sb *SegmentBase) updateSize() {
 	sizeInBytes := reflectStaticSizeSegmentBase +
-		cap(sb.mem)
+		sb.memSize
 
 	// fieldsMap
 	for k, _ := range sb.fieldsMap {
@@ -148,6 +157,7 @@ type Segment struct {
 
 	f       *os.File
 	mm      mmap.MMap
+	mmSize  uint64
 	path    string
 	version uint32
 	crc     uint32
@@ -168,7 +178,7 @@ func (s *Segment) Size() int {
 	sizeInBytes += 16
 
 	// do not include the mmap'ed part
-	return sizeInBytes + s.SegmentBase.Size() - cap(s.mem)
+	return sizeInBytes + s.SegmentBase.Size() - s.memSize
 }
 
 func (s *Segment) AddRef() {
@@ -188,52 +198,51 @@ func (s *Segment) DecRef() (err error) {
 }
 
 func (s *Segment) loadConfig() error {
-	crcOffset := len(s.mm) - 4
-	s.crc = binary.BigEndian.Uint32(s.mm[crcOffset : crcOffset+4])
+	crcOffset := s.mmSize - 4
+	s.crc = binary.BigEndian.Uint32(s.readMM(crcOffset, crcOffset+4))
 
 	verOffset := crcOffset - 4
-	s.version = binary.BigEndian.Uint32(s.mm[verOffset : verOffset+4])
+	s.version = binary.BigEndian.Uint32(s.readMM(verOffset, verOffset+4))
 	if s.version != Version {
 		return fmt.Errorf("unsupported version %d", s.version)
 	}
 
 	chunkOffset := verOffset - 4
-	s.chunkFactor = binary.BigEndian.Uint32(s.mm[chunkOffset : chunkOffset+4])
+	s.chunkFactor = binary.BigEndian.Uint32(s.readMM(chunkOffset, chunkOffset+4))
 
 	docValueOffset := chunkOffset - 8
-	s.docValueOffset = binary.BigEndian.Uint64(s.mm[docValueOffset : docValueOffset+8])
+	s.docValueOffset = binary.BigEndian.Uint64(s.readMM(docValueOffset, docValueOffset+8))
 
 	fieldsIndexOffset := docValueOffset - 8
-	s.fieldsIndexOffset = binary.BigEndian.Uint64(s.mm[fieldsIndexOffset : fieldsIndexOffset+8])
+	s.fieldsIndexOffset = binary.BigEndian.Uint64(s.readMM(fieldsIndexOffset, fieldsIndexOffset+8))
 
 	storedIndexOffset := fieldsIndexOffset - 8
-	s.storedIndexOffset = binary.BigEndian.Uint64(s.mm[storedIndexOffset : storedIndexOffset+8])
+	s.storedIndexOffset = binary.BigEndian.Uint64(s.readMM(storedIndexOffset, storedIndexOffset+8))
 
 	numDocsOffset := storedIndexOffset - 8
-	s.numDocs = binary.BigEndian.Uint64(s.mm[numDocsOffset : numDocsOffset+8])
+	s.numDocs = binary.BigEndian.Uint64(s.readMM(numDocsOffset, numDocsOffset+8))
 	return nil
 }
 
 func (s *SegmentBase) loadFields() error {
 	// NOTE for now we assume the fields index immediately precedes
-	// the footer, and if this changes, need to adjust accordingly (or
-	// store explicit length), where s.mem was sliced from s.mm in Open().
-	fieldsIndexEnd := uint64(len(s.mem))
+	// the footer.
+	fieldsIndexEnd := uint64(s.memSize)
 
 	// iterate through fields index
 	var fieldID uint64
 	for s.fieldsIndexOffset+(8*fieldID) < fieldsIndexEnd {
-		addr := binary.BigEndian.Uint64(s.mem[s.fieldsIndexOffset+(8*fieldID) : s.fieldsIndexOffset+(8*fieldID)+8])
+		addr := binary.BigEndian.Uint64(s.readMem(s.fieldsIndexOffset+(8*fieldID), s.fieldsIndexOffset+(8*fieldID)+8))
 
-		dictLoc, read := binary.Uvarint(s.mem[addr:fieldsIndexEnd])
+		dictLoc, read := binary.Uvarint(s.readMem(addr, fieldsIndexEnd))
 		n := uint64(read)
 		s.dictLocs = append(s.dictLocs, dictLoc)
 
 		var nameLen uint64
-		nameLen, read = binary.Uvarint(s.mem[addr+n : fieldsIndexEnd])
+		nameLen, read = binary.Uvarint(s.readMem(addr+n, fieldsIndexEnd))
 		n += uint64(read)
 
-		name := string(s.mem[addr+n : addr+n+nameLen])
+		name := string(s.readMem(addr+n, addr+n+nameLen))
 		s.fieldsInv = append(s.fieldsInv, name)
 		s.fieldsMap[name] = uint16(fieldID + 1)
 
@@ -266,8 +275,8 @@ func (sb *SegmentBase) dictionary(field string) (rv *Dictionary, err error) {
 			sb.m.Lock()
 			if rv.fst, ok = sb.fieldFSTs[rv.fieldID]; !ok {
 				// read the length of the vellum data
-				vellumLen, read := binary.Uvarint(sb.mem[dictStart : dictStart+binary.MaxVarintLen64])
-				fstBytes := sb.mem[dictStart+uint64(read) : dictStart+uint64(read)+vellumLen]
+				vellumLen, read := binary.Uvarint(sb.readMem(dictStart, dictStart+binary.MaxVarintLen64))
+				fstBytes := sb.readMem(dictStart+uint64(read), dictStart+uint64(read)+vellumLen)
 				rv.fst, err = vellum.Load(fstBytes)
 				if err != nil {
 					sb.m.Unlock()
@@ -471,9 +480,8 @@ func (s *Segment) Close() (err error) {
 }
 
 func (s *Segment) closeActual() (err error) {
-	if s.mm != nil {
-		err = s.mm.Unmap()
-	}
+	err = s.unloadMmap()
+
 	// try to close file even if unmap failed
 	if s.f != nil {
 		err2 := s.f.Close()
@@ -547,12 +555,12 @@ func (s *SegmentBase) loadDvReaders() error {
 	for fieldID, field := range s.fieldsInv {
 		var fieldLocStart, fieldLocEnd uint64
 		var n int
-		fieldLocStart, n = binary.Uvarint(s.mem[s.docValueOffset+read : s.docValueOffset+read+binary.MaxVarintLen64])
+		fieldLocStart, n = binary.Uvarint(s.readMem(s.docValueOffset+read, s.docValueOffset+read+binary.MaxVarintLen64))
 		if n <= 0 {
 			return fmt.Errorf("loadDvReaders: failed to read the docvalue offset start for field %d", fieldID)
 		}
 		read += uint64(n)
-		fieldLocEnd, n = binary.Uvarint(s.mem[s.docValueOffset+read : s.docValueOffset+read+binary.MaxVarintLen64])
+		fieldLocEnd, n = binary.Uvarint(s.readMem(s.docValueOffset+read, s.docValueOffset+read+binary.MaxVarintLen64))
 		if n <= 0 {
 			return fmt.Errorf("loadDvReaders: failed to read the docvalue offset end for field %d", fieldID)
 		}
