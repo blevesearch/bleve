@@ -16,9 +16,10 @@ package zap
 
 import (
 	"bufio"
-	"github.com/couchbase/vellum"
 	"math"
 	"os"
+
+	"github.com/couchbase/vellum"
 )
 
 const Version uint32 = 11
