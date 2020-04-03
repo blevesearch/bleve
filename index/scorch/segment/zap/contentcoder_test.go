@@ -16,6 +16,7 @@ package zap
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 )
 
@@ -121,5 +122,32 @@ func TestChunkedContentCoders(t *testing.T) {
 
 	if !bytes.Equal(actual1.Bytes(), actual2.Bytes()) {
 		t.Errorf("%s != %s", string(actual1.Bytes()), string(actual2.Bytes()))
+	}
+}
+
+type countWriter struct {
+	n int
+}
+
+func (w *countWriter) Write(p []byte) (int, error) {
+	w.n += len(p)
+	return len(p), nil
+}
+
+func TestChunkedContentCoderSizesWhenEmpty(t *testing.T) {
+	// Prints out how many bytes were written for an empty chunked
+	// content coder (the Add() method is not invoked) at various
+	// chunk sizes and maxDocNum's.  This is a scenario when
+	// term-vectors / locations are disabled.
+	w := &countWriter{}
+	for chunkSize := 10; chunkSize < 1000000; chunkSize = chunkSize * 10 {
+		fmt.Printf("  chunkSize: %d\n", chunkSize)
+		for maxDocNum := 10; maxDocNum < 1000000000; maxDocNum = maxDocNum * 100 {
+			w.n = 0
+			c := newChunkedContentCoder(uint64(chunkSize), uint64(maxDocNum), w, false)
+			_ = c.Close()
+			_, _ = c.Write()
+			fmt.Printf("    maxDocNum: %d\t bytes written: %d\n", maxDocNum, w.n)
+		}
 	}
 }
