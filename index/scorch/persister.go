@@ -145,6 +145,19 @@ OUTER:
 				}
 				close(ch)
 			}
+
+			if unpersistedCallbacks != nil {
+				// in the event of this being a retry attempt for persisting a snapshot
+				// that had earlier failed, prepend the persistedCallbacks associated
+				// with earlier segment(s) to the latest persistedCallbacks
+				ourPersistedCallbacks = append(unpersistedCallbacks, ourPersistedCallbacks...)
+				unpersistedCallbacks = nil
+			}
+
+			for i := range ourPersistedCallbacks {
+				ourPersistedCallbacks[i](err)
+			}
+
 			if err != nil {
 				atomic.StoreUint64(&s.iStats.persistEpoch, 0)
 				if err == segment.ErrClosed {
@@ -161,18 +174,6 @@ OUTER:
 				_ = ourSnapshot.DecRef()
 				atomic.AddUint64(&s.stats.TotPersistLoopErr, 1)
 				continue OUTER
-			}
-
-			if unpersistedCallbacks != nil {
-				// in the event of this being a retry attempt for persisting a snapshot
-				// that had earlier failed, prepend the persistedCallbacks associated
-				// with earlier segment(s) to the latest persistedCallbacks
-				ourPersistedCallbacks = append(unpersistedCallbacks, ourPersistedCallbacks...)
-				unpersistedCallbacks = nil
-			}
-
-			for i := range ourPersistedCallbacks {
-				ourPersistedCallbacks[i](err)
 			}
 
 			atomic.StoreUint64(&s.stats.LastPersistedEpoch, ourSnapshot.epoch)
