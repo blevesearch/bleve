@@ -8,8 +8,8 @@ require (
 	github.com/blevesearch/go-porterstemmer v1.0.3
 	github.com/blevesearch/segment v0.9.0
 	github.com/blevesearch/snowballstem v0.9.0
-	github.com/blevesearch/zap/v11 v11.0.3
-	github.com/blevesearch/zap/v12 v12.0.3
+	github.com/blevesearch/zap/v11 v11.0.4
+	github.com/blevesearch/zap/v12 v12.0.4
 	github.com/couchbase/ghistogram v0.1.0 // indirect
 	github.com/couchbase/moss v0.0.0-20190322010551-a0cae174c498
 	github.com/couchbase/vellum v1.0.0
