@@ -32,11 +32,8 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
-	"github.com/blevesearch/bleve/index/scorch/segment/zap"
-	bolt "github.com/etcd-io/bbolt"
+	bolt "go.etcd.io/bbolt"
 )
-
-var DefaultChunkFactor uint32 = 1024
 
 // DefaultPersisterNapTimeMSec is kept to zero as this helps in direct
 // persistence of segments with the default safe batch option.
@@ -253,7 +250,7 @@ func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
 	persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
 
 	// Check the merger lag by counting the segment files on disk,
-	numFilesOnDisk, _ := s.diskFileStats()
+	numFilesOnDisk, _, _ := s.diskFileStats(nil)
 
 	// On finding fewer files on disk, persister takes a short pause
 	// for sufficient in-memory segments to pile up for the next
@@ -280,7 +277,7 @@ func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
 	// 2. The merger could be lagging behind on merging the disk files.
 	if numFilesOnDisk > uint64(po.PersisterNapUnderNumFiles) {
 		s.removeOldData()
-		numFilesOnDisk, _ = s.diskFileStats()
+		numFilesOnDisk, _, _ = s.diskFileStats(nil)
 	}
 
 	// Persister pause until the merger catches up to reduce the segment
@@ -305,7 +302,7 @@ OUTER:
 		// let the watchers proceed if they lag behind
 		persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
 
-		numFilesOnDisk, _ = s.diskFileStats()
+		numFilesOnDisk, _, _ = s.diskFileStats(nil)
 	}
 
 	return lastMergedEpoch, persistWatchers
@@ -360,13 +357,13 @@ var DefaultMinSegmentsForInMemoryMerge = 2
 func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	bool, error) {
 	// collect the in-memory zap segments (SegmentBase instances)
-	var sbs []*zap.SegmentBase
+	var sbs []segment.Segment
 	var sbsDrops []*roaring.Bitmap
 	var sbsIndexes []int
 
 	for i, segmentSnapshot := range snapshot.segment {
-		if sb, ok := segmentSnapshot.segment.(*zap.SegmentBase); ok {
-			sbs = append(sbs, sb)
+		if _, ok := segmentSnapshot.segment.(segment.PersistedSegment); !ok {
+			sbs = append(sbs, segmentSnapshot.segment)
 			sbsDrops = append(sbsDrops, segmentSnapshot.deleted)
 			sbsIndexes = append(sbsIndexes, i)
 		}
@@ -377,7 +374,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	}
 
 	newSnapshot, newSegmentID, err := s.mergeSegmentBases(
-		snapshot, sbs, sbsDrops, sbsIndexes, DefaultChunkFactor)
+		snapshot, sbs, sbsDrops, sbsIndexes)
 	if err != nil {
 		return false, err
 	}
@@ -431,7 +428,8 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	return true, nil
 }
 
-func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string) ([]string, map[uint64]string, error) {
+func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
+	segPlugin segment.Plugin) ([]string, map[uint64]string, error) {
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(boltSnapshotsBucket)
 	if err != nil {
 		return nil, nil, err
@@ -447,13 +445,13 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string) ([]s
 	if err != nil {
 		return nil, nil, err
 	}
-	err = metaBucket.Put([]byte("type"), []byte(zap.Type))
+	err = metaBucket.Put(boltMetaDataSegmentTypeKey, []byte(segPlugin.Type()))
 	if err != nil {
 		return nil, nil, err
 	}
 	buf := make([]byte, binary.MaxVarintLen32)
-	binary.BigEndian.PutUint32(buf, zap.Version)
-	err = metaBucket.Put([]byte("version"), buf)
+	binary.BigEndian.PutUint32(buf, segPlugin.Version())
+	err = metaBucket.Put(boltMetaDataSegmentVersionKey, buf)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -482,23 +480,23 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string) ([]s
 			return nil, nil, err
 		}
 		switch seg := segmentSnapshot.segment.(type) {
-		case *zap.SegmentBase:
-			// need to persist this to disk
-			filename := zapFileName(segmentSnapshot.id)
-			path := path + string(os.PathSeparator) + filename
-			err = zap.PersistSegmentBase(seg, path)
-			if err != nil {
-				return nil, nil, fmt.Errorf("error persisting segment: %v", err)
-			}
-			newSegmentPaths[segmentSnapshot.id] = path
+		case segment.PersistedSegment:
+			segPath := seg.Path()
+			filename := strings.TrimPrefix(segPath, path+string(os.PathSeparator))
 			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
 			if err != nil {
 				return nil, nil, err
 			}
 			filenames = append(filenames, filename)
-		case *zap.Segment:
-			segPath := seg.Path()
-			filename := strings.TrimPrefix(segPath, path+string(os.PathSeparator))
+		case segment.UnpersistedSegment:
+			// need to persist this to disk
+			filename := zapFileName(segmentSnapshot.id)
+			path := path + string(os.PathSeparator) + filename
+			err = seg.Persist(path)
+			if err != nil {
+				return nil, nil, fmt.Errorf("error persisting segment: %v", err)
+			}
+			newSegmentPaths[segmentSnapshot.id] = path
 			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
 			if err != nil {
 				return nil, nil, err
@@ -537,7 +535,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 		}
 	}()
 
-	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path)
+	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin)
 	if err != nil {
 		return err
 	}
@@ -562,7 +560,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 			}
 		}()
 		for segmentID, path := range newSegmentPaths {
-			newSegments[segmentID], err = zap.Open(path)
+			newSegments[segmentID], err = s.segPlugin.Open(path)
 			if err != nil {
 				return fmt.Errorf("error opening new segment at %s, %v", path, err)
 			}
@@ -618,6 +616,8 @@ var boltPathKey = []byte{'p'}
 var boltDeletedKey = []byte{'d'}
 var boltInternalKey = []byte{'i'}
 var boltMetaDataKey = []byte{'m'}
+var boltMetaDataSegmentTypeKey = []byte("type")
+var boltMetaDataSegmentVersionKey = []byte("version")
 
 func (s *Scorch) loadFromBolt() error {
 	return s.rootBolt.View(func(tx *bolt.Tx) error {
@@ -702,6 +702,23 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 		refs:     1,
 		creator:  "loadSnapshot",
 	}
+	// first we look for the meta-data bucket, this will tell us
+	// which segment type/version was used for this snapshot
+	// all operations for this scorch will use this type/version
+	metaBucket := snapshot.Bucket(boltMetaDataKey)
+	if metaBucket == nil {
+		_ = rv.DecRef()
+		return nil, fmt.Errorf("meta-data bucket missing")
+	}
+	segmentType := string(metaBucket.Get(boltMetaDataSegmentTypeKey))
+	segmentVersion := binary.BigEndian.Uint32(
+		metaBucket.Get(boltMetaDataSegmentVersionKey))
+	err := s.loadSegmentPlugin(segmentType, segmentVersion)
+	if err != nil {
+		_ = rv.DecRef()
+		return nil, fmt.Errorf(
+			"unable to load correct segment wrapper: %v", err)
+	}
 	var running uint64
 	c := snapshot.Cursor()
 	for k, _ := c.First(); k != nil; k, _ = c.Next() {
@@ -746,7 +763,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		return nil, fmt.Errorf("segment path missing")
 	}
 	segmentPath := s.path + string(os.PathSeparator) + string(pathBytes)
-	segment, err := zap.Open(segmentPath)
+	segment, err := s.segPlugin.Open(segmentPath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening bolt segment: %v", err)
 	}

@@ -163,6 +163,116 @@ func TestIndexOpenReopen(t *testing.T) {
 	}
 }
 
+func TestIndexOpenReopenWithInsert(t *testing.T) {
+	cfg := CreateConfig("TestIndexOpenReopen")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+
+	var expectedCount uint64
+	reader, err := idx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	docCount, err := reader.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// insert a doc
+	doc := document.NewDocument("1")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+	expectedCount++
+
+	reader, err = idx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	docCount, err = reader.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// now close it
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// try to open the index and insert data
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+
+	// insert a doc
+	doc = document.NewDocument("2")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test2")))
+	err = idx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+	expectedCount++
+
+	// check the doc count again after reopening it
+	reader, err = idx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	docCount, err = reader.DocCount()
+	if err != nil {
+		t.Error(err)
+	}
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+	err = reader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// now close it
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestIndexInsert(t *testing.T) {
 	cfg := CreateConfig("TestIndexInsert")
 	err := InitTest(cfg)
@@ -2009,5 +2119,34 @@ func TestAllFieldWithDifferentTermVectorsEnabled(t *testing.T) {
 	err = idx.Update(doc)
 	if err != nil {
 		t.Errorf("Error updating index: %v", err)
+	}
+}
+
+func TestForceVersion(t *testing.T) {
+	cfg := map[string]interface{}{}
+	cfg["forceSegmentType"] = "zap"
+	cfg["forceSegmentVersion"] = 11
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("error opening a supported vesion: %v", err)
+	}
+	s := idx.(*Scorch)
+	if s.segPlugin.Version() != 11 {
+		t.Fatalf("wrong segment wrapper version loaded, expected %d got %d", 11, s.segPlugin.Version())
+	}
+	cfg["forceSegmentVersion"] = 12
+	idx, err = NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatalf("error opening a supported vesion: %v", err)
+	}
+	s = idx.(*Scorch)
+	if s.segPlugin.Version() != 12 {
+		t.Fatalf("wrong segment wrapper version loaded, expected %d got %d", 12, s.segPlugin.Version())
+	}
+	cfg["forceSegmentVersion"] = 10
+	idx, err = NewScorch(Name, cfg, analysisQueue)
+	if err == nil {
+		t.Fatalf("expected an error opening an unsupported vesion, got nil")
 	}
 }

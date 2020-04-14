@@ -113,7 +113,7 @@ func TestHaversinDistance(t *testing.T) {
 		if math.IsNaN(test.want) && !math.IsNaN(got) {
 			t.Errorf("expected NaN, got %f", got)
 		}
-		if !math.IsNaN(test.want) && math.Abs(got-test.want) > 1E-2 {
+		if !math.IsNaN(test.want) && math.Abs(got-test.want) > 1e-2 {
 			t.Errorf("expected %f got %f", test.want, got)
 		}
 	}

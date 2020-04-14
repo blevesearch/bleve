@@ -23,8 +23,8 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment/zap"
-	bolt "github.com/etcd-io/bbolt"
+	"github.com/blevesearch/bleve/index/scorch/segment"
+	bolt "go.etcd.io/bbolt"
 )
 
 const DefaultBatchSize = 1000
@@ -40,6 +40,7 @@ type Builder struct {
 	mergeMax  int
 	batch     *index.Batch
 	internal  map[string][]byte
+	segPlugin segment.Plugin
 }
 
 func NewBuilder(config map[string]interface{}) (*Builder, error) {
@@ -60,6 +61,7 @@ func NewBuilder(config map[string]interface{}) (*Builder, error) {
 		mergeMax:  DefaultMergeMax,
 		batchSize: DefaultBatchSize,
 		batch:     index.NewBatch(),
+		segPlugin: defaultSegmentPlugin,
 	}
 
 	err = rv.parseConfig(config)
@@ -97,6 +99,18 @@ func (o *Builder) parseConfig(config map[string]interface{}) (err error) {
 		}
 	}
 
+	forcedSegmentType, forcedSegmentVersion, err := configForceSegmentTypeVersion(config)
+	if err != nil {
+		return err
+	}
+	if forcedSegmentType != "" && forcedSegmentVersion != 0 {
+		segPlugin, err := chooseSegmentPlugin(forcedSegmentType,
+			uint32(forcedSegmentVersion))
+		if err != nil {
+			o.segPlugin = segPlugin
+		}
+	}
+
 	return nil
 }
 
@@ -131,7 +145,7 @@ func (o *Builder) executeBatchLOCKED(batch *index.Batch) (err error) {
 		}
 	}
 
-	seg, _, err := zap.AnalysisResultsToSegmentBase(analysisResults, DefaultChunkFactor)
+	seg, _, err := o.segPlugin.New(analysisResults)
 	if err != nil {
 		return fmt.Errorf("error building segment base: %v", err)
 	}
@@ -139,14 +153,19 @@ func (o *Builder) executeBatchLOCKED(batch *index.Batch) (err error) {
 	filename := zapFileName(o.segCount)
 	o.segCount++
 	path := o.buildPath + string(os.PathSeparator) + filename
-	err = zap.PersistSegmentBase(seg, path)
-	if err != nil {
-		return fmt.Errorf("error persisting segment base to %s: %v", path, err)
+
+	if segUnpersisted, ok := seg.(segment.UnpersistedSegment); ok {
+
+		err = segUnpersisted.Persist(path)
+		if err != nil {
+			return fmt.Errorf("error persisting segment base to %s: %v", path, err)
+		}
+
+		o.segPaths = append(o.segPaths, path)
+		return nil
 	}
 
-	o.segPaths = append(o.segPaths, path)
-
-	return nil
+	return fmt.Errorf("new segment does not implement unpersisted: %T", seg)
 }
 
 func (o *Builder) doMerge() error {
@@ -164,25 +183,25 @@ func (o *Builder) doMerge() error {
 		o.segPaths = o.segPaths[mergeCount:]
 
 		// open each of the segments to be merged
-		mergeSegs := make([]*zap.Segment, 0, mergeCount)
+		mergeSegs := make([]segment.Segment, 0, mergeCount)
 		closeOpenedSegs := func() {
 			for _, seg := range mergeSegs {
 				_ = seg.Close()
 			}
 		}
 		for _, mergePath := range mergePaths {
-			seg, err := zap.Open(mergePath)
+			seg, err := o.segPlugin.Open(mergePath)
 			if err != nil {
 				closeOpenedSegs()
 				return fmt.Errorf("error opening segment (%s) for merge: %v", mergePath, err)
 			}
-			mergeSegs = append(mergeSegs, seg.(*zap.Segment))
+			mergeSegs = append(mergeSegs, seg)
 		}
 
 		// do the merge
 		mergedSegPath := o.buildPath + string(os.PathSeparator) + zapFileName(o.segCount)
 		drops := make([]*roaring.Bitmap, mergeCount)
-		_, _, err := zap.Merge(mergeSegs, drops, mergedSegPath, DefaultChunkFactor, nil, nil)
+		_, _, err := o.segPlugin.Merge(mergeSegs, drops, mergedSegPath, nil, nil)
 		if err != nil {
 			closeOpenedSegs()
 			return fmt.Errorf("error merging segments (%v): %v", mergePaths, err)
@@ -243,7 +262,7 @@ func (o *Builder) Close() error {
 	}
 
 	// prepare wrapping
-	seg, err := zap.Open(finalSegPath)
+	seg, err := o.segPlugin.Open(finalSegPath)
 	if err != nil {
 		return fmt.Errorf("error opening final segment")
 	}
@@ -273,7 +292,7 @@ func (o *Builder) Close() error {
 	}
 
 	// fill the root bolt with this fake index snapshot
-	_, _, err = prepareBoltSnapshot(is, tx, o.path)
+	_, _, err = prepareBoltSnapshot(is, tx, o.path, o.segPlugin)
 	if err != nil {
 		_ = tx.Rollback()
 		_ = rootBolt.Close()

@@ -28,11 +28,11 @@ import (
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/couchbase/vellum"
-	lev2 "github.com/couchbase/vellum/levenshtein2"
+	lev "github.com/couchbase/vellum/levenshtein"
 )
 
 // re usable, threadsafe levenshtein builders
-var lb1, lb2 *lev2.LevenshteinAutomatonBuilder
+var lb1, lb2 *lev.LevenshteinAutomatonBuilder
 
 type asynchSegmentResult struct {
 	dict    segment.TermDictionary
@@ -52,11 +52,11 @@ func init() {
 	var is interface{} = IndexSnapshot{}
 	reflectStaticSizeIndexSnapshot = int(reflect.TypeOf(is).Size())
 	var err error
-	lb1, err = lev2.NewLevenshteinAutomatonBuilder(1, true)
+	lb1, err = lev.NewLevenshteinAutomatonBuilder(1, true)
 	if err != nil {
 		panic(fmt.Errorf("Levenshtein automaton ed1 builder err: %v", err))
 	}
-	lb2, err = lev2.NewLevenshteinAutomatonBuilder(2, true)
+	lb2, err = lev.NewLevenshteinAutomatonBuilder(2, true)
 	if err != nil {
 		panic(fmt.Errorf("Levenshtein automaton ed2 builder err: %v", err))
 	}

@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/blevesearch/bleve/index/scorch/segment/zap"
+	seg "github.com/blevesearch/bleve/index/scorch/segment"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +49,7 @@ var snapshotCmd = &cobra.Command{
 			segments := snapshot.Segments()
 			for i, segmentSnap := range segments {
 				segment := segmentSnap.Segment()
-				if segment, ok := segment.(*zap.Segment); ok {
+				if segment, ok := segment.(seg.PersistedSegment); ok {
 					fmt.Printf("%d %s\n", i, segment.Path())
 				}
 			}
