@@ -1707,3 +1707,115 @@ func TestSearchHighlightingWithRegexpReplacement(t *testing.T) {
 		t.Fatalf("Expected 1 hit, got: %v", sres.Total)
 	}
 }
+
+func TestMultiMatchQuery(t *testing.T) {
+	// create an index with default settings
+	idx, err := New("testidx", NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// create and insert documents as a batch
+	batch := idx.NewBatch()
+	docs := []map[string]string{
+		{
+			"id":      "1",
+			"members": "nada",
+		},
+		{
+			"id":      "2",
+			"members": "marty steve sreekanth",
+			"comment": "somebody let abhi know that abhi is not listed as a member",
+		},
+		{
+			"id":      "3",
+			"members": "marty steve sreekanth abhi",
+			"comment": "update: members look good",
+		},
+	}
+
+	for _, doc := range docs {
+		if err = batch.Index("doc"+doc["id"], doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		match           string
+		operator        query.MatchQueryOperator
+		fields          []string
+		matchFieldsType string
+		expectedHits    []string
+	}{
+		{
+			match:           "abhi",
+			fields:          []string{"members", "comment"},
+			matchFieldsType: "all_fields",
+			expectedHits:    []string{},
+		},
+		{
+			match:           "abhi",
+			fields:          []string{"members", "comment"},
+			matchFieldsType: "most_fields",
+			// order based on score, "abhi" appears twice in doc2, once in doc3
+			expectedHits: []string{"doc2", "doc3"},
+		},
+		{
+			match:           "abhi",
+			fields:          []string{"members^3", "comment"},
+			matchFieldsType: "most_fields",
+			// order based on boost, although "abhi" appears twice in doc2's
+			// comment, members has more relevance
+			expectedHits: []string{"doc3", "doc2"},
+		},
+		{
+			match:           "sreekanth abhi",
+			operator:        1,
+			fields:          []string{"members", "comment"},
+			matchFieldsType: "most_fields",
+			expectedHits:    []string{"doc3"},
+		},
+	}
+
+	for testi, test := range tests {
+		mm := NewMultiMatchQuery(test.match)
+		mm.SetOperator(test.operator)
+		for _, field := range test.fields {
+			mm.AddFields(field)
+		}
+		mm.SetType(test.matchFieldsType)
+
+		sr := NewSearchRequest(mm)
+		res, err := idx.Search(sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if res == nil || len(res.Hits) != len(test.expectedHits) {
+			t.Fatalf("[%d] Expected a non-nil result with hits: %+v",
+				testi+1, res)
+		}
+
+		// check hits ordering (based on score)
+		for i := range test.expectedHits {
+			if test.expectedHits[i] != res.Hits[i].ID {
+				t.Fatalf("[%d], Expected hit: %s, got: %v",
+					testi+1, test.expectedHits[i], res.Hits[i].ID)
+			}
+		}
+	}
+}

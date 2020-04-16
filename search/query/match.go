@@ -115,7 +115,6 @@ func (q *MatchQuery) SetOperator(operator MatchQueryOperator) {
 }
 
 func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()

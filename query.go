@@ -122,6 +122,16 @@ func NewMatchQuery(match string) *query.MatchQuery {
 	return query.NewMatchQuery(match)
 }
 
+// NewMultiMatchQuery creates a Query for matching text, across multiple fields.
+// Analyzers are chosen based on the fields.
+// Input text is analyzed using provided analyzer or chosen analyzers.
+// Token terms resulting from this analysis are used to perform
+// term searches. Result documents must satisfy at least specified number of
+// term searches (defaults to 1).
+func NewMultiMatchQuery(match string) *query.MultiMatchQuery {
+	return query.NewMultiMatchQuery(match)
+}
+
 // NewNumericRangeQuery creates a new Query for ranges
 // of numeric values.
 // Either, but not both endpoints can be nil.
