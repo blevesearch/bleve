@@ -1558,7 +1558,11 @@ func TestSearchScoreNone(t *testing.T) {
 	}
 
 	defer func() {
-		err := os.RemoveAll("testidx")
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = os.RemoveAll("testidx")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1609,7 +1613,11 @@ func TestGeoDistanceIssue1301(t *testing.T) {
 	}
 
 	defer func() {
-		err := os.RemoveAll("testidx")
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = os.RemoveAll("testidx")
 		if err != nil {
 			t.Fatal(err)
 		}
