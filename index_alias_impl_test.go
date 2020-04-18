@@ -1013,7 +1013,7 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(50 * time.Millisecond):
+			case <-time.After(250 * time.Millisecond):
 				return nil
 			}
 		},
@@ -1042,7 +1042,7 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(50 * time.Millisecond):
+			case <-time.After(250 * time.Millisecond):
 				return nil
 			}
 		},
