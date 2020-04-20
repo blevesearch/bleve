@@ -187,7 +187,7 @@ func (s *Scorch) Open() error {
 
 	if !s.readOnly && s.path != "" {
 		s.asyncTasks.Add(1)
-		go s.persisterLoop()
+		go s.persisterLoop(initialEpoch)
 		s.asyncTasks.Add(1)
 		go s.mergerLoop(initialEpoch)
 	}
