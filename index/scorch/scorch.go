@@ -180,6 +180,8 @@ func (s *Scorch) Open() error {
 		return err
 	}
 
+	initialEpoch := s.root.epoch
+
 	s.asyncTasks.Add(1)
 	go s.introducerLoop()
 
@@ -187,7 +189,7 @@ func (s *Scorch) Open() error {
 		s.asyncTasks.Add(1)
 		go s.persisterLoop()
 		s.asyncTasks.Add(1)
-		go s.mergerLoop()
+		go s.mergerLoop(initialEpoch)
 	}
 
 	return nil

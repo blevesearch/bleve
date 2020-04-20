@@ -55,16 +55,3 @@ func (w watcherChan) NotifyUsAfter(epoch uint64, closeCh chan struct{}) (*epochW
 	}
 	return ew, nil
 }
-
-func (w watcherChan) NotifyUsAfterAndWait(epoch uint64, closeCh chan struct{}) error {
-	ew, err := w.NotifyUsAfter(epoch, closeCh)
-	if err != nil {
-		return err
-	}
-	select {
-	case <-closeCh:
-		return ErrClosed
-	case <-ew.notifyCh:
-	}
-	return nil
-}
