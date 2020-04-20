@@ -79,12 +79,10 @@ type persisterOptions struct {
 	MemoryPressurePauseThreshold uint64
 }
 
-type notificationChan chan struct{}
-
 func (s *Scorch) persisterLoop() {
 	defer s.asyncTasks.Done()
 
-	var persistWatchers []*epochWatcher
+	var persistWatchers epochWatchers
 	var lastPersistedEpoch, lastMergedEpoch uint64
 	var ew *epochWatcher
 
@@ -105,7 +103,7 @@ OUTER:
 		case <-s.closeCh:
 			break OUTER
 		case ew = <-s.persisterNotifier:
-			persistWatchers = append(persistWatchers, ew)
+			persistWatchers.Add(ew)
 		default:
 		}
 		if ew != nil && ew.epoch > lastMergedEpoch {
@@ -198,15 +196,10 @@ OUTER:
 		}
 
 		// tell the introducer we're waiting for changes
-		w := &epochWatcher{
-			epoch:    lastPersistedEpoch,
-			notifyCh: make(notificationChan, 1),
-		}
-
-		select {
-		case <-s.closeCh:
+		var w *epochWatcher
+		w, err = s.introducerNotifier.NotifyUsAfter(lastPersistedEpoch, s.closeCh)
+		if err != nil {
 			break OUTER
-		case s.introducerNotifier <- w:
 		}
 
 		s.removeOldData() // might as well cleanup while waiting
@@ -222,32 +215,19 @@ OUTER:
 		case ew = <-s.persisterNotifier:
 			// if the watchers are already caught up then let them wait,
 			// else let them continue to do the catch up
-			persistWatchers = append(persistWatchers, ew)
+			persistWatchers.Add(ew)
 		}
 
 		atomic.AddUint64(&s.stats.TotPersistLoopEnd, 1)
 	}
 }
 
-func notifyMergeWatchers(lastPersistedEpoch uint64,
-	persistWatchers []*epochWatcher) []*epochWatcher {
-	var watchersNext []*epochWatcher
-	for _, w := range persistWatchers {
-		if w.epoch < lastPersistedEpoch {
-			close(w.notifyCh)
-		} else {
-			watchersNext = append(watchersNext, w)
-		}
-	}
-	return watchersNext
-}
-
 func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
-	lastMergedEpoch uint64, persistWatchers []*epochWatcher,
-	po *persisterOptions) (uint64, []*epochWatcher) {
+	lastMergedEpoch uint64, persistWatchers epochWatchers,
+	po *persisterOptions) (uint64, epochWatchers) {
 
 	// First, let the watchers proceed if they lag behind
-	persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
+	persistWatchers.NotifySatisfiedWatchers(lastPersistedEpoch)
 
 	// Check the merger lag by counting the segment files on disk,
 	numFilesOnDisk, _, _ := s.diskFileStats(nil)
@@ -264,9 +244,9 @@ func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
 
 		case ew := <-s.persisterNotifier:
 			// unblock the merger in meantime
-			persistWatchers = append(persistWatchers, ew)
+			persistWatchers.Add(ew)
 			lastMergedEpoch = ew.epoch
-			persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
+			persistWatchers.NotifySatisfiedWatchers(lastPersistedEpoch)
 			atomic.AddUint64(&s.stats.TotPersisterMergerNapBreak, 1)
 		}
 		return lastMergedEpoch, persistWatchers
@@ -293,14 +273,14 @@ OUTER:
 		case <-s.closeCh:
 			break OUTER
 		case ew := <-s.persisterNotifier:
-			persistWatchers = append(persistWatchers, ew)
+			persistWatchers.Add(ew)
 			lastMergedEpoch = ew.epoch
 		}
 
 		atomic.AddUint64(&s.stats.TotPersisterSlowMergerResume, 1)
 
 		// let the watchers proceed if they lag behind
-		persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
+		persistWatchers.NotifySatisfiedWatchers(lastPersistedEpoch)
 
 		numFilesOnDisk, _, _ = s.diskFileStats(nil)
 	}

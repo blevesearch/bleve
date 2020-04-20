@@ -79,24 +79,9 @@ OUTER:
 			_ = ourSnapshot.DecRef()
 
 			// tell the persister we're waiting for changes
-			// first make a epochWatcher chan
-			ew := &epochWatcher{
-				epoch:    lastEpochMergePlanned,
-				notifyCh: make(notificationChan, 1),
-			}
-
-			// give it to the persister
-			select {
-			case <-s.closeCh:
+			err = s.persisterNotifier.NotifyUsAfterAndWait(lastEpochMergePlanned, s.closeCh)
+			if err != nil {
 				break OUTER
-			case s.persisterNotifier <- ew:
-			}
-
-			// now wait for persister (but also detect close)
-			select {
-			case <-s.closeCh:
-				break OUTER
-			case <-ew.notifyCh:
 			}
 		}
 
