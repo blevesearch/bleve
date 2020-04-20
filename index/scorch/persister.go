@@ -780,12 +780,6 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	return rv, nil
 }
 
-type uint64Descending []uint64
-
-func (p uint64Descending) Len() int           { return len(p) }
-func (p uint64Descending) Less(i, j int) bool { return p[i] > p[j] }
-func (p uint64Descending) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-
 func (s *Scorch) removeOldData() {
 	removed, err := s.removeOldBoltSnapshots()
 	if err != nil {
