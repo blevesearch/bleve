@@ -46,8 +46,6 @@ func (w watcherChan) NotifyUsAfter(epoch uint64, closeCh chan struct{}) (*epochW
 		epoch:    epoch,
 		notifyCh: make(notificationChan, 1),
 	}
-
-	// give it to the persister
 	select {
 	case <-closeCh:
 		return nil, ErrClosed
