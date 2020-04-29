@@ -17,6 +17,7 @@ package scorch
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"sync"
 
@@ -155,7 +156,6 @@ func (o *Builder) executeBatchLOCKED(batch *index.Batch) (err error) {
 	path := o.buildPath + string(os.PathSeparator) + filename
 
 	if segUnpersisted, ok := seg.(segment.UnpersistedSegment); ok {
-
 		err = segUnpersisted.Persist(path)
 		if err != nil {
 			return fmt.Errorf("error persisting segment base to %s: %v", path, err)
@@ -191,7 +191,9 @@ func (o *Builder) doMerge() error {
 		closeOpenedSegs := func() error {
 			var err error
 			for _, seg := range mergeSegs {
+				log.Printf("closing seg: %#v", seg)
 				clErr := seg.Close()
+				log.Printf("seg close returned: %v", clErr)
 				if clErr != nil && err == nil {
 					err = clErr
 				}
