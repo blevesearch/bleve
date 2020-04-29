@@ -27,8 +27,8 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-const DefaultBatchSize = 1000
-const DefaultMergeMax = 10
+const DefaultBuilderBatchSize = 1000
+const DefaultBuilderMergeMax = 10
 
 type Builder struct {
 	m         sync.Mutex
@@ -58,8 +58,8 @@ func NewBuilder(config map[string]interface{}) (*Builder, error) {
 	rv := &Builder{
 		path:      path,
 		buildPath: buildPath,
-		mergeMax:  DefaultMergeMax,
-		batchSize: DefaultBatchSize,
+		mergeMax:  DefaultBuilderMergeMax,
+		batchSize: DefaultBuilderBatchSize,
 		batch:     index.NewBatch(),
 		segPlugin: defaultSegmentPlugin,
 	}
