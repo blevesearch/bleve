@@ -269,10 +269,10 @@ func (o *Builder) Close() error {
 	}
 
 	// remove the buildPath, as it is no longer needed
-	err = os.RemoveAll(o.buildPath)
-	if err != nil {
-		return fmt.Errorf("error removing build path: %v", err)
-	}
+	// err = os.RemoveAll(o.buildPath)
+	// if err != nil {
+	// 	return fmt.Errorf("error removing build path: %v", err)
+	// }
 
 	// prepare wrapping
 	seg, err := o.segPlugin.Open(finalSegPath)
@@ -332,6 +332,5 @@ func (o *Builder) Close() error {
 		return fmt.Errorf("error closing final segment: %v", err)
 	}
 	log.Printf("closed returned: %v", err)
-
 	return nil
 }
