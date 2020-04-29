@@ -32,7 +32,7 @@ func TestBuilder(t *testing.T) {
 	defer func() {
 		err = os.RemoveAll(tmpDir)
 		if err != nil {
-			t.Fatalf("error cleaning up test index")
+			t.Fatalf("error cleaning up test index: %v", err)
 		}
 	}()
 	options := map[string]interface{}{
@@ -122,7 +122,7 @@ func TestBuilderFlushFinalBatch(t *testing.T) {
 	defer func() {
 		err = os.RemoveAll(tmpDir)
 		if err != nil {
-			t.Fatalf("error cleaning up test index")
+			t.Fatalf("error cleaning up test index: %v", err)
 		}
 	}()
 	options := map[string]interface{}{
