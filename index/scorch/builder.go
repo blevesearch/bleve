@@ -184,15 +184,25 @@ func (o *Builder) doMerge() error {
 
 		// open each of the segments to be merged
 		mergeSegs := make([]segment.Segment, 0, mergeCount)
-		closeOpenedSegs := func() {
+
+		// closeOpenedSegs attempts to close all opened
+		// segments even if an error occurs, in which case
+		// the first error is returned
+		closeOpenedSegs := func() error {
+			var err error
 			for _, seg := range mergeSegs {
-				_ = seg.Close()
+				clErr := seg.Close()
+				if clErr != nil && err == nil {
+					err = clErr
+				}
 			}
+			return err
 		}
+
 		for _, mergePath := range mergePaths {
 			seg, err := o.segPlugin.Open(mergePath)
 			if err != nil {
-				closeOpenedSegs()
+				_ = closeOpenedSegs()
 				return fmt.Errorf("error opening segment (%s) for merge: %v", mergePath, err)
 			}
 			mergeSegs = append(mergeSegs, seg)
@@ -203,14 +213,17 @@ func (o *Builder) doMerge() error {
 		drops := make([]*roaring.Bitmap, mergeCount)
 		_, _, err := o.segPlugin.Merge(mergeSegs, drops, mergedSegPath, nil, nil)
 		if err != nil {
-			closeOpenedSegs()
+			_ = closeOpenedSegs()
 			return fmt.Errorf("error merging segments (%v): %v", mergePaths, err)
 		}
 		o.segCount++
 		o.segPaths = append(o.segPaths, mergedSegPath)
 
 		// close segments  opened for merge
-		closeOpenedSegs()
+		err = closeOpenedSegs()
+		if err != nil {
+			return fmt.Errorf("error closing opened segments: %v", err)
+		}
 
 		// remove merged segments
 		for _, mergePath := range mergePaths {
