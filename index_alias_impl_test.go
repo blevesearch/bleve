@@ -913,8 +913,6 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(50 * time.Millisecond):
-				return nil
 			}
 		},
 		err: nil,
