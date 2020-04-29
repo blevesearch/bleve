@@ -191,9 +191,7 @@ func (o *Builder) doMerge() error {
 		closeOpenedSegs := func() error {
 			var err error
 			for _, seg := range mergeSegs {
-				log.Printf("closing seg: %#v", seg)
 				clErr := seg.Close()
-				log.Printf("seg close returned: %v", clErr)
 				if clErr != nil && err == nil {
 					err = clErr
 				}
@@ -327,11 +325,13 @@ func (o *Builder) Close() error {
 		return fmt.Errorf("error closing root.bolt: %v", err)
 	}
 
+	log.Printf("closing seg: %#v", seg)
 	// close final segment
 	err = seg.Close()
 	if err != nil {
 		return fmt.Errorf("error closing final segment: %v", err)
 	}
+	log.Printf("closed returned: %v", err)
 
 	return nil
 }
