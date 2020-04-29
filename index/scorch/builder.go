@@ -219,7 +219,7 @@ func (o *Builder) doMerge() error {
 		o.segCount++
 		o.segPaths = append(o.segPaths, mergedSegPath)
 
-		// close segments  opened for merge
+		// close segments opened for merge
 		err = closeOpenedSegs()
 		if err != nil {
 			return fmt.Errorf("error closing opened segments: %v", err)
