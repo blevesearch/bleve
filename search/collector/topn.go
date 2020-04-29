@@ -73,6 +73,8 @@ type TopNCollector struct {
 	searchAfter               *search.DocumentMatch
 }
 
+var BleveMaxResultWindow = int(10000)
+
 // CheckDoneEvery controls how frequently we check the context deadline
 const CheckDoneEvery = uint64(1024)
 
@@ -117,7 +119,17 @@ func newTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector 
 		backingSize = PreAllocSizeSkipCap + 1
 	}
 
-	if size+skip > 10 {
+	// these lookups traverse an interface, so do once up-front
+	if sort.RequiresDocID() {
+		hc.needDocIds = true
+	}
+	hc.neededFields = sort.RequiredFields()
+	hc.cachedScoring = sort.CacheIsScore()
+	hc.cachedDesc = sort.CacheDescending()
+
+	if size+skip >= BleveMaxResultWindow {
+		hc.store = newStoreSpillOverHeap(backingSize, hc.cachedScoring, hc.cachedDesc, sort)
+	} else if size+skip > 10 {
 		hc.store = newStoreHeap(backingSize, func(i, j *search.DocumentMatch) int {
 			return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
 		})
@@ -126,14 +138,6 @@ func newTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector 
 			return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
 		})
 	}
-
-	// these lookups traverse an interface, so do once up-front
-	if sort.RequiresDocID() {
-		hc.needDocIds = true
-	}
-	hc.neededFields = sort.RequiredFields()
-	hc.cachedScoring = sort.CacheIsScore()
-	hc.cachedDesc = sort.CacheDescending()
 
 	return hc
 }
@@ -379,6 +383,10 @@ func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
 		doc.Complete(nil)
 		return nil
 	})
+
+	if bp, ok := hc.store.(*storeSpillOverHeap); ok {
+		bp.Close()
+	}
 
 	return err
 }

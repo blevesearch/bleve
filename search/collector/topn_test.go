@@ -724,6 +724,22 @@ func TestCollectorChaining(t *testing.T) {
 	}
 }
 
+func TestSpillOverHeapStore(t *testing.T) {
+	prevMax := BleveMaxResultWindow
+	defer func() {
+		BleveMaxResultWindow = prevMax
+	}()
+
+	BleveMaxResultWindow = 5
+	TestPaginationSameScores(t)
+
+	TestTop10Scores(t)
+
+	TestTop10ScoresSkip10(t)
+
+	TestTop10ScoresSkip10Only9Hits(t)
+}
+
 func BenchmarkTop10of0Scores(b *testing.B) {
 	benchHelper(0, func() search.Collector {
 		return NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
