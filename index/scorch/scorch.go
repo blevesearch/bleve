@@ -193,7 +193,7 @@ func (s *Scorch) Open() error {
 	}
 
 	s.asyncTasks.Add(1)
-	go s.mainLoop()
+	go s.introducerLoop()
 
 	if !s.readOnly && s.path != "" {
 		s.asyncTasks.Add(1)
