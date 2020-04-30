@@ -1892,12 +1892,17 @@ func TestSearchQueryCallback(t *testing.T) {
 	}()
 
 	elements := []string{"air", "water", "fire", "earth"}
+	b := index.NewBatch()
 	for j := 0; j < 10000; j++ {
-		err = index.Index(fmt.Sprintf("%d", j),
+		err = b.Index(fmt.Sprintf("%d", j),
 			map[string]interface{}{"name": elements[j%len(elements)]})
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+	err = index.Batch(b)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	query := NewTermQuery("water")
