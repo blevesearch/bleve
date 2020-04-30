@@ -263,16 +263,16 @@ func (o *Builder) Close() error {
 	// segment id 2 is chosen to match the behavior of a scorch
 	// index which indexes a single batch of data
 	finalSegPath := o.path + string(os.PathSeparator) + zapFileName(2)
-	err = os.Rename(o.segPaths[0], finalSegPath)
-	if err != nil {
-		return fmt.Errorf("error moving final segment into place: %v", err)
-	}
+	// err = os.Rename(o.segPaths[0], finalSegPath)
+	// if err != nil {
+	// 	return fmt.Errorf("error moving final segment into place: %v", err)
+	// }
 
 	// remove the buildPath, as it is no longer needed
-	// err = os.RemoveAll(o.buildPath)
-	// if err != nil {
-	// 	return fmt.Errorf("error removing build path: %v", err)
-	// }
+	err = os.RemoveAll(o.buildPath)
+	if err != nil {
+		return fmt.Errorf("error removing build path: %v", err)
+	}
 
 	// prepare wrapping
 	seg, err := o.segPlugin.Open(finalSegPath)
