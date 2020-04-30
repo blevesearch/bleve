@@ -315,7 +315,7 @@ func (o *Builder) Close() error {
 	err = tx.Commit()
 	if err != nil {
 		_ = rootBolt.Close()
-		return fmt.Errorf("error committing botl tx in root.bolt: %v", err)
+		return fmt.Errorf("error committing bolt tx in root.bolt: %v", err)
 	}
 
 	// close bolt
