@@ -726,15 +726,20 @@ func TestSortMatchSearch(t *testing.T) {
 	names := []string{"Noam", "Uri", "David", "Yosef", "Eitan", "Itay", "Ariel", "Daniel", "Omer", "Yogev", "Yehonatan", "Moshe", "Mohammed", "Yusuf", "Omar"}
 	days := []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
 	numbers := []string{"One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"}
+	b := index.NewBatch()
 	for i := 0; i < 200; i++ {
 		doc := make(map[string]interface{})
 		doc["Name"] = names[i%len(names)]
 		doc["Day"] = days[i%len(days)]
 		doc["Number"] = numbers[i%len(numbers)]
-		err = index.Index(fmt.Sprintf("%d", i), doc)
+		err = b.Index(fmt.Sprintf("%d", i), doc)
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+	err = index.Batch(b)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	req := NewSearchRequest(NewMatchQuery("One"))
@@ -1891,29 +1896,15 @@ func TestSearchQueryCallback(t *testing.T) {
 		}
 	}()
 
-	elements := []string{"air", "water", "fire", "earth"}
-	b := index.NewBatch()
-	for j := 0; j < 10000; j++ {
-		err = b.Index(fmt.Sprintf("%d", j),
-			map[string]interface{}{"name": elements[j%len(elements)]})
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	err = index.Batch(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	query := NewTermQuery("water")
 	req := NewSearchRequest(query)
 
 	expErr := fmt.Errorf("MEM_LIMIT_EXCEEDED")
 	f := func(size uint64) error {
-		if size > 1000 {
-			return expErr
-		}
-		return nil
+		// the intended usage of this callback is to see the estimated
+		// memory usage before executing, and possibly abort early
+		// in this test we simulate returning such an error
+		return expErr
 	}
 
 	ctx := context.WithValue(context.Background(), SearchQueryStartCallbackKey,
