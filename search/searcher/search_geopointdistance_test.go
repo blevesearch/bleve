@@ -18,7 +18,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blevesearch/bleve/geo"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
 )
@@ -82,76 +81,4 @@ func testGeoPointDistanceSearch(i index.IndexReader, centerLon, centerLat, dist 
 		return nil, err
 	}
 	return rv, nil
-}
-
-func TestGeoPointDistanceCompare(t *testing.T) {
-	tests := []struct {
-		docLat, docLon       float64
-		centerLat, centerLon float64
-		distance             string
-	}{
-		// Data points originally from MB-33454.
-		{
-			docLat:    33.718,
-			docLon:    -116.8293,
-			centerLat: 39.59000587,
-			centerLon: -119.22998428,
-			distance:  "10000mi",
-		},
-		{
-			docLat:    41.1305,
-			docLon:    -121.6587,
-			centerLat: 61.28,
-			centerLon: -149.34,
-			distance:  "10000mi",
-		},
-	}
-
-	for testi, test := range tests {
-		// compares the results from ComputeGeoRange with original, non-optimized version
-		compare := func(desc string,
-			minLon, minLat, maxLon, maxLat float64, checkBoundaries bool) {
-			// do math to produce list of terms needed for this search
-			onBoundaryRes, offBoundaryRes, err := ComputeGeoRange(0, GeoBitsShift1Minus1,
-				minLon, minLat, maxLon, maxLat, checkBoundaries, nil, "")
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			onBROrig, offBROrig := origComputeGeoRange(0, GeoBitsShift1Minus1,
-				minLon, minLat, maxLon, maxLat, checkBoundaries)
-			if !reflect.DeepEqual(onBoundaryRes, onBROrig) {
-				t.Fatalf("testi: %d, test: %+v, desc: %s, onBoundaryRes != onBROrig,\n onBoundaryRes:%v,\n onBROrig: %v",
-					testi, test, desc, onBoundaryRes, onBROrig)
-			}
-			if !reflect.DeepEqual(offBoundaryRes, offBROrig) {
-				t.Fatalf("testi: %d, test: %+v, desc: %s, offBoundaryRes, offBROrig,\n offBoundaryRes: %v,\n offBROrig: %v",
-					testi, test, desc, offBoundaryRes, offBROrig)
-			}
-		}
-
-		// follow the general approach of the GeoPointDistanceSearcher...
-		dist, err := geo.ParseDistance(test.distance)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		topLeftLon, topLeftLat, bottomRightLon, bottomRightLat, err :=
-			geo.RectFromPointDistance(test.centerLon, test.centerLat, dist)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if bottomRightLon < topLeftLon {
-			// crosses date line, rewrite as two parts
-			compare("-180/f", -180, bottomRightLat, bottomRightLon, topLeftLat, false)
-			compare("-180/t", -180, bottomRightLat, bottomRightLon, topLeftLat, true)
-
-			compare("180/f", topLeftLon, bottomRightLat, 180, topLeftLat, false)
-			compare("180/t", topLeftLon, bottomRightLat, 180, topLeftLat, true)
-		} else {
-			compare("reg/f", topLeftLon, bottomRightLat, bottomRightLon, topLeftLat, false)
-			compare("reg/t", topLeftLon, bottomRightLat, bottomRightLon, topLeftLat, true)
-		}
-	}
 }
