@@ -75,11 +75,23 @@ func checkIndex(t *testing.T, path string, term []byte, field string, expectCoun
 	if err != nil {
 		t.Fatalf("error opening index: %v", err)
 	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatalf("error closing index: %v", err)
+		}
+	}()
 
 	r, err := idx.Reader()
 	if err != nil {
 		t.Fatalf("error accessing index reader: %v", err)
 	}
+	defer func() {
+		err = r.Close()
+		if err != nil {
+			t.Fatalf("error closing reader: %v", err)
+		}
+	}()
 
 	// check the count, expect 10 docs
 	count, err := r.DocCount()
@@ -106,11 +118,6 @@ func checkIndex(t *testing.T, path string, term []byte, field string, expectCoun
 		if rows != expectCount {
 			t.Errorf("expected %d rows for term hello, field name, got %d", expectCount, rows)
 		}
-	}
-
-	err = idx.Close()
-	if err != nil {
-		t.Fatalf("error closing index: %v", err)
 	}
 }
 
