@@ -17,7 +17,6 @@ package scorch
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"sync"
 
@@ -263,10 +262,10 @@ func (o *Builder) Close() error {
 	// segment id 2 is chosen to match the behavior of a scorch
 	// index which indexes a single batch of data
 	finalSegPath := o.path + string(os.PathSeparator) + zapFileName(2)
-	// err = os.Rename(o.segPaths[0], finalSegPath)
-	// if err != nil {
-	// 	return fmt.Errorf("error moving final segment into place: %v", err)
-	// }
+	err = os.Rename(o.segPaths[0], finalSegPath)
+	if err != nil {
+		return fmt.Errorf("error moving final segment into place: %v", err)
+	}
 
 	// remove the buildPath, as it is no longer needed
 	err = os.RemoveAll(o.buildPath)
@@ -325,12 +324,10 @@ func (o *Builder) Close() error {
 		return fmt.Errorf("error closing root.bolt: %v", err)
 	}
 
-	log.Printf("closing seg: %#v", seg)
 	// close final segment
 	err = seg.Close()
 	if err != nil {
 		return fmt.Errorf("error closing final segment: %v", err)
 	}
-	log.Printf("closed returned: %v", err)
 	return nil
 }
