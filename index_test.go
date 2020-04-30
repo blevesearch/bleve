@@ -1896,29 +1896,15 @@ func TestSearchQueryCallback(t *testing.T) {
 		}
 	}()
 
-	elements := []string{"air", "water", "fire", "earth"}
-	b := index.NewBatch()
-	for j := 0; j < 10000; j++ {
-		err = b.Index(fmt.Sprintf("%d", j),
-			map[string]interface{}{"name": elements[j%len(elements)]})
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	err = index.Batch(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	query := NewTermQuery("water")
 	req := NewSearchRequest(query)
 
 	expErr := fmt.Errorf("MEM_LIMIT_EXCEEDED")
 	f := func(size uint64) error {
-		if size > 1000 {
-			return expErr
-		}
-		return nil
+		// the intended usage of this callback is to see the estimated
+		// memory usage before executing, and possibly abort early
+		// in this test we simulate returning such an error
+		return expErr
 	}
 
 	ctx := context.WithValue(context.Background(), SearchQueryStartCallbackKey,
