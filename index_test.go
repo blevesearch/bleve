@@ -726,15 +726,20 @@ func TestSortMatchSearch(t *testing.T) {
 	names := []string{"Noam", "Uri", "David", "Yosef", "Eitan", "Itay", "Ariel", "Daniel", "Omer", "Yogev", "Yehonatan", "Moshe", "Mohammed", "Yusuf", "Omar"}
 	days := []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
 	numbers := []string{"One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"}
+	b := index.NewBatch()
 	for i := 0; i < 200; i++ {
 		doc := make(map[string]interface{})
 		doc["Name"] = names[i%len(names)]
 		doc["Day"] = days[i%len(days)]
 		doc["Number"] = numbers[i%len(numbers)]
-		err = index.Index(fmt.Sprintf("%d", i), doc)
+		err = b.Index(fmt.Sprintf("%d", i), doc)
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+	err = index.Batch(b)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	req := NewSearchRequest(NewMatchQuery("One"))
