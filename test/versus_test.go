@@ -53,7 +53,7 @@ func TestScorchVersusUpsideDownBoltAll(t *testing.T) {
 		NumDocs:              1000,
 		MaxWordsPerDoc:       20,
 		NumWords:             10,
-		BatchSize:            10,
+		BatchSize:            1000,
 		NumAttemptsPerSearch: 100,
 	}).run(scorch.Name, boltdb.Name, upsidedown.Name, boltdb.Name, nil, nil)
 }
@@ -275,7 +275,6 @@ func testVersusSearches(vt *VersusTest, searchTemplates []string, idxA, idxB ble
 		if err != nil {
 			t.Fatalf("could not parse search template: %s, err: %v", searchTemplate, err)
 		}
-
 		for j := 0; j < vt.NumAttemptsPerSearch; j++ {
 			vt.CurAttempt = j
 
