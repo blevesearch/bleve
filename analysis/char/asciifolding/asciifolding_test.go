@@ -15,6 +15,7 @@
 package asciifolding
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -52,9 +53,11 @@ func TestAsciiFoldingFilter(t *testing.T) {
 
 	for _, test := range tests {
 		filter := New()
-		output := filter.Filter(test.input)
-		if !reflect.DeepEqual(output, test.output) {
-			t.Errorf("Expected:\n`%s`\ngot:\n`%s`\nfor:\n`%s`\n", string(test.output), string(output), string(test.input))
-		}
+		t.Run(fmt.Sprintf("on %s", test.input), func(t *testing.T) {
+			output := filter.Filter(test.input)
+			if !reflect.DeepEqual(output, test.output) {
+				t.Errorf("\nExpected:\n`%s`\ngot:\n`%s`\n", string(test.output), string(output))
+			}
+		})
 	}
 }

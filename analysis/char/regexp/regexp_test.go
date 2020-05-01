@@ -15,64 +15,32 @@
 package regexp
 
 import (
+	"fmt"
 	"reflect"
 	"regexp"
 	"testing"
 )
 
 func TestRegexpCharFilter(t *testing.T) {
-	htmlTagPattern := `</?[!\w]+((\s+\w+(\s*=\s*(?:".*?"|'.*?'|[^'">\s]+))?)+\s*|\s*)/?>`
-	htmlRegex := regexp.MustCompile(htmlTagPattern)
 
-	tests := []struct {
-		input  []byte
-		output []byte
-	}{
-		{
-			input:  []byte(`<html>test</html>`),
-			output: []byte(` test `),
-		},
-	}
-
-	for _, test := range tests {
-		filter := New(htmlRegex, []byte{' '})
-		output := filter.Filter(test.input)
-		if !reflect.DeepEqual(output, test.output) {
-			t.Errorf("Expected:\n`%s`\ngot:\n`%s`\nfor:\n`%s`\n", string(test.output), string(output), string(test.input))
-		}
-	}
-}
-
-func TestZeroWidthNonJoinerCharFilter(t *testing.T) {
-	zeroWidthNonJoinerPattern := `\x{200C}`
-	zeroWidthNonJoinerRegex := regexp.MustCompile(zeroWidthNonJoinerPattern)
-
-	tests := []struct {
-		input  []byte
-		output []byte
-	}{
-		{
-			input:  []byte("water\u200Cunder\u200Cthe\u200Cbridge"),
-			output: []byte("water under the bridge"),
-		},
-	}
-
-	for _, test := range tests {
-		filter := New(zeroWidthNonJoinerRegex, []byte{' '})
-		output := filter.Filter(test.input)
-		if !reflect.DeepEqual(output, test.output) {
-			t.Errorf("Expected:\n`%s`\ngot:\n`%s`\nfor:\n`%s`\n", string(test.output), string(output), string(test.input))
-		}
-	}
-}
-
-func TestRegexpCustomReplace(t *testing.T) {
 	tests := []struct {
 		regexStr string
 		replace  []byte
 		input    []byte
 		output   []byte
 	}{
+		{
+			regexStr: `</?[!\w]+((\s+\w+(\s*=\s*(?:".*?"|'.*?'|[^'">\s]+))?)+\s*|\s*)/?>`,
+			replace:  []byte{' '},
+			input:    []byte(`<html>test</html>`),
+			output:   []byte(` test `),
+		},
+		{
+			regexStr: `\x{200C}`,
+			replace:  []byte{' '},
+			input:    []byte("water\u200Cunder\u200Cthe\u200Cbridge"),
+			output:   []byte("water under the bridge"),
+		},
 		{
 			regexStr: `([a-z])\s+(\d)`,
 			replace:  []byte(`$1-$2`),
@@ -105,13 +73,16 @@ func TestRegexpCustomReplace(t *testing.T) {
 		},
 	}
 
-	for i := range tests {
-		regex := regexp.MustCompile(tests[i].regexStr)
-		filter := New(regex, tests[i].replace)
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("match %s replace %s", test.regexStr, string(test.replace)), func(t *testing.T) {
+			regex := regexp.MustCompile(test.regexStr)
+			filter := New(regex, test.replace)
 
-		output := filter.Filter(tests[i].input)
-		if !reflect.DeepEqual(tests[i].output, output) {
-			t.Errorf("[%d] Expected: `%s`, Got: `%s`\n", i, string(tests[i].output), string(output))
-		}
+			output := filter.Filter(test.input)
+			if !reflect.DeepEqual(test.output, output) {
+				t.Errorf("Expected: `%s`, Got: `%s`\n", string(test.output), string(output))
+			}
+		})
+
 	}
 }
