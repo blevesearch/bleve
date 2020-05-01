@@ -16,6 +16,7 @@ package test
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"testing"
@@ -48,9 +49,19 @@ func TestDisjunctionSearchScoreIndexWithCompositeFields(t *testing.T) {
 
 func disjunctionQueryiOnIndexWithCompositeFields(indexName string,
 	t *testing.T) []*search.DocumentMatch {
+	tmpIndexPath, err := ioutil.TempDir("", "bleve-testidx")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer func() {
+		err := os.RemoveAll(tmpIndexPath)
+		if err != nil {
+			t.Fatalf("error removing temp dir: %v", err)
+		}
+	}()
 	// create an index
 	idxMapping := mapping.NewIndexMapping()
-	idx, err := bleve.NewUsing("testidx", idxMapping, indexName,
+	idx, err := bleve.NewUsing(tmpIndexPath, idxMapping, indexName,
 		bleve.Config.DefaultKVStore, nil)
 	if err != nil {
 		t.Error(err)
@@ -58,10 +69,6 @@ func disjunctionQueryiOnIndexWithCompositeFields(indexName string,
 
 	defer func() {
 		err = idx.Close()
-		if err != nil {
-			t.Error(err)
-		}
-		err = os.RemoveAll("testidx")
 		if err != nil {
 			t.Error(err)
 		}
