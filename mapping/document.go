@@ -316,10 +316,16 @@ func (dm *DocumentMapping) defaultAnalyzerName(path []string) string {
 		if !ok {
 			break
 		}
+
 		if current.DefaultAnalyzer != "" {
 			rv = current.DefaultAnalyzer
 		}
 	}
+
+	if rv == "" {
+		rv = dm.DefaultAnalyzer
+	}
+
 	return rv
 }
 

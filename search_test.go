@@ -1707,3 +1707,47 @@ func TestSearchHighlightingWithRegexpReplacement(t *testing.T) {
 		t.Fatalf("Expected 1 hit, got: %v", sres.Total)
 	}
 }
+
+func TestAnalyzerInheritance(t *testing.T) {
+	dMapping := mapping.NewDocumentStaticMapping()
+	dMapping.DefaultAnalyzer = keyword.Name
+
+	fMapping := mapping.NewTextFieldMapping()
+	dMapping.AddFieldMappingsAt("city", fMapping)
+
+	idxMapping := NewIndexMapping()
+	idxMapping.DefaultMapping = dMapping
+
+	tmpIndexPath := createTmpIndexPath(t)
+	idx, err := New(tmpIndexPath, idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := map[string]interface{}{
+		"city": "San Francisco",
+	}
+
+	if err = idx.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	q := NewTermQuery("San Francisco")
+	q.SetField("city")
+
+	res, err := idx.Search(NewSearchRequest(q))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) != 1 {
+		t.Fatalf("unexpected number of hits: %v", len(res.Hits))
+	}
+}
