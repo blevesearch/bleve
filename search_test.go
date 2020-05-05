@@ -1709,45 +1709,110 @@ func TestSearchHighlightingWithRegexpReplacement(t *testing.T) {
 }
 
 func TestAnalyzerInheritance(t *testing.T) {
-	dMapping := mapping.NewDocumentStaticMapping()
-	dMapping.DefaultAnalyzer = keyword.Name
-
-	fMapping := mapping.NewTextFieldMapping()
-	dMapping.AddFieldMappingsAt("city", fMapping)
-
-	idxMapping := NewIndexMapping()
-	idxMapping.DefaultMapping = dMapping
-
-	tmpIndexPath := createTmpIndexPath(t)
-	idx, err := New(tmpIndexPath, idxMapping)
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		mappingStr string
+		doc        map[string]interface{}
+		queryField string
+		queryTerm  string
+	}{
+		{
+			/*
+				index_mapping: keyword
+				default_mapping: ""
+					-> child field (should inherit keyword)
+			*/
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
+				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"store":false,"index":true}]}}},"default_analyzer":"keyword"}`,
+			doc:        map[string]interface{}{"city": "San Francisco"},
+			queryField: "city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
+				default_mapping: keyword
+				    -> child field (should inherit keyword)
+			*/
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
+				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"index":true}]}},"default_analyzer":"keyword"},"default_analyzer":"standard"}`,
+			doc:        map[string]interface{}{"city": "San Francisco"},
+			queryField: "city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
+				default_mapping: keyword
+				    -> child mapping: ""
+					    -> child field: (should inherit keyword)
+			*/
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"default_analyzer":` +
+				`"keyword","properties":{"address":{"enabled":true,"dynamic":false,"properties":` +
+				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"index":true}]}}}}},"default_analyzer":"standard"}`,
+			doc: map[string]interface{}{
+				"address": map[string]interface{}{"city": "San Francisco"},
+			},
+			queryField: "address.city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
+				default_mapping: ""
+				    -> child mapping: "keyword"
+					    -> child mapping: ""
+						    -> child field: (should inherit keyword)
+			*/
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
+				`{"address":{"enabled":true,"dynamic":false,"default_analyzer":"keyword",` +
+				`"properties":{"state":{"enabled":true,"dynamic":false,"properties":{"city":` +
+				`{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"store":false,"index":true}]}}}}}}},"default_analyer":"standard"}`,
+			doc: map[string]interface{}{
+				"address": map[string]interface{}{
+					"state": map[string]interface{}{"city": "San Francisco"},
+				},
+			},
+			queryField: "address.state.city",
+			queryTerm:  "San Francisco",
+		},
 	}
 
-	defer func() {
-		err := idx.Close()
+	for i := range tests {
+		idxMapping := NewIndexMapping()
+		if err := idxMapping.UnmarshalJSON([]byte(tests[i].mappingStr)); err != nil {
+			t.Fatal(err)
+		}
+
+		tmpIndexPath := createTmpIndexPath(t)
+		idx, err := New(tmpIndexPath, idxMapping)
 		if err != nil {
 			t.Fatal(err)
 		}
-	}()
 
-	doc := map[string]interface{}{
-		"city": "San Francisco",
-	}
+		defer func() {
+			if err := idx.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}()
 
-	if err = idx.Index("doc", doc); err != nil {
-		t.Fatal(err)
-	}
+		if err = idx.Index("doc", tests[i].doc); err != nil {
+			t.Fatal(err)
+		}
 
-	q := NewTermQuery("San Francisco")
-	q.SetField("city")
+		q := NewTermQuery(tests[i].queryTerm)
+		q.SetField(tests[i].queryField)
 
-	res, err := idx.Search(NewSearchRequest(q))
-	if err != nil {
-		t.Fatal(err)
-	}
+		res, err := idx.Search(NewSearchRequest(q))
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if len(res.Hits) != 1 {
-		t.Fatalf("unexpected number of hits: %v", len(res.Hits))
+		if len(res.Hits) != 1 {
+			t.Errorf("[%d] Unexpected number of hits: %v", i, len(res.Hits))
+		}
 	}
 }
