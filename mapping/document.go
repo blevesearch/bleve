@@ -251,7 +251,6 @@ func (dm *DocumentMapping) AddFieldMapping(fm *FieldMapping) {
 
 // UnmarshalJSON offers custom unmarshaling with optional strict validation
 func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
-
 	var tmp map[string]json.RawMessage
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
@@ -316,12 +315,10 @@ func (dm *DocumentMapping) defaultAnalyzerName(path []string) string {
 		if !ok {
 			break
 		}
-
 		if current.DefaultAnalyzer != "" {
 			rv = current.DefaultAnalyzer
 		}
 	}
-
 	return rv
 }
 
