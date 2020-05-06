@@ -16,6 +16,7 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -29,14 +30,17 @@ func showError(w http.ResponseWriter, r *http.Request,
 }
 
 func mustEncode(w io.Writer, i interface{}) {
-	if headered, ok := w.(http.ResponseWriter); ok {
+	var headered http.ResponseWriter
+	var ok bool
+	if headered, ok = w.(http.ResponseWriter); ok {
 		headered.Header().Set("Cache-Control", "no-cache")
 		headered.Header().Set("Content-type", "application/json")
 	}
 
 	e := json.NewEncoder(w)
 	if err := e.Encode(i); err != nil {
-		panic(err)
+		showError(headered, nil, fmt.Sprintf("json encode, err: %v",
+			err), http.StatusInternalServerError)
 	}
 }
 
