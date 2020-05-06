@@ -308,8 +308,8 @@ func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 }
 
 func (dm *DocumentMapping) defaultAnalyzerName(path []string) string {
-	rv := ""
 	current := dm
+	rv := current.DefaultAnalyzer
 	for _, pathElement := range path {
 		var ok bool
 		current, ok = current.Properties[pathElement]
@@ -320,10 +320,6 @@ func (dm *DocumentMapping) defaultAnalyzerName(path []string) string {
 		if current.DefaultAnalyzer != "" {
 			rv = current.DefaultAnalyzer
 		}
-	}
-
-	if rv == "" {
-		rv = dm.DefaultAnalyzer
 	}
 
 	return rv
