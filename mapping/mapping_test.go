@@ -1111,7 +1111,6 @@ func TestClosestDocDynamicMapping(t *testing.T) {
 }
 
 func TestMappingPointerToTimeBug1152(t *testing.T) {
-
 	when, err := time.Parse(time.RFC3339, "2019-03-06T15:04:05Z")
 	if err != nil {
 		t.Fatal(err)
@@ -1139,5 +1138,16 @@ func TestMappingPointerToTimeBug1152(t *testing.T) {
 	}
 	if _, ok := doc.Fields[0].(*document.DateTimeField); !ok {
 		t.Fatalf("expected field to be type *document.DateTimeField, got %T", doc.Fields[0])
+	}
+}
+
+func TestDefaultAnalyzerInheritance(t *testing.T) {
+	docMapping := NewDocumentMapping()
+	docMapping.DefaultAnalyzer = "xyz"
+	childMapping := NewTextFieldMapping()
+	docMapping.AddFieldMappingsAt("field", childMapping)
+
+	if analyzer := docMapping.defaultAnalyzerName([]string{"field"}); analyzer != "xyz" {
+		t.Fatalf("Expected analyzer: xyz to be inherited by field, but got: '%v'", analyzer)
 	}
 }
