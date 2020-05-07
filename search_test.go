@@ -28,6 +28,7 @@ import (
 	"github.com/blevesearch/bleve/analysis/analyzer/custom"
 	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/analysis/analyzer/standard"
+	regexp_char_filter "github.com/blevesearch/bleve/analysis/char/regexp"
 	"github.com/blevesearch/bleve/analysis/token/length"
 	"github.com/blevesearch/bleve/analysis/token/lowercase"
 	"github.com/blevesearch/bleve/analysis/token/shingle"
@@ -38,6 +39,7 @@ import (
 	"github.com/blevesearch/bleve/index/upsidedown"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/highlight/highlighter/ansi"
 	"github.com/blevesearch/bleve/search/highlight/highlighter/html"
 	"github.com/blevesearch/bleve/search/query"
 )
@@ -1637,5 +1639,187 @@ func TestGeoDistanceIssue1301(t *testing.T) {
 
 	if sr.Total != 3 {
 		t.Fatalf("Size expected: 3, actual %d\n", sr.Total)
+	}
+}
+
+func TestSearchHighlightingWithRegexpReplacement(t *testing.T) {
+	idxMapping := NewIndexMapping()
+	if err := idxMapping.AddCustomCharFilter(regexp_char_filter.Name, map[string]interface{}{
+		"regexp":  `([a-z])\s+(\d)`,
+		"replace": "ooooo$1-$2",
+		"type":    regexp_char_filter.Name,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idxMapping.AddCustomAnalyzer("regexp_replace", map[string]interface{}{
+		"type":      custom.Name,
+		"tokenizer": "unicode",
+		"char_filters": []string{
+			regexp_char_filter.Name,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	idxMapping.DefaultAnalyzer = "regexp_replace"
+	idxMapping.StoreDynamic = true
+	idx, err := NewUsing("testidx", idxMapping, scorch.Name, Config.DefaultKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := map[string]interface{}{
+		"status": "fool 10",
+	}
+
+	batch := idx.NewBatch()
+	if err = batch.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	query := NewMatchQuery("fool 10")
+	sreq := NewSearchRequest(query)
+	sreq.Fields = []string{"*"}
+	sreq.Highlight = NewHighlightWithStyle(ansi.Name)
+
+	sres, err := idx.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if sres.Total != 1 {
+		t.Fatalf("Expected 1 hit, got: %v", sres.Total)
+	}
+}
+
+func TestAnalyzerInheritance(t *testing.T) {
+	tests := []struct {
+		name       string
+		mappingStr string
+		doc        map[string]interface{}
+		queryField string
+		queryTerm  string
+	}{
+		{
+			/*
+				index_mapping: keyword
+				default_mapping: ""
+					-> child field (should inherit keyword)
+			*/
+			name: "Child field to inherit index mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
+				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"store":false,"index":true}]}}},"default_analyzer":"keyword"}`,
+			doc:        map[string]interface{}{"city": "San Francisco"},
+			queryField: "city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
+				default_mapping: keyword
+				    -> child field (should inherit keyword)
+			*/
+			name: "Child field to inherit default mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
+				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"index":true}]}},"default_analyzer":"keyword"},"default_analyzer":"standard"}`,
+			doc:        map[string]interface{}{"city": "San Francisco"},
+			queryField: "city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
+				default_mapping: keyword
+				    -> child mapping: ""
+					    -> child field: (should inherit keyword)
+			*/
+			name: "Nested child field to inherit default mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"default_analyzer":` +
+				`"keyword","properties":{"address":{"enabled":true,"dynamic":false,"properties":` +
+				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"index":true}]}}}}},"default_analyzer":"standard"}`,
+			doc: map[string]interface{}{
+				"address": map[string]interface{}{"city": "San Francisco"},
+			},
+			queryField: "address.city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
+				default_mapping: ""
+				    -> child mapping: "keyword"
+					    -> child mapping: ""
+						    -> child field: (should inherit keyword)
+			*/
+			name: "Nested child field to inherit first child mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
+				`{"address":{"enabled":true,"dynamic":false,"default_analyzer":"keyword",` +
+				`"properties":{"state":{"enabled":true,"dynamic":false,"properties":{"city":` +
+				`{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"store":false,"index":true}]}}}}}}},"default_analyer":"standard"}`,
+			doc: map[string]interface{}{
+				"address": map[string]interface{}{
+					"state": map[string]interface{}{"city": "San Francisco"},
+				},
+			},
+			queryField: "address.state.city",
+			queryTerm:  "San Francisco",
+		},
+	}
+
+	for i := range tests {
+		t.Run(fmt.Sprintf("%s", tests[i].name), func(t *testing.T) {
+			idxMapping := NewIndexMapping()
+			if err := idxMapping.UnmarshalJSON([]byte(tests[i].mappingStr)); err != nil {
+				t.Fatal(err)
+			}
+
+			tmpIndexPath := createTmpIndexPath(t)
+			idx, err := New(tmpIndexPath, idxMapping)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			defer func() {
+				if err := idx.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}()
+
+			if err = idx.Index("doc", tests[i].doc); err != nil {
+				t.Fatal(err)
+			}
+
+			q := NewTermQuery(tests[i].queryTerm)
+			q.SetField(tests[i].queryField)
+
+			res, err := idx.Search(NewSearchRequest(q))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(res.Hits) != 1 {
+				t.Errorf("Unexpected number of hits: %v", len(res.Hits))
+			}
+		})
 	}
 }
