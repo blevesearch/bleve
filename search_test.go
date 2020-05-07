@@ -1710,6 +1710,7 @@ func TestSearchHighlightingWithRegexpReplacement(t *testing.T) {
 
 func TestAnalyzerInheritance(t *testing.T) {
 	tests := []struct {
+		name       string
 		mappingStr string
 		doc        map[string]interface{}
 		queryField string
@@ -1721,6 +1722,7 @@ func TestAnalyzerInheritance(t *testing.T) {
 				default_mapping: ""
 					-> child field (should inherit keyword)
 			*/
+			name: "Child field to inherit index mapping's default analyzer",
 			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
 				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
 				`"store":false,"index":true}]}}},"default_analyzer":"keyword"}`,
@@ -1734,6 +1736,7 @@ func TestAnalyzerInheritance(t *testing.T) {
 				default_mapping: keyword
 				    -> child field (should inherit keyword)
 			*/
+			name: "Child field to inherit default mapping's default analyzer",
 			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
 				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
 				`"index":true}]}},"default_analyzer":"keyword"},"default_analyzer":"standard"}`,
@@ -1748,6 +1751,7 @@ func TestAnalyzerInheritance(t *testing.T) {
 				    -> child mapping: ""
 					    -> child field: (should inherit keyword)
 			*/
+			name: "Nested child field to inherit default mapping's default analyzer",
 			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"default_analyzer":` +
 				`"keyword","properties":{"address":{"enabled":true,"dynamic":false,"properties":` +
 				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
@@ -1766,6 +1770,7 @@ func TestAnalyzerInheritance(t *testing.T) {
 					    -> child mapping: ""
 						    -> child field: (should inherit keyword)
 			*/
+			name: "Nested child field to inherit first child mapping's default analyzer",
 			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
 				`{"address":{"enabled":true,"dynamic":false,"default_analyzer":"keyword",` +
 				`"properties":{"state":{"enabled":true,"dynamic":false,"properties":{"city":` +
@@ -1782,37 +1787,39 @@ func TestAnalyzerInheritance(t *testing.T) {
 	}
 
 	for i := range tests {
-		idxMapping := NewIndexMapping()
-		if err := idxMapping.UnmarshalJSON([]byte(tests[i].mappingStr)); err != nil {
-			t.Fatal(err)
-		}
-
-		tmpIndexPath := createTmpIndexPath(t)
-		idx, err := New(tmpIndexPath, idxMapping)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		defer func() {
-			if err := idx.Close(); err != nil {
+		t.Run(fmt.Sprintf("%s", tests[i].name), func(t *testing.T) {
+			idxMapping := NewIndexMapping()
+			if err := idxMapping.UnmarshalJSON([]byte(tests[i].mappingStr)); err != nil {
 				t.Fatal(err)
 			}
-		}()
 
-		if err = idx.Index("doc", tests[i].doc); err != nil {
-			t.Fatal(err)
-		}
+			tmpIndexPath := createTmpIndexPath(t)
+			idx, err := New(tmpIndexPath, idxMapping)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		q := NewTermQuery(tests[i].queryTerm)
-		q.SetField(tests[i].queryField)
+			defer func() {
+				if err := idx.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}()
 
-		res, err := idx.Search(NewSearchRequest(q))
-		if err != nil {
-			t.Fatal(err)
-		}
+			if err = idx.Index("doc", tests[i].doc); err != nil {
+				t.Fatal(err)
+			}
 
-		if len(res.Hits) != 1 {
-			t.Errorf("[%d] Unexpected number of hits: %v", i, len(res.Hits))
-		}
+			q := NewTermQuery(tests[i].queryTerm)
+			q.SetField(tests[i].queryField)
+
+			res, err := idx.Search(NewSearchRequest(q))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(res.Hits) != 1 {
+				t.Errorf("Unexpected number of hits: %v", len(res.Hits))
+			}
+		})
 	}
 }
