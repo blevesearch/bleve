@@ -209,7 +209,7 @@ OUTER:
 		case s.introducerNotifier <- w:
 		}
 
-		s.removeOldData() // might as well cleanup while waiting
+		s.removeOldData(s.getNumSnapshotsToKeep(ourSnapshot)) // might as well cleanup while waiting
 
 		atomic.AddUint64(&s.stats.TotPersistLoopWait, 1)
 
@@ -276,7 +276,7 @@ func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
 	// 1. Too many older snapshots awaiting the clean up.
 	// 2. The merger could be lagging behind on merging the disk files.
 	if numFilesOnDisk > uint64(po.PersisterNapUnderNumFiles) {
-		s.removeOldData()
+		s.removeOldData(s.numSnapshotsToKeep)
 		numFilesOnDisk, _, _ = s.diskFileStats(nil)
 	}
 
@@ -780,8 +780,8 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	return rv, nil
 }
 
-func (s *Scorch) removeOldData() {
-	removed, err := s.removeOldBoltSnapshots()
+func (s *Scorch) removeOldData(numSnapshotsToKeep int) {
+	removed, err := s.removeOldBoltSnapshots(numSnapshotsToKeep)
 	if err != nil {
 		s.fireAsyncError(fmt.Errorf("got err removing old bolt snapshots: %v", err))
 	}
@@ -798,22 +798,31 @@ func (s *Scorch) removeOldData() {
 // rollback'ability.
 var NumSnapshotsToKeep = 1
 
+func (s *Scorch) getNumSnapshotsToKeep(ourSnapshot *IndexSnapshot) int {
+	if ourSnapshot != nil &&
+		ourSnapshot.creator != numSnapShotsToKeepOverRuler {
+		return s.numSnapshotsToKeep
+	}
+	return 1
+}
+
 // Removes enough snapshots from the rootBolt so that the
 // s.eligibleForRemoval stays under the NumSnapshotsToKeep policy.
-func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
+func (s *Scorch) removeOldBoltSnapshots(numSnapshotsToKeep int) (
+	numRemoved int, err error) {
 	persistedEpochs, err := s.RootBoltSnapshotEpochs()
 	if err != nil {
 		return 0, err
 	}
 
-	if len(persistedEpochs) <= s.numSnapshotsToKeep {
+	if len(persistedEpochs) <= numSnapshotsToKeep {
 		// we need to keep everything
 		return 0, nil
 	}
 
 	// make a map of epochs to protect from deletion
-	protectedEpochs := make(map[uint64]struct{}, s.numSnapshotsToKeep)
-	for _, epoch := range persistedEpochs[0:s.numSnapshotsToKeep] {
+	protectedEpochs := make(map[uint64]struct{}, numSnapshotsToKeep)
+	for _, epoch := range persistedEpochs[0:numSnapshotsToKeep] {
 		protectedEpochs[epoch] = struct{}{}
 	}
 

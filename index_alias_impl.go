@@ -44,6 +44,18 @@ func NewIndexAlias(indexes ...Index) *indexAliasImpl {
 	}
 }
 
+// Indexes just returns the indexes included in the
+// index alias at the moment in an unsafe way.
+// Caller must be aware that the results will be
+// inconsistent if there are concurrent Add/Remove
+// operations on the alias.
+func (i *indexAliasImpl) Indexes() []Index {
+	i.mutex.RLock()
+	rv := i.indexes
+	i.mutex.RUnlock()
+	return rv
+}
+
 func (i *indexAliasImpl) isAliasToSingleIndex() error {
 	if len(i.indexes) < 1 {
 		return ErrorAliasEmpty

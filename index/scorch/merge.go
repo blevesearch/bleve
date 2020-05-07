@@ -27,14 +27,18 @@ import (
 	"github.com/blevesearch/bleve/index/scorch/segment"
 )
 
+var numSnapShotsToKeepOverRuler = "introduceForceMerge"
+
 func (s *Scorch) mergerLoop() {
 	var lastEpochMergePlanned uint64
+	var ctrlMsg *mergerCtrl
 	mergePlannerOptions, err := s.parseMergePlannerOptions()
 	if err != nil {
 		s.fireAsyncError(fmt.Errorf("mergePlannerOption json parsing err: %v", err))
 		s.asyncTasks.Done()
 		return
 	}
+	ctrlMsgDflt := &mergerCtrl{options: mergePlannerOptions, doneCh: nil}
 
 OUTER:
 	for {
@@ -53,16 +57,30 @@ OUTER:
 			atomic.StoreUint64(&s.iStats.mergeEpoch, ourSnapshot.epoch)
 			s.rootLock.Unlock()
 
-			if ourSnapshot.epoch != lastEpochMergePlanned {
+			if ctrlMsg == nil && ourSnapshot.epoch != lastEpochMergePlanned {
+				ctrlMsg = ctrlMsgDflt
+			}
+			if ctrlMsg != nil {
 				startTime := time.Now()
 
 				// lets get started
-				err := s.planMergeAtSnapshot(ourSnapshot, mergePlannerOptions)
+				err := s.planMergeAtSnapshot(ourSnapshot, ctrlMsg.options,
+					ctrlMsg.creator, ctrlMsg.cancelCh)
 				if err != nil {
 					atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
 					if err == segment.ErrClosed {
 						// index has been closed
 						_ = ourSnapshot.DecRef()
+
+						// continue the workloop on a user triggered cancel
+						if ctrlMsg.doneCh != nil {
+							close(ctrlMsg.doneCh)
+							ctrlMsg = nil
+							continue OUTER
+						}
+
+						// exit the workloop on index closure
+						ctrlMsg = nil
 						break OUTER
 					}
 					s.fireAsyncError(fmt.Errorf("merging err: %v", err))
@@ -70,6 +88,12 @@ OUTER:
 					atomic.AddUint64(&s.stats.TotFileMergeLoopErr, 1)
 					continue OUTER
 				}
+
+				if ctrlMsg.doneCh != nil {
+					close(ctrlMsg.doneCh)
+				}
+				ctrlMsg = nil
+
 				lastEpochMergePlanned = ourSnapshot.epoch
 
 				atomic.StoreUint64(&s.stats.LastMergedEpoch, ourSnapshot.epoch)
@@ -90,6 +114,8 @@ OUTER:
 			case <-s.closeCh:
 				break OUTER
 			case s.persisterNotifier <- ew:
+			case ctrlMsg = <-s.mergerKickCh:
+				continue OUTER
 			}
 
 			// now wait for persister (but also detect close)
@@ -97,6 +123,7 @@ OUTER:
 			case <-s.closeCh:
 				break OUTER
 			case <-ew.notifyCh:
+			case ctrlMsg = <-s.mergerKickCh:
 			}
 		}
 
@@ -104,6 +131,76 @@ OUTER:
 	}
 
 	s.asyncTasks.Done()
+}
+
+type mergerCtrl struct {
+	creator  string
+	options  *mergeplan.MergePlanOptions
+	doneCh   chan struct{}
+	cancelCh chan struct{}
+}
+
+// MergeRequest represents various control
+// parameters for the ForceMerge API.
+type MergeRequest struct {
+	// MergeOptions specify the merge policy applied during
+	// the forced merge cycles. This doesn't override the
+	// index's original merge policy.
+	MergeOptions *mergeplan.MergePlanOptions
+
+	// OverrideNumSnapshotsToKeep specify whether to retain
+	// a number of older snapshots dictated by numSnapshotsToKeep
+	// during a forced merge cycle. Enabling this reduces the
+	// disk space requirements during a forced merge operation.
+	OverrideNumSnapshotsToKeep bool
+
+	// CancelCh helps in cancelling an ongoing merge operation.
+	CancelCh chan struct{}
+}
+
+// ForceMerge helps users trigger a merge operation on
+// an online scorch index.
+func (s *Scorch) ForceMerge(mr *MergeRequest) error {
+	// check whether force merge is already under processing
+	s.rootLock.Lock()
+	if s.stats.TotFileMergeForceOpsStarted >
+		s.stats.TotFileMergeForceOpsCompleted {
+		s.rootLock.Unlock()
+		return fmt.Errorf("force merge already in progress")
+	}
+
+	s.stats.TotFileMergeForceOpsStarted++
+	s.rootLock.Unlock()
+
+	if mr.MergeOptions == nil {
+		// assume the default single segment merge policy
+		mr.MergeOptions = &mergeplan.SingleSegmentMergePlanOptions
+	}
+	var ssCreator string
+	if mr.OverrideNumSnapshotsToKeep {
+		ssCreator = numSnapShotsToKeepOverRuler
+	}
+	msg := &mergerCtrl{creator: ssCreator,
+		options:  mr.MergeOptions,
+		doneCh:   make(chan struct{}),
+		cancelCh: mr.CancelCh,
+	}
+
+	// kick the merger workloop
+	select {
+	case s.mergerKickCh <- msg:
+	case <-s.closeCh:
+		return nil
+	}
+
+	// wait for the force merge operation completion
+	select {
+	case <-msg.doneCh:
+		atomic.AddUint64(&s.stats.TotFileMergeForceOpsCompleted, 1)
+	case <-s.closeCh:
+	}
+
+	return nil
 }
 
 func (s *Scorch) parseMergePlannerOptions() (*mergeplan.MergePlanOptions,
@@ -129,7 +226,8 @@ func (s *Scorch) parseMergePlannerOptions() (*mergeplan.MergePlanOptions,
 }
 
 func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
-	options *mergeplan.MergePlanOptions) error {
+	options *mergeplan.MergePlanOptions, creator string,
+	cancelCh chan struct{}) error {
 	// build list of persisted segments in this snapshot
 	var onlyPersistedSnapshots []mergeplan.Segment
 	for _, segmentSnapshot := range ourSnapshot.segment {
@@ -157,6 +255,26 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 
 	// process tasks in serial for now
 	var filenames []string
+
+	closeCh := make(chan struct{})
+	defer func() {
+		select {
+		case <-closeCh:
+		default:
+			close(closeCh)
+		}
+	}()
+	// cancel the merge operation on events like the index closure
+	// or upon a user cancel.
+	go func() {
+		select {
+		case <-s.closeCh:
+			close(closeCh)
+		case <-cancelCh:
+			close(closeCh)
+		case <-closeCh:
+		}
+	}()
 
 	for _, task := range resultMergePlan.Tasks {
 		if len(task.Segments) == 0 {
@@ -203,7 +321,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			newDocNums, _, err := s.segPlugin.Merge(segmentsToMerge, docsToDrop, path,
-				s.closeCh, s)
+				closeCh, s)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
 
 			fileMergeZapTime := uint64(time.Since(fileMergeZapStartTime))
@@ -241,6 +359,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 			oldNewDocNums: oldNewDocNums,
 			new:           seg,
 			notify:        make(chan *IndexSnapshot),
+			creator:       creator,
 		}
 
 		// give it to the introducer
@@ -285,6 +404,7 @@ type segmentMerge struct {
 	oldNewDocNums map[uint64][]uint64
 	new           segment.Segment
 	notify        chan *IndexSnapshot
+	creator       string
 }
 
 // perform a merging of the given SegmentBase instances into a new,

@@ -77,6 +77,8 @@ type Scorch struct {
 
 	pauseCount uint64
 
+	mergerKickCh chan *mergerCtrl
+
 	segPlugin segment.Plugin
 }
 
@@ -101,6 +103,7 @@ func NewScorch(storeName string,
 		nextSnapshotEpoch:    1,
 		closeCh:              make(chan struct{}),
 		ineligibleForRemoval: map[string]bool{},
+		mergerKickCh:         make(chan *mergerCtrl, 1),
 		segPlugin:            defaultSegmentPlugin,
 	}
 
