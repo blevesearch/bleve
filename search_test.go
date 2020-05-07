@@ -1693,3 +1693,119 @@ func TestSearchHighlightingWithRegexpReplacement(t *testing.T) {
 		t.Fatalf("Expected 1 hit, got: %v", sres.Total)
 	}
 }
+
+func TestAnalyzerInheritance(t *testing.T) {
+	tests := []struct {
+		name       string
+		mappingStr string
+		doc        map[string]interface{}
+		queryField string
+		queryTerm  string
+	}{
+		{
+			/*
+				index_mapping: keyword
+				default_mapping: ""
+					-> child field (should inherit keyword)
+			*/
+			name: "Child field to inherit index mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
+				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"store":false,"index":true}]}}},"default_analyzer":"keyword"}`,
+			doc:        map[string]interface{}{"city": "San Francisco"},
+			queryField: "city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
+				default_mapping: keyword
+				    -> child field (should inherit keyword)
+			*/
+			name: "Child field to inherit default mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
+				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"index":true}]}},"default_analyzer":"keyword"},"default_analyzer":"standard"}`,
+			doc:        map[string]interface{}{"city": "San Francisco"},
+			queryField: "city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
+				default_mapping: keyword
+				    -> child mapping: ""
+					    -> child field: (should inherit keyword)
+			*/
+			name: "Nested child field to inherit default mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"default_analyzer":` +
+				`"keyword","properties":{"address":{"enabled":true,"dynamic":false,"properties":` +
+				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"index":true}]}}}}},"default_analyzer":"standard"}`,
+			doc: map[string]interface{}{
+				"address": map[string]interface{}{"city": "San Francisco"},
+			},
+			queryField: "address.city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
+				default_mapping: ""
+				    -> child mapping: "keyword"
+					    -> child mapping: ""
+						    -> child field: (should inherit keyword)
+			*/
+			name: "Nested child field to inherit first child mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
+				`{"address":{"enabled":true,"dynamic":false,"default_analyzer":"keyword",` +
+				`"properties":{"state":{"enabled":true,"dynamic":false,"properties":{"city":` +
+				`{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"store":false,"index":true}]}}}}}}},"default_analyer":"standard"}`,
+			doc: map[string]interface{}{
+				"address": map[string]interface{}{
+					"state": map[string]interface{}{"city": "San Francisco"},
+				},
+			},
+			queryField: "address.state.city",
+			queryTerm:  "San Francisco",
+		},
+	}
+
+	for i := range tests {
+		t.Run(fmt.Sprintf("%s", tests[i].name), func(t *testing.T) {
+			idxMapping := NewIndexMapping()
+			if err := idxMapping.UnmarshalJSON([]byte(tests[i].mappingStr)); err != nil {
+				t.Fatal(err)
+			}
+
+			tmpIndexPath := createTmpIndexPath(t)
+			idx, err := New(tmpIndexPath, idxMapping)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			defer func() {
+				if err := idx.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}()
+
+			if err = idx.Index("doc", tests[i].doc); err != nil {
+				t.Fatal(err)
+			}
+
+			q := NewTermQuery(tests[i].queryTerm)
+			q.SetField(tests[i].queryField)
+
+			res, err := idx.Search(NewSearchRequest(q))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(res.Hits) != 1 {
+				t.Errorf("Unexpected number of hits: %v", len(res.Hits))
+			}
+		})
+	}
+}
