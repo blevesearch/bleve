@@ -10,6 +10,7 @@ require (
 	github.com/blevesearch/snowballstem v0.9.0
 	github.com/blevesearch/zap/v11 v11.0.7
 	github.com/blevesearch/zap/v12 v12.0.7
+	github.com/couchbase/ghistogram v0.1.0 // indirect
 	github.com/couchbase/moss v0.1.0
 	github.com/couchbase/vellum v1.0.1
 	github.com/golang/protobuf v1.3.2
