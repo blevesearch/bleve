@@ -1793,14 +1793,18 @@ func TestAnalyzerInheritance(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			tmpIndexPath := createTmpIndexPath(t)
-			idx, err := New(tmpIndexPath, idxMapping)
+			idx, err := New("testidx", idxMapping)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			defer func() {
 				if err := idx.Close(); err != nil {
+					t.Fatal(err)
+				}
+
+				err = os.RemoveAll("testidx")
+				if err != nil {
 					t.Fatal(err)
 				}
 			}()
