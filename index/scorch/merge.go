@@ -257,21 +257,23 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 	var filenames []string
 
 	closeCh := make(chan struct{})
-	defer func() {
+	cleanup := func() {
 		select {
 		case <-closeCh:
 		default:
 			close(closeCh)
 		}
-	}()
+	}
+	defer cleanup()
+
 	// cancel the merge operation on events like the index closure
 	// or upon a user cancel.
 	go func() {
 		select {
 		case <-s.closeCh:
-			close(closeCh)
+			cleanup()
 		case <-cancelCh:
-			close(closeCh)
+			cleanup()
 		case <-closeCh:
 		}
 	}()

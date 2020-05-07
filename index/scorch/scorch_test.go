@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -2153,8 +2154,14 @@ func TestForceVersion(t *testing.T) {
 }
 
 func TestIndexForceMerge(t *testing.T) {
-	cfg := CreateConfig("TestIndexBatch")
+	cfg := CreateConfig("TestIndexForceMerge")
 	err := InitTest(cfg)
+	defer func() {
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
 	tmp := struct {
 		MaxSegmentsPerTier   int   `json:"maxSegmentsPerTier"`
 		SegmentsPerMergeTask int   `json:"segmentsPerMergeTask"`
@@ -2166,16 +2173,6 @@ func TestIndexForceMerge(t *testing.T) {
 	}
 	cfg["scorchMergePlanOptions"] = &tmp
 
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := DestroyTest(cfg)
-		if err != nil {
-			t.Log(err)
-		}
-	}()
-
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
@@ -2185,13 +2182,6 @@ func TestIndexForceMerge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error opening index: %v", err)
 	}
-	defer func() {
-		err := idx.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
 	var expectedCount uint64
 	batch := index.NewBatch()
 	for i := 0; i < 10; i++ {
@@ -2225,42 +2215,57 @@ func TestIndexForceMerge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ns, ok := idx.StatsMap()["TotFileSegmentsAtRoot"].(uint64); ok &&
-		ns != 10 {
-		t.Errorf("expected 10 root file segments, got: %d", ns)
+	var si *Scorch
+	var ok bool
+	if si, ok = idx.(*Scorch); !ok {
+		t.Errorf("expects a scorch index")
+	}
+
+	nfs := atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot)
+	if nfs != 10 {
+		t.Errorf("expected 10 root file segments, got: %d", nfs)
 	}
 
 	for {
-		if ns, ok := idx.StatsMap()["TotFileSegmentsAtRoot"].(uint64); ok &&
-			ns == 1 {
+		if atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot) == 1 {
 			break
 		}
-
-		if si, ok := idx.(*Scorch); ok {
-			err := si.ForceMerge(&MergeRequest{
-				MergeOptions: &mergeplan.MergePlanOptions{
-					MaxSegmentsPerTier:   1,
-					MaxSegmentSize:       10000,
-					SegmentsPerMergeTask: 10,
-					FloorSegmentSize:     10000},
-				OverrideNumSnapshotsToKeep: true})
-			if err != nil {
-				t.Errorf("RequestMerge failed, err: %v", err)
-			}
+		err := si.ForceMerge(&MergeRequest{
+			MergeOptions: &mergeplan.MergePlanOptions{
+				MaxSegmentsPerTier:   1,
+				MaxSegmentSize:       10000,
+				SegmentsPerMergeTask: 10,
+				FloorSegmentSize:     10000},
+			OverrideNumSnapshotsToKeep: true})
+		if err != nil {
+			t.Errorf("ForceMerge failed, err: %v", err)
 		}
 	}
 
 	// verify the final root segment count
-	if ns, ok := idx.StatsMap()["TotFileSegmentsAtRoot"].(uint64); ok &&
-		ns != 1 {
-		t.Errorf("expected a single root file segments, got: %d", ns)
+	if atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot) != 1 {
+		t.Errorf("expected a single root file segments, got: %d",
+			atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot))
 	}
-
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestCancelIndexForceMerge(t *testing.T) {
-	cfg := CreateConfig("TestIndexBatch")
+	cfg := CreateConfig("TestCancelIndexForceMerge")
 	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
 	tmp := struct {
 		MaxSegmentsPerTier   int   `json:"maxSegmentsPerTier"`
 		SegmentsPerMergeTask int   `json:"segmentsPerMergeTask"`
@@ -2272,16 +2277,6 @@ func TestCancelIndexForceMerge(t *testing.T) {
 	}
 	cfg["scorchMergePlanOptions"] = &tmp
 
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := DestroyTest(cfg)
-		if err != nil {
-			t.Log(err)
-		}
-	}()
-
 	analysisQueue := index.NewAnalysisQueue(1)
 	idx, err := NewScorch(Name, cfg, analysisQueue)
 	if err != nil {
@@ -2291,12 +2286,6 @@ func TestCancelIndexForceMerge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error opening index: %v", err)
 	}
-	defer func() {
-		err := idx.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
 
 	var expectedCount uint64
 	batch := index.NewBatch()
@@ -2332,20 +2321,25 @@ func TestCancelIndexForceMerge(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// no merge operations are expected as per the original merge policy.
-	if ns, ok := idx.StatsMap()["TotFileSegmentsAtRoot"].(uint64); ok &&
-		ns != 20 {
-		t.Errorf("expected 20 root file segments, got: %d", ns)
+	var si *Scorch
+	var ok bool
+	if si, ok = idx.(*Scorch); !ok {
+		t.Fatal("expects a scorch index")
 	}
 
-	fsar := uint64(0)
+	// no merge operations are expected as per the original merge policy.
+	nfsr := atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot)
+	if nfsr != 20 {
+		t.Errorf("expected 20 root file segments, got: %d", nfsr)
+	}
+
 	cancelCh := make(chan struct{})
 	// cancel the force merge operation once the root has some new merge
 	// introductions. ie if the root has lesser file segments than earlier.
 	go func() {
 		for {
-			if nval, ok := idx.StatsMap()["TotFileSegmentsAtRoot"].(uint64); ok &&
-				nval < fsar {
+			nval := atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot)
+			if nval < nfsr {
 				close(cancelCh)
 				return
 			}
@@ -2353,35 +2347,26 @@ func TestCancelIndexForceMerge(t *testing.T) {
 		}
 	}()
 
-OUTER:
-	for {
-		select {
-		case <-cancelCh:
-			break OUTER
-		default:
-		}
-		// get the number of file segments at root right before
-		// the force merge operation.
-		fsar, _ = idx.StatsMap()["TotFileSegmentsAtRoot"].(uint64)
-
-		if si, ok := idx.(*Scorch); ok {
-			err := si.ForceMerge(&MergeRequest{
-				MergeOptions: &mergeplan.MergePlanOptions{
-					MaxSegmentsPerTier:   1,
-					MaxSegmentSize:       10000,
-					SegmentsPerMergeTask: 5,
-					FloorSegmentSize:     10000},
-				OverrideNumSnapshotsToKeep: true,
-				CancelCh:                   cancelCh})
-			if err != nil {
-				t.Errorf("RequestMerge failed, err: %v", err)
-			}
-		}
+	err = si.ForceMerge(&MergeRequest{
+		MergeOptions: &mergeplan.MergePlanOptions{
+			MaxSegmentsPerTier:   1,
+			MaxSegmentSize:       10000,
+			SegmentsPerMergeTask: 5,
+			FloorSegmentSize:     10000},
+		OverrideNumSnapshotsToKeep: true,
+		CancelCh:                   cancelCh})
+	if err != nil {
+		t.Errorf("ForceMerge failed, err: %v", err)
 	}
 
 	// verify the final root file segment count or forceMerge completion
-	if ns, ok := idx.StatsMap()["TotFileSegmentsAtRoot"].(uint64); ok &&
-		ns == 1 {
-		t.Errorf("expected many files at root, but got: %d segments", ns)
+	if atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot) == 1 {
+		t.Errorf("expected many files at root, but got: %d segments",
+			atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot))
+	}
+
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
