@@ -40,13 +40,8 @@ type persistIntroduction struct {
 	applied   notificationChan
 }
 
-type epochWatcher struct {
-	epoch    uint64
-	notifyCh notificationChan
-}
-
 func (s *Scorch) introducerLoop() {
-	var epochWatchers []*epochWatcher
+	var introduceWatchers epochWatchers
 OUTER:
 	for {
 		atomic.AddUint64(&s.stats.TotIntroduceLoop, 1)
@@ -56,7 +51,7 @@ OUTER:
 			break OUTER
 
 		case epochWatcher := <-s.introducerNotifier:
-			epochWatchers = append(epochWatchers, epochWatcher)
+			introduceWatchers.Add(epochWatcher)
 
 		case nextMerge := <-s.merges:
 			s.introduceMerge(nextMerge)
@@ -78,15 +73,7 @@ OUTER:
 			epochCurr = s.root.epoch
 		}
 		s.rootLock.RUnlock()
-		var epochWatchersNext []*epochWatcher
-		for _, w := range epochWatchers {
-			if w.epoch < epochCurr {
-				close(w.notifyCh)
-			} else {
-				epochWatchersNext = append(epochWatchersNext, w)
-			}
-		}
-		epochWatchers = epochWatchersNext
+		introduceWatchers.NotifySatisfiedWatchers(epochCurr)
 	}
 
 	s.asyncTasks.Done()

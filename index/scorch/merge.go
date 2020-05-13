@@ -27,12 +27,20 @@ import (
 	"github.com/blevesearch/bleve/index/scorch/segment"
 )
 
-func (s *Scorch) mergerLoop() {
+func (s *Scorch) mergerLoop(initialEpoch uint64) {
+	defer s.asyncTasks.Done()
+
 	var lastEpochMergePlanned uint64
 	mergePlannerOptions, err := s.parseMergePlannerOptions()
 	if err != nil {
 		s.fireAsyncError(fmt.Errorf("mergePlannerOption json parsing err: %v", err))
-		s.asyncTasks.Done()
+		return
+	}
+
+	// tell the persister we're waiting for anything after the initialEpoch
+	var ew *epochWatcher
+	ew, err = s.persisterNotifier.NotifyUsAfter(initialEpoch, s.closeCh)
+	if err != nil {
 		return
 	}
 
@@ -44,7 +52,7 @@ OUTER:
 		case <-s.closeCh:
 			break OUTER
 
-		default:
+		case <-ew.notifyCh:
 			// check to see if there is a new snapshot to persist
 			s.rootLock.Lock()
 			ourSnapshot := s.root
@@ -78,32 +86,16 @@ OUTER:
 			}
 			_ = ourSnapshot.DecRef()
 
-			// tell the persister we're waiting for changes
-			// first make a epochWatcher chan
-			ew := &epochWatcher{
-				epoch:    lastEpochMergePlanned,
-				notifyCh: make(notificationChan, 1),
-			}
-
-			// give it to the persister
-			select {
-			case <-s.closeCh:
+			// update the persister, that we're now waiting for something
+			// after lastEpochMergePlanned
+			ew, err = s.persisterNotifier.NotifyUsAfter(lastEpochMergePlanned, s.closeCh)
+			if err != nil {
 				break OUTER
-			case s.persisterNotifier <- ew:
-			}
-
-			// now wait for persister (but also detect close)
-			select {
-			case <-s.closeCh:
-				break OUTER
-			case <-ew.notifyCh:
 			}
 		}
 
 		atomic.AddUint64(&s.stats.TotFileMergeLoopEnd, 1)
 	}
-
-	s.asyncTasks.Done()
 }
 
 func (s *Scorch) parseMergePlannerOptions() (*mergeplan.MergePlanOptions,

@@ -79,12 +79,10 @@ type persisterOptions struct {
 	MemoryPressurePauseThreshold uint64
 }
 
-type notificationChan chan struct{}
-
-func (s *Scorch) persisterLoop() {
+func (s *Scorch) persisterLoop(initialEpoch uint64) {
 	defer s.asyncTasks.Done()
 
-	var persistWatchers []*epochWatcher
+	var persistWatchers epochWatchers
 	var lastPersistedEpoch, lastMergedEpoch uint64
 	var ew *epochWatcher
 
@@ -97,157 +95,133 @@ func (s *Scorch) persisterLoop() {
 		return
 	}
 
+	// tell the introducer we're waiting for changes after the initial epoch
+	var introducerEpochWatcher *epochWatcher
+	introducerEpochWatcher, err = s.introducerNotifier.NotifyUsAfter(initialEpoch, s.closeCh)
+	if err != nil {
+		return
+	}
+
 OUTER:
 	for {
 		atomic.AddUint64(&s.stats.TotPersistLoopBeg, 1)
-
-		select {
-		case <-s.closeCh:
-			break OUTER
-		case ew = <-s.persisterNotifier:
-			persistWatchers = append(persistWatchers, ew)
-		default:
-		}
-		if ew != nil && ew.epoch > lastMergedEpoch {
-			lastMergedEpoch = ew.epoch
-		}
-		lastMergedEpoch, persistWatchers = s.pausePersisterForMergerCatchUp(lastPersistedEpoch,
-			lastMergedEpoch, persistWatchers, po)
-
-		var ourSnapshot *IndexSnapshot
-		var ourPersisted []chan error
-		var ourPersistedCallbacks []index.BatchCallback
-
-		// check to see if there is a new snapshot to persist
-		s.rootLock.Lock()
-		if s.root != nil && s.root.epoch > lastPersistedEpoch {
-			ourSnapshot = s.root
-			ourSnapshot.AddRef()
-			ourPersisted = s.rootPersisted
-			s.rootPersisted = nil
-			ourPersistedCallbacks = s.persistedCallbacks
-			s.persistedCallbacks = nil
-			atomic.StoreUint64(&s.iStats.persistSnapshotSize, uint64(ourSnapshot.Size()))
-			atomic.StoreUint64(&s.iStats.persistEpoch, ourSnapshot.epoch)
-		}
-		s.rootLock.Unlock()
-
-		if ourSnapshot != nil {
-			startTime := time.Now()
-
-			err := s.persistSnapshot(ourSnapshot, po)
-			for _, ch := range ourPersisted {
-				if err != nil {
-					ch <- err
-				}
-				close(ch)
-			}
-			if err != nil {
-				atomic.StoreUint64(&s.iStats.persistEpoch, 0)
-				if err == segment.ErrClosed {
-					// index has been closed
-					_ = ourSnapshot.DecRef()
-					break OUTER
-				}
-
-				// save this current snapshot's persistedCallbacks, to invoke during
-				// the retry attempt
-				unpersistedCallbacks = append(unpersistedCallbacks, ourPersistedCallbacks...)
-
-				s.fireAsyncError(fmt.Errorf("got err persisting snapshot: %v", err))
-				_ = ourSnapshot.DecRef()
-				atomic.AddUint64(&s.stats.TotPersistLoopErr, 1)
-				continue OUTER
-			}
-
-			if unpersistedCallbacks != nil {
-				// in the event of this being a retry attempt for persisting a snapshot
-				// that had earlier failed, prepend the persistedCallbacks associated
-				// with earlier segment(s) to the latest persistedCallbacks
-				ourPersistedCallbacks = append(unpersistedCallbacks, ourPersistedCallbacks...)
-				unpersistedCallbacks = nil
-			}
-
-			for i := range ourPersistedCallbacks {
-				ourPersistedCallbacks[i](err)
-			}
-
-			atomic.StoreUint64(&s.stats.LastPersistedEpoch, ourSnapshot.epoch)
-
-			lastPersistedEpoch = ourSnapshot.epoch
-			for _, ew := range persistWatchers {
-				close(ew.notifyCh)
-			}
-
-			persistWatchers = nil
-			_ = ourSnapshot.DecRef()
-
-			changed := false
-			s.rootLock.RLock()
-			if s.root != nil && s.root.epoch != lastPersistedEpoch {
-				changed = true
-			}
-			s.rootLock.RUnlock()
-
-			s.fireEvent(EventKindPersisterProgress, time.Since(startTime))
-
-			if changed {
-				atomic.AddUint64(&s.stats.TotPersistLoopProgress, 1)
-				continue OUTER
-			}
-		}
-
-		// tell the introducer we're waiting for changes
-		w := &epochWatcher{
-			epoch:    lastPersistedEpoch,
-			notifyCh: make(notificationChan, 1),
-		}
-
-		select {
-		case <-s.closeCh:
-			break OUTER
-		case s.introducerNotifier <- w:
-		}
-
-		s.removeOldData() // might as well cleanup while waiting
-
 		atomic.AddUint64(&s.stats.TotPersistLoopWait, 1)
 
 		select {
 		case <-s.closeCh:
 			break OUTER
-		case <-w.notifyCh:
+		case ew = <-s.persisterNotifier:
+			persistWatchers.Add(ew)
+			lastMergedEpoch = ew.epoch
+		case <-introducerEpochWatcher.notifyCh:
 			// woken up, next loop should pick up work
 			atomic.AddUint64(&s.stats.TotPersistLoopWaitNotified, 1)
-		case ew = <-s.persisterNotifier:
-			// if the watchers are already caught up then let them wait,
-			// else let them continue to do the catch up
-			persistWatchers = append(persistWatchers, ew)
+
+			lastMergedEpoch, persistWatchers = s.pausePersisterForMergerCatchUp(lastPersistedEpoch,
+				lastMergedEpoch, persistWatchers, po)
+
+			var ourSnapshot *IndexSnapshot
+			var ourPersisted []chan error
+			var ourPersistedCallbacks []index.BatchCallback
+
+			// check to see if there is a new snapshot to persist
+			s.rootLock.Lock()
+			if s.root != nil && s.root.epoch > lastPersistedEpoch {
+				ourSnapshot = s.root
+				ourSnapshot.AddRef()
+				ourPersisted = s.rootPersisted
+				s.rootPersisted = nil
+				ourPersistedCallbacks = s.persistedCallbacks
+				s.persistedCallbacks = nil
+				atomic.StoreUint64(&s.iStats.persistSnapshotSize, uint64(ourSnapshot.Size()))
+				atomic.StoreUint64(&s.iStats.persistEpoch, ourSnapshot.epoch)
+			}
+			s.rootLock.Unlock()
+
+			if ourSnapshot != nil {
+				startTime := time.Now()
+
+				err := s.persistSnapshot(ourSnapshot, po)
+				for _, ch := range ourPersisted {
+					if err != nil {
+						ch <- err
+					}
+					close(ch)
+				}
+				if err != nil {
+					atomic.StoreUint64(&s.iStats.persistEpoch, 0)
+					if err == segment.ErrClosed {
+						// index has been closed
+						_ = ourSnapshot.DecRef()
+						break OUTER
+					}
+
+					// save this current snapshot's persistedCallbacks, to invoke during
+					// the retry attempt
+					unpersistedCallbacks = append(unpersistedCallbacks, ourPersistedCallbacks...)
+
+					s.fireAsyncError(fmt.Errorf("got err persisting snapshot: %v", err))
+					_ = ourSnapshot.DecRef()
+					atomic.AddUint64(&s.stats.TotPersistLoopErr, 1)
+					continue OUTER
+				}
+
+				if unpersistedCallbacks != nil {
+					// in the event of this being a retry attempt for persisting a snapshot
+					// that had earlier failed, prepend the persistedCallbacks associated
+					// with earlier segment(s) to the latest persistedCallbacks
+					ourPersistedCallbacks = append(unpersistedCallbacks, ourPersistedCallbacks...)
+					unpersistedCallbacks = nil
+				}
+
+				for i := range ourPersistedCallbacks {
+					ourPersistedCallbacks[i](err)
+				}
+
+				atomic.StoreUint64(&s.stats.LastPersistedEpoch, ourSnapshot.epoch)
+
+				lastPersistedEpoch = ourSnapshot.epoch
+				for _, ew := range persistWatchers {
+					close(ew.notifyCh)
+				}
+
+				persistWatchers = nil
+				_ = ourSnapshot.DecRef()
+
+				changed := false
+				s.rootLock.RLock()
+				if s.root != nil && s.root.epoch != lastPersistedEpoch {
+					changed = true
+				}
+				s.rootLock.RUnlock()
+
+				s.fireEvent(EventKindPersisterProgress, time.Since(startTime))
+
+				if changed {
+					atomic.AddUint64(&s.stats.TotPersistLoopProgress, 1)
+					continue OUTER
+				}
+			}
+
+			// tell the introducer we're waiting for changes after lastPersistedEpoch
+			introducerEpochWatcher, err = s.introducerNotifier.NotifyUsAfter(lastPersistedEpoch, s.closeCh)
+			if err != nil {
+				break OUTER
+			}
+
+			s.removeOldData() // might as well cleanup while waiting
 		}
 
 		atomic.AddUint64(&s.stats.TotPersistLoopEnd, 1)
 	}
 }
 
-func notifyMergeWatchers(lastPersistedEpoch uint64,
-	persistWatchers []*epochWatcher) []*epochWatcher {
-	var watchersNext []*epochWatcher
-	for _, w := range persistWatchers {
-		if w.epoch < lastPersistedEpoch {
-			close(w.notifyCh)
-		} else {
-			watchersNext = append(watchersNext, w)
-		}
-	}
-	return watchersNext
-}
-
 func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
-	lastMergedEpoch uint64, persistWatchers []*epochWatcher,
-	po *persisterOptions) (uint64, []*epochWatcher) {
+	lastMergedEpoch uint64, persistWatchers epochWatchers,
+	po *persisterOptions) (uint64, epochWatchers) {
 
 	// First, let the watchers proceed if they lag behind
-	persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
+	persistWatchers.NotifySatisfiedWatchers(lastPersistedEpoch)
 
 	// Check the merger lag by counting the segment files on disk,
 	numFilesOnDisk, _, _ := s.diskFileStats(nil)
@@ -264,9 +238,9 @@ func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
 
 		case ew := <-s.persisterNotifier:
 			// unblock the merger in meantime
-			persistWatchers = append(persistWatchers, ew)
+			persistWatchers.Add(ew)
 			lastMergedEpoch = ew.epoch
-			persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
+			persistWatchers.NotifySatisfiedWatchers(lastPersistedEpoch)
 			atomic.AddUint64(&s.stats.TotPersisterMergerNapBreak, 1)
 		}
 		return lastMergedEpoch, persistWatchers
@@ -293,14 +267,14 @@ OUTER:
 		case <-s.closeCh:
 			break OUTER
 		case ew := <-s.persisterNotifier:
-			persistWatchers = append(persistWatchers, ew)
+			persistWatchers.Add(ew)
 			lastMergedEpoch = ew.epoch
 		}
 
 		atomic.AddUint64(&s.stats.TotPersisterSlowMergerResume, 1)
 
 		// let the watchers proceed if they lag behind
-		persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
+		persistWatchers.NotifySatisfiedWatchers(lastPersistedEpoch)
 
 		numFilesOnDisk, _, _ = s.diskFileStats(nil)
 	}
