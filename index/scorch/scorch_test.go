@@ -15,6 +15,7 @@
 package scorch
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -2226,17 +2227,16 @@ func TestIndexForceMerge(t *testing.T) {
 		t.Errorf("expected 10 root file segments, got: %d", nfs)
 	}
 
+	ctx := context.Background()
 	for {
 		if atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot) == 1 {
 			break
 		}
-		err := si.ForceMerge(&MergeRequest{
-			MergeOptions: &mergeplan.MergePlanOptions{
-				MaxSegmentsPerTier:   1,
-				MaxSegmentSize:       10000,
-				SegmentsPerMergeTask: 10,
-				FloorSegmentSize:     10000},
-			OverrideNumSnapshotsToKeep: true})
+		err := si.ForceMerge(ctx, &mergeplan.MergePlanOptions{
+			MaxSegmentsPerTier:   1,
+			MaxSegmentSize:       10000,
+			SegmentsPerMergeTask: 10,
+			FloorSegmentSize:     10000})
 		if err != nil {
 			t.Errorf("ForceMerge failed, err: %v", err)
 		}
@@ -2247,6 +2247,17 @@ func TestIndexForceMerge(t *testing.T) {
 		t.Errorf("expected a single root file segments, got: %d",
 			atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot))
 	}
+
+	// verify with an invalid merge plan
+	err = si.ForceMerge(ctx, &mergeplan.MergePlanOptions{
+		MaxSegmentsPerTier:   1,
+		MaxSegmentSize:       1 << 33,
+		SegmentsPerMergeTask: 10,
+		FloorSegmentSize:     10000})
+	if err != mergeplan.ErrMaxSegmentSizeTooLarge {
+		t.Errorf("ForceMerge expected to fail with ErrMaxSegmentSizeTooLarge")
+	}
+
 	err = idx.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -2333,28 +2344,27 @@ func TestCancelIndexForceMerge(t *testing.T) {
 		t.Errorf("expected 20 root file segments, got: %d", nfsr)
 	}
 
-	cancelCh := make(chan struct{})
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+
 	// cancel the force merge operation once the root has some new merge
 	// introductions. ie if the root has lesser file segments than earlier.
 	go func() {
 		for {
 			nval := atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot)
 			if nval < nfsr {
-				close(cancelCh)
+				cancel()
 				return
 			}
 			time.Sleep(time.Millisecond * 5)
 		}
 	}()
 
-	err = si.ForceMerge(&MergeRequest{
-		MergeOptions: &mergeplan.MergePlanOptions{
-			MaxSegmentsPerTier:   1,
-			MaxSegmentSize:       10000,
-			SegmentsPerMergeTask: 5,
-			FloorSegmentSize:     10000},
-		OverrideNumSnapshotsToKeep: true,
-		CancelCh:                   cancelCh})
+	err = si.ForceMerge(ctx, &mergeplan.MergePlanOptions{
+		MaxSegmentsPerTier:   1,
+		MaxSegmentSize:       10000,
+		SegmentsPerMergeTask: 5,
+		FloorSegmentSize:     10000})
 	if err != nil {
 		t.Errorf("ForceMerge failed, err: %v", err)
 	}

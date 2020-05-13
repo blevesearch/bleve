@@ -15,6 +15,7 @@
 package scorch
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -27,8 +28,6 @@ import (
 	"github.com/blevesearch/bleve/index/scorch/segment"
 )
 
-var numSnapShotsToKeepOverRuler = "introduceForceMerge"
-
 func (s *Scorch) mergerLoop() {
 	var lastEpochMergePlanned uint64
 	var ctrlMsg *mergerCtrl
@@ -38,7 +37,9 @@ func (s *Scorch) mergerLoop() {
 		s.asyncTasks.Done()
 		return
 	}
-	ctrlMsgDflt := &mergerCtrl{options: mergePlannerOptions, doneCh: nil}
+	ctrlMsgDflt := &mergerCtrl{ctx: context.Background(),
+		options: mergePlannerOptions,
+		doneCh:  nil}
 
 OUTER:
 	for {
@@ -64,8 +65,8 @@ OUTER:
 				startTime := time.Now()
 
 				// lets get started
-				err := s.planMergeAtSnapshot(ourSnapshot, ctrlMsg.options,
-					ctrlMsg.creator, ctrlMsg.cancelCh)
+				err := s.planMergeAtSnapshot(ctrlMsg.ctx, ctrlMsg.options,
+					ourSnapshot)
 				if err != nil {
 					atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
 					if err == segment.ErrClosed {
@@ -114,7 +115,7 @@ OUTER:
 			case <-s.closeCh:
 				break OUTER
 			case s.persisterNotifier <- ew:
-			case ctrlMsg = <-s.mergerKickCh:
+			case ctrlMsg = <-s.forceMergeRequestCh:
 				continue OUTER
 			}
 
@@ -123,7 +124,7 @@ OUTER:
 			case <-s.closeCh:
 				break OUTER
 			case <-ew.notifyCh:
-			case ctrlMsg = <-s.mergerKickCh:
+			case ctrlMsg = <-s.forceMergeRequestCh:
 			}
 		}
 
@@ -134,33 +135,15 @@ OUTER:
 }
 
 type mergerCtrl struct {
-	creator  string
-	options  *mergeplan.MergePlanOptions
-	doneCh   chan struct{}
-	cancelCh chan struct{}
-}
-
-// MergeRequest represents various control
-// parameters for the ForceMerge API.
-type MergeRequest struct {
-	// MergeOptions specify the merge policy applied during
-	// the forced merge cycles. This doesn't override the
-	// index's original merge policy.
-	MergeOptions *mergeplan.MergePlanOptions
-
-	// OverrideNumSnapshotsToKeep specify whether to retain
-	// a number of older snapshots dictated by numSnapshotsToKeep
-	// during a forced merge cycle. Enabling this reduces the
-	// disk space requirements during a forced merge operation.
-	OverrideNumSnapshotsToKeep bool
-
-	// CancelCh helps in cancelling an ongoing merge operation.
-	CancelCh chan struct{}
+	ctx     context.Context
+	options *mergeplan.MergePlanOptions
+	doneCh  chan struct{}
 }
 
 // ForceMerge helps users trigger a merge operation on
 // an online scorch index.
-func (s *Scorch) ForceMerge(mr *MergeRequest) error {
+func (s *Scorch) ForceMerge(ctx context.Context,
+	mo *mergeplan.MergePlanOptions) error {
 	// check whether force merge is already under processing
 	s.rootLock.Lock()
 	if s.stats.TotFileMergeForceOpsStarted >
@@ -172,23 +155,23 @@ func (s *Scorch) ForceMerge(mr *MergeRequest) error {
 	s.stats.TotFileMergeForceOpsStarted++
 	s.rootLock.Unlock()
 
-	if mr.MergeOptions == nil {
+	if mo != nil {
+		err := mergeplan.ValidateMergePlannerOptions(mo)
+		if err != nil {
+			return err
+		}
+	} else {
 		// assume the default single segment merge policy
-		mr.MergeOptions = &mergeplan.SingleSegmentMergePlanOptions
+		mo = &mergeplan.SingleSegmentMergePlanOptions
 	}
-	var ssCreator string
-	if mr.OverrideNumSnapshotsToKeep {
-		ssCreator = numSnapShotsToKeepOverRuler
-	}
-	msg := &mergerCtrl{creator: ssCreator,
-		options:  mr.MergeOptions,
-		doneCh:   make(chan struct{}),
-		cancelCh: mr.CancelCh,
+	msg := &mergerCtrl{options: mo,
+		doneCh: make(chan struct{}),
+		ctx:    ctx,
 	}
 
-	// kick the merger workloop
+	// request the merger perform a force merge
 	select {
-	case s.mergerKickCh <- msg:
+	case s.forceMergeRequestCh <- msg:
 	case <-s.closeCh:
 		return nil
 	}
@@ -225,9 +208,39 @@ func (s *Scorch) parseMergePlannerOptions() (*mergeplan.MergePlanOptions,
 	return &mergePlannerOptions, nil
 }
 
-func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
-	options *mergeplan.MergePlanOptions, creator string,
-	cancelCh chan struct{}) error {
+type closeChWrapper struct {
+	ch1     chan struct{}
+	ctx     context.Context
+	closeCh chan struct{}
+}
+
+func newCloseChWrapper(ch1 chan struct{},
+	ctx context.Context) *closeChWrapper {
+	return &closeChWrapper{ch1: ch1,
+		ctx:     ctx,
+		closeCh: make(chan struct{})}
+}
+
+func (w *closeChWrapper) close() {
+	select {
+	case <-w.closeCh:
+	default:
+		close(w.closeCh)
+	}
+}
+
+func (w *closeChWrapper) listen() {
+	select {
+	case <-w.ch1:
+		w.close()
+	case <-w.ctx.Done():
+		w.close()
+	case <-w.closeCh:
+	}
+}
+
+func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
+	options *mergeplan.MergePlanOptions, ourSnapshot *IndexSnapshot) error {
 	// build list of persisted segments in this snapshot
 	var onlyPersistedSnapshots []mergeplan.Segment
 	for _, segmentSnapshot := range ourSnapshot.segment {
@@ -256,27 +269,10 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 	// process tasks in serial for now
 	var filenames []string
 
-	closeCh := make(chan struct{})
-	cleanup := func() {
-		select {
-		case <-closeCh:
-		default:
-			close(closeCh)
-		}
-	}
-	defer cleanup()
+	cw := newCloseChWrapper(s.closeCh, ctx)
+	defer cw.close()
 
-	// cancel the merge operation on events like the index closure
-	// or upon a user cancel.
-	go func() {
-		select {
-		case <-s.closeCh:
-			cleanup()
-		case <-cancelCh:
-			cleanup()
-		case <-closeCh:
-		}
-	}()
+	go cw.listen()
 
 	for _, task := range resultMergePlan.Tasks {
 		if len(task.Segments) == 0 {
@@ -323,7 +319,7 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			newDocNums, _, err := s.segPlugin.Merge(segmentsToMerge, docsToDrop, path,
-				closeCh, s)
+				cw.closeCh, s)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
 
 			fileMergeZapTime := uint64(time.Since(fileMergeZapStartTime))
@@ -361,7 +357,6 @@ func (s *Scorch) planMergeAtSnapshot(ourSnapshot *IndexSnapshot,
 			oldNewDocNums: oldNewDocNums,
 			new:           seg,
 			notify:        make(chan *IndexSnapshot),
-			creator:       creator,
 		}
 
 		// give it to the introducer
@@ -406,7 +401,6 @@ type segmentMerge struct {
 	oldNewDocNums map[uint64][]uint64
 	new           segment.Segment
 	notify        chan *IndexSnapshot
-	creator       string
 }
 
 // perform a merging of the given SegmentBase instances into a new,

@@ -313,15 +313,11 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 
 	defer func() { _ = root.DecRef() }()
 
-	if nextMerge.creator == "" {
-		nextMerge.creator = "introduceMerge"
-	}
-
 	newSnapshot := &IndexSnapshot{
 		parent:   s,
 		internal: root.internal,
 		refs:     1,
-		creator:  nextMerge.creator,
+		creator:  "introduceMerge",
 	}
 
 	// iterate through current segments
