@@ -15,6 +15,7 @@
 package scorch
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -23,6 +24,7 @@ import (
 	"regexp"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -32,6 +34,7 @@ import (
 	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizer/regexp"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/scorch/mergeplan"
 	"github.com/blevesearch/bleve/mapping"
 )
 
@@ -2148,5 +2151,232 @@ func TestForceVersion(t *testing.T) {
 	idx, err = NewScorch(Name, cfg, analysisQueue)
 	if err == nil {
 		t.Fatalf("expected an error opening an unsupported vesion, got nil")
+	}
+}
+
+func TestIndexForceMerge(t *testing.T) {
+	cfg := CreateConfig("TestIndexForceMerge")
+	err := InitTest(cfg)
+	defer func() {
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+	tmp := struct {
+		MaxSegmentsPerTier   int   `json:"maxSegmentsPerTier"`
+		SegmentsPerMergeTask int   `json:"segmentsPerMergeTask"`
+		FloorSegmentSize     int64 `json:"floorSegmentSize"`
+	}{
+		int(1),
+		int(1),
+		int64(2),
+	}
+	cfg["scorchMergePlanOptions"] = &tmp
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Fatalf("error opening index: %v", err)
+	}
+	var expectedCount uint64
+	batch := index.NewBatch()
+	for i := 0; i < 10; i++ {
+		doc := document.NewDocument(fmt.Sprintf("doc1-%d", i))
+		doc.AddField(document.NewTextField("name", []uint64{}, []byte(fmt.Sprintf("text1-%d", i))))
+		batch.Update(doc)
+		doc = document.NewDocument(fmt.Sprintf("doc2-%d", i))
+		doc.AddField(document.NewTextField("name", []uint64{}, []byte(fmt.Sprintf("text2-%d", i))))
+		batch.Update(doc)
+		err = idx.Batch(batch)
+		if err != nil {
+			t.Error(err)
+		}
+		batch.Reset()
+		expectedCount += 2
+	}
+
+	// verify doc count
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	docCount, err := indexReader.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+	err = indexReader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var si *Scorch
+	var ok bool
+	if si, ok = idx.(*Scorch); !ok {
+		t.Errorf("expects a scorch index")
+	}
+
+	nfs := atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot)
+	if nfs != 10 {
+		t.Errorf("expected 10 root file segments, got: %d", nfs)
+	}
+
+	ctx := context.Background()
+	for {
+		if atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot) == 1 {
+			break
+		}
+		err := si.ForceMerge(ctx, &mergeplan.MergePlanOptions{
+			MaxSegmentsPerTier:   1,
+			MaxSegmentSize:       10000,
+			SegmentsPerMergeTask: 10,
+			FloorSegmentSize:     10000})
+		if err != nil {
+			t.Errorf("ForceMerge failed, err: %v", err)
+		}
+	}
+
+	// verify the final root segment count
+	if atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot) != 1 {
+		t.Errorf("expected a single root file segments, got: %d",
+			atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot))
+	}
+
+	// verify with an invalid merge plan
+	err = si.ForceMerge(ctx, &mergeplan.MergePlanOptions{
+		MaxSegmentsPerTier:   1,
+		MaxSegmentSize:       1 << 33,
+		SegmentsPerMergeTask: 10,
+		FloorSegmentSize:     10000})
+	if err != mergeplan.ErrMaxSegmentSizeTooLarge {
+		t.Errorf("ForceMerge expected to fail with ErrMaxSegmentSizeTooLarge")
+	}
+
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCancelIndexForceMerge(t *testing.T) {
+	cfg := CreateConfig("TestCancelIndexForceMerge")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	tmp := struct {
+		MaxSegmentsPerTier   int   `json:"maxSegmentsPerTier"`
+		SegmentsPerMergeTask int   `json:"segmentsPerMergeTask"`
+		FloorSegmentSize     int64 `json:"floorSegmentSize"`
+	}{
+		int(1),
+		int(1),
+		int64(2),
+	}
+	cfg["scorchMergePlanOptions"] = &tmp
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Fatalf("error opening index: %v", err)
+	}
+
+	var expectedCount uint64
+	batch := index.NewBatch()
+	for i := 0; i < 20; i++ {
+		doc := document.NewDocument(fmt.Sprintf("doc1-%d", i))
+		doc.AddField(document.NewTextField("name", []uint64{}, []byte(fmt.Sprintf("text1-%d", i))))
+		batch.Update(doc)
+		doc = document.NewDocument(fmt.Sprintf("doc2-%d", i))
+		doc.AddField(document.NewTextField("name", []uint64{}, []byte(fmt.Sprintf("text2-%d", i))))
+		batch.Update(doc)
+		err = idx.Batch(batch)
+		if err != nil {
+			t.Error(err)
+		}
+		batch.Reset()
+		expectedCount += 2
+	}
+
+	// verify doc count
+	indexReader, err := idx.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	docCount, err := indexReader.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if docCount != expectedCount {
+		t.Errorf("Expected document count to be %d got %d", expectedCount, docCount)
+	}
+	err = indexReader.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var si *Scorch
+	var ok bool
+	if si, ok = idx.(*Scorch); !ok {
+		t.Fatal("expects a scorch index")
+	}
+
+	// no merge operations are expected as per the original merge policy.
+	nfsr := atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot)
+	if nfsr != 20 {
+		t.Errorf("expected 20 root file segments, got: %d", nfsr)
+	}
+
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+
+	// cancel the force merge operation once the root has some new merge
+	// introductions. ie if the root has lesser file segments than earlier.
+	go func() {
+		for {
+			nval := atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot)
+			if nval < nfsr {
+				cancel()
+				return
+			}
+			time.Sleep(time.Millisecond * 5)
+		}
+	}()
+
+	err = si.ForceMerge(ctx, &mergeplan.MergePlanOptions{
+		MaxSegmentsPerTier:   1,
+		MaxSegmentSize:       10000,
+		SegmentsPerMergeTask: 5,
+		FloorSegmentSize:     10000})
+	if err != nil {
+		t.Errorf("ForceMerge failed, err: %v", err)
+	}
+
+	// verify the final root file segment count or forceMerge completion
+	if atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot) == 1 {
+		t.Errorf("expected many files at root, but got: %d segments",
+			atomic.LoadUint64(&si.stats.TotFileSegmentsAtRoot))
+	}
+
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

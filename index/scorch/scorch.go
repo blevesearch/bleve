@@ -77,6 +77,8 @@ type Scorch struct {
 
 	pauseCount uint64
 
+	forceMergeRequestCh chan *mergerCtrl
+
 	segPlugin segment.Plugin
 }
 
@@ -101,6 +103,7 @@ func NewScorch(storeName string,
 		nextSnapshotEpoch:    1,
 		closeCh:              make(chan struct{}),
 		ineligibleForRemoval: map[string]bool{},
+		forceMergeRequestCh:  make(chan *mergerCtrl, 1),
 		segPlugin:            defaultSegmentPlugin,
 	}
 
@@ -253,6 +256,7 @@ func (s *Scorch) openBolt() error {
 	s.introducerNotifier = make(chan *epochWatcher, 1)
 	s.persisterNotifier = make(chan *epochWatcher, 1)
 	s.closeCh = make(chan struct{})
+	s.forceMergeRequestCh = make(chan *mergerCtrl, 1)
 
 	if !s.readOnly && s.path != "" {
 		err := s.removeOldZapFiles() // Before persister or merger create any new files.
