@@ -520,11 +520,11 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 		}
 	}
 
-	sortImpl := req.GetSortImpl()
+	sortFunc := req.SortFunc()
 	// sort all hits with the requested order
 	if len(req.Sort) > 0 {
 		sorter := newSearchHitSorter(req.Sort, sr.Hits)
-		sortImpl(sorter)
+		sortFunc(sorter)
 	}
 
 	// now skip over the correct From
@@ -549,7 +549,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 		req.Sort.Reverse()
 		// resort using the original order
 		mhs := newSearchHitSorter(req.Sort, sr.Hits)
-		sortImpl(mhs)
+		sortFunc(mhs)
 		// reset request
 		req.SearchBefore = req.SearchAfter
 		req.SearchAfter = nil

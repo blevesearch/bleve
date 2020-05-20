@@ -265,7 +265,7 @@ func (h *HighlightRequest) AddField(field string) {
 // Score controls the kind of scoring performed
 // SearchAfter supports deep paging by providing a minimum sort key
 // SearchBefore supports deep paging by providing a maximum sort key
-// SortImpl specifies the sort implementation to use for sorting results.
+// sortFunc specifies the sort implementation to use for sorting results.
 //
 // A special field named "*" can be used to return all fields.
 type SearchRequest struct {
@@ -282,7 +282,7 @@ type SearchRequest struct {
 	SearchAfter      []string          `json:"search_after"`
 	SearchBefore     []string          `json:"search_before"`
 
-	SortImpl func(sort.Interface) `json:"-"`
+	sortFunc func(sort.Interface)
 }
 
 func (r *SearchRequest) Validate() error {
@@ -616,15 +616,15 @@ func MemoryNeededForSearchResult(req *SearchRequest) uint64 {
 // SearchRequests can specify a custom sort implementation to meet
 // their needs. For instance, by specifying a parallel sort
 // that uses all available cores.
-func (r *SearchRequest) SetSortImpl(s func(sort.Interface)) {
-	r.SortImpl = s
+func (r *SearchRequest) SetSortFunc(s func(sort.Interface)) {
+	r.sortFunc = s
 }
 
-// GetSortFunc returns the sort implementation to use when sorting hits.
+// SortFunc returns the sort implementation to use when sorting hits.
 // Defaults to sort.Sort.
-func (r *SearchRequest) GetSortImpl() func(data sort.Interface) {
-	if r.SortImpl != nil {
-		return r.SortImpl
+func (r *SearchRequest) SortFunc() func(data sort.Interface) {
+	if r.sortFunc != nil {
+		return r.sortFunc
 	}
 
 	return sort.Sort
