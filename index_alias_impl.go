@@ -25,6 +25,7 @@ import (
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
+	"github.com/twotwotwo/sorts"
 )
 
 type indexAliasImpl struct {
@@ -524,7 +525,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 	// sort all hits with the requested order
 	if len(req.Sort) > 0 {
 		sorter := newSearchHitSorter(req.Sort, sr.Hits)
-		sort.Sort(sorter)
+		sorts.Quicksort(sorter)
 	}
 
 	// now skip over the correct From
