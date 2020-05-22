@@ -39,14 +39,20 @@ var keepIndex = flag.Bool("keepIndex", false, "keep the index after testing")
 
 var indexType = flag.String("indexType", bleve.Config.DefaultIndexType, "index type to build")
 var kvType = flag.String("kvType", bleve.Config.DefaultKVStore, "kv store type to build")
+var segType = flag.String("segType", "", "force scorch segment type")
+var segVer = flag.Int("segVer", 0, "force scorch segment version")
 
 func TestIntegration(t *testing.T) {
 
 	flag.Parse()
 
-	bleve.Config.DefaultIndexType = *indexType
-	bleve.Config.DefaultKVStore = *kvType
 	t.Logf("using index type %s and kv type %s", *indexType, *kvType)
+	if *segType != "" {
+		t.Logf("forcing segment type: %s", *segType)
+	}
+	if *segVer != 0 {
+		t.Logf("forcing segment version: %d", *segVer)
+	}
 
 	var err error
 	var datasetRegexp *regexp.Regexp
@@ -194,7 +200,15 @@ func runTestDir(t *testing.T, dir, datasetName string) {
 
 func loadDataSet(t *testing.T, datasetName string, mapping mapping.IndexMappingImpl, path string) (bleve.Index, func(), error) {
 	idxPath := fmt.Sprintf("test-%s.bleve", datasetName)
-	index, err := bleve.New(idxPath, &mapping)
+	cfg := map[string]interface{}{}
+	if *segType != "" {
+		cfg["forceSegmentType"] = *segType
+	}
+	if *segVer != 0 {
+		cfg["forceSegmentVersion"] = *segVer
+	}
+
+	index, err := bleve.NewUsing(idxPath, &mapping, *indexType, *kvType, cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating new index: %v", err)
 	}
