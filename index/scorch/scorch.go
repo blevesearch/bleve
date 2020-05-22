@@ -139,17 +139,18 @@ func NewScorch(storeName string,
 // configForceSegmentTypeVersion checks if the caller has requested a
 // specific segment type/version
 func configForceSegmentTypeVersion(config map[string]interface{}) (string, uint32, error) {
-	forcedSegmentVersion, ok := config["forceSegmentVersion"].(int)
-	if ok {
-		forcedSegmentType, ok2 := config["forceSegmentType"].(string)
-		if !ok2 {
-			return "", 0, fmt.Errorf(
-				"forceSegmentVersion set to %d, must also specify forceSegmentType", forcedSegmentVersion)
-		}
-
-		return forcedSegmentType, uint32(forcedSegmentVersion), nil
+	forcedSegmentVersion, err := parseToInteger(config["forceSegmentVersion"])
+	if err != nil {
+		return "", 0, nil
 	}
-	return "", 0, nil
+
+	forcedSegmentType, ok2 := config["forceSegmentType"].(string)
+	if !ok2 {
+		return "", 0, fmt.Errorf(
+			"forceSegmentVersion set to %d, must also specify forceSegmentType", forcedSegmentVersion)
+	}
+
+	return forcedSegmentType, uint32(forcedSegmentVersion), nil
 }
 
 func (s *Scorch) paused() uint64 {
