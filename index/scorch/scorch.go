@@ -144,8 +144,8 @@ func configForceSegmentTypeVersion(config map[string]interface{}) (string, uint3
 		return "", 0, nil
 	}
 
-	forcedSegmentType, ok2 := config["forceSegmentType"].(string)
-	if !ok2 {
+	forcedSegmentType, ok := config["forceSegmentType"].(string)
+	if !ok {
 		return "", 0, fmt.Errorf(
 			"forceSegmentVersion set to %d, must also specify forceSegmentType", forcedSegmentVersion)
 	}
