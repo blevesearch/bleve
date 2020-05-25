@@ -43,7 +43,7 @@ func init() {
 
 type FacetBuilder interface {
 	StartDoc()
-	UpdateVisitor(field string, term []byte)
+	UpdateVisitor(term []byte)
 	EndDoc()
 
 	Result() *FacetResult
@@ -110,7 +110,7 @@ func (fb *FacetsBuilder) EndDoc() {
 func (fb *FacetsBuilder) UpdateVisitor(field string, term []byte) {
 	if facetBuilders, ok := fb.facetsByField[field]; ok {
 		for _, facetBuilder := range facetBuilders {
-			facetBuilder.UpdateVisitor(field, term)
+			facetBuilder.UpdateVisitor(term)
 		}
 	}
 }

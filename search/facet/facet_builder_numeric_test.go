@@ -52,7 +52,7 @@ func numericFacetN(b *testing.B, numTerms int) {
 
 		for _, pv := range pcodedvalues {
 			nfb.StartDoc()
-			nfb.UpdateVisitor(field, pv)
+			nfb.UpdateVisitor(pv)
 			nfb.EndDoc()
 		}
 	}

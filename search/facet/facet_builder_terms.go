@@ -62,12 +62,10 @@ func (fb *TermsFacetBuilder) Field() string {
 	return fb.field
 }
 
-func (fb *TermsFacetBuilder) UpdateVisitor(field string, term []byte) {
-	if field == fb.field {
-		fb.sawValue = true
-		fb.termsCount[string(term)] = fb.termsCount[string(term)] + 1
-		fb.total++
-	}
+func (fb *TermsFacetBuilder) UpdateVisitor(term []byte) {
+	fb.sawValue = true
+	fb.termsCount[string(term)] = fb.termsCount[string(term)] + 1
+	fb.total++
 }
 
 func (fb *TermsFacetBuilder) StartDoc() {
