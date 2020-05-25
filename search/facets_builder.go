@@ -53,10 +53,11 @@ type FacetBuilder interface {
 }
 
 type FacetsBuilder struct {
-	indexReader index.IndexReader
-	facetNames  []string
-	facets      []FacetBuilder
-	fields      []string
+	indexReader   index.IndexReader
+	facetNames    []string
+	facets        []FacetBuilder
+	facetsByField map[string][]FacetBuilder
+	fields        []string
 }
 
 func NewFacetsBuilder(indexReader index.IndexReader) *FacetsBuilder {
@@ -80,8 +81,13 @@ func (fb *FacetsBuilder) Size() int {
 }
 
 func (fb *FacetsBuilder) Add(name string, facetBuilder FacetBuilder) {
+	if fb.facetsByField == nil {
+		fb.facetsByField = map[string][]FacetBuilder{}
+	}
+
 	fb.facetNames = append(fb.facetNames, name)
 	fb.facets = append(fb.facets, facetBuilder)
+	fb.facetsByField[facetBuilder.Field()] = append(fb.facetsByField[facetBuilder.Field()], facetBuilder)
 	fb.fields = append(fb.fields, facetBuilder.Field())
 }
 
@@ -102,8 +108,10 @@ func (fb *FacetsBuilder) EndDoc() {
 }
 
 func (fb *FacetsBuilder) UpdateVisitor(field string, term []byte) {
-	for _, facetBuilder := range fb.facets {
-		facetBuilder.UpdateVisitor(field, term)
+	if facetBuilders, ok := fb.facetsByField[field]; ok {
+		for _, facetBuilder := range facetBuilders {
+			facetBuilder.UpdateVisitor(field, term)
+		}
 	}
 }
 
