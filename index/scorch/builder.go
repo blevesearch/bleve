@@ -107,8 +107,9 @@ func (o *Builder) parseConfig(config map[string]interface{}) (err error) {
 		segPlugin, err := chooseSegmentPlugin(forcedSegmentType,
 			uint32(forcedSegmentVersion))
 		if err != nil {
-			o.segPlugin = segPlugin
+			return err
 		}
+		o.segPlugin = segPlugin
 	}
 
 	return nil
