@@ -84,10 +84,30 @@ func TestParseQuery(t *testing.T) {
 			}(),
 		},
 		{
+			input: []byte(`{"match":"beer","field":"desc","operator":"and"}`),
+			output: func() Query {
+				operator := MatchQueryOperatorAnd
+				q := NewMatchQuery("beer")
+				q.SetOperator(operator)
+				q.SetField("desc")
+				return q
+			}(),
+		},
+		{
 			input: []byte(`{"match":"beer","field":"desc","operator":"or"}`),
 			output: func() Query {
 				q := NewMatchQuery("beer")
 				q.SetOperator(MatchQueryOperatorOr)
+				q.SetField("desc")
+				return q
+			}(),
+		},
+		{
+			input: []byte(`{"match":"beer","field":"desc","operator":"or"}`),
+			output: func() Query {
+				operator := MatchQueryOperatorOr
+				q := NewMatchQuery("beer")
+				q.SetOperator(operator)
 				q.SetField("desc")
 				return q
 			}(),

@@ -37,9 +37,9 @@ type MatchQueryOperator int
 
 const (
 	// Document must satisfy AT LEAST ONE of term searches.
-	MatchQueryOperatorOr = 0
+	MatchQueryOperatorOr = MatchQueryOperator(0)
 	// Document must satisfy ALL of term searches.
-	MatchQueryOperatorAnd = 1
+	MatchQueryOperatorAnd = MatchQueryOperator(1)
 )
 
 func (o MatchQueryOperator) MarshalJSON() ([]byte, error) {
