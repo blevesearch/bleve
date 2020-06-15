@@ -103,7 +103,7 @@ func tooManyClauses(count int) bool {
 	return false
 }
 
-func tooManyClausesErr(count int) error {
-	return fmt.Errorf("TooManyClauses[%d > maxClauseCount, which is set to %d]",
-		count, DisjunctionMaxClauseCount)
+func tooManyClausesErr(field string, count int) error {
+	return fmt.Errorf("TooManyClauses over field: `%s` [%d > maxClauseCount,"+
+		" which is set to %d]", field, count, DisjunctionMaxClauseCount)
 }
