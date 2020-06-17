@@ -133,9 +133,8 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 		if err != nil {
 			return nil, err
 		}
-		// a new term searcher is started as a result of this, so consider the first closed
-		// for stats tracking purposes
-		atomic.AddUint64(&i.snapshot.parent.stats.TotTermSearchersFinished, uint64(1))
+		// close the current term field reader before replacing it with a new one
+		_ = i.Close()
 		*i = *(i2.(*IndexSnapshotTermFieldReader))
 	}
 	num, err := docInternalToNumber(ID)
