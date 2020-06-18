@@ -310,8 +310,9 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 		var oldNewDocNums map[uint64][]uint64
 		var seg segment.Segment
+		var filename string
 		if len(segmentsToMerge) > 0 {
-			filename := zapFileName(newSegmentID)
+			filename = zapFileName(newSegmentID)
 			s.markIneligibleForRemoval(filename)
 			path := s.path + string(os.PathSeparator) + filename
 
@@ -356,7 +357,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			old:           oldMap,
 			oldNewDocNums: oldNewDocNums,
 			new:           seg,
-			notify:        make(chan *IndexSnapshot),
+			notifyCh:      make(chan *notify),
 		}
 
 		// give it to the introducer
@@ -371,15 +372,20 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 		introStartTime := time.Now()
 		// it is safe to blockingly wait for the merge introduction
 		// here as the introducer is bound to handle the notify channel.
-		newSnapshot := <-sm.notify
+		notify := <-sm.notifyCh
 		introTime := uint64(time.Since(introStartTime))
 		atomic.AddUint64(&s.stats.TotFileMergeZapIntroductionTime, introTime)
 		if atomic.LoadUint64(&s.stats.MaxFileMergeZapIntroductionTime) < introTime {
 			atomic.StoreUint64(&s.stats.MaxFileMergeZapIntroductionTime, introTime)
 		}
 		atomic.AddUint64(&s.stats.TotFileMergeIntroductionsDone, 1)
-		if newSnapshot != nil {
-			_ = newSnapshot.DecRef()
+		if notify != nil && notify.iss != nil {
+			_ = notify.iss.DecRef()
+			if notify.skipped {
+				// decrement the ref counts on skipping introduction.
+				s.unmarkIneligibleForRemoval(filename)
+				_ = seg.DecRef()
+			}
 		}
 
 		atomic.AddUint64(&s.stats.TotFileMergePlanTasksDone, 1)
@@ -395,12 +401,17 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 	return nil
 }
 
+type notify struct {
+	iss     *IndexSnapshot
+	skipped bool
+}
+
 type segmentMerge struct {
 	id            uint64
 	old           map[uint64]*SegmentSnapshot
 	oldNewDocNums map[uint64][]uint64
 	new           segment.Segment
-	notify        chan *IndexSnapshot
+	notifyCh      chan *notify
 }
 
 // perform a merging of the given SegmentBase instances into a new,
@@ -450,7 +461,7 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 		old:           make(map[uint64]*SegmentSnapshot),
 		oldNewDocNums: make(map[uint64][]uint64),
 		new:           seg,
-		notify:        make(chan *IndexSnapshot),
+		notifyCh:      make(chan *notify),
 	}
 
 	for i, idx := range sbsIndexes {
@@ -467,11 +478,20 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	}
 
 	// blockingly wait for the introduction to complete
-	newSnapshot := <-sm.notify
-	if newSnapshot != nil {
+	var newSnapshot *IndexSnapshot
+	notify := <-sm.notifyCh
+	if notify != nil && notify.iss != nil {
+		newSnapshot = notify.iss
 		atomic.AddUint64(&s.stats.TotMemMergeSegments, uint64(len(sbs)))
 		atomic.AddUint64(&s.stats.TotMemMergeDone, 1)
+		if notify.skipped {
+			// decrement the ref counts on skipping introduction.
+			_ = newSnapshot.DecRef()
+			_ = seg.DecRef()
+			newSnapshot = nil
+		}
 	}
+
 	return newSnapshot, newSegmentID, nil
 }
 
