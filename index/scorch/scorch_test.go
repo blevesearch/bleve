@@ -2380,3 +2380,88 @@ func TestCancelIndexForceMerge(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestIndexSeekBackwardsStats(t *testing.T) {
+	cfg := CreateConfig("TestIndexOpenReopen")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// insert a doc
+	doc := document.NewDocument("1")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("cat")))
+	err = idx.Update(doc)
+	if err != nil {
+		t.Fatalf("error updating index: %v", err)
+	}
+
+	// insert another doc
+	doc = document.NewDocument("2")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("cat")))
+	err = idx.Update(doc)
+	if err != nil {
+		t.Fatalf("error updating index: %v", err)
+	}
+
+	reader, err := idx.Reader()
+	if err != nil {
+		t.Fatalf("error getting index reader: %v", err)
+	}
+	defer reader.Close()
+
+	tfr, err := reader.TermFieldReader([]byte("cat"), "name", false, false, false)
+	if err != nil {
+		t.Fatalf("error getting term field readyer for name/cat: %v", err)
+	}
+
+	tfdFirst, err := tfr.Next(nil)
+	if err != nil {
+		t.Fatalf("error getting first tfd: %v", err)
+	}
+
+	_, err = tfr.Next(nil)
+	if err != nil {
+		t.Fatalf("error getting second tfd: %v", err)
+	}
+
+	// seek backwards to the first
+	_, err = tfr.Advance(tfdFirst.ID, nil)
+	if err != nil {
+		t.Fatalf("error adancing backwards: %v", err)
+	}
+
+	err = tfr.Close()
+	if err != nil {
+		t.Fatalf("error closing term field reader: %v", err)
+	}
+
+
+	if idx.(*Scorch).stats.TotTermSearchersStarted != idx.(*Scorch).stats.TotTermSearchersFinished {
+		t.Errorf("expected term searchers started %d to equal term searchers finished %d",
+			idx.(*Scorch).stats.TotTermSearchersStarted,
+			idx.(*Scorch).stats.TotTermSearchersFinished)
+	}
+}
