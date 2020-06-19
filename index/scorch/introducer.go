@@ -433,7 +433,9 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	}
 
 	// notify requester that we incorporated this
-	nextMerge.notifyCh <- &notify{iss: newSnapshot, skipped: skipped}
+	nextMerge.notifyCh <- &mergeTaskIntroStatus{
+		indexSnapshot: newSnapshot,
+		skipped:       skipped}
 	close(nextMerge.notifyCh)
 }
 
