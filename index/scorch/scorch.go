@@ -73,10 +73,6 @@ type Scorch struct {
 	onEvent      func(event Event)
 	onAsyncError func(err error)
 
-	pauseLock sync.RWMutex
-
-	pauseCount uint64
-
 	forceMergeRequestCh chan *mergerCtrl
 
 	segPlugin segment.Plugin
@@ -156,30 +152,17 @@ func configForceSegmentTypeVersion(config map[string]interface{}) (string, uint3
 	return forcedSegmentType, uint32(forcedSegmentVersion), nil
 }
 
-func (s *Scorch) paused() uint64 {
-	s.pauseLock.Lock()
-	pc := s.pauseCount
-	s.pauseLock.Unlock()
-	return pc
-}
-
-func (s *Scorch) incrPause() {
-	s.pauseLock.Lock()
-	s.pauseCount++
-	s.pauseLock.Unlock()
-}
-
-func (s *Scorch) decrPause() {
-	s.pauseLock.Lock()
-	s.pauseCount--
-	s.pauseLock.Unlock()
+func (s *Scorch) NumEventsBlocking() uint64 {
+	eventsCompleted := atomic.LoadUint64(&s.stats.TotEventTriggerCompleted)
+	eventsStarted := atomic.LoadUint64(&s.stats.TotEventTriggerStarted)
+	return eventsStarted - eventsCompleted
 }
 
 func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) {
 	if s.onEvent != nil {
-		s.incrPause()
+		atomic.AddUint64(&s.stats.TotEventTriggerStarted, 1)
 		s.onEvent(Event{Kind: kind, Scorch: s, Duration: dur})
-		s.decrPause()
+		atomic.AddUint64(&s.stats.TotEventTriggerCompleted, 1)
 	}
 }
 
