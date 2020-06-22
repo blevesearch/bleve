@@ -395,6 +395,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			}
 		}
 	}
+	var skipped bool
 	// In case where all the docs in the newly merged segment getting
 	// deleted by the time we reach here, can skip the introduction.
 	if nextMerge.new != nil &&
@@ -417,6 +418,9 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 		case *zap.Segment:
 			fileSegments++
 		}
+	} else {
+		skipped = true
+		atomic.AddUint64(&s.stats.TotFileMergeIntroductionsObsoleted, 1)
 	}
 
 	atomic.StoreUint64(&s.stats.TotItemsToPersist, docsToPersistCount)
@@ -441,8 +445,10 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	}
 
 	// notify requester that we incorporated this
-	nextMerge.notify <- newSnapshot
-	close(nextMerge.notify)
+	nextMerge.notifyCh <- &mergeTaskIntroStatus{
+		indexSnapshot: newSnapshot,
+		skipped:       skipped}
+	close(nextMerge.notifyCh)
 }
 
 func (s *Scorch) revertToSnapshot(revertTo *snapshotReversion) error {
