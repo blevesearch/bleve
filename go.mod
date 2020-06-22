@@ -22,6 +22,6 @@ require (
 	github.com/steveyen/gtreap v0.1.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/willf/bitset v1.1.10
-	go.etcd.io/bbolt v1.3.4
+	go.etcd.io/bbolt v1.3.5
 	golang.org/x/text v0.3.0
 )
