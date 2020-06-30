@@ -15,7 +15,10 @@
 package searcher
 
 import (
+	"io/ioutil"
+	"os"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/blevesearch/bleve/search"
@@ -196,6 +199,67 @@ func TestTermRangeSearch(t *testing.T) {
 			t.Errorf("expected: %v, got %v for test %#v", test.want, got, test)
 		}
 
+	}
+
+}
+
+func TestTermRangeSearchTooManyTerms(t *testing.T) {
+	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
+
+	scorchIndex := initTwoDocScorch(dir)
+
+	// use lower limit for this test
+	origLimit := DisjunctionMaxClauseCount
+	DisjunctionMaxClauseCount = 2
+	defer func() {
+		DisjunctionMaxClauseCount = origLimit
+	}()
+
+	scorchReader, err := scorchIndex.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err := scorchReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var want = []string{"1", "3", "4", "5"}
+	var truth = true
+	searcher, err := NewTermRangeSearcher(scorchReader, []byte("bobert"), []byte("ravi"),
+		&truth, &truth, "name", 1.0, search.SearcherOptions{Score: "none", IncludeTermVectors: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got []string
+	ctx := &search.SearchContext{
+		DocumentMatchPool: search.NewDocumentMatchPool(
+			searcher.DocumentMatchPoolSize(), 0),
+	}
+	next, err := searcher.Next(ctx)
+	i := 0
+	for err == nil && next != nil {
+		extId, err := scorchReader.ExternalID(next.IndexInternalID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, extId)
+		ctx.DocumentMatchPool.Put(next)
+		next, err = searcher.Next(ctx)
+		i++
+	}
+	if err != nil {
+		t.Fatalf("error iterating searcher: %v", err)
+	}
+	sort.Strings(got)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("expected: %#v, got %#v", want, got)
 	}
 
 }
