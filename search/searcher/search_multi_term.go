@@ -24,12 +24,13 @@ func NewMultiTermSearcher(indexReader index.IndexReader, terms []string,
 	field string, boost float64, options search.SearcherOptions, limit bool) (
 	search.Searcher, error) {
 
-	if tooManyClauses(len(terms)) && optionsDisjunctionOptimizable(options) {
-		return optimizeMultiTermSearcher(indexReader, terms, field, boost, options)
-	}
-
-	if limit && tooManyClauses(len(terms)) {
-		return nil, tooManyClausesErr(field, len(terms))
+	if tooManyClauses(len(terms)) {
+		if optionsDisjunctionOptimizable(options) {
+			return optimizeMultiTermSearcher(indexReader, terms, field, boost, options)
+		}
+		if limit {
+			return nil, tooManyClausesErr(field, len(terms))
+		}
 	}
 
 	qsearchers, err  := makeBatchSearchers(indexReader, terms, field, boost, options)
