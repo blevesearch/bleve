@@ -178,12 +178,13 @@ func optimizeMultiTermSearcherBytes(indexReader index.IndexReader, terms [][]byt
 		}
 		finalSearcher, err =  optimizeCompositeSearcher("disjunction:unadorned-force",
 			indexReader, batch, options)
+		// all searchers in batch should be closed, regardless of error or optimization failure
+		// either we're returning, or continuing and only finalSearcher is needed for next loop
+		cleanup()
 		if err != nil {
-			cleanup()
 			return nil, err
 		}
 		if finalSearcher == nil {
-			cleanup()
 			return nil, fmt.Errorf("unable to optimize")
 		}
 	}
