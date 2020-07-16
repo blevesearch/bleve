@@ -51,7 +51,10 @@ message := struct{
 mapping := bleve.NewIndexMapping()
 index, err := bleve.New("example.bleve", mapping)
 if err != nil {
-	panic(err)
+    index, err = bleve.Open("example.bleve")
+    if err != nil {
+        panic(err)
+    }
 }
 index.Index(message.Id, message)
 ```
