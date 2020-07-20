@@ -59,6 +59,8 @@ type FieldMapping struct {
 	// DocValues, if true makes the index uninverting possible for this field
 	// It is useful for faceting and sorting queries.
 	DocValues bool `json:"docvalues,omitempty"`
+
+	FormatSpecifier string `json:"format_specifier,omitempty"`
 }
 
 // NewTextFieldMapping returns a default field mapping for text

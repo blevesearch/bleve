@@ -458,7 +458,12 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		if subDocMapping != nil {
 			// index by explicit mapping
 			for _, fieldMapping := range subDocMapping.Fields {
-				fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
+				if fieldMapping.Type == "text" && fieldMapping.FormatSpecifier != "" {
+					fieldMapping.processString(fmt.Sprintf(fieldMapping.FormatSpecifier, propertyValFloat),
+						pathString, path, indexes, context)
+				} else {
+					fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
+				}
 			}
 		} else if closestDocMapping.Dynamic {
 			// automatic indexing behavior

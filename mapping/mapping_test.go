@@ -1151,3 +1151,53 @@ func TestDefaultAnalyzerInheritance(t *testing.T) {
 		t.Fatalf("Expected analyzer: xyz to be inherited by field, but got: '%v'", analyzer)
 	}
 }
+
+func TestNumericValueWithFormatSpecifier(t *testing.T) {
+	numericTextField := NewTextFieldMapping()
+	numericTextField.FormatSpecifier = "%.0f"
+	mapping := NewIndexMapping()
+	mapping.DefaultMapping.AddFieldMappingsAt("productId", numericTextField)
+
+	doc := document.NewDocument("x")
+	err := mapping.MapDocument(doc, map[string]interface{}{
+		"productId": float64(20201001),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(doc.Fields) != 1 {
+		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
+	}
+	if _, ok := doc.Fields[0].(*document.TextField); !ok {
+		t.Fatalf("expected field to be type *document.TextField, got %T", doc.Fields[0])
+	}
+	if string(doc.Fields[0].(*document.TextField).Value()) != "20201001" {
+		t.Fatalf("expected string value 20201001, got %s", string(doc.Fields[0].(*document.TextField).Value()))
+	}
+}
+
+func TestNumericValueWithFormatSpecifierZeroPadding(t *testing.T) {
+	numericTextField := NewTextFieldMapping()
+	numericTextField.FormatSpecifier = "%03.0f"
+	mapping := NewIndexMapping()
+	mapping.DefaultMapping.AddFieldMappingsAt("age", numericTextField)
+
+	doc := document.NewDocument("x")
+	err := mapping.MapDocument(doc, map[string]interface{}{
+		"age": float64(9),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(doc.Fields) != 1 {
+		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
+	}
+	if _, ok := doc.Fields[0].(*document.TextField); !ok {
+		t.Fatalf("expected field to be type *document.TextField, got %T", doc.Fields[0])
+	}
+	if string(doc.Fields[0].(*document.TextField).Value()) != "009" {
+		t.Fatalf("expected string value 009, got %s", string(doc.Fields[0].(*document.TextField).Value()))
+	}
+}
