@@ -88,7 +88,6 @@ func newMultiTermSearcherInternal(indexReader index.IndexReader,
 func optimizeMultiTermSearcher(indexReader index.IndexReader, terms []string,
 	field string, boost float64, options search.SearcherOptions) (
 	search.Searcher, error) {
-
 	var finalSearcher search.Searcher
 	for len(terms) > 0 {
 		var batchTerms []string

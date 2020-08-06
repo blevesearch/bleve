@@ -19,6 +19,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"sync/atomic"
 )
 
 var OptimizeConjunction = true
@@ -268,6 +269,7 @@ OUTER:
 		oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFromBitmap(bm)
 	}
 
+	atomic.AddUint64(&o.snapshot.parent.stats.TotTermSearchersStarted, uint64(1))
 	return oTFR, nil
 }
 
@@ -400,5 +402,6 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 		oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFromBitmap(bm)
 	}
 
+	atomic.AddUint64(&o.snapshot.parent.stats.TotTermSearchersStarted, uint64(1))
 	return oTFR, nil
 }

@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"github.com/blevesearch/bleve/index/scorch"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -257,6 +258,24 @@ func TestTermRangeSearchTooManyTerms(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error iterating searcher: %v", err)
 	}
+	err = searcher.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check that the expected number of term searchers were started
+	// 6 = 4 original terms, 1 optimized after first round, then final searcher
+	// from the last round
+	statsMap := scorchIndex.(*scorch.Scorch).StatsMap()
+	if statsMap["term_searchers_started"].(uint64) != 6 {
+		t.Errorf("expected 6 term searchers started, got %d", statsMap["term_searchers_started"])
+	}
+	// check that all started searchers were closed
+	if statsMap["term_searchers_started"] != statsMap["term_searchers_finished"] {
+		t.Errorf("expected all term searchers closed, %d started %d closed",
+			statsMap["term_searchers_started"], statsMap["term_searchers_finished"])
+	}
+
 	sort.Strings(got)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("expected: %#v, got %#v", want, got)
