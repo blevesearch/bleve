@@ -106,6 +106,22 @@ func TestParseQuery(t *testing.T) {
 			}(),
 		},
 		{
+			input: []byte(`{"disjuncts":[{"match":"beer","field":"desc","disable_coord":true}],"disable_coord":true}`),
+			output: func() Query {
+				q := NewDisjunctionQuery([]Query{
+					func() Query {
+						q := NewMatchQuery("beer")
+						q.SetField("desc")
+						q.SetDisableCoord(true)
+						return q
+					}(),
+				})
+				q.SetDisableCoord(true)
+
+				return q
+			}(),
+		},
+		{
 			input: []byte(`{"must":{"conjuncts": [{"match":"beer","field":"desc"}]},"should":{"disjuncts": [{"match":"water","field":"desc"}],"min":1.0},"must_not":{"disjuncts": [{"match":"devon","field":"desc"}]}}`),
 			output: func() Query {
 				q := NewBooleanQuery(

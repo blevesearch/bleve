@@ -46,7 +46,7 @@ type DisjunctionSliceSearcher struct {
 }
 
 func newDisjunctionSliceSearcher(indexReader index.IndexReader,
-	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
+	qsearchers []search.Searcher, min float64, enableCoord bool, options search.SearcherOptions,
 	limit bool) (
 	*DisjunctionSliceSearcher, error) {
 	if limit && tooManyClauses(len(qsearchers)) {
@@ -59,13 +59,19 @@ func newDisjunctionSliceSearcher(indexReader index.IndexReader,
 	}
 	// sort the searchers
 	sort.Sort(sort.Reverse(searchers))
+
+	buildScorer := scorer.NewUncoordDisjunctionQueryScorer
+	if enableCoord {
+		buildScorer = scorer.NewDisjunctionQueryScorer
+	}
+
 	// build our searcher
 	rv := DisjunctionSliceSearcher{
 		indexReader:  indexReader,
 		searchers:    searchers,
 		numSearchers: len(searchers),
 		currs:        make([]*search.DocumentMatch, len(searchers)),
-		scorer:       scorer.NewDisjunctionQueryScorer(options),
+		scorer:       buildScorer(options),
 		min:          int(min),
 		matching:     make([]*search.DocumentMatch, len(searchers)),
 		matchingIdxs: make([]int, len(searchers)),

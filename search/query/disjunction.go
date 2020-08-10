@@ -25,9 +25,12 @@ import (
 )
 
 type DisjunctionQuery struct {
-	Disjuncts       []Query `json:"disjuncts"`
-	BoostVal        *Boost  `json:"boost,omitempty"`
-	Min             float64 `json:"min"`
+	Disjuncts []Query `json:"disjuncts"`
+	BoostVal  *Boost  `json:"boost,omitempty"`
+	Min       float64 `json:"min"`
+	// DisableCoord controls whether coordination factor should be considered
+	// when scoring this query.
+	DisableCoord    bool `json:"disable_coord,omitempty"`
 	queryStringMode bool
 }
 
@@ -52,6 +55,12 @@ func (q *DisjunctionQuery) AddQuery(aq ...Query) {
 	for _, aaq := range aq {
 		q.Disjuncts = append(q.Disjuncts, aaq)
 	}
+}
+
+// SetDisableCoord enables or disables coordination factor in the scoring of
+// the query.
+func (q *DisjunctionQuery) SetDisableCoord(disabled bool) {
+	q.DisableCoord = disabled
 }
 
 func (q *DisjunctionQuery) SetMin(m float64) {
@@ -82,7 +91,12 @@ func (q *DisjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 		return searcher.NewMatchNoneSearcher(i)
 	}
 
-	return searcher.NewDisjunctionSearcher(i, ss, q.Min, options)
+	buildSearcher := searcher.NewDisjunctionSearcher
+	if q.DisableCoord {
+		buildSearcher = searcher.NewUncoordDisjunctionSearcher
+	}
+
+	return buildSearcher(i, ss, q.Min, options)
 }
 
 func (q *DisjunctionQuery) Validate() error {
@@ -102,9 +116,10 @@ func (q *DisjunctionQuery) Validate() error {
 
 func (q *DisjunctionQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
-		Disjuncts []json.RawMessage `json:"disjuncts"`
-		Boost     *Boost            `json:"boost,omitempty"`
-		Min       float64           `json:"min"`
+		Disjuncts    []json.RawMessage `json:"disjuncts"`
+		Boost        *Boost            `json:"boost,omitempty"`
+		Min          float64           `json:"min"`
+		DisableCoord bool              `json:"disable_coord"`
 	}{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
@@ -120,5 +135,7 @@ func (q *DisjunctionQuery) UnmarshalJSON(data []byte) error {
 	}
 	q.BoostVal = tmp.Boost
 	q.Min = tmp.Min
+	q.DisableCoord = tmp.DisableCoord
+
 	return nil
 }

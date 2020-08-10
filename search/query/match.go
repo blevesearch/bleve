@@ -24,13 +24,14 @@ import (
 )
 
 type MatchQuery struct {
-	Match     string             `json:"match"`
-	FieldVal  string             `json:"field,omitempty"`
-	Analyzer  string             `json:"analyzer,omitempty"`
-	BoostVal  *Boost             `json:"boost,omitempty"`
-	Prefix    int                `json:"prefix_length"`
-	Fuzziness int                `json:"fuzziness"`
-	Operator  MatchQueryOperator `json:"operator,omitempty"`
+	Match        string             `json:"match"`
+	FieldVal     string             `json:"field,omitempty"`
+	Analyzer     string             `json:"analyzer,omitempty"`
+	BoostVal     *Boost             `json:"boost,omitempty"`
+	Prefix       int                `json:"prefix_length"`
+	Fuzziness    int                `json:"fuzziness"`
+	Operator     MatchQueryOperator `json:"operator,omitempty"`
+	DisableCoord bool               `json:"disable_coord,omitempty"`
 }
 
 type MatchQueryOperator int
@@ -114,6 +115,10 @@ func (q *MatchQuery) SetOperator(operator MatchQueryOperator) {
 	q.Operator = operator
 }
 
+func (q *MatchQuery) SetDisableCoord(disable bool) {
+	q.DisableCoord = disable
+}
+
 func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 
 	field := q.FieldVal
@@ -160,6 +165,7 @@ func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, optio
 			shouldQuery := NewDisjunctionQuery(tqs)
 			shouldQuery.SetMin(1)
 			shouldQuery.SetBoost(q.BoostVal.Value())
+			shouldQuery.SetDisableCoord(q.DisableCoord)
 			return shouldQuery.Searcher(i, m, options)
 
 		case MatchQueryOperatorAnd:
