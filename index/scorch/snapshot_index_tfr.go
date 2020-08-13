@@ -45,7 +45,6 @@ type IndexSnapshotTermFieldReader struct {
 	includeTermVectors bool
 	currPosting        segment.Posting
 	currID             index.IndexInternalID
-	doNotRecycle       bool
 }
 
 func (i *IndexSnapshotTermFieldReader) Size() int {
@@ -187,7 +186,8 @@ func (i *IndexSnapshotTermFieldReader) Close() error {
 		// fresh roaring.Bitmap is built by AND-ing or OR-ing individual
 		// bitmaps, and we'll need to release them for GC.
 		// (See MB-40916)
-		if !i.doNotRecycle {
+		if !(bytes.Equal(i.term, OptimizeTFRConjunctionUnadornedTerm) ||
+			bytes.Equal(i.term, OptimizeTFRDisjunctionUnadornedTerm)) {
 			i.snapshot.recycleTermFieldReader(i)
 		}
 	}
