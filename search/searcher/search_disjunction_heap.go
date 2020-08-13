@@ -310,7 +310,7 @@ func (s *DisjunctionHeapSearcher) Optimize(kind string, octx index.OptimizableCo
 		}
 	}
 
-	return octx, nil
+	return nil, nil
 }
 
 // heap impl

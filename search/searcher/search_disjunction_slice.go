@@ -294,5 +294,5 @@ func (s *DisjunctionSliceSearcher) Optimize(kind string, octx index.OptimizableC
 		}
 	}
 
-	return octx, nil
+	return nil, nil
 }
