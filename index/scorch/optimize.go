@@ -266,6 +266,10 @@ OUTER:
 			bm.And(actualBM)
 		}
 
+		// On closure, do not recycle this optimized TermFieldReader -
+		// as the roaring.Bitmap created above needs to be released.
+		oTFR.doNotRecycle = true
+
 		oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFromBitmap(bm)
 	}
 
@@ -398,6 +402,10 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 		}
 
 		bm.AddMany(docNums)
+
+		// On closure, do not recycle this optimized TermFieldReader -
+		// as the roaring.Bitmap created above needs to be released.
+		oTFR.doNotRecycle = true
 
 		oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFromBitmap(bm)
 	}

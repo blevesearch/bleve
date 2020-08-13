@@ -45,6 +45,7 @@ type IndexSnapshotTermFieldReader struct {
 	includeTermVectors bool
 	currPosting        segment.Posting
 	currID             index.IndexInternalID
+	doNotRecycle       bool
 }
 
 func (i *IndexSnapshotTermFieldReader) Size() int {
@@ -181,7 +182,14 @@ func (i *IndexSnapshotTermFieldReader) Count() uint64 {
 func (i *IndexSnapshotTermFieldReader) Close() error {
 	if i.snapshot != nil {
 		atomic.AddUint64(&i.snapshot.parent.stats.TotTermSearchersFinished, uint64(1))
-		i.snapshot.recycleTermFieldReader(i)
+		// Recycle the term field reader only if it wasn't optimized for
+		// ConjunctionUnadorned or DisjunctionUnadorned, during when a
+		// fresh roaring.Bitmap is built by AND-ing or OR-ing individual
+		// bitmaps, and we'll need to release them for GC.
+		// (See MB-40916)
+		if !i.doNotRecycle {
+			i.snapshot.recycleTermFieldReader(i)
+		}
 	}
 	return nil
 }
