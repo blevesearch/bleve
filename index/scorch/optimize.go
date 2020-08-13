@@ -283,7 +283,7 @@ func (s *IndexSnapshotTermFieldReader) optimizeDisjunctionUnadorned(
 	octx index.OptimizableContext, minChildCardinality uint64) (index.OptimizableContext, error) {
 	if octx == nil {
 		octx = &OptimizeTFRDisjunctionUnadorned{
-			snapshot: s.snapshot,
+			snapshot:            s.snapshot,
 			minChildCardinality: minChildCardinality,
 		}
 	}
