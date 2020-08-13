@@ -16,10 +16,10 @@ package scorch
 
 import (
 	"fmt"
-
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
+	"sync/atomic"
 )
 
 var OptimizeConjunction = true
@@ -37,7 +37,11 @@ func (s *IndexSnapshotTermFieldReader) Optimize(kind string,
 	}
 
 	if OptimizeDisjunctionUnadorned && kind == "disjunction:unadorned" {
-		return s.optimizeDisjunctionUnadorned(octx)
+		return s.optimizeDisjunctionUnadorned(octx, OptimizeDisjunctionUnadornedMinChildCardinality)
+	}
+
+	if OptimizeDisjunctionUnadorned && kind == "disjunction:unadorned-force" {
+		return s.optimizeDisjunctionUnadorned(octx, 0)
 	}
 
 	return octx, nil
@@ -265,6 +269,7 @@ OUTER:
 		oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFromBitmap(bm)
 	}
 
+	atomic.AddUint64(&o.snapshot.parent.stats.TotTermSearchersStarted, uint64(1))
 	return oTFR, nil
 }
 
@@ -275,9 +280,12 @@ OUTER:
 // term-vectors are not required, and instead only the internal-id's
 // are needed.
 func (s *IndexSnapshotTermFieldReader) optimizeDisjunctionUnadorned(
-	octx index.OptimizableContext) (index.OptimizableContext, error) {
+	octx index.OptimizableContext, minChildCardinality uint64) (index.OptimizableContext, error) {
 	if octx == nil {
-		octx = &OptimizeTFRDisjunctionUnadorned{snapshot: s.snapshot}
+		octx = &OptimizeTFRDisjunctionUnadorned{
+			snapshot: s.snapshot,
+			minChildCardinality: minChildCardinality,
+		}
 	}
 
 	o, ok := octx.(*OptimizeTFRDisjunctionUnadorned)
@@ -298,6 +306,8 @@ type OptimizeTFRDisjunctionUnadorned struct {
 	snapshot *IndexSnapshot
 
 	tfrs []*IndexSnapshotTermFieldReader
+
+	minChildCardinality uint64
 }
 
 var OptimizeTFRDisjunctionUnadornedTerm = []byte("<disjunction:unadorned>")
@@ -332,7 +342,7 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 		// Heuristic to skip the optimization if all the constituent
 		// bitmaps are too small, where the processing & resource
 		// overhead to create the OR'ed bitmap outweighs the benefit.
-		if cMax < OptimizeDisjunctionUnadornedMinChildCardinality {
+		if cMax < o.minChildCardinality {
 			return nil, nil
 		}
 	}
@@ -392,5 +402,6 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 		oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFromBitmap(bm)
 	}
 
+	atomic.AddUint64(&o.snapshot.parent.stats.TotTermSearchersStarted, uint64(1))
 	return oTFR, nil
 }

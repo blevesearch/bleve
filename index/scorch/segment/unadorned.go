@@ -72,6 +72,19 @@ func (i *UnadornedPostingsIteratorBitmap) Size() int {
 	return reflectStaticSizeUnadornedPostingsIteratorBitmap
 }
 
+func (i *UnadornedPostingsIteratorBitmap)  ActualBitmap() *roaring.Bitmap {
+	return i.actualBM
+}
+
+func (i *UnadornedPostingsIteratorBitmap)  DocNum1Hit() (uint64, bool) {
+	return 0, false
+}
+
+func (i *UnadornedPostingsIteratorBitmap)  ReplaceActual(actual *roaring.Bitmap) {
+	i.actualBM = actual
+	i.actual = actual.Iterator()
+}
+
 func NewUnadornedPostingsIteratorFromBitmap(bm *roaring.Bitmap) PostingsIterator {
 	return &UnadornedPostingsIteratorBitmap{
 		actualBM: bm,
