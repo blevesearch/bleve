@@ -44,7 +44,7 @@ func (s *IndexSnapshotTermFieldReader) Optimize(kind string,
 		return s.optimizeDisjunctionUnadorned(octx, 0)
 	}
 
-	return octx, nil
+	return nil, nil
 }
 
 var OptimizeDisjunctionUnadornedMinChildCardinality = uint64(256)
