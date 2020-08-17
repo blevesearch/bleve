@@ -12,7 +12,6 @@ require (
 	github.com/blevesearch/zap/v12 v12.0.9
 	github.com/blevesearch/zap/v13 v13.0.1
 	github.com/blevesearch/zap/v14 v14.0.0
-	github.com/couchbase/ghistogram v0.1.0 // indirect
 	github.com/couchbase/moss v0.1.0
 	github.com/couchbase/vellum v1.0.1
 	github.com/golang/protobuf v1.3.2

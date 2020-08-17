@@ -303,9 +303,12 @@ func (i *IndexSnapshot) newDocIDReader(results chan *asynchSegmentResult) (index
 	var err error
 	for count := 0; count < len(i.segment); count++ {
 		asr := <-results
-		if asr.err != nil && err != nil {
-			err = asr.err
-		} else {
+		if asr.err != nil {
+			if err == nil {
+				// returns the first error encountered
+				err = asr.err
+			}
+		} else if err == nil {
 			rv.iterators[asr.index] = asr.docs.Iterator()
 		}
 	}
