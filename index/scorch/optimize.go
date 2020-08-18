@@ -166,16 +166,8 @@ func (o *OptimizeTFRConjunctionUnadorned) Finish() (rv index.Optimized, err erro
 
 	// We use an artificial term and field because the optimized
 	// termFieldReader can represent multiple terms and fields.
-	oTFR := &IndexSnapshotTermFieldReader{
-		term:               OptimizeTFRConjunctionUnadornedTerm,
-		field:              OptimizeTFRConjunctionUnadornedField,
-		snapshot:           o.snapshot,
-		iterators:          make([]segment.PostingsIterator, len(o.snapshot.segment)),
-		segmentOffset:      0,
-		includeFreq:        false,
-		includeNorm:        false,
-		includeTermVectors: false,
-	}
+	oTFR := o.snapshot.unadornedTermFieldReader(
+		OptimizeTFRConjunctionUnadornedTerm, OptimizeTFRConjunctionUnadornedField)
 
 	var actualBMs []*roaring.Bitmap // Collected from regular posting lists.
 
@@ -290,7 +282,7 @@ func (s *IndexSnapshotTermFieldReader) optimizeDisjunctionUnadorned(
 	octx index.OptimizableContext, minChildCardinality uint64) (index.OptimizableContext, error) {
 	if octx == nil {
 		octx = &OptimizeTFRDisjunctionUnadorned{
-			snapshot: s.snapshot,
+			snapshot:            s.snapshot,
 			minChildCardinality: minChildCardinality,
 		}
 	}
@@ -356,16 +348,8 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 
 	// We use an artificial term and field because the optimized
 	// termFieldReader can represent multiple terms and fields.
-	oTFR := &IndexSnapshotTermFieldReader{
-		term:               OptimizeTFRDisjunctionUnadornedTerm,
-		field:              OptimizeTFRDisjunctionUnadornedField,
-		snapshot:           o.snapshot,
-		iterators:          make([]segment.PostingsIterator, len(o.snapshot.segment)),
-		segmentOffset:      0,
-		includeFreq:        false,
-		includeNorm:        false,
-		includeTermVectors: false,
-	}
+	oTFR := o.snapshot.unadornedTermFieldReader(
+		OptimizeTFRDisjunctionUnadornedTerm, OptimizeTFRDisjunctionUnadornedField)
 
 	var docNums []uint32            // Collected docNum's from 1-hit posting lists.
 	var actualBMs []*roaring.Bitmap // Collected from regular posting lists.
@@ -411,4 +395,23 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 
 	atomic.AddUint64(&o.snapshot.parent.stats.TotTermSearchersStarted, uint64(1))
 	return oTFR, nil
+}
+
+// ----------------------------------------------------------------
+
+func (i *IndexSnapshot) unadornedTermFieldReader(
+	term []byte, field string) *IndexSnapshotTermFieldReader {
+	// This IndexSnapshotTermFieldReader will not be recycled, more
+	// conversation here: https://github.com/blevesearch/bleve/pull/1438
+	return &IndexSnapshotTermFieldReader{
+		term:               term,
+		field:              field,
+		snapshot:           i,
+		iterators:          make([]segment.PostingsIterator, len(i.segment)),
+		segmentOffset:      0,
+		includeFreq:        false,
+		includeNorm:        false,
+		includeTermVectors: false,
+		recycle:            false,
+	}
 }
