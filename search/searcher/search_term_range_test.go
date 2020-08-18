@@ -280,5 +280,4 @@ func TestTermRangeSearchTooManyTerms(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("expected: %#v, got %#v", want, got)
 	}
-
 }

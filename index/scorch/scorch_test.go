@@ -2458,7 +2458,6 @@ func TestIndexSeekBackwardsStats(t *testing.T) {
 		t.Fatalf("error closing term field reader: %v", err)
 	}
 
-
 	if idx.(*Scorch).stats.TotTermSearchersStarted != idx.(*Scorch).stats.TotTermSearchersFinished {
 		t.Errorf("expected term searchers started %d to equal term searchers finished %d",
 			idx.(*Scorch).stats.TotTermSearchersStarted,

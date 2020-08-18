@@ -81,11 +81,11 @@ func chooseSegmentPlugin(forcedSegmentType string,
 
 func (s *Scorch) loadSegmentPlugin(forcedSegmentType string,
 	forcedSegmentVersion uint32) error {
-		segPlugin, err := chooseSegmentPlugin(forcedSegmentType,
-			forcedSegmentVersion)
-		if err != nil {
-			return err
-		}
-		s.segPlugin = segPlugin
-		return nil
+	segPlugin, err := chooseSegmentPlugin(forcedSegmentType,
+		forcedSegmentVersion)
+	if err != nil {
+		return err
+	}
+	s.segPlugin = segPlugin
+	return nil
 }
