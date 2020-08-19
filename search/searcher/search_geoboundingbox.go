@@ -106,20 +106,6 @@ func ComputeGeoRange(term uint64, shift uint,
 	sminLon, sminLat, smaxLon, smaxLat float64, checkBoundaries bool,
 	indexReader index.IndexReader, field string) (
 	onBoundary [][]byte, notOnBoundary [][]byte, err error) {
-	preallocBytesLen := 32
-	preallocBytes := make([]byte, preallocBytesLen)
-
-	makePrefixCoded := func(in int64, shift uint) (rv numeric.PrefixCoded) {
-		if len(preallocBytes) <= 0 {
-			preallocBytesLen = preallocBytesLen * 2
-			preallocBytes = make([]byte, preallocBytesLen)
-		}
-
-		rv, preallocBytes, err =
-			numeric.NewPrefixCodedInt64Prealloc(in, shift, preallocBytes)
-
-		return rv
-	}
 
 	isIndexed, closeF, err := buildIsIndexedFunc(indexReader, field)
 	if closeF != nil {
@@ -131,9 +117,20 @@ func ComputeGeoRange(term uint64, shift uint,
 		}()
 	}
 
-	onBoundary, notOnBoundary = computeGeoRange(term, shift, sminLon, sminLat, smaxLon, smaxLat, checkBoundaries, onBoundary, notOnBoundary, makePrefixCoded, isIndexed)
+	grc := &geoRangeCompute{
+		preallocBytesLen: 32,
+		preallocBytes:    make([]byte, 32),
+		sminLon:          sminLon,
+		sminLat:          sminLat,
+		smaxLon:          smaxLon,
+		smaxLat:          smaxLat,
+		checkBoundaries:  checkBoundaries,
+		isIndexed:        isIndexed,
+	}
 
-	return onBoundary, notOnBoundary, nil
+	grc.computeGeoRange(term, shift)
+
+	return grc.onBoundary, grc.notOnBoundary, nil
 }
 
 func buildIsIndexedFunc(indexReader index.IndexReader, field string) (isIndexed filterFunc, closeF closeFunc, err error) {
@@ -211,12 +208,28 @@ func buildRectFilter(dvReader index.DocValueReader, field string,
 	}
 }
 
-func computeGeoRange(term uint64, shift uint,
-	sminLon, sminLat, smaxLon, smaxLat float64,
-	checkBoundaries bool, onBoundary, notOnBoundary [][]byte,
-	makePrefixCoded func(in int64, shift uint) (rv numeric.PrefixCoded),
-	isIndexed func(term []byte) bool) (
-	onBoundaryOut, notOnBoundarOut [][]byte) {
+type geoRangeCompute struct {
+	preallocBytesLen int
+	preallocBytes []byte
+	sminLon, sminLat, smaxLon, smaxLat float64
+	checkBoundaries bool
+	onBoundary, notOnBoundary [][]byte
+	isIndexed func(term []byte) bool
+}
+
+func (grc *geoRangeCompute) makePrefixCoded(in int64, shift uint) (rv numeric.PrefixCoded) {
+	if len(grc.preallocBytes) <= 0 {
+		grc.preallocBytesLen = grc.preallocBytesLen * 2
+		grc.preallocBytes = make([]byte, grc.preallocBytesLen)
+	}
+
+	rv, grc.preallocBytes, _ =
+		numeric.NewPrefixCodedInt64Prealloc(in, shift, grc.preallocBytes)
+
+	return rv
+}
+
+func (grc *geoRangeCompute) computeGeoRange(term uint64, shift uint) {
 	split := term | uint64(0x1)<<shift
 	var upperMax uint64
 	if shift < 63 {
@@ -225,19 +238,11 @@ func computeGeoRange(term uint64, shift uint,
 		upperMax = 0xffffffffffffffff
 	}
 	lowerMax := split - 1
-	onBoundary, notOnBoundary = relateAndRecurse(term, lowerMax, shift,
-		sminLon, sminLat, smaxLon, smaxLat, checkBoundaries, onBoundary, notOnBoundary, makePrefixCoded, isIndexed)
-	onBoundary, notOnBoundary = relateAndRecurse(split, upperMax, shift,
-		sminLon, sminLat, smaxLon, smaxLat, checkBoundaries, onBoundary, notOnBoundary, makePrefixCoded, isIndexed)
-	return onBoundary, notOnBoundary
+	grc.relateAndRecurse(term, lowerMax, shift)
+	grc.relateAndRecurse(split, upperMax, shift)
 }
 
-func relateAndRecurse(start, end uint64, res uint,
-	sminLon, sminLat, smaxLon, smaxLat float64,
-	checkBoundaries bool, onBoundary, notOnBoundary [][]byte,
-	makePrefixCoded func(in int64, shift uint,) (rv numeric.PrefixCoded),
-	isIndexed func(term []byte) bool) (
-	onBoundaryOut, notOnBoundaryOut [][]byte) {
+func (grc *geoRangeCompute) relateAndRecurse(start, end uint64, res uint) {
 	minLon := geo.MortonUnhashLon(start)
 	minLat := geo.MortonUnhashLat(start)
 	maxLon := geo.MortonUnhashLon(end)
@@ -247,24 +252,21 @@ func relateAndRecurse(start, end uint64, res uint,
 
 	within := res%document.GeoPrecisionStep == 0 &&
 		geo.RectWithin(minLon, minLat, maxLon, maxLat,
-			sminLon, sminLat, smaxLon, smaxLat)
+			grc.sminLon, grc.sminLat, grc.smaxLon, grc.smaxLat)
 	if within || (level == geoDetailLevel &&
 		geo.RectIntersects(minLon, minLat, maxLon, maxLat,
-			sminLon, sminLat, smaxLon, smaxLat)) {
-		codedTerm := makePrefixCoded(int64(start), res)
-		if isIndexed(codedTerm) {
-			if !within && checkBoundaries {
-				onBoundary = append(onBoundary, codedTerm)
+			grc.sminLon, grc.sminLat, grc.smaxLon, grc.smaxLat)) {
+		codedTerm := grc.makePrefixCoded(int64(start), res)
+		if grc.isIndexed(codedTerm) {
+			if !within && grc.checkBoundaries {
+				grc.onBoundary = append(grc.onBoundary, codedTerm)
 			} else {
-				notOnBoundary = append(notOnBoundary, codedTerm)
+				grc.notOnBoundary = append(grc.notOnBoundary, codedTerm)
 			}
 		}
-		return onBoundary, notOnBoundary
 	} else if level < geoDetailLevel &&
 		geo.RectIntersects(minLon, minLat, maxLon, maxLat,
-			sminLon, sminLat, smaxLon, smaxLat) {
-		return computeGeoRange(start, res-1, sminLon, sminLat, smaxLon, smaxLat,
-			checkBoundaries, onBoundary, notOnBoundary, makePrefixCoded, isIndexed)
+			grc.sminLon, grc.sminLat, grc.smaxLon, grc.smaxLat) {
+		grc.computeGeoRange(start, res-1)
 	}
-	return onBoundary, notOnBoundary
 }
