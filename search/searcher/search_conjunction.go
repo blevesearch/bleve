@@ -38,7 +38,7 @@ type ConjunctionSearcher struct {
 	queryNorm   float64
 	currs       []*search.DocumentMatch
 	maxIDIdx    int
-	scorer      *scorer.ConjunctionQueryScorer
+	scorer      scorer.ConjunctionQueryScorer
 	initialized bool
 	options     search.SearcherOptions
 }

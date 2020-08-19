@@ -27,11 +27,18 @@ import (
 var reflectStaticSizeTermQueryScorer int
 
 func init() {
-	var tqs TermQueryScorer
+	var tqs termQueryScorer
 	reflectStaticSizeTermQueryScorer = int(reflect.TypeOf(tqs).Size())
 }
 
-type TermQueryScorer struct {
+type TermQueryScorer interface {
+	Size() int
+	Weight() float64
+	SetQueryNorm(qnorm float64)
+	Score(ctx *search.SearchContext, termMatch *index.TermFieldDoc) *search.DocumentMatch
+}
+
+type termQueryScorer struct {
 	queryTerm              string
 	queryField             string
 	queryBoost             float64
@@ -46,7 +53,7 @@ type TermQueryScorer struct {
 	queryWeightExplanation *search.Explanation
 }
 
-func (s *TermQueryScorer) Size() int {
+func (s *termQueryScorer) Size() int {
 	sizeInBytes := reflectStaticSizeTermQueryScorer + size.SizeOfPtr +
 		len(s.queryTerm) + len(s.queryField)
 
@@ -61,8 +68,8 @@ func (s *TermQueryScorer) Size() int {
 	return sizeInBytes
 }
 
-func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64, docTotal, docTerm uint64, options search.SearcherOptions) *TermQueryScorer {
-	rv := TermQueryScorer{
+func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64, docTotal, docTerm uint64, options search.SearcherOptions) TermQueryScorer {
+	rv := termQueryScorer{
 		queryTerm:    string(queryTerm),
 		queryField:   queryField,
 		queryBoost:   queryBoost,
@@ -84,12 +91,12 @@ func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64,
 	return &rv
 }
 
-func (s *TermQueryScorer) Weight() float64 {
+func (s *termQueryScorer) Weight() float64 {
 	sum := s.queryBoost * s.idf
 	return sum * sum
 }
 
-func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
+func (s *termQueryScorer) SetQueryNorm(qnorm float64) {
 	s.queryNorm = qnorm
 
 	// update the query weight
@@ -114,7 +121,7 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.TermFieldDoc) *search.DocumentMatch {
+func (s *termQueryScorer) Score(ctx *search.SearchContext, termMatch *index.TermFieldDoc) *search.DocumentMatch {
 	rv := ctx.DocumentMatchPool.Get()
 	// perform any score computations only when needed
 	if s.includeScore || s.options.Explain {

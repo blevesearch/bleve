@@ -33,7 +33,7 @@ func init() {
 type MatchAllSearcher struct {
 	indexReader index.IndexReader
 	reader      index.DocIDReader
-	scorer      *scorer.ConstantScorer
+	scorer      scorer.ConstantScorer
 	count       uint64
 }
 

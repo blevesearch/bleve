@@ -33,7 +33,7 @@ func init() {
 type TermSearcher struct {
 	indexReader index.IndexReader
 	reader      index.TermFieldReader
-	scorer      *scorer.TermQueryScorer
+	scorer      scorer.TermQueryScorer
 	tfd         index.TermFieldDoc
 }
 

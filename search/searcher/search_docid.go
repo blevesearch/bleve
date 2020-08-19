@@ -33,7 +33,7 @@ func init() {
 // DocIDSearcher returns documents matching a predefined set of identifiers.
 type DocIDSearcher struct {
 	reader index.DocIDReader
-	scorer *scorer.ConstantScorer
+	scorer scorer.ConstantScorer
 	count  int
 }
 

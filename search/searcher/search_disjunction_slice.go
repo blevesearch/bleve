@@ -38,7 +38,7 @@ type DisjunctionSliceSearcher struct {
 	numSearchers int
 	queryNorm    float64
 	currs        []*search.DocumentMatch
-	scorer       *scorer.DisjunctionQueryScorer
+	scorer       scorer.DisjunctionQueryScorer
 	min          int
 	matching     []*search.DocumentMatch
 	matchingIdxs []int

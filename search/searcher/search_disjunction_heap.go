@@ -46,7 +46,7 @@ type DisjunctionHeapSearcher struct {
 	indexReader index.IndexReader
 
 	numSearchers int
-	scorer       *scorer.DisjunctionQueryScorer
+	scorer       scorer.DisjunctionQueryScorer
 	min          int
 	queryNorm    float64
 	initialized  bool
