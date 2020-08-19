@@ -37,11 +37,7 @@ func (s *IndexSnapshotTermFieldReader) Optimize(kind string,
 	}
 
 	if OptimizeDisjunctionUnadorned && kind == "disjunction:unadorned" {
-		return s.optimizeDisjunctionUnadorned(octx, OptimizeDisjunctionUnadornedMinChildCardinality)
-	}
-
-	if OptimizeDisjunctionUnadorned && kind == "disjunction:unadorned-force" {
-		return s.optimizeDisjunctionUnadorned(octx, 0)
+		return s.optimizeDisjunctionUnadorned(octx)
 	}
 
 	return nil, nil
@@ -272,11 +268,10 @@ OUTER:
 // term-vectors are not required, and instead only the internal-id's
 // are needed.
 func (s *IndexSnapshotTermFieldReader) optimizeDisjunctionUnadorned(
-	octx index.OptimizableContext, minChildCardinality uint64) (index.OptimizableContext, error) {
+	octx index.OptimizableContext) (index.OptimizableContext, error) {
 	if octx == nil {
 		octx = &OptimizeTFRDisjunctionUnadorned{
-			snapshot:            s.snapshot,
-			minChildCardinality: minChildCardinality,
+			snapshot: s.snapshot,
 		}
 	}
 
@@ -298,8 +293,6 @@ type OptimizeTFRDisjunctionUnadorned struct {
 	snapshot *IndexSnapshot
 
 	tfrs []*IndexSnapshotTermFieldReader
-
-	minChildCardinality uint64
 }
 
 var OptimizeTFRDisjunctionUnadornedTerm = []byte("<disjunction:unadorned>")
@@ -329,13 +322,6 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 					cMax = c
 				}
 			}
-		}
-
-		// Heuristic to skip the optimization if all the constituent
-		// bitmaps are too small, where the processing & resource
-		// overhead to create the OR'ed bitmap outweighs the benefit.
-		if cMax < o.minChildCardinality {
-			return nil, nil
 		}
 	}
 
