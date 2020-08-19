@@ -24,7 +24,7 @@ import (
 
 type filterFunc func(key []byte) bool
 
-var GeoBitsShift1 = (geo.GeoBits << 1)
+var GeoBitsShift1 = geo.GeoBits << 1
 var GeoBitsShift1Minus1 = GeoBitsShift1 - 1
 
 func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
@@ -248,7 +248,7 @@ func (grc *geoRangeCompute) relateAndRecurse(start, end uint64, res uint) {
 	maxLon := geo.MortonUnhashLon(end)
 	maxLat := geo.MortonUnhashLat(end)
 
-	level := ((geo.GeoBits << 1) - res) >> 1
+	level := (GeoBitsShift1 - res) >> 1
 
 	within := res%document.GeoPrecisionStep == 0 &&
 		geo.RectWithin(minLon, minLat, maxLon, maxLat,
