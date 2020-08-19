@@ -100,6 +100,7 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 
 var geoMaxShift = document.GeoPrecisionStep * 4
 var geoDetailLevel = ((geo.GeoBits << 1) - geoMaxShift) / 2
+type closeFunc func() error
 
 func ComputeGeoRange(term uint64, shift uint,
 	sminLon, sminLat, smaxLon, smaxLat float64, checkBoundaries bool,
@@ -120,10 +121,24 @@ func ComputeGeoRange(term uint64, shift uint,
 		return rv
 	}
 
-	var fieldDict index.FieldDictContains
-	var isIndexed filterFunc
+	isIndexed, closeF, err := buildIsIndexedFunc(indexReader, field)
+	if closeF != nil {
+		defer func() {
+			cerr := closeF()
+			if cerr != nil {
+				err = cerr
+			}
+		}()
+	}
+
+	onBoundary, notOnBoundary = computeGeoRange(term, shift, sminLon, sminLat, smaxLon, smaxLat, checkBoundaries, onBoundary, notOnBoundary, makePrefixCoded, isIndexed)
+
+	return onBoundary, notOnBoundary, nil
+}
+
+func buildIsIndexedFunc(indexReader index.IndexReader, field string) (isIndexed filterFunc, closeF closeFunc, err error) {
 	if irr, ok := indexReader.(index.IndexReaderContains); ok {
-		fieldDict, err = irr.FieldDictContains(field)
+		fieldDict, err := irr.FieldDictContains(field)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -132,22 +147,18 @@ func ComputeGeoRange(term uint64, shift uint,
 			found, err := fieldDict.Contains(term)
 			return err == nil && found
 		}
-	}
 
-	defer func() {
-		if fieldDict != nil {
+		closeF = func() error {
 			if fd, ok := fieldDict.(index.FieldDict); ok {
-				cerr := fd.Close()
-				if cerr != nil {
-					err = cerr
+				err := fd.Close()
+				if err != nil {
+					return err
 				}
 			}
+			return nil
 		}
-	}()
-
-	if isIndexed == nil {
+	} else if indexReader != nil {
 		isIndexed = func(term []byte) bool {
-			if indexReader != nil {
 				reader, err := indexReader.TermFieldReader(term, field, false, false, false)
 				if err != nil || reader == nil {
 					return false
@@ -157,68 +168,15 @@ func ComputeGeoRange(term uint64, shift uint,
 					return false
 				}
 				_ = reader.Close()
-			}
+				return true
+		}
+
+	} else {
+		isIndexed = func([]byte) bool {
 			return true
 		}
 	}
-
-	var computeGeoRange func(term uint64, shift uint) // declare for recursion
-
-	relateAndRecurse := func(start, end uint64, res, level uint) {
-		minLon := geo.MortonUnhashLon(start)
-		minLat := geo.MortonUnhashLat(start)
-		maxLon := geo.MortonUnhashLon(end)
-		maxLat := geo.MortonUnhashLat(end)
-
-		within := res%document.GeoPrecisionStep == 0 &&
-			geo.RectWithin(minLon, minLat, maxLon, maxLat,
-				sminLon, sminLat, smaxLon, smaxLat)
-		if within || (level == geoDetailLevel &&
-			geo.RectIntersects(minLon, minLat, maxLon, maxLat,
-				sminLon, sminLat, smaxLon, smaxLat)) {
-			codedTerm := makePrefixCoded(int64(start), res)
-			if isIndexed(codedTerm) {
-				if !within && checkBoundaries {
-					onBoundary = append(onBoundary, codedTerm)
-				} else {
-					notOnBoundary = append(notOnBoundary, codedTerm)
-				}
-			}
-		} else if level < geoDetailLevel &&
-			geo.RectIntersects(minLon, minLat, maxLon, maxLat,
-				sminLon, sminLat, smaxLon, smaxLat) {
-			computeGeoRange(start, res-1)
-		}
-	}
-
-	computeGeoRange = func(term uint64, shift uint) {
-		if err != nil {
-			return
-		}
-
-		split := term | uint64(0x1)<<shift
-		var upperMax uint64
-		if shift < 63 {
-			upperMax = term | ((uint64(1) << (shift + 1)) - 1)
-		} else {
-			upperMax = 0xffffffffffffffff
-		}
-
-		lowerMax := split - 1
-
-		level := (GeoBitsShift1 - shift) >> 1
-
-		relateAndRecurse(term, lowerMax, shift, level)
-		relateAndRecurse(split, upperMax, shift, level)
-	}
-
-	computeGeoRange(term, shift)
-
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return onBoundary, notOnBoundary, err
+	return isIndexed, closeF, err
 }
 
 func buildRectFilter(dvReader index.DocValueReader, field string,
@@ -251,4 +209,62 @@ func buildRectFilter(dvReader index.DocValueReader, field string,
 		}
 		return false
 	}
+}
+
+func computeGeoRange(term uint64, shift uint,
+	sminLon, sminLat, smaxLon, smaxLat float64,
+	checkBoundaries bool, onBoundary, notOnBoundary [][]byte,
+	makePrefixCoded func(in int64, shift uint) (rv numeric.PrefixCoded),
+	isIndexed func(term []byte) bool) (
+	onBoundaryOut, notOnBoundarOut [][]byte) {
+	split := term | uint64(0x1)<<shift
+	var upperMax uint64
+	if shift < 63 {
+		upperMax = term | ((uint64(1) << (shift + 1)) - 1)
+	} else {
+		upperMax = 0xffffffffffffffff
+	}
+	lowerMax := split - 1
+	onBoundary, notOnBoundary = relateAndRecurse(term, lowerMax, shift,
+		sminLon, sminLat, smaxLon, smaxLat, checkBoundaries, onBoundary, notOnBoundary, makePrefixCoded, isIndexed)
+	onBoundary, notOnBoundary = relateAndRecurse(split, upperMax, shift,
+		sminLon, sminLat, smaxLon, smaxLat, checkBoundaries, onBoundary, notOnBoundary, makePrefixCoded, isIndexed)
+	return onBoundary, notOnBoundary
+}
+
+func relateAndRecurse(start, end uint64, res uint,
+	sminLon, sminLat, smaxLon, smaxLat float64,
+	checkBoundaries bool, onBoundary, notOnBoundary [][]byte,
+	makePrefixCoded func(in int64, shift uint,) (rv numeric.PrefixCoded),
+	isIndexed func(term []byte) bool) (
+	onBoundaryOut, notOnBoundaryOut [][]byte) {
+	minLon := geo.MortonUnhashLon(start)
+	minLat := geo.MortonUnhashLat(start)
+	maxLon := geo.MortonUnhashLon(end)
+	maxLat := geo.MortonUnhashLat(end)
+
+	level := ((geo.GeoBits << 1) - res) >> 1
+
+	within := res%document.GeoPrecisionStep == 0 &&
+		geo.RectWithin(minLon, minLat, maxLon, maxLat,
+			sminLon, sminLat, smaxLon, smaxLat)
+	if within || (level == geoDetailLevel &&
+		geo.RectIntersects(minLon, minLat, maxLon, maxLat,
+			sminLon, sminLat, smaxLon, smaxLat)) {
+		codedTerm := makePrefixCoded(int64(start), res)
+		if isIndexed(codedTerm) {
+			if !within && checkBoundaries {
+				onBoundary = append(onBoundary, codedTerm)
+			} else {
+				notOnBoundary = append(notOnBoundary, codedTerm)
+			}
+		}
+		return onBoundary, notOnBoundary
+	} else if level < geoDetailLevel &&
+		geo.RectIntersects(minLon, minLat, maxLon, maxLat,
+			sminLon, sminLat, smaxLon, smaxLat) {
+		return computeGeoRange(start, res-1, sminLon, sminLat, smaxLon, smaxLat,
+			checkBoundaries, onBoundary, notOnBoundary, makePrefixCoded, isIndexed)
+	}
+	return onBoundary, notOnBoundary
 }
