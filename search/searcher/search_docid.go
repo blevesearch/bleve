@@ -107,3 +107,7 @@ func (s *DocIDSearcher) Min() int {
 func (s *DocIDSearcher) DocumentMatchPoolSize() int {
 	return 1
 }
+
+func (s *DocIDSearcher) SetScorer(scorer scorer.ConstantScorer) {
+	s.scorer = scorer
+}

@@ -448,3 +448,7 @@ func (s *BooleanSearcher) DocumentMatchPoolSize() int {
 	}
 	return rv
 }
+
+func (s *BooleanSearcher) SetScorer(scorer scorer.ConjunctionQueryScorer) {
+	s.scorer = scorer
+}

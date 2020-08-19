@@ -282,6 +282,10 @@ func (s *DisjunctionSliceSearcher) DocumentMatchPoolSize() int {
 	return rv
 }
 
+func (s *DisjunctionSliceSearcher) SetScorer(scorer scorer.DisjunctionQueryScorer) {
+	s.scorer = scorer
+}
+
 // a disjunction searcher implements the index.Optimizable interface
 // but only activates on an edge case where the disjunction is a
 // wrapper around a single Optimizable child searcher

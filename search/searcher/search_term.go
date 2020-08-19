@@ -139,3 +139,7 @@ func (s *TermSearcher) Optimize(kind string, octx index.OptimizableContext) (
 
 	return octx, nil
 }
+
+func (s *TermSearcher) SetScorer(scorer scorer.TermQueryScorer) {
+	s.scorer = scorer
+}

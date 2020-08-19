@@ -119,3 +119,7 @@ func (s *MatchAllSearcher) Min() int {
 func (s *MatchAllSearcher) DocumentMatchPoolSize() int {
 	return 1
 }
+
+func (s *MatchAllSearcher) SetScorer(scorer scorer.ConstantScorer) {
+	s.scorer = scorer
+}

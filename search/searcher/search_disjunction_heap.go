@@ -341,3 +341,7 @@ func (s *DisjunctionHeapSearcher) Pop() interface{} {
 	s.heap = old[0 : n-1]
 	return x
 }
+
+func (s *DisjunctionHeapSearcher) SetScorer(scorer scorer.DisjunctionQueryScorer) {
+	s.scorer = scorer
+}

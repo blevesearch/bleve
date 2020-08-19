@@ -282,3 +282,7 @@ func (s *ConjunctionSearcher) DocumentMatchPoolSize() int {
 	}
 	return rv
 }
+
+func (s *ConjunctionSearcher) SetScorer(scorer scorer.ConjunctionQueryScorer) {
+	s.scorer = scorer
+}
