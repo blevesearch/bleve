@@ -30,10 +30,10 @@ var TermSeparator byte = 0xff
 var TermSeparatorSplitSlice = []byte{TermSeparator}
 
 type SegmentSnapshot struct {
-	id      uint64
-	segment segment.Segment
-	deleted *roaring.Bitmap
-	creator string
+	id        uint64
+	segment   segment.Segment
+	obsoleted *roaring.Bitmap
+	creator   string
 
 	cachedDocs *cachedDocs
 }
@@ -43,7 +43,7 @@ func (s *SegmentSnapshot) Segment() segment.Segment {
 }
 
 func (s *SegmentSnapshot) Deleted() *roaring.Bitmap {
-	return s.deleted
+	return s.obsoleted
 }
 
 func (s *SegmentSnapshot) Id() uint64 {
@@ -72,8 +72,8 @@ func (s *SegmentSnapshot) DocID(num uint64) ([]byte, error) {
 
 func (s *SegmentSnapshot) Count() uint64 {
 	rv := s.segment.Count()
-	if s.deleted != nil {
-		rv -= s.deleted.GetCardinality()
+	if s.obsoleted != nil {
+		rv -= s.obsoleted.GetCardinality()
 	}
 	return rv
 }
@@ -83,8 +83,8 @@ func (s *SegmentSnapshot) DocNumbers(docIDs []string) (*roaring.Bitmap, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.deleted != nil {
-		rv.AndNot(s.deleted)
+	if s.obsoleted != nil {
+		rv.AndNot(s.obsoleted)
 	}
 	return rv, nil
 }
@@ -93,8 +93,8 @@ func (s *SegmentSnapshot) DocNumbers(docIDs []string) (*roaring.Bitmap, error) {
 func (s *SegmentSnapshot) DocNumbersLive() *roaring.Bitmap {
 	rv := roaring.NewBitmap()
 	rv.AddRange(0, s.segment.Count())
-	if s.deleted != nil {
-		rv.AndNot(s.deleted)
+	if s.obsoleted != nil {
+		rv.AndNot(s.obsoleted)
 	}
 	return rv
 }
@@ -105,8 +105,8 @@ func (s *SegmentSnapshot) Fields() []string {
 
 func (s *SegmentSnapshot) Size() (rv int) {
 	rv = s.segment.Size()
-	if s.deleted != nil {
-		rv += int(s.deleted.GetSizeInBytes())
+	if s.obsoleted != nil {
+		rv += int(s.obsoleted.GetSizeInBytes())
 	}
 	rv += s.cachedDocs.Size()
 	return

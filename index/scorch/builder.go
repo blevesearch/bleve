@@ -285,10 +285,10 @@ func (o *Builder) Close() error {
 		segment: seg,
 	}
 	is := &IndexSnapshot{
-		epoch:    3, // chosen to match scorch behavior when indexing a single batch
-		segment:  []*SegmentSnapshot{ss},
-		creator:  "scorch-builder",
-		internal: o.internal,
+		epoch:            3, // chosen to match scorch behavior when indexing a single batch
+		segmentSnapshots: []*SegmentSnapshot{ss},
+		creator:          "scorch-builder",
+		internal:         o.internal,
 	}
 
 	// create the root bolt

@@ -63,13 +63,13 @@ func init() {
 }
 
 type IndexSnapshot struct {
-	parent   *Scorch
-	segment  []*SegmentSnapshot
-	offsets  []uint64
-	internal map[string][]byte
-	epoch    uint64
-	size     uint64
-	creator  string
+	parent           *Scorch
+	segmentSnapshots []*SegmentSnapshot
+	offsets          []uint64
+	internal         map[string][]byte
+	epoch            uint64
+	size             uint64
+	creator          string
 
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
@@ -79,7 +79,7 @@ type IndexSnapshot struct {
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
-	return i.segment
+	return i.segmentSnapshots
 }
 
 func (i *IndexSnapshot) Internal() map[string][]byte {
@@ -96,7 +96,7 @@ func (i *IndexSnapshot) DecRef() (err error) {
 	i.m.Lock()
 	i.refs--
 	if i.refs == 0 {
-		for _, s := range i.segment {
+		for _, s := range i.segmentSnapshots {
 			if s != nil {
 				err2 := s.segment.DecRef()
 				if err == nil {
@@ -122,7 +122,7 @@ func (i *IndexSnapshot) Size() int {
 
 func (i *IndexSnapshot) updateSize() {
 	i.size += uint64(reflectStaticSizeIndexSnapshot)
-	for _, s := range i.segment {
+	for _, s := range i.segmentSnapshots {
 		i.size += uint64(s.Size())
 	}
 }
@@ -132,7 +132,7 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 	randomLookup bool) (*IndexSnapshotFieldDict, error) {
 
 	results := make(chan *asynchSegmentResult)
-	for index, segment := range i.segment {
+	for index, segment := range i.segmentSnapshots {
 		go func(index int, segment *SegmentSnapshot) {
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
@@ -150,9 +150,9 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 	var err error
 	rv := &IndexSnapshotFieldDict{
 		snapshot: i,
-		cursors:  make([]*segmentDictCursor, 0, len(i.segment)),
+		cursors:  make([]*segmentDictCursor, 0, len(i.segmentSnapshots)),
 	}
-	for count := 0; count < len(i.segment); count++ {
+	for count := 0; count < len(i.segmentSnapshots); count++ {
 		asr := <-results
 		if asr.err != nil && err == nil {
 			err = asr.err
@@ -264,7 +264,7 @@ func (i *IndexSnapshot) FieldDictContains(field string) (index.FieldDictContains
 
 func (i *IndexSnapshot) DocIDReaderAll() (index.DocIDReader, error) {
 	results := make(chan *asynchSegmentResult)
-	for index, segment := range i.segment {
+	for index, segment := range i.segmentSnapshots {
 		go func(index int, segment *SegmentSnapshot) {
 			results <- &asynchSegmentResult{
 				index: index,
@@ -278,7 +278,7 @@ func (i *IndexSnapshot) DocIDReaderAll() (index.DocIDReader, error) {
 
 func (i *IndexSnapshot) DocIDReaderOnly(ids []string) (index.DocIDReader, error) {
 	results := make(chan *asynchSegmentResult)
-	for index, segment := range i.segment {
+	for index, segment := range i.segmentSnapshots {
 		go func(index int, segment *SegmentSnapshot) {
 			docs, err := segment.DocNumbers(ids)
 			if err != nil {
@@ -298,10 +298,10 @@ func (i *IndexSnapshot) DocIDReaderOnly(ids []string) (index.DocIDReader, error)
 func (i *IndexSnapshot) newDocIDReader(results chan *asynchSegmentResult) (index.DocIDReader, error) {
 	rv := &IndexSnapshotDocIDReader{
 		snapshot:  i,
-		iterators: make([]roaring.IntIterable, len(i.segment)),
+		iterators: make([]roaring.IntIterable, len(i.segmentSnapshots)),
 	}
 	var err error
-	for count := 0; count < len(i.segment); count++ {
+	for count := 0; count < len(i.segmentSnapshots); count++ {
 		asr := <-results
 		if asr.err != nil {
 			if err == nil {
@@ -324,7 +324,7 @@ func (i *IndexSnapshot) Fields() ([]string, error) {
 	// FIXME not making this concurrent for now as it's not used in hot path
 	// of any searches at the moment (just a debug aid)
 	fieldsMap := map[string]struct{}{}
-	for _, segment := range i.segment {
+	for _, segment := range i.segmentSnapshots {
 		fields := segment.Fields()
 		for _, field := range fields {
 			fieldsMap[field] = struct{}{}
@@ -343,7 +343,7 @@ func (i *IndexSnapshot) GetInternal(key []byte) ([]byte, error) {
 
 func (i *IndexSnapshot) DocCount() (uint64, error) {
 	var rv uint64
-	for _, segment := range i.segment {
+	for _, segment := range i.segmentSnapshots {
 		rv += segment.Count()
 	}
 	return rv, nil
@@ -378,7 +378,7 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
 	rv = document.NewDocument(id)
-	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, val []byte, pos []uint64) bool {
+	err = i.segmentSnapshots[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, val []byte, pos []uint64) bool {
 		if name == "_id" {
 			return true
 		}
@@ -426,7 +426,7 @@ func (i *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
 	}
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
-	v, err := i.segment[segmentIndex].DocID(localDocNum)
+	v, err := i.segmentSnapshots[segmentIndex].DocID(localDocNum)
 	if err != nil {
 		return "", err
 	}
@@ -465,10 +465,10 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	rv.field = field
 	rv.snapshot = i
 	if rv.postings == nil {
-		rv.postings = make([]segment.PostingsList, len(i.segment))
+		rv.postings = make([]segment.PostingsList, len(i.segmentSnapshots))
 	}
 	if rv.iterators == nil {
-		rv.iterators = make([]segment.PostingsIterator, len(i.segment))
+		rv.iterators = make([]segment.PostingsIterator, len(i.segmentSnapshots))
 	}
 	rv.segmentOffset = 0
 	rv.includeFreq = includeFreq
@@ -478,8 +478,8 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	rv.currID = rv.currID[:0]
 
 	if rv.dicts == nil {
-		rv.dicts = make([]segment.TermDictionary, len(i.segment))
-		for i, segment := range i.segment {
+		rv.dicts = make([]segment.TermDictionary, len(i.segmentSnapshots))
+		for i, segment := range i.segmentSnapshots {
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				return nil, err
@@ -488,8 +488,8 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		}
 	}
 
-	for i, segment := range i.segment {
-		pl, err := rv.dicts[i].PostingsList(term, segment.deleted, rv.postings[i])
+	for i, segment := range i.segmentSnapshots {
+		pl, err := rv.dicts[i].PostingsList(term, segment.obsoleted, rv.postings[i])
 		if err != nil {
 			return nil, err
 		}
@@ -578,7 +578,7 @@ func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
 	}
 
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
-	if segmentIndex >= len(i.segment) {
+	if segmentIndex >= len(i.segmentSnapshots) {
 		return nil, nil
 	}
 
@@ -592,7 +592,7 @@ func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	segmentIndex int, localDocNum uint64, fields []string, cFields []string,
 	visitor index.DocumentFieldTermVisitor, dvs segment.DocVisitState) (
 	cFieldsOut []string, dvsOut segment.DocVisitState, err error) {
-	ss := i.segment[segmentIndex]
+	ss := i.segmentSnapshots[segmentIndex]
 
 	var vFields []string // fields that are visitable via the segment
 
@@ -669,7 +669,7 @@ func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	}
 
 	segmentIndex, localDocNum := dvr.i.segmentIndexAndLocalDocNumFromGlobal(docNum)
-	if segmentIndex >= len(dvr.i.segment) {
+	if segmentIndex >= len(dvr.i.segmentSnapshots) {
 		return nil
 	}
 

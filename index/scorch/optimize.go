@@ -16,10 +16,11 @@ package scorch
 
 import (
 	"fmt"
+	"sync/atomic"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch/segment"
-	"sync/atomic"
 )
 
 var OptimizeConjunction = true
@@ -78,7 +79,7 @@ func (o *OptimizeTFRConjunction) Finish() (index.Optimized, error) {
 		return nil, nil
 	}
 
-	for i := range o.snapshot.segment {
+	for i := range o.snapshot.segmentSnapshots {
 		itr0, ok := o.tfrs[0].iterators[i].(segment.OptimizablePostingsIterator)
 		if !ok || itr0.ActualBitmap() == nil {
 			continue
@@ -165,9 +166,8 @@ func (o *OptimizeTFRConjunctionUnadorned) Finish() (rv index.Optimized, err erro
 		OptimizeTFRConjunctionUnadornedTerm, OptimizeTFRConjunctionUnadornedField)
 
 	var actualBMs []*roaring.Bitmap // Collected from regular posting lists.
-
 OUTER:
-	for i := range o.snapshot.segment {
+	for i := range o.snapshot.segmentSnapshots {
 		actualBMs = actualBMs[:0]
 
 		var docNum1HitLast uint64
@@ -175,7 +175,7 @@ OUTER:
 
 		for _, tfr := range o.tfrs {
 			if _, ok := tfr.iterators[i].(*segment.EmptyPostingsIterator); ok {
-				// An empty postings iterator means the entire AND is empty.
+				// An empty postings itsegmentSnapshotsmeans the entire AND is empty.
 				oTFR.iterators[i] = segment.AnEmptyPostingsIterator
 				continue OUTER
 			}
@@ -307,7 +307,7 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 		return nil, nil
 	}
 
-	for i := range o.snapshot.segment {
+	for i := range o.snapshot.segmentSnapshots {
 		var cMax uint64
 
 		for _, tfr := range o.tfrs {
@@ -333,7 +333,7 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 	var docNums []uint32            // Collected docNum's from 1-hit posting lists.
 	var actualBMs []*roaring.Bitmap // Collected from regular posting lists.
 
-	for i := range o.snapshot.segment {
+	for i := range o.snapshot.segmentSnapshots {
 		docNums = docNums[:0]
 		actualBMs = actualBMs[:0]
 
@@ -386,7 +386,7 @@ func (i *IndexSnapshot) unadornedTermFieldReader(
 		term:               term,
 		field:              field,
 		snapshot:           i,
-		iterators:          make([]segment.PostingsIterator, len(i.segment)),
+		iterators:          make([]segment.PostingsIterator, len(i.segmentSnapshots)),
 		segmentOffset:      0,
 		includeFreq:        false,
 		includeNorm:        false,

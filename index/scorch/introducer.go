@@ -25,7 +25,7 @@ import (
 
 type segmentIntroduction struct {
 	id        uint64
-	data      segment.Segment
+	segment   segment.Segment
 	obsoletes map[uint64]*roaring.Bitmap
 	ids       []string
 	internal  map[string][]byte
@@ -92,7 +92,7 @@ OUTER:
 	s.asyncTasks.Done()
 }
 
-func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
+func (s *Scorch) introduceSegment(introduction *segmentIntroduction) error {
 	atomic.AddUint64(&s.stats.TotIntroduceSegmentBeg, 1)
 	defer atomic.AddUint64(&s.stats.TotIntroduceSegmentEnd, 1)
 
@@ -103,62 +103,66 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 
 	defer func() { _ = root.DecRef() }()
 
-	nsegs := len(root.segment)
+	nsegs := len(root.segmentSnapshots)
 
 	// prepare new index snapshot
-	newSnapshot := &IndexSnapshot{
-		parent:   s,
-		segment:  make([]*SegmentSnapshot, 0, nsegs+1),
-		offsets:  make([]uint64, 0, nsegs+1),
-		internal: make(map[string][]byte, len(root.internal)),
-		refs:     1,
-		creator:  "introduceSegment",
+	newIndexSnapshot := &IndexSnapshot{
+		parent:           s,
+		segmentSnapshots: make([]*SegmentSnapshot, 0, nsegs+1),
+		offsets:          make([]uint64, 0, nsegs+1),
+		internal:         make(map[string][]byte, len(root.internal)),
+		refs:             1,
+		creator:          "introduceSegment",
 	}
 
 	// iterate through current segments
 	var running uint64
 	var docsToPersistCount, memSegments, fileSegments uint64
-	for i := range root.segment {
+	for i := range root.segmentSnapshots {
 		// see if optimistic work included this segment
-		delta, ok := next.obsoletes[root.segment[i].id]
+		delta, ok := introduction.obsoletes[root.segmentSnapshots[i].id]
 		if !ok {
 			var err error
-			delta, err = root.segment[i].segment.DocNumbers(next.ids)
+			delta, err = root.segmentSnapshots[i].segment.DocNumbers(introduction.ids)
 			if err != nil {
-				next.applied <- fmt.Errorf("error computing doc numbers: %v", err)
-				close(next.applied)
-				_ = newSnapshot.DecRef()
+				introduction.applied <- fmt.Errorf("error computing doc numbers: %v", err)
+				close(introduction.applied)
+				_ = newIndexSnapshot.DecRef()
 				return err
 			}
 		}
 
-		newss := &SegmentSnapshot{
-			id:         root.segment[i].id,
-			segment:    root.segment[i].segment,
-			cachedDocs: root.segment[i].cachedDocs,
-			creator:    root.segment[i].creator,
+		newSegmentSnapshot := &SegmentSnapshot{
+			id:         root.segmentSnapshots[i].id,
+			segment:    root.segmentSnapshots[i].segment,
+			cachedDocs: root.segmentSnapshots[i].cachedDocs,
+			creator:    root.segmentSnapshots[i].creator,
 		}
 
 		// apply new obsoletions
-		if root.segment[i].deleted == nil {
-			newss.deleted = delta
+		if root.segmentSnapshots[i].obsoleted == nil {
+			newSegmentSnapshot.obsoleted = delta
 		} else {
-			newss.deleted = roaring.Or(root.segment[i].deleted, delta)
+			newSegmentSnapshot.obsoleted = roaring.Or(root.segmentSnapshots[i].obsoleted, delta)
 		}
-		if newss.deleted.IsEmpty() {
-			newss.deleted = nil
+		if newSegmentSnapshot.obsoleted.IsEmpty() {
+			newSegmentSnapshot.obsoleted = nil
 		}
 
 		// check for live size before copying
-		if newss.LiveSize() > 0 {
-			newSnapshot.segment = append(newSnapshot.segment, newss)
-			root.segment[i].segment.AddRef()
-			newSnapshot.offsets = append(newSnapshot.offsets, running)
-			running += newss.segment.Count()
+		// this is number of docs in the segment minus number deleted
+		// if there are none, we don't need to add this to the IndexSnapshot
+		if newSegmentSnapshot.LiveSize() > 0 {
+			newIndexSnapshot.segmentSnapshots = append(newIndexSnapshot.segmentSnapshots, newSegmentSnapshot)
+			root.segmentSnapshots[i].segment.AddRef()
+			newIndexSnapshot.offsets = append(newIndexSnapshot.offsets, running)
+			running += newSegmentSnapshot.segment.Count()
 		}
 
-		if isMemorySegment(root.segment[i]) {
-			docsToPersistCount += root.segment[i].Count()
+		// The segment isn't necessarily on the disk when we wrap up the introduction.
+		// So recalculate stats for the new IndexSnapshot as we add SegmentSnapshots
+		if isMemorySegment(root.segmentSnapshots[i]) {
+			docsToPersistCount += root.segmentSnapshots[i].Count()
 			memSegments++
 		} else {
 			fileSegments++
@@ -170,47 +174,48 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 	atomic.StoreUint64(&s.stats.TotFileSegmentsAtRoot, fileSegments)
 
 	// append new segment, if any, to end of the new index snapshot
-	if next.data != nil {
+	if introduction.segment != nil {
 		newSegmentSnapshot := &SegmentSnapshot{
-			id:         next.id,
-			segment:    next.data, // take ownership of next.data's ref-count
+			id:         introduction.id,
+			segment:    introduction.segment, // take ownership of introduction.data's ref-count
 			cachedDocs: &cachedDocs{cache: nil},
 			creator:    "introduceSegment",
 		}
-		newSnapshot.segment = append(newSnapshot.segment, newSegmentSnapshot)
-		newSnapshot.offsets = append(newSnapshot.offsets, running)
+		newIndexSnapshot.segmentSnapshots = append(newIndexSnapshot.segmentSnapshots, newSegmentSnapshot)
+		newIndexSnapshot.offsets = append(newIndexSnapshot.offsets, running)
 
-		// increment numItemsIntroduced which tracks the number of items
-		// queued for persistence.
+		// increment numItemsIntroduced which tracks the number of items queued for persistence.
 		atomic.AddUint64(&s.stats.TotIntroducedItems, newSegmentSnapshot.Count())
 		atomic.AddUint64(&s.stats.TotIntroducedSegmentsBatch, 1)
 	}
+
 	// copy old values
 	for key, oldVal := range root.internal {
-		newSnapshot.internal[key] = oldVal
+		newIndexSnapshot.internal[key] = oldVal
 	}
+
 	// set new values and apply deletes
-	for key, newVal := range next.internal {
+	for key, newVal := range introduction.internal {
 		if newVal != nil {
-			newSnapshot.internal[key] = newVal
+			newIndexSnapshot.internal[key] = newVal
 		} else {
-			delete(newSnapshot.internal, key)
+			delete(newIndexSnapshot.internal, key)
 		}
 	}
 
-	newSnapshot.updateSize()
+	newIndexSnapshot.updateSize()
 	s.rootLock.Lock()
-	if next.persisted != nil {
-		s.rootPersisted = append(s.rootPersisted, next.persisted)
+	if introduction.persisted != nil {
+		s.rootPersisted = append(s.rootPersisted, introduction.persisted)
 	}
-	if next.persistedCallback != nil {
-		s.persistedCallbacks = append(s.persistedCallbacks, next.persistedCallback)
+	if introduction.persistedCallback != nil {
+		s.persistedCallbacks = append(s.persistedCallbacks, introduction.persistedCallback)
 	}
 	// swap in new index snapshot
-	newSnapshot.epoch = s.nextSnapshotEpoch
+	newIndexSnapshot.epoch = s.nextSnapshotEpoch
 	s.nextSnapshotEpoch++
 	rootPrev := s.root
-	s.root = newSnapshot
+	s.root = newIndexSnapshot
 	atomic.StoreUint64(&s.stats.CurRootEpoch, s.root.epoch)
 	// release lock
 	s.rootLock.Unlock()
@@ -219,7 +224,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		_ = rootPrev.DecRef()
 	}
 
-	close(next.applied)
+	close(introduction.applied)
 
 	return nil
 }
@@ -238,27 +243,27 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 	defer func() { _ = root.DecRef() }()
 
 	newIndexSnapshot := &IndexSnapshot{
-		parent:   s,
-		epoch:    nextSnapshotEpoch,
-		segment:  make([]*SegmentSnapshot, len(root.segment)),
-		offsets:  make([]uint64, len(root.offsets)),
-		internal: make(map[string][]byte, len(root.internal)),
-		refs:     1,
-		creator:  "introducePersist",
+		parent:           s,
+		epoch:            nextSnapshotEpoch,
+		segmentSnapshots: make([]*SegmentSnapshot, len(root.segmentSnapshots)),
+		offsets:          make([]uint64, len(root.offsets)),
+		internal:         make(map[string][]byte, len(root.internal)),
+		refs:             1,
+		creator:          "introducePersist",
 	}
 
 	var docsToPersistCount, memSegments, fileSegments uint64
-	for i, segmentSnapshot := range root.segment {
+	for i, segmentSnapshot := range root.segmentSnapshots {
 		// see if this segment has been replaced
 		if replacement, ok := persist.persisted[segmentSnapshot.id]; ok {
 			newSegmentSnapshot := &SegmentSnapshot{
 				id:         segmentSnapshot.id,
 				segment:    replacement,
-				deleted:    segmentSnapshot.deleted,
+				obsoleted:  segmentSnapshot.obsoleted,
 				cachedDocs: segmentSnapshot.cachedDocs,
 				creator:    "introducePersist",
 			}
-			newIndexSnapshot.segment[i] = newSegmentSnapshot
+			newIndexSnapshot.segmentSnapshots[i] = newSegmentSnapshot
 			delete(persist.persisted, segmentSnapshot.id)
 
 			// update items persisted incase of a new segment snapshot
@@ -266,11 +271,11 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 			atomic.AddUint64(&s.stats.TotPersistedSegments, 1)
 			fileSegments++
 		} else {
-			newIndexSnapshot.segment[i] = root.segment[i]
-			newIndexSnapshot.segment[i].segment.AddRef()
+			newIndexSnapshot.segmentSnapshots[i] = root.segmentSnapshots[i]
+			newIndexSnapshot.segmentSnapshots[i].segment.AddRef()
 
-			if isMemorySegment(root.segment[i]) {
-				docsToPersistCount += root.segment[i].Count()
+			if isMemorySegment(root.segmentSnapshots[i]) {
+				docsToPersistCount += root.segmentSnapshots[i].Count()
 				memSegments++
 			} else {
 				fileSegments++
@@ -323,16 +328,16 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	// iterate through current segments
 	newSegmentDeleted := roaring.NewBitmap()
 	var running, docsToPersistCount, memSegments, fileSegments uint64
-	for i := range root.segment {
-		segmentID := root.segment[i].id
+	for i := range root.segmentSnapshots {
+		segmentID := root.segmentSnapshots[i].id
 		if segSnapAtMerge, ok := nextMerge.old[segmentID]; ok {
 			// this segment is going away, see if anything else was deleted since we started the merge
-			if segSnapAtMerge != nil && root.segment[i].deleted != nil {
+			if segSnapAtMerge != nil && root.segmentSnapshots[i].obsoleted != nil {
 				// assume all these deletes are new
-				deletedSince := root.segment[i].deleted
+				deletedSince := root.segmentSnapshots[i].obsoleted
 				// if we already knew about some of them, remove
-				if segSnapAtMerge.deleted != nil {
-					deletedSince = roaring.AndNot(root.segment[i].deleted, segSnapAtMerge.deleted)
+				if segSnapAtMerge.obsoleted != nil {
+					deletedSince = roaring.AndNot(root.segmentSnapshots[i].obsoleted, segSnapAtMerge.obsoleted)
 				}
 				deletedSinceItr := deletedSince.Iterator()
 				for deletedSinceItr.HasNext() {
@@ -346,21 +351,21 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			// segments left behind in old map after processing
 			// the root segments would be the obsolete segment set
 			delete(nextMerge.old, segmentID)
-		} else if root.segment[i].LiveSize() > 0 {
+		} else if root.segmentSnapshots[i].LiveSize() > 0 {
 			// this segment is staying
-			newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
-				id:         root.segment[i].id,
-				segment:    root.segment[i].segment,
-				deleted:    root.segment[i].deleted,
-				cachedDocs: root.segment[i].cachedDocs,
-				creator:    root.segment[i].creator,
+			newSnapshot.segmentSnapshots = append(newSnapshot.segmentSnapshots, &SegmentSnapshot{
+				id:         root.segmentSnapshots[i].id,
+				segment:    root.segmentSnapshots[i].segment,
+				obsoleted:  root.segmentSnapshots[i].obsoleted,
+				cachedDocs: root.segmentSnapshots[i].cachedDocs,
+				creator:    root.segmentSnapshots[i].creator,
 			})
-			root.segment[i].segment.AddRef()
+			root.segmentSnapshots[i].segment.AddRef()
 			newSnapshot.offsets = append(newSnapshot.offsets, running)
-			running += root.segment[i].segment.Count()
+			running += root.segmentSnapshots[i].segment.Count()
 
-			if isMemorySegment(root.segment[i]) {
-				docsToPersistCount += root.segment[i].Count()
+			if isMemorySegment(root.segmentSnapshots[i]) {
+				docsToPersistCount += root.segmentSnapshots[i].Count()
 				memSegments++
 			} else {
 				fileSegments++
@@ -389,10 +394,10 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	if nextMerge.new != nil &&
 		nextMerge.new.Count() > newSegmentDeleted.GetCardinality() {
 		// put new segment at end
-		newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
+		newSnapshot.segmentSnapshots = append(newSnapshot.segmentSnapshots, &SegmentSnapshot{
 			id:         nextMerge.id,
 			segment:    nextMerge.new, // take ownership for nextMerge.new's ref-count
-			deleted:    newSegmentDeleted,
+			obsoleted:  newSegmentDeleted,
 			cachedDocs: &cachedDocs{cache: nil},
 			creator:    "introduceMerge",
 		})

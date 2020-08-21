@@ -361,10 +361,10 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	var sbsDrops []*roaring.Bitmap
 	var sbsIndexes []int
 
-	for i, segmentSnapshot := range snapshot.segment {
+	for i, segmentSnapshot := range snapshot.segmentSnapshots {
 		if _, ok := segmentSnapshot.segment.(segment.PersistedSegment); !ok {
 			sbs = append(sbs, segmentSnapshot.segment)
-			sbsDrops = append(sbsDrops, segmentSnapshot.deleted)
+			sbsDrops = append(sbsDrops, segmentSnapshot.obsoleted)
 			sbsIndexes = append(sbsIndexes, i)
 		}
 	}
@@ -388,33 +388,33 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 
 	mergedSegmentIDs := map[uint64]struct{}{}
 	for _, idx := range sbsIndexes {
-		mergedSegmentIDs[snapshot.segment[idx].id] = struct{}{}
+		mergedSegmentIDs[snapshot.segmentSnapshots[idx].id] = struct{}{}
 	}
 
 	// construct a snapshot that's logically equivalent to the input
 	// snapshot, but with merged segments replaced by the new segment
 	equiv := &IndexSnapshot{
-		parent:   snapshot.parent,
-		segment:  make([]*SegmentSnapshot, 0, len(snapshot.segment)),
-		internal: snapshot.internal,
-		epoch:    snapshot.epoch,
-		creator:  "persistSnapshotMaybeMerge",
+		parent:           snapshot.parent,
+		segmentSnapshots: make([]*SegmentSnapshot, 0, len(snapshot.segmentSnapshots)),
+		internal:         snapshot.internal,
+		epoch:            snapshot.epoch,
+		creator:          "persistSnapshotMaybeMerge",
 	}
 
 	// copy to the equiv the segments that weren't replaced
-	for _, segment := range snapshot.segment {
+	for _, segment := range snapshot.segmentSnapshots {
 		if _, wasMerged := mergedSegmentIDs[segment.id]; !wasMerged {
-			equiv.segment = append(equiv.segment, segment)
+			equiv.segmentSnapshots = append(equiv.segmentSnapshots, segment)
 		}
 	}
 
 	// append to the equiv the new segment
-	for _, segment := range newSnapshot.segment {
+	for _, segment := range newSnapshot.segmentSnapshots {
 		if segment.id == newSegmentID {
-			equiv.segment = append(equiv.segment, &SegmentSnapshot{
-				id:      newSegmentID,
-				segment: segment.segment,
-				deleted: nil, // nil since merging handled deletions
+			equiv.segmentSnapshots = append(equiv.segmentSnapshots, &SegmentSnapshot{
+				id:        newSegmentID,
+				segment:   segment.segment,
+				obsoleted: nil, // nil since merging handled deletions
 			})
 			break
 		}
@@ -473,7 +473,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 	newSegmentPaths := make(map[uint64]string)
 
 	// first ensure that each segment in this snapshot has been persisted
-	for _, segmentSnapshot := range snapshot.segment {
+	for _, segmentSnapshot := range snapshot.segmentSnapshots {
 		snapshotSegmentKey := segment.EncodeUvarintAscending(nil, segmentSnapshot.id)
 		snapshotSegmentBucket, err := snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
 		if err != nil {
@@ -507,8 +507,8 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 		}
 		// store current deleted bits
 		var roaringBuf bytes.Buffer
-		if segmentSnapshot.deleted != nil {
-			_, err = segmentSnapshot.deleted.WriteTo(&roaringBuf)
+		if segmentSnapshot.obsoleted != nil {
+			_, err = segmentSnapshot.obsoleted.WriteTo(&roaringBuf)
 			if err != nil {
 				return nil, nil, fmt.Errorf("error persisting roaring bytes: %v", err)
 			}
@@ -749,7 +749,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 				_ = rv.DecRef()
 				return nil, fmt.Errorf("failed to decode segment id: %v", err)
 			}
-			rv.segment = append(rv.segment, segmentSnapshot)
+			rv.segmentSnapshots = append(rv.segmentSnapshots, segmentSnapshot)
 			rv.offsets = append(rv.offsets, running)
 			running += segmentSnapshot.segment.Count()
 		}
@@ -782,7 +782,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 			return nil, fmt.Errorf("error reading deleted bytes: %v", err)
 		}
 		if !deletedBitmap.IsEmpty() {
-			rv.deleted = deletedBitmap
+			rv.obsoleted = deletedBitmap
 		}
 	}
 

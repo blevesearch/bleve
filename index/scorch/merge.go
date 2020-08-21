@@ -243,7 +243,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 	options *mergeplan.MergePlanOptions, ourSnapshot *IndexSnapshot) error {
 	// build list of persisted segments in this snapshot
 	var onlyPersistedSnapshots []mergeplan.Segment
-	for _, segmentSnapshot := range ourSnapshot.segment {
+	for _, segmentSnapshot := range ourSnapshot.segmentSnapshots {
 		if _, ok := segmentSnapshot.segment.(segment.PersistedSegment); ok {
 			onlyPersistedSnapshots = append(onlyPersistedSnapshots, segmentSnapshot)
 		}
@@ -296,7 +296,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 						oldMap[segSnapshot.id] = nil
 					} else {
 						segmentsToMerge = append(segmentsToMerge, segSnapshot.segment)
-						docsToDrop = append(docsToDrop, segSnapshot.deleted)
+						docsToDrop = append(docsToDrop, segSnapshot.obsoleted)
 					}
 					// track the files getting merged for unsetting the
 					// removal ineligibility. This helps to unflip files
@@ -469,7 +469,7 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	}
 
 	for i, idx := range sbsIndexes {
-		ss := snapshot.segment[idx]
+		ss := snapshot.segmentSnapshots[idx]
 		sm.old[ss.id] = ss
 		sm.oldNewDocNums[ss.id] = newDocNums[i]
 	}

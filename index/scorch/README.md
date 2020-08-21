@@ -1,109 +1,12 @@
-# scorch
+# Scorch
+The Scorch object is the root object of the index. For all intents and purposes, it is the index. It is created with NewScorch and includes version info, configuration for the scorch index, and some other metadata. Notably, it includes the AnalysisQueue and a segment plugin.
 
-## Definitions
+When a client Opens a Scorch index with Scorch.Open(), the index spawns three goroutine loops... the introducer, the persister, and the merger. It also opens an embedded Bolt DB for metadata management and initializes a bunch of channels. The index keeps a count of the number of asynchronous tasks.
 
-Batch
-- A collection of Documents to mutate in the index.
 
-Document
-- Has a unique identifier (arbitrary bytes).
-- Is comprised of a list of fields.
+## Mutation : Summary
 
-Field
-- Has a name (string).
-- Has a type (text, number, date, geopoint).
-- Has a value (depending on type).
-- Can be indexed, stored, or both.
-- If indexed, can be analyzed.
--m If indexed, can optionally store term vectors.
-
-## Scope
-
-Scorch *MUST* implement the bleve.index API without requiring any changes to this API.
-
-Scorch *MAY* introduce new interfaces, which can be discovered to allow use of new capabilities not in the current API.
-
-## Implementation
-
-The scorch implementation starts with the concept of a segmented index.
-
-A segment is simply a slice, subset, or portion of the entire index.  A segmented index is one which is composed of one or more segments.  Although segments are created in a particular order, knowing this ordering is not required to achieve correct semantics when querying.  Because there is no ordering, this means that when searching an index, you can (and should) search all the segments concurrently.
-
-### Internal Wrapper
-
-In order to accommodate the existing APIs while also improving the implementation, the scorch implementation includes some wrapper functionality that must be described.
-
-#### \_id field
-
-In scorch, field 0 is prearranged to be named \_id.  All documents have a value for this field, which is the documents external identifier.  In this version the field *MUST* be both indexed AND stored.  The scorch wrapper adds this field, as it will not be present in the Document from the calling bleve code.
-
-NOTE: If a document already contains a field \_id, it will be replaced.  If this is problematic, the caller must ensure such a scenario does not happen.
-
-### Proposed Structures
-
-```
-type Segment interface {
-
-  Dictionary(field string) TermDictionary
-
-}
-
-type TermDictionary interface {
-
-  PostingsList(term string, excluding PostingsList) PostingsList
-
-}
-
-type PostingsList interface {
-
-  Next() Posting
-
-  And(other PostingsList) PostingsList
-  Or(other PostingsList) PostingsList
-
-}
-
-type Posting interface {
-  Number() uint64
-
-  Frequency() uint64
-  Norm() float64
-
-  Locations() Locations
-}
-
-type Locations interface {
-  Start() uint64
-  End() uint64
-  Pos() uint64
-  ArrayPositions() ...
-}
-
-type DeletedDocs {
-
-}
-
-type SegmentSnapshot struct {
-  segment Segment
-  deleted PostingsList
-}
-
-type IndexSnapshot struct {
-  segment []SegmentSnapshot
-}
-```
-**What about errors?**
-**What about memory mgmnt or context?**
-**Postings List separate iterator to separate stateful from stateless**
-### Mutating the Index
-
-The bleve.index API has methods for directly making individual mutations (Update/Delete/SetInternal/DeleteInternal), however for this first implementation, we assume that all of these calls can simply be turned into a Batch of size 1.  This may be highly inefficient, but it will be correct.  This decision is made based on the fact that Couchbase FTS always uses Batches.
-
-NOTE: As a side-effect of this decision, it should be clear that performance tuning may depend on the batch size, which may in-turn require changes in FTS.
-
-From this point forward, only Batch mutations will be discussed.
-
-Sequence of Operations:
+Clients call Scorch.Batch() to get data into the index. Here is a summary of the sequence of operation:
 
 1.  For each document in the batch, search through all existing segments.  The goal is to build up a per-segment bitset which tells us which documents in that segment are obsoleted by the addition of the new segment we're currently building.  NOTE: we're not ready for this change to take effect yet, so rather than this operation mutating anything, they simply return bitsets, which we can apply later.  Logically, this is something like:
 
@@ -197,13 +100,155 @@ An ASCII art example:
 **is there opportunity to stop early when doc is found in one segment**
 **also, more efficient way to find bits for long lists of ids?**
 
-### Searching
+## Mutation: Details
+
+### Batches
+A Batch is a collection of Documents to mutate (create / delete) in the index. Scorch enforces the use of the `_id` field (see Internal Wrapper below) and adds an `_id` field to each document populating it from doc.ID.
+
+Batches can include inserts and deletes. If the batch includes inserts... Batch spawns a goroutine to loop through the documents to insert. For each document, it creates an AnalysisWork object for each.
+
+### AnalysisWork and AnalysisQueue
+AnalysisWork is work that is done when adding documents to an index. Bleve supports asynchronous / parallel analysis during batch insert operations and the AnalysisQueue coordinates parallel completion of the work. Batch spawns another goroutine to send the AnalysisWork objects to the AnalysisQueue via the AnalysisQueue.queue channel. This is done in a separate goroutine presumably because the AnalysisQueue.queue channel has no buffer and there is no sense in predefining the buffer since we never know how many documents might be in a batch.
+
+The AnalysisQueue is created with a number of workers and each worker runs in its own go routine to pull jobs off the queue and then call upon the index to do the analysis. The results of the analysis are passed back to Batch through a result channel on the AnalysisWork object. Batch creates each AnalysisWork object with the same result channel so it listens for results from just the one channel.
+
+Once analysis for the batch is complete, Batch generates some stats.
+
+### Segments
+Every batch operation introduces a new **Segment**. A segment is simply a slice, subset, or portion of the entire index.  A segmented index is one which is composed of one or more segments.  Although segments are created in a particular order, knowing this ordering is not required to achieve correct semantics when querying.  Because there is no ordering, this means that when searching an index, you can (and should) search all the segments concurrently.
+
+The segment plugin manages the persistence of a Segment and can create a new segment from a set of AnalysisResults or from a file on disk. The plugin also manages merging Segments. Since each batch produces a segment, the segments must merge eventually to reduce the number of segments that must be queried in parallel. While not exactly equivalent... it may be helpful to see https://en.wikipedia.org/wiki/Log-structured_merge-tree to better understand Scorch segments.
+
+The only segment plugin used in scorch is the `zapv` plugin. Multiple versions of zapv are registered at the time of this writing.... The current default is `zapv11` and the latest available is `zapv14`
+
+### Segment Preparation and Obsolescence
+Scorch.Batch() now `prepares` the segment by calling Scorch.prepareSegment, which creates a `segmentIntroduction`. When a new segment is introduced to the index... it may mutate documents that are already in the index. Remember that each batch produces a segment to be merged at some point after the batch commits... so at any given moment... more than one segment may contain data for a document.  Scorch.prepareSegment loops through all segments that have been committed to the index... Scorch.segment... it passes the set of ids for the documents about to be introduced into the segment.DocNumbers() function which returns the intersection of ids that are found in the persisted segment. This intersection is the list of documents that will become *obsolete* once the current segment is introduced and the list cached with the `segmentIntroduction` object.
+
+Note that DocNumbers returns a `roaring.Bitmap`. See (http://roaringbitmap.org/about/) for more info. In short, its a datastructure that represents a set of integers that performs set operations efficiently and also compresses well.
+
+Finally, the `segmentIntroduction` is queued on the Scorch.introduction channel and prepareSegment blocks on the introduction.applied channel, which signals that the introduction has been applied to the index. Note that this does not mean persisted. If Scorch.unsafeBatch is true, which is the default, Batch completes even though the data has not yet been written to disk. If Scorch.unsafeBatch is false, Batch will then block until the data is on disk.
+
+An event is fired upon introduction of the new segment, but it seems that only test code listens for this. Batch calls upon Scorch.segPlugin to to create the segment from . analysisResults.
+
+
+### Introductions: IndexSnapshots, and SegmentSnapshots
+
+Remember the introducer loop. Once a `segmentIntroduction` is queued on the introductions channel, the introducerloop will pick it up and invoke `Scorch.introduceSegment`.
+
+`Scorch.introduceSegment` creates a new IndexSnapshot to eventually replace the Scorch.root IndexSnapshot. This happens at the conslusion of each introduction. As batches settle, the Scorch.root reflects their changes and represents a snapshot of the index at that point in time.
+
+`IndexSnapshots` consist, in part, of `SegmentSnapshots`. A `SegmentSnapshot` has some metadata, but most importantly references a Segment (which... for unmerged segments... is the Segment created in the batch) and the list of computed obsoletions.  The new SegmentSnapshot... if it has any documents in it at all after obsoletions have been computed, is added to the new IndexSnapshot. The underlying segment includes a count of references from SegmentSnapshots so that as SegmentSnapshots are merged and deleted, their underlying segments can be garbage collected. The SegmentSnapshot is added to the IndexSnapshot and an offset is added to the IndexSnapshot referring to the SegmentSnapshot. The offset represents the first index of a document in the `IndexSnapshot` that can be found in the `SegmentSnapshot`.
+
+`Scorch.introduceSegment` loops through Scorch.segmentSnapshots again and checks the introduction for pre-computed obsoletes / deletions on that segment. Note that delete and obsolete are quite different. A document is obsolete in a segment if it is updated or deleted in segment that is added to the index later. If there is no precomputed set of obsoletions, it is computed again. This can happen because the root snapshot can be changed between the optimistic computation and this introduction.
+
+Now that `Scorch.introduceSegment` has processed existing SnapshotSegments, it adds the new one. This is fairly straightfoward because it looks a lot like the other introductions, but without the computation for obsolescence.
+
+### Introductions: Internal Data
+
+IndexSnapshot.internal is data that is used for... Internal Storage (see the section on internal storage below). At this point, it is copied to the new SnapshotIndex and new internal data introduced by the batch is added / overwritten.
+
+### Introductions: Wrap Up
+
+The finale of `Scorch.introduceSegment` is to register the `introduction.persisted` and `introduction.persistedCallback` channels on the scorch index. These will be called when the Snapshot and underlying segments have actually gone to disk. Note that the index accumulates these... they are not replaced merely because the root snapshot is updated. Thus they are valid for all Snapshots that have been applied so far.
+
+This introduction.applied channel is closed... The Batch, blocking on the introduction.applied channel moves forward.
+
+## Documents and Fields
+
+Document
+- Has a unique identifier (arbitrary bytes).
+- Is comprised of a list of fields.
+
+Field
+- Has a name (string).
+- Has a type (text, number, date, geopoint).
+- Has a value (depending on type).
+- Can be indexed, stored, or both.
+- If indexed, can be analyzed.
+-m If indexed, can optionally store term vectors.
+
+## Internal Wrapper
+
+In order to accommodate the existing APIs while also improving the implementation, the scorch implementation includes some wrapper functionality that must be described.
+
+### \_id field
+
+In scorch, field 0 is prearranged to be named \_id.  All documents have a value for this field, which is the documents external identifier.  In this version the field *MUST* be both indexed AND stored.  The scorch wrapper adds this field, as it will not be present in the Document from the calling bleve code.
+
+NOTE: If a document already contains a field \_id, it will be replaced.  If this is problematic, the caller must ensure such a scenario does not happen.
+
+## Proposed Structures
+
+```
+type Segment interface {
+
+  Dictionary(field string) TermDictionary
+
+}
+
+type TermDictionary interface {
+
+  PostingsList(term string, excluding PostingsList) PostingsList
+
+}
+
+type PostingsList interface {
+
+  Next() Posting
+
+  And(other PostingsList) PostingsList
+  Or(other PostingsList) PostingsList
+
+}
+
+type Posting interface {
+  Number() uint64
+
+  Frequency() uint64
+  Norm() float64
+
+  Locations() Locations
+}
+
+type Locations interface {
+  Start() uint64
+  End() uint64
+  Pos() uint64
+  ArrayPositions() ...
+}
+
+type DeletedDocs {
+
+}
+
+type SegmentSnapshot struct {
+  segment Segment
+  deleted PostingsList
+}
+
+type IndexSnapshot struct {
+  segment []SegmentSnapshot
+}
+```
+**What about errors?**
+**What about memory mgmnt or context?**
+**Postings List separate iterator to separate stateful from stateless**
+
+## Backward Compatibility
+
+The bleve.index API has methods for directly making individual mutations (Update/Delete/SetInternal/DeleteInternal), however for this first implementation, we assume that all of these calls can simply be turned into a Batch of size 1.  This may be highly inefficient, but it will be correct.  This decision is made based on the fact that Couchbase FTS always uses Batches.
+
+NOTE: As a side-effect of this decision, it should be clear that performance tuning may depend on the batch size, which may in-turn require changes in FTS.
+
+From this point forward, only Batch mutations will be discussed.
+
+## Searching
 
 In the bleve.index API all searching starts by getting an IndexReader, which represents a snapshot of the index at a point in time.
 
 As described in the section above, our index implementation maintains a pointer to the current IndexSnapshot.  When a caller gets an IndexReader, they get a copy of this pointer, and can use it as long as they like.  The IndexSnapshot contains SegmentSnapshots, which only contain pointers to immutable segments.  The deleted posting lists associated with a segment change over time, but the particular deleted posting list in YOUR snapshot is immutable.  This gives a stable view of the data.
 
-#### Term Search
+### Term Search
 
 Term search is the only searching primitive exposed in today's bleve.index API.  This ultimately could limit our ability to take advantage of the indexing improvements, but it also means it will be easier to get a first version of this working.
 
@@ -314,20 +359,20 @@ Caller could then ask to get term locations, stored fields, external doc ID for 
 
 ```
 
-#### Future improvements
+### Future improvements
 
 In the future, interfaces to detect these non-serially operating TermFieldReaders could expose their own And() and Or() up to the higher level Conjunction/Disjunction searchers.  Doing this alone offers some win, but also means there would be greater burden on the Searcher code rewriting logical expressions for maximum performance.
 
 Another related topic is that of peak memory usage.  With serially operating TermFieldReaders it was necessary to start them all at the same time and operate in unison.  However, with these non-serially operating TermFieldReaders we have the option of doing a few at a time, consolidating them, dispoting the intermediaries, and then doing a few more.  For very complex queries with many clauses this could reduce peak memory usage.
 
 
-### Memory Tracking
+## Memory Tracking
 
 All segments must be able to produce two statistics, an estimate of their explicit memory usage, and their actual size on disk (if any).  For in-memory segments, disk usage could be zero, and the memory usage represents the entire information content.  For mmap-based disk segments, the memory could be as low as the size of tracking structure itself (say just a few pointers).
 
 This would allow the implementation to throttle or block incoming mutations when a threshold memory usage has (or would be) exceeded.
 
-### Persistence
+## Persistence
 
 Obviously, we want to support (but maybe not require) asynchronous persistence of segments.  My expectation is that segments are initially built in memory.  At some point they are persisted to disk.  This poses some interesting challenges.
 
@@ -336,14 +381,14 @@ At runtime, the state of an index (it's IndexSnapshot) is not only the contents 
 This also relates to the topic rollback, addressed next...
 
 
-### Rollback
+## Rollback
 
 One desirable property in the Couchbase ecosystem is the ability to rollback to some previous (though typically not long ago) state.  One idea for keeping this property in this design is to protect some of the most recent segments from merging.  Then, if necessary, they could be "undone" to reveal previous states of the system.  In these scenarios "undone" has to properly undo the deleted bitmasks on the other segments.  Again, the current thinking is that rather than "undo" anything, it could be work that was deferred in the first place, thus making it easier to logically undo.
 
 Another possibly related approach would be to tie this into our existing snapshot mechanism.  Perhaps simulating a slow reader (holding onto index snapshots) for some period of time, can be the mechanism to achieve the desired end goal.
 
 
-### Internal Storage
+## Internal Storage
 
 The bleve.index API has support for "internal storage".  The ability to store information under a separate name space.
 
@@ -351,7 +396,7 @@ This is not used for high volume storage, so it is tempting to think we could ju
 
 More thought is required here.
 
-### Merging
+## Merging
 
 The segmented index approach requires merging to prevent the number of segments from growing too large.
 

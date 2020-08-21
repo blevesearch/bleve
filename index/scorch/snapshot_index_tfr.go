@@ -143,9 +143,9 @@ func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAllo
 		return nil, fmt.Errorf("error converting to doc number % x - %v", ID, err)
 	}
 	segIndex, ldocNum := i.snapshot.segmentIndexAndLocalDocNumFromGlobal(num)
-	if segIndex >= len(i.snapshot.segment) {
+	if segIndex >= len(i.snapshot.segmentSnapshots) {
 		return nil, fmt.Errorf("computed segment index %d out of bounds %d",
-			segIndex, len(i.snapshot.segment))
+			segIndex, len(i.snapshot.segmentSnapshots))
 	}
 	// skip directly to the target segment
 	i.segmentOffset = segIndex
