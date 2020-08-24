@@ -3,7 +3,7 @@ module github.com/blevesearch/bleve
 go 1.13
 
 require (
-	github.com/RoaringBitmap/roaring v0.4.21
+	github.com/RoaringBitmap/roaring v0.4.23
 	github.com/blevesearch/blevex v0.0.0-20190916190636-152f0fe5c040
 	github.com/blevesearch/go-porterstemmer v1.0.3
 	github.com/blevesearch/segment v0.9.0
@@ -21,6 +21,6 @@ require (
 	github.com/steveyen/gtreap v0.1.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/willf/bitset v1.1.10
-	go.etcd.io/bbolt v1.3.4
+	go.etcd.io/bbolt v1.3.5
 	golang.org/x/text v0.3.0
 )
