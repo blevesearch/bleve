@@ -232,7 +232,7 @@ func (s *Scorch) openBolt() error {
 		}
 	}
 
-	atomic.StoreUint64(&s.stats.TotFileSegmentsAtRoot, uint64(len(s.root.segment)))
+	atomic.StoreUint64(&s.stats.TotFileSegmentsAtRoot, uint64(len(s.root.segmentSnapshots)))
 
 	s.introductions = make(chan *segmentIntroduction)
 	s.persists = make(chan *persistIntroduction)
@@ -404,7 +404,7 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 	// new introduction
 	introduction := &segmentIntroduction{
 		id:                atomic.AddUint64(&s.nextSegmentID, 1),
-		data:              newSegment,
+		segment:           newSegment,
 		ids:               ids,
 		obsoletes:         make(map[uint64]*roaring.Bitmap),
 		internal:          internalOps,
@@ -416,7 +416,9 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 		introduction.persisted = make(chan error, 1)
 	}
 
-	// optimistically prepare obsoletes outside of rootLock
+	// prepare obsoletes outside of rootLock
+	// other segments could be introduced outside of rootLock that contain mutations on documents
+	// that are included in this batch. thus this is an optimistic locking approach.
 	s.rootLock.RLock()
 	root := s.root
 	root.AddRef()
@@ -424,7 +426,7 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 
 	defer func() { _ = root.DecRef() }()
 
-	for _, seg := range root.segment {
+	for _, seg := range root.segmentSnapshots {
 		delta, err := seg.segment.DocNumbers(ids)
 		if err != nil {
 			return err
@@ -516,8 +518,8 @@ func (s *Scorch) diskFileStats(rootSegmentPaths map[string]struct{}) (uint64,
 }
 
 func (s *Scorch) rootDiskSegmentsPaths() map[string]struct{} {
-	rv := make(map[string]struct{}, len(s.root.segment))
-	for _, segmentSnapshot := range s.root.segment {
+	rv := make(map[string]struct{}, len(s.root.segmentSnapshots))
+	for _, segmentSnapshot := range s.root.segmentSnapshots {
 		if seg, ok := segmentSnapshot.segment.(segment.PersistedSegment); ok {
 			rv[seg.Path()] = struct{}{}
 		}
