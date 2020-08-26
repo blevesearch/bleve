@@ -706,11 +706,16 @@ func TestAnonymousStructFields(t *testing.T) {
 
 	type Contact3 interface{}
 
+	type Contact4 struct {
+		Name string
+	}
+
 	type Thing struct {
 		Contact0
 		Contact1
 		Contact2
 		Contact3
+		*Contact4
 	}
 
 	x := Thing{
@@ -722,6 +727,9 @@ func TestAnonymousStructFields(t *testing.T) {
 			Name: "will",
 		},
 		Contact3: "steve",
+		Contact4: &Contact4{
+			Name: "brian",
+		},
 	}
 
 	doc := document.NewDocument("1")
@@ -731,8 +739,8 @@ func TestAnonymousStructFields(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(doc.Fields) != 4 {
-		t.Fatalf("expected 4 fields, got %d", len(doc.Fields))
+	if len(doc.Fields) != 5 {
+		t.Fatalf("expected 5 fields, got %d", len(doc.Fields))
 	}
 	if doc.Fields[0].Name() != "Contact0" {
 		t.Errorf("expected field named 'Contact0', got '%s'", doc.Fields[0].Name())
@@ -746,12 +754,16 @@ func TestAnonymousStructFields(t *testing.T) {
 	if doc.Fields[3].Name() != "Contact3" {
 		t.Errorf("expected field named 'Contact3', got '%s'", doc.Fields[3].Name())
 	}
+	if doc.Fields[4].Name() != "Name" {
+		t.Errorf("expected field named 'Name', got '%s'", doc.Fields[4].Name())
+	}
 
 	type AnotherThing struct {
-		Contact0 `json:"Alternate0"`
-		Contact1 `json:"Alternate1"`
-		Contact2 `json:"Alternate2"`
-		Contact3 `json:"Alternate3"`
+		Contact0  `json:"Alternate0"`
+		Contact1  `json:"Alternate1"`
+		Contact2  `json:"Alternate2"`
+		Contact3  `json:"Alternate3"`
+		*Contact4 `json:"Alternate4"`
 	}
 
 	y := AnotherThing{
@@ -763,6 +775,9 @@ func TestAnonymousStructFields(t *testing.T) {
 			Name: "will",
 		},
 		Contact3: "steve",
+		Contact4: &Contact4{
+			Name: "brian",
+		},
 	}
 
 	doc2 := document.NewDocument("2")
@@ -771,8 +786,8 @@ func TestAnonymousStructFields(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(doc2.Fields) != 4 {
-		t.Fatalf("expected 4 fields, got %d", len(doc2.Fields))
+	if len(doc2.Fields) != 5 {
+		t.Fatalf("expected 5 fields, got %d", len(doc2.Fields))
 	}
 	if doc2.Fields[0].Name() != "Alternate0" {
 		t.Errorf("expected field named 'Alternate0', got '%s'", doc2.Fields[0].Name())
@@ -785,6 +800,9 @@ func TestAnonymousStructFields(t *testing.T) {
 	}
 	if doc2.Fields[3].Name() != "Alternate3" {
 		t.Errorf("expected field named 'Alternate3', got '%s'", doc2.Fields[3].Name())
+	}
+	if doc2.Fields[4].Name() != "Alternate4.Name" {
+		t.Errorf("expected field named 'Alternate4.Name', got '%s'", doc2.Fields[4].Name())
 	}
 }
 
@@ -959,7 +977,7 @@ func TestMappingForGeo(t *testing.T) {
 	expect = append(expect, []float64{-71.34, 41.12})
 
 	for i, geopoint := range geopoints {
-		doc := document.NewDocument(string(i))
+		doc := document.NewDocument(fmt.Sprint(i))
 		err := mapping.MapDocument(doc, geopoint)
 		if err != nil {
 			t.Fatal(err)

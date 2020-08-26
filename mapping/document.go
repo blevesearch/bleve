@@ -350,8 +350,15 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 			field := typ.Field(i)
 			fieldName := field.Name
 			// anonymous fields of type struct can elide the type name
-			if field.Anonymous && field.Type.Kind() == reflect.Struct {
-				fieldName = ""
+			if field.Anonymous {
+				switch field.Type.Kind() {
+				case reflect.Struct:
+					fieldName = ""
+				case reflect.Ptr:
+					if field.Type.Elem().Kind() == reflect.Struct {
+						fieldName = ""
+					}
+				}
 			}
 
 			// if the field has a name under the specified tag, prefer that
@@ -397,7 +404,6 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 	case reflect.Bool:
 		dm.processProperty(val.Bool(), path, indexes, context)
 	}
-
 }
 
 func (dm *DocumentMapping) processProperty(property interface{}, path []string, indexes []uint64, context *walkContext) {
