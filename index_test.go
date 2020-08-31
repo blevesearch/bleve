@@ -2216,3 +2216,101 @@ func TestBatchRaceBug1149(t *testing.T) {
 	}
 	b.Reset()
 }
+
+func TestOptimisedConjunctionSearchHits(t *testing.T) {
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	idx, err := NewUsing("testidx", NewIndexMapping(), "scorch", "scorch", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doca := map[string]interface{}{
+		"country":    "united",
+		"name":       "Mercure Hotel",
+		"directions": "B560 and B56 Follow signs to the M56",
+	}
+	docb := map[string]interface{}{
+		"country":    "united",
+		"name":       "Mercure Altrincham Bowdon Hotel",
+		"directions": "A570 and A57 Follow signs to the M56 Manchester Airport",
+	}
+	docc := map[string]interface{}{
+		"country":    "india united",
+		"name":       "Sonoma Hotel",
+		"directions": "Northwest",
+	}
+	docd := map[string]interface{}{
+		"country":    "United Kingdom",
+		"name":       "Cresta Court Hotel",
+		"directions": "junction of A560 and A56",
+	}
+
+	b := idx.NewBatch()
+	err = b.Index("a", doca)
+	if err != nil {
+		t.Error(err)
+	}
+	err = b.Index("b", docb)
+	if err != nil {
+		t.Error(err)
+	}
+	err = b.Index("c", docc)
+	if err != nil {
+		t.Error(err)
+	}
+	err = b.Index("d", docd)
+	if err != nil {
+		t.Error(err)
+	}
+	// execute the batch
+	err = idx.Batch(b)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mq := NewMatchQuery("united")
+	mq.SetField("country")
+
+	cq := NewConjunctionQuery(mq)
+
+	mq1 := NewMatchQuery("hotel")
+	mq1.SetField("name")
+	cq.AddQuery(mq1)
+
+	mq2 := NewMatchQuery("56")
+	mq2.SetField("directions")
+	mq2.SetFuzziness(1)
+	cq.AddQuery(mq2)
+
+	req := NewSearchRequest(cq)
+	req.Score = "none"
+
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hitsWithOutScore := res.Total
+
+	req = NewSearchRequest(cq)
+	req.Score = ""
+
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hitsWithScore := res.Total
+
+	if hitsWithOutScore != hitsWithScore {
+		t.Errorf("expected %d hits without score, got %d", hitsWithScore, hitsWithOutScore)
+	}
+
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}

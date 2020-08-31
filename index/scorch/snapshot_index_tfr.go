@@ -45,6 +45,7 @@ type IndexSnapshotTermFieldReader struct {
 	includeTermVectors bool
 	currPosting        segment.Posting
 	currID             index.IndexInternalID
+	recycle            bool
 }
 
 func (i *IndexSnapshotTermFieldReader) Size() int {

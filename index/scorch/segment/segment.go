@@ -96,6 +96,12 @@ type PostingsIterator interface {
 	Size() int
 }
 
+type OptimizablePostingsIterator interface {
+	ActualBitmap() *roaring.Bitmap
+	DocNum1Hit() (uint64, bool)
+	ReplaceActual(*roaring.Bitmap)
+}
+
 type Posting interface {
 	Number() uint64
 
