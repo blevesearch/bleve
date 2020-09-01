@@ -2135,6 +2135,11 @@ func testBatchRaceBug1149(t *testing.T, i Index) {
 }
 
 func TestOptimisedConjunctionSearchHits(t *testing.T) {
+	scorch.OptimizeDisjunctionUnadorned = false
+	defer func() {
+		scorch.OptimizeDisjunctionUnadorned = true
+	}()
+
 	defer func() {
 		err := os.RemoveAll("testidx")
 		if err != nil {
