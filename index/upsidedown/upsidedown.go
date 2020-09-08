@@ -819,16 +819,18 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	}
 
 	if numUpdates > 0 {
-		go func() {
-			for k := range batch.IndexOps {
-				doc := batch.IndexOps[k]
+		// batch.IndexOps maybe reseted when the goroutine is running, so
+		// we should send a copy of it.
+		go func(ops map[string]*document.Document) {
+			for k := range ops {
+				doc := ops[k]
 				if doc != nil {
 					aw := index.NewAnalysisWork(udc, doc, resultChan)
 					// put the work on the queue
 					udc.analysisQueue.Queue(aw)
 				}
 			}
-		}()
+		}(batch.IndexOps)
 	}
 
 	// retrieve back index rows concurrent with analysis

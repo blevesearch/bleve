@@ -334,15 +334,17 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	// FIXME could sort ids list concurrent with analysis?
 
 	if numUpdates > 0 {
-		go func() {
-			for _, doc := range batch.IndexOps {
+		// batch.IndexOps maybe reseted when the goroutine is running, so
+		// we should send a copy of it.
+		go func(ops map[string]*document.Document) {
+			for _, doc := range ops {
 				if doc != nil {
 					aw := index.NewAnalysisWork(s, doc, resultChan)
 					// put the work on the queue
 					s.analysisQueue.Queue(aw)
 				}
 			}
-		}()
+		}(batch.IndexOps)
 	}
 
 	// wait for analysis result
