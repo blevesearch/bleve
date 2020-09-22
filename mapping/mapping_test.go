@@ -959,7 +959,7 @@ func TestMappingForGeo(t *testing.T) {
 	expect = append(expect, []float64{-71.34, 41.12})
 
 	for i, geopoint := range geopoints {
-		doc := document.NewDocument(string(i))
+		doc := document.NewDocument(fmt.Sprint(i))
 		err := mapping.MapDocument(doc, geopoint)
 		if err != nil {
 			t.Fatal(err)
