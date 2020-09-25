@@ -515,6 +515,26 @@ func (s *Scorch) diskFileStats(rootSegmentPaths map[string]struct{}) (uint64,
 	return numFilesOnDisk, numBytesUsedDisk, numBytesOnDiskByRoot
 }
 
+// reClaimableDocsRatio gives a ratio about the obsoleted or
+// reclaimable documents present in a scorch index.
+func (s *Scorch) reClaimableDocsRatio() float64 {
+	var totalCount, liveCount uint64
+	s.rootLock.RLock()
+	indexSnapshot := s.root
+	s.rootLock.RUnlock()
+	for _, segmentSnapshot := range indexSnapshot.segment {
+		if _, ok := segmentSnapshot.segment.(segment.PersistedSegment); ok {
+			totalCount += uint64(segmentSnapshot.FullSize())
+			liveCount += uint64(segmentSnapshot.Count())
+		}
+	}
+
+	if totalCount > 0 {
+		return float64(totalCount-liveCount) / float64(totalCount)
+	}
+	return 0
+}
+
 func (s *Scorch) rootDiskSegmentsPaths() map[string]struct{} {
 	rv := make(map[string]struct{}, len(s.root.segment))
 	for _, segmentSnapshot := range s.root.segment {
@@ -556,6 +576,9 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["num_bytes_used_disk"] = numBytesUsedDisk
 	// total disk bytes by the latest root index, exclusive of older snapshots
 	m["num_bytes_used_disk_by_root"] = numBytesOnDiskByRoot
+	// num_bytes_used_disk_by_root_reclaimable is an approximation about the
+	// reclaimable disk space in an index. (eg: from a full compaction)
+	m["num_bytes_used_disk_by_root_reclaimable"] = uint64(float64(numBytesOnDiskByRoot) * s.reClaimableDocsRatio())
 	m["num_files_on_disk"] = numFilesOnDisk
 	m["num_root_memorysegments"] = m["TotMemorySegmentsAtRoot"]
 	m["num_root_filesegments"] = m["TotFileSegmentsAtRoot"]
