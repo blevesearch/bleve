@@ -74,9 +74,8 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 	terms := termRanges.Enumerate(isIndexed)
 	if fieldDict != nil {
 		if fd, ok := fieldDict.(index.FieldDict); ok {
-			cerr := fd.Close()
-			if cerr != nil {
-				err = cerr
+			if err = fd.Close(); err != nil {
+				return nil, err
 			}
 		}
 	}
