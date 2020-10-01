@@ -26,7 +26,7 @@ Try out bleve live by [searching the bleve website](http://www.blevesearch.com/s
     * Simple query [syntax](http://www.blevesearch.com/docs/Query-String-Query/) for human entry
 * tf-idf Scoring
 * Search result match highlighting
-* Supports Aggregating Facets:
+* Supports Aggregating Facets:-
     * Terms Facet
     * Numeric Range Facet
     * Date Range Facet
