@@ -394,6 +394,9 @@ func testScorchCompositeSearchOptimizationsHelper(
 			}
 
 			next, err = cs.Next(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
 			i++
 		}
 

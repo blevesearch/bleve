@@ -253,6 +253,9 @@ func TestTermRangeSearchTooManyTerms(t *testing.T) {
 		got = append(got, extId)
 		ctx.DocumentMatchPool.Put(next)
 		next, err = searcher.Next(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
 		i++
 	}
 	if err != nil {
