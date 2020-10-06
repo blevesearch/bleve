@@ -874,7 +874,7 @@ func foldToASCII(input []rune, inputPos int, output []rune, outputPos int, lengt
 				outputPos++
 
 			case '\u24A2': // ⒢ [PARENTHESIZED LATIN SMALL LETTER G]
-				output = output[:(len(output) + 1)]
+				output = output[:(len(output) + 2)]
 				output[outputPos] = '('
 				outputPos++
 				output[outputPos] = 'g'
