@@ -42,7 +42,7 @@
 			"size": 10,
 			"sort": ["-_score", "_id"],
 			"query": {
-				"match_phrase": "long name"
+				"match_phrase": "steve has"
 			}
 		},
 		"result": {
@@ -385,7 +385,7 @@
 				{
 					"id": "b",
 					"fragments": {
-						"name": ["steve has a <mark>long</mark> name"]
+						"name": ["steve has &lt;a&gt; <mark>long</mark> &amp; complicated name"]
 					}
 				}
 			]
@@ -409,7 +409,7 @@
 				{
 					"id": "b",
 					"fragments": {
-						"name": ["steve has a <mark>long</mark> name"]
+						"name": ["steve has &lt;a&gt; <mark>long</mark> &amp; complicated name"]
 					}
 				}
 			]
@@ -485,7 +485,7 @@
 				{
 					"id": "b",
 					"fragments": {
-						"name": ["steve has a <mark>long</mark> name"],
+						"name": ["steve has &lt;a&gt; <mark>long</mark> &amp; complicated name"],
 						"title": ["missess"]
 					}
 				}
