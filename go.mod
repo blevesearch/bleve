@@ -12,7 +12,7 @@ require (
 	github.com/blevesearch/zap/v12 v12.0.11
 	github.com/blevesearch/zap/v13 v13.0.3
 	github.com/blevesearch/zap/v14 v14.0.2
-        github.com/blevesearch/zap/v15 v15.0.0
+	github.com/blevesearch/zap/v15 v15.0.0
 	github.com/couchbase/moss v0.1.0
 	github.com/couchbase/vellum v1.0.2
 	github.com/golang/protobuf v1.3.2
