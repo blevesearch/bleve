@@ -49,7 +49,7 @@ func TestAsciiFoldingFilter(t *testing.T) {
 			input:  []byte(`Ápple Àpple Äpple Âpple Ãpple Åpple`),
 			output: []byte(`Apple Apple Apple Apple Apple Apple`),
 		}, {
-			// apples from https://issues.couchbase.com/browse/MB-33486
+			// Fix ASCII folding of \u24A2
 			input:  []byte(`⒢`),
 			output: []byte(`(g)`),
 		},
