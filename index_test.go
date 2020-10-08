@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -2234,5 +2235,41 @@ func TestOptimisedConjunctionSearchHits(t *testing.T) {
 	err = idx.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestIndexMappingDocValuesDynamic(t *testing.T) {
+	im := NewIndexMapping()
+	// DocValuesDynamic's default is true
+	// Now explicitly set it to false
+	im.DocValuesDynamic = false
+
+	// Next, retrieve the JSON dump of the index mapping
+	var data []byte
+	data, err = json.Marshal(im)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Now, edit an unrelated setting in the index mapping
+	var m map[string]interface{}
+	err = json.Unmarshal(data, &m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m["index_dynamic"] = false
+	data, err = json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Unmarshal back the changes into the index mapping struct
+	if err = im.UnmarshalJSON(data); err != nil {
+		t.Fatal(err)
+	}
+
+	// Expect DocValuesDynamic to remain false!
+	if im.DocValuesDynamic {
+		t.Fatalf("Expected DocValuesDynamic to remain false after the index mapping edit")
 	}
 }
