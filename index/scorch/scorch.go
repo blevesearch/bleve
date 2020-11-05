@@ -202,11 +202,9 @@ func (s *Scorch) openBolt() error {
 		s.unsafeBatch = true
 	}
 
-	var rootBoltOpt *bolt.Options
+	var rootBoltOpt bolt.Options = *bolt.DefaultOptions
 	if s.readOnly {
-		rootBoltOpt = &bolt.Options{
-			ReadOnly: true,
-		}
+		rootBoltOpt.ReadOnly = true
 	} else {
 		if s.path != "" {
 			err := os.MkdirAll(s.path, 0700)
@@ -215,11 +213,14 @@ func (s *Scorch) openBolt() error {
 			}
 		}
 	}
+	if timeout, ok := s.config["bolt_timeout"].(time.Duration); ok {
+		rootBoltOpt.Timeout = timeout
+	}
 
 	rootBoltPath := s.path + string(os.PathSeparator) + "root.bolt"
 	var err error
 	if s.path != "" {
-		s.rootBolt, err = bolt.Open(rootBoltPath, 0600, rootBoltOpt)
+		s.rootBolt, err = bolt.Open(rootBoltPath, 0600, &rootBoltOpt)
 		if err != nil {
 			return err
 		}
