@@ -17,13 +17,13 @@ package scorch
 import (
 	"fmt"
 
-	"github.com/blevesearch/bleve/index/scorch/segment"
+	segment "github.com/blevesearch/scorch_segment_api"
 
-	zapv11 "github.com/blevesearch/zap/v11"
-	zapv12 "github.com/blevesearch/zap/v12"
-	zapv13 "github.com/blevesearch/zap/v13"
-	zapv14 "github.com/blevesearch/zap/v14"
-	zapv15 "github.com/blevesearch/zap/v15"
+	zapv11 "github.com/blevesearch/zapx/v11"
+	zapv12 "github.com/blevesearch/zapx/v12"
+	zapv13 "github.com/blevesearch/zapx/v13"
+	zapv14 "github.com/blevesearch/zapx/v14"
+	zapv15 "github.com/blevesearch/zapx/v15"
 )
 
 var supportedSegmentPlugins map[string]map[uint32]segment.Plugin

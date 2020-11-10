@@ -22,6 +22,7 @@ import (
 	"github.com/blevesearch/bleve/geo"
 	"github.com/blevesearch/bleve/numeric"
 	"github.com/blevesearch/bleve/size"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var reflectStaticSizeGeoPointField int
@@ -39,6 +40,8 @@ type GeoPointField struct {
 	options           IndexingOptions
 	value             numeric.PrefixCoded
 	numPlainTextBytes uint64
+	length            int
+	frequencies       index.TokenFrequencies
 }
 
 func (n *GeoPointField) Size() int {
@@ -59,7 +62,35 @@ func (n *GeoPointField) Options() IndexingOptions {
 	return n.options
 }
 
-func (n *GeoPointField) Analyze() (int, analysis.TokenFrequencies) {
+func (n *GeoPointField) EncodedFieldType() byte {
+	return 'g'
+}
+
+func (n *GeoPointField) IsIndexed() bool {
+	return n.options.IsIndexed()
+}
+
+func (n *GeoPointField) IsStored() bool {
+	return n.options.IsStored()
+}
+
+func (n *GeoPointField) IncludeDocValues() bool {
+	return n.options.IncludeDocValues()
+}
+
+func (n *GeoPointField) IncludeTermVectors() bool {
+	return n.options.IncludeTermVectors()
+}
+
+func (n *GeoPointField) AnalyzedLength() int {
+	return n.length
+}
+
+func (n *GeoPointField) AnalyzedTokenFrequencies() index.TokenFrequencies {
+	return n.frequencies
+}
+
+func (n *GeoPointField) Analyze() {
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
@@ -90,9 +121,8 @@ func (n *GeoPointField) Analyze() (int, analysis.TokenFrequencies) {
 		}
 	}
 
-	fieldLength := len(tokens)
-	tokenFreqs := analysis.TokenFrequency(tokens, n.arrayPositions, n.options.IncludeTermVectors())
-	return fieldLength, tokenFreqs
+	n.length = len(tokens)
+	n.frequencies = analysis.TokenFrequency(tokens, n.arrayPositions, n.options.IncludeTermVectors())
 }
 
 func (n *GeoPointField) Value() []byte {

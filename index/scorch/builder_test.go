@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 func TestBuilder(t *testing.T) {

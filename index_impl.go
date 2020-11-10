@@ -24,8 +24,6 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/upsidedown"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/registry"
@@ -33,6 +31,8 @@ import (
 	"github.com/blevesearch/bleve/search/collector"
 	"github.com/blevesearch/bleve/search/facet"
 	"github.com/blevesearch/bleve/search/highlight"
+	index "github.com/blevesearch/bleve_index_api"
+	store "github.com/blevesearch/bleve_index_api/store"
 )
 
 type indexImpl struct {
@@ -271,7 +271,7 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 // IndexAdvanced takes a document.Document object
 // skips the mapping and indexes it.
 func (i *indexImpl) IndexAdvanced(doc *document.Document) (err error) {
-	if doc.ID == "" {
+	if doc.ID() == "" {
 		return ErrorEmptyID
 	}
 
@@ -323,7 +323,7 @@ func (i *indexImpl) Batch(b *Batch) error {
 // stored fields for a document in the index.  These
 // stored fields are put back into a Document object
 // and returned.
-func (i *indexImpl) Document(id string) (doc *document.Document, err error) {
+func (i *indexImpl) Document(id string) (doc index.Document, err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -617,7 +617,7 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 			if len(req.Fields) > 0 {
 				fieldsToLoad := deDuplicate(req.Fields)
 				for _, f := range fieldsToLoad {
-					for _, docF := range doc.Fields {
+					doc.VisitFields(func(docF index.Field) {
 						if f == "*" || docF.Name() == f {
 							var value interface{}
 							switch docF := docF.(type) {
@@ -651,7 +651,7 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 								hit.AddFieldValue(docF.Name(), value)
 							}
 						}
-					}
+					})
 				}
 			}
 			if highlighter != nil {

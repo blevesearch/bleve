@@ -25,11 +25,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
+	index "github.com/blevesearch/bleve_index_api"
+	store "github.com/blevesearch/bleve_index_api/store"
 
 	"github.com/golang/protobuf/proto"
 )
@@ -68,7 +67,7 @@ type UpsideDownCouch struct {
 
 type docBackIndexRow struct {
 	docID        string
-	doc          *document.Document // If deletion, doc will be nil.
+	doc          index.Document // If deletion, doc will be nil.
 	backIndexRow *BackIndexRow
 }
 
@@ -412,7 +411,7 @@ func (udc *UpsideDownCouch) Close() error {
 	return udc.store.Close()
 }
 
-func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
+func (udc *UpsideDownCouch) Update(doc index.Document) (err error) {
 	// do analysis before acquiring write lock
 	analysisStart := time.Now()
 	resultChan := make(chan *index.AnalysisResult)
@@ -439,7 +438,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	// first we lookup the backindex row for the doc id if it exists
 	// lookup the back index row
 	var backIndexRow *BackIndexRow
-	backIndexRow, err = backIndexRowForDoc(kvreader, index.IndexInternalID(doc.ID))
+	backIndexRow, err = backIndexRowForDoc(kvreader, index.IndexInternalID(doc.ID()))
 	if err != nil {
 		_ = kvreader.Close()
 		atomic.AddUint64(&udc.stats.errors, 1)
@@ -454,7 +453,7 @@ func (udc *UpsideDownCouch) Update(doc *document.Document) (err error) {
 	return udc.UpdateWithAnalysis(doc, result, backIndexRow)
 }
 
-func (udc *UpsideDownCouch) UpdateWithAnalysis(doc *document.Document,
+func (udc *UpsideDownCouch) UpdateWithAnalysis(doc index.Document,
 	result *index.AnalysisResult, backIndexRow *BackIndexRow) (err error) {
 	// start a writer for this update
 	indexStart := time.Now()
@@ -587,8 +586,8 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []in
 	return addRows, updateRows, deleteRows
 }
 
-func (udc *UpsideDownCouch) storeField(docID []byte, field document.Field, fieldIndex uint16, rows []index.IndexRow, backIndexStoredEntries []*BackIndexStoreEntry) ([]index.IndexRow, []*BackIndexStoreEntry) {
-	fieldType := encodeFieldType(field)
+func (udc *UpsideDownCouch) storeField(docID []byte, field index.Field, fieldIndex uint16, rows []index.IndexRow, backIndexStoredEntries []*BackIndexStoreEntry) ([]index.IndexRow, []*BackIndexStoreEntry) {
+	fieldType := field.EncodedFieldType()
 	storedRow := NewStoredRow(docID, fieldIndex, field.ArrayPositions(), fieldType, field.Value())
 
 	// record the back index entry
@@ -616,7 +615,7 @@ func encodeFieldType(f document.Field) byte {
 	return fieldType
 }
 
-func (udc *UpsideDownCouch) indexField(docID []byte, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs analysis.TokenFrequencies, rows []index.IndexRow, backIndexTermsEntries []*BackIndexTermsEntry) ([]index.IndexRow, []*BackIndexTermsEntry) {
+func (udc *UpsideDownCouch) indexField(docID []byte, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs index.TokenFrequencies, rows []index.IndexRow, backIndexTermsEntries []*BackIndexTermsEntry) ([]index.IndexRow, []*BackIndexTermsEntry) {
 	fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
 
 	termFreqRows := make([]TermFrequencyRow, len(tokenFreqs))
@@ -747,11 +746,11 @@ func decodeFieldType(typ byte, name string, pos []uint64, value []byte) document
 	return nil
 }
 
-func frequencyFromTokenFreq(tf *analysis.TokenFreq) int {
+func frequencyFromTokenFreq(tf *index.TokenFreq) int {
 	return tf.Frequency()
 }
 
-func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *analysis.TokenFreq, rows []index.IndexRow) ([]*TermVector, []index.IndexRow) {
+func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *index.TokenFreq, rows []index.IndexRow) ([]*TermVector, []index.IndexRow) {
 	a := make([]TermVector, len(tf.Locations))
 	rv := make([]*TermVector, len(tf.Locations))
 

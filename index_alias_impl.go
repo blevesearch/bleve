@@ -19,9 +19,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store"
+	index "github.com/blevesearch/bleve_index_api"
+	store "github.com/blevesearch/bleve_index_api/store"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 )
@@ -110,7 +109,7 @@ func (i *indexAliasImpl) Batch(b *Batch) error {
 	return i.indexes[0].Batch(b)
 }
 
-func (i *indexAliasImpl) Document(id string) (*document.Document, error) {
+func (i *indexAliasImpl) Document(id string) (index.Document, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 

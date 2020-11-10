@@ -19,7 +19,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/numeric"
 	"github.com/blevesearch/bleve/search"
 )

@@ -17,9 +17,8 @@ package collector
 import (
 	"reflect"
 
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/search"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 type stubSearcher struct {
@@ -118,7 +117,7 @@ func (sr *stubReader) FieldDictPrefix(field string, termPrefix []byte) (index.Fi
 	return nil, nil
 }
 
-func (sr *stubReader) Document(id string) (*document.Document, error) {
+func (sr *stubReader) Document(id string) (index.Document, error) {
 	return nil, nil
 }
 

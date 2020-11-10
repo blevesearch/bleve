@@ -19,7 +19,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/blevesearch/bleve/index/scorch/segment"
+	segment "github.com/blevesearch/scorch_segment_api"
 	bolt "go.etcd.io/bbolt"
 )
 

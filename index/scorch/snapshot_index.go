@@ -25,8 +25,8 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment"
+	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api"
 	"github.com/couchbase/vellum"
 	lev "github.com/couchbase/vellum/levenshtein"
 )
@@ -349,7 +349,7 @@ func (i *IndexSnapshot) DocCount() (uint64, error) {
 	return rv, nil
 }
 
-func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
+func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	// FIXME could be done more efficiently directly, but reusing for simplicity
 	tfr, err := i.TermFieldReader([]byte(id), "_id", false, false, false)
 	if err != nil {
@@ -377,7 +377,7 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 	}
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
-	rv = document.NewDocument(id)
+	rvd := document.NewDocument(id)
 	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, val []byte, pos []uint64) bool {
 		if name == "_id" {
 			return true
@@ -389,15 +389,15 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 
 		switch typ {
 		case 't':
-			rv.AddField(document.NewTextField(name, arrayPos, value))
+			rvd.AddField(document.NewTextField(name, arrayPos, value))
 		case 'n':
-			rv.AddField(document.NewNumericFieldFromBytes(name, arrayPos, value))
+			rvd.AddField(document.NewNumericFieldFromBytes(name, arrayPos, value))
 		case 'd':
-			rv.AddField(document.NewDateTimeFieldFromBytes(name, arrayPos, value))
+			rvd.AddField(document.NewDateTimeFieldFromBytes(name, arrayPos, value))
 		case 'b':
-			rv.AddField(document.NewBooleanFieldFromBytes(name, arrayPos, value))
+			rvd.AddField(document.NewBooleanFieldFromBytes(name, arrayPos, value))
 		case 'g':
-			rv.AddField(document.NewGeoPointFieldFromBytes(name, arrayPos, value))
+			rvd.AddField(document.NewGeoPointFieldFromBytes(name, arrayPos, value))
 		}
 
 		return true
@@ -406,7 +406,7 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 		return nil, err
 	}
 
-	return rv, nil
+	return rvd, nil
 }
 
 func (i *IndexSnapshot) segmentIndexAndLocalDocNumFromGlobal(docNum uint64) (int, uint64) {

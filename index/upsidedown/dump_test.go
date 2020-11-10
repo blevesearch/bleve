@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/index/store/boltdb"
 
 	"github.com/blevesearch/bleve/document"

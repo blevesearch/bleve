@@ -19,7 +19,7 @@ import (
 
 	"github.com/blevesearch/bleve/analysis/analyzer/standard"
 	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/registry"
 )

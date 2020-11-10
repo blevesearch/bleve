@@ -20,7 +20,7 @@ import (
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/geo"
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/index/store/gtreap"
 	"github.com/blevesearch/bleve/index/upsidedown"
 	"github.com/blevesearch/bleve/search"
@@ -183,132 +183,93 @@ func setupGeoPolygonPoints(t *testing.T) index.Index {
 		t.Fatal(err)
 	}
 
-	err = i.Update(&document.Document{
-		ID: "k",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, -80.86469327, 35.2782),
-		},
-	})
+	doc := document.NewDocument("k")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, -80.86469327, 35.2782))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = i.Update(&document.Document{
-		ID: "l",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, -80.8713, 35.28138),
-		},
-	})
+	doc = document.NewDocument("l")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, -80.8713, 35.28138))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = i.Update(&document.Document{
-		ID: "m",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, -84.25, 33.153),
-		},
-	})
+	doc = document.NewDocument("m")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, -84.25, 33.153))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = i.Update(&document.Document{
-		ID: "n",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, -89.992, 35.063),
-		},
-	})
+	doc = document.NewDocument("n")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, -89.992, 35.063))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = i.Update(&document.Document{
-		ID: "o",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, -71.648, 42.437),
-		},
-	})
+	doc = document.NewDocument("o")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, -71.648, 42.437))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = i.Update(&document.Document{
-		ID: "p",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, -80.016, 40.314),
-		},
-	})
+	doc = document.NewDocument("p")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, -80.016, 40.314))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = i.Update(&document.Document{
-		ID: "q",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, -111.919, 33.494),
-		},
-	})
+	doc = document.NewDocument("q")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, -111.919, 33.494))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = i.Update(&document.Document{
-		ID: "r",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 1.5, 1.1),
-		},
-	})
+	doc = document.NewDocument("r")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 1.5, 1.1))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = i.Update(&document.Document{
-		ID: "s",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 2, 1.5),
-		},
-	})
+	doc = document.NewDocument("s")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 2, 1.5))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = i.Update(&document.Document{
-		ID: "t",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 2.0, 1.9),
-		},
-	})
+	doc = document.NewDocument("t")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 2.0, 1.9))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = i.Update(&document.Document{
-		ID: "u",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 2.0, 1.0),
-		},
-	})
+	doc = document.NewDocument("u")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 2.0, 1.0))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = i.Update(&document.Document{
-		ID: "amoeba",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 77.60490, 12.97467),
-		},
-	})
+	doc = document.NewDocument("amoeba")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 77.60490, 12.97467))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = i.Update(&document.Document{
-		ID: "communiti",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 77.608237, 12.97237),
-		},
-	})
+	doc = document.NewDocument("communiti")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 77.608237, 12.97237))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,12 +354,9 @@ func setupComplexGeoPolygonPoints(t *testing.T, points []geoPoint) index.Index {
 		t.Fatal(err)
 	}
 	for _, point := range points {
-		err = i.Update(&document.Document{
-			ID: point.title,
-			Fields: []document.Field{
-				document.NewGeoPointField("loc", []uint64{}, point.lon, point.lat),
-			},
-		})
+		doc := document.NewDocument(point.title)
+		doc.AddField(document.NewGeoPointField("loc", []uint64{}, point.lon, point.lat))
+		err = i.Update(doc)
 		if err != nil {
 			t.Fatal(err)
 		}

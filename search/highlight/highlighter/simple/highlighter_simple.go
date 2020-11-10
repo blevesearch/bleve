@@ -17,6 +17,7 @@ package simple
 import (
 	"container/heap"
 	"fmt"
+	index "github.com/blevesearch/bleve_index_api"
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/registry"
@@ -65,7 +66,7 @@ func (s *Highlighter) SetSeparator(sep string) {
 	s.sep = sep
 }
 
-func (s *Highlighter) BestFragmentInField(dm *search.DocumentMatch, doc *document.Document, field string) string {
+func (s *Highlighter) BestFragmentInField(dm *search.DocumentMatch, doc index.Document, field string) string {
 	fragments := s.BestFragmentsInField(dm, doc, field, 1)
 	if len(fragments) > 0 {
 		return fragments[0]
@@ -73,7 +74,7 @@ func (s *Highlighter) BestFragmentInField(dm *search.DocumentMatch, doc *documen
 	return ""
 }
 
-func (s *Highlighter) BestFragmentsInField(dm *search.DocumentMatch, doc *document.Document, field string, num int) []string {
+func (s *Highlighter) BestFragmentsInField(dm *search.DocumentMatch, doc index.Document, field string, num int) []string {
 	tlm := dm.Locations[field]
 	orderedTermLocations := highlight.OrderTermLocations(tlm)
 	scorer := NewFragmentScorer(tlm)
@@ -81,7 +82,7 @@ func (s *Highlighter) BestFragmentsInField(dm *search.DocumentMatch, doc *docume
 	// score the fragments and put them into a priority queue ordered by score
 	fq := make(FragmentQueue, 0)
 	heap.Init(&fq)
-	for _, f := range doc.Fields {
+	doc.VisitFields(func(f index.Field) {
 		if f.Name() == field {
 			_, ok := f.(*document.TextField)
 			if ok {
@@ -101,7 +102,7 @@ func (s *Highlighter) BestFragmentsInField(dm *search.DocumentMatch, doc *docume
 				}
 			}
 		}
-	}
+	})
 
 	// now find the N best non-overlapping fragments
 	var bestFragments []*highlight.Fragment

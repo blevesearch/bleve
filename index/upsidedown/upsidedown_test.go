@@ -28,7 +28,7 @@ import (
 	"github.com/blevesearch/bleve/analysis/analyzer/standard"
 	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizer/regexp"
 	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/index/store/boltdb"
 	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/registry"
@@ -555,10 +555,11 @@ func TestIndexInsertWithStore(t *testing.T) {
 		}
 	}()
 
-	storedDoc, err := indexReader.Document("1")
+	storedDocInt, err := indexReader.Document("1")
 	if err != nil {
 		t.Error(err)
 	}
+	storedDoc := storedDocInt.(*document.Document)
 
 	if len(storedDoc.Fields) != 1 {
 		t.Errorf("expected 1 stored field, got %d", len(storedDoc.Fields))
@@ -863,10 +864,11 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		t.Error(err)
 	}
 
-	storedDoc, err := indexReader.Document("1")
+	storedDocInt, err := indexReader.Document("1")
 	if err != nil {
 		t.Error(err)
 	}
+	storedDoc := storedDocInt.(*document.Document)
 
 	err = indexReader.Close()
 	if err != nil {
@@ -932,10 +934,11 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	}
 
 	// should only get 2 fields back now though
-	storedDoc, err = indexReader2.Document("1")
+	storedDocInt, err = indexReader2.Document("1")
 	if err != nil {
 		t.Error(err)
 	}
+	storedDoc = storedDocInt.(*document.Document)
 
 	err = indexReader2.Close()
 	if err != nil {
@@ -1118,10 +1121,11 @@ func TestIndexUpdateComposites(t *testing.T) {
 	}()
 
 	// make sure new values are in index
-	storedDoc, err := indexReader.Document("1")
+	storedDocInt, err := indexReader.Document("1")
 	if err != nil {
 		t.Error(err)
 	}
+	storedDoc := storedDocInt.(*document.Document)
 	if len(storedDoc.Fields) != 2 {
 		t.Errorf("expected 2 stored field, got %d", len(storedDoc.Fields))
 	}
@@ -1394,10 +1398,11 @@ func TestConcurrentUpdate(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	doc, err := r.Document("1")
+	docInt, err := r.Document("1")
 	if err != nil {
 		log.Fatal(err)
 	}
+	doc := docInt.(*document.Document)
 
 	if len(doc.Fields) > 1 {
 		t.Errorf("expected single field, found %d", len(doc.Fields))

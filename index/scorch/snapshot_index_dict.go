@@ -17,8 +17,8 @@ package scorch
 import (
 	"container/heap"
 
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment"
+	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api"
 )
 
 type segmentDictCursor struct {

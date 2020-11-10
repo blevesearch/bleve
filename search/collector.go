@@ -18,7 +18,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 type Collector interface {

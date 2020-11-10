@@ -28,7 +28,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/blevesearch/bleve/index/store"
+	store "github.com/blevesearch/bleve_index_api/store"
 	"github.com/blevesearch/bleve/registry"
 	bolt "go.etcd.io/bbolt"
 )

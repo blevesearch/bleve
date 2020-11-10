@@ -17,8 +17,8 @@ package document
 import (
 	"reflect"
 
-	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/size"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var reflectStaticSizeCompositeField int
@@ -37,7 +37,7 @@ type CompositeField struct {
 	defaultInclude       bool
 	options              IndexingOptions
 	totalLength          int
-	compositeFrequencies analysis.TokenFrequencies
+	compositeFrequencies index.TokenFrequencies
 }
 
 func NewCompositeField(name string, defaultInclude bool, include []string, exclude []string) *CompositeField {
@@ -51,7 +51,7 @@ func NewCompositeFieldWithIndexingOptions(name string, defaultInclude bool, incl
 		defaultInclude:       defaultInclude,
 		includedFields:       make(map[string]bool, len(include)),
 		excludedFields:       make(map[string]bool, len(exclude)),
-		compositeFrequencies: make(analysis.TokenFrequencies),
+		compositeFrequencies: make(index.TokenFrequencies),
 	}
 
 	for _, i := range include {
@@ -91,8 +91,7 @@ func (c *CompositeField) Options() IndexingOptions {
 	return c.options
 }
 
-func (c *CompositeField) Analyze() (int, analysis.TokenFrequencies) {
-	return c.totalLength, c.compositeFrequencies
+func (c *CompositeField) Analyze() {
 }
 
 func (c *CompositeField) Value() []byte {
@@ -116,9 +115,37 @@ func (c *CompositeField) includesField(field string) bool {
 	return shouldInclude
 }
 
-func (c *CompositeField) Compose(field string, length int, freq analysis.TokenFrequencies) {
+func (c *CompositeField) Compose(field string, length int, freq index.TokenFrequencies) {
 	if c.includesField(field) {
 		c.totalLength += length
 		c.compositeFrequencies.MergeAll(field, freq)
 	}
+}
+
+func (c *CompositeField) EncodedFieldType() byte {
+	return 'c'
+}
+
+func (c *CompositeField) IsIndexed() bool {
+	return c.options.IsIndexed()
+}
+
+func (c *CompositeField) IsStored() bool {
+	return c.options.IsStored()
+}
+
+func (c *CompositeField) IncludeDocValues() bool {
+	return c.options.IncludeDocValues()
+}
+
+func (c *CompositeField) IncludeTermVectors() bool {
+	return c.options.IncludeTermVectors()
+}
+
+func (c *CompositeField) AnalyzedLength() int {
+	return c.totalLength
+}
+
+func (c *CompositeField) AnalyzedTokenFrequencies() index.TokenFrequencies {
+	return c.compositeFrequencies
 }

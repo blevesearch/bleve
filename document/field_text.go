@@ -20,6 +20,7 @@ import (
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/size"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var reflectStaticSizeTextField int
@@ -38,6 +39,8 @@ type TextField struct {
 	analyzer          *analysis.Analyzer
 	value             []byte
 	numPlainTextBytes uint64
+	length            int
+	frequencies       index.TokenFrequencies
 }
 
 func (t *TextField) Size() int {
@@ -59,7 +62,35 @@ func (t *TextField) Options() IndexingOptions {
 	return t.options
 }
 
-func (t *TextField) Analyze() (int, analysis.TokenFrequencies) {
+func (t *TextField) EncodedFieldType() byte {
+	return 't'
+}
+
+func (t *TextField) IsIndexed() bool {
+	return t.options.IsIndexed()
+}
+
+func (t *TextField) IsStored() bool {
+	return t.options.IsStored()
+}
+
+func (t *TextField) IncludeDocValues() bool {
+	return t.options.IncludeDocValues()
+}
+
+func (t *TextField) IncludeTermVectors() bool {
+	return t.options.IncludeTermVectors()
+}
+
+func (t *TextField) AnalyzedLength() int {
+	return t.length
+}
+
+func (t *TextField) AnalyzedTokenFrequencies() index.TokenFrequencies {
+	return t.frequencies
+}
+
+func (t *TextField) Analyze() {
 	var tokens analysis.TokenStream
 	if t.analyzer != nil {
 		bytesToAnalyze := t.Value()
@@ -81,9 +112,8 @@ func (t *TextField) Analyze() (int, analysis.TokenFrequencies) {
 			},
 		}
 	}
-	fieldLength := len(tokens) // number of tokens in this doc field
-	tokenFreqs := analysis.TokenFrequency(tokens, t.arrayPositions, t.options.IncludeTermVectors())
-	return fieldLength, tokenFreqs
+	t.length = len(tokens) // number of tokens in this doc field
+	t.frequencies = analysis.TokenFrequency(tokens, t.arrayPositions, t.options.IncludeTermVectors())
 }
 
 func (t *TextField) Analyzer() *analysis.Analyzer {

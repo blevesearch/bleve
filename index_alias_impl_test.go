@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store"
+	index "github.com/blevesearch/bleve_index_api"
+	store "github.com/blevesearch/bleve_index_api/store"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/numeric"
 	"github.com/blevesearch/bleve/search"
@@ -1259,7 +1259,7 @@ func (i *stubIndex) Batch(b *Batch) error {
 	return i.err
 }
 
-func (i *stubIndex) Document(id string) (*document.Document, error) {
+func (i *stubIndex) Document(id string) (index.Document, error) {
 	if i.documentResult != nil {
 		return i.documentResult, nil
 	}

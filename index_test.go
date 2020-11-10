@@ -33,7 +33,7 @@ import (
 
 	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/index/store/boltdb"
 	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/mapping"
@@ -193,10 +193,11 @@ func TestCrud(t *testing.T) {
 		t.Errorf("expected doc count 2, got %d", count)
 	}
 
-	doc, err := index.Document("a")
+	docInt, err := index.Document("a")
 	if err != nil {
 		t.Fatal(err)
 	}
+	doc := docInt.(*document.Document)
 	if doc == nil {
 		t.Errorf("expected doc not nil, got nil")
 	}
@@ -877,10 +878,11 @@ func TestDocumentFieldArrayPositions(t *testing.T) {
 	}
 
 	// load the document
-	doc, err := index.Document("k")
+	docInt, err := index.Document("k")
 	if err != nil {
 		t.Fatal(err)
 	}
+	doc := docInt.(*document.Document)
 
 	for _, f := range doc.Fields {
 		if reflect.DeepEqual(f.Value(), []byte("first")) {
@@ -936,10 +938,11 @@ func TestDocumentFieldArrayPositions(t *testing.T) {
 	}
 
 	// load the document
-	doc, err = index.Document("k2")
+	docInt, err = index.Document("k2")
 	if err != nil {
 		t.Fatal(err)
 	}
+	doc = docInt.(*document.Document)
 
 	for _, f := range doc.Fields {
 		if reflect.DeepEqual(f.Value(), []byte("only")) {
@@ -1700,15 +1703,9 @@ func TestIndexAdvancedCountMatchSearch(t *testing.T) {
 			for j := 0; j < 200; j++ {
 				id := fmt.Sprintf("%d", (i*200)+j)
 
-				doc := &document.Document{
-					ID: id,
-					Fields: []document.Field{
-						document.NewTextField("body", []uint64{}, []byte("match")),
-					},
-					CompositeFields: []*document.CompositeField{
-						document.NewCompositeField("_all", true, []string{}, []string{}),
-					},
-				}
+				doc := document.NewDocument(id)
+				doc.AddField(document.NewTextField("body", []uint64{}, []byte("match")))
+				doc.AddField(document.NewCompositeField("_all", true, []string{}, []string{}))
 
 				err := b.IndexAdvanced(doc)
 				if err != nil {
@@ -1925,10 +1922,11 @@ func TestBatchMerge(t *testing.T) {
 		t.Errorf("expected doc count 2, got %d", count)
 	}
 
-	doc, err := index.Document("c")
+	docInt, err := index.Document("c")
 	if err != nil {
 		t.Fatal(err)
 	}
+	doc := docInt.(*document.Document)
 	if doc == nil {
 		t.Errorf("expected doc not nil, got nil")
 	}

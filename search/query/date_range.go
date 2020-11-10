@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/analysis/datetime/optional"
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/numeric"
 	"github.com/blevesearch/bleve/registry"

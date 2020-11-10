@@ -15,37 +15,37 @@
 package upsidedown
 
 import (
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
-func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult {
+func (udc *UpsideDownCouch) Analyze(d index.Document) *index.AnalysisResult {
 	rv := &index.AnalysisResult{
-		DocID: d.ID,
+		DocID: d.ID(),
 		Rows:  make([]index.IndexRow, 0, 100),
 	}
 
-	docIDBytes := []byte(d.ID)
+	docIDBytes := []byte(d.ID())
 
 	// track our back index entries
 	backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
 
 	// information we collate as we merge fields with same name
-	fieldTermFreqs := make(map[uint16]analysis.TokenFrequencies)
+	fieldTermFreqs := make(map[uint16]index.TokenFrequencies)
 	fieldLengths := make(map[uint16]int)
 	fieldIncludeTermVectors := make(map[uint16]bool)
 	fieldNames := make(map[uint16]string)
 
-	analyzeField := func(field document.Field, storable bool) {
+	analyzeField := func(field index.Field, storable bool) {
 		fieldIndex, newFieldRow := udc.fieldIndexOrNewRow(field.Name())
 		if newFieldRow != nil {
 			rv.Rows = append(rv.Rows, newFieldRow)
 		}
 		fieldNames[fieldIndex] = field.Name()
 
-		if field.Options().IsIndexed() {
-			fieldLength, tokenFreqs := field.Analyze()
+		if field.IsIndexed() {
+			field.Analyze()
+			fieldLength := field.AnalyzedLength()
+			tokenFreqs := field.AnalyzedTokenFrequencies()
 			existingFreqs := fieldTermFreqs[fieldIndex]
 			if existingFreqs == nil {
 				fieldTermFreqs[fieldIndex] = tokenFreqs
@@ -54,10 +54,10 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 				fieldTermFreqs[fieldIndex] = existingFreqs
 			}
 			fieldLengths[fieldIndex] += fieldLength
-			fieldIncludeTermVectors[fieldIndex] = field.Options().IncludeTermVectors()
+			fieldIncludeTermVectors[fieldIndex] = field.IncludeTermVectors()
 		}
 
-		if storable && field.Options().IsStored() {
+		if storable && field.IsStored() {
 			rv.Rows, backIndexStoredEntries = udc.storeField(docIDBytes, field, fieldIndex, rv.Rows, backIndexStoredEntries)
 		}
 	}
@@ -66,21 +66,21 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 	// place information about indexed fields into map
 	// this collates information across fields with
 	// same names (arrays)
-	for _, field := range d.Fields {
+	d.VisitFields(func(field index.Field) {
 		analyzeField(field, true)
-	}
+	})
 
-	if len(d.CompositeFields) > 0 {
+	if d.HasComposite() {
 		for fieldIndex, tokenFreqs := range fieldTermFreqs {
 			// see if any of the composite fields need this
-			for _, compositeField := range d.CompositeFields {
-				compositeField.Compose(fieldNames[fieldIndex], fieldLengths[fieldIndex], tokenFreqs)
-			}
+			d.VisitComposite(func(field index.CompositeField) {
+				field.Compose(fieldNames[fieldIndex], fieldLengths[fieldIndex], tokenFreqs)
+			})
 		}
 
-		for _, compositeField := range d.CompositeFields {
-			analyzeField(compositeField, false)
-		}
+		d.VisitComposite(func(field index.CompositeField) {
+			analyzeField(field, false)
+		})
 	}
 
 	rowsCapNeeded := len(rv.Rows) + 1

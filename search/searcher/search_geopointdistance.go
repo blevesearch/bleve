@@ -16,7 +16,7 @@ package searcher
 
 import (
 	"github.com/blevesearch/bleve/geo"
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/numeric"
 	"github.com/blevesearch/bleve/search"
 )

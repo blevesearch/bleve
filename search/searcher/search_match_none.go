@@ -17,7 +17,7 @@ package searcher
 import (
 	"reflect"
 
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/size"
 )

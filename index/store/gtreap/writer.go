@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve_index_api/store"
 )
 
 type Writer struct {

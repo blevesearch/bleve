@@ -20,6 +20,7 @@ import (
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/size"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var reflectStaticSizeBooleanField int
@@ -37,6 +38,8 @@ type BooleanField struct {
 	options           IndexingOptions
 	value             []byte
 	numPlainTextBytes uint64
+	length            int
+	frequencies       index.TokenFrequencies
 }
 
 func (b *BooleanField) Size() int {
@@ -58,7 +61,7 @@ func (b *BooleanField) Options() IndexingOptions {
 	return b.options
 }
 
-func (b *BooleanField) Analyze() (int, analysis.TokenFrequencies) {
+func (b *BooleanField) Analyze() {
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
@@ -68,9 +71,8 @@ func (b *BooleanField) Analyze() (int, analysis.TokenFrequencies) {
 		Type:     analysis.Boolean,
 	})
 
-	fieldLength := len(tokens)
-	tokenFreqs := analysis.TokenFrequency(tokens, b.arrayPositions, b.options.IncludeTermVectors())
-	return fieldLength, tokenFreqs
+	b.length = len(tokens)
+	b.frequencies = analysis.TokenFrequency(tokens, b.arrayPositions, b.options.IncludeTermVectors())
 }
 
 func (b *BooleanField) Value() []byte {
@@ -90,6 +92,34 @@ func (b *BooleanField) GoString() string {
 
 func (b *BooleanField) NumPlainTextBytes() uint64 {
 	return b.numPlainTextBytes
+}
+
+func (b *BooleanField) EncodedFieldType() byte {
+	return 'b'
+}
+
+func (b *BooleanField) IsIndexed() bool {
+	return b.options.IsIndexed()
+}
+
+func (b *BooleanField) IsStored() bool {
+	return b.options.IsStored()
+}
+
+func (b *BooleanField) IncludeDocValues() bool {
+	return b.options.IncludeDocValues()
+}
+
+func (b *BooleanField) IncludeTermVectors() bool {
+	return b.options.IncludeTermVectors()
+}
+
+func (b *BooleanField) AnalyzedLength() int {
+	return b.length
+}
+
+func (b *BooleanField) AnalyzedTokenFrequencies() index.TokenFrequencies {
+	return b.frequencies
 }
 
 func NewBooleanFieldFromBytes(name string, arrayPositions []uint64, value []byte) *BooleanField {

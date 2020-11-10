@@ -23,6 +23,7 @@ import (
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/numeric"
 	"github.com/blevesearch/bleve/size"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var reflectStaticSizeDateTimeField int
@@ -44,6 +45,8 @@ type DateTimeField struct {
 	options           IndexingOptions
 	value             numeric.PrefixCoded
 	numPlainTextBytes uint64
+	length            int
+	frequencies       index.TokenFrequencies
 }
 
 func (n *DateTimeField) Size() int {
@@ -64,7 +67,35 @@ func (n *DateTimeField) Options() IndexingOptions {
 	return n.options
 }
 
-func (n *DateTimeField) Analyze() (int, analysis.TokenFrequencies) {
+func (n *DateTimeField) EncodedFieldType() byte {
+	return 'd'
+}
+
+func (n *DateTimeField) IsIndexed() bool {
+	return n.options.IsIndexed()
+}
+
+func (n *DateTimeField) IsStored() bool {
+	return n.options.IsStored()
+}
+
+func (n *DateTimeField) IncludeDocValues() bool {
+	return n.options.IncludeDocValues()
+}
+
+func (n *DateTimeField) IncludeTermVectors() bool {
+	return n.options.IncludeTermVectors()
+}
+
+func (n *DateTimeField) AnalyzedLength() int {
+	return n.length
+}
+
+func (n *DateTimeField) AnalyzedTokenFrequencies() index.TokenFrequencies {
+	return n.frequencies
+}
+
+func (n *DateTimeField) Analyze() {
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
@@ -95,9 +126,8 @@ func (n *DateTimeField) Analyze() (int, analysis.TokenFrequencies) {
 		}
 	}
 
-	fieldLength := len(tokens)
-	tokenFreqs := analysis.TokenFrequency(tokens, n.arrayPositions, n.options.IncludeTermVectors())
-	return fieldLength, tokenFreqs
+	n.length = len(tokens)
+	n.frequencies = analysis.TokenFrequency(tokens, n.arrayPositions, n.options.IncludeTermVectors())
 }
 
 func (n *DateTimeField) Value() []byte {

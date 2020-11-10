@@ -18,10 +18,10 @@ import (
 	"context"
 
 	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/size"
+	index "github.com/blevesearch/bleve_index_api"
+	store "github.com/blevesearch/bleve_index_api/store"
 )
 
 // A Batch groups together multiple Index and Delete
@@ -71,7 +71,7 @@ func (b *Batch) TotalDocsSize() uint64 {
 // batch which skips the mapping.  NOTE: the bleve Index is not updated
 // until the batch is executed.
 func (b *Batch) IndexAdvanced(doc *document.Document) (err error) {
-	if doc.ID == "" {
+	if doc.ID() == "" {
 		return ErrorEmptyID
 	}
 	b.internal.Update(doc)
@@ -216,7 +216,7 @@ type Index interface {
 
 	// Document returns specified document or nil if the document is not
 	// indexed or stored.
-	Document(id string) (*document.Document, error)
+	Document(id string) (index.Document, error)
 	// DocCount returns the number of documents in the index.
 	DocCount() (uint64, error)
 

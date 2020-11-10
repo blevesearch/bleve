@@ -24,12 +24,10 @@ import (
 	"time"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment"
-	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
+	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/bleve_index_api/store"
+	segment "github.com/blevesearch/scorch_segment_api"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -293,7 +291,7 @@ func (s *Scorch) Close() (err error) {
 	return
 }
 
-func (s *Scorch) Update(doc *document.Document) error {
+func (s *Scorch) Update(doc index.Document) error {
 	b := index.NewBatch()
 	b.Update(doc)
 	return s.Batch(b)
@@ -322,7 +320,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	for docID, doc := range batch.IndexOps {
 		if doc != nil {
 			// insert _id field
-			doc.AddField(document.NewTextFieldCustom("_id", nil, []byte(doc.ID), document.IndexField|document.StoreField, nil))
+			doc.AddIDField()
 			numUpdates++
 			numPlainTextBytes += doc.NumPlainTextBytes()
 		} else {
@@ -566,31 +564,27 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	return m
 }
 
-func (s *Scorch) Analyze(d *document.Document) *index.AnalysisResult {
+func (s *Scorch) Analyze(d index.Document) *index.AnalysisResult {
 	return analyze(d)
 }
 
-func analyze(d *document.Document) *index.AnalysisResult {
+func analyze(d index.Document) *index.AnalysisResult {
 	rv := &index.AnalysisResult{
 		Document: d,
-		Analyzed: make([]analysis.TokenFrequencies, len(d.Fields)+len(d.CompositeFields)),
-		Length:   make([]int, len(d.Fields)+len(d.CompositeFields)),
 	}
 
-	for i, field := range d.Fields {
-		if field.Options().IsIndexed() {
-			fieldLength, tokenFreqs := field.Analyze()
-			rv.Analyzed[i] = tokenFreqs
-			rv.Length[i] = fieldLength
+	d.VisitFields(func(field index.Field) {
+		if field.IsIndexed() {
+			field.Analyze()
 
-			if len(d.CompositeFields) > 0 && field.Name() != "_id" {
+			if d.HasComposite() && field.Name() != "_id" {
 				// see if any of the composite fields need this
-				for _, compositeField := range d.CompositeFields {
-					compositeField.Compose(field.Name(), fieldLength, tokenFreqs)
-				}
+				d.VisitComposite(func(cf index.CompositeField) {
+					cf.Compose(field.Name(), field.AnalyzedLength(), field.AnalyzedTokenFrequencies())
+				})
 			}
 		}
-	}
+	})
 
 	return rv
 }

@@ -19,9 +19,9 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/scorch"
 	"github.com/blevesearch/bleve/mapping"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 type builderImpl struct {

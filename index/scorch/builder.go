@@ -21,9 +21,8 @@ import (
 	"sync"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment"
+	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -117,7 +116,7 @@ func (o *Builder) parseConfig(config map[string]interface{}) (err error) {
 
 // Index will place the document into the index.
 // It is invalid to index the same document multiple times.
-func (o *Builder) Index(doc *document.Document) error {
+func (o *Builder) Index(doc index.Document) error {
 	o.m.Lock()
 	defer o.m.Unlock()
 
@@ -139,7 +138,7 @@ func (o *Builder) executeBatchLOCKED(batch *index.Batch) (err error) {
 	for _, doc := range batch.IndexOps {
 		if doc != nil {
 			// insert _id field
-			doc.AddField(document.NewTextFieldCustom("_id", nil, []byte(doc.ID), document.IndexField|document.StoreField, nil))
+			doc.AddIDField()
 			// perform analysis directly
 			analysisResult := analyze(doc)
 			analysisResults = append(analysisResults, analysisResult)

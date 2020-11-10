@@ -14,7 +14,7 @@
 
 package metrics
 
-import "github.com/blevesearch/bleve/index/store"
+import store "github.com/blevesearch/bleve_index_api/store"
 
 type Reader struct {
 	s *Store

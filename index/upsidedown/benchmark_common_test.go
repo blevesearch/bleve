@@ -21,7 +21,7 @@ import (
 
 	_ "github.com/blevesearch/bleve/analysis/analyzer/standard"
 	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/registry"
 )
 
@@ -68,7 +68,7 @@ func CommonBenchmarkIndex(b *testing.B, storeName string, storeConfig map[string
 		if err != nil {
 			b.Fatal(err)
 		}
-		indexDocument.ID = strconv.Itoa(i)
+		indexDocument.SetID(strconv.Itoa(i))
 		// just time the indexing portion
 		b.StartTimer()
 		err = idx.Update(indexDocument)
@@ -125,7 +125,7 @@ func CommonBenchmarkIndexBatch(b *testing.B, storeName string, storeConfig map[s
 			}
 			indexDocument := document.NewDocument("").
 				AddField(document.NewTextFieldWithAnalyzer("body", []uint64{}, []byte(benchmarkDocBodies[j%10]), analyzer))
-			indexDocument.ID = strconv.Itoa(i) + "-" + strconv.Itoa(j)
+			indexDocument.SetID(strconv.Itoa(i) + "-" + strconv.Itoa(j))
 			batch.Update(indexDocument)
 		}
 		// close last batch

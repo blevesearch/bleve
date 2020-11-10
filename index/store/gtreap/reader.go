@@ -18,7 +18,7 @@
 package gtreap
 
 import (
-	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve_index_api/store"
 
 	"github.com/steveyen/gtreap"
 )

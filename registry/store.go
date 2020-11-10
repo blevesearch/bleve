@@ -17,7 +17,7 @@ package registry
 import (
 	"fmt"
 
-	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve_index_api/store"
 )
 
 func RegisterKVStore(name string, constructor KVStoreConstructor) {

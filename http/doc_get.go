@@ -59,14 +59,20 @@ func (h *DocGetHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	doc, err := index.Document(docID)
+	docInt, err := index.Document(docID)
 	if err != nil {
 		showError(w, req, fmt.Sprintf("error deleting document '%s': %v", docID, err), 500)
 		return
 	}
-	if doc == nil {
+	if docInt == nil {
 		showError(w, req, fmt.Sprintf("no such document '%s'", docID), 404)
 		return
+	}
+	doc, ok := docInt.(*document.Document)
+	if !ok {
+		showError(w, req, fmt.Sprintf("unexpected document type: %T", doc), 500)
+		return
+
 	}
 
 	rv := struct {
