@@ -1151,3 +1151,23 @@ func TestDefaultAnalyzerInheritance(t *testing.T) {
 		t.Fatalf("Expected analyzer: xyz to be inherited by field, but got: '%v'", analyzer)
 	}
 }
+
+func TestWrongAnalyzerSearchableAs(t *testing.T) {
+	fieldMapping := NewTextFieldMapping()
+	fieldMapping.Name = "geo.accuracy"
+	fieldMapping.Analyzer = "xyz"
+
+	nestedMapping := NewDocumentMapping()
+	nestedMapping.AddFieldMappingsAt("accuracy", fieldMapping)
+
+	docMapping := NewDocumentMapping()
+	docMapping.AddSubDocumentMapping("geo", nestedMapping)
+
+	indexMapping := NewIndexMapping()
+	indexMapping.AddDocumentMapping("brewery", docMapping)
+
+	analyzerName := indexMapping.AnalyzerNameForPath("geo.geo.accuracy")
+	if analyzerName != "xyz" {
+		t.Errorf("expected analyzer name `xyz`, got `%s`", analyzerName)
+	}
+}
