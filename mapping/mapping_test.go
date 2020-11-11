@@ -1168,6 +1168,6 @@ func TestWrongAnalyzerSearchableAs(t *testing.T) {
 
 	analyzerName := indexMapping.AnalyzerNameForPath("geo.geo.accuracy")
 	if analyzerName != "xyz" {
-		t.Errorf("expected analyzer name `xyz`, got `%s", analyzerName)
+		t.Errorf("expected analyzer name `xyz`, got `%s`", analyzerName)
 	}
 }
