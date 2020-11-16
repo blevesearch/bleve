@@ -596,25 +596,6 @@ func (udc *UpsideDownCouch) storeField(docID []byte, field index.Field, fieldInd
 	return append(rows, storedRow), append(backIndexStoredEntries, &backIndexStoredEntry)
 }
 
-func encodeFieldType(f document.Field) byte {
-	fieldType := byte('x')
-	switch f.(type) {
-	case *document.TextField:
-		fieldType = 't'
-	case *document.NumericField:
-		fieldType = 'n'
-	case *document.DateTimeField:
-		fieldType = 'd'
-	case *document.BooleanField:
-		fieldType = 'b'
-	case *document.GeoPointField:
-		fieldType = 'g'
-	case *document.CompositeField:
-		fieldType = 'c'
-	}
-	return fieldType
-}
-
 func (udc *UpsideDownCouch) indexField(docID []byte, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs index.TokenFrequencies, rows []index.IndexRow, backIndexTermsEntries []*BackIndexTermsEntry) ([]index.IndexRow, []*BackIndexTermsEntry) {
 	fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
 
