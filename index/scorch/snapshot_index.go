@@ -195,17 +195,20 @@ func (i *IndexSnapshot) FieldDict(field string) (index.FieldDict, error) {
 }
 
 func exclusiveEndFromInclusiveEnd(inclusiveEnd []byte) []byte {
+	rv := inclusiveEnd
 	if len(inclusiveEnd) > 0 {
-		if inclusiveEnd[len(inclusiveEnd)-1] < 0xff {
+		rv = make([]byte, len(inclusiveEnd))
+		copy(rv, inclusiveEnd)
+		if rv[len(rv)-1] < 0xff {
 			// last byte can be incremented by one
-			inclusiveEnd[len(inclusiveEnd)-1]++
+			rv[len(rv)-1]++
 		} else {
 			// last byte is already 0xff, so append 0
 			// next key is simply one byte longer
-			inclusiveEnd = append(inclusiveEnd, 0x0)
+			rv = append(rv, 0x0)
 		}
 	}
-	return inclusiveEnd
+	return rv
 }
 
 func (i *IndexSnapshot) FieldDictRange(field string, startTerm []byte,
