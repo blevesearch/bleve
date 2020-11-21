@@ -194,7 +194,11 @@ func (i *IndexSnapshot) FieldDict(field string) (index.FieldDict, error) {
 	}, false)
 }
 
-func exclusiveEndFromInclusiveEnd(inclusiveEnd []byte) []byte {
+// calculateExclusiveEndFromInclusiveEnd produces the next key
+// when sorting using memcmp style comparisons, suitable to
+// use as the end key in a traditional (inclusive, exclusive]
+// start/end range
+func calculateExclusiveEndFromInclusiveEnd(inclusiveEnd []byte) []byte {
 	rv := inclusiveEnd
 	if len(inclusiveEnd) > 0 {
 		rv = make([]byte, len(inclusiveEnd))
@@ -214,16 +218,16 @@ func exclusiveEndFromInclusiveEnd(inclusiveEnd []byte) []byte {
 func (i *IndexSnapshot) FieldDictRange(field string, startTerm []byte,
 	endTerm []byte) (index.FieldDict, error) {
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		endTermExclusive := exclusiveEndFromInclusiveEnd(endTerm)
+		endTermExclusive := calculateExclusiveEndFromInclusiveEnd(endTerm)
 		return i.AutomatonIterator(nil, startTerm, endTermExclusive)
 	}, false)
 }
 
-// incrementBytesPrefix produces the first key that does not
-// have the same prefix as the input bytes, suitable to use
-// as the end key in a traditional (inclusive, exclusive]
+// calculateExclusiveEndFromPrefix produces the first key that
+// does not have the same prefix as the input bytes, suitable
+// to use as the end key in a traditional (inclusive, exclusive]
 // start/end range
-func exclusiveEndFromPrefix(in []byte) []byte {
+func calculateExclusiveEndFromPrefix(in []byte) []byte {
 	rv := make([]byte, len(in))
 	copy(rv, in)
 	for i := len(rv) - 1; i >= 0; i-- {
@@ -239,7 +243,7 @@ func exclusiveEndFromPrefix(in []byte) []byte {
 
 func (i *IndexSnapshot) FieldDictPrefix(field string,
 	termPrefix []byte) (index.FieldDict, error) {
-	termPrefixEnd := exclusiveEndFromPrefix(termPrefix)
+	termPrefixEnd := calculateExclusiveEndFromPrefix(termPrefix)
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
 		return i.AutomatonIterator(nil, termPrefix, termPrefixEnd)
 	}, false)
