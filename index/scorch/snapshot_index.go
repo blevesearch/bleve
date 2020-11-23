@@ -254,7 +254,7 @@ func (i *IndexSnapshot) FieldDictRegexp(field string,
 	// TODO: potential optimization where the literal prefix represents the,
 	//       entire regexp, allowing us to use PrefixIterator(prefixTerm)?
 
-	a, prefixBeg, prefixEnd, err := segment.ParseRegexp(termRegex)
+	a, prefixBeg, prefixEnd, err := parseRegexp(termRegex)
 	if err != nil {
 		return nil, err
 	}
