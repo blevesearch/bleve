@@ -190,21 +190,62 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 
 func (i *IndexSnapshot) FieldDict(field string) (index.FieldDict, error) {
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.Iterator()
+		return i.AutomatonIterator(nil, nil, nil)
 	}, false)
+}
+
+// calculateExclusiveEndFromInclusiveEnd produces the next key
+// when sorting using memcmp style comparisons, suitable to
+// use as the end key in a traditional (inclusive, exclusive]
+// start/end range
+func calculateExclusiveEndFromInclusiveEnd(inclusiveEnd []byte) []byte {
+	rv := inclusiveEnd
+	if len(inclusiveEnd) > 0 {
+		rv = make([]byte, len(inclusiveEnd))
+		copy(rv, inclusiveEnd)
+		if rv[len(rv)-1] < 0xff {
+			// last byte can be incremented by one
+			rv[len(rv)-1]++
+		} else {
+			// last byte is already 0xff, so append 0
+			// next key is simply one byte longer
+			rv = append(rv, 0x0)
+		}
+	}
+	return rv
 }
 
 func (i *IndexSnapshot) FieldDictRange(field string, startTerm []byte,
 	endTerm []byte) (index.FieldDict, error) {
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.RangeIterator(string(startTerm), string(endTerm))
+		endTermExclusive := calculateExclusiveEndFromInclusiveEnd(endTerm)
+		return i.AutomatonIterator(nil, startTerm, endTermExclusive)
 	}, false)
+}
+
+// calculateExclusiveEndFromPrefix produces the first key that
+// does not have the same prefix as the input bytes, suitable
+// to use as the end key in a traditional (inclusive, exclusive]
+// start/end range
+func calculateExclusiveEndFromPrefix(in []byte) []byte {
+	rv := make([]byte, len(in))
+	copy(rv, in)
+	for i := len(rv) - 1; i >= 0; i-- {
+		rv[i] = rv[i] + 1
+		if rv[i] != 0 {
+			return rv // didn't overflow, so stop
+		}
+	}
+	// all bytes were 0xff, so return nil
+	// as there is no end key for this prefix
+	return nil
 }
 
 func (i *IndexSnapshot) FieldDictPrefix(field string,
 	termPrefix []byte) (index.FieldDict, error) {
+	termPrefixEnd := calculateExclusiveEndFromPrefix(termPrefix)
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.PrefixIterator(string(termPrefix))
+		return i.AutomatonIterator(nil, termPrefix, termPrefixEnd)
 	}, false)
 }
 
@@ -248,13 +289,6 @@ func (i *IndexSnapshot) FieldDictFuzzy(field string,
 
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
 		return i.AutomatonIterator(a, prefixBeg, prefixEnd)
-	}, false)
-}
-
-func (i *IndexSnapshot) FieldDictOnly(field string,
-	onlyTerms [][]byte, includeCount bool) (index.FieldDict, error) {
-	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.OnlyIterator(onlyTerms, includeCount)
 	}, false)
 }
 

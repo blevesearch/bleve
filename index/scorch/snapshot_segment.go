@@ -147,7 +147,7 @@ func (cfd *cachedFieldDocs) prepareField(field string, ss *SegmentSnapshot) {
 	var postings segment.PostingsList
 	var postingsItr segment.PostingsIterator
 
-	dictItr := dict.Iterator()
+	dictItr := dict.AutomatonIterator(nil, nil, nil)
 	next, err := dictItr.Next()
 	for err == nil && next != nil {
 		var err1 error
