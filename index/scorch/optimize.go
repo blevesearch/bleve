@@ -176,7 +176,7 @@ OUTER:
 		for _, tfr := range o.tfrs {
 			if _, ok := tfr.iterators[i].(*segment.EmptyPostingsIterator); ok {
 				// An empty postings iterator means the entire AND is empty.
-				oTFR.iterators[i] = segment.AnEmptyPostingsIterator
+				oTFR.iterators[i] = anEmptyPostingsIterator
 				continue OUTER
 			}
 
@@ -193,7 +193,7 @@ OUTER:
 				if docNum1HitLastOk && docNum1HitLast != docNum1Hit {
 					// The docNum1Hit doesn't match the previous
 					// docNum1HitLast, so the entire AND is empty.
-					oTFR.iterators[i] = segment.AnEmptyPostingsIterator
+					oTFR.iterators[i] = anEmptyPostingsIterator
 					continue OUTER
 				}
 
@@ -205,7 +205,7 @@ OUTER:
 
 			if itr.ActualBitmap() == nil {
 				// An empty actual bitmap means the entire AND is empty.
-				oTFR.iterators[i] = segment.AnEmptyPostingsIterator
+				oTFR.iterators[i] = anEmptyPostingsIterator
 				continue OUTER
 			}
 
@@ -221,7 +221,7 @@ OUTER:
 				if !bm.Contains(uint32(docNum1HitLast)) {
 					// The docNum1Hit isn't in one of our actual
 					// bitmaps, so the entire AND is empty.
-					oTFR.iterators[i] = segment.AnEmptyPostingsIterator
+					oTFR.iterators[i] = anEmptyPostingsIterator
 					continue OUTER
 				}
 			}
@@ -236,7 +236,7 @@ OUTER:
 		if len(actualBMs) == 0 {
 			// If we've collected no actual bitmaps at this point,
 			// then the entire AND is empty.
-			oTFR.iterators[i] = segment.AnEmptyPostingsIterator
+			oTFR.iterators[i] = anEmptyPostingsIterator
 			continue OUTER
 		}
 
