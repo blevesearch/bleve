@@ -228,7 +228,7 @@ OUTER:
 
 			// The actual bitmaps and docNum1Hits all contain or have
 			// the same 1-hit docNum, so that's our AND'ed result.
-			oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFrom1Hit(docNum1HitLast)
+			oTFR.iterators[i] = newUnadornedPostingsIteratorFrom1Hit(docNum1HitLast)
 
 			continue OUTER
 		}
@@ -242,7 +242,7 @@ OUTER:
 
 		if len(actualBMs) == 1 {
 			// If we've only 1 actual bitmap, then that's our result.
-			oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFromBitmap(actualBMs[0])
+			oTFR.iterators[i] = newUnadornedPostingsIteratorFromBitmap(actualBMs[0])
 
 			continue OUTER
 		}
@@ -254,7 +254,7 @@ OUTER:
 			bm.And(actualBM)
 		}
 
-		oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFromBitmap(bm)
+		oTFR.iterators[i] = newUnadornedPostingsIteratorFromBitmap(bm)
 	}
 
 	atomic.AddUint64(&o.snapshot.parent.stats.TotTermSearchersStarted, uint64(1))
@@ -369,7 +369,7 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 
 		bm.AddMany(docNums)
 
-		oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFromBitmap(bm)
+		oTFR.iterators[i] = newUnadornedPostingsIteratorFromBitmap(bm)
 	}
 
 	atomic.AddUint64(&o.snapshot.parent.stats.TotTermSearchersStarted, uint64(1))
