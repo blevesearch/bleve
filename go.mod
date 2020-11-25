@@ -8,14 +8,14 @@ require (
 	github.com/blevesearch/blevex v0.0.0-20190916190636-152f0fe5c040
 	github.com/blevesearch/cld2 v0.0.0-20200327141045-8b5f551d37f5 // indirect
 	github.com/blevesearch/go-porterstemmer v1.0.3
-	github.com/blevesearch/scorch_segment_api v0.0.1
+	github.com/blevesearch/scorch_segment_api v0.0.2
 	github.com/blevesearch/segment v0.9.0
 	github.com/blevesearch/snowballstem v0.9.0
-	github.com/blevesearch/zapx/v11 v11.1.1
-	github.com/blevesearch/zapx/v12 v12.1.1
-	github.com/blevesearch/zapx/v13 v13.1.1
-	github.com/blevesearch/zapx/v14 v14.1.1
-	github.com/blevesearch/zapx/v15 v15.1.1
+	github.com/blevesearch/zapx/v11 v11.1.2
+	github.com/blevesearch/zapx/v12 v12.1.2
+	github.com/blevesearch/zapx/v13 v13.1.2
+	github.com/blevesearch/zapx/v14 v14.1.2
+	github.com/blevesearch/zapx/v15 v15.1.2
 	github.com/couchbase/moss v0.1.0
 	github.com/couchbase/vellum v1.0.2
 	github.com/golang/protobuf v1.3.2
