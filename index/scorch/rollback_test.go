@@ -246,3 +246,78 @@ func TestIndexRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGetProtectedSnapshots(t *testing.T) {
+	tests := []struct {
+		title              string
+		persistedEpochs    []uint64
+		numSnapshotsToKeep int
+		expCount           int
+		expEpochs          []uint64
+	}{
+		{
+			title:              "most recent epoch numbers, and remaining equidistant epochs",
+			persistedEpochs:    []uint64{100, 99, 88, 77, 50, 25, 10},
+			numSnapshotsToKeep: 3,
+			expCount:           3,
+			expEpochs:          []uint64{100, 88, 50},
+		},
+		{
+			title:              "latest and the middle epochs remain protected",
+			persistedEpochs:    []uint64{100, 99, 88, 77, 50, 25, 10},
+			numSnapshotsToKeep: 2,
+			expCount:           2,
+			expEpochs:          []uint64{100, 77},
+		},
+		{
+			title:              "only the latest remains protected",
+			persistedEpochs:    []uint64{100, 50, 10},
+			numSnapshotsToKeep: 1,
+			expCount:           1,
+			expEpochs:          []uint64{100},
+		},
+		{
+			title:              "all epochs remains protected",
+			persistedEpochs:    []uint64{100, 50, 10},
+			numSnapshotsToKeep: 3,
+			expCount:           3,
+			expEpochs:          []uint64{100, 50, 10},
+		},
+		{
+			title:              "epochs at an equidistant interval remains protected",
+			persistedEpochs:    []uint64{1990, 1850, 1800, 1550, 1489, 1449, 1200, 1111, 1055, 921, 900, 850, 800, 555, 299, 199, 60, 29},
+			numSnapshotsToKeep: 3,
+			expCount:           3,
+			expEpochs:          []uint64{1990, 1200, 800},
+		},
+		{
+			title:              "epochs at an equidistant interval remains protected",
+			persistedEpochs:    []uint64{1990, 1850, 1800, 1550, 1489, 1449},
+			numSnapshotsToKeep: 3,
+			expCount:           3,
+			expEpochs:          []uint64{1990, 1800, 1489},
+		},
+		{
+			title:              "epochs at an equidistant interval remains protected",
+			persistedEpochs:    []uint64{1990, 1850, 1800, 1550, 1489, 1449},
+			numSnapshotsToKeep: 5,
+			expCount:           5,
+			expEpochs:          []uint64{1990, 1850, 1800, 1550, 1489},
+		},
+	}
+
+	for i, test := range tests {
+		ps := getProtectedSnapshots(test.persistedEpochs, test.numSnapshotsToKeep)
+		if len(ps) != test.expCount {
+			t.Errorf("%d test: %s, getProtectedSnapshots expected to return %d "+
+				"snapshots, but got: %d", i, test.title, test.expCount, len(ps))
+		}
+		for _, e := range test.expEpochs {
+			if _, found := ps[e]; !found {
+				t.Errorf("%d test: %s, %d epoch expected to be protected, "+
+					"but missing from protected list: %v", i, test.title, e, ps)
+			}
+		}
+	}
+
+}

@@ -807,6 +807,33 @@ func (s *Scorch) removeOldData() {
 // rollback'ability.
 var NumSnapshotsToKeep = 1
 
+// getProtectedSnapshots always protects the most recent epoch
+// from the persisted list of epochs. After that, it tries to
+// pick up epochs which are located at even intervals from the list.
+// It helps to evenly distribute the rollback restore points in a given
+// range of persisted epochs and thereby increasing the effectiveness
+// rollback points.
+func getProtectedSnapshots(persistedEpochs []uint64,
+	numSnapshotsToKeep int) map[uint64]struct{} {
+	// always save the most recent epoch.
+	protectedEpochs := make(map[uint64]struct{}, numSnapshotsToKeep)
+	protectedEpochs[persistedEpochs[0]] = struct{}{}
+	if numSnapshotsToKeep == 1 {
+		return protectedEpochs
+	}
+	// save the remaining epochs which are at even intervals
+	// in the whole list of persisted epochs.
+	interval := len(persistedEpochs) / numSnapshotsToKeep
+	pos := interval
+
+	for pos < len(persistedEpochs) && len(protectedEpochs) < numSnapshotsToKeep {
+		protectedEpochs[persistedEpochs[pos]] = struct{}{}
+		pos += interval
+	}
+
+	return protectedEpochs
+}
+
 // Removes enough snapshots from the rootBolt so that the
 // s.eligibleForRemoval stays under the NumSnapshotsToKeep policy.
 func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
@@ -820,11 +847,8 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 		return 0, nil
 	}
 
-	// make a map of epochs to protect from deletion
-	protectedEpochs := make(map[uint64]struct{}, s.numSnapshotsToKeep)
-	for _, epoch := range persistedEpochs[0:s.numSnapshotsToKeep] {
-		protectedEpochs[epoch] = struct{}{}
-	}
+	// get a map of epochs to protect from deletion
+	protectedEpochs := getProtectedSnapshots(persistedEpochs, s.numSnapshotsToKeep)
 
 	var epochsToRemove []uint64
 	var newEligible []uint64
