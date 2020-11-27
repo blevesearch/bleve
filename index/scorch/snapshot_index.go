@@ -284,7 +284,7 @@ func (i *IndexSnapshot) FieldDictFuzzy(field string,
 	var prefixBeg, prefixEnd []byte
 	if prefix != "" {
 		prefixBeg = []byte(prefix)
-		prefixEnd = segment.IncrementBytes(prefixBeg)
+		prefixEnd = calculateExclusiveEndFromPrefix(prefixBeg)
 	}
 
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
