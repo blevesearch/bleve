@@ -174,7 +174,7 @@ OUTER:
 		var docNum1HitLastOk bool
 
 		for _, tfr := range o.tfrs {
-			if _, ok := tfr.iterators[i].(*segment.EmptyPostingsIterator); ok {
+			if _, ok := tfr.iterators[i].(*emptyPostingsIterator); ok {
 				// An empty postings iterator means the entire AND is empty.
 				oTFR.iterators[i] = anEmptyPostingsIterator
 				continue OUTER
