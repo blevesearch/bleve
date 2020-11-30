@@ -73,7 +73,7 @@ type Scorch struct {
 
 	forceMergeRequestCh chan *mergerCtrl
 
-	segPlugin segment.Plugin
+	segPlugin Plugin
 }
 
 type internalStats struct {

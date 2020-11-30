@@ -39,7 +39,7 @@ type Builder struct {
 	mergeMax  int
 	batch     *index.Batch
 	internal  map[string][]byte
-	segPlugin segment.Plugin
+	segPlugin Plugin
 }
 
 func NewBuilder(config map[string]interface{}) (*Builder, error) {
