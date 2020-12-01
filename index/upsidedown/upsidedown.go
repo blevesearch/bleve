@@ -414,11 +414,13 @@ func (udc *UpsideDownCouch) Close() error {
 func (udc *UpsideDownCouch) Update(doc index.Document) (err error) {
 	// do analysis before acquiring write lock
 	analysisStart := time.Now()
-	resultChan := make(chan *index.AnalysisResult)
-	aw := index.NewAnalysisWork(udc, doc, resultChan)
+	resultChan := make(chan *AnalysisResult)
 
 	// put the work on the queue
-	udc.analysisQueue.Queue(aw)
+	udc.analysisQueue.Queue(func() {
+		ar := udc.analyze(doc)
+		resultChan <- ar
+	})
 
 	// wait for the result
 	result := <-resultChan
@@ -454,7 +456,7 @@ func (udc *UpsideDownCouch) Update(doc index.Document) (err error) {
 }
 
 func (udc *UpsideDownCouch) UpdateWithAnalysis(doc index.Document,
-	result *index.AnalysisResult, backIndexRow *BackIndexRow) (err error) {
+	result *AnalysisResult, backIndexRow *BackIndexRow) (err error) {
 	// start a writer for this update
 	indexStart := time.Now()
 	var kvwriter store.KVWriter
@@ -500,7 +502,7 @@ func (udc *UpsideDownCouch) UpdateWithAnalysis(doc index.Document,
 	return
 }
 
-func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []index.IndexRow) (addRows []UpsideDownCouchRow, updateRows []UpsideDownCouchRow, deleteRows []UpsideDownCouchRow) {
+func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []IndexRow) (addRows []UpsideDownCouchRow, updateRows []UpsideDownCouchRow, deleteRows []UpsideDownCouchRow) {
 	addRows = make([]UpsideDownCouchRow, 0, len(rows))
 
 	if backIndexRow == nil {
@@ -586,7 +588,7 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []in
 	return addRows, updateRows, deleteRows
 }
 
-func (udc *UpsideDownCouch) storeField(docID []byte, field index.Field, fieldIndex uint16, rows []index.IndexRow, backIndexStoredEntries []*BackIndexStoreEntry) ([]index.IndexRow, []*BackIndexStoreEntry) {
+func (udc *UpsideDownCouch) storeField(docID []byte, field index.Field, fieldIndex uint16, rows []IndexRow, backIndexStoredEntries []*BackIndexStoreEntry) ([]IndexRow, []*BackIndexStoreEntry) {
 	fieldType := field.EncodedFieldType()
 	storedRow := NewStoredRow(docID, fieldIndex, field.ArrayPositions(), fieldType, field.Value())
 
@@ -596,7 +598,7 @@ func (udc *UpsideDownCouch) storeField(docID []byte, field index.Field, fieldInd
 	return append(rows, storedRow), append(backIndexStoredEntries, &backIndexStoredEntry)
 }
 
-func (udc *UpsideDownCouch) indexField(docID []byte, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs index.TokenFrequencies, rows []index.IndexRow, backIndexTermsEntries []*BackIndexTermsEntry) ([]index.IndexRow, []*BackIndexTermsEntry) {
+func (udc *UpsideDownCouch) indexField(docID []byte, includeTermVectors bool, fieldIndex uint16, fieldLength int, tokenFreqs index.TokenFrequencies, rows []IndexRow, backIndexTermsEntries []*BackIndexTermsEntry) ([]IndexRow, []*BackIndexTermsEntry) {
 	fieldNorm := float32(1.0 / math.Sqrt(float64(fieldLength)))
 
 	termFreqRows := make([]TermFrequencyRow, len(tokenFreqs))
@@ -731,7 +733,7 @@ func frequencyFromTokenFreq(tf *index.TokenFreq) int {
 	return tf.Frequency()
 }
 
-func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *index.TokenFreq, rows []index.IndexRow) ([]*TermVector, []index.IndexRow) {
+func (udc *UpsideDownCouch) termVectorsFromTokenFreq(field uint16, tf *index.TokenFreq, rows []IndexRow) ([]*TermVector, []IndexRow) {
 	a := make([]TermVector, len(tf.Locations))
 	rv := make([]*TermVector, len(tf.Locations))
 
@@ -787,7 +789,7 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	}
 	analysisStart := time.Now()
 
-	resultChan := make(chan *index.AnalysisResult, len(batch.IndexOps))
+	resultChan := make(chan *AnalysisResult, len(batch.IndexOps))
 
 	var numUpdates uint64
 	var numPlainTextBytes uint64
@@ -803,9 +805,11 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 			for k := range batch.IndexOps {
 				doc := batch.IndexOps[k]
 				if doc != nil {
-					aw := index.NewAnalysisWork(udc, doc, resultChan)
 					// put the work on the queue
-					udc.analysisQueue.Queue(aw)
+					udc.analysisQueue.Queue(func() {
+						ar := udc.analyze(doc)
+						resultChan <- ar
+					})
 				}
 			}
 		}()
@@ -846,7 +850,7 @@ func (udc *UpsideDownCouch) Batch(batch *index.Batch) (err error) {
 	}()
 
 	// wait for analysis result
-	newRowsMap := make(map[string][]index.IndexRow)
+	newRowsMap := make(map[string][]IndexRow)
 	var itemsDeQueued uint64
 	for itemsDeQueued < numUpdates {
 		result := <-resultChan

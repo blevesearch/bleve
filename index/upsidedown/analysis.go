@@ -18,10 +18,25 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-func (udc *UpsideDownCouch) Analyze(d index.Document) *index.AnalysisResult {
-	rv := &index.AnalysisResult{
+type IndexRow interface {
+	KeySize() int
+	KeyTo([]byte) (int, error)
+	Key() []byte
+
+	ValueSize() int
+	ValueTo([]byte) (int, error)
+	Value() []byte
+}
+
+type AnalysisResult struct {
+	DocID string
+	Rows  []IndexRow
+}
+
+func (udc *UpsideDownCouch) analyze(d index.Document) *AnalysisResult {
+	rv := &AnalysisResult{
 		DocID: d.ID(),
-		Rows:  make([]index.IndexRow, 0, 100),
+		Rows:  make([]IndexRow, 0, 100),
 	}
 
 	docIDBytes := []byte(d.ID())
@@ -88,7 +103,7 @@ func (udc *UpsideDownCouch) Analyze(d index.Document) *index.AnalysisResult {
 		rowsCapNeeded += len(tokenFreqs)
 	}
 
-	rv.Rows = append(make([]index.IndexRow, 0, rowsCapNeeded), rv.Rows...)
+	rv.Rows = append(make([]IndexRow, 0, rowsCapNeeded), rv.Rows...)
 
 	backIndexTermsEntries := make([]*BackIndexTermsEntry, 0, len(fieldTermFreqs))
 
