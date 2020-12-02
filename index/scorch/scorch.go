@@ -333,9 +333,9 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 
 	if numUpdates > 0 {
 		go func() {
-			for _, doc := range batch.IndexOps {
+			for k := range batch.IndexOps {
+				doc := batch.IndexOps[k]
 				if doc != nil {
-					doc := doc
 					// put the work on the queue
 					s.analysisQueue.Queue(func() {
 						analyze(doc)
