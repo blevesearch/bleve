@@ -39,7 +39,7 @@ type Builder struct {
 	mergeMax  int
 	batch     *index.Batch
 	internal  map[string][]byte
-	segPlugin segment.Plugin
+	segPlugin SegmentPlugin
 }
 
 func NewBuilder(config map[string]interface{}) (*Builder, error) {
@@ -134,14 +134,14 @@ func (o *Builder) maybeFlushBatchLOCKED(moreThan int) error {
 }
 
 func (o *Builder) executeBatchLOCKED(batch *index.Batch) (err error) {
-	analysisResults := make([]*index.AnalysisResult, 0, len(batch.IndexOps))
+	analysisResults := make([]index.Document, 0, len(batch.IndexOps))
 	for _, doc := range batch.IndexOps {
 		if doc != nil {
 			// insert _id field
 			doc.AddIDField()
 			// perform analysis directly
-			analysisResult := analyze(doc)
-			analysisResults = append(analysisResults, analysisResult)
+			analyze(doc)
+			analysisResults = append(analysisResults, doc)
 		}
 	}
 

@@ -73,7 +73,7 @@ type Scorch struct {
 
 	forceMergeRequestCh chan *mergerCtrl
 
-	segPlugin segment.Plugin
+	segPlugin SegmentPlugin
 }
 
 type internalStats struct {
@@ -311,7 +311,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		s.fireEvent(EventKindBatchIntroduction, time.Since(start))
 	}()
 
-	resultChan := make(chan *index.AnalysisResult, len(batch.IndexOps))
+	resultChan := make(chan index.Document, len(batch.IndexOps))
 
 	var numUpdates uint64
 	var numDeletes uint64
@@ -333,18 +333,21 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 
 	if numUpdates > 0 {
 		go func() {
-			for _, doc := range batch.IndexOps {
+			for k := range batch.IndexOps {
+				doc := batch.IndexOps[k]
 				if doc != nil {
-					aw := index.NewAnalysisWork(s, doc, resultChan)
 					// put the work on the queue
-					s.analysisQueue.Queue(aw)
+					s.analysisQueue.Queue(func() {
+						analyze(doc)
+						resultChan <- doc
+					})
 				}
 			}
 		}()
 	}
 
 	// wait for analysis result
-	analysisResults := make([]*index.AnalysisResult, int(numUpdates))
+	analysisResults := make([]index.Document, int(numUpdates))
 	var itemsDeQueued uint64
 	var totalAnalysisSize int
 	for itemsDeQueued < numUpdates {
@@ -564,15 +567,7 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	return m
 }
 
-func (s *Scorch) Analyze(d index.Document) *index.AnalysisResult {
-	return analyze(d)
-}
-
-func analyze(d index.Document) *index.AnalysisResult {
-	rv := &index.AnalysisResult{
-		Document: d,
-	}
-
+func analyze(d index.Document) {
 	d.VisitFields(func(field index.Field) {
 		if field.IsIndexed() {
 			field.Analyze()
@@ -585,8 +580,6 @@ func analyze(d index.Document) *index.AnalysisResult {
 			}
 		}
 	})
-
-	return rv
 }
 
 func (s *Scorch) Advanced() (store.KVStore, error) {
