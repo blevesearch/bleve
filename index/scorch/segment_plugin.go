@@ -40,8 +40,8 @@ type SegmentPlugin interface {
 	// version must be incremented.
 	Version() uint32
 
-	// New takes a set of AnalysisResults and turns them into a new Segment
-	New(results []*index.AnalysisResult) (segment.Segment, uint64, error)
+	// New takes a set of Documents and turns them into a new Segment
+	New(results []index.Document) (segment.Segment, uint64, error)
 
 	// Open attempts to open the file at the specified path and
 	// return the corresponding Segment
