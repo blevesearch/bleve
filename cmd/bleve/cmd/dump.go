@@ -29,7 +29,7 @@ var dumpCmd = &cobra.Command{
 	Short: "dumps the contents of the index",
 	Long:  `The dump command will dump (possibly a section of) the index.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		i, _, err := idx.Advanced()
+		i, err := idx.Advanced()
 		if err != nil {
 			return fmt.Errorf("error getting index: %v", err)
 		}

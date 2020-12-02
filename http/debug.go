@@ -57,7 +57,7 @@ func (h *DebugDocumentHandler) ServeHTTP(w http.ResponseWriter, req *http.Reques
 		docID = h.DocIDLookup(req)
 	}
 
-	internalIndex, _, err := index.Advanced()
+	internalIndex, err := index.Advanced()
 	if err != nil {
 		showError(w, req, fmt.Sprintf("error getting index: %v", err), 500)
 		return

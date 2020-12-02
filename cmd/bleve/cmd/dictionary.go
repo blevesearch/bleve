@@ -29,7 +29,7 @@ var dictionaryCmd = &cobra.Command{
 		if len(args) < 2 {
 			return fmt.Errorf("must specify field")
 		}
-		i, _, err := idx.Advanced()
+		i, err := idx.Advanced()
 		if err != nil {
 			return fmt.Errorf("error getting index: %v", err)
 		}

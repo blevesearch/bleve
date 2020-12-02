@@ -22,11 +22,10 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/document"
-	index "github.com/blevesearch/bleve_index_api"
-	store "github.com/blevesearch/bleve_index_api/store"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/numeric"
 	"github.com/blevesearch/bleve/search"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 func TestIndexAliasSingle(t *testing.T) {
@@ -1334,8 +1333,8 @@ func (i *stubIndex) DeleteInternal(key []byte) error {
 	return i.err
 }
 
-func (i *stubIndex) Advanced() (index.Index, store.KVStore, error) {
-	return nil, nil, nil
+func (i *stubIndex) Advanced() (index.Index, error) {
+	return nil, nil
 }
 
 func (i *stubIndex) NewBatch() *Batch {

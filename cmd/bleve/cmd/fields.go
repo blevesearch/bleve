@@ -26,7 +26,7 @@ var fieldsCmd = &cobra.Command{
 	Short: "lists the fields in this index",
 	Long:  `The fields command will list the fields used in this index.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		i, _, err := idx.Advanced()
+		i, err := idx.Advanced()
 		if err != nil {
 			return fmt.Errorf("error getting index: %v", err)
 		}

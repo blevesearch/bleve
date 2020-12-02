@@ -27,7 +27,7 @@ var dumpFieldsCmd = &cobra.Command{
 	Short: "dump only the field rows",
 	Long:  `The fields sub-command of dump will only dump the field rows.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		i, _, err := idx.Advanced()
+		i, err := idx.Advanced()
 		if err != nil {
 			return fmt.Errorf("error getting index: %v", err)
 		}

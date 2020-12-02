@@ -19,10 +19,9 @@ import (
 	"sync"
 	"time"
 
-	index "github.com/blevesearch/bleve_index_api"
-	store "github.com/blevesearch/bleve_index_api/store"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 type indexAliasImpl struct {
@@ -368,17 +367,17 @@ func (i *indexAliasImpl) DeleteInternal(key []byte) error {
 	return i.indexes[0].DeleteInternal(key)
 }
 
-func (i *indexAliasImpl) Advanced() (index.Index, store.KVStore, error) {
+func (i *indexAliasImpl) Advanced() (index.Index, error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
 	if !i.open {
-		return nil, nil, ErrorIndexClosed
+		return nil, ErrorIndexClosed
 	}
 
 	err := i.isAliasToSingleIndex()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	return i.indexes[0].Advanced()
