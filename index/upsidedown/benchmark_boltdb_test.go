@@ -17,7 +17,7 @@ package upsidedown
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/index/store/boltdb"
+	"github.com/blevesearch/bleve/index/upsidedown/store/boltdb"
 )
 
 var boltTestConfig = map[string]interface{}{
