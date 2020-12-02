@@ -26,7 +26,6 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/registry"
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/bleve_index_api/store"
 	segment "github.com/blevesearch/scorch_segment_api"
 	bolt "go.etcd.io/bbolt"
 )
@@ -580,10 +579,6 @@ func analyze(d index.Document) {
 			}
 		}
 	})
-}
-
-func (s *Scorch) Advanced() (store.KVStore, error) {
-	return nil, nil
 }
 
 func (s *Scorch) AddEligibleForRemoval(epoch uint64) {
