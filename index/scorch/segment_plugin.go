@@ -28,9 +28,9 @@ import (
 	zapv15 "github.com/blevesearch/zapx/v15"
 )
 
-// Plugin represents the essential functions required by a package to plug in
+// SegmentPlugin represents the essential functions required by a package to plug in
 // it's segment implementation
-type Plugin interface {
+type SegmentPlugin interface {
 
 	// Type is the name for this segment plugin
 	Type() string
@@ -66,25 +66,25 @@ type Plugin interface {
 		[][]uint64, uint64, error)
 }
 
-var supportedSegmentPlugins map[string]map[uint32]Plugin
-var defaultSegmentPlugin Plugin
+var supportedSegmentPlugins map[string]map[uint32]SegmentPlugin
+var defaultSegmentPlugin SegmentPlugin
 
 func init() {
-	ResetPlugins()
-	RegisterPlugin(&zapv15.ZapPlugin{}, false)
-	RegisterPlugin(&zapv14.ZapPlugin{}, false)
-	RegisterPlugin(&zapv13.ZapPlugin{}, false)
-	RegisterPlugin(&zapv12.ZapPlugin{}, false)
-	RegisterPlugin(&zapv11.ZapPlugin{}, true)
+	ResetSegmentPlugins()
+	RegisterSegmentPlugin(&zapv15.ZapPlugin{}, false)
+	RegisterSegmentPlugin(&zapv14.ZapPlugin{}, false)
+	RegisterSegmentPlugin(&zapv13.ZapPlugin{}, false)
+	RegisterSegmentPlugin(&zapv12.ZapPlugin{}, false)
+	RegisterSegmentPlugin(&zapv11.ZapPlugin{}, true)
 }
 
-func ResetPlugins() {
-	supportedSegmentPlugins = map[string]map[uint32]Plugin{}
+func ResetSegmentPlugins() {
+	supportedSegmentPlugins = map[string]map[uint32]SegmentPlugin{}
 }
 
-func RegisterPlugin(plugin Plugin, makeDefault bool) {
+func RegisterSegmentPlugin(plugin SegmentPlugin, makeDefault bool) {
 	if _, ok := supportedSegmentPlugins[plugin.Type()]; !ok {
-		supportedSegmentPlugins[plugin.Type()] = map[uint32]Plugin{}
+		supportedSegmentPlugins[plugin.Type()] = map[uint32]SegmentPlugin{}
 	}
 	supportedSegmentPlugins[plugin.Type()][plugin.Version()] = plugin
 	if makeDefault {
@@ -107,7 +107,7 @@ func SupportedSegmentTypeVersions(typ string) (rv []uint32) {
 }
 
 func chooseSegmentPlugin(forcedSegmentType string,
-	forcedSegmentVersion uint32) (Plugin, error) {
+	forcedSegmentVersion uint32) (SegmentPlugin, error) {
 	if versions, ok := supportedSegmentPlugins[forcedSegmentType]; ok {
 		if segPlugin, ok := versions[uint32(forcedSegmentVersion)]; ok {
 			return segPlugin, nil

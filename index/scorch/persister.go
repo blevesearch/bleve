@@ -429,7 +429,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 }
 
 func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
-	segPlugin Plugin) ([]string, map[uint64]string, error) {
+	segPlugin SegmentPlugin) ([]string, map[uint64]string, error) {
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(boltSnapshotsBucket)
 	if err != nil {
 		return nil, nil, err
