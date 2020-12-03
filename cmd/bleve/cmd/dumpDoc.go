@@ -31,7 +31,7 @@ var dumpDocCmd = &cobra.Command{
 			return fmt.Errorf("must specify docid")
 		}
 
-		i, _, err := idx.Advanced()
+		i, err := idx.Advanced()
 		if err != nil {
 			return fmt.Errorf("error getting index: %v", err)
 		}

@@ -19,7 +19,7 @@ import (
 
 	"github.com/blevesearch/bleve/document"
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/bleve/index/store/gtreap"
+	"github.com/blevesearch/bleve/index/upsidedown/store/gtreap"
 	"github.com/blevesearch/bleve/index/upsidedown"
 	"github.com/blevesearch/bleve/search"
 )

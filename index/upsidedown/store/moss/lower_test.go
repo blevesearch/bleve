@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	store "github.com/blevesearch/bleve_index_api/store"
-	"github.com/blevesearch/bleve/index/store/test"
+	"github.com/blevesearch/bleve/index/upsidedown/store/test"
 )
 
 func openWithLower(t *testing.T, mo store.MergeOperator) (string, store.KVStore) {

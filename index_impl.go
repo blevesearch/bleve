@@ -32,7 +32,6 @@ import (
 	"github.com/blevesearch/bleve/search/facet"
 	"github.com/blevesearch/bleve/search/highlight"
 	index "github.com/blevesearch/bleve_index_api"
-	store "github.com/blevesearch/bleve_index_api/store"
 )
 
 type indexImpl struct {
@@ -228,14 +227,9 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	return rv, err
 }
 
-// Advanced returns implementation internals
-// necessary ONLY for advanced usage.
-func (i *indexImpl) Advanced() (index.Index, store.KVStore, error) {
-	s, err := i.i.Advanced()
-	if err != nil {
-		return nil, nil, err
-	}
-	return i.i, s, nil
+// Advanced returns internal index implementation
+func (i *indexImpl) Advanced() (index.Index, error) {
+	return i.i, nil
 }
 
 // Mapping returns the IndexMapping in use by this

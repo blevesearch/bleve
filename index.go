@@ -21,7 +21,6 @@ import (
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/size"
 	index "github.com/blevesearch/bleve_index_api"
-	store "github.com/blevesearch/bleve_index_api/store"
 )
 
 // A Batch groups together multiple Index and Delete
@@ -245,9 +244,8 @@ type Index interface {
 	// SetName lets you assign your own logical name to this index
 	SetName(string)
 
-	// Advanced returns the indexer and data store, exposing lower level
-	// methods to enumerate records and access data.
-	Advanced() (index.Index, store.KVStore, error)
+	// Advanced returns the internal index implementation
+	Advanced() (index.Index, error)
 }
 
 // New index at the specified path, must not exist.
