@@ -105,10 +105,10 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/lang/tr"
 
 	// kv stores
-	_ "github.com/blevesearch/bleve/index/store/boltdb"
-	_ "github.com/blevesearch/bleve/index/store/goleveldb"
-	_ "github.com/blevesearch/bleve/index/store/gtreap"
-	_ "github.com/blevesearch/bleve/index/store/moss"
+	_ "github.com/blevesearch/bleve/index/upsidedown/store/boltdb"
+	_ "github.com/blevesearch/bleve/index/upsidedown/store/goleveldb"
+	_ "github.com/blevesearch/bleve/index/upsidedown/store/gtreap"
+	_ "github.com/blevesearch/bleve/index/upsidedown/store/moss"
 
 	// index types
 	_ "github.com/blevesearch/bleve/index/upsidedown"

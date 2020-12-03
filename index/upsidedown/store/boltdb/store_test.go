@@ -12,21 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package goleveldb
+package boltdb
 
 import (
 	"os"
 	"testing"
 
 	store "github.com/blevesearch/bleve_index_api/store"
-	"github.com/blevesearch/bleve/index/store/test"
+	"github.com/blevesearch/bleve/index/upsidedown/store/test"
+	bolt "go.etcd.io/bbolt"
 )
 
 func open(t *testing.T, mo store.MergeOperator) store.KVStore {
-	rv, err := New(mo, map[string]interface{}{
-		"path":              "test",
-		"create_if_missing": true,
-	})
+	rv, err := New(mo, map[string]interface{}{"path": "test"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,56 +42,105 @@ func cleanup(t *testing.T, s store.KVStore) {
 	}
 }
 
-func TestGoLevelDBKVCrud(t *testing.T) {
+func TestBoltDBKVCrud(t *testing.T) {
 	s := open(t, nil)
 	defer cleanup(t, s)
 	test.CommonTestKVCrud(t, s)
 }
 
-func TestGoLevelDBReaderIsolation(t *testing.T) {
+func TestBoltDBReaderIsolation(t *testing.T) {
 	s := open(t, nil)
 	defer cleanup(t, s)
 	test.CommonTestReaderIsolation(t, s)
 }
 
-func TestGoLevelDBReaderOwnsGetBytes(t *testing.T) {
+func TestBoltDBReaderOwnsGetBytes(t *testing.T) {
 	s := open(t, nil)
 	defer cleanup(t, s)
 	test.CommonTestReaderOwnsGetBytes(t, s)
 }
 
-func TestGoLevelDBWriterOwnsBytes(t *testing.T) {
+func TestBoltDBWriterOwnsBytes(t *testing.T) {
 	s := open(t, nil)
 	defer cleanup(t, s)
 	test.CommonTestWriterOwnsBytes(t, s)
 }
 
-func TestGoLevelDBPrefixIterator(t *testing.T) {
+func TestBoltDBPrefixIterator(t *testing.T) {
 	s := open(t, nil)
 	defer cleanup(t, s)
 	test.CommonTestPrefixIterator(t, s)
 }
 
-func TestGoLevelDBPrefixIteratorSeek(t *testing.T) {
+func TestBoltDBPrefixIteratorSeek(t *testing.T) {
 	s := open(t, nil)
 	defer cleanup(t, s)
 	test.CommonTestPrefixIteratorSeek(t, s)
 }
 
-func TestGoLevelDBRangeIterator(t *testing.T) {
+func TestBoltDBRangeIterator(t *testing.T) {
 	s := open(t, nil)
 	defer cleanup(t, s)
 	test.CommonTestRangeIterator(t, s)
 }
 
-func TestGoLevelDBRangeIteratorSeek(t *testing.T) {
+func TestBoltDBRangeIteratorSeek(t *testing.T) {
 	s := open(t, nil)
 	defer cleanup(t, s)
 	test.CommonTestRangeIteratorSeek(t, s)
 }
 
-func TestGoLevelDBMerge(t *testing.T) {
+func TestBoltDBMerge(t *testing.T) {
 	s := open(t, &test.TestMergeCounter{})
 	defer cleanup(t, s)
 	test.CommonTestMerge(t, s)
+}
+
+func TestBoltDBConfig(t *testing.T) {
+	var tests = []struct {
+		in          map[string]interface{}
+		path        string
+		bucket      string
+		noSync      bool
+		fillPercent float64
+	}{
+		{
+			map[string]interface{}{"path": "test", "bucket": "mybucket", "nosync": true, "fillPercent": 0.75},
+			"test",
+			"mybucket",
+			true,
+			0.75,
+		},
+		{
+			map[string]interface{}{"path": "test"},
+			"test",
+			"bleve",
+			false,
+			bolt.DefaultFillPercent,
+		},
+	}
+
+	for _, test := range tests {
+		kv, err := New(nil, test.in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bs, ok := kv.(*Store)
+		if !ok {
+			t.Fatal("failed type assertion to *boltdb.Store")
+		}
+		if bs.path != test.path {
+			t.Fatalf("path: expected %q, got %q", test.path, bs.path)
+		}
+		if bs.bucket != test.bucket {
+			t.Fatalf("bucket: expected %q, got %q", test.bucket, bs.bucket)
+		}
+		if bs.noSync != test.noSync {
+			t.Fatalf("noSync: expected %t, got %t", test.noSync, bs.noSync)
+		}
+		if bs.fillPercent != test.fillPercent {
+			t.Fatalf("fillPercent: expected %f, got %f", test.fillPercent, bs.fillPercent)
+		}
+		cleanup(t, kv)
+	}
 }

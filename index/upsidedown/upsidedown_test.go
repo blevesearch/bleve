@@ -29,8 +29,8 @@ import (
 	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizer/regexp"
 	"github.com/blevesearch/bleve/document"
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/bleve/index/store/boltdb"
-	"github.com/blevesearch/bleve/index/store/null"
+	"github.com/blevesearch/bleve/index/upsidedown/store/boltdb"
+	"github.com/blevesearch/bleve/index/upsidedown/store/null"
 	"github.com/blevesearch/bleve/registry"
 )
 

@@ -19,7 +19,7 @@ import (
 	"time"
 
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/bleve/index/store/boltdb"
+	"github.com/blevesearch/bleve/index/upsidedown/store/boltdb"
 
 	"github.com/blevesearch/bleve/document"
 )
