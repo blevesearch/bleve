@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"os"
 
-	store "github.com/blevesearch/bleve_index_api/store"
+	store "github.com/blevesearch/upsidedown_store_api"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"

@@ -14,7 +14,7 @@
 
 package metrics
 
-import store "github.com/blevesearch/bleve_index_api/store"
+import store "github.com/blevesearch/upsidedown_store_api"
 
 type Iterator struct {
 	s *Store

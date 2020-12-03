@@ -19,7 +19,7 @@ import (
 
 	"github.com/blevesearch/bleve/document"
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/bleve_index_api/store"
+	"github.com/blevesearch/upsidedown_store_api"
 )
 
 var reflectStaticSizeIndexReader int

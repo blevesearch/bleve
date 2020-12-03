@@ -28,7 +28,7 @@ import (
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/registry"
 	index "github.com/blevesearch/bleve_index_api"
-	store "github.com/blevesearch/bleve_index_api/store"
+	store "github.com/blevesearch/upsidedown_store_api"
 
 	"github.com/golang/protobuf/proto"
 )
