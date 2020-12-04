@@ -17,9 +17,9 @@ package metrics
 import (
 	"testing"
 
-	store "github.com/blevesearch/bleve_index_api/store"
+	store "github.com/blevesearch/upsidedown_store_api"
 	"github.com/blevesearch/bleve/index/upsidedown/store/gtreap"
-	"github.com/blevesearch/bleve/index/upsidedown/store/test"
+	"github.com/blevesearch/upsidedown_store_api/test"
 )
 
 func open(t *testing.T, mo store.MergeOperator) store.KVStore {

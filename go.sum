@@ -18,6 +18,8 @@ github.com/blevesearch/segment v0.9.0 h1:5lG7yBCx98or7gK2cHMKPukPZ/31Kag7nONpoBt
 github.com/blevesearch/segment v0.9.0/go.mod h1:9PfHYUdQCgHktBgvtUOF4x+pc4/l8rdH0u5spnW85UQ=
 github.com/blevesearch/snowballstem v0.9.0 h1:lMQ189YspGP6sXvZQ4WZ+MLawfV8wOmPoD/iWeNXm8s=
 github.com/blevesearch/snowballstem v0.9.0/go.mod h1:PivSj3JMc8WuaFkTSRDW2SlrulNWPl4ABg1tC/hlgLs=
+github.com/blevesearch/upsidedown_store_api v0.0.1 h1:cf3YQ6c3jvZ/gvHL6k71cshDG+nYTgL5PTWFqYXA3bg=
+github.com/blevesearch/upsidedown_store_api v0.0.1/go.mod h1:jRZGTYWNqHXvOOjvT0WXHYO5Yin7U/PmTX1nevIY8yo=
 github.com/blevesearch/zapx/v11 v11.1.5 h1:junThJcb8Zb9R06FXrSrbGv8w+q0JCeWiCUmBZCzoF0=
 github.com/blevesearch/zapx/v11 v11.1.5/go.mod h1:t0iWZlu/G6tiOr2kS4yDQfomnErPOwe7MyTSNfmanZc=
 github.com/blevesearch/zapx/v12 v12.1.5 h1:iGVqwKCEvN313f5wxVmgu3G53oIRlzgcStVYmIhzJyg=

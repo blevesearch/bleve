@@ -15,7 +15,7 @@
 package boltdb
 
 import (
-	store "github.com/blevesearch/bleve_index_api/store"
+	store "github.com/blevesearch/upsidedown_store_api"
 	bolt "go.etcd.io/bbolt"
 )
 
