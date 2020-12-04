@@ -21,6 +21,17 @@ import (
 	"github.com/blevesearch/bleve/search"
 )
 
+// The Regexp interface defines the subset of the regexp.Regexp API
+// methods that are used by bleve indexes, allowing callers to pass in
+// alternate implementations.
+type Regexp interface {
+	FindStringIndex(s string) (loc []int)
+
+	LiteralPrefix() (prefix string, complete bool)
+
+	String() string
+}
+
 // NewRegexpStringSearcher is similar to NewRegexpSearcher, but
 // additionally optimizes for index readers that handle regexp's.
 func NewRegexpStringSearcher(indexReader index.IndexReader, pattern string,
@@ -66,7 +77,7 @@ func NewRegexpStringSearcher(indexReader index.IndexReader, pattern string,
 // matching the entire term.  The provided regexp SHOULD NOT start with ^
 // or end with $ as this can intefere with the implementation.  Separately,
 // matches will be checked to ensure they match the entire term.
-func NewRegexpSearcher(indexReader index.IndexReader, pattern index.Regexp,
+func NewRegexpSearcher(indexReader index.IndexReader, pattern Regexp,
 	field string, boost float64, options search.SearcherOptions) (
 	search.Searcher, error) {
 	var candidateTerms []string
@@ -89,7 +100,7 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern index.Regexp,
 }
 
 func findRegexpCandidateTerms(indexReader index.IndexReader,
-	pattern index.Regexp, field, prefixTerm string) (rv []string, err error) {
+	pattern Regexp, field, prefixTerm string) (rv []string, err error) {
 	rv = make([]string, 0)
 	var fieldDict index.FieldDict
 	if len(prefixTerm) > 0 {
