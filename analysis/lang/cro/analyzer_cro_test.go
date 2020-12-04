@@ -53,7 +53,7 @@ func TestCroatianAnalyzer(t *testing.T) {
 				},
 			},
 		},
-		// vovelR
+		// vowelR
 		{
 			input: []byte("crvi"),
 			output: analysis.TokenStream{
