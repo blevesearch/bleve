@@ -48,6 +48,8 @@ const Version uint8 = 7
 
 var IncompatibleVersion = fmt.Errorf("incompatible version, %d is supported", Version)
 
+var ErrorUnknownStorageType = fmt.Errorf("unknown storage type")
+
 type UpsideDownCouch struct {
 	version       uint8
 	path          string
@@ -299,7 +301,7 @@ func (udc *UpsideDownCouch) Open() (err error) {
 	// open the kv store
 	storeConstructor := registry.KVStoreConstructorByName(udc.storeName)
 	if storeConstructor == nil {
-		err = index.ErrorUnknownStorageType
+		err = ErrorUnknownStorageType
 		return
 	}
 

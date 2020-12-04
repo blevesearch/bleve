@@ -106,9 +106,6 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	}
 	err = rv.i.Open()
 	if err != nil {
-		if err == index.ErrorUnknownStorageType {
-			return nil, ErrorUnknownStorageType
-		}
 		return nil, err
 	}
 	defer func(rv *indexImpl) {
@@ -176,9 +173,6 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	}
 	err = rv.i.Open()
 	if err != nil {
-		if err == index.ErrorUnknownStorageType {
-			return nil, ErrorUnknownStorageType
-		}
 		return nil, err
 	}
 	defer func(rv *indexImpl) {
