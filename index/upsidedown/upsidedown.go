@@ -54,7 +54,7 @@ type UpsideDownCouch struct {
 	storeName     string
 	storeConfig   map[string]interface{}
 	store         store.KVStore
-	fieldCache    *index.FieldCache
+	fieldCache    *FieldCache
 	analysisQueue *index.AnalysisQueue
 	stats         *indexStat
 
@@ -74,7 +74,7 @@ type docBackIndexRow struct {
 func NewUpsideDownCouch(storeName string, storeConfig map[string]interface{}, analysisQueue *index.AnalysisQueue) (index.Index, error) {
 	rv := &UpsideDownCouch{
 		version:       Version,
-		fieldCache:    index.NewFieldCache(),
+		fieldCache:    NewFieldCache(),
 		storeName:     storeName,
 		storeConfig:   storeConfig,
 		analysisQueue: analysisQueue,
