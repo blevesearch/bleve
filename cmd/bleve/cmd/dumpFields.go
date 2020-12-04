@@ -35,8 +35,12 @@ var dumpFieldsCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("error getting index reader: %v", err)
 		}
+		upsideDownReader, ok := r.(*upsidedown.IndexReader)
+		if !ok {
+			return fmt.Errorf("dump fields is only supported by index type upsidedown")
+		}
 
-		dumpChan := r.DumpFields()
+		dumpChan := upsideDownReader.DumpFields()
 		for rowOrErr := range dumpChan {
 			switch rowOrErr := rowOrErr.(type) {
 			case error:
