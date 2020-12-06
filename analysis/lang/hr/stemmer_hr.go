@@ -1,4 +1,4 @@
-//  Copyright (c) 2018 Couchbase, Inc.
+//  Copyright (c) 2020 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cro
+package hr
 
 import (
 	"regexp"
@@ -22,7 +22,7 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
-const StemmerName = "stemmer_cro"
+const StemmerName = "stemmer_hr"
 
 var stemmingRules = []*regexp.Regexp{
 	regexp.MustCompile(`^(.+(s|š)k)(ijima|ijega|ijemu|ijem|ijim|ijih|ijoj|ijeg|iji|ije|ija|oga|ome|omu|ima|og|om|im|ih|oj|i|e|o|a|u)$`),

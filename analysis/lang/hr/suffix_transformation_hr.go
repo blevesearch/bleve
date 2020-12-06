@@ -1,4 +1,4 @@
-//  Copyright (c) 2018 Couchbase, Inc.
+//  Copyright (c) 2020 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cro
+package hr
 
 import (
 	"strings"
@@ -21,7 +21,7 @@ import (
 	"github.com/blevesearch/bleve/registry"
 )
 
-const SuffixTransformationFilterName = "cro_suffix_transformation_filter"
+const SuffixTransformationFilterName = "hr_suffix_transformation_filter"
 
 var SuffixTransformations = map[string]string{
 	"lozi":     "loga",

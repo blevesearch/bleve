@@ -1,4 +1,4 @@
-//  Copyright (c) 2018 Couchbase, Inc.
+//  Copyright (c) 2020 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cro
+package hr
 
 import (
 	"github.com/blevesearch/bleve/analysis"
@@ -22,9 +22,9 @@ import (
 	"github.com/blevesearch/bleve/analysis/tokenizer/unicode"
 )
 
-// http://nlp.ffzg.hr/resources/tools/stemmer-for-croatian/
+// Originated from: http://nlp.ffzg.hr/resources/tools/stemmer-for-croatian/
 
-const AnalyzerName = "cro"
+const AnalyzerName = "hr"
 
 func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
 	unicodeTokenizer, err := cache.TokenizerNamed(unicode.Name)
