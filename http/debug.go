@@ -67,9 +67,14 @@ func (h *DebugDocumentHandler) ServeHTTP(w http.ResponseWriter, req *http.Reques
 		showError(w, req, fmt.Sprintf("error operning index reader: %v", err), 500)
 		return
 	}
+	upsideDownReader, ok := internalIndexReader.(*upsidedown.IndexReader)
+	if !ok {
+		showError(w, req, fmt.Sprintf("dump is only supported by index type upsidedown"), 500)
+		return
+	}
 
 	var rv []interface{}
-	rowChan := internalIndexReader.DumpDoc(docID)
+	rowChan := upsideDownReader.DumpDoc(docID)
 	for row := range rowChan {
 		switch row := row.(type) {
 		case error:
