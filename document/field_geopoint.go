@@ -91,7 +91,13 @@ func (n *GeoPointField) Analyze() (int, analysis.TokenFrequencies) {
 	}
 
 	fieldLength := len(tokens)
-	tokenFreqs := analysis.TokenFrequency(tokens, n.arrayPositions, n.options.IncludeTermVectors())
+	var tokenFreqs analysis.TokenFrequencies
+	if n.options.SkipFreqNorm() {
+		tokenFreqs = analysis.TokenWithoutFrequencyNorm(tokens, n.arrayPositions, n.options.IncludeTermVectors())
+	} else {
+		tokenFreqs = analysis.TokenFrequency(tokens, n.arrayPositions, n.options.IncludeTermVectors())
+	}
+
 	return fieldLength, tokenFreqs
 }
 

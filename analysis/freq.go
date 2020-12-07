@@ -106,6 +106,16 @@ func (tfs TokenFrequencies) MergeAll(remoteField string, other TokenFrequencies)
 }
 
 func TokenFrequency(tokens TokenStream, arrayPositions []uint64, includeTermVectors bool) TokenFrequencies {
+	return tokenFrequency(tokens, arrayPositions, includeTermVectors, true)
+}
+
+func TokenWithoutFrequencyNorm(tokens TokenStream, arrayPositions []uint64,
+	includeTermVectors bool) TokenFrequencies {
+	return tokenFrequency(tokens, arrayPositions, includeTermVectors, false)
+}
+
+func tokenFrequency(tokens TokenStream, arrayPositions []uint64,
+	includeTermVectors, includeFreqNorm bool) TokenFrequencies {
 	rv := make(map[string]*TokenFreq, len(tokens))
 
 	if includeTermVectors {
@@ -123,13 +133,16 @@ func TokenFrequency(tokens TokenStream, arrayPositions []uint64, includeTermVect
 			curr, ok := rv[string(token.Term)]
 			if ok {
 				curr.Locations = append(curr.Locations, &tls[tlNext])
-				curr.frequency++
 			} else {
-				rv[string(token.Term)] = &TokenFreq{
+				curr = &TokenFreq{
 					Term:      token.Term,
 					Locations: []*TokenLocation{&tls[tlNext]},
-					frequency: 1,
 				}
+				rv[string(token.Term)] = curr
+			}
+
+			if includeFreqNorm {
+				curr.frequency++
 			}
 
 			tlNext++
@@ -137,13 +150,13 @@ func TokenFrequency(tokens TokenStream, arrayPositions []uint64, includeTermVect
 	} else {
 		for _, token := range tokens {
 			curr, exists := rv[string(token.Term)]
-			if exists {
+			if !exists {
+				curr = &TokenFreq{Term: token.Term}
+				rv[string(token.Term)] = curr
+			}
+
+			if includeFreqNorm {
 				curr.frequency++
-			} else {
-				rv[string(token.Term)] = &TokenFreq{
-					Term:      token.Term,
-					frequency: 1,
-				}
 			}
 		}
 	}

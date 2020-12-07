@@ -25,6 +25,7 @@ func TestIndexingOptions(t *testing.T) {
 		isStored           bool
 		includeTermVectors bool
 		docValues          bool
+		skipFreqNorm       bool
 	}{
 		{
 			options:            IndexField | StoreField | IncludeTermVectors,
@@ -75,6 +76,18 @@ func TestIndexingOptions(t *testing.T) {
 			includeTermVectors: true,
 			docValues:          true,
 		},
+		{
+			options:      SkipFreqNorm,
+			skipFreqNorm: true,
+		},
+		{
+			options:            IndexField | StoreField | SkipFreqNorm | DocValues,
+			isIndexed:          true,
+			isStored:           true,
+			skipFreqNorm:       true,
+			docValues:          true,
+			includeTermVectors: false,
+		},
 	}
 
 	for _, test := range tests {
@@ -93,6 +106,10 @@ func TestIndexingOptions(t *testing.T) {
 		actuallyDocValues := test.options.IncludeDocValues()
 		if actuallyDocValues != test.docValues {
 			t.Errorf("expected docValue to be %v, got %v for %d", test.docValues, actuallyDocValues, test.options)
+		}
+		actuallyFreqNormValues := test.options.SkipFreqNorm()
+		if actuallyFreqNormValues != test.skipFreqNorm {
+			t.Errorf("expected docValue to be %v, got %v for %d", test.skipFreqNorm, actuallyFreqNormValues, test.options)
 		}
 	}
 }

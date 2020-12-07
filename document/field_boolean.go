@@ -69,7 +69,13 @@ func (b *BooleanField) Analyze() (int, analysis.TokenFrequencies) {
 	})
 
 	fieldLength := len(tokens)
-	tokenFreqs := analysis.TokenFrequency(tokens, b.arrayPositions, b.options.IncludeTermVectors())
+	var tokenFreqs analysis.TokenFrequencies
+	if b.options.SkipFreqNorm() {
+		tokenFreqs = analysis.TokenWithoutFrequencyNorm(tokens, b.arrayPositions, b.options.IncludeTermVectors())
+	} else {
+		tokenFreqs = analysis.TokenFrequency(tokens, b.arrayPositions, b.options.IncludeTermVectors())
+	}
+
 	return fieldLength, tokenFreqs
 }
 
