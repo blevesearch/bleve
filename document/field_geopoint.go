@@ -37,7 +37,7 @@ var GeoPrecisionStep uint = 9
 type GeoPointField struct {
 	name              string
 	arrayPositions    []uint64
-	options           IndexingOptions
+	options           index.FieldIndexingOptions
 	value             numeric.PrefixCoded
 	numPlainTextBytes uint64
 	length            int
@@ -58,28 +58,12 @@ func (n *GeoPointField) ArrayPositions() []uint64 {
 	return n.arrayPositions
 }
 
-func (n *GeoPointField) Options() IndexingOptions {
+func (n *GeoPointField) Options() index.FieldIndexingOptions {
 	return n.options
 }
 
 func (n *GeoPointField) EncodedFieldType() byte {
 	return 'g'
-}
-
-func (n *GeoPointField) IsIndexed() bool {
-	return n.options.IsIndexed()
-}
-
-func (n *GeoPointField) IsStored() bool {
-	return n.options.IsStored()
-}
-
-func (n *GeoPointField) IncludeDocValues() bool {
-	return n.options.IncludeDocValues()
-}
-
-func (n *GeoPointField) IncludeTermVectors() bool {
-	return n.options.IncludeTermVectors()
 }
 
 func (n *GeoPointField) AnalyzedLength() int {
@@ -167,7 +151,7 @@ func NewGeoPointField(name string, arrayPositions []uint64, lon, lat float64) *G
 	return NewGeoPointFieldWithIndexingOptions(name, arrayPositions, lon, lat, DefaultNumericIndexingOptions)
 }
 
-func NewGeoPointFieldWithIndexingOptions(name string, arrayPositions []uint64, lon, lat float64, options IndexingOptions) *GeoPointField {
+func NewGeoPointFieldWithIndexingOptions(name string, arrayPositions []uint64, lon, lat float64, options index.FieldIndexingOptions) *GeoPointField {
 	mhash := geo.MortonHash(lon, lat)
 	prefixCoded := numeric.MustNewPrefixCodedInt64(int64(mhash), 0)
 	return &GeoPointField{

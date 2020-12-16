@@ -17,6 +17,7 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
+	index "github.com/blevesearch/bleve_index_api"
 	"time"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -150,19 +151,19 @@ func NewGeoPointFieldMapping() *FieldMapping {
 }
 
 // Options returns the indexing options for this field.
-func (fm *FieldMapping) Options() document.IndexingOptions {
-	var rv document.IndexingOptions
+func (fm *FieldMapping) Options() index.FieldIndexingOptions {
+	var rv index.FieldIndexingOptions
 	if fm.Store {
-		rv |= document.StoreField
+		rv |= index.StoreField
 	}
 	if fm.Index {
-		rv |= document.IndexField
+		rv |= index.IndexField
 	}
 	if fm.IncludeTermVectors {
-		rv |= document.IncludeTermVectors
+		rv |= index.IncludeTermVectors
 	}
 	if fm.DocValues {
-		rv |= document.DocValues
+		rv |= index.DocValues
 	}
 	return rv
 }

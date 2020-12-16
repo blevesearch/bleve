@@ -30,12 +30,12 @@ func init() {
 	reflectStaticSizeBooleanField = int(reflect.TypeOf(f).Size())
 }
 
-const DefaultBooleanIndexingOptions = StoreField | IndexField | DocValues
+const DefaultBooleanIndexingOptions = index.StoreField | index.IndexField | index.DocValues
 
 type BooleanField struct {
 	name              string
 	arrayPositions    []uint64
-	options           IndexingOptions
+	options           index.FieldIndexingOptions
 	value             []byte
 	numPlainTextBytes uint64
 	length            int
@@ -57,7 +57,7 @@ func (b *BooleanField) ArrayPositions() []uint64 {
 	return b.arrayPositions
 }
 
-func (b *BooleanField) Options() IndexingOptions {
+func (b *BooleanField) Options() index.FieldIndexingOptions {
 	return b.options
 }
 
@@ -98,22 +98,6 @@ func (b *BooleanField) EncodedFieldType() byte {
 	return 'b'
 }
 
-func (b *BooleanField) IsIndexed() bool {
-	return b.options.IsIndexed()
-}
-
-func (b *BooleanField) IsStored() bool {
-	return b.options.IsStored()
-}
-
-func (b *BooleanField) IncludeDocValues() bool {
-	return b.options.IncludeDocValues()
-}
-
-func (b *BooleanField) IncludeTermVectors() bool {
-	return b.options.IncludeTermVectors()
-}
-
 func (b *BooleanField) AnalyzedLength() int {
 	return b.length
 }
@@ -136,7 +120,7 @@ func NewBooleanField(name string, arrayPositions []uint64, b bool) *BooleanField
 	return NewBooleanFieldWithIndexingOptions(name, arrayPositions, b, DefaultNumericIndexingOptions)
 }
 
-func NewBooleanFieldWithIndexingOptions(name string, arrayPositions []uint64, b bool, options IndexingOptions) *BooleanField {
+func NewBooleanFieldWithIndexingOptions(name string, arrayPositions []uint64, b bool, options index.FieldIndexingOptions) *BooleanField {
 	numPlainTextBytes := 5
 	v := []byte("F")
 	if b {

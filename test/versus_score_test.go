@@ -16,6 +16,7 @@ package test
 
 import (
 	"fmt"
+	index "github.com/blevesearch/bleve_index_api"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -99,7 +100,7 @@ func disjunctionQueryiOnIndexWithCompositeFields(indexName string,
 		doc.CompositeFields = []*document.CompositeField{
 			document.NewCompositeFieldWithIndexingOptions(
 				"_all", true, []string{"field1"}, []string{},
-				document.IndexField|document.IncludeTermVectors),
+				index.IndexField|index.IncludeTermVectors),
 		}
 		if err = batch.IndexAdvanced(doc); err != nil {
 			t.Error(err)

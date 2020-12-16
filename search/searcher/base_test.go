@@ -82,7 +82,7 @@ var testAnalyzer = &analysis.Analyzer{
 }
 
 // sets up some mock data used in many tests in this package
-var twoDocIndexDescIndexingOptions = document.DefaultTextIndexingOptions | document.IncludeTermVectors
+var twoDocIndexDescIndexingOptions = document.DefaultTextIndexingOptions | index.IncludeTermVectors
 
 var twoDocIndexDocs = []*document.Document{
 	// must have 4/4 beer
