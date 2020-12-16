@@ -33,7 +33,7 @@ func init() {
 	reflectStaticSizeDateTimeField = int(reflect.TypeOf(f).Size())
 }
 
-const DefaultDateTimeIndexingOptions = StoreField | IndexField | DocValues
+const DefaultDateTimeIndexingOptions = index.StoreField | index.IndexField | index.DocValues
 const DefaultDateTimePrecisionStep uint = 4
 
 var MinTimeRepresentable = time.Unix(0, math.MinInt64)
@@ -42,7 +42,7 @@ var MaxTimeRepresentable = time.Unix(0, math.MaxInt64)
 type DateTimeField struct {
 	name              string
 	arrayPositions    []uint64
-	options           IndexingOptions
+	options           index.FieldIndexingOptions
 	value             numeric.PrefixCoded
 	numPlainTextBytes uint64
 	length            int
@@ -63,28 +63,12 @@ func (n *DateTimeField) ArrayPositions() []uint64 {
 	return n.arrayPositions
 }
 
-func (n *DateTimeField) Options() IndexingOptions {
+func (n *DateTimeField) Options() index.FieldIndexingOptions {
 	return n.options
 }
 
 func (n *DateTimeField) EncodedFieldType() byte {
 	return 'd'
-}
-
-func (n *DateTimeField) IsIndexed() bool {
-	return n.options.IsIndexed()
-}
-
-func (n *DateTimeField) IsStored() bool {
-	return n.options.IsStored()
-}
-
-func (n *DateTimeField) IncludeDocValues() bool {
-	return n.options.IncludeDocValues()
-}
-
-func (n *DateTimeField) IncludeTermVectors() bool {
-	return n.options.IncludeTermVectors()
 }
 
 func (n *DateTimeField) AnalyzedLength() int {
@@ -127,7 +111,7 @@ func (n *DateTimeField) Analyze() {
 	}
 
 	n.length = len(tokens)
-	n.frequencies = analysis.TokenFrequency(tokens, n.arrayPositions, n.options.IncludeTermVectors())
+	n.frequencies = analysis.TokenFrequency(tokens, n.arrayPositions, n.options)
 }
 
 func (n *DateTimeField) Value() []byte {
@@ -164,7 +148,7 @@ func NewDateTimeField(name string, arrayPositions []uint64, dt time.Time) (*Date
 	return NewDateTimeFieldWithIndexingOptions(name, arrayPositions, dt, DefaultDateTimeIndexingOptions)
 }
 
-func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, dt time.Time, options IndexingOptions) (*DateTimeField, error) {
+func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, dt time.Time, options index.FieldIndexingOptions) (*DateTimeField, error) {
 	if canRepresent(dt) {
 		dtInt64 := dt.UnixNano()
 		prefixCoded := numeric.MustNewPrefixCodedInt64(dtInt64, 0)

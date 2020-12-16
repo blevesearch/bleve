@@ -17,6 +17,7 @@ package bleve
 import (
 	"encoding/json"
 	"fmt"
+	index "github.com/blevesearch/bleve_index_api"
 	"reflect"
 	"strconv"
 	"strings"
@@ -478,7 +479,7 @@ func TestNestedBooleanSearchers(t *testing.T) {
 		doc := document.NewDocument(strconv.Itoa(i))
 		doc.Fields = []document.Field{
 			document.NewTextFieldCustom("hostname", []uint64{}, []byte(hostname),
-				document.IndexField,
+				index.IndexField,
 				&analysis.Analyzer{
 					Tokenizer: single.NewSingleTokenTokenizer(),
 					TokenFilters: []analysis.TokenFilter{
@@ -489,12 +490,12 @@ func TestNestedBooleanSearchers(t *testing.T) {
 		}
 		for k, v := range metadata {
 			doc.AddField(document.NewTextFieldWithIndexingOptions(
-				fmt.Sprintf("metadata.%s", k), []uint64{}, []byte(v), document.IndexField))
+				fmt.Sprintf("metadata.%s", k), []uint64{}, []byte(v), index.IndexField))
 		}
 		doc.CompositeFields = []*document.CompositeField{
 			document.NewCompositeFieldWithIndexingOptions(
 				"_all", true, []string{"text"}, []string{},
-				document.IndexField|document.IncludeTermVectors),
+				index.IndexField|index.IncludeTermVectors),
 		}
 
 		if err = batch.IndexAdvanced(doc); err != nil {
@@ -645,7 +646,7 @@ func TestNestedBooleanMustNotSearcherUpsidedown(t *testing.T) {
 		doc.CompositeFields = []*document.CompositeField{
 			document.NewCompositeFieldWithIndexingOptions(
 				"_all", true, []string{"text"}, []string{},
-				document.IndexField|document.IncludeTermVectors),
+				index.IndexField|index.IncludeTermVectors),
 		}
 
 		if err = batch.IndexAdvanced(doc); err != nil {
@@ -781,7 +782,7 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 	doc.CompositeFields = []*document.CompositeField{
 		document.NewCompositeFieldWithIndexingOptions(
 			"_all", true, []string{"text"}, []string{},
-			document.IndexField|document.IncludeTermVectors),
+			index.IndexField|index.IncludeTermVectors),
 	}
 
 	if err = batch.IndexAdvanced(doc); err != nil {
@@ -826,7 +827,7 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 		doc.CompositeFields = []*document.CompositeField{
 			document.NewCompositeFieldWithIndexingOptions(
 				"_all", true, []string{"text"}, []string{},
-				document.IndexField|document.IncludeTermVectors),
+				index.IndexField|index.IncludeTermVectors),
 		}
 
 		if err = batch.IndexAdvanced(doc); err != nil {
@@ -850,7 +851,7 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 	doc.CompositeFields = []*document.CompositeField{
 		document.NewCompositeFieldWithIndexingOptions(
 			"_all", true, []string{"text"}, []string{},
-			document.IndexField|document.IncludeTermVectors),
+			index.IndexField|index.IncludeTermVectors),
 	}
 
 	if err = batch.IndexAdvanced(doc); err != nil {
@@ -1054,7 +1055,7 @@ func TestDisjunctionQueryIncorrectMin(t *testing.T) {
 		doc.CompositeFields = []*document.CompositeField{
 			document.NewCompositeFieldWithIndexingOptions(
 				"_all", true, []string{"text"}, []string{},
-				document.IndexField|document.IncludeTermVectors),
+				index.IndexField|index.IncludeTermVectors),
 		}
 		if err = batch.IndexAdvanced(doc); err != nil {
 			t.Fatal(err)

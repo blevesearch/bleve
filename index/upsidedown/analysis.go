@@ -57,7 +57,7 @@ func (udc *UpsideDownCouch) analyze(d index.Document) *AnalysisResult {
 		}
 		fieldNames[fieldIndex] = field.Name()
 
-		if field.IsIndexed() {
+		if field.Options().IsIndexed() {
 			field.Analyze()
 			fieldLength := field.AnalyzedLength()
 			tokenFreqs := field.AnalyzedTokenFrequencies()
@@ -69,10 +69,10 @@ func (udc *UpsideDownCouch) analyze(d index.Document) *AnalysisResult {
 				fieldTermFreqs[fieldIndex] = existingFreqs
 			}
 			fieldLengths[fieldIndex] += fieldLength
-			fieldIncludeTermVectors[fieldIndex] = field.IncludeTermVectors()
+			fieldIncludeTermVectors[fieldIndex] = field.Options().IncludeTermVectors()
 		}
 
-		if storable && field.IsStored() {
+		if storable && field.Options().IsStored() {
 			rv.Rows, backIndexStoredEntries = udc.storeField(docIDBytes, field, fieldIndex, rv.Rows, backIndexStoredEntries)
 		}
 	}

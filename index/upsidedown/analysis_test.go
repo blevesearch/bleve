@@ -38,11 +38,11 @@ func TestAnalysisBug328(t *testing.T) {
 	}
 
 	d := document.NewDocument("1")
-	f := document.NewTextFieldCustom("title", nil, []byte("bleve"), document.IndexField|document.IncludeTermVectors, analyzer)
+	f := document.NewTextFieldCustom("title", nil, []byte("bleve"), index.IndexField|index.IncludeTermVectors, analyzer)
 	d.AddField(f)
-	f = document.NewTextFieldCustom("body", nil, []byte("bleve"), document.IndexField|document.IncludeTermVectors, analyzer)
+	f = document.NewTextFieldCustom("body", nil, []byte("bleve"), index.IndexField|index.IncludeTermVectors, analyzer)
 	d.AddField(f)
-	cf := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, []string{}, document.IndexField|document.IncludeTermVectors)
+	cf := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, []string{}, index.IndexField|index.IncludeTermVectors)
 	d.AddField(cf)
 
 	rv := idx.(*UpsideDownCouch).analyze(d)

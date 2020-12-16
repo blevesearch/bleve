@@ -28,7 +28,7 @@ type Field interface {
 	// arrays, ArrayPositions returns 2 indices used to resolve "doc2" value in
 	// "doc1", then "field" in "doc2".
 	ArrayPositions() []uint64
-	Options() IndexingOptions
+	Options() index.FieldIndexingOptions
 	Analyze()
 	Value() []byte
 
@@ -40,10 +40,6 @@ type Field interface {
 	Size() int
 
 	EncodedFieldType() byte
-	IsIndexed() bool
-	IsStored() bool
-	IncludeDocValues() bool
-	IncludeTermVectors() bool
 	AnalyzedLength() int
 	AnalyzedTokenFrequencies() index.TokenFrequencies
 }

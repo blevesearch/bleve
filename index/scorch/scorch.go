@@ -568,7 +568,7 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 
 func analyze(d index.Document) {
 	d.VisitFields(func(field index.Field) {
-		if field.IsIndexed() {
+		if field.Options().IsIndexed() {
 			field.Analyze()
 
 			if d.HasComposite() && field.Name() != "_id" {

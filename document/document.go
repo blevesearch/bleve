@@ -110,7 +110,7 @@ func (d *Document) SetID(id string) {
 }
 
 func (d *Document) AddIDField() {
-	d.AddField(NewTextFieldCustom("_id", nil, []byte(d.ID()), IndexField|StoreField, nil))
+	d.AddField(NewTextFieldCustom("_id", nil, []byte(d.ID()), index.IndexField|index.StoreField, nil))
 }
 
 func (d *Document) VisitFields(visitor index.FieldVisitor) {

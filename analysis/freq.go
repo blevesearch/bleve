@@ -18,10 +18,10 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-func TokenFrequency(tokens TokenStream, arrayPositions []uint64, includeTermVectors bool) index.TokenFrequencies {
+func TokenFrequency(tokens TokenStream, arrayPositions []uint64, options index.FieldIndexingOptions) index.TokenFrequencies {
 	rv := make(map[string]*index.TokenFreq, len(tokens))
 
-	if includeTermVectors {
+	if options.IncludeTermVectors() {
 		tls := make([]index.TokenLocation, len(tokens))
 		tlNext := 0
 

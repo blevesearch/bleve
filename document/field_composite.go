@@ -28,14 +28,14 @@ func init() {
 	reflectStaticSizeCompositeField = int(reflect.TypeOf(cf).Size())
 }
 
-const DefaultCompositeIndexingOptions = IndexField
+const DefaultCompositeIndexingOptions = index.IndexField
 
 type CompositeField struct {
 	name                 string
 	includedFields       map[string]bool
 	excludedFields       map[string]bool
 	defaultInclude       bool
-	options              IndexingOptions
+	options              index.FieldIndexingOptions
 	totalLength          int
 	compositeFrequencies index.TokenFrequencies
 }
@@ -44,7 +44,7 @@ func NewCompositeField(name string, defaultInclude bool, include []string, exclu
 	return NewCompositeFieldWithIndexingOptions(name, defaultInclude, include, exclude, DefaultCompositeIndexingOptions)
 }
 
-func NewCompositeFieldWithIndexingOptions(name string, defaultInclude bool, include []string, exclude []string, options IndexingOptions) *CompositeField {
+func NewCompositeFieldWithIndexingOptions(name string, defaultInclude bool, include []string, exclude []string, options index.FieldIndexingOptions) *CompositeField {
 	rv := &CompositeField{
 		name:                 name,
 		options:              options,
@@ -87,7 +87,7 @@ func (c *CompositeField) ArrayPositions() []uint64 {
 	return []uint64{}
 }
 
-func (c *CompositeField) Options() IndexingOptions {
+func (c *CompositeField) Options() index.FieldIndexingOptions {
 	return c.options
 }
 
@@ -124,22 +124,6 @@ func (c *CompositeField) Compose(field string, length int, freq index.TokenFrequ
 
 func (c *CompositeField) EncodedFieldType() byte {
 	return 'c'
-}
-
-func (c *CompositeField) IsIndexed() bool {
-	return c.options.IsIndexed()
-}
-
-func (c *CompositeField) IsStored() bool {
-	return c.options.IsStored()
-}
-
-func (c *CompositeField) IncludeDocValues() bool {
-	return c.options.IncludeDocValues()
-}
-
-func (c *CompositeField) IncludeTermVectors() bool {
-	return c.options.IncludeTermVectors()
 }
 
 func (c *CompositeField) AnalyzedLength() int {
