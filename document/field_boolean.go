@@ -72,7 +72,7 @@ func (b *BooleanField) Analyze() {
 	})
 
 	b.length = len(tokens)
-	b.frequencies = analysis.TokenFrequency(tokens, b.arrayPositions, b.options.IncludeTermVectors())
+	b.frequencies = analysis.TokenFrequency(tokens, b.arrayPositions, b.options)
 }
 
 func (b *BooleanField) Value() []byte {

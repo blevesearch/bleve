@@ -54,7 +54,7 @@ func TestTokenFrequency(t *testing.T) {
 		},
 	}
 	expectedResult["water"].SetFrequency(2)
-	result := TokenFrequency(tokens, nil, true)
+	result := TokenFrequency(tokens, nil, index.IncludeTermVectors)
 	if !reflect.DeepEqual(result, expectedResult) {
 		t.Errorf("expected %#v, got %#v", expectedResult, result)
 	}

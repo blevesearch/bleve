@@ -15,6 +15,7 @@
 package analysis_test
 
 import (
+	index "github.com/blevesearch/bleve_index_api"
 	"testing"
 
 	"github.com/blevesearch/bleve/analysis"
@@ -32,7 +33,7 @@ func BenchmarkAnalysis(b *testing.B) {
 		}
 
 		ts := analyzer.Analyze(bleveWikiArticle)
-		freqs := analysis.TokenFrequency(ts, nil, true)
+		freqs := analysis.TokenFrequency(ts, nil, index.IncludeTermVectors)
 		if len(freqs) != 511 {
 			b.Errorf("expected %d freqs, got %d", 511, len(freqs))
 		}

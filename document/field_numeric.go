@@ -107,7 +107,7 @@ func (n *NumericField) Analyze() {
 	}
 
 	n.length = len(tokens)
-	n.frequencies = analysis.TokenFrequency(tokens, n.arrayPositions, n.options.IncludeTermVectors())
+	n.frequencies = analysis.TokenFrequency(tokens, n.arrayPositions, n.options)
 }
 
 func (n *NumericField) Value() []byte {
