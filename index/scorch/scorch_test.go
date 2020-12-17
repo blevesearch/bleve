@@ -1548,7 +1548,7 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 	}
 }
 
-func TestIndexDocumentVisitFieldTerms(t *testing.T) {
+func TestIndexDocValueReader(t *testing.T) {
 	cfg := CreateConfig("TestIndexDocumentVisitFieldTerms")
 	err := InitTest(cfg)
 	if err != nil {
@@ -1596,29 +1596,34 @@ func TestIndexDocumentVisitFieldTerms(t *testing.T) {
 		}
 	}()
 
-	fieldTerms := make(index.FieldTerms)
+	actualFieldTerms := make(fieldTerms)
 
 	internalID, err := indexReader.InternalID("1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = indexReader.DocumentVisitFieldTerms(internalID, []string{"name", "title"}, func(field string, term []byte) {
-		fieldTerms[field] = append(fieldTerms[field], string(term))
+	dvr, err := indexReader.DocValueReader([]string{"name", "title"})
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = dvr.VisitDocValues(internalID, func(field string, term []byte) {
+		actualFieldTerms[field] = append(actualFieldTerms[field], string(term))
 	})
 	if err != nil {
 		t.Error(err)
 	}
-	expectedFieldTerms := index.FieldTerms{
+	expectedFieldTerms := fieldTerms{
 		"name":  []string{"test"},
 		"title": []string{"mister"},
 	}
-	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
-		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	if !reflect.DeepEqual(actualFieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, actualFieldTerms)
 	}
 }
 
-func TestFieldTermsConcurrent(t *testing.T) {
+func TestDocValueReaderConcurrent(t *testing.T) {
 	cfg := CreateConfig("TestFieldTermsConcurrent")
 
 	// setting path to empty string disables persistence/merging
@@ -1689,9 +1694,11 @@ func TestFieldTermsConcurrent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = r.DocumentVisitFieldTerms(docNumber,
-				[]string{fmt.Sprintf("f%d", rand.Intn(100))},
-				func(field string, term []byte) {})
+			dvr, err := r.DocValueReader([]string{fmt.Sprintf("f%d", rand.Intn(100))})
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = dvr.VisitDocValues(docNumber, func(field string, term []byte) {})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1838,7 +1845,7 @@ Mechanism[edit]
 This section needs additional citations for verification. Please help improve this article by adding citations to reliable sources. Unsourced material may be challenged and removed. (July 2013)
 There are three characteristics of liquids which are relevant to the discussion of a BLEVE:`)
 
-func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
+func TestIndexDocValueReaderWithMultipleDocs(t *testing.T) {
 	cfg := CreateConfig("TestIndexDocumentVisitFieldTermsWithMultipleDocs")
 	err := InitTest(cfg)
 	if err != nil {
@@ -1881,23 +1888,29 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 		t.Error(err)
 	}
 
-	fieldTerms := make(index.FieldTerms)
+	actualFieldTerms := make(fieldTerms)
 	docNumber, err := indexReader.InternalID("1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
-		fieldTerms[field] = append(fieldTerms[field], string(term))
+
+	dvr, err := indexReader.DocValueReader([]string{"name", "title"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = dvr.VisitDocValues(docNumber, func(field string, term []byte) {
+		actualFieldTerms[field] = append(actualFieldTerms[field], string(term))
 	})
 	if err != nil {
 		t.Error(err)
 	}
-	expectedFieldTerms := index.FieldTerms{
+	expectedFieldTerms := fieldTerms{
 		"name":  []string{"test"},
 		"title": []string{"mister"},
 	}
-	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
-		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	if !reflect.DeepEqual(actualFieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, actualFieldTerms)
 	}
 	err = indexReader.Close()
 	if err != nil {
@@ -1916,23 +1929,29 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 		t.Error(err)
 	}
 
-	fieldTerms = make(index.FieldTerms)
+	actualFieldTerms = make(fieldTerms)
 	docNumber, err = indexReader.InternalID("2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
-		fieldTerms[field] = append(fieldTerms[field], string(term))
+
+	dvr, err = indexReader.DocValueReader([]string{"name", "title"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = dvr.VisitDocValues(docNumber, func(field string, term []byte) {
+		actualFieldTerms[field] = append(actualFieldTerms[field], string(term))
 	})
 	if err != nil {
 		t.Error(err)
 	}
-	expectedFieldTerms = index.FieldTerms{
+	expectedFieldTerms = fieldTerms{
 		"name":  []string{"test2"},
 		"title": []string{"mister2"},
 	}
-	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
-		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	if !reflect.DeepEqual(actualFieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, actualFieldTerms)
 	}
 	err = indexReader.Close()
 	if err != nil {
@@ -1951,42 +1970,54 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 		t.Error(err)
 	}
 
-	fieldTerms = make(index.FieldTerms)
+	actualFieldTerms = make(fieldTerms)
 	docNumber, err = indexReader.InternalID("3")
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name3", "title3"}, func(field string, term []byte) {
-		fieldTerms[field] = append(fieldTerms[field], string(term))
+
+	dvr, err = indexReader.DocValueReader([]string{"name3", "title3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = dvr.VisitDocValues(docNumber, func(field string, term []byte) {
+		actualFieldTerms[field] = append(actualFieldTerms[field], string(term))
 	})
 	if err != nil {
 		t.Error(err)
 	}
-	expectedFieldTerms = index.FieldTerms{
+	expectedFieldTerms = fieldTerms{
 		"name3":  []string{"test3"},
 		"title3": []string{"mister3"},
 	}
-	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
-		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	if !reflect.DeepEqual(actualFieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, actualFieldTerms)
 	}
 
-	fieldTerms = make(index.FieldTerms)
+	actualFieldTerms = make(fieldTerms)
 	docNumber, err = indexReader.InternalID("1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
-		fieldTerms[field] = append(fieldTerms[field], string(term))
+
+	dvr, err = indexReader.DocValueReader([]string{"name", "title"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = dvr.VisitDocValues(docNumber, func(field string, term []byte) {
+		actualFieldTerms[field] = append(actualFieldTerms[field], string(term))
 	})
 	if err != nil {
 		t.Error(err)
 	}
-	expectedFieldTerms = index.FieldTerms{
+	expectedFieldTerms = fieldTerms{
 		"name":  []string{"test"},
 		"title": []string{"mister"},
 	}
-	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
-		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	if !reflect.DeepEqual(actualFieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, actualFieldTerms)
 	}
 	err = indexReader.Close()
 	if err != nil {
@@ -1995,7 +2026,7 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 
 }
 
-func TestIndexDocumentVisitFieldTermsWithMultipleFieldOptions(t *testing.T) {
+func TestIndexDocValueReaderWithMultipleFieldOptions(t *testing.T) {
 	cfg := CreateConfig("TestIndexDocumentVisitFieldTermsWithMultipleFieldOptions")
 	err := InitTest(cfg)
 	if err != nil {
@@ -2043,24 +2074,30 @@ func TestIndexDocumentVisitFieldTermsWithMultipleFieldOptions(t *testing.T) {
 		t.Error(err)
 	}
 
-	fieldTerms := make(index.FieldTerms)
+	actualFieldTerms := make(fieldTerms)
 	docNumber, err := indexReader.InternalID("1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "designation", "dept"}, func(field string, term []byte) {
-		fieldTerms[field] = append(fieldTerms[field], string(term))
+
+	dvr, err := indexReader.DocValueReader([]string{"name", "designation", "dept"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = dvr.VisitDocValues(docNumber, func(field string, term []byte) {
+		actualFieldTerms[field] = append(actualFieldTerms[field], string(term))
 	})
 	if err != nil {
 		t.Error(err)
 	}
-	expectedFieldTerms := index.FieldTerms{
+	expectedFieldTerms := fieldTerms{
 		"name":        []string{"test"},
 		"designation": []string{"engineer"},
 		"dept":        []string{"bleve"},
 	}
-	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
-		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	if !reflect.DeepEqual(actualFieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, actualFieldTerms)
 	}
 	err = indexReader.Close()
 	if err != nil {
@@ -2472,5 +2509,28 @@ func TestIndexSeekBackwardsStats(t *testing.T) {
 		t.Errorf("expected term searchers started %d to equal term searchers finished %d",
 			idx.(*Scorch).stats.TotTermSearchersStarted,
 			idx.(*Scorch).stats.TotTermSearchersFinished)
+	}
+}
+
+// fieldTerms contains the terms used by a document, keyed by field
+type fieldTerms map[string][]string
+
+// FieldsNotYetCached returns a list of fields not yet cached out of a larger list of fields
+func (f fieldTerms) FieldsNotYetCached(fields []string) []string {
+	rv := make([]string, 0, len(fields))
+	for _, field := range fields {
+		if _, ok := f[field]; !ok {
+			rv = append(rv, field)
+		}
+	}
+	return rv
+}
+
+// Merge will combine two fieldTerms
+// it assumes that the terms lists are complete (thus do not need to be merged)
+// field terms from the other list always replace the ones in the receiver
+func (f fieldTerms) Merge(other fieldTerms) {
+	for field, terms := range other {
+		f[field] = terms
 	}
 }

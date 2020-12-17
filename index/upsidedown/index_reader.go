@@ -109,7 +109,7 @@ func (i *IndexReader) Document(id string) (doc index.Document, err error) {
 	return rvd, nil
 }
 
-func (i *IndexReader) DocumentVisitFieldTerms(id index.IndexInternalID, fields []string, visitor index.DocumentFieldTermVisitor) error {
+func (i *IndexReader) documentVisitFieldTerms(id index.IndexInternalID, fields []string, visitor index.DocumentFieldTermVisitor) error {
 	fieldsMap := make(map[uint16]string, len(fields))
 	for _, f := range fields {
 		id, ok := i.index.fieldCache.FieldNamed(f, false)
@@ -221,5 +221,5 @@ type DocValueReader struct {
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	visitor index.DocumentFieldTermVisitor) error {
-	return dvr.i.DocumentVisitFieldTerms(id, dvr.fields, visitor)
+	return dvr.i.documentVisitFieldTerms(id, dvr.fields, visitor)
 }
