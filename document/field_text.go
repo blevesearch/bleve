@@ -108,6 +108,10 @@ func (t *TextField) Value() []byte {
 	return t.value
 }
 
+func (t *TextField) Text() string {
+	return string(t.value)
+}
+
 func (t *TextField) GoString() string {
 	return fmt.Sprintf("&document.TextField{Name:%s, Options: %s, Analyzer: %v, Value: %s, ArrayPositions: %v}", t.name, t.options, t.analyzer, t.value, t.arrayPositions)
 }

@@ -19,7 +19,6 @@ import (
 	"fmt"
 	index "github.com/blevesearch/bleve_index_api"
 
-	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/highlight"
@@ -84,7 +83,7 @@ func (s *Highlighter) BestFragmentsInField(dm *search.DocumentMatch, doc index.D
 	heap.Init(&fq)
 	doc.VisitFields(func(f index.Field) {
 		if f.Name() == field {
-			_, ok := f.(*document.TextField)
+			_, ok := f.(index.TextField)
 			if ok {
 				termLocationsSameArrayPosition := make(highlight.TermLocations, 0)
 				for _, otl := range orderedTermLocations {
