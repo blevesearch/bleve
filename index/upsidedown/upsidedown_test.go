@@ -1301,7 +1301,7 @@ func TestIndexDocumentVisitFieldTerms(t *testing.T) {
 
 	fieldTerms := make(index.FieldTerms)
 
-	err = indexReader.DocumentVisitFieldTerms(index.IndexInternalID("1"), []string{"name", "title"}, func(field string, term []byte) {
+	err = indexReader.VisitStoredFieldTerms(index.IndexInternalID("1"), []string{"name", "title"}, func(field string, term []byte) {
 		fieldTerms[field] = append(fieldTerms[field], string(term))
 	})
 	if err != nil {

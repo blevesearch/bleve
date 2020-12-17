@@ -253,7 +253,7 @@ func (c *cachedDocs) updateSizeLOCKED() {
 }
 
 func (c *cachedDocs) visitDoc(localDocNum uint64,
-	fields []string, visitor index.DocumentFieldTermVisitor) {
+	fields []string, visitor index.FieldTermVisitor) {
 	c.m.Lock()
 
 	for _, field := range fields {

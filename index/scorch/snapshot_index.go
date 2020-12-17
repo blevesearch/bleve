@@ -597,14 +597,14 @@ func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
 	return binary.BigEndian.Uint64(in), nil
 }
 
-func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
-	fields []string, visitor index.DocumentFieldTermVisitor) error {
+func (i *IndexSnapshot) VisitStoredFieldTerms(id index.IndexInternalID,
+	fields []string, visitor index.FieldTermVisitor) error {
 	_, err := i.documentVisitFieldTerms(id, fields, visitor, nil)
 	return err
 }
 
 func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
-	fields []string, visitor index.DocumentFieldTermVisitor,
+	fields []string, visitor index.FieldTermVisitor,
 	dvs segment.DocVisitState) (segment.DocVisitState, error) {
 	docNum, err := docInternalToNumber(id)
 	if err != nil {
@@ -624,7 +624,7 @@ func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
 
 func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	segmentIndex int, localDocNum uint64, fields []string, cFields []string,
-	visitor index.DocumentFieldTermVisitor, dvs segment.DocVisitState) (
+	visitor index.FieldTermVisitor, dvs segment.DocVisitState) (
 	cFieldsOut []string, dvsOut segment.DocVisitState, err error) {
 	ss := i.segment[segmentIndex]
 
@@ -696,7 +696,7 @@ type DocValueReader struct {
 }
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
-	visitor index.DocumentFieldTermVisitor) (err error) {
+	visitor index.FieldTermVisitor) (err error) {
 	docNum, err := docInternalToNumber(id)
 	if err != nil {
 		return err

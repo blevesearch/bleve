@@ -68,7 +68,7 @@ type TopNCollector struct {
 	cachedDesc    []bool
 
 	lowestMatchOutsideResults *search.DocumentMatch
-	updateFieldVisitor        index.DocumentFieldTermVisitor
+	updateFieldVisitor        index.FieldTermVisitor
 	dvReader                  index.DocValueReader
 	searchAfter               *search.DocumentMatch
 }

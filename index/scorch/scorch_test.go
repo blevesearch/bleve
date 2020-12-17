@@ -1603,7 +1603,7 @@ func TestIndexDocumentVisitFieldTerms(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = indexReader.DocumentVisitFieldTerms(internalID, []string{"name", "title"}, func(field string, term []byte) {
+	err = indexReader.VisitStoredFieldTerms(internalID, []string{"name", "title"}, func(field string, term []byte) {
 		fieldTerms[field] = append(fieldTerms[field], string(term))
 	})
 	if err != nil {
@@ -1689,7 +1689,7 @@ func TestFieldTermsConcurrent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = r.DocumentVisitFieldTerms(docNumber,
+			err = r.VisitStoredFieldTerms(docNumber,
 				[]string{fmt.Sprintf("f%d", rand.Intn(100))},
 				func(field string, term []byte) {})
 			if err != nil {
@@ -1886,7 +1886,7 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
+	err = indexReader.VisitStoredFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
 		fieldTerms[field] = append(fieldTerms[field], string(term))
 	})
 	if err != nil {
@@ -1921,7 +1921,7 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
+	err = indexReader.VisitStoredFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
 		fieldTerms[field] = append(fieldTerms[field], string(term))
 	})
 	if err != nil {
@@ -1956,7 +1956,7 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name3", "title3"}, func(field string, term []byte) {
+	err = indexReader.VisitStoredFieldTerms(docNumber, []string{"name3", "title3"}, func(field string, term []byte) {
 		fieldTerms[field] = append(fieldTerms[field], string(term))
 	})
 	if err != nil {
@@ -1975,7 +1975,7 @@ func TestIndexDocumentVisitFieldTermsWithMultipleDocs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
+	err = indexReader.VisitStoredFieldTerms(docNumber, []string{"name", "title"}, func(field string, term []byte) {
 		fieldTerms[field] = append(fieldTerms[field], string(term))
 	})
 	if err != nil {
@@ -2048,7 +2048,7 @@ func TestIndexDocumentVisitFieldTermsWithMultipleFieldOptions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = indexReader.DocumentVisitFieldTerms(docNumber, []string{"name", "designation", "dept"}, func(field string, term []byte) {
+	err = indexReader.VisitStoredFieldTerms(docNumber, []string{"name", "designation", "dept"}, func(field string, term []byte) {
 		fieldTerms[field] = append(fieldTerms[field], string(term))
 	})
 	if err != nil {
