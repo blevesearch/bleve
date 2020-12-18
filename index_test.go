@@ -67,7 +67,7 @@ func TestCrud(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New(tmpIndexPath, NewIndexMapping())
+	idx, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestCrud(t *testing.T) {
 		"name": "marty",
 		"desc": "gophercon india",
 	}
-	err = index.Index("a", doca)
+	err = idx.Index("a", doca)
 	if err != nil {
 		t.Error(err)
 	}
@@ -85,12 +85,12 @@ func TestCrud(t *testing.T) {
 		"name": "jasper",
 		"desc": "clojure",
 	}
-	err = index.Index("y", docy)
+	err = idx.Index("y", docy)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = index.Delete("y")
+	err = idx.Delete("y")
 	if err != nil {
 		t.Error(err)
 	}
@@ -99,12 +99,12 @@ func TestCrud(t *testing.T) {
 		"name": "rose",
 		"desc": "googler",
 	}
-	err = index.Index("x", docx)
+	err = idx.Index("x", docx)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = index.SetInternal([]byte("status"), []byte("pending"))
+	err = idx.SetInternal([]byte("status"), []byte("pending"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -113,7 +113,7 @@ func TestCrud(t *testing.T) {
 		"name": "steve",
 		"desc": "cbft master",
 	}
-	batch := index.NewBatch()
+	batch := idx.NewBatch()
 	err = batch.Index("b", docb)
 	if err != nil {
 		t.Error(err)
@@ -121,18 +121,18 @@ func TestCrud(t *testing.T) {
 	batch.Delete("x")
 	batch.SetInternal([]byte("batchi"), []byte("batchv"))
 	batch.DeleteInternal([]byte("status"))
-	err = index.Batch(batch)
+	err = idx.Batch(batch)
 	if err != nil {
 		t.Error(err)
 	}
-	val, err := index.GetInternal([]byte("batchi"))
+	val, err := idx.GetInternal([]byte("batchi"))
 	if err != nil {
 		t.Error(err)
 	}
 	if string(val) != "batchv" {
 		t.Errorf("expected 'batchv', got '%s'", val)
 	}
-	val, err = index.GetInternal([]byte("status"))
+	val, err = idx.GetInternal([]byte("status"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -140,19 +140,19 @@ func TestCrud(t *testing.T) {
 		t.Errorf("expected nil, got '%s'", val)
 	}
 
-	err = index.SetInternal([]byte("seqno"), []byte("7"))
+	err = idx.SetInternal([]byte("seqno"), []byte("7"))
 	if err != nil {
 		t.Error(err)
 	}
-	err = index.SetInternal([]byte("status"), []byte("ready"))
+	err = idx.SetInternal([]byte("status"), []byte("ready"))
 	if err != nil {
 		t.Error(err)
 	}
-	err = index.DeleteInternal([]byte("status"))
+	err = idx.DeleteInternal([]byte("status"))
 	if err != nil {
 		t.Error(err)
 	}
-	val, err = index.GetInternal([]byte("status"))
+	val, err = idx.GetInternal([]byte("status"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -160,7 +160,7 @@ func TestCrud(t *testing.T) {
 		t.Errorf("expected nil, got '%s'", val)
 	}
 
-	val, err = index.GetInternal([]byte("seqno"))
+	val, err = idx.GetInternal([]byte("seqno"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -169,23 +169,23 @@ func TestCrud(t *testing.T) {
 	}
 
 	// close the index, open it again, and try some more things
-	err = index.Close()
+	err = idx.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	index, err = Open(tmpIndexPath)
+	idx, err = Open(tmpIndexPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		err := index.Close()
+		err := idx.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	count, err := index.DocCount()
+	count, err := idx.DocCount()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,25 +193,21 @@ func TestCrud(t *testing.T) {
 		t.Errorf("expected doc count 2, got %d", count)
 	}
 
-	docInt, err := index.Document("a")
+	doc, err := idx.Document("a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	doc := docInt.(*document.Document)
-	if doc == nil {
-		t.Errorf("expected doc not nil, got nil")
-	}
 	foundNameField := false
-	for _, field := range doc.Fields {
+	doc.VisitFields(func(field index.Field) {
 		if field.Name() == "name" && string(field.Value()) == "marty" {
 			foundNameField = true
 		}
-	}
+	})
 	if !foundNameField {
 		t.Errorf("expected to find field named 'name' with value 'marty'")
 	}
 
-	fields, err := index.Fields()
+	fields, err := idx.Fields()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -857,13 +853,13 @@ func TestDocumentFieldArrayPositions(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New(tmpIndexPath, NewIndexMapping())
+	idx, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// index a document with an array of strings
-	err = index.Index("k", struct {
+	err = idx.Index("k", struct {
 		Messages []string
 	}{
 		Messages: []string{
@@ -878,18 +874,17 @@ func TestDocumentFieldArrayPositions(t *testing.T) {
 	}
 
 	// load the document
-	docInt, err := index.Document("k")
+	doc, err := idx.Document("k")
 	if err != nil {
 		t.Fatal(err)
 	}
-	doc := docInt.(*document.Document)
 
-	for _, f := range doc.Fields {
+	doc.VisitFields(func(f index.Field) {
 		if reflect.DeepEqual(f.Value(), []byte("first")) {
 			ap := f.ArrayPositions()
 			if len(ap) < 1 {
 				t.Errorf("expected an array position, got none")
-				continue
+				return
 			}
 			if ap[0] != 0 {
 				t.Errorf("expected 'first' in array position 0, got %d", ap[0])
@@ -899,7 +894,7 @@ func TestDocumentFieldArrayPositions(t *testing.T) {
 			ap := f.ArrayPositions()
 			if len(ap) < 1 {
 				t.Errorf("expected an array position, got none")
-				continue
+				return
 			}
 			if ap[0] != 1 {
 				t.Errorf("expected 'second' in array position 1, got %d", ap[0])
@@ -909,7 +904,7 @@ func TestDocumentFieldArrayPositions(t *testing.T) {
 			ap := f.ArrayPositions()
 			if len(ap) < 1 {
 				t.Errorf("expected an array position, got none")
-				continue
+				return
 			}
 			if ap[0] != 2 {
 				t.Errorf("expected 'third' in array position 2, got %d", ap[0])
@@ -919,16 +914,16 @@ func TestDocumentFieldArrayPositions(t *testing.T) {
 			ap := f.ArrayPositions()
 			if len(ap) < 1 {
 				t.Errorf("expected an array position, got none")
-				continue
+				return
 			}
 			if ap[0] != 3 {
 				t.Errorf("expected 'last' in array position 3, got %d", ap[0])
 			}
 		}
-	}
+	})
 
 	// now index a document in the same field with a single string
-	err = index.Index("k2", struct {
+	err = idx.Index("k2", struct {
 		Messages string
 	}{
 		Messages: "only",
@@ -938,23 +933,22 @@ func TestDocumentFieldArrayPositions(t *testing.T) {
 	}
 
 	// load the document
-	docInt, err = index.Document("k2")
+	doc, err = idx.Document("k2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	doc = docInt.(*document.Document)
 
-	for _, f := range doc.Fields {
+	doc.VisitFields(func(f index.Field) {
 		if reflect.DeepEqual(f.Value(), []byte("only")) {
 			ap := f.ArrayPositions()
 			if len(ap) != 0 {
 				t.Errorf("expected no array positions, got %d", len(ap))
-				continue
+				return
 			}
 		}
-	}
+	})
 
-	err = index.Close()
+	err = idx.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1835,7 +1829,7 @@ func TestBatchMerge(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New(tmpIndexPath, NewIndexMapping())
+	idx, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1845,7 +1839,7 @@ func TestBatchMerge(t *testing.T) {
 		"nation": "india",
 	}
 
-	batchA := index.NewBatch()
+	batchA := idx.NewBatch()
 	err = batchA.Index("a", doca)
 	if err != nil {
 		t.Error(err)
@@ -1857,7 +1851,7 @@ func TestBatchMerge(t *testing.T) {
 		"desc": "gophercon MV",
 	}
 
-	batchB := index.NewBatch()
+	batchB := idx.NewBatch()
 	err = batchB.Index("b", docb)
 	if err != nil {
 		t.Error(err)
@@ -1870,7 +1864,7 @@ func TestBatchMerge(t *testing.T) {
 		"country": "usa",
 	}
 
-	batchC := index.NewBatch()
+	batchC := idx.NewBatch()
 	err = batchC.Index("c", docC)
 	if err != nil {
 		t.Error(err)
@@ -1892,29 +1886,29 @@ func TestBatchMerge(t *testing.T) {
 		t.Errorf("expected batch size 6, got %d", batchA.Size())
 	}
 
-	err = index.Batch(batchA)
+	err = idx.Batch(batchA)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// close the index, open it again, and try some more things
-	err = index.Close()
+	err = idx.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	index, err = Open(tmpIndexPath)
+	idx, err = Open(tmpIndexPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		err := index.Close()
+		err := idx.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	count, err := index.DocCount()
+	count, err := idx.DocCount()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1922,16 +1916,12 @@ func TestBatchMerge(t *testing.T) {
 		t.Errorf("expected doc count 2, got %d", count)
 	}
 
-	docInt, err := index.Document("c")
+	doc, err := idx.Document("c")
 	if err != nil {
 		t.Fatal(err)
 	}
-	doc := docInt.(*document.Document)
-	if doc == nil {
-		t.Errorf("expected doc not nil, got nil")
-	}
 
-	val, err := index.GetInternal([]byte("batchkB"))
+	val, err := idx.GetInternal([]byte("batchkB"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1939,7 +1929,7 @@ func TestBatchMerge(t *testing.T) {
 		t.Errorf("expected val: batchvBNew , got %s", val)
 	}
 
-	val, err = index.GetInternal([]byte("batchkA"))
+	val, err = idx.GetInternal([]byte("batchkA"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1948,16 +1938,16 @@ func TestBatchMerge(t *testing.T) {
 	}
 
 	foundNameField := false
-	for _, field := range doc.Fields {
+	doc.VisitFields(func(field index.Field) {
 		if field.Name() == "name" && string(field.Value()) == "blahblah" {
 			foundNameField = true
 		}
-	}
+	})
 	if !foundNameField {
 		t.Errorf("expected to find field named 'name' with value 'blahblah'")
 	}
 
-	fields, err := index.Fields()
+	fields, err := idx.Fields()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -609,24 +609,24 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 						if f == "*" || docF.Name() == f {
 							var value interface{}
 							switch docF := docF.(type) {
-							case *document.TextField:
-								value = string(docF.Value())
-							case *document.NumericField:
+							case index.TextField:
+								value = docF.Text()
+							case index.NumericField:
 								num, err := docF.Number()
 								if err == nil {
 									value = num
 								}
-							case *document.DateTimeField:
+							case index.DateTimeField:
 								datetime, err := docF.DateTime()
 								if err == nil {
 									value = datetime.Format(time.RFC3339)
 								}
-							case *document.BooleanField:
+							case index.BooleanField:
 								boolean, err := docF.Boolean()
 								if err == nil {
 									value = boolean
 								}
-							case *document.GeoPointField:
+							case index.GeoPointField:
 								lon, err := docF.Lon()
 								if err == nil {
 									lat, err := docF.Lat()
