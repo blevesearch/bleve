@@ -597,31 +597,6 @@ func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
 	return binary.BigEndian.Uint64(in), nil
 }
 
-func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
-	fields []string, visitor index.DocumentFieldTermVisitor) error {
-	_, err := i.documentVisitFieldTerms(id, fields, visitor, nil)
-	return err
-}
-
-func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
-	fields []string, visitor index.DocumentFieldTermVisitor,
-	dvs segment.DocVisitState) (segment.DocVisitState, error) {
-	docNum, err := docInternalToNumber(id)
-	if err != nil {
-		return nil, err
-	}
-
-	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
-	if segmentIndex >= len(i.segment) {
-		return nil, nil
-	}
-
-	_, dvs, err = i.documentVisitFieldTermsOnSegment(
-		segmentIndex, localDocNum, fields, nil, visitor, dvs)
-
-	return dvs, err
-}
-
 func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	segmentIndex int, localDocNum uint64, fields []string, cFields []string,
 	visitor index.DocumentFieldTermVisitor, dvs segment.DocVisitState) (
