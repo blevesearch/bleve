@@ -1256,7 +1256,7 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 	}
 }
 
-func TestIndexDocumentVisitFieldTerms(t *testing.T) {
+func TestIndexDocValueReader(t *testing.T) {
 	defer func() {
 		err := DestroyTest()
 		if err != nil {
@@ -1299,20 +1299,25 @@ func TestIndexDocumentVisitFieldTerms(t *testing.T) {
 		}
 	}()
 
-	fieldTerms := make(index.FieldTerms)
+	actualFieldTerms := make(fieldTerms)
 
-	err = indexReader.DocumentVisitFieldTerms(index.IndexInternalID("1"), []string{"name", "title"}, func(field string, term []byte) {
-		fieldTerms[field] = append(fieldTerms[field], string(term))
+	dvr, err := indexReader.DocValueReader([]string{"name", "title"})
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = dvr.VisitDocValues(index.IndexInternalID("1"), func(field string, term []byte) {
+		actualFieldTerms[field] = append(actualFieldTerms[field], string(term))
 	})
 	if err != nil {
 		t.Error(err)
 	}
-	expectedFieldTerms := index.FieldTerms{
+	expectedFieldTerms := fieldTerms{
 		"name":  []string{"test"},
 		"title": []string{"mister"},
 	}
-	if !reflect.DeepEqual(fieldTerms, expectedFieldTerms) {
-		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, fieldTerms)
+	if !reflect.DeepEqual(actualFieldTerms, expectedFieldTerms) {
+		t.Errorf("expected field terms: %#v, got: %#v", expectedFieldTerms, actualFieldTerms)
 	}
 }
 
@@ -1497,4 +1502,27 @@ func TestIndexBatchPersistedCallbackWithErrorUpsideDown(t *testing.T) {
 		t.Fatal("expected callback to fire, it did not")
 	}
 
+}
+
+// fieldTerms contains the terms used by a document, keyed by field
+type fieldTerms map[string][]string
+
+// FieldsNotYetCached returns a list of fields not yet cached out of a larger list of fields
+func (f fieldTerms) FieldsNotYetCached(fields []string) []string {
+	rv := make([]string, 0, len(fields))
+	for _, field := range fields {
+		if _, ok := f[field]; !ok {
+			rv = append(rv, field)
+		}
+	}
+	return rv
+}
+
+// Merge will combine two fieldTerms
+// it assumes that the terms lists are complete (thus do not need to be merged)
+// field terms from the other list always replace the ones in the receiver
+func (f fieldTerms) Merge(other fieldTerms) {
+	for field, terms := range other {
+		f[field] = terms
+	}
 }
