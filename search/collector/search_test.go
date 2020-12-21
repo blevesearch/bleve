@@ -121,7 +121,7 @@ func (sr *stubReader) Document(id string) (index.Document, error) {
 	return nil, nil
 }
 
-func (sr *stubReader) DocumentVisitFieldTerms(id index.IndexInternalID, fields []string, visitor index.DocumentFieldTermVisitor) error {
+func (sr *stubReader) DocumentVisitFieldTerms(id index.IndexInternalID, fields []string, visitor index.DocValueVisitor) error {
 	return nil
 }
 
@@ -170,6 +170,6 @@ type DocValueReader struct {
 	fields []string
 }
 
-func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID, visitor index.DocumentFieldTermVisitor) error {
+func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID, visitor index.DocValueVisitor) error {
 	return dvr.i.DocumentVisitFieldTerms(id, dvr.fields, visitor)
 }
