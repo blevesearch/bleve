@@ -20,14 +20,11 @@ import (
 	"log"
 	"time"
 
+	"github.com/blevesearch/bleve/index/scorch"
 	"github.com/blevesearch/bleve/index/upsidedown/store/gtreap"
-	"github.com/blevesearch/bleve/index/upsidedown"
 	"github.com/blevesearch/bleve/registry"
 	"github.com/blevesearch/bleve/search/highlight/highlighter/html"
 	index "github.com/blevesearch/bleve_index_api"
-
-	// force import of scorch so its accessible by default
-	_ "github.com/blevesearch/bleve/index/scorch"
 )
 
 var bleveExpVar = expvar.NewMap("bleve")
@@ -79,7 +76,7 @@ func init() {
 	Config.DefaultMemKVStore = gtreap.Name
 
 	// default index
-	Config.DefaultIndexType = upsidedown.Name
+	Config.DefaultIndexType = scorch.Name
 
 	bootDuration := time.Since(bootStart)
 	bleveExpVar.Add("bootDuration", int64(bootDuration))

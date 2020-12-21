@@ -449,6 +449,7 @@ func ExampleSearchRequest_SortByCustom() {
 			Field:   "Age",
 			Missing: search.SortFieldMissingFirst,
 		},
+		&search.SortDocID{},
 	})
 	searchResults, err := exampleIndex.Search(searchRequest)
 	if err != nil {
