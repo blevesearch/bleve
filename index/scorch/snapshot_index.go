@@ -599,13 +599,13 @@ func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
 
 func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	segmentIndex int, localDocNum uint64, fields []string, cFields []string,
-	visitor index.DocumentFieldTermVisitor, dvs segment.DocVisitState) (
+	visitor index.DocValueVisitor, dvs segment.DocVisitState) (
 	cFieldsOut []string, dvsOut segment.DocVisitState, err error) {
 	ss := i.segment[segmentIndex]
 
 	var vFields []string // fields that are visitable via the segment
 
-	ssv, ssvOk := ss.segment.(segment.DocumentFieldTermVisitable)
+	ssv, ssvOk := ss.segment.(segment.DocValueVisitable)
 	if ssvOk && ssv != nil {
 		vFields, err = ssv.VisitableDocValueFields()
 		if err != nil {
@@ -636,7 +636,7 @@ func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	}
 
 	if ssvOk && ssv != nil && len(vFields) > 0 {
-		dvs, err = ssv.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
+		dvs, err = ssv.VisitDocValues(localDocNum, fields, visitor, dvs)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -671,7 +671,7 @@ type DocValueReader struct {
 }
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
-	visitor index.DocumentFieldTermVisitor) (err error) {
+	visitor index.DocValueVisitor) (err error) {
 	docNum, err := docInternalToNumber(id)
 	if err != nil {
 		return err

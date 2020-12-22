@@ -62,8 +62,8 @@ func (s *SegmentSnapshot) Close() error {
 	return s.segment.Close()
 }
 
-func (s *SegmentSnapshot) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
-	return s.segment.VisitDocument(num, visitor)
+func (s *SegmentSnapshot) VisitDocument(num uint64, visitor segment.StoredFieldValueVisitor) error {
+	return s.segment.VisitStoredFields(num, visitor)
 }
 
 func (s *SegmentSnapshot) DocID(num uint64) ([]byte, error) {
@@ -253,7 +253,7 @@ func (c *cachedDocs) updateSizeLOCKED() {
 }
 
 func (c *cachedDocs) visitDoc(localDocNum uint64,
-	fields []string, visitor index.DocumentFieldTermVisitor) {
+	fields []string, visitor index.DocValueVisitor) {
 	c.m.Lock()
 
 	for _, field := range fields {

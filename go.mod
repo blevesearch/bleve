@@ -4,17 +4,17 @@ go 1.13
 
 require (
 	github.com/RoaringBitmap/roaring v0.4.23
-	github.com/blevesearch/bleve_index_api v0.0.6
+	github.com/blevesearch/bleve_index_api v0.0.7
 	github.com/blevesearch/go-porterstemmer v1.0.3
-	github.com/blevesearch/scorch_segment_api v0.0.8
+	github.com/blevesearch/scorch_segment_api v0.0.9
 	github.com/blevesearch/segment v0.9.0
 	github.com/blevesearch/snowballstem v0.9.0
 	github.com/blevesearch/upsidedown_store_api v0.0.1
-	github.com/blevesearch/zapx/v11 v11.1.7
-	github.com/blevesearch/zapx/v12 v12.1.7
-	github.com/blevesearch/zapx/v13 v13.1.7
-	github.com/blevesearch/zapx/v14 v14.1.7
-	github.com/blevesearch/zapx/v15 v15.1.7
+	github.com/blevesearch/zapx/v11 v11.1.8
+	github.com/blevesearch/zapx/v12 v12.1.8
+	github.com/blevesearch/zapx/v13 v13.1.8
+	github.com/blevesearch/zapx/v14 v14.1.8
+	github.com/blevesearch/zapx/v15 v15.1.8
 	github.com/couchbase/moss v0.1.0
 	github.com/couchbase/vellum v1.0.2
 	github.com/golang/protobuf v1.3.2
