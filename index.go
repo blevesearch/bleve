@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"context"
+	"github.com/blevesearch/bleve/index/upsidedown"
 
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/mapping"
@@ -261,7 +262,7 @@ func New(path string, mapping mapping.IndexMapping) (Index, error) {
 // The provided mapping will be used for all
 // Index/Search operations.
 func NewMemOnly(mapping mapping.IndexMapping) (Index, error) {
-	return newIndexUsing("", mapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	return newIndexUsing("", mapping, upsidedown.Name, Config.DefaultMemKVStore, nil)
 }
 
 // NewUsing creates index at the specified path,

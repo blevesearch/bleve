@@ -71,11 +71,11 @@ var defaultSegmentPlugin SegmentPlugin
 
 func init() {
 	ResetSegmentPlugins()
-	RegisterSegmentPlugin(&zapv15.ZapPlugin{}, false)
+	RegisterSegmentPlugin(&zapv15.ZapPlugin{}, true)
 	RegisterSegmentPlugin(&zapv14.ZapPlugin{}, false)
 	RegisterSegmentPlugin(&zapv13.ZapPlugin{}, false)
 	RegisterSegmentPlugin(&zapv12.ZapPlugin{}, false)
-	RegisterSegmentPlugin(&zapv11.ZapPlugin{}, true)
+	RegisterSegmentPlugin(&zapv11.ZapPlugin{}, false)
 }
 
 func ResetSegmentPlugins() {
