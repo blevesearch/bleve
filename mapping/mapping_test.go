@@ -18,13 +18,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/blevesearch/bleve/analysis/tokenizer/exception"
 	"github.com/blevesearch/bleve/analysis/tokenizer/regexp"
 	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/numeric"
 )
 
 var mappingSource = []byte(`{
@@ -40,7 +40,8 @@ var mappingSource = []byte(`{
     						"store": true,
     						"index": true,
                             "include_term_vectors": true,
-                            "include_in_all": true
+                            "include_in_all": true,
+                            "docvalues": true
     					}
     				]
     			}
@@ -868,37 +869,131 @@ func TestMappingForGeo(t *testing.T) {
 	mapping := NewIndexMapping()
 	mapping.DefaultMapping = thingMapping
 
-	x := struct {
+	geopoints := []interface{}{}
+	expect := [][]float64{} // to contain expected [lon,lat] for geopoints
+
+	// geopoint as a struct
+	geopoints = append(geopoints, struct {
 		Name     string    `json:"name"`
 		Location *Location `json:"location"`
 	}{
-		Name: "marty",
+		Name: "struct",
 		Location: &Location{
 			Lon: -180,
 			Lat: -90,
 		},
-	}
+	})
+	expect = append(expect, []float64{-180, -90})
 
-	doc := document.NewDocument("1")
-	err := mapping.MapDocument(doc, x)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// geopoint as a map
+	geopoints = append(geopoints, struct {
+		Name     string                 `json:"name"`
+		Location map[string]interface{} `json:"location"`
+	}{
+		Name: "map",
+		Location: map[string]interface{}{
+			"lon": -180,
+			"lat": -90,
+		},
+	})
+	expect = append(expect, []float64{-180, -90})
 
-	var foundGeo bool
-	for _, f := range doc.Fields {
-		if f.Name() == "location" {
-			foundGeo = true
-			got := f.Value()
-			expect := []byte(numeric.MustNewPrefixCodedInt64(0, 0))
-			if !reflect.DeepEqual(got, expect) {
-				t.Errorf("expected geo value: %v, got %v", expect, got)
+	// geopoint as a slice, format: {lon, lat}
+	geopoints = append(geopoints, struct {
+		Name     string        `json:"name"`
+		Location []interface{} `json:"location"`
+	}{
+		Name: "slice",
+		Location: []interface{}{
+			-180, -90,
+		},
+	})
+	expect = append(expect, []float64{-180, -90})
+
+	// geopoint as a string, format: "lat,lon"
+	geopoints = append(geopoints, struct {
+		Name     string        `json:"name"`
+		Location []interface{} `json:"location"`
+	}{
+		Name: "string",
+		Location: []interface{}{
+			"-90,-180",
+		},
+	})
+	expect = append(expect, []float64{-180, -90})
+
+	// geopoint as a string, format: "lat , lon" with leading/trailing whitespaces
+	geopoints = append(geopoints, struct {
+		Name     string        `json:"name"`
+		Location []interface{} `json:"location"`
+	}{
+		Name: "string",
+		Location: []interface{}{
+			"-90    ,    -180",
+		},
+	})
+	expect = append(expect, []float64{-180, -90})
+
+	// geopoint as a string - geohash
+	geopoints = append(geopoints, struct {
+		Name     string        `json:"name"`
+		Location []interface{} `json:"location"`
+	}{
+		Name: "string",
+		Location: []interface{}{
+			"000000000000",
+		},
+	})
+	expect = append(expect, []float64{-180, -90})
+
+	// geopoint as a string - geohash
+	geopoints = append(geopoints, struct {
+		Name     string        `json:"name"`
+		Location []interface{} `json:"location"`
+	}{
+		Name: "string",
+		Location: []interface{}{
+			"drm3btev3e86",
+		},
+	})
+	expect = append(expect, []float64{-71.34, 41.12})
+
+	for i, geopoint := range geopoints {
+		doc := document.NewDocument(fmt.Sprint(i))
+		err := mapping.MapDocument(doc, geopoint)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var foundGeo bool
+		for _, f := range doc.Fields {
+			if f.Name() == "location" {
+				foundGeo = true
+				geoF, ok := f.(*document.GeoPointField)
+				if !ok {
+					t.Errorf("expected a geopoint field!")
+				}
+				lon, err := geoF.Lon()
+				if err != nil {
+					t.Errorf("error in fetching lon, err: %v", err)
+				}
+				lat, err := geoF.Lat()
+				if err != nil {
+					t.Errorf("error in fetching lat, err: %v", err)
+				}
+				// round obtained lon, lat to 2 decimal places
+				roundLon, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", lon), 64)
+				roundLat, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", lat), 64)
+				if roundLon != expect[i][0] || roundLat != expect[i][1] {
+					t.Errorf("expected geo point: {%v, %v}, got {%v, %v}",
+						expect[i][0], expect[i][1], lon, lat)
+				}
 			}
 		}
-	}
 
-	if !foundGeo {
-		t.Errorf("expected to find geo point, did not")
+		if !foundGeo {
+			t.Errorf("expected to find geo point, did not")
+		}
 	}
 }
 
@@ -921,7 +1016,7 @@ func TestMappingForTextMarshaler(t *testing.T) {
 		},
 	}
 
-	// first verify that when using a mapping that doesn't explicity
+	// first verify that when using a mapping that doesn't explicitly
 	// map the stuct field as text, then we traverse inside the struct
 	// and do our best
 	m := NewIndexMapping()
@@ -941,7 +1036,7 @@ func TestMappingForTextMarshaler(t *testing.T) {
 		t.Errorf("expected field value to be '%s', got: '%s'", tm.Marshalable.Extra, string(doc.Fields[0].Value()))
 	}
 
-	// now verify that when a mapping explicity
+	// now verify that when a mapping explicitly
 	m = NewIndexMapping()
 	txt := NewTextFieldMapping()
 	m.DefaultMapping.AddFieldMappingsAt("Marshalable", txt)
@@ -975,7 +1070,7 @@ func TestMappingForNilTextMarshaler(t *testing.T) {
 		Marshalable: nil,
 	}
 
-	// now verify that when a mapping explicity
+	// now verify that when a mapping explicitly
 	m := NewIndexMapping()
 	txt := NewTextFieldMapping()
 	m.DefaultMapping.AddFieldMappingsAt("Marshalable", txt)
@@ -990,4 +1085,89 @@ func TestMappingForNilTextMarshaler(t *testing.T) {
 
 	}
 
+}
+
+func TestClosestDocDynamicMapping(t *testing.T) {
+	mapping := NewIndexMapping()
+	mapping.IndexDynamic = false
+	mapping.DefaultMapping = NewDocumentStaticMapping()
+	mapping.DefaultMapping.AddFieldMappingsAt("foo", NewTextFieldMapping())
+
+	doc := document.NewDocument("x")
+	err := mapping.MapDocument(doc, map[string]interface{}{
+		"foo": "value",
+		"bar": map[string]string{
+			"foo": "value2",
+			"baz": "value3",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(doc.Fields) != 1 {
+		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
+	}
+}
+
+func TestMappingPointerToTimeBug1152(t *testing.T) {
+	when, err := time.Parse(time.RFC3339, "2019-03-06T15:04:05Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	thing := struct {
+		When *time.Time
+	}{
+		When: &when,
+	}
+
+	// this case tests when there WAS an explicit mapping, but it was NOT type text
+	// as this was the specific case that was problematic
+	m := NewIndexMapping()
+	dtf := NewDateTimeFieldMapping()
+	m.DefaultMapping.AddFieldMappingsAt("When", dtf)
+	doc := document.NewDocument("x")
+	err = m.MapDocument(doc, thing)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(doc.Fields) != 1 {
+		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
+	}
+	if _, ok := doc.Fields[0].(*document.DateTimeField); !ok {
+		t.Fatalf("expected field to be type *document.DateTimeField, got %T", doc.Fields[0])
+	}
+}
+
+func TestDefaultAnalyzerInheritance(t *testing.T) {
+	docMapping := NewDocumentMapping()
+	docMapping.DefaultAnalyzer = "xyz"
+	childMapping := NewTextFieldMapping()
+	docMapping.AddFieldMappingsAt("field", childMapping)
+
+	if analyzer := docMapping.defaultAnalyzerName([]string{"field"}); analyzer != "xyz" {
+		t.Fatalf("Expected analyzer: xyz to be inherited by field, but got: '%v'", analyzer)
+	}
+}
+
+func TestWrongAnalyzerSearchableAs(t *testing.T) {
+	fieldMapping := NewTextFieldMapping()
+	fieldMapping.Name = "geo.accuracy"
+	fieldMapping.Analyzer = "xyz"
+
+	nestedMapping := NewDocumentMapping()
+	nestedMapping.AddFieldMappingsAt("accuracy", fieldMapping)
+
+	docMapping := NewDocumentMapping()
+	docMapping.AddSubDocumentMapping("geo", nestedMapping)
+
+	indexMapping := NewIndexMapping()
+	indexMapping.AddDocumentMapping("brewery", docMapping)
+
+	analyzerName := indexMapping.AnalyzerNameForPath("geo.geo.accuracy")
+	if analyzerName != "xyz" {
+		t.Errorf("expected analyzer name `xyz`, got `%s`", analyzerName)
+	}
 }

@@ -15,14 +15,17 @@
 package searcher
 
 import (
+	"io/ioutil"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/scorch"
 	"github.com/blevesearch/bleve/search"
 )
 
 func TestConjunctionSearch(t *testing.T) {
-
 	twoDocIndexReader, err := twoDocIndex.Reader()
 	if err != nil {
 		t.Error(err)
@@ -218,6 +221,192 @@ func TestConjunctionSearch(t *testing.T) {
 		}
 		if len(test.results) != i {
 			t.Errorf("expected %d results got %d for test %d", len(test.results), i, testIndex)
+		}
+	}
+}
+
+type compositeSearchOptimizationTest struct {
+	fieldTerms  []string
+	expectEmpty string
+}
+
+func TestScorchCompositeSearchOptimizations(t *testing.T) {
+	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
+
+	twoDocIndex := initTwoDocScorch(dir)
+
+	twoDocIndexReader, err := twoDocIndex.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err := twoDocIndexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	tests := []compositeSearchOptimizationTest{
+		{fieldTerms: []string{},
+			expectEmpty: "conjunction,disjunction"},
+		{fieldTerms: []string{"name:marty"},
+			expectEmpty: ""},
+		{fieldTerms: []string{"name:marty", "desc:beer"},
+			expectEmpty: ""},
+		{fieldTerms: []string{"name:marty", "name:marty"},
+			expectEmpty: ""},
+		{fieldTerms: []string{"name:marty", "desc:beer", "title:mister", "street:couchbase"},
+			expectEmpty: "conjunction"},
+		{fieldTerms: []string{"name:steve", "desc:beer", "title:mister", "street:couchbase"},
+			expectEmpty: ""},
+
+		{fieldTerms: []string{"name:NotARealName"},
+			expectEmpty: "conjunction,disjunction"},
+		{fieldTerms: []string{"name:NotARealName", "name:marty"},
+			expectEmpty: "conjunction"},
+		{fieldTerms: []string{"name:NotARealName", "name:marty", "desc:beer"},
+			expectEmpty: "conjunction"},
+		{fieldTerms: []string{"name:NotARealName", "name:marty", "name:marty"},
+			expectEmpty: "conjunction"},
+		{fieldTerms: []string{"name:NotARealName", "name:marty", "desc:beer", "title:mister", "street:couchbase"},
+			expectEmpty: "conjunction"},
+	}
+
+	// The theme of this unit test is that given one of the above
+	// search test cases -- no matter what searcher options we
+	// provide, across either conjunctions or disjunctions, whether we
+	// have optimizations that are enabled or disabled, the set of doc
+	// ID's from the search results from any of those combinations
+	// should be the same.
+	searcherOptionsToCompare := []search.SearcherOptions{
+		search.SearcherOptions{},
+		search.SearcherOptions{Explain: true},
+		search.SearcherOptions{IncludeTermVectors: true},
+		search.SearcherOptions{IncludeTermVectors: true, Explain: true},
+		search.SearcherOptions{Score: "none"},
+		search.SearcherOptions{Score: "none", IncludeTermVectors: true},
+		search.SearcherOptions{Score: "none", IncludeTermVectors: true, Explain: true},
+		search.SearcherOptions{Score: "none", Explain: true},
+	}
+
+	testScorchCompositeSearchOptimizations(t, twoDocIndexReader, tests,
+		searcherOptionsToCompare, "conjunction")
+
+	testScorchCompositeSearchOptimizations(t, twoDocIndexReader, tests,
+		searcherOptionsToCompare, "disjunction")
+}
+
+func testScorchCompositeSearchOptimizations(t *testing.T, indexReader index.IndexReader,
+	tests []compositeSearchOptimizationTest,
+	searcherOptionsToCompare []search.SearcherOptions,
+	compositeKind string) {
+	for testi := range tests {
+		resultsToCompare := map[string]bool{}
+
+		testScorchCompositeSearchOptimizationsHelper(t, indexReader, tests, testi,
+			searcherOptionsToCompare, compositeKind, false, resultsToCompare)
+
+		testScorchCompositeSearchOptimizationsHelper(t, indexReader, tests, testi,
+			searcherOptionsToCompare, compositeKind, true, resultsToCompare)
+	}
+}
+
+func testScorchCompositeSearchOptimizationsHelper(
+	t *testing.T, indexReader index.IndexReader,
+	tests []compositeSearchOptimizationTest, testi int,
+	searcherOptionsToCompare []search.SearcherOptions,
+	compositeKind string, allowOptimizations bool, resultsToCompare map[string]bool) {
+	// Save the global allowed optimization settings to restore later.
+	optimizeConjunction := scorch.OptimizeConjunction
+	optimizeConjunctionUnadorned := scorch.OptimizeConjunctionUnadorned
+	optimizeDisjunctionUnadorned := scorch.OptimizeDisjunctionUnadorned
+	optimizeDisjunctionUnadornedMinChildCardinality :=
+		scorch.OptimizeDisjunctionUnadornedMinChildCardinality
+
+	scorch.OptimizeConjunction = allowOptimizations
+	scorch.OptimizeConjunctionUnadorned = allowOptimizations
+	scorch.OptimizeDisjunctionUnadorned = allowOptimizations
+
+	if allowOptimizations {
+		scorch.OptimizeDisjunctionUnadornedMinChildCardinality = uint64(0)
+	}
+
+	defer func() {
+		scorch.OptimizeConjunction = optimizeConjunction
+		scorch.OptimizeConjunctionUnadorned = optimizeConjunctionUnadorned
+		scorch.OptimizeDisjunctionUnadorned = optimizeDisjunctionUnadorned
+		scorch.OptimizeDisjunctionUnadornedMinChildCardinality =
+			optimizeDisjunctionUnadornedMinChildCardinality
+	}()
+
+	test := tests[testi]
+
+	for searcherOptionsI, searcherOptions := range searcherOptionsToCompare {
+		// Construct the leaf term searchers.
+		var searchers []search.Searcher
+
+		for _, fieldTerm := range test.fieldTerms {
+			ft := strings.Split(fieldTerm, ":")
+			field := ft[0]
+			term := ft[1]
+
+			searcher, err := NewTermSearcher(indexReader, term, field, 1.0, searcherOptions)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			searchers = append(searchers, searcher)
+		}
+
+		// Construct the composite searcher.
+		var cs search.Searcher
+		var err error
+		if compositeKind == "conjunction" {
+			cs, err = NewConjunctionSearcher(indexReader, searchers, searcherOptions)
+		} else {
+			cs, err = NewDisjunctionSearcher(indexReader, searchers, 0, searcherOptions)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ctx := &search.SearchContext{
+			DocumentMatchPool: search.NewDocumentMatchPool(10, 0),
+		}
+
+		next, err := cs.Next(ctx)
+		i := 0
+		for err == nil && next != nil {
+			docID, err := indexReader.ExternalID(next.IndexInternalID)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if searcherOptionsI == 0 && allowOptimizations == false {
+				resultsToCompare[string(docID)] = true
+			} else {
+				if !resultsToCompare[string(docID)] {
+					t.Errorf("missing %s", string(docID))
+				}
+			}
+
+			next, err = cs.Next(ctx)
+			i++
+		}
+
+		if i != len(resultsToCompare) {
+			t.Errorf("mismatched count, %d vs %d", i, len(resultsToCompare))
+		}
+
+		if i == 0 && !strings.Contains(test.expectEmpty, compositeKind) {
+			t.Errorf("testi: %d, compositeKind: %s, allowOptimizations: %t,"+
+				" searcherOptionsI: %d, searcherOptions: %#v,"+
+				" expected some results but got no results on test: %#v",
+				testi, compositeKind, allowOptimizations,
+				searcherOptionsI, searcherOptions, test)
 		}
 	}
 }

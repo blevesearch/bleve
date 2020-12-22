@@ -15,7 +15,11 @@
 package searcher
 
 import (
+	"github.com/blevesearch/bleve/index/scorch"
+	"io/ioutil"
+	"os"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/blevesearch/bleve/search"
@@ -94,7 +98,7 @@ func TestTermRangeSearch(t *testing.T) {
 			inclusiveMax: true,
 			want:         nil,
 		},
-		// max nil sees everyting after marty
+		// max nil sees everything after marty
 		{
 			min:          []byte("marty"),
 			max:          nil,
@@ -103,7 +107,7 @@ func TestTermRangeSearch(t *testing.T) {
 			inclusiveMax: true,
 			want:         []string{"1", "2", "4"},
 		},
-		// min nil sees everyting before ravi
+		// min nil sees everything before ravi
 		{
 			min:          nil,
 			max:          []byte("ravi"),
@@ -198,4 +202,82 @@ func TestTermRangeSearch(t *testing.T) {
 
 	}
 
+}
+
+func TestTermRangeSearchTooManyTerms(t *testing.T) {
+	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
+
+	scorchIndex := initTwoDocScorch(dir)
+
+	// use lower limit for this test
+	origLimit := DisjunctionMaxClauseCount
+	DisjunctionMaxClauseCount = 2
+	defer func() {
+		DisjunctionMaxClauseCount = origLimit
+	}()
+
+	scorchReader, err := scorchIndex.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err := scorchReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var want = []string{"1", "3", "4", "5"}
+	var truth = true
+	searcher, err := NewTermRangeSearcher(scorchReader, []byte("bobert"), []byte("ravi"),
+		&truth, &truth, "name", 1.0, search.SearcherOptions{Score: "none", IncludeTermVectors: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got []string
+	ctx := &search.SearchContext{
+		DocumentMatchPool: search.NewDocumentMatchPool(
+			searcher.DocumentMatchPoolSize(), 0),
+	}
+	next, err := searcher.Next(ctx)
+	i := 0
+	for err == nil && next != nil {
+		extId, err := scorchReader.ExternalID(next.IndexInternalID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, extId)
+		ctx.DocumentMatchPool.Put(next)
+		next, err = searcher.Next(ctx)
+		i++
+	}
+	if err != nil {
+		t.Fatalf("error iterating searcher: %v", err)
+	}
+	err = searcher.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check that the expected number of term searchers were started
+	// 6 = 4 original terms, 1 optimized after first round, then final searcher
+	// from the last round
+	statsMap := scorchIndex.(*scorch.Scorch).StatsMap()
+	if statsMap["term_searchers_started"].(uint64) != 6 {
+		t.Errorf("expected 6 term searchers started, got %d", statsMap["term_searchers_started"])
+	}
+	// check that all started searchers were closed
+	if statsMap["term_searchers_started"] != statsMap["term_searchers_finished"] {
+		t.Errorf("expected all term searchers closed, %d started %d closed",
+			statsMap["term_searchers_started"], statsMap["term_searchers_finished"])
+	}
+
+	sort.Strings(got)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("expected: %#v, got %#v", want, got)
+	}
 }

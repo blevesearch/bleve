@@ -18,11 +18,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/blevesearch/bleve/analysis"
+	"github.com/blevesearch/bleve/analysis/analyzer/custom"
+	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
+	"github.com/blevesearch/bleve/analysis/analyzer/standard"
+	regexp_char_filter "github.com/blevesearch/bleve/analysis/char/regexp"
+	"github.com/blevesearch/bleve/analysis/token/length"
+	"github.com/blevesearch/bleve/analysis/token/lowercase"
+	"github.com/blevesearch/bleve/analysis/token/shingle"
+	"github.com/blevesearch/bleve/analysis/tokenizer/single"
+	"github.com/blevesearch/bleve/analysis/tokenizer/whitespace"
+	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/index/scorch"
+	"github.com/blevesearch/bleve/index/upsidedown"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/search/highlight/highlighter/ansi"
+	"github.com/blevesearch/bleve/search/highlight/highlighter/html"
+	"github.com/blevesearch/bleve/search/query"
 )
 
 func TestSearchResultString(t *testing.T) {
@@ -202,7 +220,7 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 				Field: "Date_Range_Success_With_StartEnd",
 				Size:  1,
 				DateTimeRanges: []*dateTimeRange{
-					&dateTimeRange{Name: "testName", Start: time.Unix(0, 0), End: time.Now()},
+					{Name: "testName", Start: time.Unix(0, 0), End: time.Now()},
 				},
 			},
 			result: nil,
@@ -212,7 +230,7 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 				Field: "Date_Range_Success_With_Start",
 				Size:  1,
 				DateTimeRanges: []*dateTimeRange{
-					&dateTimeRange{Name: "testName", Start: time.Unix(0, 0)},
+					{Name: "testName", Start: time.Unix(0, 0)},
 				},
 			},
 			result: nil,
@@ -222,7 +240,7 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 				Field: "Date_Range_Success_With_End",
 				Size:  1,
 				DateTimeRanges: []*dateTimeRange{
-					&dateTimeRange{Name: "testName", End: time.Now()},
+					{Name: "testName", End: time.Now()},
 				},
 			},
 			result: nil,
@@ -232,7 +250,7 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 				Field: "Numeric_Range_Success_With_MinMax",
 				Size:  1,
 				NumericRanges: []*numericRange{
-					&numericRange{Name: "testName", Min: &value, Max: &value},
+					{Name: "testName", Min: &value, Max: &value},
 				},
 			},
 			result: nil,
@@ -242,7 +260,7 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 				Field: "Numeric_Range_Success_With_Min",
 				Size:  1,
 				NumericRanges: []*numericRange{
-					&numericRange{Name: "testName", Min: &value},
+					{Name: "testName", Min: &value},
 				},
 			},
 			result: nil,
@@ -252,7 +270,7 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 				Field: "Numeric_Range_Success_With_Max",
 				Size:  1,
 				NumericRanges: []*numericRange{
-					&numericRange{Name: "testName", Max: &value},
+					{Name: "testName", Max: &value},
 				},
 			},
 			result: nil,
@@ -262,9 +280,9 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 				Field: "Date_Range_Missing_Failure",
 				Size:  1,
 				DateTimeRanges: []*dateTimeRange{
-					&dateTimeRange{Name: "testName2", Start: time.Unix(0, 0)},
-					&dateTimeRange{Name: "testName1", End: time.Now()},
-					&dateTimeRange{Name: "testName"},
+					{Name: "testName2", Start: time.Unix(0, 0)},
+					{Name: "testName1", End: time.Now()},
+					{Name: "testName"},
 				},
 			},
 			result: drMissingErr,
@@ -274,9 +292,9 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 				Field: "Numeric_Range_Missing_Failure",
 				Size:  1,
 				NumericRanges: []*numericRange{
-					&numericRange{Name: "testName2", Min: &value},
-					&numericRange{Name: "testName1", Max: &value},
-					&numericRange{Name: "testName"},
+					{Name: "testName2", Min: &value},
+					{Name: "testName1", Max: &value},
+					{Name: "testName"},
 				},
 			},
 			result: nrMissingErr,
@@ -286,10 +304,10 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 				Field: "Numeric_And_DateRanges_Failure",
 				Size:  1,
 				NumericRanges: []*numericRange{
-					&numericRange{Name: "testName", Max: &value},
+					{Name: "testName", Max: &value},
 				},
 				DateTimeRanges: []*dateTimeRange{
-					&dateTimeRange{Name: "testName", End: time.Now()},
+					{Name: "testName", End: time.Now()},
 				},
 			},
 			result: drNrErr,
@@ -299,8 +317,8 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 				Field: "Numeric_Range_Name_Repeat_Failure",
 				Size:  1,
 				NumericRanges: []*numericRange{
-					&numericRange{Name: "testName", Min: &value},
-					&numericRange{Name: "testName", Max: &value},
+					{Name: "testName", Min: &value},
+					{Name: "testName", Max: &value},
 				},
 			},
 			result: nrNameDupErr,
@@ -310,8 +328,8 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 				Field: "Date_Range_Name_Repeat_Failure",
 				Size:  1,
 				DateTimeRanges: []*dateTimeRange{
-					&dateTimeRange{Name: "testName", Start: time.Unix(0, 0)},
-					&dateTimeRange{Name: "testName", End: time.Now()},
+					{Name: "testName", Start: time.Unix(0, 0)},
+					{Name: "testName", End: time.Now()},
 				},
 			},
 			result: drNameDupErr,
@@ -325,4 +343,1469 @@ func TestFacetNumericDateRangeRequests(t *testing.T) {
 		}
 	}
 
+}
+
+func TestSearchResultFacetsMerge(t *testing.T) {
+	lowmed := "2010-01-01"
+	medhi := "2011-01-01"
+	hihigher := "2012-01-01"
+
+	fr := &search.FacetResult{
+		Field:   "birthday",
+		Total:   100,
+		Missing: 25,
+		Other:   25,
+		DateRanges: []*search.DateRangeFacet{
+			{
+				Name:  "low",
+				End:   &lowmed,
+				Count: 25,
+			},
+			{
+				Name:  "med",
+				Count: 24,
+				Start: &lowmed,
+				End:   &medhi,
+			},
+			{
+				Name:  "hi",
+				Count: 1,
+				Start: &medhi,
+				End:   &hihigher,
+			},
+		},
+	}
+	frs := search.FacetResults{
+		"birthdays": fr,
+	}
+
+	l := &SearchResult{
+		Status: &SearchStatus{
+			Total:      10,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
+		Total:    10,
+		MaxScore: 1,
+	}
+
+	r := &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Successful: 1,
+			Errors:     make(map[string]error),
+		},
+		Total:    1,
+		MaxScore: 2,
+		Facets:   frs,
+	}
+
+	expected := &SearchResult{
+		Status: &SearchStatus{
+			Total:      11,
+			Successful: 2,
+			Errors:     make(map[string]error),
+		},
+		Total:    11,
+		MaxScore: 2,
+		Facets:   frs,
+	}
+
+	l.Merge(r)
+
+	if !reflect.DeepEqual(l, expected) {
+		t.Errorf("expected %#v, got %#v", expected, l)
+	}
+}
+
+func TestMemoryNeededForSearchResult(t *testing.T) {
+	query := NewTermQuery("blah")
+	req := NewSearchRequest(query)
+
+	var sr SearchResult
+	expect := sr.Size()
+	var dm search.DocumentMatch
+	expect += 10 * dm.Size()
+
+	estimate := MemoryNeededForSearchResult(req)
+	if estimate != uint64(expect) {
+		t.Errorf("estimate not what is expected: %v != %v", estimate, expect)
+	}
+}
+
+// https://github.com/blevesearch/bleve/issues/954
+func TestNestedBooleanSearchers(t *testing.T) {
+	// create an index with a custom analyzer
+	idxMapping := NewIndexMapping()
+	if err := idxMapping.AddCustomAnalyzer("3xbla", map[string]interface{}{
+		"type":          custom.Name,
+		"tokenizer":     whitespace.Name,
+		"token_filters": []interface{}{lowercase.Name, "stop_en"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	idxMapping.DefaultAnalyzer = "3xbla"
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// create and insert documents as a batch
+	batch := idx.NewBatch()
+	matches := 0
+	for i := 0; i < 100; i++ {
+		hostname := fmt.Sprintf("planner_hostname_%d", i%5)
+		metadata := map[string]string{"region": fmt.Sprintf("planner_us-east-%d", i%5)}
+
+		// Expected matches
+		if (hostname == "planner_hostname_1" || hostname == "planner_hostname_2") &&
+			metadata["region"] == "planner_us-east-1" {
+			matches++
+		}
+
+		doc := document.NewDocument(strconv.Itoa(i))
+		doc.Fields = []document.Field{
+			document.NewTextFieldCustom("hostname", []uint64{}, []byte(hostname),
+				document.IndexField,
+				&analysis.Analyzer{
+					Tokenizer: single.NewSingleTokenTokenizer(),
+					TokenFilters: []analysis.TokenFilter{
+						lowercase.NewLowerCaseFilter(),
+					},
+				},
+			),
+		}
+		for k, v := range metadata {
+			doc.AddField(document.NewTextFieldWithIndexingOptions(
+				fmt.Sprintf("metadata.%s", k), []uint64{}, []byte(v), document.IndexField))
+		}
+		doc.CompositeFields = []*document.CompositeField{
+			document.NewCompositeFieldWithIndexingOptions(
+				"_all", true, []string{"text"}, []string{},
+				document.IndexField|document.IncludeTermVectors),
+		}
+
+		if err = batch.IndexAdvanced(doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	que, err := query.ParseQuery([]byte(
+		`{
+			"conjuncts": [
+			{
+				"must": {
+					"conjuncts": [
+					{
+						"disjuncts": [
+						{
+							"match": "planner_hostname_1",
+							"field": "hostname"
+						},
+						{
+							"match": "planner_hostname_2",
+							"field": "hostname"
+						}
+						]
+					}
+					]
+				}
+			},
+			{
+				"must": {
+					"conjuncts": [
+					{
+						"match": "planner_us-east-1",
+						"field": "metadata.region"
+					}
+					]
+				}
+			}
+			]
+		}`,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := NewSearchRequest(que)
+	req.Size = 100
+	req.Fields = []string{"hostname", "metadata.region"}
+	searchResults, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if matches != len(searchResults.Hits) {
+		t.Fatalf("Unexpected result set, %v != %v", matches, len(searchResults.Hits))
+	}
+}
+
+func TestNestedBooleanMustNotSearcherUpsidedown(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	// create an index with default settings
+	idxMapping := NewIndexMapping()
+	idx, err := New(tmpIndexPath, idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// create and insert documents as a batch
+	batch := idx.NewBatch()
+
+	docs := []struct {
+		id              string
+		hasRole         bool
+		investigationId string
+	}{
+		{
+			id:              "1@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+		{
+			id:              "1@2",
+			hasRole:         false,
+			investigationId: "2",
+		},
+		{
+			id:              "2@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+		{
+			id:              "2@2",
+			hasRole:         false,
+			investigationId: "2",
+		},
+		{
+			id:              "3@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+		{
+			id:              "3@2",
+			hasRole:         false,
+			investigationId: "2",
+		},
+		{
+			id:              "4@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+		{
+			id:              "5@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+		{
+			id:              "6@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+		{
+			id:              "7@1",
+			hasRole:         true,
+			investigationId: "1",
+		},
+	}
+
+	for i := 0; i < len(docs); i++ {
+		doc := document.NewDocument(docs[i].id)
+		doc.Fields = []document.Field{
+			document.NewTextField("id", []uint64{}, []byte(docs[i].id)),
+			document.NewBooleanField("hasRole", []uint64{}, docs[i].hasRole),
+			document.NewTextField("investigationId", []uint64{}, []byte(docs[i].investigationId)),
+		}
+
+		doc.CompositeFields = []*document.CompositeField{
+			document.NewCompositeFieldWithIndexingOptions(
+				"_all", true, []string{"text"}, []string{},
+				document.IndexField|document.IncludeTermVectors),
+		}
+
+		if err = batch.IndexAdvanced(doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	tq := NewTermQuery("1")
+	tq.SetField("investigationId")
+	// using must not, for cases that the field did not exists at all
+	hasRole := NewBoolFieldQuery(true)
+	hasRole.SetField("hasRole")
+	noRole := NewBooleanQuery()
+	noRole.AddMustNot(hasRole)
+	oneRolesOrNoRoles := NewBooleanQuery()
+	oneRolesOrNoRoles.AddShould(noRole)
+	oneRolesOrNoRoles.SetMinShould(1)
+	q := NewConjunctionQuery(tq, oneRolesOrNoRoles)
+
+	sr := NewSearchRequestOptions(q, 100, 0, false)
+	sr.Fields = []string{"hasRole"}
+	sr.Highlight = NewHighlight()
+
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 0 {
+		t.Fatalf("Unexpected result, %v != 0", res.Total)
+	}
+}
+
+func TestSearchScorchOverEmptyKeyword(t *testing.T) {
+	defaultIndexType := Config.DefaultIndexType
+	Config.DefaultIndexType = scorch.Name
+
+	dmap := mapping.NewDocumentMapping()
+	dmap.DefaultAnalyzer = standard.Name
+
+	fm := mapping.NewTextFieldMapping()
+	fm.Analyzer = keyword.Name
+
+	fm1 := mapping.NewTextFieldMapping()
+	fm1.Analyzer = standard.Name
+
+	dmap.AddFieldMappingsAt("id", fm)
+	dmap.AddFieldMappingsAt("name", fm1)
+
+	imap := mapping.NewIndexMapping()
+	imap.DefaultMapping = dmap
+	imap.DefaultAnalyzer = standard.Name
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		Config.DefaultIndexType = defaultIndexType
+	}()
+
+	for i := 0; i < 10; i++ {
+		err = idx.Index(fmt.Sprint(i), map[string]string{"name": fmt.Sprintf("test%d", i), "id": ""})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	count, err := idx.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 10 {
+		t.Fatalf("Unexpected doc count: %v, expected 10", count)
+	}
+
+	q := query.NewWildcardQuery("test*")
+	sr := NewSearchRequestOptions(q, 40, 0, false)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 10 {
+		t.Fatalf("Unexpected search hits: %v, expected 10", res.Total)
+	}
+}
+
+func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
+	defaultIndexType := Config.DefaultIndexType
+	Config.DefaultIndexType = scorch.Name
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	// create an index with default settings
+	idxMapping := NewIndexMapping()
+	idx, err := New(tmpIndexPath, idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		Config.DefaultIndexType = defaultIndexType
+	}()
+
+	// create and insert documents as a batch
+	batch := idx.NewBatch()
+
+	doc := document.NewDocument("1-child-0")
+	doc.Fields = []document.Field{
+		document.NewTextField("id", []uint64{}, []byte("1-child-0")),
+		document.NewBooleanField("hasRole", []uint64{}, false),
+		document.NewTextField("roles", []uint64{}, []byte("R1")),
+		document.NewNumericField("type", []uint64{}, 0),
+	}
+	doc.CompositeFields = []*document.CompositeField{
+		document.NewCompositeFieldWithIndexingOptions(
+			"_all", true, []string{"text"}, []string{},
+			document.IndexField|document.IncludeTermVectors),
+	}
+
+	if err = batch.IndexAdvanced(doc); err != nil {
+		t.Fatal(err)
+	}
+
+	docs := []struct {
+		id      string
+		hasRole bool
+		typ     int
+	}{
+		{
+			id:      "16d6fa37-48fd-4dea-8b3d-a52bddf73951",
+			hasRole: false,
+			typ:     9,
+		},
+		{
+			id:      "18fa9eb2-8b1f-46f0-8b56-b4c551213f78",
+			hasRole: false,
+			typ:     9,
+		},
+		{
+			id:      "3085855b-d74b-474a-86c3-9bf3e4504382",
+			hasRole: false,
+			typ:     9,
+		},
+		{
+			id:      "38ef5d28-0f85-4fb0-8a94-dd20751c3364",
+			hasRole: false,
+			typ:     9,
+		},
+	}
+
+	for i := 0; i < len(docs); i++ {
+		doc := document.NewDocument(docs[i].id)
+		doc.Fields = []document.Field{
+			document.NewTextField("id", []uint64{}, []byte(docs[i].id)),
+			document.NewBooleanField("hasRole", []uint64{}, docs[i].hasRole),
+			document.NewNumericField("type", []uint64{}, float64(docs[i].typ)),
+		}
+
+		doc.CompositeFields = []*document.CompositeField{
+			document.NewCompositeFieldWithIndexingOptions(
+				"_all", true, []string{"text"}, []string{},
+				document.IndexField|document.IncludeTermVectors),
+		}
+
+		if err = batch.IndexAdvanced(doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	batch = idx.NewBatch()
+
+	// Update 1st doc
+	doc = document.NewDocument("1-child-0")
+	doc.Fields = []document.Field{
+		document.NewTextField("id", []uint64{}, []byte("1-child-0")),
+		document.NewBooleanField("hasRole", []uint64{}, false),
+		document.NewNumericField("type", []uint64{}, 0),
+	}
+	doc.CompositeFields = []*document.CompositeField{
+		document.NewCompositeFieldWithIndexingOptions(
+			"_all", true, []string{"text"}, []string{},
+			document.IndexField|document.IncludeTermVectors),
+	}
+
+	if err = batch.IndexAdvanced(doc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	inclusive := true
+	val := float64(9)
+	q := query.NewNumericRangeInclusiveQuery(&val, &val, &inclusive, &inclusive)
+	q.SetField("type")
+	initialQuery := query.NewBooleanQuery(nil, nil, []query.Query{q})
+
+	// using must not, for cases that the field did not exists at all
+	hasRole := NewBoolFieldQuery(true)
+	hasRole.SetField("hasRole")
+	noRole := NewBooleanQuery()
+	noRole.AddMustNot(hasRole)
+
+	rq := query.NewBooleanQuery([]query.Query{initialQuery, noRole}, nil, nil)
+
+	sr := NewSearchRequestOptions(rq, 100, 0, false)
+	sr.Fields = []string{"id", "hasRole", "type"}
+	sr.Highlight = NewHighlight()
+
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 1 {
+		t.Fatalf("Unexpected result, %v != 1", res.Total)
+	}
+}
+
+func testBooleanMustNotSearcher(t *testing.T, indexName string) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	im := NewIndexMapping()
+	idx, err := NewUsing(tmpIndexPath, im, indexName, Config.DefaultKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	docs := []struct {
+		Name    string
+		HasRole bool
+	}{
+		{
+			Name: "13900",
+		},
+		{
+			Name: "13901",
+		},
+		{
+			Name: "13965",
+		},
+		{
+			Name:    "13966",
+			HasRole: true,
+		},
+		{
+			Name:    "13967",
+			HasRole: true,
+		},
+	}
+
+	for _, doc := range docs {
+		err := idx.Index(doc.Name, doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	lhs := NewDocIDQuery([]string{"13965", "13966", "13967"})
+	hasRole := NewBoolFieldQuery(true)
+	hasRole.SetField("HasRole")
+	rhs := NewBooleanQuery()
+	rhs.AddMustNot(hasRole)
+
+	var compareLeftRightAndConjunction = func(idx Index, left, right query.Query) error {
+		// left
+		lr := NewSearchRequestOptions(left, 100, 0, false)
+		lres, err := idx.Search(lr)
+		if err != nil {
+			return fmt.Errorf("error left: %v", err)
+		}
+		lresIds := map[string]struct{}{}
+		for i := range lres.Hits {
+			lresIds[lres.Hits[i].ID] = struct{}{}
+		}
+		// right
+		rr := NewSearchRequestOptions(right, 100, 0, false)
+		rres, err := idx.Search(rr)
+		if err != nil {
+			return fmt.Errorf("error right: %v", err)
+		}
+		rresIds := map[string]struct{}{}
+		for i := range rres.Hits {
+			rresIds[rres.Hits[i].ID] = struct{}{}
+		}
+		// conjunction
+		cr := NewSearchRequestOptions(NewConjunctionQuery(left, right), 100, 0, false)
+		cres, err := idx.Search(cr)
+		if err != nil {
+			return fmt.Errorf("error conjunction: %v", err)
+		}
+		for i := range cres.Hits {
+			if _, ok := lresIds[cres.Hits[i].ID]; ok {
+				if _, ok := rresIds[cres.Hits[i].ID]; !ok {
+					return fmt.Errorf("error id %s missing from right", cres.Hits[i].ID)
+				}
+			} else {
+				return fmt.Errorf("error id %s missing from left", cres.Hits[i].ID)
+			}
+		}
+		return nil
+	}
+
+	err = compareLeftRightAndConjunction(idx, lhs, rhs)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBooleanMustNotSearcherUpsidedown(t *testing.T) {
+	testBooleanMustNotSearcher(t, upsidedown.Name)
+}
+
+func TestBooleanMustNotSearcherScorch(t *testing.T) {
+	testBooleanMustNotSearcher(t, scorch.Name)
+}
+
+func TestQueryStringEmptyConjunctionSearcher(t *testing.T) {
+	mapping := NewIndexMapping()
+	mapping.DefaultAnalyzer = keyword.Name
+	index, err := NewMemOnly(mapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = index.Close()
+	}()
+
+	query := NewQueryStringQuery("foo:bar +baz:\"\"")
+	searchReq := NewSearchRequest(query)
+
+	_, _ = index.Search(searchReq)
+}
+
+func TestDisjunctionQueryIncorrectMin(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	// create an index with default settings
+	idxMapping := NewIndexMapping()
+	idx, err := New(tmpIndexPath, idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// create and insert documents as a batch
+	batch := idx.NewBatch()
+	docs := []struct {
+		field1 string
+		field2 int
+	}{
+		{
+			field1: "one",
+			field2: 1,
+		},
+		{
+			field1: "two",
+			field2: 2,
+		},
+	}
+
+	for i := 0; i < len(docs); i++ {
+		doc := document.NewDocument(strconv.Itoa(docs[i].field2))
+		doc.Fields = []document.Field{
+			document.NewTextField("field1", []uint64{}, []byte(docs[i].field1)),
+			document.NewNumericField("field2", []uint64{}, float64(docs[i].field2)),
+		}
+		doc.CompositeFields = []*document.CompositeField{
+			document.NewCompositeFieldWithIndexingOptions(
+				"_all", true, []string{"text"}, []string{},
+				document.IndexField|document.IncludeTermVectors),
+		}
+		if err = batch.IndexAdvanced(doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	tq := NewTermQuery("one")
+	dq := NewDisjunctionQuery(tq)
+	dq.SetMin(2)
+	sr := NewSearchRequestOptions(dq, 1, 0, false)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total > 0 {
+		t.Fatalf("Expected 0 matches as disjunction query contains a single clause"+
+			" but got: %v", res.Total)
+	}
+}
+
+func TestBooleanShouldMinPropagation(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc1 := map[string]interface{}{
+		"dept": "queen",
+		"name": "cersei lannister",
+	}
+
+	doc2 := map[string]interface{}{
+		"dept": "kings guard",
+		"name": "jaime lannister",
+	}
+
+	batch := idx.NewBatch()
+
+	if err = batch.Index("doc1", doc1); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = batch.Index("doc2", doc2); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	// term dictionaries in the index for field..
+	//  dept: queen kings guard
+	//  name: cersei jaime lannister
+
+	// the following match query would match doc2
+	mq1 := NewMatchQuery("kings guard")
+	mq1.SetField("dept")
+
+	// the following match query would match both doc1 and doc2,
+	// as both docs share common lastname
+	mq2 := NewMatchQuery("jaime lannister")
+	mq2.SetField("name")
+
+	bq := NewBooleanQuery()
+	bq.AddShould(mq1)
+	bq.AddMust(mq2)
+
+	sr := NewSearchRequest(bq)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 2 {
+		t.Errorf("Expected 2 results, but got: %v", res.Total)
+	}
+}
+
+func TestDisjunctionMinPropagation(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc1 := map[string]interface{}{
+		"dept": "finance",
+		"name": "xyz",
+	}
+
+	doc2 := map[string]interface{}{
+		"dept": "marketing",
+		"name": "xyz",
+	}
+
+	doc3 := map[string]interface{}{
+		"dept": "engineering",
+		"name": "abc",
+	}
+
+	batch := idx.NewBatch()
+
+	if err = batch.Index("doc1", doc1); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = batch.Index("doc2", doc2); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = batch.Index("doc3", doc3); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	mq1 := NewMatchQuery("finance")
+	mq2 := NewMatchQuery("marketing")
+	dq := NewDisjunctionQuery(mq1, mq2)
+	dq.SetMin(3)
+
+	dq2 := NewDisjunctionQuery(dq)
+	dq2.SetMin(1)
+
+	sr := NewSearchRequest(dq2)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 0 {
+		t.Fatalf("Expect 0 results, but got: %v", res.Total)
+	}
+}
+
+func TestDuplicateLocationsIssue1168(t *testing.T) {
+	fm1 := NewTextFieldMapping()
+	fm1.Analyzer = keyword.Name
+	fm1.Name = "name1"
+
+	dm := NewDocumentStaticMapping()
+	dm.AddFieldMappingsAt("name", fm1)
+
+	m := NewIndexMapping()
+	m.DefaultMapping = dm
+
+	idx, err := NewMemOnly(m)
+	if err != nil {
+		t.Fatalf("bleve new err: %v", err)
+	}
+
+	err = idx.Index("x", map[string]interface{}{
+		"name": "marty",
+	})
+	if err != nil {
+		t.Fatalf("bleve index err: %v", err)
+	}
+
+	q1 := NewTermQuery("marty")
+	q2 := NewTermQuery("marty")
+	dq := NewDisjunctionQuery(q1, q2)
+
+	sreq := NewSearchRequest(dq)
+	sreq.Fields = []string{"*"}
+	sreq.Highlight = NewHighlightWithStyle(html.Name)
+
+	sres, err := idx.Search(sreq)
+	if err != nil {
+		t.Fatalf("bleve search err: %v", err)
+	}
+	if len(sres.Hits[0].Locations["name1"]["marty"]) != 1 {
+		t.Fatalf("duplicate marty")
+	}
+}
+
+func TestBooleanMustSingleMatchNone(t *testing.T) {
+	idxMapping := NewIndexMapping()
+	if err := idxMapping.AddCustomTokenFilter(length.Name, map[string]interface{}{
+		"min":  3.0,
+		"max":  5.0,
+		"type": length.Name,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idxMapping.AddCustomAnalyzer("custom1", map[string]interface{}{
+		"type":          "custom",
+		"tokenizer":     "single",
+		"token_filters": []interface{}{length.Name},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	idxMapping.DefaultAnalyzer = "custom1"
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := map[string]interface{}{
+		"languages_known": "Dutch",
+		"dept":            "Sales",
+	}
+
+	batch := idx.NewBatch()
+	if err = batch.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	// this is a successful match
+	matchSales := NewMatchQuery("Sales")
+	matchSales.SetField("dept")
+
+	// this would spin off a MatchNoneSearcher as the
+	// token filter rules out the word "French"
+	matchFrench := NewMatchQuery("French")
+	matchFrench.SetField("languages_known")
+
+	bq := NewBooleanQuery()
+	bq.AddShould(matchSales)
+	bq.AddMust(matchFrench)
+
+	sr := NewSearchRequest(bq)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 0 {
+		t.Fatalf("Expected 0 results but got: %v", res.Total)
+	}
+}
+
+func TestBooleanMustNotSingleMatchNone(t *testing.T) {
+	idxMapping := NewIndexMapping()
+	if err := idxMapping.AddCustomTokenFilter(shingle.Name, map[string]interface{}{
+		"min":  3.0,
+		"max":  5.0,
+		"type": shingle.Name,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idxMapping.AddCustomAnalyzer("custom1", map[string]interface{}{
+		"type":          "custom",
+		"tokenizer":     "unicode",
+		"token_filters": []interface{}{shingle.Name},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	idxMapping.DefaultAnalyzer = "custom1"
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := map[string]interface{}{
+		"languages_known": "Dutch",
+		"dept":            "Sales",
+	}
+
+	batch := idx.NewBatch()
+	if err = batch.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	// this is a successful match
+	matchSales := NewMatchQuery("Sales")
+	matchSales.SetField("dept")
+
+	// this would spin off a MatchNoneSearcher as the
+	// token filter rules out the word "Dutch"
+	matchDutch := NewMatchQuery("Dutch")
+	matchDutch.SetField("languages_known")
+
+	matchEngineering := NewMatchQuery("Engineering")
+	matchEngineering.SetField("dept")
+
+	bq := NewBooleanQuery()
+	bq.AddShould(matchSales)
+	bq.AddMustNot(matchDutch, matchEngineering)
+
+	sr := NewSearchRequest(bq)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 0 {
+		t.Fatalf("Expected 0 results but got: %v", res.Total)
+	}
+}
+
+func TestBooleanSearchBug1185(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	of := NewTextFieldMapping()
+	of.Analyzer = keyword.Name
+	of.Name = "owner"
+
+	dm := NewDocumentMapping()
+	dm.AddFieldMappingsAt("owner", of)
+
+	m := NewIndexMapping()
+	m.DefaultMapping = dm
+
+	idx, err := NewUsing(tmpIndexPath, m, "scorch", "scorch", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	err = idx.Index("17112", map[string]interface{}{
+		"owner": "marty",
+		"type":  "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17139", map[string]interface{}{
+		"type": "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("177777", map[string]interface{}{
+		"type": "x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = idx.Index("177778", map[string]interface{}{
+		"type": "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17140", map[string]interface{}{
+		"type": "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17000", map[string]interface{}{
+		"owner": "marty",
+		"type":  "x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17141", map[string]interface{}{
+		"type": "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17428", map[string]interface{}{
+		"owner": "marty",
+		"type":  "A Demo Type",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idx.Index("17113", map[string]interface{}{
+		"owner": "marty",
+		"type":  "x",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	matchTypeQ := NewMatchPhraseQuery("A Demo Type")
+	matchTypeQ.SetField("type")
+
+	matchAnyOwnerRegQ := NewRegexpQuery(".+")
+	matchAnyOwnerRegQ.SetField("owner")
+
+	matchNoOwner := NewBooleanQuery()
+	matchNoOwner.AddMustNot(matchAnyOwnerRegQ)
+
+	notNoOwner := NewBooleanQuery()
+	notNoOwner.AddMustNot(matchNoOwner)
+
+	matchTypeAndNoOwner := NewConjunctionQuery()
+	matchTypeAndNoOwner.AddQuery(matchTypeQ)
+	matchTypeAndNoOwner.AddQuery(notNoOwner)
+
+	req := NewSearchRequest(matchTypeAndNoOwner)
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// query 2
+	matchTypeAndNoOwnerBoolean := NewBooleanQuery()
+	matchTypeAndNoOwnerBoolean.AddMust(matchTypeQ)
+	matchTypeAndNoOwnerBoolean.AddMustNot(matchNoOwner)
+
+	req2 := NewSearchRequest(matchTypeAndNoOwnerBoolean)
+	res2, err := idx.Search(req2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) != len(res2.Hits) {
+		t.Fatalf("expected same number of hits, got: %d and %d", len(res.Hits), len(res2.Hits))
+	}
+}
+
+func TestSearchScoreNone(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := NewUsing(tmpIndexPath, NewIndexMapping(), scorch.Name, Config.DefaultKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := map[string]interface{}{
+		"field1": "asd fgh jkl",
+		"field2": "more content blah blah",
+		"id":     "doc",
+	}
+
+	if err = idx.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	q := NewQueryStringQuery("content")
+	sr := NewSearchRequest(q)
+	sr.IncludeLocations = true
+	sr.Score = "none"
+
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Hits) != 1 {
+		t.Fatal("unexpected number of hits")
+	}
+
+	if len(res.Hits[0].Locations) != 1 {
+		t.Fatal("unexpected locations for the hit")
+	}
+
+	if res.Hits[0].Score != 0 {
+		t.Fatal("unexpected score for the hit")
+	}
+}
+
+func TestGeoDistanceIssue1301(t *testing.T) {
+	shopMapping := NewDocumentMapping()
+	shopMapping.AddFieldMappingsAt("GEO", NewGeoPointFieldMapping())
+	shopIndexMapping := NewIndexMapping()
+	shopIndexMapping.DefaultMapping = shopMapping
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := NewUsing(tmpIndexPath, shopIndexMapping, scorch.Name, Config.DefaultKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	for i, g := range []string{"wecpkbeddsmf", "wecpk8tne453", "wecpkb80s09t"} {
+		if err = idx.Index(strconv.Itoa(i), map[string]interface{}{
+			"ID":  i,
+			"GEO": g,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Not setting "Field" for the following query, targets it against the _all
+	// field and this is returning inconsistent results, when there's another
+	// field indexed along with the geopoint which is numeric.
+	// As reported in: https://github.com/blevesearch/bleve/issues/1301
+	lat, lon := 22.371154, 114.112603
+	q := NewGeoDistanceQuery(lon, lat, "1km")
+
+	req := NewSearchRequest(q)
+	sr, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if sr.Total != 3 {
+		t.Fatalf("Size expected: 3, actual %d\n", sr.Total)
+	}
+}
+
+func TestSearchHighlightingWithRegexpReplacement(t *testing.T) {
+	idxMapping := NewIndexMapping()
+	if err := idxMapping.AddCustomCharFilter(regexp_char_filter.Name, map[string]interface{}{
+		"regexp":  `([a-z])\s+(\d)`,
+		"replace": "ooooo$1-$2",
+		"type":    regexp_char_filter.Name,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idxMapping.AddCustomAnalyzer("regexp_replace", map[string]interface{}{
+		"type":      custom.Name,
+		"tokenizer": "unicode",
+		"char_filters": []string{
+			regexp_char_filter.Name,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	idxMapping.DefaultAnalyzer = "regexp_replace"
+	idxMapping.StoreDynamic = true
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := NewUsing(tmpIndexPath, idxMapping, scorch.Name, Config.DefaultKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := map[string]interface{}{
+		"status": "fool 10",
+	}
+
+	batch := idx.NewBatch()
+	if err = batch.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+
+	query := NewMatchQuery("fool 10")
+	sreq := NewSearchRequest(query)
+	sreq.Fields = []string{"*"}
+	sreq.Highlight = NewHighlightWithStyle(ansi.Name)
+
+	sres, err := idx.Search(sreq)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if sres.Total != 1 {
+		t.Fatalf("Expected 1 hit, got: %v", sres.Total)
+	}
+}
+
+func TestAnalyzerInheritance(t *testing.T) {
+	tests := []struct {
+		name       string
+		mappingStr string
+		doc        map[string]interface{}
+		queryField string
+		queryTerm  string
+	}{
+		{
+			/*
+				index_mapping: keyword
+				default_mapping: ""
+					-> child field (should inherit keyword)
+			*/
+			name: "Child field to inherit index mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
+				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"store":false,"index":true}]}}},"default_analyzer":"keyword"}`,
+			doc:        map[string]interface{}{"city": "San Francisco"},
+			queryField: "city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
+				default_mapping: keyword
+				    -> child field (should inherit keyword)
+			*/
+			name: "Child field to inherit default mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
+				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"index":true}]}},"default_analyzer":"keyword"},"default_analyzer":"standard"}`,
+			doc:        map[string]interface{}{"city": "San Francisco"},
+			queryField: "city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
+				default_mapping: keyword
+				    -> child mapping: ""
+					    -> child field: (should inherit keyword)
+			*/
+			name: "Nested child field to inherit default mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"default_analyzer":` +
+				`"keyword","properties":{"address":{"enabled":true,"dynamic":false,"properties":` +
+				`{"city":{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"index":true}]}}}}},"default_analyzer":"standard"}`,
+			doc: map[string]interface{}{
+				"address": map[string]interface{}{"city": "San Francisco"},
+			},
+			queryField: "address.city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
+				default_mapping: ""
+				    -> child mapping: "keyword"
+					    -> child mapping: ""
+						    -> child field: (should inherit keyword)
+			*/
+			name: "Nested child field to inherit first child mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":false,"properties":` +
+				`{"address":{"enabled":true,"dynamic":false,"default_analyzer":"keyword",` +
+				`"properties":{"state":{"enabled":true,"dynamic":false,"properties":{"city":` +
+				`{"enabled":true,"dynamic":false,"fields":[{"name":"city","type":"text",` +
+				`"store":false,"index":true}]}}}}}}},"default_analyer":"standard"}`,
+			doc: map[string]interface{}{
+				"address": map[string]interface{}{
+					"state": map[string]interface{}{"city": "San Francisco"},
+				},
+			},
+			queryField: "address.state.city",
+			queryTerm:  "San Francisco",
+		},
+	}
+
+	for i := range tests {
+		t.Run(fmt.Sprintf("%s", tests[i].name), func(t *testing.T) {
+			idxMapping := NewIndexMapping()
+			if err := idxMapping.UnmarshalJSON([]byte(tests[i].mappingStr)); err != nil {
+				t.Fatal(err)
+			}
+
+			tmpIndexPath := createTmpIndexPath(t)
+			idx, err := New(tmpIndexPath, idxMapping)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			defer func() {
+				if err := idx.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}()
+
+			if err = idx.Index("doc", tests[i].doc); err != nil {
+				t.Fatal(err)
+			}
+
+			q := NewTermQuery(tests[i].queryTerm)
+			q.SetField(tests[i].queryField)
+
+			res, err := idx.Search(NewSearchRequest(q))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(res.Hits) != 1 {
+				t.Errorf("Unexpected number of hits: %v", len(res.Hits))
+			}
+		})
+	}
 }

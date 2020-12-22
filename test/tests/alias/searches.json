@@ -1,0 +1,76 @@
+[
+  {
+    "comment": "match all across shards",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "sort": ["-_score", "_id"],
+      "query": {
+        "match_all": {}
+      }
+    },
+    "result": {
+      "total_hits": 4,
+      "hits": [
+        {
+          "id": "a"
+        },
+        {
+          "id": "b"
+        },
+        {
+          "id": "c"
+        },
+        {
+          "id": "d"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search after b (page 2 when size=2)",
+    "search": {
+      "from": 0,
+      "size": 2,
+      "sort": ["name"],
+      "search_after": ["b"],
+      "query": {
+        "match_all": {}
+      }
+    },
+    "result": {
+      "total_hits": 4,
+      "hits": [
+        {
+          "id": "c"
+        },
+        {
+          "id": "d"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search before c (page 1 when size=2)",
+    "search": {
+      "from": 0,
+      "size": 2,
+      "sort": ["name"],
+      "search_before": ["c"],
+      "query": {
+        "match_all": {}
+      }
+    },
+    "result": {
+      "total_hits": 4,
+      "hits": [
+        {
+          "id": "a"
+        },
+        {
+          "id": "b"
+        }
+      ]
+    }
+  }
+]

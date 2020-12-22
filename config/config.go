@@ -31,6 +31,7 @@ import (
 	_ "github.com/blevesearch/bleve/search/highlight/highlighter/simple"
 
 	// char filters
+	_ "github.com/blevesearch/bleve/analysis/char/asciifolding"
 	_ "github.com/blevesearch/bleve/analysis/char/html"
 	_ "github.com/blevesearch/bleve/analysis/char/regexp"
 	_ "github.com/blevesearch/bleve/analysis/char/zerowidthnonjoiner"
@@ -44,6 +45,7 @@ import (
 
 	// token filters
 	_ "github.com/blevesearch/bleve/analysis/token/apostrophe"
+	_ "github.com/blevesearch/bleve/analysis/token/camelcase"
 	_ "github.com/blevesearch/bleve/analysis/token/compound"
 	_ "github.com/blevesearch/bleve/analysis/token/edgengram"
 	_ "github.com/blevesearch/bleve/analysis/token/elision"
@@ -51,10 +53,12 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/token/length"
 	_ "github.com/blevesearch/bleve/analysis/token/lowercase"
 	_ "github.com/blevesearch/bleve/analysis/token/ngram"
+	_ "github.com/blevesearch/bleve/analysis/token/reverse"
 	_ "github.com/blevesearch/bleve/analysis/token/shingle"
 	_ "github.com/blevesearch/bleve/analysis/token/stop"
 	_ "github.com/blevesearch/bleve/analysis/token/truncate"
 	_ "github.com/blevesearch/bleve/analysis/token/unicodenorm"
+	_ "github.com/blevesearch/bleve/analysis/token/unique"
 
 	// tokenizers
 	_ "github.com/blevesearch/bleve/analysis/tokenizer/exception"
@@ -75,19 +79,30 @@ import (
 	_ "github.com/blevesearch/bleve/analysis/lang/cjk"
 	_ "github.com/blevesearch/bleve/analysis/lang/ckb"
 	_ "github.com/blevesearch/bleve/analysis/lang/cs"
+	_ "github.com/blevesearch/bleve/analysis/lang/da"
+	_ "github.com/blevesearch/bleve/analysis/lang/de"
 	_ "github.com/blevesearch/bleve/analysis/lang/el"
 	_ "github.com/blevesearch/bleve/analysis/lang/en"
+	_ "github.com/blevesearch/bleve/analysis/lang/es"
 	_ "github.com/blevesearch/bleve/analysis/lang/eu"
 	_ "github.com/blevesearch/bleve/analysis/lang/fa"
+	_ "github.com/blevesearch/bleve/analysis/lang/fi"
 	_ "github.com/blevesearch/bleve/analysis/lang/fr"
 	_ "github.com/blevesearch/bleve/analysis/lang/ga"
 	_ "github.com/blevesearch/bleve/analysis/lang/gl"
 	_ "github.com/blevesearch/bleve/analysis/lang/hi"
+	_ "github.com/blevesearch/bleve/analysis/lang/hu"
 	_ "github.com/blevesearch/bleve/analysis/lang/hy"
 	_ "github.com/blevesearch/bleve/analysis/lang/id"
 	_ "github.com/blevesearch/bleve/analysis/lang/in"
 	_ "github.com/blevesearch/bleve/analysis/lang/it"
+	_ "github.com/blevesearch/bleve/analysis/lang/nl"
+	_ "github.com/blevesearch/bleve/analysis/lang/no"
 	_ "github.com/blevesearch/bleve/analysis/lang/pt"
+	_ "github.com/blevesearch/bleve/analysis/lang/ro"
+	_ "github.com/blevesearch/bleve/analysis/lang/ru"
+	_ "github.com/blevesearch/bleve/analysis/lang/sv"
+	_ "github.com/blevesearch/bleve/analysis/lang/tr"
 
 	// kv stores
 	_ "github.com/blevesearch/bleve/index/store/boltdb"

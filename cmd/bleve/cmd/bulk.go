@@ -112,6 +112,6 @@ func randomString(n int) string {
 func init() {
 	RootCmd.AddCommand(bulkCmd)
 
-	bulkCmd.Flags().IntVarP(&batchSize, "batch", "b", 1000, "Batch size for loading, default 1000.")
-	bulkCmd.Flags().BoolVarP(&parseJSON, "json", "j", true, "Parse the contents as JSON, defaults true.")
+	bulkCmd.Flags().IntVarP(&batchSize, "batch", "b", 1000, "Batch size for loading.")
+	bulkCmd.Flags().BoolVarP(&parseJSON, "json", "j", true, "Parse the contents as JSON.")
 }

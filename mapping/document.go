@@ -42,7 +42,7 @@ type DocumentMapping struct {
 	Dynamic         bool                        `json:"dynamic"`
 	Properties      map[string]*DocumentMapping `json:"properties,omitempty"`
 	Fields          []*FieldMapping             `json:"fields,omitempty"`
-	DefaultAnalyzer string                      `json:"default_analyzer"`
+	DefaultAnalyzer string                      `json:"default_analyzer,omitempty"`
 
 	// StructTagKey overrides "json" when looking for field names in struct tags
 	StructTagKey string `json:"struct_tag_key,omitempty"`
@@ -106,28 +106,31 @@ func (dm *DocumentMapping) fieldDescribedByPath(path string) *FieldMapping {
 				return subDocMapping.fieldDescribedByPath(encodePath(pathElements[1:]))
 			}
 		}
-	} else {
-		// just 1 path elememnt
-		// first look for property name with empty field
-		for propName, subDocMapping := range dm.Properties {
-			if propName == pathElements[0] {
-				// found property name match, now look at its fields
-				for _, field := range subDocMapping.Fields {
-					if field.Name == "" || field.Name == pathElements[0] {
-						// match
-						return field
-					}
+	}
+
+	// either the path just had one element
+	// or it had multiple, but no match for the first element at this level
+	// look for match with full path
+
+	// first look for property name with empty field
+	for propName, subDocMapping := range dm.Properties {
+		if propName == path {
+			// found property name match, now look at its fields
+			for _, field := range subDocMapping.Fields {
+				if field.Name == "" || field.Name == path {
+					// match
+					return field
 				}
 			}
 		}
-		// next, walk the properties again, looking for field overriding the name
-		for propName, subDocMapping := range dm.Properties {
-			if propName != pathElements[0] {
-				// property name isn't a match, but field name could override it
-				for _, field := range subDocMapping.Fields {
-					if field.Name == pathElements[0] {
-						return field
-					}
+	}
+	// next, walk the properties again, looking for field overriding the name
+	for propName, subDocMapping := range dm.Properties {
+		if propName != path {
+			// property name isn't a match, but field name could override it
+			for _, field := range subDocMapping.Fields {
+				if field.Name == path {
+					return field
 				}
 			}
 		}
@@ -179,6 +182,7 @@ OUTER:
 				continue OUTER
 			}
 		}
+		break
 	}
 	return current
 }
@@ -250,7 +254,6 @@ func (dm *DocumentMapping) AddFieldMapping(fm *FieldMapping) {
 
 // UnmarshalJSON offers custom unmarshaling with optional strict validation
 func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
-
 	var tmp map[string]json.RawMessage
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
@@ -307,8 +310,8 @@ func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 }
 
 func (dm *DocumentMapping) defaultAnalyzerName(path []string) string {
-	rv := ""
 	current := dm
+	rv := current.DefaultAnalyzer
 	for _, pathElement := range path {
 		var ok bool
 		current, ok = current.Properties[pathElement]
@@ -323,13 +326,17 @@ func (dm *DocumentMapping) defaultAnalyzerName(path []string) string {
 }
 
 func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes []uint64, context *walkContext) {
-	// allow default "json" tag to be overriden
+	// allow default "json" tag to be overridden
 	structTagKey := dm.StructTagKey
 	if structTagKey == "" {
 		structTagKey = "json"
 	}
 
 	val := reflect.ValueOf(data)
+	if !val.IsValid() {
+		return
+	}
+
 	typ := val.Type()
 	switch typ.Kind() {
 	case reflect.Map:
@@ -419,7 +426,11 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		if subDocMapping != nil {
 			// index by explicit mapping
 			for _, fieldMapping := range subDocMapping.Fields {
-				fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
+				if fieldMapping.Type == "geopoint" {
+					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
+				} else {
+					fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
+				}
 			}
 		} else if closestDocMapping.Dynamic {
 			// automatic indexing behavior
@@ -503,7 +514,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			}
 			dm.walkDocument(property, path, indexes, context)
 		}
-	case reflect.Map:
+	case reflect.Map, reflect.Slice:
 		if subDocMapping != nil {
 			for _, fieldMapping := range subDocMapping.Fields {
 				if fieldMapping.Type == "geopoint" {
@@ -516,19 +527,27 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		if !propertyValue.IsNil() {
 			switch property := property.(type) {
 			case encoding.TextMarshaler:
-
-				txt, err := property.MarshalText()
-				if err == nil && subDocMapping != nil {
-					// index by explicit mapping
+				// ONLY process TextMarshaler if there is an explicit mapping
+				// AND all of the fiels are of type text
+				// OTHERWISE process field without TextMarshaler
+				if subDocMapping != nil {
+					allFieldsText := true
 					for _, fieldMapping := range subDocMapping.Fields {
-						if fieldMapping.Type == "text" {
-							fieldMapping.processString(string(txt), pathString, path, indexes, context)
+						if fieldMapping.Type != "text" {
+							allFieldsText = false
+							break
 						}
 					}
-				} else {
-					dm.walkDocument(property, path, indexes, context)
+					txt, err := property.MarshalText()
+					if err == nil && allFieldsText {
+						txtStr := string(txt)
+						for _, fieldMapping := range subDocMapping.Fields {
+							fieldMapping.processString(txtStr, pathString, path, indexes, context)
+						}
+						return
+					}
 				}
-
+				dm.walkDocument(property, path, indexes, context)
 			default:
 				dm.walkDocument(property, path, indexes, context)
 			}

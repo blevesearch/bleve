@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package moss provides a KVStore implementation based on the
-// github.com/couchbaselabs/moss library.
+// github.com/couchbase/moss library.
 
 package moss
 
@@ -216,6 +216,10 @@ func (s *Store) StatsMap() map[string]interface{} {
 
 func (s *Store) LowerLevelStore() store.KVStore {
 	return s.llstore
+}
+
+func (s *Store) Collection() moss.Collection {
+	return s.ms
 }
 
 func init() {

@@ -20,7 +20,7 @@ import (
 
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/index/store/test"
-	"github.com/boltdb/bolt"
+	bolt "go.etcd.io/bbolt"
 )
 
 func open(t *testing.T, mo store.MergeOperator) store.KVStore {

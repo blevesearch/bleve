@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package moss provides a KVStore implementation based on the
-// github.com/couchbaselabs/moss library.
+// github.com/couchbase/moss library.
 
 package moss
 

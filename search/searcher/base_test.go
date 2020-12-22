@@ -22,16 +22,20 @@ import (
 	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizer/regexp"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/scorch"
 	"github.com/blevesearch/bleve/index/store/gtreap"
 	"github.com/blevesearch/bleve/index/upsidedown"
 )
 
-var twoDocIndex index.Index //= upside_down.NewUpsideDownCouch(inmem.MustOpen())
+var twoDocIndex index.Index
 
 func init() {
+	twoDocIndex = initTwoDocUpsideDown()
+}
+
+func initTwoDocUpsideDown() index.Index {
 	analysisQueue := index.NewAnalysisQueue(1)
-	var err error
-	twoDocIndex, err = upsidedown.NewUpsideDownCouch(
+	twoDocIndex, err := upsidedown.NewUpsideDownCouch(
 		gtreap.Name,
 		map[string]interface{}{
 			"path": "",
@@ -39,15 +43,36 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	err = twoDocIndex.Open()
+	initTwoDocs(twoDocIndex)
+	return twoDocIndex
+}
+
+func initTwoDocScorch(dir string) index.Index {
+	analysisQueue := index.NewAnalysisQueue(1)
+	twoDocIndex, err := scorch.NewScorch(
+		scorch.Name,
+		map[string]interface{}{
+			"path": dir,
+		}, analysisQueue)
 	if err != nil {
 		panic(err)
 	}
+	initTwoDocs(twoDocIndex)
+	return twoDocIndex
+}
+
+func initTwoDocs(twoDocIndex index.Index) {
+	err := twoDocIndex.Open()
+	if err != nil {
+		panic(err)
+	}
+	batch := index.NewBatch()
 	for _, doc := range twoDocIndexDocs {
-		err := twoDocIndex.Update(doc)
-		if err != nil {
-			panic(err)
-		}
+		batch.Update(doc)
+	}
+	err = twoDocIndex.Batch(batch)
+	if err != nil {
+		panic(err)
 	}
 }
 

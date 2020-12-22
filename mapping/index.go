@@ -50,6 +50,7 @@ type IndexMappingImpl struct {
 	DefaultField          string                      `json:"default_field"`
 	StoreDynamic          bool                        `json:"store_dynamic"`
 	IndexDynamic          bool                        `json:"index_dynamic"`
+	DocValuesDynamic      bool                        `json:"docvalues_dynamic"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
 	cache                 *registry.Cache
 }
@@ -100,26 +101,26 @@ func (im *IndexMappingImpl) AddCustomTokenFilter(name string, config map[string]
 // returned analyzer is registered in the IndexMapping.
 //
 // bleve comes with predefined analyzers, like
-// github.com/blevesearch/bleve/analysis/analyzers/custom_analyzer. They are
+// github.com/blevesearch/bleve/analysis/analyzer/custom. They are
 // available only if their package is imported by client code. To achieve this,
 // use their metadata to fill configuration entries:
 //
 //   import (
-//       "github.com/blevesearch/bleve/analysis/analyzers/custom_analyzer"
-//       "github.com/blevesearch/bleve/analysis/char_filters/html_char_filter"
-//       "github.com/blevesearch/bleve/analysis/token_filters/lower_case_filter"
-//       "github.com/blevesearch/bleve/analysis/tokenizers/unicode"
+//       "github.com/blevesearch/bleve/analysis/analyzer/custom"
+//       "github.com/blevesearch/bleve/analysis/char/html"
+//       "github.com/blevesearch/bleve/analysis/token/lowercase"
+//       "github.com/blevesearch/bleve/analysis/tokenizer/unicode"
 //   )
 //
 //   m := bleve.NewIndexMapping()
 //   err := m.AddCustomAnalyzer("html", map[string]interface{}{
-//       "type": custom_analyzer.Name,
+//       "type": custom.Name,
 //       "char_filters": []string{
-//           html_char_filter.Name,
+//           html.Name,
 //       },
 //       "tokenizer":     unicode.Name,
 //       "token_filters": []string{
-//           lower_case_filter.Name,
+//           lowercase.Name,
 //           ...
 //       },
 //   })
@@ -154,6 +155,7 @@ func NewIndexMapping() *IndexMappingImpl {
 		DefaultField:          defaultField,
 		IndexDynamic:          IndexDynamic,
 		StoreDynamic:          StoreDynamic,
+		DocValuesDynamic:      DocValuesDynamic,
 		CustomAnalysis:        newCustomAnalysis(),
 		cache:                 registry.NewCache(),
 	}
@@ -217,6 +219,7 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 	im.TypeMapping = make(map[string]*DocumentMapping)
 	im.StoreDynamic = StoreDynamic
 	im.IndexDynamic = IndexDynamic
+	im.DocValuesDynamic = DocValuesDynamic
 
 	var invalidKeys []string
 	for k, v := range tmp {
@@ -271,6 +274,11 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
+		case "docvalues_dynamic":
+			err := json.Unmarshal(v, &im.DocValuesDynamic)
+			if err != nil {
+				return err
+			}
 		default:
 			invalidKeys = append(invalidKeys, k)
 		}
@@ -312,8 +320,8 @@ func (im *IndexMappingImpl) determineType(data interface{}) string {
 func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}) error {
 	docType := im.determineType(data)
 	docMapping := im.mappingForType(docType)
-	walkContext := im.newWalkContext(doc, docMapping)
 	if docMapping.Enabled {
+		walkContext := im.newWalkContext(doc, docMapping)
 		docMapping.walkDocument(data, []string{}, []uint64{}, walkContext)
 
 		// see if the _all field was disabled
@@ -339,7 +347,7 @@ func (im *IndexMappingImpl) newWalkContext(doc *document.Document, dm *DocumentM
 		doc:             doc,
 		im:              im,
 		dm:              dm,
-		excludedFromAll: []string{},
+		excludedFromAll: []string{"_id"},
 	}
 }
 

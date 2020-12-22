@@ -126,6 +126,6 @@ func getDictionary(index bleve.Index, field string) (map[string]uint64, error) {
 
 func init() {
 	RootCmd.AddCommand(checkCmd)
-	checkCmd.Flags().StringVarP(&checkFieldName, "field", "f", "", "Restrict check to the specified field name, by default check all fields.")
-	checkCmd.Flags().IntVarP(&checkCount, "count", "c", 100, "Check this many terms, default 100.")
+	checkCmd.Flags().StringVarP(&checkFieldName, "field", "f", "", "Restrict check to the specified field name.")
+	checkCmd.Flags().IntVarP(&checkCount, "count", "c", 100, "Check this many terms.")
 }

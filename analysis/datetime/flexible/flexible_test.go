@@ -76,14 +76,14 @@ func TestFlexibleDateTimeParser(t *testing.T) {
 		})
 
 	for _, test := range tests {
-		actualTime, actualErr := dateOptionalTimeParser.ParseDateTime(test.input)
-		if actualErr != test.expectedError {
-			t.Errorf("expected error %#v, got %#v", test.expectedError, actualErr)
-			continue
-		}
-		if !reflect.DeepEqual(actualTime, test.expectedTime) {
-			t.Errorf("expected time %#v, got %#v", test.expectedTime, actualTime)
-			t.Errorf("expected location %#v,\n got %#v", test.expectedTime.Location(), actualTime.Location())
-		}
+		t.Run(test.input, func(t *testing.T) {
+			actualTime, actualErr := dateOptionalTimeParser.ParseDateTime(test.input)
+			if actualErr != test.expectedError {
+				t.Fatalf("expected error %#v, got %#v", test.expectedError, actualErr)
+			}
+			if !reflect.DeepEqual(actualTime, test.expectedTime) {
+				t.Errorf("expected time %v, got %v", test.expectedTime, actualTime)
+			}
+		})
 	}
 }

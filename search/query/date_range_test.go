@@ -49,3 +49,84 @@ func TestBleveQueryTime(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateDatetimeRanges(t *testing.T) {
+	tests := []struct {
+		start  string
+		end    string
+		expect bool
+	}{
+		{
+			start:  "2019-03-22T13:25:00Z",
+			end:    "2019-03-22T18:25:00Z",
+			expect: true,
+		},
+		{
+			start:  "2019-03-22T13:25:00Z",
+			end:    "9999-03-22T13:25:00Z",
+			expect: false,
+		},
+		{
+			start:  "2019-03-22T13:25:00Z",
+			end:    "2262-04-11T11:59:59Z",
+			expect: true,
+		},
+		{
+			start:  "2019-03-22T13:25:00Z",
+			end:    "2262-04-12T00:00:00Z",
+			expect: false,
+		},
+		{
+			start:  "1950-03-22T12:23:23Z",
+			end:    "1960-02-21T15:23:34Z",
+			expect: true,
+		},
+		{
+			start:  "0001-01-01T00:00:00Z",
+			end:    "0001-01-01T00:00:00Z",
+			expect: false,
+		},
+		{
+			start:  "0001-01-01T00:00:00Z",
+			end:    "2000-01-01T00:00:00Z",
+			expect: true,
+		},
+		{
+			start:  "1677-11-30T11:59:59Z",
+			end:    "2262-04-11T11:59:59Z",
+			expect: false,
+		},
+		{
+			start:  "2262-04-12T00:00:00Z",
+			end:    "2262-04-11T11:59:59Z",
+			expect: false,
+		},
+		{
+			start:  "1677-12-01T00:00:00Z",
+			end:    "2262-04-12T00:00:00Z",
+			expect: false,
+		},
+		{
+			start:  "1677-12-01T00:00:00Z",
+			end:    "1677-11-30T11:59:59Z",
+			expect: false,
+		},
+		{
+			start:  "1677-12-01T00:00:00Z",
+			end:    "2262-04-11T11:59:59Z",
+			expect: true,
+		},
+	}
+
+	for _, test := range tests {
+		startTime, _ := time.Parse(time.RFC3339, test.start)
+		endTime, _ := time.Parse(time.RFC3339, test.end)
+
+		dateRangeQuery := NewDateRangeQuery(startTime, endTime)
+		if (dateRangeQuery.Validate() == nil) != test.expect {
+			t.Errorf("unexpected results while validating date range query with"+
+				" {start: %v, end: %v}, expected: %v",
+				test.start, test.end, test.expect)
+		}
+	}
+}
