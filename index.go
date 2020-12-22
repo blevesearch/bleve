@@ -15,11 +15,13 @@
 package bleve
 
 import (
+	"context"
+
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/mapping"
-	"golang.org/x/net/context"
+	"github.com/blevesearch/bleve/size"
 )
 
 // A Batch groups together multiple Index and Delete
@@ -31,6 +33,9 @@ import (
 type Batch struct {
 	index    Index
 	internal *index.Batch
+
+	lastDocSize uint64
+	totalSize   uint64
 }
 
 // Index adds the specified index operation to the
@@ -46,7 +51,20 @@ func (b *Batch) Index(id string, data interface{}) error {
 		return err
 	}
 	b.internal.Update(doc)
+
+	b.lastDocSize = uint64(doc.Size() +
+		len(id) + size.SizeOfString) // overhead from internal
+	b.totalSize += b.lastDocSize
+
 	return nil
+}
+
+func (b *Batch) LastDocSize() uint64 {
+	return b.lastDocSize
+}
+
+func (b *Batch) TotalDocsSize() uint64 {
+	return b.totalSize
 }
 
 // IndexAdvanced adds the specified index operation to the
@@ -76,7 +94,7 @@ func (b *Batch) SetInternal(key, val []byte) {
 	b.internal.SetInternal(key, val)
 }
 
-// SetInternal adds the specified delete internal
+// DeleteInternal adds the specified delete internal
 // operation to the batch. NOTE: the bleve Index is
 // not updated until the batch is executed.
 func (b *Batch) DeleteInternal(key []byte) {
@@ -99,6 +117,26 @@ func (b *Batch) String() string {
 // be re-used in the future.
 func (b *Batch) Reset() {
 	b.internal.Reset()
+	b.lastDocSize = 0
+	b.totalSize = 0
+}
+
+func (b *Batch) Merge(o *Batch) {
+	if o != nil && o.internal != nil {
+		b.internal.Merge(o.internal)
+		if o.LastDocSize() > 0 {
+			b.lastDocSize = o.LastDocSize()
+		}
+		b.totalSize = uint64(b.internal.TotalDocSize())
+	}
+}
+
+func (b *Batch) SetPersistedCallback(f index.BatchCallback) {
+	b.internal.SetPersistedCallback(f)
+}
+
+func (b *Batch) PersistedCallback() index.BatchCallback {
+	return b.internal.PersistedCallback()
 }
 
 // An Index implements all the indexing and searching
@@ -254,4 +292,18 @@ func Open(path string) (Index, error) {
 // persisted when the kvstore was created.
 func OpenUsing(path string, runtimeConfig map[string]interface{}) (Index, error) {
 	return openIndexUsing(path, runtimeConfig)
+}
+
+// Builder is a limited interface, used to build indexes in an offline mode.
+// Items cannot be updated or deleted, and the caller MUST ensure a document is
+// indexed only once.
+type Builder interface {
+	Index(id string, data interface{}) error
+	Close() error
+}
+
+// NewBuilder creates a builder, which will build an index at the specified path,
+// using the specified mapping and options.
+func NewBuilder(path string, mapping mapping.IndexMapping, config map[string]interface{}) (Builder, error) {
+	return newBuilder(path, mapping, config)
 }

@@ -15,6 +15,7 @@
 package regexp
 
 import (
+	"fmt"
 	"reflect"
 	"regexp"
 	"testing"
@@ -22,48 +23,66 @@ import (
 
 func TestRegexpCharFilter(t *testing.T) {
 
-	htmlTagPattern := `</?[!\w]+((\s+\w+(\s*=\s*(?:".*?"|'.*?'|[^'">\s]+))?)+\s*|\s*)/?>`
-	htmlRegex := regexp.MustCompile(htmlTagPattern)
-
 	tests := []struct {
-		input  []byte
-		output []byte
+		regexStr string
+		replace  []byte
+		input    []byte
+		output   []byte
 	}{
 		{
-			input:  []byte(`<html>test</html>`),
-			output: []byte(`      test       `),
+			regexStr: `</?[!\w]+((\s+\w+(\s*=\s*(?:".*?"|'.*?'|[^'">\s]+))?)+\s*|\s*)/?>`,
+			replace:  []byte{' '},
+			input:    []byte(`<html>test</html>`),
+			output:   []byte(` test `),
+		},
+		{
+			regexStr: `\x{200C}`,
+			replace:  []byte{' '},
+			input:    []byte("water\u200Cunder\u200Cthe\u200Cbridge"),
+			output:   []byte("water under the bridge"),
+		},
+		{
+			regexStr: `([a-z])\s+(\d)`,
+			replace:  []byte(`$1-$2`),
+			input:    []byte(`temp 1`),
+			output:   []byte(`temp-1`),
+		},
+		{
+			regexStr: `foo.?`,
+			replace:  []byte(`X`),
+			input:    []byte(`seafood, fool`),
+			output:   []byte(`seaX, X`),
+		},
+		{
+			regexStr: `def`,
+			replace:  []byte(`_`),
+			input:    []byte(`abcdefghi`),
+			output:   []byte(`abc_ghi`),
+		},
+		{
+			regexStr: `456`,
+			replace:  []byte(`000000`),
+			input:    []byte(`123456789`),
+			output:   []byte(`123000000789`),
+		},
+		{
+			regexStr: `“|”`,
+			replace:  []byte(`"`),
+			input:    []byte(`“hello”`),
+			output:   []byte(`"hello"`),
 		},
 	}
 
 	for _, test := range tests {
-		filter := New(htmlRegex, []byte{' '})
-		output := filter.Filter(test.input)
-		if !reflect.DeepEqual(output, test.output) {
-			t.Errorf("Expected:\n`%s`\ngot:\n`%s`\nfor:\n`%s`\n", string(test.output), string(output), string(test.input))
-		}
-	}
-}
+		t.Run(fmt.Sprintf("match %s replace %s", test.regexStr, string(test.replace)), func(t *testing.T) {
+			regex := regexp.MustCompile(test.regexStr)
+			filter := New(regex, test.replace)
 
-func TestZeroWidthNonJoinerCharFilter(t *testing.T) {
+			output := filter.Filter(test.input)
+			if !reflect.DeepEqual(test.output, output) {
+				t.Errorf("Expected: `%s`, Got: `%s`\n", string(test.output), string(output))
+			}
+		})
 
-	zeroWidthNonJoinerPattern := `\x{200C}`
-	zeroWidthNonJoinerRegex := regexp.MustCompile(zeroWidthNonJoinerPattern)
-
-	tests := []struct {
-		input  []byte
-		output []byte
-	}{
-		{
-			input:  []byte("water\u200Cunder\u200Cthe\u200Cbridge"),
-			output: []byte("water   under   the   bridge"),
-		},
-	}
-
-	for _, test := range tests {
-		filter := New(zeroWidthNonJoinerRegex, []byte{' '})
-		output := filter.Filter(test.input)
-		if !reflect.DeepEqual(output, test.output) {
-			t.Errorf("Expected:\n`%s`\ngot:\n`%s`\nfor:\n`%s`\n", string(test.output), string(output), string(test.input))
-		}
 	}
 }

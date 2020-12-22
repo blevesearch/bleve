@@ -1,37 +1,4 @@
 [
-	{
-    "comment": "default order, all have same score, then by natural index order",
-		"search": {
-			"from": 0,
-			"size": 10,
-			"query": {
-				"match_all":{}
-			}
-		},
-		"result": {
-			"total_hits": 6,
-			"hits": [
-				{
-					"id": "a"
-				},
-        {
-          "id": "b"
-        },
-        {
-          "id": "c"
-        },
-        {
-          "id": "d"
-        },
-        {
-          "id": "e"
-        },
-        {
-          "id": "f"
-        }
-			]
-		}
-	},
   {
     "comment": "sort by name, ascending",
 		"search": {
@@ -439,5 +406,149 @@
           }
   			]
   		}
-  	}
+  	},
+  {
+    "comment": "sort by name, ascending, after marty",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "match_all":{}
+      },
+      "sort": ["name"],
+      "search_after": ["marty"]
+    },
+    "result": {
+      "total_hits": 6,
+      "hits": [
+        {
+          "id": "e"
+        },
+        {
+          "id": "b"
+        },
+        {
+          "id": "d"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "sort by name, ascending, before nancy",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "match_all":{}
+      },
+      "sort": ["name"],
+      "search_before": ["nancy"]
+    },
+    "result": {
+      "total_hits": 6,
+      "hits": [
+        {
+          "id": "c"
+        },
+        {
+          "id": "f"
+        },
+        {
+          "id": "a"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "sort by ID, after doc d",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "match_all":{}
+      },
+      "sort": ["_id"],
+      "search_after": ["d"]
+    },
+    "result": {
+      "total_hits": 6,
+      "hits": [
+        {
+          "id": "e"
+        },
+        {
+          "id": "f"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "sort by ID, before doc d",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "match_all":{}
+      },
+      "sort": ["_id"],
+      "search_before": ["d"]
+    },
+    "result": {
+      "total_hits": 6,
+      "hits": [
+        {
+          "id": "a"
+        },
+        {
+          "id": "b"
+        },
+        {
+          "id": "c"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "sort by score, after score 0.286889[ e(299646) > f(286889) > d(222224)]",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "query":"rapster"
+      },
+      "sort": ["_score"],
+      "search_after": ["0.286889"]
+    },
+    "result": {
+      "total_hits": 3,
+      "hits": [
+        {
+          "id": "f"
+        },
+        {
+          "id": "e"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "sort by score, before score f/0.286889[ e(299646) > f(286889) > d(222224)]",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "query":"rapster"
+      },
+      "sort": ["_score"],
+      "search_before": ["0.286889"]
+    },
+    "result": {
+      "total_hits": 3,
+      "hits": [
+        {
+          "id": "d"
+        }
+      ]
+    }
+  }
 ]

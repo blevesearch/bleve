@@ -15,11 +15,14 @@
 package bleve
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
@@ -28,26 +31,43 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
-
 	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/document"
 	"github.com/blevesearch/bleve/index"
+	"github.com/blevesearch/bleve/index/store/boltdb"
 	"github.com/blevesearch/bleve/index/store/null"
 	"github.com/blevesearch/bleve/mapping"
 	"github.com/blevesearch/bleve/search"
 	"github.com/blevesearch/bleve/search/query"
+
+	"github.com/blevesearch/bleve/index/scorch"
+	"github.com/blevesearch/bleve/index/upsidedown"
 )
 
-func TestCrud(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+type Fatalfable interface {
+	Fatalf(format string, args ...interface{})
+}
 
-	index, err := New("testidx", NewIndexMapping())
+func createTmpIndexPath(f Fatalfable) string {
+	tmpIndexPath, err := ioutil.TempDir("", "bleve-testidx")
+	if err != nil {
+		f.Fatalf("error creating temp dir: %v", err)
+	}
+	return tmpIndexPath
+}
+
+func cleanupTmpIndexPath(f Fatalfable, path string) {
+	err := os.RemoveAll(path)
+	if err != nil {
+		f.Fatalf("error removing temp dir: %v", err)
+	}
+}
+
+func TestCrud(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +174,7 @@ func TestCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	index, err = Open("testidx")
+	index, err = Open(tmpIndexPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,14 +233,10 @@ func TestCrud(t *testing.T) {
 }
 
 func TestIndexCreateNewOverExisting(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +244,7 @@ func TestIndexCreateNewOverExisting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	index, err = New("testidx", NewIndexMapping())
+	index, err = New(tmpIndexPath, NewIndexMapping())
 	if err != ErrorIndexPathExists {
 		t.Fatalf("expected error index path exists, got %v", err)
 	}
@@ -242,14 +258,10 @@ func TestIndexOpenNonExisting(t *testing.T) {
 }
 
 func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,35 +270,37 @@ func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	tmpIndexPathMeta := filepath.Join(tmpIndexPath, "index_meta.json")
+
 	// now intentionally change the storage type
-	err = ioutil.WriteFile("testidx/index_meta.json", []byte(`{"storage":"mystery"}`), 0666)
+	err = ioutil.WriteFile(tmpIndexPathMeta, []byte(`{"storage":"mystery"}`), 0666)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	index, err = Open("testidx")
+	index, err = Open(tmpIndexPath)
 	if err != ErrorUnknownStorageType {
 		t.Fatalf("expected error unknown storage type, got %v", err)
 	}
 
 	// now intentionally corrupt the metadata
-	err = ioutil.WriteFile("testidx/index_meta.json", []byte("corrupted"), 0666)
+	err = ioutil.WriteFile(tmpIndexPathMeta, []byte("corrupted"), 0666)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	index, err = Open("testidx")
+	index, err = Open(tmpIndexPath)
 	if err != ErrorIndexMetaCorrupt {
 		t.Fatalf("expected error index metadata corrupted, got %v", err)
 	}
 
 	// now intentionally remove the metadata
-	err = os.Remove("testidx/index_meta.json")
+	err = os.Remove(tmpIndexPathMeta)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	index, err = Open("testidx")
+	index, err = Open(tmpIndexPath)
 	if err != ErrorIndexMetaMissing {
 		t.Fatalf("expected error index metadata missing, got %v", err)
 	}
@@ -362,12 +376,8 @@ func (s *slowQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, option
 }
 
 func TestSlowSearch(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
 	defer func() {
 		// reset logger back to normal
@@ -377,7 +387,7 @@ func TestSlowSearch(t *testing.T) {
 	var sdw sawDataWriter
 	SetLog(log.New(&sdw, "bleve", log.LstdFlags))
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,14 +437,10 @@ func (s *sawDataWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestStoredFieldPreserved(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -482,14 +488,10 @@ func TestStoredFieldPreserved(t *testing.T) {
 }
 
 func TestDict(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -609,14 +611,10 @@ func TestDict(t *testing.T) {
 }
 
 func TestBatchString(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -656,14 +654,10 @@ func TestBatchString(t *testing.T) {
 }
 
 func TestIndexMetadataRaceBug198(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -674,16 +668,19 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 		}
 	}()
 
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	done := make(chan struct{})
 	go func() {
 		for {
 			select {
 			case <-done:
+				wg.Done()
 				return
 			default:
-				_, err := index.DocCount()
-				if err != nil {
-					t.Fatal(err)
+				_, err2 := index.DocCount()
+				if err2 != nil {
+					t.Fatal(err2)
 				}
 			}
 		}
@@ -701,17 +698,14 @@ func TestIndexMetadataRaceBug198(t *testing.T) {
 		}
 	}
 	close(done)
+	wg.Wait()
 }
 
 func TestSortMatchSearch(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -719,15 +713,20 @@ func TestSortMatchSearch(t *testing.T) {
 	names := []string{"Noam", "Uri", "David", "Yosef", "Eitan", "Itay", "Ariel", "Daniel", "Omer", "Yogev", "Yehonatan", "Moshe", "Mohammed", "Yusuf", "Omar"}
 	days := []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
 	numbers := []string{"One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"}
+	b := index.NewBatch()
 	for i := 0; i < 200; i++ {
 		doc := make(map[string]interface{})
 		doc["Name"] = names[i%len(names)]
 		doc["Day"] = days[i%len(days)]
 		doc["Number"] = numbers[i%len(numbers)]
-		err = index.Index(fmt.Sprintf("%d", i), doc)
+		err = b.Index(fmt.Sprintf("%d", i), doc)
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+	err = index.Batch(b)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	req := NewSearchRequest(NewMatchQuery("One"))
@@ -752,14 +751,10 @@ func TestSortMatchSearch(t *testing.T) {
 }
 
 func TestIndexCountMatchSearch(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -819,14 +814,10 @@ func TestIndexCountMatchSearch(t *testing.T) {
 }
 
 func TestBatchReset(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -862,14 +853,10 @@ func TestBatchReset(t *testing.T) {
 }
 
 func TestDocumentFieldArrayPositions(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -971,12 +958,8 @@ func TestDocumentFieldArrayPositions(t *testing.T) {
 }
 
 func TestKeywordSearchBug207(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
 	f := NewTextFieldMapping()
 	f.Analyzer = keyword.Name
@@ -985,7 +968,7 @@ func TestKeywordSearchBug207(t *testing.T) {
 	m.DefaultMapping = NewDocumentMapping()
 	m.DefaultMapping.AddFieldMappingsAt("Body", f)
 
-	index, err := New("testidx", m)
+	index, err := New(tmpIndexPath, m)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1069,14 +1052,10 @@ func TestKeywordSearchBug207(t *testing.T) {
 }
 
 func TestTermVectorArrayPositions(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1146,12 +1125,8 @@ func TestTermVectorArrayPositions(t *testing.T) {
 }
 
 func TestDocumentStaticMapping(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
 	m := NewIndexMapping()
 	m.DefaultMapping = NewDocumentStaticMapping()
@@ -1159,7 +1134,7 @@ func TestDocumentStaticMapping(t *testing.T) {
 	m.DefaultMapping.AddFieldMappingsAt("Date", NewDateTimeFieldMapping())
 	m.DefaultMapping.AddFieldMappingsAt("Numeric", NewNumericFieldMapping())
 
-	index, err := New("testidx", m)
+	index, err := New(tmpIndexPath, m)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1207,14 +1182,10 @@ func TestDocumentStaticMapping(t *testing.T) {
 }
 
 func TestIndexEmptyDocId(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1252,12 +1223,8 @@ func TestIndexEmptyDocId(t *testing.T) {
 }
 
 func TestDateTimeFieldMappingIssue287(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
 	f := NewDateTimeFieldMapping()
 
@@ -1265,7 +1232,7 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 	m.DefaultMapping = NewDocumentMapping()
 	m.DefaultMapping.AddFieldMappingsAt("Date", f)
 
-	index, err := New("testidx", m)
+	index, err := New(tmpIndexPath, m)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1335,14 +1302,10 @@ func TestDateTimeFieldMappingIssue287(t *testing.T) {
 }
 
 func TestDocumentFieldArrayPositionsBug295(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1419,18 +1382,14 @@ func TestDocumentFieldArrayPositionsBug295(t *testing.T) {
 }
 
 func TestBooleanFieldMappingIssue109(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
 	m := NewIndexMapping()
 	m.DefaultMapping = NewDocumentMapping()
 	m.DefaultMapping.AddFieldMappingsAt("Bool", NewBooleanFieldMapping())
 
-	index, err := New("testidx", m)
+	index, err := New(tmpIndexPath, m)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1485,14 +1444,10 @@ func TestBooleanFieldMappingIssue109(t *testing.T) {
 }
 
 func TestSearchTimeout(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1503,8 +1458,9 @@ func TestSearchTimeout(t *testing.T) {
 		}
 	}()
 
-	// first run a search with an absurdly long timeout (should succeeed)
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	// first run a search with an absurdly long timeout (should succeed)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	query := NewTermQuery("water")
 	req := NewSearchRequest(query)
 	_, err = index.SearchInContext(ctx, req)
@@ -1513,7 +1469,8 @@ func TestSearchTimeout(t *testing.T) {
 	}
 
 	// now run a search again with an absurdly low timeout (should timeout)
-	ctx, _ = context.WithTimeout(context.Background(), 1*time.Microsecond)
+	ctx, cancel = context.WithTimeout(context.Background(), 1*time.Microsecond)
+	defer cancel()
 	sq := &slowQuery{
 		actual: query,
 		delay:  50 * time.Millisecond, // on Windows timer resolution is 15ms
@@ -1525,7 +1482,7 @@ func TestSearchTimeout(t *testing.T) {
 	}
 
 	// now run a search with a long timeout, but with a long query, and cancel it
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 	sq = &slowQuery{
 		actual: query,
 		delay:  100 * time.Millisecond, // on Windows timer resolution is 15ms
@@ -1551,16 +1508,18 @@ func TestConfigCache(t *testing.T) {
 }
 
 func TestBatchRaceBug260(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+	i, err := New(tmpIndexPath, NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		err := os.RemoveAll("testidx")
+		err := i.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
-	i, err := New("testidx", NewIndexMapping())
-	if err != nil {
-		t.Fatal(err)
-	}
 	b := i.NewBatch()
 	err = b.Index("1", 1)
 	if err != nil {
@@ -1583,14 +1542,10 @@ func TestBatchRaceBug260(t *testing.T) {
 }
 
 func BenchmarkBatchOverhead(b *testing.B) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			b.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(b)
+	defer cleanupTmpIndexPath(b, tmpIndexPath)
 	m := NewIndexMapping()
-	i, err := NewUsing("testidx", m, Config.DefaultIndexType, null.Name, nil)
+	i, err := NewUsing(tmpIndexPath, m, Config.DefaultIndexType, null.Name, nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -1612,15 +1567,11 @@ func BenchmarkBatchOverhead(b *testing.B) {
 }
 
 func TestOpenReadonlyMultiple(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
 	// build an index and close it
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1640,7 +1591,7 @@ func TestOpenReadonlyMultiple(t *testing.T) {
 	}
 
 	// now open it read-only
-	index, err = OpenUsing("testidx", map[string]interface{}{
+	index, err = OpenUsing(tmpIndexPath, map[string]interface{}{
 		"read_only": true,
 	})
 
@@ -1649,7 +1600,7 @@ func TestOpenReadonlyMultiple(t *testing.T) {
 	}
 
 	// now open it again
-	index2, err := OpenUsing("testidx", map[string]interface{}{
+	index2, err := OpenUsing(tmpIndexPath, map[string]interface{}{
 		"read_only": true,
 	})
 
@@ -1733,14 +1684,10 @@ func TestBug408(t *testing.T) {
 }
 
 func TestIndexAdvancedCountMatchSearch(t *testing.T) {
-	defer func() {
-		err := os.RemoveAll("testidx")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-	index, err := New("testidx", NewIndexMapping())
+	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1802,5 +1749,527 @@ func TestIndexAdvancedCountMatchSearch(t *testing.T) {
 	err = index.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func benchmarkSearchOverhead(indexType string, b *testing.B) {
+	tmpIndexPath := createTmpIndexPath(b)
+	defer cleanupTmpIndexPath(b, tmpIndexPath)
+
+	index, err := NewUsing(tmpIndexPath, NewIndexMapping(),
+		indexType, Config.DefaultKVStore, nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}()
+
+	elements := []string{"air", "water", "fire", "earth"}
+	for j := 0; j < 10000; j++ {
+		err = index.Index(fmt.Sprintf("%d", j),
+			map[string]interface{}{"name": elements[j%len(elements)]})
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	query1 := NewTermQuery("water")
+	query2 := NewTermQuery("fire")
+	query := NewDisjunctionQuery(query1, query2)
+	req := NewSearchRequest(query)
+
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		_, err = index.Search(req)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkUpsidedownSearchOverhead(b *testing.B) {
+	benchmarkSearchOverhead(upsidedown.Name, b)
+}
+
+func BenchmarkScorchSearchOverhead(b *testing.B) {
+	benchmarkSearchOverhead(scorch.Name, b)
+}
+
+func TestSearchQueryCallback(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	index, err := New(tmpIndexPath, NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	query := NewTermQuery("water")
+	req := NewSearchRequest(query)
+
+	expErr := fmt.Errorf("MEM_LIMIT_EXCEEDED")
+	f := func(size uint64) error {
+		// the intended usage of this callback is to see the estimated
+		// memory usage before executing, and possibly abort early
+		// in this test we simulate returning such an error
+		return expErr
+	}
+
+	ctx := context.WithValue(context.Background(), SearchQueryStartCallbackKey,
+		SearchQueryStartCallbackFn(f))
+	_, err = index.SearchInContext(ctx, req)
+	if err != expErr {
+		t.Fatalf("Expected: %v, Got: %v", expErr, err)
+	}
+}
+
+func TestBatchMerge(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	index, err := New(tmpIndexPath, NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	doca := map[string]interface{}{
+		"name":   "scorch",
+		"desc":   "gophercon india",
+		"nation": "india",
+	}
+
+	batchA := index.NewBatch()
+	err = batchA.Index("a", doca)
+	if err != nil {
+		t.Error(err)
+	}
+	batchA.SetInternal([]byte("batchkA"), []byte("batchvA"))
+
+	docb := map[string]interface{}{
+		"name": "moss",
+		"desc": "gophercon MV",
+	}
+
+	batchB := index.NewBatch()
+	err = batchB.Index("b", docb)
+	if err != nil {
+		t.Error(err)
+	}
+	batchB.SetInternal([]byte("batchkB"), []byte("batchvB"))
+
+	docC := map[string]interface{}{
+		"name":    "blahblah",
+		"desc":    "inProgress",
+		"country": "usa",
+	}
+
+	batchC := index.NewBatch()
+	err = batchC.Index("c", docC)
+	if err != nil {
+		t.Error(err)
+	}
+	batchC.SetInternal([]byte("batchkC"), []byte("batchvC"))
+	batchC.SetInternal([]byte("batchkB"), []byte("batchvBNew"))
+	batchC.Delete("a")
+	batchC.DeleteInternal([]byte("batchkA"))
+
+	batchA.Merge(batchB)
+
+	if batchA.Size() != 4 {
+		t.Errorf("expected batch size 4, got %d", batchA.Size())
+	}
+
+	batchA.Merge(batchC)
+
+	if batchA.Size() != 6 {
+		t.Errorf("expected batch size 6, got %d", batchA.Size())
+	}
+
+	err = index.Batch(batchA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// close the index, open it again, and try some more things
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	index, err = Open(tmpIndexPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	count, err := index.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Errorf("expected doc count 2, got %d", count)
+	}
+
+	doc, err := index.Document("c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc == nil {
+		t.Errorf("expected doc not nil, got nil")
+	}
+
+	val, err := index.GetInternal([]byte("batchkB"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val == nil || string(val) != "batchvBNew" {
+		t.Errorf("expected val: batchvBNew , got %s", val)
+	}
+
+	val, err = index.GetInternal([]byte("batchkA"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != nil {
+		t.Errorf("expected nil, got %s", val)
+	}
+
+	foundNameField := false
+	for _, field := range doc.Fields {
+		if field.Name() == "name" && string(field.Value()) == "blahblah" {
+			foundNameField = true
+		}
+	}
+	if !foundNameField {
+		t.Errorf("expected to find field named 'name' with value 'blahblah'")
+	}
+
+	fields, err := index.Fields()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedFields := map[string]bool{
+		"_all":    false,
+		"name":    false,
+		"desc":    false,
+		"country": false,
+	}
+	if len(fields) < len(expectedFields) {
+		t.Fatalf("expected %d fields got %d", len(expectedFields), len(fields))
+	}
+
+	for _, f := range fields {
+		expectedFields[f] = true
+	}
+
+	for ef, efp := range expectedFields {
+		if !efp {
+			t.Errorf("field %s is missing", ef)
+		}
+	}
+
+}
+
+func TestBug1096(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	// use default mapping
+	mapping := NewIndexMapping()
+
+	// create a scorch index with default SAFE batches
+	var idx Index
+	idx, err = NewUsing(tmpIndexPath, mapping, "scorch", "scorch", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// create a single batch instance that we will reuse
+	// this should be safe because we have single goroutine
+	// and we always wait for batch execution to finish
+	batch := idx.NewBatch()
+
+	// number of batches to execute
+	for i := 0; i < 10; i++ {
+
+		// number of documents to put into the batch
+		for j := 0; j < 91; j++ {
+
+			// create a doc id 0-90 (important so that we get id's 9 and 90)
+			// this could duplicate something already in the index
+			//   this too should be OK and update the item in the index
+			id := fmt.Sprintf("%d", j)
+
+			err = batch.Index(id, map[string]interface{}{
+				"name":  id,
+				"batch": fmt.Sprintf("%d", i),
+			})
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		// execute the batch
+		err = idx.Batch(batch)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// reset the batch before reusing it
+		batch.Reset()
+	}
+
+	// search for docs having name starting with the number 9
+	q := NewWildcardQuery("9*")
+	q.SetField("name")
+	req := NewSearchRequestOptions(q, 1000, 0, false)
+	req.Fields = []string{"*"}
+	var res *SearchResult
+	res, err = idx.Search(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// we expect only 2 hits, for docs 9 and 90
+	if res.Total > 2 {
+		t.Fatalf("expected only 2 hits '9' and '90', got %v", res)
+	}
+}
+
+func TestDataRaceBug1092(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	// use default mapping
+	mapping := NewIndexMapping()
+
+	var idx Index
+	idx, err = NewUsing(tmpIndexPath, mapping, upsidedown.Name, boltdb.Name, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		cerr := idx.Close()
+		if cerr != nil {
+			t.Fatal(cerr)
+		}
+	}()
+
+	batch := idx.NewBatch()
+	for i := 0; i < 10; i++ {
+		err = idx.Batch(batch)
+		if err != nil {
+			t.Error(err)
+		}
+
+		batch.Reset()
+	}
+}
+
+func TestBatchRaceBug1149(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+	i, err := New(tmpIndexPath, NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	testBatchRaceBug1149(t, i)
+}
+
+func TestBatchRaceBug1149Scorch(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+	i, err := NewUsing(tmpIndexPath, NewIndexMapping(), "scorch", "scorch", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := i.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	testBatchRaceBug1149(t, i)
+}
+
+func testBatchRaceBug1149(t *testing.T, i Index) {
+	b := i.NewBatch()
+	b.Delete("1")
+	err = i.Batch(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.Reset()
+	err = i.Batch(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.Reset()
+}
+
+func TestOptimisedConjunctionSearchHits(t *testing.T) {
+	scorch.OptimizeDisjunctionUnadorned = false
+	defer func() {
+		scorch.OptimizeDisjunctionUnadorned = true
+	}()
+
+	defer func() {
+		err := os.RemoveAll("testidx")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	idx, err := NewUsing("testidx", NewIndexMapping(), "scorch", "scorch", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doca := map[string]interface{}{
+		"country":    "united",
+		"name":       "Mercure Hotel",
+		"directions": "B560 and B56 Follow signs to the M56",
+	}
+	docb := map[string]interface{}{
+		"country":    "united",
+		"name":       "Mercure Altrincham Bowdon Hotel",
+		"directions": "A570 and A57 Follow signs to the M56 Manchester Airport",
+	}
+	docc := map[string]interface{}{
+		"country":    "india united",
+		"name":       "Sonoma Hotel",
+		"directions": "Northwest",
+	}
+	docd := map[string]interface{}{
+		"country":    "United Kingdom",
+		"name":       "Cresta Court Hotel",
+		"directions": "junction of A560 and A56",
+	}
+
+	b := idx.NewBatch()
+	err = b.Index("a", doca)
+	if err != nil {
+		t.Error(err)
+	}
+	err = b.Index("b", docb)
+	if err != nil {
+		t.Error(err)
+	}
+	err = b.Index("c", docc)
+	if err != nil {
+		t.Error(err)
+	}
+	err = b.Index("d", docd)
+	if err != nil {
+		t.Error(err)
+	}
+	// execute the batch
+	err = idx.Batch(b)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mq := NewMatchQuery("united")
+	mq.SetField("country")
+
+	cq := NewConjunctionQuery(mq)
+
+	mq1 := NewMatchQuery("hotel")
+	mq1.SetField("name")
+	cq.AddQuery(mq1)
+
+	mq2 := NewMatchQuery("56")
+	mq2.SetField("directions")
+	mq2.SetFuzziness(1)
+	cq.AddQuery(mq2)
+
+	req := NewSearchRequest(cq)
+	req.Score = "none"
+
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hitsWithOutScore := res.Total
+
+	req = NewSearchRequest(cq)
+	req.Score = ""
+
+	res, err = idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hitsWithScore := res.Total
+
+	if hitsWithOutScore != hitsWithScore {
+		t.Errorf("expected %d hits without score, got %d", hitsWithScore, hitsWithOutScore)
+	}
+
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestIndexMappingDocValuesDynamic(t *testing.T) {
+	im := NewIndexMapping()
+	// DocValuesDynamic's default is true
+	// Now explicitly set it to false
+	im.DocValuesDynamic = false
+
+	// Next, retrieve the JSON dump of the index mapping
+	var data []byte
+	data, err = json.Marshal(im)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Now, edit an unrelated setting in the index mapping
+	var m map[string]interface{}
+	err = json.Unmarshal(data, &m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m["index_dynamic"] = false
+	data, err = json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Unmarshal back the changes into the index mapping struct
+	if err = im.UnmarshalJSON(data); err != nil {
+		t.Fatal(err)
+	}
+
+	// Expect DocValuesDynamic to remain false!
+	if im.DocValuesDynamic {
+		t.Fatalf("Expected DocValuesDynamic to remain false after the index mapping edit")
 	}
 }

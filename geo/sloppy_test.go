@@ -21,7 +21,7 @@ import (
 
 func TestCos(t *testing.T) {
 
-	cosDelta := 1E-15
+	cosDelta := 1e-15
 
 	tests := []struct {
 		in   float64
@@ -55,7 +55,7 @@ func TestCos(t *testing.T) {
 
 func TestAsin(t *testing.T) {
 
-	asinDelta := 1E-7
+	asinDelta := 1e-7
 
 	tests := []struct {
 		in   float64

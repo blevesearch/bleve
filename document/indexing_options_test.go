@@ -24,36 +24,56 @@ func TestIndexingOptions(t *testing.T) {
 		isIndexed          bool
 		isStored           bool
 		includeTermVectors bool
+		docValues          bool
 	}{
 		{
 			options:            IndexField | StoreField | IncludeTermVectors,
 			isIndexed:          true,
 			isStored:           true,
 			includeTermVectors: true,
+			docValues:          false,
 		},
 		{
 			options:            IndexField | IncludeTermVectors,
 			isIndexed:          true,
 			isStored:           false,
 			includeTermVectors: true,
+			docValues:          false,
 		},
 		{
 			options:            StoreField | IncludeTermVectors,
 			isIndexed:          false,
 			isStored:           true,
 			includeTermVectors: true,
+			docValues:          false,
 		},
 		{
 			options:            IndexField,
 			isIndexed:          true,
 			isStored:           false,
 			includeTermVectors: false,
+			docValues:          false,
 		},
 		{
 			options:            StoreField,
 			isIndexed:          false,
 			isStored:           true,
 			includeTermVectors: false,
+			docValues:          false,
+		},
+		{
+			options:            DocValues,
+			isIndexed:          false,
+			isStored:           false,
+			includeTermVectors: false,
+			docValues:          true,
+		},
+		{
+			options:            IndexField | StoreField | IncludeTermVectors | DocValues,
+			isIndexed:          true,
+			isStored:           true,
+			includeTermVectors: true,
+			docValues:          true,
 		},
 	}
 
@@ -69,6 +89,10 @@ func TestIndexingOptions(t *testing.T) {
 		actuallyIncludeTermVectors := test.options.IncludeTermVectors()
 		if actuallyIncludeTermVectors != test.includeTermVectors {
 			t.Errorf("expected includeTermVectors to be %v, got %v for %d", test.includeTermVectors, actuallyIncludeTermVectors, test.options)
+		}
+		actuallyDocValues := test.options.IncludeDocValues()
+		if actuallyDocValues != test.docValues {
+			t.Errorf("expected docValue to be %v, got %v for %d", test.docValues, actuallyDocValues, test.options)
 		}
 	}
 }

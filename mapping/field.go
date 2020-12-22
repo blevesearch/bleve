@@ -28,8 +28,9 @@ import (
 
 // control the default behavior for dynamic fields (those not explicitly mapped)
 var (
-	IndexDynamic = true
-	StoreDynamic = true
+	IndexDynamic     = true
+	StoreDynamic     = true
+	DocValuesDynamic = true // TODO revisit default?
 )
 
 // A FieldMapping describes how a specific item
@@ -56,6 +57,10 @@ type FieldMapping struct {
 	IncludeTermVectors bool   `json:"include_term_vectors,omitempty"`
 	IncludeInAll       bool   `json:"include_in_all,omitempty"`
 	DateFormat         string `json:"date_format,omitempty"`
+
+	// DocValues, if true makes the index uninverting possible for this field
+	// It is useful for faceting and sorting queries.
+	DocValues bool `json:"docvalues,omitempty"`
 }
 
 // NewTextFieldMapping returns a default field mapping for text
@@ -66,6 +71,7 @@ func NewTextFieldMapping() *FieldMapping {
 		Index:              true,
 		IncludeTermVectors: true,
 		IncludeInAll:       true,
+		DocValues:          true,
 	}
 }
 
@@ -73,6 +79,7 @@ func newTextFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewTextFieldMapping()
 	rv.Store = im.StoreDynamic
 	rv.Index = im.IndexDynamic
+	rv.DocValues = im.DocValuesDynamic
 	return rv
 }
 
@@ -83,6 +90,7 @@ func NewNumericFieldMapping() *FieldMapping {
 		Store:        true,
 		Index:        true,
 		IncludeInAll: true,
+		DocValues:    true,
 	}
 }
 
@@ -90,6 +98,7 @@ func newNumericFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewNumericFieldMapping()
 	rv.Store = im.StoreDynamic
 	rv.Index = im.IndexDynamic
+	rv.DocValues = im.DocValuesDynamic
 	return rv
 }
 
@@ -100,6 +109,7 @@ func NewDateTimeFieldMapping() *FieldMapping {
 		Store:        true,
 		Index:        true,
 		IncludeInAll: true,
+		DocValues:    true,
 	}
 }
 
@@ -107,6 +117,7 @@ func newDateTimeFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewDateTimeFieldMapping()
 	rv.Store = im.StoreDynamic
 	rv.Index = im.IndexDynamic
+	rv.DocValues = im.DocValuesDynamic
 	return rv
 }
 
@@ -117,6 +128,7 @@ func NewBooleanFieldMapping() *FieldMapping {
 		Store:        true,
 		Index:        true,
 		IncludeInAll: true,
+		DocValues:    true,
 	}
 }
 
@@ -124,6 +136,7 @@ func newBooleanFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewBooleanFieldMapping()
 	rv.Store = im.StoreDynamic
 	rv.Index = im.IndexDynamic
+	rv.DocValues = im.DocValuesDynamic
 	return rv
 }
 
@@ -134,6 +147,7 @@ func NewGeoPointFieldMapping() *FieldMapping {
 		Store:        true,
 		Index:        true,
 		IncludeInAll: true,
+		DocValues:    true,
 	}
 }
 
@@ -158,6 +172,9 @@ func (fm *FieldMapping) Options() document.IndexingOptions {
 	}
 	if fm.IncludeTermVectors {
 		rv |= document.IncludeTermVectors
+	}
+	if fm.DocValues {
+		rv |= document.DocValues
 	}
 	return rv
 }
@@ -342,6 +359,11 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 			}
 		case "date_format":
 			err := json.Unmarshal(v, &fm.DateFormat)
+			if err != nil {
+				return err
+			}
+		case "docvalues":
+			err := json.Unmarshal(v, &fm.DocValues)
 			if err != nil {
 				return err
 			}
