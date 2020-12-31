@@ -17,8 +17,9 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
-	index "github.com/blevesearch/bleve_index_api"
 	"time"
+
+	index "github.com/blevesearch/bleve_index_api"
 
 	"github.com/blevesearch/bleve/analysis"
 	"github.com/blevesearch/bleve/document"
@@ -60,6 +61,12 @@ type FieldMapping struct {
 	// DocValues, if true makes the index uninverting possible for this field
 	// It is useful for faceting and sorting queries.
 	DocValues bool `json:"docvalues,omitempty"`
+
+	// SkipFreqNorm, if true, avoids the indexing of frequency and norm values
+	// of the tokens for this field. This option would be useful for saving
+	// the processing of freq/norm details when the default score based relevancy
+	// isn't needed.
+	SkipFreqNorm bool `json:"skip_freq_norm,omitempty"`
 }
 
 // NewTextFieldMapping returns a default field mapping for text
@@ -164,6 +171,9 @@ func (fm *FieldMapping) Options() index.FieldIndexingOptions {
 	}
 	if fm.DocValues {
 		rv |= index.DocValues
+	}
+	if fm.SkipFreqNorm {
+		rv |= index.SkipFreqNorm
 	}
 	return rv
 }
@@ -328,6 +338,11 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 			}
 		case "docvalues":
 			err := json.Unmarshal(v, &fm.DocValues)
+			if err != nil {
+				return err
+			}
+		case "skip_freq_norm":
+			err := json.Unmarshal(v, &fm.SkipFreqNorm)
 			if err != nil {
 				return err
 			}
