@@ -36,14 +36,16 @@ func TokenFrequency(tokens TokenStream, arrayPositions []uint64, options index.F
 			curr, ok := rv[string(token.Term)]
 			if ok {
 				curr.Locations = append(curr.Locations, &tls[tlNext])
-				curr.SetFrequency(curr.Frequency() + 1)
 			} else {
-				tf := &index.TokenFreq{
+				curr = &index.TokenFreq{
 					Term:      token.Term,
 					Locations: []*index.TokenLocation{&tls[tlNext]},
 				}
-				tf.SetFrequency(1)
-				rv[string(token.Term)] = tf
+				rv[string(token.Term)] = curr
+			}
+
+			if !options.SkipFreqNorm() {
+				curr.SetFrequency(curr.Frequency() + 1)
 			}
 
 			tlNext++
@@ -51,14 +53,15 @@ func TokenFrequency(tokens TokenStream, arrayPositions []uint64, options index.F
 	} else {
 		for _, token := range tokens {
 			curr, exists := rv[string(token.Term)]
-			if exists {
-				curr.SetFrequency(curr.Frequency() + 1)
-			} else {
-				tf := &index.TokenFreq{
+			if !exists {
+				curr = &index.TokenFreq{
 					Term: token.Term,
 				}
-				tf.SetFrequency(1)
-				rv[string(token.Term)] = tf
+				rv[string(token.Term)] = curr
+			}
+
+			if !options.SkipFreqNorm() {
+				curr.SetFrequency(curr.Frequency() + 1)
 			}
 		}
 	}
