@@ -811,6 +811,36 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				},
 				nil),
 		},
+
+		// field names as phrases
+		{
+			input:   `"fie ld":test`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					func() Query {
+						q := NewMatchQuery("test")
+						q.SetField("fie ld")
+						return q
+					}(),
+				},
+				nil),
+		},
+		{
+			input:   `"fie ld":"test"`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					func() Query {
+						q := NewMatchPhraseQuery("test")
+						q.SetField("fie ld")
+						return q
+					}(),
+				},
+				nil),
+		},
 	}
 
 	// turn on lexer debugging
