@@ -21,6 +21,7 @@ import (
 
 	"github.com/blevesearch/bleve/index"
 	"github.com/blevesearch/bleve/size"
+	"strings"
 )
 
 var reflectStaticSizeDocumentMatch int
@@ -139,6 +140,40 @@ type FieldTermLocation struct {
 	Field    string
 	Term     string
 	Location Location
+}
+
+func FieldTermLocationCompare(x, y *FieldTermLocation) int {
+	cmp := strings.Compare(x.Field, y.Field)
+	if cmp != 0 {
+		return cmp
+	}
+	cmp = strings.Compare(x.Term, y.Term)
+	if cmp != 0 {
+		return cmp
+	}
+	cmp =  x.Location.ArrayPositions.Compare(y.Location.ArrayPositions)
+	if cmp != 0 {
+		return cmp
+	}
+	if x.Location.Pos < y.Location.Pos {
+		return -1
+	} else if x.Location.Pos > y.Location.Pos{
+		return 1
+	} else {
+		return 0
+	}
+}
+
+type FieldTermLocations []FieldTermLocation
+
+func (c FieldTermLocations) Len() int           { return len(c) }
+func (c FieldTermLocations) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
+func (c FieldTermLocations) Less(i, j int) bool {
+	cmp := FieldTermLocationCompare(&c[i], &c[j])
+	if cmp < 0 {
+		return true
+	}
+	return false
 }
 
 type FieldFragmentMap map[string][]string
