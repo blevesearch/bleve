@@ -15,6 +15,9 @@
 package moss
 
 import (
+	"errors"
+	"io"
+
 	"github.com/couchbase/moss"
 
 	"github.com/blevesearch/bleve/index/store"
@@ -78,6 +81,10 @@ func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
 	rv.current()
 
 	return rv
+}
+
+func (r *Reader) WriteTo(w io.Writer) (int64, error) {
+	return 0, errors.New("WriteTo not implemented for moss")
 }
 
 func (r *Reader) Close() error {

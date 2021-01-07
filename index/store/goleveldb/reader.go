@@ -15,6 +15,9 @@
 package goleveldb
 
 import (
+	"errors"
+	"io"
+
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -60,6 +63,10 @@ func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
 		iterator: iter,
 	}
 	return &rv
+}
+
+func (r *Reader) WriteTo(w io.Writer) (int64, error) {
+	return 0, errors.New("WriteTo not implemented for goleveldb")
 }
 
 func (r *Reader) Close() error {

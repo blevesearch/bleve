@@ -15,6 +15,8 @@
 package null
 
 import (
+	"io"
+
 	"github.com/blevesearch/bleve/index/store"
 	"github.com/blevesearch/bleve/registry"
 )
@@ -55,6 +57,10 @@ func (r *reader) PrefixIterator(prefix []byte) store.KVIterator {
 
 func (r *reader) RangeIterator(start, end []byte) store.KVIterator {
 	return &iterator{}
+}
+
+func (r *reader) WriteTo(w io.Writer) (int64, error) {
+	return 0, nil
 }
 
 func (r *reader) Close() error {

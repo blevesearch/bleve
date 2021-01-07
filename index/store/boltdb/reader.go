@@ -15,6 +15,8 @@
 package boltdb
 
 import (
+	"io"
+
 	"github.com/blevesearch/bleve/index/store"
 	bolt "go.etcd.io/bbolt"
 )
@@ -66,6 +68,16 @@ func (r *Reader) RangeIterator(start, end []byte) store.KVIterator {
 
 	rv.Seek(start)
 	return rv
+}
+
+// As said in the BoltDB documentation:
+// You can use the Tx.WriteTo() function to write
+// a consistent view of the database to a writer.
+// If you call this from a read-only transaction,
+// it will perform a hot backup and not block
+// your other database reads and writes.
+func (r *Reader) WriteTo(w io.Writer) (int64, error) {
+	return r.tx.WriteTo(w)
 }
 
 func (r *Reader) Close() error {
