@@ -71,6 +71,10 @@ func (m *upsideDownMerge) PartialMerge(key, leftOperand, rightOperand []byte) ([
 	return rv, true
 }
 
+func (m *upsideDownMerge) DecodeMergedVal(val []byte) (uint64, error) {
+	return dictionaryRowParseV(val)
+}
+
 func (m *upsideDownMerge) Name() string {
 	return "upsideDownMerge"
 }

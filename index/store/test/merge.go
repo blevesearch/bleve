@@ -29,16 +29,25 @@ func encodeUint64(in uint64) []byte {
 	return rv
 }
 
+func encodeInt64(in int64) []byte {
+	rv := make([]byte, 8)
+	binary.LittleEndian.PutUint64(rv, uint64(in))
+	return rv
+}
+
 func CommonTestMerge(t *testing.T, s store.KVStore) {
 
-	testKey := []byte("k1")
+	textKey1 := []byte("k1")
+	testKey2 := []byte("k2")
 
 	data := []struct {
 		key []byte
 		val []byte
 	}{
-		{testKey, encodeUint64(1)},
-		{testKey, encodeUint64(1)},
+		{textKey1, encodeUint64(1)},
+		{textKey1, encodeUint64(1)},
+		{testKey2, encodeInt64(1)},
+		{testKey2, encodeInt64(-1)},
 	}
 
 	// open a writer
@@ -70,7 +79,7 @@ func CommonTestMerge(t *testing.T, s store.KVStore) {
 	}
 
 	// read key
-	returnedVal, err := reader.Get(testKey)
+	returnedVal, err := reader.Get(textKey1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,6 +88,16 @@ func CommonTestMerge(t *testing.T, s store.KVStore) {
 	mergedval := binary.LittleEndian.Uint64(returnedVal)
 	if mergedval != 2 {
 		t.Errorf("expected 2, got %d", mergedval)
+	}
+
+	returnedVal, err = reader.Get(testKey2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The node is not expected to be inserted when the count is zero.
+	if returnedVal != nil {
+		t.Errorf("expected nil, got %v", binary.LittleEndian.Uint64(returnedVal))
 	}
 
 	// close the reader
@@ -115,6 +134,10 @@ func (mc *TestMergeCounter) PartialMerge(key, leftOperand, rightOperand []byte) 
 	rv := make([]byte, 8)
 	binary.LittleEndian.PutUint64(rv, left+right)
 	return rv, true
+}
+
+func (mc *TestMergeCounter) DecodeMergedVal(val []byte) (uint64, error) {
+	return binary.LittleEndian.Uint64(val), nil
 }
 
 func (mc *TestMergeCounter) Name() string {

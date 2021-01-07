@@ -55,8 +55,19 @@ func (w *Writer) ExecuteBatch(b store.KVBatch) error {
 		if !fullMergeOk {
 			return fmt.Errorf("merge operator returned failure")
 		}
-		// add the final merge to this batch
-		batch.batch.Put(kb, mergedVal)
+
+		decodedVal, err := w.store.mo.DecodeMergedVal(mergedVal)
+		if err != nil {
+			return err
+		}
+
+		if decodedVal > 0 {
+			// Add the final merge to this batch.
+			batch.batch.Put(kb, mergedVal)
+		} else {
+			// Remove this record when its frequency drops to zero.
+			batch.batch.Delete(kb)
+		}
 	}
 
 	// now execute the batch
