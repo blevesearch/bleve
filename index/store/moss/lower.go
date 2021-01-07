@@ -520,6 +520,11 @@ type mossStoreWrapper struct {
 	m    sync.Mutex
 	refs int
 	s    *moss.Store
+
+	pendingWrites int
+
+	enablePersistSync bool
+	persistCh         chan struct{}
 }
 
 func (w *mossStoreWrapper) AddRef() {
