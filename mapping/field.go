@@ -15,7 +15,6 @@
 package mapping
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -204,25 +203,12 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 		}
 	} else if fm.Type == "IP" {
 		ip := net.ParseIP(propertyValueString)
-		isIPv4 := ip.DefaultMask() != nil // Only IPv4 addresses have default masks
+		//isIPv4 := ip.DefaultMask() != nil // Only IPv4 addresses have default masks
 
 		if ip != nil {
 			options := fm.Options()
-			fieldv4 := document.NewBooleanFieldWithIndexingOptions(fieldName+"_isIPv4", indexes, isIPv4, options)
-			context.doc.AddField(fieldv4)
-			fieldip1 := document.NewNumericFieldWithIndexingOptions(fieldName+"_IP1", indexes, float64(binary.BigEndian.Uint32(ip[0:4])), options)
-			context.doc.AddField(fieldip1)
-			fieldip2 := document.NewNumericFieldWithIndexingOptions(fieldName+"_IP2", indexes, float64(binary.BigEndian.Uint32(ip[4:8])), options)
-			context.doc.AddField(fieldip2)
-			fieldip3 := document.NewNumericFieldWithIndexingOptions(fieldName+"_IP3", indexes, float64(binary.BigEndian.Uint32(ip[8:12])), options)
-			context.doc.AddField(fieldip3)
-			fieldip4 := document.NewNumericFieldWithIndexingOptions(fieldName+"_IP4", indexes, float64(binary.BigEndian.Uint32(ip[12:16])), options)
-			context.doc.AddField(fieldip4)
-
-			fa := []string{fieldName + "_isIPv4", fieldName + "_IP1", fieldName + "_IP2", fieldName + "_IP3", fieldName + "_IP4"}
-			field := document.NewCompositeFieldWithIndexingOptions(fieldName, true, fa, nil, options)
+			field := document.NewIpFieldWithIndexingOptions(fieldName, indexes, ip, options)
 			context.doc.AddField(field)
-
 			if !fm.IncludeInAll {
 				context.excludedFromAll = append(context.excludedFromAll, fieldName)
 			}

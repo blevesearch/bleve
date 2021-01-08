@@ -34,6 +34,7 @@ const (
 	Single
 	Double
 	Boolean
+	Ip
 )
 
 // Token represents one occurrence of a term at a particular location in a
