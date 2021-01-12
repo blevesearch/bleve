@@ -23,16 +23,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store"
-	"github.com/blevesearch/bleve/index/upsidedown"
-	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/registry"
-	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/search/collector"
-	"github.com/blevesearch/bleve/search/facet"
-	"github.com/blevesearch/bleve/search/highlight"
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/index/upsidedown"
+	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/collector"
+	"github.com/blevesearch/bleve/v2/search/facet"
+	"github.com/blevesearch/bleve/v2/search/highlight"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 type indexImpl struct {
@@ -107,9 +106,6 @@ func newIndexUsing(path string, mapping mapping.IndexMapping, indexType string, 
 	}
 	err = rv.i.Open()
 	if err != nil {
-		if err == index.ErrorUnknownStorageType {
-			return nil, ErrorUnknownStorageType
-		}
 		return nil, err
 	}
 	defer func(rv *indexImpl) {
@@ -177,9 +173,6 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	}
 	err = rv.i.Open()
 	if err != nil {
-		if err == index.ErrorUnknownStorageType {
-			return nil, ErrorUnknownStorageType
-		}
 		return nil, err
 	}
 	defer func(rv *indexImpl) {
@@ -228,14 +221,9 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 	return rv, err
 }
 
-// Advanced returns implementation internals
-// necessary ONLY for advanced usage.
-func (i *indexImpl) Advanced() (index.Index, store.KVStore, error) {
-	s, err := i.i.Advanced()
-	if err != nil {
-		return nil, nil, err
-	}
-	return i.i, s, nil
+// Advanced returns internal index implementation
+func (i *indexImpl) Advanced() (index.Index, error) {
+	return i.i, nil
 }
 
 // Mapping returns the IndexMapping in use by this
@@ -271,7 +259,7 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 // IndexAdvanced takes a document.Document object
 // skips the mapping and indexes it.
 func (i *indexImpl) IndexAdvanced(doc *document.Document) (err error) {
-	if doc.ID == "" {
+	if doc.ID() == "" {
 		return ErrorEmptyID
 	}
 
@@ -323,7 +311,7 @@ func (i *indexImpl) Batch(b *Batch) error {
 // stored fields for a document in the index.  These
 // stored fields are put back into a Document object
 // and returned.
-func (i *indexImpl) Document(id string) (doc *document.Document, err error) {
+func (i *indexImpl) Document(id string) (doc index.Document, err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -617,28 +605,28 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 			if len(req.Fields) > 0 {
 				fieldsToLoad := deDuplicate(req.Fields)
 				for _, f := range fieldsToLoad {
-					for _, docF := range doc.Fields {
+					doc.VisitFields(func(docF index.Field) {
 						if f == "*" || docF.Name() == f {
 							var value interface{}
 							switch docF := docF.(type) {
-							case *document.TextField:
-								value = string(docF.Value())
-							case *document.NumericField:
+							case index.TextField:
+								value = docF.Text()
+							case index.NumericField:
 								num, err := docF.Number()
 								if err == nil {
 									value = num
 								}
-							case *document.DateTimeField:
+							case index.DateTimeField:
 								datetime, err := docF.DateTime()
 								if err == nil {
 									value = datetime.Format(time.RFC3339)
 								}
-							case *document.BooleanField:
+							case index.BooleanField:
 								boolean, err := docF.Boolean()
 								if err == nil {
 									value = boolean
 								}
-							case *document.GeoPointField:
+							case index.GeoPointField:
 								lon, err := docF.Lon()
 								if err == nil {
 									lat, err := docF.Lat()
@@ -651,7 +639,7 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 								hit.AddFieldValue(docF.Name(), value)
 							}
 						}
-					}
+					})
 				}
 			}
 			if highlighter != nil {

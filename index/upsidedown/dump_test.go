@@ -18,10 +18,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/boltdb"
+	"github.com/blevesearch/bleve/v2/index/upsidedown/store/boltdb"
+	index "github.com/blevesearch/bleve_index_api"
 
-	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/v2/document"
 )
 
 func TestDump(t *testing.T) {
@@ -66,9 +66,9 @@ func TestDump(t *testing.T) {
 	}
 
 	doc := document.NewDocument("1")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), document.IndexField|document.StoreField))
-	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, document.IndexField|document.StoreField))
-	dateField, err := document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), document.IndexField|document.StoreField)
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), index.IndexField|index.StoreField))
+	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, index.IndexField|index.StoreField))
+	dateField, err := document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), index.IndexField|index.StoreField)
 	if err != nil {
 		t.Error(err)
 	}
@@ -79,9 +79,9 @@ func TestDump(t *testing.T) {
 	}
 
 	doc = document.NewDocument("2")
-	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test2"), document.IndexField|document.StoreField))
-	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, document.IndexField|document.StoreField))
-	dateField, err = document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), document.IndexField|document.StoreField)
+	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test2"), index.IndexField|index.StoreField))
+	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, index.IndexField|index.StoreField))
+	dateField, err = document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), index.IndexField|index.StoreField)
 	if err != nil {
 		t.Error(err)
 	}
@@ -96,7 +96,11 @@ func TestDump(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fieldsRows := reader.DumpFields()
+	upsideDownReader, ok := reader.(*IndexReader)
+	if !ok {
+		t.Fatal("dump is only supported by index type upsidedown")
+	}
+	fieldsRows := upsideDownReader.DumpFields()
 	for range fieldsRows {
 		fieldsCount++
 	}
@@ -110,7 +114,7 @@ func TestDump(t *testing.T) {
 	// 3 stored fields
 	expectedDocRowCount := int(1 + (2 * (64 / document.DefaultPrecisionStep)) + 3)
 	docRowCount := 0
-	docRows := reader.DumpDoc("1")
+	docRows := upsideDownReader.DumpDoc("1")
 	for range docRows {
 		docRowCount++
 	}
@@ -119,7 +123,7 @@ func TestDump(t *testing.T) {
 	}
 
 	docRowCount = 0
-	docRows = reader.DumpDoc("2")
+	docRows = upsideDownReader.DumpDoc("2")
 	for range docRows {
 		docRowCount++
 	}
@@ -136,7 +140,7 @@ func TestDump(t *testing.T) {
 	// 16 date term row counts (shared for both docs, same date value)
 	expectedAllRowCount := int(1 + fieldsCount + (2 * expectedDocRowCount) + 2 + 2 + int((2 * (64 / document.DefaultPrecisionStep))))
 	allRowCount := 0
-	allRows := reader.DumpAll()
+	allRows := upsideDownReader.DumpAll()
 	for range allRows {
 		allRowCount++
 	}

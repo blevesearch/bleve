@@ -17,11 +17,11 @@ package searcher
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/gtreap"
-	"github.com/blevesearch/bleve/index/upsidedown"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/v2/document"
+	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
+	"github.com/blevesearch/bleve/v2/index/upsidedown"
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
@@ -40,12 +40,9 @@ func testDocIDSearcher(t *testing.T, indexed, searched, wanted []string) {
 		t.Fatal(err)
 	}
 	for _, id := range indexed {
-		err = i.Update(&document.Document{
-			ID: id,
-			Fields: []document.Field{
-				document.NewTextField("desc", []uint64{}, []byte("beer")),
-			},
-		})
+		doc := document.NewDocument(id)
+		doc.AddField(document.NewTextField("desc", []uint64{}, []byte("beer")))
+		err = i.Update(doc)
 		if err != nil {
 			t.Fatal(err)
 		}

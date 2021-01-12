@@ -19,9 +19,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/geo"
+	index "github.com/blevesearch/bleve_index_api"
+
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/geo"
 )
 
 // control the default behavior for dynamic fields (those not explicitly mapped)
@@ -59,6 +61,12 @@ type FieldMapping struct {
 	// DocValues, if true makes the index uninverting possible for this field
 	// It is useful for faceting and sorting queries.
 	DocValues bool `json:"docvalues,omitempty"`
+
+	// SkipFreqNorm, if true, avoids the indexing of frequency and norm values
+	// of the tokens for this field. This option would be useful for saving
+	// the processing of freq/norm details when the default score based relevancy
+	// isn't needed.
+	SkipFreqNorm bool `json:"skip_freq_norm,omitempty"`
 }
 
 // NewTextFieldMapping returns a default field mapping for text
@@ -150,19 +158,22 @@ func NewGeoPointFieldMapping() *FieldMapping {
 }
 
 // Options returns the indexing options for this field.
-func (fm *FieldMapping) Options() document.IndexingOptions {
-	var rv document.IndexingOptions
+func (fm *FieldMapping) Options() index.FieldIndexingOptions {
+	var rv index.FieldIndexingOptions
 	if fm.Store {
-		rv |= document.StoreField
+		rv |= index.StoreField
 	}
 	if fm.Index {
-		rv |= document.IndexField
+		rv |= index.IndexField
 	}
 	if fm.IncludeTermVectors {
-		rv |= document.IncludeTermVectors
+		rv |= index.IncludeTermVectors
 	}
 	if fm.DocValues {
-		rv |= document.DocValues
+		rv |= index.DocValues
+	}
+	if fm.SkipFreqNorm {
+		rv |= index.SkipFreqNorm
 	}
 	return rv
 }
@@ -327,6 +338,11 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 			}
 		case "docvalues":
 			err := json.Unmarshal(v, &fm.DocValues)
+			if err != nil {
+				return err
+			}
+		case "skip_freq_norm":
+			err := json.Unmarshal(v, &fm.SkipFreqNorm)
 			if err != nil {
 				return err
 			}

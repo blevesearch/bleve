@@ -17,8 +17,8 @@ package scorch
 import (
 	"fmt"
 	"github.com/RoaringBitmap/roaring"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment"
+	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api"
 	"sync/atomic"
 )
 
@@ -174,9 +174,9 @@ OUTER:
 		var docNum1HitLastOk bool
 
 		for _, tfr := range o.tfrs {
-			if _, ok := tfr.iterators[i].(*segment.EmptyPostingsIterator); ok {
+			if _, ok := tfr.iterators[i].(*emptyPostingsIterator); ok {
 				// An empty postings iterator means the entire AND is empty.
-				oTFR.iterators[i] = segment.AnEmptyPostingsIterator
+				oTFR.iterators[i] = anEmptyPostingsIterator
 				continue OUTER
 			}
 
@@ -193,7 +193,7 @@ OUTER:
 				if docNum1HitLastOk && docNum1HitLast != docNum1Hit {
 					// The docNum1Hit doesn't match the previous
 					// docNum1HitLast, so the entire AND is empty.
-					oTFR.iterators[i] = segment.AnEmptyPostingsIterator
+					oTFR.iterators[i] = anEmptyPostingsIterator
 					continue OUTER
 				}
 
@@ -205,7 +205,7 @@ OUTER:
 
 			if itr.ActualBitmap() == nil {
 				// An empty actual bitmap means the entire AND is empty.
-				oTFR.iterators[i] = segment.AnEmptyPostingsIterator
+				oTFR.iterators[i] = anEmptyPostingsIterator
 				continue OUTER
 			}
 
@@ -221,14 +221,14 @@ OUTER:
 				if !bm.Contains(uint32(docNum1HitLast)) {
 					// The docNum1Hit isn't in one of our actual
 					// bitmaps, so the entire AND is empty.
-					oTFR.iterators[i] = segment.AnEmptyPostingsIterator
+					oTFR.iterators[i] = anEmptyPostingsIterator
 					continue OUTER
 				}
 			}
 
 			// The actual bitmaps and docNum1Hits all contain or have
 			// the same 1-hit docNum, so that's our AND'ed result.
-			oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFrom1Hit(docNum1HitLast)
+			oTFR.iterators[i] = newUnadornedPostingsIteratorFrom1Hit(docNum1HitLast)
 
 			continue OUTER
 		}
@@ -236,13 +236,13 @@ OUTER:
 		if len(actualBMs) == 0 {
 			// If we've collected no actual bitmaps at this point,
 			// then the entire AND is empty.
-			oTFR.iterators[i] = segment.AnEmptyPostingsIterator
+			oTFR.iterators[i] = anEmptyPostingsIterator
 			continue OUTER
 		}
 
 		if len(actualBMs) == 1 {
 			// If we've only 1 actual bitmap, then that's our result.
-			oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFromBitmap(actualBMs[0])
+			oTFR.iterators[i] = newUnadornedPostingsIteratorFromBitmap(actualBMs[0])
 
 			continue OUTER
 		}
@@ -254,7 +254,7 @@ OUTER:
 			bm.And(actualBM)
 		}
 
-		oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFromBitmap(bm)
+		oTFR.iterators[i] = newUnadornedPostingsIteratorFromBitmap(bm)
 	}
 
 	atomic.AddUint64(&o.snapshot.parent.stats.TotTermSearchersStarted, uint64(1))
@@ -369,7 +369,7 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 
 		bm.AddMany(docNums)
 
-		oTFR.iterators[i] = segment.NewUnadornedPostingsIteratorFromBitmap(bm)
+		oTFR.iterators[i] = newUnadornedPostingsIteratorFromBitmap(bm)
 	}
 
 	atomic.AddUint64(&o.snapshot.parent.stats.TotTermSearchersStarted, uint64(1))

@@ -16,17 +16,18 @@ package test
 
 import (
 	"fmt"
+	index "github.com/blevesearch/bleve_index_api"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"testing"
 
-	"github.com/blevesearch/bleve"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index/scorch"
-	"github.com/blevesearch/bleve/index/upsidedown"
-	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/index/scorch"
+	"github.com/blevesearch/bleve/v2/index/upsidedown"
+	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 func TestDisjunctionSearchScoreIndexWithCompositeFields(t *testing.T) {
@@ -99,7 +100,7 @@ func disjunctionQueryiOnIndexWithCompositeFields(indexName string,
 		doc.CompositeFields = []*document.CompositeField{
 			document.NewCompositeFieldWithIndexingOptions(
 				"_all", true, []string{"field1"}, []string{},
-				document.IndexField|document.IncludeTermVectors),
+				index.IndexField|index.IncludeTermVectors),
 		}
 		if err = batch.IndexAdvanced(doc); err != nil {
 			t.Error(err)

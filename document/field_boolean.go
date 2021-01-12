@@ -18,8 +18,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/size"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var reflectStaticSizeBooleanField int
@@ -29,14 +30,16 @@ func init() {
 	reflectStaticSizeBooleanField = int(reflect.TypeOf(f).Size())
 }
 
-const DefaultBooleanIndexingOptions = StoreField | IndexField | DocValues
+const DefaultBooleanIndexingOptions = index.StoreField | index.IndexField | index.DocValues
 
 type BooleanField struct {
 	name              string
 	arrayPositions    []uint64
-	options           IndexingOptions
+	options           index.FieldIndexingOptions
 	value             []byte
 	numPlainTextBytes uint64
+	length            int
+	frequencies       index.TokenFrequencies
 }
 
 func (b *BooleanField) Size() int {
@@ -54,11 +57,11 @@ func (b *BooleanField) ArrayPositions() []uint64 {
 	return b.arrayPositions
 }
 
-func (b *BooleanField) Options() IndexingOptions {
+func (b *BooleanField) Options() index.FieldIndexingOptions {
 	return b.options
 }
 
-func (b *BooleanField) Analyze() (int, analysis.TokenFrequencies) {
+func (b *BooleanField) Analyze() {
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
@@ -68,9 +71,8 @@ func (b *BooleanField) Analyze() (int, analysis.TokenFrequencies) {
 		Type:     analysis.Boolean,
 	})
 
-	fieldLength := len(tokens)
-	tokenFreqs := analysis.TokenFrequency(tokens, b.arrayPositions, b.options.IncludeTermVectors())
-	return fieldLength, tokenFreqs
+	b.length = len(tokens)
+	b.frequencies = analysis.TokenFrequency(tokens, b.arrayPositions, b.options)
 }
 
 func (b *BooleanField) Value() []byte {
@@ -92,6 +94,18 @@ func (b *BooleanField) NumPlainTextBytes() uint64 {
 	return b.numPlainTextBytes
 }
 
+func (b *BooleanField) EncodedFieldType() byte {
+	return 'b'
+}
+
+func (b *BooleanField) AnalyzedLength() int {
+	return b.length
+}
+
+func (b *BooleanField) AnalyzedTokenFrequencies() index.TokenFrequencies {
+	return b.frequencies
+}
+
 func NewBooleanFieldFromBytes(name string, arrayPositions []uint64, value []byte) *BooleanField {
 	return &BooleanField{
 		name:              name,
@@ -106,7 +120,7 @@ func NewBooleanField(name string, arrayPositions []uint64, b bool) *BooleanField
 	return NewBooleanFieldWithIndexingOptions(name, arrayPositions, b, DefaultNumericIndexingOptions)
 }
 
-func NewBooleanFieldWithIndexingOptions(name string, arrayPositions []uint64, b bool, options IndexingOptions) *BooleanField {
+func NewBooleanFieldWithIndexingOptions(name string, arrayPositions []uint64, b bool, options index.FieldIndexingOptions) *BooleanField {
 	numPlainTextBytes := 5
 	v := []byte("F")
 	if b {

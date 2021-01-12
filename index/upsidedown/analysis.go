@@ -15,29 +15,42 @@
 package upsidedown
 
 import (
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
-func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult {
-	rv := &index.AnalysisResult{
-		DocID: d.ID,
-		Rows:  make([]index.IndexRow, 0, 100),
+type IndexRow interface {
+	KeySize() int
+	KeyTo([]byte) (int, error)
+	Key() []byte
+
+	ValueSize() int
+	ValueTo([]byte) (int, error)
+	Value() []byte
+}
+
+type AnalysisResult struct {
+	DocID string
+	Rows  []IndexRow
+}
+
+func (udc *UpsideDownCouch) analyze(d index.Document) *AnalysisResult {
+	rv := &AnalysisResult{
+		DocID: d.ID(),
+		Rows:  make([]IndexRow, 0, 100),
 	}
 
-	docIDBytes := []byte(d.ID)
+	docIDBytes := []byte(d.ID())
 
 	// track our back index entries
 	backIndexStoredEntries := make([]*BackIndexStoreEntry, 0)
 
 	// information we collate as we merge fields with same name
-	fieldTermFreqs := make(map[uint16]analysis.TokenFrequencies)
+	fieldTermFreqs := make(map[uint16]index.TokenFrequencies)
 	fieldLengths := make(map[uint16]int)
 	fieldIncludeTermVectors := make(map[uint16]bool)
 	fieldNames := make(map[uint16]string)
 
-	analyzeField := func(field document.Field, storable bool) {
+	analyzeField := func(field index.Field, storable bool) {
 		fieldIndex, newFieldRow := udc.fieldIndexOrNewRow(field.Name())
 		if newFieldRow != nil {
 			rv.Rows = append(rv.Rows, newFieldRow)
@@ -45,7 +58,9 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		fieldNames[fieldIndex] = field.Name()
 
 		if field.Options().IsIndexed() {
-			fieldLength, tokenFreqs := field.Analyze()
+			field.Analyze()
+			fieldLength := field.AnalyzedLength()
+			tokenFreqs := field.AnalyzedTokenFrequencies()
 			existingFreqs := fieldTermFreqs[fieldIndex]
 			if existingFreqs == nil {
 				fieldTermFreqs[fieldIndex] = tokenFreqs
@@ -66,21 +81,21 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 	// place information about indexed fields into map
 	// this collates information across fields with
 	// same names (arrays)
-	for _, field := range d.Fields {
+	d.VisitFields(func(field index.Field) {
 		analyzeField(field, true)
-	}
+	})
 
-	if len(d.CompositeFields) > 0 {
+	if d.HasComposite() {
 		for fieldIndex, tokenFreqs := range fieldTermFreqs {
 			// see if any of the composite fields need this
-			for _, compositeField := range d.CompositeFields {
-				compositeField.Compose(fieldNames[fieldIndex], fieldLengths[fieldIndex], tokenFreqs)
-			}
+			d.VisitComposite(func(field index.CompositeField) {
+				field.Compose(fieldNames[fieldIndex], fieldLengths[fieldIndex], tokenFreqs)
+			})
 		}
 
-		for _, compositeField := range d.CompositeFields {
-			analyzeField(compositeField, false)
-		}
+		d.VisitComposite(func(field index.CompositeField) {
+			analyzeField(field, false)
+		})
 	}
 
 	rowsCapNeeded := len(rv.Rows) + 1
@@ -88,7 +103,7 @@ func (udc *UpsideDownCouch) Analyze(d *document.Document) *index.AnalysisResult 
 		rowsCapNeeded += len(tokenFreqs)
 	}
 
-	rv.Rows = append(make([]index.IndexRow, 0, rowsCapNeeded), rv.Rows...)
+	rv.Rows = append(make([]IndexRow, 0, rowsCapNeeded), rv.Rows...)
 
 	backIndexTermsEntries := make([]*BackIndexTermsEntry, 0, len(fieldTermFreqs))
 

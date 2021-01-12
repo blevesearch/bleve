@@ -17,8 +17,8 @@ package document
 import (
 	"reflect"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/size"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var reflectStaticSizeCompositeField int
@@ -28,30 +28,30 @@ func init() {
 	reflectStaticSizeCompositeField = int(reflect.TypeOf(cf).Size())
 }
 
-const DefaultCompositeIndexingOptions = IndexField
+const DefaultCompositeIndexingOptions = index.IndexField
 
 type CompositeField struct {
 	name                 string
 	includedFields       map[string]bool
 	excludedFields       map[string]bool
 	defaultInclude       bool
-	options              IndexingOptions
+	options              index.FieldIndexingOptions
 	totalLength          int
-	compositeFrequencies analysis.TokenFrequencies
+	compositeFrequencies index.TokenFrequencies
 }
 
 func NewCompositeField(name string, defaultInclude bool, include []string, exclude []string) *CompositeField {
 	return NewCompositeFieldWithIndexingOptions(name, defaultInclude, include, exclude, DefaultCompositeIndexingOptions)
 }
 
-func NewCompositeFieldWithIndexingOptions(name string, defaultInclude bool, include []string, exclude []string, options IndexingOptions) *CompositeField {
+func NewCompositeFieldWithIndexingOptions(name string, defaultInclude bool, include []string, exclude []string, options index.FieldIndexingOptions) *CompositeField {
 	rv := &CompositeField{
 		name:                 name,
 		options:              options,
 		defaultInclude:       defaultInclude,
 		includedFields:       make(map[string]bool, len(include)),
 		excludedFields:       make(map[string]bool, len(exclude)),
-		compositeFrequencies: make(analysis.TokenFrequencies),
+		compositeFrequencies: make(index.TokenFrequencies),
 	}
 
 	for _, i := range include {
@@ -87,12 +87,11 @@ func (c *CompositeField) ArrayPositions() []uint64 {
 	return []uint64{}
 }
 
-func (c *CompositeField) Options() IndexingOptions {
+func (c *CompositeField) Options() index.FieldIndexingOptions {
 	return c.options
 }
 
-func (c *CompositeField) Analyze() (int, analysis.TokenFrequencies) {
-	return c.totalLength, c.compositeFrequencies
+func (c *CompositeField) Analyze() {
 }
 
 func (c *CompositeField) Value() []byte {
@@ -116,9 +115,21 @@ func (c *CompositeField) includesField(field string) bool {
 	return shouldInclude
 }
 
-func (c *CompositeField) Compose(field string, length int, freq analysis.TokenFrequencies) {
+func (c *CompositeField) Compose(field string, length int, freq index.TokenFrequencies) {
 	if c.includesField(field) {
 		c.totalLength += length
 		c.compositeFrequencies.MergeAll(field, freq)
 	}
+}
+
+func (c *CompositeField) EncodedFieldType() byte {
+	return 'c'
+}
+
+func (c *CompositeField) AnalyzedLength() int {
+	return c.totalLength
+}
+
+func (c *CompositeField) AnalyzedTokenFrequencies() index.TokenFrequencies {
+	return c.compositeFrequencies
 }

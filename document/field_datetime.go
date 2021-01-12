@@ -20,9 +20,10 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/numeric"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/numeric"
+	"github.com/blevesearch/bleve/v2/size"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var reflectStaticSizeDateTimeField int
@@ -32,7 +33,7 @@ func init() {
 	reflectStaticSizeDateTimeField = int(reflect.TypeOf(f).Size())
 }
 
-const DefaultDateTimeIndexingOptions = StoreField | IndexField | DocValues
+const DefaultDateTimeIndexingOptions = index.StoreField | index.IndexField | index.DocValues
 const DefaultDateTimePrecisionStep uint = 4
 
 var MinTimeRepresentable = time.Unix(0, math.MinInt64)
@@ -41,9 +42,11 @@ var MaxTimeRepresentable = time.Unix(0, math.MaxInt64)
 type DateTimeField struct {
 	name              string
 	arrayPositions    []uint64
-	options           IndexingOptions
+	options           index.FieldIndexingOptions
 	value             numeric.PrefixCoded
 	numPlainTextBytes uint64
+	length            int
+	frequencies       index.TokenFrequencies
 }
 
 func (n *DateTimeField) Size() int {
@@ -60,11 +63,23 @@ func (n *DateTimeField) ArrayPositions() []uint64 {
 	return n.arrayPositions
 }
 
-func (n *DateTimeField) Options() IndexingOptions {
+func (n *DateTimeField) Options() index.FieldIndexingOptions {
 	return n.options
 }
 
-func (n *DateTimeField) Analyze() (int, analysis.TokenFrequencies) {
+func (n *DateTimeField) EncodedFieldType() byte {
+	return 'd'
+}
+
+func (n *DateTimeField) AnalyzedLength() int {
+	return n.length
+}
+
+func (n *DateTimeField) AnalyzedTokenFrequencies() index.TokenFrequencies {
+	return n.frequencies
+}
+
+func (n *DateTimeField) Analyze() {
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
@@ -95,9 +110,8 @@ func (n *DateTimeField) Analyze() (int, analysis.TokenFrequencies) {
 		}
 	}
 
-	fieldLength := len(tokens)
-	tokenFreqs := analysis.TokenFrequency(tokens, n.arrayPositions, n.options.IncludeTermVectors())
-	return fieldLength, tokenFreqs
+	n.length = len(tokens)
+	n.frequencies = analysis.TokenFrequency(tokens, n.arrayPositions, n.options)
 }
 
 func (n *DateTimeField) Value() []byte {
@@ -134,7 +148,7 @@ func NewDateTimeField(name string, arrayPositions []uint64, dt time.Time) (*Date
 	return NewDateTimeFieldWithIndexingOptions(name, arrayPositions, dt, DefaultDateTimeIndexingOptions)
 }
 
-func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, dt time.Time, options IndexingOptions) (*DateTimeField, error) {
+func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, dt time.Time, options index.FieldIndexingOptions) (*DateTimeField, error) {
 	if canRepresent(dt) {
 		dtInt64 := dt.UnixNano()
 		prefixCoded := numeric.MustNewPrefixCodedInt64(dtInt64, 0)

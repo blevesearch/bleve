@@ -67,7 +67,7 @@ func TestDocumentNumPlainTextBytes(t *testing.T) {
 	for _, test := range tests {
 		actual := test.doc.NumPlainTextBytes()
 		if actual != test.num {
-			t.Errorf("expected doc '%s' to have %d plain text bytes, got %d", test.doc.ID, test.num, actual)
+			t.Errorf("expected doc '%s' to have %d plain text bytes, got %d", test.doc.ID(), test.num, actual)
 		}
 	}
 }
