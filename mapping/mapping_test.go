@@ -1209,7 +1209,7 @@ func TestMappingArrayOfStringGeoPoints(t *testing.T) {
 
 	for _, f := range doc.Fields {
 		if f.Name() == "points" {
-			geoF, ok := f.(index.GeoPointField)
+			geoF, ok := f.(*document.GeoPointField)
 			if !ok {
 				t.Errorf("expected a geopoint field!")
 			}
