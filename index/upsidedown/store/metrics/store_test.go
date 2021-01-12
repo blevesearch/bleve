@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	store "github.com/blevesearch/upsidedown_store_api"
-	"github.com/blevesearch/bleve/index/upsidedown/store/gtreap"
+	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
 	"github.com/blevesearch/upsidedown_store_api/test"
 )
 

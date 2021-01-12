@@ -18,8 +18,8 @@ import (
 	"reflect"
 
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/size"
 )
 
 var reflectStaticSizeFilteringSearcher int

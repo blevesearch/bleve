@@ -20,8 +20,8 @@ import (
 	"sort"
 
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/bleve/numeric"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/v2/numeric"
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 func NewNumericRangeSearcher(indexReader index.IndexReader,

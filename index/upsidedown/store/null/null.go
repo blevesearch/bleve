@@ -16,7 +16,7 @@ package null
 
 import (
 	store "github.com/blevesearch/upsidedown_store_api"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blevesearch/bleve/v2/registry"
 )
 
 const Name = "null"

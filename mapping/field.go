@@ -21,9 +21,9 @@ import (
 
 	index "github.com/blevesearch/bleve_index_api"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/geo"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/geo"
 )
 
 // control the default behavior for dynamic fields (those not explicitly mapped)

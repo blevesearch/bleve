@@ -17,7 +17,7 @@ package collector
 import (
 	"container/list"
 
-	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 type collectStoreList struct {

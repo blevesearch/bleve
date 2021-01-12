@@ -22,7 +22,7 @@ import (
 
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/upsidedown_store_api"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/size"
 )
 
 var reflectStaticSizeUpsideDownCouchTermFieldReader int
