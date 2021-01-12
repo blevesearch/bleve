@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/bleve/index/scorch"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/v2/index/scorch"
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 func TestConjunctionSearch(t *testing.T) {

@@ -19,9 +19,9 @@ import (
 	"fmt"
 
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/search/searcher"
+	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/searcher"
 )
 
 type BooleanQuery struct {

@@ -16,11 +16,11 @@ package bleve
 
 import (
 	"context"
-	"github.com/blevesearch/bleve/index/upsidedown"
+	"github.com/blevesearch/bleve/v2/index/upsidedown"
 
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 )
 

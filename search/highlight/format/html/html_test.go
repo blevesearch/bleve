@@ -17,8 +17,8 @@ package html
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/search/highlight"
+	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/highlight"
 )
 
 func TestHTMLFragmentFormatter(t *testing.T) {

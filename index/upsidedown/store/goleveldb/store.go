@@ -20,7 +20,7 @@ import (
 	"os"
 
 	store "github.com/blevesearch/upsidedown_store_api"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"

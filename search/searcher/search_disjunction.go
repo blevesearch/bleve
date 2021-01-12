@@ -17,7 +17,7 @@ package searcher
 import (
 	"fmt"
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 // DisjunctionMaxClauseCount is a compile time setting that applications can

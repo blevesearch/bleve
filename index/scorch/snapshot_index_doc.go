@@ -20,7 +20,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/size"
 )
 
 var reflectStaticSizeIndexSnapshotDocIDReader int

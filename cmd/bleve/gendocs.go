@@ -19,7 +19,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/blevesearch/bleve/cmd/bleve/cmd"
+	"github.com/blevesearch/bleve/v2/cmd/bleve/cmd"
 
 	"github.com/spf13/cobra/doc"
 )
