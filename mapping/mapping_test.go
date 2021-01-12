@@ -1181,62 +1181,80 @@ func TestMappingArrayOfStringGeoPoints(t *testing.T) {
 	locFieldMapping := NewGeoPointFieldMapping()
 
 	thingMapping := NewDocumentMapping()
-	thingMapping.AddFieldMappingsAt("name", nameFieldMapping)
 	thingMapping.AddFieldMappingsAt("points", locFieldMapping)
 
 	mapping := NewIndexMapping()
 	mapping.DefaultMapping = thingMapping
 
-	docSrc := map[string]interface{}{
-		"name": "hello",
-		"points": []string {
-			"1.0, 2.0",
-			"3.0, 4.0",
-			"5.0, 6.0",
+	docs := []map[string]interface{}{
+		{
+			// string: "lat,lon"
+			"points": []string{
+				"1.0, 2.0",
+				"3.0, 4.0",
+				"5.0, 6.0",
+			},
+		},
+		{
+			// slice: {lon, lat}
+			"points": [][]float64{
+				{2.0, 1.0},
+				{4.0, 3.0},
+				{6.0, 5.0},
+			},
+		},
+		{
+			// struct: {"lon/lng": .., "lat": ..}
+			"points": []map[string]interface{}{
+				{"lon": 2.0, "lat": 1.0},
+				{"lng": 4.0, "lat": 3.0},
+				{"lng": 6.0, "lat": 5.0},
+			},
 		},
 	}
 
-	doc := document.NewDocument("x")
-	err := mapping.MapDocument(doc, docSrc)
-	if err != nil {
-		t.Fatal(err)
-	}
+	for _, docSrc := range docs {
+		doc := document.NewDocument("x")
+		err := mapping.MapDocument(doc, docSrc)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	// points here in lon, lat order (consistent with previous test)
-	expectPoints := map[string][]float64{
-		"first": {2.0, 1.0},
-		"second": {4.0, 3.0},
-		"third": {6.0, 5.0},
-	}
+		// points here in lon, lat order
+		expectPoints := map[string][]float64{
+			"first":  {2.0, 1.0},
+			"second": {4.0, 3.0},
+			"third":  {6.0, 5.0},
+		}
 
-	for _, f := range doc.Fields {
-		if f.Name() == "points" {
-			geoF, ok := f.(*document.GeoPointField)
-			if !ok {
-				t.Errorf("expected a geopoint field!")
-			}
-			lon, err := geoF.Lon()
-			if err != nil {
-				t.Errorf("error in fetching lon, err: %v", err)
-			}
-			lat, err := geoF.Lat()
-			if err != nil {
-				t.Errorf("error in fetching lat, err: %v", err)
-			}
-			// round obtained lon, lat to 2 decimal places
-			roundLon, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", lon), 64)
-			roundLat, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", lat), 64)
+		for _, f := range doc.Fields {
+			if f.Name() == "points" {
+				geoF, ok := f.(*document.GeoPointField)
+				if !ok {
+					t.Errorf("expected a geopoint field!")
+				}
+				lon, err := geoF.Lon()
+				if err != nil {
+					t.Errorf("error in fetching lon, err: %v", err)
+				}
+				lat, err := geoF.Lat()
+				if err != nil {
+					t.Errorf("error in fetching lat, err: %v", err)
+				}
+				// round obtained lon, lat to 2 decimal places
+				roundLon, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", lon), 64)
+				roundLat, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", lat), 64)
 
-			for key, point := range expectPoints {
-				if roundLon == point[0] && roundLat == point[1] {
-					delete(expectPoints, key)
+				for key, point := range expectPoints {
+					if roundLon == point[0] && roundLat == point[1] {
+						delete(expectPoints, key)
+					}
 				}
 			}
 		}
-	}
 
-	if len(expectPoints) > 0 {
-		t.Errorf("some points not found: %v", expectPoints)
+		if len(expectPoints) > 0 {
+			t.Errorf("some points not found: %v", expectPoints)
+		}
 	}
-
 }
