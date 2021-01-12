@@ -9,7 +9,7 @@ require (
 	github.com/blevesearch/scorch_segment_api v1.0.0
 	github.com/blevesearch/segment v0.9.0
 	github.com/blevesearch/snowballstem v0.9.0
-	github.com/blevesearch/upsidedown_store_api v0.0.1
+	github.com/blevesearch/upsidedown_store_api v1.0.1
 	github.com/blevesearch/zapx/v11 v11.1.10
 	github.com/blevesearch/zapx/v12 v12.1.10
 	github.com/blevesearch/zapx/v13 v13.1.10
