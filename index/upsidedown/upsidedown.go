@@ -612,6 +612,8 @@ func encodeFieldType(f document.Field) byte {
 		fieldType = 'g'
 	case *document.CompositeField:
 		fieldType = 'c'
+	case *document.IpField:
+		fieldType = 'i'
 	}
 	return fieldType
 }
