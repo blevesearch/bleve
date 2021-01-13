@@ -16,9 +16,9 @@ package searcher
 
 import (
 	"github.com/blevesearch/bleve/v2/geo"
-	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 func NewGeoPointDistanceSearcher(indexReader index.IndexReader, centerLon,

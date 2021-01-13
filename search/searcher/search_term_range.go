@@ -15,8 +15,8 @@
 package searcher
 
 import (
-	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/v2/search"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 func NewTermRangeSearcher(indexReader index.IndexReader,

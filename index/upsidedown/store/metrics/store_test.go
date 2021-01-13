@@ -17,8 +17,8 @@ package metrics
 import (
 	"testing"
 
-	store "github.com/blevesearch/upsidedown_store_api"
 	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
+	store "github.com/blevesearch/upsidedown_store_api"
 	"github.com/blevesearch/upsidedown_store_api/test"
 )
 

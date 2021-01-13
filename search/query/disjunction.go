@@ -18,10 +18,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 type DisjunctionQuery struct {

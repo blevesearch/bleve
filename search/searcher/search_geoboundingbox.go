@@ -17,9 +17,9 @@ package searcher
 import (
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/geo"
-	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 type filterFunc func(key []byte) bool
@@ -100,6 +100,7 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 
 var geoMaxShift = document.GeoPrecisionStep * 4
 var geoDetailLevel = ((geo.GeoBits << 1) - geoMaxShift) / 2
+
 type closeFunc func() error
 
 func ComputeGeoRange(term uint64, shift uint,
@@ -156,16 +157,16 @@ func buildIsIndexedFunc(indexReader index.IndexReader, field string) (isIndexed 
 		}
 	} else if indexReader != nil {
 		isIndexed = func(term []byte) bool {
-				reader, err := indexReader.TermFieldReader(term, field, false, false, false)
-				if err != nil || reader == nil {
-					return false
-				}
-				if reader.Count() == 0 {
-					_ = reader.Close()
-					return false
-				}
+			reader, err := indexReader.TermFieldReader(term, field, false, false, false)
+			if err != nil || reader == nil {
+				return false
+			}
+			if reader.Count() == 0 {
 				_ = reader.Close()
-				return true
+				return false
+			}
+			_ = reader.Close()
+			return true
 		}
 
 	} else {
@@ -209,12 +210,12 @@ func buildRectFilter(dvReader index.DocValueReader, field string,
 }
 
 type geoRangeCompute struct {
-	preallocBytesLen int
-	preallocBytes []byte
+	preallocBytesLen                   int
+	preallocBytes                      []byte
 	sminLon, sminLat, smaxLon, smaxLat float64
-	checkBoundaries bool
-	onBoundary, notOnBoundary [][]byte
-	isIndexed func(term []byte) bool
+	checkBoundaries                    bool
+	onBoundary, notOnBoundary          [][]byte
+	isIndexed                          func(term []byte) bool
 }
 
 func (grc *geoRangeCompute) makePrefixCoded(in int64, shift uint) (rv numeric.PrefixCoded) {
