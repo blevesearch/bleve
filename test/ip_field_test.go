@@ -49,6 +49,35 @@ func Test_iprange(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(doc1)
+
+	fd, err := idx.FieldDict("ip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, err := fd.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log([]byte(e.Term), e.Count)
+	if e.Term != string([]byte{192, 168, 1, 21}) {
+		t.Fatal("expected to find ip 192.168.1.21")
+	}
+	fd.Close()
+
+	pd, err := idx.FieldDictPrefix("ip", []byte{192, 168, 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e2, err := pd.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e2.Term != string([]byte{192, 168, 1, 21}) {
+		t.Fatal("expected to find ip 192.168.1.21")
+	}
+	pd.Close()
+
 	min := 120.0
 	max := 130.0
 	q1 := bleve.NewNumericRangeQuery(&min, &max)
@@ -68,7 +97,8 @@ func Test_iprange(t *testing.T) {
 		t.Fatalf("failed to find Num, res -> %s", res)
 	}
 
-	query := bleve.NewIPRangeQuery(`192.200.1.21`)
+	reqStr := `192.168.1.0/24`
+	query := bleve.NewIPRangeQuery(reqStr)
 	query.FieldVal = "ip"
 
 	search = bleve.NewSearchRequest(query)
@@ -80,8 +110,9 @@ func Test_iprange(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// TODO this fails
 	if res.Total != 1 {
-		t.Fatalf("failed to find ip, res -> %s", res)
+		t.Fatalf("failed to find %q, res -> %s", reqStr, res)
 	}
 
 }
