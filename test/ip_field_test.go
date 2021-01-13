@@ -1,7 +1,6 @@
 package test
 
 import (
-	"log"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2"
@@ -23,7 +22,7 @@ func createIdx(t *testing.T) bleve.Index {
 	mapping.DefaultMapping = lineMapping
 	mapping.DefaultAnalyzer = "standard"
 
-	idx, err := bleve.New(t.TempDir(), mapping)
+	idx, err := bleve.NewMemOnly(mapping)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +90,6 @@ func Test_MultiIpvr4CidrQuery(t *testing.T) {
 	if res.Total != 2 {
 		t.Fatalf("failed to find %q, res -> %s", reqStr, res)
 	}
-	log.Println(res)
 	if res.Hits[0].ID != "id1" {
 		t.Fatalf("expected %q got %q", "id1", res.Hits[0].ID)
 	}
