@@ -24,9 +24,9 @@ import (
 	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment"
+	"github.com/blevesearch/bleve/v2/document"
+	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api"
 	"github.com/couchbase/vellum"
 	lev "github.com/couchbase/vellum/levenshtein"
 )
@@ -190,21 +190,62 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 
 func (i *IndexSnapshot) FieldDict(field string) (index.FieldDict, error) {
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.Iterator()
+		return i.AutomatonIterator(nil, nil, nil)
 	}, false)
+}
+
+// calculateExclusiveEndFromInclusiveEnd produces the next key
+// when sorting using memcmp style comparisons, suitable to
+// use as the end key in a traditional (inclusive, exclusive]
+// start/end range
+func calculateExclusiveEndFromInclusiveEnd(inclusiveEnd []byte) []byte {
+	rv := inclusiveEnd
+	if len(inclusiveEnd) > 0 {
+		rv = make([]byte, len(inclusiveEnd))
+		copy(rv, inclusiveEnd)
+		if rv[len(rv)-1] < 0xff {
+			// last byte can be incremented by one
+			rv[len(rv)-1]++
+		} else {
+			// last byte is already 0xff, so append 0
+			// next key is simply one byte longer
+			rv = append(rv, 0x0)
+		}
+	}
+	return rv
 }
 
 func (i *IndexSnapshot) FieldDictRange(field string, startTerm []byte,
 	endTerm []byte) (index.FieldDict, error) {
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.RangeIterator(string(startTerm), string(endTerm))
+		endTermExclusive := calculateExclusiveEndFromInclusiveEnd(endTerm)
+		return i.AutomatonIterator(nil, startTerm, endTermExclusive)
 	}, false)
+}
+
+// calculateExclusiveEndFromPrefix produces the first key that
+// does not have the same prefix as the input bytes, suitable
+// to use as the end key in a traditional (inclusive, exclusive]
+// start/end range
+func calculateExclusiveEndFromPrefix(in []byte) []byte {
+	rv := make([]byte, len(in))
+	copy(rv, in)
+	for i := len(rv) - 1; i >= 0; i-- {
+		rv[i] = rv[i] + 1
+		if rv[i] != 0 {
+			return rv // didn't overflow, so stop
+		}
+	}
+	// all bytes were 0xff, so return nil
+	// as there is no end key for this prefix
+	return nil
 }
 
 func (i *IndexSnapshot) FieldDictPrefix(field string,
 	termPrefix []byte) (index.FieldDict, error) {
+	termPrefixEnd := calculateExclusiveEndFromPrefix(termPrefix)
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.PrefixIterator(string(termPrefix))
+		return i.AutomatonIterator(nil, termPrefix, termPrefixEnd)
 	}, false)
 }
 
@@ -213,7 +254,7 @@ func (i *IndexSnapshot) FieldDictRegexp(field string,
 	// TODO: potential optimization where the literal prefix represents the,
 	//       entire regexp, allowing us to use PrefixIterator(prefixTerm)?
 
-	a, prefixBeg, prefixEnd, err := segment.ParseRegexp(termRegex)
+	a, prefixBeg, prefixEnd, err := parseRegexp(termRegex)
 	if err != nil {
 		return nil, err
 	}
@@ -243,18 +284,11 @@ func (i *IndexSnapshot) FieldDictFuzzy(field string,
 	var prefixBeg, prefixEnd []byte
 	if prefix != "" {
 		prefixBeg = []byte(prefix)
-		prefixEnd = segment.IncrementBytes(prefixBeg)
+		prefixEnd = calculateExclusiveEndFromPrefix(prefixBeg)
 	}
 
 	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
 		return i.AutomatonIterator(a, prefixBeg, prefixEnd)
-	}, false)
-}
-
-func (i *IndexSnapshot) FieldDictOnly(field string,
-	onlyTerms [][]byte, includeCount bool) (index.FieldDict, error) {
-	return i.newIndexSnapshotFieldDict(field, func(i segment.TermDictionary) segment.DictionaryIterator {
-		return i.OnlyIterator(onlyTerms, includeCount)
 	}, false)
 }
 
@@ -349,7 +383,7 @@ func (i *IndexSnapshot) DocCount() (uint64, error) {
 	return rv, nil
 }
 
-func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
+func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	// FIXME could be done more efficiently directly, but reusing for simplicity
 	tfr, err := i.TermFieldReader([]byte(id), "_id", false, false, false)
 	if err != nil {
@@ -377,7 +411,7 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 	}
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
-	rv = document.NewDocument(id)
+	rvd := document.NewDocument(id)
 	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, val []byte, pos []uint64) bool {
 		if name == "_id" {
 			return true
@@ -389,17 +423,17 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 
 		switch typ {
 		case 't':
-			rv.AddField(document.NewTextField(name, arrayPos, value))
+			rvd.AddField(document.NewTextField(name, arrayPos, value))
 		case 'n':
-			rv.AddField(document.NewNumericFieldFromBytes(name, arrayPos, value))
+			rvd.AddField(document.NewNumericFieldFromBytes(name, arrayPos, value))
 		case 'i':
-			rv.AddField(document.NewIpFieldFromBytes(name, arrayPos, value))
+			rvd.AddField(document.NewIpFieldFromBytes(name, arrayPos, value))
 		case 'd':
-			rv.AddField(document.NewDateTimeFieldFromBytes(name, arrayPos, value))
+			rvd.AddField(document.NewDateTimeFieldFromBytes(name, arrayPos, value))
 		case 'b':
-			rv.AddField(document.NewBooleanFieldFromBytes(name, arrayPos, value))
+			rvd.AddField(document.NewBooleanFieldFromBytes(name, arrayPos, value))
 		case 'g':
-			rv.AddField(document.NewGeoPointFieldFromBytes(name, arrayPos, value))
+			rvd.AddField(document.NewGeoPointFieldFromBytes(name, arrayPos, value))
 		}
 
 		return true
@@ -408,7 +442,7 @@ func (i *IndexSnapshot) Document(id string) (rv *document.Document, err error) {
 		return nil, err
 	}
 
-	return rv, nil
+	return rvd, nil
 }
 
 func (i *IndexSnapshot) segmentIndexAndLocalDocNumFromGlobal(docNum uint64) (int, uint64) {
@@ -565,40 +599,15 @@ func docInternalToNumber(in index.IndexInternalID) (uint64, error) {
 	return binary.BigEndian.Uint64(in), nil
 }
 
-func (i *IndexSnapshot) DocumentVisitFieldTerms(id index.IndexInternalID,
-	fields []string, visitor index.DocumentFieldTermVisitor) error {
-	_, err := i.documentVisitFieldTerms(id, fields, visitor, nil)
-	return err
-}
-
-func (i *IndexSnapshot) documentVisitFieldTerms(id index.IndexInternalID,
-	fields []string, visitor index.DocumentFieldTermVisitor,
-	dvs segment.DocVisitState) (segment.DocVisitState, error) {
-	docNum, err := docInternalToNumber(id)
-	if err != nil {
-		return nil, err
-	}
-
-	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
-	if segmentIndex >= len(i.segment) {
-		return nil, nil
-	}
-
-	_, dvs, err = i.documentVisitFieldTermsOnSegment(
-		segmentIndex, localDocNum, fields, nil, visitor, dvs)
-
-	return dvs, err
-}
-
 func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	segmentIndex int, localDocNum uint64, fields []string, cFields []string,
-	visitor index.DocumentFieldTermVisitor, dvs segment.DocVisitState) (
+	visitor index.DocValueVisitor, dvs segment.DocVisitState) (
 	cFieldsOut []string, dvsOut segment.DocVisitState, err error) {
 	ss := i.segment[segmentIndex]
 
 	var vFields []string // fields that are visitable via the segment
 
-	ssv, ssvOk := ss.segment.(segment.DocumentFieldTermVisitable)
+	ssv, ssvOk := ss.segment.(segment.DocValueVisitable)
 	if ssvOk && ssv != nil {
 		vFields, err = ssv.VisitableDocValueFields()
 		if err != nil {
@@ -629,7 +638,7 @@ func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	}
 
 	if ssvOk && ssv != nil && len(vFields) > 0 {
-		dvs, err = ssv.VisitDocumentFieldTerms(localDocNum, fields, visitor, dvs)
+		dvs, err = ssv.VisitDocValues(localDocNum, fields, visitor, dvs)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -664,7 +673,7 @@ type DocValueReader struct {
 }
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
-	visitor index.DocumentFieldTermVisitor) (err error) {
+	visitor index.DocValueVisitor) (err error) {
 	docNum, err := docInternalToNumber(id)
 	if err != nil {
 		return err

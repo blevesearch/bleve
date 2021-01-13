@@ -18,10 +18,11 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/geo"
-	"github.com/blevesearch/bleve/numeric"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/geo"
+	"github.com/blevesearch/bleve/v2/numeric"
+	"github.com/blevesearch/bleve/v2/size"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var reflectStaticSizeGeoPointField int
@@ -36,9 +37,11 @@ var GeoPrecisionStep uint = 9
 type GeoPointField struct {
 	name              string
 	arrayPositions    []uint64
-	options           IndexingOptions
+	options           index.FieldIndexingOptions
 	value             numeric.PrefixCoded
 	numPlainTextBytes uint64
+	length            int
+	frequencies       index.TokenFrequencies
 }
 
 func (n *GeoPointField) Size() int {
@@ -55,11 +58,23 @@ func (n *GeoPointField) ArrayPositions() []uint64 {
 	return n.arrayPositions
 }
 
-func (n *GeoPointField) Options() IndexingOptions {
+func (n *GeoPointField) Options() index.FieldIndexingOptions {
 	return n.options
 }
 
-func (n *GeoPointField) Analyze() (int, analysis.TokenFrequencies) {
+func (n *GeoPointField) EncodedFieldType() byte {
+	return 'g'
+}
+
+func (n *GeoPointField) AnalyzedLength() int {
+	return n.length
+}
+
+func (n *GeoPointField) AnalyzedTokenFrequencies() index.TokenFrequencies {
+	return n.frequencies
+}
+
+func (n *GeoPointField) Analyze() {
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
@@ -90,9 +105,8 @@ func (n *GeoPointField) Analyze() (int, analysis.TokenFrequencies) {
 		}
 	}
 
-	fieldLength := len(tokens)
-	tokenFreqs := analysis.TokenFrequency(tokens, n.arrayPositions, n.options.IncludeTermVectors())
-	return fieldLength, tokenFreqs
+	n.length = len(tokens)
+	n.frequencies = analysis.TokenFrequency(tokens, n.arrayPositions, n.options)
 }
 
 func (n *GeoPointField) Value() []byte {
@@ -137,7 +151,7 @@ func NewGeoPointField(name string, arrayPositions []uint64, lon, lat float64) *G
 	return NewGeoPointFieldWithIndexingOptions(name, arrayPositions, lon, lat, DefaultNumericIndexingOptions)
 }
 
-func NewGeoPointFieldWithIndexingOptions(name string, arrayPositions []uint64, lon, lat float64, options IndexingOptions) *GeoPointField {
+func NewGeoPointFieldWithIndexingOptions(name string, arrayPositions []uint64, lon, lat float64, options index.FieldIndexingOptions) *GeoPointField {
 	mhash := geo.MortonHash(lon, lat)
 	prefixCoded := numeric.MustNewPrefixCodedInt64(int64(mhash), 0)
 	return &GeoPointField{

@@ -4,25 +4,33 @@ package document
 import (
 	"fmt"
 	"net"
+	"reflect"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/size"
+	index "github.com/blevesearch/bleve_index_api"
+
 )
 
 var reflectStaticSizeIpField int
 
 func init() {
-	reflectStaticSizeIpField = net.IPv6len
+	var f IpField
+	reflectStaticSizeIpField = int(reflect.TypeOf(f).Size())
 }
 
-const DefaultIpIndexingOptions = StoreField | IndexField | DocValues
+const DefaultIpIndexingOptions = index.StoreField | index.IndexField | index.DocValues
+
 
 type IpField struct {
 	name              string
 	arrayPositions    []uint64
-	options           IndexingOptions
+	options           index.FieldIndexingOptions
 	value             []byte
 	numPlainTextBytes uint64
+	length            int
+	frequencies       index.TokenFrequencies
+
 }
 
 func (b *IpField) Size() int {
@@ -40,11 +48,24 @@ func (b *IpField) ArrayPositions() []uint64 {
 	return b.arrayPositions
 }
 
-func (b *IpField) Options() IndexingOptions {
+func (b *IpField) Options() index.FieldIndexingOptions {
 	return b.options
 }
 
-func (b *IpField) Analyze() (int, analysis.TokenFrequencies) {
+func (n *IpField) EncodedFieldType() byte {
+	return 'i'
+}
+
+func (n *IpField) AnalyzedLength() int {
+	return n.length
+}
+
+func (n *IpField) AnalyzedTokenFrequencies() index.TokenFrequencies {
+	return n.frequencies
+}
+
+func (b *IpField) Analyze() {
+
 	tokens := analysis.TokenStream{
 		&analysis.Token{
 			Start:    0,
@@ -54,9 +75,8 @@ func (b *IpField) Analyze() (int, analysis.TokenFrequencies) {
 			Type:     analysis.Ip,
 		},
 	}
-	fieldLength := 1
-	tokenFreqs := analysis.TokenFrequency(tokens, b.arrayPositions, b.options.IncludeTermVectors())
-	return fieldLength, tokenFreqs
+	b.length = 1
+	b.frequencies = analysis.TokenFrequency(tokens, b.arrayPositions, b.options)
 }
 
 func (b *IpField) Value() []byte {
@@ -89,7 +109,7 @@ func NewIpField(name string, arrayPositions []uint64, v net.IP) *IpField {
 	return NewIpFieldWithIndexingOptions(name, arrayPositions, v, DefaultIpIndexingOptions)
 }
 
-func NewIpFieldWithIndexingOptions(name string, arrayPositions []uint64, b net.IP, options IndexingOptions) *IpField {
+func NewIpFieldWithIndexingOptions(name string, arrayPositions []uint64, b net.IP, options index.FieldIndexingOptions) *IpField {
 	numPlainTextBytes := 16
 	v := make([]byte, numPlainTextBytes)
 	copy(v, b)

@@ -17,14 +17,15 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
+	index "github.com/blevesearch/bleve_index_api"
 	"reflect"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/blevesearch/bleve/analysis/tokenizer/exception"
-	"github.com/blevesearch/bleve/analysis/tokenizer/regexp"
-	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/exception"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/regexp"
+	"github.com/blevesearch/bleve/v2/document"
 )
 
 var mappingSource = []byte(`{
@@ -969,7 +970,7 @@ func TestMappingForGeo(t *testing.T) {
 		for _, f := range doc.Fields {
 			if f.Name() == "location" {
 				foundGeo = true
-				geoF, ok := f.(*document.GeoPointField)
+				geoF, ok := f.(index.GeoPointField)
 				if !ok {
 					t.Errorf("expected a geopoint field!")
 				}
@@ -1136,7 +1137,7 @@ func TestMappingPointerToTimeBug1152(t *testing.T) {
 	if len(doc.Fields) != 1 {
 		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
 	}
-	if _, ok := doc.Fields[0].(*document.DateTimeField); !ok {
+	if _, ok := doc.Fields[0].(index.DateTimeField); !ok {
 		t.Fatalf("expected field to be type *document.DateTimeField, got %T", doc.Fields[0])
 	}
 }

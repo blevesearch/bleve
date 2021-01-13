@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/blevesearch/bleve"
+	"github.com/blevesearch/bleve/v2"
 	"github.com/spf13/cobra"
 )
 
@@ -100,7 +100,7 @@ func checkField(index bleve.Index, fieldName string) (int, error) {
 
 func getDictionary(index bleve.Index, field string) (map[string]uint64, error) {
 	rv := make(map[string]uint64)
-	i, _, err := index.Advanced()
+	i, err := index.Advanced()
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -16,12 +16,12 @@ package bleve
 
 import (
 	"context"
+	"github.com/blevesearch/bleve/v2/index/upsidedown"
 
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store"
-	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/size"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 // A Batch groups together multiple Index and Delete
@@ -71,7 +71,7 @@ func (b *Batch) TotalDocsSize() uint64 {
 // batch which skips the mapping.  NOTE: the bleve Index is not updated
 // until the batch is executed.
 func (b *Batch) IndexAdvanced(doc *document.Document) (err error) {
-	if doc.ID == "" {
+	if doc.ID() == "" {
 		return ErrorEmptyID
 	}
 	b.internal.Update(doc)
@@ -216,7 +216,7 @@ type Index interface {
 
 	// Document returns specified document or nil if the document is not
 	// indexed or stored.
-	Document(id string) (*document.Document, error)
+	Document(id string) (index.Document, error)
 	// DocCount returns the number of documents in the index.
 	DocCount() (uint64, error)
 
@@ -245,9 +245,8 @@ type Index interface {
 	// SetName lets you assign your own logical name to this index
 	SetName(string)
 
-	// Advanced returns the indexer and data store, exposing lower level
-	// methods to enumerate records and access data.
-	Advanced() (index.Index, store.KVStore, error)
+	// Advanced returns the internal index implementation
+	Advanced() (index.Index, error)
 }
 
 // New index at the specified path, must not exist.
@@ -263,7 +262,7 @@ func New(path string, mapping mapping.IndexMapping) (Index, error) {
 // The provided mapping will be used for all
 // Index/Search operations.
 func NewMemOnly(mapping mapping.IndexMapping) (Index, error) {
-	return newIndexUsing("", mapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	return newIndexUsing("", mapping, upsidedown.Name, Config.DefaultMemKVStore, nil)
 }
 
 // NewUsing creates index at the specified path,

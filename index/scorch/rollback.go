@@ -19,7 +19,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/blevesearch/bleve/index/scorch/segment"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -71,7 +70,7 @@ func RollbackPoints(path string) ([]*RollbackPoint, error) {
 
 	c1 := snapshots.Cursor()
 	for k, _ := c1.Last(); k != nil; k, _ = c1.Prev() {
-		_, snapshotEpoch, err := segment.DecodeUvarintAscending(k)
+		_, snapshotEpoch, err := decodeUvarintAscending(k)
 		if err != nil {
 			log.Printf("RollbackPoints:"+
 				" unable to parse segment epoch %x, continuing", k)
@@ -154,7 +153,7 @@ func Rollback(path string, to *RollbackPoint) error {
 		}
 		sc := snapshots.Cursor()
 		for sk, _ := sc.Last(); sk != nil && !found; sk, _ = sc.Prev() {
-			_, snapshotEpoch, err := segment.DecodeUvarintAscending(sk)
+			_, snapshotEpoch, err := decodeUvarintAscending(sk)
 			if err != nil {
 				continue
 			}
@@ -195,7 +194,7 @@ func Rollback(path string, to *RollbackPoint) error {
 		return nil
 	}
 	for _, epoch := range eligibleEpochs {
-		k := segment.EncodeUvarintAscending(nil, epoch)
+		k := encodeUvarintAscending(nil, epoch)
 		if err != nil {
 			continue
 		}

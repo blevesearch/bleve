@@ -15,8 +15,8 @@
 package highlight
 
 import (
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/v2/search"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 type Fragment struct {
@@ -59,6 +59,6 @@ type Highlighter interface {
 	Separator() string
 	SetSeparator(string)
 
-	BestFragmentInField(*search.DocumentMatch, *document.Document, string) string
-	BestFragmentsInField(*search.DocumentMatch, *document.Document, string, int) []string
+	BestFragmentInField(*search.DocumentMatch, index.Document, string) string
+	BestFragmentsInField(*search.DocumentMatch, index.Document, string, int) []string
 }

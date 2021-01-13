@@ -20,7 +20,6 @@ const (
 	ErrorIndexPathDoesNotExist
 	ErrorIndexMetaMissing
 	ErrorIndexMetaCorrupt
-	ErrorUnknownStorageType
 	ErrorIndexClosed
 	ErrorAliasMulti
 	ErrorAliasEmpty
@@ -42,7 +41,6 @@ var errorMessages = map[Error]string{
 	ErrorIndexPathDoesNotExist:  "cannot open index, path does not exist",
 	ErrorIndexMetaMissing:       "cannot open index, metadata missing",
 	ErrorIndexMetaCorrupt:       "cannot open index, metadata corrupt",
-	ErrorUnknownStorageType:     "unknown storage type",
 	ErrorIndexClosed:            "index is closed",
 	ErrorAliasMulti:             "cannot perform single index operation on multiple index alias",
 	ErrorAliasEmpty:             "cannot perform operation on empty alias",

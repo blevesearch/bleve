@@ -17,8 +17,8 @@ package html
 import (
 	"html"
 
-	"github.com/blevesearch/bleve/registry"
-	"github.com/blevesearch/bleve/search/highlight"
+	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/search/highlight"
 )
 
 const Name = "html"
@@ -60,7 +60,7 @@ func (a *FragmentFormatter) Format(f *highlight.Fragment, orderedTermLocations h
 		// start the <mark> tag
 		rv += a.before
 		// add the term itself
-		rv += string(f.Orig[termLocation.Start:termLocation.End])
+		rv += html.EscapeString(string(f.Orig[termLocation.Start:termLocation.End]))
 		// end the <mark> tag
 		rv += a.after
 		// update current

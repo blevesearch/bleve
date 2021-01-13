@@ -17,7 +17,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/blevesearch/bleve/index/upsidedown"
+	"github.com/blevesearch/bleve/v2/index/upsidedown"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +27,7 @@ var dumpFieldsCmd = &cobra.Command{
 	Short: "dump only the field rows",
 	Long:  `The fields sub-command of dump will only dump the field rows.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		i, _, err := idx.Advanced()
+		i, err := idx.Advanced()
 		if err != nil {
 			return fmt.Errorf("error getting index: %v", err)
 		}
@@ -35,8 +35,12 @@ var dumpFieldsCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("error getting index reader: %v", err)
 		}
+		upsideDownReader, ok := r.(*upsidedown.IndexReader)
+		if !ok {
+			return fmt.Errorf("dump fields is only supported by index type upsidedown")
+		}
 
-		dumpChan := r.DumpFields()
+		dumpChan := upsideDownReader.DumpFields()
 		for rowOrErr := range dumpChan {
 			switch rowOrErr := rowOrErr.(type) {
 			case error:

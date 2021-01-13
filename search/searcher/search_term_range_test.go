@@ -15,14 +15,14 @@
 package searcher
 
 import (
-	"github.com/blevesearch/bleve/index/scorch"
+	"github.com/blevesearch/bleve/v2/index/scorch"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"sort"
 	"testing"
 
-	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 func TestTermRangeSearch(t *testing.T) {
