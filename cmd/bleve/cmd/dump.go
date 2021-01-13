@@ -17,7 +17,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/blevesearch/bleve/index/upsidedown"
+	"github.com/blevesearch/bleve/v2/index/upsidedown"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +29,7 @@ var dumpCmd = &cobra.Command{
 	Short: "dumps the contents of the index",
 	Long:  `The dump command will dump (possibly a section of) the index.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		i, _, err := idx.Advanced()
+		i, err := idx.Advanced()
 		if err != nil {
 			return fmt.Errorf("error getting index: %v", err)
 		}
@@ -37,8 +37,12 @@ var dumpCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("error getting index reader: %v", err)
 		}
+		upsideDownReader, ok := r.(*upsidedown.IndexReader)
+		if !ok {
+			return fmt.Errorf("dump is only supported by index type upsidedown")
+		}
 
-		dumpChan := r.DumpAll()
+		dumpChan := upsideDownReader.DumpAll()
 		for rowOrErr := range dumpChan {
 			switch rowOrErr := rowOrErr.(type) {
 			case error:

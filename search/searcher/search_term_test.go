@@ -18,11 +18,11 @@ import (
 	"math"
 	"testing"
 
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/gtreap"
-	"github.com/blevesearch/bleve/index/upsidedown"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/v2/document"
+	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
+	"github.com/blevesearch/bleve/v2/index/upsidedown"
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 func TestTermSearcher(t *testing.T) {
@@ -46,93 +46,63 @@ func TestTermSearcher(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "a",
-		Fields: []document.Field{
-			document.NewTextField("desc", []uint64{}, []byte("beer")),
-		},
-	})
+	doc := document.NewDocument("a")
+	doc.AddField(document.NewTextField("desc", []uint64{}, []byte("beer")))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "b",
-		Fields: []document.Field{
-			document.NewTextField("desc", []uint64{}, []byte("beer")),
-		},
-	})
+	doc = document.NewDocument("b")
+	doc.AddField(document.NewTextField("desc", []uint64{}, []byte("beer")))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "c",
-		Fields: []document.Field{
-			document.NewTextField("desc", []uint64{}, []byte("beer")),
-		},
-	})
+	doc = document.NewDocument("c")
+	doc.AddField(document.NewTextField("desc", []uint64{}, []byte("beer")))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "d",
-		Fields: []document.Field{
-			document.NewTextField("desc", []uint64{}, []byte("beer")),
-		},
-	})
+	doc = document.NewDocument("d")
+	doc.AddField(document.NewTextField("desc", []uint64{}, []byte("beer")))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "e",
-		Fields: []document.Field{
-			document.NewTextField("desc", []uint64{}, []byte("beer")),
-		},
-	})
+	doc = document.NewDocument("e")
+	doc.AddField(document.NewTextField("desc", []uint64{}, []byte("beer")))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "f",
-		Fields: []document.Field{
-			document.NewTextField("desc", []uint64{}, []byte("beer")),
-		},
-	})
+	doc = document.NewDocument("f")
+	doc.AddField(document.NewTextField("desc", []uint64{}, []byte("beer")))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "g",
-		Fields: []document.Field{
-			document.NewTextField("desc", []uint64{}, []byte("beer")),
-		},
-	})
+	doc = document.NewDocument("g")
+	doc.AddField(document.NewTextField("desc", []uint64{}, []byte("beer")))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "h",
-		Fields: []document.Field{
-			document.NewTextField("desc", []uint64{}, []byte("beer")),
-		},
-	})
+	doc = document.NewDocument("h")
+	doc.AddField(document.NewTextField("desc", []uint64{}, []byte("beer")))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "i",
-		Fields: []document.Field{
-			document.NewTextField("desc", []uint64{}, []byte("beer")),
-		},
-	})
+	doc = document.NewDocument("i")
+	doc.AddField(document.NewTextField("desc", []uint64{}, []byte("beer")))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "j",
-		Fields: []document.Field{
-			document.NewTextField("title", []uint64{}, []byte("cat")),
-		},
-	})
+	doc = document.NewDocument("j")
+	doc.AddField(document.NewTextField("title", []uint64{}, []byte("cat")))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,7 +17,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/blevesearch/bleve/index/upsidedown"
+	"github.com/blevesearch/bleve/v2/index/upsidedown"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +31,7 @@ var dumpDocCmd = &cobra.Command{
 			return fmt.Errorf("must specify docid")
 		}
 
-		i, _, err := idx.Advanced()
+		i, err := idx.Advanced()
 		if err != nil {
 			return fmt.Errorf("error getting index: %v", err)
 		}
@@ -39,8 +39,12 @@ var dumpDocCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("error getting index reader: %v", err)
 		}
+		upsideDownReader, ok := r.(*upsidedown.IndexReader)
+		if !ok {
+			return fmt.Errorf("dump doc is only supported by index type upsidedown")
+		}
 
-		dumpChan := r.DumpDoc(args[1])
+		dumpChan := upsideDownReader.DumpDoc(args[1])
 		for rowOrErr := range dumpChan {
 			switch rowOrErr := rowOrErr.(type) {
 			case error:

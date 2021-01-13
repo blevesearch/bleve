@@ -24,12 +24,9 @@ import (
 	"time"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment"
-	"github.com/blevesearch/bleve/index/store"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blevesearch/bleve/v2/registry"
+	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -75,7 +72,7 @@ type Scorch struct {
 
 	forceMergeRequestCh chan *mergerCtrl
 
-	segPlugin segment.Plugin
+	segPlugin SegmentPlugin
 }
 
 type internalStats struct {
@@ -293,7 +290,7 @@ func (s *Scorch) Close() (err error) {
 	return
 }
 
-func (s *Scorch) Update(doc *document.Document) error {
+func (s *Scorch) Update(doc index.Document) error {
 	b := index.NewBatch()
 	b.Update(doc)
 	return s.Batch(b)
@@ -313,7 +310,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		s.fireEvent(EventKindBatchIntroduction, time.Since(start))
 	}()
 
-	resultChan := make(chan *index.AnalysisResult, len(batch.IndexOps))
+	resultChan := make(chan index.Document, len(batch.IndexOps))
 
 	var numUpdates uint64
 	var numDeletes uint64
@@ -322,7 +319,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	for docID, doc := range batch.IndexOps {
 		if doc != nil {
 			// insert _id field
-			doc.AddField(document.NewTextFieldCustom("_id", nil, []byte(doc.ID), document.IndexField|document.StoreField, nil))
+			doc.AddIDField()
 			numUpdates++
 			numPlainTextBytes += doc.NumPlainTextBytes()
 		} else {
@@ -335,18 +332,21 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 
 	if numUpdates > 0 {
 		go func() {
-			for _, doc := range batch.IndexOps {
+			for k := range batch.IndexOps {
+				doc := batch.IndexOps[k]
 				if doc != nil {
-					aw := index.NewAnalysisWork(s, doc, resultChan)
 					// put the work on the queue
-					s.analysisQueue.Queue(aw)
+					s.analysisQueue.Queue(func() {
+						analyze(doc)
+						resultChan <- doc
+					})
 				}
 			}
 		}()
 	}
 
 	// wait for analysis result
-	analysisResults := make([]*index.AnalysisResult, int(numUpdates))
+	analysisResults := make([]index.Document, int(numUpdates))
 	var itemsDeQueued uint64
 	var totalAnalysisSize int
 	for itemsDeQueued < numUpdates {
@@ -566,37 +566,19 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	return m
 }
 
-func (s *Scorch) Analyze(d *document.Document) *index.AnalysisResult {
-	return analyze(d)
-}
-
-func analyze(d *document.Document) *index.AnalysisResult {
-	rv := &index.AnalysisResult{
-		Document: d,
-		Analyzed: make([]analysis.TokenFrequencies, len(d.Fields)+len(d.CompositeFields)),
-		Length:   make([]int, len(d.Fields)+len(d.CompositeFields)),
-	}
-
-	for i, field := range d.Fields {
+func analyze(d index.Document) {
+	d.VisitFields(func(field index.Field) {
 		if field.Options().IsIndexed() {
-			fieldLength, tokenFreqs := field.Analyze()
-			rv.Analyzed[i] = tokenFreqs
-			rv.Length[i] = fieldLength
+			field.Analyze()
 
-			if len(d.CompositeFields) > 0 && field.Name() != "_id" {
+			if d.HasComposite() && field.Name() != "_id" {
 				// see if any of the composite fields need this
-				for _, compositeField := range d.CompositeFields {
-					compositeField.Compose(field.Name(), fieldLength, tokenFreqs)
-				}
+				d.VisitComposite(func(cf index.CompositeField) {
+					cf.Compose(field.Name(), field.AnalyzedLength(), field.AnalyzedTokenFrequencies())
+				})
 			}
 		}
-	}
-
-	return rv
-}
-
-func (s *Scorch) Advanced() (store.KVStore, error) {
-	return nil, nil
+	})
 }
 
 func (s *Scorch) AddEligibleForRemoval(epoch uint64) {

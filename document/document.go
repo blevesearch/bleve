@@ -18,7 +18,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/size"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var reflectStaticSizeDocument int
@@ -29,14 +30,14 @@ func init() {
 }
 
 type Document struct {
-	ID              string  `json:"id"`
+	id              string  `json:"id"`
 	Fields          []Field `json:"fields"`
 	CompositeFields []*CompositeField
 }
 
 func NewDocument(id string) *Document {
 	return &Document{
-		ID:              id,
+		id:              id,
 		Fields:          make([]Field, 0),
 		CompositeFields: make([]*CompositeField, 0),
 	}
@@ -44,7 +45,7 @@ func NewDocument(id string) *Document {
 
 func (d *Document) Size() int {
 	sizeInBytes := reflectStaticSizeDocument + size.SizeOfPtr +
-		len(d.ID)
+		len(d.id)
 
 	for _, entry := range d.Fields {
 		sizeInBytes += entry.Size()
@@ -82,7 +83,7 @@ func (d *Document) GoString() string {
 		}
 		compositeFields += fmt.Sprintf("%#v", field)
 	}
-	return fmt.Sprintf("&document.Document{ID:%s, Fields: %s, CompositeFields: %s}", d.ID, fields, compositeFields)
+	return fmt.Sprintf("&document.Document{ID:%s, Fields: %s, CompositeFields: %s}", d.ID(), fields, compositeFields)
 }
 
 func (d *Document) NumPlainTextBytes() uint64 {
@@ -98,4 +99,32 @@ func (d *Document) NumPlainTextBytes() uint64 {
 		}
 	}
 	return rv
+}
+
+func (d *Document) ID() string {
+	return d.id
+}
+
+func (d *Document) SetID(id string) {
+	d.id = id
+}
+
+func (d *Document) AddIDField() {
+	d.AddField(NewTextFieldCustom("_id", nil, []byte(d.ID()), index.IndexField|index.StoreField, nil))
+}
+
+func (d *Document) VisitFields(visitor index.FieldVisitor) {
+	for _, f := range d.Fields {
+		visitor(f)
+	}
+}
+
+func (d *Document) VisitComposite(visitor index.CompositeFieldVisitor) {
+	for _, f := range d.CompositeFields {
+		visitor(f)
+	}
+}
+
+func (d *Document) HasComposite() bool {
+	return len(d.CompositeFields) > 0
 }

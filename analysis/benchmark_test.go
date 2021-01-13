@@ -15,11 +15,12 @@
 package analysis_test
 
 import (
+	index "github.com/blevesearch/bleve_index_api"
 	"testing"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/analyzer/standard"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
+	"github.com/blevesearch/bleve/v2/registry"
 )
 
 func BenchmarkAnalysis(b *testing.B) {
@@ -32,7 +33,7 @@ func BenchmarkAnalysis(b *testing.B) {
 		}
 
 		ts := analyzer.Analyze(bleveWikiArticle)
-		freqs := analysis.TokenFrequency(ts, nil, true)
+		freqs := analysis.TokenFrequency(ts, nil, index.IncludeTermVectors)
 		if len(freqs) != 511 {
 			b.Errorf("expected %d freqs, got %d", 511, len(freqs))
 		}

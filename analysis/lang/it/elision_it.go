@@ -17,9 +17,9 @@ package it
 import (
 	"fmt"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/token/elision"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis/token/elision"
+	"github.com/blevesearch/bleve/v2/registry"
 )
 
 const ElisionName = "elision_it"

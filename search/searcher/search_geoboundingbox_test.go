@@ -18,13 +18,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/geo"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/gtreap"
-	"github.com/blevesearch/bleve/index/upsidedown"
-	"github.com/blevesearch/bleve/numeric"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/geo"
+	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
+	"github.com/blevesearch/bleve/v2/index/upsidedown"
+	"github.com/blevesearch/bleve/v2/numeric"
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 func TestGeoBoundingBox(t *testing.T) {
@@ -107,93 +107,63 @@ func setupGeo(t *testing.T) index.Index {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "a",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 0.0015, 0.0015),
-		},
-	})
+	doc := document.NewDocument("a")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 0.0015, 0.0015))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "b",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 1.0015, 1.0015),
-		},
-	})
+	doc = document.NewDocument("b")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 1.0015, 1.0015))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "c",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 2.0015, 2.0015),
-		},
-	})
+	doc = document.NewDocument("c")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 2.0015, 2.0015))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "d",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 3.0015, 3.0015),
-		},
-	})
+	doc = document.NewDocument("d")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 3.0015, 3.0015))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "e",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 4.0015, 4.0015),
-		},
-	})
+	doc = document.NewDocument("e")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 4.0015, 4.0015))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "f",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 5.0015, 5.0015),
-		},
-	})
+	doc = document.NewDocument("f")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 5.0015, 5.0015))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "g",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 6.0015, 6.0015),
-		},
-	})
+	doc = document.NewDocument("g")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 6.0015, 6.0015))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "h",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 7.0015, 7.0015),
-		},
-	})
+	doc = document.NewDocument("h")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 7.0015, 7.0015))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "i",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 8.0015, 8.0015),
-		},
-	})
+	doc = document.NewDocument("i")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 8.0015, 8.0015))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = i.Update(&document.Document{
-		ID: "j",
-		Fields: []document.Field{
-			document.NewGeoPointField("loc", []uint64{}, 9.0015, 9.0015),
-		},
-	})
+	doc = document.NewDocument("j")
+	doc.AddField(document.NewGeoPointField("loc", []uint64{}, 9.0015, 9.0015))
+	err = i.Update(doc)
 	if err != nil {
 		t.Fatal(err)
 	}

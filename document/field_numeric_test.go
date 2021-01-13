@@ -20,7 +20,9 @@ import (
 
 func TestNumericField(t *testing.T) {
 	nf := NewNumericField("age", []uint64{}, 3.4)
-	numTokens, tokenFreqs := nf.Analyze()
+	nf.Analyze()
+	numTokens := nf.AnalyzedLength()
+	tokenFreqs := nf.AnalyzedTokenFrequencies()
 	if numTokens != 16 {
 		t.Errorf("expected 16 tokens")
 	}

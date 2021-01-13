@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"strconv"
 
-	seg "github.com/blevesearch/bleve/index/scorch/segment"
+	seg "github.com/blevesearch/scorch_segment_api"
 	"github.com/spf13/cobra"
 )
 

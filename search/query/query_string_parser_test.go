@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blevesearch/bleve/mapping"
+	"github.com/blevesearch/bleve/v2/mapping"
 )
 
 func TestQuerySyntaxParserValid(t *testing.T) {
@@ -808,6 +808,36 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				nil,
 				[]Query{
 					NewMatchQuery(`3.0\a`),
+				},
+				nil),
+		},
+
+		// field names as phrases
+		{
+			input:   `"fie ld":test`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					func() Query {
+						q := NewMatchQuery("test")
+						q.SetField("fie ld")
+						return q
+					}(),
+				},
+				nil),
+		},
+		{
+			input:   `"fie ld":"test"`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					func() Query {
+						q := NewMatchPhraseQuery("test")
+						q.SetField("fie ld")
+						return q
+					}(),
 				},
 				nil),
 		},

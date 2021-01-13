@@ -16,35 +16,75 @@ package scorch
 
 import (
 	"fmt"
+	"github.com/RoaringBitmap/roaring"
+	index "github.com/blevesearch/bleve_index_api"
 
-	"github.com/blevesearch/bleve/index/scorch/segment"
+	segment "github.com/blevesearch/scorch_segment_api"
 
-	zapv11 "github.com/blevesearch/zap/v11"
-	zapv12 "github.com/blevesearch/zap/v12"
-	zapv13 "github.com/blevesearch/zap/v13"
-	zapv14 "github.com/blevesearch/zap/v14"
-	zapv15 "github.com/blevesearch/zap/v15"
+	zapv11 "github.com/blevesearch/zapx/v11"
+	zapv12 "github.com/blevesearch/zapx/v12"
+	zapv13 "github.com/blevesearch/zapx/v13"
+	zapv14 "github.com/blevesearch/zapx/v14"
+	zapv15 "github.com/blevesearch/zapx/v15"
 )
 
-var supportedSegmentPlugins map[string]map[uint32]segment.Plugin
-var defaultSegmentPlugin segment.Plugin
+// SegmentPlugin represents the essential functions required by a package to plug in
+// it's segment implementation
+type SegmentPlugin interface {
+
+	// Type is the name for this segment plugin
+	Type() string
+
+	// Version is a numeric value identifying a specific version of this type.
+	// When incompatible changes are made to a particular type of plugin, the
+	// version must be incremented.
+	Version() uint32
+
+	// New takes a set of Documents and turns them into a new Segment
+	New(results []index.Document) (segment.Segment, uint64, error)
+
+	// Open attempts to open the file at the specified path and
+	// return the corresponding Segment
+	Open(path string) (segment.Segment, error)
+
+	// Merge takes a set of Segments, and creates a new segment on disk at
+	// the specified path.
+	// Drops is a set of bitmaps (one for each segment) indicating which
+	// documents can be dropped from the segments during the merge.
+	// If the closeCh channel is closed, Merge will cease doing work at
+	// the next opportunity, and return an error (closed).
+	// StatsReporter can optionally be provided, in which case progress
+	// made during the merge is reported while operation continues.
+	// Returns:
+	// A slice of new document numbers (one for each input segment),
+	// this allows the caller to know a particular document's new
+	// document number in the newly merged segment.
+	// The number of bytes written to the new segment file.
+	// An error, if any occurred.
+	Merge(segments []segment.Segment, drops []*roaring.Bitmap, path string,
+		closeCh chan struct{}, s segment.StatsReporter) (
+		[][]uint64, uint64, error)
+}
+
+var supportedSegmentPlugins map[string]map[uint32]SegmentPlugin
+var defaultSegmentPlugin SegmentPlugin
 
 func init() {
-	ResetPlugins()
-	RegisterPlugin(zapv15.Plugin(), false)
-	RegisterPlugin(zapv14.Plugin(), false)
-	RegisterPlugin(zapv13.Plugin(), false)
-	RegisterPlugin(zapv12.Plugin(), false)
-	RegisterPlugin(zapv11.Plugin(), true)
+	ResetSegmentPlugins()
+	RegisterSegmentPlugin(&zapv15.ZapPlugin{}, true)
+	RegisterSegmentPlugin(&zapv14.ZapPlugin{}, false)
+	RegisterSegmentPlugin(&zapv13.ZapPlugin{}, false)
+	RegisterSegmentPlugin(&zapv12.ZapPlugin{}, false)
+	RegisterSegmentPlugin(&zapv11.ZapPlugin{}, false)
 }
 
-func ResetPlugins() {
-	supportedSegmentPlugins = map[string]map[uint32]segment.Plugin{}
+func ResetSegmentPlugins() {
+	supportedSegmentPlugins = map[string]map[uint32]SegmentPlugin{}
 }
 
-func RegisterPlugin(plugin segment.Plugin, makeDefault bool) {
+func RegisterSegmentPlugin(plugin SegmentPlugin, makeDefault bool) {
 	if _, ok := supportedSegmentPlugins[plugin.Type()]; !ok {
-		supportedSegmentPlugins[plugin.Type()] = map[uint32]segment.Plugin{}
+		supportedSegmentPlugins[plugin.Type()] = map[uint32]SegmentPlugin{}
 	}
 	supportedSegmentPlugins[plugin.Type()][plugin.Version()] = plugin
 	if makeDefault {
@@ -67,7 +107,7 @@ func SupportedSegmentTypeVersions(typ string) (rv []uint32) {
 }
 
 func chooseSegmentPlugin(forcedSegmentType string,
-	forcedSegmentVersion uint32) (segment.Plugin, error) {
+	forcedSegmentVersion uint32) (SegmentPlugin, error) {
 	if versions, ok := supportedSegmentPlugins[forcedSegmentType]; ok {
 		if segPlugin, ok := versions[uint32(forcedSegmentVersion)]; ok {
 			return segPlugin, nil

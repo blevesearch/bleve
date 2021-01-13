@@ -18,9 +18,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/search"
+	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/search"
 )
 
 type MatchQuery struct {
@@ -37,9 +37,9 @@ type MatchQueryOperator int
 
 const (
 	// Document must satisfy AT LEAST ONE of term searches.
-	MatchQueryOperatorOr = 0
+	MatchQueryOperatorOr = MatchQueryOperator(0)
 	// Document must satisfy ALL of term searches.
-	MatchQueryOperatorAnd = 1
+	MatchQueryOperatorAnd = MatchQueryOperator(1)
 )
 
 func (o MatchQueryOperator) MarshalJSON() ([]byte, error) {

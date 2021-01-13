@@ -20,9 +20,9 @@ import (
 	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment"
-	"github.com/blevesearch/bleve/size"
+	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api"
+	"github.com/blevesearch/bleve/v2/size"
 )
 
 var TermSeparator byte = 0xff
@@ -62,8 +62,8 @@ func (s *SegmentSnapshot) Close() error {
 	return s.segment.Close()
 }
 
-func (s *SegmentSnapshot) VisitDocument(num uint64, visitor segment.DocumentFieldValueVisitor) error {
-	return s.segment.VisitDocument(num, visitor)
+func (s *SegmentSnapshot) VisitDocument(num uint64, visitor segment.StoredFieldValueVisitor) error {
+	return s.segment.VisitStoredFields(num, visitor)
 }
 
 func (s *SegmentSnapshot) DocID(num uint64) ([]byte, error) {
@@ -147,7 +147,7 @@ func (cfd *cachedFieldDocs) prepareField(field string, ss *SegmentSnapshot) {
 	var postings segment.PostingsList
 	var postingsItr segment.PostingsIterator
 
-	dictItr := dict.Iterator()
+	dictItr := dict.AutomatonIterator(nil, nil, nil)
 	next, err := dictItr.Next()
 	for err == nil && next != nil {
 		var err1 error
@@ -253,7 +253,7 @@ func (c *cachedDocs) updateSizeLOCKED() {
 }
 
 func (c *cachedDocs) visitDoc(localDocNum uint64,
-	fields []string, visitor index.DocumentFieldTermVisitor) {
+	fields []string, visitor index.DocValueVisitor) {
 	c.m.Lock()
 
 	for _, field := range fields {
