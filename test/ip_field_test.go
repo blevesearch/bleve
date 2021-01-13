@@ -110,9 +110,24 @@ func Test_iprange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// TODO this fails
 	if res.Total != 1 {
 		t.Fatalf("failed to find %q, res -> %s", reqStr, res)
 	}
 
+	reqStr = `192.168.1.21`
+	query = bleve.NewIPRangeQuery(reqStr)
+	query.FieldVal = "ip"
+
+	search = bleve.NewSearchRequest(query)
+	search.Fields = []string{"*"}
+	search.Explain = true
+	search.IncludeLocations = true
+	res, err = idx.Search(search)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 1 {
+		t.Fatalf("failed to find %q, res -> %s", reqStr, res)
+	}
 }
