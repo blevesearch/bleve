@@ -170,14 +170,14 @@
 		}
 	},
   {
-    "comment": "sort by age, descending, missing first, _id, ascending",
+    "comment": "sort by age, descending, missing first, id, ascending",
 		"search": {
 			"from": 0,
 			"size": 10,
 			"query": {
 				"match_all":{}
 			},
-      "sort": [{"by":"field","field":"age","missing":"first","desc":true},{"by":"field","field":"_id"}]
+      "sort": [{"by":"field","field":"age","missing":"first","desc":true},{"by":"id","desc":false}]
 		},
 		"result": {
 			"total_hits": 6,
