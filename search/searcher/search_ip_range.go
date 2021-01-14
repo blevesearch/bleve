@@ -21,6 +21,7 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
+// maksLen returns the number of whole bytes in cidr.
 func maskLen(cidr *net.IPNet) int {
 	for i, v := range cidr.Mask {
 		if v != 0xff {
