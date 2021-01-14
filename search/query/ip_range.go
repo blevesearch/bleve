@@ -45,13 +45,12 @@ func (q *IPRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, opt
 	}
 	_, ipNet, err := net.ParseCIDR(q.CIDRVal)
 	if err != nil {
-		isIP := net.ParseIP(q.CIDRVal)
-		if isIP == nil {
+		ip := net.ParseIP(q.CIDRVal)
+		if ip == nil {
 			return nil, err
 		}
-		ipv4 := isIP.To4()
 		// If we are searching for a specific ip rather than members of a network, just use a term search.
-		return searcher.NewTermSearcherBytes(i, ipv4, field, q.BoostVal.Value(), options)
+		return searcher.NewTermSearcherBytes(i, ip.To16(), field, q.BoostVal.Value(), options)
 	}
 	return searcher.NewIpRangeSearcher(i, ipNet, field, q.BoostVal.Value(), options)
 }

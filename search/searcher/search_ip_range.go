@@ -17,9 +17,8 @@ package searcher
 import (
 	"net"
 
-	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/v2/search"
-
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 func maskLen(cidr *net.IPNet) int {
@@ -36,7 +35,13 @@ func NewIpRangeSearcher(indexReader index.IndexReader, ipNet *net.IPNet,
 	search.Searcher, error) {
 	// find the terms with this prefix
 	mLen := maskLen(ipNet)
-	fieldDict, err := indexReader.FieldDictPrefix(field, ipNet.IP[0:mLen])
+	ip := ipNet.IP
+	if len(ip) == net.IPv4len {
+		ip = ip.To16()
+		mLen += (net.IPv6len - net.IPv4len)
+	}
+
+	fieldDict, err := indexReader.FieldDictPrefix(field, ip[0:mLen])
 	if err != nil {
 		return nil, err
 	}

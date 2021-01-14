@@ -1,4 +1,3 @@
-
 package document
 
 import (
@@ -9,7 +8,6 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
-
 )
 
 var reflectStaticSizeIpField int
@@ -21,7 +19,6 @@ func init() {
 
 const DefaultIpIndexingOptions = index.StoreField | index.IndexField | index.DocValues | index.IncludeTermVectors
 
-
 type IpField struct {
 	name              string
 	arrayPositions    []uint64
@@ -30,7 +27,6 @@ type IpField struct {
 	numPlainTextBytes uint64
 	length            int
 	frequencies       index.TokenFrequencies
-
 }
 
 func (b *IpField) Size() int {
@@ -110,15 +106,13 @@ func NewIpField(name string, arrayPositions []uint64, v net.IP) *IpField {
 }
 
 func NewIpFieldWithIndexingOptions(name string, arrayPositions []uint64, b net.IP, options index.FieldIndexingOptions) *IpField {
-	numPlainTextBytes := 4
-	v := make([]byte, numPlainTextBytes)
-	copy(v, b.To4())
+	v := b.To16()
 
 	return &IpField{
 		name:              name,
 		arrayPositions:    arrayPositions,
 		value:             v,
 		options:           options,
-		numPlainTextBytes: uint64(numPlainTextBytes),
+		numPlainTextBytes: net.IPv6len,
 	}
 }
