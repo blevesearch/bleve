@@ -11,14 +11,14 @@ import (
 )
 
 type IPRangeQuery struct {
-	CIDRVal  string `json:"cidr, omitempty"`
+	CIDR     string `json:"cidr, omitempty"`
 	FieldVal string `json:"field,omitempty"`
 	BoostVal *Boost `json:"boost,omitempty"`
 }
 
 func NewIPRangeQuery(cidr string) *IPRangeQuery {
 	return &IPRangeQuery{
-		CIDRVal: cidr,
+		CIDR: cidr,
 	}
 }
 
@@ -44,9 +44,9 @@ func (q *IPRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, opt
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
-	_, ipNet, err := net.ParseCIDR(q.CIDRVal)
+	_, ipNet, err := net.ParseCIDR(q.CIDR)
 	if err != nil {
-		ip := net.ParseIP(q.CIDRVal)
+		ip := net.ParseIP(q.CIDR)
 		if ip == nil {
 			return nil, err
 		}
@@ -57,14 +57,14 @@ func (q *IPRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, opt
 }
 
 func (q *IPRangeQuery) Validate() error {
-	_, _, err := net.ParseCIDR(q.CIDRVal)
+	_, _, err := net.ParseCIDR(q.CIDR)
 	if err == nil {
 		return nil
 	}
 	// We also allow search for a specific IP.
-	ip := net.ParseIP(q.CIDRVal)
+	ip := net.ParseIP(q.CIDR)
 	if ip != nil {
 		return nil // we have a valid ip
 	}
-	return fmt.Errorf("IPRangeQuery must be for an network or ip address, %q", q.CIDRVal)
+	return fmt.Errorf("IPRangeQuery must be for an network or ip address, %q", q.CIDR)
 }
