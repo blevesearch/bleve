@@ -33,9 +33,9 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	regexpTokenizer "github.com/blevesearch/bleve/v2/analysis/tokenizer/regexp"
 	"github.com/blevesearch/bleve/v2/document"
-	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/v2/index/scorch/mergeplan"
 	"github.com/blevesearch/bleve/v2/mapping"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 func init() {
@@ -794,7 +794,6 @@ func TestIndexInsertWithStore(t *testing.T) {
 	}
 
 	storedDoc := storedDocInt.(*document.Document)
-
 
 	if len(storedDoc.Fields) != 1 {
 		t.Errorf("expected 1 stored field, got %d", len(storedDoc.Fields))

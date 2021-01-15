@@ -566,6 +566,10 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	return m
 }
 
+func (s *Scorch) Analyze(d index.Document) {
+	analyze(d)
+}
+
 func analyze(d index.Document) {
 	d.VisitFields(func(field index.Field) {
 		if field.Options().IsIndexed() {

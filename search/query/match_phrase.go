@@ -18,9 +18,9 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/analysis"
-	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 type MatchPhraseQuery struct {

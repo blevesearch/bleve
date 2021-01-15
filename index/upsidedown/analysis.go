@@ -33,6 +33,10 @@ type AnalysisResult struct {
 	Rows  []IndexRow
 }
 
+func (udc *UpsideDownCouch) Analyze(d index.Document) *AnalysisResult {
+	return udc.analyze(d)
+}
+
 func (udc *UpsideDownCouch) analyze(d index.Document) *AnalysisResult {
 	rv := &AnalysisResult{
 		DocID: d.ID(),
