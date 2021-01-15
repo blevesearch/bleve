@@ -46,11 +46,7 @@ func NewIpRangeSearcher(indexReader index.IndexReader, ipNet *net.IPNet,
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if cerr := fieldDict.Close(); cerr != nil && err == nil {
-			err = cerr
-		}
-	}()
+	defer fieldDict.Close()
 
 	var terms []string
 	tfd, err := fieldDict.Next()
