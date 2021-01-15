@@ -30,8 +30,8 @@ func netLimits(n *net.IPNet) (lo net.IP, hi net.IP) {
 		ones += 8 * (net.IPv6len - net.IPv4len)
 	}
 	mask := net.CIDRMask(ones, 8*net.IPv6len)
-	lo = make([]byte, net.IPv6len)
-	hi = make([]byte, net.IPv6len)
+	lo = make(net.IP, net.IPv6len)
+	hi = make(net.IP, net.IPv6len)
 	for i := 0; i < net.IPv6len; i++ {
 		lo[i] = netNum[i] & mask[i]
 		hi[i] = lo[i] | ^mask[i]
