@@ -1,6 +1,7 @@
 package query
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -57,5 +58,13 @@ func (q *IPRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, opt
 
 func (q *IPRangeQuery) Validate() error {
 	_, _, err := net.ParseCIDR(q.CIDRVal)
-	return err
+	if err == nil {
+		return nil
+	}
+	// We also allow search for a specific IP.
+	ip := net.ParseIP(q.CIDRVal)
+	if ip != nil {
+		return nil // we have a valid ip
+	}
+	return fmt.Errorf("IPRangeQuery must be for an network or ip address, %q", q.CIDRVal)
 }
