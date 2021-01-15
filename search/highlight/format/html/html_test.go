@@ -26,8 +26,8 @@ func TestHTMLFragmentFormatter(t *testing.T) {
 		fragment *highlight.Fragment
 		tlm      search.TermLocationMap
 		output   string
-		start string
-		end string
+		start    string
+		end      string
 	}{
 		{
 			fragment: &highlight.Fragment{
@@ -45,8 +45,8 @@ func TestHTMLFragmentFormatter(t *testing.T) {
 				},
 			},
 			output: "the <b>quick</b> brown fox",
-			start: "<b>",
-			end: "</b>",
+			start:  "<b>",
+			end:    "</b>",
 		},
 		{
 			fragment: &highlight.Fragment{
@@ -64,8 +64,8 @@ func TestHTMLFragmentFormatter(t *testing.T) {
 				},
 			},
 			output: "the <em>quick</em> brown fox",
-			start: "<em>",
-			end: "</em>",
+			start:  "<em>",
+			end:    "</em>",
 		},
 		// test html escaping
 		{
@@ -84,8 +84,8 @@ func TestHTMLFragmentFormatter(t *testing.T) {
 				},
 			},
 			output: "&lt;the&gt; <em>quick</em> brown &amp; fox",
-			start: "<em>",
-			end: "</em>",
+			start:  "<em>",
+			end:    "</em>",
 		},
 		// test html escaping inside search term
 		{
@@ -104,8 +104,8 @@ func TestHTMLFragmentFormatter(t *testing.T) {
 				},
 			},
 			output: "&lt;the&gt; <em>qu&amp;ick</em> brown &amp; fox",
-			start: "<em>",
-			end: "</em>",
+			start:  "<em>",
+			end:    "</em>",
 		},
 	}
 

@@ -19,8 +19,8 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/geo"
-	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/v2/search"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 func TestGeoPointDistanceSearcher(t *testing.T) {
