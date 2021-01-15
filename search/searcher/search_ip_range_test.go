@@ -5,20 +5,22 @@ import (
 	"testing"
 )
 
-func Test_maskLen(t *testing.T) {
+func Test_netLimits(t *testing.T) {
 	tests := []struct {
-		arg  string
-		want int
+		arg string
+		lo  string
+		hi  string
 	}{
-		{"1.1.1.1/1", 0},
-		{"1.1.1.1/7", 0},
-		{"1.1.1.1/8", 1},
-		{"1.1.1.1/24", 3},
-		{"1.1.1.1/23", 2},
-		{"1.1.1.1/25", 3},
-		{"1.1.1.1/31", 3},
-		{"1.1.1.1/32", 4},
-		{"2001:db8::/32", 4},
+		{"128.0.0.0/1", "128.0.0.0", "255.255.255.255"},
+		{"128.0.0.0/7", "128.0.0.0", "129.255.255.255"},
+		{"1.1.1.1/8", "1.0.0.0", "1.255.255.255"},
+		{"1.2.3.0/24", "1.2.3.0", "1.2.3.255"},
+		{"1.2.2.0/23", "1.2.2.0", "1.2.3.255"},
+		{"1.2.3.128/25", "1.2.3.128", "1.2.3.255"},
+		{"1.2.3.0/25", "1.2.3.0", "1.2.3.127"},
+		{"1.2.3.4/31", "1.2.3.4", "1.2.3.5"},
+		{"1.2.3.4/32", "1.2.3.4", "1.2.3.4"},
+		{"2a00:23c8:7283:ff00:1fa8:0:0:0/80", "2a00:23c8:7283:ff00:1fa8::", "2a00:23c8:7283:ff00:1fa8:ffff:ffff:ffff"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.arg, func(t *testing.T) {
@@ -26,9 +28,11 @@ func Test_maskLen(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := maskLen(net); got != tt.want {
-				t.Errorf("maskLen() = %v, want %v", got, tt.want)
+			lo, hi := netLimits(net)
+			if lo.String() != tt.lo || hi.String() != tt.hi {
+				t.Errorf("netLimits(%q) = %s %s, want %s %s", tt.arg, lo, hi, tt.lo, tt.hi)
 			}
+
 		})
 	}
 }

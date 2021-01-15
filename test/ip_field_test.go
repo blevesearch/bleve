@@ -87,11 +87,11 @@ func Test_MultiIpvr4CidrQuery(t *testing.T) {
 	idx := createIdx(t)
 	defer idx.Close()
 
-	err := idx.Index("id1", doc{"192.168.1.21"})
+	err := idx.Index("id1", doc{"192.168.1.0"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = idx.Index("id2", doc{"192.168.1.22"})
+	err = idx.Index("id2", doc{"192.168.1.255"})
 	if err != nil {
 		t.Fatal(err)
 	}

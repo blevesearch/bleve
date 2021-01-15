@@ -21,28 +21,30 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-// maksLen returns the number of whole bytes in cidr.
-func maskLen(cidr *net.IPNet) int {
-	for i, v := range cidr.Mask {
-		if v != 0xff {
-			return i
-		}
+// netLimits returns the lo and hi bounds inside the network.
+func netLimits(n *net.IPNet) (lo net.IP, hi net.IP) {
+	ones, bits := n.Mask.Size()
+	netNum := n.IP
+	if bits == net.IPv4len*8 {
+		netNum = netNum.To16()
+		ones += 8 * (net.IPv6len - net.IPv4len)
 	}
-	return len(cidr.Mask)
+	mask := net.CIDRMask(ones, 8*net.IPv6len)
+	lo = make([]byte, net.IPv6len)
+	hi = make([]byte, net.IPv6len)
+	for i := 0; i < net.IPv6len; i++ {
+		lo[i] = netNum[i] & mask[i]
+		hi[i] = lo[i] | ^mask[i]
+	}
+	return lo, hi
 }
 
 func NewIpRangeSearcher(indexReader index.IndexReader, ipNet *net.IPNet,
 	field string, boost float64, options search.SearcherOptions) (
 	search.Searcher, error) {
-	// find the terms with this prefix
-	mLen := maskLen(ipNet)
-	ip := ipNet.IP
-	if len(ip) == net.IPv4len {
-		ip = ip.To16()
-		mLen += (net.IPv6len - net.IPv4len)
-	}
 
-	fieldDict, err := indexReader.FieldDictPrefix(field, ip[0:mLen])
+	lo, hi := netLimits(ipNet)
+	fieldDict, err := indexReader.FieldDictRange(field, lo, hi)
 	if err != nil {
 		return nil, err
 	}
@@ -51,14 +53,9 @@ func NewIpRangeSearcher(indexReader index.IndexReader, ipNet *net.IPNet,
 	var terms []string
 	tfd, err := fieldDict.Next()
 	for err == nil && tfd != nil {
-		ip := net.IP(tfd.Term)
-		// If the mask length is not an exact number of bytes, we could get some
-		// ips from outside the network here.
-		if ipNet.Contains(ip) {
-			terms = append(terms, tfd.Term)
-			if tooManyClauses(len(terms)) {
-				return nil, tooManyClausesErr(field, len(terms))
-			}
+		terms = append(terms, tfd.Term)
+		if tooManyClauses(len(terms)) {
+			return nil, tooManyClausesErr(field, len(terms))
 		}
 		tfd, err = fieldDict.Next()
 	}
