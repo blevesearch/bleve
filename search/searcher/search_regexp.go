@@ -36,7 +36,7 @@ type Regexp interface {
 // additionally optimizes for index readers that handle regexp's.
 func NewRegexpStringSearcher(indexReader index.IndexReader, pattern string,
 	field string, boost float64, options search.SearcherOptions) (
-	search.Searcher, error) {
+	rv search.Searcher, err error) {
 	ir, ok := indexReader.(index.IndexReaderRegexp)
 	if !ok {
 		r, err := regexp.Compile(pattern)

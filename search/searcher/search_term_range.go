@@ -21,7 +21,7 @@ import (
 
 func NewTermRangeSearcher(indexReader index.IndexReader,
 	min, max []byte, inclusiveMin, inclusiveMax *bool, field string,
-	boost float64, options search.SearcherOptions) (search.Searcher, error) {
+	boost float64, options search.SearcherOptions) (rv search.Searcher, err error) {
 
 	if inclusiveMin == nil {
 		defaultInclusiveMin := true

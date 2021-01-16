@@ -21,7 +21,7 @@ import (
 
 func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string,
 	field string, boost float64, options search.SearcherOptions) (
-	search.Searcher, error) {
+	rv search.Searcher, err error) {
 	// find the terms with this prefix
 	fieldDict, err := indexReader.FieldDictPrefix(field, []byte(prefix))
 	if err != nil {
