@@ -18,6 +18,7 @@ import (
 	"encoding"
 	"encoding/json"
 	"fmt"
+	"net"
 	"reflect"
 	"time"
 
@@ -521,7 +522,10 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				case "geopoint":
 					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
 				case "IP":
-					fieldMapping.processIP(property, pathString, path, indexes, context)
+					ip, ok := property.(net.IP)
+					if ok {
+						fieldMapping.processIP(ip, pathString, path, indexes, context)
+					}
 				}
 			}
 		}
