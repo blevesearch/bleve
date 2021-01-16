@@ -51,7 +51,11 @@ func NewRegexpStringSearcher(indexReader index.IndexReader, pattern string,
 	if err != nil {
 		return nil, err
 	}
-	defer fieldDict.Close()
+	defer func() {
+		if cerr := fieldDict.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	var candidateTerms []string
 
@@ -104,7 +108,11 @@ func findRegexpCandidateTerms(indexReader index.IndexReader,
 	} else {
 		fieldDict, err = indexReader.FieldDict(field)
 	}
-	defer fieldDict.Close()
+	defer func() {
+		if cerr := fieldDict.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	// enumerate the terms and check against regexp
 	tfd, err := fieldDict.Next()

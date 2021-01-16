@@ -27,7 +27,11 @@ func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string,
 	if err != nil {
 		return nil, err
 	}
-	defer fieldDict.Close()
+	defer func() {
+		if cerr := fieldDict.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	var terms []string
 	tfd, err := fieldDict.Next()
