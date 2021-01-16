@@ -1,6 +1,7 @@
 package test
 
 import (
+	"net"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2"
@@ -173,6 +174,37 @@ func Test_simpleIpv4MatchQuery(t *testing.T) {
 	}
 
 	reqStr := `192.168.1.21`
+	query := bleve.NewIPRangeQuery(reqStr)
+	query.FieldVal = "ip"
+
+	search := bleve.NewSearchRequest(query)
+	res, err := idx.Search(search)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if res.Total != 1 {
+		t.Fatalf("failed to find %q, res -> %s", reqStr, res)
+	}
+	if res.Hits[0].ID != "id1" {
+		t.Fatalf("expected %q got %q", "id1", res.Hits[0].Index)
+	}
+}
+
+func Test_ipv4LiteralData(t *testing.T) {
+	idx := createIdx(t)
+	defer idx.Close()
+
+	type stronglyTyped struct {
+		IP net.IP `json:"ip"`
+	}
+
+	err := idx.Index("id1", stronglyTyped{net.ParseIP("192.168.1.21")})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reqStr := `192.168.1.0/24`
 	query := bleve.NewIPRangeQuery(reqStr)
 	query.FieldVal = "ip"
 

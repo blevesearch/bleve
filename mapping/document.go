@@ -517,8 +517,11 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 	case reflect.Map, reflect.Slice:
 		if subDocMapping != nil {
 			for _, fieldMapping := range subDocMapping.Fields {
-				if fieldMapping.Type == "geopoint" {
+				switch fieldMapping.Type {
+				case "geopoint":
 					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
+				case "IP":
+					fieldMapping.processIP(property, pathString, path, indexes, context)
 				}
 			}
 		}

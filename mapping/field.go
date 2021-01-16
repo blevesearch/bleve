@@ -214,7 +214,6 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 		}
 	} else if fm.Type == "IP" {
 		ip := net.ParseIP(propertyValueString)
-		//isIPv4 := ip.DefaultMask() != nil // Only IPv4 addresses have default masks
 
 		if ip != nil {
 			options := fm.Options()
@@ -281,6 +280,21 @@ func (fm *FieldMapping) processGeoPoint(propertyMightBeGeoPoint interface{}, pat
 		if !fm.IncludeInAll {
 			context.excludedFromAll = append(context.excludedFromAll, fieldName)
 		}
+	}
+}
+
+func (fm *FieldMapping) processIP(propertyMightBeIP interface{}, pathString string, path []string, indexes []uint64, context *walkContext) {
+	ip, ok := propertyMightBeIP.(net.IP)
+	if !ok {
+		return
+	}
+	fieldName := getFieldName(pathString, path, fm)
+	options := fm.Options()
+	field := document.NewIpFieldWithIndexingOptions(fieldName, indexes, ip, options)
+	context.doc.AddField(field)
+
+	if !fm.IncludeInAll {
+		context.excludedFromAll = append(context.excludedFromAll, fieldName)
 	}
 }
 
