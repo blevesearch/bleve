@@ -217,6 +217,11 @@ func NewGeoDistanceQuery(lon, lat float64, distance string) *query.GeoDistanceQu
 	return query.NewGeoDistanceQuery(lon, lat, distance)
 }
 
+// NewIPRangeQuery creates a new Query for matching IP addresses.
+// If the argument is in CIDR format, then the query will match all
+// IP addresses in the network specified. If the argument is an IP address,
+// then the query will return documents which contain that IP.
+// Both ipv4 and ipv6 are supported.
 func NewIPRangeQuery(cidr string) *query.IPRangeQuery {
 	return query.NewIPRangeQuery(cidr)
 }
