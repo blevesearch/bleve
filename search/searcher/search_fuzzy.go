@@ -91,11 +91,7 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if cerr := fieldDict.Close(); cerr != nil && err == nil {
-			err = cerr
-		}
-	}()
+	defer fieldDict.Close()
 
 	// enumerate terms and check levenshtein distance
 	var reuse []int
