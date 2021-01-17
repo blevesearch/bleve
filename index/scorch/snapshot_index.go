@@ -426,6 +426,8 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 			rvd.AddField(document.NewTextField(name, arrayPos, value))
 		case 'n':
 			rvd.AddField(document.NewNumericFieldFromBytes(name, arrayPos, value))
+		case 'i':
+			rvd.AddField(document.NewIpFieldFromBytes(name, arrayPos, value))
 		case 'd':
 			rvd.AddField(document.NewDateTimeFieldFromBytes(name, arrayPos, value))
 		case 'b':

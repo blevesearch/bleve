@@ -63,3 +63,7 @@ func NewBooleanFieldMapping() *mapping.FieldMapping {
 func NewGeoPointFieldMapping() *mapping.FieldMapping {
 	return mapping.NewGeoPointFieldMapping()
 }
+
+func NewIPFieldMapping() *mapping.FieldMapping {
+	return mapping.NewIPFieldMapping()
+}
