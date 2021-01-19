@@ -221,3 +221,39 @@ func Test_ipv4LiteralData(t *testing.T) {
 		t.Fatalf("expected %q got %q", "id1", res.Hits[0].Index)
 	}
 }
+
+func Test_badIPFmt(t *testing.T) {
+	idx := createIdx(t)
+	defer idx.Close()
+
+
+	reqStr := `192.168.1.`
+	query := bleve.NewIPRangeQuery(reqStr)
+	query.FieldVal = "ip"
+
+	search := bleve.NewSearchRequest(query)
+	_, err := idx.Search(search)
+	if err == nil {
+		t.Errorf("%q is not a valid IP", reqStr)
+	}
+}
+
+func Test_badCIDRFmt(t *testing.T) {
+	idx := createIdx(t)
+	defer idx.Close()
+
+	reqStr := `/`
+	query := bleve.NewIPRangeQuery(reqStr)
+	query.FieldVal = "ip"
+
+	err := query.Validate()
+	if err == nil {
+		t.Errorf("%q is not a valid CIDR", reqStr)
+	}
+
+	search := bleve.NewSearchRequest(query)
+	_, err = idx.Search(search)
+	if err == nil {
+		t.Errorf("%q is not a valid CIDR", reqStr)
+	}
+}
