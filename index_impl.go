@@ -856,6 +856,38 @@ func (i *indexImpl) SetName(name string) {
 	indexStats.Register(i)
 }
 
+func (i *indexImpl) Backup(path string) (err error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	indexReader, err := i.i.Reader()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := indexReader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	indexReaderBackupable, ok := indexReader.(index.IndexReaderBackupable)
+	if !ok {
+		return fmt.Errorf("index implementation does not support backup")
+	}
+
+	// copy the metadata
+	err = i.meta.Save(path)
+	if err != nil {
+		return fmt.Errorf("error copying index metadata: %v", err)
+	}
+
+	return indexReaderBackupable.Backup(indexStorePath(path))
+}
+
 type indexImplFieldDict struct {
 	index       *indexImpl
 	indexReader index.IndexReader

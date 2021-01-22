@@ -249,6 +249,14 @@ type Index interface {
 	Advanced() (index.Index, error)
 }
 
+// IndexBackupable is an Index which supports an online backup operation.
+type IndexBackupable interface {
+
+	// Backup creates a fully functional backup copy of the index at the
+	// specified destination path.
+	Backup(string) error
+}
+
 // New index at the specified path, must not exist.
 // The provided mapping will be used for all
 // Index/Search operations.

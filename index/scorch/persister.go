@@ -429,7 +429,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 }
 
 func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
-	segPlugin SegmentPlugin) ([]string, map[uint64]string, error) {
+	segPlugin SegmentPlugin, backupHelper func(string, uint64) (string, error)) ([]string, map[uint64]string, error) {
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(boltSnapshotsBucket)
 	if err != nil {
 		return nil, nil, err
@@ -482,6 +482,12 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 		switch seg := segmentSnapshot.segment.(type) {
 		case segment.PersistedSegment:
 			segPath := seg.Path()
+			if backupHelper != nil {
+				segPath, err = backupHelper(segPath, segmentSnapshot.id)
+				if err != nil {
+					return nil, nil, fmt.Errorf("error backing up segment: %v", err)
+				}
+			}
 			filename := strings.TrimPrefix(segPath, path+string(os.PathSeparator))
 			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
 			if err != nil {
@@ -535,7 +541,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 		}
 	}()
 
-	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin)
+	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, nil)
 	if err != nil {
 		return err
 	}

@@ -18,6 +18,10 @@ import (
 	"container/heap"
 	"encoding/binary"
 	"fmt"
+	bolt "go.etcd.io/bbolt"
+	"io"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"sync"
@@ -742,6 +746,89 @@ func (i *IndexSnapshot) reClaimableDocsRatio() float64 {
 		return float64(totalCount-liveCount) / float64(totalCount)
 	}
 	return 0
+}
+
+func copyFile(src, dst string) (int64, error) {
+	sourceFileStat, err := os.Stat(src)
+	if err != nil {
+		return 0, err
+	}
+
+	if !sourceFileStat.Mode().IsRegular() {
+		return 0, fmt.Errorf("%s is not a regular file", src)
+	}
+
+	source, err := os.Open(src)
+	if err != nil {
+		return 0, err
+	}
+	defer source.Close()
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return 0, err
+	}
+	defer destination.Close()
+	nBytes, err := io.Copy(destination, source)
+	return nBytes, err
+}
+
+// Backup will back up this snapshot into the provided path
+// This method will create the path if it does not exist
+// (consistent with how scorch Open() method operates when
+// creating new indexes).
+func (i *IndexSnapshot) Backup(path string) (err error) {
+	backupHelper := func(src string, segmentSnapshotId uint64) (string, error) {
+		filename := zapFileName(segmentSnapshotId)
+		destPath := filepath.Join(path, filename)
+		_, err := copyFile(src, destPath)
+		if err != nil {
+			return "", err
+		}
+		return destPath, nil
+	}
+
+	err = os.MkdirAll(path, 0700)
+	if err != nil {
+		return err
+	}
+
+	// create the root bolt
+	backupBoltPath := filepath.Join(path, "root.bolt")
+	backupBolt, err := bolt.Open(backupBoltPath, 0600, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := backupBolt.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
+
+	// start a write transaction
+	tx, err := backupBolt.Begin(true)
+	if err != nil {
+		return err
+	}
+
+	_, _, err = prepareBoltSnapshot(i, tx, path, i.parent.segPlugin, backupHelper)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("error backing up index snapshot: %v", err)
+	}
+
+	// commit bolt data
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("error commit tx to backup root bolt: %v", err)
+	}
+
+	err = backupBolt.Sync()
+	if err != nil {
+		return fmt.Errorf("error syncing backup root bolt: %v", err)
+	}
+
+	return nil
 }
 
 // subtractStrings returns set a minus elements of set b.
