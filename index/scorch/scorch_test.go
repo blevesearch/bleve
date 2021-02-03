@@ -2557,10 +2557,14 @@ func TestOpenBoltTimeout(t *testing.T) {
 		t.Errorf("error opening index: %v", err)
 	}
 
-	// use timeout for second open of same
-	cfg["bolt_timeout"] = "100ms"
+	// new config
+	cfg2 := CreateConfig("TestIndexOpenReopen")
+	// copy path from original config
+	cfg2["path"] = cfg["path"]
+	// set timeout in this cfg
+	cfg2["bolt_timeout"] = "100ms"
 
-	idx2, err := NewScorch("storeName", cfg, analysisQueue)
+	idx2, err := NewScorch("storeName", cfg2, analysisQueue)
 	if err != nil {
 		log.Fatalln(err)
 	}
