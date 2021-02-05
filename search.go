@@ -603,9 +603,11 @@ func MemoryNeededForSearchResult(req *SearchRequest) uint64 {
 	// overhead from fields, highlighting
 	var d document.Document
 	if len(req.Fields) > 0 || req.Highlight != nil {
-		for i := 0; i < numDocMatches; i++ {
-			estimate += d.Size()
+		numDocsApplicable := req.Size
+		if numDocsApplicable > collector.PreAllocSizeSkipCap {
+			numDocsApplicable = collector.PreAllocSizeSkipCap
 		}
+		estimate += numDocsApplicable * d.Size()
 	}
 
 	return uint64(estimate)
