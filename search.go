@@ -600,11 +600,11 @@ func MemoryNeededForSearchResult(req *SearchRequest) uint64 {
 		estimate += len(req.Facets) * fr.Size()
 	}
 
-	// highlighting, store
+	// overhead from fields, highlighting
 	var d document.Document
 	if len(req.Fields) > 0 || req.Highlight != nil {
-		for i := 0; i < (req.Size + req.From); i++ {
-			estimate += (req.Size + req.From) * d.Size()
+		for i := 0; i < numDocMatches; i++ {
+			estimate += d.Size()
 		}
 	}
 
