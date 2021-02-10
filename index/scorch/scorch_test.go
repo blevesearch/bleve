@@ -2533,3 +2533,43 @@ func (f fieldTerms) Merge(other fieldTerms) {
 		f[field] = terms
 	}
 }
+
+func TestOpenBoltTimeout(t *testing.T) {
+	cfg := CreateConfig("TestIndexOpenReopen")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	idx, err := NewScorch("storeName", cfg, analysisQueue)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	err = idx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+
+	// new config
+	cfg2 := CreateConfig("TestIndexOpenReopen")
+	// copy path from original config
+	cfg2["path"] = cfg["path"]
+	// set timeout in this cfg
+	cfg2["bolt_timeout"] = "100ms"
+
+	idx2, err := NewScorch("storeName", cfg2, analysisQueue)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	err = idx2.Open()
+	if err == nil {
+		t.Error("expected timeout error opening index again")
+	}
+}
