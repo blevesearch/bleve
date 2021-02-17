@@ -29,7 +29,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/RoaringBitmap/roaring"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	bolt "go.etcd.io/bbolt"
@@ -358,7 +357,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	bool, error) {
 	// collect the in-memory zap segments (SegmentBase instances)
 	var sbs []segment.Segment
-	var sbsDrops []*roaring.Bitmap
+	var sbsDrops []segment.Bitmap
 	var sbsIndexes []int
 
 	for i, segmentSnapshot := range snapshot.segment {
@@ -506,13 +505,13 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			return nil, nil, fmt.Errorf("unknown segment type: %T", seg)
 		}
 		// store current deleted bits
-		var roaringBuf bytes.Buffer
+		var bitmapBuf bytes.Buffer
 		if segmentSnapshot.deleted != nil {
-			_, err = segmentSnapshot.deleted.WriteTo(&roaringBuf)
+			_, err = segmentSnapshot.deleted.WriteTo(&bitmapBuf)
 			if err != nil {
-				return nil, nil, fmt.Errorf("error persisting roaring bytes: %v", err)
+				return nil, nil, fmt.Errorf("error persisting bitmap bytes: %v", err)
 			}
-			err = snapshotSegmentBucket.Put(boltDeletedKey, roaringBuf.Bytes())
+			err = snapshotSegmentBucket.Put(boltDeletedKey, bitmapBuf.Bytes())
 			if err != nil {
 				return nil, nil, err
 			}
@@ -774,7 +773,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	}
 	deletedBytes := segmentBucket.Get(boltDeletedKey)
 	if deletedBytes != nil {
-		deletedBitmap := roaring.NewBitmap()
+		deletedBitmap := s.segPlugin.NewBitmap()
 		r := bytes.NewReader(deletedBytes)
 		_, err := deletedBitmap.ReadFrom(r)
 		if err != nil {

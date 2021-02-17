@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/RoaringBitmap/roaring"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
@@ -26,7 +25,7 @@ import (
 type segmentIntroduction struct {
 	id        uint64
 	data      segment.Segment
-	obsoletes map[uint64]*roaring.Bitmap
+	obsoletes map[uint64]segment.Bitmap
 	ids       []string
 	internal  map[string][]byte
 
@@ -143,7 +142,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		if root.segment[i].deleted == nil {
 			newss.deleted = delta
 		} else {
-			newss.deleted = roaring.Or(root.segment[i].deleted, delta)
+			newss.deleted = root.segment[i].deleted.OrNew(delta)
 		}
 		if newss.deleted.IsEmpty() {
 			newss.deleted = nil
@@ -321,7 +320,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	}
 
 	// iterate through current segments
-	newSegmentDeleted := roaring.NewBitmap()
+	newSegmentDeleted := s.segPlugin.NewBitmap()
 	var running, docsToPersistCount, memSegments, fileSegments uint64
 	for i := range root.segment {
 		segmentID := root.segment[i].id
@@ -332,7 +331,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 				deletedSince := root.segment[i].deleted
 				// if we already knew about some of them, remove
 				if segSnapAtMerge.deleted != nil {
-					deletedSince = roaring.AndNot(root.segment[i].deleted, segSnapAtMerge.deleted)
+					deletedSince = root.segment[i].deleted.AndNotNew(segSnapAtMerge.deleted)
 				}
 				deletedSinceItr := deletedSince.Iterator()
 				for deletedSinceItr.HasNext() {
@@ -373,7 +372,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	// merged segment wrt the current root segments, hence
 	// applying the obsolete segment contents to newly merged segment
 	for segID, ss := range nextMerge.old {
-		obsoleted := ss.DocNumbersLive()
+		obsoleted := ss.DocNumbersLive(s.segPlugin.NewBitmap())
 		if obsoleted != nil {
 			obsoletedIter := obsoleted.Iterator()
 			for obsoletedIter.HasNext() {

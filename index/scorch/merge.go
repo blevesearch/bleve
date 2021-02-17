@@ -23,7 +23,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/v2/index/scorch/mergeplan"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
@@ -285,7 +284,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 		oldMap := make(map[uint64]*SegmentSnapshot)
 		newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
 		segmentsToMerge := make([]segment.Segment, 0, len(task.Segments))
-		docsToDrop := make([]*roaring.Bitmap, 0, len(task.Segments))
+		docsToDrop := make([]segment.Bitmap, 0, len(task.Segments))
 
 		for _, planSegment := range task.Segments {
 			if segSnapshot, ok := planSegment.(*SegmentSnapshot); ok {
@@ -422,7 +421,7 @@ type segmentMerge struct {
 // persisted segment, and synchronously introduce that new segment
 // into the root
 func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
-	sbs []segment.Segment, sbsDrops []*roaring.Bitmap,
+	sbs []segment.Segment, sbsDrops []segment.Bitmap,
 	sbsIndexes []int) (*IndexSnapshot, uint64, error) {
 	atomic.AddUint64(&s.stats.TotMemMergeBeg, 1)
 

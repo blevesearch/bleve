@@ -16,9 +16,9 @@ package scorch
 
 import (
 	"bytes"
+	segment "github.com/blevesearch/scorch_segment_api/v2"
 	"reflect"
 
-	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -32,7 +32,7 @@ func init() {
 
 type IndexSnapshotDocIDReader struct {
 	snapshot      *IndexSnapshot
-	iterators     []roaring.IntIterable
+	iterators     []segment.IntIterable
 	segmentOffset int
 }
 

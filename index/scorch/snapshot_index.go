@@ -23,7 +23,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/v2/document"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
@@ -39,7 +38,7 @@ type asynchSegmentResult struct {
 	dictItr segment.DictionaryIterator
 
 	index int
-	docs  *roaring.Bitmap
+	docs  segment.Bitmap
 
 	postings segment.PostingsList
 
@@ -302,7 +301,7 @@ func (i *IndexSnapshot) DocIDReaderAll() (index.DocIDReader, error) {
 		go func(index int, segment *SegmentSnapshot) {
 			results <- &asynchSegmentResult{
 				index: index,
-				docs:  segment.DocNumbersLive(),
+				docs:  segment.DocNumbersLive(i.parent.segPlugin.NewBitmap()),
 			}
 		}(index, segment)
 	}
@@ -332,7 +331,7 @@ func (i *IndexSnapshot) DocIDReaderOnly(ids []string) (index.DocIDReader, error)
 func (i *IndexSnapshot) newDocIDReader(results chan *asynchSegmentResult) (index.DocIDReader, error) {
 	rv := &IndexSnapshotDocIDReader{
 		snapshot:  i,
-		iterators: make([]roaring.IntIterable, len(i.segment)),
+		iterators: make([]segment.IntIterable, len(i.segment)),
 	}
 	var err error
 	for count := 0; count < len(i.segment); count++ {
@@ -557,7 +556,7 @@ func (i *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader
 	if !tfr.recycle {
 		// Do not recycle an optimized unadorned term field reader (used for
 		// ConjunctionUnadorned or DisjunctionUnadorned), during when a fresh
-		// roaring.Bitmap is built by AND-ing or OR-ing individual bitmaps,
+		// segment.Bitmap is built by AND-ing or OR-ing individual bitmaps,
 		// and we'll need to release them for GC. (See MB-40916)
 		return
 	}

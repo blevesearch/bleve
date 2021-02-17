@@ -23,7 +23,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/v2/registry"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
@@ -413,7 +412,7 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 		id:                atomic.AddUint64(&s.nextSegmentID, 1),
 		data:              newSegment,
 		ids:               ids,
-		obsoletes:         make(map[uint64]*roaring.Bitmap),
+		obsoletes:         make(map[uint64]segment.Bitmap),
 		internal:          internalOps,
 		applied:           make(chan error),
 		persistedCallback: persistedCallback,
