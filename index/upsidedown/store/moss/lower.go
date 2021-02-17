@@ -553,3 +553,13 @@ func (w *mossStoreWrapper) Actual() *moss.Store {
 	w.m.Unlock()
 	return rv
 }
+
+func (w *mossStoreWrapper) histograms() string {
+	var rv string
+	w.m.Lock()
+	if w.s != nil {
+		rv = w.s.Histograms().String()
+	}
+	w.m.Unlock()
+	return rv
+}
