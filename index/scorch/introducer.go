@@ -46,6 +46,16 @@ type epochWatcher struct {
 }
 
 func (s *Scorch) introducerLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			s.fireAsyncError(&AsyncPanicError{
+				Source: "introducer",
+				Path:   s.path,
+			})
+			s.asyncTasks.Done()
+		}
+	}()
+
 	var epochWatchers []*epochWatcher
 OUTER:
 	for {

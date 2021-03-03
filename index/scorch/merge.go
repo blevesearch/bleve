@@ -29,6 +29,16 @@ import (
 )
 
 func (s *Scorch) mergerLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			s.fireAsyncError(&AsyncPanicError{
+				Source: "merger",
+				Path:   s.path,
+			})
+			s.asyncTasks.Done()
+		}
+	}()
+
 	var lastEpochMergePlanned uint64
 	var ctrlMsg *mergerCtrl
 	mergePlannerOptions, err := s.parseMergePlannerOptions()
