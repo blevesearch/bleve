@@ -17,15 +17,17 @@ package html
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/search/highlight"
+	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/highlight"
 )
 
-func TestHTMLFragmentFormatter1(t *testing.T) {
+func TestHTMLFragmentFormatter(t *testing.T) {
 	tests := []struct {
 		fragment *highlight.Fragment
 		tlm      search.TermLocationMap
 		output   string
+		start    string
+		end      string
 	}{
 		{
 			fragment: &highlight.Fragment{
@@ -43,25 +45,9 @@ func TestHTMLFragmentFormatter1(t *testing.T) {
 				},
 			},
 			output: "the <b>quick</b> brown fox",
+			start:  "<b>",
+			end:    "</b>",
 		},
-	}
-
-	emHTMLFormatter := NewFragmentFormatter("<b>", "</b>")
-	for _, test := range tests {
-		otl := highlight.OrderTermLocations(test.tlm)
-		result := emHTMLFormatter.Format(test.fragment, otl)
-		if result != test.output {
-			t.Errorf("expected `%s`, got `%s`", test.output, result)
-		}
-	}
-}
-
-func TestHTMLFragmentFormatter2(t *testing.T) {
-	tests := []struct {
-		fragment *highlight.Fragment
-		tlm      search.TermLocationMap
-		output   string
-	}{
 		{
 			fragment: &highlight.Fragment{
 				Orig:  []byte("the quick brown fox"),
@@ -78,11 +64,53 @@ func TestHTMLFragmentFormatter2(t *testing.T) {
 				},
 			},
 			output: "the <em>quick</em> brown fox",
+			start:  "<em>",
+			end:    "</em>",
+		},
+		// test html escaping
+		{
+			fragment: &highlight.Fragment{
+				Orig:  []byte("<the> quick brown & fox"),
+				Start: 0,
+				End:   23,
+			},
+			tlm: search.TermLocationMap{
+				"quick": []*search.Location{
+					{
+						Pos:   2,
+						Start: 6,
+						End:   11,
+					},
+				},
+			},
+			output: "&lt;the&gt; <em>quick</em> brown &amp; fox",
+			start:  "<em>",
+			end:    "</em>",
+		},
+		// test html escaping inside search term
+		{
+			fragment: &highlight.Fragment{
+				Orig:  []byte("<the> qu&ick brown & fox"),
+				Start: 0,
+				End:   24,
+			},
+			tlm: search.TermLocationMap{
+				"qu&ick": []*search.Location{
+					{
+						Pos:   2,
+						Start: 6,
+						End:   12,
+					},
+				},
+			},
+			output: "&lt;the&gt; <em>qu&amp;ick</em> brown &amp; fox",
+			start:  "<em>",
+			end:    "</em>",
 		},
 	}
 
-	emHTMLFormatter := NewFragmentFormatter("<em>", "</em>")
 	for _, test := range tests {
+		emHTMLFormatter := NewFragmentFormatter(test.start, test.end)
 		otl := highlight.OrderTermLocations(test.tlm)
 		result := emHTMLFormatter.Format(test.fragment, otl)
 		if result != test.output {

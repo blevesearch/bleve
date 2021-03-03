@@ -28,10 +28,11 @@ tEQUAL tTILDE
 %type <s>                tPHRASE
 %type <s>                tNUMBER
 %type <s>                posOrNegNumber
+%type <s>                fieldName
 %type <s>                tTILDE
 %type <s>                tBOOST
 %type <q>                searchBase
-%type <pf>                searchSuffix
+%type <pf>               searchSuffix
 %type <n>                searchPrefix
 
 %%
@@ -111,7 +112,7 @@ tSTRING tTILDE {
 	$$ = q
 }
 |
-tSTRING tCOLON tSTRING tTILDE {
+fieldName tCOLON tSTRING tTILDE {
 	field := $1
 	str := $3
 	fuzziness, err := strconv.ParseFloat($4, 64)
@@ -147,7 +148,7 @@ tPHRASE {
 	$$ = q
 }
 |
-tSTRING tCOLON tSTRING {
+fieldName tCOLON tSTRING {
 	field := $1
 	str := $3
 	logDebugGrammar("FIELD - %s STRING - %s", field, str)
@@ -163,7 +164,7 @@ tSTRING tCOLON tSTRING {
 	$$ = q
 }
 |
-tSTRING tCOLON posOrNegNumber {
+fieldName tCOLON posOrNegNumber {
 	field := $1
 	str := $3
 	logDebugGrammar("FIELD - %s STRING - %s", field, str)
@@ -181,7 +182,7 @@ tSTRING tCOLON posOrNegNumber {
 	$$ = q
 }
 |
-tSTRING tCOLON tPHRASE {
+fieldName tCOLON tPHRASE {
 	field := $1
 	phrase := $3
 	logDebugGrammar("FIELD - %s PHRASE - %s", field, phrase)
@@ -190,7 +191,7 @@ tSTRING tCOLON tPHRASE {
 	$$ = q
 }
 |
-tSTRING tCOLON tGREATER posOrNegNumber {
+fieldName tCOLON tGREATER posOrNegNumber {
 	field := $1
 	min, err := strconv.ParseFloat($4, 64)
 	if err != nil {
@@ -203,7 +204,7 @@ tSTRING tCOLON tGREATER posOrNegNumber {
 	$$ = q
 }
 |
-tSTRING tCOLON tGREATER tEQUAL posOrNegNumber {
+fieldName tCOLON tGREATER tEQUAL posOrNegNumber {
 	field := $1
 	min, err := strconv.ParseFloat($5, 64)
 	if err != nil {
@@ -216,7 +217,7 @@ tSTRING tCOLON tGREATER tEQUAL posOrNegNumber {
 	$$ = q
 }
 |
-tSTRING tCOLON tLESS posOrNegNumber {
+fieldName tCOLON tLESS posOrNegNumber {
 	field := $1
 	max, err := strconv.ParseFloat($4, 64)
 	if err != nil {
@@ -229,7 +230,7 @@ tSTRING tCOLON tLESS posOrNegNumber {
 	$$ = q
 }
 |
-tSTRING tCOLON tLESS tEQUAL posOrNegNumber {
+fieldName tCOLON tLESS tEQUAL posOrNegNumber {
 	field := $1
 	max, err := strconv.ParseFloat($5, 64)
 	if err != nil {
@@ -242,7 +243,7 @@ tSTRING tCOLON tLESS tEQUAL posOrNegNumber {
 	$$ = q
 }
 |
-tSTRING tCOLON tGREATER tPHRASE {
+fieldName tCOLON tGREATER tPHRASE {
 	field := $1
 	minInclusive := false
 	phrase := $4
@@ -257,7 +258,7 @@ tSTRING tCOLON tGREATER tPHRASE {
 	$$ = q
 }
 |
-tSTRING tCOLON tGREATER tEQUAL tPHRASE {
+fieldName tCOLON tGREATER tEQUAL tPHRASE {
 	field := $1
 	minInclusive := true
 	phrase := $5
@@ -272,7 +273,7 @@ tSTRING tCOLON tGREATER tEQUAL tPHRASE {
 	$$ = q
 }
 |
-tSTRING tCOLON tLESS tPHRASE {
+fieldName tCOLON tLESS tPHRASE {
 	field := $1
 	maxInclusive := false
 	phrase := $4
@@ -287,7 +288,7 @@ tSTRING tCOLON tLESS tPHRASE {
 	$$ = q
 }
 |
-tSTRING tCOLON tLESS tEQUAL tPHRASE {
+fieldName tCOLON tLESS tEQUAL tPHRASE {
 	field := $1
 	maxInclusive := true
 	phrase := $5
@@ -325,4 +326,13 @@ tNUMBER {
 |
 tMINUS tNUMBER {
 	$$ = "-" + $2
+};
+
+fieldName:
+tPHRASE {
+    $$ = $1
+}
+|
+tSTRING {
+    $$ = $1
 };

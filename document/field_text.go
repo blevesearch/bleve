@@ -18,8 +18,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/size"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var reflectStaticSizeTextField int
@@ -29,15 +30,17 @@ func init() {
 	reflectStaticSizeTextField = int(reflect.TypeOf(f).Size())
 }
 
-const DefaultTextIndexingOptions = IndexField | DocValues
+const DefaultTextIndexingOptions = index.IndexField | index.DocValues
 
 type TextField struct {
 	name              string
 	arrayPositions    []uint64
-	options           IndexingOptions
+	options           index.FieldIndexingOptions
 	analyzer          *analysis.Analyzer
 	value             []byte
 	numPlainTextBytes uint64
+	length            int
+	frequencies       index.TokenFrequencies
 }
 
 func (t *TextField) Size() int {
@@ -55,11 +58,23 @@ func (t *TextField) ArrayPositions() []uint64 {
 	return t.arrayPositions
 }
 
-func (t *TextField) Options() IndexingOptions {
+func (t *TextField) Options() index.FieldIndexingOptions {
 	return t.options
 }
 
-func (t *TextField) Analyze() (int, analysis.TokenFrequencies) {
+func (t *TextField) EncodedFieldType() byte {
+	return 't'
+}
+
+func (t *TextField) AnalyzedLength() int {
+	return t.length
+}
+
+func (t *TextField) AnalyzedTokenFrequencies() index.TokenFrequencies {
+	return t.frequencies
+}
+
+func (t *TextField) Analyze() {
 	var tokens analysis.TokenStream
 	if t.analyzer != nil {
 		bytesToAnalyze := t.Value()
@@ -81,9 +96,8 @@ func (t *TextField) Analyze() (int, analysis.TokenFrequencies) {
 			},
 		}
 	}
-	fieldLength := len(tokens) // number of tokens in this doc field
-	tokenFreqs := analysis.TokenFrequency(tokens, t.arrayPositions, t.options.IncludeTermVectors())
-	return fieldLength, tokenFreqs
+	t.length = len(tokens) // number of tokens in this doc field
+	t.frequencies = analysis.TokenFrequency(tokens, t.arrayPositions, t.options)
 }
 
 func (t *TextField) Analyzer() *analysis.Analyzer {
@@ -92,6 +106,10 @@ func (t *TextField) Analyzer() *analysis.Analyzer {
 
 func (t *TextField) Value() []byte {
 	return t.value
+}
+
+func (t *TextField) Text() string {
+	return string(t.value)
 }
 
 func (t *TextField) GoString() string {
@@ -106,7 +124,7 @@ func NewTextField(name string, arrayPositions []uint64, value []byte) *TextField
 	return NewTextFieldWithIndexingOptions(name, arrayPositions, value, DefaultTextIndexingOptions)
 }
 
-func NewTextFieldWithIndexingOptions(name string, arrayPositions []uint64, value []byte, options IndexingOptions) *TextField {
+func NewTextFieldWithIndexingOptions(name string, arrayPositions []uint64, value []byte, options index.FieldIndexingOptions) *TextField {
 	return &TextField{
 		name:              name,
 		arrayPositions:    arrayPositions,
@@ -127,7 +145,7 @@ func NewTextFieldWithAnalyzer(name string, arrayPositions []uint64, value []byte
 	}
 }
 
-func NewTextFieldCustom(name string, arrayPositions []uint64, value []byte, options IndexingOptions, analyzer *analysis.Analyzer) *TextField {
+func NewTextFieldCustom(name string, arrayPositions []uint64, value []byte, options index.FieldIndexingOptions, analyzer *analysis.Analyzer) *TextField {
 	return &TextField{
 		name:              name,
 		arrayPositions:    arrayPositions,

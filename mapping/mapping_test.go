@@ -17,14 +17,15 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
+	index "github.com/blevesearch/bleve_index_api"
 	"reflect"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/blevesearch/bleve/analysis/tokenizer/exception"
-	"github.com/blevesearch/bleve/analysis/tokenizer/regexp"
-	"github.com/blevesearch/bleve/document"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/exception"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/regexp"
+	"github.com/blevesearch/bleve/v2/document"
 )
 
 var mappingSource = []byte(`{
@@ -969,7 +970,7 @@ func TestMappingForGeo(t *testing.T) {
 		for _, f := range doc.Fields {
 			if f.Name() == "location" {
 				foundGeo = true
-				geoF, ok := f.(*document.GeoPointField)
+				geoF, ok := f.(index.GeoPointField)
 				if !ok {
 					t.Errorf("expected a geopoint field!")
 				}
@@ -1136,7 +1137,7 @@ func TestMappingPointerToTimeBug1152(t *testing.T) {
 	if len(doc.Fields) != 1 {
 		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
 	}
-	if _, ok := doc.Fields[0].(*document.DateTimeField); !ok {
+	if _, ok := doc.Fields[0].(index.DateTimeField); !ok {
 		t.Fatalf("expected field to be type *document.DateTimeField, got %T", doc.Fields[0])
 	}
 }
@@ -1149,5 +1150,111 @@ func TestDefaultAnalyzerInheritance(t *testing.T) {
 
 	if analyzer := docMapping.defaultAnalyzerName([]string{"field"}); analyzer != "xyz" {
 		t.Fatalf("Expected analyzer: xyz to be inherited by field, but got: '%v'", analyzer)
+	}
+}
+
+func TestWrongAnalyzerSearchableAs(t *testing.T) {
+	fieldMapping := NewTextFieldMapping()
+	fieldMapping.Name = "geo.accuracy"
+	fieldMapping.Analyzer = "xyz"
+
+	nestedMapping := NewDocumentMapping()
+	nestedMapping.AddFieldMappingsAt("accuracy", fieldMapping)
+
+	docMapping := NewDocumentMapping()
+	docMapping.AddSubDocumentMapping("geo", nestedMapping)
+
+	indexMapping := NewIndexMapping()
+	indexMapping.AddDocumentMapping("brewery", docMapping)
+
+	analyzerName := indexMapping.AnalyzerNameForPath("geo.geo.accuracy")
+	if analyzerName != "xyz" {
+		t.Errorf("expected analyzer name `xyz`, got `%s`", analyzerName)
+	}
+}
+
+func TestMappingArrayOfStringGeoPoints(t *testing.T) {
+	nameFieldMapping := NewTextFieldMapping()
+	nameFieldMapping.Name = "name"
+	nameFieldMapping.Analyzer = "standard"
+
+	locFieldMapping := NewGeoPointFieldMapping()
+
+	thingMapping := NewDocumentMapping()
+	thingMapping.AddFieldMappingsAt("points", locFieldMapping)
+
+	mapping := NewIndexMapping()
+	mapping.DefaultMapping = thingMapping
+
+	docs := []map[string]interface{}{
+		{
+			// string: "lat,lon"
+			"points": []string{
+				"1.0, 2.0",
+				"3.0, 4.0",
+				"5.0, 6.0",
+			},
+		},
+		{
+			// slice: {lon, lat}
+			"points": [][]float64{
+				{2.0, 1.0},
+				{4.0, 3.0},
+				{6.0, 5.0},
+			},
+		},
+		{
+			// struct: {"lon/lng": .., "lat": ..}
+			"points": []map[string]interface{}{
+				{"lon": 2.0, "lat": 1.0},
+				{"lng": 4.0, "lat": 3.0},
+				{"lng": 6.0, "lat": 5.0},
+			},
+		},
+	}
+
+	for _, docSrc := range docs {
+		doc := document.NewDocument("x")
+		err := mapping.MapDocument(doc, docSrc)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// points here in lon, lat order
+		expectPoints := map[string][]float64{
+			"first":  {2.0, 1.0},
+			"second": {4.0, 3.0},
+			"third":  {6.0, 5.0},
+		}
+
+		for _, f := range doc.Fields {
+			if f.Name() == "points" {
+				geoF, ok := f.(*document.GeoPointField)
+				if !ok {
+					t.Errorf("expected a geopoint field!")
+				}
+				lon, err := geoF.Lon()
+				if err != nil {
+					t.Errorf("error in fetching lon, err: %v", err)
+				}
+				lat, err := geoF.Lat()
+				if err != nil {
+					t.Errorf("error in fetching lat, err: %v", err)
+				}
+				// round obtained lon, lat to 2 decimal places
+				roundLon, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", lon), 64)
+				roundLat, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", lat), 64)
+
+				for key, point := range expectPoints {
+					if roundLon == point[0] && roundLat == point[1] {
+						delete(expectPoints, key)
+					}
+				}
+			}
+		}
+
+		if len(expectPoints) > 0 {
+			t.Errorf("some points not found: %v", expectPoints)
+		}
 	}
 }

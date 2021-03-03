@@ -18,13 +18,13 @@ import (
 	"math"
 	"regexp"
 
-	"github.com/blevesearch/bleve/analysis"
-	regexpTokenizer "github.com/blevesearch/bleve/analysis/tokenizer/regexp"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch"
-	"github.com/blevesearch/bleve/index/store/gtreap"
-	"github.com/blevesearch/bleve/index/upsidedown"
+	"github.com/blevesearch/bleve/v2/analysis"
+	regexpTokenizer "github.com/blevesearch/bleve/v2/analysis/tokenizer/regexp"
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/index/scorch"
+	"github.com/blevesearch/bleve/v2/index/upsidedown"
+	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var twoDocIndex index.Index
@@ -82,7 +82,7 @@ var testAnalyzer = &analysis.Analyzer{
 }
 
 // sets up some mock data used in many tests in this package
-var twoDocIndexDescIndexingOptions = document.DefaultTextIndexingOptions | document.IncludeTermVectors
+var twoDocIndexDescIndexingOptions = document.DefaultTextIndexingOptions | index.IncludeTermVectors
 
 var twoDocIndexDocs = []*document.Document{
 	// must have 4/4 beer

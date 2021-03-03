@@ -17,9 +17,9 @@ package upsidedown
 import (
 	"reflect"
 
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store"
+	"github.com/blevesearch/bleve/v2/document"
+	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/upsidedown_store_api"
 )
 
 var reflectStaticSizeIndexReader int
@@ -67,7 +67,7 @@ func (i *IndexReader) DocIDReaderOnly(ids []string) (index.DocIDReader, error) {
 	return newUpsideDownCouchDocIDReaderOnly(i, ids)
 }
 
-func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
+func (i *IndexReader) Document(id string) (doc index.Document, err error) {
 	// first hit the back index to confirm doc exists
 	var backIndexRow *BackIndexRow
 	backIndexRow, err = backIndexRowForDoc(i.kvreader, []byte(id))
@@ -77,7 +77,7 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 	if backIndexRow == nil {
 		return
 	}
-	doc = document.NewDocument(id)
+	rvd := document.NewDocument(id)
 	storedRow := NewStoredRow([]byte(id), 0, []uint64{}, 'x', nil)
 	storedRowScanPrefix := storedRow.ScanPrefixForDoc()
 	it := i.kvreader.PrefixIterator(storedRowScanPrefix)
@@ -93,24 +93,23 @@ func (i *IndexReader) Document(id string) (doc *document.Document, err error) {
 		var row *StoredRow
 		row, err = NewStoredRowKV(key, safeVal)
 		if err != nil {
-			doc = nil
-			return
+			return nil, err
 		}
 		if row != nil {
 			fieldName := i.index.fieldCache.FieldIndexed(row.field)
 			field := decodeFieldType(row.typ, fieldName, row.arrayPositions, row.value)
 			if field != nil {
-				doc.AddField(field)
+				rvd.AddField(field)
 			}
 		}
 
 		it.Next()
 		key, val, valid = it.Current()
 	}
-	return
+	return rvd, nil
 }
 
-func (i *IndexReader) DocumentVisitFieldTerms(id index.IndexInternalID, fields []string, visitor index.DocumentFieldTermVisitor) error {
+func (i *IndexReader) documentVisitFieldTerms(id index.IndexInternalID, fields []string, visitor index.DocValueVisitor) error {
 	fieldsMap := make(map[uint16]string, len(fields))
 	for _, f := range fields {
 		id, ok := i.index.fieldCache.FieldNamed(f, false)
@@ -221,6 +220,6 @@ type DocValueReader struct {
 }
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
-	visitor index.DocumentFieldTermVisitor) error {
-	return dvr.i.DocumentVisitFieldTerms(id, dvr.fields, visitor)
+	visitor index.DocValueVisitor) error {
+	return dvr.i.documentVisitFieldTerms(id, dvr.fields, visitor)
 }

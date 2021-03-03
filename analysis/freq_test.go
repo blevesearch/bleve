@@ -15,6 +15,7 @@
 package analysis
 
 import (
+	index "github.com/blevesearch/bleve_index_api"
 	"reflect"
 	"testing"
 )
@@ -34,10 +35,10 @@ func TestTokenFrequency(t *testing.T) {
 			End:      11,
 		},
 	}
-	expectedResult := TokenFrequencies{
-		"water": &TokenFreq{
+	expectedResult := index.TokenFrequencies{
+		"water": &index.TokenFreq{
 			Term: []byte("water"),
-			Locations: []*TokenLocation{
+			Locations: []*index.TokenLocation{
 				{
 					Position: 1,
 					Start:    0,
@@ -49,125 +50,11 @@ func TestTokenFrequency(t *testing.T) {
 					End:      11,
 				},
 			},
-			frequency: 2,
 		},
 	}
-	result := TokenFrequency(tokens, nil, true)
+	expectedResult["water"].SetFrequency(2)
+	result := TokenFrequency(tokens, nil, index.IncludeTermVectors)
 	if !reflect.DeepEqual(result, expectedResult) {
 		t.Errorf("expected %#v, got %#v", expectedResult, result)
-	}
-}
-
-func TestTokenFrequenciesMergeAll(t *testing.T) {
-	tf1 := TokenFrequencies{
-		"water": &TokenFreq{
-			Term: []byte("water"),
-			Locations: []*TokenLocation{
-				{
-					Position: 1,
-					Start:    0,
-					End:      5,
-				},
-				{
-					Position: 2,
-					Start:    6,
-					End:      11,
-				},
-			},
-		},
-	}
-	tf2 := TokenFrequencies{
-		"water": &TokenFreq{
-			Term: []byte("water"),
-			Locations: []*TokenLocation{
-				{
-					Position: 1,
-					Start:    0,
-					End:      5,
-				},
-				{
-					Position: 2,
-					Start:    6,
-					End:      11,
-				},
-			},
-		},
-	}
-	expectedResult := TokenFrequencies{
-		"water": &TokenFreq{
-			Term: []byte("water"),
-			Locations: []*TokenLocation{
-				{
-					Position: 1,
-					Start:    0,
-					End:      5,
-				},
-				{
-					Position: 2,
-					Start:    6,
-					End:      11,
-				},
-				{
-					Field:    "tf2",
-					Position: 1,
-					Start:    0,
-					End:      5,
-				},
-				{
-					Field:    "tf2",
-					Position: 2,
-					Start:    6,
-					End:      11,
-				},
-			},
-		},
-	}
-	tf1.MergeAll("tf2", tf2)
-	if !reflect.DeepEqual(tf1, expectedResult) {
-		t.Errorf("expected %#v, got %#v", expectedResult, tf1)
-	}
-}
-
-func TestTokenFrequenciesMergeAllLeftEmpty(t *testing.T) {
-	tf1 := TokenFrequencies{}
-	tf2 := TokenFrequencies{
-		"water": &TokenFreq{
-			Term: []byte("water"),
-			Locations: []*TokenLocation{
-				{
-					Position: 1,
-					Start:    0,
-					End:      5,
-				},
-				{
-					Position: 2,
-					Start:    6,
-					End:      11,
-				},
-			},
-		},
-	}
-	expectedResult := TokenFrequencies{
-		"water": &TokenFreq{
-			Term: []byte("water"),
-			Locations: []*TokenLocation{
-				{
-					Field:    "tf2",
-					Position: 1,
-					Start:    0,
-					End:      5,
-				},
-				{
-					Field:    "tf2",
-					Position: 2,
-					Start:    6,
-					End:      11,
-				},
-			},
-		},
-	}
-	tf1.MergeAll("tf2", tf2)
-	if !reflect.DeepEqual(tf1, expectedResult) {
-		t.Errorf("expected %#v, got %#v", expectedResult, tf1)
 	}
 }

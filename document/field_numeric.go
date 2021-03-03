@@ -18,9 +18,10 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/numeric"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/numeric"
+	"github.com/blevesearch/bleve/v2/size"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var reflectStaticSizeNumericField int
@@ -30,16 +31,18 @@ func init() {
 	reflectStaticSizeNumericField = int(reflect.TypeOf(f).Size())
 }
 
-const DefaultNumericIndexingOptions = StoreField | IndexField | DocValues
+const DefaultNumericIndexingOptions = index.StoreField | index.IndexField | index.DocValues
 
 const DefaultPrecisionStep uint = 4
 
 type NumericField struct {
 	name              string
 	arrayPositions    []uint64
-	options           IndexingOptions
+	options           index.FieldIndexingOptions
 	value             numeric.PrefixCoded
 	numPlainTextBytes uint64
+	length            int
+	frequencies       index.TokenFrequencies
 }
 
 func (n *NumericField) Size() int {
@@ -56,11 +59,23 @@ func (n *NumericField) ArrayPositions() []uint64 {
 	return n.arrayPositions
 }
 
-func (n *NumericField) Options() IndexingOptions {
+func (n *NumericField) Options() index.FieldIndexingOptions {
 	return n.options
 }
 
-func (n *NumericField) Analyze() (int, analysis.TokenFrequencies) {
+func (n *NumericField) EncodedFieldType() byte {
+	return 'n'
+}
+
+func (n *NumericField) AnalyzedLength() int {
+	return n.length
+}
+
+func (n *NumericField) AnalyzedTokenFrequencies() index.TokenFrequencies {
+	return n.frequencies
+}
+
+func (n *NumericField) Analyze() {
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
@@ -91,9 +106,8 @@ func (n *NumericField) Analyze() (int, analysis.TokenFrequencies) {
 		}
 	}
 
-	fieldLength := len(tokens)
-	tokenFreqs := analysis.TokenFrequency(tokens, n.arrayPositions, n.options.IncludeTermVectors())
-	return fieldLength, tokenFreqs
+	n.length = len(tokens)
+	n.frequencies = analysis.TokenFrequency(tokens, n.arrayPositions, n.options)
 }
 
 func (n *NumericField) Value() []byte {
@@ -130,7 +144,7 @@ func NewNumericField(name string, arrayPositions []uint64, number float64) *Nume
 	return NewNumericFieldWithIndexingOptions(name, arrayPositions, number, DefaultNumericIndexingOptions)
 }
 
-func NewNumericFieldWithIndexingOptions(name string, arrayPositions []uint64, number float64, options IndexingOptions) *NumericField {
+func NewNumericFieldWithIndexingOptions(name string, arrayPositions []uint64, number float64, options index.FieldIndexingOptions) *NumericField {
 	numberInt64 := numeric.Float64ToInt64(number)
 	prefixCoded := numeric.MustNewPrefixCodedInt64(numberInt64, 0)
 	return &NumericField{

@@ -30,8 +30,8 @@ import (
 	"time"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment"
+	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api/v2"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -429,12 +429,12 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 }
 
 func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
-	segPlugin segment.Plugin) ([]string, map[uint64]string, error) {
+	segPlugin SegmentPlugin) ([]string, map[uint64]string, error) {
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(boltSnapshotsBucket)
 	if err != nil {
 		return nil, nil, err
 	}
-	newSnapshotKey := segment.EncodeUvarintAscending(nil, snapshot.epoch)
+	newSnapshotKey := encodeUvarintAscending(nil, snapshot.epoch)
 	snapshotBucket, err := snapshotsBucket.CreateBucketIfNotExists(newSnapshotKey)
 	if err != nil {
 		return nil, nil, err
@@ -474,7 +474,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 
 	// first ensure that each segment in this snapshot has been persisted
 	for _, segmentSnapshot := range snapshot.segment {
-		snapshotSegmentKey := segment.EncodeUvarintAscending(nil, segmentSnapshot.id)
+		snapshotSegmentKey := encodeUvarintAscending(nil, segmentSnapshot.id)
 		snapshotSegmentBucket, err := snapshotBucket.CreateBucketIfNotExists(snapshotSegmentKey)
 		if err != nil {
 			return nil, nil, err
@@ -628,7 +628,7 @@ func (s *Scorch) loadFromBolt() error {
 		foundRoot := false
 		c := snapshots.Cursor()
 		for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
-			_, snapshotEpoch, err := segment.DecodeUvarintAscending(k)
+			_, snapshotEpoch, err := decodeUvarintAscending(k)
 			if err != nil {
 				log.Printf("unable to parse segment epoch %x, continuing", k)
 				continue
@@ -680,7 +680,7 @@ func (s *Scorch) LoadSnapshot(epoch uint64) (rv *IndexSnapshot, err error) {
 		if snapshots == nil {
 			return nil
 		}
-		snapshotKey := segment.EncodeUvarintAscending(nil, epoch)
+		snapshotKey := encodeUvarintAscending(nil, epoch)
 		snapshot := snapshots.Bucket(snapshotKey)
 		if snapshot == nil {
 			return fmt.Errorf("snapshot with epoch: %v - doesn't exist", epoch)
@@ -744,7 +744,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 				_ = rv.DecRef()
 				return nil, fmt.Errorf("failed to load segment: %v", err)
 			}
-			_, segmentSnapshot.id, err = segment.DecodeUvarintAscending(k)
+			_, segmentSnapshot.id, err = decodeUvarintAscending(k)
 			if err != nil {
 				_ = rv.DecRef()
 				return nil, fmt.Errorf("failed to decode segment id: %v", err)
@@ -865,7 +865,7 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 	}
 
 	for _, epochToRemove := range epochsToRemove {
-		k := segment.EncodeUvarintAscending(nil, epochToRemove)
+		k := encodeUvarintAscending(nil, epochToRemove)
 		err = snapshots.DeleteBucket(k)
 		if err == bolt.ErrBucketNotFound {
 			err = nil
@@ -941,7 +941,7 @@ func (s *Scorch) RootBoltSnapshotEpochs() ([]uint64, error) {
 		}
 		sc := snapshots.Cursor()
 		for sk, _ := sc.Last(); sk != nil; sk, _ = sc.Prev() {
-			_, snapshotEpoch, err := segment.DecodeUvarintAscending(sk)
+			_, snapshotEpoch, err := decodeUvarintAscending(sk)
 			if err != nil {
 				continue
 			}

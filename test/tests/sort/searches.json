@@ -102,14 +102,14 @@
 		}
 	},
   {
-    "comment": "sort by age, ascending",
+    "comment": "sort by age, ascending, _id,  ascending",
 		"search": {
 			"from": 0,
 			"size": 10,
 			"query": {
 				"match_all":{}
 			},
-      "sort": ["age"]
+      "sort": ["age", "_id"]
 		},
 		"result": {
 			"total_hits": 6,
@@ -136,14 +136,14 @@
 		}
 	},
   {
-    "comment": "sort by age, descending",
+    "comment": "sort by age, descending, _id,  ascending",
 		"search": {
 			"from": 0,
 			"size": 10,
 			"query": {
 				"match_all":{}
 			},
-      "sort": ["-age"]
+      "sort": ["-age", "_id"]
 		},
 		"result": {
 			"total_hits": 6,
@@ -170,14 +170,14 @@
 		}
 	},
   {
-    "comment": "sort by age, descending, missing first",
+    "comment": "sort by age, descending, missing first, id, ascending",
 		"search": {
 			"from": 0,
 			"size": 10,
 			"query": {
 				"match_all":{}
 			},
-      "sort": [{"by":"field","field":"age","missing":"first","desc":true}]
+      "sort": [{"by":"field","field":"age","missing":"first","desc":true},{"by":"id","desc":false}]
 		},
 		"result": {
 			"total_hits": 6,

@@ -19,9 +19,9 @@ import (
 	"math"
 	"sort"
 
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/numeric"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/v2/numeric"
+	"github.com/blevesearch/bleve/v2/search"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 func NewNumericRangeSearcher(indexReader index.IndexReader,
@@ -105,24 +105,6 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 
 func filterCandidateTerms(indexReader index.IndexReader,
 	terms [][]byte, field string) (rv [][]byte, err error) {
-
-	if ir, ok := indexReader.(index.IndexReaderOnly); ok {
-		fieldDict, err := ir.FieldDictOnly(field, terms, false)
-		if err != nil {
-			return nil, err
-		}
-		// enumerate the terms (no need to check them again)
-		tfd, err := fieldDict.Next()
-		for err == nil && tfd != nil {
-			rv = append(rv, []byte(tfd.Term))
-			tfd, err = fieldDict.Next()
-		}
-		if cerr := fieldDict.Close(); cerr != nil && err == nil {
-			err = cerr
-		}
-
-		return rv, err
-	}
 
 	fieldDict, err := indexReader.FieldDictRange(field, terms[0], terms[len(terms)-1])
 	if err != nil {

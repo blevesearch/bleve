@@ -20,14 +20,11 @@ import (
 	"log"
 	"time"
 
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/gtreap"
-	"github.com/blevesearch/bleve/index/upsidedown"
-	"github.com/blevesearch/bleve/registry"
-	"github.com/blevesearch/bleve/search/highlight/highlighter/html"
-
-	// force import of scorch so its accessible by default
-	_ "github.com/blevesearch/bleve/index/scorch"
+	"github.com/blevesearch/bleve/v2/index/scorch"
+	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
+	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/search/highlight/highlighter/html"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var bleveExpVar = expvar.NewMap("bleve")
@@ -43,7 +40,14 @@ type configuration struct {
 }
 
 func (c *configuration) SetAnalysisQueueSize(n int) {
+	if c.analysisQueue != nil {
+		c.analysisQueue.Close()
+	}
 	c.analysisQueue = index.NewAnalysisQueue(n)
+}
+
+func (c *configuration) Shutdown() {
+	c.SetAnalysisQueueSize(0)
 }
 
 func newConfiguration() *configuration {
@@ -72,7 +76,7 @@ func init() {
 	Config.DefaultMemKVStore = gtreap.Name
 
 	// default index
-	Config.DefaultIndexType = upsidedown.Name
+	Config.DefaultIndexType = scorch.Name
 
 	bootDuration := time.Since(bootStart)
 	bleveExpVar.Add("bootDuration", int64(bootDuration))

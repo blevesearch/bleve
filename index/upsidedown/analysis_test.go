@@ -17,11 +17,11 @@ package upsidedown
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/analysis/analyzer/standard"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/store/null"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/index/upsidedown/store/null"
+	"github.com/blevesearch/bleve/v2/registry"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 func TestAnalysisBug328(t *testing.T) {
@@ -38,14 +38,14 @@ func TestAnalysisBug328(t *testing.T) {
 	}
 
 	d := document.NewDocument("1")
-	f := document.NewTextFieldCustom("title", nil, []byte("bleve"), document.IndexField|document.IncludeTermVectors, analyzer)
+	f := document.NewTextFieldCustom("title", nil, []byte("bleve"), index.IndexField|index.IncludeTermVectors, analyzer)
 	d.AddField(f)
-	f = document.NewTextFieldCustom("body", nil, []byte("bleve"), document.IndexField|document.IncludeTermVectors, analyzer)
+	f = document.NewTextFieldCustom("body", nil, []byte("bleve"), index.IndexField|index.IncludeTermVectors, analyzer)
 	d.AddField(f)
-	cf := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, []string{}, document.IndexField|document.IncludeTermVectors)
+	cf := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, []string{}, index.IndexField|index.IncludeTermVectors)
 	d.AddField(cf)
 
-	rv := idx.Analyze(d)
+	rv := idx.(*UpsideDownCouch).analyze(d)
 	fieldIndexes := make(map[uint16]string)
 	for _, row := range rv.Rows {
 		if row, ok := row.(*FieldRow); ok {
@@ -84,7 +84,7 @@ func BenchmarkAnalyze(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		rv := idx.Analyze(d)
+		rv := idx.(*UpsideDownCouch).analyze(d)
 		if len(rv.Rows) < 92 || len(rv.Rows) > 93 {
 			b.Fatalf("expected 512-13 rows, got %d", len(rv.Rows))
 		}

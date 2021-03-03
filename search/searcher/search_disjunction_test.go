@@ -17,8 +17,8 @@ package searcher
 import (
 	"testing"
 
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/search"
+	"github.com/blevesearch/bleve/v2/search"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 func TestDisjunctionSearch(t *testing.T) {

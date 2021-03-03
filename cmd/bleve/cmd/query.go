@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/blevesearch/bleve"
-	"github.com/blevesearch/bleve/search/query"
+	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/search/query"
 	"github.com/spf13/cobra"
 )
 
@@ -89,13 +89,13 @@ func buildQuery(args []string) query.Query {
 func init() {
 	RootCmd.AddCommand(queryCmd)
 
-	queryCmd.Flags().IntVarP(&repeat, "repeat", "r", 1, "Repeat the query this many times, default 1.")
-	queryCmd.Flags().IntVarP(&limit, "limit", "l", 10, "Limit number of results returned, default 10.")
-	queryCmd.Flags().IntVarP(&skip, "skip", "s", 0, "Skip the first N results, default 0.")
-	queryCmd.Flags().BoolVarP(&explain, "explain", "x", false, "Explain the result scoring, default false.")
-	queryCmd.Flags().BoolVar(&highlight, "highlight", true, "Highlight matching text in results, default true.")
-	queryCmd.Flags().BoolVar(&fields, "fields", false, "Load stored fields, default false.")
-	queryCmd.Flags().StringVarP(&qtype, "type", "t", "query_string", "Type of query to run, defaults to 'query_string'")
-	queryCmd.Flags().StringVarP(&qfield, "field", "f", "", "Restrict query to field, by default no restriction, not applicable to query_string queries.")
+	queryCmd.Flags().IntVarP(&repeat, "repeat", "r", 1, "Repeat the query this many times.")
+	queryCmd.Flags().IntVarP(&limit, "limit", "l", 10, "Limit number of results returned.")
+	queryCmd.Flags().IntVarP(&skip, "skip", "s", 0, "Skip the first N results.")
+	queryCmd.Flags().BoolVarP(&explain, "explain", "x", false, "Explain the result scoring.")
+	queryCmd.Flags().BoolVar(&highlight, "highlight", true, "Highlight matching text in results.")
+	queryCmd.Flags().BoolVar(&fields, "fields", false, "Load stored fields.")
+	queryCmd.Flags().StringVarP(&qtype, "type", "t", "query_string", "Type of query to run.")
+	queryCmd.Flags().StringVarP(&qfield, "field", "f", "", "Restrict query to field, not applicable to query_string queries.")
 	queryCmd.Flags().StringVarP(&sortby, "sort-by", "b", "", "Sort by field.")
 }

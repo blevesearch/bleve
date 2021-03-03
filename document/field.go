@@ -15,7 +15,7 @@
 package document
 
 import (
-	"github.com/blevesearch/bleve/analysis"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 type Field interface {
@@ -28,8 +28,8 @@ type Field interface {
 	// arrays, ArrayPositions returns 2 indices used to resolve "doc2" value in
 	// "doc1", then "field" in "doc2".
 	ArrayPositions() []uint64
-	Options() IndexingOptions
-	Analyze() (int, analysis.TokenFrequencies)
+	Options() index.FieldIndexingOptions
+	Analyze()
 	Value() []byte
 
 	// NumPlainTextBytes should return the number of plain text bytes
@@ -38,4 +38,8 @@ type Field interface {
 	NumPlainTextBytes() uint64
 
 	Size() int
+
+	EncodedFieldType() byte
+	AnalyzedLength() int
+	AnalyzedTokenFrequencies() index.TokenFrequencies
 }

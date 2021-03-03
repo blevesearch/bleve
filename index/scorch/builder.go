@@ -21,9 +21,8 @@ import (
 	"sync"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index"
-	"github.com/blevesearch/bleve/index/scorch/segment"
+	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api/v2"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -40,7 +39,7 @@ type Builder struct {
 	mergeMax  int
 	batch     *index.Batch
 	internal  map[string][]byte
-	segPlugin segment.Plugin
+	segPlugin SegmentPlugin
 }
 
 func NewBuilder(config map[string]interface{}) (*Builder, error) {
@@ -117,7 +116,7 @@ func (o *Builder) parseConfig(config map[string]interface{}) (err error) {
 
 // Index will place the document into the index.
 // It is invalid to index the same document multiple times.
-func (o *Builder) Index(doc *document.Document) error {
+func (o *Builder) Index(doc index.Document) error {
 	o.m.Lock()
 	defer o.m.Unlock()
 
@@ -135,14 +134,14 @@ func (o *Builder) maybeFlushBatchLOCKED(moreThan int) error {
 }
 
 func (o *Builder) executeBatchLOCKED(batch *index.Batch) (err error) {
-	analysisResults := make([]*index.AnalysisResult, 0, len(batch.IndexOps))
+	analysisResults := make([]index.Document, 0, len(batch.IndexOps))
 	for _, doc := range batch.IndexOps {
 		if doc != nil {
 			// insert _id field
-			doc.AddField(document.NewTextFieldCustom("_id", nil, []byte(doc.ID), document.IndexField|document.StoreField, nil))
+			doc.AddIDField()
 			// perform analysis directly
-			analysisResult := analyze(doc)
-			analysisResults = append(analysisResults, analysisResult)
+			analyze(doc)
+			analysisResults = append(analysisResults, doc)
 		}
 	}
 

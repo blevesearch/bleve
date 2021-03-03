@@ -20,9 +20,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/search/highlight/highlighter/ansi"
+	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/highlight/highlighter/ansi"
 )
 
 var indexMapping mapping.IndexMapping
@@ -449,6 +449,7 @@ func ExampleSearchRequest_SortByCustom() {
 			Field:   "Age",
 			Missing: search.SortFieldMissingFirst,
 		},
+		&search.SortDocID{},
 	})
 	searchResults, err := exampleIndex.Search(searchRequest)
 	if err != nil {

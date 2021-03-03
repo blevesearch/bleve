@@ -21,14 +21,14 @@ import (
 	"sort"
 	"time"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/datetime/optional"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/registry"
-	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/search/collector"
-	"github.com/blevesearch/bleve/search/query"
-	"github.com/blevesearch/bleve/size"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/collector"
+	"github.com/blevesearch/bleve/v2/search/query"
+	"github.com/blevesearch/bleve/v2/size"
 )
 
 var reflectStaticSizeSearchResult int
@@ -600,12 +600,14 @@ func MemoryNeededForSearchResult(req *SearchRequest) uint64 {
 		estimate += len(req.Facets) * fr.Size()
 	}
 
-	// highlighting, store
+	// overhead from fields, highlighting
 	var d document.Document
 	if len(req.Fields) > 0 || req.Highlight != nil {
-		for i := 0; i < (req.Size + req.From); i++ {
-			estimate += (req.Size + req.From) * d.Size()
+		numDocsApplicable := req.Size
+		if numDocsApplicable > collector.PreAllocSizeSkipCap {
+			numDocsApplicable = collector.PreAllocSizeSkipCap
 		}
+		estimate += numDocsApplicable * d.Size()
 	}
 
 	return uint64(estimate)

@@ -17,30 +17,31 @@ package bleve
 import (
 	"encoding/json"
 	"fmt"
+	index "github.com/blevesearch/bleve_index_api"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/analyzer/custom"
-	"github.com/blevesearch/bleve/analysis/analyzer/keyword"
-	"github.com/blevesearch/bleve/analysis/analyzer/standard"
-	regexp_char_filter "github.com/blevesearch/bleve/analysis/char/regexp"
-	"github.com/blevesearch/bleve/analysis/token/length"
-	"github.com/blevesearch/bleve/analysis/token/lowercase"
-	"github.com/blevesearch/bleve/analysis/token/shingle"
-	"github.com/blevesearch/bleve/analysis/tokenizer/single"
-	"github.com/blevesearch/bleve/analysis/tokenizer/whitespace"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/index/scorch"
-	"github.com/blevesearch/bleve/index/upsidedown"
-	"github.com/blevesearch/bleve/mapping"
-	"github.com/blevesearch/bleve/search"
-	"github.com/blevesearch/bleve/search/highlight/highlighter/ansi"
-	"github.com/blevesearch/bleve/search/highlight/highlighter/html"
-	"github.com/blevesearch/bleve/search/query"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/custom"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
+	regexp_char_filter "github.com/blevesearch/bleve/v2/analysis/char/regexp"
+	"github.com/blevesearch/bleve/v2/analysis/token/length"
+	"github.com/blevesearch/bleve/v2/analysis/token/lowercase"
+	"github.com/blevesearch/bleve/v2/analysis/token/shingle"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/single"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/whitespace"
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/index/scorch"
+	"github.com/blevesearch/bleve/v2/index/upsidedown"
+	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/highlight/highlighter/ansi"
+	"github.com/blevesearch/bleve/v2/search/highlight/highlighter/html"
+	"github.com/blevesearch/bleve/v2/search/query"
 )
 
 func TestSearchResultString(t *testing.T) {
@@ -478,7 +479,7 @@ func TestNestedBooleanSearchers(t *testing.T) {
 		doc := document.NewDocument(strconv.Itoa(i))
 		doc.Fields = []document.Field{
 			document.NewTextFieldCustom("hostname", []uint64{}, []byte(hostname),
-				document.IndexField,
+				index.IndexField,
 				&analysis.Analyzer{
 					Tokenizer: single.NewSingleTokenTokenizer(),
 					TokenFilters: []analysis.TokenFilter{
@@ -489,12 +490,12 @@ func TestNestedBooleanSearchers(t *testing.T) {
 		}
 		for k, v := range metadata {
 			doc.AddField(document.NewTextFieldWithIndexingOptions(
-				fmt.Sprintf("metadata.%s", k), []uint64{}, []byte(v), document.IndexField))
+				fmt.Sprintf("metadata.%s", k), []uint64{}, []byte(v), index.IndexField))
 		}
 		doc.CompositeFields = []*document.CompositeField{
 			document.NewCompositeFieldWithIndexingOptions(
 				"_all", true, []string{"text"}, []string{},
-				document.IndexField|document.IncludeTermVectors),
+				index.IndexField|index.IncludeTermVectors),
 		}
 
 		if err = batch.IndexAdvanced(doc); err != nil {
@@ -645,7 +646,7 @@ func TestNestedBooleanMustNotSearcherUpsidedown(t *testing.T) {
 		doc.CompositeFields = []*document.CompositeField{
 			document.NewCompositeFieldWithIndexingOptions(
 				"_all", true, []string{"text"}, []string{},
-				document.IndexField|document.IncludeTermVectors),
+				index.IndexField|index.IncludeTermVectors),
 		}
 
 		if err = batch.IndexAdvanced(doc); err != nil {
@@ -781,7 +782,7 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 	doc.CompositeFields = []*document.CompositeField{
 		document.NewCompositeFieldWithIndexingOptions(
 			"_all", true, []string{"text"}, []string{},
-			document.IndexField|document.IncludeTermVectors),
+			index.IndexField|index.IncludeTermVectors),
 	}
 
 	if err = batch.IndexAdvanced(doc); err != nil {
@@ -826,7 +827,7 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 		doc.CompositeFields = []*document.CompositeField{
 			document.NewCompositeFieldWithIndexingOptions(
 				"_all", true, []string{"text"}, []string{},
-				document.IndexField|document.IncludeTermVectors),
+				index.IndexField|index.IncludeTermVectors),
 		}
 
 		if err = batch.IndexAdvanced(doc); err != nil {
@@ -850,7 +851,7 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 	doc.CompositeFields = []*document.CompositeField{
 		document.NewCompositeFieldWithIndexingOptions(
 			"_all", true, []string{"text"}, []string{},
-			document.IndexField|document.IncludeTermVectors),
+			index.IndexField|index.IncludeTermVectors),
 	}
 
 	if err = batch.IndexAdvanced(doc); err != nil {
@@ -1054,7 +1055,7 @@ func TestDisjunctionQueryIncorrectMin(t *testing.T) {
 		doc.CompositeFields = []*document.CompositeField{
 			document.NewCompositeFieldWithIndexingOptions(
 				"_all", true, []string{"text"}, []string{},
-				document.IndexField|document.IncludeTermVectors),
+				index.IndexField|index.IncludeTermVectors),
 		}
 		if err = batch.IndexAdvanced(doc); err != nil {
 			t.Fatal(err)

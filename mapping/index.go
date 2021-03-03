@@ -17,12 +17,13 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
+	index "github.com/blevesearch/bleve_index_api"
 
-	"github.com/blevesearch/bleve/analysis"
-	"github.com/blevesearch/bleve/analysis/analyzer/standard"
-	"github.com/blevesearch/bleve/analysis/datetime/optional"
-	"github.com/blevesearch/bleve/document"
-	"github.com/blevesearch/bleve/registry"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/registry"
 )
 
 var MappingJSONStrict = false
@@ -50,7 +51,7 @@ type IndexMappingImpl struct {
 	DefaultField          string                      `json:"default_field"`
 	StoreDynamic          bool                        `json:"store_dynamic"`
 	IndexDynamic          bool                        `json:"index_dynamic"`
-	DocValuesDynamic      bool                        `json:"docvalues_dynamic,omitempty"`
+	DocValuesDynamic      bool                        `json:"docvalues_dynamic"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
 	cache                 *registry.Cache
 }
@@ -106,10 +107,10 @@ func (im *IndexMappingImpl) AddCustomTokenFilter(name string, config map[string]
 // use their metadata to fill configuration entries:
 //
 //   import (
-//       "github.com/blevesearch/bleve/analysis/analyzer/custom"
-//       "github.com/blevesearch/bleve/analysis/char/html"
-//       "github.com/blevesearch/bleve/analysis/token/lowercase"
-//       "github.com/blevesearch/bleve/analysis/tokenizer/unicode"
+//       "github.com/blevesearch/bleve/v2/analysis/analyzer/custom"
+//       "github.com/blevesearch/bleve/v2/analysis/char/html"
+//       "github.com/blevesearch/bleve/v2/analysis/token/lowercase"
+//       "github.com/blevesearch/bleve/v2/analysis/tokenizer/unicode"
 //   )
 //
 //   m := bleve.NewIndexMapping()
@@ -327,7 +328,7 @@ func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}
 		// see if the _all field was disabled
 		allMapping := docMapping.documentMappingForPath("_all")
 		if allMapping == nil || allMapping.Enabled {
-			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, document.IndexField|document.IncludeTermVectors)
+			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, index.IndexField|index.IncludeTermVectors)
 			doc.AddField(field)
 		}
 	}
