@@ -20,11 +20,13 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
 
 var batchSize int
+var named bool
 
 // bulkCmd represents the bulk command
 var bulkCmd = &cobra.Command{
@@ -62,6 +64,25 @@ var bulkCmd = &cobra.Command{
 					batch = idx.NewBatch()
 				}
 
+				docID := ""
+
+				if named {
+					n, _ := r.ReadBytes('\n')
+					if len(n) == 0 {
+						break
+					}
+
+					var err error
+					if parseJSON {
+						err = json.Unmarshal(n, &docID)
+						if err != nil {
+							return fmt.Errorf("error parsing JSON: %v", err)
+						}
+					} else {
+						docID = strings.TrimRight(string(n), "\r\n")
+					}
+				}
+
 				b, _ := r.ReadBytes('\n')
 				if len(b) == 0 {
 					break
@@ -77,7 +98,14 @@ var bulkCmd = &cobra.Command{
 					}
 				}
 
-				docID := randomString(5)
+				if docID == "" {
+					if named {
+						return fmt.Errorf("document name is empty")
+					}
+
+					docID = randomString(5)
+				}
+
 				err = batch.Index(docID, doc)
 				if err != nil {
 					return err
@@ -114,4 +142,5 @@ func init() {
 
 	bulkCmd.Flags().IntVarP(&batchSize, "batch", "b", 1000, "Batch size for loading.")
 	bulkCmd.Flags().BoolVarP(&parseJSON, "json", "j", true, "Parse the contents as JSON.")
+	bulkCmd.Flags().BoolVarP(&named, "named", "n", false, "Specify the document id on a separate line before each line with document contents, otherwise use a random generated 5-digit id.")
 }
