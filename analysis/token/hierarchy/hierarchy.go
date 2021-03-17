@@ -74,12 +74,12 @@ func HierarchyFilterConstructor(config map[string]interface{}, cache *registry.C
 	}
 
 	splitInput := true
-	splitInputVal, ok := config["output_original"].(bool)
+	splitInputVal, ok := config["split_input"].(bool)
 	if ok {
 		splitInput = splitInputVal
 	}
 
-	delimiter, ok := config["separator"].(string)
+	delimiter, ok := config["delimiter"].(string)
 	if !ok {
 		return nil, fmt.Errorf("must specify delimiter")
 	}
