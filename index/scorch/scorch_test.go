@@ -1299,7 +1299,10 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 	}
 
 	// now delete the document
-	err = idx.Delete("1")
+	if err := idx.Delete("1"); err != nil {
+		t.Fatal(err)
+	}
+
 	expectedCount--
 
 	// expected doc count shouldn't have changed
@@ -1541,6 +1544,9 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 			t.Errorf("expected to find document id 1")
 		}
 		tfd, err = termFieldReader.Next(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err != nil {
 		t.Error(err)

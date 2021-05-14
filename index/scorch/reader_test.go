@@ -289,10 +289,16 @@ func TestIndexDocIdReader(t *testing.T) {
 	}()
 
 	id, err := reader.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
 	count := uint64(0)
 	for id != nil {
 		count++
 		id, err = reader.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	if count != expectedCount {
 		t.Errorf("expected %d, got %d", expectedCount, count)
@@ -417,6 +423,9 @@ func TestIndexDocIdOnlyReader(t *testing.T) {
 	}()
 
 	id, err := reader.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
 	count := uint64(0)
 	for id != nil {
 		count++
@@ -477,10 +486,16 @@ func TestIndexDocIdOnlyReader(t *testing.T) {
 	}()
 
 	id, err = reader3.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
 	count = uint64(0)
 	for id != nil {
 		count++
 		id, err = reader3.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	if count != 1 {
 		t.Errorf("expected 1, got %d", count)
