@@ -265,12 +265,14 @@ func (dm *DocumentMatch) Complete(prealloc []Location) []Location {
 		}
 		prealloc = prealloc[:nlocs]
 
+		var firstField = true
 		var lastField string
 		var tlm TermLocationMap
 		var needsDedupe bool
 
 		for i, ftl := range dm.FieldTermLocations {
-			if lastField != ftl.Field {
+			if firstField || lastField != ftl.Field {
+				firstField = false
 				lastField = ftl.Field
 
 				if dm.Locations == nil {
