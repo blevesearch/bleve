@@ -18,7 +18,6 @@ github.com/blevesearch/snowballstem v0.9.0 h1:lMQ189YspGP6sXvZQ4WZ+MLawfV8wOmPoD
 github.com/blevesearch/snowballstem v0.9.0/go.mod h1:PivSj3JMc8WuaFkTSRDW2SlrulNWPl4ABg1tC/hlgLs=
 github.com/blevesearch/upsidedown_store_api v1.0.1 h1:1SYRwyoFLwG3sj0ed89RLtM15amfX2pXlYbFOnF8zNU=
 github.com/blevesearch/upsidedown_store_api v1.0.1/go.mod h1:MQDVGpHZrpe3Uy26zJBf/a8h0FZY6xJbthIMm8myH2Q=
-github.com/blevesearch/vellum v1.0.3 h1:U86G41A7CtXNzzpIJHM8lSTUqz1Mp8U870TkcdCzZc8=
 github.com/blevesearch/vellum v1.0.3/go.mod h1:2u5ax02KeDuNWu4/C+hVQMD6uLN4txH1JbtpaDNLJRo=
 github.com/blevesearch/vellum v1.0.4 h1:o6t7NxTnThp1es52uQvOJJx+9yK/nKXlWC5xl4LCz1U=
 github.com/blevesearch/vellum v1.0.4/go.mod h1:cMhywHI0de50f7Nj42YgvyD6bFJ2WkNRvNBlNMrEVgY=
