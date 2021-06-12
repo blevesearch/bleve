@@ -19,8 +19,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/rand"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/numeric"
@@ -57,6 +59,10 @@ func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 	case "score":
 		return &SortScore{
 			Desc: descending,
+		}, nil
+	case "random":
+		return &SortRandom{
+			Rand: rand.New(rand.NewSource(time.Now().UnixNano())),
 		}, nil
 	case "geo_distance":
 		field, ok := input["field"].(string)
@@ -152,6 +158,10 @@ func ParseSearchSortString(input string) SearchSort {
 	} else if input == "_score" {
 		return &SortScore{
 			Desc: descending,
+		}
+	} else if input == "_random" {
+		return &SortRandom{
+			Rand: rand.New(rand.NewSource(time.Now().UnixNano())),
 		}
 	}
 	return &SortField{
@@ -602,6 +612,52 @@ func (s *SortScore) Copy() SearchSort {
 
 func (s *SortScore) Reverse() {
 	s.Desc = !s.Desc
+}
+
+// SortRandom will sort results randomly
+//  Rand is the source of the rand numbers.
+type SortRandom struct {
+	Rand *rand.Rand
+}
+
+// UpdateVisitor does nothing for random sort
+func (s *SortRandom) UpdateVisitor(field string, term []byte) {
+}
+
+const alphaNumTable = "abcdefghijklmnopqrstuvwxyz01234567890"
+
+// Value returns the sort value of the DocumentMatch
+// for random sort it resets the state for processing
+// the each next document
+func (s *SortRandom) Value(i *DocumentMatch) string {
+	return string(alphaNumTable[s.Rand.Intn(len(alphaNumTable))])
+}
+
+// Descending determines the order of the sort
+// for random sort it is always false
+func (s *SortRandom) Descending() bool {
+	return false
+}
+
+// RequiresDocID says random sort does not require the DocID be loaded
+func (s *SortRandom) RequiresDocID() bool { return false }
+
+// RequiresScoring says random sort does not require scoring
+func (s *SortRandom) RequiresScoring() bool { return false }
+
+// RequiresFields says random sort does not require any store fields
+func (s *SortRandom) RequiresFields() []string { return nil }
+
+func (s *SortRandom) MarshalJSON() ([]byte, error) {
+	return json.Marshal("_random")
+}
+
+func (s *SortRandom) Copy() SearchSort {
+	rv := *s
+	return &rv
+}
+
+func (s *SortRandom) Reverse() {
 }
 
 var maxDistance = string(numeric.MustNewPrefixCodedInt64(math.MaxInt64, 0))
