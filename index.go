@@ -16,6 +16,8 @@ package bleve
 
 import (
 	"context"
+	"io"
+
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 
 	"github.com/blevesearch/bleve/v2/document"
@@ -305,4 +307,17 @@ type Builder interface {
 // using the specified mapping and options.
 func NewBuilder(path string, mapping mapping.IndexMapping, config map[string]interface{}) (Builder, error) {
 	return newBuilder(path, mapping, config)
+}
+
+// IndexCopyable is an index which supports an online copy operation
+// of the index. This is an experimental api and could potentially get
+// changed or deprecated in future.
+type IndexCopyable interface {
+	// CopyTo creates a fully functional copy of the index using the
+	// specified destination writer builder callback.
+	// The index implementation would trigger the given builder callback for
+	// each index file and it is the callback implementation's responsibilty
+	// to build and return the respective target writer for the file given
+	// in the callback.
+	CopyTo(func(string) io.WriteCloser) error
 }

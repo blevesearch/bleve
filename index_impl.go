@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -909,4 +910,36 @@ func (m *searchHitSorter) Swap(i, j int) { m.hits[i], m.hits[j] = m.hits[j], m.h
 func (m *searchHitSorter) Less(i, j int) bool {
 	c := m.sort.Compare(m.cachedScoring, m.cachedDesc, m.hits[i], m.hits[j])
 	return c < 0
+}
+
+func (i *indexImpl) CopyTo(getWriter func(string) io.WriteCloser) (err error) {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	indexReader, err := i.i.Reader()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := indexReader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	irc, ok := indexReader.(IndexCopyable)
+	if !ok {
+		return fmt.Errorf("index implementation does not support copy")
+	}
+
+	err = irc.CopyTo(getWriter)
+	if err != nil {
+		return fmt.Errorf("error copying index metadata: %v", err)
+	}
+
+	// copy the metadata
+	return i.meta.SaveToWriter(getWriter)
 }

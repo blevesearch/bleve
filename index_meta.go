@@ -16,6 +16,8 @@ package bleve
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -90,6 +92,22 @@ func (i *indexMeta) Save(path string) (err error) {
 		return err
 	}
 	return nil
+}
+
+func (i *indexMeta) SaveToWriter(getWriter func(string) io.WriteCloser) (err error) {
+	metaBytes, err := json.Marshal(i)
+	if err != nil {
+		return err
+	}
+
+	w := getWriter(metaFilename)
+	if w == nil {
+		return fmt.Errorf("invalid writer for file: %s", metaFilename)
+	}
+	defer w.Close()
+
+	_, err = w.Write(metaBytes)
+	return err
 }
 
 func indexMetaPath(path string) string {
