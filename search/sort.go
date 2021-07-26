@@ -27,7 +27,7 @@ import (
 	"github.com/blevesearch/bleve/v2/numeric"
 )
 
-var HighTerm = string(utf8.MaxRune)
+var HighTerm = strings.Repeat(string(utf8.MaxRune), 3)
 var LowTerm = string([]byte{0x00})
 
 type SearchSort interface {
