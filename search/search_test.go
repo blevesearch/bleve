@@ -15,6 +15,7 @@
 package search
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 )
@@ -72,5 +73,22 @@ func TestLocationsDedupe(t *testing.T) {
 		if !reflect.DeepEqual(res, test.expect) {
 			t.Errorf("testi: %d, test: %+v, res: %+v", testi, test, res)
 		}
+	}
+}
+
+func TestMarshallingHighTerm(t *testing.T) {
+	highTermBytes, err := json.Marshal(HighTerm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var unmarshalledHighTerm string
+	err = json.Unmarshal(highTermBytes, &unmarshalledHighTerm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if unmarshalledHighTerm != HighTerm {
+		t.Fatalf("unexpected %x != %x", unmarshalledHighTerm, HighTerm)
 	}
 }
