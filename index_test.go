@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"math"
@@ -2425,83 +2424,64 @@ func TestCopyIndex(t *testing.T) {
 	backupIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, backupIndexPath)
 
-	getWriter := func(filePath string) io.WriteCloser {
-		var path string
-		if strings.Contains(filePath, "store") ||
-			strings.Contains(filePath, "root.bolt") {
-			path = filepath.Join(backupIndexPath, "store",
-				filepath.Base(filePath))
-			_ = os.MkdirAll(filepath.Join(backupIndexPath, "store"), 0700)
-		} else {
-			path = filepath.Join(backupIndexPath,
-				filepath.Base(filePath))
-		}
-		f, err := os.OpenFile(path,
-			os.O_RDWR|os.O_CREATE, 0600)
-		if err != nil {
-			return nil
-		}
-		return f
-	}
-
-	err = copyableIndex.CopyTo(getWriter)
+	err = copyableIndex.CopyTo(FileSystemDirectory(backupIndexPath))
 	if err != nil {
-		t.Fatalf("error backing up index: %v", err)
+		t.Fatalf("error copying the index: %v", err)
 	}
 
 	// open the copied  index
-	idxBackup, err := Open(backupIndexPath)
+	idxCopied, err := Open(backupIndexPath)
 	if err != nil {
-		t.Fatalf("unable to open backup index")
+		t.Fatalf("unable to open copy index")
 	}
 	defer func() {
-		err := idxBackup.Close()
+		err := idxCopied.Close()
 		if err != nil {
-			t.Fatalf("error closing backup index: %v", err)
+			t.Fatalf("error closing copy index: %v", err)
 		}
 	}()
 
 	// assertions on copied index
-	backupCount, err := idxBackup.DocCount()
+	copyCount, err := idxCopied.DocCount()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if backupCount != 2 {
-		t.Errorf("expected doc count 2, got %d", backupCount)
+	if copyCount != 2 {
+		t.Errorf("expected doc count 2, got %d", copyCount)
 	}
 
-	backupDoc, err := idxBackup.Document("a")
+	copyDoc, err := idxCopied.Document("a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	backupFoundNameField := false
-	backupDoc.VisitFields(func(field index.Field) {
+	copyFoundNameField := false
+	copyDoc.VisitFields(func(field index.Field) {
 		if field.Name() == "name" && string(field.Value()) == "tester" {
-			backupFoundNameField = true
+			copyFoundNameField = true
 		}
 	})
-	if !backupFoundNameField {
-		t.Errorf("expected backup to find field named 'name' with value 'tester'")
+	if !copyFoundNameField {
+		t.Errorf("expected copy index to find field named 'name' with value 'tester'")
 	}
 
-	backupFields, err := idx.Fields()
+	copyFields, err := idx.Fields()
 	if err != nil {
 		t.Fatal(err)
 	}
-	backupExpectedFields := map[string]bool{
+	copyExpectedFields := map[string]bool{
 		"_all": false,
 		"name": false,
 		"desc": false,
 	}
-	if len(backupFields) < len(backupExpectedFields) {
-		t.Fatalf("expected %d fields got %d", len(backupExpectedFields), len(backupFields))
+	if len(copyFields) < len(copyExpectedFields) {
+		t.Fatalf("expected %d fields got %d", len(copyExpectedFields), len(copyFields))
 	}
-	for _, f := range backupFields {
-		backupExpectedFields[f] = true
+	for _, f := range copyFields {
+		copyExpectedFields[f] = true
 	}
-	for ef, efp := range backupExpectedFields {
+	for ef, efp := range copyExpectedFields {
 		if !efp {
-			t.Errorf("backup field %s is missing", ef)
+			t.Errorf("copy field %s is missing", ef)
 		}
 	}
 }
