@@ -18,8 +18,8 @@ import (
 	"container/heap"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"sync"
@@ -766,15 +766,15 @@ OUTER:
 	return rv
 }
 
-func (i *IndexSnapshot) CopyTo(getWriter func(string) io.WriteCloser) (err error) {
+func (i *IndexSnapshot) CopyTo(d index.Directory) error {
 	// get the root bolt file.
-	w := getWriter("root.bolt")
-	if w == nil {
-		fmt.Errorf("failed to create the root.bolt file")
+	w, err := d.GetWriter(filepath.Join("store", "root.bolt"))
+	if err != nil || w == nil {
+		return fmt.Errorf("failed to create the root.bolt file, err: %v", err)
 	}
 	rootFile, ok := w.(*os.File)
 	if !ok {
-		fmt.Errorf("failed to create the root.bolt file")
+		return fmt.Errorf("invalid root.bolt file found")
 	}
 
 	copyBolt, err := bolt.Open(rootFile.Name(), 0600, nil)
@@ -794,7 +794,7 @@ func (i *IndexSnapshot) CopyTo(getWriter func(string) io.WriteCloser) (err error
 		return err
 	}
 
-	_, _, err = prepareBoltSnapshot(i, tx, "", i.parent.segPlugin, getWriter)
+	_, _, err = prepareBoltSnapshot(i, tx, "", i.parent.segPlugin, d)
 	if err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("error backing up index snapshot: %v", err)

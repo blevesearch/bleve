@@ -428,20 +428,26 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	return true, nil
 }
 
-func copyFile(src string, dest io.WriteCloser) (int64, error) {
-	if dest == nil {
-		return 0, fmt.Errorf("invalid writer for file: %s", src)
+func copyToDirectory(srcPath string, d index.Directory) (int64, error) {
+	if d == nil {
+		return 0, nil
 	}
-	sourceFileStat, err := os.Stat(src)
+
+	dest, err := d.GetWriter(filepath.Join("store", filepath.Base(srcPath)))
+	if err != nil {
+		return 0, fmt.Errorf("GetWriter err: %v", err)
+	}
+
+	sourceFileStat, err := os.Stat(srcPath)
 	if err != nil {
 		return 0, err
 	}
 
 	if !sourceFileStat.Mode().IsRegular() {
-		return 0, fmt.Errorf("%s is not a regular file", src)
+		return 0, fmt.Errorf("%s is not a regular file", srcPath)
 	}
 
-	source, err := os.Open(src)
+	source, err := os.Open(srcPath)
 	if err != nil {
 		return 0, err
 	}
@@ -450,8 +456,30 @@ func copyFile(src string, dest io.WriteCloser) (int64, error) {
 	return io.Copy(dest, source)
 }
 
+func persistToDirectory(seg segment.UnpersistedSegment, d index.Directory,
+	path string) error {
+	if d == nil {
+		return seg.Persist(path)
+	}
+
+	sg, ok := seg.(io.WriterTo)
+	if !ok {
+		return fmt.Errorf("no io.WriterTo segment implementation found")
+	}
+
+	w, err := d.GetWriter(filepath.Join("store", filepath.Base(path)))
+	if err != nil {
+		return err
+	}
+
+	_, err = sg.WriteTo(w)
+	w.Close()
+
+	return err
+}
+
 func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
-	segPlugin SegmentPlugin, getWriter func(string) io.WriteCloser) (
+	segPlugin SegmentPlugin, d index.Directory) (
 	[]string, map[uint64]string, error) {
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(boltSnapshotsBucket)
 	if err != nil {
@@ -505,11 +533,9 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 		switch seg := segmentSnapshot.segment.(type) {
 		case segment.PersistedSegment:
 			segPath := seg.Path()
-			if getWriter != nil {
-				_, err := copyFile(segPath, getWriter(segPath))
-				if err != nil {
-					return nil, nil, fmt.Errorf("segment: %s copy err: %v", segPath, err)
-				}
+			_, err = copyToDirectory(segPath, d)
+			if err != nil {
+				return nil, nil, fmt.Errorf("segment: %s copy err: %v", segPath, err)
 			}
 			filename := filepath.Base(segPath)
 			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
@@ -519,17 +545,11 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			filenames = append(filenames, filename)
 		case segment.UnpersistedSegment:
 			// need to persist this to disk
-			var err error
 			filename := zapFileName(segmentSnapshot.id)
-			path := path + string(os.PathSeparator) + filename
-			if getWriter != nil {
-				err = seg.PersistToWriter(getWriter(path))
-			} else {
-				err = seg.Persist(path)
-			}
-
+			path := filepath.Join(path, filename)
+			err := persistToDirectory(seg, d, path)
 			if err != nil {
-				return nil, nil, fmt.Errorf("error persisting segment: %v", err)
+				return nil, nil, fmt.Errorf("segment: %s persist err: %v", path, err)
 			}
 			newSegmentPaths[segmentSnapshot.id] = path
 			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
