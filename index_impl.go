@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -912,7 +913,7 @@ func (m *searchHitSorter) Less(i, j int) bool {
 	return c < 0
 }
 
-func (i *indexImpl) CopyTo(getWriter func(string) io.WriteCloser) (err error) {
+func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
@@ -935,11 +936,25 @@ func (i *indexImpl) CopyTo(getWriter func(string) io.WriteCloser) (err error) {
 		return fmt.Errorf("index implementation does not support copy")
 	}
 
-	err = irc.CopyTo(getWriter)
+	err = irc.CopyTo(d)
 	if err != nil {
 		return fmt.Errorf("error copying index metadata: %v", err)
 	}
 
 	// copy the metadata
-	return i.meta.SaveToWriter(getWriter)
+	return i.meta.CopyTo(d)
+}
+
+func (f FileSystemDirectory) GetWriter(filePath string) (io.WriteCloser,
+	error) {
+	dir, file := filepath.Split(filePath)
+	if dir != "" {
+		err := os.MkdirAll(filepath.Join(string(f), dir), os.ModePerm)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return os.OpenFile(filepath.Join(string(f), dir, file),
+		os.O_RDWR|os.O_CREATE, 0600)
 }
