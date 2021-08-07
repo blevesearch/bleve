@@ -2261,3 +2261,227 @@ func TestIndexMappingDocValuesDynamic(t *testing.T) {
 		t.Fatalf("Expected DocValuesDynamic to remain false after the index mapping edit")
 	}
 }
+
+func TestCopyIndex(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doca := map[string]interface{}{
+		"name": "tester",
+		"desc": "gophercon india testing",
+	}
+	err = idx.Index("a", doca)
+	if err != nil {
+		t.Error(err)
+	}
+
+	docy := map[string]interface{}{
+		"name": "jasper",
+		"desc": "clojure",
+	}
+	err = idx.Index("y", docy)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = idx.Delete("y")
+	if err != nil {
+		t.Error(err)
+	}
+
+	docx := map[string]interface{}{
+		"name": "rose",
+		"desc": "xoogler",
+	}
+	err = idx.Index("x", docx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = idx.SetInternal([]byte("status"), []byte("pending"))
+	if err != nil {
+		t.Error(err)
+	}
+
+	docb := map[string]interface{}{
+		"name": "sree",
+		"desc": "cbft janitor",
+	}
+	batch := idx.NewBatch()
+	err = batch.Index("b", docb)
+	if err != nil {
+		t.Error(err)
+	}
+	batch.Delete("x")
+	batch.SetInternal([]byte("batchi"), []byte("batchv"))
+	batch.DeleteInternal([]byte("status"))
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Error(err)
+	}
+	val, err := idx.GetInternal([]byte("batchi"))
+	if err != nil {
+		t.Error(err)
+	}
+	if string(val) != "batchv" {
+		t.Errorf("expected 'batchv', got '%s'", val)
+	}
+	val, err = idx.GetInternal([]byte("status"))
+	if err != nil {
+		t.Error(err)
+	}
+	if val != nil {
+		t.Errorf("expected nil, got '%s'", val)
+	}
+
+	err = idx.SetInternal([]byte("seqno"), []byte("7"))
+	if err != nil {
+		t.Error(err)
+	}
+	err = idx.SetInternal([]byte("status"), []byte("ready"))
+	if err != nil {
+		t.Error(err)
+	}
+	err = idx.DeleteInternal([]byte("status"))
+	if err != nil {
+		t.Error(err)
+	}
+	val, err = idx.GetInternal([]byte("status"))
+	if err != nil {
+		t.Error(err)
+	}
+	if val != nil {
+		t.Errorf("expected nil, got '%s'", val)
+	}
+
+	val, err = idx.GetInternal([]byte("seqno"))
+	if err != nil {
+		t.Error(err)
+	}
+	if string(val) != "7" {
+		t.Errorf("expected '7', got '%s'", val)
+	}
+
+	count, err := idx.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Errorf("expected doc count 2, got %d", count)
+	}
+
+	doc, err := idx.Document("a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundNameField := false
+	doc.VisitFields(func(field index.Field) {
+		if field.Name() == "name" && string(field.Value()) == "tester" {
+			foundNameField = true
+		}
+	})
+	if !foundNameField {
+		t.Errorf("expected to find field named 'name' with value 'tester'")
+	}
+
+	fields, err := idx.Fields()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedFields := map[string]bool{
+		"_all": false,
+		"name": false,
+		"desc": false,
+	}
+	if len(fields) < len(expectedFields) {
+		t.Fatalf("expected %d fields got %d", len(expectedFields), len(fields))
+	}
+	for _, f := range fields {
+		expectedFields[f] = true
+	}
+	for ef, efp := range expectedFields {
+		if !efp {
+			t.Errorf("field %s is missing", ef)
+		}
+	}
+
+	// now create a copy of the index, and repeat assertions on it
+	copyableIndex, ok := idx.(IndexCopyable)
+	if !ok {
+		t.Fatal("index doesn't support copy")
+	}
+	backupIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, backupIndexPath)
+
+	err = copyableIndex.CopyTo(FileSystemDirectory(backupIndexPath))
+	if err != nil {
+		t.Fatalf("error copying the index: %v", err)
+	}
+
+	// open the copied  index
+	idxCopied, err := Open(backupIndexPath)
+	if err != nil {
+		t.Fatalf("unable to open copy index")
+	}
+	defer func() {
+		err := idxCopied.Close()
+		if err != nil {
+			t.Fatalf("error closing copy index: %v", err)
+		}
+	}()
+
+	// assertions on copied index
+	copyCount, err := idxCopied.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if copyCount != 2 {
+		t.Errorf("expected doc count 2, got %d", copyCount)
+	}
+
+	copyDoc, err := idxCopied.Document("a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	copyFoundNameField := false
+	copyDoc.VisitFields(func(field index.Field) {
+		if field.Name() == "name" && string(field.Value()) == "tester" {
+			copyFoundNameField = true
+		}
+	})
+	if !copyFoundNameField {
+		t.Errorf("expected copy index to find field named 'name' with value 'tester'")
+	}
+
+	copyFields, err := idx.Fields()
+	if err != nil {
+		t.Fatal(err)
+	}
+	copyExpectedFields := map[string]bool{
+		"_all": false,
+		"name": false,
+		"desc": false,
+	}
+	if len(copyFields) < len(copyExpectedFields) {
+		t.Fatalf("expected %d fields got %d", len(copyExpectedFields), len(copyFields))
+	}
+	for _, f := range copyFields {
+		copyExpectedFields[f] = true
+	}
+	for ef, efp := range copyExpectedFields {
+		if !efp {
+			t.Errorf("copy field %s is missing", ef)
+		}
+	}
+}
