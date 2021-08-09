@@ -209,32 +209,32 @@ func (s *Scorch) parseMergePlannerOptions() (*mergeplan.MergePlanOptions,
 }
 
 type closeChWrapper struct {
-	ch1     chan struct{}
-	ctx     context.Context
-	closeCh chan struct{}
+	ch1      chan struct{}
+	ctx      context.Context
+	closeCh  chan struct{}
+	cancelCh chan struct{}
 }
 
 func newCloseChWrapper(ch1 chan struct{},
 	ctx context.Context) *closeChWrapper {
-	return &closeChWrapper{ch1: ch1,
-		ctx:     ctx,
-		closeCh: make(chan struct{})}
+	return &closeChWrapper{
+		ch1:      ch1,
+		ctx:      ctx,
+		closeCh:  make(chan struct{}),
+		cancelCh: make(chan struct{}),
+	}
 }
 
 func (w *closeChWrapper) close() {
-	select {
-	case <-w.closeCh:
-	default:
-		close(w.closeCh)
-	}
+	close(w.closeCh)
 }
 
 func (w *closeChWrapper) listen() {
 	select {
 	case <-w.ch1:
-		w.close()
+		close(w.cancelCh)
 	case <-w.ctx.Done():
-		w.close()
+		close(w.cancelCh)
 	case <-w.closeCh:
 	}
 }
@@ -320,7 +320,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			newDocNums, _, err := s.segPlugin.Merge(segmentsToMerge, docsToDrop, path,
-				cw.closeCh, s)
+				cw.cancelCh, s)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
 
 			fileMergeZapTime := uint64(time.Since(fileMergeZapStartTime))
