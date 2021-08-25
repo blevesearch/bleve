@@ -82,8 +82,6 @@ type persisterOptions struct {
 type notificationChan chan struct{}
 
 func (s *Scorch) persisterLoop() {
-	defer s.asyncTasks.Done()
-
 	defer func() {
 		if r := recover(); r != nil {
 			s.fireAsyncError(&AsyncPanicError{
@@ -91,6 +89,8 @@ func (s *Scorch) persisterLoop() {
 				Path:   s.path,
 			})
 		}
+
+		s.asyncTasks.Done()
 	}()
 
 	var persistWatchers []*epochWatcher
@@ -102,7 +102,6 @@ func (s *Scorch) persisterLoop() {
 	po, err := s.parsePersisterOptions()
 	if err != nil {
 		s.fireAsyncError(fmt.Errorf("persisterOptions json parsing err: %v", err))
-		s.asyncTasks.Done()
 		return
 	}
 
