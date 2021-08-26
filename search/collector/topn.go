@@ -235,9 +235,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 
 	// compute search duration
 	hc.took = time.Since(startTime)
-	if err != nil {
-		return err
-	}
+
 	// finalize actual results
 	err = hc.finalizeResults(reader)
 	if err != nil {
