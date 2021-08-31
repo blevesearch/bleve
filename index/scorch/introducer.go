@@ -52,8 +52,9 @@ func (s *Scorch) introducerLoop() {
 				Source: "introducer",
 				Path:   s.path,
 			})
-			s.asyncTasks.Done()
 		}
+
+		s.asyncTasks.Done()
 	}()
 
 	var epochWatchers []*epochWatcher
@@ -98,8 +99,6 @@ OUTER:
 		}
 		epochWatchers = epochWatchersNext
 	}
-
-	s.asyncTasks.Done()
 }
 
 func (s *Scorch) introduceSegment(next *segmentIntroduction) error {

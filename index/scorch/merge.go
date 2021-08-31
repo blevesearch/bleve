@@ -35,8 +35,9 @@ func (s *Scorch) mergerLoop() {
 				Source: "merger",
 				Path:   s.path,
 			})
-			s.asyncTasks.Done()
 		}
+
+		s.asyncTasks.Done()
 	}()
 
 	var lastEpochMergePlanned uint64
@@ -44,7 +45,6 @@ func (s *Scorch) mergerLoop() {
 	mergePlannerOptions, err := s.parseMergePlannerOptions()
 	if err != nil {
 		s.fireAsyncError(fmt.Errorf("mergePlannerOption json parsing err: %v", err))
-		s.asyncTasks.Done()
 		return
 	}
 	ctrlMsgDflt := &mergerCtrl{ctx: context.Background(),
@@ -140,8 +140,6 @@ OUTER:
 
 		atomic.AddUint64(&s.stats.TotFileMergeLoopEnd, 1)
 	}
-
-	s.asyncTasks.Done()
 }
 
 type mergerCtrl struct {
