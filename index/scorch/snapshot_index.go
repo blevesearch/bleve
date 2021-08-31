@@ -494,6 +494,42 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 	return next.ID, nil
 }
 
+func (i *IndexSnapshot) NumericRangeReader(field string, min, max float64, inclusiveMin, inclusiveMax bool) (
+	index.TermFieldReader, error) {
+
+	rv := &IndexSnapshotNumericRangeReader{
+		field: field,
+		min: min,
+		max: max,
+		inclusiveMin: inclusiveMin,
+		inclusiveMax: inclusiveMax,
+		postings: make([]segment.PostingsList, len(i.segment)),
+		iterators: make([]segment.PostingsIterator, len(i.segment)),
+		snapshot: i,
+		// FIXME if we add recycling we have to rest all fields
+	}
+
+
+	for i, seg := range i.segment {
+
+		if sn, ok := seg.segment.(segment.SegmentNumeric); ok {
+			pl, err := sn.InRange(field, min, max, inclusiveMin, inclusiveMax, seg.deleted)
+			if err != nil {
+				return nil, err
+			}
+			rv.postings[i] = pl
+			rv.iterators[i] = pl.Iterator(false, false, false, rv.iterators[i])
+		} else {
+			// FIXME handle this case with empty postings list???
+			fmt.Println("oops not doing anything")
+		}
+	}
+
+	// add stat tracking here
+
+	return rv, nil
+}
+
 func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
 	rv := i.allocTermFieldReaderDicts(field)

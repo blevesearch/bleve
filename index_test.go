@@ -2485,3 +2485,103 @@ func TestCopyIndex(t *testing.T) {
 		}
 	}
 }
+
+func TestNumericRangeFieldNoMerge(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	m := NewIndexMapping()
+
+	idx, err := New(tmpIndexPath, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doca := map[string]interface{}{
+		"name": "tester",
+		"desc": "gophercon india testing",
+	}
+	doc := document.NewDocument("a")
+	m.MapDocument(doc, doca)
+
+	// add a numeric range field to the document
+	nrf := document.NewNumericRangeField("nrf", nil, 3.69)
+	doc.AddField(nrf)
+
+	batch := idx.NewBatch()
+	batch.IndexAdvanced(doc)
+
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatalf("error indexing batch: %v", err)
+	}
+
+	min := 1.0
+	max := 5.0
+	q := query.NewAltNumericRangeQuery(&min, &max)
+	q.SetField("nrf")
+	req := NewSearchRequest(q)
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(res)
+
+}
+
+func TestNumericRangeFieldMerge(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	m := NewIndexMapping()
+
+	idx, err := New(tmpIndexPath, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	for i := 1; i < 11; i++ {
+		doca := map[string]interface{}{
+			"name": "tester",
+			"desc": "gophercon india testing",
+		}
+		doc := document.NewDocument(fmt.Sprintf("doc-%d", i))
+		m.MapDocument(doc, doca)
+
+		// add a numeric range field to the document
+		nrf := document.NewNumericRangeField("nrf", nil, float64(i))
+		doc.AddField(nrf)
+
+		batch := idx.NewBatch()
+		batch.IndexAdvanced(doc)
+
+		err = idx.Batch(batch)
+		if err != nil {
+			t.Fatalf("error indexing batch: %v", err)
+		}
+	}
+
+	min := 0.0
+	max := 15.0
+	q := query.NewAltNumericRangeQuery(&min, &max)
+	q.SetField("nrf")
+	req := NewSearchRequest(q)
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(res)
+
+}

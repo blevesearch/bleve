@@ -21,10 +21,6 @@ import (
 
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 
-	zapv11 "github.com/blevesearch/zapx/v11"
-	zapv12 "github.com/blevesearch/zapx/v12"
-	zapv13 "github.com/blevesearch/zapx/v13"
-	zapv14 "github.com/blevesearch/zapx/v14"
 	zapv15 "github.com/blevesearch/zapx/v15"
 )
 
@@ -72,10 +68,6 @@ var defaultSegmentPlugin SegmentPlugin
 func init() {
 	ResetSegmentPlugins()
 	RegisterSegmentPlugin(&zapv15.ZapPlugin{}, true)
-	RegisterSegmentPlugin(&zapv14.ZapPlugin{}, false)
-	RegisterSegmentPlugin(&zapv13.ZapPlugin{}, false)
-	RegisterSegmentPlugin(&zapv12.ZapPlugin{}, false)
-	RegisterSegmentPlugin(&zapv11.ZapPlugin{}, false)
 }
 
 func ResetSegmentPlugins() {
