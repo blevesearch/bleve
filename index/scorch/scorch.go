@@ -75,6 +75,16 @@ type Scorch struct {
 	segPlugin SegmentPlugin
 }
 
+// AsyncPanicError is passed to scorch asyncErrorHandler when panic occurs in scorch background process
+type AsyncPanicError struct {
+	Source string
+	Path   string
+}
+
+func (e *AsyncPanicError) Error() string {
+	return fmt.Sprintf("%s panic when processing %s", e.Source, e.Path)
+}
+
 type internalStats struct {
 	persistEpoch          uint64
 	persistSnapshotSize   uint64
