@@ -17,9 +17,11 @@ package scorch
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -2571,5 +2573,94 @@ func TestOpenBoltTimeout(t *testing.T) {
 	err = idx2.Open()
 	if err == nil {
 		t.Error("expected timeout error opening index again")
+	}
+}
+
+func TestReadOnlyIndex(t *testing.T) {
+	// https://github.com/blevesearch/bleve/issues/1623
+	cfg := CreateConfig("TestReadOnlyIndex")
+	err := InitTest(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := DestroyTest(cfg)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+
+	analysisQueue := index.NewAnalysisQueue(1)
+	writeIdx, err := NewScorch(Name, cfg, analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = writeIdx.Open()
+	if err != nil {
+		t.Fatalf("error opening index: %v", err)
+	}
+	writeIdxClosed := false
+	defer func() {
+		if !writeIdxClosed {
+			err := writeIdx.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}()
+
+	// Add a single document to the index.
+	doc := document.NewDocument("1")
+	doc.AddField(document.NewTextField("name", []uint64{}, []byte("test")))
+	err = writeIdx.Update(doc)
+	if err != nil {
+		t.Errorf("Error updating index: %v", err)
+	}
+	writeIdx.Close()
+	writeIdxClosed = true
+
+	// After the index is written, change permissions on every file
+	// in the index to read-only.
+	var permissionsFunc func(folder string)
+	permissionsFunc = func(folder string) {
+		entries, _ := ioutil.ReadDir(folder)
+		for _, entry := range entries {
+			fullName := filepath.Join(folder, entry.Name())
+			if entry.IsDir() {
+				permissionsFunc(fullName)
+			} else {
+				os.Chmod(fullName, 0555)
+			}
+		}
+	}
+	permissionsFunc(cfg["path"].(string))
+
+	// Now reopen the index in read-only mode and attempt to read from it.
+	cfg["read_only"] = true
+	readIdx, err := NewScorch(Name, cfg, analysisQueue)
+	defer func() {
+		err := readIdx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = readIdx.Open()
+	if err != nil {
+		t.Errorf("error opening index: %v", err)
+	}
+	reader, err := readIdx.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	docCount, err := reader.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if docCount != 1 {
+		t.Errorf("Expected document count to be %d got %d", 1, docCount)
 	}
 }
