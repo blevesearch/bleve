@@ -92,6 +92,7 @@ import (
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/gl"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/hi"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/hu"
+	_ "github.com/blevesearch/bleve/v2/analysis/lang/hr"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/hy"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/id"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/in"
