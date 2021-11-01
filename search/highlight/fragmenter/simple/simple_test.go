@@ -285,6 +285,17 @@ func TestSimpleFragmenterWithSize(t *testing.T) {
 				},
 			},
 		},
+		{
+			orig: []byte("避免出现 rune 越界问题"),
+			fragments: []*highlight.Fragment{
+				{
+					Orig:  []byte("避免出现 rune 越界问题"),
+					Start: 0,
+					End:   13,
+				},
+			},
+			ot: nil,
+		},
 	}
 
 	fragmenter := NewFragmenter(5)
