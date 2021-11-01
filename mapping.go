@@ -45,6 +45,11 @@ func NewTextFieldMapping() *mapping.FieldMapping {
 	return mapping.NewTextFieldMapping()
 }
 
+// NewKeywordFieldMapping returns a default field mapping for text
+func NewKeywordFieldMapping() *mapping.FieldMapping {
+	return mapping.NewKeywordFieldMapping()
+}
+
 // NewNumericFieldMapping returns a default field mapping for numbers
 func NewNumericFieldMapping() *mapping.FieldMapping {
 	return mapping.NewNumericFieldMapping()
