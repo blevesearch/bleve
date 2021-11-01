@@ -90,25 +90,17 @@ func newTextFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	return rv
 }
 
-// NewKeyworFieldMapping returns a default field mapping for []byte.
+// NewKeyworFieldMapping returns a default field mapping for text with analyzer "keyword".
 func NewKeywordFieldMapping() *FieldMapping {
 	return &FieldMapping{
-		Type:               "keyword",
+		Type:               "text",
+		Analyzer:           keyword.Name,
 		Store:              true,
 		Index:              true,
 		IncludeTermVectors: true,
 		IncludeInAll:       true,
 		DocValues:          true,
 	}
-}
-
-func newKeywordFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
-	rv := NewTextFieldMapping()
-	rv.Analyzer = keyword.Name
-	rv.Store = im.StoreDynamic
-	rv.Index = im.IndexDynamic
-	rv.DocValues = im.DocValuesDynamic
-	return rv
 }
 
 // NewNumericFieldMapping returns a default field mapping for numbers

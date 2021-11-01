@@ -76,7 +76,7 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 			}
 		}
 		switch field.Type {
-		case "text", "keyword", "datetime", "number", "boolean", "geopoint":
+		case "text", "datetime", "number", "boolean", "geopoint":
 		default:
 			return fmt.Errorf("unknown field type: '%s'", field.Type)
 		}
@@ -528,7 +528,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			switch property := property.(type) {
 			case encoding.TextMarshaler:
 				// ONLY process TextMarshaler if there is an explicit mapping
-				// AND all of the fiels are of type text
+				// AND all of the fields are of type text
 				// OTHERWISE process field without TextMarshaler
 				if subDocMapping != nil {
 					allFieldsText := true
