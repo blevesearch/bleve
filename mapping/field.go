@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
 	index "github.com/blevesearch/bleve_index_api"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -87,6 +88,19 @@ func newTextFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv.Index = im.IndexDynamic
 	rv.DocValues = im.DocValuesDynamic
 	return rv
+}
+
+// NewKeyworFieldMapping returns a default field mapping for text with analyzer "keyword".
+func NewKeywordFieldMapping() *FieldMapping {
+	return &FieldMapping{
+		Type:               "text",
+		Analyzer:           keyword.Name,
+		Store:              true,
+		Index:              true,
+		IncludeTermVectors: true,
+		IncludeInAll:       true,
+		DocValues:          true,
+	}
 }
 
 // NewNumericFieldMapping returns a default field mapping for numbers

@@ -45,6 +45,12 @@ func NewTextFieldMapping() *mapping.FieldMapping {
 	return mapping.NewTextFieldMapping()
 }
 
+// NewKeywordFieldMapping returns a field mapping for text using the keyword
+// analyzer, which essentially doesn't apply any specific text analysis.
+func NewKeywordFieldMapping() *mapping.FieldMapping {
+	return mapping.NewKeywordFieldMapping()
+}
+
 // NewNumericFieldMapping returns a default field mapping for numbers
 func NewNumericFieldMapping() *mapping.FieldMapping {
 	return mapping.NewNumericFieldMapping()

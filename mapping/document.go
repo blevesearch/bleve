@@ -528,7 +528,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			switch property := property.(type) {
 			case encoding.TextMarshaler:
 				// ONLY process TextMarshaler if there is an explicit mapping
-				// AND all of the fiels are of type text
+				// AND all of the fields are of type text
 				// OTHERWISE process field without TextMarshaler
 				if subDocMapping != nil {
 					allFieldsText := true
