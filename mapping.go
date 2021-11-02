@@ -45,12 +45,8 @@ func NewTextFieldMapping() *mapping.FieldMapping {
 	return mapping.NewTextFieldMapping()
 }
 
-// NewKeywordFieldMapping returns a default field mapping for structured
-// content which are typically used for filtering, sorting, aggregations.
-// Keyword fields are only searchable by their exact value.
-// For example, IDs, email addresses, hostnames, tags, etc.
-// Avoid using keyword fields for full-text search (use the `text` field type
-// instead).
+// NewKeywordFieldMapping returns a field mapping for text using the keyword
+// analyzer, which essentially doesn't apply any specific text analysis.
 func NewKeywordFieldMapping() *mapping.FieldMapping {
 	return mapping.NewKeywordFieldMapping()
 }
