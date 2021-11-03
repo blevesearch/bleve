@@ -140,11 +140,11 @@ func Test_CidrQueryNonDivisibleBy8(t *testing.T) {
 	idx := createIdx(t)
 	defer idx.Close()
 
-	err := idx.Index("id1", doc{"192.168.1.01"})
+	err := idx.Index("id1", doc{"192.168.1.1"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = idx.Index("id2", doc{"192.168.1.02"})
+	err = idx.Index("id2", doc{"192.168.1.2"})
 	if err != nil {
 		t.Fatal(err)
 	}
