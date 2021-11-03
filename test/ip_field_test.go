@@ -98,7 +98,7 @@ func Test_ipv6CidrQuery(t *testing.T) {
 	}
 }
 
-func Test_MultiIpvr4CidrQuery(t *testing.T) {
+func Test_MultiIPvr4CidrQuery(t *testing.T) {
 	idx := createIdx(t)
 	defer idx.Close()
 
@@ -178,7 +178,7 @@ func Test_CidrQueryNonDivisibleBy8(t *testing.T) {
 	}
 }
 
-func Test_simpleIpv4MatchQuery(t *testing.T) {
+func Test_simpleIPv4MatchQuery(t *testing.T) {
 	idx := createIdx(t)
 	defer idx.Close()
 

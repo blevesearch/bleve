@@ -728,7 +728,7 @@ func decodeFieldType(typ byte, name string, pos []uint64, value []byte) document
 	case 'g':
 		return document.NewGeoPointFieldFromBytes(name, pos, value)
 	case 'i':
-		return document.NewIpFieldFromBytes(name, pos, value)
+		return document.NewIPFieldFromBytes(name, pos, value)
 	}
 	return nil
 }

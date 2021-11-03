@@ -280,7 +280,7 @@ func (fm *FieldMapping) processGeoPoint(propertyMightBeGeoPoint interface{}, pat
 func (fm *FieldMapping) processIP(ip net.IP, pathString string, path []string, indexes []uint64, context *walkContext) {
 	fieldName := getFieldName(pathString, path, fm)
 	options := fm.Options()
-	field := document.NewIpFieldWithIndexingOptions(fieldName, indexes, ip, options)
+	field := document.NewIPFieldWithIndexingOptions(fieldName, indexes, ip, options)
 	context.doc.AddField(field)
 
 	if !fm.IncludeInAll {

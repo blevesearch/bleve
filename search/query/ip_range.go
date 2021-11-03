@@ -67,7 +67,7 @@ func (q *IPRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, opt
 		// If we are searching for a specific ip rather than members of a network, just use a term search.
 		return searcher.NewTermSearcherBytes(i, ip.To16(), field, q.BoostVal.Value(), options)
 	}
-	return searcher.NewIpRangeSearcher(i, ipNet, field, q.BoostVal.Value(), options)
+	return searcher.NewIPRangeSearcher(i, ipNet, field, q.BoostVal.Value(), options)
 }
 
 func (q *IPRangeQuery) Validate() error {

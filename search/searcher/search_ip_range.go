@@ -39,7 +39,7 @@ func netLimits(n *net.IPNet) (lo net.IP, hi net.IP) {
 	return lo, hi
 }
 
-func NewIpRangeSearcher(indexReader index.IndexReader, ipNet *net.IPNet,
+func NewIPRangeSearcher(indexReader index.IndexReader, ipNet *net.IPNet,
 	field string, boost float64, options search.SearcherOptions) (
 	search.Searcher, error) {
 

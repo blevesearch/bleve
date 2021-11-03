@@ -24,16 +24,16 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-var reflectStaticSizeIpField int
+var reflectStaticSizeIPField int
 
 func init() {
-	var f IpField
-	reflectStaticSizeIpField = int(reflect.TypeOf(f).Size())
+	var f IPField
+	reflectStaticSizeIPField = int(reflect.TypeOf(f).Size())
 }
 
-const DefaultIpIndexingOptions = index.StoreField | index.IndexField | index.DocValues | index.IncludeTermVectors
+const DefaultIPIndexingOptions = index.StoreField | index.IndexField | index.DocValues | index.IncludeTermVectors
 
-type IpField struct {
+type IPField struct {
 	name              string
 	arrayPositions    []uint64
 	options           index.FieldIndexingOptions
@@ -43,38 +43,38 @@ type IpField struct {
 	frequencies       index.TokenFrequencies
 }
 
-func (b *IpField) Size() int {
-	return reflectStaticSizeIpField + size.SizeOfPtr +
+func (b *IPField) Size() int {
+	return reflectStaticSizeIPField + size.SizeOfPtr +
 		len(b.name) +
 		len(b.arrayPositions)*size.SizeOfUint64 +
 		len(b.value)
 }
 
-func (b *IpField) Name() string {
+func (b *IPField) Name() string {
 	return b.name
 }
 
-func (b *IpField) ArrayPositions() []uint64 {
+func (b *IPField) ArrayPositions() []uint64 {
 	return b.arrayPositions
 }
 
-func (b *IpField) Options() index.FieldIndexingOptions {
+func (b *IPField) Options() index.FieldIndexingOptions {
 	return b.options
 }
 
-func (n *IpField) EncodedFieldType() byte {
+func (n *IPField) EncodedFieldType() byte {
 	return 'i'
 }
 
-func (n *IpField) AnalyzedLength() int {
+func (n *IPField) AnalyzedLength() int {
 	return n.length
 }
 
-func (n *IpField) AnalyzedTokenFrequencies() index.TokenFrequencies {
+func (n *IPField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return n.frequencies
 }
 
-func (b *IpField) Analyze() {
+func (b *IPField) Analyze() {
 
 	tokens := analysis.TokenStream{
 		&analysis.Token{
@@ -82,31 +82,31 @@ func (b *IpField) Analyze() {
 			End:      len(b.value),
 			Term:     b.value,
 			Position: 1,
-			Type:     analysis.Ip,
+			Type:     analysis.IP,
 		},
 	}
 	b.length = 1
 	b.frequencies = analysis.TokenFrequency(tokens, b.arrayPositions, b.options)
 }
 
-func (b *IpField) Value() []byte {
+func (b *IPField) Value() []byte {
 	return b.value
 }
 
-func (b *IpField) Ip() (net.IP, error) {
+func (b *IPField) IP() (net.IP, error) {
 	return net.IP(b.value), nil
 }
 
-func (b *IpField) GoString() string {
-	return fmt.Sprintf("&document.IpField{Name:%s, Options: %s, Value: %s}", b.name, b.options, net.IP(b.value))
+func (b *IPField) GoString() string {
+	return fmt.Sprintf("&document.IPField{Name:%s, Options: %s, Value: %s}", b.name, b.options, net.IP(b.value))
 }
 
-func (b *IpField) NumPlainTextBytes() uint64 {
+func (b *IPField) NumPlainTextBytes() uint64 {
 	return b.numPlainTextBytes
 }
 
-func NewIpFieldFromBytes(name string, arrayPositions []uint64, value []byte) *IpField {
-	return &IpField{
+func NewIPFieldFromBytes(name string, arrayPositions []uint64, value []byte) *IPField {
+	return &IPField{
 		name:              name,
 		arrayPositions:    arrayPositions,
 		value:             value,
@@ -115,14 +115,14 @@ func NewIpFieldFromBytes(name string, arrayPositions []uint64, value []byte) *Ip
 	}
 }
 
-func NewIpField(name string, arrayPositions []uint64, v net.IP) *IpField {
-	return NewIpFieldWithIndexingOptions(name, arrayPositions, v, DefaultIpIndexingOptions)
+func NewIPField(name string, arrayPositions []uint64, v net.IP) *IPField {
+	return NewIPFieldWithIndexingOptions(name, arrayPositions, v, DefaultIPIndexingOptions)
 }
 
-func NewIpFieldWithIndexingOptions(name string, arrayPositions []uint64, b net.IP, options index.FieldIndexingOptions) *IpField {
+func NewIPFieldWithIndexingOptions(name string, arrayPositions []uint64, b net.IP, options index.FieldIndexingOptions) *IPField {
 	v := b.To16()
 
-	return &IpField{
+	return &IPField{
 		name:              name,
 		arrayPositions:    arrayPositions,
 		value:             v,
