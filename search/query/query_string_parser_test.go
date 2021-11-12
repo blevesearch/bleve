@@ -841,6 +841,35 @@ func TestQuerySyntaxParserValid(t *testing.T) {
 				},
 				nil),
 		},
+		// exact match number with boost
+		{
+			input:   `age:65^10`,
+			mapping: mapping.NewIndexMapping(),
+			result: NewBooleanQueryForQueryString(
+				nil,
+				[]Query{
+					func() Query {
+						q := NewDisjunctionQuery([]Query{
+							func() Query {
+								mq := NewMatchQuery("65")
+								mq.SetField("age")
+								return mq
+							}(),
+							func() Query {
+								val := float64(65)
+								inclusive := true
+								nq := NewNumericRangeInclusiveQuery(&val, &val, &inclusive, &inclusive)
+								nq.SetField("age")
+								return nq
+							}(),
+						})
+						q.SetBoost(10)
+						q.queryStringMode = true
+						return q
+					}(),
+				},
+				nil),
+		},
 	}
 
 	// turn on lexer debugging
