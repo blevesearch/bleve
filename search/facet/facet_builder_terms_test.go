@@ -60,7 +60,7 @@ func termsFacetN(b *testing.B, numTerms int) {
 		j := i % termsLen
 		term := terms[j]
 		tfb.StartDoc()
-		tfb.UpdateVisitor(field, []byte(term))
+		tfb.UpdateVisitor([]byte(term))
 		tfb.EndDoc()
 		i++
 	}
