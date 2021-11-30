@@ -21,66 +21,75 @@ import (
 
 func TestTermFacetResultsMerge(t *testing.T) {
 
+	fr1TypeTerms := &TermFacets{}
+	fr1TypeTerms.Add(
+		&TermFacet{
+			Term:  "blog",
+			Count: 25,
+		},
+		&TermFacet{
+			Term:  "comment",
+			Count: 24,
+		},
+		&TermFacet{
+			Term:  "feedback",
+			Count: 1,
+		},
+	)
 	fr1 := &FacetResult{
 		Field:   "type",
 		Total:   100,
 		Missing: 25,
 		Other:   25,
-		Terms: []*TermFacet{
-			{
-				Term:  "blog",
-				Count: 25,
-			},
-			{
-				Term:  "comment",
-				Count: 24,
-			},
-			{
-				Term:  "feedback",
-				Count: 1,
-			},
-		},
+		Terms:   fr1TypeTerms,
 	}
+
+	fr1CategoryTerms := &TermFacets{}
+	fr1CategoryTerms.Add(
+		&TermFacet{
+			Term:  "clothing",
+			Count: 35,
+		},
+		&TermFacet{
+			Term:  "electronics",
+			Count: 25,
+		},
+	)
+
 	fr1Only := &FacetResult{
 		Field:   "category",
 		Total:   97,
 		Missing: 22,
 		Other:   15,
-		Terms: []*TermFacet{
-			{
-				Term:  "clothing",
-				Count: 35,
-			},
-			{
-				Term:  "electronics",
-				Count: 25,
-			},
-		},
+		Terms:   fr1CategoryTerms,
 	}
 	frs1 := FacetResults{
 		"types":      fr1,
 		"categories": fr1Only,
 	}
 
+	fr2TypeTerms := &TermFacets{}
+	fr2TypeTerms.Add(
+		&TermFacet{
+			Term:  "blog",
+			Count: 25,
+		},
+		&TermFacet{
+			Term:  "comment",
+			Count: 22,
+		},
+		&TermFacet{
+			Term:  "flag",
+			Count: 3,
+		},
+	)
+
 	fr2 := &FacetResult{
 		Field:   "type",
 		Total:   100,
 		Missing: 25,
 		Other:   25,
-		Terms: []*TermFacet{
-			{
-				Term:  "blog",
-				Count: 25,
-			},
-			{
-				Term:  "comment",
-				Count: 22,
-			},
-			{
-				Term:  "flag",
-				Count: 3,
-			},
-		},
+		Terms:   fr2TypeTerms,
 	}
 	frs2 := FacetResults{
 		"types": fr2,
@@ -91,18 +100,20 @@ func TestTermFacetResultsMerge(t *testing.T) {
 		Total:   200,
 		Missing: 50,
 		Other:   51,
-		Terms: []*TermFacet{
-			{
-				Term:  "blog",
-				Count: 50,
-			},
-			{
-				Term:  "comment",
-				Count: 46,
-			},
-			{
-				Term:  "flag",
-				Count: 3,
+		Terms: &TermFacets{
+			termFacets: []*TermFacet{
+				{
+					Term:  "blog",
+					Count: 50,
+				},
+				{
+					Term:  "comment",
+					Count: 46,
+				},
+				{
+					Term:  "flag",
+					Count: 3,
+				},
 			},
 		},
 	}
@@ -113,6 +124,11 @@ func TestTermFacetResultsMerge(t *testing.T) {
 
 	frs1.Merge(frs2)
 	frs1.Fixup("types", 3)
+
+	for _, v := range frs1 {
+		v.Terms.termLookup = nil
+	}
+
 	if !reflect.DeepEqual(frs1, expectedFrs) {
 		t.Errorf("expected %v, got %v", expectedFrs, frs1)
 	}
