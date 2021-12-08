@@ -28,6 +28,7 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/custom"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
+	html_char_filter "github.com/blevesearch/bleve/v2/analysis/char/html"
 	regexp_char_filter "github.com/blevesearch/bleve/v2/analysis/char/regexp"
 	"github.com/blevesearch/bleve/v2/analysis/token/length"
 	"github.com/blevesearch/bleve/v2/analysis/token/lowercase"
@@ -1808,5 +1809,83 @@ func TestAnalyzerInheritance(t *testing.T) {
 				t.Errorf("Unexpected number of hits: %v", len(res.Hits))
 			}
 		})
+	}
+}
+
+func TestHightlightingWithHTMLCharacterFilter(t *testing.T) {
+	idxMapping := NewIndexMapping()
+	if err := idxMapping.AddCustomAnalyzer("custom-html", map[string]interface{}{
+		"type":         custom.Name,
+		"tokenizer":    "unicode",
+		"char_filters": []interface{}{html_char_filter.Name},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	fm := mapping.NewTextFieldMapping()
+	fm.Analyzer = "custom-html"
+
+	dmap := mapping.NewDocumentMapping()
+	dmap.AddFieldMappingsAt("content", fm)
+
+	idxMapping.DefaultMapping = dmap
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	content := "<div> Welcome to blevesearch. </div>"
+	if err = idx.Index("doc", map[string]string{
+		"content": content,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	searchStr := "blevesearch"
+	q := query.NewMatchQuery(searchStr)
+	q.SetField("content")
+	sr := NewSearchRequest(q)
+	sr.IncludeLocations = true
+	sr.Fields = []string{"*"}
+	sr.Highlight = NewHighlightWithStyle(html.Name)
+	searchResults, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(searchResults.Hits) != 1 ||
+		len(searchResults.Hits[0].Locations["content"][searchStr]) != 1 {
+		t.Fatalf("Expected 1 hit with 1 location")
+	}
+
+	expectedLocation := &search.Location{
+		Pos:   3,
+		Start: uint64(strings.Index(content, searchStr)),
+		End:   uint64(strings.Index(content, searchStr) + len(searchStr)),
+	}
+	expectedFragment := "&lt;div&gt; Welcome to <mark>blevesearch</mark>. &lt;/div&gt;"
+
+	gotLocation := searchResults.Hits[0].Locations["content"]["blevesearch"][0]
+	gotFragment := searchResults.Hits[0].Fragments["content"][0]
+
+	if !reflect.DeepEqual(expectedLocation, gotLocation) {
+		t.Fatalf("Mismatch in locations, got: %v, expected: %v",
+			gotLocation, expectedLocation)
+	}
+
+	if expectedFragment != gotFragment {
+		t.Fatalf("Mismatch in fragment, got: %v, expected: %v",
+			gotFragment, expectedFragment)
 	}
 }
