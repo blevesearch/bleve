@@ -15,10 +15,10 @@
 package html
 
 import (
+	"bytes"
 	"regexp"
 
 	"github.com/blevesearch/bleve/v2/analysis"
-	regexpCharFilter "github.com/blevesearch/bleve/v2/analysis/char/regexp"
 	"github.com/blevesearch/bleve/v2/registry"
 )
 
@@ -26,9 +26,27 @@ const Name = "html"
 
 var htmlCharFilterRegexp = regexp.MustCompile(`</?[!\w]+((\s+\w+(\s*=\s*(?:".*?"|'.*?'|[^'">\s]+))?)+\s*|\s*)/?>`)
 
+type CharFilter struct {
+	r           *regexp.Regexp
+	replacement []byte
+}
+
+func New() *CharFilter {
+	return &CharFilter{
+		r:           htmlCharFilterRegexp,
+		replacement: []byte(" "),
+	}
+}
+
+func (s *CharFilter) Filter(input []byte) []byte {
+	return s.r.ReplaceAllFunc(
+		input, func(in []byte) []byte {
+			return bytes.Repeat(s.replacement, len(in))
+		})
+}
+
 func CharFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.CharFilter, error) {
-	replaceBytes := []byte(" ")
-	return regexpCharFilter.New(htmlCharFilterRegexp, replaceBytes), nil
+	return New(), nil
 }
 
 func init() {
