@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"fmt"
+	"path/filepath"
 	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
@@ -164,6 +165,11 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			root.segment[i].segment.AddRef()
 			newSnapshot.offsets = append(newSnapshot.offsets, running)
 			running += newss.segment.Count()
+		} else {
+			if seg, ok := newss.segment.(segment.PersistedSegment); ok {
+				filename := filepath.Base(seg.Path())
+				s.unmarkIneligibleForRemoval(filename)
+			}
 		}
 
 		if isMemorySegment(root.segment[i]) {
@@ -374,8 +380,12 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			} else {
 				fileSegments++
 			}
+		} else if root.segment[i].LiveSize() == 0 {
+			if seg, ok := root.segment[i].segment.(segment.PersistedSegment); ok {
+				filename := filepath.Base(seg.Path())
+				s.unmarkIneligibleForRemoval(filename)
+			}
 		}
-
 	}
 
 	// before the newMerge introduction, need to clean the newly
@@ -418,6 +428,10 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	} else {
 		skipped = true
 		atomic.AddUint64(&s.stats.TotFileMergeIntroductionsObsoleted, 1)
+		if seg, ok := nextMerge.new.(segment.PersistedSegment); ok {
+			filename := filepath.Base(seg.Path())
+			s.unmarkIneligibleForRemoval(filename)
+		}
 	}
 
 	atomic.StoreUint64(&s.stats.TotItemsToPersist, docsToPersistCount)
