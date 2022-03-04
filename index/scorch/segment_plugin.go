@@ -16,9 +16,8 @@ package scorch
 
 import (
 	"fmt"
-	"github.com/RoaringBitmap/roaring"
-	index "github.com/blevesearch/bleve_index_api"
 
+	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 
 	zapv11 "github.com/blevesearch/zapx/v11"
@@ -61,9 +60,12 @@ type SegmentPlugin interface {
 	// document number in the newly merged segment.
 	// The number of bytes written to the new segment file.
 	// An error, if any occurred.
-	Merge(segments []segment.Segment, drops []*roaring.Bitmap, path string,
+	Merge(segments []segment.Segment, drops []segment.Bitmap, path string,
 		closeCh chan struct{}, s segment.StatsReporter) (
 		[][]uint64, uint64, error)
+
+	// NewBitmap returns a new empty Bitmap compatible with this implementation
+	NewBitmap() segment.Bitmap
 }
 
 var supportedSegmentPlugins map[string]map[uint32]SegmentPlugin

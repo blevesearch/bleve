@@ -19,7 +19,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
@@ -32,7 +31,7 @@ var TermSeparatorSplitSlice = []byte{TermSeparator}
 type SegmentSnapshot struct {
 	id      uint64
 	segment segment.Segment
-	deleted *roaring.Bitmap
+	deleted segment.Bitmap
 	creator string
 
 	cachedDocs *cachedDocs
@@ -42,7 +41,7 @@ func (s *SegmentSnapshot) Segment() segment.Segment {
 	return s.segment
 }
 
-func (s *SegmentSnapshot) Deleted() *roaring.Bitmap {
+func (s *SegmentSnapshot) Deleted() segment.Bitmap {
 	return s.deleted
 }
 
@@ -78,7 +77,7 @@ func (s *SegmentSnapshot) Count() uint64 {
 	return rv
 }
 
-func (s *SegmentSnapshot) DocNumbers(docIDs []string) (*roaring.Bitmap, error) {
+func (s *SegmentSnapshot) DocNumbers(docIDs []string) (segment.Bitmap, error) {
 	rv, err := s.segment.DocNumbers(docIDs)
 	if err != nil {
 		return nil, err
@@ -90,8 +89,7 @@ func (s *SegmentSnapshot) DocNumbers(docIDs []string) (*roaring.Bitmap, error) {
 }
 
 // DocNumbersLive returns a bitmap containing doc numbers for all live docs
-func (s *SegmentSnapshot) DocNumbersLive() *roaring.Bitmap {
-	rv := roaring.NewBitmap()
+func (s *SegmentSnapshot) DocNumbersLive(rv segment.Bitmap) segment.Bitmap {
 	rv.AddRange(0, s.segment.Count())
 	if s.deleted != nil {
 		rv.AndNot(s.deleted)

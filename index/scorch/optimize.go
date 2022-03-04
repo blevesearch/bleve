@@ -16,7 +16,6 @@ package scorch
 
 import (
 	"fmt"
-	"github.com/RoaringBitmap/roaring"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	"sync/atomic"
@@ -89,7 +88,7 @@ func (o *OptimizeTFRConjunction) Finish() (index.Optimized, error) {
 			continue
 		}
 
-		bm := roaring.And(itr0.ActualBitmap(), itr1.ActualBitmap())
+		bm := itr0.ActualBitmap().AndNew(itr1.ActualBitmap())
 
 		for _, tfr := range o.tfrs[2:] {
 			itr, ok := tfr.iterators[i].(segment.OptimizablePostingsIterator)
@@ -164,7 +163,7 @@ func (o *OptimizeTFRConjunctionUnadorned) Finish() (rv index.Optimized, err erro
 	oTFR := o.snapshot.unadornedTermFieldReader(
 		OptimizeTFRConjunctionUnadornedTerm, OptimizeTFRConjunctionUnadornedField)
 
-	var actualBMs []*roaring.Bitmap // Collected from regular posting lists.
+	var actualBMs []segment.Bitmap // Collected from regular posting lists.
 
 OUTER:
 	for i := range o.snapshot.segment {
@@ -248,7 +247,7 @@ OUTER:
 		}
 
 		// Else, AND together our collected bitmaps as our result.
-		bm := roaring.And(actualBMs[0], actualBMs[1])
+		bm := actualBMs[0].AndNew(actualBMs[1])
 
 		for _, actualBM := range actualBMs[2:] {
 			bm.And(actualBM)
@@ -331,7 +330,7 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 		OptimizeTFRDisjunctionUnadornedTerm, OptimizeTFRDisjunctionUnadornedField)
 
 	var docNums []uint32            // Collected docNum's from 1-hit posting lists.
-	var actualBMs []*roaring.Bitmap // Collected from regular posting lists.
+	var actualBMs []segment.Bitmap // Collected from regular posting lists.
 
 	for i := range o.snapshot.segment {
 		docNums = docNums[:0]
@@ -354,17 +353,17 @@ func (o *OptimizeTFRDisjunctionUnadorned) Finish() (rv index.Optimized, err erro
 			}
 		}
 
-		var bm *roaring.Bitmap
+		var bm segment.Bitmap
 		if len(actualBMs) > 2 {
-			bm = roaring.HeapOr(actualBMs...)
+			bm = actualBMs[0].HeapOrNew(actualBMs[1:]...)
 		} else if len(actualBMs) == 2 {
-			bm = roaring.Or(actualBMs[0], actualBMs[1])
+			bm = actualBMs[0].OrNew(actualBMs[1])
 		} else if len(actualBMs) == 1 {
 			bm = actualBMs[0].Clone()
 		}
 
 		if bm == nil {
-			bm = roaring.New()
+			bm = o.snapshot.parent.segPlugin.NewBitmap()
 		}
 
 		bm.AddMany(docNums)

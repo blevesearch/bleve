@@ -20,7 +20,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/RoaringBitmap/roaring"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	bolt "go.etcd.io/bbolt"
@@ -209,7 +208,7 @@ func (o *Builder) doMerge() error {
 
 		// do the merge
 		mergedSegPath := o.buildPath + string(os.PathSeparator) + zapFileName(o.segCount)
-		drops := make([]*roaring.Bitmap, mergeCount)
+		drops := make([]segment.Bitmap, mergeCount)
 		_, _, err := o.segPlugin.Merge(mergeSegs, drops, mergedSegPath, nil, nil)
 		if err != nil {
 			_ = closeOpenedSegs()

@@ -15,7 +15,6 @@
 package scorch
 
 import (
-	"github.com/RoaringBitmap/roaring"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 	"math"
 	"reflect"
@@ -35,8 +34,8 @@ func init() {
 }
 
 type unadornedPostingsIteratorBitmap struct {
-	actual   roaring.IntPeekable
-	actualBM *roaring.Bitmap
+	actual   segment.IntPeekable
+	actualBM segment.Bitmap
 }
 
 func (i *unadornedPostingsIteratorBitmap) Next() (segment.Posting, error) {
@@ -72,7 +71,12 @@ func (i *unadornedPostingsIteratorBitmap) Size() int {
 	return reflectStaticSizeUnadornedPostingsIteratorBitmap
 }
 
-func (i *unadornedPostingsIteratorBitmap) ActualBitmap() *roaring.Bitmap {
+func (i *unadornedPostingsIteratorBitmap) ActualBitmap() segment.Bitmap {
+	if i.actualBM == nil {
+		// NOTE: this returns nil segment.Bitmap as opposed to a nil *bitmap
+		// allowing downstream == nil checks to work as expected
+		return nil
+	}
 	return i.actualBM
 }
 
@@ -80,12 +84,12 @@ func (i *unadornedPostingsIteratorBitmap) DocNum1Hit() (uint64, bool) {
 	return 0, false
 }
 
-func (i *unadornedPostingsIteratorBitmap) ReplaceActual(actual *roaring.Bitmap) {
+func (i *unadornedPostingsIteratorBitmap) ReplaceActual(actual segment.Bitmap) {
 	i.actualBM = actual
 	i.actual = actual.Iterator()
 }
 
-func newUnadornedPostingsIteratorFromBitmap(bm *roaring.Bitmap) segment.PostingsIterator {
+func newUnadornedPostingsIteratorFromBitmap(bm segment.Bitmap) segment.PostingsIterator {
 	return &unadornedPostingsIteratorBitmap{
 		actualBM: bm,
 		actual:   bm.Iterator(),
