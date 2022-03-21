@@ -18,7 +18,7 @@ import (
 	"fmt"
 
 	store "github.com/blevesearch/upsidedown_store_api"
-	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/blevesearch/goleveldb/leveldb"
 )
 
 type Writer struct {
