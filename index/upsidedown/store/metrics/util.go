@@ -19,7 +19,7 @@ import (
 	"io"
 	"math"
 
-	"github.com/rcrowley/go-metrics"
+	"github.com/blevesearch/go-metrics"
 )
 
 // NOTE: This is copy & pasted from cbft as otherwise there
