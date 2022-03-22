@@ -20,7 +20,7 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/registry"
 
-	"github.com/kljensen/snowball"
+	"github.com/blevesearch/snowball"
 )
 
 const Name = "stemmer_snowball"
