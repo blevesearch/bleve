@@ -5,8 +5,9 @@ go 1.13
 require (
 	github.com/RoaringBitmap/roaring v0.9.4
 	github.com/bits-and-blooms/bitset v1.2.0
-	github.com/blevesearch/bleve_index_api v1.0.1
-	github.com/blevesearch/go-metrics v0.0.0-20190826022208-cac0b30c2563
+	github.com/blevesearch/bleve_index_api v1.0.2-0.20220322163856-157bc7f3ed4d
+	github.com/blevesearch/geo v0.1.9
+	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/blevesearch/go-porterstemmer v1.0.3
 	github.com/blevesearch/goleveldb v1.0.1
 	github.com/blevesearch/gtreap v0.1.1

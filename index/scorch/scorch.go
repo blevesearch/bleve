@@ -73,6 +73,8 @@ type Scorch struct {
 	forceMergeRequestCh chan *mergerCtrl
 
 	segPlugin SegmentPlugin
+
+	spatialPlugin index.SpatialAnalyzerPlugin
 }
 
 // AsyncPanicError is passed to scorch asyncErrorHandler when panic occurs in scorch background process
@@ -120,6 +122,11 @@ func NewScorch(storeName string,
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	typ, ok := config["spatialPlugin"].(string)
+	if ok {
+		rv.loadSpatialAnalyzerPlugin(typ)
 	}
 
 	rv.root = &IndexSnapshot{parent: rv, refs: 1, creator: "NewScorch"}
@@ -284,6 +291,11 @@ func (s *Scorch) openBolt() error {
 		}
 	}
 
+	typ, ok := s.config["spatialPlugin"].(string)
+	if ok {
+		s.loadSpatialAnalyzerPlugin(typ)
+	}
+
 	return nil
 }
 
@@ -363,7 +375,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 				if doc != nil {
 					// put the work on the queue
 					s.analysisQueue.Queue(func() {
-						analyze(doc)
+						analyze(doc, s.setSpatialAnalyzerPlugin)
 						resultChan <- doc
 					})
 				}
@@ -593,12 +605,29 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 }
 
 func (s *Scorch) Analyze(d index.Document) {
-	analyze(d)
+	analyze(d, s.setSpatialAnalyzerPlugin)
 }
 
-func analyze(d index.Document) {
+type customAnalyzerPluginInitFunc func(field index.Field)
+
+func (s *Scorch) setSpatialAnalyzerPlugin(f index.Field) {
+	if s.segPlugin != nil {
+		// check whether the current field is a custom tokenisable
+		// spatial field then set the spatial analyser plugin for
+		// overriding the tokenisation during the analysis stage.
+		if sf, ok := f.(index.TokenisableSpatialField); ok {
+			sf.SetSpatialAnalyzerPlugin(s.spatialPlugin)
+		}
+	}
+}
+
+func analyze(d index.Document, fn customAnalyzerPluginInitFunc) {
 	d.VisitFields(func(field index.Field) {
 		if field.Options().IsIndexed() {
+			if fn != nil {
+				fn(field)
+			}
+
 			field.Analyze()
 
 			if d.HasComposite() && field.Name() != "_id" {

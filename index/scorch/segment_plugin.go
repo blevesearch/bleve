@@ -19,6 +19,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	index "github.com/blevesearch/bleve_index_api"
 
+	"github.com/blevesearch/bleve/v2/geo"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 
 	zapv11 "github.com/blevesearch/zapx/v11"
@@ -129,5 +130,13 @@ func (s *Scorch) loadSegmentPlugin(forcedSegmentType string,
 		return err
 	}
 	s.segPlugin = segPlugin
+	return nil
+}
+
+func (s *Scorch) loadSpatialAnalyzerPlugin(typ string) error {
+	s.spatialPlugin = geo.GetSpatialAnalyzerPlugin(typ)
+	if s.spatialPlugin == nil {
+		return fmt.Errorf("unsupported spatial plugin type: %s", typ)
+	}
 	return nil
 }

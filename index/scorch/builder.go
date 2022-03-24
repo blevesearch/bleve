@@ -140,7 +140,7 @@ func (o *Builder) executeBatchLOCKED(batch *index.Batch) (err error) {
 			// insert _id field
 			doc.AddIDField()
 			// perform analysis directly
-			analyze(doc)
+			analyze(doc, nil)
 			analysisResults = append(analysisResults, doc)
 		}
 	}
