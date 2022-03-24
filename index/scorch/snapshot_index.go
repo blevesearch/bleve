@@ -830,3 +830,16 @@ func (i *IndexSnapshot) CopyTo(d index.Directory) error {
 
 	return copyBolt.Sync()
 }
+
+func (i *IndexSnapshot) GetSpatialAnalyzerPlugin(typ string) (
+	index.SpatialAnalyzerPlugin, error) {
+	var rv index.SpatialAnalyzerPlugin
+	i.m.Lock()
+	rv = i.parent.spatialPlugin
+	i.m.Unlock()
+
+	if rv == nil {
+		return nil, fmt.Errorf("no spatial plugin type: %s found", typ)
+	}
+	return rv, nil
+}

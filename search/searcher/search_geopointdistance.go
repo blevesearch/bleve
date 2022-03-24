@@ -24,19 +24,37 @@ import (
 func NewGeoPointDistanceSearcher(indexReader index.IndexReader, centerLon,
 	centerLat, dist float64, field string, boost float64,
 	options search.SearcherOptions) (search.Searcher, error) {
-	// compute bounding box containing the circle
-	topLeftLon, topLeftLat, bottomRightLon, bottomRightLat, err :=
-		geo.RectFromPointDistance(centerLon, centerLat, dist)
-	if err != nil {
-		return nil, err
+	var rectSearcher search.Searcher
+	if tp, ok := indexReader.(index.SpatialIndexPlugin); ok {
+		sp, err := tp.GetSpatialAnalyzerPlugin("s2")
+		if err == nil {
+			terms := sp.GetQueryTokens(geo.NewPointDistance(centerLat,
+				centerLon, dist))
+			rectSearcher, err = NewMultiTermSearcher(indexReader, terms,
+				field, boost, options, false)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
-	// build a searcher for the box
-	boxSearcher, err := boxSearcher(indexReader,
-		topLeftLon, topLeftLat, bottomRightLon, bottomRightLat,
-		field, boost, options, false)
-	if err != nil {
-		return nil, err
+	// indexes without the spatial plugin override would get
+	// initialized here.
+	if rectSearcher == nil {
+		// compute bounding box containing the circle
+		topLeftLon, topLeftLat, bottomRightLon, bottomRightLat, err :=
+			geo.RectFromPointDistance(centerLon, centerLat, dist)
+		if err != nil {
+			return nil, err
+		}
+
+		// build a searcher for the box
+		rectSearcher, err = boxSearcher(indexReader,
+			topLeftLon, topLeftLat, bottomRightLon, bottomRightLat,
+			field, boost, options, false)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	dvReader, err := indexReader.DocValueReader([]string{field})
@@ -45,7 +63,7 @@ func NewGeoPointDistanceSearcher(indexReader index.IndexReader, centerLon,
 	}
 
 	// wrap it in a filtering searcher which checks the actual distance
-	return NewFilteringSearcher(boxSearcher,
+	return NewFilteringSearcher(rectSearcher,
 		buildDistFilter(dvReader, field, centerLon, centerLat, dist)), nil
 }
 

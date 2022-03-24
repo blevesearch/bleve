@@ -31,6 +31,28 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 	maxLon, maxLat float64, field string, boost float64,
 	options search.SearcherOptions, checkBoundaries bool) (
 	search.Searcher, error) {
+	if tp, ok := indexReader.(index.SpatialIndexPlugin); ok {
+		sp, err := tp.GetSpatialAnalyzerPlugin("s2")
+		if err == nil {
+			terms := sp.GetQueryTokens(geo.NewBoundedRectangle(minLat,
+				minLon, maxLat, maxLon))
+			boxSearcher, err := NewMultiTermSearcher(indexReader,
+				terms, field, boost, options, false)
+			if err != nil {
+				return nil, err
+			}
+
+			dvReader, err := indexReader.DocValueReader([]string{field})
+			if err != nil {
+				return nil, err
+			}
+
+			return NewFilteringSearcher(boxSearcher, buildRectFilter(dvReader,
+				field, minLon, minLat, maxLon, maxLat)), nil
+		}
+	}
+
+	// indexes without the spatial plugin override would continue here.
 
 	// track list of opened searchers, for cleanup on early exit
 	var openedSearchers []search.Searcher

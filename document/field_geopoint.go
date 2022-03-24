@@ -42,6 +42,8 @@ type GeoPointField struct {
 	numPlainTextBytes uint64
 	length            int
 	frequencies       index.TokenFrequencies
+
+	spatialplugin index.SpatialAnalyzerPlugin
 }
 
 func (n *GeoPointField) Size() int {
@@ -75,7 +77,7 @@ func (n *GeoPointField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 }
 
 func (n *GeoPointField) Analyze() {
-	tokens := make(analysis.TokenStream, 0)
+	tokens := make(analysis.TokenStream, 0, 8)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
 		End:      len(n.value),
@@ -84,24 +86,42 @@ func (n *GeoPointField) Analyze() {
 		Type:     analysis.Numeric,
 	})
 
-	original, err := n.value.Int64()
-	if err == nil {
+	if n.spatialplugin != nil {
+		lat, _ := n.Lat()
+		lon, _ := n.Lon()
+		p := &geo.Point{Lat: lat, Lon: lon}
+		terms := n.spatialplugin.GetIndexTokens(p)
 
-		shift := GeoPrecisionStep
-		for shift < 64 {
-			shiftEncoded, err := numeric.NewPrefixCodedInt64(original, shift)
-			if err != nil {
-				break
-			}
+		for _, term := range terms {
 			token := analysis.Token{
 				Start:    0,
-				End:      len(shiftEncoded),
-				Term:     shiftEncoded,
+				End:      len(term),
+				Term:     []byte(term),
 				Position: 1,
-				Type:     analysis.Numeric,
+				Type:     analysis.AlphaNumeric,
 			}
 			tokens = append(tokens, &token)
-			shift += GeoPrecisionStep
+		}
+	} else {
+		original, err := n.value.Int64()
+		if err == nil {
+
+			shift := GeoPrecisionStep
+			for shift < 64 {
+				shiftEncoded, err := numeric.NewPrefixCodedInt64(original, shift)
+				if err != nil {
+					break
+				}
+				token := analysis.Token{
+					Start:    0,
+					End:      len(shiftEncoded),
+					Term:     shiftEncoded,
+					Position: 1,
+					Type:     analysis.Numeric,
+				}
+				tokens = append(tokens, &token)
+				shift += GeoPrecisionStep
+			}
 		}
 	}
 
@@ -163,4 +183,11 @@ func NewGeoPointFieldWithIndexingOptions(name string, arrayPositions []uint64, l
 		// represented and can fix this better
 		numPlainTextBytes: uint64(8),
 	}
+}
+
+// SetSpatialAnalyzerPlugin implements the
+// index.TokenisableSpatialField interface.
+func (n *GeoPointField) SetSpatialAnalyzerPlugin(
+	plugin index.SpatialAnalyzerPlugin) {
+	n.spatialplugin = plugin
 }

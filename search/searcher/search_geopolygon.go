@@ -16,34 +16,51 @@ package searcher
 
 import (
 	"fmt"
+	"math"
+
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
-	"math"
 )
 
 func NewGeoBoundedPolygonSearcher(indexReader index.IndexReader,
-	polygon []geo.Point, field string, boost float64,
+	coordinates []geo.Point, field string, boost float64,
 	options search.SearcherOptions) (search.Searcher, error) {
-
-	if len(polygon) < 3 {
+	if len(coordinates) < 3 {
 		return nil, fmt.Errorf("Too few points specified for the polygon boundary")
 	}
 
-	// compute the bounding box enclosing the polygon
-	topLeftLon, topLeftLat, bottomRightLon, bottomRightLat, err :=
-		geo.BoundingRectangleForPolygon(polygon)
-	if err != nil {
-		return nil, err
+	var rectSearcher search.Searcher
+	if sr, ok := indexReader.(index.SpatialIndexPlugin); ok {
+		tp, err := sr.GetSpatialAnalyzerPlugin("s2")
+		if err == nil {
+			terms := tp.GetQueryTokens(geo.NewBoundedPolygon(coordinates))
+			rectSearcher, err = NewMultiTermSearcher(indexReader, terms,
+				field, boost, options, false)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
-	// build a searcher for the bounding box on the polygon
-	boxSearcher, err := boxSearcher(indexReader,
-		topLeftLon, topLeftLat, bottomRightLon, bottomRightLat,
-		field, boost, options, true)
-	if err != nil {
-		return nil, err
+	// indexes without the spatial plugin override would get
+	// initialized here.
+	if rectSearcher == nil {
+		// compute the bounding box enclosing the polygon
+		topLeftLon, topLeftLat, bottomRightLon, bottomRightLat, err :=
+			geo.BoundingRectangleForPolygon(coordinates)
+		if err != nil {
+			return nil, err
+		}
+
+		// build a searcher for the bounding box on the polygon
+		rectSearcher, err = boxSearcher(indexReader,
+			topLeftLon, topLeftLat, bottomRightLon, bottomRightLat,
+			field, boost, options, true)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	dvReader, err := indexReader.DocValueReader([]string{field})
@@ -52,8 +69,8 @@ func NewGeoBoundedPolygonSearcher(indexReader index.IndexReader,
 	}
 
 	// wrap it in a filtering searcher that checks for the polygon inclusivity
-	return NewFilteringSearcher(boxSearcher,
-		buildPolygonFilter(dvReader, field, polygon)), nil
+	return NewFilteringSearcher(rectSearcher,
+		buildPolygonFilter(dvReader, field, coordinates)), nil
 }
 
 const float64EqualityThreshold = 1e-6
@@ -66,7 +83,7 @@ func almostEqual(a, b float64) bool {
 // polygon. It is based on the ray-casting technique as referred
 // here: https://wrf.ecse.rpi.edu/nikola/pubdetails/pnpoly.html
 func buildPolygonFilter(dvReader index.DocValueReader, field string,
-	polygon []geo.Point) FilterFunc {
+	coordinates []geo.Point) FilterFunc {
 	return func(d *search.DocumentMatch) bool {
 		// check geo matches against all numeric type terms indexed
 		var lons, lats []float64
@@ -89,8 +106,8 @@ func buildPolygonFilter(dvReader index.DocValueReader, field string,
 		// Note: this approach works for points which are strictly inside
 		// the polygon. ie it might fail for certain points on the polygon boundaries.
 		if err == nil && found {
-			nVertices := len(polygon)
-			if len(polygon) < 3 {
+			nVertices := len(coordinates)
+			if len(coordinates) < 3 {
 				return false
 			}
 			rayIntersectsSegment := func(point, a, b geo.Point) bool {
@@ -100,19 +117,19 @@ func buildPolygonFilter(dvReader index.DocValueReader, field string,
 
 			for i := range lons {
 				pt := geo.Point{Lon: lons[i], Lat: lats[i]}
-				inside := rayIntersectsSegment(pt, polygon[len(polygon)-1], polygon[0])
+				inside := rayIntersectsSegment(pt, coordinates[len(coordinates)-1], coordinates[0])
 				// check for a direct vertex match
-				if almostEqual(polygon[0].Lat, lats[i]) &&
-					almostEqual(polygon[0].Lon, lons[i]) {
+				if almostEqual(coordinates[0].Lat, lats[i]) &&
+					almostEqual(coordinates[0].Lon, lons[i]) {
 					return true
 				}
 
 				for j := 1; j < nVertices; j++ {
-					if almostEqual(polygon[j].Lat, lats[i]) &&
-						almostEqual(polygon[j].Lon, lons[i]) {
+					if almostEqual(coordinates[j].Lat, lats[i]) &&
+						almostEqual(coordinates[j].Lon, lons[i]) {
 						return true
 					}
-					if rayIntersectsSegment(pt, polygon[j-1], polygon[j]) {
+					if rayIntersectsSegment(pt, coordinates[j-1], coordinates[j]) {
 						inside = !inside
 					}
 				}
