@@ -102,7 +102,7 @@ func TestExtractGeoPoint(t *testing.T) {
 		},
 		// test going throug interface
 		{
-			in: &s1{
+			in: &s11{
 				lon: 4.0,
 				lat: 6.9,
 			},
@@ -174,16 +174,16 @@ func TestExtractGeoPoint(t *testing.T) {
 	}
 }
 
-type s1 struct {
+type s11 struct {
 	lon float64
 	lat float64
 }
 
-func (s *s1) Lon() float64 {
+func (s *s11) Lon() float64 {
 	return s.lon
 }
 
-func (s *s1) Lat() float64 {
+func (s *s11) Lat() float64 {
 	return s.lat
 }
 

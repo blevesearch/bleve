@@ -612,10 +612,10 @@ type customAnalyzerPluginInitFunc func(field index.Field)
 
 func (s *Scorch) setSpatialAnalyzerPlugin(f index.Field) {
 	if s.segPlugin != nil {
-		// check whether the current field is a custom tokenisable
+		// check whether the current field is a custom tokenizable
 		// spatial field then set the spatial analyser plugin for
 		// overriding the tokenisation during the analysis stage.
-		if sf, ok := f.(index.TokenisableSpatialField); ok {
+		if sf, ok := f.(index.TokenizableSpatialField); ok {
 			sf.SetSpatialAnalyzerPlugin(s.spatialPlugin)
 		}
 	}
