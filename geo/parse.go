@@ -182,7 +182,7 @@ type lnger interface {
 
 // GlueBytes primarily for quicker filtering of docvalues
 // during the filtering phase.
-var GlueBytes = []byte("$geoJson$")
+var GlueBytes = []byte("##")
 
 var GlueBytesOffset = len(GlueBytes)
 

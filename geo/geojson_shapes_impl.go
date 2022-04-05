@@ -379,13 +379,13 @@ func (gc *geometryCollection) Contains(other index.GeoJSON) (bool, error) {
 		otherShapes := cs.Members()
 		shapesFoundWithIn := make(map[int]struct{})
 
-	NextShape:
+	nextShape:
 		for pos, shapeInDoc := range otherShapes {
 			for _, shape := range gc.Members() {
 				within, err := shape.Contains(shapeInDoc)
 				if within && err == nil {
 					shapesFoundWithIn[pos] = struct{}{}
-					continue NextShape
+					continue nextShape
 				}
 			}
 		}
@@ -683,8 +683,7 @@ func (p *Point) Contains(s index.GeoJSON) (bool, error) {
 func checkCellIntersectsShape(cell *s2.Cell, shapeIn,
 	other index.GeoJSON) (bool, error) {
 	// check if the other shape is a point.
-	if p2, ok := other.(*point); ok &&
-		other.Type() == PointType {
+	if p2, ok := other.(*point); ok {
 		s2cell := s2.CellFromLatLng(s2.LatLngFromDegrees(
 			p2.Vertices[1], p2.Vertices[0]))
 
@@ -696,8 +695,7 @@ func checkCellIntersectsShape(cell *s2.Cell, shapeIn,
 	}
 
 	// check if the other shape is a multipoint.
-	if p2, ok := other.(*multipoint); ok &&
-		other.Type() == MultiPointType {
+	if p2, ok := other.(*multipoint); ok {
 		// check the intersection for any point in the array.
 		for _, point := range p2.Vertices {
 			s2cell := s2.CellFromLatLng(s2.LatLngFromDegrees(
@@ -712,8 +710,7 @@ func checkCellIntersectsShape(cell *s2.Cell, shapeIn,
 	}
 
 	// check if the other shape is a polygon.
-	if p2, ok := other.(*polygon); ok &&
-		other.Type() == PolygonType {
+	if p2, ok := other.(*polygon); ok {
 		s2pgn2 := s2PolygonFromCoordinates(p2.Coordinates())
 
 		if s2pgn2.IntersectsCell(*cell) {
@@ -724,8 +721,7 @@ func checkCellIntersectsShape(cell *s2.Cell, shapeIn,
 	}
 
 	// check if the other shape is a multipolygon.
-	if p2, ok := other.(*multipolygon); ok &&
-		other.Type() == MultiPolygonType {
+	if p2, ok := other.(*multipolygon); ok {
 		// check the intersection for any polygon in the collection.
 		for _, coordinates := range p2.Vertices {
 			s2pgn2 := s2PolygonFromCoordinates(coordinates)
@@ -739,8 +735,7 @@ func checkCellIntersectsShape(cell *s2.Cell, shapeIn,
 	}
 
 	// check if the other shape is a linestring.
-	if p2, ok := other.(*linestring); ok &&
-		other.Type() == LineStringType {
+	if p2, ok := other.(*linestring); ok {
 		for _, point := range p2.Vertices {
 			s2cell := s2.CellFromLatLng(s2.LatLngFromDegrees(
 				point[1], point[0]))
@@ -753,8 +748,7 @@ func checkCellIntersectsShape(cell *s2.Cell, shapeIn,
 	}
 
 	// check if the other shape is a multilinestring.
-	if p2, ok := other.(*multilinestring); ok &&
-		other.Type() == MultiLineStringType {
+	if p2, ok := other.(*multilinestring); ok {
 		// check the intersection for any linestring in the array.
 		for _, linestrings := range p2.Vertices {
 			for _, point := range linestrings {
@@ -770,8 +764,7 @@ func checkCellIntersectsShape(cell *s2.Cell, shapeIn,
 	}
 
 	// check if the other shape is a geometrycollection.
-	if gc, ok := other.(*geometryCollection); ok &&
-		other.Type() == GeometryCollectionType {
+	if gc, ok := other.(*geometryCollection); ok {
 		// check for intersection across every member shape.
 		if geometryCollectionIntersectsShape(gc, shapeIn) {
 			return true, nil
@@ -781,9 +774,7 @@ func checkCellIntersectsShape(cell *s2.Cell, shapeIn,
 	}
 
 	// check if the other shape is a circle.
-	if c, ok := other.(*circle); ok &&
-		other.Type() == CircleType {
-
+	if c, ok := other.(*circle); ok {
 		s2cap := s2Cap(c.Vertices, c.RadiusInMeters)
 		if s2cap.IntersectsCell(*cell) {
 			return true, nil
@@ -793,8 +784,7 @@ func checkCellIntersectsShape(cell *s2.Cell, shapeIn,
 	}
 
 	// check if the other shape is an envelope.
-	if e, ok := other.(*envelope); ok &&
-		other.Type() == EnvelopeType {
+	if e, ok := other.(*envelope); ok {
 		s2rectInDoc := s2RectFromBounds(e.Vertices[0],
 			e.Vertices[1])
 
@@ -814,7 +804,7 @@ func checkCellIntersectsShape(cell *s2.Cell, shapeIn,
 func checkCellContainsShape(cells []*s2.Cell,
 	other index.GeoJSON) (bool, error) {
 	// check if the other shape is a point.
-	if p2, ok := other.(*point); ok && other.Type() == PointType {
+	if p2, ok := other.(*point); ok {
 		for _, cell := range cells {
 			s2point := s2.PointFromLatLng(s2.LatLngFromDegrees(
 				p2.Vertices[1], p2.Vertices[0]))
@@ -829,8 +819,7 @@ func checkCellContainsShape(cells []*s2.Cell,
 
 	// check if the other shape is a multipoint, if so containment is
 	// checked for every point in the multipoint with every given cells.
-	if p2, ok := other.(*multipoint); ok &&
-		other.Type() == MultiPointType {
+	if p2, ok := other.(*multipoint); ok {
 		// check the containment for every point in the collection.
 		lookup := make(map[int]struct{})
 		for _, cell := range cells {
@@ -867,7 +856,7 @@ func checkCellContainsShape(cells []*s2.Cell,
 func checkLineStringsIntersectsShape(pls []*s2.Polyline, shapeIn,
 	other index.GeoJSON) (bool, error) {
 	// check if the other shape is a point.
-	if p2, ok := other.(*point); ok && other.Type() == PointType {
+	if p2, ok := other.(*point); ok {
 
 		if polylineIntersectsPoint(pls, p2.Vertices) {
 			return true, nil
@@ -877,8 +866,7 @@ func checkLineStringsIntersectsShape(pls []*s2.Polyline, shapeIn,
 	}
 
 	// check if the other shape is a multipoint.
-	if p2, ok := other.(*multipoint); ok &&
-		other.Type() == MultiPointType {
+	if p2, ok := other.(*multipoint); ok {
 		// check the intersection for any point in the collection.
 		for _, point := range p2.Vertices {
 
@@ -891,8 +879,7 @@ func checkLineStringsIntersectsShape(pls []*s2.Polyline, shapeIn,
 	}
 
 	// check if the other shape is a polygon.
-	if p2, ok := other.(*polygon); ok &&
-		other.Type() == PolygonType {
+	if p2, ok := other.(*polygon); ok {
 
 		if polylineIntersectsPolygons(pls,
 			[][][][]float64{p2.Coordinates()}) {
@@ -903,8 +890,7 @@ func checkLineStringsIntersectsShape(pls []*s2.Polyline, shapeIn,
 	}
 
 	// check if the other shape is a multipolygon.
-	if p2, ok := other.(*multipolygon); ok &&
-		other.Type() == MultiPolygonType {
+	if p2, ok := other.(*multipolygon); ok {
 		// check the intersection for any polygon in the collection.
 		if polylineIntersectsPolygons(pls, p2.Coordinates()) {
 			return true, nil
@@ -914,8 +900,7 @@ func checkLineStringsIntersectsShape(pls []*s2.Polyline, shapeIn,
 	}
 
 	// check if the other shape is a linestring.
-	if ls, ok := other.(*linestring); ok &&
-		other.Type() == LineStringType {
+	if ls, ok := other.(*linestring); ok {
 
 		if polylineIntersectsPolylines(pls, [][][]float64{ls.Vertices}) {
 			return true, nil
@@ -925,8 +910,7 @@ func checkLineStringsIntersectsShape(pls []*s2.Polyline, shapeIn,
 	}
 
 	// check if the other shape is a multilinestring.
-	if mls, ok := other.(*multilinestring); ok &&
-		other.Type() == MultiLineStringType {
+	if mls, ok := other.(*multilinestring); ok {
 
 		if polylineIntersectsPolylines(pls, mls.Vertices) {
 			return true, nil
@@ -935,8 +919,7 @@ func checkLineStringsIntersectsShape(pls []*s2.Polyline, shapeIn,
 		return false, nil
 	}
 
-	if gc, ok := other.(*geometryCollection); ok &&
-		other.Type() == GeometryCollectionType {
+	if gc, ok := other.(*geometryCollection); ok {
 		// check whether the linestring intersects with any of the
 		// shapes Contains a geometrycollection.
 		if geometryCollectionIntersectsShape(gc, shapeIn) {
@@ -947,8 +930,7 @@ func checkLineStringsIntersectsShape(pls []*s2.Polyline, shapeIn,
 	}
 
 	// check if the other shape is a circle.
-	if c, ok := other.(*circle); ok &&
-		other.Type() == CircleType {
+	if c, ok := other.(*circle); ok {
 		centre := s2.PointFromLatLng(
 			s2.LatLngFromDegrees(c.Vertices[1], c.Vertices[0]))
 
@@ -963,7 +945,7 @@ func checkLineStringsIntersectsShape(pls []*s2.Polyline, shapeIn,
 	}
 
 	// check if the other shape is a envelope.
-	if e, ok := other.(*envelope); ok && other.Type() == EnvelopeType {
+	if e, ok := other.(*envelope); ok {
 		s2rectInDoc := s2RectFromBounds(e.Vertices[0], e.Vertices[1])
 
 		for _, pl := range pls {
@@ -995,8 +977,7 @@ func checkLineStringsIntersectsShape(pls []*s2.Polyline, shapeIn,
 func checkLineStringsContainsShape(vertices [][][]float64,
 	other index.GeoJSON) (bool, error) {
 	// check if the other shape is a point.
-	if p, ok := other.(*point); ok &&
-		other.Type() == PointType {
+	if p, ok := other.(*point); ok {
 
 		if polylinesContainPoints(vertices, [][]float64{p.Vertices}) {
 			return true, nil
@@ -1006,8 +987,7 @@ func checkLineStringsContainsShape(vertices [][][]float64,
 	}
 
 	// check if the other shape is a multipoint.
-	if mp, ok := other.(*multipoint); ok &&
-		other.Type() == MultiPointType {
+	if mp, ok := other.(*multipoint); ok {
 
 		if polylinesContainPoints(vertices, mp.Vertices) {
 			return true, nil
@@ -1024,7 +1004,7 @@ func checkLineStringsContainsShape(vertices [][][]float64,
 func checkPolygonIntersectsShape(s2pgn *s2.Polygon, vertices [][][]float64,
 	shapeIn, other index.GeoJSON) (bool, error) {
 	// check if the other shape is a point.
-	if p2, ok := other.(*point); ok && other.Type() == PointType {
+	if p2, ok := other.(*point); ok {
 		s2cell := s2.CellFromLatLng(s2.LatLngFromDegrees(p2.Vertices[1],
 			p2.Vertices[0]))
 
@@ -1036,7 +1016,7 @@ func checkPolygonIntersectsShape(s2pgn *s2.Polygon, vertices [][][]float64,
 	}
 
 	// check if the other shape is a multipoint.
-	if p2, ok := other.(*multipoint); ok && other.Type() == MultiPointType {
+	if p2, ok := other.(*multipoint); ok {
 		// check the intersection for any point in the collection.
 		for _, point := range p2.Vertices {
 			s2cell := s2.CellFromLatLng(s2.LatLngFromDegrees(point[1],
@@ -1051,7 +1031,7 @@ func checkPolygonIntersectsShape(s2pgn *s2.Polygon, vertices [][][]float64,
 	}
 
 	// check if the other shape is a polygon.
-	if p2, ok := other.(*polygon); ok && other.Type() == PolygonType {
+	if p2, ok := other.(*polygon); ok {
 		s2p2 := s2PolygonFromCoordinates(p2.Coordinates())
 
 		if s2pgn.Intersects(s2p2) {
@@ -1062,8 +1042,7 @@ func checkPolygonIntersectsShape(s2pgn *s2.Polygon, vertices [][][]float64,
 	}
 
 	// check if the other shape is a multipolygon.
-	if p2, ok := other.(*multipolygon); ok &&
-		other.Type() == MultiPolygonType {
+	if p2, ok := other.(*multipolygon); ok {
 		// check the intersection for any polygon in the collection.
 		for _, coordinates := range p2.Vertices {
 			s2p2 := s2PolygonFromCoordinates(coordinates)
@@ -1077,7 +1056,7 @@ func checkPolygonIntersectsShape(s2pgn *s2.Polygon, vertices [][][]float64,
 	}
 
 	// check if the other shape is a linestring.
-	if ls, ok := other.(*linestring); ok && other.Type() == LineStringType {
+	if ls, ok := other.(*linestring); ok {
 
 		if polygonsIntersectsLinestrings(s2pgn,
 			[][][]float64{ls.Vertices}) {
@@ -1088,8 +1067,7 @@ func checkPolygonIntersectsShape(s2pgn *s2.Polygon, vertices [][][]float64,
 	}
 
 	// check if the other shape is a multilinestring.
-	if mls, ok := other.(*multilinestring); ok &&
-		other.Type() == MultiLineStringType {
+	if mls, ok := other.(*multilinestring); ok {
 
 		if polygonsIntersectsLinestrings(s2pgn, mls.Vertices) {
 			return true, nil
@@ -1098,8 +1076,7 @@ func checkPolygonIntersectsShape(s2pgn *s2.Polygon, vertices [][][]float64,
 		return false, nil
 	}
 
-	if gc, ok := other.(*geometryCollection); ok &&
-		other.Type() == GeometryCollectionType {
+	if gc, ok := other.(*geometryCollection); ok {
 		// check whether the polygon intersects with any of the
 		// member shapes of the geometry collection.
 		if geometryCollectionIntersectsShape(gc, shapeIn) {
@@ -1110,27 +1087,25 @@ func checkPolygonIntersectsShape(s2pgn *s2.Polygon, vertices [][][]float64,
 	}
 
 	// check if the other shape is a circle.
-	if c, ok := other.(*circle); ok && other.Type() == CircleType {
+	if c, ok := other.(*circle); ok {
 
 		cp := s2.PointFromLatLng(s2.LatLngFromDegrees(
 			c.Vertices[1], c.Vertices[0]))
-		angle := radiusInMetersToS1Angle(float64(c.RadiusInMeters))
+		radius := radiusInMetersToS1Angle(float64(c.RadiusInMeters))
 		projected := s2pgn.Project(&cp)
 		distance := projected.Distance(cp)
 
-		return distance < angle, nil
+		return distance <= radius, nil
 	}
 
 	// check if the other shape is a envelope.
-	if e, ok := other.(*envelope); ok &&
-		other.Type() == EnvelopeType {
-		s2rectInDoc := s2RectFromBounds(e.Vertices[0], e.Vertices[1])
+	if e, ok := other.(*envelope); ok {
 
-		if rectangleIntersectsWithPolygons(s2rectInDoc,
-			[][][][]float64{vertices}) {
+		s2rectInDoc := s2RectFromBounds(e.Vertices[0], e.Vertices[1])
+		s2pgnInDoc := s2PolygonFromS2Rectangle(s2rectInDoc)
+		if s2pgn.Intersects(s2pgnInDoc) {
 			return true, nil
 		}
-
 		return false, nil
 	}
 
@@ -1143,7 +1118,7 @@ func checkPolygonIntersectsShape(s2pgn *s2.Polygon, vertices [][][]float64,
 func checkMultiPolygonContainsShape(s2pgns []*s2.Polygon,
 	shapeIn, other index.GeoJSON) (bool, error) {
 	// check if the other shape is a point.
-	if p2, ok := other.(*point); ok && other.Type() == PointType {
+	if p2, ok := other.(*point); ok {
 		s2point := s2.PointFromLatLng(
 			s2.LatLngFromDegrees(p2.Vertices[1], p2.Vertices[0]))
 
@@ -1157,8 +1132,7 @@ func checkMultiPolygonContainsShape(s2pgns []*s2.Polygon,
 	}
 
 	// check if the other shape is a multipoint.
-	if p2, ok := other.(*multipoint); ok &&
-		other.Type() == MultiPointType {
+	if p2, ok := other.(*multipoint); ok {
 		// check the containment for every point in the collection.
 		pointsWithIn := make(map[int]struct{})
 	nextPoint:
@@ -1178,7 +1152,7 @@ func checkMultiPolygonContainsShape(s2pgns []*s2.Polygon,
 	}
 
 	// check if the other shape is a polygon.
-	if p2, ok := other.(*polygon); ok && other.Type() == PolygonType {
+	if p2, ok := other.(*polygon); ok {
 		s2p2 := s2PolygonFromCoordinates(p2.Coordinates())
 
 		for _, s2pgn := range s2pgns {
@@ -1191,8 +1165,7 @@ func checkMultiPolygonContainsShape(s2pgns []*s2.Polygon,
 	}
 
 	// check if the other shape is a multipolygon.
-	if p2, ok := other.(*multipolygon); ok &&
-		other.Type() == MultiPolygonType {
+	if p2, ok := other.(*multipolygon); ok {
 		// check the intersection for every polygon in the collection.
 		polygonsWithIn := make(map[int]struct{})
 	nextPolygon:
@@ -1207,14 +1180,11 @@ func checkMultiPolygonContainsShape(s2pgns []*s2.Polygon,
 			}
 		}
 
-		rv := len(p2.Vertices) == len(polygonsWithIn)
-
-		return rv, nil
+		return len(p2.Vertices) == len(polygonsWithIn), nil
 	}
 
 	// check if the other shape is a linestring.
-	if ls, ok := other.(*linestring); ok &&
-		other.Type() == LineStringType {
+	if ls, ok := other.(*linestring); ok {
 
 		if polygonsContainsLineStrings(s2pgns,
 			[][][]float64{ls.Vertices}) {
@@ -1224,8 +1194,7 @@ func checkMultiPolygonContainsShape(s2pgns []*s2.Polygon,
 	}
 
 	// check if the other shape is a multilinestring.
-	if mls, ok := other.(*multilinestring); ok &&
-		other.Type() == MultiLineStringType {
+	if mls, ok := other.(*multilinestring); ok {
 		// check whether any of the linestring is inside the polygon.
 		if polygonsContainsLineStrings(s2pgns, mls.Vertices) {
 			return true, nil
@@ -1234,8 +1203,7 @@ func checkMultiPolygonContainsShape(s2pgns []*s2.Polygon,
 		return false, nil
 	}
 
-	if gc, ok := other.(*geometryCollection); ok &&
-		other.Type() == GeometryCollectionType {
+	if gc, ok := other.(*geometryCollection); ok {
 		shapesWithIn := make(map[int]struct{})
 	nextShape:
 		for pos, shape := range gc.Members() {
@@ -1252,17 +1220,17 @@ func checkMultiPolygonContainsShape(s2pgns []*s2.Polygon,
 	}
 
 	// check if the other shape is a circle.
-	if c, ok := other.(*circle); ok && other.Type() == CircleType {
+	if c, ok := other.(*circle); ok {
 		cp := s2.PointFromLatLng(
 			s2.LatLngFromDegrees(c.Vertices[1], c.Vertices[0]))
-		angle := radiusInMetersToS1Angle(float64(c.RadiusInMeters))
+		radius := radiusInMetersToS1Angle(float64(c.RadiusInMeters))
 
 		for _, s2pgn := range s2pgns {
 
 			if s2pgn.ContainsPoint(cp) {
 				projected := s2pgn.ProjectToBoundary(&cp)
 				distance := projected.Distance(cp)
-				if distance > angle {
+				if distance >= radius {
 					return true, nil
 				}
 			}
@@ -1272,7 +1240,7 @@ func checkMultiPolygonContainsShape(s2pgns []*s2.Polygon,
 	}
 
 	// check if the other shape is a envelope.
-	if e, ok := other.(*envelope); ok && other.Type() == EnvelopeType {
+	if e, ok := other.(*envelope); ok {
 		s2rectInDoc := s2RectFromBounds(e.Vertices[0], e.Vertices[1])
 		// create a polygon from the rectangle and checks the containment.
 		s2pgnInDoc := s2PolygonFromS2Rectangle(s2rectInDoc)
@@ -1296,7 +1264,7 @@ func checkMultiPolygonContainsShape(s2pgns []*s2.Polygon,
 func checkCircleIntersectsShape(s2cap *s2.Cap, shapeIn,
 	other index.GeoJSON) (bool, error) {
 	// check if the other shape is a point.
-	if p2, ok := other.(*point); ok && other.Type() == PointType {
+	if p2, ok := other.(*point); ok {
 		s2cell := s2.CellFromLatLng(s2.LatLngFromDegrees(p2.Vertices[1],
 			p2.Vertices[0]))
 
@@ -1308,8 +1276,7 @@ func checkCircleIntersectsShape(s2cap *s2.Cap, shapeIn,
 	}
 
 	// check if the other shape is a multipoint.
-	if p2, ok := other.(*multipoint); ok &&
-		other.Type() == MultiPointType {
+	if p2, ok := other.(*multipoint); ok {
 		// check the intersection for any point in the collection.
 		for _, point := range p2.Vertices {
 			s2cell := s2.CellFromLatLng(s2.LatLngFromDegrees(point[1],
@@ -1324,7 +1291,7 @@ func checkCircleIntersectsShape(s2cap *s2.Cap, shapeIn,
 	}
 
 	// check if the other shape is a polygon.
-	if p2, ok := other.(*polygon); ok && other.Type() == PolygonType {
+	if p2, ok := other.(*polygon); ok {
 		s2pgn := s2PolygonFromCoordinates(p2.Coordinates())
 		centerPoint := s2cap.Center()
 		projected := s2pgn.Project(&centerPoint)
@@ -1333,39 +1300,36 @@ func checkCircleIntersectsShape(s2cap *s2.Cap, shapeIn,
 	}
 
 	// check if the other shape is a multipolygon.
-	if p2, ok := other.(*multipolygon); ok &&
-		other.Type() == MultiPolygonType {
+	if p2, ok := other.(*multipolygon); ok {
 		// check the intersection for any polygon in the collection.
 		for _, coordinates := range p2.Vertices {
 			s2pgn := s2PolygonFromCoordinates(coordinates)
 			centerPoint := s2cap.Center()
 			projected := s2pgn.Project(&centerPoint)
 			distance := projected.Distance(centerPoint)
-			return distance < s2cap.Radius(), nil
+			return distance <= s2cap.Radius(), nil
 		}
 
 		return false, nil
 	}
 
 	// check if the other shape is a linestring.
-	if p2, ok := other.(*linestring); ok &&
-		other.Type() == LineStringType {
+	if p2, ok := other.(*linestring); ok {
 		start := s2.LatLngFromDegrees(p2.Vertices[0][1], p2.Vertices[0][0])
 		end := s2.LatLngFromDegrees(p2.Vertices[1][1], p2.Vertices[1][0])
 		pl := s2.PolylineFromLatLngs([]s2.LatLng{start, end})
 		projected, _ := pl.Project(s2cap.Center())
 		distance := projected.Distance(s2cap.Center())
-		return distance < s2cap.Radius(), nil
+		return distance <= s2cap.Radius(), nil
 	}
 
 	// check if the other shape is a multilinestring.
-	if p2, ok := other.(*multilinestring); ok &&
-		other.Type() == MultiLineStringType {
+	if p2, ok := other.(*multilinestring); ok {
 		polylines := s2PolylinesFromCoordinates(p2.Vertices)
 		for _, pl := range polylines {
 			projected, _ := pl.Project(s2cap.Center())
 			distance := projected.Distance(s2cap.Center())
-			if distance < s2cap.Radius() {
+			if distance <= s2cap.Radius() {
 				return true, nil
 			}
 		}
@@ -1373,8 +1337,7 @@ func checkCircleIntersectsShape(s2cap *s2.Cap, shapeIn,
 		return false, nil
 	}
 
-	if gc, ok := other.(*geometryCollection); ok &&
-		other.Type() == GeometryCollectionType {
+	if gc, ok := other.(*geometryCollection); ok {
 		// check whether the circle intersects with any of the
 		// member shapes Contains the geometrycollection.
 		if geometryCollectionIntersectsShape(gc, shapeIn) {
@@ -1384,8 +1347,7 @@ func checkCircleIntersectsShape(s2cap *s2.Cap, shapeIn,
 	}
 
 	// check if the other shape is a circle.
-	if c, ok := other.(*circle); ok &&
-		other.Type() == CircleType {
+	if c, ok := other.(*circle); ok {
 
 		s2capInDoc := s2Cap(c.Vertices, c.RadiusInMeters)
 
@@ -1397,8 +1359,7 @@ func checkCircleIntersectsShape(s2cap *s2.Cap, shapeIn,
 	}
 
 	// check if the other shape is a envelope.
-	if e, ok := other.(*envelope); ok &&
-		other.Type() == EnvelopeType {
+	if e, ok := other.(*envelope); ok {
 		s2rectInDoc := s2RectFromBounds(e.Vertices[0], e.Vertices[1])
 
 		if s2rectInDoc.ContainsPoint(s2cap.Center()) {
@@ -1410,7 +1371,7 @@ func checkCircleIntersectsShape(s2cap *s2.Cap, shapeIn,
 		pl := s2.PolylineFromLatLngs(latlngs)
 		projected, _ := pl.Project(s2cap.Center())
 		distance := projected.Distance(s2cap.Center())
-		if distance < s2cap.Radius() {
+		if distance <= s2cap.Radius() {
 			return true, nil
 		}
 
@@ -1426,7 +1387,7 @@ func checkCircleIntersectsShape(s2cap *s2.Cap, shapeIn,
 func checkCircleContainsShape(s2cap *s2.Cap,
 	shapeIn, other index.GeoJSON) (bool, error) {
 	// check if the other shape is a point.
-	if p2, ok := other.(*point); ok && other.Type() == PointType {
+	if p2, ok := other.(*point); ok {
 		s2point := s2.PointFromLatLng(s2.LatLngFromDegrees(
 			p2.Vertices[1], p2.Vertices[0]))
 
@@ -1438,8 +1399,7 @@ func checkCircleContainsShape(s2cap *s2.Cap,
 	}
 
 	// check if the other shape is a multipoint.
-	if p2, ok := other.(*multipoint); ok &&
-		other.Type() == MultiPointType {
+	if p2, ok := other.(*multipoint); ok {
 		// check the intersection for every point in the collection.
 		for _, point := range p2.Vertices {
 			s2point := s2.PointFromLatLng(s2.LatLngFromDegrees(
@@ -1454,8 +1414,7 @@ func checkCircleContainsShape(s2cap *s2.Cap,
 	}
 
 	// check if the other shape is a polygon.
-	if p2, ok := other.(*polygon); ok &&
-		other.Type() == PolygonType {
+	if p2, ok := other.(*polygon); ok {
 		for _, vertex := range p2.Vertices {
 			for _, v := range vertex {
 				if !s2cap.ContainsPoint(s2.PointFromLatLng(
@@ -1469,8 +1428,7 @@ func checkCircleContainsShape(s2cap *s2.Cap,
 	}
 
 	// check if the other shape is a multipolygon.
-	if p2, ok := other.(*multipolygon); ok &&
-		other.Type() == MultiPolygonType {
+	if p2, ok := other.(*multipolygon); ok {
 		// check the containment for every polygon in the collection.
 		for _, coordinates := range p2.Vertices {
 			for _, vertex := range coordinates {
@@ -1487,8 +1445,7 @@ func checkCircleContainsShape(s2cap *s2.Cap,
 	}
 
 	// check if the other shape is a linestring.
-	if p2, ok := other.(*linestring); ok &&
-		other.Type() == LineStringType {
+	if p2, ok := other.(*linestring); ok {
 		start := s2.PointFromLatLng(s2.LatLngFromDegrees(
 			p2.Vertices[0][1], p2.Vertices[0][0]))
 		end := s2.PointFromLatLng(s2.LatLngFromDegrees(
@@ -1502,8 +1459,7 @@ func checkCircleContainsShape(s2cap *s2.Cap,
 	}
 
 	// check if the other shape is a multilinestring.
-	if p2, ok := other.(*multilinestring); ok &&
-		other.Type() == MultiLineStringType {
+	if p2, ok := other.(*multilinestring); ok {
 		for _, lines := range p2.Vertices {
 			start := s2.PointFromLatLng(s2.LatLngFromDegrees(
 				lines[0][1], lines[0][0]))
@@ -1518,8 +1474,7 @@ func checkCircleContainsShape(s2cap *s2.Cap,
 		return true, nil
 	}
 
-	if gc, ok := other.(*geometryCollection); ok &&
-		other.Type() == GeometryCollectionType {
+	if gc, ok := other.(*geometryCollection); ok {
 		for _, shape := range gc.Members() {
 			contains, err := shapeIn.Contains(shape)
 			if err == nil && !contains {
@@ -1530,7 +1485,7 @@ func checkCircleContainsShape(s2cap *s2.Cap,
 	}
 
 	// check if the other shape is a circle.
-	if c, ok := other.(*circle); ok && other.Type() == CircleType {
+	if c, ok := other.(*circle); ok {
 		s2capInDoc := s2Cap(c.Vertices, c.RadiusInMeters)
 
 		if s2cap.Contains(*s2capInDoc) {
@@ -1541,7 +1496,7 @@ func checkCircleContainsShape(s2cap *s2.Cap,
 	}
 
 	// check if the other shape is a envelope.
-	if e, ok := other.(*envelope); ok && other.Type() == EnvelopeType {
+	if e, ok := other.(*envelope); ok {
 		s2rectInDoc := s2RectFromBounds(e.Vertices[0], e.Vertices[1])
 
 		for i := 0; i < 4; i++ {
@@ -1565,7 +1520,7 @@ func checkCircleContainsShape(s2cap *s2.Cap,
 func checkEnvelopeIntersectsShape(s2rect *s2.Rect, shapeIn,
 	other index.GeoJSON) (bool, error) {
 	// check if the other shape is a point.
-	if p2, ok := other.(*point); ok && other.Type() == PointType {
+	if p2, ok := other.(*point); ok {
 		s2cell := s2.CellFromLatLng(s2.LatLngFromDegrees(p2.Vertices[1],
 			p2.Vertices[0]))
 
@@ -1577,8 +1532,7 @@ func checkEnvelopeIntersectsShape(s2rect *s2.Rect, shapeIn,
 	}
 
 	// check if the other shape is a multipoint.
-	if p2, ok := other.(*multipoint); ok &&
-		other.Type() == MultiPointType {
+	if p2, ok := other.(*multipoint); ok {
 		// check the intersection for any point in the collection.
 		for _, point := range p2.Vertices {
 			s2cell := s2.CellFromLatLng(s2.LatLngFromDegrees(point[1],
@@ -1593,8 +1547,7 @@ func checkEnvelopeIntersectsShape(s2rect *s2.Rect, shapeIn,
 	}
 
 	// check if the other shape is a polygon.
-	if pgn, ok := other.(*polygon); ok &&
-		other.Type() == PolygonType {
+	if pgn, ok := other.(*polygon); ok {
 
 		if rectangleIntersectsWithPolygons(s2rect,
 			[][][][]float64{pgn.Vertices}) {
@@ -1605,8 +1558,7 @@ func checkEnvelopeIntersectsShape(s2rect *s2.Rect, shapeIn,
 	}
 
 	// check if the other shape is a multipolygon.
-	if mpgn, ok := other.(*multipolygon); ok &&
-		other.Type() == MultiPolygonType {
+	if mpgn, ok := other.(*multipolygon); ok {
 		// check the intersection for any polygon in the collection.
 		if rectangleIntersectsWithPolygons(s2rect, mpgn.Vertices) {
 			return true, nil
@@ -1616,8 +1568,7 @@ func checkEnvelopeIntersectsShape(s2rect *s2.Rect, shapeIn,
 	}
 
 	// check if the other shape is a linestring.
-	if ls, ok := other.(*linestring); ok &&
-		other.Type() == LineStringType {
+	if ls, ok := other.(*linestring); ok {
 
 		if rectangleIntersectsWithLineStrings(s2rect,
 			[][][]float64{ls.Vertices}) {
@@ -1628,8 +1579,7 @@ func checkEnvelopeIntersectsShape(s2rect *s2.Rect, shapeIn,
 	}
 
 	// check if the other shape is a multilinestring.
-	if mls, ok := other.(*multilinestring); ok &&
-		other.Type() == MultiLineStringType {
+	if mls, ok := other.(*multilinestring); ok {
 
 		if rectangleIntersectsWithLineStrings(s2rect, mls.Vertices) {
 			return true, nil
@@ -1638,8 +1588,7 @@ func checkEnvelopeIntersectsShape(s2rect *s2.Rect, shapeIn,
 		return false, nil
 	}
 
-	if gc, ok := other.(*geometryCollection); ok &&
-		other.Type() == GeometryCollectionType {
+	if gc, ok := other.(*geometryCollection); ok {
 		// check for the intersection of every member shape
 		// within the geometrycollection.
 		if geometryCollectionIntersectsShape(gc, shapeIn) {
@@ -1649,19 +1598,17 @@ func checkEnvelopeIntersectsShape(s2rect *s2.Rect, shapeIn,
 	}
 
 	// check if the other shape is a circle.
-	if c, ok := other.(*circle); ok &&
-		other.Type() == CircleType {
+	if c, ok := other.(*circle); ok {
 		s2capInDoc := s2Cap(c.Vertices, c.RadiusInMeters)
 		s2pgn := s2PolygonFromS2Rectangle(s2rect)
 		cp := s2capInDoc.Center()
 		projected := s2pgn.Project(&cp)
 		distance := projected.Distance(s2capInDoc.Center())
-		return distance < s2capInDoc.Radius(), nil
+		return distance <= s2capInDoc.Radius(), nil
 	}
 
 	// check if the other shape is a envelope.
-	if e, ok := other.(*envelope); ok &&
-		other.Type() == EnvelopeType {
+	if e, ok := other.(*envelope); ok {
 		s2rectInDoc := s2RectFromBounds(e.Vertices[0], e.Vertices[1])
 
 		if s2rect.Intersects(*s2rectInDoc) {
@@ -1680,8 +1627,7 @@ func checkEnvelopeIntersectsShape(s2rect *s2.Rect, shapeIn,
 func checkEnvelopeContainsShape(s2rect *s2.Rect, shapeIn,
 	other index.GeoJSON) (bool, error) {
 	// check if the other shape is a point.
-	if p2, ok := other.(*point); ok &&
-		other.Type() == PointType {
+	if p2, ok := other.(*point); ok {
 		s2LatLng := s2.LatLngFromDegrees(p2.Vertices[1], p2.Vertices[0])
 
 		if s2rect.ContainsLatLng(s2LatLng) {
@@ -1692,8 +1638,7 @@ func checkEnvelopeContainsShape(s2rect *s2.Rect, shapeIn,
 	}
 
 	// check if the other shape is a multipoint.
-	if p2, ok := other.(*multipoint); ok &&
-		other.Type() == MultiPointType {
+	if p2, ok := other.(*multipoint); ok {
 		// check the intersection for any point in the collection.
 		for _, point := range p2.Vertices {
 			s2LatLng := s2.LatLngFromDegrees(point[1], point[0])
@@ -1707,7 +1652,7 @@ func checkEnvelopeContainsShape(s2rect *s2.Rect, shapeIn,
 	}
 
 	// check if the other shape is a polygon.
-	if p2, ok := other.(*polygon); ok && other.Type() == PolygonType {
+	if p2, ok := other.(*polygon); ok {
 		for _, points := range p2.Vertices {
 			for _, point := range points {
 				if !s2rect.ContainsLatLng(s2.LatLngFromDegrees(point[1],
@@ -1721,8 +1666,7 @@ func checkEnvelopeContainsShape(s2rect *s2.Rect, shapeIn,
 	}
 
 	// check if the other shape is a multipolygon.
-	if p2, ok := other.(*multipolygon); ok &&
-		other.Type() == MultiPolygonType {
+	if p2, ok := other.(*multipolygon); ok {
 		// check the intersection for any polygon in the collection.
 		for _, coordinates := range p2.Vertices {
 			for _, points := range coordinates {
@@ -1739,8 +1683,7 @@ func checkEnvelopeContainsShape(s2rect *s2.Rect, shapeIn,
 	}
 
 	// check if the other shape is a linestring.
-	if p2, ok := other.(*linestring); ok &&
-		other.Type() == LineStringType {
+	if p2, ok := other.(*linestring); ok {
 		for _, point := range p2.Vertices {
 			s2LatLng := s2.LatLngFromDegrees(point[1], point[0])
 			if !s2rect.ContainsLatLng(s2LatLng) {
@@ -1751,8 +1694,7 @@ func checkEnvelopeContainsShape(s2rect *s2.Rect, shapeIn,
 	}
 
 	// check if the other shape is a multilinestring.
-	if p2, ok := other.(*multilinestring); ok &&
-		other.Type() == MultiLineStringType {
+	if p2, ok := other.(*multilinestring); ok {
 		for _, points := range p2.Vertices {
 			for _, point := range points {
 				s2LatLng := s2.LatLngFromDegrees(point[1], point[0])
@@ -1764,8 +1706,18 @@ func checkEnvelopeContainsShape(s2rect *s2.Rect, shapeIn,
 		return true, nil
 	}
 
+	if gc, ok := other.(*geometryCollection); ok {
+		for _, shape := range gc.Members() {
+			contains, err := shapeIn.Contains(shape)
+			if err == nil && !contains {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+
 	// check if the other shape is a circle.
-	if c, ok := other.(*circle); ok && other.Type() == CircleType {
+	if c, ok := other.(*circle); ok {
 		cp := s2.PointFromLatLng(s2.LatLngFromDegrees(c.Vertices[1],
 			c.Vertices[0]))
 		angle := radiusInMetersToS1Angle(float64(c.RadiusInMeters))
@@ -1779,7 +1731,7 @@ func checkEnvelopeContainsShape(s2rect *s2.Rect, shapeIn,
 	}
 
 	// check if the other shape is a envelope.
-	if e, ok := other.(*envelope); ok && other.Type() == EnvelopeType {
+	if e, ok := other.(*envelope); ok {
 		s2rectInDoc := s2RectFromBounds(e.Vertices[0], e.Vertices[1])
 
 		if s2rect.Contains(*s2rectInDoc) {
@@ -1787,17 +1739,6 @@ func checkEnvelopeContainsShape(s2rect *s2.Rect, shapeIn,
 		}
 
 		return false, nil
-	}
-
-	if gc, ok := other.(*geometryCollection); ok &&
-		other.Type() == GeometryCollectionType {
-		for _, shape := range gc.Members() {
-			contains, err := shapeIn.Contains(shape)
-			if err == nil && !contains {
-				return false, nil
-			}
-		}
-		return true, nil
 	}
 
 	return false, fmt.Errorf("unknown geojson type: %s"+

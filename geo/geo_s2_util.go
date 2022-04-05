@@ -184,25 +184,11 @@ nextLine:
 
 func rectangleIntersectsWithPolygons(s2rect *s2.Rect,
 	coordinates [][][][]float64) bool {
+	s2pgnFromRect := s2PolygonFromS2Rectangle(s2rect)
 	for _, pgnVertices := range coordinates {
 		s2pgn := s2PolygonFromCoordinates(pgnVertices)
-
-		for i := 0; i < s2pgn.NumEdges(); i++ {
-			edgeA := s2pgn.Edge(i)
-			a := []float64{edgeA.V0.X, edgeA.V0.Y}
-			b := []float64{edgeA.V1.X, edgeA.V1.Y}
-
-			for j := 0; j < 4; j++ {
-				v1 := s2.PointFromLatLng(s2rect.Vertex(j))
-				v2 := s2.PointFromLatLng(s2rect.Vertex((j + 1) % 4))
-
-				c := []float64{v1.X, v1.Y}
-				d := []float64{v2.X, v2.Y}
-
-				if doIntersect(a, b, c, d) {
-					return true
-				}
-			}
+		if s2pgn.Intersects(s2pgnFromRect) {
+			return true
 		}
 	}
 
