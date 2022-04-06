@@ -1,0 +1,1436 @@
+[
+  {
+    "comment": "search with a circular shape within cubbon park polygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "Circle",
+            "coordinates": [
+              77.59092092514038,
+              12.975494856600474
+            ],
+            "radius": "0.1km"
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "polygon_cubbonpark"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with a circular shape within cubbon park polygon, (circle doesn't fully contained within)",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "circle",
+            "coordinates": [
+              77.59092092514038,
+              12.975494856600474
+            ],
+            "radius": "150m"
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 0,
+      "hits": []
+    }
+  },
+  {
+    "comment": "search with a polygon that contains the cubbon park polygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  77.58617877960205,
+                  12.9772303619447
+                ],
+                [
+                  77.58630752563477,
+                  12.966419848296587
+                ],
+                [
+                  77.59802341461182,
+                  12.968887279637073
+                ],
+                [
+                  77.5989246368408,
+                  12.980304058548604
+                ],
+                [
+                  77.58617877960205,
+                  12.9772303619447
+                ]
+              ]
+            ]
+          },
+          "relation": "within"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "polygon_cubbonpark"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with a multipolygon that intersects the cubbon park polygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "multipolygon",
+            "coordinates": [
+              [
+                [
+                  [
+                    77.58268117904663,
+                    12.980513152175025
+                  ],
+                  [
+                    77.58147954940794,
+                    12.977983107483992
+                  ],
+                  [
+                    77.58708000183104,
+                    12.97886130773254
+                  ],
+                  [
+                    77.58268117904663,
+                    12.980513152175025
+                  ]
+                ]
+              ],
+              [
+                [
+                  [
+                    77.5864577293396,
+                    12.97762764459667
+                  ],
+                  [
+                    77.58879661560059,
+                    12.975076660730531
+                  ],
+                  [
+                    77.59115695953369,
+                    12.979216768855913
+                  ],
+                  [
+                    77.5864577293396,
+                    12.97762764459667
+                  ]
+                ]
+              ]
+            ]
+          },
+          "relation": "intersects"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "polygon_cubbonpark"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with multilinestrings that intersects the cubbon park polygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "multilinestring",
+            "coordinates": [
+              [
+                [
+                  77.58761644363403,
+                  12.974302996517075
+                ],
+                [
+                  77.59319543838501,
+                  12.978401298465434
+                ]
+              ],
+              [
+                [
+                  77.5947618484497,
+                  12.98500862259466
+                ],
+                [
+                  77.59808778762817,
+                  12.983565899088745
+                ]
+              ],
+              [
+                [
+                  77.60109186172485,
+                  12.973529329896703
+                ],
+                [
+                  77.59943962097168,
+                  12.970225537247586
+                ]
+              ]
+            ]
+          },
+          "relation": "intersects"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "polygon_cubbonpark"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with multilinestrings that aren't contained within the cubbon park polygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "multilinestring",
+            "coordinates": [
+              [
+                [
+                  77.58761644363403,
+                  12.974302996517075
+                ],
+                [
+                  77.59319543838501,
+                  12.978401298465434
+                ]
+              ],
+              [
+                [
+                  77.5947618484497,
+                  12.98500862259466
+                ],
+                [
+                  77.59808778762817,
+                  12.983565899088745
+                ]
+              ],
+              [
+                [
+                  77.60109186172485,
+                  12.973529329896703
+                ],
+                [
+                  77.59943962097168,
+                  12.970225537247586
+                ]
+              ]
+            ]
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 0,
+      "hits": []
+    }
+  },
+  {
+    "comment": "search with multilinestrings that are all contained within the cubbon park polygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "multilinestring",
+            "coordinates": [
+              [
+                [
+                  77.59107112884521,
+                  12.975243939162915
+                ],
+                [
+                  77.59190797805786,
+                  12.973842978816679
+                ]
+              ],
+              [
+                [
+                  77.58954763412476,
+                  12.970685561638497
+                ],
+                [
+                  77.59117841720581,
+                  12.971835618893842
+                ]
+              ],
+              [
+                [
+                  77.58851766586304,
+                  12.973152950670608
+                ],
+                [
+                  77.58937597274779,
+                  12.972212000113458
+                ]
+              ]
+            ]
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "polygon_cubbonpark"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with point that is contained within the cubbon park polygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "Point",
+            "coordinates": [
+              77.59107112884521,
+              12.975243939162915
+            ]
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "polygon_cubbonpark"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with an envelope that is within the cubbon park polygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "Envelope",
+            "coordinates": [
+              [
+                77.59158611297607,
+                12.9720028995062035
+              ],
+              [
+                77.59263753890991,
+                12.973173860642571
+              ]
+            ]
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "polygon_cubbonpark"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with an envelope that contains the cubbon park polygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "Envelope",
+            "coordinates": [
+              [
+                77.57969856262207,
+                12.9641614998626
+              ],
+              [
+                77.60295867919922,
+                12.989336742847172
+              ]
+            ]
+          },
+          "relation": "within"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "polygon_cubbonpark"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with a geometrycollection that is within the cubbon park polygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "geometrycollection",
+            "geometries": [
+              {
+                "type": "point",
+                "coordinates": [
+                  77.59158611297607,
+                  12.972002899506203
+                ]
+              },
+              {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    77.58851766586304,
+                    12.973152950670608
+                  ],
+                  [
+                    77.58937597274779,
+                    12.972212000113458
+                  ]
+                ]
+              },
+              {
+                "type": "polygon",
+                "coordinates": [
+                  [
+                    [
+                      77.59055614471436,
+                      12.974721193688106
+                    ],
+                    [
+                      77.58954763412476,
+                      12.97350841995465
+                    ],
+                    [
+                      77.59141445159912,
+                      12.973382960265356
+                    ],
+                    [
+                      77.59055614471436,
+                      12.974721193688106
+                    ]
+                  ]
+                ]
+              }
+            ]
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "polygon_cubbonpark"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with a polygon that intersects the hal airport region",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "polygon",
+            "coordinates": [
+              [
+                [
+                  77.67934799194336,
+                  12.938147195017896
+                ],
+                [
+                  77.66793251037598,
+                  12.930492951786736
+                ],
+                [
+                  77.67711639404297,
+                  12.922127390141315
+                ],
+                [
+                  77.67934799194336,
+                  12.938147195017896
+                ]
+              ]
+            ]
+          },
+          "relation": "intersects"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "circle_halairport"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with a linestring that intersects the hal airport and cubbon park region",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "linestring",
+            "coordinates": [
+              [
+                77.59042739868164,
+                12.973529329896703
+              ],
+              [
+                77.65892028808594,
+                12.950109093741462
+              ]
+            ]
+          },
+          "relation": "intersects"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 2,
+      "hits": [
+        {
+          "id": "circle_halairport"
+        },
+        {
+          "id": "polygon_cubbonpark"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with an envelope within the circle_halairport",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "envelope",
+            "coordinates": [
+              [
+                77.65625953674316,
+                12.943249893344905
+              ],
+              [
+                77.68355369567871,
+                12.945843027882455
+              ]
+            ]
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "circle_halairport"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with a circle which intersects the road multilinestring and the hal circle",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "circle",
+            "coordinates": [
+              77.68132209777832,
+              12.954918786278716
+            ],
+            "radius": "50m"
+          },
+          "relation": "intersects"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 2,
+      "hits": [
+        {
+          "id": "circle_halairport"
+        },
+        {
+          "id": "multilinestring_old_airport_road"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with a polygon which intersects the road multilinestring",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "polygon",
+            "coordinates": [
+              [
+                [
+                  77.64102458953856,
+                  12.97751264178902
+                ],
+                [
+                  77.64109969139099,
+                  12.975317123441693
+                ],
+                [
+                  77.64338493347168,
+                  12.976728530319054
+                ],
+                [
+                  77.64102458953856,
+                  12.97751264178902
+                ]
+              ]
+            ]
+          },
+          "relation": "intersects"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "multilinestring_old_airport_road"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with a linestring which intersects the road multilinestring",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "linestring",
+            "coordinates": [
+              [
+                77.63969421386717,
+                12.978265386473618
+              ],
+              [
+                77.64354586601257,
+                12.978453572288663
+              ]
+            ]
+          },
+          "relation": "intersects"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "multilinestring_old_airport_road"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with an envelope which intersects the road multilinestring",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "envelope",
+            "coordinates": [
+              [
+                77.64100313186644,
+                12.95902786307307
+              ],
+              [
+                77.6419472694397,
+                12.96069029472353
+              ]
+            ]
+          },
+          "relation": "intersects"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "multilinestring_old_airport_road"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with multipoint which are contained within the multipolygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "multipoint",
+            "coordinates": [
+              [
+                -0.14797210693359375,
+                51.52615424940099
+              ],
+              [
+                -0.16857147216796875,
+                51.50863561745838
+              ],
+              [
+                -0.15535354614257812,
+                51.48010001366223
+              ]
+            ]
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "multipolygon_london_parks"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with multilinestring that are contained within the multipolygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "multilinestring",
+            "coordinates": [
+              [
+                [
+                  -0.17063140869140625,
+                  51.50884929989774
+                ],
+                [
+                  -0.15655517578125,
+                  51.5072466571743
+                ]
+              ],
+              [
+                [
+                  -0.16222000122070312,
+                  51.47988619641402
+                ],
+                [
+                  -0.15466690063476562,
+                  51.48074145939243
+                ]
+              ],
+              [
+                [
+                  -0.15844345092773438,
+                  51.53245503603458
+                ],
+                [
+                  -0.15123367309570312,
+                  51.53170753066937
+                ]
+              ]
+            ]
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "multipolygon_london_parks"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with multilinestring out of which one isn't contained within the multipolygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "multilinestring",
+            "coordinates": [
+              [
+                [
+                  -0.17063140869140625,
+                  51.50884929989774
+                ],
+                [
+                  -0.15655517578125,
+                  51.5072466571743
+                ]
+              ],
+              [
+                [
+                  -0.16222000122070312,
+                  51.47988619641402
+                ],
+                [
+                  -0.15466690063476562,
+                  51.48074145939243
+                ]
+              ],
+              [
+                [
+                  -0.15844345092773438,
+                  51.53245503603458
+                ],
+                [
+                  -0.15123367309570312,
+                  51.53170753066937
+                ]
+              ],
+              [
+                [
+                  -0.08651733398437499,
+                  51.51013137348817
+                ],
+                [
+                  -0.08909225463867188,
+                  51.50543026060529
+                ]
+              ]
+            ]
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 0,
+      "hits": []
+    }
+  },
+  {
+    "comment": "search with a geometrycollection that contains the london_parks_multipolygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "geometrycollection",
+            "geometries": [
+              {
+                "type": "multipolygon",
+                "coordinates": [
+                  [
+                    [
+                      [
+                        -0.19517898559570312,
+                        51.51344322994464
+                      ],
+                      [
+                        -0.19277572631835938,
+                        51.49292721420451
+                      ],
+                      [
+                        -0.14110565185546875,
+                        51.49773648412071
+                      ],
+                      [
+                        -0.14471054077148438,
+                        51.51889124411907
+                      ],
+                      [
+                        -0.19517898559570312,
+                        51.51344322994464
+                      ]
+                    ]
+                  ],
+                  [
+                    [
+                      [
+                        -0.16925811767578122,
+                        51.48373475351443
+                      ],
+                      [
+                        -0.16925811767578122,
+                        51.47004951935931
+                      ],
+                      [
+                        -0.14608383178710938,
+                        51.472722739318336
+                      ],
+                      [
+                        -0.14453887939453125,
+                        51.48758298584306
+                      ],
+                      [
+                        -0.16925811767578122,
+                        51.48373475351443
+                      ]
+                    ]
+                  ]
+                ]
+              },
+              {
+                "type": "LineString",
+                "coordinates": [
+                  [
+                    77.58851766586304,
+                    12.973152950670608
+                  ],
+                  [
+                    77.58937597274779,
+                    12.972212000113458
+                  ]
+                ]
+              },
+              {
+                "type": "polygon",
+                "coordinates": [
+                  [
+                    [
+                      -0.17337799072265625,
+                      51.54323910441573
+                    ],
+                    [
+                      -0.1668548583984375,
+                      51.51889124411907
+                    ],
+                    [
+                      -0.09286880493164062,
+                      51.53341609632549
+                    ],
+                    [
+                      -0.17337799072265625,
+                      51.54323910441573
+                    ]
+                  ]
+                ]
+              }
+            ]
+          },
+          "relation": "within"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "multipolygon_london_parks"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with a circle that intersects with one of the polygons in the multipolygon_london_parks",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "circle",
+            "coordinates": [
+              -0.14265060424804688,
+              51.53298896092339
+            ],
+            "radius": "550m"
+          },
+          "relation": "intersects"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "multipolygon_london_parks"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with a circle that contains london museum geopoint",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "circle",
+            "coordinates": [
+              -0.09115219116210938,
+              51.516487788780005
+            ],
+            "radius": "1050m"
+          },
+          "relation": "within"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "point_museum_of_london"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with brockwell park polygon that is contained within brockwell park envelope",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "polygon",
+            "coordinates": [
+              [
+                [
+                  -0.11149406433105469,
+                  51.454942883825744
+                ],
+                [
+                  -0.11230945587158205,
+                  51.45218839188088
+                ],
+                [
+                  -0.11136531829833984,
+                  51.450530268053605
+                ],
+                [
+                  -0.1117086410522461,
+                  51.44873835686053
+                ],
+                [
+                  -0.11016368865966797,
+                  51.446010237625224
+                ],
+                [
+                  -0.10497093200683594,
+                  51.446705656046376
+                ],
+                [
+                  -0.10192394256591797,
+                  51.4490058107573
+                ],
+                [
+                  -0.1007223129272461,
+                  51.45085119994589
+                ],
+                [
+                  -0.10188102722167967,
+                  51.45218839188088
+                ],
+                [
+                  -0.10681629180908203,
+                  51.45368600035086
+                ],
+                [
+                  -0.10715961456298828,
+                  51.453338345620416
+                ],
+                [
+                  -0.11149406433105469,
+                  51.454942883825744
+                ]
+              ]
+            ]
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "envelope_brockwell_park"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with point that is contained within brockwell park envelope",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "point",
+            "coordinates": [
+              -0.10074377059936523,
+              51.450824455707696
+            ]
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "envelope_brockwell_park"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with linestring that intersects the putney bridge",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                -0.2171945571899414,
+                51.46876631814087
+              ],
+              [
+                -0.2064228057861328,
+                51.464943233925986
+              ]
+            ]
+          },
+          "relation": "intersects"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "linestring_putney_bridge"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search with polygon that contains the blr stadiums/multipoint",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "polygon",
+            "coordinates": [
+              [
+                [
+                  77.60107040405273,
+                  12.981349524921757
+                ],
+                [
+                  77.59270191192627,
+                  12.969180024104505
+                ],
+                [
+                  77.60089874267577,
+                  12.961024870820744
+                ],
+                [
+                  77.60107040405273,
+                  12.981349524921757
+                ]
+              ]
+            ]
+          },
+          "relation": "within"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "multipoint_blr_stadiums"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search a point that is within the multipolygon of the geometrycollection",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "point",
+            "coordinates": [
+              76.88919067382812,
+              8.556238400473156
+            ]
+          },
+          "relation": "contains"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "geometrycollection_tvm"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search an envelope that intersects with the polygon of the geometrycollection",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "envelope",
+            "coordinates": [
+              [
+                76.91880226135254,
+                8.515665792358828
+              ],
+              [
+                76.92523956298828,
+                8.525427378462332
+              ]
+            ]
+          },
+          "relation": "intersects"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "geometrycollection_tvm"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search a circle that intersects with the linestring of the geometrycollection",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "circle",
+            "coordinates": [
+              76.91305160522461,
+              8.477890354619287
+            ],
+            "radius": "1mi"
+          },
+          "relation": "intersects"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "geometrycollection_tvm"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search a circle that contains the entire geometrycollection",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "circle",
+            "coordinates": [
+              76.93622589111328,
+              8.501574715933401
+            ],
+            "radius": "10mi"
+          },
+          "relation": "within"
+        }
+      }
+    },
+    "result": {
+      "total_hits": 1,
+      "hits": [
+        {
+          "id": "geometrycollection_tvm"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search a polygon that contains the entire geometrycollection, circle, multilinestring, polygon, multipoint",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "circle",
+            "coordinates": [
+              77.71728515624999,
+              12.060809058367294
+            ],
+            "radius": "1000mi"
+          },
+          "relation": "within"
+        }
+      },
+      "sort": ["-_id"]
+    },
+    "result": {
+      "total_hits": 5,
+      "hits": [
+        {
+          "id": "polygon_cubbonpark"
+        },
+        {
+          "id": "multipoint_blr_stadiums"
+        },
+        {
+          "id": "multilinestring_old_airport_road"
+        },
+        {
+          "id": "geometrycollection_tvm"
+        },
+        {
+          "id": "circle_halairport"
+        }
+      ]
+    }
+  },
+  {
+    "comment": "search circle that contains the envelope, linestring, point, multipolygon",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "circle",
+            "coordinates": [
+              -0.23277282714843747,
+              51.45828549061808
+            ],
+            "radius": "1000mi"
+          },
+          "relation": "within"
+        }
+      },
+      "sort": ["-_id"]
+    },
+    "result": {
+      "total_hits": 4,
+      "hits": [
+        {
+          "id": "point_museum_of_london"
+        },
+        {
+          "id": "multipolygon_london_parks"
+        },
+        {
+          "id": "linestring_putney_bridge"
+        },
+        {
+          "id": "envelope_brockwell_park"
+        }
+      ]
+    }
+  }
+]

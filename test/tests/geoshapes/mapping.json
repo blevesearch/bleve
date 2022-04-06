@@ -1,0 +1,36 @@
+{
+  "types": {
+    "geoshapes": {
+      "properties": {
+        "name": {
+          "fields": [
+            {
+              "include_term_vectors": true,
+              "include_in_all": true,
+              "index": true,
+              "store": true,
+              "analyzer": "keyword",
+              "type": "text"
+            }
+          ],
+          "dynamic": true,
+          "enabled": true
+        },
+        "region": {
+          "fields": [
+            {
+              "include_term_vectors": true,
+              "include_in_all": true,
+              "index": true,
+              "store": true,
+              "type": "geoshape"
+            }
+          ],
+          "dynamic": true,
+          "enabled": true
+        }
+      }
+    }
+  },
+  "default_type": "geoshapes"
+}

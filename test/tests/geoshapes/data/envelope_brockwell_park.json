@@ -1,0 +1,19 @@
+{
+  "name": "brockwell park envelope",
+  "city": "london",
+  "type": "geoshapes",
+  "description": "brockwell park envelope",
+  "region": {
+    "type": "envelope",
+    "coordinates": [
+      [
+        -0.11278152465820314,
+        51.44579626059569
+      ],
+      [
+        -0.10037899017333984,
+        51.45566490761856
+      ]
+    ]
+  }
+}
