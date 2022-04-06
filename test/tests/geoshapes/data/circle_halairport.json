@@ -1,0 +1,14 @@
+{
+  "name": "hal airpork circular region",
+  "city": "bangalore",
+  "type": "geoshapes",
+  "description": "circle covering the hal airport",
+  "region": {
+    "type": "Circle",
+    "coordinates": [
+      77.6698637008667,
+      12.951865687866821
+    ],
+    "radius": "2.4km"
+  }
+}

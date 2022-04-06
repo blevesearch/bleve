@@ -1,0 +1,13 @@
+{
+  "name": "geopoint for the museum of london",
+  "city": "london",
+  "type": "geoshapes",
+  "description": "geopoint for the museum of london",
+  "region": {
+    "type": "point",
+    "coordinates": [
+      -0.09613037109375,
+      51.51803669675129
+    ]
+  }
+}

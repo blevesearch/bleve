@@ -16,7 +16,6 @@ package searcher
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/search"
@@ -26,29 +25,35 @@ import (
 func NewGeoShapeSearcher(indexReader index.IndexReader, shape index.GeoJSON,
 	relation string, field string, boost float64,
 	options search.SearcherOptions) (search.Searcher, error) {
+	var err error
+	var spatialPlugin index.SpatialAnalyzerPlugin
 
+	// check for the spatial plugin from the index.
 	if sr, ok := indexReader.(index.SpatialIndexPlugin); ok {
-		tp, err := sr.GetSpatialAnalyzerPlugin("s2")
-		if err == nil {
-			// obtain the query tokens.
-			terms := tp.GetQueryTokens(shape)
-			mSearcher, err := NewMultiTermSearcher(indexReader, terms,
-				field, boost, options, false)
-			if err != nil {
-				return nil, err
-			}
-
-			dvReader, err := indexReader.DocValueReader([]string{field})
-			if err != nil {
-				return nil, err
-			}
-
-			return NewFilteringSearcher(mSearcher,
-				buildRelationFilterOnShapes(dvReader, field, relation, shape)), nil
-		}
+		spatialPlugin, _ = sr.GetSpatialAnalyzerPlugin("s2")
 	}
 
-	return nil, fmt.Errorf("no SpatialIndexPlugin implementation found")
+	if spatialPlugin == nil {
+		// fallback to the default spatial plugin(s2).
+		spatialPlugin = geo.GetSpatialAnalyzerPlugin("s2")
+	}
+
+	// obtain the query tokens.
+	terms := spatialPlugin.GetQueryTokens(shape)
+	mSearcher, err := NewMultiTermSearcher(indexReader, terms,
+		field, boost, options, false)
+	if err != nil {
+		return nil, err
+	}
+
+	dvReader, err := indexReader.DocValueReader([]string{field})
+	if err != nil {
+		return nil, err
+	}
+
+	return NewFilteringSearcher(mSearcher,
+		buildRelationFilterOnShapes(dvReader, field, relation, shape)), nil
+
 }
 
 func buildRelationFilterOnShapes(dvReader index.DocValueReader, field string,

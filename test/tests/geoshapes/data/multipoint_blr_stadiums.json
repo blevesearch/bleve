@@ -1,0 +1,23 @@
+{
+  "name": "multipoints for stadiums",
+  "city": "bangalore",
+  "type": "geoshapes",
+  "description": "contains 3 points",
+  "region": {
+    "type": "multipoint",
+    "coordinates": [
+      [
+        77.5929594039917,
+        12.969347306502671
+      ],
+      [
+        77.6004695892334,
+        12.979007674139009
+      ],
+      [
+        77.60068416595459,
+        12.961735843534306
+      ]
+    ]
+  }
+}

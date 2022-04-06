@@ -1,0 +1,19 @@
+{
+    "name": "linestring for putney bridge",
+    "city": "london",
+    "type": "geoshapes",
+    "description": "linestring for putney bridge",
+    "region": {
+        "type": "linestring",
+        "coordinates": [
+            [
+                -0.21183013916015625,
+                51.46791083061189
+            ],
+            [
+                -0.21431922912597656,
+                51.465504685939706
+            ]
+        ]
+    }
+}
