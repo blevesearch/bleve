@@ -179,3 +179,229 @@ type later interface {
 type lnger interface {
 	Lng() float64
 }
+
+// GlueBytes primarily for quicker filtering of docvalues
+// during the filtering phase.
+var GlueBytes = []byte("##")
+
+var GlueBytesOffset = len(GlueBytes)
+
+func extractCoordinates(thing interface{}) []float64 {
+	thingVal := reflect.ValueOf(thing)
+	if !thingVal.IsValid() {
+		return nil
+	}
+
+	if thingVal.Kind() == reflect.Slice {
+		// must be length 2
+		if thingVal.Len() == 2 {
+			var foundLon, foundLat bool
+			var lon, lat float64
+			first := thingVal.Index(0)
+			if first.CanInterface() {
+				firstVal := first.Interface()
+				lon, foundLon = extractNumericVal(firstVal)
+			}
+			second := thingVal.Index(1)
+			if second.CanInterface() {
+				secondVal := second.Interface()
+				lat, foundLat = extractNumericVal(secondVal)
+			}
+
+			if !foundLon || !foundLat {
+				return nil
+			}
+
+			return []float64{lon, lat}
+		}
+	}
+	return nil
+}
+
+func extract2DCoordinates(thing interface{}) [][]float64 {
+	thingVal := reflect.ValueOf(thing)
+	if !thingVal.IsValid() {
+		return nil
+	}
+
+	rv := make([][]float64, 0, 8)
+	if thingVal.Kind() == reflect.Slice {
+		for j := 0; j < thingVal.Len(); j++ {
+			edges := thingVal.Index(j).Interface()
+			if es, ok := edges.([]interface{}); ok {
+				rv = append(rv, extractCoordinates(es))
+			}
+		}
+
+		return rv
+	}
+
+	return nil
+}
+
+func extract3DCoordinates(thing interface{}) (c [][][]float64) {
+	coords := reflect.ValueOf(thing)
+	for i := 0; i < coords.Len(); i++ {
+		vals := coords.Index(i)
+
+		edges := vals.Interface()
+		if es, ok := edges.([]interface{}); ok {
+			loop := extract2DCoordinates(es)
+			if len(loop) > 0 {
+				c = append(c, loop)
+			}
+		}
+	}
+
+	return c
+}
+
+func extract4DCoordinates(thing interface{}) (rv [][][][]float64) {
+	thingVal := reflect.ValueOf(thing)
+	if !thingVal.IsValid() {
+		return nil
+	}
+
+	if thingVal.Kind() == reflect.Slice {
+		for j := 0; j < thingVal.Len(); j++ {
+			c := extract3DCoordinates(thingVal.Index(j).Interface())
+			rv = append(rv, c)
+		}
+	}
+
+	return rv
+}
+
+func extractGeoShape(thing interface{}) ([][][][]float64, string, bool) {
+	thingVal := reflect.ValueOf(thing)
+	if !thingVal.IsValid() {
+		return nil, "", false
+	}
+
+	var coordValue interface{}
+	var typ string
+	if thingVal.Kind() == reflect.Map {
+		iter := thingVal.MapRange()
+		for iter.Next() {
+			if iter.Key().String() == "type" {
+				typ = iter.Value().Interface().(string)
+				// make the shape type case insensitive.
+				typ = strings.ToLower(typ)
+				continue
+			}
+			if iter.Key().String() == "coordinates" {
+				coordValue = iter.Value().Interface()
+			}
+		}
+	}
+
+	return ExtractGeoShapeCoordinates(coordValue, typ)
+}
+
+// ExtractGeometryCollection takes an interface{} and tries it's best to
+// interpret all the member geojson shapes within it.
+func ExtractGeometryCollection(thing interface{}) ([][][][][]float64, []string, bool) {
+	thingVal := reflect.ValueOf(thing)
+	if !thingVal.IsValid() {
+		return nil, nil, false
+	}
+	var rv [][][][][]float64
+	var types []string
+	var f bool
+
+	if thingVal.Kind() == reflect.Map {
+		iter := thingVal.MapRange()
+		for iter.Next() {
+
+			if iter.Key().String() == "type" {
+				continue
+			}
+
+			if iter.Key().String() == "geometries" {
+				collection := iter.Value().Interface()
+				items := reflect.ValueOf(collection)
+
+				for j := 0; j < items.Len(); j++ {
+					coords, shape, found := extractGeoShape(items.Index(j).Interface())
+					if found {
+						f = found
+						rv = append(rv, coords)
+						types = append(types, shape)
+					}
+				}
+			}
+		}
+	}
+
+	return rv, types, f
+}
+
+// ExtractCircle takes an interface{} and tries it's best to
+// interpret the center point coordinates and the radius for a
+// given circle shape.
+func ExtractCircle(thing interface{}) ([]float64, float64, bool) {
+	thingVal := reflect.ValueOf(thing)
+	if !thingVal.IsValid() {
+		return nil, 0, false
+	}
+	var rv []float64
+	var radius float64
+	var radiusStr string
+
+	if thingVal.Kind() == reflect.Map {
+		iter := thingVal.MapRange()
+		for iter.Next() {
+
+			if iter.Key().String() == "radius" {
+				radiusStr = iter.Value().Interface().(string)
+				r, err := ParseDistance(radiusStr)
+				if err != nil {
+					return nil, 0, false
+				}
+				radius = r
+				continue
+			}
+
+			if iter.Key().String() == "coordinates" {
+				lng, lat, found := ExtractGeoPoint(iter.Value().Interface())
+				if !found {
+					return nil, 0, false
+				}
+				rv = append(rv, lng)
+				rv = append(rv, lat)
+			}
+		}
+	}
+
+	return rv, radius, true
+}
+
+// ExtractGeoShapeCoordinates takes an interface{} and tries it's best to
+// interpret the coordinates for any of the given geoshape typ like
+// a point, multipoint, linestring, multilinestring, polygon, multipolygon,
+func ExtractGeoShapeCoordinates(coordValue interface{},
+	typ string) ([][][][]float64, string, bool) {
+	var rv [][][][]float64
+	if typ == PointType {
+		rv = [][][][]float64{{{extractCoordinates(coordValue)}}}
+		return rv, typ, true
+	}
+
+	if typ == MultiPointType || typ == LineStringType ||
+		typ == EnvelopeType {
+		rv = [][][][]float64{{extract2DCoordinates(coordValue)}}
+		return rv, typ, true
+	}
+
+	if typ == PolygonType || typ == MultiLineStringType {
+		rv = [][][][]float64{extract3DCoordinates(coordValue)}
+		return rv, typ, true
+	}
+
+	if typ == MultiPolygonType {
+		rv = extract4DCoordinates(coordValue)
+		return rv, typ, true
+	}
+
+	return rv, typ, false
+}

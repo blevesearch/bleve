@@ -77,7 +77,7 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 			}
 		}
 		switch field.Type {
-		case "text", "datetime", "number", "boolean", "geopoint", "IP":
+		case "text", "datetime", "number", "boolean", "geopoint", "geoshape", "IP":
 		default:
 			return fmt.Errorf("unknown field type: '%s'", field.Type)
 		}
@@ -427,7 +427,9 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		if subDocMapping != nil {
 			// index by explicit mapping
 			for _, fieldMapping := range subDocMapping.Fields {
-				if fieldMapping.Type == "geopoint" {
+				if fieldMapping.Type == "geoshape" {
+					fieldMapping.processGeoShape(property, pathString, path, indexes, context)
+				} else if fieldMapping.Type == "geopoint" {
 					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
 				} else {
 					fieldMapping.processString(propertyValueString, pathString, path, indexes, context)
@@ -510,6 +512,8 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				for _, fieldMapping := range subDocMapping.Fields {
 					if fieldMapping.Type == "geopoint" {
 						fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
+					} else if fieldMapping.Type == "geoshape" {
+						fieldMapping.processGeoShape(property, pathString, path, indexes, context)
 					}
 				}
 			}
@@ -526,6 +530,8 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 					if ok {
 						fieldMapping.processIP(ip, pathString, path, indexes, context)
 					}
+				case "geoshape":
+					fieldMapping.processGeoShape(property, pathString, path, indexes, context)
 				}
 			}
 		}

@@ -282,6 +282,16 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
+
+	_, hasGeo := tmp["geometry"]
+	if hasGeo {
+		var rv GeoShapeQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
 	return nil, fmt.Errorf("unknown query type")
 }
 

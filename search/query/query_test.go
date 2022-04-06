@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/mapping"
 )
 
@@ -439,5 +440,69 @@ func TestDumpQuery(t *testing.T) {
 }`)
 	if wanted != s {
 		t.Fatalf("query:\n%s\ndiffers from expected:\n%s", s, wanted)
+	}
+}
+
+func TestGeoShapeQuery(t *testing.T) {
+	tests := []struct {
+		input  []byte
+		output Query
+		err    bool
+	}{
+		{
+			input: []byte(`{      
+				"field" : "region",
+				 "geometry": {
+					 "shape": {
+						 "type": "polygon",
+						"coordinates": [
+							[                 
+							[                   
+								74.1357421875,
+								30.600093873550072
+							],              
+							[                  
+								67.0166015625,
+								21.57571893245848
+							],              
+							[                  
+								68.8623046875,
+								9.145486056167277
+							],              
+							[                  
+								83.1884765625,
+								4.083452772038619
+							],              
+							[                  
+								88.9892578125,
+								22.67484735118852
+							],              
+							[                   
+								74.1357421875,
+								30.600093873550072
+							]]]                       
+						},
+					  "relation": "intersects"
+			  }}`),
+			output: func() Query {
+				q := NewGeoShapeQuery([][][][]float64{{{{74.1357421875, 30.600093873550072},
+					{67.0166015625, 21.57571893245848}, {68.8623046875, 9.145486056167277},
+					{83.1884765625, 4.083452772038619}, {88.9892578125, 22.67484735118852},
+					{74.1357421875, 30.600093873550072}}}}, geo.PolygonType, "intersects")
+				q.SetField("region")
+				return q
+			}(),
+		},
+	}
+
+	for i, test := range tests {
+		actual, err := ParseQuery(test.input)
+		if err != nil && test.err == false {
+			t.Errorf("error %v for %d", err, i)
+		}
+
+		if !reflect.DeepEqual(test.output, actual) {
+			t.Errorf("expected: %#v, got: %#v for %s", test.output, actual, string(test.input))
+		}
 	}
 }
