@@ -35,13 +35,54 @@ type GeoShapeQuery struct {
 	BoostVal *Boost   `json:"boost,omitempty"`
 }
 
-func NewGeoShapeQuery(coordinates [][][][]float64, typ, relation string) *GeoShapeQuery {
+// NewGeoShapeQuery creates a geoshape query for the
+// given shape type. This method can be used for
+// creating geoshape queries for shape types like: point,
+// linestring, polygon, multipoint, multilinestring,
+// multipolygon and envelope.
+func NewGeoShapeQuery(coordinates [][][][]float64, typ,
+	relation string) (*GeoShapeQuery, error) {
 	s, _, err := geo.NewGeoJsonShape(coordinates, typ)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
-	return &GeoShapeQuery{Geometry: Geometry{Shape: s, Relation: relation}}
+	return &GeoShapeQuery{Geometry: Geometry{Shape: s,
+		Relation: relation}}, nil
+}
+
+// NewGeoShapeCircleQuery creates a geoshape query for the
+// given center point and the radius. Radius formats supported:
+// "5in" "5inch" "7yd" "7yards" "9ft" "9feet" "11km" "11kilometers"
+// "3nm" "3nauticalmiles" "13mm" "13millimeters" "15cm" "15centimeters"
+// "17mi" "17miles" "19m" "19meters" If the unit cannot be determined,
+// the entire string is parsed and the unit of meters is assumed.
+func NewGeoShapeCircleQuery(coordinates []float64, radius,
+	relation string) (*GeoShapeQuery, error) {
+	radiusInMeters, err := geo.ParseDistance(radius)
+	if err != nil {
+		return nil, err
+	}
+	s, _, err := geo.NewGeoCircleShape(coordinates, radiusInMeters)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GeoShapeQuery{Geometry: Geometry{Shape: s,
+		Relation: relation}}, nil
+}
+
+// NewGeometryCollectionQuery creates a geoshape query for the
+// given geometrycollection coordinates and types.
+func NewGeometryCollectionQuery(coordinates [][][][][]float64, types []string,
+	relation string) (*GeoShapeQuery, error) {
+	s, _, err := geo.NewGeometryCollection(coordinates, types)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GeoShapeQuery{Geometry: Geometry{Shape: s,
+		Relation: relation}}, nil
 }
 
 func (q *GeoShapeQuery) SetBoost(b float64) {
@@ -68,7 +109,8 @@ func (q *GeoShapeQuery) Searcher(i index.IndexReader,
 		field = m.DefaultSearchField()
 	}
 
-	return searcher.NewGeoShapeSearcher(i, q.Geometry.Shape, q.Geometry.Relation, field, q.BoostVal.Value(), options)
+	return searcher.NewGeoShapeSearcher(i, q.Geometry.Shape, q.Geometry.Relation, field,
+		q.BoostVal.Value(), options)
 }
 
 func (q *GeoShapeQuery) Validate() error {
