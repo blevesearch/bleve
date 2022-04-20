@@ -680,3 +680,77 @@ func setupGeoJsonShapesIndexForMultiPolygonQuery(t *testing.T) index.Index {
 
 	return i
 }
+
+func setupGeoJsonPolygonS2LoopPortingIssue(t *testing.T) index.Index {
+	analysisQueue := index.NewAnalysisQueue(1)
+	i, err := scorch.NewScorch(
+		gtreap.Name,
+		map[string]interface{}{
+			"path":          "",
+			"spatialPlugin": "s2",
+		},
+		analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	polygon1 := [][][][]float64{{{{-135.0, -38.0},
+		{149.0, -38.0}, {149.0, 77.0},
+		{-135.0, 77.0}}}}
+	doc := document.NewDocument("polygon1")
+	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry", []uint64{},
+		polygon1, "polygon", document.DefaultGeoShapeIndexingOptions))
+	err = i.Update(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return i
+}
+
+func TestGeoJsonPolygonContainsQueryS2LoopPortingIssue(t *testing.T) {
+	tests := []struct {
+		polygon [][][]float64
+		field   string
+		want    []string
+	}{
+
+		// test containment query polygon for polygon1.
+		{[][][]float64{{{13.007812500000002, 37.99616267972809},
+			{13.559375000000002, 37.99616267972809}, {13.559375000000002, 38.472819658516866},
+			{13.007812500000002, 38.472819658516866}}},
+			"geometry", []string{"polygon1"}},
+
+		// test containment query polygon for polygon1.
+		{[][][]float64{{{13.007812500000002, 37.99616267972809},
+			{13.359375000000002, 37.99616267972809}, {13.359375000000002, 38.272819658516866},
+			{13.007812500000002, 38.272819658516866}}},
+			"geometry", []string{"polygon1"}},
+	}
+	i := setupGeoJsonPolygonS2LoopPortingIssue(t)
+	indexReader, err := i.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err = indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	for n, test := range tests {
+		got, err := runGeoShapePolygonQueryWithRelation("contains",
+			indexReader, test.polygon, test.field)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("test %d, expected %v, got %v for polygon: %+v",
+				n, test.want, got, test.polygon)
+		}
+	}
+}
