@@ -261,6 +261,13 @@ func TestGeoJsonPolygonWithInQuery(t *testing.T) {
 			{8.516979217529295, 47.38733837470806}, {8.522472381591797, 47.38794853343167},
 			{8.516507148742676, 47.388994503382285}, {8.515305519104004, 47.392597129887}}},
 			"geometry", nil},
+
+		// test with query polygon for all the shapes.
+		{[][][]float64{{{-135.0, -38.0},
+			{149.0, -38.0}, {149.0, 77.0}, {-135.0, 77.0}}},
+			"geometry", []string{"polygon1", "polygon2", "polygon3", "envelope1", "circle1", "linestring1",
+				"linestring2", "linestring3", "multilinestring1", "multilinestring2", "multipoint1",
+				"polygonWithHole1", "polygon4", "multipolygon1"}},
 	}
 
 	i := setupGeoJsonShapesIndexForPolygonQuery(t)
