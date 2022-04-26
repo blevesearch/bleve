@@ -1432,5 +1432,69 @@
         }
       ]
     }
+  },
+  {
+    "comment": "search a polygon(almost the whole earth surface) that contains every indexed shape",
+    "search": {
+      "from": 0,
+      "size": 10,
+      "query": {
+        "geometry": {
+          "shape": {
+            "type": "polygon",
+            "coordinates": [
+              [
+                [
+                  -135.0, -38.0
+                ],
+                [
+                  149.0, -38.0
+                ],
+                [
+                  149.0, 77.0
+                ],
+                [
+                  -135.0, 77.0
+                ]
+              ]
+            ]
+          },
+          "relation": "within"
+        }
+      },
+      "sort": ["-_id"]
+    },
+    "result": {
+      "total_hits": 9,
+      "hits": [
+        {
+          "id": "polygon_cubbonpark"
+        },
+        {
+          "id": "point_museum_of_london"
+        },
+        {
+          "id": "multipolygon_london_parks"
+        },
+        {
+          "id": "multipoint_blr_stadiums"
+        },
+        {
+          "id": "multilinestring_old_airport_road"
+        },
+        {
+          "id": "linestring_putney_bridge"
+        },
+        {
+          "id": "geometrycollection_tvm"
+        },
+        {
+          "id": "envelope_brockwell_park"
+        },
+        {
+          "id": "circle_halairport"
+        }
+      ]
+    }
   }
 ]
