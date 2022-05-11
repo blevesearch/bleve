@@ -40,6 +40,7 @@ type PhraseSearcher struct {
 	paths        []phrasePath
 	locations    []search.Location
 	initialized  bool
+	slop         int
 }
 
 func (s *PhraseSearcher) Size() int {
@@ -129,6 +130,7 @@ func NewMultiPhraseSearcher(indexReader index.IndexReader, terms [][]string, fie
 	rv := PhraseSearcher{
 		mustSearcher: mustSearcher,
 		terms:        terms,
+		slop:         options.Slop,
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
@@ -252,7 +254,7 @@ func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext,
 	if s.path == nil {
 		s.path = make(phrasePath, 0, len(s.terms))
 	}
-	s.paths = findPhrasePaths(0, nil, s.terms, tlm, s.path[:0], 0, s.paths[:0])
+	s.paths = findPhrasePaths(0, nil, s.terms, tlm, s.path[:0], s.slop, s.paths[:0])
 	for _, p := range s.paths {
 		for _, pp := range p {
 			ftls = append(ftls, search.FieldTermLocation{
