@@ -376,7 +376,7 @@ func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]s
 
 				// this location works, add it to the path (but not for empty term)
 				px := append(p, phrasePart{term: carTerm, loc: loc})
-				rv = findPhrasePaths(loc.Pos, loc.ArrayPositions, cdr, tlm, px, remainingSlop-dist, rv)
+				rv = findPhrasePaths(loc.Pos, loc.ArrayPositions, cdr, tlm, px, remainingSlop, rv)
 			}
 		}
 	}
