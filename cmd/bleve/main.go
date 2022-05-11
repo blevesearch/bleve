@@ -15,10 +15,10 @@
 package main
 
 import (
-	"github.com/blevesearch/bleve/v2/cmd/bleve/cmd"
+	"github.com/ltraniello/bleve/v2/cmd/bleve/cmd"
 
 	// to support standard set of build tags
-	_ "github.com/blevesearch/bleve/v2/config"
+	_ "github.com/ltraniello/bleve/v2/config"
 )
 
 func main() {

@@ -18,8 +18,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/ltraniello/bleve/v2/search"
 )
 
 func TestPhraseSearch(t *testing.T) {
@@ -474,6 +474,19 @@ func TestFindPhrasePathsSloppy(t *testing.T) {
 			phrase: [][]string{[]string{"three"}, []string{"one"}, []string{"five"}},
 			slop:   1,
 		},
+		{
+			phrase: [][]string{[]string{"three"}, []string{"one"}, []string{"four"}},
+			slop:   3,
+			paths: []phrasePath{
+				phrasePath{
+					phrasePart{"three", &search.Location{Pos: 3}},
+					phrasePart{"one", &search.Location{Pos: 1}},
+					phrasePart{"four", &search.Location{Pos: 4}},
+				},
+			},
+
+		},
+
 
 		{
 			phrase: [][]string{[]string{"one"}, []string{"three"}, []string{"five"}},

@@ -17,8 +17,8 @@ package hr
 import (
 	"strings"
 
-	"github.com/blevesearch/bleve/v2/analysis"
-	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/ltraniello/bleve/v2/analysis"
+	"github.com/ltraniello/bleve/v2/registry"
 )
 
 const SuffixTransformationFilterName = "hr_suffix_transformation_filter"

@@ -20,8 +20,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blevesearch/bleve/v2/index/scorch"
-	"github.com/blevesearch/bleve/v2/search"
+	"github.com/ltraniello/bleve/v2/index/scorch"
+	"github.com/ltraniello/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 )
 

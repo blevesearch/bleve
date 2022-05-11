@@ -19,8 +19,8 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/ltraniello/bleve/v2/size"
 )
 
 var reflectStaticSizeDocumentMatch int

@@ -22,12 +22,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
+	"github.com/ltraniello/bleve/v2/analysis/analyzer/keyword"
 	index "github.com/blevesearch/bleve_index_api"
 
-	"github.com/blevesearch/bleve/v2/analysis"
-	"github.com/blevesearch/bleve/v2/document"
-	"github.com/blevesearch/bleve/v2/geo"
+	"github.com/ltraniello/bleve/v2/analysis"
+	"github.com/ltraniello/bleve/v2/document"
+	"github.com/ltraniello/bleve/v2/geo"
 )
 
 // control the default behavior for dynamic fields (those not explicitly mapped)

@@ -19,8 +19,8 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/blevesearch/bleve/v2/analysis"
-	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/ltraniello/bleve/v2/analysis"
+	"github.com/ltraniello/bleve/v2/registry"
 )
 
 const Name = "regexp"

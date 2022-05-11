@@ -25,14 +25,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/blevesearch/bleve/v2/document"
-	"github.com/blevesearch/bleve/v2/index/upsidedown"
-	"github.com/blevesearch/bleve/v2/mapping"
-	"github.com/blevesearch/bleve/v2/registry"
-	"github.com/blevesearch/bleve/v2/search"
-	"github.com/blevesearch/bleve/v2/search/collector"
-	"github.com/blevesearch/bleve/v2/search/facet"
-	"github.com/blevesearch/bleve/v2/search/highlight"
+	"github.com/ltraniello/bleve/v2/document"
+	"github.com/ltraniello/bleve/v2/index/upsidedown"
+	"github.com/ltraniello/bleve/v2/mapping"
+	"github.com/ltraniello/bleve/v2/registry"
+	"github.com/ltraniello/bleve/v2/search"
+	"github.com/ltraniello/bleve/v2/search/collector"
+	"github.com/ltraniello/bleve/v2/search/facet"
+	"github.com/ltraniello/bleve/v2/search/highlight"
 	index "github.com/blevesearch/bleve_index_api"
 )
 

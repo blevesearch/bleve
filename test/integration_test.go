@@ -26,11 +26,11 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/blevesearch/bleve/v2"
-	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/ltraniello/bleve/v2"
+	"github.com/ltraniello/bleve/v2/mapping"
 
 	// allow choosing alternate kvstores
-	_ "github.com/blevesearch/bleve/v2/config"
+	_ "github.com/ltraniello/bleve/v2/config"
 )
 
 var dataset = flag.String("dataset", "", "only test datasets matching this regex")

@@ -19,7 +19,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	index "github.com/blevesearch/bleve_index_api"
 
-	"github.com/blevesearch/bleve/v2/geo"
+	"github.com/ltraniello/bleve/v2/geo"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 
 	zapv11 "github.com/blevesearch/zapx/v11"

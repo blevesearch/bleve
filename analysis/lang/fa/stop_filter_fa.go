@@ -15,9 +15,9 @@
 package fa
 
 import (
-	"github.com/blevesearch/bleve/v2/analysis"
-	"github.com/blevesearch/bleve/v2/analysis/token/stop"
-	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/ltraniello/bleve/v2/analysis"
+	"github.com/ltraniello/bleve/v2/analysis/token/stop"
+	"github.com/ltraniello/bleve/v2/registry"
 )
 
 func StopTokenFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {

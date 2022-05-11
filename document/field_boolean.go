@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/blevesearch/bleve/v2/analysis"
-	"github.com/blevesearch/bleve/v2/size"
+	"github.com/ltraniello/bleve/v2/analysis"
+	"github.com/ltraniello/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
