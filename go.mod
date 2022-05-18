@@ -26,5 +26,6 @@ require (
 	github.com/golang/protobuf v1.3.2
 	github.com/spf13/cobra v0.0.5
 	go.etcd.io/bbolt v1.3.5
+	golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6 // indirect
 	golang.org/x/text v0.3.7
 )
