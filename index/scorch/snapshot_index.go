@@ -539,7 +539,6 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 			}
 			rv.dicts[i] = dict
 		}
-
 	}
 
 	for i, segment := range i.segment {
@@ -549,11 +548,16 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		}
 		rv.postings[i] = pl
 		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, rv.iterators[i])
+
 		if _, ok := segment.segment.(segmentl.BytesOffDiskStats); ok {
+			if postings, ok := pl.(segmentl.BytesOffDiskStats); ok {
+				bytesRead += postings.BytesRead()
+			}
+
 			if itr, ok := rv.iterators[i].(segmentl.BytesOffDiskStats); ok {
 				bytesRead += itr.BytesRead()
-				log.Printf("bytes read of disk for this query %v\n", bytesRead)
 			}
+			log.Printf("bytes read of disk for this query %v\n", bytesRead)
 		}
 	}
 	atomic.AddUint64(&i.parent.stats.TotTermSearchersStarted, uint64(1))
