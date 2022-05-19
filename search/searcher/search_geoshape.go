@@ -20,6 +20,7 @@ import (
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/geo/geojson"
 )
 
 func NewGeoShapeSearcher(indexReader index.IndexReader, shape index.GeoJSON,
@@ -56,22 +57,58 @@ func NewGeoShapeSearcher(indexReader index.IndexReader, shape index.GeoJSON,
 
 }
 
+// Using the same term splitter slice used in the doc values in zap.
+// TODO: This needs to be revisited whenever we change the zap
+// implementation of doc values.
+var termSeparatorSplitSlice = []byte{0xff}
+
 func buildRelationFilterOnShapes(dvReader index.DocValueReader, field string,
 	relation string, shape index.GeoJSON) FilterFunc {
+	// this is for accumulating the shape's actual complete value
+	// spread across multiple docvalue visitor callbacks.
+	var dvShapeValue []byte
+	var startReading, finishReading bool
+	var reader *bytes.Reader
 	return func(d *search.DocumentMatch) bool {
 		var found bool
 
 		err := dvReader.VisitDocValues(d.IndexInternalID,
 			func(field string, term []byte) {
+
 				// only consider the values which are GlueBytes prefixed.
 				if len(term) > geo.GlueBytesOffset {
-					if bytes.Equal(geo.GlueBytes, term[:geo.GlueBytesOffset]) {
 
-						v, err := geo.FilterGeoShapesOnRelation(shape,
-							term[geo.GlueBytesOffset:], relation)
+					if !startReading && bytes.Equal(geo.GlueBytes, term[:geo.GlueBytesOffset]) {
+						if bytes.Equal(geo.GlueBytes, term[len(term)-geo.GlueBytesOffset:]) {
+							term = term[:len(term)-geo.GlueBytesOffset]
+							dvShapeValue = append(dvShapeValue, term[geo.GlueBytesOffset:]...)
+							finishReading = true
+						} else {
+							startReading = true
+							dvShapeValue = append(dvShapeValue, term[geo.GlueBytesOffset:]...)
+							dvShapeValue = append(dvShapeValue, termSeparatorSplitSlice...)
+						}
+					} else if startReading && !finishReading {
+						if bytes.Equal(geo.GlueBytes, term[len(term)-geo.GlueBytesOffset:]) {
+							term = term[:len(term)-geo.GlueBytesOffset]
+							dvShapeValue = append(dvShapeValue, term...)
+							finishReading = true
+						} else {
+							dvShapeValue = append(dvShapeValue, term...)
+							dvShapeValue = append(dvShapeValue, termSeparatorSplitSlice...)
+						}
+					}
+
+					// apply the filter once the entire docvalue is finished reading.
+					if finishReading {
+						v, err := geojson.FilterGeoShapesOnRelation(shape,
+							dvShapeValue, relation, &reader)
 						if err == nil && v {
 							found = true
 						}
+						dvShapeValue = dvShapeValue[:0]
+						startReading = false
+						finishReading = false
 					}
 				}
 			})

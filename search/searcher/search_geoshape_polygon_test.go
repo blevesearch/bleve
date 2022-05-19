@@ -761,3 +761,103 @@ func TestGeoJsonPolygonContainsQueryS2LoopPortingIssue(t *testing.T) {
 		}
 	}
 }
+
+func TestGeoJsonPolygonIntersectsQuery1(t *testing.T) {
+	tests := []struct {
+		polygon [][][]float64
+		field   string
+		want    []string
+	}{
+
+		// test non-intersecting query polygon.
+		{[][][]float64{{{97.745361328125,
+			68.21644657802169},
+			{97.701416015625,
+				67.97051353559428}, {97.80029296875,
+				67.97875365614591},
+			{97.745361328125,
+				68.21644657802169}}}, "geometry", nil},
+
+		// test intersecting query polygon.
+		{[][][]float64{{{77.59214401245117,
+			12.966043458314124},
+			{77.58853912353516,
+				12.95232574618635}, {77.60943889617919,
+				12.956466232826733},
+			{77.59214401245117,
+				12.966043458314124}}}, "geometry", nil},
+
+		// test intersecting query polygon for polygon1.
+		{[][][]float64{{{97.0806884765625, 61.61423180712503},
+			{96.7510986328125, 61.54625879879804},
+			{97.305908203125, 61.367777577924},
+			{97.0806884765625, 61.61423180712503}}}, "geometry", []string{"polygon1"}},
+	}
+	i := setupGeoJsonShapesIndexForPolygonQuery1(t)
+	indexReader, err := i.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err = indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	for n, test := range tests {
+		got, err := runGeoShapePolygonQueryWithRelation("intersects",
+			indexReader, test.polygon, test.field)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("test %d, expected %v, got %v for polygon: %+v", n,
+				test.want, got, test.polygon)
+		}
+	}
+}
+
+func setupGeoJsonShapesIndexForPolygonQuery1(t *testing.T) index.Index {
+	analysisQueue := index.NewAnalysisQueue(1)
+	i, err := scorch.NewScorch(
+		gtreap.Name,
+		map[string]interface{}{
+			"path":          "",
+			"spatialPlugin": "s2",
+		},
+		analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	polygon1 := [][][][]float64{{{{96.69202458735312, 61.59480859768306},
+		{96.79202458735311, 61.39480859768306},
+		{96.79202458735311, 61.59480859768306},
+		{96.69202458735312, 61.59480859768306}}}}
+	doc := document.NewDocument("polygon1")
+	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry", []uint64{},
+		polygon1, "polygon", document.DefaultGeoShapeIndexingOptions))
+	err = i.Update(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	polygon2 := [][][][]float64{{{{91.35604953911839, 65.11164029408492},
+		{91.45604953911838, 64.91164029408492},
+		{91.45604953911838, 65.11164029408492},
+		{91.35604953911839, 65.11164029408492}}}}
+	doc = document.NewDocument("polygon2")
+	doc.AddField(document.NewGeoShapeFieldWithIndexingOptions("geometry", []uint64{},
+		polygon2, "polygon", document.DefaultGeoShapeIndexingOptions))
+	err = i.Update(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return i
+}
