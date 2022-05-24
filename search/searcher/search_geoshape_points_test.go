@@ -26,7 +26,7 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-func TestGeoJsonPointWithInQuery(t *testing.T) {
+func TestGeoJsonPointContainsQuery(t *testing.T) {
 	tests := []struct {
 		point []float64
 		field string
@@ -54,11 +54,11 @@ func TestGeoJsonPointWithInQuery(t *testing.T) {
 
 		// test point on the linestring vertex.
 		{[]float64{77.57776737213135, 12.952074805390097},
-			"geometry", []string{"linestring1"}},
+			"geometry", nil},
 
 		// test point on the multilinestring vertex.
 		{[]float64{77.5779390335083, 12.945006535817749},
-			"geometry", []string{"multilinestring1"}},
+			"geometry", nil},
 
 		// test point on the multipoint vertex.
 		{[]float64{77.56407737731932, 12.951614746607163},
@@ -131,7 +131,7 @@ func TestGeoJsonMultiPointWithInQuery(t *testing.T) {
 		// test multipoint on the linestring vertex.
 		{[][]float64{{77.5841188430786, 12.957093573282744},
 			{77.57776737213135, 12.952074805390097}},
-			"geometry", []string{"linestring1"}},
+			"geometry", nil},
 
 		// test multipoint outside the linestring vertex.
 		{[][]float64{{77.5841188430786, 12.957093573282744},
@@ -142,7 +142,7 @@ func TestGeoJsonMultiPointWithInQuery(t *testing.T) {
 		// test multipoint on the multilinestring vertex.
 		{[][]float64{{77.5779390335083, 12.94471376293191},
 			{77.57218837738037, 12.948268838994263}},
-			"geometry", []string{"multilinestring1"}},
+			"geometry", nil},
 
 		// test multipoint outside the multilinestring vertex.
 		{[][]float64{{77.5779390335083, 12.94471376293191},

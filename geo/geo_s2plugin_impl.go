@@ -15,11 +15,25 @@
 package geo
 
 import (
+	"encoding/json"
 	"sync"
 
 	index "github.com/blevesearch/bleve_index_api"
 
+	"github.com/blevesearch/geo/geojson"
 	"github.com/blevesearch/geo/s2"
+)
+
+const (
+	PointType              = "point"
+	MultiPointType         = "multipoint"
+	LineStringType         = "linestring"
+	MultiLineStringType    = "multilinestring"
+	PolygonType            = "polygon"
+	MultiPolygonType       = "multipolygon"
+	GeometryCollectionType = "geometrycollection"
+	CircleType             = "circle"
+	EnvelopeType           = "envelope"
 )
 
 // spatialPluginsMap is spatial plugin cache.
@@ -27,6 +41,19 @@ var (
 	spatialPluginsMap = make(map[string]index.SpatialAnalyzerPlugin)
 	pluginsMapLock    = sync.RWMutex{}
 )
+
+func init() {
+	registerS2RegionTermIndexer()
+}
+
+func registerS2RegionTermIndexer() {
+	spatialPlugin := S2SpatialAnalyzerPlugin{
+		s2Indexer:  s2.NewRegionTermIndexerWithOptions(initS2IndexerOptions()),
+		s2Searcher: s2.NewRegionTermIndexerWithOptions(initS2SearcherOptions()),
+	}
+
+	RegisterSpatialAnalyzerPlugin(&spatialPlugin)
+}
 
 // RegisterSpatialAnalyzerPlugin registers the given plugin implementation.
 func RegisterSpatialAnalyzerPlugin(plugin index.SpatialAnalyzerPlugin) {
@@ -43,41 +70,53 @@ func GetSpatialAnalyzerPlugin(typ string) index.SpatialAnalyzerPlugin {
 	return rv
 }
 
-func init() {
-	registerS2RegionTermIndexer()
-}
-
-func registerS2RegionTermIndexer() {
-	// refer for detailed commentary on s2 options here
-	// https://github.com/blevesearch/geo/blob/5734244d948a0ccf9a6b00e02d1a05f94cbc8849/s2/region_term_indexer.go#L92
-	options := &s2.Options{}
-
+func initS2IndexerOptions() s2.Options {
+	options := s2.Options{}
 	// maxLevel control the maximum size of the
 	// S2Cells used to approximate regions.
 	options.SetMaxLevel(16)
 
 	// minLevel control the minimum size of the
 	// S2Cells used to approximate regions.
-	options.SetMinLevel(4)
+	options.SetMinLevel(2)
 
 	// levelMod value greater than 1 increases the effective branching
 	// factor of the S2Cell hierarchy by skipping some levels.
-	options.SetLevelMod(2)
+	options.SetLevelMod(1)
+
+	// maxCells controls the maximum number of cells
+	// when approximating each s2 region.
+	options.SetMaxCells(20)
+
+	return options
+}
+
+func initS2SearcherOptions() s2.Options {
+	options := s2.Options{}
+	// maxLevel control the maximum size of the
+	// S2Cells used to approximate regions.
+	options.SetMaxLevel(16)
+
+	// minLevel control the minimum size of the
+	// S2Cells used to approximate regions.
+	options.SetMinLevel(2)
+
+	// levelMod value greater than 1 increases the effective branching
+	// factor of the S2Cell hierarchy by skipping some levels.
+	options.SetLevelMod(1)
 
 	// maxCells controls the maximum number of cells
 	// when approximating each s2 region.
 	options.SetMaxCells(8)
 
-	spatialPlugin := S2SpatialAnalyzerPlugin{
-		s2Indexer: s2.NewRegionTermIndexerWithOptions(*options)}
-
-	RegisterSpatialAnalyzerPlugin(&spatialPlugin)
+	return options
 }
 
 // S2SpatialAnalyzerPlugin is an implementation of
 // the index.SpatialAnalyzerPlugin interface.
 type S2SpatialAnalyzerPlugin struct {
-	s2Indexer *s2.RegionTermIndexer
+	s2Indexer  *s2.RegionTermIndexer
+	s2Searcher *s2.RegionTermIndexer
 }
 
 func (s *S2SpatialAnalyzerPlugin) Type() string {
@@ -87,33 +126,33 @@ func (s *S2SpatialAnalyzerPlugin) Type() string {
 func (s *S2SpatialAnalyzerPlugin) GetIndexTokens(queryShape index.GeoJSON) []string {
 	var rv []string
 	shapes := []index.GeoJSON{queryShape}
-	if gc, ok := queryShape.(*geometryCollection); ok {
+	if gc, ok := queryShape.(*geojson.GeometryCollection); ok {
 		shapes = gc.Shapes
 	}
 
 	for _, shape := range shapes {
 		if s2t, ok := shape.(s2Tokenizable); ok {
-			rv = append(rv, s2t.IndexTokens(s)...)
+			rv = append(rv, s2t.IndexTokens(s.s2Indexer)...)
 		}
 	}
 
-	return stripCoveringTerms(rv)
+	return geojson.DeduplicateTerms(rv)
 }
 
 func (s *S2SpatialAnalyzerPlugin) GetQueryTokens(queryShape index.GeoJSON) []string {
 	var rv []string
 	shapes := []index.GeoJSON{queryShape}
-	if gc, ok := queryShape.(*geometryCollection); ok {
+	if gc, ok := queryShape.(*geojson.GeometryCollection); ok {
 		shapes = gc.Shapes
 	}
 
 	for _, shape := range shapes {
 		if s2t, ok := shape.(s2Tokenizable); ok {
-			rv = append(rv, s2t.QueryTokens(s)...)
+			rv = append(rv, s2t.QueryTokens(s.s2Searcher)...)
 		}
 	}
 
-	return stripCoveringTerms(rv)
+	return geojson.DeduplicateTerms(rv)
 }
 
 // ------------------------------------------------------------------------
@@ -123,196 +162,110 @@ func (s *S2SpatialAnalyzerPlugin) GetQueryTokens(queryShape index.GeoJSON) []str
 
 type s2Tokenizable interface {
 	// IndexTokens returns the tokens for indexing.
-	IndexTokens(*S2SpatialAnalyzerPlugin) []string
+	IndexTokens(*s2.RegionTermIndexer) []string
 
 	// QueryTokens returns the tokens for searching.
-	QueryTokens(*S2SpatialAnalyzerPlugin) []string
+	QueryTokens(*s2.RegionTermIndexer) []string
 }
 
-// ------------------------------------------------------------------------
+//----------------------------------------------------------------------------------
 
-func (p *point) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
-	ll := s2.LatLngFromDegrees(p.Vertices[1], p.Vertices[0])
-	point := s2.PointFromLatLng(ll)
-	return s.s2Indexer.GetIndexTermsForPoint(point, "")
+func (p *Point) Type() string {
+	return PointType
 }
 
-func (p *point) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
-	ll := s2.LatLngFromDegrees(p.Vertices[1], p.Vertices[0])
-	point := s2.PointFromLatLng(ll)
-	return s.s2Indexer.GetQueryTermsForPoint(point, "")
+func (p *Point) Intersects(s index.GeoJSON) (bool, error) {
+	// placeholder implementation
+	return false, nil
 }
 
-// ------------------------------------------------------------------------
-
-func (mp *multipoint) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
-	var rv []string
-	for _, point := range mp.Vertices {
-		terms := s.s2Indexer.GetIndexTermsForPoint(s2.PointFromLatLng(
-			s2.LatLngFromDegrees(point[1], point[0])), "")
-		rv = append(rv, terms...)
-	}
-	return deduplicateTerms(rv)
+func (p *Point) Contains(s index.GeoJSON) (bool, error) {
+	// placeholder implementation
+	return false, nil
 }
 
-func (mp *multipoint) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
-	var rv []string
-	for _, point := range mp.Vertices {
-		terms := s.s2Indexer.GetQueryTermsForPoint(s2.PointFromLatLng(
-			s2.LatLngFromDegrees(point[1], point[0])), "")
-		rv = append(rv, terms...)
-	}
-
-	return deduplicateTerms(rv)
-}
-
-// ------------------------------------------------------------------------
-
-func (ls *linestring) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
-	pls := s2PolylinesFromCoordinates([][][]float64{ls.Vertices})
-	if len(pls) == 1 {
-		return s.s2Indexer.GetIndexTermsForRegion(pls[0].CapBound(), "")
-	}
-	return nil
-}
-
-func (ls *linestring) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
-	pls := s2PolylinesFromCoordinates([][][]float64{ls.Vertices})
-	if len(pls) == 1 {
-		return s.s2Indexer.GetQueryTermsForRegion(pls[0].CapBound(), "")
-	}
-	return nil
-}
-
-// ------------------------------------------------------------------------
-
-func (mls *multilinestring) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
-	var rv []string
-	polylines := s2PolylinesFromCoordinates(mls.Vertices)
-
-	for _, pline := range polylines {
-		terms := s.s2Indexer.GetIndexTermsForRegion(pline.CapBound(), "")
-		rv = append(rv, terms...)
-	}
-
-	return deduplicateTerms(rv)
-}
-
-func (mls *multilinestring) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
-	var rv []string
-	polylines := s2PolylinesFromCoordinates(mls.Vertices)
-
-	for _, pline := range polylines {
-		terms := s.s2Indexer.GetQueryTermsForRegion(pline.CapBound(), "")
-		rv = append(rv, terms...)
-	}
-
-	return deduplicateTerms(rv)
-}
-
-// ------------------------------------------------------------------------
-
-func (mp *multipolygon) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
-	var rv []string
-	for _, loops := range mp.Coordinates() {
-		s2polygon := s2PolygonFromCoordinates(loops)
-		terms := s.s2Indexer.GetIndexTermsForRegion(s2polygon.CapBound(), "")
-		rv = append(rv, terms...)
-	}
-
-	return rv
-}
-
-func (mp *multipolygon) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
-	var rv []string
-	for _, coords := range mp.Coordinates() {
-		s2polygon := s2PolygonFromCoordinates(coords)
-		terms := s.s2Indexer.GetQueryTermsForRegion(s2polygon.CapBound(), "")
-		rv = append(rv, terms...)
-	}
-
-	return rv
-}
-
-// ------------------------------------------------------------------------
-
-func (pgn *polygon) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
-	s2polygon := s2PolygonFromCoordinates(pgn.Coordinates())
-	return s.s2Indexer.GetIndexTermsForRegion(
-		s2polygon.CapBound(), "")
-}
-
-func (pgn *polygon) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
-	s2polygon := s2PolygonFromCoordinates(pgn.Coordinates())
-	return s.s2Indexer.GetQueryTermsForRegion(
-		s2polygon.CapBound(), "")
-}
-
-// ------------------------------------------------------------------------
-
-func (c *circle) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
-	cp := s2.PointFromLatLng(s2.LatLngFromDegrees(c.Vertices[1], c.Vertices[0]))
-	angle := radiusInMetersToS1Angle(float64(c.RadiusInMeters))
-	cap := s2.CapFromCenterAngle(cp, angle)
-
-	return s.s2Indexer.GetIndexTermsForRegion(cap.CapBound(), "")
-}
-
-func (c *circle) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
-	cp := s2.PointFromLatLng(s2.LatLngFromDegrees(c.Vertices[1], c.Vertices[0]))
-	angle := radiusInMetersToS1Angle(float64(c.RadiusInMeters))
-	cap := s2.CapFromCenterAngle(cp, angle)
-
-	return s.s2Indexer.GetQueryTermsForRegion(cap.CapBound(), "")
-}
-
-// ------------------------------------------------------------------------
-
-func (e *envelope) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
-	s2rect := s2RectFromBounds(e.Vertices[0], e.Vertices[1])
-	return s.s2Indexer.GetIndexTermsForRegion(s2rect.CapBound(), "")
-}
-
-func (e *envelope) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
-	s2rect := s2RectFromBounds(e.Vertices[0], e.Vertices[1])
-	return s.s2Indexer.GetQueryTermsForRegion(s2rect.CapBound(), "")
-}
-
-// ------------------------------------------------------------------------
-
-func (p *Point) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
-	return s.s2Indexer.GetIndexTermsForPoint(s2.PointFromLatLng(
+func (p *Point) IndexTokens(s *s2.RegionTermIndexer) []string {
+	return s.GetIndexTermsForPoint(s2.PointFromLatLng(
 		s2.LatLngFromDegrees(p.Lat, p.Lon)), "")
 }
 
-func (p *Point) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
+func (p *Point) QueryTokens(s *s2.RegionTermIndexer) []string {
 	return nil
 }
 
-// ------------------------------------------------------------------------
+//----------------------------------------------------------------------------------
 
-func (pd *pointDistance) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
+type boundedRectangle struct {
+	minLat float64
+	maxLat float64
+	minLon float64
+	maxLon float64
+}
+
+func NewBoundedRectangle(minLat, minLon, maxLat,
+	maxLon float64) *boundedRectangle {
+	return &boundedRectangle{minLat: minLat,
+		maxLat: maxLat, minLon: minLon, maxLon: maxLon}
+}
+
+func (br *boundedRectangle) Type() string {
+	// placeholder implementation
+	return "boundedRectangle"
+}
+
+func (p *boundedRectangle) Intersects(s index.GeoJSON) (bool, error) {
+	// placeholder implementation
+	return false, nil
+}
+
+func (p *boundedRectangle) Contains(s index.GeoJSON) (bool, error) {
+	// placeholder implementation
+	return false, nil
+}
+
+func (br *boundedRectangle) IndexTokens(s *s2.RegionTermIndexer) []string {
 	return nil
 }
 
-func (pd *pointDistance) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
-	// obtain the covering query region from the given points.
-	queryRegion := s2.CapFromCenterAndRadius(pd.centerLat,
-		pd.centerLon, pd.dist)
+func (br *boundedRectangle) QueryTokens(s *s2.RegionTermIndexer) []string {
+	rect := s2.RectFromDegrees(br.minLat, br.minLon, br.maxLat, br.maxLon)
 
-	// obtain the query terms for the query region.
-	terms := s.s2Indexer.GetQueryTermsForRegion(queryRegion, "")
+	// obtain the terms to be searched for the given bounding box.
+	terms := s.GetQueryTermsForRegion(rect, "")
 
-	return s2.FilterOutCoveringTerms(terms)
+	return geojson.StripCoveringTerms(terms)
 }
 
-// ------------------------------------------------------------------------
+//----------------------------------------------------------------------------------
 
-func (bp *boundedPolygon) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
+type boundedPolygon struct {
+	coordinates []Point
+}
+
+func NewBoundedPolygon(coordinates []Point) *boundedPolygon {
+	return &boundedPolygon{coordinates: coordinates}
+}
+
+func (bp *boundedPolygon) Type() string {
+	// placeholder implementation
+	return "boundedPolygon"
+}
+
+func (p *boundedPolygon) Intersects(s index.GeoJSON) (bool, error) {
+	// placeholder implementation
+	return false, nil
+}
+
+func (p *boundedPolygon) Contains(s index.GeoJSON) (bool, error) {
+	// placeholder implementation
+	return false, nil
+}
+
+func (bp *boundedPolygon) IndexTokens(s *s2.RegionTermIndexer) []string {
 	return nil
 }
 
-func (bp *boundedPolygon) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
+func (bp *boundedPolygon) QueryTokens(s *s2.RegionTermIndexer) []string {
 	vertices := make([]s2.Point, len(bp.coordinates))
 	for i, point := range bp.coordinates {
 		vertices[i] = s2.PointFromLatLng(
@@ -321,23 +274,112 @@ func (bp *boundedPolygon) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 	s2polygon := s2.PolygonFromOrientedLoops([]*s2.Loop{s2.LoopFromPoints(vertices)})
 
 	// obtain the terms to be searched for the given polygon.
-	terms := s.s2Indexer.GetQueryTermsForRegion(
+	terms := s.GetQueryTermsForRegion(
 		s2polygon.CapBound(), "")
 
-	return s2.FilterOutCoveringTerms(terms)
+	return geojson.StripCoveringTerms(terms)
+}
+
+//----------------------------------------------------------------------------------
+
+type pointDistance struct {
+	dist      float64
+	centerLat float64
+	centerLon float64
+}
+
+func (p *pointDistance) Type() string {
+	// placeholder implementation
+	return "pointDistance"
+}
+
+func NewPointDistance(centerLat, centerLon,
+	dist float64) *pointDistance {
+	return &pointDistance{centerLat: centerLat,
+		centerLon: centerLon, dist: dist}
+}
+
+func (p *pointDistance) Intersects(s index.GeoJSON) (bool, error) {
+	// placeholder implementation
+	return false, nil
+}
+
+func (p *pointDistance) Contains(s index.GeoJSON) (bool, error) {
+	// placeholder implementation
+	return false, nil
+}
+
+func (pd *pointDistance) IndexTokens(s *s2.RegionTermIndexer) []string {
+	return nil
+}
+
+func (pd *pointDistance) QueryTokens(s *s2.RegionTermIndexer) []string {
+	// obtain the covering query region from the given points.
+	queryRegion := s2.CapFromCenterAndRadius(pd.centerLat,
+		pd.centerLon, pd.dist)
+
+	// obtain the query terms for the query region.
+	terms := s.GetQueryTermsForRegion(queryRegion, "")
+
+	return geojson.StripCoveringTerms(terms)
 }
 
 // ------------------------------------------------------------------------
 
-func (br *boundedRectangle) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
-	return nil
+// NewGeometryCollection instantiate a geometrycollection
+// and prefix the byte contents with certain glue bytes that
+// can be used later while filering the doc values.
+func NewGeometryCollection(coordinates [][][][][]float64,
+	typs []string) (index.GeoJSON, []byte, error) {
+
+	return geojson.NewGeometryCollection(coordinates, typs)
 }
 
-func (br *boundedRectangle) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
-	rect := s2.RectFromDegrees(br.minLat, br.minLon, br.maxLat, br.maxLon)
+// NewGeoCircleShape instantiate a circle shape and
+// prefix the byte contents with certain glue bytes that
+// can be used later while filering the doc values.
+func NewGeoCircleShape(cp []float64,
+	radiusInMeter float64) (index.GeoJSON, []byte, error) {
+	return geojson.NewGeoCircleShape(cp, radiusInMeter)
+}
 
-	// obtain the terms to be searched for the given bounding box.
-	terms := s.s2Indexer.GetQueryTermsForRegion(rect, "")
+func NewGeoJsonShape(coordinates [][][][]float64, typ string) (
+	index.GeoJSON, []byte, error) {
+	return geojson.NewGeoJsonShape(coordinates, typ)
+}
 
-	return s2.FilterOutCoveringTerms(terms)
+func NewGeoJsonPoint(points []float64) index.GeoJSON {
+	return geojson.NewGeoJsonPoint(points)
+}
+
+func NewGeoJsonMultiPoint(points [][]float64) index.GeoJSON {
+	return geojson.NewGeoJsonMultiPoint(points)
+}
+
+func NewGeoJsonLinestring(points [][]float64) index.GeoJSON {
+	return geojson.NewGeoJsonLinestring(points)
+}
+
+func NewGeoJsonMultilinestring(points [][][]float64) index.GeoJSON {
+	return geojson.NewGeoJsonMultilinestring(points)
+}
+
+func NewGeoJsonPolygon(points [][][]float64) index.GeoJSON {
+	return geojson.NewGeoJsonPolygon(points)
+}
+
+func NewGeoJsonMultiPolygon(points [][][][]float64) index.GeoJSON {
+	return geojson.NewGeoJsonMultiPolygon(points)
+}
+
+func NewGeoCircle(points []float64, radius float64) index.GeoJSON {
+	return geojson.NewGeoCircle(points, radius)
+}
+
+func NewGeoEnvelope(points [][]float64) index.GeoJSON {
+	return geojson.NewGeoEnvelope(points)
+}
+
+func ParseGeoJSONShape(input json.RawMessage) (index.GeoJSON, error) {
+	return geojson.ParseGeoJSONShape(input)
 }

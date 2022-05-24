@@ -130,6 +130,10 @@ func NewGeoShapeFieldWithIndexingOptions(name string, arrayPositions []uint64,
 		return nil
 	}
 
+	// extra glue bytes to work around the term splitting logic from interfering
+	// the custom encoding of the geoshape coordinates inside the docvalues.
+	value = append(geo.GlueBytes, append(value, geo.GlueBytes...)...)
+
 	options = options | DefaultGeoShapeIndexingOptions
 
 	return &GeoShapeField{
@@ -150,6 +154,10 @@ func NewGeometryCollectionFieldWithIndexingOptions(name string,
 		return nil
 	}
 
+	// extra glue bytes to work around the term splitting logic from interfering
+	// the custom encoding of the geoshape coordinates inside the docvalues.
+	value = append(geo.GlueBytes, append(value, geo.GlueBytes...)...)
+
 	options = options | DefaultGeoShapeIndexingOptions
 
 	return &GeoShapeField{
@@ -169,6 +177,10 @@ func NewGeoCircleFieldWithIndexingOptions(name string, arrayPositions []uint64,
 	if err != nil {
 		return nil
 	}
+
+	// extra glue bytes to work around the term splitting logic from interfering
+	// the custom encoding of the geoshape coordinates inside the docvalues.
+	value = append(geo.GlueBytes, append(value, geo.GlueBytes...)...)
 
 	options = options | DefaultGeoShapeIndexingOptions
 
