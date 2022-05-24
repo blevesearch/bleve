@@ -18,7 +18,6 @@ import (
 	"container/heap"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -508,7 +507,6 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 
 func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
-	log.Printf("inside term field reader")
 	rv := is.allocTermFieldReaderDicts(field)
 
 	rv.term = term

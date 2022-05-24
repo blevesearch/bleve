@@ -525,6 +525,14 @@ func (s *Scorch) Stats() json.Marshaler {
 	return &s.stats
 }
 
+func (s *Scorch) BytesRead() uint64 {
+	return s.stats.TotBytesReadQueryTime
+}
+
+func (s *Scorch) ResetBytesRead() {
+	atomic.StoreUint64(&s.stats.TotBytesReadQueryTime, uint64(0))
+}
+
 func (s *Scorch) diskFileStats(rootSegmentPaths map[string]struct{}) (uint64,
 	uint64, uint64) {
 	var numFilesOnDisk, numBytesUsedDisk, numBytesOnDiskByRoot uint64
