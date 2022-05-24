@@ -506,19 +506,19 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 	return next.ID, nil
 }
 
-func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
+func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
 	log.Printf("inside term field reader")
-	rv := i.allocTermFieldReaderDicts(field)
+	rv := is.allocTermFieldReaderDicts(field)
 
 	rv.term = term
 	rv.field = field
-	rv.snapshot = i
+	rv.snapshot = is
 	if rv.postings == nil {
-		rv.postings = make([]segmentl.PostingsList, len(i.segment))
+		rv.postings = make([]segmentl.PostingsList, len(is.segment))
 	}
 	if rv.iterators == nil {
-		rv.iterators = make([]segmentl.PostingsIterator, len(i.segment))
+		rv.iterators = make([]segmentl.PostingsIterator, len(is.segment))
 	}
 	rv.segmentOffset = 0
 	rv.includeFreq = includeFreq
@@ -526,12 +526,11 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	rv.includeTermVectors = includeTermVectors
 	rv.currPosting = nil
 	rv.currID = rv.currID[:0]
-	var bytesRead uint64
 	if rv.dicts == nil {
-		rv.dicts = make([]segmentl.TermDictionary, len(i.segment))
-		for i, segment := range i.segment {
+		rv.dicts = make([]segmentl.TermDictionary, len(is.segment))
+		for i, segment := range is.segment {
 			if segP, ok := segment.segment.(segmentl.BytesOffDiskStats); ok {
-				bytesRead += segP.BytesRead()
+				atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime, segP.BytesRead())
 			}
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
@@ -541,7 +540,7 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		}
 	}
 
-	for i, segment := range i.segment {
+	for i, segment := range is.segment {
 		pl, err := rv.dicts[i].PostingsList(term, segment.deleted, rv.postings[i])
 		if err != nil {
 			return nil, err
@@ -551,16 +550,15 @@ func (i *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 
 		if _, ok := segment.segment.(segmentl.BytesOffDiskStats); ok {
 			if postings, ok := pl.(segmentl.BytesOffDiskStats); ok {
-				bytesRead += postings.BytesRead()
+				atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime, postings.BytesRead())
 			}
 
 			if itr, ok := rv.iterators[i].(segmentl.BytesOffDiskStats); ok {
-				bytesRead += itr.BytesRead()
+				atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime, itr.BytesRead())
 			}
-			log.Printf("bytes read of disk for this query %v\n", bytesRead)
 		}
 	}
-	atomic.AddUint64(&i.parent.stats.TotTermSearchersStarted, uint64(1))
+	atomic.AddUint64(&is.parent.stats.TotTermSearchersStarted, uint64(1))
 	return rv, nil
 }
 
