@@ -23,7 +23,6 @@ require (
 	github.com/blevesearch/zapx/v14 v14.3.3
 	github.com/blevesearch/zapx/v15 v15.3.3
 	github.com/couchbase/moss v0.2.0
-	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551
 	github.com/golang/protobuf v1.3.2
 	github.com/spf13/cobra v0.0.5
 	go.etcd.io/bbolt v1.3.5
