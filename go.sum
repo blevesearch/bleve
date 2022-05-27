@@ -7,8 +7,8 @@ github.com/bits-and-blooms/bitset v1.2.0/go.mod h1:gIdJ4wp64HaoK2YrL1Q5/N7Y16edY
 github.com/blevesearch/bleve_index_api v1.0.1/go.mod h1:fiwKS0xLEm+gBRgv5mumf0dhgFr2mDgZah1pqv1c1M4=
 github.com/blevesearch/bleve_index_api v1.0.2-0.20220328092731-fdf526452081 h1:fNEcBSZemFr2krbmxaEeejjR+31J+12WALApLXEFhPQ=
 github.com/blevesearch/bleve_index_api v1.0.2-0.20220328092731-fdf526452081/go.mod h1:fiwKS0xLEm+gBRgv5mumf0dhgFr2mDgZah1pqv1c1M4=
-github.com/blevesearch/geo v0.1.11 h1:+X53A23YCBqu/TwxRNjB7LGu8acC2dG4oY+Zq7IL5yY=
-github.com/blevesearch/geo v0.1.11/go.mod h1:PRmwIBrXhv5neTjdXwpq7WPhgOe1RRK/i1vomza/VAg=
+github.com/blevesearch/geo v0.1.12-0.20220525024427-4ff549e2782c h1:/ZfhdfLAriZvkSY4CnmHsq2FqIg0xVD04V1LybtajL4=
+github.com/blevesearch/geo v0.1.12-0.20220525024427-4ff549e2782c/go.mod h1:PRmwIBrXhv5neTjdXwpq7WPhgOe1RRK/i1vomza/VAg=
 github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475 h1:kDy+zgJFJJoJYBvdfBSiZYBbdsUL0XcjHYWezpQBGPA=
 github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475/go.mod h1:9eJDeqxJ3E7WnLebQUlPD7ZjSce7AnDb9vjGmMCbD0A=
 github.com/blevesearch/go-porterstemmer v1.0.3 h1:GtmsqID0aZdCSNiY8SkuPJ12pD4jI+DdXTAn4YRcHCo=
