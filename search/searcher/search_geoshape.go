@@ -75,28 +75,29 @@ func buildRelationFilterOnShapes(dvReader index.DocValueReader, field string,
 		err := dvReader.VisitDocValues(d.IndexInternalID,
 			func(field string, term []byte) {
 
-				// only consider the values which are GlueBytes prefixed.
-				if len(term) > geo.GlueBytesOffset {
+				// only consider the values which are GlueBytes prefixed or
+				// if it had already started reading the shape bytes from previous callbacks.
+				if startReading || len(term) > geo.GlueBytesOffset {
 
 					if !startReading && bytes.Equal(geo.GlueBytes, term[:geo.GlueBytesOffset]) {
+						startReading = true
+
 						if bytes.Equal(geo.GlueBytes, term[len(term)-geo.GlueBytesOffset:]) {
 							term = term[:len(term)-geo.GlueBytesOffset]
-							dvShapeValue = append(dvShapeValue, term[geo.GlueBytesOffset:]...)
 							finishReading = true
-						} else {
-							startReading = true
-							dvShapeValue = append(dvShapeValue, term[geo.GlueBytesOffset:]...)
-							dvShapeValue = append(dvShapeValue, termSeparatorSplitSlice...)
 						}
+
+						dvShapeValue = append(dvShapeValue, term[geo.GlueBytesOffset:]...)
+
 					} else if startReading && !finishReading {
-						if bytes.Equal(geo.GlueBytes, term[len(term)-geo.GlueBytesOffset:]) {
+						if len(term) > geo.GlueBytesOffset &&
+							bytes.Equal(geo.GlueBytes, term[len(term)-geo.GlueBytesOffset:]) {
 							term = term[:len(term)-geo.GlueBytesOffset]
-							dvShapeValue = append(dvShapeValue, term...)
 							finishReading = true
-						} else {
-							dvShapeValue = append(dvShapeValue, term...)
-							dvShapeValue = append(dvShapeValue, termSeparatorSplitSlice...)
 						}
+
+						term = append(termSeparatorSplitSlice, term...)
+						dvShapeValue = append(dvShapeValue, term...)
 					}
 
 					// apply the filter once the entire docvalue is finished reading.
