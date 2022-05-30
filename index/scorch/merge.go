@@ -327,6 +327,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			fileMergeZapStartTime := time.Now()
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
+			prevBytesReadTotal := cumulateBytesRead(segmentsToMerge)
 			newDocNums, _, err := s.segPlugin.Merge(segmentsToMerge, docsToDrop, path,
 				cw.cancelCh, s)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
@@ -352,6 +353,13 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
 				return err
 			}
+
+			switch segI := seg.(type) {
+			case segment.BytesOffDiskStats:
+				segI.SetBytesRead(prevBytesReadTotal)
+				seg = segI.(segment.Segment)
+			}
+
 			oldNewDocNums = make(map[uint64][]uint64)
 			for i, segNewDocNums := range newDocNums {
 				oldNewDocNums[task.Segments[i].Id()] = segNewDocNums
@@ -426,6 +434,16 @@ type segmentMerge struct {
 	notifyCh      chan *mergeTaskIntroStatus
 }
 
+func cumulateBytesRead(sbs []segment.Segment) uint64 {
+	rv := uint64(0)
+	for _, seg := range sbs {
+		if segI, ok := seg.(segment.BytesOffDiskStats); ok {
+			rv += segI.BytesRead()
+		}
+	}
+	return rv
+}
+
 // perform a merging of the given SegmentBase instances into a new,
 // persisted segment, and synchronously introduce that new segment
 // into the root
@@ -442,6 +460,7 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	filename := zapFileName(newSegmentID)
 	path := s.path + string(os.PathSeparator) + filename
 
+	prevBytesReadTotal := cumulateBytesRead(sbs)
 	newDocNums, _, err :=
 		s.segPlugin.Merge(sbs, sbsDrops, path, s.closeCh, s)
 
@@ -462,6 +481,11 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	if err != nil {
 		atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
 		return nil, 0, err
+	}
+	switch segI := seg.(type) {
+	case segment.BytesOffDiskStats:
+		segI.SetBytesRead(prevBytesReadTotal)
+		seg = segI.(segment.Segment)
 	}
 
 	// update persisted stats

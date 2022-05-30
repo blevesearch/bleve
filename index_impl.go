@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/v2/document"
-	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/registry"
@@ -468,14 +467,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			err = cerr
 		}
 	}()
-
-	// TODO: need a better way to reset the bytes read
-	// exposes index type being scorch over here, is
-	// this fine?
-	if i.meta.IndexType == scorch.Name {
-		is, _ := i.i.(*scorch.Scorch)
-		is.ResetBytesRead()
-	}
 
 	searcher, err := req.Query.Searcher(indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
