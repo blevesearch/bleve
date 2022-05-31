@@ -356,7 +356,8 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 			switch segI := seg.(type) {
 			case segment.BytesOffDiskStats:
-				segI.SetBytesRead(prevBytesReadTotal)
+				totalBytesRead := segI.BytesRead() + prevBytesReadTotal
+				segI.SetBytesRead(totalBytesRead)
 				seg = segI.(segment.Segment)
 			}
 
@@ -460,7 +461,6 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	filename := zapFileName(newSegmentID)
 	path := s.path + string(os.PathSeparator) + filename
 
-	prevBytesReadTotal := cumulateBytesRead(sbs)
 	newDocNums, _, err :=
 		s.segPlugin.Merge(sbs, sbsDrops, path, s.closeCh, s)
 
@@ -481,11 +481,6 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	if err != nil {
 		atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
 		return nil, 0, err
-	}
-	switch segI := seg.(type) {
-	case segment.BytesOffDiskStats:
-		segI.SetBytesRead(prevBytesReadTotal)
-		seg = segI.(segment.Segment)
 	}
 
 	// update persisted stats
