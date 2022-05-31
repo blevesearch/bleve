@@ -9,7 +9,7 @@ require (
 	github.com/blevesearch/geo v0.1.12-0.20220531073316-e435177b73a3
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/blevesearch/go-porterstemmer v1.0.3
-	github.com/blevesearch/goleveldb v1.0.1
+	github.com/blevesearch/goleveldb v1.1.0
 	github.com/blevesearch/gtreap v0.1.1
 	github.com/blevesearch/scorch_segment_api/v2 v2.1.0
 	github.com/blevesearch/segment v0.9.0
@@ -23,7 +23,7 @@ require (
 	github.com/blevesearch/zapx/v14 v14.3.4
 	github.com/blevesearch/zapx/v15 v15.3.4
 	github.com/couchbase/moss v0.2.0
-	github.com/golang/protobuf v1.3.2
+	github.com/golang/protobuf v1.5.2
 	github.com/spf13/cobra v0.0.5
 	go.etcd.io/bbolt v1.3.5
 	golang.org/x/text v0.3.7
