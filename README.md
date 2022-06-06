@@ -21,6 +21,7 @@ modern text indexing in go - [blevesearch.com](http://www.blevesearch.com/)
     * Term, Phrase, Match, Match Phrase, Prefix
     * Conjunction, Disjunction, Boolean
     * Numeric Range, Date Range
+    * [Geo Spatial](https://github.com/blevesearch/bleve/blob/master/geo/README.md)
     * Simple query [syntax](http://www.blevesearch.com/docs/Query-String-Query/) for human entry
 * tf-idf Scoring
 * Search result match highlighting
@@ -61,6 +62,42 @@ index, _ := bleve.Open("example.bleve")
 query := bleve.NewQueryStringQuery("bleve")
 searchRequest := bleve.NewSearchRequest(query)
 searchResult, _ := index.Search(searchRequest)
+```
+
+## Command Line Interface
+
+To install the CLI for the latest release of bleve, run:
+
+```bash
+$ go install github.com/blevesearch/bleve/v2/cmd/bleve@latest
+```
+
+```
+$ bleve --help
+Bleve is a command-line tool to interact with a bleve index.
+
+Usage:
+  bleve [command]
+
+Available Commands:
+  bulk        bulk loads from newline delimited JSON files
+  check       checks the contents of the index
+  count       counts the number documents in the index
+  create      creates a new index
+  dictionary  prints the term dictionary for the specified field in the index
+  dump        dumps the contents of the index
+  fields      lists the fields in this index
+  help        Help about any command
+  index       adds the files to the index
+  mapping     prints the mapping used for this index
+  query       queries the index
+  registry    registry lists the bleve components compiled into this executable
+  scorch      command-line tool to interact with a scorch index
+
+Flags:
+  -h, --help   help for bleve
+
+Use "bleve [command] --help" for more information about a command.
 ```
 
 ## License
