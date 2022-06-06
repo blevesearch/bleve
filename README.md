@@ -21,6 +21,7 @@ modern text indexing in go - [blevesearch.com](http://www.blevesearch.com/)
     * Term, Phrase, Match, Match Phrase, Prefix
     * Conjunction, Disjunction, Boolean
     * Numeric Range, Date Range
+    * [Geo Spatial](https://github.com/blevesearch/bleve/blob/master/geo/README.md)
     * Simple query [syntax](http://www.blevesearch.com/docs/Query-String-Query/) for human entry
 * tf-idf Scoring
 * Search result match highlighting
