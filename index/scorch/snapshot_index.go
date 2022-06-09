@@ -424,6 +424,10 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
 	rvd := document.NewDocument(id)
+	var prevBytesRead uint64
+	if seg, ok := i.segment[segmentIndex].segment.(segmentl.BytesOffDiskStats); ok {
+		prevBytesRead = seg.BytesRead()
+	}
 	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, val []byte, pos []uint64) bool {
 		if name == "_id" {
 			return true
@@ -453,7 +457,10 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	if err != nil {
 		return nil, err
 	}
-
+	if seg, ok := i.segment[segmentIndex].segment.(segmentl.BytesOffDiskStats); ok {
+		delta := seg.BytesRead() - prevBytesRead
+		atomic.AddUint64(&i.parent.stats.TotBytesReadQueryTime, delta)
+	}
 	return rvd, nil
 }
 
@@ -527,12 +534,12 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	if rv.dicts == nil {
 		rv.dicts = make([]segmentl.TermDictionary, len(is.segment))
 		for i, segment := range is.segment {
-			if segP, ok := segment.segment.(segmentl.BytesOffDiskStats); ok {
-				atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime, segP.BytesRead())
-			}
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				return nil, err
+			}
+			if segP, ok := segment.segment.(segmentl.BytesOffDiskStats); ok {
+				atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime, segP.BytesRead())
 			}
 			rv.dicts[i] = dict
 		}

@@ -76,6 +76,10 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 	}
 	// find the next hit
 	for i.segmentOffset < len(i.iterators) {
+		prevBytesRead := uint64(0)
+		if itr, ok := i.iterators[i.segmentOffset].(segment.BytesOffDiskStats); ok {
+			prevBytesRead = itr.BytesRead()
+		}
 		next, err := i.iterators[i.segmentOffset].Next()
 		if err != nil {
 			return nil, err
@@ -89,6 +93,15 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 
 			i.currID = rv.ID
 			i.currPosting = next
+			// postingsIterators is maintain the bytesRead stat in a cumulative fashion.
+			// this is because there are chances of having a series of loadChunk calls,
+			// and they have to be added together before sending the bytesRead at this point
+			// upstream.
+			if itr, ok := i.iterators[i.segmentOffset].(segment.BytesOffDiskStats); ok {
+				delta := itr.BytesRead() - prevBytesRead
+				atomic.AddUint64(&i.snapshot.parent.stats.TotBytesReadQueryTime, uint64(delta))
+			}
+
 			return rv, nil
 		}
 		i.segmentOffset++

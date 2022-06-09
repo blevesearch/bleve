@@ -402,7 +402,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		itemsDeQueued++
 		result.VisitFields(func(f index.Field) {
 			atomic.AddUint64(&s.stats.TotIndexedAnalysisBytes,
-				uint64(analysisBytes(f.AnalyzedTokenFrequencies())))
+				analysisBytes(f.AnalyzedTokenFrequencies()))
 		})
 	}
 	close(resultChan)
