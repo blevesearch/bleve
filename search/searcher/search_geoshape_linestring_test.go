@@ -86,7 +86,7 @@ func TestGeoJsonLinestringIntersectsQuery(t *testing.T) {
 	}()
 
 	for n, test := range tests {
-		got, err := runGeoShapeLinestringIntersectsQuery("intersects",
+		got, err := runGeoShapeLinestringQueryWithRelation("intersects",
 			indexReader, test.line, test.field)
 		if err != nil {
 			t.Fatal(err)
@@ -147,7 +147,7 @@ func TestGeoJsonLinestringContainsQuery(t *testing.T) {
 	}()
 
 	for n, test := range tests {
-		got, err := runGeoShapeLinestringIntersectsQuery("contains",
+		got, err := runGeoShapeLinestringQueryWithRelation("contains",
 			indexReader, test.line, test.field)
 		if err != nil {
 			t.Fatal(err)
@@ -225,7 +225,7 @@ func TestGeoJsonMultiLinestringContainsQuery(t *testing.T) {
 	}()
 
 	for n, test := range tests {
-		got, err := runGeoShapeMultiLinestringIntersectsQuery("contains",
+		got, err := runGeoShapeMultiLinestringQueryWithRelation("contains",
 			indexReader, test.line, test.field)
 		if err != nil {
 			t.Fatal(err)
@@ -237,14 +237,14 @@ func TestGeoJsonMultiLinestringContainsQuery(t *testing.T) {
 	}
 }
 
-func runGeoShapeMultiLinestringIntersectsQuery(relation string, i index.IndexReader,
+func runGeoShapeMultiLinestringQueryWithRelation(relation string, i index.IndexReader,
 	points [][][]float64, field string) ([]string, error) {
 
 	s := geo.NewGeoJsonMultilinestring(points)
 	return executeSearch(relation, i, s, field)
 }
 
-func runGeoShapeLinestringIntersectsQuery(relation string, i index.IndexReader,
+func runGeoShapeLinestringQueryWithRelation(relation string, i index.IndexReader,
 	points [][]float64, field string) ([]string, error) {
 
 	s := geo.NewGeoJsonLinestring(points)
