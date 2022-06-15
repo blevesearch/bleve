@@ -150,6 +150,10 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 			if err != nil {
 				results <- &asynchSegmentResult{err: err}
 			} else {
+				if seg, ok := segment.segment.(segmentl.BytesOffDiskStats); ok {
+					atomic.AddUint64(&i.parent.stats.TotBytesReadQueryTime,
+						seg.BytesRead())
+				}
 				if randomLookup {
 					results <- &asynchSegmentResult{dict: dict}
 				} else {
