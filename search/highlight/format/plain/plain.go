@@ -21,8 +21,8 @@ import (
 
 const Name = "plain"
 
-const defaultPlainHighlightBefore = "markbefore"
-const defaultPlainHighlightAfter = "markafter"
+const defaultPlainHighlightBefore = "<start>"
+const defaultPlainHighlightAfter = "<end>"
 
 type FragmentFormatter struct {
 	before string
