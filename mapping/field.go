@@ -18,8 +18,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"reflect"
-	"strings"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
@@ -315,36 +313,9 @@ func (fm *FieldMapping) processIP(ip net.IP, pathString string, path []string, i
 	}
 }
 
-func parseGeoShapeField(thing interface{}) (interface{}, string, error) {
-	thingVal := reflect.ValueOf(thing)
-	if !thingVal.IsValid() {
-		return nil, "", nil
-	}
-
-	var shape string
-	var coordValue interface{}
-
-	if thingVal.Kind() == reflect.Map {
-		iter := thingVal.MapRange()
-		for iter.Next() {
-			if iter.Key().String() == "type" {
-				shape = iter.Value().Interface().(string)
-				continue
-
-			}
-
-			if iter.Key().String() == "coordinates" {
-				coordValue = iter.Value().Interface()
-			}
-		}
-	}
-
-	return coordValue, strings.ToLower(shape), nil
-}
-
 func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 	pathString string, path []string, indexes []uint64, context *walkContext) {
-	coordValue, shape, err := parseGeoShapeField(propertyMightBeGeoShape)
+	coordValue, shape, err := geo.ParseGeoShapeField(propertyMightBeGeoShape)
 	if err != nil {
 		return
 	}
