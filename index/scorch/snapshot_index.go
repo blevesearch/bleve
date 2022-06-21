@@ -146,13 +146,17 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 	results := make(chan *asynchSegmentResult)
 	for index, segment := range i.segment {
 		go func(index int, segment *SegmentSnapshot) {
+			var prevBytesRead uint64
+			if seg, ok := segment.segment.(segmentl.BytesOffDiskStats); ok {
+				prevBytesRead = seg.BytesRead()
+			}
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				results <- &asynchSegmentResult{err: err}
 			} else {
 				if seg, ok := segment.segment.(segmentl.BytesOffDiskStats); ok {
 					atomic.AddUint64(&i.parent.stats.TotBytesReadQueryTime,
-						seg.BytesRead())
+						seg.BytesRead()-prevBytesRead)
 				}
 				if randomLookup {
 					results <- &asynchSegmentResult{dict: dict}
@@ -463,6 +467,7 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	}
 	if seg, ok := i.segment[segmentIndex].segment.(segmentl.BytesOffDiskStats); ok {
 		delta := seg.BytesRead() - prevBytesRead
+		// log.Printf("stored field section %v\n", delta)
 		atomic.AddUint64(&i.parent.stats.TotBytesReadQueryTime, delta)
 	}
 	return rvd, nil
@@ -538,32 +543,48 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	if rv.dicts == nil {
 		rv.dicts = make([]segmentl.TermDictionary, len(is.segment))
 		for i, segment := range is.segment {
+			var prevBytesRead uint64
+			if segP, ok := segment.segment.(segmentl.BytesOffDiskStats); ok {
+				prevBytesRead = segP.BytesRead()
+			}
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				return nil, err
 			}
 			if segP, ok := segment.segment.(segmentl.BytesOffDiskStats); ok {
-				atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime, segP.BytesRead())
+				atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime, segP.BytesRead()-prevBytesRead)
 			}
 			rv.dicts[i] = dict
 		}
 	}
 
 	for i, segment := range is.segment {
+		var prevBytesReadPL uint64
+		if _, ok := segment.segment.(segmentl.BytesOffDiskStats); ok {
+			if postings, ok := rv.postings[i].(segmentl.BytesOffDiskStats); ok {
+				prevBytesReadPL = postings.BytesRead()
+			}
+		}
 		pl, err := rv.dicts[i].PostingsList(term, segment.deleted, rv.postings[i])
 		if err != nil {
 			return nil, err
 		}
 		rv.postings[i] = pl
+		var prevBytesReadItr uint64
+		if _, ok := segment.segment.(segmentl.BytesOffDiskStats); ok {
+			if itr, ok := rv.iterators[i].(segmentl.BytesOffDiskStats); ok {
+				prevBytesReadItr = itr.BytesRead()
+			}
+		}
 		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, rv.iterators[i])
 
 		if _, ok := segment.segment.(segmentl.BytesOffDiskStats); ok {
-			if postings, ok := pl.(segmentl.BytesOffDiskStats); ok {
-				atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime, postings.BytesRead())
+			if postings, ok := pl.(segmentl.BytesOffDiskStats); ok && prevBytesReadPL < postings.BytesRead() {
+				atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime, postings.BytesRead()-prevBytesReadPL)
 			}
 
-			if itr, ok := rv.iterators[i].(segmentl.BytesOffDiskStats); ok {
-				atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime, itr.BytesRead())
+			if itr, ok := rv.iterators[i].(segmentl.BytesOffDiskStats); ok && prevBytesReadItr < itr.BytesRead() {
+				atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime, itr.BytesRead()-prevBytesReadItr)
 			}
 		}
 	}
@@ -684,9 +705,16 @@ func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	}
 
 	if ssvOk && ssv != nil && len(vFields) > 0 {
+		var prevBytesRead uint64
+		if ssvp, ok := ssv.(segmentl.BytesOffDiskStats); ok {
+			prevBytesRead = ssvp.BytesRead()
+		}
 		dvs, err = ssv.VisitDocValues(localDocNum, fields, visitor, dvs)
 		if err != nil {
 			return nil, nil, err
+		}
+		if ssvp, ok := ssv.(segmentl.BytesOffDiskStats); ok {
+			atomic.AddUint64(&i.parent.stats.TotBytesReadQueryTime, ssvp.BytesRead()-prevBytesRead)
 		}
 	}
 

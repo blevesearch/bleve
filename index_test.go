@@ -15,6 +15,7 @@
 package bleve
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -227,6 +228,169 @@ func TestCrud(t *testing.T) {
 			t.Errorf("field %s is missing", ef)
 		}
 	}
+}
+
+func TestBytesRead(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMapping := NewIndexMapping()
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = "en"
+	documentMapping := NewDocumentMapping()
+	indexMapping.AddDocumentMapping("hotel", documentMapping)
+	indexMapping.StoreDynamic = false
+	FieldMapping := NewTextFieldMapping()
+	FieldMapping.Store = false
+	documentMapping.AddFieldMappingsAt("reviews.content", FieldMapping)
+	FieldMapping = NewTextFieldMapping()
+	FieldMapping.Store = true
+	documentMapping.AddFieldMappingsAt("type", FieldMapping)
+	idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	file, err := os.Open("sample.txt")
+	scanner := bufio.NewScanner(file)
+	batch := idx.NewBatch()
+
+	type docStructure map[string]interface{}
+
+	for scanner.Scan() {
+		var doc docStructure
+		docContent := (scanner.Text())
+		json.Unmarshal([]byte(docContent), &doc)
+		err = batch.Index(fmt.Sprintf("%d", doc["id"]), doc)
+		if err != nil {
+			t.Fatalf("failed to create batch %v\n", err)
+		}
+	}
+
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to index batch %v\n", err)
+	}
+	query := NewQueryStringQuery("united")
+	searchRequest := NewSearchRequestOptions(query, int(10), 0, true)
+
+	res, err := idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
+	prevBytesRead, _ := stats["num_bytes_read_query_time"].(uint64)
+	fmt.Printf("bytes read %v\n", prevBytesRead)
+
+	// checking for reusability
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ := stats["num_bytes_read_query_time"].(uint64)
+	fmt.Printf("bytes read %v\n", bytesRead-prevBytesRead)
+	prevBytesRead = bytesRead
+	fmt.Printf("res hits %v\n", len(res.Hits))
+
+	fuzz := NewFuzzyQuery("unitd")
+	fuzz.Fuzziness = 2
+	searchRequest = NewSearchRequest(fuzz)
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Printf("res hits %v\n", len(res.Hits))
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_query_time"].(uint64)
+	fmt.Printf("bytes read %v %v\n", stats["num_bytes_used_disk_by_root"], bytesRead-prevBytesRead)
+	prevBytesRead = bytesRead
+
+	typeFacet := NewFacetRequest("type", 2)
+	query = NewQueryStringQuery("united")
+	searchRequest = NewSearchRequestOptions(query, int(0), 0, true)
+	searchRequest.AddFacet("types", typeFacet)
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_query_time"].(uint64)
+	fmt.Printf("bytes read %v\n", bytesRead-prevBytesRead)
+	prevBytesRead = bytesRead
+
+	min := float64(8000)
+	max := float64(8010)
+	numRangeQuery := NewNumericRangeQuery(&min, &max)
+	numRangeQuery.FieldVal = "id"
+	searchRequest = NewSearchRequestOptions(numRangeQuery, int(10), 0, true)
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_query_time"].(uint64)
+	fmt.Printf("bytes read %v\n", bytesRead-prevBytesRead)
+	prevBytesRead = bytesRead
+
+	searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
+	searchRequest.IncludeLocations = true
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_query_time"].(uint64)
+	fmt.Printf("bytes read %v\n", bytesRead-prevBytesRead)
+	prevBytesRead = bytesRead
+
+	searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
+	searchRequest.Fields = []string{"type"}
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_query_time"].(uint64)
+	fmt.Printf("bytes read %v\n", bytesRead-prevBytesRead)
+	prevBytesRead = bytesRead
+
+	searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
+	searchRequest.Fields = []string{"type"}
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_query_time"].(uint64)
+	fmt.Printf("bytes read %v\n", bytesRead-prevBytesRead)
+	prevBytesRead = bytesRead
+
+	disQuery := NewDisjunctionQuery(NewMatchQuery("hotel"), NewMatchQuery("united"))
+	searchRequest = NewSearchRequestOptions(disQuery, int(10), 0, true)
+	res, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_query_time"].(uint64)
+	fmt.Printf("bytes read dis %v\n", bytesRead-prevBytesRead)
+	prevBytesRead = bytesRead
+
+	t.Errorf("erorr")
 }
 
 func TestIndexCreateNewOverExisting(t *testing.T) {
