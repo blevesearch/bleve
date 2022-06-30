@@ -322,7 +322,7 @@ func TestBytesRead(t *testing.T) {
 	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_query_time"].(uint64)
 	if bytesRead-prevBytesRead != 16556 {
-		t.Fatalf("expected bytes read for fuzzy query is 16176, got %v\n",
+		t.Fatalf("expected bytes read for fuzzy query is 16556, got %v\n",
 			bytesRead-prevBytesRead)
 	}
 	prevBytesRead = bytesRead
