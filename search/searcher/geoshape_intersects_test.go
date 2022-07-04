@@ -18,9 +18,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blevesearch/bleve/v2/index/scorch"
-	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/linbaozhong/bleve/v2/index/scorch"
+	"github.com/linbaozhong/bleve/v2/index/upsidedown/store/gtreap"
 )
 
 func setupIndex(t *testing.T) index.Index {

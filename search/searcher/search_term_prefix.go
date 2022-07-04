@@ -15,8 +15,8 @@
 package searcher
 
 import (
-	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/linbaozhong/bleve/v2/search"
 )
 
 func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string,

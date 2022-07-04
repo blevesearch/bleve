@@ -17,15 +17,16 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
-	index "github.com/blevesearch/bleve_index_api"
 	"reflect"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/blevesearch/bleve/v2/analysis/tokenizer/exception"
-	"github.com/blevesearch/bleve/v2/analysis/tokenizer/regexp"
-	"github.com/blevesearch/bleve/v2/document"
+	index "github.com/blevesearch/bleve_index_api"
+
+	"github.com/linbaozhong/bleve/v2/analysis/tokenizer/exception"
+	"github.com/linbaozhong/bleve/v2/analysis/tokenizer/regexp"
+	"github.com/linbaozhong/bleve/v2/document"
 )
 
 var mappingSource = []byte(`{

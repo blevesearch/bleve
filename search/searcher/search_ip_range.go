@@ -17,8 +17,8 @@ package searcher
 import (
 	"net"
 
-	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/linbaozhong/bleve/v2/search"
 )
 
 // netLimits returns the lo and hi bounds inside the network.

@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/linbaozhong/bleve/v2/analysis"
 )
 
 func TestHindiStemmerFilter(t *testing.T) {

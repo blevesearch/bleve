@@ -17,11 +17,12 @@ package simple
 import (
 	"container/heap"
 	"fmt"
+
 	index "github.com/blevesearch/bleve_index_api"
 
-	"github.com/blevesearch/bleve/v2/registry"
-	"github.com/blevesearch/bleve/v2/search"
-	"github.com/blevesearch/bleve/v2/search/highlight"
+	"github.com/linbaozhong/bleve/v2/registry"
+	"github.com/linbaozhong/bleve/v2/search"
+	"github.com/linbaozhong/bleve/v2/search/highlight"
 )
 
 const Name = "simple"

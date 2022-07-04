@@ -24,9 +24,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/blevesearch/bleve/v2/registry"
-	"github.com/blevesearch/upsidedown_store_api"
 	"github.com/blevesearch/gtreap"
+	store "github.com/blevesearch/upsidedown_store_api"
+	"github.com/linbaozhong/bleve/v2/registry"
 )
 
 const Name = "gtreap"

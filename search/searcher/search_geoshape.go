@@ -17,10 +17,10 @@ package searcher
 import (
 	"bytes"
 
-	"github.com/blevesearch/bleve/v2/geo"
-	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/geojson"
+	"github.com/linbaozhong/bleve/v2/geo"
+	"github.com/linbaozhong/bleve/v2/search"
 )
 
 func NewGeoShapeSearcher(indexReader index.IndexReader, shape index.GeoJSON,
