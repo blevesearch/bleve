@@ -122,6 +122,10 @@ func NewMatchQuery(match string) *query.MatchQuery {
 	return query.NewMatchQuery(match)
 }
 
+func NewFieldMatchQuery(name, match string) *query.MatchQuery {
+	return query.NewFieldMatchQuery(name, match)
+}
+
 // NewNumericRangeQuery creates a new Query for ranges
 // of numeric values.
 // Either, but not both endpoints can be nil.
