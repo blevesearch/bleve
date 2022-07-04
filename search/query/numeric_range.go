@@ -32,6 +32,15 @@ type NumericRangeQuery struct {
 	BoostVal     *Boost   `json:"boost,omitempty"`
 }
 
+func NewNumericFieldRangeQuery(name string, min, max *float64, bs ...float64) *NumericRangeQuery {
+	q := NewNumericRangeInclusiveQuery(min, max, nil, nil)
+	q.SetField(name)
+	if len(bs) > 0 {
+		q.SetBoost(bs[0])
+	}
+	return q
+}
+
 // NewNumericRangeQuery creates a new Query for ranges
 // of numeric values.
 // Either, but not both endpoints can be nil.

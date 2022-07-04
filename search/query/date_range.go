@@ -92,6 +92,15 @@ type DateRangeQuery struct {
 	BoostVal       *Boost         `json:"boost,omitempty"`
 }
 
+func NewDateFieldRangeQuery(name string, start, end time.Time, bs ...float64) *DateRangeQuery {
+	q := NewDateRangeInclusiveQuery(start, end, nil, nil)
+	q.SetField(name)
+	if len(bs) > 0 {
+		q.SetBoost(bs[0])
+	}
+	return q
+}
+
 // NewDateRangeQuery creates a new Query for ranges
 // of date values.
 // Date strings are parsed using the DateTimeParser configured in the

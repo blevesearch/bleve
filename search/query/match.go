@@ -72,12 +72,13 @@ func (o *MatchQueryOperator) UnmarshalJSON(data []byte) error {
 	}
 }
 
-func NewFieldMatchQuery(name, match string) *MatchQuery {
-	return &MatchQuery{
-		FieldVal: name,
-		Match:    match,
-		Operator: MatchQueryOperatorOr,
+func NewFieldMatchQuery(name, match string, bs ...float64) *MatchQuery {
+	q := NewMatchQuery(match)
+	q.SetField(name)
+	if len(bs) > 0 {
+		q.SetBoost(bs[0])
 	}
+	return q
 }
 
 // NewMatchQuery creates a Query for matching text.

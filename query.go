@@ -54,6 +54,10 @@ func NewDateRangeQuery(start, end time.Time) *query.DateRangeQuery {
 	return query.NewDateRangeQuery(start, end)
 }
 
+func NewDateFieldRangeQuery(name string, start, end time.Time, bs ...float64) *query.DateRangeQuery {
+	return query.NewDateFieldRangeQuery(name, start, end, bs...)
+}
+
 // NewDateRangeInclusiveQuery creates a new Query for ranges
 // of date values.
 // Date strings are parsed using the DateTimeParser configured in the
@@ -122,8 +126,9 @@ func NewMatchQuery(match string) *query.MatchQuery {
 	return query.NewMatchQuery(match)
 }
 
-func NewFieldMatchQuery(name, match string) *query.MatchQuery {
-	return query.NewFieldMatchQuery(name, match)
+// NewFieldMatchQuery
+func NewFieldMatchQuery(name, match string, bs ...float64) *query.MatchQuery {
+	return query.NewFieldMatchQuery(name, match, bs...)
 }
 
 // NewNumericRangeQuery creates a new Query for ranges
@@ -133,6 +138,10 @@ func NewFieldMatchQuery(name, match string) *query.MatchQuery {
 // The maximum value is exclusive.
 func NewNumericRangeQuery(min, max *float64) *query.NumericRangeQuery {
 	return query.NewNumericRangeQuery(min, max)
+}
+
+func NewNumericFieldRangeQuery(name string, min, max *float64, bs ...float64) *query.NumericRangeQuery {
+	return query.NewNumericFieldRangeQuery(name, min, max, bs...)
 }
 
 // NewNumericRangeInclusiveQuery creates a new Query for ranges
