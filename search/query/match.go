@@ -72,6 +72,14 @@ func (o *MatchQueryOperator) UnmarshalJSON(data []byte) error {
 	}
 }
 
+func NewFieldMatchQuery(name, match string) *MatchQuery {
+	return &MatchQuery{
+		FieldVal: name,
+		Match:    match,
+		Operator: MatchQueryOperatorOr,
+	}
+}
+
 // NewMatchQuery creates a Query for matching text.
 // An Analyzer is chosen based on the field.
 // Input text is analyzed using this analyzer.
