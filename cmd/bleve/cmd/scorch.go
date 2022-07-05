@@ -15,7 +15,7 @@
 package cmd
 
 import (
-	"bleve/v2/cmd/bleve/cmd/scorch"
+	"github.com/blevesearch/bleve/v2/cmd/bleve/cmd/scorch"
 )
 
 // make scorch command-line tool a bleve sub-command

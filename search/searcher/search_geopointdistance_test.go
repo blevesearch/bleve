@@ -18,8 +18,8 @@ import (
 	"reflect"
 	"testing"
 
-	"bleve/v2/geo"
-	"bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/geo"
+	"github.com/blevesearch/bleve/v2/search"
 
 	index "github.com/blevesearch/bleve_index_api"
 )

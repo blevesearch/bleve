@@ -20,9 +20,9 @@ import (
 
 	index "github.com/blevesearch/bleve_index_api"
 
-	"bleve/v2/registry"
-	"bleve/v2/search"
-	"bleve/v2/search/highlight"
+	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/highlight"
 )
 
 const Name = "simple"

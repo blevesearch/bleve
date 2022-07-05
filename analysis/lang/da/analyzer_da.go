@@ -15,10 +15,10 @@
 package da
 
 import (
-	"bleve/v2/analysis"
-	"bleve/v2/analysis/token/lowercase"
-	"bleve/v2/analysis/tokenizer/unicode"
-	"bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis/token/lowercase"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/unicode"
+	"github.com/blevesearch/bleve/v2/registry"
 )
 
 const AnalyzerName = "da"

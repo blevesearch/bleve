@@ -18,8 +18,8 @@ import (
 	"reflect"
 	"testing"
 
-	"bleve/v2/analysis"
-	"bleve/v2/analysis/tokenizer/single"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/single"
 )
 
 func TestSoraniStemmerFilter(t *testing.T) {

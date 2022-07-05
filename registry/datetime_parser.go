@@ -17,7 +17,7 @@ package registry
 import (
 	"fmt"
 
-	"bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis"
 )
 
 func RegisterDateTimeParser(name string, constructor DateTimeParserConstructor) {

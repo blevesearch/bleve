@@ -20,8 +20,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"bleve/v2"
-	"bleve/v2/search/query"
+	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/search/query"
 )
 
 // SearchHandler can handle search requests sent over HTTP

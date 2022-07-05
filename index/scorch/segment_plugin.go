@@ -20,7 +20,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	index "github.com/blevesearch/bleve_index_api"
 
-	"bleve/v2/geo"
+	"github.com/blevesearch/bleve/v2/geo"
 
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 

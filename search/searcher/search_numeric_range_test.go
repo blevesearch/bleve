@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"bleve/v2/numeric"
+	"github.com/blevesearch/bleve/v2/numeric"
 )
 
 func TestSplitRange(t *testing.T) {

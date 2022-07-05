@@ -19,7 +19,7 @@ import (
 	"os"
 	"strconv"
 
-	"bleve/v2"
+	"github.com/blevesearch/bleve/v2"
 
 	"github.com/spf13/cobra"
 )

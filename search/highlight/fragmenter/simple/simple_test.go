@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"bleve/v2/search/highlight"
+	"github.com/blevesearch/bleve/v2/search/highlight"
 )
 
 func TestSimpleFragmenter(t *testing.T) {

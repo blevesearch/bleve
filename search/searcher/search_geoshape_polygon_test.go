@@ -18,11 +18,11 @@ import (
 	"reflect"
 	"testing"
 
-	"bleve/v2/document"
-	"bleve/v2/geo"
-	"bleve/v2/index/scorch"
-	"bleve/v2/index/upsidedown/store/gtreap"
-	"bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/geo"
+	"github.com/blevesearch/bleve/v2/index/scorch"
+	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
+	"github.com/blevesearch/bleve/v2/search"
 
 	index "github.com/blevesearch/bleve_index_api"
 )

@@ -23,7 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"bleve/v2/index/scorch/mergeplan"
+	"github.com/blevesearch/bleve/v2/index/scorch/mergeplan"
 
 	"github.com/RoaringBitmap/roaring"
 	segment "github.com/blevesearch/scorch_segment_api/v2"

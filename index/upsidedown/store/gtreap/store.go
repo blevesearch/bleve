@@ -24,7 +24,7 @@ import (
 	"os"
 	"sync"
 
-	"bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/registry"
 
 	"github.com/blevesearch/gtreap"
 	store "github.com/blevesearch/upsidedown_store_api"

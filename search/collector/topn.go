@@ -20,8 +20,8 @@ import (
 	"strconv"
 	"time"
 
-	"bleve/v2/search"
-	"bleve/v2/size"
+	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/size"
 
 	index "github.com/blevesearch/bleve_index_api"
 )

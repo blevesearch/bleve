@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"bleve/v2"
-	"bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/mapping"
 
 	"github.com/spf13/cobra"
 )

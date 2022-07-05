@@ -17,8 +17,8 @@ package registry
 import (
 	"fmt"
 
-	"bleve/v2/analysis"
-	"bleve/v2/search/highlight"
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/search/highlight"
 )
 
 var stores = make(KVStoreRegistry, 0)

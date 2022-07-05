@@ -17,7 +17,7 @@
 
 package bleve
 
-import "bleve/v2/index/upsidedown/store/boltdb"
+import "github.com/blevesearch/bleve/v2/index/upsidedown/store/boltdb"
 
 // in normal environments we configure boltdb as the default storage
 func initDisk() {

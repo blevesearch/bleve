@@ -19,7 +19,7 @@ import (
 	"testing"
 	"unicode"
 
-	"bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis"
 )
 
 func TestCharacterTokenizer(t *testing.T) {

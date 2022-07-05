@@ -14,7 +14,7 @@
 
 package bleve
 
-import "bleve/v2/mapping"
+import "github.com/blevesearch/bleve/v2/mapping"
 
 // NewIndexMapping creates a new IndexMapping that will use all the default indexing rules
 func NewIndexMapping() *mapping.IndexMappingImpl {
