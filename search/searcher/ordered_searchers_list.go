@@ -15,7 +15,7 @@
 package searcher
 
 import (
-	"github.com/linbaozhong/bleve/v2/search"
+	"bleve/v2/search"
 )
 
 type OrderedSearcherList []search.Searcher

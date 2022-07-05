@@ -15,11 +15,11 @@
 package ro
 
 import (
-	"github.com/linbaozhong/bleve/v2/analysis"
-	"github.com/linbaozhong/bleve/v2/registry"
+	"bleve/v2/analysis"
+	"bleve/v2/registry"
 
-	"github.com/linbaozhong/bleve/v2/analysis/token/lowercase"
-	"github.com/linbaozhong/bleve/v2/analysis/tokenizer/unicode"
+	"bleve/v2/analysis/token/lowercase"
+	"bleve/v2/analysis/tokenizer/unicode"
 )
 
 const AnalyzerName = "ro"

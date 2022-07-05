@@ -17,7 +17,7 @@ package collector
 import (
 	"container/heap"
 
-	"github.com/linbaozhong/bleve/v2/search"
+	"bleve/v2/search"
 )
 
 type collectStoreHeap struct {

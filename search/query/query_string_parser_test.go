@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/linbaozhong/bleve/v2/mapping"
+	"bleve/v2/mapping"
 )
 
 func TestQuerySyntaxParserValid(t *testing.T) {

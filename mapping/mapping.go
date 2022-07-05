@@ -18,8 +18,8 @@ import (
 	"io/ioutil"
 	"log"
 
-	"github.com/linbaozhong/bleve/v2/analysis"
-	"github.com/linbaozhong/bleve/v2/document"
+	"bleve/v2/analysis"
+	"bleve/v2/document"
 )
 
 // A Classifier is an interface describing any object which knows how to

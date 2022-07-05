@@ -18,7 +18,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/linbaozhong/bleve/v2/registry"
+	"bleve/v2/registry"
+
 	"github.com/spf13/cobra"
 )
 

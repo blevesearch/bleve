@@ -18,13 +18,14 @@ import (
 	"reflect"
 	"testing"
 
+	"bleve/v2/document"
+	"bleve/v2/geo"
+	"bleve/v2/index/upsidedown"
+	"bleve/v2/index/upsidedown/store/gtreap"
+	"bleve/v2/numeric"
+	"bleve/v2/search"
+
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/linbaozhong/bleve/v2/document"
-	"github.com/linbaozhong/bleve/v2/geo"
-	"github.com/linbaozhong/bleve/v2/index/upsidedown"
-	"github.com/linbaozhong/bleve/v2/index/upsidedown/store/gtreap"
-	"github.com/linbaozhong/bleve/v2/numeric"
-	"github.com/linbaozhong/bleve/v2/search"
 )
 
 func TestGeoBoundingBox(t *testing.T) {

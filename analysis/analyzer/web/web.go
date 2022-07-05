@@ -15,11 +15,11 @@
 package web
 
 import (
-	"github.com/linbaozhong/bleve/v2/analysis"
-	"github.com/linbaozhong/bleve/v2/analysis/lang/en"
-	"github.com/linbaozhong/bleve/v2/analysis/token/lowercase"
-	"github.com/linbaozhong/bleve/v2/analysis/tokenizer/web"
-	"github.com/linbaozhong/bleve/v2/registry"
+	"bleve/v2/analysis"
+	"bleve/v2/analysis/lang/en"
+	"bleve/v2/analysis/token/lowercase"
+	"bleve/v2/analysis/tokenizer/web"
+	"bleve/v2/registry"
 )
 
 const Name = "web"

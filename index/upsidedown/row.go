@@ -22,8 +22,9 @@ import (
 	"math"
 	"reflect"
 
+	"bleve/v2/size"
+
 	"github.com/golang/protobuf/proto"
-	"github.com/linbaozhong/bleve/v2/size"
 )
 
 var reflectStaticSizeTermFrequencyRow int

@@ -17,7 +17,7 @@ package registry
 import (
 	"fmt"
 
-	"github.com/linbaozhong/bleve/v2/analysis"
+	"bleve/v2/analysis"
 )
 
 func RegisterTokenFilter(name string, constructor TokenFilterConstructor) {

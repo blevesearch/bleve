@@ -19,9 +19,9 @@ import (
 
 	index "github.com/blevesearch/bleve_index_api"
 
-	"github.com/linbaozhong/bleve/v2/analysis"
-	"github.com/linbaozhong/bleve/v2/analysis/analyzer/standard"
-	"github.com/linbaozhong/bleve/v2/registry"
+	"bleve/v2/analysis"
+	"bleve/v2/analysis/analyzer/standard"
+	"bleve/v2/registry"
 )
 
 func BenchmarkAnalysis(b *testing.B) {

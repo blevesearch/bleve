@@ -24,9 +24,9 @@ import (
 
 	index "github.com/blevesearch/bleve_index_api"
 
-	"github.com/linbaozhong/bleve/v2/analysis/tokenizer/exception"
-	"github.com/linbaozhong/bleve/v2/analysis/tokenizer/regexp"
-	"github.com/linbaozhong/bleve/v2/document"
+	"bleve/v2/analysis/tokenizer/exception"
+	"bleve/v2/analysis/tokenizer/regexp"
+	"bleve/v2/document"
 )
 
 var mappingSource = []byte(`{

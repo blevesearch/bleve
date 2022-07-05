@@ -69,7 +69,7 @@ searchResult, _ := index.Search(searchRequest)
 To install the CLI for the latest release of bleve, run:
 
 ```bash
-$ go install github.com/linbaozhong/bleve/v2/cmd/bleve@latest
+$ go install bleve/v2/cmd/bleve@latest
 ```
 
 ```

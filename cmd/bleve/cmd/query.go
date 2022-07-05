@@ -18,8 +18,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/linbaozhong/bleve/v2"
-	"github.com/linbaozhong/bleve/v2/search/query"
+	"bleve/v2"
+	"bleve/v2/search/query"
+
 	"github.com/spf13/cobra"
 )
 

@@ -30,14 +30,15 @@ import (
 	"testing"
 	"time"
 
+	"bleve/v2/analysis"
+	"bleve/v2/analysis/analyzer/keyword"
+	"bleve/v2/analysis/analyzer/standard"
+	regexpTokenizer "bleve/v2/analysis/tokenizer/regexp"
+	"bleve/v2/document"
+	"bleve/v2/index/scorch/mergeplan"
+	"bleve/v2/mapping"
+
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/linbaozhong/bleve/v2/analysis"
-	"github.com/linbaozhong/bleve/v2/analysis/analyzer/keyword"
-	"github.com/linbaozhong/bleve/v2/analysis/analyzer/standard"
-	regexpTokenizer "github.com/linbaozhong/bleve/v2/analysis/tokenizer/regexp"
-	"github.com/linbaozhong/bleve/v2/document"
-	"github.com/linbaozhong/bleve/v2/index/scorch/mergeplan"
-	"github.com/linbaozhong/bleve/v2/mapping"
 )
 
 func init() {

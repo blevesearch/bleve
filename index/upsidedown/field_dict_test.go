@@ -18,9 +18,10 @@ import (
 	"reflect"
 	"testing"
 
+	"bleve/v2/document"
+	"bleve/v2/index/upsidedown/store/boltdb"
+
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/linbaozhong/bleve/v2/document"
-	"github.com/linbaozhong/bleve/v2/index/upsidedown/store/boltdb"
 )
 
 func TestIndexFieldDict(t *testing.T) {

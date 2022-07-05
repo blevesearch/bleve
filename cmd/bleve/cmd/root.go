@@ -19,7 +19,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/linbaozhong/bleve/v2"
+	"bleve/v2"
+
 	"github.com/spf13/cobra"
 )
 

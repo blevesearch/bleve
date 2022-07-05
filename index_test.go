@@ -31,17 +31,18 @@ import (
 	"testing"
 	"time"
 
-	index "github.com/blevesearch/bleve_index_api"
-	"github.com/linbaozhong/bleve/v2/analysis/analyzer/keyword"
-	"github.com/linbaozhong/bleve/v2/document"
-	"github.com/linbaozhong/bleve/v2/index/upsidedown/store/boltdb"
-	"github.com/linbaozhong/bleve/v2/index/upsidedown/store/null"
-	"github.com/linbaozhong/bleve/v2/mapping"
-	"github.com/linbaozhong/bleve/v2/search"
-	"github.com/linbaozhong/bleve/v2/search/query"
+	"bleve/v2/analysis/analyzer/keyword"
+	"bleve/v2/document"
+	"bleve/v2/index/upsidedown/store/boltdb"
+	"bleve/v2/index/upsidedown/store/null"
+	"bleve/v2/mapping"
+	"bleve/v2/search"
+	"bleve/v2/search/query"
 
-	"github.com/linbaozhong/bleve/v2/index/scorch"
-	"github.com/linbaozhong/bleve/v2/index/upsidedown"
+	index "github.com/blevesearch/bleve_index_api"
+
+	"bleve/v2/index/scorch"
+	"bleve/v2/index/upsidedown"
 )
 
 type Fatalfable interface {

@@ -17,8 +17,8 @@ package it
 import (
 	"bytes"
 
-	"github.com/linbaozhong/bleve/v2/analysis"
-	"github.com/linbaozhong/bleve/v2/registry"
+	"bleve/v2/analysis"
+	"bleve/v2/registry"
 )
 
 const LightStemmerName = "stemmer_it_light"

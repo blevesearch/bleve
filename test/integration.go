@@ -15,7 +15,7 @@
 package test
 
 import (
-	"github.com/linbaozhong/bleve/v2"
+	"bleve/v2"
 )
 
 type SearchTest struct {

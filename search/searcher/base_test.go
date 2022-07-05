@@ -18,13 +18,14 @@ import (
 	"math"
 	"regexp"
 
+	"bleve/v2/analysis"
+	regexpTokenizer "bleve/v2/analysis/tokenizer/regexp"
+	"bleve/v2/document"
+	"bleve/v2/index/scorch"
+	"bleve/v2/index/upsidedown"
+	"bleve/v2/index/upsidedown/store/gtreap"
+
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/linbaozhong/bleve/v2/analysis"
-	regexpTokenizer "github.com/linbaozhong/bleve/v2/analysis/tokenizer/regexp"
-	"github.com/linbaozhong/bleve/v2/document"
-	"github.com/linbaozhong/bleve/v2/index/scorch"
-	"github.com/linbaozhong/bleve/v2/index/upsidedown"
-	"github.com/linbaozhong/bleve/v2/index/upsidedown/store/gtreap"
 )
 
 var twoDocIndex index.Index

@@ -17,8 +17,9 @@ package searcher
 import (
 	"testing"
 
+	"bleve/v2/search"
+
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/linbaozhong/bleve/v2/search"
 )
 
 func TestFuzzySearch(t *testing.T) {

@@ -25,15 +25,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"bleve/v2/document"
+	"bleve/v2/index/upsidedown"
+	"bleve/v2/mapping"
+	"bleve/v2/registry"
+	"bleve/v2/search"
+	"bleve/v2/search/collector"
+	"bleve/v2/search/facet"
+	"bleve/v2/search/highlight"
+
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/linbaozhong/bleve/v2/document"
-	"github.com/linbaozhong/bleve/v2/index/upsidedown"
-	"github.com/linbaozhong/bleve/v2/mapping"
-	"github.com/linbaozhong/bleve/v2/registry"
-	"github.com/linbaozhong/bleve/v2/search"
-	"github.com/linbaozhong/bleve/v2/search/collector"
-	"github.com/linbaozhong/bleve/v2/search/facet"
-	"github.com/linbaozhong/bleve/v2/search/highlight"
 )
 
 type indexImpl struct {

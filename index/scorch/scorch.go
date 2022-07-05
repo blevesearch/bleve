@@ -23,10 +23,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"bleve/v2/registry"
+
 	"github.com/RoaringBitmap/roaring"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
-	"github.com/linbaozhong/bleve/v2/registry"
 	bolt "go.etcd.io/bbolt"
 )
 

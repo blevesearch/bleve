@@ -18,7 +18,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/linbaozhong/bleve/v2/index/scorch"
+	"bleve/v2/index/scorch"
+
 	"github.com/spf13/cobra"
 )
 

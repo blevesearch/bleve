@@ -17,7 +17,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/linbaozhong/bleve/v2/index/upsidedown"
+	"bleve/v2/index/upsidedown"
+
 	"github.com/spf13/cobra"
 )
 

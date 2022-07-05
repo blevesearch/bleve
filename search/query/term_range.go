@@ -17,10 +17,11 @@ package query
 import (
 	"fmt"
 
+	"bleve/v2/mapping"
+	"bleve/v2/search"
+	"bleve/v2/search/searcher"
+
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/linbaozhong/bleve/v2/mapping"
-	"github.com/linbaozhong/bleve/v2/search"
-	"github.com/linbaozhong/bleve/v2/search/searcher"
 )
 
 type TermRangeQuery struct {

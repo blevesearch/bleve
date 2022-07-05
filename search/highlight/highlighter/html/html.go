@@ -17,11 +17,11 @@ package html
 import (
 	"fmt"
 
-	"github.com/linbaozhong/bleve/v2/registry"
-	"github.com/linbaozhong/bleve/v2/search/highlight"
-	htmlFormatter "github.com/linbaozhong/bleve/v2/search/highlight/format/html"
-	simpleFragmenter "github.com/linbaozhong/bleve/v2/search/highlight/fragmenter/simple"
-	simpleHighlighter "github.com/linbaozhong/bleve/v2/search/highlight/highlighter/simple"
+	"bleve/v2/registry"
+	"bleve/v2/search/highlight"
+	htmlFormatter "bleve/v2/search/highlight/format/html"
+	simpleFragmenter "bleve/v2/search/highlight/fragmenter/simple"
+	simpleHighlighter "bleve/v2/search/highlight/highlighter/simple"
 )
 
 const Name = "html"

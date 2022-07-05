@@ -14,9 +14,9 @@
 package es
 
 import (
-	"github.com/linbaozhong/bleve/v2/analysis"
-	"github.com/linbaozhong/bleve/v2/analysis/token/stop"
-	"github.com/linbaozhong/bleve/v2/registry"
+	"bleve/v2/analysis"
+	"bleve/v2/analysis/token/stop"
+	"bleve/v2/registry"
 )
 
 func StopTokenFilterConstructor(config map[string]interface{},

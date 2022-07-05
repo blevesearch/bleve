@@ -17,12 +17,13 @@ package bleve
 import (
 	"context"
 
-	"github.com/linbaozhong/bleve/v2/index/upsidedown"
+	"bleve/v2/index/upsidedown"
+
+	"bleve/v2/document"
+	"bleve/v2/mapping"
+	"bleve/v2/size"
 
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/linbaozhong/bleve/v2/document"
-	"github.com/linbaozhong/bleve/v2/mapping"
-	"github.com/linbaozhong/bleve/v2/size"
 )
 
 // A Batch groups together multiple Index and Delete

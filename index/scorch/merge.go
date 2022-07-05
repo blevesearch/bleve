@@ -23,9 +23,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"bleve/v2/index/scorch/mergeplan"
+
 	"github.com/RoaringBitmap/roaring"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
-	"github.com/linbaozhong/bleve/v2/index/scorch/mergeplan"
 )
 
 func (s *Scorch) mergerLoop() {

@@ -20,9 +20,10 @@ import (
 	"reflect"
 	"sync/atomic"
 
+	"bleve/v2/size"
+
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
-	"github.com/linbaozhong/bleve/v2/size"
 )
 
 var reflectStaticSizeIndexSnapshotTermFieldReader int

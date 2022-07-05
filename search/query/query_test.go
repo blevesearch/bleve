@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/linbaozhong/bleve/v2/geo"
-	"github.com/linbaozhong/bleve/v2/mapping"
+	"bleve/v2/geo"
+	"bleve/v2/mapping"
 )
 
 var minNum = 5.1

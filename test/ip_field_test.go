@@ -18,8 +18,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/linbaozhong/bleve/v2"
-	"github.com/linbaozhong/bleve/v2/mapping"
+	"bleve/v2"
+	"bleve/v2/mapping"
 )
 
 type doc struct {

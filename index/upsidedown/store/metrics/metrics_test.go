@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/linbaozhong/bleve/v2/index/upsidedown/store/gtreap"
+	"bleve/v2/index/upsidedown/store/gtreap"
 )
 
 func TestMetricsStore(t *testing.T) {

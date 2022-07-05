@@ -20,10 +20,11 @@ import (
 	"reflect"
 	"time"
 
+	"bleve/v2/analysis"
+	"bleve/v2/numeric"
+	"bleve/v2/size"
+
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/linbaozhong/bleve/v2/analysis"
-	"github.com/linbaozhong/bleve/v2/numeric"
-	"github.com/linbaozhong/bleve/v2/size"
 )
 
 var reflectStaticSizeDateTimeField int

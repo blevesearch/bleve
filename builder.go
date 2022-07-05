@@ -18,10 +18,11 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"bleve/v2/document"
+	"bleve/v2/index/scorch"
+	"bleve/v2/mapping"
+
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/linbaozhong/bleve/v2/document"
-	"github.com/linbaozhong/bleve/v2/index/scorch"
-	"github.com/linbaozhong/bleve/v2/mapping"
 )
 
 type builderImpl struct {

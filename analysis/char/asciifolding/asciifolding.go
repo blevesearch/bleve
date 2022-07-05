@@ -18,8 +18,8 @@
 package asciifolding
 
 import (
-	"github.com/linbaozhong/bleve/v2/analysis"
-	"github.com/linbaozhong/bleve/v2/registry"
+	"bleve/v2/analysis"
+	"bleve/v2/registry"
 )
 
 const Name = "asciifolding"
