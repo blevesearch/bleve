@@ -71,7 +71,7 @@ func (q *BooleanQuery) SetMinShould(minShould float64) {
 	q.Should.(*DisjunctionQuery).SetMin(minShould)
 }
 
-func (q *BooleanQuery) AddMust(m ...Query) {
+func (q *BooleanQuery) AddMust(m ...Query) *BooleanQuery {
 	if q.Must == nil {
 		tmp := NewConjunctionQuery([]Query{})
 		tmp.queryStringMode = q.queryStringMode
@@ -80,9 +80,10 @@ func (q *BooleanQuery) AddMust(m ...Query) {
 	for _, mq := range m {
 		q.Must.(*ConjunctionQuery).AddQuery(mq)
 	}
+	return q
 }
 
-func (q *BooleanQuery) AddShould(m ...Query) {
+func (q *BooleanQuery) AddShould(m ...Query) *BooleanQuery {
 	if q.Should == nil {
 		tmp := NewDisjunctionQuery([]Query{})
 		tmp.queryStringMode = q.queryStringMode
@@ -91,9 +92,10 @@ func (q *BooleanQuery) AddShould(m ...Query) {
 	for _, mq := range m {
 		q.Should.(*DisjunctionQuery).AddQuery(mq)
 	}
+	return q
 }
 
-func (q *BooleanQuery) AddMustNot(m ...Query) {
+func (q *BooleanQuery) AddMustNot(m ...Query) *BooleanQuery {
 	if q.MustNot == nil {
 		tmp := NewDisjunctionQuery([]Query{})
 		tmp.queryStringMode = q.queryStringMode
@@ -102,6 +104,7 @@ func (q *BooleanQuery) AddMustNot(m ...Query) {
 	for _, mq := range m {
 		q.MustNot.(*DisjunctionQuery).AddQuery(mq)
 	}
+	return q
 }
 
 func (q *BooleanQuery) SetBoost(b float64) {
