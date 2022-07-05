@@ -206,6 +206,10 @@ func NewTermQuery(term string) *query.TermQuery {
 	return query.NewTermQuery(term)
 }
 
+func NewFieldTermQuery(name, term string, bs ...float64) *query.TermQuery {
+	return query.NewFieldTermQuery(name, term, bs...)
+}
+
 // NewWildcardQuery creates a new Query which finds
 // documents containing terms that match the
 // specified wildcard.  In the wildcard pattern '*'

@@ -27,6 +27,17 @@ type TermQuery struct {
 	BoostVal *Boost `json:"boost,omitempty"`
 }
 
+func NewFieldTermQuery(name, term string, bs ...float64) *TermQuery {
+	q := &TermQuery{
+		Term: term,
+	}
+	q.SetField(name)
+	if len(bs) > 0 {
+		q.SetBoost(bs[0])
+	}
+	return q
+}
+
 // NewTermQuery creates a new Query for finding an
 // exact term match in the index.
 func NewTermQuery(term string) *TermQuery {
