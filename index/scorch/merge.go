@@ -355,7 +355,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			}
 
 			switch segI := seg.(type) {
-			case segment.BytesOffDiskStats:
+			case segment.DiskStatsReporter:
 				totalBytesRead := segI.BytesRead() + prevBytesReadTotal
 				segI.SetBytesRead(totalBytesRead)
 				seg = segI.(segment.Segment)
@@ -438,7 +438,7 @@ type segmentMerge struct {
 func cumulateBytesRead(sbs []segment.Segment) uint64 {
 	rv := uint64(0)
 	for _, seg := range sbs {
-		if segI, ok := seg.(segment.BytesOffDiskStats); ok {
+		if segI, ok := seg.(segment.DiskStatsReporter); ok {
 			rv += segI.BytesRead()
 		}
 	}

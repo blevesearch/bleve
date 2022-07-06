@@ -535,12 +535,8 @@ func (s *Scorch) Stats() json.Marshaler {
 	return &s.stats
 }
 
-func (s *Scorch) BytesRead() uint64 {
+func (s *Scorch) BytesReadQueryTime() uint64 {
 	return s.stats.TotBytesReadQueryTime
-}
-
-func (s *Scorch) SetBytesRead(val uint64) {
-	atomic.StoreUint64(&s.stats.TotBytesReadQueryTime, val)
 }
 
 func (s *Scorch) diskFileStats(rootSegmentPaths map[string]struct{}) (uint64,
@@ -602,7 +598,7 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["term_searchers_finished"] = m["TotTermSearchersFinished"]
 	m["num_bytes_read_query_time"] = m["TotBytesReadQueryTime"]
 	m["num_plain_text_bytes_indexed"] = m["TotIndexedPlainTextBytes"]
-	m["num_analysis_bytes_indexed"] = m["TotIndexedAnalysisBytes"]
+	m["num_bytes_indexed_after_analysis"] = m["TotIndexedAnalysisBytes"]
 	m["num_items_introduced"] = m["TotIntroducedItems"]
 	m["num_items_persisted"] = m["TotPersistedItems"]
 	m["num_recs_to_persist"] = m["TotItemsToPersist"]
