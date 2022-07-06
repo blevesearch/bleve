@@ -27,12 +27,12 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/blevesearch/bleve/v2"
-	"github.com/blevesearch/bleve/v2/index/scorch"
-	"github.com/blevesearch/bleve/v2/index/upsidedown"
-	"github.com/blevesearch/bleve/v2/index/upsidedown/store/boltdb"
-	"github.com/blevesearch/bleve/v2/mapping"
-	"github.com/blevesearch/bleve/v2/search"
+	"github.com/linbaozhong/bleve/v2"
+	"github.com/linbaozhong/bleve/v2/index/scorch"
+	"github.com/linbaozhong/bleve/v2/index/upsidedown"
+	"github.com/linbaozhong/bleve/v2/index/upsidedown/store/boltdb"
+	"github.com/linbaozhong/bleve/v2/mapping"
+	"github.com/linbaozhong/bleve/v2/search"
 )
 
 // Tests scorch indexer versus upsidedown/bolt indexer against various

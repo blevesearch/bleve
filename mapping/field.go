@@ -20,13 +20,13 @@ import (
 	"net"
 	"time"
 
-	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
+	"github.com/linbaozhong/bleve/v2/analysis/analyzer/keyword"
 
 	index "github.com/blevesearch/bleve_index_api"
 
-	"github.com/blevesearch/bleve/v2/analysis"
-	"github.com/blevesearch/bleve/v2/document"
-	"github.com/blevesearch/bleve/v2/geo"
+	"github.com/linbaozhong/bleve/v2/analysis"
+	"github.com/linbaozhong/bleve/v2/document"
+	"github.com/linbaozhong/bleve/v2/geo"
 )
 
 // control the default behavior for dynamic fields (those not explicitly mapped)

@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/linbaozhong/bleve/v2/registry"
 
 	"github.com/blevesearch/goleveldb/leveldb"
 	"github.com/blevesearch/goleveldb/leveldb/opt"

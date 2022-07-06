@@ -19,8 +19,8 @@ import (
 	"math"
 	"reflect"
 
-	"github.com/blevesearch/bleve/v2/search"
-	"github.com/blevesearch/bleve/v2/size"
+	"github.com/linbaozhong/bleve/v2/search"
+	"github.com/linbaozhong/bleve/v2/size"
 
 	index "github.com/blevesearch/bleve_index_api"
 )

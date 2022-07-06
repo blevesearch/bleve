@@ -15,8 +15,8 @@
 package plain
 
 import (
-	"github.com/blevesearch/bleve/v2/registry"
-	"github.com/blevesearch/bleve/v2/search/highlight"
+	"github.com/linbaozhong/bleve/v2/registry"
+	"github.com/linbaozhong/bleve/v2/search/highlight"
 )
 
 const Name = "plain"

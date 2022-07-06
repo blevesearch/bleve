@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"reflect"
 
-	"github.com/blevesearch/bleve/v2/size"
+	"github.com/linbaozhong/bleve/v2/size"
 
 	"github.com/RoaringBitmap/roaring"
 	index "github.com/blevesearch/bleve_index_api"

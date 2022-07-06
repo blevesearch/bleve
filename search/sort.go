@@ -23,8 +23,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/blevesearch/bleve/v2/geo"
-	"github.com/blevesearch/bleve/v2/numeric"
+	"github.com/linbaozhong/bleve/v2/geo"
+	"github.com/linbaozhong/bleve/v2/numeric"
 )
 
 var HighTerm = strings.Repeat(string(utf8.MaxRune), 3)

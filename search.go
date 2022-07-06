@@ -21,14 +21,14 @@ import (
 	"sort"
 	"time"
 
-	"github.com/blevesearch/bleve/v2/analysis"
-	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
-	"github.com/blevesearch/bleve/v2/document"
-	"github.com/blevesearch/bleve/v2/registry"
-	"github.com/blevesearch/bleve/v2/search"
-	"github.com/blevesearch/bleve/v2/search/collector"
-	"github.com/blevesearch/bleve/v2/search/query"
-	"github.com/blevesearch/bleve/v2/size"
+	"github.com/linbaozhong/bleve/v2/analysis"
+	"github.com/linbaozhong/bleve/v2/analysis/datetime/optional"
+	"github.com/linbaozhong/bleve/v2/document"
+	"github.com/linbaozhong/bleve/v2/registry"
+	"github.com/linbaozhong/bleve/v2/search"
+	"github.com/linbaozhong/bleve/v2/search/collector"
+	"github.com/linbaozhong/bleve/v2/search/query"
+	"github.com/linbaozhong/bleve/v2/size"
 )
 
 var reflectStaticSizeSearchResult int

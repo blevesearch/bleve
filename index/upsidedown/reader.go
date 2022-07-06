@@ -20,7 +20,7 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"github.com/blevesearch/bleve/v2/size"
+	"github.com/linbaozhong/bleve/v2/size"
 
 	index "github.com/blevesearch/bleve_index_api"
 	store "github.com/blevesearch/upsidedown_store_api"

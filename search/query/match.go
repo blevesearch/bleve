@@ -18,8 +18,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/blevesearch/bleve/v2/mapping"
-	"github.com/blevesearch/bleve/v2/search"
+	"github.com/linbaozhong/bleve/v2/mapping"
+	"github.com/linbaozhong/bleve/v2/search"
 
 	index "github.com/blevesearch/bleve_index_api"
 )

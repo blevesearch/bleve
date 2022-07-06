@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/linbaozhong/bleve/v2/registry"
 
 	"github.com/blevesearch/go-metrics"
 	store "github.com/blevesearch/upsidedown_store_api"

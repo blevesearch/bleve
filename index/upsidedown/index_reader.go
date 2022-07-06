@@ -17,7 +17,7 @@ package upsidedown
 import (
 	"reflect"
 
-	"github.com/blevesearch/bleve/v2/document"
+	"github.com/linbaozhong/bleve/v2/document"
 
 	index "github.com/blevesearch/bleve_index_api"
 	store "github.com/blevesearch/upsidedown_store_api"
