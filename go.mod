@@ -11,7 +11,7 @@ require (
 	github.com/blevesearch/go-porterstemmer v1.0.3
 	github.com/blevesearch/goleveldb v1.0.1
 	github.com/blevesearch/gtreap v0.1.1
-	github.com/blevesearch/scorch_segment_api/v2 v2.1.0
+	github.com/blevesearch/scorch_segment_api/v2 v2.1.1
 	github.com/blevesearch/segment v0.9.0
 	github.com/blevesearch/snowball v0.6.1
 	github.com/blevesearch/snowballstem v0.9.0
