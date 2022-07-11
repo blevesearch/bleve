@@ -401,7 +401,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		analysisResults[itemsDeQueued] = result
 		itemsDeQueued++
 		result.VisitFields(func(f index.Field) {
-			atomic.AddUint64(&s.stats.TotIndexedAnalysisBytes,
+			atomic.AddUint64(&s.stats.TotBytesIndexedAfterAnalysis,
 				analysisBytes(f.AnalyzedTokenFrequencies()))
 		})
 	}
@@ -536,7 +536,7 @@ func (s *Scorch) Stats() json.Marshaler {
 }
 
 func (s *Scorch) BytesReadQueryTime() uint64 {
-	return s.stats.TotBytesReadQueryTime
+	return s.stats.TotBytesReadAtQueryTime
 }
 
 func (s *Scorch) diskFileStats(rootSegmentPaths map[string]struct{}) (uint64,
@@ -596,9 +596,9 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["index_time"] = m["TotIndexTime"]
 	m["term_searchers_started"] = m["TotTermSearchersStarted"]
 	m["term_searchers_finished"] = m["TotTermSearchersFinished"]
-	m["num_bytes_read_query_time"] = m["TotBytesReadQueryTime"]
+	m["num_bytes_read_query_time"] = m["TotBytesReadAtQueryTime"]
 	m["num_plain_text_bytes_indexed"] = m["TotIndexedPlainTextBytes"]
-	m["num_bytes_indexed_after_analysis"] = m["TotIndexedAnalysisBytes"]
+	m["num_bytes_indexed_after_analysis"] = m["TotBytesIndexedAfterAnalysis"]
 	m["num_items_introduced"] = m["TotIntroducedItems"]
 	m["num_items_persisted"] = m["TotPersistedItems"]
 	m["num_recs_to_persist"] = m["TotItemsToPersist"]

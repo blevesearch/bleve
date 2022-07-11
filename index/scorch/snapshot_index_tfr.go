@@ -100,7 +100,7 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 			// upstream.
 			if ok {
 				delta := itr.BytesRead() - prevBytesRead
-				atomic.AddUint64(&i.snapshot.parent.stats.TotBytesReadQueryTime, uint64(delta))
+				atomic.AddUint64(&i.snapshot.parent.stats.TotBytesReadAtQueryTime, uint64(delta))
 			}
 
 			return rv, nil

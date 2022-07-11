@@ -149,15 +149,16 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 	for index, segment := range i.segment {
 		go func(index int, segment *SegmentSnapshot) {
 			var prevBytesRead uint64
-			if seg, ok := segment.segment.(diskStatsReporter); ok {
+			seg, ok := segment.segment.(diskStatsReporter)
+			if ok {
 				prevBytesRead = seg.BytesRead()
 			}
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				results <- &asynchSegmentResult{err: err}
 			} else {
-				if seg, ok := segment.segment.(diskStatsReporter); ok {
-					atomic.AddUint64(&i.parent.stats.TotBytesReadQueryTime,
+				if ok {
+					atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime,
 						seg.BytesRead()-prevBytesRead)
 				}
 				if randomLookup {
@@ -470,7 +471,7 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	}
 	if ok {
 		delta := seg.BytesRead() - prevBytesRead
-		atomic.AddUint64(&i.parent.stats.TotBytesReadQueryTime, delta)
+		atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime, delta)
 	}
 	return rvd, nil
 }
@@ -556,7 +557,7 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 				return nil, err
 			}
 			if ok {
-				atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime, segP.BytesRead()-prevBytesRead)
+				atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime, segP.BytesRead()-prevBytesRead)
 			}
 			rv.dicts[i] = dict
 		}
@@ -581,13 +582,13 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 
 		if postings, ok := pl.(diskStatsReporter); ok &&
 			prevBytesReadPL < postings.BytesRead() {
-			atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime,
+			atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
 				postings.BytesRead()-prevBytesReadPL)
 		}
 
 		if itr, ok := rv.iterators[i].(diskStatsReporter); ok &&
 			prevBytesReadItr < itr.BytesRead() {
-			atomic.AddUint64(&is.parent.stats.TotBytesReadQueryTime,
+			atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
 				itr.BytesRead()-prevBytesReadItr)
 		}
 	}
@@ -718,7 +719,7 @@ func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 			return nil, nil, err
 		}
 		if ok {
-			atomic.AddUint64(&i.parent.stats.TotBytesReadQueryTime, ssvp.BytesRead()-prevBytesRead)
+			atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime, ssvp.BytesRead()-prevBytesRead)
 		}
 	}
 

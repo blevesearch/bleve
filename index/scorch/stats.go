@@ -42,9 +42,9 @@ type Stats struct {
 	TotAnalysisTime uint64
 	TotIndexTime    uint64
 
-	TotBytesReadQueryTime    uint64
-	TotIndexedPlainTextBytes uint64
-	TotIndexedAnalysisBytes  uint64
+	TotBytesReadAtQueryTime      uint64
+	TotIndexedPlainTextBytes     uint64
+	TotBytesIndexedAfterAnalysis uint64
 
 	TotTermSearchersStarted  uint64
 	TotTermSearchersFinished uint64
