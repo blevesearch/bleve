@@ -229,7 +229,10 @@ func extract2DCoordinates(thing interface{}) [][]float64 {
 		for j := 0; j < thingVal.Len(); j++ {
 			edges := thingVal.Index(j).Interface()
 			if es, ok := edges.([]interface{}); ok {
-				rv = append(rv, extractCoordinates(es))
+				v := extractCoordinates(es)
+				if len(v) == 2 {
+					rv = append(rv, v)
+				}
 			}
 		}
 
@@ -272,27 +275,36 @@ func extract4DCoordinates(thing interface{}) (rv [][][][]float64) {
 	return rv
 }
 
-func extractGeoShape(thing interface{}) ([][][][]float64, string, bool) {
+func ParseGeoShapeField(thing interface{}) (interface{}, string, error) {
 	thingVal := reflect.ValueOf(thing)
 	if !thingVal.IsValid() {
-		return nil, "", false
+		return nil, "", nil
 	}
 
+	var shape string
 	var coordValue interface{}
-	var typ string
+
 	if thingVal.Kind() == reflect.Map {
 		iter := thingVal.MapRange()
 		for iter.Next() {
 			if iter.Key().String() == "type" {
-				typ = iter.Value().Interface().(string)
-				// make the shape type case insensitive.
-				typ = strings.ToLower(typ)
+				shape = iter.Value().Interface().(string)
 				continue
 			}
+
 			if iter.Key().String() == "coordinates" {
 				coordValue = iter.Value().Interface()
 			}
 		}
+	}
+
+	return coordValue, strings.ToLower(shape), nil
+}
+
+func extractGeoShape(thing interface{}) ([][][][]float64, string, bool) {
+	coordValue, typ, err := ParseGeoShapeField(thing)
+	if err != nil {
+		return nil, "", false
 	}
 
 	return ExtractGeoShapeCoordinates(coordValue, typ)
@@ -383,23 +395,68 @@ func ExtractGeoShapeCoordinates(coordValue interface{},
 	typ string) ([][][][]float64, string, bool) {
 	var rv [][][][]float64
 	if typ == PointType {
-		rv = [][][][]float64{{{extractCoordinates(coordValue)}}}
+		point := extractCoordinates(coordValue)
+
+		// ignore the contents with invalid entry.
+		if len(point) < 2 {
+			return nil, typ, false
+		}
+
+		rv = [][][][]float64{{{point}}}
 		return rv, typ, true
 	}
 
 	if typ == MultiPointType || typ == LineStringType ||
 		typ == EnvelopeType {
-		rv = [][][][]float64{{extract2DCoordinates(coordValue)}}
+		coords := extract2DCoordinates(coordValue)
+
+		// ignore the contents with invalid entry.
+		if len(coords) == 0 {
+			return nil, typ, false
+		}
+
+		if typ == EnvelopeType && len(coords) != 2 {
+			return nil, typ, false
+		}
+
+		if typ == LineStringType && len(coords) < 2 {
+			return nil, typ, false
+		}
+
+		rv = [][][][]float64{{coords}}
 		return rv, typ, true
 	}
 
 	if typ == PolygonType || typ == MultiLineStringType {
-		rv = [][][][]float64{extract3DCoordinates(coordValue)}
+		coords := extract3DCoordinates(coordValue)
+
+		// ignore the contents with invalid entry.
+		if len(coords) == 0 {
+			return nil, typ, false
+		}
+
+		if typ == PolygonType && len(coords[0]) < 3 ||
+			typ == MultiLineStringType && len(coords[0]) < 2 {
+			return nil, typ, false
+		}
+
+		rv = [][][][]float64{coords}
 		return rv, typ, true
 	}
 
 	if typ == MultiPolygonType {
 		rv = extract4DCoordinates(coordValue)
+
+		// ignore the contents with invalid entry.
+		if len(rv) == 0 || len(rv[0]) == 0 {
+			return nil, typ, false
+
+		}
+
+		if len(rv[0][0]) < 3 {
+			return nil, typ, false
+		}
+
 		return rv, typ, true
 	}
 

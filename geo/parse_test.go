@@ -14,7 +14,10 @@
 
 package geo
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestExtractGeoPoint(t *testing.T) {
 
@@ -198,4 +201,155 @@ func (s *s12) Lng() float64 {
 
 func (s *s12) Lat() float64 {
 	return s.lat
+}
+
+func TestExtractGeoShape(t *testing.T) {
+	tests := []struct {
+		in      interface{}
+		resTyp  string
+		result  [][][][]float64
+		success bool
+	}{
+		// valid point slice
+		{
+			in: map[string]interface{}{
+				"coordinates": []interface{}{3.4, 5.9},
+				"type":        "Point",
+			},
+			resTyp:  "point",
+			result:  [][][][]float64{{{{3.4, 5.9}}}},
+			success: true,
+		},
+		// invalid point slice
+		{
+			in: map[string]interface{}{
+				"coordinates": []interface{}{3.4},
+				"type":        "point"},
+
+			resTyp:  "point",
+			result:  nil,
+			success: false,
+		},
+		// valid multipoint slice containing single point
+		{
+			in: map[string]interface{}{
+				"coordinates": [][]interface{}{{3.4, 5.9}},
+				"type":        "multipoint"},
+			resTyp:  "multipoint",
+			result:  [][][][]float64{{{{3.4, 5.9}}}},
+			success: true,
+		},
+		// valid multipoint slice
+		{
+			in: map[string]interface{}{
+				"coordinates": [][]interface{}{{3.4, 5.9}, {6.7, 9.8}},
+				"type":        "multipoint"},
+			resTyp:  "multipoint",
+			result:  [][][][]float64{{{{3.4, 5.9}, {6.7, 9.8}}}},
+			success: true,
+		},
+		// valid multipoint slice containing one invalid entry
+		{
+			in: map[string]interface{}{
+				"coordinates": [][]interface{}{{3.4, 5.9}, {6.7}},
+				"type":        "multipoint"},
+			resTyp:  "multipoint",
+			result:  [][][][]float64{{{{3.4, 5.9}}}},
+			success: true,
+		},
+		// invalid multipoint slice
+		{
+			in: map[string]interface{}{
+				"coordinates": [][]interface{}{{3.4}},
+				"type":        "multipoint"},
+			resTyp:  "multipoint",
+			result:  nil,
+			success: false,
+		},
+		// valid linestring slice
+		{
+			in: map[string]interface{}{
+				"coordinates": [][]interface{}{{3.4, 4.4}, {8.4, 9.4}},
+				"type":        "linestring"},
+			resTyp:  "linestring",
+			result:  [][][][]float64{{{{3.4, 4.4}, {8.4, 9.4}}}},
+			success: true,
+		},
+		// valid linestring slice
+		{
+			in: map[string]interface{}{
+				"coordinates": [][]interface{}{{3.4, 4.4}, {8.4, 9.4}, {10.1, 12.3}},
+				"type":        "linestring"},
+			resTyp:  "linestring",
+			result:  [][][][]float64{{{{3.4, 4.4}, {8.4, 9.4}, {10.1, 12.3}}}},
+			success: true,
+		},
+		// invalid linestring slice with single entry
+		{
+			in: map[string]interface{}{
+				"coordinates": [][]interface{}{{3.4, 4.4}},
+				"type":        "linestring"},
+			resTyp:  "linestring",
+			result:  nil,
+			success: false,
+		},
+		// invalid linestring slice with wrong paranthesis
+		{
+			in: map[string]interface{}{
+				"coordinates": [][][]interface{}{{{3.4, 4.4}, {8.4, 9.4}}},
+				"type":        "linestring"},
+			resTyp:  "linestring",
+			result:  nil,
+			success: false,
+		},
+		// valid envelope
+		{
+			in: map[string]interface{}{
+				"coordinates": [][]interface{}{{3.4, 4.4}, {8.4, 9.4}},
+				"type":        "envelope"},
+			resTyp:  "envelope",
+			result:  [][][][]float64{{{{3.4, 4.4}, {8.4, 9.4}}}},
+			success: true,
+		},
+		// invalid envelope
+		{
+			in: map[string]interface{}{
+				"coordinates": [][]interface{}{{3.4, 4.4}},
+				"type":        "envelope"},
+			resTyp:  "envelope",
+			result:  nil,
+			success: false,
+		},
+		// invalid envelope
+		{
+			in: map[string]interface{}{
+				"coordinates": [][][]interface{}{{{3.4, 4.4}, {8.4, 9.4}}},
+				"type":        "envelope"},
+			resTyp:  "envelope",
+			result:  nil,
+			success: false,
+		},
+		// invalid envelope with >2 vertices
+		{
+			in: map[string]interface{}{
+				"coordinates": [][]interface{}{{3.4, 4.4}, {5.6, 6.4}, {7.4, 7.4}},
+				"type":        "envelope"},
+			resTyp:  "envelope",
+			result:  nil,
+			success: false,
+		},
+	}
+
+	for _, test := range tests {
+		result, shapeType, success := extractGeoShape(test.in)
+		if success != test.success {
+			t.Errorf("expected extract geo point: %t, got: %t for: %v", test.success, success, test.in)
+		}
+		if shapeType != test.resTyp {
+			t.Errorf("expected shape type: %v, got: %v for input: %v", test.resTyp, shapeType, test.in)
+		}
+		if !reflect.DeepEqual(test.result, result) {
+			t.Errorf("expected result %+v, got %+v for %v", test.result, result, test.in)
+		}
+	}
 }

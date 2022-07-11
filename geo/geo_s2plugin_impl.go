@@ -48,8 +48,9 @@ func init() {
 
 func registerS2RegionTermIndexer() {
 	spatialPlugin := S2SpatialAnalyzerPlugin{
-		s2Indexer:  s2.NewRegionTermIndexerWithOptions(initS2IndexerOptions()),
-		s2Searcher: s2.NewRegionTermIndexerWithOptions(initS2SearcherOptions()),
+		s2Indexer:                    s2.NewRegionTermIndexerWithOptions(initS2IndexerOptions()),
+		s2Searcher:                   s2.NewRegionTermIndexerWithOptions(initS2SearcherOptions()),
+		s2GeoPointsRegionTermIndexer: s2.NewRegionTermIndexerWithOptions(initS2OptionsForGeoPoints()),
 	}
 
 	RegisterSpatialAnalyzerPlugin(&spatialPlugin)
@@ -70,6 +71,8 @@ func GetSpatialAnalyzerPlugin(typ string) index.SpatialAnalyzerPlugin {
 	return rv
 }
 
+// initS2IndexerOptions returns the options for s2's region
+// term indexer for the index time tokens of geojson shapes.
 func initS2IndexerOptions() s2.Options {
 	options := s2.Options{}
 	// maxLevel control the maximum size of the
@@ -91,6 +94,8 @@ func initS2IndexerOptions() s2.Options {
 	return options
 }
 
+// initS2SearcherOptions returns the options for s2's region
+// term indexer for the query time tokens of geojson shapes.
 func initS2SearcherOptions() s2.Options {
 	options := s2.Options{}
 	// maxLevel control the maximum size of the
@@ -112,11 +117,38 @@ func initS2SearcherOptions() s2.Options {
 	return options
 }
 
+// initS2OptionsForGeoPoints returns the options for
+// s2's region term indexer for the original geopoints.
+func initS2OptionsForGeoPoints() s2.Options {
+	options := s2.Options{}
+	// maxLevel control the maximum size of the
+	// S2Cells used to approximate regions.
+	options.SetMaxLevel(16)
+
+	// minLevel control the minimum size of the
+	// S2Cells used to approximate regions.
+	options.SetMinLevel(4)
+
+	// levelMod value greater than 1 increases the effective branching
+	// factor of the S2Cell hierarchy by skipping some levels.
+	options.SetLevelMod(2)
+
+	// maxCells controls the maximum number of cells
+	// when approximating each s2 region.
+	options.SetMaxCells(8)
+
+	// explicit for geo points.
+	options.SetPointsOnly(true)
+
+	return options
+}
+
 // S2SpatialAnalyzerPlugin is an implementation of
 // the index.SpatialAnalyzerPlugin interface.
 type S2SpatialAnalyzerPlugin struct {
-	s2Indexer  *s2.RegionTermIndexer
-	s2Searcher *s2.RegionTermIndexer
+	s2Indexer                    *s2.RegionTermIndexer
+	s2Searcher                   *s2.RegionTermIndexer
+	s2GeoPointsRegionTermIndexer *s2.RegionTermIndexer
 }
 
 func (s *S2SpatialAnalyzerPlugin) Type() string {
@@ -133,6 +165,8 @@ func (s *S2SpatialAnalyzerPlugin) GetIndexTokens(queryShape index.GeoJSON) []str
 	for _, shape := range shapes {
 		if s2t, ok := shape.(s2Tokenizable); ok {
 			rv = append(rv, s2t.IndexTokens(s.s2Indexer)...)
+		} else if s2t, ok := shape.(s2TokenizableEx); ok {
+			rv = append(rv, s2t.IndexTokens(s)...)
 		}
 	}
 
@@ -149,6 +183,8 @@ func (s *S2SpatialAnalyzerPlugin) GetQueryTokens(queryShape index.GeoJSON) []str
 	for _, shape := range shapes {
 		if s2t, ok := shape.(s2Tokenizable); ok {
 			rv = append(rv, s2t.QueryTokens(s.s2Searcher)...)
+		} else if s2t, ok := shape.(s2TokenizableEx); ok {
+			rv = append(rv, s2t.QueryTokens(s)...)
 		}
 	}
 
@@ -168,6 +204,19 @@ type s2Tokenizable interface {
 	QueryTokens(*s2.RegionTermIndexer) []string
 }
 
+// ------------------------------------------------------------------------
+// s2TokenizableEx is an optional interface for shapes that support
+// the generation of s2 based tokens that can be used for both
+// indexing and querying. This is intended for the older geopoint
+// indexing and querying.
+type s2TokenizableEx interface {
+	// IndexTokens returns the tokens for indexing.
+	IndexTokens(*S2SpatialAnalyzerPlugin) []string
+
+	// QueryTokens returns the tokens for searching.
+	QueryTokens(*S2SpatialAnalyzerPlugin) []string
+}
+
 //----------------------------------------------------------------------------------
 
 func (p *Point) Type() string {
@@ -184,12 +233,12 @@ func (p *Point) Contains(s index.GeoJSON) (bool, error) {
 	return false, nil
 }
 
-func (p *Point) IndexTokens(s *s2.RegionTermIndexer) []string {
-	return s.GetIndexTermsForPoint(s2.PointFromLatLng(
+func (p *Point) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
+	return s.s2GeoPointsRegionTermIndexer.GetIndexTermsForPoint(s2.PointFromLatLng(
 		s2.LatLngFromDegrees(p.Lat, p.Lon)), "")
 }
 
-func (p *Point) QueryTokens(s *s2.RegionTermIndexer) []string {
+func (p *Point) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 	return nil
 }
 
@@ -223,15 +272,15 @@ func (p *boundedRectangle) Contains(s index.GeoJSON) (bool, error) {
 	return false, nil
 }
 
-func (br *boundedRectangle) IndexTokens(s *s2.RegionTermIndexer) []string {
+func (br *boundedRectangle) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
 	return nil
 }
 
-func (br *boundedRectangle) QueryTokens(s *s2.RegionTermIndexer) []string {
+func (br *boundedRectangle) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 	rect := s2.RectFromDegrees(br.minLat, br.minLon, br.maxLat, br.maxLon)
 
 	// obtain the terms to be searched for the given bounding box.
-	terms := s.GetQueryTermsForRegion(rect, "")
+	terms := s.s2GeoPointsRegionTermIndexer.GetQueryTermsForRegion(rect, "")
 
 	return geojson.StripCoveringTerms(terms)
 }
@@ -261,11 +310,11 @@ func (p *boundedPolygon) Contains(s index.GeoJSON) (bool, error) {
 	return false, nil
 }
 
-func (bp *boundedPolygon) IndexTokens(s *s2.RegionTermIndexer) []string {
+func (bp *boundedPolygon) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
 	return nil
 }
 
-func (bp *boundedPolygon) QueryTokens(s *s2.RegionTermIndexer) []string {
+func (bp *boundedPolygon) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 	vertices := make([]s2.Point, len(bp.coordinates))
 	for i, point := range bp.coordinates {
 		vertices[i] = s2.PointFromLatLng(
@@ -274,7 +323,7 @@ func (bp *boundedPolygon) QueryTokens(s *s2.RegionTermIndexer) []string {
 	s2polygon := s2.PolygonFromOrientedLoops([]*s2.Loop{s2.LoopFromPoints(vertices)})
 
 	// obtain the terms to be searched for the given polygon.
-	terms := s.GetQueryTermsForRegion(
+	terms := s.s2GeoPointsRegionTermIndexer.GetQueryTermsForRegion(
 		s2polygon.CapBound(), "")
 
 	return geojson.StripCoveringTerms(terms)
@@ -309,17 +358,17 @@ func (p *pointDistance) Contains(s index.GeoJSON) (bool, error) {
 	return false, nil
 }
 
-func (pd *pointDistance) IndexTokens(s *s2.RegionTermIndexer) []string {
+func (pd *pointDistance) IndexTokens(s *S2SpatialAnalyzerPlugin) []string {
 	return nil
 }
 
-func (pd *pointDistance) QueryTokens(s *s2.RegionTermIndexer) []string {
+func (pd *pointDistance) QueryTokens(s *S2SpatialAnalyzerPlugin) []string {
 	// obtain the covering query region from the given points.
 	queryRegion := s2.CapFromCenterAndRadius(pd.centerLat,
 		pd.centerLon, pd.dist)
 
 	// obtain the query terms for the query region.
-	terms := s.GetQueryTermsForRegion(queryRegion, "")
+	terms := s.s2GeoPointsRegionTermIndexer.GetQueryTermsForRegion(queryRegion, "")
 
 	return geojson.StripCoveringTerms(terms)
 }
