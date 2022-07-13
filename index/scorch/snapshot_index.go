@@ -149,15 +149,15 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 	for index, segment := range i.segment {
 		go func(index int, segment *SegmentSnapshot) {
 			var prevBytesRead uint64
-			seg, ok := segment.segment.(diskStatsReporter)
-			if ok {
+			seg, diskStatsAvailable := segment.segment.(diskStatsReporter)
+			if diskStatsAvailable {
 				prevBytesRead = seg.BytesRead()
 			}
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				results <- &asynchSegmentResult{err: err}
 			} else {
-				if ok {
+				if diskStatsAvailable {
 					atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime,
 						seg.BytesRead()-prevBytesRead)
 				}
@@ -436,8 +436,8 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 
 	rvd := document.NewDocument(id)
 	var prevBytesRead uint64
-	seg, ok := i.segment[segmentIndex].segment.(segment.DiskStatsReporter)
-	if ok {
+	seg, diskStatsAvailable := i.segment[segmentIndex].segment.(segment.DiskStatsReporter)
+	if diskStatsAvailable {
 		prevBytesRead = seg.BytesRead()
 	}
 	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, val []byte, pos []uint64) bool {
@@ -469,7 +469,7 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if ok {
+	if diskStatsAvailable {
 		delta := seg.BytesRead() - prevBytesRead
 		atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime, delta)
 	}
@@ -548,15 +548,15 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		rv.dicts = make([]segment.TermDictionary, len(is.segment))
 		for i, segment := range is.segment {
 			var prevBytesRead uint64
-			segP, ok := segment.segment.(diskStatsReporter)
-			if ok {
+			segP, diskStatsAvailable := segment.segment.(diskStatsReporter)
+			if diskStatsAvailable {
 				prevBytesRead = segP.BytesRead()
 			}
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				return nil, err
 			}
-			if ok {
+			if diskStatsAvailable {
 				atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime, segP.BytesRead()-prevBytesRead)
 			}
 			rv.dicts[i] = dict
@@ -565,7 +565,7 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 
 	for i, segment := range is.segment {
 		var prevBytesReadPL uint64
-		if postings, ok := rv.postings[i].(diskStatsReporter); ok {
+		if postings, diskStatsAvailable := rv.postings[i].(diskStatsReporter); diskStatsAvailable {
 			prevBytesReadPL = postings.BytesRead()
 		}
 		pl, err := rv.dicts[i].PostingsList(term, segment.deleted, rv.postings[i])
@@ -575,18 +575,18 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		rv.postings[i] = pl
 
 		var prevBytesReadItr uint64
-		if itr, ok := rv.iterators[i].(diskStatsReporter); ok {
+		if itr, diskStatsAvailable := rv.iterators[i].(diskStatsReporter); diskStatsAvailable {
 			prevBytesReadItr = itr.BytesRead()
 		}
 		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, rv.iterators[i])
 
-		if postings, ok := pl.(diskStatsReporter); ok &&
+		if postings, diskStatsAvailable := pl.(diskStatsReporter); diskStatsAvailable &&
 			prevBytesReadPL < postings.BytesRead() {
 			atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
 				postings.BytesRead()-prevBytesReadPL)
 		}
 
-		if itr, ok := rv.iterators[i].(diskStatsReporter); ok &&
+		if itr, diskStatsAvailable := rv.iterators[i].(diskStatsReporter); diskStatsAvailable &&
 			prevBytesReadItr < itr.BytesRead() {
 			atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
 				itr.BytesRead()-prevBytesReadItr)
@@ -710,15 +710,15 @@ func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 
 	if ssvOk && ssv != nil && len(vFields) > 0 {
 		var prevBytesRead uint64
-		ssvp, ok := ssv.(segment.DiskStatsReporter)
-		if ok {
+		ssvp, diskStatsAvailable := ssv.(segment.DiskStatsReporter)
+		if diskStatsAvailable {
 			prevBytesRead = ssvp.BytesRead()
 		}
 		dvs, err = ssv.VisitDocValues(localDocNum, fields, visitor, dvs)
 		if err != nil {
 			return nil, nil, err
 		}
-		if ok {
+		if diskStatsAvailable {
 			atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime, ssvp.BytesRead()-prevBytesRead)
 		}
 	}
