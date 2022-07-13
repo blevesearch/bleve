@@ -387,6 +387,12 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	analysisResults := make([]index.Document, int(numUpdates))
 	var itemsDeQueued uint64
 	var totalAnalysisSize int
+	analysisBytes := func(tokMap index.TokenFrequencies) (rv uint64) {
+		for k := range tokMap {
+			rv += uint64(len(k))
+		}
+		return rv
+	}
 	for itemsDeQueued < numUpdates {
 		result := <-resultChan
 		resultSize := result.Size()
@@ -394,6 +400,10 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		totalAnalysisSize += resultSize
 		analysisResults[itemsDeQueued] = result
 		itemsDeQueued++
+		result.VisitFields(func(f index.Field) {
+			atomic.AddUint64(&s.stats.TotBytesIndexedAfterAnalysis,
+				analysisBytes(f.AnalyzedTokenFrequencies()))
+		})
 	}
 	close(resultChan)
 	defer atomic.AddUint64(&s.iStats.analysisBytesRemoved, uint64(totalAnalysisSize))
@@ -525,6 +535,10 @@ func (s *Scorch) Stats() json.Marshaler {
 	return &s.stats
 }
 
+func (s *Scorch) BytesReadQueryTime() uint64 {
+	return s.stats.TotBytesReadAtQueryTime
+}
+
 func (s *Scorch) diskFileStats(rootSegmentPaths map[string]struct{}) (uint64,
 	uint64, uint64) {
 	var numFilesOnDisk, numBytesUsedDisk, numBytesOnDiskByRoot uint64
@@ -582,7 +596,9 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["index_time"] = m["TotIndexTime"]
 	m["term_searchers_started"] = m["TotTermSearchersStarted"]
 	m["term_searchers_finished"] = m["TotTermSearchersFinished"]
+	m["num_bytes_read_at_query_time"] = m["TotBytesReadAtQueryTime"]
 	m["num_plain_text_bytes_indexed"] = m["TotIndexedPlainTextBytes"]
+	m["num_bytes_indexed_after_analysis"] = m["TotBytesIndexedAfterAnalysis"]
 	m["num_items_introduced"] = m["TotIntroducedItems"]
 	m["num_items_persisted"] = m["TotPersistedItems"]
 	m["num_recs_to_persist"] = m["TotItemsToPersist"]

@@ -15,6 +15,7 @@
 package bleve
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -229,9 +230,341 @@ func TestCrud(t *testing.T) {
 	}
 }
 
-func TestIndexCreateNewOverExisting(t *testing.T) {
+func approxSame(actual, expected uint64) bool {
+	modulus := func(a, b uint64) uint64 {
+		if a > b {
+			return a - b
+		}
+		return b - a
+	}
+
+	return float64(modulus(actual, expected))/float64(expected) < float64(0.25)
+}
+
+func TestBytesRead(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMapping := NewIndexMapping()
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = "en"
+	documentMapping := NewDocumentMapping()
+	indexMapping.AddDocumentMapping("hotel", documentMapping)
+	indexMapping.StoreDynamic = false
+	indexMapping.DocValuesDynamic = false
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.Store = false
+
+	reviewsMapping := NewDocumentMapping()
+	reviewsMapping.AddFieldMappingsAt("content", contentFieldMapping)
+	documentMapping.AddSubDocumentMapping("reviews", reviewsMapping)
+
+	typeFieldMapping := NewTextFieldMapping()
+	typeFieldMapping.Store = false
+	documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
+	idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch, err := getBatchFromData(idx, "sample.txt")
+	if err != nil {
+		t.Fatalf("failed to form a batch")
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to index batch %v\n", err)
+	}
+	query := NewQueryStringQuery("united")
+	searchRequest := NewSearchRequestOptions(query, int(10), 0, true)
+
+	_, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
+	prevBytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
+	if prevBytesRead != 28618 {
+		t.Fatalf("expected bytes read for query string 28618, got %v",
+			prevBytesRead)
+	}
+
+	// subsequent queries on the same field results in lesser amount
+	// of bytes read because the segment static and dictionary is reused and not
+	// loaded from mmap'd filed
+	_, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 23 {
+		t.Fatalf("expected bytes read for query string 23, got %v",
+			bytesRead-prevBytesRead)
+	}
+	prevBytesRead = bytesRead
+
+	fuzz := NewFuzzyQuery("hotel")
+	fuzz.FieldVal = "reviews.content"
+	fuzz.Fuzziness = 2
+	searchRequest = NewSearchRequest(fuzz)
+	_, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 16556 {
+		t.Fatalf("expected bytes read for fuzzy query is 16556, got %v\n",
+			bytesRead-prevBytesRead)
+	}
+	prevBytesRead = bytesRead
+
+	typeFacet := NewFacetRequest("type", 2)
+	query = NewQueryStringQuery("united")
+	searchRequest = NewSearchRequestOptions(query, int(0), 0, true)
+	searchRequest.AddFacet("types", typeFacet)
+	_, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if !approxSame(bytesRead-prevBytesRead, 259) {
+		t.Fatalf("expected bytes read for faceted query is 259, got %v",
+			bytesRead-prevBytesRead)
+	}
+	prevBytesRead = bytesRead
+
+	min := float64(8000)
+	max := float64(8010)
+	numRangeQuery := NewNumericRangeQuery(&min, &max)
+	numRangeQuery.FieldVal = "id"
+	searchRequest = NewSearchRequestOptions(numRangeQuery, int(10), 0, true)
+	_, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 1678 {
+		t.Fatalf("expected bytes read for numeric range query is 1678, got %v",
+			bytesRead-prevBytesRead)
+	}
+	prevBytesRead = bytesRead
+
+	searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
+	searchRequest.Highlight = &HighlightRequest{}
+	_, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 676 {
+		t.Fatalf("expected bytes read for query with highlighter is 676, got %v",
+			bytesRead-prevBytesRead)
+	}
+	prevBytesRead = bytesRead
+
+	disQuery := NewDisjunctionQuery(NewMatchQuery("united"), NewMatchQuery("hotel"))
+	searchRequest = NewSearchRequestOptions(disQuery, int(10), 0, true)
+	_, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	// expectation is that the bytes read is roughly equal to sum of sub queries in
+	// the disjunction query plus sum static value
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 77 {
+		t.Fatalf("expected bytes read for disjunction query is 77, got %v",
+			bytesRead-prevBytesRead)
+	}
+}
+
+func getBatchFromData(idx Index, fileName string) (*Batch, error) {
+	file, err := os.Open(fileName)
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	batch := idx.NewBatch()
+
+	type docStructure map[string]interface{}
+
+	for scanner.Scan() {
+		var doc docStructure
+		docContent := (scanner.Text())
+		json.Unmarshal([]byte(docContent), &doc)
+		err = batch.Index(fmt.Sprintf("%d", doc["id"]), doc)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return batch, err
+}
+
+func TestBytesReadStored(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMapping := NewIndexMapping()
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = "en"
+	documentMapping := NewDocumentMapping()
+	indexMapping.AddDocumentMapping("hotel", documentMapping)
+
+	indexMapping.DocValuesDynamic = false
+	indexMapping.StoreDynamic = false
+
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.Store = true
+	contentFieldMapping.IncludeInAll = false
+	contentFieldMapping.IncludeTermVectors = false
+
+	reviewsMapping := NewDocumentMapping()
+	reviewsMapping.AddFieldMappingsAt("content", contentFieldMapping)
+	documentMapping.AddSubDocumentMapping("reviews", reviewsMapping)
+
+	typeFieldMapping := NewTextFieldMapping()
+	typeFieldMapping.Store = false
+	typeFieldMapping.IncludeInAll = false
+	typeFieldMapping.IncludeTermVectors = false
+	documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
+	idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch, err := getBatchFromData(idx, "sample.txt")
+	if err != nil {
+		t.Fatalf("failed to form a batch %v\n", err)
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to index batch %v\n", err)
+	}
+	query := NewTermQuery("hotel")
+	query.FieldVal = "reviews.content"
+	searchRequest := NewSearchRequestOptions(query, int(10), 0, true)
+	_, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead != 15792 {
+		t.Fatalf("expected the bytes read stat to be around 15792, got %v", err)
+	}
+	prevBytesRead := bytesRead
+
+	searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
+	_, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 15 {
+		t.Fatalf("expected the bytes read stat to be around 15, got %v", err)
+	}
+	prevBytesRead = bytesRead
+
+	searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
+	searchRequest.Fields = []string{"*"}
+	_, err = idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+
+	if bytesRead-prevBytesRead != 38278 {
+		t.Fatalf("expected the bytes read stat to be around 38278, got %v", err)
+	}
+	idx.Close()
+	cleanupTmpIndexPath(t, tmpIndexPath)
+
+	// same type of querying but on field "type"
+	contentFieldMapping.Store = false
+	typeFieldMapping.Store = true
+
+	tmpIndexPath1 := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath1)
+
+	idx1, err := NewUsing(tmpIndexPath1, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx1.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch, err = getBatchFromData(idx1, "sample.txt")
+	if err != nil {
+		t.Fatalf("failed to form a batch %v\n", err)
+	}
+	err = idx1.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to index batch %v\n", err)
+	}
+
+	query = NewTermQuery("hotel")
+	query.FieldVal = "type"
+	searchRequest = NewSearchRequestOptions(query, int(10), 0, true)
+	_, err = idx1.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead != 167 {
+		t.Fatalf("expected the bytes read stat to be around 167, got %v", bytesRead-prevBytesRead)
+	}
+	prevBytesRead = bytesRead
+
+	_, err = idx1.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+	if bytesRead-prevBytesRead != 12 {
+		t.Fatalf("expected the bytes read stat to be around 12, got %v", err)
+	}
+	prevBytesRead = bytesRead
+
+	searchRequest.Fields = []string{"*"}
+	_, err = idx1.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
+	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
+
+	if bytesRead-prevBytesRead != 646 {
+		t.Fatalf("expected the bytes read stat to be around 646, got %v", err)
+	}
+}
+
+func TestIndexCreateNewOverExisting(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
 
 	index, err := New(tmpIndexPath, NewIndexMapping())
 	if err != nil {

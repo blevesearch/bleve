@@ -20,8 +20,9 @@ github.com/blevesearch/gtreap v0.1.1/go.mod h1:QaQyDRAT51sotthUWAH4Sj08awFSSWzgY
 github.com/blevesearch/mmap-go v1.0.2/go.mod h1:ol2qBqYaOUsGdm7aRMRrYGgPvnwLe6Y+7LMvAB5IbSA=
 github.com/blevesearch/mmap-go v1.0.4 h1:OVhDhT5B/M1HNPpYPBKIEJaD0F3Si+CrEKULGCDPWmc=
 github.com/blevesearch/mmap-go v1.0.4/go.mod h1:EWmEAOmdAS9z/pi/+Toxu99DnsbhG1TIxUoRmJw/pSs=
-github.com/blevesearch/scorch_segment_api/v2 v2.1.0 h1:NFwteOpZEvJk5Vg0H6gD0hxupsG3JYocE4DBvsA2GZI=
 github.com/blevesearch/scorch_segment_api/v2 v2.1.0/go.mod h1:uch7xyyO/Alxkuxa+CGs79vw0QY8BENSBjg6Mw5L5DE=
+github.com/blevesearch/scorch_segment_api/v2 v2.1.1 h1:J8UDudUpDJz21d/hCMIshCeRordwnDTftgXcSDMUx40=
+github.com/blevesearch/scorch_segment_api/v2 v2.1.1/go.mod h1:uch7xyyO/Alxkuxa+CGs79vw0QY8BENSBjg6Mw5L5DE=
 github.com/blevesearch/segment v0.9.0 h1:5lG7yBCx98or7gK2cHMKPukPZ/31Kag7nONpoBt22Ac=
 github.com/blevesearch/segment v0.9.0/go.mod h1:9PfHYUdQCgHktBgvtUOF4x+pc4/l8rdH0u5spnW85UQ=
 github.com/blevesearch/snowball v0.6.1 h1:cDYjn/NCH+wwt2UdehaLpr2e4BwLIjN4V/TdLsL+B5A=
@@ -40,8 +41,8 @@ github.com/blevesearch/zapx/v13 v13.3.4 h1:f646k6300VGRIR7eJ6lLtF8UC95NIWmF899j4
 github.com/blevesearch/zapx/v13 v13.3.4/go.mod h1:Wl7hO1gT+IDvJb7i06g2iW5Qvw0KzncJPsBx7WGWhLA=
 github.com/blevesearch/zapx/v14 v14.3.4 h1:/FVzSGFG5rbVWfPEqlcaJd8lZSJMQpTdmFhz/l2QI7w=
 github.com/blevesearch/zapx/v14 v14.3.4/go.mod h1:b1YhRXXhAj9i+9aOwhRKCHUmJyYieK/QbDvPJDLddUk=
-github.com/blevesearch/zapx/v15 v15.3.4 h1:/y6AOxRuBiZPFAItqcrKcXPPtlAwuW/jMoOFO7tc7rs=
-github.com/blevesearch/zapx/v15 v15.3.4/go.mod h1:TQ/qDC2q7TSSpeC6Vgr9fDN56Ra0u49lZJQ4v30WEx4=
+github.com/blevesearch/zapx/v15 v15.3.5-0.20220713163830-ae843e553177 h1:0/WYF9nS1HBgDc3z7ePdDz15CwMuNYZ4WeD7Kravm7M=
+github.com/blevesearch/zapx/v15 v15.3.5-0.20220713163830-ae843e553177/go.mod h1:ii4ohMQC0TCUjYfq8OtrbABgeI1zljjyXBFpUe/dPDw=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
 github.com/coreos/go-etcd v2.0.0+incompatible/go.mod h1:Jez6KQU2B/sWsbdaef3ED8NzMklzPG4d5KIOhIy30Tk=
 github.com/coreos/go-semver v0.2.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=

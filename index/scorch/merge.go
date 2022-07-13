@@ -327,6 +327,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			fileMergeZapStartTime := time.Now()
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
+			prevBytesReadTotal := cumulateBytesRead(segmentsToMerge)
 			newDocNums, _, err := s.segPlugin.Merge(segmentsToMerge, docsToDrop, path,
 				cw.cancelCh, s)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
@@ -352,6 +353,14 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 				atomic.AddUint64(&s.stats.TotFileMergePlanTasksErr, 1)
 				return err
 			}
+
+			switch segI := seg.(type) {
+			case segment.DiskStatsReporter:
+				totalBytesRead := segI.BytesRead() + prevBytesReadTotal
+				segI.SetBytesRead(totalBytesRead)
+				seg = segI.(segment.Segment)
+			}
+
 			oldNewDocNums = make(map[uint64][]uint64)
 			for i, segNewDocNums := range newDocNums {
 				oldNewDocNums[task.Segments[i].Id()] = segNewDocNums
@@ -424,6 +433,16 @@ type segmentMerge struct {
 	oldNewDocNums map[uint64][]uint64
 	new           segment.Segment
 	notifyCh      chan *mergeTaskIntroStatus
+}
+
+func cumulateBytesRead(sbs []segment.Segment) uint64 {
+	var rv uint64
+	for _, seg := range sbs {
+		if segI, diskStatsAvailable := seg.(segment.DiskStatsReporter); diskStatsAvailable {
+			rv += segI.BytesRead()
+		}
+	}
+	return rv
 }
 
 // perform a merging of the given SegmentBase instances into a new,
