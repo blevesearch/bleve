@@ -100,6 +100,10 @@ Flags:
 Use "bleve [command] --help" for more information about a command.
 ```
 
+## Text Analysis Wizard
+
+https://bleveanalysis.couchbase.com
+
 ## License
 
 Apache License Version 2.0
