@@ -368,7 +368,7 @@ func setupGeoJsonShapesIndex(t *testing.T) index.Index {
 
 	doc = document.NewDocument("circle1")
 	doc.AddField(document.NewGeoCircleFieldWithIndexingOptions("geometry", []uint64{},
-		[]float64{77.59137153625487, 12.952660333521468}, 900,
+		[]float64{77.59137153625487, 12.952660333521468}, "900m",
 		document.DefaultGeoShapeIndexingOptions))
 	err = i.Update(doc)
 	if err != nil {

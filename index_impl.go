@@ -636,7 +636,13 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 										value = []float64{lon, lat}
 									}
 								}
+							case index.GeoShapeField:
+								v, err := docF.GeoShape()
+								if err == nil {
+									value = v
+								}
 							}
+
 							if value != nil {
 								hit.AddFieldValue(docF.Name(), value)
 							}

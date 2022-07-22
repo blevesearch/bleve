@@ -404,7 +404,7 @@ func setupGeoJsonShapesIndexForPolygonQuery(t *testing.T) index.Index {
 
 	doc = document.NewDocument("circle1")
 	doc.AddField(document.NewGeoCircleFieldWithIndexingOptions("geometry",
-		[]uint64{}, []float64{77.59253025054932, 12.955587953533424}, 900,
+		[]uint64{}, []float64{77.59253025054932, 12.955587953533424}, "900m",
 		document.DefaultGeoShapeIndexingOptions))
 	err = i.Update(doc)
 	if err != nil {

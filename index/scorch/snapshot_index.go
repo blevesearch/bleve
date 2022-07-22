@@ -462,6 +462,8 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 			rvd.AddField(document.NewBooleanFieldFromBytes(name, arrayPos, value))
 		case 'g':
 			rvd.AddField(document.NewGeoPointFieldFromBytes(name, arrayPos, value))
+		case 's':
+			rvd.AddField(document.NewGeoShapeFieldFromBytes(name, arrayPos, value))
 		}
 
 		return true

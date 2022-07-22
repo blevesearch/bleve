@@ -304,7 +304,7 @@ func setupGeoJsonShapesIndexForEnvelopeQuery(t *testing.T) index.Index {
 
 	doc = document.NewDocument("circle1")
 	doc.AddField(document.NewGeoCircleFieldWithIndexingOptions("geometry", []uint64{},
-		[]float64{75.0531005859375, 17.675427818339383}, 12900,
+		[]float64{75.0531005859375, 17.675427818339383}, "12900m",
 		document.DefaultGeoShapeIndexingOptions))
 	err = i.Update(doc)
 	if err != nil {
@@ -313,7 +313,7 @@ func setupGeoJsonShapesIndexForEnvelopeQuery(t *testing.T) index.Index {
 
 	doc = document.NewDocument("circle2")
 	doc.AddField(document.NewGeoCircleFieldWithIndexingOptions("geometry", []uint64{},
-		[]float64{82.69683837890625, 17.902955242676995}, 6000,
+		[]float64{82.69683837890625, 17.902955242676995}, "6000m",
 		document.DefaultGeoShapeIndexingOptions))
 	err = i.Update(doc)
 	if err != nil {
@@ -323,7 +323,7 @@ func setupGeoJsonShapesIndexForEnvelopeQuery(t *testing.T) index.Index {
 	doc = document.NewDocument("circle3")
 	doc.AddField(document.NewGeoCircleFieldWithIndexingOptions("geometry", []uint64{},
 		[]float64{8.53363037109375,
-			47.38191927423153}, 400,
+			47.38191927423153}, "400m",
 		document.DefaultGeoShapeIndexingOptions))
 	err = i.Update(doc)
 	if err != nil {

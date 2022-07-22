@@ -343,7 +343,7 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 
 	doc = document.NewDocument("circle1")
 	doc.AddField(document.NewGeoCircleFieldWithIndexingOptions("geometry",
-		[]uint64{}, []float64{74.93671417236328, 22.308314152382284}, 300,
+		[]uint64{}, []float64{74.93671417236328, 22.308314152382284}, "300m",
 		document.DefaultGeoShapeIndexingOptions))
 	err = i.Update(doc)
 	if err != nil {
@@ -352,7 +352,7 @@ func setupGeoJsonShapesIndexForLinestringQuery(t *testing.T) index.Index {
 
 	doc = document.NewDocument("circle2")
 	doc.AddField(document.NewGeoCircleFieldWithIndexingOptions("geometry",
-		[]uint64{}, []float64{36.22243881225586, 50.02941280037234}, 600,
+		[]uint64{}, []float64{36.22243881225586, 50.02941280037234}, "600m",
 		document.DefaultGeoShapeIndexingOptions))
 	err = i.Update(doc)
 	if err != nil {

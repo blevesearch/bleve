@@ -29,39 +29,39 @@ import (
 func TestGeoJsonCircleIntersectsQuery(t *testing.T) {
 	tests := []struct {
 		centrePoint    []float64
-		radiusInMeters float64
+		radiusInMeters string
 		field          string
 		want           []string
 	}{
 		// test intersecting query circle for polygon1.
-		{[]float64{77.68115043640137, 12.94663769274367}, 200,
+		{[]float64{77.68115043640137, 12.94663769274367}, "200m",
 			"geometry", []string{"polygon1"}},
 
 		// test intersecting query circle for polygon1, circle1 and linestring1.
-		{[]float64{77.68115043640137, 12.94663769274367}, 750,
+		{[]float64{77.68115043640137, 12.94663769274367}, "750m",
 			"geometry", []string{"polygon1", "circle1", "linestring1"}},
 
 		// test intersecting query circle for linestring2.
-		{[]float64{77.69591331481932, 12.92756503709986}, 250,
+		{[]float64{77.69591331481932, 12.92756503709986}, "250m",
 			"geometry", []string{"linestring2"}},
 
 		// test intersecting query circle for circle1.
-		{[]float64{77.6767, 12.9422}, 250, "geometry", []string{"circle1"}},
+		{[]float64{77.6767, 12.9422}, "250m", "geometry", []string{"circle1"}},
 
 		// test intersecting query circle for point1, envelope1 and linestring3.
-		{[]float64{81.243896484375, 26.22444694563432}, 90000,
+		{[]float64{81.243896484375, 26.22444694563432}, "90000m",
 			"geometry", []string{"point1", "envelope1", "linestring3"}},
 
 		// test intersecting query circle for envelope.
-		{[]float64{79.98458862304688, 25.339061458818374}, 1250,
+		{[]float64{79.98458862304688, 25.339061458818374}, "1250m",
 			"geometry", []string{"envelope1"}},
 
 		// test intersecting query circle for multipoint.
-		{[]float64{81.87346458435059, 25.41505910223247}, 200,
+		{[]float64{81.87346458435059, 25.41505910223247}, "200m",
 			"geometry", []string{"multipoint1"}},
 
 		// test intersecting query circle for multilinestring.
-		{[]float64{81.8669843673706, 25.512661276952272}, 90,
+		{[]float64{81.8669843673706, 25.512661276952272}, "90m",
 			"geometry", []string{"multilinestring1"}},
 	}
 
@@ -93,32 +93,32 @@ func TestGeoJsonCircleIntersectsQuery(t *testing.T) {
 func TestGeoJsonCircleWithInQuery(t *testing.T) {
 	tests := []struct {
 		centrePoint    []float64
-		radiusInMeters float64
+		radiusInMeters string
 		field          string
 		want           []string
 	}{
 		// test query circle containing polygon2 and multilinestring2.
-		{[]float64{81.85981750488281, 25.546778150624146}, 3700,
+		{[]float64{81.85981750488281, 25.546778150624146}, "3700m",
 			"geometry", []string{"polygon2", "multilinestring2"}},
 
 		// test query circle containing multilinestring2.
-		{[]float64{81.85981750488281, 25.546778150624146}, 3250,
+		{[]float64{81.85981750488281, 25.546778150624146}, "3250m",
 			"geometry", []string{"multilinestring2"}},
 
 		// test query circle containing multipoint1.
-		{[]float64{81.88599586486816, 25.425756968727935}, 1650,
+		{[]float64{81.88599586486816, 25.425756968727935}, "1650m",
 			"geometry", []string{"multipoint1"}},
 
 		// test query circle containing circle2.
-		{[]float64{82.09362030029297, 25.546313513788725}, 1280,
+		{[]float64{82.09362030029297, 25.546313513788725}, "1280m",
 			"geometry", []string{"envelope2", "circle2"}},
 
 		// test query circle containing envelope2 and circle2.
-		{[]float64{82.10289001464844, 25.544919592476727}, 700,
+		{[]float64{82.10289001464844, 25.544919592476727}, "700m",
 			"geometry", []string{"envelope2", "circle2"}},
 
 		// test query circle containing point1 and linestring3.
-		{[]float64{81.27685546875, 26.1899475672235}, 5600,
+		{[]float64{81.27685546875, 26.1899475672235}, "5600m",
 			"geometry", []string{"point1", "linestring3"}},
 	}
 
@@ -150,24 +150,24 @@ func TestGeoJsonCircleWithInQuery(t *testing.T) {
 func TestGeoJsonCircleContainsQuery(t *testing.T) {
 	tests := []struct {
 		centrePoint    []float64
-		radiusInMeters float64
+		radiusInMeters string
 		field          string
 		want           []string
 	}{
 		// test query circle within polygon3.
-		{[]float64{8.549551963806152, 47.3759038562437}, 180,
+		{[]float64{8.549551963806152, 47.3759038562437}, "180m",
 			"geometry", []string{"polygon3"}},
 
 		// test query circle containing envelope3.
-		{[]float64{8.551011085510254, 47.380117626829275}, 75,
+		{[]float64{8.551011085510254, 47.380117626829275}, "75m",
 			"geometry", []string{"envelope3"}},
 
 		// test query circle exceeding envelope3 with a few meters.
-		{[]float64{8.551011085510254, 47.380117626829275}, 78,
+		{[]float64{8.551011085510254, 47.380117626829275}, "78m",
 			"geometry", nil},
 
 		// test query circle containing circle3.
-		{[]float64{8.535819053649902, 47.38297989270074}, 185,
+		{[]float64{8.535819053649902, 47.38297989270074}, "185m",
 			"geometry", []string{"circle3"}},
 	}
 
@@ -197,7 +197,7 @@ func TestGeoJsonCircleContainsQuery(t *testing.T) {
 }
 
 func runGeoShapeCircleRelationQuery(relation string, i index.IndexReader,
-	points []float64, radius float64, field string) ([]string, error) {
+	points []float64, radius string, field string) ([]string, error) {
 	var rv []string
 	s := geo.NewGeoCircle(points, radius)
 
@@ -313,7 +313,7 @@ func setupGeoJsonShapesIndexForCircleQuery(t *testing.T) index.Index {
 
 	doc = document.NewDocument("circle1")
 	doc.AddField(document.NewGeoCircleFieldWithIndexingOptions("geometry", []uint64{},
-		[]float64{77.67252445220947, 12.936348678099293}, 900,
+		[]float64{77.67252445220947, 12.936348678099293}, "900m",
 		document.DefaultGeoShapeIndexingOptions))
 	err = i.Update(doc)
 	if err != nil {
@@ -322,7 +322,7 @@ func setupGeoJsonShapesIndexForCircleQuery(t *testing.T) index.Index {
 
 	doc = document.NewDocument("circle2")
 	doc.AddField(document.NewGeoCircleFieldWithIndexingOptions("geometry", []uint64{},
-		[]float64{82.10289001464844, 25.544919592476727}, 100,
+		[]float64{82.10289001464844, 25.544919592476727}, "100m",
 		document.DefaultGeoShapeIndexingOptions))
 	err = i.Update(doc)
 	if err != nil {
@@ -332,7 +332,7 @@ func setupGeoJsonShapesIndexForCircleQuery(t *testing.T) index.Index {
 	doc = document.NewDocument("circle3")
 	doc.AddField(document.NewGeoCircleFieldWithIndexingOptions("geometry", []uint64{},
 		[]float64{8.53363037109375,
-			47.38191927423153}, 400,
+			47.38191927423153}, "400m",
 		document.DefaultGeoShapeIndexingOptions))
 	err = i.Update(doc)
 	if err != nil {

@@ -223,6 +223,10 @@ func (p *Point) Type() string {
 	return PointType
 }
 
+func (p *Point) Value() ([]byte, error) {
+	return json.Marshal(p)
+}
+
 func (p *Point) Intersects(s index.GeoJSON) (bool, error) {
 	// placeholder implementation
 	return false, nil
@@ -262,6 +266,10 @@ func (br *boundedRectangle) Type() string {
 	return "boundedRectangle"
 }
 
+func (br *boundedRectangle) Value() ([]byte, error) {
+	return json.Marshal(br)
+}
+
 func (p *boundedRectangle) Intersects(s index.GeoJSON) (bool, error) {
 	// placeholder implementation
 	return false, nil
@@ -298,6 +306,10 @@ func NewBoundedPolygon(coordinates []Point) *boundedPolygon {
 func (bp *boundedPolygon) Type() string {
 	// placeholder implementation
 	return "boundedPolygon"
+}
+
+func (bp *boundedPolygon) Value() ([]byte, error) {
+	return json.Marshal(bp)
 }
 
 func (p *boundedPolygon) Intersects(s index.GeoJSON) (bool, error) {
@@ -340,6 +352,10 @@ type pointDistance struct {
 func (p *pointDistance) Type() string {
 	// placeholder implementation
 	return "pointDistance"
+}
+
+func (p *pointDistance) Value() ([]byte, error) {
+	return json.Marshal(p)
 }
 
 func NewPointDistance(centerLat, centerLon,
@@ -388,8 +404,8 @@ func NewGeometryCollection(coordinates [][][][][]float64,
 // prefix the byte contents with certain glue bytes that
 // can be used later while filering the doc values.
 func NewGeoCircleShape(cp []float64,
-	radiusInMeter float64) (index.GeoJSON, []byte, error) {
-	return geojson.NewGeoCircleShape(cp, radiusInMeter)
+	radius string) (index.GeoJSON, []byte, error) {
+	return geojson.NewGeoCircleShape(cp, radius)
 }
 
 func NewGeoJsonShape(coordinates [][][][]float64, typ string) (
@@ -421,7 +437,7 @@ func NewGeoJsonMultiPolygon(points [][][][]float64) index.GeoJSON {
 	return geojson.NewGeoJsonMultiPolygon(points)
 }
 
-func NewGeoCircle(points []float64, radius float64) index.GeoJSON {
+func NewGeoCircle(points []float64, radius string) index.GeoJSON {
 	return geojson.NewGeoCircle(points, radius)
 }
 
