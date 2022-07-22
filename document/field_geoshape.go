@@ -22,6 +22,7 @@ import (
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/geo/geojson"
 )
 
 var reflectStaticSizeGeoShapeField int
@@ -40,6 +41,7 @@ type GeoShapeField struct {
 	options           index.FieldIndexingOptions
 	numPlainTextBytes uint64
 	length            int
+	encodedValue      []byte
 	value             []byte
 
 	frequencies index.TokenFrequencies
@@ -80,8 +82,8 @@ func (n *GeoShapeField) Analyze() {
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
-		End:      len(n.value),
-		Term:     n.value,
+		End:      len(n.encodedValue),
+		Term:     n.encodedValue,
 		Position: 1,
 		Type:     analysis.AlphaNumeric,
 	})
@@ -109,7 +111,8 @@ func (n *GeoShapeField) Value() []byte {
 }
 
 func (n *GeoShapeField) GoString() string {
-	return fmt.Sprintf("&document.GeoShapeField{Name:%s, Options: %s, Value: %s}", n.name, n.options, n.value)
+	return fmt.Sprintf("&document.GeoShapeField{Name:%s, Options: %s, Value: %s}",
+		n.name, n.options, n.value)
 }
 
 func (n *GeoShapeField) NumPlainTextBytes() uint64 {
@@ -122,17 +125,34 @@ func NewGeoShapeField(name string, arrayPositions []uint64,
 		coordinates, typ, DefaultGeoShapeIndexingOptions)
 }
 
+func NewGeoShapeFieldFromBytes(name string, arrayPositions []uint64,
+	value []byte) *GeoShapeField {
+	return &GeoShapeField{
+		name:              name,
+		arrayPositions:    arrayPositions,
+		value:             value,
+		options:           DefaultGeoShapeIndexingOptions,
+		numPlainTextBytes: uint64(len(value)),
+	}
+}
+
 func NewGeoShapeFieldWithIndexingOptions(name string, arrayPositions []uint64,
 	coordinates [][][][]float64, typ string,
 	options index.FieldIndexingOptions) *GeoShapeField {
-	shape, value, err := geo.NewGeoJsonShape(coordinates, typ)
+	shape, encodedValue, err := geo.NewGeoJsonShape(coordinates, typ)
 	if err != nil {
 		return nil
 	}
 
 	// extra glue bytes to work around the term splitting logic from interfering
 	// the custom encoding of the geoshape coordinates inside the docvalues.
-	value = append(geo.GlueBytes, append(value, geo.GlueBytes...)...)
+	encodedValue = append(geo.GlueBytes, append(encodedValue, geo.GlueBytes...)...)
+
+	// get the byte value for the geoshape.
+	value, err := shape.Value()
+	if err != nil {
+		return nil
+	}
 
 	options = options | DefaultGeoShapeIndexingOptions
 
@@ -141,6 +161,7 @@ func NewGeoShapeFieldWithIndexingOptions(name string, arrayPositions []uint64,
 		name:              name,
 		arrayPositions:    arrayPositions,
 		options:           options,
+		encodedValue:      encodedValue,
 		value:             value,
 		numPlainTextBytes: uint64(len(value)),
 	}
@@ -149,14 +170,20 @@ func NewGeoShapeFieldWithIndexingOptions(name string, arrayPositions []uint64,
 func NewGeometryCollectionFieldWithIndexingOptions(name string,
 	arrayPositions []uint64, coordinates [][][][][]float64, types []string,
 	options index.FieldIndexingOptions) *GeoShapeField {
-	shape, value, err := geo.NewGeometryCollection(coordinates, types)
+	shape, encodedValue, err := geo.NewGeometryCollection(coordinates, types)
 	if err != nil {
 		return nil
 	}
 
 	// extra glue bytes to work around the term splitting logic from interfering
 	// the custom encoding of the geoshape coordinates inside the docvalues.
-	value = append(geo.GlueBytes, append(value, geo.GlueBytes...)...)
+	encodedValue = append(geo.GlueBytes, append(encodedValue, geo.GlueBytes...)...)
+
+	// get the byte value for the geometryCollection.
+	value, err := shape.Value()
+	if err != nil {
+		return nil
+	}
 
 	options = options | DefaultGeoShapeIndexingOptions
 
@@ -165,22 +192,29 @@ func NewGeometryCollectionFieldWithIndexingOptions(name string,
 		name:              name,
 		arrayPositions:    arrayPositions,
 		options:           options,
+		encodedValue:      encodedValue,
 		value:             value,
 		numPlainTextBytes: uint64(len(value)),
 	}
 }
 
 func NewGeoCircleFieldWithIndexingOptions(name string, arrayPositions []uint64,
-	centerPoint []float64, radius float64,
+	centerPoint []float64, radius string,
 	options index.FieldIndexingOptions) *GeoShapeField {
-	shape, value, err := geo.NewGeoCircleShape(centerPoint, radius)
+	shape, encodedValue, err := geo.NewGeoCircleShape(centerPoint, radius)
 	if err != nil {
 		return nil
 	}
 
 	// extra glue bytes to work around the term splitting logic from interfering
 	// the custom encoding of the geoshape coordinates inside the docvalues.
-	value = append(geo.GlueBytes, append(value, geo.GlueBytes...)...)
+	encodedValue = append(geo.GlueBytes, append(encodedValue, geo.GlueBytes...)...)
+
+	// get the byte value for the circle.
+	value, err := shape.Value()
+	if err != nil {
+		return nil
+	}
 
 	options = options | DefaultGeoShapeIndexingOptions
 
@@ -189,7 +223,13 @@ func NewGeoCircleFieldWithIndexingOptions(name string, arrayPositions []uint64,
 		name:              name,
 		arrayPositions:    arrayPositions,
 		options:           options,
+		encodedValue:      encodedValue,
 		value:             value,
 		numPlainTextBytes: uint64(len(value)),
 	}
+}
+
+// GeoShape is an implementation of the index.GeoShapeField interface.
+func (n *GeoShapeField) GeoShape() (index.GeoJSON, error) {
+	return geojson.ParseGeoJSONShape(n.value)
 }

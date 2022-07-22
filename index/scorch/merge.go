@@ -357,7 +357,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			switch segI := seg.(type) {
 			case segment.DiskStatsReporter:
 				totalBytesRead := segI.BytesRead() + prevBytesReadTotal
-				segI.SetBytesRead(totalBytesRead)
+				segI.ResetBytesRead(totalBytesRead)
 				seg = segI.(segment.Segment)
 			}
 

@@ -321,12 +321,12 @@ func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 	}
 
 	if shape == geo.CircleType {
-		center, radiusInMeter, found := geo.ExtractCircle(propertyMightBeGeoShape)
+		center, radius, found := geo.ExtractCircle(propertyMightBeGeoShape)
 		if found {
 			fieldName := getFieldName(pathString, path, fm)
 			options := fm.Options()
 			field := document.NewGeoCircleFieldWithIndexingOptions(fieldName,
-				indexes, center, radiusInMeter, options)
+				indexes, center, radius, options)
 			context.doc.AddField(field)
 
 			if !fm.IncludeInAll {

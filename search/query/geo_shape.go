@@ -59,11 +59,8 @@ func NewGeoShapeQuery(coordinates [][][][]float64, typ,
 // the entire string is parsed and the unit of meters is assumed.
 func NewGeoShapeCircleQuery(coordinates []float64, radius,
 	relation string) (*GeoShapeQuery, error) {
-	radiusInMeters, err := geo.ParseDistance(radius)
-	if err != nil {
-		return nil, err
-	}
-	s, _, err := geo.NewGeoCircleShape(coordinates, radiusInMeters)
+
+	s, _, err := geo.NewGeoCircleShape(coordinates, radius)
 	if err != nil {
 		return nil, err
 	}

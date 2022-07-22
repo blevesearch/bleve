@@ -351,13 +351,12 @@ func ExtractGeometryCollection(thing interface{}) ([][][][][]float64, []string, 
 // ExtractCircle takes an interface{} and tries it's best to
 // interpret the center point coordinates and the radius for a
 // given circle shape.
-func ExtractCircle(thing interface{}) ([]float64, float64, bool) {
+func ExtractCircle(thing interface{}) ([]float64, string, bool) {
 	thingVal := reflect.ValueOf(thing)
 	if !thingVal.IsValid() {
-		return nil, 0, false
+		return nil, "", false
 	}
 	var rv []float64
-	var radius float64
 	var radiusStr string
 
 	if thingVal.Kind() == reflect.Map {
@@ -366,18 +365,13 @@ func ExtractCircle(thing interface{}) ([]float64, float64, bool) {
 
 			if iter.Key().String() == "radius" {
 				radiusStr = iter.Value().Interface().(string)
-				r, err := ParseDistance(radiusStr)
-				if err != nil {
-					return nil, 0, false
-				}
-				radius = r
 				continue
 			}
 
 			if iter.Key().String() == "coordinates" {
 				lng, lat, found := ExtractGeoPoint(iter.Value().Interface())
 				if !found {
-					return nil, 0, false
+					return nil, radiusStr, false
 				}
 				rv = append(rv, lng)
 				rv = append(rv, lat)
@@ -385,7 +379,7 @@ func ExtractCircle(thing interface{}) ([]float64, float64, bool) {
 		}
 	}
 
-	return rv, radius, true
+	return rv, radiusStr, true
 }
 
 // ExtractGeoShapeCoordinates takes an interface{} and tries it's best to
