@@ -239,9 +239,43 @@ func approxSame(actual, expected uint64) bool {
 
 	return float64(modulus(actual, expected))/float64(expected) < float64(0.25)
 }
+
+func checkStatsOnIndexedBatch(indexPath string, indexMapping mapping.IndexMapping,
+	expectedVal uint64) error {
+	var wg sync.WaitGroup
+	var statValError error
+
+	idx, err := NewUsing(indexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		return err
+	}
+
+	batch, err := getBatchFromData(idx, "sample-data.json")
+	if err != nil {
+		return fmt.Errorf("failed to form a batch %v\n", err)
+	}
+	wg.Add(1)
+	batch.SetPersistedCallback(func(e error) {
+		defer wg.Done()
+		stats, _ := idx.StatsMap()["index"].(map[string]interface{})
+		bytesWritten, _ := stats["num_bytes_written_at_index_time"].(uint64)
+		if !approxSame(bytesWritten, expectedVal) {
+			statValError = fmt.Errorf("expected bytes written is %d, got %v", expectedVal,
+				bytesWritten)
+		}
+	})
+	err = idx.Batch(batch)
+	if err != nil {
+		return fmt.Errorf("failed to index batch %v\n", err)
+	}
+	wg.Wait()
+	idx.Close()
+
+	return statValError
+}
+
 func TestBytesWritten(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
-	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
 	indexMapping := NewIndexMapping()
 	indexMapping.TypeField = "type"
@@ -269,154 +303,53 @@ func TestBytesWritten(t *testing.T) {
 	typeFieldMapping.IncludeTermVectors = false
 	typeFieldMapping.DocValues = false
 	documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
-	idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+
+	err = checkStatsOnIndexedBatch(tmpIndexPath, indexMapping, 37767)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	var wg sync.WaitGroup
-	batch, err := getBatchFromData(idx, "sample-data.json")
-	if err != nil {
-		t.Fatalf("failed to form a batch %v\n", err)
-	}
-	wg.Add(1)
-	batch.SetPersistedCallback(func(e error) {
-		defer wg.Done()
-		stats, _ := idx.StatsMap()["index"].(map[string]interface{})
-		bytesWritten, _ := stats["num_bytes_written_at_index_time"].(uint64)
-		if bytesWritten != 37767 {
-			t.Fatalf("expected bytes written is 37767, got %v",
-				bytesWritten)
-		}
-	})
-	err = idx.Batch(batch)
-	if err != nil {
-		t.Fatalf("failed to index batch %v\n", err)
-	}
-	wg.Wait()
-	idx.Close()
+	cleanupTmpIndexPath(t, tmpIndexPath)
 
 	contentFieldMapping.Store = true
 	tmpIndexPath1 := createTmpIndexPath(t)
-	defer cleanupTmpIndexPath(t, tmpIndexPath1)
 
-	idx, err = NewUsing(tmpIndexPath1, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	err := checkStatsOnIndexedBatch(tmpIndexPath1, indexMapping, 56582)
 	if err != nil {
 		t.Fatal(err)
 	}
+	cleanupTmpIndexPath(t, tmpIndexPath1)
 
-	batch, err = getBatchFromData(idx, "sample-data.json")
-	if err != nil {
-		t.Fatalf("failed to form a batch %v\n", err)
-	}
-	wg.Add(1)
-	batch.SetPersistedCallback(func(e error) {
-		defer wg.Done()
-		stats, _ := idx.StatsMap()["index"].(map[string]interface{})
-		bytesWritten, _ := stats["num_bytes_written_at_index_time"].(uint64)
-		if bytesWritten != 56582 {
-			t.Fatalf("expected bytes written is 56582, got %v",
-				bytesWritten)
-		}
-	})
-	err = idx.Batch(batch)
-	if err != nil {
-		t.Fatalf("failed to index batch %v\n", err)
-	}
-	wg.Wait()
-	idx.Close()
-
+	contentFieldMapping.Store = false
 	contentFieldMapping.IncludeInAll = true
 	tmpIndexPath2 := createTmpIndexPath(t)
 
-	idx, err = NewUsing(tmpIndexPath2, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	err = checkStatsOnIndexedBatch(tmpIndexPath2, indexMapping, 44714)
 	if err != nil {
 		t.Fatal(err)
 	}
+	cleanupTmpIndexPath(t, tmpIndexPath2)
 
-	batch, err = getBatchFromData(idx, "sample-data.json")
-	if err != nil {
-		t.Fatalf("failed to form a batch %v\n", err)
-	}
-	wg.Add(1)
-	batch.SetPersistedCallback(func(e error) {
-		defer wg.Done()
-		stats, _ := idx.StatsMap()["index"].(map[string]interface{})
-		bytesWritten, _ := stats["num_bytes_written_at_index_time"].(uint64)
-		if bytesWritten != 63458 {
-			t.Fatalf("expected bytes written is 63458, got %v",
-				bytesWritten)
-		}
-	})
-	err = idx.Batch(batch)
-	if err != nil {
-		t.Fatalf("failed to index batch %v\n", err)
-	}
-	wg.Wait()
-	idx.Close()
-
+	contentFieldMapping.IncludeInAll = false
 	contentFieldMapping.IncludeTermVectors = true
 	tmpIndexPath3 := createTmpIndexPath(t)
-	defer cleanupTmpIndexPath(t, tmpIndexPath3)
 
-	idx, err = NewUsing(tmpIndexPath3, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	err = checkStatsOnIndexedBatch(tmpIndexPath3, indexMapping, 59479)
 	if err != nil {
 		t.Fatal(err)
 	}
+	cleanupTmpIndexPath(t, tmpIndexPath3)
 
-	batch, err = getBatchFromData(idx, "sample-data.json")
-	if err != nil {
-		t.Fatalf("failed to form a batch %v\n", err)
-	}
-	wg.Add(1)
-	batch.SetPersistedCallback(func(e error) {
-		defer wg.Done()
-		stats, _ := idx.StatsMap()["index"].(map[string]interface{})
-		bytesWritten, _ := stats["num_bytes_written_at_index_time"].(uint64)
-		if bytesWritten != 106822 {
-			t.Fatalf("expected bytes written is 106822, got %v",
-				bytesWritten)
-		}
-	})
-	err = idx.Batch(batch)
-	if err != nil {
-		t.Fatalf("failed to index batch %v\n", err)
-	}
-
-	wg.Wait()
-	idx.Close()
-
+	contentFieldMapping.IncludeTermVectors = false
 	contentFieldMapping.DocValues = true
 	tmpIndexPath4 := createTmpIndexPath(t)
-	defer cleanupTmpIndexPath(t, tmpIndexPath4)
 
-	idx, err = NewUsing(tmpIndexPath4, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	err = checkStatsOnIndexedBatch(tmpIndexPath4, indexMapping, 44722)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	batch, err = getBatchFromData(idx, "sample-data.json")
-	if err != nil {
-		t.Fatalf("failed to form a batch %v\n", err)
-	}
-	wg.Add(1)
-	batch.SetPersistedCallback(func(e error) {
-		defer wg.Done()
-		stats, _ := idx.StatsMap()["index"].(map[string]interface{})
-		bytesWritten, _ := stats["num_bytes_written_at_index_time"].(uint64)
-		if !approxSame(bytesWritten, 113776) {
-			t.Fatalf("expected bytes written is 113776, got %v",
-				bytesWritten)
-		}
-	})
-	err = idx.Batch(batch)
-	if err != nil {
-		t.Fatalf("failed to index batch %v\n", err)
-	}
-
-	wg.Wait()
-	idx.Close()
+	cleanupTmpIndexPath(t, tmpIndexPath4)
 }
+
 func TestBytesRead(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
