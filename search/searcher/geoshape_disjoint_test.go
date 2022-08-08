@@ -867,12 +867,11 @@ func TestMultiLinestringDisjoint(t *testing.T) {
 			Expected:         nil,
 		},
 		{
-			// check this
 			QueryShape:       [][][]float64{{{1.0, 1.0}, {1.1, 1.1}, {2.0, 2.0}, {2.1, 2.1}}},
-			DocShapeVertices: [][][]float64{{{100.1, 100.5}, {101.5, 102.5}}},
+			DocShapeVertices: [][][]float64{{{10.1, 10.5}, {11.5, 12.5}}},
 			DocShapeName:     "multilinestring1",
 			Desc:             "non-intersecting multilinestrings",
-			Expected:         nil, // why is this nil?
+			Expected:         []string{"multilinestring1"},
 		},
 	}
 
