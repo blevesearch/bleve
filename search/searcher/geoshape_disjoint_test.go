@@ -695,7 +695,7 @@ func TestLinestringPolygonDisjoint(t *testing.T) {
 			DocShapeVertices: [][][]float64{{{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}, {0.0, 0.0}}},
 			DocShapeName:     "polygon1",
 			Desc:             "linestring within polygon",
-			Expected:         []string{"polygon1"},
+			Expected:         nil, // considered intersecting, so nil
 		},
 		{
 			QueryShape:       [][]float64{{-0.5, 0.5}, {0.5, 0.5}},
@@ -1166,13 +1166,12 @@ func TestMultiPolygonMultiPointDisjoint(t *testing.T) {
 			Expected:         nil,
 		},
 		{
-			// check this
 			QueryShape: [][][][]float64{{{{15, 5}, {40, 10}, {10, 20}, {5, 10}, {15, 5}}},
 				{{{30, 20}, {45, 50}, {10, 50}, {30, 20}}}},
-			DocShapeVertices: [][]float64{{30, -20}, {-30, 30}, {45, 66}},
+			DocShapeVertices: [][]float64{{30, -20}, {-30, 30}, {41, 32}},
 			DocShapeName:     "multipoint1",
 			Desc:             "multipolygon does not intersect multipoint",
-			Expected:         nil, // should not be nil
+			Expected:         []string{"multipoint1"},
 		},
 	}
 	i := setupIndex(t)
