@@ -1380,18 +1380,18 @@ func TestPointGeometryCollectionDisjoint(t *testing.T) {
 	}{
 		{
 			QueryShape:       []float64{1.0, 2.0},
-			DocShapeVertices: nil,
+			DocShapeVertices: [][][][][]float64{{{{{11.0, 12.0}, {13.0, 14.0}}}}},
 			DocShapeName:     "geometrycollection1",
 			Desc:             "geometry collection does not intersect with a point",
-			Expected:         nil,
-			Types:            nil,
+			Expected:         []string{"geometrycollection1"},
+			Types:            []string{"linestring"},
 		},
 		{
 			QueryShape:       []float64{1.0, 2.0},
 			DocShapeVertices: [][][][][]float64{{{{{1.0, 2.0}}}}},
 			DocShapeName:     "geometrycollection1",
 			Desc:             "geometry collection intersects with a point",
-			Expected:         []string{"geometrycollection1"},
+			Expected:         nil,
 			Types:            []string{"point"},
 		},
 	}
