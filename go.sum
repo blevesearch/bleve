@@ -39,8 +39,8 @@ github.com/blevesearch/zapx/v13 v13.3.5 h1:eJ3gbD+Nu8p36/O6lhfdvWQ4pxsGYSuTOBrLL
 github.com/blevesearch/zapx/v13 v13.3.5/go.mod h1:FV+dRnScFgKnRDIp08RQL4JhVXt1x2HE3AOzqYa6fjo=
 github.com/blevesearch/zapx/v14 v14.3.5 h1:hEvVjZaagFCvOUJrlFQ6/Z6Jjy0opM3g7TMEo58TwP4=
 github.com/blevesearch/zapx/v14 v14.3.5/go.mod h1:954A/eKFb+pg/ncIYWLWCKY+mIjReM9FGTGIO2Wu1cU=
-github.com/blevesearch/zapx/v15 v15.3.5-0.20220722171731-5dd118e621d2 h1:kXBfopw0cwKD37xif91wzHqSkP9eyI9MAZv4MNxPR4w=
-github.com/blevesearch/zapx/v15 v15.3.5-0.20220722171731-5dd118e621d2/go.mod h1:QMUh2hXCaYIWFKPYGavq/Iga2zbHWZ9DZAa9uFbWyvg=
+github.com/blevesearch/zapx/v15 v15.3.5-0.20220805051919-e14ad3bf63e7 h1:cJlMJ9pW2iFRw9lx4289u0OO0wT6KKx/SDXhpebIlys=
+github.com/blevesearch/zapx/v15 v15.3.5-0.20220805051919-e14ad3bf63e7/go.mod h1:QMUh2hXCaYIWFKPYGavq/Iga2zbHWZ9DZAa9uFbWyvg=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
 github.com/coreos/go-etcd v2.0.0+incompatible/go.mod h1:Jez6KQU2B/sWsbdaef3ED8NzMklzPG4d5KIOhIy30Tk=
 github.com/coreos/go-semver v0.2.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=

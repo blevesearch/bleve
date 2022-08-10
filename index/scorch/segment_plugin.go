@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"fmt"
+
 	"github.com/RoaringBitmap/roaring"
 	index "github.com/blevesearch/bleve_index_api"
 

@@ -15,7 +15,6 @@
 package bleve
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -241,6 +240,116 @@ func approxSame(actual, expected uint64) bool {
 	return float64(modulus(actual, expected))/float64(expected) < float64(0.25)
 }
 
+func checkStatsOnIndexedBatch(indexPath string, indexMapping mapping.IndexMapping,
+	expectedVal uint64) error {
+	var wg sync.WaitGroup
+	var statValError error
+
+	idx, err := NewUsing(indexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		return err
+	}
+
+	batch, err := getBatchFromData(idx, "sample-data.json")
+	if err != nil {
+		return fmt.Errorf("failed to form a batch %v\n", err)
+	}
+	wg.Add(1)
+	batch.SetPersistedCallback(func(e error) {
+		defer wg.Done()
+		stats, _ := idx.StatsMap()["index"].(map[string]interface{})
+		bytesWritten, _ := stats["num_bytes_written_at_index_time"].(uint64)
+		if !approxSame(bytesWritten, expectedVal) {
+			statValError = fmt.Errorf("expected bytes written is %d, got %v", expectedVal,
+				bytesWritten)
+		}
+	})
+	err = idx.Batch(batch)
+	if err != nil {
+		return fmt.Errorf("failed to index batch %v\n", err)
+	}
+	wg.Wait()
+	idx.Close()
+
+	return statValError
+}
+
+func TestBytesWritten(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+
+	indexMapping := NewIndexMapping()
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = "en"
+	documentMapping := NewDocumentMapping()
+	indexMapping.AddDocumentMapping("hotel", documentMapping)
+
+	indexMapping.DocValuesDynamic = false
+	indexMapping.StoreDynamic = false
+
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.Index = true
+	contentFieldMapping.Store = false
+	contentFieldMapping.IncludeInAll = false
+	contentFieldMapping.IncludeTermVectors = false
+	contentFieldMapping.DocValues = false
+
+	reviewsMapping := NewDocumentMapping()
+	reviewsMapping.AddFieldMappingsAt("content", contentFieldMapping)
+	documentMapping.AddSubDocumentMapping("reviews", reviewsMapping)
+
+	typeFieldMapping := NewTextFieldMapping()
+	typeFieldMapping.Store = false
+	typeFieldMapping.IncludeInAll = false
+	typeFieldMapping.IncludeTermVectors = false
+	typeFieldMapping.DocValues = false
+	documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
+
+	err = checkStatsOnIndexedBatch(tmpIndexPath, indexMapping, 37767)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanupTmpIndexPath(t, tmpIndexPath)
+
+	contentFieldMapping.Store = true
+	tmpIndexPath1 := createTmpIndexPath(t)
+
+	err := checkStatsOnIndexedBatch(tmpIndexPath1, indexMapping, 56582)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanupTmpIndexPath(t, tmpIndexPath1)
+
+	contentFieldMapping.Store = false
+	contentFieldMapping.IncludeInAll = true
+	tmpIndexPath2 := createTmpIndexPath(t)
+
+	err = checkStatsOnIndexedBatch(tmpIndexPath2, indexMapping, 44714)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanupTmpIndexPath(t, tmpIndexPath2)
+
+	contentFieldMapping.IncludeInAll = false
+	contentFieldMapping.IncludeTermVectors = true
+	tmpIndexPath3 := createTmpIndexPath(t)
+
+	err = checkStatsOnIndexedBatch(tmpIndexPath3, indexMapping, 59479)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanupTmpIndexPath(t, tmpIndexPath3)
+
+	contentFieldMapping.IncludeTermVectors = false
+	contentFieldMapping.DocValues = true
+	tmpIndexPath4 := createTmpIndexPath(t)
+
+	err = checkStatsOnIndexedBatch(tmpIndexPath4, indexMapping, 44722)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanupTmpIndexPath(t, tmpIndexPath4)
+}
+
 func TestBytesRead(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
@@ -274,7 +383,7 @@ func TestBytesRead(t *testing.T) {
 		}
 	}()
 
-	batch, err := getBatchFromData(idx, "sample.txt")
+	batch, err := getBatchFromData(idx, "sample-data.json")
 	if err != nil {
 		t.Fatalf("failed to form a batch")
 	}
@@ -394,17 +503,23 @@ func TestBytesRead(t *testing.T) {
 }
 
 func getBatchFromData(idx Index, fileName string) (*Batch, error) {
-	file, err := os.Open(fileName)
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
+	pwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	path := filepath.Join(pwd, "data", "test", fileName)
 	batch := idx.NewBatch()
+	var dataset []map[string]interface{}
+	fileContent, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(fileContent, &dataset)
+	if err != nil {
+		return nil, err
+	}
 
-	type docStructure map[string]interface{}
-
-	for scanner.Scan() {
-		var doc docStructure
-		docContent := (scanner.Text())
-		json.Unmarshal([]byte(docContent), &doc)
+	for _, doc := range dataset {
 		err = batch.Index(fmt.Sprintf("%d", doc["id"]), doc)
 		if err != nil {
 			return nil, err
@@ -445,7 +560,7 @@ func TestBytesReadStored(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	batch, err := getBatchFromData(idx, "sample.txt")
+	batch, err := getBatchFromData(idx, "sample-data.json")
 	if err != nil {
 		t.Fatalf("failed to form a batch %v\n", err)
 	}
@@ -514,7 +629,7 @@ func TestBytesReadStored(t *testing.T) {
 		}
 	}()
 
-	batch, err = getBatchFromData(idx1, "sample.txt")
+	batch, err = getBatchFromData(idx1, "sample-data.json")
 	if err != nil {
 		t.Fatalf("failed to form a batch %v\n", err)
 	}
