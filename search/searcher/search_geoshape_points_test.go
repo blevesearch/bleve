@@ -19,12 +19,53 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/document"
-	"github.com/blevesearch/bleve/v2/geo"
+	"github.com/blevesearch/bleve/v2/geo" // replace this in go.mod
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/index/upsidedown/store/gtreap"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 )
+
+func TestGeoJsonPointDisjointQuery(t *testing.T) {
+	tests := []struct {
+		point []float64
+		field string
+		want  []string
+	}{
+		// Does not intersect with any of the shapes in the index.
+		{[]float64{77.89031982421875, 13.116930018103586},
+			"geometry", []string{"polygon1", "circle1", "linestring1",
+				"multilinestring1", "multipoint1", "polygonWithHole1"}},
+
+		// Lies within hole of the polygon
+		{[]float64{77.59918212890625, 12.978965855174526},
+			"geometry", []string{"polygon1", "circle1", "linestring1",
+				"multilinestring1", "multipoint1", "polygonWithHole1"}},
+	}
+	i := setupGeoJsonShapesIndex(t)
+	indexReader, err := i.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err = indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	for n, test := range tests {
+		got, err := runGeoShapePointRelationQuery("disjoint",
+			false, indexReader, [][]float64{test.point}, test.field)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("test %d, expected %v, got %v for point: %+v",
+				n, test.want, got, test.point)
+		}
+	}
+}
 
 func TestGeoJsonPointContainsQuery(t *testing.T) {
 	tests := []struct {
@@ -91,7 +132,7 @@ func TestGeoJsonPointContainsQuery(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(got, test.want) {
-			t.Errorf("test %d, expected %v, got %v for polygon: %+v",
+			t.Errorf("test %d, expected %v, got %v for point: %+v",
 				n, test.want, got, test.point)
 		}
 	}
@@ -185,7 +226,7 @@ func TestGeoJsonMultiPointWithInQuery(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(got, test.want) {
-			t.Errorf("test %d, expected %v, got %v for polygon: %+v",
+			t.Errorf("test %d, expected %v, got %v for multipoint: %+v",
 				n, test.want, got, test.multipoint)
 		}
 	}
@@ -281,7 +322,7 @@ func TestGeoJsonMultiPointIntersectsQuery(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(got, test.want) {
-			t.Errorf("test %d, expected %v, got %v for polygon: %+v",
+			t.Errorf("test %d, expected %v, got %v for multipoint: %+v",
 				n, test.want, got, test.multipoint)
 		}
 	}

@@ -26,6 +26,43 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
+func TestGeoJsonLinestringDisjointQuery(t *testing.T) {
+	tests := []struct {
+		line  [][]float64
+		field string
+		want  []string
+	}{
+		// line crossing linestring1
+		{[][]float64{{74.93182182312012, 22.326417697029033},
+			{74.93019104003906, 22.314825346701916}},
+			"geometry", []string{"polygon1", "polygon2", "envelope1", "circle1",
+				"multilinestring1"}},
+	}
+	i := setupGeoJsonShapesIndexForLinestringQuery(t)
+	indexReader, err := i.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err = indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	for n, test := range tests {
+		got, err := runGeoShapeLinestringQueryWithRelation("disjoint",
+			indexReader, test.line, test.field)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("test %d, expected %v, got %v for polygon: %+v",
+				n, test.want, got, test.line)
+		}
+	}
+}
+
 func TestGeoJsonLinestringIntersectsQuery(t *testing.T) {
 	tests := []struct {
 		line  [][]float64

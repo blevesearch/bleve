@@ -26,6 +26,42 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
+func TestGeoJsonPolygonDisjointQuery(t *testing.T) {
+	tests := []struct {
+		polygon [][][]float64
+		field   string
+		want    []string
+	}{
+		{[][][]float64{{{77.59866714477539, 12.999539935560733}, {77.55609512329102, 12.99050762232266},
+			{77.54459381103516, 12.94433734014486}, {77.60965347290039, 12.93496841213425},
+			{77.64020919799805, 12.969765512005967}, {77.59866714477539, 12.999539935560733}}},
+			"geometry", []string{"linestring1", "linestring2", "multilinestring1", "multilinestring2"}},
+	}
+	i := setupGeoJsonShapesIndexForPolygonQuery(t)
+	indexReader, err := i.Reader()
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err = indexReader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	for n, test := range tests {
+		got, err := runGeoShapePolygonQueryWithRelation("disjoint",
+			indexReader, test.polygon, test.field)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("test %d, expected %v, got %v for polygon: %+v", n,
+				test.want, got, test.polygon)
+		}
+	}
+}
+
 func TestGeoJsonPolygonIntersectsQuery(t *testing.T) {
 	tests := []struct {
 		polygon [][][]float64
