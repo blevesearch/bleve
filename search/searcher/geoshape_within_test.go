@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -23,19 +24,24 @@ import (
 )
 
 var (
-	leftRect             [][][]float64   = [][][]float64{{{-1, 0}, {0, 0}, {0, 1}, {-1, 1}, {-1, 0}}}
-	leftRectPoint        []float64       = []float64{-0.5, 0.5}
-	rightRect            [][][]float64   = [][][]float64{{{0, 0}, {1, 0}, {1, 1}, {0, 1}, {0, 0}}}
-	rightRectPoint       []float64       = []float64{0.5, 0.5}
-	overLappingRightRect [][][][]float64 = [][][][]float64{{{{-1, 0}, {1, 0}, {1, 1}, {-0.1, 1}, {-1, 0}}}}
-	middleLine           [][]float64     = [][]float64{{-0.5, 0.5}, {0.5, 0.5}}
+	leftRect       [][][]float64 = [][][]float64{{{-1, 0}, {0, 0}, {0, 1}, {-1, 1}, {-1, 0}}}
+	leftRectPoint  []float64     = []float64{-0.5, 0.5}
+	rightRect      [][][]float64 = [][][]float64{{{0, 0}, {1, 0}, {1, 1}, {0, 1}, {0, 0}}}
+	rightRectPoint []float64     = []float64{0.5, 0.5}
 )
 
 func testCaseSetupGeometryCollection(t *testing.T, docShapeName string, types []string, docShapeVertices [][][][][]float64,
 	i index.Index) (index.IndexReader, func() error, error) {
 	doc := document.NewDocument(docShapeName)
-	doc.AddField(document.NewGeometryCollectionFieldWithIndexingOptions("geometry",
-		[]uint64{}, docShapeVertices, types, document.DefaultGeoShapeIndexingOptions))
+	gcField := document.NewGeometryCollectionFieldWithIndexingOptions("geometry",
+		[]uint64{}, docShapeVertices, types, document.DefaultGeoShapeIndexingOptions)
+	if gcField == nil {
+		return nil, nil, fmt.Errorf("the GC field is nil")
+	}
+	doc.AddField(gcField)
+	if doc == nil {
+		return nil, nil, fmt.Errorf("the doc is nil")
+	}
 	err := i.Update(doc)
 	if err != nil {
 		t.Errorf(err.Error())
@@ -675,7 +681,6 @@ func TestLinestringGeometryCollectionWithin(t *testing.T) {
 			Types:            []string{"point"},
 			QueryType:        "within",
 		},
-		{},
 	}
 
 	i := setupIndex(t)
@@ -1210,14 +1215,14 @@ func TestGeometryCollectionWithin(t *testing.T) {
 		DocShapeTypes    []string
 	}{
 		{
-			QueryShape:       nil,
-			DocShapeVertices: nil,
+			QueryShape:       [][][][][]float64{{{{}}}},
+			DocShapeVertices: [][][][][]float64{{{{}}}},
 			DocShapeName:     "geometrycollection1",
 			Desc:             "empty geometry collections",
 			Expected:         nil,
 			QueryType:        "within",
-			QueryShapeTypes:  nil,
-			DocShapeTypes:    nil,
+			QueryShapeTypes:  []string{""},
+			DocShapeTypes:    []string{""},
 		},
 		{
 			QueryShape:       [][][][][]float64{{{{{1, 2}, {2, 3}}}}},
@@ -1281,11 +1286,11 @@ func TestGeometryCollectionPointWithin(t *testing.T) {
 	}{
 		{
 			QueryShape:       []float64{1.0, 2.0},
-			DocShapeVertices: nil,
+			DocShapeVertices: [][][][][]float64{{{{}}}},
 			DocShapeName:     "geometrycollection1",
 			Desc:             "empty geometry collection not within a point",
 			Expected:         nil,
-			Types:            nil,
+			Types:            []string{""},
 			QueryType:        "within",
 		},
 	}
