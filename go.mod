@@ -1,6 +1,6 @@
 module github.com/blevesearch/bleve/v2
 
-go 1.13
+go 1.18
 
 require (
 	github.com/RoaringBitmap/roaring v0.9.4
@@ -27,4 +27,16 @@ require (
 	github.com/spf13/cobra v0.0.5
 	go.etcd.io/bbolt v1.3.5
 	golang.org/x/text v0.3.7
+)
+
+require (
+	github.com/blevesearch/mmap-go v1.0.4 // indirect
+	github.com/couchbase/ghistogram v0.1.0 // indirect
+	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
+	github.com/golang/snappy v0.0.1 // indirect
+	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/json-iterator/go v0.0.0-20171115153421-f7279a603ede // indirect
+	github.com/mschoch/smat v0.2.0 // indirect
+	github.com/spf13/pflag v1.0.3 // indirect
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 )
