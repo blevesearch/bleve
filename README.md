@@ -16,23 +16,26 @@ modern text indexing in go - [blevesearch.com](http://www.blevesearch.com/)
 * Index any go data structure (including JSON)
 * Intelligent defaults backed up by powerful configuration
 * Supported field types:
-    * Text, Numeric, Date
+    * Text, Numeric, Datetime, Boolean
 * Supported query types:
-    * Term, Phrase, Match, Match Phrase, Prefix
-    * Conjunction, Disjunction, Boolean
-    * Numeric Range, Date Range
+    * Term, Phrase, Match, Match Phrase, Prefix, Fuzzy
+    * Conjunction, Disjunction, Boolean (must/should/must_not)
+    * Term Range, Numeric Range, Date Range
     * [Geo Spatial](https://github.com/blevesearch/bleve/blob/master/geo/README.md)
-    * Simple query [syntax](http://www.blevesearch.com/docs/Query-String-Query/) for human entry
-* tf-idf Scoring
+    * Simple [query string syntax](http://www.blevesearch.com/docs/Query-String-Query/) for human entry
+* [tf-idf](https://en.wikipedia.org/wiki/Tf-idf) Scoring
+* Boosting
 * Search result match highlighting
-* Supports Aggregating Facets:
+* Aggregations/faceting support:
     * Terms Facet
     * Numeric Range Facet
     * Date Range Facet
 
-## Discussion
+## Discussion/Issues
 
-Discuss usage and development of bleve in the [google group](https://groups.google.com/forum/#!forum/bleve).
+Discuss usage/development of bleve and/or report issues here:
+* [Github issues](https://github.com/blevesearch/bleve/issues)
+* [Google group](https://groups.google.com/forum/#!forum/bleve)
 
 ## Indexing
 
@@ -102,7 +105,7 @@ Use "bleve [command] --help" for more information about a command.
 
 ## Text Analysis Wizard
 
-https://bleveanalysis.couchbase.com
+[bleveanalysis.couchbase.com](https://bleveanalysis.couchbase.com)
 
 ## License
 
