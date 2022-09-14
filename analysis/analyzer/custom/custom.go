@@ -23,7 +23,7 @@ import (
 
 const Name = "custom"
 
-func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
+func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.Analyzer, error) {
 
 	var err error
 	var charFilters []analysis.CharFilter
@@ -88,7 +88,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 		}
 	}
 
-	rv := analysis.Analyzer{
+	rv := analysis.DefaultAnalyzer{
 		Tokenizer: tokenizer,
 	}
 	if charFilters != nil {

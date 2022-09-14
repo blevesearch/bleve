@@ -28,7 +28,7 @@ func RegisterAnalyzer(name string, constructor AnalyzerConstructor) {
 	analyzers[name] = constructor
 }
 
-type AnalyzerConstructor func(config map[string]interface{}, cache *Cache) (*analysis.Analyzer, error)
+type AnalyzerConstructor func(config map[string]interface{}, cache *Cache) (analysis.Analyzer, error)
 type AnalyzerRegistry map[string]AnalyzerConstructor
 
 type AnalyzerCache struct {
@@ -53,15 +53,15 @@ func AnalyzerBuild(name string, config map[string]interface{}, cache *Cache) (in
 	return analyzer, nil
 }
 
-func (c *AnalyzerCache) AnalyzerNamed(name string, cache *Cache) (*analysis.Analyzer, error) {
+func (c *AnalyzerCache) AnalyzerNamed(name string, cache *Cache) (analysis.Analyzer, error) {
 	item, err := c.ItemNamed(name, cache, AnalyzerBuild)
 	if err != nil {
 		return nil, err
 	}
-	return item.(*analysis.Analyzer), nil
+	return item.(analysis.Analyzer), nil
 }
 
-func (c *AnalyzerCache) DefineAnalyzer(name string, typ string, config map[string]interface{}, cache *Cache) (*analysis.Analyzer, error) {
+func (c *AnalyzerCache) DefineAnalyzer(name string, typ string, config map[string]interface{}, cache *Cache) (analysis.Analyzer, error) {
 	item, err := c.DefineItem(name, typ, config, cache, AnalyzerBuild)
 	if err != nil {
 		if err == ErrAlreadyDefined {
@@ -69,7 +69,7 @@ func (c *AnalyzerCache) DefineAnalyzer(name string, typ string, config map[strin
 		}
 		return nil, err
 	}
-	return item.(*analysis.Analyzer), nil
+	return item.(analysis.Analyzer), nil
 }
 
 func AnalyzerTypesAndInstances() ([]string, []string) {

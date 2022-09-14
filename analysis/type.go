@@ -73,7 +73,7 @@ type TokenFilter interface {
 }
 
 type Analyzer interface {
-	Analyzer([]byte) TokenStream
+	Analyze([]byte) TokenStream
 }
 
 type DefaultAnalyzer struct {

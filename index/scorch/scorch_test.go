@@ -60,7 +60,7 @@ func CreateConfig(name string) map[string]interface{} {
 	return rv
 }
 
-var testAnalyzer = &analysis.Analyzer{
+var testAnalyzer = &analysis.DefaultAnalyzer{
 	Tokenizer: regexpTokenizer.NewRegexpTokenizer(regexp.MustCompile(`\w+`)),
 }
 

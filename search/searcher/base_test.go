@@ -77,7 +77,7 @@ func initTwoDocs(twoDocIndex index.Index) {
 }
 
 // create a simpler analyzer which will support these tests
-var testAnalyzer = &analysis.Analyzer{
+var testAnalyzer = &analysis.DefaultAnalyzer{
 	Tokenizer: regexpTokenizer.NewRegexpTokenizer(regexp.MustCompile(`\w+`)),
 }
 
