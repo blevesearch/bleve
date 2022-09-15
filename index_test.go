@@ -245,7 +245,10 @@ func checkStatsOnIndexedBatch(indexPath string, indexMapping mapping.IndexMappin
 	var wg sync.WaitGroup
 	var statValError error
 
-	idx, err := NewUsing(indexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	kvConfig := map[string]interface{}{
+		"accountIOStats": true,
+	}
+	idx, err := NewUsing(indexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, kvConfig)
 	if err != nil {
 		return err
 	}
@@ -371,7 +374,10 @@ func TestBytesRead(t *testing.T) {
 	typeFieldMapping := NewTextFieldMapping()
 	typeFieldMapping.Store = false
 	documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
-	idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	kvConfig := map[string]interface{}{
+		"accountIOStats": true,
+	}
+	idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, kvConfig)
 	if err != nil {
 		t.Fatal(err)
 	}

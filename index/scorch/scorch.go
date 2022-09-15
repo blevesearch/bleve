@@ -146,6 +146,10 @@ func NewScorch(storeName string,
 	if ok {
 		rv.onAsyncError = RegistryAsyncErrorCallbacks[aecbName]
 	}
+	accountIOStats, ok := config["accountIOStats"].(bool)
+	if ok {
+		rv.enableIOStatsComputation(accountIOStats)
+	}
 	return rv, nil
 }
 

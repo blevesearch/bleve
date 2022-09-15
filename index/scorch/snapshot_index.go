@@ -149,7 +149,11 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 	for index, segment := range i.segment {
 		go func(index int, segment *SegmentSnapshot) {
 			var prevBytesRead uint64
-			seg, diskStatsAvailable := segment.segment.(diskStatsReporter)
+			var seg diskStatsReporter
+			var diskStatsAvailable bool
+			if accountIOStats() {
+				seg, diskStatsAvailable = segment.segment.(diskStatsReporter)
+			}
 			if diskStatsAvailable {
 				prevBytesRead = seg.BytesRead()
 			}
@@ -436,7 +440,11 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 
 	rvd := document.NewDocument(id)
 	var prevBytesRead uint64
-	seg, diskStatsAvailable := i.segment[segmentIndex].segment.(segment.DiskStatsReporter)
+	var seg segment.DiskStatsReporter
+	var diskStatsAvailable bool
+	if accountIOStats() {
+		seg, diskStatsAvailable = i.segment[segmentIndex].segment.(segment.DiskStatsReporter)
+	}
 	if diskStatsAvailable {
 		prevBytesRead = seg.BytesRead()
 	}
@@ -550,7 +558,11 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		rv.dicts = make([]segment.TermDictionary, len(is.segment))
 		for i, segment := range is.segment {
 			var prevBytesRead uint64
-			segP, diskStatsAvailable := segment.segment.(diskStatsReporter)
+			var segP diskStatsReporter
+			var diskStatsAvailable bool
+			if accountIOStats() {
+				segP, diskStatsAvailable = segment.segment.(diskStatsReporter)
+			}
 			if diskStatsAvailable {
 				prevBytesRead = segP.BytesRead()
 			}
@@ -567,8 +579,12 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 
 	for i, segment := range is.segment {
 		var prevBytesReadPL uint64
-		if postings, diskStatsAvailable := rv.postings[i].(diskStatsReporter); diskStatsAvailable {
-			prevBytesReadPL = postings.BytesRead()
+		var postings diskStatsReporter
+		var diskStatsAvailable bool
+		if accountIOStats() {
+			if postings, diskStatsAvailable = rv.postings[i].(diskStatsReporter); diskStatsAvailable {
+				prevBytesReadPL = postings.BytesRead()
+			}
 		}
 		pl, err := rv.dicts[i].PostingsList(term, segment.deleted, rv.postings[i])
 		if err != nil {
@@ -577,21 +593,26 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		rv.postings[i] = pl
 
 		var prevBytesReadItr uint64
-		if itr, diskStatsAvailable := rv.iterators[i].(diskStatsReporter); diskStatsAvailable {
-			prevBytesReadItr = itr.BytesRead()
+		var itr diskStatsReporter
+		if accountIOStats() {
+			if itr, diskStatsAvailable = rv.iterators[i].(diskStatsReporter); diskStatsAvailable {
+				prevBytesReadItr = itr.BytesRead()
+			}
 		}
 		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, rv.iterators[i])
 
-		if postings, diskStatsAvailable := pl.(diskStatsReporter); diskStatsAvailable &&
-			prevBytesReadPL < postings.BytesRead() {
-			atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
-				postings.BytesRead()-prevBytesReadPL)
-		}
+		if accountIOStats() {
+			if postings, diskStatsAvailable := pl.(diskStatsReporter); diskStatsAvailable &&
+				prevBytesReadPL < postings.BytesRead() {
+				atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
+					postings.BytesRead()-prevBytesReadPL)
+			}
 
-		if itr, diskStatsAvailable := rv.iterators[i].(diskStatsReporter); diskStatsAvailable &&
-			prevBytesReadItr < itr.BytesRead() {
-			atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
-				itr.BytesRead()-prevBytesReadItr)
+			if itr, diskStatsAvailable := rv.iterators[i].(diskStatsReporter); diskStatsAvailable &&
+				prevBytesReadItr < itr.BytesRead() {
+				atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
+					itr.BytesRead()-prevBytesReadItr)
+			}
 		}
 	}
 	atomic.AddUint64(&is.parent.stats.TotTermSearchersStarted, uint64(1))
@@ -712,7 +733,11 @@ func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 
 	if ssvOk && ssv != nil && len(vFields) > 0 {
 		var prevBytesRead uint64
-		ssvp, diskStatsAvailable := ssv.(segment.DiskStatsReporter)
+		var ssvp segment.DiskStatsReporter
+		var diskStatsAvailable bool
+		if accountIOStats() {
+			ssvp, diskStatsAvailable = ssv.(segment.DiskStatsReporter)
+		}
 		if diskStatsAvailable {
 			prevBytesRead = ssvp.BytesRead()
 		}

@@ -94,6 +94,20 @@ func RegisterSegmentPlugin(plugin SegmentPlugin, makeDefault bool) {
 	}
 }
 
+// This exported method allows the application
+// to set the state as to whether it needs
+// disk stats to be tracked while indexing and querying
+//
+// The stats said above refer to num_bytes_read_at_query_time
+// and num_bytes_written_at_index_time
+func (s *Scorch) enableIOStatsComputation(state bool) {
+	zapv15.AccountIOStats = state
+}
+
+func accountIOStats() bool {
+	return zapv15.AccountIOStats
+}
+
 func SupportedSegmentTypes() (rv []string) {
 	for k := range supportedSegmentPlugins {
 		rv = append(rv, k)

@@ -77,8 +77,10 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 	// find the next hit
 	for i.segmentOffset < len(i.iterators) {
 		prevBytesRead := uint64(0)
-		itr, diskStatsAvailable := i.iterators[i.segmentOffset].(segment.DiskStatsReporter)
-		if diskStatsAvailable {
+		var itr segment.DiskStatsReporter
+		var diskStatsAvailable bool
+		if accountIOStats() {
+			itr, diskStatsAvailable = i.iterators[i.segmentOffset].(segment.DiskStatsReporter)
 			prevBytesRead = itr.BytesRead()
 		}
 		next, err := i.iterators[i.segmentOffset].Next()
