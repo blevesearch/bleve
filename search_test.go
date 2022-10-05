@@ -1889,3 +1889,47 @@ func TestHightlightingWithHTMLCharacterFilter(t *testing.T) {
 			gotFragment, expectedFragment)
 	}
 }
+
+func TestIPRangeQuery(t *testing.T) {
+	idxMapping := NewIndexMapping()
+	im := NewIPFieldMapping()
+	dmap := mapping.NewDocumentMapping()
+	dmap.AddFieldMappingsAt("ip_content", im)
+	idxMapping.DefaultMapping = dmap
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	ipContent := "1.2.3.4"
+	if err = idx.Index("doc", map[string]string{
+		"ip_content": ipContent,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	q := query.NewIPRangeQuery("1.2.3.0/5")
+	q.SetField("ip_content")
+	sr := NewSearchRequest(q)
+
+	searchResults, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(searchResults.Hits) != 1 ||
+		searchResults.Hits[0].ID != "doc" {
+		t.Fatal("Expected the 1 result - doc")
+	}
+}
