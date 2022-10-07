@@ -1912,14 +1912,14 @@ func TestIPRangeQuery(t *testing.T) {
 		}
 	}()
 
-	ipContent := "1.2.3.4"
+	ipContent := "192.168.10.11"
 	if err = idx.Index("doc", map[string]string{
 		"ip_content": ipContent,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	q := query.NewIPRangeQuery("1.2.3.0/5")
+	q := query.NewIPRangeQuery("192.168.10.0/24")
 	q.SetField("ip_content")
 	sr := NewSearchRequest(q)
 
