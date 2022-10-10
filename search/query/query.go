@@ -292,6 +292,17 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
+
+	_, hasCIDR := tmp["cidr"]
+	if hasCIDR {
+		var rv IPRangeQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+
 	return nil, fmt.Errorf("unknown query type")
 }
 

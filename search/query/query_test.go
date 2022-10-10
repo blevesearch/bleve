@@ -206,6 +206,14 @@ func TestParseQuery(t *testing.T) {
 			output: NewBoolFieldQuery(true),
 		},
 		{
+			input: []byte(`{"field": "x", "cidr": "1.2.3.0/4"}`),
+			output: func() Query {
+				q := NewIPRangeQuery("1.2.3.0/4")
+				q.SetField("x")
+				return q
+			}(),
+		},
+		{
 			input:  []byte(`{"madeitup":"queryhere"}`),
 			output: nil,
 			err:    true,
