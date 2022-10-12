@@ -397,7 +397,7 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		dm.processProperty(float64(val.Uint()), path, indexes, context)
 	case reflect.Float32, reflect.Float64:
-		dm.processProperty(float64(val.Float()), path, indexes, context)
+		dm.processProperty(val.Float(), path, indexes, context)
 	case reflect.Bool:
 		dm.processProperty(val.Bool(), path, indexes, context)
 	}
