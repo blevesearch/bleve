@@ -1,0 +1,20 @@
+{
+    "book": {
+      "title": "couples in politics",
+      "author": "dummy",
+      "chapters": [
+        {
+          "number": 1,
+          "title": "bill and hillary clinton",
+          "pages": [
+            {
+              "page": {
+                "contents": "brief contents, blah blah blah",
+                "number": 1
+              }
+            }         
+        ]
+        }
+      ]
+    }
+  }
