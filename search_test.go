@@ -17,7 +17,6 @@ package bleve
 import (
 	"encoding/json"
 	"fmt"
-	index "github.com/blevesearch/bleve_index_api"
 	"reflect"
 	"strconv"
 	"strings"
@@ -36,6 +35,7 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis/tokenizer/single"
 	"github.com/blevesearch/bleve/v2/analysis/tokenizer/whitespace"
 	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -43,6 +43,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search/highlight/highlighter/ansi"
 	"github.com/blevesearch/bleve/v2/search/highlight/highlighter/html"
 	"github.com/blevesearch/bleve/v2/search/query"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 func TestSearchResultString(t *testing.T) {
@@ -1931,5 +1932,171 @@ func TestIPRangeQuery(t *testing.T) {
 	if len(searchResults.Hits) != 1 ||
 		searchResults.Hits[0].ID != "doc" {
 		t.Fatal("Expected the 1 result - doc")
+	}
+}
+
+func TestGeoShapePolygonContainsPoint(t *testing.T) {
+	fm := mapping.NewGeoShapeFieldMapping()
+	dmap := mapping.NewDocumentMapping()
+	dmap.AddFieldMappingsAt("geometry", fm)
+
+	idxMapping := NewIndexMapping()
+	idxMapping.DefaultMapping = dmap
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Polygon coordinates to be ordered in counter-clock-wise order
+	// for the outer loop, and holes to follow clock-wise order.
+	// See: https://www.rfc-editor.org/rfc/rfc7946.html#section-3.1.6
+
+	one := []byte(`{
+		"geometry":{
+			"type":"Polygon",
+			"coordinates":[[
+				[4.8089,46.9307],
+				[4.8223,46.8915],
+				[4.8149,46.886],
+				[4.8252,46.8647],
+				[4.8305,46.8531],
+				[4.8506,46.8509],
+				[4.8574,46.8621],
+				[4.8576,46.8769],
+				[4.8753,46.8774],
+				[4.8909,46.8519],
+				[4.8837,46.8485],
+				[4.9014,46.8318],
+				[4.9067,46.8179],
+				[4.8986,46.8122],
+				[4.9081,46.7969],
+				[4.9535,46.8254],
+				[4.9577,46.8053],
+				[5.0201,46.821],
+				[5.0357,46.8207],
+				[5.0656,46.8434],
+				[5.0955,46.8411],
+				[5.1149,46.8435],
+				[5.1259,46.8395],
+				[5.1433,46.8463],
+				[5.1415,46.8589],
+				[5.1533,46.873],
+				[5.138,46.8843],
+				[5.1525,46.9012],
+				[5.1485,46.9165],
+				[5.1582,46.926],
+				[5.1882,46.9251],
+				[5.2039,46.9129],
+				[5.2223,46.9175],
+				[5.2168,46.926],
+				[5.2338,46.9316],
+				[5.228,46.9505],
+				[5.2078,46.9722],
+				[5.2117,46.98],
+				[5.1961,46.9783],
+				[5.1663,46.9638],
+				[5.1213,46.9634],
+				[5.1086,46.9596],
+				[5.0729,46.9604],
+				[5.0731,46.9668],
+				[5.0493,46.9817],
+				[5.0034,46.9722],
+				[4.9852,46.9585],
+				[4.9479,46.9664],
+				[4.8943,46.9663],
+				[4.8937,46.951],
+				[4.8534,46.9458],
+				[4.8089,46.9307]
+			]]
+		}
+	}`)
+
+	two := []byte(`{
+		"geometry":{
+			"type":"Polygon",
+			"coordinates":[[
+				[2.2266,48.7816],
+				[2.2266,48.7761],
+				[2.2288,48.7745],
+				[2.2717,48.7905],
+				[2.2799,48.8109],
+				[2.3013,48.8251],
+				[2.2894,48.8283],
+				[2.2726,48.8144],
+				[2.2518,48.8164],
+				[2.255,48.8101],
+				[2.2348,48.7954],
+				[2.2266,48.7816]
+			]]
+		}
+	}`)
+
+	var doc1, doc2 map[string]interface{}
+
+	if err = json.Unmarshal(one, &doc1); err != nil {
+		t.Fatal(err)
+	}
+	if err = idx.Index("doc1", doc1); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = json.Unmarshal(two, &doc2); err != nil {
+		t.Fatal(err)
+	}
+	if err = idx.Index("doc2", doc2); err != nil {
+		t.Fatal(err)
+	}
+
+	for testi, test := range []struct {
+		coordinates []float64
+		expectHits  []string
+	}{
+		{
+			coordinates: []float64{5, 46.9},
+			expectHits:  []string{"doc1"},
+		},
+		{
+			coordinates: []float64{1.5, 48.2},
+		},
+	} {
+		q, err := query.NewGeoShapeQuery(
+			[][][][]float64{{{test.coordinates}}},
+			geo.PointType,
+			"contains",
+		)
+		if err != nil {
+			t.Fatalf("test: %d, query err: %v", testi+1, err)
+		}
+		q.SetField("geometry")
+
+		res, err := idx.Search(NewSearchRequest(q))
+		if err != nil {
+			t.Fatalf("test: %d, search err: %v", testi+1, err)
+		}
+
+		if len(res.Hits) != len(test.expectHits) {
+			t.Errorf("test: %d, unexpected hits: %v", testi+1, len(res.Hits))
+		}
+
+	OUTER:
+		for _, expect := range test.expectHits {
+			for _, got := range res.Hits {
+				if got.ID == expect {
+					continue OUTER
+				}
+			}
+			t.Errorf("test: %d, couldn't get: %v", testi+1, expect)
+		}
 	}
 }

@@ -20,10 +20,10 @@ import (
 	"os"
 
 	"github.com/blevesearch/bleve/v2/registry"
-	store "github.com/blevesearch/upsidedown_store_api"
 	"github.com/blevesearch/goleveldb/leveldb"
 	"github.com/blevesearch/goleveldb/leveldb/opt"
 	"github.com/blevesearch/goleveldb/leveldb/util"
+	store "github.com/blevesearch/upsidedown_store_api"
 )
 
 const (
