@@ -15,9 +15,9 @@
 package goleveldb
 
 import (
-	store "github.com/blevesearch/upsidedown_store_api"
 	"github.com/blevesearch/goleveldb/leveldb"
 	"github.com/blevesearch/goleveldb/leveldb/util"
+	store "github.com/blevesearch/upsidedown_store_api"
 )
 
 type Reader struct {
