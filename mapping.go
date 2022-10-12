@@ -70,6 +70,10 @@ func NewGeoPointFieldMapping() *mapping.FieldMapping {
 	return mapping.NewGeoPointFieldMapping()
 }
 
+func NewGeoShapeFieldMapping() *mapping.FieldMapping {
+	return mapping.NewGeoShapeFieldMapping()
+}
+
 func NewIPFieldMapping() *mapping.FieldMapping {
 	return mapping.NewIPFieldMapping()
 }
