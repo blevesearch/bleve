@@ -102,7 +102,8 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 			// upstream.
 			if diskStatsAvailable {
 				delta := itr.BytesRead() - prevBytesRead
-				atomic.AddUint64(&i.snapshot.parent.stats.TotBytesReadAtQueryTime, uint64(delta))
+				// atomic.AddUint64(&i.snapshot.parent.stats.TotBytesReadAtQueryTime, uint64(delta))
+				rv.BytesRead = delta
 			}
 
 			return rv, nil

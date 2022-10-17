@@ -914,6 +914,10 @@ func (i *IndexSnapshot) CopyTo(d index.Directory) error {
 	return copyBolt.Sync()
 }
 
+func (s *IndexSnapshot) UpdateIOStats(val uint64) {
+	atomic.AddUint64(&s.parent.stats.TotBytesReadAtQueryTime, val)
+}
+
 func (i *IndexSnapshot) GetSpatialAnalyzerPlugin(typ string) (
 	index.SpatialAnalyzerPlugin, error) {
 	var rv index.SpatialAnalyzerPlugin

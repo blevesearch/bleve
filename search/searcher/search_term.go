@@ -96,6 +96,7 @@ func (s *TermSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, e
 
 	// score match
 	docMatch := s.scorer.Score(ctx, termMatch)
+	docMatch.BytesRead = termMatch.BytesRead
 	// return doc match
 	return docMatch, nil
 
