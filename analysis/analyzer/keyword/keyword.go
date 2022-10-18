@@ -22,12 +22,12 @@ import (
 
 const Name = "keyword"
 
-func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
+func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.Analyzer, error) {
 	keywordTokenizer, err := cache.TokenizerNamed(single.Name)
 	if err != nil {
 		return nil, err
 	}
-	rv := analysis.Analyzer{
+	rv := analysis.DefaultAnalyzer{
 		Tokenizer: keywordTokenizer,
 	}
 	return &rv, nil

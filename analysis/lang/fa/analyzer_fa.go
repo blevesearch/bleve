@@ -26,7 +26,7 @@ import (
 
 const AnalyzerName = "fa"
 
-func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
+func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.Analyzer, error) {
 	zFilter, err := cache.CharFilterNamed(zerowidthnonjoiner.Name)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	if err != nil {
 		return nil, err
 	}
-	rv := analysis.Analyzer{
+	rv := analysis.DefaultAnalyzer{
 		CharFilters: []analysis.CharFilter{
 			zFilter,
 		},

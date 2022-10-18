@@ -36,7 +36,7 @@ type TextField struct {
 	name              string
 	arrayPositions    []uint64
 	options           index.FieldIndexingOptions
-	analyzer          *analysis.Analyzer
+	analyzer          analysis.Analyzer
 	value             []byte
 	numPlainTextBytes uint64
 	length            int
@@ -100,7 +100,7 @@ func (t *TextField) Analyze() {
 	t.frequencies = analysis.TokenFrequency(tokens, t.arrayPositions, t.options)
 }
 
-func (t *TextField) Analyzer() *analysis.Analyzer {
+func (t *TextField) Analyzer() analysis.Analyzer {
 	return t.analyzer
 }
 
@@ -134,7 +134,7 @@ func NewTextFieldWithIndexingOptions(name string, arrayPositions []uint64, value
 	}
 }
 
-func NewTextFieldWithAnalyzer(name string, arrayPositions []uint64, value []byte, analyzer *analysis.Analyzer) *TextField {
+func NewTextFieldWithAnalyzer(name string, arrayPositions []uint64, value []byte, analyzer analysis.Analyzer) *TextField {
 	return &TextField{
 		name:              name,
 		arrayPositions:    arrayPositions,
@@ -145,7 +145,7 @@ func NewTextFieldWithAnalyzer(name string, arrayPositions []uint64, value []byte
 	}
 }
 
-func NewTextFieldCustom(name string, arrayPositions []uint64, value []byte, options index.FieldIndexingOptions, analyzer *analysis.Analyzer) *TextField {
+func NewTextFieldCustom(name string, arrayPositions []uint64, value []byte, options index.FieldIndexingOptions, analyzer analysis.Analyzer) *TextField {
 	return &TextField{
 		name:              name,
 		arrayPositions:    arrayPositions,

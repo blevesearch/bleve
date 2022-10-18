@@ -25,7 +25,7 @@ import (
 const AnalyzerName = "es"
 
 func AnalyzerConstructor(config map[string]interface{},
-	cache *registry.Cache) (*analysis.Analyzer, error) {
+	cache *registry.Cache) (analysis.Analyzer, error) {
 	unicodeTokenizer, err := cache.TokenizerNamed(unicode.Name)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func AnalyzerConstructor(config map[string]interface{},
 	if err != nil {
 		return nil, err
 	}
-	rv := analysis.Analyzer{
+	rv := analysis.DefaultAnalyzer{
 		Tokenizer: unicodeTokenizer,
 		TokenFilters: []analysis.TokenFilter{
 			toLowerFilter,

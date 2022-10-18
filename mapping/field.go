@@ -363,7 +363,7 @@ func (fm *FieldMapping) processGeoShape(propertyMightBeGeoShape interface{},
 	}
 }
 
-func (fm *FieldMapping) analyzerForField(path []string, context *walkContext) *analysis.Analyzer {
+func (fm *FieldMapping) analyzerForField(path []string, context *walkContext) analysis.Analyzer {
 	analyzerName := fm.Analyzer
 	if analyzerName == "" {
 		analyzerName = context.dm.defaultAnalyzerName(path)

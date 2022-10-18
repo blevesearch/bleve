@@ -23,7 +23,7 @@ import (
 
 const Name = "simple"
 
-func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (*analysis.Analyzer, error) {
+func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.Analyzer, error) {
 	tokenizer, err := cache.TokenizerNamed(letter.Name)
 	if err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (
 	if err != nil {
 		return nil, err
 	}
-	rv := analysis.Analyzer{
+	rv := analysis.DefaultAnalyzer{
 		Tokenizer: tokenizer,
 		TokenFilters: []analysis.TokenFilter{
 			toLowerFilter,

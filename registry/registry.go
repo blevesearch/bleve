@@ -123,11 +123,11 @@ func (c *Cache) DefineTokenFilter(name string, config map[string]interface{}) (a
 	return c.TokenFilters.DefineTokenFilter(name, typ, config, c)
 }
 
-func (c *Cache) AnalyzerNamed(name string) (*analysis.Analyzer, error) {
+func (c *Cache) AnalyzerNamed(name string) (analysis.Analyzer, error) {
 	return c.Analyzers.AnalyzerNamed(name, c)
 }
 
-func (c *Cache) DefineAnalyzer(name string, config map[string]interface{}) (*analysis.Analyzer, error) {
+func (c *Cache) DefineAnalyzer(name string, config map[string]interface{}) (analysis.Analyzer, error) {
 	typ, err := typeFromConfig(config)
 	if err != nil {
 		return nil, err

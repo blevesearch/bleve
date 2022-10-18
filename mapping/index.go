@@ -386,7 +386,7 @@ func (im *IndexMappingImpl) AnalyzerNameForPath(path string) string {
 	return im.DefaultAnalyzer
 }
 
-func (im *IndexMappingImpl) AnalyzerNamed(name string) *analysis.Analyzer {
+func (im *IndexMappingImpl) AnalyzerNamed(name string) analysis.Analyzer {
 	analyzer, err := im.cache.AnalyzerNamed(name)
 	if err != nil {
 		logger.Printf("error using analyzer named: %s", name)

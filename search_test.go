@@ -482,7 +482,7 @@ func TestNestedBooleanSearchers(t *testing.T) {
 		doc.Fields = []document.Field{
 			document.NewTextFieldCustom("hostname", []uint64{}, []byte(hostname),
 				index.IndexField,
-				&analysis.Analyzer{
+				&analysis.DefaultAnalyzer{
 					Tokenizer: single.NewSingleTokenTokenizer(),
 					TokenFilters: []analysis.TokenFilter{
 						lowercase.NewLowerCaseFilter(),

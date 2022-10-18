@@ -72,13 +72,17 @@ type TokenFilter interface {
 	Filter(TokenStream) TokenStream
 }
 
-type Analyzer struct {
+type Analyzer interface {
+	Analyze([]byte) TokenStream
+}
+
+type DefaultAnalyzer struct {
 	CharFilters  []CharFilter
 	Tokenizer    Tokenizer
 	TokenFilters []TokenFilter
 }
 
-func (a *Analyzer) Analyze(input []byte) TokenStream {
+func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
 	if a.CharFilters != nil {
 		for _, cf := range a.CharFilters {
 			input = cf.Filter(input)

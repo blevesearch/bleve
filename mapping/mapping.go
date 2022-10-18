@@ -54,5 +54,5 @@ type IndexMapping interface {
 	DefaultSearchField() string
 
 	AnalyzerNameForPath(path string) string
-	AnalyzerNamed(name string) *analysis.Analyzer
+	AnalyzerNamed(name string) analysis.Analyzer
 }

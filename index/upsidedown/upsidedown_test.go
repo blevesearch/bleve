@@ -34,7 +34,7 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-var testAnalyzer = &analysis.Analyzer{
+var testAnalyzer = &analysis.DefaultAnalyzer{
 	Tokenizer: regexpTokenizer.NewRegexpTokenizer(regexp.MustCompile(`\w+`)),
 }
 
