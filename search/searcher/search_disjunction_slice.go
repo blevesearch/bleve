@@ -156,7 +156,9 @@ func (s *DisjunctionSliceSearcher) updateMatches() error {
 				matchingIdxs = matchingIdxs[:0]
 			}
 		}
-
+		if len(matching) > 0 {
+			matching[0].BytesRead += curr.BytesRead
+		}
 		matching = append(matching, curr)
 		matchingIdxs = append(matchingIdxs, i)
 	}

@@ -153,6 +153,7 @@ func TestIndexReader(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	match.BytesRead = 0
 	if !reflect.DeepEqual(expectedMatch, match) {
 		t.Errorf("got %#v, expected %#v", match, expectedMatch)
 	}

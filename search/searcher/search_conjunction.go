@@ -204,6 +204,12 @@ OUTER:
 			// currs[i] again
 		}
 
+		// track the bytes read for each searcher
+		var totalBytesRead uint64
+		for i := 0; i < len(s.currs); i++ {
+			totalBytesRead += s.currs[i].BytesRead
+		}
+
 		// if we get here, a doc matched all readers, so score and add it
 		rv = s.scorer.Score(ctx, s.currs)
 
@@ -219,6 +225,7 @@ OUTER:
 			}
 		}
 
+		rv.BytesRead = totalBytesRead
 		// don't continue now, wait for the next call to Next()
 		break
 	}

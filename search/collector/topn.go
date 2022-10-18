@@ -49,7 +49,9 @@ type collectorCompare func(i, j *search.DocumentMatch) int
 
 type collectorFixup func(d *search.DocumentMatch) error
 
-type SendBytesReadFuncSign func(uint64)
+const SearchIOStatsCallbackKey = "_search_io_stats_callback_key"
+
+type SearchIOStatsCallbackFunc func(uint64)
 
 // TopNCollector collects the top N hits, optionally skipping some results
 type TopNCollector struct {
@@ -207,6 +209,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		next, err = searcher.Next(searchContext)
 	}
 	for err == nil && next != nil {
+		// log.Printf("the next bytes read %v\n", next.BytesRead)
 		totalBytesRead += next.BytesRead
 		if hc.total%CheckDoneEvery == 0 {
 			select {
@@ -229,8 +232,10 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		next, err = searcher.Next(searchContext)
 	}
 
-	sendBytesRead := ctx.Value("_send_bytes_read_key").(SendBytesReadFuncSign)
-	sendBytesRead(totalBytesRead)
+	statsCallbackFn := ctx.Value(SearchIOStatsCallbackKey)
+	if statsCallbackFn != nil {
+		statsCallbackFn.(SearchIOStatsCallbackFunc)(totalBytesRead)
+	}
 
 	// help finalize/flush the results in case
 	// of custom document match handlers.

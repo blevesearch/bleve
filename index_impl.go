@@ -533,7 +533,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		totalBytesRead = bytesRead
 	}
 
-	ctx = context.WithValue(ctx, "_send_bytes_read_key", collector.SendBytesReadFuncSign(SendBytesRead))
+	ctx = context.WithValue(ctx, collector.SearchIOStatsCallbackKey,
+		collector.SearchIOStatsCallbackFunc(SendBytesRead))
 	err = coll.Collect(ctx, searcher, indexReader)
 	if err != nil {
 		return nil, err
