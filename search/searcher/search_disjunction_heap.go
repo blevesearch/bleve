@@ -155,7 +155,6 @@ func (s *DisjunctionHeapSearcher) updateMatches() error {
 		// now as long as top of heap matches, keep popping
 		for len(s.heap) > 0 && bytes.Compare(next.curr.IndexInternalID, s.heap[0].curr.IndexInternalID) == 0 {
 			next = heap.Pop(s).(*SearcherCurr)
-			matching[0].BytesRead += next.curr.BytesRead
 			matching = append(matching, next.curr)
 			matchingCurrs = append(matchingCurrs, next)
 		}
@@ -197,7 +196,6 @@ func (s *DisjunctionHeapSearcher) Next(ctx *search.SearchContext) (
 			found = true
 			// score this match
 			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
-			rv.BytesRead = s.matching[0].BytesRead
 		}
 
 		// invoke next on all the matching searchers

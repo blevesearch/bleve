@@ -41,7 +41,13 @@ func NewConjunctionQueryScorer(options search.SearcherOptions) *ConjunctionQuery
 		options: options,
 	}
 }
-
+func getTotalBytesRead(matches []*search.DocumentMatch) uint64 {
+	var rv uint64
+	for _, match := range matches {
+		rv += match.BytesRead
+	}
+	return rv
+}
 func (s *ConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch) *search.DocumentMatch {
 	var sum float64
 	var childrenExplanations []*search.Explanation
@@ -67,6 +73,7 @@ func (s *ConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	rv.Expl = newExpl
 	rv.FieldTermLocations = search.MergeFieldTermLocations(
 		rv.FieldTermLocations, constituents[1:])
+	rv.BytesRead = getTotalBytesRead(constituents)
 
 	return rv
 }

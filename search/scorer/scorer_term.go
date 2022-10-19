@@ -198,6 +198,6 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 				})
 		}
 	}
-
+	rv.BytesRead = termMatch.BytesRead
 	return rv
 }

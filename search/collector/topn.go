@@ -209,7 +209,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		next, err = searcher.Next(searchContext)
 	}
 	for err == nil && next != nil {
-		// log.Printf("the next bytes read %v\n", next.BytesRead)
 		totalBytesRead += next.BytesRead
 		if hc.total%CheckDoneEvery == 0 {
 			select {
