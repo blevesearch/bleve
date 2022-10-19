@@ -30,4 +30,12 @@ func (e *emptyPostingsIterator) Size() int {
 	return 0
 }
 
+func (e *emptyPostingsIterator) BytesRead() uint64 {
+	return 0
+}
+
+func (e *emptyPostingsIterator) ResetBytesRead(uint64) {}
+
+func (e *emptyPostingsIterator) BytesWritten() uint64 { return 0 }
+
 var anEmptyPostingsIterator = &emptyPostingsIterator{}
