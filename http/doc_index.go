@@ -25,7 +25,7 @@ type DocIndexHandler struct {
 	defaultIndexName string
 	IndexNameLookup  varLookupFunc
 	DocIDLookup      varLookupFunc
-	IndexDocType     map[string]any
+	IndexDocType     map[string]interface{}
 }
 
 func NewDocIndexHandler(defaultIndexName string) *DocIndexHandler {
@@ -68,7 +68,7 @@ func (h *DocIndexHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// parse request body as json
-	var doc any
+	var doc interface{}
 	if nil != h.IndexDocType {
 		if v, ok := h.IndexDocType[indexName]; ok {
 			doc = v
