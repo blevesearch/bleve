@@ -343,8 +343,6 @@ func testVersusSearches(vt *VersusTest, searchTemplates []string, idxA, idxB ble
 				if len(hitB.FieldTermLocations) == 0 {
 					hitB.FieldTermLocations = nil
 				}
-				// hitA.BytesRead = 0
-				// hitB.BytesRead = 0
 				if !reflect.DeepEqual(hitA, hitB) {
 					t.Errorf("\n  driving from hitsB\n    hitA: %#v,\n    hitB: %#v", hitA, hitB)
 					idx, _ := strconv.Atoi(id)
@@ -389,6 +387,8 @@ func hitsById(res *bleve.SearchResult) map[string]*search.DocumentMatch {
 		hit.Score = math.Trunc(hit.Score*1000.0) / 1000.0
 		hit.IndexInternalID = nil
 		hit.HitNumber = 0
+		// Ignoring the BytesRead value, since it doesn't have
+		// relevance in this type of test
 		hit.BytesRead = 0
 		rv[hit.ID] = hit
 	}

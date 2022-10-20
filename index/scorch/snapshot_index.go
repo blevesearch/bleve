@@ -430,13 +430,8 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
 	rvd := document.NewDocument(id)
-	var prevBytesRead uint64
-	var seg segment.DiskStatsReporter
-	var diskStatsAvailable bool
-	seg, diskStatsAvailable = i.segment[segmentIndex].segment.(segment.DiskStatsReporter)
-	if diskStatsAvailable {
-		prevBytesRead = seg.BytesRead()
-	}
+	prevBytesRead := i.segment[segmentIndex].segment.BytesRead()
+
 	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, val []byte, pos []uint64) bool {
 		if name == "_id" {
 			return true
@@ -469,8 +464,7 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		return nil, err
 	}
 
-	if diskStatsAvailable {
-		delta := seg.BytesRead() - prevBytesRead
+	if delta := i.segment[segmentIndex].segment.BytesRead() - prevBytesRead; delta > 0 {
 		atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime, delta)
 	}
 	return rvd, nil
