@@ -78,6 +78,6 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	rv.Expl = newExpl
 	rv.FieldTermLocations = search.MergeFieldTermLocations(
 		rv.FieldTermLocations, constituents[1:])
-
+	rv.BytesRead = getTotalBytesRead(constituents)
 	return rv
 }

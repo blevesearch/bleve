@@ -349,6 +349,7 @@ func testVersusSearches(vt *VersusTest, searchTemplates []string, idxA, idxB ble
 					t.Errorf("\n    doc: %d, body: %s", idx, strings.Join(vt.Bodies[idx], " "))
 				}
 			}
+
 			if !reflect.DeepEqual(hitsA, hitsB) {
 				t.Errorf("=========\nsearch: (%d) %s,\n res hits mismatch,\n len(hitsA): %d,\n len(hitsB): %d",
 					i, bufBytes, len(hitsA), len(hitsB))
@@ -386,7 +387,9 @@ func hitsById(res *bleve.SearchResult) map[string]*search.DocumentMatch {
 		hit.Score = math.Trunc(hit.Score*1000.0) / 1000.0
 		hit.IndexInternalID = nil
 		hit.HitNumber = 0
-
+		// Ignoring the BytesRead value, since it doesn't have
+		// relevance in this type of test
+		hit.BytesRead = 0
 		rv[hit.ID] = hit
 	}
 

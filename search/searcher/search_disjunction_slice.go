@@ -156,7 +156,6 @@ func (s *DisjunctionSliceSearcher) updateMatches() error {
 				matchingIdxs = matchingIdxs[:0]
 			}
 		}
-
 		matching = append(matching, curr)
 		matchingIdxs = append(matchingIdxs, i)
 	}

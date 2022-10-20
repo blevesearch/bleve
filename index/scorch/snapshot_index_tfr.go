@@ -76,11 +76,7 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 	}
 	// find the next hit
 	for i.segmentOffset < len(i.iterators) {
-		prevBytesRead := uint64(0)
-		itr, diskStatsAvailable := i.iterators[i.segmentOffset].(segment.DiskStatsReporter)
-		if diskStatsAvailable {
-			prevBytesRead = itr.BytesRead()
-		}
+		prevBytesRead := i.iterators[i.segmentOffset].BytesRead()
 		next, err := i.iterators[i.segmentOffset].Next()
 		if err != nil {
 			return nil, err
@@ -98,9 +94,8 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 			// this is because there are chances of having a series of loadChunk calls,
 			// and they have to be added together before sending the bytesRead at this point
 			// upstream.
-			if diskStatsAvailable {
-				delta := itr.BytesRead() - prevBytesRead
-				atomic.AddUint64(&i.snapshot.parent.stats.TotBytesReadAtQueryTime, uint64(delta))
+			if delta := i.iterators[i.segmentOffset].BytesRead() - prevBytesRead; delta > 0 {
+				rv.BytesRead = delta
 			}
 
 			return rv, nil

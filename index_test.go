@@ -371,6 +371,7 @@ func TestBytesRead(t *testing.T) {
 	typeFieldMapping := NewTextFieldMapping()
 	typeFieldMapping.Store = false
 	documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
+
 	idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -579,7 +580,7 @@ func TestBytesReadStored(t *testing.T) {
 	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
 	if bytesRead != 15792 {
-		t.Fatalf("expected the bytes read stat to be around 15792, got %v", err)
+		t.Fatalf("expected the bytes read stat to be around 15792, got %v", bytesRead)
 	}
 	prevBytesRead := bytesRead
 
@@ -591,7 +592,7 @@ func TestBytesReadStored(t *testing.T) {
 	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
 	if bytesRead-prevBytesRead != 15 {
-		t.Fatalf("expected the bytes read stat to be around 15, got %v", err)
+		t.Fatalf("expected the bytes read stat to be around 15, got %v", bytesRead-prevBytesRead)
 	}
 	prevBytesRead = bytesRead
 
@@ -660,7 +661,7 @@ func TestBytesReadStored(t *testing.T) {
 	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
 	if bytesRead-prevBytesRead != 12 {
-		t.Fatalf("expected the bytes read stat to be around 12, got %v", err)
+		t.Fatalf("expected the bytes read stat to be around 12, got %v", bytesRead-prevBytesRead)
 	}
 	prevBytesRead = bytesRead
 
@@ -674,7 +675,7 @@ func TestBytesReadStored(t *testing.T) {
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
 
 	if bytesRead-prevBytesRead != 646 {
-		t.Fatalf("expected the bytes read stat to be around 646, got %v", err)
+		t.Fatalf("expected the bytes read stat to be around 646, got %v", bytesRead-prevBytesRead)
 	}
 }
 

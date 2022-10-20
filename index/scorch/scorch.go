@@ -146,6 +146,7 @@ func NewScorch(storeName string,
 	if ok {
 		rv.onAsyncError = RegistryAsyncErrorCallbacks[aecbName]
 	}
+
 	return rv, nil
 }
 

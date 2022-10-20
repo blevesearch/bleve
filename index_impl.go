@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/v2/document"
+	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/registry"
@@ -527,12 +528,21 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			}()
 		}
 	}
+	var totalBytesRead uint64
+	SendBytesRead := func(bytesRead uint64) {
+		totalBytesRead = bytesRead
+	}
 
+	ctx = context.WithValue(ctx, collector.SearchIOStatsCallbackKey,
+		collector.SearchIOStatsCallbackFunc(SendBytesRead))
 	err = coll.Collect(ctx, searcher, indexReader)
 	if err != nil {
 		return nil, err
 	}
 
+	if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
+		sr.UpdateIOStats(totalBytesRead)
+	}
 	hits := coll.Results()
 
 	var highlighter highlight.Highlighter
