@@ -479,10 +479,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		return nil, err
 	}
 	defer func() {
-		// while closing the searcher, use the tfr to fetch the bytesRead for that
-		// query over here and update the same in the searchResult struct
-		bytesRead += searcher.BytesRead()
-
 		if serr := searcher.Close(); err == nil && serr != nil {
 			err = serr
 		}
@@ -599,6 +595,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		req.SearchBefore = req.SearchAfter
 		req.SearchAfter = nil
 	}
+
+	bytesRead += searcher.BytesRead()
 
 	return &SearchResult{
 		Status: &SearchStatus{
