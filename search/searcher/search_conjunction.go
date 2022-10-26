@@ -86,6 +86,14 @@ func NewConjunctionSearcher(indexReader index.IndexReader,
 	return &rv, nil
 }
 
+func (s *ConjunctionSearcher) BytesRead() uint64 {
+	var rv uint64
+	for _, searcher := range s.searchers {
+		rv += searcher.BytesRead()
+	}
+	return rv
+}
+
 func (s *ConjunctionSearcher) Size() int {
 	sizeInBytes := reflectStaticSizeConjunctionSearcher + size.SizeOfPtr +
 		s.scorer.Size()

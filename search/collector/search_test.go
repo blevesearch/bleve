@@ -26,6 +26,10 @@ type stubSearcher struct {
 	matches []*search.DocumentMatch
 }
 
+func (ss *stubSearcher) BytesRead() uint64 {
+	return 0
+}
+
 func (ss *stubSearcher) Size() int {
 	sizeInBytes := int(reflect.TypeOf(*ss).Size())
 
@@ -172,4 +176,7 @@ type DocValueReader struct {
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID, visitor index.DocValueVisitor) error {
 	return dvr.i.DocumentVisitFieldTerms(id, dvr.fields, visitor)
+}
+func (dvr *DocValueReader) BytesRead() uint64 {
+	return 0
 }

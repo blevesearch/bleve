@@ -37,6 +37,7 @@ import (
 // re usable, threadsafe levenshtein builders
 var lb1, lb2 *lev.LevenshteinAutomatonBuilder
 
+type diskStatsReporter segment.DiskStatsReporter
 type asynchSegmentResult struct {
 	dict    segment.TermDictionary
 	dictItr segment.DictionaryIterator
@@ -430,10 +431,17 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
 	rvd := document.NewDocument(id)
-	prevBytesRead := i.segment[segmentIndex].segment.BytesRead()
+	var totalStoredBytes uint64
 
 	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, val []byte, pos []uint64) bool {
 		if name == "_id" {
+			return true
+		}
+
+		if name == "$#" {
+			// the reasoning behind this special name is to retrieve the total
+			// bytes on disk specific to the storedFields
+			totalStoredBytes = binary.LittleEndian.Uint64(val)
 			return true
 		}
 
@@ -464,9 +472,7 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		return nil, err
 	}
 
-	if delta := i.segment[segmentIndex].segment.BytesRead() - prevBytesRead; delta > 0 {
-		atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime, delta)
-	}
+	rvd.StoredFieldsBytes = totalStoredBytes
 	return rvd, nil
 }
 
@@ -541,19 +547,21 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	if rv.dicts == nil {
 		rv.dicts = make([]segment.TermDictionary, len(is.segment))
 		for i, segment := range is.segment {
-			prevBytesRead := segment.segment.BytesRead()
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				return nil, err
 			}
-			if bytesRead := segment.segment.BytesRead(); bytesRead > prevBytesRead {
-				atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime, bytesRead-prevBytesRead)
+			if dictStats, ok := dict.(diskStatsReporter); ok {
+				bytesRead := dictStats.BytesRead()
+				rv.incrementBytesRead(bytesRead)
 			}
 			rv.dicts[i] = dict
 		}
 	}
 
 	for i, segment := range is.segment {
+		segBytesRead := segment.segment.BytesRead()
+		rv.incrementBytesRead(segBytesRead)
 		var prevBytesReadPL uint64
 		if rv.postings[i] != nil {
 			prevBytesReadPL = rv.postings[i].BytesRead()
@@ -571,13 +579,15 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, rv.iterators[i])
 
 		if bytesRead := rv.postings[i].BytesRead(); prevBytesReadPL < bytesRead {
-			atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
-				bytesRead-prevBytesReadPL)
+			// atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
+			// 	bytesRead-prevBytesReadPL)
+			rv.incrementBytesRead(bytesRead - prevBytesReadPL)
 		}
 
 		if bytesRead := rv.iterators[i].BytesRead(); prevBytesReadItr < bytesRead {
-			atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
-				bytesRead-prevBytesReadItr)
+			// atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
+			// 	bytesRead-prevBytesReadItr)
+			rv.incrementBytesRead(bytesRead - prevBytesReadItr)
 		}
 	}
 	atomic.AddUint64(&is.parent.stats.TotTermSearchersStarted, uint64(1))
@@ -697,13 +707,9 @@ func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	}
 
 	if ssvOk && ssv != nil && len(vFields) > 0 {
-		prevBytesRead := ss.segment.BytesRead()
 		dvs, err = ssv.VisitDocValues(localDocNum, fields, visitor, dvs)
 		if err != nil {
 			return nil, nil, err
-		}
-		if delta := ss.segment.BytesRead() - prevBytesRead; delta > 0 {
-			atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime, delta)
 		}
 	}
 
@@ -733,6 +739,12 @@ type DocValueReader struct {
 
 	currSegmentIndex int
 	currCachedFields []string
+
+	bytesRead uint64
+}
+
+func (dvr *DocValueReader) BytesRead() uint64 {
+	return atomic.LoadUint64(&dvr.bytesRead)
 }
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
@@ -755,6 +767,7 @@ func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	dvr.currCachedFields, dvr.dvs, err = dvr.i.documentVisitFieldTermsOnSegment(
 		dvr.currSegmentIndex, localDocNum, dvr.fields, dvr.currCachedFields, visitor, dvr.dvs)
 
+	dvr.bytesRead = dvr.dvs.BytesRead()
 	return err
 }
 

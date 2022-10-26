@@ -46,7 +46,22 @@ type IndexSnapshotTermFieldReader struct {
 	currPosting        segment.Posting
 	currID             index.IndexInternalID
 	recycle            bool
+	bytesRead          uint64
 }
+
+func (i *IndexSnapshotTermFieldReader) incrementBytesRead(val uint64) {
+	atomic.AddUint64(&i.bytesRead, val)
+}
+
+func (i *IndexSnapshotTermFieldReader) BytesRead() uint64 {
+	return atomic.LoadUint64(&i.bytesRead)
+}
+
+func (i *IndexSnapshotTermFieldReader) BytesWritten() uint64 {
+	return 0
+}
+
+func (i *IndexSnapshotTermFieldReader) ResetBytesRead(val uint64) {}
 
 func (i *IndexSnapshotTermFieldReader) Size() int {
 	sizeInBytes := reflectStaticSizeIndexSnapshotTermFieldReader + size.SizeOfPtr +
@@ -95,7 +110,7 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 			// and they have to be added together before sending the bytesRead at this point
 			// upstream.
 			if delta := i.iterators[i.segmentOffset].BytesRead() - prevBytesRead; delta > 0 {
-				rv.BytesRead = delta
+				i.incrementBytesRead(delta)
 			}
 
 			return rv, nil

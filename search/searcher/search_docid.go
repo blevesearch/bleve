@@ -52,6 +52,10 @@ func NewDocIDSearcher(indexReader index.IndexReader, ids []string, boost float64
 	}, nil
 }
 
+func (s *DocIDSearcher) BytesRead() uint64 {
+	return 0
+}
+
 func (s *DocIDSearcher) Size() int {
 	return reflectStaticSizeDocIDSearcher + size.SizeOfPtr +
 		s.reader.Size() +

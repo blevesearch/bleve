@@ -206,6 +206,10 @@ func (s *BooleanSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
+func (s *BooleanSearcher) BytesRead() uint64 {
+	return s.mustSearcher.BytesRead() + s.shouldSearcher.BytesRead() + s.mustNotSearcher.BytesRead()
+}
+
 func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 
 	if s.done {

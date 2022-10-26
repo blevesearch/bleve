@@ -21,6 +21,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search/scorer"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
 var reflectStaticSizeTermSearcher int
@@ -63,6 +64,14 @@ func newTermSearcherFromReader(indexReader index.IndexReader, reader index.TermF
 		reader:      reader,
 		scorer:      scorer,
 	}, nil
+}
+
+func (s *TermSearcher) BytesRead() uint64 {
+	var rv uint64
+	if statsReader, ok := s.reader.(segment.DiskStatsReporter); ok {
+		rv = statsReader.BytesRead()
+	}
+	return rv
 }
 
 func (s *TermSearcher) Size() int {

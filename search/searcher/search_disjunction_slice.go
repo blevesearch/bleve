@@ -74,6 +74,14 @@ func newDisjunctionSliceSearcher(indexReader index.IndexReader,
 	return &rv, nil
 }
 
+func (s *DisjunctionSliceSearcher) BytesRead() uint64 {
+	var rv uint64
+	for _, searcher := range s.searchers {
+		rv += searcher.BytesRead()
+	}
+	return rv
+}
+
 func (s *DisjunctionSliceSearcher) Size() int {
 	sizeInBytes := reflectStaticSizeDisjunctionSliceSearcher + size.SizeOfPtr +
 		s.scorer.Size()

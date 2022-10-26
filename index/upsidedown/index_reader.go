@@ -19,7 +19,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/document"
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/upsidedown_store_api"
+	store "github.com/blevesearch/upsidedown_store_api"
 )
 
 var reflectStaticSizeIndexReader int
@@ -223,3 +223,5 @@ func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	visitor index.DocValueVisitor) error {
 	return dvr.i.documentVisitFieldTerms(id, dvr.fields, visitor)
 }
+
+func (dvr *DocValueReader) BytesRead() uint64 { return 0 }

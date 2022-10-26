@@ -58,6 +58,7 @@ type TopNCollector struct {
 	size          int
 	skip          int
 	total         uint64
+	bytesRead     uint64
 	maxScore      float64
 	took          time.Duration
 	sort          search.SortOrder
@@ -201,7 +202,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 
 	hc.needDocIds = hc.needDocIds || loadID
-	var totalBytesRead uint64
+	var totalHitsBytesRead uint64
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -209,7 +210,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		next, err = searcher.Next(searchContext)
 	}
 	for err == nil && next != nil {
-		totalBytesRead += next.BytesRead
+		totalHitsBytesRead += next.BytesRead
 		if hc.total%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
@@ -233,7 +234,10 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 
 	statsCallbackFn := ctx.Value(SearchIOStatsCallbackKey)
 	if statsCallbackFn != nil {
-		statsCallbackFn.(SearchIOStatsCallbackFunc)(totalBytesRead)
+		// essentially totalBytesRead corresponds to all the hits' bytesRead
+		// as part of the Next() calls, and hc.bytesRead corresponds to the
+		// total bytes read as part of docValues being read every hit
+		statsCallbackFn.(SearchIOStatsCallbackFunc)(totalHitsBytesRead + hc.bytesRead)
 	}
 
 	// help finalize/flush the results in case
@@ -360,6 +364,8 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.EndDoc()
 	}
+
+	hc.bytesRead += hc.dvReader.BytesRead()
 
 	return err
 }

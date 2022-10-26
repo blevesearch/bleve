@@ -48,6 +48,10 @@ func NewFilteringSearcher(s search.Searcher, filter FilterFunc) *FilteringSearch
 	}
 }
 
+func (f *FilteringSearcher) BytesRead() uint64 {
+	return f.child.BytesRead()
+}
+
 func (f *FilteringSearcher) Size() int {
 	return reflectStaticSizeFilteringSearcher + size.SizeOfPtr +
 		f.child.Size()

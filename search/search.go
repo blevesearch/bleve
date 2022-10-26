@@ -348,6 +348,7 @@ type Searcher interface {
 	Min() int
 	Size() int
 
+	BytesRead() uint64
 	DocumentMatchPoolSize() int
 }
 

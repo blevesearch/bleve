@@ -469,6 +469,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}()
 
+	var bytesRead uint64
 	searcher, err := req.Query.Searcher(indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
 		IncludeTermVectors: req.IncludeLocations || req.Highlight != nil,
@@ -478,6 +479,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		return nil, err
 	}
 	defer func() {
+		// while closing the searcher, use the tfr to fetch the bytesRead for that
+		// query over here and update the same in the searchResult struct
+		bytesRead += searcher.BytesRead()
+
 		if serr := searcher.Close(); err == nil && serr != nil {
 			err = serr
 		}
@@ -568,10 +573,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if i.name != "" {
 			hit.Index = i.name
 		}
-		err = LoadAndHighlightFields(hit, req, i.name, indexReader, highlighter)
+		err, storedFieldsBytes := LoadAndHighlightFields(hit, req, i.name, indexReader, highlighter)
 		if err != nil {
 			return nil, err
 		}
+		bytesRead += storedFieldsBytes
 	}
 
 	atomic.AddUint64(&i.stats.searches, 1)
@@ -599,20 +605,23 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			Total:      1,
 			Successful: 1,
 		},
-		Request:  req,
-		Hits:     hits,
-		Total:    coll.Total(),
-		MaxScore: coll.MaxScore(),
-		Took:     searchDuration,
-		Facets:   coll.FacetResults(),
+		Request:   req,
+		Hits:      hits,
+		Total:     coll.Total(),
+		MaxScore:  coll.MaxScore(),
+		Took:      searchDuration,
+		Facets:    coll.FacetResults(),
+		BytesRead: bytesRead,
 	}, nil
 }
 
 func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 	indexName string, r index.IndexReader,
-	highlighter highlight.Highlighter) error {
+	highlighter highlight.Highlighter) (error, uint64) {
+	var totalStoredFieldsBytes uint64
 	if len(req.Fields) > 0 || highlighter != nil {
 		doc, err := r.Document(hit.ID)
+		totalStoredFieldsBytes = doc.GetStoredFieldsBytes()
 		if err == nil && doc != nil {
 			if len(req.Fields) > 0 {
 				fieldsToLoad := deDuplicate(req.Fields)
@@ -676,11 +685,11 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 		} else if doc == nil {
 			// unexpected case, a doc ID that was found as a search hit
 			// was unable to be found during document lookup
-			return ErrorIndexReadInconsistency
+			return ErrorIndexReadInconsistency, 0
 		}
 	}
 
-	return nil
+	return nil, totalStoredFieldsBytes
 }
 
 // Fields returns the name of all the fields this
