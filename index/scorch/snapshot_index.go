@@ -432,16 +432,18 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 
 	rvd := document.NewDocument(id)
 	var totalStoredBytes uint64
+	computeIOStats := true
 
 	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, val []byte, pos []uint64) bool {
 		if name == "_id" {
 			return true
 		}
 
-		if name == "$#" {
+		if name == "$#" && computeIOStats {
 			// the reasoning behind this special name is to retrieve the total
 			// bytes on disk specific to the storedFields
 			totalStoredBytes = binary.LittleEndian.Uint64(val)
+			computeIOStats = false
 			return true
 		}
 
@@ -472,7 +474,7 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		return nil, err
 	}
 
-	rvd.StoredFieldsBytes = totalStoredBytes
+	rvd.SetStoredFieldsBytes(totalStoredBytes)
 	return rvd, nil
 }
 
@@ -547,6 +549,8 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	if rv.dicts == nil {
 		rv.dicts = make([]segment.TermDictionary, len(is.segment))
 		for i, segment := range is.segment {
+			segBytesRead := segment.segment.BytesRead()
+			rv.incrementBytesRead(segBytesRead)
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				return nil, err
@@ -560,8 +564,6 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	}
 
 	for i, segment := range is.segment {
-		segBytesRead := segment.segment.BytesRead()
-		rv.incrementBytesRead(segBytesRead)
 		var prevBytesReadPL uint64
 		if rv.postings[i] != nil {
 			prevBytesReadPL = rv.postings[i].BytesRead()
@@ -740,11 +742,12 @@ type DocValueReader struct {
 	currSegmentIndex int
 	currCachedFields []string
 
-	bytesRead uint64
+	totalBytesRead uint64
+	bytesRead      uint64
 }
 
 func (dvr *DocValueReader) BytesRead() uint64 {
-	return atomic.LoadUint64(&dvr.bytesRead)
+	return atomic.LoadUint64(&dvr.totalBytesRead)
 }
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
@@ -762,6 +765,8 @@ func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	if dvr.currSegmentIndex != segmentIndex {
 		dvr.currSegmentIndex = segmentIndex
 		dvr.currCachedFields = nil
+		dvr.totalBytesRead += dvr.bytesRead
+		dvr.bytesRead = 0
 	}
 
 	dvr.currCachedFields, dvr.dvs, err = dvr.i.documentVisitFieldTermsOnSegment(

@@ -33,11 +33,15 @@ type Document struct {
 	id                string  `json:"id"`
 	Fields            []Field `json:"fields"`
 	CompositeFields   []*CompositeField
-	StoredFieldsBytes uint64
+	storedFieldsBytes uint64
+}
+
+func (d *Document) SetStoredFieldsBytes(val uint64) {
+	d.storedFieldsBytes = val
 }
 
 func (d *Document) GetStoredFieldsBytes() uint64 {
-	return d.StoredFieldsBytes
+	return d.storedFieldsBytes
 }
 
 func NewDocument(id string) *Document {
