@@ -44,19 +44,40 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string,
 			break
 		}
 	}
-	candidateTerms, err := findFuzzyCandidateTerms(indexReader, term, fuzziness,
+	fuzzyCandidates, err := findFuzzyCandidateTerms(indexReader, term, fuzziness,
 		field, prefixTerm)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewMultiTermSearcher(indexReader, candidateTerms, field,
+	var candidates []string
+	var dictBytesRead uint64
+	if fuzzyCandidates != nil {
+		candidates = fuzzyCandidates.candidates
+		dictBytesRead = fuzzyCandidates.bytesRead
+	}
+
+	fuzzySearcher, err := NewMultiTermSearcher(indexReader, candidates, field,
 		boost, options, true)
+	if err != nil {
+		return nil, err
+	}
+
+	fuzzySearcher.SetBytesRead(dictBytesRead)
+
+	return fuzzySearcher, err
+}
+
+type fuzzyCandidates struct {
+	candidates []string
+	bytesRead  uint64
 }
 
 func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
-	fuzziness int, field, prefixTerm string) (rv []string, err error) {
-	rv = make([]string, 0)
+	fuzziness int, field, prefixTerm string) (rv *fuzzyCandidates, err error) {
+	rv = &fuzzyCandidates{
+		candidates: make([]string, 0),
+	}
 
 	// in case of advanced reader implementations directly call
 	// the levenshtein automaton based iterator to collect the
@@ -73,12 +94,14 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 		}()
 		tfd, err := fieldDict.Next()
 		for err == nil && tfd != nil {
-			rv = append(rv, tfd.Term)
-			if tooManyClauses(len(rv)) {
-				return nil, tooManyClausesErr(field, len(rv))
+			rv.candidates = append(rv.candidates, tfd.Term)
+			if tooManyClauses(len(rv.candidates)) {
+				return nil, tooManyClausesErr(field, len(rv.candidates))
 			}
 			tfd, err = fieldDict.Next()
 		}
+
+		rv.bytesRead = fieldDict.BytesRead()
 		return rv, err
 	}
 
@@ -105,13 +128,14 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 		var exceeded bool
 		ld, exceeded, reuse = search.LevenshteinDistanceMaxReuseSlice(term, tfd.Term, fuzziness, reuse)
 		if !exceeded && ld <= fuzziness {
-			rv = append(rv, tfd.Term)
-			if tooManyClauses(len(rv)) {
-				return nil, tooManyClausesErr(field, len(rv))
+			rv.candidates = append(rv.candidates, tfd.Term)
+			if tooManyClauses(len(rv.candidates)) {
+				return nil, tooManyClausesErr(field, len(rv.candidates))
 			}
 		}
 		tfd, err = fieldDict.Next()
 	}
 
+	rv.bytesRead = fieldDict.BytesRead()
 	return rv, err
 }

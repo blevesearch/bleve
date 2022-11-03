@@ -56,6 +56,10 @@ func NewMatchAllSearcher(indexReader index.IndexReader, boost float64, options s
 	}, nil
 }
 
+func (s *MatchAllSearcher) SetBytesRead(val uint64) {
+	// no-op for matchAllSearcher
+}
+
 func (s *MatchAllSearcher) BytesRead() uint64 {
 	return 0
 }

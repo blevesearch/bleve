@@ -28,9 +28,14 @@ type segmentDictCursor struct {
 }
 
 type IndexSnapshotFieldDict struct {
-	snapshot *IndexSnapshot
-	cursors  []*segmentDictCursor
-	entry    index.DictEntry
+	snapshot  *IndexSnapshot
+	cursors   []*segmentDictCursor
+	entry     index.DictEntry
+	bytesRead uint64
+}
+
+func (i *IndexSnapshotFieldDict) BytesRead() uint64 {
+	return i.bytesRead
 }
 
 func (i *IndexSnapshotFieldDict) Len() int { return len(i.cursors) }

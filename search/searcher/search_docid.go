@@ -52,6 +52,10 @@ func NewDocIDSearcher(indexReader index.IndexReader, ids []string, boost float64
 	}, nil
 }
 
+func (s *DocIDSearcher) SetBytesRead(val uint64) {
+	// no-op for docID searcher
+}
+
 func (s *DocIDSearcher) BytesRead() uint64 {
 	return 0
 }

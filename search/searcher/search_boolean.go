@@ -206,6 +206,10 @@ func (s *BooleanSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
+func (s *BooleanSearcher) SetBytesRead(val uint64) {
+	// no-op for boolean searcher
+}
+
 func (s *BooleanSearcher) BytesRead() (rv uint64) {
 	if s.mustSearcher != nil {
 		rv += s.mustSearcher.BytesRead()

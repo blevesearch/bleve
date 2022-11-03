@@ -41,6 +41,7 @@ type ConjunctionSearcher struct {
 	scorer      *scorer.ConjunctionQueryScorer
 	initialized bool
 	options     search.SearcherOptions
+	bytesRead   uint64
 }
 
 func NewConjunctionSearcher(indexReader index.IndexReader,
@@ -84,6 +85,10 @@ func NewConjunctionSearcher(indexReader index.IndexReader,
 	}
 
 	return &rv, nil
+}
+
+func (s *ConjunctionSearcher) SetBytesRead(val uint64) {
+	s.bytesRead = val
 }
 
 func (s *ConjunctionSearcher) BytesRead() uint64 {

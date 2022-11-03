@@ -145,6 +145,7 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 	randomLookup bool) (*IndexSnapshotFieldDict, error) {
 
 	results := make(chan *asynchSegmentResult)
+	var totalBytesRead uint64
 	for index, segment := range i.segment {
 		go func(index int, segment *SegmentSnapshot) {
 			dict, err := segment.segment.Dictionary(field)
@@ -152,7 +153,7 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 				results <- &asynchSegmentResult{err: err}
 			} else {
 				if dictStats, ok := dict.(diskStatsReporter); ok {
-					atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime,
+					atomic.AddUint64(&totalBytesRead,
 						dictStats.BytesRead())
 				}
 				if randomLookup {
@@ -166,8 +167,9 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 
 	var err error
 	rv := &IndexSnapshotFieldDict{
-		snapshot: i,
-		cursors:  make([]*segmentDictCursor, 0, len(i.segment)),
+		snapshot:  i,
+		cursors:   make([]*segmentDictCursor, 0, len(i.segment)),
+		bytesRead: totalBytesRead,
 	}
 	for count := 0; count < len(i.segment); count++ {
 		asr := <-results

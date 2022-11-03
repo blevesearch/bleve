@@ -48,6 +48,10 @@ func NewFilteringSearcher(s search.Searcher, filter FilterFunc) *FilteringSearch
 	}
 }
 
+func (f *FilteringSearcher) SetBytesRead(uint64) {
+	// no-op for filtering searcher
+}
+
 func (f *FilteringSearcher) BytesRead() uint64 {
 	return f.child.BytesRead()
 }

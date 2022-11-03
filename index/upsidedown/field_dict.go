@@ -51,6 +51,10 @@ func newUpsideDownCouchFieldDict(indexReader *IndexReader, field uint16, startTe
 
 }
 
+func (r *UpsideDownCouchFieldDict) BytesRead() uint64 {
+	return 0
+}
+
 func (r *UpsideDownCouchFieldDict) Next() (*index.DictEntry, error) {
 	key, val, valid := r.iterator.Current()
 	if !valid {

@@ -26,6 +26,10 @@ type stubSearcher struct {
 	matches []*search.DocumentMatch
 }
 
+func (ss *stubSearcher) SetBytesRead(val uint64) {
+
+}
+
 func (ss *stubSearcher) BytesRead() uint64 {
 	return 0
 }

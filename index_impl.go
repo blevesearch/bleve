@@ -885,6 +885,10 @@ type indexImplFieldDict struct {
 	fieldDict   index.FieldDict
 }
 
+func (f *indexImplFieldDict) BytesRead() uint64 {
+	return f.fieldDict.BytesRead()
+}
+
 func (f *indexImplFieldDict) Next() (*index.DictEntry, error) {
 	return f.fieldDict.Next()
 }
