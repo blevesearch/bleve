@@ -359,6 +359,8 @@ func testVersusSearches(vt *VersusTest, searchTemplates []string, idxA, idxB ble
 
 			resA.Hits = nil
 			resB.Hits = nil
+			resA.BytesRead = 0
+			resB.BytesRead = 0
 
 			if !reflect.DeepEqual(resA, resB) {
 				resAj, _ := json.Marshal(resA)

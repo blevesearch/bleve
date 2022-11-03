@@ -202,7 +202,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 
 	hc.needDocIds = hc.needDocIds || loadID
-	var totalHitsBytesRead uint64
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -210,7 +209,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		next, err = searcher.Next(searchContext)
 	}
 	for err == nil && next != nil {
-		totalHitsBytesRead += next.BytesRead
 		if hc.total%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
@@ -237,7 +235,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		// essentially totalBytesRead corresponds to all the hits' bytesRead
 		// as part of the Next() calls, and hc.bytesRead corresponds to the
 		// total bytes read as part of docValues being read every hit
-		statsCallbackFn.(SearchIOStatsCallbackFunc)(totalHitsBytesRead + hc.bytesRead)
+		statsCallbackFn.(SearchIOStatsCallbackFunc)(hc.bytesRead)
 	}
 
 	// help finalize/flush the results in case

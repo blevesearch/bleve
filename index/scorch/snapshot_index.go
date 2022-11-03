@@ -147,16 +147,14 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 	results := make(chan *asynchSegmentResult)
 	for index, segment := range i.segment {
 		go func(index int, segment *SegmentSnapshot) {
-			var prevBytesRead uint64
-			prevBytesRead = segment.segment.BytesRead()
-
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				results <- &asynchSegmentResult{err: err}
 			} else {
-				atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime,
-					segment.segment.BytesRead()-prevBytesRead)
-
+				if dictStats, ok := dict.(diskStatsReporter); ok {
+					atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime,
+						dictStats.BytesRead())
+				}
 				if randomLookup {
 					results <- &asynchSegmentResult{dict: dict}
 				} else {
@@ -431,22 +429,17 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
 	rvd := document.NewDocument(id)
-	var totalStoredBytes uint64
-	computeIOStats := true
+	var totalStoredBytes int
 
 	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, val []byte, pos []uint64) bool {
 		if name == "_id" {
 			return true
 		}
 
-		if name == "$#" && computeIOStats {
-			// the reasoning behind this special name is to retrieve the total
-			// bytes on disk specific to the storedFields
-			totalStoredBytes = binary.LittleEndian.Uint64(val)
-			computeIOStats = false
-			return true
-		}
-
+		// track uncompressed stored fields bytes as part of IO stats.
+		// However, ideally we'd need to track the compressed on-disk value
+		// Keeping that TODO for now until we have a cleaner way.
+		totalStoredBytes += len(val)
 		// copy value, array positions to preserve them beyond the scope of this callback
 		value := append([]byte(nil), val...)
 		arrayPos := append([]uint64(nil), pos...)
@@ -474,7 +467,7 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		return nil, err
 	}
 
-	rvd.SetStoredFieldsBytes(totalStoredBytes)
+	rvd.SetStoredFieldsBytes(uint64(totalStoredBytes))
 	return rvd, nil
 }
 
@@ -581,14 +574,10 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, rv.iterators[i])
 
 		if bytesRead := rv.postings[i].BytesRead(); prevBytesReadPL < bytesRead {
-			// atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
-			// 	bytesRead-prevBytesReadPL)
 			rv.incrementBytesRead(bytesRead - prevBytesReadPL)
 		}
 
 		if bytesRead := rv.iterators[i].BytesRead(); prevBytesReadItr < bytesRead {
-			// atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
-			// 	bytesRead-prevBytesReadItr)
 			rv.incrementBytesRead(bytesRead - prevBytesReadItr)
 		}
 	}
@@ -646,6 +635,7 @@ func (i *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader
 		i.fieldTFRs = map[string][]*IndexSnapshotTermFieldReader{}
 	}
 	if uint64(len(i.fieldTFRs[tfr.field])) < i.getFieldTFRCacheThreshold() {
+		tfr.bytesRead = 0
 		i.fieldTFRs[tfr.field] = append(i.fieldTFRs[tfr.field], tfr)
 	}
 	i.m2.Unlock()
@@ -747,7 +737,7 @@ type DocValueReader struct {
 }
 
 func (dvr *DocValueReader) BytesRead() uint64 {
-	return atomic.LoadUint64(&dvr.totalBytesRead)
+	return dvr.totalBytesRead + dvr.bytesRead
 }
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
@@ -772,7 +762,9 @@ func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	dvr.currCachedFields, dvr.dvs, err = dvr.i.documentVisitFieldTermsOnSegment(
 		dvr.currSegmentIndex, localDocNum, dvr.fields, dvr.currCachedFields, visitor, dvr.dvs)
 
-	dvr.bytesRead = dvr.dvs.BytesRead()
+	if dvr.dvs != nil {
+		dvr.bytesRead = dvr.dvs.BytesRead()
+	}
 	return err
 }
 

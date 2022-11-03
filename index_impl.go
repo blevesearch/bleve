@@ -469,7 +469,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}()
 
-	var bytesRead uint64
 	searcher, err := req.Query.Searcher(indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
 		IncludeTermVectors: req.IncludeLocations || req.Highlight != nil,
@@ -531,7 +530,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 	var totalBytesRead uint64
 	SendBytesRead := func(bytesRead uint64) {
-		totalBytesRead = bytesRead
+		totalBytesRead += bytesRead
 	}
 
 	ctx = context.WithValue(ctx, collector.SearchIOStatsCallbackKey,
@@ -541,9 +540,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		return nil, err
 	}
 
-	if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
-		sr.UpdateIOStats(totalBytesRead)
-	}
 	hits := coll.Results()
 
 	var highlighter highlight.Highlighter
@@ -573,7 +569,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if err != nil {
 			return nil, err
 		}
-		bytesRead += storedFieldsBytes
+		totalBytesRead += storedFieldsBytes
 	}
 
 	atomic.AddUint64(&i.stats.searches, 1)
@@ -596,8 +592,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		req.SearchAfter = nil
 	}
 
-	bytesRead += searcher.BytesRead()
-
+	totalBytesRead += searcher.BytesRead()
+	if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
+		sr.UpdateIOStats(totalBytesRead)
+	}
 	return &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
@@ -609,7 +607,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		MaxScore:  coll.MaxScore(),
 		Took:      searchDuration,
 		Facets:    coll.FacetResults(),
-		BytesRead: bytesRead,
+		BytesRead: totalBytesRead,
 	}, nil
 }
 
