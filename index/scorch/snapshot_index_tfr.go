@@ -57,12 +57,6 @@ func (i *IndexSnapshotTermFieldReader) BytesRead() uint64 {
 	return atomic.LoadUint64(&i.bytesRead)
 }
 
-func (i *IndexSnapshotTermFieldReader) BytesWritten() uint64 {
-	return 0
-}
-
-func (i *IndexSnapshotTermFieldReader) ResetBytesRead(val uint64) {}
-
 func (i *IndexSnapshotTermFieldReader) Size() int {
 	sizeInBytes := reflectStaticSizeIndexSnapshotTermFieldReader + size.SizeOfPtr +
 		len(i.term) +

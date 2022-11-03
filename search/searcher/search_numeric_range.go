@@ -55,6 +55,7 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 	}
 
 	var fieldDict index.FieldDictContains
+	var bytesRead uint64
 	var isIndexed filterFunc
 	var err error
 	if irr, ok := indexReader.(index.IndexReaderContains); ok {
@@ -83,8 +84,14 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 	if len(terms) < 1 {
 		// cannot return MatchNoneSearcher because of interaction with
 		// commit f391b991c20f02681bacd197afc6d8aed444e132
-		return NewMultiTermSearcherBytes(indexReader, terms, field, boost, options,
-			true)
+		numericRangeSearcher, err := NewMultiTermSearcherBytes(indexReader, terms, field,
+			boost, options, true)
+		if err != nil {
+			return nil, err
+		}
+
+		numericRangeSearcher.SetBytesRead(bytesRead)
+		return numericRangeSearcher, err
 	}
 
 	// for upside_down
@@ -99,8 +106,14 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 		return nil, tooManyClausesErr(field, len(terms))
 	}
 
-	return NewMultiTermSearcherBytes(indexReader, terms, field, boost, options,
-		true)
+	numericRangeSearcher, err := NewMultiTermSearcherBytes(indexReader, terms, field,
+		boost, options, true)
+	if err != nil {
+		return nil, err
+	}
+
+	numericRangeSearcher.SetBytesRead(bytesRead)
+	return numericRangeSearcher, err
 }
 
 func filterCandidateTerms(indexReader index.IndexReader,

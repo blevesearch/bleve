@@ -81,27 +81,45 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern Regexp,
 	field string, boost float64, options search.SearcherOptions) (
 	search.Searcher, error) {
 	var candidateTerms []string
-
+	var regexpCandidates *regexpCandidates
 	prefixTerm, complete := pattern.LiteralPrefix()
 	if complete {
 		// there is no pattern
 		candidateTerms = []string{prefixTerm}
 	} else {
 		var err error
-		candidateTerms, err = findRegexpCandidateTerms(indexReader, pattern, field,
+		regexpCandidates, err = findRegexpCandidateTerms(indexReader, pattern, field,
 			prefixTerm)
 		if err != nil {
 			return nil, err
 		}
 	}
+	var bytesRead uint64
+	if regexpCandidates != nil {
+		candidateTerms = regexpCandidates.candidates
+		bytesRead = regexpCandidates.bytesRead
+	}
 
-	return NewMultiTermSearcher(indexReader, candidateTerms, field, boost,
+	regexpSearcher, err := NewMultiTermSearcher(indexReader, candidateTerms, field, boost,
 		options, true)
+	if err != nil {
+		return nil, err
+	}
+
+	regexpSearcher.SetBytesRead(bytesRead)
+	return regexpSearcher, err
+}
+
+type regexpCandidates struct {
+	candidates []string
+	bytesRead  uint64
 }
 
 func findRegexpCandidateTerms(indexReader index.IndexReader,
-	pattern Regexp, field, prefixTerm string) (rv []string, err error) {
-	rv = make([]string, 0)
+	pattern Regexp, field, prefixTerm string) (rv *regexpCandidates, err error) {
+	rv = &regexpCandidates{
+		candidates: make([]string, 0),
+	}
 	var fieldDict index.FieldDict
 	if len(prefixTerm) > 0 {
 		fieldDict, err = indexReader.FieldDictPrefix(field, []byte(prefixTerm))
@@ -119,13 +137,13 @@ func findRegexpCandidateTerms(indexReader index.IndexReader,
 	for err == nil && tfd != nil {
 		matchPos := pattern.FindStringIndex(tfd.Term)
 		if matchPos != nil && matchPos[0] == 0 && matchPos[1] == len(tfd.Term) {
-			rv = append(rv, tfd.Term)
-			if tooManyClauses(len(rv)) {
-				return rv, tooManyClausesErr(field, len(rv))
+			rv.candidates = append(rv.candidates, tfd.Term)
+			if tooManyClauses(len(rv.candidates)) {
+				return rv, tooManyClausesErr(field, len(rv.candidates))
 			}
 		}
 		tfd, err = fieldDict.Next()
 	}
-
+	rv.bytesRead = fieldDict.BytesRead()
 	return rv, err
 }
