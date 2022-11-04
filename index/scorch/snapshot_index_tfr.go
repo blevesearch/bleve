@@ -53,11 +53,7 @@ type IndexSnapshotTermFieldReader struct {
 }
 
 func (i *IndexSnapshotTermFieldReader) incrementBytesRead(val uint64) {
-	atomic.AddUint64(&i.bytesRead, val)
-}
-
-func (i *IndexSnapshotTermFieldReader) BytesRead() uint64 {
-	return atomic.LoadUint64(&i.bytesRead)
+	i.bytesRead += val
 }
 
 func (i *IndexSnapshotTermFieldReader) Size() int {
@@ -204,9 +200,8 @@ func (i *IndexSnapshotTermFieldReader) Close() error {
 	if i.ctx != nil {
 		statsCallbackFn := i.ctx.Value(search.SearchIOStatsCallbackKey)
 		if statsCallbackFn != nil {
-			// essentially totalBytesRead corresponds to all the hits' bytesRead
-			// as part of the Next() calls, and hc.bytesRead corresponds to the
-			// total bytes read as part of docValues being read every hit
+			// essentially before you close the TFR, you must report this
+			// reader's bytesRead value
 			statsCallbackFn.(search.SearchIOStatsCallbackFunc)(i.bytesRead)
 		}
 	}

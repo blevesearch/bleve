@@ -168,9 +168,8 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 
 	var err error
 	rv := &IndexSnapshotFieldDict{
-		snapshot:  i,
-		cursors:   make([]*segmentDictCursor, 0, len(i.segment)),
-		bytesRead: totalBytesRead,
+		snapshot: i,
+		cursors:  make([]*segmentDictCursor, 0, len(i.segment)),
 	}
 	for count := 0; count < len(i.segment); count++ {
 		asr := <-results
@@ -195,6 +194,7 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 			}
 		}
 	}
+	rv.bytesRead = totalBytesRead
 	// after ensuring we've read all items on channel
 	if err != nil {
 		return nil, err

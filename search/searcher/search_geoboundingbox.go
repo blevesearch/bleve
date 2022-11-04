@@ -49,7 +49,7 @@ func NewGeoBoundingBoxSearcher(ctx context.Context, indexReader index.IndexReade
 				return nil, err
 			}
 
-			return NewFilteringSearcher(boxSearcher, buildRectFilter(dvReader,
+			return NewFilteringSearcher(ctx, boxSearcher, buildRectFilter(dvReader,
 				field, minLon, minLat, maxLon, maxLat)), nil
 		}
 	}
@@ -84,7 +84,7 @@ func NewGeoBoundingBoxSearcher(ctx context.Context, indexReader index.IndexReade
 			return nil, err
 		}
 		// add filter to check points near the boundary
-		onBoundarySearcher = NewFilteringSearcher(rawOnBoundarySearcher,
+		onBoundarySearcher = NewFilteringSearcher(ctx, rawOnBoundarySearcher,
 			buildRectFilter(dvReader, field, minLon, minLat, maxLon, maxLat))
 		openedSearchers = append(openedSearchers, onBoundarySearcher)
 	}

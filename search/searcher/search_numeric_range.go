@@ -17,6 +17,7 @@ package searcher
 import (
 	"bytes"
 	"context"
+	"log"
 	"math"
 	"sort"
 
@@ -56,7 +57,7 @@ func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 	}
 
 	var fieldDict index.FieldDictContains
-	// var bytesRead uint64
+	var dictBytesRead uint64
 	var isIndexed filterFunc
 	var err error
 	if irr, ok := indexReader.(index.IndexReaderContains); ok {
@@ -69,6 +70,8 @@ func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 			found, err := fieldDict.Contains(term)
 			return err == nil && found
 		}
+
+		dictBytesRead = fieldDict.BytesRead()
 	}
 
 	// FIXME hard-coded precision, should match field declaration
@@ -91,7 +94,9 @@ func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 			return nil, err
 		}
 
-		// numericRangeSearcher.SetBytesRead(bytesRead)
+		if ctx != nil {
+			reportIOStats(dictBytesRead, ctx)
+		}
 		return numericRangeSearcher, err
 	}
 
@@ -107,14 +112,13 @@ func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 		return nil, tooManyClausesErr(field, len(terms))
 	}
 
-	numericRangeSearcher, err := NewMultiTermSearcherBytes(ctx, indexReader, terms, field,
-		boost, options, true)
-	if err != nil {
-		return nil, err
+	if ctx != nil {
+		log.Printf("the numeric range %v", dictBytesRead)
+		reportIOStats(dictBytesRead, ctx)
 	}
 
-	// numericRangeSearcher.SetBytesRead(bytesRead)
-	return numericRangeSearcher, err
+	return NewMultiTermSearcherBytes(ctx, indexReader, terms, field,
+		boost, options, true)
 }
 
 func filterCandidateTerms(indexReader index.IndexReader,

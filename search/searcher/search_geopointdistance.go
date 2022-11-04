@@ -65,7 +65,7 @@ func NewGeoPointDistanceSearcher(ctx context.Context, indexReader index.IndexRea
 	}
 
 	// wrap it in a filtering searcher which checks the actual distance
-	return NewFilteringSearcher(rectSearcher,
+	return NewFilteringSearcher(ctx, rectSearcher,
 		buildDistFilter(dvReader, field, centerLon, centerLat, dist)), nil
 }
 

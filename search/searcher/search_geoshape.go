@@ -53,7 +53,7 @@ func NewGeoShapeSearcher(ctx context.Context, indexReader index.IndexReader, sha
 		return nil, err
 	}
 
-	return NewFilteringSearcher(mSearcher,
+	return NewFilteringSearcher(ctx, mSearcher,
 		buildRelationFilterOnShapes(dvReader, field, relation, shape)), nil
 
 }

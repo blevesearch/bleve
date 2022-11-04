@@ -70,7 +70,7 @@ func NewGeoBoundedPolygonSearcher(ctx context.Context, indexReader index.IndexRe
 	}
 
 	// wrap it in a filtering searcher that checks for the polygon inclusivity
-	return NewFilteringSearcher(rectSearcher,
+	return NewFilteringSearcher(ctx, rectSearcher,
 		buildPolygonFilter(dvReader, field, coordinates)), nil
 }
 

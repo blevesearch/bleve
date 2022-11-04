@@ -83,11 +83,9 @@ func NewTermRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 		terms = terms[:len(terms)-1]
 	}
 
-	termRangeSearcher, err := NewMultiTermSearcher(ctx, indexReader, terms, field, boost, options, true)
-	if err != nil {
-		return nil, err
+	if ctx != nil {
+		reportIOStats(fieldDict.BytesRead(), ctx)
 	}
 
-	// termRangeSearcher.SetBytesRead(fieldDict.BytesRead())
-	return termRangeSearcher, err
+	return NewMultiTermSearcher(ctx, indexReader, terms, field, boost, options, true)
 }

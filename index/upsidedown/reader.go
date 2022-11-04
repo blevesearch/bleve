@@ -105,10 +105,6 @@ func newUpsideDownCouchTermFieldReader(indexReader *IndexReader, term []byte, fi
 	}, nil
 }
 
-func (r *UpsideDownCouchTermFieldReader) BytesRead() uint64 {
-	return 0
-}
-
 func (r *UpsideDownCouchTermFieldReader) Count() uint64 {
 	return r.count
 }

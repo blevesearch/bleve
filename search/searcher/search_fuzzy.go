@@ -52,26 +52,30 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 	}
 
 	var candidates []string
-	// var dictBytesRead uint64
+	var dictBytesRead uint64
 	if fuzzyCandidates != nil {
 		candidates = fuzzyCandidates.candidates
-		// dictBytesRead = fuzzyCandidates.bytesRead
+		dictBytesRead = fuzzyCandidates.bytesRead
 	}
 
-	fuzzySearcher, err := NewMultiTermSearcher(ctx, indexReader, candidates, field,
+	if ctx != nil {
+		reportIOStats(dictBytesRead, ctx)
+	}
+
+	return NewMultiTermSearcher(ctx, indexReader, candidates, field,
 		boost, options, true)
-	if err != nil {
-		return nil, err
-	}
-
-	// fuzzySearcher.SetBytesRead(dictBytesRead)
-
-	return fuzzySearcher, err
 }
 
 type fuzzyCandidates struct {
 	candidates []string
 	bytesRead  uint64
+}
+
+func reportIOStats(bytesRead uint64, ctx context.Context) {
+	statsCallbackFn := ctx.Value(search.SearchIOStatsCallbackKey)
+	if statsCallbackFn != nil {
+		statsCallbackFn.(search.SearchIOStatsCallbackFunc)(bytesRead)
+	}
 }
 
 func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,

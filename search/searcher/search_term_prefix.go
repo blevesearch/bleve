@@ -48,11 +48,9 @@ func NewTermPrefixSearcher(ctx context.Context, indexReader index.IndexReader, p
 		return nil, err
 	}
 
-	termPrefixSearcher, err := NewMultiTermSearcher(nil, indexReader, terms, field, boost, options, true)
-	if err != nil {
-		return nil, err
+	if ctx != nil {
+		reportIOStats(fieldDict.BytesRead(), ctx)
 	}
 
-	// termPrefixSearcher.SetBytesRead(fieldDict.BytesRead())
-	return termPrefixSearcher, err
+	return NewMultiTermSearcher(ctx, indexReader, terms, field, boost, options, true)
 }

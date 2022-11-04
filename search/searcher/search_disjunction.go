@@ -51,7 +51,7 @@ func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	// and the requested min is simple
 	if len(qsearchers) > 1 && min <= 1 &&
 		optionsDisjunctionOptimizable(options) {
-		rv, err := optimizeCompositeSearcher("disjunction:unadorned",
+		rv, err := optimizeCompositeSearcher(ctx, "disjunction:unadorned",
 			indexReader, qsearchers, options)
 		if err != nil || rv != nil {
 			return rv, err
@@ -66,7 +66,7 @@ func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 		limit)
 }
 
-func optimizeCompositeSearcher(optimizationKind string,
+func optimizeCompositeSearcher(ctx context.Context, optimizationKind string,
 	indexReader index.IndexReader, qsearchers []search.Searcher,
 	options search.SearcherOptions) (search.Searcher, error) {
 	var octx index.OptimizableContext

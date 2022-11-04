@@ -431,8 +431,8 @@ func TestBytesRead(t *testing.T) {
 	}
 	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead-prevBytesRead != 198457 {
-		t.Fatalf("expected bytes read for fuzzy query is 198457, got %v",
+	if bytesRead-prevBytesRead != 206545 {
+		t.Fatalf("expected bytes read for fuzzy query is 206545, got %v",
 			bytesRead-prevBytesRead)
 	}
 	prevBytesRead = bytesRead
@@ -466,8 +466,8 @@ func TestBytesRead(t *testing.T) {
 
 	stats, _ = idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead-prevBytesRead != 54106 {
-		t.Fatalf("expected bytes read for numeric range query is 54106, got %v",
+	if bytesRead-prevBytesRead != 54945 {
+		t.Fatalf("expected bytes read for numeric range query is 54945, got %v",
 			bytesRead-prevBytesRead)
 	}
 	prevBytesRead = bytesRead

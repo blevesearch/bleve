@@ -95,20 +95,18 @@ func NewRegexpSearcher(ctx context.Context, indexReader index.IndexReader, patte
 			return nil, err
 		}
 	}
-	// var bytesRead uint64
+	var dictBytesRead uint64
 	if regexpCandidates != nil {
 		candidateTerms = regexpCandidates.candidates
-		// bytesRead = regexpCandidates.bytesRead
+		dictBytesRead = regexpCandidates.bytesRead
 	}
 
-	regexpSearcher, err := NewMultiTermSearcher(ctx, indexReader, candidateTerms, field, boost,
+	if ctx != nil {
+		reportIOStats(dictBytesRead, ctx)
+	}
+
+	return NewMultiTermSearcher(ctx, indexReader, candidateTerms, field, boost,
 		options, true)
-	if err != nil {
-		return nil, err
-	}
-
-	// regexpSearcher.SetBytesRead(bytesRead)
-	return regexpSearcher, err
 }
 
 type regexpCandidates struct {

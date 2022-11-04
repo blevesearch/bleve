@@ -59,7 +59,7 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	// do not need extra information like freq-norm's or term vectors
 	if len(searchers) > 1 &&
 		options.Score == "none" && !options.IncludeTermVectors {
-		rv, err := optimizeCompositeSearcher("conjunction:unadorned",
+		rv, err := optimizeCompositeSearcher(ctx, "conjunction:unadorned",
 			indexReader, searchers, options)
 		if err != nil || rv != nil {
 			return rv, err
@@ -78,7 +78,7 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 
 	// attempt push-down conjunction optimization when there's >1 searchers
 	if len(searchers) > 1 {
-		rv, err := optimizeCompositeSearcher("conjunction",
+		rv, err := optimizeCompositeSearcher(ctx, "conjunction",
 			indexReader, searchers, options)
 		if err != nil || rv != nil {
 			return rv, err
