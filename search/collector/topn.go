@@ -49,10 +49,6 @@ type collectorCompare func(i, j *search.DocumentMatch) int
 
 type collectorFixup func(d *search.DocumentMatch) error
 
-const SearchIOStatsCallbackKey = "_search_io_stats_callback_key"
-
-type SearchIOStatsCallbackFunc func(uint64)
-
 // TopNCollector collects the top N hits, optionally skipping some results
 type TopNCollector struct {
 	size          int
@@ -230,12 +226,12 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		next, err = searcher.Next(searchContext)
 	}
 
-	statsCallbackFn := ctx.Value(SearchIOStatsCallbackKey)
+	statsCallbackFn := ctx.Value(search.SearchIOStatsCallbackKey)
 	if statsCallbackFn != nil {
 		// essentially totalBytesRead corresponds to all the hits' bytesRead
 		// as part of the Next() calls, and hc.bytesRead corresponds to the
 		// total bytes read as part of docValues being read every hit
-		statsCallbackFn.(SearchIOStatsCallbackFunc)(hc.bytesRead)
+		statsCallbackFn.(search.SearchIOStatsCallbackFunc)(hc.bytesRead)
 	}
 
 	// help finalize/flush the results in case

@@ -474,8 +474,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		totalBytesRead += bytesRead
 	}
 
-	ctx = context.WithValue(ctx, collector.SearchIOStatsCallbackKey,
-		collector.SearchIOStatsCallbackFunc(SendBytesRead))
+	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey,
+		search.SearchIOStatsCallbackFunc(SendBytesRead))
 
 	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
@@ -488,6 +488,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	defer func() {
 		if serr := searcher.Close(); err == nil && serr != nil {
 			err = serr
+		}
+		if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
+			sr.UpdateIOStats(totalBytesRead)
 		}
 	}()
 
@@ -594,10 +597,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		req.SearchAfter = nil
 	}
 
-	totalBytesRead += searcher.BytesRead()
-	if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
-		sr.UpdateIOStats(totalBytesRead)
-	}
 	return &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,

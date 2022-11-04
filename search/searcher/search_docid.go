@@ -53,14 +53,6 @@ func NewDocIDSearcher(ctx context.Context, indexReader index.IndexReader, ids []
 	}, nil
 }
 
-func (s *DocIDSearcher) SetBytesRead(val uint64) {
-	// no-op for docID searcher
-}
-
-func (s *DocIDSearcher) BytesRead() uint64 {
-	return 0
-}
-
 func (s *DocIDSearcher) Size() int {
 	return reflectStaticSizeDocIDSearcher + size.SizeOfPtr +
 		s.reader.Size() +

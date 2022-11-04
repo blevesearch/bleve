@@ -43,14 +43,6 @@ type PhraseSearcher struct {
 	initialized  bool
 }
 
-func (s *PhraseSearcher) SetBytesRead(val uint64) {
-	// no-op for phrase searcher
-}
-
-func (s *PhraseSearcher) BytesRead() uint64 {
-	return s.mustSearcher.BytesRead()
-}
-
 func (s *PhraseSearcher) Size() int {
 	sizeInBytes := reflectStaticSizePhraseSearcher + size.SizeOfPtr
 

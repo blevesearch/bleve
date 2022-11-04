@@ -56,7 +56,7 @@ func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 	}
 
 	var fieldDict index.FieldDictContains
-	var bytesRead uint64
+	// var bytesRead uint64
 	var isIndexed filterFunc
 	var err error
 	if irr, ok := indexReader.(index.IndexReaderContains); ok {
@@ -91,7 +91,7 @@ func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 			return nil, err
 		}
 
-		numericRangeSearcher.SetBytesRead(bytesRead)
+		// numericRangeSearcher.SetBytesRead(bytesRead)
 		return numericRangeSearcher, err
 	}
 
@@ -113,7 +113,7 @@ func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 		return nil, err
 	}
 
-	numericRangeSearcher.SetBytesRead(bytesRead)
+	// numericRangeSearcher.SetBytesRead(bytesRead)
 	return numericRangeSearcher, err
 }
 

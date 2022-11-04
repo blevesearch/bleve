@@ -88,6 +88,6 @@ func NewTermRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 		return nil, err
 	}
 
-	termRangeSearcher.SetBytesRead(fieldDict.BytesRead())
+	// termRangeSearcher.SetBytesRead(fieldDict.BytesRead())
 	return termRangeSearcher, err
 }

@@ -66,15 +66,6 @@ func newTermSearcherFromReader(indexReader index.IndexReader, reader index.TermF
 	}, nil
 }
 
-func (s *TermSearcher) SetBytesRead(val uint64) {
-	// no-op for term searcher because it has all it needs
-	// to get the proper computation
-}
-
-func (s *TermSearcher) BytesRead() uint64 {
-	return s.reader.BytesRead()
-}
-
 func (s *TermSearcher) Size() int {
 	return reflectStaticSizeTermSearcher + size.SizeOfPtr +
 		s.reader.Size() +

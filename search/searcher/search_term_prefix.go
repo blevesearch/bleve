@@ -53,6 +53,6 @@ func NewTermPrefixSearcher(ctx context.Context, indexReader index.IndexReader, p
 		return nil, err
 	}
 
-	termPrefixSearcher.SetBytesRead(fieldDict.BytesRead())
+	// termPrefixSearcher.SetBytesRead(fieldDict.BytesRead())
 	return termPrefixSearcher, err
 }

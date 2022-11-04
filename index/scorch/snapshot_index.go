@@ -526,6 +526,7 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
 	rv := is.allocTermFieldReaderDicts(field)
 
+	rv.ctx = ctx
 	rv.term = term
 	rv.field = field
 	rv.snapshot = is

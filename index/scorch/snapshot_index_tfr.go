@@ -16,10 +16,12 @@ package scorch
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"reflect"
 	"sync/atomic"
 
+	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
@@ -47,6 +49,7 @@ type IndexSnapshotTermFieldReader struct {
 	currID             index.IndexInternalID
 	recycle            bool
 	bytesRead          uint64
+	ctx                context.Context
 }
 
 func (i *IndexSnapshotTermFieldReader) incrementBytesRead(val uint64) {
@@ -198,7 +201,16 @@ func (i *IndexSnapshotTermFieldReader) Count() uint64 {
 }
 
 func (i *IndexSnapshotTermFieldReader) Close() error {
-	// call the IOstats callback here
+	if i.ctx != nil {
+		statsCallbackFn := i.ctx.Value(search.SearchIOStatsCallbackKey)
+		if statsCallbackFn != nil {
+			// essentially totalBytesRead corresponds to all the hits' bytesRead
+			// as part of the Next() calls, and hc.bytesRead corresponds to the
+			// total bytes read as part of docValues being read every hit
+			statsCallbackFn.(search.SearchIOStatsCallbackFunc)(i.bytesRead)
+		}
+	}
+
 	if i.snapshot != nil {
 		atomic.AddUint64(&i.snapshot.parent.stats.TotTermSearchersFinished, uint64(1))
 		i.snapshot.recycleTermFieldReader(i)

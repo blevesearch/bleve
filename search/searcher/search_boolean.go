@@ -207,25 +207,6 @@ func (s *BooleanSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *BooleanSearcher) SetBytesRead(val uint64) {
-	// no-op for boolean searcher
-}
-
-func (s *BooleanSearcher) BytesRead() (rv uint64) {
-	if s.mustSearcher != nil {
-		rv += s.mustSearcher.BytesRead()
-	}
-
-	if s.shouldSearcher != nil {
-		rv += s.shouldSearcher.BytesRead()
-	}
-
-	if s.mustNotSearcher != nil {
-		rv += s.mustNotSearcher.BytesRead()
-	}
-	return rv
-}
-
 func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 
 	if s.done {

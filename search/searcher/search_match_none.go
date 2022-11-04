@@ -55,14 +55,6 @@ func (s *MatchNoneSearcher) SetQueryNorm(qnorm float64) {
 
 }
 
-func (s *MatchNoneSearcher) SetBytesRead(val uint64) {
-
-}
-
-func (s *MatchNoneSearcher) BytesRead() uint64 {
-	return 0
-}
-
 func (s *MatchNoneSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	return nil, nil
 }

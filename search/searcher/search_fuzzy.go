@@ -52,10 +52,10 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 	}
 
 	var candidates []string
-	var dictBytesRead uint64
+	// var dictBytesRead uint64
 	if fuzzyCandidates != nil {
 		candidates = fuzzyCandidates.candidates
-		dictBytesRead = fuzzyCandidates.bytesRead
+		// dictBytesRead = fuzzyCandidates.bytesRead
 	}
 
 	fuzzySearcher, err := NewMultiTermSearcher(ctx, indexReader, candidates, field,
@@ -64,7 +64,7 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 		return nil, err
 	}
 
-	fuzzySearcher.SetBytesRead(dictBytesRead)
+	// fuzzySearcher.SetBytesRead(dictBytesRead)
 
 	return fuzzySearcher, err
 }

@@ -49,20 +49,13 @@ func NewMatchAllSearcher(ctx context.Context, indexReader index.IndexReader, boo
 		return nil, err
 	}
 	scorer := scorer.NewConstantScorer(1.0, boost, options)
+
 	return &MatchAllSearcher{
 		indexReader: indexReader,
 		reader:      reader,
 		scorer:      scorer,
 		count:       count,
 	}, nil
-}
-
-func (s *MatchAllSearcher) SetBytesRead(val uint64) {
-	// no-op for matchAllSearcher
-}
-
-func (s *MatchAllSearcher) BytesRead() uint64 {
-	return 0
 }
 
 func (s *MatchAllSearcher) Size() int {

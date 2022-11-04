@@ -95,10 +95,10 @@ func NewRegexpSearcher(ctx context.Context, indexReader index.IndexReader, patte
 			return nil, err
 		}
 	}
-	var bytesRead uint64
+	// var bytesRead uint64
 	if regexpCandidates != nil {
 		candidateTerms = regexpCandidates.candidates
-		bytesRead = regexpCandidates.bytesRead
+		// bytesRead = regexpCandidates.bytesRead
 	}
 
 	regexpSearcher, err := NewMultiTermSearcher(ctx, indexReader, candidateTerms, field, boost,
@@ -107,7 +107,7 @@ func NewRegexpSearcher(ctx context.Context, indexReader index.IndexReader, patte
 		return nil, err
 	}
 
-	regexpSearcher.SetBytesRead(bytesRead)
+	// regexpSearcher.SetBytesRead(bytesRead)
 	return regexpSearcher, err
 }
 

@@ -83,18 +83,6 @@ func newDisjunctionHeapSearcher(ctx context.Context, indexReader index.IndexRead
 	return &rv, nil
 }
 
-func (s *DisjunctionHeapSearcher) SetBytesRead(val uint64) {
-	s.bytesRead = val
-}
-
-func (s *DisjunctionHeapSearcher) BytesRead() uint64 {
-	var rv uint64
-	for _, searcher := range s.searchers {
-		rv += searcher.BytesRead()
-	}
-	return rv + s.bytesRead
-}
-
 func (s *DisjunctionHeapSearcher) Size() int {
 	sizeInBytes := reflectStaticSizeDisjunctionHeapSearcher + size.SizeOfPtr +
 		s.scorer.Size()
