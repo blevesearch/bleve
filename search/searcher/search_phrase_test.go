@@ -36,7 +36,7 @@ func TestPhraseSearch(t *testing.T) {
 	}()
 
 	soptions := search.SearcherOptions{Explain: true, IncludeTermVectors: true}
-	phraseSearcher, err := NewPhraseSearcher(twoDocIndexReader, []string{"angst", "beer"}, "desc", soptions)
+	phraseSearcher, err := NewPhraseSearcher(nil, twoDocIndexReader, []string{"angst", "beer"}, "desc", soptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestMultiPhraseSearch(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		searcher, err := NewMultiPhraseSearcher(reader, test.phrase, "desc", soptions)
+		searcher, err := NewMultiPhraseSearcher(nil, reader, test.phrase, "desc", soptions)
 		if err != nil {
 			t.Error(err)
 		}

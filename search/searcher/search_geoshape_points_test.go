@@ -297,7 +297,7 @@ func runGeoShapePointRelationQuery(relation string, multi bool,
 		s = geo.NewGeoJsonPoint(points[0])
 	}
 
-	gbs, err := NewGeoShapeSearcher(i, s, relation, field, 1.0, search.SearcherOptions{})
+	gbs, err := NewGeoShapeSearcher(nil, i, s, relation, field, 1.0, search.SearcherOptions{})
 	if err != nil {
 		return nil, err
 	}

@@ -16,6 +16,7 @@ package searcher
 
 import (
 	"bytes"
+	"context"
 	"math"
 	"sort"
 
@@ -24,7 +25,7 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-func NewNumericRangeSearcher(indexReader index.IndexReader,
+func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 	min *float64, max *float64, inclusiveMin, inclusiveMax *bool, field string,
 	boost float64, options search.SearcherOptions) (search.Searcher, error) {
 	// account for unbounded edges
@@ -84,7 +85,7 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 	if len(terms) < 1 {
 		// cannot return MatchNoneSearcher because of interaction with
 		// commit f391b991c20f02681bacd197afc6d8aed444e132
-		numericRangeSearcher, err := NewMultiTermSearcherBytes(indexReader, terms, field,
+		numericRangeSearcher, err := NewMultiTermSearcherBytes(ctx, indexReader, terms, field,
 			boost, options, true)
 		if err != nil {
 			return nil, err
@@ -106,7 +107,7 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 		return nil, tooManyClausesErr(field, len(terms))
 	}
 
-	numericRangeSearcher, err := NewMultiTermSearcherBytes(indexReader, terms, field,
+	numericRangeSearcher, err := NewMultiTermSearcherBytes(ctx, indexReader, terms, field,
 		boost, options, true)
 	if err != nil {
 		return nil, err

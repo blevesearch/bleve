@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"strings"
 
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -76,7 +77,7 @@ func (q *WildcardQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *WildcardQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *WildcardQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -84,7 +85,7 @@ func (q *WildcardQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, op
 
 	regexpString := wildcardRegexpReplacer.Replace(q.Wildcard)
 
-	return searcher.NewRegexpStringSearcher(i, regexpString, field,
+	return searcher.NewRegexpStringSearcher(ctx, i, regexpString, field,
 		q.BoostVal.Value(), options)
 }
 

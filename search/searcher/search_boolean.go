@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"math"
 	"reflect"
 
@@ -48,7 +49,7 @@ type BooleanSearcher struct {
 	done            bool
 }
 
-func NewBooleanSearcher(indexReader index.IndexReader, mustSearcher search.Searcher, shouldSearcher search.Searcher, mustNotSearcher search.Searcher, options search.SearcherOptions) (*BooleanSearcher, error) {
+func NewBooleanSearcher(ctx context.Context, indexReader index.IndexReader, mustSearcher search.Searcher, shouldSearcher search.Searcher, mustNotSearcher search.Searcher, options search.SearcherOptions) (*BooleanSearcher, error) {
 	// build our searcher
 	rv := BooleanSearcher{
 		indexReader:     indexReader,

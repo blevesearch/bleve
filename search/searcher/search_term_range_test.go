@@ -15,12 +15,13 @@
 package searcher
 
 import (
-	"github.com/blevesearch/bleve/v2/index/scorch"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/blevesearch/bleve/v2/index/scorch"
 
 	"github.com/blevesearch/bleve/v2/search"
 )
@@ -174,7 +175,7 @@ func TestTermRangeSearch(t *testing.T) {
 
 	for _, test := range tests {
 
-		searcher, err := NewTermRangeSearcher(twoDocIndexReader, test.min, test.max,
+		searcher, err := NewTermRangeSearcher(nil, twoDocIndexReader, test.min, test.max,
 			&test.inclusiveMin, &test.inclusiveMax, test.field, 1.0, search.SearcherOptions{Explain: true})
 		if err != nil {
 			t.Fatal(err)
@@ -232,7 +233,7 @@ func TestTermRangeSearchTooManyTerms(t *testing.T) {
 
 	var want = []string{"1", "3", "4", "5"}
 	var truth = true
-	searcher, err := NewTermRangeSearcher(scorchReader, []byte("bobert"), []byte("ravi"),
+	searcher, err := NewTermRangeSearcher(nil, scorchReader, []byte("bobert"), []byte("ravi"),
 		&truth, &truth, "name", 1.0, search.SearcherOptions{Score: "none", IncludeTermVectors: false})
 	if err != nil {
 		t.Fatal(err)

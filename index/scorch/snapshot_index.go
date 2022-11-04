@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"container/heap"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -404,7 +405,7 @@ func (i *IndexSnapshot) DocCount() (uint64, error) {
 
 func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	// FIXME could be done more efficiently directly, but reusing for simplicity
-	tfr, err := i.TermFieldReader([]byte(id), "_id", false, false, false)
+	tfr, err := i.TermFieldReader(nil, []byte(id), "_id", false, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -503,7 +504,7 @@ func (i *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
 
 func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err error) {
 	// FIXME could be done more efficiently directly, but reusing for simplicity
-	tfr, err := i.TermFieldReader([]byte(id), "_id", false, false, false)
+	tfr, err := i.TermFieldReader(nil, []byte(id), "_id", false, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -521,7 +522,7 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 	return next.ID, nil
 }
 
-func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
+func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field string, includeFreq,
 	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
 	rv := is.allocTermFieldReaderDicts(field)
 

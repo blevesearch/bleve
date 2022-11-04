@@ -15,11 +15,13 @@
 package searcher
 
 import (
+	"context"
+
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string,
+func NewTermPrefixSearcher(ctx context.Context, indexReader index.IndexReader, prefix string,
 	field string, boost float64, options search.SearcherOptions) (
 	search.Searcher, error) {
 	// find the terms with this prefix
@@ -46,7 +48,7 @@ func NewTermPrefixSearcher(indexReader index.IndexReader, prefix string,
 		return nil, err
 	}
 
-	termPrefixSearcher, err := NewMultiTermSearcher(indexReader, terms, field, boost, options, true)
+	termPrefixSearcher, err := NewMultiTermSearcher(nil, indexReader, terms, field, boost, options, true)
 	if err != nil {
 		return nil, err
 	}

@@ -15,11 +15,13 @@
 package searcher
 
 import (
+	"context"
+
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-func NewTermRangeSearcher(indexReader index.IndexReader,
+func NewTermRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 	min, max []byte, inclusiveMin, inclusiveMax *bool, field string,
 	boost float64, options search.SearcherOptions) (search.Searcher, error) {
 
@@ -81,7 +83,7 @@ func NewTermRangeSearcher(indexReader index.IndexReader,
 		terms = terms[:len(terms)-1]
 	}
 
-	termRangeSearcher, err := NewMultiTermSearcher(indexReader, terms, field, boost, options, true)
+	termRangeSearcher, err := NewMultiTermSearcher(ctx, indexReader, terms, field, boost, options, true)
 	if err != nil {
 		return nil, err
 	}

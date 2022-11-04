@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -114,7 +115,7 @@ func (q *MatchQuery) SetOperator(operator MatchQueryOperator) {
 	q.Operator = operator
 }
 
-func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 
 	field := q.FieldVal
 	if q.FieldVal == "" {
@@ -160,17 +161,17 @@ func (q *MatchQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, optio
 			shouldQuery := NewDisjunctionQuery(tqs)
 			shouldQuery.SetMin(1)
 			shouldQuery.SetBoost(q.BoostVal.Value())
-			return shouldQuery.Searcher(i, m, options)
+			return shouldQuery.Searcher(ctx, i, m, options)
 
 		case MatchQueryOperatorAnd:
 			mustQuery := NewConjunctionQuery(tqs)
 			mustQuery.SetBoost(q.BoostVal.Value())
-			return mustQuery.Searcher(i, m, options)
+			return mustQuery.Searcher(ctx, i, m, options)
 
 		default:
 			return nil, fmt.Errorf("unhandled operator %d", q.Operator)
 		}
 	}
 	noneQuery := NewMatchNoneQuery()
-	return noneQuery.Searcher(i, m, options)
+	return noneQuery.Searcher(ctx, i, m, options)
 }

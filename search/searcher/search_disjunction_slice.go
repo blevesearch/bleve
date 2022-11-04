@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"math"
 	"reflect"
 	"sort"
@@ -46,7 +47,7 @@ type DisjunctionSliceSearcher struct {
 	bytesRead    uint64
 }
 
-func newDisjunctionSliceSearcher(indexReader index.IndexReader,
+func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
 	limit bool) (
 	*DisjunctionSliceSearcher, error) {

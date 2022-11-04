@@ -469,7 +469,15 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}()
 
-	searcher, err := req.Query.Searcher(indexReader, i.m, search.SearcherOptions{
+	var totalBytesRead uint64
+	SendBytesRead := func(bytesRead uint64) {
+		totalBytesRead += bytesRead
+	}
+
+	ctx = context.WithValue(ctx, collector.SearchIOStatsCallbackKey,
+		collector.SearchIOStatsCallbackFunc(SendBytesRead))
+
+	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
 		IncludeTermVectors: req.IncludeLocations || req.Highlight != nil,
 		Score:              req.Score,
@@ -528,13 +536,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			}()
 		}
 	}
-	var totalBytesRead uint64
-	SendBytesRead := func(bytesRead uint64) {
-		totalBytesRead += bytesRead
-	}
 
-	ctx = context.WithValue(ctx, collector.SearchIOStatsCallbackKey,
-		collector.SearchIOStatsCallbackFunc(SendBytesRead))
 	err = coll.Collect(ctx, searcher, indexReader)
 	if err != nil {
 		return nil, err

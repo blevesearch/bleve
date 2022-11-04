@@ -817,9 +817,9 @@ type slowQuery struct {
 	delay  time.Duration
 }
 
-func (s *slowQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (s *slowQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	time.Sleep(s.delay)
-	return s.actual.Searcher(i, m, options)
+	return s.actual.Searcher(ctx, i, m, options)
 }
 
 func TestSlowSearch(t *testing.T) {

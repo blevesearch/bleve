@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -52,10 +53,10 @@ func (q *ConjunctionQuery) AddQuery(aq ...Query) {
 	}
 }
 
-func (q *ConjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	ss := make([]search.Searcher, 0, len(q.Conjuncts))
 	for _, conjunct := range q.Conjuncts {
-		sr, err := conjunct.Searcher(i, m, options)
+		sr, err := conjunct.Searcher(ctx, i, m, options)
 		if err != nil {
 			for _, searcher := range ss {
 				if searcher != nil {
@@ -75,7 +76,7 @@ func (q *ConjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 		return searcher.NewMatchNoneSearcher(i)
 	}
 
-	return searcher.NewConjunctionSearcher(i, ss, options)
+	return searcher.NewConjunctionSearcher(ctx, i, ss, options)
 }
 
 func (q *ConjunctionQuery) Validate() error {

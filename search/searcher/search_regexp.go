@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"regexp"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -34,7 +35,7 @@ type Regexp interface {
 
 // NewRegexpStringSearcher is similar to NewRegexpSearcher, but
 // additionally optimizes for index readers that handle regexp's.
-func NewRegexpStringSearcher(indexReader index.IndexReader, pattern string,
+func NewRegexpStringSearcher(ctx context.Context, indexReader index.IndexReader, pattern string,
 	field string, boost float64, options search.SearcherOptions) (
 	search.Searcher, error) {
 	ir, ok := indexReader.(index.IndexReaderRegexp)
@@ -44,7 +45,7 @@ func NewRegexpStringSearcher(indexReader index.IndexReader, pattern string,
 			return nil, err
 		}
 
-		return NewRegexpSearcher(indexReader, r, field, boost, options)
+		return NewRegexpSearcher(ctx, indexReader, r, field, boost, options)
 	}
 
 	fieldDict, err := ir.FieldDictRegexp(field, pattern)
@@ -68,7 +69,7 @@ func NewRegexpStringSearcher(indexReader index.IndexReader, pattern string,
 		return nil, err
 	}
 
-	return NewMultiTermSearcher(indexReader, candidateTerms, field, boost,
+	return NewMultiTermSearcher(ctx, indexReader, candidateTerms, field, boost,
 		options, true)
 }
 
@@ -77,7 +78,7 @@ func NewRegexpStringSearcher(indexReader index.IndexReader, pattern string,
 // matching the entire term.  The provided regexp SHOULD NOT start with ^
 // or end with $ as this can intefere with the implementation.  Separately,
 // matches will be checked to ensure they match the entire term.
-func NewRegexpSearcher(indexReader index.IndexReader, pattern Regexp,
+func NewRegexpSearcher(ctx context.Context, indexReader index.IndexReader, pattern Regexp,
 	field string, boost float64, options search.SearcherOptions) (
 	search.Searcher, error) {
 	var candidateTerms []string
@@ -100,7 +101,7 @@ func NewRegexpSearcher(indexReader index.IndexReader, pattern Regexp,
 		bytesRead = regexpCandidates.bytesRead
 	}
 
-	regexpSearcher, err := NewMultiTermSearcher(indexReader, candidateTerms, field, boost,
+	regexpSearcher, err := NewMultiTermSearcher(ctx, indexReader, candidateTerms, field, boost,
 		options, true)
 	if err != nil {
 		return nil, err

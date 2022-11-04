@@ -15,6 +15,7 @@
 package collector
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -101,7 +102,7 @@ func (sr *stubReader) Size() int {
 	return 0
 }
 
-func (sr *stubReader) TermFieldReader(term []byte, field string, includeFreq, includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
+func (sr *stubReader) TermFieldReader(ctx context.Context, term []byte, field string, includeFreq, includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
 	return nil, nil
 }
 

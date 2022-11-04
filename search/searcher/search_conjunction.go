@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"math"
 	"reflect"
 	"sort"
@@ -44,7 +45,7 @@ type ConjunctionSearcher struct {
 	bytesRead   uint64
 }
 
-func NewConjunctionSearcher(indexReader index.IndexReader,
+func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, options search.SearcherOptions) (
 	search.Searcher, error) {
 	// build the sorted downstream searchers

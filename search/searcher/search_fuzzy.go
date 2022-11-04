@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -23,7 +24,7 @@ import (
 
 var MaxFuzziness = 2
 
-func NewFuzzySearcher(indexReader index.IndexReader, term string,
+func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term string,
 	prefix, fuzziness int, field string, boost float64,
 	options search.SearcherOptions) (search.Searcher, error) {
 
@@ -57,7 +58,7 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string,
 		dictBytesRead = fuzzyCandidates.bytesRead
 	}
 
-	fuzzySearcher, err := NewMultiTermSearcher(indexReader, candidates, field,
+	fuzzySearcher, err := NewMultiTermSearcher(ctx, indexReader, candidates, field,
 		boost, options, true)
 	if err != nil {
 		return nil, err
