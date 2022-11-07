@@ -30,18 +30,14 @@ func init() {
 }
 
 type Document struct {
-	id                string  `json:"id"`
-	Fields            []Field `json:"fields"`
-	CompositeFields   []*CompositeField
-	storedFieldsBytes uint64
+	id               string  `json:"id"`
+	Fields           []Field `json:"fields"`
+	CompositeFields  []*CompositeField
+	StoredFieldsSize uint64
 }
 
-func (d *Document) SetStoredFieldsBytes(val uint64) {
-	d.storedFieldsBytes = val
-}
-
-func (d *Document) GetStoredFieldsBytes() uint64 {
-	return d.storedFieldsBytes
+func (d *Document) StoredFieldsBytes() uint64 {
+	return d.StoredFieldsSize
 }
 
 func NewDocument(id string) *Document {

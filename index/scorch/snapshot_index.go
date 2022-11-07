@@ -432,7 +432,6 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
 	rvd := document.NewDocument(id)
-	var totalStoredBytes int
 
 	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, val []byte, pos []uint64) bool {
 		if name == "_id" {
@@ -442,7 +441,8 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		// track uncompressed stored fields bytes as part of IO stats.
 		// However, ideally we'd need to track the compressed on-disk value
 		// Keeping that TODO for now until we have a cleaner way.
-		totalStoredBytes += len(val)
+		rvd.StoredFieldsSize += uint64(len(val))
+
 		// copy value, array positions to preserve them beyond the scope of this callback
 		value := append([]byte(nil), val...)
 		arrayPos := append([]uint64(nil), pos...)
@@ -470,7 +470,6 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		return nil, err
 	}
 
-	rvd.SetStoredFieldsBytes(uint64(totalStoredBytes))
 	return rvd, nil
 }
 
