@@ -17,7 +17,6 @@ package searcher
 import (
 	"bytes"
 	"context"
-	"log"
 	"math"
 	"sort"
 
@@ -86,18 +85,16 @@ func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 	}
 
 	if len(terms) < 1 {
-		// cannot return MatchNoneSearcher because of interaction with
-		// commit f391b991c20f02681bacd197afc6d8aed444e132
-		numericRangeSearcher, err := NewMultiTermSearcherBytes(ctx, indexReader, terms, field,
-			boost, options, true)
-		if err != nil {
-			return nil, err
-		}
-
+		// reporting back the IO stats with respect to the dictionary
+		// loaded, using the context
 		if ctx != nil {
 			reportIOStats(dictBytesRead, ctx)
 		}
-		return numericRangeSearcher, err
+
+		// cannot return MatchNoneSearcher because of interaction with
+		// commit f391b991c20f02681bacd197afc6d8aed444e132
+		return NewMultiTermSearcherBytes(ctx, indexReader, terms, field,
+			boost, options, true)
 	}
 
 	// for upside_down
@@ -113,7 +110,6 @@ func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 	}
 
 	if ctx != nil {
-		log.Printf("the numeric range %v", dictBytesRead)
 		reportIOStats(dictBytesRead, ctx)
 	}
 

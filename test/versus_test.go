@@ -389,9 +389,7 @@ func hitsById(res *bleve.SearchResult) map[string]*search.DocumentMatch {
 		hit.Score = math.Trunc(hit.Score*1000.0) / 1000.0
 		hit.IndexInternalID = nil
 		hit.HitNumber = 0
-		// Ignoring the BytesRead value, since it doesn't have
-		// relevance in this type of test
-		hit.BytesRead = 0
+
 		rv[hit.ID] = hit
 	}
 
