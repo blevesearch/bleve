@@ -489,6 +489,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if serr := searcher.Close(); err == nil && serr != nil {
 			err = serr
 		}
+		sr.BytesRead = totalBytesRead
 		if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
 			sr.UpdateIOStats(totalBytesRead)
 		}
@@ -602,13 +603,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			Total:      1,
 			Successful: 1,
 		},
-		Request:   req,
-		Hits:      hits,
-		Total:     coll.Total(),
-		MaxScore:  coll.MaxScore(),
-		Took:      searchDuration,
-		Facets:    coll.FacetResults(),
-		BytesRead: totalBytesRead,
+		Request:  req,
+		Hits:     hits,
+		Total:    coll.Total(),
+		MaxScore: coll.MaxScore(),
+		Took:     searchDuration,
+		Facets:   coll.FacetResults(),
 	}, nil
 }
 
