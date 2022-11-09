@@ -489,7 +489,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if serr := searcher.Close(); err == nil && serr != nil {
 			err = serr
 		}
-		sr.BytesRead = totalBytesRead
+		if sr != nil {
+			sr.BytesRead = totalBytesRead
+		}
 		if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
 			sr.UpdateIOStats(totalBytesRead)
 		}
