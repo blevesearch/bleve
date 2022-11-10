@@ -72,6 +72,9 @@ type fuzzyCandidates struct {
 }
 
 func reportIOStats(bytesRead uint64, ctx context.Context) {
+	// The fuzzy, regexp like queries essentially load a dictionary,
+	// which potentially incurs a cost that must be accounted by
+	// using the callback to report the value.
 	statsCallbackFn := ctx.Value(search.SearchIOStatsCallbackKey)
 	if statsCallbackFn != nil {
 		statsCallbackFn.(search.SearchIOStatsCallbackFunc)(bytesRead)

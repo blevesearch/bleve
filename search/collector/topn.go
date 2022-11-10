@@ -228,9 +228,9 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 
 	statsCallbackFn := ctx.Value(search.SearchIOStatsCallbackKey)
 	if statsCallbackFn != nil {
-		// essentially totalBytesRead corresponds to all the hits' bytesRead
-		// as part of the Next() calls, and hc.bytesRead corresponds to the
+		// hc.bytesRead corresponds to the
 		// total bytes read as part of docValues being read every hit
+		// which must be accounted by invoking the callback.
 		statsCallbackFn.(search.SearchIOStatsCallbackFunc)(hc.bytesRead)
 	}
 

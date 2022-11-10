@@ -469,6 +469,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}()
 
+	// This callback and variable handles the tracking of bytes read
+	//  1. as part of creation of tfr and its Next() calls which is
+	//     accounted by invoking this callback when the TFR is closed.
+	//  2. the docvalues portion (accounted in collector) and the retrieval
+	//     of stored fields bytes (by LoadAndHighlightFields)
 	var totalBytesRead uint64
 	SendBytesRead := func(bytesRead uint64) {
 		totalBytesRead += bytesRead
