@@ -475,12 +475,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	//  2. the docvalues portion (accounted in collector) and the retrieval
 	//     of stored fields bytes (by LoadAndHighlightFields)
 	var totalBytesRead uint64
-	SendBytesRead := func(bytesRead uint64) {
+	sendBytesRead := func(bytesRead uint64) {
 		totalBytesRead += bytesRead
 	}
 
 	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey,
-		search.SearchIOStatsCallbackFunc(SendBytesRead))
+		search.SearchIOStatsCallbackFunc(sendBytesRead))
 
 	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
