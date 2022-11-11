@@ -38,7 +38,6 @@ import (
 // re usable, threadsafe levenshtein builders
 var lb1, lb2 *lev.LevenshteinAutomatonBuilder
 
-type diskStatsReporter segment.DiskStatsReporter
 type asynchSegmentResult struct {
 	dict    segment.TermDictionary
 	dictItr segment.DictionaryIterator
@@ -147,15 +146,14 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 
 	results := make(chan *asynchSegmentResult)
 	var totalBytesRead uint64
-	for index, segment := range i.segment {
-		go func(index int, segment *SegmentSnapshot) {
-			dict, err := segment.segment.Dictionary(field)
+	for _, s := range i.segment {
+		go func(s *SegmentSnapshot) {
+			dict, err := s.segment.Dictionary(field)
 			if err != nil {
 				results <- &asynchSegmentResult{err: err}
 			} else {
-				if dictStats, ok := dict.(diskStatsReporter); ok {
-					atomic.AddUint64(&totalBytesRead,
-						dictStats.BytesRead())
+				if dictStats, ok := dict.(segment.DiskStatsReporter); ok {
+					atomic.AddUint64(&totalBytesRead, dictStats.BytesRead())
 				}
 				if randomLookup {
 					results <- &asynchSegmentResult{dict: dict}
@@ -163,7 +161,7 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 					results <- &asynchSegmentResult{dictItr: makeItr(dict)}
 				}
 			}
-		}(index, segment)
+		}(s)
 	}
 
 	var err error
@@ -544,14 +542,14 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 
 	if rv.dicts == nil {
 		rv.dicts = make([]segment.TermDictionary, len(is.segment))
-		for i, segment := range is.segment {
-			segBytesRead := segment.segment.BytesRead()
+		for i, s := range is.segment {
+			segBytesRead := s.segment.BytesRead()
 			rv.incrementBytesRead(segBytesRead)
-			dict, err := segment.segment.Dictionary(field)
+			dict, err := s.segment.Dictionary(field)
 			if err != nil {
 				return nil, err
 			}
-			if dictStats, ok := dict.(diskStatsReporter); ok {
+			if dictStats, ok := dict.(segment.DiskStatsReporter); ok {
 				bytesRead := dictStats.BytesRead()
 				rv.incrementBytesRead(bytesRead)
 			}
@@ -559,12 +557,12 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 		}
 	}
 
-	for i, segment := range is.segment {
+	for i, s := range is.segment {
 		var prevBytesReadPL uint64
 		if rv.postings[i] != nil {
 			prevBytesReadPL = rv.postings[i].BytesRead()
 		}
-		pl, err := rv.dicts[i].PostingsList(term, segment.deleted, rv.postings[i])
+		pl, err := rv.dicts[i].PostingsList(term, s.deleted, rv.postings[i])
 		if err != nil {
 			return nil, err
 		}
