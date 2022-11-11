@@ -82,7 +82,7 @@ func TestIndexReader(t *testing.T) {
 	}()
 
 	// first look for a term that doesn't exist
-	reader, err := indexReader.TermFieldReader([]byte("nope"), "name", true, true, true)
+	reader, err := indexReader.TermFieldReader(nil, []byte("nope"), "name", true, true, true)
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestIndexReader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reader, err = indexReader.TermFieldReader([]byte("test"), "name", true, true, true)
+	reader, err = indexReader.TermFieldReader(nil, []byte("test"), "name", true, true, true)
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestIndexReader(t *testing.T) {
 			},
 		},
 	}
-	tfr, err := indexReader.TermFieldReader([]byte("rice"), "desc", true, true, true)
+	tfr, err := indexReader.TermFieldReader(nil, []byte("rice"), "desc", true, true, true)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -153,9 +153,7 @@ func TestIndexReader(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	// Ignoring the BytesRead value, since it doesn't have
-	// relevance in this type of test
-	match.BytesRead = 0
+
 	if !reflect.DeepEqual(expectedMatch, match) {
 		t.Errorf("got %#v, expected %#v", match, expectedMatch)
 	}
@@ -165,7 +163,7 @@ func TestIndexReader(t *testing.T) {
 	}
 
 	// now test usage of advance
-	reader, err = indexReader.TermFieldReader([]byte("test"), "name", true, true, true)
+	reader, err = indexReader.TermFieldReader(nil, []byte("test"), "name", true, true, true)
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}
@@ -196,7 +194,7 @@ func TestIndexReader(t *testing.T) {
 	}
 
 	// now test creating a reader for a field that doesn't exist
-	reader, err = indexReader.TermFieldReader([]byte("water"), "doesnotexist", true, true, true)
+	reader, err = indexReader.TermFieldReader(nil, []byte("water"), "doesnotexist", true, true, true)
 	if err != nil {
 		t.Errorf("Error accessing term field reader: %v", err)
 	}

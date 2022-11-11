@@ -27,6 +27,10 @@ var reflectStaticSizeDocumentMatch int
 var reflectStaticSizeSearchContext int
 var reflectStaticSizeLocation int
 
+const SearchIOStatsCallbackKey = "_search_io_stats_callback_key"
+
+type SearchIOStatsCallbackFunc func(uint64)
+
 func init() {
 	var dm DocumentMatch
 	reflectStaticSizeDocumentMatch = int(reflect.TypeOf(dm).Size())
@@ -166,8 +170,6 @@ type DocumentMatch struct {
 	// be later incorporated into the Locations map when search
 	// results are completed
 	FieldTermLocations []FieldTermLocation `json:"-"`
-
-	BytesRead uint64 `json:"-"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {

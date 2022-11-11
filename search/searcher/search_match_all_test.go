@@ -36,12 +36,12 @@ func TestMatchAllSearch(t *testing.T) {
 
 	explainTrue := search.SearcherOptions{Explain: true}
 
-	allSearcher, err := NewMatchAllSearcher(twoDocIndexReader, 1.0, explainTrue)
+	allSearcher, err := NewMatchAllSearcher(nil, twoDocIndexReader, 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	allSearcher2, err := NewMatchAllSearcher(twoDocIndexReader, 1.2, explainTrue)
+	allSearcher2, err := NewMatchAllSearcher(nil, twoDocIndexReader, 1.2, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}

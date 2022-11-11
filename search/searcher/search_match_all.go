@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -37,7 +38,7 @@ type MatchAllSearcher struct {
 	count       uint64
 }
 
-func NewMatchAllSearcher(indexReader index.IndexReader, boost float64, options search.SearcherOptions) (*MatchAllSearcher, error) {
+func NewMatchAllSearcher(ctx context.Context, indexReader index.IndexReader, boost float64, options search.SearcherOptions) (*MatchAllSearcher, error) {
 	reader, err := indexReader.DocIDReaderAll()
 	if err != nil {
 		return nil, err
@@ -48,6 +49,7 @@ func NewMatchAllSearcher(indexReader index.IndexReader, boost float64, options s
 		return nil, err
 	}
 	scorer := scorer.NewConstantScorer(1.0, boost, options)
+
 	return &MatchAllSearcher{
 		indexReader: indexReader,
 		reader:      reader,

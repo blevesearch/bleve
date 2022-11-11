@@ -15,6 +15,8 @@
 package query
 
 import (
+	"context"
+
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
@@ -44,6 +46,6 @@ func (q *DocIDQuery) Boost() float64 {
 	return q.BoostVal.Value()
 }
 
-func (q *DocIDQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-	return searcher.NewDocIDSearcher(i, q.IDs, q.BoostVal.Value(), options)
+func (q *DocIDQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+	return searcher.NewDocIDSearcher(ctx, i, q.IDs, q.BoostVal.Value(), options)
 }

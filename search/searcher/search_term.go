@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -37,13 +38,13 @@ type TermSearcher struct {
 	tfd         index.TermFieldDoc
 }
 
-func NewTermSearcher(indexReader index.IndexReader, term string, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
-	return NewTermSearcherBytes(indexReader, []byte(term), field, boost, options)
+func NewTermSearcher(ctx context.Context, indexReader index.IndexReader, term string, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
+	return NewTermSearcherBytes(ctx, indexReader, []byte(term), field, boost, options)
 }
 
-func NewTermSearcherBytes(indexReader index.IndexReader, term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
+func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader, term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
 	needFreqNorm := options.Score != "none"
-	reader, err := indexReader.TermFieldReader(term, field, needFreqNorm, needFreqNorm, options.IncludeTermVectors)
+	reader, err := indexReader.TermFieldReader(ctx, term, field, needFreqNorm, needFreqNorm, options.IncludeTermVectors)
 	if err != nil {
 		return nil, err
 	}

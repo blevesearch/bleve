@@ -15,6 +15,7 @@
 package collector
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -24,6 +25,14 @@ import (
 type stubSearcher struct {
 	index   int
 	matches []*search.DocumentMatch
+}
+
+func (ss *stubSearcher) SetBytesRead(val uint64) {
+
+}
+
+func (ss *stubSearcher) BytesRead() uint64 {
+	return 0
 }
 
 func (ss *stubSearcher) Size() int {
@@ -93,7 +102,7 @@ func (sr *stubReader) Size() int {
 	return 0
 }
 
-func (sr *stubReader) TermFieldReader(term []byte, field string, includeFreq, includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
+func (sr *stubReader) TermFieldReader(ctx context.Context, term []byte, field string, includeFreq, includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
 	return nil, nil
 }
 
@@ -172,4 +181,7 @@ type DocValueReader struct {
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID, visitor index.DocValueVisitor) error {
 	return dvr.i.DocumentVisitFieldTerms(id, dvr.fields, visitor)
+}
+func (dvr *DocValueReader) BytesRead() uint64 {
+	return 0
 }

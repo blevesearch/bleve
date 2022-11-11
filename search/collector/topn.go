@@ -49,15 +49,12 @@ type collectorCompare func(i, j *search.DocumentMatch) int
 
 type collectorFixup func(d *search.DocumentMatch) error
 
-const SearchIOStatsCallbackKey = "_search_io_stats_callback_key"
-
-type SearchIOStatsCallbackFunc func(uint64)
-
 // TopNCollector collects the top N hits, optionally skipping some results
 type TopNCollector struct {
 	size          int
 	skip          int
 	total         uint64
+	bytesRead     uint64
 	maxScore      float64
 	took          time.Duration
 	sort          search.SortOrder
@@ -201,7 +198,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 
 	hc.needDocIds = hc.needDocIds || loadID
-	var totalBytesRead uint64
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -209,7 +205,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		next, err = searcher.Next(searchContext)
 	}
 	for err == nil && next != nil {
-		totalBytesRead += next.BytesRead
 		if hc.total%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
@@ -231,9 +226,12 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		next, err = searcher.Next(searchContext)
 	}
 
-	statsCallbackFn := ctx.Value(SearchIOStatsCallbackKey)
+	statsCallbackFn := ctx.Value(search.SearchIOStatsCallbackKey)
 	if statsCallbackFn != nil {
-		statsCallbackFn.(SearchIOStatsCallbackFunc)(totalBytesRead)
+		// hc.bytesRead corresponds to the
+		// total bytes read as part of docValues being read every hit
+		// which must be accounted by invoking the callback.
+		statsCallbackFn.(search.SearchIOStatsCallbackFunc)(hc.bytesRead)
 	}
 
 	// help finalize/flush the results in case
@@ -360,6 +358,8 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.EndDoc()
 	}
+
+	hc.bytesRead += hc.dvReader.BytesRead()
 
 	return err
 }

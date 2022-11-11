@@ -1239,7 +1239,7 @@ func TestIndexTermReaderCompositeFields(t *testing.T) {
 		}
 	}()
 
-	termFieldReader, err := indexReader.TermFieldReader([]byte("mister"), "_all", true, true, true)
+	termFieldReader, err := indexReader.TermFieldReader(nil, []byte("mister"), "_all", true, true, true)
 	if err != nil {
 		t.Error(err)
 	}

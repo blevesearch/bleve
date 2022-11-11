@@ -17,6 +17,7 @@ package searcher
 import (
 	"bytes"
 	"container/heap"
+	"context"
 	"math"
 	"reflect"
 
@@ -55,9 +56,11 @@ type DisjunctionHeapSearcher struct {
 
 	matching      []*search.DocumentMatch
 	matchingCurrs []*SearcherCurr
+
+	bytesRead uint64
 }
 
-func newDisjunctionHeapSearcher(indexReader index.IndexReader,
+func newDisjunctionHeapSearcher(ctx context.Context, indexReader index.IndexReader,
 	searchers []search.Searcher, min float64, options search.SearcherOptions,
 	limit bool) (
 	*DisjunctionHeapSearcher, error) {

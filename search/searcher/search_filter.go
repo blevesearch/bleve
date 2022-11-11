@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -41,7 +42,7 @@ type FilteringSearcher struct {
 	accept FilterFunc
 }
 
-func NewFilteringSearcher(s search.Searcher, filter FilterFunc) *FilteringSearcher {
+func NewFilteringSearcher(ctx context.Context, s search.Searcher, filter FilterFunc) *FilteringSearcher {
 	return &FilteringSearcher{
 		child:  s,
 		accept: filter,

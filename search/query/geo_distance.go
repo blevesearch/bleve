@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -56,7 +57,7 @@ func (q *GeoDistanceQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *GeoDistanceQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
+func (q *GeoDistanceQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping,
 	options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
@@ -68,7 +69,7 @@ func (q *GeoDistanceQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 		return nil, err
 	}
 
-	return searcher.NewGeoPointDistanceSearcher(i, q.Location[0], q.Location[1],
+	return searcher.NewGeoPointDistanceSearcher(ctx, i, q.Location[0], q.Location[1],
 		dist, field, q.BoostVal.Value(), options)
 }
 

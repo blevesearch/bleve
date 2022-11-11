@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"container/heap"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -37,6 +38,7 @@ import (
 // re usable, threadsafe levenshtein builders
 var lb1, lb2 *lev.LevenshteinAutomatonBuilder
 
+type diskStatsReporter segment.DiskStatsReporter
 type asynchSegmentResult struct {
 	dict    segment.TermDictionary
 	dictItr segment.DictionaryIterator
@@ -144,18 +146,17 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 	randomLookup bool) (*IndexSnapshotFieldDict, error) {
 
 	results := make(chan *asynchSegmentResult)
+	var totalBytesRead uint64
 	for index, segment := range i.segment {
 		go func(index int, segment *SegmentSnapshot) {
-			var prevBytesRead uint64
-			prevBytesRead = segment.segment.BytesRead()
-
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				results <- &asynchSegmentResult{err: err}
 			} else {
-				atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime,
-					segment.segment.BytesRead()-prevBytesRead)
-
+				if dictStats, ok := dict.(diskStatsReporter); ok {
+					atomic.AddUint64(&totalBytesRead,
+						dictStats.BytesRead())
+				}
 				if randomLookup {
 					results <- &asynchSegmentResult{dict: dict}
 				} else {
@@ -193,6 +194,7 @@ func (i *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 			}
 		}
 	}
+	rv.bytesRead = totalBytesRead
 	// after ensuring we've read all items on channel
 	if err != nil {
 		return nil, err
@@ -403,7 +405,7 @@ func (i *IndexSnapshot) DocCount() (uint64, error) {
 
 func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	// FIXME could be done more efficiently directly, but reusing for simplicity
-	tfr, err := i.TermFieldReader([]byte(id), "_id", false, false, false)
+	tfr, err := i.TermFieldReader(nil, []byte(id), "_id", false, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -430,12 +432,16 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	segmentIndex, localDocNum := i.segmentIndexAndLocalDocNumFromGlobal(docNum)
 
 	rvd := document.NewDocument(id)
-	prevBytesRead := i.segment[segmentIndex].segment.BytesRead()
 
 	err = i.segment[segmentIndex].VisitDocument(localDocNum, func(name string, typ byte, val []byte, pos []uint64) bool {
 		if name == "_id" {
 			return true
 		}
+
+		// track uncompressed stored fields bytes as part of IO stats.
+		// However, ideally we'd need to track the compressed on-disk value
+		// Keeping that TODO for now until we have a cleaner way.
+		rvd.StoredFieldsSize += uint64(len(val))
 
 		// copy value, array positions to preserve them beyond the scope of this callback
 		value := append([]byte(nil), val...)
@@ -464,9 +470,6 @@ func (i *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		return nil, err
 	}
 
-	if delta := i.segment[segmentIndex].segment.BytesRead() - prevBytesRead; delta > 0 {
-		atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime, delta)
-	}
 	return rvd, nil
 }
 
@@ -500,7 +503,7 @@ func (i *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {
 
 func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err error) {
 	// FIXME could be done more efficiently directly, but reusing for simplicity
-	tfr, err := i.TermFieldReader([]byte(id), "_id", false, false, false)
+	tfr, err := i.TermFieldReader(nil, []byte(id), "_id", false, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -518,10 +521,11 @@ func (i *IndexSnapshot) InternalID(id string) (rv index.IndexInternalID, err err
 	return next.ID, nil
 }
 
-func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
+func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field string, includeFreq,
 	includeNorm, includeTermVectors bool) (index.TermFieldReader, error) {
 	rv := is.allocTermFieldReaderDicts(field)
 
+	rv.ctx = ctx
 	rv.term = term
 	rv.field = field
 	rv.snapshot = is
@@ -541,13 +545,15 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 	if rv.dicts == nil {
 		rv.dicts = make([]segment.TermDictionary, len(is.segment))
 		for i, segment := range is.segment {
-			prevBytesRead := segment.segment.BytesRead()
+			segBytesRead := segment.segment.BytesRead()
+			rv.incrementBytesRead(segBytesRead)
 			dict, err := segment.segment.Dictionary(field)
 			if err != nil {
 				return nil, err
 			}
-			if bytesRead := segment.segment.BytesRead(); bytesRead > prevBytesRead {
-				atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime, bytesRead-prevBytesRead)
+			if dictStats, ok := dict.(diskStatsReporter); ok {
+				bytesRead := dictStats.BytesRead()
+				rv.incrementBytesRead(bytesRead)
 			}
 			rv.dicts[i] = dict
 		}
@@ -571,13 +577,11 @@ func (is *IndexSnapshot) TermFieldReader(term []byte, field string, includeFreq,
 		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, rv.iterators[i])
 
 		if bytesRead := rv.postings[i].BytesRead(); prevBytesReadPL < bytesRead {
-			atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
-				bytesRead-prevBytesReadPL)
+			rv.incrementBytesRead(bytesRead - prevBytesReadPL)
 		}
 
 		if bytesRead := rv.iterators[i].BytesRead(); prevBytesReadItr < bytesRead {
-			atomic.AddUint64(&is.parent.stats.TotBytesReadAtQueryTime,
-				bytesRead-prevBytesReadItr)
+			rv.incrementBytesRead(bytesRead - prevBytesReadItr)
 		}
 	}
 	atomic.AddUint64(&is.parent.stats.TotTermSearchersStarted, uint64(1))
@@ -634,6 +638,7 @@ func (i *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader
 		i.fieldTFRs = map[string][]*IndexSnapshotTermFieldReader{}
 	}
 	if uint64(len(i.fieldTFRs[tfr.field])) < i.getFieldTFRCacheThreshold() {
+		tfr.bytesRead = 0
 		i.fieldTFRs[tfr.field] = append(i.fieldTFRs[tfr.field], tfr)
 	}
 	i.m2.Unlock()
@@ -697,13 +702,9 @@ func (i *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	}
 
 	if ssvOk && ssv != nil && len(vFields) > 0 {
-		prevBytesRead := ss.segment.BytesRead()
 		dvs, err = ssv.VisitDocValues(localDocNum, fields, visitor, dvs)
 		if err != nil {
 			return nil, nil, err
-		}
-		if delta := ss.segment.BytesRead() - prevBytesRead; delta > 0 {
-			atomic.AddUint64(&i.parent.stats.TotBytesReadAtQueryTime, delta)
 		}
 	}
 
@@ -733,6 +734,13 @@ type DocValueReader struct {
 
 	currSegmentIndex int
 	currCachedFields []string
+
+	totalBytesRead uint64
+	bytesRead      uint64
+}
+
+func (dvr *DocValueReader) BytesRead() uint64 {
+	return dvr.totalBytesRead + dvr.bytesRead
 }
 
 func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
@@ -750,11 +758,16 @@ func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	if dvr.currSegmentIndex != segmentIndex {
 		dvr.currSegmentIndex = segmentIndex
 		dvr.currCachedFields = nil
+		dvr.totalBytesRead += dvr.bytesRead
+		dvr.bytesRead = 0
 	}
 
 	dvr.currCachedFields, dvr.dvs, err = dvr.i.documentVisitFieldTermsOnSegment(
 		dvr.currSegmentIndex, localDocNum, dvr.fields, dvr.currCachedFields, visitor, dvr.dvs)
 
+	if dvr.dvs != nil {
+		dvr.bytesRead = dvr.dvs.BytesRead()
+	}
 	return err
 }
 

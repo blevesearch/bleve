@@ -15,13 +15,15 @@
 package searcher
 
 import (
+	"context"
+
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-func NewGeoPointDistanceSearcher(indexReader index.IndexReader, centerLon,
+func NewGeoPointDistanceSearcher(ctx context.Context, indexReader index.IndexReader, centerLon,
 	centerLat, dist float64, field string, boost float64,
 	options search.SearcherOptions) (search.Searcher, error) {
 	var rectSearcher search.Searcher
@@ -30,7 +32,7 @@ func NewGeoPointDistanceSearcher(indexReader index.IndexReader, centerLon,
 		if err == nil {
 			terms := sp.GetQueryTokens(geo.NewPointDistance(centerLat,
 				centerLon, dist))
-			rectSearcher, err = NewMultiTermSearcher(indexReader, terms,
+			rectSearcher, err = NewMultiTermSearcher(ctx, indexReader, terms,
 				field, boost, options, false)
 			if err != nil {
 				return nil, err
@@ -49,7 +51,7 @@ func NewGeoPointDistanceSearcher(indexReader index.IndexReader, centerLon,
 		}
 
 		// build a searcher for the box
-		rectSearcher, err = boxSearcher(indexReader,
+		rectSearcher, err = boxSearcher(ctx, indexReader,
 			topLeftLon, topLeftLat, bottomRightLon, bottomRightLat,
 			field, boost, options, false)
 		if err != nil {
@@ -63,27 +65,27 @@ func NewGeoPointDistanceSearcher(indexReader index.IndexReader, centerLon,
 	}
 
 	// wrap it in a filtering searcher which checks the actual distance
-	return NewFilteringSearcher(rectSearcher,
+	return NewFilteringSearcher(ctx, rectSearcher,
 		buildDistFilter(dvReader, field, centerLon, centerLat, dist)), nil
 }
 
 // boxSearcher builds a searcher for the described bounding box
 // if the desired box crosses the dateline, it is automatically split into
 // two boxes joined through a disjunction searcher
-func boxSearcher(indexReader index.IndexReader,
+func boxSearcher(ctx context.Context, indexReader index.IndexReader,
 	topLeftLon, topLeftLat, bottomRightLon, bottomRightLat float64,
 	field string, boost float64, options search.SearcherOptions, checkBoundaries bool) (
 	search.Searcher, error) {
 	if bottomRightLon < topLeftLon {
 		// cross date line, rewrite as two parts
 
-		leftSearcher, err := NewGeoBoundingBoxSearcher(indexReader,
+		leftSearcher, err := NewGeoBoundingBoxSearcher(ctx, indexReader,
 			-180, bottomRightLat, bottomRightLon, topLeftLat,
 			field, boost, options, checkBoundaries)
 		if err != nil {
 			return nil, err
 		}
-		rightSearcher, err := NewGeoBoundingBoxSearcher(indexReader,
+		rightSearcher, err := NewGeoBoundingBoxSearcher(ctx, indexReader,
 			topLeftLon, bottomRightLat, 180, topLeftLat, field, boost, options,
 			checkBoundaries)
 		if err != nil {
@@ -91,7 +93,7 @@ func boxSearcher(indexReader index.IndexReader,
 			return nil, err
 		}
 
-		boxSearcher, err := NewDisjunctionSearcher(indexReader,
+		boxSearcher, err := NewDisjunctionSearcher(ctx, indexReader,
 			[]search.Searcher{leftSearcher, rightSearcher}, 0, options)
 		if err != nil {
 			_ = leftSearcher.Close()
@@ -102,7 +104,7 @@ func boxSearcher(indexReader index.IndexReader,
 	}
 
 	// build geoboundingbox searcher for that bounding box
-	boxSearcher, err := NewGeoBoundingBoxSearcher(indexReader,
+	boxSearcher, err := NewGeoBoundingBoxSearcher(ctx, indexReader,
 		topLeftLon, bottomRightLat, bottomRightLon, topLeftLat, field, boost,
 		options, checkBoundaries)
 	if err != nil {

@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -61,7 +62,7 @@ func (q *MatchPhraseQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *MatchPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -83,10 +84,10 @@ func (q *MatchPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 		phrase := tokenStreamToPhrase(tokens)
 		phraseQuery := NewMultiPhraseQuery(phrase, field)
 		phraseQuery.SetBoost(q.BoostVal.Value())
-		return phraseQuery.Searcher(i, m, options)
+		return phraseQuery.Searcher(ctx, i, m, options)
 	}
 	noneQuery := NewMatchNoneQuery()
-	return noneQuery.Searcher(i, m, options)
+	return noneQuery.Searcher(ctx, i, m, options)
 }
 
 func tokenStreamToPhrase(tokens analysis.TokenStream) [][]string {

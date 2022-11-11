@@ -15,6 +15,8 @@
 package query
 
 import (
+	"context"
+
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
@@ -51,7 +53,7 @@ func (q *BoolFieldQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *BoolFieldQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *BoolFieldQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -60,5 +62,5 @@ func (q *BoolFieldQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, o
 	if q.Bool {
 		term = "T"
 	}
-	return searcher.NewTermSearcher(i, term, field, q.BoostVal.Value(), options)
+	return searcher.NewTermSearcher(ctx, i, term, field, q.BoostVal.Value(), options)
 }

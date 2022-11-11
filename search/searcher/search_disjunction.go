@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -31,10 +32,10 @@ var DisjunctionMaxClauseCount = 0
 // slice implementation to a heap implementation.
 var DisjunctionHeapTakeover = 10
 
-func NewDisjunctionSearcher(indexReader index.IndexReader,
+func NewDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions) (
 	search.Searcher, error) {
-	return newDisjunctionSearcher(indexReader, qsearchers, min, options, true)
+	return newDisjunctionSearcher(ctx, indexReader, qsearchers, min, options, true)
 }
 
 func optionsDisjunctionOptimizable(options search.SearcherOptions) bool {
@@ -42,7 +43,7 @@ func optionsDisjunctionOptimizable(options search.SearcherOptions) bool {
 	return rv
 }
 
-func newDisjunctionSearcher(indexReader index.IndexReader,
+func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
 	limit bool) (search.Searcher, error) {
 	// attempt the "unadorned" disjunction optimization only when we
@@ -50,7 +51,7 @@ func newDisjunctionSearcher(indexReader index.IndexReader,
 	// and the requested min is simple
 	if len(qsearchers) > 1 && min <= 1 &&
 		optionsDisjunctionOptimizable(options) {
-		rv, err := optimizeCompositeSearcher("disjunction:unadorned",
+		rv, err := optimizeCompositeSearcher(ctx, "disjunction:unadorned",
 			indexReader, qsearchers, options)
 		if err != nil || rv != nil {
 			return rv, err
@@ -58,14 +59,14 @@ func newDisjunctionSearcher(indexReader index.IndexReader,
 	}
 
 	if len(qsearchers) > DisjunctionHeapTakeover {
-		return newDisjunctionHeapSearcher(indexReader, qsearchers, min, options,
+		return newDisjunctionHeapSearcher(ctx, indexReader, qsearchers, min, options,
 			limit)
 	}
-	return newDisjunctionSliceSearcher(indexReader, qsearchers, min, options,
+	return newDisjunctionSliceSearcher(ctx, indexReader, qsearchers, min, options,
 		limit)
 }
 
-func optimizeCompositeSearcher(optimizationKind string,
+func optimizeCompositeSearcher(ctx context.Context, optimizationKind string,
 	indexReader index.IndexReader, qsearchers []search.Searcher,
 	options search.SearcherOptions) (search.Searcher, error) {
 	var octx index.OptimizableContext

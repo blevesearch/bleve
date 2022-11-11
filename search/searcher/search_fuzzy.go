@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -23,7 +24,7 @@ import (
 
 var MaxFuzziness = 2
 
-func NewFuzzySearcher(indexReader index.IndexReader, term string,
+func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term string,
 	prefix, fuzziness int, field string, boost float64,
 	options search.SearcherOptions) (search.Searcher, error) {
 
@@ -44,19 +45,47 @@ func NewFuzzySearcher(indexReader index.IndexReader, term string,
 			break
 		}
 	}
-	candidateTerms, err := findFuzzyCandidateTerms(indexReader, term, fuzziness,
+	fuzzyCandidates, err := findFuzzyCandidateTerms(indexReader, term, fuzziness,
 		field, prefixTerm)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewMultiTermSearcher(indexReader, candidateTerms, field,
+	var candidates []string
+	var dictBytesRead uint64
+	if fuzzyCandidates != nil {
+		candidates = fuzzyCandidates.candidates
+		dictBytesRead = fuzzyCandidates.bytesRead
+	}
+
+	if ctx != nil {
+		reportIOStats(dictBytesRead, ctx)
+	}
+
+	return NewMultiTermSearcher(ctx, indexReader, candidates, field,
 		boost, options, true)
 }
 
+type fuzzyCandidates struct {
+	candidates []string
+	bytesRead  uint64
+}
+
+func reportIOStats(bytesRead uint64, ctx context.Context) {
+	// The fuzzy, regexp like queries essentially load a dictionary,
+	// which potentially incurs a cost that must be accounted by
+	// using the callback to report the value.
+	statsCallbackFn := ctx.Value(search.SearchIOStatsCallbackKey)
+	if statsCallbackFn != nil {
+		statsCallbackFn.(search.SearchIOStatsCallbackFunc)(bytesRead)
+	}
+}
+
 func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
-	fuzziness int, field, prefixTerm string) (rv []string, err error) {
-	rv = make([]string, 0)
+	fuzziness int, field, prefixTerm string) (rv *fuzzyCandidates, err error) {
+	rv = &fuzzyCandidates{
+		candidates: make([]string, 0),
+	}
 
 	// in case of advanced reader implementations directly call
 	// the levenshtein automaton based iterator to collect the
@@ -73,12 +102,14 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 		}()
 		tfd, err := fieldDict.Next()
 		for err == nil && tfd != nil {
-			rv = append(rv, tfd.Term)
-			if tooManyClauses(len(rv)) {
-				return nil, tooManyClausesErr(field, len(rv))
+			rv.candidates = append(rv.candidates, tfd.Term)
+			if tooManyClauses(len(rv.candidates)) {
+				return nil, tooManyClausesErr(field, len(rv.candidates))
 			}
 			tfd, err = fieldDict.Next()
 		}
+
+		rv.bytesRead = fieldDict.BytesRead()
 		return rv, err
 	}
 
@@ -105,13 +136,14 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 		var exceeded bool
 		ld, exceeded, reuse = search.LevenshteinDistanceMaxReuseSlice(term, tfd.Term, fuzziness, reuse)
 		if !exceeded && ld <= fuzziness {
-			rv = append(rv, tfd.Term)
-			if tooManyClauses(len(rv)) {
-				return nil, tooManyClausesErr(field, len(rv))
+			rv.candidates = append(rv.candidates, tfd.Term)
+			if tooManyClauses(len(rv.candidates)) {
+				return nil, tooManyClausesErr(field, len(rv.candidates))
 			}
 		}
 		tfd, err = fieldDict.Next()
 	}
 
+	rv.bytesRead = fieldDict.BytesRead()
 	return rv, err
 }

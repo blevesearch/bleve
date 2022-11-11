@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"fmt"
 	"math"
 
@@ -24,7 +25,7 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-func NewGeoBoundedPolygonSearcher(indexReader index.IndexReader,
+func NewGeoBoundedPolygonSearcher(ctx context.Context, indexReader index.IndexReader,
 	coordinates []geo.Point, field string, boost float64,
 	options search.SearcherOptions) (search.Searcher, error) {
 	if len(coordinates) < 3 {
@@ -36,7 +37,7 @@ func NewGeoBoundedPolygonSearcher(indexReader index.IndexReader,
 		tp, err := sr.GetSpatialAnalyzerPlugin("s2")
 		if err == nil {
 			terms := tp.GetQueryTokens(geo.NewBoundedPolygon(coordinates))
-			rectSearcher, err = NewMultiTermSearcher(indexReader, terms,
+			rectSearcher, err = NewMultiTermSearcher(ctx, indexReader, terms,
 				field, boost, options, false)
 			if err != nil {
 				return nil, err
@@ -55,7 +56,7 @@ func NewGeoBoundedPolygonSearcher(indexReader index.IndexReader,
 		}
 
 		// build a searcher for the bounding box on the polygon
-		rectSearcher, err = boxSearcher(indexReader,
+		rectSearcher, err = boxSearcher(ctx, indexReader,
 			topLeftLon, topLeftLat, bottomRightLon, bottomRightLat,
 			field, boost, options, true)
 		if err != nil {
@@ -69,7 +70,7 @@ func NewGeoBoundedPolygonSearcher(indexReader index.IndexReader,
 	}
 
 	// wrap it in a filtering searcher that checks for the polygon inclusivity
-	return NewFilteringSearcher(rectSearcher,
+	return NewFilteringSearcher(ctx, rectSearcher,
 		buildPolygonFilter(dvReader, field, coordinates)), nil
 }
 

@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"net"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -39,7 +40,7 @@ func netLimits(n *net.IPNet) (lo net.IP, hi net.IP) {
 	return lo, hi
 }
 
-func NewIPRangeSearcher(indexReader index.IndexReader, ipNet *net.IPNet,
+func NewIPRangeSearcher(ctx context.Context, indexReader index.IndexReader, ipNet *net.IPNet,
 	field string, boost float64, options search.SearcherOptions) (
 	search.Searcher, error) {
 
@@ -63,5 +64,5 @@ func NewIPRangeSearcher(indexReader index.IndexReader, ipNet *net.IPNet,
 		return nil, err
 	}
 
-	return NewMultiTermSearcher(indexReader, terms, field, boost, options, true)
+	return NewMultiTermSearcher(ctx, indexReader, terms, field, boost, options, true)
 }
