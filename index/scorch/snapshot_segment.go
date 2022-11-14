@@ -30,10 +30,11 @@ var TermSeparator byte = 0xff
 var TermSeparatorSplitSlice = []byte{TermSeparator}
 
 type SegmentSnapshot struct {
-	id      uint64
-	segment segment.Segment
-	deleted *roaring.Bitmap
-	creator string
+	id             uint64
+	segment        segment.Segment
+	deleted        *roaring.Bitmap
+	creator        string
+	loadedFromFile uint64
 
 	cachedDocs *cachedDocs
 }

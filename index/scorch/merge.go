@@ -371,6 +371,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			oldNewDocNums: oldNewDocNums,
 			new:           seg,
 			notifyCh:      make(chan *mergeTaskIntroStatus),
+			fileLoaded:    true,
 		}
 
 		s.fireEvent(EventKindMergeTaskIntroductionStart, 0)
@@ -429,6 +430,7 @@ type segmentMerge struct {
 	oldNewDocNums map[uint64][]uint64
 	new           segment.Segment
 	notifyCh      chan *mergeTaskIntroStatus
+	fileLoaded    bool
 }
 
 func cumulateBytesRead(sbs []segment.Segment) uint64 {

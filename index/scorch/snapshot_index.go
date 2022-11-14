@@ -543,8 +543,10 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 	if rv.dicts == nil {
 		rv.dicts = make([]segment.TermDictionary, len(is.segment))
 		for i, s := range is.segment {
-			segBytesRead := s.segment.BytesRead()
-			rv.incrementBytesRead(segBytesRead)
+			if atomic.CompareAndSwapUint64(&s.loadedFromFile, 1, 0) {
+				segBytesRead := s.segment.BytesRead()
+				rv.incrementBytesRead(segBytesRead)
+			}
 			dict, err := s.segment.Dictionary(field)
 			if err != nil {
 				return nil, err
