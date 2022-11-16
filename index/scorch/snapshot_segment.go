@@ -60,7 +60,7 @@ func (s *SegmentSnapshot) FullSize() int64 {
 	return int64(s.segment.Count())
 }
 
-func (s SegmentSnapshot) LiveSize() int64 {
+func (s *SegmentSnapshot) LiveSize() int64 {
 	return int64(s.Count())
 }
 
