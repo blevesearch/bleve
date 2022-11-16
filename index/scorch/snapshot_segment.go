@@ -30,11 +30,16 @@ var TermSeparator byte = 0xff
 var TermSeparatorSplitSlice = []byte{TermSeparator}
 
 type SegmentSnapshot struct {
-	id             uint64
-	segment        segment.Segment
-	deleted        *roaring.Bitmap
-	creator        string
-	loadedFromFile uint64
+	id      uint64
+	segment segment.Segment
+	deleted *roaring.Bitmap
+	creator string
+
+	// this flag is needed to identify whether this
+	// segment was mmaped recently, in which case
+	// we consider the loading cost of the metadata
+	// as part of IO stats.
+	mmaped uint64
 
 	cachedDocs *cachedDocs
 }

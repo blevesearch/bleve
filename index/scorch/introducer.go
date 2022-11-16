@@ -272,12 +272,12 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 		// see if this segment has been replaced
 		if replacement, ok := persist.persisted[segmentSnapshot.id]; ok {
 			newSegmentSnapshot := &SegmentSnapshot{
-				id:             segmentSnapshot.id,
-				segment:        replacement,
-				deleted:        segmentSnapshot.deleted,
-				cachedDocs:     segmentSnapshot.cachedDocs,
-				creator:        "introducePersist",
-				loadedFromFile: 1,
+				id:         segmentSnapshot.id,
+				segment:    replacement,
+				deleted:    segmentSnapshot.deleted,
+				cachedDocs: segmentSnapshot.cachedDocs,
+				creator:    "introducePersist",
+				mmaped:     1,
 			}
 			newIndexSnapshot.segment[i] = newSegmentSnapshot
 			delete(persist.persisted, segmentSnapshot.id)
@@ -415,18 +415,18 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	if nextMerge.new != nil &&
 		nextMerge.new.Count() > newSegmentDeleted.GetCardinality() {
 		// put new segment at end
-		var loadedFromFile uint64
-		if nextMerge.fileLoaded {
-			loadedFromFile = 1
+		var mmaped uint64
+		if nextMerge.mmaped {
+			mmaped = 1
 		}
 
 		newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
-			id:             nextMerge.id,
-			segment:        nextMerge.new, // take ownership for nextMerge.new's ref-count
-			deleted:        newSegmentDeleted,
-			cachedDocs:     &cachedDocs{cache: nil},
-			creator:        "introduceMerge",
-			loadedFromFile: loadedFromFile,
+			id:         nextMerge.id,
+			segment:    nextMerge.new, // take ownership for nextMerge.new's ref-count
+			deleted:    newSegmentDeleted,
+			cachedDocs: &cachedDocs{cache: nil},
+			creator:    "introduceMerge",
+			mmaped:     mmaped,
 		})
 		newSnapshot.offsets = append(newSnapshot.offsets, running)
 		atomic.AddUint64(&s.stats.TotIntroducedSegmentsMerge, 1)
