@@ -500,6 +500,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 			} else {
 				// merge with previous
 				sr.Merge(asr.Result)
+				sr.BytesRead += asr.Result.BytesRead
 			}
 		} else {
 			indexErrors[asr.Name] = asr.Err
