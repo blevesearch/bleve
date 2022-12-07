@@ -414,19 +414,15 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	// deleted by the time we reach here, can skip the introduction.
 	if nextMerge.new != nil &&
 		nextMerge.new.Count() > newSegmentDeleted.GetCardinality() {
-		// put new segment at end
-		var mmaped uint64
-		if nextMerge.mmaped {
-			mmaped = 1
-		}
 
+		// put new segment at end
 		newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
 			id:         nextMerge.id,
 			segment:    nextMerge.new, // take ownership for nextMerge.new's ref-count
 			deleted:    newSegmentDeleted,
 			cachedDocs: &cachedDocs{cache: nil},
 			creator:    "introduceMerge",
-			mmaped:     mmaped,
+			mmaped:     nextMerge.mmaped,
 		})
 		newSnapshot.offsets = append(newSnapshot.offsets, running)
 		atomic.AddUint64(&s.stats.TotIntroducedSegmentsMerge, 1)

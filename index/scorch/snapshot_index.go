@@ -548,7 +548,7 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 			// only once(which corresponds to this persisted segment's most
 			// recent segPlugin.Open() call), and any subsequent queries won't
 			// incur this cost which would essentially be a double counting.
-			if atomic.CompareAndSwapUint64(&s.mmaped, 1, 0) {
+			if atomic.CompareAndSwapUint32(&s.mmaped, 1, 0) {
 				segBytesRead := s.segment.BytesRead()
 				rv.incrementBytesRead(segBytesRead)
 			}
