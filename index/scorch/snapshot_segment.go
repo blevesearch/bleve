@@ -30,6 +30,11 @@ var TermSeparator byte = 0xff
 var TermSeparatorSplitSlice = []byte{TermSeparator}
 
 type SegmentSnapshot struct {
+	// this flag is needed to identify whether this
+	// segment was mmaped recently, in which case
+	// we consider the loading cost of the metadata
+	// as part of IO stats.
+	mmaped  uint32
 	id      uint64
 	segment segment.Segment
 	deleted *roaring.Bitmap
@@ -54,7 +59,7 @@ func (s *SegmentSnapshot) FullSize() int64 {
 	return int64(s.segment.Count())
 }
 
-func (s SegmentSnapshot) LiveSize() int64 {
+func (s *SegmentSnapshot) LiveSize() int64 {
 	return int64(s.Count())
 }
 

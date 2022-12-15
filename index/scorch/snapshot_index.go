@@ -543,8 +543,15 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 	if rv.dicts == nil {
 		rv.dicts = make([]segment.TermDictionary, len(is.segment))
 		for i, s := range is.segment {
-			segBytesRead := s.segment.BytesRead()
-			rv.incrementBytesRead(segBytesRead)
+			// the intention behind this compare and swap operation is
+			// to make sure that the accounting of the metadata is happening
+			// only once(which corresponds to this persisted segment's most
+			// recent segPlugin.Open() call), and any subsequent queries won't
+			// incur this cost which would essentially be a double counting.
+			if atomic.CompareAndSwapUint32(&s.mmaped, 1, 0) {
+				segBytesRead := s.segment.BytesRead()
+				rv.incrementBytesRead(segBytesRead)
+			}
 			dict, err := s.segment.Dictionary(field)
 			if err != nil {
 				return nil, err
