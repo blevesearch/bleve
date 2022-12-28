@@ -516,6 +516,20 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 		return nil, nil, err
 	}
 
+	// Storing the timestamp at which the current indexSnapshot
+	// was persisted, useful when you want to spread the
+	// numSnapshotsToKeep reasonably better than consecutive
+	// epochs.
+	currTimeStamp := time.Now()
+	timeStampBinary, err := currTimeStamp.MarshalText()
+	if err != nil {
+		return nil, nil, err
+	}
+	err = metaBucket.Put(boltMetaDataTimeStamp, timeStampBinary)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// persist internal values
 	internalBucket, err := snapshotBucket.CreateBucketIfNotExists(boltInternalKey)
 	if err != nil {
@@ -682,6 +696,7 @@ var boltInternalKey = []byte{'i'}
 var boltMetaDataKey = []byte{'m'}
 var boltMetaDataSegmentTypeKey = []byte("type")
 var boltMetaDataSegmentVersionKey = []byte("version")
+var boltMetaDataTimeStamp = []byte("timeStamp")
 
 func (s *Scorch) loadFromBolt() error {
 	return s.rootBolt.View(func(tx *bolt.Tx) error {
@@ -871,24 +886,58 @@ func (s *Scorch) removeOldData() {
 // rollback'ability.
 var NumSnapshotsToKeep = 1
 
+var RollbackPointsSamplingRate = 1 * time.Hour
+
+// getProtectedEpochs aims to fetch the epochs keep based on a timestamp basis.
+// It tries to get NumSnapshotsToKeep snapshots, each of which are separated
+// by a time duration of RollbackPointsSamplingRate
+func (s *Scorch) getProtectedEpochs(persistedSnapshots []*snapshotMetaData) map[uint64]struct{} {
+	// make a map of epochs to protect from deletion
+	protectedEpochs := make(map[uint64]struct{}, s.numSnapshotsToKeep)
+
+	protectedEpochs[persistedSnapshots[0].epoch] = struct{}{}
+	nextSnapshotToProtect := persistedSnapshots[0].timeStamp.Add(RollbackPointsSamplingRate)
+	protectedSnapshots := 1
+	lastProtectedSnapshot := 0
+
+	for i := 1; i < len(persistedSnapshots); i++ {
+		if persistedSnapshots[i].timeStamp.After(nextSnapshotToProtect) {
+			protectedEpochs[persistedSnapshots[i-1].epoch] = struct{}{}
+			nextSnapshotToProtect =
+				persistedSnapshots[i-1].timeStamp.Add(RollbackPointsSamplingRate)
+			protectedSnapshots++
+			lastProtectedSnapshot = i - 1
+			if protectedSnapshots >= s.numSnapshotsToKeep {
+				return protectedEpochs
+			}
+		}
+	}
+
+	// The worst case when there aren't enough snapshots which are
+	// RollbackPointsSamplingRate apart from each other, then just
+	// protect the next s.numSnapshotsToKeep - lastProtectedSnapshot
+	// of snapshots.
+	for _, snapshot := range persistedSnapshots[lastProtectedSnapshot+
+		1 : lastProtectedSnapshot+1+s.numSnapshotsToKeep] {
+		protectedEpochs[snapshot.epoch] = struct{}{}
+	}
+	return protectedEpochs
+}
+
 // Removes enough snapshots from the rootBolt so that the
 // s.eligibleForRemoval stays under the NumSnapshotsToKeep policy.
 func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
-	persistedEpochs, err := s.RootBoltSnapshotEpochs()
+	persistedSnapshots, err := s.rootBoltSnapshotEpochTimeStamps()
 	if err != nil {
 		return 0, err
 	}
 
-	if len(persistedEpochs) <= s.numSnapshotsToKeep {
+	if len(persistedSnapshots) <= s.numSnapshotsToKeep {
 		// we need to keep everything
 		return 0, nil
 	}
 
-	// make a map of epochs to protect from deletion
-	protectedEpochs := make(map[uint64]struct{}, s.numSnapshotsToKeep)
-	for _, epoch := range persistedEpochs[0:s.numSnapshotsToKeep] {
-		protectedEpochs[epoch] = struct{}{}
-	}
+	protectedEpochs := s.getProtectedEpochs(persistedSnapshots)
 
 	var epochsToRemove []uint64
 	var newEligible []uint64
@@ -994,6 +1043,45 @@ func (s *Scorch) removeOldZapFiles() error {
 	s.rootLock.RUnlock()
 
 	return nil
+}
+
+type snapshotMetaData struct {
+	epoch     uint64
+	timeStamp time.Time
+}
+
+func (s *Scorch) rootBoltSnapshotEpochTimeStamps() ([]*snapshotMetaData, error) {
+	var rv []*snapshotMetaData
+	err := s.rootBolt.View(func(tx *bolt.Tx) error {
+		snapshots := tx.Bucket(boltSnapshotsBucket)
+		if snapshots == nil {
+			return nil
+		}
+		sc := snapshots.Cursor()
+		for sk, _ := sc.Last(); sk != nil; sk, _ = sc.Prev() {
+			_, snapshotEpoch, err := decodeUvarintAscending(sk)
+			if err != nil {
+				continue
+			}
+
+			snapshot := snapshots.Bucket(sk)
+			metaBucket := snapshot.Bucket(boltMetaDataKey)
+			if metaBucket == nil {
+				continue
+			}
+			timeStampBytes := metaBucket.Get(boltMetaDataTimeStamp)
+			var timeStamp time.Time
+			err = timeStamp.UnmarshalText(timeStampBytes)
+			if err != nil {
+				continue
+			}
+			rv = append(rv, &snapshotMetaData{
+				epoch:     snapshotEpoch,
+				timeStamp: timeStamp})
+		}
+		return nil
+	})
+	return rv, err
 }
 
 func (s *Scorch) RootBoltSnapshotEpochs() ([]uint64, error) {
