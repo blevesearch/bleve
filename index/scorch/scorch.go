@@ -294,6 +294,13 @@ func (s *Scorch) openBolt() error {
 	}
 
 	s.rollbackSamplingInterval = RollbackSamplingInterval
+	if v, ok := s.config["rollbackSamplingInterval"]; ok {
+		var t time.Duration
+		if t, err = parseToTimeDuration(v); err != nil {
+			return fmt.Errorf("rollbackSamplingInterval parse err: %v", err)
+		}
+		s.rollbackSamplingInterval = t
+	}
 
 	typ, ok := s.config["spatialPlugin"].(string)
 	if ok {
@@ -716,6 +723,16 @@ func (s *Scorch) unmarkIneligibleForRemoval(filename string) {
 
 func init() {
 	registry.RegisterIndexType(Name, NewScorch)
+}
+
+func parseToTimeDuration(i interface{}) (time.Duration, error) {
+	switch v := i.(type) {
+	case string:
+		return time.ParseDuration(v)
+
+	default:
+		return 0, fmt.Errorf("expects a duration string")
+	}
 }
 
 func parseToInteger(i interface{}) (int, error) {
