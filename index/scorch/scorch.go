@@ -57,15 +57,16 @@ type Scorch struct {
 	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
 
-	numSnapshotsToKeep int
-	closeCh            chan struct{}
-	introductions      chan *segmentIntroduction
-	persists           chan *persistIntroduction
-	merges             chan *segmentMerge
-	introducerNotifier chan *epochWatcher
-	persisterNotifier  chan *epochWatcher
-	rootBolt           *bolt.DB
-	asyncTasks         sync.WaitGroup
+	numSnapshotsToKeep       int
+	rollbackSamplingInterval time.Duration
+	closeCh                  chan struct{}
+	introductions            chan *segmentIntroduction
+	persists                 chan *persistIntroduction
+	merges                   chan *segmentMerge
+	introducerNotifier       chan *epochWatcher
+	persisterNotifier        chan *epochWatcher
+	rootBolt                 *bolt.DB
+	asyncTasks               sync.WaitGroup
 
 	onEvent      func(event Event)
 	onAsyncError func(err error)
@@ -291,6 +292,8 @@ func (s *Scorch) openBolt() error {
 			s.numSnapshotsToKeep = t
 		}
 	}
+
+	s.rollbackSamplingInterval = RollbackSamplingInterval
 
 	typ, ok := s.config["spatialPlugin"].(string)
 	if ok {

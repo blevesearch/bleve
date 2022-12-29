@@ -886,25 +886,31 @@ func (s *Scorch) removeOldData() {
 // rollback'ability.
 var NumSnapshotsToKeep = 1
 
-var RollbackPointsSamplingRate = 1 * time.Hour
+var RollbackSamplingInterval = 1 * time.Hour
 
 // getProtectedEpochs aims to fetch the epochs keep based on a timestamp basis.
 // It tries to get NumSnapshotsToKeep snapshots, each of which are separated
-// by a time duration of RollbackPointsSamplingRate
-func (s *Scorch) getProtectedEpochs(persistedSnapshots []*snapshotMetaData) map[uint64]struct{} {
+// by a time duration of RollbackSamplingInterval
+func (s *Scorch) getProtectedEpochs(
+	persistedSnapshots []*snapshotMetaData) map[uint64]struct{} {
+
 	// make a map of epochs to protect from deletion
 	protectedEpochs := make(map[uint64]struct{}, s.numSnapshotsToKeep)
-
 	protectedEpochs[persistedSnapshots[0].epoch] = struct{}{}
-	nextSnapshotToProtect := persistedSnapshots[0].timeStamp.Add(RollbackPointsSamplingRate)
+	nextSnapshotToProtect :=
+		persistedSnapshots[0].timeStamp.Add(s.rollbackSamplingInterval)
 	protectedSnapshots := 1
 	lastProtectedSnapshot := 0
 
 	for i := 1; i < len(persistedSnapshots); i++ {
+		// Finding that snapshot whose timestamp is just above
+		// the required timestamp, because the snapshot at the previous
+		// index is bound to be the closest possible snapshot to the
+		// required timestamp of nextSnapshotToProtect
 		if persistedSnapshots[i].timeStamp.After(nextSnapshotToProtect) {
 			protectedEpochs[persistedSnapshots[i-1].epoch] = struct{}{}
 			nextSnapshotToProtect =
-				persistedSnapshots[i-1].timeStamp.Add(RollbackPointsSamplingRate)
+				persistedSnapshots[i-1].timeStamp.Add(s.rollbackSamplingInterval)
 			protectedSnapshots++
 			lastProtectedSnapshot = i - 1
 			if protectedSnapshots >= s.numSnapshotsToKeep {
@@ -915,10 +921,18 @@ func (s *Scorch) getProtectedEpochs(persistedSnapshots []*snapshotMetaData) map[
 
 	// The worst case when there aren't enough snapshots which are
 	// RollbackPointsSamplingRate apart from each other, then just
-	// protect the next s.numSnapshotsToKeep - lastProtectedSnapshot
+	// protect the next s.numSnapshotsToKeep - protectedSnapshots
 	// of snapshots.
-	for _, snapshot := range persistedSnapshots[lastProtectedSnapshot+
-		1 : lastProtectedSnapshot+1+s.numSnapshotsToKeep] {
+	start := lastProtectedSnapshot + 1
+	end := start + s.numSnapshotsToKeep - protectedSnapshots
+
+	// If we don't have enough snapshots, just take all of them.
+	if s.numSnapshotsToKeep-protectedSnapshots >=
+		len(persistedSnapshots)-lastProtectedSnapshot {
+		end = len(persistedSnapshots)
+	}
+
+	for _, snapshot := range persistedSnapshots[start:end] {
 		protectedEpochs[snapshot.epoch] = struct{}{}
 	}
 	return protectedEpochs
