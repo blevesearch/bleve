@@ -886,11 +886,18 @@ func (s *Scorch) removeOldData() {
 // rollback'ability.
 var NumSnapshotsToKeep = 1
 
+// RollbackSamplingInterval controls how far back we are looking
+// in the history to get the rollback points.
+// For example, the default value of 1 hour ensures that the
+// protected snapshots (NumSnapshotsToKeep = 3) are:
+//    the very latest snapshot(ie the current one),
+//    the snapshot that was persisted 1 hour before the current one,
+//	  the snapshot that was persisted 2 hours before the current one
 var RollbackSamplingInterval = 1 * time.Hour
 
 // getProtectedEpochs aims to fetch the epochs keep based on a timestamp basis.
 // It tries to get NumSnapshotsToKeep snapshots, each of which are separated
-// by a time duration of RollbackSamplingInterval
+// by a time duration of RollbackSamplingInterval.
 func (s *Scorch) getProtectedEpochs(
 	persistedSnapshots []*snapshotMetaData) map[uint64]struct{} {
 
