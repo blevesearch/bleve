@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/blevesearch/bleve/v2/geo"
@@ -99,14 +100,14 @@ func (q *GeoShapeQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *GeoShapeQuery) Searcher(i index.IndexReader,
+func (q *GeoShapeQuery) Searcher(ctx context.Context, i index.IndexReader,
 	m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
 
-	return searcher.NewGeoShapeSearcher(i, q.Geometry.Shape, q.Geometry.Relation, field,
+	return searcher.NewGeoShapeSearcher(ctx, i, q.Geometry.Shape, q.Geometry.Relation, field,
 		q.BoostVal.Value(), options)
 }
 

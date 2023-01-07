@@ -40,93 +40,93 @@ func TestConjunctionSearch(t *testing.T) {
 	explainTrue := search.SearcherOptions{Explain: true}
 
 	// test 0
-	beerTermSearcher, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
+	beerTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	martyTermSearcher, err := NewTermSearcher(twoDocIndexReader, "marty", "name", 5.0, explainTrue)
+	martyTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "marty", "name", 5.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerAndMartySearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher, martyTermSearcher}, explainTrue)
+	beerAndMartySearcher, err := NewConjunctionSearcher(nil, twoDocIndexReader, []search.Searcher{beerTermSearcher, martyTermSearcher}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 1
-	angstTermSearcher, err := NewTermSearcher(twoDocIndexReader, "angst", "desc", 1.0, explainTrue)
+	angstTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "angst", "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
+	beerTermSearcher2, err := NewTermSearcher(nil, twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	angstAndBeerSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{angstTermSearcher, beerTermSearcher2}, explainTrue)
+	angstAndBeerSearcher, err := NewConjunctionSearcher(nil, twoDocIndexReader, []search.Searcher{angstTermSearcher, beerTermSearcher2}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 2
-	beerTermSearcher3, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
+	beerTermSearcher3, err := NewTermSearcher(nil, twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	jackTermSearcher, err := NewTermSearcher(twoDocIndexReader, "jack", "name", 5.0, explainTrue)
+	jackTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "jack", "name", 5.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerAndJackSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher3, jackTermSearcher}, explainTrue)
+	beerAndJackSearcher, err := NewConjunctionSearcher(nil, twoDocIndexReader, []search.Searcher{beerTermSearcher3, jackTermSearcher}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 3
-	beerTermSearcher4, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
+	beerTermSearcher4, err := NewTermSearcher(nil, twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	misterTermSearcher, err := NewTermSearcher(twoDocIndexReader, "mister", "title", 5.0, explainTrue)
+	misterTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "mister", "title", 5.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerAndMisterSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher4, misterTermSearcher}, explainTrue)
+	beerAndMisterSearcher, err := NewConjunctionSearcher(nil, twoDocIndexReader, []search.Searcher{beerTermSearcher4, misterTermSearcher}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 4
-	couchbaseTermSearcher, err := NewTermSearcher(twoDocIndexReader, "couchbase", "street", 1.0, explainTrue)
+	couchbaseTermSearcher, err := NewTermSearcher(nil, twoDocIndexReader, "couchbase", "street", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	misterTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "mister", "title", 5.0, explainTrue)
+	misterTermSearcher2, err := NewTermSearcher(nil, twoDocIndexReader, "mister", "title", 5.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	couchbaseAndMisterSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{couchbaseTermSearcher, misterTermSearcher2}, explainTrue)
+	couchbaseAndMisterSearcher, err := NewConjunctionSearcher(nil, twoDocIndexReader, []search.Searcher{couchbaseTermSearcher, misterTermSearcher2}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// test 5
-	beerTermSearcher5, err := NewTermSearcher(twoDocIndexReader, "beer", "desc", 5.0, explainTrue)
+	beerTermSearcher5, err := NewTermSearcher(nil, twoDocIndexReader, "beer", "desc", 5.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	couchbaseTermSearcher2, err := NewTermSearcher(twoDocIndexReader, "couchbase", "street", 1.0, explainTrue)
+	couchbaseTermSearcher2, err := NewTermSearcher(nil, twoDocIndexReader, "couchbase", "street", 1.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	misterTermSearcher3, err := NewTermSearcher(twoDocIndexReader, "mister", "title", 5.0, explainTrue)
+	misterTermSearcher3, err := NewTermSearcher(nil, twoDocIndexReader, "mister", "title", 5.0, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	couchbaseAndMisterSearcher2, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{couchbaseTermSearcher2, misterTermSearcher3}, explainTrue)
+	couchbaseAndMisterSearcher2, err := NewConjunctionSearcher(nil, twoDocIndexReader, []search.Searcher{couchbaseTermSearcher2, misterTermSearcher3}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beerAndCouchbaseAndMisterSearcher, err := NewConjunctionSearcher(twoDocIndexReader, []search.Searcher{beerTermSearcher5, couchbaseAndMisterSearcher2}, explainTrue)
+	beerAndCouchbaseAndMisterSearcher, err := NewConjunctionSearcher(nil, twoDocIndexReader, []search.Searcher{beerTermSearcher5, couchbaseAndMisterSearcher2}, explainTrue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -353,7 +353,7 @@ func testScorchCompositeSearchOptimizationsHelper(
 			field := ft[0]
 			term := ft[1]
 
-			searcher, err := NewTermSearcher(indexReader, term, field, 1.0, searcherOptions)
+			searcher, err := NewTermSearcher(nil, indexReader, term, field, 1.0, searcherOptions)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -365,9 +365,9 @@ func testScorchCompositeSearchOptimizationsHelper(
 		var cs search.Searcher
 		var err error
 		if compositeKind == "conjunction" {
-			cs, err = NewConjunctionSearcher(indexReader, searchers, searcherOptions)
+			cs, err = NewConjunctionSearcher(nil, indexReader, searchers, searcherOptions)
 		} else {
-			cs, err = NewDisjunctionSearcher(indexReader, searchers, 0, searcherOptions)
+			cs, err = NewDisjunctionSearcher(nil, indexReader, searchers, 0, searcherOptions)
 		}
 		if err != nil {
 			t.Fatal(err)

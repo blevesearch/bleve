@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -55,8 +56,8 @@ func (q *MultiPhraseQuery) Boost() float64 {
 	return q.BoostVal.Value()
 }
 
-func (q *MultiPhraseQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-	return searcher.NewMultiPhraseSearcher(i, q.Terms, q.Field, options)
+func (q *MultiPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+	return searcher.NewMultiPhraseSearcher(ctx, i, q.Terms, q.Field, options)
 }
 
 func (q *MultiPhraseQuery) Validate() error {

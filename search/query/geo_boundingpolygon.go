@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -53,14 +54,14 @@ func (q *GeoBoundingPolygonQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *GeoBoundingPolygonQuery) Searcher(i index.IndexReader,
+func (q *GeoBoundingPolygonQuery) Searcher(ctx context.Context, i index.IndexReader,
 	m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
 
-	return searcher.NewGeoBoundedPolygonSearcher(i, q.Points, field, q.BoostVal.Value(), options)
+	return searcher.NewGeoBoundedPolygonSearcher(ctx, i, q.Points, field, q.BoostVal.Value(), options)
 }
 
 func (q *GeoBoundingPolygonQuery) Validate() error {

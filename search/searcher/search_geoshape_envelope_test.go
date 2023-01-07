@@ -221,7 +221,7 @@ func runGeoShapeEnvelopeRelationQuery(relation string, i index.IndexReader,
 	var rv []string
 	s := geo.NewGeoEnvelope(points)
 
-	gbs, err := NewGeoShapeSearcher(i, s, relation, field, 1.0, search.SearcherOptions{})
+	gbs, err := NewGeoShapeSearcher(nil, i, s, relation, field, 1.0, search.SearcherOptions{})
 	if err != nil {
 		return nil, err
 	}

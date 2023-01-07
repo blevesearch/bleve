@@ -118,7 +118,7 @@ func TestTermSearcher(t *testing.T) {
 		}
 	}()
 
-	searcher, err := NewTermSearcher(indexReader, queryTerm, queryField, queryBoost, queryExplain)
+	searcher, err := NewTermSearcher(nil, indexReader, queryTerm, queryField, queryBoost, queryExplain)
 	if err != nil {
 		t.Fatal(err)
 	}

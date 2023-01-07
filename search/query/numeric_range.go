@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -71,12 +72,12 @@ func (q *NumericRangeQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *NumericRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *NumericRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
-	return searcher.NewNumericRangeSearcher(i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.BoostVal.Value(), options)
+	return searcher.NewNumericRangeSearcher(ctx, i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.BoostVal.Value(), options)
 }
 
 func (q *NumericRangeQuery) Validate() error {

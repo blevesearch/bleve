@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -53,7 +54,7 @@ func (q *IPRangeQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *IPRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *IPRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -65,9 +66,9 @@ func (q *IPRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, opt
 			return nil, err
 		}
 		// If we are searching for a specific ip rather than members of a network, just use a term search.
-		return searcher.NewTermSearcherBytes(i, ip.To16(), field, q.BoostVal.Value(), options)
+		return searcher.NewTermSearcherBytes(ctx, i, ip.To16(), field, q.BoostVal.Value(), options)
 	}
-	return searcher.NewIPRangeSearcher(i, ipNet, field, q.BoostVal.Value(), options)
+	return searcher.NewIPRangeSearcher(ctx, i, ipNet, field, q.BoostVal.Value(), options)
 }
 
 func (q *IPRangeQuery) Validate() error {

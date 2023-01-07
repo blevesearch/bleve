@@ -277,6 +277,7 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 				deleted:    segmentSnapshot.deleted,
 				cachedDocs: segmentSnapshot.cachedDocs,
 				creator:    "introducePersist",
+				mmaped:     1,
 			}
 			newIndexSnapshot.segment[i] = newSegmentSnapshot
 			delete(persist.persisted, segmentSnapshot.id)
@@ -413,6 +414,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	// deleted by the time we reach here, can skip the introduction.
 	if nextMerge.new != nil &&
 		nextMerge.new.Count() > newSegmentDeleted.GetCardinality() {
+
 		// put new segment at end
 		newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
 			id:         nextMerge.id,
@@ -420,6 +422,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			deleted:    newSegmentDeleted,
 			cachedDocs: &cachedDocs{cache: nil},
 			creator:    "introduceMerge",
+			mmaped:     nextMerge.mmaped,
 		})
 		newSnapshot.offsets = append(newSnapshot.offsets, running)
 		atomic.AddUint64(&s.stats.TotIntroducedSegmentsMerge, 1)

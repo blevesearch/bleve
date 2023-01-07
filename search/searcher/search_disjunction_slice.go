@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"math"
 	"reflect"
 	"sort"
@@ -43,9 +44,10 @@ type DisjunctionSliceSearcher struct {
 	matching     []*search.DocumentMatch
 	matchingIdxs []int
 	initialized  bool
+	bytesRead    uint64
 }
 
-func newDisjunctionSliceSearcher(indexReader index.IndexReader,
+func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
 	limit bool) (
 	*DisjunctionSliceSearcher, error) {
@@ -156,7 +158,6 @@ func (s *DisjunctionSliceSearcher) updateMatches() error {
 				matchingIdxs = matchingIdxs[:0]
 			}
 		}
-
 		matching = append(matching, curr)
 		matchingIdxs = append(matchingIdxs, i)
 	}

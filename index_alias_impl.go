@@ -602,6 +602,10 @@ type indexAliasImplFieldDict struct {
 	fieldDict index.FieldDict
 }
 
+func (f *indexAliasImplFieldDict) BytesRead() uint64 {
+	return f.fieldDict.BytesRead()
+}
+
 func (f *indexAliasImplFieldDict) Next() (*index.DictEntry, error) {
 	return f.fieldDict.Next()
 }

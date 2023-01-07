@@ -354,12 +354,8 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 				return err
 			}
 
-			switch segI := seg.(type) {
-			case segment.DiskStatsReporter:
-				totalBytesRead := segI.BytesRead() + prevBytesReadTotal
-				segI.ResetBytesRead(totalBytesRead)
-				seg = segI.(segment.Segment)
-			}
+			totalBytesRead := seg.BytesRead() + prevBytesReadTotal
+			seg.ResetBytesRead(totalBytesRead)
 
 			oldNewDocNums = make(map[uint64][]uint64)
 			for i, segNewDocNums := range newDocNums {
@@ -375,6 +371,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			oldNewDocNums: oldNewDocNums,
 			new:           seg,
 			notifyCh:      make(chan *mergeTaskIntroStatus),
+			mmaped:        1,
 		}
 
 		s.fireEvent(EventKindMergeTaskIntroductionStart, 0)
@@ -433,14 +430,13 @@ type segmentMerge struct {
 	oldNewDocNums map[uint64][]uint64
 	new           segment.Segment
 	notifyCh      chan *mergeTaskIntroStatus
+	mmaped        uint32
 }
 
 func cumulateBytesRead(sbs []segment.Segment) uint64 {
 	var rv uint64
 	for _, seg := range sbs {
-		if segI, diskStatsAvailable := seg.(segment.DiskStatsReporter); diskStatsAvailable {
-			rv += segI.BytesRead()
-		}
+		rv += seg.BytesRead()
 	}
 	return rv
 }

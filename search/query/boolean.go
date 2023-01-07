@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -113,11 +114,11 @@ func (q *BooleanQuery) Boost() float64 {
 	return q.BoostVal.Value()
 }
 
-func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	var err error
 	var mustNotSearcher search.Searcher
 	if q.MustNot != nil {
-		mustNotSearcher, err = q.MustNot.Searcher(i, m, options)
+		mustNotSearcher, err = q.MustNot.Searcher(ctx, i, m, options)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +130,7 @@ func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, opt
 
 	var mustSearcher search.Searcher
 	if q.Must != nil {
-		mustSearcher, err = q.Must.Searcher(i, m, options)
+		mustSearcher, err = q.Must.Searcher(ctx, i, m, options)
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +142,7 @@ func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, opt
 
 	var shouldSearcher search.Searcher
 	if q.Should != nil {
-		shouldSearcher, err = q.Should.Searcher(i, m, options)
+		shouldSearcher, err = q.Should.Searcher(ctx, i, m, options)
 		if err != nil {
 			return nil, err
 		}
@@ -158,7 +159,7 @@ func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, opt
 
 	// if only mustNotSearcher, start with MatchAll
 	if mustSearcher == nil && shouldSearcher == nil && mustNotSearcher != nil {
-		mustSearcher, err = searcher.NewMatchAllSearcher(i, 1.0, options)
+		mustSearcher, err = searcher.NewMatchAllSearcher(ctx, i, 1.0, options)
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +170,7 @@ func (q *BooleanQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, opt
 		return shouldSearcher, nil
 	}
 
-	return searcher.NewBooleanSearcher(i, mustSearcher, shouldSearcher, mustNotSearcher, options)
+	return searcher.NewBooleanSearcher(ctx, i, mustSearcher, shouldSearcher, mustNotSearcher, options)
 }
 
 func (q *BooleanQuery) Validate() error {

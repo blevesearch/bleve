@@ -15,6 +15,8 @@
 package searcher
 
 import (
+	"context"
+
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/numeric"
@@ -27,7 +29,7 @@ type filterFunc func(key []byte) bool
 var GeoBitsShift1 = geo.GeoBits << 1
 var GeoBitsShift1Minus1 = GeoBitsShift1 - 1
 
-func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
+func NewGeoBoundingBoxSearcher(ctx context.Context, indexReader index.IndexReader, minLon, minLat,
 	maxLon, maxLat float64, field string, boost float64,
 	options search.SearcherOptions, checkBoundaries bool) (
 	search.Searcher, error) {
@@ -36,7 +38,7 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 		if err == nil {
 			terms := sp.GetQueryTokens(geo.NewBoundedRectangle(minLat,
 				minLon, maxLat, maxLon))
-			boxSearcher, err := NewMultiTermSearcher(indexReader,
+			boxSearcher, err := NewMultiTermSearcher(ctx, indexReader,
 				terms, field, boost, options, false)
 			if err != nil {
 				return nil, err
@@ -47,7 +49,7 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 				return nil, err
 			}
 
-			return NewFilteringSearcher(boxSearcher, buildRectFilter(dvReader,
+			return NewFilteringSearcher(ctx, boxSearcher, buildRectFilter(dvReader,
 				field, minLon, minLat, maxLon, maxLat)), nil
 		}
 	}
@@ -63,7 +65,7 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 	}
 
 	// do math to produce list of terms needed for this search
-	onBoundaryTerms, notOnBoundaryTerms, err := ComputeGeoRange(0, GeoBitsShift1Minus1,
+	onBoundaryTerms, notOnBoundaryTerms, err := ComputeGeoRange(nil, 0, GeoBitsShift1Minus1,
 		minLon, minLat, maxLon, maxLat, checkBoundaries, indexReader, field)
 	if err != nil {
 		return nil, err
@@ -76,13 +78,13 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 	}
 
 	if len(onBoundaryTerms) > 0 {
-		rawOnBoundarySearcher, err := NewMultiTermSearcherBytes(indexReader,
+		rawOnBoundarySearcher, err := NewMultiTermSearcherBytes(ctx, indexReader,
 			onBoundaryTerms, field, boost, options, false)
 		if err != nil {
 			return nil, err
 		}
 		// add filter to check points near the boundary
-		onBoundarySearcher = NewFilteringSearcher(rawOnBoundarySearcher,
+		onBoundarySearcher = NewFilteringSearcher(ctx, rawOnBoundarySearcher,
 			buildRectFilter(dvReader, field, minLon, minLat, maxLon, maxLat))
 		openedSearchers = append(openedSearchers, onBoundarySearcher)
 	}
@@ -90,7 +92,7 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 	var notOnBoundarySearcher search.Searcher
 	if len(notOnBoundaryTerms) > 0 {
 		var err error
-		notOnBoundarySearcher, err = NewMultiTermSearcherBytes(indexReader,
+		notOnBoundarySearcher, err = NewMultiTermSearcherBytes(ctx, indexReader,
 			notOnBoundaryTerms, field, boost, options, false)
 		if err != nil {
 			cleanupOpenedSearchers()
@@ -100,7 +102,7 @@ func NewGeoBoundingBoxSearcher(indexReader index.IndexReader, minLon, minLat,
 	}
 
 	if onBoundarySearcher != nil && notOnBoundarySearcher != nil {
-		rv, err := NewDisjunctionSearcher(indexReader,
+		rv, err := NewDisjunctionSearcher(ctx, indexReader,
 			[]search.Searcher{
 				onBoundarySearcher,
 				notOnBoundarySearcher,
@@ -125,12 +127,12 @@ var geoDetailLevel = ((geo.GeoBits << 1) - geoMaxShift) / 2
 
 type closeFunc func() error
 
-func ComputeGeoRange(term uint64, shift uint,
+func ComputeGeoRange(ctx context.Context, term uint64, shift uint,
 	sminLon, sminLat, smaxLon, smaxLat float64, checkBoundaries bool,
 	indexReader index.IndexReader, field string) (
 	onBoundary [][]byte, notOnBoundary [][]byte, err error) {
 
-	isIndexed, closeF, err := buildIsIndexedFunc(indexReader, field)
+	isIndexed, closeF, err := buildIsIndexedFunc(ctx, indexReader, field)
 	if closeF != nil {
 		defer func() {
 			cerr := closeF()
@@ -156,7 +158,7 @@ func ComputeGeoRange(term uint64, shift uint,
 	return grc.onBoundary, grc.notOnBoundary, nil
 }
 
-func buildIsIndexedFunc(indexReader index.IndexReader, field string) (isIndexed filterFunc, closeF closeFunc, err error) {
+func buildIsIndexedFunc(ctx context.Context, indexReader index.IndexReader, field string) (isIndexed filterFunc, closeF closeFunc, err error) {
 	if irr, ok := indexReader.(index.IndexReaderContains); ok {
 		fieldDict, err := irr.FieldDictContains(field)
 		if err != nil {
@@ -179,7 +181,7 @@ func buildIsIndexedFunc(indexReader index.IndexReader, field string) (isIndexed 
 		}
 	} else if indexReader != nil {
 		isIndexed = func(term []byte) bool {
-			reader, err := indexReader.TermFieldReader(term, field, false, false, false)
+			reader, err := indexReader.TermFieldReader(ctx, term, field, false, false, false)
 			if err != nil || reader == nil {
 				return false
 			}

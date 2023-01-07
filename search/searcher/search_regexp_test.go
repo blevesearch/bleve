@@ -76,7 +76,7 @@ func searcherMaker(t *testing.T, ir index.IndexReader, re, field string) search.
 		t.Fatal(err)
 	}
 
-	regexpSearcher, err := NewRegexpSearcher(ir, pattern, field, 1.0,
+	regexpSearcher, err := NewRegexpSearcher(nil, ir, pattern, field, 1.0,
 		search.SearcherOptions{Explain: true})
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +86,7 @@ func searcherMaker(t *testing.T, ir index.IndexReader, re, field string) search.
 }
 
 func searcherStringMaker(t *testing.T, ir index.IndexReader, re, field string) search.Searcher {
-	regexpSearcher, err := NewRegexpStringSearcher(ir, re, field, 1.0,
+	regexpSearcher, err := NewRegexpStringSearcher(nil, ir, re, field, 1.0,
 		search.SearcherOptions{Explain: true})
 	if err != nil {
 		t.Fatal(err)

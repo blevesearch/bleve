@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -133,7 +134,7 @@ func (q *DateRangeQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *DateRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *DateRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	min, max, err := q.parseEndpoints()
 	if err != nil {
 		return nil, err
@@ -144,7 +145,7 @@ func (q *DateRangeQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, o
 		field = m.DefaultSearchField()
 	}
 
-	return searcher.NewNumericRangeSearcher(i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal.Value(), options)
+	return searcher.NewNumericRangeSearcher(ctx, i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal.Value(), options)
 }
 
 func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {

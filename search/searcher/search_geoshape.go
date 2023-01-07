@@ -16,6 +16,7 @@ package searcher
 
 import (
 	"bytes"
+	"context"
 
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/search"
@@ -23,7 +24,7 @@ import (
 	"github.com/blevesearch/geo/geojson"
 )
 
-func NewGeoShapeSearcher(indexReader index.IndexReader, shape index.GeoJSON,
+func NewGeoShapeSearcher(ctx context.Context, indexReader index.IndexReader, shape index.GeoJSON,
 	relation string, field string, boost float64,
 	options search.SearcherOptions) (search.Searcher, error) {
 	var err error
@@ -41,7 +42,7 @@ func NewGeoShapeSearcher(indexReader index.IndexReader, shape index.GeoJSON,
 
 	// obtain the query tokens.
 	terms := spatialPlugin.GetQueryTokens(shape)
-	mSearcher, err := NewMultiTermSearcher(indexReader, terms,
+	mSearcher, err := NewMultiTermSearcher(ctx, indexReader, terms,
 		field, boost, options, false)
 	if err != nil {
 		return nil, err
@@ -52,7 +53,7 @@ func NewGeoShapeSearcher(indexReader index.IndexReader, shape index.GeoJSON,
 		return nil, err
 	}
 
-	return NewFilteringSearcher(mSearcher,
+	return NewFilteringSearcher(ctx, mSearcher,
 		buildRelationFilterOnShapes(dvReader, field, relation, shape)), nil
 
 }

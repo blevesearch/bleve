@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -42,7 +43,7 @@ func (q *MatchNoneQuery) Boost() float64 {
 	return q.BoostVal.Value()
 }
 
-func (q *MatchNoneQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *MatchNoneQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	return searcher.NewMatchNoneSearcher(i)
 }
 

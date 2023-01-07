@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -37,7 +38,7 @@ type DocIDSearcher struct {
 	count  int
 }
 
-func NewDocIDSearcher(indexReader index.IndexReader, ids []string, boost float64,
+func NewDocIDSearcher(ctx context.Context, indexReader index.IndexReader, ids []string, boost float64,
 	options search.SearcherOptions) (searcher *DocIDSearcher, err error) {
 
 	reader, err := indexReader.DocIDReaderOnly(ids)

@@ -15,6 +15,8 @@
 package query
 
 import (
+	"context"
+
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
@@ -53,10 +55,10 @@ func (q *PrefixQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *PrefixQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *PrefixQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
-	return searcher.NewTermPrefixSearcher(i, q.Prefix, field, q.BoostVal.Value(), options)
+	return searcher.NewTermPrefixSearcher(ctx, i, q.Prefix, field, q.BoostVal.Value(), options)
 }

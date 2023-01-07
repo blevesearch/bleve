@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -58,11 +59,11 @@ func (q *DisjunctionQuery) SetMin(m float64) {
 	q.Min = m
 }
 
-func (q *DisjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
+func (q *DisjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping,
 	options search.SearcherOptions) (search.Searcher, error) {
 	ss := make([]search.Searcher, 0, len(q.Disjuncts))
 	for _, disjunct := range q.Disjuncts {
-		sr, err := disjunct.Searcher(i, m, options)
+		sr, err := disjunct.Searcher(ctx, i, m, options)
 		if err != nil {
 			for _, searcher := range ss {
 				if searcher != nil {
@@ -82,7 +83,7 @@ func (q *DisjunctionQuery) Searcher(i index.IndexReader, m mapping.IndexMapping,
 		return searcher.NewMatchNoneSearcher(i)
 	}
 
-	return searcher.NewDisjunctionSearcher(i, ss, q.Min, options)
+	return searcher.NewDisjunctionSearcher(ctx, i, ss, q.Min, options)
 }
 
 func (q *DisjunctionQuery) Validate() error {

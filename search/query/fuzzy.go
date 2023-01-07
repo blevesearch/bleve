@@ -15,6 +15,8 @@
 package query
 
 import (
+	"context"
+
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
@@ -68,10 +70,10 @@ func (q *FuzzyQuery) SetPrefix(p int) {
 	q.Prefix = p
 }
 
-func (q *FuzzyQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *FuzzyQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
-	return searcher.NewFuzzySearcher(i, q.Term, q.Prefix, q.Fuzziness, field, q.BoostVal.Value(), options)
+	return searcher.NewFuzzySearcher(ctx, i, q.Term, q.Prefix, q.Fuzziness, field, q.BoostVal.Value(), options)
 }

@@ -15,6 +15,7 @@
 package query
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -56,7 +57,7 @@ func (q *GeoBoundingBoxQuery) Field() string {
 	return q.FieldVal
 }
 
-func (q *GeoBoundingBoxQuery) Searcher(i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
+func (q *GeoBoundingBoxQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
@@ -65,20 +66,20 @@ func (q *GeoBoundingBoxQuery) Searcher(i index.IndexReader, m mapping.IndexMappi
 	if q.BottomRight[0] < q.TopLeft[0] {
 		// cross date line, rewrite as two parts
 
-		leftSearcher, err := searcher.NewGeoBoundingBoxSearcher(i, -180, q.BottomRight[1], q.BottomRight[0], q.TopLeft[1], field, q.BoostVal.Value(), options, true)
+		leftSearcher, err := searcher.NewGeoBoundingBoxSearcher(ctx, i, -180, q.BottomRight[1], q.BottomRight[0], q.TopLeft[1], field, q.BoostVal.Value(), options, true)
 		if err != nil {
 			return nil, err
 		}
-		rightSearcher, err := searcher.NewGeoBoundingBoxSearcher(i, q.TopLeft[0], q.BottomRight[1], 180, q.TopLeft[1], field, q.BoostVal.Value(), options, true)
+		rightSearcher, err := searcher.NewGeoBoundingBoxSearcher(ctx, i, q.TopLeft[0], q.BottomRight[1], 180, q.TopLeft[1], field, q.BoostVal.Value(), options, true)
 		if err != nil {
 			_ = leftSearcher.Close()
 			return nil, err
 		}
 
-		return searcher.NewDisjunctionSearcher(i, []search.Searcher{leftSearcher, rightSearcher}, 0, options)
+		return searcher.NewDisjunctionSearcher(ctx, i, []search.Searcher{leftSearcher, rightSearcher}, 0, options)
 	}
 
-	return searcher.NewGeoBoundingBoxSearcher(i, q.TopLeft[0], q.BottomRight[1], q.BottomRight[0], q.TopLeft[1], field, q.BoostVal.Value(), options, true)
+	return searcher.NewGeoBoundingBoxSearcher(ctx, i, q.TopLeft[0], q.BottomRight[1], q.BottomRight[0], q.TopLeft[1], field, q.BoostVal.Value(), options, true)
 }
 
 func (q *GeoBoundingBoxQuery) Validate() error {

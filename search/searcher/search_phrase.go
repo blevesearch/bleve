@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"reflect"
@@ -63,22 +64,22 @@ func (s *PhraseSearcher) Size() int {
 	return sizeInBytes
 }
 
-func NewPhraseSearcher(indexReader index.IndexReader, terms []string, field string, options search.SearcherOptions) (*PhraseSearcher, error) {
+func NewPhraseSearcher(ctx context.Context, indexReader index.IndexReader, terms []string, field string, options search.SearcherOptions) (*PhraseSearcher, error) {
 	// turn flat terms []string into [][]string
 	mterms := make([][]string, len(terms))
 	for i, term := range terms {
 		mterms[i] = []string{term}
 	}
-	return NewMultiPhraseSearcher(indexReader, mterms, field, options)
+	return NewMultiPhraseSearcher(ctx, indexReader, mterms, field, options)
 }
 
-func NewMultiPhraseSearcher(indexReader index.IndexReader, terms [][]string, field string, options search.SearcherOptions) (*PhraseSearcher, error) {
+func NewMultiPhraseSearcher(ctx context.Context, indexReader index.IndexReader, terms [][]string, field string, options search.SearcherOptions) (*PhraseSearcher, error) {
 	options.IncludeTermVectors = true
 	var termPositionSearchers []search.Searcher
 	for _, termPos := range terms {
 		if len(termPos) == 1 && termPos[0] != "" {
 			// single term
-			ts, err := NewTermSearcher(indexReader, termPos[0], field, 1.0, options)
+			ts, err := NewTermSearcher(ctx, indexReader, termPos[0], field, 1.0, options)
 			if err != nil {
 				// close any searchers already opened
 				for _, ts := range termPositionSearchers {
@@ -94,7 +95,7 @@ func NewMultiPhraseSearcher(indexReader index.IndexReader, terms [][]string, fie
 				if term == "" {
 					continue
 				}
-				ts, err := NewTermSearcher(indexReader, term, field, 1.0, options)
+				ts, err := NewTermSearcher(ctx, indexReader, term, field, 1.0, options)
 				if err != nil {
 					// close any searchers already opened
 					for _, ts := range termPositionSearchers {
@@ -104,7 +105,7 @@ func NewMultiPhraseSearcher(indexReader index.IndexReader, terms [][]string, fie
 				}
 				termSearchers = append(termSearchers, ts)
 			}
-			disjunction, err := NewDisjunctionSearcher(indexReader, termSearchers, 1, options)
+			disjunction, err := NewDisjunctionSearcher(ctx, indexReader, termSearchers, 1, options)
 			if err != nil {
 				// close any searchers already opened
 				for _, ts := range termPositionSearchers {
@@ -116,7 +117,7 @@ func NewMultiPhraseSearcher(indexReader index.IndexReader, terms [][]string, fie
 		}
 	}
 
-	mustSearcher, err := NewConjunctionSearcher(indexReader, termPositionSearchers, options)
+	mustSearcher, err := NewConjunctionSearcher(ctx, indexReader, termPositionSearchers, options)
 	if err != nil {
 		// close any searchers already opened
 		for _, ts := range termPositionSearchers {

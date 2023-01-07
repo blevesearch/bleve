@@ -286,7 +286,7 @@ func runGeoShapeGeometryCollectionRelationQuery(relation string, i index.IndexRe
 		return nil, err
 	}
 
-	gbs, err := NewGeoShapeSearcher(i, s, relation, field, 1.0, search.SearcherOptions{})
+	gbs, err := NewGeoShapeSearcher(nil, i, s, relation, field, 1.0, search.SearcherOptions{})
 	if err != nil {
 		return nil, err
 	}

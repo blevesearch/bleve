@@ -254,7 +254,7 @@ func runGeoShapeLinestringQueryWithRelation(relation string, i index.IndexReader
 func executeSearch(relation string, i index.IndexReader,
 	s index.GeoJSON, field string) ([]string, error) {
 	var rv []string
-	gbs, err := NewGeoShapeSearcher(i, s, relation, field, 1.0, search.SearcherOptions{})
+	gbs, err := NewGeoShapeSearcher(nil, i, s, relation, field, 1.0, search.SearcherOptions{})
 	if err != nil {
 		return nil, err
 	}

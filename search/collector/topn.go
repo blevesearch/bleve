@@ -54,6 +54,7 @@ type TopNCollector struct {
 	size          int
 	skip          int
 	total         uint64
+	bytesRead     uint64
 	maxScore      float64
 	took          time.Duration
 	sort          search.SortOrder
@@ -197,7 +198,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 
 	hc.needDocIds = hc.needDocIds || loadID
-
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -224,6 +224,14 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		}
 
 		next, err = searcher.Next(searchContext)
+	}
+
+	statsCallbackFn := ctx.Value(search.SearchIOStatsCallbackKey)
+	if statsCallbackFn != nil {
+		// hc.bytesRead corresponds to the
+		// total bytes read as part of docValues being read every hit
+		// which must be accounted by invoking the callback.
+		statsCallbackFn.(search.SearchIOStatsCallbackFunc)(hc.bytesRead)
 	}
 
 	// help finalize/flush the results in case
@@ -350,6 +358,8 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.EndDoc()
 	}
+
+	hc.bytesRead += hc.dvReader.BytesRead()
 
 	return err
 }

@@ -78,9 +78,11 @@ func (s *CJKBigramFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
 				if itemsInRing < 2 {
 					itemsInRing++
 				}
+				builtUnigram := false
 				if itemsInRing > 1 && s.outputUnigram {
 					unigram := s.buildUnigram(r, &itemsInRing, outputPos)
 					if unigram != nil {
+						builtUnigram = true
 						rv = append(rv, unigram)
 					}
 				}
@@ -88,6 +90,11 @@ func (s *CJKBigramFilter) Filter(input analysis.TokenStream) analysis.TokenStrea
 				if bigramToken != nil {
 					rv = append(rv, bigramToken)
 					outputPos++
+				}
+
+				// prev token should be removed if unigram was built
+				if builtUnigram {
+					itemsInRing--
 				}
 			}
 

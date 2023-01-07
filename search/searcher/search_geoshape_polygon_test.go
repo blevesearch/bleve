@@ -300,7 +300,7 @@ func runGeoShapePolygonQueryWithRelation(relation string, i index.IndexReader,
 	var rv []string
 	s := geo.NewGeoJsonPolygon(points)
 
-	gbs, err := NewGeoShapeSearcher(i, s, relation, field, 1.0, search.SearcherOptions{})
+	gbs, err := NewGeoShapeSearcher(nil, i, s, relation, field, 1.0, search.SearcherOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -607,7 +607,7 @@ func runGeoShapeMultiPolygonQueryWithRelation(relation string,
 	var rv []string
 	s := geo.NewGeoJsonMultiPolygon(points)
 
-	gbs, err := NewGeoShapeSearcher(i, s, relation,
+	gbs, err := NewGeoShapeSearcher(nil, i, s, relation,
 		field, 1.0, search.SearcherOptions{})
 	if err != nil {
 		return nil, err

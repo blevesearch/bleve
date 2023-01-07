@@ -16,6 +16,7 @@ package searcher
 
 import (
 	"bytes"
+	"context"
 	"math"
 	"sort"
 
@@ -24,7 +25,7 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-func NewNumericRangeSearcher(indexReader index.IndexReader,
+func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 	min *float64, max *float64, inclusiveMin, inclusiveMax *bool, field string,
 	boost float64, options search.SearcherOptions) (search.Searcher, error) {
 	// account for unbounded edges
@@ -55,6 +56,7 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 	}
 
 	var fieldDict index.FieldDictContains
+	var dictBytesRead uint64
 	var isIndexed filterFunc
 	var err error
 	if irr, ok := indexReader.(index.IndexReaderContains); ok {
@@ -67,6 +69,8 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 			found, err := fieldDict.Contains(term)
 			return err == nil && found
 		}
+
+		dictBytesRead = fieldDict.BytesRead()
 	}
 
 	// FIXME hard-coded precision, should match field declaration
@@ -81,10 +85,16 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 	}
 
 	if len(terms) < 1 {
+		// reporting back the IO stats with respect to the dictionary
+		// loaded, using the context
+		if ctx != nil {
+			reportIOStats(dictBytesRead, ctx)
+		}
+
 		// cannot return MatchNoneSearcher because of interaction with
 		// commit f391b991c20f02681bacd197afc6d8aed444e132
-		return NewMultiTermSearcherBytes(indexReader, terms, field, boost, options,
-			true)
+		return NewMultiTermSearcherBytes(ctx, indexReader, terms, field,
+			boost, options, true)
 	}
 
 	// for upside_down
@@ -99,8 +109,12 @@ func NewNumericRangeSearcher(indexReader index.IndexReader,
 		return nil, tooManyClausesErr(field, len(terms))
 	}
 
-	return NewMultiTermSearcherBytes(indexReader, terms, field, boost, options,
-		true)
+	if ctx != nil {
+		reportIOStats(dictBytesRead, ctx)
+	}
+
+	return NewMultiTermSearcherBytes(ctx, indexReader, terms, field,
+		boost, options, true)
 }
 
 func filterCandidateTerms(indexReader index.IndexReader,

@@ -349,6 +349,7 @@ func testVersusSearches(vt *VersusTest, searchTemplates []string, idxA, idxB ble
 					t.Errorf("\n    doc: %d, body: %s", idx, strings.Join(vt.Bodies[idx], " "))
 				}
 			}
+
 			if !reflect.DeepEqual(hitsA, hitsB) {
 				t.Errorf("=========\nsearch: (%d) %s,\n res hits mismatch,\n len(hitsA): %d,\n len(hitsB): %d",
 					i, bufBytes, len(hitsA), len(hitsB))
@@ -358,6 +359,8 @@ func testVersusSearches(vt *VersusTest, searchTemplates []string, idxA, idxB ble
 
 			resA.Hits = nil
 			resB.Hits = nil
+			resA.BytesRead = 0
+			resB.BytesRead = 0
 
 			if !reflect.DeepEqual(resA, resB) {
 				resAj, _ := json.Marshal(resA)
