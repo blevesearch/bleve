@@ -902,7 +902,7 @@ func (s *Scorch) getProtectedEpochs(
 	persistedSnapshots []*snapshotMetaData) map[uint64]struct{} {
 
 	// make a map of epochs to protect from deletion
-	protectedEpochs := make(map[uint64]struct{}, s.numSnapshotsToKeep)
+	protectedEpochs := make(map[uint64]struct{})
 	protectedEpochs[persistedSnapshots[0].epoch] = struct{}{}
 	nextSnapshotToProtect :=
 		persistedSnapshots[0].timeStamp.Add(s.rollbackSamplingInterval)
@@ -948,7 +948,7 @@ func (s *Scorch) getProtectedEpochs(
 // Removes enough snapshots from the rootBolt so that the
 // s.eligibleForRemoval stays under the NumSnapshotsToKeep policy.
 func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
-	persistedSnapshots, err := s.rootBoltSnapshotEpochTimeStamps()
+	persistedSnapshots, err := s.rootBoltSnapshotMetaData()
 	if err != nil {
 		return 0, err
 	}
@@ -1071,7 +1071,7 @@ type snapshotMetaData struct {
 	timeStamp time.Time
 }
 
-func (s *Scorch) rootBoltSnapshotEpochTimeStamps() ([]*snapshotMetaData, error) {
+func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 	var rv []*snapshotMetaData
 	err := s.rootBolt.View(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(boltSnapshotsBucket)
@@ -1098,7 +1098,8 @@ func (s *Scorch) rootBoltSnapshotEpochTimeStamps() ([]*snapshotMetaData, error) 
 			}
 			rv = append(rv, &snapshotMetaData{
 				epoch:     snapshotEpoch,
-				timeStamp: timeStamp})
+				timeStamp: timeStamp,
+			})
 		}
 		return nil
 	})
