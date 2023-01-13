@@ -905,19 +905,20 @@ func (s *Scorch) getProtectedEpochs(
 	protectedEpochs := make(map[uint64]struct{})
 	protectedEpochs[persistedSnapshots[0].epoch] = struct{}{}
 	nextSnapshotToProtect :=
-		persistedSnapshots[0].timeStamp.Add(s.rollbackSamplingInterval)
+		persistedSnapshots[0].timeStamp.Add(-s.rollbackSamplingInterval)
 	protectedSnapshots := 1
 	lastProtectedSnapshot := 0
 
 	for i := 1; i < len(persistedSnapshots); i++ {
-		// Finding that snapshot whose timestamp is just above
+		// Finding that snapshot whose timestamp is just older than
 		// the required timestamp, because the snapshot at the previous
 		// index is bound to be the closest possible snapshot to the
-		// required timestamp of nextSnapshotToProtect
-		if persistedSnapshots[i].timeStamp.After(nextSnapshotToProtect) {
+		// required timestamp of nextSnapshotToProtect but newer than the
+		// same.
+		if persistedSnapshots[i].timeStamp.Before(nextSnapshotToProtect) {
 			protectedEpochs[persistedSnapshots[i-1].epoch] = struct{}{}
 			nextSnapshotToProtect =
-				persistedSnapshots[i-1].timeStamp.Add(s.rollbackSamplingInterval)
+				persistedSnapshots[i-1].timeStamp.Add(-s.rollbackSamplingInterval)
 			protectedSnapshots++
 			lastProtectedSnapshot = i - 1
 			if protectedSnapshots >= s.numSnapshotsToKeep {
