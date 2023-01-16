@@ -16,7 +16,6 @@ package scorch
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 
@@ -49,7 +48,7 @@ func NewBuilder(config map[string]interface{}) (*Builder, error) {
 	}
 
 	buildPathPrefix, _ := config["buildPathPrefix"].(string)
-	buildPath, err := ioutil.TempDir(buildPathPrefix, "scorch-offline-build")
+	buildPath, err := os.MkdirTemp(buildPathPrefix, "scorch-offline-build")
 	if err != nil {
 		return nil, err
 	}

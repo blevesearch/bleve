@@ -3,15 +3,17 @@
 // DO NOT EDIT!
 
 /*
-	Package upsidedown is a generated protocol buffer package.
+Package upsidedown is a generated protocol buffer package.
 
-	It is generated from these files:
-		upsidedown.proto
+It is generated from these files:
 
-	It has these top-level messages:
-		BackIndexTermsEntry
-		BackIndexStoreEntry
-		BackIndexRowValue
+	upsidedown.proto
+
+It has these top-level messages:
+
+	BackIndexTermsEntry
+	BackIndexStoreEntry
+	BackIndexRowValue
 */
 package upsidedown
 

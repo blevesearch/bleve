@@ -15,14 +15,12 @@
 package searcher
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"sort"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/index/scorch"
-
 	"github.com/blevesearch/bleve/v2/search"
 )
 
@@ -206,7 +204,7 @@ func TestTermRangeSearch(t *testing.T) {
 }
 
 func TestTermRangeSearchTooManyTerms(t *testing.T) {
-	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
+	dir, _ := os.MkdirTemp("", "scorchTwoDoc")
 	defer func() {
 		_ = os.RemoveAll(dir)
 	}()

@@ -17,7 +17,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -91,7 +90,7 @@ func getAllFiles(args []string, rv chan file) {
 				return nil
 			}
 
-			bytes, err := ioutil.ReadFile(path)
+			bytes, err := os.ReadFile(path)
 			if err != nil {
 				log.Fatal(err)
 			}

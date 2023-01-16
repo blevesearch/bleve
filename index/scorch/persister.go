@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math"
 	"os"
@@ -943,14 +942,14 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 }
 
 func (s *Scorch) maxSegmentIDOnDisk() (uint64, error) {
-	currFileInfos, err := ioutil.ReadDir(s.path)
+	files, err := os.ReadDir(s.path)
 	if err != nil {
 		return 0, err
 	}
 
 	var rv uint64
-	for _, finfo := range currFileInfos {
-		fname := finfo.Name()
+	for _, f := range files {
+		fname := f.Name()
 		if filepath.Ext(fname) == ".zap" {
 			prefix := strings.TrimSuffix(fname, ".zap")
 			id, err2 := strconv.ParseUint(prefix, 16, 64)
@@ -972,15 +971,15 @@ func (s *Scorch) removeOldZapFiles() error {
 		return err
 	}
 
-	currFileInfos, err := ioutil.ReadDir(s.path)
+	files, err := os.ReadDir(s.path)
 	if err != nil {
 		return err
 	}
 
 	s.rootLock.RLock()
 
-	for _, finfo := range currFileInfos {
-		fname := finfo.Name()
+	for _, f := range files {
+		fname := f.Name()
 		if filepath.Ext(fname) == ".zap" {
 			if _, exists := liveFileNames[fname]; !exists && !s.ineligibleForRemoval[fname] {
 				err := os.Remove(s.path + string(os.PathSeparator) + fname)

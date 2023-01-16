@@ -17,7 +17,6 @@ package bleve
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -46,7 +45,7 @@ func openIndexMeta(path string) (*indexMeta, error) {
 		return nil, ErrorIndexPathDoesNotExist
 	}
 	indexMetaPath := indexMetaPath(path)
-	metaBytes, err := ioutil.ReadFile(indexMetaPath)
+	metaBytes, err := os.ReadFile(indexMetaPath)
 	if err != nil {
 		return nil, ErrorIndexMetaMissing
 	}

@@ -17,22 +17,21 @@ Package bleve is a library for indexing and searching text.
 
 Example Opening New Index, Indexing Data
 
-    message := struct{
-        Id:   "example"
-        From: "marty.schoch@gmail.com",
-        Body: "bleve indexing is easy",
-    }
+	message := struct{
+	    Id:   "example"
+	    From: "marty.schoch@gmail.com",
+	    Body: "bleve indexing is easy",
+	}
 
-    mapping := bleve.NewIndexMapping()
-    index, _ := bleve.New("example.bleve", mapping)
-    index.Index(message.Id, message)
+	mapping := bleve.NewIndexMapping()
+	index, _ := bleve.New("example.bleve", mapping)
+	index.Index(message.Id, message)
 
 Example Opening Existing Index, Searching Data
 
-    index, _ := bleve.Open("example.bleve")
-    query := bleve.NewQueryStringQuery("bleve")
-    searchRequest := bleve.NewSearchRequest(query)
-    searchResult, _ := index.Search(searchRequest)
-
+	index, _ := bleve.Open("example.bleve")
+	query := bleve.NewQueryStringQuery("bleve")
+	searchRequest := bleve.NewSearchRequest(query)
+	searchResult, _ := index.Search(searchRequest)
 */
 package bleve
