@@ -898,14 +898,19 @@ var RollbackSamplingInterval = 1 * time.Hour
 // getProtectedEpochs aims to fetch the epochs keep based on a timestamp basis.
 // It tries to get NumSnapshotsToKeep snapshots, each of which are separated
 // by a time duration of RollbackSamplingInterval.
-func (s *Scorch) getProtectedEpochs(
+func getProtectedEpochs(rollbackSamplingInterval time.Duration,
+	numSnapshotsToKeep int,
 	persistedSnapshots []*snapshotMetaData) map[uint64]struct{} {
 
 	// make a map of epochs to protect from deletion
 	protectedEpochs := make(map[uint64]struct{})
 	protectedEpochs[persistedSnapshots[0].epoch] = struct{}{}
+
+	// snapshot.timeStamp.Add(-s.rollbackSamplingInterval) basically
+	// translates to "the next timestamp which is s.rollbackSamplingInterval
+	// older than the current timestamp"
 	nextSnapshotToProtect :=
-		persistedSnapshots[0].timeStamp.Add(-s.rollbackSamplingInterval)
+		persistedSnapshots[0].timeStamp.Add(-rollbackSamplingInterval)
 	protectedSnapshots := 1
 	lastProtectedSnapshot := 0
 
@@ -918,12 +923,18 @@ func (s *Scorch) getProtectedEpochs(
 		if persistedSnapshots[i].timeStamp.Before(nextSnapshotToProtect) {
 			protectedEpochs[persistedSnapshots[i-1].epoch] = struct{}{}
 			nextSnapshotToProtect =
-				persistedSnapshots[i-1].timeStamp.Add(-s.rollbackSamplingInterval)
+				persistedSnapshots[i-1].timeStamp.Add(-rollbackSamplingInterval)
 			protectedSnapshots++
 			lastProtectedSnapshot = i - 1
-			if protectedSnapshots >= s.numSnapshotsToKeep {
-				return protectedEpochs
-			}
+		} else if persistedSnapshots[i].timeStamp.Equal(nextSnapshotToProtect) {
+			protectedEpochs[persistedSnapshots[i].epoch] = struct{}{}
+			nextSnapshotToProtect =
+				persistedSnapshots[i].timeStamp.Add(-rollbackSamplingInterval)
+			protectedSnapshots++
+			lastProtectedSnapshot = i
+		}
+		if protectedSnapshots >= numSnapshotsToKeep {
+			return protectedEpochs
 		}
 	}
 
@@ -932,10 +943,10 @@ func (s *Scorch) getProtectedEpochs(
 	// protect the next s.numSnapshotsToKeep - protectedSnapshots
 	// of snapshots.
 	start := lastProtectedSnapshot + 1
-	end := start + s.numSnapshotsToKeep - protectedSnapshots
+	end := start + numSnapshotsToKeep - protectedSnapshots
 
 	// If we don't have enough snapshots, just take all of them.
-	if s.numSnapshotsToKeep-protectedSnapshots >=
+	if numSnapshotsToKeep-protectedSnapshots >=
 		len(persistedSnapshots)-lastProtectedSnapshot {
 		end = len(persistedSnapshots)
 	}
@@ -959,7 +970,8 @@ func (s *Scorch) removeOldBoltSnapshots() (numRemoved int, err error) {
 		return 0, nil
 	}
 
-	protectedEpochs := s.getProtectedEpochs(persistedSnapshots)
+	protectedEpochs := getProtectedEpochs(s.rollbackSamplingInterval,
+		s.numSnapshotsToKeep, persistedSnapshots)
 
 	var epochsToRemove []uint64
 	var newEligible []uint64
