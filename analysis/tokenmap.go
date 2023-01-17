@@ -18,7 +18,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"io/ioutil"
+	"os"
 	"strings"
 )
 
@@ -32,7 +32,7 @@ func NewTokenMap() TokenMap {
 // one per line.
 // Comments are supported using `#` or `|`
 func (t TokenMap) LoadFile(filename string) error {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}

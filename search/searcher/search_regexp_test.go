@@ -17,7 +17,6 @@ package searcher
 import (
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"testing"
@@ -39,7 +38,7 @@ func TestRegexpStringSearchUpsideDown(t *testing.T) {
 }
 
 func TestRegexpSearchScorch(t *testing.T) {
-	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
+	dir, _ := os.MkdirTemp("", "scorchTwoDoc")
 	defer func() {
 		_ = os.RemoveAll(dir)
 	}()
@@ -50,7 +49,7 @@ func TestRegexpSearchScorch(t *testing.T) {
 }
 
 func TestRegexpStringSearchScorch(t *testing.T) {
-	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
+	dir, _ := os.MkdirTemp("", "scorchTwoDoc")
 	defer func() {
 		_ = os.RemoveAll(dir)
 	}()

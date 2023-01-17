@@ -16,7 +16,6 @@ package scorch
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -25,7 +24,7 @@ import (
 )
 
 func TestBuilder(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "scorch-builder-test")
+	tmpDir, err := os.MkdirTemp("", "scorch-builder-test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +121,7 @@ func checkIndex(t *testing.T, path string, term []byte, field string, expectCoun
 }
 
 func TestBuilderFlushFinalBatch(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "scorch-builder-test")
+	tmpDir, err := os.MkdirTemp("", "scorch-builder-test")
 	if err != nil {
 		t.Fatal(err)
 	}

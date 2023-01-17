@@ -17,7 +17,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -60,7 +60,7 @@ var createCmd = &cobra.Command{
 func buildMapping() (mapping.IndexMapping, error) {
 	mapping := mapping.NewIndexMapping()
 	if mappingPath != "" {
-		mappingBytes, err := ioutil.ReadFile(mappingPath)
+		mappingBytes, err := os.ReadFile(mappingPath)
 		if err != nil {
 			return nil, err
 		}

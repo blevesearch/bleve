@@ -16,13 +16,12 @@ package bleve
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 )
 
 func TestBuilder(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "bleve-scorch-builder-test")
+	tmpDir, err := os.MkdirTemp("", "bleve-scorch-builder-test")
 	if err != nil {
 		t.Fatal(err)
 	}

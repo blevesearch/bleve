@@ -49,7 +49,7 @@ type Fatalfable interface {
 }
 
 func createTmpIndexPath(f Fatalfable) string {
-	tmpIndexPath, err := ioutil.TempDir("", "bleve-testidx")
+	tmpIndexPath, err := os.MkdirTemp("", "bleve-testidx")
 	if err != nil {
 		f.Fatalf("error creating temp dir: %v", err)
 	}
@@ -512,7 +512,7 @@ func getBatchFromData(idx Index, fileName string) (*Batch, error) {
 	path := filepath.Join(pwd, "data", "test", fileName)
 	batch := idx.NewBatch()
 	var dataset []map[string]interface{}
-	fileContent, err := ioutil.ReadFile(path)
+	fileContent, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -720,7 +720,7 @@ func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
 	tmpIndexPathMeta := filepath.Join(tmpIndexPath, "index_meta.json")
 
 	// now intentionally change the storage type
-	err = ioutil.WriteFile(tmpIndexPathMeta, []byte(`{"storage":"mystery"}`), 0666)
+	err = os.WriteFile(tmpIndexPathMeta, []byte(`{"storage":"mystery"}`), 0666)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -731,7 +731,7 @@ func TestIndexOpenMetaMissingOrCorrupt(t *testing.T) {
 	}
 
 	// now intentionally corrupt the metadata
-	err = ioutil.WriteFile(tmpIndexPathMeta, []byte("corrupted"), 0666)
+	err = os.WriteFile(tmpIndexPathMeta, []byte("corrupted"), 0666)
 	if err != nil {
 		t.Fatal(err)
 	}

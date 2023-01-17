@@ -17,7 +17,6 @@ package scorch
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
@@ -2623,7 +2622,7 @@ func TestReadOnlyIndex(t *testing.T) {
 	// in the index to read-only.
 	var permissionsFunc func(folder string)
 	permissionsFunc = func(folder string) {
-		entries, _ := ioutil.ReadDir(folder)
+		entries, _ := os.ReadDir(folder)
 		for _, entry := range entries {
 			fullName := filepath.Join(folder, entry.Name())
 			if entry.IsDir() {

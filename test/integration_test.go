@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -63,26 +62,26 @@ func TestIntegration(t *testing.T) {
 		}
 	}
 
-	fis, err := ioutil.ReadDir("tests")
+	entries, err := os.ReadDir("tests")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, fi := range fis {
+	for _, f := range entries {
 		if datasetRegexp != nil {
-			if !datasetRegexp.MatchString(fi.Name()) {
+			if !datasetRegexp.MatchString(f.Name()) {
 				continue
 			}
 		}
-		if fi.IsDir() {
-			t.Logf("Running test: %s", fi.Name())
-			runTestDir(t, "tests"+string(filepath.Separator)+fi.Name(), fi.Name())
+		if f.IsDir() {
+			t.Logf("Running test: %s", f.Name())
+			runTestDir(t, "tests"+string(filepath.Separator)+f.Name(), f.Name())
 		}
 	}
 }
 
 func runTestDir(t *testing.T, dir, datasetName string) {
 	// read the mapping
-	mappingBytes, err := ioutil.ReadFile(dir + string(filepath.Separator) + "mapping.json")
+	mappingBytes, err := os.ReadFile(dir + string(filepath.Separator) + "mapping.json")
 	if err != nil {
 		t.Errorf("error reading mapping: %v", err)
 		return
@@ -121,7 +120,7 @@ func runTestDir(t *testing.T, dir, datasetName string) {
 	}
 
 	// read the searches
-	searchBytes, err := ioutil.ReadFile(dir + string(filepath.Separator) + "searches.json")
+	searchBytes, err := os.ReadFile(dir + string(filepath.Separator) + "searches.json")
 	if err != nil {
 		t.Errorf("error reading searches: %v", err)
 		return
@@ -216,12 +215,12 @@ func loadDataSet(t *testing.T, datasetName string, mapping mapping.IndexMappingI
 	index.SetName(datasetName)
 
 	// index data
-	fis, err := ioutil.ReadDir(path)
+	entries, err := os.ReadDir(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error reading data dir: %v", err)
 	}
-	for _, fi := range fis {
-		fileBytes, err := ioutil.ReadFile(path + string(filepath.Separator) + fi.Name())
+	for _, f := range entries {
+		fileBytes, err := os.ReadFile(path + string(filepath.Separator) + f.Name())
 		if err != nil {
 			return nil, nil, fmt.Errorf("error reading data file: %v", err)
 		}
@@ -230,7 +229,7 @@ func loadDataSet(t *testing.T, datasetName string, mapping mapping.IndexMappingI
 		if err != nil {
 			return nil, nil, fmt.Errorf("error parsing data file as json: %v", err)
 		}
-		filename := fi.Name()
+		filename := f.Name()
 		ext := filepath.Ext(filename)
 		id := filename[0 : len(filename)-len(ext)]
 		err = index.Index(id, fileDoc)
@@ -254,14 +253,14 @@ func loadDataSet(t *testing.T, datasetName string, mapping mapping.IndexMappingI
 }
 
 func loadDataSets(t *testing.T, datasetName string, mapping mapping.IndexMappingImpl, path string) (bleve.Index, func(), error) {
-	fis, err := ioutil.ReadDir(path)
+	entries, err := os.ReadDir(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error reading datasets dir: %v", err)
 	}
 	var cleanups []func()
 	alias := bleve.NewIndexAlias()
-	for _, fi := range fis {
-		idx, idxCleanup, err := loadDataSet(t, fi.Name(), mapping, path+string(filepath.Separator)+fi.Name())
+	for _, f := range entries {
+		idx, idxCleanup, err := loadDataSet(t, f.Name(), mapping, path+string(filepath.Separator)+f.Name())
 		if err != nil {
 			return nil, nil, fmt.Errorf("error loading dataset: %v", err)
 		}

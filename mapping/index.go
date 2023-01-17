@@ -106,25 +106,25 @@ func (im *IndexMappingImpl) AddCustomTokenFilter(name string, config map[string]
 // available only if their package is imported by client code. To achieve this,
 // use their metadata to fill configuration entries:
 //
-//   import (
-//       "github.com/blevesearch/bleve/v2/analysis/analyzer/custom"
-//       "github.com/blevesearch/bleve/v2/analysis/char/html"
-//       "github.com/blevesearch/bleve/v2/analysis/token/lowercase"
-//       "github.com/blevesearch/bleve/v2/analysis/tokenizer/unicode"
-//   )
+//	import (
+//	    "github.com/blevesearch/bleve/v2/analysis/analyzer/custom"
+//	    "github.com/blevesearch/bleve/v2/analysis/char/html"
+//	    "github.com/blevesearch/bleve/v2/analysis/token/lowercase"
+//	    "github.com/blevesearch/bleve/v2/analysis/tokenizer/unicode"
+//	)
 //
-//   m := bleve.NewIndexMapping()
-//   err := m.AddCustomAnalyzer("html", map[string]interface{}{
-//       "type": custom.Name,
-//       "char_filters": []string{
-//           html.Name,
-//       },
-//       "tokenizer":     unicode.Name,
-//       "token_filters": []string{
-//           lowercase.Name,
-//           ...
-//       },
-//   })
+//	m := bleve.NewIndexMapping()
+//	err := m.AddCustomAnalyzer("html", map[string]interface{}{
+//	    "type": custom.Name,
+//	    "char_filters": []string{
+//	        html.Name,
+//	    },
+//	    "tokenizer":     unicode.Name,
+//	    "token_filters": []string{
+//	        lowercase.Name,
+//	        ...
+//	    },
+//	})
 func (im *IndexMappingImpl) AddCustomAnalyzer(name string, config map[string]interface{}) error {
 	_, err := im.cache.DefineAnalyzer(name, config)
 	if err != nil {

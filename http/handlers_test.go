@@ -16,7 +16,7 @@ package http
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -666,7 +666,7 @@ func TestHandlers(t *testing.T) {
 			Method: test.Method,
 			URL:    &url.URL{Path: test.Path},
 			Form:   test.Params,
-			Body:   ioutil.NopCloser(bytes.NewBuffer(test.Body)),
+			Body:   io.NopCloser(bytes.NewBuffer(test.Body)),
 		}
 		test.Handler.ServeHTTP(record, req)
 		if got, want := record.Code, test.Status; got != want {

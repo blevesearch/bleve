@@ -345,11 +345,12 @@ const (
 )
 
 // SortField will sort results by the value of a stored field
-//   Field is the name of the field
-//   Descending reverse the sort order (default false)
-//   Type allows forcing of string/number/date behavior (default auto)
-//   Mode controls behavior for multi-values fields (default first)
-//   Missing controls behavior of missing values (default last)
+//
+//	Field is the name of the field
+//	Descending reverse the sort order (default false)
+//	Type allows forcing of string/number/date behavior (default auto)
+//	Mode controls behavior for multi-values fields (default first)
+//	Missing controls behavior of missing values (default last)
 type SortField struct {
 	Field   string
 	Desc    bool
@@ -628,8 +629,9 @@ func NewSortGeoDistance(field, unit string, lon, lat float64, desc bool) (
 
 // SortGeoDistance will sort results by the distance of an
 // indexed geo point, from the provided location.
-//   Field is the name of the field
-//   Descending reverse the sort order (default false)
+//
+//	Field is the name of the field
+//	Descending reverse the sort order (default false)
 type SortGeoDistance struct {
 	Field    string
 	Desc     bool

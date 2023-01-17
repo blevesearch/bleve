@@ -17,7 +17,6 @@ package scorch
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -538,16 +537,18 @@ func (s *Scorch) diskFileStats(rootSegmentPaths map[string]struct{}) (uint64,
 	uint64, uint64) {
 	var numFilesOnDisk, numBytesUsedDisk, numBytesOnDiskByRoot uint64
 	if s.path != "" {
-		finfos, err := ioutil.ReadDir(s.path)
+		files, err := os.ReadDir(s.path)
 		if err == nil {
-			for _, finfo := range finfos {
-				if !finfo.IsDir() {
-					numBytesUsedDisk += uint64(finfo.Size())
-					numFilesOnDisk++
-					if rootSegmentPaths != nil {
-						fname := s.path + string(os.PathSeparator) + finfo.Name()
-						if _, fileAtRoot := rootSegmentPaths[fname]; fileAtRoot {
-							numBytesOnDiskByRoot += uint64(finfo.Size())
+			for _, f := range files {
+				if !f.IsDir() {
+					if finfo, err := f.Info(); err == nil {
+						numBytesUsedDisk += uint64(finfo.Size())
+						numFilesOnDisk++
+						if rootSegmentPaths != nil {
+							fname := s.path + string(os.PathSeparator) + finfo.Name()
+							if _, fileAtRoot := rootSegmentPaths[fname]; fileAtRoot {
+								numBytesOnDiskByRoot += uint64(finfo.Size())
+							}
 						}
 					}
 				}

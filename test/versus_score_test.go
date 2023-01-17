@@ -16,8 +16,6 @@ package test
 
 import (
 	"fmt"
-	index "github.com/blevesearch/bleve_index_api"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"testing"
@@ -28,6 +26,7 @@ import (
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 func TestDisjunctionSearchScoreIndexWithCompositeFields(t *testing.T) {
@@ -50,7 +49,7 @@ func TestDisjunctionSearchScoreIndexWithCompositeFields(t *testing.T) {
 
 func disjunctionQueryiOnIndexWithCompositeFields(indexName string,
 	t *testing.T) []*search.DocumentMatch {
-	tmpIndexPath, err := ioutil.TempDir("", "bleve-testidx")
+	tmpIndexPath, err := os.MkdirTemp("", "bleve-testidx")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}

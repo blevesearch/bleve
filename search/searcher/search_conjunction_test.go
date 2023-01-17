@@ -15,7 +15,6 @@
 package searcher
 
 import (
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -231,7 +230,7 @@ type compositeSearchOptimizationTest struct {
 }
 
 func TestScorchCompositeSearchOptimizations(t *testing.T) {
-	dir, _ := ioutil.TempDir("", "scorchTwoDoc")
+	dir, _ := os.MkdirTemp("", "scorchTwoDoc")
 	defer func() {
 		_ = os.RemoveAll(dir)
 	}()

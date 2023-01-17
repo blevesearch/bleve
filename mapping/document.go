@@ -227,9 +227,10 @@ func (dm *DocumentMapping) AddSubDocumentMapping(property string, sdm *DocumentM
 // This is a convenience function to make most common
 // mappings more concise.
 // Otherwise, you would:
-//     subMapping := NewDocumentMapping()
-//     subMapping.AddFieldMapping(fieldMapping)
-//     parentMapping.AddSubDocumentMapping(property, subMapping)
+//
+//	subMapping := NewDocumentMapping()
+//	subMapping.AddFieldMapping(fieldMapping)
+//	parentMapping.AddSubDocumentMapping(property, subMapping)
 func (dm *DocumentMapping) AddFieldMappingsAt(property string, fms ...*FieldMapping) {
 	if dm.Properties == nil {
 		dm.Properties = make(map[string]*DocumentMapping)

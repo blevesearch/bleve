@@ -149,11 +149,12 @@ func (b *Batch) PersistedCallback() index.BatchCallback {
 // them.
 //
 // The DocumentMapping used to index a value is deduced by the following rules:
-// 1) If value implements mapping.bleveClassifier interface, resolve the mapping
-//    from BleveType().
-// 2) If value implements mapping.Classifier interface, resolve the mapping
-//    from Type().
-// 3) If value has a string field or value at IndexMapping.TypeField.
+//  1. If value implements mapping.bleveClassifier interface, resolve the mapping
+//     from BleveType().
+//  2. If value implements mapping.Classifier interface, resolve the mapping
+//     from Type().
+//  3. If value has a string field or value at IndexMapping.TypeField.
+//
 // (defaulting to "_type"), use it to resolve the mapping. Fields addressing
 // is described below.
 // 4) If IndexMapping.DefaultType is registered, return it.
@@ -187,17 +188,17 @@ func (b *Batch) PersistedCallback() index.BatchCallback {
 //
 // Examples:
 //
-//  type Date struct {
-//    Day string `json:"day"`
-//    Month string
-//    Year string
-//  }
+//	type Date struct {
+//	  Day string `json:"day"`
+//	  Month string
+//	  Year string
+//	}
 //
-//  type Person struct {
-//    FirstName string `json:"first_name"`
-//    LastName string
-//    BirthDate Date `json:"birth_date"`
-//  }
+//	type Person struct {
+//	  FirstName string `json:"first_name"`
+//	  LastName string
+//	  BirthDate Date `json:"birth_date"`
+//	}
 //
 // A Person value FirstName is mapped by the SubDocumentMapping at
 // "first_name". Its LastName is mapped by the one at "LastName". The day of

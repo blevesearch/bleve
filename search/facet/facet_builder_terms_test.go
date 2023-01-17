@@ -15,7 +15,7 @@
 package facet
 
 import (
-	"io/ioutil"
+	"os"
 	"regexp"
 	"testing"
 )
@@ -24,7 +24,7 @@ var terms []string
 
 func init() {
 	wsRegexp := regexp.MustCompile(`\W+`)
-	input, err := ioutil.ReadFile("benchmark_data.txt")
+	input, err := os.ReadFile("benchmark_data.txt")
 	if err != nil {
 		panic(err)
 	}

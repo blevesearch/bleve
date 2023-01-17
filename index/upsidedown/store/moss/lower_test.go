@@ -15,7 +15,6 @@
 package moss
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -24,7 +23,7 @@ import (
 )
 
 func openWithLower(t *testing.T, mo store.MergeOperator) (string, store.KVStore) {
-	tmpDir, _ := ioutil.TempDir("", "mossStore")
+	tmpDir, _ := os.MkdirTemp("", "mossStore")
 
 	config := map[string]interface{}{
 		"path":                    tmpDir,
