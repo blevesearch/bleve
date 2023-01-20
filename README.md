@@ -31,12 +31,6 @@ modern text indexing in go - [blevesearch.com](http://www.blevesearch.com/)
     * Numeric Range Facet
     * Date Range Facet
 
-## Discussion/Issues
-
-Discuss usage/development of bleve and/or report issues here:
-* [Github issues](https://github.com/blevesearch/bleve/issues)
-* [Google group](https://groups.google.com/forum/#!forum/bleve)
-
 ## Indexing
 
 ```go
@@ -106,6 +100,12 @@ Use "bleve [command] --help" for more information about a command.
 ## Text Analysis Wizard
 
 [bleveanalysis.couchbase.com](https://bleveanalysis.couchbase.com)
+
+## Discussion/Issues
+
+Discuss usage/development of bleve and/or report issues here:
+* [Github issues](https://github.com/blevesearch/bleve/issues)
+* [Google group](https://groups.google.com/forum/#!forum/bleve)
 
 ## License
 
