@@ -248,7 +248,7 @@ func TestIndexRollback(t *testing.T) {
 	}
 }
 
-func TestGetProtectedEpochs(t *testing.T) {
+func TestGetProtectedSnapshots(t *testing.T) {
 	currentTimeStamp := time.Now()
 	tests := []struct {
 		title              string
@@ -258,7 +258,6 @@ func TestGetProtectedEpochs(t *testing.T) {
 		expEpochs          []uint64
 	}{
 		{
-			//100, 99, 88, 77, 50, 25, 10
 			title: "epochs that have exact timestamps as per expectation for protecting",
 			metaData: []*snapshotMetaData{
 				{epoch: 100, timeStamp: currentTimeStamp},
@@ -273,7 +272,6 @@ func TestGetProtectedEpochs(t *testing.T) {
 			expEpochs:          []uint64{100, 50, 10},
 		},
 		{
-			//100, 99, 88, 77, 50, 25, 10
 			title: "epochs that have exact timestamps as per expectation for protecting",
 			metaData: []*snapshotMetaData{
 				{epoch: 100, timeStamp: currentTimeStamp},
@@ -302,7 +300,8 @@ func TestGetProtectedEpochs(t *testing.T) {
 			expEpochs:          []uint64{100, 50, 35},
 		},
 		{
-			title: "protecting epochs when not enough epochs are in the expected timestamp range",
+			title: "protecting epochs when we don't have enough snapshots with RollbackSamplingInterval" +
+				" separated timestamps",
 			metaData: []*snapshotMetaData{
 				{epoch: 100, timeStamp: currentTimeStamp},
 				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
@@ -317,7 +316,7 @@ func TestGetProtectedEpochs(t *testing.T) {
 		},
 		{
 			title: "epochs of which some are approximated to the expected timestamps, and" +
-				" some don't fall near the expected timestamp range",
+				" we don't have enough snapshots with RollbackSamplingInterval separated timestamps",
 			metaData: []*snapshotMetaData{
 				{epoch: 100, timeStamp: currentTimeStamp},
 				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
@@ -333,7 +332,7 @@ func TestGetProtectedEpochs(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		protectedEpochs := getProtectedEpochs(RollbackSamplingInterval,
+		protectedEpochs := getProtectedSnapshots(RollbackSamplingInterval,
 			test.numSnapshotsToKeep, test.metaData)
 		if len(protectedEpochs) != test.expCount {
 			t.Errorf("%d test: %s, getProtectedSnapshots expected to return %d "+
