@@ -81,5 +81,5 @@ func (q *IPRangeQuery) Validate() error {
 	if ip != nil {
 		return nil // we have a valid ip
 	}
-	return fmt.Errorf("IPRangeQuery must be for an network or ip address, %q", q.CIDR)
+	return fmt.Errorf("IPRangeQuery must be for a network or ip address, %q", q.CIDR)
 }
