@@ -145,7 +145,7 @@ func GetRowBuffer() []byte {
 }
 
 func PutRowBuffer(buf []byte) {
-	rowBufferPool.Put(buf)
+	rowBufferPool.Put(&buf)
 }
 
 func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]UpsideDownCouchRow, updateRowsAll [][]UpsideDownCouchRow, deleteRowsAll [][]UpsideDownCouchRow) (err error) {
