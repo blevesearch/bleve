@@ -283,7 +283,7 @@ func TestGetProtectedSnapshots(t *testing.T) {
 			},
 			numSnapshotsToKeep: 2,
 			expCount:           2,
-			expEpochs:          []uint64{100, 50},
+			expEpochs:          []uint64{50, 10},
 		},
 		{
 			title: "epochs that have timestamps approximated to the expected value",
@@ -297,7 +297,7 @@ func TestGetProtectedSnapshots(t *testing.T) {
 			},
 			numSnapshotsToKeep: 3,
 			expCount:           3,
-			expEpochs:          []uint64{100, 50, 35},
+			expEpochs:          []uint64{100, 50, 10},
 		},
 		{
 			title: "protecting epochs when we don't have enough snapshots with RollbackSamplingInterval" +
@@ -312,7 +312,7 @@ func TestGetProtectedSnapshots(t *testing.T) {
 			},
 			numSnapshotsToKeep: 4,
 			expCount:           4,
-			expEpochs:          []uint64{100, 99, 88, 50},
+			expEpochs:          []uint64{100, 99, 88, 10},
 		},
 		{
 			title: "epochs of which some are approximated to the expected timestamps, and" +
@@ -327,7 +327,7 @@ func TestGetProtectedSnapshots(t *testing.T) {
 			},
 			numSnapshotsToKeep: 3,
 			expCount:           3,
-			expEpochs:          []uint64{100, 50, 35},
+			expEpochs:          []uint64{100, 88, 10},
 		},
 	}
 

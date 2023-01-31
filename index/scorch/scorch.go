@@ -58,6 +58,8 @@ type Scorch struct {
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
 
 	numSnapshotsToKeep       int
+	rollbackRetentionFactor  float64
+	checkPoints              []*snapshotMetaData
 	rollbackSamplingInterval time.Duration
 	closeCh                  chan struct{}
 	introductions            chan *segmentIntroduction
@@ -300,6 +302,15 @@ func (s *Scorch) openBolt() error {
 			return fmt.Errorf("rollbackSamplingInterval parse err: %v", err)
 		}
 		s.rollbackSamplingInterval = t
+	}
+
+	s.rollbackRetentionFactor = RollbackRetentionFactor
+	if v, ok := s.config["rollbackRetentionFactor"]; ok {
+		var r float64
+		if r, ok = v.(float64); ok {
+			return fmt.Errorf("rollbackRetentionFactor parse err: %v", err)
+		}
+		s.rollbackRetentionFactor = r
 	}
 
 	typ, ok := s.config["spatialPlugin"].(string)
