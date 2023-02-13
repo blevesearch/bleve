@@ -249,6 +249,11 @@ func TestIndexRollback(t *testing.T) {
 }
 
 func TestGetProtectedSnapshots(t *testing.T) {
+	origRollbackSamplingInterval := RollbackSamplingInterval
+	defer func() {
+		RollbackSamplingInterval = origRollbackSamplingInterval
+	}()
+	RollbackSamplingInterval = 10 * time.Minute
 	currentTimeStamp := time.Now()
 	tests := []struct {
 		title              string
@@ -297,7 +302,7 @@ func TestGetProtectedSnapshots(t *testing.T) {
 			},
 			numSnapshotsToKeep: 3,
 			expCount:           3,
-			expEpochs:          []uint64{100, 50, 10},
+			expEpochs:          []uint64{50, 35, 10},
 		},
 		{
 			title: "protecting epochs when we don't have enough snapshots with RollbackSamplingInterval" +
@@ -327,7 +332,7 @@ func TestGetProtectedSnapshots(t *testing.T) {
 			},
 			numSnapshotsToKeep: 3,
 			expCount:           3,
-			expEpochs:          []uint64{100, 88, 10},
+			expEpochs:          []uint64{100, 50, 10},
 		},
 	}
 

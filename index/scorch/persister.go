@@ -114,7 +114,6 @@ OUTER:
 		select {
 		case <-s.closeCh:
 			break OUTER
-
 		case ew = <-s.persisterNotifier:
 			persistWatchers = append(persistWatchers, ew)
 		default:
@@ -890,12 +889,16 @@ var NumSnapshotsToKeep = 1
 
 // RollbackSamplingInterval controls how far back we are looking
 // in the history to get the rollback points.
-// For example, the default value of 10 minutes ensures that the
+// For example, a value of 10 minutes ensures that the
 // protected snapshots (NumSnapshotsToKeep = 3) are:
-//    the very latest snapshot(ie the current one),
-//    the snapshot that was persisted 10 minutes before the current one,
-//	  the snapshot that was persisted 20 minutes before the current one
-var RollbackSamplingInterval = 2 * time.Minute
+//
+//	   the very latest snapshot(ie the current one),
+//	   the snapshot that was persisted 10 minutes before the current one,
+//		  the snapshot that was persisted 20 minutes before the current one
+//
+// By default however, the timeseries way of protecting snapshots is
+// disabled, and we protect the latest three contiguous snapshots
+var RollbackSamplingInterval = 0 * time.Minute
 
 // Controls what portion of the earlier rollback points to retain during
 // a infrequent/sparse mutation scenario
@@ -903,6 +906,9 @@ var RollbackRetentionFactor = float64(0.5)
 
 func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
 	snapshots []*snapshotMetaData) (int, map[uint64]time.Time) {
+	if interval == 0 {
+		return len(snapshots), map[uint64]time.Time{}
+	}
 	// the map containing the time series snapshots, i.e the timeseries of snapshots
 	// each of which is separated by rollbackSamplingInterval
 	rv := make(map[uint64]time.Time)
@@ -918,13 +924,13 @@ func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
 		// timeseries of snapshots, and newer by RollbackSamplingInterval duration
 		// (comparison in terms of minutes), which is the interval of our time
 		// series. In this case, add the epoch rv
-		if int(snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp).Minutes()) >
-			int(interval.Minutes()) {
+		if snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp).Minutes() >
+			interval.Minutes() {
 			rv[snapshots[i+1].epoch] = snapshots[i+1].timeStamp
 			ptr = i + 1
 			numSnapshotsProtected++
-		} else if int(snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp).Minutes()) ==
-			int(interval.Minutes()) {
+		} else if snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp).Minutes() ==
+			interval.Minutes() {
 			rv[snapshots[i].epoch] = snapshots[i].timeStamp
 			ptr = i
 			numSnapshotsProtected++
@@ -1102,14 +1108,13 @@ func (s *Scorch) removeOldZapFiles() error {
 	return nil
 }
 
-// In low/sparse mutation scenarios, because there can be
-// a scenario where all (or most/lot of) the existing protected snapshots
-// are infact older than the expiration duration, we try
-// to retain atleast some of the protected snapshots (controlled
-// by retention factor), so that we don't start protected
-// contiguous snapshots (in which case we would not be protected
-// snapshots that are far apart for the rollback to be effective
-// enough)
+// In sparse mutation scenario, it can so happen that all protected
+// snapshots are older than the numSnapshotsToKeep * rollbackSamplingInterval
+// duration. This results in all of them being purged from the boltDB
+// and the next iteration of the removeOldData() would end up protecting
+// latest contiguous snapshot which is a poor pattern in the rollback checkpoints.
+// Hence we try to retain atleast retentionFactor portion worth of old snapshots
+// in such a scenario using the following function
 func getBoundaryCheckPoint(retentionFactor float64,
 	checkPoints []*snapshotMetaData, timeStamp time.Time) time.Time {
 	if checkPoints != nil {
@@ -1143,6 +1148,13 @@ func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 		for sk, _ := sc.Last(); sk != nil; sk, _ = sc.Prev() {
 			_, snapshotEpoch, err := decodeUvarintAscending(sk)
 			if err != nil {
+				continue
+			}
+
+			if expirationDuration == 0 {
+				rv = append(rv, &snapshotMetaData{
+					epoch: snapshotEpoch,
+				})
 				continue
 			}
 
