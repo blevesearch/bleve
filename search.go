@@ -490,7 +490,7 @@ type SearchResult struct {
 	Request   *SearchRequest                 `json:"request"`
 	Hits      search.DocumentMatchCollection `json:"hits"`
 	Total     uint64                         `json:"total_hits"`
-	BytesRead uint64                         `json:"bytesRead,omitempty"`
+	BytesRead uint64                         `json:"bytesRead"`
 	MaxScore  float64                        `json:"max_score"`
 	Took      time.Duration                  `json:"took"`
 	Facets    search.FacetResults            `json:"facets"`
