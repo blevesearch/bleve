@@ -338,7 +338,7 @@
 				{
 					"id": "a",
 					"fields": {
-						"tags": ["gopher", "belieber"]
+						"`tags`": ["gopher", "belieber"]
 					}
 				}
 			]
@@ -385,7 +385,7 @@
 				{
 					"id": "b",
 					"fragments": {
-						"name": ["steve has &lt;a&gt; <mark>long</mark> &amp; complicated name"]
+						"`name`": ["steve has &lt;a&gt; <mark>long</mark> &amp; complicated name"]
 					}
 				}
 			]
@@ -409,7 +409,7 @@
 				{
 					"id": "b",
 					"fragments": {
-						"name": ["steve has &lt;a&gt; <mark>long</mark> &amp; complicated name"]
+						"`name`": ["steve has &lt;a&gt; <mark>long</mark> &amp; complicated name"]
 					}
 				}
 			]
@@ -433,8 +433,8 @@
 				{
 					"id": "b",
 					"fields": {
-						"age": 27,
-						"birthday": "2001-09-09T01:46:40Z"
+						"`age`": 27,
+						"`birthday`": "2001-09-09T01:46:40Z"
 					}
 				}
 			]
@@ -485,8 +485,8 @@
 				{
 					"id": "b",
 					"fragments": {
-						"name": ["steve has &lt;a&gt; <mark>long</mark> &amp; complicated name"],
-						"title": ["missess"]
+						"`name`": ["steve has &lt;a&gt; <mark>long</mark> &amp; complicated name"],
+						"`title`": ["missess"]
 					}
 				}
 			]
@@ -512,7 +512,7 @@
 				{
 					"id": "a",
 					"fragments": {
-						"tags": ["<mark>gopher</mark>"]
+						"`tags`": ["<mark>gopher</mark>"]
 					}
 				}
 			]

@@ -321,7 +321,7 @@ func ExampleNewHighlight() {
 		panic(err)
 	}
 
-	fmt.Println(searchResults.Hits[0].Fragments["Name"][0])
+	fmt.Println(searchResults.Hits[0].Fragments["`Name`"][0])
 	// Output:
 	// great <mark>nameless</mark> one
 }
@@ -335,7 +335,7 @@ func ExampleNewHighlightWithStyle() {
 		panic(err)
 	}
 
-	fmt.Println(searchResults.Hits[0].Fragments["Name"][0])
+	fmt.Println(searchResults.Hits[0].Fragments["`Name`"][0])
 	// Output:
 	// great [43mnameless[0m one
 }
@@ -446,7 +446,7 @@ func ExampleSearchRequest_SortByCustom() {
 	searchRequest := NewSearchRequest(query)
 	searchRequest.SortByCustom(search.SortOrder{
 		&search.SortField{
-			Field:   "Age",
+			Field:   "`Age`",
 			Missing: search.SortFieldMissingFirst,
 		},
 		&search.SortDocID{},

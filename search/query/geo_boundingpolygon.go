@@ -23,6 +23,7 @@ import (
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -59,6 +60,8 @@ func (q *GeoBoundingPolygonQuery) Searcher(ctx context.Context, i index.IndexRea
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
+	} else {
+		field = util.CleansePath(field)
 	}
 
 	return searcher.NewGeoBoundedPolygonSearcher(ctx, i, q.Points, field, q.BoostVal.Value(), options)

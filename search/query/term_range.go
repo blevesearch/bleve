@@ -21,6 +21,7 @@ import (
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -76,7 +77,10 @@ func (q *TermRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m ma
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
+	} else {
+		field = util.CleansePath(field)
 	}
+
 	var minTerm []byte
 	if q.Min != "" {
 		minTerm = []byte(q.Min)
@@ -85,6 +89,7 @@ func (q *TermRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m ma
 	if q.Max != "" {
 		maxTerm = []byte(q.Max)
 	}
+
 	return searcher.NewTermRangeSearcher(ctx, i, minTerm, maxTerm, q.InclusiveMin, q.InclusiveMax, field, q.BoostVal.Value(), options)
 }
 

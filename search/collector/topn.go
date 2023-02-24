@@ -22,6 +22,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -180,6 +181,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 
 	hc.updateFieldVisitor = func(field string, term []byte) {
+		field = util.CleansePath(field)
 		if hc.facetsBuilder != nil {
 			hc.facetsBuilder.UpdateVisitor(field, term)
 		}

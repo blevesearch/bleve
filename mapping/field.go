@@ -20,12 +20,12 @@ import (
 	"net"
 	"time"
 
-	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
-	index "github.com/blevesearch/bleve_index_api"
-
 	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/geo"
+	"github.com/blevesearch/bleve/v2/util"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 // control the default behavior for dynamic fields (those not explicitly mapped)
@@ -377,11 +377,11 @@ func (fm *FieldMapping) analyzerForField(path []string, context *walkContext) an
 func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) string {
 	fieldName := pathString
 	if fieldMapping.Name != "" {
-		parentName := ""
+		parentName := []string{}
 		if len(path) > 1 {
-			parentName = encodePath(path[:len(path)-1]) + pathSeparator
+			parentName = path[:len(path)-1]
 		}
-		fieldName = parentName + fieldMapping.Name
+		fieldName = util.EncodePath(append(parentName, fieldMapping.Name))
 	}
 	return fieldName
 }

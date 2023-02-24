@@ -480,7 +480,7 @@ func TestNestedBooleanSearchers(t *testing.T) {
 
 		doc := document.NewDocument(strconv.Itoa(i))
 		doc.Fields = []document.Field{
-			document.NewTextFieldCustom("hostname", []uint64{}, []byte(hostname),
+			document.NewTextFieldCustom("`hostname`", []uint64{}, []byte(hostname),
 				index.IndexField,
 				&analysis.DefaultAnalyzer{
 					Tokenizer: single.NewSingleTokenTokenizer(),
@@ -492,7 +492,7 @@ func TestNestedBooleanSearchers(t *testing.T) {
 		}
 		for k, v := range metadata {
 			doc.AddField(document.NewTextFieldWithIndexingOptions(
-				fmt.Sprintf("metadata.%s", k), []uint64{}, []byte(v), index.IndexField))
+				fmt.Sprintf("`metadata`.`%s`", k), []uint64{}, []byte(v), index.IndexField))
 		}
 		doc.CompositeFields = []*document.CompositeField{
 			document.NewCompositeFieldWithIndexingOptions(
@@ -640,9 +640,9 @@ func TestNestedBooleanMustNotSearcherUpsidedown(t *testing.T) {
 	for i := 0; i < len(docs); i++ {
 		doc := document.NewDocument(docs[i].id)
 		doc.Fields = []document.Field{
-			document.NewTextField("id", []uint64{}, []byte(docs[i].id)),
-			document.NewBooleanField("hasRole", []uint64{}, docs[i].hasRole),
-			document.NewTextField("investigationId", []uint64{}, []byte(docs[i].investigationId)),
+			document.NewTextField("`id`", []uint64{}, []byte(docs[i].id)),
+			document.NewBooleanField("`hasRole`", []uint64{}, docs[i].hasRole),
+			document.NewTextField("`investigationId`", []uint64{}, []byte(docs[i].investigationId)),
 		}
 
 		doc.CompositeFields = []*document.CompositeField{
@@ -776,10 +776,10 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 
 	doc := document.NewDocument("1-child-0")
 	doc.Fields = []document.Field{
-		document.NewTextField("id", []uint64{}, []byte("1-child-0")),
-		document.NewBooleanField("hasRole", []uint64{}, false),
-		document.NewTextField("roles", []uint64{}, []byte("R1")),
-		document.NewNumericField("type", []uint64{}, 0),
+		document.NewTextField("`id`", []uint64{}, []byte("1-child-0")),
+		document.NewBooleanField("`hasRole`", []uint64{}, false),
+		document.NewTextField("`roles`", []uint64{}, []byte("R1")),
+		document.NewNumericField("`type`", []uint64{}, 0),
 	}
 	doc.CompositeFields = []*document.CompositeField{
 		document.NewCompositeFieldWithIndexingOptions(
@@ -821,9 +821,9 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 	for i := 0; i < len(docs); i++ {
 		doc := document.NewDocument(docs[i].id)
 		doc.Fields = []document.Field{
-			document.NewTextField("id", []uint64{}, []byte(docs[i].id)),
-			document.NewBooleanField("hasRole", []uint64{}, docs[i].hasRole),
-			document.NewNumericField("type", []uint64{}, float64(docs[i].typ)),
+			document.NewTextField("`id`", []uint64{}, []byte(docs[i].id)),
+			document.NewBooleanField("`hasRole`", []uint64{}, docs[i].hasRole),
+			document.NewNumericField("`type`", []uint64{}, float64(docs[i].typ)),
 		}
 
 		doc.CompositeFields = []*document.CompositeField{
@@ -846,9 +846,9 @@ func TestMultipleNestedBooleanMustNotSearchersOnScorch(t *testing.T) {
 	// Update 1st doc
 	doc = document.NewDocument("1-child-0")
 	doc.Fields = []document.Field{
-		document.NewTextField("id", []uint64{}, []byte("1-child-0")),
-		document.NewBooleanField("hasRole", []uint64{}, false),
-		document.NewNumericField("type", []uint64{}, 0),
+		document.NewTextField("`id`", []uint64{}, []byte("1-child-0")),
+		document.NewBooleanField("`hasRole`", []uint64{}, false),
+		document.NewNumericField("`type`", []uint64{}, 0),
 	}
 	doc.CompositeFields = []*document.CompositeField{
 		document.NewCompositeFieldWithIndexingOptions(
@@ -1254,7 +1254,7 @@ func TestDuplicateLocationsIssue1168(t *testing.T) {
 	if err != nil {
 		t.Fatalf("bleve search err: %v", err)
 	}
-	if len(sres.Hits[0].Locations["name1"]["marty"]) != 1 {
+	if len(sres.Hits[0].Locations["`name1`"]["marty"]) != 1 {
 		t.Fatalf("duplicate marty")
 	}
 }
@@ -1866,7 +1866,7 @@ func TestHightlightingWithHTMLCharacterFilter(t *testing.T) {
 	}
 
 	if len(searchResults.Hits) != 1 ||
-		len(searchResults.Hits[0].Locations["content"][searchStr]) != 1 {
+		len(searchResults.Hits[0].Locations["`content`"][searchStr]) != 1 {
 		t.Fatalf("Expected 1 hit with 1 location")
 	}
 
@@ -1877,8 +1877,8 @@ func TestHightlightingWithHTMLCharacterFilter(t *testing.T) {
 	}
 	expectedFragment := "&lt;div&gt; Welcome to <mark>blevesearch</mark>. &lt;/div&gt;"
 
-	gotLocation := searchResults.Hits[0].Locations["content"]["blevesearch"][0]
-	gotFragment := searchResults.Hits[0].Fragments["content"][0]
+	gotLocation := searchResults.Hits[0].Locations["`content`"]["blevesearch"][0]
+	gotFragment := searchResults.Hits[0].Fragments["`content`"][0]
 
 	if !reflect.DeepEqual(expectedLocation, gotLocation) {
 		t.Fatalf("Mismatch in locations, got: %v, expected: %v",

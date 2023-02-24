@@ -20,6 +20,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
+	"github.com/blevesearch/bleve/v2/util"
 )
 
 var reflectStaticSizeTermsFacetBuilder int
@@ -41,7 +42,7 @@ type TermsFacetBuilder struct {
 func NewTermsFacetBuilder(field string, size int) *TermsFacetBuilder {
 	return &TermsFacetBuilder{
 		size:       size,
-		field:      field,
+		field:      util.CleansePath(field),
 		termsCount: make(map[string]int),
 	}
 }

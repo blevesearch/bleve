@@ -17,13 +17,14 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
-	index "github.com/blevesearch/bleve_index_api"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/util"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var MappingJSONStrict = false
@@ -310,7 +311,7 @@ func (im *IndexMappingImpl) determineType(data interface{}) string {
 	}
 
 	// now see if we can find a type using the mapping
-	typ, ok := mustString(lookupPropertyPath(data, im.TypeField))
+	typ, ok := util.LookupPropertyPathStr(data, im.TypeField)
 	if ok {
 		return typ
 	}
@@ -375,7 +376,7 @@ func (im *IndexMappingImpl) AnalyzerNameForPath(path string) string {
 	}
 
 	// next we will try default analyzers for the path
-	pathDecoded := decodePath(path)
+	pathDecoded := util.DecodePath(path)
 	for _, docMapping := range im.TypeMapping {
 		rv := docMapping.defaultAnalyzerName(pathDecoded)
 		if rv != "" {

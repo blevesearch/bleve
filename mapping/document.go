@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/util"
 )
 
 // A DocumentMapping describes how a type of document
@@ -97,14 +98,14 @@ func (dm *DocumentMapping) analyzerNameForPath(path string) string {
 }
 
 func (dm *DocumentMapping) fieldDescribedByPath(path string) *FieldMapping {
-	pathElements := decodePath(path)
+	pathElements := util.DecodePath(path)
 	if len(pathElements) > 1 {
 		// easy case, there is more than 1 path element remaining
 		// the next path element must match a property name
 		// at this level
 		for propName, subDocMapping := range dm.Properties {
 			if propName == pathElements[0] {
-				return subDocMapping.fieldDescribedByPath(encodePath(pathElements[1:]))
+				return subDocMapping.fieldDescribedByPath(util.EncodePath(pathElements[1:]))
 			}
 		}
 	}
@@ -115,10 +116,10 @@ func (dm *DocumentMapping) fieldDescribedByPath(path string) *FieldMapping {
 
 	// first look for property name with empty field
 	for propName, subDocMapping := range dm.Properties {
-		if propName == path {
+		if propName == pathElements[0] {
 			// found property name match, now look at its fields
 			for _, field := range subDocMapping.Fields {
-				if field.Name == "" || field.Name == path {
+				if field.Name == "" || field.Name == pathElements[0] {
 					// match
 					return field
 				}
@@ -127,10 +128,10 @@ func (dm *DocumentMapping) fieldDescribedByPath(path string) *FieldMapping {
 	}
 	// next, walk the properties again, looking for field overriding the name
 	for propName, subDocMapping := range dm.Properties {
-		if propName != path {
+		if propName != pathElements[0] {
 			// property name isn't a match, but field name could override it
 			for _, field := range subDocMapping.Fields {
-				if field.Name == path {
+				if field.Name == pathElements[0] {
 					return field
 				}
 			}
@@ -145,7 +146,7 @@ func (dm *DocumentMapping) fieldDescribedByPath(path string) *FieldMapping {
 // closest document mapping to a field not explicitly mapped
 // use closestDocMapping
 func (dm *DocumentMapping) documentMappingForPath(path string) *DocumentMapping {
-	pathElements := decodePath(path)
+	pathElements := util.DecodePath(path)
 	current := dm
 OUTER:
 	for i, pathElement := range pathElements {
@@ -173,7 +174,7 @@ OUTER:
 // closestDocMapping findest the most specific document mapping that matches
 // part of the provided path
 func (dm *DocumentMapping) closestDocMapping(path string) *DocumentMapping {
-	pathElements := decodePath(path)
+	pathElements := util.DecodePath(path)
 	current := dm
 OUTER:
 	for _, pathElement := range pathElements {
@@ -361,7 +362,7 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 
 			// if the field has a name under the specified tag, prefer that
 			tag := field.Tag.Get(structTagKey)
-			tagFieldName := parseTagName(tag)
+			tagFieldName := util.ParseTagName(tag)
 			if tagFieldName == "-" {
 				continue
 			}
@@ -406,7 +407,7 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 }
 
 func (dm *DocumentMapping) processProperty(property interface{}, path []string, indexes []uint64, context *walkContext) {
-	pathString := encodePath(path)
+	pathString := util.EncodePath(path)
 	// look to see if there is a mapping for this field
 	subDocMapping := dm.documentMappingForPath(pathString)
 	closestDocMapping := dm.closestDocMapping(pathString)

@@ -24,7 +24,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -199,7 +198,7 @@ func TestCrud(t *testing.T) {
 	}
 	foundNameField := false
 	doc.VisitFields(func(field index.Field) {
-		if field.Name() == "name" && string(field.Value()) == "marty" {
+		if field.Name() == "`name`" && string(field.Value()) == "marty" {
 			foundNameField = true
 		}
 	})
@@ -212,9 +211,9 @@ func TestCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectedFields := map[string]bool{
-		"_all": false,
-		"name": false,
-		"desc": false,
+		"_all":   false,
+		"`name`": false,
+		"`desc`": false,
 	}
 	if len(fields) < len(expectedFields) {
 		t.Fatalf("expected %d fields got %d", len(expectedFields), len(fields))
@@ -399,10 +398,11 @@ func TestBytesRead(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
 	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
 	prevBytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
-	if prevBytesRead != 32349 && res.BytesRead == prevBytesRead {
-		t.Fatalf("expected bytes read for query string 32349, got %v",
+	if prevBytesRead != 32475 && res.BytesRead == prevBytesRead {
+		t.Fatalf("expected bytes read for query string 32475, got %v",
 			prevBytesRead)
 	}
 
@@ -580,8 +580,8 @@ func TestBytesReadStored(t *testing.T) {
 
 	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead != 25928 && bytesRead == res.BytesRead {
-		t.Fatalf("expected the bytes read stat to be around 25928, got %v", bytesRead)
+	if bytesRead != 26054 && bytesRead == res.BytesRead {
+		t.Fatalf("expected the bytes read stat to be around 26054, got %v", bytesRead)
 	}
 	prevBytesRead := bytesRead
 
@@ -651,8 +651,8 @@ func TestBytesReadStored(t *testing.T) {
 
 	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead != 18114 && bytesRead == res.BytesRead {
-		t.Fatalf("expected the bytes read stat to be around 18114, got %v", bytesRead)
+	if bytesRead != 18240 && bytesRead == res.BytesRead {
+		t.Fatalf("expected the bytes read stat to be around 18240, got %v", bytesRead)
 	}
 	prevBytesRead = bytesRead
 
@@ -920,17 +920,17 @@ func TestStoredFieldPreserved(t *testing.T) {
 	if len(res.Hits) != 1 {
 		t.Fatalf("expected 1 hit, got %d", len(res.Hits))
 	}
-	if res.Hits[0].Fields["name"] != "Marty" {
-		t.Errorf("expected 'Marty' got '%s'", res.Hits[0].Fields["name"])
+	if res.Hits[0].Fields["`name`"] != "Marty" {
+		t.Errorf("expected 'Marty' got '%s'", res.Hits[0].Fields["`name`"])
 	}
-	if res.Hits[0].Fields["desc"] != "GopherCON India" {
-		t.Errorf("expected 'GopherCON India' got '%s'", res.Hits[0].Fields["desc"])
+	if res.Hits[0].Fields["`desc`"] != "GopherCON India" {
+		t.Errorf("expected 'GopherCON India' got '%s'", res.Hits[0].Fields["`desc`"])
 	}
-	if res.Hits[0].Fields["num"] != float64(1) {
-		t.Errorf("expected '1' got '%v'", res.Hits[0].Fields["num"])
+	if res.Hits[0].Fields["`num`"] != float64(1) {
+		t.Errorf("expected '1' got '%v'", res.Hits[0].Fields["`num`"])
 	}
-	if res.Hits[0].Fields["bool"] != true {
-		t.Errorf("expected 'true' got '%v'", res.Hits[0].Fields["bool"])
+	if res.Hits[0].Fields["`bool`"] != true {
+		t.Errorf("expected 'true' got '%v'", res.Hits[0].Fields["`bool`"])
 	}
 }
 
@@ -1185,7 +1185,7 @@ func TestSortMatchSearch(t *testing.T) {
 	}
 	prev := ""
 	for _, hit := range sr.Hits {
-		val := hit.Fields["Day"].(string)
+		val := hit.Fields["`Day`"].(string)
 		if prev > val {
 			t.Errorf("Hits must be sorted by 'Day'. Found '%s' before '%s'", prev, val)
 		}
@@ -1533,14 +1533,14 @@ func TestTermVectorArrayPositions(t *testing.T) {
 	if results.Total != 1 {
 		t.Fatalf("expected 1 result, got %d", results.Total)
 	}
-	if len(results.Hits[0].Locations["Messages"]["second"]) < 1 {
+	if len(results.Hits[0].Locations["`Messages`"]["second"]) < 1 {
 		t.Fatalf("expected at least one location")
 	}
-	if len(results.Hits[0].Locations["Messages"]["second"][0].ArrayPositions) < 1 {
+	if len(results.Hits[0].Locations["`Messages`"]["second"][0].ArrayPositions) < 1 {
 		t.Fatalf("expected at least one location array position")
 	}
-	if results.Hits[0].Locations["Messages"]["second"][0].ArrayPositions[0] != 1 {
-		t.Fatalf("expected array position 1, got %d", results.Hits[0].Locations["Messages"]["second"][0].ArrayPositions[0])
+	if results.Hits[0].Locations["`Messages`"]["second"][0].ArrayPositions[0] != 1 {
+		t.Fatalf("expected array position 1, got %d", results.Hits[0].Locations["`Messages`"]["second"][0].ArrayPositions[0])
 	}
 
 	// repeat search for this document in Messages field
@@ -1555,14 +1555,14 @@ func TestTermVectorArrayPositions(t *testing.T) {
 	if results.Total != 1 {
 		t.Fatalf("expected 1 result, got %d", results.Total)
 	}
-	if len(results.Hits[0].Locations["Messages"]["third"]) < 1 {
+	if len(results.Hits[0].Locations["`Messages`"]["third"]) < 1 {
 		t.Fatalf("expected at least one location")
 	}
-	if len(results.Hits[0].Locations["Messages"]["third"][0].ArrayPositions) < 1 {
+	if len(results.Hits[0].Locations["`Messages`"]["third"][0].ArrayPositions) < 1 {
 		t.Fatalf("expected at least one location array position")
 	}
-	if results.Hits[0].Locations["Messages"]["third"][0].ArrayPositions[0] != 2 {
-		t.Fatalf("expected array position 2, got %d", results.Hits[0].Locations["Messages"]["third"][0].ArrayPositions[0])
+	if results.Hits[0].Locations["`Messages`"]["third"][0].ArrayPositions[0] != 2 {
+		t.Fatalf("expected array position 2, got %d", results.Hits[0].Locations["`Messages`"]["third"][0].ArrayPositions[0])
 	}
 
 	err = index.Close()
@@ -1611,14 +1611,21 @@ func TestDocumentStaticMapping(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sort.Strings(fields)
-	expectedFields := []string{"Date", "Numeric", "Text", "_all"}
-	if len(fields) < len(expectedFields) {
-		t.Fatalf("invalid field count: %d", len(fields))
+	expectedFields := map[string]bool{
+		"`Date`":    false,
+		"`Numeric`": false,
+		"`Text`":    false,
+		"_all":      false,
 	}
-	for i, expected := range expectedFields {
-		if expected != fields[i] {
-			t.Fatalf("unexpected field[%d]: %s", i, fields[i])
+	if len(fields) < len(expectedFields) {
+		t.Fatalf("expected %d fields got %d", len(expectedFields), len(fields))
+	}
+	for _, f := range fields {
+		expectedFields[f] = true
+	}
+	for ef, efp := range expectedFields {
+		if !efp {
+			t.Errorf("field %s is missing", ef)
 		}
 	}
 
@@ -1791,13 +1798,13 @@ func TestDocumentFieldArrayPositionsBug295(t *testing.T) {
 	if results.Total != 1 {
 		t.Fatalf("expected 1 result, got %d", results.Total)
 	}
-	if len(results.Hits[0].Locations["Messages"]["bleve"]) != 2 {
-		t.Fatalf("expected 2 locations of 'bleve', got %d", len(results.Hits[0].Locations["Messages"]["bleve"]))
+	if len(results.Hits[0].Locations["`Messages`"]["bleve"]) != 2 {
+		t.Fatalf("expected 2 locations of 'bleve', got %d", len(results.Hits[0].Locations["`Messages`"]["bleve"]))
 	}
-	if results.Hits[0].Locations["Messages"]["bleve"][0].ArrayPositions[0] != 0 {
+	if results.Hits[0].Locations["`Messages`"]["bleve"][0].ArrayPositions[0] != 0 {
 		t.Errorf("expected array position to be 0")
 	}
-	if results.Hits[0].Locations["Messages"]["bleve"][1].ArrayPositions[0] != 1 {
+	if results.Hits[0].Locations["`Messages`"]["bleve"][1].ArrayPositions[0] != 1 {
 		t.Errorf("expected array position to be 1")
 	}
 
@@ -1812,13 +1819,13 @@ func TestDocumentFieldArrayPositionsBug295(t *testing.T) {
 	if results.Total != 1 {
 		t.Fatalf("expected 1 result, got %d", results.Total)
 	}
-	if len(results.Hits[0].Locations["Messages"]["bleve"]) != 2 {
-		t.Fatalf("expected 2 locations of 'bleve', got %d", len(results.Hits[0].Locations["Messages"]["bleve"]))
+	if len(results.Hits[0].Locations["`Messages`"]["bleve"]) != 2 {
+		t.Fatalf("expected 2 locations of 'bleve', got %d", len(results.Hits[0].Locations["`Messages`"]["bleve"]))
 	}
-	if results.Hits[0].Locations["Messages"]["bleve"][0].ArrayPositions[0] != 0 {
+	if results.Hits[0].Locations["`Messages`"]["bleve"][0].ArrayPositions[0] != 0 {
 		t.Errorf("expected array position to be 0")
 	}
-	if results.Hits[0].Locations["Messages"]["bleve"][1].ArrayPositions[0] != 1 {
+	if results.Hits[0].Locations["`Messages`"]["bleve"][1].ArrayPositions[0] != 1 {
 		t.Errorf("expected array position to be 1")
 	}
 
@@ -2389,7 +2396,7 @@ func TestBatchMerge(t *testing.T) {
 
 	foundNameField := false
 	doc.VisitFields(func(field index.Field) {
-		if field.Name() == "name" && string(field.Value()) == "blahblah" {
+		if field.Name() == "`name`" && string(field.Value()) == "blahblah" {
 			foundNameField = true
 		}
 	})
@@ -2403,10 +2410,10 @@ func TestBatchMerge(t *testing.T) {
 	}
 
 	expectedFields := map[string]bool{
-		"_all":    false,
-		"name":    false,
-		"desc":    false,
-		"country": false,
+		"_all":      false,
+		"`name`":    false,
+		"`desc`":    false,
+		"`country`": false,
 	}
 	if len(fields) < len(expectedFields) {
 		t.Fatalf("expected %d fields got %d", len(expectedFields), len(fields))
@@ -2837,7 +2844,7 @@ func TestCopyIndex(t *testing.T) {
 	}
 	foundNameField := false
 	doc.VisitFields(func(field index.Field) {
-		if field.Name() == "name" && string(field.Value()) == "tester" {
+		if field.Name() == "`name`" && string(field.Value()) == "tester" {
 			foundNameField = true
 		}
 	})
@@ -2850,9 +2857,9 @@ func TestCopyIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectedFields := map[string]bool{
-		"_all": false,
-		"name": false,
-		"desc": false,
+		"_all":   false,
+		"`name`": false,
+		"`desc`": false,
 	}
 	if len(fields) < len(expectedFields) {
 		t.Fatalf("expected %d fields got %d", len(expectedFields), len(fields))
@@ -2906,7 +2913,7 @@ func TestCopyIndex(t *testing.T) {
 	}
 	copyFoundNameField := false
 	copyDoc.VisitFields(func(field index.Field) {
-		if field.Name() == "name" && string(field.Value()) == "tester" {
+		if field.Name() == "`name`" && string(field.Value()) == "tester" {
 			copyFoundNameField = true
 		}
 	})
@@ -2919,9 +2926,9 @@ func TestCopyIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	copyExpectedFields := map[string]bool{
-		"_all": false,
-		"name": false,
-		"desc": false,
+		"_all":   false,
+		"`name`": false,
+		"`desc`": false,
 	}
 	if len(copyFields) < len(copyExpectedFields) {
 		t.Fatalf("expected %d fields got %d", len(copyExpectedFields), len(copyFields))

@@ -19,7 +19,7 @@
 			"hits": [],
 			"facets": {
 				"types": {
-					"field": "type",
+					"field": "`type`",
 					"total": 10,
 					"missing": 0,
 					"other": 0,
@@ -71,7 +71,7 @@
 			"hits": [],
 			"facets": {
 				"types": {
-					"field": "rating",
+					"field": "`rating`",
 					"total": 10,
 					"missing": 0,
 					"other": 0,
@@ -121,7 +121,7 @@
 			"hits": [],
 			"facets": {
 				"types": {
-					"field": "updated",
+					"field": "`updated`",
 					"total": 10,
 					"missing": 0,
 					"other": 0,

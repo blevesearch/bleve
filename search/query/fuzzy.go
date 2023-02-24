@@ -20,6 +20,7 @@ import (
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -74,6 +75,9 @@ func (q *FuzzyQuery) Searcher(ctx context.Context, i index.IndexReader, m mappin
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
+	} else {
+		field = util.CleansePath(field)
 	}
+
 	return searcher.NewFuzzySearcher(ctx, i, q.Term, q.Prefix, q.Fuzziness, field, q.BoostVal.Value(), options)
 }

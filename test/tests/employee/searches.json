@@ -17,7 +17,7 @@
 				{
 					"id": "emp10508560",
 					"locations": {
-						"manages.reports": {
+						"`manages`.`reports`": {
 							"julián": [
 								{
 									"pos": 2,

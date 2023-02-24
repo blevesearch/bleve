@@ -34,6 +34,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/facet"
 	"github.com/blevesearch/bleve/v2/search/highlight"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -631,7 +632,7 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 				fieldsToLoad := deDuplicate(req.Fields)
 				for _, f := range fieldsToLoad {
 					doc.VisitFields(func(docF index.Field) {
-						if f == "*" || docF.Name() == f {
+						if f == "*" || docF.Name() == util.CleansePath(f) {
 							var value interface{}
 							switch docF := docF.(type) {
 							case index.TextField:
@@ -683,7 +684,7 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 					}
 				}
 				for _, hf := range highlightFields {
-					highlighter.BestFragmentsInField(hit, doc, hf, 1)
+					highlighter.BestFragmentsInField(hit, doc, util.CleansePath(hf), 1)
 				}
 			}
 		} else if doc == nil {
@@ -737,6 +738,7 @@ func (i *indexImpl) FieldDict(field string) (index.FieldDict, error) {
 		return nil, err
 	}
 
+	field = util.CleansePath(field)
 	fieldDict, err := indexReader.FieldDict(field)
 	if err != nil {
 		i.mutex.RUnlock()
@@ -764,6 +766,7 @@ func (i *indexImpl) FieldDictRange(field string, startTerm []byte, endTerm []byt
 		return nil, err
 	}
 
+	field = util.CleansePath(field)
 	fieldDict, err := indexReader.FieldDictRange(field, startTerm, endTerm)
 	if err != nil {
 		i.mutex.RUnlock()
@@ -791,6 +794,7 @@ func (i *indexImpl) FieldDictPrefix(field string, termPrefix []byte) (index.Fiel
 		return nil, err
 	}
 
+	field = util.CleansePath(field)
 	fieldDict, err := indexReader.FieldDictPrefix(field, termPrefix)
 	if err != nil {
 		i.mutex.RUnlock()
