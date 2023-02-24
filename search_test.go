@@ -2100,3 +2100,56 @@ func TestGeoShapePolygonContainsPoint(t *testing.T) {
 		}
 	}
 }
+
+func TestMB55699(t *testing.T) {
+	// Unit test to demonstrate capability to differentiate between
+	// a nested field name and one that has a "." within it.
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+	idx, err := New(tmpIndexPath, NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	docBytes := []byte(`
+	{
+		"x": {
+			"y": "1"
+		},
+		"x.y": "2"
+	}
+	`)
+	var doc map[string]interface{}
+	if err = json.Unmarshal(docBytes, &doc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = idx.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	q1 := query.NewMatchQuery("1")
+	q1.SetField("x.y")
+	if res, err := idx.Search(NewSearchRequest(q1)); err != nil || len(res.Hits) != 1 {
+		t.Fatalf("Expected x.y to contain 1")
+	}
+	q1.SetField("`x`.`y`")
+	if res, err := idx.Search(NewSearchRequest(q1)); err != nil || len(res.Hits) != 1 {
+		t.Fatalf("Expected `x`.`y` to contain 1")
+	}
+
+	q2 := query.NewMatchQuery("2")
+	q2.SetField("x.y")
+	if res, err := idx.Search(NewSearchRequest(q2)); err != nil || len(res.Hits) != 0 {
+		t.Fatalf("Expected `x`.`y` to not contain 2")
+	}
+	q2.SetField("`x.y`")
+	if res, err := idx.Search(NewSearchRequest(q2)); err != nil || len(res.Hits) != 1 {
+		t.Fatalf("Expected `x.y` to contain 2")
+	}
+}
