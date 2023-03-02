@@ -1,6 +1,6 @@
 module github.com/blevesearch/bleve/v2
 
-go 1.18
+go 1.19
 
 require (
 	github.com/RoaringBitmap/roaring v0.9.4
