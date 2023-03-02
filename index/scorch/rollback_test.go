@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve/v2/document"
 	index "github.com/blevesearch/bleve_index_api"
@@ -244,5 +245,109 @@ func TestIndexRollback(t *testing.T) {
 	err = idx.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestGetProtectedSnapshots(t *testing.T) {
+	origRollbackSamplingInterval := RollbackSamplingInterval
+	defer func() {
+		RollbackSamplingInterval = origRollbackSamplingInterval
+	}()
+	RollbackSamplingInterval = 10 * time.Minute
+	currentTimeStamp := time.Now()
+	tests := []struct {
+		title              string
+		metaData           []*snapshotMetaData
+		numSnapshotsToKeep int
+		expCount           int
+		expEpochs          []uint64
+	}{
+		{
+			title: "epochs that have exact timestamps as per expectation for protecting",
+			metaData: []*snapshotMetaData{
+				{epoch: 100, timeStamp: currentTimeStamp},
+				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
+				{epoch: 88, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 6))},
+				{epoch: 50, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval))},
+				{epoch: 35, timeStamp: currentTimeStamp.Add(-(6 * RollbackSamplingInterval / 5))},
+				{epoch: 10, timeStamp: currentTimeStamp.Add(-(2 * RollbackSamplingInterval))},
+			},
+			numSnapshotsToKeep: 3,
+			expCount:           3,
+			expEpochs:          []uint64{100, 50, 10},
+		},
+		{
+			title: "epochs that have exact timestamps as per expectation for protecting",
+			metaData: []*snapshotMetaData{
+				{epoch: 100, timeStamp: currentTimeStamp},
+				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
+				{epoch: 88, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 6))},
+				{epoch: 50, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval))},
+				{epoch: 35, timeStamp: currentTimeStamp.Add(-(6 * RollbackSamplingInterval / 5))},
+				{epoch: 10, timeStamp: currentTimeStamp.Add(-(2 * RollbackSamplingInterval))},
+			},
+			numSnapshotsToKeep: 2,
+			expCount:           2,
+			expEpochs:          []uint64{50, 10},
+		},
+		{
+			title: "epochs that have timestamps approximated to the expected value",
+			metaData: []*snapshotMetaData{
+				{epoch: 100, timeStamp: currentTimeStamp},
+				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
+				{epoch: 88, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 6))},
+				{epoch: 50, timeStamp: currentTimeStamp.Add(-(3 * RollbackSamplingInterval / 4))},
+				{epoch: 35, timeStamp: currentTimeStamp.Add(-(6 * RollbackSamplingInterval / 5))},
+				{epoch: 10, timeStamp: currentTimeStamp.Add(-(2 * RollbackSamplingInterval))},
+			},
+			numSnapshotsToKeep: 3,
+			expCount:           3,
+			expEpochs:          []uint64{50, 35, 10},
+		},
+		{
+			title: "protecting epochs when we don't have enough snapshots with RollbackSamplingInterval" +
+				" separated timestamps",
+			metaData: []*snapshotMetaData{
+				{epoch: 100, timeStamp: currentTimeStamp},
+				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
+				{epoch: 88, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 6))},
+				{epoch: 50, timeStamp: currentTimeStamp.Add(-(3 * RollbackSamplingInterval / 4))},
+				{epoch: 35, timeStamp: currentTimeStamp.Add(-(5 * RollbackSamplingInterval / 6))},
+				{epoch: 10, timeStamp: currentTimeStamp.Add(-(7 * RollbackSamplingInterval / 8))},
+			},
+			numSnapshotsToKeep: 4,
+			expCount:           4,
+			expEpochs:          []uint64{100, 99, 88, 10},
+		},
+		{
+			title: "epochs of which some are approximated to the expected timestamps, and" +
+				" we don't have enough snapshots with RollbackSamplingInterval separated timestamps",
+			metaData: []*snapshotMetaData{
+				{epoch: 100, timeStamp: currentTimeStamp},
+				{epoch: 99, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 12))},
+				{epoch: 88, timeStamp: currentTimeStamp.Add(-(RollbackSamplingInterval / 6))},
+				{epoch: 50, timeStamp: currentTimeStamp.Add(-(3 * RollbackSamplingInterval / 4))},
+				{epoch: 35, timeStamp: currentTimeStamp.Add(-(8 * RollbackSamplingInterval / 7))},
+				{epoch: 10, timeStamp: currentTimeStamp.Add(-(6 * RollbackSamplingInterval / 5))},
+			},
+			numSnapshotsToKeep: 3,
+			expCount:           3,
+			expEpochs:          []uint64{100, 50, 10},
+		},
+	}
+
+	for i, test := range tests {
+		protectedEpochs := getProtectedSnapshots(RollbackSamplingInterval,
+			test.numSnapshotsToKeep, test.metaData)
+		if len(protectedEpochs) != test.expCount {
+			t.Errorf("%d test: %s, getProtectedSnapshots expected to return %d "+
+				"snapshots, but got: %d", i, test.title, test.expCount, len(protectedEpochs))
+		}
+		for _, e := range test.expEpochs {
+			if _, found := protectedEpochs[e]; !found {
+				t.Errorf("%d test: %s, %d epoch expected to be protected, "+
+					"but missing from protected list: %v", i, test.title, e, protectedEpochs)
+			}
+		}
 	}
 }
