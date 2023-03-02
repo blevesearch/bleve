@@ -892,9 +892,9 @@ var NumSnapshotsToKeep = 1
 // For example, a value of 10 minutes ensures that the
 // protected snapshots (NumSnapshotsToKeep = 3) are:
 //
-//	   the very latest snapshot(ie the current one),
-//	   the snapshot that was persisted 10 minutes before the current one,
-//		  the snapshot that was persisted 20 minutes before the current one
+//	the very latest snapshot(ie the current one),
+//	the snapshot that was persisted 10 minutes before the current one,
+//	the snapshot that was persisted 20 minutes before the current one
 //
 // By default however, the timeseries way of protecting snapshots is
 // disabled, and we protect the latest three contiguous snapshots
@@ -926,14 +926,18 @@ func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
 		// series. In this case, add the epoch rv
 		if snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp).Minutes() >
 			interval.Minutes() {
-			rv[snapshots[i+1].epoch] = snapshots[i+1].timeStamp
-			ptr = i + 1
-			numSnapshotsProtected++
+			if _, ok := rv[snapshots[i+1].epoch]; !ok {
+				rv[snapshots[i+1].epoch] = snapshots[i+1].timeStamp
+				ptr = i + 1
+				numSnapshotsProtected++
+			}
 		} else if snapshots[i].timeStamp.Sub(snapshots[ptr].timeStamp).Minutes() ==
 			interval.Minutes() {
-			rv[snapshots[i].epoch] = snapshots[i].timeStamp
-			ptr = i
-			numSnapshotsProtected++
+			if _, ok := rv[snapshots[i].epoch]; !ok {
+				rv[snapshots[i].epoch] = snapshots[i].timeStamp
+				ptr = i
+				numSnapshotsProtected++
+			}
 		}
 
 		if numSnapshotsProtected >= maxDataPoints {
