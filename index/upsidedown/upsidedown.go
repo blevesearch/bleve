@@ -135,7 +135,7 @@ func (udc *UpsideDownCouch) loadSchema(kvreader store.KVReader) (err error) {
 }
 
 type RowBuffer struct {
-    buf *[]byte
+    buf []byte
 }
 
 var rowBufferPool sync.Pool
@@ -145,7 +145,7 @@ func GetRowBuffer() *RowBuffer {
         	return rb
     	} else {
         	buf := make([]byte, RowBufferSize)
-        	return &RowBuffer{buf: &buf}
+        	return &RowBuffer{buf: buf}
     	}
 }
 
@@ -174,14 +174,14 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]Upsi
 		for _, row := range addRows {
 			tfr, ok := row.(*TermFrequencyRow)
 			if ok {
-				if tfr.DictionaryRowKeySize() > len(rowBuf) {
-					rowBuf = make([]byte, tfr.DictionaryRowKeySize())
+				if tfr.DictionaryRowKeySize() > len(rowBuf.buf) {
+					rowBuf.buf = make([]byte, tfr.DictionaryRowKeySize())
 				}
-				dictKeySize, err := tfr.DictionaryRowKeyTo(rowBuf)
+				dictKeySize, err := tfr.DictionaryRowKeyTo(rowBuf.buf)
 				if err != nil {
 					return err
 				}
-				dictionaryDeltas[string(rowBuf[:dictKeySize])] += 1
+				dictionaryDeltas[string(rowBuf.buf[:dictKeySize])] += 1
 			}
 			addKeyBytes += row.KeySize()
 			addValBytes += row.ValueSize()
@@ -202,14 +202,14 @@ func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]Upsi
 			tfr, ok := row.(*TermFrequencyRow)
 			if ok {
 				// need to decrement counter
-				if tfr.DictionaryRowKeySize() > len(rowBuf) {
-					rowBuf = make([]byte, tfr.DictionaryRowKeySize())
+				if tfr.DictionaryRowKeySize() > len(rowBuf.buf) {
+					rowBuf.buf = make([]byte, tfr.DictionaryRowKeySize())
 				}
-				dictKeySize, err := tfr.DictionaryRowKeyTo(rowBuf)
+				dictKeySize, err := tfr.DictionaryRowKeyTo(rowBuf.buf)
 				if err != nil {
 					return err
 				}
-				dictionaryDeltas[string(rowBuf[:dictKeySize])] -= 1
+				dictionaryDeltas[string(rowBuf.buf[:dictKeySize])] -= 1
 			}
 			deleteKeyBytes += row.KeySize()
 		}
@@ -546,26 +546,26 @@ func (udc *UpsideDownCouch) mergeOldAndNew(backIndexRow *BackIndexRow, rows []In
 		switch row := row.(type) {
 		case *TermFrequencyRow:
 			if existingTermKeys != nil {
-				if row.KeySize() > len(keyBuf) {
-					keyBuf = make([]byte, row.KeySize())
+				if row.KeySize() > len(keyBuf.buf) {
+					keyBuf.buf = make([]byte, row.KeySize())
 				}
-				keySize, _ := row.KeyTo(keyBuf)
-				if _, ok := existingTermKeys[string(keyBuf[:keySize])]; ok {
+				keySize, _ := row.KeyTo(keyBuf.buf)
+				if _, ok := existingTermKeys[string(keyBuf.buf[:keySize])]; ok {
 					updateRows = append(updateRows, row)
-					delete(existingTermKeys, string(keyBuf[:keySize]))
+					delete(existingTermKeys, string(keyBuf.buf[:keySize]))
 					continue
 				}
 			}
 			addRows = append(addRows, row)
 		case *StoredRow:
 			if existingStoredKeys != nil {
-				if row.KeySize() > len(keyBuf) {
-					keyBuf = make([]byte, row.KeySize())
+				if row.KeySize() > len(keyBuf.buf) {
+					keyBuf.buf = make([]byte, row.KeySize())
 				}
-				keySize, _ := row.KeyTo(keyBuf)
-				if _, ok := existingStoredKeys[string(keyBuf[:keySize])]; ok {
+				keySize, _ := row.KeyTo(keyBuf.buf)
+				if _, ok := existingStoredKeys[string(keyBuf.buf[:keySize])]; ok {
 					updateRows = append(updateRows, row)
-					delete(existingStoredKeys, string(keyBuf[:keySize]))
+					delete(existingStoredKeys, string(keyBuf.buf[:keySize]))
 					continue
 				}
 			}
@@ -1052,23 +1052,23 @@ func backIndexRowForDoc(kvreader store.KVReader, docID index.IndexInternalID) (*
 	}
 
 	keyBuf := GetRowBuffer()
-	if tempRow.KeySize() > len(keyBuf) {
-		keyBuf = make([]byte, 2*tempRow.KeySize())
+	if tempRow.KeySize() > len(keyBuf.buf) {
+		keyBuf.buf = make([]byte, 2*tempRow.KeySize())
 	}
 	defer PutRowBuffer(keyBuf)
-	keySize, err := tempRow.KeyTo(keyBuf)
+	keySize, err := tempRow.KeyTo(keyBuf.buf)
 	if err != nil {
 		return nil, err
 	}
 
-	value, err := kvreader.Get(keyBuf[:keySize])
+	value, err := kvreader.Get(keyBuf.buf[:keySize])
 	if err != nil {
 		return nil, err
 	}
 	if value == nil {
 		return nil, nil
 	}
-	backIndexRow, err := NewBackIndexRowKV(keyBuf[:keySize], value)
+	backIndexRow, err := NewBackIndexRowKV(keyBuf.buf[:keySize], value)
 	if err != nil {
 		return nil, err
 	}
