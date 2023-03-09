@@ -35,6 +35,7 @@ const (
 	Double
 	Boolean
 	IP
+	Synonym
 )
 
 // Token represents one occurrence of a term at a particular location in a
@@ -50,9 +51,22 @@ type Token struct {
 
 	// Position specifies the 1-based index of the token in the sequence of
 	// occurrences of its term in the field.
-	Position int       `json:"position"`
-	Type     TokenType `json:"type"`
-	KeyWord  bool      `json:"keyword"`
+	Position  int       `json:"position"`
+	Type      TokenType `json:"type"`
+	KeyWord   bool      `json:"keyword"`
+	PosLength int
+}
+
+type SynonymStruct struct {
+	LHS           [][]byte //array of equivalent stuff if equivalent
+	RHS           [][]byte //NULL if unidirectional
+	BiDirectional bool
+	KeepOrig      bool
+}
+
+type TestStruct struct {
+	SearchPhrase []byte
+	SynonymList  []SynonymStruct
 }
 
 func (t *Token) String() string {
