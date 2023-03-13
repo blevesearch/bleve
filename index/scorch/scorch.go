@@ -70,7 +70,7 @@ type Scorch struct {
 	asyncTasks               sync.WaitGroup
 
 	onEvent      func(event Event)
-	onAsyncError func(err error)
+	onAsyncError func(err error, path string)
 
 	forceMergeRequestCh chan *mergerCtrl
 
@@ -185,7 +185,7 @@ func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) {
 
 func (s *Scorch) fireAsyncError(err error) {
 	if s.onAsyncError != nil {
-		s.onAsyncError(err)
+		s.onAsyncError(err, s.path)
 	}
 	atomic.AddUint64(&s.stats.TotOnErrors, 1)
 }
