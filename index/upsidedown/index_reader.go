@@ -124,16 +124,16 @@ func (i *IndexReader) documentVisitFieldTerms(id index.IndexInternalID, fields [
 	}
 
 	keyBuf := GetRowBuffer()
-	if tempRow.KeySize() > len(keyBuf) {
-		keyBuf = make([]byte, 2*tempRow.KeySize())
+	if tempRow.KeySize() > len(keyBuf.buf) {
+		keyBuf.buf = make([]byte, 2*tempRow.KeySize())
 	}
 	defer PutRowBuffer(keyBuf)
-	keySize, err := tempRow.KeyTo(keyBuf)
+	keySize, err := tempRow.KeyTo(keyBuf.buf)
 	if err != nil {
 		return err
 	}
 
-	value, err := i.kvreader.Get(keyBuf[:keySize])
+	value, err := i.kvreader.Get(keyBuf.buf[:keySize])
 	if err != nil {
 		return err
 	}
