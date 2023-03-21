@@ -4,14 +4,14 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/token/lowercase"
 	"github.com/blevesearch/bleve/v2/analysis/token/synonymFilter"
-	"github.com/blevesearch/bleve/v2/analysis/tokenizer/unicode"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/whitespace"
 	"github.com/blevesearch/bleve/v2/registry"
 )
 
 const AnalyzerName = "synonymAnalyzer"
 
 func AnalyzerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.Analyzer, error) {
-	tokenizer, err := cache.TokenizerNamed(unicode.Name)
+	tokenizer, err := cache.TokenizerNamed(whitespace.Name)
 	if err != nil {
 		return nil, err
 	}
