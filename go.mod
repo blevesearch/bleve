@@ -31,6 +31,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/goombaio/orderedmap v0.0.0-20180924084748-ba921b7e2419 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 )
 
@@ -39,6 +40,7 @@ require (
 	github.com/couchbase/ghistogram v0.1.0 // indirect
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
+	github.com/goombaio/orderedset v0.0.0-20180925151225-8e67b20a9b77
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/json-iterator/go v0.0.0-20171115153421-f7279a603ede // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
