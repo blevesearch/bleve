@@ -1736,6 +1736,19 @@ func TestAnalyzerInheritance(t *testing.T) {
 		{
 			/*
 				index_mapping: standard
+				default_mapping: keyword (dynamic)
+				    -> search over field to (should inherit keyword)
+			*/
+			name: "Child field to inherit default mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":true,"default_analyzer":"keyword"}` +
+				`,"default_analyzer":"standard"}`,
+			doc:        map[string]interface{}{"city": "San Francisco"},
+			queryField: "city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
 				default_mapping: keyword
 				    -> child mapping: ""
 					    -> child field: (should inherit keyword)
