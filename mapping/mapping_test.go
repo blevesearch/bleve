@@ -105,10 +105,10 @@ func TestMappingStructWithJSONTags(t *testing.T) {
 	foundNoJSONName := false
 	count := 0
 	for _, f := range doc.Fields {
-		if f.Name() == "name" {
+		if f.Name() == "`name`" {
 			foundJSONName = true
 		}
-		if f.Name() == "NoJSONTag" {
+		if f.Name() == "`NoJSONTag`" {
 			foundNoJSONName = true
 		}
 		count++
@@ -145,10 +145,10 @@ func TestMappingStructWithJSONTagsOneDisabled(t *testing.T) {
 	foundNoJSONName := false
 	count := 0
 	for _, f := range doc.Fields {
-		if f.Name() == "name" {
+		if f.Name() == "`name`" {
 			foundJSONName = true
 		}
-		if f.Name() == "NoJSONTag" {
+		if f.Name() == "`NoJSONTag`" {
 			foundNoJSONName = true
 		}
 		count++
@@ -185,10 +185,10 @@ func TestMappingStructWithAlternateTags(t *testing.T) {
 	foundNoBLEVEName := false
 	count := 0
 	for _, f := range doc.Fields {
-		if f.Name() == "name" {
+		if f.Name() == "`name`" {
 			foundBLEVEName = true
 		}
-		if f.Name() == "NoBLEVETag" {
+		if f.Name() == "`NoBLEVETag`" {
 			foundNoBLEVEName = true
 		}
 		count++
@@ -227,10 +227,10 @@ func TestMappingStructWithAlternateTagsTwoDisabled(t *testing.T) {
 	foundNoBLEVEName := false
 	count := 0
 	for _, f := range doc.Fields {
-		if f.Name() == "name" {
+		if f.Name() == "`name`" {
 			foundBLEVEName = true
 		}
-		if f.Name() == "NoBLEVETag" {
+		if f.Name() == "`NoBLEVETag`" {
 			foundNoBLEVEName = true
 		}
 		count++
@@ -266,7 +266,7 @@ func TestMappingStructWithPointerToString(t *testing.T) {
 	found := false
 	count := 0
 	for _, f := range doc.Fields {
-		if f.Name() == "Name" {
+		if f.Name() == "`Name`" {
 			found = true
 		}
 		count++
@@ -298,7 +298,7 @@ func TestMappingJSONWithNull(t *testing.T) {
 	found := false
 	count := 0
 	for _, f := range doc.Fields {
-		if f.Name() == "name" {
+		if f.Name() == "`name`" {
 			found = true
 		}
 		count++
@@ -504,10 +504,10 @@ func TestMappingBool(t *testing.T) {
 	foundPProp := false
 	count := 0
 	for _, f := range doc.Fields {
-		if f.Name() == "prop" {
+		if f.Name() == "`prop`" {
 			foundProp = true
 		}
-		if f.Name() == "pprop" {
+		if f.Name() == "`pprop`" {
 			foundPProp = true
 		}
 		count++
@@ -735,17 +735,17 @@ func TestAnonymousStructFields(t *testing.T) {
 	if len(doc.Fields) != 4 {
 		t.Fatalf("expected 4 fields, got %d", len(doc.Fields))
 	}
-	if doc.Fields[0].Name() != "Contact0" {
-		t.Errorf("expected field named 'Contact0', got '%s'", doc.Fields[0].Name())
+	if doc.Fields[0].Name() != "`Contact0`" {
+		t.Errorf("expected field named '`Contact0`', got '%s'", doc.Fields[0].Name())
 	}
-	if doc.Fields[1].Name() != "Name" {
-		t.Errorf("expected field named 'Name', got '%s'", doc.Fields[1].Name())
+	if doc.Fields[1].Name() != "`Name`" {
+		t.Errorf("expected field named '`Name`', got '%s'", doc.Fields[1].Name())
 	}
-	if doc.Fields[2].Name() != "Contact2.Name" {
-		t.Errorf("expected field named 'Contact2.Name', got '%s'", doc.Fields[2].Name())
+	if doc.Fields[2].Name() != "`Contact2`.`Name`" {
+		t.Errorf("expected field named '`Contact2`.`Name`', got '%s'", doc.Fields[2].Name())
 	}
-	if doc.Fields[3].Name() != "Contact3" {
-		t.Errorf("expected field named 'Contact3', got '%s'", doc.Fields[3].Name())
+	if doc.Fields[3].Name() != "`Contact3`" {
+		t.Errorf("expected field named '`Contact3`', got '%s'", doc.Fields[3].Name())
 	}
 
 	type AnotherThing struct {
@@ -775,17 +775,17 @@ func TestAnonymousStructFields(t *testing.T) {
 	if len(doc2.Fields) != 4 {
 		t.Fatalf("expected 4 fields, got %d", len(doc2.Fields))
 	}
-	if doc2.Fields[0].Name() != "Alternate0" {
-		t.Errorf("expected field named 'Alternate0', got '%s'", doc2.Fields[0].Name())
+	if doc2.Fields[0].Name() != "`Alternate0`" {
+		t.Errorf("expected field named '`Alternate0`', got '%s'", doc2.Fields[0].Name())
 	}
-	if doc2.Fields[1].Name() != "Alternate1.Name" {
-		t.Errorf("expected field named 'Name', got '%s'", doc2.Fields[1].Name())
+	if doc2.Fields[1].Name() != "`Alternate1`.`Name`" {
+		t.Errorf("expected field named '`Alternte1`.`Name`', got '%s'", doc2.Fields[1].Name())
 	}
-	if doc2.Fields[2].Name() != "Alternate2.Name" {
-		t.Errorf("expected field named 'Alternate2.Name', got '%s'", doc2.Fields[2].Name())
+	if doc2.Fields[2].Name() != "`Alternate2`.`Name`" {
+		t.Errorf("expected field named '`Alternate2`.`Name`', got '%s'", doc2.Fields[2].Name())
 	}
-	if doc2.Fields[3].Name() != "Alternate3" {
-		t.Errorf("expected field named 'Alternate3', got '%s'", doc2.Fields[3].Name())
+	if doc2.Fields[3].Name() != "`Alternate3`" {
+		t.Errorf("expected field named '`Alternate3`', got '%s'", doc2.Fields[3].Name())
 	}
 }
 
@@ -811,8 +811,8 @@ func TestAnonymousStructFieldWithJSONStructTagEmptString(t *testing.T) {
 	if len(doc.Fields) != 1 {
 		t.Fatalf("expected 1 field, got %d", len(doc.Fields))
 	}
-	if doc.Fields[0].Name() != "key" {
-		t.Errorf("expected field named 'key', got '%s'", doc.Fields[0].Name())
+	if doc.Fields[0].Name() != "`key`" {
+		t.Errorf("expected field named '`key`', got '%s'", doc.Fields[0].Name())
 	}
 }
 
@@ -968,7 +968,7 @@ func TestMappingForGeo(t *testing.T) {
 
 		var foundGeo bool
 		for _, f := range doc.Fields {
-			if f.Name() == "location" {
+			if f.Name() == "`location`" {
 				foundGeo = true
 				geoF, ok := f.(index.GeoPointField)
 				if !ok {
@@ -1030,8 +1030,8 @@ func TestMappingForTextMarshaler(t *testing.T) {
 	if len(doc.Fields) != 1 {
 		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
 	}
-	if doc.Fields[0].Name() != "Marshalable.Extra" {
-		t.Errorf("expected field to be named 'Marshalable.Extra', got: '%s'", doc.Fields[0].Name())
+	if doc.Fields[0].Name() != "`Marshalable`.`Extra`" {
+		t.Errorf("expected field to be named '`Marshalable`.`Extra`', got: '%s'", doc.Fields[0].Name())
 	}
 	if string(doc.Fields[0].Value()) != tm.Marshalable.Extra {
 		t.Errorf("expected field value to be '%s', got: '%s'", tm.Marshalable.Extra, string(doc.Fields[0].Value()))
@@ -1051,8 +1051,8 @@ func TestMappingForTextMarshaler(t *testing.T) {
 		t.Fatalf("expected 1 field, got: %d", len(doc.Fields))
 
 	}
-	if doc.Fields[0].Name() != "Marshalable" {
-		t.Errorf("expected field to be named 'Marshalable', got: '%s'", doc.Fields[0].Name())
+	if doc.Fields[0].Name() != "`Marshalable`" {
+		t.Errorf("expected field to be named '`Marshalable`', got: '%s'", doc.Fields[0].Name())
 	}
 	want, err := tm.Marshalable.MarshalText()
 	if err != nil {
@@ -1167,7 +1167,7 @@ func TestWrongAnalyzerSearchableAs(t *testing.T) {
 	indexMapping := NewIndexMapping()
 	indexMapping.AddDocumentMapping("brewery", docMapping)
 
-	analyzerName := indexMapping.AnalyzerNameForPath("geo.geo.accuracy")
+	analyzerName := indexMapping.AnalyzerNameForPath("`geo`.`geo.accuracy`")
 	if analyzerName != "xyz" {
 		t.Errorf("expected analyzer name `xyz`, got `%s`", analyzerName)
 	}
@@ -1228,7 +1228,7 @@ func TestMappingArrayOfStringGeoPoints(t *testing.T) {
 		}
 
 		for _, f := range doc.Fields {
-			if f.Name() == "points" {
+			if f.Name() == "`points`" {
 				geoF, ok := f.(*document.GeoPointField)
 				if !ok {
 					t.Errorf("expected a geopoint field!")

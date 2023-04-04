@@ -25,6 +25,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/numeric"
+	"github.com/blevesearch/bleve/v2/util"
 )
 
 var HighTerm = strings.Repeat(string(utf8.MaxRune), 3)
@@ -64,6 +65,7 @@ func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 		if !ok {
 			return nil, fmt.Errorf("search sort mode geo_distance must specify field")
 		}
+		field = util.CleansePath(field)
 		lon, lat, foundLocation := geo.ExtractGeoPoint(input["location"])
 		if !foundLocation {
 			return nil, fmt.Errorf("unable to parse geo_distance location")
@@ -89,6 +91,7 @@ func ParseSearchSortObj(input map[string]interface{}) (SearchSort, error) {
 		if !ok {
 			return nil, fmt.Errorf("search sort mode field must specify field")
 		}
+		field = util.CleansePath(field)
 		rv := &SortField{
 			Field: field,
 			Desc:  descending,
@@ -156,7 +159,7 @@ func ParseSearchSortString(input string) SearchSort {
 		}
 	}
 	return &SortField{
-		Field: input,
+		Field: util.CleansePath(input),
 		Desc:  descending,
 	}
 }

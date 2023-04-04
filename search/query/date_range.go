@@ -27,6 +27,7 @@ import (
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -96,7 +97,9 @@ type DateRangeQuery struct {
 // NewDateRangeQuery creates a new Query for ranges
 // of date values.
 // Date strings are parsed using the DateTimeParser configured in the
-//  top-level config.QueryDateTimeParser
+//
+//	top-level config.QueryDateTimeParser
+//
 // Either, but not both endpoints can be nil.
 func NewDateRangeQuery(start, end time.Time) *DateRangeQuery {
 	return NewDateRangeInclusiveQuery(start, end, nil, nil)
@@ -105,7 +108,9 @@ func NewDateRangeQuery(start, end time.Time) *DateRangeQuery {
 // NewDateRangeInclusiveQuery creates a new Query for ranges
 // of date values.
 // Date strings are parsed using the DateTimeParser configured in the
-//  top-level config.QueryDateTimeParser
+//
+//	top-level config.QueryDateTimeParser
+//
 // Either, but not both endpoints can be nil.
 // startInclusive and endInclusive control inclusion of the endpoints.
 func NewDateRangeInclusiveQuery(start, end time.Time, startInclusive, endInclusive *bool) *DateRangeQuery {
@@ -143,6 +148,8 @@ func (q *DateRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m ma
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
+	} else {
+		field = util.CleansePath(field)
 	}
 
 	return searcher.NewNumericRangeSearcher(ctx, i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal.Value(), options)

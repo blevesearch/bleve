@@ -21,6 +21,7 @@ import (
 	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
+	"github.com/blevesearch/bleve/v2/util"
 )
 
 var reflectStaticSizeNumericFacetBuilder int
@@ -51,7 +52,7 @@ type NumericFacetBuilder struct {
 func NewNumericFacetBuilder(field string, size int) *NumericFacetBuilder {
 	return &NumericFacetBuilder{
 		size:       size,
-		field:      field,
+		field:      util.CleansePath(field),
 		termsCount: make(map[string]int),
 		ranges:     make(map[string]*numericRange, 0),
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -62,6 +63,8 @@ func (q *GeoDistanceQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
+	} else {
+		field = util.CleansePath(field)
 	}
 
 	dist, err := geo.ParseDistance(q.Distance)

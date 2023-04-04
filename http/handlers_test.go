@@ -292,9 +292,9 @@ func TestHandlers(t *testing.T) {
 			},
 			Status: http.StatusOK,
 			ResponseMatch: map[string]bool{
-				`"id":"a"`:      true,
-				`"body":"test"`: true,
-				`"name":"a"`:    true,
+				"\"id\":\"a\"":      true,
+				"\"`body`\":\"test\"": true,
+				"\"`name`\":\"a\"":    true,
 			},
 		},
 		{
@@ -483,10 +483,10 @@ func TestHandlers(t *testing.T) {
 			},
 			Status: http.StatusOK,
 			ResponseMatch: map[string]bool{
-				`"fields":`: true,
-				`"name"`:    true,
-				`"body"`:    true,
-				`"_all"`:    true,
+				"\"fields\"": true,
+				"\"`name`\"":    true,
+				"\"`body`\"":    true,
+				"\"_all\"":    true,
 			},
 		},
 		{

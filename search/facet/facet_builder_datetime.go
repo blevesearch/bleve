@@ -22,6 +22,7 @@ import (
 	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
+	"github.com/blevesearch/bleve/v2/util"
 )
 
 var reflectStaticSizeDateTimeFacetBuilder int
@@ -52,7 +53,7 @@ type DateTimeFacetBuilder struct {
 func NewDateTimeFacetBuilder(field string, size int) *DateTimeFacetBuilder {
 	return &DateTimeFacetBuilder{
 		size:       size,
-		field:      field,
+		field:      util.CleansePath(field),
 		termsCount: make(map[string]int),
 		ranges:     make(map[string]*dateTimeRange, 0),
 	}

@@ -22,6 +22,7 @@ import (
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -105,6 +106,8 @@ func (q *GeoShapeQuery) Searcher(ctx context.Context, i index.IndexReader,
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
+	} else {
+		field = util.CleansePath(field)
 	}
 
 	return searcher.NewGeoShapeSearcher(ctx, i, q.Geometry.Shape, q.Geometry.Relation, field,

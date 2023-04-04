@@ -22,6 +22,7 @@ import (
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -58,7 +59,10 @@ func (q *IPRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
+	} else {
+		field = util.CleansePath(field)
 	}
+
 	_, ipNet, err := net.ParseCIDR(q.CIDR)
 	if err != nil {
 		ip := net.ParseIP(q.CIDR)
