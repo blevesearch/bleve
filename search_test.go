@@ -1933,3 +1933,44 @@ func TestIPRangeQuery(t *testing.T) {
 		t.Fatal("Expected the 1 result - doc")
 	}
 }
+
+func TestAnalyzerInheritanceForDefaultDynamicMapping(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	imap := mapping.NewIndexMapping()
+	imap.DefaultMapping.DefaultAnalyzer = keyword.Name
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := map[string]interface{}{
+		"fieldX": "AbCdEf",
+	}
+
+	if err = idx.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	// Match query to apply keyword analyzer to fieldX.
+	mq := NewMatchQuery("AbCdEf")
+	mq.SetField("fieldX")
+
+	sr := NewSearchRequest(mq)
+	results, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(results.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(results.Hits))
+	}
+}

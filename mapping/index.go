@@ -364,6 +364,7 @@ func (im *IndexMappingImpl) AnalyzerNameForPath(path string) string {
 			return analyzerName
 		}
 	}
+
 	// now try the default mapping
 	pathMapping := im.DefaultMapping.documentMappingForPath(path)
 	if pathMapping != nil {
@@ -377,7 +378,16 @@ func (im *IndexMappingImpl) AnalyzerNameForPath(path string) string {
 	// next we will try default analyzers for the path
 	pathDecoded := decodePath(path)
 	for _, docMapping := range im.TypeMapping {
-		rv := docMapping.defaultAnalyzerName(pathDecoded)
+		if docMapping.Enabled {
+			rv := docMapping.defaultAnalyzerName(pathDecoded)
+			if rv != "" {
+				return rv
+			}
+		}
+	}
+	// now the default analyzer for the default mapping
+	if im.DefaultMapping.Enabled {
+		rv := im.DefaultMapping.defaultAnalyzerName(pathDecoded)
 		if rv != "" {
 			return rv
 		}
