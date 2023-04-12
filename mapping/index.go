@@ -17,11 +17,13 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
+
 	index "github.com/blevesearch/bleve_index_api"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
+	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/registry"
 )
@@ -33,6 +35,7 @@ const defaultType = "_default"
 const defaultField = "_all"
 const defaultAnalyzer = standard.Name
 const defaultDateTimeParser = optional.Name
+const defaultEnableSynonym = false
 
 // An IndexMappingImpl controls how objects are placed
 // into an index.
@@ -53,6 +56,8 @@ type IndexMappingImpl struct {
 	IndexDynamic          bool                        `json:"index_dynamic"`
 	DocValuesDynamic      bool                        `json:"docvalues_dynamic"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
+	EnableSynonym         bool                        `json:"enable_synonym"`
+	SynonymConfig         *synonym.SynonymConfig      `json:"synonym_config"`
 	cache                 *registry.Cache
 }
 
@@ -159,6 +164,7 @@ func NewIndexMapping() *IndexMappingImpl {
 		DocValuesDynamic:      DocValuesDynamic,
 		CustomAnalysis:        newCustomAnalysis(),
 		cache:                 registry.NewCache(),
+		EnableSynonym:         defaultEnableSynonym,
 	}
 }
 
@@ -220,6 +226,8 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 	im.TypeMapping = make(map[string]*DocumentMapping)
 	im.StoreDynamic = StoreDynamic
 	im.IndexDynamic = IndexDynamic
+	im.EnableSynonym = defaultEnableSynonym
+	im.SynonymConfig = nil
 	im.DocValuesDynamic = DocValuesDynamic
 
 	var invalidKeys []string
@@ -277,6 +285,16 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			}
 		case "docvalues_dynamic":
 			err := json.Unmarshal(v, &im.DocValuesDynamic)
+			if err != nil {
+				return err
+			}
+		case "enable_synonym":
+			err := json.Unmarshal(v, &im.EnableSynonym)
+			if err != nil {
+				return err
+			}
+		case "synonym_config":
+			err := json.Unmarshal(v, &im.SynonymConfig)
 			if err != nil {
 				return err
 			}
@@ -395,6 +413,31 @@ func (im *IndexMappingImpl) AnalyzerNamed(name string) analysis.Analyzer {
 	return analyzer
 }
 
+func (im *IndexMappingImpl) AnalyzerNamedSynonym(name string) (analysis.Analyzer, bool) {
+	analyzer, err := im.cache.AnalyzerNamed(name)
+	if err != nil {
+		logger.Printf("error using analyzer named: %s", name)
+		return nil, false
+	}
+	if im.EnableSynonym {
+		config := make(map[string]interface{})
+		config["fst"] = im.SynonymConfig.FST
+		config["vellumMap"] = im.SynonymConfig.VellumMap
+		config["byteSliceHashMap"] = im.SynonymConfig.ByteSliceHashMap
+		config["type"] = synonym.Name
+		synonymFilter, err := im.cache.DefineTokenFilter(synonym.Name, config)
+		if err != nil {
+			fmt.Printf("error using the synonym filter - %v", err)
+			return nil, false
+		}
+		return &analysis.WrapperAnalyzer{
+			BaseAnalyzer:          analyzer,
+			AdditionalTokenFilter: synonymFilter,
+		}, true
+	}
+	return analyzer, false
+}
+
 func (im *IndexMappingImpl) DateTimeParserNamed(name string) analysis.DateTimeParser {
 	if name == "" {
 		name = im.DefaultDateTimeParser
@@ -441,4 +484,19 @@ func (im *IndexMappingImpl) FieldAnalyzer(field string) string {
 
 func (im *IndexMappingImpl) DefaultSearchField() string {
 	return im.DefaultField
+}
+
+func (im *IndexMappingImpl) SynonymSource(synonymCollection string) error {
+	synonyms := synonym.ReadSynonymFromCollection(synonymCollection)
+	vellumMap, byteSliceHashMap := synonym.CleanSynonymMap(synonyms)
+	buf, err := synonym.BuildSynonymFST(byteSliceHashMap, vellumMap)
+	if err != nil {
+		return err
+	}
+	im.SynonymConfig = &synonym.SynonymConfig{
+		FST:              buf.Bytes(),
+		VellumMap:        vellumMap,
+		ByteSliceHashMap: byteSliceHashMap,
+	}
+	return nil
 }

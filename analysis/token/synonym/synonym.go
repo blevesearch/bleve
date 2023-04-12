@@ -1,0 +1,248 @@
+package synonym
+
+import (
+	"log"
+
+	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/vellum"
+)
+
+const Name = "synonym"
+
+var equivalentSynonymType = []byte("equivalent")
+var explicitSynonymType = []byte("explicit")
+
+type SynonymFilter struct {
+	Fst              []byte
+	ByteSliceHashMap map[uint64][]byte
+	VellumMap        map[uint64][]uint64
+}
+
+type synonymGraphNode struct {
+	token    []byte
+	node     int
+	orig     bool
+	position int
+	start    int
+	end      int
+}
+
+func checkForMatch(tokenPos int, input analysis.TokenStream, consumedTokens *[]*analysis.Token, keepOrig *bool,
+	fst vellum.FST, vellumStructMap map[uint64][]uint64, synTokenEnd *int) (int, *[]uint64, int) {
+	var matchedSynonyms *[]uint64
+	var maxMatchedTokenPos = tokenPos + 1
+	var output uint64 = 0
+	var tmp uint64
+	var isMatch bool
+	var consumedTokenLen = 0
+	curr := fst.Start()
+matchFailed:
+	for tokenPos != len(input) {
+		for _, character := range input[tokenPos].Term {
+			curr, tmp = fst.AcceptWithVal(curr, character)
+			if curr == 1 {
+				break matchFailed
+			}
+			output += tmp
+		}
+		*consumedTokens = append(*consumedTokens, input[tokenPos])
+		tokenPos++
+		isMatch, tmp = fst.IsMatchWithVal(curr)
+		if isMatch {
+			*synTokenEnd = input[tokenPos-1].End
+			synonyms := vellumStructMap[output+tmp]
+			hashedSynonyms := synonyms[1:]
+			matchedSynonyms = &hashedSynonyms
+			*keepOrig = false
+			if synonyms[0] == 1 {
+				*keepOrig = true
+			}
+			maxMatchedTokenPos = tokenPos
+			consumedTokenLen = len(*consumedTokens)
+		}
+		curr, tmp = fst.AcceptWithVal(curr, ' ')
+		output += tmp
+	}
+	return maxMatchedTokenPos, matchedSynonyms, consumedTokenLen
+}
+
+func getAdjListOfSynonymGraph(matchedSynonymPos *[]uint64, consumedTokens []*analysis.Token, startNode int,
+	byteSliceHashMap map[uint64][]byte, consumedTokenLen int) (map[int][]synonymGraphNode, int) {
+	var numberOfNodes = 0
+	if consumedTokens != nil {
+		numberOfNodes += consumedTokenLen - 1
+	}
+	var synonymTokensContainer [][][]byte
+	var synonymTokens [][]byte
+	var tmpStr []byte
+	for _, hashval := range *matchedSynonymPos {
+		for _, character := range byteSliceHashMap[hashval] {
+			if character == ' ' {
+				synonymTokens = append(synonymTokens, tmpStr)
+				tmpStr = nil
+				continue
+			}
+			tmpStr = append(tmpStr, character)
+		}
+		synonymTokens = append(synonymTokens, tmpStr)
+		synonymTokensContainer = append(synonymTokensContainer, synonymTokens)
+		numberOfNodes += len(synonymTokens) - 1
+		synonymTokens = nil
+		tmpStr = nil
+	}
+	var endNode = startNode + numberOfNodes + 1
+	var adjList = make(map[int][]synonymGraphNode)
+	var newNodeCount = 0
+	var pathEndNode int
+	for _, synonymTokens = range synonymTokensContainer {
+		if len(synonymTokens) == 1 {
+			pathEndNode = endNode
+		} else {
+			pathEndNode = startNode + newNodeCount + 1
+			newNodeCount += len(synonymTokens) - 1
+		}
+		adjList[startNode] = append(adjList[startNode], synonymGraphNode{
+			token: synonymTokens[0],
+			node:  pathEndNode,
+			orig:  false,
+		})
+		if len(synonymTokens) > 1 {
+			for i := 1; i < len(synonymTokens)-1; i++ {
+				adjList[pathEndNode] = append(adjList[pathEndNode], synonymGraphNode{
+					token: synonymTokens[i],
+					node:  pathEndNode + 1,
+					orig:  false,
+				})
+				pathEndNode++
+			}
+			adjList[pathEndNode] = append(adjList[pathEndNode], synonymGraphNode{
+				token: synonymTokens[len(synonymTokens)-1],
+				node:  endNode,
+				orig:  false,
+			})
+		}
+	}
+	if consumedTokens != nil {
+		if consumedTokenLen == 1 {
+			pathEndNode = endNode
+		} else {
+			pathEndNode = startNode + newNodeCount + 1
+		}
+		adjList[startNode] = append(adjList[startNode], synonymGraphNode{
+			token:    consumedTokens[0].Term,
+			node:     pathEndNode,
+			position: consumedTokens[0].Position,
+			start:    consumedTokens[0].Start,
+			end:      consumedTokens[0].End,
+			orig:     true,
+		})
+		if consumedTokenLen > 1 {
+			for i := 1; i < consumedTokenLen-1; i++ {
+				adjList[pathEndNode] = append(adjList[pathEndNode], synonymGraphNode{
+					token:    consumedTokens[i].Term,
+					node:     pathEndNode + 1,
+					orig:     true,
+					start:    consumedTokens[i].Start,
+					end:      consumedTokens[i].End,
+					position: consumedTokens[i].Position,
+				})
+				pathEndNode++
+			}
+			adjList[pathEndNode] = append(adjList[pathEndNode], synonymGraphNode{
+				token:    consumedTokens[consumedTokenLen-1].Term,
+				node:     endNode,
+				orig:     true,
+				start:    consumedTokens[consumedTokenLen-1].Start,
+				end:      consumedTokens[consumedTokenLen-1].End,
+				position: consumedTokens[consumedTokenLen-1].Position,
+			})
+		}
+	}
+	return adjList, endNode
+}
+
+func getOutputTokensFromGraph(adjList map[int][]synonymGraphNode, endNode int, OutputTokenStream *analysis.TokenStream,
+	SynTokenStart int, SynTokenEnd int) {
+	for node, neighList := range adjList {
+		for _, neighbor := range neighList {
+			startForToken := SynTokenStart
+			endForToken := SynTokenEnd
+			typeForToken := analysis.Synonym
+			positionForToken := -1
+			if neighbor.orig {
+				typeForToken = 0
+				startForToken = neighbor.start
+				endForToken = neighbor.end
+				positionForToken = neighbor.position
+			}
+			posLenForToken := neighbor.node
+			OutputToken := analysis.Token{
+				Term:        neighbor.token,
+				Start:       startForToken,
+				End:         endForToken,
+				Type:        typeForToken,
+				Position:    positionForToken,
+				CurrentNode: node,
+				NextNode:    posLenForToken,
+				FinalNode:   endNode,
+			}
+			*OutputTokenStream = append(*OutputTokenStream, &OutputToken)
+		}
+	}
+}
+
+func (s *SynonymFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
+	fst, err := vellum.Load(s.Fst)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var matchedSynonyms *[]uint64
+	var outputTokenStream analysis.TokenStream
+	var consumedTokens []*analysis.Token
+	var keepOrig = false
+	var startNode = 1
+	var endNode int
+	var tokenPos = 0
+	var adjList map[int][]synonymGraphNode
+	var synTokenStart int
+	var synTokenEnd = 0
+	var consumedTokenLen int
+	for tokenPos < len(input) {
+		consumedTokens = nil
+		synTokenStart = input[tokenPos].Start
+		synTokenEnd = 0
+		tokenPos, matchedSynonyms, consumedTokenLen = checkForMatch(tokenPos, input, &consumedTokens, &keepOrig, *fst,
+			s.VellumMap, &synTokenEnd)
+		if matchedSynonyms != nil {
+			if !keepOrig {
+				adjList, endNode = getAdjListOfSynonymGraph(matchedSynonyms, nil, startNode,
+					s.ByteSliceHashMap, consumedTokenLen)
+			} else {
+				adjList, endNode = getAdjListOfSynonymGraph(matchedSynonyms, consumedTokens, startNode,
+					s.ByteSliceHashMap, consumedTokenLen)
+			}
+			getOutputTokensFromGraph(adjList, endNode, &outputTokenStream, synTokenStart, synTokenEnd)
+			startNode = endNode
+		} else {
+			input[tokenPos-1].NextNode = startNode + 1
+			input[tokenPos-1].FinalNode = startNode + 1
+			input[tokenPos-1].CurrentNode = startNode
+			outputTokenStream = append(outputTokenStream, input[tokenPos-1])
+			startNode += 1
+		}
+	}
+	return outputTokenStream
+}
+
+func SynonymFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
+	return &SynonymFilter{
+		Fst:              config["fst"].([]byte),
+		VellumMap:        config["vellumMap"].(map[uint64][]uint64),
+		ByteSliceHashMap: config["byteSliceHashMap"].(map[uint64][]byte),
+	}, nil
+}
+
+func init() {
+	registry.RegisterTokenFilter(Name, SynonymFilterConstructor)
+}

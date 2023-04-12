@@ -51,22 +51,12 @@ type Token struct {
 
 	// Position specifies the 1-based index of the token in the sequence of
 	// occurrences of its term in the field.
-	Position  int       `json:"position"`
-	Type      TokenType `json:"type"`
-	KeyWord   bool      `json:"keyword"`
-	PosLength int
-}
-
-type SynonymStruct struct {
-	LHS           [][]byte //array of equivalent stuff if equivalent
-	RHS           [][]byte //NULL if unidirectional
-	BiDirectional bool
-	KeepOrig      bool
-}
-
-type TestStruct struct {
-	SearchPhrase []byte
-	SynonymList  []SynonymStruct
+	Position    int       `json:"position"`
+	Type        TokenType `json:"type"`
+	KeyWord     bool      `json:"keyword"`
+	CurrentNode int
+	NextNode    int
+	FinalNode   int
 }
 
 func (t *Token) String() string {
@@ -96,6 +86,11 @@ type DefaultAnalyzer struct {
 	TokenFilters []TokenFilter
 }
 
+type WrapperAnalyzer struct {
+	BaseAnalyzer          Analyzer
+	AdditionalTokenFilter TokenFilter
+}
+
 func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
 	if a.CharFilters != nil {
 		for _, cf := range a.CharFilters {
@@ -109,6 +104,12 @@ func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
 		}
 	}
 	return tokens
+}
+
+func (wa *WrapperAnalyzer) Analyze(input []byte) TokenStream {
+	output := wa.BaseAnalyzer.Analyze(input)
+	output = wa.AdditionalTokenFilter.Filter(output)
+	return output
 }
 
 var ErrInvalidDateTime = fmt.Errorf("unable to parse datetime with any of the layouts")
