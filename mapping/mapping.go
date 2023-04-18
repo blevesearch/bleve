@@ -20,6 +20,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/document"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 // A Classifier is an interface describing any object which knows how to
@@ -55,5 +56,5 @@ type IndexMapping interface {
 
 	AnalyzerNameForPath(path string) string
 	AnalyzerNamed(name string) analysis.Analyzer
-	AnalyzerNamedSynonym(name string) (analysis.Analyzer, bool)
+	AnalyzerNamedSynonym(name string, fuzziness int, prefix int, i index.IndexReader) (analysis.Analyzer, bool)
 }

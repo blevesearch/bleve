@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"hash/fnv"
-	"log"
-	"os"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -39,22 +37,6 @@ func stripJsonQuotes(synonym *SynonymStruct) {
 	}
 }
 
-func ReadSynonymFromCollection(synonymCollection string) []SynonymStruct {
-	files, err := os.ReadDir(synonymCollection)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var synonyms []SynonymStruct
-	for _, file := range files {
-		byteValue, _ := os.ReadFile(synonymCollection + "/" + file.Name())
-		var synonym SynonymStruct
-		json.Unmarshal([]byte(byteValue), &synonym)
-		stripJsonQuotes(&synonym)
-		synonyms = append(synonyms, synonym)
-	}
-	return synonyms
-}
-
 func hash(s []byte) uint64 {
 	h := fnv.New64a()
 	h.Write(s)
@@ -73,6 +55,7 @@ func CleanSynonymMap(synonymMap []SynonymStruct) (map[uint64][]uint64, map[uint6
 	var hashval uint64
 	var byteSliceHash []uint64
 	for _, synonym := range synonymMap {
+		stripJsonQuotes(&synonym)
 		byteSliceHash = nil
 		if bytes.Equal(synonym.MappingType, equivalentSynonymType) {
 			for _, rhs := range synonym.Synonyms {

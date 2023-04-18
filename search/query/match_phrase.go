@@ -22,6 +22,7 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/searcher"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -75,7 +76,7 @@ func (q *MatchPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 	} else {
 		analyzerName = m.AnalyzerNameForPath(field)
 	}
-	analyzer, usingSyn := m.AnalyzerNamedSynonym(analyzerName)
+	analyzer, usingSyn := m.AnalyzerNamedSynonym(analyzerName, 0, 0, i)
 	if analyzer == nil {
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
 	}
@@ -85,10 +86,7 @@ func (q *MatchPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		if usingSyn {
 			// TODO: Match Phrase integration with synonyms
 			graph := synonym.SynonymTokenStreamToGraph(tokens)
-			synonymQuery := NewSynonymQuery(graph, field)
-			synonymQuery.SetBoost(q.BoostVal.Value())
-			synonymQuery.SetOperator(1)
-			return synonymQuery.Searcher(ctx, i, m, options)
+			return searcher.NewSynonymSearcher(ctx, i, graph, field, q.BoostVal.Value(), 0, 0, 1, options)
 		} else {
 			phrase := tokenStreamToPhrase(tokens)
 			phraseQuery := NewMultiPhraseQuery(phrase, field)

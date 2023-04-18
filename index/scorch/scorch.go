@@ -23,6 +23,8 @@ import (
 	"time"
 
 	"github.com/RoaringBitmap/roaring"
+	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
+	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/registry"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
@@ -372,19 +374,28 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	resultChan := make(chan index.Document, len(batch.IndexOps))
 
 	var numUpdates uint64
+	var numSynonyms uint64
 	var numDeletes uint64
 	var numPlainTextBytes uint64
 	var ids []string
+	var synonymDocuments []synonym.SynonymStruct
 	for docID, doc := range batch.IndexOps {
 		if doc != nil {
 			// insert _id field
 			doc.AddIDField()
-			numUpdates++
-			numPlainTextBytes += doc.NumPlainTextBytes()
+			synStruct := doc.SynonymInfo()
+			if synStruct != nil {
+				numSynonyms++
+				synonymDocuments = append(synonymDocuments, synStruct.(synonym.SynonymStruct))
+			} else {
+				numUpdates++
+				numPlainTextBytes += doc.NumPlainTextBytes()
+				ids = append(ids, docID)
+			}
 		} else {
 			numDeletes++
+			ids = append(ids, docID)
 		}
-		ids = append(ids, docID)
 	}
 
 	// FIXME could sort ids list concurrent with analysis?
@@ -393,7 +404,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		go func() {
 			for k := range batch.IndexOps {
 				doc := batch.IndexOps[k]
-				if doc != nil {
+				if doc != nil && doc.SynonymInfo() == nil {
 					// put the work on the queue
 					s.analysisQueue.Queue(func() {
 						analyze(doc, s.setSpatialAnalyzerPlugin)
@@ -403,9 +414,13 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 			}
 		}()
 	}
-
+	var analysisResults []index.Document
 	// wait for analysis result
-	analysisResults := make([]index.Document, int(numUpdates))
+	if numSynonyms == 0 {
+		analysisResults = make([]index.Document, int(numUpdates))
+	} else {
+		analysisResults = make([]index.Document, int(numUpdates)+1)
+	}
 	var itemsDeQueued uint64
 	var totalAnalysisSize int
 	for itemsDeQueued < numUpdates {
@@ -418,6 +433,37 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	}
 	close(resultChan)
 	defer atomic.AddUint64(&s.iStats.analysisBytesRemoved, uint64(totalAnalysisSize))
+
+	if numSynonyms > 0 {
+
+		vellumMap, byteSliceHashMap := synonym.CleanSynonymMap(synonymDocuments)
+
+		vellumMapData, err := json.Marshal(vellumMap)
+		if err != nil {
+			return err
+		}
+
+		byteSliceHashMapData, err := json.Marshal(byteSliceHashMap)
+		if err != nil {
+			return err
+		}
+
+		fst, err := synonym.BuildSynonymFST(byteSliceHashMap, vellumMap)
+		if err != nil {
+			return err
+		}
+		megaSynDoc := document.NewDocument("__megaSpecialSecretSynDoc")
+		megaSynDoc.AddIDField()
+		fstField := document.NewTextFieldCustom("fst", nil, fst.Bytes(), index.IndexField|index.StoreField, nil)
+		vellumMapField := document.NewTextFieldCustom("vellummap", nil, vellumMapData, index.IndexField|index.StoreField, nil)
+		byteSliceHashMapField := document.NewTextFieldCustom("byteslicehashmap", nil, byteSliceHashMapData, index.IndexField|index.StoreField, nil)
+		megaSynDoc.AddField(fstField)
+		megaSynDoc.AddField(vellumMapField)
+		megaSynDoc.AddField(byteSliceHashMapField)
+		analyze(megaSynDoc, s.setSpatialAnalyzerPlugin)
+		ids = append(ids, megaSynDoc.ID())
+		analysisResults[itemsDeQueued] = megaSynDoc
+	}
 
 	atomic.AddUint64(&s.stats.TotAnalysisTime, uint64(time.Since(start)))
 

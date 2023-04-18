@@ -5,10 +5,13 @@ import (
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/vellum"
 )
 
 const Name = "synonym"
+
+const SeparatingCharacter = ' '
 
 var equivalentSynonymType = []byte("equivalent")
 var explicitSynonymType = []byte("explicit")
@@ -17,6 +20,8 @@ type SynonymFilter struct {
 	Fst              []byte
 	ByteSliceHashMap map[uint64][]byte
 	VellumMap        map[uint64][]uint64
+	Fuzziness        int
+	Prefix           int
 }
 
 type synonymGraphNode struct {
@@ -27,44 +32,148 @@ type synonymGraphNode struct {
 	start    int
 	end      int
 }
+type fuzzyStruct struct {
+	output uint64
+	state  int
+}
 
-func checkForMatch(tokenPos int, input analysis.TokenStream, consumedTokens *[]*analysis.Token, keepOrig *bool,
-	fst vellum.FST, vellumStructMap map[uint64][]uint64, synTokenEnd *int) (int, *[]uint64, int) {
-	var matchedSynonyms *[]uint64
+func fuzzySearchFST(output uint64, curr int, depth int, fuzzyQueue []fuzzyStruct, fst *vellum.FST, curWord string, matchTry string, fuzziness int) ([]fuzzyStruct, error) {
+	newCur := fst.Accept(curr, SeparatingCharacter)
+	numEdges, err := fst.GetNumTransitionsForState(curr)
+	if err != nil {
+		return nil, err
+	}
+	if newCur != 1 || numEdges == 0 {
+		_, exceeded := search.LevenshteinDistanceMax(curWord, matchTry, fuzziness)
+		if !exceeded {
+			fuzzyQueue = append(fuzzyQueue, fuzzyStruct{
+				output: output,
+				state:  curr,
+			})
+		}
+	}
+	if depth != 0 {
+		edges, err := fst.GetTransitionsForState(curr)
+		if err != nil {
+			return nil, err
+		}
+		for _, i := range edges {
+			if i != SeparatingCharacter {
+				newCur, newOut := fst.AcceptWithVal(curr, i)
+				newCurWord := curWord + string(i)
+				fuzzyQueue, err = fuzzySearchFST(output+newOut, newCur, depth-1, fuzzyQueue, fst, newCurWord, matchTry, fuzziness)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+	return fuzzyQueue, nil
+}
+
+func checkForMatch(tokenPos int, input analysis.TokenStream, keepOrig *bool,
+	fst *vellum.FST, vellumStructMap map[uint64][]uint64, synTokenEnd *int, fuzziness int, prefix int) (int, *[]uint64, []*analysis.Token, error) {
+
 	var maxMatchedTokenPos = tokenPos + 1
-	var output uint64 = 0
+	var matchedSynonyms *[]uint64
+	var consumedTokens []*analysis.Token
+	var err error
+
+	var seenTokens []*analysis.Token
 	var tmp uint64
 	var isMatch bool
-	var consumedTokenLen = 0
-	curr := fst.Start()
-matchFailed:
+	var fuzzyQueue []fuzzyStruct
+	var curr int
+	var newCurr int
+	var currOutput uint64
+	var tokenLen int
+	var matchLen int
+	var fuzzyQueueLen = 1
+	var queuePos int
+	fuzzyQueue = append(fuzzyQueue, fuzzyStruct{
+		state:  fst.Start(),
+		output: 0,
+	})
 	for tokenPos != len(input) {
-		for _, character := range input[tokenPos].Term {
-			curr, tmp = fst.AcceptWithVal(curr, character)
-			if curr == 1 {
-				break matchFailed
+		queuePos = 0
+		for queuePos < fuzzyQueueLen {
+			tokenLen = len(input[tokenPos].Term)
+			matchLen = 0
+			var curWord []byte
+			curr = fuzzyQueue[0].state
+			currOutput = fuzzyQueue[0].output
+			fuzzyQueue = fuzzyQueue[1:]
+			for _, character := range input[tokenPos].Term {
+				newCurr, tmp = fst.AcceptWithVal(curr, character)
+				if newCurr == 1 {
+					if fuzziness == 0 || matchLen < prefix {
+						return maxMatchedTokenPos, matchedSynonyms, consumedTokens, nil
+					} else {
+						fuzzyQueue, err = fuzzySearchFST(currOutput, curr, tokenLen-matchLen+fuzziness-1, fuzzyQueue, fst, string(curWord), string(input[tokenPos].Term), fuzziness)
+						if err != nil {
+							return -1, nil, nil, err
+						}
+						break
+					}
+				} else {
+					matchLen++
+					curr = newCurr
+					currOutput += tmp
+					curWord = append(curWord, character)
+				}
 			}
-			output += tmp
+			if matchLen == tokenLen {
+				wholeWord := fst.Accept(curr, SeparatingCharacter)
+				numEdges, err := fst.GetNumTransitionsForState(curr)
+				if err != nil {
+					return -1, nil, nil, err
+				}
+				if numEdges == 0 || wholeWord != 1 {
+					fuzzyQueue = append(fuzzyQueue, fuzzyStruct{
+						output: currOutput,
+						state:  curr,
+					})
+				}
+			}
+			queuePos += 1
 		}
-		*consumedTokens = append(*consumedTokens, input[tokenPos])
+		seenTokens = append(seenTokens, input[tokenPos])
 		tokenPos++
-		isMatch, tmp = fst.IsMatchWithVal(curr)
-		if isMatch {
-			*synTokenEnd = input[tokenPos-1].End
-			synonyms := vellumStructMap[output+tmp]
-			hashedSynonyms := synonyms[1:]
-			matchedSynonyms = &hashedSynonyms
-			*keepOrig = false
-			if synonyms[0] == 1 {
-				*keepOrig = true
+		var synonyms []uint64
+		var matched = false
+		var queueWithoutDeadEnds []fuzzyStruct
+		for _, val := range fuzzyQueue {
+			isMatch, tmp = fst.IsMatchWithVal(val.state)
+			if isMatch {
+				vellumTailValue := vellumStructMap[val.output+tmp]
+				hashedSynonyms := vellumTailValue[1:]
+				hashedSynonyms = append(hashedSynonyms, val.output+tmp)
+				synonyms = append(synonyms, hashedSynonyms...)
+				if vellumTailValue[0] == 1 {
+					*keepOrig = true
+				}
+				matched = true
 			}
-			maxMatchedTokenPos = tokenPos
-			consumedTokenLen = len(*consumedTokens)
+			deadEnd, tmp := fst.AcceptWithVal(val.state, SeparatingCharacter)
+			if deadEnd != 1 {
+				val.state = deadEnd
+				val.output = val.output + tmp
+				queueWithoutDeadEnds = append(queueWithoutDeadEnds, val)
+			}
 		}
-		curr, tmp = fst.AcceptWithVal(curr, ' ')
-		output += tmp
+		if matched {
+			*synTokenEnd = input[tokenPos-1].End
+			maxMatchedTokenPos = tokenPos
+			consumedTokens = seenTokens
+			matchedSynonyms = &synonyms
+		}
+		fuzzyQueue = queueWithoutDeadEnds
+		fuzzyQueueLen = len(fuzzyQueue)
+		if fuzzyQueueLen == 0 {
+			return maxMatchedTokenPos, matchedSynonyms, consumedTokens, nil
+		}
 	}
-	return maxMatchedTokenPos, matchedSynonyms, consumedTokenLen
+	return maxMatchedTokenPos, matchedSynonyms, consumedTokens, nil
 }
 
 func getAdjListOfSynonymGraph(matchedSynonymPos *[]uint64, consumedTokens []*analysis.Token, startNode int,
@@ -78,7 +187,7 @@ func getAdjListOfSynonymGraph(matchedSynonymPos *[]uint64, consumedTokens []*ana
 	var tmpStr []byte
 	for _, hashval := range *matchedSynonymPos {
 		for _, character := range byteSliceHashMap[hashval] {
-			if character == ' ' {
+			if character == SeparatingCharacter {
 				synonymTokens = append(synonymTokens, tmpStr)
 				tmpStr = nil
 				continue
@@ -191,7 +300,6 @@ func getOutputTokensFromGraph(adjList map[int][]synonymGraphNode, endNode int, O
 		}
 	}
 }
-
 func (s *SynonymFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 	fst, err := vellum.Load(s.Fst)
 	if err != nil {
@@ -203,24 +311,26 @@ func (s *SynonymFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 	var keepOrig = false
 	var startNode = 1
 	var endNode int
-	var tokenPos = 0
+	var tokenPos int
 	var adjList map[int][]synonymGraphNode
 	var synTokenStart int
-	var synTokenEnd = 0
-	var consumedTokenLen int
+	var synTokenEnd int
 	for tokenPos < len(input) {
 		consumedTokens = nil
 		synTokenStart = input[tokenPos].Start
 		synTokenEnd = 0
-		tokenPos, matchedSynonyms, consumedTokenLen = checkForMatch(tokenPos, input, &consumedTokens, &keepOrig, *fst,
-			s.VellumMap, &synTokenEnd)
+		tokenPos, matchedSynonyms, consumedTokens, err = checkForMatch(tokenPos, input, &keepOrig, fst,
+			s.VellumMap, &synTokenEnd, s.Fuzziness, s.Prefix)
+		if err != nil {
+			log.Fatal(err)
+		}
 		if matchedSynonyms != nil {
 			if !keepOrig {
 				adjList, endNode = getAdjListOfSynonymGraph(matchedSynonyms, nil, startNode,
-					s.ByteSliceHashMap, consumedTokenLen)
+					s.ByteSliceHashMap, len(consumedTokens))
 			} else {
 				adjList, endNode = getAdjListOfSynonymGraph(matchedSynonyms, consumedTokens, startNode,
-					s.ByteSliceHashMap, consumedTokenLen)
+					s.ByteSliceHashMap, len(consumedTokens))
 			}
 			getOutputTokensFromGraph(adjList, endNode, &outputTokenStream, synTokenStart, synTokenEnd)
 			startNode = endNode
@@ -240,6 +350,8 @@ func SynonymFilterConstructor(config map[string]interface{}, cache *registry.Cac
 		Fst:              config["fst"].([]byte),
 		VellumMap:        config["vellumMap"].(map[uint64][]uint64),
 		ByteSliceHashMap: config["byteSliceHashMap"].(map[uint64][]byte),
+		Fuzziness:        config["fuzziness"].(int),
+		Prefix:           config["prefix"].(int),
 	}, nil
 }
 

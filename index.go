@@ -17,6 +17,7 @@ package bleve
 import (
 	"context"
 
+	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 
 	"github.com/blevesearch/bleve/v2/document"
@@ -51,6 +52,20 @@ func (b *Batch) Index(id string, data interface{}) error {
 	if err != nil {
 		return err
 	}
+	b.internal.Update(doc)
+
+	b.lastDocSize = uint64(doc.Size() +
+		len(id) + size.SizeOfString) // overhead from internal
+	b.totalSize += b.lastDocSize
+
+	return nil
+}
+
+func (b *Batch) IndexSynonym(id string, syn synonym.SynonymStruct) error {
+	if id == "" {
+		return ErrorEmptyID
+	}
+	doc := document.NewSynDocument(id, syn)
 	b.internal.Update(doc)
 
 	b.lastDocSize = uint64(doc.Size() +

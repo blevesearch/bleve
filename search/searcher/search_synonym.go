@@ -21,10 +21,21 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader, grap
 	var searcher search.Searcher
 	var err error
 	var term string
+	if fuzziness > MaxFuzziness {
+		return nil, fmt.Errorf("fuzziness exceeds max (%d)", MaxFuzziness)
+	}
+
+	if fuzziness < 0 {
+		return nil, fmt.Errorf("invalid fuzziness, negative")
+	}
 	for len(graphNodes[curNode]) != 0 {
 		if len(graphNodes[curNode]) == 1 {
 			term = string(graphNodes[curNode][0].Term)
-			searcher, err = NewTermSearcher(ctx, indexReader, term, field, boost, options)
+			if fuzziness == 0 {
+				searcher, err = NewTermSearcher(ctx, indexReader, term, field, boost, options)
+			} else {
+				searcher, err = NewFuzzySearcher(ctx, indexReader, term, prefix, fuzziness, field, boost, options)
+			}
 			if err != nil {
 				for _, searcher = range outerSearcher {
 					_ = searcher.Close()
