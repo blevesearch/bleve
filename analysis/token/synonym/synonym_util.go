@@ -10,6 +10,9 @@ import (
 	"github.com/blevesearch/vellum"
 )
 
+var equivalentSynonymType = []byte("equivalent")
+var explicitSynonymType = []byte("explicit")
+
 type SynonymConfig struct {
 	FST              []byte
 	VellumMap        map[uint64][]uint64
@@ -131,7 +134,9 @@ func CleanSynonymMap(synonymMap []SynonymStruct) (map[uint64][]uint64, map[uint6
 	return vellumMap, byteSliceHashMap
 }
 
-func BuildSynonymFST(byteSliceHashMap map[uint64][]byte, vellumMap map[uint64][]uint64) (*bytes.Buffer, error) {
+func BuildSynonymFST(byteSliceHashMap map[uint64][]byte,
+	vellumMap map[uint64][]uint64) (*bytes.Buffer, error) {
+
 	type kv struct {
 		Key   uint64
 		Value []byte

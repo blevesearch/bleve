@@ -9,9 +9,23 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader, graphNodes [][]*analysis.Token,
-	field string, boost float64, fuzziness int, prefix int, operator int,
-	options search.SearcherOptions) (search.Searcher, error) {
+func closeSearchers(searchers ...[]search.Searcher) error {
+	var err error
+	for _, sa := range searchers {
+		for _, s := range sa {
+			err = s.Close()
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
+	graphNodes [][]*analysis.Token, field string, boost float64, fuzziness int,
+	prefix int, operator int, options search.SearcherOptions) (search.Searcher, error) {
+
 	options.IncludeTermVectors = true
 	var outerSearcher []search.Searcher
 	var innerSearcher []search.Searcher
@@ -24,7 +38,6 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader, grap
 	if fuzziness > MaxFuzziness {
 		return nil, fmt.Errorf("fuzziness exceeds max (%d)", MaxFuzziness)
 	}
-
 	if fuzziness < 0 {
 		return nil, fmt.Errorf("invalid fuzziness, negative")
 	}
@@ -32,67 +45,57 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader, grap
 		if len(graphNodes[curNode]) == 1 {
 			term = string(graphNodes[curNode][0].Term)
 			if fuzziness == 0 {
-				searcher, err = NewTermSearcher(ctx, indexReader, term, field, boost, options)
+				searcher, err = NewTermSearcher(ctx, indexReader, term,
+					field, boost, options)
 			} else {
-				searcher, err = NewFuzzySearcher(ctx, indexReader, term, prefix, fuzziness, field, boost, options)
+				searcher, err = NewFuzzySearcher(ctx, indexReader, term, prefix,
+					fuzziness, field, boost, options)
 			}
 			if err != nil {
-				for _, searcher = range outerSearcher {
-					_ = searcher.Close()
-				}
-				return nil, fmt.Errorf("phrase searcher error building term searcher: %v", err)
+				err2 := closeSearchers(outerSearcher, innerSearcher)
+				return nil, fmt.Errorf("error building term searcher: %v, close error: %v", err, err2)
 			}
 			outerSearcher = append(outerSearcher, searcher)
 			curNode++
 		} else {
 			innerSearcher = nil
-			newCurnode = curNode + 1
 			for _, neighborNode := range graphNodes[curNode] {
-				if neighborNode.NextNode != neighborNode.FinalNode {
+				if !neighborNode.FinalNode {
 					matchPhrase = nil
-					matchPhrase = append(matchPhrase, string(neighborNode.Term))
+					matchPhrase = append(matchPhrase,
+						string(neighborNode.Term))
 					innerCur := neighborNode.NextNode
-					for innerCur != neighborNode.FinalNode {
-						matchPhrase = append(matchPhrase, string(graphNodes[innerCur][0].Term))
+					for !graphNodes[innerCur][0].FinalNode {
+						matchPhrase = append(matchPhrase,
+							string(graphNodes[innerCur][0].Term))
 						innerCur = graphNodes[innerCur][0].NextNode
 					}
-					newCurnode = neighborNode.FinalNode
-					searcher, err = NewPhraseSearcher(ctx, indexReader, matchPhrase, field, options)
+					matchPhrase = append(matchPhrase,
+						string(graphNodes[innerCur][0].Term))
+					newCurnode = graphNodes[innerCur][0].NextNode
+					searcher, err = NewPhraseSearcher(ctx, indexReader,
+						matchPhrase, field, options)
 					if err != nil {
-						for _, searcher = range outerSearcher {
-							_ = searcher.Close()
-						}
-						for _, searcher = range innerSearcher {
-							_ = searcher.Close()
-						}
-						return nil, fmt.Errorf("phrase searcher error building term searcher: %v", err)
+						err2 := closeSearchers(outerSearcher, innerSearcher)
+						return nil, fmt.Errorf("error building term searcher: %v, close error: %v", err, err2)
 					}
 					innerSearcher = append(innerSearcher, searcher)
 				} else {
 					term = string(neighborNode.Term)
-					searcher, err = NewTermSearcher(ctx, indexReader, term, field, boost, options)
+					searcher, err = NewTermSearcher(ctx, indexReader, term,
+						field, boost, options)
 					if err != nil {
-						for _, searcher = range outerSearcher {
-							_ = searcher.Close()
-						}
-						for _, searcher = range innerSearcher {
-							_ = searcher.Close()
-						}
-						return nil, fmt.Errorf("phrase searcher error building term searcher: %v", err)
+						err2 := closeSearchers(outerSearcher, innerSearcher)
+						return nil, fmt.Errorf("error building term searcher: %v, close error: %v", err, err2)
 					}
 					innerSearcher = append(innerSearcher, searcher)
-					newCurnode = neighborNode.FinalNode
+					newCurnode = neighborNode.NextNode
 				}
 			}
 			searcher, err = NewDisjunctionSearcher(ctx, indexReader, innerSearcher, 1, options)
 			if err != nil {
-				for _, searcher = range outerSearcher {
-					_ = searcher.Close()
-				}
-				for _, searcher = range innerSearcher {
-					_ = searcher.Close()
-				}
-				return nil, fmt.Errorf("phrase searcher error building term searcher: %v", err)
+				err2 := closeSearchers(outerSearcher, innerSearcher)
+				return nil, fmt.Errorf("error building term searcher: %v, close error: %v", err, err2)
 			}
 			outerSearcher = append(outerSearcher, searcher)
 			curNode = newCurnode
@@ -104,13 +107,8 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader, grap
 		searcher, err = NewConjunctionSearcher(ctx, indexReader, outerSearcher, options)
 	}
 	if err != nil {
-		for _, ts := range outerSearcher {
-			_ = ts.Close()
-		}
-		for _, ts := range innerSearcher {
-			_ = ts.Close()
-		}
-		return nil, fmt.Errorf("phrase searcher error building term searcher: %v", err)
+		err2 := closeSearchers(outerSearcher, innerSearcher)
+		return nil, fmt.Errorf("error building term searcher: %v, close error: %v", err, err2)
 	}
 	return searcher, nil
 }

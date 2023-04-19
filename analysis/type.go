@@ -56,7 +56,7 @@ type Token struct {
 	KeyWord     bool      `json:"keyword"`
 	CurrentNode int
 	NextNode    int
-	FinalNode   int
+	FinalNode   bool
 }
 
 func (t *Token) String() string {
