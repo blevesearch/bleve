@@ -37,11 +37,12 @@ type fuzzyStruct struct {
 	state  int
 }
 
-func fuzzySearchFST(output uint64, curr int, depth int, fuzzyQueue []fuzzyStruct, fst *vellum.FST, curWord string, matchTry string, fuzziness int) ([]fuzzyStruct, error) {
+func fuzzySearchFST(output uint64, curr int, depth int, fuzzyQueue []fuzzyStruct, fst *vellum.FST, curWord string, matchTry string, fuzziness int) ([]fuzzyStruct, bool, error) {
+	var fuzzyMatched = false
 	newCur := fst.Accept(curr, SeparatingCharacter)
 	numEdges, err := fst.GetNumTransitionsForState(curr)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if newCur != 1 || numEdges == 0 {
 		_, exceeded := search.LevenshteinDistanceMax(curWord, matchTry, fuzziness)
@@ -50,25 +51,26 @@ func fuzzySearchFST(output uint64, curr int, depth int, fuzzyQueue []fuzzyStruct
 				output: output,
 				state:  curr,
 			})
+			fuzzyMatched = true
 		}
 	}
 	if depth != 0 {
 		edges, err := fst.GetTransitionsForState(curr)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		for _, i := range edges {
 			if i != SeparatingCharacter {
 				newCur, newOut := fst.AcceptWithVal(curr, i)
 				newCurWord := curWord + string(i)
-				fuzzyQueue, err = fuzzySearchFST(output+newOut, newCur, depth-1, fuzzyQueue, fst, newCurWord, matchTry, fuzziness)
+				fuzzyQueue, fuzzyMatched, err = fuzzySearchFST(output+newOut, newCur, depth-1, fuzzyQueue, fst, newCurWord, matchTry, fuzziness)
 				if err != nil {
-					return nil, err
+					return nil, false, err
 				}
 			}
 		}
 	}
-	return fuzzyQueue, nil
+	return fuzzyQueue, fuzzyMatched, nil
 }
 
 func checkForMatch(tokenPos int, input analysis.TokenStream, keepOrig *bool,
@@ -90,6 +92,7 @@ func checkForMatch(tokenPos int, input analysis.TokenStream, keepOrig *bool,
 	var matchLen int
 	var fuzzyQueueLen = 1
 	var queuePos int
+	var fuzzyMatched bool
 	fuzzyQueue = append(fuzzyQueue, fuzzyStruct{
 		state:  fst.Start(),
 		output: 0,
@@ -109,9 +112,12 @@ func checkForMatch(tokenPos int, input analysis.TokenStream, keepOrig *bool,
 					if fuzziness == 0 || matchLen < prefix {
 						return maxMatchedTokenPos, matchedSynonyms, consumedTokens, nil
 					} else {
-						fuzzyQueue, err = fuzzySearchFST(currOutput, curr, tokenLen-matchLen+fuzziness-1, fuzzyQueue, fst, string(curWord), string(input[tokenPos].Term), fuzziness)
+						fuzzyQueue, fuzzyMatched, err = fuzzySearchFST(currOutput, curr, tokenLen-matchLen+fuzziness-1, fuzzyQueue, fst, string(curWord), string(input[tokenPos].Term), fuzziness)
 						if err != nil {
 							return -1, nil, nil, err
+						}
+						if !fuzzyMatched {
+							return maxMatchedTokenPos, matchedSynonyms, consumedTokens, nil
 						}
 						break
 					}
@@ -133,6 +139,18 @@ func checkForMatch(tokenPos int, input analysis.TokenStream, keepOrig *bool,
 						output: currOutput,
 						state:  curr,
 					})
+				} else {
+					if fuzziness == 0 || matchLen < prefix {
+						return maxMatchedTokenPos, matchedSynonyms, consumedTokens, nil
+					} else {
+						fuzzyQueue, fuzzyMatched, err = fuzzySearchFST(currOutput, curr, fuzziness, fuzzyQueue, fst, string(curWord), string(input[tokenPos].Term), fuzziness)
+						if err != nil {
+							return -1, nil, nil, err
+						}
+						if !fuzzyMatched {
+							return maxMatchedTokenPos, matchedSynonyms, consumedTokens, nil
+						}
+					}
 				}
 			}
 			queuePos += 1
