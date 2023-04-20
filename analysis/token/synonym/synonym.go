@@ -100,7 +100,7 @@ func checkForMatch(tokenPos int, input analysis.TokenStream, keepOrig *bool,
 						break
 					} else {
 						fuzzyQueue, err = fuzzySearchFST(currOutput, curr,
-							tokenLen-matchLen+fuzziness-1, fuzzyQueue, fst,
+							tokenLen-matchLen+fuzziness, fuzzyQueue, fst,
 							string(curWord), string(input[tokenPos].Term),
 							fuzziness)
 						if err != nil {
