@@ -36,8 +36,8 @@ func fuzzySearchFST(output uint64, curr int, depth int,
 		return nil, err
 	}
 	if newCur != 1 || numEdges == 0 {
-		_, exceeded := search.LevenshteinDistanceMax(curWord, matchTry, fuzziness)
-		if !exceeded {
+		distance := search.LevenshteinDistance(curWord, matchTry)
+		if distance <= fuzziness {
 			fuzzyQueue = append(fuzzyQueue, fuzzyStruct{
 				output: output,
 				state:  curr,
@@ -148,6 +148,7 @@ func checkForMatch(tokenPos int, input analysis.TokenStream, keepOrig *bool,
 		tokenPos++
 		seenSynonyms = nil
 		queueWithoutDeadEnds = nil
+		matched = false
 		for _, val := range fuzzyQueue {
 			isMatch, tmp = fst.IsMatchWithVal(val.state)
 			if isMatch {
