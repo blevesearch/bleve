@@ -24,7 +24,7 @@ require (
 	github.com/blevesearch/zapx/v15 v15.3.10-0.20230425220633-071c5056947d
 	github.com/couchbase/moss v0.2.0
 	github.com/golang/protobuf v1.3.2
-	github.com/spf13/cobra v1.4.0
+	github.com/spf13/cobra v1.7.0
 	go.etcd.io/bbolt v1.3.5
 	golang.org/x/text v0.3.8
 )
@@ -34,10 +34,9 @@ require (
 	github.com/couchbase/ghistogram v0.1.0 // indirect
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v0.0.0-20171115153421-f7279a603ede // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
