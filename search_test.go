@@ -1736,6 +1736,19 @@ func TestAnalyzerInheritance(t *testing.T) {
 		{
 			/*
 				index_mapping: standard
+				default_mapping: keyword (dynamic)
+				    -> search over field to (should inherit keyword)
+			*/
+			name: "Child field to inherit default mapping's default analyzer",
+			mappingStr: `{"default_mapping":{"enabled":true,"dynamic":true,"default_analyzer":"keyword"}` +
+				`,"default_analyzer":"standard"}`,
+			doc:        map[string]interface{}{"city": "San Francisco"},
+			queryField: "city",
+			queryTerm:  "San Francisco",
+		},
+		{
+			/*
+				index_mapping: standard
 				default_mapping: keyword
 				    -> child mapping: ""
 					    -> child field: (should inherit keyword)
@@ -2098,5 +2111,46 @@ func TestGeoShapePolygonContainsPoint(t *testing.T) {
 			}
 			t.Errorf("test: %d, couldn't get: %v", testi+1, expect)
 		}
+	}
+}
+
+func TestAnalyzerInheritanceForDefaultDynamicMapping(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	imap := mapping.NewIndexMapping()
+	imap.DefaultMapping.DefaultAnalyzer = keyword.Name
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	doc := map[string]interface{}{
+		"fieldX": "AbCdEf",
+	}
+
+	if err = idx.Index("doc", doc); err != nil {
+		t.Fatal(err)
+	}
+
+	// Match query to apply keyword analyzer to fieldX.
+	mq := NewMatchQuery("AbCdEf")
+	mq.SetField("fieldX")
+
+	sr := NewSearchRequest(mq)
+	results, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(results.Hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(results.Hits))
 	}
 }
