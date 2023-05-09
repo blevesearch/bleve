@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/analysis"
-	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
@@ -84,9 +83,11 @@ func (q *MatchPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 	tokens := analyzer.Analyze([]byte(q.MatchPhrase))
 	if len(tokens) > 0 {
 		if usingSyn {
-			// TODO: Match Phrase integration with synonyms
-			graph := synonym.SynonymTokenStreamToGraph(tokens)
-			return searcher.NewSynonymSearcher(ctx, i, graph, field, q.BoostVal.Value(), 0, 0, 1, options)
+			arrangedTokens := make([][]*analysis.Token, tokens[len(tokens)-1].Position)
+			for _, token := range tokens {
+				arrangedTokens[token.Position-1] = append(arrangedTokens[token.Position-1], token)
+			}
+			return searcher.NewSynonymSearcher(ctx, i, arrangedTokens, field, q.BoostVal.Value(), 0, 0, 2, options)
 		} else {
 			phrase := tokenStreamToPhrase(tokens)
 			phraseQuery := NewMultiPhraseQuery(phrase, field)

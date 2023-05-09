@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
+	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
@@ -140,8 +140,11 @@ func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mappin
 			if q.Operator != MatchQueryOperatorOr && q.Operator != MatchQueryOperatorAnd {
 				return nil, fmt.Errorf("unhandled operator %d", q.Operator)
 			}
-			graph := synonym.SynonymTokenStreamToGraph(tokens)
-			return searcher.NewSynonymSearcher(ctx, i, graph, field, q.BoostVal.Value(), q.Fuzziness, q.Prefix, int(q.Operator), options)
+			arrangedTokens := make([][]*analysis.Token, tokens[len(tokens)-1].Position)
+			for _, token := range tokens {
+				arrangedTokens[token.Position-1] = append(arrangedTokens[token.Position-1], token)
+			}
+			return searcher.NewSynonymSearcher(ctx, i, arrangedTokens, field, q.BoostVal.Value(), q.Fuzziness, q.Prefix, int(q.Operator), options)
 		}
 		tqs := make([]Query, len(tokens))
 		if q.Fuzziness != 0 {

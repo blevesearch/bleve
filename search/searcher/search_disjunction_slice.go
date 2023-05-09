@@ -182,6 +182,17 @@ func (s *DisjunctionSliceSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
+func MergeFTL(docMatches []*search.DocumentMatch) [][]uint64 {
+	rv := make([][]uint64, len(docMatches))
+	for i, docMatch := range docMatches {
+		rv[i] = make([]uint64, len(docMatch.FieldTermLocations))
+		for j, ftl := range docMatch.FieldTermLocations {
+			rv[i][j] = ftl.Location.Pos
+		}
+	}
+	return rv
+}
+
 func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 	*search.DocumentMatch, error) {
 	if !s.initialized {
@@ -197,8 +208,10 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 	for !found && len(s.matching) > 0 {
 		if len(s.matching) >= s.min {
 			found = true
+			FTLSynonym := MergeFTL(s.matching)
 			// score this match
 			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
+			rv.FTLSynonym = FTLSynonym
 		}
 
 		// invoke next on all the matching searchers

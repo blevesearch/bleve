@@ -21,6 +21,7 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 
 	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/simple"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
 	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
@@ -36,6 +37,7 @@ const defaultField = "_all"
 const defaultAnalyzer = standard.Name
 const defaultDateTimeParser = optional.Name
 const defaultEnableSynonym = false
+const defaultSynonymAnalyzer = simple.Name
 
 // An IndexMappingImpl controls how objects are placed
 // into an index.
@@ -50,6 +52,7 @@ type IndexMappingImpl struct {
 	TypeField             string                      `json:"type_field"`
 	DefaultType           string                      `json:"default_type"`
 	DefaultAnalyzer       string                      `json:"default_analyzer"`
+	SynonymAnalyzer       string                      `json:"synonym_analyzer"`
 	DefaultDateTimeParser string                      `json:"default_datetime_parser"`
 	DefaultField          string                      `json:"default_field"`
 	StoreDynamic          bool                        `json:"store_dynamic"`
@@ -164,6 +167,7 @@ func NewIndexMapping() *IndexMappingImpl {
 		CustomAnalysis:        newCustomAnalysis(),
 		cache:                 registry.NewCache(),
 		EnableSynonym:         defaultEnableSynonym,
+		SynonymAnalyzer:       defaultSynonymAnalyzer,
 	}
 }
 
@@ -226,6 +230,7 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 	im.StoreDynamic = StoreDynamic
 	im.IndexDynamic = IndexDynamic
 	im.EnableSynonym = defaultEnableSynonym
+	im.SynonymAnalyzer = defaultSynonymAnalyzer
 	im.DocValuesDynamic = DocValuesDynamic
 
 	var invalidKeys []string
@@ -288,6 +293,11 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			}
 		case "enable_synonym":
 			err := json.Unmarshal(v, &im.EnableSynonym)
+			if err != nil {
+				return err
+			}
+		case "analyzer_for_synonym":
+			err := json.Unmarshal(v, &im.SynonymAnalyzer)
 			if err != nil {
 				return err
 			}
@@ -401,6 +411,15 @@ func (im *IndexMappingImpl) AnalyzerNamed(name string) analysis.Analyzer {
 	analyzer, err := im.cache.AnalyzerNamed(name)
 	if err != nil {
 		logger.Printf("error using analyzer named: %s", name)
+		return nil
+	}
+	return analyzer
+}
+
+func (im *IndexMappingImpl) AnalyzerForSynonym() analysis.Analyzer {
+	analyzer, err := im.cache.AnalyzerNamed(im.SynonymAnalyzer)
+	if err != nil {
+		logger.Printf("error using analyzer named: %s", im.SynonymAnalyzer)
 		return nil
 	}
 	return analyzer

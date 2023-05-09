@@ -23,14 +23,13 @@ type SynonymStruct struct {
 	Input       []json.RawMessage
 	Synonyms    []json.RawMessage
 	MappingType json.RawMessage
-	KeepOrig    bool
 }
 
 func stripQuotes(word []byte) []byte {
 	return word[1 : len(word)-1]
 }
 
-func stripJsonQuotes(synonym *SynonymStruct) {
+func StripJsonQuotes(synonym *SynonymStruct) {
 	synonym.MappingType = stripQuotes(synonym.MappingType)
 	for index, i := range synonym.Input {
 		synonym.Input[index] = stripQuotes(i)
@@ -58,7 +57,6 @@ func CleanSynonymMap(synonymMap []SynonymStruct) (map[uint64][]uint64, map[uint6
 	var hashval uint64
 	var byteSliceHash []uint64
 	for _, synonym := range synonymMap {
-		stripJsonQuotes(&synonym)
 		byteSliceHash = nil
 		if bytes.Equal(synonym.MappingType, equivalentSynonymType) {
 			for _, rhs := range synonym.Synonyms {
@@ -75,19 +73,12 @@ func CleanSynonymMap(synonymMap []SynonymStruct) (map[uint64][]uint64, map[uint6
 					for _, syn := range rhsCopy {
 						Original[syn] = struct{}{}
 					}
-					if vellumMap[hashval][0] == 0 && synonym.KeepOrig {
-						vellumMap[hashval][0] = 1
-					}
 				} else {
 					newSet := make(map[uint64]interface{})
 					for _, syn := range rhsCopy {
 						newSet[syn] = struct{}{}
 					}
 					hashSet[hashval] = newSet
-					vellumMap[hashval] = []uint64{0}
-					if synonym.KeepOrig {
-						vellumMap[hashval][0] = 1
-					}
 				}
 			}
 		} else if bytes.Equal(synonym.MappingType, explicitSynonymType) {
@@ -104,27 +95,19 @@ func CleanSynonymMap(synonymMap []SynonymStruct) (map[uint64][]uint64, map[uint6
 					for _, syn := range byteSliceHash {
 						Original[syn] = struct{}{}
 					}
-					if vellumMap[hashval][0] == 0 && synonym.KeepOrig {
-						vellumMap[hashval][0] = 1
-					}
 				} else {
 					newSet := make(map[uint64]interface{})
 					for _, syn := range byteSliceHash {
 						newSet[syn] = struct{}{}
 					}
 					hashSet[hashval] = newSet
-					vellumMap[hashval] = []uint64{0}
-					if synonym.KeepOrig {
-						vellumMap[hashval][0] = 1
-					}
 				}
 			}
 		}
 	}
 	for key, set := range hashSet {
-		tmpArray := make([]uint64, len(set)+1)
-		tmpArray[0] = vellumMap[key][0]
-		index := 1
+		tmpArray := make([]uint64, len(set))
+		index := 0
 		for k := range set {
 			tmpArray[index] = k
 			index++
@@ -168,11 +151,24 @@ func BuildSynonymFST(byteSliceHashMap map[uint64][]byte,
 	return &buf, nil
 }
 
-func SynonymTokenStreamToGraph(tokens analysis.TokenStream) [][]*analysis.Token {
-	graphNodes := make([][]*analysis.Token, len(tokens)+2)
-	for _, tok := range tokens {
-		graphNodes[tok.CurrentNode] = append(graphNodes[tok.CurrentNode], tok)
+func TokenStreamToPhrase(tokens analysis.TokenStream) [][]byte {
+	firstPosition := int(^uint(0) >> 1)
+	lastPosition := 0
+	for _, token := range tokens {
+		if token.Position < firstPosition {
+			firstPosition = token.Position
+		}
+		if token.Position > lastPosition {
+			lastPosition = token.Position
+		}
 	}
-
-	return graphNodes
+	phraseLen := lastPosition - firstPosition + 1
+	rv := make([][]byte, phraseLen)
+	if phraseLen > 0 {
+		for _, token := range tokens {
+			pos := token.Position - firstPosition
+			rv[pos] = token.Term
+		}
+	}
+	return rv
 }

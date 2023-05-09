@@ -51,12 +51,11 @@ type Token struct {
 
 	// Position specifies the 1-based index of the token in the sequence of
 	// occurrences of its term in the field.
-	Position    int       `json:"position"`
-	Type        TokenType `json:"type"`
-	KeyWord     bool      `json:"keyword"`
-	CurrentNode int
-	NextNode    int
-	FinalNode   bool
+	Position      int       `json:"position"`
+	Type          TokenType `json:"type"`
+	KeyWord       bool      `json:"keyword"`
+	FirstPosition int
+	LastPosition  int
 }
 
 func (t *Token) String() string {

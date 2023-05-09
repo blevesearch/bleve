@@ -97,9 +97,17 @@ func (s *TermSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, e
 
 	// score match
 	docMatch := s.scorer.Score(ctx, termMatch)
+	addFtlSynToDocMatch(docMatch)
 	// return doc match
 	return docMatch, nil
 
+}
+
+func addFtlSynToDocMatch(docMatch *search.DocumentMatch) {
+	docMatch.FTLSynonym = make([][]uint64, len(docMatch.FieldTermLocations))
+	for i, ftlTerm := range docMatch.FieldTermLocations {
+		docMatch.FTLSynonym[i] = []uint64{ftlTerm.Location.Pos}
+	}
 }
 
 func (s *TermSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
@@ -114,6 +122,7 @@ func (s *TermSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternal
 
 	// score match
 	docMatch := s.scorer.Score(ctx, termMatch)
+	addFtlSynToDocMatch(docMatch)
 
 	// return doc match
 	return docMatch, nil

@@ -26,9 +26,16 @@ type fuzzyStruct struct {
 	state  int
 }
 
+type checkForMatchReturnVal struct {
+	maxMatchedTokenPos int
+	matchedSynonyms    []uint64
+	firstPos           int
+	lastPos            int
+}
+
 func fuzzySearchFST(output uint64, curr int, depth int,
-	fuzzyQueue []fuzzyStruct, fst *vellum.FST, curWord string, matchTry string,
-	fuzziness int) ([]fuzzyStruct, error) {
+	fuzzyQueue []*fuzzyStruct, fst *vellum.FST, curWord string, matchTry string,
+	fuzziness int) ([]*fuzzyStruct, error) {
 
 	newCur := fst.Accept(curr, SeparatingCharacter)
 	numEdges, err := fst.GetNumTransitionsForState(curr)
@@ -38,7 +45,7 @@ func fuzzySearchFST(output uint64, curr int, depth int,
 	if newCur != 1 || numEdges == 0 {
 		distance := search.LevenshteinDistance(curWord, matchTry)
 		if distance <= fuzziness {
-			fuzzyQueue = append(fuzzyQueue, fuzzyStruct{
+			fuzzyQueue = append(fuzzyQueue, &fuzzyStruct{
 				output: output,
 				state:  curr,
 			})
@@ -64,24 +71,64 @@ func fuzzySearchFST(output uint64, curr int, depth int,
 	return fuzzyQueue, nil
 }
 
-func checkForMatch(tokenPos int, input analysis.TokenStream, keepOrig *bool,
-	fst *vellum.FST, vellumStructMap map[uint64][]uint64, synTokenEnd *int,
-	fuzziness int, prefix int) (int, []uint64, analysis.TokenStream, error) {
+func matchWildCardTokens(numStopWords int, currState *fuzzyStruct, fst *vellum.FST) *fuzzyStruct {
+	if numStopWords == 0 {
+		return nil
+	}
+	loopVariable := 0
+	tmpSum := currState.output
+	foundSpace := currState.state
+	var tmp uint64
+	for loopVariable = 0; loopVariable < numStopWords; loopVariable++ {
+		foundSpace, tmp = fst.AcceptWithVal(foundSpace, SeparatingCharacter)
+		if foundSpace != 1 {
+			tmpSum += tmp
+		} else {
+			break
+		}
+	}
+	if loopVariable == numStopWords {
+		currState.state = foundSpace
+		currState.output = tmpSum
+		return currState
+	}
+	return nil
+}
 
-	maxMatchedTokenPos := tokenPos + 1
-	fuzzyQueueLen := 1
-	var matchedSynonyms, seenSynonyms []uint64
-	var consumedTokens, seenTokens analysis.TokenStream
-	var fuzzyQueue, queueWithoutDeadEnds []fuzzyStruct
+func checkForMatch(s *SynonymFilter, input analysis.TokenStream, tokenPos int, fst *vellum.FST) (*checkForMatchReturnVal, error) {
+	rv := &checkForMatchReturnVal{
+		maxMatchedTokenPos: tokenPos + 1,
+		matchedSynonyms:    nil,
+		firstPos:           input[tokenPos].Position,
+		lastPos:            input[tokenPos].Position,
+	}
+	var seenSynonyms []uint64
+	var fuzzyQueue, fuzzyQueue2 []*fuzzyStruct
 	var currOutput, tmp uint64
 	var tokenLen, matchLen, queuePos, curr, newCurr int
 	var matched, isMatch bool
 	var err error
-	fuzzyQueue = append(fuzzyQueue, fuzzyStruct{
+
+	initFuzzyStruct := fuzzyStruct{
 		state:  fst.Start(),
 		output: 0,
-	})
+	}
+	fuzzyQueue = append(fuzzyQueue, &initFuzzyStruct)
+	fuzzyQueueLen := len(fuzzyQueue)
+	prevPos := input[tokenPos].Position
 	for tokenPos != len(input) {
+		fuzzyQueue2 = nil
+		numStopWords := input[tokenPos].Position - prevPos - 1
+		if numStopWords > 0 {
+			for _, val := range fuzzyQueue {
+				rv := matchWildCardTokens(numStopWords, val, fst)
+				if rv != nil {
+					fuzzyQueue2 = append(fuzzyQueue2, rv)
+				}
+			}
+			fuzzyQueue = fuzzyQueue2
+			fuzzyQueueLen = len(fuzzyQueue)
+		}
 		queuePos = 0
 		for queuePos < fuzzyQueueLen {
 			tokenLen = len(input[tokenPos].Term)
@@ -93,21 +140,16 @@ func checkForMatch(tokenPos int, input analysis.TokenStream, keepOrig *bool,
 			for _, character := range input[tokenPos].Term {
 				newCurr, tmp = fst.AcceptWithVal(curr, character)
 				if newCurr == 1 {
-					if fuzziness == 0 {
-						return maxMatchedTokenPos, matchedSynonyms,
-							consumedTokens, nil
-					} else if matchLen < prefix {
-						break
-					} else {
+					if s.Fuzziness != 0 && matchLen >= s.Prefix {
 						fuzzyQueue, err = fuzzySearchFST(currOutput, curr,
-							tokenLen-matchLen+fuzziness, fuzzyQueue, fst,
+							tokenLen-matchLen+s.Fuzziness, fuzzyQueue, fst,
 							string(curWord), string(input[tokenPos].Term),
-							fuzziness)
+							s.Fuzziness)
 						if err != nil {
-							return -1, nil, nil, err
+							return nil, err
 						}
-						break
 					}
+					break
 				} else {
 					matchLen++
 					curr = newCurr
@@ -119,168 +161,58 @@ func checkForMatch(tokenPos int, input analysis.TokenStream, keepOrig *bool,
 				wholeWord := fst.Accept(curr, SeparatingCharacter)
 				numEdges, err := fst.GetNumTransitionsForState(curr)
 				if err != nil {
-					return -1, nil, nil, err
+					return nil, err
 				}
 				if numEdges == 0 || wholeWord != 1 {
-					fuzzyQueue = append(fuzzyQueue, fuzzyStruct{
+					fuzzyQueue = append(fuzzyQueue, &fuzzyStruct{
 						output: currOutput,
 						state:  curr,
 					})
 				} else {
-					if fuzziness == 0 {
-						return maxMatchedTokenPos, matchedSynonyms,
-							consumedTokens, nil
-					} else if matchLen < prefix {
-						break
-					} else {
+					if s.Fuzziness != 0 && matchLen >= s.Prefix {
 						fuzzyQueue, err = fuzzySearchFST(currOutput, curr,
-							fuzziness, fuzzyQueue, fst, string(curWord),
-							string(input[tokenPos].Term), fuzziness)
+							s.Fuzziness, fuzzyQueue, fst, string(curWord),
+							string(input[tokenPos].Term), s.Fuzziness)
 						if err != nil {
-							return -1, nil, nil, err
+							return nil, err
 						}
 					}
 				}
 			}
 			queuePos += 1
 		}
-		seenTokens = append(seenTokens, input[tokenPos])
+		prevPos = input[tokenPos].Position
 		tokenPos++
 		seenSynonyms = nil
-		queueWithoutDeadEnds = nil
+		fuzzyQueue2 = nil
 		matched = false
 		for _, val := range fuzzyQueue {
 			isMatch, tmp = fst.IsMatchWithVal(val.state)
 			if isMatch {
-				vellumTailValue := vellumStructMap[val.output+tmp]
-				hashedSynonyms := vellumTailValue[1:]
-				if fuzziness != 0 {
-					hashedSynonyms = append(hashedSynonyms, val.output+tmp)
-				}
+				hashedSynonyms := s.VellumMap[val.output+tmp]
+				hashedSynonyms = append(hashedSynonyms, val.output+tmp)
 				seenSynonyms = append(seenSynonyms, hashedSynonyms...)
-				if vellumTailValue[0] == 1 {
-					*keepOrig = true
-				}
 				matched = true
 			}
 			deadEnd, tmp := fst.AcceptWithVal(val.state, SeparatingCharacter)
 			if deadEnd != 1 {
 				val.state = deadEnd
 				val.output = val.output + tmp
-				queueWithoutDeadEnds = append(queueWithoutDeadEnds, val)
+				fuzzyQueue2 = append(fuzzyQueue2, val)
 			}
 		}
 		if matched {
-			*synTokenEnd = input[tokenPos-1].End
-			maxMatchedTokenPos = tokenPos
-			consumedTokens = seenTokens
-			matchedSynonyms = seenSynonyms
+			rv.maxMatchedTokenPos = tokenPos
+			rv.matchedSynonyms = seenSynonyms
+			rv.lastPos = prevPos
 		}
-		fuzzyQueue = queueWithoutDeadEnds
+		fuzzyQueue = fuzzyQueue2
 		fuzzyQueueLen = len(fuzzyQueue)
 		if fuzzyQueueLen == 0 {
-			return maxMatchedTokenPos, matchedSynonyms, consumedTokens, nil
+			return rv, nil
 		}
 	}
-	return maxMatchedTokenPos, matchedSynonyms, consumedTokens, nil
-}
-
-func getAdjListOfSynonymGraph(matchedSynonymPos []uint64,
-	consumedTokens analysis.TokenStream, startNode int, keepOrig bool,
-	byteSliceHashMap map[uint64][]byte, synTokenStart int, synTokenEnd int,
-	outputTokenStream analysis.TokenStream) (analysis.TokenStream, int) {
-
-	var newNodeCount, pathEndNode, loopVariable, numberOfNodes int
-	var synonymTokensContainer = make([][][]byte, len(matchedSynonymPos))
-	var tmpStr []byte
-	var finalNode bool
-
-	if consumedTokens != nil {
-		numberOfNodes += len(consumedTokens) - 1
-	}
-	for index, hashval := range matchedSynonymPos {
-		for _, character := range byteSliceHashMap[hashval] {
-			if character == SeparatingCharacter {
-				synonymTokensContainer[index] = append(synonymTokensContainer[index], tmpStr)
-				tmpStr = nil
-			} else {
-				tmpStr = append(tmpStr, character)
-			}
-		}
-		synonymTokensContainer[index] = append(synonymTokensContainer[index], tmpStr)
-		numberOfNodes += len(synonymTokensContainer[index]) - 1
-		tmpStr = nil
-	}
-	endNode := startNode + numberOfNodes + 1
-	for _, synonymTokens := range synonymTokensContainer {
-		finalNode = false
-		if len(synonymTokens) == 1 {
-			pathEndNode = endNode
-			finalNode = true
-		} else {
-			pathEndNode = startNode + newNodeCount + 1
-			newNodeCount += len(synonymTokens) - 1
-		}
-		outputTokenStream = append(outputTokenStream, &analysis.Token{
-			Term:        synonymTokens[0],
-			Type:        analysis.Synonym,
-			CurrentNode: startNode,
-			NextNode:    pathEndNode,
-			Start:       synTokenStart,
-			End:         synTokenEnd,
-			FinalNode:   finalNode,
-		})
-		if len(synonymTokens) > 1 {
-			for loopVariable = 1; loopVariable < len(synonymTokens)-1; loopVariable++ {
-				outputTokenStream = append(outputTokenStream, &analysis.Token{
-					Term:        synonymTokens[loopVariable],
-					Type:        analysis.Synonym,
-					CurrentNode: pathEndNode,
-					NextNode:    pathEndNode + 1,
-					Start:       synTokenStart,
-					End:         synTokenEnd,
-				})
-				pathEndNode++
-			}
-			outputTokenStream = append(outputTokenStream, &analysis.Token{
-				Term:        synonymTokens[loopVariable],
-				Type:        analysis.Synonym,
-				CurrentNode: pathEndNode,
-				NextNode:    endNode,
-				Start:       synTokenStart,
-				End:         synTokenEnd,
-				FinalNode:   true,
-			})
-		}
-	}
-	finalNode = false
-	if keepOrig {
-		if len(consumedTokens) == 1 {
-			pathEndNode = endNode
-			finalNode = true
-		} else {
-			pathEndNode = startNode + newNodeCount + 1
-		}
-		consumedTokens[0].CurrentNode = startNode
-		consumedTokens[0].NextNode = pathEndNode
-		consumedTokens[0].FinalNode = finalNode
-		outputTokenStream = append(outputTokenStream, consumedTokens[0])
-		if len(consumedTokens) > 1 {
-			for loopVariable = 1; loopVariable < len(consumedTokens)-1; loopVariable++ {
-				consumedTokens[loopVariable].CurrentNode = pathEndNode
-				consumedTokens[loopVariable].NextNode = pathEndNode + 1
-				outputTokenStream = append(outputTokenStream,
-					consumedTokens[loopVariable])
-				pathEndNode++
-			}
-			consumedTokens[loopVariable].CurrentNode = pathEndNode
-			consumedTokens[loopVariable].NextNode = endNode
-			consumedTokens[loopVariable].FinalNode = true
-			outputTokenStream = append(outputTokenStream,
-				consumedTokens[loopVariable])
-		}
-	}
-	return outputTokenStream, endNode
+	return rv, nil
 }
 
 func (s *SynonymFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
@@ -288,31 +220,33 @@ func (s *SynonymFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 	if err != nil {
 		log.Fatal(err)
 	}
-	var matchedSynonyms []uint64
-	var outputTokenStream, consumedTokens analysis.TokenStream
-	var keepOrig bool
-	var endNode, tokenPos, synTokenStart, synTokenEnd int
-	startNode := 1
+	var outputTokenStream analysis.TokenStream
+	var tokenPos int
+	tokenIndex := 1
 	for tokenPos < len(input) {
-		consumedTokens = nil
-		synTokenStart = input[tokenPos].Start
-		synTokenEnd = 0
-		tokenPos, matchedSynonyms, consumedTokens, err = checkForMatch(tokenPos,
-			input, &keepOrig, fst, s.VellumMap, &synTokenEnd, s.Fuzziness, s.Prefix)
+		rv, err := checkForMatch(s, input, tokenPos, fst)
+		tokenPos = rv.maxMatchedTokenPos
 		if err != nil {
 			log.Fatal(err)
 		}
-		if matchedSynonyms != nil {
-			outputTokenStream, endNode = getAdjListOfSynonymGraph(matchedSynonyms,
-				consumedTokens, startNode, keepOrig, s.ByteSliceHashMap, synTokenStart,
-				synTokenEnd, outputTokenStream)
-			startNode = endNode
+		if rv.matchedSynonyms != nil {
+			for _, hashval := range rv.matchedSynonyms {
+				synonym := s.ByteSliceHashMap[hashval]
+				outputTokenStream = append(outputTokenStream, &analysis.Token{
+					Term:          synonym,
+					Type:          analysis.Synonym,
+					Position:      tokenIndex,
+					FirstPosition: rv.firstPos,
+					LastPosition:  rv.lastPos,
+				})
+			}
 		} else {
-			input[tokenPos-1].CurrentNode = startNode
-			input[tokenPos-1].NextNode = startNode + 1
+			input[tokenPos-1].FirstPosition = input[tokenPos-1].Position
+			input[tokenPos-1].LastPosition = input[tokenPos-1].Position
+			input[tokenPos-1].Position = tokenIndex
 			outputTokenStream = append(outputTokenStream, input[tokenPos-1])
-			startNode += 1
 		}
+		tokenIndex += 1
 	}
 	return outputTokenStream
 }

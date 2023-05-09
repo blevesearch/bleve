@@ -16,7 +16,10 @@ package bleve
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
+	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 
@@ -61,10 +64,34 @@ func (b *Batch) Index(id string, data interface{}) error {
 	return nil
 }
 
+func applyAnalyzerToSlice(analyzer analysis.Analyzer, slice []json.RawMessage) []json.RawMessage {
+	for loc, val := range slice {
+		analyzedPhrase := synonym.TokenStreamToPhrase(analyzer.Analyze(val))
+		var cleanedWord []byte
+		for _, tok := range analyzedPhrase {
+			cleanedWord = append(cleanedWord, tok...)
+			cleanedWord = append(cleanedWord, synonym.SeparatingCharacter)
+		}
+		sz := len(cleanedWord)
+		if sz > 0 && cleanedWord[sz-1] == synonym.SeparatingCharacter {
+			cleanedWord = cleanedWord[:sz-1]
+		}
+		slice[loc] = cleanedWord
+	}
+	return slice
+}
+
 func (b *Batch) IndexSynonym(id string, syn synonym.SynonymStruct) error {
 	if id == "" {
 		return ErrorEmptyID
 	}
+	analyzer := b.index.Mapping().AnalyzerForSynonym()
+	if analyzer == nil {
+		return fmt.Errorf("no analyzer found for synonyms")
+	}
+	synonym.StripJsonQuotes(&syn)
+	syn.Input = applyAnalyzerToSlice(analyzer, syn.Input)
+	syn.Synonyms = applyAnalyzerToSlice(analyzer, syn.Synonyms)
 	doc := document.NewSynDocument(id, syn)
 	b.internal.Update(doc)
 
