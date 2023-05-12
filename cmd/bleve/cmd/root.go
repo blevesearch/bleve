@@ -53,6 +53,10 @@ var RootCmd = &cobra.Command{
 	Short: "command-line tool to interact with a bleve index",
 	Long:  `Bleve is a command-line tool to interact with a bleve index.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if cmd.Use == "bash" || cmd.Use == "zsh" || cmd.Use == "fish" || cmd.Use == "powershell" {
+			// Not applicable to cobra's completion subcommands
+			return nil
+		}
 		if len(args) < 1 {
 			return fmt.Errorf("must specify path to index")
 		}
@@ -67,6 +71,10 @@ var RootCmd = &cobra.Command{
 		return nil
 	},
 	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+		if cmd.Use == "bash" || cmd.Use == "zsh" || cmd.Use == "fish" || cmd.Use == "powershell" {
+			// Not applicable to cobra's completion subcommands
+			return nil
+		}
 		err := idx.Close()
 		if err != nil {
 			return fmt.Errorf("error closing bleve index: %v", err)

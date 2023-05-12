@@ -18,7 +18,7 @@ import "time"
 
 // RegistryAsyncErrorCallbacks should be treated as read-only after
 // process init()'ialization.
-var RegistryAsyncErrorCallbacks = map[string]func(error){}
+var RegistryAsyncErrorCallbacks = map[string]func(error, string){}
 
 // RegistryEventCallbacks should be treated as read-only after
 // process init()'ialization.
