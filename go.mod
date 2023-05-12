@@ -41,7 +41,3 @@ require (
 	github.com/stretchr/testify v1.8.2 // indirect
 	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
 )
-
-replace github.com/blevesearch/vellum => ../SynonymVellum/
-
-replace github.com/blevesearch/bleve_index_api => ../SynonymBleveIndexAPI/
