@@ -68,7 +68,8 @@ type FieldMapping struct {
 	// of the tokens for this field. This option would be useful for saving
 	// the processing of freq/norm details when the default score based relevancy
 	// isn't needed.
-	SkipFreqNorm bool `json:"skip_freq_norm,omitempty"`
+	SkipFreqNorm  bool `json:"skip_freq_norm,omitempty"`
+	EnableSynonym bool `json:"enable_synonym,omitempty"`
 }
 
 // NewTextFieldMapping returns a default field mapping for text
@@ -80,6 +81,7 @@ func NewTextFieldMapping() *FieldMapping {
 		IncludeTermVectors: true,
 		IncludeInAll:       true,
 		DocValues:          true,
+		EnableSynonym:      false,
 	}
 }
 
@@ -445,6 +447,11 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 			}
 		case "skip_freq_norm":
 			err := json.Unmarshal(v, &fm.SkipFreqNorm)
+			if err != nil {
+				return err
+			}
+		case "enable_synonym":
+			err := json.Unmarshal(v, &fm.EnableSynonym)
 			if err != nil {
 				return err
 			}

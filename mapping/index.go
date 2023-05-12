@@ -59,7 +59,7 @@ type IndexMappingImpl struct {
 	IndexDynamic          bool                        `json:"index_dynamic"`
 	DocValuesDynamic      bool                        `json:"docvalues_dynamic"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
-	EnableSynonym         bool                        `json:"enable_synonym"`
+	DefaultEnableSynonym  bool                        `json:"default_enable_synonym"`
 	cache                 *registry.Cache
 }
 
@@ -166,7 +166,7 @@ func NewIndexMapping() *IndexMappingImpl {
 		DocValuesDynamic:      DocValuesDynamic,
 		CustomAnalysis:        newCustomAnalysis(),
 		cache:                 registry.NewCache(),
-		EnableSynonym:         defaultEnableSynonym,
+		DefaultEnableSynonym:  defaultEnableSynonym,
 		SynonymAnalyzer:       defaultSynonymAnalyzer,
 	}
 }
@@ -229,7 +229,7 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 	im.TypeMapping = make(map[string]*DocumentMapping)
 	im.StoreDynamic = StoreDynamic
 	im.IndexDynamic = IndexDynamic
-	im.EnableSynonym = defaultEnableSynonym
+	im.DefaultEnableSynonym = defaultEnableSynonym
 	im.SynonymAnalyzer = defaultSynonymAnalyzer
 	im.DocValuesDynamic = DocValuesDynamic
 
@@ -291,8 +291,8 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
-		case "enable_synonym":
-			err := json.Unmarshal(v, &im.EnableSynonym)
+		case "default_enable_synonym":
+			err := json.Unmarshal(v, &im.DefaultEnableSynonym)
 			if err != nil {
 				return err
 			}
@@ -425,48 +425,63 @@ func (im *IndexMappingImpl) AnalyzerForSynonym() analysis.Analyzer {
 	return analyzer
 }
 
-func (im *IndexMappingImpl) AnalyzerNamedSynonym(name string, fuzziness int, prefix int, i index.IndexReader) (analysis.Analyzer, bool) {
-	analyzer, err := im.cache.AnalyzerNamed(name)
-	if err != nil {
-		logger.Printf("error using analyzer named: %s", name)
-		return nil, false
-	}
-	if im.EnableSynonym {
-		config := make(map[string]interface{})
-		synDoc, err := i.Document("__megaSpecialSecretSynDoc")
-		if err != nil {
-			fmt.Printf("error using the synonym filter - %v", err)
-			return nil, false
+func (im *IndexMappingImpl) SynonymEnabledForPath(path string) bool {
+	for _, docMapping := range im.TypeMapping {
+		if docMapping.synonymEnabledForPath(path) {
+			return true
 		}
-		var fst []byte
-		var vellumMap = make(map[uint64][]uint64)
-		var byteSliceHashMap = make(map[uint64][]byte)
-		synDoc.VisitFields(func(field index.Field) {
-			if field.Name() == "fst" {
-				fst = field.Value()
-			} else if field.Name() == "vellummap" {
-				json.Unmarshal(field.Value(), &vellumMap)
-			} else if field.Name() == "byteslicehashmap" {
-				json.Unmarshal(field.Value(), &byteSliceHashMap)
+	}
+	pathMapping := im.DefaultMapping.documentMappingForPath(path)
+	if pathMapping != nil {
+		if len(pathMapping.Fields) > 0 {
+			if pathMapping.Fields[0].EnableSynonym {
+				return true
 			}
-		})
-		config["fst"] = fst
-		config["vellumMap"] = vellumMap
-		config["byteSliceHashMap"] = byteSliceHashMap
-		config["fuzziness"] = fuzziness
-		config["prefix"] = prefix
-		config["type"] = synonym.Name
-		synonymFilter, err := im.cache.DefineTokenFilter(synonym.Name, config)
-		if err != nil {
-			fmt.Printf("error using the synonym filter - %v", err)
-			return nil, false
 		}
-		return &analysis.WrapperAnalyzer{
-			BaseAnalyzer:          analyzer,
-			AdditionalTokenFilter: synonymFilter,
-		}, true
 	}
-	return analyzer, false
+	pathDecoded := decodePath(path)
+	for _, docMapping := range im.TypeMapping {
+		if docMapping.defaultSynonymEnabled(pathDecoded) {
+			return true
+		}
+	}
+	return im.DefaultEnableSynonym
+}
+
+func (im *IndexMappingImpl) AddSynonymFilter(analyzer analysis.Analyzer, fuzziness int, prefix int, i index.IndexReader) analysis.Analyzer {
+	config := make(map[string]interface{})
+	synDoc, err := i.Document("__megaSpecialSecretSynDoc")
+	if err != nil {
+		fmt.Printf("error using the synonym filter - %v", err)
+		return nil
+	}
+	var fst []byte
+	var vellumMap = make(map[uint64][]uint64)
+	var byteSliceHashMap = make(map[uint64][]byte)
+	synDoc.VisitFields(func(field index.Field) {
+		if field.Name() == "fst" {
+			fst = field.Value()
+		} else if field.Name() == "vellummap" {
+			json.Unmarshal(field.Value(), &vellumMap)
+		} else if field.Name() == "byteslicehashmap" {
+			json.Unmarshal(field.Value(), &byteSliceHashMap)
+		}
+	})
+	config["fst"] = fst
+	config["vellumMap"] = vellumMap
+	config["byteSliceHashMap"] = byteSliceHashMap
+	config["fuzziness"] = fuzziness
+	config["prefix"] = prefix
+	config["type"] = synonym.Name
+	synonymFilter, err := im.cache.DefineTokenFilter(synonym.Name, config)
+	if err != nil {
+		fmt.Printf("error using the synonym filter - %v", err)
+		return nil
+	}
+	return &analysis.AddTokenFiltersToAnalyzerOutput{
+		BaseAnalyzer:      analyzer,
+		ExtraTokenFilters: []analysis.TokenFilter{synonymFilter},
+	}
 }
 
 func (im *IndexMappingImpl) DateTimeParserNamed(name string) analysis.DateTimeParser {

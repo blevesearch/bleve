@@ -85,9 +85,9 @@ type DefaultAnalyzer struct {
 	TokenFilters []TokenFilter
 }
 
-type WrapperAnalyzer struct {
-	BaseAnalyzer          Analyzer
-	AdditionalTokenFilter TokenFilter
+type AddTokenFiltersToAnalyzerOutput struct {
+	BaseAnalyzer      Analyzer
+	ExtraTokenFilters []TokenFilter
 }
 
 func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
@@ -105,9 +105,11 @@ func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
 	return tokens
 }
 
-func (wa *WrapperAnalyzer) Analyze(input []byte) TokenStream {
-	output := wa.BaseAnalyzer.Analyze(input)
-	output = wa.AdditionalTokenFilter.Filter(output)
+func (atf *AddTokenFiltersToAnalyzerOutput) Analyze(input []byte) TokenStream {
+	output := atf.BaseAnalyzer.Analyze(input)
+	for _, tf := range atf.ExtraTokenFilters {
+		output = tf.Filter(output)
+	}
 	return output
 }
 

@@ -56,6 +56,7 @@ type IndexMapping interface {
 
 	AnalyzerNameForPath(path string) string
 	AnalyzerNamed(name string) analysis.Analyzer
-	AnalyzerNamedSynonym(name string, fuzziness int, prefix int, i index.IndexReader) (analysis.Analyzer, bool)
+	AddSynonymFilter(analyzer analysis.Analyzer, fuzziness int, prefix int, i index.IndexReader) analysis.Analyzer
 	AnalyzerForSynonym() analysis.Analyzer
+	SynonymEnabledForPath(path string) bool
 }

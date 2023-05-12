@@ -75,14 +75,18 @@ func (q *MatchPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 	} else {
 		analyzerName = m.AnalyzerNameForPath(field)
 	}
-	analyzer, usingSyn := m.AnalyzerNamedSynonym(analyzerName, 0, 0, i)
+	analyzer := m.AnalyzerNamed(analyzerName)
 	if analyzer == nil {
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
 	}
-
+	var useSynonymSearcher bool
+	if m.SynonymEnabledForPath(field) {
+		analyzer = m.AddSynonymFilter(analyzer, 0, 0, i)
+		useSynonymSearcher = true
+	}
 	tokens := analyzer.Analyze([]byte(q.MatchPhrase))
 	if len(tokens) > 0 {
-		if usingSyn {
+		if useSynonymSearcher {
 			arrangedTokens := make([][]*analysis.Token, tokens[len(tokens)-1].Position)
 			for _, token := range tokens {
 				arrangedTokens[token.Position-1] = append(arrangedTokens[token.Position-1], token)
