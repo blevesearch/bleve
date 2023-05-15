@@ -10,6 +10,10 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
+// closeSearchers closes the searchers passed to it.
+// called when there is an error building the searchers.
+// It returns the first error encountered while closing the searchers.
+// If no error is encountered, it returns nil.
 func closeSearchers(searchers ...[]search.Searcher) error {
 	var err error
 	for _, sa := range searchers {
@@ -23,6 +27,12 @@ func closeSearchers(searchers ...[]search.Searcher) error {
 	return nil
 }
 
+// splitOnSpace splits the phrase on space and returns a slice of strings.
+// This is used to split the synonym phrase into individual words.
+// For example, "a b c" is split into ["a", "b", "c"].
+// It differs from strings.Split() in that it inserts a null character
+// when two consecutive spaces are encountered.
+// For example, "a  b c" is split into ["a", "", "b", "c"].
 func splitOnSpace(phrase []byte) []string {
 	var rv []string
 	var tmp string

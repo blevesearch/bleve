@@ -134,6 +134,16 @@ func acceptSpaces(numSpaces int, path *fstPath, fst *vellum.FST) *fstPath {
 	return path
 }
 
+// checkForMatch is a function that checks if a sequence of tokens starting from inputIndex in the input
+// token stream matches a phrase in the FST.
+// if a match is found, the function returns the new value to be assigned to inputIndex in the Filter, which is
+// index of the last matched token, along with the list of synonyms found for the matched phrase.
+// The position of the first word and the position of the last word in the matched phrase are also returned.
+// Greedy matching is used to find the longest sequence of input tokens that matches a phrase in the FST.
+// Two types of matches are possible for a word in the FST:
+//  1. Exact match: the word in the FST matches the word in the input token stream exactly.
+//  2. Fuzzy match: the word in the FST matches the word in the input token stream with a Levenshtein distance
+//     less than or equal to the fuzziness parameter.
 func checkForMatch(s *SynonymFilter, input analysis.TokenStream, inputIndex int, fst *vellum.FST) (*matchParameters, error) {
 	rv := &matchParameters{
 		newInputIndex:   inputIndex + 1,
@@ -145,6 +155,9 @@ func checkForMatch(s *SynonymFilter, input analysis.TokenStream, inputIndex int,
 	var validPaths []*fstPath
 	var tokenLen, matchLen, pathIndex int
 	var err error
+	// since a token can fuzzily match multiple words in the FST, a slice of valid paths is maintained.
+	// with each valid path representing a sequence of transitions in the FST that starts from the start state.
+	// for every input token, all the valid paths are checked for an exact match or a fuzzy match.
 	validPaths = append(validPaths, &fstPath{
 		state:  fst.Start(),
 		output: 0,
@@ -233,8 +246,8 @@ func checkForMatch(s *SynonymFilter, input analysis.TokenStream, inputIndex int,
 		pathIndex = 0
 		// for each valid path, if the state is a matching state, append the seenSynonyms with the synonyms
 		// by using the output of the path as the key to the hashToSynonyms map.
-		// filter out all paths that do not have a transition for space from the current state, since each
-		// valid path is a word in the FST, the "dead-ends", or the paths that do not have any transition
+		// filter out all paths that do not have a transition for space from the current state and since each
+		// valid path ends with a word in the FST, the "dead-ends", or the paths that do not have any transition
 		// from the current state are filtered out.
 		for _, path := range validPaths {
 			isMatch, finalOutput := fst.IsMatchWithVal(path.state)
