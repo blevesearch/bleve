@@ -104,9 +104,9 @@ func (s *TermSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, e
 }
 
 func addFtlSynToDocMatch(docMatch *search.DocumentMatch) {
-	docMatch.FTLSynonym = make([][]uint64, len(docMatch.FieldTermLocations))
+	docMatch.HitPositions = make([][]uint64, len(docMatch.FieldTermLocations))
 	for i, ftlTerm := range docMatch.FieldTermLocations {
-		docMatch.FTLSynonym[i] = []uint64{ftlTerm.Location.Pos}
+		docMatch.HitPositions[i] = []uint64{ftlTerm.Location.Pos}
 	}
 }
 

@@ -436,33 +436,33 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 
 	if numSynonyms > 0 {
 
-		vellumMap, byteSliceHashMap := synonym.CleanSynonymMap(synonymDocuments)
+		hashToSynonyms, hashToPhrase := synonym.ProcessSynonyms(synonymDocuments)
 
-		vellumMapData, err := json.Marshal(vellumMap)
+		hashToSynonymsData, err := json.Marshal(hashToSynonyms)
 		if err != nil {
 			return err
 		}
 
-		byteSliceHashMapData, err := json.Marshal(byteSliceHashMap)
+		hashToPhraseData, err := json.Marshal(hashToPhrase)
 		if err != nil {
 			return err
 		}
 
-		fst, err := synonym.BuildSynonymFST(byteSliceHashMap, vellumMap)
+		fst, err := synonym.BuildSynonymFST(hashToPhrase, hashToSynonyms)
 		if err != nil {
 			return err
 		}
-		megaSynDoc := document.NewDocument("__megaSpecialSecretSynDoc")
-		megaSynDoc.AddIDField()
+		synDoc := document.NewDocument("_synonymDocument")
+		synDoc.AddIDField()
 		fstField := document.NewTextFieldCustom("fst", nil, fst.Bytes(), index.IndexField|index.StoreField, nil)
-		vellumMapField := document.NewTextFieldCustom("vellummap", nil, vellumMapData, index.IndexField|index.StoreField, nil)
-		byteSliceHashMapField := document.NewTextFieldCustom("byteslicehashmap", nil, byteSliceHashMapData, index.IndexField|index.StoreField, nil)
-		megaSynDoc.AddField(fstField)
-		megaSynDoc.AddField(vellumMapField)
-		megaSynDoc.AddField(byteSliceHashMapField)
-		analyze(megaSynDoc, s.setSpatialAnalyzerPlugin)
-		ids = append(ids, megaSynDoc.ID())
-		analysisResults[itemsDeQueued] = megaSynDoc
+		hashToSynonymsField := document.NewTextFieldCustom("hashToSynonyms", nil, hashToSynonymsData, index.IndexField|index.StoreField, nil)
+		hashToPhraseField := document.NewTextFieldCustom("hashToPhrase", nil, hashToPhraseData, index.IndexField|index.StoreField, nil)
+		synDoc.AddField(fstField)
+		synDoc.AddField(hashToSynonymsField)
+		synDoc.AddField(hashToPhraseField)
+		analyze(synDoc, s.setSpatialAnalyzerPlugin)
+		ids = append(ids, synDoc.ID())
+		analysisResults[itemsDeQueued] = synDoc
 	}
 
 	atomic.AddUint64(&s.stats.TotAnalysisTime, uint64(time.Since(start)))

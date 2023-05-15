@@ -64,20 +64,28 @@ func (b *Batch) Index(id string, data interface{}) error {
 	return nil
 }
 
+// applies an analyzer to each string in a slice and returns the result slice.
+// if the analyzer is nil, the original slice is returned.
 func applyAnalyzerToSlice(analyzer analysis.Analyzer, slice []json.RawMessage) []json.RawMessage {
-	for loc, val := range slice {
-		analyzedPhrase := synonym.TokenStreamToPhrase(analyzer.Analyze(val))
-		var cleanedWord []byte
-		for _, tok := range analyzedPhrase {
-			cleanedWord = append(cleanedWord, tok...)
-			cleanedWord = append(cleanedWord, synonym.SeparatingCharacter)
-		}
-		sz := len(cleanedWord)
-		if sz > 0 && cleanedWord[sz-1] == synonym.SeparatingCharacter {
-			cleanedWord = cleanedWord[:sz-1]
-		}
-		slice[loc] = cleanedWord
+	if analyzer == nil {
+		return slice
 	}
+	loc := 0
+	for _, val := range slice {
+		analyzedPhrase := synonym.TokenStreamToPhrase(analyzer.Analyze(val))
+		var combinedPhrase []byte
+		for _, tok := range analyzedPhrase {
+			combinedPhrase = append(combinedPhrase, tok...)
+			combinedPhrase = append(combinedPhrase, synonym.SeparatingCharacter)
+		}
+		sz := len(combinedPhrase)
+		if sz > 0 && combinedPhrase[sz-1] == synonym.SeparatingCharacter {
+			combinedPhrase = combinedPhrase[:sz-1]
+			slice[loc] = combinedPhrase
+			loc++
+		}
+	}
+	slice = slice[:loc]
 	return slice
 }
 

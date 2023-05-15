@@ -198,9 +198,9 @@ func (s *DisjunctionHeapSearcher) Next(ctx *search.SearchContext) (
 		if len(s.matching) >= s.min {
 			found = true
 			// score this match
-			FTLSynonym := MergeFTL(s.matching)
+			hitPositions := MergePositions(s.matching)
 			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
-			rv.FTLSynonym = FTLSynonym
+			rv.HitPositions = hitPositions
 		}
 
 		// invoke next on all the matching searchers

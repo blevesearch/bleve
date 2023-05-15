@@ -52,15 +52,16 @@ type IndexMappingImpl struct {
 	TypeField             string                      `json:"type_field"`
 	DefaultType           string                      `json:"default_type"`
 	DefaultAnalyzer       string                      `json:"default_analyzer"`
-	SynonymAnalyzer       string                      `json:"synonym_analyzer"`
 	DefaultDateTimeParser string                      `json:"default_datetime_parser"`
 	DefaultField          string                      `json:"default_field"`
 	StoreDynamic          bool                        `json:"store_dynamic"`
 	IndexDynamic          bool                        `json:"index_dynamic"`
 	DocValuesDynamic      bool                        `json:"docvalues_dynamic"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
-	DefaultEnableSynonym  bool                        `json:"default_enable_synonym"`
-	cache                 *registry.Cache
+	// SynonymAnalyzer is the name of the analyzer to use on the synonym documents.
+	SynonymAnalyzer      string `json:"synonym_analyzer"`
+	DefaultEnableSynonym bool   `json:"default_enable_synonym"`
+	cache                *registry.Cache
 }
 
 // AddCustomCharFilter defines a custom char filter for use in this mapping
@@ -426,6 +427,8 @@ func (im *IndexMappingImpl) AnalyzerNamed(name string) analysis.Analyzer {
 	return analyzer
 }
 
+// AnalyzerForSynonym returns the analyzer to use on the synonym documents
+// when indexing.
 func (im *IndexMappingImpl) AnalyzerForSynonym() analysis.Analyzer {
 	analyzer, err := im.cache.AnalyzerNamed(im.SynonymAnalyzer)
 	if err != nil {
@@ -435,12 +438,16 @@ func (im *IndexMappingImpl) AnalyzerForSynonym() analysis.Analyzer {
 	return analyzer
 }
 
+// SynonymEnabledForPath returns true if the path has synonym filter enabled.
 func (im *IndexMappingImpl) SynonymEnabledForPath(path string) bool {
+	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
 		if docMapping.synonymEnabledForPath(path) {
 			return true
 		}
 	}
+
+	// now try the default mapping
 	pathMapping := im.DefaultMapping.documentMappingForPath(path)
 	if pathMapping != nil {
 		if len(pathMapping.Fields) > 0 {
@@ -449,37 +456,41 @@ func (im *IndexMappingImpl) SynonymEnabledForPath(path string) bool {
 			}
 		}
 	}
+
+	// next we will try default analyzers for the path
 	pathDecoded := decodePath(path)
 	for _, docMapping := range im.TypeMapping {
 		if docMapping.defaultSynonymEnabled(pathDecoded) {
 			return true
 		}
 	}
+
 	return im.DefaultEnableSynonym
 }
 
+// AddSynonymFilter adds the synonym filter to the analyzer and returns the new analyzer.
 func (im *IndexMappingImpl) AddSynonymFilter(analyzer analysis.Analyzer, fuzziness int, prefix int, i index.IndexReader) analysis.Analyzer {
 	config := make(map[string]interface{})
-	synDoc, err := i.Document("__megaSpecialSecretSynDoc")
+	synDoc, err := i.Document("_synonymDocument")
 	if err != nil {
 		fmt.Printf("error using the synonym filter - %v", err)
 		return nil
 	}
 	var fst []byte
-	var vellumMap = make(map[uint64][]uint64)
-	var byteSliceHashMap = make(map[uint64][]byte)
+	var hashToSynonyms = make(map[uint64][]uint64)
+	var hashToPhrase = make(map[uint64][]byte)
 	synDoc.VisitFields(func(field index.Field) {
 		if field.Name() == "fst" {
 			fst = field.Value()
-		} else if field.Name() == "vellummap" {
-			json.Unmarshal(field.Value(), &vellumMap)
-		} else if field.Name() == "byteslicehashmap" {
-			json.Unmarshal(field.Value(), &byteSliceHashMap)
+		} else if field.Name() == "hashToSynonyms" {
+			json.Unmarshal(field.Value(), &hashToSynonyms)
+		} else if field.Name() == "hashToPhrase" {
+			json.Unmarshal(field.Value(), &hashToPhrase)
 		}
 	})
 	config["fst"] = fst
-	config["vellumMap"] = vellumMap
-	config["byteSliceHashMap"] = byteSliceHashMap
+	config["hashToSynonyms"] = hashToSynonyms
+	config["hashToPhrase"] = hashToPhrase
 	config["fuzziness"] = fuzziness
 	config["prefix"] = prefix
 	config["type"] = synonym.Name

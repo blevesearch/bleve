@@ -38,6 +38,22 @@ func splitOnSpace(phrase []byte) []string {
 	return rv
 }
 
+// NewSynonymSearcher is an abstraction that returns either a disjunction searcher or a conjunction searcher
+// or a ordered conjunction searcher based on the operator.
+//
+// The operator can be 0, 1 or 2. 0 is for disjunction, 1 is for conjunction and 2 is for ordered conjunction.
+//
+// arrangedTokens is a 2D slice of tokens arranged in the order of the query.
+// Each element in the slice
+// 		- contains only one token if it is not of type synonym.
+//			-> this token is used to build basic term or fuzzy searchers.
+// 		- contains multiple tokens if it is of type synonym.
+//			-> these tokens are used to build phrase searchers, one per token,
+//					since synonyms are generally considered to be phrases.
+//			-> the phrase searchers are then used to build a disjunction searcher.
+// Hence, for each element in the slice, there is one searcher, which is either a term or fuzzy searcher or a disjunction searcher.
+// These searchers are then used to build a disjunction searcher or a conjunction searcher or a ordered conjunction searcher based on the operator.
+
 func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 	arrangedTokens [][]*analysis.Token, field string, boost float64, fuzziness int,
 	prefix int, operator int, options search.SearcherOptions) (search.Searcher, error) {
@@ -75,7 +91,6 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 				synonymPhrases[synonymIndex] = searcher
 			}
 			searcher, err = NewDisjunctionSearcher(ctx, indexReader, synonymPhrases, 1, options)
-			synonymPhrases = nil
 		}
 		if err != nil {
 			err2 := closeSearchers(outerSearcher, synonymPhrases, []search.Searcher{searcher})
@@ -92,11 +107,11 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 		for searcherIndex, searcher := range outerSearcher {
 			searchersWithPositions[searcherIndex] = SearchAtPosition{
 				Searcher: searcher,
-				FirstPos: arrangedTokens[searcherIndex][0].FirstPosition,
-				LastPos:  arrangedTokens[searcherIndex][0].LastPosition,
+				FirstPos: uint64(arrangedTokens[searcherIndex][0].FirstPosition),
+				LastPos:  uint64(arrangedTokens[searcherIndex][0].LastPosition),
 			}
 		}
-		searcher, err = NewSynonymPhraseSearcher(ctx, indexReader, searchersWithPositions, options)
+		searcher, err = NewOrderedConjunctionSearcher(ctx, indexReader, searchersWithPositions, options)
 	}
 	if err != nil {
 		err2 := closeSearchers(outerSearcher, synonymPhrases, []search.Searcher{searcher})

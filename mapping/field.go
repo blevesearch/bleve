@@ -68,7 +68,8 @@ type FieldMapping struct {
 	// of the tokens for this field. This option would be useful for saving
 	// the processing of freq/norm details when the default score based relevancy
 	// isn't needed.
-	SkipFreqNorm  bool `json:"skip_freq_norm,omitempty"`
+	SkipFreqNorm bool `json:"skip_freq_norm,omitempty"`
+	// EnableSynonym, if true, enables synonym processing for this field.
 	EnableSynonym bool `json:"enable_synonym,omitempty"`
 }
 

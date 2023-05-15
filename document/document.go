@@ -31,7 +31,6 @@ func init() {
 }
 
 const SynonymDocument = true
-const NormalDocument = false
 
 type Document struct {
 	id               string  `json:"id"`
@@ -51,7 +50,7 @@ func NewDocument(id string) *Document {
 		id:              id,
 		Fields:          make([]Field, 0),
 		CompositeFields: make([]*CompositeField, 0),
-		DocType:         NormalDocument,
+		DocType:         !SynonymDocument,
 	}
 }
 

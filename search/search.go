@@ -170,7 +170,7 @@ type DocumentMatch struct {
 	// be later incorporated into the Locations map when search
 	// results are completed
 	FieldTermLocations []FieldTermLocation `json:"-"`
-	FTLSynonym         [][]uint64          `json:"-"`
+	HitPositions       [][]uint64          `json:"-"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {

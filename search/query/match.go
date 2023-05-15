@@ -130,6 +130,7 @@ func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mappin
 	} else {
 		analyzerName = m.AnalyzerNameForPath(field)
 	}
+
 	analyzer := m.AnalyzerNamed(analyzerName)
 	if analyzer == nil {
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)

@@ -46,8 +46,11 @@ type DocumentMapping struct {
 	DefaultAnalyzer string                      `json:"default_analyzer,omitempty"`
 
 	// StructTagKey overrides "json" when looking for field names in struct tags
-	StructTagKey          string `json:"struct_tag_key,omitempty"`
-	DefaultSynonymEnabled bool   `json:"default_synonym_enabled"`
+	StructTagKey string `json:"struct_tag_key,omitempty"`
+	// DefaultSynonymEnabled is used to set the default value for the synonym_enabled field
+	// in all the field mappings in the document mapping.  This is used when a field mapping does not explicitly set the
+	// synonym_enabled field.
+	DefaultSynonymEnabled bool `json:"default_synonym_enabled"`
 }
 
 func (dm *DocumentMapping) Validate(cache *registry.Cache) error {

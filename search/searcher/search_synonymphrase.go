@@ -28,17 +28,43 @@ import (
 var reflectStaticSizeSynonymSearcher int
 
 func init() {
-	var cs SynonymPhraseSearcher
+	var cs OrderedConjunctionSearcher
 	reflectStaticSizeSynonymSearcher = int(reflect.TypeOf(cs).Size())
 }
 
+// SearchAtPosition is a struct that contains a searcher and the first and last position of the searcher in the query.
+//   - Searcher is the main searcher for the token.
+//   - FirstPos is the first position of the searcher.
+//   - LastPos is the last position of the searcher.
 type SearchAtPosition struct {
 	Searcher search.Searcher
-	FirstPos int
-	LastPos  int
+	FirstPos uint64
+	LastPos  uint64
 }
 
-type SynonymPhraseSearcher struct {
+// OrderedConjunctionSearcher implements a specialized conjunction searcher.
+// In addition to ensuring that all sub-searchers match a document, it also ensures that
+// the sub-searchers match in the correct order in the document.
+// The input sub-searchers must be in order, and must all have the same field.
+// It uses two properties, first and last position, for each sub searcher,
+// which ensures that the relative positioning of each sub searchers hits in the document is maintained.
+//
+// For example - if there are 3 sub-searchers with the following parameters
+//   - searcher1: first position = 4, last position = 4
+//   - searcher2: first position = 6, last position = 8
+//   - searcher3: first position = 13, last position = 16
+//
+// Then any document hit must have
+//   - searcher1 hit (extending positions [X,X])
+//   - searcher2 hit 2 positions after searcher1 hit (extending positions [X+2,X+4])
+//   - searcher3 hit 5 positions after searcher2 hit (extending positions [X+9,X+12])
+//
+// thus for each sub searcher:
+//   - the hit in the document must be at position equal to its first position - the previous searcher's last position
+//   - the hit for the first sub searcher in the sequence can be anywhere in the document.
+
+// searchersWithPosition is a slice of searchAtPosition, which is the input to the searcher.
+type OrderedConjunctionSearcher struct {
 	indexReader           index.IndexReader
 	searchersWithPosition []SearchAtPosition
 	queryNorm             float64
@@ -50,11 +76,11 @@ type SynonymPhraseSearcher struct {
 	bytesRead             uint64
 }
 
-func NewSynonymPhraseSearcher(ctx context.Context, indexReader index.IndexReader,
+func NewOrderedConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []SearchAtPosition, options search.SearcherOptions) (
 	search.Searcher, error) {
 
-	rv := SynonymPhraseSearcher{
+	rv := OrderedConjunctionSearcher{
 		indexReader:           indexReader,
 		options:               options,
 		searchersWithPosition: qsearchers,
@@ -65,7 +91,7 @@ func NewSynonymPhraseSearcher(ctx context.Context, indexReader index.IndexReader
 	return &rv, nil
 }
 
-func (s *SynonymPhraseSearcher) Size() int {
+func (s *OrderedConjunctionSearcher) Size() int {
 	sizeInBytes := reflectStaticSizeConjunctionSearcher + size.SizeOfPtr +
 		s.scorer.Size()
 
@@ -82,7 +108,7 @@ func (s *SynonymPhraseSearcher) Size() int {
 	return sizeInBytes
 }
 
-func (s *SynonymPhraseSearcher) computeQueryNorm() {
+func (s *OrderedConjunctionSearcher) computeQueryNorm() {
 	// first calculate sum of squared weights
 	sumOfSquaredWeights := 0.0
 	for _, searcher := range s.searchersWithPosition {
@@ -96,7 +122,7 @@ func (s *SynonymPhraseSearcher) computeQueryNorm() {
 	}
 }
 
-func (s *SynonymPhraseSearcher) initSearchers(ctx *search.SearchContext) error {
+func (s *OrderedConjunctionSearcher) initSearchers(ctx *search.SearchContext) error {
 	var err error
 	// get all searchers pointing at their first match
 	for i, searcher := range s.searchersWithPosition {
@@ -112,7 +138,7 @@ func (s *SynonymPhraseSearcher) initSearchers(ctx *search.SearchContext) error {
 	return nil
 }
 
-func (s *SynonymPhraseSearcher) Weight() float64 {
+func (s *OrderedConjunctionSearcher) Weight() float64 {
 	var rv float64
 	for _, searcher := range s.searchersWithPosition {
 		rv += searcher.Searcher.Weight()
@@ -120,13 +146,13 @@ func (s *SynonymPhraseSearcher) Weight() float64 {
 	return rv
 }
 
-func (s *SynonymPhraseSearcher) SetQueryNorm(qnorm float64) {
+func (s *OrderedConjunctionSearcher) SetQueryNorm(qnorm float64) {
 	for _, searcher := range s.searchersWithPosition {
 		searcher.Searcher.SetQueryNorm(qnorm)
 	}
 }
 
-func (s *SynonymPhraseSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+func (s *OrderedConjunctionSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 	if !s.initialized {
 		err := s.initSearchers(ctx)
 		if err != nil {
@@ -185,13 +211,15 @@ OUTER:
 		}
 
 		// if we get here, a doc matched all readers
-		var FTLshit [][][]uint64
-		for _, l := range s.currs {
-			FTLshit = append(FTLshit, l.FTLSynonym)
+		// we only score the document if the relative positioning rule is satisfied
+		// if not, we advance the maxIDIdx and try again
+		var documentHitPositions = make([][][]uint64, len(s.currs))
+		for i, match := range s.currs {
+			documentHitPositions[i] = match.HitPositions
 		}
-		for i := 0; i < len(FTLshit[0]); i++ {
-			lastPos := FTLshit[0][i][len(FTLshit[0][i])-1]
-			if theDFS(s.searchersWithPosition, 1, FTLshit, lastPos) {
+		for i := 0; i < len(documentHitPositions[0]); i++ {
+			startHit := documentHitPositions[0][i]
+			if positionsAreCorrect(s.searchersWithPosition, 1, documentHitPositions, startHit[len(startHit)-1]) {
 				rv = s.scorer.Score(ctx, s.currs)
 				found = true
 				break
@@ -213,19 +241,28 @@ OUTER:
 	return rv, nil
 }
 
-func theDFS(origStream []SearchAtPosition, currIndex int, FTLshit [][][]uint64, lastPos uint64) bool {
-	if currIndex == len(origStream) {
+// positionsAreCorrect checks if the positions of the sub searchers hits are correct by performing a DFS on the documentHitPositions
+// matrix that is passed.
+// For each element in the current row of the matrix, it checks if the position of the first element minus the position of the last element
+// in the previous row is equal to the difference between the first position of the current searcher and the last position of the previous searcher.
+// If a row is reached where this is not true, the function returns false. If the end of the matrix is reached, the function returns true.
+// The function is called recursively, starting at the second row.
+func positionsAreCorrect(origStream []SearchAtPosition, currentRow int, documentHitPositions [][][]uint64, lastPos uint64) bool {
+	if currentRow == len(origStream) {
 		return true
 	}
-	for _, FTL := range FTLshit[currIndex] {
-		if FTL[0]-uint64(lastPos) == (uint64(origStream[currIndex].FirstPos - origStream[currIndex-1].LastPos)) {
-			return theDFS(origStream, currIndex+1, FTLshit, FTL[len(FTL)-1])
+	for _, documentHitPosition := range documentHitPositions[currentRow] {
+		documentRelativePosition := documentHitPosition[0] - lastPos
+		expectedRelativePosition := origStream[currentRow].FirstPos - origStream[currentRow-1].LastPos
+		if documentRelativePosition == expectedRelativePosition {
+			newLastPos := documentHitPosition[len(documentHitPosition)-1]
+			return positionsAreCorrect(origStream, currentRow+1, documentHitPositions, newLastPos)
 		}
 	}
 	return false
 }
 
-func (s *SynonymPhraseSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
+func (s *OrderedConjunctionSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {
 	if !s.initialized {
 		err := s.initSearchers(ctx)
 		if err != nil {
@@ -244,7 +281,7 @@ func (s *SynonymPhraseSearcher) Advance(ctx *search.SearchContext, ID index.Inde
 	return s.Next(ctx)
 }
 
-func (s *SynonymPhraseSearcher) advanceChild(ctx *search.SearchContext, i int, ID index.IndexInternalID) (err error) {
+func (s *OrderedConjunctionSearcher) advanceChild(ctx *search.SearchContext, i int, ID index.IndexInternalID) (err error) {
 	if s.currs[i] != nil {
 		ctx.DocumentMatchPool.Put(s.currs[i])
 	}
@@ -252,7 +289,7 @@ func (s *SynonymPhraseSearcher) advanceChild(ctx *search.SearchContext, i int, I
 	return err
 }
 
-func (s *SynonymPhraseSearcher) Count() uint64 {
+func (s *OrderedConjunctionSearcher) Count() uint64 {
 	// for now return a worst case
 	var sum uint64
 	for _, searcher := range s.searchersWithPosition {
@@ -261,7 +298,7 @@ func (s *SynonymPhraseSearcher) Count() uint64 {
 	return sum
 }
 
-func (s *SynonymPhraseSearcher) Close() (rv error) {
+func (s *OrderedConjunctionSearcher) Close() (rv error) {
 	for _, searcher := range s.searchersWithPosition {
 		err := searcher.Searcher.Close()
 		if err != nil && rv == nil {
@@ -271,11 +308,11 @@ func (s *SynonymPhraseSearcher) Close() (rv error) {
 	return rv
 }
 
-func (s *SynonymPhraseSearcher) Min() int {
+func (s *OrderedConjunctionSearcher) Min() int {
 	return 0
 }
 
-func (s *SynonymPhraseSearcher) DocumentMatchPoolSize() int {
+func (s *OrderedConjunctionSearcher) DocumentMatchPoolSize() int {
 	rv := len(s.currs)
 	for _, s := range s.searchersWithPosition {
 		rv += s.Searcher.DocumentMatchPoolSize()

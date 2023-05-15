@@ -51,11 +51,15 @@ type Token struct {
 
 	// Position specifies the 1-based index of the token in the sequence of
 	// occurrences of its term in the field.
-	Position      int       `json:"position"`
-	Type          TokenType `json:"type"`
-	KeyWord       bool      `json:"keyword"`
-	FirstPosition int
-	LastPosition  int
+	Position int       `json:"position"`
+	Type     TokenType `json:"type"`
+	KeyWord  bool      `json:"keyword"`
+
+	// if the token is a phrase, which is a sequence of words separated by the SeparatingCharacter
+	// FirstPosition and LastPosition specify the Position of the first and last word in the phrase
+	// Used in synonym token filter.
+	FirstPosition int `json:"first_position"`
+	LastPosition  int `json:"last_position"`
 }
 
 func (t *Token) String() string {
@@ -64,7 +68,7 @@ func (t *Token) String() string {
 
 type TokenStream []*Token
 
-// A Tokenizer splits an input string into tokens, the usual behaviour being to
+// A Tokenizer splits an input string into tokens, the usual behavior being to
 // map words to tokens.
 type Tokenizer interface {
 	Tokenize([]byte) TokenStream
