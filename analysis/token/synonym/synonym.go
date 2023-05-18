@@ -304,6 +304,7 @@ func (s *SynonymFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 		log.Println(err)
 		return input
 	}
+	defer fst.Close()
 	var outputTokenStream analysis.TokenStream
 	// inputIndex is the index of a token in the input token stream.
 	// outputIndex is the index of a token in the output token stream.
@@ -341,10 +342,6 @@ func (s *SynonymFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 		// returned by checkForMatch.
 		inputIndex = rv.newInputIndex
 		outputIndex += 1
-	}
-	err = fst.Close()
-	if err != nil {
-		log.Println(err)
 	}
 	return outputTokenStream
 }

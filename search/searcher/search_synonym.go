@@ -14,17 +14,12 @@ import (
 // called when there is an error building the searchers.
 // It returns the first error encountered while closing the searchers.
 // If no error is encountered, it returns nil.
-func closeSearchers(searchers ...[]search.Searcher) error {
-	var err error
+func closeSearchers(searchers ...[]search.Searcher) {
 	for _, sa := range searchers {
 		for _, s := range sa {
-			err = s.Close()
-			if err != nil {
-				return err
-			}
+			s.Close()
 		}
 	}
-	return nil
 }
 
 // splitOnSpace splits the phrase on space and returns a slice of strings.
@@ -72,6 +67,7 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 	var searcher search.Searcher
 	var outerSearcher = make([]search.Searcher, len(arrangedTokens))
 	var synonymPhrases []search.Searcher
+	defer closeSearchers(outerSearcher, synonymPhrases, []search.Searcher{searcher})
 	var err error
 	if fuzziness > MaxFuzziness {
 		return nil, fmt.Errorf("fuzziness exceeds max (%d)", MaxFuzziness)
@@ -95,16 +91,14 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 				phrase := splitOnSpace(synonym.Term)
 				searcher, err = NewPhraseSearcher(ctx, indexReader, phrase, field, options)
 				if err != nil {
-					err2 := closeSearchers(outerSearcher, synonymPhrases, []search.Searcher{searcher})
-					return nil, fmt.Errorf("error building term searcher: %v, close error: %v", err, err2)
+					return nil, err
 				}
 				synonymPhrases[synonymIndex] = searcher
 			}
 			searcher, err = NewDisjunctionSearcher(ctx, indexReader, synonymPhrases, 1, options)
 		}
 		if err != nil {
-			err2 := closeSearchers(outerSearcher, synonymPhrases, []search.Searcher{searcher})
-			return nil, fmt.Errorf("error building term searcher: %v, close error: %v", err, err2)
+			return nil, err
 		}
 		outerSearcher[tokenPosition] = searcher
 	}
@@ -124,8 +118,7 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 		searcher, err = NewOrderedConjunctionSearcher(ctx, indexReader, searchersWithPositions, options)
 	}
 	if err != nil {
-		err2 := closeSearchers(outerSearcher, synonymPhrases, []search.Searcher{searcher})
-		return nil, fmt.Errorf("error building term searcher: %v, close error: %v", err, err2)
+		return nil, err
 	}
 	return searcher, nil
 }
