@@ -1,4 +1,4 @@
-//  Copyright (c) 2014 Couchbase, Inc.
+//  Copyright (c) 2023 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,11 +25,14 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-var reflectStaticSizeSynonymSearcher int
+var reflectOrderedConjunctionSearcher int
+var reflectSearchAtPosition int
 
 func init() {
 	var cs OrderedConjunctionSearcher
-	reflectStaticSizeSynonymSearcher = int(reflect.TypeOf(cs).Size())
+	var sp SearchAtPosition
+	reflectOrderedConjunctionSearcher = int(reflect.TypeOf(cs).Size())
+	reflectSearchAtPosition = int(reflect.TypeOf(sp).Size())
 }
 
 // SearchAtPosition is a struct that contains a searcher and the first and last position of the searcher in the query.
@@ -66,7 +69,7 @@ type SearchAtPosition struct {
 // searchersWithPosition is a slice of searchAtPosition, which is the input to the searcher.
 type OrderedConjunctionSearcher struct {
 	indexReader           index.IndexReader
-	searchersWithPosition []SearchAtPosition
+	searchersWithPosition []*SearchAtPosition
 	queryNorm             float64
 	currs                 []*search.DocumentMatch
 	maxIDIdx              int
@@ -77,7 +80,7 @@ type OrderedConjunctionSearcher struct {
 }
 
 func NewOrderedConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
-	qsearchers []SearchAtPosition, options search.SearcherOptions) (
+	qsearchers []*SearchAtPosition, options search.SearcherOptions) (
 	search.Searcher, error) {
 
 	rv := OrderedConjunctionSearcher{
@@ -92,11 +95,11 @@ func NewOrderedConjunctionSearcher(ctx context.Context, indexReader index.IndexR
 }
 
 func (s *OrderedConjunctionSearcher) Size() int {
-	sizeInBytes := reflectStaticSizeConjunctionSearcher + size.SizeOfPtr +
+	sizeInBytes := reflectOrderedConjunctionSearcher + size.SizeOfPtr +
 		s.scorer.Size()
 
 	for _, entry := range s.searchersWithPosition {
-		sizeInBytes += entry.Searcher.Size()
+		sizeInBytes += entry.Searcher.Size() + 2*size.SizeOfUint64 + size.SizeOfPtr + reflectSearchAtPosition
 	}
 
 	for _, entry := range s.currs {
@@ -247,7 +250,7 @@ OUTER:
 // in the previous row is equal to the difference between the first position of the current searcher and the last position of the previous searcher.
 // If a row is reached where this is not true, the function returns false. If the end of the matrix is reached, the function returns true.
 // The function is called recursively, starting at the second row.
-func positionsAreCorrect(origStream []SearchAtPosition, currentRow int, documentHitPositions [][][]uint64, lastPos uint64) bool {
+func positionsAreCorrect(origStream []*SearchAtPosition, currentRow int, documentHitPositions [][][]uint64, lastPos uint64) bool {
 	if currentRow == len(origStream) {
 		return true
 	}

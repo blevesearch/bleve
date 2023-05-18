@@ -14,10 +14,12 @@ import (
 // called when there is an error building the searchers.
 // It returns the first error encountered while closing the searchers.
 // If no error is encountered, it returns nil.
-func closeSearchers(searchers ...[]search.Searcher) {
-	for _, sa := range searchers {
-		for _, s := range sa {
-			s.Close()
+func closeSearchers(err *error, searchers ...[]search.Searcher) {
+	if *err != nil {
+		for _, sa := range searchers {
+			for _, s := range sa {
+				s.Close()
+			}
 		}
 	}
 }
@@ -67,8 +69,8 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 	var searcher search.Searcher
 	var outerSearcher = make([]search.Searcher, len(arrangedTokens))
 	var synonymPhrases []search.Searcher
-	defer closeSearchers(outerSearcher, synonymPhrases, []search.Searcher{searcher})
 	var err error
+	defer closeSearchers(&err, outerSearcher, synonymPhrases, []search.Searcher{searcher})
 	if fuzziness > MaxFuzziness {
 		return nil, fmt.Errorf("fuzziness exceeds max (%d)", MaxFuzziness)
 	}
@@ -107,9 +109,9 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 	} else if operator == 1 {
 		searcher, err = NewConjunctionSearcher(ctx, indexReader, outerSearcher, options)
 	} else if operator == 2 {
-		var searchersWithPositions = make([]SearchAtPosition, len(arrangedTokens))
+		var searchersWithPositions = make([]*SearchAtPosition, len(arrangedTokens))
 		for searcherIndex, searcher := range outerSearcher {
-			searchersWithPositions[searcherIndex] = SearchAtPosition{
+			searchersWithPositions[searcherIndex] = &SearchAtPosition{
 				Searcher: searcher,
 				FirstPos: uint64(arrangedTokens[searcherIndex][0].FirstPosition),
 				LastPos:  uint64(arrangedTokens[searcherIndex][0].LastPosition),

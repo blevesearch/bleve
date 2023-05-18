@@ -80,9 +80,13 @@ func (q *MatchPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
 	}
 	var useSynonymSearcher bool
+	var err error
 	if m.SynonymEnabledForPath(field) {
-		analyzer = m.AddSynonymFilter(analyzer, 0, 0, i)
+		analyzer, err = m.AddSynonymFilter(analyzer, 0, 0, i)
 		useSynonymSearcher = true
+	}
+	if err != nil {
+		return nil, err
 	}
 	tokens := analyzer.Analyze([]byte(q.MatchPhrase))
 	if len(tokens) > 0 {

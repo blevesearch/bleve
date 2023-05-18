@@ -378,15 +378,15 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	var numDeletes uint64
 	var numPlainTextBytes uint64
 	var ids []string
-	var synonymDocuments []synonym.SynonymDefinition
+	var synonymDocuments []*synonym.SynonymDefinition
 	for docID, doc := range batch.IndexOps {
 		if doc != nil {
 			// insert _id field
 			doc.AddIDField()
-			synStruct := doc.SynonymInfo()
+			synStruct := doc.SynonymInfo().(*synonym.SynonymDefinition)
 			if synStruct != nil {
 				numSynonyms++
-				synonymDocuments = append(synonymDocuments, synStruct.(synonym.SynonymDefinition))
+				synonymDocuments = append(synonymDocuments, synStruct)
 			} else {
 				numUpdates++
 				numPlainTextBytes += doc.NumPlainTextBytes()
@@ -398,12 +398,11 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	}
 
 	// FIXME could sort ids list concurrent with analysis?
-
 	if numUpdates > 0 {
 		go func() {
 			for k := range batch.IndexOps {
 				doc := batch.IndexOps[k]
-				if doc != nil && doc.SynonymInfo() == nil {
+				if doc != nil && doc.SynonymInfo().(*synonym.SynonymDefinition) == nil {
 					// put the work on the queue
 					s.analysisQueue.Queue(func() {
 						analyze(doc, s.setSpatialAnalyzerPlugin)
@@ -432,11 +431,9 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	}
 	close(resultChan)
 	defer atomic.AddUint64(&s.iStats.analysisBytesRemoved, uint64(totalAnalysisSize))
-
 	if numSynonyms > 0 {
 
 		hashToSynonyms, hashToPhrase := synonym.ProcessSynonyms(synonymDocuments)
-
 		hashToSynonymsData, err := json.Marshal(hashToSynonyms)
 		if err != nil {
 			return err

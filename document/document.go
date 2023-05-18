@@ -38,7 +38,7 @@ type Document struct {
 	CompositeFields   []*CompositeField
 	StoredFieldsSize  uint64
 	DocType           bool
-	SynonymDefinition synonym.SynonymDefinition
+	SynonymDefinition *synonym.SynonymDefinition
 }
 
 func (d *Document) StoredFieldsBytes() uint64 {
@@ -54,7 +54,7 @@ func NewDocument(id string) *Document {
 	}
 }
 
-func NewSynDocument(id string, syn synonym.SynonymDefinition) *Document {
+func NewSynDocument(id string, syn *synonym.SynonymDefinition) *Document {
 	return &Document{
 		id:                id,
 		Fields:            make([]Field, 0),

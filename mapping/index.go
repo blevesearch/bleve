@@ -468,12 +468,14 @@ func (im *IndexMappingImpl) SynonymEnabledForPath(path string) bool {
 }
 
 // AddSynonymFilter adds the synonym filter to the analyzer and returns the new analyzer.
-func (im *IndexMappingImpl) AddSynonymFilter(analyzer analysis.Analyzer, fuzziness int, prefix int, i index.IndexReader) analysis.Analyzer {
+func (im *IndexMappingImpl) AddSynonymFilter(analyzer analysis.Analyzer, fuzziness int, prefix int, i index.IndexReader) (analysis.Analyzer, error) {
 	config := make(map[string]interface{})
 	synDoc, err := i.Document("_synonymDocument")
 	if err != nil {
-		fmt.Printf("error using the synonym filter - %v", err)
-		return nil
+		return nil, fmt.Errorf("error using the synonym filter - %v", err)
+	}
+	if synDoc == nil {
+		return nil, fmt.Errorf("error using the synonym filter - no synonym definitions found in index")
 	}
 	var fst []byte
 	var hashToSynonyms = make(map[uint64][]uint64)
@@ -495,13 +497,12 @@ func (im *IndexMappingImpl) AddSynonymFilter(analyzer analysis.Analyzer, fuzzine
 	config["type"] = synonym.Name
 	synonymFilter, err := im.cache.DefineTokenFilter(synonym.Name, config)
 	if err != nil {
-		fmt.Printf("error using the synonym filter - %v", err)
-		return nil
+		return nil, fmt.Errorf("error using the synonym filter - %v", err)
 	}
 	return &analysis.AddTokenFiltersToAnalyzerOutput{
 		BaseAnalyzer:      analyzer,
 		ExtraTokenFilters: []analysis.TokenFilter{synonymFilter},
-	}
+	}, nil
 }
 
 func (im *IndexMappingImpl) DateTimeParserNamed(name string) analysis.DateTimeParser {

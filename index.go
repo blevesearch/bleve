@@ -106,7 +106,7 @@ func (b *Batch) IndexSynonym(id string, syn synonym.SynonymDefinition) error {
 		return fmt.Errorf("no analyzer found for synonyms")
 	}
 	applySynonymAnalyzer(&syn, analyzer)
-	doc := document.NewSynDocument(id, syn)
+	doc := document.NewSynDocument(id, &syn)
 	b.internal.Update(doc)
 
 	b.lastDocSize = uint64(doc.Size() +

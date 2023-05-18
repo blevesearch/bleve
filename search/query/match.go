@@ -136,9 +136,13 @@ func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mappin
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
 	}
 	var useSynonymSearcher bool
+	var err error
 	if m.SynonymEnabledForPath(field) {
-		analyzer = m.AddSynonymFilter(analyzer, q.Fuzziness, q.Prefix, i)
+		analyzer, err = m.AddSynonymFilter(analyzer, q.Fuzziness, q.Prefix, i)
 		useSynonymSearcher = true
+	}
+	if err != nil {
+		return nil, err
 	}
 	tokens := analyzer.Analyze([]byte(q.Match))
 	if len(tokens) > 0 {
