@@ -66,7 +66,7 @@ func (b *Batch) Index(id string, data interface{}) error {
 
 // applies an analyzer to each string in a slice and returns the result slice.
 // if the analyzer is nil, the original slice is returned.
-func applyAnalyzerToSlice(analyzer analysis.Analyzer, slice []json.RawMessage) []json.RawMessage {
+func analyzeSlice(analyzer analysis.Analyzer, slice []json.RawMessage) []json.RawMessage {
 	if analyzer == nil {
 		return slice
 	}
@@ -89,7 +89,15 @@ func applyAnalyzerToSlice(analyzer analysis.Analyzer, slice []json.RawMessage) [
 	return slice
 }
 
-func (b *Batch) IndexSynonym(id string, syn synonym.SynonymStruct) error {
+// applies the analyzer specified by the mapping to the input and synonyms
+// of the synonym struct.  if the analyzer is nil, the original struct is returned.
+func applySynonymAnalyzer(syn *synonym.SynonymDefinition, analyzer analysis.Analyzer) {
+	synonym.StripJsonQuotes(syn)
+	syn.Input = analyzeSlice(analyzer, syn.Input)
+	syn.Synonyms = analyzeSlice(analyzer, syn.Synonyms)
+}
+
+func (b *Batch) IndexSynonym(id string, syn synonym.SynonymDefinition) error {
 	if id == "" {
 		return ErrorEmptyID
 	}
@@ -97,9 +105,7 @@ func (b *Batch) IndexSynonym(id string, syn synonym.SynonymStruct) error {
 	if analyzer == nil {
 		return fmt.Errorf("no analyzer found for synonyms")
 	}
-	synonym.StripJsonQuotes(&syn)
-	syn.Input = applyAnalyzerToSlice(analyzer, syn.Input)
-	syn.Synonyms = applyAnalyzerToSlice(analyzer, syn.Synonyms)
+	applySynonymAnalyzer(&syn, analyzer)
 	doc := document.NewSynDocument(id, syn)
 	b.internal.Update(doc)
 

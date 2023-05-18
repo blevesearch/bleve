@@ -13,16 +13,9 @@ import (
 var equivalentSynonymType = []byte("equivalent")
 var explicitSynonymType = []byte("explicit")
 
-// SynonymConfig is the configuration for the Synonym TokenFilter.
-// It contains the FST and the hashToSynonyms and hashToPhrase maps.
-// The FST is used to find the hash of a phrase if it is present in the FST.
-// The hashToSynonyms map is used to find the hashed synonyms of a phrase which was matched in the FST.
-// The hashToPhrase map is used to find the phrase from its hash.
-type SynonymConfig struct {
-	FST            []byte
-	hashToSynonyms map[uint64][]uint64
-	hashToPhrase   map[uint64][]byte
-}
+const SynonymDocumentType = "synonym"
+const SynonymDefinitionLHS = "input"
+const SynonymDefinitionRHS = "synonyms"
 
 // A synonym document is a json object with the following fields:
 //  1. mapping type: either "equivalent" or "explicit"
@@ -34,10 +27,11 @@ type SynonymConfig struct {
 //
 // A phrase is a sequence of words separated by spaces, and a word is a sequence of characters.
 // A phrase can be a single word.
-type SynonymStruct struct {
-	MappingType json.RawMessage
-	Input       []json.RawMessage
-	Synonyms    []json.RawMessage
+type SynonymDefinition struct {
+	Type        string            `json:"type"`
+	MappingType json.RawMessage   `json:"mappingType"`
+	Input       []json.RawMessage `json:"input"`
+	Synonyms    []json.RawMessage `json:"synonyms"`
 }
 
 // stripQuotes takes as input a byte slice and returns the byte slice without the first and last characters.
@@ -49,7 +43,7 @@ func stripQuotes(word []byte) []byte {
 // StripJsonQuotes takes as input a pointer to a synonym struct and removes the quotes from the json.RawMessage fields.
 // This is done to avoid having to unmarshal the json.RawMessage fields to strings and then marshal them back to json.RawMessage.
 // This function is used in the synonym file parser.
-func StripJsonQuotes(synonym *SynonymStruct) {
+func StripJsonQuotes(synonym *SynonymDefinition) {
 	synonym.MappingType = stripQuotes(synonym.MappingType)
 	for index, i := range synonym.Input {
 		synonym.Input[index] = stripQuotes(i)
@@ -106,7 +100,7 @@ func updateSynonyms(hashSet map[uint64]map[uint64]interface{}, hashval uint64, h
 //  1. For each phrase in synonym.Input,
 //     a.	Map its hash to it in hashToPhrase map.
 //     b.	Map its hash to the generated slice by calling the updateSynonyms function.
-func ProcessSynonyms(synonyms []SynonymStruct) (map[uint64][]uint64, map[uint64][]byte) {
+func ProcessSynonyms(synonyms []SynonymDefinition) (map[uint64][]uint64, map[uint64][]byte) {
 	var hashToSynonyms = make(map[uint64][]uint64)
 	var hashSet = make(map[uint64]map[uint64]interface{})
 	var hashToPhrase = make(map[uint64][]byte)

@@ -2,6 +2,7 @@ package synonym
 
 import (
 	"log"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/registry"
@@ -31,6 +32,10 @@ type fstPath struct {
 	state int
 	// word is the sequence of characters that were matched in the path
 	word []byte
+}
+
+var pathPool = sync.Pool{
+	New: func() interface{} { return new(fstPath) },
 }
 
 // matchParameters is used for representing the output for the checkForMatch function.
@@ -63,53 +68,70 @@ func pathEndsWithWord(path *fstPath, fst *vellum.FST) (bool, error) {
 	return spaceAccept != 1 || numEdges == 0, nil
 }
 
-// A recursive function that performs a DFS from the state present in the path, which is the input FST path.
-//
+// This function performs a DFS from the state present in the input FST path.
 // MatchTry is the word that must be fuzzily matched in the FST, starting from path.
-//
-// Depth is the maximum depth to which the DFS must be performed.
-//
 // ValidPaths is the list of valid paths that were found in the FST and if the matchTry is fuzzily matched in
 // the FST, validPaths is appended with the new path that was found.
-//
-// Fst is the FST that is being searched.
-//
 // Fuzziness is the maximum Levenshtein distance allowed between matchTry and the word fuzzily matched in the FST.
-func fuzzyMatch(path *fstPath, matchTry string, depth int,
-	validPaths []*fstPath, fst *vellum.FST, fuzziness int) ([]*fstPath, error) {
-	// if input FST path ends with a word and if the word fuzzily matches the matchTry, append the validPaths with the input FST path.
-	endsWithWord, err := pathEndsWithWord(path, fst)
-	if err != nil {
-		return nil, err
-	}
-	if endsWithWord {
-		if search.LevenshteinDistance(string(path.word), matchTry) <= fuzziness {
-			validPaths = append(validPaths, path)
-		}
-	}
-	// if depth is not 0, perform a DFS from the current state of the input FST path.
-	// even if the path ends with a word, the DFS is performed since there there may be
-	// another transition apart from a space at the state in the path.
-	if depth != 0 {
-		transitions, err := fst.GetTransitionsForState(path.state)
+//
+// Basic logic followed is as follows:
+//   - At the state in the FST where the character in the input string fails to match,
+//     we start a DFS searching for states that end a word
+//   - which are states that either do not have any outgoing transition or
+//     have a transition for a space
+//   - Since it is a FST, multiple such paths will be found, and each path's word is checked for
+//     edit distance criteria satisfaction before it is added to validPaths
+func fuzzyMatch(path *fstPath, matchTry string, validPaths []*fstPath, fst *vellum.FST, fuzziness int) ([]*fstPath, error) {
+
+	// stack for iterative DFS
+	pathStack := []*fstPath{path}
+	var pathIsValid bool
+	for len(pathStack) > 0 {
+		path = pathStack[len(pathStack)-1]
+		pathStack = pathStack[:len(pathStack)-1]
+		pathIsValid = false
+		// if input FST path ends with a word and if the word fuzzily matches the matchTry, append the validPaths with the input FST path.
+		endsWithWord, err := pathEndsWithWord(path, fst)
 		if err != nil {
 			return nil, err
 		}
-		// for each transition from the current state of the input FST path, perform a DFS.
-		// if the transition is not a space, append the character to the word in the input FST path,
-		// update the state and output of the input FST path and perform a DFS from the new state by calling
-		// the fuzzyMatch function recursively.
-		for _, character := range transitions {
-			if character != SeparatingCharacter {
-				newState, newOutput := fst.AcceptWithVal(path.state, character)
-				path.word = append(path.word, character)
-				path.state = newState
-				path.output += newOutput
-				validPaths, err = fuzzyMatch(path, matchTry, depth-1, validPaths, fst, fuzziness)
-				if err != nil {
-					return nil, err
+		if endsWithWord {
+			if search.LevenshteinDistance(string(path.word), matchTry) <= fuzziness {
+				validPaths = append(validPaths, path)
+				pathIsValid = true
+			}
+		}
+		// perform a DFS from the current state of the input FST path.
+		// even if the path ends with a word, the DFS is performed since there there may be
+		// another transition apart from a space at the state in the path.
+		//
+		// this condition is a shortcut to discard certain fst paths where it becomes known that the word
+		// will have a edit distance > fuzziness to matchTry, as path does not end with a word and
+		// path.word is already exceeding len(matchTry) by 'fuzziness' amount and any further
+		// exploration along this path will need removal of characters >'fuzziness'
+		if len(path.word)-len(matchTry) <= fuzziness {
+			transitions, err := fst.GetTransitionsForState(path.state)
+			if err != nil {
+				return nil, err
+			}
+			// for each transition from the current state of the input FST path, perform a DFS.
+			// if the transition is not a space, get a new  fstPath from the pool, and insert it
+			// into the stack with the updated parameters
+			for _, character := range transitions {
+				if character != SeparatingCharacter {
+					newState, newOutput := fst.AcceptWithVal(path.state, character)
+					newPath := pathPool.Get().(*fstPath)
+					newPath.state, newPath.output, newPath.word = newState, path.output+newOutput, append(path.word, character)
+					pathStack = append(pathStack, newPath)
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
+		}
+		// only discard fstPath if it was not added to validPaths
+		if !pathIsValid {
+			pathPool.Put(path)
 		}
 	}
 	return validPaths, nil
@@ -158,11 +180,9 @@ func checkForMatch(s *SynonymFilter, input analysis.TokenStream, inputIndex int,
 	// since a token can fuzzily match multiple words in the FST, a slice of valid paths is maintained.
 	// with each valid path representing a sequence of transitions in the FST that starts from the start state.
 	// for every input token, all the valid paths are checked for an exact match or a fuzzy match.
-	validPaths = append(validPaths, &fstPath{
-		state:  fst.Start(),
-		output: 0,
-		word:   nil,
-	})
+	startPath := pathPool.Get().(*fstPath)
+	startPath.state, startPath.output, startPath.word = fst.Start(), 0, nil
+	validPaths = append(validPaths, startPath)
 	numValidPaths := len(validPaths)
 	prevPos := input[inputIndex].Position
 	for inputIndex != len(input) {
@@ -197,7 +217,7 @@ func checkForMatch(s *SynonymFilter, input analysis.TokenStream, inputIndex int,
 					// set of new paths that are found.
 					if s.fuzziness != 0 && matchLen >= s.prefix {
 						validPaths, err = fuzzyMatch(path, string(input[inputIndex].Term),
-							tokenLen-matchLen+s.fuzziness, validPaths, fst, s.fuzziness)
+							validPaths, fst, s.fuzziness)
 						if err != nil {
 							return nil, err
 						}
@@ -228,7 +248,7 @@ func checkForMatch(s *SynonymFilter, input analysis.TokenStream, inputIndex int,
 					// provided fuzziness is set to 3.
 					if s.fuzziness != 0 && matchLen >= s.prefix {
 						validPaths, err = fuzzyMatch(path, string(input[inputIndex].Term),
-							s.fuzziness, validPaths, fst, s.fuzziness)
+							validPaths, fst, s.fuzziness)
 						if err != nil {
 							return nil, err
 						}

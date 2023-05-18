@@ -82,7 +82,6 @@ func NewTextFieldMapping() *FieldMapping {
 		IncludeTermVectors: true,
 		IncludeInAll:       true,
 		DocValues:          true,
-		EnableSynonym:      false,
 	}
 }
 

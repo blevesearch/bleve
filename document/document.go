@@ -33,12 +33,12 @@ func init() {
 const SynonymDocument = true
 
 type Document struct {
-	id               string  `json:"id"`
-	Fields           []Field `json:"fields"`
-	CompositeFields  []*CompositeField
-	StoredFieldsSize uint64
-	DocType          bool
-	SynonymStruct    synonym.SynonymStruct
+	id                string  `json:"id"`
+	Fields            []Field `json:"fields"`
+	CompositeFields   []*CompositeField
+	StoredFieldsSize  uint64
+	DocType           bool
+	SynonymDefinition synonym.SynonymDefinition
 }
 
 func (d *Document) StoredFieldsBytes() uint64 {
@@ -54,13 +54,13 @@ func NewDocument(id string) *Document {
 	}
 }
 
-func NewSynDocument(id string, syn synonym.SynonymStruct) *Document {
+func NewSynDocument(id string, syn synonym.SynonymDefinition) *Document {
 	return &Document{
-		id:              id,
-		Fields:          make([]Field, 0),
-		CompositeFields: make([]*CompositeField, 0),
-		DocType:         SynonymDocument,
-		SynonymStruct:   syn,
+		id:                id,
+		Fields:            make([]Field, 0),
+		CompositeFields:   make([]*CompositeField, 0),
+		DocType:           SynonymDocument,
+		SynonymDefinition: syn,
 	}
 }
 
@@ -152,7 +152,7 @@ func (d *Document) HasComposite() bool {
 
 func (d *Document) SynonymInfo() interface{} {
 	if d.DocType {
-		return d.SynonymStruct
+		return d.SynonymDefinition
 	}
 	return nil
 }

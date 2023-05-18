@@ -363,7 +363,7 @@ func (s *Scorch) Delete(id string) error {
 	return s.Batch(b)
 }
 
-// Batch applices a batch of changes to the index atomically
+// Batch applies a batch of changes to the index atomically
 func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	start := time.Now()
 
@@ -378,7 +378,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	var numDeletes uint64
 	var numPlainTextBytes uint64
 	var ids []string
-	var synonymDocuments []synonym.SynonymStruct
+	var synonymDocuments []synonym.SynonymDefinition
 	for docID, doc := range batch.IndexOps {
 		if doc != nil {
 			// insert _id field
@@ -386,16 +386,15 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 			synStruct := doc.SynonymInfo()
 			if synStruct != nil {
 				numSynonyms++
-				synonymDocuments = append(synonymDocuments, synStruct.(synonym.SynonymStruct))
+				synonymDocuments = append(synonymDocuments, synStruct.(synonym.SynonymDefinition))
 			} else {
 				numUpdates++
 				numPlainTextBytes += doc.NumPlainTextBytes()
-				ids = append(ids, docID)
 			}
 		} else {
 			numDeletes++
-			ids = append(ids, docID)
 		}
+		ids = append(ids, docID)
 	}
 
 	// FIXME could sort ids list concurrent with analysis?
