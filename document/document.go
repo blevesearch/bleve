@@ -76,6 +76,10 @@ func (d *Document) Size() int {
 		sizeInBytes += entry.Size()
 	}
 
+	if d.DocType {
+		sizeInBytes += d.SynonymDefinition.Size()
+	}
+
 	return sizeInBytes
 }
 
@@ -151,8 +155,5 @@ func (d *Document) HasComposite() bool {
 }
 
 func (d *Document) SynonymInfo() interface{} {
-	if d.DocType {
-		return d.SynonymDefinition
-	}
-	return nil
+	return d.SynonymDefinition
 }

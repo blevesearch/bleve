@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"hash/fnv"
+	"reflect"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/size"
 	"github.com/blevesearch/vellum"
 )
 
@@ -28,10 +30,21 @@ const SynonymDefinitionRHS = "synonyms"
 // A phrase is a sequence of words separated by spaces, and a word is a sequence of characters.
 // A phrase can be a single word.
 type SynonymDefinition struct {
-	Type        string            `json:"type"`
 	MappingType json.RawMessage   `json:"mappingType"`
 	Input       []json.RawMessage `json:"input"`
 	Synonyms    []json.RawMessage `json:"synonyms"`
+}
+
+func (s *SynonymDefinition) Size() int {
+	var sd SynonymDefinition
+	sizeInBytes := len(s.MappingType) + int(reflect.TypeOf(sd).Size()) + size.SizeOfPtr
+	for _, entry := range s.Input {
+		sizeInBytes += len(entry)
+	}
+	for _, entry := range s.Synonyms {
+		sizeInBytes += len(entry)
+	}
+	return sizeInBytes
 }
 
 // stripQuotes takes as input a byte slice and returns the byte slice without the first and last characters.

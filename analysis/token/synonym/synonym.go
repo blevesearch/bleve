@@ -173,7 +173,6 @@ func checkForMatch(s *SynonymFilter, input analysis.TokenStream, inputIndex int,
 		firstPos:        input[inputIndex].Position,
 		lastPos:         input[inputIndex].Position,
 	}
-	var seenSynonyms []uint64
 	var validPaths []*fstPath
 	var tokenLen, matchLen, pathIndex int
 	var err error
@@ -185,7 +184,7 @@ func checkForMatch(s *SynonymFilter, input analysis.TokenStream, inputIndex int,
 	validPaths = append(validPaths, startPath)
 	numValidPaths := len(validPaths)
 	prevPos := input[inputIndex].Position
-	for inputIndex != len(input) {
+	for inputIndex < len(input) {
 		// check how many stop words are present between the current token and the previous token.
 		// the number of stop words is the number of times a FST path accepts the space character
 		// this code block will be executed only after the first token is exactly or fuzzily matched.
@@ -261,7 +260,7 @@ func checkForMatch(s *SynonymFilter, input analysis.TokenStream, inputIndex int,
 		validPaths = validPaths[numValidPaths:]
 		prevPos = input[inputIndex].Position
 		inputIndex++
-		seenSynonyms = nil
+		var seenSynonyms []uint64
 		matchFound := false
 		pathIndex = 0
 		// for each valid path, if the state is a matching state, append the seenSynonyms with the synonyms
@@ -302,7 +301,8 @@ func checkForMatch(s *SynonymFilter, input analysis.TokenStream, inputIndex int,
 func (s *SynonymFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
 	fst, err := vellum.Load(s.fst)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return input
 	}
 	var outputTokenStream analysis.TokenStream
 	// inputIndex is the index of a token in the input token stream.
@@ -312,7 +312,11 @@ func (s *SynonymFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 	for inputIndex < len(input) {
 		rv, err := checkForMatch(s, input, inputIndex, fst)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+			rv = &matchParameters{
+				newInputIndex:   inputIndex + 1,
+				matchedSynonyms: nil,
+			}
 		}
 		if rv.matchedSynonyms != nil {
 			// We have a match, so we need to add the synonyms to the output
@@ -340,7 +344,7 @@ func (s *SynonymFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 	}
 	err = fst.Close()
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 	return outputTokenStream
 }
