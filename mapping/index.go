@@ -499,7 +499,7 @@ func (im *IndexMappingImpl) AddSynonymFilter(analyzer analysis.Analyzer, fuzzine
 	if err != nil {
 		return nil, fmt.Errorf("error using the synonym filter - %v", err)
 	}
-	return &analysis.AddTokenFiltersToAnalyzerOutput{
+	return &analysis.ExtendedAnalyzer{
 		BaseAnalyzer:      analyzer,
 		ExtraTokenFilters: []analysis.TokenFilter{synonymFilter},
 	}, nil
