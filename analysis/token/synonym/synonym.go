@@ -48,6 +48,13 @@ type fstPath struct {
 	word []byte
 }
 
+func resetPath(path *fstPath) *fstPath {
+	path.output = 0
+	path.state = 0
+	path.word = nil
+	return path
+}
+
 var pathPool = sync.Pool{
 	New: func() interface{} { return new(fstPath) },
 }
@@ -145,7 +152,7 @@ func fuzzyMatch(path *fstPath, matchTry string, validPaths []*fstPath, fst *vell
 		}
 		// only discard fstPath if it was not added to validPaths
 		if !pathIsValid {
-			pathPool.Put(path)
+			pathPool.Put(resetPath(path))
 		}
 	}
 	return validPaths, nil
@@ -210,6 +217,8 @@ func checkForMatch(s *SynonymFilter, input analysis.TokenStream, inputIndex int,
 				if rv != nil {
 					validPaths[pathIndex] = rv
 					pathIndex++
+				} else {
+					pathPool.Put(resetPath(path))
 				}
 			}
 			validPaths = validPaths[:pathIndex]
@@ -295,6 +304,8 @@ func checkForMatch(s *SynonymFilter, input analysis.TokenStream, inputIndex int,
 				validPaths[pathIndex] = pathAfterSpace
 				validPaths[pathIndex].word = nil
 				pathIndex++
+			} else {
+				pathPool.Put(resetPath(path))
 			}
 		}
 		validPaths = validPaths[:pathIndex]

@@ -34,27 +34,42 @@ func init() {
 }
 
 type ConjunctionSearcher struct {
-	indexReader index.IndexReader
-	searchers   OrderedSearcherList
-	queryNorm   float64
-	currs       []*search.DocumentMatch
-	maxIDIdx    int
-	scorer      *scorer.ConjunctionQueryScorer
-	initialized bool
-	options     search.SearcherOptions
-	bytesRead   uint64
+	indexReader       index.IndexReader
+	searchers         OrderedSearcherList
+	queryNorm         float64
+	currs             []*search.DocumentMatch
+	maxIDIdx          int
+	scorer            *scorer.ConjunctionQueryScorer
+	initialized       bool
+	options           search.SearcherOptions
+	bytesRead         uint64
+	searcherPositions []*SearcherPosition
 }
 
 func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, options search.SearcherOptions) (
 	search.Searcher, error) {
+
+	if ctx.Value(ctxKey("searcherPositions")) != nil {
+		searcherPositions := ctx.Value(ctxKey("searcherPositions")).([]*SearcherPosition)
+		rv := ConjunctionSearcher{
+			indexReader:       indexReader,
+			options:           options,
+			searchers:         qsearchers,
+			currs:             make([]*search.DocumentMatch, len(qsearchers)),
+			scorer:            scorer.NewConjunctionQueryScorer(options),
+			searcherPositions: searcherPositions,
+		}
+		rv.computeQueryNorm()
+		return &rv, nil
+	}
+
 	// build the sorted downstream searchers
 	searchers := make(OrderedSearcherList, len(qsearchers))
 	for i, searcher := range qsearchers {
 		searchers[i] = searcher
 	}
 	sort.Sort(searchers)
-
 	// attempt the "unadorned" conjunction optimization only when we
 	// do not need extra information like freq-norm's or term vectors
 	if len(searchers) > 1 &&
@@ -205,12 +220,24 @@ OUTER:
 			// don't bump i, so that we'll examine the just-advanced
 			// currs[i] again
 		}
-
-		// if we get here, a doc matched all readers, so score and add it
-		rv = s.scorer.Score(ctx, s.currs)
-
-		// we know all the searchers are pointing at the same thing
-		// so they all need to be bumped
+		// if we get here, a doc matched all readers
+		if s.searcherPositions == nil {
+			rv = s.scorer.Score(ctx, s.currs)
+		} else {
+			// we only score the document if the relative positioning rule is satisfied
+			// if not, we advance the maxIDIdx and try again
+			var documentHitPositions = make([][][]uint64, len(s.currs))
+			for i, match := range s.currs {
+				documentHitPositions[i] = match.HitPositions
+			}
+			for i := 0; i < len(documentHitPositions[0]); i++ {
+				startHit := documentHitPositions[0][i]
+				if positionsAreCorrect(s.searcherPositions, 1, documentHitPositions, startHit[len(startHit)-1]) {
+					rv = s.scorer.Score(ctx, s.currs)
+					break
+				}
+			}
+		}
 		for i, searcher := range s.searchers {
 			if s.currs[i] != rv {
 				ctx.DocumentMatchPool.Put(s.currs[i])
@@ -220,11 +247,32 @@ OUTER:
 				return nil, err
 			}
 		}
-
-		// don't continue now, wait for the next call to Next()
-		break
+		if rv != nil {
+			break
+		}
 	}
 	return rv, nil
+}
+
+// positionsAreCorrect checks if the positions of the sub searchers hits are correct by performing a DFS on the documentHitPositions
+// matrix that is passed.
+// For each element in the current row of the matrix, it checks if the position of the first element minus the position of the last element
+// in the previous row is equal to the difference between the first position of the current searcher and the last position of the previous searcher.
+// If a row is reached where this is not true, the function returns false. If the end of the matrix is reached, the function returns true.
+// The function is called recursively, starting at the second row.
+func positionsAreCorrect(origStream []*SearcherPosition, currentRow int, documentHitPositions [][][]uint64, lastPos uint64) bool {
+	if currentRow == len(origStream) {
+		return true
+	}
+	for _, documentHitPosition := range documentHitPositions[currentRow] {
+		documentRelativePosition := documentHitPosition[0] - lastPos
+		expectedRelativePosition := origStream[currentRow].FirstPos - origStream[currentRow-1].LastPos
+		if documentRelativePosition == expectedRelativePosition {
+			newLastPos := documentHitPosition[len(documentHitPosition)-1]
+			return positionsAreCorrect(origStream, currentRow+1, documentHitPositions, newLastPos)
+		}
+	}
+	return false
 }
 
 func (s *ConjunctionSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (*search.DocumentMatch, error) {

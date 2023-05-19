@@ -45,10 +45,47 @@ func splitOnSpace(phrase []byte) []string {
 	return rv
 }
 
-// NewSynonymSearcher is an abstraction that returns either a disjunction searcher or a conjunction searcher
-// or a ordered conjunction searcher based on the operator.
+type ctxKey string
+
+// SearchAtPosition is a struct that contains a searcher and the first and last position of the searcher in the query.
+//   - Searcher is the main searcher for the token.
+//   - FirstPos is the first position of the searcher.
+//   - LastPos is the last position of the searcher.
+
+// This is used for match phrase query support for synonyms, where we need to
+// know the position of the first and last word in the synonym phrase,
+// to ensure that the document matched has the same number of stop words
+// as the query.
+
+// Operator == 2 implements a specialized conjunction searcher.
+// In addition to ensuring that all sub-searchers match a document, it also ensures that
+// the sub-searchers match in the correct order in the document.
+// The input sub-searchers must be in order, and must all have the same field.
+// It uses two properties, first and last position, for each sub searcher,
+// which ensures that the relative positioning of each sub searchers hits in the document is maintained.
 //
-// The operator can be 0, 1 or 2. 0 is for disjunction, 1 is for conjunction and 2 is for ordered conjunction.
+// For example - if there are 3 sub-searchers with the following parameters
+//   - searcher1: first position = 4, last position = 4
+//   - searcher2: first position = 6, last position = 8
+//   - searcher3: first position = 13, last position = 16
+//
+// Then any document hit must have
+//   - searcher1 hit (extending positions [X,X])
+//   - searcher2 hit 2 positions after searcher1 hit (extending positions [X+2,X+4])
+//   - searcher3 hit 5 positions after searcher2 hit (extending positions [X+9,X+12])
+//
+// thus for each sub searcher:
+//   - the hit in the document must be at position equal to its first position - the previous searcher's last position
+//   - the hit for the first sub searcher in the sequence can be anywhere in the document.
+type SearcherPosition struct {
+	FirstPos uint64
+	LastPos  uint64
+}
+
+// NewSynonymSearcher is an abstraction that returns either a disjunction searcher or a conjunction searcher
+// or a specialized conjunction searcher based on the operator.
+//
+// The operator can be 0, 1 or 2. 0 is for disjunction, 1 is for conjunction and 2 is for specialized conjunction.
 //
 // arrangedTokens is a 2D slice of tokens arranged in the order of the query.
 // Each element in the slice
@@ -59,7 +96,7 @@ func splitOnSpace(phrase []byte) []string {
 //					since synonyms are generally considered to be phrases.
 //			-> the phrase searchers are then used to build a disjunction searcher.
 // Hence, for each element in the slice, there is one searcher, which is either a term or fuzzy searcher or a disjunction searcher.
-// These searchers are then used to build a disjunction searcher or a conjunction searcher or a ordered conjunction searcher based on the operator.
+// These searchers are then used to build a disjunction searcher or a conjunction searcher or a specialized conjunction searcher based on the operator.
 
 func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 	arrangedTokens [][]*analysis.Token, field string, boost float64, fuzziness int,
@@ -109,15 +146,15 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 	} else if operator == 1 {
 		searcher, err = NewConjunctionSearcher(ctx, indexReader, outerSearcher, options)
 	} else if operator == 2 {
-		var searchersWithPositions = make([]*SearchAtPosition, len(arrangedTokens))
-		for searcherIndex, searcher := range outerSearcher {
-			searchersWithPositions[searcherIndex] = &SearchAtPosition{
-				Searcher: searcher,
-				FirstPos: uint64(arrangedTokens[searcherIndex][0].FirstPosition),
-				LastPos:  uint64(arrangedTokens[searcherIndex][0].LastPosition),
+		var searchersPositions = make([]*SearcherPosition, len(arrangedTokens))
+		for tokIndex, tok := range arrangedTokens {
+			searchersPositions[tokIndex] = &SearcherPosition{
+				FirstPos: uint64(tok[0].FirstPosition),
+				LastPos:  uint64(tok[0].LastPosition),
 			}
 		}
-		searcher, err = NewOrderedConjunctionSearcher(ctx, indexReader, searchersWithPositions, options)
+		ctx = context.WithValue(ctx, ctxKey("searcherPositions"), searchersPositions)
+		searcher, err = NewConjunctionSearcher(ctx, indexReader, outerSearcher, options)
 	}
 	if err != nil {
 		return nil, err
