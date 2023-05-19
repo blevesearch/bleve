@@ -17,10 +17,10 @@
 
 package bleve
 
-import "github.com/binhjax/bleve/v2/index/upsidedown/store/boltdb"
+import "github.com/binhjax/bleve/v2/index/upsidedown/store/redis"
 
 // in normal environments we configure boltdb as the default storage
 func initDisk() {
 	// default kv store
-	Config.DefaultKVStore = boltdb.Name
+	Config.DefaultKVStore = redis.Name
 }
