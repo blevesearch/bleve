@@ -19,9 +19,9 @@ import (
 	"math"
 	"reflect"
 
-	"github.com/blevesearch/bleve/v2/search"
-	"github.com/blevesearch/bleve/v2/search/scorer"
-	"github.com/blevesearch/bleve/v2/size"
+	"github.com/binhjax/bleve/v2/search"
+	"github.com/binhjax/bleve/v2/search/scorer"
+	"github.com/binhjax/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 )
 

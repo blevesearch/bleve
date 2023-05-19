@@ -20,7 +20,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/blevesearch/bleve/v2/index/upsidedown"
+	"github.com/binhjax/bleve/v2/index/upsidedown"
 	index "github.com/blevesearch/bleve_index_api"
 )
 

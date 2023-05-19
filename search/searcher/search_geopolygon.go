@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/blevesearch/bleve/v2/geo"
-	"github.com/blevesearch/bleve/v2/numeric"
-	"github.com/blevesearch/bleve/v2/search"
+	"github.com/binhjax/bleve/v2/geo"
+	"github.com/binhjax/bleve/v2/numeric"
+	"github.com/binhjax/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 )
 

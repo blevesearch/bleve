@@ -19,9 +19,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/blevesearch/bleve/v2/numeric"
-	"github.com/blevesearch/bleve/v2/search"
-	"github.com/blevesearch/bleve/v2/size"
+	"github.com/binhjax/bleve/v2/numeric"
+	"github.com/binhjax/bleve/v2/search"
+	"github.com/binhjax/bleve/v2/size"
 )
 
 var reflectStaticSizeDateTimeFacetBuilder int

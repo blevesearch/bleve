@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/binhjax/bleve/v2/analysis"
 )
 
 func TestCJKBigramFilter(t *testing.T) {

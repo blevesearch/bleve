@@ -18,10 +18,10 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/blevesearch/bleve/v2/geo"
-	"github.com/blevesearch/bleve/v2/mapping"
-	"github.com/blevesearch/bleve/v2/search"
-	"github.com/blevesearch/bleve/v2/search/searcher"
+	"github.com/binhjax/bleve/v2/geo"
+	"github.com/binhjax/bleve/v2/mapping"
+	"github.com/binhjax/bleve/v2/search"
+	"github.com/binhjax/bleve/v2/search/searcher"
 	index "github.com/blevesearch/bleve_index_api"
 )
 

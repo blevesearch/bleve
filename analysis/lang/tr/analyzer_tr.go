@@ -15,12 +15,12 @@
 package tr
 
 import (
-	"github.com/blevesearch/bleve/v2/analysis"
-	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/binhjax/bleve/v2/analysis"
+	"github.com/binhjax/bleve/v2/registry"
 
-	"github.com/blevesearch/bleve/v2/analysis/token/apostrophe"
-	"github.com/blevesearch/bleve/v2/analysis/token/lowercase"
-	"github.com/blevesearch/bleve/v2/analysis/tokenizer/unicode"
+	"github.com/binhjax/bleve/v2/analysis/token/apostrophe"
+	"github.com/binhjax/bleve/v2/analysis/token/lowercase"
+	"github.com/binhjax/bleve/v2/analysis/tokenizer/unicode"
 )
 
 const AnalyzerName = "tr"
