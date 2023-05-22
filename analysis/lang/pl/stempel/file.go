@@ -23,7 +23,7 @@ import (
 	"strings"
 )
 
-//go:embed stemmer_20000.tbl
+//go:embed pl/stemmer_20000.tbl
 var stempelFile []byte
 
 // Trie is the external interface to work with the stempel trie
