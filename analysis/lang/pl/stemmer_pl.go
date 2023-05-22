@@ -16,20 +16,19 @@ package pl
 
 import (
 	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis/lang/pl/stempel"
 	"github.com/blevesearch/bleve/v2/registry"
-	"github.com/blevesearch/stempel"
 	"log"
 )
 
-const SnowballStemmerName = "stemmer_pl_snowball"
-const TrieStempelFileName = "stemmer_20000.tbl"
+const SnowballStemmerName = "stemmer_pl"
 
 type PolishStemmerFilter struct {
 	trie stempel.Trie
 }
 
 func NewPolishStemmerFilter() *PolishStemmerFilter {
-	trie, err := stempel.Open(TrieStempelFileName)
+	trie, err := stempel.LoadTrie()
 	if err != nil {
 		log.Fatal(err)
 	}

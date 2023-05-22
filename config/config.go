@@ -99,6 +99,7 @@ import (
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/it"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/nl"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/no"
+	_ "github.com/blevesearch/bleve/v2/analysis/lang/pl"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/pt"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/ro"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/ru"
