@@ -417,17 +417,19 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	// wait for analysis result
 	analysisResults = make([]index.Document, resultSize)
 	var itemsDeQueued uint64
+	var resultIndex uint64
 	var totalAnalysisSize int
-	for itemsDeQueued < resultSize {
+	for itemsDeQueued < numUpdates {
 		result := <-resultChan
-		if result.SynonymInfo().(*synonym.SynonymDefinition) != nil {
-			continue
-		}
 		resultSize := result.Size()
 		atomic.AddUint64(&s.iStats.analysisBytesAdded, uint64(resultSize))
 		totalAnalysisSize += resultSize
-		analysisResults[itemsDeQueued] = result
 		itemsDeQueued++
+		if result.SynonymInfo().(*synonym.SynonymDefinition) != nil {
+			continue
+		}
+		analysisResults[resultIndex] = result
+		resultIndex++
 	}
 	close(resultChan)
 	defer atomic.AddUint64(&s.iStats.analysisBytesRemoved, uint64(totalAnalysisSize))
