@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
@@ -33,12 +34,13 @@ func init() {
 const SynonymDocument = true
 
 type Document struct {
-	id                string  `json:"id"`
-	Fields            []Field `json:"fields"`
-	CompositeFields   []*CompositeField
-	StoredFieldsSize  uint64
-	DocType           bool
-	SynonymDefinition *synonym.SynonymDefinition
+	id                 string  `json:"id"`
+	Fields             []Field `json:"fields"`
+	CompositeFields    []*CompositeField
+	StoredFieldsSize   uint64
+	DocType            bool
+	SynonymDefinition  *synonym.SynonymDefinition
+	AnalyzerForSynonym *analysis.Analyzer
 }
 
 func (d *Document) StoredFieldsBytes() uint64 {
@@ -156,4 +158,8 @@ func (d *Document) HasComposite() bool {
 
 func (d *Document) SynonymInfo() interface{} {
 	return d.SynonymDefinition
+}
+
+func (d *Document) SynonymAnalyzer() interface{} {
+	return d.AnalyzerForSynonym
 }

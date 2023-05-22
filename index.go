@@ -16,10 +16,8 @@ package bleve
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
-	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 
@@ -64,39 +62,6 @@ func (b *Batch) Index(id string, data interface{}) error {
 	return nil
 }
 
-// applies an analyzer to each string in a slice and returns the result slice.
-// if the analyzer is nil, the original slice is returned.
-func analyzeSlice(analyzer analysis.Analyzer, slice []json.RawMessage) []json.RawMessage {
-	if analyzer == nil {
-		return slice
-	}
-	loc := 0
-	for _, val := range slice {
-		analyzedPhrase := synonym.TokenStreamToPhrase(analyzer.Analyze(val))
-		var combinedPhrase []byte
-		for _, tok := range analyzedPhrase {
-			combinedPhrase = append(combinedPhrase, tok...)
-			combinedPhrase = append(combinedPhrase, synonym.SeparatingCharacter)
-		}
-		sz := len(combinedPhrase)
-		if sz > 0 && combinedPhrase[sz-1] == synonym.SeparatingCharacter {
-			combinedPhrase = combinedPhrase[:sz-1]
-			slice[loc] = combinedPhrase
-			loc++
-		}
-	}
-	slice = slice[:loc]
-	return slice
-}
-
-// applies the analyzer specified by the mapping to the input and synonyms
-// of the synonym struct.  if the analyzer is nil, the original struct is returned.
-func applySynonymAnalyzer(syn *synonym.SynonymDefinition, analyzer analysis.Analyzer) {
-	synonym.StripJsonQuotes(syn)
-	syn.Input = analyzeSlice(analyzer, syn.Input)
-	syn.Synonyms = analyzeSlice(analyzer, syn.Synonyms)
-}
-
 func (b *Batch) IndexSynonym(id string, syn synonym.SynonymDefinition) error {
 	if id == "" {
 		return ErrorEmptyID
@@ -105,8 +70,8 @@ func (b *Batch) IndexSynonym(id string, syn synonym.SynonymDefinition) error {
 	if analyzer == nil {
 		return fmt.Errorf("no analyzer found for synonyms")
 	}
-	applySynonymAnalyzer(&syn, analyzer)
 	doc := document.NewSynDocument(id, &syn)
+	doc.AnalyzerForSynonym = analyzer
 	b.internal.Update(doc)
 
 	b.lastDocSize = uint64(doc.Size() +

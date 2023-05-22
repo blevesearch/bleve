@@ -428,13 +428,13 @@ func (im *IndexMappingImpl) AnalyzerNamed(name string) analysis.Analyzer {
 
 // AnalyzerForSynonym returns the analyzer to use on the synonym documents
 // when indexing.
-func (im *IndexMappingImpl) AnalyzerForSynonym() analysis.Analyzer {
+func (im *IndexMappingImpl) AnalyzerForSynonym() *analysis.Analyzer {
 	analyzer, err := im.cache.AnalyzerNamed(im.SynonymAnalyzer)
 	if err != nil {
 		logger.Printf("error using analyzer named: %s", im.SynonymAnalyzer)
 		return nil
 	}
-	return analyzer
+	return &analyzer
 }
 
 // SynonymEnabledForPath returns true if the path has synonym filter enabled.
