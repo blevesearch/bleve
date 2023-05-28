@@ -30,6 +30,10 @@ var reflectStaticSizeLocation int
 const SearchIOStatsCallbackKey = "_search_io_stats_callback_key"
 
 type SearchIOStatsCallbackFunc func(uint64)
+type SearchCostAggregatorCallbackFn func(string, string, uint64)
+
+const SearchCostAggregatorKey = "_search_cost_aggregator_key"
+const QueryTypeKey = "_query_type_key"
 
 func init() {
 	var dm DocumentMatch

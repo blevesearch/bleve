@@ -54,7 +54,7 @@ func NewGeoShapeSearcher(ctx context.Context, indexReader index.IndexReader, sha
 	}
 
 	return NewFilteringSearcher(ctx, mSearcher,
-		buildRelationFilterOnShapes(dvReader, field, relation, shape)), nil
+		buildRelationFilterOnShapes(ctx, dvReader, field, relation, shape)), nil
 
 }
 
@@ -63,7 +63,7 @@ func NewGeoShapeSearcher(ctx context.Context, indexReader index.IndexReader, sha
 // implementation of doc values.
 var termSeparatorSplitSlice = []byte{0xff}
 
-func buildRelationFilterOnShapes(dvReader index.DocValueReader, field string,
+func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueReader, field string,
 	relation string, shape index.GeoJSON) FilterFunc {
 	// this is for accumulating the shape's actual complete value
 	// spread across multiple docvalue visitor callbacks.
@@ -115,7 +115,12 @@ func buildRelationFilterOnShapes(dvReader index.DocValueReader, field string,
 				}
 			})
 
+		// use ctx to aggregate the bytes read
 		if err == nil && found {
+			bytes := dvReader.BytesRead()
+			if bytes > 0 {
+				aggregateBytesRead(ctx, bytes)
+			}
 			return found
 		}
 

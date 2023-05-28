@@ -61,6 +61,8 @@ func (q *GeoBoundingPolygonQuery) Searcher(ctx context.Context, i index.IndexRea
 		field = m.DefaultSearchField()
 	}
 
+	ctx = context.WithValue(ctx, search.QueryTypeKey, "geo")
+
 	return searcher.NewGeoBoundedPolygonSearcher(ctx, i, q.Points, field, q.BoostVal.Value(), options)
 }
 
