@@ -431,13 +431,14 @@ func memNeededForSearch(req *SearchRequest,
 	return uint64(estimate)
 }
 
-func aggregateBytesRead(ctx context.Context, bytes uint64) {
+func aggregateBytesRead(msg string, ctx context.Context, bytes uint64) {
 	if ctx != nil {
 		aggCallbackFn := ctx.Value(search.SearchCostAggregatorKey)
 		if aggCallbackFn != nil {
-			aggCallbackFn.(search.SearchCostAggregatorCallbackFn)("add", "", bytes)
+			aggCallbackFn.(search.SearchCostAggregatorCallbackFn)(msg, "", bytes)
 		}
 	}
+
 }
 
 // SearchInContext executes a search request operation within the provided
@@ -509,6 +510,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
 			sr.UpdateIOStats(totalBytesRead)
 		}
+
+		aggregateBytesRead("done", ctx, 0)
 
 		// commit the aggregation.
 	}()
@@ -595,7 +598,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 		totalBytesRead += storedFieldsBytes
 
-		aggregateBytesRead(ctx, storedFieldsBytes)
+		aggregateBytesRead("add", ctx, storedFieldsBytes)
 	}
 
 	atomic.AddUint64(&i.stats.searches, 1)
