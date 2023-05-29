@@ -17,6 +17,7 @@ package document
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/geo"
@@ -75,6 +76,9 @@ func (n *GeoShapeField) AnalyzedLength() int {
 
 func (n *GeoShapeField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return n.frequencies
+}
+
+func (t *GeoShapeField) AnalyzeSynonyms([]*index.SynonymDefinition, *sync.Map) {
 }
 
 func (n *GeoShapeField) Analyze() {

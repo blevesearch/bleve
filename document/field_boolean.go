@@ -17,6 +17,7 @@ package document
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/size"
@@ -59,6 +60,9 @@ func (b *BooleanField) ArrayPositions() []uint64 {
 
 func (b *BooleanField) Options() index.FieldIndexingOptions {
 	return b.options
+}
+
+func (t *BooleanField) AnalyzeSynonyms([]*index.SynonymDefinition, *sync.Map) {
 }
 
 func (b *BooleanField) Analyze() {

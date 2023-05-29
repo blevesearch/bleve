@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -61,6 +62,9 @@ func (n *DateTimeField) Name() string {
 
 func (n *DateTimeField) ArrayPositions() []uint64 {
 	return n.arrayPositions
+}
+
+func (t *DateTimeField) AnalyzeSynonyms([]*index.SynonymDefinition, *sync.Map) {
 }
 
 func (n *DateTimeField) Options() index.FieldIndexingOptions {

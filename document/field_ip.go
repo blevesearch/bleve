@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/size"
@@ -103,6 +104,9 @@ func (b *IPField) GoString() string {
 
 func (b *IPField) NumPlainTextBytes() uint64 {
 	return b.numPlainTextBytes
+}
+
+func (t *IPField) AnalyzeSynonyms([]*index.SynonymDefinition, *sync.Map) {
 }
 
 func NewIPFieldFromBytes(name string, arrayPositions []uint64, value []byte) *IPField {

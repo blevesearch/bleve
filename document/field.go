@@ -15,6 +15,8 @@
 package document
 
 import (
+	"sync"
+
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -30,6 +32,7 @@ type Field interface {
 	ArrayPositions() []uint64
 	Options() index.FieldIndexingOptions
 	Analyze()
+	AnalyzeSynonyms([]*index.SynonymDefinition, *sync.Map)
 	Value() []byte
 
 	// NumPlainTextBytes should return the number of plain text bytes

@@ -69,8 +69,8 @@ type FieldMapping struct {
 	// the processing of freq/norm details when the default score based relevancy
 	// isn't needed.
 	SkipFreqNorm bool `json:"skip_freq_norm,omitempty"`
-	// EnableSynonym, if true, enables synonym processing for this field.
-	EnableSynonym bool `json:"enable_synonym,omitempty"`
+
+	SynonymAnalyzer string `json:"synonym_analyzer,omitempty"`
 }
 
 // NewTextFieldMapping returns a default field mapping for text
@@ -222,7 +222,8 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 	options := fm.Options()
 	if fm.Type == "text" {
 		analyzer := fm.analyzerForField(path, context)
-		field := document.NewTextFieldCustom(fieldName, indexes, []byte(propertyValueString), options, analyzer)
+		synonymAnalyzer, synonymAnalyzerName := fm.synonymAnalyzerForField(path, context)
+		field := document.NewTextFieldWithSynonym(fieldName, indexes, []byte(propertyValueString), options, analyzer, synonymAnalyzer, synonymAnalyzerName)
 		context.doc.AddField(field)
 
 		if !fm.IncludeInAll {
@@ -376,6 +377,17 @@ func (fm *FieldMapping) analyzerForField(path []string, context *walkContext) an
 	return context.im.AnalyzerNamed(analyzerName)
 }
 
+func (fm *FieldMapping) synonymAnalyzerForField(path []string, context *walkContext) (analysis.Analyzer, string) {
+	analyzerName := fm.SynonymAnalyzer
+	if analyzerName == "" {
+		analyzerName = context.dm.defaultSynonymAnalyzerName(path)
+		if analyzerName == "" {
+			analyzerName = context.im.DefaultSynonymAnalyzer
+		}
+	}
+	return context.im.AnalyzerNamed(analyzerName), analyzerName
+}
+
 func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) string {
 	fieldName := pathString
 	if fieldMapping.Name != "" {
@@ -450,8 +462,8 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
-		case "enable_synonym":
-			err := json.Unmarshal(v, &fm.EnableSynonym)
+		case "synonym_analyzer":
+			err := json.Unmarshal(v, &fm.SynonymAnalyzer)
 			if err != nil {
 				return err
 			}

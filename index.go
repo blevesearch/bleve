@@ -16,9 +16,7 @@ package bleve
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 
 	"github.com/blevesearch/bleve/v2/document"
@@ -62,17 +60,12 @@ func (b *Batch) Index(id string, data interface{}) error {
 	return nil
 }
 
-func (b *Batch) IndexSynonym(id string, syn synonym.SynonymDefinition) error {
+func (b *Batch) IndexSynonym(id string, syn index.SynonymDefinition) error {
 	if id == "" {
 		return ErrorEmptyID
 	}
-	analyzer := b.index.Mapping().AnalyzerForSynonym()
-	if analyzer == nil {
-		return fmt.Errorf("no analyzer found for synonyms")
-	}
 	doc := document.NewSynDocument(id, &syn)
-	doc.AnalyzerForSynonym = analyzer
-	b.internal.Update(doc)
+	b.internal.UpdateSynonym(doc)
 
 	b.lastDocSize = uint64(doc.Size() +
 		len(id) + size.SizeOfString) // overhead from internal

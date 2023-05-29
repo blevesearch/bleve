@@ -15,6 +15,7 @@
 package scorch
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -23,7 +24,6 @@ import (
 	"time"
 
 	"github.com/RoaringBitmap/roaring"
-	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/registry"
@@ -379,16 +379,10 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	var numDeletes uint64
 	var numPlainTextBytes uint64
 	var ids []string
-	var synonymDocuments []*synonym.SynonymDefinition
 	for docID, doc := range batch.IndexOps {
 		if doc != nil {
 			// insert _id field
 			doc.AddIDField()
-			synStruct := doc.SynonymInfo().(*synonym.SynonymDefinition)
-			if synStruct != nil {
-				numSynonyms++
-				synonymDocuments = append(synonymDocuments, synStruct)
-			}
 			numUpdates++
 			numPlainTextBytes += doc.NumPlainTextBytes()
 		} else {
@@ -397,70 +391,105 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		ids = append(ids, docID)
 	}
 
+	var synonymDocuments = make([]*index.SynonymDefinition, len(batch.SynOps))
+	synDocIndex := 0
+	for docID, doc := range batch.SynOps {
+		if doc != nil {
+			// insert _id field
+			doc.AddIDField()
+			numSynonyms++
+			synonymDocuments[synDocIndex] = doc.SynonymInfo()
+			synDocIndex++
+			numPlainTextBytes += doc.NumPlainTextBytes()
+		} else {
+			numDeletes++
+		}
+		ids = append(ids, docID)
+	}
+	synonymDocuments = synonymDocuments[:synDocIndex]
+	var synNameToAnalyzedDocs sync.Map
+
 	// FIXME could sort ids list concurrent with analysis?
 	if numUpdates > 0 {
-		go func() {
-			for k := range batch.IndexOps {
-				doc := batch.IndexOps[k]
-				if doc != nil {
-					// put the work on the queue
-					s.analysisQueue.Queue(func() {
-						analyze(doc, s.setSpatialAnalyzerPlugin)
-						resultChan <- doc
-					})
+		if numSynonyms > 0 {
+			go func() {
+				for k := range batch.IndexOps {
+					doc := batch.IndexOps[k]
+					if doc != nil {
+						// put the work on the queue
+						s.analysisQueue.Queue(func() {
+							analyzeWithSynonym(doc, s.setSpatialAnalyzerPlugin, synonymDocuments, &synNameToAnalyzedDocs)
+							resultChan <- doc
+						})
+					}
 				}
-			}
-		}()
+			}()
+		} else {
+			go func() {
+				for k := range batch.IndexOps {
+					doc := batch.IndexOps[k]
+					if doc != nil {
+						// put the work on the queue
+						s.analysisQueue.Queue(func() {
+							analyze(doc, s.setSpatialAnalyzerPlugin)
+							resultChan <- doc
+						})
+					}
+				}
+			}()
+		}
 	}
-	resultSize := numUpdates - numSynonyms
-	var analysisResults []index.Document
+	analysisResults := make([]index.Document, numUpdates)
 	// wait for analysis result
-	analysisResults = make([]index.Document, resultSize)
 	var itemsDeQueued uint64
-	var resultIndex uint64
 	var totalAnalysisSize int
 	for itemsDeQueued < numUpdates {
 		result := <-resultChan
 		resultSize := result.Size()
 		atomic.AddUint64(&s.iStats.analysisBytesAdded, uint64(resultSize))
 		totalAnalysisSize += resultSize
+		analysisResults[itemsDeQueued] = result
 		itemsDeQueued++
-		if result.SynonymInfo().(*synonym.SynonymDefinition) != nil {
-			continue
-		}
-		analysisResults[resultIndex] = result
-		resultIndex++
 	}
 	close(resultChan)
 	defer atomic.AddUint64(&s.iStats.analysisBytesRemoved, uint64(totalAnalysisSize))
 	if numSynonyms > 0 {
+		var err error
+		var hashToSynonymsData, hashToPhraseData []byte
+		var fst *bytes.Buffer
+		synNameToAnalyzedDocs.Range(func(key, value interface{}) bool {
+			hashToSynonyms, hashToPhrase := synonym.ProcessSynonyms(value.([]*index.SynonymDefinition))
 
-		hashToSynonyms, hashToPhrase := synonym.ProcessSynonyms(synonymDocuments)
-		hashToSynonymsData, err := json.Marshal(hashToSynonyms)
+			hashToSynonymsData, err = json.Marshal(hashToSynonyms)
+			if err != nil {
+				return false
+			}
+
+			hashToPhraseData, err = json.Marshal(hashToPhrase)
+			if err != nil {
+				return false
+			}
+
+			fst, err = synonym.BuildSynonymFST(hashToPhrase, hashToSynonyms)
+			if err != nil {
+				return false
+			}
+			synDoc := document.NewDocument("_synonymDocument_" + key.(string))
+			synDoc.AddIDField()
+			fstField := document.NewTextFieldCustom("fst", nil, fst.Bytes(), index.IndexField|index.StoreField, nil)
+			hashToSynonymsField := document.NewTextFieldCustom("hashToSynonyms", nil, hashToSynonymsData, index.IndexField|index.StoreField, nil)
+			hashToPhraseField := document.NewTextFieldCustom("hashToPhrase", nil, hashToPhraseData, index.IndexField|index.StoreField, nil)
+			synDoc.AddField(fstField)
+			synDoc.AddField(hashToSynonymsField)
+			synDoc.AddField(hashToPhraseField)
+			analyze(synDoc, s.setSpatialAnalyzerPlugin)
+			ids = append(ids, synDoc.ID())
+			analysisResults = append(analysisResults, synDoc)
+			return true
+		})
 		if err != nil {
 			return err
 		}
-
-		hashToPhraseData, err := json.Marshal(hashToPhrase)
-		if err != nil {
-			return err
-		}
-
-		fst, err := synonym.BuildSynonymFST(hashToPhrase, hashToSynonyms)
-		if err != nil {
-			return err
-		}
-		synDoc := document.NewDocument("_synonymDocument")
-		synDoc.AddIDField()
-		fstField := document.NewTextFieldCustom("fst", nil, fst.Bytes(), index.IndexField|index.StoreField, nil)
-		hashToSynonymsField := document.NewTextFieldCustom("hashToSynonyms", nil, hashToSynonymsData, index.IndexField|index.StoreField, nil)
-		hashToPhraseField := document.NewTextFieldCustom("hashToPhrase", nil, hashToPhraseData, index.IndexField|index.StoreField, nil)
-		synDoc.AddField(fstField)
-		synDoc.AddField(hashToSynonymsField)
-		synDoc.AddField(hashToPhraseField)
-		analyze(synDoc, s.setSpatialAnalyzerPlugin)
-		ids = append(ids, synDoc.ID())
-		analysisResults = append(analysisResults, synDoc)
 	}
 
 	atomic.AddUint64(&s.stats.TotAnalysisTime, uint64(time.Since(start)))
@@ -698,62 +727,43 @@ func (s *Scorch) setSpatialAnalyzerPlugin(f index.Field) {
 	}
 }
 
-// applies an analyzer to each string in a slice and returns the result slice.
-// if the analyzer is nil, the original slice is returned.
-func analyzeSlice(analyzer analysis.Analyzer, slice []json.RawMessage) []json.RawMessage {
-	if analyzer == nil {
-		return slice
-	}
-	loc := 0
-	for _, val := range slice {
-		analyzedPhrase := synonym.TokenStreamToPhrase(analyzer.Analyze(val))
-		var combinedPhrase []byte
-		for _, tok := range analyzedPhrase {
-			combinedPhrase = append(combinedPhrase, tok...)
-			combinedPhrase = append(combinedPhrase, synonym.SeparatingCharacter)
-		}
-		sz := len(combinedPhrase)
-		if sz > 0 && combinedPhrase[sz-1] == synonym.SeparatingCharacter {
-			combinedPhrase = combinedPhrase[:sz-1]
-			slice[loc] = combinedPhrase
-			loc++
-		}
-	}
-	slice = slice[:loc]
-	return slice
-}
-
-// applies the analyzer specified by the mapping to the input and synonyms
-// of the synonym struct.  if the analyzer is nil, the original struct is returned.
-func applySynonymAnalyzer(syn *synonym.SynonymDefinition, analyzer analysis.Analyzer) {
-	synonym.StripJsonQuotes(syn)
-	syn.Input = analyzeSlice(analyzer, syn.Input)
-	syn.Synonyms = analyzeSlice(analyzer, syn.Synonyms)
-}
-
 func analyze(d index.Document, fn customAnalyzerPluginInitFunc) {
-	synStruct := d.SynonymInfo().(*synonym.SynonymDefinition)
-	synAnalyzer := d.SynonymAnalyzer().(*analysis.Analyzer)
-	if synAnalyzer != nil && synStruct != nil {
-		applySynonymAnalyzer(synStruct, *synAnalyzer)
-	} else {
-		d.VisitFields(func(field index.Field) {
-			if field.Options().IsIndexed() {
-				if fn != nil {
-					fn(field)
-				}
-
-				field.Analyze()
-
-				if d.HasComposite() && field.Name() != "_id" {
-					// see if any of the composite fields need this
-					d.VisitComposite(func(cf index.CompositeField) {
-						cf.Compose(field.Name(), field.AnalyzedLength(), field.AnalyzedTokenFrequencies())
-					})
-				}
+	d.VisitFields(func(field index.Field) {
+		if field.Options().IsIndexed() {
+			if fn != nil {
+				fn(field)
 			}
-		})
-	}
+
+			field.Analyze()
+
+			if d.HasComposite() && field.Name() != "_id" {
+				// see if any of the composite fields need this
+				d.VisitComposite(func(cf index.CompositeField) {
+					cf.Compose(field.Name(), field.AnalyzedLength(), field.AnalyzedTokenFrequencies())
+				})
+			}
+		}
+	})
+}
+
+func analyzeWithSynonym(d index.Document, fn customAnalyzerPluginInitFunc, synonymDocuments []*index.SynonymDefinition, synNameToAnalyzedDocs *sync.Map) {
+	d.VisitFields(func(field index.Field) {
+		if field.Options().IsIndexed() {
+			if fn != nil {
+				fn(field)
+			}
+
+			field.Analyze()
+			field.AnalyzeSynonyms(synonymDocuments, synNameToAnalyzedDocs)
+
+			if d.HasComposite() && field.Name() != "_id" {
+				// see if any of the composite fields need this
+				d.VisitComposite(func(cf index.CompositeField) {
+					cf.Compose(field.Name(), field.AnalyzedLength(), field.AnalyzedTokenFrequencies())
+				})
+			}
+		}
+	})
 }
 
 func (s *Scorch) AddEligibleForRemoval(epoch uint64) {

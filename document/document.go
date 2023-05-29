@@ -19,7 +19,6 @@ import (
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/analysis"
-	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -39,7 +38,7 @@ type Document struct {
 	CompositeFields    []*CompositeField
 	StoredFieldsSize   uint64
 	DocType            bool
-	SynonymDefinition  *synonym.SynonymDefinition
+	SynonymDefinition  *index.SynonymDefinition
 	AnalyzerForSynonym *analysis.Analyzer
 }
 
@@ -56,7 +55,7 @@ func NewDocument(id string) *Document {
 	}
 }
 
-func NewSynDocument(id string, syn *synonym.SynonymDefinition) *Document {
+func NewSynDocument(id string, syn *index.SynonymDefinition) *Document {
 	return &Document{
 		id:                id,
 		Fields:            make([]Field, 0),
@@ -156,10 +155,6 @@ func (d *Document) HasComposite() bool {
 	return len(d.CompositeFields) > 0
 }
 
-func (d *Document) SynonymInfo() interface{} {
+func (d *Document) SynonymInfo() *index.SynonymDefinition {
 	return d.SynonymDefinition
-}
-
-func (d *Document) SynonymAnalyzer() interface{} {
-	return d.AnalyzerForSynonym
 }

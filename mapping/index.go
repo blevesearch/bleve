@@ -21,7 +21,6 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 
 	"github.com/blevesearch/bleve/v2/analysis"
-	"github.com/blevesearch/bleve/v2/analysis/analyzer/simple"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
 	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
@@ -36,8 +35,7 @@ const defaultType = "_default"
 const defaultField = "_all"
 const defaultAnalyzer = standard.Name
 const defaultDateTimeParser = optional.Name
-const defaultEnableSynonym = false
-const defaultSynonymAnalyzer = simple.Name
+const defaultSynonymAnalyzer = ""
 
 // An IndexMappingImpl controls how objects are placed
 // into an index.
@@ -59,9 +57,8 @@ type IndexMappingImpl struct {
 	DocValuesDynamic      bool                        `json:"docvalues_dynamic"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
 	// SynonymAnalyzer is the name of the analyzer to use on the synonym documents.
-	SynonymAnalyzer      string `json:"synonym_analyzer"`
-	DefaultEnableSynonym bool   `json:"default_enable_synonym"`
-	cache                *registry.Cache
+	DefaultSynonymAnalyzer string `json:"default_synonym_analyzer"`
+	cache                  *registry.Cache
 }
 
 // AddCustomCharFilter defines a custom char filter for use in this mapping
@@ -155,20 +152,19 @@ func (im *IndexMappingImpl) AddCustomDateTimeParser(name string, config map[stri
 // NewIndexMapping creates a new IndexMapping that will use all the default indexing rules
 func NewIndexMapping() *IndexMappingImpl {
 	return &IndexMappingImpl{
-		TypeMapping:           make(map[string]*DocumentMapping),
-		DefaultMapping:        NewDocumentMapping(),
-		TypeField:             defaultTypeField,
-		DefaultType:           defaultType,
-		DefaultAnalyzer:       defaultAnalyzer,
-		DefaultDateTimeParser: defaultDateTimeParser,
-		DefaultField:          defaultField,
-		IndexDynamic:          IndexDynamic,
-		StoreDynamic:          StoreDynamic,
-		DocValuesDynamic:      DocValuesDynamic,
-		CustomAnalysis:        newCustomAnalysis(),
-		cache:                 registry.NewCache(),
-		DefaultEnableSynonym:  defaultEnableSynonym,
-		SynonymAnalyzer:       defaultSynonymAnalyzer,
+		TypeMapping:            make(map[string]*DocumentMapping),
+		DefaultMapping:         NewDocumentMapping(),
+		TypeField:              defaultTypeField,
+		DefaultType:            defaultType,
+		DefaultAnalyzer:        defaultAnalyzer,
+		DefaultDateTimeParser:  defaultDateTimeParser,
+		DefaultField:           defaultField,
+		IndexDynamic:           IndexDynamic,
+		StoreDynamic:           StoreDynamic,
+		DocValuesDynamic:       DocValuesDynamic,
+		CustomAnalysis:         newCustomAnalysis(),
+		cache:                  registry.NewCache(),
+		DefaultSynonymAnalyzer: defaultSynonymAnalyzer,
 	}
 }
 
@@ -230,8 +226,7 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 	im.TypeMapping = make(map[string]*DocumentMapping)
 	im.StoreDynamic = StoreDynamic
 	im.IndexDynamic = IndexDynamic
-	im.DefaultEnableSynonym = defaultEnableSynonym
-	im.SynonymAnalyzer = defaultSynonymAnalyzer
+	im.DefaultSynonymAnalyzer = defaultSynonymAnalyzer
 	im.DocValuesDynamic = DocValuesDynamic
 
 	var invalidKeys []string
@@ -292,13 +287,8 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
-		case "default_enable_synonym":
-			err := json.Unmarshal(v, &im.DefaultEnableSynonym)
-			if err != nil {
-				return err
-			}
-		case "analyzer_for_synonym":
-			err := json.Unmarshal(v, &im.SynonymAnalyzer)
+		case "default_synonym_analyzer":
+			err := json.Unmarshal(v, &im.DefaultSynonymAnalyzer)
 			if err != nil {
 				return err
 			}
@@ -426,51 +416,48 @@ func (im *IndexMappingImpl) AnalyzerNamed(name string) analysis.Analyzer {
 	return analyzer
 }
 
-// AnalyzerForSynonym returns the analyzer to use on the synonym documents
-// when indexing.
-func (im *IndexMappingImpl) AnalyzerForSynonym() *analysis.Analyzer {
-	analyzer, err := im.cache.AnalyzerNamed(im.SynonymAnalyzer)
-	if err != nil {
-		logger.Printf("error using analyzer named: %s", im.SynonymAnalyzer)
-		return nil
-	}
-	return &analyzer
-}
-
-// SynonymEnabledForPath returns true if the path has synonym filter enabled.
-func (im *IndexMappingImpl) SynonymEnabledForPath(path string) bool {
+func (im *IndexMappingImpl) SynonymAnalyzerNameForPath(path string) string {
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
-		if docMapping.synonymEnabledForPath(path) {
-			return true
+		analyzerName := docMapping.synonymAnalyzerNameForPath(path)
+		if analyzerName != "" {
+			return analyzerName
 		}
 	}
 
 	// now try the default mapping
 	pathMapping := im.DefaultMapping.documentMappingForPath(path)
-	if pathMapping != nil {
-		if len(pathMapping.Fields) > 0 {
-			if pathMapping.Fields[0].EnableSynonym {
-				return true
-			}
-		}
+	if pathMapping != nil &&
+		len(pathMapping.Fields) > 0 &&
+		pathMapping.Fields[0].Analyzer != "" {
+		return pathMapping.Fields[0].SynonymAnalyzer
 	}
 
 	// next we will try default analyzers for the path
 	pathDecoded := decodePath(path)
 	for _, docMapping := range im.TypeMapping {
-		if docMapping.defaultSynonymEnabled(pathDecoded) {
-			return true
+		if docMapping.Enabled {
+			rv := docMapping.defaultSynonymAnalyzerName(pathDecoded)
+			if rv != "" {
+				return rv
+			}
+		}
+	}
+	// now the default analyzer for the default mapping
+	if im.DefaultMapping.Enabled {
+		rv := im.DefaultMapping.defaultSynonymAnalyzerName(pathDecoded)
+		if rv != "" {
+			return rv
 		}
 	}
 
-	return im.DefaultEnableSynonym
+	return im.DefaultSynonymAnalyzer
 }
 
 // AddSynonymFilter adds the synonym filter to the analyzer and returns the new analyzer.
-func (im *IndexMappingImpl) AddSynonymFilter(analyzer analysis.Analyzer, fuzziness int, prefix int, i index.IndexReader) (analysis.Analyzer, error) {
+func (im *IndexMappingImpl) AddSynonymFilter(analyzer analysis.Analyzer, synAnalyzerName string, fuzziness int, prefix int, i index.IndexReader) (analysis.Analyzer, error) {
 	config := make(map[string]interface{})
-	synDoc, err := i.Document("_synonymDocument")
+	synDoc, err := i.Document("_synonymDocument_" + synAnalyzerName)
 	if err != nil {
 		return nil, fmt.Errorf("error using the synonym filter - %v", err)
 	}

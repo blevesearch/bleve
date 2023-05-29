@@ -135,18 +135,17 @@ func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mappin
 	if analyzer == nil {
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
 	}
-	var useSynonymSearcher bool
+	synAnalyzerName := m.SynonymAnalyzerNameForPath(field)
 	var err error
-	if m.SynonymEnabledForPath(field) {
-		analyzer, err = m.AddSynonymFilter(analyzer, q.Fuzziness, q.Prefix, i)
-		useSynonymSearcher = true
+	if synAnalyzerName != "" {
+		analyzer, err = m.AddSynonymFilter(analyzer, synAnalyzerName, q.Fuzziness, q.Prefix, i)
 	}
 	if err != nil {
 		return nil, err
 	}
 	tokens := analyzer.Analyze([]byte(q.Match))
 	if len(tokens) > 0 {
-		if useSynonymSearcher {
+		if synAnalyzerName != "" {
 			if q.Operator != MatchQueryOperatorOr && q.Operator != MatchQueryOperatorAnd {
 				return nil, fmt.Errorf("unhandled operator %d", q.Operator)
 			}

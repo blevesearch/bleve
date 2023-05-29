@@ -16,6 +16,7 @@ package document
 
 import (
 	"reflect"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
@@ -96,6 +97,8 @@ func (c *CompositeField) Analyze() {
 
 func (c *CompositeField) Value() []byte {
 	return []byte{}
+}
+func (t *CompositeField) AnalyzeSynonyms([]*index.SynonymDefinition, *sync.Map) {
 }
 
 func (c *CompositeField) NumPlainTextBytes() uint64 {

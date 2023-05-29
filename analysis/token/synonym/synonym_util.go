@@ -18,62 +18,20 @@ import (
 	"bytes"
 	"encoding/json"
 	"hash/fnv"
-	"reflect"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/analysis"
-	"github.com/blevesearch/bleve/v2/size"
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/vellum"
 )
 
 var equivalentSynonymType = []byte("equivalent")
 var explicitSynonymType = []byte("explicit")
 
-// A synonym document is a json object with the following fields:
-//  1. mapping type: either "equivalent" or "explicit"
-//     a. equivalent: all the phrases in the synonym list are equivalent to each other
-//     b. explicit: each phrase in the input list is equivalent to the phrases in the synonym list,
-//     but not to each other
-//  2. input: a list of phrases
-//  3. synonyms: a list of phrases
-//
-// A phrase is a sequence of words separated by spaces, and a word is a sequence of characters.
-// A phrase can be a single word.
-type SynonymDefinition struct {
-	MappingType json.RawMessage   `json:"mappingType"`
-	Input       []json.RawMessage `json:"input"`
-	Synonyms    []json.RawMessage `json:"synonyms"`
-}
-
-func (s *SynonymDefinition) Size() int {
-	var sd SynonymDefinition
-	sizeInBytes := len(s.MappingType) + int(reflect.TypeOf(sd).Size()) + size.SizeOfPtr
-	for _, entry := range s.Input {
-		sizeInBytes += len(entry)
-	}
-	for _, entry := range s.Synonyms {
-		sizeInBytes += len(entry)
-	}
-	return sizeInBytes
-}
-
 // stripQuotes takes as input a byte slice and returns the byte slice without the first and last characters.
 // This function is used in the stripJsonQuotes function. The first and last characters are assumed to be quotes.
 func stripQuotes(word []byte) []byte {
 	return word[1 : len(word)-1]
-}
-
-// StripJsonQuotes takes as input a pointer to a synonym struct and removes the quotes from the json.RawMessage fields.
-// This is done to avoid having to unmarshal the json.RawMessage fields to strings and then marshal them back to json.RawMessage.
-// This function is used in the synonym file parser.
-func StripJsonQuotes(synonym *SynonymDefinition) {
-	synonym.MappingType = stripQuotes(synonym.MappingType)
-	for index, i := range synonym.Input {
-		synonym.Input[index] = stripQuotes(i)
-	}
-	for index, i := range synonym.Synonyms {
-		synonym.Synonyms[index] = stripQuotes(i)
-	}
 }
 
 // returns the hash of the input phrase
@@ -123,7 +81,7 @@ func updateSynonyms(hashSet map[uint64]map[uint64]interface{}, hashval uint64, h
 //  1. For each phrase in synonym.Input,
 //     a.	Map its hash to it in hashToPhrase map.
 //     b.	Map its hash to the generated slice by calling the updateSynonyms function.
-func ProcessSynonyms(synonyms []*SynonymDefinition) (map[uint64][]uint64, map[uint64][]byte) {
+func ProcessSynonyms(synonyms []*index.SynonymDefinition) (map[uint64][]uint64, map[uint64][]byte) {
 	var hashToSynonyms = make(map[uint64][]uint64)
 	var hashSet = make(map[uint64]map[uint64]interface{})
 	var hashToPhrase = make(map[uint64][]byte)
@@ -240,4 +198,41 @@ func TokenStreamToPhrase(tokens analysis.TokenStream) [][]byte {
 		}
 	}
 	return rv
+}
+
+// applies an analyzer to each string in a slice and returns the result slice.
+// if the analyzer is nil, the original slice is returned.
+func analyzeSlice(analyzer analysis.Analyzer, slice []json.RawMessage) []json.RawMessage {
+	if analyzer == nil {
+		return slice
+	}
+	loc := 0
+	rv := make([]json.RawMessage, len(slice))
+	for _, val := range slice {
+		val = stripQuotes(val)
+		analyzedPhrase := TokenStreamToPhrase(analyzer.Analyze(val))
+		var combinedPhrase []byte
+		for _, tok := range analyzedPhrase {
+			combinedPhrase = append(combinedPhrase, tok...)
+			combinedPhrase = append(combinedPhrase, SeparatingCharacter)
+		}
+		sz := len(combinedPhrase)
+		if sz > 0 && combinedPhrase[sz-1] == SeparatingCharacter {
+			combinedPhrase = combinedPhrase[:sz-1]
+			rv[loc] = combinedPhrase
+			loc++
+		}
+	}
+	rv = rv[:loc]
+	return rv
+}
+
+// applies the analyzer specified by the mapping to the input and synonyms
+// of the synonym struct.  if the analyzer is nil, the original struct is returned.
+func Analyze(syn *index.SynonymDefinition, analyzer analysis.Analyzer) *index.SynonymDefinition {
+	return &index.SynonymDefinition{
+		MappingType: stripQuotes(syn.MappingType),
+		Input:       analyzeSlice(analyzer, syn.Input),
+		Synonyms:    analyzeSlice(analyzer, syn.Synonyms),
+	}
 }

@@ -17,6 +17,7 @@ package document
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/geo"
@@ -66,6 +67,9 @@ func (n *GeoPointField) Options() index.FieldIndexingOptions {
 
 func (n *GeoPointField) EncodedFieldType() byte {
 	return 'g'
+}
+
+func (t *GeoPointField) AnalyzeSynonyms([]*index.SynonymDefinition, *sync.Map) {
 }
 
 func (n *GeoPointField) AnalyzedLength() int {

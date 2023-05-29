@@ -46,11 +46,8 @@ type DocumentMapping struct {
 	DefaultAnalyzer string                      `json:"default_analyzer,omitempty"`
 
 	// StructTagKey overrides "json" when looking for field names in struct tags
-	StructTagKey string `json:"struct_tag_key,omitempty"`
-	// DefaultSynonymEnabled is used to set the default value for the synonym_enabled field
-	// in all the field mappings in the document mapping.  This is used when a field mapping does not explicitly set the
-	// synonym_enabled field.
-	DefaultSynonymEnabled bool `json:"default_synonym_enabled"`
+	StructTagKey           string `json:"struct_tag_key,omitempty"`
+	DefaultSynonymAnalyzer string `json:"default_synonym_analyzer,omitempty"`
 }
 
 func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
@@ -303,8 +300,8 @@ func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
-		case "default_synonym_enabled":
-			err := json.Unmarshal(v, &dm.DefaultSynonymEnabled)
+		case "default_synonym_analyzer":
+			err := json.Unmarshal(v, &dm.DefaultSynonymAnalyzer)
 			if err != nil {
 				return err
 			}
@@ -336,28 +333,28 @@ func (dm *DocumentMapping) defaultAnalyzerName(path []string) string {
 	return rv
 }
 
-func (dm *DocumentMapping) defaultSynonymEnabled(path []string) bool {
+func (dm *DocumentMapping) defaultSynonymAnalyzerName(path []string) string {
 	current := dm
-	rv := current.DefaultSynonymEnabled
+	rv := current.DefaultSynonymAnalyzer
 	for _, pathElement := range path {
 		var ok bool
 		current, ok = current.Properties[pathElement]
 		if !ok {
 			break
 		}
-		if current.DefaultSynonymEnabled {
-			rv = current.DefaultSynonymEnabled
+		if current.DefaultSynonymAnalyzer != "" {
+			rv = current.DefaultSynonymAnalyzer
 		}
 	}
 	return rv
 }
 
-func (dm *DocumentMapping) synonymEnabledForPath(path string) bool {
+func (dm *DocumentMapping) synonymAnalyzerNameForPath(path string) string {
 	field := dm.fieldDescribedByPath(path)
 	if field != nil {
-		return field.EnableSynonym
+		return field.SynonymAnalyzer
 	}
-	return false
+	return ""
 }
 
 func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes []uint64, context *walkContext) {

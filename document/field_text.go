@@ -17,8 +17,10 @@ package document
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -33,14 +35,17 @@ func init() {
 const DefaultTextIndexingOptions = index.IndexField | index.DocValues
 
 type TextField struct {
-	name              string
-	arrayPositions    []uint64
-	options           index.FieldIndexingOptions
-	analyzer          analysis.Analyzer
-	value             []byte
-	numPlainTextBytes uint64
-	length            int
-	frequencies       index.TokenFrequencies
+	name                string
+	arrayPositions      []uint64
+	options             index.FieldIndexingOptions
+	analyzer            analysis.Analyzer
+	synonymAnalyzerName string
+	synonymAnalyzer     analysis.Analyzer
+	analyzedSynonyms    []*index.SynonymDefinition
+	value               []byte
+	numPlainTextBytes   uint64
+	length              int
+	frequencies         index.TokenFrequencies
 }
 
 func (t *TextField) Size() int {
@@ -73,7 +78,6 @@ func (t *TextField) AnalyzedLength() int {
 func (t *TextField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return t.frequencies
 }
-
 func (t *TextField) Analyze() {
 	var tokens analysis.TokenStream
 	if t.analyzer != nil {
@@ -98,6 +102,19 @@ func (t *TextField) Analyze() {
 	}
 	t.length = len(tokens) // number of tokens in this doc field
 	t.frequencies = analysis.TokenFrequency(tokens, t.arrayPositions, t.options)
+}
+
+func (t *TextField) AnalyzeSynonyms(synonyms []*index.SynonymDefinition, synNameToAnalyzedDocs *sync.Map) {
+	if t.synonymAnalyzer != nil {
+		if _, found := synNameToAnalyzedDocs.Load(t.synonymAnalyzerName); found {
+			return
+		}
+		analyzedSynDocs := make([]*index.SynonymDefinition, len(synonyms))
+		for i, syn := range synonyms {
+			analyzedSynDocs[i] = synonym.Analyze(syn, t.synonymAnalyzer)
+		}
+		synNameToAnalyzedDocs.Store(t.synonymAnalyzerName, analyzedSynDocs)
+	}
 }
 
 func (t *TextField) Analyzer() analysis.Analyzer {
@@ -153,5 +170,17 @@ func NewTextFieldCustom(name string, arrayPositions []uint64, value []byte, opti
 		analyzer:          analyzer,
 		value:             value,
 		numPlainTextBytes: uint64(len(value)),
+	}
+}
+func NewTextFieldWithSynonym(name string, arrayPositions []uint64, value []byte, options index.FieldIndexingOptions, analyzer analysis.Analyzer, synonymAnalyzer analysis.Analyzer, synonymAnalyzerName string) *TextField {
+	return &TextField{
+		name:                name,
+		arrayPositions:      arrayPositions,
+		options:             options,
+		analyzer:            analyzer,
+		value:               value,
+		numPlainTextBytes:   uint64(len(value)),
+		synonymAnalyzer:     synonymAnalyzer,
+		synonymAnalyzerName: synonymAnalyzerName,
 	}
 }

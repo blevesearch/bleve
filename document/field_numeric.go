@@ -17,6 +17,7 @@ package document
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/numeric"
@@ -73,6 +74,9 @@ func (n *NumericField) AnalyzedLength() int {
 
 func (n *NumericField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return n.frequencies
+}
+
+func (t *NumericField) AnalyzeSynonyms([]*index.SynonymDefinition, *sync.Map) {
 }
 
 func (n *NumericField) Analyze() {
