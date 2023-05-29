@@ -41,7 +41,6 @@ type TextField struct {
 	analyzer            analysis.Analyzer
 	synonymAnalyzerName string
 	synonymAnalyzer     analysis.Analyzer
-	analyzedSynonyms    []*index.SynonymDefinition
 	value               []byte
 	numPlainTextBytes   uint64
 	length              int

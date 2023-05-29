@@ -30,7 +30,7 @@ func closeSearchers(err *error, searchers ...[]search.Searcher) {
 // It differs from strings.Split() in that it inserts a null character
 // when two consecutive spaces are encountered.
 // For example, "a  b c" is split into ["a", "", "b", "c"].
-func splitOnSpace(phrase []byte) []string {
+func tokenizeSynonym(phrase []byte) []string {
 	var rv []string
 	var tmp string
 	for _, character := range phrase {
@@ -102,7 +102,9 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 	arrangedTokens [][]*analysis.Token, field string, boost float64, fuzziness int,
 	prefix int, operator int, options search.SearcherOptions) (search.Searcher, error) {
 
-	options.IncludeTermVectors = true
+	if operator == 2 {
+		options.IncludeTermVectors = true
+	}
 	var searcher search.Searcher
 	var outerSearcher = make([]search.Searcher, len(arrangedTokens))
 	var synonymPhrases []search.Searcher
@@ -127,7 +129,7 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 		} else {
 			synonymPhrases = make([]search.Searcher, len(arrangedTokens[tokenPosition]))
 			for synonymIndex, synonym := range arrangedTokens[tokenPosition] {
-				phrase := splitOnSpace(synonym.Term)
+				phrase := tokenizeSynonym(synonym.Term)
 				searcher, err = NewPhraseSearcher(ctx, indexReader, phrase, field, options)
 				if err != nil {
 					return nil, err

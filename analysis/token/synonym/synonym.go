@@ -51,7 +51,7 @@ type fstPath struct {
 func resetPath(path *fstPath) *fstPath {
 	path.output = 0
 	path.state = 0
-	path.word = nil
+	path.word = path.word[:0]
 	return path
 }
 
