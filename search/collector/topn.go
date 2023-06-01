@@ -155,13 +155,6 @@ func (hc *TopNCollector) Size() int {
 	return sizeInBytes
 }
 
-func aggregateBytesRead(ctx context.Context, bytes uint64) {
-	aggCallbackFn := ctx.Value(search.SearchCostAggregatorKey)
-	if aggCallbackFn != nil {
-		aggCallbackFn.(search.SearchCostAggregatorCallbackFn)("add", "", bytes)
-	}
-}
-
 // Collect goes to the index to find the matching documents
 func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, reader index.IndexReader) error {
 	startTime := time.Now()
@@ -240,7 +233,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		// which must be accounted by invoking the callback.
 		statsCallbackFn.(search.SearchIOStatsCallbackFunc)(hc.bytesRead)
 
-		aggregateBytesRead(ctx, hc.bytesRead)
+		search.RecordSearchCost(ctx, "add", hc.bytesRead)
 	}
 
 	// help finalize/flush the results in case

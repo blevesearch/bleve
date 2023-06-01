@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-
 	"reflect"
 	"sync/atomic"
 
@@ -55,16 +54,6 @@ type IndexSnapshotTermFieldReader struct {
 
 func (i *IndexSnapshotTermFieldReader) incrementBytesRead(val uint64) {
 	i.bytesRead += val
-}
-
-func aggregateBytesRead(ctx context.Context, bytes uint64) {
-	queryType, ok := ctx.Value(search.QueryTypeKey).(string)
-	if ok {
-		aggCallbackFn := ctx.Value(search.SearchCostAggregatorKey)
-		if aggCallbackFn != nil {
-			aggCallbackFn.(search.SearchCostAggregatorCallbackFn)("add", queryType, bytes)
-		}
-	}
 }
 
 func (i *IndexSnapshotTermFieldReader) Size() int {
@@ -217,7 +206,7 @@ func (i *IndexSnapshotTermFieldReader) Close() error {
 		}
 
 		// todo: should this is be per hit?
-		aggregateBytesRead(i.ctx, i.bytesRead)
+		search.RecordSearchCost(i.ctx, "add", i.bytesRead)
 	}
 
 	if i.snapshot != nil {

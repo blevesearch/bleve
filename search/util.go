@@ -14,6 +14,8 @@
 
 package search
 
+import "context"
+
 func MergeLocations(locations []FieldTermLocationMap) FieldTermLocationMap {
 	rv := locations[0]
 
@@ -66,4 +68,26 @@ func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch)
 	}
 
 	return dest
+}
+
+const SearchIOStatsCallbackKey = "_search_io_stats_callback_key"
+
+type SearchIOStatsCallbackFunc func(uint64)
+type SearchCostAggregatorCallbackFn func(string, string, uint64)
+
+const SearchCostAggregatorKey = "_search_cost_aggregator_key"
+const QueryTypeKey = "_query_type_key"
+
+func RecordSearchCost(ctx context.Context, msg string, bytes uint64) {
+	queryType, ok := ctx.Value(QueryTypeKey).(string)
+	if !ok {
+		// for the cost of the non query type specific factors such as
+		// doc values and stored fields section.
+		queryType = ""
+	}
+
+	aggCallbackFn := ctx.Value(SearchCostAggregatorKey)
+	if aggCallbackFn != nil {
+		aggCallbackFn.(SearchCostAggregatorCallbackFn)(msg, queryType, bytes)
+	}
 }
