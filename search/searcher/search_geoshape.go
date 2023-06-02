@@ -115,11 +115,11 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 				}
 			})
 
-		// use ctx to aggregate the bytes read
 		if err == nil && found {
 			bytes := dvReader.BytesRead()
 			if bytes > 0 {
-				aggregateBytesRead(ctx, bytes)
+				reportIOStats(ctx, bytes)
+				search.RecordSearchCost(ctx, "add", bytes)
 			}
 			return found
 		}

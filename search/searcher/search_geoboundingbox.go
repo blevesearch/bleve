@@ -222,6 +222,11 @@ func buildRectFilter(ctx context.Context, dvReader index.DocValueReader, field s
 			}
 		})
 		if err == nil && found {
+			bytes := dvReader.BytesRead()
+			if bytes > 0 {
+				reportIOStats(ctx, bytes)
+				search.RecordSearchCost(ctx, "add", bytes)
+			}
 			for i := range lons {
 				if geo.BoundingBoxContains(lons[i], lats[i],
 					minLon, minLat, maxLon, maxLat) {

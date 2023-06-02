@@ -134,6 +134,11 @@ func buildDistFilter(ctx context.Context, dvReader index.DocValueReader, field s
 			}
 		})
 		if err == nil && found {
+			bytes := dvReader.BytesRead()
+			if bytes > 0 {
+				reportIOStats(ctx, bytes)
+				search.RecordSearchCost(ctx, "add", bytes)
+			}
 			for i := range lons {
 				dist := geo.Haversin(lons[i], lats[i], centerLon, centerLat)
 				if dist <= maxDist/1000 {

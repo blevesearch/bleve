@@ -39,7 +39,7 @@ type TermSearcher struct {
 }
 
 func NewTermSearcher(ctx context.Context, indexReader index.IndexReader, term string, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
-	if !getQueryType(ctx) {
+	if isTermQuery(ctx) {
 		ctx = context.WithValue(ctx, search.QueryTypeKey, "term")
 	}
 	return NewTermSearcherBytes(ctx, indexReader, []byte(term), field, boost, options)
@@ -144,22 +144,13 @@ func (s *TermSearcher) Optimize(kind string, octx index.OptimizableContext) (
 	return nil, nil
 }
 
-func getQueryType(ctx context.Context) bool {
+func isTermQuery(ctx context.Context) bool {
 	if ctx != nil {
+		// if the ctx already has a value set for query type
+		// it would've been done at a non term searcher level.
 		_, ok := ctx.Value(search.QueryTypeKey).(string)
-		return ok
+		return !ok
 	}
-	return true
-}
-
-func aggregateBytesRead(ctx context.Context, bytes uint64) {
-	if ctx != nil {
-		queryType, ok := ctx.Value(search.QueryTypeKey).(string)
-		if ok {
-			aggCallbackFn := ctx.Value(search.SearchCostAggregatorKey)
-			if aggCallbackFn != nil {
-				aggCallbackFn.(search.SearchCostAggregatorCallbackFn)("add", queryType, bytes)
-			}
-		}
-	}
+	// if the context is nil, then don't set the query type
+	return false
 }

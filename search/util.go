@@ -73,9 +73,14 @@ func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch)
 const SearchIOStatsCallbackKey = "_search_io_stats_callback_key"
 
 type SearchIOStatsCallbackFunc func(uint64)
-type SearchCostAggregatorCallbackFn func(string, string, uint64)
 
-const SearchCostAggregatorKey = "_search_cost_aggregator_key"
+// The callback signature is (message, queryType, cost) which allows
+// the caller to act on a particular query type and what its the associated
+// cost of an operation. "add" indicates to increment the cost for the query
+// "done" indicates a finish of the accounting of the costs.
+type SearchIncrementalCostCallbackFn func(string, string, uint64)
+
+const SearchIncrementalCostKey = "_search_incremental_cost_key"
 const QueryTypeKey = "_query_type_key"
 
 func RecordSearchCost(ctx context.Context, msg string, bytes uint64) {
@@ -86,8 +91,8 @@ func RecordSearchCost(ctx context.Context, msg string, bytes uint64) {
 		queryType = ""
 	}
 
-	aggCallbackFn := ctx.Value(SearchCostAggregatorKey)
+	aggCallbackFn := ctx.Value(SearchIncrementalCostKey)
 	if aggCallbackFn != nil {
-		aggCallbackFn.(SearchCostAggregatorCallbackFn)(msg, queryType, bytes)
+		aggCallbackFn.(SearchIncrementalCostCallbackFn)(msg, queryType, bytes)
 	}
 }

@@ -205,7 +205,6 @@ func (i *IndexSnapshotTermFieldReader) Close() error {
 			statsCallbackFn.(search.SearchIOStatsCallbackFunc)(i.bytesRead)
 		}
 
-		// todo: should this is be per hit?
 		search.RecordSearchCost(i.ctx, "add", i.bytesRead)
 	}
 

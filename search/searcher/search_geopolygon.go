@@ -107,6 +107,11 @@ func buildPolygonFilter(ctx context.Context, dvReader index.DocValueReader, fiel
 		// Note: this approach works for points which are strictly inside
 		// the polygon. ie it might fail for certain points on the polygon boundaries.
 		if err == nil && found {
+			bytes := dvReader.BytesRead()
+			if bytes > 0 {
+				reportIOStats(ctx, bytes)
+				search.RecordSearchCost(ctx, "add", bytes)
+			}
 			nVertices := len(coordinates)
 			if len(coordinates) < 3 {
 				return false
