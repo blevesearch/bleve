@@ -76,9 +76,11 @@ func reportIOStats(ctx context.Context, bytesRead uint64) {
 	// The fuzzy, regexp like queries essentially load a dictionary,
 	// which potentially incurs a cost that must be accounted by
 	// using the callback to report the value.
-	statsCallbackFn := ctx.Value(search.SearchIOStatsCallbackKey)
-	if statsCallbackFn != nil {
-		statsCallbackFn.(search.SearchIOStatsCallbackFunc)(bytesRead)
+	if ctx != nil {
+		statsCallbackFn := ctx.Value(search.SearchIOStatsCallbackKey)
+		if statsCallbackFn != nil {
+			statsCallbackFn.(search.SearchIOStatsCallbackFunc)(bytesRead)
+		}
 	}
 }
 

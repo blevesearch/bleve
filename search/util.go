@@ -84,15 +84,17 @@ const SearchIncrementalCostKey = "_search_incremental_cost_key"
 const QueryTypeKey = "_query_type_key"
 
 func RecordSearchCost(ctx context.Context, msg string, bytes uint64) {
-	queryType, ok := ctx.Value(QueryTypeKey).(string)
-	if !ok {
-		// for the cost of the non query type specific factors such as
-		// doc values and stored fields section.
-		queryType = ""
-	}
+	if ctx != nil {
+		queryType, ok := ctx.Value(QueryTypeKey).(string)
+		if !ok {
+			// for the cost of the non query type specific factors such as
+			// doc values and stored fields section.
+			queryType = "non-query-specific-cost"
+		}
 
-	aggCallbackFn := ctx.Value(SearchIncrementalCostKey)
-	if aggCallbackFn != nil {
-		aggCallbackFn.(SearchIncrementalCostCallbackFn)(msg, queryType, bytes)
+		aggCallbackFn := ctx.Value(SearchIncrementalCostKey)
+		if aggCallbackFn != nil {
+			aggCallbackFn.(SearchIncrementalCostCallbackFn)(msg, queryType, bytes)
+		}
 	}
 }
