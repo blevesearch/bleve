@@ -45,7 +45,7 @@ func tokenizeSynonym(phrase []byte) []string {
 	return rv
 }
 
-type ctxKey string
+type synonymSearchCtxKey string
 
 // SearchAtPosition is a struct that contains a searcher and the first and last position of the searcher in the query.
 //   - Searcher is the main searcher for the token.
@@ -155,7 +155,7 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 				LastPos:  uint64(tok[0].LastPosition),
 			}
 		}
-		ctx = context.WithValue(ctx, ctxKey("searcherPositions"), searchersPositions)
+		ctx = context.WithValue(ctx, synonymSearchCtxKey("searcherPositions"), searchersPositions)
 		searcher, err = NewConjunctionSearcher(ctx, indexReader, outerSearcher, options)
 	}
 	if err != nil {

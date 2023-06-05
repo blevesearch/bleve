@@ -456,7 +456,6 @@ func (im *IndexMappingImpl) SynonymAnalyzerNameForPath(path string) string {
 
 // AddSynonymFilter adds the synonym filter to the analyzer and returns the new analyzer.
 func (im *IndexMappingImpl) AddSynonymFilter(analyzer analysis.Analyzer, synAnalyzerName string, fuzziness int, prefix int, i index.IndexReader) (analysis.Analyzer, error) {
-	config := make(map[string]interface{})
 	synDoc, err := i.Document("_synonymDocument_" + synAnalyzerName)
 	if err != nil {
 		return nil, fmt.Errorf("error using the synonym filter - %v", err)
@@ -476,13 +475,15 @@ func (im *IndexMappingImpl) AddSynonymFilter(analyzer analysis.Analyzer, synAnal
 			json.Unmarshal(field.Value(), &hashToPhrase)
 		}
 	})
-	config["fst"] = fst
-	config["hashToSynonyms"] = hashToSynonyms
-	config["hashToPhrase"] = hashToPhrase
-	config["fuzziness"] = fuzziness
-	config["prefix"] = prefix
-	config["type"] = synonym.Name
-	synonymFilter, err := im.cache.DefineTokenFilter(synonym.Name, config)
+	// instead of define, do a fetch of the synonym token filter
+	// the important thing to keep in mind is that, parallel queries have
+	// different variables of type SynonymFilter
+	// then call a separate function which will set the synonym info (on this variable).
+	synonymFilter, err := im.cache.TokenFilterNamed(synonym.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error using the synonym filter - %v", err)
+	}
+	synonymFilter.(*synonym.SynonymFilter).SetSynonymInfo(fst, hashToSynonyms, hashToPhrase, fuzziness, prefix)
 	if err != nil {
 		return nil, fmt.Errorf("error using the synonym filter - %v", err)
 	}

@@ -371,14 +371,18 @@ func (s *SynonymFilter) Filter(input analysis.TokenStream) analysis.TokenStream 
 	return outputTokenStream
 }
 
+// update the synonymFilter.config map with the fst, hashToSynonyms, hashToPhrase, fuzziness and prefix.
+func (s *SynonymFilter) SetSynonymInfo(fst []byte, hashToSynonyms map[uint64][]uint64,
+	hashToPhrase map[uint64][]byte, fuzziness int, prefix int) {
+	s.fst = fst
+	s.hashToSynonyms = hashToSynonyms
+	s.hashToPhrase = hashToPhrase
+	s.fuzziness = fuzziness
+	s.prefix = prefix
+}
+
 func SynonymFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
-	return &SynonymFilter{
-		fst:            config["fst"].([]byte),
-		hashToSynonyms: config["hashToSynonyms"].(map[uint64][]uint64),
-		hashToPhrase:   config["hashToPhrase"].(map[uint64][]byte),
-		fuzziness:      config["fuzziness"].(int),
-		prefix:         config["prefix"].(int),
-	}, nil
+	return &SynonymFilter{}, nil
 }
 
 func init() {
