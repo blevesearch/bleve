@@ -486,14 +486,14 @@ func (ss *SearchStatus) Merge(other *SearchStatus) {
 // A SearchResult describes the results of executing
 // a SearchRequest.
 type SearchResult struct {
-	Status    *SearchStatus                  `json:"status"`
-	Request   *SearchRequest                 `json:"request"`
-	Hits      search.DocumentMatchCollection `json:"hits"`
-	Total     uint64                         `json:"total_hits"`
-	BytesRead uint64                         `json:"bytesRead"`
-	MaxScore  float64                        `json:"max_score"`
-	Took      time.Duration                  `json:"took"`
-	Facets    search.FacetResults            `json:"facets"`
+	Status   *SearchStatus                  `json:"status"`
+	Request  *SearchRequest                 `json:"request"`
+	Hits     search.DocumentMatchCollection `json:"hits"`
+	Total    uint64                         `json:"total_hits"`
+	Cost     uint64                         `json:"search_cost"`
+	MaxScore float64                        `json:"max_score"`
+	Took     time.Duration                  `json:"took"`
+	Facets   search.FacetResults            `json:"facets"`
 }
 
 func (sr *SearchResult) Size() int {
@@ -566,7 +566,7 @@ func (sr *SearchResult) Merge(other *SearchResult) {
 	sr.Status.Merge(other.Status)
 	sr.Hits = append(sr.Hits, other.Hits...)
 	sr.Total += other.Total
-	sr.BytesRead += other.BytesRead
+	sr.Cost += other.Cost
 	if other.MaxScore > sr.MaxScore {
 		sr.MaxScore = other.MaxScore
 	}
