@@ -75,9 +75,11 @@ const SearchIOStatsCallbackKey = "_search_io_stats_callback_key"
 type SearchIOStatsCallbackFunc func(uint64)
 
 // The callback signature is (message, queryType, cost) which allows
-// the caller to act on a particular query type and what its the associated
-// cost of an operation. "add" indicates to increment the cost for the query
+// the caller to act on a particular query type and its associated
+// cost of operation. "add" indicates to increment the cost for the query
 // "done" indicates a finish of the accounting of the costs.
+// "abort" would indicate with respect to the fact that the search's context
+// was cancelled and the caller should act appropriately on it.
 type SearchIncrementalCostCallbackFn func(string, string, uint64)
 
 const SearchIncrementalCostKey = "_search_incremental_cost_key"
