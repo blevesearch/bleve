@@ -64,7 +64,7 @@ func (q *GeoDistanceQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		field = m.DefaultSearchField()
 	}
 
-	ctx = context.WithValue(ctx, search.QueryTypeKey, "geo")
+	ctx = context.WithValue(ctx, search.QueryTypeKey, search.Geo)
 
 	dist, err := geo.ParseDistance(q.Distance)
 	if err != nil {

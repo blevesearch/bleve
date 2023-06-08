@@ -40,7 +40,7 @@ type TermSearcher struct {
 
 func NewTermSearcher(ctx context.Context, indexReader index.IndexReader, term string, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
 	if isTermQuery(ctx) {
-		ctx = context.WithValue(ctx, search.QueryTypeKey, "term")
+		ctx = context.WithValue(ctx, search.QueryTypeKey, search.Term)
 	}
 	return NewTermSearcherBytes(ctx, indexReader, []byte(term), field, boost, options)
 }

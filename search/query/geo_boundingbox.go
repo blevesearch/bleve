@@ -63,7 +63,7 @@ func (q *GeoBoundingBoxQuery) Searcher(ctx context.Context, i index.IndexReader,
 		field = m.DefaultSearchField()
 	}
 
-	ctx = context.WithValue(ctx, search.QueryTypeKey, "geo")
+	ctx = context.WithValue(ctx, search.QueryTypeKey, search.Geo)
 
 	if q.BottomRight[0] < q.TopLeft[0] {
 		// cross date line, rewrite as two parts

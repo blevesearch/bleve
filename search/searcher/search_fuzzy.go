@@ -60,7 +60,7 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 
 	if ctx != nil {
 		reportIOStats(ctx, dictBytesRead)
-		search.RecordSearchCost(ctx, "add", dictBytesRead)
+		search.RecordSearchCost(ctx, search.AddM, dictBytesRead)
 	}
 
 	return NewMultiTermSearcher(ctx, indexReader, candidates, field,

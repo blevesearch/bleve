@@ -200,7 +200,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	hc.needDocIds = hc.needDocIds || loadID
 	select {
 	case <-ctx.Done():
-		search.RecordSearchCost(ctx, "abort", 0)
+		search.RecordSearchCost(ctx, search.AbortM, 0)
 		return ctx.Err()
 	default:
 		next, err = searcher.Next(searchContext)
@@ -209,7 +209,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		if hc.total%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
-				search.RecordSearchCost(ctx, "abort", 0)
+				search.RecordSearchCost(ctx, search.AbortM, 0)
 				return ctx.Err()
 			default:
 			}
@@ -235,7 +235,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		// which must be accounted by invoking the callback.
 		statsCallbackFn.(search.SearchIOStatsCallbackFunc)(hc.bytesRead)
 
-		search.RecordSearchCost(ctx, "add", hc.bytesRead)
+		search.RecordSearchCost(ctx, search.AddM, hc.bytesRead)
 	}
 
 	// help finalize/flush the results in case

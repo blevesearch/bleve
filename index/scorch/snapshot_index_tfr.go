@@ -205,7 +205,7 @@ func (i *IndexSnapshotTermFieldReader) Close() error {
 			statsCallbackFn.(search.SearchIOStatsCallbackFunc)(i.bytesRead)
 		}
 
-		search.RecordSearchCost(i.ctx, "add", i.bytesRead)
+		search.RecordSearchCost(i.ctx, search.AddM, i.bytesRead)
 	}
 
 	if i.snapshot != nil {

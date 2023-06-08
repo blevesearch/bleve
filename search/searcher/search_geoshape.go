@@ -119,7 +119,7 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 			bytes := dvReader.BytesRead()
 			if bytes > 0 {
 				reportIOStats(ctx, bytes)
-				search.RecordSearchCost(ctx, "add", bytes)
+				search.RecordSearchCost(ctx, search.AddM, bytes)
 			}
 			return found
 		}

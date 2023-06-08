@@ -110,7 +110,7 @@ func buildPolygonFilter(ctx context.Context, dvReader index.DocValueReader, fiel
 			bytes := dvReader.BytesRead()
 			if bytes > 0 {
 				reportIOStats(ctx, bytes)
-				search.RecordSearchCost(ctx, "add", bytes)
+				search.RecordSearchCost(ctx, search.AddM, bytes)
 			}
 			nVertices := len(coordinates)
 			if len(coordinates) < 3 {

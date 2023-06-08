@@ -103,7 +103,7 @@ func NewRegexpSearcher(ctx context.Context, indexReader index.IndexReader, patte
 
 	if ctx != nil {
 		reportIOStats(ctx, dictBytesRead)
-		search.RecordSearchCost(ctx, "add", dictBytesRead)
+		search.RecordSearchCost(ctx, search.AddM, dictBytesRead)
 	}
 
 	return NewMultiTermSearcher(ctx, indexReader, candidateTerms, field, boost,

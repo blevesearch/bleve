@@ -501,7 +501,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			sr.UpdateIOStats(totalSearchCost)
 		}
 
-		search.RecordSearchCost(ctx, "done", 0)
+		search.RecordSearchCost(ctx, search.DoneM, 0)
 	}()
 
 	if req.Facets != nil {
@@ -586,7 +586,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 		totalSearchCost += storedFieldsBytes
 
-		search.RecordSearchCost(ctx, "add", storedFieldsBytes)
+		search.RecordSearchCost(ctx, search.AddM, storedFieldsBytes)
 	}
 
 	atomic.AddUint64(&i.stats.searches, 1)
