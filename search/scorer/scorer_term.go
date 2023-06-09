@@ -176,7 +176,7 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 			rv.FieldTermLocations = make([]search.FieldTermLocation, 0, len(termMatch.Vectors))
 		}
 
-		for _, v := range termMatch.Vectors {
+		for oid, v := range termMatch.Vectors {
 			var ap search.ArrayPositions
 			if len(v.ArrayPositions) > 0 {
 				n := len(rv.FieldTermLocations)
@@ -187,8 +187,9 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 			}
 			rv.FieldTermLocations =
 				append(rv.FieldTermLocations, search.FieldTermLocation{
-					Field: v.Field,
-					Term:  s.queryTerm,
+					Field:           v.Field,
+					Term:            s.queryTerm,
+					OccurrenceIndex: oid,
 					Location: search.Location{
 						Pos:            v.Pos,
 						Start:          v.Start,

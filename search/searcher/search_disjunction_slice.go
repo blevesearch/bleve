@@ -182,21 +182,6 @@ func (s *DisjunctionSliceSearcher) SetQueryNorm(qnorm float64) {
 	}
 }
 
-// This is used by the disjunction searcher to merge the positions of the
-// underlying searchers. It will create a 2D slice of these positions, where
-// the first dimension is the number of underlying searchers, and the second
-// dimension is the number of terms in the document.
-func MergePositions(docMatches []*search.DocumentMatch) [][]uint64 {
-	rv := make([][]uint64, len(docMatches))
-	for i, docMatch := range docMatches {
-		rv[i] = make([]uint64, len(docMatch.FieldTermLocations))
-		for j, ftl := range docMatch.FieldTermLocations {
-			rv[i][j] = ftl.Location.Pos
-		}
-	}
-	return rv
-}
-
 func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 	*search.DocumentMatch, error) {
 	if !s.initialized {
@@ -212,10 +197,8 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 	for !found && len(s.matching) > 0 {
 		if len(s.matching) >= s.min {
 			found = true
-			hitPositions := MergePositions(s.matching)
 			// score this match
 			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
-			rv.HitPositions = hitPositions
 		}
 
 		// invoke next on all the matching searchers

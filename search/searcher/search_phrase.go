@@ -254,11 +254,12 @@ func (s *PhraseSearcher) checkCurrMustMatchField(ctx *search.SearchContext,
 		s.path = make(phrasePath, 0, len(s.terms))
 	}
 	s.paths = findPhrasePaths(0, nil, s.terms, tlm, s.path[:0], 0, s.paths[:0])
-	for _, p := range s.paths {
+	for qid, p := range s.paths {
 		for _, pp := range p {
 			ftls = append(ftls, search.FieldTermLocation{
-				Field: field,
-				Term:  pp.term,
+				Field:           field,
+				OccurrenceIndex: qid,
+				Term:            pp.term,
 				Location: search.Location{
 					Pos:            pp.loc.Pos,
 					Start:          pp.loc.Start,
@@ -306,20 +307,28 @@ func (p phrasePath) String() string {
 //
 // prevPos - the previous location, 0 on first invocation
 // ap - array positions of the first candidate phrase part to
-//      which further recursive phrase parts must match,
-//      nil on initial invocation or when there are no array positions
+//
+//	which further recursive phrase parts must match,
+//	nil on initial invocation or when there are no array positions
+//
 // phraseTerms - slice containing the phrase terms,
-//               may contain empty string as placeholder (don't care)
+//
+//	may contain empty string as placeholder (don't care)
+//
 // tlm - the Term Location Map containing all relevant term locations
 // p - the current path being explored (appended to in recursive calls)
-//     this is the primary state being built during the traversal
+//
+//	this is the primary state being built during the traversal
+//
 // remainingSlop - amount of sloppiness that's allowed, which is the
-//        sum of the editDistances from each matching phrase part,
-//        where 0 means no sloppiness allowed (all editDistances must be 0),
-//        decremented during recursion
+//
+//	sum of the editDistances from each matching phrase part,
+//	where 0 means no sloppiness allowed (all editDistances must be 0),
+//	decremented during recursion
+//
 // rv - the final result being appended to by all the recursive calls
 //
-// returns slice of paths, or nil if invocation did not find any successul paths
+// returns slice of paths, or nil if invocation did not find any successful paths
 func findPhrasePaths(prevPos uint64, ap search.ArrayPositions, phraseTerms [][]string,
 	tlm search.TermLocationMap, p phrasePath, remainingSlop int, rv []phrasePath) []phrasePath {
 	// no more terms

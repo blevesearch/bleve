@@ -43,15 +43,15 @@ type ConjunctionSearcher struct {
 	initialized       bool
 	options           search.SearcherOptions
 	bytesRead         uint64
-	searcherPositions []*SearcherPosition
+	searcherPositions []*PositionPair
 }
 
 func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, options search.SearcherOptions) (
 	search.Searcher, error) {
 
-	if ctx.Value(ctxKey("searcherPositions")) != nil {
-		searcherPositions := ctx.Value(ctxKey("searcherPositions")).([]*SearcherPosition)
+	if ctx.Value(synonymSearchCtxKey) != nil {
+		searcherPositions := ctx.Value(synonymSearchCtxKey).([]*PositionPair)
 		rv := ConjunctionSearcher{
 			indexReader:       indexReader,
 			options:           options,
@@ -226,13 +226,29 @@ OUTER:
 		} else {
 			// we only score the document if the relative positioning rule is satisfied
 			// if not, we advance the maxIDIdx and try again
-			var documentHitPositions = make([][][]uint64, len(s.currs))
-			for i, match := range s.currs {
-				documentHitPositions[i] = match.HitPositions
+			var hitTable = make([][]PositionPair, len(s.currs))
+			for id, match := range s.currs {
+				hitTable[id] = make([]PositionPair, len(match.FieldTermLocations))
+				firstPos := match.FieldTermLocations[0].Location.Pos
+				lastPos := firstPos
+				colID := 0
+				for i := 1; i < len(match.FieldTermLocations); i++ {
+					if match.FieldTermLocations[i].QueryIndex > match.FieldTermLocations[i-1].QueryIndex ||
+						match.FieldTermLocations[i].OccurrenceIndex > match.FieldTermLocations[i-1].OccurrenceIndex {
+						hitTable[id][colID] = PositionPair{firstPos, lastPos}
+						colID++
+						firstPos = match.FieldTermLocations[i].Location.Pos
+						lastPos = firstPos
+					} else {
+						lastPos = match.FieldTermLocations[i].Location.Pos
+					}
+				}
+				hitTable[id][colID] = PositionPair{firstPos, lastPos}
+				hitTable[id] = hitTable[id][:colID+1]
 			}
-			for i := 0; i < len(documentHitPositions[0]); i++ {
-				startHit := documentHitPositions[0][i]
-				if positionsAreCorrect(s.searcherPositions, 1, documentHitPositions, startHit[len(startHit)-1]) {
+
+			for i := 0; i < len(hitTable[0]); i++ {
+				if positionsAreCorrect(s.searcherPositions, 1, hitTable, hitTable[0][i].LastPos) {
 					rv = s.scorer.Score(ctx, s.currs)
 					break
 				}
@@ -260,16 +276,15 @@ OUTER:
 // in the previous row is equal to the difference between the first position of the current searcher and the last position of the previous searcher.
 // If a row is reached where this is not true, the function returns false. If the end of the matrix is reached, the function returns true.
 // The function is called recursively, starting at the second row.
-func positionsAreCorrect(origStream []*SearcherPosition, currentRow int, documentHitPositions [][][]uint64, lastPos uint64) bool {
+func positionsAreCorrect(origStream []*PositionPair, currentRow int, hitTable [][]PositionPair, lastPos uint64) bool {
 	if currentRow == len(origStream) {
 		return true
 	}
-	for _, documentHitPosition := range documentHitPositions[currentRow] {
-		documentRelativePosition := documentHitPosition[0] - lastPos
+	for _, hit := range hitTable[currentRow] {
+		documentRelativePosition := hit.FirstPos - lastPos
 		expectedRelativePosition := origStream[currentRow].FirstPos - origStream[currentRow-1].LastPos
 		if documentRelativePosition == expectedRelativePosition {
-			newLastPos := documentHitPosition[len(documentHitPosition)-1]
-			return positionsAreCorrect(origStream, currentRow+1, documentHitPositions, newLastPos)
+			return positionsAreCorrect(origStream, currentRow+1, hitTable, hit.LastPos)
 		}
 	}
 	return false

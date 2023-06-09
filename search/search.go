@@ -140,9 +140,11 @@ func (t TermLocationMap) AddLocation(term string, location *Location) {
 type FieldTermLocationMap map[string]TermLocationMap
 
 type FieldTermLocation struct {
-	Field    string
-	Term     string
-	Location Location
+	Field           string
+	Term            string
+	OccurrenceIndex int
+	QueryIndex      int
+	Location        Location
 }
 
 type FieldFragmentMap map[string][]string
@@ -170,7 +172,6 @@ type DocumentMatch struct {
 	// be later incorporated into the Locations map when search
 	// results are completed
 	FieldTermLocations []FieldTermLocation `json:"-"`
-	HitPositions       [][]uint64          `json:"-"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {

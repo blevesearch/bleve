@@ -45,12 +45,7 @@ func tokenizeSynonym(phrase []byte) []string {
 	return rv
 }
 
-type synonymSearchCtxKey string
-
-// SearchAtPosition is a struct that contains a searcher and the first and last position of the searcher in the query.
-//   - Searcher is the main searcher for the token.
-//   - FirstPos is the first position of the searcher.
-//   - LastPos is the last position of the searcher.
+const synonymSearchCtxKey = "_searcher_positions"
 
 // This is used for match phrase query support for synonyms, where we need to
 // know the position of the first and last word in the synonym phrase,
@@ -77,9 +72,13 @@ type synonymSearchCtxKey string
 // thus for each sub searcher:
 //   - the hit in the document must be at position equal to its first position - the previous searcher's last position
 //   - the hit for the first sub searcher in the sequence can be anywhere in the document.
-type SearcherPosition struct {
+
+// PositionPair is a struct that emulates a pair data structure, storing the first and last positions of a searcher.
+type PositionPair struct {
+	//  FirstPos is the first position of the searcher.
 	FirstPos uint64
-	LastPos  uint64
+	//	LastPos is the last position of the searcher.
+	LastPos uint64
 }
 
 // NewSynonymSearcher is an abstraction that returns either a disjunction searcher or a conjunction searcher
@@ -148,14 +147,14 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 	} else if operator == 1 {
 		searcher, err = NewConjunctionSearcher(ctx, indexReader, outerSearcher, options)
 	} else if operator == 2 {
-		var searchersPositions = make([]*SearcherPosition, len(arrangedTokens))
+		var searchersPositions = make([]*PositionPair, len(arrangedTokens))
 		for tokIndex, tok := range arrangedTokens {
-			searchersPositions[tokIndex] = &SearcherPosition{
+			searchersPositions[tokIndex] = &PositionPair{
 				FirstPos: uint64(tok[0].FirstPosition),
 				LastPos:  uint64(tok[0].LastPosition),
 			}
 		}
-		ctx = context.WithValue(ctx, synonymSearchCtxKey("searcherPositions"), searchersPositions)
+		ctx = context.WithValue(ctx, synonymSearchCtxKey, searchersPositions)
 		searcher, err = NewConjunctionSearcher(ctx, indexReader, outerSearcher, options)
 	}
 	if err != nil {
