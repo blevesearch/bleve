@@ -576,6 +576,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}
 
+	var storedFieldsCost uint64
 	for _, hit := range hits {
 		if i.name != "" {
 			hit.Index = i.name
@@ -584,10 +585,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if err != nil {
 			return nil, err
 		}
-		totalSearchCost += storedFieldsBytes
-
-		search.RecordSearchCost(ctx, search.AddM, storedFieldsBytes)
+		storedFieldsCost += storedFieldsBytes
 	}
+
+	totalSearchCost += storedFieldsCost
+	search.RecordSearchCost(ctx, search.AddM, storedFieldsCost)
 
 	atomic.AddUint64(&i.stats.searches, 1)
 	searchDuration := time.Since(searchStart)
