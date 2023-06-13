@@ -474,9 +474,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	//     accounted by invoking this callback when the TFR is closed.
 	//  2. the docvalues portion (accounted in collector) and the retrieval
 	//     of stored fields bytes (by LoadAndHighlightFields)
-	var totalBytesRead uint64
+	var totalSearchCost uint64
 	sendBytesRead := func(bytesRead uint64) {
-		totalBytesRead += bytesRead
+		totalSearchCost += bytesRead
 	}
 
 	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey,
@@ -495,11 +495,13 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			err = serr
 		}
 		if sr != nil {
-			sr.BytesRead = totalBytesRead
+			sr.Cost = totalSearchCost
 		}
 		if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
-			sr.UpdateIOStats(totalBytesRead)
+			sr.UpdateIOStats(totalSearchCost)
 		}
+
+		search.RecordSearchCost(ctx, search.DoneM, 0)
 	}()
 
 	if req.Facets != nil {
@@ -574,6 +576,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}
 
+	var storedFieldsCost uint64
 	for _, hit := range hits {
 		if i.name != "" {
 			hit.Index = i.name
@@ -582,8 +585,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if err != nil {
 			return nil, err
 		}
-		totalBytesRead += storedFieldsBytes
+		storedFieldsCost += storedFieldsBytes
 	}
+
+	totalSearchCost += storedFieldsCost
+	search.RecordSearchCost(ctx, search.AddM, storedFieldsCost)
 
 	atomic.AddUint64(&i.stats.searches, 1)
 	searchDuration := time.Since(searchStart)

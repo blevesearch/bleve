@@ -14,6 +14,8 @@
 
 package search
 
+import "context"
+
 func MergeLocations(locations []FieldTermLocationMap) FieldTermLocationMap {
 	rv := locations[0]
 
@@ -66,4 +68,53 @@ func MergeFieldTermLocations(dest []FieldTermLocation, matches []*DocumentMatch)
 	}
 
 	return dest
+}
+
+const SearchIOStatsCallbackKey = "_search_io_stats_callback_key"
+
+type SearchIOStatsCallbackFunc func(uint64)
+
+// Implementation of SearchIncrementalCostCallbackFn should handle the following messages
+//   - add: increment the cost of a search operation
+//     (which can be specific to a query type as well)
+//   - abort: query was aborted due to a cancel of search's context (for eg),
+//     which can be handled differently as well
+//   - done: indicates that a search was complete and the tracked cost can be
+//     handled safely by the implementation.
+type SearchIncrementalCostCallbackFn func(SearchIncrementalCostCallbackMsg,
+	SearchQueryType, uint64)
+type SearchIncrementalCostCallbackMsg uint
+type SearchQueryType uint
+
+const (
+	Term = SearchQueryType(1 << iota)
+	Geo
+	Numeric
+	GenericCost
+)
+
+const (
+	AddM = SearchIncrementalCostCallbackMsg(1 << iota)
+	AbortM
+	DoneM
+)
+
+const SearchIncrementalCostKey = "_search_incremental_cost_key"
+const QueryTypeKey = "_query_type_key"
+
+func RecordSearchCost(ctx context.Context,
+	msg SearchIncrementalCostCallbackMsg, bytes uint64) {
+	if ctx != nil {
+		queryType, ok := ctx.Value(QueryTypeKey).(SearchQueryType)
+		if !ok {
+			// for the cost of the non query type specific factors such as
+			// doc values and stored fields section.
+			queryType = GenericCost
+		}
+
+		aggCallbackFn := ctx.Value(SearchIncrementalCostKey)
+		if aggCallbackFn != nil {
+			aggCallbackFn.(SearchIncrementalCostCallbackFn)(msg, queryType, bytes)
+		}
+	}
 }

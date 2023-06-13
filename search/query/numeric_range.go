@@ -77,6 +77,7 @@ func (q *NumericRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
+	ctx = context.WithValue(ctx, search.QueryTypeKey, search.Numeric)
 	return searcher.NewNumericRangeSearcher(ctx, i, q.Min, q.Max, q.InclusiveMin, q.InclusiveMax, field, q.BoostVal.Value(), options)
 }
 

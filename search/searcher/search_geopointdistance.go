@@ -66,7 +66,7 @@ func NewGeoPointDistanceSearcher(ctx context.Context, indexReader index.IndexRea
 
 	// wrap it in a filtering searcher which checks the actual distance
 	return NewFilteringSearcher(ctx, rectSearcher,
-		buildDistFilter(dvReader, field, centerLon, centerLat, dist)), nil
+		buildDistFilter(ctx, dvReader, field, centerLon, centerLat, dist)), nil
 }
 
 // boxSearcher builds a searcher for the described bounding box
@@ -113,7 +113,7 @@ func boxSearcher(ctx context.Context, indexReader index.IndexReader,
 	return boxSearcher, nil
 }
 
-func buildDistFilter(dvReader index.DocValueReader, field string,
+func buildDistFilter(ctx context.Context, dvReader index.DocValueReader, field string,
 	centerLon, centerLat, maxDist float64) FilterFunc {
 	return func(d *search.DocumentMatch) bool {
 		// check geo matches against all numeric type terms indexed
@@ -134,6 +134,11 @@ func buildDistFilter(dvReader index.DocValueReader, field string,
 			}
 		})
 		if err == nil && found {
+			bytes := dvReader.BytesRead()
+			if bytes > 0 {
+				reportIOStats(ctx, bytes)
+				search.RecordSearchCost(ctx, search.AddM, bytes)
+			}
 			for i := range lons {
 				dist := geo.Haversin(lons[i], lats[i], centerLon, centerLat)
 				if dist <= maxDist/1000 {

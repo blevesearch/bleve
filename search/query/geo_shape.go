@@ -107,6 +107,8 @@ func (q *GeoShapeQuery) Searcher(ctx context.Context, i index.IndexReader,
 		field = m.DefaultSearchField()
 	}
 
+	ctx = context.WithValue(ctx, search.QueryTypeKey, search.Geo)
+
 	return searcher.NewGeoShapeSearcher(ctx, i, q.Geometry.Shape, q.Geometry.Relation, field,
 		q.BoostVal.Value(), options)
 }

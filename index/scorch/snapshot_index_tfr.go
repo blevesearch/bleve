@@ -102,10 +102,10 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 			// this is because there are chances of having a series of loadChunk calls,
 			// and they have to be added together before sending the bytesRead at this point
 			// upstream.
-			if delta := i.iterators[i.segmentOffset].BytesRead() - prevBytesRead; delta > 0 {
-				i.incrementBytesRead(delta)
+			bytesRead := i.iterators[i.segmentOffset].BytesRead()
+			if bytesRead > prevBytesRead {
+				i.incrementBytesRead(bytesRead - prevBytesRead)
 			}
-
 			return rv, nil
 		}
 		i.segmentOffset++
@@ -204,6 +204,8 @@ func (i *IndexSnapshotTermFieldReader) Close() error {
 			// reader's bytesRead value
 			statsCallbackFn.(search.SearchIOStatsCallbackFunc)(i.bytesRead)
 		}
+
+		search.RecordSearchCost(i.ctx, search.AddM, i.bytesRead)
 	}
 
 	if i.snapshot != nil {

@@ -588,6 +588,10 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m := s.stats.ToMap()
 
 	indexSnapshot := s.currentSnapshot()
+	if indexSnapshot == nil {
+		return nil
+	}
+
 	defer func() {
 		_ = indexSnapshot.Close()
 	}()

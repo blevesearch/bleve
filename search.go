@@ -485,15 +485,27 @@ func (ss *SearchStatus) Merge(other *SearchStatus) {
 
 // A SearchResult describes the results of executing
 // a SearchRequest.
+//
+// Status - Whether the search was executed on the underlying indexes successfully
+// or failed, and the corresponding errors.
+// Request - The SearchRequest that was executed.
+// Hits - The list of documents that matched the query and their corresponding
+// scores, score explanation, location info and so on.
+// Total - The total number of documents that matched the query.
+// Cost - indicates how expensive was the query with respect to bytes read
+// from the mmaped index files.
+// MaxScore - The maximum score seen across all document hits seen for this query.
+// Took - The time taken to execute the search.
+// Facets - The facet results for the search.
 type SearchResult struct {
-	Status    *SearchStatus                  `json:"status"`
-	Request   *SearchRequest                 `json:"request"`
-	Hits      search.DocumentMatchCollection `json:"hits"`
-	Total     uint64                         `json:"total_hits"`
-	BytesRead uint64                         `json:"bytesRead"`
-	MaxScore  float64                        `json:"max_score"`
-	Took      time.Duration                  `json:"took"`
-	Facets    search.FacetResults            `json:"facets"`
+	Status   *SearchStatus                  `json:"status"`
+	Request  *SearchRequest                 `json:"request"`
+	Hits     search.DocumentMatchCollection `json:"hits"`
+	Total    uint64                         `json:"total_hits"`
+	Cost     uint64                         `json:"cost"`
+	MaxScore float64                        `json:"max_score"`
+	Took     time.Duration                  `json:"took"`
+	Facets   search.FacetResults            `json:"facets"`
 }
 
 func (sr *SearchResult) Size() int {
@@ -566,7 +578,7 @@ func (sr *SearchResult) Merge(other *SearchResult) {
 	sr.Status.Merge(other.Status)
 	sr.Hits = append(sr.Hits, other.Hits...)
 	sr.Total += other.Total
-	sr.BytesRead += other.BytesRead
+	sr.Cost += other.Cost
 	if other.MaxScore > sr.MaxScore {
 		sr.MaxScore = other.MaxScore
 	}

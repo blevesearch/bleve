@@ -71,7 +71,7 @@ func NewGeoBoundedPolygonSearcher(ctx context.Context, indexReader index.IndexRe
 
 	// wrap it in a filtering searcher that checks for the polygon inclusivity
 	return NewFilteringSearcher(ctx, rectSearcher,
-		buildPolygonFilter(dvReader, field, coordinates)), nil
+		buildPolygonFilter(ctx, dvReader, field, coordinates)), nil
 }
 
 const float64EqualityThreshold = 1e-6
@@ -83,7 +83,7 @@ func almostEqual(a, b float64) bool {
 // buildPolygonFilter returns true if the point lies inside the
 // polygon. It is based on the ray-casting technique as referred
 // here: https://wrf.ecse.rpi.edu/nikola/pubdetails/pnpoly.html
-func buildPolygonFilter(dvReader index.DocValueReader, field string,
+func buildPolygonFilter(ctx context.Context, dvReader index.DocValueReader, field string,
 	coordinates []geo.Point) FilterFunc {
 	return func(d *search.DocumentMatch) bool {
 		// check geo matches against all numeric type terms indexed
@@ -107,6 +107,11 @@ func buildPolygonFilter(dvReader index.DocValueReader, field string,
 		// Note: this approach works for points which are strictly inside
 		// the polygon. ie it might fail for certain points on the polygon boundaries.
 		if err == nil && found {
+			bytes := dvReader.BytesRead()
+			if bytes > 0 {
+				reportIOStats(ctx, bytes)
+				search.RecordSearchCost(ctx, search.AddM, bytes)
+			}
 			nVertices := len(coordinates)
 			if len(coordinates) < 3 {
 				return false

@@ -49,7 +49,8 @@ func NewTermPrefixSearcher(ctx context.Context, indexReader index.IndexReader, p
 	}
 
 	if ctx != nil {
-		reportIOStats(fieldDict.BytesRead(), ctx)
+		reportIOStats(ctx, fieldDict.BytesRead())
+		search.RecordSearchCost(ctx, search.AddM, fieldDict.BytesRead())
 	}
 
 	return NewMultiTermSearcher(ctx, indexReader, terms, field, boost, options, true)

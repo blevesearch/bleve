@@ -27,10 +27,6 @@ var reflectStaticSizeDocumentMatch int
 var reflectStaticSizeSearchContext int
 var reflectStaticSizeLocation int
 
-const SearchIOStatsCallbackKey = "_search_io_stats_callback_key"
-
-type SearchIOStatsCallbackFunc func(uint64)
-
 func init() {
 	var dm DocumentMatch
 	reflectStaticSizeDocumentMatch = int(reflect.TypeOf(dm).Size())

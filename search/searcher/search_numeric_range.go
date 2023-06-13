@@ -88,7 +88,8 @@ func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 		// reporting back the IO stats with respect to the dictionary
 		// loaded, using the context
 		if ctx != nil {
-			reportIOStats(dictBytesRead, ctx)
+			reportIOStats(ctx, dictBytesRead)
+			search.RecordSearchCost(ctx, search.AddM, dictBytesRead)
 		}
 
 		// cannot return MatchNoneSearcher because of interaction with
@@ -110,7 +111,8 @@ func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 	}
 
 	if ctx != nil {
-		reportIOStats(dictBytesRead, ctx)
+		reportIOStats(ctx, dictBytesRead)
+		search.RecordSearchCost(ctx, search.AddM, dictBytesRead)
 	}
 
 	return NewMultiTermSearcherBytes(ctx, indexReader, terms, field,

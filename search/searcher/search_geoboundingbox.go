@@ -49,7 +49,7 @@ func NewGeoBoundingBoxSearcher(ctx context.Context, indexReader index.IndexReade
 				return nil, err
 			}
 
-			return NewFilteringSearcher(ctx, boxSearcher, buildRectFilter(dvReader,
+			return NewFilteringSearcher(ctx, boxSearcher, buildRectFilter(ctx, dvReader,
 				field, minLon, minLat, maxLon, maxLat)), nil
 		}
 	}
@@ -85,7 +85,7 @@ func NewGeoBoundingBoxSearcher(ctx context.Context, indexReader index.IndexReade
 		}
 		// add filter to check points near the boundary
 		onBoundarySearcher = NewFilteringSearcher(ctx, rawOnBoundarySearcher,
-			buildRectFilter(dvReader, field, minLon, minLat, maxLon, maxLat))
+			buildRectFilter(ctx, dvReader, field, minLon, minLat, maxLon, maxLat))
 		openedSearchers = append(openedSearchers, onBoundarySearcher)
 	}
 
@@ -201,7 +201,7 @@ func buildIsIndexedFunc(ctx context.Context, indexReader index.IndexReader, fiel
 	return isIndexed, closeF, err
 }
 
-func buildRectFilter(dvReader index.DocValueReader, field string,
+func buildRectFilter(ctx context.Context, dvReader index.DocValueReader, field string,
 	minLon, minLat, maxLon, maxLat float64) FilterFunc {
 	return func(d *search.DocumentMatch) bool {
 		// check geo matches against all numeric type terms indexed
@@ -222,6 +222,11 @@ func buildRectFilter(dvReader index.DocValueReader, field string,
 			}
 		})
 		if err == nil && found {
+			bytes := dvReader.BytesRead()
+			if bytes > 0 {
+				reportIOStats(ctx, bytes)
+				search.RecordSearchCost(ctx, search.AddM, bytes)
+			}
 			for i := range lons {
 				if geo.BoundingBoxContains(lons[i], lats[i],
 					minLon, minLat, maxLon, maxLat) {
