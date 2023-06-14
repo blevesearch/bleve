@@ -140,11 +140,11 @@ func (dm *DocumentMapping) fieldDescribedByPath(path string) *FieldMapping {
 	return nil
 }
 
-// documentMappingForPath only returns EXACT matches for a sub document
-// or for an explicitly mapped field, if you want to find the
-// closest document mapping to a field not explicitly mapped
-// use closestDocMapping
-func (dm *DocumentMapping) documentMappingForPath(path string) *DocumentMapping {
+// documentMappingForPath returns the EXACT and closest matches for a sub
+// document or for an explicitly mapped field; the closest most specific
+// document mapping could be one that matches part of the provided path.
+func (dm *DocumentMapping) documentMappingForPath(path string) (
+	*DocumentMapping, *DocumentMapping) {
 	pathElements := decodePath(path)
 	current := dm
 OUTER:
@@ -165,27 +165,9 @@ OUTER:
 			}
 		}
 
-		return nil
+		return nil, current
 	}
-	return current
-}
-
-// closestDocMapping findest the most specific document mapping that matches
-// part of the provided path
-func (dm *DocumentMapping) closestDocMapping(path string) *DocumentMapping {
-	pathElements := decodePath(path)
-	current := dm
-OUTER:
-	for _, pathElement := range pathElements {
-		for name, subDocMapping := range current.Properties {
-			if name == pathElement {
-				current = subDocMapping
-				continue OUTER
-			}
-		}
-		break
-	}
-	return current
+	return current, current
 }
 
 // NewDocumentMapping returns a new document mapping
@@ -408,8 +390,7 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 func (dm *DocumentMapping) processProperty(property interface{}, path []string, indexes []uint64, context *walkContext) {
 	pathString := encodePath(path)
 	// look to see if there is a mapping for this field
-	subDocMapping := dm.documentMappingForPath(pathString)
-	closestDocMapping := dm.closestDocMapping(pathString)
+	subDocMapping, closestDocMapping := dm.documentMappingForPath(pathString)
 
 	// check to see if we even need to do further processing
 	if subDocMapping != nil && !subDocMapping.Enabled {
