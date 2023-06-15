@@ -326,7 +326,7 @@ func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}
 		docMapping.walkDocument(data, []string{}, []uint64{}, walkContext)
 
 		// see if the _all field was disabled
-		allMapping := docMapping.documentMappingForPath("_all")
+		allMapping, _ := docMapping.documentMappingForPath("_all")
 		if allMapping == nil || allMapping.Enabled {
 			field := document.NewCompositeFieldWithIndexingOptions("_all", true, []string{}, walkContext.excludedFromAll, index.IndexField|index.IncludeTermVectors)
 			doc.AddField(field)
@@ -366,7 +366,7 @@ func (im *IndexMappingImpl) AnalyzerNameForPath(path string) string {
 	}
 
 	// now try the default mapping
-	pathMapping := im.DefaultMapping.documentMappingForPath(path)
+	pathMapping, _ := im.DefaultMapping.documentMappingForPath(path)
 	if pathMapping != nil {
 		if len(pathMapping.Fields) > 0 {
 			if pathMapping.Fields[0].Analyzer != "" {
@@ -421,7 +421,7 @@ func (im *IndexMappingImpl) datetimeParserNameForPath(path string) string {
 
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
-		pathMapping := docMapping.documentMappingForPath(path)
+		pathMapping, _ := docMapping.documentMappingForPath(path)
 		if pathMapping != nil {
 			if len(pathMapping.Fields) > 0 {
 				if pathMapping.Fields[0].Analyzer != "" {
