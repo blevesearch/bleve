@@ -43,7 +43,7 @@ func NewDisjunctionQueryScorer(options search.SearcherOptions) *DisjunctionQuery
 	}
 }
 
-func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
+func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int, scorerOptimizerDisable bool) *search.DocumentMatch {
 	var sum float64
 	var childrenExplanations []*search.Explanation
 	if s.options.Explain {
@@ -61,21 +61,25 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	if s.options.Explain {
 		rawExpl = &search.Explanation{Value: sum, Message: "sum of:", Children: childrenExplanations}
 	}
-
-	coord := float64(countMatch) / float64(countTotal)
-	newScore := sum * coord
 	var newExpl *search.Explanation
-	if s.options.Explain {
-		ce := make([]*search.Explanation, 2)
-		ce[0] = rawExpl
-		ce[1] = &search.Explanation{Value: coord, Message: fmt.Sprintf("coord(%d/%d)", countMatch, countTotal)}
-		newExpl = &search.Explanation{Value: newScore, Message: "product of:", Children: ce}
-	}
-
+	var newScore float64
 	// reuse constituents[0] as the return value
 	rv := constituents[0]
-	rv.Score = newScore
-	rv.Expl = newExpl
+	if !scorerOptimizerDisable {
+		coord := float64(countMatch) / float64(countTotal)
+		newScore = sum * coord
+		if s.options.Explain {
+			ce := make([]*search.Explanation, 2)
+			ce[0] = rawExpl
+			ce[1] = &search.Explanation{Value: coord, Message: fmt.Sprintf("coord(%d/%d)", countMatch, countTotal)}
+			newExpl = &search.Explanation{Value: newScore, Message: "product of:", Children: ce}
+		}
+		rv.Score = newScore
+		rv.Expl = newExpl
+	} else {
+		rv.Score = sum
+		rv.Expl = rawExpl
+	}
 	rv.FieldTermLocations = search.MergeFieldTermLocations(
 		rv.FieldTermLocations, constituents[1:])
 

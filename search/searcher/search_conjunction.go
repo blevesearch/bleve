@@ -50,8 +50,8 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, options search.SearcherOptions) (
 	search.Searcher, error) {
 
-	if ctx.Value(synonymSearchCtxKey) != nil {
-		searcherPositions := ctx.Value(synonymSearchCtxKey).([]*PositionPair)
+	if ctx.Value(synonymFlag) != nil {
+		searcherPositions := ctx.Value(synonymFlag).([]*PositionPair)
 		rv := ConjunctionSearcher{
 			indexReader:       indexReader,
 			options:           options,

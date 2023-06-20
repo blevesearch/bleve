@@ -57,7 +57,8 @@ type DisjunctionHeapSearcher struct {
 	matching      []*search.DocumentMatch
 	matchingCurrs []*SearcherCurr
 
-	bytesRead uint64
+	bytesRead              uint64
+	scorerOptimizerDisable bool
 }
 
 func newDisjunctionHeapSearcher(ctx context.Context, indexReader index.IndexReader,
@@ -68,16 +69,22 @@ func newDisjunctionHeapSearcher(ctx context.Context, indexReader index.IndexRead
 		return nil, tooManyClausesErr("", len(searchers))
 	}
 
+	scorerOptimizerDisable := false
+	if ctx.Value(synonymFlag) != nil {
+		scorerOptimizerDisable = true
+	}
+
 	// build our searcher
 	rv := DisjunctionHeapSearcher{
-		indexReader:   indexReader,
-		searchers:     searchers,
-		numSearchers:  len(searchers),
-		scorer:        scorer.NewDisjunctionQueryScorer(options),
-		min:           int(min),
-		matching:      make([]*search.DocumentMatch, len(searchers)),
-		matchingCurrs: make([]*SearcherCurr, len(searchers)),
-		heap:          make([]*SearcherCurr, 0, len(searchers)),
+		indexReader:            indexReader,
+		searchers:              searchers,
+		numSearchers:           len(searchers),
+		scorer:                 scorer.NewDisjunctionQueryScorer(options),
+		min:                    int(min),
+		matching:               make([]*search.DocumentMatch, len(searchers)),
+		matchingCurrs:          make([]*SearcherCurr, len(searchers)),
+		heap:                   make([]*SearcherCurr, 0, len(searchers)),
+		scorerOptimizerDisable: scorerOptimizerDisable,
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
@@ -198,7 +205,7 @@ func (s *DisjunctionHeapSearcher) Next(ctx *search.SearchContext) (
 		if len(s.matching) >= s.min {
 			found = true
 			// score this match
-			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
+			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers, s.scorerOptimizerDisable)
 		}
 
 		// invoke next on all the matching searchers

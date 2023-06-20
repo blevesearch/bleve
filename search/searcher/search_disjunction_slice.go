@@ -34,17 +34,18 @@ func init() {
 }
 
 type DisjunctionSliceSearcher struct {
-	indexReader  index.IndexReader
-	searchers    OrderedSearcherList
-	numSearchers int
-	queryNorm    float64
-	currs        []*search.DocumentMatch
-	scorer       *scorer.DisjunctionQueryScorer
-	min          int
-	matching     []*search.DocumentMatch
-	matchingIdxs []int
-	initialized  bool
-	bytesRead    uint64
+	indexReader            index.IndexReader
+	searchers              OrderedSearcherList
+	numSearchers           int
+	queryNorm              float64
+	currs                  []*search.DocumentMatch
+	scorer                 *scorer.DisjunctionQueryScorer
+	min                    int
+	matching               []*search.DocumentMatch
+	matchingIdxs           []int
+	initialized            bool
+	bytesRead              uint64
+	scorerOptimizerDisable bool
 }
 
 func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexReader,
@@ -62,15 +63,22 @@ func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexRea
 	// sort the searchers
 	sort.Sort(sort.Reverse(searchers))
 	// build our searcher
+
+	scorerOptimizerDisable := false
+	if ctx.Value(synonymFlag) != nil {
+		scorerOptimizerDisable = true
+	}
+
 	rv := DisjunctionSliceSearcher{
-		indexReader:  indexReader,
-		searchers:    searchers,
-		numSearchers: len(searchers),
-		currs:        make([]*search.DocumentMatch, len(searchers)),
-		scorer:       scorer.NewDisjunctionQueryScorer(options),
-		min:          int(min),
-		matching:     make([]*search.DocumentMatch, len(searchers)),
-		matchingIdxs: make([]int, len(searchers)),
+		indexReader:            indexReader,
+		searchers:              searchers,
+		numSearchers:           len(searchers),
+		currs:                  make([]*search.DocumentMatch, len(searchers)),
+		scorer:                 scorer.NewDisjunctionQueryScorer(options),
+		min:                    int(min),
+		matching:               make([]*search.DocumentMatch, len(searchers)),
+		matchingIdxs:           make([]int, len(searchers)),
+		scorerOptimizerDisable: scorerOptimizerDisable,
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
@@ -198,7 +206,7 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 		if len(s.matching) >= s.min {
 			found = true
 			// score this match
-			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
+			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers, s.scorerOptimizerDisable)
 		}
 
 		// invoke next on all the matching searchers

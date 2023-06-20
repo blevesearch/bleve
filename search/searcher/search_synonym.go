@@ -32,20 +32,25 @@ func closeSearchers(err *error, searchers ...[]search.Searcher) {
 // For example, "a  b c" is split into ["a", "", "b", "c"].
 func tokenizeSynonym(phrase []byte) []string {
 	var rv []string
-	var tmp string
+	var tmp []byte
 	for _, character := range phrase {
 		if character == synonym.SeparatingCharacter {
-			rv = append(rv, tmp)
-			tmp = ""
+			rv = append(rv, string(tmp))
+			tmp = tmp[:0]
 		} else {
-			tmp = tmp + string(character)
+			tmp = append(tmp, character)
 		}
 	}
-	rv = append(rv, tmp)
+	rv = append(rv, string(tmp))
 	return rv
 }
 
-const synonymSearchCtxKey = "_searcher_positions"
+type synonymSearchCtxKey string
+
+const (
+	synonymFlag     synonymSearchCtxKey = "_synonym_flag"
+	synonymFlagTrue synonymSearchCtxKey = "true"
+)
 
 // This is used for match phrase query support for synonyms, where we need to
 // know the position of the first and last word in the synonym phrase,
@@ -135,7 +140,8 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 				}
 				synonymPhrases[synonymIndex] = searcher
 			}
-			searcher, err = NewDisjunctionSearcher(ctx, indexReader, synonymPhrases, 1, options)
+			innerCtx := context.WithValue(ctx, synonymFlag, synonymFlagTrue)
+			searcher, err = NewDisjunctionSearcher(innerCtx, indexReader, synonymPhrases, 1, options)
 		}
 		if err != nil {
 			return nil, err
@@ -154,7 +160,7 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader,
 				LastPos:  uint64(tok[0].LastPosition),
 			}
 		}
-		ctx = context.WithValue(ctx, synonymSearchCtxKey, searchersPositions)
+		ctx = context.WithValue(ctx, synonymFlag, searchersPositions)
 		searcher, err = NewConjunctionSearcher(ctx, indexReader, outerSearcher, options)
 	}
 	if err != nil {
