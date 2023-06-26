@@ -227,6 +227,7 @@ OUTER:
 			// we only score the document if the relative positioning rule is satisfied
 			// if not, we advance the maxIDIdx and try again
 			var hitTable = make([][]PositionPair, len(s.currs))
+			var hitValidityTable = make([][]bool, len(s.currs))
 			for id, match := range s.currs {
 				hitTable[id] = make([]PositionPair, len(match.FieldTermLocations))
 				firstPos := match.FieldTermLocations[0].Location.Pos
@@ -245,10 +246,14 @@ OUTER:
 				}
 				hitTable[id][colID] = PositionPair{firstPos, lastPos}
 				hitTable[id] = hitTable[id][:colID+1]
+				hitValidityTable[id] = make([]bool, colID+1)
+				for i := range hitValidityTable[id] {
+					hitValidityTable[id][i] = true
+				}
 			}
 
 			for i := 0; i < len(hitTable[0]); i++ {
-				if positionsAreCorrect(s.searcherPositions, 1, hitTable, hitTable[0][i].LastPos) {
+				if positionsAreCorrect(s.searcherPositions, hitTable, hitValidityTable, 0, i) {
 					rv = s.scorer.Score(ctx, s.currs)
 					break
 				}
@@ -276,17 +281,23 @@ OUTER:
 // in the previous row is equal to the difference between the first position of the current searcher and the last position of the previous searcher.
 // If a row is reached where this is not true, the function returns false. If the end of the matrix is reached, the function returns true.
 // The function is called recursively, starting at the second row.
-func positionsAreCorrect(origStream []*PositionPair, currentRow int, hitTable [][]PositionPair, lastPos uint64) bool {
-	if currentRow == len(origStream) {
+func positionsAreCorrect(origStream []*PositionPair, hitTable [][]PositionPair, hitValidityTable [][]bool, currentRow int, currentCol int) bool {
+	if currentRow+1 == len(origStream) {
 		return true
 	}
-	for _, hit := range hitTable[currentRow] {
+	lastPos := hitTable[currentRow][currentCol].LastPos
+	expectedRelativePosition := origStream[currentRow+1].FirstPos - origStream[currentRow].LastPos
+	for col, hit := range hitTable[currentRow+1] {
 		documentRelativePosition := hit.FirstPos - lastPos
-		expectedRelativePosition := origStream[currentRow].FirstPos - origStream[currentRow-1].LastPos
-		if documentRelativePosition == expectedRelativePosition {
-			return positionsAreCorrect(origStream, currentRow+1, hitTable, hit.LastPos)
+		if documentRelativePosition == expectedRelativePosition && hitValidityTable[currentRow+1][col] {
+			if positionsAreCorrect(origStream, hitTable, hitValidityTable, currentRow+1, col) {
+				return true
+			} else {
+				hitValidityTable[currentRow+1][col] = false
+			}
 		}
 	}
+	hitValidityTable[currentRow][currentCol] = false
 	return false
 }
 
