@@ -371,7 +371,20 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 // SetFacetsBuilder registers a facet builder for this collector
 func (hc *TopNCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
 	hc.facetsBuilder = facetsBuilder
-	hc.neededFields = append(hc.neededFields, hc.facetsBuilder.RequiredFields()...)
+	fieldsRequiredForFaceting := facetsBuilder.RequiredFields()
+	// for each of these fields, append only if not already there in hc.neededFields.
+	for _, field := range fieldsRequiredForFaceting {
+		found := false
+		for _, neededField := range hc.neededFields {
+			if field == neededField {
+				found = true
+				break
+			}
+		}
+		if !found {
+			hc.neededFields = append(hc.neededFields, field)
+		}
+	}
 }
 
 // finalizeResults starts with the heap containing the final top size+skip
