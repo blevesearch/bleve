@@ -16,12 +16,12 @@ require (
 	github.com/blevesearch/snowball v0.6.1
 	github.com/blevesearch/snowballstem v0.9.0
 	github.com/blevesearch/upsidedown_store_api v1.0.2
-	github.com/blevesearch/vellum v1.0.9
-	github.com/blevesearch/zapx/v11 v11.3.8
-	github.com/blevesearch/zapx/v12 v12.3.8
-	github.com/blevesearch/zapx/v13 v13.3.8
-	github.com/blevesearch/zapx/v14 v14.3.8
-	github.com/blevesearch/zapx/v15 v15.3.11
+	github.com/blevesearch/vellum v1.0.10
+	github.com/blevesearch/zapx/v11 v11.3.9
+	github.com/blevesearch/zapx/v12 v12.3.9
+	github.com/blevesearch/zapx/v13 v13.3.9
+	github.com/blevesearch/zapx/v14 v14.3.9
+	github.com/blevesearch/zapx/v15 v15.3.12
 	github.com/couchbase/moss v0.2.0
 	github.com/golang/protobuf v1.3.2
 	github.com/spf13/cobra v1.7.0
