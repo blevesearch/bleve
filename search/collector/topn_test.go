@@ -19,7 +19,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/facet"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -721,6 +723,48 @@ func TestCollectorChaining(t *testing.T) {
 
 	if minScore < 10 {
 		t.Errorf("expected minimum score to be higher than 10, got %f", minScore)
+	}
+}
+
+func setupIndex(t *testing.T) index.Index {
+	analysisQueue := index.NewAnalysisQueue(1)
+	i, err := scorch.NewScorch(
+		scorch.Name,
+		map[string]interface{}{
+			"path": "",
+		},
+		analysisQueue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = i.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return i
+}
+
+func TestSetFacetsBuilder(t *testing.T) {
+	// Field common to both sorting and faceting.
+	sortFacetsField := "locations"
+
+	coll := NewTopNCollector(10, 0, search.SortOrder{&search.SortField{Field: sortFacetsField}})
+
+	i := setupIndex(t)
+	indexReader, err := i.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fb := search.NewFacetsBuilder(indexReader)
+	facetBuilder := facet.NewTermsFacetBuilder(sortFacetsField, 100)
+	fb.Add("locations_facet", facetBuilder)
+	coll.SetFacetsBuilder(fb)
+
+	// Should not duplicate the "locations" field in the collector.
+	if len(coll.neededFields) != 1 || coll.neededFields[0] != sortFacetsField {
+		t.Errorf("expected fields in collector: %v, observed: %v", []string{sortFacetsField}, coll.neededFields)
 	}
 }
 
