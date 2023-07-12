@@ -46,6 +46,77 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
+func TestSortedFacetedQuery(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMapping := NewIndexMapping()
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = "en"
+	documentMapping := NewDocumentMapping()
+	indexMapping.AddDocumentMapping("hotel", documentMapping)
+
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.Index = true
+	contentFieldMapping.DocValues = true
+	documentMapping.AddFieldMappingsAt("content", contentFieldMapping)
+	documentMapping.AddFieldMappingsAt("country", contentFieldMapping)
+
+	index, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index.Index("1", map[string]interface{}{
+		"country": "india",
+		"content": "k",
+	})
+	index.Index("2", map[string]interface{}{
+		"country": "india",
+		"content": "l",
+	})
+	index.Index("3", map[string]interface{}{
+		"country": "india",
+		"content": "k",
+	})
+
+	d, err := index.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d != 3 {
+		t.Errorf("expected 3, got %d", d)
+	}
+
+	query := NewMatchPhraseQuery("india")
+	query.SetField("country")
+	searchRequest := NewSearchRequest(query)
+	searchRequest.SortBy([]string{"content"})
+	fr := NewFacetRequest("content", 100)
+	searchRequest.AddFacet("content_facet", fr)
+
+	searchResults, err := index.Search(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedResults := map[string]int{"k": 2, "l": 1}
+
+	for _, v := range searchResults.Facets {
+		for _, v1 := range v.Terms.Terms() {
+			if v1.Count != expectedResults[v1.Term] {
+				t.Errorf("expected %d, got %d", expectedResults[v1.Term], v1.Count)
+			}
+		}
+	}
+}
+
 func TestSearchResultString(t *testing.T) {
 
 	tests := []struct {
