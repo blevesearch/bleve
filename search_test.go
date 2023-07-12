@@ -2154,7 +2154,7 @@ func TestGeoShapePolygonContainsPoint(t *testing.T) {
 			coordinates: []float64{1.5, 48.2},
 		},
 	} {
-		q, err := query.NewGeoShapeQuery(
+		q, err := NewGeoShapeQuery(
 			[][][][]float64{{{test.coordinates}}},
 			geo.PointType,
 			"contains",
