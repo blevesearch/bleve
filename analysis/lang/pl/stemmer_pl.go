@@ -18,7 +18,6 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/lang/pl/stempel"
 	"github.com/blevesearch/bleve/v2/registry"
-	"log"
 )
 
 const SnowballStemmerName = "stemmer_pl"
@@ -27,14 +26,14 @@ type PolishStemmerFilter struct {
 	trie stempel.Trie
 }
 
-func NewPolishStemmerFilter() *PolishStemmerFilter {
+func NewPolishStemmerFilter() (*PolishStemmerFilter, error) {
 	trie, err := stempel.LoadTrie()
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	return &PolishStemmerFilter{
 		trie: trie,
-	}
+	}, nil
 }
 
 func (s *PolishStemmerFilter) Filter(input analysis.TokenStream) analysis.TokenStream {
@@ -48,7 +47,7 @@ func (s *PolishStemmerFilter) Filter(input analysis.TokenStream) analysis.TokenS
 }
 
 func PolishStemmerFilterConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.TokenFilter, error) {
-	return NewPolishStemmerFilter(), nil
+	return NewPolishStemmerFilter()
 }
 
 func init() {
