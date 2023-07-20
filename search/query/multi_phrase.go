@@ -26,9 +26,11 @@ import (
 )
 
 type MultiPhraseQuery struct {
-	Terms    [][]string `json:"terms"`
-	Field    string     `json:"field,omitempty"`
-	BoostVal *Boost     `json:"boost,omitempty"`
+	Terms     [][]string `json:"terms"`
+	Field     string     `json:"field,omitempty"`
+	BoostVal  *Boost     `json:"boost,omitempty"`
+	Fuzziness int        `json:"fuzziness,omitempty"`
+	Prefix    int        `json:"prefix,omitempty"`
 }
 
 // NewMultiPhraseQuery creates a new Query for finding
@@ -47,6 +49,14 @@ func NewMultiPhraseQuery(terms [][]string, field string) *MultiPhraseQuery {
 	}
 }
 
+func (q *MultiPhraseQuery) SetFuzziness(f int) {
+	q.Fuzziness = f
+}
+
+func (q *MultiPhraseQuery) SetPrefix(p int) {
+	q.Prefix = p
+}
+
 func (q *MultiPhraseQuery) SetBoost(b float64) {
 	boost := Boost(b)
 	q.BoostVal = &boost
@@ -57,7 +67,7 @@ func (q *MultiPhraseQuery) Boost() float64 {
 }
 
 func (q *MultiPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-	return searcher.NewMultiPhraseSearcher(ctx, i, q.Terms, q.Field, options)
+	return searcher.NewMultiPhraseSearcher(ctx, i, q.Terms, q.Field, options, q.Fuzziness, q.Prefix, q.BoostVal.Value())
 }
 
 func (q *MultiPhraseQuery) Validate() error {

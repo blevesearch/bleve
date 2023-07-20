@@ -130,7 +130,7 @@ func TestMultiPhraseSearch(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		searcher, err := NewMultiPhraseSearcher(nil, reader, test.phrase, "desc", soptions)
+		searcher, err := NewMultiPhraseSearcher(nil, reader, test.phrase, "desc", soptions, 0, 0, 1.0)
 		if err != nil {
 			t.Error(err)
 		}
