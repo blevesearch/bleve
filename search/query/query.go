@@ -74,7 +74,8 @@ func ParseQuery(input []byte) (Query, error) {
 	}
 	_, isMatchQuery := tmp["match"]
 	_, hasFuzziness := tmp["fuzziness"]
-	if hasFuzziness && !isMatchQuery {
+	_, isMatchPhraseQuery := tmp["match_phrase"]
+	if hasFuzziness && !isMatchQuery && !isMatchPhraseQuery {
 		var rv FuzzyQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
@@ -99,7 +100,6 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
-	_, isMatchPhraseQuery := tmp["match_phrase"]
 	if isMatchPhraseQuery {
 		var rv MatchPhraseQuery
 		err := json.Unmarshal(input, &rv)
