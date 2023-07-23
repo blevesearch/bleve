@@ -29,8 +29,8 @@ type MatchPhraseQuery struct {
 	FieldVal    string `json:"field,omitempty"`
 	Analyzer    string `json:"analyzer,omitempty"`
 	BoostVal    *Boost `json:"boost,omitempty"`
-	Fuzziness   int    `json:"fuzziness,omitempty"`
-	Prefix      int    `json:"prefix,omitempty"`
+	Prefix      int    `json:"prefix_length"`
+	Fuzziness   int    `json:"fuzziness"`
 }
 
 // NewMatchPhraseQuery creates a new Query object
