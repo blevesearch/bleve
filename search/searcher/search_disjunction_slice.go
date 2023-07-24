@@ -197,8 +197,10 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 	for !found && len(s.matching) > 0 {
 		if len(s.matching) >= s.min {
 			found = true
+			partialMatch := len(s.matching) != len(s.searchers)
 			// score this match
 			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
+			rv.PartialMatch = partialMatch
 		}
 
 		// invoke next on all the matching searchers
