@@ -37,7 +37,7 @@ func TestPhraseSearch(t *testing.T) {
 	}()
 
 	soptions := search.SearcherOptions{Explain: true, IncludeTermVectors: true}
-	phraseSearcher, err := NewPhraseSearcher(nil, twoDocIndexReader, []string{"angst", "beer"}, "desc", soptions)
+	phraseSearcher, err := NewPhraseSearcher(nil, twoDocIndexReader, []string{"angst", "beer"}, 0, 0, "desc", 1.0, soptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestMultiPhraseSearch(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		searcher, err := NewMultiPhraseSearcher(nil, reader, test.phrase, "desc", soptions, 0, 0, 1.0)
+		searcher, err := NewMultiPhraseSearcher(nil, reader, test.phrase, 0, 0, "desc", 1.0, soptions)
 		if err != nil {
 			t.Error(err)
 		}
@@ -169,49 +169,49 @@ func TestFuzzyMultiPhraseSearch(t *testing.T) {
 	soptions := search.SearcherOptions{Explain: true, IncludeTermVectors: true}
 
 	tests := []struct {
-		phrase    [][]string
+		mphrase   [][]string
 		docids    [][]byte
 		fuzziness int
 		prefix    int
 	}{
 		{
-			phrase:    [][]string{[]string{"pale", "anger"}, []string{"best"}, []string{"colon", "porch"}},
+			mphrase:   [][]string{[]string{"pale", "anger"}, []string{"best"}, []string{"colon", "porch"}},
 			docids:    [][]byte{[]byte("2"), []byte("3")},
 			fuzziness: 2,
 			prefix:    0,
 		},
 		{
-			phrase:    [][]string{[]string{"pale", "anger"}, []string{}, []string{"colon", "porch", "could"}},
+			mphrase:   [][]string{[]string{"pale", "anger"}, []string{}, []string{"colon", "porch", "could"}},
 			docids:    [][]byte{[]byte("2")},
 			fuzziness: 2,
 			prefix:    1,
 		},
 		{
-			phrase:    [][]string{[]string{"pale", "anger"}, []string{}, []string{"colon", "porch", "could"}},
+			mphrase:   [][]string{[]string{"pale", "anger"}, []string{}, []string{"colon", "porch", "could"}},
 			docids:    nil,
 			fuzziness: 1,
 			prefix:    1,
 		},
 		{
-			phrase:    [][]string{[]string{"anger", "pale"}, []string{}, []string{"colon", "porch"}},
+			mphrase:   [][]string{[]string{"anger", "pale"}, []string{}, []string{"colon", "porch"}},
 			docids:    [][]byte{[]byte("2"), []byte("3")},
 			fuzziness: 2,
 			prefix:    0,
 		},
 		{
-			phrase:    [][]string{[]string{"app"}, []string{"best"}, []string{"volume"}},
+			mphrase:   [][]string{[]string{"app"}, []string{"best"}, []string{"volume"}},
 			docids:    [][]byte{[]byte("3")},
 			fuzziness: 2,
 			prefix:    0,
 		},
 		{
-			phrase:    [][]string{[]string{"anger", "pale", "bar"}, []string{"beard"}, []string{}, []string{}},
+			mphrase:   [][]string{[]string{"anger", "pale", "bar"}, []string{"beard"}, []string{}, []string{}},
 			docids:    [][]byte{[]byte("1"), []byte("2"), []byte("3"), []byte("4")},
 			fuzziness: 2,
 			prefix:    0,
 		},
 		{
-			phrase:    [][]string{[]string{"anger", "pale", "bar"}, []string{}, []string{"beard"}, []string{}},
+			mphrase:   [][]string{[]string{"anger", "pale", "bar"}, []string{}, []string{"beard"}, []string{}},
 			docids:    [][]byte{[]byte("1"), []byte("4")},
 			fuzziness: 2,
 			prefix:    0,
@@ -224,7 +224,7 @@ func TestFuzzyMultiPhraseSearch(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		searcher, err := NewMultiPhraseSearcher(context.TODO(), reader, test.phrase, "desc", soptions, test.fuzziness, test.prefix, 1.0)
+		searcher, err := NewMultiPhraseSearcher(context.TODO(), reader, test.mphrase, test.prefix, test.fuzziness, "desc", 1.0, soptions)
 		if err != nil {
 			t.Error(err)
 		}

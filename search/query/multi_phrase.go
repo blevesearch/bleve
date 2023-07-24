@@ -67,7 +67,7 @@ func (q *MultiPhraseQuery) Boost() float64 {
 }
 
 func (q *MultiPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-	return searcher.NewMultiPhraseSearcher(ctx, i, q.Terms, q.Field, options, q.Fuzziness, q.Prefix, q.BoostVal.Value())
+	return searcher.NewMultiPhraseSearcher(ctx, i, q.Terms, q.Prefix, q.Fuzziness, q.Field, q.BoostVal.Value(), options)
 }
 
 func (q *MultiPhraseQuery) Validate() error {

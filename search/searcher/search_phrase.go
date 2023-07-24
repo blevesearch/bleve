@@ -66,16 +66,20 @@ func (s *PhraseSearcher) Size() int {
 	return sizeInBytes
 }
 
-func NewPhraseSearcher(ctx context.Context, indexReader index.IndexReader, terms []string, field string, options search.SearcherOptions) (*PhraseSearcher, error) {
+func NewPhraseSearcher(ctx context.Context, indexReader index.IndexReader, terms []string,
+	prefix, fuzziness int, field string, boost float64, options search.SearcherOptions) (*PhraseSearcher, error) {
+
 	// turn flat terms []string into [][]string
 	mterms := make([][]string, len(terms))
 	for i, term := range terms {
 		mterms[i] = []string{term}
 	}
-	return NewMultiPhraseSearcher(ctx, indexReader, mterms, field, options, 0, 0, 1.0)
+	return NewMultiPhraseSearcher(ctx, indexReader, mterms, prefix, fuzziness, field, boost, options)
 }
 
-func NewMultiPhraseSearcher(ctx context.Context, indexReader index.IndexReader, terms [][]string, field string, options search.SearcherOptions, fuzziness int, prefix int, boost float64) (*PhraseSearcher, error) {
+func NewMultiPhraseSearcher(ctx context.Context, indexReader index.IndexReader, terms [][]string,
+	prefix, fuzziness int, field string, boost float64, options search.SearcherOptions) (*PhraseSearcher, error) {
+
 	options.IncludeTermVectors = true
 	var termPositionSearchers []search.Searcher
 	var err error
