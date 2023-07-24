@@ -1154,6 +1154,136 @@ func TestDisjunctionQueryIncorrectMin(t *testing.T) {
 	}
 }
 
+func TestMatchQueryPartialMatch(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+	idx, err := New(tmpIndexPath, NewIndexMapping())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	doc1 := map[string]interface{}{
+		"description": "Patrick is first name Stewart is last name",
+	}
+	doc2 := map[string]interface{}{
+		"description": "Manager given name is Patrick",
+	}
+	batch := idx.NewBatch()
+	if err = batch.Index("doc1", doc1); err != nil {
+		t.Fatal(err)
+	}
+	if err = batch.Index("doc2", doc2); err != nil {
+		t.Fatal(err)
+	}
+	if err = idx.Batch(batch); err != nil {
+		t.Fatal(err)
+	}
+	// Test 1 - Both Docs hit, doc 1 = Full Match and doc 2 = Partial Match
+	mq1 := NewMatchQuery("patrick stewart")
+	mq1.SetField("description")
+
+	sr := NewSearchRequest(mq1)
+	res, err := idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 2 {
+		t.Errorf("Expected 2 results, but got: %v", res.Total)
+	}
+	for _, hit := range res.Hits {
+		if hit.ID == "doc1" && hit.PartialMatch {
+			t.Errorf("Expected doc1 to be a full match")
+		}
+		if hit.ID == "doc2" && !hit.PartialMatch {
+			t.Errorf("Expected doc2 to be a partial match")
+		}
+	}
+
+	// Test 2 - Both Docs hit, doc 1 = Partial Match and doc 2 = Full Match
+	mq2 := NewMatchQuery("paltric manner")
+	mq2.SetField("description")
+	mq2.SetFuzziness(2)
+
+	sr = NewSearchRequest(mq2)
+	res, err = idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 2 {
+		t.Errorf("Expected 2 results, but got: %v", res.Total)
+	}
+	for _, hit := range res.Hits {
+		if hit.ID == "doc1" && !hit.PartialMatch {
+			t.Errorf("Expected doc1 to be a partial match")
+		}
+		if hit.ID == "doc2" && hit.PartialMatch {
+			t.Errorf("Expected doc2 to be a full match")
+		}
+	}
+	// Test 3 - Two Docs hits, both full match
+	mq3 := NewMatchQuery("patrick")
+	mq3.SetField("description")
+
+	sr = NewSearchRequest(mq3)
+	res, err = idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 2 {
+		t.Errorf("Expected 2 results, but got: %v", res.Total)
+	}
+	for _, hit := range res.Hits {
+		if hit.ID == "doc1" && hit.PartialMatch {
+			t.Errorf("Expected doc1 to be a full match")
+		}
+		if hit.ID == "doc2" && hit.PartialMatch {
+			t.Errorf("Expected doc2 to be a full match")
+		}
+	}
+	// Test 4 - Two Docs hits, both partial match
+	mq4 := NewMatchQuery("patrick stewart manager")
+	mq4.SetField("description")
+
+	sr = NewSearchRequest(mq4)
+	res, err = idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 2 {
+		t.Errorf("Expected 2 results, but got: %v", res.Total)
+	}
+	for _, hit := range res.Hits {
+		if hit.ID == "doc1" && !hit.PartialMatch {
+			t.Errorf("Expected doc1 to be a partial match")
+		}
+		if hit.ID == "doc2" && !hit.PartialMatch {
+			t.Errorf("Expected doc2 to be a partial match")
+		}
+	}
+
+	// Test 5 - Match Query AND operator always results in full match
+	mq5 := NewMatchQuery("patrick stewart")
+	mq5.SetField("description")
+	mq5.SetOperator(1)
+
+	sr = NewSearchRequest(mq5)
+	res, err = idx.Search(sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Total != 1 {
+		t.Errorf("Expected 1 result, but got: %v", res.Total)
+	}
+	if res.Hits[0].ID == "doc2" || res.Hits[0].PartialMatch {
+		t.Errorf("Expected doc1 to be a full match")
+	}
+}
+
 func TestBooleanShouldMinPropagation(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
