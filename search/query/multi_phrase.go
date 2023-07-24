@@ -29,8 +29,8 @@ type MultiPhraseQuery struct {
 	Terms     [][]string `json:"terms"`
 	Field     string     `json:"field,omitempty"`
 	BoostVal  *Boost     `json:"boost,omitempty"`
-	Fuzziness int        `json:"fuzziness,omitempty"`
-	Prefix    int        `json:"prefix,omitempty"`
+	Fuzziness int        `json:"fuzziness"`
+	Prefix    int        `json:"prefix_length"`
 }
 
 // NewMultiPhraseQuery creates a new Query for finding
@@ -87,5 +87,7 @@ func (q *MultiPhraseQuery) UnmarshalJSON(data []byte) error {
 	q.Terms = tmp.Terms
 	q.Field = tmp.Field
 	q.BoostVal = tmp.BoostVal
+	q.Fuzziness = tmp.Fuzziness
+	q.Prefix = tmp.Prefix
 	return nil
 }

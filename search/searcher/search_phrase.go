@@ -27,12 +27,6 @@ import (
 
 var reflectStaticSizePhraseSearcher int
 
-type contextKey int
-
-const (
-	fuzzyMatchPhrase contextKey = iota
-)
-
 func init() {
 	var ps PhraseSearcher
 	reflectStaticSizePhraseSearcher = int(reflect.TypeOf(ps).Size())
@@ -89,7 +83,7 @@ func NewMultiPhraseSearcher(ctx context.Context, indexReader index.IndexReader, 
 	var fuzzyTermMatches map[string][]string
 	if fuzziness > 0 {
 		fuzzyTermMatches = make(map[string][]string)
-		ctx = context.WithValue(ctx, fuzzyMatchPhrase, fuzzyTermMatches)
+		ctx = context.WithValue(ctx, search.FuzzyMatchPhraseKey, fuzzyTermMatches)
 	}
 	for _, termPos := range terms {
 		if len(termPos) == 1 && termPos[0] != "" {
