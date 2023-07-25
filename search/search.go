@@ -172,7 +172,7 @@ type DocumentMatch struct {
 	// this means that the match is partial because
 	// not all sub-queries matched
 	// if false, all the sub-queries matched
-	PartialMatch bool `json:"-"`
+	PartialMatch bool `json:"partial_match,omitempty"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
