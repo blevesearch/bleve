@@ -30,7 +30,6 @@ type MultiPhraseQuery struct {
 	Field     string     `json:"field,omitempty"`
 	BoostVal  *Boost     `json:"boost,omitempty"`
 	Fuzziness int        `json:"fuzziness"`
-	Prefix    int        `json:"prefix_length"`
 }
 
 // NewMultiPhraseQuery creates a new Query for finding
@@ -53,10 +52,6 @@ func (q *MultiPhraseQuery) SetFuzziness(f int) {
 	q.Fuzziness = f
 }
 
-func (q *MultiPhraseQuery) SetPrefix(p int) {
-	q.Prefix = p
-}
-
 func (q *MultiPhraseQuery) SetBoost(b float64) {
 	boost := Boost(b)
 	q.BoostVal = &boost
@@ -67,7 +62,7 @@ func (q *MultiPhraseQuery) Boost() float64 {
 }
 
 func (q *MultiPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-	return searcher.NewMultiPhraseSearcher(ctx, i, q.Terms, q.Prefix, q.Fuzziness, q.Field, q.BoostVal.Value(), options)
+	return searcher.NewMultiPhraseSearcher(ctx, i, q.Terms, q.Fuzziness, q.Field, q.BoostVal.Value(), options)
 }
 
 func (q *MultiPhraseQuery) Validate() error {
@@ -88,6 +83,5 @@ func (q *MultiPhraseQuery) UnmarshalJSON(data []byte) error {
 	q.Field = tmp.Field
 	q.BoostVal = tmp.BoostVal
 	q.Fuzziness = tmp.Fuzziness
-	q.Prefix = tmp.Prefix
 	return nil
 }

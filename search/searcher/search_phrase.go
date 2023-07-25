@@ -67,18 +67,18 @@ func (s *PhraseSearcher) Size() int {
 }
 
 func NewPhraseSearcher(ctx context.Context, indexReader index.IndexReader, terms []string,
-	prefix, fuzziness int, field string, boost float64, options search.SearcherOptions) (*PhraseSearcher, error) {
+	fuzziness int, field string, boost float64, options search.SearcherOptions) (*PhraseSearcher, error) {
 
 	// turn flat terms []string into [][]string
 	mterms := make([][]string, len(terms))
 	for i, term := range terms {
 		mterms[i] = []string{term}
 	}
-	return NewMultiPhraseSearcher(ctx, indexReader, mterms, prefix, fuzziness, field, boost, options)
+	return NewMultiPhraseSearcher(ctx, indexReader, mterms, fuzziness, field, boost, options)
 }
 
 func NewMultiPhraseSearcher(ctx context.Context, indexReader index.IndexReader, terms [][]string,
-	prefix, fuzziness int, field string, boost float64, options search.SearcherOptions) (*PhraseSearcher, error) {
+	fuzziness int, field string, boost float64, options search.SearcherOptions) (*PhraseSearcher, error) {
 
 	options.IncludeTermVectors = true
 	var termPositionSearchers []search.Searcher
@@ -89,12 +89,15 @@ func NewMultiPhraseSearcher(ctx context.Context, indexReader index.IndexReader, 
 		fuzzyTermMatches = make(map[string][]string)
 		ctx = context.WithValue(ctx, search.FuzzyMatchPhraseKey, fuzzyTermMatches)
 	}
+	// in case of fuzzy multi-phrase, phrase and match-phrase queries we hardcode the
+	// prefix length to 0, as setting a per word matching prefix length would not be
+	// make sense from a user perspective.
 	for _, termPos := range terms {
 		if len(termPos) == 1 && termPos[0] != "" {
 			// single term
 			if fuzziness > 0 {
 				// fuzzy
-				ts, err = NewFuzzySearcher(ctx, indexReader, termPos[0], prefix, fuzziness, field, boost, options)
+				ts, err = NewFuzzySearcher(ctx, indexReader, termPos[0], 0, fuzziness, field, boost, options)
 			} else {
 				// non-fuzzy
 				ts, err = NewTermSearcher(ctx, indexReader, termPos[0], field, boost, options)
@@ -116,7 +119,7 @@ func NewMultiPhraseSearcher(ctx context.Context, indexReader index.IndexReader, 
 				}
 				if fuzziness > 0 {
 					// fuzzy
-					ts, err = NewFuzzySearcher(ctx, indexReader, term, prefix, fuzziness, field, boost, options)
+					ts, err = NewFuzzySearcher(ctx, indexReader, term, 0, fuzziness, field, boost, options)
 				} else {
 					// non-fuzzy
 					ts, err = NewTermSearcher(ctx, indexReader, term, field, boost, options)

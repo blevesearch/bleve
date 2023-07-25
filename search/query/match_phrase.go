@@ -29,7 +29,6 @@ type MatchPhraseQuery struct {
 	FieldVal    string `json:"field,omitempty"`
 	Analyzer    string `json:"analyzer,omitempty"`
 	BoostVal    *Boost `json:"boost,omitempty"`
-	Prefix      int    `json:"prefix_length"`
 	Fuzziness   int    `json:"fuzziness"`
 }
 
@@ -64,10 +63,6 @@ func (q *MatchPhraseQuery) SetFuzziness(f int) {
 	q.Fuzziness = f
 }
 
-func (q *MatchPhraseQuery) SetPrefix(p int) {
-	q.Prefix = p
-}
-
 func (q *MatchPhraseQuery) Field() string {
 	return q.FieldVal
 }
@@ -95,7 +90,6 @@ func (q *MatchPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		phraseQuery := NewMultiPhraseQuery(phrase, field)
 		phraseQuery.SetBoost(q.BoostVal.Value())
 		phraseQuery.SetFuzziness(q.Fuzziness)
-		phraseQuery.SetPrefix(q.Prefix)
 		return phraseQuery.Searcher(ctx, i, m, options)
 	}
 	noneQuery := NewMatchNoneQuery()
