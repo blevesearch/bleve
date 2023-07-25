@@ -90,7 +90,7 @@ func NewMultiPhraseSearcher(ctx context.Context, indexReader index.IndexReader, 
 		ctx = context.WithValue(ctx, search.FuzzyMatchPhraseKey, fuzzyTermMatches)
 	}
 	// in case of fuzzy multi-phrase, phrase and match-phrase queries we hardcode the
-	// prefix length to 0, as setting a per word matching prefix length would not be
+	// prefix length to 0, as setting a per word matching prefix length would not
 	// make sense from a user perspective.
 	for _, termPos := range terms {
 		if len(termPos) == 1 && termPos[0] != "" {
