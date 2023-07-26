@@ -1,3 +1,6 @@
+//go:build densevector
+// +build densevector
+
 package document
 
 import (

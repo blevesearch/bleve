@@ -76,34 +76,16 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 				return err
 			}
 		}
-		switch field.Type {
-		case "text", "datetime", "number", "boolean", "geopoint", "geoshape",
-			"IP", "densevector":
-		default:
-			return fmt.Errorf("unknown field type: '%s'", field.Type)
+
+		err := validateFieldType(field.Type)
+		if err != nil {
+			return err
 		}
 
 		if field.Type == "densevector" {
-			if field.Dims <= 0 || field.Dims > 1024 {
-				return fmt.Errorf("invalid dense vector dimension,"+
-					" value should be in range (%d, %d]", 0, 1024)
-			}
-
-			if field.Similarity == "" {
-				field.Similarity = SimilarityDefault
-			}
-
-			// following fields are not applicable for dense vector
-			// thus, we set them to default values
-			field.IncludeInAll = false
-			field.IncludeTermVectors = false
-			field.Store = false
-			field.DocValues = false
-
-			if _, ok := SimilarityValid[field.Similarity]; !ok {
-				return fmt.Errorf("invalid similarity value: '%s', "+
-					"valid values are: %+v", field.Similarity,
-					reflect.ValueOf(SimilarityValid).MapKeys())
+			err := validateDenseVectorField(field)
+			if err != nil {
+				return err
 			}
 		}
 	}

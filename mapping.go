@@ -74,10 +74,6 @@ func NewGeoShapeFieldMapping() *mapping.FieldMapping {
 	return mapping.NewGeoShapeFieldMapping()
 }
 
-func NewDenseVectorFieldMapping() *mapping.FieldMapping {
-	return mapping.NewDenseVectorFieldMapping()
-}
-
 func NewIPFieldMapping() *mapping.FieldMapping {
 	return mapping.NewIPFieldMapping()
 }
