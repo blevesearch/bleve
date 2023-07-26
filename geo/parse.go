@@ -24,15 +24,24 @@ import (
 // interpret it is as geo point.  Supported formats:
 // Container:
 // slice length 2 (GeoJSON)
-//  first element lon, second element lat
+//
+//	first element lon, second element lat
+//
 // string (coordinates separated by comma, or a geohash)
-//  first element lat, second element lon
+//
+//	first element lat, second element lon
+//
 // map[string]interface{}
-//  exact keys lat and lon or lng
+//
+//	exact keys lat and lon or lng
+//
 // struct
-//  w/exported fields case-insensitive match on lat and lon or lng
+//
+//	w/exported fields case-insensitive match on lat and lon or lng
+//
 // struct
-//  satisfying Later and Loner or Lnger interfaces
+//
+//	satisfying Later and Loner or Lnger interfaces
 //
 // in all cases values must be some sort of numeric-like thing: int/uint/float
 func ExtractGeoPoint(thing interface{}) (lon, lat float64, success bool) {
@@ -52,12 +61,12 @@ func ExtractGeoPoint(thing interface{}) (lon, lat float64, success bool) {
 			first := thingVal.Index(0)
 			if first.CanInterface() {
 				firstVal := first.Interface()
-				lon, foundLon = extractNumericVal(firstVal)
+				lon, foundLon = ExtractNumericValDouble(firstVal)
 			}
 			second := thingVal.Index(1)
 			if second.CanInterface() {
 				secondVal := second.Interface()
-				lat, foundLat = extractNumericVal(secondVal)
+				lat, foundLat = ExtractNumericValDouble(secondVal)
 			}
 		}
 	}
@@ -96,12 +105,12 @@ func ExtractGeoPoint(thing interface{}) (lon, lat float64, success bool) {
 	// is it a map
 	if l, ok := thing.(map[string]interface{}); ok {
 		if lval, ok := l["lon"]; ok {
-			lon, foundLon = extractNumericVal(lval)
+			lon, foundLon = ExtractNumericValDouble(lval)
 		} else if lval, ok := l["lng"]; ok {
-			lon, foundLon = extractNumericVal(lval)
+			lon, foundLon = ExtractNumericValDouble(lval)
 		}
 		if lval, ok := l["lat"]; ok {
-			lat, foundLat = extractNumericVal(lval)
+			lat, foundLat = ExtractNumericValDouble(lval)
 		}
 	}
 
@@ -112,19 +121,19 @@ func ExtractGeoPoint(thing interface{}) (lon, lat float64, success bool) {
 			if strings.HasPrefix(strings.ToLower(fieldName), "lon") {
 				if thingVal.Field(i).CanInterface() {
 					fieldVal := thingVal.Field(i).Interface()
-					lon, foundLon = extractNumericVal(fieldVal)
+					lon, foundLon = ExtractNumericValDouble(fieldVal)
 				}
 			}
 			if strings.HasPrefix(strings.ToLower(fieldName), "lng") {
 				if thingVal.Field(i).CanInterface() {
 					fieldVal := thingVal.Field(i).Interface()
-					lon, foundLon = extractNumericVal(fieldVal)
+					lon, foundLon = ExtractNumericValDouble(fieldVal)
 				}
 			}
 			if strings.HasPrefix(strings.ToLower(fieldName), "lat") {
 				if thingVal.Field(i).CanInterface() {
 					fieldVal := thingVal.Field(i).Interface()
-					lat, foundLat = extractNumericVal(fieldVal)
+					lat, foundLat = ExtractNumericValDouble(fieldVal)
 				}
 			}
 		}
@@ -148,8 +157,8 @@ func ExtractGeoPoint(thing interface{}) (lon, lat float64, success bool) {
 	return lon, lat, foundLon && foundLat
 }
 
-// extract numeric value (if possible) and returns a float64
-func extractNumericVal(v interface{}) (float64, bool) {
+// extract numeric value (if possible) and returns a float64 (Double Precision)
+func ExtractNumericValDouble(v interface{}) (float64, bool) {
 	val := reflect.ValueOf(v)
 	if !val.IsValid() {
 		return 0, false
@@ -162,6 +171,25 @@ func extractNumericVal(v interface{}) (float64, bool) {
 		return float64(val.Int()), true
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return float64(val.Uint()), true
+	}
+
+	return 0, false
+}
+
+// extract numeric value (if possible) and returns a float32 (Single Precision)
+func ExtractNumericValSingle(v interface{}) (float32, bool) {
+	val := reflect.ValueOf(v)
+	if !val.IsValid() {
+		return 0, false
+	}
+	typ := val.Type()
+	switch typ.Kind() {
+	case reflect.Float32, reflect.Float64:
+		return float32(val.Float()), true
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float32(val.Int()), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float32(val.Uint()), true
 	}
 
 	return 0, false
@@ -200,12 +228,12 @@ func extractCoordinates(thing interface{}) []float64 {
 			first := thingVal.Index(0)
 			if first.CanInterface() {
 				firstVal := first.Interface()
-				lon, foundLon = extractNumericVal(firstVal)
+				lon, foundLon = ExtractNumericValDouble(firstVal)
 			}
 			second := thingVal.Index(1)
 			if second.CanInterface() {
 				secondVal := second.Interface()
-				lat, foundLat = extractNumericVal(secondVal)
+				lat, foundLat = ExtractNumericValDouble(secondVal)
 			}
 
 			if !foundLon || !foundLat {

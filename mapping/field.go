@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"reflect"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
@@ -69,6 +70,23 @@ type FieldMapping struct {
 	// the processing of freq/norm details when the default score based relevancy
 	// isn't needed.
 	SkipFreqNorm bool `json:"skip_freq_norm,omitempty"`
+
+	// Dimension of the dense vector
+	Dims int `json:"dims,omitempty"`
+
+	// Similarity is the similarity algorithm used for scoring
+	// dense_vector fields. See also SimilarityDefault and SimilarityValid
+	Similarity string `json:"similarity,omitempty"`
+}
+
+// Default Similarity value for dense_vector fields
+const SimilarityDefault = "l2_norm"
+
+// Set of Valid Similarity values for dense_vector fields
+var SimilarityValid = map[string]bool{
+	"l2_norm":     true, // default
+	"cosine":      false,
+	"dot_product": false,
 }
 
 // NewTextFieldMapping returns a default field mapping for text
@@ -181,6 +199,16 @@ func NewGeoShapeFieldMapping() *FieldMapping {
 		Index:        true,
 		IncludeInAll: true,
 		DocValues:    true,
+	}
+}
+
+func NewDenseVectorFieldMapping() *FieldMapping {
+	return &FieldMapping{
+		Type:         "densevector",
+		Store:        false,
+		Index:        true,
+		IncludeInAll: false,
+		DocValues:    false,
 	}
 }
 
@@ -310,6 +338,36 @@ func (fm *FieldMapping) processIP(ip net.IP, pathString string, path []string, i
 	context.doc.AddField(field)
 
 	if !fm.IncludeInAll {
+		context.excludedFromAll = append(context.excludedFromAll, fieldName)
+	}
+}
+
+func (fm *FieldMapping) processDenseVector(propertyMightBeDenseVector interface{},
+	pathString string, path []string, indexes []uint64, context *walkContext) {
+	propertyVal := reflect.ValueOf(propertyMightBeDenseVector)
+	if !propertyVal.IsValid() {
+		return
+	}
+
+	if propertyVal.Kind() == reflect.Slice {
+		dv := make([]float32, propertyVal.Len())
+		for i := 0; i < propertyVal.Len(); i++ {
+			item := propertyVal.Index(i)
+			if item.CanInterface() {
+				itemVal := item.Interface()
+				itemFloat, _ := geo.ExtractNumericValSingle(itemVal)
+				// In case, itemVal is not numeric, dv[i] will be 0
+				dv[i] = itemFloat
+			}
+		}
+
+		fieldName := getFieldName(pathString, path, fm)
+		options := fm.Options()
+		field := document.NewDenseVectorFieldWithIndexingOptions(fieldName,
+			indexes, dv, fm.Dims, fm.Similarity, options)
+		context.doc.AddField(field)
+
+		// Dense vector fields are not included in all
 		context.excludedFromAll = append(context.excludedFromAll, fieldName)
 	}
 }
@@ -445,6 +503,16 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 			}
 		case "skip_freq_norm":
 			err := json.Unmarshal(v, &fm.SkipFreqNorm)
+			if err != nil {
+				return err
+			}
+		case "dims":
+			err := json.Unmarshal(v, &fm.Dims)
+			if err != nil {
+				return err
+			}
+		case "similarity":
+			err := json.Unmarshal(v, &fm.Similarity)
 			if err != nil {
 				return err
 			}
