@@ -18,6 +18,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/blevesearch/bleve/v2/util"
 )
 
 // ExtractGeoPoint takes an arbitrary interface{} and tries it's best to
@@ -61,12 +63,12 @@ func ExtractGeoPoint(thing interface{}) (lon, lat float64, success bool) {
 			first := thingVal.Index(0)
 			if first.CanInterface() {
 				firstVal := first.Interface()
-				lon, foundLon = extractNumericVal(firstVal)
+				lon, foundLon = util.ExtractNumericValFloat64(firstVal)
 			}
 			second := thingVal.Index(1)
 			if second.CanInterface() {
 				secondVal := second.Interface()
-				lat, foundLat = extractNumericVal(secondVal)
+				lat, foundLat = util.ExtractNumericValFloat64(secondVal)
 			}
 		}
 	}
@@ -105,12 +107,12 @@ func ExtractGeoPoint(thing interface{}) (lon, lat float64, success bool) {
 	// is it a map
 	if l, ok := thing.(map[string]interface{}); ok {
 		if lval, ok := l["lon"]; ok {
-			lon, foundLon = extractNumericVal(lval)
+			lon, foundLon = util.ExtractNumericValFloat64(lval)
 		} else if lval, ok := l["lng"]; ok {
-			lon, foundLon = extractNumericVal(lval)
+			lon, foundLon = util.ExtractNumericValFloat64(lval)
 		}
 		if lval, ok := l["lat"]; ok {
-			lat, foundLat = extractNumericVal(lval)
+			lat, foundLat = util.ExtractNumericValFloat64(lval)
 		}
 	}
 
@@ -121,19 +123,19 @@ func ExtractGeoPoint(thing interface{}) (lon, lat float64, success bool) {
 			if strings.HasPrefix(strings.ToLower(fieldName), "lon") {
 				if thingVal.Field(i).CanInterface() {
 					fieldVal := thingVal.Field(i).Interface()
-					lon, foundLon = extractNumericVal(fieldVal)
+					lon, foundLon = util.ExtractNumericValFloat64(fieldVal)
 				}
 			}
 			if strings.HasPrefix(strings.ToLower(fieldName), "lng") {
 				if thingVal.Field(i).CanInterface() {
 					fieldVal := thingVal.Field(i).Interface()
-					lon, foundLon = extractNumericVal(fieldVal)
+					lon, foundLon = util.ExtractNumericValFloat64(fieldVal)
 				}
 			}
 			if strings.HasPrefix(strings.ToLower(fieldName), "lat") {
 				if thingVal.Field(i).CanInterface() {
 					fieldVal := thingVal.Field(i).Interface()
-					lat, foundLat = extractNumericVal(fieldVal)
+					lat, foundLat = util.ExtractNumericValFloat64(fieldVal)
 				}
 			}
 		}
@@ -155,25 +157,6 @@ func ExtractGeoPoint(thing interface{}) (lon, lat float64, success bool) {
 	}
 
 	return lon, lat, foundLon && foundLat
-}
-
-// extract numeric value (if possible) and returns a float64
-func extractNumericVal(v interface{}) (float64, bool) {
-	val := reflect.ValueOf(v)
-	if !val.IsValid() {
-		return 0, false
-	}
-	typ := val.Type()
-	switch typ.Kind() {
-	case reflect.Float32, reflect.Float64:
-		return val.Float(), true
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return float64(val.Int()), true
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return float64(val.Uint()), true
-	}
-
-	return 0, false
 }
 
 // various support interfaces which can be used to find lat/lon
@@ -209,12 +192,12 @@ func extractCoordinates(thing interface{}) []float64 {
 			first := thingVal.Index(0)
 			if first.CanInterface() {
 				firstVal := first.Interface()
-				lon, foundLon = extractNumericVal(firstVal)
+				lon, foundLon = util.ExtractNumericValFloat64(firstVal)
 			}
 			second := thingVal.Index(1)
 			if second.CanInterface() {
 				secondVal := second.Interface()
-				lat, foundLat = extractNumericVal(secondVal)
+				lat, foundLat = util.ExtractNumericValFloat64(secondVal)
 			}
 
 			if !foundLon || !foundLat {
