@@ -269,6 +269,7 @@ func (h *HighlightRequest) AddField(field string) {
 //
 // A special field named "*" can be used to return all fields.
 type SearchRequest struct {
+	ClientContextID  string            `json:"client_context_id"`
 	Query            query.Query       `json:"query"`
 	Size             int               `json:"size"`
 	From             int               `json:"from"`
@@ -283,6 +284,10 @@ type SearchRequest struct {
 	SearchBefore     []string          `json:"search_before"`
 
 	sortFunc func(sort.Interface)
+}
+
+func (r *SearchRequest) SetClientContextID(id string) {
+	r.ClientContextID = id
 }
 
 func (r *SearchRequest) Validate() error {
@@ -356,6 +361,7 @@ func (r *SearchRequest) SetSearchBefore(before []string) {
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	var temp struct {
+		ClientContextID  string            `json:"client_context_id"`
 		Q                json.RawMessage   `json:"query"`
 		Size             *int              `json:"size"`
 		From             int               `json:"from"`
@@ -388,6 +394,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 			return err
 		}
 	}
+	r.ClientContextID = temp.ClientContextID
 	r.From = temp.From
 	r.Explain = temp.Explain
 	r.Highlight = temp.Highlight
@@ -426,11 +433,12 @@ func NewSearchRequest(q query.Query) *SearchRequest {
 // By default results are ordered by score, descending.
 func NewSearchRequestOptions(q query.Query, size, from int, explain bool) *SearchRequest {
 	return &SearchRequest{
-		Query:   q,
-		Size:    size,
-		From:    from,
-		Explain: explain,
-		Sort:    search.SortOrder{&search.SortScore{Desc: true}},
+		ClientContextID: search.NewUUID(),
+		Query:           q,
+		Size:            size,
+		From:            from,
+		Explain:         explain,
+		Sort:            search.SortOrder{&search.SortScore{Desc: true}},
 	}
 }
 
