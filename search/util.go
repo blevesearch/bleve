@@ -16,8 +16,6 @@ package search
 
 import (
 	"context"
-	"fmt"
-	"math/rand"
 )
 
 func MergeLocations(locations []FieldTermLocationMap) FieldTermLocationMap {
@@ -121,11 +119,4 @@ func RecordSearchCost(ctx context.Context,
 			aggCallbackFn.(SearchIncrementalCostCallbackFn)(msg, queryType, bytes)
 		}
 	}
-}
-
-func NewUUID() string {
-	val1 := rand.Int63()
-	val2 := rand.Int63()
-	uuid := fmt.Sprintf("%x%x", val1, val2)
-	return uuid[0:16]
 }

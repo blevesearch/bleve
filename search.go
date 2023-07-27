@@ -269,7 +269,7 @@ func (h *HighlightRequest) AddField(field string) {
 //
 // A special field named "*" can be used to return all fields.
 type SearchRequest struct {
-	ClientContextID  string            `json:"client_context_id"`
+	ClientContextID  string            `json:"client_context_id,omitempty"`
 	Query            query.Query       `json:"query"`
 	Size             int               `json:"size"`
 	From             int               `json:"from"`
@@ -433,12 +433,11 @@ func NewSearchRequest(q query.Query) *SearchRequest {
 // By default results are ordered by score, descending.
 func NewSearchRequestOptions(q query.Query, size, from int, explain bool) *SearchRequest {
 	return &SearchRequest{
-		ClientContextID: search.NewUUID(),
-		Query:           q,
-		Size:            size,
-		From:            from,
-		Explain:         explain,
-		Sort:            search.SortOrder{&search.SortScore{Desc: true}},
+		Query:   q,
+		Size:    size,
+		From:    from,
+		Explain: explain,
+		Sort:    search.SortOrder{&search.SortScore{Desc: true}},
 	}
 }
 
