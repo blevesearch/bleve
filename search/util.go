@@ -14,9 +14,7 @@
 
 package search
 
-import (
-	"context"
-)
+import "context"
 
 func MergeLocations(locations []FieldTermLocationMap) FieldTermLocationMap {
 	rv := locations[0]
