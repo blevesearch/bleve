@@ -16,6 +16,7 @@ package flexible
 
 import (
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -44,6 +45,52 @@ func (p *DateTimeParser) ParseDateTime(input string) (time.Time, error) {
 	return time.Time{}, analysis.ErrInvalidDateTime
 }
 
+func validateLayout(layout string) bool {
+	validMagicNumbers := map[string]bool{
+		"2006":    true,
+		"06":      true, // Year
+		"01":      true,
+		"1":       true,
+		"_1":      true,
+		"January": true,
+		"Jan":     true, // Month
+		"02":      true,
+		"2":       true,
+		"_2":      true,
+		"Monday":  true,
+		"Mon":     true, // Day
+		"15":      true,
+		"3":       true,
+		"03":      true, // Hour
+		"4":       true,
+		"04":      true, // Minute
+		"5":       true,
+		"05":      true, // Second
+		"PM":      true,
+		"pm":      true,
+		"MST":     true,
+		"Z0700":   true, // prints Z for UTC
+		"Z070000": true,
+		"Z07":     true,
+		"0700":    true,
+		"070000":  true,
+		"07":      true,
+		"":        true,
+	}
+	re := regexp.MustCompile("[- :T,\\.<>;\\?!`~@#$%\\^&\\*|\\(\\){}\\[\\]/\\\\]")
+	split := re.Split(layout, -1)
+	for _, v := range split {
+		fmt.Println(v)
+	}
+
+	for i := range split {
+		if !validMagicNumbers[split[i]] {
+			return false
+		}
+	}
+	return true
+
+}
 func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.DateTimeParser, error) {
 	layouts, ok := config["layouts"].([]interface{})
 	if !ok {
@@ -53,6 +100,11 @@ func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Ca
 	for _, layout := range layouts {
 		layoutStr, ok := layout.(string)
 		if ok {
+			if !validateLayout(layoutStr) {
+				return nil, fmt.Errorf("invalid datetime parser layout: %s,"+
+					" please refer to https://pkg.go.dev/time#pkg-constants for valid"+
+					" constants to use", layoutStr)
+			}
 			layoutStrs = append(layoutStrs, layoutStr)
 		}
 	}
