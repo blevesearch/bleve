@@ -17,6 +17,7 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
+
 	index "github.com/blevesearch/bleve_index_api"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -417,17 +418,40 @@ func (im *IndexMappingImpl) DateTimeParserNamed(name string) analysis.DateTimePa
 	return dateTimeParser
 }
 
-func (im *IndexMappingImpl) datetimeParserNameForPath(path string) string {
-
+func (im *IndexMappingImpl) DatetimeParserNameForPath(path string) string {
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
-		pathMapping, _ := docMapping.documentMappingForPath(path)
-		if pathMapping != nil {
-			if len(pathMapping.Fields) > 0 {
-				if pathMapping.Fields[0].Analyzer != "" {
-					return pathMapping.Fields[0].Analyzer
-				}
+		dateTimeParser := docMapping.dateTimeParserForPath(path)
+		if dateTimeParser != "" {
+			return dateTimeParser
+		}
+	}
+
+	// now try the default mapping
+	pathMapping, _ := im.DefaultMapping.documentMappingForPath(path)
+	if pathMapping != nil {
+		if len(pathMapping.Fields) > 0 {
+			if pathMapping.Fields[0].DateFormat != "" {
+				return pathMapping.Fields[0].DateFormat
 			}
+		}
+	}
+
+	// next we will try default date-time parsers for the path
+	pathDecoded := decodePath(path)
+	for _, docMapping := range im.TypeMapping {
+		if docMapping.Enabled {
+			rv := docMapping.defaultDateTimeParser(pathDecoded)
+			if rv != "" {
+				return rv
+			}
+		}
+	}
+	// now the default date-time parser for the default mapping
+	if im.DefaultMapping.Enabled {
+		rv := im.DefaultMapping.defaultDateTimeParser(pathDecoded)
+		if rv != "" {
+			return rv
 		}
 	}
 
