@@ -17,6 +17,7 @@ package flexible
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -24,6 +25,37 @@ import (
 )
 
 const Name = "flexiblego"
+
+var validMagicNumbers = map[string]struct{}{
+	"2006":    {},
+	"06":      {}, // Year
+	"01":      {},
+	"1":       {},
+	"_1":      {},
+	"January": {},
+	"Jan":     {}, // Month
+	"02":      {},
+	"2":       {},
+	"_2":      {},
+	"Monday":  {},
+	"Mon":     {}, // Day
+	"15":      {},
+	"3":       {},
+	"03":      {}, // Hour
+	"4":       {},
+	"04":      {}, // Minute
+	"5":       {},
+	"05":      {}, // Second
+	"0700":    {},
+	"070000":  {},
+	"07":      {},
+	"00":      {},
+	"":        {},
+}
+
+var layoutSplitRegex = regexp.MustCompile("[- :T,Z\\.<>;\\?!`~@#$%\\^&\\*|\\(\\){}\\[\\]/\\\\\\'\\\"]")
+
+var layoutConstants = []string{"PM", "pm", "MST", ".999999999", ".000000000", ".000000", ".000"}
 
 type DateTimeParser struct {
 	layouts []string
@@ -45,51 +77,23 @@ func (p *DateTimeParser) ParseDateTime(input string) (time.Time, error) {
 	return time.Time{}, analysis.ErrInvalidDateTime
 }
 
-func validateLayout(layout string) bool {
-	validMagicNumbers := map[string]bool{
-		"2006":    true,
-		"06":      true, // Year
-		"01":      true,
-		"1":       true,
-		"_1":      true,
-		"January": true,
-		"Jan":     true, // Month
-		"02":      true,
-		"2":       true,
-		"_2":      true,
-		"Monday":  true,
-		"Mon":     true, // Day
-		"15":      true,
-		"3":       true,
-		"03":      true, // Hour
-		"4":       true,
-		"04":      true, // Minute
-		"5":       true,
-		"05":      true, // Second
-		"PM":      true,
-		"pm":      true,
-		"MST":     true,
-		"Z0700":   true, // prints Z for UTC
-		"Z070000": true,
-		"Z07":     true,
-		"0700":    true,
-		"070000":  true,
-		"07":      true,
-		"":        true,
+func stripLayout(layout string) string {
+	for _, k := range layoutConstants {
+		layout = strings.ReplaceAll(layout, k, "")
 	}
-	re := regexp.MustCompile("[- :T,\\.<>;\\?!`~@#$%\\^&\\*|\\(\\){}\\[\\]/\\\\]")
-	split := re.Split(layout, -1)
-	for _, v := range split {
-		fmt.Println(v)
-	}
+	return layout
+}
 
+func validateLayout(layout string) bool {
+	layout = stripLayout(layout)
+	split := layoutSplitRegex.Split(layout, -1)
 	for i := range split {
-		if !validMagicNumbers[split[i]] {
+		_, found := validMagicNumbers[split[i]]
+		if !found {
 			return false
 		}
 	}
 	return true
-
 }
 func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.DateTimeParser, error) {
 	layouts, ok := config["layouts"].([]interface{})
@@ -102,8 +106,8 @@ func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Ca
 		if ok {
 			if !validateLayout(layoutStr) {
 				return nil, fmt.Errorf("invalid datetime parser layout: %s,"+
-					" please refer to https://pkg.go.dev/time#pkg-constants for valid"+
-					" constants to use", layoutStr)
+					" please refer to https://pkg.go.dev/time#pkg-constants for supported"+
+					" layouts", layoutStr)
 			}
 			layoutStrs = append(layoutStrs, layoutStr)
 		}
