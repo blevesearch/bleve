@@ -199,18 +199,18 @@ func (q *DateRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m ma
 		// ParseQuery path since at least one of rawStart and rawEnd is not empty
 		// parse rawStart and rawEnd to time.Time objects
 		var err error
-		dateTimeParser := m.DateTimeParserNamed(m.DatetimeParserNameForPath(field))
-		fmt.Println("dateTimeParser: ", dateTimeParser)
+		dateTimeParserName := m.DatetimeParserNameForPath(field)
+		dateTimeParser := m.DateTimeParserNamed(dateTimeParserName)
 		if q.rawStart != "" {
 			q.Start.Time, err = dateTimeParser.ParseDateTime(q.rawStart)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("%v, date time parser name: %s", err, dateTimeParserName)
 			}
 		}
 		if q.rawEnd != "" {
 			q.End.Time, err = dateTimeParser.ParseDateTime(q.rawEnd)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("%v, date time parser name: %s", err, dateTimeParserName)
 			}
 		}
 	}
