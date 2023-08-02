@@ -1,4 +1,4 @@
-//  Copyright (c) 2022 Couchbase, Inc.
+//  Copyright (c) 2023 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,8 +36,8 @@ const DefaultDenseVectorIndexingOptions = index.IndexField
 
 type DenseVectorField struct {
 	name              string
-	dims              int
-	similarity        string
+	dims              int    // Dimensionality of the vector
+	similarity        string // Similarity metric to use for scoring
 	options           index.FieldIndexingOptions
 	value             []float32
 	numPlainTextBytes uint64
@@ -46,7 +46,7 @@ type DenseVectorField struct {
 func (n *DenseVectorField) Size() int {
 	return reflectStaticSizeDenseVectorField + size.SizeOfPtr +
 		len(n.name) +
-		int(numBytesSingleFloats(n.value))
+		int(numBytesFloat32s(n.value))
 }
 
 func (n *DenseVectorField) Name() string {
@@ -88,8 +88,8 @@ func (n *DenseVectorField) Value() []byte {
 }
 
 func (n *DenseVectorField) GoString() string {
-	return fmt.Sprintf("&document.DenseVectorField{Name:%s, Options: %s, Value: %+v}",
-		n.name, n.options, n.value)
+	return fmt.Sprintf("&document.DenseVectorField{Name:%s, Options: %s, "+
+		"Value: %+v}", n.name, n.options, n.value)
 }
 
 // For the sake of not polluting the API, we are keeping arrayPositions as a
@@ -103,7 +103,8 @@ func NewDenseVectorField(name string, arrayPositions []uint64,
 // For the sake of not polluting the API, we are keeping arrayPositions as a
 // parameter, but it is not used.
 func NewDenseVectorFieldWithIndexingOptions(name string, arrayPositions []uint64,
-	denseVector []float32, dims int, similarity string, options index.FieldIndexingOptions) *DenseVectorField {
+	denseVector []float32, dims int, similarity string,
+	options index.FieldIndexingOptions) *DenseVectorField {
 	options = options | DefaultDenseVectorIndexingOptions
 
 	return &DenseVectorField{
@@ -112,15 +113,26 @@ func NewDenseVectorFieldWithIndexingOptions(name string, arrayPositions []uint64
 		similarity:        similarity,
 		options:           options,
 		value:             denseVector,
-		numPlainTextBytes: numBytesSingleFloats(denseVector),
+		numPlainTextBytes: numBytesFloat32s(denseVector),
 	}
 }
 
-func numBytesSingleFloats(value []float32) uint64 {
-	return uint64(len(value) * 4)
+func numBytesFloat32s(value []float32) uint64 {
+	return uint64(len(value) * size.SizeOfFloat32)
 }
 
-// DenseVector is an implementation of the index.DenseVectorField interface.
-func (n *DenseVectorField) DenseVector() ([]float32, int, string) {
-	return n.value, n.dims, n.similarity
+// -----------------------------------------------------------------------------
+// Following methods help in implementing the bleve_index_api's DenseVectorField
+// interface.
+
+func (n *DenseVectorField) DenseVector() []float32 {
+	return n.value
+}
+
+func (n *DenseVectorField) Dims() int {
+	return n.dims
+}
+
+func (n *DenseVectorField) Similarity() string {
+	return n.similarity
 }
