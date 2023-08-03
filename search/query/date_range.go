@@ -30,10 +30,10 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-// QueryDateTimeParser controls the default query date time parser
+// QueryDateTimeParser controls the default query date time parser in User Path.
 var QueryDateTimeParser = optional.Name
 
-// QueryDateTimeFormat controls the format when Marshaling to JSON
+// QueryDateTimeFormat controls the format when Marshaling to JSON in User Path.
 var QueryDateTimeFormat = time.RFC3339Nano
 
 var cache = registry.NewCache()
@@ -68,6 +68,7 @@ func (t *BleveQueryTime) MarshalJSON() ([]byte, error) {
 }
 
 func (t *BleveQueryTime) UnmarshalJSON(data []byte) error {
+	// called in the User Path where we can use the default date time parser.
 	var timeString string
 	err := json.Unmarshal(data, &timeString)
 	if err != nil {
@@ -84,6 +85,59 @@ func (t *BleveQueryTime) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func DateRangeUnmarshal(input []byte, obj *DateRangeQuery) error {
+	// Only called in ParseQuery path, since we do not know the date time parser.
+	var objmap map[string]interface{}
+	err := json.Unmarshal(input, &objmap)
+	if err != nil {
+		return err
+	}
+	if objmap["start"] != nil {
+		rawStart, canConvert := objmap["start"].(string)
+		if !canConvert {
+			return fmt.Errorf("invalid start")
+		}
+		obj.rawStart = rawStart
+	}
+	if objmap["end"] != nil {
+		rawEnd, canConvert := objmap["end"].(string)
+		if !canConvert {
+			return fmt.Errorf("invalid end")
+		}
+		obj.rawEnd = rawEnd
+	}
+	if objmap["inclusive_start"] != nil {
+		inclusiveStart, canConvert := objmap["inclusive_start"].(bool)
+		if !canConvert {
+			return fmt.Errorf("invalid inclusive_start")
+		}
+		obj.InclusiveStart = &inclusiveStart
+	}
+	if objmap["inclusive_end"] != nil {
+		inclusiveEnd, canConvert := objmap["inclusive_end"].(bool)
+		if !canConvert {
+			return fmt.Errorf("invalid inclusive_end")
+		}
+		obj.InclusiveEnd = &inclusiveEnd
+	}
+	if objmap["boost"] != nil {
+		boost, canConvert := objmap["boost"].(float64)
+		if !canConvert {
+			return fmt.Errorf("invalid boost")
+		}
+		boostVal := Boost(boost)
+		obj.BoostVal = &boostVal
+	}
+	if objmap["field"] != nil {
+		fieldVal, canConvert := objmap["field"].(string)
+		if !canConvert {
+			return fmt.Errorf("invalid field")
+		}
+		obj.FieldVal = fieldVal
+	}
+	return nil
+}
+
 type DateRangeQuery struct {
 	Start          BleveQueryTime `json:"start,omitempty"`
 	End            BleveQueryTime `json:"end,omitempty"`
@@ -91,14 +145,14 @@ type DateRangeQuery struct {
 	InclusiveEnd   *bool          `json:"inclusive_end,omitempty"`
 	FieldVal       string         `json:"field,omitempty"`
 	BoostVal       *Boost         `json:"boost,omitempty"`
+	rawStart       string         `json:"-"`
+	rawEnd         string         `json:"-"`
 }
 
 // NewDateRangeQuery creates a new Query for ranges
 // of date values.
 // Date strings are parsed using the DateTimeParser configured in the
-//
-//	top-level config.QueryDateTimeParser
-//
+// top-level config.QueryDateTimeParser
 // Either, but not both endpoints can be nil.
 func NewDateRangeQuery(start, end time.Time) *DateRangeQuery {
 	return NewDateRangeInclusiveQuery(start, end, nil, nil)
@@ -139,16 +193,33 @@ func (q *DateRangeQuery) Field() string {
 }
 
 func (q *DateRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-	min, max, err := q.parseEndpoints()
-	if err != nil {
-		return nil, err
-	}
-
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
-
+	if q.rawStart != "" || q.rawEnd != "" {
+		// ParseQuery path since at least one of rawStart and rawEnd is not empty
+		// parse rawStart and rawEnd to time.Time objects
+		var err error
+		dateTimeParserName := m.DatetimeParserNameForPath(field)
+		dateTimeParser := m.DateTimeParserNamed(dateTimeParserName)
+		if q.rawStart != "" {
+			q.Start.Time, err = dateTimeParser.ParseDateTime(q.rawStart)
+			if err != nil {
+				return nil, fmt.Errorf("%v, date time parser name: %s", err, dateTimeParserName)
+			}
+		}
+		if q.rawEnd != "" {
+			q.End.Time, err = dateTimeParser.ParseDateTime(q.rawEnd)
+			if err != nil {
+				return nil, fmt.Errorf("%v, date time parser name: %s", err, dateTimeParserName)
+			}
+		}
+	}
+	min, max, err := q.parseEndpoints()
+	if err != nil {
+		return nil, err
+	}
 	return searcher.NewNumericRangeSearcher(ctx, i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal.Value(), options)
 }
 
@@ -186,13 +257,23 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 }
 
 func (q *DateRangeQuery) Validate() error {
+	// First test for User path
 	if q.Start.IsZero() && q.End.IsZero() {
-		return fmt.Errorf("must specify start or end")
+		// Test for ParseQuery path
+		if q.rawStart == "" && q.rawEnd == "" {
+			// Really invalid now
+			return fmt.Errorf("date range query must specify at least one of start/end")
+		}
 	}
-	_, _, err := q.parseEndpoints()
-	if err != nil {
-		return err
+	if !q.Start.IsZero() || !q.End.IsZero() {
+		// User path
+		_, _, err := q.parseEndpoints()
+		if err != nil {
+			return err
+		}
 	}
+	// Do not validate endpoints for ParseQuery path since we do not know the date time parser
+	// Instead validate in the Searcher, where we get the index mapping.
 	return nil
 }
 

@@ -39,11 +39,12 @@ import (
 // are used.  To disable this automatic handling, set
 // Dynamic to false.
 type DocumentMapping struct {
-	Enabled         bool                        `json:"enabled"`
-	Dynamic         bool                        `json:"dynamic"`
-	Properties      map[string]*DocumentMapping `json:"properties,omitempty"`
-	Fields          []*FieldMapping             `json:"fields,omitempty"`
-	DefaultAnalyzer string                      `json:"default_analyzer,omitempty"`
+	Enabled               bool                        `json:"enabled"`
+	Dynamic               bool                        `json:"dynamic"`
+	Properties            map[string]*DocumentMapping `json:"properties,omitempty"`
+	Fields                []*FieldMapping             `json:"fields,omitempty"`
+	DefaultAnalyzer       string                      `json:"default_analyzer,omitempty"`
+	DefaultDateTimeParser string                      `json:"default_date_time_parser,omitempty"`
 
 	// StructTagKey overrides "json" when looking for field names in struct tags
 	StructTagKey string `json:"struct_tag_key,omitempty"`
@@ -92,6 +93,14 @@ func (dm *DocumentMapping) analyzerNameForPath(path string) string {
 	field := dm.fieldDescribedByPath(path)
 	if field != nil {
 		return field.Analyzer
+	}
+	return ""
+}
+
+func (dm *DocumentMapping) dateTimeParserForPath(path string) string {
+	field := dm.fieldDescribedByPath(path)
+	if field != nil {
+		return field.DateFormat
 	}
 	return ""
 }
@@ -266,6 +275,11 @@ func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
+		case "default_datetime_parser":
+			err := json.Unmarshal(v, &dm.DefaultDateTimeParser)
+			if err != nil {
+				return err
+			}
 		case "properties":
 			err := json.Unmarshal(v, &dm.Properties)
 			if err != nil {
@@ -304,6 +318,22 @@ func (dm *DocumentMapping) defaultAnalyzerName(path []string) string {
 		}
 		if current.DefaultAnalyzer != "" {
 			rv = current.DefaultAnalyzer
+		}
+	}
+	return rv
+}
+
+func (dm *DocumentMapping) defaultDateTimeParser(path []string) string {
+	current := dm
+	rv := current.DefaultDateTimeParser
+	for _, pathElement := range path {
+		var ok bool
+		current, ok = current.Properties[pathElement]
+		if !ok {
+			break
+		}
+		if current.DefaultDateTimeParser != "" {
+			rv = current.DefaultDateTimeParser
 		}
 	}
 	return rv
