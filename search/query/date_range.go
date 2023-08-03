@@ -34,7 +34,7 @@ import (
 var QueryDateTimeParser = optional.Name
 
 // QueryDateTimeFormat controls the format when Marshaling to JSON
-var QueryDateTimeFormat = time.RFC3339
+var QueryDateTimeFormat = time.RFC3339Nano
 
 var cache = registry.NewCache()
 
@@ -42,12 +42,12 @@ type BleveQueryTime struct {
 	time.Time
 }
 
-var MinRFC3339CompatibleTime time.Time
-var MaxRFC3339CompatibleTime time.Time
+var MinRFC3339NanoCompatibleTime time.Time
+var MaxRFC3339NanoCompatibleTime time.Time
 
 func init() {
-	MinRFC3339CompatibleTime, _ = time.Parse(time.RFC3339, "1677-12-01T00:00:00Z")
-	MaxRFC3339CompatibleTime, _ = time.Parse(time.RFC3339, "2262-04-11T11:59:59Z")
+	MinRFC3339NanoCompatibleTime, _ = time.Parse(time.RFC3339Nano, "1677-12-01T00:00:00.999999999Z")
+	MaxRFC3339NanoCompatibleTime, _ = time.Parse(time.RFC3339Nano, "2262-04-11T11:59:59.999999999Z")
 }
 
 func queryTimeFromString(t string) (time.Time, error) {
@@ -96,7 +96,9 @@ type DateRangeQuery struct {
 // NewDateRangeQuery creates a new Query for ranges
 // of date values.
 // Date strings are parsed using the DateTimeParser configured in the
-//  top-level config.QueryDateTimeParser
+//
+//	top-level config.QueryDateTimeParser
+//
 // Either, but not both endpoints can be nil.
 func NewDateRangeQuery(start, end time.Time) *DateRangeQuery {
 	return NewDateRangeInclusiveQuery(start, end, nil, nil)
@@ -105,7 +107,9 @@ func NewDateRangeQuery(start, end time.Time) *DateRangeQuery {
 // NewDateRangeInclusiveQuery creates a new Query for ranges
 // of date values.
 // Date strings are parsed using the DateTimeParser configured in the
-//  top-level config.QueryDateTimeParser
+//
+//	top-level config.QueryDateTimeParser
+//
 // Either, but not both endpoints can be nil.
 // startInclusive and endInclusive control inclusion of the endpoints.
 func NewDateRangeInclusiveQuery(start, end time.Time, startInclusive, endInclusive *bool) *DateRangeQuery {
@@ -152,6 +156,11 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 	min := math.Inf(-1)
 	max := math.Inf(1)
 	if !q.Start.IsZero() {
+		if q.Start.Year() == 0 {
+			// year is zero, so this time.Time has unspecified date
+			// but is Not Zero so must have time only
+			q.Start.Time = q.Start.Time.AddDate(1700, 0, 0)
+		}
 		if !isDatetimeCompatible(q.Start) {
 			// overflow
 			return nil, nil, fmt.Errorf("invalid/unsupported date range, start: %v", q.Start)
@@ -160,6 +169,11 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 		min = numeric.Int64ToFloat64(startInt64)
 	}
 	if !q.End.IsZero() {
+		if q.End.Year() == 0 {
+			// year is zero, so this time.Time has unspecified date
+			// but is Not Zero so must have time only
+			q.End.Time = q.End.Time.AddDate(1700, 0, 0)
+		}
 		if !isDatetimeCompatible(q.End) {
 			// overflow
 			return nil, nil, fmt.Errorf("invalid/unsupported date range, end: %v", q.End)
@@ -183,8 +197,8 @@ func (q *DateRangeQuery) Validate() error {
 }
 
 func isDatetimeCompatible(t BleveQueryTime) bool {
-	if QueryDateTimeFormat == time.RFC3339 &&
-		(t.Before(MinRFC3339CompatibleTime) || t.After(MaxRFC3339CompatibleTime)) {
+	if QueryDateTimeFormat == time.RFC3339Nano &&
+		(t.Before(MinRFC3339NanoCompatibleTime) || t.After(MaxRFC3339NanoCompatibleTime)) {
 		return false
 	}
 
