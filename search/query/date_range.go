@@ -46,8 +46,8 @@ var MinRFC3339NanoCompatibleTime time.Time
 var MaxRFC3339NanoCompatibleTime time.Time
 
 func init() {
-	MinRFC3339NanoCompatibleTime, _ = time.Parse(time.RFC3339Nano, "1677-12-01T00:00:00.999999999Z")
-	MaxRFC3339NanoCompatibleTime, _ = time.Parse(time.RFC3339Nano, "2262-04-11T11:59:59.999999999Z")
+	MinRFC3339NanoCompatibleTime, _ = time.Parse(time.RFC3339Nano, "1677-12-01T00:00:00.000000000Z")
+	MaxRFC3339NanoCompatibleTime, _ = time.Parse(time.RFC3339Nano, "2262-04-11T11:59:59.000000000Z")
 }
 
 func queryTimeFromString(t string) (time.Time, error) {

@@ -119,8 +119,8 @@ func TestValidateDatetimeRanges(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		startTime, _ := time.Parse(time.RFC3339, test.start)
-		endTime, _ := time.Parse(time.RFC3339, test.end)
+		startTime, _ := time.Parse(time.RFC3339Nano, test.start)
+		endTime, _ := time.Parse(time.RFC3339Nano, test.end)
 
 		dateRangeQuery := NewDateRangeQuery(startTime, endTime)
 		if (dateRangeQuery.Validate() == nil) != test.expect {
