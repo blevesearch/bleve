@@ -16,6 +16,8 @@ package flexible
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -57,6 +59,37 @@ var formatSpecifierToLayout = map[byte]string{
 	'U':             ".000",
 }
 
+var validMagicNumbers = map[string]struct{}{
+	"2006":    {},
+	"06":      {}, // Year
+	"01":      {},
+	"1":       {},
+	"_1":      {},
+	"January": {},
+	"Jan":     {}, // Month
+	"02":      {},
+	"2":       {},
+	"_2":      {},
+	"Monday":  {},
+	"Mon":     {}, // Day
+	"15":      {},
+	"3":       {},
+	"03":      {}, // Hour
+	"4":       {},
+	"04":      {}, // Minute
+	"5":       {},
+	"05":      {}, // Second
+	"0700":    {},
+	"070000":  {},
+	"07":      {},
+	"00":      {},
+	"":        {},
+}
+
+var layoutSplitRegex = regexp.MustCompile("[- :T,Z\\.<>;\\?!`~@#$%\\^&\\*|\\(\\){}\\[\\]/\\\\\\'\\\"]")
+
+var layoutConstants = []string{"PM", "pm", "MST", ".999999999", ".000000000", ".000000", ".000"}
+
 type DateTimeParser struct {
 	layouts []string
 }
@@ -84,12 +117,14 @@ func (p *DateTimeParser) ParseDateTime(input string) (time.Time, error) {
 
 func parseFormatString(formatString string) (string, error) {
 	dateTimeLayout := ""
+	usingNewFormat := false
 	for idx := 0; idx < len(formatString); {
 		if formatString[idx] == formatDelimiter {
 			if idx+1 < len(formatString) {
 				if layout, ok := formatSpecifierToLayout[formatString[idx+1]]; ok {
 					dateTimeLayout += layout
 					idx += 2
+					usingNewFormat = true
 				} else {
 					return "", fmt.Errorf("invalid format string, unknown format specifier: " + string(formatString[idx+1]))
 				}
@@ -101,9 +136,30 @@ func parseFormatString(formatString string) (string, error) {
 			idx++
 		}
 	}
+	if !usingNewFormat {
+		return "", nil
+	}
 	return dateTimeLayout, nil
 }
 
+func stripLayout(layout string) string {
+	for _, k := range layoutConstants {
+		layout = strings.ReplaceAll(layout, k, "")
+	}
+	return layout
+}
+
+func validateLayout(layout string) bool {
+	layout = stripLayout(layout)
+	split := layoutSplitRegex.Split(layout, -1)
+	for i := range split {
+		_, found := validMagicNumbers[split[i]]
+		if !found {
+			return false
+		}
+	}
+	return true
+}
 func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.DateTimeParser, error) {
 	layouts, ok := config["layouts"].([]interface{})
 	if !ok {
@@ -113,11 +169,21 @@ func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Ca
 	for _, layout := range layouts {
 		layoutStr, ok := layout.(string)
 		if ok {
-			layoutStr, err := parseFormatString(layoutStr)
+			layout, err := parseFormatString(layoutStr)
 			if err != nil {
 				return nil, err
 			}
-			layoutStrs = append(layoutStrs, layoutStr)
+			if layout == "" {
+				// if layout is empty, and there is no error then it means that the layoutStr
+				// is not using the new format and is in the old format
+				if !validateLayout(layoutStr) {
+					return nil, fmt.Errorf("invalid datetime parser layout: %s,"+
+						" please refer to https://pkg.go.dev/time#pkg-constants for supported"+
+						" layouts", layoutStr)
+				}
+				layout = layoutStr
+			}
+			layoutStrs = append(layoutStrs, layout)
 		}
 	}
 	return New(layoutStrs), nil
