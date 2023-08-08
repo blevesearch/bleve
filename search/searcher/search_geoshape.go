@@ -70,7 +70,20 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 	var dvShapeValue []byte
 	var startReading, finishReading bool
 	var reader *bytes.Reader
-	var bufPool [][]byte
+
+	bufPool := make([][]byte, 11)
+	bufPool[0] = make([]byte, 8192*3)
+	bufPool[1] = make([]byte, 4096*3)
+	bufPool[2] = make([]byte, 2048*3)
+	bufPool[3] = make([]byte, 1024*3)
+	bufPool[4] = make([]byte, 512*3)
+	bufPool[5] = make([]byte, 256*3)
+	bufPool[6] = make([]byte, 128*3)
+	bufPool[7] = make([]byte, 64*3)
+	bufPool[8] = make([]byte, 32*3)
+	bufPool[9] = make([]byte, 16*3)
+	bufPool[10] = make([]byte, 8*3)
+
 	return func(d *search.DocumentMatch) bool {
 		var found bool
 
