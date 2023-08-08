@@ -70,6 +70,7 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 	var dvShapeValue []byte
 	var startReading, finishReading bool
 	var reader *bytes.Reader
+	var bufPool [][]byte
 	return func(d *search.DocumentMatch) bool {
 		var found bool
 
@@ -104,7 +105,7 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 					// apply the filter once the entire docvalue is finished reading.
 					if finishReading {
 						v, err := geojson.FilterGeoShapesOnRelation(shape,
-							dvShapeValue, relation, &reader)
+							dvShapeValue, relation, &reader, &bufPool)
 						if err == nil && v {
 							found = true
 						}
