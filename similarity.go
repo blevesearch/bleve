@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build vectors
-// +build vectors
+//go:build densevector
+// +build densevector
 
 package bleve
 
-import "github.com/blevesearch/bleve/v2/mapping"
+import "github.com/blevesearch/bleve/v2/search/query"
 
-func NewDenseVectorFieldMapping() *mapping.FieldMapping {
-	return mapping.NewDenseVectorFieldMapping()
+func addSimilarityQuery(req *SearchRequest) query.Query {
+	if req.Similarity != nil {
+		similarityQuery := query.NewSimilarityQuery(req.Similarity.Vector)
+		similarityQuery.SetFieldVal(req.Similarity.Field)
+		similarityQuery.SetK(req.Similarity.K)
+		return query.NewConjunctionQuery([]query.Query{req.Query, similarityQuery})
+	}
+	return nil
 }
