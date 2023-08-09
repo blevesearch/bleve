@@ -482,7 +482,15 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey,
 		search.SearchIOStatsCallbackFunc(sendBytesRead))
 
-	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
+	// Using a conjunction query to get intersection of results from similarity query
+	// and the original query
+	searchQuery := req.Query
+	similaritySearchQuery := addSimilarityQuery(req)
+	if similaritySearchQuery != nil {
+		searchQuery = similaritySearchQuery
+	}
+
+	searcher, err := searchQuery.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
 		IncludeTermVectors: req.IncludeLocations || req.Highlight != nil,
 		Score:              req.Score,
