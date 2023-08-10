@@ -88,7 +88,7 @@ func (sqs *SimilarityQueryScorer) Weight() float64 {
 }
 
 func (sqs *SimilarityQueryScorer) SetQueryNorm(qnorm float64) {
-	sqs.queryNorm = qnorm
+	sqs.queryNorm = qnorm * sqs.queryWeight
 
 	// update the query weight
 	sqs.queryWeight = sqs.queryBoost
