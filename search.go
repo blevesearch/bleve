@@ -18,6 +18,7 @@
 package bleve
 
 import (
+	"encoding/json"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -60,4 +61,65 @@ type SearchRequest struct {
 	SearchBefore     []string          `json:"search_before"`
 
 	sortFunc func(sort.Interface)
+}
+
+// UnmarshalJSON deserializes a JSON representation of
+// a SearchRequest
+func (r *SearchRequest) UnmarshalJSON(input []byte) error {
+	var temp struct {
+		Q                json.RawMessage   `json:"query"`
+		Size             *int              `json:"size"`
+		From             int               `json:"from"`
+		Highlight        *HighlightRequest `json:"highlight"`
+		Fields           []string          `json:"fields"`
+		Facets           FacetsRequest     `json:"facets"`
+		Explain          bool              `json:"explain"`
+		Sort             []json.RawMessage `json:"sort"`
+		IncludeLocations bool              `json:"includeLocations"`
+		Score            string            `json:"score"`
+		SearchAfter      []string          `json:"search_after"`
+		SearchBefore     []string          `json:"search_before"`
+	}
+
+	err := json.Unmarshal(input, &temp)
+	if err != nil {
+		return err
+	}
+
+	if temp.Size == nil {
+		r.Size = 10
+	} else {
+		r.Size = *temp.Size
+	}
+	if temp.Sort == nil {
+		r.Sort = search.SortOrder{&search.SortScore{Desc: true}}
+	} else {
+		r.Sort, err = search.ParseSortOrderJSON(temp.Sort)
+		if err != nil {
+			return err
+		}
+	}
+	r.From = temp.From
+	r.Explain = temp.Explain
+	r.Highlight = temp.Highlight
+	r.Fields = temp.Fields
+	r.Facets = temp.Facets
+	r.IncludeLocations = temp.IncludeLocations
+	r.Score = temp.Score
+	r.SearchAfter = temp.SearchAfter
+	r.SearchBefore = temp.SearchBefore
+	r.Query, err = query.ParseQuery(temp.Q)
+	if err != nil {
+		return err
+	}
+
+	if r.Size < 0 {
+		r.Size = 10
+	}
+	if r.From < 0 {
+		r.From = 0
+	}
+
+	return nil
+
 }
