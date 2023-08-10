@@ -149,20 +149,18 @@ func TestSimilaritySearchQuery(t *testing.T) {
 
 	contentFieldMapping := NewTextFieldMapping()
 	contentFieldMapping.Index = true
-	contentFieldMapping.DocValues = true
 	documentMapping.AddFieldMappingsAt("content", contentFieldMapping)
 	documentMapping.AddFieldMappingsAt("country", contentFieldMapping)
 
 	vecFieldMapping := NewDenseVectorFieldMapping()
 	vecFieldMapping.Index = true
-	vecFieldMapping.DocValues = true
 	vecFieldMapping.Dims = 64
 	documentMapping.AddFieldMappingsAt("stubVec", vecFieldMapping)
 
 	dataset := make([]map[string]interface{}, 3)
-	dataset[0] = map[string]interface{}{"country": "uk", "content": "a"}
-	dataset[1] = map[string]interface{}{"country": "china", "content": "b"}
-	dataset[2] = map[string]interface{}{"country": "nepal", "content": "c"}
+	dataset[0] = map[string]interface{}{"type": "hotel", "country": "uk", "content": "a"}
+	dataset[1] = map[string]interface{}{"type": "hotel", "country": "china", "content": "b"}
+	dataset[2] = map[string]interface{}{"type": "hotel", "country": "nepal", "content": "c"}
 	dataset = populateFakeVecs(64, dataset)
 
 	index, err := New(tmpIndexPath, indexMapping)
@@ -176,20 +174,28 @@ func TestSimilaritySearchQuery(t *testing.T) {
 		}
 	}()
 
-	index.Index("11", map[string]interface{}{
+	batch := index.NewBatch()
+	batch.Index("11", map[string]interface{}{
+		"type":    "hotel",
 		"country": "india",
 		"content": "k",
 	})
-	index.Index("12", map[string]interface{}{
+	batch.Index("12", map[string]interface{}{
+		"type":    "hotel",
 		"country": "india",
 		"content": "l",
 	})
-	index.Index("13", map[string]interface{}{
+	batch.Index("13", map[string]interface{}{
+		"type":    "hotel",
 		"country": "india",
 		"content": "k",
 	})
 	for i, k := range dataset {
-		index.Index(strconv.Itoa(i), k)
+		batch.Index(strconv.Itoa(i), k)
+	}
+	err = index.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	d, err := index.DocCount()
@@ -215,6 +221,8 @@ func TestSimilaritySearchQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// TODO Need to update this to determine which are the most similar vectors
+	// and then compare it to those.
 	fmt.Printf("results are %+v", searchResults)
 }
 
