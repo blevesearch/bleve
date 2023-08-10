@@ -18,7 +18,6 @@
 package scorer
 
 import (
-	"math/rand"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -35,17 +34,22 @@ func init() {
 type SimilarityQueryScorer struct {
 	queryVector  []float32
 	queryField   string
+	queryWeight  float64
+	queryBoost   float64
+	queryNorm    float64
 	docTerm      uint64
 	docTotal     uint64
 	options      search.SearcherOptions
 	includeScore bool
 }
 
-func NewSimilarityQueryScorer(queryVector []float32, queryField string,
+func NewSimilarityQueryScorer(queryVector []float32, queryField string, queryBoost float64,
 	docTerm uint64, docTotal uint64, options search.SearcherOptions) *SimilarityQueryScorer {
 	return &SimilarityQueryScorer{
 		queryVector:  queryVector,
 		queryField:   queryField,
+		queryBoost:   queryBoost,
+		queryWeight:  1.0,
 		docTerm:      docTerm,
 		docTotal:     docTotal,
 		options:      options,
@@ -57,17 +61,35 @@ func (sqs *SimilarityQueryScorer) Score(ctx *search.SearchContext,
 	similarityMatch *index.VectorDoc) *search.DocumentMatch {
 	rv := ctx.DocumentMatchPool.Get()
 
-	rv.IndexInternalID = append(rv.IndexInternalID, similarityMatch.ID...)
+	if sqs.includeScore || sqs.options.Explain {
+		var scoreExplanation *search.Explanation
+		score := similarityMatch.Score
 
-	// TODO Need to replace dummy score with actual score obtained from vector doc.
+		// if the query weight isn't 1, multiply
+		if sqs.queryWeight != 1.0 {
+			score = score * sqs.queryWeight
+		}
 
-	if sqs.includeScore {
-		rv.Score = float64(rand.Intn(50))
+		if sqs.includeScore {
+			rv.Score = score
+		}
+
+		if sqs.options.Explain {
+			rv.Expl = scoreExplanation
+		}
 	}
 
+	rv.IndexInternalID = append(rv.IndexInternalID, similarityMatch.ID...)
 	return rv
 }
 
 func (sqs *SimilarityQueryScorer) Weight() float64 {
-	return 1
+	return sqs.queryBoost * sqs.queryBoost
+}
+
+func (sqs *SimilarityQueryScorer) SetQueryNorm(qnorm float64) {
+	sqs.queryNorm = qnorm
+
+	// update the query weight
+	sqs.queryWeight = sqs.queryBoost
 }

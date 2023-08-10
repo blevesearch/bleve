@@ -38,7 +38,7 @@ type SearchRequest struct {
 	SearchAfter      []string          `json:"search_after"`
 	SearchBefore     []string          `json:"search_before"`
 
-	Similarity *SimilarityRequest `json:"similarity"`
+	Similarity *SimilarityRequest `json:"knn"`
 
 	sortFunc func(sort.Interface)
 }

@@ -24,7 +24,7 @@ func addSimilarityQuery(req *SearchRequest) query.Query {
 		similarityQuery := query.NewSimilarityQuery(req.Similarity.Vector)
 		similarityQuery.SetFieldVal(req.Similarity.Field)
 		similarityQuery.SetK(req.Similarity.K)
-		return query.NewConjunctionQuery([]query.Query{req.Query, similarityQuery})
+		return query.NewDisjunctionQuery([]query.Query{req.Query, similarityQuery})
 	}
 	return nil
 }
