@@ -83,8 +83,8 @@ func (i *IndexSnapshotVectorReader) Next(preAlloced *index.VectorDoc) (
 			// make segment number into global number by adding offset
 			globalOffset := i.snapshot.offsets[i.segmentOffset]
 			nnum := next.Number()
-			// TODO Invoke next.Score() and make it part of vector doc.
 			rv.ID = docNumberToBytes(rv.ID, nnum+globalOffset)
+			rv.Score = float64(next.Score())
 
 			i.currID = rv.ID
 			i.currPosting = next

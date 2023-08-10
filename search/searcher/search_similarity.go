@@ -38,7 +38,8 @@ type SimilaritySearcher struct {
 }
 
 func NewSimilaritySearcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping,
-	options search.SearcherOptions, field string, vector []float32, k int64) (search.Searcher, error) {
+	options search.SearcherOptions, field string, vector []float32, k int64,
+	boost float64) (search.Searcher, error) {
 	if vr, ok := i.(index.VectorIndexReader); ok {
 		vectorReader, _ := vr.VectorReader(ctx, vector, field, k)
 
@@ -48,7 +49,7 @@ func NewSimilaritySearcher(ctx context.Context, i index.IndexReader, m mapping.I
 			return nil, err
 		}
 
-		similarityScorer := scorer.NewSimilarityQueryScorer(vector, field,
+		similarityScorer := scorer.NewSimilarityQueryScorer(vector, field, boost,
 			vectorReader.Count(), count, options)
 		return &SimilaritySearcher{
 			indexReader:  i,
@@ -111,7 +112,7 @@ func (s *SimilaritySearcher) Next(ctx *search.SearchContext) (*search.DocumentMa
 }
 
 func (s *SimilaritySearcher) SetQueryNorm(qnorm float64) {
-	// no-op
+	s.scorer.SetQueryNorm(qnorm)
 }
 
 func (s *SimilaritySearcher) Size() int {
