@@ -19,6 +19,6 @@ package bleve
 
 import "github.com/blevesearch/bleve/v2/search/query"
 
-func addSimilarityQuery(req *SearchRequest) query.Query {
+func addKNNQuery(req *SearchRequest) query.Query {
 	return nil
 }

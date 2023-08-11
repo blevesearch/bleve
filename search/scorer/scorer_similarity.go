@@ -24,14 +24,14 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-var reflectStaticSizeSimilarityQueryScorer int
+var reflectStaticSizeKNNQueryScorer int
 
 func init() {
-	var sqs SimilarityQueryScorer
-	reflectStaticSizeSimilarityQueryScorer = int(reflect.TypeOf(sqs).Size())
+	var sqs KNNQueryScorer
+	reflectStaticSizeKNNQueryScorer = int(reflect.TypeOf(sqs).Size())
 }
 
-type SimilarityQueryScorer struct {
+type KNNQueryScorer struct {
 	queryVector  []float32
 	queryField   string
 	queryWeight  float64
@@ -43,9 +43,9 @@ type SimilarityQueryScorer struct {
 	includeScore bool
 }
 
-func NewSimilarityQueryScorer(queryVector []float32, queryField string, queryBoost float64,
-	docTerm uint64, docTotal uint64, options search.SearcherOptions) *SimilarityQueryScorer {
-	return &SimilarityQueryScorer{
+func NewKNNQueryScorer(queryVector []float32, queryField string, queryBoost float64,
+	docTerm uint64, docTotal uint64, options search.SearcherOptions) *KNNQueryScorer {
+	return &KNNQueryScorer{
 		queryVector:  queryVector,
 		queryField:   queryField,
 		queryBoost:   queryBoost,
@@ -57,13 +57,13 @@ func NewSimilarityQueryScorer(queryVector []float32, queryField string, queryBoo
 	}
 }
 
-func (sqs *SimilarityQueryScorer) Score(ctx *search.SearchContext,
-	similarityMatch *index.VectorDoc) *search.DocumentMatch {
+func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
+	knnMatch *index.VectorDoc) *search.DocumentMatch {
 	rv := ctx.DocumentMatchPool.Get()
 
 	if sqs.includeScore || sqs.options.Explain {
 		var scoreExplanation *search.Explanation
-		score := similarityMatch.Score
+		score := knnMatch.Score
 
 		// if the query weight isn't 1, multiply
 		if sqs.queryWeight != 1.0 {
@@ -79,15 +79,15 @@ func (sqs *SimilarityQueryScorer) Score(ctx *search.SearchContext,
 		}
 	}
 
-	rv.IndexInternalID = append(rv.IndexInternalID, similarityMatch.ID...)
+	rv.IndexInternalID = append(rv.IndexInternalID, knnMatch.ID...)
 	return rv
 }
 
-func (sqs *SimilarityQueryScorer) Weight() float64 {
+func (sqs *KNNQueryScorer) Weight() float64 {
 	return sqs.queryBoost * sqs.queryBoost
 }
 
-func (sqs *SimilarityQueryScorer) SetQueryNorm(qnorm float64) {
+func (sqs *KNNQueryScorer) SetQueryNorm(qnorm float64) {
 	sqs.queryNorm = qnorm
 
 	// update the query weight

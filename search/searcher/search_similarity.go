@@ -26,18 +26,18 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-type SimilaritySearcher struct {
+type KNNSearcher struct {
 	field        string
 	vector       []float32
 	k            int64
 	indexReader  index.IndexReader
 	vectorReader index.VectorReader
-	scorer       *scorer.SimilarityQueryScorer
+	scorer       *scorer.KNNQueryScorer
 	count        uint64
 	vd           index.VectorDoc
 }
 
-func NewSimilaritySearcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping,
+func NewKNNSearcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping,
 	options search.SearcherOptions, field string, vector []float32, k int64,
 	boost float64) (search.Searcher, error) {
 	if vr, ok := i.(index.VectorIndexReader); ok {
@@ -49,76 +49,76 @@ func NewSimilaritySearcher(ctx context.Context, i index.IndexReader, m mapping.I
 			return nil, err
 		}
 
-		similarityScorer := scorer.NewSimilarityQueryScorer(vector, field, boost,
+		knnScorer := scorer.NewKNNQueryScorer(vector, field, boost,
 			vectorReader.Count(), count, options)
-		return &SimilaritySearcher{
+		return &KNNSearcher{
 			indexReader:  i,
 			vectorReader: vectorReader,
 			field:        field,
 			vector:       vector,
 			k:            k,
-			scorer:       similarityScorer,
+			scorer:       knnScorer,
 		}, nil
 	}
 	return nil, nil
 }
 
-func (s *SimilaritySearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (
+func (s *KNNSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (
 	*search.DocumentMatch, error) {
-	similarityMatch, err := s.vectorReader.Next(s.vd.Reset())
+	knnMatch, err := s.vectorReader.Next(s.vd.Reset())
 	if err != nil {
 		return nil, err
 	}
 
-	if similarityMatch == nil {
+	if knnMatch == nil {
 		return nil, nil
 	}
 
-	docMatch := s.scorer.Score(ctx, similarityMatch)
+	docMatch := s.scorer.Score(ctx, knnMatch)
 
 	return docMatch, nil
 }
 
-func (s *SimilaritySearcher) Close() error {
+func (s *KNNSearcher) Close() error {
 	return s.vectorReader.Close()
 }
 
-func (s *SimilaritySearcher) Count() uint64 {
+func (s *KNNSearcher) Count() uint64 {
 	return s.vectorReader.Count()
 }
 
-func (s *SimilaritySearcher) DocumentMatchPoolSize() int {
+func (s *KNNSearcher) DocumentMatchPoolSize() int {
 	return 1
 }
 
-func (s *SimilaritySearcher) Min() int {
+func (s *KNNSearcher) Min() int {
 	return 0
 }
 
-func (s *SimilaritySearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
+func (s *KNNSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
 
-	similarityMatch, err := s.vectorReader.Next(s.vd.Reset())
+	knnMatch, err := s.vectorReader.Next(s.vd.Reset())
 	if err != nil {
 		return nil, err
 	}
 
-	if similarityMatch == nil {
+	if knnMatch == nil {
 		return nil, nil
 	}
 
-	docMatch := s.scorer.Score(ctx, similarityMatch)
+	docMatch := s.scorer.Score(ctx, knnMatch)
 
 	return docMatch, nil
 }
 
-func (s *SimilaritySearcher) SetQueryNorm(qnorm float64) {
+func (s *KNNSearcher) SetQueryNorm(qnorm float64) {
 	s.scorer.SetQueryNorm(qnorm)
 }
 
-func (s *SimilaritySearcher) Size() int {
+func (s *KNNSearcher) Size() int {
 	return 0
 }
 
-func (s *SimilaritySearcher) Weight() float64 {
+func (s *KNNSearcher) Weight() float64 {
 	return s.scorer.Weight()
 }
