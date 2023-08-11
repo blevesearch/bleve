@@ -482,12 +482,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey,
 		search.SearchIOStatsCallbackFunc(sendBytesRead))
 
-	// Using a conjunction query to get intersection of results from similarity query
+	// Using a disjunction query to get union of results from KNN query
 	// and the original query
 	searchQuery := req.Query
-	similaritySearchQuery := addSimilarityQuery(req)
-	if similaritySearchQuery != nil {
-		searchQuery = similaritySearchQuery
+	knnSearchQuery := addKNNQuery(req)
+	if knnSearchQuery != nil {
+		searchQuery = knnSearchQuery
 	}
 
 	searcher, err := searchQuery.Searcher(ctx, indexReader, i.m, search.SearcherOptions{

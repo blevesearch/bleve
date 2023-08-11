@@ -26,41 +26,41 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-type SimilarityQuery struct {
+type KNNQuery struct {
 	VectorField string    `json:"field"`
 	Vector      []float32 `json:"vector"`
 	K           int64     `json:"k"`
 	BoostVal    *Boost    `json:"boost,omitempty"`
 }
 
-func NewSimilarityQuery(vector []float32) *SimilarityQuery {
-	return &SimilarityQuery{Vector: vector}
+func NewKNNQuery(vector []float32) *KNNQuery {
+	return &KNNQuery{Vector: vector}
 }
 
-func (q *SimilarityQuery) Field() string {
+func (q *KNNQuery) Field() string {
 	return q.VectorField
 }
 
-func (q *SimilarityQuery) SetK(k int64) {
+func (q *KNNQuery) SetK(k int64) {
 	q.K = k
 }
 
-func (q *SimilarityQuery) SetFieldVal(field string) {
+func (q *KNNQuery) SetFieldVal(field string) {
 	q.VectorField = field
 }
 
-func (q *SimilarityQuery) SetBoost(b float64) {
+func (q *KNNQuery) SetBoost(b float64) {
 	boost := Boost(b)
 	q.BoostVal = &boost
 }
 
-func (q *SimilarityQuery) Boost() float64 {
+func (q *KNNQuery) Boost() float64 {
 	return q.BoostVal.Value()
 }
 
-func (q *SimilarityQuery) Searcher(ctx context.Context, i index.IndexReader,
+func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
 	m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 
-	return searcher.NewSimilaritySearcher(ctx, i, m, options, q.VectorField,
+	return searcher.NewKNNSearcher(ctx, i, m, options, q.VectorField,
 		q.Vector, q.K, q.BoostVal.Value())
 }

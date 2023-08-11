@@ -17,14 +17,17 @@
 
 package bleve
 
-import "github.com/blevesearch/bleve/v2/search/query"
+import (
+	"github.com/blevesearch/bleve/v2/search/query"
+)
 
-func addSimilarityQuery(req *SearchRequest) query.Query {
-	if req.Similarity != nil {
-		similarityQuery := query.NewSimilarityQuery(req.Similarity.Vector)
-		similarityQuery.SetFieldVal(req.Similarity.Field)
-		similarityQuery.SetK(req.Similarity.K)
-		return query.NewDisjunctionQuery([]query.Query{req.Query, similarityQuery})
+func addKNNQuery(req *SearchRequest) query.Query {
+	if req.KNN != nil {
+		knnQuery := query.NewKNNQuery(req.KNN.Vector)
+		knnQuery.SetFieldVal(req.KNN.Field)
+		knnQuery.SetK(req.KNN.K)
+		// Need to set boost here.
+		return query.NewDisjunctionQuery([]query.Query{req.Query, knnQuery})
 	}
 	return nil
 }

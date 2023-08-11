@@ -18,8 +18,8 @@
 package bleve
 
 import (
-	"sort"
 	"encoding/json"
+	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/query"
@@ -39,20 +39,20 @@ type SearchRequest struct {
 	SearchAfter      []string          `json:"search_after"`
 	SearchBefore     []string          `json:"search_before"`
 
-	Similarity *SimilarityRequest `json:"similarity"`
+	KNN *KNNRequest `json:"knn"`
 
 	sortFunc func(sort.Interface)
 }
 
 // TODO Add boost here too.
-type SimilarityRequest struct {
+type KNNRequest struct {
 	Field  string    `json:"field"`
 	Vector []float32 `json:"vector"`
 	K      int64     `json:"k"`
 }
 
-func (r *SearchRequest) SetSimilarity(field string, vector []float32, k int64) {
-	r.Similarity = &SimilarityRequest{
+func (r *SearchRequest) SetKNN(field string, vector []float32, k int64) {
+	r.KNN = &KNNRequest{
 		Field:  field,
 		Vector: vector,
 		K:      k,
@@ -63,19 +63,19 @@ func (r *SearchRequest) SetSimilarity(field string, vector []float32, k int64) {
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	var temp struct {
-		Q                json.RawMessage    `json:"query"`
-		Size             *int               `json:"size"`
-		From             int                `json:"from"`
-		Highlight        *HighlightRequest  `json:"highlight"`
-		Fields           []string           `json:"fields"`
-		Facets           FacetsRequest      `json:"facets"`
-		Explain          bool               `json:"explain"`
-		Sort             []json.RawMessage  `json:"sort"`
-		IncludeLocations bool               `json:"includeLocations"`
-		Score            string             `json:"score"`
-		SearchAfter      []string           `json:"search_after"`
-		SearchBefore     []string           `json:"search_before"`
-		Similarity       *SimilarityRequest `json:"similarity"`
+		Q                json.RawMessage   `json:"query"`
+		Size             *int              `json:"size"`
+		From             int               `json:"from"`
+		Highlight        *HighlightRequest `json:"highlight"`
+		Fields           []string          `json:"fields"`
+		Facets           FacetsRequest     `json:"facets"`
+		Explain          bool              `json:"explain"`
+		Sort             []json.RawMessage `json:"sort"`
+		IncludeLocations bool              `json:"includeLocations"`
+		Score            string            `json:"score"`
+		SearchAfter      []string          `json:"search_after"`
+		SearchBefore     []string          `json:"search_before"`
+		KNN              *KNNRequest       `json:"knn"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -117,7 +117,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.From = 0
 	}
 
-	r.Similarity = temp.Similarity
+	r.KNN = temp.KNN
 
 	return nil
 
