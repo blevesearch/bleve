@@ -100,7 +100,7 @@ func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
 var ErrInvalidDateTime = fmt.Errorf("unable to parse datetime with any of the layouts")
 
 type DateTimeParser interface {
-	ParseDateTime(string) (time.Time, error)
+	ParseDateTime(string) (time.Time, string, error)
 }
 
 type ByteArrayConverter interface {

@@ -648,9 +648,9 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 									value = num
 								}
 							case index.DateTimeField:
-								datetime, err := docF.DateTime()
+								datetime, layout, err := docF.DateTime()
 								if err == nil {
-									value = datetime.Format(time.RFC3339)
+									value = datetime.Format(layout)
 								}
 							case index.BooleanField:
 								boolean, err := docF.Boolean()

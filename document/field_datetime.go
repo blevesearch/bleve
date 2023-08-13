@@ -15,6 +15,7 @@
 package document
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"reflect"
@@ -25,6 +26,8 @@ import (
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 )
+
+var dateTimeValueSeperator = []byte{'\xff'}
 
 var reflectStaticSizeDateTimeField int
 
@@ -79,17 +82,23 @@ func (n *DateTimeField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return n.frequencies
 }
 
+func splitValue(value []byte) (numeric.PrefixCoded, string) {
+	parts := bytes.SplitN(value, dateTimeValueSeperator, 2)
+	return numeric.PrefixCoded(parts[0]), string(parts[1])
+}
+
 func (n *DateTimeField) Analyze() {
+	valueWithoutLayout, _ := splitValue(n.value)
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
-		End:      len(n.value),
-		Term:     n.value,
+		End:      len(valueWithoutLayout),
+		Term:     valueWithoutLayout,
 		Position: 1,
 		Type:     analysis.DateTime,
 	})
 
-	original, err := n.value.Int64()
+	original, err := valueWithoutLayout.Int64()
 	if err == nil {
 
 		shift := DefaultDateTimePrecisionStep
@@ -118,12 +127,13 @@ func (n *DateTimeField) Value() []byte {
 	return n.value
 }
 
-func (n *DateTimeField) DateTime() (time.Time, error) {
-	i64, err := n.value.Int64()
+func (n *DateTimeField) DateTime() (time.Time, string, error) {
+	date, layout := splitValue(n.value)
+	i64, err := date.Int64()
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, "", err
 	}
-	return time.Unix(0, i64).UTC(), nil
+	return time.Unix(0, i64).UTC(), layout, nil
 }
 
 func (n *DateTimeField) GoString() string {
@@ -144,18 +154,20 @@ func NewDateTimeFieldFromBytes(name string, arrayPositions []uint64, value []byt
 	}
 }
 
-func NewDateTimeField(name string, arrayPositions []uint64, dt time.Time) (*DateTimeField, error) {
-	return NewDateTimeFieldWithIndexingOptions(name, arrayPositions, dt, DefaultDateTimeIndexingOptions)
+func NewDateTimeField(name string, arrayPositions []uint64, dt time.Time, layout string) (*DateTimeField, error) {
+	return NewDateTimeFieldWithIndexingOptions(name, arrayPositions, dt, layout, DefaultDateTimeIndexingOptions)
 }
 
-func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, dt time.Time, options index.FieldIndexingOptions) (*DateTimeField, error) {
+func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, dt time.Time, layout string, options index.FieldIndexingOptions) (*DateTimeField, error) {
 	if canRepresent(dt) {
 		dtInt64 := dt.UnixNano()
 		prefixCoded := numeric.MustNewPrefixCodedInt64(dtInt64, 0)
+		valueWithLayout := append(prefixCoded, dateTimeValueSeperator...)
+		valueWithLayout = append(valueWithLayout, []byte(layout)...)
 		return &DateTimeField{
 			name:           name,
 			arrayPositions: arrayPositions,
-			value:          prefixCoded,
+			value:          valueWithLayout,
 			options:        options,
 			// not correct, just a place holder until we revisit how fields are
 			// represented and can fix this better
