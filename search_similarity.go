@@ -44,18 +44,21 @@ type SearchRequest struct {
 	sortFunc func(sort.Interface)
 }
 
-// TODO Add boost here too.
 type KNNRequest struct {
-	Field  string    `json:"field"`
-	Vector []float32 `json:"vector"`
-	K      int64     `json:"k"`
+	Field  string       `json:"field"`
+	Vector []float32    `json:"vector"`
+	K      int64        `json:"k"`
+	Boost  *query.Boost `json:"boost,omitempty"`
 }
 
-func (r *SearchRequest) SetKNN(field string, vector []float32, k int64) {
+func (r *SearchRequest) SetKNN(field string, vector []float32, k int64,
+	boost float64) {
+	b := query.Boost(boost)
 	r.KNN = &KNNRequest{
 		Field:  field,
 		Vector: vector,
 		K:      k,
+		Boost:  &b,
 	}
 }
 

@@ -26,7 +26,7 @@ func addKNNQuery(req *SearchRequest) query.Query {
 		knnQuery := query.NewKNNQuery(req.KNN.Vector)
 		knnQuery.SetFieldVal(req.KNN.Field)
 		knnQuery.SetK(req.KNN.K)
-		// Need to set boost here.
+		knnQuery.SetBoost(req.KNN.Boost.Value())
 		return query.NewDisjunctionQuery([]query.Query{req.Query, knnQuery})
 	}
 	return nil
