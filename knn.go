@@ -12,13 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !densevector
-// +build !densevector
+//go:build densevector
+// +build densevector
 
 package bleve
 
-import "github.com/blevesearch/bleve/v2/search/query"
+import (
+	"github.com/blevesearch/bleve/v2/search/query"
+)
 
-func addKNNQuery(req *SearchRequest) query.Query {
-	return nil
+func disjunctQueryWithKNN(req *SearchRequest) query.Query {
+	if req.KNN != nil {
+		knnQuery := query.NewKNNQuery(req.KNN.Vector)
+		knnQuery.SetFieldVal(req.KNN.Field)
+		knnQuery.SetK(req.KNN.K)
+		knnQuery.SetBoost(req.KNN.Boost.Value())
+		return query.NewDisjunctionQuery([]query.Query{req.Query, knnQuery})
+	}
+	return req.Query
 }

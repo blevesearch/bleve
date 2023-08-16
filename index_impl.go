@@ -498,11 +498,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	// Using a disjunction query to get union of results from KNN query
 	// and the original query
-	searchQuery := req.Query
-	knnSearchQuery := addKNNQuery(req)
-	if knnSearchQuery != nil {
-		searchQuery = knnSearchQuery
-	}
+	searchQuery := disjunctQueryWithKNN(req)
 
 	searcher, err := searchQuery.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
