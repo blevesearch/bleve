@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
@@ -231,11 +232,22 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 		if fm.DateFormat != "" {
 			dateTimeFormat = fm.DateFormat
 		}
-		dateTimeParser := context.im.DateTimeParserNamed(dateTimeFormat)
-		if dateTimeParser != nil {
-			parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
+
+		_, isUnixFormat := analysis.UnixTimestampFormats[dateTimeFormat]
+		if !isUnixFormat {
+			dateTimeParser := context.im.DateTimeParserNamed(dateTimeFormat)
+			if dateTimeParser != nil {
+				parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
+				if err == nil {
+					fm.processTime(parsedDateTime, pathString, path, indexes, context)
+				}
+			}
+		} else {
+			// special case for unix timestamp
+			// we need to convert the string to a time object
+			timestamp, err := strconv.ParseInt(propertyValueString, 10, 64)
 			if err == nil {
-				fm.processTime(parsedDateTime, pathString, path, indexes, context)
+				fm.processTimestamp(timestamp, pathString, path, indexes, context)
 			}
 		}
 	} else if fm.Type == "IP" {
@@ -252,6 +264,23 @@ func (fm *FieldMapping) processFloat64(propertyValFloat float64, pathString stri
 		options := fm.Options()
 		field := document.NewNumericFieldWithIndexingOptions(fieldName, indexes, propertyValFloat, options)
 		context.doc.AddField(field)
+
+		if !fm.IncludeInAll {
+			context.excludedFromAll = append(context.excludedFromAll, fieldName)
+		}
+	}
+}
+
+func (fm *FieldMapping) processTimestamp(unixTimestamp int64, pathString string, path []string, indexes []uint64, context *walkContext) {
+	fieldName := getFieldName(pathString, path, fm)
+	if fm.Type == "datetime" {
+		options := fm.Options()
+		field, err := document.NewDateTimeFieldWithTimestamp(fieldName, indexes, unixTimestamp, options)
+		if err == nil {
+			context.doc.AddField(field)
+		} else {
+			logger.Printf("could not build date %v", err)
+		}
 
 		if !fm.IncludeInAll {
 			context.excludedFromAll = append(context.excludedFromAll, fieldName)

@@ -165,6 +165,19 @@ func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, d
 	return nil, fmt.Errorf("cannot represent %s in this type", dt)
 }
 
+func NewDateTimeFieldWithTimestamp(name string, arrayPositions []uint64, timestamp int64, options index.FieldIndexingOptions) (*DateTimeField, error) {
+	prefixCoded := numeric.MustNewPrefixCodedInt64(timestamp, 0)
+	return &DateTimeField{
+		name:           name,
+		arrayPositions: arrayPositions,
+		value:          prefixCoded,
+		options:        options,
+		// not correct, just a place holder until we revisit how fields are
+		// represented and can fix this better
+		numPlainTextBytes: uint64(8),
+	}, nil
+}
+
 func canRepresent(dt time.Time) bool {
 	if dt.Before(MinTimeRepresentable) || dt.After(MaxTimeRepresentable) {
 		return false

@@ -99,6 +99,18 @@ func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
 
 var ErrInvalidDateTime = fmt.Errorf("unable to parse datetime with any of the layouts")
 
+const UnixSecs = "unix_sec"
+const UnixMilliSecs = "unix_ms"
+const UnixMicroSecs = "unix_us"
+const UnixNanoSecs = "unix_ns"
+
+var UnixTimestampFormats = map[string]interface{}{
+	UnixSecs:      struct{}{},
+	UnixMilliSecs: struct{}{},
+	UnixMicroSecs: struct{}{},
+	UnixNanoSecs:  struct{}{},
+}
+
 type DateTimeParser interface {
 	ParseDateTime(string) (time.Time, error)
 }
