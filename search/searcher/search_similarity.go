@@ -39,7 +39,7 @@ type KNNSearcher struct {
 
 func NewKNNSearcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping,
 	options search.SearcherOptions, field string, vector []float32, k int64,
-	boost float64) (search.Searcher, error) {
+	boost float64, similarityMetric string) (search.Searcher, error) {
 	if vr, ok := i.(index.VectorIndexReader); ok {
 		vectorReader, _ := vr.VectorReader(ctx, vector, field, k)
 
@@ -50,7 +50,7 @@ func NewKNNSearcher(ctx context.Context, i index.IndexReader, m mapping.IndexMap
 		}
 
 		knnScorer := scorer.NewKNNQueryScorer(vector, field, boost,
-			vectorReader.Count(), count, options)
+			vectorReader.Count(), count, options, similarityMetric)
 		return &KNNSearcher{
 			indexReader:  i,
 			vectorReader: vectorReader,
