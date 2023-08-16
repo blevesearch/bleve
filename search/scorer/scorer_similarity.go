@@ -32,28 +32,31 @@ func init() {
 }
 
 type KNNQueryScorer struct {
-	queryVector  []float32
-	queryField   string
-	queryWeight  float64
-	queryBoost   float64
-	queryNorm    float64
-	docTerm      uint64
-	docTotal     uint64
-	options      search.SearcherOptions
-	includeScore bool
+	queryVector      []float32
+	queryField       string
+	queryWeight      float64
+	queryBoost       float64
+	queryNorm        float64
+	docTerm          uint64
+	docTotal         uint64
+	options          search.SearcherOptions
+	includeScore     bool
+	similarityMetric string
 }
 
 func NewKNNQueryScorer(queryVector []float32, queryField string, queryBoost float64,
-	docTerm uint64, docTotal uint64, options search.SearcherOptions) *KNNQueryScorer {
+	docTerm uint64, docTotal uint64, options search.SearcherOptions,
+	similarityMetric string) *KNNQueryScorer {
 	return &KNNQueryScorer{
-		queryVector:  queryVector,
-		queryField:   queryField,
-		queryBoost:   queryBoost,
-		queryWeight:  1.0,
-		docTerm:      docTerm,
-		docTotal:     docTotal,
-		options:      options,
-		includeScore: options.Score != "none",
+		queryVector:      queryVector,
+		queryField:       queryField,
+		queryBoost:       queryBoost,
+		queryWeight:      1.0,
+		docTerm:          docTerm,
+		docTotal:         docTotal,
+		options:          options,
+		includeScore:     options.Score != "none",
+		similarityMetric: similarityMetric,
 	}
 }
 
@@ -64,6 +67,9 @@ func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 	if sqs.includeScore || sqs.options.Explain {
 		var scoreExplanation *search.Explanation
 		score := knnMatch.Score
+		if sqs.similarityMetric == "l2_norm" {
+			score = 1.0 / score
+		}
 
 		// if the query weight isn't 1, multiply
 		if sqs.queryWeight != 1.0 {

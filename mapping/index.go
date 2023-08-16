@@ -17,6 +17,7 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
+
 	index "github.com/blevesearch/bleve_index_api"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -445,6 +446,21 @@ func (im *IndexMappingImpl) AnalyzeText(analyzerName string, text []byte) (analy
 // FieldAnalyzer returns the name of the analyzer used on a field.
 func (im *IndexMappingImpl) FieldAnalyzer(field string) string {
 	return im.AnalyzerNameForPath(field)
+}
+
+// FieldMappingForPath returns the mapping for a specific field 'path'.
+func (im *IndexMappingImpl) FieldMappingForPath(path string) *FieldMapping {
+	for _, v := range im.TypeMapping {
+		for field, property := range v.Properties {
+			for _, v1 := range property.Fields {
+				if field == path {
+					// Return field mapping if the name matches the path param.
+					return v1
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // wrapper to satisfy new interface
