@@ -223,7 +223,7 @@ func TestSimilaritySearchQuery(t *testing.T) {
 		queryVector[i] = float32(math.Round(rand.Float64()*1000) / 1000)
 	}
 	// stubVec is the field indexed with the vectors
-	searchRequest.SetSimilarity("stubVec", queryVector, 2)
+	searchRequest.SetKNN("stubVec", queryVector, 2)
 
 	searchResults, err := index.Search(searchRequest)
 	if err != nil {
