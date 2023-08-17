@@ -61,9 +61,6 @@ func (q *KNNQuery) Boost() float64 {
 func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
 	m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 
-	// TODO Add a check to see if the dense vector field has the same name
-	fm := m.FieldMappingForPath(q.VectorField)
-
 	return searcher.NewKNNSearcher(ctx, i, m, options, q.VectorField,
-		q.Vector, q.K, q.BoostVal.Value(), fm.Similarity)
+		q.Vector, q.K, q.BoostVal.Value(), m.FieldMappingForPath(q.VectorField).Similarity)
 }

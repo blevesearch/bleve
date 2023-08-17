@@ -56,5 +56,5 @@ type IndexMapping interface {
 	AnalyzerNameForPath(path string) string
 	AnalyzerNamed(name string) analysis.Analyzer
 
-	FieldMappingForPath(path string) *FieldMapping
+	FieldMappingForPath(path string) FieldMapping
 }
