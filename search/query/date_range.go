@@ -30,10 +30,10 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-// QueryDateTimeParser controls the default query date time parser in User Path.
+// QueryDateTimeParser controls the default query date time parser.
 var QueryDateTimeParser = optional.Name
 
-// QueryDateTimeFormat controls the format when Marshaling to JSON in User Path.
+// QueryDateTimeFormat controls the format when Marshaling to JSON.
 var QueryDateTimeFormat = time.RFC3339
 
 var cache = registry.NewCache()
@@ -68,7 +68,7 @@ func (t *BleveQueryTime) MarshalJSON() ([]byte, error) {
 }
 
 func (t *BleveQueryTime) UnmarshalJSON(data []byte) error {
-	// called in the User Path where we can use the default date time parser.
+	// called where we can use the default date time parser.
 	var timeString string
 	err := json.Unmarshal(data, &timeString)
 	if err != nil {
@@ -245,7 +245,6 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 }
 
 func (q *DateRangeQuery) Validate() error {
-	// First test for User path
 	if q.Start.IsZero() && q.End.IsZero() {
 		// Test for ParseQuery path
 		if q.rawStart == "" && q.rawEnd == "" {
@@ -254,7 +253,7 @@ func (q *DateRangeQuery) Validate() error {
 		}
 	}
 	if !q.Start.IsZero() || !q.End.IsZero() {
-		// User path
+		// dateRangeUnmarshal not used
 		_, _, err := q.parseEndpoints()
 		if err != nil {
 			return err
