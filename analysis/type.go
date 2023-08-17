@@ -16,6 +16,7 @@ package analysis
 
 import (
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -100,15 +101,32 @@ func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
 var ErrInvalidDateTime = fmt.Errorf("unable to parse datetime with any of the layouts")
 
 const UnixSecs = "unix_sec"
-const UnixMilliSecs = "unix_ms"
-const UnixMicroSecs = "unix_us"
-const UnixNanoSecs = "unix_ns"
+const UnixMilliSecs = "unix_milli"
+const UnixMicroSecs = "unix_micro"
+const UnixNanoSecs = "unix_nano"
 
-var UnixTimestampFormats = map[string]interface{}{
-	UnixSecs:      struct{}{},
-	UnixMilliSecs: struct{}{},
-	UnixMicroSecs: struct{}{},
-	UnixNanoSecs:  struct{}{},
+type TimestampBounds struct {
+	Min int64
+	Max int64
+}
+
+var UnixTimestampFormats = map[string]TimestampBounds{
+	UnixSecs: {
+		Min: math.MinInt64 / 1000000000,
+		Max: math.MaxInt64 / 1000000000,
+	},
+	UnixMilliSecs: {
+		Min: math.MinInt64 / 1000000,
+		Max: math.MaxInt64 / 1000000,
+	},
+	UnixMicroSecs: {
+		Min: math.MinInt64 / 1000,
+		Max: math.MaxInt64 / 1000,
+	},
+	UnixNanoSecs: {
+		Min: math.MinInt64,
+		Max: math.MaxInt64,
+	},
 }
 
 type DateTimeParser interface {

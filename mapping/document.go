@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/registry"
 )
 
@@ -73,7 +74,10 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 		if field.DateFormat != "" {
 			_, err = cache.DateTimeParserNamed(field.DateFormat)
 			if err != nil {
-				return err
+				_, unixFormat := analysis.UnixTimestampFormats[field.DateFormat]
+				if !unixFormat {
+					return err
+				}
 			}
 		}
 		switch field.Type {
@@ -437,12 +441,17 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if subDocMapping != nil {
-			// index by explicit mapping
+			// index by explicit mapping in case of datetime
 			for _, fieldMapping := range subDocMapping.Fields {
 				if fieldMapping.Type == "datetime" {
 					// This number is a UNIX timestamp
 					// hence must parse as a datetime
-					fieldMapping.processTimestamp(propertyValue.Int(), pathString, path, indexes, context)
+					bounds, isUnixFormat := analysis.UnixTimestampFormats[fieldMapping.DateFormat]
+					timestamp := propertyValue.Int()
+					if isUnixFormat && (timestamp > bounds.Min && timestamp < bounds.Max) {
+						timestamp = convertTimestamp(timestamp, fieldMapping.DateFormat)
+						fieldMapping.processTimestamp(timestamp, pathString, path, indexes, context)
+					}
 				}
 			}
 		}
