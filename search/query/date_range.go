@@ -85,7 +85,7 @@ func (t *BleveQueryTime) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func DateRangeUnmarshal(input []byte, obj *DateRangeQuery) error {
+func dateRangeUnmarshal(input []byte, obj *DateRangeQuery) error {
 	// Only called in ParseQuery path, since we do not know the date time parser.
 	var objmap map[string]interface{}
 	err := json.Unmarshal(input, &objmap)
