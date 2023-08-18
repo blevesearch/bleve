@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
@@ -200,6 +201,36 @@ func (q *DateRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m ma
 		// parse rawStart and rawEnd to time.Time objects
 		var err error
 		dateTimeParserName := m.DatetimeParserNameForPath(field)
+		bounds, isUnixFormat := analysis.UnixTimestampFormats[dateTimeParserName]
+		if isUnixFormat {
+			// unix timestamp format
+			// rawStart and rawEnd are timestamps so do not parse them
+			min := bounds.Min
+			max := bounds.Max
+			if q.rawStart != "" {
+				min, err = strconv.ParseInt(q.rawStart, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("invalid start: %v", err)
+				}
+				min, err = analysis.ValidateAndConvertTimestamp(min, bounds, dateTimeParserName)
+				if err != nil {
+					return nil, fmt.Errorf("invalid start: %v", err)
+				}
+			}
+			if q.rawEnd != "" {
+				max, err = strconv.ParseInt(q.rawEnd, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("invalid end: %v", err)
+				}
+				max, err = analysis.ValidateAndConvertTimestamp(max, bounds, dateTimeParserName)
+				if err != nil {
+					return nil, fmt.Errorf("invalid end: %v", err)
+				}
+			}
+			minFloat := numeric.Int64ToFloat64(min)
+			maxFloat := numeric.Int64ToFloat64(max)
+			return searcher.NewNumericRangeSearcher(ctx, i, &minFloat, &maxFloat, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal.Value(), options)
+		}
 		dateTimeParser := m.DateTimeParserNamed(dateTimeParserName)
 		if q.rawStart != "" {
 			q.Start.Time, err = dateTimeParser.ParseDateTime(q.rawStart)
