@@ -448,8 +448,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 					// hence must parse as a datetime
 					bounds, isUnixFormat := analysis.UnixTimestampFormats[fieldMapping.DateFormat]
 					if isUnixFormat {
-						timestamp := propertyValue.Int()
-						timestamp, err := analysis.ValidateAndConvertTimestamp(timestamp, bounds, fieldMapping.DateFormat)
+						timestamp, err := analysis.ValidateAndConvertTimestamp(propertyValue.Int(), bounds, fieldMapping.DateFormat)
 						if err == nil {
 							fieldMapping.processTimestamp(timestamp, pathString, path, indexes, context)
 						}
