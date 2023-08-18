@@ -650,7 +650,12 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 							case index.DateTimeField:
 								datetime, layout, err := docF.DateTime()
 								if err == nil {
-									value = datetime.Format(layout)
+									if layout == "" {
+										// layout not set probably means it was indexed as a timestamp
+										value = datetime.UnixNano()
+									} else {
+										value = datetime.Format(layout)
+									}
 								}
 							case index.BooleanField:
 								boolean, err := docF.Boolean()

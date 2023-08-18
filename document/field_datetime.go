@@ -84,6 +84,9 @@ func (n *DateTimeField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 
 func splitValue(value []byte) (numeric.PrefixCoded, string) {
 	parts := bytes.SplitN(value, dateTimeValueSeperator, 2)
+	if len(parts) == 1 {
+		return numeric.PrefixCoded(parts[0]), ""
+	}
 	return numeric.PrefixCoded(parts[0]), string(parts[1])
 }
 

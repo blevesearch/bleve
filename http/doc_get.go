@@ -89,7 +89,12 @@ func (h *DocGetHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		case index.DateTimeField:
 			d, layout, err := field.DateTime()
 			if err == nil {
-				newval = d.Format(layout)
+				if layout == "" {
+					// layout not set probably means it was indexed as a timestamp
+					newval = d.UnixNano()
+				} else {
+					newval = d.Format(layout)
+				}
 			}
 		}
 		existing, existed := rv.Fields[field.Name()]
