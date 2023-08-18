@@ -245,9 +245,11 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 			// special case for unix timestamp
 			// we need to convert the string to a time object
 			timestamp, err := strconv.ParseInt(propertyValueString, 10, 64)
-			if err == nil && (timestamp > bounds.Min && timestamp < bounds.Max) {
-				timestamp = convertTimestamp(timestamp, dateTimeFormat)
-				fm.processTimestamp(timestamp, pathString, path, indexes, context)
+			if err == nil {
+				timestamp, err = analysis.ValidateAndConvertTimestamp(timestamp, bounds, dateTimeFormat)
+				if err == nil {
+					fm.processTimestamp(timestamp, pathString, path, indexes, context)
+				}
 			}
 		}
 	} else if fm.Type == "IP" {
@@ -269,17 +271,6 @@ func (fm *FieldMapping) processFloat64(propertyValFloat float64, pathString stri
 			context.excludedFromAll = append(context.excludedFromAll, fieldName)
 		}
 	}
-}
-
-func convertTimestamp(timestamp int64, format string) int64 {
-	if format == analysis.UnixSecs {
-		return timestamp * 1000000000
-	} else if format == analysis.UnixMilliSecs {
-		return timestamp * 1000000
-	} else if format == analysis.UnixMicroSecs {
-		return timestamp * 1000
-	}
-	return timestamp
 }
 
 func (fm *FieldMapping) processTimestamp(unixTimestamp int64, pathString string, path []string, indexes []uint64, context *walkContext) {

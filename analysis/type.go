@@ -110,7 +110,7 @@ type TimestampBounds struct {
 	Max int64
 }
 
-var UnixTimestampFormats = map[string]TimestampBounds{
+var UnixTimestampFormats = map[string]*TimestampBounds{
 	UnixSecs: {
 		Min: math.MinInt64 / 1000000000,
 		Max: math.MaxInt64 / 1000000000,
@@ -127,6 +127,27 @@ var UnixTimestampFormats = map[string]TimestampBounds{
 		Min: math.MinInt64,
 		Max: math.MaxInt64,
 	},
+}
+
+func convertTimestamp(timestamp int64, format string) int64 {
+	if format == UnixSecs {
+		return timestamp * 1000000000
+	} else if format == UnixMilliSecs {
+		return timestamp * 1000000
+	} else if format == UnixMicroSecs {
+		return timestamp * 1000
+	}
+	return timestamp
+}
+
+// ValidateAndConvertTimestamp validates the timestamp against the bounds and
+// converts it to the nanoseconds if valid.
+func ValidateAndConvertTimestamp(timestamp int64, bounds *TimestampBounds, format string) (int64, error) {
+	if timestamp > bounds.Min && timestamp < bounds.Max {
+		return convertTimestamp(timestamp, format), nil
+	} else {
+		return 0, fmt.Errorf("timestamp out of range")
+	}
 }
 
 type DateTimeParser interface {
