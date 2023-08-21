@@ -17,7 +17,6 @@ package flexible
 import (
 	"fmt"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis"
@@ -37,6 +36,8 @@ var validMagicNumbers = map[string]struct{}{
 	"02":      {},
 	"2":       {},
 	"_2":      {},
+	"__2":     {},
+	"002":     {},
 	"Monday":  {},
 	"Mon":     {}, // Day
 	"15":      {},
@@ -53,9 +54,9 @@ var validMagicNumbers = map[string]struct{}{
 	"":        {},
 }
 
-var layoutSplitRegex = regexp.MustCompile("[- :T,Z\\.<>;\\?!`~@#$%\\^&\\*|\\(\\){}\\[\\]/\\\\\\'\\\"]")
+var layoutSplitRegex = regexp.MustCompile("[\\- :T,Z\\.<>;\\?!`~@#$%\\^&\\*|'\"\\(\\){}\\[\\]/\\\\]")
 
-var layoutConstants = []string{"PM", "pm", "MST", ".999999999", ".000000000", ".000000", ".000"}
+var layoutStripRegex = regexp.MustCompile(`PM|pm|\.9+|\.0+|MST`)
 
 type DateTimeParser struct {
 	layouts []string
@@ -77,15 +78,20 @@ func (p *DateTimeParser) ParseDateTime(input string) (time.Time, error) {
 	return time.Time{}, analysis.ErrInvalidDateTime
 }
 
-func stripLayout(layout string) string {
-	for _, k := range layoutConstants {
-		layout = strings.ReplaceAll(layout, k, "")
-	}
-	return layout
-}
-
+// date time layouts must be a combination of constants specified in golang time package
+// https://pkg.go.dev/time#pkg-constants
+// this validation verifies that only these constants are used in the custom layout
+// for compatibility with the golang time package
 func validateLayout(layout string) bool {
-	layout = stripLayout(layout)
+	// first we strip out commonly used constants
+	// such as "PM" which can be present in the layout
+	// right after a time component, e.g. 03:04PM;
+	// because regex split cannot separate "03:04PM" into
+	// "03:04" and "PM". We also strip out ".9+" and ".0+"
+	// which represent fractional seconds.
+	layout = layoutStripRegex.ReplaceAllString(layout, "")
+	// then we split the layout by non-constant characters
+	// which is a regex and verify that each split is a valid magic number
 	split := layoutSplitRegex.Split(layout, -1)
 	for i := range split {
 		_, found := validMagicNumbers[split[i]]
