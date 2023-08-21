@@ -51,15 +51,17 @@ type KNNRequest struct {
 	Boost  *query.Boost `json:"boost,omitempty"`
 }
 
-func (r *SearchRequest) SetKNN(field string, vector []float32, k int64,
-	boost float64) {
-	b := query.Boost(boost)
+func (r *SearchRequest) SetKNN(field string, vector []float32, k int64) {
 	r.KNN = &KNNRequest{
 		Field:  field,
 		Vector: vector,
 		K:      k,
-		Boost:  &b,
 	}
+}
+
+func (r *SearchRequest) SetKNNBoost(boost float64) {
+	b := query.Boost(boost)
+	r.KNN.Boost = &b
 }
 
 // UnmarshalJSON deserializes a JSON representation of
