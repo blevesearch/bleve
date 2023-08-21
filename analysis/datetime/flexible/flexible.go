@@ -17,7 +17,6 @@ package flexible
 import (
 	"fmt"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis"
