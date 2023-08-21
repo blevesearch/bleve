@@ -18,7 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"math"
 	"os"
@@ -828,7 +828,7 @@ func TestSlowSearch(t *testing.T) {
 
 	defer func() {
 		// reset logger back to normal
-		SetLog(log.New(ioutil.Discard, "bleve", log.LstdFlags))
+		SetLog(log.New(io.Discard, "bleve", log.LstdFlags))
 	}()
 	// set custom logger
 	var sdw sawDataWriter
