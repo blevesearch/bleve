@@ -17,7 +17,6 @@ package http
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 )
@@ -42,10 +41,10 @@ func mustEncode(w io.Writer, i interface{}) {
 
 type varLookupFunc func(req *http.Request) string
 
-var logger = log.New(ioutil.Discard, "bleve.http", log.LstdFlags)
+var logger = log.New(io.Discard, "bleve.http", log.LstdFlags)
 
 // SetLog sets the logger used for logging
-// by default log messages are sent to ioutil.Discard
+// by default log messages are sent to io.Discard
 func SetLog(l *log.Logger) {
 	logger = l
 }
