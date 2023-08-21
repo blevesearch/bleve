@@ -69,7 +69,7 @@ func TestFlexibleDateTimeParser(t *testing.T) {
 
 	rfc3339NoTimezone := "2006-01-02T15:04:05"
 	rfc3339NoTimezoneNoT := "2006-01-02 15:04:05"
-	rfc3339Offest := "2006-01-02 15:04:05 -0700"
+	rfc3339Offset := "2006-01-02 15:04:05 -0700"
 	rfc3339NoTime := "2006-01-02"
 
 	dateOptionalTimeParser := New(
@@ -78,7 +78,7 @@ func TestFlexibleDateTimeParser(t *testing.T) {
 			time.RFC3339,
 			rfc3339NoTimezone,
 			rfc3339NoTimezoneNoT,
-			rfc3339Offest,
+			rfc3339Offset,
 			rfc3339NoTime,
 		})
 
