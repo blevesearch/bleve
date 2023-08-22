@@ -2225,3 +2225,95 @@ func TestAnalyzerInheritanceForDefaultDynamicMapping(t *testing.T) {
 		t.Fatalf("expected 1 hit, got %d", len(results.Hits))
 	}
 }
+
+func TestCustomDateTimeParserLayoutValidation(t *testing.T) {
+	imap := mapping.NewIndexMapping()
+	correctConfig := map[string]interface{}{
+		"type": "flexiblego",
+		"layouts": []interface{}{
+			// some custom layouts
+			"2006-01-02 15:04:05.0000",
+			"2006\\01\\02T03:04:05PM",
+			"2006/01/02",
+			"2006-01-02T15:04:05.999Z0700PMMST",
+			"15:04:05.0000Z07:00 Monday",
+
+			// standard layouts
+			time.Layout,
+			time.ANSIC,
+			time.UnixDate,
+			time.RubyDate,
+			time.RFC822,
+			time.RFC822Z,
+			time.RFC850,
+			time.RFC1123,
+			time.RFC1123Z,
+			time.RFC3339,
+			time.RFC3339Nano,
+			time.Kitchen,
+			time.Stamp,
+			time.StampMilli,
+			time.StampMicro,
+			time.StampNano,
+			time.DateTime,
+			time.DateOnly,
+			time.TimeOnly,
+
+			// Corrected layouts to the incorrect ones below.
+			"2006-01-02 03:04:05 -0700",
+			"2006-01-02 15:04:05 -0700",
+			"3:04PM",
+			"2006-01-02 15:04:05.000 -0700 MST",
+			"January 2 2006 3:04 PM",
+			"02/Jan/06 3:04PM",
+			"Mon 02 Jan 3:04:05 PM",
+		},
+	}
+
+	err := imap.AddCustomDateTimeParser("custDT", correctConfig)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	incorrectLayouts := [][]interface{}{
+		{
+			"2000-03-31 01:33:51 +0300",
+		},
+		{
+			"2006-01-02 15:04:51 +0300",
+		},
+		{
+			"2000-03-31 01:33:05 +0300",
+		},
+		{
+			"4:45PM",
+		},
+		{
+			"2006-01-02 15:04:05.445 -0700 MST",
+		},
+		{
+			"August 20 2001 8:55 AM",
+		},
+		{
+			"28/Jul/23 12:48PM",
+		},
+		{
+			"Tue 22 Aug 6:37:30 AM",
+		},
+	}
+	numExpectedErrors := len(incorrectLayouts)
+	numActualErrors := 0
+	for _, badLayout := range incorrectLayouts {
+		incorrectConfig := map[string]interface{}{
+			"type":    "flexiblego",
+			"layouts": badLayout,
+		}
+		err := imap.AddCustomDateTimeParser("badDT", incorrectConfig)
+		if err != nil {
+			numActualErrors++
+		}
+	}
+	if numActualErrors != numExpectedErrors {
+		t.Fatalf("expected %d errors, got: %d", numExpectedErrors, numActualErrors)
+	}
+}
