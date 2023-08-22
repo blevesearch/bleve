@@ -54,7 +54,7 @@ var validMagicNumbers = map[string]struct{}{
 	"":        {},
 }
 
-var layoutSplitRegex = regexp.MustCompile("[\\- :T,Z\\.<>;\\?!`~@#$%\\^&\\*|'\"\\(\\){}\\[\\]/\\\\]")
+var layoutSplitRegex = regexp.MustCompile("[\\+\\-= :T,Z\\.<>;\\?!`~@#$%\\^&\\*|'\"\\(\\){}\\[\\]/\\\\]")
 
 var layoutStripRegex = regexp.MustCompile(`PM|pm|\.9+|\.0+|MST`)
 
