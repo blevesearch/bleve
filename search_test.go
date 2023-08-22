@@ -2255,9 +2255,9 @@ func TestCustomDateTimeParserLayoutValidation(t *testing.T) {
 			time.StampMilli,
 			time.StampMicro,
 			time.StampNano,
-			time.DateTime,
-			time.DateOnly,
-			time.TimeOnly,
+			"2006-01-02 15:04:05", //time.DateTime
+			"2006-01-02",          //time.DateOnly
+			"15:04:05",            //time.TimeOnly
 
 			// Corrected layouts to the incorrect ones below.
 			"2006-01-02 03:04:05 -0700",
