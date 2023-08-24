@@ -72,19 +72,12 @@ func ParseQuery(input []byte) (Query, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, isMatchQuery := tmp["match"]
 	_, hasFuzziness := tmp["fuzziness"]
-	if hasFuzziness && !isMatchQuery {
+	_, isMatchQuery := tmp["match"]
+	_, isMatchPhraseQuery := tmp["match_phrase"]
+	_, hasTerms := tmp["terms"]
+	if hasFuzziness && !isMatchQuery && !isMatchPhraseQuery && !hasTerms {
 		var rv FuzzyQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			return nil, err
-		}
-		return &rv, nil
-	}
-	_, isTermQuery := tmp["term"]
-	if isTermQuery {
-		var rv TermQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
@@ -99,9 +92,31 @@ func ParseQuery(input []byte) (Query, error) {
 		}
 		return &rv, nil
 	}
-	_, isMatchPhraseQuery := tmp["match_phrase"]
 	if isMatchPhraseQuery {
 		var rv MatchPhraseQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	if hasTerms {
+		var rv PhraseQuery
+		err := json.Unmarshal(input, &rv)
+		if err != nil {
+			// now try multi-phrase
+			var rv2 MultiPhraseQuery
+			err = json.Unmarshal(input, &rv2)
+			if err != nil {
+				return nil, err
+			}
+			return &rv2, nil
+		}
+		return &rv, nil
+	}
+	_, isTermQuery := tmp["term"]
+	if isTermQuery {
+		var rv TermQuery
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
@@ -116,21 +131,6 @@ func ParseQuery(input []byte) (Query, error) {
 		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
-		}
-		return &rv, nil
-	}
-	_, hasTerms := tmp["terms"]
-	if hasTerms {
-		var rv PhraseQuery
-		err := json.Unmarshal(input, &rv)
-		if err != nil {
-			// now try multi-phrase
-			var rv2 MultiPhraseQuery
-			err = json.Unmarshal(input, &rv2)
-			if err != nil {
-				return nil, err
-			}
-			return &rv2, nil
 		}
 		return &rv, nil
 	}
