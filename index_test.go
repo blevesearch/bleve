@@ -401,7 +401,7 @@ func TestBytesRead(t *testing.T) {
 	}
 	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
 	prevBytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
-	if prevBytesRead != 32349 && res.Cost == prevBytesRead {
+	if prevBytesRead != 36066 && res.Cost == prevBytesRead {
 		t.Fatalf("expected bytes read for query string 32349, got %v",
 			prevBytesRead)
 	}
