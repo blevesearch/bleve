@@ -51,6 +51,11 @@ func TestFlexibleDateTimeParser(t *testing.T) {
 			expectedError: nil,
 		},
 		{
+			input:         "2000-03-31 01:33:51 -0800",
+			expectedTime:  time.Date(2000, 3, 31, 01, 33, 51, 0, testLocation),
+			expectedError: nil,
+		},
+		{
 			input:         "2014-08-03T15:59:30.999999999-08:00",
 			expectedTime:  time.Date(2014, 8, 3, 15, 59, 30, 999999999, testLocation),
 			expectedError: nil,
@@ -64,6 +69,7 @@ func TestFlexibleDateTimeParser(t *testing.T) {
 
 	rfc3339NoTimezone := "2006-01-02T15:04:05"
 	rfc3339NoTimezoneNoT := "2006-01-02 15:04:05"
+	rfc3339Offset := "2006-01-02 15:04:05 -0700"
 	rfc3339NoTime := "2006-01-02"
 
 	dateOptionalTimeParser := New(
@@ -72,6 +78,7 @@ func TestFlexibleDateTimeParser(t *testing.T) {
 			time.RFC3339,
 			rfc3339NoTimezone,
 			rfc3339NoTimezoneNoT,
+			rfc3339Offset,
 			rfc3339NoTime,
 		})
 
