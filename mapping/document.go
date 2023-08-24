@@ -149,12 +149,11 @@ func (dm *DocumentMapping) documentMappingForPath(path string) (
 	current := dm
 OUTER:
 	for i, pathElement := range pathElements {
-		for name, subDocMapping := range current.Properties {
-			if name == pathElement {
-				current = subDocMapping
-				continue OUTER
-			}
+		if subDocMapping, exists := current.Properties[pathElement]; exists {
+			current = subDocMapping
+			continue OUTER
 		}
+
 		// no subDocMapping matches this pathElement
 		// only if this is the last element check for field name
 		if i == len(pathElements)-1 {

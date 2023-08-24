@@ -69,6 +69,7 @@ func TestFlexibleDateTimeParser(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
+
 			input:          "2014-08-03T15:59:30.999999999-08:00",
 			expectedTime:   time.Date(2014, 8, 3, 15, 59, 30, 999999999, testLocation),
 			expectedLayout: time.RFC3339Nano,

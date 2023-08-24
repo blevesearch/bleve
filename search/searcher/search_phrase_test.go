@@ -15,6 +15,7 @@
 package searcher
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -36,7 +37,7 @@ func TestPhraseSearch(t *testing.T) {
 	}()
 
 	soptions := search.SearcherOptions{Explain: true, IncludeTermVectors: true}
-	phraseSearcher, err := NewPhraseSearcher(nil, twoDocIndexReader, []string{"angst", "beer"}, "desc", soptions)
+	phraseSearcher, err := NewPhraseSearcher(nil, twoDocIndexReader, []string{"angst", "beer"}, 0, "desc", 1.0, soptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +131,83 @@ func TestMultiPhraseSearch(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		searcher, err := NewMultiPhraseSearcher(nil, reader, test.phrase, "desc", soptions)
+		searcher, err := NewMultiPhraseSearcher(nil, reader, test.phrase, 0, "desc", 1.0, soptions)
+		if err != nil {
+			t.Error(err)
+		}
+		ctx := &search.SearchContext{
+			DocumentMatchPool: search.NewDocumentMatchPool(searcher.DocumentMatchPoolSize(), 0),
+		}
+		next, err := searcher.Next(ctx)
+		var actualIds [][]byte
+		for err == nil && next != nil {
+			actualIds = append(actualIds, next.IndexInternalID)
+			ctx.DocumentMatchPool.Put(next)
+			next, err = searcher.Next(ctx)
+		}
+		if err != nil {
+			t.Fatalf("error iterating searcher: %v for test %d", err, i)
+		}
+		if !reflect.DeepEqual(test.docids, actualIds) {
+			t.Fatalf("expected ids: %v, got %v", test.docids, actualIds)
+		}
+
+		err = searcher.Close()
+		if err != nil {
+			t.Error(err)
+		}
+
+		err = reader.Close()
+		if err != nil {
+			t.Error(err)
+		}
+	}
+}
+
+func TestFuzzyMultiPhraseSearch(t *testing.T) {
+
+	soptions := search.SearcherOptions{Explain: true, IncludeTermVectors: true}
+
+	tests := []struct {
+		mphrase   [][]string
+		docids    [][]byte
+		fuzziness int
+		prefix    int
+	}{
+		{
+			mphrase:   [][]string{[]string{"pale", "anger"}, []string{"best"}, []string{"colon", "porch"}},
+			docids:    [][]byte{[]byte("2"), []byte("3")},
+			fuzziness: 2,
+		},
+		{
+			mphrase:   [][]string{[]string{"pale", "anger"}, []string{}, []string{"colon", "porch", "could"}},
+			docids:    nil,
+			fuzziness: 1,
+		},
+		{
+			mphrase:   [][]string{[]string{"app"}, []string{"best"}, []string{"volume"}},
+			docids:    [][]byte{[]byte("3")},
+			fuzziness: 2,
+		},
+		{
+			mphrase:   [][]string{[]string{"anger", "pale", "bar"}, []string{"beard"}, []string{}, []string{}},
+			docids:    [][]byte{[]byte("1"), []byte("2"), []byte("3"), []byte("4")},
+			fuzziness: 2,
+		},
+		{
+			mphrase:   [][]string{[]string{"anger", "pale", "bar"}, []string{}, []string{"beard"}, []string{}},
+			docids:    [][]byte{[]byte("1"), []byte("4")},
+			fuzziness: 2,
+		},
+	}
+
+	for i, test := range tests {
+
+		reader, err := twoDocIndex.Reader()
+		if err != nil {
+			t.Error(err)
+		}
+		searcher, err := NewMultiPhraseSearcher(context.TODO(), reader, test.mphrase, test.fuzziness, "desc", 1.0, soptions)
 		if err != nil {
 			t.Error(err)
 		}
