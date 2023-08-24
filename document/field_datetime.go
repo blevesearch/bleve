@@ -82,8 +82,10 @@ func (n *DateTimeField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return n.frequencies
 }
 
-func splitValue(value []byte) (numeric.PrefixCoded, string) {
-	parts := bytes.SplitN(value, dateTimeValueSeperator, 2)
+// split the value into the prefix coded date and the layout
+// using the dateTimeValueSeperator as the split point
+func (n *DateTimeField) splitValue() (numeric.PrefixCoded, string) {
+	parts := bytes.SplitN(n.value, dateTimeValueSeperator, 2)
 	if len(parts) == 1 {
 		return numeric.PrefixCoded(parts[0]), ""
 	}
@@ -91,7 +93,7 @@ func splitValue(value []byte) (numeric.PrefixCoded, string) {
 }
 
 func (n *DateTimeField) Analyze() {
-	valueWithoutLayout, _ := splitValue(n.value)
+	valueWithoutLayout, _ := n.splitValue()
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
@@ -131,7 +133,7 @@ func (n *DateTimeField) Value() []byte {
 }
 
 func (n *DateTimeField) DateTime() (time.Time, string, error) {
-	date, layout := splitValue(n.value)
+	date, layout := n.splitValue()
 	i64, err := date.Int64()
 	if err != nil {
 		return time.Time{}, "", err
@@ -165,6 +167,12 @@ func NewDateTimeFieldWithIndexingOptions(name string, arrayPositions []uint64, d
 	if canRepresent(dt) {
 		dtInt64 := dt.UnixNano()
 		prefixCoded := numeric.MustNewPrefixCodedInt64(dtInt64, 0)
+		// The prefixCoded value is combined with the layout.
+		// This is necessary because the storage layer stores a fields value as a byte slice
+		// without storing extra information like layout. So by making value = prefixCoded + layout,
+		// both pieces of information are stored in the byte slice.
+		// During a query, the layout is extracted from the byte slice stored to correctly
+		// format the prefixCoded value.
 		valueWithLayout := append(prefixCoded, dateTimeValueSeperator...)
 		valueWithLayout = append(valueWithLayout, []byte(layout)...)
 		return &DateTimeField{
