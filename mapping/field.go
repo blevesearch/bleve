@@ -233,9 +233,9 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 		}
 		dateTimeParser := context.im.DateTimeParserNamed(dateTimeFormat)
 		if dateTimeParser != nil {
-			parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
+			parsedDateTime, layout, err := dateTimeParser.ParseDateTime(propertyValueString)
 			if err == nil {
-				fm.processTime(parsedDateTime, pathString, path, indexes, context)
+				fm.processTime(parsedDateTime, layout, pathString, path, indexes, context)
 			}
 		}
 	} else if fm.Type == "IP" {
@@ -259,11 +259,11 @@ func (fm *FieldMapping) processFloat64(propertyValFloat float64, pathString stri
 	}
 }
 
-func (fm *FieldMapping) processTime(propertyValueTime time.Time, pathString string, path []string, indexes []uint64, context *walkContext) {
+func (fm *FieldMapping) processTime(propertyValueTime time.Time, layout string, pathString string, path []string, indexes []uint64, context *walkContext) {
 	fieldName := getFieldName(pathString, path, fm)
 	if fm.Type == "datetime" {
 		options := fm.Options()
-		field, err := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, propertyValueTime, options)
+		field, err := document.NewDateTimeFieldWithIndexingOptions(fieldName, indexes, propertyValueTime, layout, options)
 		if err == nil {
 			context.doc.AddField(field)
 		} else {

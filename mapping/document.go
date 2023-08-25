@@ -422,7 +422,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			// first see if it can be parsed by the default date parser
 			dateTimeParser := context.im.DateTimeParserNamed(context.im.DefaultDateTimeParser)
 			if dateTimeParser != nil {
-				parsedDateTime, err := dateTimeParser.ParseDateTime(propertyValueString)
+				parsedDateTime, layout, err := dateTimeParser.ParseDateTime(propertyValueString)
 				if err != nil {
 					// index as text
 					fieldMapping := newTextFieldMappingDynamic(context.im)
@@ -430,7 +430,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				} else {
 					// index as datetime
 					fieldMapping := newDateTimeFieldMappingDynamic(context.im)
-					fieldMapping.processTime(parsedDateTime, pathString, path, indexes, context)
+					fieldMapping.processTime(parsedDateTime, layout, pathString, path, indexes, context)
 				}
 			}
 		}
@@ -471,11 +471,11 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			if subDocMapping != nil {
 				// index by explicit mapping
 				for _, fieldMapping := range subDocMapping.Fields {
-					fieldMapping.processTime(property, pathString, path, indexes, context)
+					fieldMapping.processTime(property, time.RFC3339, pathString, path, indexes, context)
 				}
 			} else if closestDocMapping.Dynamic {
 				fieldMapping := newDateTimeFieldMappingDynamic(context.im)
-				fieldMapping.processTime(property, pathString, path, indexes, context)
+				fieldMapping.processTime(property, time.RFC3339, pathString, path, indexes, context)
 			}
 		case encoding.TextMarshaler:
 			txt, err := property.MarshalText()
