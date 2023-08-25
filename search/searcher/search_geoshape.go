@@ -22,6 +22,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/geojson"
+	"github.com/blevesearch/geo/s2"
 )
 
 func NewGeoShapeSearcher(ctx context.Context, indexReader index.IndexReader, shape index.GeoJSON,
@@ -63,6 +64,12 @@ func NewGeoShapeSearcher(ctx context.Context, indexReader index.IndexReader, sha
 // implementation of doc values.
 var termSeparatorSplitSlice = []byte{0xff}
 
+// Assigning the size of the largest buffer in the pool to 24KB and 
+// the smallest buffer to 24 bytes. The pools are used to read a 
+// sequence of vertices which are always 24 bytes each.
+var maxBufPoolSize = 24 * 1024
+var minBufPoolSize = 24
+
 func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueReader, field string,
 	relation string, shape index.GeoJSON) FilterFunc {
 	// this is for accumulating the shape's actual complete value
@@ -70,19 +77,8 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 	var dvShapeValue []byte
 	var startReading, finishReading bool
 	var reader *bytes.Reader
-
-	bufPool := make([][]byte, 11)
-	bufPool[0] = make([]byte, 8192*3)
-	bufPool[1] = make([]byte, 4096*3)
-	bufPool[2] = make([]byte, 2048*3)
-	bufPool[3] = make([]byte, 1024*3)
-	bufPool[4] = make([]byte, 512*3)
-	bufPool[5] = make([]byte, 256*3)
-	bufPool[6] = make([]byte, 128*3)
-	bufPool[7] = make([]byte, 64*3)
-	bufPool[8] = make([]byte, 32*3)
-	bufPool[9] = make([]byte, 16*3)
-	bufPool[10] = make([]byte, 8*3)
+	
+	bufPool := s2.NewGeoBufferPool(maxBufPoolSize, minBufPoolSize)
 
 	return func(d *search.DocumentMatch) bool {
 		var found bool
@@ -118,7 +114,7 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 					// apply the filter once the entire docvalue is finished reading.
 					if finishReading {
 						v, err := geojson.FilterGeoShapesOnRelation(shape,
-							dvShapeValue, relation, &reader, &bufPool)
+							dvShapeValue, relation, &reader, bufPool)
 						if err == nil && v {
 							found = true
 						}
