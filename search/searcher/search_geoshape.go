@@ -22,7 +22,6 @@ import (
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/geojson"
-	"github.com/blevesearch/geo/s2"
 )
 
 func NewGeoShapeSearcher(ctx context.Context, indexReader index.IndexReader, shape index.GeoJSON,
@@ -64,12 +63,6 @@ func NewGeoShapeSearcher(ctx context.Context, indexReader index.IndexReader, sha
 // implementation of doc values.
 var termSeparatorSplitSlice = []byte{0xff}
 
-// Assigning the size of the largest buffer in the pool to 24KB and 
-// the smallest buffer to 24 bytes. The pools are used to read a 
-// sequence of vertices which are always 24 bytes each.
-var maxBufPoolSize = 24 * 1024
-var minBufPoolSize = 24
-
 func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueReader, field string,
 	relation string, shape index.GeoJSON) FilterFunc {
 	// this is for accumulating the shape's actual complete value
@@ -78,7 +71,7 @@ func buildRelationFilterOnShapes(ctx context.Context, dvReader index.DocValueRea
 	var startReading, finishReading bool
 	var reader *bytes.Reader
 	
-	bufPool := s2.NewGeoBufferPool(maxBufPoolSize, minBufPoolSize)
+	bufPool := ctx.Value(search.GeoBufferPoolCallbackKey).(search.GeoBufferPoolCallbackFunc)()
 
 	return func(d *search.DocumentMatch) bool {
 		var found bool
