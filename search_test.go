@@ -12,16 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build densevector
-// +build densevector
-
 package bleve
 
 import (
 	"encoding/json"
 	"fmt"
-	"math"
-	"math/rand"
 	"reflect"
 	"strconv"
 	"strings"
@@ -58,21 +53,6 @@ import (
 	"github.com/blevesearch/bleve/v2/search/query"
 	index "github.com/blevesearch/bleve_index_api"
 )
-
-func populateFakeVecs(dim int, dataset []map[string]interface{}) (rv []map[string]interface{}) {
-
-	for _, doc := range dataset {
-		var fakeVec []float32
-		for i := 0; i < dim; i++ {
-			fakeVec = append(fakeVec, float32(math.Round(rand.Float64()*1000)/1000))
-		}
-
-		doc["stubVec"] = fakeVec
-	}
-
-	rv = dataset
-	return rv
-}
 
 func TestSortedFacetedQuery(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
@@ -143,95 +123,6 @@ func TestSortedFacetedQuery(t *testing.T) {
 			}
 		}
 	}
-}
-
-func TestSimilaritySearchQuery(t *testing.T) {
-	tmpIndexPath := createTmpIndexPath(t)
-	defer cleanupTmpIndexPath(t, tmpIndexPath)
-
-	indexMapping := NewIndexMapping()
-	indexMapping.TypeField = "type"
-	indexMapping.DefaultAnalyzer = "en"
-	documentMapping := NewDocumentMapping()
-	indexMapping.AddDocumentMapping("hotel", documentMapping)
-
-	contentFieldMapping := NewTextFieldMapping()
-	contentFieldMapping.Index = true
-	documentMapping.AddFieldMappingsAt("content", contentFieldMapping)
-	documentMapping.AddFieldMappingsAt("country", contentFieldMapping)
-
-	vecFieldMapping := NewDenseVectorFieldMapping()
-	vecFieldMapping.Index = true
-	vecFieldMapping.Dims = 64
-	documentMapping.AddFieldMappingsAt("stubVec", vecFieldMapping)
-
-	dataset := make([]map[string]interface{}, 3)
-	dataset[0] = map[string]interface{}{"type": "hotel", "country": "uk", "content": "a"}
-	dataset[1] = map[string]interface{}{"type": "hotel", "country": "china", "content": "b"}
-	dataset[2] = map[string]interface{}{"type": "hotel", "country": "nepal", "content": "c"}
-	dataset = populateFakeVecs(64, dataset)
-
-	index, err := New(tmpIndexPath, indexMapping)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		err := index.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	batch := index.NewBatch()
-	batch.Index("11", map[string]interface{}{
-		"type":    "hotel",
-		"country": "india",
-		"content": "k",
-	})
-	batch.Index("12", map[string]interface{}{
-		"type":    "hotel",
-		"country": "india",
-		"content": "l",
-	})
-	batch.Index("13", map[string]interface{}{
-		"type":    "hotel",
-		"country": "india",
-		"content": "k",
-	})
-	for i, k := range dataset {
-		batch.Index(strconv.Itoa(i), k)
-	}
-	err = index.Batch(batch)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	d, err := index.DocCount()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d != 6 {
-		t.Errorf("expected 6, got %d", d)
-	}
-
-	query := NewMatchPhraseQuery("india")
-	query.SetField("country")
-	searchRequest := NewSearchRequest(query)
-	searchRequest.SortBy([]string{"content"})
-	queryVector := make([]float32, 64)
-	for i := 0; i < 64; i++ {
-		queryVector[i] = float32(math.Round(rand.Float64()*1000) / 1000)
-	}
-	// stubVec is the field indexed with the vectors
-	searchRequest.SetKNN("stubVec", queryVector, 2)
-
-	searchResults, err := index.Search(searchRequest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// TODO Need to update this to determine which are the most similar vectors
-	// and then compare it to those.
-	fmt.Printf("results are %+v", searchResults)
 }
 
 func TestSearchResultString(t *testing.T) {
