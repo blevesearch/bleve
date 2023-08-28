@@ -78,7 +78,7 @@ func init() {
 type IndexSnapshot struct {
 	parent   *Scorch
 	segment  []*SegmentSnapshot
-	offsets  []uint64 // offsets in the zap file?
+	offsets  []uint64
 	internal map[string][]byte
 	epoch    uint64
 	size     uint64
