@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -652,7 +653,7 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 								if err == nil {
 									if layout == "" {
 										// layout not set probably means it was indexed as a timestamp
-										value = datetime.UnixNano()
+										value = strconv.FormatInt(datetime.UnixNano(), 10)
 									} else {
 										value = datetime.Format(layout)
 									}

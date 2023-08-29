@@ -17,6 +17,7 @@ package http
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -91,7 +92,7 @@ func (h *DocGetHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			if err == nil {
 				if layout == "" {
 					// layout not set probably means it was indexed as a timestamp
-					newval = d.UnixNano()
+					newval = strconv.FormatInt(d.UnixNano(), 10)
 				} else {
 					newval = d.Format(layout)
 				}
