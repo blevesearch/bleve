@@ -440,22 +440,6 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			}
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if subDocMapping != nil {
-			// index by explicit mapping in case of datetime
-			for _, fieldMapping := range subDocMapping.Fields {
-				if fieldMapping.Type == "datetime" {
-					// This number is a UNIX timestamp
-					// hence must parse as a datetime
-					bounds, isUnixFormat := analysis.UnixTimestampFormats[fieldMapping.DateFormat]
-					if isUnixFormat {
-						timestamp, err := analysis.ValidateAndConvertTimestamp(propertyValue.Int(), bounds, fieldMapping.DateFormat)
-						if err == nil {
-							fieldMapping.processTimestamp(timestamp, pathString, path, indexes, context)
-						}
-					}
-				}
-			}
-		}
 		dm.processProperty(float64(propertyValue.Int()), path, indexes, context)
 		return
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
@@ -466,9 +450,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		if subDocMapping != nil {
 			// index by explicit mapping
 			for _, fieldMapping := range subDocMapping.Fields {
-				if fieldMapping.Type != "datetime" {
-					fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
-				}
+				fieldMapping.processFloat64(propertyValFloat, pathString, path, indexes, context)
 			}
 		} else if closestDocMapping.Dynamic {
 			// automatic indexing behavior

@@ -280,8 +280,6 @@ func (fm *FieldMapping) processTimestamp(unixTimestamp int64, pathString string,
 		field, err := document.NewDateTimeFieldWithTimestamp(fieldName, indexes, unixTimestamp, options)
 		if err == nil {
 			context.doc.AddField(field)
-		} else {
-			logger.Printf("could not build date %v", err)
 		}
 
 		if !fm.IncludeInAll {
