@@ -483,8 +483,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey,
 		search.SearchIOStatsCallbackFunc(sendBytesRead))
 
-	bufPool := s2.NewGeoBufferPool(24 * 1024, 24)
+	var bufPool *s2.GeoBufferPool
 	getBufferPool := func() *s2.GeoBufferPool {
+		if bufPool == nil {
+			bufPool = s2.NewGeoBufferPool(search.MaxBufPoolSize, search.MinBufPoolSize)
+		}
+
 		return bufPool
 	}
 
