@@ -16,7 +16,7 @@ package bleve
 
 import (
 	"expvar"
-	"io/ioutil"
+	"io"
 	"log"
 	"time"
 
@@ -86,10 +86,10 @@ func init() {
 	initDisk()
 }
 
-var logger = log.New(ioutil.Discard, "bleve", log.LstdFlags)
+var logger = log.New(io.Discard, "bleve", log.LstdFlags)
 
 // SetLog sets the logger used for logging
-// by default log messages are sent to ioutil.Discard
+// by default log messages are sent to io.Discard
 func SetLog(l *log.Logger) {
 	logger = l
 }

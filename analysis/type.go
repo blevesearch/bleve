@@ -151,7 +151,7 @@ func ValidateAndConvertTimestamp(timestamp int64, bounds TimestampBounds, format
 }
 
 type DateTimeParser interface {
-	ParseDateTime(string) (time.Time, error)
+	ParseDateTime(string) (time.Time, string, error)
 }
 
 type ByteArrayConverter interface {

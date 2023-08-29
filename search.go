@@ -62,14 +62,14 @@ type dateTimeRange struct {
 func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (start, end time.Time) {
 	start = dr.Start
 	if dr.Start.IsZero() && dr.startString != nil {
-		s, err := dateTimeParser.ParseDateTime(*dr.startString)
+		s, _, err := dateTimeParser.ParseDateTime(*dr.startString)
 		if err == nil {
 			start = s
 		}
 	}
 	end = dr.End
 	if dr.End.IsZero() && dr.endString != nil {
-		e, err := dateTimeParser.ParseDateTime(*dr.endString)
+		e, _, err := dateTimeParser.ParseDateTime(*dr.endString)
 		if err == nil {
 			end = e
 		}
