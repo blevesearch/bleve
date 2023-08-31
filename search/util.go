@@ -128,7 +128,7 @@ const GeoBufferPoolCallbackKey = "_geo_buffer_pool_callback_key"
 // Assigning the size of the largest buffer in the pool to 24KB and
 // the smallest buffer to 24 bytes. The pools are used to read a
 // sequence of vertices which are always 24 bytes each.
-const MaxBufPoolSize = 24 * 1024
-const MinBufPoolSize = 24
+const MaxGeoBufPoolSize = 24 * 1024
+const MinGeoBufPoolSize = 24
 
 type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool

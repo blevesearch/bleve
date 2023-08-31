@@ -486,7 +486,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	var bufPool *s2.GeoBufferPool
 	getBufferPool := func() *s2.GeoBufferPool {
 		if bufPool == nil {
-			bufPool = s2.NewGeoBufferPool(search.MaxBufPoolSize, search.MinBufPoolSize)
+			bufPool = s2.NewGeoBufferPool(search.MaxGeoBufPoolSize, search.MinGeoBufPoolSize)
 		}
 
 		return bufPool
