@@ -105,6 +105,7 @@ const (
 
 const SearchIncrementalCostKey = "_search_incremental_cost_key"
 const QueryTypeKey = "_query_type_key"
+const FuzzyMatchPhraseKey = "_fuzzy_match_phrase_key"
 
 func RecordSearchCost(ctx context.Context,
 	msg SearchIncrementalCostCallbackMsg, bytes uint64) {

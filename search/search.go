@@ -155,7 +155,7 @@ type DocumentMatch struct {
 
 	// Fields contains the values for document fields listed in
 	// SearchRequest.Fields. Text fields are returned as strings, numeric
-	// fields as float64s and date fields as time.RFC3339 formatted strings.
+	// fields as float64s and date fields as strings.
 	Fields map[string]interface{} `json:"fields,omitempty"`
 
 	// used to maintain natural index order
