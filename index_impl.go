@@ -35,6 +35,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search/facet"
 	"github.com/blevesearch/bleve/v2/search/highlight"
 	index "github.com/blevesearch/bleve_index_api"
+	"github.com/blevesearch/geo/s2"
 )
 
 type indexImpl struct {
@@ -481,6 +482,18 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey,
 		search.SearchIOStatsCallbackFunc(sendBytesRead))
+
+	var bufPool *s2.GeoBufferPool
+	getBufferPool := func() *s2.GeoBufferPool {
+		if bufPool == nil {
+			bufPool = s2.NewGeoBufferPool(search.MaxGeoBufPoolSize, search.MinGeoBufPoolSize)
+		}
+
+		return bufPool
+	}
+
+	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey,
+		search.GeoBufferPoolCallbackFunc(getBufferPool))
 
 	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
