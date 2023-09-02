@@ -16,7 +16,6 @@ package analysis
 
 import (
 	"fmt"
-	"math"
 	"time"
 )
 
@@ -100,55 +99,8 @@ func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
 
 var ErrInvalidDateTime = fmt.Errorf("unable to parse datetime with any of the layouts")
 
-const UnixSecs = "unix_sec"
-const UnixMilliSecs = "unix_milli"
-const UnixMicroSecs = "unix_micro"
-const UnixNanoSecs = "unix_nano"
-
-type TimestampBounds struct {
-	Min int64
-	Max int64
-}
-
-var UnixTimestampFormats = map[string]TimestampBounds{
-	UnixSecs: {
-		Min: math.MinInt64 / 1000000000,
-		Max: math.MaxInt64 / 1000000000,
-	},
-	UnixMilliSecs: {
-		Min: math.MinInt64 / 1000000,
-		Max: math.MaxInt64 / 1000000,
-	},
-	UnixMicroSecs: {
-		Min: math.MinInt64 / 1000,
-		Max: math.MaxInt64 / 1000,
-	},
-	UnixNanoSecs: {
-		Min: math.MinInt64,
-		Max: math.MaxInt64,
-	},
-}
-
-func convertTimestamp(timestamp int64, format string) int64 {
-	switch format {
-	case UnixSecs:
-		timestamp *= 1000000000
-	case UnixMilliSecs:
-		timestamp *= 1000000
-	case UnixMicroSecs:
-		timestamp *= 1000
-	}
-	return timestamp
-}
-
-// ValidateAndConvertTimestamp validates the timestamp against the bounds and
-// converts it to the nanoseconds if valid.
-func ValidateAndConvertTimestamp(timestamp int64, bounds TimestampBounds, format string) (int64, error) {
-	if timestamp > bounds.Min && timestamp < bounds.Max {
-		return convertTimestamp(timestamp, format), nil
-	}
-	return 0, fmt.Errorf("timestamp out of range")
-}
+var ErrInvalidTimestampString = fmt.Errorf("unable to parse timestamp string")
+var ErrInvalidTimestampRange = fmt.Errorf("timestamp out of range")
 
 type DateTimeParser interface {
 	ParseDateTime(string) (time.Time, string, error)

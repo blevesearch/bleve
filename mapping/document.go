@@ -22,7 +22,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/registry"
 )
 
@@ -74,10 +73,7 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 		if field.DateFormat != "" {
 			_, err = cache.DateTimeParserNamed(field.DateFormat)
 			if err != nil {
-				_, unixFormat := analysis.UnixTimestampFormats[field.DateFormat]
-				if !unixFormat {
-					return err
-				}
+				return err
 			}
 		}
 		switch field.Type {

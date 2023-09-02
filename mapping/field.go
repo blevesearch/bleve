@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"strconv"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
@@ -232,24 +231,11 @@ func (fm *FieldMapping) processString(propertyValueString string, pathString str
 		if fm.DateFormat != "" {
 			dateTimeFormat = fm.DateFormat
 		}
-		bounds, isUnixFormat := analysis.UnixTimestampFormats[dateTimeFormat]
-		if !isUnixFormat {
-			dateTimeParser := context.im.DateTimeParserNamed(dateTimeFormat)
-			if dateTimeParser != nil {
-				parsedDateTime, layout, err := dateTimeParser.ParseDateTime(propertyValueString)
-				if err == nil {
-					fm.processTime(parsedDateTime, layout, pathString, path, indexes, context)
-				}
-			}
-		} else {
-			// special case for unix timestamp
-			// we need to convert the string to a time object
-			timestamp, err := strconv.ParseInt(propertyValueString, 10, 64)
+		dateTimeParser := context.im.DateTimeParserNamed(dateTimeFormat)
+		if dateTimeParser != nil {
+			parsedDateTime, layout, err := dateTimeParser.ParseDateTime(propertyValueString)
 			if err == nil {
-				timestamp, err = analysis.ValidateAndConvertTimestamp(timestamp, bounds, dateTimeFormat)
-				if err == nil {
-					fm.processTimestamp(timestamp, pathString, path, indexes, context)
-				}
+				fm.processTime(parsedDateTime, layout, pathString, path, indexes, context)
 			}
 		}
 	} else if fm.Type == "IP" {
@@ -266,21 +252,6 @@ func (fm *FieldMapping) processFloat64(propertyValFloat float64, pathString stri
 		options := fm.Options()
 		field := document.NewNumericFieldWithIndexingOptions(fieldName, indexes, propertyValFloat, options)
 		context.doc.AddField(field)
-
-		if !fm.IncludeInAll {
-			context.excludedFromAll = append(context.excludedFromAll, fieldName)
-		}
-	}
-}
-
-func (fm *FieldMapping) processTimestamp(unixTimestamp int64, pathString string, path []string, indexes []uint64, context *walkContext) {
-	fieldName := getFieldName(pathString, path, fm)
-	if fm.Type == "datetime" {
-		options := fm.Options()
-		field, err := document.NewDateTimeFieldWithTimestamp(fieldName, indexes, unixTimestamp, options)
-		if err == nil {
-			context.doc.AddField(field)
-		}
 
 		if !fm.IncludeInAll {
 			context.excludedFromAll = append(context.excludedFromAll, fieldName)

@@ -71,6 +71,10 @@ import (
 	// date time parsers
 	_ "github.com/blevesearch/bleve/v2/analysis/datetime/flexible"
 	_ "github.com/blevesearch/bleve/v2/analysis/datetime/optional"
+	_ "github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/microseconds"
+	_ "github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/milliseconds"
+	_ "github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/nanoseconds"
+	_ "github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/seconds"
 
 	// languages
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/ar"

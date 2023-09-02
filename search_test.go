@@ -29,6 +29,11 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	html_char_filter "github.com/blevesearch/bleve/v2/analysis/char/html"
 	regexp_char_filter "github.com/blevesearch/bleve/v2/analysis/char/regexp"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/flexible"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/microseconds"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/milliseconds"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/nanoseconds"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/seconds"
 	"github.com/blevesearch/bleve/v2/analysis/token/length"
 	"github.com/blevesearch/bleve/v2/analysis/token/lowercase"
 	"github.com/blevesearch/bleve/v2/analysis/token/shingle"
@@ -2366,7 +2371,7 @@ func TestDateRangeTimestampQueries(t *testing.T) {
 	// for good measure
 
 	dtParserConfig := map[string]interface{}{
-		"type":    "flexiblego",
+		"type":    flexible.Name,
 		"layouts": []interface{}{"2006/01/02 15:04:05"},
 	}
 	err := imap.AddCustomDateTimeParser("custDT", dtParserConfig)
@@ -2378,16 +2383,16 @@ func TestDateRangeTimestampQueries(t *testing.T) {
 	dateField.DateFormat = "custDT"
 
 	unixSecField := mapping.NewDateTimeFieldMapping()
-	unixSecField.DateFormat = analysis.UnixSecs
+	unixSecField.DateFormat = seconds.Name
 
 	unixMilliSecField := mapping.NewDateTimeFieldMapping()
-	unixMilliSecField.DateFormat = analysis.UnixMilliSecs
+	unixMilliSecField.DateFormat = milliseconds.Name
 
 	unixMicroSecField := mapping.NewDateTimeFieldMapping()
-	unixMicroSecField.DateFormat = analysis.UnixMicroSecs
+	unixMicroSecField.DateFormat = microseconds.Name
 
 	unixNanoSecField := mapping.NewDateTimeFieldMapping()
-	unixNanoSecField.DateFormat = analysis.UnixNanoSecs
+	unixNanoSecField.DateFormat = nanoseconds.Name
 
 	imap.DefaultMapping.AddFieldMappingsAt("date", dateField)
 	imap.DefaultMapping.AddFieldMappingsAt("seconds", unixSecField)
