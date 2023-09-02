@@ -61,7 +61,6 @@ func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (sta
 			start = s
 		}
 	}
-
 	end = dr.End
 	if dr.End.IsZero() && dr.endString != nil {
 		e, _, err := dateTimeParser.ParseDateTime(*dr.endString)
@@ -69,7 +68,6 @@ func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (sta
 			end = e
 		}
 	}
-
 	return start, end
 }
 
@@ -88,7 +86,6 @@ func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
 	if temp.Start != nil {
 		dr.startString = temp.Start
 	}
-
 	if temp.End != nil {
 		dr.endString = temp.End
 	}
@@ -102,15 +99,12 @@ func (dr *dateTimeRange) MarshalJSON() ([]byte, error) {
 		"start": dr.Start,
 		"end":   dr.End,
 	}
-
 	if dr.Start.IsZero() && dr.startString != nil {
 		rv["start"] = dr.startString
 	}
-
 	if dr.End.IsZero() && dr.endString != nil {
 		rv["end"] = dr.endString
 	}
-
 	return json.Marshal(rv)
 }
 
@@ -153,24 +147,22 @@ func (fr *FacetRequest) Validate() error {
 			if _, ok := nrNames[nr.Name]; ok {
 				return fmt.Errorf("numeric ranges contains duplicate name '%s'", nr.Name)
 			}
-
 			nrNames[nr.Name] = struct{}{}
 			if nr.Min == nil && nr.Max == nil {
 				return fmt.Errorf("numeric range query must specify either min, max or both for range name '%s'", nr.Name)
 			}
 		}
+
 	} else {
 		dateTimeParser, err := cache.DateTimeParserNamed(defaultDateTimeParser)
 		if err != nil {
 			return err
 		}
-
 		drNames := map[string]interface{}{}
 		for _, dr := range fr.DateTimeRanges {
 			if _, ok := drNames[dr.Name]; ok {
 				return fmt.Errorf("date ranges contains duplicate name '%s'", dr.Name)
 			}
-
 			drNames[dr.Name] = struct{}{}
 			start, end := dr.ParseDates(dateTimeParser)
 			if start.IsZero() && end.IsZero() {
@@ -224,7 +216,6 @@ func (fr FacetsRequest) Validate() error {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -312,7 +303,6 @@ func (r *SearchRequest) Validate() error {
 			return fmt.Errorf("search after must have same size as sort order")
 		}
 	}
-
 	if r.SearchBefore != nil {
 		if r.From != 0 {
 			return fmt.Errorf("cannot use search before with from !=0")
@@ -390,7 +380,6 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	} else {
 		r.Size = *temp.Size
 	}
-
 	if temp.Sort == nil {
 		r.Sort = search.SortOrder{&search.SortScore{Desc: true}}
 	} else {
@@ -398,7 +387,6 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 			return err
 		}
 	}
-
 	r.From = temp.From
 	r.Explain = temp.Explain
 	r.Highlight = temp.Highlight
@@ -453,7 +441,6 @@ func (iem IndexErrMap) MarshalJSON() ([]byte, error) {
 	for k, v := range iem {
 		tmp[k] = v.Error()
 	}
-
 	return json.Marshal(tmp)
 }
 
@@ -462,11 +449,9 @@ func (iem IndexErrMap) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &tmp); err != nil {
 		return err
 	}
-
 	for k, v := range tmp {
 		iem[k] = fmt.Errorf("%s", v)
 	}
-
 	return nil
 }
 
@@ -485,7 +470,6 @@ func (ss *SearchStatus) Merge(other *SearchStatus) {
 	ss.Total += other.Total
 	ss.Failed += other.Failed
 	ss.Successful += other.Successful
-
 	if len(other.Errors) > 0 {
 		if ss.Errors == nil {
 			ss.Errors = make(map[string]error)
@@ -565,7 +549,6 @@ func (sr *SearchResult) String() string {
 	} else {
 		rv = "No matches"
 	}
-
 	if len(sr.Facets) > 0 {
 		rv += fmt.Sprintf("Facets:\n")
 		for fn, f := range sr.Facets {
@@ -584,7 +567,6 @@ func (sr *SearchResult) String() string {
 			}
 		}
 	}
-
 	return rv
 }
 
@@ -594,11 +576,9 @@ func (sr *SearchResult) Merge(other *SearchResult) {
 	sr.Hits = append(sr.Hits, other.Hits...)
 	sr.Total += other.Total
 	sr.Cost += other.Cost
-
 	if other.MaxScore > sr.MaxScore {
 		sr.MaxScore = other.MaxScore
 	}
-
 	if sr.Facets == nil && len(other.Facets) != 0 {
 		sr.Facets = other.Facets
 		return
