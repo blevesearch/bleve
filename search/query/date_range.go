@@ -152,11 +152,6 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 	min := math.Inf(-1)
 	max := math.Inf(1)
 	if !q.Start.IsZero() {
-		if q.Start.Year() == 0 {
-			// year is zero, so this time.Time has unspecified date
-			// but is Not Zero so must have time only
-			q.Start.Time = q.Start.Time.AddDate(1700, 0, 0)
-		}
 		if !isDatetimeCompatible(q.Start) {
 			// overflow
 			return nil, nil, fmt.Errorf("invalid/unsupported date range, start: %v", q.Start)
@@ -165,11 +160,6 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 		min = numeric.Int64ToFloat64(startInt64)
 	}
 	if !q.End.IsZero() {
-		if q.End.Year() == 0 {
-			// year is zero, so this time.Time has unspecified date
-			// but is Not Zero so must have time only
-			q.End.Time = q.End.Time.AddDate(1700, 0, 0)
-		}
 		if !isDatetimeCompatible(q.End) {
 			// overflow
 			return nil, nil, fmt.Errorf("invalid/unsupported date range, end: %v", q.End)
