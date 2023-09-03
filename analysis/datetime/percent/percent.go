@@ -126,14 +126,14 @@ func parseFormatString(formatString string) (string, error) {
 	return dateTimeLayout.String(), nil
 }
 
-func (p *DateTimeParser) ParseDateTime(input string) (time.Time, error) {
+func (p *DateTimeParser) ParseDateTime(input string) (time.Time, string, error) {
 	for _, layout := range p.layouts {
 		rv, err := time.Parse(layout, input)
 		if err == nil {
-			return rv, nil
+			return rv, layout, nil
 		}
 	}
-	return time.Time{}, analysis.ErrInvalidDateTime
+	return time.Time{}, "", analysis.ErrInvalidDateTime
 }
 
 func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.DateTimeParser, error) {
