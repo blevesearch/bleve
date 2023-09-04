@@ -56,7 +56,7 @@ func queryTimeFromString(t string) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-	rv, err := dateTimeParser.ParseDateTime(t)
+	rv, _, err := dateTimeParser.ParseDateTime(t)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -79,7 +79,7 @@ func (t *BleveQueryTime) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	t.Time, err = dateTimeParser.ParseDateTime(timeString)
+	t.Time, _, err = dateTimeParser.ParseDateTime(timeString)
 	if err != nil {
 		return err
 	}

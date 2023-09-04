@@ -25,43 +25,6 @@ import (
 func TestFlexibleDateTimeParser(t *testing.T) {
 	testLocation := time.FixedZone("", -8*60*60)
 
-	tests := []struct {
-		input         string
-		expectedTime  time.Time
-		expectedError error
-	}{
-		{
-			input:         "2014-08-03",
-			expectedTime:  time.Date(2014, 8, 3, 0, 0, 0, 0, time.UTC),
-			expectedError: nil,
-		},
-		{
-			input:         "2014-08-03T15:59:30",
-			expectedTime:  time.Date(2014, 8, 3, 15, 59, 30, 0, time.UTC),
-			expectedError: nil,
-		},
-		{
-			input:         "2014-08-03 15:59:30",
-			expectedTime:  time.Date(2014, 8, 3, 15, 59, 30, 0, time.UTC),
-			expectedError: nil,
-		},
-		{
-			input:         "2014-08-03T15:59:30-08:00",
-			expectedTime:  time.Date(2014, 8, 3, 15, 59, 30, 0, testLocation),
-			expectedError: nil,
-		},
-		{
-			input:         "2014-08-03T15:59:30.999999999-08:00",
-			expectedTime:  time.Date(2014, 8, 3, 15, 59, 30, 999999999, testLocation),
-			expectedError: nil,
-		},
-		{
-			input:         "not a date time",
-			expectedTime:  time.Time{},
-			expectedError: analysis.ErrInvalidDateTime,
-		},
-	}
-
 	rfc3339NoTimezone := "2006-01-02T15:04:05"
 	rfc3339NoTimezoneNoT := "2006-01-02 15:04:05"
 	rfc3339NoTime := "2006-01-02"
@@ -75,14 +38,62 @@ func TestFlexibleDateTimeParser(t *testing.T) {
 			rfc3339NoTime,
 		})
 
+	tests := []struct {
+		input          string
+		expectedTime   time.Time
+		expectedLayout string
+		expectedError  error
+	}{
+		{
+			input:          "2014-08-03",
+			expectedTime:   time.Date(2014, 8, 3, 0, 0, 0, 0, time.UTC),
+			expectedLayout: rfc3339NoTime,
+			expectedError:  nil,
+		},
+		{
+			input:          "2014-08-03T15:59:30",
+			expectedTime:   time.Date(2014, 8, 3, 15, 59, 30, 0, time.UTC),
+			expectedLayout: rfc3339NoTimezone,
+			expectedError:  nil,
+		},
+		{
+			input:          "2014-08-03 15:59:30",
+			expectedTime:   time.Date(2014, 8, 3, 15, 59, 30, 0, time.UTC),
+			expectedLayout: rfc3339NoTimezoneNoT,
+			expectedError:  nil,
+		},
+		{
+			input:          "2014-08-03T15:59:30-08:00",
+			expectedTime:   time.Date(2014, 8, 3, 15, 59, 30, 0, testLocation),
+			expectedLayout: time.RFC3339Nano,
+			expectedError:  nil,
+		},
+		{
+
+			input:          "2014-08-03T15:59:30.999999999-08:00",
+			expectedTime:   time.Date(2014, 8, 3, 15, 59, 30, 999999999, testLocation),
+			expectedLayout: time.RFC3339Nano,
+			expectedError:  nil,
+		},
+		{
+			input:          "not a date time",
+			expectedTime:   time.Time{},
+			expectedLayout: "",
+			expectedError:  analysis.ErrInvalidDateTime,
+		},
+	}
+
 	for _, test := range tests {
 		t.Run(test.input, func(t *testing.T) {
-			actualTime, actualErr := dateOptionalTimeParser.ParseDateTime(test.input)
+			actualTime, actualLayout, actualErr := dateOptionalTimeParser.ParseDateTime(test.input)
 			if actualErr != test.expectedError {
 				t.Fatalf("expected error %#v, got %#v", test.expectedError, actualErr)
 			}
 			if !reflect.DeepEqual(actualTime, test.expectedTime) {
 				t.Errorf("expected time %v, got %v", test.expectedTime, actualTime)
+			}
+			if !reflect.DeepEqual(actualLayout, test.expectedLayout) {
+				t.Errorf("expected layout %v, got %v", test.expectedLayout, actualLayout)
 			}
 		})
 	}

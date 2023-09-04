@@ -16,9 +16,9 @@ package http
 
 import (
 	"fmt"
-	index "github.com/blevesearch/bleve_index_api"
 	"net/http"
-	"time"
+
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 type DocGetHandler struct {
@@ -87,9 +87,14 @@ func (h *DocGetHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				newval = n
 			}
 		case index.DateTimeField:
-			d, err := field.DateTime()
+			d, layout, err := field.DateTime()
 			if err == nil {
-				newval = d.Format(time.RFC3339Nano)
+				if layout == "" {
+					// layout not set probably means it was indexed as a timestamp
+					newval = d.UnixNano()
+				} else {
+					newval = d.Format(layout)
+				}
 			}
 		}
 		existing, existed := rv.Fields[field.Name()]

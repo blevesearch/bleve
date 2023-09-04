@@ -29,6 +29,8 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	html_char_filter "github.com/blevesearch/bleve/v2/analysis/char/html"
 	regexp_char_filter "github.com/blevesearch/bleve/v2/analysis/char/regexp"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/flexible"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/sanitized"
 	"github.com/blevesearch/bleve/v2/analysis/token/length"
 	"github.com/blevesearch/bleve/v2/analysis/token/lowercase"
 	"github.com/blevesearch/bleve/v2/analysis/token/shingle"
@@ -2353,5 +2355,121 @@ func TestAnalyzerInheritanceForDefaultDynamicMapping(t *testing.T) {
 
 	if len(results.Hits) != 1 {
 		t.Fatalf("expected 1 hit, got %d", len(results.Hits))
+	}
+}
+
+func TestCustomDateTimeParserLayoutValidation(t *testing.T) {
+	flexiblegoName := flexible.Name
+	sanitizedgoName := sanitized.Name
+	imap := mapping.NewIndexMapping()
+	correctConfig := map[string]interface{}{
+		"type": sanitizedgoName,
+		"layouts": []interface{}{
+			// some custom layouts
+			"2006-01-02 15:04:05.0000",
+			"2006\\01\\02T03:04:05PM",
+			"2006/01/02",
+			"2006-01-02T15:04:05.999Z0700PMMST",
+			"15:04:05.0000Z07:00 Monday",
+
+			// standard layouts
+			time.Layout,
+			time.ANSIC,
+			time.UnixDate,
+			time.RubyDate,
+			time.RFC822,
+			time.RFC822Z,
+			time.RFC850,
+			time.RFC1123,
+			time.RFC1123Z,
+			time.RFC3339,
+			time.RFC3339Nano,
+			time.Kitchen,
+			time.Stamp,
+			time.StampMilli,
+			time.StampMicro,
+			time.StampNano,
+			"2006-01-02 15:04:05", //time.DateTime
+			"2006-01-02",          //time.DateOnly
+			"15:04:05",            //time.TimeOnly
+
+			// Corrected layouts to the incorrect ones below.
+			"2006-01-02 03:04:05 -0700",
+			"2006-01-02 15:04:05 -0700",
+			"3:04PM",
+			"2006-01-02 15:04:05.000 -0700 MST",
+			"January 2 2006 3:04 PM",
+			"02/Jan/06 3:04PM",
+			"Mon 02 Jan 3:04:05 PM",
+		},
+	}
+
+	// Correct layouts - sanitizedgo should work without errors.
+	err := imap.AddCustomDateTimeParser("custDT", correctConfig)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	// Flexiblego should work without errors as well.
+	correctConfig["type"] = flexiblegoName
+	err = imap.AddCustomDateTimeParser("custDT_Flexi", correctConfig)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	incorrectLayouts := [][]interface{}{
+		{
+			"2000-03-31 01:33:51 +0300",
+		},
+		{
+			"2006-01-02 15:04:51 +0300",
+		},
+		{
+			"2000-03-31 01:33:05 +0300",
+		},
+		{
+			"4:45PM",
+		},
+		{
+			"2006-01-02 15:04:05.445 -0700 MST",
+		},
+		{
+			"August 20 2001 8:55 AM",
+		},
+		{
+			"28/Jul/23 12:48PM",
+		},
+		{
+			"Tue 22 Aug 6:37:30 AM",
+		},
+	}
+
+	// first check sanitizedgo, should throw error for each of the incorrect layouts.
+	numExpectedErrors := len(incorrectLayouts)
+	numActualErrors := 0
+	for idx, badLayout := range incorrectLayouts {
+		incorrectConfig := map[string]interface{}{
+			"type":    sanitizedgoName,
+			"layouts": badLayout,
+		}
+		err := imap.AddCustomDateTimeParser(fmt.Sprintf("%d_DT", idx), incorrectConfig)
+		if err != nil {
+			numActualErrors++
+		}
+	}
+	// Expecting all layouts to be incorrect, since sanitizedgo is being used.
+	if numActualErrors != numExpectedErrors {
+		t.Fatalf("expected %d errors, got: %d", numExpectedErrors, numActualErrors)
+	}
+
+	// sanity test - flexiblego should still allow the incorrect layouts, for legacy purposes
+	for idx, badLayout := range incorrectLayouts {
+		incorrectConfig := map[string]interface{}{
+			"type":    flexiblegoName,
+			"layouts": badLayout,
+		}
+		err := imap.AddCustomDateTimeParser(fmt.Sprintf("%d_DT_Flexi", idx), incorrectConfig)
+		if err != nil {
+			t.Fatalf("expected no error, got: %v", err)
+		}
 	}
 }
