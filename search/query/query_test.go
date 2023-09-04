@@ -174,6 +174,14 @@ func TestParseQuery(t *testing.T) {
 			}(),
 		},
 		{
+			input: []byte(`{"start":"` + startDateStr + `","end":"` + endDateStr + `","field":"desc"}`),
+			output: func() Query {
+				q := NewDateRangeQuery(startDate, endDate)
+				q.SetField("desc")
+				return q
+			}(),
+		},
+		{
 			input: []byte(`{"prefix":"budwei","field":"desc"}`),
 			output: func() Query {
 				q := NewPrefixQuery("budwei")

@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"strconv"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
@@ -86,59 +85,6 @@ func (t *BleveQueryTime) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func dateRangeUnmarshal(input []byte, obj *DateRangeQuery) error {
-	// Only called in ParseQuery path, since we do not know the date time parser.
-	var objmap map[string]interface{}
-	err := json.Unmarshal(input, &objmap)
-	if err != nil {
-		return err
-	}
-	if objmap["start"] != nil {
-		rawStart, canConvert := objmap["start"].(string)
-		if !canConvert {
-			return fmt.Errorf("invalid start")
-		}
-		obj.rawStart = rawStart
-	}
-	if objmap["end"] != nil {
-		rawEnd, canConvert := objmap["end"].(string)
-		if !canConvert {
-			return fmt.Errorf("invalid end")
-		}
-		obj.rawEnd = rawEnd
-	}
-	if objmap["inclusive_start"] != nil {
-		inclusiveStart, canConvert := objmap["inclusive_start"].(bool)
-		if !canConvert {
-			return fmt.Errorf("invalid inclusive_start")
-		}
-		obj.InclusiveStart = &inclusiveStart
-	}
-	if objmap["inclusive_end"] != nil {
-		inclusiveEnd, canConvert := objmap["inclusive_end"].(bool)
-		if !canConvert {
-			return fmt.Errorf("invalid inclusive_end")
-		}
-		obj.InclusiveEnd = &inclusiveEnd
-	}
-	if objmap["boost"] != nil {
-		boost, canConvert := objmap["boost"].(float64)
-		if !canConvert {
-			return fmt.Errorf("invalid boost")
-		}
-		boostVal := Boost(boost)
-		obj.BoostVal = &boostVal
-	}
-	if objmap["field"] != nil {
-		fieldVal, canConvert := objmap["field"].(string)
-		if !canConvert {
-			return fmt.Errorf("invalid field")
-		}
-		obj.FieldVal = fieldVal
-	}
-	return nil
-}
-
 type DateRangeQuery struct {
 	Start          BleveQueryTime `json:"start,omitempty"`
 	End            BleveQueryTime `json:"end,omitempty"`
@@ -146,8 +92,82 @@ type DateRangeQuery struct {
 	InclusiveEnd   *bool          `json:"inclusive_end,omitempty"`
 	FieldVal       string         `json:"field,omitempty"`
 	BoostVal       *Boost         `json:"boost,omitempty"`
+	InheritParser  bool           `json:"inherit_parser"`
 	rawStart       string         `json:"-"`
 	rawEnd         string         `json:"-"`
+}
+
+// UnmarshalJSON offers custom unmarshaling
+func (q *DateRangeQuery) UnmarshalJSON(data []byte) error {
+	var tmp map[string]json.RawMessage
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
+	}
+	// set defaults
+	q.InheritParser = false
+
+	for k, v := range tmp {
+		switch k {
+		case "inclusive_start":
+			err := json.Unmarshal(v, &q.InclusiveStart)
+			if err != nil {
+				return err
+			}
+		case "inclusive_end":
+			err := json.Unmarshal(v, &q.InclusiveEnd)
+			if err != nil {
+				return err
+			}
+		case "field":
+			err := json.Unmarshal(v, &q.FieldVal)
+			if err != nil {
+				return err
+			}
+		case "boost":
+			err := json.Unmarshal(v, &q.BoostVal)
+			if err != nil {
+				return err
+			}
+		case "inherit_parser":
+			err := json.Unmarshal(v, &q.InheritParser)
+			if err != nil {
+				return err
+			}
+
+		}
+	}
+	if tmp["start"] != nil {
+		if q.InheritParser {
+			// inherit parser from index mapping
+			err := json.Unmarshal(tmp["start"], &q.rawStart)
+			if err != nil {
+				return err
+			}
+		} else {
+			// use QueryDateTimeParser
+			err := json.Unmarshal(tmp["start"], &q.Start)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if tmp["end"] != nil {
+		if q.InheritParser {
+			// inherit parser from index mapping
+			err := json.Unmarshal(tmp["end"], &q.rawEnd)
+			if err != nil {
+				return err
+			}
+		} else {
+			// use QueryDateTimeParser
+			err := json.Unmarshal(tmp["end"], &q.End)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // NewDateRangeQuery creates a new Query for ranges
@@ -196,50 +216,19 @@ func (q *DateRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m ma
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
-	if q.rawStart != "" || q.rawEnd != "" {
-		// ParseQuery path since at least one of rawStart and rawEnd is not empty
-		// parse rawStart and rawEnd to time.Time objects
+	if q.InheritParser {
 		var err error
+		// inherit parser from index mapping
 		dateTimeParserName := m.DatetimeParserNameForPath(field)
-		bounds, isUnixFormat := analysis.UnixTimestampFormats[dateTimeParserName]
-		if isUnixFormat {
-			// unix timestamp format
-			// rawStart and rawEnd are timestamps so do not parse them
-			min := bounds.Min
-			max := bounds.Max
-			if q.rawStart != "" {
-				min, err = strconv.ParseInt(q.rawStart, 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("invalid start: %v", err)
-				}
-				min, err = analysis.ValidateAndConvertTimestamp(min, bounds, dateTimeParserName)
-				if err != nil {
-					return nil, fmt.Errorf("invalid start: %v", err)
-				}
-			}
-			if q.rawEnd != "" {
-				max, err = strconv.ParseInt(q.rawEnd, 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("invalid end: %v", err)
-				}
-				max, err = analysis.ValidateAndConvertTimestamp(max, bounds, dateTimeParserName)
-				if err != nil {
-					return nil, fmt.Errorf("invalid end: %v", err)
-				}
-			}
-			minFloat := numeric.Int64ToFloat64(min)
-			maxFloat := numeric.Int64ToFloat64(max)
-			return searcher.NewNumericRangeSearcher(ctx, i, &minFloat, &maxFloat, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal.Value(), options)
-		}
 		dateTimeParser := m.DateTimeParserNamed(dateTimeParserName)
 		if q.rawStart != "" {
-			q.Start.Time, err = dateTimeParser.ParseDateTime(q.rawStart)
+			q.Start.Time, _, err = dateTimeParser.ParseDateTime(q.rawStart)
 			if err != nil {
 				return nil, fmt.Errorf("%v, date time parser name: %s", err, dateTimeParserName)
 			}
 		}
 		if q.rawEnd != "" {
-			q.End.Time, err = dateTimeParser.ParseDateTime(q.rawEnd)
+			q.End.Time, _, err = dateTimeParser.ParseDateTime(q.rawEnd)
 			if err != nil {
 				return nil, fmt.Errorf("%v, date time parser name: %s", err, dateTimeParserName)
 			}
@@ -276,22 +265,22 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 }
 
 func (q *DateRangeQuery) Validate() error {
+	// either start or end must be specified
 	if q.Start.IsZero() && q.End.IsZero() {
-		// Test for ParseQuery path
-		if q.rawStart == "" && q.rawEnd == "" {
-			// Really invalid now
+		// if inherit parser is true, perform check if rawStart/rawEnd is specified
+		if q.InheritParser {
+			if q.rawStart == "" && q.rawEnd == "" {
+				// Really invalid now
+				return fmt.Errorf("date range query must specify at least one of start/end")
+			}
+		} else {
 			return fmt.Errorf("date range query must specify at least one of start/end")
 		}
 	}
-	if !q.Start.IsZero() || !q.End.IsZero() {
-		// dateRangeUnmarshal not used
-		_, _, err := q.parseEndpoints()
-		if err != nil {
-			return err
-		}
+	_, _, err := q.parseEndpoints()
+	if err != nil {
+		return err
 	}
-	// Do not validate endpoints for ParseQuery path since we do not know the date time parser
-	// Instead validate in the Searcher, where we get the index mapping.
 	return nil
 }
 

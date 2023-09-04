@@ -186,7 +186,7 @@ func ParseQuery(input []byte) (Query, error) {
 	_, hasEnd := tmp["end"]
 	if hasStart || hasEnd {
 		var rv DateRangeQuery
-		err := dateRangeUnmarshal(input, &rv)
+		err := json.Unmarshal(input, &rv)
 		if err != nil {
 			return nil, err
 		}
