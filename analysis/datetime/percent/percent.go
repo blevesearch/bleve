@@ -48,8 +48,8 @@ var formatSpecifierToLayout = map[byte]string{
 	'I':             "04",
 	's':             "5",
 	'S':             "05",
-	'p':             "pm",
-	'P':             "PM",
+	'p':             "PM",
+	'P':             "pm",
 	'N':             ".999999999",
 }
 
@@ -71,24 +71,24 @@ func New(layouts []string) *DateTimeParser {
 	}
 }
 
-func checkTZOptions(formatString string, idx int) (string, error) {
+func checkTZOptions(formatString string, idx int) (string, int, error) {
 	key := "Z"
 	if idx+1 >= len(formatString) {
-		return "", fmt.Errorf("invalid format string, expected character after " + string(timezoneSpecifier))
+		return "", 0, fmt.Errorf("invalid format string, expected character after " + string(timezoneSpecifier))
 	}
 	if formatString[idx+1] == ':' {
 		// check if there is a character after the colon
 		if idx+2 >= len(formatString) {
-			return "", fmt.Errorf("invalid format string, expected character after colon")
+			return "", 0, fmt.Errorf("invalid format string, expected character after colon")
 		}
 		key += ":"
 		idx++
 	}
 	key += string(formatString[idx+1])
 	if layout, ok := timezoneOptions[key]; ok {
-		return layout, nil
+		return layout, idx + 2, nil
 	}
-	return "", fmt.Errorf("invalid format string, unknown timezone specifier: " + key)
+	return "", 0, fmt.Errorf("invalid format string, unknown timezone specifier: " + key)
 }
 
 func parseFormatString(formatString string) (string, error) {
@@ -109,7 +109,9 @@ func parseFormatString(formatString string) (string, error) {
 			} else if formatSpecifier == timezoneSpecifier {
 				// did not find a valid specifier
 				// check if it is for timezone
-				tzLayout, err := checkTZOptions(formatString, idx+1)
+				var tzLayout string
+				var err error
+				tzLayout, idx, err = checkTZOptions(formatString, idx+1)
 				if err != nil {
 					return "", err
 				}
