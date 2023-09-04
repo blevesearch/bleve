@@ -68,7 +68,6 @@ func (t *BleveQueryTime) MarshalJSON() ([]byte, error) {
 }
 
 func (t *BleveQueryTime) UnmarshalJSON(data []byte) error {
-	// called where we can use the default date time parser.
 	var timeString string
 	err := json.Unmarshal(data, &timeString)
 	if err != nil {
@@ -93,8 +92,8 @@ type DateRangeQuery struct {
 	FieldVal       string         `json:"field,omitempty"`
 	BoostVal       *Boost         `json:"boost,omitempty"`
 	InheritParser  bool           `json:"inherit_parser"`
-	rawStart       string         `json:"-"`
-	rawEnd         string         `json:"-"`
+	RawStart       string         `json:"raw_start,omitempty"`
+	RawEnd         string         `json:"raw_end,omitempty"`
 }
 
 // UnmarshalJSON offers custom unmarshaling
@@ -140,7 +139,7 @@ func (q *DateRangeQuery) UnmarshalJSON(data []byte) error {
 	if tmp["start"] != nil {
 		if q.InheritParser {
 			// inherit parser from index mapping
-			err := json.Unmarshal(tmp["start"], &q.rawStart)
+			err := json.Unmarshal(tmp["start"], &q.RawStart)
 			if err != nil {
 				return err
 			}
@@ -155,7 +154,7 @@ func (q *DateRangeQuery) UnmarshalJSON(data []byte) error {
 	if tmp["end"] != nil {
 		if q.InheritParser {
 			// inherit parser from index mapping
-			err := json.Unmarshal(tmp["end"], &q.rawEnd)
+			err := json.Unmarshal(tmp["end"], &q.RawEnd)
 			if err != nil {
 				return err
 			}
@@ -194,6 +193,32 @@ func NewDateRangeInclusiveQuery(start, end time.Time, startInclusive, endInclusi
 	}
 }
 
+// NewRawDateRangeQuery creates a new Query for ranges
+// of date values.
+// Date strings are not parsed, and are used as is.
+// Either, but not both endpoints can be nil.
+// Used when start and end must be parsed by deriving
+// the parser from the index mapping for the queried field.
+func NewDateRangeRawQuery(start, end string) *DateRangeQuery {
+	return NewDateRangeRawInclusiveQuery(start, end, nil, nil)
+}
+
+// NewDateRangeInclusiveQuery creates a new Query for ranges
+// of date values.
+// Date strings are parsed using the DateTimeParser configured for the
+// queried field in the index mapping.
+// Either, but not both endpoints can be nil.
+// startInclusive and endInclusive control inclusion of the endpoints.
+func NewDateRangeRawInclusiveQuery(start, end string, startInclusive, endInclusive *bool) *DateRangeQuery {
+	return &DateRangeQuery{
+		RawStart:       start,
+		RawEnd:         end,
+		InclusiveStart: startInclusive,
+		InclusiveEnd:   endInclusive,
+		InheritParser:  true,
+	}
+}
+
 func (q *DateRangeQuery) SetBoost(b float64) {
 	boost := Boost(b)
 	q.BoostVal = &boost
@@ -211,6 +236,10 @@ func (q *DateRangeQuery) Field() string {
 	return q.FieldVal
 }
 
+func (q *DateRangeQuery) SetInheritParser(i bool) {
+	q.InheritParser = i
+}
+
 func (q *DateRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
@@ -221,14 +250,14 @@ func (q *DateRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m ma
 		// inherit parser from index mapping
 		dateTimeParserName := m.DatetimeParserNameForPath(field)
 		dateTimeParser := m.DateTimeParserNamed(dateTimeParserName)
-		if q.rawStart != "" {
-			q.Start.Time, _, err = dateTimeParser.ParseDateTime(q.rawStart)
+		if q.RawStart != "" {
+			q.Start.Time, _, err = dateTimeParser.ParseDateTime(q.RawStart)
 			if err != nil {
 				return nil, fmt.Errorf("%v, date time parser name: %s", err, dateTimeParserName)
 			}
 		}
-		if q.rawEnd != "" {
-			q.End.Time, _, err = dateTimeParser.ParseDateTime(q.rawEnd)
+		if q.RawEnd != "" {
+			q.End.Time, _, err = dateTimeParser.ParseDateTime(q.RawEnd)
 			if err != nil {
 				return nil, fmt.Errorf("%v, date time parser name: %s", err, dateTimeParserName)
 			}
@@ -244,6 +273,11 @@ func (q *DateRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m ma
 func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 	min := math.Inf(-1)
 	max := math.Inf(1)
+
+	if q.Start.IsZero() && q.End.IsZero() {
+		return nil, nil, fmt.Errorf("date range query must specify at least one of start/end")
+	}
+
 	if !q.Start.IsZero() {
 		if !isDatetimeCompatible(q.Start) {
 			// overflow
@@ -267,9 +301,9 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 func (q *DateRangeQuery) Validate() error {
 	// either start or end must be specified
 	if q.Start.IsZero() && q.End.IsZero() {
-		// if inherit parser is true, perform check if rawStart/rawEnd is specified
+		// if inherit parser is true, perform check if RawStart/RawEnd is specified
 		if q.InheritParser {
-			if q.rawStart == "" && q.rawEnd == "" {
+			if q.RawStart == "" && q.RawEnd == "" {
 				// Really invalid now
 				return fmt.Errorf("date range query must specify at least one of start/end")
 			}
