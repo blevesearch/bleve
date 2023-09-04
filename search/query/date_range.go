@@ -203,12 +203,13 @@ func NewDateRangeRawQuery(start, end string) *DateRangeQuery {
 	return NewDateRangeRawInclusiveQuery(start, end, nil, nil)
 }
 
-// NewDateRangeInclusiveQuery creates a new Query for ranges
-// of date values.
-// Date strings are parsed using the DateTimeParser configured for the
-// queried field in the index mapping.
-// Either, but not both endpoints can be nil.
-// startInclusive and endInclusive control inclusion of the endpoints.
+// NewDateRangeRawInclusiveQuery creates a new query for searching date value ranges.
+// The start and end parameters are date strings, which are parsed into date time objects
+// using the DateTimeParser configured for the queried field in the index mapping.
+// You have two options:
+//   - You can omit either the start point or the end point of the date range, but not both.
+//   - You can control whether the start and end points are included in the range with the
+//     'startInclusive' and 'endInclusive' parameters.
 func NewDateRangeRawInclusiveQuery(start, end string, startInclusive, endInclusive *bool) *DateRangeQuery {
 	return &DateRangeQuery{
 		RawStart:       start,
