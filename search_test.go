@@ -2499,6 +2499,12 @@ func TestDateRangeQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	documents := map[string]map[string]interface{}{
 		"doc1": {
 			"date": "2001/08/20 6:00PM",
