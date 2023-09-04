@@ -880,6 +880,9 @@ func NewStoredRowK(key []byte) (*StoredRow, error) {
 	}
 
 	rv.doc, err = buf.ReadBytes(ByteSeparator)
+	if err != nil {
+		return nil, err
+	}
 	if len(rv.doc) < 2 { // 1 for min doc id length, 1 for separator
 		err = fmt.Errorf("invalid doc length 0")
 		return nil, err
