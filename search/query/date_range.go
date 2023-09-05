@@ -135,13 +135,13 @@ func (q *DateRangeQuery) Field() string {
 }
 
 func (q *DateRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-	field := q.FieldVal
-	if q.FieldVal == "" {
-		field = m.DefaultSearchField()
-	}
 	min, max, err := q.parseEndpoints()
 	if err != nil {
 		return nil, err
+	}
+	field := q.FieldVal
+	if q.FieldVal == "" {
+		field = m.DefaultSearchField()
 	}
 	return searcher.NewNumericRangeSearcher(ctx, i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal.Value(), options)
 }
@@ -173,7 +173,8 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 func (q *DateRangeQuery) Validate() error {
 	// either start or end must be specified
 	if q.Start.IsZero() && q.End.IsZero() {
-		return fmt.Errorf("date range query must specify at least one of start/end")
+		return fmt.Errorf("must specify start or end")
+
 	}
 	_, _, err := q.parseEndpoints()
 	if err != nil {
