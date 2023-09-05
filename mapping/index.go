@@ -418,7 +418,7 @@ func (im *IndexMappingImpl) DateTimeParserNamed(name string) analysis.DateTimePa
 	return dateTimeParser
 }
 
-func (im *IndexMappingImpl) DatetimeParserNameForPath(path string) string {
+func (im *IndexMappingImpl) DateTimeParserNameForPath(path string) string {
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
 		dateTimeParser := docMapping.dateTimeParserForPath(path)

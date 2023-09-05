@@ -2484,6 +2484,18 @@ func TestDateRangeStringQuery(t *testing.T) {
 			"2006/01/02 3:04PM",
 		},
 	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idxMapping.AddCustomDateTimeParser("queryDT", map[string]interface{}{
+		"type": sanitized.Name,
+		"layouts": []interface{}{
+			"02/01/2006 3:04PM",
+		},
+	})
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2541,14 +2553,15 @@ func TestDateRangeStringQuery(t *testing.T) {
 	}
 
 	type testStruct struct {
-		start         string
-		end           string
-		field         string
-		inheritParser bool // whether to inherit the parser from the index mapping - if false then use RFC3339.
-		includeStart  bool
-		includeEnd    bool
-		expectedHits  []testResult
-		err           error
+		start          string
+		end            string
+		field          string
+		dateTimeParser string // name of the custom date time parser to use
+		inheritParser  bool   // whether to inherit the parser from the index mapping if dateTimeParser is not specified - if false, use QueryDateTimeParser
+		includeStart   bool
+		includeEnd     bool
+		expectedHits   []testResult
+		err            error
 	}
 
 	testQueries := []testStruct{
@@ -2672,6 +2685,23 @@ func TestDateRangeStringQuery(t *testing.T) {
 				},
 			},
 		},
+		{
+			start:          "20/08/2001 6:15PM",
+			field:          "date",
+			dateTimeParser: "queryDT",
+			includeStart:   true,
+			includeEnd:     true,
+			expectedHits: []testResult{
+				{
+					docID:    "doc4",
+					hitField: "2001/08/20 6:15PM",
+				},
+				{
+					docID:    "doc5",
+					hitField: "20/08/2001 18:20:00",
+				},
+			},
+		},
 		// error path test cases
 		{
 			field:         "date",
@@ -2714,6 +2744,7 @@ func TestDateRangeStringQuery(t *testing.T) {
 		var err error
 		dateQuery := query.NewDateRangeStringInclusiveQuery(dtq.start, dtq.end, &dtq.includeStart, &dtq.includeEnd)
 		dateQuery.SetInheritParser(dtq.inheritParser)
+		dateQuery.SetDateTimeParser(dtq.dateTimeParser)
 		dateQuery.SetField(dtq.field)
 
 		sr := NewSearchRequest(dateQuery)

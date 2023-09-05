@@ -29,11 +29,11 @@ import (
 
 // DateRangeStringQuery represents a query for a range of date values.
 // Start and End are the range endpoints, as strings.
-// Start and End are parsed using DateTimeParser, which is a custom date time parser
+// Start and End are parsed using DateTimeParserVal, which is a custom date time parser
 // defined in the index mapping.
-// If DateTimeParser is not specified, and if InheritParserVal is true,
+// If DateTimeParserVal is not specified, and if InheritParserVal is true,
 // the parser is inherited from the index mapping, by using the parser associated with FieldVal.
-// if DateTimeParser is not specified and inheritParserVal is false, then the
+// if DateTimeParserVal is not specified and if InheritParserVal is false, then the
 // top-level config.QueryDateTimeParser is used.
 type DateRangeStringQuery struct {
 	Start             string `json:"start,omitempty"`
@@ -48,11 +48,11 @@ type DateRangeStringQuery struct {
 
 // NewDateRangeStringQuery creates a new Query for ranges
 // of date values.
-// Date strings are parsed using the DateTimeParser field of the query struct,
-// which is a custom date time parser defined in the index mapping. If DateTimeParser
+// Date strings are parsed using the DateTimeParserVal field of the query struct,
+// which is a custom date time parser defined in the index mapping. If DateTimeParserVal
 // is not specified, and if InheritParserVal is true,
 // the parser is inherited from the index mapping, by using the parser associated with FieldVal.
-// if DateTimeParser is not specified and inheritParserVal is false, then the
+// if DateTimeParserVal is not specified and if InheritParserVal is false, then the
 // top-level config.QueryDateTimeParser is used.
 // Either, but not both endpoints can be nil.
 func NewDateRangeStringQuery(start, end string) *DateRangeStringQuery {
@@ -61,11 +61,11 @@ func NewDateRangeStringQuery(start, end string) *DateRangeStringQuery {
 
 // NewDateRangeStringInclusiveQuery creates a new Query for ranges
 // of date values.
-// Date strings are parsed using the DateTimeParser field of the query struct,
-// which is a custom date time parser defined in the index mapping. If DateTimeParser
+// Date strings are parsed using the DateTimeParserVal field of the query struct,
+// which is a custom date time parser defined in the index mapping. If DateTimeParserVal
 // is not specified, and if InheritParserVal is true,
 // the parser is inherited from the index mapping, by using the parser associated with FieldVal.
-// if DateTimeParser is not specified and inheritParserVal is false, then the
+// if DateTimeParserVal is not specified and if InheritParserVal is false, then the
 // top-level config.QueryDateTimeParser is used.
 // Either, but not both endpoints can be nil.
 // startInclusive and endInclusive control inclusion of the endpoints.
@@ -118,7 +118,7 @@ func (q *DateRangeStringQuery) Searcher(ctx context.Context, i index.IndexReader
 	if q.DateTimeParserVal != "" {
 		dateTimeParserName = q.DateTimeParserVal
 	} else if q.InheritParserVal {
-		dateTimeParserName = m.DatetimeParserNameForPath(field)
+		dateTimeParserName = m.DateTimeParserNameForPath(field)
 	}
 	dateTimeParser := m.DateTimeParserNamed(dateTimeParserName)
 	if dateTimeParser == nil {
@@ -156,7 +156,7 @@ func (q *DateRangeStringQuery) parseEndpoints(startTime, endTime time.Time) (*fl
 	}
 
 	if !startTime.IsZero() {
-		if !isDatetimeWithinRange(startTime) {
+		if !isDateTimeWithinRange(startTime) {
 			// overflow
 			return nil, nil, fmt.Errorf("invalid/unsupported date range, start: %v", q.Start)
 		}
@@ -164,7 +164,7 @@ func (q *DateRangeStringQuery) parseEndpoints(startTime, endTime time.Time) (*fl
 		min = numeric.Int64ToFloat64(startInt64)
 	}
 	if !endTime.IsZero() {
-		if !isDatetimeWithinRange(endTime) {
+		if !isDateTimeWithinRange(endTime) {
 			// overflow
 			return nil, nil, fmt.Errorf("invalid/unsupported date range, end: %v", q.End)
 		}
@@ -183,7 +183,7 @@ func (q *DateRangeStringQuery) Validate() error {
 	return nil
 }
 
-func isDatetimeWithinRange(t time.Time) bool {
+func isDateTimeWithinRange(t time.Time) bool {
 	if t.Before(MinRFC3339CompatibleTime) || t.After(MaxRFC3339CompatibleTime) {
 		return false
 	}
