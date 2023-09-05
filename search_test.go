@@ -2473,3 +2473,123 @@ func TestCustomDateTimeParserLayoutValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
+	idxMapping := NewIndexMapping()
+
+	err := idxMapping.AddCustomDateTimeParser("customDT", map[string]interface{}{
+		"type": sanitized.Name,
+		"layouts": []interface{}{
+			"02/01/2006 15:04:05",
+			"2006/01/02 3:04PM",
+		},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idxMapping.AddCustomDateTimeParser("queryDT", map[string]interface{}{
+		"type": sanitized.Name,
+		"layouts": []interface{}{
+			"02/01/2006 3:04PM",
+		},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dtmap := NewDateTimeFieldMapping()
+	dtmap.DateFormat = "customDT"
+	idxMapping.DefaultMapping.AddFieldMappingsAt("date", dtmap)
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	documents := map[string]map[string]interface{}{
+		"doc1": {
+			"date": "2001/08/20 6:00PM",
+		},
+		"doc2": {
+			"date": "20/08/2001 18:00:20",
+		},
+		"doc3": {
+			"date": "20/08/2001 18:10:00",
+		},
+		"doc4": {
+			"date": "2001/08/20 6:15PM",
+		},
+		"doc5": {
+			"date": "22/08/2001 18:20:00",
+		},
+	}
+
+	batch := idx.NewBatch()
+	for docID, doc := range documents {
+		err := batch.Index(docID, doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	query := NewMatchAllQuery()
+
+	type testResult struct {
+		name  string
+		start string
+		end   string
+	}
+
+	type testStruct struct {
+		name  string
+		start string
+		end   string
+		count int
+	}
+
+	tests := []testStruct{
+		{
+			name:  "test1",
+			start: "2001-08-20",
+			end:   "2001-08-21",
+		},
+	}
+
+	for _, test := range tests {
+		searchRequest := NewSearchRequest(query)
+
+		fr := NewFacetRequest("dateFacet", 100)
+		fr.Field = "date"
+		fr.AddDateTimeRangeString(test.name, &test.start, &test.end)
+		searchRequest.AddFacet("dateFacet", fr)
+
+		searchResults, err := idx.Search(searchRequest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log(searchResults)
+		for _, facetResult := range searchResults.Facets {
+			for _, dateRange := range facetResult.DateRanges {
+				t.Log(dateRange.Name)
+				t.Log(*dateRange.Start)
+				t.Log(*dateRange.End)
+				t.Log(dateRange.Count)
+			}
+		}
+	}
+}

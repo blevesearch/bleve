@@ -52,29 +52,34 @@ type numericRange struct {
 }
 
 type dateTimeRange struct {
-	Name        string    `json:"name,omitempty"`
-	Start       time.Time `json:"start,omitempty"`
-	End         time.Time `json:"end,omitempty"`
-	startString *string
-	endString   *string
+	Name           string    `json:"name,omitempty"`
+	Start          time.Time `json:"start,omitempty"`
+	End            time.Time `json:"end,omitempty"`
+	DateTimeParser string    `json:"date_time_parser,omitempty"`
+	startString    *string
+	endString      *string
 }
 
-func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (start, end time.Time) {
+func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (start, end time.Time, startLayout, endLayout string) {
 	start = dr.Start
+	startLayout = time.RFC3339Nano
 	if dr.Start.IsZero() && dr.startString != nil {
-		s, _, err := dateTimeParser.ParseDateTime(*dr.startString)
+		s, layout, err := dateTimeParser.ParseDateTime(*dr.startString)
 		if err == nil {
 			start = s
+			startLayout = layout
 		}
 	}
 	end = dr.End
+	endLayout = time.RFC3339Nano
 	if dr.End.IsZero() && dr.endString != nil {
-		e, _, err := dateTimeParser.ParseDateTime(*dr.endString)
+		e, layout, err := dateTimeParser.ParseDateTime(*dr.endString)
 		if err == nil {
 			end = e
+			endLayout = layout
 		}
 	}
-	return start, end
+	return start, end, startLayout, endLayout
 }
 
 func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
@@ -155,7 +160,7 @@ func (fr *FacetRequest) Validate() error {
 				return fmt.Errorf("date ranges contains duplicate name '%s'", dr.Name)
 			}
 			drNames[dr.Name] = struct{}{}
-			start, end := dr.ParseDates(dateTimeParser)
+			start, end, _, _ := dr.ParseDates(dateTimeParser)
 			if start.IsZero() && end.IsZero() {
 				return fmt.Errorf("date range query must specify either start, end or both for range name '%s'", dr.Name)
 			}

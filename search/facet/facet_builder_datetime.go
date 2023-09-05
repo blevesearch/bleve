@@ -35,8 +35,10 @@ func init() {
 }
 
 type dateTimeRange struct {
-	start time.Time
-	end   time.Time
+	start       time.Time
+	end         time.Time
+	startLayout string
+	endLayout   string
 }
 
 type DateTimeFacetBuilder struct {
@@ -75,10 +77,12 @@ func (fb *DateTimeFacetBuilder) Size() int {
 	return sizeInBytes
 }
 
-func (fb *DateTimeFacetBuilder) AddRange(name string, start, end time.Time) {
+func (fb *DateTimeFacetBuilder) AddRange(name string, start, end time.Time, startLayout string, endLayout string) {
 	r := dateTimeRange{
-		start: start,
-		end:   end,
+		start:       start,
+		end:         end,
+		startLayout: startLayout,
+		endLayout:   endLayout,
 	}
 	fb.ranges[name] = &r
 }
@@ -134,11 +138,11 @@ func (fb *DateTimeFacetBuilder) Result() *search.FacetResult {
 			Count: count,
 		}
 		if !dateRange.start.IsZero() {
-			start := dateRange.start.Format(time.RFC3339Nano)
+			start := dateRange.start.Format(dateRange.startLayout)
 			tf.Start = &start
 		}
 		if !dateRange.end.IsZero() {
-			end := dateRange.end.Format(time.RFC3339Nano)
+			end := dateRange.end.Format(dateRange.endLayout)
 			tf.End = &end
 		}
 		rv.DateRanges = append(rv.DateRanges, tf)
