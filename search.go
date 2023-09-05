@@ -55,12 +55,12 @@ type dateTimeRange struct {
 	Name           string    `json:"name,omitempty"`
 	Start          time.Time `json:"start,omitempty"`
 	End            time.Time `json:"end,omitempty"`
-	DateTimeParser string    `json:"date_time_parser,omitempty"`
+	DateTimeParser string    `json:"datetime_parser,omitempty"`
 	startString    *string
 	endString      *string
 }
 
-func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (start, end time.Time, startLayout, endLayout string) {
+func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (start, end time.Time, startLayout, endLayout string, err error) {
 	start = dr.Start
 	startLayout = time.RFC3339Nano
 	if dr.Start.IsZero() && dr.startString != nil {
@@ -68,6 +68,8 @@ func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (sta
 		if err == nil {
 			start = s
 			startLayout = layout
+		} else {
+			err = fmt.Errorf("error parsing start date '%s' for range '%s': %v", *dr.startString, dr.Name, err)
 		}
 	}
 	end = dr.End
@@ -77,16 +79,19 @@ func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (sta
 		if err == nil {
 			end = e
 			endLayout = layout
+		} else {
+			err = fmt.Errorf("error parsing start date '%s' for range '%s': %v", *dr.startString, dr.Name, err)
 		}
 	}
-	return start, end, startLayout, endLayout
+	return start, end, startLayout, endLayout, err
 }
 
 func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
 	var temp struct {
-		Name  string  `json:"name,omitempty"`
-		Start *string `json:"start,omitempty"`
-		End   *string `json:"end,omitempty"`
+		Name           string  `json:"name,omitempty"`
+		Start          *string `json:"start,omitempty"`
+		End            *string `json:"end,omitempty"`
+		DateTimeParser string  `json:"datetime_parser,omitempty"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -101,21 +106,32 @@ func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
 	if temp.End != nil {
 		dr.endString = temp.End
 	}
+	if temp.DateTimeParser != "" {
+		dr.DateTimeParser = temp.DateTimeParser
+	}
 
 	return nil
 }
 
 func (dr *dateTimeRange) MarshalJSON() ([]byte, error) {
 	rv := map[string]interface{}{
-		"name":  dr.Name,
-		"start": dr.Start,
-		"end":   dr.End,
+		"name": dr.Name,
 	}
-	if dr.Start.IsZero() && dr.startString != nil {
+
+	if !dr.Start.IsZero() {
+		rv["start"] = dr.Start
+	} else if dr.startString != nil {
 		rv["start"] = dr.startString
 	}
-	if dr.End.IsZero() && dr.endString != nil {
+
+	if !dr.End.IsZero() {
+		rv["end"] = dr.End
+	} else if dr.endString != nil {
 		rv["end"] = dr.endString
+	}
+
+	if dr.DateTimeParser != "" {
+		rv["datetime_parser"] = dr.DateTimeParser
 	}
 	return json.Marshal(rv)
 }
@@ -134,7 +150,7 @@ func (fr *FacetRequest) Validate() error {
 	nrCount := len(fr.NumericRanges)
 	drCount := len(fr.DateTimeRanges)
 	if nrCount > 0 && drCount > 0 {
-		return fmt.Errorf("facet can only conain numeric ranges or date ranges, not both")
+		return fmt.Errorf("facet can only contain numeric ranges or date ranges, not both")
 	}
 
 	if nrCount > 0 {
@@ -160,9 +176,17 @@ func (fr *FacetRequest) Validate() error {
 				return fmt.Errorf("date ranges contains duplicate name '%s'", dr.Name)
 			}
 			drNames[dr.Name] = struct{}{}
-			start, end, _, _ := dr.ParseDates(dateTimeParser)
+			if dr.DateTimeParser != "" {
+				// cannot parse the date range dates as the defaultDateTimeParser is overridden
+				// so perform this validation at query time
+				continue
+			}
+			start, end, _, _, err := dr.ParseDates(dateTimeParser)
 			if start.IsZero() && end.IsZero() {
 				return fmt.Errorf("date range query must specify either start, end or both for range name '%s'", dr.Name)
+			}
+			if err != nil {
+				return err
 			}
 		}
 	}
@@ -191,13 +215,24 @@ func (fr *FacetRequest) AddDateTimeRange(name string, start, end time.Time) {
 }
 
 // AddDateTimeRangeString adds a bucket to a field
-// containing date values.
+// containing date values. Uses defaultDateTimeParser to parse the date strings.
 func (fr *FacetRequest) AddDateTimeRangeString(name string, start, end *string) {
 	if fr.DateTimeRanges == nil {
 		fr.DateTimeRanges = make([]*dateTimeRange, 0, 1)
 	}
 	fr.DateTimeRanges = append(fr.DateTimeRanges,
 		&dateTimeRange{Name: name, startString: start, endString: end})
+}
+
+// AddDateTimeRangeString adds a bucket to a field
+// containing date values. Uses the specified parser to parse the date strings.
+// provided the parser is registered in the index mapping.
+func (fr *FacetRequest) AddDateTimeRangeStringWithParser(name string, start, end *string, parser string) {
+	if fr.DateTimeRanges == nil {
+		fr.DateTimeRanges = make([]*dateTimeRange, 0, 1)
+	}
+	fr.DateTimeRanges = append(fr.DateTimeRanges,
+		&dateTimeRange{Name: name, startString: start, endString: end, DateTimeParser: parser})
 }
 
 // AddNumericRange adds a bucket to a field

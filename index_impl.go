@@ -530,9 +530,22 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			} else if facetRequest.DateTimeRanges != nil {
 				// build date range facet
 				facetBuilder := facet.NewDateTimeFacetBuilder(facetRequest.Field, facetRequest.Size)
-				dateTimeParser := i.m.DateTimeParserNamed("")
+				dateTimeParserName := defaultDateTimeParser
 				for _, dr := range facetRequest.DateTimeRanges {
-					start, end, startLayout, endLayout := dr.ParseDates(dateTimeParser)
+					if dr.DateTimeParser != "" {
+						dateTimeParserName = dr.DateTimeParser
+					}
+					dateTimeParser := i.m.DateTimeParserNamed(dateTimeParserName)
+					if dateTimeParser == nil {
+						return nil, fmt.Errorf("no date time parser named `%s` registered", dateTimeParserName)
+					}
+					start, end, startLayout, endLayout, err := dr.ParseDates(dateTimeParser)
+					if err != nil {
+						return nil, err
+					}
+					if start.IsZero() && end.IsZero() {
+						return nil, fmt.Errorf("date range query must specify either start, end or both for range name '%s'", dr.Name)
+					}
 					facetBuilder.AddRange(dr.Name, start, end, startLayout, endLayout)
 				}
 				facetsBuilder.Add(facetName, facetBuilder)

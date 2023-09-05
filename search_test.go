@@ -2531,7 +2531,7 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 			"date": "2001/08/20 6:15PM",
 		},
 		"doc5": {
-			"date": "22/08/2001 18:20:00",
+			"date": "20/08/2001 18:20:00",
 		},
 	}
 
@@ -2549,46 +2549,103 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 
 	query := NewMatchAllQuery()
 
-	type testResult struct {
-		name  string
-		start string
-		end   string
-	}
-
-	type testStruct struct {
+	type testFacetResult struct {
 		name  string
 		start string
 		end   string
 		count int
 	}
 
-	tests := []testStruct{
+	type testFacetRequest struct {
+		name   string
+		start  string
+		end    string
+		parser string
+		result testFacetResult
+	}
+
+	tests := []testFacetRequest{
 		{
-			name:  "test1",
-			start: "2001-08-20",
-			end:   "2001-08-21",
+			// Test without a query time override of the parser (use default parser)
+			name:  "test",
+			start: "2001-08-20 18:00:00",
+			end:   "2001-08-20 18:10:00",
+			result: testFacetResult{
+				name:  "test",
+				start: "2001-08-20 18:00:00",
+				end:   "2001-08-20 18:10:00",
+				count: 2,
+			},
+		},
+		{
+			name:   "test",
+			start:  "20/08/2001 6:00PM",
+			end:    "20/08/2001 6:10PM",
+			parser: "queryDT",
+			result: testFacetResult{
+				name:  "test",
+				start: "20/08/2001 6:00PM",
+				end:   "20/08/2001 6:10PM",
+				count: 2,
+			},
+		},
+		{
+			name:   "test",
+			start:  "20/08/2001 15:00:00",
+			end:    "2001/08/20 6:10PM",
+			parser: "customDT",
+			result: testFacetResult{
+				name:  "test",
+				start: "20/08/2001 15:00:00",
+				end:   "2001/08/20 6:10PM",
+				count: 2,
+			},
+		},
+		{
+			name:   "test",
+			end:    "2001/08/20 6:15PM",
+			parser: "customDT",
+			result: testFacetResult{
+				name:  "test",
+				end:   "2001/08/20 6:15PM",
+				count: 3,
+			},
 		},
 	}
 
 	for _, test := range tests {
 		searchRequest := NewSearchRequest(query)
 
-		fr := NewFacetRequest("dateFacet", 100)
-		fr.Field = "date"
-		fr.AddDateTimeRangeString(test.name, &test.start, &test.end)
+		fr := NewFacetRequest("date", 100)
+		fr.AddDateTimeRangeStringWithParser(test.name, &test.start, &test.end, test.parser)
 		searchRequest.AddFacet("dateFacet", fr)
 
 		searchResults, err := idx.Search(searchRequest)
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Log(searchResults)
 		for _, facetResult := range searchResults.Facets {
-			for _, dateRange := range facetResult.DateRanges {
-				t.Log(dateRange.Name)
-				t.Log(*dateRange.Start)
-				t.Log(*dateRange.End)
-				t.Log(dateRange.Count)
+			if len(facetResult.DateRanges) != 1 {
+				t.Fatal("Expected 1 date range facet")
+			}
+			result := facetResult.DateRanges[0]
+			if result.Name != test.result.name {
+				t.Fatalf("Expected name %s, got %s", test.result.name, result.Name)
+			}
+			if result.Start != nil && *result.Start != test.result.start {
+				t.Fatalf("Expected start %s, got %s", test.result.start, *result.Start)
+			}
+			if result.End != nil && *result.End != test.result.end {
+				t.Fatalf("Expected end %s, got %s", test.result.end, *result.End)
+			}
+			if result.Start == nil && test.result.start != "" {
+				t.Fatalf("Expected start %s, got nil", test.result.start)
+			}
+			if result.End == nil && test.result.end != "" {
+				t.Fatalf("Expected end %s, got nil", test.result.end)
+			}
+			if result.Count != test.result.count {
+				t.Fatalf("Expected count %d, got %d", test.result.count, result.Count)
 			}
 		}
 	}
