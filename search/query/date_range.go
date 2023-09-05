@@ -139,17 +139,18 @@ func (q *DateRangeQuery) Searcher(ctx context.Context, i index.IndexReader, m ma
 	if err != nil {
 		return nil, err
 	}
+
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
+
 	return searcher.NewNumericRangeSearcher(ctx, i, min, max, q.InclusiveStart, q.InclusiveEnd, field, q.BoostVal.Value(), options)
 }
 
 func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 	min := math.Inf(-1)
 	max := math.Inf(1)
-
 	if !q.Start.IsZero() {
 		if !isDatetimeCompatible(q.Start) {
 			// overflow
@@ -171,10 +172,8 @@ func (q *DateRangeQuery) parseEndpoints() (*float64, *float64, error) {
 }
 
 func (q *DateRangeQuery) Validate() error {
-	// either start or end must be specified
 	if q.Start.IsZero() && q.End.IsZero() {
 		return fmt.Errorf("must specify start or end")
-
 	}
 	_, _, err := q.parseEndpoints()
 	if err != nil {
