@@ -2556,8 +2556,7 @@ func TestDateRangeStringQuery(t *testing.T) {
 		start          string
 		end            string
 		field          string
-		dateTimeParser string // name of the custom date time parser to use
-		inheritParser  bool   // whether to inherit the parser from the index mapping if dateTimeParser is not specified - if false, use QueryDateTimeParser
+		dateTimeParser string // name of the custom date time parser to use if nil, use QueryDateTimeParser
 		includeStart   bool
 		includeEnd     bool
 		expectedHits   []testResult
@@ -2567,12 +2566,11 @@ func TestDateRangeStringQuery(t *testing.T) {
 	testQueries := []testStruct{
 		// test cases with RFC3339 parser and toggling includeStart and includeEnd
 		{
-			start:         "2001-08-20T18:00:00",
-			end:           "2001-08-20T18:10:00",
-			field:         "date",
-			inheritParser: false,
-			includeStart:  true,
-			includeEnd:    true,
+			start:        "2001-08-20T18:00:00",
+			end:          "2001-08-20T18:10:00",
+			field:        "date",
+			includeStart: true,
+			includeEnd:   true,
 			expectedHits: []testResult{
 				{
 					docID:    "doc1",
@@ -2589,12 +2587,11 @@ func TestDateRangeStringQuery(t *testing.T) {
 			},
 		},
 		{
-			start:         "2001-08-20T18:00:00",
-			end:           "2001-08-20T18:10:00",
-			field:         "date",
-			inheritParser: false,
-			includeStart:  false,
-			includeEnd:    true,
+			start:        "2001-08-20T18:00:00",
+			end:          "2001-08-20T18:10:00",
+			field:        "date",
+			includeStart: false,
+			includeEnd:   true,
 			expectedHits: []testResult{
 				{
 					docID:    "doc2",
@@ -2607,12 +2604,11 @@ func TestDateRangeStringQuery(t *testing.T) {
 			},
 		},
 		{
-			start:         "2001-08-20T18:00:00",
-			end:           "2001-08-20T18:10:00",
-			field:         "date",
-			inheritParser: false,
-			includeStart:  false,
-			includeEnd:    false,
+			start:        "2001-08-20T18:00:00",
+			end:          "2001-08-20T18:10:00",
+			field:        "date",
+			includeStart: false,
+			includeEnd:   false,
 			expectedHits: []testResult{
 				{
 					docID:    "doc2",
@@ -2622,12 +2618,12 @@ func TestDateRangeStringQuery(t *testing.T) {
 		},
 		// test cases with custom parser and omitting start and end
 		{
-			start:         "20/08/2001 18:00:00",
-			end:           "2001/08/20 6:10PM",
-			field:         "date",
-			inheritParser: true,
-			includeStart:  true,
-			includeEnd:    true,
+			start:          "20/08/2001 18:00:00",
+			end:            "2001/08/20 6:10PM",
+			field:          "date",
+			dateTimeParser: "customDT",
+			includeStart:   true,
+			includeEnd:     true,
 			expectedHits: []testResult{
 				{
 					docID:    "doc1",
@@ -2644,11 +2640,11 @@ func TestDateRangeStringQuery(t *testing.T) {
 			},
 		},
 		{
-			end:           "20/08/2001 18:15:00",
-			field:         "date",
-			inheritParser: true,
-			includeStart:  true,
-			includeEnd:    true,
+			end:            "20/08/2001 18:15:00",
+			field:          "date",
+			dateTimeParser: "customDT",
+			includeStart:   true,
+			includeEnd:     true,
 			expectedHits: []testResult{
 				{
 					docID:    "doc1",
@@ -2669,11 +2665,11 @@ func TestDateRangeStringQuery(t *testing.T) {
 			},
 		},
 		{
-			start:         "2001/08/20 6:15PM",
-			field:         "date",
-			inheritParser: true,
-			includeStart:  true,
-			includeEnd:    true,
+			start:          "2001/08/20 6:15PM",
+			field:          "date",
+			dateTimeParser: "customDT",
+			includeStart:   true,
+			includeEnd:     true,
 			expectedHits: []testResult{
 				{
 					docID:    "doc4",
@@ -2704,46 +2700,43 @@ func TestDateRangeStringQuery(t *testing.T) {
 		},
 		// error path test cases
 		{
-			field:         "date",
-			inheritParser: true,
-			includeStart:  true,
-			includeEnd:    true,
-			err:           fmt.Errorf("date range query must specify at least one of start/end"),
+			field:          "date",
+			dateTimeParser: "customDT",
+			includeStart:   true,
+			includeEnd:     true,
+			err:            fmt.Errorf("date range query must specify at least one of start/end"),
 		},
 		{
-			field:         "date",
-			inheritParser: false,
-			includeStart:  true,
-			includeEnd:    true,
-			err:           fmt.Errorf("date range query must specify at least one of start/end"),
+			field:        "date",
+			includeStart: true,
+			includeEnd:   true,
+			err:          fmt.Errorf("date range query must specify at least one of start/end"),
 		},
 		{
-			start:         "2001-08-20T18:00:00",
-			end:           "2001-08-20T18:10:00",
-			field:         "date",
-			inheritParser: true,
-			err:           fmt.Errorf("unable to parse datetime with any of the layouts, date time parser name: customDT"),
+			start:          "2001-08-20T18:00:00",
+			end:            "2001-08-20T18:10:00",
+			field:          "date",
+			dateTimeParser: "customDT",
+			err:            fmt.Errorf("unable to parse datetime with any of the layouts, date time parser name: customDT"),
 		},
 		{
-			start:         "3001-08-20T18:00:00",
-			end:           "2001-08-20T18:10:00",
-			field:         "date",
-			inheritParser: false,
-			err:           fmt.Errorf("invalid/unsupported date range, start: 3001-08-20T18:00:00"),
+			start: "3001-08-20T18:00:00",
+			end:   "2001-08-20T18:10:00",
+			field: "date",
+			err:   fmt.Errorf("invalid/unsupported date range, start: 3001-08-20T18:00:00"),
 		},
 		{
-			start:         "2001/08/20 6:00PM",
-			end:           "3001/08/20 6:30PM",
-			field:         "date",
-			inheritParser: true,
-			err:           fmt.Errorf("invalid/unsupported date range, end: 3001/08/20 6:30PM"),
+			start:          "2001/08/20 6:00PM",
+			end:            "3001/08/20 6:30PM",
+			field:          "date",
+			dateTimeParser: "customDT",
+			err:            fmt.Errorf("invalid/unsupported date range, end: 3001/08/20 6:30PM"),
 		},
 	}
 
 	for _, dtq := range testQueries {
 		var err error
 		dateQuery := query.NewDateRangeStringInclusiveQuery(dtq.start, dtq.end, &dtq.includeStart, &dtq.includeEnd)
-		dateQuery.SetInheritParser(dtq.inheritParser)
 		dateQuery.SetDateTimeParser(dtq.dateTimeParser)
 		dateQuery.SetField(dtq.field)
 

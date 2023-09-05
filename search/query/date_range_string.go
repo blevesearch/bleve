@@ -29,43 +29,35 @@ import (
 
 // DateRangeStringQuery represents a query for a range of date values.
 // Start and End are the range endpoints, as strings.
-// Start and End are parsed using DateTimeParserVal, which is a custom date time parser
-// defined in the index mapping.
-// If DateTimeParserVal is not specified, and if InheritParserVal is true,
-// the parser is inherited from the index mapping, by using the parser associated with FieldVal.
-// if DateTimeParserVal is not specified and if InheritParserVal is false, then the
+// Start and End are parsed using DateTimeParser, which is a custom date time parser
+// defined in the index mapping. If DateTimeParser is not specified, then the
 // top-level config.QueryDateTimeParser is used.
 type DateRangeStringQuery struct {
-	Start             string `json:"start,omitempty"`
-	End               string `json:"end,omitempty"`
-	InclusiveStart    *bool  `json:"inclusive_start,omitempty"`
-	InclusiveEnd      *bool  `json:"inclusive_end,omitempty"`
-	FieldVal          string `json:"field,omitempty"`
-	BoostVal          *Boost `json:"boost,omitempty"`
-	InheritParserVal  bool   `json:"inherit_parser,omitempty"`
-	DateTimeParserVal string `json:"datetime_parser,omitempty"`
+	Start          string `json:"start,omitempty"`
+	End            string `json:"end,omitempty"`
+	InclusiveStart *bool  `json:"inclusive_start,omitempty"`
+	InclusiveEnd   *bool  `json:"inclusive_end,omitempty"`
+	FieldVal       string `json:"field,omitempty"`
+	BoostVal       *Boost `json:"boost,omitempty"`
+	DateTimeParser string `json:"datetime_parser,omitempty"`
 }
 
 // NewDateRangeStringQuery creates a new Query for ranges
 // of date values.
-// Date strings are parsed using the DateTimeParserVal field of the query struct,
-// which is a custom date time parser defined in the index mapping. If DateTimeParserVal
-// is not specified, and if InheritParserVal is true,
-// the parser is inherited from the index mapping, by using the parser associated with FieldVal.
-// if DateTimeParserVal is not specified and if InheritParserVal is false, then the
+// Date strings are parsed using the DateTimeParser field of the query struct,
+// which is a custom date time parser defined in the index mapping.
+// if DateTimeParser is not specified, then the
 // top-level config.QueryDateTimeParser is used.
 // Either, but not both endpoints can be nil.
 func NewDateRangeStringQuery(start, end string) *DateRangeStringQuery {
 	return NewDateRangeStringInclusiveQuery(start, end, nil, nil)
 }
 
-// NewDateRangeStringInclusiveQuery creates a new Query for ranges
+// NewDateRangeStringQuery creates a new Query for ranges
 // of date values.
-// Date strings are parsed using the DateTimeParserVal field of the query struct,
-// which is a custom date time parser defined in the index mapping. If DateTimeParserVal
-// is not specified, and if InheritParserVal is true,
-// the parser is inherited from the index mapping, by using the parser associated with FieldVal.
-// if DateTimeParserVal is not specified and if InheritParserVal is false, then the
+// Date strings are parsed using the DateTimeParser field of the query struct,
+// which is a custom date time parser defined in the index mapping.
+// if DateTimeParser is not specified, then the
 // top-level config.QueryDateTimeParser is used.
 // Either, but not both endpoints can be nil.
 // startInclusive and endInclusive control inclusion of the endpoints.
@@ -96,15 +88,11 @@ func (q *DateRangeStringQuery) Field() string {
 }
 
 func (q *DateRangeStringQuery) SetDateTimeParser(d string) {
-	q.DateTimeParserVal = d
+	q.DateTimeParser = d
 }
 
-func (q *DateRangeStringQuery) DateTimeParser() string {
-	return q.DateTimeParserVal
-}
-
-func (q *DateRangeStringQuery) SetInheritParser(i bool) {
-	q.InheritParserVal = i
+func (q *DateRangeStringQuery) DateTimeParserName() string {
+	return q.DateTimeParser
 }
 
 func (q *DateRangeStringQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
@@ -115,10 +103,8 @@ func (q *DateRangeStringQuery) Searcher(ctx context.Context, i index.IndexReader
 	}
 
 	dateTimeParserName := QueryDateTimeParser
-	if q.DateTimeParserVal != "" {
-		dateTimeParserName = q.DateTimeParserVal
-	} else if q.InheritParserVal {
-		dateTimeParserName = m.DateTimeParserNameForPath(field)
+	if q.DateTimeParser != "" {
+		dateTimeParserName = q.DateTimeParser
 	}
 	dateTimeParser := m.DateTimeParserNamed(dateTimeParserName)
 	if dateTimeParser == nil {

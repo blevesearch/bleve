@@ -49,7 +49,6 @@ type IndexMapping interface {
 	MapDocument(doc *document.Document, data interface{}) error
 	Validate() error
 
-	DateTimeParserNameForPath(path string) string
 	DateTimeParserNamed(name string) analysis.DateTimeParser
 
 	DefaultSearchField() string
