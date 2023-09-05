@@ -2474,7 +2474,7 @@ func TestCustomDateTimeParserLayoutValidation(t *testing.T) {
 	}
 }
 
-func TestDateRangeQuery(t *testing.T) {
+func TestDateRangeStringQuery(t *testing.T) {
 	idxMapping := NewIndexMapping()
 
 	err := idxMapping.AddCustomDateTimeParser("customDT", map[string]interface{}{
@@ -2699,40 +2699,21 @@ func TestDateRangeQuery(t *testing.T) {
 			end:           "2001-08-20T18:10:00",
 			field:         "date",
 			inheritParser: false,
-			err:           fmt.Errorf("invalid/unsupported date range, start: 3001-08-20 18:00:00 +0000 UTC"),
+			err:           fmt.Errorf("invalid/unsupported date range, start: 3001-08-20T18:00:00"),
 		},
 		{
 			start:         "2001/08/20 6:00PM",
 			end:           "3001/08/20 6:30PM",
 			field:         "date",
 			inheritParser: true,
-			err:           fmt.Errorf("invalid/unsupported date range, end: 3001-08-20 18:30:00 +0000 UTC"),
+			err:           fmt.Errorf("invalid/unsupported date range, end: 3001/08/20 6:30PM"),
 		},
 	}
 
-	testLayout := "2006-01-02T15:04:05"
-
 	for _, dtq := range testQueries {
 		var err error
-		var dateQuery *query.DateRangeQuery
-		if dtq.inheritParser {
-			dateQuery = query.NewDateRangeRawInclusiveQuery(dtq.start, dtq.end, &dtq.includeStart, &dtq.includeEnd)
-		} else {
-			var startTime, endTime time.Time
-			if dtq.start != "" {
-				startTime, err = time.Parse(testLayout, dtq.start)
-				if err != nil {
-					t.Fatal(err)
-				}
-			}
-			if dtq.end != "" {
-				endTime, err = time.Parse(testLayout, dtq.end)
-				if err != nil {
-					t.Fatal(err)
-				}
-			}
-			dateQuery = query.NewDateRangeInclusiveQuery(startTime, endTime, &dtq.includeStart, &dtq.includeEnd)
-		}
+		dateQuery := query.NewDateRangeStringInclusiveQuery(dtq.start, dtq.end, &dtq.includeStart, &dtq.includeEnd)
+		dateQuery.SetInheritParser(dtq.inheritParser)
 		dateQuery.SetField(dtq.field)
 
 		sr := NewSearchRequest(dateQuery)
