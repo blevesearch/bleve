@@ -64,24 +64,22 @@ func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (sta
 	start = dr.Start
 	startLayout = time.RFC3339Nano
 	if dr.Start.IsZero() && dr.startString != nil {
-		s, layout, err := dateTimeParser.ParseDateTime(*dr.startString)
-		if err == nil {
-			start = s
-			startLayout = layout
-		} else {
-			err = fmt.Errorf("error parsing start date '%s' for range '%s': %v", *dr.startString, dr.Name, err)
+		s, layout, parseError := dateTimeParser.ParseDateTime(*dr.startString)
+		if parseError != nil {
+			return start, end, startLayout, endLayout, fmt.Errorf("error parsing start date '%s' for date range name '%s': %v", *dr.startString, dr.Name, parseError)
 		}
+		start = s
+		startLayout = layout
 	}
 	end = dr.End
 	endLayout = time.RFC3339Nano
 	if dr.End.IsZero() && dr.endString != nil {
-		e, layout, err := dateTimeParser.ParseDateTime(*dr.endString)
-		if err == nil {
-			end = e
-			endLayout = layout
-		} else {
-			err = fmt.Errorf("error parsing start date '%s' for range '%s': %v", *dr.startString, dr.Name, err)
+		e, layout, parseError := dateTimeParser.ParseDateTime(*dr.endString)
+		if parseError != nil {
+			return start, end, startLayout, endLayout, fmt.Errorf("error parsing end date '%s' for date range name '%s': %v", *dr.endString, dr.Name, parseError)
 		}
+		end = e
+		endLayout = layout
 	}
 	return start, end, startLayout, endLayout, err
 }
@@ -176,17 +174,16 @@ func (fr *FacetRequest) Validate() error {
 				return fmt.Errorf("date ranges contains duplicate name '%s'", dr.Name)
 			}
 			drNames[dr.Name] = struct{}{}
-			if dr.DateTimeParser != "" {
+			if dr.DateTimeParser == "" {
 				// cannot parse the date range dates as the defaultDateTimeParser is overridden
 				// so perform this validation at query time
-				continue
-			}
-			start, end, _, _, err := dr.ParseDates(dateTimeParser)
-			if start.IsZero() && end.IsZero() {
-				return fmt.Errorf("date range query must specify either start, end or both for range name '%s'", dr.Name)
-			}
-			if err != nil {
-				return err
+				start, end, _, _, err := dr.ParseDates(dateTimeParser)
+				if err != nil {
+					return fmt.Errorf("ParseDates err: %v, using date time parser named %s", err, defaultDateTimeParser)
+				}
+				if start.IsZero() && end.IsZero() {
+					return fmt.Errorf("date range query must specify either start, end or both for range name '%s'", dr.Name)
+				}
 			}
 		}
 	}

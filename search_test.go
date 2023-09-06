@@ -282,7 +282,7 @@ func TestUnmarshalingSearchResult(t *testing.T) {
 func TestFacetNumericDateRangeRequests(t *testing.T) {
 	var drMissingErr = fmt.Errorf("date range query must specify either start, end or both for range name 'testName'")
 	var nrMissingErr = fmt.Errorf("numeric range query must specify either min, max or both for range name 'testName'")
-	var drNrErr = fmt.Errorf("facet can only conain numeric ranges or date ranges, not both")
+	var drNrErr = fmt.Errorf("facet can only contain numeric ranges or date ranges, not both")
 	var drNameDupErr = fmt.Errorf("date ranges contains duplicate name 'testName'")
 	var nrNameDupErr = fmt.Errorf("numeric ranges contains duplicate name 'testName'")
 	value := float64(5)
@@ -2554,6 +2554,7 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 		start string
 		end   string
 		count int
+		err   error
 	}
 
 	type testFacetRequest struct {
@@ -2575,6 +2576,7 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 				start: "2001-08-20 18:00:00",
 				end:   "2001-08-20 18:10:00",
 				count: 2,
+				err:   nil,
 			},
 		},
 		{
@@ -2587,6 +2589,7 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 				start: "20/08/2001 6:00PM",
 				end:   "20/08/2001 6:10PM",
 				count: 2,
+				err:   nil,
 			},
 		},
 		{
@@ -2599,6 +2602,7 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 				start: "20/08/2001 15:00:00",
 				end:   "2001/08/20 6:10PM",
 				count: 2,
+				err:   nil,
 			},
 		},
 		{
@@ -2609,6 +2613,37 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 				name:  "test",
 				end:   "2001/08/20 6:15PM",
 				count: 3,
+				err:   nil,
+			},
+		},
+		{
+			name:   "test",
+			start:  "20/08/2001 6:15PM",
+			parser: "queryDT",
+			result: testFacetResult{
+				name:  "test",
+				start: "20/08/2001 6:15PM",
+				count: 2,
+				err:   nil,
+			},
+		},
+		// some error cases
+		{
+			name:   "test",
+			parser: "queryDT",
+			result: testFacetResult{
+				name: "test",
+				err:  fmt.Errorf("date range query must specify either start, end or both for date range name 'test'"),
+			},
+		},
+		{
+			// default parser is used for the query, but the start time is not in the correct format (RFC3339),
+			// so it should throw an error
+			name:  "test",
+			start: "20/08/2001 6:15PM",
+			result: testFacetResult{
+				name: "test",
+				err:  fmt.Errorf("ParseDates err: error parsing start date '20/08/2001 6:15PM' for date range name 'test': unable to parse datetime with any of the layouts, using date time parser named dateTimeOptional"),
 			},
 		},
 	}
@@ -2617,12 +2652,27 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 		searchRequest := NewSearchRequest(query)
 
 		fr := NewFacetRequest("date", 100)
-		fr.AddDateTimeRangeStringWithParser(test.name, &test.start, &test.end, test.parser)
+		start := &test.start
+		if test.start == "" {
+			start = nil
+		}
+		end := &test.end
+		if test.end == "" {
+			end = nil
+		}
+
+		fr.AddDateTimeRangeStringWithParser(test.name, start, end, test.parser)
 		searchRequest.AddFacet("dateFacet", fr)
 
 		searchResults, err := idx.Search(searchRequest)
 		if err != nil {
-			t.Fatal(err)
+			if test.result.err == nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if err.Error() != test.result.err.Error() {
+				t.Fatalf("Expected error %v, got %v", test.result.err, err)
+			}
+			continue
 		}
 		for _, facetResult := range searchResults.Facets {
 			if len(facetResult.DateRanges) != 1 {
