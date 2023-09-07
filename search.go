@@ -31,24 +31,18 @@ import (
 	"github.com/blevesearch/bleve/v2/size"
 )
 
-var reflectStaticSizeSearchResult int
-var reflectStaticSizeSearchStatus int
-
-func init() {
-	var sr SearchResult
-	reflectStaticSizeSearchResult = int(reflect.TypeOf(sr).Size())
-	var ss SearchStatus
-	reflectStaticSizeSearchStatus = int(reflect.TypeOf(ss).Size())
-}
+const defaultDateTimeParser = optional.Name
 
 var cache = registry.NewCache()
 
-const defaultDateTimeParser = optional.Name
+var (
+	reflectStaticSizeSearchResult int
+	reflectStaticSizeSearchStatus int
+)
 
-type numericRange struct {
-	Name string   `json:"name,omitempty"`
-	Min  *float64 `json:"min,omitempty"`
-	Max  *float64 `json:"max,omitempty"`
+func init() {
+	reflectStaticSizeSearchResult = int(reflect.TypeOf(SearchResult{}).Size())
+	reflectStaticSizeSearchStatus = int(reflect.TypeOf(SearchStatus{}).Size())
 }
 
 type dateTimeRange struct {
@@ -84,8 +78,7 @@ func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
 		End   *string `json:"end,omitempty"`
 	}
 
-	err := json.Unmarshal(input, &temp)
-	if err != nil {
+	if err := json.Unmarshal(input, &temp); err != nil {
 		return err
 	}
 
@@ -115,6 +108,12 @@ func (dr *dateTimeRange) MarshalJSON() ([]byte, error) {
 	return json.Marshal(rv)
 }
 
+type numericRange struct {
+	Name string   `json:"name,omitempty"`
+	Min  *float64 `json:"min,omitempty"`
+	Max  *float64 `json:"max,omitempty"`
+}
+
 // A FacetRequest describes a facet or aggregation
 // of the result document set you would like to be
 // built.
@@ -123,6 +122,16 @@ type FacetRequest struct {
 	Field          string           `json:"field"`
 	NumericRanges  []*numericRange  `json:"numeric_ranges,omitempty"`
 	DateTimeRanges []*dateTimeRange `json:"date_ranges,omitempty"`
+}
+
+// NewFacetRequest creates a facet on the specified
+// field that limits the number of entries to the
+// specified size.
+func NewFacetRequest(field string, size int) *FacetRequest {
+	return &FacetRequest{
+		Field: field,
+		Size:  size,
+	}
 }
 
 func (fr *FacetRequest) Validate() error {
@@ -161,17 +170,8 @@ func (fr *FacetRequest) Validate() error {
 			}
 		}
 	}
-	return nil
-}
 
-// NewFacetRequest creates a facet on the specified
-// field that limits the number of entries to the
-// specified size.
-func NewFacetRequest(field string, size int) *FacetRequest {
-	return &FacetRequest{
-		Field: field,
-		Size:  size,
-	}
+	return nil
 }
 
 // AddDateTimeRange adds a bucket to a field
@@ -212,8 +212,7 @@ type FacetsRequest map[string]*FacetRequest
 
 func (fr FacetsRequest) Validate() error {
 	for _, v := range fr {
-		err := v.Validate()
-		if err != nil {
+		if err := v.Validate(); err != nil {
 			return err
 		}
 	}
@@ -287,8 +286,7 @@ type SearchRequest struct {
 
 func (r *SearchRequest) Validate() error {
 	if srq, ok := r.Query.(query.ValidatableQuery); ok {
-		err := srq.Validate()
-		if err != nil {
+		if err := srq.Validate(); err != nil {
 			return err
 		}
 	}
@@ -355,23 +353,25 @@ func (r *SearchRequest) SetSearchBefore(before []string) {
 // UnmarshalJSON deserializes a JSON representation of
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
-	var temp struct {
-		Q                json.RawMessage   `json:"query"`
-		Size             *int              `json:"size"`
-		From             int               `json:"from"`
-		Highlight        *HighlightRequest `json:"highlight"`
-		Fields           []string          `json:"fields"`
-		Facets           FacetsRequest     `json:"facets"`
-		Explain          bool              `json:"explain"`
-		Sort             []json.RawMessage `json:"sort"`
-		IncludeLocations bool              `json:"includeLocations"`
-		Score            string            `json:"score"`
-		SearchAfter      []string          `json:"search_after"`
-		SearchBefore     []string          `json:"search_before"`
-	}
+	var (
+		temp struct {
+			Q                json.RawMessage   `json:"query"`
+			Size             *int              `json:"size"`
+			From             int               `json:"from"`
+			Highlight        *HighlightRequest `json:"highlight"`
+			Fields           []string          `json:"fields"`
+			Facets           FacetsRequest     `json:"facets"`
+			Explain          bool              `json:"explain"`
+			Sort             []json.RawMessage `json:"sort"`
+			IncludeLocations bool              `json:"includeLocations"`
+			Score            string            `json:"score"`
+			SearchAfter      []string          `json:"search_after"`
+			SearchBefore     []string          `json:"search_before"`
+		}
+		err error
+	)
 
-	err := json.Unmarshal(input, &temp)
-	if err != nil {
+	if err = json.Unmarshal(input, &temp); err != nil {
 		return err
 	}
 
@@ -383,8 +383,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	if temp.Sort == nil {
 		r.Sort = search.SortOrder{&search.SortScore{Desc: true}}
 	} else {
-		r.Sort, err = search.ParseSortOrderJSON(temp.Sort)
-		if err != nil {
+		if r.Sort, err = search.ParseSortOrderJSON(temp.Sort); err != nil {
 			return err
 		}
 	}
@@ -397,8 +396,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	r.Score = temp.Score
 	r.SearchAfter = temp.SearchAfter
 	r.SearchBefore = temp.SearchBefore
-	r.Query, err = query.ParseQuery(temp.Q)
-	if err != nil {
+	if r.Query, err = query.ParseQuery(temp.Q); err != nil {
 		return err
 	}
 
@@ -448,8 +446,7 @@ func (iem IndexErrMap) MarshalJSON() ([]byte, error) {
 
 func (iem IndexErrMap) UnmarshalJSON(data []byte) error {
 	var tmp map[string]string
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
+	if err := json.Unmarshal(data, &tmp); err != nil {
 		return err
 	}
 	for k, v := range tmp {

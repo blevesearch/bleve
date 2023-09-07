@@ -176,7 +176,7 @@ func TestParseQuery(t *testing.T) {
 		{
 			input: []byte(`{"start":"` + startDateStr + `","end":"` + endDateStr + `","field":"desc"}`),
 			output: func() Query {
-				q := NewDateRangeQuery(startDate, endDate)
+				q := NewDateRangeStringQuery(startDateStr, endDateStr)
 				q.SetField("desc")
 				return q
 			}(),
