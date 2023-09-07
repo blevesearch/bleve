@@ -530,8 +530,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			} else if facetRequest.DateTimeRanges != nil {
 				// build date range facet
 				facetBuilder := facet.NewDateTimeFacetBuilder(facetRequest.Field, facetRequest.Size)
-				dateTimeParserName := defaultDateTimeParser
 				for _, dr := range facetRequest.DateTimeRanges {
+					dateTimeParserName := defaultDateTimeParser
 					if dr.DateTimeParser != "" {
 						dateTimeParserName = dr.DateTimeParser
 					}
