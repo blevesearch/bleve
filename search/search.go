@@ -155,7 +155,7 @@ type DocumentMatch struct {
 
 	// Fields contains the values for document fields listed in
 	// SearchRequest.Fields. Text fields are returned as strings, numeric
-	// fields as float64s and date fields as time.RFC3339 formatted strings.
+	// fields as float64s and date fields as strings.
 	Fields map[string]interface{} `json:"fields,omitempty"`
 
 	// used to maintain natural index order
@@ -166,6 +166,13 @@ type DocumentMatch struct {
 	// be later incorporated into the Locations map when search
 	// results are completed
 	FieldTermLocations []FieldTermLocation `json:"-"`
+
+	// used to indicate if this match is a partial match
+	// in the case of a disjunction search
+	// this means that the match is partial because
+	// not all sub-queries matched
+	// if false, all the sub-queries matched
+	PartialMatch bool `json:"partial_match,omitempty"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {

@@ -71,6 +71,7 @@ import (
 	// date time parsers
 	_ "github.com/blevesearch/bleve/v2/analysis/datetime/flexible"
 	_ "github.com/blevesearch/bleve/v2/analysis/datetime/optional"
+	_ "github.com/blevesearch/bleve/v2/analysis/datetime/sanitized"
 
 	// languages
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/ar"
@@ -99,6 +100,7 @@ import (
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/it"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/nl"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/no"
+	_ "github.com/blevesearch/bleve/v2/analysis/lang/pl"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/pt"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/ro"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/ru"

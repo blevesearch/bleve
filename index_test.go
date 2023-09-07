@@ -18,7 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"math"
 	"os"
@@ -401,7 +401,7 @@ func TestBytesRead(t *testing.T) {
 	}
 	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
 	prevBytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
-	if prevBytesRead != 32349 && res.Cost == prevBytesRead {
+	if prevBytesRead != 36066 && res.Cost == prevBytesRead {
 		t.Fatalf("expected bytes read for query string 32349, got %v",
 			prevBytesRead)
 	}
@@ -828,7 +828,7 @@ func TestSlowSearch(t *testing.T) {
 
 	defer func() {
 		// reset logger back to normal
-		SetLog(log.New(ioutil.Discard, "bleve", log.LstdFlags))
+		SetLog(log.New(io.Discard, "bleve", log.LstdFlags))
 	}()
 	// set custom logger
 	var sdw sawDataWriter

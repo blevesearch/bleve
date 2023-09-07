@@ -68,7 +68,7 @@ func TestDump(t *testing.T) {
 	doc := document.NewDocument("1")
 	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test"), index.IndexField|index.StoreField))
 	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, index.IndexField|index.StoreField))
-	dateField, err := document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), index.IndexField|index.StoreField)
+	dateField, err := document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), time.RFC3339, index.IndexField|index.StoreField)
 	if err != nil {
 		t.Error(err)
 	}
@@ -81,7 +81,7 @@ func TestDump(t *testing.T) {
 	doc = document.NewDocument("2")
 	doc.AddField(document.NewTextFieldWithIndexingOptions("name", []uint64{}, []byte("test2"), index.IndexField|index.StoreField))
 	doc.AddField(document.NewNumericFieldWithIndexingOptions("age", []uint64{}, 35.99, index.IndexField|index.StoreField))
-	dateField, err = document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), index.IndexField|index.StoreField)
+	dateField, err = document.NewDateTimeFieldWithIndexingOptions("unixEpoch", []uint64{}, time.Unix(0, 0), time.RFC3339, index.IndexField|index.StoreField)
 	if err != nil {
 		t.Error(err)
 	}
