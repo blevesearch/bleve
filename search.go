@@ -360,7 +360,7 @@ func (r *SearchRequest) SetSearchBefore(before []string) {
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	var (
 		temp struct {
-      ClientContextID  string            `json:"client_context_id"`
+			ClientContextID  string            `json:"client_context_id"`
 			Q                json.RawMessage   `json:"query"`
 			Size             *int              `json:"size"`
 			From             int               `json:"from"`
