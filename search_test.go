@@ -282,7 +282,7 @@ func TestUnmarshalingSearchResult(t *testing.T) {
 func TestFacetNumericDateRangeRequests(t *testing.T) {
 	var drMissingErr = fmt.Errorf("date range query must specify either start, end or both for range name 'testName'")
 	var nrMissingErr = fmt.Errorf("numeric range query must specify either min, max or both for range name 'testName'")
-	var drNrErr = fmt.Errorf("facet can only conain numeric ranges or date ranges, not both")
+	var drNrErr = fmt.Errorf("facet can only contain numeric ranges or date ranges, not both")
 	var drNameDupErr = fmt.Errorf("date ranges contains duplicate name 'testName'")
 	var nrNameDupErr = fmt.Errorf("numeric ranges contains duplicate name 'testName'")
 	value := float64(5)
@@ -2763,6 +2763,233 @@ func TestDateRangeStringQuery(t *testing.T) {
 			}
 			if hit.Fields[dtq.field].(string) != dtq.expectedHits[i].hitField {
 				t.Fatalf("expected hit field %s, got %s", dtq.expectedHits[i].hitField, hit.Fields[dtq.field])
+			}
+		}
+	}
+}
+
+func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
+	idxMapping := NewIndexMapping()
+
+	err := idxMapping.AddCustomDateTimeParser("customDT", map[string]interface{}{
+		"type": sanitized.Name,
+		"layouts": []interface{}{
+			"02/01/2006 15:04:05",
+			"2006/01/02 3:04PM",
+		},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = idxMapping.AddCustomDateTimeParser("queryDT", map[string]interface{}{
+		"type": sanitized.Name,
+		"layouts": []interface{}{
+			"02/01/2006 3:04PM",
+		},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dtmap := NewDateTimeFieldMapping()
+	dtmap.DateFormat = "customDT"
+	idxMapping.DefaultMapping.AddFieldMappingsAt("date", dtmap)
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, idxMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	documents := map[string]map[string]interface{}{
+		"doc1": {
+			"date": "2001/08/20 6:00PM",
+		},
+		"doc2": {
+			"date": "20/08/2001 18:00:20",
+		},
+		"doc3": {
+			"date": "20/08/2001 18:10:00",
+		},
+		"doc4": {
+			"date": "2001/08/20 6:15PM",
+		},
+		"doc5": {
+			"date": "20/08/2001 18:20:00",
+		},
+	}
+
+	batch := idx.NewBatch()
+	for docID, doc := range documents {
+		err := batch.Index(docID, doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	query := NewMatchAllQuery()
+
+	type testFacetResult struct {
+		name  string
+		start string
+		end   string
+		count int
+		err   error
+	}
+
+	type testFacetRequest struct {
+		name   string
+		start  string
+		end    string
+		parser string
+		result testFacetResult
+	}
+
+	tests := []testFacetRequest{
+		{
+			// Test without a query time override of the parser (use default parser)
+			name:  "test",
+			start: "2001-08-20 18:00:00",
+			end:   "2001-08-20 18:10:00",
+			result: testFacetResult{
+				name:  "test",
+				start: "2001-08-20 18:00:00",
+				end:   "2001-08-20 18:10:00",
+				count: 2,
+				err:   nil,
+			},
+		},
+		{
+			name:   "test",
+			start:  "20/08/2001 6:00PM",
+			end:    "20/08/2001 6:10PM",
+			parser: "queryDT",
+			result: testFacetResult{
+				name:  "test",
+				start: "20/08/2001 6:00PM",
+				end:   "20/08/2001 6:10PM",
+				count: 2,
+				err:   nil,
+			},
+		},
+		{
+			name:   "test",
+			start:  "20/08/2001 15:00:00",
+			end:    "2001/08/20 6:10PM",
+			parser: "customDT",
+			result: testFacetResult{
+				name:  "test",
+				start: "20/08/2001 15:00:00",
+				end:   "2001/08/20 6:10PM",
+				count: 2,
+				err:   nil,
+			},
+		},
+		{
+			name:   "test",
+			end:    "2001/08/20 6:15PM",
+			parser: "customDT",
+			result: testFacetResult{
+				name:  "test",
+				end:   "2001/08/20 6:15PM",
+				count: 3,
+				err:   nil,
+			},
+		},
+		{
+			name:   "test",
+			start:  "20/08/2001 6:15PM",
+			parser: "queryDT",
+			result: testFacetResult{
+				name:  "test",
+				start: "20/08/2001 6:15PM",
+				count: 2,
+				err:   nil,
+			},
+		},
+		// some error cases
+		{
+			name:   "test",
+			parser: "queryDT",
+			result: testFacetResult{
+				name: "test",
+				err:  fmt.Errorf("date range query must specify either start, end or both for date range name 'test'"),
+			},
+		},
+		{
+			// default parser is used for the query, but the start time is not in the correct format (RFC3339),
+			// so it should throw an error
+			name:  "test",
+			start: "20/08/2001 6:15PM",
+			result: testFacetResult{
+				name: "test",
+				err:  fmt.Errorf("ParseDates err: error parsing start date '20/08/2001 6:15PM' for date range name 'test': unable to parse datetime with any of the layouts, using date time parser named dateTimeOptional"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		searchRequest := NewSearchRequest(query)
+
+		fr := NewFacetRequest("date", 100)
+		start := &test.start
+		if test.start == "" {
+			start = nil
+		}
+		end := &test.end
+		if test.end == "" {
+			end = nil
+		}
+
+		fr.AddDateTimeRangeStringWithParser(test.name, start, end, test.parser)
+		searchRequest.AddFacet("dateFacet", fr)
+
+		searchResults, err := idx.Search(searchRequest)
+		if err != nil {
+			if test.result.err == nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if err.Error() != test.result.err.Error() {
+				t.Fatalf("Expected error %v, got %v", test.result.err, err)
+			}
+			continue
+		}
+		for _, facetResult := range searchResults.Facets {
+			if len(facetResult.DateRanges) != 1 {
+				t.Fatal("Expected 1 date range facet")
+			}
+			result := facetResult.DateRanges[0]
+			if result.Name != test.result.name {
+				t.Fatalf("Expected name %s, got %s", test.result.name, result.Name)
+			}
+			if result.Start != nil && *result.Start != test.result.start {
+				t.Fatalf("Expected start %s, got %s", test.result.start, *result.Start)
+			}
+			if result.End != nil && *result.End != test.result.end {
+				t.Fatalf("Expected end %s, got %s", test.result.end, *result.End)
+			}
+			if result.Start == nil && test.result.start != "" {
+				t.Fatalf("Expected start %s, got nil", test.result.start)
+			}
+			if result.End == nil && test.result.end != "" {
+				t.Fatalf("Expected end %s, got nil", test.result.end)
+			}
+			if result.Count != test.result.count {
+				t.Fatalf("Expected count %d, got %d", test.result.count, result.Count)
 			}
 		}
 	}
