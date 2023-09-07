@@ -417,23 +417,6 @@ func (im *IndexMappingImpl) DateTimeParserNamed(name string) analysis.DateTimePa
 	return dateTimeParser
 }
 
-func (im *IndexMappingImpl) datetimeParserNameForPath(path string) string {
-
-	// first we look for explicit mapping on the field
-	for _, docMapping := range im.TypeMapping {
-		pathMapping, _ := docMapping.documentMappingForPath(path)
-		if pathMapping != nil {
-			if len(pathMapping.Fields) > 0 {
-				if pathMapping.Fields[0].Analyzer != "" {
-					return pathMapping.Fields[0].Analyzer
-				}
-			}
-		}
-	}
-
-	return im.DefaultDateTimeParser
-}
-
 func (im *IndexMappingImpl) AnalyzeText(analyzerName string, text []byte) (analysis.TokenStream, error) {
 	analyzer, err := im.cache.AnalyzerNamed(analyzerName)
 	if err != nil {

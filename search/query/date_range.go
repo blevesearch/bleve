@@ -30,10 +30,10 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-// QueryDateTimeParser controls the default query date time parser
+// QueryDateTimeParser controls the default query date time parser.
 var QueryDateTimeParser = optional.Name
 
-// QueryDateTimeFormat controls the format when Marshaling to JSON
+// QueryDateTimeFormat controls the format when Marshaling to JSON.
 var QueryDateTimeFormat = time.RFC3339
 
 var cache = registry.NewCache()
