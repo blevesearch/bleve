@@ -25,6 +25,7 @@ import (
 	"github.com/couchbase/moss"
 
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/util"
 	store "github.com/blevesearch/upsidedown_store_api"
 )
 
@@ -77,13 +78,13 @@ func New(mo store.MergeOperator, config map[string]interface{}) (
 
 	v, ok = config["mossCollectionOptions"]
 	if ok {
-		b, err := json.Marshal(v) // Convert from map[string]interface{}.
+		b, err := util.MarshalJSON(v) // Convert from map[string]interface{}.
 		if err != nil {
 			return nil, fmt.Errorf("moss store,"+
 				" could not marshal config[mossCollectionOptions]: %v, err: %v", v, err)
 		}
 
-		err = json.Unmarshal(b, &options)
+		err = util.UnmarshalJSON(b, &options)
 		if err != nil {
 			return nil, fmt.Errorf("moss store,"+
 				" could not unmarshal config[mossCollectionOptions]: %v, err: %v", v, err)

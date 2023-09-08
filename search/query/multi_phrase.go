@@ -16,12 +16,12 @@ package query
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -75,7 +75,7 @@ func (q *MultiPhraseQuery) Validate() error {
 func (q *MultiPhraseQuery) UnmarshalJSON(data []byte) error {
 	type _mphraseQuery MultiPhraseQuery
 	tmp := _mphraseQuery{}
-	err := json.Unmarshal(data, &tmp)
+	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
 		return err
 	}

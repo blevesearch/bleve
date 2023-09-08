@@ -18,8 +18,8 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
-
 	"github.com/blevesearch/geo/geojson"
 	"github.com/blevesearch/geo/s2"
 )
@@ -224,7 +224,7 @@ func (p *Point) Type() string {
 }
 
 func (p *Point) Value() ([]byte, error) {
-	return json.Marshal(p)
+	return util.MarshalJSON(p)
 }
 
 func (p *Point) Intersects(s index.GeoJSON) (bool, error) {
@@ -267,7 +267,7 @@ func (br *boundedRectangle) Type() string {
 }
 
 func (br *boundedRectangle) Value() ([]byte, error) {
-	return json.Marshal(br)
+	return util.MarshalJSON(br)
 }
 
 func (p *boundedRectangle) Intersects(s index.GeoJSON) (bool, error) {
@@ -309,7 +309,7 @@ func (bp *boundedPolygon) Type() string {
 }
 
 func (bp *boundedPolygon) Value() ([]byte, error) {
-	return json.Marshal(bp)
+	return util.MarshalJSON(bp)
 }
 
 func (p *boundedPolygon) Intersects(s index.GeoJSON) (bool, error) {
@@ -355,7 +355,7 @@ func (p *pointDistance) Type() string {
 }
 
 func (p *pointDistance) Value() ([]byte, error) {
-	return json.Marshal(p)
+	return util.MarshalJSON(p)
 }
 
 func NewPointDistance(centerLat, centerLon,

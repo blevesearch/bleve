@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/util"
 	"github.com/blevesearch/go-metrics"
 	store "github.com/blevesearch/upsidedown_store_api"
 )
@@ -206,7 +207,7 @@ func (s *Store) WriteJSON(w io.Writer) (err error) {
 				}
 			}
 			var buf []byte
-			buf, err = json.Marshal(se)
+			buf, err = util.MarshalJSON(se)
 			if err == nil {
 				_, err = w.Write(buf)
 				if err != nil {
@@ -226,7 +227,7 @@ func (s *Store) WriteJSON(w io.Writer) (err error) {
 	if o, ok := s.o.(store.KVStoreStats); ok {
 		storeStats := o.Stats()
 		var storeBytes []byte
-		storeBytes, err = json.Marshal(storeStats)
+		storeBytes, err = util.MarshalJSON(storeStats)
 		if err != nil {
 			return
 		}

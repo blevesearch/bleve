@@ -1,4 +1,4 @@
-//  Copyright (c) 2014 Couchbase, Inc.
+//  Copyright (c) 2023 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,17 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package boltdb
+package util
 
 import (
-	"github.com/blevesearch/bleve/v2/util"
+	"encoding/json"
 )
 
-type stats struct {
-	s *Store
-}
-
-func (s *stats) MarshalJSON() ([]byte, error) {
-	bs := s.s.db.Stats()
-	return util.MarshalJSON(bs)
-}
+// Should only be overwritten during process init()'ialization.
+var (
+	MarshalJSON   = json.Marshal
+	UnmarshalJSON = json.Unmarshal
+)

@@ -17,13 +17,14 @@ package mapping
 import (
 	"encoding/json"
 	"fmt"
-	index "github.com/blevesearch/bleve_index_api"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/util"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 var MappingJSONStrict = false
@@ -203,7 +204,7 @@ func (im *IndexMappingImpl) mappingForType(docType string) *DocumentMapping {
 func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 
 	var tmp map[string]json.RawMessage
-	err := json.Unmarshal(data, &tmp)
+	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
 		return err
 	}
@@ -226,57 +227,57 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 	for k, v := range tmp {
 		switch k {
 		case "analysis":
-			err := json.Unmarshal(v, &im.CustomAnalysis)
+			err := util.UnmarshalJSON(v, &im.CustomAnalysis)
 			if err != nil {
 				return err
 			}
 		case "type_field":
-			err := json.Unmarshal(v, &im.TypeField)
+			err := util.UnmarshalJSON(v, &im.TypeField)
 			if err != nil {
 				return err
 			}
 		case "default_type":
-			err := json.Unmarshal(v, &im.DefaultType)
+			err := util.UnmarshalJSON(v, &im.DefaultType)
 			if err != nil {
 				return err
 			}
 		case "default_analyzer":
-			err := json.Unmarshal(v, &im.DefaultAnalyzer)
+			err := util.UnmarshalJSON(v, &im.DefaultAnalyzer)
 			if err != nil {
 				return err
 			}
 		case "default_datetime_parser":
-			err := json.Unmarshal(v, &im.DefaultDateTimeParser)
+			err := util.UnmarshalJSON(v, &im.DefaultDateTimeParser)
 			if err != nil {
 				return err
 			}
 		case "default_field":
-			err := json.Unmarshal(v, &im.DefaultField)
+			err := util.UnmarshalJSON(v, &im.DefaultField)
 			if err != nil {
 				return err
 			}
 		case "default_mapping":
-			err := json.Unmarshal(v, &im.DefaultMapping)
+			err := util.UnmarshalJSON(v, &im.DefaultMapping)
 			if err != nil {
 				return err
 			}
 		case "types":
-			err := json.Unmarshal(v, &im.TypeMapping)
+			err := util.UnmarshalJSON(v, &im.TypeMapping)
 			if err != nil {
 				return err
 			}
 		case "store_dynamic":
-			err := json.Unmarshal(v, &im.StoreDynamic)
+			err := util.UnmarshalJSON(v, &im.StoreDynamic)
 			if err != nil {
 				return err
 			}
 		case "index_dynamic":
-			err := json.Unmarshal(v, &im.IndexDynamic)
+			err := util.UnmarshalJSON(v, &im.IndexDynamic)
 			if err != nil {
 				return err
 			}
 		case "docvalues_dynamic":
-			err := json.Unmarshal(v, &im.DocValuesDynamic)
+			err := util.UnmarshalJSON(v, &im.DocValuesDynamic)
 			if err != nil {
 				return err
 			}

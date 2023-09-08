@@ -15,8 +15,7 @@
 package moss
 
 import (
-	"encoding/json"
-
+	"github.com/blevesearch/bleve/v2/util"
 	store "github.com/blevesearch/upsidedown_store_api"
 )
 
@@ -55,5 +54,5 @@ func (s *stats) statsMap() map[string]interface{} {
 
 func (s *stats) MarshalJSON() ([]byte, error) {
 	m := s.statsMap()
-	return json.Marshal(m)
+	return util.MarshalJSON(m)
 }

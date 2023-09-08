@@ -15,11 +15,11 @@
 package search
 
 import (
-	"encoding/json"
 	"reflect"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/size"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -176,12 +176,12 @@ func (tf *TermFacets) Less(i, j int) bool {
 // To maintain backwards compatibility, we have to implement custom
 // JSON marshalling.
 func (tf *TermFacets) MarshalJSON() ([]byte, error) {
-	return json.Marshal(tf.termFacets)
+	return util.MarshalJSON(tf.termFacets)
 }
 
 func (tf *TermFacets) UnmarshalJSON(b []byte) error {
 	termFacets := []*TermFacet{}
-	err := json.Unmarshal(b, &termFacets)
+	err := util.UnmarshalJSON(b, &termFacets)
 	if err != nil {
 		return err
 	}

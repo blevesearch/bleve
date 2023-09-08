@@ -135,22 +135,22 @@ func (udc *UpsideDownCouch) loadSchema(kvreader store.KVReader) (err error) {
 }
 
 type rowBuffer struct {
-    buf []byte
+	buf []byte
 }
 
 var rowBufferPool sync.Pool
 
 func GetRowBuffer() *rowBuffer {
-    if rb, ok := rowBufferPool.Get().(*rowBuffer); ok {
-        return rb
-    } else {
-        buf := make([]byte, RowBufferSize)
-        return &rowBuffer{buf: buf}
-    }
+	if rb, ok := rowBufferPool.Get().(*rowBuffer); ok {
+		return rb
+	} else {
+		buf := make([]byte, RowBufferSize)
+		return &rowBuffer{buf: buf}
+	}
 }
 
 func PutRowBuffer(rb *rowBuffer) {
-    rowBufferPool.Put(rb)
+	rowBufferPool.Put(rb)
 }
 
 func (udc *UpsideDownCouch) batchRows(writer store.KVWriter, addRowsAll [][]UpsideDownCouchRow, updateRowsAll [][]UpsideDownCouchRow, deleteRowsAll [][]UpsideDownCouchRow) (err error) {
