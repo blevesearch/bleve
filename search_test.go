@@ -31,6 +31,10 @@ import (
 	regexp_char_filter "github.com/blevesearch/bleve/v2/analysis/char/regexp"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/flexible"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/sanitized"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/microseconds"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/milliseconds"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/nanoseconds"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/seconds"
 	"github.com/blevesearch/bleve/v2/analysis/token/length"
 	"github.com/blevesearch/bleve/v2/analysis/token/lowercase"
 	"github.com/blevesearch/bleve/v2/analysis/token/shingle"
@@ -2990,6 +2994,237 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 			}
 			if result.Count != test.result.count {
 				t.Fatalf("Expected count %d, got %d", test.result.count, result.Count)
+			}
+		}
+	}
+}
+
+func TestDateRangeTimestampQueries(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	imap := mapping.NewIndexMapping()
+
+	// add a date field with a valid format to the default mapping
+	// for good measure
+
+	dtParserConfig := map[string]interface{}{
+		"type":    flexible.Name,
+		"layouts": []interface{}{"2006/01/02 15:04:05"},
+	}
+	err := imap.AddCustomDateTimeParser("custDT", dtParserConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dateField := mapping.NewDateTimeFieldMapping()
+	dateField.DateFormat = "custDT"
+
+	unixSecField := mapping.NewDateTimeFieldMapping()
+	unixSecField.DateFormat = seconds.Name
+
+	unixMilliSecField := mapping.NewDateTimeFieldMapping()
+	unixMilliSecField.DateFormat = milliseconds.Name
+
+	unixMicroSecField := mapping.NewDateTimeFieldMapping()
+	unixMicroSecField.DateFormat = microseconds.Name
+
+	unixNanoSecField := mapping.NewDateTimeFieldMapping()
+	unixNanoSecField.DateFormat = nanoseconds.Name
+
+	imap.DefaultMapping.AddFieldMappingsAt("date", dateField)
+	imap.DefaultMapping.AddFieldMappingsAt("seconds", unixSecField)
+	imap.DefaultMapping.AddFieldMappingsAt("milliseconds", unixMilliSecField)
+	imap.DefaultMapping.AddFieldMappingsAt("microseconds", unixMicroSecField)
+	imap.DefaultMapping.AddFieldMappingsAt("nanoseconds", unixNanoSecField)
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	documents := map[string]map[string]interface{}{
+		"doc1": {
+			"date":         "2001/08/20 03:00:10",
+			"seconds":      "998276410",
+			"milliseconds": "998276410100",
+			"microseconds": "998276410100300",
+			"nanoseconds":  "998276410100300400",
+		},
+		"doc2": {
+			"date":         "2001/08/20 03:00:20",
+			"seconds":      "998276420",
+			"milliseconds": "998276410200",
+			"microseconds": "998276410100400",
+			"nanoseconds":  "998276410100300500",
+		},
+		"doc3": {
+			"date":         "2001/08/20 03:00:30",
+			"seconds":      "998276430",
+			"milliseconds": "998276410300",
+			"microseconds": "998276410100500",
+			"nanoseconds":  "998276410100300600",
+		},
+		"doc4": {
+			"date":         "2001/08/20 03:00:40",
+			"seconds":      "998276440",
+			"milliseconds": "998276410400",
+			"microseconds": "998276410100600",
+			"nanoseconds":  "998276410100300700",
+		},
+		"doc5": {
+			"date":         "2001/08/20 03:00:50",
+			"seconds":      "998276450",
+			"milliseconds": "998276410500",
+			"microseconds": "998276410100700",
+			"nanoseconds":  "998276410100300800",
+		},
+	}
+
+	batch := idx.NewBatch()
+	for docID, doc := range documents {
+		err := batch.Index(docID, doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type testResult struct {
+		docID    string // doc ID of the hit
+		hitField string // fields returned as part of the hit
+	}
+	type testStruct struct {
+		start        string
+		end          string
+		field        string
+		expectedHits []testResult
+	}
+
+	testQueries := []testStruct{
+		{
+			start: "2001-08-20T03:00:05",
+			end:   "2001-08-20T03:00:25",
+			field: "date",
+			expectedHits: []testResult{
+				{
+					docID:    "doc1",
+					hitField: "2001/08/20 03:00:10",
+				},
+				{
+					docID:    "doc2",
+					hitField: "2001/08/20 03:00:20",
+				},
+			},
+		},
+		{
+			start: "2001-08-20T03:00:15",
+			end:   "2001-08-20T03:00:35",
+			field: "seconds",
+			expectedHits: []testResult{
+				{
+					docID:    "doc2",
+					hitField: "998276420000000000",
+				},
+				{
+					docID:    "doc3",
+					hitField: "998276430000000000",
+				},
+			},
+		},
+		{
+			start: "2001-08-20T03:00:10.150",
+			end:   "2001-08-20T03:00:10.450",
+			field: "milliseconds",
+			expectedHits: []testResult{
+				{
+					docID:    "doc2",
+					hitField: "998276410200000000",
+				},
+				{
+					docID:    "doc3",
+					hitField: "998276410300000000",
+				},
+				{
+					docID:    "doc4",
+					hitField: "998276410400000000",
+				},
+			},
+		},
+		{
+			start: "2001-08-20T03:00:10.100450",
+			end:   "2001-08-20T03:00:10.100650",
+			field: "microseconds",
+			expectedHits: []testResult{
+				{
+					docID:    "doc3",
+					hitField: "998276410100500000",
+				},
+				{
+					docID:    "doc4",
+					hitField: "998276410100600000",
+				},
+			},
+		},
+		{
+			start: "2001-08-20T03:00:10.100300550",
+			end:   "2001-08-20T03:00:10.100300850",
+			field: "nanoseconds",
+			expectedHits: []testResult{
+				{
+					docID:    "doc3",
+					hitField: "998276410100300600",
+				},
+				{
+					docID:    "doc4",
+					hitField: "998276410100300700",
+				},
+				{
+					docID:    "doc5",
+					hitField: "998276410100300800",
+				},
+			},
+		},
+	}
+	testLayout := "2006-01-02T15:04:05"
+	for _, dtq := range testQueries {
+		startTime, err := time.Parse(testLayout, dtq.start)
+		if err != nil {
+			t.Fatal(err)
+		}
+		endTime, err := time.Parse(testLayout, dtq.end)
+		if err != nil {
+			t.Fatal(err)
+		}
+		drq := NewDateRangeQuery(startTime, endTime)
+		drq.SetField(dtq.field)
+
+		sr := NewSearchRequest(drq)
+		sr.SortBy([]string{dtq.field})
+		sr.Fields = []string{dtq.field}
+
+		res, err := idx.Search(sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Hits) != len(dtq.expectedHits) {
+			t.Fatalf("expected %d hits, got %d", len(dtq.expectedHits), len(res.Hits))
+		}
+		for i, hit := range res.Hits {
+			if hit.ID != dtq.expectedHits[i].docID {
+				t.Fatalf("expected docID %s, got %s", dtq.expectedHits[i].docID, hit.ID)
+			}
+			if hit.Fields[dtq.field].(string) != dtq.expectedHits[i].hitField {
+				t.Fatalf("expected hit field %s, got %s", dtq.expectedHits[i].hitField, hit.Fields[dtq.field])
 			}
 		}
 	}

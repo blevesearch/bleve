@@ -99,6 +99,9 @@ func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
 
 var ErrInvalidDateTime = fmt.Errorf("unable to parse datetime with any of the layouts")
 
+var ErrInvalidTimestampString = fmt.Errorf("unable to parse timestamp string")
+var ErrInvalidTimestampRange = fmt.Errorf("timestamp out of range")
+
 type DateTimeParser interface {
 	ParseDateTime(string) (time.Time, string, error)
 }
