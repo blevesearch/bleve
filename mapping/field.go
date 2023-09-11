@@ -20,12 +20,12 @@ import (
 	"net"
 	"time"
 
-	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
-	index "github.com/blevesearch/bleve_index_api"
-
 	"github.com/blevesearch/bleve/v2/analysis"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/geo"
+	"github.com/blevesearch/bleve/v2/util"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 // control the default behavior for dynamic fields (those not explicitly mapped)
@@ -390,7 +390,7 @@ func getFieldName(pathString string, path []string, fieldMapping *FieldMapping) 
 func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 
 	var tmp map[string]json.RawMessage
-	err := json.Unmarshal(data, &tmp)
+	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
 		return err
 	}
@@ -399,52 +399,52 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 	for k, v := range tmp {
 		switch k {
 		case "name":
-			err := json.Unmarshal(v, &fm.Name)
+			err := util.UnmarshalJSON(v, &fm.Name)
 			if err != nil {
 				return err
 			}
 		case "type":
-			err := json.Unmarshal(v, &fm.Type)
+			err := util.UnmarshalJSON(v, &fm.Type)
 			if err != nil {
 				return err
 			}
 		case "analyzer":
-			err := json.Unmarshal(v, &fm.Analyzer)
+			err := util.UnmarshalJSON(v, &fm.Analyzer)
 			if err != nil {
 				return err
 			}
 		case "store":
-			err := json.Unmarshal(v, &fm.Store)
+			err := util.UnmarshalJSON(v, &fm.Store)
 			if err != nil {
 				return err
 			}
 		case "index":
-			err := json.Unmarshal(v, &fm.Index)
+			err := util.UnmarshalJSON(v, &fm.Index)
 			if err != nil {
 				return err
 			}
 		case "include_term_vectors":
-			err := json.Unmarshal(v, &fm.IncludeTermVectors)
+			err := util.UnmarshalJSON(v, &fm.IncludeTermVectors)
 			if err != nil {
 				return err
 			}
 		case "include_in_all":
-			err := json.Unmarshal(v, &fm.IncludeInAll)
+			err := util.UnmarshalJSON(v, &fm.IncludeInAll)
 			if err != nil {
 				return err
 			}
 		case "date_format":
-			err := json.Unmarshal(v, &fm.DateFormat)
+			err := util.UnmarshalJSON(v, &fm.DateFormat)
 			if err != nil {
 				return err
 			}
 		case "docvalues":
-			err := json.Unmarshal(v, &fm.DocValues)
+			err := util.UnmarshalJSON(v, &fm.DocValues)
 			if err != nil {
 				return err
 			}
 		case "skip_freq_norm":
-			err := json.Unmarshal(v, &fm.SkipFreqNorm)
+			err := util.UnmarshalJSON(v, &fm.SkipFreqNorm)
 			if err != nil {
 				return err
 			}

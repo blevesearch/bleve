@@ -29,6 +29,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
 	"github.com/blevesearch/bleve/v2/size"
+	"github.com/blevesearch/bleve/v2/util"
 )
 
 const defaultDateTimeParser = optional.Name
@@ -86,7 +87,7 @@ func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
 		DateTimeParser string  `json:"datetime_parser,omitempty"`
 	}
 
-	if err := json.Unmarshal(input, &temp); err != nil {
+	if err := util.UnmarshalJSON(input, &temp); err != nil {
 		return err
 	}
 
@@ -124,7 +125,7 @@ func (dr *dateTimeRange) MarshalJSON() ([]byte, error) {
 	if dr.DateTimeParser != "" {
 		rv["datetime_parser"] = dr.DateTimeParser
 	}
-	return json.Marshal(rv)
+	return util.MarshalJSON(rv)
 }
 
 type numericRange struct {
@@ -414,7 +415,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		err error
 	)
 
-	if err = json.Unmarshal(input, &temp); err != nil {
+	if err = util.UnmarshalJSON(input, &temp); err != nil {
 		return err
 	}
 
@@ -485,12 +486,12 @@ func (iem IndexErrMap) MarshalJSON() ([]byte, error) {
 	for k, v := range iem {
 		tmp[k] = v.Error()
 	}
-	return json.Marshal(tmp)
+	return util.MarshalJSON(tmp)
 }
 
 func (iem IndexErrMap) UnmarshalJSON(data []byte) error {
 	var tmp map[string]string
-	if err := json.Unmarshal(data, &tmp); err != nil {
+	if err := util.UnmarshalJSON(data, &tmp); err != nil {
 		return err
 	}
 	for k, v := range tmp {

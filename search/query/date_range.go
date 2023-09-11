@@ -16,7 +16,6 @@ package query
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"time"
@@ -27,6 +26,7 @@ import (
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -69,7 +69,7 @@ func (t *BleveQueryTime) MarshalJSON() ([]byte, error) {
 
 func (t *BleveQueryTime) UnmarshalJSON(data []byte) error {
 	var timeString string
-	err := json.Unmarshal(data, &timeString)
+	err := util.UnmarshalJSON(data, &timeString)
 	if err != nil {
 		return err
 	}

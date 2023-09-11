@@ -16,11 +16,11 @@ package query
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -46,9 +46,9 @@ const (
 func (o MatchQueryOperator) MarshalJSON() ([]byte, error) {
 	switch o {
 	case MatchQueryOperatorOr:
-		return json.Marshal("or")
+		return util.MarshalJSON("or")
 	case MatchQueryOperatorAnd:
-		return json.Marshal("and")
+		return util.MarshalJSON("and")
 	default:
 		return nil, fmt.Errorf("cannot marshal match operator %d to JSON", o)
 	}
@@ -56,7 +56,7 @@ func (o MatchQueryOperator) MarshalJSON() ([]byte, error) {
 
 func (o *MatchQueryOperator) UnmarshalJSON(data []byte) error {
 	var operatorString string
-	err := json.Unmarshal(data, &operatorString)
+	err := util.UnmarshalJSON(data, &operatorString)
 	if err != nil {
 		return err
 	}

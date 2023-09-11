@@ -16,13 +16,13 @@ package query
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/geo"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -76,7 +76,7 @@ func (q *GeoBoundingPolygonQuery) UnmarshalJSON(data []byte) error {
 		FieldVal string        `json:"field,omitempty"`
 		BoostVal *Boost        `json:"boost,omitempty"`
 	}{}
-	err := json.Unmarshal(data, &tmp)
+	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
 		return err
 	}

@@ -18,7 +18,6 @@
 package moss
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"sync"
@@ -26,6 +25,7 @@ import (
 	"github.com/couchbase/moss"
 
 	"github.com/blevesearch/bleve/v2/registry"
+	"github.com/blevesearch/bleve/v2/util"
 	store "github.com/blevesearch/upsidedown_store_api"
 )
 
@@ -463,12 +463,12 @@ func InitMossStore(config map[string]interface{}, options moss.CollectionOptions
 	}
 	v, ok := config["mossStoreOptions"]
 	if ok {
-		b, err := json.Marshal(v) // Convert from map[string]interface{}.
+		b, err := util.MarshalJSON(v) // Convert from map[string]interface{}.
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
 
-		err = json.Unmarshal(b, &storeOptions)
+		err = util.UnmarshalJSON(b, &storeOptions)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}

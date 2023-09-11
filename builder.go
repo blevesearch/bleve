@@ -15,12 +15,12 @@
 package bleve
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -63,7 +63,7 @@ func newBuilder(path string, mapping mapping.IndexMapping, config map[string]int
 
 	// the builder does not have an API to interact with internal storage
 	// however we can pass k/v pairs through the config
-	mappingBytes, err := json.Marshal(mapping)
+	mappingBytes, err := util.MarshalJSON(mapping)
 	if err != nil {
 		return nil, err
 	}

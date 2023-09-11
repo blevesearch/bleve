@@ -15,9 +15,9 @@
 package upsidedown
 
 import (
-	"encoding/json"
 	"sync/atomic"
 
+	"github.com/blevesearch/bleve/v2/util"
 	"github.com/blevesearch/upsidedown_store_api"
 )
 
@@ -51,5 +51,5 @@ func (i *indexStat) statsMap() map[string]interface{} {
 
 func (i *indexStat) MarshalJSON() ([]byte, error) {
 	m := i.statsMap()
-	return json.Marshal(m)
+	return util.MarshalJSON(m)
 }
