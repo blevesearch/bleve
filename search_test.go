@@ -30,6 +30,8 @@ import (
 	html_char_filter "github.com/blevesearch/bleve/v2/analysis/char/html"
 	regexp_char_filter "github.com/blevesearch/bleve/v2/analysis/char/regexp"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/flexible"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/iso"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/percent"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/sanitized"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/microseconds"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/milliseconds"
@@ -2740,7 +2742,7 @@ func TestDateRangeStringQuery(t *testing.T) {
 
 	for _, dtq := range testQueries {
 		var err error
-		dateQuery := query.NewDateRangeStringInclusiveQuery(dtq.start, dtq.end, &dtq.includeStart, &dtq.includeEnd)
+		dateQuery := NewDateRangeInclusiveStringQuery(dtq.start, dtq.end, &dtq.includeStart, &dtq.includeEnd)
 		dateQuery.SetDateTimeParser(dtq.dateTimeParser)
 		dateQuery.SetField(dtq.field)
 
@@ -3225,6 +3227,151 @@ func TestDateRangeTimestampQueries(t *testing.T) {
 			}
 			if hit.Fields[dtq.field].(string) != dtq.expectedHits[i].hitField {
 				t.Fatalf("expected hit field %s, got %s", dtq.expectedHits[i].hitField, hit.Fields[dtq.field])
+			}
+		}
+	}
+}
+
+func TestPercentAndIsoStyleDates(t *testing.T) {
+	percentName := percent.Name
+	isoName := iso.Name
+
+	imap := mapping.NewIndexMapping()
+	percentConfig := map[string]interface{}{
+		"type": percentName,
+		"layouts": []interface{}{
+			"%Y/%m/%d %l:%M%p",                // doc 1
+			"%d/%m/%Y %H:%M:%S",               // doc 2
+			"%Y-%m-%dT%H:%M:%S%z",             // doc 3
+			"%d %B %y %l%p %Z",                // doc 4
+			"%Y; %b %d (%a) %I:%M:%S.%N%P %z", // doc 5
+		},
+	}
+	isoConfig := map[string]interface{}{
+		"type": isoName,
+		"layouts": []interface{}{
+			"yyyy/MM/dd h:mma",                       // doc 1
+			"dd/MM/yyyy HH:mm:ss",                    // doc 2
+			"yyyy-MM-dd'T'HH:mm:ssXX",                // doc 3
+			"dd MMMM yy ha z",                        // doc 4
+			"yyyy; MMM dd (EEE) hh:mm:ss.SSSSSaa xx", // doc 5
+		},
+	}
+
+	err := imap.AddCustomDateTimeParser("percentDate", percentConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = imap.AddCustomDateTimeParser("isoDate", isoConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	percentField := mapping.NewDateTimeFieldMapping()
+	percentField.DateFormat = "percentDate"
+
+	isoField := mapping.NewDateTimeFieldMapping()
+	isoField.DateFormat = "isoDate"
+
+	imap.DefaultMapping.AddFieldMappingsAt("percentDate", percentField)
+	imap.DefaultMapping.AddFieldMappingsAt("isoDate", isoField)
+
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	documents := map[string]map[string]interface{}{
+		"doc1": {
+			"percentDate": "2001/08/20 6:00PM",
+			"isoDate":     "2001/08/20 6:00PM",
+		},
+		"doc2": {
+			"percentDate": "20/08/2001 18:05:00",
+			"isoDate":     "20/08/2001 18:05:00",
+		},
+		"doc3": {
+			"percentDate": "2001-08-20T18:10:00Z",
+			"isoDate":     "2001-08-20T18:10:00Z",
+		},
+		"doc4": {
+			"percentDate": "20 August 01 6PM UTC",
+			"isoDate":     "20 August 01 6PM UTC",
+		},
+		"doc5": {
+			"percentDate": "2001; Aug 20 (Mon) 06:15:15.23456pm +0000",
+			"isoDate":     "2001; Aug 20 (Mon) 06:15:15.23456pm +0000",
+		},
+	}
+
+	batch := idx.NewBatch()
+	for docID, doc := range documents {
+		err := batch.Index(docID, doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type testStruct struct {
+		start string
+		end   string
+		field string
+	}
+
+	for _, field := range []string{"percentDate", "isoDate"} {
+		testQueries := []testStruct{
+			{
+				start: "2001/08/20 6:00PM",
+				end:   "2001/08/20 6:20PM",
+				field: field,
+			},
+			{
+				start: "20/08/2001 18:00:00",
+				end:   "20/08/2001 18:20:00",
+				field: field,
+			},
+			{
+				start: "2001-08-20T18:00:00Z",
+				end:   "2001-08-20T18:20:00Z",
+				field: field,
+			},
+			{
+				start: "20 August 01 6PM UTC",
+				end:   "20 August 01 7PM UTC",
+				field: field,
+			},
+			{
+				start: "2001; Aug 20 (Mon) 06:00:00.00000pm +0000",
+				end:   "2001; Aug 20 (Mon) 06:20:20.00000pm +0000",
+				field: field,
+			},
+		}
+		includeStart := true
+		includeEnd := true
+		for _, dtq := range testQueries {
+			drq := NewDateRangeInclusiveStringQuery(dtq.start, dtq.end, &includeStart, &includeEnd)
+			drq.SetField(dtq.field)
+			drq.SetDateTimeParser(field)
+			sr := NewSearchRequest(drq)
+			res, err := idx.Search(sr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(res.Hits) != 5 {
+				t.Fatalf("expected %d hits, got %d", 5, len(res.Hits))
 			}
 		}
 	}
