@@ -27,53 +27,78 @@ func TestConversionFromPercentStyle(t *testing.T) {
 	}{
 		{
 			input:  "%Y-%m-%d",
-			output: "2006-1-2",
+			output: "2006-01-02",
 			err:    nil,
 		},
 		{
-			input:  "%Y/%M%%%%%DT%H%i:%S",
-			output: "2006/01%%02T034:05",
+			input:  "%Y/%m%%%%%dT%H%M:%S",
+			output: "2006/01%%02T1504:05",
 			err:    nil,
 		},
 		{
-			input:  "%Y-%M-%DT%O:%I:%S%ZM",
-			output: "2006-01-02T15:04:05Z0700",
+			input:  "%Y-%m-%dT%H:%M:%S %Z%z",
+			output: "2006-01-02T15:04:05 MSTZ0700",
 			err:    nil,
 		},
 		{
-			input:  "%B %D, %Y %H:%I %P %Z:M",
-			output: "January 02, 2006 03:04 pm Z07:00",
+			input:  "%B %e, %Y %l:%i %P %z:M",
+			output: "January 2, 2006 3:4 pm Z07:00",
 			err:    nil,
 		},
 		{
-			input:  "Hour %O Minute %iseconds %S%N Timezone:%Z:S, Weekday %a; Day %D Month %b, Year %y",
-			output: "Hour 15 Minute 4seconds 05.999999999 Timezone:Z07:00:00, Weekday Mon; Day 02 Month Jan, Year 06",
+			input:  "Hour %H Minute %Mseconds %S.%N Timezone:%Z:S, Weekday %a; Day %d Month %b, Year %y",
+			output: "Hour 15 Minute 04seconds 05.999999999 Timezone:MST:S, Weekday Mon; Day 02 Month Jan, Year 06",
 			err:    nil,
 		},
 		{
-			input:  "%Y-%M-%D%T%O:%I:%S%ZM",
+			input:  "%Y-%m-%dT%H:%M:%S.%N",
+			output: "2006-01-02T15:04:05.999999999",
+			err:    nil,
+		},
+		{
+			input:  "%H:%M:%S %Z %z",
+			output: "15:04:05 MST Z0700",
+			err:    nil,
+		},
+		{
+			input:  "%H:%M:%S %Z %z:",
+			output: "15:04:05 MST Z0700:",
+			err:    nil,
+		},
+		{
+			input:  "%H:%M:%S %Z %z:M",
+			output: "15:04:05 MST Z07:00",
+			err:    nil,
+		},
+		{
+			input:  "%H:%M:%S %Z %z:A",
+			output: "15:04:05 MST Z0700:A",
+			err:    nil,
+		},
+		{
+			input:  "%H:%M:%S %Z %zM",
+			output: "15:04:05 MST Z0700M",
+			err:    nil,
+		},
+		{
+			input:  "%H:%M:%S %Z %zS",
+			output: "15:04:05 MST Z070000",
+			err:    nil,
+		},
+		{
+			input:  "%H:%M:%S %Z %z%Z %zS%z:%zH",
+			output: "15:04:05 MST Z0700MST Z070000Z0700:Z07",
+			err:    nil,
+		},
+		{
+			input:  "%Y-%m-%d%T%H:%M:%S %ZM",
 			output: "",
 			err:    fmt.Errorf("invalid format string, unknown format specifier: T"),
 		},
 		{
-			input:  "%Y-%M-%DT%O:%I%S%ZM%",
+			input:  "%Y-%m-%dT%H:%M:%S %ZM%",
 			output: "",
 			err:    fmt.Errorf("invalid format string, invalid format string, expected character after %%"),
-		},
-		{
-			input:  "%Y-%M-%DT%O:%I:%S%Z",
-			output: "",
-			err:    fmt.Errorf("invalid format string, expected character after Z"),
-		},
-		{
-			input:  "%Y-%M-%DT%O:%I:%S%Z:",
-			output: "",
-			err:    fmt.Errorf("invalid format string, expected character after colon"),
-		},
-		{
-			input:  "%O:%I:%S%Z%H:%M:%S",
-			output: "",
-			err:    fmt.Errorf("invalid format string, unknown timezone specifier: Z%%"),
 		},
 	}
 	for _, test := range tests {
