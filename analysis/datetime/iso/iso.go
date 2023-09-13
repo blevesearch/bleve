@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package javatime
+package iso
 
 import (
 	"fmt"
@@ -23,11 +23,11 @@ import (
 	"github.com/blevesearch/bleve/v2/registry"
 )
 
-const Name = "javastyle"
+const Name = "isostyle"
 
 var textLiteralDelimiter byte = '\'' // single quote
 
-// java style date strings are represented in
+// ISO style date strings are represented in
 // https://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html
 //
 // Some format specifiers are not specified in go time package, such as:
@@ -121,7 +121,7 @@ func invalidFormatError(character byte, count int) error {
 	return fmt.Errorf("invalid format string, unknown format specifier: " + strings.Repeat(string(character), count))
 }
 
-func parseJavaString(layout string) (string, error) {
+func parseISOString(layout string) (string, error) {
 	var dateTimeLayout strings.Builder
 
 	for idx := 0; idx < len(layout); {
@@ -228,7 +228,7 @@ func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Ca
 	for _, layout := range layouts {
 		layoutStr, ok := layout.(string)
 		if ok {
-			layout, err := parseJavaString(layoutStr)
+			layout, err := parseISOString(layoutStr)
 			if err != nil {
 				return nil, err
 			}

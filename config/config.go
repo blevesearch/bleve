@@ -70,7 +70,7 @@ import (
 
 	// date time parsers
 	_ "github.com/blevesearch/bleve/v2/analysis/datetime/flexible"
-	_ "github.com/blevesearch/bleve/v2/analysis/datetime/javatime"
+	_ "github.com/blevesearch/bleve/v2/analysis/datetime/iso"
 	_ "github.com/blevesearch/bleve/v2/analysis/datetime/optional"
 	_ "github.com/blevesearch/bleve/v2/analysis/datetime/percent"
 	_ "github.com/blevesearch/bleve/v2/analysis/datetime/sanitized"

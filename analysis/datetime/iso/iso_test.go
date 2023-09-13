@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package javatime
+package iso
 
 import (
 	"fmt"
 	"testing"
 )
 
-func TestConversionFromJavaStyle(t *testing.T) {
+func TestConversionFromISOStyle(t *testing.T) {
 	tests := []struct {
 		input  string
 		output string
@@ -43,6 +43,7 @@ func TestConversionFromJavaStyle(t *testing.T) {
 		{
 			input:  "MMMM dd yyyy', 'HH:mm:ss.SSS",
 			output: "January 02 2006, 15:04:05.000",
+			err:    nil,
 		},
 		{
 			input:  "h 'o'''' clock' a, XXX",
@@ -55,13 +56,8 @@ func TestConversionFromJavaStyle(t *testing.T) {
 			err:    nil,
 		},
 		{
-			input:  "E MMM d H:m:s z Y",
-			output: "Mon Jan 2 15:4:5 MST 2006",
-			err:    nil,
-		},
-		{
-			input:  "E MMM d H:m:s z Y",
-			output: "Mon Jan 2 15:4:5 MST 2006",
+			input:  "E MMM d H:mm:ss z Y",
+			output: "Mon Jan 2 15:04:05 MST 2006",
 			err:    nil,
 		},
 		{
@@ -74,9 +70,14 @@ func TestConversionFromJavaStyle(t *testing.T) {
 			output: "",
 			err:    fmt.Errorf("invalid format string, expected text literal delimiter: '"),
 		},
+		{
+			input:  "MMMMM dd yyyy', 'HH:mm:ss.SSS",
+			output: "",
+			err:    fmt.Errorf("invalid format string, unknown format specifier: MMMMM"),
+		},
 	}
 	for _, test := range tests {
-		out, err := parseJavaString(test.input)
+		out, err := parseISOString(test.input)
 		if err != nil && test.err == nil || err == nil && test.err != nil {
 			t.Fatalf("expected error %v, got error %v", test.err, err)
 		}

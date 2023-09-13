@@ -27,29 +27,28 @@ const Name = "percentstyle"
 
 var formatDelimiter byte = '%'
 
+// format specifiers as per strftime in the C standard library
+// https://man7.org/linux/man-pages/man3/strftime.3.html
 var formatSpecifierToLayout = map[byte]string{
-	// format specifiers as per strftime in the C standard library
-	// https://man7.org/linux/man-pages/man3/strftime.3.html
-
-	formatDelimiter: string(formatDelimiter),
-	'a':             "Mon",     // %a = short weekday name
-	'A':             "Monday",  // %A = full weekday name
-	'd':             "02",      // %d = day of month (2 digits) (01-31)
-	'e':             "2",       // %e = day of month (1 digit) (1-31)
-	'b':             "Jan",     // %b = short month name
-	'B':             "January", // %B = full month name
-	'm':             "01",      // %m = month of year (2 digits) (01-12)
-	'y':             "06",      // %y = year without century
-	'Y':             "2006",    // %Y = year with century
-	'H':             "15",      // %H = hour (24 hour clock) (2 digits)
-	'I':             "03",      // %I = hour (12 hour clock) (2 digits)
-	'l':             "3",       // %l = hour (12 hour clock) (1 digit)
-	'p':             "PM",      // %p = PM/AM
-	'P':             "pm",      // %P = pm/am (lowercase)
-	'M':             "04",      // %M = minute (2 digits)
-	'S':             "05",      // %S = seconds (2 digits)
-	'f':             "999999",  // .%f = fraction of seconds - up to microseconds (6 digits) - deci/milli/micro
-	'Z':             "MST",     // %Z = timezone name (GMT, JST, UTC etc)
+	formatDelimiter: string(formatDelimiter), // %% = % (literal %)
+	'a':             "Mon",                   // %a = short weekday name
+	'A':             "Monday",                // %A = full weekday name
+	'd':             "02",                    // %d = day of month (2 digits) (01-31)
+	'e':             "2",                     // %e = day of month (1 digit) (1-31)
+	'b':             "Jan",                   // %b = short month name
+	'B':             "January",               // %B = full month name
+	'm':             "01",                    // %m = month of year (2 digits) (01-12)
+	'y':             "06",                    // %y = year without century
+	'Y':             "2006",                  // %Y = year with century
+	'H':             "15",                    // %H = hour (24 hour clock) (2 digits)
+	'I':             "03",                    // %I = hour (12 hour clock) (2 digits)
+	'l':             "3",                     // %l = hour (12 hour clock) (1 digit)
+	'p':             "PM",                    // %p = PM/AM
+	'P':             "pm",                    // %P = pm/am (lowercase)
+	'M':             "04",                    // %M = minute (2 digits)
+	'S':             "05",                    // %S = seconds (2 digits)
+	'f':             "999999",                // .%f = fraction of seconds - up to microseconds (6 digits) - deci/milli/micro
+	'Z':             "MST",                   // %Z = timezone name (GMT, JST, UTC etc)
 	// %z is present in timezone options
 
 	// some additional options not in strftime to support additional options such as
