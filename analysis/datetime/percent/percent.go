@@ -62,6 +62,7 @@ var formatSpecifierToLayout = map[byte]string{
 
 // some additional options for timezone
 // such as allowing colon in timezone offset and specifying the seconds
+// timezone offsets are from UTC
 var timezoneOptions = map[string]string{
 	"z":   "Z0700",     // %z = timezone offset in +-hhmm / +-(2 digit hour)(2 digit minute) +0500, -0600 etc
 	"z:M": "Z07:00",    // %z:M = timezone offset(+-hh:mm) / +-(2 digit hour):(2 digit minute) +05:00, -06:00 etc

@@ -39,21 +39,21 @@ var textLiteralDelimiter byte = '\'' // single quote
 // - 'G' for era, like AD or BC.
 // - 'W' for week of month.
 // - 'D' for day of year.
-// So date strings with date elements cannot be parsed.
+// So date strings with these date elements cannot be parsed.
 var timeElementToLayout = map[byte]map[int]string{
 	'M': {
-		4: "January",
-		3: "Jan", // MMM = short month name
-		2: "01",  // MM = month of year (2 digits) (01-12)
-		1: "1",   // M = month of year (1 digit) (1-12)
+		4: "January", // MMMM = full month name
+		3: "Jan",     // MMM = short month name
+		2: "01",      // MM = month of year (2 digits) (01-12)
+		1: "1",       // M = month of year (1 digit) (1-12)
 	},
 	'd': {
 		2: "02", // dd = day of month (2 digits) (01-31)
 		1: "2",  // d = day of month (1 digit) (1-31)
 	},
 	'a': {
-		2: "pm", // PM = PM/AM
-		1: "PM", // PM = PM/AM
+		2: "pm", // aa = pm/am
+		1: "PM", // a = PM/AM
 	},
 	'H': {
 		2: "15", // HH = hour (24 hour clock) (2 digits)
@@ -70,15 +70,15 @@ var timeElementToLayout = map[byte]map[int]string{
 
 	// timezone offsets from UTC below
 	'X': {
-		5: "Z07:00:00", // XXXXXX = timezone offset (+-hh:mm:ss)
-		4: "Z070000",   // XXXXX = timezone offset (+-hhmmss)
+		5: "Z07:00:00", // XXXXX = timezone offset (+-hh:mm:ss)
+		4: "Z070000",   // XXXX = timezone offset (+-hhmmss)
 		3: "Z07:00",    // XXX = timezone offset (+-hh:mm)
 		2: "Z0700",     // XX = timezone offset (+-hhmm)
 		1: "Z07",       // X = timezone offset (+-hh)
 	},
 	'x': {
-		5: "-07:00:00", // xxxxxx = timezone offset (+-hh:mm:ss)
-		4: "-070000",   // xxxxx = timezone offset (+-hhmmss)
+		5: "-07:00:00", // xxxxx = timezone offset (+-hh:mm:ss)
+		4: "-070000",   // xxxx = timezone offset (+-hhmmss)
 		3: "-07:00",    // xxx = timezone offset (+-hh:mm)
 		2: "-0700",     // xx = timezone offset (+-hhmm)
 		1: "-07",       // x = timezone offset (+-hh)
@@ -191,6 +191,9 @@ func parseJavaString(layout string) (string, error) {
 					}
 				case 'S':
 					// fraction of second
+					// .SSS = millisecond
+					// .SSSSSS = microsecond
+					// .SSSSSSSSS = nanosecond
 					if count > 9 {
 						return "", invalidFormatError(character, count)
 					}
