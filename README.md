@@ -101,7 +101,7 @@ Use "bleve [command] --help" for more information about a command.
 
 Bleve includes general-purpose analyzers (customizable) as well as pre-built text analyzers for the following languages:
 
-Arabic (ar), Bulgarian (bg), Catalan (ca), Chinese-Japanese-Korean (cjk), Kurdish (ckb), Danish (da), German (de), Greek (el), English (en), Spanish - Castilian (es), Basque (eu), Persian (fa), Finnish (fi), French (fr), Gaelic (ga), Spanish - Galician (gl), Hindi (hi), Croatian (hr), Hungarian (hu), Armenian (hy), Indonesian (id, in), Italian (it), Dutch (nl), Norwegian (no), Portuguese (pt), Romanian (ro), Russian (ru), Swedish (sv), Turkish (tr)
+Arabic (ar), Bulgarian (bg), Catalan (ca), Chinese-Japanese-Korean (cjk), Kurdish (ckb), Danish (da), German (de), Greek (el), English (en), Spanish - Castilian (es), Basque (eu), Persian (fa), Finnish (fi), French (fr), Gaelic (ga), Spanish - Galician (gl), Hindi (hi), Croatian (hr), Hungarian (hu), Armenian (hy), Indonesian (id, in), Italian (it), Dutch (nl), Norwegian (no), Polish (pl), Portuguese (pt), Romanian (ro), Russian (ru), Swedish (sv), Turkish (tr)
 
 ## Text Analysis Wizard
 
