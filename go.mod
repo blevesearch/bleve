@@ -27,7 +27,7 @@ require (
 	github.com/golang/protobuf v1.3.2
 	github.com/spf13/cobra v1.7.0
 	go.etcd.io/bbolt v1.3.7
-	golang.org/x/text v0.8.0
+	golang.org/x/text v0.13.0
 )
 
 require (
@@ -39,5 +39,5 @@ require (
 	github.com/json-iterator/go v0.0.0-20171115153421-f7279a603ede // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
 )
