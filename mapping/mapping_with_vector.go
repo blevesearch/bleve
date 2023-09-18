@@ -31,7 +31,11 @@ const SimilarityDefaultVal = "l2_norm"
 // Set of Valid Similarity values for vector fields
 var SimilarityValidVals = map[string]struct{}{
 	"l2_norm":     {},
-	"cosine":      {},
+	// dotProduct(vecA, vecB) = vecA . vecB = |vecA| * |vecB| * cos(theta);
+	//  where, theta is the angle between vecA and vecB
+	// If vecA and vecB are normalized (unit magnitude), then
+	// vecA . vecB = cos(theta), which is the cosine similarity.
+	// Thus, we don't need a separate similarity type for cosine similarity
 	"dot_product": {},
 }
 
@@ -91,9 +95,9 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 // document validation functions
 
 func validateVectorField(field *FieldMapping) error {
-	if field.Dims <= 0 || field.Dims > 1024 {
+	if field.Dims <= 0 || field.Dims > 2048 {
 		return fmt.Errorf("invalid vector dimension,"+
-			" value should be in range (%d, %d]", 0, 1024)
+			" value should be in range (%d, %d]", 0, 2048)
 	}
 
 	if field.Similarity == "" {
