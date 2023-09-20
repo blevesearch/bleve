@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build vector
-// +build vector
+//go:build vectors
+// +build vectors
 
 package searcher
 
