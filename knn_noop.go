@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build vectors
-// +build vectors
+//go:build !vectors
+// +build !vectors
 
 package bleve
 
-import "github.com/blevesearch/bleve/v2/mapping"
+import "github.com/blevesearch/bleve/v2/search/query"
 
-func NewDenseVectorFieldMapping() *mapping.FieldMapping {
-	return mapping.NewDenseVectorFieldMapping()
+func disjunctQueryWithKNN(req *SearchRequest) query.Query {
+	return req.Query
 }

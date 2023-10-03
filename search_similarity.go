@@ -1,4 +1,4 @@
-//  Copyright (c) 2014 Couchbase, Inc.
+//  Copyright (c) 2023 Couchbase, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !vectors
-// +build !vectors
+//go:build vectors
+// +build vectors
 
 package bleve
 
@@ -25,28 +25,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search/query"
 )
 
-// A SearchRequest describes all the parameters
-// needed to search the index.
-// Query is required.
-// Size/From describe how much and which part of the
-// result set to return.
-// Highlight describes optional search result
-// highlighting.
-// Fields describes a list of field values which
-// should be retrieved for result documents, provided they
-// were stored while indexing.
-// Facets describe the set of facets to be computed.
-// Explain triggers inclusion of additional search
-// result score explanations.
-// Sort describes the desired order for the results to be returned.
-// Score controls the kind of scoring performed
-// SearchAfter supports deep paging by providing a minimum sort key
-// SearchBefore supports deep paging by providing a maximum sort key
-// sortFunc specifies the sort implementation to use for sorting results.
-//
-// A special field named "*" can be used to return all fields.
 type SearchRequest struct {
-	ClientContextID  string            `json:"client_context_id,omitempty"`
 	Query            query.Query       `json:"query"`
 	Size             int               `json:"size"`
 	From             int               `json:"from"`
@@ -60,7 +39,29 @@ type SearchRequest struct {
 	SearchAfter      []string          `json:"search_after"`
 	SearchBefore     []string          `json:"search_before"`
 
+	KNN *KNNRequest `json:"knn"`
+
 	sortFunc func(sort.Interface)
+}
+
+type KNNRequest struct {
+	Field  string       `json:"field"`
+	Vector []float32    `json:"vector"`
+	K      int64        `json:"k"`
+	Boost  *query.Boost `json:"boost,omitempty"`
+}
+
+func (r *SearchRequest) SetKNN(field string, vector []float32, k int64) {
+	r.KNN = &KNNRequest{
+		Field:  field,
+		Vector: vector,
+		K:      k,
+	}
+}
+
+func (r *SearchRequest) SetKNNBoost(boost float64) {
+	b := query.Boost(boost)
+	r.KNN.Boost = &b
 }
 
 // UnmarshalJSON deserializes a JSON representation of
@@ -79,6 +80,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Score            string            `json:"score"`
 		SearchAfter      []string          `json:"search_after"`
 		SearchBefore     []string          `json:"search_before"`
+		KNN              *KNNRequest       `json:"knn"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -119,6 +121,8 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	if r.From < 0 {
 		r.From = 0
 	}
+
+	r.KNN = temp.KNN
 
 	return nil
 
