@@ -25,20 +25,6 @@ import (
 	"github.com/blevesearch/bleve/v2/util"
 )
 
-// Default Similarity value for vector fields
-const SimilarityDefaultVal = "l2_norm"
-
-// Set of Valid Similarity values for vector fields
-var SimilarityValidVals = map[string]struct{}{
-	"l2_norm":     {},
-	// dotProduct(vecA, vecB) = vecA . vecB = |vecA| * |vecB| * cos(theta);
-	//  where, theta is the angle between vecA and vecB
-	// If vecA and vecB are normalized (unit magnitude), then
-	// vecA . vecB = cos(theta), which is the cosine similarity.
-	// Thus, we don't need a separate similarity type for cosine similarity
-	"dot_product": {},
-}
-
 func NewVectorFieldMapping() *FieldMapping {
 	return &FieldMapping{
 		Type:         "vector",
@@ -101,7 +87,7 @@ func validateVectorField(field *FieldMapping) error {
 	}
 
 	if field.Similarity == "" {
-		field.Similarity = SimilarityDefaultVal
+		field.Similarity = util.DefaultSimilarityMetric
 	}
 
 	// following fields are not applicable for vector
@@ -112,10 +98,10 @@ func validateVectorField(field *FieldMapping) error {
 	field.DocValues = false
 	field.SkipFreqNorm = true
 
-	if _, ok := SimilarityValidVals[field.Similarity]; !ok {
-		return fmt.Errorf("invalid similarity value: '%s', "+
-			"valid values are: %+v", field.Similarity,
-			reflect.ValueOf(SimilarityValidVals).MapKeys())
+	if _, ok := util.SupportedSimilarityMetrics[field.Similarity]; !ok {
+		return fmt.Errorf("invalid similarity metric: '%s', "+
+			"valid metrics are: %+v", field.Similarity,
+			reflect.ValueOf(util.SupportedSimilarityMetrics).MapKeys())
 	}
 
 	return nil

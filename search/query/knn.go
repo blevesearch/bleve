@@ -23,6 +23,7 @@ import (
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -62,9 +63,9 @@ func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
 	m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 
 	fieldMapping := m.FieldMappingForPath(q.VectorField)
-	similarityMetric := mapping.SimilarityDefaultVal
-	if fieldMapping.Similarity != "" {
-		similarityMetric = fieldMapping.Similarity
+	similarityMetric := fieldMapping.Similarity
+	if similarityMetric == "" {
+		similarityMetric = util.DefaultSimilarityMetric
 	}
 
 	return searcher.NewKNNSearcher(ctx, i, m, options, q.VectorField,
