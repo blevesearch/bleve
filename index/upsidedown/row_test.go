@@ -380,3 +380,22 @@ func TestVisitBackIndexRow(t *testing.T) {
 		t.Errorf("expected visitor to see these but did not %v", expected)
 	}
 }
+
+func FuzzParseFromKeyValue(f *testing.F) {
+
+	f.Add([]byte{'f', 0, 0}, []byte{'n', 'a', 'm', 'e', ByteSeparator})
+	f.Add([]byte{'f', 1, 0}, []byte{'d', 'e', 's', 'c', ByteSeparator})
+	f.Add([]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'}, []byte{3, 195, 235, 163, 130, 4})
+	f.Add([]byte{'t', 0, 0, 'b', 'e', 'e', 'r', ByteSeparator, 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'}, []byte{168, 202, 1, 195, 235, 163, 130, 4, 255, 1, 1, 3, 11, 1, 0, 0, 150, 17, 23, 31, 2, 1, 2, 0, 3, 43, 51, 3, 3, 4, 5})
+	f.Add([]byte{'b', 'b', 'u', 'd', 'w', 'e', 'i', 's', 'e', 'r'}, []byte{10, 8, 8, 0, 18, 4, 'b', 'e', 'e', 'r', 10, 8, 8, 1, 18, 4, 'b', 'e', 'a', 't', 18, 2, 8, 3, 18, 2, 8, 4, 18, 2, 8, 5})
+
+	f.Fuzz(func(t *testing.T, key []byte, value []byte) {
+
+		ParseFromKeyValue(key, value)
+	})
+}
+
+func TestParseFromKeyValue(t *testing.T) {
+
+	ParseFromKeyValue([]byte("d"), []byte("0"))
+}

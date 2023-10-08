@@ -118,3 +118,15 @@ func TestHaversinDistance(t *testing.T) {
 		}
 	}
 }
+
+func FuzzParseDistance(f *testing.F) {
+
+	f.Add("5mi")
+	f.Add("3")
+	f.Add("3m")
+	f.Add("5km")
+
+	f.Fuzz(func(t *testing.T, input string) {
+		ParseDistance(input)
+	})
+}

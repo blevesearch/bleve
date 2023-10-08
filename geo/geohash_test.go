@@ -62,3 +62,14 @@ func TestEncodeGeoHash(t *testing.T) {
 		}
 	}
 }
+
+func FuzzDecodeGeoHash(f *testing.F) {
+
+	f.Add("d3hn3")
+	f.Add("u4pruy")
+	f.Add("u4pruydqqvj")
+
+	f.Fuzz(func(t *testing.T, input string) {
+		DecodeGeoHash(input)
+	})
+}

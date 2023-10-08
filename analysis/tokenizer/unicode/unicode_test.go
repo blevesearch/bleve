@@ -200,3 +200,14 @@ func TestConvertType(t *testing.T) {
 		}
 	}
 }
+func FuzzTokenize(f *testing.F) {
+
+	f.Add([]byte("Hello World"))
+	f.Add([]byte("こんにちは世界"))
+	f.Add([]byte("age 25"))
+
+	f.Fuzz(func(t *testing.T, input []byte) {
+		tokenizer := NewUnicodeTokenizer()
+		tokenizer.Tokenize(input)
+	})
+}

@@ -948,3 +948,16 @@ func BenchmarkLexer(b *testing.B) {
 	}
 
 }
+
+func FuzzParseQuerySyntax(f *testing.F) {
+
+	f.Add("127.0.0.1")
+	f.Add(`"test phrase 1"`)
+	f.Add("field:t+est")
+	f.Add(`field3:"test phrase 2"`)
+	f.Add(`+field6:test3 -field7:test4 field8:test5`)
+
+	f.Fuzz(func(t *testing.T, input string) {
+		parseQuerySyntax(input)
+	})
+}
