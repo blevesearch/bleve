@@ -84,7 +84,10 @@ func (q *MatchPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
 	}
 
-	tokens := analyzer.Analyze([]byte(q.MatchPhrase))
+	tokens, err := analysis.AnalyzeForTokens(analyzer, []byte(q.MatchPhrase))
+	if err != nil {
+		fmt.Printf("(*MatchQuery) Searcher: analysis err:%+v\n", err)
+	}
 	if len(tokens) > 0 {
 		phrase := tokenStreamToPhrase(tokens)
 		phraseQuery := NewMultiPhraseQuery(phrase, field)

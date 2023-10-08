@@ -74,7 +74,7 @@ func (n *IPField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return n.frequencies
 }
 
-func (b *IPField) Analyze() {
+func (b *IPField) Analyze() error {
 
 	tokens := analysis.TokenStream{
 		&analysis.Token{
@@ -87,6 +87,7 @@ func (b *IPField) Analyze() {
 	}
 	b.length = 1
 	b.frequencies = analysis.TokenFrequency(tokens, b.arrayPositions, b.options)
+	return nil
 }
 
 func (b *IPField) Value() []byte {

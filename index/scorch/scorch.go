@@ -370,6 +370,12 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	}()
 
 	resultChan := make(chan index.Document, len(batch.IndexOps))
+	// docIDs of failed doc
+	type failedDoc struct {
+		id  string
+		err error
+	}
+	failedDocs := make(chan *failedDoc, len(batch.IndexOps))
 
 	var numUpdates uint64
 	var numDeletes uint64
@@ -391,32 +397,68 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 
 	if numUpdates > 0 {
 		go func() {
+			var wg sync.WaitGroup
 			for k := range batch.IndexOps {
 				doc := batch.IndexOps[k]
 				if doc != nil {
 					// put the work on the queue
+					wg.Add(1)
 					s.analysisQueue.Queue(func() {
-						analyze(doc, s.setSpatialAnalyzerPlugin)
+						defer wg.Done()
+						errAnalyze := analyze(doc, s.setSpatialAnalyzerPlugin)
+						if errAnalyze != nil {
+							failedDocs <- &failedDoc{id: k, err: errAnalyze}
+							return
+						}
 						resultChan <- doc
 					})
 				}
 			}
+			wg.Wait()
+			close(resultChan)
+			close(failedDocs)
 		}()
+	} else {
+		close(resultChan)
+		close(failedDocs)
 	}
 
-	// wait for analysis result
+	// # Setup routines to handle analysis results and failed docs
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// handle analysis result
 	analysisResults := make([]index.Document, int(numUpdates))
-	var itemsDeQueued uint64
+	analysisResults = analysisResults[:0]
 	var totalAnalysisSize int
-	for itemsDeQueued < numUpdates {
-		result := <-resultChan
-		resultSize := result.Size()
-		atomic.AddUint64(&s.iStats.analysisBytesAdded, uint64(resultSize))
-		totalAnalysisSize += resultSize
-		analysisResults[itemsDeQueued] = result
-		itemsDeQueued++
+	go func() {
+		defer wg.Done()
+
+		for result := range resultChan {
+			resultSize := result.Size()
+			atomic.AddUint64(&s.iStats.analysisBytesAdded, uint64(resultSize))
+			totalAnalysisSize += resultSize
+			analysisResults = append(analysisResults, result)
+		}
+	}()
+
+	// handle failed docs
+	failedResults := make([]*failedDoc, 0, len(batch.IndexOps))
+	failedResults = failedResults[:0]
+	go func() {
+		defer wg.Done()
+		for failedDoc := range failedDocs {
+			failedResults = append(failedResults, failedDoc)
+		}
+	}()
+
+	wg.Wait()
+
+	// todo: change the interface of bleve_index_api.Index to return failedDocs
+	for _, failedDoc := range failedResults {
+		fmt.Println("failed doc:", failedDoc.id, failedDoc.err)
 	}
-	close(resultChan)
+
 	defer atomic.AddUint64(&s.iStats.analysisBytesRemoved, uint64(totalAnalysisSize))
 
 	atomic.AddUint64(&s.stats.TotAnalysisTime, uint64(time.Since(start)))
@@ -658,14 +700,19 @@ func (s *Scorch) setSpatialAnalyzerPlugin(f index.Field) {
 	}
 }
 
-func analyze(d index.Document, fn customAnalyzerPluginInitFunc) {
-	d.VisitFields(func(field index.Field) {
+func analyze(d index.Document, fn customAnalyzerPluginInitFunc) error {
+	var analyzeErr error
+	d.VisitFieldsAdv(func(field index.Field) bool {
 		if field.Options().IsIndexed() {
 			if fn != nil {
 				fn(field)
 			}
 
-			field.Analyze()
+			err := field.Analyze()
+			if err != nil {
+				analyzeErr = err
+				return true // stop visiting further fields
+			}
 
 			if d.HasComposite() && field.Name() != "_id" {
 				// see if any of the composite fields need this
@@ -674,7 +721,11 @@ func analyze(d index.Document, fn customAnalyzerPluginInitFunc) {
 				})
 			}
 		}
+
+		return false
 	})
+
+	return analyzeErr
 }
 
 func (s *Scorch) AddEligibleForRemoval(epoch uint64) {

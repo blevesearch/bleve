@@ -423,7 +423,13 @@ func (im *IndexMappingImpl) AnalyzeText(analyzerName string, text []byte) (analy
 	if err != nil {
 		return nil, err
 	}
-	return analyzer.Analyze(text), nil
+
+	tokens, err := analysis.AnalyzeForTokens(analyzer, text)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
 }
 
 // FieldAnalyzer returns the name of the analyzer used on a field.
