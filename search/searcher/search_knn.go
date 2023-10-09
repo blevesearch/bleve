@@ -96,7 +96,6 @@ func (s *KNNSearcher) Min() int {
 }
 
 func (s *KNNSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch, error) {
-
 	knnMatch, err := s.vectorReader.Next(s.vd.Reset())
 	if err != nil {
 		return nil, err
