@@ -112,7 +112,7 @@ func GetTokensAnalyzerHook(name string) (TokensAnalyzerHook, error) {
 // -----------------------------------------------------------------------------
 // Hook to Analyzer adapter
 
-func HookTokensAnalyzerBuild(name string, config map[string]interface{}, 
+func HookTokensAnalyzerBuild(name string, config map[string]interface{},
 	cache *Cache) (interface{}, error) {
 	_, err := GetTokensAnalyzerHook(name)
 	if err != nil {
