@@ -86,7 +86,7 @@ func (q *MatchPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 
 	tokens, err := analysis.AnalyzeForTokens(analyzer, []byte(q.MatchPhrase))
 	if err != nil {
-		fmt.Printf("(*MatchQuery) Searcher: analysis err:%+v\n", err)
+		return nil, fmt.Errorf("error analyzing input: %v", err)
 	}
 	if len(tokens) > 0 {
 		phrase := tokenStreamToPhrase(tokens)
