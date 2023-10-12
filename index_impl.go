@@ -496,11 +496,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey,
 		search.GeoBufferPoolCallbackFunc(getBufferPool))
 
-	// Using a disjunction query to get union of results from KNN query
-	// and the original query
-	searchQuery := disjunctQueryWithKNN(req)
-
-	searcher, err := searchQuery.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
+	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
 		IncludeTermVectors: req.IncludeLocations || req.Highlight != nil,
 		Score:              req.Score,

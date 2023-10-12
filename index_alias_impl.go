@@ -468,6 +468,10 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 		req.SearchBefore = nil
 	}
 
+	// Using a disjunction query to get union of results from KNN query
+	// and the original query
+	req.Query = disjunctQueryWithKNN(req)
+
 	// run search on each index in separate go routine
 	var waitGroup sync.WaitGroup
 

@@ -15,7 +15,6 @@
 package bleve
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -382,12 +381,12 @@ func (iem IndexErrMap) MarshalJSON() ([]byte, error) {
 	for k, v := range iem {
 		tmp[k] = v.Error()
 	}
-	return json.Marshal(tmp)
+	return util.MarshalJSON(tmp)
 }
 
 func (iem IndexErrMap) UnmarshalJSON(data []byte) error {
 	var tmp map[string]string
-	err := json.Unmarshal(data, &tmp)
+	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
 		return err
 	}
