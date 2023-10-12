@@ -124,15 +124,6 @@ func (d *Document) VisitFields(visitor index.FieldVisitor) {
 	}
 }
 
-func (d *Document) VisitFieldsAdv(visitor index.FieldVisitorAdv) {
-	for _, f := range d.Fields {
-		stop := visitor(f)
-		if stop {
-			break
-		}
-	}
-}
-
 func (d *Document) VisitComposite(visitor index.CompositeFieldVisitor) {
 	for _, f := range d.CompositeFields {
 		visitor(f)
