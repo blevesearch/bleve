@@ -127,3 +127,36 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	return nil
 
 }
+
+// -----------------------------------------------------------------------------
+
+func copySearchRequest(req *SearchRequest) *SearchRequest {
+	rv := SearchRequest{
+		Query:            req.Query,
+		Size:             req.Size + req.From,
+		From:             0,
+		Highlight:        req.Highlight,
+		Fields:           req.Fields,
+		Facets:           req.Facets,
+		Explain:          req.Explain,
+		Sort:             req.Sort.Copy(),
+		IncludeLocations: req.IncludeLocations,
+		Score:            req.Score,
+		SearchAfter:      req.SearchAfter,
+		SearchBefore:     req.SearchBefore,
+		KNN:              req.KNN,
+	}
+	return &rv
+
+}
+
+func disjunctQueryWithKNN(req *SearchRequest) query.Query {
+	if req.KNN != nil {
+		knnQuery := query.NewKNNQuery(req.KNN.Vector)
+		knnQuery.SetFieldVal(req.KNN.Field)
+		knnQuery.SetK(req.KNN.K)
+		knnQuery.SetBoost(req.KNN.Boost.Value())
+		return query.NewDisjunctionQuery([]query.Query{req.Query, knnQuery})
+	}
+	return req.Query
+}
