@@ -39,7 +39,7 @@ type SearchRequest struct {
 	SearchAfter      []string          `json:"search_after"`
 	SearchBefore     []string          `json:"search_before"`
 
-	KNN *KNNRequest `json:"knn"`
+	KNN []*KNNRequest `json:"knn"`
 
 	sortFunc func(sort.Interface)
 }
@@ -49,19 +49,6 @@ type KNNRequest struct {
 	Vector []float32    `json:"vector"`
 	K      int64        `json:"k"`
 	Boost  *query.Boost `json:"boost,omitempty"`
-}
-
-func (r *SearchRequest) SetKNN(field string, vector []float32, k int64) {
-	r.KNN = &KNNRequest{
-		Field:  field,
-		Vector: vector,
-		K:      k,
-	}
-}
-
-func (r *SearchRequest) SetKNNBoost(boost float64) {
-	b := query.Boost(boost)
-	r.KNN.Boost = &b
 }
 
 // UnmarshalJSON deserializes a JSON representation of
@@ -80,7 +67,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Score            string            `json:"score"`
 		SearchAfter      []string          `json:"search_after"`
 		SearchBefore     []string          `json:"search_before"`
-		KNN              *KNNRequest       `json:"knn"`
+		KNN              []*KNNRequest     `json:"knn"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -151,12 +138,18 @@ func copySearchRequest(req *SearchRequest) *SearchRequest {
 }
 
 func disjunctQueryWithKNN(req *SearchRequest) query.Query {
-	if req.KNN != nil {
-		knnQuery := query.NewKNNQuery(req.KNN.Vector)
-		knnQuery.SetFieldVal(req.KNN.Field)
-		knnQuery.SetK(req.KNN.K)
-		knnQuery.SetBoost(req.KNN.Boost.Value())
-		return query.NewDisjunctionQuery([]query.Query{req.Query, knnQuery})
+	if len(req.KNN) > 0 {
+		disjuncts := []query.Query{req.Query}
+		for _, knn := range req.KNN {
+			if knn != nil {
+				knnQuery := query.NewKNNQuery(knn.Vector)
+				knnQuery.SetFieldVal(knn.Field)
+				knnQuery.SetK(knn.K)
+				knnQuery.SetBoost(knn.Boost.Value())
+				disjuncts = append(disjuncts, knnQuery)
+			}
+		}
+		return query.NewDisjunctionQuery(disjuncts)
 	}
 	return req.Query
 }
