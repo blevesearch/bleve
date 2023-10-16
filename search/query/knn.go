@@ -61,7 +61,6 @@ func (q *KNNQuery) Boost() float64 {
 
 func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
 	m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-
 	fieldMapping := m.FieldMappingForPath(q.VectorField)
 	similarityMetric := fieldMapping.Similarity
 	if similarityMetric == "" {
