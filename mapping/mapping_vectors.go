@@ -83,7 +83,7 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 func validateVectorField(field *FieldMapping) error {
 	if field.Dims <= 0 || field.Dims > 2048 {
 		return fmt.Errorf("invalid vector dimension,"+
-			" value should be in range (%d, %d]", 0, 2048)
+			" value should be in range (%d, %d)", 0, 2048)
 	}
 
 	if field.Similarity == "" {
