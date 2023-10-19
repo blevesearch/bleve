@@ -67,3 +67,13 @@ func (q *QueryStringQuery) Validate() error {
 	}
 	return nil
 }
+func (q *QueryStringQuery) SynonymSourceName(m mapping.IndexMapping) []string {
+	newQuery, err := parseQuerySyntax(q.Query)
+	if err != nil {
+		return nil
+	}
+	if newQuery, ok := newQuery.(SynonymSearchEnabledQuery); ok {
+		return newQuery.SynonymSourceName(m)
+	}
+	return nil
+}

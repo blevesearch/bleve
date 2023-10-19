@@ -69,6 +69,8 @@ type FieldMapping struct {
 	// the processing of freq/norm details when the default score based relevancy
 	// isn't needed.
 	SkipFreqNorm bool `json:"skip_freq_norm,omitempty"`
+
+	SynonymSource string `json:"synonym_source,omitempty"`
 }
 
 // NewTextFieldMapping returns a default field mapping for text
@@ -445,6 +447,11 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 			}
 		case "skip_freq_norm":
 			err := util.UnmarshalJSON(v, &fm.SkipFreqNorm)
+			if err != nil {
+				return err
+			}
+		case "synonym_source":
+			err := json.Unmarshal(v, &fm.SynonymSource)
 			if err != nil {
 				return err
 			}

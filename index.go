@@ -16,6 +16,8 @@ package bleve
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
 
@@ -50,6 +52,45 @@ func (b *Batch) Index(id string, data interface{}) error {
 	err := b.index.Mapping().MapDocument(doc, data)
 	if err != nil {
 		return err
+	}
+	b.internal.Update(doc)
+
+	b.lastDocSize = uint64(doc.Size() +
+		len(id) + size.SizeOfString) // overhead from internal
+	b.totalSize += b.lastDocSize
+
+	return nil
+}
+
+func (b *Batch) IndexSynonym(collection string, id string, data []byte) error {
+	if id == "" {
+		return ErrorEmptyID
+	}
+	if collection == "" {
+		return fmt.Errorf("collection cannot be empty")
+	}
+	var syn index.SynonymDefinition
+	err := json.Unmarshal(data, &syn)
+	if err != nil {
+		return fmt.Errorf("error parsing synonym definition: %v", err)
+	}
+
+	err = syn.Validate()
+	if err != nil {
+		return fmt.Errorf("error validating synonym definition: %v", err)
+	}
+
+	// the list of synonym sources in the index mapping
+	analyzers := b.index.Mapping().AnalyzersForSynonymCollection(collection)
+	if analyzers == nil {
+		return fmt.Errorf("no synonym sources defined for collection: %s", collection)
+	}
+
+	// Create a new synonym document
+	doc := document.NewDocument(id)
+	for analyzerName, analyzer := range analyzers {
+		fieldName := index.CreateSynonymMetadataKey(collection, analyzerName)
+		doc.AddField(document.NewSynonymField(fieldName, &syn, analyzer, collection))
 	}
 	b.internal.Update(doc)
 
@@ -211,6 +252,7 @@ type Index interface {
 	// requests. See Index interface documentation for details about mapping
 	// rules.
 	Index(id string, data interface{}) error
+	IndexSynonym(collection string, id string, data []byte) error
 	Delete(id string) error
 
 	NewBatch() *Batch
@@ -300,6 +342,7 @@ func OpenUsing(path string, runtimeConfig map[string]interface{}) (Index, error)
 // indexed only once.
 type Builder interface {
 	Index(id string, data interface{}) error
+	IndexSynonym(collection string, id string, data []byte) error
 	Close() error
 }
 

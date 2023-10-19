@@ -30,6 +30,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search/query"
 	"github.com/blevesearch/bleve/v2/size"
 	"github.com/blevesearch/bleve/v2/util"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 const defaultDateTimeParser = optional.Name
@@ -540,14 +541,15 @@ func (ss *SearchStatus) Merge(other *SearchStatus) {
 // Took - The time taken to execute the search.
 // Facets - The facet results for the search.
 type SearchResult struct {
-	Status   *SearchStatus                  `json:"status"`
-	Request  *SearchRequest                 `json:"request"`
-	Hits     search.DocumentMatchCollection `json:"hits"`
-	Total    uint64                         `json:"total_hits"`
-	Cost     uint64                         `json:"cost"`
-	MaxScore float64                        `json:"max_score"`
-	Took     time.Duration                  `json:"took"`
-	Facets   search.FacetResults            `json:"facets"`
+	Status          *SearchStatus                       `json:"status"`
+	Request         *SearchRequest                      `json:"request"`
+	Hits            search.DocumentMatchCollection      `json:"hits"`
+	Total           uint64                              `json:"total_hits"`
+	Cost            uint64                              `json:"cost"`
+	MaxScore        float64                             `json:"max_score"`
+	Took            time.Duration                       `json:"took"`
+	Facets          search.FacetResults                 `json:"facets"`
+	SynonymMetadata map[string][]*index.SynonymMetadata `json:"synonym_metadata,omitempty"`
 }
 
 func (sr *SearchResult) Size() int {
@@ -618,6 +620,14 @@ func (sr *SearchResult) String() string {
 // Merge will merge together multiple SearchResults during a MultiSearch
 func (sr *SearchResult) Merge(other *SearchResult) {
 	sr.Status.Merge(other.Status)
+	if other.SynonymMetadata != nil {
+		if sr.SynonymMetadata == nil {
+			sr.SynonymMetadata = make(map[string][]*index.SynonymMetadata)
+		}
+		for k, v := range other.SynonymMetadata {
+			sr.SynonymMetadata[k] = append(sr.SynonymMetadata[k], v...)
+		}
+	}
 	sr.Hits = append(sr.Hits, other.Hits...)
 	sr.Total += other.Total
 	sr.Cost += other.Cost

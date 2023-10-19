@@ -77,6 +77,16 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 				return err
 			}
 		}
+		if field.SynonymSource != "" {
+			synSrc, err := cache.SynonymSourceNamed(field.SynonymSource)
+			if err != nil {
+				return err
+			}
+			_, err = cache.AnalyzerNamed(synSrc.Analyzer())
+			if err != nil {
+				return err
+			}
+		}
 		switch field.Type {
 		case "text", "datetime", "number", "boolean", "geopoint", "geoshape", "IP":
 		default:
@@ -93,6 +103,14 @@ func (dm *DocumentMapping) analyzerNameForPath(path string) string {
 	field := dm.fieldDescribedByPath(path)
 	if field != nil {
 		return field.Analyzer
+	}
+	return ""
+}
+
+func (dm *DocumentMapping) synonymSourceNameForPath(path string) string {
+	field := dm.fieldDescribedByPath(path)
+	if field != nil {
+		return field.SynonymSource
 	}
 	return ""
 }

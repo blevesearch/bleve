@@ -58,6 +58,11 @@ type FieldableQuery interface {
 	Field() string
 }
 
+type SynonymSearchEnabledQuery interface {
+	Query
+	SynonymSourceName(mapping.IndexMapping) []string
+}
+
 // A ValidatableQuery represents a Query which can be validated
 // prior to execution.
 type ValidatableQuery interface {

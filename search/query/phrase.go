@@ -26,10 +26,11 @@ import (
 )
 
 type PhraseQuery struct {
-	Terms     []string `json:"terms"`
-	Field     string   `json:"field,omitempty"`
-	BoostVal  *Boost   `json:"boost,omitempty"`
-	Fuzziness int      `json:"fuzziness"`
+	Terms         []string `json:"terms"`
+	FieldVal      string   `json:"field,omitempty"`
+	BoostVal      *Boost   `json:"boost,omitempty"`
+	Fuzziness     int      `json:"fuzziness"`
+	SynonymSource string   `json:"synonym_source,omitempty"`
 }
 
 // NewPhraseQuery creates a new Query for finding
@@ -40,14 +41,22 @@ type PhraseQuery struct {
 // IncludeTermVectors set to true.
 func NewPhraseQuery(terms []string, field string) *PhraseQuery {
 	return &PhraseQuery{
-		Terms: terms,
-		Field: field,
+		Terms:    terms,
+		FieldVal: field,
 	}
 }
 
 func (q *PhraseQuery) SetBoost(b float64) {
 	boost := Boost(b)
 	q.BoostVal = &boost
+}
+
+func (q *PhraseQuery) SetField(f string) {
+	q.FieldVal = f
+}
+
+func (q *PhraseQuery) Field() string {
+	return q.FieldVal
 }
 
 func (q *PhraseQuery) SetFuzziness(f int) {
@@ -59,7 +68,12 @@ func (q *PhraseQuery) Boost() float64 {
 }
 
 func (q *PhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-	return searcher.NewPhraseSearcher(ctx, i, q.Terms, q.Fuzziness, q.Field, q.BoostVal.Value(), options)
+	field := q.FieldVal
+	if q.FieldVal == "" {
+		field = m.DefaultSearchField()
+	}
+
+	return searcher.NewPhraseSearcher(ctx, i, q.Terms, q.Fuzziness, field, q.BoostVal.Value(), options)
 }
 
 func (q *PhraseQuery) Validate() error {
@@ -77,7 +91,7 @@ func (q *PhraseQuery) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	q.Terms = tmp.Terms
-	q.Field = tmp.Field
+	q.FieldVal = tmp.FieldVal
 	q.BoostVal = tmp.BoostVal
 	q.Fuzziness = tmp.Fuzziness
 	return nil

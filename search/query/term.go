@@ -16,7 +16,9 @@ package query
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
@@ -24,9 +26,10 @@ import (
 )
 
 type TermQuery struct {
-	Term     string `json:"term"`
-	FieldVal string `json:"field,omitempty"`
-	BoostVal *Boost `json:"boost,omitempty"`
+	Term          string `json:"term"`
+	FieldVal      string `json:"field,omitempty"`
+	BoostVal      *Boost `json:"boost,omitempty"`
+	SynonymSource string `json:"synonym_source,omitempty"`
 }
 
 // NewTermQuery creates a new Query for finding an
@@ -54,10 +57,50 @@ func (q *TermQuery) Field() string {
 	return q.FieldVal
 }
 
+func (q *TermQuery) SynonymSourceName(m mapping.IndexMapping) []string {
+	synonymSourceName := ""
+	if q.SynonymSource != "" {
+		synonymSourceName = q.SynonymSource
+	} else {
+		field := q.FieldVal
+		if q.FieldVal == "" {
+			field = m.DefaultSearchField()
+		}
+		synonymSourceName = m.SynonymSourceNameForPath(field)
+	}
+	if synonymSourceName != "" {
+		return []string{synonymSourceName}
+	}
+	return []string{}
+}
+
 func (q *TermQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	field := q.FieldVal
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
+	}
+
+	synonymSourceName := q.SynonymSourceName(m)
+	if len(synonymSourceName) > 0 {
+		// Switch to Synonym Search
+		synonymSource := m.SynonymSourceNamed(synonymSourceName[0])
+		if synonymSource == nil {
+			return nil, fmt.Errorf("no synonym source named '%s' registered", synonymSourceName)
+		}
+		// there is no base analyzer in term queries, so the created analyzer will only be a
+		// synonym filter
+		analyzer, err := synonym.AddSynonymFilter(ctx, nil, i, synonymSource.MetadataKey(), synonymSourceName[0], 0, 0)
+		if err != nil {
+			return nil, err
+		}
+
+		tokens := analyzer.Analyze([]byte(q.Term))
+		if len(tokens) > 0 {
+			return searcher.NewSynonymSearcher(ctx, i, tokens, field, q.BoostVal.Value(), 0, 0, 0, options)
+		}
+		noneQuery := NewMatchNoneQuery()
+		return noneQuery.Searcher(ctx, i, m, options)
+
 	}
 	return searcher.NewTermSearcher(ctx, i, q.Term, field, q.BoostVal.Value(), options)
 }

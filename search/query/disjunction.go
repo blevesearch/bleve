@@ -60,6 +60,16 @@ func (q *DisjunctionQuery) SetMin(m float64) {
 	q.Min = m
 }
 
+func (q *DisjunctionQuery) SynonymSourceName(m mapping.IndexMapping) []string {
+	rv := []string{}
+	for _, disjunct := range q.Disjuncts {
+		if disjunct, ok := disjunct.(SynonymSearchEnabledQuery); ok {
+			rv = append(rv, disjunct.SynonymSourceName(m)...)
+		}
+	}
+	return rv
+}
+
 func (q *DisjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping,
 	options search.SearcherOptions) (search.Searcher, error) {
 	ss := make([]search.Searcher, 0, len(q.Disjuncts))

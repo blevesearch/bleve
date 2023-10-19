@@ -106,6 +106,12 @@ const (
 const SearchIncrementalCostKey = "_search_incremental_cost_key"
 const QueryTypeKey = "_query_type_key"
 const FuzzyMatchPhraseKey = "_fuzzy_match_phrase_key"
+const SynonymScorerKey = "_synonym_scorer_key"
+
+type SynonymScorerCallbackFn func(*SearchContext, []*DocumentMatch, SearcherOptions) *DocumentMatch
+
+const ScatterSynonymMetadataKey = "_scatter_synonym_metadata_key"
+const GatherSynonymMetadataKey = "_gather_synonym_metadata_key"
 
 func RecordSearchCost(ctx context.Context,
 	msg SearchIncrementalCostCallbackMsg, bytes uint64) {

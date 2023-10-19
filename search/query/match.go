@@ -18,20 +18,23 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/blevesearch/bleve/v2/analysis/token/synonym"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/searcher"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
 type MatchQuery struct {
-	Match     string             `json:"match"`
-	FieldVal  string             `json:"field,omitempty"`
-	Analyzer  string             `json:"analyzer,omitempty"`
-	BoostVal  *Boost             `json:"boost,omitempty"`
-	Prefix    int                `json:"prefix_length"`
-	Fuzziness int                `json:"fuzziness"`
-	Operator  MatchQueryOperator `json:"operator,omitempty"`
+	Match         string             `json:"match"`
+	FieldVal      string             `json:"field,omitempty"`
+	Analyzer      string             `json:"analyzer,omitempty"`
+	BoostVal      *Boost             `json:"boost,omitempty"`
+	Prefix        int                `json:"prefix_length"`
+	Fuzziness     int                `json:"fuzziness"`
+	Operator      MatchQueryOperator `json:"operator,omitempty"`
+	SynonymSource string             `json:"synonym_source,omitempty"`
 }
 
 type MatchQueryOperator int
@@ -111,6 +114,27 @@ func (q *MatchQuery) SetPrefix(p int) {
 	q.Prefix = p
 }
 
+func (q *MatchQuery) SynonymSourceName(m mapping.IndexMapping) []string {
+	synonymSourceName := ""
+	if q.SynonymSource != "" {
+		synonymSourceName = q.SynonymSource
+	} else {
+		field := q.FieldVal
+		if q.FieldVal == "" {
+			field = m.DefaultSearchField()
+		}
+		synonymSourceName = m.SynonymSourceNameForPath(field)
+	}
+	if synonymSourceName != "" {
+		return []string{synonymSourceName}
+	}
+	return []string{}
+}
+
+func (q *MatchQuery) SetSynonymSource(s string) {
+	q.SynonymSource = s
+}
+
 func (q *MatchQuery) SetOperator(operator MatchQueryOperator) {
 	q.Operator = operator
 }
@@ -134,6 +158,37 @@ func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mappin
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
 	}
 
+	// short circuit fuzziness value validation
+	if q.Fuzziness > searcher.MaxFuzziness {
+		return nil, fmt.Errorf("fuzziness exceeds max (%d)", searcher.MaxFuzziness)
+	}
+	if q.Fuzziness < 0 {
+		return nil, fmt.Errorf("invalid fuzziness, negative")
+	}
+
+	synonymSourceName := q.SynonymSourceName(m)
+	if len(synonymSourceName) > 0 {
+		// Switch to Synonym Search
+		synonymSource := m.SynonymSourceNamed(synonymSourceName[0])
+		if synonymSource == nil {
+			return nil, fmt.Errorf("no synonym source named '%s' registered", synonymSourceName)
+		}
+
+		analyzer, err := synonym.AddSynonymFilter(ctx, analyzer, i, synonymSource.MetadataKey(), synonymSourceName[0], q.Fuzziness, q.Prefix)
+		if err != nil {
+			return nil, err
+		}
+
+		tokens := analyzer.Analyze([]byte(q.Match))
+		if len(tokens) > 0 {
+			return searcher.NewSynonymSearcher(ctx, i, tokens, field, q.BoostVal.Value(), q.Fuzziness, q.Prefix, int(q.Operator), options)
+		}
+
+		noneQuery := NewMatchNoneQuery()
+		return noneQuery.Searcher(ctx, i, m, options)
+	}
+
+	// Default to non-synonym search
 	tokens := analyzer.Analyze([]byte(q.Match))
 	if len(tokens) > 0 {
 

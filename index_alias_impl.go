@@ -76,6 +76,21 @@ func (i *indexAliasImpl) Index(id string, data interface{}) error {
 	return i.indexes[0].Index(id, data)
 }
 
+func (i *indexAliasImpl) IndexSynonym(collection string, id string, data []byte) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	err := i.isAliasToSingleIndex()
+	if err != nil {
+		return err
+	}
+	return i.indexes[0].Index(id, data)
+}
+
 func (i *indexAliasImpl) Delete(id string) error {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -279,12 +294,12 @@ func (i *indexAliasImpl) Mapping() mapping.IndexMapping {
 		return nil
 	}
 
-	err := i.isAliasToSingleIndex()
-	if err != nil {
-		return nil
+	for _, index := range i.indexes {
+		if index.Mapping() != nil {
+			return index.Mapping()
+		}
 	}
-
-	return i.indexes[0].Mapping()
+	return nil
 }
 
 func (i *indexAliasImpl) Stats() *IndexStat {

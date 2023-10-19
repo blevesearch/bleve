@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -261,6 +262,48 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 	return
 }
 
+func (i *indexImpl) IndexSynonym(collection string, id string, data []byte) (err error) {
+	if id == "" {
+		return ErrorEmptyID
+	}
+	if collection == "" {
+		return fmt.Errorf("collection cannot be empty")
+	}
+
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+	var syn index.SynonymDefinition
+	err = json.Unmarshal(data, &syn)
+	if err != nil {
+		err = fmt.Errorf("error parsing synonym definition: %v", err)
+		return
+	}
+	err = syn.Validate()
+	if err != nil {
+		err = fmt.Errorf("error validating synonym definition: %v", err)
+		return
+	}
+
+	// the list of synonym sources in the index mapping
+	analyzers := i.m.AnalyzersForSynonymCollection(collection)
+	if analyzers == nil {
+		return fmt.Errorf("no synonym sources defined for collection: %s", collection)
+	}
+
+	// Create a new synonym document
+	doc := document.NewDocument(id)
+	for analyzerName, analyzer := range analyzers {
+		fieldName := index.CreateSynonymMetadataKey(collection, analyzerName)
+		doc.AddField(document.NewSynonymField(fieldName, &syn, analyzer, collection))
+	}
+	err = i.i.Update(doc)
+	return nil
+}
+
 // IndexAdvanced takes a document.Document object
 // skips the mapping and indexes it.
 func (i *indexImpl) IndexAdvanced(doc *document.Document) (err error) {
@@ -444,7 +487,39 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	if !i.open {
 		return nil, ErrorIndexClosed
 	}
-
+	if searchSynMD := ctx.Value(search.GatherSynonymMetadataKey); searchSynMD != nil {
+		if synSources, ok := searchSynMD.([]string); ok {
+			rv := make(map[string][]*index.SynonymMetadata)
+			indexReader, err := i.i.Reader()
+			if err != nil {
+				return nil, fmt.Errorf("error opening index reader %v", err)
+			}
+			defer func() {
+				if cerr := indexReader.Close(); err == nil && cerr != nil {
+					err = cerr
+				}
+			}()
+			for _, src := range synSources {
+				synOb := i.m.SynonymSourceNamed(src)
+				if synOb == nil {
+					return nil, fmt.Errorf("no synonym source named '%s' registered", src)
+				}
+				synonyms, err := indexReader.SynonymMetadata(synOb.MetadataKey())
+				if err != nil {
+					return nil, err
+				}
+				rv[src] = synonyms
+			}
+			return &SearchResult{
+				Status: &SearchStatus{
+					Total:      1,
+					Successful: 1,
+				},
+				Request:         req,
+				SynonymMetadata: rv,
+			}, nil
+		}
+	}
 	var reverseQueryExecution bool
 	if req.SearchBefore != nil {
 		reverseQueryExecution = true

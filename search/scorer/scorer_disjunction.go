@@ -15,6 +15,7 @@
 package scorer
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
@@ -30,20 +31,33 @@ func init() {
 }
 
 type DisjunctionQueryScorer struct {
-	options search.SearcherOptions
+	overrideScorer search.SynonymScorerCallbackFn
+	options        search.SearcherOptions
 }
 
 func (s *DisjunctionQueryScorer) Size() int {
 	return reflectStaticSizeDisjunctionQueryScorer + size.SizeOfPtr
 }
 
-func NewDisjunctionQueryScorer(options search.SearcherOptions) *DisjunctionQueryScorer {
+func NewDisjunctionQueryScorer(ctx context.Context, options search.SearcherOptions) *DisjunctionQueryScorer {
+	if overridingScorer := ctx.Value(search.SynonymScorerKey); overridingScorer != nil {
+		if scorerF, ok := overridingScorer.(search.SynonymScorerCallbackFn); ok {
+			return &DisjunctionQueryScorer{
+				overrideScorer: scorerF,
+				options:        options,
+			}
+		}
+	}
 	return &DisjunctionQueryScorer{
 		options: options,
 	}
 }
 
 func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
+	if s.overrideScorer != nil {
+		return s.overrideScorer(ctx, constituents, s.options)
+	}
+
 	var sum float64
 	var childrenExplanations []*search.Explanation
 	if s.options.Explain {

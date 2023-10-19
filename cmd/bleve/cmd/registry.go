@@ -54,6 +54,9 @@ var registryCmd = &cobra.Command{
 		types, instances = registry.DateTimeParserTypesAndInstances()
 		printType("Date Time Parser", types, instances)
 
+		types, instances = registry.SynonymSourceTypesAndInstances()
+		printType("Synonym Source", types, instances)
+
 		types, instances = registry.KVStoreTypesAndInstances()
 		printType("KV Store", types, instances)
 

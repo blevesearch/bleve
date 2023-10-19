@@ -73,7 +73,7 @@ func newDisjunctionHeapSearcher(ctx context.Context, indexReader index.IndexRead
 		indexReader:   indexReader,
 		searchers:     searchers,
 		numSearchers:  len(searchers),
-		scorer:        scorer.NewDisjunctionQueryScorer(options),
+		scorer:        scorer.NewDisjunctionQueryScorer(ctx, options),
 		min:           int(min),
 		matching:      make([]*search.DocumentMatch, len(searchers)),
 		matchingCurrs: make([]*SearcherCurr, len(searchers)),
