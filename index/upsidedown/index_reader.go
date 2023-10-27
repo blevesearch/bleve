@@ -20,7 +20,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/document"
 	index "github.com/blevesearch/bleve_index_api"
-	"github.com/blevesearch/upsidedown_store_api"
+	store "github.com/blevesearch/upsidedown_store_api"
 )
 
 var reflectStaticSizeIndexReader int
@@ -62,6 +62,10 @@ func (i *IndexReader) FieldDictPrefix(fieldName string, termPrefix []byte) (inde
 
 func (i *IndexReader) DocIDReaderAll() (index.DocIDReader, error) {
 	return newUpsideDownCouchDocIDReader(i)
+}
+
+func (i *IndexReader) SynonymMetadata(field string) ([]*index.SynonymMetadata, error) {
+	return nil, nil
 }
 
 func (i *IndexReader) DocIDReaderOnly(ids []string) (index.DocIDReader, error) {

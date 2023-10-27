@@ -47,6 +47,8 @@ type asynchSegmentResult struct {
 
 	postings segment.PostingsList
 
+	synonymMetadata *index.SynonymMetadata
+
 	err error
 }
 
@@ -210,6 +212,73 @@ func (is *IndexSnapshot) FieldDict(field string) (index.FieldDict, error) {
 	return is.newIndexSnapshotFieldDict(field, func(is segment.TermDictionary) segment.DictionaryIterator {
 		return is.AutomatonIterator(nil, nil, nil)
 	}, false)
+}
+
+func isValid(deleted *roaring.Bitmap, docNums map[uint32]struct{}) bool {
+	if deleted == nil {
+		return true
+	}
+	for docNum := range docNums {
+		if !deleted.Contains(docNum) {
+			return true
+		}
+	}
+	return false
+}
+
+func cleanSynonymMetadata(s *index.SynonymMetadata, b *roaring.Bitmap) {
+	if s == nil {
+		return
+	}
+	for hash, synonyms := range s.HashToSynonyms {
+		// fast path -> if the LHS' DocNums is not in the bitmap, then
+		// set lhsStruct Invalid as true.
+		lhsStruct := s.HashToPhrase[hash]
+		if !isValid(b, lhsStruct.DocNums) {
+			lhsStruct.IsInvalid = true
+			continue
+		}
+		// lhs struct is valid
+		for _, syn := range synonyms {
+			// check all rhs structs now
+			if !isValid(b, syn.DocNums) {
+				syn.IsInvalid = true
+			}
+		}
+	}
+}
+
+func (is *IndexSnapshot) SynonymMetadata(metadataKey string) ([]*index.SynonymMetadata, error) {
+	results := make(chan *asynchSegmentResult)
+	for _, s := range is.segment {
+		go func(s *SegmentSnapshot) {
+			synSeg, ok := s.segment.(segment.SynonymSegment)
+			if !ok {
+				// segment is not a synonym segment so just skip it
+				results <- &asynchSegmentResult{synonymMetadata: nil, err: nil}
+				return
+			}
+			metadata, err := synSeg.SynonymMetadata(metadataKey)
+			cleanSynonymMetadata(metadata, s.Deleted())
+			results <- &asynchSegmentResult{synonymMetadata: metadata, err: err}
+		}(s)
+	}
+	rv := make([]*index.SynonymMetadata, 0, len(is.segment))
+	var err error
+	for count := 0; count < len(is.segment); count++ {
+		asr := <-results
+		if asr.err != nil && err == nil {
+			err = asr.err
+		} else {
+			if asr.synonymMetadata != nil {
+				rv = append(rv, asr.synonymMetadata)
+			}
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return rv, nil
 }
 
 // calculateExclusiveEndFromInclusiveEnd produces the next key

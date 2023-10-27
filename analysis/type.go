@@ -35,6 +35,7 @@ const (
 	Double
 	Boolean
 	IP
+	Synonym
 )
 
 // Token represents one occurrence of a term at a particular location in a
@@ -106,6 +107,30 @@ type DateTimeParser interface {
 	ParseDateTime(string) (time.Time, string, error)
 }
 
+type SynonymSource interface {
+	Collection() string
+	Analyzer() string
+	MetadataKey() string
+}
+
 type ByteArrayConverter interface {
 	Convert([]byte) (interface{}, error)
+}
+
+type ExtendedAnalyzer struct {
+	BaseAnalyzer      Analyzer
+	ExtraTokenFilters []TokenFilter
+}
+
+func (atf *ExtendedAnalyzer) Analyze(input []byte) TokenStream {
+	var output TokenStream
+	if atf.BaseAnalyzer != nil {
+		output = atf.BaseAnalyzer.Analyze(input)
+	} else {
+		output = TokenStream{&Token{Term: input, Position: 1}}
+	}
+	for _, tf := range atf.ExtraTokenFilters {
+		output = tf.Filter(output)
+	}
+	return output
 }

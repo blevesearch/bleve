@@ -198,6 +198,19 @@ func (q *BooleanQuery) Validate() error {
 	}
 	return nil
 }
+func (q *BooleanQuery) SynonymSourceName(m mapping.IndexMapping) []string {
+	rv := []string{}
+	if qm, ok := q.Must.(SynonymSearchEnabledQuery); ok {
+		rv = append(rv, qm.SynonymSourceName(m)...)
+	}
+	if qs, ok := q.Should.(SynonymSearchEnabledQuery); ok {
+		rv = append(rv, qs.SynonymSourceName(m)...)
+	}
+	if qmn, ok := q.MustNot.(SynonymSearchEnabledQuery); ok {
+		rv = append(rv, qmn.SynonymSourceName(m)...)
+	}
+	return rv
+}
 
 func (q *BooleanQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {

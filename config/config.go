@@ -79,6 +79,9 @@ import (
 	_ "github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/nanoseconds"
 	_ "github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/seconds"
 
+	// synonym sources
+	_ "github.com/blevesearch/bleve/v2/analysis/synonym"
+
 	// languages
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/ar"
 	_ "github.com/blevesearch/bleve/v2/analysis/lang/bg"

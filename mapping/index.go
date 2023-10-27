@@ -21,6 +21,7 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/optional"
+	"github.com/blevesearch/bleve/v2/analysis/synonym"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/registry"
 	"github.com/blevesearch/bleve/v2/util"
@@ -34,6 +35,7 @@ const defaultType = "_default"
 const defaultField = "_all"
 const defaultAnalyzer = standard.Name
 const defaultDateTimeParser = optional.Name
+const defaultSynonymSource = synonym.Name
 
 // An IndexMappingImpl controls how objects are placed
 // into an index.
@@ -142,6 +144,16 @@ func (im *IndexMappingImpl) AddCustomDateTimeParser(name string, config map[stri
 		return err
 	}
 	im.CustomAnalysis.DateTimeParsers[name] = config
+	return nil
+}
+
+// AddSynonymSource defines a custom synonym source for use in this mapping
+func (im *IndexMappingImpl) AddSynonymSource(name string, config map[string]interface{}) error {
+	_, err := im.cache.DefineSynonymSource(name, config)
+	if err != nil {
+		return err
+	}
+	im.CustomAnalysis.SynonymSources[name] = config
 	return nil
 }
 
@@ -337,6 +349,14 @@ func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}
 	return nil
 }
 
+func (im *IndexMappingImpl) AnalyzersForSynonymCollection(collection string) map[string]analysis.Analyzer {
+	return im.cache.AnalyzersForSynonymCollection(collection)
+}
+
+func (im *IndexMappingImpl) SynonymCollections() []string {
+	return im.cache.SynonymCollections()
+}
+
 type walkContext struct {
 	doc             *document.Document
 	im              *IndexMappingImpl
@@ -435,4 +455,34 @@ func (im *IndexMappingImpl) FieldAnalyzer(field string) string {
 
 func (im *IndexMappingImpl) DefaultSearchField() string {
 	return im.DefaultField
+}
+
+func (im *IndexMappingImpl) SynonymSourceNameForPath(path string) string {
+	//look for explicit mapping on the field
+	for _, docMapping := range im.TypeMapping {
+		synonymSourceName := docMapping.synonymSourceNameForPath(path)
+		if synonymSourceName != "" {
+			return synonymSourceName
+		}
+	}
+
+	// now try the default mapping
+	pathMapping, _ := im.DefaultMapping.documentMappingForPath(path)
+	if pathMapping != nil {
+		if len(pathMapping.Fields) > 0 {
+			if pathMapping.Fields[0].SynonymSource != "" {
+				return pathMapping.Fields[0].SynonymSource
+			}
+		}
+	}
+	return ""
+}
+
+func (im *IndexMappingImpl) SynonymSourceNamed(name string) analysis.SynonymSource {
+	synonymSource, err := im.cache.SynonymSourceNamed(name)
+	if err != nil {
+		logger.Printf("error using synonym source named: %s", name)
+		return nil
+	}
+	return synonymSource
 }

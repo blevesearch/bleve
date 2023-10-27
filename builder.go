@@ -15,6 +15,7 @@
 package bleve
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/document"
@@ -41,6 +42,40 @@ func (b *builderImpl) Index(id string, data interface{}) error {
 	}
 	err = b.b.Index(doc)
 	return err
+}
+
+func (b *builderImpl) IndexSynonym(collection string, id string, data []byte) error {
+	if id == "" {
+		return ErrorEmptyID
+	}
+	if collection == "" {
+		return fmt.Errorf("collection cannot be empty")
+	}
+	var syn index.SynonymDefinition
+	err := json.Unmarshal(data, &syn)
+	if err != nil {
+		return fmt.Errorf("error parsing synonym definition: %v", err)
+	}
+
+	err = syn.Validate()
+	if err != nil {
+		return fmt.Errorf("error validating synonym definition: %v", err)
+	}
+
+	// the list of synonym sources in the index mapping
+	analyzers := b.m.AnalyzersForSynonymCollection(collection)
+	if analyzers == nil {
+		return fmt.Errorf("no synonym sources defined for collection: %s", collection)
+	}
+
+	// Create a new synonym document
+	doc := document.NewDocument(id)
+	for analyzerName, analyzer := range analyzers {
+		fieldName := index.CreateSynonymMetadataKey(collection, analyzerName)
+		doc.AddField(document.NewSynonymField(fieldName, &syn, analyzer, collection))
+	}
+	b.b.Index(doc)
+	return nil
 }
 
 func (b *builderImpl) Close() error {

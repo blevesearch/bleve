@@ -67,7 +67,7 @@ func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexRea
 		searchers:    searchers,
 		numSearchers: len(searchers),
 		currs:        make([]*search.DocumentMatch, len(searchers)),
-		scorer:       scorer.NewDisjunctionQueryScorer(options),
+		scorer:       scorer.NewDisjunctionQueryScorer(ctx, options),
 		min:          int(min),
 		matching:     make([]*search.DocumentMatch, len(searchers)),
 		matchingIdxs: make([]int, len(searchers)),

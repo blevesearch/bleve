@@ -36,6 +36,7 @@ var tokenMaps = make(TokenMapRegistry, 0)
 var tokenFilters = make(TokenFilterRegistry, 0)
 var analyzers = make(AnalyzerRegistry, 0)
 var dateTimeParsers = make(DateTimeParserRegistry, 0)
+var synonymSources = make(SynonymSourceRegistry, 0)
 
 type Cache struct {
 	CharFilters        *CharFilterCache
@@ -44,6 +45,7 @@ type Cache struct {
 	TokenFilters       *TokenFilterCache
 	Analyzers          *AnalyzerCache
 	DateTimeParsers    *DateTimeParserCache
+	SynonymSources     *SynonymSourceCache
 	FragmentFormatters *FragmentFormatterCache
 	Fragmenters        *FragmenterCache
 	Highlighters       *HighlighterCache
@@ -57,6 +59,7 @@ func NewCache() *Cache {
 		TokenFilters:       NewTokenFilterCache(),
 		Analyzers:          NewAnalyzerCache(),
 		DateTimeParsers:    NewDateTimeParserCache(),
+		SynonymSources:     NewSynonymSourceCache(),
 		FragmentFormatters: NewFragmentFormatterCache(),
 		Fragmenters:        NewFragmenterCache(),
 		Highlighters:       NewHighlighterCache(),
@@ -145,6 +148,44 @@ func (c *Cache) DefineDateTimeParser(name string, config map[string]interface{})
 		return nil, err
 	}
 	return c.DateTimeParsers.DefineDateTimeParser(name, typ, config, c)
+}
+
+func (c *Cache) SynonymSourceNamed(name string) (analysis.SynonymSource, error) {
+	return c.SynonymSources.SynonymSourceNamed(name, c)
+}
+
+func (c *Cache) DefineSynonymSource(name string, config map[string]interface{}) (analysis.SynonymSource, error) {
+	typ, err := typeFromConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	return c.SynonymSources.DefineSynonymSource(name, typ, config, c)
+}
+
+func (c *Cache) AnalyzersForSynonymCollection(collection string) map[string]analysis.Analyzer {
+	if c.SynonymSources == nil {
+		// no synonym sources defined
+		return nil
+	}
+	analyzerNames := c.SynonymSources.analyzersForCollection(collection)
+	if len(analyzerNames) == 0 {
+		// no synonym sources for this collection
+		return nil
+	}
+	rv := make(map[string]analysis.Analyzer)
+	for _, analyzerName := range analyzerNames {
+		analyzer, _ := c.AnalyzerNamed(analyzerName)
+		rv[analyzerName] = analyzer
+	}
+	return rv
+}
+
+func (c *Cache) SynonymCollections() []string {
+	if c.SynonymSources == nil {
+		// no synonym sources defined
+		return nil
+	}
+	return c.SynonymSources.SynonymCollections()
 }
 
 func (c *Cache) FragmentFormatterNamed(name string) (highlight.FragmentFormatter, error) {

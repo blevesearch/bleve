@@ -55,4 +55,8 @@ type IndexMapping interface {
 
 	AnalyzerNameForPath(path string) string
 	AnalyzerNamed(name string) analysis.Analyzer
+
+	SynonymSourceNameForPath(path string) string
+	SynonymSourceNamed(name string) analysis.SynonymSource
+	AnalyzersForSynonymCollection(name string) map[string]analysis.Analyzer
 }

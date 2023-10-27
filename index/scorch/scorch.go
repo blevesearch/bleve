@@ -361,7 +361,7 @@ func (s *Scorch) Delete(id string) error {
 	return s.Batch(b)
 }
 
-// Batch applices a batch of changes to the index atomically
+// Batch applies a batch of changes to the index atomically
 func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	start := time.Now()
 

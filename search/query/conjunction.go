@@ -54,6 +54,16 @@ func (q *ConjunctionQuery) AddQuery(aq ...Query) {
 	}
 }
 
+func (q *ConjunctionQuery) SynonymSourceName(m mapping.IndexMapping) []string {
+	rv := []string{}
+	for _, disjunct := range q.Conjuncts {
+		if disjunct, ok := disjunct.(SynonymSearchEnabledQuery); ok {
+			rv = append(rv, disjunct.SynonymSourceName(m)...)
+		}
+	}
+	return rv
+}
+
 func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	ss := make([]search.Searcher, 0, len(q.Conjuncts))
 	for _, conjunct := range q.Conjuncts {
