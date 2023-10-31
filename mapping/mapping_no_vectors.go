@@ -17,8 +17,6 @@
 
 package mapping
 
-import "fmt"
-
 func NewVectorFieldMapping() *FieldMapping {
 	return nil
 }
@@ -31,16 +29,7 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 // -----------------------------------------------------------------------------
 // document validation functions
 
-func validateVectorField(fieldMapping *FieldMapping) error {
-	return nil
-}
-
-func validateFieldType(fieldType string) error {
-	switch fieldType {
-	case "text", "datetime", "number", "boolean", "geopoint", "geoshape", "IP":
-	default:
-		return fmt.Errorf("unknown field type: '%s'", fieldType)
-	}
-
-	return nil
+func validateFieldMapping(field *FieldMapping, parentName string,
+	fieldAliasCtx map[string]*FieldMapping) error {
+	return validateFieldType(field)
 }
