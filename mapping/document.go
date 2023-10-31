@@ -50,7 +50,8 @@ type DocumentMapping struct {
 	StructTagKey string `json:"struct_tag_key,omitempty"`
 }
 
-func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
+func (dm *DocumentMapping) Validate(cache *registry.Cache,
+	fieldAliasCtx map[string]*FieldMapping) error {
 	var err error
 	if dm.DefaultAnalyzer != "" {
 		_, err := cache.AnalyzerNamed(dm.DefaultAnalyzer)
@@ -59,7 +60,7 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 		}
 	}
 	for _, property := range dm.Properties {
-		err = property.Validate(cache)
+		err = property.Validate(cache, fieldAliasCtx)
 		if err != nil {
 			return err
 		}
@@ -84,7 +85,7 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 		}
 
 		if field.Type == "vector" {
-			err := validateVectorField(field)
+			err := validateVectorField(field, fieldAliasCtx)
 			if err != nil {
 				return err
 			}

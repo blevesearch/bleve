@@ -31,7 +31,8 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 // -----------------------------------------------------------------------------
 // document validation functions
 
-func validateVectorField(fieldMapping *FieldMapping) error {
+func validateVectorField(fieldMapping *FieldMapping,
+	fieldAliasCtx map[string]*FieldMapping) error {
 	return nil
 }
 
