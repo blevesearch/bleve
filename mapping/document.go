@@ -51,7 +51,7 @@ type DocumentMapping struct {
 }
 
 func (dm *DocumentMapping) Validate(cache *registry.Cache,
-	parentName string, fieldAliasCtx map[string]*FieldMapping) error {
+	fieldAliasCtx map[string]*FieldMapping) error {
 	var err error
 	if dm.DefaultAnalyzer != "" {
 		_, err := cache.AnalyzerNamed(dm.DefaultAnalyzer)
@@ -59,8 +59,8 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache,
 			return err
 		}
 	}
-	for propertyName, property := range dm.Properties {
-		err = property.Validate(cache, propertyName, fieldAliasCtx)
+	for _, property := range dm.Properties {
+		err = property.Validate(cache, fieldAliasCtx)
 		if err != nil {
 			return err
 		}
@@ -79,40 +79,18 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache,
 			}
 		}
 
-		err := validateFieldMapping(field, parentName, fieldAliasCtx)
+		err := validateFieldType(field.Type)
 		if err != nil {
 			return err
 		}
-	}
-	return nil
-}
 
-func validateFieldType(field *FieldMapping) error {
-	switch field.Type {
-	case "text", "datetime", "number", "boolean", "geopoint", "geoshape", "IP":
-	default:
-		return fmt.Errorf("field: '%s', unknown field type: '%s'",
-			field.Name, field.Type)
-	}
-
-	return nil
-}
-
-func validateFieldAlias(field *FieldMapping, parentName string,
-	fieldAliasCtx map[string]*FieldMapping) error {
-	if field.Name == "" {
-		field.Name = parentName
-	}
-	if fieldAlias, ok := fieldAliasCtx[field.Name]; ok {
-		if field.Type != fieldAlias.Type {
-			return fmt.Errorf("field: '%s', invalid alias "+
-				"(different types %s and %s)", field.Name, field.Type,
-				fieldAlias.Type)
+		if field.Type == "vector" {
+			err := validateVectorField(field, fieldAliasCtx)
+			if err != nil {
+				return err
+			}
 		}
-	} else {
-		fieldAliasCtx[field.Name] = field
 	}
-
 	return nil
 }
 
