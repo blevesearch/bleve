@@ -176,12 +176,12 @@ func (im *IndexMappingImpl) Validate() error {
 	}
 
 	fieldAliasCtx := make(map[string]*FieldMapping)
-	err = im.DefaultMapping.Validate(im.cache, fieldAliasCtx)
+	err = im.DefaultMapping.Validate(im.cache, "", fieldAliasCtx)
 	if err != nil {
 		return err
 	}
-	for _, docMapping := range im.TypeMapping {
-		err = docMapping.Validate(im.cache, fieldAliasCtx)
+	for docType, docMapping := range im.TypeMapping {
+		err = docMapping.Validate(im.cache, docType, fieldAliasCtx)
 		if err != nil {
 			return err
 		}
