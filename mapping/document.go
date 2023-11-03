@@ -77,10 +77,17 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 				return err
 			}
 		}
-		switch field.Type {
-		case "text", "datetime", "number", "boolean", "geopoint", "geoshape", "IP":
-		default:
-			return fmt.Errorf("unknown field type: '%s'", field.Type)
+
+		err := validateFieldType(field.Type)
+		if err != nil {
+			return err
+		}
+
+		if field.Type == "vector" {
+			err := validateVectorField(field)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -505,6 +512,9 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		if subDocMapping != nil {
 			for _, fieldMapping := range subDocMapping.Fields {
 				switch fieldMapping.Type {
+				case "vector":
+					fieldMapping.processVector(property, pathString, path,
+						indexes, context)
 				case "geopoint":
 					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
 				case "IP":

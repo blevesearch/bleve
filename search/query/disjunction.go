@@ -73,11 +73,13 @@ func (q *DisjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 			}
 			return nil, err
 		}
-		if _, ok := sr.(*searcher.MatchNoneSearcher); ok && q.queryStringMode {
-			// in query string mode, skip match none
-			continue
+		if sr != nil {
+			if _, ok := sr.(*searcher.MatchNoneSearcher); ok && q.queryStringMode {
+				// in query string mode, skip match none
+				continue
+			}
+			ss = append(ss, sr)
 		}
-		ss = append(ss, sr)
 	}
 
 	if len(ss) < 1 {

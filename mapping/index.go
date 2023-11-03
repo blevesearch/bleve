@@ -431,6 +431,33 @@ func (im *IndexMappingImpl) FieldAnalyzer(field string) string {
 	return im.AnalyzerNameForPath(field)
 }
 
+// FieldMappingForPath returns the mapping for a specific field 'path'.
+func (im *IndexMappingImpl) FieldMappingForPath(path string) FieldMapping {
+	if im.TypeMapping != nil {
+		for _, v := range im.TypeMapping {
+			for field, property := range v.Properties {
+				for _, v1 := range property.Fields {
+					if field == path {
+						// Return field mapping if the name matches the path param.
+						return *v1
+					}
+				}
+			}
+		}
+	}
+
+	for field, property := range im.DefaultMapping.Properties {
+		for _, v1 := range property.Fields {
+			if field == path {
+				// Return field mapping if the name matches the path param.
+				return *v1
+			}
+		}
+	}
+
+	return FieldMapping{}
+}
+
 // wrapper to satisfy new interface
 
 func (im *IndexMappingImpl) DefaultSearchField() string {

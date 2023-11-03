@@ -15,7 +15,6 @@
 package bleve
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -32,19 +31,19 @@ import (
 	"github.com/blevesearch/bleve/v2/util"
 )
 
-const defaultDateTimeParser = optional.Name
+var reflectStaticSizeSearchResult int
+var reflectStaticSizeSearchStatus int
+
+func init() {
+	var sr SearchResult
+	reflectStaticSizeSearchResult = int(reflect.TypeOf(sr).Size())
+	var ss SearchStatus
+	reflectStaticSizeSearchStatus = int(reflect.TypeOf(ss).Size())
+}
 
 var cache = registry.NewCache()
 
-var (
-	reflectStaticSizeSearchResult int
-	reflectStaticSizeSearchStatus int
-)
-
-func init() {
-	reflectStaticSizeSearchResult = int(reflect.TypeOf(SearchResult{}).Size())
-	reflectStaticSizeSearchStatus = int(reflect.TypeOf(SearchStatus{}).Size())
-}
+const defaultDateTimeParser = optional.Name
 
 type dateTimeRange struct {
 	Name           string    `json:"name,omitempty"`
@@ -285,51 +284,10 @@ func (h *HighlightRequest) AddField(field string) {
 	h.Fields = append(h.Fields, field)
 }
 
-// A SearchRequest describes all the parameters
-// needed to search the index.
-// Query is required.
-// Size/From describe how much and which part of the
-// result set to return.
-// Highlight describes optional search result
-// highlighting.
-// Fields describes a list of field values which
-// should be retrieved for result documents, provided they
-// were stored while indexing.
-// Facets describe the set of facets to be computed.
-// Explain triggers inclusion of additional search
-// result score explanations.
-// Sort describes the desired order for the results to be returned.
-// Score controls the kind of scoring performed
-// SearchAfter supports deep paging by providing a minimum sort key
-// SearchBefore supports deep paging by providing a maximum sort key
-// sortFunc specifies the sort implementation to use for sorting results.
-//
-// A special field named "*" can be used to return all fields.
-type SearchRequest struct {
-	ClientContextID  string            `json:"client_context_id,omitempty"`
-	Query            query.Query       `json:"query"`
-	Size             int               `json:"size"`
-	From             int               `json:"from"`
-	Highlight        *HighlightRequest `json:"highlight"`
-	Fields           []string          `json:"fields"`
-	Facets           FacetsRequest     `json:"facets"`
-	Explain          bool              `json:"explain"`
-	Sort             search.SortOrder  `json:"sort"`
-	IncludeLocations bool              `json:"includeLocations"`
-	Score            string            `json:"score,omitempty"`
-	SearchAfter      []string          `json:"search_after"`
-	SearchBefore     []string          `json:"search_before"`
-
-	sortFunc func(sort.Interface)
-}
-
-func (r *SearchRequest) SetClientContextID(id string) {
-	r.ClientContextID = id
-}
-
 func (r *SearchRequest) Validate() error {
 	if srq, ok := r.Query.(query.ValidatableQuery); ok {
-		if err := srq.Validate(); err != nil {
+		err := srq.Validate()
+		if err != nil {
 			return err
 		}
 	}
@@ -393,69 +351,6 @@ func (r *SearchRequest) SetSearchBefore(before []string) {
 	r.SearchBefore = before
 }
 
-// UnmarshalJSON deserializes a JSON representation of
-// a SearchRequest
-func (r *SearchRequest) UnmarshalJSON(input []byte) error {
-	var (
-		temp struct {
-			ClientContextID  string            `json:"client_context_id"`
-			Q                json.RawMessage   `json:"query"`
-			Size             *int              `json:"size"`
-			From             int               `json:"from"`
-			Highlight        *HighlightRequest `json:"highlight"`
-			Fields           []string          `json:"fields"`
-			Facets           FacetsRequest     `json:"facets"`
-			Explain          bool              `json:"explain"`
-			Sort             []json.RawMessage `json:"sort"`
-			IncludeLocations bool              `json:"includeLocations"`
-			Score            string            `json:"score"`
-			SearchAfter      []string          `json:"search_after"`
-			SearchBefore     []string          `json:"search_before"`
-		}
-		err error
-	)
-
-	if err = util.UnmarshalJSON(input, &temp); err != nil {
-		return err
-	}
-
-	if temp.Size == nil {
-		r.Size = 10
-	} else {
-		r.Size = *temp.Size
-	}
-	if temp.Sort == nil {
-		r.Sort = search.SortOrder{&search.SortScore{Desc: true}}
-	} else {
-		if r.Sort, err = search.ParseSortOrderJSON(temp.Sort); err != nil {
-			return err
-		}
-	}
-	r.ClientContextID = temp.ClientContextID
-	r.From = temp.From
-	r.Explain = temp.Explain
-	r.Highlight = temp.Highlight
-	r.Fields = temp.Fields
-	r.Facets = temp.Facets
-	r.IncludeLocations = temp.IncludeLocations
-	r.Score = temp.Score
-	r.SearchAfter = temp.SearchAfter
-	r.SearchBefore = temp.SearchBefore
-	if r.Query, err = query.ParseQuery(temp.Q); err != nil {
-		return err
-	}
-
-	if r.Size < 0 {
-		r.Size = 10
-	}
-	if r.From < 0 {
-		r.From = 0
-	}
-
-	return nil
-
-}
-
 // NewSearchRequest creates a new SearchRequest
 // for the Query, using default values for all
 // other search parameters.
@@ -491,7 +386,8 @@ func (iem IndexErrMap) MarshalJSON() ([]byte, error) {
 
 func (iem IndexErrMap) UnmarshalJSON(data []byte) error {
 	var tmp map[string]string
-	if err := util.UnmarshalJSON(data, &tmp); err != nil {
+	err := util.UnmarshalJSON(data, &tmp)
+	if err != nil {
 		return err
 	}
 	for k, v := range tmp {
