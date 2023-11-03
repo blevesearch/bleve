@@ -305,7 +305,7 @@ func TestBytesWritten(t *testing.T) {
 	typeFieldMapping.DocValues = false
 	documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
 
-	err = checkStatsOnIndexedBatch(tmpIndexPath, indexMapping, 37767)
+	err = checkStatsOnIndexedBatch(tmpIndexPath, indexMapping, 57273)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +314,7 @@ func TestBytesWritten(t *testing.T) {
 	contentFieldMapping.Store = true
 	tmpIndexPath1 := createTmpIndexPath(t)
 
-	err := checkStatsOnIndexedBatch(tmpIndexPath1, indexMapping, 56582)
+	err := checkStatsOnIndexedBatch(tmpIndexPath1, indexMapping, 76069)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +324,7 @@ func TestBytesWritten(t *testing.T) {
 	contentFieldMapping.IncludeInAll = true
 	tmpIndexPath2 := createTmpIndexPath(t)
 
-	err = checkStatsOnIndexedBatch(tmpIndexPath2, indexMapping, 44714)
+	err = checkStatsOnIndexedBatch(tmpIndexPath2, indexMapping, 68875)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -334,7 +334,7 @@ func TestBytesWritten(t *testing.T) {
 	contentFieldMapping.IncludeTermVectors = true
 	tmpIndexPath3 := createTmpIndexPath(t)
 
-	err = checkStatsOnIndexedBatch(tmpIndexPath3, indexMapping, 59479)
+	err = checkStatsOnIndexedBatch(tmpIndexPath3, indexMapping, 78985)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,7 +344,7 @@ func TestBytesWritten(t *testing.T) {
 	contentFieldMapping.DocValues = true
 	tmpIndexPath4 := createTmpIndexPath(t)
 
-	err = checkStatsOnIndexedBatch(tmpIndexPath4, indexMapping, 44722)
+	err = checkStatsOnIndexedBatch(tmpIndexPath4, indexMapping, 64228)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -402,8 +402,8 @@ func TestBytesRead(t *testing.T) {
 	}
 	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
 	prevBytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
-	if prevBytesRead != 36066 && res.Cost == prevBytesRead {
-		t.Fatalf("expected bytes read for query string 32349, got %v",
+	if prevBytesRead != 21631 && res.Cost == prevBytesRead {
+		t.Fatalf("expected bytes read for query string 21631, got %v",
 			prevBytesRead)
 	}
 
@@ -554,8 +554,8 @@ func TestBytesReadStored(t *testing.T) {
 
 	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead != 25928 && bytesRead == res.Cost {
-		t.Fatalf("expected the bytes read stat to be around 25928, got %v", bytesRead)
+	if bytesRead != 11493 && bytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around 11493, got %v", bytesRead)
 	}
 	prevBytesRead := bytesRead
 
@@ -625,8 +625,8 @@ func TestBytesReadStored(t *testing.T) {
 
 	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead != 18114 && bytesRead == res.Cost {
-		t.Fatalf("expected the bytes read stat to be around 18114, got %v", bytesRead)
+	if bytesRead != 3679 && bytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around 3679, got %v", bytesRead)
 	}
 	prevBytesRead = bytesRead
 
