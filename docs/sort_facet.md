@@ -171,9 +171,9 @@
 		<td>No DocValues used</td>
 		<td>No DocValues used</td>
 		<td>No DocValues used</td>
-		<td>DocValues used for field “dolor”. Field Mapping for “dolor” may enable docValues.</td>
-		<td>DocValues used, for field “sit_amet”. 
-Field Mapping for “sit_amet” may enable docValues.</td>
+		<td>DocValues used for field "dolor". Field Mapping for "dolor" may enable docValues.</td>
+		<td>DocValues used, for field "sit_amet". 
+Field Mapping for "sit_amet" may enable docValues.</td>
 	</tr>
 </table>
 </div>
@@ -208,7 +208,6 @@ Enabling docValues for the fields associated with such facet requests might prov
   "size": 10,
   "from": 0
 }
-
 			</pre>
 		</td>
 		<td style="vertical-align: top; width: 20%;">
@@ -240,7 +239,6 @@ Enabling docValues for the fields associated with such facet requests might prov
   "size": 10,
   "from": 0
 }
-
 			</pre>
 		</td>
 		<td style="vertical-align: top; width: 20%;">
@@ -299,7 +297,8 @@ Enabling docValues for the fields associated with such facet requests might prov
 	</tr>
 	<tr align="center">
 		<td>No DocValues used</td>
-		<td colspan="3">DocValues used for field “dolor”. Field Mapping for “dolor” may enable docValues.</td>	</tr>
+		<td colspan="3">DocValues used for field "dolor". Field Mapping for "dolor" may enable docValues.</td>	
+  </tr>
 </table>
 </div>
 
@@ -395,8 +394,8 @@ Enabling docValues for the fields associated with such facet requests might prov
 		</td>
 	</tr>
 	<tr align="center">
-		<td>DocValues used for field “dolor” and “lorem”. Field Mapping for “dolor” and “lorem” may enable docValues.</td>
-		<td>DocValues used for field “dolor” and “ipsum”. Field Mapping for “dolor” and “ipsum” may enable docValues.</td>
+		<td>DocValues used for field "dolor" and "lorem". Field Mapping for "dolor" and "lorem" may enable docValues.</td>
+		<td>DocValues used for field "dolor" and "ipsum". Field Mapping for "dolor" and "ipsum" may enable docValues.</td>
 	</tr>
 </table>
 </div>
@@ -546,36 +545,36 @@ Document Format used for the test scenario:
 		<td style="vertical-align: top; width: 20%;">
 			<pre>
 {
-	“dummyTerm”:”Term”,
-	“dummyDate”:”2000-01-01T00:00:00,
-	“dummyNumber:1
+	"dummyTerm":"Term",
+	"dummyDate":"2000-01-01T00:00:00,
+	"dummyNumber:1
 }
 			</pre>
 		</td>
 		<td style="vertical-align: top; width: 20%;">
 			<pre>
 {
-	“dummyTerm”:”Term”,
-	“dummyDate”:”2000-01-01T01:00:00,
-	“dummyNumber:2
+	"dummyTerm":"Term",
+	"dummyDate":"2000-01-01T01:00:00,
+	"dummyNumber:2
 }
 			</pre>
 		</td>
 		<td style="vertical-align: top; width: 20%;">
 			<pre>
 {
-	“dummyTerm”:”Term”,
-	“dummyDate”:”2000-01-01T01:00:00”+(i hours),
-	“dummyNumber:i
+	"dummyTerm":"Term",
+	"dummyDate":"2000-01-01T01:00:00"+(i hours),
+	"dummyNumber:i
 }
 			</pre>
 		</td>
 		<td style="vertical-align: top; width: 20%;">
 			<pre>
 {
-	“dummyTerm”:”Term”,
-	“dummyDate”:2000-01-01T01:00:00 + (5000 hours),
-	“dummyNumber:5000
+	"dummyTerm":"Term",
+	"dummyDate":2000-01-01T01:00:00 + (5000 hours),
+	"dummyNumber:5000
 }
 			</pre>
 		</td>
@@ -630,7 +629,6 @@ Document Format used for the test scenario:
   "size": 10,
   "from": 0
 }
-
 			</pre>
 		</td>
 		<td style="vertical-align: top; width: 20%;">
@@ -670,7 +668,6 @@ Document Format used for the test scenario:
   "size": 10,
   "from": 0
 }
-
 			</pre>
 		</td>
 		<td style="vertical-align: top; width: 20%;">
@@ -710,7 +707,6 @@ Document Format used for the test scenario:
   "size": 10,
   "from": 0
 }
-
 			</pre>
 		</td>
 		<td style="vertical-align: top; width: 20%;">
