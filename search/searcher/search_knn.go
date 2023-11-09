@@ -41,8 +41,10 @@ func NewKNNSearcher(ctx context.Context, i index.IndexReader, m mapping.IndexMap
 	options search.SearcherOptions, field string, vector []float32, k int64,
 	boost float64, similarityMetric string) (search.Searcher, error) {
 	if vr, ok := i.(index.VectorIndexReader); ok {
-		vectorReader, _ := vr.VectorReader(ctx, vector, field, k)
-
+		vectorReader, err := vr.VectorReader(ctx, vector, field, k)
+		if err != nil {
+			return nil, err
+		}
 		count, err := i.DocCount()
 		if err != nil {
 			_ = vectorReader.Close()
