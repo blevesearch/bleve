@@ -19,6 +19,7 @@ package query
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
@@ -65,6 +66,9 @@ func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
 	similarityMetric := fieldMapping.Similarity
 	if similarityMetric == "" {
 		similarityMetric = util.DefaultSimilarityMetric
+	}
+	if q.K <= 0 {
+		return nil, fmt.Errorf("k must be greater than 0")
 	}
 
 	return searcher.NewKNNSearcher(ctx, i, m, options, q.VectorField,
