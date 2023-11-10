@@ -496,7 +496,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey,
 		search.GeoBufferPoolCallbackFunc(getBufferPool))
 
-
 	// Using a disjunction query to get union of results from KNN query
 	// and the original query
 	searchQuery := disjunctQueryWithKNN(req)
@@ -663,9 +662,9 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 	var totalStoredFieldsBytes uint64
 	if len(req.Fields) > 0 || highlighter != nil {
 		doc, err := r.Document(hit.ID)
-		totalStoredFieldsBytes = doc.StoredFieldsBytes()
 		if err == nil && doc != nil {
 			if len(req.Fields) > 0 {
+				totalStoredFieldsBytes = doc.StoredFieldsBytes()
 				fieldsToLoad := deDuplicate(req.Fields)
 				for _, f := range fieldsToLoad {
 					doc.VisitFields(func(docF index.Field) {
