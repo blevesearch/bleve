@@ -25,6 +25,8 @@ import (
 	"github.com/blevesearch/bleve/v2/search/query"
 )
 
+type knnOperator string
+
 type SearchRequest struct {
 	Query            query.Query       `json:"query"`
 	Size             int               `json:"size"`
@@ -39,7 +41,8 @@ type SearchRequest struct {
 	SearchAfter      []string          `json:"search_after"`
 	SearchBefore     []string          `json:"search_before"`
 
-	KNN []*KNNRequest `json:"knn"`
+	KNN         []*KNNRequest `json:"knn"`
+	KNNOperator knnOperator   `json:"knn_operator,omitempty"`
 
 	sortFunc func(sort.Interface)
 }
@@ -61,6 +64,10 @@ func (r *SearchRequest) AddKNN(field string, vector []float32, k int64, boost fl
 	})
 }
 
+func (r *SearchRequest) AddKNNOperator(operator knnOperator) {
+	r.KNNOperator = operator
+}
+
 // UnmarshalJSON deserializes a JSON representation of
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
@@ -78,6 +85,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		SearchAfter      []string          `json:"search_after"`
 		SearchBefore     []string          `json:"search_before"`
 		KNN              []*KNNRequest     `json:"knn"`
+		KNNOperator      knnOperator       `json:"knn_operator"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -120,6 +128,10 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	}
 
 	r.KNN = temp.KNN
+	r.KNNOperator = temp.KNNOperator
+	if r.KNNOperator == "" {
+		r.KNNOperator = knnOperatorOr
+	}
 
 	return nil
 
@@ -147,19 +159,27 @@ func copySearchRequest(req *SearchRequest) *SearchRequest {
 
 }
 
-func disjunctQueryWithKNN(req *SearchRequest) query.Query {
+var (
+	knnOperatorAnd = knnOperator("and")
+	knnOperatorOr  = knnOperator("or")
+)
+
+func queryWithKNN(req *SearchRequest) query.Query {
 	if len(req.KNN) > 0 {
-		disjuncts := []query.Query{req.Query}
+		subQueries := []query.Query{req.Query}
 		for _, knn := range req.KNN {
 			if knn != nil {
 				knnQuery := query.NewKNNQuery(knn.Vector)
 				knnQuery.SetFieldVal(knn.Field)
 				knnQuery.SetK(knn.K)
 				knnQuery.SetBoost(knn.Boost.Value())
-				disjuncts = append(disjuncts, knnQuery)
+				subQueries = append(subQueries, knnQuery)
 			}
 		}
-		return query.NewDisjunctionQuery(disjuncts)
+		if req.KNNOperator == knnOperatorAnd {
+			return query.NewConjunctionQuery(subQueries)
+		}
+		return query.NewDisjunctionQuery(subQueries)
 	}
 	return req.Query
 }
