@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/blevesearch/bleve/v2"
@@ -89,12 +88,12 @@ func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if timeoutStr == "" {
 		ctx = context.Background()
 	} else {
-		timeout, err := strconv.Atoi(timeoutStr)
+		timeout, err := time.ParseDuration(timeoutStr)
 		if err != nil {
 			showError(w, req, fmt.Sprintf("error parsing timeout value: %v", err), 400)
 			return
 		}
-		ctx, _ = context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
+		ctx, _ = context.WithTimeout(context.Background(), timeout)
 	}
 
 	// execute the query
