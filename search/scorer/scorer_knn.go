@@ -21,7 +21,6 @@ import (
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
-	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -68,7 +67,7 @@ func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 	if sqs.includeScore || sqs.options.Explain {
 		var scoreExplanation *search.Explanation
 		score := knnMatch.Score
-		if sqs.similarityMetric == util.EuclideanDistance {
+		if sqs.similarityMetric == index.EuclideanDistance {
 			// eucliden distances need to be inverted to work
 			// tf-idf scoring
 			score = 1.0 / score
