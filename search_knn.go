@@ -18,6 +18,7 @@
 package bleve
 
 import (
+	"container/heap"
 	"encoding/json"
 	"sort"
 
@@ -162,4 +163,96 @@ func disjunctQueryWithKNN(req *SearchRequest) query.Query {
 		return query.NewDisjunctionQuery(disjuncts)
 	}
 	return req.Query
+}
+
+func mergeKNNResults(req *SearchRequest, sr *SearchResult) {
+	if len(req.KNN) > 0 {
+		mergeKNN(req, sr)
+	}
+}
+
+// heap impl
+type scoreHeap struct {
+	scoreBreakdown []*[]float64
+	sortIndex      int
+}
+
+func (s *scoreHeap) Len() int { return len(s.scoreBreakdown) }
+
+func (s *scoreHeap) Less(i, j int) bool {
+	return (*s.scoreBreakdown[i])[s.sortIndex] > (*s.scoreBreakdown[j])[s.sortIndex]
+}
+
+func (s *scoreHeap) Swap(i, j int) {
+	s.scoreBreakdown[i], s.scoreBreakdown[j] = s.scoreBreakdown[j], s.scoreBreakdown[i]
+}
+
+func (s *scoreHeap) Push(x interface{}) {
+	s.scoreBreakdown = append(s.scoreBreakdown, x.(*[]float64))
+}
+
+func (s *scoreHeap) Pop() interface{} {
+	old := s.scoreBreakdown
+	n := len(old)
+	x := old[n-1]
+	s.scoreBreakdown = old[0 : n-1]
+	return x
+}
+
+func mergeKNN(req *SearchRequest, sr *SearchResult) {
+	// index 0 of score breakdown is always tf-idf score
+	numKnnQuery := len(req.KNN)
+	maxHeap := &scoreHeap{
+		scoreBreakdown: make([]*[]float64, 0),
+	}
+	for i := 0; i < numKnnQuery; i++ {
+		kVal := req.KNN[i].K
+		maxHeap.sortIndex = i + 1
+		for _, hit := range sr.Hits {
+			heap.Push(maxHeap, &hit.ScoreBreakdown)
+		}
+		for maxHeap.Len() > 0 {
+			arr := heap.Pop(maxHeap).(*[]float64)
+			if kVal > 0 {
+				kVal--
+			} else {
+				(*arr)[maxHeap.sortIndex] = 0
+			}
+		}
+	}
+	operator := 0
+	if _, ok := req.Query.(*query.ConjunctionQuery); ok {
+		operator = 1
+	}
+	nonZeroScoreHits := make([]*search.DocumentMatch, 0, len(sr.Hits))
+	maxScore := 0.0
+	for _, hit := range sr.Hits {
+		newScore := recomputeTotalScore(operator, hit)
+		if newScore > 0 {
+			hit.Score = newScore
+			if newScore > maxScore {
+				maxScore = newScore
+			}
+			nonZeroScoreHits = append(nonZeroScoreHits, hit)
+		}
+	}
+	sr.Hits = nonZeroScoreHits
+	sr.MaxScore = maxScore
+	sr.Total = uint64(len(nonZeroScoreHits))
+}
+
+func recomputeTotalScore(operator int, hit *search.DocumentMatch) float64 {
+	totalScore := 0.0
+	numNonZero := 0
+	for _, score := range hit.ScoreBreakdown {
+		if score != 0 {
+			numNonZero += 1
+		}
+		totalScore += score
+	}
+	if operator == 0 {
+		coord := float64(numNonZero) / float64(len(hit.ScoreBreakdown))
+		totalScore = totalScore * coord
+	}
+	return totalScore
 }

@@ -35,7 +35,8 @@ func init() {
 
 type DisjunctionSliceSearcher struct {
 	indexReader  index.IndexReader
-	searchers    OrderedSearcherList
+	searchers    []search.Searcher
+	originalPos  []int
 	numSearchers int
 	queryNorm    float64
 	currs        []*search.DocumentMatch
@@ -55,16 +56,24 @@ func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexRea
 		return nil, tooManyClausesErr("", len(qsearchers))
 	}
 	// build the downstream searchers
-	searchers := make(OrderedSearcherList, len(qsearchers))
+	sortedSearchers := &OrderedSearcherList{
+		searchers: make([]search.Searcher, len(qsearchers)),
+		index:     make([]int, len(qsearchers)),
+	}
 	for i, searcher := range qsearchers {
-		searchers[i] = searcher
+		sortedSearchers.searchers[i] = searcher
+		sortedSearchers.index[i] = i
 	}
 	// sort the searchers
-	sort.Sort(sort.Reverse(searchers))
+	sort.Sort(sort.Reverse(sortedSearchers))
 	// build our searcher
+	searchers := sortedSearchers.searchers
+	originalPos := sortedSearchers.index
+
 	rv := DisjunctionSliceSearcher{
 		indexReader:  indexReader,
 		searchers:    searchers,
+		originalPos:  originalPos,
 		numSearchers: len(searchers),
 		currs:        make([]*search.DocumentMatch, len(searchers)),
 		scorer:       scorer.NewDisjunctionQueryScorer(options),
@@ -199,7 +208,7 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 			found = true
 			partialMatch := len(s.matching) != len(s.searchers)
 			// score this match
-			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
+			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers, s.matchingIdxs, s.originalPos)
 			rv.PartialMatch = partialMatch
 		}
 

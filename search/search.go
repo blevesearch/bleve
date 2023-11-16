@@ -173,6 +173,8 @@ type DocumentMatch struct {
 	// not all sub-queries matched
 	// if false, all the sub-queries matched
 	PartialMatch bool `json:"partial_match,omitempty"`
+
+	ScoreBreakdown []float64 `json:"score_breakdown,omitempty"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {

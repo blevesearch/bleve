@@ -25,10 +25,11 @@ import (
 )
 
 type indexAliasImpl struct {
-	name    string
-	indexes []Index
-	mutex   sync.RWMutex
-	open    bool
+	name            string
+	indexes         []Index
+	mutex           sync.RWMutex
+	open            bool
+	partitionedMode bool
 }
 
 // NewIndexAlias creates a new IndexAlias over the provided
@@ -39,6 +40,10 @@ func NewIndexAlias(indexes ...Index) *indexAliasImpl {
 		indexes: indexes,
 		open:    true,
 	}
+}
+
+func (i *indexAliasImpl) SetPartitionedMode(partitionedMode bool) {
+	i.partitionedMode = partitionedMode
 }
 
 // VisitIndexes invokes the visit callback on every
@@ -166,6 +171,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		return i.indexes[0].SearchInContext(ctx, req)
 	}
 
+	ctx = context.WithValue(ctx, search.AliasPartitionedModeKey, i.partitionedMode)
 	return MultiSearch(ctx, req, i.indexes...)
 }
 
@@ -501,6 +507,23 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 			Status: &SearchStatus{
 				Errors: make(map[string]error),
 			},
+		}
+	}
+
+	if mode := ctx.Value(search.AliasPartitionedModeKey); mode != nil {
+		aliasForPartitionedIndex, ok := mode.(bool)
+		if ok && aliasForPartitionedIndex && len(indexes) > 1 {
+			// this is an alias for a partitioned index, where each child index
+			// is a partition of a larger index.
+			// when knn queries are present we need to perform
+			// a special merge of the hits to ensure that hits corresponding to the
+			// knn queries are representative of the entire index, not just the
+			// partition that was searched. If k is 2 and there are 3 partitions,
+			// then the top 2 hits from each partition is returned, resulting in
+			// 6 hits in total. This is incorrect because k=2 should return the
+			// top 2 hits from the entire index, not the top 2 hits from each
+			// partition.
+			mergeKNNResults(req, sr)
 		}
 	}
 

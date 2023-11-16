@@ -147,3 +147,6 @@ func copySearchRequest(req *SearchRequest) *SearchRequest {
 func disjunctQueryWithKNN(req *SearchRequest) query.Query {
 	return req.Query
 }
+
+func mergeKNNResults(req *SearchRequest, sr *SearchResult) {
+}

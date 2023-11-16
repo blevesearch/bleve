@@ -18,6 +18,7 @@
 package scorer
 
 import (
+	"math"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -26,6 +27,8 @@ import (
 )
 
 var reflectStaticSizeKNNQueryScorer int
+
+const MaxAllowedScore = 10000.0
 
 func init() {
 	var sqs KNNQueryScorer
@@ -80,6 +83,11 @@ func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 		}
 
 		if sqs.includeScore {
+			if math.IsInf(score, 1) {
+				score = MaxAllowedScore // MAX ALLOWED SCORE
+			} else if math.IsInf(score, -1) {
+				score = 0.0
+			}
 			rv.Score = score
 		}
 

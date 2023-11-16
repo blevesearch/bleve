@@ -48,9 +48,10 @@ func (s *ConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	if s.options.Explain {
 		childrenExplanations = make([]*search.Explanation, len(constituents))
 	}
-
+	scoreBreakdown := make([]float64, len(constituents))
 	for i, docMatch := range constituents {
 		sum += docMatch.Score
+		scoreBreakdown[i] = docMatch.Score
 		if s.options.Explain {
 			childrenExplanations[i] = docMatch.Expl
 		}
@@ -65,6 +66,7 @@ func (s *ConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	rv := constituents[0]
 	rv.Score = newScore
 	rv.Expl = newExpl
+	rv.ScoreBreakdown = scoreBreakdown
 	rv.FieldTermLocations = search.MergeFieldTermLocations(
 		rv.FieldTermLocations, constituents[1:])
 

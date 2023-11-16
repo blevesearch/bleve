@@ -39,8 +39,9 @@ func init() {
 }
 
 type SearcherCurr struct {
-	searcher search.Searcher
-	curr     *search.DocumentMatch
+	searcher    search.Searcher
+	curr        *search.DocumentMatch
+	matchingIdx int
 }
 
 type DisjunctionHeapSearcher struct {
@@ -55,6 +56,7 @@ type DisjunctionHeapSearcher struct {
 	heap         []*SearcherCurr
 
 	matching      []*search.DocumentMatch
+	matchingIdxs  []int
 	matchingCurrs []*SearcherCurr
 
 	bytesRead uint64
@@ -77,6 +79,7 @@ func newDisjunctionHeapSearcher(ctx context.Context, indexReader index.IndexRead
 		min:           int(min),
 		matching:      make([]*search.DocumentMatch, len(searchers)),
 		matchingCurrs: make([]*SearcherCurr, len(searchers)),
+		matchingIdxs:  make([]int, len(searchers)),
 		heap:          make([]*SearcherCurr, 0, len(searchers)),
 	}
 	rv.computeQueryNorm()
@@ -101,6 +104,7 @@ func (s *DisjunctionHeapSearcher) Size() int {
 	// since searchers and document matches already counted above
 	sizeInBytes += len(s.matchingCurrs) * reflectStaticSizeSearcherCurr
 	sizeInBytes += len(s.heap) * reflectStaticSizeSearcherCurr
+	sizeInBytes += len(s.matchingIdxs) * size.SizeOfInt
 
 	return sizeInBytes
 }
@@ -132,6 +136,7 @@ func (s *DisjunctionHeapSearcher) initSearchers(ctx *search.SearchContext) error
 		if curr != nil {
 			block[i].searcher = searcher
 			block[i].curr = curr
+			block[i].matchingIdx = i
 			heap.Push(s, &block[i])
 		}
 	}
@@ -147,6 +152,7 @@ func (s *DisjunctionHeapSearcher) initSearchers(ctx *search.SearchContext) error
 func (s *DisjunctionHeapSearcher) updateMatches() error {
 	matching := s.matching[:0]
 	matchingCurrs := s.matchingCurrs[:0]
+	matchingIdxs := s.matchingIdxs[:0]
 
 	if len(s.heap) > 0 {
 
@@ -154,17 +160,20 @@ func (s *DisjunctionHeapSearcher) updateMatches() error {
 		next := heap.Pop(s).(*SearcherCurr)
 		matching = append(matching, next.curr)
 		matchingCurrs = append(matchingCurrs, next)
+		matchingIdxs = append(matchingIdxs, next.matchingIdx)
 
 		// now as long as top of heap matches, keep popping
 		for len(s.heap) > 0 && bytes.Compare(next.curr.IndexInternalID, s.heap[0].curr.IndexInternalID) == 0 {
 			next = heap.Pop(s).(*SearcherCurr)
 			matching = append(matching, next.curr)
 			matchingCurrs = append(matchingCurrs, next)
+			matchingIdxs = append(matchingIdxs, next.matchingIdx)
 		}
 	}
 
 	s.matching = matching
 	s.matchingCurrs = matchingCurrs
+	s.matchingIdxs = matchingIdxs
 
 	return nil
 }
@@ -199,7 +208,7 @@ func (s *DisjunctionHeapSearcher) Next(ctx *search.SearchContext) (
 			found = true
 			partialMatch := len(s.matching) != len(s.searchers)
 			// score this match
-			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
+			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers, s.matchingIdxs, nil)
 			rv.PartialMatch = partialMatch
 		}
 

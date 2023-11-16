@@ -43,15 +43,22 @@ func NewDisjunctionQueryScorer(options search.SearcherOptions) *DisjunctionQuery
 	}
 }
 
-func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
+func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int,
+	matchingIdxs []int, originalPositions []int) *search.DocumentMatch {
+
 	var sum float64
 	var childrenExplanations []*search.Explanation
 	if s.options.Explain {
 		childrenExplanations = make([]*search.Explanation, len(constituents))
 	}
-
+	scoreBreakdown := make([]float64, countTotal)
 	for i, docMatch := range constituents {
 		sum += docMatch.Score
+		if originalPositions != nil {
+			scoreBreakdown[originalPositions[matchingIdxs[i]]] = docMatch.Score
+		} else {
+			scoreBreakdown[matchingIdxs[i]] = docMatch.Score
+		}
 		if s.options.Explain {
 			childrenExplanations[i] = docMatch.Expl
 		}
@@ -75,6 +82,7 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	// reuse constituents[0] as the return value
 	rv := constituents[0]
 	rv.Score = newScore
+	rv.ScoreBreakdown = scoreBreakdown
 	rv.Expl = newExpl
 	rv.FieldTermLocations = search.MergeFieldTermLocations(
 		rv.FieldTermLocations, constituents[1:])
