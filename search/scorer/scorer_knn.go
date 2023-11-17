@@ -18,7 +18,6 @@
 package scorer
 
 import (
-	"math"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -71,8 +70,13 @@ func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 	if sqs.includeScore || sqs.options.Explain {
 		var scoreExplanation *search.Explanation
 		score := knnMatch.Score
-		if sqs.similarityMetric == util.EuclideanDistance {
-			// eucliden distances need to be inverted to work
+		if score == 0.0 {
+			// the vector is found to be exactly same as the query vector
+			// this is a perfect match, so return the max score
+			score = MaxAllowedScore
+		} else if sqs.similarityMetric == util.EuclideanDistance {
+			// safeguard from divide-by-zero
+			// euclidean distances need to be inverted to work
 			// tf-idf scoring
 			score = 1.0 / score
 		}
@@ -83,11 +87,6 @@ func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 		}
 
 		if sqs.includeScore {
-			if math.IsInf(score, 1) {
-				score = MaxAllowedScore // MAX ALLOWED SCORE
-			} else if math.IsInf(score, -1) {
-				score = 0.0
-			}
 			rv.Score = score
 		}
 

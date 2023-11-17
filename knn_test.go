@@ -310,8 +310,8 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			numIndexPartitions: 1,
 			expectedResults: map[string]testResult{
 				"doc7": {
-					score:          3333.333333333333,
-					scoreBreakdown: []float64{0, 0, 10000},
+					score:          2357.022603955158,
+					scoreBreakdown: []float64{0, 0, 7071.067811865475},
 				},
 				"doc29": {
 					score:          0.6774608026082964,
@@ -356,8 +356,8 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			numIndexPartitions: 4,
 			expectedResults: map[string]testResult{
 				"doc7": {
-					score:          3333.333333333333,
-					scoreBreakdown: []float64{0, 0, 10000},
+					score:          2357.022603955158,
+					scoreBreakdown: []float64{0, 0, 7071.067811865475},
 				},
 				"doc29": {
 					score:          0.567426591648309,
