@@ -147,3 +147,7 @@ func copySearchRequest(req *SearchRequest) *SearchRequest {
 func disjunctQueryWithKNN(req *SearchRequest) query.Query {
 	return req.Query
 }
+
+func validateKNN(req *SearchRequest) error {
+	return nil
+}
