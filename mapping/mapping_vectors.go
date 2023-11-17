@@ -22,6 +22,7 @@ import (
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/document"
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/v2/util"
 )
 
@@ -87,7 +88,7 @@ func validateVectorField(field *FieldMapping) error {
 	}
 
 	if field.Similarity == "" {
-		field.Similarity = util.DefaultSimilarityMetric
+		field.Similarity = index.DefaultSimilarityMetric
 	}
 
 	// following fields are not applicable for vector
@@ -98,10 +99,10 @@ func validateVectorField(field *FieldMapping) error {
 	field.DocValues = false
 	field.SkipFreqNorm = true
 
-	if _, ok := util.SupportedSimilarityMetrics[field.Similarity]; !ok {
+	if _, ok := index.SupportedSimilarityMetrics[field.Similarity]; !ok {
 		return fmt.Errorf("invalid similarity metric: '%s', "+
 			"valid metrics are: %+v", field.Similarity,
-			reflect.ValueOf(util.SupportedSimilarityMetrics).MapKeys())
+			reflect.ValueOf(index.SupportedSimilarityMetrics).MapKeys())
 	}
 
 	return nil
