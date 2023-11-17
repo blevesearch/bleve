@@ -15,10 +15,12 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search/query"
@@ -80,8 +82,22 @@ func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	// check for timeout and create context
+	var ctx context.Context
+	timeoutStr := req.FormValue("timeout")
+	if timeoutStr == "" {
+		ctx = context.Background()
+	} else {
+		timeout, err := time.ParseDuration(timeoutStr)
+		if err != nil {
+			showError(w, req, fmt.Sprintf("error parsing timeout value: %v", err), 400)
+			return
+		}
+		ctx, _ = context.WithTimeout(context.Background(), timeout)
+	}
+
 	// execute the query
-	searchResponse, err := index.Search(&searchRequest)
+	searchResponse, err := index.SearchInContext(ctx, &searchRequest)
 	if err != nil {
 		showError(w, req, fmt.Sprintf("error executing query: %v", err), 500)
 		return
