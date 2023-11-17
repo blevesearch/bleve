@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"container/heap"
 	"context"
-	"math"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -47,13 +46,14 @@ type SearcherCurr struct {
 type DisjunctionHeapSearcher struct {
 	indexReader index.IndexReader
 
-	numSearchers int
-	scorer       *scorer.DisjunctionQueryScorer
-	min          int
-	queryNorm    float64
-	initialized  bool
-	searchers    []search.Searcher
-	heap         []*SearcherCurr
+	numSearchers    int
+	scorer          *scorer.DisjunctionQueryScorer
+	min             int
+	queryNorm       float64
+	queryNormForKNN float64
+	initialized     bool
+	searchers       []search.Searcher
+	heap            []*SearcherCurr
 
 	matching      []*search.DocumentMatch
 	matchingIdxs  []int
@@ -107,20 +107,6 @@ func (s *DisjunctionHeapSearcher) Size() int {
 	sizeInBytes += len(s.matchingIdxs) * size.SizeOfInt
 
 	return sizeInBytes
-}
-
-func (s *DisjunctionHeapSearcher) computeQueryNorm() {
-	// first calculate sum of squared weights
-	sumOfSquaredWeights := 0.0
-	for _, searcher := range s.searchers {
-		sumOfSquaredWeights += searcher.Weight()
-	}
-	// now compute query norm from this
-	s.queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
-	// finally tell all the downstream searchers the norm
-	for _, searcher := range s.searchers {
-		searcher.SetQueryNorm(s.queryNorm)
-	}
 }
 
 func (s *DisjunctionHeapSearcher) initSearchers(ctx *search.SearchContext) error {

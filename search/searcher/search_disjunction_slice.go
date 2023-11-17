@@ -16,7 +16,6 @@ package searcher
 
 import (
 	"context"
-	"math"
 	"reflect"
 	"sort"
 
@@ -34,18 +33,19 @@ func init() {
 }
 
 type DisjunctionSliceSearcher struct {
-	indexReader  index.IndexReader
-	searchers    []search.Searcher
-	originalPos  []int
-	numSearchers int
-	queryNorm    float64
-	currs        []*search.DocumentMatch
-	scorer       *scorer.DisjunctionQueryScorer
-	min          int
-	matching     []*search.DocumentMatch
-	matchingIdxs []int
-	initialized  bool
-	bytesRead    uint64
+	indexReader     index.IndexReader
+	searchers       []search.Searcher
+	originalPos     []int
+	numSearchers    int
+	queryNorm       float64
+	queryNormForKNN float64
+	currs           []*search.DocumentMatch
+	scorer          *scorer.DisjunctionQueryScorer
+	min             int
+	matching        []*search.DocumentMatch
+	matchingIdxs    []int
+	initialized     bool
+	bytesRead       uint64
 }
 
 func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexReader,
@@ -108,20 +108,6 @@ func (s *DisjunctionSliceSearcher) Size() int {
 	sizeInBytes += len(s.matchingIdxs) * size.SizeOfInt
 
 	return sizeInBytes
-}
-
-func (s *DisjunctionSliceSearcher) computeQueryNorm() {
-	// first calculate sum of squared weights
-	sumOfSquaredWeights := 0.0
-	for _, searcher := range s.searchers {
-		sumOfSquaredWeights += searcher.Weight()
-	}
-	// now compute query norm from this
-	s.queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
-	// finally tell all the downstream searchers the norm
-	for _, searcher := range s.searchers {
-		searcher.SetQueryNorm(s.queryNorm)
-	}
 }
 
 func (s *DisjunctionSliceSearcher) initSearchers(ctx *search.SearchContext) error {
