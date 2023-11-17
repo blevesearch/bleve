@@ -496,7 +496,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey,
 		search.GeoBufferPoolCallbackFunc(getBufferPool))
 
-
 	// Using a disjunction query to get union of results from KNN query
 	// and the original query
 	searchQuery := disjunctQueryWithKNN(req)
@@ -643,7 +642,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		req.SearchAfter = nil
 	}
 
-	return &SearchResult{
+	rv := &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
 			Successful: 1,
@@ -654,7 +653,32 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		MaxScore: coll.MaxScore(),
 		Took:     searchDuration,
 		Facets:   coll.FacetResults(),
-	}, nil
+	}
+	// if AliasPartitionedModeKey is true
+	//   -> this is a child index in an alias for a partitioned index
+	//   -> do not merge the KNN results now, as we need to merge them
+	//      with the results from the other child indexes in the alias
+	//   -> the merge will happen in the top-level MultiSearch
+	// else if false
+	//   -> this is child index in an user alias for multiple different indexes
+	//   -> NOT a child index in an alias for a partitioned index
+	//   -> merge the KNN results now
+	// else if not present
+	//   -> this is a regular index
+	//   -> merge the KNN results now
+	if mode := ctx.Value(search.AliasPartitionedModeKey); mode != nil {
+		aliasForPartitionedIndex, ok := mode.(bool)
+		if ok && !aliasForPartitionedIndex {
+			// this is NOT a child index in an alias for a partitioned index,
+			// so we can merge the KNN results now. This merge is required
+			// as the top k results are from each segment, resulting in
+			// k * numSegments results.
+			mergeKNNResults(req, rv)
+		}
+	} else {
+		mergeKNNResults(req, rv)
+	}
+	return rv, nil
 }
 
 func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,

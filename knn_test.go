@@ -130,6 +130,43 @@ func createPartitionedIndex(documents []map[string]interface{}, index *indexAlia
 	return rv
 }
 
+func createMultipleSegmentsIndex(documents []map[string]interface{}, index Index, numSegments int) error {
+	// create multiple batches to simulate more than one segment
+	numBatches := numSegments
+
+	batches := make([]*Batch, numBatches)
+	numDocsPerBatch := len(documents) / numBatches
+	extraDocs := len(documents) % numBatches
+
+	docsPerBatch := make([]int, numBatches)
+	for i := 0; i < numBatches; i++ {
+		docsPerBatch[i] = numDocsPerBatch
+		if extraDocs > 0 {
+			docsPerBatch[i]++
+			extraDocs--
+		}
+	}
+	prevCutoff := 0
+	for i := 0; i < numBatches; i++ {
+		batches[i] = index.NewBatch()
+		for j := prevCutoff; j < prevCutoff+docsPerBatch[i]; j++ {
+			doc := documents[j]
+			err := batches[i].Index(doc["id"].(string), doc)
+			if err != nil {
+				return err
+			}
+		}
+		prevCutoff += docsPerBatch[i]
+	}
+	for _, batch := range batches {
+		err = index.Batch(batch)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Fisher-Yates shuffle
 func shuffleDocuments(documents []map[string]interface{}) []map[string]interface{} {
 	for i := range documents {
@@ -443,5 +480,272 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 		}
 		cleanUp(t, indexPaths, index.indexes...)
 	}
+}
 
+func TestSimilaritySearchMultipleSegments(t *testing.T) {
+	dataset, err := createVectorDataset(testDatasetFileName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	documents := makeDatasetIntoDocuments(dataset)
+	searchRequests, err := getSearchRequests(testQueryFileName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	indexMapping := NewIndexMapping()
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.Analyzer = "en"
+
+	vecFieldMapping := mapping.NewVectorFieldMapping()
+	vecFieldMapping.Dims = testDatasetDims
+	vecFieldMapping.Similarity = "l2_norm"
+
+	indexMapping.DefaultMapping.AddFieldMappingsAt("content", contentFieldMapping)
+	indexMapping.DefaultMapping.AddFieldMappingsAt("vector", vecFieldMapping)
+
+	type testResult struct {
+		score          float64
+		scoreBreakdown []float64
+	}
+
+	testCases := []struct {
+		numSegments     int
+		queryIndex      int
+		expectedResults map[string]testResult
+	}{
+		{
+			numSegments: 1,
+			queryIndex:  0,
+			expectedResults: map[string]testResult{
+				"doc29": {
+					score:          0.5547758085810349,
+					scoreBreakdown: []float64{0, 1.1095516171620698},
+				},
+				"doc23": {
+					score:          0.3817633037007331,
+					scoreBreakdown: []float64{0, 0.7635266074014662},
+				},
+				"doc28": {
+					score:          0.33983667469689355,
+					scoreBreakdown: []float64{0, 0.6796733493937871},
+				},
+			},
+		},
+		{
+			numSegments: 6,
+			queryIndex:  0,
+			expectedResults: map[string]testResult{
+				"doc29": {
+					score:          0.5547758085810349,
+					scoreBreakdown: []float64{0, 1.1095516171620698},
+				},
+				"doc23": {
+					score:          0.3817633037007331,
+					scoreBreakdown: []float64{0, 0.7635266074014662},
+				},
+				"doc28": {
+					score:          0.33983667469689355,
+					scoreBreakdown: []float64{0, 0.6796733493937871},
+				},
+			},
+		},
+		{
+			numSegments: 1,
+			queryIndex:  1,
+			expectedResults: map[string]testResult{
+				"doc29": {
+					score:          1.8859816084399936,
+					scoreBreakdown: []float64{0.7764299912779237, 1.1095516171620698},
+				},
+				"doc23": {
+					score:          1.8615644255330264,
+					scoreBreakdown: []float64{1.0980378181315602, 0.7635266074014662},
+				},
+				"doc27": {
+					score:          0.4640056648691007,
+					scoreBreakdown: []float64{0.9280113297382014, 0},
+				},
+				"doc28": {
+					score:          0.434037555556026,
+					scoreBreakdown: []float64{0.868075111112052, 0},
+				},
+				"doc30": {
+					score:          0.38821499563896184,
+					scoreBreakdown: []float64{0.7764299912779237, 0},
+				},
+				"doc24": {
+					score:          0.38821499563896184,
+					scoreBreakdown: []float64{0.7764299912779237, 0},
+				},
+			},
+		},
+		{
+			numSegments: 7,
+			queryIndex:  1,
+			expectedResults: map[string]testResult{
+				"doc29": {
+					score:          1.8859816084399936,
+					scoreBreakdown: []float64{0.7764299912779237, 1.1095516171620698},
+				},
+				"doc23": {
+					score:          1.8615644255330264,
+					scoreBreakdown: []float64{1.0980378181315602, 0.7635266074014662},
+				},
+				"doc27": {
+					score:          0.4640056648691007,
+					scoreBreakdown: []float64{0.9280113297382014, 0},
+				},
+				"doc28": {
+					score:          0.434037555556026,
+					scoreBreakdown: []float64{0.868075111112052, 0},
+				},
+				"doc30": {
+					score:          0.38821499563896184,
+					scoreBreakdown: []float64{0.7764299912779237, 0},
+				},
+				"doc24": {
+					score:          0.38821499563896184,
+					scoreBreakdown: []float64{0.7764299912779237, 0},
+				},
+			},
+		},
+		{
+			numSegments: 1,
+			queryIndex:  2,
+			expectedResults: map[string]testResult{
+				"doc7": {
+					score:          2357.022603955158,
+					scoreBreakdown: []float64{0, 0, 7071.067811865475},
+				},
+				"doc29": {
+					score:          0.6774608026082964,
+					scoreBreakdown: []float64{0.23161973134064517, 0.7845714725717996, 0},
+				},
+				"doc23": {
+					score:          0.5783030702431613,
+					scoreBreakdown: []float64{0.32755976365480655, 0.5398948417099355, 0},
+				},
+				"doc3": {
+					score:          0.2550334160459894,
+					scoreBreakdown: []float64{0.7651002481379682, 0, 0},
+				},
+				"doc13": {
+					score:          0.2208654210738964,
+					scoreBreakdown: []float64{0.6625962632216892, 0, 0},
+				},
+				"doc5": {
+					score:          0.21180931116413285,
+					scoreBreakdown: []float64{0, 0, 0.6354279334923986},
+				},
+				"doc27": {
+					score:          0.09227950890170131,
+					scoreBreakdown: []float64{0.27683852670510395, 0, 0},
+				},
+				"doc28": {
+					score:          0.0863195764709126,
+					scoreBreakdown: []float64{0.2589587294127378, 0, 0},
+				},
+				"doc30": {
+					score:          0.07720657711354839,
+					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+				},
+				"doc24": {
+					score:          0.07720657711354839,
+					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+				},
+			},
+		},
+		{
+			numSegments: 6,
+			queryIndex:  2,
+			expectedResults: map[string]testResult{
+				"doc7": {
+					score:          2357.022603955158,
+					scoreBreakdown: []float64{0, 0, 7071.067811865475},
+				},
+				"doc29": {
+					score:          0.6774608026082964,
+					scoreBreakdown: []float64{0.23161973134064517, 0.7845714725717996, 0},
+				},
+				"doc23": {
+					score:          0.5783030702431613,
+					scoreBreakdown: []float64{0.32755976365480655, 0.5398948417099355, 0},
+				},
+				"doc3": {
+					score:          0.2550334160459894,
+					scoreBreakdown: []float64{0.7651002481379682, 0, 0},
+				},
+				"doc13": {
+					score:          0.2208654210738964,
+					scoreBreakdown: []float64{0.6625962632216892, 0, 0},
+				},
+				"doc5": {
+					score:          0.21180931116413285,
+					scoreBreakdown: []float64{0, 0, 0.6354279334923986},
+				},
+				"doc27": {
+					score:          0.09227950890170131,
+					scoreBreakdown: []float64{0.27683852670510395, 0, 0},
+				},
+				"doc28": {
+					score:          0.0863195764709126,
+					scoreBreakdown: []float64{0.2589587294127378, 0, 0},
+				},
+				"doc30": {
+					score:          0.07720657711354839,
+					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+				},
+				"doc24": {
+					score:          0.07720657711354839,
+					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+				},
+			},
+		},
+	}
+	for testCaseNum, testCase := range testCases {
+		tmpIndexPath := createTmpIndexPath(t)
+		index, err := New(tmpIndexPath, indexMapping)
+		if err != nil {
+			t.Fatal(err)
+		}
+		query := searchRequests[testCase.queryIndex]
+		err = createMultipleSegmentsIndex(documents, index, testCase.numSegments)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := index.Search(query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, hit := range res.Hits {
+			var expectedHit testResult
+			var ok bool
+			if expectedHit, ok = testCase.expectedResults[hit.ID]; !ok {
+				t.Fatalf("testcase %d failed: unexpected result %s", testCaseNum, hit.ID)
+			}
+			// Truncate to 6 decimal places
+			actualScore := truncateScore(hit.Score)
+			expectScore := truncateScore(expectedHit.score)
+			if expectScore != actualScore {
+				t.Fatalf("testcase %d failed: expected hit %d to have score %f, got %f", testCaseNum, i, expectedHit.score, hit.Score)
+			}
+			if len(hit.ScoreBreakdown) != len(expectedHit.scoreBreakdown) {
+				t.Fatalf("testcase %d failed: expected hit %d to have %d score breakdowns, got %d", testCaseNum, i, len(expectedHit.scoreBreakdown), len(hit.ScoreBreakdown))
+			}
+			for j := 0; j < len(hit.ScoreBreakdown); j++ {
+				// Truncate to 6 decimal places
+				actualScore := truncateScore(hit.ScoreBreakdown[j])
+				expectScore := truncateScore(expectedHit.scoreBreakdown[j])
+				if expectScore != actualScore {
+					t.Fatalf("testcase %d failed: expected hit %d to have score breakdown %f, got %f", testCaseNum, i, expectedHit.scoreBreakdown[j], hit.ScoreBreakdown[j])
+				}
+			}
+		}
+		err = index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		cleanupTmpIndexPath(t, tmpIndexPath)
+	}
 }

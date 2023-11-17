@@ -171,8 +171,8 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		return i.indexes[0].SearchInContext(ctx, req)
 	}
 
-	ctx = context.WithValue(ctx, search.AliasPartitionedModeKey, i.partitionedMode)
-	return MultiSearch(ctx, req, i.indexes...)
+	nctx := context.WithValue(ctx, search.AliasPartitionedModeKey, i.partitionedMode)
+	return MultiSearch(nctx, req, i.indexes...)
 }
 
 func (i *indexAliasImpl) Fields() ([]string, error) {
