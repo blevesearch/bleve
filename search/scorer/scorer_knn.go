@@ -26,8 +26,6 @@ import (
 
 var reflectStaticSizeKNNQueryScorer int
 
-const MaxAllowedScore = 10000.0
-
 func init() {
 	var sqs KNNQueryScorer
 	reflectStaticSizeKNNQueryScorer = int(reflect.TypeOf(sqs).Size())
@@ -62,6 +60,9 @@ func NewKNNQueryScorer(queryVector []float32, queryField string, queryBoost floa
 	}
 }
 
+// TODO: Better value needed here?
+const maxEuclideanDistance = 10000.0
+
 func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 	knnMatch *index.VectorDoc) *search.DocumentMatch {
 	rv := ctx.DocumentMatchPool.Get()
@@ -69,15 +70,16 @@ func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 	if sqs.includeScore || sqs.options.Explain {
 		var scoreExplanation *search.Explanation
 		score := knnMatch.Score
-		if score == 0.0 {
-			// the vector is found to be exactly same as the query vector
-			// this is a perfect match, so return the max score
-			score = MaxAllowedScore
-		} else if sqs.similarityMetric == index.EuclideanDistance {
-			// safeguard from divide-by-zero
-			// euclidean distances need to be inverted to work
-			// tf-idf scoring
-			score = 1.0 / score
+		if sqs.similarityMetric == index.EuclideanDistance {
+			// in case of euclidean distance being the distance metric,
+			// an exact vector (perfect match), would return distance = 0
+			if score == 0 {
+				score = maxEuclideanDistance
+			} else {
+				// euclidean distances need to be inverted to work with
+				// tf-idf scoring
+				score = 1.0 / score
+			}
 		}
 
 		// if the query weight isn't 1, multiply

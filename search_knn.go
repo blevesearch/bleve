@@ -181,17 +181,22 @@ func mergeKNNResults(req *SearchRequest, sr *SearchResult) {
 	}
 }
 
-func modifyRequestSize(req *SearchRequest, numIndexes int) {
-	if len(req.KNN) > 0 {
-		var minSizeReq int64
-		for _, knn := range req.KNN {
-			minSizeReq += knn.K
-		}
-		minSizeReq *= int64(numIndexes)
-		if int64(req.Size) < minSizeReq {
-			req.Size = int(minSizeReq)
+func adjustRequestSizeForKNN(req *SearchRequest, numIndexPartitions int) int {
+	var adjustedSize int
+	if req != nil {
+		adjustedSize = req.Size
+		if len(req.KNN) > 0 {
+			var minSizeReq int64
+			for _, knn := range req.KNN {
+				minSizeReq += knn.K
+			}
+			minSizeReq *= int64(numIndexPartitions)
+			if int64(adjustedSize) < minSizeReq {
+				adjustedSize = int(minSizeReq)
+			}
 		}
 	}
+	return adjustedSize
 }
 
 // heap impl

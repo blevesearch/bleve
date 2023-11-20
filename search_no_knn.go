@@ -153,7 +153,12 @@ func validateKNN(req *SearchRequest) error {
 }
 
 func mergeKNNResults(req *SearchRequest, sr *SearchResult) {
+	// no-op
 }
 
-func modifyRequestSize(req *SearchRequest, numPartitions int) {
+func adjustRequestSizeForKNN(req *SearchRequest, numIndexPartitions int) int {
+	if req != nil {
+		return req.Size
+	}
+	return 0
 }

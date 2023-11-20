@@ -454,7 +454,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 	}
 	originalSize := req.Size
 	if len(indexes) > 1 {
-		modifyRequestSize(req, len(indexes))
+		req.Size = adjustRequestSizeForKNN(req, len(indexes))
 	}
 
 	// run search on each index in separate go routine
