@@ -181,13 +181,13 @@ func mergeKNNResults(req *SearchRequest, sr *SearchResult) {
 	}
 }
 
-func modifyRequestSize(req *SearchRequest, numPartitions int) {
+func modifyRequestSize(req *SearchRequest, numIndexes int) {
 	if len(req.KNN) > 0 {
 		var minSizeReq int64
 		for _, knn := range req.KNN {
 			minSizeReq += knn.K
 		}
-		minSizeReq *= int64(numPartitions)
+		minSizeReq *= int64(numIndexes)
 		if int64(req.Size) < minSizeReq {
 			req.Size = int(minSizeReq)
 		}

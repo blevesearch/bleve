@@ -25,11 +25,10 @@ import (
 )
 
 type indexAliasImpl struct {
-	name            string
-	indexes         []Index
-	mutex           sync.RWMutex
-	open            bool
-	partitionedMode bool
+	name    string
+	indexes []Index
+	mutex   sync.RWMutex
+	open    bool
 }
 
 // NewIndexAlias creates a new IndexAlias over the provided
@@ -40,10 +39,6 @@ func NewIndexAlias(indexes ...Index) *indexAliasImpl {
 		indexes: indexes,
 		open:    true,
 	}
-}
-
-func (i *indexAliasImpl) SetPartitionedMode(partitionedMode bool) {
-	i.partitionedMode = partitionedMode
 }
 
 // VisitIndexes invokes the visit callback on every
@@ -170,9 +165,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	if len(i.indexes) == 1 {
 		return i.indexes[0].SearchInContext(ctx, req)
 	}
-
-	nctx := context.WithValue(ctx, search.AliasPartitionedModeKey, i.partitionedMode)
-	return MultiSearch(nctx, req, i.indexes...)
+	return MultiSearch(ctx, req, i.indexes...)
 }
 
 func (i *indexAliasImpl) Fields() ([]string, error) {
@@ -460,22 +453,8 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 		req.SearchBefore = nil
 	}
 	originalSize := req.Size
-	if mode := ctx.Value(search.AliasPartitionedModeKey); mode != nil {
-		aliasForPartitionedIndex, ok := mode.(bool)
-		if ok && aliasForPartitionedIndex && len(indexes) > 1 {
-			// this is an alias for a partitioned index, where each child index
-			// is a partition of a larger index.
-			// when knn queries are present we need to  modify the
-			// size property of the request to ensure that the pagination works
-			// correctly, irrespective of the number of partitions.
-			// i.e if sum of all k is K and there are N partitions,
-			// then the top K hits from each partition is returned, resulting in
-			// N*K hits (worst case). If the size of the request < N*K, then the ordering
-			// of the hits will be different from the ordering of the hits when
-			// size >= N*K, upon merging since complete information is not available
-			// hence we need to modify the size to be N*K.
-			modifyRequestSize(req, len(indexes))
-		}
+	if len(indexes) > 1 {
+		modifyRequestSize(req, len(indexes))
 	}
 
 	// run search on each index in separate go routine
@@ -529,21 +508,8 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 		}
 	}
 
-	if mode := ctx.Value(search.AliasPartitionedModeKey); mode != nil {
-		aliasForPartitionedIndex, ok := mode.(bool)
-		if ok && aliasForPartitionedIndex && len(indexes) > 1 {
-			// this is an alias for a partitioned index, where each child index
-			// is a partition of a larger index.
-			// when knn queries are present we need to perform
-			// a special merge of the hits to ensure that hits corresponding to the
-			// knn queries are representative of the entire index, not just the
-			// partition that was searched. If k is 2 and there are 3 partitions,
-			// then the top 2 hits from each partition is returned, resulting in
-			// 6 hits in total. This is incorrect because k=2 should return the
-			// top 2 hits from the entire index, not the top 2 hits from each
-			// partition.
-			mergeKNNResults(req, sr)
-		}
+	if len(indexes) > 1 {
+		mergeKNNResults(req, sr)
 	}
 
 	sortFunc := req.SortFunc()

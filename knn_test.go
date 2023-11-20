@@ -216,7 +216,6 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 	indexMapping.DefaultMapping.AddFieldMappingsAt("vector", vecFieldMapping)
 
 	index := NewIndexAlias()
-	index.SetPartitionedMode(true)
 
 	type testResult struct {
 		score          float64
