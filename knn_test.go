@@ -18,16 +18,17 @@
 package bleve
 
 import (
+	"archive/zip"
 	"encoding/json"
 	"math/rand"
-	"os"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/mapping"
 )
 
-const testDatasetFileName = "test/knn/knn_dataset.json"
-const testQueryFileName = "test/knn/knn_queries.json"
+const testInputCompressedFile = "test/knn/knn_dataset_queries.zip"
+const testDatasetFileName = "knn_dataset.json"
+const testQueryFileName = "knn_queries.json"
 
 const testDatasetDims = 384
 
@@ -37,17 +38,35 @@ type testDocument struct {
 	Vector  []float64 `json:"vector"`
 }
 
-func createVectorDataset(datasetFileName string) ([]testDocument, error) {
+func readDatasetAndQueries(fileName string) ([]testDocument, []*SearchRequest, error) {
+	// Open the zip archive for reading
+	r, err := zip.OpenReader(fileName)
+	if err != nil {
+		return nil, nil, err
+	}
 	var dataset []testDocument
-	datasetFileData, err := os.ReadFile(datasetFileName)
-	if err != nil {
-		return nil, err
+	var queries []*SearchRequest
+
+	defer r.Close()
+	for _, f := range r.File {
+		jsonFile, err := f.Open()
+		if err != nil {
+			return nil, nil, err
+		}
+		defer jsonFile.Close()
+		if f.Name == testDatasetFileName {
+			err = json.NewDecoder(jsonFile).Decode(&dataset)
+			if err != nil {
+				return nil, nil, err
+			}
+		} else if f.Name == testQueryFileName {
+			err = json.NewDecoder(jsonFile).Decode(&queries)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
 	}
-	err = json.Unmarshal(datasetFileData, &dataset)
-	if err != nil {
-		return nil, err
-	}
-	return dataset, nil
+	return dataset, queries, nil
 }
 
 func makeDatasetIntoDocuments(dataset []testDocument) []map[string]interface{} {
@@ -60,19 +79,6 @@ func makeDatasetIntoDocuments(dataset []testDocument) []map[string]interface{} {
 		documents[i] = document
 	}
 	return documents
-}
-
-func getSearchRequests(queryFileName string) ([]*SearchRequest, error) {
-	var reqArr []*SearchRequest
-	queryFileData, err := os.ReadFile(queryFileName)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(queryFileData, &reqArr)
-	if err != nil {
-		return nil, err
-	}
-	return reqArr, nil
 }
 
 func cleanUp(t *testing.T, indexPaths []string, indexes ...Index) {
@@ -189,17 +195,13 @@ func TestSimilaritySearchNotRandomized(t *testing.T) {
 }
 
 func runKNNTest(t *testing.T, randomizeDocuments bool) {
-	dataset, err := createVectorDataset(testDatasetFileName)
+	dataset, searchRequests, err := readDatasetAndQueries(testInputCompressedFile)
 	if err != nil {
 		t.Fatal(err)
 	}
 	documents := makeDatasetIntoDocuments(dataset)
 	if randomizeDocuments {
 		documents = shuffleDocuments(documents)
-	}
-	searchRequests, err := getSearchRequests(testQueryFileName)
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	indexMapping := NewIndexMapping()
@@ -483,15 +485,11 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 }
 
 func TestSimilaritySearchMultipleSegments(t *testing.T) {
-	dataset, err := createVectorDataset(testDatasetFileName)
+	dataset, searchRequests, err := readDatasetAndQueries(testInputCompressedFile)
 	if err != nil {
 		t.Fatal(err)
 	}
 	documents := makeDatasetIntoDocuments(dataset)
-	searchRequests, err := getSearchRequests(testQueryFileName)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	indexMapping := NewIndexMapping()
 	contentFieldMapping := NewTextFieldMapping()
