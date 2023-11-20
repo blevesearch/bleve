@@ -181,6 +181,19 @@ func mergeKNNResults(req *SearchRequest, sr *SearchResult) {
 	}
 }
 
+func modifyRequestSize(req *SearchRequest, numPartitions int) {
+	if len(req.KNN) > 0 {
+		var minSizeReq int64
+		for _, knn := range req.KNN {
+			minSizeReq += knn.K
+		}
+		minSizeReq *= int64(numPartitions)
+		if int64(req.Size) < minSizeReq {
+			req.Size = int(minSizeReq)
+		}
+	}
+}
+
 // heap impl
 type scoreHeap struct {
 	scoreBreakdown []*[]float64

@@ -224,6 +224,7 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 	}
 
 	type testCase struct {
+		testType           string
 		queryIndex         int
 		numIndexPartitions int
 		expectedResults    map[string]testResult
@@ -231,6 +232,7 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 
 	testCases := []testCase{
 		{
+			testType:           "single_partition:match_none:oneKNNreq:k=3",
 			queryIndex:         0,
 			numIndexPartitions: 1,
 			expectedResults: map[string]testResult{
@@ -249,6 +251,7 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			},
 		},
 		{
+			testType:           "multi_partition:match_none:oneKNNreq:k=3",
 			queryIndex:         0,
 			numIndexPartitions: 4,
 			expectedResults: map[string]testResult{
@@ -267,6 +270,7 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			},
 		},
 		{
+			testType:           "multi_partition:match_none:oneKNNreq:k=2",
 			queryIndex:         0,
 			numIndexPartitions: 10,
 			expectedResults: map[string]testResult{
@@ -285,6 +289,7 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			},
 		},
 		{
+			testType:           "single_partition:match:oneKNNreq:k=2",
 			queryIndex:         1,
 			numIndexPartitions: 1,
 			expectedResults: map[string]testResult{
@@ -315,6 +320,7 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			},
 		},
 		{
+			testType:           "multi_partition:match:oneKNNreq:k=2",
 			queryIndex:         1,
 			numIndexPartitions: 5,
 			expectedResults: map[string]testResult{
@@ -345,6 +351,7 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			},
 		},
 		{
+			testType:           "single_partition:disjunction:twoKNNreq:k=2,2",
 			queryIndex:         2,
 			numIndexPartitions: 1,
 			expectedResults: map[string]testResult{
@@ -391,6 +398,7 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			},
 		},
 		{
+			testType:           "multi_partition:disjunction:twoKNNreq:k=2,2",
 			queryIndex:         2,
 			numIndexPartitions: 4,
 			expectedResults: map[string]testResult{
@@ -436,6 +444,91 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 				},
 			},
 		},
+		{
+			// control:
+			// from = 0
+			// size = 8
+			testType:           "pagination",
+			queryIndex:         3,
+			numIndexPartitions: 4,
+			expectedResults: map[string]testResult{
+				"doc24": {
+					score:          1.22027994094805,
+					scoreBreakdown: []float64{0.027736154383370196, 0.3471022633855392, 0.5085619451465123, 0.33687957803262836},
+				},
+				"doc17": {
+					score:          0.7851856993753307,
+					scoreBreakdown: []float64{0.3367753689069724, 0, 0.3892791754255179, 0.320859721501284},
+				},
+				"doc21": {
+					score:          0.5927148028393034,
+					scoreBreakdown: []float64{0.06974846263723515, 0, 0.3914133076090359, 0.3291246335394669},
+				},
+				"doc14": {
+					score:          0.45680756875853035,
+					scoreBreakdown: []float64{0.5968461853543279, 0, 0, 0.31676895216273276},
+				},
+				"doc25": {
+					score:          0.292014972318407,
+					scoreBreakdown: []float64{0.17861510907524708, 0, 0.405414835561567, 0},
+				},
+				"doc23": {
+					score:          0.24706850662359503,
+					scoreBreakdown: []float64{0.09761951136424651, 0, 0.39651750188294355, 0},
+				},
+				"doc15": {
+					score:          0.24489276164017085,
+					scoreBreakdown: []float64{0.17216818679645968, 0, 0, 0.317617336483882},
+				},
+				"doc5": {
+					score:          0.10331722282971788,
+					scoreBreakdown: []float64{0, 0.4132688913188715, 0, 0},
+				},
+			},
+		},
+		{
+			// experimental:
+			// from = 0
+			// size = 3
+			testType:           "pagination",
+			queryIndex:         4,
+			numIndexPartitions: 4,
+			expectedResults: map[string]testResult{
+				"doc24": {
+					score:          1.22027994094805,
+					scoreBreakdown: []float64{0.027736154383370196, 0.3471022633855392, 0.5085619451465123, 0.33687957803262836},
+				},
+				"doc17": {
+					score:          0.7851856993753307,
+					scoreBreakdown: []float64{0.3367753689069724, 0, 0.3892791754255179, 0.320859721501284},
+				},
+				"doc21": {
+					score:          0.5927148028393034,
+					scoreBreakdown: []float64{0.06974846263723515, 0, 0.3914133076090359, 0.3291246335394669},
+				},
+			},
+		},
+		{
+			// from = 3
+			// size = 3
+			testType:           "pagination",
+			queryIndex:         5,
+			numIndexPartitions: 4,
+			expectedResults: map[string]testResult{
+				"doc14": {
+					score:          0.45680756875853035,
+					scoreBreakdown: []float64{0.5968461853543279, 0, 0, 0.31676895216273276},
+				},
+				"doc25": {
+					score:          0.292014972318407,
+					scoreBreakdown: []float64{0.17861510907524708, 0, 0.405414835561567, 0},
+				},
+				"doc23": {
+					score:          0.24706850662359503,
+					scoreBreakdown: []float64{0.09761951136424651, 0, 0.39651750188294355, 0},
+				},
+			},
+		},
 	}
 
 	for testCaseNum, testCase := range testCases {
@@ -448,6 +541,10 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 		}
 		if len(res.Hits) != len(testCase.expectedResults) {
 			t.Fatalf("testcase %d failed: expected %d results, got %d", testCaseNum, len(testCase.expectedResults), len(res.Hits))
+		}
+		if randomizeDocuments && testCase.testType == "pagination" {
+			// pagination is not deterministic when documents are randomized
+			continue
 		}
 		for i, hit := range res.Hits {
 			var expectedHit testResult

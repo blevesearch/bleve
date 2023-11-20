@@ -459,6 +459,24 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 		req.SearchAfter = req.SearchBefore
 		req.SearchBefore = nil
 	}
+	originalSize := req.Size
+	if mode := ctx.Value(search.AliasPartitionedModeKey); mode != nil {
+		aliasForPartitionedIndex, ok := mode.(bool)
+		if ok && aliasForPartitionedIndex && len(indexes) > 1 {
+			// this is an alias for a partitioned index, where each child index
+			// is a partition of a larger index.
+			// when knn queries are present we need to  modify the
+			// size property of the request to ensure that the pagination works
+			// correctly, irrespective of the number of partitions.
+			// i.e if sum of all k is K and there are N partitions,
+			// then the top K hits from each partition is returned, resulting in
+			// N*K hits (worst case). If the size of the request < N*K, then the ordering
+			// of the hits will be different from the ordering of the hits when
+			// size >= N*K, upon merging since complete information is not available
+			// hence we need to modify the size to be N*K.
+			modifyRequestSize(req, len(indexes))
+		}
+	}
 
 	// run search on each index in separate go routine
 	var waitGroup sync.WaitGroup
@@ -497,6 +515,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 			indexErrors[asr.Name] = asr.Err
 		}
 	}
+	req.Size = originalSize
 
 	// merge just concatenated all the hits
 	// now lets clean it up
