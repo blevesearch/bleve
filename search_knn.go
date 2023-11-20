@@ -168,7 +168,8 @@ var (
 )
 
 func queryWithKNN(req *SearchRequest) (query.Query, error) {
-	if len(req.KNN) > 0 {
+	_, ok := req.Query.(*query.KNNQuery)
+	if len(req.KNN) > 0 || ok {
 		subQueries := []query.Query{req.Query}
 		for _, knn := range req.KNN {
 			if knn != nil {

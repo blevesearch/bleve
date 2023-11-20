@@ -46,6 +46,18 @@ func optionsDisjunctionOptimizable(options search.SearcherOptions) bool {
 func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
 	limit bool) (search.Searcher, error) {
+
+	// The KNN Searcher optimization is a necessary pre-req for KNN Searchers, not an
+	// optional optimization like for, say term searchers.
+	// It's an optimization in the sense that it's more optimal to batch calls
+	// Hence, this optimization should be invoked for KNN searchers irrespective
+	// of whether there are other searchers in the disjunction or not.
+
+	err := optimizeKNNSearcher(ctx, "", indexReader, qsearchers, options)
+	if err != nil {
+		return nil, err
+	}
+
 	// attempt the "unadorned" disjunction optimization only when we
 	// do not need extra information like freq-norm's or term vectors
 	// and the requested min is simple

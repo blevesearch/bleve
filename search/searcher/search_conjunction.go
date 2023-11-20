@@ -49,6 +49,13 @@ type ConjunctionSearcher struct {
 func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, options search.SearcherOptions) (
 	search.Searcher, error) {
+	// Doing this prior to sorting since sorting involves Count() which requires
+	// posting lists to be populated.
+	err := optimizeKNNSearcher(ctx, "", indexReader, qsearchers, options)
+	if err != nil {
+		return nil, err
+	}
+
 	// build the sorted downstream searchers
 	sortedSearchers := &OrderedSearcherList{
 		searchers: make([]search.Searcher, len(qsearchers)),

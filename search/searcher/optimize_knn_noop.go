@@ -12,38 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build vectors
-// +build vectors
+//go:build !vectors
+// +build !vectors
 
-package scorch
+package searcher
 
 import (
 	"context"
 
+	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
-	segment_api "github.com/blevesearch/scorch_segment_api/v2"
 )
 
-func (is *IndexSnapshot) VectorReader(ctx context.Context, vector []float32,
-	field string, k int64) (
-	index.VectorReader, error) {
-
-	rv := &IndexSnapshotVectorReader{
-		vector:      vector,
-		field:       field,
-		k:           k,
-		snapshot:    is,
-		queryVector: vector,
-	}
-
-	if rv.postings == nil {
-		rv.postings = make([]segment_api.VecPostingsList, len(is.segment))
-	}
-	if rv.iterators == nil {
-		rv.iterators = make([]segment_api.VecPostingsIterator, len(is.segment))
-	}
-
-	// Do this as part of optimizations' Finish() func.
-
-	return rv, nil
+func optimizeKNNSearcher(ctx context.Context, optimizationKind string,
+	indexReader index.IndexReader, qsearchers []search.Searcher,
+	options search.SearcherOptions) error {
+	// Not supported
+	return nil
 }

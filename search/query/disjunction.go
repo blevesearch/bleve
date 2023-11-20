@@ -64,6 +64,7 @@ func (q *DisjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 	options search.SearcherOptions) (search.Searcher, error) {
 	ss := make([]search.Searcher, 0, len(q.Disjuncts))
 	for _, disjunct := range q.Disjuncts {
+		// at this point, VR has already read the vector index
 		sr, err := disjunct.Searcher(ctx, i, m, options)
 		if err != nil {
 			for _, searcher := range ss {

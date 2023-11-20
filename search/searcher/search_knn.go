@@ -60,6 +60,16 @@ func NewKNNSearcher(ctx context.Context, i index.IndexReader, m mapping.IndexMap
 	return nil, nil
 }
 
+func (s *KNNSearcher) Optimize(kind string, octx index.OptimizableContext) (
+	index.OptimizableContext, error) {
+	o, ok := s.vectorReader.(index.Optimizable)
+	if ok {
+		return o.Optimize(kind, octx)
+	}
+
+	return nil, nil
+}
+
 func (s *KNNSearcher) Advance(ctx *search.SearchContext, ID index.IndexInternalID) (
 	*search.DocumentMatch, error) {
 	knnMatch, err := s.vectorReader.Next(s.vd.Reset())
