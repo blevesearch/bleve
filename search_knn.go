@@ -20,6 +20,7 @@ package bleve
 import (
 	"container/heap"
 	"encoding/json"
+	"fmt"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -163,6 +164,15 @@ func disjunctQueryWithKNN(req *SearchRequest) query.Query {
 		return query.NewDisjunctionQuery(disjuncts)
 	}
 	return req.Query
+}
+
+func validateKNN(req *SearchRequest) error {
+	for _, q := range req.KNN {
+		if q.K <= 0 || len(q.Vector) == 0 {
+			return fmt.Errorf("k must be greater than 0 and vector must be non-empty")
+		}
+	}
+	return nil
 }
 
 func mergeKNNResults(req *SearchRequest, sr *SearchResult) {

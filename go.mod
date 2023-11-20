@@ -5,13 +5,13 @@ go 1.20
 require (
 	github.com/RoaringBitmap/roaring v1.2.3
 	github.com/bits-and-blooms/bitset v1.2.0
-	github.com/blevesearch/bleve_index_api v1.1.2
+	github.com/blevesearch/bleve_index_api v1.1.3
 	github.com/blevesearch/geo v0.1.18
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/blevesearch/go-porterstemmer v1.0.3
 	github.com/blevesearch/goleveldb v1.0.1
 	github.com/blevesearch/gtreap v0.1.1
-	github.com/blevesearch/scorch_segment_api/v2 v2.2.2
+	github.com/blevesearch/scorch_segment_api/v2 v2.2.3
 	github.com/blevesearch/segment v0.9.1
 	github.com/blevesearch/snowball v0.6.1
 	github.com/blevesearch/snowballstem v0.9.0

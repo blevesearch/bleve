@@ -313,6 +313,10 @@ func (r *SearchRequest) Validate() error {
 		}
 	}
 
+	err := validateKNN(r)
+	if err != nil {
+		return err
+	}
 	return r.Facets.Validate()
 }
 

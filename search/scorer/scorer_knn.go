@@ -21,7 +21,6 @@ import (
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
-	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -74,7 +73,7 @@ func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 			// the vector is found to be exactly same as the query vector
 			// this is a perfect match, so return the max score
 			score = MaxAllowedScore
-		} else if sqs.similarityMetric == util.EuclideanDistance {
+		} else if sqs.similarityMetric == index.EuclideanDistance {
 			// safeguard from divide-by-zero
 			// euclidean distances need to be inverted to work
 			// tf-idf scoring

@@ -148,5 +148,9 @@ func disjunctQueryWithKNN(req *SearchRequest) query.Query {
 	return req.Query
 }
 
+func validateKNN(req *SearchRequest) error {
+	return nil
+}
+
 func mergeKNNResults(req *SearchRequest, sr *SearchResult) {
 }

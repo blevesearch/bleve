@@ -2,8 +2,8 @@ github.com/RoaringBitmap/roaring v1.2.3 h1:yqreLINqIrX22ErkKI0vY47/ivtJr6n+kMhVO
 github.com/RoaringBitmap/roaring v1.2.3/go.mod h1:plvDsJQpxOC5bw8LRteu/MLWHsHez/3y6cubLI4/1yE=
 github.com/bits-and-blooms/bitset v1.2.0 h1:Kn4yilvwNtMACtf1eYDlG8H77R07mZSPbMjLyS07ChA=
 github.com/bits-and-blooms/bitset v1.2.0/go.mod h1:gIdJ4wp64HaoK2YrL1Q5/N7Y16edYb8uY+O0FJTyyDA=
-github.com/blevesearch/bleve_index_api v1.1.2 h1:A8MhXiNbZ9DI+lZytWkOY75MwesRdOlE+7/MzdC9YXY=
-github.com/blevesearch/bleve_index_api v1.1.2/go.mod h1:PbcwjIcRmjhGbkS/lJCpfgVSMROV6TRubGGAODaK1W8=
+github.com/blevesearch/bleve_index_api v1.1.3 h1:aNyMEiWFviY/1zYm7JCr2lZRIiYX0TMtz3oymxxbApc=
+github.com/blevesearch/bleve_index_api v1.1.3/go.mod h1:PbcwjIcRmjhGbkS/lJCpfgVSMROV6TRubGGAODaK1W8=
 github.com/blevesearch/geo v0.1.18 h1:Np8jycHTZ5scFe7VEPLrDoHnnb9C4j636ue/CGrhtDw=
 github.com/blevesearch/geo v0.1.18/go.mod h1:uRMGWG0HJYfWfFJpK3zTdnnr1K+ksZTuWKhXeSokfnM=
 github.com/blevesearch/go-faiss v1.0.3-0.20231110151003-0ea762e5c06d h1:qIVY0mozIvyrOJso6EnuWnXMDjOy9DqCC+TOEdthdNg=
@@ -19,8 +19,8 @@ github.com/blevesearch/gtreap v0.1.1/go.mod h1:QaQyDRAT51sotthUWAH4Sj08awFSSWzgY
 github.com/blevesearch/mmap-go v1.0.2/go.mod h1:ol2qBqYaOUsGdm7aRMRrYGgPvnwLe6Y+7LMvAB5IbSA=
 github.com/blevesearch/mmap-go v1.0.4 h1:OVhDhT5B/M1HNPpYPBKIEJaD0F3Si+CrEKULGCDPWmc=
 github.com/blevesearch/mmap-go v1.0.4/go.mod h1:EWmEAOmdAS9z/pi/+Toxu99DnsbhG1TIxUoRmJw/pSs=
-github.com/blevesearch/scorch_segment_api/v2 v2.2.2 h1:wRkJ2tAP0HsS4M2pK/qDkNV0PvUo33umcsjzLIgvVA4=
-github.com/blevesearch/scorch_segment_api/v2 v2.2.2/go.mod h1:7mKEerrxzvfImS2pMvpfV5MGFYVcQ9NBTkBd/ApU7cI=
+github.com/blevesearch/scorch_segment_api/v2 v2.2.3 h1:apMwrcLmPrlMZ2n+SzcTJ6v0EVWjVU6PXZ+IlC+MTiw=
+github.com/blevesearch/scorch_segment_api/v2 v2.2.3/go.mod h1:ZDNK8ckaZNQ1nLz5ELvAd7BffgiNEwtkZMYF9B6rt8E=
 github.com/blevesearch/segment v0.9.1 h1:+dThDy+Lvgj5JMxhmOVlgFfkUtZV2kw49xax4+jTfSU=
 github.com/blevesearch/segment v0.9.1/go.mod h1:zN21iLm7+GnBHWTao9I+Au/7MBiL8pPFtJBJTsk6kQw=
 github.com/blevesearch/snowball v0.6.1 h1:cDYjn/NCH+wwt2UdehaLpr2e4BwLIjN4V/TdLsL+B5A=

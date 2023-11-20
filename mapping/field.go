@@ -75,7 +75,7 @@ type FieldMapping struct {
 
 	// Similarity is the similarity algorithm used for scoring
 	// vector fields.
-	// See: util.DefaultSimilarityMetric & util.SupportedSimilarityMetrics
+	// See: index.DefaultSimilarityMetric & index.SupportedSimilarityMetrics
 	Similarity string `json:"similarity,omitempty"`
 }
 
