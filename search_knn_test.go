@@ -852,14 +852,14 @@ func TestKNNOperator(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
-    const dims = 5
-    getRandomVector := func() []float32 {
-        vec := make([]float32, dims)
-        for i := 0; i < dims; i++ {
-            vec[i] = rand.Float32()
-        }
-        return vec
-    }
+	const dims = 5
+	getRandomVector := func() []float32 {
+		vec := make([]float32, dims)
+		for i := 0; i < dims; i++ {
+			vec[i] = rand.Float32()
+		}
+		return vec
+	}
 
 	dataset := make([]map[string]interface{}, 10)
 
@@ -907,7 +907,7 @@ func TestKNNOperator(t *testing.T) {
 
 	err = index.Batch(batch)
 	if err != nil {
-        t.Fatal(err)
+		t.Fatal(err)
 	}
 
 	termQuery := query.NewTermQuery("2")
