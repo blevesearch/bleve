@@ -33,6 +33,8 @@ import (
 // and using the same value for knn searchers will make the
 // knn score dependent on tf-idf.
 func computeQueryNorm(searchers []search.Searcher) (float64, float64) {
+	var queryNorm float64
+	var queryNormForKNN float64
 	// first calculate sum of squared weights
 	sumOfSquaredWeights := 0.0
 
@@ -46,8 +48,12 @@ func computeQueryNorm(searchers []search.Searcher) (float64, float64) {
 		}
 	}
 	// now compute query norm from this
-	queryNorm := 1.0 / math.Sqrt(sumOfSquaredWeights)
-	queryNormForKNN := 1.0 / math.Sqrt(sumOfSquaredWeightsForKNN)
+	if sumOfSquaredWeights != 0.0 {
+		queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
+	}
+	if sumOfSquaredWeightsForKNN != 0.0 {
+		queryNormForKNN = 1.0 / math.Sqrt(sumOfSquaredWeightsForKNN)
+	}
 	// finally tell all the downstream searchers the norm
 	for _, searcher := range searchers {
 		if knnSearcher, ok := searcher.(*KNNSearcher); ok {

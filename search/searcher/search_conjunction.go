@@ -35,6 +35,7 @@ func init() {
 type ConjunctionSearcher struct {
 	indexReader     index.IndexReader
 	searchers       []search.Searcher
+	originalPos     []int
 	queryNorm       float64
 	queryNormForKNN float64
 	currs           []*search.DocumentMatch
@@ -59,6 +60,7 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	}
 	sort.Sort(sortedSearchers)
 	searchers := sortedSearchers.searchers
+	originalPos := sortedSearchers.index
 
 	// attempt the "unadorned" conjunction optimization only when we
 	// do not need extra information like freq-norm's or term vectors
@@ -75,6 +77,7 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	rv := ConjunctionSearcher{
 		indexReader: indexReader,
 		options:     options,
+		originalPos: originalPos,
 		searchers:   searchers,
 		currs:       make([]*search.DocumentMatch, len(searchers)),
 		scorer:      scorer.NewConjunctionQueryScorer(options),
@@ -106,6 +109,8 @@ func (s *ConjunctionSearcher) Size() int {
 			sizeInBytes += entry.Size()
 		}
 	}
+
+	sizeInBytes += len(s.originalPos) * size.SizeOfInt
 
 	return sizeInBytes
 }
@@ -198,7 +203,7 @@ OUTER:
 		}
 
 		// if we get here, a doc matched all readers, so score and add it
-		rv = s.scorer.Score(ctx, s.currs)
+		rv = s.scorer.Score(ctx, s.currs, s.originalPos)
 
 		// we know all the searchers are pointing at the same thing
 		// so they all need to be bumped

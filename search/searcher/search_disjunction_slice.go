@@ -106,6 +106,7 @@ func (s *DisjunctionSliceSearcher) Size() int {
 	}
 
 	sizeInBytes += len(s.matchingIdxs) * size.SizeOfInt
+	sizeInBytes += len(s.originalPos) * size.SizeOfInt
 
 	return sizeInBytes
 }
