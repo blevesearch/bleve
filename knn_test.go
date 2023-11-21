@@ -20,6 +20,7 @@ package bleve
 import (
 	"archive/zip"
 	"encoding/json"
+	"math"
 	"math/rand"
 	"testing"
 
@@ -355,8 +356,8 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			numIndexPartitions: 1,
 			expectedResults: map[string]testResult{
 				"doc7": {
-					score:          2357.022603955158,
-					scoreBreakdown: []float64{0, 0, 7071.067811865475},
+					score:          math.MaxFloat64,
+					scoreBreakdown: []float64{0, 0, math.MaxFloat64 / 3.0},
 				},
 				"doc29": {
 					score:          0.6774608026082964,
@@ -402,8 +403,8 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			numIndexPartitions: 4,
 			expectedResults: map[string]testResult{
 				"doc7": {
-					score:          2357.022603955158,
-					scoreBreakdown: []float64{0, 0, 7071.067811865475},
+					score:          math.MaxFloat64,
+					scoreBreakdown: []float64{0, 0, math.MaxFloat64 / 3.0},
 				},
 				"doc29": {
 					score:          0.567426591648309,
