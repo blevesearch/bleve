@@ -1,3 +1,17 @@
+//  Copyright (c) 2023 Couchbase, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 		http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //go:build vectors
 // +build vectors
 
@@ -10,14 +24,14 @@ import (
 	segment_api "github.com/blevesearch/scorch_segment_api/v2"
 )
 
-type OptimizeVRDisjunction struct {
+type OptimizeVR struct {
 	snapshot *IndexSnapshot
 
 	// map of the same field --> vrs
 	vrs map[string][]*IndexSnapshotVectorReader
 }
 
-func (o *OptimizeVRDisjunction) Finish() (index.Optimized, error) {
+func (o *OptimizeVR) Finish() error {
 
 	// for each field, get the faiss index --> invoke the zap func.
 
@@ -34,7 +48,7 @@ func (o *OptimizeVRDisjunction) Finish() (index.Optimized, error) {
 				// reading just once per field per segment.
 				faissIndex, err := sv.ReadVectorIndex(field)
 				if err != nil {
-					return nil, err
+					return err
 				}
 				defer faissIndex.Close()
 
@@ -44,7 +58,7 @@ func (o *OptimizeVRDisjunction) Finish() (index.Optimized, error) {
 					pl, err := sv.SearchSimilarVectors(faissIndex, vr.field,
 						vr.queryVector, vr.k, seg.deleted)
 					if err != nil {
-						return nil, err
+						return err
 					}
 					vr.postings[i] = pl
 					vr.iterators[i] = pl.Iterator(vr.iterators[i])
@@ -53,19 +67,19 @@ func (o *OptimizeVRDisjunction) Finish() (index.Optimized, error) {
 		}
 	}
 
-	return nil, nil
+	return nil
 }
 
-func (s *IndexSnapshotVectorReader) Optimize(kind string,
-	octx index.OptimizableContext) (index.OptimizableContext, error) {
+func (s *IndexSnapshotVectorReader) VectorOptimize(
+	octx index.VectorOptimizableContext) (index.VectorOptimizableContext, error) {
 
 	if octx == nil {
-		octx = &OptimizeVRDisjunction{snapshot: s.snapshot,
+		octx = &OptimizeVR{snapshot: s.snapshot,
 			vrs: make(map[string][]*IndexSnapshotVectorReader),
 		}
 	}
 
-	o, ok := octx.(*OptimizeVRDisjunction)
+	o, ok := octx.(*OptimizeVR)
 	if !ok {
 		return octx, nil
 	}

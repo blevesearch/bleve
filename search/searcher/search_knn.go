@@ -60,11 +60,11 @@ func NewKNNSearcher(ctx context.Context, i index.IndexReader, m mapping.IndexMap
 	return nil, nil
 }
 
-func (s *KNNSearcher) Optimize(kind string, octx index.OptimizableContext) (
-	index.OptimizableContext, error) {
-	o, ok := s.vectorReader.(index.Optimizable)
+func (s *KNNSearcher) VectorOptimize(octx index.VectorOptimizableContext) (
+	index.VectorOptimizableContext, error) {
+	o, ok := s.vectorReader.(index.VectorOptimizable)
 	if ok {
-		return o.Optimize(kind, octx)
+		return o.VectorOptimize(octx)
 	}
 
 	return nil, nil

@@ -27,7 +27,7 @@ import (
 func optimizeKNNSearcher(ctx context.Context, optimizationKind string,
 	indexReader index.IndexReader, qsearchers []search.Searcher,
 	options search.SearcherOptions) error {
-	var octx index.OptimizableContext
+	var octx index.VectorOptimizableContext
 
 	for _, searcher := range qsearchers {
 		// Only applicable to KNN Searchers.
@@ -35,13 +35,13 @@ func optimizeKNNSearcher(ctx context.Context, optimizationKind string,
 			continue
 		}
 
-		o, ok := searcher.(index.Optimizable)
+		o, ok := searcher.(index.VectorOptimizable)
 		if !ok {
 			return nil
 		}
 
 		var err error
-		octx, err = o.Optimize(optimizationKind, octx)
+		octx, err = o.VectorOptimize(octx)
 		if err != nil {
 			return err
 		}
@@ -52,7 +52,7 @@ func optimizeKNNSearcher(ctx context.Context, optimizationKind string,
 		return nil
 	}
 
-	_, err := octx.Finish()
+	err := octx.Finish()
 	// Pl and iterators replaced in the pointer to the vector reader
 	// and hence,no need for a non nil return.
 	return err
