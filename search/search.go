@@ -173,6 +173,15 @@ type DocumentMatch struct {
 	// not all sub-queries matched
 	// if false, all the sub-queries matched
 	PartialMatch bool `json:"partial_match,omitempty"`
+
+	// used to indicate the sub-scores that combined to form the
+	// final score for this document match.  This is only populated
+	// when the search request's query is a DisjunctionQuery
+	// or a ConjunctionQuery. The length of this slice will be
+	// the same as the number of sub-queries in the query.
+	// the order of the scores will match the order of the sub-queries
+	// in the query.
+	ScoreBreakdown []float64 `json:"score_breakdown,omitempty"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {

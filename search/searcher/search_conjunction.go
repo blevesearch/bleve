@@ -16,7 +16,6 @@ package searcher
 
 import (
 	"context"
-	"math"
 	"reflect"
 	"sort"
 
@@ -34,26 +33,34 @@ func init() {
 }
 
 type ConjunctionSearcher struct {
-	indexReader index.IndexReader
-	searchers   OrderedSearcherList
-	queryNorm   float64
-	currs       []*search.DocumentMatch
-	maxIDIdx    int
-	scorer      *scorer.ConjunctionQueryScorer
-	initialized bool
-	options     search.SearcherOptions
-	bytesRead   uint64
+	indexReader     index.IndexReader
+	searchers       []search.Searcher
+	originalPos     []int
+	queryNorm       float64
+	queryNormForKNN float64
+	currs           []*search.DocumentMatch
+	maxIDIdx        int
+	scorer          *scorer.ConjunctionQueryScorer
+	initialized     bool
+	options         search.SearcherOptions
+	bytesRead       uint64
 }
 
 func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, options search.SearcherOptions) (
 	search.Searcher, error) {
 	// build the sorted downstream searchers
-	searchers := make(OrderedSearcherList, len(qsearchers))
-	for i, searcher := range qsearchers {
-		searchers[i] = searcher
+	sortedSearchers := &OrderedSearcherList{
+		searchers: make([]search.Searcher, len(qsearchers)),
+		index:     make([]int, len(qsearchers)),
 	}
-	sort.Sort(searchers)
+	for i, searcher := range qsearchers {
+		sortedSearchers.searchers[i] = searcher
+		sortedSearchers.index[i] = i
+	}
+	sort.Sort(sortedSearchers)
+	searchers := sortedSearchers.searchers
+	originalPos := sortedSearchers.index
 
 	// attempt the "unadorned" conjunction optimization only when we
 	// do not need extra information like freq-norm's or term vectors
@@ -70,6 +77,7 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	rv := ConjunctionSearcher{
 		indexReader: indexReader,
 		options:     options,
+		originalPos: originalPos,
 		searchers:   searchers,
 		currs:       make([]*search.DocumentMatch, len(searchers)),
 		scorer:      scorer.NewConjunctionQueryScorer(options),
@@ -102,21 +110,9 @@ func (s *ConjunctionSearcher) Size() int {
 		}
 	}
 
-	return sizeInBytes
-}
+	sizeInBytes += len(s.originalPos) * size.SizeOfInt
 
-func (s *ConjunctionSearcher) computeQueryNorm() {
-	// first calculate sum of squared weights
-	sumOfSquaredWeights := 0.0
-	for _, searcher := range s.searchers {
-		sumOfSquaredWeights += searcher.Weight()
-	}
-	// now compute query norm from this
-	s.queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
-	// finally tell all the downstream searchers the norm
-	for _, searcher := range s.searchers {
-		searcher.SetQueryNorm(s.queryNorm)
-	}
+	return sizeInBytes
 }
 
 func (s *ConjunctionSearcher) initSearchers(ctx *search.SearchContext) error {
@@ -207,7 +203,7 @@ OUTER:
 		}
 
 		// if we get here, a doc matched all readers, so score and add it
-		rv = s.scorer.Score(ctx, s.currs)
+		rv = s.scorer.Score(ctx, s.currs, s.originalPos)
 
 		// we know all the searchers are pointing at the same thing
 		// so they all need to be bumped

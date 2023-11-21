@@ -17,6 +17,7 @@ package bleve
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/custom"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/simple"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	html_char_filter "github.com/blevesearch/bleve/v2/analysis/char/html"
 	regexp_char_filter "github.com/blevesearch/bleve/v2/analysis/char/regexp"
@@ -3375,4 +3377,176 @@ func TestPercentAndIsoStyleDates(t *testing.T) {
 			}
 		}
 	}
+}
+
+func roundToDecimalPlace(num float64, decimalPlaces int) float64 {
+	precision := math.Pow(10, float64(decimalPlaces))
+	return math.Round(num*precision) / precision
+}
+
+func TestScoreBreakdown(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	imap := mapping.NewIndexMapping()
+	textField := mapping.NewTextFieldMapping()
+	textField.Analyzer = simple.Name
+	imap.DefaultMapping.AddFieldMappingsAt("text", textField)
+
+	documents := map[string]map[string]interface{}{
+		"doc1": {
+			"text": "lorem ipsum dolor sit amet consectetur adipiscing elit do eiusmod tempor",
+		},
+		"doc2": {
+			"text": "lorem dolor amet adipiscing sed eiusmod",
+		},
+		"doc3": {
+			"text": "ipsum sit consectetur elit do tempor",
+		},
+		"doc4": {
+			"text": "lorem ipsum sit amet adipiscing elit do eiusmod",
+		},
+	}
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch := idx.NewBatch()
+	for docID, doc := range documents {
+		err := batch.Index(docID, doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type testResult struct {
+		docID          string // doc ID of the hit
+		score          float64
+		scoreBreakdown []float64
+	}
+	type testStruct struct {
+		query      string
+		operator   int
+		expectHits []testResult
+	}
+	testQueries := []testStruct{
+		{
+			// trigger conjunction searcher from match query with operator 1
+			// expect dolor and tempor to have higher term score - since present in lesser docs and having same term freq
+			query:    "lorem dolor amet adipiscing do tempor",
+			operator: 1,
+			expectHits: []testResult{
+				{
+					docID:          "doc1",
+					score:          0.815545,
+					scoreBreakdown: []float64{0.11147035536863306, 0.18483179634014485, 0.11147035536863306, 0.11147035536863306, 0.11147035536863306, 0.18483179634014485},
+				},
+			},
+		},
+		{
+			// trigger disjunction heap searcher from match query with operator 0 (>10 searchers)
+			// expect score breakdown to have a 0 at BLANK
+			query:    "lorem BLANK ipsum BLANK BLANK dolor sit amet consectetur BLANK adipiscing BLANK elit sed do eiusmod tempor BLANK BLANK",
+			operator: 0,
+			expectHits: []testResult{
+				{
+					docID:          "doc1",
+					score:          0.3034548543819603,
+					scoreBreakdown: []float64{0.040398807605268316, 0, 0.040398807605268316, 0, 0, 0.0669862776967768, 0.040398807605268316, 0.040398807605268316, 0.0669862776967768, 0, 0.040398807605268316, 0, 0.040398807605268316, 0, 0.040398807605268316, 0.040398807605268316, 0.0669862776967768, 0, 0},
+				},
+				{
+					docID:          "doc4",
+					score:          0.15956816751152955,
+					scoreBreakdown: []float64{0.04737179972998534, 0, 0.04737179972998534, 0, 0, 0, 0.04737179972998534, 0.04737179972998534, 0, 0, 0.04737179972998534, 0, 0.04737179972998534, 0, 0.04737179972998534, 0.04737179972998534, 0, 0, 0},
+				},
+				{
+					docID:          "doc2",
+					score:          0.14725661652397853,
+					scoreBreakdown: []float64{0.05470024557900147, 0, 0, 0, 0, 0.09069985124905133, 0, 0.05470024557900147, 0, 0, 0.05470024557900147, 0, 0, 0.15681178542754148, 0, 0.05470024557900147, 0, 0, 0},
+				},
+				{
+					docID:          "doc3",
+					score:          0.12637916362550797,
+					scoreBreakdown: []float64{0, 0, 0.05470024557900147, 0, 0, 0, 0.05470024557900147, 0, 0.09069985124905133, 0, 0, 0, 0.05470024557900147, 0, 0.05470024557900147, 0, 0.09069985124905133, 0, 0},
+				},
+			},
+		},
+		{
+			// trigger disjunction slice searcher from match query with operator 0 (< 10 searchers)
+			// expect BLANK to give a 0 in score breakdown
+			query:    "BLANK lorem ipsum BLANK BLANK dolor sit BLANK",
+			operator: 0,
+			expectHits: []testResult{
+				{
+					docID:          "doc1",
+					score:          0.1340684440934241,
+					scoreBreakdown: []float64{0, 0.05756326446708409, 0.05756326446708409, 0, 0, 0.09544709478559595, 0.05756326446708409, 0},
+				},
+				{
+					docID:          "doc4",
+					score:          0.07593627256602972,
+					scoreBreakdown: []float64{0, 0.06749890894758198, 0.06749890894758198, 0, 0, 0, 0.06749890894758198, 0},
+				},
+				{
+					docID:          "doc2",
+					score:          0.05179425287147191,
+					scoreBreakdown: []float64{0, 0.0779410306721006, 0, 0, 0, 0.129235980813787, 0, 0},
+				},
+				{
+					docID:          "doc3",
+					score:          0.0389705153360503,
+					scoreBreakdown: []float64{0, 0, 0.0779410306721006, 0, 0, 0, 0.0779410306721006, 0},
+				},
+			},
+		},
+	}
+
+	for _, dtq := range testQueries {
+
+		mq := NewMatchQuery(dtq.query)
+		mq.SetField("text")
+		mq.SetOperator(query.MatchQueryOperator(dtq.operator))
+		sr := NewSearchRequest(mq)
+		sr.Explain = true
+		res, err := idx.Search(sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Hits) != len(dtq.expectHits) {
+			t.Fatalf("expected %d hits, got %d", len(dtq.expectHits), len(res.Hits))
+		}
+		for i, hit := range res.Hits {
+			if hit.ID != dtq.expectHits[i].docID {
+				t.Fatalf("expected docID %s, got %s", dtq.expectHits[i].docID, hit.ID)
+			}
+			hit.Score = roundToDecimalPlace(hit.Score, 3)
+			expectScore := roundToDecimalPlace(dtq.expectHits[i].score, 3)
+			if hit.Score != expectScore {
+				t.Fatalf("expected score %f, got %f", dtq.expectHits[i].score, hit.Score)
+			}
+			if len(hit.ScoreBreakdown) != len(dtq.expectHits[i].scoreBreakdown) {
+				t.Fatalf("expected %d score breakdown, got %d", len(dtq.expectHits[i].scoreBreakdown), len(hit.ScoreBreakdown))
+			}
+			for j, score := range hit.ScoreBreakdown {
+				actualScore := roundToDecimalPlace(score, 3)
+				expectScore := roundToDecimalPlace(dtq.expectHits[i].scoreBreakdown[j], 3)
+				if actualScore != expectScore {
+					t.Fatalf("expected score breakdown %f, got %f", dtq.expectHits[i].scoreBreakdown[j], score)
+				}
+			}
+		}
+	}
+
 }

@@ -642,7 +642,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		req.SearchAfter = nil
 	}
 
-	return &SearchResult{
+	rv := &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
 			Successful: 1,
@@ -653,7 +653,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		MaxScore: coll.MaxScore(),
 		Took:     searchDuration,
 		Facets:   coll.FacetResults(),
-	}, nil
+	}
+	mergeKNNResults(req, rv)
+	return rv, nil
 }
 
 func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,

@@ -16,7 +16,6 @@ package searcher
 
 import (
 	"context"
-	"math"
 	"reflect"
 	"sort"
 
@@ -34,17 +33,19 @@ func init() {
 }
 
 type DisjunctionSliceSearcher struct {
-	indexReader  index.IndexReader
-	searchers    OrderedSearcherList
-	numSearchers int
-	queryNorm    float64
-	currs        []*search.DocumentMatch
-	scorer       *scorer.DisjunctionQueryScorer
-	min          int
-	matching     []*search.DocumentMatch
-	matchingIdxs []int
-	initialized  bool
-	bytesRead    uint64
+	indexReader     index.IndexReader
+	searchers       []search.Searcher
+	originalPos     []int
+	numSearchers    int
+	queryNorm       float64
+	queryNormForKNN float64
+	currs           []*search.DocumentMatch
+	scorer          *scorer.DisjunctionQueryScorer
+	min             int
+	matching        []*search.DocumentMatch
+	matchingIdxs    []int
+	initialized     bool
+	bytesRead       uint64
 }
 
 func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexReader,
@@ -55,16 +56,24 @@ func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexRea
 		return nil, tooManyClausesErr("", len(qsearchers))
 	}
 	// build the downstream searchers
-	searchers := make(OrderedSearcherList, len(qsearchers))
+	sortedSearchers := &OrderedSearcherList{
+		searchers: make([]search.Searcher, len(qsearchers)),
+		index:     make([]int, len(qsearchers)),
+	}
 	for i, searcher := range qsearchers {
-		searchers[i] = searcher
+		sortedSearchers.searchers[i] = searcher
+		sortedSearchers.index[i] = i
 	}
 	// sort the searchers
-	sort.Sort(sort.Reverse(searchers))
+	sort.Sort(sort.Reverse(sortedSearchers))
 	// build our searcher
+	searchers := sortedSearchers.searchers
+	originalPos := sortedSearchers.index
+
 	rv := DisjunctionSliceSearcher{
 		indexReader:  indexReader,
 		searchers:    searchers,
+		originalPos:  originalPos,
 		numSearchers: len(searchers),
 		currs:        make([]*search.DocumentMatch, len(searchers)),
 		scorer:       scorer.NewDisjunctionQueryScorer(options),
@@ -97,22 +106,9 @@ func (s *DisjunctionSliceSearcher) Size() int {
 	}
 
 	sizeInBytes += len(s.matchingIdxs) * size.SizeOfInt
+	sizeInBytes += len(s.originalPos) * size.SizeOfInt
 
 	return sizeInBytes
-}
-
-func (s *DisjunctionSliceSearcher) computeQueryNorm() {
-	// first calculate sum of squared weights
-	sumOfSquaredWeights := 0.0
-	for _, searcher := range s.searchers {
-		sumOfSquaredWeights += searcher.Weight()
-	}
-	// now compute query norm from this
-	s.queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
-	// finally tell all the downstream searchers the norm
-	for _, searcher := range s.searchers {
-		searcher.SetQueryNorm(s.queryNorm)
-	}
 }
 
 func (s *DisjunctionSliceSearcher) initSearchers(ctx *search.SearchContext) error {
@@ -199,7 +195,7 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 			found = true
 			partialMatch := len(s.matching) != len(s.searchers)
 			// score this match
-			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
+			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers, s.matchingIdxs, s.originalPos)
 			rv.PartialMatch = partialMatch
 		}
 

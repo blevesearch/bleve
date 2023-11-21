@@ -18,6 +18,7 @@
 package scorer
 
 import (
+	"math"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -60,6 +61,10 @@ func NewKNNQueryScorer(queryVector []float32, queryField string, queryBoost floa
 	}
 }
 
+// Score used when the knnMatch.Score = 0 ->
+// the query and indexed vector are exactly the same.
+const maxKNNScore = math.MaxFloat64
+
 func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 	knnMatch *index.VectorDoc) *search.DocumentMatch {
 	rv := ctx.DocumentMatchPool.Get()
@@ -67,14 +72,18 @@ func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 	if sqs.includeScore || sqs.options.Explain {
 		var scoreExplanation *search.Explanation
 		score := knnMatch.Score
-		if sqs.similarityMetric == index.EuclideanDistance {
-			// eucliden distances need to be inverted to work
+		// in case of euclidean distance being the distance metric,
+		// an exact vector (perfect match), would return distance = 0
+		if score == 0 {
+			score = maxKNNScore
+		} else {
+			// euclidean distances need to be inverted to work with
 			// tf-idf scoring
 			score = 1.0 / score
 		}
 
 		// if the query weight isn't 1, multiply
-		if sqs.queryWeight != 1.0 {
+		if sqs.queryWeight != 1.0 && score != maxKNNScore {
 			score = score * sqs.queryWeight
 		}
 

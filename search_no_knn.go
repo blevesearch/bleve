@@ -151,3 +151,14 @@ func disjunctQueryWithKNN(req *SearchRequest) query.Query {
 func validateKNN(req *SearchRequest) error {
 	return nil
 }
+
+func mergeKNNResults(req *SearchRequest, sr *SearchResult) {
+	// no-op
+}
+
+func adjustRequestSizeForKNN(req *SearchRequest, numIndexPartitions int) int {
+	if req != nil {
+		return req.Size
+	}
+	return 0
+}

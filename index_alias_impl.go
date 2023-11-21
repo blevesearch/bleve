@@ -165,7 +165,6 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	if len(i.indexes) == 1 {
 		return i.indexes[0].SearchInContext(ctx, req)
 	}
-
 	return MultiSearch(ctx, req, i.indexes...)
 }
 
@@ -453,6 +452,10 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 		req.SearchAfter = req.SearchBefore
 		req.SearchBefore = nil
 	}
+	originalSize := req.Size
+	if len(indexes) > 1 {
+		req.Size = adjustRequestSizeForKNN(req, len(indexes))
+	}
 
 	// run search on each index in separate go routine
 	var waitGroup sync.WaitGroup
@@ -491,6 +494,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 			indexErrors[asr.Name] = asr.Err
 		}
 	}
+	req.Size = originalSize
 
 	// merge just concatenated all the hits
 	// now lets clean it up
@@ -502,6 +506,10 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 				Errors: make(map[string]error),
 			},
 		}
+	}
+
+	if len(indexes) > 1 {
+		mergeKNNResults(req, sr)
 	}
 
 	sortFunc := req.SortFunc()

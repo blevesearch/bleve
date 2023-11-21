@@ -42,15 +42,28 @@ func NewConjunctionQueryScorer(options search.SearcherOptions) *ConjunctionQuery
 	}
 }
 
-func (s *ConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch) *search.DocumentMatch {
+func (s *ConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, originalPositions []int) *search.DocumentMatch {
 	var sum float64
 	var childrenExplanations []*search.Explanation
 	if s.options.Explain {
 		childrenExplanations = make([]*search.Explanation, len(constituents))
 	}
-
+	scoreBreakdown := make([]float64, len(constituents))
 	for i, docMatch := range constituents {
 		sum += docMatch.Score
+		if originalPositions != nil {
+			// for use in conjunction searcher
+			// the originalPositions are the positions of the searchers
+			// pre sort, since conjunction searcher sorts the searchers
+			// in order of their Count().
+			scoreBreakdown[originalPositions[i]] = docMatch.Score
+		} else {
+			// the indexes of searchers are the original searcher positions
+			// eg boolean searcher also uses the conjunction scorer,
+			// with index 0 being the must (conjunction) searcher
+			// and index 1 being the should (disjunction) searcher
+			scoreBreakdown[i] = docMatch.Score
+		}
 		if s.options.Explain {
 			childrenExplanations[i] = docMatch.Expl
 		}
@@ -65,6 +78,7 @@ func (s *ConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	rv := constituents[0]
 	rv.Score = newScore
 	rv.Expl = newExpl
+	rv.ScoreBreakdown = scoreBreakdown
 	rv.FieldTermLocations = search.MergeFieldTermLocations(
 		rv.FieldTermLocations, constituents[1:])
 
