@@ -278,6 +278,7 @@ func mergeKNN(req *SearchRequest, sr *SearchResult) {
 	}
 	nonZeroScoreHits := make([]*search.DocumentMatch, 0, len(sr.Hits))
 	maxScore := 0.0
+	var numHitsDropped uint64
 	for _, hit := range sr.Hits {
 		newScore := recomputeTotalScore(operator, hit)
 		if newScore > 0 {
@@ -286,11 +287,13 @@ func mergeKNN(req *SearchRequest, sr *SearchResult) {
 				maxScore = newScore
 			}
 			nonZeroScoreHits = append(nonZeroScoreHits, hit)
+		} else {
+			numHitsDropped++
 		}
 	}
 	sr.Hits = nonZeroScoreHits
 	sr.MaxScore = maxScore
-	sr.Total = uint64(len(nonZeroScoreHits))
+	sr.Total -= numHitsDropped
 }
 
 func recomputeTotalScore(operator int, hit *search.DocumentMatch) float64 {
