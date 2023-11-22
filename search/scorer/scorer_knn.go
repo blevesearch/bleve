@@ -86,7 +86,7 @@ func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 			childrenExplanations := make([]*search.Explanation, 1)
 			childrenExplanations[0] = &search.Explanation{
 				Value: score,
-				Message: fmt.Sprintf("vector(field(%s:%s) with similarity_metric(%s)=%.3f",
+				Message: fmt.Sprintf("vector(field(%s:%s) with similarity_metric(%s)=%e",
 					sqs.queryField, knnMatch.ID, sqs.similarityMetric, score),
 			}
 			scoreExplanation = &search.Explanation{

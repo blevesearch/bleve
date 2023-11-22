@@ -62,7 +62,7 @@ func TestKNNScorerExplanation(t *testing.T) {
 					Message: "fieldWeight(desc in doc one), score of:",
 					Children: []*search.Explanation{
 						{Value: 1 / 0.5,
-							Message: "vector(field(desc:one) with similarity_metric(l2_norm)=2.000",
+							Message: "vector(field(desc:one) with similarity_metric(l2_norm)=2.000000e+00",
 						},
 					},
 				},
@@ -87,7 +87,7 @@ func TestKNNScorerExplanation(t *testing.T) {
 					Message: "fieldWeight(desc in doc one), score of:",
 					Children: []*search.Explanation{
 						{Value: maxKNNScore,
-							Message: "vector(field(desc:one) with similarity_metric(l2_norm)=0.000",
+							Message: "vector(field(desc:one) with similarity_metric(l2_norm)=1.797693e+308",
 						},
 					},
 				},
@@ -110,7 +110,7 @@ func TestKNNScorerExplanation(t *testing.T) {
 					Message: "fieldWeight(desc in doc one), score of:",
 					Children: []*search.Explanation{
 						{Value: 0.5,
-							Message: "vector(field(desc:one) with similarity_metric(dot_product)=0.500",
+							Message: "vector(field(desc:one) with similarity_metric(dot_product)=5.000000e-01",
 						},
 					},
 				},
@@ -152,7 +152,7 @@ func TestKNNScorerExplanation(t *testing.T) {
 							Children: []*search.Explanation{
 								{
 									Value:   0.25,
-									Message: "vector(field(desc:one) with similarity_metric(dot_product)=0.250",
+									Message: "vector(field(desc:one) with similarity_metric(dot_product)=2.500000e-01",
 								},
 							},
 						},
