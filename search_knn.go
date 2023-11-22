@@ -272,14 +272,10 @@ func mergeKNN(req *SearchRequest, sr *SearchResult) {
 			}
 		}
 	}
-	operator := 0
-	if _, ok := req.Query.(*query.ConjunctionQuery); ok {
-		operator = 1
-	}
 	nonZeroScoreHits := make([]*search.DocumentMatch, 0, len(sr.Hits))
 	maxScore := 0.0
 	for _, hit := range sr.Hits {
-		newScore := recomputeTotalScore(operator, hit)
+		newScore := recomputeTotalScore(req.KNNOperator, hit)
 		if newScore > 0 {
 			hit.Score = newScore
 			if newScore > maxScore {
@@ -293,18 +289,21 @@ func mergeKNN(req *SearchRequest, sr *SearchResult) {
 	sr.Total = uint64(len(nonZeroScoreHits))
 }
 
-func recomputeTotalScore(operator int, hit *search.DocumentMatch) float64 {
+func recomputeTotalScore(operator knnOperator, hit *search.DocumentMatch) float64 {
 	totalScore := 0.0
-	numNonZero := 0
+	numNonZero := 0.0
+	numTotal := float64(len(hit.ScoreBreakdown))
 	for _, score := range hit.ScoreBreakdown {
 		if score != 0 {
 			numNonZero += 1
 		}
 		totalScore += score
 	}
-	if operator == 0 {
-		coord := float64(numNonZero) / float64(len(hit.ScoreBreakdown))
+	if operator == knnOperatorOr || operator == "" {
+		coord := numNonZero / numTotal
 		totalScore = totalScore * coord
+	} else if operator == knnOperatorAnd && numNonZero != numTotal {
+		totalScore = 0
 	}
 	return totalScore
 }
