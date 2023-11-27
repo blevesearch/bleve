@@ -600,7 +600,7 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 
 	type testResult struct {
 		score          float64
-		scoreBreakdown []float64
+		scoreBreakdown map[int]float64
 	}
 
 	testCases := []struct {
@@ -614,15 +614,15 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			expectedResults: map[string]testResult{
 				"doc29": {
 					score:          0.5547758085810349,
-					scoreBreakdown: []float64{0, 1.1095516171620698},
+					scoreBreakdown: map[int]float64{1: 1.1095516171620698},
 				},
 				"doc23": {
 					score:          0.3817633037007331,
-					scoreBreakdown: []float64{0, 0.7635266074014662},
+					scoreBreakdown: map[int]float64{1: 0.7635266074014662},
 				},
 				"doc28": {
 					score:          0.33983667469689355,
-					scoreBreakdown: []float64{0, 0.6796733493937871},
+					scoreBreakdown: map[int]float64{1: 0.6796733493937871},
 				},
 			},
 		},
@@ -632,15 +632,15 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			expectedResults: map[string]testResult{
 				"doc29": {
 					score:          0.5547758085810349,
-					scoreBreakdown: []float64{0, 1.1095516171620698},
+					scoreBreakdown: map[int]float64{1: 1.1095516171620698},
 				},
 				"doc23": {
 					score:          0.3817633037007331,
-					scoreBreakdown: []float64{0, 0.7635266074014662},
+					scoreBreakdown: map[int]float64{1: 0.7635266074014662},
 				},
 				"doc28": {
 					score:          0.33983667469689355,
-					scoreBreakdown: []float64{0, 0.6796733493937871},
+					scoreBreakdown: map[int]float64{1: 0.6796733493937871},
 				},
 			},
 		},
@@ -650,27 +650,27 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			expectedResults: map[string]testResult{
 				"doc29": {
 					score:          1.8859816084399936,
-					scoreBreakdown: []float64{0.7764299912779237, 1.1095516171620698},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237, 1: 1.1095516171620698},
 				},
 				"doc23": {
 					score:          1.8615644255330264,
-					scoreBreakdown: []float64{1.0980378181315602, 0.7635266074014662},
+					scoreBreakdown: map[int]float64{0: 1.0980378181315602, 1: 0.7635266074014662},
 				},
 				"doc27": {
 					score:          0.4640056648691007,
-					scoreBreakdown: []float64{0.9280113297382014, 0},
+					scoreBreakdown: map[int]float64{0: 0.9280113297382014},
 				},
 				"doc28": {
 					score:          0.434037555556026,
-					scoreBreakdown: []float64{0.868075111112052, 0},
+					scoreBreakdown: map[int]float64{0: 0.868075111112052},
 				},
 				"doc30": {
 					score:          0.38821499563896184,
-					scoreBreakdown: []float64{0.7764299912779237, 0},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237},
 				},
 				"doc24": {
 					score:          0.38821499563896184,
-					scoreBreakdown: []float64{0.7764299912779237, 0},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237},
 				},
 			},
 		},
@@ -680,27 +680,27 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			expectedResults: map[string]testResult{
 				"doc29": {
 					score:          1.8859816084399936,
-					scoreBreakdown: []float64{0.7764299912779237, 1.1095516171620698},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237, 1: 1.1095516171620698},
 				},
 				"doc23": {
 					score:          1.8615644255330264,
-					scoreBreakdown: []float64{1.0980378181315602, 0.7635266074014662},
+					scoreBreakdown: map[int]float64{0: 1.0980378181315602, 1: 0.7635266074014662},
 				},
 				"doc27": {
 					score:          0.4640056648691007,
-					scoreBreakdown: []float64{0.9280113297382014, 0},
+					scoreBreakdown: map[int]float64{0: 0.9280113297382014},
 				},
 				"doc28": {
 					score:          0.434037555556026,
-					scoreBreakdown: []float64{0.868075111112052, 0},
+					scoreBreakdown: map[int]float64{0: 0.868075111112052},
 				},
 				"doc30": {
 					score:          0.38821499563896184,
-					scoreBreakdown: []float64{0.7764299912779237, 0},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237},
 				},
 				"doc24": {
 					score:          0.38821499563896184,
-					scoreBreakdown: []float64{0.7764299912779237, 0},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237},
 				},
 			},
 		},
@@ -710,43 +710,43 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			expectedResults: map[string]testResult{
 				"doc7": {
 					score:          math.MaxFloat64 / 3.0,
-					scoreBreakdown: []float64{0, 0, math.MaxFloat64},
+					scoreBreakdown: map[int]float64{2: math.MaxFloat64},
 				},
 				"doc29": {
 					score:          0.6774608026082964,
-					scoreBreakdown: []float64{0.23161973134064517, 0.7845714725717996, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517, 1: 0.7845714725717996},
 				},
 				"doc23": {
 					score:          0.5783030702431613,
-					scoreBreakdown: []float64{0.32755976365480655, 0.5398948417099355, 0},
+					scoreBreakdown: map[int]float64{0: 0.32755976365480655, 1: 0.5398948417099355},
 				},
 				"doc3": {
 					score:          0.2550334160459894,
-					scoreBreakdown: []float64{0.7651002481379682, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.7651002481379682},
 				},
 				"doc13": {
 					score:          0.2208654210738964,
-					scoreBreakdown: []float64{0.6625962632216892, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.6625962632216892},
 				},
 				"doc5": {
 					score:          0.21180931116413285,
-					scoreBreakdown: []float64{0, 0, 0.6354279334923986},
+					scoreBreakdown: map[int]float64{2: 0.6354279334923986},
 				},
 				"doc27": {
 					score:          0.09227950890170131,
-					scoreBreakdown: []float64{0.27683852670510395, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.2768385267051039},
 				},
 				"doc28": {
 					score:          0.0863195764709126,
-					scoreBreakdown: []float64{0.2589587294127378, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.2589587294127378},
 				},
 				"doc30": {
 					score:          0.07720657711354839,
-					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517},
 				},
 				"doc24": {
 					score:          0.07720657711354839,
-					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517},
 				},
 			},
 		},
@@ -756,43 +756,43 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			expectedResults: map[string]testResult{
 				"doc7": {
 					score:          math.MaxFloat64 / 3.0,
-					scoreBreakdown: []float64{0, 0, math.MaxFloat64},
+					scoreBreakdown: map[int]float64{2: math.MaxFloat64},
 				},
 				"doc29": {
 					score:          0.6774608026082964,
-					scoreBreakdown: []float64{0.23161973134064517, 0.7845714725717996, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517, 1: 0.7845714725717996},
 				},
 				"doc23": {
 					score:          0.5783030702431613,
-					scoreBreakdown: []float64{0.32755976365480655, 0.5398948417099355, 0},
+					scoreBreakdown: map[int]float64{0: 0.32755976365480655, 1: 0.5398948417099355},
 				},
 				"doc3": {
 					score:          0.2550334160459894,
-					scoreBreakdown: []float64{0.7651002481379682, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.7651002481379682},
 				},
 				"doc13": {
 					score:          0.2208654210738964,
-					scoreBreakdown: []float64{0.6625962632216892, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.6625962632216892},
 				},
 				"doc5": {
 					score:          0.21180931116413285,
-					scoreBreakdown: []float64{0, 0, 0.6354279334923986},
+					scoreBreakdown: map[int]float64{2: 0.6354279334923986},
 				},
 				"doc27": {
 					score:          0.09227950890170131,
-					scoreBreakdown: []float64{0.27683852670510395, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.2768385267051039},
 				},
 				"doc28": {
 					score:          0.0863195764709126,
-					scoreBreakdown: []float64{0.2589587294127378, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.2589587294127378},
 				},
 				"doc30": {
 					score:          0.07720657711354839,
-					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517},
 				},
 				"doc24": {
 					score:          0.07720657711354839,
-					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517},
 				},
 			},
 		},
