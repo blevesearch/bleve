@@ -274,6 +274,69 @@ func checkStatsOnIndexedBatch(indexPath string, indexMapping mapping.IndexMappin
 	return statValError
 }
 
+func TestIndexSectionsUpgrade(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMapping := NewIndexMapping()
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = "en"
+	documentMapping := NewDocumentMapping()
+	indexMapping.AddDocumentMapping("hotel", documentMapping)
+	indexMapping.StoreDynamic = false
+	indexMapping.DocValuesDynamic = false
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.IncludeInAll = false
+
+	reviewsMapping := NewDocumentMapping()
+	reviewsMapping.AddFieldMappingsAt("content", contentFieldMapping)
+	documentMapping.AddSubDocumentMapping("reviews", reviewsMapping)
+
+	typeFieldMapping := NewTextFieldMapping()
+	typeFieldMapping.Store = false
+	typeFieldMapping.DocValues = true
+	documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
+
+	config := map[string]interface{}{
+		"forceSegmentVersion": 11,
+		"forceSegmentType":    "zap",
+	}
+
+	idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch, err := getBatchFromData(idx, "sample-data.json")
+	if err != nil {
+		t.Fatalf("failed to form a batch")
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to index batch %v\n", err)
+	}
+	typeFacet := NewFacetRequest("type", 2)
+	query := NewQueryStringQuery("united")
+
+	searchRequest := NewSearchRequestOptions(query, int(10), 0, true)
+	searchRequest.AddFacet("types", typeFacet)
+	res, err := idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if res.Facets["types"].Total != 9 {
+		t.Errorf("expected count for types facets is 9 got %v", res.Facets["types"].Total)
+	}
+}
+
 /*
 func TestBytesWritten(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
@@ -402,8 +465,8 @@ func TestBytesRead(t *testing.T) {
 	}
 	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
 	prevBytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
-	if prevBytesRead != 21631 && res.Cost == prevBytesRead {
-		t.Fatalf("expected bytes read for query string 21631, got %v",
+	if prevBytesRead != 21639 && res.Cost == prevBytesRead {
+		t.Fatalf("expected bytes read for query string 21639, got %v",
 			prevBytesRead)
 	}
 
@@ -554,8 +617,8 @@ func TestBytesReadStored(t *testing.T) {
 
 	stats, _ := idx.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead != 11493 && bytesRead == res.Cost {
-		t.Fatalf("expected the bytes read stat to be around 11493, got %v", bytesRead)
+	if bytesRead != 11501 && bytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around 11501, got %v", bytesRead)
 	}
 	prevBytesRead := bytesRead
 
@@ -625,8 +688,8 @@ func TestBytesReadStored(t *testing.T) {
 
 	stats, _ = idx1.StatsMap()["index"].(map[string]interface{})
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
-	if bytesRead != 3679 && bytesRead == res.Cost {
-		t.Fatalf("expected the bytes read stat to be around 3679, got %v", bytesRead)
+	if bytesRead != 3687 && bytesRead == res.Cost {
+		t.Fatalf("expected the bytes read stat to be around 3687, got %v", bytesRead)
 	}
 	prevBytesRead = bytesRead
 
