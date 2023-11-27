@@ -225,48 +225,48 @@ func adjustRequestSizeForKNN(req *SearchRequest, numIndexPartitions int) int {
 
 // heap impl
 type scoreHeap struct {
-	scoreBreakdown []*map[int]float64
-	sortIndex      int
+	scoreMaps []map[int]float64
+	sortIndex int
 }
 
-func (s *scoreHeap) Len() int { return len(s.scoreBreakdown) }
+func (s *scoreHeap) Len() int { return len(s.scoreMaps) }
 
 func (s *scoreHeap) Less(i, j int) bool {
-	return (*s.scoreBreakdown[i])[s.sortIndex] > (*s.scoreBreakdown[j])[s.sortIndex]
+	return (s.scoreMaps[i])[s.sortIndex] > (s.scoreMaps[j])[s.sortIndex]
 }
 
 func (s *scoreHeap) Swap(i, j int) {
-	s.scoreBreakdown[i], s.scoreBreakdown[j] = s.scoreBreakdown[j], s.scoreBreakdown[i]
+	s.scoreMaps[i], s.scoreMaps[j] = s.scoreMaps[j], s.scoreMaps[i]
 }
 
 func (s *scoreHeap) Push(x interface{}) {
-	s.scoreBreakdown = append(s.scoreBreakdown, x.(*map[int]float64))
+	s.scoreMaps = append(s.scoreMaps, x.(map[int]float64))
 }
 
 func (s *scoreHeap) Pop() interface{} {
-	old := s.scoreBreakdown
+	old := s.scoreMaps
 	n := len(old)
 	x := old[n-1]
-	s.scoreBreakdown = old[0 : n-1]
+	s.scoreMaps = old[0 : n-1]
 	return x
 }
 
 func mergeKNN(req *SearchRequest, sr *SearchResult) {
 	maxHeap := &scoreHeap{
-		scoreBreakdown: make([]*map[int]float64, 0),
+		scoreMaps: make([]map[int]float64, 0),
 	}
 	for i := 0; i < len(req.KNN); i++ {
 		kVal := req.KNN[i].K
 		maxHeap.sortIndex = i + 1
 		for _, hit := range sr.Hits {
-			heap.Push(maxHeap, &hit.ScoreBreakdown)
+			heap.Push(maxHeap, hit.ScoreBreakdown)
 		}
 		for maxHeap.Len() > 0 {
-			scBreakdown := heap.Pop(maxHeap).(*map[int]float64)
+			scBreakdown := heap.Pop(maxHeap).(map[int]float64)
 			if kVal > 0 {
 				kVal--
 			} else {
-				delete(*scBreakdown, maxHeap.sortIndex)
+				delete(scBreakdown, maxHeap.sortIndex)
 			}
 		}
 	}
