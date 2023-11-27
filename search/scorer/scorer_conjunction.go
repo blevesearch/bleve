@@ -48,7 +48,7 @@ func (s *ConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	if s.options.Explain {
 		childrenExplanations = make([]*search.Explanation, len(constituents))
 	}
-	scoreBreakdown := make([]float64, len(constituents))
+	scoreBreakdown := make(map[int]float64)
 	for i, docMatch := range constituents {
 		sum += docMatch.Score
 		if originalPositions != nil {

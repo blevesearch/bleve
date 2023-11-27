@@ -181,7 +181,7 @@ type DocumentMatch struct {
 	// the same as the number of sub-queries in the query.
 	// the order of the scores will match the order of the sub-queries
 	// in the query.
-	ScoreBreakdown []float64 `json:"score_breakdown,omitempty"`
+	ScoreBreakdown map[int]float64 `json:"score_breakdown,omitempty"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
