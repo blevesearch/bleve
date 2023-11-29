@@ -83,48 +83,6 @@ func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 		limit)
 }
 
-func optimizeCompositeSearcher(ctx context.Context, optimizationKind string,
-	indexReader index.IndexReader, qsearchers []search.Searcher,
-	options search.SearcherOptions) (search.Searcher, error) {
-	var octx index.OptimizableContext
-
-	for _, searcher := range qsearchers {
-		// if is KNN searcher, continue
-		// should not break due to a kNN searcher.
-		if _, ok := searcher.(*KNNSearcher); ok {
-			continue
-		}
-
-		o, ok := searcher.(index.Optimizable)
-		if !ok {
-			return nil, nil
-		}
-
-		var err error
-		octx, err = o.Optimize(optimizationKind, octx)
-		if err != nil {
-			return nil, err
-		}
-
-		if octx == nil {
-			return nil, nil
-		}
-	}
-
-	optimized, err := octx.Finish()
-	if err != nil || optimized == nil {
-		return nil, err
-	}
-
-	tfr, ok := optimized.(index.TermFieldReader)
-	if !ok {
-		return nil, nil
-	}
-
-	return newTermSearcherFromReader(indexReader, tfr,
-		[]byte(optimizationKind), "*", 1.0, options)
-}
-
 func tooManyClauses(count int) bool {
 	if DisjunctionMaxClauseCount != 0 && count > DisjunctionMaxClauseCount {
 		return true
