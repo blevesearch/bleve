@@ -26,7 +26,7 @@ import (
 
 func optimizeKNNSearcher(ctx context.Context, optimizationKind string,
 	indexReader index.IndexReader, qsearchers []search.Searcher,
-	options search.SearcherOptions) error {
+	options search.SearcherOptions) ([]search.Searcher, error) {
 	// Not supported
-	return nil
+	return nil, nil
 }

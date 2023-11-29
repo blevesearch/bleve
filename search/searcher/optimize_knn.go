@@ -26,34 +26,33 @@ import (
 
 func optimizeKNNSearcher(ctx context.Context, optimizationKind string,
 	indexReader index.IndexReader, qsearchers []search.Searcher,
-	options search.SearcherOptions) error {
+	options search.SearcherOptions) ([]search.Searcher, error) {
 	var octx index.VectorOptimizableContext
+	knnSearchers := make([]search.Searcher, 0)
 
 	for _, searcher := range qsearchers {
 		// Only applicable to KNN Searchers.
-		if _, ok := searcher.(*KNNSearcher); !ok {
+		o, ok := searcher.(index.VectorOptimizable)
+		if !ok {
 			continue
 		}
 
-		o, ok := searcher.(index.VectorOptimizable)
-		if !ok {
-			return nil
-		}
+		knnSearchers = append(knnSearchers, searcher)
 
 		var err error
 		octx, err = o.VectorOptimize(octx)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	// No KNN searchers.
 	if octx == nil {
-		return nil
+		return nil, nil
 	}
 
 	err := octx.Finish()
 	// Pl and iterators replaced in the pointer to the vector reader
 	// and hence,no need for a non nil return.
-	return err
+	return knnSearchers, err
 }

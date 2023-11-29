@@ -47,7 +47,11 @@ func (o *OptimizeVR) Finish() error {
 				if err != nil {
 					return err
 				}
-				defer faissIndex.Close()
+				defer func(vecIndex segment_api.VectorIndex) {
+					go func(vecIndex segment_api.VectorIndex) {
+						vecIndex.Close()
+					}(vecIndex)
+				}(faissIndex)
 
 				for _, vr := range vrs {
 					// for each VR, populate postings list and iterators

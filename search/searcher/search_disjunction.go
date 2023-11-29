@@ -53,7 +53,7 @@ func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	// Hence, this optimization should be invoked for KNN searchers irrespective
 	// of whether there are other searchers in the disjunction or not.
 
-	err := optimizeKNNSearcher(ctx, "", indexReader, qsearchers, options)
+	optimizedKNNSearchers, err := optimizeKNNSearcher(ctx, "", indexReader, qsearchers, options)
 	if err != nil {
 		return nil, err
 	}
@@ -65,8 +65,13 @@ func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 		optionsDisjunctionOptimizable(options) {
 		rv, err := optimizeCompositeSearcher(ctx, "disjunction:unadorned",
 			indexReader, qsearchers, options)
-		if err != nil || rv != nil {
+		if err != nil {
 			return rv, err
+		}
+		if rv != nil && optimizedKNNSearchers != nil && len(optimizedKNNSearchers) != 0 {
+			qsearchers = make([]search.Searcher, 1+len(optimizedKNNSearchers))
+			qsearchers = append(qsearchers, optimizedKNNSearchers...)
+			qsearchers = append(qsearchers, rv)
 		}
 	}
 
@@ -84,6 +89,12 @@ func optimizeCompositeSearcher(ctx context.Context, optimizationKind string,
 	var octx index.OptimizableContext
 
 	for _, searcher := range qsearchers {
+		// if is KNN searcher, continue
+		// should not break due to a kNN searcher.
+		if _, ok := searcher.(*KNNSearcher); ok {
+			continue
+		}
+
 		o, ok := searcher.(index.Optimizable)
 		if !ok {
 			return nil, nil

@@ -51,7 +51,7 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	search.Searcher, error) {
 	// Doing this prior to sorting since sorting involves Count() which requires
 	// posting lists to be populated.
-	err := optimizeKNNSearcher(ctx, "", indexReader, qsearchers, options)
+	optimizedKNNSearchers, err := optimizeKNNSearcher(ctx, "", indexReader, qsearchers, options)
 	if err != nil {
 		return nil, err
 	}
@@ -75,8 +75,13 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 		options.Score == "none" && !options.IncludeTermVectors {
 		rv, err := optimizeCompositeSearcher(ctx, "conjunction:unadorned",
 			indexReader, searchers, options)
-		if err != nil || rv != nil {
+		if err != nil {
 			return rv, err
+		}
+		if rv != nil && optimizedKNNSearchers != nil && len(optimizedKNNSearchers) != 0 {
+			qsearchers = make([]search.Searcher, 1+len(optimizedKNNSearchers))
+			qsearchers = append(qsearchers, optimizedKNNSearchers...)
+			qsearchers = append(qsearchers, rv)
 		}
 	}
 
