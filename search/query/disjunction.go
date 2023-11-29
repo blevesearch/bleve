@@ -27,10 +27,11 @@ import (
 )
 
 type DisjunctionQuery struct {
-	Disjuncts       []Query `json:"disjuncts"`
-	BoostVal        *Boost  `json:"boost,omitempty"`
-	Min             float64 `json:"min"`
-	queryStringMode bool
+	Disjuncts              []Query `json:"disjuncts"`
+	BoostVal               *Boost  `json:"boost,omitempty"`
+	Min                    float64 `json:"min"`
+	RetrieveScoreBreakdown bool    `json:"retrieve_score_breakdown,omitempty"`
+	queryStringMode        bool
 }
 
 // NewDisjunctionQuery creates a new compound Query.
@@ -86,7 +87,9 @@ func (q *DisjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		return searcher.NewMatchNoneSearcher(i)
 	}
 
-	return searcher.NewDisjunctionSearcher(ctx, i, ss, q.Min, options)
+	nctx := context.WithValue(ctx, search.IncludeScoreBreakdownKey, q.RetrieveScoreBreakdown)
+
+	return searcher.NewDisjunctionSearcher(nctx, i, ss, q.Min, options)
 }
 
 func (q *DisjunctionQuery) Validate() error {
@@ -106,9 +109,10 @@ func (q *DisjunctionQuery) Validate() error {
 
 func (q *DisjunctionQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
-		Disjuncts []json.RawMessage `json:"disjuncts"`
-		Boost     *Boost            `json:"boost,omitempty"`
-		Min       float64           `json:"min"`
+		Disjuncts              []json.RawMessage `json:"disjuncts"`
+		Boost                  *Boost            `json:"boost,omitempty"`
+		Min                    float64           `json:"min"`
+		RetrieveScoreBreakdown bool              `json:"retrieve_score_breakdown"`
 	}{}
 	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
@@ -124,5 +128,6 @@ func (q *DisjunctionQuery) UnmarshalJSON(data []byte) error {
 	}
 	q.BoostVal = tmp.Boost
 	q.Min = tmp.Min
+	q.RetrieveScoreBreakdown = tmp.RetrieveScoreBreakdown
 	return nil
 }

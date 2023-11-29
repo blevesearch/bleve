@@ -26,9 +26,10 @@ import (
 )
 
 type ConjunctionQuery struct {
-	Conjuncts       []Query `json:"conjuncts"`
-	BoostVal        *Boost  `json:"boost,omitempty"`
-	queryStringMode bool
+	Conjuncts              []Query `json:"conjuncts"`
+	BoostVal               *Boost  `json:"boost,omitempty"`
+	RetrieveScoreBreakdown bool    `json:"retrieve_score_breakdown,omitempty"`
+	queryStringMode        bool
 }
 
 // NewConjunctionQuery creates a new compound Query.
@@ -76,8 +77,9 @@ func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 	if len(ss) < 1 {
 		return searcher.NewMatchNoneSearcher(i)
 	}
+	nctx := context.WithValue(ctx, search.IncludeScoreBreakdownKey, q.RetrieveScoreBreakdown)
 
-	return searcher.NewConjunctionSearcher(ctx, i, ss, options)
+	return searcher.NewConjunctionSearcher(nctx, i, ss, options)
 }
 
 func (q *ConjunctionQuery) Validate() error {
@@ -94,8 +96,9 @@ func (q *ConjunctionQuery) Validate() error {
 
 func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 	tmp := struct {
-		Conjuncts []json.RawMessage `json:"conjuncts"`
-		Boost     *Boost            `json:"boost,omitempty"`
+		Conjuncts              []json.RawMessage `json:"conjuncts"`
+		RetrieveScoreBreakdown bool              `json:"retrieve_score_breakdown"`
+		Boost                  *Boost            `json:"boost,omitempty"`
 	}{}
 	err := util.UnmarshalJSON(data, &tmp)
 	if err != nil {
@@ -110,5 +113,6 @@ func (q *ConjunctionQuery) UnmarshalJSON(data []byte) error {
 		q.Conjuncts[i] = query
 	}
 	q.BoostVal = tmp.Boost
+	q.RetrieveScoreBreakdown = tmp.RetrieveScoreBreakdown
 	return nil
 }
