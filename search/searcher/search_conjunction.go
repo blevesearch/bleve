@@ -79,7 +79,7 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 			return rv, err
 		}
 		if rv != nil && optimizedKNNSearchers != nil && len(optimizedKNNSearchers) != 0 {
-			qsearchers = make([]search.Searcher, 1+len(optimizedKNNSearchers))
+			qsearchers = make([]search.Searcher, 0, len(optimizedKNNSearchers)+1)
 			qsearchers = append(qsearchers, optimizedKNNSearchers...)
 			qsearchers = append(qsearchers, rv)
 		}

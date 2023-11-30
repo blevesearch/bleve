@@ -17,7 +17,10 @@
 
 package searcher
 
-import "math"
+import (
+	"context"
+	"math"
+)
 
 func (s *DisjunctionSliceSearcher) computeQueryNorm() {
 	// first calculate sum of squared weights

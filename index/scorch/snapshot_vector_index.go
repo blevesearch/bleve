@@ -29,11 +29,10 @@ func (is *IndexSnapshot) VectorReader(ctx context.Context, vector []float32,
 	index.VectorReader, error) {
 
 	rv := &IndexSnapshotVectorReader{
-		vector:      vector,
-		field:       field,
-		k:           k,
-		snapshot:    is,
-		queryVector: vector,
+		vector:   vector,
+		field:    field,
+		k:        k,
+		snapshot: is,
 	}
 
 	if rv.postings == nil {

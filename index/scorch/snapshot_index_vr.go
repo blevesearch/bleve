@@ -46,7 +46,6 @@ type IndexSnapshotVectorReader struct {
 	currPosting   segment_api.VecPosting
 	currID        index.IndexInternalID
 	ctx           context.Context
-	queryVector   []float32
 }
 
 func (i *IndexSnapshotVectorReader) Size() int {

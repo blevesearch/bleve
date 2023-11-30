@@ -43,7 +43,7 @@ func (o *OptimizeVR) Finish() error {
 			// for each VR belonging to that field
 			if sv, ok := seg.segment.(segment_api.VectorSegment); ok {
 				// reading just once per field per segment.
-				faissIndex, err := sv.GetVectorIndex(field)
+				vecIndex, err := sv.GetVectorIndex(field)
 				if err != nil {
 					return err
 				}
@@ -51,13 +51,13 @@ func (o *OptimizeVR) Finish() error {
 					go func(vecIndex segment_api.VectorIndex) {
 						vecIndex.Close()
 					}(vecIndex)
-				}(faissIndex)
+				}(vecIndex)
 
 				for _, vr := range vrs {
 					// for each VR, populate postings list and iterators
-					// by passing the obtained FAISS index and getting similar vectors.
-					pl, err := sv.SearchSimilarVectors(faissIndex, vr.field,
-						vr.queryVector, vr.k, seg.deleted)
+					// by passing the obtained vector index and getting similar vectors.
+					pl, err := sv.SearchSimilarVectors(vecIndex, vr.field,
+						vr.vector, vr.k, seg.deleted)
 					if err != nil {
 						return err
 					}
