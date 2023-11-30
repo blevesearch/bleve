@@ -3445,7 +3445,7 @@ func TestScoreBreakdown(t *testing.T) {
 		{
 			// trigger conjunction searcher
 			// expect dolor and tempor to have higher term score - since present in lesser docs and having same term freq
-			query: `{"conjuncts":[{"term":"lorem","field":"text"},{"term":"dolor","field":"text"},{"term":"amet","field":"text"},{"term":"adipiscing","field":"text"},{"term":"do","field":"text"},{"term":"tempor","field":"text"}], "retrieve_score_breakdown":true}`,
+			query: `{"conjuncts":[{"term":"lorem","field":"text"},{"term":"dolor","field":"text"},{"term":"amet","field":"text"},{"term":"adipiscing","field":"text"},{"term":"do","field":"text"},{"term":"tempor","field":"text"}]}`,
 			typ:   "conjunction",
 			expectHits: []testResult{
 				{
@@ -3458,7 +3458,7 @@ func TestScoreBreakdown(t *testing.T) {
 		{
 			// trigger disjunction heap searcher (>10 searchers)
 			// expect score breakdown to have a 0 at BLANK
-			query: `{"disjuncts":[{"term":"lorem","field":"text"},{"term":"blank","field":"text"},{"term":"ipsum","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"},{"term":"dolor","field":"text"},{"term":"sit","field":"text"},{"term":"amet","field":"text"},{"term":"consectetur","field":"text"},{"term":"blank","field":"text"},{"term":"adipiscing","field":"text"},{"term":"blank","field":"text"},{"term":"elit","field":"text"},{"term":"sed","field":"text"},{"term":"do","field":"text"},{"term":"eiusmod","field":"text"},{"term":"tempor","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"}],"retrieve_score_breakdown":true}`,
+			query: `{"disjuncts":[{"term":"lorem","field":"text"},{"term":"blank","field":"text"},{"term":"ipsum","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"},{"term":"dolor","field":"text"},{"term":"sit","field":"text"},{"term":"amet","field":"text"},{"term":"consectetur","field":"text"},{"term":"blank","field":"text"},{"term":"adipiscing","field":"text"},{"term":"blank","field":"text"},{"term":"elit","field":"text"},{"term":"sed","field":"text"},{"term":"do","field":"text"},{"term":"eiusmod","field":"text"},{"term":"tempor","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"}]}`,
 			typ:   "disjunction",
 			expectHits: []testResult{
 				{
@@ -3486,7 +3486,7 @@ func TestScoreBreakdown(t *testing.T) {
 		{
 			// trigger disjunction slice searcher (< 10 searchers)
 			// expect BLANK to give a 0 in score breakdown
-			query: `{"disjuncts":[{"term":"blank","field":"text"},{"term":"lorem","field":"text"},{"term":"ipsum","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"},{"term":"dolor","field":"text"},{"term":"sit","field":"text"},{"term":"blank","field":"text"}],"retrieve_score_breakdown":true}`,
+			query: `{"disjuncts":[{"term":"blank","field":"text"},{"term":"lorem","field":"text"},{"term":"ipsum","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"},{"term":"dolor","field":"text"},{"term":"sit","field":"text"},{"term":"blank","field":"text"}]}`,
 			typ:   "disjunction",
 			expectHits: []testResult{
 				{
@@ -3520,6 +3520,7 @@ func TestScoreBreakdown(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			rv.RetrieveScoreBreakdown(true)
 			q = &rv
 		} else if dtq.typ == "disjunction" {
 			var rv query.DisjunctionQuery
@@ -3527,6 +3528,7 @@ func TestScoreBreakdown(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			rv.RetrieveScoreBreakdown(true)
 			q = &rv
 		}
 		sr := NewSearchRequest(q)

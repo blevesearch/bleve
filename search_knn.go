@@ -181,11 +181,11 @@ func queryWithKNN(req *SearchRequest) (query.Query, error) {
 		}
 		if req.KNNOperator == knnOperatorAnd {
 			rv := query.NewConjunctionQuery(subQueries)
-			rv.RetrieveScoreBreakdown = true
+			rv.RetrieveScoreBreakdown(true)
 			return rv, nil
 		} else if req.KNNOperator == knnOperatorOr || req.KNNOperator == "" {
 			rv := query.NewDisjunctionQuery(subQueries)
-			rv.RetrieveScoreBreakdown = true
+			rv.RetrieveScoreBreakdown(true)
 			return rv, nil
 		} else {
 			return nil, fmt.Errorf("unknown knn operator: %s", req.KNNOperator)
