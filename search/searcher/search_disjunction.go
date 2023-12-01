@@ -46,6 +46,15 @@ func optionsDisjunctionOptimizable(options search.SearcherOptions) bool {
 func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
 	limit bool) (search.Searcher, error) {
+	// The KNN Searcher optimization is a necessary pre-req for any KNN Searchers,
+	// not an optional optimization like for, say term searchers.
+	// It's an optimization to repeat search an open vector index when applicable,
+	// rather than individually opening and searching a vector index.
+	optimizedKNNSearchers, err := optimizeKNN(ctx, indexReader, qsearchers)
+	if err != nil {
+		return nil, err
+	}
+
 	// attempt the "unadorned" disjunction optimization only when we
 	// do not need extra information like freq-norm's or term vectors
 	// and the requested min is simple
@@ -53,8 +62,13 @@ func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 		optionsDisjunctionOptimizable(options) {
 		rv, err := optimizeCompositeSearcher(ctx, "disjunction:unadorned",
 			indexReader, qsearchers, options)
-		if err != nil || rv != nil {
+		if err != nil || (rv != nil && len(optimizedKNNSearchers) == 0) {
 			return rv, err
+		}
+
+		if rv != nil && len(optimizedKNNSearchers) > 0 {
+			// reinitialze qsearchers with rv + optimizedKNNSearchers
+			qsearchers = append(optimizedKNNSearchers, rv)
 		}
 	}
 
@@ -64,42 +78,6 @@ func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	}
 	return newDisjunctionSliceSearcher(ctx, indexReader, qsearchers, min, options,
 		limit)
-}
-
-func optimizeCompositeSearcher(ctx context.Context, optimizationKind string,
-	indexReader index.IndexReader, qsearchers []search.Searcher,
-	options search.SearcherOptions) (search.Searcher, error) {
-	var octx index.OptimizableContext
-
-	for _, searcher := range qsearchers {
-		o, ok := searcher.(index.Optimizable)
-		if !ok {
-			return nil, nil
-		}
-
-		var err error
-		octx, err = o.Optimize(optimizationKind, octx)
-		if err != nil {
-			return nil, err
-		}
-
-		if octx == nil {
-			return nil, nil
-		}
-	}
-
-	optimized, err := octx.Finish()
-	if err != nil || optimized == nil {
-		return nil, err
-	}
-
-	tfr, ok := optimized.(index.TermFieldReader)
-	if !ok {
-		return nil, nil
-	}
-
-	return newTermSearcherFromReader(indexReader, tfr,
-		[]byte(optimizationKind), "*", 1.0, options)
 }
 
 func tooManyClauses(count int) bool {
