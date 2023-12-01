@@ -117,16 +117,16 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 		indexReader: indexReader,
 		options:     options,
 		originalPos: originalPos,
-		searchers:   qsearchers,
-		currs:       make([]*search.DocumentMatch, len(qsearchers)),
+		searchers:   searchers,
+		currs:       make([]*search.DocumentMatch, len(searchers)),
 		scorer:      scorer.NewConjunctionQueryScorer(options),
 	}
 	rv.computeQueryNorm()
 
 	// attempt push-down conjunction optimization when there's >1 searchers
-	if len(qsearchers) > 1 {
+	if len(searchers) > 1 {
 		rv, err := optimizeCompositeSearcher(ctx, "conjunction",
-			indexReader, qsearchers, options)
+			indexReader, searchers, options)
 		if err != nil || rv != nil {
 			return rv, err
 		}
