@@ -66,22 +66,38 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 		sortedSearchers.index[i] = i
 	}
 	sort.Sort(sortedSearchers)
-	searchers := sortedSearchers.searchers
+	qsearchers = sortedSearchers.searchers
 	originalPos := sortedSearchers.index
 
 	// attempt the "unadorned" conjunction optimization only when we
 	// do not need extra information like freq-norm's or term vectors
-	if len(searchers) > 1 &&
+	if len(qsearchers) > 1 &&
 		options.Score == "none" && !options.IncludeTermVectors {
 		rv, err := optimizeCompositeSearcher(ctx, "conjunction:unadorned",
-			indexReader, searchers, options)
+			indexReader, qsearchers, options)
 		if err != nil {
 			return rv, err
 		}
-		if rv != nil && optimizedKNNSearchers != nil && len(optimizedKNNSearchers) != 0 {
+		if rv != nil && len(optimizedKNNSearchers) != 0 {
+			// Need to append the optimized KNN searcher to the single, optimized term searcher
+			// need to do this since the above func returns only a term searcher
+			// Basically, replacing the original searchers with these when constructing
 			qsearchers = make([]search.Searcher, 0, len(optimizedKNNSearchers)+1)
 			qsearchers = append(qsearchers, optimizedKNNSearchers...)
 			qsearchers = append(qsearchers, rv)
+			// Need to resort the searchers since original position matters for
+			// score breakdown too.
+			// build the sorted downstream searchers
+			sortedSearchers := &OrderedSearcherList{
+				searchers: qsearchers,
+				index:     make([]int, len(qsearchers)),
+			}
+			for i := range qsearchers {
+				sortedSearchers.index[i] = i
+			}
+			sort.Sort(sortedSearchers)
+			qsearchers = sortedSearchers.searchers
+			originalPos = sortedSearchers.index
 		}
 	}
 
@@ -90,16 +106,16 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 		indexReader: indexReader,
 		options:     options,
 		originalPos: originalPos,
-		searchers:   searchers,
-		currs:       make([]*search.DocumentMatch, len(searchers)),
+		searchers:   qsearchers,
+		currs:       make([]*search.DocumentMatch, len(qsearchers)),
 		scorer:      scorer.NewConjunctionQueryScorer(options),
 	}
 	rv.computeQueryNorm()
 
 	// attempt push-down conjunction optimization when there's >1 searchers
-	if len(searchers) > 1 {
+	if len(qsearchers) > 1 {
 		rv, err := optimizeCompositeSearcher(ctx, "conjunction",
-			indexReader, searchers, options)
+			indexReader, qsearchers, options)
 		if err != nil || rv != nil {
 			return rv, err
 		}
