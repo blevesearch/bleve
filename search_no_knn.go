@@ -22,6 +22,7 @@ import (
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
 )
 
@@ -150,6 +151,10 @@ func queryWithKNN(req *SearchRequest) (query.Query, error) {
 
 func validateKNN(req *SearchRequest) error {
 	return nil
+}
+
+func setStoreForKNN(req *SearchRequest, coll *collector.TopNCollector, size int) {
+	return
 }
 
 func mergeKNNResults(req *SearchRequest, sr *SearchResult) {

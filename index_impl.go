@@ -460,6 +460,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		coll = collector.NewTopNCollector(req.Size, req.From, req.Sort)
 	}
 
+	setStoreForKNN(req, coll, req.Size)
+
 	// open a reader for this search
 	indexReader, err := i.i.Reader()
 	if err != nil {
@@ -657,7 +659,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		Took:     searchDuration,
 		Facets:   coll.FacetResults(),
 	}
-	mergeKNNResults(req, rv)
 	return rv, nil
 }
 

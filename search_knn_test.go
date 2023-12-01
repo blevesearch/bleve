@@ -977,17 +977,32 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 		{
 			numSegments: 6,
 			queryIndex:  0,
-			mapping:     indexMappingDotProduct,
+			mapping:     indexMappingL2Norm,
 		},
 		{
 			numSegments: 7,
 			queryIndex:  1,
-			mapping:     indexMappingDotProduct,
+			mapping:     indexMappingL2Norm,
 		},
 		{
 			numSegments: 8,
 			queryIndex:  2,
-			mapping:     indexMappingDotProduct,
+			mapping:     indexMappingL2Norm,
+		},
+		{
+			numSegments: 12,
+			queryIndex:  3,
+			mapping:     indexMappingL2Norm,
+		},
+		{
+			numSegments: 11,
+			queryIndex:  4,
+			mapping:     indexMappingL2Norm,
+		},
+		{
+			numSegments: 22,
+			queryIndex:  5,
+			mapping:     indexMappingL2Norm,
 		},
 	}
 	for testCaseNum, testCase := range testCases {

@@ -24,6 +24,7 @@ import (
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
 )
 
@@ -192,6 +193,21 @@ func queryWithKNN(req *SearchRequest) (query.Query, error) {
 		}
 	}
 	return req.Query, nil
+}
+
+func setStoreForKNN(req *SearchRequest, coll *collector.TopNCollector, size int) {
+	if len(req.KNN) > 0 {
+		kArray := make([]int64, 1+len(req.KNN))
+		kArray[0] = int64(req.Size + req.From)
+		for i, knn := range req.KNN {
+			kArray[i+1] = knn.K
+		}
+		numTotalSearchers := float64(len(req.KNN) + 1)
+		coll.SetKNNCollectorStore(kArray, func(docMatch *search.DocumentMatch) {
+			numMatchedSearchers := float64(len(docMatch.ScoreBreakdown))
+			docMatch.Score = recomputeTotalScore(req.KNNOperator, docMatch, numMatchedSearchers, numTotalSearchers)
+		})
+	}
 }
 
 func validateKNN(req *SearchRequest) error {

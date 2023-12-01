@@ -14,7 +14,9 @@
 
 package collector
 
-import "github.com/blevesearch/bleve/v2/search"
+import (
+	"github.com/blevesearch/bleve/v2/search"
+)
 
 type collectStoreSlice struct {
 	slice   search.DocumentMatchCollection
@@ -29,11 +31,46 @@ func newStoreSlice(capacity int, compare collectorCompare) *collectStoreSlice {
 	return rv
 }
 
+func (c *collectStoreSlice) Add(doc *search.DocumentMatch) {
+	c.add(doc)
+}
+
+func (c *collectStoreSlice) Remove() *search.DocumentMatch {
+	if c.len() > 0 {
+		return c.removeLast()
+	}
+	return nil
+}
+
+func (c *collectStoreSlice) Len() int {
+	return c.len()
+}
+
+func (c *collectStoreSlice) PopWhile(popCondition func(doc *search.DocumentMatch) bool) []*search.DocumentMatch {
+	var rv []*search.DocumentMatch
+	for c.len() > 0 {
+		doc := c.peak()
+		if popCondition(doc) {
+			rv = append(rv, c.removeLast())
+		} else {
+			break
+		}
+	}
+	return rv
+}
+
+func (c *collectStoreSlice) peak() *search.DocumentMatch {
+	if c.len() > 0 {
+		return c.slice[c.len()-1]
+	}
+	return nil
+}
+
 func (c *collectStoreSlice) AddNotExceedingSize(doc *search.DocumentMatch,
-	size int) *search.DocumentMatch {
+	size int) []*search.DocumentMatch {
 	c.add(doc)
 	if c.len() > size {
-		return c.removeLast()
+		return []*search.DocumentMatch{c.removeLast()}
 	}
 	return nil
 }

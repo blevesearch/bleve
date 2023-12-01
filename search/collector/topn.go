@@ -36,7 +36,15 @@ type collectorStore interface {
 	// Add the document, and if the new store size exceeds the provided size
 	// the last element is removed and returned.  If the size has not been
 	// exceeded, nil is returned.
-	AddNotExceedingSize(doc *search.DocumentMatch, size int) *search.DocumentMatch
+	AddNotExceedingSize(doc *search.DocumentMatch, size int) []*search.DocumentMatch
+
+	PopWhile(popCondition func(doc *search.DocumentMatch) bool) []*search.DocumentMatch
+
+	Add(doc *search.DocumentMatch)
+
+	Remove() *search.DocumentMatch
+
+	Len() int
 
 	Final(skip int, fixup collectorFixup) (search.DocumentMatchCollection, error)
 }
@@ -109,25 +117,9 @@ func NewTopNCollectorAfter(size int, sort search.SortOrder, after []string) *Top
 
 func newTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector {
 	hc := &TopNCollector{size: size, skip: skip, sort: sort}
-
-	// pre-allocate space on the store to avoid reslicing
-	// unless the size + skip is too large, then cap it
-	// everything should still work, just reslices as necessary
-	backingSize := size + skip + 1
-	if size+skip > PreAllocSizeSkipCap {
-		backingSize = PreAllocSizeSkipCap + 1
-	}
-
-	if size+skip > 10 {
-		hc.store = newStoreHeap(backingSize, func(i, j *search.DocumentMatch) int {
-			return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
-		})
-	} else {
-		hc.store = newStoreSlice(backingSize, func(i, j *search.DocumentMatch) int {
-			return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
-		})
-	}
-
+	hc.store = getOptimalCollectorStore(size, skip, func(i, j *search.DocumentMatch) int {
+		return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
+	})
 	// these lookups traverse an interface, so do once up-front
 	if sort.RequiresDocID() {
 		hc.needDocIds = true
@@ -153,6 +145,22 @@ func (hc *TopNCollector) Size() int {
 	sizeInBytes += len(hc.cachedScoring) + len(hc.cachedDesc)
 
 	return sizeInBytes
+}
+
+func getOptimalCollectorStore(size, skip int, comparator collectorCompare) collectorStore {
+	// pre-allocate space on the store to avoid reslicing
+	// unless the size + skip is too large, then cap it
+	// everything should still work, just reslices as necessary
+	backingSize := size + skip + 1
+	if size+skip > PreAllocSizeSkipCap {
+		backingSize = PreAllocSizeSkipCap + 1
+	}
+
+	if size+skip > 10 {
+		return newStoreHeap(backingSize, comparator)
+	} else {
+		return newStoreSlice(backingSize, comparator)
+	}
 }
 
 // Collect goes to the index to find the matching documents
@@ -331,8 +339,8 @@ func MakeTopNDocumentMatchHandler(
 				}
 			}
 
-			removed := hc.store.AddNotExceedingSize(d, hc.size+hc.skip)
-			if removed != nil {
+			removedDocs := hc.store.AddNotExceedingSize(d, hc.size+hc.skip)
+			for _, removed := range removedDocs {
 				if hc.lowestMatchOutsideResults == nil {
 					hc.lowestMatchOutsideResults = removed
 				} else {
@@ -416,6 +424,68 @@ func (hc *TopNCollector) Results() search.DocumentMatchCollection {
 // Total returns the total number of hits
 func (hc *TopNCollector) Total() uint64 {
 	return hc.total
+}
+
+func (hc *TopNCollector) SetKNNCollectorStore(kArray []int64, scoreCorrector func(docMatch *search.DocumentMatch)) {
+	// background - assuming D segments exists in the index (D is a highly variable number)
+	// the vector reader returns the top K results for each segment
+	// resulting in D * K hits matching the KNN query. With M KNN queries,
+	// the total number of results matching the KNN queries is at max D * M * K
+	// the goal is to ensure that the behavior remains the same as observed
+	// in a single segment scenario - M * K results are returned for M KNN queries
+	//
+	// the scenario becomes complex when pagination is involved - since the pagination is done on the total score
+	// the total score is a combination of TF-IDF score and KNN scores and as the document matches
+	// are streamed from the compound searcher across Next() calls,
+	// attempting to retain the top K elements for each KNN query with accurate pagination
+	// becomes a challenge - since for each KNN query we need to reduce the KNN score
+	// of D*K - K = K*(D-1) hits to 0, which reduces the total score of the document
+	// which inturn messes up the pagination - since the total score is used for pagination
+	//
+	// this problem is a constrained equivalent to the problem of maintaining top N elements from an infinite
+	// stream of objects where the stream can contain duplicates, (wherein we need to
+	// update the value of the duplicate object received in the stream), with the additional
+	// constraint that the space complexity of the solution should be O(N) and not infinite
+	//
+	// idea:-
+	// keep a min-heap for each KNN query 	- this is because we need to maintain top K elements for each KNN query
+	// keep a min-heap for the TF-IDF query - this is because we need to maintain top size+from elements for the TF-IDF query
+	//										  this is to ensure that when ejecting a document from the total score heap
+	//										  it is guaranteed that the document will never be part of the top size+from elements
+	// keep a min-heap for the total score 	- this is because the final pagination is done on the total score
+	//										  this heap is voluntarily corrupted as documents are ejected out of the KNN heaps
+	//										  but we use the TF-IDF heap to ensure that the document ejected out of the total score heap
+	//										  is guaranteed to be outside the top size+from elements
+	// all the knn heaps and TF-IDF heaps can be completely disjoint and hence the total score heap
+	// served as a catch all heap for all the document matches. Only ejecting a document if and only if
+	// the min score document at the root is having a score 0.0
+	//
+	// as per the design the sorting of the document matches is done
+	// only after all the document matches are collected from the compound searcher
+
+	internalHeaps := make([]collectorStore, len(kArray))
+	// index 0 of kArray is the size+from for the TF-IDF searcher
+	// index 1 of kArray is the K for the KNN searcher at index 0 of SearchRequest.KNN slice
+	// index 2 of kArray is the K for the KNN searcher at index 1 of SearchRequest.KNN slice
+	for knnIdx, k := range kArray {
+		// TODO - Check if the datatype of k can be made into an int instead of int64
+		idx := knnIdx
+		internalHeaps[knnIdx] = getOptimalCollectorStore(int(k), 0, func(i, j *search.DocumentMatch) int {
+			if i.ScoreBreakdown[idx] < j.ScoreBreakdown[idx] {
+				// min heap to maintain top K elements for KNN searcher or the top from+size values of the Query searcher
+				return 1
+			}
+			return -1
+		})
+	}
+	totalScoreHeap := getOptimalCollectorStore(hc.size, hc.skip, func(i, j *search.DocumentMatch) int {
+		if i.Score < j.Score {
+			// min heap to maintain top size+from elements for the total score
+			return 1
+		}
+		return -1
+	})
+	hc.store = newStoreKNN(totalScoreHeap, kArray, internalHeaps, scoreCorrector)
 }
 
 // MaxScore returns the maximum score seen across all the hits

@@ -35,10 +35,41 @@ func newStoreHeap(capacity int, compare collectorCompare) *collectStoreHeap {
 }
 
 func (c *collectStoreHeap) AddNotExceedingSize(doc *search.DocumentMatch,
-	size int) *search.DocumentMatch {
+	size int) []*search.DocumentMatch {
 	c.add(doc)
 	if c.Len() > size {
+		return []*search.DocumentMatch{c.removeLast()}
+	}
+	return nil
+}
+
+func (c *collectStoreHeap) Add(doc *search.DocumentMatch) {
+	c.add(doc)
+}
+
+func (c *collectStoreHeap) Remove() *search.DocumentMatch {
+	if c.Len() > 0 {
 		return c.removeLast()
+	}
+	return nil
+}
+
+func (c *collectStoreHeap) PopWhile(popCondition func(doc *search.DocumentMatch) bool) []*search.DocumentMatch {
+	var rv []*search.DocumentMatch
+	for c.Len() > 0 {
+		doc := c.peak()
+		if popCondition(doc) {
+			rv = append(rv, c.removeLast())
+		} else {
+			break
+		}
+	}
+	return rv
+}
+
+func (c *collectStoreHeap) peak() *search.DocumentMatch {
+	if c.Len() > 0 {
+		return c.heap[0]
 	}
 	return nil
 }
