@@ -3438,15 +3438,15 @@ func TestScoreBreakdown(t *testing.T) {
 	}
 	type testStruct struct {
 		query      string
-		operator   int
+		typ        string
 		expectHits []testResult
 	}
 	testQueries := []testStruct{
 		{
-			// trigger conjunction searcher from match query with operator 1
+			// trigger conjunction searcher
 			// expect dolor and tempor to have higher term score - since present in lesser docs and having same term freq
-			query:    "lorem dolor amet adipiscing do tempor",
-			operator: 1,
+			query: `{"conjuncts":[{"term":"lorem","field":"text"},{"term":"dolor","field":"text"},{"term":"amet","field":"text"},{"term":"adipiscing","field":"text"},{"term":"do","field":"text"},{"term":"tempor","field":"text"}]}`,
+			typ:   "conjunction",
 			expectHits: []testResult{
 				{
 					docID:          "doc1",
@@ -3456,10 +3456,10 @@ func TestScoreBreakdown(t *testing.T) {
 			},
 		},
 		{
-			// trigger disjunction heap searcher from match query with operator 0 (>10 searchers)
+			// trigger disjunction heap searcher (>10 searchers)
 			// expect score breakdown to have a 0 at BLANK
-			query:    "lorem BLANK ipsum BLANK BLANK dolor sit amet consectetur BLANK adipiscing BLANK elit sed do eiusmod tempor BLANK BLANK",
-			operator: 0,
+			query: `{"disjuncts":[{"term":"lorem","field":"text"},{"term":"blank","field":"text"},{"term":"ipsum","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"},{"term":"dolor","field":"text"},{"term":"sit","field":"text"},{"term":"amet","field":"text"},{"term":"consectetur","field":"text"},{"term":"blank","field":"text"},{"term":"adipiscing","field":"text"},{"term":"blank","field":"text"},{"term":"elit","field":"text"},{"term":"sed","field":"text"},{"term":"do","field":"text"},{"term":"eiusmod","field":"text"},{"term":"tempor","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"}]}`,
+			typ:   "disjunction",
 			expectHits: []testResult{
 				{
 					docID:          "doc1",
@@ -3484,10 +3484,10 @@ func TestScoreBreakdown(t *testing.T) {
 			},
 		},
 		{
-			// trigger disjunction slice searcher from match query with operator 0 (< 10 searchers)
+			// trigger disjunction slice searcher (< 10 searchers)
 			// expect BLANK to give a 0 in score breakdown
-			query:    "BLANK lorem ipsum BLANK BLANK dolor sit BLANK",
-			operator: 0,
+			query: `{"disjuncts":[{"term":"blank","field":"text"},{"term":"lorem","field":"text"},{"term":"ipsum","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"},{"term":"dolor","field":"text"},{"term":"sit","field":"text"},{"term":"blank","field":"text"}]}`,
+			typ:   "disjunction",
 			expectHits: []testResult{
 				{
 					docID:          "doc1",
@@ -3513,11 +3513,25 @@ func TestScoreBreakdown(t *testing.T) {
 		},
 	}
 	for _, dtq := range testQueries {
-
-		mq := NewMatchQuery(dtq.query)
-		mq.SetField("text")
-		mq.SetOperator(query.MatchQueryOperator(dtq.operator))
-		sr := NewSearchRequest(mq)
+		var q query.Query
+		if dtq.typ == "conjunction" {
+			var rv query.ConjunctionQuery
+			err := json.Unmarshal([]byte(dtq.query), &rv)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rv.RetrieveScoreBreakdown(true)
+			q = &rv
+		} else if dtq.typ == "disjunction" {
+			var rv query.DisjunctionQuery
+			err := json.Unmarshal([]byte(dtq.query), &rv)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rv.RetrieveScoreBreakdown(true)
+			q = &rv
+		}
+		sr := NewSearchRequest(q)
 		sr.Explain = true
 		res, err := idx.Search(sr)
 		if err != nil {
