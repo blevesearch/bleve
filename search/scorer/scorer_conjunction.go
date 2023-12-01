@@ -48,21 +48,18 @@ func (s *ConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	if s.options.Explain {
 		childrenExplanations = make([]*search.Explanation, len(constituents))
 	}
-	scoreBreakdown := make([]float64, len(constituents))
+	var scoreBreakdown map[int]float64
+	if originalPositions != nil {
+		scoreBreakdown = make(map[int]float64)
+	}
 	for i, docMatch := range constituents {
 		sum += docMatch.Score
-		if originalPositions != nil {
+		if scoreBreakdown != nil {
 			// for use in conjunction searcher
 			// the originalPositions are the positions of the searchers
 			// pre sort, since conjunction searcher sorts the searchers
 			// in order of their Count().
 			scoreBreakdown[originalPositions[i]] = docMatch.Score
-		} else {
-			// the indexes of searchers are the original searcher positions
-			// eg boolean searcher also uses the conjunction scorer,
-			// with index 0 being the must (conjunction) searcher
-			// and index 1 being the should (disjunction) searcher
-			scoreBreakdown[i] = docMatch.Score
 		}
 		if s.options.Explain {
 			childrenExplanations[i] = docMatch.Expl

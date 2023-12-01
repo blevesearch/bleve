@@ -57,10 +57,30 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	}
 
 	// build the sorted downstream searchers
-	sortedSearchers := &OrderedSearcherList{
-		searchers: make([]search.Searcher, len(qsearchers)),
-		index:     make([]int, len(qsearchers)),
+
+	var searchers OrderedSearcherList
+	var originalPos []int
+	retrieveScoreBreakdown, ok := ctx.Value(search.IncludeScoreBreakdownKey).(bool)
+	if ok && retrieveScoreBreakdown {
+		sortedSearchers := &OrderedPositionalSearcherList{
+			searchers: make([]search.Searcher, len(qsearchers)),
+			index:     make([]int, len(qsearchers)),
+		}
+		for i, searcher := range qsearchers {
+			sortedSearchers.searchers[i] = searcher
+			sortedSearchers.index[i] = i
+		}
+		sort.Sort(sortedSearchers)
+		searchers = sortedSearchers.searchers
+		originalPos = sortedSearchers.index
+	} else {
+		searchers = make(OrderedSearcherList, len(qsearchers))
+		for i, searcher := range qsearchers {
+			searchers[i] = searcher
+		}
+		sort.Sort(searchers)
 	}
+<<<<<<< HEAD
 	for i, searcher := range qsearchers {
 		sortedSearchers.searchers[i] = searcher
 		sortedSearchers.index[i] = i
@@ -68,6 +88,8 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	sort.Sort(sortedSearchers)
 	qsearchers = sortedSearchers.searchers
 	originalPos := sortedSearchers.index
+=======
+>>>>>>> origin/unstable
 
 	// attempt the "unadorned" conjunction optimization only when we
 	// do not need extra information like freq-norm's or term vectors

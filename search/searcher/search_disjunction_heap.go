@@ -46,14 +46,15 @@ type SearcherCurr struct {
 type DisjunctionHeapSearcher struct {
 	indexReader index.IndexReader
 
-	numSearchers    int
-	scorer          *scorer.DisjunctionQueryScorer
-	min             int
-	queryNorm       float64
-	queryNormForKNN float64
-	initialized     bool
-	searchers       []search.Searcher
-	heap            []*SearcherCurr
+	numSearchers           int
+	scorer                 *scorer.DisjunctionQueryScorer
+	min                    int
+	queryNorm              float64
+	queryNormForKNN        float64
+	retrieveScoreBreakdown bool
+	initialized            bool
+	searchers              []search.Searcher
+	heap                   []*SearcherCurr
 
 	matching      []*search.DocumentMatch
 	matchingIdxs  []int
@@ -69,18 +70,20 @@ func newDisjunctionHeapSearcher(ctx context.Context, indexReader index.IndexRead
 	if limit && tooManyClauses(len(searchers)) {
 		return nil, tooManyClausesErr("", len(searchers))
 	}
+	retrieveScoreBreakdown, _ := ctx.Value(search.IncludeScoreBreakdownKey).(bool)
 
 	// build our searcher
 	rv := DisjunctionHeapSearcher{
-		indexReader:   indexReader,
-		searchers:     searchers,
-		numSearchers:  len(searchers),
-		scorer:        scorer.NewDisjunctionQueryScorer(options),
-		min:           int(min),
-		matching:      make([]*search.DocumentMatch, len(searchers)),
-		matchingCurrs: make([]*SearcherCurr, len(searchers)),
-		matchingIdxs:  make([]int, len(searchers)),
-		heap:          make([]*SearcherCurr, 0, len(searchers)),
+		indexReader:            indexReader,
+		searchers:              searchers,
+		numSearchers:           len(searchers),
+		scorer:                 scorer.NewDisjunctionQueryScorer(options),
+		min:                    int(min),
+		matching:               make([]*search.DocumentMatch, len(searchers)),
+		matchingCurrs:          make([]*SearcherCurr, len(searchers)),
+		matchingIdxs:           make([]int, len(searchers)),
+		retrieveScoreBreakdown: retrieveScoreBreakdown,
+		heap:                   make([]*SearcherCurr, 0, len(searchers)),
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
@@ -194,7 +197,7 @@ func (s *DisjunctionHeapSearcher) Next(ctx *search.SearchContext) (
 			found = true
 			partialMatch := len(s.matching) != len(s.searchers)
 			// score this match
-			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers, s.matchingIdxs, nil)
+			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers, s.matchingIdxs, nil, s.retrieveScoreBreakdown)
 			rv.PartialMatch = partialMatch
 		}
 

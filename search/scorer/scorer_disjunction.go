@@ -44,21 +44,31 @@ func NewDisjunctionQueryScorer(options search.SearcherOptions) *DisjunctionQuery
 }
 
 func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int,
-	matchingIdxs []int, originalPositions []int) *search.DocumentMatch {
+	matchingIdxs []int, originalPositions []int, includeScoreBreakdown bool) *search.DocumentMatch {
 
 	var sum float64
 	var childrenExplanations []*search.Explanation
 	if s.options.Explain {
 		childrenExplanations = make([]*search.Explanation, len(constituents))
 	}
-	scoreBreakdown := make([]float64, countTotal)
+	var scoreBreakdown map[int]float64
+	if includeScoreBreakdown {
+		scoreBreakdown = make(map[int]float64)
+	}
+
 	for i, docMatch := range constituents {
 		sum += docMatch.Score
-		if originalPositions != nil {
-			scoreBreakdown[originalPositions[matchingIdxs[i]]] = docMatch.Score
-		} else {
-			scoreBreakdown[matchingIdxs[i]] = docMatch.Score
+
+		if scoreBreakdown != nil {
+			if originalPositions != nil {
+				// scorer used in disjunction slice searcher
+				scoreBreakdown[originalPositions[matchingIdxs[i]]] = docMatch.Score
+			} else {
+				// scorer used in disjunction heap searcher
+				scoreBreakdown[matchingIdxs[i]] = docMatch.Score
+			}
 		}
+
 		if s.options.Explain {
 			childrenExplanations[i] = docMatch.Expl
 		}

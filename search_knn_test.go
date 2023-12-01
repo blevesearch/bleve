@@ -222,7 +222,7 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 
 	type testResult struct {
 		score          float64
-		scoreBreakdown []float64
+		scoreBreakdown map[int]float64
 	}
 
 	type testCase struct {
@@ -240,15 +240,15 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			expectedResults: map[string]testResult{
 				"doc29": {
 					score:          0.5547758085810349,
-					scoreBreakdown: []float64{0, 1.1095516171620698},
+					scoreBreakdown: map[int]float64{1: 1.1095516171620698},
 				},
 				"doc23": {
 					score:          0.3817633037007331,
-					scoreBreakdown: []float64{0, 0.7635266074014662},
+					scoreBreakdown: map[int]float64{1: 0.7635266074014662},
 				},
 				"doc28": {
 					score:          0.33983667469689355,
-					scoreBreakdown: []float64{0, 0.6796733493937871},
+					scoreBreakdown: map[int]float64{1: 0.6796733493937871},
 				},
 			},
 		},
@@ -259,15 +259,15 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			expectedResults: map[string]testResult{
 				"doc29": {
 					score:          0.5547758085810349,
-					scoreBreakdown: []float64{0, 1.1095516171620698},
+					scoreBreakdown: map[int]float64{1: 1.1095516171620698},
 				},
 				"doc23": {
 					score:          0.3817633037007331,
-					scoreBreakdown: []float64{0, 0.7635266074014662},
+					scoreBreakdown: map[int]float64{1: 0.7635266074014662},
 				},
 				"doc28": {
 					score:          0.33983667469689355,
-					scoreBreakdown: []float64{0, 0.6796733493937871},
+					scoreBreakdown: map[int]float64{1: 0.6796733493937871},
 				},
 			},
 		},
@@ -277,16 +277,16 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			numIndexPartitions: 10,
 			expectedResults: map[string]testResult{
 				"doc29": {
-					score:          0.554775,
-					scoreBreakdown: []float64{0, 1.109551},
+					score:          0.5547758085810349,
+					scoreBreakdown: map[int]float64{1: 1.1095516171620698},
 				},
 				"doc23": {
-					score:          0.381763,
-					scoreBreakdown: []float64{0, 0.763526},
+					score:          0.3817633037007331,
+					scoreBreakdown: map[int]float64{1: 0.7635266074014662},
 				},
 				"doc28": {
-					score:          0.339836,
-					scoreBreakdown: []float64{0, 0.679673},
+					score:          0.33983667469689355,
+					scoreBreakdown: map[int]float64{1: 0.6796733493937871},
 				},
 			},
 		},
@@ -297,27 +297,27 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			expectedResults: map[string]testResult{
 				"doc29": {
 					score:          1.8859816084399936,
-					scoreBreakdown: []float64{0.7764299912779237, 1.1095516171620698},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237, 1: 1.1095516171620698},
 				},
 				"doc23": {
 					score:          1.8615644255330264,
-					scoreBreakdown: []float64{1.0980378181315602, 0.7635266074014662},
+					scoreBreakdown: map[int]float64{0: 1.0980378181315602, 1: 0.7635266074014662},
 				},
 				"doc27": {
 					score:          0.4640056648691007,
-					scoreBreakdown: []float64{0.9280113297382014, 0},
+					scoreBreakdown: map[int]float64{0: 0.9280113297382014},
 				},
 				"doc28": {
 					score:          0.434037555556026,
-					scoreBreakdown: []float64{0.868075111112052, 0},
+					scoreBreakdown: map[int]float64{0: 0.868075111112052},
 				},
 				"doc30": {
 					score:          0.38821499563896184,
-					scoreBreakdown: []float64{0.7764299912779237, 0},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237},
 				},
 				"doc24": {
 					score:          0.38821499563896184,
-					scoreBreakdown: []float64{0.7764299912779237, 0},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237},
 				},
 			},
 		},
@@ -328,27 +328,27 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			expectedResults: map[string]testResult{
 				"doc23": {
 					score:          1.5207250366637521,
-					scoreBreakdown: []float64{0.7571984292622859, 0.7635266074014662},
+					scoreBreakdown: map[int]float64{0: 0.7571984292622859, 1: 0.7635266074014662},
 				},
 				"doc29": {
 					score:          1.4834345192674083,
-					scoreBreakdown: []float64{0.3738829021053385, 1.1095516171620698},
+					scoreBreakdown: map[int]float64{0: 0.3738829021053385, 1: 1.1095516171620698},
 				},
 				"doc24": {
 					score:          0.2677100734235977,
-					scoreBreakdown: []float64{0.5354201468471954, 0},
+					scoreBreakdown: map[int]float64{0: 0.5354201468471954},
 				},
 				"doc27": {
 					score:          0.22343776840593196,
-					scoreBreakdown: []float64{0.4468755368118639, 0},
+					scoreBreakdown: map[int]float64{0: 0.4468755368118639},
 				},
 				"doc28": {
 					score:          0.20900689401100958,
-					scoreBreakdown: []float64{0.41801378802201916, 0},
+					scoreBreakdown: map[int]float64{0: 0.41801378802201916},
 				},
 				"doc30": {
 					score:          0.18694145105266924,
-					scoreBreakdown: []float64{0.3738829021053385, 0},
+					scoreBreakdown: map[int]float64{0: 0.3738829021053385},
 				},
 			},
 		},
@@ -359,43 +359,43 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			expectedResults: map[string]testResult{
 				"doc7": {
 					score:          math.MaxFloat64 / 3.0,
-					scoreBreakdown: []float64{0, 0, math.MaxFloat64},
+					scoreBreakdown: map[int]float64{2: math.MaxFloat64},
 				},
 				"doc29": {
 					score:          0.6774608026082964,
-					scoreBreakdown: []float64{0.23161973134064517, 0.7845714725717996, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517, 1: 0.7845714725717996},
 				},
 				"doc23": {
 					score:          0.5783030702431613,
-					scoreBreakdown: []float64{0.32755976365480655, 0.5398948417099355, 0},
+					scoreBreakdown: map[int]float64{0: 0.32755976365480655, 1: 0.5398948417099355},
 				},
 				"doc3": {
 					score:          0.2550334160459894,
-					scoreBreakdown: []float64{0.7651002481379682, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.7651002481379682},
 				},
 				"doc13": {
 					score:          0.2208654210738964,
-					scoreBreakdown: []float64{0.6625962632216892, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.6625962632216892},
 				},
 				"doc5": {
 					score:          0.21180931116413285,
-					scoreBreakdown: []float64{0, 0, 0.6354279334923986},
+					scoreBreakdown: map[int]float64{2: 0.6354279334923986},
 				},
 				"doc27": {
 					score:          0.09227950890170131,
-					scoreBreakdown: []float64{0.27683852670510395, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.2768385267051039},
 				},
 				"doc28": {
 					score:          0.0863195764709126,
-					scoreBreakdown: []float64{0.2589587294127378, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.2589587294127378},
 				},
 				"doc30": {
 					score:          0.07720657711354839,
-					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517},
 				},
 				"doc24": {
 					score:          0.07720657711354839,
-					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517},
 				},
 			},
 		},
@@ -406,43 +406,43 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			expectedResults: map[string]testResult{
 				"doc7": {
 					score:          math.MaxFloat64 / 3.0,
-					scoreBreakdown: []float64{0, 0, math.MaxFloat64},
+					scoreBreakdown: map[int]float64{2: math.MaxFloat64},
 				},
 				"doc29": {
 					score:          0.567426591648309,
-					scoreBreakdown: []float64{0.06656841490066398, 0.7845714725717996, 0},
+					scoreBreakdown: map[int]float64{0: 0.06656841490066398, 1: 0.7845714725717996},
 				},
 				"doc23": {
 					score:          0.5639255136185979,
-					scoreBreakdown: []float64{0.3059934287179615, 0.5398948417099355, 0},
+					scoreBreakdown: map[int]float64{0: 0.3059934287179615, 1: 0.5398948417099355},
 				},
 				"doc5": {
 					score:          0.21180931116413285,
-					scoreBreakdown: []float64{0, 0, 0.6354279334923986},
+					scoreBreakdown: map[int]float64{2: 0.6354279334923986},
 				},
 				"doc3": {
 					score:          0.14064944169372873,
-					scoreBreakdown: []float64{0.42194832508118624, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.4219483250811862},
 				},
 				"doc13": {
 					score:          0.12180599172106943,
-					scoreBreakdown: []float64{0.3654179751632083, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.3654179751632083},
 				},
 				"doc27": {
 					score:          0.026521491065731144,
-					scoreBreakdown: []float64{0.07956447319719344, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.07956447319719343},
 				},
 				"doc28": {
 					score:          0.024808583220893122,
-					scoreBreakdown: []float64{0.07442574966267937, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.07442574966267937},
 				},
 				"doc30": {
 					score:          0.02218947163355466,
-					scoreBreakdown: []float64{0.06656841490066398, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.06656841490066398},
 				},
 				"doc24": {
 					score:          0.02218947163355466,
-					scoreBreakdown: []float64{0.06656841490066398, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.06656841490066398},
 				},
 			},
 		},
@@ -456,35 +456,35 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			expectedResults: map[string]testResult{
 				"doc24": {
 					score:          1.22027994094805,
-					scoreBreakdown: []float64{0.027736154383370196, 0.3471022633855392, 0.5085619451465123, 0.33687957803262836},
+					scoreBreakdown: map[int]float64{0: 0.027736154383370196, 1: 0.3471022633855392, 2: 0.5085619451465123, 3: 0.33687957803262836},
 				},
 				"doc17": {
 					score:          0.7851856993753307,
-					scoreBreakdown: []float64{0.3367753689069724, 0, 0.3892791754255179, 0.320859721501284},
+					scoreBreakdown: map[int]float64{0: 0.3367753689069724, 2: 0.3892791754255179, 3: 0.320859721501284},
 				},
 				"doc21": {
 					score:          0.5927148028393034,
-					scoreBreakdown: []float64{0.06974846263723515, 0, 0.3914133076090359, 0.3291246335394669},
+					scoreBreakdown: map[int]float64{0: 0.06974846263723515, 2: 0.3914133076090359, 3: 0.3291246335394669},
 				},
 				"doc14": {
 					score:          0.45680756875853035,
-					scoreBreakdown: []float64{0.5968461853543279, 0, 0, 0.31676895216273276},
+					scoreBreakdown: map[int]float64{0: 0.5968461853543279, 3: 0.31676895216273276},
 				},
 				"doc25": {
 					score:          0.292014972318407,
-					scoreBreakdown: []float64{0.17861510907524708, 0, 0.405414835561567, 0},
+					scoreBreakdown: map[int]float64{0: 0.17861510907524708, 2: 0.405414835561567},
 				},
 				"doc23": {
 					score:          0.24706850662359503,
-					scoreBreakdown: []float64{0.09761951136424651, 0, 0.39651750188294355, 0},
+					scoreBreakdown: map[int]float64{0: 0.09761951136424651, 2: 0.39651750188294355},
 				},
 				"doc15": {
 					score:          0.24489276164017085,
-					scoreBreakdown: []float64{0.17216818679645968, 0, 0, 0.317617336483882},
+					scoreBreakdown: map[int]float64{0: 0.17216818679645968, 3: 0.317617336483882},
 				},
 				"doc5": {
 					score:          0.10331722282971788,
-					scoreBreakdown: []float64{0, 0.4132688913188715, 0, 0},
+					scoreBreakdown: map[int]float64{1: 0.4132688913188715},
 				},
 			},
 		},
@@ -498,15 +498,15 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			expectedResults: map[string]testResult{
 				"doc24": {
 					score:          1.22027994094805,
-					scoreBreakdown: []float64{0.027736154383370196, 0.3471022633855392, 0.5085619451465123, 0.33687957803262836},
+					scoreBreakdown: map[int]float64{0: 0.027736154383370196, 1: 0.3471022633855392, 2: 0.5085619451465123, 3: 0.33687957803262836},
 				},
 				"doc17": {
 					score:          0.7851856993753307,
-					scoreBreakdown: []float64{0.3367753689069724, 0, 0.3892791754255179, 0.320859721501284},
+					scoreBreakdown: map[int]float64{0: 0.3367753689069724, 2: 0.3892791754255179, 3: 0.320859721501284},
 				},
 				"doc21": {
 					score:          0.5927148028393034,
-					scoreBreakdown: []float64{0.06974846263723515, 0, 0.3914133076090359, 0.3291246335394669},
+					scoreBreakdown: map[int]float64{0: 0.06974846263723515, 2: 0.3914133076090359, 3: 0.3291246335394669},
 				},
 			},
 		},
@@ -519,15 +519,15 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			expectedResults: map[string]testResult{
 				"doc14": {
 					score:          0.45680756875853035,
-					scoreBreakdown: []float64{0.5968461853543279, 0, 0, 0.31676895216273276},
+					scoreBreakdown: map[int]float64{0: 0.5968461853543279, 3: 0.31676895216273276},
 				},
 				"doc25": {
 					score:          0.292014972318407,
-					scoreBreakdown: []float64{0.17861510907524708, 0, 0.405414835561567, 0},
+					scoreBreakdown: map[int]float64{0: 0.17861510907524708, 2: 0.405414835561567},
 				},
 				"doc23": {
 					score:          0.24706850662359503,
-					scoreBreakdown: []float64{0.09761951136424651, 0, 0.39651750188294355, 0},
+					scoreBreakdown: map[int]float64{0: 0.09761951136424651, 2: 0.39651750188294355},
 				},
 			},
 		},
@@ -559,9 +559,6 @@ func runKNNTest(t *testing.T, randomizeDocuments bool) {
 			expectScore := truncateScore(expectedHit.score)
 			if !randomizeDocuments && expectScore != actualScore {
 				t.Fatalf("testcase %d failed: expected hit %d to have score %f, got %f", testCaseNum, i, expectedHit.score, hit.Score)
-			}
-			if len(hit.ScoreBreakdown) != len(expectedHit.scoreBreakdown) {
-				t.Fatalf("testcase %d failed: expected hit %d to have %d score breakdowns, got %d", testCaseNum, i, len(expectedHit.scoreBreakdown), len(hit.ScoreBreakdown))
 			}
 			if !randomizeDocuments {
 				actualScore := truncateScore(hit.ScoreBreakdown[0])
@@ -603,7 +600,7 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 
 	type testResult struct {
 		score          float64
-		scoreBreakdown []float64
+		scoreBreakdown map[int]float64
 	}
 
 	testCases := []struct {
@@ -617,15 +614,15 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			expectedResults: map[string]testResult{
 				"doc29": {
 					score:          0.5547758085810349,
-					scoreBreakdown: []float64{0, 1.1095516171620698},
+					scoreBreakdown: map[int]float64{1: 1.1095516171620698},
 				},
 				"doc23": {
 					score:          0.3817633037007331,
-					scoreBreakdown: []float64{0, 0.7635266074014662},
+					scoreBreakdown: map[int]float64{1: 0.7635266074014662},
 				},
 				"doc28": {
 					score:          0.33983667469689355,
-					scoreBreakdown: []float64{0, 0.6796733493937871},
+					scoreBreakdown: map[int]float64{1: 0.6796733493937871},
 				},
 			},
 		},
@@ -635,15 +632,15 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			expectedResults: map[string]testResult{
 				"doc29": {
 					score:          0.5547758085810349,
-					scoreBreakdown: []float64{0, 1.1095516171620698},
+					scoreBreakdown: map[int]float64{1: 1.1095516171620698},
 				},
 				"doc23": {
 					score:          0.3817633037007331,
-					scoreBreakdown: []float64{0, 0.7635266074014662},
+					scoreBreakdown: map[int]float64{1: 0.7635266074014662},
 				},
 				"doc28": {
 					score:          0.33983667469689355,
-					scoreBreakdown: []float64{0, 0.6796733493937871},
+					scoreBreakdown: map[int]float64{1: 0.6796733493937871},
 				},
 			},
 		},
@@ -653,27 +650,27 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			expectedResults: map[string]testResult{
 				"doc29": {
 					score:          1.8859816084399936,
-					scoreBreakdown: []float64{0.7764299912779237, 1.1095516171620698},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237, 1: 1.1095516171620698},
 				},
 				"doc23": {
 					score:          1.8615644255330264,
-					scoreBreakdown: []float64{1.0980378181315602, 0.7635266074014662},
+					scoreBreakdown: map[int]float64{0: 1.0980378181315602, 1: 0.7635266074014662},
 				},
 				"doc27": {
 					score:          0.4640056648691007,
-					scoreBreakdown: []float64{0.9280113297382014, 0},
+					scoreBreakdown: map[int]float64{0: 0.9280113297382014},
 				},
 				"doc28": {
 					score:          0.434037555556026,
-					scoreBreakdown: []float64{0.868075111112052, 0},
+					scoreBreakdown: map[int]float64{0: 0.868075111112052},
 				},
 				"doc30": {
 					score:          0.38821499563896184,
-					scoreBreakdown: []float64{0.7764299912779237, 0},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237},
 				},
 				"doc24": {
 					score:          0.38821499563896184,
-					scoreBreakdown: []float64{0.7764299912779237, 0},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237},
 				},
 			},
 		},
@@ -683,27 +680,27 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			expectedResults: map[string]testResult{
 				"doc29": {
 					score:          1.8859816084399936,
-					scoreBreakdown: []float64{0.7764299912779237, 1.1095516171620698},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237, 1: 1.1095516171620698},
 				},
 				"doc23": {
 					score:          1.8615644255330264,
-					scoreBreakdown: []float64{1.0980378181315602, 0.7635266074014662},
+					scoreBreakdown: map[int]float64{0: 1.0980378181315602, 1: 0.7635266074014662},
 				},
 				"doc27": {
 					score:          0.4640056648691007,
-					scoreBreakdown: []float64{0.9280113297382014, 0},
+					scoreBreakdown: map[int]float64{0: 0.9280113297382014},
 				},
 				"doc28": {
 					score:          0.434037555556026,
-					scoreBreakdown: []float64{0.868075111112052, 0},
+					scoreBreakdown: map[int]float64{0: 0.868075111112052},
 				},
 				"doc30": {
 					score:          0.38821499563896184,
-					scoreBreakdown: []float64{0.7764299912779237, 0},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237},
 				},
 				"doc24": {
 					score:          0.38821499563896184,
-					scoreBreakdown: []float64{0.7764299912779237, 0},
+					scoreBreakdown: map[int]float64{0: 0.7764299912779237},
 				},
 			},
 		},
@@ -713,43 +710,43 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			expectedResults: map[string]testResult{
 				"doc7": {
 					score:          math.MaxFloat64 / 3.0,
-					scoreBreakdown: []float64{0, 0, math.MaxFloat64},
+					scoreBreakdown: map[int]float64{2: math.MaxFloat64},
 				},
 				"doc29": {
 					score:          0.6774608026082964,
-					scoreBreakdown: []float64{0.23161973134064517, 0.7845714725717996, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517, 1: 0.7845714725717996},
 				},
 				"doc23": {
 					score:          0.5783030702431613,
-					scoreBreakdown: []float64{0.32755976365480655, 0.5398948417099355, 0},
+					scoreBreakdown: map[int]float64{0: 0.32755976365480655, 1: 0.5398948417099355},
 				},
 				"doc3": {
 					score:          0.2550334160459894,
-					scoreBreakdown: []float64{0.7651002481379682, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.7651002481379682},
 				},
 				"doc13": {
 					score:          0.2208654210738964,
-					scoreBreakdown: []float64{0.6625962632216892, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.6625962632216892},
 				},
 				"doc5": {
 					score:          0.21180931116413285,
-					scoreBreakdown: []float64{0, 0, 0.6354279334923986},
+					scoreBreakdown: map[int]float64{2: 0.6354279334923986},
 				},
 				"doc27": {
 					score:          0.09227950890170131,
-					scoreBreakdown: []float64{0.27683852670510395, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.2768385267051039},
 				},
 				"doc28": {
 					score:          0.0863195764709126,
-					scoreBreakdown: []float64{0.2589587294127378, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.2589587294127378},
 				},
 				"doc30": {
 					score:          0.07720657711354839,
-					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517},
 				},
 				"doc24": {
 					score:          0.07720657711354839,
-					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517},
 				},
 			},
 		},
@@ -759,43 +756,43 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			expectedResults: map[string]testResult{
 				"doc7": {
 					score:          math.MaxFloat64 / 3.0,
-					scoreBreakdown: []float64{0, 0, math.MaxFloat64},
+					scoreBreakdown: map[int]float64{2: math.MaxFloat64},
 				},
 				"doc29": {
 					score:          0.6774608026082964,
-					scoreBreakdown: []float64{0.23161973134064517, 0.7845714725717996, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517, 1: 0.7845714725717996},
 				},
 				"doc23": {
 					score:          0.5783030702431613,
-					scoreBreakdown: []float64{0.32755976365480655, 0.5398948417099355, 0},
+					scoreBreakdown: map[int]float64{0: 0.32755976365480655, 1: 0.5398948417099355},
 				},
 				"doc3": {
 					score:          0.2550334160459894,
-					scoreBreakdown: []float64{0.7651002481379682, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.7651002481379682},
 				},
 				"doc13": {
 					score:          0.2208654210738964,
-					scoreBreakdown: []float64{0.6625962632216892, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.6625962632216892},
 				},
 				"doc5": {
 					score:          0.21180931116413285,
-					scoreBreakdown: []float64{0, 0, 0.6354279334923986},
+					scoreBreakdown: map[int]float64{2: 0.6354279334923986},
 				},
 				"doc27": {
 					score:          0.09227950890170131,
-					scoreBreakdown: []float64{0.27683852670510395, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.2768385267051039},
 				},
 				"doc28": {
 					score:          0.0863195764709126,
-					scoreBreakdown: []float64{0.2589587294127378, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.2589587294127378},
 				},
 				"doc30": {
 					score:          0.07720657711354839,
-					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517},
 				},
 				"doc24": {
 					score:          0.07720657711354839,
-					scoreBreakdown: []float64{0.23161973134064517, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.23161973134064517},
 				},
 			},
 		},

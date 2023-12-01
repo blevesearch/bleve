@@ -177,11 +177,10 @@ type DocumentMatch struct {
 	// used to indicate the sub-scores that combined to form the
 	// final score for this document match.  This is only populated
 	// when the search request's query is a DisjunctionQuery
-	// or a ConjunctionQuery. The length of this slice will be
-	// the same as the number of sub-queries in the query.
-	// the order of the scores will match the order of the sub-queries
-	// in the query.
-	ScoreBreakdown []float64 `json:"score_breakdown,omitempty"`
+	// or a ConjunctionQuery. The map key is the index of the sub-query
+	// in the DisjunctionQuery or ConjunctionQuery. The map value is the
+	// sub-score for that sub-query.
+	ScoreBreakdown map[int]float64 `json:"score_breakdown,omitempty"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {

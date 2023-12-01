@@ -3434,91 +3434,104 @@ func TestScoreBreakdown(t *testing.T) {
 	type testResult struct {
 		docID          string // doc ID of the hit
 		score          float64
-		scoreBreakdown []float64
+		scoreBreakdown map[int]float64
 	}
 	type testStruct struct {
 		query      string
-		operator   int
+		typ        string
 		expectHits []testResult
 	}
 	testQueries := []testStruct{
 		{
-			// trigger conjunction searcher from match query with operator 1
+			// trigger conjunction searcher
 			// expect dolor and tempor to have higher term score - since present in lesser docs and having same term freq
-			query:    "lorem dolor amet adipiscing do tempor",
-			operator: 1,
+			query: `{"conjuncts":[{"term":"lorem","field":"text"},{"term":"dolor","field":"text"},{"term":"amet","field":"text"},{"term":"adipiscing","field":"text"},{"term":"do","field":"text"},{"term":"tempor","field":"text"}]}`,
+			typ:   "conjunction",
 			expectHits: []testResult{
 				{
 					docID:          "doc1",
 					score:          0.815545,
-					scoreBreakdown: []float64{0.11147035536863306, 0.18483179634014485, 0.11147035536863306, 0.11147035536863306, 0.11147035536863306, 0.18483179634014485},
+					scoreBreakdown: map[int]float64{0: 0.11147035536863306, 1: 0.18483179634014485, 2: 0.11147035536863306, 3: 0.11147035536863306, 4: 0.11147035536863306, 5: 0.18483179634014485},
 				},
 			},
 		},
 		{
-			// trigger disjunction heap searcher from match query with operator 0 (>10 searchers)
+			// trigger disjunction heap searcher (>10 searchers)
 			// expect score breakdown to have a 0 at BLANK
-			query:    "lorem BLANK ipsum BLANK BLANK dolor sit amet consectetur BLANK adipiscing BLANK elit sed do eiusmod tempor BLANK BLANK",
-			operator: 0,
+			query: `{"disjuncts":[{"term":"lorem","field":"text"},{"term":"blank","field":"text"},{"term":"ipsum","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"},{"term":"dolor","field":"text"},{"term":"sit","field":"text"},{"term":"amet","field":"text"},{"term":"consectetur","field":"text"},{"term":"blank","field":"text"},{"term":"adipiscing","field":"text"},{"term":"blank","field":"text"},{"term":"elit","field":"text"},{"term":"sed","field":"text"},{"term":"do","field":"text"},{"term":"eiusmod","field":"text"},{"term":"tempor","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"}]}`,
+			typ:   "disjunction",
 			expectHits: []testResult{
 				{
 					docID:          "doc1",
 					score:          0.3034548543819603,
-					scoreBreakdown: []float64{0.040398807605268316, 0, 0.040398807605268316, 0, 0, 0.0669862776967768, 0.040398807605268316, 0.040398807605268316, 0.0669862776967768, 0, 0.040398807605268316, 0, 0.040398807605268316, 0, 0.040398807605268316, 0.040398807605268316, 0.0669862776967768, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.040398807605268316, 2: 0.040398807605268316, 5: 0.0669862776967768, 6: 0.040398807605268316, 7: 0.040398807605268316, 8: 0.0669862776967768, 10: 0.040398807605268316, 12: 0.040398807605268316, 14: 0.040398807605268316, 15: 0.040398807605268316, 16: 0.0669862776967768},
 				},
 				{
 					docID:          "doc4",
 					score:          0.15956816751152955,
-					scoreBreakdown: []float64{0.04737179972998534, 0, 0.04737179972998534, 0, 0, 0, 0.04737179972998534, 0.04737179972998534, 0, 0, 0.04737179972998534, 0, 0.04737179972998534, 0, 0.04737179972998534, 0.04737179972998534, 0, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.04737179972998534, 2: 0.04737179972998534, 6: 0.04737179972998534, 7: 0.04737179972998534, 10: 0.04737179972998534, 12: 0.04737179972998534, 14: 0.04737179972998534, 15: 0.04737179972998534},
 				},
 				{
 					docID:          "doc2",
 					score:          0.14725661652397853,
-					scoreBreakdown: []float64{0.05470024557900147, 0, 0, 0, 0, 0.09069985124905133, 0, 0.05470024557900147, 0, 0, 0.05470024557900147, 0, 0, 0.15681178542754148, 0, 0.05470024557900147, 0, 0, 0},
+					scoreBreakdown: map[int]float64{0: 0.05470024557900147, 5: 0.09069985124905133, 7: 0.05470024557900147, 10: 0.05470024557900147, 13: 0.15681178542754148, 15: 0.05470024557900147},
 				},
 				{
 					docID:          "doc3",
 					score:          0.12637916362550797,
-					scoreBreakdown: []float64{0, 0, 0.05470024557900147, 0, 0, 0, 0.05470024557900147, 0, 0.09069985124905133, 0, 0, 0, 0.05470024557900147, 0, 0.05470024557900147, 0, 0.09069985124905133, 0, 0},
+					scoreBreakdown: map[int]float64{2: 0.05470024557900147, 6: 0.05470024557900147, 8: 0.09069985124905133, 12: 0.05470024557900147, 14: 0.05470024557900147, 16: 0.09069985124905133},
 				},
 			},
 		},
 		{
-			// trigger disjunction slice searcher from match query with operator 0 (< 10 searchers)
+			// trigger disjunction slice searcher (< 10 searchers)
 			// expect BLANK to give a 0 in score breakdown
-			query:    "BLANK lorem ipsum BLANK BLANK dolor sit BLANK",
-			operator: 0,
+			query: `{"disjuncts":[{"term":"blank","field":"text"},{"term":"lorem","field":"text"},{"term":"ipsum","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"},{"term":"dolor","field":"text"},{"term":"sit","field":"text"},{"term":"blank","field":"text"}]}`,
+			typ:   "disjunction",
 			expectHits: []testResult{
 				{
 					docID:          "doc1",
 					score:          0.1340684440934241,
-					scoreBreakdown: []float64{0, 0.05756326446708409, 0.05756326446708409, 0, 0, 0.09544709478559595, 0.05756326446708409, 0},
+					scoreBreakdown: map[int]float64{1: 0.05756326446708409, 2: 0.05756326446708409, 5: 0.09544709478559595, 6: 0.05756326446708409},
 				},
 				{
 					docID:          "doc4",
 					score:          0.07593627256602972,
-					scoreBreakdown: []float64{0, 0.06749890894758198, 0.06749890894758198, 0, 0, 0, 0.06749890894758198, 0},
+					scoreBreakdown: map[int]float64{1: 0.06749890894758198, 2: 0.06749890894758198, 6: 0.06749890894758198},
 				},
 				{
 					docID:          "doc2",
 					score:          0.05179425287147191,
-					scoreBreakdown: []float64{0, 0.0779410306721006, 0, 0, 0, 0.129235980813787, 0, 0},
+					scoreBreakdown: map[int]float64{1: 0.0779410306721006, 5: 0.129235980813787},
 				},
 				{
 					docID:          "doc3",
 					score:          0.0389705153360503,
-					scoreBreakdown: []float64{0, 0, 0.0779410306721006, 0, 0, 0, 0.0779410306721006, 0},
+					scoreBreakdown: map[int]float64{2: 0.0779410306721006, 6: 0.0779410306721006},
 				},
 			},
 		},
 	}
-
 	for _, dtq := range testQueries {
-
-		mq := NewMatchQuery(dtq.query)
-		mq.SetField("text")
-		mq.SetOperator(query.MatchQueryOperator(dtq.operator))
-		sr := NewSearchRequest(mq)
+		var q query.Query
+		if dtq.typ == "conjunction" {
+			var rv query.ConjunctionQuery
+			err := json.Unmarshal([]byte(dtq.query), &rv)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rv.RetrieveScoreBreakdown(true)
+			q = &rv
+		} else if dtq.typ == "disjunction" {
+			var rv query.DisjunctionQuery
+			err := json.Unmarshal([]byte(dtq.query), &rv)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rv.RetrieveScoreBreakdown(true)
+			q = &rv
+		}
+		sr := NewSearchRequest(q)
 		sr.Explain = true
 		res, err := idx.Search(sr)
 		if err != nil {
