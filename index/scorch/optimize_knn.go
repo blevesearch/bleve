@@ -44,11 +44,6 @@ func (o *OptimizeVR) Finish() error {
 			if sv, ok := seg.segment.(segment_api.VectorSegment); ok {
 				// reading just once per field per segment.
 				searchVectorIndex, closeVectorIndex, err := sv.InterpretVectorIndex(field)
-
-				defer func(closeIndex segment_api.CloseVectorIndex) {
-					go closeIndex()
-				}(closeVectorIndex)
-
 				if err != nil {
 					return err
 				}
@@ -58,11 +53,14 @@ func (o *OptimizeVR) Finish() error {
 					// by passing the obtained vector index and getting similar vectors.
 					pl, err := searchVectorIndex(vr.field, vr.vector, vr.k, seg.deleted)
 					if err != nil {
+						go closeVectorIndex()
 						return err
 					}
 					vr.postings[i] = pl
 					vr.iterators[i] = pl.Iterator(vr.iterators[i])
 				}
+
+				go closeVectorIndex()
 			}
 		}
 	}
