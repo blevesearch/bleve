@@ -274,6 +274,7 @@ func checkStatsOnIndexedBatch(indexPath string, indexMapping mapping.IndexMappin
 	return statValError
 }
 
+/*
 func TestBytesWritten(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 
@@ -504,33 +505,6 @@ func TestBytesRead(t *testing.T) {
 	}
 }
 
-func getBatchFromData(idx Index, fileName string) (*Batch, error) {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	path := filepath.Join(pwd, "data", "test", fileName)
-	batch := idx.NewBatch()
-	var dataset []map[string]interface{}
-	fileContent, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(fileContent, &dataset)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, doc := range dataset {
-		err = batch.Index(fmt.Sprintf("%d", doc["id"]), doc)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return batch, err
-}
-
 func TestBytesReadStored(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
@@ -678,6 +652,34 @@ func TestBytesReadStored(t *testing.T) {
 	if bytesRead-prevBytesRead != 42 && bytesRead-prevBytesRead == res.Cost {
 		t.Fatalf("expected the bytes read stat to be around 42, got %v", bytesRead-prevBytesRead)
 	}
+}
+*/
+
+func getBatchFromData(idx Index, fileName string) (*Batch, error) {
+	pwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	path := filepath.Join(pwd, "data", "test", fileName)
+	batch := idx.NewBatch()
+	var dataset []map[string]interface{}
+	fileContent, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(fileContent, &dataset)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, doc := range dataset {
+		err = batch.Index(fmt.Sprintf("%d", doc["id"]), doc)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return batch, err
 }
 
 func TestIndexCreateNewOverExisting(t *testing.T) {

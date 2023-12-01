@@ -59,8 +59,12 @@ func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexRea
 
 	var searchers OrderedSearcherList
 	var originalPos []int
-	retrieveScoreBreakdown, ok := ctx.Value(search.IncludeScoreBreakdownKey).(bool)
-	if ok && retrieveScoreBreakdown {
+	var retrieveScoreBreakdown bool
+	if ctx != nil {
+		retrieveScoreBreakdown, _ = ctx.Value(search.IncludeScoreBreakdownKey).(bool)
+	}
+
+	if retrieveScoreBreakdown {
 		sortedSearchers := &OrderedPositionalSearcherList{
 			searchers: make([]search.Searcher, len(qsearchers)),
 			index:     make([]int, len(qsearchers)),

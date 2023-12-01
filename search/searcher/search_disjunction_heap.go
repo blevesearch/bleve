@@ -70,7 +70,10 @@ func newDisjunctionHeapSearcher(ctx context.Context, indexReader index.IndexRead
 	if limit && tooManyClauses(len(searchers)) {
 		return nil, tooManyClausesErr("", len(searchers))
 	}
-	retrieveScoreBreakdown, _ := ctx.Value(search.IncludeScoreBreakdownKey).(bool)
+	var retrieveScoreBreakdown bool
+	if ctx != nil {
+		retrieveScoreBreakdown, _ = ctx.Value(search.IncludeScoreBreakdownKey).(bool)
+	}
 
 	// build our searcher
 	rv := DisjunctionHeapSearcher{
