@@ -32,13 +32,13 @@ type OptimizeVR struct {
 }
 
 func (o *OptimizeVR) Finish() error {
-	// for each field, get the faiss index --> invoke the zap func.
+	// for each field, get the vector index --> invoke the zap func.
 	// for each VR, populate postings list and iterators
-	// by passing the obtained FAISS index and getting similar vectors.
+	// by passing the obtained vector index and getting similar vectors.
 	// defer close index - just once.
 
 	for i, seg := range o.snapshot.segment {
-		// for each field, get the faiss index --> invoke the zap func.
+		// for each field, get the vector index --> invoke the zap func.
 		for field, vrs := range o.vrs {
 			// for each VR belonging to that field
 			if sv, ok := seg.segment.(segment_api.VectorSegment); ok {
