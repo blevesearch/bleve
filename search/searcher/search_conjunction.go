@@ -51,7 +51,7 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	search.Searcher, error) {
 	// Doing this prior to sorting since sorting involves Count() which requires
 	// posting lists to be populated.
-	optimizedKNNSearchers, err := optimizeKNNSearcher(ctx, "", indexReader, qsearchers, options)
+	optimizedKNNSearchers, err := optimizeKNN(ctx, "", indexReader, qsearchers, options)
 	if err != nil {
 		return nil, err
 	}

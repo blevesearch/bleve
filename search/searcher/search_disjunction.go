@@ -53,7 +53,7 @@ func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	// Hence, this optimization should be invoked for KNN searchers irrespective
 	// of whether there are other searchers in the disjunction or not.
 
-	optimizedKNNSearchers, err := optimizeKNNSearcher(ctx, "", indexReader, qsearchers, options)
+	optimizedKNNSearchers, err := optimizeKNN(ctx, "", indexReader, qsearchers, options)
 	if err != nil {
 		return nil, err
 	}
