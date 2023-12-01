@@ -27,7 +27,7 @@ import (
 type OptimizeVR struct {
 	snapshot *IndexSnapshot
 
-	// map of the same field --> vrs
+	// maps field to vector readers
 	vrs map[string][]*IndexSnapshotVectorReader
 }
 
@@ -45,10 +45,8 @@ func (o *OptimizeVR) Finish() error {
 				// reading just once per field per segment.
 				searchVectorIndex, closeVectorIndex, err := sv.InterpretVectorIndex(field)
 
-				defer func(closeVectorIndex segment_api.CloseVectorIndex) {
-					go func(closeVectorIndex segment_api.CloseVectorIndex) {
-						closeVectorIndex()
-					}(closeVectorIndex)
+				defer func(closeIndex segment_api.CloseVectorIndex) {
+					go closeIndex()
 				}(closeVectorIndex)
 
 				if err != nil {
