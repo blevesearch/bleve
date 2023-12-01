@@ -24,12 +24,11 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-func optimizeKNN(ctx context.Context, optimizationKind string,
-	indexReader index.IndexReader, qsearchers []search.Searcher,
-	options search.SearcherOptions) ([]search.Searcher, error) {
+func optimizeKNN(ctx context.Context, indexReader index.IndexReader,
+	qsearchers []search.Searcher) ([]search.Searcher, error) {
 	var octx index.VectorOptimizableContext
 	var err error
-	knnSearchers := make([]search.Searcher, 0)
+	var knnSearchers []search.Searcher
 
 	for _, searcher := range qsearchers {
 		// Only applicable to KNN Searchers.
@@ -51,8 +50,7 @@ func optimizeKNN(ctx context.Context, optimizationKind string,
 		return nil, nil
 	}
 
-	err = octx.Finish()
-	// Pl and iterators replaced in the pointer to the vector reader
-	// and hence,no need for a non nil return.
-	return knnSearchers, err
+	// Postings lists and iterators replaced in the pointer to the
+	// vector reader
+	return knnSearchers, octx.Finish()
 }

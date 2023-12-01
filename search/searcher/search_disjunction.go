@@ -46,14 +46,11 @@ func optionsDisjunctionOptimizable(options search.SearcherOptions) bool {
 func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
 	limit bool) (search.Searcher, error) {
-
-	// The KNN Searcher optimization is a necessary pre-req for KNN Searchers, not an
-	// optional optimization like for, say term searchers.
-	// It's an optimization in the sense that it's more optimal to batch calls
-	// Hence, this optimization should be invoked for KNN searchers irrespective
-	// of whether there are other searchers in the disjunction or not.
-
-	optimizedKNNSearchers, err := optimizeKNN(ctx, "", indexReader, qsearchers, options)
+	// The KNN Searcher optimization is a necessary pre-req for any KNN Searchers,
+	// not an optional optimization like for, say term searchers.
+	// It's an optimization to repeat search an open vector index when applicable,
+	// rather than individually opening and searching a vector index.
+	optimizedKNNSearchers, err := optimizeKNN(ctx, indexReader, qsearchers)
 	if err != nil {
 		return nil, err
 	}
@@ -65,13 +62,13 @@ func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 		optionsDisjunctionOptimizable(options) {
 		rv, err := optimizeCompositeSearcher(ctx, "disjunction:unadorned",
 			indexReader, qsearchers, options)
-		if err != nil {
+		if err != nil || (rv != nil && len(optimizedKNNSearchers) == 0) {
 			return rv, err
 		}
-		if rv != nil && optimizedKNNSearchers != nil && len(optimizedKNNSearchers) != 0 {
-			qsearchers = make([]search.Searcher, 0, len(optimizedKNNSearchers)+1)
-			qsearchers = append(qsearchers, optimizedKNNSearchers...)
-			qsearchers = append(qsearchers, rv)
+
+		if rv != nil && len(optimizedKNNSearchers) > 0 {
+			// reinitialze qsearchers with rv + optimizedKNNSearchers
+			qsearchers = append(optimizedKNNSearchers, rv)
 		}
 	}
 

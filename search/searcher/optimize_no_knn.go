@@ -24,9 +24,8 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-func optimizeKNN(ctx context.Context, optimizationKind string,
-	indexReader index.IndexReader, qsearchers []search.Searcher,
-	options search.SearcherOptions) ([]search.Searcher, error) {
-	// Not supported
+func optimizeKNN(ctx context.Context, indexReader index.IndexReader,
+	qsearchers []search.Searcher) ([]search.Searcher, error) {
+	// No-op
 	return nil, nil
 }

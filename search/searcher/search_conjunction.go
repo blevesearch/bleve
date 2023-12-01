@@ -49,24 +49,45 @@ type ConjunctionSearcher struct {
 func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, options search.SearcherOptions) (
 	search.Searcher, error) {
-	// Doing this prior to sorting since sorting involves Count() which requires
-	// posting lists to be populated.
-	optimizedKNNSearchers, err := optimizeKNN(ctx, "", indexReader, qsearchers, options)
+	// The KNN Searcher optimization is a necessary pre-req for any KNN Searchers,
+	// not an optional optimization like for, say term searchers.
+	// It's an optimization to repeat search an open vector index when applicable,
+	// rather than individually opening and searching a vector index.
+	optimizedKNNSearchers, err := optimizeKNN(ctx, indexReader, qsearchers)
 	if err != nil {
 		return nil, err
 	}
 
-	// build the sorted downstream searchers
+	// attempt the "unadorned" conjunction optimization only when we
+	// do not need extra information like freq-norm's or term vectors
+	if len(qsearchers) > 1 &&
+		options.Score == "none" && !options.IncludeTermVectors {
+		rv, err := optimizeCompositeSearcher(ctx, "conjunction:unadorned",
+			indexReader, qsearchers, options)
+		if err != nil || (rv != nil && len(optimizedKNNSearchers) == 0) {
+			return rv, err
+		}
 
+		if rv != nil && len(optimizedKNNSearchers) > 0 {
+			// reinitialze qsearchers with rv + optimizedKNNSearchers
+			qsearchers = append(optimizedKNNSearchers, rv)
+		}
+	}
+
+	var retrieveScoreBreakdown bool
+	if ctx != nil {
+		retrieveScoreBreakdown, _ = ctx.Value(search.IncludeScoreBreakdownKey).(bool)
+	}
+
+	// build the sorted downstream searchers
 	var searchers OrderedSearcherList
 	var originalPos []int
-	retrieveScoreBreakdown, ok := ctx.Value(search.IncludeScoreBreakdownKey).(bool)
-	if ok && retrieveScoreBreakdown {
+	if retrieveScoreBreakdown {
 		sortedSearchers := &OrderedPositionalSearcherList{
 			searchers: qsearchers,
 			index:     make([]int, len(qsearchers)),
 		}
-		for i, searcher := range qsearchers {
+		for i := range qsearchers {
 			sortedSearchers.index[i] = i
 		}
 		sort.Sort(sortedSearchers)
@@ -78,38 +99,6 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 			searchers[i] = searcher
 		}
 		sort.Sort(searchers)
-	}
-
-	// attempt the "unadorned" conjunction optimization only when we
-	// do not need extra information like freq-norm's or term vectors
-	if len(qsearchers) > 1 &&
-		options.Score == "none" && !options.IncludeTermVectors {
-		rv, err := optimizeCompositeSearcher(ctx, "conjunction:unadorned",
-			indexReader, qsearchers, options)
-		if err != nil {
-			return rv, err
-		}
-		if rv != nil && len(optimizedKNNSearchers) != 0 {
-			// Need to append the optimized KNN searcher to the single, optimized term searcher
-			// need to do this since the above func returns only a term searcher
-			// Basically, replacing the original searchers with these when constructing
-			qsearchers = make([]search.Searcher, 0, len(optimizedKNNSearchers)+1)
-			qsearchers = append(qsearchers, optimizedKNNSearchers...)
-			qsearchers = append(qsearchers, rv)
-			// Need to resort the searchers since original position matters for
-			// score breakdown too.
-			// build the sorted downstream searchers
-			sortedSearchers := &OrderedSearcherList{
-				searchers: qsearchers,
-				index:     make([]int, len(qsearchers)),
-			}
-			for i := range qsearchers {
-				sortedSearchers.index[i] = i
-			}
-			sort.Sort(sortedSearchers)
-			qsearchers = sortedSearchers.searchers
-			originalPos = sortedSearchers.index
-		}
 	}
 
 	// build our searcher
