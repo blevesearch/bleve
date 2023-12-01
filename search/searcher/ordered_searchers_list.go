@@ -18,22 +18,38 @@ import (
 	"github.com/blevesearch/bleve/v2/search"
 )
 
-type OrderedSearcherList struct {
+type OrderedSearcherList []search.Searcher
+
+// sort.Interface
+
+func (otrl OrderedSearcherList) Len() int {
+	return len(otrl)
+}
+
+func (otrl OrderedSearcherList) Less(i, j int) bool {
+	return otrl[i].Count() < otrl[j].Count()
+}
+
+func (otrl OrderedSearcherList) Swap(i, j int) {
+	otrl[i], otrl[j] = otrl[j], otrl[i]
+}
+
+type OrderedPositionalSearcherList struct {
 	searchers []search.Searcher
 	index     []int
 }
 
 // sort.Interface
 
-func (otrl OrderedSearcherList) Len() int {
+func (otrl OrderedPositionalSearcherList) Len() int {
 	return len(otrl.searchers)
 }
 
-func (otrl OrderedSearcherList) Less(i, j int) bool {
+func (otrl OrderedPositionalSearcherList) Less(i, j int) bool {
 	return otrl.searchers[i].Count() < otrl.searchers[j].Count()
 }
 
-func (otrl OrderedSearcherList) Swap(i, j int) {
+func (otrl OrderedPositionalSearcherList) Swap(i, j int) {
 	otrl.searchers[i], otrl.searchers[j] = otrl.searchers[j], otrl.searchers[i]
 	otrl.index[i], otrl.index[j] = otrl.index[j], otrl.index[i]
 }

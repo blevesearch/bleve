@@ -180,9 +180,13 @@ func queryWithKNN(req *SearchRequest) (query.Query, error) {
 			}
 		}
 		if req.KNNOperator == knnOperatorAnd {
-			return query.NewConjunctionQuery(subQueries), nil
+			rv := query.NewConjunctionQuery(subQueries)
+			rv.RetrieveScoreBreakdown(true)
+			return rv, nil
 		} else if req.KNNOperator == knnOperatorOr || req.KNNOperator == "" {
-			return query.NewDisjunctionQuery(subQueries), nil
+			rv := query.NewDisjunctionQuery(subQueries)
+			rv.RetrieveScoreBreakdown(true)
+			return rv, nil
 		} else {
 			return nil, fmt.Errorf("unknown knn operator: %s", req.KNNOperator)
 		}
@@ -225,88 +229,84 @@ func adjustRequestSizeForKNN(req *SearchRequest, numIndexPartitions int) int {
 
 // heap impl
 type scoreHeap struct {
-	scoreBreakdown []*[]float64
-	sortIndex      int
+	scoreMaps []map[int]float64
+	sortIndex int
 }
 
-func (s *scoreHeap) Len() int { return len(s.scoreBreakdown) }
+func (s *scoreHeap) Len() int { return len(s.scoreMaps) }
 
 func (s *scoreHeap) Less(i, j int) bool {
-	return (*s.scoreBreakdown[i])[s.sortIndex] > (*s.scoreBreakdown[j])[s.sortIndex]
+	return (s.scoreMaps[i])[s.sortIndex] > (s.scoreMaps[j])[s.sortIndex]
 }
 
 func (s *scoreHeap) Swap(i, j int) {
-	s.scoreBreakdown[i], s.scoreBreakdown[j] = s.scoreBreakdown[j], s.scoreBreakdown[i]
+	s.scoreMaps[i], s.scoreMaps[j] = s.scoreMaps[j], s.scoreMaps[i]
 }
 
 func (s *scoreHeap) Push(x interface{}) {
-	s.scoreBreakdown = append(s.scoreBreakdown, x.(*[]float64))
+	s.scoreMaps = append(s.scoreMaps, x.(map[int]float64))
 }
 
 func (s *scoreHeap) Pop() interface{} {
-	old := s.scoreBreakdown
+	old := s.scoreMaps
 	n := len(old)
 	x := old[n-1]
-	s.scoreBreakdown = old[0 : n-1]
+	s.scoreMaps = old[0 : n-1]
 	return x
 }
 
 func mergeKNN(req *SearchRequest, sr *SearchResult) {
-	// index 0 of score breakdown is always tf-idf score
-	numKnnQuery := len(req.KNN)
 	maxHeap := &scoreHeap{
-		scoreBreakdown: make([]*[]float64, 0),
+		scoreMaps: make([]map[int]float64, 0),
 	}
-	for i := 0; i < numKnnQuery; i++ {
+	for i := 0; i < len(req.KNN); i++ {
 		kVal := req.KNN[i].K
 		maxHeap.sortIndex = i + 1
 		for _, hit := range sr.Hits {
-			heap.Push(maxHeap, &hit.ScoreBreakdown)
+			heap.Push(maxHeap, hit.ScoreBreakdown)
 		}
 		for maxHeap.Len() > 0 {
-			arr := heap.Pop(maxHeap).(*[]float64)
+			scBreakdown := heap.Pop(maxHeap).(map[int]float64)
 			if kVal > 0 {
 				kVal--
 			} else {
-				(*arr)[maxHeap.sortIndex] = 0
+				delete(scBreakdown, maxHeap.sortIndex)
 			}
 		}
 	}
-	nonZeroScoreHits := make([]*search.DocumentMatch, 0, len(sr.Hits))
 	maxScore := 0.0
 	var numHitsDropped uint64
+	numTotalSearchers := float64(len(req.KNN) + 1)
+	hitIdx := 0
 	for _, hit := range sr.Hits {
-		newScore := recomputeTotalScore(req.KNNOperator, hit)
+		numMatchedSearchers := float64(len(hit.ScoreBreakdown))
+		newScore := recomputeTotalScore(req.KNNOperator, hit, numMatchedSearchers, numTotalSearchers)
 		if newScore > 0 {
 			hit.Score = newScore
 			if newScore > maxScore {
 				maxScore = newScore
 			}
-			nonZeroScoreHits = append(nonZeroScoreHits, hit)
+			sr.Hits[hitIdx] = hit
+			hitIdx++
 		} else {
 			numHitsDropped++
 		}
 	}
-	sr.Hits = nonZeroScoreHits
+	sr.Hits = sr.Hits[:hitIdx]
 	sr.MaxScore = maxScore
 	sr.Total -= numHitsDropped
 }
 
-func recomputeTotalScore(operator knnOperator, hit *search.DocumentMatch) float64 {
-	totalScore := 0.0
-	numNonZero := 0.0
-	numTotal := float64(len(hit.ScoreBreakdown))
+func recomputeTotalScore(operator knnOperator, hit *search.DocumentMatch, numMatchedSearchers, numTotalSearchers float64) float64 {
+	if operator == knnOperatorAnd && numMatchedSearchers != numTotalSearchers {
+		return 0
+	}
+	var totalScore float64
 	for _, score := range hit.ScoreBreakdown {
-		if score != 0 {
-			numNonZero += 1
-		}
 		totalScore += score
 	}
 	if operator == knnOperatorOr || operator == "" {
-		coord := numNonZero / numTotal
-		totalScore = totalScore * coord
-	} else if operator == knnOperatorAnd && numNonZero != numTotal {
-		totalScore = 0
+		totalScore *= (numMatchedSearchers / numTotalSearchers)
 	}
 	return totalScore
 }
