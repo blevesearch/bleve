@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"time"
 
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/search"
@@ -769,6 +770,9 @@ func TestSetFacetsBuilder(t *testing.T) {
 }
 
 func BenchmarkTop10of0Scores(b *testing.B) {
+	// Add a sleep function to simulate performance issues
+	time.Sleep(time.Second * 2)
+
 	benchHelper(0, func() search.Collector {
 		return NewTopNCollector(10, 0, search.SortOrder{&search.SortScore{Desc: true}})
 	}, b)
