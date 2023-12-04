@@ -15,6 +15,7 @@
 package bleve
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -274,6 +275,72 @@ func checkStatsOnIndexedBatch(indexPath string, indexMapping mapping.IndexMappin
 	return statValError
 }
 
+func CopyFile(source string, dest string) (err error) {
+	sourcefile, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer sourcefile.Close()
+
+	destfile, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer destfile.Close()
+
+	_, err = io.Copy(destfile, sourcefile)
+	if err == nil {
+		sourceinfo, err := os.Stat(source)
+		if err != nil {
+			err = os.Chmod(dest, sourceinfo.Mode())
+		}
+	}
+	return
+}
+
+func CopyDir(source *zip.ReadCloser, dest string) (err error) {
+	// Extract the files from the zip
+	for _, f := range source.File {
+		// Create the destination file path
+		filePath := filepath.Join(dest, f.Name)
+
+		// Check if the file is a directory
+		if f.FileInfo().IsDir() {
+			// Create the directory
+			if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
+				panic(err)
+			}
+			continue
+		}
+
+		// Create the parent directory if it doesn't exist
+		if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+			panic(err)
+		}
+
+		// Create an empty destination file
+		dstFile, err := os.OpenFile(filePath, os.O_WRONLY|
+			os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			panic(err)
+		}
+
+		// Open the file in the zip and copy its contents to the destination file
+		srcFile, err := f.Open()
+		if err != nil {
+			panic(err)
+		}
+		if _, err := io.Copy(dstFile, srcFile); err != nil {
+			panic(err)
+		}
+
+		// Close the files
+		dstFile.Close()
+		srcFile.Close()
+	}
+	return nil
+}
+
 func TestIndexSectionsUpgrade(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
@@ -297,21 +364,47 @@ func TestIndexSectionsUpgrade(t *testing.T) {
 	typeFieldMapping.DocValues = true
 	documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
 
+	// create a v16 index
+	idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	config := map[string]interface{}{
 		"forceSegmentVersion": 11,
 		"forceSegmentType":    "zap",
 	}
 
-	idx, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, config)
+	r, err := zip.OpenReader("./data/test/upgrade/bleve-testIdx-v11.zip")
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	err = CopyDir(r, "./data/test/upgrade/")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idxV11Path := "./data/test/upgrade/bleve-testIdx-v11"
+	// this an index with old file format - v11. however, when its opened the
+	// back data structures are in accordance with v16 -> upgrade
+	idxV11, err := OpenUsing(idxV11Path, config)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
 		err := idx.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		err = idxV11.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cleanupTmpIndexPath(t, idxV11Path)
+
 	}()
 
 	batch, err := getBatchFromData(idx, "sample-data.json")
@@ -327,13 +420,20 @@ func TestIndexSectionsUpgrade(t *testing.T) {
 
 	searchRequest := NewSearchRequestOptions(query, int(10), 0, true)
 	searchRequest.AddFacet("types", typeFacet)
+
 	res, err := idx.Search(searchRequest)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if res.Facets["types"].Total != 9 {
-		t.Errorf("expected count for types facets is 9 got %v", res.Facets["types"].Total)
+	resV11, err := idxV11.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if res.Facets["types"].Total != resV11.Facets["types"].Total {
+		t.Errorf("expected count for types facets is %v got %v",
+			resV11.Facets["types"].Total, res.Facets["types"].Total)
 	}
 }
 

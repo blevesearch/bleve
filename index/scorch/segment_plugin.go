@@ -109,6 +109,8 @@ func chooseSegmentPlugin(forcedSegmentType string,
 	// v16 and above are able to handle upgrade scenarios, so no need to load
 	// the force load the older plugins
 	if defaultSegmentPlugin.Version() >= 16 {
+		fmt.Printf("WARN: using v16 plugin to load index of segment "+
+			"type %v\n", forcedSegmentVersion)
 		return defaultSegmentPlugin, nil
 	}
 
