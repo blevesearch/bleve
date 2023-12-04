@@ -83,6 +83,7 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	var searchers OrderedSearcherList
 	var originalPos []int
 	if retrieveScoreBreakdown {
+		// needed only when kNN is in picture
 		sortedSearchers := &OrderedPositionalSearcherList{
 			searchers: qsearchers,
 			index:     make([]int, len(qsearchers)),
