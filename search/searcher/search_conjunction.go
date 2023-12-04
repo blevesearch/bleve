@@ -119,10 +119,6 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 		if err != nil || (rv != nil && len(optimizedKNNSearchers) == 0) {
 			return rv, err
 		}
-
-		if rv != nil && len(optimizedKNNSearchers) > 0 {
-			c.searchers = append(optimizedKNNSearchers, rv)
-		}
 	}
 
 	return &c, nil
