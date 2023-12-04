@@ -56,6 +56,9 @@ func (o *OptimizeVR) Finish() error {
 						go closeVectorIndex()
 						return err
 					}
+
+					// postings and iterators are already alloc'ed when
+					// IndexSnapshotVectorReader is created
 					vr.postings[i] = pl
 					vr.iterators[i] = pl.Iterator(vr.iterators[i])
 				}
