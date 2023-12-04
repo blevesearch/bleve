@@ -65,6 +65,7 @@ func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexRea
 	}
 
 	if retrieveScoreBreakdown {
+		// needed only when kNN is in picture
 		sortedSearchers := &OrderedPositionalSearcherList{
 			searchers: make([]search.Searcher, len(qsearchers)),
 			index:     make([]int, len(qsearchers)),
