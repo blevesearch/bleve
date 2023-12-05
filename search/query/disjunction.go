@@ -68,6 +68,8 @@ func (q *DisjunctionQuery) SetMin(m float64) {
 func (q *DisjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping,
 	options search.SearcherOptions) (search.Searcher, error) {
 	ss := make([]search.Searcher, 0, len(q.Disjuncts))
+	knnSearcherCount := 0
+	matchNoneSearcherCount := 0
 	for _, disjunct := range q.Disjuncts {
 		sr, err := disjunct.Searcher(ctx, i, m, options)
 		if err != nil {
@@ -83,6 +85,12 @@ func (q *DisjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 				// in query string mode, skip match none
 				continue
 			}
+			if _, ok := sr.(*searcher.KNNSearcher); ok {
+				knnSearcherCount += 1
+			}
+			if _, ok := sr.(*searcher.MatchNoneSearcher); ok {
+				matchNoneSearcherCount += 1
+			}
 			ss = append(ss, sr)
 		}
 	}
@@ -92,6 +100,16 @@ func (q *DisjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 	}
 
 	nctx := context.WithValue(ctx, search.IncludeScoreBreakdownKey, q.retrieveScoreBreakdown)
+
+	// Here, check if it's effectively a single KNN searcher
+	// If so, return new KNN Searcher
+	if knnSearcherCount == 1 && matchNoneSearcherCount == 1 {
+		finalSearchers, err := searcher.OptimizeKNNSearchers(nctx, i, ss, options)
+		if err != nil {
+			return nil, err
+		}
+		return finalSearchers[0], nil
+	}
 
 	return searcher.NewDisjunctionSearcher(nctx, i, ss, q.Min, options)
 }

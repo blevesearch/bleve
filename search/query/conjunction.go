@@ -61,6 +61,8 @@ func (q *ConjunctionQuery) AddQuery(aq ...Query) {
 
 func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	ss := make([]search.Searcher, 0, len(q.Conjuncts))
+	matchAllSearcherCount := 0
+	knnSearcherCount := 0
 	for _, conjunct := range q.Conjuncts {
 		sr, err := conjunct.Searcher(ctx, i, m, options)
 		if err != nil {
@@ -75,6 +77,12 @@ func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 			// in query string mode, skip match none
 			continue
 		}
+		if _, ok := sr.(*searcher.MatchAllSearcher); ok {
+			matchAllSearcherCount += 1
+		}
+		if _, ok := sr.(*searcher.KNNSearcher); ok {
+			knnSearcherCount += 1
+		}
 		ss = append(ss, sr)
 	}
 
@@ -82,6 +90,16 @@ func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		return searcher.NewMatchNoneSearcher(i)
 	}
 	nctx := context.WithValue(ctx, search.IncludeScoreBreakdownKey, q.retrieveScoreBreakdown)
+
+	// Here, check if it's effectively a single KNN searcher
+	// If so, return new KNN Searcher
+	if knnSearcherCount == 1 && matchAllSearcherCount == 1 {
+		finalSearchers, err := searcher.OptimizeKNNSearchers(nctx, i, ss, options)
+		if err != nil {
+			return nil, err
+		}
+		return finalSearchers[0], nil
+	}
 
 	return searcher.NewConjunctionSearcher(nctx, i, ss, options)
 }
