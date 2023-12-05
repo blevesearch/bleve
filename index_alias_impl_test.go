@@ -494,8 +494,7 @@ func TestIndexAliasMulti(t *testing.T) {
 			Successful: 2,
 			Errors:     make(map[string]error),
 		},
-		Request: sr,
-		Total:   2,
+		Total: 2,
 		Hits: search.DocumentMatchCollection{
 			{
 				ID:    "b",
@@ -575,8 +574,7 @@ func TestMultiSearchNoError(t *testing.T) {
 			Successful: 2,
 			Errors:     make(map[string]error),
 		},
-		Request: sr,
-		Total:   2,
+		Total: 2,
 		Hits: search.DocumentMatchCollection{
 			{
 				Index: "2",
@@ -949,8 +947,7 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 				"ei3": context.DeadlineExceeded,
 			},
 		},
-		Request: sr,
-		Total:   2,
+		Total: 2,
 		Hits: search.DocumentMatchCollection{
 			{
 				Index: "2",
@@ -1105,8 +1102,7 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 				"ei3": context.DeadlineExceeded,
 			},
 		},
-		Request: sr,
-		Total:   2,
+		Total: 2,
 		Hits: search.DocumentMatchCollection{
 			{
 				Index: "4",
@@ -1191,8 +1187,7 @@ func TestMultiSearchCustomSort(t *testing.T) {
 			Successful: 2,
 			Errors:     make(map[string]error),
 		},
-		Request: sr,
-		Total:   4,
+		Total: 4,
 		Hits: search.DocumentMatchCollection{
 			{
 				Index: "1",
