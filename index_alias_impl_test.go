@@ -1189,7 +1189,7 @@ func TestMultiSearchCustomSort(t *testing.T) {
 			Errors:     make(map[string]error),
 		},
 		Request: sr,
-		Total: 4,
+		Total:   4,
 		Hits: search.DocumentMatchCollection{
 			{
 				Index: "1",
