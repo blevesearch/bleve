@@ -1180,6 +1180,7 @@ func TestMultiSearchCustomSort(t *testing.T) {
 	}}
 
 	sr := NewSearchRequest(NewTermQuery("test"))
+	sr.Explain = true
 	sr.SortBy([]string{"name"})
 	expected := &SearchResult{
 		Status: &SearchStatus{
@@ -1187,6 +1188,7 @@ func TestMultiSearchCustomSort(t *testing.T) {
 			Successful: 2,
 			Errors:     make(map[string]error),
 		},
+		Request: sr,
 		Total: 4,
 		Hits: search.DocumentMatchCollection{
 			{
