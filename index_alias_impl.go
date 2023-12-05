@@ -548,7 +548,9 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 	}
 
 	// fix up original request
-	sr.Request = req
+	if req.Explain {
+		sr.Request = req
+	}
 	searchDuration := time.Since(searchStart)
 	sr.Took = searchDuration
 
