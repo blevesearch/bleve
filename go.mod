@@ -18,6 +18,11 @@ require (
 	github.com/blevesearch/stempel v0.2.0
 	github.com/blevesearch/upsidedown_store_api v1.0.2
 	github.com/blevesearch/vellum v1.0.10
+	github.com/blevesearch/zapx/v11 v11.3.10
+	github.com/blevesearch/zapx/v12 v12.3.10
+	github.com/blevesearch/zapx/v13 v13.3.10
+	github.com/blevesearch/zapx/v14 v14.3.10
+	github.com/blevesearch/zapx/v15 v15.3.13
 	github.com/blevesearch/zapx/v16 v16.0.0-20231201163306-89e8af44fd80
 	github.com/couchbase/moss v0.2.0
 	github.com/golang/protobuf v1.3.2
