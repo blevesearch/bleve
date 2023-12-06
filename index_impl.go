@@ -650,13 +650,16 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 			Total:      1,
 			Successful: 1,
 		},
-		Request:  req,
 		Hits:     hits,
 		Total:    coll.Total(),
 		MaxScore: coll.MaxScore(),
 		Took:     searchDuration,
 		Facets:   coll.FacetResults(),
 	}
+	if req.Explain {
+		rv.Request = req
+	}
+
 	mergeKNNResults(req, rv)
 	return rv, nil
 }
