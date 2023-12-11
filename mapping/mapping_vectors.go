@@ -38,9 +38,8 @@ func NewVectorFieldMapping() *FieldMapping {
 }
 
 // validate and process a flat vector
-func processFlatVector(vecI interface{}, dims int) ([]float32, bool) {
-	vecV := reflect.ValueOf(vecI)
-	if !vecV.IsValid() || vecV.Kind() != reflect.Slice || vecV.Len() != dims {
+func processFlatVector(vecV reflect.Value, dims int) ([]float32, bool) {
+	if vecV.Len() != dims {
 		return nil, false
 	}
 
@@ -71,13 +70,17 @@ func processVector(vecI interface{}, dims int) ([]float32, bool) {
 
 	// Let's examine the first element (head) of the vector.
 	// If head is a slice, then vector is nested, otherwise flat.
-	headI := vecV.Index(0).Interface()
+	head := vecV.Index(0)
+	if !head.CanInterface() {
+		return nil, false
+	}
+	headI := head.Interface()
 	headV := reflect.ValueOf(headI)
 	if !headV.IsValid() {
 		return nil, false
 	}
 	if headV.Kind() != reflect.Slice { // vector is flat
-		return processFlatVector(vecI, dims)
+		return processFlatVector(vecV, dims)
 	}
 
 	// # process nested vector
@@ -101,7 +104,7 @@ func processVector(vecI interface{}, dims int) ([]float32, bool) {
 			return nil, false
 		}
 
-		flatVector, ok := processFlatVector(subVecI, dims)
+		flatVector, ok := processFlatVector(subVecV, dims)
 		if !ok {
 			return nil, false
 		}

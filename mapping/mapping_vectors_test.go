@@ -21,14 +21,23 @@ import (
 	"testing"
 )
 
+// A test case for processVector function
 type vectorTest struct {
-	vector       interface{} // input vector
-	dims         int         // expected dims of input vector
-	valid        bool        // expected validity of input vector
-	parsedVector []float32   // expected parsed vector
+	// Input
+
+	ipVec interface{} // input vector
+	dims  int         // dimensionality of input vector
+
+	// Expected Output
+
+	expValidity bool      // expected validity of the input
+	expOpVec    []float32 // expected output vector, given the input is valid
 }
 
 func TestProcessVector(t *testing.T) {
+	// Note: while creating vectors, we are using []any instead of []float32,
+	// this is done to enhance our test coverage.
+	// When we unmarshal a vector from a JSON, we get []any, not []float32.
 	tests := []vectorTest{
 		// # Flat vectors
 
@@ -79,25 +88,31 @@ func TestProcessVector(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		vec, ok := processVector(test.vector, test.dims)
-		if ok != test.valid {
-			t.Errorf("validity mismatch for %v: expected %v, got %v",
-				test.vector, test.valid, ok)
+		opVec, valid := processVector(test.ipVec, test.dims)
+
+		// check the validity of the input, as returned by processVector,
+		// against the expected validity.
+		if valid != test.expValidity {
+			t.Errorf("validity mismatch, ipVec:%v, dims:%v, expected:%v, got:%v",
+				test.ipVec, test.dims, test.expValidity, valid)
 			t.Fail()
 		}
 
-		// If input vector is valid, then compare parsed vector with expected
-		if test.valid {
-			if len(vec) != len(test.parsedVector) {
-				t.Errorf("parsed vector mismatch for: %v: expected %v, got %v",
-					test.vector, test.parsedVector, vec)
+		// If input vector is valid, check the correctness of the output vector
+		// against the expected output vector.
+		if valid {
+			if len(opVec) != len(test.expOpVec) {
+				t.Errorf("output vector mismatch, ipVec:%v, dims:%v, "+
+					"expected:%v, got:%v", test.ipVec, test.dims, test.expOpVec,
+					opVec)
 				t.Fail()
 			}
 
-			for i := 0; i < len(vec); i++ {
-				if vec[i] != test.parsedVector[i] {
-					t.Errorf("parsed vector mismatch for: %v: expected %v, got %v",
-						test.vector, test.parsedVector, vec)
+			for i := 0; i < len(opVec); i++ {
+				if opVec[i] != test.expOpVec[i] {
+					t.Errorf("output vector mismatch, ipVec:%v, dims:%v, "+
+						"expected:%v, got:%v", test.ipVec, test.dims, test.expOpVec,
+						opVec)
 					t.Fail()
 				}
 			}
