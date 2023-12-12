@@ -195,6 +195,9 @@ func queryWithKNN(req *SearchRequest) (query.Query, error) {
 }
 
 func validateKNN(req *SearchRequest) error {
+	if req.KNNOperator != knnOperatorAnd && req.KNNOperator != knnOperatorOr {
+		return fmt.Errorf("unknown knn operator: %s", req.KNNOperator)
+	}
 	for _, q := range req.KNN {
 		if q.K <= 0 || len(q.Vector) == 0 {
 			return fmt.Errorf("k must be greater than 0 and vector must be non-empty")
