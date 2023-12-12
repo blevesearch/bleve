@@ -51,18 +51,22 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 		isVectorValid := true
 		for i := 0; i < propertyVal.Len(); i++ {
 			item := propertyVal.Index(i)
-			if item.CanInterface() {
-				itemVal := item.Interface()
-				itemFloat, ok := util.ExtractNumericValFloat32(itemVal)
-				if !ok {
-					isVectorValid = false
-					break
-				}
-				vector[i] = itemFloat
+			if !item.CanInterface() {
+				isVectorValid = false
+				break
 			}
+
+			itemFloat, ok := util.ExtractNumericValFloat32(item.Interface())
+			if !ok {
+				isVectorValid = false
+				break
+			}
+
+			vector[i] = itemFloat
 		}
+
 		// Even if one of the vector elements is not a float32, we do not index
-		// this field and return silently
+		// this field value and continue silently
 		if !isVectorValid {
 			return
 		}
