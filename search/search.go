@@ -181,6 +181,10 @@ type DocumentMatch struct {
 	// in the DisjunctionQuery or ConjunctionQuery. The map value is the
 	// sub-score for that sub-query.
 	ScoreBreakdown map[int]float64 `json:"score_breakdown,omitempty"`
+
+	// internal variable used in PreSearch phase of search in alias
+	// indicated the index id of the index that this match came from
+	IndexId int
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {

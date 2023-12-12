@@ -18,13 +18,15 @@
 package bleve
 
 import (
-	"container/heap"
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 type knnOperator string
@@ -45,6 +47,18 @@ type SearchRequest struct {
 
 	KNN         []*KNNRequest `json:"knn"`
 	KNNOperator knnOperator   `json:"knn_operator"`
+
+	// metadata will be a  map that will be used
+	// in the second phase of any 2-phase search, to provide additional
+	// context to the second phase. This is useful in the case of index
+	// aliases where the first phase will gather the metadata from all
+	// the indexes in the alias, and the second phase will use that
+	// metadata to perform the actual search.
+	// The currently accepted map configuration is:
+	//
+	// "_knn_metadata_key": []*search.DocumentMatch
+
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 
 	sortFunc func(sort.Interface)
 }
@@ -74,20 +88,21 @@ func (r *SearchRequest) AddKNNOperator(operator knnOperator) {
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	var temp struct {
-		Q                json.RawMessage   `json:"query"`
-		Size             *int              `json:"size"`
-		From             int               `json:"from"`
-		Highlight        *HighlightRequest `json:"highlight"`
-		Fields           []string          `json:"fields"`
-		Facets           FacetsRequest     `json:"facets"`
-		Explain          bool              `json:"explain"`
-		Sort             []json.RawMessage `json:"sort"`
-		IncludeLocations bool              `json:"includeLocations"`
-		Score            string            `json:"score"`
-		SearchAfter      []string          `json:"search_after"`
-		SearchBefore     []string          `json:"search_before"`
-		KNN              []*KNNRequest     `json:"knn"`
-		KNNOperator      knnOperator       `json:"knn_operator"`
+		Q                json.RawMessage        `json:"query"`
+		Size             *int                   `json:"size"`
+		From             int                    `json:"from"`
+		Highlight        *HighlightRequest      `json:"highlight"`
+		Fields           []string               `json:"fields"`
+		Facets           FacetsRequest          `json:"facets"`
+		Explain          bool                   `json:"explain"`
+		Sort             []json.RawMessage      `json:"sort"`
+		IncludeLocations bool                   `json:"includeLocations"`
+		Score            string                 `json:"score"`
+		SearchAfter      []string               `json:"search_after"`
+		SearchBefore     []string               `json:"search_before"`
+		KNN              []*KNNRequest          `json:"knn"`
+		KNNOperator      knnOperator            `json:"knn_operator"`
+		Metadata         map[string]interface{} `json:"metadata"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -134,6 +149,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	if r.KNNOperator == "" {
 		r.KNNOperator = knnOperatorOr
 	}
+	r.Metadata = temp.Metadata
 
 	return nil
 
@@ -141,7 +157,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 
 // -----------------------------------------------------------------------------
 
-func copySearchRequest(req *SearchRequest) *SearchRequest {
+func copySearchRequest(req *SearchRequest, metadata map[string]interface{}) *SearchRequest {
 	rv := SearchRequest{
 		Query:            req.Query,
 		Size:             req.Size + req.From,
@@ -157,6 +173,7 @@ func copySearchRequest(req *SearchRequest) *SearchRequest {
 		SearchBefore:     req.SearchBefore,
 		KNN:              req.KNN,
 		KNNOperator:      req.KNNOperator,
+		Metadata:         metadata,
 	}
 	return &rv
 
@@ -167,146 +184,145 @@ var (
 	knnOperatorOr  = knnOperator("or")
 )
 
-func queryWithKNN(req *SearchRequest) (query.Query, error) {
-	if len(req.KNN) > 0 {
-		subQueries := []query.Query{req.Query}
+func createKNNQuery(req *SearchRequest) (query.Query, []int64, int64, error) {
+	if requestHasKNN(req) {
+		// first perform validation
+		err := validateKNN(req)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		var subQueries []query.Query
+		kArray := make([]int64, 0, len(req.KNN))
+		sumOfK := int64(0)
 		for _, knn := range req.KNN {
-			if knn != nil {
-				knnQuery := query.NewKNNQuery(knn.Vector)
-				knnQuery.SetFieldVal(knn.Field)
-				knnQuery.SetK(knn.K)
-				knnQuery.SetBoost(knn.Boost.Value())
-				subQueries = append(subQueries, knnQuery)
-			}
+			knnQuery := query.NewKNNQuery(knn.Vector)
+			knnQuery.SetFieldVal(knn.Field)
+			knnQuery.SetK(knn.K)
+			knnQuery.SetBoost(knn.Boost.Value())
+			subQueries = append(subQueries, knnQuery)
+			kArray = append(kArray, knn.K)
+			sumOfK += knn.K
 		}
-		if req.KNNOperator == knnOperatorAnd {
-			rv := query.NewConjunctionQuery(subQueries)
-			rv.RetrieveScoreBreakdown(true)
-			return rv, nil
-		} else if req.KNNOperator == knnOperatorOr || req.KNNOperator == "" {
-			rv := query.NewDisjunctionQuery(subQueries)
-			rv.RetrieveScoreBreakdown(true)
-			return rv, nil
-		} else {
-			return nil, fmt.Errorf("unknown knn operator: %s", req.KNNOperator)
-		}
+		rv := query.NewDisjunctionQuery(subQueries)
+		rv.RetrieveScoreBreakdown(true)
+		return rv, kArray, sumOfK, nil
 	}
-	return req.Query, nil
+	return nil, nil, 0, nil
 }
 
 func validateKNN(req *SearchRequest) error {
 	for _, q := range req.KNN {
+		if q == nil {
+			return fmt.Errorf("knn query cannot be nil")
+		}
 		if q.K <= 0 || len(q.Vector) == 0 {
 			return fmt.Errorf("k must be greater than 0 and vector must be non-empty")
 		}
 	}
+	switch req.KNNOperator {
+	case knnOperatorAnd, knnOperatorOr, "":
+		// Valid cases, do nothing
+	default:
+		return fmt.Errorf("knn_operator must be either 'and' / 'or'")
+	}
 	return nil
 }
 
-func mergeKNNResults(req *SearchRequest, sr *SearchResult) {
-	if len(req.KNN) > 0 {
-		mergeKNN(req, sr)
+func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, reader index.IndexReader, preSearch bool) ([]*search.DocumentMatch, error) {
+	KNNQuery, kArray, sumOfK, err := createKNNQuery(req)
+	if err != nil {
+		return nil, err
 	}
-}
-
-func adjustRequestSizeForKNN(req *SearchRequest, numIndexPartitions int) int {
-	var adjustedSize int
-	if req != nil {
-		adjustedSize = req.Size
-		if len(req.KNN) > 0 {
-			var minSizeReq int64
-			for _, knn := range req.KNN {
-				minSizeReq += knn.K
+	knnSearcher, err := KNNQuery.Searcher(ctx, reader, i.m, search.SearcherOptions{
+		Explain: req.Explain,
+	})
+	if err != nil {
+		return nil, err
+	}
+	knnCollector := collector.NewKNNCollector(kArray, sumOfK)
+	err = knnCollector.Collect(ctx, knnSearcher, reader)
+	if err != nil {
+		return nil, err
+	}
+	knnHits := knnCollector.Results()
+	if !preSearch {
+		if req.KNNOperator == knnOperatorAnd {
+			idx := 0
+			for _, hit := range knnHits {
+				if len(hit.ScoreBreakdown) == len(kArray) {
+					knnHits[idx] = hit
+					idx++
+				}
 			}
-			minSizeReq *= int64(numIndexPartitions)
-			if int64(adjustedSize) < minSizeReq {
-				adjustedSize = int(minSizeReq)
-			}
+			knnHits = knnHits[:idx]
 		}
-	}
-	return adjustedSize
-}
-
-// heap impl
-type scoreHeap struct {
-	scoreMaps []map[int]float64
-	sortIndex int
-}
-
-func (s *scoreHeap) Len() int { return len(s.scoreMaps) }
-
-func (s *scoreHeap) Less(i, j int) bool {
-	return (s.scoreMaps[i])[s.sortIndex] > (s.scoreMaps[j])[s.sortIndex]
-}
-
-func (s *scoreHeap) Swap(i, j int) {
-	s.scoreMaps[i], s.scoreMaps[j] = s.scoreMaps[j], s.scoreMaps[i]
-}
-
-func (s *scoreHeap) Push(x interface{}) {
-	s.scoreMaps = append(s.scoreMaps, x.(map[int]float64))
-}
-
-func (s *scoreHeap) Pop() interface{} {
-	old := s.scoreMaps
-	n := len(old)
-	x := old[n-1]
-	s.scoreMaps = old[0 : n-1]
-	return x
-}
-
-func mergeKNN(req *SearchRequest, sr *SearchResult) {
-	maxHeap := &scoreHeap{
-		scoreMaps: make([]map[int]float64, 0),
-	}
-	for i := 0; i < len(req.KNN); i++ {
-		kVal := req.KNN[i].K
-		maxHeap.sortIndex = i + 1
-		for _, hit := range sr.Hits {
-			heap.Push(maxHeap, hit.ScoreBreakdown)
-		}
-		for maxHeap.Len() > 0 {
-			scBreakdown := heap.Pop(maxHeap).(map[int]float64)
-			if kVal > 0 {
-				kVal--
-			} else {
-				delete(scBreakdown, maxHeap.sortIndex)
+		if req.Score == "none" {
+			for _, hit := range knnHits {
+				hit.Score = 0.0
+				hit.ScoreBreakdown = nil
 			}
 		}
 	}
-	maxScore := 0.0
-	var numHitsDropped uint64
-	numTotalSearchers := float64(len(req.KNN) + 1)
-	hitIdx := 0
-	for _, hit := range sr.Hits {
-		numMatchedSearchers := float64(len(hit.ScoreBreakdown))
-		newScore := recomputeTotalScore(req.KNNOperator, hit, numMatchedSearchers, numTotalSearchers)
-		if newScore > 0 {
-			hit.Score = newScore
-			if newScore > maxScore {
-				maxScore = newScore
-			}
-			sr.Hits[hitIdx] = hit
-			hitIdx++
-		} else {
-			numHitsDropped++
-		}
-	}
-	sr.Hits = sr.Hits[:hitIdx]
-	sr.MaxScore = maxScore
-	sr.Total -= numHitsDropped
+	return knnHits, nil
 }
 
-func recomputeTotalScore(operator knnOperator, hit *search.DocumentMatch, numMatchedSearchers, numTotalSearchers float64) float64 {
-	if operator == knnOperatorAnd && numMatchedSearchers != numTotalSearchers {
-		return 0
+func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector) {
+	if len(knnHits) > 0 {
+		coll.SetKNNHits(knnHits,
+			func(tdIdfDocMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) float64 {
+				totalScore := 0.0
+				if tdIdfDocMatch != nil {
+					totalScore += tdIdfDocMatch.Score
+				}
+				for _, score := range knnMatch.ScoreBreakdown {
+					totalScore += score
+				}
+				return totalScore
+			},
+			func() bool {
+				return req.KNNOperator == knnOperatorAnd
+			},
+		)
 	}
-	var totalScore float64
-	for _, score := range hit.ScoreBreakdown {
-		totalScore += score
+}
+
+func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch, mergeOut []map[string]interface{}) {
+	kArray := make([]int64, len(req.KNN))
+	for i, knnReq := range req.KNN {
+		kArray[i] = knnReq.K
 	}
-	if operator == knnOperatorOr || operator == "" {
-		totalScore *= (numMatchedSearchers / numTotalSearchers)
+	knnStore := collector.GetNewKNNCollectorStore(kArray)
+	for _, hit := range knnHits {
+		knnStore.AddDocument(hit)
 	}
-	return totalScore
+	mergedKNNhits := knnStore.AllHits()
+	if req.KNNOperator == knnOperatorAnd {
+		for hit := range mergedKNNhits {
+			if len(hit.ScoreBreakdown) != len(req.KNN) {
+				delete(mergedKNNhits, hit)
+			}
+		}
+	}
+	if req.Score == "none" {
+		for hit := range mergedKNNhits {
+			hit.Score = 0.0
+			hit.ScoreBreakdown = nil
+		}
+	}
+	indexNumToDocMatchList := make(map[int][]*search.DocumentMatch)
+	for docMatch := range mergedKNNhits {
+		indexNumToDocMatchList[docMatch.IndexId] = append(indexNumToDocMatchList[docMatch.IndexId], docMatch)
+	}
+	for i := 0; i < len(mergeOut); i++ {
+		mergeOut[i][search.KnnMetadataKey] = indexNumToDocMatchList[i]
+	}
+}
+
+func requestHasKNN(req *SearchRequest) bool {
+	return len(req.KNN) > 0
+}
+
+func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
+	dummyReq.KNN = realReq.KNN
+	dummyReq.KNNOperator = knnOperatorOr
 }

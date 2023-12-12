@@ -21,6 +21,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/query"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -165,7 +166,20 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	if len(i.indexes) == 1 {
 		return i.indexes[0].SearchInContext(ctx, req)
 	}
-	return MultiSearch(ctx, req, i.indexes...)
+
+	// at this stage we know we have multiple indexes
+	// check if metadata needs to be gathered from all indexes
+	// before executing the query
+	var metadata []map[string]interface{}
+	var err error
+	if PreSearchRequired(ctx, req) {
+		metadata, err = PreSearch(ctx, req, i.indexes...)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return MultiSearch(ctx, req, metadata, i.indexes...)
 }
 
 func (i *indexAliasImpl) Fields() ([]string, error) {
@@ -428,19 +442,136 @@ func (i *indexAliasImpl) Swap(in, out []Index) {
 // the actual final results.
 // Perhaps that part needs to be optional,
 // could be slower in remote usages.
-func createChildSearchRequest(req *SearchRequest) *SearchRequest {
-	return copySearchRequest(req)
+func createChildSearchRequest(req *SearchRequest, metadata map[string]interface{}) *SearchRequest {
+	return copySearchRequest(req, metadata)
 }
 
 type asyncSearchResult struct {
-	Name   string
-	Result *SearchResult
-	Err    error
+	Name     string
+	IndexNum int
+	Result   *SearchResult
+	Err      error
+}
+
+func PreSearchRequired(ctx context.Context, req *SearchRequest) bool {
+	return requestHasKNN(req)
+}
+
+func PreSearch(ctx context.Context, req *SearchRequest, indexes ...Index) ([]map[string]interface{}, error) {
+	// create a dummy request with a match none query
+	// since we only care about the metadata in PreSearch
+	dummyRequest := &SearchRequest{
+		Query: query.NewMatchNoneQuery(),
+	}
+	newCtx := context.WithValue(ctx, search.PreSearchKey, true)
+	if requestHasKNN(req) {
+		addKnnToDummyRequest(dummyRequest, req)
+	}
+	res, err := MetadataSearch(newCtx, dummyRequest, indexes...)
+	if err != nil {
+		return nil, err
+	}
+	metadata, err := mergeMetadata(req, res, len(indexes))
+	if err != nil {
+		return nil, err
+	}
+	return metadata, nil
+}
+
+func tagHitsWithIndexNum(sr *SearchResult, indexNum int) {
+	for _, hit := range sr.Hits {
+		hit.IndexId = indexNum
+	}
+}
+
+func mergeMetadata(req *SearchRequest, res *SearchResult, numIndexes int) ([]map[string]interface{}, error) {
+	mergedOut := make([]map[string]interface{}, numIndexes)
+	for i := 0; i < len(mergedOut); i++ {
+		mergedOut[i] = make(map[string]interface{})
+	}
+	if requestHasKNN(req) {
+		mergeKNNDocumentMatches(req, res.Hits, mergedOut)
+	}
+	return mergedOut, nil
+}
+
+func MetadataSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*SearchResult, error) {
+	searchStart := time.Now()
+	asyncResults := make(chan *asyncSearchResult, len(indexes))
+
+	// run search on each index in separate go routine
+	var waitGroup sync.WaitGroup
+
+	var searchChildIndex = func(in Index, childReq *SearchRequest, idx int) {
+		rv := asyncSearchResult{Name: in.Name(), IndexNum: idx}
+		rv.Result, rv.Err = in.SearchInContext(ctx, childReq)
+		asyncResults <- &rv
+		waitGroup.Done()
+	}
+
+	waitGroup.Add(len(indexes))
+	for idx, in := range indexes {
+		go searchChildIndex(in, createChildSearchRequest(req, nil), idx)
+	}
+
+	// on another go routine, close after finished
+	go func() {
+		waitGroup.Wait()
+		close(asyncResults)
+	}()
+
+	var sr *SearchResult
+	indexErrors := make(map[string]error)
+
+	for asr := range asyncResults {
+		if asr.Err == nil {
+			if sr == nil {
+				// first result
+				sr = asr.Result
+				tagHitsWithIndexNum(sr, asr.IndexNum)
+			} else {
+				// merge with previous
+				tagHitsWithIndexNum(asr.Result, asr.IndexNum)
+				sr.Merge(asr.Result)
+			}
+		} else {
+			indexErrors[asr.Name] = asr.Err
+		}
+	}
+
+	// merge just concatenated all the hits
+	// now lets clean it up
+
+	// handle case where no results were successful
+	if sr == nil {
+		sr = &SearchResult{
+			Status: &SearchStatus{
+				Errors: make(map[string]error),
+			},
+		}
+	}
+
+	searchDuration := time.Since(searchStart)
+	sr.Took = searchDuration
+
+	// fix up errors
+	if len(indexErrors) > 0 {
+		if sr.Status.Errors == nil {
+			sr.Status.Errors = make(map[string]error)
+		}
+		for indexName, indexErr := range indexErrors {
+			sr.Status.Errors[indexName] = indexErr
+			sr.Status.Total++
+			sr.Status.Failed++
+		}
+	}
+
+	return sr, nil
 }
 
 // MultiSearch executes a SearchRequest across multiple Index objects,
 // then merges the results.  The indexes must honor any ctx deadline.
-func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*SearchResult, error) {
+func MultiSearch(ctx context.Context, req *SearchRequest, metadata []map[string]interface{}, indexes ...Index) (*SearchResult, error) {
 
 	searchStart := time.Now()
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
@@ -451,10 +582,6 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 		req.Sort.Reverse()
 		req.SearchAfter = req.SearchBefore
 		req.SearchBefore = nil
-	}
-	originalSize := req.Size
-	if len(indexes) > 1 {
-		req.Size = adjustRequestSizeForKNN(req, len(indexes))
 	}
 
 	// run search on each index in separate go routine
@@ -468,8 +595,12 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 	}
 
 	waitGroup.Add(len(indexes))
-	for _, in := range indexes {
-		go searchChildIndex(in, createChildSearchRequest(req))
+	for idx, in := range indexes {
+		var md map[string]interface{}
+		if metadata != nil {
+			md = metadata[idx]
+		}
+		searchChildIndex(in, createChildSearchRequest(req, md))
 	}
 
 	// on another go routine, close after finished
@@ -494,7 +625,6 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 			indexErrors[asr.Name] = asr.Err
 		}
 	}
-	req.Size = originalSize
 
 	// merge just concatenated all the hits
 	// now lets clean it up
@@ -506,10 +636,6 @@ func MultiSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Se
 				Errors: make(map[string]error),
 			},
 		}
-	}
-
-	if len(indexes) > 1 {
-		mergeKNNResults(req, sr)
 	}
 
 	sortFunc := req.SortFunc()

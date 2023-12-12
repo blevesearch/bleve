@@ -134,3 +134,7 @@ const MaxGeoBufPoolSize = 24 * 1024
 const MinGeoBufPoolSize = 24
 
 type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
+
+const KnnMetadataKey = "_knn_metadata_key"
+
+const PreSearchKey = "_presearch_key"

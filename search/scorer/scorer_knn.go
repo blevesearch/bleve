@@ -40,7 +40,6 @@ type KNNQueryScorer struct {
 	queryBoost             float64
 	queryNorm              float64
 	options                search.SearcherOptions
-	includeScore           bool
 	similarityMetric       string
 	queryWeightExplanation *search.Explanation
 }
@@ -54,7 +53,6 @@ func NewKNNQueryScorer(queryVector []float32, queryField string, queryBoost floa
 		queryBoost:       queryBoost,
 		queryWeight:      1.0,
 		options:          options,
-		includeScore:     options.Score != "none",
 		similarityMetric: similarityMetric,
 	}
 }
@@ -66,65 +64,55 @@ const maxKNNScore = math.MaxFloat64
 func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 	knnMatch *index.VectorDoc) *search.DocumentMatch {
 	rv := ctx.DocumentMatchPool.Get()
-
-	if sqs.includeScore || sqs.options.Explain {
-		var scoreExplanation *search.Explanation
-		score := knnMatch.Score
-		if sqs.similarityMetric == index.EuclideanDistance {
-			// in case of euclidean distance being the distance metric,
-			// an exact vector (perfect match), would return distance = 0
-			if score == 0 {
-				score = maxKNNScore
-			} else {
-				// euclidean distances need to be inverted to work with
-				// tf-idf scoring
-				score = 1.0 / score
-			}
+	var scoreExplanation *search.Explanation
+	score := knnMatch.Score
+	if sqs.similarityMetric == index.EuclideanDistance {
+		// in case of euclidean distance being the distance metric,
+		// an exact vector (perfect match), would return distance = 0
+		if score == 0 {
+			score = maxKNNScore
+		} else {
+			// euclidean distances need to be inverted to work with
+			// tf-idf scoring
+			score = 1.0 / score
 		}
-
+	}
+	if sqs.options.Explain {
+		childExplanations := make([]*search.Explanation, 1)
+		childExplanations[0] = &search.Explanation{
+			Value: score,
+			Message: fmt.Sprintf("vector(field(%s:%s) with similarity_metric(%s)=%e",
+				sqs.queryField, knnMatch.ID, sqs.similarityMetric, score),
+		}
+		scoreExplanation = &search.Explanation{
+			Value: score,
+			Message: fmt.Sprintf("fieldWeight(%s in doc %s), score of:",
+				sqs.queryField, knnMatch.ID),
+			Children: childExplanations,
+		}
+	}
+	// if the query weight isn't 1, multiply
+	if sqs.queryWeight != 1.0 && score != maxKNNScore {
+		score = score * sqs.queryWeight
 		if sqs.options.Explain {
-			childExplanations := make([]*search.Explanation, 1)
-			childExplanations[0] = &search.Explanation{
-				Value: score,
-				Message: fmt.Sprintf("vector(field(%s:%s) with similarity_metric(%s)=%e",
-					sqs.queryField, knnMatch.ID, sqs.similarityMetric, score),
-			}
+			childExplanations := make([]*search.Explanation, 2)
+			childExplanations[0] = sqs.queryWeightExplanation
+			childExplanations[1] = scoreExplanation
 			scoreExplanation = &search.Explanation{
 				Value: score,
-				Message: fmt.Sprintf("fieldWeight(%s in doc %s), score of:",
-					sqs.queryField, knnMatch.ID),
+				// Product of score * weight
+				// Avoid adding the query vector to the explanation since vectors
+				// can get quite large.
+				Message: fmt.Sprintf("weight(%s:query Vector^%f in %s), product of:",
+					sqs.queryField, sqs.queryBoost, knnMatch.ID),
 				Children: childExplanations,
 			}
 		}
-
-		// if the query weight isn't 1, multiply
-		if sqs.queryWeight != 1.0 && score != maxKNNScore {
-			score = score * sqs.queryWeight
-			if sqs.options.Explain {
-				childExplanations := make([]*search.Explanation, 2)
-				childExplanations[0] = sqs.queryWeightExplanation
-				childExplanations[1] = scoreExplanation
-				scoreExplanation = &search.Explanation{
-					Value: score,
-					// Product of score * weight
-					// Avoid adding the query vector to the explanation since vectors
-					// can get quite large.
-					Message: fmt.Sprintf("weight(%s:query Vector^%f in %s), product of:",
-						sqs.queryField, sqs.queryBoost, knnMatch.ID),
-					Children: childExplanations,
-				}
-			}
-		}
-
-		if sqs.includeScore {
-			rv.Score = score
-		}
-
-		if sqs.options.Explain {
-			rv.Expl = scoreExplanation
-		}
 	}
-
+	rv.Score = score
+	if sqs.options.Explain {
+		rv.Expl = scoreExplanation
+	}
 	rv.IndexInternalID = append(rv.IndexInternalID, knnMatch.ID...)
 	return rv
 }

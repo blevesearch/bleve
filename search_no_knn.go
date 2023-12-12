@@ -18,11 +18,14 @@
 package bleve
 
 import (
+	"context"
 	"encoding/json"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 // A SearchRequest describes all the parameters
@@ -60,6 +63,18 @@ type SearchRequest struct {
 	SearchAfter      []string          `json:"search_after"`
 	SearchBefore     []string          `json:"search_before"`
 
+	// metadata will be a  map that will be used
+	// in the second phase of any 2-phase search, to provide additional
+	// context to the second phase. This is useful in the case of index
+	// aliases where the first phase will gather the metadata from all
+	// the indexes in the alias, and the second phase will use that
+	// metadata to perform the actual search.
+	// The currently accepted map configuration is:
+	//
+	// "_knn_metadata_key": []*search.DocumentMatch
+
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+
 	sortFunc func(sort.Interface)
 }
 
@@ -67,18 +82,19 @@ type SearchRequest struct {
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	var temp struct {
-		Q                json.RawMessage   `json:"query"`
-		Size             *int              `json:"size"`
-		From             int               `json:"from"`
-		Highlight        *HighlightRequest `json:"highlight"`
-		Fields           []string          `json:"fields"`
-		Facets           FacetsRequest     `json:"facets"`
-		Explain          bool              `json:"explain"`
-		Sort             []json.RawMessage `json:"sort"`
-		IncludeLocations bool              `json:"includeLocations"`
-		Score            string            `json:"score"`
-		SearchAfter      []string          `json:"search_after"`
-		SearchBefore     []string          `json:"search_before"`
+		Q                json.RawMessage        `json:"query"`
+		Size             *int                   `json:"size"`
+		From             int                    `json:"from"`
+		Highlight        *HighlightRequest      `json:"highlight"`
+		Fields           []string               `json:"fields"`
+		Facets           FacetsRequest          `json:"facets"`
+		Explain          bool                   `json:"explain"`
+		Sort             []json.RawMessage      `json:"sort"`
+		IncludeLocations bool                   `json:"includeLocations"`
+		Score            string                 `json:"score"`
+		SearchAfter      []string               `json:"search_after"`
+		SearchBefore     []string               `json:"search_before"`
+		Metadata         map[string]interface{} `json:"metadata"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -119,6 +135,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	if r.From < 0 {
 		r.From = 0
 	}
+	r.Metadata = temp.Metadata
 
 	return nil
 
@@ -126,7 +143,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 
 // -----------------------------------------------------------------------------
 
-func copySearchRequest(req *SearchRequest) *SearchRequest {
+func copySearchRequest(req *SearchRequest, metadata map[string]interface{}) *SearchRequest {
 	rv := SearchRequest{
 		Query:            req.Query,
 		Size:             req.Size + req.From,
@@ -140,25 +157,28 @@ func copySearchRequest(req *SearchRequest) *SearchRequest {
 		Score:            req.Score,
 		SearchAfter:      req.SearchAfter,
 		SearchBefore:     req.SearchBefore,
+		Metadata:         metadata,
 	}
 	return &rv
-}
-
-func queryWithKNN(req *SearchRequest) (query.Query, error) {
-	return req.Query, nil
 }
 
 func validateKNN(req *SearchRequest) error {
 	return nil
 }
 
-func mergeKNNResults(req *SearchRequest, sr *SearchResult) {
-	// no-op
+func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, reader index.IndexReader, preSearch bool) ([]*search.DocumentMatch, error) {
+	return nil, nil
 }
 
-func adjustRequestSizeForKNN(req *SearchRequest, numIndexPartitions int) int {
-	if req != nil {
-		return req.Size
-	}
-	return 0
+func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector) {
+}
+
+func requestHasKNN(req *SearchRequest) bool {
+	return false
+}
+
+func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
+}
+
+func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch, mergeOut []map[string]interface{}) {
 }
