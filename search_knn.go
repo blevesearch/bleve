@@ -195,7 +195,10 @@ func queryWithKNN(req *SearchRequest) (query.Query, error) {
 }
 
 func validateKNN(req *SearchRequest) error {
-	if req.KNNOperator != knnOperatorAnd && req.KNNOperator != knnOperatorOr {
+	if req.KNN != nil &&
+		req.KNNOperator != "" &&
+		req.KNNOperator != knnOperatorOr &&
+		req.KNNOperator != knnOperatorAnd {
 		return fmt.Errorf("unknown knn operator: %s", req.KNNOperator)
 	}
 	for _, q := range req.KNN {
