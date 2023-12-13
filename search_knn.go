@@ -195,7 +195,7 @@ func queryWithKNN(req *SearchRequest) (query.Query, error) {
 }
 
 func validateKNN(req *SearchRequest) error {
-	if if req.KNN != nil &&
+	if req.KNN != nil &&
 		req.KNNOperator != "" &&
 		req.KNNOperator != knnOperatorOr &&
 		req.KNNOperator != knnOperatorAnd {
