@@ -127,6 +127,70 @@ func TestSortedFacetedQuery(t *testing.T) {
 	}
 }
 
+func TestMatchAllScorer(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMapping := NewIndexMapping()
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = "en"
+	documentMapping := NewDocumentMapping()
+
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.Index = true
+	contentFieldMapping.Store = true
+	documentMapping.AddFieldMappingsAt("content", contentFieldMapping)
+
+	index, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index.Index("1", map[string]interface{}{
+		"country": "india",
+		"content": "k",
+	})
+	index.Index("2", map[string]interface{}{
+		"country": "india",
+		"content": "l",
+	})
+	index.Index("3", map[string]interface{}{
+		"country": "india",
+		"content": "k",
+	})
+
+	d, err := index.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d != 3 {
+		t.Errorf("expected 3, got %d", d)
+	}
+
+	searchRequest := NewSearchRequest(NewMatchAllQuery())
+	searchRequest.Score = "none"
+	searchResults, err := index.Search(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if searchResults.Total != 3 {
+		t.Fatalf("expected all the 3 docs in the index, got %v", searchResults.Total)
+	}
+
+	for _, hit := range searchResults.Hits {
+		if hit.Score != 0.0 {
+			t.Fatalf("expected 0 score since score = none, got %v", hit.Score)
+		}
+	}
+}
+
 func TestSearchResultString(t *testing.T) {
 
 	tests := []struct {

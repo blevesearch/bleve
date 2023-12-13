@@ -42,7 +42,7 @@ func (is *IndexSnapshot) VectorReader(ctx context.Context, vector []float32,
 		rv.iterators = make([]segment_api.VecPostingsIterator, len(is.segment))
 	}
 
-	// Do this as part of optimizations' Finish() func.
+	// initialize postings and iterators within the OptimizeVR's Finish()
 
 	return rv, nil
 }

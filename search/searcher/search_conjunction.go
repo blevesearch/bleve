@@ -83,6 +83,7 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	var searchers OrderedSearcherList
 	var originalPos []int
 	if retrieveScoreBreakdown {
+		// needed only when kNN is in picture
 		sortedSearchers := &OrderedPositionalSearcherList{
 			searchers: qsearchers,
 			index:     make([]int, len(qsearchers)),
@@ -102,7 +103,7 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	}
 
 	// build our searcher
-	rv := ConjunctionSearcher{
+	c := ConjunctionSearcher{
 		indexReader: indexReader,
 		options:     options,
 		originalPos: originalPos,
@@ -110,18 +111,18 @@ func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 		currs:       make([]*search.DocumentMatch, len(searchers)),
 		scorer:      scorer.NewConjunctionQueryScorer(options),
 	}
-	rv.computeQueryNorm()
+	c.computeQueryNorm()
 
 	// attempt push-down conjunction optimization when there's >1 searchers
 	if len(searchers) > 1 {
 		rv, err := optimizeCompositeSearcher(ctx, "conjunction",
 			indexReader, searchers, options)
-		if err != nil || rv != nil {
+		if err != nil || (rv != nil && len(optimizedKNNSearchers) == 0) {
 			return rv, err
 		}
 	}
 
-	return &rv, nil
+	return &c, nil
 }
 
 func (s *ConjunctionSearcher) Size() int {
