@@ -82,19 +82,19 @@ type SearchRequest struct {
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	var temp struct {
-		Q                json.RawMessage        `json:"query"`
-		Size             *int                   `json:"size"`
-		From             int                    `json:"from"`
-		Highlight        *HighlightRequest      `json:"highlight"`
-		Fields           []string               `json:"fields"`
-		Facets           FacetsRequest          `json:"facets"`
-		Explain          bool                   `json:"explain"`
-		Sort             []json.RawMessage      `json:"sort"`
-		IncludeLocations bool                   `json:"includeLocations"`
-		Score            string                 `json:"score"`
-		SearchAfter      []string               `json:"search_after"`
-		SearchBefore     []string               `json:"search_before"`
-		PreSearchData    map[string]interface{} `json:"pre_search_data"`
+		Q                json.RawMessage   `json:"query"`
+		Size             *int              `json:"size"`
+		From             int               `json:"from"`
+		Highlight        *HighlightRequest `json:"highlight"`
+		Fields           []string          `json:"fields"`
+		Facets           FacetsRequest     `json:"facets"`
+		Explain          bool              `json:"explain"`
+		Sort             []json.RawMessage `json:"sort"`
+		IncludeLocations bool              `json:"includeLocations"`
+		Score            string            `json:"score"`
+		SearchAfter      []string          `json:"search_after"`
+		SearchBefore     []string          `json:"search_before"`
+		PreSearchData    json.RawMessage   `json:"pre_search_data"`
 	}
 
 	err := json.Unmarshal(input, &temp)
