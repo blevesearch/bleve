@@ -48,18 +48,18 @@ type SearchRequest struct {
 	KNN         []*KNNRequest `json:"knn"`
 	KNNOperator knnOperator   `json:"knn_operator"`
 
-	// metadata will be a  map that will be used
+	// PreSearchData will be a  map that will be used
 	// in the second phase of any 2-phase search, to provide additional
 	// context to the second phase. This is useful in the case of index
-	// aliases where the first phase will gather the metadata from all
+	// aliases where the first phase will gather the PreSearchData from all
 	// the indexes in the alias, and the second phase will use that
-	// metadata to perform the actual search.
+	// PreSearchData to perform the actual search.
 	// The currently accepted map configuration is:
 	//
-	// "_knn_metadata_key": []*search.DocumentMatch
-	// "_synonym_metadata_key":		[]*synonym.SynonymDefinition
+	// "_knn_pre_search_data_key": []*search.DocumentMatch
+	// "_synonym_pre_search_data_key":		[]*synonym.SynonymDefinition
 
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
 
 	sortFunc func(sort.Interface)
 }
@@ -103,7 +103,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		SearchBefore     []string          `json:"search_before"`
 		KNN              []*KNNRequest     `json:"knn"`
 		KNNOperator      knnOperator       `json:"knn_operator"`
-		Metadata         json.RawMessage   `json:"metadata"`
+		PreSearchData    json.RawMessage   `json:"pre_search_data"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -151,8 +151,8 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.KNNOperator = knnOperatorOr
 	}
 
-	if temp.Metadata != nil {
-		r.Metadata, err = query.ParseMetadata(temp.Metadata)
+	if temp.PreSearchData != nil {
+		r.PreSearchData, err = query.ParsePreSearchData(temp.PreSearchData)
 		if err != nil {
 			return err
 		}
@@ -164,7 +164,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 
 // -----------------------------------------------------------------------------
 
-func copySearchRequest(req *SearchRequest, metadata map[string]interface{}) *SearchRequest {
+func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{}) *SearchRequest {
 	rv := SearchRequest{
 		Query:            req.Query,
 		Size:             req.Size + req.From,
@@ -180,7 +180,7 @@ func copySearchRequest(req *SearchRequest, metadata map[string]interface{}) *Sea
 		SearchBefore:     req.SearchBefore,
 		KNN:              req.KNN,
 		KNNOperator:      req.KNNOperator,
-		Metadata:         metadata,
+		PreSearchData:    preSearchData,
 	}
 	return &rv
 
@@ -321,7 +321,7 @@ func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch
 		distributeKNNHit(docMatch, indexNumToDocMatchList)
 	}
 	for i := 0; i < len(mergeOut); i++ {
-		mergeOut[i][search.KnnMetadataKey] = indexNumToDocMatchList[i]
+		mergeOut[i][search.KnnPreSearchDataKey] = indexNumToDocMatchList[i]
 	}
 }
 
@@ -340,10 +340,10 @@ func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
 	dummyReq.KNNOperator = knnOperatorOr
 }
 
-func redistributeKNNMetadata(req *SearchRequest, mergedOut []map[string]interface{}) error {
-	knnHits, ok := req.Metadata[search.KnnMetadataKey].([]*search.DocumentMatch)
+func redistributeKNNPreSearchData(req *SearchRequest, mergedOut []map[string]interface{}) error {
+	knnHits, ok := req.PreSearchData[search.KnnPreSearchDataKey].([]*search.DocumentMatch)
 	if !ok {
-		return fmt.Errorf("metadata does not have knn metadata for redistribution")
+		return fmt.Errorf("preSearchData does not have knn preSearchData for redistribution")
 	}
 	indexNumToDocMatchList := make(map[int][]*search.DocumentMatch)
 	for _, docMatch := range knnHits {
@@ -351,9 +351,9 @@ func redistributeKNNMetadata(req *SearchRequest, mergedOut []map[string]interfac
 	}
 	for i := 0; i < len(mergedOut); i++ {
 		newMD := make(map[string]interface{})
-		for k, v := range req.Metadata {
+		for k, v := range req.PreSearchData {
 			switch k {
-			case search.KnnMetadataKey:
+			case search.KnnPreSearchDataKey:
 				newMD[k] = indexNumToDocMatchList[i]
 			default:
 				newMD[k] = v

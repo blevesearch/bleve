@@ -135,6 +135,6 @@ const MinGeoBufPoolSize = 24
 
 type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
 
-const KnnMetadataKey = "_knn_metadata_key"
+const KnnPreSearchDataKey = "_knn_pre_search_data_key"
 
 const PreSearchKey = "_presearch_key"

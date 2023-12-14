@@ -66,8 +66,8 @@ type ValidatableQuery interface {
 }
 
 // ParseQuery deserializes a JSON representation of
-// a Metadata object.
-func ParseMetadata(input []byte) (map[string]interface{}, error) {
+// a PreSearchData object.
+func ParsePreSearchData(input []byte) (map[string]interface{}, error) {
 	var rv map[string]interface{}
 
 	var tmp map[string]json.RawMessage
@@ -78,7 +78,7 @@ func ParseMetadata(input []byte) (map[string]interface{}, error) {
 
 	for k, v := range tmp {
 		switch k {
-		case search.KnnMetadataKey:
+		case search.KnnPreSearchDataKey:
 			var value []*search.DocumentMatch
 			if v != nil {
 				err := util.UnmarshalJSON(v, &value)
@@ -89,7 +89,7 @@ func ParseMetadata(input []byte) (map[string]interface{}, error) {
 			if rv == nil {
 				rv = make(map[string]interface{})
 			}
-			rv[search.KnnMetadataKey] = value
+			rv[search.KnnPreSearchDataKey] = value
 		}
 	}
 	return rv, nil

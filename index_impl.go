@@ -501,14 +501,14 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	var knnHits []*search.DocumentMatch
 	var ok bool
 	var skipKnnCollector bool
-	if req.Metadata != nil {
-		for k, v := range req.Metadata {
+	if req.PreSearchData != nil {
+		for k, v := range req.PreSearchData {
 			switch k {
-			case search.KnnMetadataKey:
+			case search.KnnPreSearchDataKey:
 				if v != nil {
 					knnHits, ok = v.([]*search.DocumentMatch)
 					if !ok {
-						return nil, fmt.Errorf("knn metadata must be of type []*search.DocumentMatch")
+						return nil, fmt.Errorf("knn preSearchData must be of type []*search.DocumentMatch")
 					}
 				}
 				skipKnnCollector = true

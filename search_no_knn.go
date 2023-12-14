@@ -63,17 +63,17 @@ type SearchRequest struct {
 	SearchAfter      []string          `json:"search_after"`
 	SearchBefore     []string          `json:"search_before"`
 
-	// metadata will be a  map that will be used
+	// PreSearchData will be a  map that will be used
 	// in the second phase of any 2-phase search, to provide additional
 	// context to the second phase. This is useful in the case of index
-	// aliases where the first phase will gather the metadata from all
+	// aliases where the first phase will gather the PreSearchData from all
 	// the indexes in the alias, and the second phase will use that
-	// metadata to perform the actual search.
+	// PreSearchData to perform the actual search.
 	// The currently accepted map configuration is:
 	//
-	// "_knn_metadata_key": []*search.DocumentMatch
+	// "_knn_pre_search_data_key": []*search.DocumentMatch
 
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
 
 	sortFunc func(sort.Interface)
 }
@@ -94,7 +94,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Score            string                 `json:"score"`
 		SearchAfter      []string               `json:"search_after"`
 		SearchBefore     []string               `json:"search_before"`
-		Metadata         map[string]interface{} `json:"metadata"`
+		PreSearchData    map[string]interface{} `json:"pre_search_data"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -135,7 +135,12 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	if r.From < 0 {
 		r.From = 0
 	}
-	r.Metadata = temp.Metadata
+	if temp.PreSearchData != nil {
+		r.PreSearchData, err = query.ParsePreSearchData(temp.PreSearchData)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 
@@ -143,7 +148,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 
 // -----------------------------------------------------------------------------
 
-func copySearchRequest(req *SearchRequest, metadata map[string]interface{}) *SearchRequest {
+func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{}) *SearchRequest {
 	rv := SearchRequest{
 		Query:            req.Query,
 		Size:             req.Size + req.From,
@@ -157,7 +162,7 @@ func copySearchRequest(req *SearchRequest, metadata map[string]interface{}) *Sea
 		Score:            req.Score,
 		SearchAfter:      req.SearchAfter,
 		SearchBefore:     req.SearchBefore,
-		Metadata:         metadata,
+		PreSearchData:    preSearchData,
 	}
 	return &rv
 }
@@ -183,6 +188,6 @@ func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
 func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch, mergeOut []map[string]interface{}) {
 }
 
-func redistributeKNNMetadata(req *SearchRequest, mergedOut []map[string]interface{}) error {
+func redistributeKNNPreSearchData(req *SearchRequest, mergedOut []map[string]interface{}) error {
 	return nil
 }

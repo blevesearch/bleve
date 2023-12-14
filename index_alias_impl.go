@@ -163,54 +163,54 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	}
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
 		// this alias is an index in a larger alias
-		// we need to do a metadata search and NOT
+		// we need to do a presearch search and NOT
 		// a real search
-		return MetadataSearch(ctx, req, i.indexes...)
+		return PreSearchDataSearch(ctx, req, i.indexes...)
 	}
 
 	// at this point we know we are doing a real search
 	// either after a presearch is done, or directly
 	// on the alias
 
-	// check if request has metadata which would indicate that the
-	// request has already been presearched and we can skip the
-	// presearch step now, we call an optional function to
-	// redistribute the metadata to the individual indexes
+	// check if request has preSearchData which would indicate that the
+	// request has already been preSearched and we can skip the
+	// preSearch step now, we call an optional function to
+	// redistribute the preSearchData to the individual indexes
 	// if necessary
-	var metadata []map[string]interface{}
-	if req.Metadata != nil {
+	var preSearchData []map[string]interface{}
+	if req.PreSearchData != nil {
 		if requestHasKNN(req) {
-			metadata = make([]map[string]interface{}, len(i.indexes))
-			for i := 0; i < len(metadata); i++ {
-				metadata[i] = make(map[string]interface{})
+			preSearchData = make([]map[string]interface{}, len(i.indexes))
+			for i := 0; i < len(preSearchData); i++ {
+				preSearchData[i] = make(map[string]interface{})
 			}
-			redistributeKNNMetadata(req, metadata)
+			redistributeKNNPreSearchData(req, preSearchData)
 		}
 	}
 
 	// short circuit the simple case
 	if len(i.indexes) == 1 {
-		if metadata != nil {
-			req.Metadata = metadata[0]
+		if preSearchData != nil {
+			req.PreSearchData = preSearchData[0]
 		}
 		return i.indexes[0].SearchInContext(ctx, req)
 	}
 
 	// at this stage we know we have multiple indexes
-	// check if metadata needs to be gathered from all indexes
+	// check if preSearchData needs to be gathered from all indexes
 	// before executing the query
 	var err error
 	// only perform presearch if
-	//  - the request does not already have metadata
+	//  - the request does not already have preSearchData
 	//  - the request requires presearch
-	if req.Metadata == nil && PreSearchRequired(ctx, req) {
-		metadata, err = PreSearch(ctx, req, i.indexes...)
+	if req.PreSearchData == nil && PreSearchRequired(ctx, req) {
+		preSearchData, err = PreSearch(ctx, req, i.indexes...)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return MultiSearch(ctx, req, metadata, i.indexes...)
+	return MultiSearch(ctx, req, preSearchData, i.indexes...)
 }
 
 func (i *indexAliasImpl) Fields() ([]string, error) {
@@ -473,8 +473,8 @@ func (i *indexAliasImpl) Swap(in, out []Index) {
 // the actual final results.
 // Perhaps that part needs to be optional,
 // could be slower in remote usages.
-func createChildSearchRequest(req *SearchRequest, metadata map[string]interface{}) *SearchRequest {
-	return copySearchRequest(req, metadata)
+func createChildSearchRequest(req *SearchRequest, preSearchData map[string]interface{}) *SearchRequest {
+	return copySearchRequest(req, preSearchData)
 }
 
 type asyncSearchResult struct {
@@ -490,7 +490,7 @@ func PreSearchRequired(ctx context.Context, req *SearchRequest) bool {
 
 func PreSearch(ctx context.Context, req *SearchRequest, indexes ...Index) ([]map[string]interface{}, error) {
 	// create a dummy request with a match none query
-	// since we only care about the metadata in PreSearch
+	// since we only care about the preSearchData in PreSearch
 	dummyRequest := &SearchRequest{
 		Query: query.NewMatchNoneQuery(),
 	}
@@ -498,15 +498,15 @@ func PreSearch(ctx context.Context, req *SearchRequest, indexes ...Index) ([]map
 	if requestHasKNN(req) {
 		addKnnToDummyRequest(dummyRequest, req)
 	}
-	res, err := MetadataSearch(newCtx, dummyRequest, indexes...)
+	res, err := PreSearchDataSearch(newCtx, dummyRequest, indexes...)
 	if err != nil {
 		return nil, err
 	}
-	metadata, err := mergeMetadata(req, res, len(indexes))
+	preSearchData, err := mergePreSearchData(req, res, len(indexes))
 	if err != nil {
 		return nil, err
 	}
-	return metadata, nil
+	return preSearchData, nil
 }
 
 func tagHitsWithIndexNum(sr *SearchResult, indexNum int) {
@@ -515,7 +515,7 @@ func tagHitsWithIndexNum(sr *SearchResult, indexNum int) {
 	}
 }
 
-func mergeMetadata(req *SearchRequest, res *SearchResult, numIndexes int) ([]map[string]interface{}, error) {
+func mergePreSearchData(req *SearchRequest, res *SearchResult, numIndexes int) ([]map[string]interface{}, error) {
 	mergedOut := make([]map[string]interface{}, numIndexes)
 	for i := 0; i < len(mergedOut); i++ {
 		mergedOut[i] = make(map[string]interface{})
@@ -526,7 +526,7 @@ func mergeMetadata(req *SearchRequest, res *SearchResult, numIndexes int) ([]map
 	return mergedOut, nil
 }
 
-func MetadataSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*SearchResult, error) {
+func PreSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	searchStart := time.Now()
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
 
@@ -602,7 +602,7 @@ func MetadataSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (
 
 // MultiSearch executes a SearchRequest across multiple Index objects,
 // then merges the results.  The indexes must honor any ctx deadline.
-func MultiSearch(ctx context.Context, req *SearchRequest, metadata []map[string]interface{}, indexes ...Index) (*SearchResult, error) {
+func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData []map[string]interface{}, indexes ...Index) (*SearchResult, error) {
 
 	searchStart := time.Now()
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
@@ -628,8 +628,8 @@ func MultiSearch(ctx context.Context, req *SearchRequest, metadata []map[string]
 	waitGroup.Add(len(indexes))
 	for idx, in := range indexes {
 		var md map[string]interface{}
-		if metadata != nil {
-			md = metadata[idx]
+		if preSearchData != nil {
+			md = preSearchData[idx]
 		}
 		go searchChildIndex(in, createChildSearchRequest(req, md))
 	}
