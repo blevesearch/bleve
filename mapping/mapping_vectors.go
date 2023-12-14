@@ -133,10 +133,10 @@ func validateVectorFieldAlias(field *FieldMapping, parentName string,
 
 	// # Validate field options
 
-	if field.Dims < index.MinVectorDims || field.Dims > index.MaxVectorDims {
+	if field.Dims < MinVectorDims || field.Dims > MaxVectorDims {
 		return fmt.Errorf("field: '%s', invalid vector dimension: %d,"+
 			" value should be in range (%d, %d)", field.Name, field.Dims,
-			index.MinVectorDims, index.MaxVectorDims)
+			MinVectorDims, MaxVectorDims)
 	}
 
 	if _, ok := index.SupportedSimilarityMetrics[field.Similarity]; !ok {
