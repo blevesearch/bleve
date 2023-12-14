@@ -26,6 +26,12 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
+// Min and Max allowed dimensions for a vector field
+const (
+	MinVectorDims = 1
+	MaxVectorDims = 2048
+)
+
 func NewVectorFieldMapping() *FieldMapping {
 	return &FieldMapping{
 		Type:         "vector",
@@ -136,12 +142,22 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 // -----------------------------------------------------------------------------
 // document validation functions
 
-func validateVectorField(field *FieldMapping) error {
-	if field.Dims <= 0 || field.Dims > 2048 {
-		return fmt.Errorf("invalid vector dimension,"+
-			" value should be in range (%d, %d)", 0, 2048)
+func validateFieldMapping(field *FieldMapping, parentName string,
+	fieldAliasCtx map[string]*FieldMapping) error {
+	switch field.Type {
+	case "vector":
+		return validateVectorFieldAlias(field, parentName, fieldAliasCtx)
+	default: // non-vector field
+		return validateFieldType(field)
 	}
+}
 
+func validateVectorFieldAlias(field *FieldMapping, parentName string,
+	fieldAliasCtx map[string]*FieldMapping) error {
+
+	if field.Name == "" {
+		field.Name = parentName
+	}
 	if field.Similarity == "" {
 		field.Similarity = index.DefaultSimilarityMetric
 	}
@@ -154,21 +170,40 @@ func validateVectorField(field *FieldMapping) error {
 	field.DocValues = false
 	field.SkipFreqNorm = true
 
+	// # If alias is present, validate the field options as per the alias
+	// note: reading from a nil map is safe
+	if fieldAlias, ok := fieldAliasCtx[field.Name]; ok {
+		if field.Dims != fieldAlias.Dims {
+			return fmt.Errorf("field: '%s', invalid alias "+
+				"(different dimensions %d and %d)", fieldAlias.Name, field.Dims,
+				fieldAlias.Dims)
+		}
+
+		if field.Similarity != fieldAlias.Similarity {
+			return fmt.Errorf("field: '%s', invalid alias "+
+				"(different similarity values %s and %s)", fieldAlias.Name,
+				field.Similarity, fieldAlias.Similarity)
+		}
+
+		return nil
+	}
+
+	// # Validate field options
+
+	if field.Dims < MinVectorDims || field.Dims > MaxVectorDims {
+		return fmt.Errorf("field: '%s', invalid vector dimension: %d,"+
+			" value should be in range (%d, %d)", field.Name, field.Dims,
+			MinVectorDims, MaxVectorDims)
+	}
+
 	if _, ok := index.SupportedSimilarityMetrics[field.Similarity]; !ok {
-		return fmt.Errorf("invalid similarity metric: '%s', "+
-			"valid metrics are: %+v", field.Similarity,
+		return fmt.Errorf("field: '%s', invalid similarity "+
+			"metric: '%s', valid metrics are: %+v", field.Name, field.Similarity,
 			reflect.ValueOf(index.SupportedSimilarityMetrics).MapKeys())
 	}
 
-	return nil
-}
-
-func validateFieldType(fieldType string) error {
-	switch fieldType {
-	case "text", "datetime", "number", "boolean", "geopoint", "geoshape",
-		"IP", "vector":
-	default:
-		return fmt.Errorf("unknown field type: '%s'", fieldType)
+	if fieldAliasCtx != nil { // writing to a nil map is unsafe
+		fieldAliasCtx[field.Name] = field
 	}
 
 	return nil

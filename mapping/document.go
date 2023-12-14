@@ -50,7 +50,8 @@ type DocumentMapping struct {
 	StructTagKey string `json:"struct_tag_key,omitempty"`
 }
 
-func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
+func (dm *DocumentMapping) Validate(cache *registry.Cache,
+	parentName string, fieldAliasCtx map[string]*FieldMapping) error {
 	var err error
 	if dm.DefaultAnalyzer != "" {
 		_, err := cache.AnalyzerNamed(dm.DefaultAnalyzer)
@@ -58,8 +59,12 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 			return err
 		}
 	}
-	for _, property := range dm.Properties {
-		err = property.Validate(cache)
+	for propertyName, property := range dm.Properties {
+		newParent := propertyName
+		if parentName != "" {
+			newParent = fmt.Sprintf("%s.%s", parentName, propertyName)
+		}
+		err = property.Validate(cache, newParent, fieldAliasCtx)
 		if err != nil {
 			return err
 		}
@@ -78,19 +83,22 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 			}
 		}
 
-		err := validateFieldType(field.Type)
+		err := validateFieldMapping(field, parentName, fieldAliasCtx)
 		if err != nil {
 			return err
 		}
-
-		if field.Type == "vector" {
-			err := validateVectorField(field)
-			if err != nil {
-				return err
-			}
-		}
 	}
 	return nil
+}
+
+func validateFieldType(field *FieldMapping) error {
+	switch field.Type {
+	case "text", "datetime", "number", "boolean", "geopoint", "geoshape", "IP":
+		return nil
+	default:
+		return fmt.Errorf("field: '%s', unknown field type: '%s'",
+			field.Name, field.Type)
+	}
 }
 
 // analyzerNameForPath attempts to first find the field
