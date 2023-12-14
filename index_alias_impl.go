@@ -161,18 +161,49 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	if len(i.indexes) < 1 {
 		return nil, ErrorAliasEmpty
 	}
+	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
+		// this alias is an index in a larger alias
+		// we need to do a metadata search and NOT
+		// a real search
+		return MetadataSearch(ctx, req, i.indexes...)
+	}
+
+	// at this point we know we are doing a real search
+	// either after a presearch is done, or directly
+	// on the alias
+
+	// check if request has metadata which would indicate that the
+	// request has already been presearched and we can skip the
+	// presearch step now, we call an optional function to
+	// redistribute the metadata to the individual indexes
+	// if necessary
+	var metadata []map[string]interface{}
+	if req.Metadata != nil {
+		if requestHasKNN(req) {
+			metadata = make([]map[string]interface{}, len(i.indexes))
+			for i := 0; i < len(metadata); i++ {
+				metadata[i] = make(map[string]interface{})
+			}
+			redistributeKNNMetadata(req, metadata)
+		}
+	}
 
 	// short circuit the simple case
 	if len(i.indexes) == 1 {
+		if metadata != nil {
+			req.Metadata = metadata[0]
+		}
 		return i.indexes[0].SearchInContext(ctx, req)
 	}
 
 	// at this stage we know we have multiple indexes
 	// check if metadata needs to be gathered from all indexes
 	// before executing the query
-	var metadata []map[string]interface{}
 	var err error
-	if PreSearchRequired(ctx, req) {
+	// only perform presearch if
+	//  - the request does not already have metadata
+	//  - the request requires presearch
+	if req.Metadata == nil && PreSearchRequired(ctx, req) {
 		metadata, err = PreSearch(ctx, req, i.indexes...)
 		if err != nil {
 			return nil, err
@@ -480,7 +511,7 @@ func PreSearch(ctx context.Context, req *SearchRequest, indexes ...Index) ([]map
 
 func tagHitsWithIndexNum(sr *SearchResult, indexNum int) {
 	for _, hit := range sr.Hits {
-		hit.IndexId = indexNum
+		hit.IndexId = append(hit.IndexId, indexNum)
 	}
 }
 
@@ -600,7 +631,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, metadata []map[string]
 		if metadata != nil {
 			md = metadata[idx]
 		}
-		searchChildIndex(in, createChildSearchRequest(req, md))
+		go searchChildIndex(in, createChildSearchRequest(req, md))
 	}
 
 	// on another go routine, close after finished

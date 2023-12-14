@@ -182,3 +182,7 @@ func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
 
 func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch, mergeOut []map[string]interface{}) {
 }
+
+func redistributeKNNMetadata(req *SearchRequest, mergedOut []map[string]interface{}) error {
+	return nil
+}

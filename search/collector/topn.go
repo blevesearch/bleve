@@ -257,7 +257,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			if err != nil {
 				return err
 			}
-			err = dmHandler(next)
+			err = dmHandler(knnDoc)
 			if err != nil {
 				return err
 			}

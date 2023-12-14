@@ -57,6 +57,7 @@ type SearchRequest struct {
 	// The currently accepted map configuration is:
 	//
 	// "_knn_metadata_key": []*search.DocumentMatch
+	// "_synonym_metadata_key":		[]*synonym.SynonymDefinition
 
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 
@@ -88,21 +89,21 @@ func (r *SearchRequest) AddKNNOperator(operator knnOperator) {
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	var temp struct {
-		Q                json.RawMessage        `json:"query"`
-		Size             *int                   `json:"size"`
-		From             int                    `json:"from"`
-		Highlight        *HighlightRequest      `json:"highlight"`
-		Fields           []string               `json:"fields"`
-		Facets           FacetsRequest          `json:"facets"`
-		Explain          bool                   `json:"explain"`
-		Sort             []json.RawMessage      `json:"sort"`
-		IncludeLocations bool                   `json:"includeLocations"`
-		Score            string                 `json:"score"`
-		SearchAfter      []string               `json:"search_after"`
-		SearchBefore     []string               `json:"search_before"`
-		KNN              []*KNNRequest          `json:"knn"`
-		KNNOperator      knnOperator            `json:"knn_operator"`
-		Metadata         map[string]interface{} `json:"metadata"`
+		Q                json.RawMessage   `json:"query"`
+		Size             *int              `json:"size"`
+		From             int               `json:"from"`
+		Highlight        *HighlightRequest `json:"highlight"`
+		Fields           []string          `json:"fields"`
+		Facets           FacetsRequest     `json:"facets"`
+		Explain          bool              `json:"explain"`
+		Sort             []json.RawMessage `json:"sort"`
+		IncludeLocations bool              `json:"includeLocations"`
+		Score            string            `json:"score"`
+		SearchAfter      []string          `json:"search_after"`
+		SearchBefore     []string          `json:"search_before"`
+		KNN              []*KNNRequest     `json:"knn"`
+		KNNOperator      knnOperator       `json:"knn_operator"`
+		Metadata         json.RawMessage   `json:"metadata"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -149,7 +150,13 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	if r.KNNOperator == "" {
 		r.KNNOperator = knnOperatorOr
 	}
-	r.Metadata = temp.Metadata
+
+	if temp.Metadata != nil {
+		r.Metadata, err = query.ParseMetadata(temp.Metadata)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 
@@ -311,11 +318,17 @@ func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch
 	}
 	indexNumToDocMatchList := make(map[int][]*search.DocumentMatch)
 	for docMatch := range mergedKNNhits {
-		indexNumToDocMatchList[docMatch.IndexId] = append(indexNumToDocMatchList[docMatch.IndexId], docMatch)
+		distributeKNNHit(docMatch, indexNumToDocMatchList)
 	}
 	for i := 0; i < len(mergeOut); i++ {
 		mergeOut[i][search.KnnMetadataKey] = indexNumToDocMatchList[i]
 	}
+}
+
+func distributeKNNHit(docMatch *search.DocumentMatch, indexNumToDocMatchList map[int][]*search.DocumentMatch) {
+	top := docMatch.IndexId[len(docMatch.IndexId)-1]
+	docMatch.IndexId = docMatch.IndexId[:len(docMatch.IndexId)-1]
+	indexNumToDocMatchList[top] = append(indexNumToDocMatchList[top], docMatch)
 }
 
 func requestHasKNN(req *SearchRequest) bool {
@@ -325,4 +338,28 @@ func requestHasKNN(req *SearchRequest) bool {
 func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
 	dummyReq.KNN = realReq.KNN
 	dummyReq.KNNOperator = knnOperatorOr
+}
+
+func redistributeKNNMetadata(req *SearchRequest, mergedOut []map[string]interface{}) error {
+	knnHits, ok := req.Metadata[search.KnnMetadataKey].([]*search.DocumentMatch)
+	if !ok {
+		return fmt.Errorf("metadata does not have knn metadata for redistribution")
+	}
+	indexNumToDocMatchList := make(map[int][]*search.DocumentMatch)
+	for _, docMatch := range knnHits {
+		distributeKNNHit(docMatch, indexNumToDocMatchList)
+	}
+	for i := 0; i < len(mergedOut); i++ {
+		newMD := make(map[string]interface{})
+		for k, v := range req.Metadata {
+			switch k {
+			case search.KnnMetadataKey:
+				newMD[k] = indexNumToDocMatchList[i]
+			default:
+				newMD[k] = v
+			}
+		}
+		mergedOut[i] = newMD
+	}
+	return nil
 }

@@ -184,7 +184,11 @@ type DocumentMatch struct {
 
 	// internal variable used in PreSearch phase of search in alias
 	// indicated the index id of the index that this match came from
-	IndexId int
+	// used in vector search.
+	// it is a stack of index ids, the top of the stack is the index id
+	// of the index that this match came from
+	// of the current alias view, used in alias of aliases scenario
+	IndexId []int `json:"index_id,omitempty"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
@@ -346,7 +350,7 @@ func (dm *DocumentMatch) Complete(prealloc []Location) []Location {
 }
 
 func (dm *DocumentMatch) String() string {
-	return fmt.Sprintf("[%s-%f]", string(dm.IndexInternalID), dm.Score)
+	return fmt.Sprintf("[%s-%f]", dm.ID, dm.Score)
 }
 
 type DocumentMatchCollection []*DocumentMatch
