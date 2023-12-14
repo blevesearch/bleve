@@ -194,9 +194,8 @@ func TestVectorFieldAliasValidation(t *testing.T) {
 					test.errMsg, err.Error())
 			}
 		})
- 	}
+	}
 }
-
 
 // A test case for processVector function
 type vectorTest struct {
