@@ -1158,3 +1158,92 @@ func TestKNNOperator(t *testing.T) {
 		t.Fatalf("expected error for incorrect knn operator")
 	}
 }
+
+// -----------------------------------------------------------------------------
+// Test nested vectors
+
+func TestNestedVectors(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	const dims = 3
+	const k = 1 // one nearest neighbor
+	const vecFieldName = "vecData"
+
+	dataset := map[string]map[string]interface{}{ // docID -> Doc
+		"doc1": {
+			vecFieldName: []float32{100, 100, 100},
+		},
+		"doc2": {
+			vecFieldName: [][]float32{{0, 0, 0}, {1000, 1000, 1000}},
+		},
+	}
+
+	// Index mapping
+	indexMapping := NewIndexMapping()
+	vm := mapping.NewVectorFieldMapping()
+	vm.Dims = dims
+	vm.Similarity = "l2_norm"
+	indexMapping.DefaultMapping.AddFieldMappingsAt(vecFieldName, vm)
+
+	// Create index and upload documents
+	index, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch := index.NewBatch()
+	for docID, doc := range dataset {
+		batch.Index(docID, doc)
+	}
+
+	err = index.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Run searches
+
+	tests := []struct {
+		queryVec      []float32
+		expectedDocID string
+	}{
+		{
+			queryVec:      []float32{100, 100, 100},
+			expectedDocID: "doc1",
+		},
+		{
+			queryVec:      []float32{0, 0, 0},
+			expectedDocID: "doc2",
+		},
+		{
+			queryVec:      []float32{1000, 1000, 1000},
+			expectedDocID: "doc2",
+		},
+	}
+
+	for _, test := range tests {
+		searchReq := NewSearchRequest(query.NewMatchNoneQuery())
+		searchReq.AddKNN(vecFieldName, test.queryVec, k, 1000)
+
+		res, err := index.Search(searchReq)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(res.Hits) != 1 {
+			t.Fatalf("expected 1 hit, got %d", len(res.Hits))
+		}
+
+		if res.Hits[0].ID != test.expectedDocID {
+			t.Fatalf("expected docID %s, got %s", test.expectedDocID,
+				res.Hits[0].ID)
+		}
+	}
+}

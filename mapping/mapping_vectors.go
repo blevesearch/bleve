@@ -43,49 +43,100 @@ func NewVectorFieldMapping() *FieldMapping {
 	}
 }
 
+// validate and process a flat vector
+func processFlatVector(vecV reflect.Value, dims int) ([]float32, bool) {
+	if vecV.Len() != dims {
+		return nil, false
+	}
+
+	rv := make([]float32, dims)
+	for i := 0; i < vecV.Len(); i++ {
+		item := vecV.Index(i)
+		if !item.CanInterface() {
+			return nil, false
+		}
+		itemI := item.Interface()
+		itemFloat, ok := util.ExtractNumericValFloat32(itemI)
+		if !ok {
+			return nil, false
+		}
+		rv[i] = itemFloat
+	}
+
+	return rv, true
+}
+
+// validate and process a vector
+// max supported depth of nesting is 2 ([][]float32)
+func processVector(vecI interface{}, dims int) ([]float32, bool) {
+	vecV := reflect.ValueOf(vecI)
+	if !vecV.IsValid() || vecV.Kind() != reflect.Slice || vecV.Len() == 0 {
+		return nil, false
+	}
+
+	// Let's examine the first element (head) of the vector.
+	// If head is a slice, then vector is nested, otherwise flat.
+	head := vecV.Index(0)
+	if !head.CanInterface() {
+		return nil, false
+	}
+	headI := head.Interface()
+	headV := reflect.ValueOf(headI)
+	if !headV.IsValid() {
+		return nil, false
+	}
+	if headV.Kind() != reflect.Slice { // vector is flat
+		return processFlatVector(vecV, dims)
+	}
+
+	// # process nested vector
+
+	// pre-allocate memory for the flattened vector
+	// so that we can use copy() later
+	rv := make([]float32, dims*vecV.Len())
+
+	for i := 0; i < vecV.Len(); i++ {
+		subVec := vecV.Index(i)
+		if !subVec.CanInterface() {
+			return nil, false
+		}
+		subVecI := subVec.Interface()
+		subVecV := reflect.ValueOf(subVecI)
+		if !subVecV.IsValid() {
+			return nil, false
+		}
+
+		if subVecV.Kind() != reflect.Slice {
+			return nil, false
+		}
+
+		flatVector, ok := processFlatVector(subVecV, dims)
+		if !ok {
+			return nil, false
+		}
+
+		copy(rv[i*dims:(i+1)*dims], flatVector)
+	}
+
+	return rv, true
+}
+
 func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	pathString string, path []string, indexes []uint64, context *walkContext) {
-	propertyVal := reflect.ValueOf(propertyMightBeVector)
-	if !propertyVal.IsValid() {
+	vector, ok := processVector(propertyMightBeVector, fm.Dims)
+	// Don't add field to document if vector is invalid
+	if !ok {
 		return
 	}
 
-	// Validating the length of the vector is required here, in order to
-	// help zapx in deciding the shape of the batch of vectors to be indexed.
-	if propertyVal.Kind() == reflect.Slice && propertyVal.Len() == fm.Dims {
-		vector := make([]float32, propertyVal.Len())
-		isVectorValid := true
-		for i := 0; i < propertyVal.Len(); i++ {
-			item := propertyVal.Index(i)
-			if !item.CanInterface() {
-				isVectorValid = false
-				break
-			}
+	fieldName := getFieldName(pathString, path, fm)
+	options := fm.Options()
+	field := document.NewVectorFieldWithIndexingOptions(fieldName,
+		indexes, vector, fm.Dims, fm.Similarity, options)
+	context.doc.AddField(field)
 
-			itemFloat, ok := util.ExtractNumericValFloat32(item.Interface())
-			if !ok {
-				isVectorValid = false
-				break
-			}
-
-			vector[i] = itemFloat
-		}
-
-		// Even if one of the vector elements is not a float32, we do not index
-		// this field value and continue silently
-		if !isVectorValid {
-			return
-		}
-
-		fieldName := getFieldName(pathString, path, fm)
-		options := fm.Options()
-		field := document.NewVectorFieldWithIndexingOptions(fieldName,
-			indexes, vector, fm.Dims, fm.Similarity, options)
-		context.doc.AddField(field)
-
-		// "_all" composite field is not applicable for vector field
-		context.excludedFromAll = append(context.excludedFromAll, fieldName)
-	}
+	// "_all" composite field is not applicable for vector field
+	context.excludedFromAll = append(context.excludedFromAll, fieldName)
 }
 
 // -----------------------------------------------------------------------------
