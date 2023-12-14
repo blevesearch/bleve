@@ -285,9 +285,6 @@ func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, 
 				}
 				return totalScore
 			},
-			func() bool {
-				return req.KNNOperator == knnOperatorAnd
-			},
 		)
 	}
 }
