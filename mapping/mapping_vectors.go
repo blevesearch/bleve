@@ -114,6 +114,7 @@ func validateVectorFieldAlias(field *FieldMapping, parentName string,
 	field.SkipFreqNorm = true
 
 	// # If alias is present, validate the field options as per the alias
+	// note: reading from a nil map is safe
 	if fieldAlias, ok := fieldAliasCtx[field.Name]; ok {
 		if field.Dims != fieldAlias.Dims {
 			return fmt.Errorf("field: '%s', invalid alias "+
@@ -143,7 +144,9 @@ func validateVectorFieldAlias(field *FieldMapping, parentName string,
 			reflect.ValueOf(index.SupportedSimilarityMetrics).MapKeys())
 	}
 
-	fieldAliasCtx[field.Name] = field
+	if fieldAliasCtx != nil { // writing to a nil map is unsafe
+		fieldAliasCtx[field.Name] = field
+	}
 
 	return nil
 }
