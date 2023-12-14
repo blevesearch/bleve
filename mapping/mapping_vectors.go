@@ -26,6 +26,12 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
+// Min and Max allowed dimensions for a vector field
+const (
+	MinVectorDims = 1
+	MaxVectorDims = 2048
+)
+
 func NewVectorFieldMapping() *FieldMapping {
 	return &FieldMapping{
 		Type:         "vector",

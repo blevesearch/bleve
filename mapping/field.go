@@ -79,12 +79,6 @@ type FieldMapping struct {
 	Similarity string `json:"similarity,omitempty"`
 }
 
-// Min and Max allowed dimensions for a vector field
-const (
-	MinVectorDims = 1
-	MaxVectorDims = 2048
-)
-
 // NewTextFieldMapping returns a default field mapping for text
 func NewTextFieldMapping() *FieldMapping {
 	return &FieldMapping{
