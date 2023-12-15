@@ -416,6 +416,15 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.StartDoc()
 	}
+	if d.ID != "" && d.IndexInternalID == nil {
+		// this document may have been sent over as preSearchData and
+		// we need to look up the internal id to visit the doc values for it
+		var err error
+		d.IndexInternalID, err = reader.InternalID(d.ID)
+		if err != nil {
+			return err
+		}
+	}
 
 	err := hc.dvReader.VisitDocValues(d.IndexInternalID, hc.updateFieldVisitor)
 	if hc.facetsBuilder != nil {

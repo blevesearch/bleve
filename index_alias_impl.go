@@ -162,9 +162,11 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		return nil, ErrorAliasEmpty
 	}
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
-		// this alias is an index in a larger alias
-		// we need to do a presearch search and NOT
-		// a real search
+		// since presearchKey is set, it means that the request
+		// is being executed as part of a presearch, which
+		// indicates that this index alias is set as an Index
+		// in another alias, so we need to do a presearch search
+		// and NOT a real search
 		return PreSearchDataSearch(ctx, req, i.indexes...)
 	}
 

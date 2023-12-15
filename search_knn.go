@@ -57,7 +57,6 @@ type SearchRequest struct {
 	// The currently accepted map configuration is:
 	//
 	// "_knn_pre_search_data_key": []*search.DocumentMatch
-	// "_synonym_pre_search_data_key":		[]*synonym.SynonymDefinition
 
 	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
 
@@ -325,6 +324,14 @@ func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch
 	}
 }
 
+// when we are setting KNN hits in the preSearchData, we need to make sure that
+// the KNN hit goes to the right index. This is because the KNN hits are
+// collected from all the indexes in the alias, but the preSearchData is
+// specific to each index. If alias A1 contains indexes I1 and I2 and
+// the KNN hits collected from both I1 and I2, and merged to get top K
+// hits, then the top K hits need to be distributed to I1 and I2,
+// so that the preSearchData for I1 contains the top K hits from I1 and
+// the preSearchData for I2 contains the top K hits from I2.
 func distributeKNNHit(docMatch *search.DocumentMatch, indexNumToDocMatchList map[int][]*search.DocumentMatch) {
 	top := docMatch.IndexId[len(docMatch.IndexId)-1]
 	docMatch.IndexId = docMatch.IndexId[:len(docMatch.IndexId)-1]
@@ -340,6 +347,13 @@ func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
 	dummyReq.KNNOperator = knnOperatorOr
 }
 
+// the preSearchData for KNN is a list of DocumentMatch objects
+// that need to be redistributed to the right index.
+// This is used only in the case of an alias tree, where the indexes
+// are at the leaves of the tree, and the master alias is at the root.
+// At each level of the tree, the preSearchData needs to be redistributed
+// to the indexes/aliases at that level. Because the preSearchData is
+// specific to each final index at the leaf.
 func redistributeKNNPreSearchData(req *SearchRequest, mergedOut []map[string]interface{}) error {
 	knnHits, ok := req.PreSearchData[search.KnnPreSearchDataKey].([]*search.DocumentMatch)
 	if !ok {
