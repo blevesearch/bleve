@@ -73,9 +73,8 @@ type TopNCollector struct {
 	dvReader                  index.DocValueReader
 	searchAfter               *search.DocumentMatch
 
-	knnHits          map[string]*search.DocumentMatch
-	computeNewScore  func(d *search.DocumentMatch, knnHit *search.DocumentMatch) float64
-	isKnnOperatorAnd func() bool
+	knnHits         map[string]*search.DocumentMatch
+	computeNewScore func(d *search.DocumentMatch, knnHit *search.DocumentMatch) float64
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
@@ -211,7 +210,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	default:
 		next, err = searcher.Next(searchContext)
 	}
-	var skipped bool
 	for err == nil && next != nil {
 		if hc.total%CheckDoneEvery == 0 {
 			select {
@@ -222,15 +220,11 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			}
 		}
 
-		skipped, err = hc.adjustDocumentMatch(searchContext, reader, next)
+		err = hc.adjustDocumentMatch(searchContext, reader, next)
 		if err != nil {
 			break
 		}
-		if skipped {
-			searchContext.DocumentMatchPool.Put(next)
-			next, err = searcher.Next(searchContext)
-			continue
-		}
+
 		err = hc.prepareDocumentMatch(searchContext, reader, next)
 		if err != nil {
 			break
@@ -246,11 +240,9 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	if err != nil {
 		return err
 	}
-	if hc.knnHits != nil && !hc.isKnnOperatorAnd() {
-		// if the operator is OR, then we may have some knn hits
-		// left that did not match any of the top N tf-idf hits
-		// we need to add them to the collector store to consider
-		// them as well.
+	if hc.knnHits != nil {
+		// we may have some knn hits left that did not match any of the top N tf-idf hits
+		// we need to add them to the collector store to consider them as well.
 		for _, knnDoc := range hc.knnHits {
 			knnDoc.Score = hc.computeNewScore(nil, knnDoc)
 			err = hc.prepareDocumentMatch(searchContext, reader, knnDoc)
@@ -295,25 +287,21 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 var sortByScoreOpt = []string{"_score"}
 
 func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
-	reader index.IndexReader, d *search.DocumentMatch) (skipped bool, err error) {
+	reader index.IndexReader, d *search.DocumentMatch) (err error) {
 
 	if hc.knnHits != nil {
 		if hc.needDocIds {
 			d.ID, err = reader.ExternalID(d.IndexInternalID)
 			if err != nil {
-				return false, err
+				return err
 			}
 		}
 		if knnHit, ok := hc.knnHits[d.ID]; ok {
 			d.Score = hc.computeNewScore(d, knnHit)
 			delete(hc.knnHits, d.ID)
-		} else if hc.isKnnOperatorAnd() {
-			// if the operator is AND, then we need to skip this hit
-			// since it did not match the knn query
-			return true, nil
 		}
 	}
-	return false, nil
+	return nil
 }
 
 func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
@@ -505,15 +493,13 @@ func (hc *TopNCollector) FacetResults() search.FacetResults {
 }
 
 func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection,
-	newScoreComputer func(d *search.DocumentMatch, knnHit *search.DocumentMatch) float64,
-	isOperatorAnd func() bool) {
+	newScoreComputer func(d *search.DocumentMatch, knnHit *search.DocumentMatch) float64) {
 
 	hc.knnHits = make(map[string]*search.DocumentMatch, len(knnHits))
 	for _, hit := range knnHits {
 		hc.knnHits[hit.ID] = hit
 	}
 	hc.computeNewScore = newScoreComputer
-	hc.isKnnOperatorAnd = isOperatorAnd
 	// now that we have the knnHits
 	// when we run the top N search for just the
 	// basic Query object, we need to load the docIds
