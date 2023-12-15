@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"container/heap"
 	"context"
+	"math"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -90,6 +91,20 @@ func newDisjunctionHeapSearcher(ctx context.Context, indexReader index.IndexRead
 	}
 	rv.computeQueryNorm()
 	return &rv, nil
+}
+
+func (s *DisjunctionHeapSearcher) computeQueryNorm() {
+	// first calculate sum of squared weights
+	sumOfSquaredWeights := 0.0
+	for _, searcher := range s.searchers {
+		sumOfSquaredWeights += searcher.Weight()
+	}
+	// now compute query norm from this
+	s.queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
+	// finally tell all the downstream searchers the norm
+	for _, searcher := range s.searchers {
+		searcher.SetQueryNorm(s.queryNorm)
+	}
 }
 
 func (s *DisjunctionHeapSearcher) Size() int {

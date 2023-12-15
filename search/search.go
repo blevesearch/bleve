@@ -181,6 +181,14 @@ type DocumentMatch struct {
 	// in the DisjunctionQuery or ConjunctionQuery. The map value is the
 	// sub-score for that sub-query.
 	ScoreBreakdown map[int]float64 `json:"score_breakdown,omitempty"`
+
+	// internal variable used in PreSearch phase of search in alias
+	// indicated the index id of the index that this match came from
+	// used in vector search.
+	// it is a stack of index ids, the top of the stack is the index id
+	// of the index that this match came from
+	// of the current alias view, used in alias of aliases scenario
+	IndexId []int `json:"index_id,omitempty"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
@@ -342,7 +350,7 @@ func (dm *DocumentMatch) Complete(prealloc []Location) []Location {
 }
 
 func (dm *DocumentMatch) String() string {
-	return fmt.Sprintf("[%s-%f]", string(dm.IndexInternalID), dm.Score)
+	return fmt.Sprintf("[%s-%f]", dm.ID, dm.Score)
 }
 
 type DocumentMatchCollection []*DocumentMatch

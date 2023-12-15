@@ -72,6 +72,10 @@ type TopNCollector struct {
 	updateFieldVisitor        index.DocValueVisitor
 	dvReader                  index.DocValueReader
 	searchAfter               *search.DocumentMatch
+
+	knnHits          map[string]*search.DocumentMatch
+	computeNewScore  func(d *search.DocumentMatch, knnHit *search.DocumentMatch) float64
+	isKnnOperatorAnd func() bool
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
@@ -110,23 +114,9 @@ func NewTopNCollectorAfter(size int, sort search.SortOrder, after []string) *Top
 func newTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector {
 	hc := &TopNCollector{size: size, skip: skip, sort: sort}
 
-	// pre-allocate space on the store to avoid reslicing
-	// unless the size + skip is too large, then cap it
-	// everything should still work, just reslices as necessary
-	backingSize := size + skip + 1
-	if size+skip > PreAllocSizeSkipCap {
-		backingSize = PreAllocSizeSkipCap + 1
-	}
-
-	if size+skip > 10 {
-		hc.store = newStoreHeap(backingSize, func(i, j *search.DocumentMatch) int {
-			return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
-		})
-	} else {
-		hc.store = newStoreSlice(backingSize, func(i, j *search.DocumentMatch) int {
-			return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
-		})
-	}
+	hc.store = getOptimalCollectorStore(size, skip, func(i, j *search.DocumentMatch) int {
+		return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
+	})
 
 	// these lookups traverse an interface, so do once up-front
 	if sort.RequiresDocID() {
@@ -137,6 +127,22 @@ func newTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector 
 	hc.cachedDesc = sort.CacheDescending()
 
 	return hc
+}
+
+func getOptimalCollectorStore(size, skip int, comparator collectorCompare) collectorStore {
+	// pre-allocate space on the store to avoid reslicing
+	// unless the size + skip is too large, then cap it
+	// everything should still work, just reslices as necessary
+	backingSize := size + skip + 1
+	if size+skip > PreAllocSizeSkipCap {
+		backingSize = PreAllocSizeSkipCap + 1
+	}
+
+	if size+skip > 10 {
+		return newStoreHeap(backingSize, comparator)
+	} else {
+		return newStoreSlice(backingSize, comparator)
+	}
 }
 
 func (hc *TopNCollector) Size() int {
@@ -205,6 +211,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	default:
 		next, err = searcher.Next(searchContext)
 	}
+	var skipped bool
 	for err == nil && next != nil {
 		if hc.total%CheckDoneEvery == 0 {
 			select {
@@ -215,6 +222,15 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			}
 		}
 
+		skipped, err = hc.adjustDocumentMatch(searchContext, reader, next)
+		if err != nil {
+			break
+		}
+		if skipped {
+			searchContext.DocumentMatchPool.Put(next)
+			next, err = searcher.Next(searchContext)
+			continue
+		}
 		err = hc.prepareDocumentMatch(searchContext, reader, next)
 		if err != nil {
 			break
@@ -226,6 +242,26 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		}
 
 		next, err = searcher.Next(searchContext)
+	}
+	if err != nil {
+		return err
+	}
+	if hc.knnHits != nil && !hc.isKnnOperatorAnd() {
+		// if the operator is OR, then we may have some knn hits
+		// left that did not match any of the top N tf-idf hits
+		// we need to add them to the collector store to consider
+		// them as well.
+		for _, knnDoc := range hc.knnHits {
+			knnDoc.Score = hc.computeNewScore(nil, knnDoc)
+			err = hc.prepareDocumentMatch(searchContext, reader, knnDoc)
+			if err != nil {
+				return err
+			}
+			err = dmHandler(knnDoc)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	statsCallbackFn := ctx.Value(search.SearchIOStatsCallbackKey)
@@ -258,6 +294,28 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 
 var sortByScoreOpt = []string{"_score"}
 
+func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
+	reader index.IndexReader, d *search.DocumentMatch) (skipped bool, err error) {
+
+	if hc.knnHits != nil {
+		if hc.needDocIds {
+			d.ID, err = reader.ExternalID(d.IndexInternalID)
+			if err != nil {
+				return false, err
+			}
+		}
+		if knnHit, ok := hc.knnHits[d.ID]; ok {
+			d.Score = hc.computeNewScore(d, knnHit)
+			delete(hc.knnHits, d.ID)
+		} else if hc.isKnnOperatorAnd() {
+			// if the operator is AND, then we need to skip this hit
+			// since it did not match the knn query
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
 	reader index.IndexReader, d *search.DocumentMatch) (err error) {
 
@@ -279,7 +337,7 @@ func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
 	}
 
 	// see if we need to load ID (at this early stage, for example to sort on it)
-	if hc.needDocIds {
+	if hc.needDocIds && d.ID == "" {
 		d.ID, err = reader.ExternalID(d.IndexInternalID)
 		if err != nil {
 			return err
@@ -314,6 +372,7 @@ func MakeTopNDocumentMatchHandler(
 				// but we want to allow for exact match, so we pretend
 				hc.searchAfter.HitNumber = d.HitNumber
 				if hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, d, hc.searchAfter) <= 0 {
+					ctx.DocumentMatchPool.Put(d)
 					return nil
 				}
 			}
@@ -356,6 +415,15 @@ func MakeTopNDocumentMatchHandler(
 func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.DocumentMatch) error {
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.StartDoc()
+	}
+	if d.ID != "" && d.IndexInternalID == nil {
+		// this document may have been sent over as preSearchData and
+		// we need to look up the internal id to visit the doc values for it
+		var err error
+		d.IndexInternalID, err = reader.InternalID(d.ID)
+		if err != nil {
+			return err
+		}
 	}
 
 	err := hc.dvReader.VisitDocValues(d.IndexInternalID, hc.updateFieldVisitor)
@@ -434,4 +502,26 @@ func (hc *TopNCollector) FacetResults() search.FacetResults {
 		return hc.facetsBuilder.Results()
 	}
 	return nil
+}
+
+func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection,
+	newScoreComputer func(d *search.DocumentMatch, knnHit *search.DocumentMatch) float64,
+	isOperatorAnd func() bool) {
+
+	hc.knnHits = make(map[string]*search.DocumentMatch, len(knnHits))
+	for _, hit := range knnHits {
+		hc.knnHits[hit.ID] = hit
+	}
+	hc.computeNewScore = newScoreComputer
+	hc.isKnnOperatorAnd = isOperatorAnd
+	// now that we have the knnHits
+	// when we run the top N search for just the
+	// basic Query object, we need to load the docIds
+	// for the hits -> this is because there might be overlap
+	// or common documents between the knnHits and the top N hits
+	// which indicates that a document matches both a knn query
+	// and the top N query. This means we need to improve the score
+	// of the doc match received as part of the top N search to also incorporate
+	// the score from the knn search.
+	hc.needDocIds = true
 }
