@@ -242,8 +242,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 	}
 	if hc.knnHits != nil {
 		// we may have some knn hits left that did not match any of the top N tf-idf hits
-		// we need to add them to the collector store to consider
-		// them as well.
+		// we need to add them to the collector store to consider them as well.
 		for _, knnDoc := range hc.knnHits {
 			knnDoc.Score = hc.computeNewScore(nil, knnDoc)
 			err = hc.prepareDocumentMatch(searchContext, reader, knnDoc)
