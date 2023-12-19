@@ -39,6 +39,9 @@ type collectorStore interface {
 	AddNotExceedingSize(doc *search.DocumentMatch, size int) *search.DocumentMatch
 
 	Final(skip int, fixup collectorFixup) (search.DocumentMatchCollection, error)
+
+	// Provide access the internal heap implementation
+	Internal() search.DocumentMatchCollection
 }
 
 // PreAllocSizeSkipCap will cap preallocation to this amount when

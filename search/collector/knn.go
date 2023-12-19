@@ -60,22 +60,22 @@ func (c *collectStoreKNN) AddDocument(doc *search.DocumentMatch) []*search.Docum
 	for doc := range c.ejectedDocs {
 		if len(doc.ScoreBreakdown) == 0 {
 			rv = append(rv, doc)
-			delete(c.allHits, doc)
 		}
 		// clear out the ejectedDocs map to reuse it in the next AddDocument call
 		delete(c.ejectedDocs, doc)
 	}
-	if len(doc.ScoreBreakdown) > 0 {
-		c.allHits[doc] = struct{}{}
-	}
 	return rv
 }
 
-func (c *collectStoreKNN) AllHits() map[*search.DocumentMatch]struct{} {
-	return c.allHits
-}
-
 func (c *collectStoreKNN) Final(fixup collectorFixup) (search.DocumentMatchCollection, error) {
+	for _, heap := range c.internalHeaps {
+		for _, doc := range heap.Internal() {
+			// duplicates may be present across the internal heaps
+			// meaning the same document match may be in the top K
+			// for multiple KNN queries.
+			c.allHits[doc] = struct{}{}
+		}
+	}
 	size := len(c.allHits)
 	if size <= 0 {
 		return make(search.DocumentMatchCollection, 0), nil

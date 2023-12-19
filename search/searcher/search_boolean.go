@@ -274,7 +274,7 @@ func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch
 					cons = s.matches[0:1]
 					cons[0] = s.currShould
 				}
-				rv = s.scorer.Score(ctx, cons, nil)
+				rv = s.scorer.Score(ctx, cons)
 				err = s.advanceNextMust(ctx, rv)
 				if err != nil {
 					return nil, err
@@ -284,7 +284,7 @@ func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch
 				// match is OK anyway
 				cons := s.matches[0:1]
 				cons[0] = s.currMust
-				rv = s.scorer.Score(ctx, cons, nil)
+				rv = s.scorer.Score(ctx, cons)
 				err = s.advanceNextMust(ctx, rv)
 				if err != nil {
 					return nil, err
@@ -302,7 +302,7 @@ func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch
 				cons = s.matches[0:1]
 				cons[0] = s.currShould
 			}
-			rv = s.scorer.Score(ctx, cons, nil)
+			rv = s.scorer.Score(ctx, cons)
 			err = s.advanceNextMust(ctx, rv)
 			if err != nil {
 				return nil, err
@@ -312,7 +312,7 @@ func (s *BooleanSearcher) Next(ctx *search.SearchContext) (*search.DocumentMatch
 			// match is OK anyway
 			cons := s.matches[0:1]
 			cons[0] = s.currMust
-			rv = s.scorer.Score(ctx, cons, nil)
+			rv = s.scorer.Score(ctx, cons)
 			err = s.advanceNextMust(ctx, rv)
 			if err != nil {
 				return nil, err

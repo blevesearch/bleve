@@ -337,7 +337,7 @@ func verifyResult(t *testing.T, controlResult *SearchResult, experimentalResult 
 		t.Fatalf("testcase %d failed: expected %d results, got %d", testCaseNum, len(controlResult.Hits), len(experimentalResult.Hits))
 	}
 	if controlResult.Total != experimentalResult.Total {
-		t.Errorf("test case #%d: expected total hits to be %d, got %d", testCaseNum, controlResult.Total, experimentalResult.Total)
+		t.Fatalf("test case #%d: expected total hits to be %d, got %d", testCaseNum, controlResult.Total, experimentalResult.Total)
 	}
 	if verifyOnlyDocIDs {
 		// in multi partitioned index, we cannot be sure of the score or the ordering of the hits as the tf-idf scores are localized to each partition
@@ -377,7 +377,7 @@ func verifyResult(t *testing.T, controlResult *SearchResult, experimentalResult 
 
 	}
 	if truncateScore(controlResult.MaxScore) != truncateScore(experimentalResult.MaxScore) {
-		t.Errorf("test case #%d: expected maxScore to be %f, got %f", testCaseNum, controlResult.MaxScore, experimentalResult.MaxScore)
+		t.Fatalf("test case #%d: expected maxScore to be %f, got %f", testCaseNum, controlResult.MaxScore, experimentalResult.MaxScore)
 	}
 
 }

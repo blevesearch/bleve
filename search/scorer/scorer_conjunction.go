@@ -42,25 +42,15 @@ func NewConjunctionQueryScorer(options search.SearcherOptions) *ConjunctionQuery
 	}
 }
 
-func (s *ConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, originalPositions []int) *search.DocumentMatch {
+func (s *ConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch) *search.DocumentMatch {
 	var sum float64
 	var childrenExplanations []*search.Explanation
 	if s.options.Explain {
 		childrenExplanations = make([]*search.Explanation, len(constituents))
 	}
-	var scoreBreakdown map[int]float64
-	if originalPositions != nil {
-		scoreBreakdown = make(map[int]float64)
-	}
+
 	for i, docMatch := range constituents {
 		sum += docMatch.Score
-		if scoreBreakdown != nil {
-			// for use in conjunction searcher
-			// the originalPositions are the positions of the searchers
-			// pre sort, since conjunction searcher sorts the searchers
-			// in order of their Count().
-			scoreBreakdown[originalPositions[i]] = docMatch.Score
-		}
 		if s.options.Explain {
 			childrenExplanations[i] = docMatch.Expl
 		}
@@ -75,7 +65,6 @@ func (s *ConjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	rv := constituents[0]
 	rv.Score = newScore
 	rv.Expl = newExpl
-	rv.ScoreBreakdown = scoreBreakdown
 	rv.FieldTermLocations = search.MergeFieldTermLocations(
 		rv.FieldTermLocations, constituents[1:])
 
