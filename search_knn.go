@@ -258,41 +258,58 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	}
 	knnHits := knnCollector.Results()
 	if !preSearch {
-		if req.KNNOperator == knnOperatorAnd {
-			idx := 0
-			for _, hit := range knnHits {
-				if len(hit.ScoreBreakdown) == len(kArray) {
-					knnHits[idx] = hit
-					idx++
-				}
-			}
-			knnHits = knnHits[:idx]
-		}
-		if req.Score == "none" {
-			for _, hit := range knnHits {
-				hit.Score = 0.0
-				hit.ScoreBreakdown = nil
-			}
-		}
+		knnHits = finalizeKNNResults(req, knnHits, len(req.KNN))
 	}
 	return knnHits, nil
 }
 
 func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector) {
 	if len(knnHits) > 0 {
-		coll.SetKNNHits(knnHits,
-			func(tdIdfDocMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) float64 {
-				totalScore := 0.0
-				if tdIdfDocMatch != nil {
-					totalScore += tdIdfDocMatch.Score
-				}
-				for _, score := range knnMatch.ScoreBreakdown {
-					totalScore += score
-				}
-				return totalScore
-			},
-		)
+		newScoreExplComputer := func(queryMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) (float64, *search.Explanation) {
+			totalScore := queryMatch.Score + knnMatch.Score
+			if !req.Explain {
+				// exit early as we don't need to compute the explanation
+				return totalScore, nil
+			}
+			return totalScore, &search.Explanation{Value: totalScore, Message: "sum of:", Children: []*search.Explanation{queryMatch.Expl, knnMatch.Expl}}
+		}
+		coll.SetKNNHits(knnHits, search.ScoreExplCorrectionCallbackFunc(newScoreExplComputer))
 	}
+}
+
+func finalizeKNNResults(req *SearchRequest, knnHits search.DocumentMatchCollection, numKNNQueries int) search.DocumentMatchCollection {
+	// if the KNN operator is AND, then we need to filter out the hits that
+	// do not have match the KNN queries.
+	if req.KNNOperator == knnOperatorAnd {
+		idx := 0
+		for _, hit := range knnHits {
+			if len(hit.ScoreBreakdown) == numKNNQueries {
+				knnHits[idx] = hit
+				idx++
+			}
+		}
+		knnHits = knnHits[:idx]
+	}
+	// fix the score using score breakdown now
+	// if the score is none, then we need to set the score to 0.0
+	// if req.Explain is true, then we need to use the expl breakdown to
+	// finalize the correct explanation.
+	for _, hit := range knnHits {
+		hit.Score = 0.0
+		if req.Score != "none" {
+			for _, score := range hit.ScoreBreakdown {
+				hit.Score += score
+			}
+		}
+		if req.Explain {
+			childrenExpl := make([]*search.Explanation, 0, len(hit.ScoreBreakdown))
+			for i := range hit.ScoreBreakdown {
+				childrenExpl = append(childrenExpl, hit.Expl.Children[i])
+			}
+			hit.Expl = &search.Explanation{Value: hit.Score, Message: "sum of:", Children: childrenExpl}
+		}
+	}
+	return knnHits
 }
 
 func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch, mergeOut []map[string]interface{}) {
@@ -304,22 +321,13 @@ func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch
 	for _, hit := range knnHits {
 		knnStore.AddDocument(hit)
 	}
-	mergedKNNhits := knnStore.AllHits()
-	if req.KNNOperator == knnOperatorAnd {
-		for hit := range mergedKNNhits {
-			if len(hit.ScoreBreakdown) != len(req.KNN) {
-				delete(mergedKNNhits, hit)
-			}
-		}
-	}
-	if req.Score == "none" {
-		for hit := range mergedKNNhits {
-			hit.Score = 0.0
-			hit.ScoreBreakdown = nil
-		}
-	}
+	// passing nil as the document fixup function, because we don't need to
+	// fixup the document, since this was already done in the first phase.
+	// hence error is always nil.
+	mergedKNNhits, _ := knnStore.Final(nil)
+	mergedKNNhits = finalizeKNNResults(req, mergedKNNhits, len(req.KNN))
 	indexNumToDocMatchList := make(map[int][]*search.DocumentMatch)
-	for docMatch := range mergedKNNhits {
+	for _, docMatch := range mergedKNNhits {
 		distributeKNNHit(docMatch, indexNumToDocMatchList)
 	}
 	for i := 0; i < len(mergeOut); i++ {
@@ -348,6 +356,7 @@ func requestHasKNN(req *SearchRequest) bool {
 func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
 	dummyReq.KNN = realReq.KNN
 	dummyReq.KNNOperator = knnOperatorOr
+	dummyReq.Explain = realReq.Explain
 }
 
 // the preSearchData for KNN is a list of DocumentMatch objects

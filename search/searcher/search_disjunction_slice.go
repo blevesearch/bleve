@@ -39,7 +39,6 @@ type DisjunctionSliceSearcher struct {
 	originalPos            []int
 	numSearchers           int
 	queryNorm              float64
-	queryNormForKNN        float64
 	retrieveScoreBreakdown bool
 	currs                  []*search.DocumentMatch
 	scorer                 *scorer.DisjunctionQueryScorer
@@ -225,10 +224,16 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 	for !found && len(s.matching) > 0 {
 		if len(s.matching) >= s.min {
 			found = true
-			partialMatch := len(s.matching) != len(s.searchers)
-			// score this match
-			rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers, s.matchingIdxs, s.originalPos, s.retrieveScoreBreakdown)
-			rv.PartialMatch = partialMatch
+			if s.retrieveScoreBreakdown {
+				// just return score and expl breakdown here, since it is a disjunction over knn searchers,
+				// and the final score and expl is calculated in the knn collector
+				rv = s.scorer.ScoreAndExplBreakdown(ctx, s.matching, s.matchingIdxs, s.originalPos, s.numSearchers)
+			} else {
+				// score this match
+				partialMatch := len(s.matching) != len(s.searchers)
+				rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
+				rv.PartialMatch = partialMatch
+			}
 		}
 
 		// invoke next on all the matching searchers

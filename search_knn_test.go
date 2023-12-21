@@ -130,6 +130,7 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 			index.indexes = make([]Index, 0)
 			query := searchRequests[testCase.queryIndex]
 			query.AddKNNOperator(operator)
+			query.Explain = true
 
 			indexPaths := createPartitionedIndex(documents, index, 1, testCase.mapping, t)
 			controlResult, err := index.Search(query)
@@ -296,6 +297,9 @@ func truncateScore(score float64) float64 {
 }
 
 func verifyResult(t *testing.T, controlResult *SearchResult, experimentalResult *SearchResult, testCaseNum int, verifyOnlyDocIDs bool) {
+	if controlResult.Hits.Len() == 0 || experimentalResult.Hits.Len() == 0 {
+		t.Fatalf("testcase %d failed: 0 hits returned", testCaseNum)
+	}
 	if len(controlResult.Hits) != len(experimentalResult.Hits) {
 		t.Fatalf("testcase %d failed: expected %d results, got %d", testCaseNum, len(controlResult.Hits), len(experimentalResult.Hits))
 	}
@@ -490,6 +494,7 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			query := searchRequests[testCase.queryIndex]
 			query.Sort = search.SortOrder{&search.SortScore{Desc: true}, &search.SortDocID{Desc: true}}
 			query.AddKNNOperator(operator)
+			query.Explain = true
 			err = createMultipleSegmentsIndex(documents, index, 1)
 			if err != nil {
 				t.Fatal(err)

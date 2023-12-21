@@ -59,12 +59,7 @@ func TestKNNScorerExplanation(t *testing.T) {
 				Score:           0.5,
 				Expl: &search.Explanation{
 					Value:   1 / 0.5,
-					Message: "fieldWeight(desc in doc one), score of:",
-					Children: []*search.Explanation{
-						{Value: 1 / 0.5,
-							Message: "vector(field(desc:one) with similarity_metric(l2_norm)=2.000000e+00",
-						},
-					},
+					Message: "vector(field(desc) with similarity_metric(l2_norm)=2.000000e+00",
 				},
 			},
 		},
@@ -84,12 +79,7 @@ func TestKNNScorerExplanation(t *testing.T) {
 				Score:           0.0,
 				Expl: &search.Explanation{
 					Value:   maxKNNScore,
-					Message: "fieldWeight(desc in doc one), score of:",
-					Children: []*search.Explanation{
-						{Value: maxKNNScore,
-							Message: "vector(field(desc:one) with similarity_metric(l2_norm)=1.797693e+308",
-						},
-					},
+					Message: "vector(field(desc) with similarity_metric(l2_norm)=1.797693e+308",
 				},
 			},
 		},
@@ -107,12 +97,7 @@ func TestKNNScorerExplanation(t *testing.T) {
 				Score:           0.5,
 				Expl: &search.Explanation{
 					Value:   0.5,
-					Message: "fieldWeight(desc in doc one), score of:",
-					Children: []*search.Explanation{
-						{Value: 0.5,
-							Message: "vector(field(desc:one) with similarity_metric(dot_product)=5.000000e-01",
-						},
-					},
+					Message: "vector(field(desc) with similarity_metric(dot_product)=5.000000e-01",
 				},
 			},
 		},
@@ -130,7 +115,7 @@ func TestKNNScorerExplanation(t *testing.T) {
 				Score:           0.25,
 				Expl: &search.Explanation{
 					Value:   0.125,
-					Message: "weight(desc:query Vector^1.000000 in one), product of:",
+					Message: "weight(desc:query Vector^1.000000), product of:",
 					Children: []*search.Explanation{
 						{
 							Value:   0.5,
@@ -148,13 +133,7 @@ func TestKNNScorerExplanation(t *testing.T) {
 						},
 						{
 							Value:   0.25,
-							Message: "fieldWeight(desc in doc one), score of:",
-							Children: []*search.Explanation{
-								{
-									Value:   0.25,
-									Message: "vector(field(desc:one) with similarity_metric(dot_product)=2.500000e-01",
-								},
-							},
+							Message: "vector(field(desc) with similarity_metric(dot_product)=2.500000e-01",
 						},
 					},
 				},

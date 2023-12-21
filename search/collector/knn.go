@@ -83,9 +83,11 @@ func (c *collectStoreKNN) Final(fixup collectorFixup) (search.DocumentMatchColle
 	rv := make(search.DocumentMatchCollection, size)
 	i := 0
 	for doc := range c.allHits {
-		err := fixup(doc)
-		if err != nil {
-			return nil, err
+		if fixup != nil {
+			err := fixup(doc)
+			if err != nil {
+				return nil, err
+			}
 		}
 		rv[i] = doc
 		i++
