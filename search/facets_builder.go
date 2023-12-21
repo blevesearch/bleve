@@ -321,17 +321,29 @@ func (fr *FacetResult) Merge(other *FacetResult) {
 	fr.Total += other.Total
 	fr.Missing += other.Missing
 	fr.Other += other.Other
-	if fr.Terms != nil && other.Terms != nil {
+	if other.Terms != nil {
+		if fr.Terms == nil {
+			fr.Terms = other.Terms
+			return
+		}
 		for _, term := range other.Terms.termFacets {
 			fr.Terms.Add(term)
 		}
 	}
-	if fr.NumericRanges != nil && other.NumericRanges != nil {
+	if other.NumericRanges != nil {
+		if fr.NumericRanges == nil {
+			fr.NumericRanges = other.NumericRanges
+			return
+		}
 		for _, nr := range other.NumericRanges {
 			fr.NumericRanges = fr.NumericRanges.Add(nr)
 		}
 	}
-	if fr.DateRanges != nil && other.DateRanges != nil {
+	if other.DateRanges != nil {
+		if fr.DateRanges == nil {
+			fr.DateRanges = other.DateRanges
+			return
+		}
 		for _, dr := range other.DateRanges {
 			fr.DateRanges = fr.DateRanges.Add(dr)
 		}
