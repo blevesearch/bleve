@@ -78,26 +78,23 @@ func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 		}
 	}
 	if sqs.options.Explain {
-		childExplanations := make([]*search.Explanation, 1)
-		childExplanations[0] = &search.Explanation{
-			Value: score,
-			Message: fmt.Sprintf("vector(field(%s:%s) with similarity_metric(%s)=%e",
-				sqs.queryField, knnMatch.ID, sqs.similarityMetric, score),
-		}
 		scoreExplanation = &search.Explanation{
 			Value: score,
 			Message: fmt.Sprintf("fieldWeight(%s in doc %s), score of:",
 				sqs.queryField, knnMatch.ID),
-			Children: childExplanations,
+			Children: []*search.Explanation{
+				{
+					Value: score,
+					Message: fmt.Sprintf("vector(field(%s:%s) with similarity_metric(%s)=%e",
+						sqs.queryField, knnMatch.ID, sqs.similarityMetric, score),
+				},
+			},
 		}
 	}
 	// if the query weight isn't 1, multiply
 	if sqs.queryWeight != 1.0 && score != maxKNNScore {
 		score = score * sqs.queryWeight
 		if sqs.options.Explain {
-			childExplanations := make([]*search.Explanation, 2)
-			childExplanations[0] = sqs.queryWeightExplanation
-			childExplanations[1] = scoreExplanation
 			scoreExplanation = &search.Explanation{
 				Value: score,
 				// Product of score * weight
@@ -105,7 +102,7 @@ func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 				// can get quite large.
 				Message: fmt.Sprintf("weight(%s:query Vector^%f in %s), product of:",
 					sqs.queryField, sqs.queryBoost, knnMatch.ID),
-				Children: childExplanations,
+				Children: []*search.Explanation{sqs.queryWeightExplanation, scoreExplanation},
 			}
 		}
 	}

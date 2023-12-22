@@ -73,8 +73,8 @@ type TopNCollector struct {
 	dvReader                  index.DocValueReader
 	searchAfter               *search.DocumentMatch
 
-	knnHits         map[string]*search.DocumentMatch
-	computeNewScore func(d *search.DocumentMatch, knnHit *search.DocumentMatch) float64
+	knnHits             map[string]*search.DocumentMatch
+	computeNewScoreExpl search.ScoreExplCorrectionCallbackFunc
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
@@ -244,7 +244,6 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		// we may have some knn hits left that did not match any of the top N tf-idf hits
 		// we need to add them to the collector store to consider them as well.
 		for _, knnDoc := range hc.knnHits {
-			knnDoc.Score = hc.computeNewScore(nil, knnDoc)
 			err = hc.prepareDocumentMatch(searchContext, reader, knnDoc)
 			if err != nil {
 				return err
@@ -297,7 +296,7 @@ func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 			}
 		}
 		if knnHit, ok := hc.knnHits[d.ID]; ok {
-			d.Score = hc.computeNewScore(d, knnHit)
+			d.Score, d.Expl = hc.computeNewScoreExpl(d, knnHit)
 			delete(hc.knnHits, d.ID)
 		}
 	}
@@ -492,14 +491,12 @@ func (hc *TopNCollector) FacetResults() search.FacetResults {
 	return nil
 }
 
-func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection,
-	newScoreComputer func(d *search.DocumentMatch, knnHit *search.DocumentMatch) float64) {
-
+func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection, newScoreExplComputer search.ScoreExplCorrectionCallbackFunc) {
 	hc.knnHits = make(map[string]*search.DocumentMatch, len(knnHits))
 	for _, hit := range knnHits {
 		hc.knnHits[hit.ID] = hit
 	}
-	hc.computeNewScore = newScoreComputer
+	hc.computeNewScoreExpl = newScoreExplComputer
 	// now that we have the knnHits
 	// when we run the top N search for just the
 	// basic Query object, we need to load the docIds

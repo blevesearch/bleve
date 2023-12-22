@@ -43,32 +43,15 @@ func NewDisjunctionQueryScorer(options search.SearcherOptions) *DisjunctionQuery
 	}
 }
 
-func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int,
-	matchingIdxs []int, originalPositions []int, includeScoreBreakdown bool) *search.DocumentMatch {
-
+func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
 	var sum float64
 	var childrenExplanations []*search.Explanation
 	if s.options.Explain {
 		childrenExplanations = make([]*search.Explanation, len(constituents))
 	}
-	var scoreBreakdown map[int]float64
-	if includeScoreBreakdown {
-		scoreBreakdown = make(map[int]float64)
-	}
 
 	for i, docMatch := range constituents {
 		sum += docMatch.Score
-
-		if scoreBreakdown != nil {
-			if originalPositions != nil {
-				// scorer used in disjunction slice searcher
-				scoreBreakdown[originalPositions[matchingIdxs[i]]] = docMatch.Score
-			} else {
-				// scorer used in disjunction heap searcher
-				scoreBreakdown[matchingIdxs[i]] = docMatch.Score
-			}
-		}
-
 		if s.options.Explain {
 			childrenExplanations[i] = docMatch.Expl
 		}
@@ -92,10 +75,49 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 	// reuse constituents[0] as the return value
 	rv := constituents[0]
 	rv.Score = newScore
-	rv.ScoreBreakdown = scoreBreakdown
 	rv.Expl = newExpl
 	rv.FieldTermLocations = search.MergeFieldTermLocations(
 		rv.FieldTermLocations, constituents[1:])
 
+	return rv
+}
+
+// This method is used only when disjunction searcher is used over multiple
+// KNN searchers, where only the score breakdown and the optional explanation breakdown
+// is required. The final score and explanation is set when we finalize the KNN hits.
+func (s *DisjunctionQueryScorer) ScoreAndExplBreakdown(ctx *search.SearchContext, constituents []*search.DocumentMatch,
+	matchingIdxs []int, originalPositions []int, countTotal int) *search.DocumentMatch {
+
+	scoreBreakdown := make(map[int]float64)
+	var childrenExplanations []*search.Explanation
+	if s.options.Explain {
+		// since we want to notify which expl belongs to which matched searcher within the disjunction searcher
+		childrenExplanations = make([]*search.Explanation, countTotal)
+	}
+
+	for i, docMatch := range constituents {
+		var index int
+		if originalPositions != nil {
+			// scorer used in disjunction slice searcher
+			index = originalPositions[matchingIdxs[i]]
+		} else {
+			// scorer used in disjunction heap searcher
+			index = matchingIdxs[i]
+		}
+		scoreBreakdown[index] = docMatch.Score
+		if s.options.Explain {
+			childrenExplanations[index] = docMatch.Expl
+		}
+	}
+	var explBreakdown *search.Explanation
+	if s.options.Explain {
+		explBreakdown = &search.Explanation{Children: childrenExplanations}
+	}
+
+	rv := constituents[0]
+	rv.ScoreBreakdown = scoreBreakdown
+	rv.Expl = explBreakdown
+	rv.FieldTermLocations = search.MergeFieldTermLocations(
+		rv.FieldTermLocations, constituents[1:])
 	return rv
 }

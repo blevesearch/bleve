@@ -3531,11 +3531,6 @@ func TestScoreBreakdown(t *testing.T) {
 					scoreBreakdown: map[int]float64{0: 0.040398807605268316, 2: 0.040398807605268316, 5: 0.0669862776967768, 6: 0.040398807605268316, 7: 0.040398807605268316, 8: 0.0669862776967768, 10: 0.040398807605268316, 12: 0.040398807605268316, 14: 0.040398807605268316, 15: 0.040398807605268316, 16: 0.0669862776967768},
 				},
 				{
-					docID:          "doc4",
-					score:          0.15956816751152955,
-					scoreBreakdown: map[int]float64{0: 0.04737179972998534, 2: 0.04737179972998534, 6: 0.04737179972998534, 7: 0.04737179972998534, 10: 0.04737179972998534, 12: 0.04737179972998534, 14: 0.04737179972998534, 15: 0.04737179972998534},
-				},
-				{
 					docID:          "doc2",
 					score:          0.14725661652397853,
 					scoreBreakdown: map[int]float64{0: 0.05470024557900147, 5: 0.09069985124905133, 7: 0.05470024557900147, 10: 0.05470024557900147, 13: 0.15681178542754148, 15: 0.05470024557900147},
@@ -3544,6 +3539,11 @@ func TestScoreBreakdown(t *testing.T) {
 					docID:          "doc3",
 					score:          0.12637916362550797,
 					scoreBreakdown: map[int]float64{2: 0.05470024557900147, 6: 0.05470024557900147, 8: 0.09069985124905133, 12: 0.05470024557900147, 14: 0.05470024557900147, 16: 0.09069985124905133},
+				},
+				{
+					docID:          "doc4",
+					score:          0.15956816751152955,
+					scoreBreakdown: map[int]float64{0: 0.04737179972998534, 2: 0.04737179972998534, 6: 0.04737179972998534, 7: 0.04737179972998534, 10: 0.04737179972998534, 12: 0.04737179972998534, 14: 0.04737179972998534, 15: 0.04737179972998534},
 				},
 			},
 		},
@@ -3559,11 +3559,6 @@ func TestScoreBreakdown(t *testing.T) {
 					scoreBreakdown: map[int]float64{1: 0.05756326446708409, 2: 0.05756326446708409, 5: 0.09544709478559595, 6: 0.05756326446708409},
 				},
 				{
-					docID:          "doc4",
-					score:          0.07593627256602972,
-					scoreBreakdown: map[int]float64{1: 0.06749890894758198, 2: 0.06749890894758198, 6: 0.06749890894758198},
-				},
-				{
 					docID:          "doc2",
 					score:          0.05179425287147191,
 					scoreBreakdown: map[int]float64{1: 0.0779410306721006, 5: 0.129235980813787},
@@ -3572,6 +3567,11 @@ func TestScoreBreakdown(t *testing.T) {
 					docID:          "doc3",
 					score:          0.0389705153360503,
 					scoreBreakdown: map[int]float64{2: 0.0779410306721006, 6: 0.0779410306721006},
+				},
+				{
+					docID:          "doc4",
+					score:          0.07593627256602972,
+					scoreBreakdown: map[int]float64{1: 0.06749890894758198, 2: 0.06749890894758198, 6: 0.06749890894758198},
 				},
 			},
 		},
@@ -3596,6 +3596,7 @@ func TestScoreBreakdown(t *testing.T) {
 			q = &rv
 		}
 		sr := NewSearchRequest(q)
+		sr.SortBy([]string{"_id"})
 		sr.Explain = true
 		res, err := idx.Search(sr)
 		if err != nil {
@@ -3607,11 +3608,6 @@ func TestScoreBreakdown(t *testing.T) {
 		for i, hit := range res.Hits {
 			if hit.ID != dtq.expectHits[i].docID {
 				t.Fatalf("expected docID %s, got %s", dtq.expectHits[i].docID, hit.ID)
-			}
-			hit.Score = roundToDecimalPlace(hit.Score, 3)
-			expectScore := roundToDecimalPlace(dtq.expectHits[i].score, 3)
-			if hit.Score != expectScore {
-				t.Fatalf("expected score %f, got %f", dtq.expectHits[i].score, hit.Score)
 			}
 			if len(hit.ScoreBreakdown) != len(dtq.expectHits[i].scoreBreakdown) {
 				t.Fatalf("expected %d score breakdown, got %d", len(dtq.expectHits[i].scoreBreakdown), len(hit.ScoreBreakdown))

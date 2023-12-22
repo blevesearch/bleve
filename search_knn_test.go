@@ -21,6 +21,7 @@ import (
 	"archive/zip"
 	"encoding/json"
 	"math/rand"
+	"sort"
 	"strconv"
 	"testing"
 
@@ -130,6 +131,7 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 			index.indexes = make([]Index, 0)
 			query := searchRequests[testCase.queryIndex]
 			query.AddKNNOperator(operator)
+			query.Explain = true
 
 			indexPaths := createPartitionedIndex(documents, index, 1, testCase.mapping, t)
 			controlResult, err := index.Search(query)
@@ -295,7 +297,42 @@ func truncateScore(score float64) float64 {
 	return float64(int(score*1e6)) / 1e6
 }
 
+// Function to compare two Explanation structs recursively
+func compareExplanation(a, b *search.Explanation) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	if a.Value != b.Value || len(a.Children) != len(b.Children) {
+		return false
+	}
+
+	// Sort the children slices before comparison
+	sortChildren(a.Children)
+	sortChildren(b.Children)
+
+	for i := range a.Children {
+		if !compareExplanation(a.Children[i], b.Children[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// Function to sort the children slices
+func sortChildren(children []*search.Explanation) {
+	sort.Slice(children, func(i, j int) bool {
+		return children[i].Value < children[j].Value
+	})
+}
+
 func verifyResult(t *testing.T, controlResult *SearchResult, experimentalResult *SearchResult, testCaseNum int, verifyOnlyDocIDs bool) {
+	if controlResult.Hits.Len() == 0 || experimentalResult.Hits.Len() == 0 {
+		t.Fatalf("testcase %d failed: 0 hits returned", testCaseNum)
+	}
 	if len(controlResult.Hits) != len(experimentalResult.Hits) {
 		t.Fatalf("testcase %d failed: expected %d results, got %d", testCaseNum, len(controlResult.Hits), len(experimentalResult.Hits))
 	}
@@ -334,6 +371,10 @@ func verifyResult(t *testing.T, controlResult *SearchResult, experimentalResult 
 		if expectScore != actualScore {
 			t.Fatalf("testcase %d failed: expected hit %d to have score %f, got %f", testCaseNum, i, expectScore, actualScore)
 		}
+		if !compareExplanation(controlResult.Hits[i].Expl, experimentalResult.Hits[i].Expl) {
+			t.Fatalf("testcase %d failed: expected hit %d to have explanation %v, got %v", testCaseNum, i, controlResult.Hits[i].Expl, experimentalResult.Hits[i].Expl)
+		}
+
 	}
 	if truncateScore(controlResult.MaxScore) != truncateScore(experimentalResult.MaxScore) {
 		t.Errorf("test case #%d: expected maxScore to be %f, got %f", testCaseNum, controlResult.MaxScore, experimentalResult.MaxScore)
@@ -490,6 +531,7 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			query := searchRequests[testCase.queryIndex]
 			query.Sort = search.SortOrder{&search.SortScore{Desc: true}, &search.SortDocID{Desc: true}}
 			query.AddKNNOperator(operator)
+			query.Explain = true
 			err = createMultipleSegmentsIndex(documents, index, 1)
 			if err != nil {
 				t.Fatal(err)
