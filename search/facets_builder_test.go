@@ -15,122 +15,204 @@
 package search
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
 
 func TestTermFacetResultsMerge(t *testing.T) {
+	type testCase struct {
+		// Input
+		frs1   FacetResults   // first facet results
+		frs2   FacetResults   // second facet results (to be merged into first)
+		fixups map[string]int // {facetName:size} (to be applied after merge)
 
-	fr1TypeTerms := &TermFacets{}
-	fr1TypeTerms.Add(
-		&TermFacet{
-			Term:  "blog",
-			Count: 25,
-		},
-		&TermFacet{
-			Term:  "comment",
-			Count: 24,
-		},
-		&TermFacet{
-			Term:  "feedback",
-			Count: 1,
-		},
-	)
-	fr1 := &FacetResult{
-		Field:   "type",
-		Total:   100,
-		Missing: 25,
-		Other:   25,
-		Terms:   fr1TypeTerms,
+		// Expected output
+		expFrs FacetResults // facet results after merge and fixup
 	}
 
-	fr1CategoryTerms := &TermFacets{}
-	fr1CategoryTerms.Add(
-		&TermFacet{
-			Term:  "clothing",
-			Count: 35,
-		},
-		&TermFacet{
-			Term:  "electronics",
-			Count: 25,
-		},
-	)
+	tests := []*testCase{
+		func() *testCase {
+			rv := &testCase{}
 
-	fr1Only := &FacetResult{
-		Field:   "category",
-		Total:   97,
-		Missing: 22,
-		Other:   15,
-		Terms:   fr1CategoryTerms,
-	}
-	frs1 := FacetResults{
-		"types":      fr1,
-		"categories": fr1Only,
-	}
-
-	fr2TypeTerms := &TermFacets{}
-	fr2TypeTerms.Add(
-		&TermFacet{
-			Term:  "blog",
-			Count: 25,
-		},
-		&TermFacet{
-			Term:  "comment",
-			Count: 22,
-		},
-		&TermFacet{
-			Term:  "flag",
-			Count: 3,
-		},
-	)
-
-	fr2 := &FacetResult{
-		Field:   "type",
-		Total:   100,
-		Missing: 25,
-		Other:   25,
-		Terms:   fr2TypeTerms,
-	}
-	frs2 := FacetResults{
-		"types": fr2,
-	}
-
-	expectedFr := &FacetResult{
-		Field:   "type",
-		Total:   200,
-		Missing: 50,
-		Other:   51,
-		Terms: &TermFacets{
-			termFacets: []*TermFacet{
-				{
-					Term:  "blog",
-					Count: 50,
+			rv.frs1 = FacetResults{
+				"types": &FacetResult{
+					Field:   "type",
+					Total:   100,
+					Missing: 25,
+					Other:   25,
+					Terms: func() *TermFacets {
+						tfs := &TermFacets{}
+						tfs.Add(
+							&TermFacet{
+								Term:  "blog",
+								Count: 25,
+							},
+							&TermFacet{
+								Term:  "comment",
+								Count: 24,
+							},
+							&TermFacet{
+								Term:  "feedback",
+								Count: 1,
+							},
+						)
+						return tfs
+					}(),
 				},
-				{
-					Term:  "comment",
-					Count: 46,
+				"categories": &FacetResult{
+					Field:   "category",
+					Total:   97,
+					Missing: 22,
+					Other:   15,
+					Terms: func() *TermFacets {
+						tfs := &TermFacets{}
+						tfs.Add(
+							&TermFacet{
+								Term:  "clothing",
+								Count: 35,
+							},
+							&TermFacet{
+								Term:  "electronics",
+								Count: 25,
+							},
+						)
+						return tfs
+					}(),
 				},
-				{
-					Term:  "flag",
-					Count: 3,
+			}
+			rv.frs2 = FacetResults{
+				"types": &FacetResult{
+					Field:   "type",
+					Total:   100,
+					Missing: 25,
+					Other:   25,
+					Terms: func() *TermFacets {
+						tfs := &TermFacets{}
+						tfs.Add(
+							&TermFacet{
+								Term:  "blog",
+								Count: 25,
+							},
+							&TermFacet{
+								Term:  "comment",
+								Count: 22,
+							},
+							&TermFacet{
+								Term:  "flag",
+								Count: 3,
+							},
+						)
+						return tfs
+					}(),
 				},
-			},
-		},
-	}
-	expectedFrs := FacetResults{
-		"types":      expectedFr,
-		"categories": fr1Only,
+			}
+			rv.fixups = map[string]int{
+				"types": 3, // we want top 3 terms based on count
+			}
+
+			rv.expFrs = FacetResults{
+				"types": &FacetResult{
+					Field:   "type",
+					Total:   200,
+					Missing: 50,
+					Other:   51,
+					Terms: &TermFacets{
+						termFacets: []*TermFacet{
+							{
+								Term:  "blog",
+								Count: 50,
+							},
+							{
+								Term:  "comment",
+								Count: 46,
+							},
+							{
+								Term:  "flag",
+								Count: 3,
+							},
+						},
+					},
+				},
+				"categories": rv.frs1["categories"],
+			}
+
+			return rv
+		}(),
+		func() *testCase {
+			rv := &testCase{}
+
+			rv.frs1 = FacetResults{
+				"facetName": &FacetResult{
+					Field:   "docField",
+					Total:   0,
+					Missing: 0,
+					Other:   0,
+					Terms:   nil,
+				},
+			}
+			rv.frs2 = FacetResults{
+				"facetName": &FacetResult{
+					Field:   "docField",
+					Total:   3,
+					Missing: 0,
+					Other:   0,
+					Terms: &TermFacets{
+						termFacets: []*TermFacet{
+							{
+								Term:  "firstTerm",
+								Count: 1,
+							},
+							{
+								Term:  "secondTerm",
+								Count: 2,
+							},
+						},
+					},
+				},
+			}
+			rv.fixups = map[string]int{
+				"facetName": 1,
+			}
+
+			rv.expFrs = FacetResults{
+				"facetName": &FacetResult{
+					Field:   "docField",
+					Total:   3,
+					Missing: 0,
+					Other:   1,
+					Terms: &TermFacets{
+						termFacets: []*TermFacet{
+							{
+								Term:  "secondTerm",
+								Count: 2,
+							},
+						},
+					},
+				},
+			}
+			return rv
+		}(),
 	}
 
-	frs1.Merge(frs2)
-	frs1.Fixup("types", 3)
+	for tcIdx, tc := range tests {
+		t.Run(fmt.Sprintf("T#%d", tcIdx), func(t *testing.T) {
+			tc.frs1.Merge(tc.frs2)
+			for facetName, size := range tc.fixups {
+				tc.frs1.Fixup(facetName, size)
+			}
 
-	for _, v := range frs1 {
-		v.Terms.termLookup = nil
-	}
+			// clear termLookup, so we can compare the facet results
+			for _, fr := range tc.frs1 {
+				if fr.Terms != nil {
+					fr.Terms.termLookup = nil
+				}
+			}
 
-	if !reflect.DeepEqual(frs1, expectedFrs) {
-		t.Errorf("expected %v, got %v", expectedFrs, frs1)
+			if !reflect.DeepEqual(tc.frs1, tc.expFrs) {
+				t.Errorf("expected %v, got %v", tc.expFrs, tc.frs1)
+			}
+		})
 	}
 }
 
