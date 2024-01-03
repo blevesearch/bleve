@@ -19,53 +19,10 @@ package searcher
 
 import (
 	"context"
-	"math"
 
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 )
-
-func (s *DisjunctionSliceSearcher) computeQueryNorm() {
-	// first calculate sum of squared weights
-	sumOfSquaredWeights := 0.0
-	for _, searcher := range s.searchers {
-		sumOfSquaredWeights += searcher.Weight()
-	}
-	// now compute query norm from this
-	s.queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
-	// finally tell all the downstream searchers the norm
-	for _, searcher := range s.searchers {
-		searcher.SetQueryNorm(s.queryNorm)
-	}
-}
-
-func (s *DisjunctionHeapSearcher) computeQueryNorm() {
-	// first calculate sum of squared weights
-	sumOfSquaredWeights := 0.0
-	for _, searcher := range s.searchers {
-		sumOfSquaredWeights += searcher.Weight()
-	}
-	// now compute query norm from this
-	s.queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
-	// finally tell all the downstream searchers the norm
-	for _, searcher := range s.searchers {
-		searcher.SetQueryNorm(s.queryNorm)
-	}
-}
-
-func (s *ConjunctionSearcher) computeQueryNorm() {
-	// first calculate sum of squared weights
-	sumOfSquaredWeights := 0.0
-	for _, searcher := range s.searchers {
-		sumOfSquaredWeights += searcher.Weight()
-	}
-	// now compute query norm from this
-	s.queryNorm = 1.0 / math.Sqrt(sumOfSquaredWeights)
-	// finally tell all the downstream searchers the norm
-	for _, searcher := range s.searchers {
-		searcher.SetQueryNorm(s.queryNorm)
-	}
-}
 
 func optimizeCompositeSearcher(ctx context.Context, optimizationKind string,
 	indexReader index.IndexReader, qsearchers []search.Searcher,

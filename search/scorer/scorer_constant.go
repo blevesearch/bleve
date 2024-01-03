@@ -37,6 +37,7 @@ type ConstantScorer struct {
 	queryNorm              float64
 	queryWeight            float64
 	queryWeightExplanation *search.Explanation
+	includeScore           bool
 }
 
 func (s *ConstantScorer) Size() int {
@@ -51,10 +52,11 @@ func (s *ConstantScorer) Size() int {
 
 func NewConstantScorer(constant float64, boost float64, options search.SearcherOptions) *ConstantScorer {
 	rv := ConstantScorer{
-		options:     options,
-		queryWeight: 1.0,
-		constant:    constant,
-		boost:       boost,
+		options:      options,
+		queryWeight:  1.0,
+		constant:     constant,
+		boost:        boost,
+		includeScore: options.Score != "none",
 	}
 
 	return &rv
@@ -92,35 +94,38 @@ func (s *ConstantScorer) SetQueryNorm(qnorm float64) {
 func (s *ConstantScorer) Score(ctx *search.SearchContext, id index.IndexInternalID) *search.DocumentMatch {
 	var scoreExplanation *search.Explanation
 
-	score := s.constant
-
-	if s.options.Explain {
-		scoreExplanation = &search.Explanation{
-			Value:   score,
-			Message: fmt.Sprintf("ConstantScore()"),
-		}
-	}
-
-	// if the query weight isn't 1, multiply
-	if s.queryWeight != 1.0 {
-		score = score * s.queryWeight
-		if s.options.Explain {
-			childExplanations := make([]*search.Explanation, 2)
-			childExplanations[0] = s.queryWeightExplanation
-			childExplanations[1] = scoreExplanation
-			scoreExplanation = &search.Explanation{
-				Value:    score,
-				Message:  fmt.Sprintf("weight(^%f), product of:", s.boost),
-				Children: childExplanations,
-			}
-		}
-	}
-
 	rv := ctx.DocumentMatchPool.Get()
 	rv.IndexInternalID = id
-	rv.Score = score
-	if s.options.Explain {
-		rv.Expl = scoreExplanation
+
+	if s.includeScore {
+		score := s.constant
+
+		if s.options.Explain {
+			scoreExplanation = &search.Explanation{
+				Value:   score,
+				Message: fmt.Sprintf("ConstantScore()"),
+			}
+		}
+
+		// if the query weight isn't 1, multiply
+		if s.queryWeight != 1.0 {
+			score = score * s.queryWeight
+			if s.options.Explain {
+				childExplanations := make([]*search.Explanation, 2)
+				childExplanations[0] = s.queryWeightExplanation
+				childExplanations[1] = scoreExplanation
+				scoreExplanation = &search.Explanation{
+					Value:    score,
+					Message:  fmt.Sprintf("weight(^%f), product of:", s.boost),
+					Children: childExplanations,
+				}
+			}
+		}
+
+		rv.Score = score
+		if s.options.Explain {
+			rv.Expl = scoreExplanation
+		}
 	}
 
 	return rv

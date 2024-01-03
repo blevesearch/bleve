@@ -18,13 +18,15 @@
 package bleve
 
 import (
-	"container/heap"
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 type knnOperator string
@@ -45,6 +47,18 @@ type SearchRequest struct {
 
 	KNN         []*KNNRequest `json:"knn"`
 	KNNOperator knnOperator   `json:"knn_operator"`
+
+	// PreSearchData will be a  map that will be used
+	// in the second phase of any 2-phase search, to provide additional
+	// context to the second phase. This is useful in the case of index
+	// aliases where the first phase will gather the PreSearchData from all
+	// the indexes in the alias, and the second phase will use that
+	// PreSearchData to perform the actual search.
+	// The currently accepted map configuration is:
+	//
+	// "_knn_pre_search_data_key": []*search.DocumentMatch
+
+	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
 
 	sortFunc func(sort.Interface)
 }
@@ -88,6 +102,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		SearchBefore     []string          `json:"search_before"`
 		KNN              []*KNNRequest     `json:"knn"`
 		KNNOperator      knnOperator       `json:"knn_operator"`
+		PreSearchData    json.RawMessage   `json:"pre_search_data"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -135,13 +150,20 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.KNNOperator = knnOperatorOr
 	}
 
+	if temp.PreSearchData != nil {
+		r.PreSearchData, err = query.ParsePreSearchData(temp.PreSearchData)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 
 }
 
 // -----------------------------------------------------------------------------
 
-func copySearchRequest(req *SearchRequest) *SearchRequest {
+func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{}) *SearchRequest {
 	rv := SearchRequest{
 		Query:            req.Query,
 		Size:             req.Size + req.From,
@@ -157,6 +179,7 @@ func copySearchRequest(req *SearchRequest) *SearchRequest {
 		SearchBefore:     req.SearchBefore,
 		KNN:              req.KNN,
 		KNNOperator:      req.KNNOperator,
+		PreSearchData:    preSearchData,
 	}
 	return &rv
 
@@ -167,146 +190,202 @@ var (
 	knnOperatorOr  = knnOperator("or")
 )
 
-func queryWithKNN(req *SearchRequest) (query.Query, error) {
-	if len(req.KNN) > 0 {
-		subQueries := []query.Query{req.Query}
+func createKNNQuery(req *SearchRequest) (query.Query, []int64, int64, error) {
+	if requestHasKNN(req) {
+		// first perform validation
+		err := validateKNN(req)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		var subQueries []query.Query
+		kArray := make([]int64, 0, len(req.KNN))
+		sumOfK := int64(0)
 		for _, knn := range req.KNN {
-			if knn != nil {
-				knnQuery := query.NewKNNQuery(knn.Vector)
-				knnQuery.SetFieldVal(knn.Field)
-				knnQuery.SetK(knn.K)
-				knnQuery.SetBoost(knn.Boost.Value())
-				subQueries = append(subQueries, knnQuery)
-			}
+			knnQuery := query.NewKNNQuery(knn.Vector)
+			knnQuery.SetFieldVal(knn.Field)
+			knnQuery.SetK(knn.K)
+			knnQuery.SetBoost(knn.Boost.Value())
+			subQueries = append(subQueries, knnQuery)
+			kArray = append(kArray, knn.K)
+			sumOfK += knn.K
 		}
-		if req.KNNOperator == knnOperatorAnd {
-			rv := query.NewConjunctionQuery(subQueries)
-			rv.RetrieveScoreBreakdown(true)
-			return rv, nil
-		} else if req.KNNOperator == knnOperatorOr || req.KNNOperator == "" {
-			rv := query.NewDisjunctionQuery(subQueries)
-			rv.RetrieveScoreBreakdown(true)
-			return rv, nil
-		} else {
-			return nil, fmt.Errorf("unknown knn operator: %s", req.KNNOperator)
-		}
+		rv := query.NewDisjunctionQuery(subQueries)
+		rv.RetrieveScoreBreakdown(true)
+		return rv, kArray, sumOfK, nil
 	}
-	return req.Query, nil
+	return nil, nil, 0, nil
 }
 
 func validateKNN(req *SearchRequest) error {
+	if req.KNN != nil &&
+		req.KNNOperator != "" &&
+		req.KNNOperator != knnOperatorOr &&
+		req.KNNOperator != knnOperatorAnd {
+		return fmt.Errorf("unknown knn operator: %s", req.KNNOperator)
+	}
 	for _, q := range req.KNN {
+		if q == nil {
+			return fmt.Errorf("knn query cannot be nil")
+		}
 		if q.K <= 0 || len(q.Vector) == 0 {
 			return fmt.Errorf("k must be greater than 0 and vector must be non-empty")
 		}
 	}
+	switch req.KNNOperator {
+	case knnOperatorAnd, knnOperatorOr, "":
+		// Valid cases, do nothing
+	default:
+		return fmt.Errorf("knn_operator must be either 'and' / 'or'")
+	}
 	return nil
 }
 
-func mergeKNNResults(req *SearchRequest, sr *SearchResult) {
-	if len(req.KNN) > 0 {
-		mergeKNN(req, sr)
+func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, reader index.IndexReader, preSearch bool) ([]*search.DocumentMatch, error) {
+	KNNQuery, kArray, sumOfK, err := createKNNQuery(req)
+	if err != nil {
+		return nil, err
 	}
+	knnSearcher, err := KNNQuery.Searcher(ctx, reader, i.m, search.SearcherOptions{
+		Explain: req.Explain,
+	})
+	if err != nil {
+		return nil, err
+	}
+	knnCollector := collector.NewKNNCollector(kArray, sumOfK)
+	err = knnCollector.Collect(ctx, knnSearcher, reader)
+	if err != nil {
+		return nil, err
+	}
+	knnHits := knnCollector.Results()
+	if !preSearch {
+		knnHits = finalizeKNNResults(req, knnHits, len(req.KNN))
+	}
+	return knnHits, nil
 }
 
-func adjustRequestSizeForKNN(req *SearchRequest, numIndexPartitions int) int {
-	var adjustedSize int
-	if req != nil {
-		adjustedSize = req.Size
-		if len(req.KNN) > 0 {
-			var minSizeReq int64
-			for _, knn := range req.KNN {
-				minSizeReq += knn.K
+func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector) {
+	if len(knnHits) > 0 {
+		newScoreExplComputer := func(queryMatch *search.DocumentMatch, knnMatch *search.DocumentMatch) (float64, *search.Explanation) {
+			totalScore := queryMatch.Score + knnMatch.Score
+			if !req.Explain {
+				// exit early as we don't need to compute the explanation
+				return totalScore, nil
 			}
-			minSizeReq *= int64(numIndexPartitions)
-			if int64(adjustedSize) < minSizeReq {
-				adjustedSize = int(minSizeReq)
-			}
+			return totalScore, &search.Explanation{Value: totalScore, Message: "sum of:", Children: []*search.Explanation{queryMatch.Expl, knnMatch.Expl}}
 		}
+		coll.SetKNNHits(knnHits, search.ScoreExplCorrectionCallbackFunc(newScoreExplComputer))
 	}
-	return adjustedSize
 }
 
-// heap impl
-type scoreHeap struct {
-	scoreMaps []map[int]float64
-	sortIndex int
-}
-
-func (s *scoreHeap) Len() int { return len(s.scoreMaps) }
-
-func (s *scoreHeap) Less(i, j int) bool {
-	return (s.scoreMaps[i])[s.sortIndex] > (s.scoreMaps[j])[s.sortIndex]
-}
-
-func (s *scoreHeap) Swap(i, j int) {
-	s.scoreMaps[i], s.scoreMaps[j] = s.scoreMaps[j], s.scoreMaps[i]
-}
-
-func (s *scoreHeap) Push(x interface{}) {
-	s.scoreMaps = append(s.scoreMaps, x.(map[int]float64))
-}
-
-func (s *scoreHeap) Pop() interface{} {
-	old := s.scoreMaps
-	n := len(old)
-	x := old[n-1]
-	s.scoreMaps = old[0 : n-1]
-	return x
-}
-
-func mergeKNN(req *SearchRequest, sr *SearchResult) {
-	maxHeap := &scoreHeap{
-		scoreMaps: make([]map[int]float64, 0),
-	}
-	for i := 0; i < len(req.KNN); i++ {
-		kVal := req.KNN[i].K
-		maxHeap.sortIndex = i + 1
-		for _, hit := range sr.Hits {
-			heap.Push(maxHeap, hit.ScoreBreakdown)
-		}
-		for maxHeap.Len() > 0 {
-			scBreakdown := heap.Pop(maxHeap).(map[int]float64)
-			if kVal > 0 {
-				kVal--
-			} else {
-				delete(scBreakdown, maxHeap.sortIndex)
+func finalizeKNNResults(req *SearchRequest, knnHits search.DocumentMatchCollection, numKNNQueries int) search.DocumentMatchCollection {
+	// if the KNN operator is AND, then we need to filter out the hits that
+	// do not have match the KNN queries.
+	if req.KNNOperator == knnOperatorAnd {
+		idx := 0
+		for _, hit := range knnHits {
+			if len(hit.ScoreBreakdown) == numKNNQueries {
+				knnHits[idx] = hit
+				idx++
 			}
 		}
+		knnHits = knnHits[:idx]
 	}
-	maxScore := 0.0
-	var numHitsDropped uint64
-	numTotalSearchers := float64(len(req.KNN) + 1)
-	hitIdx := 0
-	for _, hit := range sr.Hits {
-		numMatchedSearchers := float64(len(hit.ScoreBreakdown))
-		newScore := recomputeTotalScore(req.KNNOperator, hit, numMatchedSearchers, numTotalSearchers)
-		if newScore > 0 {
-			hit.Score = newScore
-			if newScore > maxScore {
-				maxScore = newScore
+	// fix the score using score breakdown now
+	// if the score is none, then we need to set the score to 0.0
+	// if req.Explain is true, then we need to use the expl breakdown to
+	// finalize the correct explanation.
+	for _, hit := range knnHits {
+		hit.Score = 0.0
+		if req.Score != "none" {
+			for _, score := range hit.ScoreBreakdown {
+				hit.Score += score
 			}
-			sr.Hits[hitIdx] = hit
-			hitIdx++
-		} else {
-			numHitsDropped++
+		}
+		if req.Explain {
+			childrenExpl := make([]*search.Explanation, 0, len(hit.ScoreBreakdown))
+			for i := range hit.ScoreBreakdown {
+				childrenExpl = append(childrenExpl, hit.Expl.Children[i])
+			}
+			hit.Expl = &search.Explanation{Value: hit.Score, Message: "sum of:", Children: childrenExpl}
 		}
 	}
-	sr.Hits = sr.Hits[:hitIdx]
-	sr.MaxScore = maxScore
-	sr.Total -= numHitsDropped
+	return knnHits
 }
 
-func recomputeTotalScore(operator knnOperator, hit *search.DocumentMatch, numMatchedSearchers, numTotalSearchers float64) float64 {
-	if operator == knnOperatorAnd && numMatchedSearchers != numTotalSearchers {
-		return 0
+func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch, mergeOut []map[string]interface{}) {
+	kArray := make([]int64, len(req.KNN))
+	for i, knnReq := range req.KNN {
+		kArray[i] = knnReq.K
 	}
-	var totalScore float64
-	for _, score := range hit.ScoreBreakdown {
-		totalScore += score
+	knnStore := collector.GetNewKNNCollectorStore(kArray)
+	for _, hit := range knnHits {
+		knnStore.AddDocument(hit)
 	}
-	if operator == knnOperatorOr || operator == "" {
-		totalScore *= (numMatchedSearchers / numTotalSearchers)
+	// passing nil as the document fixup function, because we don't need to
+	// fixup the document, since this was already done in the first phase.
+	// hence error is always nil.
+	mergedKNNhits, _ := knnStore.Final(nil)
+	mergedKNNhits = finalizeKNNResults(req, mergedKNNhits, len(req.KNN))
+	indexNumToDocMatchList := make(map[int][]*search.DocumentMatch)
+	for _, docMatch := range mergedKNNhits {
+		distributeKNNHit(docMatch, indexNumToDocMatchList)
 	}
-	return totalScore
+	for i := 0; i < len(mergeOut); i++ {
+		mergeOut[i][search.KnnPreSearchDataKey] = indexNumToDocMatchList[i]
+	}
+}
+
+// when we are setting KNN hits in the preSearchData, we need to make sure that
+// the KNN hit goes to the right index. This is because the KNN hits are
+// collected from all the indexes in the alias, but the preSearchData is
+// specific to each index. If alias A1 contains indexes I1 and I2 and
+// the KNN hits collected from both I1 and I2, and merged to get top K
+// hits, then the top K hits need to be distributed to I1 and I2,
+// so that the preSearchData for I1 contains the top K hits from I1 and
+// the preSearchData for I2 contains the top K hits from I2.
+func distributeKNNHit(docMatch *search.DocumentMatch, indexNumToDocMatchList map[int][]*search.DocumentMatch) {
+	top := docMatch.IndexId[len(docMatch.IndexId)-1]
+	docMatch.IndexId = docMatch.IndexId[:len(docMatch.IndexId)-1]
+	indexNumToDocMatchList[top] = append(indexNumToDocMatchList[top], docMatch)
+}
+
+func requestHasKNN(req *SearchRequest) bool {
+	return len(req.KNN) > 0
+}
+
+func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
+	dummyReq.KNN = realReq.KNN
+	dummyReq.KNNOperator = knnOperatorOr
+	dummyReq.Explain = realReq.Explain
+}
+
+// the preSearchData for KNN is a list of DocumentMatch objects
+// that need to be redistributed to the right index.
+// This is used only in the case of an alias tree, where the indexes
+// are at the leaves of the tree, and the master alias is at the root.
+// At each level of the tree, the preSearchData needs to be redistributed
+// to the indexes/aliases at that level. Because the preSearchData is
+// specific to each final index at the leaf.
+func redistributeKNNPreSearchData(req *SearchRequest, mergedOut []map[string]interface{}) error {
+	knnHits, ok := req.PreSearchData[search.KnnPreSearchDataKey].([]*search.DocumentMatch)
+	if !ok {
+		return fmt.Errorf("preSearchData does not have knn preSearchData for redistribution")
+	}
+	indexNumToDocMatchList := make(map[int][]*search.DocumentMatch)
+	for _, docMatch := range knnHits {
+		distributeKNNHit(docMatch, indexNumToDocMatchList)
+	}
+	for i := 0; i < len(mergedOut); i++ {
+		newMD := make(map[string]interface{})
+		for k, v := range req.PreSearchData {
+			switch k {
+			case search.KnnPreSearchDataKey:
+				newMD[k] = indexNumToDocMatchList[i]
+			default:
+				newMD[k] = v
+			}
+		}
+		mergedOut[i] = newMD
+	}
+	return nil
 }

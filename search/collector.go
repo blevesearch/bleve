@@ -44,9 +44,15 @@ type MakeDocumentMatchHandlerKeyType string
 var MakeDocumentMatchHandlerKey = MakeDocumentMatchHandlerKeyType(
 	"MakeDocumentMatchHandlerKey")
 
+var MakeKNNDocumentMatchHandlerKey = MakeDocumentMatchHandlerKeyType(
+	"MakeKNNDocumentMatchHandlerKey")
+
 // MakeDocumentMatchHandler is an optional DocumentMatchHandler
 // builder function which the applications can pass to bleve.
 // These builder methods gives a DocumentMatchHandler function
 // to bleve, which it will invoke on every document matches.
 type MakeDocumentMatchHandler func(ctx *SearchContext) (
 	callback DocumentMatchHandler, loadID bool, err error)
+
+type MakeKNNDocumentMatchHandler func(ctx *SearchContext) (
+	callback DocumentMatchHandler, err error)

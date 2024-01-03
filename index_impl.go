@@ -433,6 +433,25 @@ func memNeededForSearch(req *SearchRequest,
 	return uint64(estimate)
 }
 
+func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader index.IndexReader) (*SearchResult, error) {
+	var knnHits []*search.DocumentMatch
+	var err error
+	if requestHasKNN(req) {
+		knnHits, err = i.runKnnCollector(ctx, req, reader, true)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Successful: 1,
+		},
+		Hits: knnHits,
+	}, nil
+}
+
 // SearchInContext executes a search request operation within the provided
 // Context. Returns a SearchResult object or an error.
 func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr *SearchResult, err error) {
@@ -443,6 +462,25 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	if !i.open {
 		return nil, ErrorIndexClosed
+	}
+
+	// open a reader for this search
+	indexReader, err := i.i.Reader()
+	if err != nil {
+		return nil, fmt.Errorf("error opening index reader %v", err)
+	}
+	defer func() {
+		if cerr := indexReader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
+		preSearchResult, err := i.preSearch(ctx, req, indexReader)
+		if err != nil {
+			return nil, err
+		}
+		return preSearchResult, nil
 	}
 
 	var reverseQueryExecution bool
@@ -460,16 +498,31 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		coll = collector.NewTopNCollector(req.Size, req.From, req.Sort)
 	}
 
-	// open a reader for this search
-	indexReader, err := i.i.Reader()
-	if err != nil {
-		return nil, fmt.Errorf("error opening index reader %v", err)
-	}
-	defer func() {
-		if cerr := indexReader.Close(); err == nil && cerr != nil {
-			err = cerr
+	var knnHits []*search.DocumentMatch
+	var ok bool
+	var skipKnnCollector bool
+	if req.PreSearchData != nil {
+		for k, v := range req.PreSearchData {
+			switch k {
+			case search.KnnPreSearchDataKey:
+				if v != nil {
+					knnHits, ok = v.([]*search.DocumentMatch)
+					if !ok {
+						return nil, fmt.Errorf("knn preSearchData must be of type []*search.DocumentMatch")
+					}
+				}
+				skipKnnCollector = true
+			}
 		}
-	}()
+	}
+	if !skipKnnCollector && requestHasKNN(req) {
+		knnHits, err = i.runKnnCollector(ctx, req, indexReader, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	setKnnHitsInCollector(knnHits, req, coll)
 
 	// This callback and variable handles the tracking of bytes read
 	//  1. as part of creation of tfr and its Next() calls which is
@@ -496,14 +549,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey,
 		search.GeoBufferPoolCallbackFunc(getBufferPool))
 
-	// Using a query to get results from KNN queries
-	// and the original query based on the KNN operator.
-	searchQuery, err := queryWithKNN(req)
-	if err != nil {
-		return nil, err
-	}
-
-	searcher, err := searchQuery.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
+	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
 		IncludeTermVectors: req.IncludeLocations || req.Highlight != nil,
 		Score:              req.Score,
@@ -656,11 +702,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		Took:     searchDuration,
 		Facets:   coll.FacetResults(),
 	}
+
 	if req.Explain {
 		rv.Request = req
 	}
 
-	mergeKNNResults(req, rv)
 	return rv, nil
 }
 

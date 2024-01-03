@@ -134,3 +134,9 @@ const MaxGeoBufPoolSize = 24 * 1024
 const MinGeoBufPoolSize = 24
 
 type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
+
+const KnnPreSearchDataKey = "_knn_pre_search_data_key"
+
+const PreSearchKey = "_presearch_key"
+
+type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)

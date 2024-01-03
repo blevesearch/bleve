@@ -26,6 +26,7 @@ const (
 	ErrorUnknownIndexType
 	ErrorEmptyID
 	ErrorIndexReadInconsistency
+	ErrorPreSearchFailed
 )
 
 // Error represents a more strongly typed bleve error for detecting
@@ -47,4 +48,5 @@ var errorMessages = map[Error]string{
 	ErrorUnknownIndexType:       "unknown index type",
 	ErrorEmptyID:                "document ID cannot be empty",
 	ErrorIndexReadInconsistency: "index read inconsistency detected",
+	ErrorPreSearchFailed:        "index pre-search failed",
 }

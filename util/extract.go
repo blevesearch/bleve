@@ -15,6 +15,7 @@
 package util
 
 import (
+	"math"
 	"reflect"
 )
 
@@ -24,13 +25,13 @@ func ExtractNumericValFloat64(v interface{}) (float64, bool) {
 	if !val.IsValid() {
 		return 0, false
 	}
-	typ := val.Type()
-	switch typ.Kind() {
-	case reflect.Float32, reflect.Float64:
+
+	switch {
+	case val.CanFloat():
 		return val.Float(), true
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+	case val.CanInt():
 		return float64(val.Int()), true
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+	case val.CanUint():
 		return float64(val.Uint()), true
 	}
 
@@ -43,13 +44,17 @@ func ExtractNumericValFloat32(v interface{}) (float32, bool) {
 	if !val.IsValid() {
 		return 0, false
 	}
-	typ := val.Type()
-	switch typ.Kind() {
-	case reflect.Float32, reflect.Float64:
-		return float32(val.Float()), true
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+
+	switch {
+	case val.CanFloat():
+		floatVal := val.Float()
+		if floatVal > math.MaxFloat32 {
+			return 0, false
+		}
+		return float32(floatVal), true
+	case val.CanInt():
 		return float32(val.Int()), true
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+	case val.CanUint():
 		return float32(val.Uint()), true
 	}
 
