@@ -81,6 +81,16 @@ func (c *collectStoreList) Final(skip int, fixup collectorFixup) (search.Documen
 	return search.DocumentMatchCollection{}, nil
 }
 
+func (c *collectStoreList) Internal() search.DocumentMatchCollection {
+	rv := make(search.DocumentMatchCollection, c.results.Len())
+	i := 0
+	for e := c.results.Front(); e != nil; e = e.Next() {
+		rv[i] = e.Value.(*search.DocumentMatch)
+		i++
+	}
+	return rv
+}
+
 func (c *collectStoreList) len() int {
 	return c.results.Len()
 }
