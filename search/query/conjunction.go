@@ -15,14 +15,9 @@
 package query
 
 import (
-	"context"
 	"encoding/json"
 
-	"github.com/blevesearch/bleve/v2/mapping"
-	"github.com/blevesearch/bleve/v2/search"
-	"github.com/blevesearch/bleve/v2/search/searcher"
 	"github.com/blevesearch/bleve/v2/util"
-	index "github.com/blevesearch/bleve_index_api"
 )
 
 type ConjunctionQuery struct {
@@ -57,33 +52,6 @@ func (q *ConjunctionQuery) AddQuery(aq ...Query) {
 	for _, aaq := range aq {
 		q.Conjuncts = append(q.Conjuncts, aaq)
 	}
-}
-
-func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
-	ss := make([]search.Searcher, 0, len(q.Conjuncts))
-	for _, conjunct := range q.Conjuncts {
-		sr, err := conjunct.Searcher(ctx, i, m, options)
-		if err != nil {
-			for _, searcher := range ss {
-				if searcher != nil {
-					_ = searcher.Close()
-				}
-			}
-			return nil, err
-		}
-		if _, ok := sr.(*searcher.MatchNoneSearcher); ok && q.queryStringMode {
-			// in query string mode, skip match none
-			continue
-		}
-		ss = append(ss, sr)
-	}
-
-	if len(ss) < 1 {
-		return searcher.NewMatchNoneSearcher(i)
-	}
-	nctx := context.WithValue(ctx, search.IncludeScoreBreakdownKey, q.retrieveScoreBreakdown)
-
-	return searcher.NewConjunctionSearcher(nctx, i, ss, options)
 }
 
 func (q *ConjunctionQuery) Validate() error {
