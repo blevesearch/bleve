@@ -37,8 +37,9 @@ func (o *OptimizeVR) Finish() error {
 	// for each VR, populate postings list and iterators
 	// by passing the obtained vector index and getting similar vectors.
 	// defer close index - just once.
+	var errorsM sync.Mutex
 	var errors []error
-	var mu sync.Mutex
+
 	wg := sync.WaitGroup{}
 	// Launch goroutines to get vector index for each segment
 	for i, seg := range o.snapshot.segment {
@@ -49,9 +50,9 @@ func (o *OptimizeVR) Finish() error {
 				for field, vrs := range o.vrs {
 					searchVectorIndex, closeVectorIndex, err := segment.InterpretVectorIndex(field)
 					if err != nil {
-						mu.Lock()
+						errorsM.Lock()
 						errors = append(errors, err)
-						mu.Unlock()
+						errorsM.Unlock()
 						return
 					}
 					for _, vr := range vrs {
@@ -59,9 +60,9 @@ func (o *OptimizeVR) Finish() error {
 						// by passing the obtained vector index and getting similar vectors.
 						pl, err := searchVectorIndex(vr.field, vr.vector, vr.k, origSeg.deleted)
 						if err != nil {
-							mu.Lock()
+							errorsM.Lock()
 							errors = append(errors, err)
-							mu.Unlock()
+							errorsM.Unlock()
 							go closeVectorIndex()
 							return
 						}
