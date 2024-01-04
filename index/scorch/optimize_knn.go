@@ -47,6 +47,11 @@ func (o *OptimizeVR) Finish() error {
 				defer wg.Done()
 				for field, vrs := range o.vrs {
 					searchVectorIndex, closeVectorIndex, err := segment.InterpretVectorIndex(field)
+					defer func() {
+						if closeVectorIndex != nil {
+							go closeVectorIndex()
+						}
+					}()
 					if err != nil {
 						errors[index] = err
 						return
@@ -56,7 +61,6 @@ func (o *OptimizeVR) Finish() error {
 						// by passing the obtained vector index and getting similar vectors.
 						pl, err := searchVectorIndex(vr.field, vr.vector, vr.k, origSeg.deleted)
 						if err != nil {
-							go closeVectorIndex()
 							errors[index] = err
 							return
 						}
@@ -66,7 +70,6 @@ func (o *OptimizeVR) Finish() error {
 						vr.postings[index] = pl
 						vr.iterators[index] = pl.Iterator(vr.iterators[index])
 					}
-					go closeVectorIndex()
 				}
 			}(i, sv, seg)
 
