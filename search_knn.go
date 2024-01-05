@@ -32,7 +32,7 @@ import (
 type knnOperator string
 
 // Must be updated only at init
-var BleveMaxK = 10000
+var BleveMaxK = int64(10000)
 
 type SearchRequest struct {
 	Query            query.Query       `json:"query"`
