@@ -19,6 +19,7 @@ package scorch
 
 import (
 	"fmt"
+	"sync"
 
 	index "github.com/blevesearch/bleve_index_api"
 	segment_api "github.com/blevesearch/scorch_segment_api/v2"
@@ -36,48 +37,60 @@ func (o *OptimizeVR) Finish() error {
 	// for each VR, populate postings list and iterators
 	// by passing the obtained vector index and getting similar vectors.
 	// defer close index - just once.
+	var errorsM sync.Mutex
+	var errors []error
 
+	wg := sync.WaitGroup{}
+	// Launch goroutines to get vector index for each segment
 	for i, seg := range o.snapshot.segment {
-		// for each field, get the vector index --> invoke the zap func.
-		for field, vrs := range o.vrs {
-			// for each VR belonging to that field
-			if sv, ok := seg.segment.(segment_api.VectorSegment); ok {
-				// reading just once per field per segment.
-				searchVectorIndex, closeVectorIndex, err := sv.InterpretVectorIndex(field)
-				if err != nil {
-					return err
-				}
-
-				for _, vr := range vrs {
-					// for each VR, populate postings list and iterators
-					// by passing the obtained vector index and getting similar vectors.
-					pl, err := searchVectorIndex(vr.field, vr.vector, vr.k, seg.deleted)
+		if sv, ok := seg.segment.(segment_api.VectorSegment); ok {
+			wg.Add(1)
+			go func(index int, segment segment_api.VectorSegment, origSeg *SegmentSnapshot) {
+				defer wg.Done()
+				for field, vrs := range o.vrs {
+					searchVectorIndex, closeVectorIndex, err := segment.InterpretVectorIndex(field)
 					if err != nil {
-						go closeVectorIndex()
-						return err
+						errorsM.Lock()
+						errors = append(errors, err)
+						errorsM.Unlock()
+						return
 					}
+					for _, vr := range vrs {
+						// for each VR, populate postings list and iterators
+						// by passing the obtained vector index and getting similar vectors.
+						pl, err := searchVectorIndex(vr.field, vr.vector, vr.k, origSeg.deleted)
+						if err != nil {
+							errorsM.Lock()
+							errors = append(errors, err)
+							errorsM.Unlock()
+							go closeVectorIndex()
+							return
+						}
 
-					// postings and iterators are already alloc'ed when
-					// IndexSnapshotVectorReader is created
-					vr.postings[i] = pl
-					vr.iterators[i] = pl.Iterator(vr.iterators[i])
+						// postings and iterators are already alloc'ed when
+						// IndexSnapshotVectorReader is created
+						vr.postings[index] = pl
+						vr.iterators[index] = pl.Iterator(vr.iterators[index])
+					}
+					go closeVectorIndex()
 				}
-
-				go closeVectorIndex()
-			}
+			}(i, sv, seg)
 		}
 	}
-
+	wg.Wait()
+	if len(errors) > 0 {
+		return errors[0]
+	}
 	return nil
 }
 
 func (s *IndexSnapshotVectorReader) VectorOptimize(
 	octx index.VectorOptimizableContext) (index.VectorOptimizableContext, error) {
 
-	if s.snapshot.parent.segPlugin.Version() < VectorSeachSupportedSegmentVersion {
+	if s.snapshot.parent.segPlugin.Version() < VectorSearchSupportedSegmentVersion {
 		return nil, fmt.Errorf("vector search not supported for this index, "+
 			"index's segment version %v, supported segment version for vector search %v",
-			s.snapshot.parent.segPlugin.Version(), VectorSeachSupportedSegmentVersion)
+			s.snapshot.parent.segPlugin.Version(), VectorSearchSupportedSegmentVersion)
 	}
 
 	if octx == nil {

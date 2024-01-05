@@ -25,10 +25,9 @@ import (
 )
 
 func optimizeKNN(ctx context.Context, indexReader index.IndexReader,
-	qsearchers []search.Searcher) ([]search.Searcher, error) {
+	qsearchers []search.Searcher) error {
 	var octx index.VectorOptimizableContext
 	var err error
-	var knnSearchers []search.Searcher
 
 	for _, searcher := range qsearchers {
 		// Only applicable to KNN Searchers.
@@ -37,20 +36,18 @@ func optimizeKNN(ctx context.Context, indexReader index.IndexReader,
 			continue
 		}
 
-		knnSearchers = append(knnSearchers, searcher)
-
 		octx, err = o.VectorOptimize(octx)
 		if err != nil {
-			return nil, err
+			return nil
 		}
 	}
 
 	// No KNN searchers.
 	if octx == nil {
-		return nil, nil
+		return nil
 	}
 
 	// Postings lists and iterators replaced in the pointer to the
 	// vector reader
-	return knnSearchers, octx.Finish()
+	return octx.Finish()
 }

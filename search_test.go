@@ -3507,19 +3507,6 @@ func TestScoreBreakdown(t *testing.T) {
 	}
 	testQueries := []testStruct{
 		{
-			// trigger conjunction searcher
-			// expect dolor and tempor to have higher term score - since present in lesser docs and having same term freq
-			query: `{"conjuncts":[{"term":"lorem","field":"text"},{"term":"dolor","field":"text"},{"term":"amet","field":"text"},{"term":"adipiscing","field":"text"},{"term":"do","field":"text"},{"term":"tempor","field":"text"}]}`,
-			typ:   "conjunction",
-			expectHits: []testResult{
-				{
-					docID:          "doc1",
-					score:          0.815545,
-					scoreBreakdown: map[int]float64{0: 0.11147035536863306, 1: 0.18483179634014485, 2: 0.11147035536863306, 3: 0.11147035536863306, 4: 0.11147035536863306, 5: 0.18483179634014485},
-				},
-			},
-		},
-		{
 			// trigger disjunction heap searcher (>10 searchers)
 			// expect score breakdown to have a 0 at BLANK
 			query: `{"disjuncts":[{"term":"lorem","field":"text"},{"term":"blank","field":"text"},{"term":"ipsum","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"},{"term":"dolor","field":"text"},{"term":"sit","field":"text"},{"term":"amet","field":"text"},{"term":"consectetur","field":"text"},{"term":"blank","field":"text"},{"term":"adipiscing","field":"text"},{"term":"blank","field":"text"},{"term":"elit","field":"text"},{"term":"sed","field":"text"},{"term":"do","field":"text"},{"term":"eiusmod","field":"text"},{"term":"tempor","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"}]}`,
@@ -3578,23 +3565,13 @@ func TestScoreBreakdown(t *testing.T) {
 	}
 	for _, dtq := range testQueries {
 		var q query.Query
-		if dtq.typ == "conjunction" {
-			var rv query.ConjunctionQuery
-			err := json.Unmarshal([]byte(dtq.query), &rv)
-			if err != nil {
-				t.Fatal(err)
-			}
-			rv.RetrieveScoreBreakdown(true)
-			q = &rv
-		} else if dtq.typ == "disjunction" {
-			var rv query.DisjunctionQuery
-			err := json.Unmarshal([]byte(dtq.query), &rv)
-			if err != nil {
-				t.Fatal(err)
-			}
-			rv.RetrieveScoreBreakdown(true)
-			q = &rv
+		var rv query.DisjunctionQuery
+		err := json.Unmarshal([]byte(dtq.query), &rv)
+		if err != nil {
+			t.Fatal(err)
 		}
+		rv.RetrieveScoreBreakdown(true)
+		q = &rv
 		sr := NewSearchRequest(q)
 		sr.SortBy([]string{"_id"})
 		sr.Explain = true

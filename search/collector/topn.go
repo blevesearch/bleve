@@ -39,6 +39,9 @@ type collectorStore interface {
 	AddNotExceedingSize(doc *search.DocumentMatch, size int) *search.DocumentMatch
 
 	Final(skip int, fixup collectorFixup) (search.DocumentMatchCollection, error)
+
+	// Provide access the internal heap implementation
+	Internal() search.DocumentMatchCollection
 }
 
 // PreAllocSizeSkipCap will cap preallocation to this amount when
@@ -287,13 +290,10 @@ var sortByScoreOpt = []string{"_score"}
 
 func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 	reader index.IndexReader, d *search.DocumentMatch) (err error) {
-
 	if hc.knnHits != nil {
-		if hc.needDocIds {
-			d.ID, err = reader.ExternalID(d.IndexInternalID)
-			if err != nil {
-				return err
-			}
+		d.ID, err = reader.ExternalID(d.IndexInternalID)
+		if err != nil {
+			return err
 		}
 		if knnHit, ok := hc.knnHits[d.ID]; ok {
 			d.Score, d.Expl = hc.computeNewScoreExpl(d, knnHit)
@@ -497,14 +497,4 @@ func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection, newS
 		hc.knnHits[hit.ID] = hit
 	}
 	hc.computeNewScoreExpl = newScoreExplComputer
-	// now that we have the knnHits
-	// when we run the top N search for just the
-	// basic Query object, we need to load the docIds
-	// for the hits -> this is because there might be overlap
-	// or common documents between the knnHits and the top N hits
-	// which indicates that a document matches both a knn query
-	// and the top N query. This means we need to improve the score
-	// of the doc match received as part of the top N search to also incorporate
-	// the score from the knn search.
-	hc.needDocIds = true
 }

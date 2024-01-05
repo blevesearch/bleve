@@ -36,7 +36,6 @@ func init() {
 type ConjunctionSearcher struct {
 	indexReader index.IndexReader
 	searchers   []search.Searcher
-	originalPos []int
 	queryNorm   float64
 	currs       []*search.DocumentMatch
 	maxIDIdx    int
@@ -49,80 +48,44 @@ type ConjunctionSearcher struct {
 func NewConjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, options search.SearcherOptions) (
 	search.Searcher, error) {
-	// The KNN Searcher optimization is a necessary pre-req for any KNN Searchers,
-	// not an optional optimization like for, say term searchers.
-	// It's an optimization to repeat search an open vector index when applicable,
-	// rather than individually opening and searching a vector index.
-	optimizedKNNSearchers, err := optimizeKNN(ctx, indexReader, qsearchers)
-	if err != nil {
-		return nil, err
+	// build the sorted downstream searchers
+	searchers := make(OrderedSearcherList, len(qsearchers))
+	for i, searcher := range qsearchers {
+		searchers[i] = searcher
 	}
+	sort.Sort(searchers)
 
 	// attempt the "unadorned" conjunction optimization only when we
 	// do not need extra information like freq-norm's or term vectors
-	if len(qsearchers) > 1 &&
+	if len(searchers) > 1 &&
 		options.Score == "none" && !options.IncludeTermVectors {
 		rv, err := optimizeCompositeSearcher(ctx, "conjunction:unadorned",
-			indexReader, qsearchers, options)
-		if err != nil || (rv != nil && len(optimizedKNNSearchers) == 0) {
+			indexReader, searchers, options)
+		if err != nil || rv != nil {
 			return rv, err
 		}
-
-		if rv != nil && len(optimizedKNNSearchers) > 0 {
-			// reinitialze qsearchers with rv + optimizedKNNSearchers
-			qsearchers = append(optimizedKNNSearchers, rv)
-		}
-	}
-
-	var retrieveScoreBreakdown bool
-	if ctx != nil {
-		retrieveScoreBreakdown, _ = ctx.Value(search.IncludeScoreBreakdownKey).(bool)
-	}
-
-	// build the sorted downstream searchers
-	var searchers OrderedSearcherList
-	var originalPos []int
-	if retrieveScoreBreakdown {
-		// needed only when kNN is in picture
-		sortedSearchers := &OrderedPositionalSearcherList{
-			searchers: qsearchers,
-			index:     make([]int, len(qsearchers)),
-		}
-		for i := range qsearchers {
-			sortedSearchers.index[i] = i
-		}
-		sort.Sort(sortedSearchers)
-		searchers = sortedSearchers.searchers
-		originalPos = sortedSearchers.index
-	} else {
-		searchers = make(OrderedSearcherList, len(qsearchers))
-		for i, searcher := range qsearchers {
-			searchers[i] = searcher
-		}
-		sort.Sort(searchers)
 	}
 
 	// build our searcher
-	c := ConjunctionSearcher{
+	rv := ConjunctionSearcher{
 		indexReader: indexReader,
 		options:     options,
-		originalPos: originalPos,
 		searchers:   searchers,
 		currs:       make([]*search.DocumentMatch, len(searchers)),
 		scorer:      scorer.NewConjunctionQueryScorer(options),
 	}
-	c.computeQueryNorm()
+	rv.computeQueryNorm()
 
 	// attempt push-down conjunction optimization when there's >1 searchers
 	if len(searchers) > 1 {
 		rv, err := optimizeCompositeSearcher(ctx, "conjunction",
 			indexReader, searchers, options)
-		if err != nil || (rv != nil && len(optimizedKNNSearchers) == 0) {
+		if err != nil || rv != nil {
 			return rv, err
 		}
 	}
 
-	return &c, nil
+	return &rv, nil
 }
 
 func (s *ConjunctionSearcher) computeQueryNorm() {
@@ -152,8 +115,6 @@ func (s *ConjunctionSearcher) Size() int {
 			sizeInBytes += entry.Size()
 		}
 	}
-
-	sizeInBytes += len(s.originalPos) * size.SizeOfInt
 
 	return sizeInBytes
 }
@@ -246,7 +207,7 @@ OUTER:
 		}
 
 		// if we get here, a doc matched all readers, so score and add it
-		rv = s.scorer.Score(ctx, s.currs, s.originalPos)
+		rv = s.scorer.Score(ctx, s.currs)
 
 		// we know all the searchers are pointing at the same thing
 		// so they all need to be bumped

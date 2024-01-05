@@ -25,7 +25,7 @@ import (
 )
 
 func optimizeKNN(ctx context.Context, indexReader index.IndexReader,
-	qsearchers []search.Searcher) ([]search.Searcher, error) {
+	qsearchers []search.Searcher) error {
 	// No-op
-	return nil, nil
+	return nil
 }

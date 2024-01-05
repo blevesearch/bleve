@@ -26,10 +26,9 @@ import (
 )
 
 type ConjunctionQuery struct {
-	Conjuncts              []Query `json:"conjuncts"`
-	BoostVal               *Boost  `json:"boost,omitempty"`
-	retrieveScoreBreakdown bool
-	queryStringMode        bool
+	Conjuncts       []Query `json:"conjuncts"`
+	BoostVal        *Boost  `json:"boost,omitempty"`
+	queryStringMode bool
 }
 
 // NewConjunctionQuery creates a new compound Query.
@@ -47,10 +46,6 @@ func (q *ConjunctionQuery) SetBoost(b float64) {
 
 func (q *ConjunctionQuery) Boost() float64 {
 	return q.BoostVal.Value()
-}
-
-func (q *ConjunctionQuery) RetrieveScoreBreakdown(b bool) {
-	q.retrieveScoreBreakdown = b
 }
 
 func (q *ConjunctionQuery) AddQuery(aq ...Query) {
@@ -81,9 +76,8 @@ func (q *ConjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 	if len(ss) < 1 {
 		return searcher.NewMatchNoneSearcher(i)
 	}
-	nctx := context.WithValue(ctx, search.IncludeScoreBreakdownKey, q.retrieveScoreBreakdown)
 
-	return searcher.NewConjunctionSearcher(nctx, i, ss, options)
+	return searcher.NewConjunctionSearcher(ctx, i, ss, options)
 }
 
 func (q *ConjunctionQuery) Validate() error {

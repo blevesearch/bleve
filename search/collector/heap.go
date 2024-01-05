@@ -69,6 +69,10 @@ func (c *collectStoreHeap) Final(skip int, fixup collectorFixup) (search.Documen
 	return rv, nil
 }
 
+func (c *collectStoreHeap) Internal() search.DocumentMatchCollection {
+	return c.heap
+}
+
 // heap interface implementation
 
 func (c *collectStoreHeap) Len() int {
