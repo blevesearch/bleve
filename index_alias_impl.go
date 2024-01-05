@@ -205,14 +205,34 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	// only perform presearch if
 	//  - the request does not already have preSearchData
 	//  - the request requires presearch
+	var preSearchDuration time.Duration
 	if req.PreSearchData == nil && PreSearchRequired(ctx, req) {
-		preSearchData, err = PreSearch(ctx, req, i.indexes...)
+		searchStart := time.Now()
+		preSearchResult, err := PreSearch(ctx, req, i.indexes...)
 		if err != nil {
 			return nil, err
 		}
+		// check if the presearch result has any errors and if so
+		// return the search result as is without executing the query
+		// so that the errors are not lost
+		if preSearchResult.Status.Failed > 0 {
+			return preSearchResult, nil
+		} else {
+			// if there are no errors, then use the presearch data
+			// to execute the query
+			preSearchData, err = mergePreSearchData(req, preSearchResult, len(i.indexes))
+			if err != nil {
+				return nil, err
+			}
+		}
+		preSearchDuration = time.Since(searchStart)
 	}
-
-	return MultiSearch(ctx, req, preSearchData, i.indexes...)
+	sr, err := MultiSearch(ctx, req, preSearchData, i.indexes...)
+	if err != nil {
+		return nil, err
+	}
+	sr.Took += preSearchDuration
+	return sr, nil
 }
 
 func (i *indexAliasImpl) Fields() ([]string, error) {
@@ -490,7 +510,7 @@ func PreSearchRequired(ctx context.Context, req *SearchRequest) bool {
 	return requestHasKNN(req)
 }
 
-func PreSearch(ctx context.Context, req *SearchRequest, indexes ...Index) ([]map[string]interface{}, error) {
+func PreSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	// create a dummy request with a match none query
 	// since we only care about the preSearchData in PreSearch
 	dummyRequest := &SearchRequest{
@@ -500,15 +520,7 @@ func PreSearch(ctx context.Context, req *SearchRequest, indexes ...Index) ([]map
 	if requestHasKNN(req) {
 		addKnnToDummyRequest(dummyRequest, req)
 	}
-	res, err := PreSearchDataSearch(newCtx, dummyRequest, indexes...)
-	if err != nil {
-		return nil, err
-	}
-	preSearchData, err := mergePreSearchData(req, res, len(indexes))
-	if err != nil {
-		return nil, err
-	}
-	return preSearchData, nil
+	return PreSearchDataSearch(newCtx, dummyRequest, indexes...)
 }
 
 func tagHitsWithIndexNum(sr *SearchResult, indexNum int) {
@@ -529,7 +541,6 @@ func mergePreSearchData(req *SearchRequest, res *SearchResult, numIndexes int) (
 }
 
 func PreSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*SearchResult, error) {
-	searchStart := time.Now()
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
 
 	// run search on each index in separate go routine
@@ -583,9 +594,6 @@ func PreSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 			},
 		}
 	}
-
-	searchDuration := time.Since(searchStart)
-	sr.Took = searchDuration
 
 	// fix up errors
 	if len(indexErrors) > 0 {
