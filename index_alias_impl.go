@@ -167,7 +167,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// indicates that this index alias is set as an Index
 		// in another alias, so we need to do a presearch search
 		// and NOT a real search
-		return PreSearchDataSearch(ctx, req, i.indexes...)
+		return preSearchDataSearch(ctx, req, i.indexes...)
 	}
 
 	// at this point we know we are doing a real search
@@ -206,9 +206,9 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	//  - the request does not already have preSearchData
 	//  - the request requires presearch
 	var preSearchDuration time.Duration
-	if req.PreSearchData == nil && PreSearchRequired(ctx, req) {
+	if req.PreSearchData == nil && preSearchRequired(ctx, req) {
 		searchStart := time.Now()
-		preSearchResult, err := PreSearch(ctx, req, i.indexes...)
+		preSearchResult, err := preSearch(ctx, req, i.indexes...)
 		if err != nil {
 			return nil, err
 		}
@@ -506,11 +506,11 @@ type asyncSearchResult struct {
 	Err      error
 }
 
-func PreSearchRequired(ctx context.Context, req *SearchRequest) bool {
+func preSearchRequired(ctx context.Context, req *SearchRequest) bool {
 	return requestHasKNN(req)
 }
 
-func PreSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*SearchResult, error) {
+func preSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	// create a dummy request with a match none query
 	// since we only care about the preSearchData in PreSearch
 	dummyRequest := &SearchRequest{
@@ -520,7 +520,7 @@ func PreSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Sear
 	if requestHasKNN(req) {
 		addKnnToDummyRequest(dummyRequest, req)
 	}
-	return PreSearchDataSearch(newCtx, dummyRequest, indexes...)
+	return preSearchDataSearch(newCtx, dummyRequest, indexes...)
 }
 
 func tagHitsWithIndexNum(sr *SearchResult, indexNum int) {
@@ -540,7 +540,7 @@ func mergePreSearchData(req *SearchRequest, res *SearchResult, numIndexes int) (
 	return mergedOut, nil
 }
 
-func PreSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*SearchResult, error) {
+func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
 
 	// run search on each index in separate go routine
