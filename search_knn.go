@@ -31,7 +31,8 @@ import (
 
 type knnOperator string
 
-const MaxKValue = 10000
+// Must be updated only at init
+var BleveMaxK = 10000
 
 type SearchRequest struct {
 	Query            query.Query       `json:"query"`
@@ -232,8 +233,8 @@ func validateKNN(req *SearchRequest) error {
 		if q.K <= 0 || len(q.Vector) == 0 {
 			return fmt.Errorf("k must be greater than 0 and vector must be non-empty")
 		}
-		if q.K > MaxKValue {
-			return fmt.Errorf("k must be less than %d", MaxKValue)
+		if q.K > BleveMaxK {
+			return fmt.Errorf("k must be less than %d", BleveMaxK)
 		}
 	}
 	switch req.KNNOperator {
