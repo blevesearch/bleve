@@ -528,13 +528,18 @@ func tagHitsWithIndexName(sr *SearchResult, indexName string) {
 	}
 }
 
-func mergePreSearchData(req *SearchRequest, res *SearchResult, indexes []Index) (map[string]map[string]interface{}, error) {
+func mergePreSearchData(req *SearchRequest, res *SearchResult,
+	indexes []Index) (map[string]map[string]interface{}, error) {
+
 	mergedOut := make(map[string]map[string]interface{}, len(indexes))
 	for _, index := range indexes {
 		mergedOut[index.Name()] = make(map[string]interface{})
 	}
 	if requestHasKNN(req) {
-		distributedHits := mergeKNNDocumentMatches(req, res.Hits)
+		distributedHits, err := mergeKNNDocumentMatches(req, res.Hits, indexes)
+		if err != nil {
+			return nil, err
+		}
 		for _, index := range indexes {
 			mergedOut[index.Name()][search.KnnPreSearchDataKey] = distributedHits[index.Name()]
 		}

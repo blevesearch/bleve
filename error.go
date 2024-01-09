@@ -48,5 +48,5 @@ var errorMessages = map[Error]string{
 	ErrorUnknownIndexType:       "unknown index type",
 	ErrorEmptyID:                "document ID cannot be empty",
 	ErrorIndexReadInconsistency: "index read inconsistency detected",
-	ErrorPreSearchFailed:        "index pre-search failed",
+	ErrorPreSearchFailed:        "index pre-search failed, inconsistency in results detected, due to a topology change/rebalance. Please retry the search",
 }
