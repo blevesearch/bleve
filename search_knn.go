@@ -344,7 +344,7 @@ func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch
 // the preSearchData for I2 contains the top K hits from I2.
 func validateAndDistributeKNNHits(knnHits []*search.DocumentMatch, indexes []Index) (map[string][]*search.DocumentMatch, error) {
 	// create a set of all the index names of this alias
-	indexNames := make(map[string]interface{})
+	indexNames := make(map[string]struct{}, len(indexes))
 	for _, index := range indexes {
 		indexNames[index.Name()] = struct{}{}
 	}
