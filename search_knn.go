@@ -314,6 +314,9 @@ func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch, num
 			}
 			hit.Expl = &search.Explanation{Value: hit.Score, Message: "sum of:", Children: childrenExpl}
 		}
+		// we don't need the score breakdown anymore
+		// so we can set it to nil
+		hit.ScoreBreakdown = nil
 	}
 	return knnHits
 }
@@ -351,10 +354,10 @@ func validateAndDistributeKNNHits(knnHits []*search.DocumentMatch, indexes []Ind
 	segregatedKnnHits := make(map[string][]*search.DocumentMatch)
 	for _, hit := range knnHits {
 		if len(hit.IndexNames) == 0 {
-			return nil, ErrorPreSearchFailed
+			return nil, ErrorSearchInconsistency
 		}
 		if _, exists := indexNames[hit.IndexNames[len(hit.IndexNames)-1]]; !exists {
-			return nil, ErrorPreSearchFailed
+			return nil, ErrorSearchInconsistency
 		}
 		stackTopIdx := len(hit.IndexNames) - 1
 		top := hit.IndexNames[stackTopIdx]
