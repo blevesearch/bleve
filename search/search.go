@@ -183,12 +183,12 @@ type DocumentMatch struct {
 	ScoreBreakdown map[int]float64 `json:"score_breakdown,omitempty"`
 
 	// internal variable used in PreSearch phase of search in alias
-	// indicated the index id of the index that this match came from
-	// used in vector search.
-	// it is a stack of index ids, the top of the stack is the index id
+	// to indicate the name of the index that this match came from.
+	// used in knn search.
+	// it is a stack of index names, the top of the stack is the name
 	// of the index that this match came from
 	// of the current alias view, used in alias of aliases scenario
-	IndexId []int `json:"index_id,omitempty"`
+	IndexNames []string `json:"index_names,omitempty"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {

@@ -283,7 +283,7 @@ func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, 
 	}
 }
 
-func finalizeKNNResults(req *SearchRequest, knnHits search.DocumentMatchCollection, numKNNQueries int) search.DocumentMatchCollection {
+func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch, numKNNQueries int) []*search.DocumentMatch {
 	// if the KNN operator is AND, then we need to filter out the hits that
 	// do not have match the KNN queries.
 	if req.KNNOperator == knnOperatorAnd {
@@ -318,7 +318,7 @@ func finalizeKNNResults(req *SearchRequest, knnHits search.DocumentMatchCollecti
 	return knnHits
 }
 
-func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch, mergeOut []map[string]interface{}) {
+func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch) map[string][]*search.DocumentMatch {
 	kArray := make([]int64, len(req.KNN))
 	for i, knnReq := range req.KNN {
 		kArray[i] = knnReq.K
@@ -331,14 +331,7 @@ func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch
 	// fixup the document, since this was already done in the first phase.
 	// hence error is always nil.
 	mergedKNNhits, _ := knnStore.Final(nil)
-	mergedKNNhits = finalizeKNNResults(req, mergedKNNhits, len(req.KNN))
-	indexNumToDocMatchList := make(map[int][]*search.DocumentMatch)
-	for _, docMatch := range mergedKNNhits {
-		distributeKNNHit(docMatch, indexNumToDocMatchList)
-	}
-	for i := 0; i < len(mergeOut); i++ {
-		mergeOut[i][search.KnnPreSearchDataKey] = indexNumToDocMatchList[i]
-	}
+	return distributeKNNHits(finalizeKNNResults(req, mergedKNNhits, len(req.KNN)))
 }
 
 // when we are setting KNN hits in the preSearchData, we need to make sure that
@@ -349,10 +342,35 @@ func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch
 // hits, then the top K hits need to be distributed to I1 and I2,
 // so that the preSearchData for I1 contains the top K hits from I1 and
 // the preSearchData for I2 contains the top K hits from I2.
-func distributeKNNHit(docMatch *search.DocumentMatch, indexNumToDocMatchList map[int][]*search.DocumentMatch) {
-	top := docMatch.IndexId[len(docMatch.IndexId)-1]
-	docMatch.IndexId = docMatch.IndexId[:len(docMatch.IndexId)-1]
-	indexNumToDocMatchList[top] = append(indexNumToDocMatchList[top], docMatch)
+func distributeKNNHits(knnHits []*search.DocumentMatch) map[string][]*search.DocumentMatch {
+	segregatedKnnHits := make(map[string][]*search.DocumentMatch)
+	for _, hit := range knnHits {
+		stackTopIdx := len(hit.IndexNames) - 1
+		top := hit.IndexNames[stackTopIdx]
+		hit.IndexNames = hit.IndexNames[:stackTopIdx]
+		segregatedKnnHits[top] = append(segregatedKnnHits[top], hit)
+	}
+	return segregatedKnnHits
+}
+
+func checkIndexNamesConsistency(knnHits []*search.DocumentMatch, indexes []Index) error {
+	// create a set of all the index names of this alias
+	indexNames := make(map[string]bool)
+	for _, index := range indexes {
+		indexNames[index.Name()] = true
+	}
+
+	// a topology change / inconsistency is detected when, for a given KNN hit,
+	// - the indexNames stack is empty -> it cannot be determined which index in the alias
+	//   the KNN hit belongs to
+	// - the top of the indexNames stack does not exist in the alias -> the index
+	//   does not exist in the alias anymore
+	for _, hit := range knnHits {
+		if len(hit.IndexNames) == 0 || !indexNames[hit.IndexNames[len(hit.IndexNames)-1]] {
+			return fmt.Errorf("Inconsistency in results detected, due to topology change/rebalance. Please retry the search")
+		}
+	}
+	return nil
 }
 
 func requestHasKNN(req *SearchRequest) bool {
@@ -372,26 +390,32 @@ func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
 // At each level of the tree, the preSearchData needs to be redistributed
 // to the indexes/aliases at that level. Because the preSearchData is
 // specific to each final index at the leaf.
-func redistributeKNNPreSearchData(req *SearchRequest, mergedOut []map[string]interface{}) error {
+func redistributeKNNPreSearchData(req *SearchRequest, indexes []Index) (map[string]map[string]interface{}, error) {
 	knnHits, ok := req.PreSearchData[search.KnnPreSearchDataKey].([]*search.DocumentMatch)
 	if !ok {
-		return fmt.Errorf("preSearchData does not have knn preSearchData for redistribution")
+		return nil, fmt.Errorf("request does not have knn preSearchData for redistribution")
 	}
-	indexNumToDocMatchList := make(map[int][]*search.DocumentMatch)
-	for _, docMatch := range knnHits {
-		distributeKNNHit(docMatch, indexNumToDocMatchList)
+	// check if topology change has happened, and if so, return an error
+	err := checkIndexNamesConsistency(knnHits, indexes)
+	if err != nil {
+		return nil, err
 	}
-	for i := 0; i < len(mergedOut); i++ {
-		newMD := make(map[string]interface{})
+	segregatedKnnHits := distributeKNNHits(knnHits)
+
+	rv := make(map[string]map[string]interface{})
+	for _, index := range indexes {
+		rv[index.Name()] = make(map[string]interface{})
+	}
+
+	for _, index := range indexes {
 		for k, v := range req.PreSearchData {
 			switch k {
 			case search.KnnPreSearchDataKey:
-				newMD[k] = indexNumToDocMatchList[i]
+				rv[index.Name()][k] = segregatedKnnHits[index.Name()]
 			default:
-				newMD[k] = v
+				rv[index.Name()][k] = v
 			}
 		}
-		mergedOut[i] = newMD
 	}
-	return nil
+	return rv, nil
 }
