@@ -46,21 +46,6 @@ func stem(input []rune) []rune {
 		return input
 	}
 
-	for i, r := range input {
-		switch r {
-		case 'à', 'á', 'â', 'ä':
-			input[i] = 'a'
-		case 'ò', 'ó', 'ô', 'ö':
-			input[i] = 'o'
-		case 'è', 'é', 'ê', 'ë':
-			input[i] = 'e'
-		case 'ù', 'ú', 'û', 'ü':
-			input[i] = 'u'
-		case 'ì', 'í', 'î', 'ï':
-			input[i] = 'i'
-		}
-	}
-
 	switch input[l-1] {
 	case 'o', 'a', 'e':
 		return input[:l-1]
