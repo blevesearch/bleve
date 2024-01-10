@@ -359,8 +359,8 @@ func validateAndDistributeKNNHits(knnHits []*search.DocumentMatch, indexes []Ind
 		// if the stack is empty, then we have an inconsistency/abnormality
 		// since any hit with an empty stack is supposed to land on a leaf index,
 		// and not an alias. This cannot happen in normal circumstances. But
-		// performing this check to be safe. Since we check the stack top
-		// in the next check.
+		// performing this check to be safe. Since we extract the stack top
+		// in the following steps.
 		if len(hit.IndexNames) == 0 {
 			return nil, ErrorSearchInconsistency
 		}
@@ -368,11 +368,11 @@ func validateAndDistributeKNNHits(knnHits []*search.DocumentMatch, indexes []Ind
 		// is a valid index name, of an index that is part of this alias. If not,
 		// then we have an inconsistency that could be caused due to a topology
 		// change.
-		if _, exists := indexNames[hit.IndexNames[len(hit.IndexNames)-1]]; !exists {
-			return nil, ErrorSearchInconsistency
-		}
 		stackTopIdx := len(hit.IndexNames) - 1
 		top := hit.IndexNames[stackTopIdx]
+		if _, exists := indexNames[top]; !exists {
+			return nil, ErrorSearchInconsistency
+		}
 		hit.IndexNames = hit.IndexNames[:stackTopIdx]
 		segregatedKnnHits[top] = append(segregatedKnnHits[top], hit)
 	}
