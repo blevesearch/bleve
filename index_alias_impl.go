@@ -179,21 +179,21 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	// preSearch step now, we call an optional function to
 	// redistribute the preSearchData to the individual indexes
 	// if necessary
-	var preSearchData []map[string]interface{}
+	var preSearchData map[string]map[string]interface{}
 	if req.PreSearchData != nil {
 		if requestHasKNN(req) {
-			preSearchData = make([]map[string]interface{}, len(i.indexes))
-			for i := 0; i < len(preSearchData); i++ {
-				preSearchData[i] = make(map[string]interface{})
+			var err error
+			preSearchData, err = redistributeKNNPreSearchData(req, i.indexes)
+			if err != nil {
+				return nil, err
 			}
-			redistributeKNNPreSearchData(req, preSearchData)
 		}
 	}
 
 	// short circuit the simple case
 	if len(i.indexes) == 1 {
 		if preSearchData != nil {
-			req.PreSearchData = preSearchData[0]
+			req.PreSearchData = preSearchData[i.indexes[0].Name()]
 		}
 		return i.indexes[0].SearchInContext(ctx, req)
 	}
@@ -220,7 +220,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		} else {
 			// if there are no errors, then use the presearch data
 			// to execute the query
-			preSearchData, err = mergePreSearchData(req, preSearchResult, len(i.indexes))
+			preSearchData, err = mergePreSearchData(req, preSearchResult, i.indexes)
 			if err != nil {
 				return nil, err
 			}
@@ -500,10 +500,9 @@ func createChildSearchRequest(req *SearchRequest, preSearchData map[string]inter
 }
 
 type asyncSearchResult struct {
-	Name     string
-	IndexNum int
-	Result   *SearchResult
-	Err      error
+	Name   string
+	Result *SearchResult
+	Err    error
 }
 
 func preSearchRequired(ctx context.Context, req *SearchRequest) bool {
@@ -523,19 +522,27 @@ func preSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Sear
 	return preSearchDataSearch(newCtx, dummyRequest, indexes...)
 }
 
-func tagHitsWithIndexNum(sr *SearchResult, indexNum int) {
+func tagHitsWithIndexName(sr *SearchResult, indexName string) {
 	for _, hit := range sr.Hits {
-		hit.IndexId = append(hit.IndexId, indexNum)
+		hit.IndexNames = append(hit.IndexNames, indexName)
 	}
 }
 
-func mergePreSearchData(req *SearchRequest, res *SearchResult, numIndexes int) ([]map[string]interface{}, error) {
-	mergedOut := make([]map[string]interface{}, numIndexes)
-	for i := 0; i < len(mergedOut); i++ {
-		mergedOut[i] = make(map[string]interface{})
+func mergePreSearchData(req *SearchRequest, res *SearchResult,
+	indexes []Index) (map[string]map[string]interface{}, error) {
+
+	mergedOut := make(map[string]map[string]interface{}, len(indexes))
+	for _, index := range indexes {
+		mergedOut[index.Name()] = make(map[string]interface{})
 	}
 	if requestHasKNN(req) {
-		mergeKNNDocumentMatches(req, res.Hits, mergedOut)
+		distributedHits, err := mergeKNNDocumentMatches(req, res.Hits, indexes)
+		if err != nil {
+			return nil, err
+		}
+		for _, index := range indexes {
+			mergedOut[index.Name()][search.KnnPreSearchDataKey] = distributedHits[index.Name()]
+		}
 	}
 	return mergedOut, nil
 }
@@ -546,16 +553,16 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 	// run search on each index in separate go routine
 	var waitGroup sync.WaitGroup
 
-	var searchChildIndex = func(in Index, childReq *SearchRequest, idx int) {
-		rv := asyncSearchResult{Name: in.Name(), IndexNum: idx}
+	var searchChildIndex = func(in Index, childReq *SearchRequest) {
+		rv := asyncSearchResult{Name: in.Name()}
 		rv.Result, rv.Err = in.SearchInContext(ctx, childReq)
 		asyncResults <- &rv
 		waitGroup.Done()
 	}
 
 	waitGroup.Add(len(indexes))
-	for idx, in := range indexes {
-		go searchChildIndex(in, createChildSearchRequest(req, nil), idx)
+	for _, in := range indexes {
+		go searchChildIndex(in, createChildSearchRequest(req, nil))
 	}
 
 	// on another go routine, close after finished
@@ -572,10 +579,10 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 			if sr == nil {
 				// first result
 				sr = asr.Result
-				tagHitsWithIndexNum(sr, asr.IndexNum)
+				tagHitsWithIndexName(sr, asr.Name)
 			} else {
 				// merge with previous
-				tagHitsWithIndexNum(asr.Result, asr.IndexNum)
+				tagHitsWithIndexName(asr.Result, asr.Name)
 				sr.Merge(asr.Result)
 			}
 		} else {
@@ -612,7 +619,7 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 
 // MultiSearch executes a SearchRequest across multiple Index objects,
 // then merges the results.  The indexes must honor any ctx deadline.
-func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData []map[string]interface{}, indexes ...Index) (*SearchResult, error) {
+func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[string]map[string]interface{}, indexes ...Index) (*SearchResult, error) {
 
 	searchStart := time.Now()
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
@@ -636,12 +643,12 @@ func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData []map[st
 	}
 
 	waitGroup.Add(len(indexes))
-	for idx, in := range indexes {
-		var md map[string]interface{}
+	for _, in := range indexes {
+		var payload map[string]interface{}
 		if preSearchData != nil {
-			md = preSearchData[idx]
+			payload = preSearchData[in.Name()]
 		}
-		go searchChildIndex(in, createChildSearchRequest(req, md))
+		go searchChildIndex(in, createChildSearchRequest(req, payload))
 	}
 
 	// on another go routine, close after finished

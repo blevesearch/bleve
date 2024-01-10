@@ -283,7 +283,7 @@ func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, 
 	}
 }
 
-func finalizeKNNResults(req *SearchRequest, knnHits search.DocumentMatchCollection, numKNNQueries int) search.DocumentMatchCollection {
+func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch, numKNNQueries int) []*search.DocumentMatch {
 	// if the KNN operator is AND, then we need to filter out the hits that
 	// do not have match the KNN queries.
 	if req.KNNOperator == knnOperatorAnd {
@@ -314,11 +314,14 @@ func finalizeKNNResults(req *SearchRequest, knnHits search.DocumentMatchCollecti
 			}
 			hit.Expl = &search.Explanation{Value: hit.Score, Message: "sum of:", Children: childrenExpl}
 		}
+		// we don't need the score breakdown anymore
+		// so we can set it to nil
+		hit.ScoreBreakdown = nil
 	}
 	return knnHits
 }
 
-func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch, mergeOut []map[string]interface{}) {
+func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch, indexes []Index) (map[string][]*search.DocumentMatch, error) {
 	kArray := make([]int64, len(req.KNN))
 	for i, knnReq := range req.KNN {
 		kArray[i] = knnReq.K
@@ -331,14 +334,7 @@ func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch
 	// fixup the document, since this was already done in the first phase.
 	// hence error is always nil.
 	mergedKNNhits, _ := knnStore.Final(nil)
-	mergedKNNhits = finalizeKNNResults(req, mergedKNNhits, len(req.KNN))
-	indexNumToDocMatchList := make(map[int][]*search.DocumentMatch)
-	for _, docMatch := range mergedKNNhits {
-		distributeKNNHit(docMatch, indexNumToDocMatchList)
-	}
-	for i := 0; i < len(mergeOut); i++ {
-		mergeOut[i][search.KnnPreSearchDataKey] = indexNumToDocMatchList[i]
-	}
+	return validateAndDistributeKNNHits(finalizeKNNResults(req, mergedKNNhits, len(req.KNN)), indexes)
 }
 
 // when we are setting KNN hits in the preSearchData, we need to make sure that
@@ -349,10 +345,38 @@ func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch
 // hits, then the top K hits need to be distributed to I1 and I2,
 // so that the preSearchData for I1 contains the top K hits from I1 and
 // the preSearchData for I2 contains the top K hits from I2.
-func distributeKNNHit(docMatch *search.DocumentMatch, indexNumToDocMatchList map[int][]*search.DocumentMatch) {
-	top := docMatch.IndexId[len(docMatch.IndexId)-1]
-	docMatch.IndexId = docMatch.IndexId[:len(docMatch.IndexId)-1]
-	indexNumToDocMatchList[top] = append(indexNumToDocMatchList[top], docMatch)
+func validateAndDistributeKNNHits(knnHits []*search.DocumentMatch, indexes []Index) (map[string][]*search.DocumentMatch, error) {
+	// create a set of all the index names of this alias
+	indexNames := make(map[string]struct{}, len(indexes))
+	for _, index := range indexes {
+		indexNames[index.Name()] = struct{}{}
+	}
+	segregatedKnnHits := make(map[string][]*search.DocumentMatch)
+	for _, hit := range knnHits {
+		// for each hit, we need to perform a validation check to ensure that the stack
+		// is still valid.
+		//
+		// if the stack is empty, then we have an inconsistency/abnormality
+		// since any hit with an empty stack is supposed to land on a leaf index,
+		// and not an alias. This cannot happen in normal circumstances. But
+		// performing this check to be safe. Since we extract the stack top
+		// in the following steps.
+		if len(hit.IndexNames) == 0 {
+			return nil, ErrorTwoPhaseSearchInconsistency
+		}
+		// since the stack is not empty, we need to check if the top of the stack
+		// is a valid index name, of an index that is part of this alias. If not,
+		// then we have an inconsistency that could be caused due to a topology
+		// change.
+		stackTopIdx := len(hit.IndexNames) - 1
+		top := hit.IndexNames[stackTopIdx]
+		if _, exists := indexNames[top]; !exists {
+			return nil, ErrorTwoPhaseSearchInconsistency
+		}
+		hit.IndexNames = hit.IndexNames[:stackTopIdx]
+		segregatedKnnHits[top] = append(segregatedKnnHits[top], hit)
+	}
+	return segregatedKnnHits, nil
 }
 
 func requestHasKNN(req *SearchRequest) bool {
@@ -372,26 +396,30 @@ func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
 // At each level of the tree, the preSearchData needs to be redistributed
 // to the indexes/aliases at that level. Because the preSearchData is
 // specific to each final index at the leaf.
-func redistributeKNNPreSearchData(req *SearchRequest, mergedOut []map[string]interface{}) error {
+func redistributeKNNPreSearchData(req *SearchRequest, indexes []Index) (map[string]map[string]interface{}, error) {
 	knnHits, ok := req.PreSearchData[search.KnnPreSearchDataKey].([]*search.DocumentMatch)
 	if !ok {
-		return fmt.Errorf("preSearchData does not have knn preSearchData for redistribution")
+		return nil, fmt.Errorf("request does not have knn preSearchData for redistribution")
 	}
-	indexNumToDocMatchList := make(map[int][]*search.DocumentMatch)
-	for _, docMatch := range knnHits {
-		distributeKNNHit(docMatch, indexNumToDocMatchList)
+	segregatedKnnHits, err := validateAndDistributeKNNHits(knnHits, indexes)
+	if err != nil {
+		return nil, err
 	}
-	for i := 0; i < len(mergedOut); i++ {
-		newMD := make(map[string]interface{})
+
+	rv := make(map[string]map[string]interface{})
+	for _, index := range indexes {
+		rv[index.Name()] = make(map[string]interface{})
+	}
+
+	for _, index := range indexes {
 		for k, v := range req.PreSearchData {
 			switch k {
 			case search.KnnPreSearchDataKey:
-				newMD[k] = indexNumToDocMatchList[i]
+				rv[index.Name()][k] = segregatedKnnHits[index.Name()]
 			default:
-				newMD[k] = v
+				rv[index.Name()][k] = v
 			}
 		}
-		mergedOut[i] = newMD
 	}
-	return nil
+	return rv, nil
 }
