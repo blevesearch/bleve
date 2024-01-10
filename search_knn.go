@@ -362,7 +362,7 @@ func validateAndDistributeKNNHits(knnHits []*search.DocumentMatch, indexes []Ind
 		// performing this check to be safe. Since we extract the stack top
 		// in the following steps.
 		if len(hit.IndexNames) == 0 {
-			return nil, ErrorSearchInconsistency
+			return nil, ErrorTwoPhaseSearchInconsistency
 		}
 		// since the stack is not empty, we need to check if the top of the stack
 		// is a valid index name, of an index that is part of this alias. If not,
@@ -371,7 +371,7 @@ func validateAndDistributeKNNHits(knnHits []*search.DocumentMatch, indexes []Ind
 		stackTopIdx := len(hit.IndexNames) - 1
 		top := hit.IndexNames[stackTopIdx]
 		if _, exists := indexNames[top]; !exists {
-			return nil, ErrorSearchInconsistency
+			return nil, ErrorTwoPhaseSearchInconsistency
 		}
 		hit.IndexNames = hit.IndexNames[:stackTopIdx]
 		segregatedKnnHits[top] = append(segregatedKnnHits[top], hit)
