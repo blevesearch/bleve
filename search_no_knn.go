@@ -185,10 +185,22 @@ func requestHasKNN(req *SearchRequest) bool {
 func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
 }
 
-func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch, indexes []Index) (map[string][]*search.DocumentMatch, error) {
-	return nil, nil
+func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
+	return nil
 }
 
 func redistributeKNNPreSearchData(req *SearchRequest, indexes []Index) (map[string]map[string]interface{}, error) {
 	return nil, nil
+}
+func constructKNNSearchResult(req *SearchRequest, preSearchResult *SearchResult) *SearchResult {
+	return preSearchResult
+}
+
+func isKNNrequestSatisfiedByPreSearch(req *SearchRequest) bool {
+	return false
+}
+
+func constructKnnPresearchData(mergedOut map[string]map[string]interface{}, preSearchResult *SearchResult,
+	indexes []Index) (map[string]map[string]interface{}, error) {
+	return mergedOut, nil
 }
