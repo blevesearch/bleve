@@ -318,7 +318,9 @@ func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
 		// and not for sorting. This is because the knn document's
 		// sort value is already computed in the knn collector.
 		err = hc.visitFieldTerms(reader, d, func(field string, term []byte) {
-			hc.facetsBuilder.UpdateVisitor(field, term)
+			if hc.facetsBuilder != nil {
+				hc.facetsBuilder.UpdateVisitor(field, term)
+			}
 		})
 		if err != nil {
 			return err
@@ -415,7 +417,7 @@ func MakeTopNDocumentMatchHandler(
 
 // visitFieldTerms is responsible for visiting the field terms of the
 // search hit, and passing visited terms to the sort and facet builder
-func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.DocumentMatch, fv index.DocValueVisitor) error {
+func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.DocumentMatch, v index.DocValueVisitor) error {
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.StartDoc()
 	}
@@ -429,7 +431,7 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 		}
 	}
 
-	err := hc.dvReader.VisitDocValues(d.IndexInternalID, fv)
+	err := hc.dvReader.VisitDocValues(d.IndexInternalID, v)
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.EndDoc()
 	}

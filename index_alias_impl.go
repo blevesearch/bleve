@@ -218,20 +218,22 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// so that the errors are not lost
 		if preSearchResult.Status.Failed > 0 {
 			return preSearchResult, nil
+		}
+
+		// if there are no errors, then merge the data in the presearch result
+		preSearchResult = mergePreSearchResult(req, preSearchResult, i.indexes)
+		if requestSatisfiedByPreSearch(req) {
+			sr = finalizeSearchResult(req, preSearchResult)
+			// no need to run the 2nd phase MultiSearch(..)
 		} else {
-			// if there are no errors, then merge the data in the presearch result
-			preSearchResult = mergePreSearchResult(req, preSearchResult, i.indexes)
-			if requestSatisfiedByPreSearch(req) {
-				sr = finalizeSearchResult(req, preSearchResult)
-			} else {
-				preSearchData, err = constructPreSearchData(req, preSearchResult, i.indexes)
-				if err != nil {
-					return nil, err
-				}
+			preSearchData, err = constructPreSearchData(req, preSearchResult, i.indexes)
+			if err != nil {
+				return nil, err
 			}
 		}
 		preSearchDuration = time.Since(searchStart)
 	}
+
 	// check if search result was generated as part of presearch itself
 	if sr == nil {
 		sr, err = MultiSearch(ctx, req, preSearchData, i.indexes...)
