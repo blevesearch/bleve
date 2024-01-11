@@ -206,7 +206,8 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	//  - the request does not already have preSearchData
 	//  - the request requires presearch
 	var preSearchDuration time.Duration
-	if req.PreSearchData == nil && preSearchRequired(ctx, req) {
+	var sr *SearchResult
+	if req.PreSearchData == nil && preSearchRequired(req) {
 		searchStart := time.Now()
 		preSearchResult, err := preSearch(ctx, req, i.indexes...)
 		if err != nil {
@@ -218,18 +219,25 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		if preSearchResult.Status.Failed > 0 {
 			return preSearchResult, nil
 		} else {
-			// if there are no errors, then use the presearch data
-			// to execute the query
-			preSearchData, err = mergePreSearchData(req, preSearchResult, i.indexes)
-			if err != nil {
-				return nil, err
+			// if there are no errors, then merge the data in the presearch result
+			preSearchResult = mergePreSearchResult(req, preSearchResult, i.indexes)
+			if requestSatisfiedByPreSearch(req) {
+				sr = finalizeSearchResult(req, preSearchResult)
+			} else {
+				preSearchData, err = constructPreSearchData(req, preSearchResult, i.indexes)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 		preSearchDuration = time.Since(searchStart)
 	}
-	sr, err := MultiSearch(ctx, req, preSearchData, i.indexes...)
-	if err != nil {
-		return nil, err
+	// check if search result was generated as part of presearch itself
+	if sr == nil {
+		sr, err = MultiSearch(ctx, req, preSearchData, i.indexes...)
+		if err != nil {
+			return nil, err
+		}
 	}
 	sr.Took += preSearchDuration
 	return sr, nil
@@ -505,7 +513,7 @@ type asyncSearchResult struct {
 	Err    error
 }
 
-func preSearchRequired(ctx context.Context, req *SearchRequest) bool {
+func preSearchRequired(req *SearchRequest) bool {
 	return requestHasKNN(req)
 }
 
@@ -528,20 +536,49 @@ func tagHitsWithIndexName(sr *SearchResult, indexName string) {
 	}
 }
 
-func mergePreSearchData(req *SearchRequest, res *SearchResult,
-	indexes []Index) (map[string]map[string]interface{}, error) {
+// if the request is satisfied by just the presearch result,
+// finalize the result and return it directly without
+// performing multi search
+func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult) *SearchResult {
+	// global values across all hits irrespective of pagination settings
+	preSearchResult.Total = uint64(preSearchResult.Hits.Len())
+	for i, hit := range preSearchResult.Hits {
+		if hit.Score > preSearchResult.MaxScore {
+			preSearchResult.MaxScore = hit.Score
+		}
+		hit.HitNumber = uint64(i)
+	}
+	if requestHasKNN(req) {
+		preSearchResult = constructKNNSearchResult(req, preSearchResult)
+	}
+	return preSearchResult
+}
 
+func mergePreSearchResult(req *SearchRequest, res *SearchResult,
+	indexes []Index) *SearchResult {
+	if requestHasKNN(req) {
+		res.Hits = mergeKNNDocumentMatches(req, res.Hits)
+	}
+	return res
+}
+
+func requestSatisfiedByPreSearch(req *SearchRequest) bool {
+	if requestHasKNN(req) && isKNNrequestSatisfiedByPreSearch(req) {
+		return true
+	}
+	return false
+}
+
+func constructPreSearchData(req *SearchRequest, preSearchResult *SearchResult, indexes []Index) (map[string]map[string]interface{}, error) {
 	mergedOut := make(map[string]map[string]interface{}, len(indexes))
 	for _, index := range indexes {
 		mergedOut[index.Name()] = make(map[string]interface{})
 	}
+	var err error
 	if requestHasKNN(req) {
-		distributedHits, err := mergeKNNDocumentMatches(req, res.Hits, indexes)
+		mergedOut, err = constructKnnPresearchData(mergedOut, preSearchResult, indexes)
 		if err != nil {
 			return nil, err
-		}
-		for _, index := range indexes {
-			mergedOut[index.Name()][search.KnnPreSearchDataKey] = distributedHits[index.Name()]
 		}
 	}
 	return mergedOut, nil

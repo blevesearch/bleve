@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/collector"
@@ -246,6 +247,35 @@ func validateKNN(req *SearchRequest) error {
 	return nil
 }
 
+func addSortAndFieldsToKNNHits(req *SearchRequest, knnHits []*search.DocumentMatch, reader index.IndexReader) (err error) {
+	requiredSortFields := req.Sort.RequiredFields()
+	var dvReader index.DocValueReader
+	var updateFieldVisitor index.DocValueVisitor
+	if len(requiredSortFields) > 0 {
+		dvReader, err = reader.DocValueReader(requiredSortFields)
+		if err != nil {
+			return err
+		}
+		updateFieldVisitor = func(field string, term []byte) {
+			req.Sort.UpdateVisitor(field, term)
+		}
+	}
+	for _, hit := range knnHits {
+		if len(requiredSortFields) > 0 {
+			err = dvReader.VisitDocValues(hit.IndexInternalID, updateFieldVisitor)
+			if err != nil {
+				return err
+			}
+		}
+		req.Sort.Value(hit)
+		err, _ = LoadAndHighlightFields(hit, req, "", reader, nil)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, reader index.IndexReader, preSearch bool) ([]*search.DocumentMatch, error) {
 	KNNQuery, kArray, sumOfK, err := createKNNQuery(req)
 	if err != nil {
@@ -265,6 +295,14 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	knnHits := knnCollector.Results()
 	if !preSearch {
 		knnHits = finalizeKNNResults(req, knnHits, len(req.KNN))
+	}
+	// at this point, irrespective of whether it is a presearch or not,
+	// the knn hits are populated with Sort and Fields.
+	// it must be ensured downstream that the Sort and Fields are not
+	// re-evaluated, for these hits.
+	err = addSortAndFieldsToKNNHits(req, knnHits, reader)
+	if err != nil {
+		return nil, err
 	}
 	return knnHits, nil
 }
@@ -321,7 +359,7 @@ func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch, num
 	return knnHits
 }
 
-func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch, indexes []Index) (map[string][]*search.DocumentMatch, error) {
+func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
 	kArray := make([]int64, len(req.KNN))
 	for i, knnReq := range req.KNN {
 		kArray[i] = knnReq.K
@@ -334,7 +372,7 @@ func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch
 	// fixup the document, since this was already done in the first phase.
 	// hence error is always nil.
 	mergedKNNhits, _ := knnStore.Final(nil)
-	return validateAndDistributeKNNHits(finalizeKNNResults(req, mergedKNNhits, len(req.KNN)), indexes)
+	return finalizeKNNResults(req, mergedKNNhits, len(req.KNN))
 }
 
 // when we are setting KNN hits in the preSearchData, we need to make sure that
@@ -383,10 +421,102 @@ func requestHasKNN(req *SearchRequest) bool {
 	return len(req.KNN) > 0
 }
 
+// returns true if the search request contains a KNN request that can be
+// satisfied by just performing a presearch, completely bypassing the
+// actual search.
+func isKNNrequestSatisfiedByPreSearch(req *SearchRequest) bool {
+	// if req.Query is not match_none => then we need to go to phase 2
+	// to perform the actual query.
+	if _, ok := req.Query.(*query.MatchNoneQuery); !ok {
+		return false
+	}
+	// req.Query is a match_none query
+	//
+	// if request contains facets, we need to perform phase 2 to calculate
+	// the facet result. Since documents were removed as part of the
+	// merging process after phase 1, if the facet results were to be calculated
+	// during phase 1, then they will be now be incorrect, since merging would
+	// remove some documents.
+	if req.Facets != nil {
+		return false
+	}
+	// the request is a match_none query and does not contain any facets
+	// so we can satisfy the request using just the preSearch result.
+	return true
+}
+
+func constructKnnPresearchData(mergedOut map[string]map[string]interface{}, preSearchResult *SearchResult,
+	indexes []Index) (map[string]map[string]interface{}, error) {
+
+	distributedHits, err := validateAndDistributeKNNHits([]*search.DocumentMatch(preSearchResult.Hits), indexes)
+	if err != nil {
+		return nil, err
+	}
+	for _, index := range indexes {
+		mergedOut[index.Name()][search.KnnPreSearchDataKey] = distributedHits[index.Name()]
+	}
+	return mergedOut, nil
+}
+
+// if the search request is satisfied by preSearch, the merged KNN hits
+// are used to construct the final search result and returned, which bypasses
+// the actual search.
+func constructKNNSearchResult(req *SearchRequest, preSearchResult *SearchResult) *SearchResult {
+	if req.SearchAfter != nil || req.SearchBefore != nil {
+		var dummyDoc *search.DocumentMatch
+		for pos, ss := range req.Sort {
+			if ss.RequiresDocID() {
+				dummyDoc.ID = req.SearchAfter[pos]
+			}
+			if ss.RequiresScoring() {
+				if score, err := strconv.ParseFloat(req.SearchAfter[pos], 64); err == nil {
+					dummyDoc.Score = score
+				}
+			}
+		}
+		if req.SearchAfter != nil {
+			dummyDoc.Sort = req.SearchAfter
+		} else {
+			dummyDoc.Sort = req.SearchBefore
+		}
+		numDocs := 0
+		for _, hit := range preSearchResult.Hits {
+			dummyDoc.HitNumber = hit.HitNumber
+			if req.SearchAfter != nil && req.Sort.Compare(req.Sort.CacheIsScore(), req.Sort.CacheDescending(), hit, dummyDoc) > 0 {
+				preSearchResult.Hits[numDocs] = hit
+				numDocs++
+			} else if req.SearchBefore != nil && req.Sort.Compare(req.Sort.CacheIsScore(), req.Sort.CacheDescending(), hit, dummyDoc) < 0 {
+				preSearchResult.Hits[numDocs] = hit
+				numDocs++
+			}
+		}
+		preSearchResult.Hits = preSearchResult.Hits[:numDocs]
+	}
+	sortFunc := req.SortFunc()
+	// sort all hits with the requested order
+	if len(req.Sort) > 0 {
+		sorter := newSearchHitSorter(req.Sort, preSearchResult.Hits)
+		sortFunc(sorter)
+	}
+	// now skip over the correct From
+	if req.From > 0 && len(preSearchResult.Hits) > req.From {
+		preSearchResult.Hits = preSearchResult.Hits[req.From:]
+	} else if req.From > 0 {
+		preSearchResult.Hits = search.DocumentMatchCollection{}
+	}
+	// now trim to the correct size
+	if req.Size > 0 && len(preSearchResult.Hits) > req.Size {
+		preSearchResult.Hits = preSearchResult.Hits[0:req.Size]
+	}
+	return preSearchResult
+}
+
 func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
 	dummyReq.KNN = realReq.KNN
 	dummyReq.KNNOperator = knnOperatorOr
 	dummyReq.Explain = realReq.Explain
+	dummyReq.Fields = realReq.Fields
+	dummyReq.Sort = realReq.Sort
 }
 
 // the preSearchData for KNN is a list of DocumentMatch objects
