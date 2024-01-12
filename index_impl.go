@@ -717,7 +717,7 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 	if len(req.Fields) > 0 || highlighter != nil {
 		doc, err := r.Document(hit.ID)
 		if err == nil && doc != nil {
-			if len(req.Fields) > 0 {
+			if len(req.Fields) > 0 && hit.Fields == nil {
 				totalStoredFieldsBytes = doc.StoredFieldsBytes()
 				fieldsToLoad := deDuplicate(req.Fields)
 				for _, f := range fieldsToLoad {

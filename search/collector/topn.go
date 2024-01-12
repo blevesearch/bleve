@@ -228,7 +228,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			break
 		}
 
-		err = hc.prepareDocumentMatch(searchContext, reader, next)
+		err = hc.prepareDocumentMatch(searchContext, reader, next, false)
 		if err != nil {
 			break
 		}
@@ -247,7 +247,7 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		// we may have some knn hits left that did not match any of the top N tf-idf hits
 		// we need to add them to the collector store to consider them as well.
 		for _, knnDoc := range hc.knnHits {
-			err = hc.prepareDocumentMatch(searchContext, reader, knnDoc)
+			err = hc.prepareDocumentMatch(searchContext, reader, knnDoc, true)
 			if err != nil {
 				return err
 			}
@@ -304,11 +304,24 @@ func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 }
 
 func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
-	reader index.IndexReader, d *search.DocumentMatch) (err error) {
+	reader index.IndexReader, d *search.DocumentMatch, isKnnDoc bool) (err error) {
 
 	// visit field terms for features that require it (sort, facets)
-	if len(hc.neededFields) > 0 {
-		err = hc.visitFieldTerms(reader, d)
+	if !isKnnDoc && len(hc.neededFields) > 0 {
+		err = hc.visitFieldTerms(reader, d, hc.updateFieldVisitor)
+		if err != nil {
+			return err
+		}
+	} else if isKnnDoc && hc.facetsBuilder != nil {
+		// we need to visit the field terms for the knn document
+		// only for those fields that are required for faceting
+		// and not for sorting. This is because the knn document's
+		// sort value is already computed in the knn collector.
+		err = hc.visitFieldTerms(reader, d, func(field string, term []byte) {
+			if hc.facetsBuilder != nil {
+				hc.facetsBuilder.UpdateVisitor(field, term)
+			}
+		})
 		if err != nil {
 			return err
 		}
@@ -321,6 +334,11 @@ func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
 	// update max score
 	if d.Score > hc.maxScore {
 		hc.maxScore = d.Score
+	}
+	// early exit as the document match had its sort value calculated in the knn
+	// collector itself
+	if isKnnDoc {
+		return nil
 	}
 
 	// see if we need to load ID (at this early stage, for example to sort on it)
@@ -399,7 +417,7 @@ func MakeTopNDocumentMatchHandler(
 
 // visitFieldTerms is responsible for visiting the field terms of the
 // search hit, and passing visited terms to the sort and facet builder
-func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.DocumentMatch) error {
+func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.DocumentMatch, v index.DocValueVisitor) error {
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.StartDoc()
 	}
@@ -413,7 +431,7 @@ func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.Doc
 		}
 	}
 
-	err := hc.dvReader.VisitDocValues(d.IndexInternalID, hc.updateFieldVisitor)
+	err := hc.dvReader.VisitDocValues(d.IndexInternalID, v)
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.EndDoc()
 	}
