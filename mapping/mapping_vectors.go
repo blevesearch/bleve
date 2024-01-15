@@ -132,7 +132,8 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	fieldName := getFieldName(pathString, path, fm)
 	options := fm.Options()
 	field := document.NewVectorFieldWithIndexingOptions(fieldName,
-		indexes, vector, fm.Dims, fm.Similarity, options)
+		indexes, vector, fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor,
+		options)
 	context.doc.AddField(field)
 
 	// "_all" composite field is not applicable for vector field
@@ -160,6 +161,11 @@ func validateVectorFieldAlias(field *FieldMapping, parentName string,
 	}
 	if field.Similarity == "" {
 		field.Similarity = index.DefaultSimilarityMetric
+	}
+
+	if field.VectorIndexOptimizedFor == "" {
+		fmt.Printf("using the default optimization type \n")
+		field.VectorIndexOptimizedFor = index.DefaultIndexOptimizedFor
 	}
 
 	// following fields are not applicable for vector
@@ -200,6 +206,12 @@ func validateVectorFieldAlias(field *FieldMapping, parentName string,
 		return fmt.Errorf("field: '%s', invalid similarity "+
 			"metric: '%s', valid metrics are: %+v", field.Name, field.Similarity,
 			reflect.ValueOf(index.SupportedSimilarityMetrics).MapKeys())
+	}
+
+	if _, ok := index.SupportedVectorIndexOptimizations[field.VectorIndexOptimizedFor]; !ok {
+		return fmt.Errorf("field: '%s', invalid optimization "+
+			"metric: '%s', valid metrics are: %+v", field.Name, field.VectorIndexOptimizedFor,
+			reflect.ValueOf(index.SupportedVectorIndexOptimizations).MapKeys())
 	}
 
 	if fieldAliasCtx != nil { // writing to a nil map is unsafe
