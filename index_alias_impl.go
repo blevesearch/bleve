@@ -641,8 +641,15 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 		}
 	}
 
-	// fix up errors
-	if len(indexErrors) > 0 {
+	// in presearch partial results are not allowed as it can lead to
+	// the real search giving incorrect results, and hence the search
+	// result is reset.
+	// discard partial hits if some child index has failed or
+	// if some child alias has returned partial results.
+	if len(indexErrors) > 0 || sr.Status.Failed > 0 {
+		sr = &SearchResult{
+			Status: sr.Status,
+		}
 		if sr.Status.Errors == nil {
 			sr.Status.Errors = make(map[string]error)
 		}
