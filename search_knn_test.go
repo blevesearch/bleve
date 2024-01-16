@@ -412,7 +412,7 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 
 	indexMappingDotProduct := NewIndexMapping()
 	indexMappingDotProduct.DefaultMapping.AddFieldMappingsAt("content", contentFieldMapping)
-	indexMappingDotProduct.DefaultMapping.AddFieldMappingsAt("vector", vecFieldMappingL2)
+	indexMappingDotProduct.DefaultMapping.AddFieldMappingsAt("vector", vecFieldMappingDot)
 
 	testCases := []struct {
 		numSegments int
@@ -532,6 +532,7 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			query.Sort = search.SortOrder{&search.SortScore{Desc: true}, &search.SortDocID{Desc: true}}
 			query.AddKNNOperator(operator)
 			query.Explain = true
+
 			err = createMultipleSegmentsIndex(documents, index, 1)
 			if err != nil {
 				t.Fatal(err)
@@ -561,8 +562,6 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			query = searchRequests[testCase.queryIndex]
-			query.AddKNNOperator(operator)
 			err = createMultipleSegmentsIndex(documents, index, testCase.numSegments)
 			if err != nil {
 				t.Fatal(err)
