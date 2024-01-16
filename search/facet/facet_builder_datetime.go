@@ -17,7 +17,6 @@ package facet
 import (
 	"reflect"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/numeric"
@@ -36,10 +35,8 @@ func init() {
 }
 
 type dateTimeRange struct {
-	start       time.Time
-	end         time.Time
-	startLayout string
-	endLayout   string
+	start time.Time
+	end   time.Time
 }
 
 type DateTimeFacetBuilder struct {
@@ -78,12 +75,10 @@ func (fb *DateTimeFacetBuilder) Size() int {
 	return sizeInBytes
 }
 
-func (fb *DateTimeFacetBuilder) AddRange(name string, start, end time.Time, startLayout string, endLayout string) {
+func (fb *DateTimeFacetBuilder) AddRange(name string, start, end time.Time) {
 	r := dateTimeRange{
-		start:       start,
-		end:         end,
-		startLayout: startLayout,
-		endLayout:   endLayout,
+		start: start,
+		end:   end,
 	}
 	fb.ranges[name] = &r
 }
@@ -139,23 +134,11 @@ func (fb *DateTimeFacetBuilder) Result() *search.FacetResult {
 			Count: count,
 		}
 		if !dateRange.start.IsZero() {
-			var start string
-			if dateRange.startLayout == "" {
-				// layout not set probably means it is probably a timestamp
-				start = strconv.FormatInt(dateRange.start.UnixNano(), 10)
-			} else {
-				start = dateRange.start.Format(dateRange.startLayout)
-			}
+			start := dateRange.start.Format(time.RFC3339Nano)
 			tf.Start = &start
 		}
 		if !dateRange.end.IsZero() {
-			var end string
-			if dateRange.endLayout == "" {
-				// layout not set probably means it is probably a timestamp
-				end = strconv.FormatInt(dateRange.end.UnixNano(), 10)
-			} else {
-				end = dateRange.end.Format(dateRange.endLayout)
-			}
+			end := dateRange.end.Format(time.RFC3339Nano)
 			tf.End = &end
 		}
 		rv.DateRanges = append(rv.DateRanges, tf)

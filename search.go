@@ -54,28 +54,24 @@ type dateTimeRange struct {
 	endString      *string
 }
 
-func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (start, end time.Time, startLayout, endLayout string, err error) {
+func (dr *dateTimeRange) ParseDates(dateTimeParser analysis.DateTimeParser) (start, end time.Time, err error) {
 	start = dr.Start
-	startLayout = time.RFC3339Nano
 	if dr.Start.IsZero() && dr.startString != nil {
-		s, layout, parseError := dateTimeParser.ParseDateTime(*dr.startString)
+		s, _, parseError := dateTimeParser.ParseDateTime(*dr.startString)
 		if parseError != nil {
-			return start, end, startLayout, endLayout, fmt.Errorf("error parsing start date '%s' for date range name '%s': %v", *dr.startString, dr.Name, parseError)
+			return start, end, fmt.Errorf("error parsing start date '%s' for date range name '%s': %v", *dr.startString, dr.Name, parseError)
 		}
 		start = s
-		startLayout = layout
 	}
 	end = dr.End
-	endLayout = time.RFC3339Nano
 	if dr.End.IsZero() && dr.endString != nil {
-		e, layout, parseError := dateTimeParser.ParseDateTime(*dr.endString)
+		e, _, parseError := dateTimeParser.ParseDateTime(*dr.endString)
 		if parseError != nil {
-			return start, end, startLayout, endLayout, fmt.Errorf("error parsing end date '%s' for date range name '%s': %v", *dr.endString, dr.Name, parseError)
+			return start, end, fmt.Errorf("error parsing end date '%s' for date range name '%s': %v", *dr.endString, dr.Name, parseError)
 		}
 		end = e
-		endLayout = layout
 	}
-	return start, end, startLayout, endLayout, err
+	return start, end, err
 }
 
 func (dr *dateTimeRange) UnmarshalJSON(input []byte) error {
@@ -186,7 +182,7 @@ func (fr *FacetRequest) Validate() error {
 			if dr.DateTimeParser == "" {
 				// cannot parse the date range dates as the defaultDateTimeParser is overridden
 				// so perform this validation at query time
-				start, end, _, _, err := dr.ParseDates(dateTimeParser)
+				start, end, err := dr.ParseDates(dateTimeParser)
 				if err != nil {
 					return fmt.Errorf("ParseDates err: %v, using date time parser named %s", err, defaultDateTimeParser)
 				}
