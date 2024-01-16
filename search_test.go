@@ -2839,8 +2839,7 @@ func TestDateRangeStringQuery(t *testing.T) {
 		}
 	}
 }
-
-func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
+func TestDateRangeFacetQueriesWithCustomDateTimeParser(t *testing.T) {
 	idxMapping := NewIndexMapping()
 
 	err := idxMapping.AddCustomDateTimeParser("customDT", map[string]interface{}{
@@ -2939,8 +2938,8 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 			end:   "2001-08-20 18:10:00",
 			result: testFacetResult{
 				name:  "test",
-				start: "2001-08-20 18:00:00",
-				end:   "2001-08-20 18:10:00",
+				start: "2001-08-20T18:00:00Z",
+				end:   "2001-08-20T18:10:00Z",
 				count: 2,
 				err:   nil,
 			},
@@ -2952,8 +2951,8 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 			parser: "queryDT",
 			result: testFacetResult{
 				name:  "test",
-				start: "20/08/2001 6:00PM",
-				end:   "20/08/2001 6:10PM",
+				start: "2001-08-20T18:00:00Z",
+				end:   "2001-08-20T18:10:00Z",
 				count: 2,
 				err:   nil,
 			},
@@ -2965,8 +2964,8 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 			parser: "customDT",
 			result: testFacetResult{
 				name:  "test",
-				start: "20/08/2001 15:00:00",
-				end:   "2001/08/20 6:10PM",
+				start: "2001-08-20T15:00:00Z",
+				end:   "2001-08-20T18:10:00Z",
 				count: 2,
 				err:   nil,
 			},
@@ -2977,7 +2976,7 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 			parser: "customDT",
 			result: testFacetResult{
 				name:  "test",
-				end:   "2001/08/20 6:15PM",
+				end:   "2001-08-20T18:15:00Z",
 				count: 3,
 				err:   nil,
 			},
@@ -2988,7 +2987,7 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 			parser: "queryDT",
 			result: testFacetResult{
 				name:  "test",
-				start: "20/08/2001 6:15PM",
+				start: "2001-08-20T18:15:00Z",
 				count: 2,
 				err:   nil,
 			},

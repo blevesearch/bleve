@@ -593,14 +593,14 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 					if dateTimeParser == nil {
 						return nil, fmt.Errorf("no date time parser named `%s` registered", dateTimeParserName)
 					}
-					start, end, startLayout, endLayout, err := dr.ParseDates(dateTimeParser)
+					start, end, err := dr.ParseDates(dateTimeParser)
 					if err != nil {
 						return nil, fmt.Errorf("ParseDates err: %v, using date time parser named %s", err, dateTimeParserName)
 					}
 					if start.IsZero() && end.IsZero() {
 						return nil, fmt.Errorf("date range query must specify either start, end or both for date range name '%s'", dr.Name)
 					}
-					facetBuilder.AddRange(dr.Name, start, end, startLayout, endLayout)
+					facetBuilder.AddRange(dr.Name, start, end)
 				}
 				facetsBuilder.Add(facetName, facetBuilder)
 			} else {
