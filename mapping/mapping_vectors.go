@@ -165,7 +165,7 @@ func validateVectorFieldAlias(field *FieldMapping, parentName string,
 
 	if field.VectorIndexOptimizedFor == "" {
 		fmt.Printf("using the default optimization type \n")
-		field.VectorIndexOptimizedFor = index.DefaultIndexOptimizedFor
+		field.VectorIndexOptimizedFor = index.DefaultIndexOptimization
 	}
 
 	// following fields are not applicable for vector
