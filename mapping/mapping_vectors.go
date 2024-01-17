@@ -131,8 +131,8 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 
 	fieldName := getFieldName(pathString, path, fm)
 	options := fm.Options()
-	field := document.NewVectorFieldWithIndexingOptions(fieldName,
-		indexes, vector, fm.Dims, fm.Similarity, options)
+	field := document.NewVectorFieldWithIndexingOptions(fieldName, indexes, vector,
+		fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor, options)
 	context.doc.AddField(field)
 
 	// "_all" composite field is not applicable for vector field
@@ -158,8 +158,17 @@ func validateVectorFieldAlias(field *FieldMapping, parentName string,
 	if field.Name == "" {
 		field.Name = parentName
 	}
+
 	if field.Similarity == "" {
 		field.Similarity = index.DefaultSimilarityMetric
+	}
+
+	if field.VectorIndexOptimizedFor == "" {
+		field.VectorIndexOptimizedFor = index.DefaultIndexOptimization
+	}
+	if _, exists := index.SupportedVectorIndexOptimizations[field.VectorIndexOptimizedFor]; !exists {
+		// if an unsupported config is provided, override to default
+		field.VectorIndexOptimizedFor = index.DefaultIndexOptimization
 	}
 
 	// following fields are not applicable for vector

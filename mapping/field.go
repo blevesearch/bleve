@@ -77,6 +77,9 @@ type FieldMapping struct {
 	// vector fields.
 	// See: index.DefaultSimilarityMetric & index.SupportedSimilarityMetrics
 	Similarity string `json:"similarity,omitempty"`
+
+	// Applicable to vector fields only - optimization string
+	VectorIndexOptimizedFor string `json:"vector_index_optimized_for,omitempty"`
 }
 
 // NewTextFieldMapping returns a default field mapping for text
@@ -463,6 +466,11 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 			}
 		case "similarity":
 			err := json.Unmarshal(v, &fm.Similarity)
+			if err != nil {
+				return err
+			}
+		case "vector_index_optimized_for":
+			err := json.Unmarshal(v, &fm.VectorIndexOptimizedFor)
 			if err != nil {
 				return err
 			}
