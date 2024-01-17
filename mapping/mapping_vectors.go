@@ -164,7 +164,10 @@ func validateVectorFieldAlias(field *FieldMapping, parentName string,
 	}
 
 	if field.VectorIndexOptimizedFor == "" {
-		fmt.Printf("using the default optimization type \n")
+		field.VectorIndexOptimizedFor = index.DefaultIndexOptimization
+	}
+
+	if _, exists := index.SupportedVectorIndexOptimizations[field.VectorIndexOptimizedFor]; !exists {
 		field.VectorIndexOptimizedFor = index.DefaultIndexOptimization
 	}
 
@@ -206,12 +209,6 @@ func validateVectorFieldAlias(field *FieldMapping, parentName string,
 		return fmt.Errorf("field: '%s', invalid similarity "+
 			"metric: '%s', valid metrics are: %+v", field.Name, field.Similarity,
 			reflect.ValueOf(index.SupportedSimilarityMetrics).MapKeys())
-	}
-
-	if _, ok := index.SupportedVectorIndexOptimizations[field.VectorIndexOptimizedFor]; !ok {
-		return fmt.Errorf("field: '%s', invalid optimization "+
-			"metric: '%s', valid metrics are: %+v", field.Name, field.VectorIndexOptimizedFor,
-			reflect.ValueOf(index.SupportedVectorIndexOptimizations).MapKeys())
 	}
 
 	if fieldAliasCtx != nil { // writing to a nil map is unsafe
