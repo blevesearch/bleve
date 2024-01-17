@@ -78,7 +78,7 @@ type FieldMapping struct {
 	// See: index.DefaultSimilarityMetric & index.SupportedSimilarityMetrics
 	Similarity string `json:"similarity,omitempty"`
 
-	// The type of index based on the parameter to optimize for.
+	// Applicable to vector fields only - optimization string
 	VectorIndexOptimizedFor string `json:"vector_index_optimized_for,omitempty"`
 }
 
