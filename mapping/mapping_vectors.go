@@ -131,9 +131,8 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 
 	fieldName := getFieldName(pathString, path, fm)
 	options := fm.Options()
-	field := document.NewVectorFieldWithIndexingOptions(fieldName,
-		indexes, vector, fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor,
-		options)
+	field := document.NewVectorFieldWithIndexingOptions(fieldName, indexes, vector,
+		fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor, options)
 	context.doc.AddField(field)
 
 	// "_all" composite field is not applicable for vector field
