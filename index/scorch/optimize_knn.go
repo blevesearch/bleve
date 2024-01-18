@@ -32,6 +32,9 @@ type OptimizeVR struct {
 	vrs map[string][]*IndexSnapshotVectorReader
 }
 
+// This setting _MUST_ only be changed during init and not after.
+var BleveMaxKNNConcurrency = 10
+
 func (o *OptimizeVR) Finish() error {
 	// for each field, get the vector index --> invoke the zap func.
 	// for each VR, populate postings list and iterators
@@ -41,12 +44,17 @@ func (o *OptimizeVR) Finish() error {
 	var errors []error
 
 	wg := sync.WaitGroup{}
+	semaphore := make(chan struct{}, BleveMaxKNNConcurrency)
 	// Launch goroutines to get vector index for each segment
 	for i, seg := range o.snapshot.segment {
 		if sv, ok := seg.segment.(segment_api.VectorSegment); ok {
 			wg.Add(1)
+			semaphore <- struct{}{} // Acquire a semaphore slot
 			go func(index int, segment segment_api.VectorSegment, origSeg *SegmentSnapshot) {
-				defer wg.Done()
+				defer func() {
+					<-semaphore // Release the semaphore slot
+					wg.Done()
+				}()
 				for field, vrs := range o.vrs {
 					searchVectorIndex, closeVectorIndex, err := segment.InterpretVectorIndex(field)
 					if err != nil {
@@ -78,6 +86,7 @@ func (o *OptimizeVR) Finish() error {
 		}
 	}
 	wg.Wait()
+	close(semaphore)
 	if len(errors) > 0 {
 		return errors[0]
 	}

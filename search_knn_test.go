@@ -306,7 +306,7 @@ func compareExplanation(a, b *search.Explanation) bool {
 		return false
 	}
 
-	if a.Value != b.Value || len(a.Children) != len(b.Children) {
+	if truncateScore(a.Value) != truncateScore(b.Value) || len(a.Children) != len(b.Children) {
 		return false
 	}
 
