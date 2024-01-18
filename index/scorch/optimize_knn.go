@@ -32,6 +32,7 @@ type OptimizeVR struct {
 	vrs map[string][]*IndexSnapshotVectorReader
 }
 
+// This setting _MUST_ only be changed during init and not after.
 var BleveMaxKNNConcurrency = 10
 
 func (o *OptimizeVR) Finish() error {
