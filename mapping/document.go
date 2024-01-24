@@ -156,15 +156,20 @@ func (dm *DocumentMapping) fieldDescribedByPath(path string) *FieldMapping {
 	return nil
 }
 
-// documentMappingForPath returns the EXACT and closest matches for a sub
+// documentMappingForPathElements returns the EXACT and closest matches for a sub
 // document or for an explicitly mapped field; the closest most specific
 // document mapping could be one that matches part of the provided path.
-func (dm *DocumentMapping) documentMappingForPath(path string) (
+func (dm *DocumentMapping) documentMappingForPathElements(pathElements []string) (
 	*DocumentMapping, *DocumentMapping) {
-	pathElements := decodePath(path)
+	var pathElementsCopy []string
+	if len(pathElements) == 0 {
+		pathElementsCopy = []string{""}
+	} else {
+		pathElementsCopy = pathElements
+	}
 	current := dm
 OUTER:
-	for i, pathElement := range pathElements {
+	for i, pathElement := range pathElementsCopy {
 		if subDocMapping, exists := current.Properties[pathElement]; exists {
 			current = subDocMapping
 			continue OUTER
@@ -172,7 +177,7 @@ OUTER:
 
 		// no subDocMapping matches this pathElement
 		// only if this is the last element check for field name
-		if i == len(pathElements)-1 {
+		if i == len(pathElementsCopy)-1 {
 			for _, field := range current.Fields {
 				if field.Name == pathElement {
 					break
@@ -183,6 +188,15 @@ OUTER:
 		return nil, current
 	}
 	return current, current
+}
+
+// documentMappingForPath returns the EXACT and closest matches for a sub
+// document or for an explicitly mapped field; the closest most specific
+// document mapping could be one that matches part of the provided path.
+func (dm *DocumentMapping) documentMappingForPath(path string) (
+	*DocumentMapping, *DocumentMapping) {
+	pathElements := decodePath(path)
+	return dm.documentMappingForPathElements(pathElements)
 }
 
 // NewDocumentMapping returns a new document mapping
@@ -403,9 +417,8 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 }
 
 func (dm *DocumentMapping) processProperty(property interface{}, path []string, indexes []uint64, context *walkContext) {
-	pathString := encodePath(path)
 	// look to see if there is a mapping for this field
-	subDocMapping, closestDocMapping := dm.documentMappingForPath(pathString)
+	subDocMapping, closestDocMapping := dm.documentMappingForPathElements(path)
 
 	// check to see if we even need to do further processing
 	if subDocMapping != nil && !subDocMapping.Enabled {
@@ -417,6 +430,8 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		// cannot do anything with the zero value
 		return
 	}
+
+	pathString := encodePath(path)
 	propertyType := propertyValue.Type()
 	switch propertyType.Kind() {
 	case reflect.String:
