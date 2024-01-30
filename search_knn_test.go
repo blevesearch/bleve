@@ -23,6 +23,7 @@ import (
 	"math/rand"
 	"sort"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/analysis/lang/en"
@@ -284,11 +285,24 @@ func createMultipleSegmentsIndex(documents []map[string]interface{}, index Index
 		}
 		prevCutoff += docsPerBatch[i]
 	}
-	for _, batch := range batches {
-		err = index.Batch(batch)
-		if err != nil {
-			return err
-		}
+	errMutex := sync.Mutex{}
+	var errors []error
+	wg := sync.WaitGroup{}
+	wg.Add(len(batches))
+	for i, batch := range batches {
+		go func(ix int, batchx *Batch) {
+			defer wg.Done()
+			err := index.Batch(batchx)
+			if err != nil {
+				errMutex.Lock()
+				errors = append(errors, err)
+				errMutex.Unlock()
+			}
+		}(i, batch)
+	}
+	wg.Wait()
+	if len(errors) > 0 {
+		return errors[0]
 	}
 	return nil
 }
