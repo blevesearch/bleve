@@ -20,6 +20,7 @@ package scorch
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	index "github.com/blevesearch/bleve_index_api"
 	segment_api "github.com/blevesearch/scorch_segment_api/v2"
@@ -74,6 +75,8 @@ func (o *OptimizeVR) Finish() error {
 							go closeVectorIndex()
 							return
 						}
+
+						atomic.AddUint64(&o.snapshot.parent.stats.TotKNNSearches, uint64(1))
 
 						// postings and iterators are already alloc'ed when
 						// IndexSnapshotVectorReader is created
