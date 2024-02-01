@@ -18,14 +18,17 @@
 package scorch
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
+	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 	segment_api "github.com/blevesearch/scorch_segment_api/v2"
 )
 
 type OptimizeVR struct {
+	ctx      context.Context
 	snapshot *IndexSnapshot
 
 	// maps field to vector readers
@@ -56,22 +59,45 @@ func (o *OptimizeVR) Finish() error {
 					wg.Done()
 				}()
 				for field, vrs := range o.vrs {
-					searchVectorIndex, closeVectorIndex, err := segment.InterpretVectorIndex(field)
+					vectorIndexInterpretImpl, err := segment.InterpretVectorIndex(field)
 					if err != nil {
 						errorsM.Lock()
 						errors = append(errors, err)
 						errorsM.Unlock()
 						return
 					}
+
+					vectorIndexSize := vectorIndexInterpretImpl.Size()
+					if cb := o.ctx.Value(search.SearchSearcherStartCallbackKey); cb != nil {
+						if cbF, ok := cb.(search.SearchSearcherStartCallbackFn); ok {
+							err = cbF(vectorIndexSize)
+						}
+					}
+					if err != nil {
+						errorsM.Lock()
+						errors = append(errors, err)
+						errorsM.Unlock()
+						go vectorIndexInterpretImpl.Close()
+						return
+					}
+
+					if cb := o.ctx.Value(search.SearchSearcherEndCallbackKey); cb != nil {
+						if cbF, ok := cb.(search.SearchSearcherEndCallbackFn); ok {
+							defer func() {
+								_ = cbF(vectorIndexSize)
+							}()
+						}
+					}
+
 					for _, vr := range vrs {
 						// for each VR, populate postings list and iterators
 						// by passing the obtained vector index and getting similar vectors.
-						pl, err := searchVectorIndex(vr.field, vr.vector, vr.k, origSeg.deleted)
+						pl, err := vectorIndexInterpretImpl.Search(vr.vector, vr.k, origSeg.deleted)
 						if err != nil {
 							errorsM.Lock()
 							errors = append(errors, err)
 							errorsM.Unlock()
-							go closeVectorIndex()
+							go vectorIndexInterpretImpl.Close()
 							return
 						}
 
@@ -80,7 +106,7 @@ func (o *OptimizeVR) Finish() error {
 						vr.postings[index] = pl
 						vr.iterators[index] = pl.Iterator(vr.iterators[index])
 					}
-					go closeVectorIndex()
+					go vectorIndexInterpretImpl.Close()
 				}
 			}(i, sv, seg)
 		}
@@ -93,7 +119,7 @@ func (o *OptimizeVR) Finish() error {
 	return nil
 }
 
-func (s *IndexSnapshotVectorReader) VectorOptimize(
+func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 	octx index.VectorOptimizableContext) (index.VectorOptimizableContext, error) {
 
 	if s.snapshot.parent.segPlugin.Version() < VectorSearchSupportedSegmentVersion {
@@ -118,6 +144,6 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(
 	}
 
 	o.vrs[s.field] = append(o.vrs[s.field], s)
-
+	o.ctx = ctx
 	return o, nil
 }
