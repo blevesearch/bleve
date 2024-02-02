@@ -320,7 +320,6 @@ func (im *IndexMappingImpl) determineType(data interface{}) string {
 
 	return im.DefaultType
 }
-
 func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}) error {
 	docType := im.determineType(data)
 	docMapping := im.mappingForType(docType)
