@@ -858,6 +858,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	rv := &SegmentSnapshot{
 		segment:    segment,
 		cachedDocs: &cachedDocs{cache: nil},
+		cachedMeta: &cachedMeta{meta: nil},
 	}
 	deletedBytes := segmentBucket.Get(boltDeletedKey)
 	if deletedBytes != nil {
