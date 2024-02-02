@@ -69,7 +69,7 @@ func (o *OptimizeVR) Finish() error {
 					wg.Done()
 				}()
 				for field, vrs := range o.vrs {
-					vectorIndexInterpret, err := segment.InterpretVectorIndex(field)
+					vecIndex, err := segment.InterpretVectorIndex(field)
 					if err != nil {
 						errorsM.Lock()
 						errors = append(errors, err)
@@ -78,17 +78,17 @@ func (o *OptimizeVR) Finish() error {
 					}
 
 					// update the vector index size as a meta value in the segment snapshot
-					vectorIndexSize := vectorIndexInterpret.Size()
+					vectorIndexSize := vecIndex.Size()
 					seg.cachedMeta.updateMeta(field, vectorIndexSize)
 					for _, vr := range vrs {
 						// for each VR, populate postings list and iterators
 						// by passing the obtained vector index and getting similar vectors.
-						pl, err := vectorIndexInterpret.Search(vr.vector, vr.k, origSeg.deleted)
+						pl, err := vecIndex.Search(vr.vector, vr.k, origSeg.deleted)
 						if err != nil {
 							errorsM.Lock()
 							errors = append(errors, err)
 							errorsM.Unlock()
-							go vectorIndexInterpret.Close()
+							go vecIndex.Close()
 							return
 						}
 
@@ -99,7 +99,7 @@ func (o *OptimizeVR) Finish() error {
 						vr.postings[index] = pl
 						vr.iterators[index] = pl.Iterator(vr.iterators[index])
 					}
-					go vectorIndexInterpret.Close()
+					go vecIndex.Close()
 				}
 			}(i, sv, seg)
 		}
