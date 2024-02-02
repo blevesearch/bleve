@@ -28,9 +28,9 @@ import (
 )
 
 type OptimizeVR struct {
-	ctx      context.Context
-	snapshot *IndexSnapshot
-
+	ctx       context.Context
+	snapshot  *IndexSnapshot
+	totalCost uint64
 	// maps field to vector readers
 	vrs map[string][]*IndexSnapshotVectorReader
 }
@@ -45,6 +45,15 @@ func (o *OptimizeVR) Finish() error {
 	// defer close index - just once.
 	var errorsM sync.Mutex
 	var errors []error
+	if cb := o.ctx.Value(search.SearchSearcherEndCallbackKey); cb != nil {
+		if cbF, ok := cb.(search.SearchSearcherEndCallbackFn); ok {
+			defer func() {
+				// notify the callback that the searcher creation etc. is finished
+				// and report back the total cost for it decrement or whatever.
+				_ = cbF(o.totalCost)
+			}()
+		}
+	}
 
 	wg := sync.WaitGroup{}
 	semaphore := make(chan struct{}, BleveMaxKNNConcurrency)
@@ -59,7 +68,7 @@ func (o *OptimizeVR) Finish() error {
 					wg.Done()
 				}()
 				for field, vrs := range o.vrs {
-					vectorIndexInterpretImpl, err := segment.InterpretVectorIndex(field)
+					vectorIndexInterpret, err := segment.InterpretVectorIndex(field)
 					if err != nil {
 						errorsM.Lock()
 						errors = append(errors, err)
@@ -67,37 +76,18 @@ func (o *OptimizeVR) Finish() error {
 						return
 					}
 
-					vectorIndexSize := vectorIndexInterpretImpl.Size()
-					if cb := o.ctx.Value(search.SearchSearcherStartCallbackKey); cb != nil {
-						if cbF, ok := cb.(search.SearchSearcherStartCallbackFn); ok {
-							err = cbF(vectorIndexSize)
-						}
-					}
-					if err != nil {
-						errorsM.Lock()
-						errors = append(errors, err)
-						errorsM.Unlock()
-						go vectorIndexInterpretImpl.Close()
-						return
-					}
-
-					if cb := o.ctx.Value(search.SearchSearcherEndCallbackKey); cb != nil {
-						if cbF, ok := cb.(search.SearchSearcherEndCallbackFn); ok {
-							defer func() {
-								_ = cbF(vectorIndexSize)
-							}()
-						}
-					}
-
+					// update the vector index size as a meta value in the segment snapshot
+					vectorIndexSize := vectorIndexInterpret.Size()
+					seg.cachedMeta.updateMeta(field, vectorIndexSize)
 					for _, vr := range vrs {
 						// for each VR, populate postings list and iterators
 						// by passing the obtained vector index and getting similar vectors.
-						pl, err := vectorIndexInterpretImpl.Search(vr.vector, vr.k, origSeg.deleted)
+						pl, err := vectorIndexInterpret.Search(vr.vector, vr.k, origSeg.deleted)
 						if err != nil {
 							errorsM.Lock()
 							errors = append(errors, err)
 							errorsM.Unlock()
-							go vectorIndexInterpretImpl.Close()
+							go vectorIndexInterpret.Close()
 							return
 						}
 
@@ -106,7 +96,7 @@ func (o *OptimizeVR) Finish() error {
 						vr.postings[index] = pl
 						vr.iterators[index] = pl.Iterator(vr.iterators[index])
 					}
-					go vectorIndexInterpretImpl.Close()
+					go vectorIndexInterpret.Close()
 				}
 			}(i, sv, seg)
 		}
@@ -143,6 +133,33 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 		return nil, fmt.Errorf("tried to optimize KNN across different snapshots")
 	}
 
+	// for every searcher creation, consult the segment snapshot to see
+	// what's the vector index size and since you're anyways going
+	// to use this vector index to perform the search etc. as part of the Finish()
+	// perform a check as to whether we allow the searcher creation (the downstream)
+	// Finish() logic to even occur or not.
+	var sumVectorIndexSize uint64
+	for _, seg := range o.snapshot.segment {
+		vecIndexSize := seg.cachedMeta.fetchMeta(s.field)
+		if vecIndexSize != nil {
+			sumVectorIndexSize += vecIndexSize.(uint64)
+		}
+	}
+
+	if cb := o.ctx.Value(search.SearchSearcherStartCallbackKey); cb != nil {
+		if cbF, ok := cb.(search.SearchSearcherStartCallbackFn); ok {
+			err := cbF(sumVectorIndexSize)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if _, ok := o.vrs[s.field]; ok {
+		// total cost is essentially the sum of the vector indexes' size of all
+		// unique fields across all segments
+		o.totalCost += sumVectorIndexSize
+	}
 	o.vrs[s.field] = append(o.vrs[s.field], s)
 	o.ctx = ctx
 	return o, nil
