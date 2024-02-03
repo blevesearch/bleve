@@ -43,7 +43,7 @@ type BooleanSearcher struct {
 	currMustNot     *search.DocumentMatch
 	currentID       index.IndexInternalID
 	min             uint64
-	scorer          *scorer.ConjunctionQueryScorer
+	scorer          scorer.ConjunctionQueryScorer
 	matches         []*search.DocumentMatch
 	initialized     bool
 	done            bool
@@ -448,4 +448,8 @@ func (s *BooleanSearcher) DocumentMatchPoolSize() int {
 		rv += s.mustNotSearcher.DocumentMatchPoolSize()
 	}
 	return rv
+}
+
+func (s *BooleanSearcher) SetScorer(scorer scorer.ConjunctionQueryScorer) {
+	s.scorer = scorer
 }

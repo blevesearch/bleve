@@ -26,11 +26,18 @@ import (
 var reflectStaticSizeConstantScorer int
 
 func init() {
-	var cs ConstantScorer
+	var cs constantScorer
 	reflectStaticSizeConstantScorer = int(reflect.TypeOf(cs).Size())
 }
 
-type ConstantScorer struct {
+type ConstantScorer interface {
+	Size() int
+	Weight() float64
+	SetQueryNorm(qnorm float64)
+	Score(ctx *search.SearchContext, id index.IndexInternalID) *search.DocumentMatch
+}
+
+type constantScorer struct {
 	constant               float64
 	boost                  float64
 	options                search.SearcherOptions
@@ -39,7 +46,7 @@ type ConstantScorer struct {
 	queryWeightExplanation *search.Explanation
 }
 
-func (s *ConstantScorer) Size() int {
+func (s *constantScorer) Size() int {
 	sizeInBytes := reflectStaticSizeConstantScorer + size.SizeOfPtr
 
 	if s.queryWeightExplanation != nil {
@@ -49,8 +56,8 @@ func (s *ConstantScorer) Size() int {
 	return sizeInBytes
 }
 
-func NewConstantScorer(constant float64, boost float64, options search.SearcherOptions) *ConstantScorer {
-	rv := ConstantScorer{
+func NewConstantScorer(constant float64, boost float64, options search.SearcherOptions) ConstantScorer {
+	rv := constantScorer{
 		options:     options,
 		queryWeight: 1.0,
 		constant:    constant,
@@ -60,12 +67,12 @@ func NewConstantScorer(constant float64, boost float64, options search.SearcherO
 	return &rv
 }
 
-func (s *ConstantScorer) Weight() float64 {
+func (s *constantScorer) Weight() float64 {
 	sum := s.boost
 	return sum * sum
 }
 
-func (s *ConstantScorer) SetQueryNorm(qnorm float64) {
+func (s *constantScorer) SetQueryNorm(qnorm float64) {
 	s.queryNorm = qnorm
 
 	// update the query weight
@@ -89,7 +96,7 @@ func (s *ConstantScorer) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *ConstantScorer) Score(ctx *search.SearchContext, id index.IndexInternalID) *search.DocumentMatch {
+func (s *constantScorer) Score(ctx *search.SearchContext, id index.IndexInternalID) *search.DocumentMatch {
 	var scoreExplanation *search.Explanation
 
 	score := s.constant

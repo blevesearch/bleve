@@ -25,25 +25,30 @@ import (
 var reflectStaticSizeDisjunctionQueryScorer int
 
 func init() {
-	var dqs DisjunctionQueryScorer
+	var dqs disjunctionQueryScorer
 	reflectStaticSizeDisjunctionQueryScorer = int(reflect.TypeOf(dqs).Size())
 }
 
-type DisjunctionQueryScorer struct {
+type DisjunctionQueryScorer interface {
+	Size() int
+	Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch
+}
+
+type disjunctionQueryScorer struct {
 	options search.SearcherOptions
 }
 
-func (s *DisjunctionQueryScorer) Size() int {
+func (s *disjunctionQueryScorer) Size() int {
 	return reflectStaticSizeDisjunctionQueryScorer + size.SizeOfPtr
 }
 
-func NewDisjunctionQueryScorer(options search.SearcherOptions) *DisjunctionQueryScorer {
-	return &DisjunctionQueryScorer{
+func NewDisjunctionQueryScorer(options search.SearcherOptions) DisjunctionQueryScorer {
+	return &disjunctionQueryScorer{
 		options: options,
 	}
 }
 
-func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
+func (s *disjunctionQueryScorer) Score(ctx *search.SearchContext, constituents []*search.DocumentMatch, countMatch, countTotal int) *search.DocumentMatch {
 	var sum float64
 	var childrenExplanations []*search.Explanation
 	if s.options.Explain {

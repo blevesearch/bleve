@@ -34,7 +34,7 @@ func init() {
 type TermSearcher struct {
 	indexReader index.IndexReader
 	reader      index.TermFieldReader
-	scorer      *scorer.TermQueryScorer
+	scorer      scorer.TermQueryScorer
 	tfd         index.TermFieldDoc
 }
 
@@ -153,4 +153,8 @@ func isTermQuery(ctx context.Context) bool {
 	}
 	// if the context is nil, then don't set the query type
 	return false
+}
+
+func (s *TermSearcher) SetScorer(scorer scorer.TermQueryScorer) {
+	s.scorer = scorer
 }

@@ -39,7 +39,7 @@ type ConjunctionSearcher struct {
 	queryNorm   float64
 	currs       []*search.DocumentMatch
 	maxIDIdx    int
-	scorer      *scorer.ConjunctionQueryScorer
+	scorer      scorer.ConjunctionQueryScorer
 	initialized bool
 	options     search.SearcherOptions
 	bytesRead   uint64
@@ -283,4 +283,8 @@ func (s *ConjunctionSearcher) DocumentMatchPoolSize() int {
 		rv += s.DocumentMatchPoolSize()
 	}
 	return rv
+}
+
+func (s *ConjunctionSearcher) SetScorer(scorer scorer.ConjunctionQueryScorer) {
+	s.scorer = scorer
 }

@@ -47,7 +47,7 @@ type DisjunctionHeapSearcher struct {
 	indexReader index.IndexReader
 
 	numSearchers int
-	scorer       *scorer.DisjunctionQueryScorer
+	scorer       scorer.DisjunctionQueryScorer
 	min          int
 	queryNorm    float64
 	initialized  bool
@@ -345,4 +345,8 @@ func (s *DisjunctionHeapSearcher) Pop() interface{} {
 	x := old[n-1]
 	s.heap = old[0 : n-1]
 	return x
+}
+
+func (s *DisjunctionHeapSearcher) SetScorer(scorer scorer.DisjunctionQueryScorer) {
+	s.scorer = scorer
 }

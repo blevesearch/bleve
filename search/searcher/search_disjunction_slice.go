@@ -39,7 +39,7 @@ type DisjunctionSliceSearcher struct {
 	numSearchers int
 	queryNorm    float64
 	currs        []*search.DocumentMatch
-	scorer       *scorer.DisjunctionQueryScorer
+	scorer       scorer.DisjunctionQueryScorer
 	min          int
 	matching     []*search.DocumentMatch
 	matchingIdxs []int
@@ -283,6 +283,10 @@ func (s *DisjunctionSliceSearcher) DocumentMatchPoolSize() int {
 		rv += s.DocumentMatchPoolSize()
 	}
 	return rv
+}
+
+func (s *DisjunctionSliceSearcher) SetScorer(scorer scorer.DisjunctionQueryScorer) {
+	s.scorer = scorer
 }
 
 // a disjunction searcher implements the index.Optimizable interface
