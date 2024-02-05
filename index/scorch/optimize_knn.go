@@ -40,13 +40,15 @@ type OptimizeVR struct {
 var BleveMaxKNNConcurrency = 10
 
 func (o *OptimizeVR) invokeSearcherEndCallback() {
-	if cb := o.ctx.Value(search.SearcherEndCallbackKey); cb != nil {
-		if cbF, ok := cb.(search.SearcherEndCallbackFn); ok {
-			if o.totalCost > 0 {
-				// notify the callback that the searcher creation etc. is finished
-				// and report back the total cost for it to track and take actions
-				// appropriately.
-				_ = cbF(o.totalCost)
+	if o.ctx != nil {
+		if cb := o.ctx.Value(search.SearcherEndCallbackKey); cb != nil {
+			if cbF, ok := cb.(search.SearcherEndCallbackFn); ok {
+				if o.totalCost > 0 {
+					// notify the callback that the searcher creation etc. is finished
+					// and report back the total cost for it to track and take actions
+					// appropriately.
+					_ = cbF(o.totalCost)
+				}
 			}
 		}
 	}
@@ -137,6 +139,7 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 	if !ok {
 		return octx, nil
 	}
+	o.ctx = ctx
 
 	if o.snapshot != s.snapshot {
 		o.invokeSearcherEndCallback()
@@ -156,18 +159,20 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 		}
 	}
 
-	if cb := o.ctx.Value(search.SearcherStartCallbackKey); cb != nil {
-		if cbF, ok := cb.(search.SearcherStartCallbackFn); ok {
-			err := cbF(sumVectorIndexSize)
-			if err != nil {
-				// it's important to invoke the end callback at this point since
-				// if the earlier searchers of this optimze struct were successful
-				// the cost corresponding to it would be incremented and if the
-				// current searcher fails the check then we end up erroring out
-				// the overall optimized searcher creation, the cost needs to be
-				// handled appropriately.
-				o.invokeSearcherEndCallback()
-				return nil, err
+	if o.ctx != nil {
+		if cb := o.ctx.Value(search.SearcherStartCallbackKey); cb != nil {
+			if cbF, ok := cb.(search.SearcherStartCallbackFn); ok {
+				err := cbF(sumVectorIndexSize)
+				if err != nil {
+					// it's important to invoke the end callback at this point since
+					// if the earlier searchers of this optimze struct were successful
+					// the cost corresponding to it would be incremented and if the
+					// current searcher fails the check then we end up erroring out
+					// the overall optimized searcher creation, the cost needs to be
+					// handled appropriately.
+					o.invokeSearcherEndCallback()
+					return nil, err
+				}
 			}
 		}
 	}
@@ -178,6 +183,5 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 	// not equal to the value passed to "start" callback.
 	o.totalCost += sumVectorIndexSize
 	o.vrs[s.field] = append(o.vrs[s.field], s)
-	o.ctx = ctx
 	return o, nil
 }
