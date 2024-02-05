@@ -39,6 +39,19 @@ type OptimizeVR struct {
 // This setting _MUST_ only be changed during init and not after.
 var BleveMaxKNNConcurrency = 10
 
+func (o *OptimizeVR) invokeSearcherEndCallback() {
+	if cb := o.ctx.Value(search.SearcherEndCallbackKey); cb != nil {
+		if cbF, ok := cb.(search.SearcherEndCallbackFn); ok {
+			if o.totalCost > 0 {
+				// notify the callback that the searcher creation etc. is finished
+				// and report back the total cost for it to track and take actions
+				// appropriately.
+				_ = cbF(o.totalCost)
+			}
+		}
+	}
+}
+
 func (o *OptimizeVR) Finish() error {
 	// for each field, get the vector index --> invoke the zap func.
 	// for each VR, populate postings list and iterators
@@ -46,15 +59,8 @@ func (o *OptimizeVR) Finish() error {
 	// defer close index - just once.
 	var errorsM sync.Mutex
 	var errors []error
-	if cb := o.ctx.Value(search.SearchSearcherEndCallbackKey); cb != nil {
-		if cbF, ok := cb.(search.SearchSearcherEndCallbackFn); ok {
-			defer func() {
-				// notify the callback that the searcher creation etc. is finished
-				// and report back the total cost for it decrement or whatever.
-				_ = cbF(o.totalCost)
-			}()
-		}
-	}
+
+	defer o.invokeSearcherEndCallback()
 
 	wg := sync.WaitGroup{}
 	semaphore := make(chan struct{}, BleveMaxKNNConcurrency)
@@ -133,6 +139,7 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 	}
 
 	if o.snapshot != s.snapshot {
+		o.invokeSearcherEndCallback()
 		return nil, fmt.Errorf("tried to optimize KNN across different snapshots")
 	}
 
@@ -149,20 +156,27 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 		}
 	}
 
-	if cb := o.ctx.Value(search.SearchSearcherStartCallbackKey); cb != nil {
-		if cbF, ok := cb.(search.SearchSearcherStartCallbackFn); ok {
+	if cb := o.ctx.Value(search.SearcherStartCallbackKey); cb != nil {
+		if cbF, ok := cb.(search.SearcherStartCallbackFn); ok {
 			err := cbF(sumVectorIndexSize)
 			if err != nil {
+				// it's important to invoke the end callback at this point since
+				// if the earlier searchers of this optimze struct were successful
+				// the cost corresponding to it would be incremented and if the
+				// current searcher fails the check then we end up erroring out
+				// the overall optimized searcher creation, the cost needs to be
+				// handled appropriately.
+				o.invokeSearcherEndCallback()
 				return nil, err
 			}
 		}
 	}
 
-	if _, ok := o.vrs[s.field]; ok {
-		// total cost is essentially the sum of the vector indexes' size of all
-		// unique fields across all segments
-		o.totalCost += sumVectorIndexSize
-	}
+	// total cost is essentially the sum of the vector indexes' size across all the
+	// searchers - all of them end up reading and maintaining a vector index.
+	// misacconting this value would end up calling the "end" callback with a value
+	// not equal to the value passed to "start" callback.
+	o.totalCost += sumVectorIndexSize
 	o.vrs[s.field] = append(o.vrs[s.field], s)
 	o.ctx = ctx
 	return o, nil

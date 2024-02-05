@@ -141,8 +141,8 @@ const PreSearchKey = "_presearch_key"
 
 type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)
 
-type SearchSearcherStartCallbackFn func(size uint64) error
-type SearchSearcherEndCallbackFn func(size uint64) error
+type SearcherStartCallbackFn func(size uint64) error
+type SearcherEndCallbackFn func(size uint64) error
 
-const SearchSearcherStartCallbackKey = "_search_searcher_start_callback_key"
-const SearchSearcherEndCallbackKey = "_search_searcher_end_callback_key"
+const SearcherStartCallbackKey = "_searcher_start_callback_key"
+const SearcherEndCallbackKey = "_searcher_end_callback_key"
