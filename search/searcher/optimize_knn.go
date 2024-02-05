@@ -36,7 +36,7 @@ func optimizeKNN(ctx context.Context, indexReader index.IndexReader,
 			continue
 		}
 
-		octx, err = o.VectorOptimize(octx)
+		octx, err = o.VectorOptimize(ctx, octx)
 		if err != nil {
 			return err
 		}

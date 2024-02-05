@@ -23,6 +23,7 @@ import (
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -42,6 +43,17 @@ type KNNQueryScorer struct {
 	options                search.SearcherOptions
 	similarityMetric       string
 	queryWeightExplanation *search.Explanation
+}
+
+func (s *KNNQueryScorer) Size() int {
+	sizeInBytes := reflectStaticSizeKNNQueryScorer + size.SizeOfPtr +
+		(len(s.queryVector) * size.SizeOfFloat32) + len(s.queryField)
+
+	if s.queryWeightExplanation != nil {
+		sizeInBytes += s.queryWeightExplanation.Size()
+	}
+
+	return sizeInBytes
 }
 
 func NewKNNQueryScorer(queryVector []float32, queryField string, queryBoost float64,

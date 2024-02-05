@@ -147,6 +147,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			id:         root.segment[i].id,
 			segment:    root.segment[i].segment,
 			cachedDocs: root.segment[i].cachedDocs,
+			cachedMeta: root.segment[i].cachedMeta,
 			creator:    root.segment[i].creator,
 		}
 
@@ -189,6 +190,7 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 			id:         next.id,
 			segment:    next.data, // take ownership of next.data's ref-count
 			cachedDocs: &cachedDocs{cache: nil},
+			cachedMeta: &cachedMeta{meta: nil},
 			creator:    "introduceSegment",
 		}
 		newSnapshot.segment = append(newSnapshot.segment, newSegmentSnapshot)
@@ -276,6 +278,7 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 				segment:    replacement,
 				deleted:    segmentSnapshot.deleted,
 				cachedDocs: segmentSnapshot.cachedDocs,
+				cachedMeta: segmentSnapshot.cachedMeta,
 				creator:    "introducePersist",
 				mmaped:     1,
 			}
@@ -375,6 +378,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 				segment:    root.segment[i].segment,
 				deleted:    root.segment[i].deleted,
 				cachedDocs: root.segment[i].cachedDocs,
+				cachedMeta: root.segment[i].cachedMeta,
 				creator:    root.segment[i].creator,
 			})
 			root.segment[i].segment.AddRef()
@@ -421,6 +425,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			segment:    nextMerge.new, // take ownership for nextMerge.new's ref-count
 			deleted:    newSegmentDeleted,
 			cachedDocs: &cachedDocs{cache: nil},
+			cachedMeta: &cachedMeta{meta: nil},
 			creator:    "introduceMerge",
 			mmaped:     nextMerge.mmaped,
 		})
