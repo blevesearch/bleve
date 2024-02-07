@@ -65,15 +65,66 @@ func (o *OptimizeVR) Finish() error {
 	defer o.invokeSearcherEndCallback()
 
 	wg := sync.WaitGroup{}
-	semaphore := make(chan struct{}, BleveMaxKNNConcurrency)
+	// BleveMaxKNNConcurrency is the max number of concurrent go routines to launch
+	// for creating the vector postings list. This is a package level variable
+	// that can be changed by the user. The default value is 10.
+
+	// A temporary buffer is required for searching the vector index and in order to
+	// avoid allocating a new buffer for each segment being searched, we create a buffer pool,
+	// which also acts as a semaphore to limit the number of concurrent goroutines.
+	// The size of this pool would be min(BleveMaxKNNConcurrency, numSegments).
+	// So if there are 5 segments (< BleveMaxKNNConcurrency),
+	//		we will have a pool of size 5. -> No reuse of buffers since we tradeoff memory for concurrency.
+	// and if there are 20 segments(> BleveMaxKNNConcurrency),
+	// 		we will have a pool of size 10 (= BleveMaxKNNConcurrency). -> Reuse 10 buffers for all 20 segments,
+	//											  						  tradeoff concurrency for reduced memory.
+	// Thus the pool acts for a dual benefit of acting as a semaphore and limiting the number of concurrent goroutines
+	// and also reusing buffers for searching the vector index.
+
+	poolSize := BleveMaxKNNConcurrency
+	if len(o.snapshot.segment) < BleveMaxKNNConcurrency {
+		poolSize = len(o.snapshot.segment)
+	}
+
+	type buffers struct {
+		distanceBuffer []float32
+		labelBuffer    []int64
+	}
+
+	semaphore := make(chan map[int64]*buffers, poolSize)
+
+	// get a set of all possible k values
+	// reuse a single buffer for each k
+	kSet := make(map[int64]struct{})
+	for _, vrs := range o.vrs {
+		for _, vr := range vrs {
+			kSet[vr.k] = struct{}{}
+		}
+	}
+
+	// populate the pool with buffers
+	// each buffer is a map of k -> buffers
+	// so for every K value, we have a single distance buffer
+	// and a single label buffer
+	for i := 0; i < poolSize; i++ {
+		buffer := make(map[int64]*buffers)
+		for k := range kSet {
+			buffer[k] = &buffers{
+				distanceBuffer: make([]float32, k),
+				labelBuffer:    make([]int64, k),
+			}
+		}
+		semaphore <- buffer
+	}
+
 	// Launch goroutines to get vector index for each segment
 	for i, seg := range o.snapshot.segment {
 		if sv, ok := seg.segment.(segment_api.VectorSegment); ok {
 			wg.Add(1)
-			semaphore <- struct{}{} // Acquire a semaphore slot
+			buffersToUse := <-semaphore // Acquire the buffers to use from the pool // block if pool is empty -> semaphore block
 			go func(index int, segment segment_api.VectorSegment, origSeg *SegmentSnapshot) {
 				defer func() {
-					<-semaphore // Release the semaphore slot
+					semaphore <- buffersToUse // Release the semaphore slot -> add back the used buffer to the pool for reuse
 					wg.Done()
 				}()
 				for field, vrs := range o.vrs {
@@ -87,11 +138,11 @@ func (o *OptimizeVR) Finish() error {
 
 					// update the vector index size as a meta value in the segment snapshot
 					vectorIndexSize := vecIndex.Size()
-					seg.cachedMeta.updateMeta(field, vectorIndexSize)
+					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
 					for _, vr := range vrs {
 						// for each VR, populate postings list and iterators
 						// by passing the obtained vector index and getting similar vectors.
-						pl, err := vecIndex.Search(vr.vector, vr.k, origSeg.deleted)
+						pl, err := vecIndex.Search(vr.vector, vr.k, origSeg.deleted, buffersToUse[vr.k].distanceBuffer, buffersToUse[vr.k].labelBuffer)
 						if err != nil {
 							errorsM.Lock()
 							errors = append(errors, err)
