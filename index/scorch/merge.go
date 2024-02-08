@@ -290,7 +290,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 		atomic.AddUint64(&s.stats.TotFileMergePlanTasksSegments, uint64(len(task.Segments)))
 
-		oldMap := make(map[uint64]*SegmentSnapshot)
+		oldMap := make(map[uint64]*SegmentSnapshot, len(task.Segments))
 		newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
 		segmentsToMerge := make([]segment.Segment, 0, len(task.Segments))
 		docsToDrop := make([]*roaring.Bitmap, 0, len(task.Segments))
@@ -357,7 +357,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			totalBytesRead := seg.BytesRead() + prevBytesReadTotal
 			seg.ResetBytesRead(totalBytesRead)
 
-			oldNewDocNums = make(map[uint64][]uint64)
+			oldNewDocNums = make(map[uint64][]uint64, len(newDocNums))
 			for i, segNewDocNums := range newDocNums {
 				oldNewDocNums[task.Segments[i].Id()] = segNewDocNums
 			}
@@ -485,8 +485,8 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 
 	sm := &segmentMerge{
 		id:            newSegmentID,
-		old:           make(map[uint64]*SegmentSnapshot),
-		oldNewDocNums: make(map[uint64][]uint64),
+		old:           make(map[uint64]*SegmentSnapshot, len(sbsIndexes)),
+		oldNewDocNums: make(map[uint64][]uint64, len(sbsIndexes)),
 		new:           seg,
 		notifyCh:      make(chan *mergeTaskIntroStatus),
 	}
