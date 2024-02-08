@@ -469,7 +469,6 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 		id:                atomic.AddUint64(&s.nextSegmentID, 1),
 		data:              newSegment,
 		ids:               ids,
-		obsoletes:         make(map[uint64]*roaring.Bitmap),
 		internal:          internalOps,
 		applied:           make(chan error),
 		persistedCallback: persistedCallback,
@@ -486,6 +485,8 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 	s.rootLock.RUnlock()
 
 	defer func() { _ = root.DecRef() }()
+
+	introduction.obsoletes = make(map[uint64]*roaring.Bitmap, len(root.segment))
 
 	for _, seg := range root.segment {
 		delta, err := seg.segment.DocNumbers(ids)

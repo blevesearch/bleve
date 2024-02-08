@@ -87,7 +87,7 @@ func (o *OptimizeVR) Finish() error {
 
 					// update the vector index size as a meta value in the segment snapshot
 					vectorIndexSize := vecIndex.Size()
-					seg.cachedMeta.updateMeta(field, vectorIndexSize)
+					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
 					for _, vr := range vrs {
 						// for each VR, populate postings list and iterators
 						// by passing the obtained vector index and getting similar vectors.

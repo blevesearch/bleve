@@ -634,7 +634,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 	// the newly populated boltdb snapshotBucket above
 	if len(newSegmentPaths) > 0 {
 		// now try to open all the new snapshots
-		newSegments := make(map[uint64]segment.Segment)
+		newSegments := make(map[uint64]segment.Segment, len(newSegmentPaths))
 		defer func() {
 			for _, s := range newSegments {
 				if s != nil {
