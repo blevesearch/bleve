@@ -166,25 +166,34 @@ func NewIndexMapping() *IndexMappingImpl {
 // Validate will walk the entire structure ensuring the following
 // explicitly named and default analyzers can be built
 func (im *IndexMappingImpl) Validate() error {
-	_, err := im.cache.AnalyzerNamed(im.DefaultAnalyzer)
-	if err != nil {
-		return err
-	}
-	_, err = im.cache.DateTimeParserNamed(im.DefaultDateTimeParser)
-	if err != nil {
-		return err
-	}
-	err = im.DefaultMapping.Validate(im.cache)
-	if err != nil {
-		return err
-	}
-	for _, docMapping := range im.TypeMapping {
-		err = docMapping.Validate(im.cache)
+	validatedMappings := make(map[*IndexMappingImpl]bool)
+	var recursiveValidate func(*IndexMappingImpl) error
+	recursiveValidate = func(mapping *IndexMappingImpl) error {
+		if validatedMappings[mapping] {
+			return nil
+		}
+		validatedMappings[mapping] = true
+		_, err := mapping.cache.AnalyzerNamed(mapping.DefaultAnalyzer)
 		if err != nil {
 			return err
 		}
+		_, err = mapping.cache.DateTimeParserNamed(mapping.DefaultDateTimeParser)
+		if err != nil {
+			return err
+		}
+		err = mapping.DefaultMapping.Validate(mapping.cache)
+		if err != nil {
+			return err
+		}
+		for _, docMapping := range mapping.TypeMapping {
+			err = docMapping.Validate(mapping.cache)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	}
-	return nil
+	return recursiveValidate(im)
 }
 
 // AddDocumentMapping sets a custom document mapping for the specified type
