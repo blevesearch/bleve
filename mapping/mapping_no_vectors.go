@@ -22,8 +22,8 @@ func NewVectorFieldMapping() *FieldMapping {
 }
 
 func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
-	pathString string, path []string, indexes []uint64, context *walkContext) {
-
+	pathString string, path []string, indexes []uint64, context *walkContext) bool {
+	return false
 }
 
 // -----------------------------------------------------------------------------
