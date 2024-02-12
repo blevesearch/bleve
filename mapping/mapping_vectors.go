@@ -122,11 +122,11 @@ func processVector(vecI interface{}, dims int) ([]float32, bool) {
 }
 
 func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
-	pathString string, path []string, indexes []uint64, context *walkContext) {
+	pathString string, path []string, indexes []uint64, context *walkContext) bool {
 	vector, ok := processVector(propertyMightBeVector, fm.Dims)
 	// Don't add field to document if vector is invalid
 	if !ok {
-		return
+		return false
 	}
 
 	fieldName := getFieldName(pathString, path, fm)
@@ -137,6 +137,7 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 
 	// "_all" composite field is not applicable for vector field
 	context.excludedFromAll = append(context.excludedFromAll, fieldName)
+	return true
 }
 
 // -----------------------------------------------------------------------------

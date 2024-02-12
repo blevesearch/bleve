@@ -532,12 +532,14 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			dm.walkDocument(property, path, indexes, context)
 		}
 	case reflect.Map, reflect.Slice:
+		var isPropertyVector bool
 		if subDocMapping != nil {
 			for _, fieldMapping := range subDocMapping.Fields {
 				switch fieldMapping.Type {
 				case "vector":
-					fieldMapping.processVector(property, pathString, path,
+					processed := fieldMapping.processVector(property, pathString, path,
 						indexes, context)
+					isPropertyVector = isPropertyVector && processed
 				case "geopoint":
 					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
 				case "IP":
@@ -550,7 +552,9 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				}
 			}
 		}
-		dm.walkDocument(property, path, indexes, context)
+		if !isPropertyVector {
+			dm.walkDocument(property, path, indexes, context)
+		}
 	case reflect.Ptr:
 		if !propertyValue.IsNil() {
 			switch property := property.(type) {
