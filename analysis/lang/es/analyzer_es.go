@@ -34,6 +34,10 @@ func AnalyzerConstructor(config map[string]interface{},
 	if err != nil {
 		return nil, err
 	}
+	normalizeEsFilter, err := cache.TokenFilterNamed(NormalizeName)
+	if err != nil {
+		return nil, err
+	}
 	stopEsFilter, err := cache.TokenFilterNamed(StopName)
 	if err != nil {
 		return nil, err
@@ -47,6 +51,7 @@ func AnalyzerConstructor(config map[string]interface{},
 		TokenFilters: []analysis.TokenFilter{
 			toLowerFilter,
 			stopEsFilter,
+			normalizeEsFilter,
 			lightStemmerEsFilter,
 		},
 	}
