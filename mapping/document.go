@@ -533,13 +533,19 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		}
 	case reflect.Map, reflect.Slice:
 		var isPropertyVector bool
+		var isPropertyVectorInitialized bool
 		if subDocMapping != nil {
 			for _, fieldMapping := range subDocMapping.Fields {
 				switch fieldMapping.Type {
 				case "vector":
 					processed := fieldMapping.processVector(property, pathString, path,
 						indexes, context)
-					isPropertyVector = isPropertyVector && processed
+					if !isPropertyVectorInitialized {
+						isPropertyVector = processed
+						isPropertyVectorInitialized = true
+					} else {
+						isPropertyVector = isPropertyVector && processed
+					}
 				case "geopoint":
 					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
 				case "IP":
