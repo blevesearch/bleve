@@ -543,6 +543,10 @@ func tagHitsWithIndexName(sr *SearchResult, indexName string) {
 // finalize the result and return it directly without
 // performing multi search
 func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult) *SearchResult {
+	if preSearchResult == nil {
+		return nil
+	}
+
 	// global values across all hits irrespective of pagination settings
 	preSearchResult.Total = uint64(preSearchResult.Hits.Len())
 	maxScore := float64(0)
