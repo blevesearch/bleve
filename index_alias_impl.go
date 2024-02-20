@@ -21,6 +21,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -542,16 +543,46 @@ func tagHitsWithIndexName(sr *SearchResult, indexName string) {
 // finalize the result and return it directly without
 // performing multi search
 func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult) *SearchResult {
+	if preSearchResult == nil {
+		return nil
+	}
+
 	// global values across all hits irrespective of pagination settings
 	preSearchResult.Total = uint64(preSearchResult.Hits.Len())
+	maxScore := float64(0)
 	for i, hit := range preSearchResult.Hits {
-		if hit.Score > preSearchResult.MaxScore {
-			preSearchResult.MaxScore = hit.Score
+		// since we are now using the presearch result as the final result
+		// we can discard the indexNames from the hits as they are no longer
+		// relevant.
+		hit.IndexNames = nil
+		if hit.Score > maxScore {
+			maxScore = hit.Score
 		}
 		hit.HitNumber = uint64(i)
 	}
-	if requestHasKNN(req) {
-		preSearchResult = constructKNNSearchResult(req, preSearchResult)
+	preSearchResult.MaxScore = maxScore
+	// now apply pagination settings
+	var reverseQueryExecution bool
+	if req.SearchBefore != nil {
+		reverseQueryExecution = true
+		req.Sort.Reverse()
+		req.SearchAfter = req.SearchBefore
+	}
+	if req.SearchAfter != nil {
+		preSearchResult.Hits = collector.FilterHitsBySearchAfter(preSearchResult.Hits, req.Sort, req.SearchAfter)
+	}
+	preSearchResult.Hits = hitsInCurrentPage(req, preSearchResult.Hits)
+	if reverseQueryExecution {
+		// reverse the sort back to the original
+		req.Sort.Reverse()
+		// resort using the original order
+		mhs := newSearchHitSorter(req.Sort, preSearchResult.Hits)
+		req.SortFunc()(mhs)
+		req.SearchAfter = nil
+	}
+
+	if req.Explain {
+		preSearchResult.Request = req
 	}
 	return preSearchResult
 }
@@ -663,6 +694,28 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 	return sr, nil
 }
 
+// hitsInCurrentPage returns the hits in the current page
+// using the From and Size parameters in the request
+func hitsInCurrentPage(req *SearchRequest, hits []*search.DocumentMatch) []*search.DocumentMatch {
+	sortFunc := req.SortFunc()
+	// sort all hits with the requested order
+	if len(req.Sort) > 0 {
+		sorter := newSearchHitSorter(req.Sort, hits)
+		sortFunc(sorter)
+	}
+	// now skip over the correct From
+	if req.From > 0 && len(hits) > req.From {
+		hits = hits[req.From:]
+	} else if req.From > 0 {
+		hits = search.DocumentMatchCollection{}
+	}
+	// now trim to the correct size
+	if req.Size > 0 && len(hits) > req.Size {
+		hits = hits[0:req.Size]
+	}
+	return hits
+}
+
 // MultiSearch executes a SearchRequest across multiple Index objects,
 // then merges the results.  The indexes must honor any ctx deadline.
 func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[string]map[string]interface{}, indexes ...Index) (*SearchResult, error) {
@@ -732,24 +785,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[stri
 		}
 	}
 
-	sortFunc := req.SortFunc()
-	// sort all hits with the requested order
-	if len(req.Sort) > 0 {
-		sorter := newSearchHitSorter(req.Sort, sr.Hits)
-		sortFunc(sorter)
-	}
-
-	// now skip over the correct From
-	if req.From > 0 && len(sr.Hits) > req.From {
-		sr.Hits = sr.Hits[req.From:]
-	} else if req.From > 0 {
-		sr.Hits = search.DocumentMatchCollection{}
-	}
-
-	// now trim to the correct size
-	if req.Size > 0 && len(sr.Hits) > req.Size {
-		sr.Hits = sr.Hits[0:req.Size]
-	}
+	sr.Hits = hitsInCurrentPage(req, sr.Hits)
 
 	// fix up facets
 	for name, fr := range req.Facets {
@@ -761,7 +797,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[stri
 		req.Sort.Reverse()
 		// resort using the original order
 		mhs := newSearchHitSorter(req.Sort, sr.Hits)
-		sortFunc(mhs)
+		req.SortFunc()(mhs)
 		// reset request
 		req.SearchBefore = req.SearchAfter
 		req.SearchAfter = nil

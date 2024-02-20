@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strconv"
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/collector"
@@ -247,7 +246,7 @@ func validateKNN(req *SearchRequest) error {
 	return nil
 }
 
-func addSortAndFieldsToKNNHits(req *SearchRequest, knnHits []*search.DocumentMatch, reader index.IndexReader) (err error) {
+func addSortAndFieldsToKNNHits(req *SearchRequest, knnHits []*search.DocumentMatch, reader index.IndexReader, name string) (err error) {
 	requiredSortFields := req.Sort.RequiredFields()
 	var dvReader index.DocValueReader
 	var updateFieldVisitor index.DocValueVisitor
@@ -272,6 +271,7 @@ func addSortAndFieldsToKNNHits(req *SearchRequest, knnHits []*search.DocumentMat
 		if err != nil {
 			return err
 		}
+		hit.Index = name
 	}
 	return nil
 }
@@ -300,7 +300,10 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	// the knn hits are populated with Sort and Fields.
 	// it must be ensured downstream that the Sort and Fields are not
 	// re-evaluated, for these hits.
-	err = addSortAndFieldsToKNNHits(req, knnHits, reader)
+	// also add the index names to the hits, so that when early
+	// exit takes place after the first phase, the hits will have
+	// a valid value for Index.
+	err = addSortAndFieldsToKNNHits(req, knnHits, reader, i.name)
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +414,15 @@ func validateAndDistributeKNNHits(knnHits []*search.DocumentMatch, indexes []Ind
 		if _, exists := indexNames[top]; !exists {
 			return nil, ErrorTwoPhaseSearchInconsistency
 		}
-		hit.IndexNames = hit.IndexNames[:stackTopIdx]
+		if stackTopIdx == 0 {
+			// if the stack consists of only one index, then popping the top
+			// would result in an empty slice, and handle this case by setting
+			// indexNames to nil. So that the final search results will not
+			// contain the indexNames field.
+			hit.IndexNames = nil
+		} else {
+			hit.IndexNames = hit.IndexNames[:stackTopIdx]
+		}
 		segregatedKnnHits[top] = append(segregatedKnnHits[top], hit)
 	}
 	return segregatedKnnHits, nil
@@ -456,59 +467,6 @@ func constructKnnPresearchData(mergedOut map[string]map[string]interface{}, preS
 		mergedOut[index.Name()][search.KnnPreSearchDataKey] = distributedHits[index.Name()]
 	}
 	return mergedOut, nil
-}
-
-// if the search request is satisfied by preSearch, the merged KNN hits
-// are used to construct the final search result and returned, which bypasses
-// the actual search.
-func constructKNNSearchResult(req *SearchRequest, preSearchResult *SearchResult) *SearchResult {
-	if req.SearchAfter != nil || req.SearchBefore != nil {
-		var dummyDoc *search.DocumentMatch
-		for pos, ss := range req.Sort {
-			if ss.RequiresDocID() {
-				dummyDoc.ID = req.SearchAfter[pos]
-			}
-			if ss.RequiresScoring() {
-				if score, err := strconv.ParseFloat(req.SearchAfter[pos], 64); err == nil {
-					dummyDoc.Score = score
-				}
-			}
-		}
-		if req.SearchAfter != nil {
-			dummyDoc.Sort = req.SearchAfter
-		} else {
-			dummyDoc.Sort = req.SearchBefore
-		}
-		numDocs := 0
-		for _, hit := range preSearchResult.Hits {
-			dummyDoc.HitNumber = hit.HitNumber
-			if req.SearchAfter != nil && req.Sort.Compare(req.Sort.CacheIsScore(), req.Sort.CacheDescending(), hit, dummyDoc) > 0 {
-				preSearchResult.Hits[numDocs] = hit
-				numDocs++
-			} else if req.SearchBefore != nil && req.Sort.Compare(req.Sort.CacheIsScore(), req.Sort.CacheDescending(), hit, dummyDoc) < 0 {
-				preSearchResult.Hits[numDocs] = hit
-				numDocs++
-			}
-		}
-		preSearchResult.Hits = preSearchResult.Hits[:numDocs]
-	}
-	sortFunc := req.SortFunc()
-	// sort all hits with the requested order
-	if len(req.Sort) > 0 {
-		sorter := newSearchHitSorter(req.Sort, preSearchResult.Hits)
-		sortFunc(sorter)
-	}
-	// now skip over the correct From
-	if req.From > 0 && len(preSearchResult.Hits) > req.From {
-		preSearchResult.Hits = preSearchResult.Hits[req.From:]
-	} else if req.From > 0 {
-		preSearchResult.Hits = search.DocumentMatchCollection{}
-	}
-	// now trim to the correct size
-	if req.Size > 0 && len(preSearchResult.Hits) > req.Size {
-		preSearchResult.Hits = preSearchResult.Hits[0:req.Size]
-	}
-	return preSearchResult
 }
 
 func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {

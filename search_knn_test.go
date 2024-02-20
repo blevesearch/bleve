@@ -20,6 +20,8 @@ package bleve
 import (
 	"archive/zip"
 	"encoding/json"
+	"fmt"
+	"math"
 	"math/rand"
 	"sort"
 	"strconv"
@@ -27,6 +29,7 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/analysis/lang/en"
+	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/query"
@@ -130,27 +133,268 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 	for testCaseNum, testCase := range testCases {
 		for _, operator := range knnOperators {
 			index.indexes = make([]Index, 0)
+
 			query := searchRequests[testCase.queryIndex]
 			query.AddKNNOperator(operator)
+			query.Sort = search.SortOrder{&search.SortScore{Desc: true}, &search.SortDocID{Desc: true}, &search.SortField{Desc: true, Field: "content"}}
 			query.Explain = true
 
-			indexPaths := createPartitionedIndex(documents, index, 1, testCase.mapping, t)
+			nameToIndex := createPartitionedIndex(documents, index, 1, testCase.mapping, t, false)
 			controlResult, err := index.Search(query)
 			if err != nil {
+				cleanUp(t, nameToIndex)
 				t.Fatal(err)
 			}
-			cleanUp(t, indexPaths, index.indexes...)
-
+			if !finalHitsHaveValidIndex(controlResult.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected control result hits to have valid `Index`", testCaseNum)
+			}
+			cleanUp(t, nameToIndex)
 			index.indexes = make([]Index, 0)
-			indexPaths = createPartitionedIndex(documents, index, testCase.numIndexPartitions, testCase.mapping, t)
+			nameToIndex = createPartitionedIndex(documents, index, testCase.numIndexPartitions, testCase.mapping, t, false)
 			experimentalResult, err := index.Search(query)
 			if err != nil {
+				cleanUp(t, nameToIndex)
 				t.Fatal(err)
 			}
+			if !finalHitsHaveValidIndex(experimentalResult.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected experimental Result hits to have valid `Index`", testCaseNum)
+			}
 			verifyResult(t, controlResult, experimentalResult, testCaseNum, true)
-			cleanUp(t, indexPaths, index.indexes...)
+			cleanUp(t, nameToIndex)
+
+			index.indexes = make([]Index, 0)
+			nameToIndex = createPartitionedIndex(documents, index, testCase.numIndexPartitions, testCase.mapping, t, true)
+			multiLevelIndexResult, err := index.Search(query)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+			if !finalHitsHaveValidIndex(multiLevelIndexResult.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected experimental Result hits to have valid `Index`", testCaseNum)
+			}
+			verifyResult(t, multiLevelIndexResult, experimentalResult, testCaseNum, false)
+			cleanUp(t, nameToIndex)
 		}
 	}
+
+	var facets = map[string]*FacetRequest{
+		"content": {
+			Field: "content",
+			Size:  10,
+		},
+	}
+
+	var sort = search.SortOrder{&search.SortScore{Desc: true}, &search.SortField{Desc: false, Field: "content"}}
+
+	index = NewIndexAlias()
+	for testCaseNum, testCase := range testCases {
+		index.indexes = make([]Index, 0)
+		nameToIndex := createPartitionedIndex(documents, index, testCase.numIndexPartitions, testCase.mapping, t, false)
+		originalRequest := searchRequests[testCase.queryIndex]
+		for _, operator := range knnOperators {
+
+			from, size := originalRequest.From, originalRequest.Size
+			query := copySearchRequest(searchRequests[testCase.queryIndex], nil)
+			query.AddKNNOperator(operator)
+			query.Explain = true
+			query.From = from
+			query.Size = size
+
+			// Three types of queries to run wrt sort and facet fields that require fields.
+			// 1. Sort And Facet are there
+			// 2. Sort is there, Facet is not there
+			// 3. Sort is not there, Facet is there
+			// The case where both sort and facet are not there is already covered in the previous tests.
+
+			// 1. Sort And Facet are there
+			query.Facets = facets
+			query.Sort = sort
+
+			res1, err := index.Search(query)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+			if !finalHitsHaveValidIndex(res1.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected experimental Result hits to have valid `Index`", testCaseNum)
+			}
+
+			facetRes1 := res1.Facets
+			facetRes1Str, err := json.Marshal(facetRes1)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+
+			// 2. Sort is there, Facet is not there
+			query.Facets = nil
+			query.Sort = sort
+
+			res2, err := index.Search(query)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+			if !finalHitsHaveValidIndex(res2.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected experimental Result hits to have valid `Index`", testCaseNum)
+			}
+
+			// 3. Sort is not there, Facet is there
+			query.Facets = facets
+			query.Sort = nil
+			res3, err := index.Search(query)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+			if !finalHitsHaveValidIndex(res3.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected experimental Result hits to have valid `Index`", testCaseNum)
+			}
+
+			facetRes3 := res3.Facets
+			facetRes3Str, err := json.Marshal(facetRes3)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+
+			// Verify the facet results
+			if string(facetRes1Str) != string(facetRes3Str) {
+				fmt.Println(operator)
+				fmt.Println(string(facetRes1Str))
+				fmt.Println(string(facetRes3Str))
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected facet results to be equal", testCaseNum)
+			}
+
+			// Verify the results
+			verifyResult(t, res1, res2, testCaseNum, false)
+			verifyResult(t, res2, res3, testCaseNum, true)
+
+			// Test early exit fail case -> matchNone + facetRequest
+			query.Query = NewMatchNoneQuery()
+			query.Sort = sort
+			// control case
+			query.Facets = nil
+			res4Ctrl, err := index.Search(query)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+			if !finalHitsHaveValidIndex(res4Ctrl.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected control Result hits to have valid `Index`", testCaseNum)
+			}
+
+			// experimental case
+			query.Facets = facets
+			res4Exp, err := index.Search(query)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+			if !finalHitsHaveValidIndex(res4Exp.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected experimental Result hits to have valid `Index`", testCaseNum)
+			}
+
+			if !(operator == knnOperatorAnd && res4Ctrl.Total == 0 && res4Exp.Total == 0) {
+				// catch case where no hits are returned
+				// due to matchNone query with a KNN request with operator AND
+				// where no hits are part of the intersection in multi knn request
+				verifyResult(t, res4Ctrl, res4Exp, testCaseNum, false)
+			}
+		}
+		cleanUp(t, nameToIndex)
+	}
+
+	// Test Pagination with multi partitioned index
+	index = NewIndexAlias()
+	index.indexes = make([]Index, 0)
+	nameToIndex := createPartitionedIndex(documents, index, 8, indexMappingL2Norm, t, true)
+
+	// Test From + Size pagination for Hybrid Search (2-Phase)
+	query := copySearchRequest(searchRequests[4], nil)
+	query.Sort = sort
+	query.Facets = facets
+	query.Explain = true
+
+	testFromSizePagination(t, query, index, nameToIndex)
+
+	// Test From + Size pagination for Early Exit Hybrid Search (1-Phase)
+	query = copySearchRequest(searchRequests[4], nil)
+	query.Query = NewMatchNoneQuery()
+	query.Sort = sort
+	query.Facets = nil
+	query.Explain = true
+
+	testFromSizePagination(t, query, index, nameToIndex)
+
+	cleanUp(t, nameToIndex)
+}
+
+func testFromSizePagination(t *testing.T, query *SearchRequest, index Index, nameToIndex map[string]Index) {
+	query.From = 0
+	query.Size = 30
+
+	resCtrl, err := index.Search(query)
+	if err != nil {
+		cleanUp(t, nameToIndex)
+		t.Fatal(err)
+	}
+
+	ctrlHitIds := make([]string, len(resCtrl.Hits))
+	for i, doc := range resCtrl.Hits {
+		ctrlHitIds[i] = doc.ID
+	}
+	// experimental case
+
+	fromValues := []int{0, 5, 10, 15, 20, 25}
+	size := 5
+	for fromIdx := 0; fromIdx < len(fromValues); fromIdx++ {
+		from := fromValues[fromIdx]
+		query.From = from
+		query.Size = size
+		resExp, err := index.Search(query)
+		if err != nil {
+			cleanUp(t, nameToIndex)
+			t.Fatal(err)
+		}
+		if from >= len(ctrlHitIds) {
+			if len(resExp.Hits) != 0 {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("expected 0 hits, got %d", len(resExp.Hits))
+			}
+			continue
+		}
+		numHitsExp := len(resExp.Hits)
+		numHitsCtrl := min(len(ctrlHitIds)-from, size)
+		if numHitsExp != numHitsCtrl {
+			cleanUp(t, nameToIndex)
+			t.Fatalf("expected %d hits, got %d", numHitsCtrl, numHitsExp)
+		}
+		for i := 0; i < numHitsExp; i++ {
+			doc := resExp.Hits[i]
+			startOffset := from + i
+			if doc.ID != ctrlHitIds[startOffset] {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("expected %s at index %d, got %s", ctrlHitIds[startOffset], i, doc.ID)
+			}
+		}
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 type testDocument struct {
@@ -202,57 +446,88 @@ func makeDatasetIntoDocuments(dataset []testDocument) []map[string]interface{} {
 	return documents
 }
 
-func cleanUp(t *testing.T, indexPaths []string, indexes ...Index) {
-	for _, childIndex := range indexes {
+func cleanUp(t *testing.T, nameToIndex map[string]Index) {
+	for path, childIndex := range nameToIndex {
 		err := childIndex.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
-	}
-	for _, indexPath := range indexPaths {
-		cleanupTmpIndexPath(t, indexPath)
+		cleanupTmpIndexPath(t, path)
 	}
 }
 
+func createChildIndex(docs []map[string]interface{}, mapping mapping.IndexMapping, t *testing.T, nameToIndex map[string]Index) Index {
+	tmpIndexPath := createTmpIndexPath(t)
+	index, err := New(tmpIndexPath, mapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nameToIndex[index.Name()] = index
+	batch := index.NewBatch()
+	for _, doc := range docs {
+		err := batch.Index(doc["id"].(string), doc)
+		if err != nil {
+			cleanUp(t, nameToIndex)
+			t.Fatal(err)
+		}
+	}
+	err = index.Batch(batch)
+	if err != nil {
+		cleanUp(t, nameToIndex)
+		t.Fatal(err)
+	}
+	return index
+}
+
 func createPartitionedIndex(documents []map[string]interface{}, index *indexAliasImpl, numPartitions int,
-	mapping mapping.IndexMapping, t *testing.T) []string {
+	mapping mapping.IndexMapping, t *testing.T, multiLevel bool) map[string]Index {
 
 	partitionSize := len(documents) / numPartitions
 	extraDocs := len(documents) % numPartitions
-	docsPerPartition := make([]int, numPartitions)
+	numDocsPerPartition := make([]int, numPartitions)
 	for i := 0; i < numPartitions; i++ {
-		docsPerPartition[i] = partitionSize
+		numDocsPerPartition[i] = partitionSize
 		if extraDocs > 0 {
-			docsPerPartition[i]++
+			numDocsPerPartition[i]++
 			extraDocs--
 		}
 	}
-	var rv []string
+	docsPerPartition := make([][]map[string]interface{}, numPartitions)
 	prevCutoff := 0
 	for i := 0; i < numPartitions; i++ {
-		tmpIndexPath := createTmpIndexPath(t)
-		rv = append(rv, tmpIndexPath)
-		childIndex, err := New(tmpIndexPath, mapping)
-		if err != nil {
-			cleanUp(t, rv)
-			t.Fatal(err)
+		docsPerPartition[i] = make([]map[string]interface{}, numDocsPerPartition[i])
+		for j := 0; j < numDocsPerPartition[i]; j++ {
+			docsPerPartition[i][j] = documents[prevCutoff+j]
 		}
-		batch := childIndex.NewBatch()
-		for j := prevCutoff; j < prevCutoff+docsPerPartition[i]; j++ {
-			doc := documents[j]
-			err := batch.Index(doc["id"].(string), doc)
-			if err != nil {
-				cleanUp(t, rv)
-				t.Fatal(err)
+		prevCutoff += numDocsPerPartition[i]
+	}
+
+	rv := make(map[string]Index)
+	if !multiLevel {
+		// all indexes are at the same level
+		for i := 0; i < numPartitions; i++ {
+			index.Add(createChildIndex(docsPerPartition[i], mapping, t, rv))
+		}
+	} else {
+		// alias tree
+		indexes := make([]Index, numPartitions)
+		for i := 0; i < numPartitions; i++ {
+			indexes[i] = createChildIndex(docsPerPartition[i], mapping, t, rv)
+		}
+		numAlias := int(math.Ceil(float64(numPartitions) / 2.0))
+		aliases := make([]IndexAlias, numAlias)
+		for i := 0; i < numAlias; i++ {
+			aliases[i] = NewIndexAlias()
+			aliases[i].SetName(fmt.Sprintf("alias%d", i))
+			for j := 0; j < 2; j++ {
+				if i*2+j < numPartitions {
+					aliases[i].Add(indexes[i*2+j])
+				}
 			}
 		}
-		prevCutoff += docsPerPartition[i]
-		err = childIndex.Batch(batch)
-		if err != nil {
-			cleanUp(t, rv)
-			t.Fatal(err)
+		for i := 0; i < numAlias; i++ {
+			index.Add(aliases[i])
 		}
-		index.Add(childIndex)
 	}
 	return rv
 }
@@ -343,15 +618,62 @@ func sortChildren(children []*search.Explanation) {
 	})
 }
 
+// All hits from a hybrid search/knn search should not have
+// index names or score breakdown.
+func finalHitsOmitKNNMetadata(hits []*search.DocumentMatch) bool {
+	for _, hit := range hits {
+		if hit.IndexNames != nil || hit.ScoreBreakdown != nil {
+			fmt.Println(len(hit.IndexNames))
+			return false
+		}
+	}
+	return true
+}
+
+func finalHitsHaveValidIndex(hits []*search.DocumentMatch, indexes map[string]Index) bool {
+	for _, hit := range hits {
+		if hit.Index == "" {
+			return false
+		}
+		var idx Index
+		var ok bool
+		if idx, ok = indexes[hit.Index]; !ok {
+			return false
+		}
+		if idx == nil {
+			return false
+		}
+		var doc index.Document
+		doc, err = idx.Document(hit.ID)
+		if err != nil {
+			return false
+		}
+		if doc == nil {
+			return false
+		}
+	}
+	return true
+}
+
 func verifyResult(t *testing.T, controlResult *SearchResult, experimentalResult *SearchResult, testCaseNum int, verifyOnlyDocIDs bool) {
 	if controlResult.Hits.Len() == 0 || experimentalResult.Hits.Len() == 0 {
-		t.Fatalf("testcase %d failed: 0 hits returned", testCaseNum)
+		t.Fatalf("test case #%d failed: 0 hits returned", testCaseNum)
 	}
 	if len(controlResult.Hits) != len(experimentalResult.Hits) {
-		t.Fatalf("testcase %d failed: expected %d results, got %d", testCaseNum, len(controlResult.Hits), len(experimentalResult.Hits))
+		t.Fatalf("test case #%d failed: expected %d results, got %d", testCaseNum, len(controlResult.Hits), len(experimentalResult.Hits))
 	}
 	if controlResult.Total != experimentalResult.Total {
-		t.Fatalf("test case #%d: expected total hits to be %d, got %d", testCaseNum, controlResult.Total, experimentalResult.Total)
+		t.Fatalf("test case #%d failed: expected total hits to be %d, got %d", testCaseNum, controlResult.Total, experimentalResult.Total)
+	}
+	// KNN Metadata -> Score Breakdown and IndexNames MUST be omitted from the final hits
+	if !finalHitsOmitKNNMetadata(controlResult.Hits) || !finalHitsOmitKNNMetadata(experimentalResult.Hits) {
+		t.Fatalf("test case #%d failed: expected no KNN metadata in hits", testCaseNum)
+	}
+	if controlResult.Took == 0 || experimentalResult.Took == 0 {
+		t.Fatalf("test case #%d failed: expected non-zero took time", testCaseNum)
+	}
+	if controlResult.Request == nil || experimentalResult.Request == nil {
+		t.Fatalf("test case #%d failed: expected non-nil request", testCaseNum)
 	}
 	if verifyOnlyDocIDs {
 		// in multi partitioned index, we cannot be sure of the score or the ordering of the hits as the tf-idf scores are localized to each partition
@@ -365,44 +687,39 @@ func verifyResult(t *testing.T, controlResult *SearchResult, experimentalResult 
 			experimentalMap[hit.ID] = struct{}{}
 		}
 		if len(controlMap) != len(experimentalMap) {
-			t.Fatalf("testcase %d failed: expected %d results, got %d", testCaseNum, len(controlMap), len(experimentalMap))
+			t.Fatalf("test case #%d failed: expected %d results, got %d", testCaseNum, len(controlMap), len(experimentalMap))
 		}
 		for id := range controlMap {
 			if _, ok := experimentalMap[id]; !ok {
-				t.Fatalf("testcase %d failed: expected id %s to be in experimental result", testCaseNum, id)
+				t.Fatalf("test case #%d failed: expected id %s to be in experimental result", testCaseNum, id)
 			}
 		}
 		return
 	}
-
 	for i := 0; i < len(controlResult.Hits); i++ {
 		if controlResult.Hits[i].ID != experimentalResult.Hits[i].ID {
-			t.Fatalf("testcase %d failed: expected hit %d to have id %s, got %s", testCaseNum, i, controlResult.Hits[i].ID, experimentalResult.Hits[i].ID)
+			t.Fatalf("test case #%d failed: expected hit %d to have id %s, got %s", testCaseNum, i, controlResult.Hits[i].ID, experimentalResult.Hits[i].ID)
 		}
 		// Truncate to 6 decimal places
 		actualScore := truncateScore(experimentalResult.Hits[i].Score)
 		expectScore := truncateScore(controlResult.Hits[i].Score)
 		if expectScore != actualScore {
-			t.Fatalf("testcase %d failed: expected hit %d to have score %f, got %f", testCaseNum, i, expectScore, actualScore)
+			t.Fatalf("test case #%d failed: expected hit %d to have score %f, got %f", testCaseNum, i, expectScore, actualScore)
 		}
 		if !compareExplanation(controlResult.Hits[i].Expl, experimentalResult.Hits[i].Expl) {
-			t.Fatalf("testcase %d failed: expected hit %d to have explanation %v, got %v", testCaseNum, i, controlResult.Hits[i].Expl, experimentalResult.Hits[i].Expl)
+			t.Fatalf("test case #%d failed: expected hit %d to have explanation %v, got %v", testCaseNum, i, controlResult.Hits[i].Expl, experimentalResult.Hits[i].Expl)
 		}
-
 	}
 	if truncateScore(controlResult.MaxScore) != truncateScore(experimentalResult.MaxScore) {
 		t.Fatalf("test case #%d: expected maxScore to be %f, got %f", testCaseNum, controlResult.MaxScore, experimentalResult.MaxScore)
 	}
-
 }
+
 func TestSimilaritySearchMultipleSegments(t *testing.T) {
-	// to run this test you must first add the line
-	// 				return nil
-	// in the scorch.go file just before these two lines
-	// 				s.asyncTasks.Add(1)
-	//				go s.mergerLoop()
-	// this is to prevent the merger from running and merging the segments
-	// before we can test the search on multiple segments
+	// using scorch options to prevent merges during the course of this test
+	// so that the knnCollector can be accurately tested
+	scorch.DefaultMemoryPressurePauseThreshold = 0
+	scorch.DefaultMinSegmentsForInMemoryMerge = math.MaxInt
 	dataset, searchRequests, err := readDatasetAndQueries(testInputCompressedFile)
 	if err != nil {
 		t.Fatal(err)
@@ -434,7 +751,7 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 		mapping     mapping.IndexMapping
 		scoreValue  string
 	}{
-		// // L2 norm similarity
+		// L2 norm similarity
 		{
 			numSegments: 6,
 			queryIndex:  0,
@@ -543,32 +860,42 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 				t.Fatal(err)
 			}
 			query := searchRequests[testCase.queryIndex]
-			query.Sort = search.SortOrder{&search.SortScore{Desc: true}, &search.SortDocID{Desc: true}}
+			query.Sort = search.SortOrder{&search.SortScore{Desc: true}, &search.SortDocID{Desc: true}, &search.SortField{Desc: false, Field: "content"}}
 			query.AddKNNOperator(operator)
 			query.Explain = true
 
+			nameToIndex := make(map[string]Index)
+			nameToIndex[index.Name()] = index
+
 			err = createMultipleSegmentsIndex(documents, index, 1)
 			if err != nil {
+				cleanUp(t, nameToIndex)
 				t.Fatal(err)
 			}
 			controlResult, err := index.Search(query)
 			if err != nil {
+				cleanUp(t, nameToIndex)
 				t.Fatal(err)
+			}
+			if !finalHitsHaveValidIndex(controlResult.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected control result hits to have valid `Index`", testCaseNum)
 			}
 			if testCase.scoreValue == "none" {
 				query.Score = testCase.scoreValue
 				expectedResultScoreNone, err := index.Search(query)
 				if err != nil {
+					cleanUp(t, nameToIndex)
 					t.Fatal(err)
+				}
+				if !finalHitsHaveValidIndex(expectedResultScoreNone.Hits, nameToIndex) {
+					cleanUp(t, nameToIndex)
+					t.Fatalf("test case #%d failed: expected score none hits to have valid `Index`", testCaseNum)
 				}
 				verifyResult(t, controlResult, expectedResultScoreNone, testCaseNum, true)
 				query.Score = ""
 			}
-			err = index.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-			cleanupTmpIndexPath(t, tmpIndexPath)
+			cleanUp(t, nameToIndex)
 
 			// run multiple segments test
 			tmpIndexPath = createTmpIndexPath(t)
@@ -576,20 +903,24 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			nameToIndex = make(map[string]Index)
+			nameToIndex[index.Name()] = index
 			err = createMultipleSegmentsIndex(documents, index, testCase.numSegments)
 			if err != nil {
+				cleanUp(t, nameToIndex)
 				t.Fatal(err)
 			}
 			experimentalResult, err := index.Search(query)
 			if err != nil {
+				cleanUp(t, nameToIndex)
 				t.Fatal(err)
+			}
+			if !finalHitsHaveValidIndex(experimentalResult.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected experimental result hits to have valid `Index`", testCaseNum)
 			}
 			verifyResult(t, controlResult, experimentalResult, testCaseNum, false)
-			err = index.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-			cleanupTmpIndexPath(t, tmpIndexPath)
+			cleanUp(t, nameToIndex)
 		}
 	}
 }
