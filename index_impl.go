@@ -658,7 +658,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	var storedFieldsCost uint64
 	for _, hit := range hits {
-		if i.name != "" {
+		// KNN documents will already have their Index value set as part of the knn collector output
+		// so check if the index is empty and set it to the current index name
+		if i.name != "" && hit.Index == "" {
 			hit.Index = i.name
 		}
 		err, storedFieldsBytes := LoadAndHighlightFields(hit, req, i.name, indexReader, highlighter)

@@ -95,21 +95,7 @@ func NewTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector 
 // ordering hits by the provided sort order
 func NewTopNCollectorAfter(size int, sort search.SortOrder, after []string) *TopNCollector {
 	rv := newTopNCollector(size, 0, sort)
-	rv.searchAfter = &search.DocumentMatch{
-		Sort: after,
-	}
-
-	for pos, ss := range sort {
-		if ss.RequiresDocID() {
-			rv.searchAfter.ID = after[pos]
-		}
-		if ss.RequiresScoring() {
-			if score, err := strconv.ParseFloat(after[pos], 64); err == nil {
-				rv.searchAfter.Score = score
-			}
-		}
-	}
-
+	rv.searchAfter = createSearchAfterDocument(sort, after)
 	return rv
 }
 
@@ -129,6 +115,43 @@ func newTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector 
 	hc.cachedDesc = sort.CacheDescending()
 
 	return hc
+}
+
+func createSearchAfterDocument(sort search.SortOrder, after []string) *search.DocumentMatch {
+	rv := &search.DocumentMatch{
+		Sort: after,
+	}
+	for pos, ss := range sort {
+		if ss.RequiresDocID() {
+			rv.ID = after[pos]
+		}
+		if ss.RequiresScoring() {
+			if score, err := strconv.ParseFloat(after[pos], 64); err == nil {
+				rv.Score = score
+			}
+		}
+	}
+	return rv
+}
+
+// Filter document matches based on the SearchAfter field in the SearchRequest.
+func FilterHitsBySearchAfter(hits []*search.DocumentMatch, sort search.SortOrder, after []string) []*search.DocumentMatch {
+	if len(hits) == 0 {
+		return hits
+	}
+	// create a search after document
+	searchAfter := createSearchAfterDocument(sort, after)
+	// filter the hits
+	idx := 0
+	cachedScoring := sort.CacheIsScore()
+	cachedDesc := sort.CacheDescending()
+	for _, hit := range hits {
+		if sort.Compare(cachedScoring, cachedDesc, hit, searchAfter) > 0 {
+			hits[idx] = hit
+			idx++
+		}
+	}
+	return hits[:idx]
 }
 
 func getOptimalCollectorStore(size, skip int, comparator collectorCompare) collectorStore {

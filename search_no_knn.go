@@ -192,9 +192,6 @@ func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch
 func redistributeKNNPreSearchData(req *SearchRequest, indexes []Index) (map[string]map[string]interface{}, error) {
 	return nil, nil
 }
-func constructKNNSearchResult(req *SearchRequest, preSearchResult *SearchResult) *SearchResult {
-	return preSearchResult
-}
 
 func isKNNrequestSatisfiedByPreSearch(req *SearchRequest) bool {
 	return false
