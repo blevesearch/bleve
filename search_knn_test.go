@@ -136,7 +136,7 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 
 			query := searchRequests[testCase.queryIndex]
 			query.AddKNNOperator(operator)
-			query.Sort = search.SortOrder{&search.SortScore{Desc: true}, &search.SortDocID{Desc: true}}
+			query.Sort = search.SortOrder{&search.SortScore{Desc: true}, &search.SortDocID{Desc: true}, &search.SortField{Desc: true, Field: "content"}}
 			query.Explain = true
 
 			nameToIndex := createPartitionedIndex(documents, index, 1, testCase.mapping, t, false)
@@ -178,6 +178,140 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 			verifyResult(t, multiLevelIndexResult, experimentalResult, testCaseNum, false)
 			cleanUp(t, nameToIndex)
 		}
+	}
+
+	var facets = map[string]*FacetRequest{
+		"content": {
+			Field: "content",
+			Size:  10,
+		},
+	}
+
+	var sort = search.SortOrder{&search.SortScore{Desc: true}, &search.SortField{Desc: false, Field: "content"}}
+
+	index = NewIndexAlias()
+	for testCaseNum, testCase := range testCases {
+		index.indexes = make([]Index, 0)
+		nameToIndex := createPartitionedIndex(documents, index, testCase.numIndexPartitions, testCase.mapping, t, false)
+		originalRequest := searchRequests[testCase.queryIndex]
+		for _, operator := range knnOperators {
+
+			from, size := originalRequest.From, originalRequest.Size
+			query := copySearchRequest(searchRequests[testCase.queryIndex], nil)
+			query.AddKNNOperator(operator)
+			query.Explain = true
+			query.From = from
+			query.Size = size
+
+			// Three types of queries to run wrt sort and facet fields that require fields.
+			// 1. Sort And Facet are there
+			// 2. Sort is there, Facet is not there
+			// 3. Sort is not there, Facet is there
+			// The case where both sort and facet are not there is already covered in the previous tests.
+
+			// 1. Sort And Facet are there
+			query.Facets = facets
+			query.Sort = sort
+
+			res1, err := index.Search(query)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+			if !finalHitsHaveValidIndex(res1.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected experimental Result hits to have valid `Index`", testCaseNum)
+			}
+
+			facetRes1 := res1.Facets
+			facetRes1Str, err := json.Marshal(facetRes1)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+
+			// 2. Sort is there, Facet is not there
+			query.Facets = nil
+			query.Sort = sort
+
+			res2, err := index.Search(query)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+			if !finalHitsHaveValidIndex(res2.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected experimental Result hits to have valid `Index`", testCaseNum)
+			}
+
+			// 3. Sort is not there, Facet is there
+			query.Facets = facets
+			query.Sort = nil
+			res3, err := index.Search(query)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+			if !finalHitsHaveValidIndex(res3.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected experimental Result hits to have valid `Index`", testCaseNum)
+			}
+
+			facetRes3 := res3.Facets
+			facetRes3Str, err := json.Marshal(facetRes3)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+
+			// Verify the facet results
+			if string(facetRes1Str) != string(facetRes3Str) {
+				fmt.Println(operator)
+				fmt.Println(string(facetRes1Str))
+				fmt.Println(string(facetRes3Str))
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected facet results to be equal", testCaseNum)
+			}
+
+			// Verify the results
+			verifyResult(t, res1, res2, testCaseNum, false)
+			verifyResult(t, res2, res3, testCaseNum, true)
+
+			// Test early exit fail case -> matchNone + facetRequest
+			query.Query = NewMatchNoneQuery()
+			query.Sort = sort
+			// control case
+			query.Facets = nil
+			res4Ctrl, err := index.Search(query)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+			if !finalHitsHaveValidIndex(res4Ctrl.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected control Result hits to have valid `Index`", testCaseNum)
+			}
+
+			// experimental case
+			query.Facets = facets
+			res4Exp, err := index.Search(query)
+			if err != nil {
+				cleanUp(t, nameToIndex)
+				t.Fatal(err)
+			}
+			if !finalHitsHaveValidIndex(res4Exp.Hits, nameToIndex) {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("test case #%d failed: expected experimental Result hits to have valid `Index`", testCaseNum)
+			}
+
+			if !(operator == knnOperatorAnd && res4Ctrl.Total == 0 && res4Exp.Total == 0) {
+				// catch case where no hits are returned
+				// due to matchNone query with a KNN request with operator AND
+				// where no hits are part of the intersection in multi knn request
+				verifyResult(t, res4Ctrl, res4Exp, testCaseNum, false)
+			}
+		}
+		cleanUp(t, nameToIndex)
 	}
 }
 
@@ -535,7 +669,7 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 		mapping     mapping.IndexMapping
 		scoreValue  string
 	}{
-		// // L2 norm similarity
+		// L2 norm similarity
 		{
 			numSegments: 6,
 			queryIndex:  0,
@@ -644,7 +778,7 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 				t.Fatal(err)
 			}
 			query := searchRequests[testCase.queryIndex]
-			query.Sort = search.SortOrder{&search.SortScore{Desc: true}, &search.SortDocID{Desc: true}}
+			query.Sort = search.SortOrder{&search.SortScore{Desc: true}, &search.SortDocID{Desc: true}, &search.SortField{Desc: false, Field: "content"}}
 			query.AddKNNOperator(operator)
 			query.Explain = true
 
