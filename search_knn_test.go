@@ -313,6 +313,88 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 		}
 		cleanUp(t, nameToIndex)
 	}
+
+	// Test Pagination with multi partitioned index
+	index = NewIndexAlias()
+	index.indexes = make([]Index, 0)
+	nameToIndex := createPartitionedIndex(documents, index, 8, indexMappingL2Norm, t, true)
+
+	// Test From + Size pagination for Hybrid Search (2-Phase)
+	query := copySearchRequest(searchRequests[4], nil)
+	query.Sort = sort
+	query.Facets = facets
+	query.Explain = true
+
+	testFromSizePagination(t, query, index, nameToIndex)
+
+	// Test From + Size pagination for Early Exit Hybrid Search (1-Phase)
+	query = copySearchRequest(searchRequests[4], nil)
+	query.Query = NewMatchNoneQuery()
+	query.Sort = sort
+	query.Facets = nil
+	query.Explain = true
+
+	testFromSizePagination(t, query, index, nameToIndex)
+
+	cleanUp(t, nameToIndex)
+}
+
+func testFromSizePagination(t *testing.T, query *SearchRequest, index Index, nameToIndex map[string]Index) {
+	query.From = 0
+	query.Size = 30
+
+	resCtrl, err := index.Search(query)
+	if err != nil {
+		cleanUp(t, nameToIndex)
+		t.Fatal(err)
+	}
+
+	ctrlHitIds := make([]string, len(resCtrl.Hits))
+	for i, doc := range resCtrl.Hits {
+		ctrlHitIds[i] = doc.ID
+	}
+	// experimental case
+
+	fromValues := []int{0, 5, 10, 15, 20, 25}
+	size := 5
+	for fromIdx := 0; fromIdx < len(fromValues); fromIdx++ {
+		from := fromValues[fromIdx]
+		query.From = from
+		query.Size = size
+		resExp, err := index.Search(query)
+		if err != nil {
+			cleanUp(t, nameToIndex)
+			t.Fatal(err)
+		}
+		if from >= len(ctrlHitIds) {
+			if len(resExp.Hits) != 0 {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("expected 0 hits, got %d", len(resExp.Hits))
+			}
+			continue
+		}
+		numHitsExp := len(resExp.Hits)
+		numHitsCtrl := min(len(ctrlHitIds)-from, size)
+		if numHitsExp != numHitsCtrl {
+			cleanUp(t, nameToIndex)
+			t.Fatalf("expected %d hits, got %d", numHitsCtrl, numHitsExp)
+		}
+		for i := 0; i < numHitsExp; i++ {
+			doc := resExp.Hits[i]
+			startOffset := from + i
+			if doc.ID != ctrlHitIds[startOffset] {
+				cleanUp(t, nameToIndex)
+				t.Fatalf("expected %s at index %d, got %s", ctrlHitIds[startOffset], i, doc.ID)
+			}
+		}
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 type testDocument struct {

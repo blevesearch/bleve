@@ -402,7 +402,7 @@ func validateAndDistributeKNNHits(knnHits []*search.DocumentMatch, indexes []Ind
 		// and not an alias. This cannot happen in normal circumstances. But
 		// performing this check to be safe. Since we extract the stack top
 		// in the following steps.
-		if hit.IndexNames == nil || len(hit.IndexNames) == 0 {
+		if len(hit.IndexNames) == 0 {
 			return nil, ErrorTwoPhaseSearchInconsistency
 		}
 		// since the stack is not empty, we need to check if the top of the stack
