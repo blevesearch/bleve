@@ -17,6 +17,7 @@ package scorch
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -424,6 +425,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 				id:      newSegmentID,
 				segment: segment.segment,
 				deleted: nil, // nil since merging handled deletions
+				stats:   make(map[string]map[string]int),
 			})
 			break
 		}
@@ -602,6 +604,17 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 				return nil, nil, err
 			}
 		}
+
+		if segmentSnapshot.stats != nil {
+			b, err := json.Marshal(segmentSnapshot.stats)
+			if err != nil {
+				return nil, nil, err
+			}
+			err = snapshotSegmentBucket.Put(boltStatsKey, b)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
 	}
 
 	return filenames, newSegmentPaths, nil
@@ -704,6 +717,7 @@ var boltMetaDataKey = []byte{'m'}
 var boltMetaDataSegmentTypeKey = []byte("type")
 var boltMetaDataSegmentVersionKey = []byte("version")
 var boltMetaDataTimeStamp = []byte("timeStamp")
+var boltStatsKey = []byte("stats")
 var TotBytesWrittenKey = []byte("TotBytesWritten")
 
 func (s *Scorch) loadFromBolt() error {
@@ -872,6 +886,17 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		if !deletedBitmap.IsEmpty() {
 			rv.deleted = deletedBitmap
 		}
+	}
+	statBytes := segmentBucket.Get(boltStatsKey)
+	if statBytes != nil {
+		var stats map[string]map[string]int
+
+		err := json.Unmarshal(statBytes, &stats)
+		if err != nil {
+			_ = segment.Close()
+			return nil, fmt.Errorf("error reading stat bytes: %v", err)
+		}
+		rv.stats = stats
 	}
 
 	return rv, nil

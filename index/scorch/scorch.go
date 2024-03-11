@@ -428,6 +428,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 
 	var newSegment segment.Segment
 	var bufBytes uint64
+	stats := make(map[string]map[string]int)
 	if len(analysisResults) > 0 {
 		newSegment, bufBytes, err = s.segPlugin.New(analysisResults)
 		if err != nil {
@@ -438,11 +439,24 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 				segB.BytesWritten())
 		}
 		atomic.AddUint64(&s.iStats.newSegBufBytesAdded, bufBytes)
+
+		stats["num_vectors"] = make(map[string]int)
+		for _, result := range analysisResults {
+			result.VisitFields(func(field index.Field) {
+				if string(field.EncodedFieldType()) == "v" {
+					if _, exists := stats["num_vectors"][field.Name()]; !exists {
+						stats["num_vectors"][field.Name()] = 0
+					}
+
+					stats["num_vectors"][field.Name()] += 1
+				}
+			})
+		}
 	} else {
 		atomic.AddUint64(&s.stats.TotBatchesEmpty, 1)
 	}
 
-	err = s.prepareSegment(newSegment, ids, batch.InternalOps, batch.PersistedCallback())
+	err = s.prepareSegment(newSegment, ids, batch.InternalOps, batch.PersistedCallback(), stats)
 	if err != nil {
 		if newSegment != nil {
 			_ = newSegment.Close()
@@ -462,7 +476,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
-	internalOps map[string][]byte, persistedCallback index.BatchCallback) error {
+	internalOps map[string][]byte, persistedCallback index.BatchCallback, stats map[string]map[string]int) error {
 
 	// new introduction
 	introduction := &segmentIntroduction{
@@ -470,6 +484,7 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 		data:              newSegment,
 		ids:               ids,
 		internal:          internalOps,
+		stats:             stats,
 		applied:           make(chan error),
 		persistedCallback: persistedCallback,
 	}
@@ -641,6 +656,31 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["num_persister_nap_merger_break"] = m["TotPersisterMergerNapBreak"]
 	m["total_compaction_written_bytes"] = m["TotFileMergeWrittenBytes"]
 
+	fieldStats := make(map[string]map[string]int)
+
+	for _, segmentSnapshot := range indexSnapshot.Segments() {
+		if segmentSnapshot.stats != nil {
+			for statName, stats := range segmentSnapshot.stats {
+				if _, exists := fieldStats[statName]; !exists {
+					fieldStats[statName] = make(map[string]int)
+				}
+
+				for fieldName, val := range stats {
+					if _, exists := fieldStats[statName][fieldName]; !exists {
+						fieldStats[statName][fieldName] = 0
+					}
+
+					fieldStats[statName][fieldName] += val
+				}
+			}
+		}
+	}
+
+	for statName, stats := range fieldStats {
+		for fieldName, val := range stats {
+			m["field:"+fieldName+":"+statName] = val
+		}
+	}
 	return m
 }
 
@@ -764,4 +804,13 @@ func parseToInteger(i interface{}) (int, error) {
 	default:
 		return 0, fmt.Errorf("expects int or float64 value")
 	}
+}
+
+func initFieldStats() map[string]map[string]int {
+
+	statsMap := make(map[string]map[string]int)
+
+	statsMap["num_vectors"] = make(map[string]int)
+
+	return statsMap
 }
