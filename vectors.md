@@ -2,14 +2,14 @@
 
 * *v2.4.0* (and after) will come with support for **vectors' indexing and search**.
 * We've achieved this by embedding [FAISS](https://github.com/facebookresearch/faiss) indexes within our bleve indexes.
-* v2.4.0 comes with a new zap file format [v16](https://github.com/blevesearch/zapx/blob/master/zap.md) which will be the default going forward. Here we co-locate text and vector indexes as neighbors within segments, continuing to conform to the segmented architecture of *scorch*.
+* A new zap file format: [v16](https://github.com/blevesearch/zapx/blob/master/zap.md) - which will be the default going forward. Here we co-locate text and vector indexes as neighbors within segments, continuing to conform to the segmented architecture of *scorch*.
 
 ## Pre-requisite(s)
 
-* Inclusion of [FAISS](https://github.com/blevesearch/faiss) into our eco system.
+* Induction of [FAISS](https://github.com/blevesearch/faiss) into our eco system.
 * FAISS is a C++ library that needs to be compiled and it's shared libraries need to be situated at an accessible path for your application.
 * A `vectors` GO TAG needs to be set for bleve to access all the supporting code. This TAG must be set only after the FAISS shared library is made available. Failure to do either will inhibit you from using this feature.
-* Please follow [instructions](#setup-instructions) below for any assistance in the area.
+* Please follow these [instructions](#setup-instructions) below for any assistance in the area.
 
 ## Indexing
 
@@ -66,9 +66,12 @@ fmt.Println(searchResult.Hits)
 * Vectors from documents that do not conform to the index mapping dimensionality are simply discarded at index time.
 * The dimensionality of the query vector must match the dimensionality of the indexed vectors to obtain any results.
 * Pure kNN searches can be performed, but the `query` attribute within the search request must be set - to `{"match_none": {}}` in this case.
-* Hybrid searches are supported, where results from `query` are unioned (for now) with results from `knn`. The tf-idf scores from exact searches are simply summed with the kNN distance metrics to determine the aggregate scores.
+* Hybrid searches are supported, where results from `query` are unioned (for now) with results from `knn`. The tf-idf scores from exact searches are simply summed with the similarity distances to determine the aggregate scores.
+```
+aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distance)
+```
 * Multi kNN searches are supported - the `knn` object within the search request accepts an array of requests. These sub objects are unioned by default but this behavior can be overriden by setting `knn_operator` to `"and"`.
-* Previously supported pagination settings will work as they were, with size/limit being applied after the top-K results are computed.
+* Previously supported pagination settings will work as they were, with size/limit being applied over the top-K hits combined with any exact search hits.
 
 ## Setup Instructions
 
@@ -103,7 +106,7 @@ sudo make -C build install
 sudo cp build/c_api/libfaiss_c.dylib /usr/local/lib
 ```
 
-### Sanity
+### Sanity check
 
 Once the supporting library is built and made available, a sanity run is recommended to make sure all unit tests and especially those accessing the vectors' code pass. Here's how I do on mac -
 
