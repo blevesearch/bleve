@@ -30,7 +30,7 @@ type segmentIntroduction struct {
 	obsoletes map[uint64]*roaring.Bitmap
 	ids       []string
 	internal  map[string][]byte
-	stats     map[string]map[string]int
+	stats     *fieldStats
 
 	applied           chan error
 	persisted         chan error
@@ -427,7 +427,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	if nextMerge.new != nil &&
 		nextMerge.new.Count() > newSegmentDeleted.GetCardinality() {
 
-		stats := initFieldStats()
+		stats := newFieldStats()
 		if fsr, ok := nextMerge.new.(segment.FieldStatsReporter); ok {
 			fsr.UpdateFieldStats(stats)
 		}

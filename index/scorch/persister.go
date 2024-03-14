@@ -425,7 +425,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 				id:      newSegmentID,
 				segment: segment.segment,
 				deleted: nil, // nil since merging handled deletions
-				stats:   make(map[string]map[string]int),
+				stats:   nil,
 			})
 			break
 		}
@@ -606,7 +606,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 		}
 
 		if segmentSnapshot.stats != nil {
-			b, err := json.Marshal(segmentSnapshot.stats)
+			b, err := json.Marshal(segmentSnapshot.stats.GetStatsMap())
 			if err != nil {
 				return nil, nil, err
 			}
@@ -889,9 +889,10 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	}
 	statBytes := segmentBucket.Get(boltStatsKey)
 	if statBytes != nil {
-		var stats map[string]map[string]int
+		var statsMap map[string]map[string]uint64
 
-		err := json.Unmarshal(statBytes, &stats)
+		err := json.Unmarshal(statBytes, &statsMap)
+		stats := &fieldStats{statMap: statsMap}
 		if err != nil {
 			_ = segment.Close()
 			return nil, fmt.Errorf("error reading stat bytes: %v", err)

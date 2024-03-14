@@ -428,7 +428,8 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 
 	var newSegment segment.Segment
 	var bufBytes uint64
-	stats := make(map[string]map[string]int)
+	stats := newFieldStats()
+
 	if len(analysisResults) > 0 {
 		newSegment, bufBytes, err = s.segPlugin.New(analysisResults)
 		if err != nil {
@@ -440,18 +441,10 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 		}
 		atomic.AddUint64(&s.iStats.newSegBufBytesAdded, bufBytes)
 
-		stats["num_vectors"] = make(map[string]int)
-		for _, result := range analysisResults {
-			result.VisitFields(func(field index.Field) {
-				if string(field.EncodedFieldType()) == "v" {
-					if _, exists := stats["num_vectors"][field.Name()]; !exists {
-						stats["num_vectors"][field.Name()] = 0
-					}
-
-					stats["num_vectors"][field.Name()] += 1
-				}
-			})
+		if fsr, ok := newSegment.(segment.FieldStatsReporter); ok {
+			fsr.UpdateFieldStats(stats)
 		}
+
 	} else {
 		atomic.AddUint64(&s.stats.TotBatchesEmpty, 1)
 	}
@@ -476,7 +469,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
-	internalOps map[string][]byte, persistedCallback index.BatchCallback, stats map[string]map[string]int) error {
+	internalOps map[string][]byte, persistedCallback index.BatchCallback, stats *fieldStats) error {
 
 	// new introduction
 	introduction := &segmentIntroduction{
@@ -656,27 +649,16 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["num_persister_nap_merger_break"] = m["TotPersisterMergerNapBreak"]
 	m["total_compaction_written_bytes"] = m["TotFileMergeWrittenBytes"]
 
-	fieldStats := make(map[string]map[string]int)
+	aggFieldStats := newFieldStats()
 
 	for _, segmentSnapshot := range indexSnapshot.Segments() {
 		if segmentSnapshot.stats != nil {
-			for statName, stats := range segmentSnapshot.stats {
-				if _, exists := fieldStats[statName]; !exists {
-					fieldStats[statName] = make(map[string]int)
-				}
-
-				for fieldName, val := range stats {
-					if _, exists := fieldStats[statName][fieldName]; !exists {
-						fieldStats[statName][fieldName] = 0
-					}
-
-					fieldStats[statName][fieldName] += val
-				}
-			}
+			aggFieldStats.AggregateStats(segmentSnapshot.stats)
 		}
 	}
 
-	for statName, stats := range fieldStats {
+	aggFieldStatsMap := aggFieldStats.GetStatsMap()
+	for statName, stats := range aggFieldStatsMap {
 		for fieldName, val := range stats {
 			m["field:"+fieldName+":"+statName] = val
 		}
@@ -806,11 +788,52 @@ func parseToInteger(i interface{}) (int, error) {
 	}
 }
 
-func initFieldStats() map[string]map[string]int {
+type fieldStats struct {
+	statMap map[string]map[string]uint64
+}
 
-	statsMap := make(map[string]map[string]int)
+func (fs *fieldStats) AddStat(statName, fieldName string, value uint64) {
 
-	statsMap["num_vectors"] = make(map[string]int)
+	if _, exists := fs.statMap[statName]; !exists {
+		fs.statMap[statName] = make(map[string]uint64)
+	}
 
-	return statsMap
+	fs.statMap[statName][fieldName] = value
+}
+
+func (fs *fieldStats) AggregateStats(stats segment.FieldStats) {
+
+	statMap := stats.GetStatsMap()
+	if statMap == nil {
+		return
+	}
+
+	for statName, statMap := range statMap {
+		for fieldName, val := range statMap {
+			fs.AppendStat(statName, fieldName, val)
+		}
+	}
+}
+
+func (fs *fieldStats) AppendStat(statName, fieldName string, value uint64) {
+
+	if _, exists := fs.statMap[statName]; !exists {
+		fs.statMap[statName] = make(map[string]uint64)
+	}
+
+	if _, exists := fs.statMap[statName][fieldName]; !exists {
+		fs.statMap[statName][fieldName] = 0
+	}
+
+	fs.statMap[statName][fieldName] += value
+}
+
+func (fs *fieldStats) GetStatsMap() map[string]map[string]uint64 {
+	return fs.statMap
+}
+
+func newFieldStats() *fieldStats {
+	return &fieldStats{
+		statMap: make(map[string]map[string]uint64),
+	}
 }
