@@ -1123,3 +1123,62 @@ func TestNestedVectors(t *testing.T) {
 		}
 	}
 }
+
+func TestNumVecsStat(t *testing.T) {
+
+	dataset, _, err := readDatasetAndQueries(testInputCompressedFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	documents := makeDatasetIntoDocuments(dataset)
+
+	indexMapping := NewIndexMapping()
+
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.Analyzer = en.AnalyzerName
+	indexMapping.DefaultMapping.AddFieldMappingsAt("content", contentFieldMapping)
+
+	vecFieldMapping1 := mapping.NewVectorFieldMapping()
+	vecFieldMapping1.Dims = testDatasetDims
+	vecFieldMapping1.Similarity = index.EuclideanDistance
+	indexMapping.DefaultMapping.AddFieldMappingsAt("vector", vecFieldMapping1)
+
+	tmpIndexPath := createTmpIndexPath(t)
+	index, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	for i := 0; i < 10; i++ {
+		batch := index.NewBatch()
+		for j := 0; j < 3; j++ {
+			for k := 0; k < 10; k++ {
+				err := batch.Index(fmt.Sprintf("%d", i*30+j*10+k), documents[j*10+k])
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		err = index.Batch(batch)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	statsMap := index.StatsMap()
+
+	if indexStats, exists := statsMap["index"]; exists {
+		if indexStatsMap, ok := indexStats.(map[string]interface{}); ok {
+			v1, ok := indexStatsMap["field:vector:num_vectors"].(uint64)
+			if !ok || v1 != uint64(300) {
+				t.Fatalf("mismatch in the number of vectors, expected 300, got %d", indexStatsMap["field:vector:num_vectors"])
+			}
+		}
+	}
+}

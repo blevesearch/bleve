@@ -649,15 +649,15 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["num_persister_nap_merger_break"] = m["TotPersisterMergerNapBreak"]
 	m["total_compaction_written_bytes"] = m["TotFileMergeWrittenBytes"]
 
+	// calculate the aggregate of all the segment's field stats
 	aggFieldStats := newFieldStats()
-
 	for _, segmentSnapshot := range indexSnapshot.Segments() {
 		if segmentSnapshot.stats != nil {
-			aggFieldStats.AggregateStats(segmentSnapshot.stats)
+			aggFieldStats.Aggregate(segmentSnapshot.stats)
 		}
 	}
 
-	aggFieldStatsMap := aggFieldStats.GetStatsMap()
+	aggFieldStatsMap := aggFieldStats.Fetch()
 	for statName, stats := range aggFieldStatsMap {
 		for fieldName, val := range stats {
 			m["field:"+fieldName+":"+statName] = val
@@ -788,52 +788,53 @@ func parseToInteger(i interface{}) (int, error) {
 	}
 }
 
+// Holds Zap's field level stats at a segment level
 type fieldStats struct {
+	// StatName -> FieldName -> value
 	statMap map[string]map[string]uint64
 }
 
-func (fs *fieldStats) AddStat(statName, fieldName string, value uint64) {
-
-	if _, exists := fs.statMap[statName]; !exists {
-		fs.statMap[statName] = make(map[string]uint64)
+// Add the data into the map after checking if the statname is valid
+func (fs *fieldStats) Store(statName, fieldName string, value uint64) {
+	if _, exists := segment.Stats[statName]; exists {
+		fs.statMap[statName][fieldName] = value
 	}
-
-	fs.statMap[statName][fieldName] = value
 }
 
-func (fs *fieldStats) AggregateStats(stats segment.FieldStats) {
+// Combine the given stats map with the existing map
+func (fs *fieldStats) Aggregate(stats segment.FieldStats) {
 
-	statMap := stats.GetStatsMap()
+	statMap := stats.Fetch()
 	if statMap == nil {
 		return
 	}
 
 	for statName, statMap := range statMap {
 		for fieldName, val := range statMap {
-			fs.AppendStat(statName, fieldName, val)
+			if _, exists := fs.statMap[statName][fieldName]; !exists {
+				fs.statMap[statName][fieldName] = 0
+			}
+
+			fs.statMap[statName][fieldName] += val
 		}
 	}
 }
 
-func (fs *fieldStats) AppendStat(statName, fieldName string, value uint64) {
-
-	if _, exists := fs.statMap[statName]; !exists {
-		fs.statMap[statName] = make(map[string]uint64)
-	}
-
-	if _, exists := fs.statMap[statName][fieldName]; !exists {
-		fs.statMap[statName][fieldName] = 0
-	}
-
-	fs.statMap[statName][fieldName] += value
-}
-
-func (fs *fieldStats) GetStatsMap() map[string]map[string]uint64 {
+// Returns the stats map
+func (fs *fieldStats) Fetch() map[string]map[string]uint64 {
 	return fs.statMap
 }
 
+// Initializes an empty stats map
 func newFieldStats() *fieldStats {
-	return &fieldStats{
-		statMap: make(map[string]map[string]uint64),
+
+	rv := &fieldStats{
+		statMap: map[string]map[string]uint64{},
 	}
+
+	for statName := range segment.Stats {
+		rv.statMap[statName] = map[string]uint64{}
+	}
+
+	return rv
 }

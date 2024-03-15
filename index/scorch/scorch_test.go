@@ -37,6 +37,7 @@ import (
 	"github.com/blevesearch/bleve/v2/index/scorch/mergeplan"
 	"github.com/blevesearch/bleve/v2/mapping"
 	index "github.com/blevesearch/bleve_index_api"
+	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
 func init() {
@@ -2661,5 +2662,26 @@ func TestReadOnlyIndex(t *testing.T) {
 	}
 	if docCount != 1 {
 		t.Errorf("Expected document count to be %d got %d", 1, docCount)
+	}
+}
+
+func BenchmarkAggregateFieldStats(b *testing.B) {
+
+	fieldStatsArray := make([]*fieldStats, 1000)
+
+	for i := range fieldStatsArray {
+		fieldStatsArray[i] = newFieldStats()
+
+		fieldStatsArray[i].Store(segment.NumVecsStat, "vector", uint64(rand.Intn(1000)))
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		aggFieldStats := newFieldStats()
+
+		for _, fs := range fieldStatsArray {
+			aggFieldStats.Aggregate(fs)
+		}
 	}
 }

@@ -605,8 +605,9 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			}
 		}
 
+		// store segment stats
 		if segmentSnapshot.stats != nil {
-			b, err := json.Marshal(segmentSnapshot.stats.GetStatsMap())
+			b, err := json.Marshal(segmentSnapshot.stats.Fetch())
 			if err != nil {
 				return nil, nil, err
 			}
