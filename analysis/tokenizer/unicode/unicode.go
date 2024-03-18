@@ -15,7 +15,8 @@
 package unicode
 
 import (
-	"github.com/blevesearch/segment"
+	"github.com/clipperhouse/uax29/iterators/filter"
+	"github.com/clipperhouse/uax29/words"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/registry"
@@ -31,83 +32,44 @@ func NewUnicodeTokenizer() *UnicodeTokenizer {
 }
 
 func (rt *UnicodeTokenizer) Tokenize(input []byte) analysis.TokenStream {
-	rvx := make([]analysis.TokenStream, 0, 10) // When rv gets full, append to rvx.
-	rv := make(analysis.TokenStream, 0, 1)
+	inputBytes := len(input)
 
-	ta := []analysis.Token(nil)
-	taNext := 0
+	// An optimization to pre-allocate & avoid re-sizing
+	const guessBytesPerToken = 6
+	guessTokens := (inputBytes / guessBytesPerToken) | 1 // ensure minimum of 1
 
-	segmenter := segment.NewWordSegmenterDirect(input)
-	start := 0
-	pos := 1
+	result := make(analysis.TokenStream, 0, guessTokens)
 
-	guessRemaining := func(end int) int {
-		avgSegmentLen := end / (len(rv) + 1)
-		if avgSegmentLen < 1 {
-			avgSegmentLen = 1
+	// Pre-allocate token pool
+	pool := make([]analysis.Token, guessTokens)
+	poolIndex := 0
+
+	segmenter := words.NewSegmenter(input)
+	segmenter.Filter(filter.AlphaNumeric)
+
+	for segmenter.Next() {
+		if poolIndex >= len(pool) {
+			bytesSoFar := segmenter.End()
+			tokensSoFar := len(result) | 1
+			avgBytesPerToken := (bytesSoFar / tokensSoFar) | 1
+			guessTokensRemaining := ((inputBytes - bytesSoFar) / avgBytesPerToken) | 1
+			pool = make([]analysis.Token, guessTokensRemaining)
+			poolIndex = 0
 		}
 
-		remainingLen := len(input) - end
+		token := &pool[poolIndex]
+		poolIndex++
 
-		return remainingLen / avgSegmentLen
+		token.Term = segmenter.Bytes()
+		token.Start = segmenter.Start()
+		token.End = segmenter.End()
+		token.Position = len(result) + 1 // 1-indexed
+		token.Type = getType(segmenter.Bytes())
+
+		result = append(result, token)
 	}
 
-	for segmenter.Segment() {
-		segmentBytes := segmenter.Bytes()
-		end := start + len(segmentBytes)
-		if segmenter.Type() != segment.None {
-			if taNext >= len(ta) {
-				remainingSegments := guessRemaining(end)
-				if remainingSegments > 1000 {
-					remainingSegments = 1000
-				}
-				if remainingSegments < 1 {
-					remainingSegments = 1
-				}
-
-				ta = make([]analysis.Token, remainingSegments)
-				taNext = 0
-			}
-
-			token := &ta[taNext]
-			taNext++
-
-			token.Term = segmentBytes
-			token.Start = start
-			token.End = end
-			token.Position = pos
-			token.Type = convertType(segmenter.Type())
-
-			if len(rv) >= cap(rv) { // When rv is full, save it into rvx.
-				rvx = append(rvx, rv)
-
-				rvCap := cap(rv) * 2
-				if rvCap > 256 {
-					rvCap = 256
-				}
-
-				rv = make(analysis.TokenStream, 0, rvCap) // Next rv cap is bigger.
-			}
-
-			rv = append(rv, token)
-			pos++
-		}
-		start = end
-	}
-
-	if len(rvx) > 0 {
-		n := len(rv)
-		for _, r := range rvx {
-			n += len(r)
-		}
-		rall := make(analysis.TokenStream, 0, n)
-		for _, r := range rvx {
-			rall = append(rall, r...)
-		}
-		return append(rall, rv...)
-	}
-
-	return rv
+	return result
 }
 
 func UnicodeTokenizerConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.Tokenizer, error) {
@@ -118,13 +80,11 @@ func init() {
 	registry.RegisterTokenizer(Name, UnicodeTokenizerConstructor)
 }
 
-func convertType(segmentWordType int) analysis.TokenType {
-	switch segmentWordType {
-	case segment.Ideo:
+func getType(segment []byte) analysis.TokenType {
+	switch {
+	case words.BleveIdeographic(segment):
 		return analysis.Ideographic
-	case segment.Kana:
-		return analysis.Ideographic
-	case segment.Number:
+	case words.BleveNumeric(segment):
 		return analysis.Numeric
 	}
 	return analysis.AlphaNumeric
