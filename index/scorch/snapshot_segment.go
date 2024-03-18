@@ -39,6 +39,7 @@ type SegmentSnapshot struct {
 	segment segment.Segment
 	deleted *roaring.Bitmap
 	creator string
+	stats   *fieldStats
 
 	cachedMeta *cachedMeta
 

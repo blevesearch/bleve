@@ -428,6 +428,8 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 
 	var newSegment segment.Segment
 	var bufBytes uint64
+	stats := newFieldStats()
+
 	if len(analysisResults) > 0 {
 		newSegment, bufBytes, err = s.segPlugin.New(analysisResults)
 		if err != nil {
@@ -438,11 +440,14 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 				segB.BytesWritten())
 		}
 		atomic.AddUint64(&s.iStats.newSegBufBytesAdded, bufBytes)
+		if fsr, ok := newSegment.(segment.FieldStatsReporter); ok {
+			fsr.UpdateFieldStats(stats)
+		}
 	} else {
 		atomic.AddUint64(&s.stats.TotBatchesEmpty, 1)
 	}
 
-	err = s.prepareSegment(newSegment, ids, batch.InternalOps, batch.PersistedCallback())
+	err = s.prepareSegment(newSegment, ids, batch.InternalOps, batch.PersistedCallback(), stats)
 	if err != nil {
 		if newSegment != nil {
 			_ = newSegment.Close()
@@ -462,7 +467,7 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 }
 
 func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
-	internalOps map[string][]byte, persistedCallback index.BatchCallback) error {
+	internalOps map[string][]byte, persistedCallback index.BatchCallback, stats *fieldStats) error {
 
 	// new introduction
 	introduction := &segmentIntroduction{
@@ -470,6 +475,7 @@ func (s *Scorch) prepareSegment(newSegment segment.Segment, ids []string,
 		data:              newSegment,
 		ids:               ids,
 		internal:          internalOps,
+		stats:             stats,
 		applied:           make(chan error),
 		persistedCallback: persistedCallback,
 	}
@@ -641,6 +647,20 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["num_persister_nap_merger_break"] = m["TotPersisterMergerNapBreak"]
 	m["total_compaction_written_bytes"] = m["TotFileMergeWrittenBytes"]
 
+	// calculate the aggregate of all the segment's field stats
+	aggFieldStats := newFieldStats()
+	for _, segmentSnapshot := range indexSnapshot.Segments() {
+		if segmentSnapshot.stats != nil {
+			aggFieldStats.Aggregate(segmentSnapshot.stats)
+		}
+	}
+
+	aggFieldStatsMap := aggFieldStats.Fetch()
+	for statName, stats := range aggFieldStatsMap {
+		for fieldName, val := range stats {
+			m["field:"+fieldName+":"+statName] = val
+		}
+	}
 	return m
 }
 
@@ -764,4 +784,51 @@ func parseToInteger(i interface{}) (int, error) {
 	default:
 		return 0, fmt.Errorf("expects int or float64 value")
 	}
+}
+
+// Holds Zap's field level stats at a segment level
+type fieldStats struct {
+	// StatName -> FieldName -> value
+	statMap map[string]map[string]uint64
+}
+
+// Add the data into the map after checking if the statname is valid
+func (fs *fieldStats) Store(statName, fieldName string, value uint64) {
+	if _, exists := fs.statMap[statName]; !exists {
+		fs.statMap[statName] = make(map[string]uint64)
+	}
+	fs.statMap[statName][fieldName] = value
+}
+
+// Combine the given stats map with the existing map
+func (fs *fieldStats) Aggregate(stats segment.FieldStats) {
+
+	statMap := stats.Fetch()
+	if statMap == nil {
+		return
+	}
+	for statName, statMap := range statMap {
+		if _, exists := fs.statMap[statName]; !exists {
+			fs.statMap[statName] = make(map[string]uint64)
+		}
+		for fieldName, val := range statMap {
+			if _, exists := fs.statMap[statName][fieldName]; !exists {
+				fs.statMap[statName][fieldName] = 0
+			}
+			fs.statMap[statName][fieldName] += val
+		}
+	}
+}
+
+// Returns the stats map
+func (fs *fieldStats) Fetch() map[string]map[string]uint64 {
+	return fs.statMap
+}
+
+// Initializes an empty stats map
+func newFieldStats() *fieldStats {
+	rv := &fieldStats{
+		statMap: map[string]map[string]uint64{},
+	}
+	return rv
 }
