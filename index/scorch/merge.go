@@ -72,6 +72,17 @@ OUTER:
 				ctrlMsg = ctrlMsgDflt
 			}
 			if ctrlMsg != nil {
+
+				continueMerge := s.continueEvent(EventKindPreMergeMemoryCheck)
+				if !continueMerge {
+					// If it's decided that this merge can't take place now,
+					// begin the merge process all over again.
+					// Retry instead of blocking/waiting here since a long wait
+					// can result in more segments introduced i.e. s.root will
+					// be updated.
+					continue OUTER
+				}
+
 				startTime := time.Now()
 
 				// lets get started
@@ -328,6 +339,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 			atomic.AddUint64(&s.stats.TotFileMergeZapBeg, 1)
 			prevBytesReadTotal := cumulateBytesRead(segmentsToMerge)
+
 			newDocNums, _, err := s.segPlugin.Merge(segmentsToMerge, docsToDrop, path,
 				cw.cancelCh, s)
 			atomic.AddUint64(&s.stats.TotFileMergeZapEnd, 1)
