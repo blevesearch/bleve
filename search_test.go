@@ -17,6 +17,7 @@ package bleve
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/custom"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/simple"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	html_char_filter "github.com/blevesearch/bleve/v2/analysis/char/html"
 	regexp_char_filter "github.com/blevesearch/bleve/v2/analysis/char/regexp"
@@ -121,6 +123,70 @@ func TestSortedFacetedQuery(t *testing.T) {
 			if v1.Count != expectedResults[v1.Term] {
 				t.Errorf("expected %d, got %d", expectedResults[v1.Term], v1.Count)
 			}
+		}
+	}
+}
+
+func TestMatchAllScorer(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMapping := NewIndexMapping()
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = "en"
+	documentMapping := NewDocumentMapping()
+
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.Index = true
+	contentFieldMapping.Store = true
+	documentMapping.AddFieldMappingsAt("content", contentFieldMapping)
+
+	index, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	index.Index("1", map[string]interface{}{
+		"country": "india",
+		"content": "k",
+	})
+	index.Index("2", map[string]interface{}{
+		"country": "india",
+		"content": "l",
+	})
+	index.Index("3", map[string]interface{}{
+		"country": "india",
+		"content": "k",
+	})
+
+	d, err := index.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d != 3 {
+		t.Errorf("expected 3, got %d", d)
+	}
+
+	searchRequest := NewSearchRequest(NewMatchAllQuery())
+	searchRequest.Score = "none"
+	searchResults, err := index.Search(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if searchResults.Total != 3 {
+		t.Fatalf("expected all the 3 docs in the index, got %v", searchResults.Total)
+	}
+
+	for _, hit := range searchResults.Hits {
+		if hit.Score != 0.0 {
+			t.Fatalf("expected 0 score since score = none, got %v", hit.Score)
 		}
 	}
 }
@@ -2773,8 +2839,7 @@ func TestDateRangeStringQuery(t *testing.T) {
 		}
 	}
 }
-
-func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
+func TestDateRangeFacetQueriesWithCustomDateTimeParser(t *testing.T) {
 	idxMapping := NewIndexMapping()
 
 	err := idxMapping.AddCustomDateTimeParser("customDT", map[string]interface{}{
@@ -2873,8 +2938,8 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 			end:   "2001-08-20 18:10:00",
 			result: testFacetResult{
 				name:  "test",
-				start: "2001-08-20 18:00:00",
-				end:   "2001-08-20 18:10:00",
+				start: "2001-08-20T18:00:00Z",
+				end:   "2001-08-20T18:10:00Z",
 				count: 2,
 				err:   nil,
 			},
@@ -2886,8 +2951,8 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 			parser: "queryDT",
 			result: testFacetResult{
 				name:  "test",
-				start: "20/08/2001 6:00PM",
-				end:   "20/08/2001 6:10PM",
+				start: "2001-08-20T18:00:00Z",
+				end:   "2001-08-20T18:10:00Z",
 				count: 2,
 				err:   nil,
 			},
@@ -2899,8 +2964,8 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 			parser: "customDT",
 			result: testFacetResult{
 				name:  "test",
-				start: "20/08/2001 15:00:00",
-				end:   "2001/08/20 6:10PM",
+				start: "2001-08-20T15:00:00Z",
+				end:   "2001-08-20T18:10:00Z",
 				count: 2,
 				err:   nil,
 			},
@@ -2911,7 +2976,7 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 			parser: "customDT",
 			result: testFacetResult{
 				name:  "test",
-				end:   "2001/08/20 6:15PM",
+				end:   "2001-08-20T18:15:00Z",
 				count: 3,
 				err:   nil,
 			},
@@ -2922,7 +2987,7 @@ func TestDateRangeFaceQueriesWithCustomDateTimeParser(t *testing.T) {
 			parser: "queryDT",
 			result: testFacetResult{
 				name:  "test",
-				start: "20/08/2001 6:15PM",
+				start: "2001-08-20T18:15:00Z",
 				count: 2,
 				err:   nil,
 			},
@@ -3375,4 +3440,162 @@ func TestPercentAndIsoStyleDates(t *testing.T) {
 			}
 		}
 	}
+}
+
+func roundToDecimalPlace(num float64, decimalPlaces int) float64 {
+	precision := math.Pow(10, float64(decimalPlaces))
+	return math.Round(num*precision) / precision
+}
+
+func TestScoreBreakdown(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	imap := mapping.NewIndexMapping()
+	textField := mapping.NewTextFieldMapping()
+	textField.Analyzer = simple.Name
+	imap.DefaultMapping.AddFieldMappingsAt("text", textField)
+
+	documents := map[string]map[string]interface{}{
+		"doc1": {
+			"text": "lorem ipsum dolor sit amet consectetur adipiscing elit do eiusmod tempor",
+		},
+		"doc2": {
+			"text": "lorem dolor amet adipiscing sed eiusmod",
+		},
+		"doc3": {
+			"text": "ipsum sit consectetur elit do tempor",
+		},
+		"doc4": {
+			"text": "lorem ipsum sit amet adipiscing elit do eiusmod",
+		},
+	}
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch := idx.NewBatch()
+	for docID, doc := range documents {
+		err := batch.Index(docID, doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type testResult struct {
+		docID          string // doc ID of the hit
+		score          float64
+		scoreBreakdown map[int]float64
+	}
+	type testStruct struct {
+		query      string
+		typ        string
+		expectHits []testResult
+	}
+	testQueries := []testStruct{
+		{
+			// trigger disjunction heap searcher (>10 searchers)
+			// expect score breakdown to have a 0 at BLANK
+			query: `{"disjuncts":[{"term":"lorem","field":"text"},{"term":"blank","field":"text"},{"term":"ipsum","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"},{"term":"dolor","field":"text"},{"term":"sit","field":"text"},{"term":"amet","field":"text"},{"term":"consectetur","field":"text"},{"term":"blank","field":"text"},{"term":"adipiscing","field":"text"},{"term":"blank","field":"text"},{"term":"elit","field":"text"},{"term":"sed","field":"text"},{"term":"do","field":"text"},{"term":"eiusmod","field":"text"},{"term":"tempor","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"}]}`,
+			typ:   "disjunction",
+			expectHits: []testResult{
+				{
+					docID:          "doc1",
+					score:          0.3034548543819603,
+					scoreBreakdown: map[int]float64{0: 0.040398807605268316, 2: 0.040398807605268316, 5: 0.0669862776967768, 6: 0.040398807605268316, 7: 0.040398807605268316, 8: 0.0669862776967768, 10: 0.040398807605268316, 12: 0.040398807605268316, 14: 0.040398807605268316, 15: 0.040398807605268316, 16: 0.0669862776967768},
+				},
+				{
+					docID:          "doc2",
+					score:          0.14725661652397853,
+					scoreBreakdown: map[int]float64{0: 0.05470024557900147, 5: 0.09069985124905133, 7: 0.05470024557900147, 10: 0.05470024557900147, 13: 0.15681178542754148, 15: 0.05470024557900147},
+				},
+				{
+					docID:          "doc3",
+					score:          0.12637916362550797,
+					scoreBreakdown: map[int]float64{2: 0.05470024557900147, 6: 0.05470024557900147, 8: 0.09069985124905133, 12: 0.05470024557900147, 14: 0.05470024557900147, 16: 0.09069985124905133},
+				},
+				{
+					docID:          "doc4",
+					score:          0.15956816751152955,
+					scoreBreakdown: map[int]float64{0: 0.04737179972998534, 2: 0.04737179972998534, 6: 0.04737179972998534, 7: 0.04737179972998534, 10: 0.04737179972998534, 12: 0.04737179972998534, 14: 0.04737179972998534, 15: 0.04737179972998534},
+				},
+			},
+		},
+		{
+			// trigger disjunction slice searcher (< 10 searchers)
+			// expect BLANK to give a 0 in score breakdown
+			query: `{"disjuncts":[{"term":"blank","field":"text"},{"term":"lorem","field":"text"},{"term":"ipsum","field":"text"},{"term":"blank","field":"text"},{"term":"blank","field":"text"},{"term":"dolor","field":"text"},{"term":"sit","field":"text"},{"term":"blank","field":"text"}]}`,
+			typ:   "disjunction",
+			expectHits: []testResult{
+				{
+					docID:          "doc1",
+					score:          0.1340684440934241,
+					scoreBreakdown: map[int]float64{1: 0.05756326446708409, 2: 0.05756326446708409, 5: 0.09544709478559595, 6: 0.05756326446708409},
+				},
+				{
+					docID:          "doc2",
+					score:          0.05179425287147191,
+					scoreBreakdown: map[int]float64{1: 0.0779410306721006, 5: 0.129235980813787},
+				},
+				{
+					docID:          "doc3",
+					score:          0.0389705153360503,
+					scoreBreakdown: map[int]float64{2: 0.0779410306721006, 6: 0.0779410306721006},
+				},
+				{
+					docID:          "doc4",
+					score:          0.07593627256602972,
+					scoreBreakdown: map[int]float64{1: 0.06749890894758198, 2: 0.06749890894758198, 6: 0.06749890894758198},
+				},
+			},
+		},
+	}
+	for _, dtq := range testQueries {
+		var q query.Query
+		var rv query.DisjunctionQuery
+		err := json.Unmarshal([]byte(dtq.query), &rv)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rv.RetrieveScoreBreakdown(true)
+		q = &rv
+		sr := NewSearchRequest(q)
+		sr.SortBy([]string{"_id"})
+		sr.Explain = true
+		res, err := idx.Search(sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Hits) != len(dtq.expectHits) {
+			t.Fatalf("expected %d hits, got %d", len(dtq.expectHits), len(res.Hits))
+		}
+		for i, hit := range res.Hits {
+			if hit.ID != dtq.expectHits[i].docID {
+				t.Fatalf("expected docID %s, got %s", dtq.expectHits[i].docID, hit.ID)
+			}
+			if len(hit.ScoreBreakdown) != len(dtq.expectHits[i].scoreBreakdown) {
+				t.Fatalf("expected %d score breakdown, got %d", len(dtq.expectHits[i].scoreBreakdown), len(hit.ScoreBreakdown))
+			}
+			for j, score := range hit.ScoreBreakdown {
+				actualScore := roundToDecimalPlace(score, 3)
+				expectScore := roundToDecimalPlace(dtq.expectHits[i].scoreBreakdown[j], 3)
+				if actualScore != expectScore {
+					t.Fatalf("expected score breakdown %f, got %f", dtq.expectHits[i].scoreBreakdown[j], score)
+				}
+			}
+		}
+	}
+
 }

@@ -147,7 +147,7 @@ type DocumentMatch struct {
 	Index           string                `json:"index,omitempty"`
 	ID              string                `json:"id"`
 	IndexInternalID index.IndexInternalID `json:"-"`
-	Score           float64               `json:"score"`
+	Score           float64               `json:"score,omitempty"`
 	Expl            *Explanation          `json:"explanation,omitempty"`
 	Locations       FieldTermLocationMap  `json:"locations,omitempty"`
 	Fragments       FieldFragmentMap      `json:"fragments,omitempty"`
@@ -173,6 +173,22 @@ type DocumentMatch struct {
 	// not all sub-queries matched
 	// if false, all the sub-queries matched
 	PartialMatch bool `json:"partial_match,omitempty"`
+
+	// used to indicate the sub-scores that combined to form the
+	// final score for this document match.  This is only populated
+	// when the search request's query is a DisjunctionQuery
+	// or a ConjunctionQuery. The map key is the index of the sub-query
+	// in the DisjunctionQuery or ConjunctionQuery. The map value is the
+	// sub-score for that sub-query.
+	ScoreBreakdown map[int]float64 `json:"score_breakdown,omitempty"`
+
+	// internal variable used in PreSearch phase of search in alias
+	// to indicate the name of the index that this match came from.
+	// used in knn search.
+	// it is a stack of index names, the top of the stack is the name
+	// of the index that this match came from
+	// of the current alias view, used in alias of aliases scenario
+	IndexNames []string `json:"index_names,omitempty"`
 }
 
 func (dm *DocumentMatch) AddFieldValue(name string, value interface{}) {
@@ -334,7 +350,7 @@ func (dm *DocumentMatch) Complete(prealloc []Location) []Location {
 }
 
 func (dm *DocumentMatch) String() string {
-	return fmt.Sprintf("[%s-%f]", string(dm.IndexInternalID), dm.Score)
+	return fmt.Sprintf("[%s-%f]", dm.ID, dm.Score)
 }
 
 type DocumentMatchCollection []*DocumentMatch

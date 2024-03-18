@@ -17,6 +17,7 @@ package scorch
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -424,6 +425,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 				id:      newSegmentID,
 				segment: segment.segment,
 				deleted: nil, // nil since merging handled deletions
+				stats:   nil,
 			})
 			break
 		}
@@ -602,6 +604,18 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 				return nil, nil, err
 			}
 		}
+
+		// store segment stats
+		if segmentSnapshot.stats != nil {
+			b, err := json.Marshal(segmentSnapshot.stats.Fetch())
+			if err != nil {
+				return nil, nil, err
+			}
+			err = snapshotSegmentBucket.Put(boltStatsKey, b)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
 	}
 
 	return filenames, newSegmentPaths, nil
@@ -634,7 +648,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 	// the newly populated boltdb snapshotBucket above
 	if len(newSegmentPaths) > 0 {
 		// now try to open all the new snapshots
-		newSegments := make(map[uint64]segment.Segment)
+		newSegments := make(map[uint64]segment.Segment, len(newSegmentPaths))
 		defer func() {
 			for _, s := range newSegments {
 				if s != nil {
@@ -704,6 +718,7 @@ var boltMetaDataKey = []byte{'m'}
 var boltMetaDataSegmentTypeKey = []byte("type")
 var boltMetaDataSegmentVersionKey = []byte("version")
 var boltMetaDataTimeStamp = []byte("timeStamp")
+var boltStatsKey = []byte("stats")
 var TotBytesWrittenKey = []byte("TotBytesWritten")
 
 func (s *Scorch) loadFromBolt() error {
@@ -858,6 +873,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	rv := &SegmentSnapshot{
 		segment:    segment,
 		cachedDocs: &cachedDocs{cache: nil},
+		cachedMeta: &cachedMeta{meta: nil},
 	}
 	deletedBytes := segmentBucket.Get(boltDeletedKey)
 	if deletedBytes != nil {
@@ -871,6 +887,18 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		if !deletedBitmap.IsEmpty() {
 			rv.deleted = deletedBitmap
 		}
+	}
+	statBytes := segmentBucket.Get(boltStatsKey)
+	if statBytes != nil {
+		var statsMap map[string]map[string]uint64
+
+		err := json.Unmarshal(statBytes, &statsMap)
+		stats := &fieldStats{statMap: statsMap}
+		if err != nil {
+			_ = segment.Close()
+			return nil, fmt.Errorf("error reading stat bytes: %v", err)
+		}
+		rv.stats = stats
 	}
 
 	return rv, nil

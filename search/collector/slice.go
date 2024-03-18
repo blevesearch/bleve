@@ -72,6 +72,10 @@ func (c *collectStoreSlice) Final(skip int, fixup collectorFixup) (search.Docume
 	return search.DocumentMatchCollection{}, nil
 }
 
+func (c *collectStoreSlice) Internal() search.DocumentMatchCollection {
+	return c.slice
+}
+
 func (c *collectStoreSlice) len() int {
 	return len(c.slice)
 }

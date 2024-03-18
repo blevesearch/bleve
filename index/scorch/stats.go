@@ -51,6 +51,8 @@ type Stats struct {
 	TotTermSearchersStarted  uint64
 	TotTermSearchersFinished uint64
 
+	TotKNNSearches uint64
+
 	TotEventTriggerStarted   uint64
 	TotEventTriggerCompleted uint64
 

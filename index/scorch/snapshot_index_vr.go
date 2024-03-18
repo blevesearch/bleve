@@ -28,6 +28,8 @@ import (
 	segment_api "github.com/blevesearch/scorch_segment_api/v2"
 )
 
+const VectorSearchSupportedSegmentVersion = 16
+
 var reflectStaticSizeIndexSnapshotVectorReader int
 
 func init() {

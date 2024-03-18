@@ -433,6 +433,25 @@ func memNeededForSearch(req *SearchRequest,
 	return uint64(estimate)
 }
 
+func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader index.IndexReader) (*SearchResult, error) {
+	var knnHits []*search.DocumentMatch
+	var err error
+	if requestHasKNN(req) {
+		knnHits, err = i.runKnnCollector(ctx, req, reader, true)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &SearchResult{
+		Status: &SearchStatus{
+			Total:      1,
+			Successful: 1,
+		},
+		Hits: knnHits,
+	}, nil
+}
+
 // SearchInContext executes a search request operation within the provided
 // Context. Returns a SearchResult object or an error.
 func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr *SearchResult, err error) {
@@ -443,6 +462,25 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	if !i.open {
 		return nil, ErrorIndexClosed
+	}
+
+	// open a reader for this search
+	indexReader, err := i.i.Reader()
+	if err != nil {
+		return nil, fmt.Errorf("error opening index reader %v", err)
+	}
+	defer func() {
+		if cerr := indexReader.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
+
+	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
+		preSearchResult, err := i.preSearch(ctx, req, indexReader)
+		if err != nil {
+			return nil, err
+		}
+		return preSearchResult, nil
 	}
 
 	var reverseQueryExecution bool
@@ -460,16 +498,31 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		coll = collector.NewTopNCollector(req.Size, req.From, req.Sort)
 	}
 
-	// open a reader for this search
-	indexReader, err := i.i.Reader()
-	if err != nil {
-		return nil, fmt.Errorf("error opening index reader %v", err)
-	}
-	defer func() {
-		if cerr := indexReader.Close(); err == nil && cerr != nil {
-			err = cerr
+	var knnHits []*search.DocumentMatch
+	var ok bool
+	var skipKnnCollector bool
+	if req.PreSearchData != nil {
+		for k, v := range req.PreSearchData {
+			switch k {
+			case search.KnnPreSearchDataKey:
+				if v != nil {
+					knnHits, ok = v.([]*search.DocumentMatch)
+					if !ok {
+						return nil, fmt.Errorf("knn preSearchData must be of type []*search.DocumentMatch")
+					}
+				}
+				skipKnnCollector = true
+			}
 		}
-	}()
+	}
+	if !skipKnnCollector && requestHasKNN(req) {
+		knnHits, err = i.runKnnCollector(ctx, req, indexReader, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	setKnnHitsInCollector(knnHits, req, coll)
 
 	// This callback and variable handles the tracking of bytes read
 	//  1. as part of creation of tfr and its Next() calls which is
@@ -496,11 +549,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	ctx = context.WithValue(ctx, search.GeoBufferPoolCallbackKey,
 		search.GeoBufferPoolCallbackFunc(getBufferPool))
 
-	// Using a disjunction query to get union of results from KNN query
-	// and the original query
-	searchQuery := disjunctQueryWithKNN(req)
 
-	searcher, err := searchQuery.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
+	searcher, err := req.Query.Searcher(ctx, indexReader, i.m, search.SearcherOptions{
 		Explain:            req.Explain,
 		IncludeTermVectors: req.IncludeLocations || req.Highlight != nil,
 		Score:              req.Score,
@@ -544,14 +594,14 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 					if dateTimeParser == nil {
 						return nil, fmt.Errorf("no date time parser named `%s` registered", dateTimeParserName)
 					}
-					start, end, startLayout, endLayout, err := dr.ParseDates(dateTimeParser)
+					start, end, err := dr.ParseDates(dateTimeParser)
 					if err != nil {
 						return nil, fmt.Errorf("ParseDates err: %v, using date time parser named %s", err, dateTimeParserName)
 					}
 					if start.IsZero() && end.IsZero() {
 						return nil, fmt.Errorf("date range query must specify either start, end or both for date range name '%s'", dr.Name)
 					}
-					facetBuilder.AddRange(dr.Name, start, end, startLayout, endLayout)
+					facetBuilder.AddRange(dr.Name, start, end)
 				}
 				facetsBuilder.Add(facetName, facetBuilder)
 			} else {
@@ -609,7 +659,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	var storedFieldsCost uint64
 	for _, hit := range hits {
-		if i.name != "" {
+		// KNN documents will already have their Index value set as part of the knn collector output
+		// so check if the index is empty and set it to the current index name
+		if i.name != "" && hit.Index == "" {
 			hit.Index = i.name
 		}
 		err, storedFieldsBytes := LoadAndHighlightFields(hit, req, i.name, indexReader, highlighter)
@@ -642,18 +694,23 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		req.SearchAfter = nil
 	}
 
-	return &SearchResult{
+	rv := &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
 			Successful: 1,
 		},
-		Request:  req,
 		Hits:     hits,
 		Total:    coll.Total(),
 		MaxScore: coll.MaxScore(),
 		Took:     searchDuration,
 		Facets:   coll.FacetResults(),
-	}, nil
+	}
+
+	if req.Explain {
+		rv.Request = req
+	}
+
+	return rv, nil
 }
 
 func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
@@ -663,7 +720,7 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 	if len(req.Fields) > 0 || highlighter != nil {
 		doc, err := r.Document(hit.ID)
 		if err == nil && doc != nil {
-			if len(req.Fields) > 0 {
+			if len(req.Fields) > 0 && hit.Fields == nil {
 				totalStoredFieldsBytes = doc.StoredFieldsBytes()
 				fieldsToLoad := deDuplicate(req.Fields)
 				for _, f := range fieldsToLoad {

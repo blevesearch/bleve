@@ -106,6 +106,7 @@ const (
 const SearchIncrementalCostKey = "_search_incremental_cost_key"
 const QueryTypeKey = "_query_type_key"
 const FuzzyMatchPhraseKey = "_fuzzy_match_phrase_key"
+const IncludeScoreBreakdownKey = "_include_score_breakdown_key"
 
 func RecordSearchCost(ctx context.Context,
 	msg SearchIncrementalCostCallbackMsg, bytes uint64) {
@@ -133,3 +134,15 @@ const MaxGeoBufPoolSize = 24 * 1024
 const MinGeoBufPoolSize = 24
 
 type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
+
+const KnnPreSearchDataKey = "_knn_pre_search_data_key"
+
+const PreSearchKey = "_presearch_key"
+
+type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)
+
+type SearcherStartCallbackFn func(size uint64) error
+type SearcherEndCallbackFn func(size uint64) error
+
+const SearcherStartCallbackKey = "_searcher_start_callback_key"
+const SearcherEndCallbackKey = "_searcher_end_callback_key"

@@ -23,6 +23,13 @@ import (
 
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/util"
+	index "github.com/blevesearch/bleve_index_api"
+)
+
+// Min and Max allowed dimensions for a vector field
+const (
+	MinVectorDims = 1
+	MaxVectorDims = 2048
 )
 
 func NewVectorFieldMapping() *FieldMapping {
@@ -36,58 +43,133 @@ func NewVectorFieldMapping() *FieldMapping {
 	}
 }
 
+// validate and process a flat vector
+func processFlatVector(vecV reflect.Value, dims int) ([]float32, bool) {
+	if vecV.Len() != dims {
+		return nil, false
+	}
+
+	rv := make([]float32, dims)
+	for i := 0; i < vecV.Len(); i++ {
+		item := vecV.Index(i)
+		if !item.CanInterface() {
+			return nil, false
+		}
+		itemI := item.Interface()
+		itemFloat, ok := util.ExtractNumericValFloat32(itemI)
+		if !ok {
+			return nil, false
+		}
+		rv[i] = itemFloat
+	}
+
+	return rv, true
+}
+
+// validate and process a vector
+// max supported depth of nesting is 2 ([][]float32)
+func processVector(vecI interface{}, dims int) ([]float32, bool) {
+	vecV := reflect.ValueOf(vecI)
+	if !vecV.IsValid() || vecV.Kind() != reflect.Slice || vecV.Len() == 0 {
+		return nil, false
+	}
+
+	// Let's examine the first element (head) of the vector.
+	// If head is a slice, then vector is nested, otherwise flat.
+	head := vecV.Index(0)
+	if !head.CanInterface() {
+		return nil, false
+	}
+	headI := head.Interface()
+	headV := reflect.ValueOf(headI)
+	if !headV.IsValid() {
+		return nil, false
+	}
+	if headV.Kind() != reflect.Slice { // vector is flat
+		return processFlatVector(vecV, dims)
+	}
+
+	// # process nested vector
+
+	// pre-allocate memory for the flattened vector
+	// so that we can use copy() later
+	rv := make([]float32, dims*vecV.Len())
+
+	for i := 0; i < vecV.Len(); i++ {
+		subVec := vecV.Index(i)
+		if !subVec.CanInterface() {
+			return nil, false
+		}
+		subVecI := subVec.Interface()
+		subVecV := reflect.ValueOf(subVecI)
+		if !subVecV.IsValid() {
+			return nil, false
+		}
+
+		if subVecV.Kind() != reflect.Slice {
+			return nil, false
+		}
+
+		flatVector, ok := processFlatVector(subVecV, dims)
+		if !ok {
+			return nil, false
+		}
+
+		copy(rv[i*dims:(i+1)*dims], flatVector)
+	}
+
+	return rv, true
+}
+
 func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
-	pathString string, path []string, indexes []uint64, context *walkContext) {
-	propertyVal := reflect.ValueOf(propertyMightBeVector)
-	if !propertyVal.IsValid() {
-		return
+	pathString string, path []string, indexes []uint64, context *walkContext) bool {
+	vector, ok := processVector(propertyMightBeVector, fm.Dims)
+	// Don't add field to document if vector is invalid
+	if !ok {
+		return false
 	}
 
-	// Validating the length of the vector is required here, in order to
-	// help zapx in deciding the shape of the batch of vectors to be indexed.
-	if propertyVal.Kind() == reflect.Slice && propertyVal.Len() == fm.Dims {
-		vector := make([]float32, propertyVal.Len())
-		isVectorValid := true
-		for i := 0; i < propertyVal.Len(); i++ {
-			item := propertyVal.Index(i)
-			if item.CanInterface() {
-				itemVal := item.Interface()
-				itemFloat, ok := util.ExtractNumericValFloat32(itemVal)
-				if !ok {
-					isVectorValid = false
-					break
-				}
-				vector[i] = itemFloat
-			}
-		}
-		// Even if one of the vector elements is not a float32, we do not index
-		// this field and return silently
-		if !isVectorValid {
-			return
-		}
+	fieldName := getFieldName(pathString, path, fm)
+	options := fm.Options()
+	field := document.NewVectorFieldWithIndexingOptions(fieldName, indexes, vector,
+		fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor, options)
+	context.doc.AddField(field)
 
-		fieldName := getFieldName(pathString, path, fm)
-		options := fm.Options()
-		field := document.NewVectorFieldWithIndexingOptions(fieldName,
-			indexes, vector, fm.Dims, fm.Similarity, options)
-		context.doc.AddField(field)
-
-		// "_all" composite field is not applicable for vector field
-		context.excludedFromAll = append(context.excludedFromAll, fieldName)
-	}
+	// "_all" composite field is not applicable for vector field
+	context.excludedFromAll = append(context.excludedFromAll, fieldName)
+	return true
 }
 
 // -----------------------------------------------------------------------------
 // document validation functions
 
-func validateVectorField(field *FieldMapping) error {
-	if field.Dims <= 0 || field.Dims > 2048 {
-		return fmt.Errorf("invalid vector dimension,"+
-			" value should be in range (%d, %d)", 0, 2048)
+func validateFieldMapping(field *FieldMapping, parentName string,
+	fieldAliasCtx map[string]*FieldMapping) error {
+	switch field.Type {
+	case "vector":
+		return validateVectorFieldAlias(field, parentName, fieldAliasCtx)
+	default: // non-vector field
+		return validateFieldType(field)
+	}
+}
+
+func validateVectorFieldAlias(field *FieldMapping, parentName string,
+	fieldAliasCtx map[string]*FieldMapping) error {
+
+	if field.Name == "" {
+		field.Name = parentName
 	}
 
 	if field.Similarity == "" {
-		field.Similarity = util.DefaultSimilarityMetric
+		field.Similarity = index.DefaultSimilarityMetric
+	}
+
+	if field.VectorIndexOptimizedFor == "" {
+		field.VectorIndexOptimizedFor = index.DefaultIndexOptimization
+	}
+	if _, exists := index.SupportedVectorIndexOptimizations[field.VectorIndexOptimizedFor]; !exists {
+		// if an unsupported config is provided, override to default
+		field.VectorIndexOptimizedFor = index.DefaultIndexOptimization
 	}
 
 	// following fields are not applicable for vector
@@ -98,21 +180,40 @@ func validateVectorField(field *FieldMapping) error {
 	field.DocValues = false
 	field.SkipFreqNorm = true
 
-	if _, ok := util.SupportedSimilarityMetrics[field.Similarity]; !ok {
-		return fmt.Errorf("invalid similarity metric: '%s', "+
-			"valid metrics are: %+v", field.Similarity,
-			reflect.ValueOf(util.SupportedSimilarityMetrics).MapKeys())
+	// # If alias is present, validate the field options as per the alias
+	// note: reading from a nil map is safe
+	if fieldAlias, ok := fieldAliasCtx[field.Name]; ok {
+		if field.Dims != fieldAlias.Dims {
+			return fmt.Errorf("field: '%s', invalid alias "+
+				"(different dimensions %d and %d)", fieldAlias.Name, field.Dims,
+				fieldAlias.Dims)
+		}
+
+		if field.Similarity != fieldAlias.Similarity {
+			return fmt.Errorf("field: '%s', invalid alias "+
+				"(different similarity values %s and %s)", fieldAlias.Name,
+				field.Similarity, fieldAlias.Similarity)
+		}
+
+		return nil
 	}
 
-	return nil
-}
+	// # Validate field options
 
-func validateFieldType(fieldType string) error {
-	switch fieldType {
-	case "text", "datetime", "number", "boolean", "geopoint", "geoshape",
-		"IP", "vector":
-	default:
-		return fmt.Errorf("unknown field type: '%s'", fieldType)
+	if field.Dims < MinVectorDims || field.Dims > MaxVectorDims {
+		return fmt.Errorf("field: '%s', invalid vector dimension: %d,"+
+			" value should be in range (%d, %d)", field.Name, field.Dims,
+			MinVectorDims, MaxVectorDims)
+	}
+
+	if _, ok := index.SupportedSimilarityMetrics[field.Similarity]; !ok {
+		return fmt.Errorf("field: '%s', invalid similarity "+
+			"metric: '%s', valid metrics are: %+v", field.Name, field.Similarity,
+			reflect.ValueOf(index.SupportedSimilarityMetrics).MapKeys())
+	}
+
+	if fieldAliasCtx != nil { // writing to a nil map is unsafe
+		fieldAliasCtx[field.Name] = field
 	}
 
 	return nil

@@ -18,11 +18,14 @@
 package bleve
 
 import (
+	"context"
 	"encoding/json"
 	"sort"
 
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
+	index "github.com/blevesearch/bleve_index_api"
 )
 
 // A SearchRequest describes all the parameters
@@ -60,6 +63,18 @@ type SearchRequest struct {
 	SearchAfter      []string          `json:"search_after"`
 	SearchBefore     []string          `json:"search_before"`
 
+	// PreSearchData will be a  map that will be used
+	// in the second phase of any 2-phase search, to provide additional
+	// context to the second phase. This is useful in the case of index
+	// aliases where the first phase will gather the PreSearchData from all
+	// the indexes in the alias, and the second phase will use that
+	// PreSearchData to perform the actual search.
+	// The currently accepted map configuration is:
+	//
+	// "_knn_pre_search_data_key": []*search.DocumentMatch
+
+	PreSearchData map[string]interface{} `json:"pre_search_data,omitempty"`
+
 	sortFunc func(sort.Interface)
 }
 
@@ -79,6 +94,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Score            string            `json:"score"`
 		SearchAfter      []string          `json:"search_after"`
 		SearchBefore     []string          `json:"search_before"`
+		PreSearchData    json.RawMessage   `json:"pre_search_data"`
 	}
 
 	err := json.Unmarshal(input, &temp)
@@ -119,6 +135,12 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 	if r.From < 0 {
 		r.From = 0
 	}
+	if temp.PreSearchData != nil {
+		r.PreSearchData, err = query.ParsePreSearchData(temp.PreSearchData)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 
@@ -126,7 +148,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 
 // -----------------------------------------------------------------------------
 
-func copySearchRequest(req *SearchRequest) *SearchRequest {
+func copySearchRequest(req *SearchRequest, preSearchData map[string]interface{}) *SearchRequest {
 	rv := SearchRequest{
 		Query:            req.Query,
 		Size:             req.Size + req.From,
@@ -140,10 +162,42 @@ func copySearchRequest(req *SearchRequest) *SearchRequest {
 		Score:            req.Score,
 		SearchAfter:      req.SearchAfter,
 		SearchBefore:     req.SearchBefore,
+		PreSearchData:    preSearchData,
 	}
 	return &rv
 }
 
-func disjunctQueryWithKNN(req *SearchRequest) query.Query {
-	return req.Query
+func validateKNN(req *SearchRequest) error {
+	return nil
+}
+
+func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, reader index.IndexReader, preSearch bool) ([]*search.DocumentMatch, error) {
+	return nil, nil
+}
+
+func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, coll *collector.TopNCollector) {
+}
+
+func requestHasKNN(req *SearchRequest) bool {
+	return false
+}
+
+func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
+}
+
+func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
+	return nil
+}
+
+func redistributeKNNPreSearchData(req *SearchRequest, indexes []Index) (map[string]map[string]interface{}, error) {
+	return nil, nil
+}
+
+func isKNNrequestSatisfiedByPreSearch(req *SearchRequest) bool {
+	return false
+}
+
+func constructKnnPresearchData(mergedOut map[string]map[string]interface{}, preSearchResult *SearchResult,
+	indexes []Index) (map[string]map[string]interface{}, error) {
+	return mergedOut, nil
 }

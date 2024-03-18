@@ -33,3 +33,23 @@ func (otrl OrderedSearcherList) Less(i, j int) bool {
 func (otrl OrderedSearcherList) Swap(i, j int) {
 	otrl[i], otrl[j] = otrl[j], otrl[i]
 }
+
+type OrderedPositionalSearcherList struct {
+	searchers []search.Searcher
+	index     []int
+}
+
+// sort.Interface
+
+func (otrl OrderedPositionalSearcherList) Len() int {
+	return len(otrl.searchers)
+}
+
+func (otrl OrderedPositionalSearcherList) Less(i, j int) bool {
+	return otrl.searchers[i].Count() < otrl.searchers[j].Count()
+}
+
+func (otrl OrderedPositionalSearcherList) Swap(i, j int) {
+	otrl.searchers[i], otrl.searchers[j] = otrl.searchers[j], otrl.searchers[i]
+	otrl.index[i], otrl.index[j] = otrl.index[j], otrl.index[i]
+}

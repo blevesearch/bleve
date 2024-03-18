@@ -2663,3 +2663,24 @@ func TestReadOnlyIndex(t *testing.T) {
 		t.Errorf("Expected document count to be %d got %d", 1, docCount)
 	}
 }
+
+func BenchmarkAggregateFieldStats(b *testing.B) {
+
+	fieldStatsArray := make([]*fieldStats, 1000)
+
+	for i := range fieldStatsArray {
+		fieldStatsArray[i] = newFieldStats()
+
+		fieldStatsArray[i].Store("num_vectors", "vector", uint64(rand.Intn(1000)))
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		aggFieldStats := newFieldStats()
+
+		for _, fs := range fieldStatsArray {
+			aggFieldStats.Aggregate(fs)
+		}
+	}
+}

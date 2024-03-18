@@ -22,7 +22,8 @@ A modern text indexing library in go
     * Conjunction, Disjunction, Boolean (must/should/must_not)
     * Term Range, Numeric Range, Date Range
     * [Geo Spatial](https://github.com/blevesearch/bleve/blob/master/geo/README.md)
-    * Simple [query string syntax](http://www.blevesearch.com/docs/Query-String-Query/) for human entry
+    * Simple [query string syntax](http://www.blevesearch.com/docs/Query-String-Query/)
+    * [Vector Search](https://github.com/blevesearch/bleve/blob/master/vectors.md)
 * [tf-idf](https://en.wikipedia.org/wiki/Tf-idf) Scoring
 * Query time boosting
 * Search result match highlighting with document fragments

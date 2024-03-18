@@ -30,6 +30,7 @@ type segmentIntroduction struct {
 	obsoletes map[uint64]*roaring.Bitmap
 	ids       []string
 	internal  map[string][]byte
+	stats     *fieldStats
 
 	applied           chan error
 	persisted         chan error
@@ -146,7 +147,9 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		newss := &SegmentSnapshot{
 			id:         root.segment[i].id,
 			segment:    root.segment[i].segment,
+			stats:      root.segment[i].stats,
 			cachedDocs: root.segment[i].cachedDocs,
+			cachedMeta: root.segment[i].cachedMeta,
 			creator:    root.segment[i].creator,
 		}
 
@@ -154,7 +157,11 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		if root.segment[i].deleted == nil {
 			newss.deleted = delta
 		} else {
-			newss.deleted = roaring.Or(root.segment[i].deleted, delta)
+			if delta.IsEmpty() {
+				newss.deleted = root.segment[i].deleted
+			} else {
+				newss.deleted = roaring.Or(root.segment[i].deleted, delta)
+			}
 		}
 		if newss.deleted.IsEmpty() {
 			newss.deleted = nil
@@ -188,7 +195,9 @@ func (s *Scorch) introduceSegment(next *segmentIntroduction) error {
 		newSegmentSnapshot := &SegmentSnapshot{
 			id:         next.id,
 			segment:    next.data, // take ownership of next.data's ref-count
+			stats:      next.stats,
 			cachedDocs: &cachedDocs{cache: nil},
+			cachedMeta: &cachedMeta{meta: nil},
 			creator:    "introduceSegment",
 		}
 		newSnapshot.segment = append(newSnapshot.segment, newSegmentSnapshot)
@@ -275,7 +284,9 @@ func (s *Scorch) introducePersist(persist *persistIntroduction) {
 				id:         segmentSnapshot.id,
 				segment:    replacement,
 				deleted:    segmentSnapshot.deleted,
+				stats:      segmentSnapshot.stats,
 				cachedDocs: segmentSnapshot.cachedDocs,
+				cachedMeta: segmentSnapshot.cachedMeta,
 				creator:    "introducePersist",
 				mmaped:     1,
 			}
@@ -374,7 +385,9 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 				id:         root.segment[i].id,
 				segment:    root.segment[i].segment,
 				deleted:    root.segment[i].deleted,
+				stats:      root.segment[i].stats,
 				cachedDocs: root.segment[i].cachedDocs,
+				cachedMeta: root.segment[i].cachedMeta,
 				creator:    root.segment[i].creator,
 			})
 			root.segment[i].segment.AddRef()
@@ -394,7 +407,6 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			}
 		}
 	}
-
 	// before the newMerge introduction, need to clean the newly
 	// merged segment wrt the current root segments, hence
 	// applying the obsolete segment contents to newly merged segment
@@ -415,12 +427,19 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	if nextMerge.new != nil &&
 		nextMerge.new.Count() > newSegmentDeleted.GetCardinality() {
 
+		stats := newFieldStats()
+		if fsr, ok := nextMerge.new.(segment.FieldStatsReporter); ok {
+			fsr.UpdateFieldStats(stats)
+		}
+
 		// put new segment at end
 		newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
 			id:         nextMerge.id,
 			segment:    nextMerge.new, // take ownership for nextMerge.new's ref-count
 			deleted:    newSegmentDeleted,
+			stats:      stats,
 			cachedDocs: &cachedDocs{cache: nil},
+			cachedMeta: &cachedMeta{meta: nil},
 			creator:    "introduceMerge",
 			mmaped:     nextMerge.mmaped,
 		})

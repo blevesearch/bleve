@@ -39,6 +39,9 @@ type SegmentSnapshot struct {
 	segment segment.Segment
 	deleted *roaring.Bitmap
 	creator string
+	stats   *fieldStats
+
+	cachedMeta *cachedMeta
 
 	cachedDocs *cachedDocs
 }
@@ -281,4 +284,31 @@ func (c *cachedDocs) visitDoc(localDocNum uint64,
 	}
 
 	c.m.Unlock()
+}
+
+// the purpose of the cachedMeta is to simply allow the user of this type to record
+// and cache certain meta data information (specific to the segment) that can be
+// used across calls to save compute on the same.
+// for example searcher creations on the same index snapshot can use this struct
+// to help and fetch the backing index size information which can be used in
+// memory usage calculation thereby deciding whether to allow a query or not.
+type cachedMeta struct {
+	m    sync.RWMutex
+	meta map[string]interface{}
+}
+
+func (c *cachedMeta) updateMeta(field string, val interface{}) {
+	c.m.Lock()
+	if c.meta == nil {
+		c.meta = make(map[string]interface{})
+	}
+	c.meta[field] = val
+	c.m.Unlock()
+}
+
+func (c *cachedMeta) fetchMeta(field string) (rv interface{}) {
+	c.m.RLock()
+	rv = c.meta[field]
+	c.m.RUnlock()
+	return rv
 }

@@ -494,8 +494,7 @@ func TestIndexAliasMulti(t *testing.T) {
 			Successful: 2,
 			Errors:     make(map[string]error),
 		},
-		Request: sr,
-		Total:   2,
+		Total: 2,
 		Hits: search.DocumentMatchCollection{
 			{
 				ID:    "b",
@@ -575,8 +574,7 @@ func TestMultiSearchNoError(t *testing.T) {
 			Successful: 2,
 			Errors:     make(map[string]error),
 		},
-		Request: sr,
-		Total:   2,
+		Total: 2,
 		Hits: search.DocumentMatchCollection{
 			{
 				Index: "2",
@@ -594,7 +592,7 @@ func TestMultiSearchNoError(t *testing.T) {
 		MaxScore: 2.0,
 	}
 
-	results, err := MultiSearch(context.Background(), sr, ei1, ei2)
+	results, err := MultiSearch(context.Background(), sr, nil, ei1, ei2)
 	if err != nil {
 		t.Error(err)
 	}
@@ -625,7 +623,7 @@ func TestMultiSearchSomeError(t *testing.T) {
 	}}
 	ei2 := &stubIndex{name: "ei2", err: fmt.Errorf("deliberate error")}
 	sr := NewSearchRequest(NewTermQuery("test"))
-	res, err := MultiSearch(context.Background(), sr, ei1, ei2)
+	res, err := MultiSearch(context.Background(), sr, nil, ei1, ei2)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -652,7 +650,7 @@ func TestMultiSearchAllError(t *testing.T) {
 	ei1 := &stubIndex{name: "ei1", err: fmt.Errorf("deliberate error")}
 	ei2 := &stubIndex{name: "ei2", err: fmt.Errorf("deliberate error")}
 	sr := NewSearchRequest(NewTermQuery("test"))
-	res, err := MultiSearch(context.Background(), sr, ei1, ei2)
+	res, err := MultiSearch(context.Background(), sr, nil, ei1, ei2)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -708,7 +706,7 @@ func TestMultiSearchSecondPage(t *testing.T) {
 		checkRequest: checkRequest,
 	}
 	sr := NewSearchRequestOptions(NewTermQuery("test"), 10, 10, false)
-	_, err := MultiSearch(context.Background(), sr, ei1, ei2)
+	_, err := MultiSearch(context.Background(), sr, nil, ei1, ei2)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -786,7 +784,7 @@ func TestMultiSearchTimeout(t *testing.T) {
 	defer cancel()
 	query := NewTermQuery("test")
 	sr := NewSearchRequest(query)
-	res, err := MultiSearch(ctx, sr, ei1, ei2)
+	res, err := MultiSearch(ctx, sr, nil, ei1, ei2)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -806,7 +804,7 @@ func TestMultiSearchTimeout(t *testing.T) {
 	// now run a search again with an absurdly low timeout (should timeout)
 	ctx, cancel = context.WithTimeout(context.Background(), 1*time.Microsecond)
 	defer cancel()
-	res, err = MultiSearch(ctx, sr, ei1, ei2)
+	res, err = MultiSearch(ctx, sr, nil, ei1, ei2)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -833,7 +831,7 @@ func TestMultiSearchTimeout(t *testing.T) {
 	// now run a search again with a normal timeout, but cancel it first
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	cancel()
-	res, err = MultiSearch(ctx, sr, ei1, ei2)
+	res, err = MultiSearch(ctx, sr, nil, ei1, ei2)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -949,8 +947,7 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 				"ei3": context.DeadlineExceeded,
 			},
 		},
-		Request: sr,
-		Total:   2,
+		Total: 2,
 		Hits: search.DocumentMatchCollection{
 			{
 				Index: "2",
@@ -968,7 +965,7 @@ func TestMultiSearchTimeoutPartial(t *testing.T) {
 		MaxScore: 2.0,
 	}
 
-	res, err := MultiSearch(ctx, sr, ei1, ei2, ei3)
+	res, err := MultiSearch(ctx, sr, nil, ei1, ei2, ei3)
 	if err != nil {
 		t.Fatalf("expected no err, got %v", err)
 	}
@@ -1105,8 +1102,7 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 				"ei3": context.DeadlineExceeded,
 			},
 		},
-		Request: sr,
-		Total:   2,
+		Total: 2,
 		Hits: search.DocumentMatchCollection{
 			{
 				Index: "4",
@@ -1184,6 +1180,7 @@ func TestMultiSearchCustomSort(t *testing.T) {
 	}}
 
 	sr := NewSearchRequest(NewTermQuery("test"))
+	sr.Explain = true
 	sr.SortBy([]string{"name"})
 	expected := &SearchResult{
 		Status: &SearchStatus{
@@ -1222,7 +1219,7 @@ func TestMultiSearchCustomSort(t *testing.T) {
 		MaxScore: 3.0,
 	}
 
-	results, err := MultiSearch(context.Background(), sr, ei1, ei2)
+	results, err := MultiSearch(context.Background(), sr, nil, ei1, ei2)
 	if err != nil {
 		t.Error(err)
 	}

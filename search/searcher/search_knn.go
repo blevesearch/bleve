@@ -19,12 +19,21 @@ package searcher
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/scorer"
+	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 )
+
+var reflectStaticSizeKNNSearcher int
+
+func init() {
+	var ks KNNSearcher
+	reflectStaticSizeKNNSearcher = int(reflect.TypeOf(ks).Size())
+}
 
 type KNNSearcher struct {
 	field        string
@@ -41,16 +50,13 @@ func NewKNNSearcher(ctx context.Context, i index.IndexReader, m mapping.IndexMap
 	options search.SearcherOptions, field string, vector []float32, k int64,
 	boost float64, similarityMetric string) (search.Searcher, error) {
 	if vr, ok := i.(index.VectorIndexReader); ok {
-		vectorReader, _ := vr.VectorReader(ctx, vector, field, k)
-
-		count, err := i.DocCount()
+		vectorReader, err := vr.VectorReader(ctx, vector, field, k)
 		if err != nil {
-			_ = vectorReader.Close()
 			return nil, err
 		}
 
 		knnScorer := scorer.NewKNNQueryScorer(vector, field, boost,
-			vectorReader.Count(), count, options, similarityMetric)
+			options, similarityMetric)
 		return &KNNSearcher{
 			indexReader:  i,
 			vectorReader: vectorReader,
@@ -60,6 +66,16 @@ func NewKNNSearcher(ctx context.Context, i index.IndexReader, m mapping.IndexMap
 			scorer:       knnScorer,
 		}, nil
 	}
+	return nil, nil
+}
+
+func (s *KNNSearcher) VectorOptimize(ctx context.Context, octx index.VectorOptimizableContext) (
+	index.VectorOptimizableContext, error) {
+	o, ok := s.vectorReader.(index.VectorOptimizable)
+	if ok {
+		return o.VectorOptimize(ctx, octx)
+	}
+
 	return nil, nil
 }
 
@@ -115,7 +131,10 @@ func (s *KNNSearcher) SetQueryNorm(qnorm float64) {
 }
 
 func (s *KNNSearcher) Size() int {
-	return 0
+	return reflectStaticSizeKNNSearcher + size.SizeOfPtr +
+		s.vectorReader.Size() +
+		s.vd.Size() +
+		s.scorer.Size()
 }
 
 func (s *KNNSearcher) Weight() float64 {

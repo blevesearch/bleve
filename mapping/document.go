@@ -50,7 +50,8 @@ type DocumentMapping struct {
 	StructTagKey string `json:"struct_tag_key,omitempty"`
 }
 
-func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
+func (dm *DocumentMapping) Validate(cache *registry.Cache,
+	parentName string, fieldAliasCtx map[string]*FieldMapping) error {
 	var err error
 	if dm.DefaultAnalyzer != "" {
 		_, err := cache.AnalyzerNamed(dm.DefaultAnalyzer)
@@ -58,8 +59,12 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 			return err
 		}
 	}
-	for _, property := range dm.Properties {
-		err = property.Validate(cache)
+	for propertyName, property := range dm.Properties {
+		newParent := propertyName
+		if parentName != "" {
+			newParent = fmt.Sprintf("%s.%s", parentName, propertyName)
+		}
+		err = property.Validate(cache, newParent, fieldAliasCtx)
 		if err != nil {
 			return err
 		}
@@ -78,19 +83,22 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache) error {
 			}
 		}
 
-		err := validateFieldType(field.Type)
+		err := validateFieldMapping(field, parentName, fieldAliasCtx)
 		if err != nil {
 			return err
 		}
-
-		if field.Type == "vector" {
-			err := validateVectorField(field)
-			if err != nil {
-				return err
-			}
-		}
 	}
 	return nil
+}
+
+func validateFieldType(field *FieldMapping) error {
+	switch field.Type {
+	case "text", "datetime", "number", "boolean", "geopoint", "geoshape", "IP":
+		return nil
+	default:
+		return fmt.Errorf("field: '%s', unknown field type: '%s'",
+			field.Name, field.Type)
+	}
 }
 
 // analyzerNameForPath attempts to first find the field
@@ -148,15 +156,20 @@ func (dm *DocumentMapping) fieldDescribedByPath(path string) *FieldMapping {
 	return nil
 }
 
-// documentMappingForPath returns the EXACT and closest matches for a sub
+// documentMappingForPathElements returns the EXACT and closest matches for a sub
 // document or for an explicitly mapped field; the closest most specific
 // document mapping could be one that matches part of the provided path.
-func (dm *DocumentMapping) documentMappingForPath(path string) (
+func (dm *DocumentMapping) documentMappingForPathElements(pathElements []string) (
 	*DocumentMapping, *DocumentMapping) {
-	pathElements := decodePath(path)
+	var pathElementsCopy []string
+	if len(pathElements) == 0 {
+		pathElementsCopy = []string{""}
+	} else {
+		pathElementsCopy = pathElements
+	}
 	current := dm
 OUTER:
-	for i, pathElement := range pathElements {
+	for i, pathElement := range pathElementsCopy {
 		if subDocMapping, exists := current.Properties[pathElement]; exists {
 			current = subDocMapping
 			continue OUTER
@@ -164,7 +177,7 @@ OUTER:
 
 		// no subDocMapping matches this pathElement
 		// only if this is the last element check for field name
-		if i == len(pathElements)-1 {
+		if i == len(pathElementsCopy)-1 {
 			for _, field := range current.Fields {
 				if field.Name == pathElement {
 					break
@@ -175,6 +188,15 @@ OUTER:
 		return nil, current
 	}
 	return current, current
+}
+
+// documentMappingForPath returns the EXACT and closest matches for a sub
+// document or for an explicitly mapped field; the closest most specific
+// document mapping could be one that matches part of the provided path.
+func (dm *DocumentMapping) documentMappingForPath(path string) (
+	*DocumentMapping, *DocumentMapping) {
+	pathElements := decodePath(path)
+	return dm.documentMappingForPathElements(pathElements)
 }
 
 // NewDocumentMapping returns a new document mapping
@@ -395,9 +417,8 @@ func (dm *DocumentMapping) walkDocument(data interface{}, path []string, indexes
 }
 
 func (dm *DocumentMapping) processProperty(property interface{}, path []string, indexes []uint64, context *walkContext) {
-	pathString := encodePath(path)
 	// look to see if there is a mapping for this field
-	subDocMapping, closestDocMapping := dm.documentMappingForPath(pathString)
+	subDocMapping, closestDocMapping := dm.documentMappingForPathElements(path)
 
 	// check to see if we even need to do further processing
 	if subDocMapping != nil && !subDocMapping.Enabled {
@@ -409,6 +430,8 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 		// cannot do anything with the zero value
 		return
 	}
+
+	pathString := encodePath(path)
 	propertyType := propertyValue.Type()
 	switch propertyType.Kind() {
 	case reflect.String:
@@ -509,12 +532,20 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			dm.walkDocument(property, path, indexes, context)
 		}
 	case reflect.Map, reflect.Slice:
+		var isPropertyVector bool
+		var isPropertyVectorInitialized bool
 		if subDocMapping != nil {
 			for _, fieldMapping := range subDocMapping.Fields {
 				switch fieldMapping.Type {
 				case "vector":
-					fieldMapping.processVector(property, pathString, path,
+					processed := fieldMapping.processVector(property, pathString, path,
 						indexes, context)
+					if !isPropertyVectorInitialized {
+						isPropertyVector = processed
+						isPropertyVectorInitialized = true
+					} else {
+						isPropertyVector = isPropertyVector && processed
+					}
 				case "geopoint":
 					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
 				case "IP":
@@ -527,7 +558,9 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 				}
 			}
 		}
-		dm.walkDocument(property, path, indexes, context)
+		if !isPropertyVector {
+			dm.walkDocument(property, path, indexes, context)
+		}
 	case reflect.Ptr:
 		if !propertyValue.IsNil() {
 			switch property := property.(type) {

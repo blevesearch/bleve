@@ -39,6 +39,9 @@ type collectorStore interface {
 	AddNotExceedingSize(doc *search.DocumentMatch, size int) *search.DocumentMatch
 
 	Final(skip int, fixup collectorFixup) (search.DocumentMatchCollection, error)
+
+	// Provide access the internal heap implementation
+	Internal() search.DocumentMatchCollection
 }
 
 // PreAllocSizeSkipCap will cap preallocation to this amount when
@@ -72,6 +75,9 @@ type TopNCollector struct {
 	updateFieldVisitor        index.DocValueVisitor
 	dvReader                  index.DocValueReader
 	searchAfter               *search.DocumentMatch
+
+	knnHits             map[string]*search.DocumentMatch
+	computeNewScoreExpl search.ScoreExplCorrectionCallbackFunc
 }
 
 // CheckDoneEvery controls how frequently we check the context deadline
@@ -89,44 +95,16 @@ func NewTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector 
 // ordering hits by the provided sort order
 func NewTopNCollectorAfter(size int, sort search.SortOrder, after []string) *TopNCollector {
 	rv := newTopNCollector(size, 0, sort)
-	rv.searchAfter = &search.DocumentMatch{
-		Sort: after,
-	}
-
-	for pos, ss := range sort {
-		if ss.RequiresDocID() {
-			rv.searchAfter.ID = after[pos]
-		}
-		if ss.RequiresScoring() {
-			if score, err := strconv.ParseFloat(after[pos], 64); err == nil {
-				rv.searchAfter.Score = score
-			}
-		}
-	}
-
+	rv.searchAfter = createSearchAfterDocument(sort, after)
 	return rv
 }
 
 func newTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector {
 	hc := &TopNCollector{size: size, skip: skip, sort: sort}
 
-	// pre-allocate space on the store to avoid reslicing
-	// unless the size + skip is too large, then cap it
-	// everything should still work, just reslices as necessary
-	backingSize := size + skip + 1
-	if size+skip > PreAllocSizeSkipCap {
-		backingSize = PreAllocSizeSkipCap + 1
-	}
-
-	if size+skip > 10 {
-		hc.store = newStoreHeap(backingSize, func(i, j *search.DocumentMatch) int {
-			return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
-		})
-	} else {
-		hc.store = newStoreSlice(backingSize, func(i, j *search.DocumentMatch) int {
-			return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
-		})
-	}
+	hc.store = getOptimalCollectorStore(size, skip, func(i, j *search.DocumentMatch) int {
+		return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
+	})
 
 	// these lookups traverse an interface, so do once up-front
 	if sort.RequiresDocID() {
@@ -137,6 +115,59 @@ func newTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector 
 	hc.cachedDesc = sort.CacheDescending()
 
 	return hc
+}
+
+func createSearchAfterDocument(sort search.SortOrder, after []string) *search.DocumentMatch {
+	rv := &search.DocumentMatch{
+		Sort: after,
+	}
+	for pos, ss := range sort {
+		if ss.RequiresDocID() {
+			rv.ID = after[pos]
+		}
+		if ss.RequiresScoring() {
+			if score, err := strconv.ParseFloat(after[pos], 64); err == nil {
+				rv.Score = score
+			}
+		}
+	}
+	return rv
+}
+
+// Filter document matches based on the SearchAfter field in the SearchRequest.
+func FilterHitsBySearchAfter(hits []*search.DocumentMatch, sort search.SortOrder, after []string) []*search.DocumentMatch {
+	if len(hits) == 0 {
+		return hits
+	}
+	// create a search after document
+	searchAfter := createSearchAfterDocument(sort, after)
+	// filter the hits
+	idx := 0
+	cachedScoring := sort.CacheIsScore()
+	cachedDesc := sort.CacheDescending()
+	for _, hit := range hits {
+		if sort.Compare(cachedScoring, cachedDesc, hit, searchAfter) > 0 {
+			hits[idx] = hit
+			idx++
+		}
+	}
+	return hits[:idx]
+}
+
+func getOptimalCollectorStore(size, skip int, comparator collectorCompare) collectorStore {
+	// pre-allocate space on the store to avoid reslicing
+	// unless the size + skip is too large, then cap it
+	// everything should still work, just reslices as necessary
+	backingSize := size + skip + 1
+	if size+skip > PreAllocSizeSkipCap {
+		backingSize = PreAllocSizeSkipCap + 1
+	}
+
+	if size+skip > 10 {
+		return newStoreHeap(backingSize, comparator)
+	} else {
+		return newStoreSlice(backingSize, comparator)
+	}
 }
 
 func (hc *TopNCollector) Size() int {
@@ -215,7 +246,12 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 			}
 		}
 
-		err = hc.prepareDocumentMatch(searchContext, reader, next)
+		err = hc.adjustDocumentMatch(searchContext, reader, next)
+		if err != nil {
+			break
+		}
+
+		err = hc.prepareDocumentMatch(searchContext, reader, next, false)
 		if err != nil {
 			break
 		}
@@ -226,6 +262,23 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 		}
 
 		next, err = searcher.Next(searchContext)
+	}
+	if err != nil {
+		return err
+	}
+	if hc.knnHits != nil {
+		// we may have some knn hits left that did not match any of the top N tf-idf hits
+		// we need to add them to the collector store to consider them as well.
+		for _, knnDoc := range hc.knnHits {
+			err = hc.prepareDocumentMatch(searchContext, reader, knnDoc, true)
+			if err != nil {
+				return err
+			}
+			err = dmHandler(knnDoc)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	statsCallbackFn := ctx.Value(search.SearchIOStatsCallbackKey)
@@ -258,12 +311,40 @@ func (hc *TopNCollector) Collect(ctx context.Context, searcher search.Searcher, 
 
 var sortByScoreOpt = []string{"_score"}
 
-func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
+func (hc *TopNCollector) adjustDocumentMatch(ctx *search.SearchContext,
 	reader index.IndexReader, d *search.DocumentMatch) (err error) {
+	if hc.knnHits != nil {
+		d.ID, err = reader.ExternalID(d.IndexInternalID)
+		if err != nil {
+			return err
+		}
+		if knnHit, ok := hc.knnHits[d.ID]; ok {
+			d.Score, d.Expl = hc.computeNewScoreExpl(d, knnHit)
+			delete(hc.knnHits, d.ID)
+		}
+	}
+	return nil
+}
+
+func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
+	reader index.IndexReader, d *search.DocumentMatch, isKnnDoc bool) (err error) {
 
 	// visit field terms for features that require it (sort, facets)
-	if len(hc.neededFields) > 0 {
-		err = hc.visitFieldTerms(reader, d)
+	if !isKnnDoc && len(hc.neededFields) > 0 {
+		err = hc.visitFieldTerms(reader, d, hc.updateFieldVisitor)
+		if err != nil {
+			return err
+		}
+	} else if isKnnDoc && hc.facetsBuilder != nil {
+		// we need to visit the field terms for the knn document
+		// only for those fields that are required for faceting
+		// and not for sorting. This is because the knn document's
+		// sort value is already computed in the knn collector.
+		err = hc.visitFieldTerms(reader, d, func(field string, term []byte) {
+			if hc.facetsBuilder != nil {
+				hc.facetsBuilder.UpdateVisitor(field, term)
+			}
+		})
 		if err != nil {
 			return err
 		}
@@ -277,9 +358,14 @@ func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
 	if d.Score > hc.maxScore {
 		hc.maxScore = d.Score
 	}
+	// early exit as the document match had its sort value calculated in the knn
+	// collector itself
+	if isKnnDoc {
+		return nil
+	}
 
 	// see if we need to load ID (at this early stage, for example to sort on it)
-	if hc.needDocIds {
+	if hc.needDocIds && d.ID == "" {
 		d.ID, err = reader.ExternalID(d.IndexInternalID)
 		if err != nil {
 			return err
@@ -314,6 +400,7 @@ func MakeTopNDocumentMatchHandler(
 				// but we want to allow for exact match, so we pretend
 				hc.searchAfter.HitNumber = d.HitNumber
 				if hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, d, hc.searchAfter) <= 0 {
+					ctx.DocumentMatchPool.Put(d)
 					return nil
 				}
 			}
@@ -353,12 +440,21 @@ func MakeTopNDocumentMatchHandler(
 
 // visitFieldTerms is responsible for visiting the field terms of the
 // search hit, and passing visited terms to the sort and facet builder
-func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.DocumentMatch) error {
+func (hc *TopNCollector) visitFieldTerms(reader index.IndexReader, d *search.DocumentMatch, v index.DocValueVisitor) error {
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.StartDoc()
 	}
+	if d.ID != "" && d.IndexInternalID == nil {
+		// this document may have been sent over as preSearchData and
+		// we need to look up the internal id to visit the doc values for it
+		var err error
+		d.IndexInternalID, err = reader.InternalID(d.ID)
+		if err != nil {
+			return err
+		}
+	}
 
-	err := hc.dvReader.VisitDocValues(d.IndexInternalID, hc.updateFieldVisitor)
+	err := hc.dvReader.VisitDocValues(d.IndexInternalID, v)
 	if hc.facetsBuilder != nil {
 		hc.facetsBuilder.EndDoc()
 	}
@@ -434,4 +530,12 @@ func (hc *TopNCollector) FacetResults() search.FacetResults {
 		return hc.facetsBuilder.Results()
 	}
 	return nil
+}
+
+func (hc *TopNCollector) SetKNNHits(knnHits search.DocumentMatchCollection, newScoreExplComputer search.ScoreExplCorrectionCallbackFunc) {
+	hc.knnHits = make(map[string]*search.DocumentMatch, len(knnHits))
+	for _, hit := range knnHits {
+		hc.knnHits[hit.ID] = hit
+	}
+	hc.computeNewScoreExpl = newScoreExplComputer
 }

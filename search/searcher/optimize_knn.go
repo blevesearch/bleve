@@ -15,34 +15,39 @@
 //go:build vectors
 // +build vectors
 
-package scorch
+package searcher
 
 import (
 	"context"
 
+	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
-	segment_api "github.com/blevesearch/scorch_segment_api/v2"
 )
 
-func (is *IndexSnapshot) VectorReader(ctx context.Context, vector []float32,
-	field string, k int64) (
-	index.VectorReader, error) {
+func optimizeKNN(ctx context.Context, indexReader index.IndexReader,
+	qsearchers []search.Searcher) error {
+	var octx index.VectorOptimizableContext
+	var err error
 
-	rv := &IndexSnapshotVectorReader{
-		vector:   vector,
-		field:    field,
-		k:        k,
-		snapshot: is,
+	for _, searcher := range qsearchers {
+		// Only applicable to KNN Searchers.
+		o, ok := searcher.(index.VectorOptimizable)
+		if !ok {
+			continue
+		}
+
+		octx, err = o.VectorOptimize(ctx, octx)
+		if err != nil {
+			return err
+		}
 	}
 
-	if rv.postings == nil {
-		rv.postings = make([]segment_api.VecPostingsList, len(is.segment))
-	}
-	if rv.iterators == nil {
-		rv.iterators = make([]segment_api.VecPostingsIterator, len(is.segment))
+	// No KNN searchers.
+	if octx == nil {
+		return nil
 	}
 
-	// initialize postings and iterators within the OptimizeVR's Finish()
-
-	return rv, nil
+	// Postings lists and iterators replaced in the pointer to the
+	// vector reader
+	return octx.Finish()
 }

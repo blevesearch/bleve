@@ -46,15 +46,31 @@ func optionsDisjunctionOptimizable(options search.SearcherOptions) bool {
 func newDisjunctionSearcher(ctx context.Context, indexReader index.IndexReader,
 	qsearchers []search.Searcher, min float64, options search.SearcherOptions,
 	limit bool) (search.Searcher, error) {
-	// attempt the "unadorned" disjunction optimization only when we
-	// do not need extra information like freq-norm's or term vectors
-	// and the requested min is simple
-	if len(qsearchers) > 1 && min <= 1 &&
-		optionsDisjunctionOptimizable(options) {
-		rv, err := optimizeCompositeSearcher(ctx, "disjunction:unadorned",
-			indexReader, qsearchers, options)
-		if err != nil || rv != nil {
-			return rv, err
+
+	var disjOverKNN bool
+	if ctx != nil {
+		disjOverKNN, _ = ctx.Value(search.IncludeScoreBreakdownKey).(bool)
+	}
+	if disjOverKNN {
+		// The KNN Searcher optimization is a necessary pre-req for the KNN Searchers,
+		// not an optional optimization like for, say term searchers.
+		// It's an optimization to repeat search an open vector index when applicable,
+		// rather than individually opening and searching a vector index.
+		err := optimizeKNN(ctx, indexReader, qsearchers)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// attempt the "unadorned" disjunction optimization only when we
+		// do not need extra information like freq-norm's or term vectors
+		// and the requested min is simple
+		if len(qsearchers) > 1 && min <= 1 &&
+			optionsDisjunctionOptimizable(options) {
+			rv, err := optimizeCompositeSearcher(ctx, "disjunction:unadorned",
+				indexReader, qsearchers, options)
+			if err != nil || rv != nil {
+				return rv, err
+			}
 		}
 	}
 
