@@ -440,11 +440,9 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 				segB.BytesWritten())
 		}
 		atomic.AddUint64(&s.iStats.newSegBufBytesAdded, bufBytes)
-
 		if fsr, ok := newSegment.(segment.FieldStatsReporter); ok {
 			fsr.UpdateFieldStats(stats)
 		}
-
 	} else {
 		atomic.AddUint64(&s.stats.TotBatchesEmpty, 1)
 	}
@@ -796,9 +794,10 @@ type fieldStats struct {
 
 // Add the data into the map after checking if the statname is valid
 func (fs *fieldStats) Store(statName, fieldName string, value uint64) {
-	if _, exists := segment.Stats[statName]; exists {
-		fs.statMap[statName][fieldName] = value
+	if _, exists := fs.statMap[statName]; !exists {
+		fs.statMap[statName] = make(map[string]uint64)
 	}
+	fs.statMap[statName][fieldName] = value
 }
 
 // Combine the given stats map with the existing map
@@ -808,13 +807,14 @@ func (fs *fieldStats) Aggregate(stats segment.FieldStats) {
 	if statMap == nil {
 		return
 	}
-
 	for statName, statMap := range statMap {
+		if _, exists := fs.statMap[statName]; !exists {
+			fs.statMap[statName] = make(map[string]uint64)
+		}
 		for fieldName, val := range statMap {
 			if _, exists := fs.statMap[statName][fieldName]; !exists {
 				fs.statMap[statName][fieldName] = 0
 			}
-
 			fs.statMap[statName][fieldName] += val
 		}
 	}
@@ -827,14 +827,8 @@ func (fs *fieldStats) Fetch() map[string]map[string]uint64 {
 
 // Initializes an empty stats map
 func newFieldStats() *fieldStats {
-
 	rv := &fieldStats{
 		statMap: map[string]map[string]uint64{},
 	}
-
-	for statName := range segment.Stats {
-		rv.statMap[statName] = map[string]uint64{}
-	}
-
 	return rv
 }

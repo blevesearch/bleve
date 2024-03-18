@@ -37,7 +37,6 @@ import (
 	"github.com/blevesearch/bleve/v2/index/scorch/mergeplan"
 	"github.com/blevesearch/bleve/v2/mapping"
 	index "github.com/blevesearch/bleve_index_api"
-	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
 func init() {
@@ -2672,7 +2671,7 @@ func BenchmarkAggregateFieldStats(b *testing.B) {
 	for i := range fieldStatsArray {
 		fieldStatsArray[i] = newFieldStats()
 
-		fieldStatsArray[i].Store(segment.NumVecsStat, "vector", uint64(rand.Intn(1000)))
+		fieldStatsArray[i].Store("num_vectors", "vector", uint64(rand.Intn(1000)))
 	}
 
 	b.ResetTimer()
