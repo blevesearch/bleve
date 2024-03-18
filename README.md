@@ -23,7 +23,7 @@ A modern text indexing library in go
     * Term Range, Numeric Range, Date Range
     * [Geo Spatial](https://github.com/blevesearch/bleve/blob/master/geo/README.md)
     * Simple [query string syntax](http://www.blevesearch.com/docs/Query-String-Query/)
-    * [Vector Search](https://github.com/blevesearch/bleve/blob/master/vectors.md)
+    * [Vector Search](https://github.com/blevesearch/bleve/blob/master/docs/vectors.md)
 * [tf-idf](https://en.wikipedia.org/wiki/Tf-idf) Scoring
 * Query time boosting
 * Search result match highlighting with document fragments
