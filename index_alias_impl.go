@@ -881,11 +881,15 @@ type KnnPreSearchResultProcessor struct {
 }
 
 func (k *KnnPreSearchResultProcessor) Add(sr *SearchResult, indexName string) {
-	k.add(sr, indexName)
+	if k.add != nil {
+		k.add(sr, indexName)
+	}
 }
 
 func (k *KnnPreSearchResultProcessor) Finalize(sr *SearchResult) {
-	k.finalize(sr)
+	if k.finalize != nil {
+		k.finalize(sr)
+	}
 }
 
 func CreatePreSearchResultProcessor(req *SearchRequest) PreSearchResultProcessor {
