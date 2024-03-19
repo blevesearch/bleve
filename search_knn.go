@@ -496,6 +496,11 @@ func redistributeKNNPreSearchData(req *SearchRequest, indexes []Index) (map[stri
 	return rv, nil
 }
 
+type KnnPreSearchResultProcessor struct {
+	add      func(sr *SearchResult, indexName string)
+	finalize func(sr *SearchResult)
+}
+
 func NewKnnPreSearchResultProcessor(req *SearchRequest) *KnnPreSearchResultProcessor {
 	kArray := make([]int64, len(req.KNN))
 	for i, knnReq := range req.KNN {
@@ -503,7 +508,7 @@ func NewKnnPreSearchResultProcessor(req *SearchRequest) *KnnPreSearchResultProce
 	}
 	knnStore := collector.GetNewKNNCollectorStore(kArray)
 	return &KnnPreSearchResultProcessor{
-		Add: func(sr *SearchResult, indexName string) {
+		add: func(sr *SearchResult, indexName string) {
 			for _, hit := range sr.Hits {
 				// tag the hit with the index name, so that when the
 				// final search result is constructed, the hit will have
@@ -513,7 +518,7 @@ func NewKnnPreSearchResultProcessor(req *SearchRequest) *KnnPreSearchResultProce
 				knnStore.AddDocument(hit)
 			}
 		},
-		Finalize: func(sr *SearchResult) {
+		finalize: func(sr *SearchResult) {
 			// passing nil as the document fixup function, because we don't need to
 			// fixup the document, since this was already done in the first phase,
 			// hence error is always nil.
@@ -521,4 +526,12 @@ func NewKnnPreSearchResultProcessor(req *SearchRequest) *KnnPreSearchResultProce
 			sr.Hits, _ = knnStore.Final(nil)
 		},
 	}
+}
+
+func (k *KnnPreSearchResultProcessor) Add(sr *SearchResult, indexName string) {
+	k.add(sr, indexName)
+}
+
+func (k *KnnPreSearchResultProcessor) Finalize(sr *SearchResult) {
+	k.finalize(sr)
 }

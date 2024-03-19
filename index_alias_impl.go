@@ -629,7 +629,7 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 	// the final search result to be returned after combining the presearch results
 	var sr *SearchResult
 	// the presearch result processor
-	var presearchResultProcessor *PreSearchResultProcessor
+	var presearchResultProcessor PreSearchResultProcessor
 	// error map
 	indexErrors := make(map[string]error)
 	for asr := range asyncResults {
@@ -863,38 +863,21 @@ func finalizePreSearchResult(req *SearchRequest, preSearchResult *SearchResult) 
 	}
 }
 
-// -----------------------------------------------------------------------------
-// KNNPreSearchResultProcessor is a preSearchResultProcessor that
-// processes the preSearchResult for KNN queries. It adds the KNN hits
-// to the KNNCollectorStore, and then calls the Final method to get the
-// final KNN hits.
-type KnnPreSearchResultProcessor struct {
-	Add      func(*SearchResult, string)
-	Finalize func(*SearchResult)
+// A PreSearchResultProcessor processes the data in
+// the presearch result from multiple
+// indexes in an alias and merges them together to
+// create the final presearch result
+type PreSearchResultProcessor interface {
+	// Add adds the presearch result to the processor
+	Add(*SearchResult, string)
+	// Update the final search result with the finalized
+	// data from the processor
+	Finalize(*SearchResult)
 }
 
-type PreSearchResultProcessor struct {
-	knnProcessor *KnnPreSearchResultProcessor
-}
-
-func CreatePreSearchResultProcessor(req *SearchRequest) *PreSearchResultProcessor {
-	var knnProcessor *KnnPreSearchResultProcessor
+func CreatePreSearchResultProcessor(req *SearchRequest) PreSearchResultProcessor {
 	if requestHasKNN(req) {
-		knnProcessor = NewKnnPreSearchResultProcessor(req)
+		return NewKnnPreSearchResultProcessor(req)
 	}
-	return &PreSearchResultProcessor{
-		knnProcessor: knnProcessor,
-	}
-}
-
-func (p *PreSearchResultProcessor) Add(sr *SearchResult, indexName string) {
-	if p.knnProcessor != nil {
-		p.knnProcessor.Add(sr, indexName)
-	}
-}
-
-func (p *PreSearchResultProcessor) Finalize(sr *SearchResult) {
-	if p.knnProcessor != nil {
-		p.knnProcessor.Finalize(sr)
-	}
+	return nil
 }
