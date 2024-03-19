@@ -640,7 +640,7 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 				// create a new presearch result processor
 				presearchResultProcessor = CreatePreSearchResultProcessor(req)
 			}
-			presearchResultProcessor.AddPreSearchResult(asr.Result, asr.Name)
+			presearchResultProcessor.Add(asr.Result, asr.Name)
 			if sr == nil {
 				// first result
 				sr = &SearchResult{
@@ -679,7 +679,7 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 			sr.Status.Failed++
 		}
 	} else {
-		presearchResultProcessor.SetProcessedData(sr)
+		presearchResultProcessor.Finalize(sr)
 	}
 	return sr, nil
 }
@@ -887,13 +887,13 @@ func CreatePreSearchResultProcessor(req *SearchRequest) *PreSearchResultProcesso
 	}
 }
 
-func (p *PreSearchResultProcessor) AddPreSearchResult(sr *SearchResult, indexName string) {
+func (p *PreSearchResultProcessor) Add(sr *SearchResult, indexName string) {
 	if p.knnProcessor != nil {
 		p.knnProcessor.Add(sr, indexName)
 	}
 }
 
-func (p *PreSearchResultProcessor) SetProcessedData(sr *SearchResult) {
+func (p *PreSearchResultProcessor) Finalize(sr *SearchResult) {
 	if p.knnProcessor != nil {
 		p.knnProcessor.Finalize(sr)
 	}
