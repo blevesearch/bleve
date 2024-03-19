@@ -496,11 +496,6 @@ func redistributeKNNPreSearchData(req *SearchRequest, indexes []Index) (map[stri
 	return rv, nil
 }
 
-type KnnPreSearchResultProcessor struct {
-	add      func(sr *SearchResult, indexName string)
-	finalize func(sr *SearchResult)
-}
-
 func NewKnnPreSearchResultProcessor(req *SearchRequest) *KnnPreSearchResultProcessor {
 	kArray := make([]int64, len(req.KNN))
 	for i, knnReq := range req.KNN {
@@ -526,12 +521,4 @@ func NewKnnPreSearchResultProcessor(req *SearchRequest) *KnnPreSearchResultProce
 			sr.Hits, _ = knnStore.Final(nil)
 		},
 	}
-}
-
-func (k *KnnPreSearchResultProcessor) Add(sr *SearchResult, indexName string) {
-	k.add(sr, indexName)
-}
-
-func (k *KnnPreSearchResultProcessor) Finalize(sr *SearchResult) {
-	k.finalize(sr)
 }

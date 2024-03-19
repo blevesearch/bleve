@@ -875,6 +875,19 @@ type PreSearchResultProcessor interface {
 	Finalize(*SearchResult)
 }
 
+type KnnPreSearchResultProcessor struct {
+	add      func(sr *SearchResult, indexName string)
+	finalize func(sr *SearchResult)
+}
+
+func (k *KnnPreSearchResultProcessor) Add(sr *SearchResult, indexName string) {
+	k.add(sr, indexName)
+}
+
+func (k *KnnPreSearchResultProcessor) Finalize(sr *SearchResult) {
+	k.finalize(sr)
+}
+
 func CreatePreSearchResultProcessor(req *SearchRequest) PreSearchResultProcessor {
 	if requestHasKNN(req) {
 		return NewKnnPreSearchResultProcessor(req)
