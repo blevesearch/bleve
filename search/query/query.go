@@ -98,11 +98,22 @@ func ParsePreSearchData(input []byte) (map[string]interface{}, error) {
 // ParseQuery deserializes a JSON representation of
 // a Query object.
 func ParseQuery(input []byte) (Query, error) {
+	if len(input) == 0 {
+		// interpret as a match_none query
+		return NewMatchNoneQuery(), nil
+	}
+
 	var tmp map[string]interface{}
 	err := util.UnmarshalJSON(input, &tmp)
 	if err != nil {
 		return nil, err
 	}
+
+	if len(tmp) == 0 {
+		// interpret as a match_none query
+		return NewMatchNoneQuery(), nil
+	}
+
 	_, hasFuzziness := tmp["fuzziness"]
 	_, isMatchQuery := tmp["match"]
 	_, isMatchPhraseQuery := tmp["match_phrase"]
