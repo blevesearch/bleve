@@ -869,8 +869,8 @@ func finalizePreSearchResult(req *SearchRequest, preSearchResult *SearchResult) 
 // to the KNNCollectorStore, and then calls the Final method to get the
 // final KNN hits.
 type KnnPreSearchResultProcessor struct {
-	AddPreSearchResult      func(*SearchResult, string)
-	FinalizePreSearchResult func(*SearchResult)
+	Add      func(*SearchResult, string)
+	Finalize func(*SearchResult)
 }
 
 type PreSearchResultProcessor struct {
@@ -889,12 +889,12 @@ func CreatePreSearchResultProcessor(req *SearchRequest) *PreSearchResultProcesso
 
 func (p *PreSearchResultProcessor) AddPreSearchResult(sr *SearchResult, indexName string) {
 	if p.knnProcessor != nil {
-		p.knnProcessor.AddPreSearchResult(sr, indexName)
+		p.knnProcessor.Add(sr, indexName)
 	}
 }
 
 func (p *PreSearchResultProcessor) SetProcessedData(sr *SearchResult) {
 	if p.knnProcessor != nil {
-		p.knnProcessor.FinalizePreSearchResult(sr)
+		p.knnProcessor.Finalize(sr)
 	}
 }

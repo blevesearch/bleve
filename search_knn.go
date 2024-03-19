@@ -503,7 +503,7 @@ func NewKnnPreSearchResultProcessor(req *SearchRequest) *KnnPreSearchResultProce
 	}
 	knnStore := collector.GetNewKNNCollectorStore(kArray)
 	return &KnnPreSearchResultProcessor{
-		AddPreSearchResult: func(sr *SearchResult, indexName string) {
+		Add: func(sr *SearchResult, indexName string) {
 			for _, hit := range sr.Hits {
 				// tag the hit with the index name, so that when the
 				// final search result is constructed, the hit will have
@@ -513,7 +513,7 @@ func NewKnnPreSearchResultProcessor(req *SearchRequest) *KnnPreSearchResultProce
 				knnStore.AddDocument(hit)
 			}
 		},
-		FinalizePreSearchResult: func(sr *SearchResult) {
+		Finalize: func(sr *SearchResult) {
 			// passing nil as the document fixup function, because we don't need to
 			// fixup the document, since this was already done in the first phase,
 			// hence error is always nil.
