@@ -22,3 +22,7 @@ import "github.com/blevesearch/bleve/v2/mapping"
 func NewVectorFieldMapping() *mapping.FieldMapping {
 	return mapping.NewVectorFieldMapping()
 }
+
+func NewVectorBase64FieldMapping() *mapping.FieldMapping {
+	return mapping.NewVectorBase64FieldMapping()
+}
