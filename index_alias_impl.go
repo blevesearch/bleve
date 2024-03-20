@@ -203,9 +203,9 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	// check if preSearchData needs to be gathered from all indexes
 	// before executing the query
 	var err error
-	// only perform pre-search if
+	// only perform preSearch if
 	//  - the request does not already have preSearchData
-	//  - the request requires pre-search
+	//  - the request requires preSearch
 	var preSearchDuration time.Duration
 	var sr *SearchResult
 	if req.PreSearchData == nil && preSearchRequired(req) {
@@ -214,19 +214,19 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		if err != nil {
 			return nil, err
 		}
-		// check if the pre-search result has any errors and if so
+		// check if the preSearch result has any errors and if so
 		// return the search result as is without executing the query
 		// so that the errors are not lost
 		if preSearchResult.Status.Failed > 0 || len(preSearchResult.Status.Errors) > 0 {
 			return preSearchResult, nil
 		}
-		// finalize the pre-search result now
+		// finalize the preSearch result now
 		finalizePreSearchResult(req, preSearchResult)
 
-		// if there are no errors, then merge the data in the pre-search result
+		// if there are no errors, then merge the data in the preSearch result
 		// and construct the preSearchData to be used in the actual search
-		// if the request is satisfied by the pre-search result, then we can
-		// directly return the pre-search result as the final result
+		// if the request is satisfied by the preSearch result, then we can
+		// directly return the preSearch result as the final result
 		if requestSatisfiedByPreSearch(req) {
 			sr = finalizeSearchResult(req, preSearchResult)
 			// no need to run the 2nd phase MultiSearch(..)
