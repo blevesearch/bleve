@@ -763,3 +763,25 @@ func TestGeoShapeQuery(t *testing.T) {
 		}
 	}
 }
+
+func TestParseEmptyQuery(t *testing.T) {
+	var qBytes []byte
+	rv, err := ParseQuery(qBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect := NewMatchNoneQuery()
+	if !reflect.DeepEqual(rv, expect) {
+		t.Errorf("[1] Expected %#v, got %#v", expect, rv)
+	}
+
+	qBytes = []byte(`{}`)
+	rv, err = ParseQuery(qBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect = NewMatchNoneQuery()
+	if !reflect.DeepEqual(rv, expect) {
+		t.Errorf("[2] Expected %#v, got %#v", expect, rv)
+	}
+}
