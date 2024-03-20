@@ -35,6 +35,7 @@ var tokenizers = make(TokenizerRegistry, 0)
 var tokenMaps = make(TokenMapRegistry, 0)
 var tokenFilters = make(TokenFilterRegistry, 0)
 var analyzers = make(AnalyzerRegistry, 0)
+var tahs = NewTokensAnalyzerHooks()
 var dateTimeParsers = make(DateTimeParserRegistry, 0)
 
 type Cache struct {

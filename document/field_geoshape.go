@@ -77,7 +77,7 @@ func (n *GeoShapeField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return n.frequencies
 }
 
-func (n *GeoShapeField) Analyze() {
+func (n *GeoShapeField) Analyze() error {
 	// compute the bytes representation for the coordinates
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
@@ -104,6 +104,8 @@ func (n *GeoShapeField) Analyze() {
 
 	n.length = len(tokens)
 	n.frequencies = analysis.TokenFrequency(tokens, n.arrayPositions, n.options)
+
+	return nil
 }
 
 func (n *GeoShapeField) Value() []byte {

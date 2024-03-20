@@ -91,7 +91,8 @@ func (c *CompositeField) Options() index.FieldIndexingOptions {
 	return c.options
 }
 
-func (c *CompositeField) Analyze() {
+func (c *CompositeField) Analyze() error {
+	return nil
 }
 
 func (c *CompositeField) Value() []byte {

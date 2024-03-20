@@ -17,6 +17,7 @@ package scorch
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -77,6 +78,13 @@ type Scorch struct {
 	segPlugin SegmentPlugin
 
 	spatialPlugin index.SpatialAnalyzerPlugin
+
+	failedAnalysisMutex sync.RWMutex
+	// note: this can grow unboundedly.
+	// In future, we may want to limit the size of this map.
+	// (something like, only keep the last 1000 failed analysis)
+	// In addition to that, we can store total number of failed analysis so far.
+	failedAnalysis map[string]map[string]error // docID -> fieldName -> error
 }
 
 // AsyncPanicError is passed to scorch asyncErrorHandler when panic occurs in scorch background process
@@ -112,6 +120,8 @@ func NewScorch(storeName string,
 		ineligibleForRemoval: map[string]bool{},
 		forceMergeRequestCh:  make(chan *mergerCtrl, 1),
 		segPlugin:            defaultSegmentPlugin,
+
+		failedAnalysis: make(map[string]map[string]error),
 	}
 
 	forcedSegmentType, forcedSegmentVersion, err := configForceSegmentTypeVersion(config)
@@ -396,7 +406,16 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 				if doc != nil {
 					// put the work on the queue
 					s.analysisQueue.Queue(func() {
-						analyze(doc, s.setSpatialAnalyzerPlugin)
+						fieldsError := analyze(doc, s.setSpatialAnalyzerPlugin)
+						if len(fieldsError) > 0 {
+							s.failedAnalysisMutex.Lock()
+							s.failedAnalysis[doc.ID()] = fieldsError
+							s.failedAnalysisMutex.Unlock()
+
+							log.Printf("AnalysisReport: docID: %s, fieldsError: %v",
+								doc.ID(), fieldsError)
+						}
+
 						resultChan <- doc
 					})
 				}
@@ -681,14 +700,18 @@ func (s *Scorch) setSpatialAnalyzerPlugin(f index.Field) {
 	}
 }
 
-func analyze(d index.Document, fn customAnalyzerPluginInitFunc) {
+func analyze(d index.Document, fn customAnalyzerPluginInitFunc) map[string]error {
+	rv := make(map[string]error)
 	d.VisitFields(func(field index.Field) {
 		if field.Options().IsIndexed() {
 			if fn != nil {
 				fn(field)
 			}
 
-			field.Analyze()
+			err := field.Analyze()
+			if err != nil {
+				rv[field.Name()] = err
+			}
 
 			if d.HasComposite() && field.Name() != "_id" {
 				// see if any of the composite fields need this
@@ -698,6 +721,8 @@ func analyze(d index.Document, fn customAnalyzerPluginInitFunc) {
 			}
 		}
 	})
+
+	return rv
 }
 
 func (s *Scorch) AddEligibleForRemoval(epoch uint64) {

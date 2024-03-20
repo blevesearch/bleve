@@ -41,7 +41,25 @@ func NewAnalyzerCache() *AnalyzerCache {
 	}
 }
 
-func AnalyzerBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
+func AnalyzerBuild(name string, config map[string]interface{}, cache *Cache) (
+	interface{}, error) {
+	analyzer, errStatic := StaticAnalyzerBuild(name, config, cache)
+	if errStatic == nil {
+		return analyzer, nil
+	}
+
+	analyzer, errTokensAnalyzerHook := HookTokensAnalyzerBuild(name, config,
+		cache)
+	if errTokensAnalyzerHook == nil {
+		return analyzer, nil
+	}
+
+	return nil, fmt.Errorf("error building analyzer: %v (static: %v, "+
+		"tokens_analyzer_hook: %v)", errTokensAnalyzerHook, errStatic,
+		errTokensAnalyzerHook)
+}
+
+func StaticAnalyzerBuild(name string, config map[string]interface{}, cache *Cache) (interface{}, error) {
 	cons, registered := analyzers[name]
 	if !registered {
 		return nil, fmt.Errorf("no analyzer with name or type '%s' registered", name)

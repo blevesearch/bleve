@@ -92,7 +92,7 @@ func (n *DateTimeField) splitValue() (numeric.PrefixCoded, string) {
 	return numeric.PrefixCoded(parts[0]), string(parts[1])
 }
 
-func (n *DateTimeField) Analyze() {
+func (n *DateTimeField) Analyze() error {
 	valueWithoutLayout, _ := n.splitValue()
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
@@ -126,6 +126,8 @@ func (n *DateTimeField) Analyze() {
 
 	n.length = len(tokens)
 	n.frequencies = analysis.TokenFrequency(tokens, n.arrayPositions, n.options)
+
+	return nil
 }
 
 func (n *DateTimeField) Value() []byte {
