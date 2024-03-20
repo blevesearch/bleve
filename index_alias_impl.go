@@ -856,16 +856,3 @@ func (f *indexAliasImplFieldDict) Close() error {
 	defer f.index.mutex.RUnlock()
 	return f.fieldDict.Close()
 }
-
-func finalizePreSearchResult(req *SearchRequest, preSearchResult *SearchResult) {
-	if requestHasKNN(req) {
-		preSearchResult.Hits = finalizeKNNResults(req, preSearchResult.Hits)
-	}
-}
-
-func createPreSearchResultProcessor(req *SearchRequest) preSearchResultProcessor {
-	if requestHasKNN(req) {
-		return newKnnPreSearchResultProcessor(req)
-	}
-	return &knnPreSearchResultProcessor{} // equivalent to nil
-}

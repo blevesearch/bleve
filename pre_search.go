@@ -42,3 +42,18 @@ func (k *knnPreSearchResultProcessor) finalize(sr *SearchResult) {
 		k.finalizeFn(sr)
 	}
 }
+
+// -----------------------------------------------------------------------------
+
+func finalizePreSearchResult(req *SearchRequest, preSearchResult *SearchResult) {
+	if requestHasKNN(req) {
+		preSearchResult.Hits = finalizeKNNResults(req, preSearchResult.Hits)
+	}
+}
+
+func createPreSearchResultProcessor(req *SearchRequest) preSearchResultProcessor {
+	if requestHasKNN(req) {
+		return newKnnPreSearchResultProcessor(req)
+	}
+	return &knnPreSearchResultProcessor{} // equivalent to nil
+}
