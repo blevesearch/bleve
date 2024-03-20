@@ -629,18 +629,18 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 	// the final search result to be returned after combining the presearch results
 	var sr *SearchResult
 	// the presearch result processor
-	var presearchResultProcessor PreSearchResultProcessor
+	var prp presearchResultProcessor
 	// error map
 	indexErrors := make(map[string]error)
 	for asr := range asyncResults {
 		if asr.Err == nil {
 			// a valid presearch result
-			if presearchResultProcessor == nil {
+			if prp == nil {
 				// first valid presearch result
 				// create a new presearch result processor
-				presearchResultProcessor = CreatePreSearchResultProcessor(req)
+				prp = createPresearchResultProcessor(req)
 			}
-			presearchResultProcessor.Add(asr.Result, asr.Name)
+			prp.add(asr.Result, asr.Name)
 			if sr == nil {
 				// first result
 				sr = &SearchResult{
@@ -679,7 +679,7 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 			sr.Status.Failed++
 		}
 	} else {
-		presearchResultProcessor.Finalize(sr)
+		prp.finalize(sr)
 	}
 	return sr, nil
 }
@@ -863,38 +863,9 @@ func finalizePreSearchResult(req *SearchRequest, preSearchResult *SearchResult) 
 	}
 }
 
-// A PreSearchResultProcessor processes the data in
-// the presearch result from multiple
-// indexes in an alias and merges them together to
-// create the final presearch result
-type PreSearchResultProcessor interface {
-	// Add adds the presearch result to the processor
-	Add(*SearchResult, string)
-	// Update the final search result with the finalized
-	// data from the processor
-	Finalize(*SearchResult)
-}
-
-type KnnPreSearchResultProcessor struct {
-	add      func(sr *SearchResult, indexName string)
-	finalize func(sr *SearchResult)
-}
-
-func (k *KnnPreSearchResultProcessor) Add(sr *SearchResult, indexName string) {
-	if k.add != nil {
-		k.add(sr, indexName)
-	}
-}
-
-func (k *KnnPreSearchResultProcessor) Finalize(sr *SearchResult) {
-	if k.finalize != nil {
-		k.finalize(sr)
-	}
-}
-
-func CreatePreSearchResultProcessor(req *SearchRequest) PreSearchResultProcessor {
+func createPresearchResultProcessor(req *SearchRequest) presearchResultProcessor {
 	if requestHasKNN(req) {
-		return NewKnnPreSearchResultProcessor(req)
+		return newKnnPresearchResultProcessor(req)
 	}
-	return nil
+	return &knnPresearchResultProcessor{} // equivalent to nil
 }
