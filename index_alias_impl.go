@@ -163,16 +163,16 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		return nil, ErrorAliasEmpty
 	}
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
-		// since presearchKey is set, it means that the request
-		// is being executed as part of a presearch, which
+		// since preSearchKey is set, it means that the request
+		// is being executed as part of a preSearch, which
 		// indicates that this index alias is set as an Index
-		// in another alias, so we need to do a presearch search
+		// in another alias, so we need to do a preSearch search
 		// and NOT a real search
 		return preSearchDataSearch(ctx, req, i.indexes...)
 	}
 
 	// at this point we know we are doing a real search
-	// either after a presearch is done, or directly
+	// either after a preSearch is done, or directly
 	// on the alias
 
 	// check if request has preSearchData which would indicate that the
@@ -203,9 +203,9 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	// check if preSearchData needs to be gathered from all indexes
 	// before executing the query
 	var err error
-	// only perform presearch if
+	// only perform preSearch if
 	//  - the request does not already have preSearchData
-	//  - the request requires presearch
+	//  - the request requires preSearch
 	var preSearchDuration time.Duration
 	var sr *SearchResult
 	if req.PreSearchData == nil && preSearchRequired(req) {
@@ -214,15 +214,19 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		if err != nil {
 			return nil, err
 		}
-		// check if the presearch result has any errors and if so
+		// check if the preSearch result has any errors and if so
 		// return the search result as is without executing the query
 		// so that the errors are not lost
-		if preSearchResult.Status.Failed > 0 {
+		if preSearchResult.Status.Failed > 0 || len(preSearchResult.Status.Errors) > 0 {
 			return preSearchResult, nil
 		}
+		// finalize the preSearch result now
+		finalizePreSearchResult(req, preSearchResult)
 
-		// if there are no errors, then merge the data in the presearch result
-		preSearchResult = mergePreSearchResult(req, preSearchResult, i.indexes)
+		// if there are no errors, then merge the data in the preSearch result
+		// and construct the preSearchData to be used in the actual search
+		// if the request is satisfied by the preSearch result, then we can
+		// directly return the preSearch result as the final result
 		if requestSatisfiedByPreSearch(req) {
 			sr = finalizeSearchResult(req, preSearchResult)
 			// no need to run the 2nd phase MultiSearch(..)
@@ -235,7 +239,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		preSearchDuration = time.Since(searchStart)
 	}
 
-	// check if search result was generated as part of presearch itself
+	// check if search result was generated as part of preSearch itself
 	if sr == nil {
 		sr, err = MultiSearch(ctx, req, preSearchData, i.indexes...)
 		if err != nil {
@@ -533,13 +537,7 @@ func preSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Sear
 	return preSearchDataSearch(newCtx, dummyRequest, indexes...)
 }
 
-func tagHitsWithIndexName(sr *SearchResult, indexName string) {
-	for _, hit := range sr.Hits {
-		hit.IndexNames = append(hit.IndexNames, indexName)
-	}
-}
-
-// if the request is satisfied by just the presearch result,
+// if the request is satisfied by just the preSearch result,
 // finalize the result and return it directly without
 // performing multi search
 func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult) *SearchResult {
@@ -551,7 +549,7 @@ func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult) *Se
 	preSearchResult.Total = uint64(preSearchResult.Hits.Len())
 	maxScore := float64(0)
 	for i, hit := range preSearchResult.Hits {
-		// since we are now using the presearch result as the final result
+		// since we are now using the preSearch result as the final result
 		// we can discard the indexNames from the hits as they are no longer
 		// relevant.
 		hit.IndexNames = nil
@@ -587,14 +585,6 @@ func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult) *Se
 	return preSearchResult
 }
 
-func mergePreSearchResult(req *SearchRequest, res *SearchResult,
-	indexes []Index) *SearchResult {
-	if requestHasKNN(req) {
-		res.Hits = mergeKNNDocumentMatches(req, res.Hits)
-	}
-	return res
-}
-
 func requestSatisfiedByPreSearch(req *SearchRequest) bool {
 	if requestHasKNN(req) && isKNNrequestSatisfiedByPreSearch(req) {
 		return true
@@ -609,7 +599,7 @@ func constructPreSearchData(req *SearchRequest, preSearchResult *SearchResult, i
 	}
 	var err error
 	if requestHasKNN(req) {
-		mergedOut, err = constructKnnPresearchData(mergedOut, preSearchResult, indexes)
+		mergedOut, err = constructKnnPreSearchData(mergedOut, preSearchResult, indexes)
 		if err != nil {
 			return nil, err
 		}
@@ -619,50 +609,53 @@ func constructPreSearchData(req *SearchRequest, preSearchResult *SearchResult, i
 
 func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*SearchResult, error) {
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
-
 	// run search on each index in separate go routine
 	var waitGroup sync.WaitGroup
-
 	var searchChildIndex = func(in Index, childReq *SearchRequest) {
 		rv := asyncSearchResult{Name: in.Name()}
 		rv.Result, rv.Err = in.SearchInContext(ctx, childReq)
 		asyncResults <- &rv
 		waitGroup.Done()
 	}
-
 	waitGroup.Add(len(indexes))
 	for _, in := range indexes {
 		go searchChildIndex(in, createChildSearchRequest(req, nil))
 	}
-
 	// on another go routine, close after finished
 	go func() {
 		waitGroup.Wait()
 		close(asyncResults)
 	}()
-
+	// the final search result to be returned after combining the preSearch results
 	var sr *SearchResult
+	// the preSearch result processor
+	var prp preSearchResultProcessor
+	// error map
 	indexErrors := make(map[string]error)
-
 	for asr := range asyncResults {
 		if asr.Err == nil {
+			// a valid preSearch result
+			if prp == nil {
+				// first valid preSearch result
+				// create a new preSearch result processor
+				prp = createPreSearchResultProcessor(req)
+			}
+			prp.add(asr.Result, asr.Name)
 			if sr == nil {
 				// first result
-				sr = asr.Result
-				tagHitsWithIndexName(sr, asr.Name)
+				sr = &SearchResult{
+					Status: asr.Result.Status,
+					Cost:   asr.Result.Cost,
+				}
 			} else {
 				// merge with previous
-				tagHitsWithIndexName(asr.Result, asr.Name)
-				sr.Merge(asr.Result)
+				sr.Status.Merge(asr.Result.Status)
+				sr.Cost += asr.Result.Cost
 			}
 		} else {
 			indexErrors[asr.Name] = asr.Err
 		}
 	}
-
-	// merge just concatenated all the hits
-	// now lets clean it up
-
 	// handle case where no results were successful
 	if sr == nil {
 		sr = &SearchResult{
@@ -671,16 +664,12 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 			},
 		}
 	}
-
-	// in presearch partial results are not allowed as it can lead to
+	// in preSearch, partial results are not allowed as it can lead to
 	// the real search giving incorrect results, and hence the search
-	// result is reset.
-	// discard partial hits if some child index has failed or
-	// if some child alias has returned partial results.
+	// result is not populated with any of the processed data from
+	// the preSearch result processor if there are any errors
+	// or the preSearch result status has any failures
 	if len(indexErrors) > 0 || sr.Status.Failed > 0 {
-		sr = &SearchResult{
-			Status: sr.Status,
-		}
 		if sr.Status.Errors == nil {
 			sr.Status.Errors = make(map[string]error)
 		}
@@ -689,8 +678,9 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 			sr.Status.Total++
 			sr.Status.Failed++
 		}
+	} else {
+		prp.finalize(sr)
 	}
-
 	return sr, nil
 }
 

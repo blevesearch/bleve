@@ -294,9 +294,9 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	}
 	knnHits := knnCollector.Results()
 	if !preSearch {
-		knnHits = finalizeKNNResults(req, knnHits, len(req.KNN))
+		knnHits = finalizeKNNResults(req, knnHits)
 	}
-	// at this point, irrespective of whether it is a presearch or not,
+	// at this point, irrespective of whether it is a preSearch or not,
 	// the knn hits are populated with Sort and Fields.
 	// it must be ensured downstream that the Sort and Fields are not
 	// re-evaluated, for these hits.
@@ -324,13 +324,13 @@ func setKnnHitsInCollector(knnHits []*search.DocumentMatch, req *SearchRequest, 
 	}
 }
 
-func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch, numKNNQueries int) []*search.DocumentMatch {
+func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
 	// if the KNN operator is AND, then we need to filter out the hits that
 	// do not have match the KNN queries.
 	if req.KNNOperator == knnOperatorAnd {
 		idx := 0
 		for _, hit := range knnHits {
-			if len(hit.ScoreBreakdown) == numKNNQueries {
+			if len(hit.ScoreBreakdown) == len(req.KNN) {
 				knnHits[idx] = hit
 				idx++
 			}
@@ -360,22 +360,6 @@ func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch, num
 		hit.ScoreBreakdown = nil
 	}
 	return knnHits
-}
-
-func mergeKNNDocumentMatches(req *SearchRequest, knnHits []*search.DocumentMatch) []*search.DocumentMatch {
-	kArray := make([]int64, len(req.KNN))
-	for i, knnReq := range req.KNN {
-		kArray[i] = knnReq.K
-	}
-	knnStore := collector.GetNewKNNCollectorStore(kArray)
-	for _, hit := range knnHits {
-		knnStore.AddDocument(hit)
-	}
-	// passing nil as the document fixup function, because we don't need to
-	// fixup the document, since this was already done in the first phase.
-	// hence error is always nil.
-	mergedKNNhits, _ := knnStore.Final(nil)
-	return finalizeKNNResults(req, mergedKNNhits, len(req.KNN))
 }
 
 // when we are setting KNN hits in the preSearchData, we need to make sure that
@@ -433,7 +417,7 @@ func requestHasKNN(req *SearchRequest) bool {
 }
 
 // returns true if the search request contains a KNN request that can be
-// satisfied by just performing a presearch, completely bypassing the
+// satisfied by just performing a preSearch, completely bypassing the
 // actual search.
 func isKNNrequestSatisfiedByPreSearch(req *SearchRequest) bool {
 	// if req.Query is not match_none => then we need to go to phase 2
@@ -456,7 +440,7 @@ func isKNNrequestSatisfiedByPreSearch(req *SearchRequest) bool {
 	return true
 }
 
-func constructKnnPresearchData(mergedOut map[string]map[string]interface{}, preSearchResult *SearchResult,
+func constructKnnPreSearchData(mergedOut map[string]map[string]interface{}, preSearchResult *SearchResult,
 	indexes []Index) (map[string]map[string]interface{}, error) {
 
 	distributedHits, err := validateAndDistributeKNNHits([]*search.DocumentMatch(preSearchResult.Hits), indexes)
@@ -510,4 +494,31 @@ func redistributeKNNPreSearchData(req *SearchRequest, indexes []Index) (map[stri
 		}
 	}
 	return rv, nil
+}
+
+func newKnnPreSearchResultProcessor(req *SearchRequest) *knnPreSearchResultProcessor {
+	kArray := make([]int64, len(req.KNN))
+	for i, knnReq := range req.KNN {
+		kArray[i] = knnReq.K
+	}
+	knnStore := collector.GetNewKNNCollectorStore(kArray)
+	return &knnPreSearchResultProcessor{
+		addFn: func(sr *SearchResult, indexName string) {
+			for _, hit := range sr.Hits {
+				// tag the hit with the index name, so that when the
+				// final search result is constructed, the hit will have
+				// a valid path to follow along the alias tree to reach
+				// the index.
+				hit.IndexNames = append(hit.IndexNames, indexName)
+				knnStore.AddDocument(hit)
+			}
+		},
+		finalizeFn: func(sr *SearchResult) {
+			// passing nil as the document fixup function, because we don't need to
+			// fixup the document, since this was already done in the first phase,
+			// hence error is always nil.
+			// the merged knn hits are finalized and set in the search result.
+			sr.Hits, _ = knnStore.Final(nil)
+		},
+	}
 }

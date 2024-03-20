@@ -71,7 +71,7 @@ func NewKNNQueryScorer(queryVector []float32, queryField string, queryBoost floa
 
 // Score used when the knnMatch.Score = 0 ->
 // the query and indexed vector are exactly the same.
-const maxKNNScore = math.MaxFloat64
+const maxKNNScore = math.MaxFloat32
 
 func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 	knnMatch *index.VectorDoc) *search.DocumentMatch {
