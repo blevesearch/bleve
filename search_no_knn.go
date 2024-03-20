@@ -202,6 +202,6 @@ func finalizeKNNResults(req *SearchRequest, knnHits []*search.DocumentMatch) []*
 	return knnHits
 }
 
-func newKnnPresearchResultProcessor(req *SearchRequest) *knnPresearchResultProcessor {
-	return &knnPresearchResultProcessor{} // equivalent to nil
+func newKnnPreSearchResultProcessor(req *SearchRequest) *knnPreSearchResultProcessor {
+	return &knnPreSearchResultProcessor{} // equivalent to nil
 }

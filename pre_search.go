@@ -14,30 +14,30 @@
 
 package bleve
 
-// A presearchResultProcessor processes the data in
-// the presearch result from multiple
+// A preSearchResultProcessor processes the data in
+// the preSearch result from multiple
 // indexes in an alias and merges them together to
-// create the final presearch result
-type presearchResultProcessor interface {
-	// Add adds the presearch result to the processor
+// create the final preSearch result
+type preSearchResultProcessor interface {
+	// Add adds the preSearch result to the processor
 	add(*SearchResult, string)
 	// Update the final search result with the finalized
 	// data from the processor
 	finalize(*SearchResult)
 }
 
-type knnPresearchResultProcessor struct {
+type knnPreSearchResultProcessor struct {
 	addFn      func(sr *SearchResult, indexName string)
 	finalizeFn func(sr *SearchResult)
 }
 
-func (k *knnPresearchResultProcessor) add(sr *SearchResult, indexName string) {
+func (k *knnPreSearchResultProcessor) add(sr *SearchResult, indexName string) {
 	if k.addFn != nil {
 		k.addFn(sr, indexName)
 	}
 }
 
-func (k *knnPresearchResultProcessor) finalize(sr *SearchResult) {
+func (k *knnPreSearchResultProcessor) finalize(sr *SearchResult) {
 	if k.finalizeFn != nil {
 		k.finalizeFn(sr)
 	}

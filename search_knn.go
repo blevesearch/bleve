@@ -296,7 +296,7 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	if !preSearch {
 		knnHits = finalizeKNNResults(req, knnHits)
 	}
-	// at this point, irrespective of whether it is a presearch or not,
+	// at this point, irrespective of whether it is a preSearch or not,
 	// the knn hits are populated with Sort and Fields.
 	// it must be ensured downstream that the Sort and Fields are not
 	// re-evaluated, for these hits.
@@ -417,7 +417,7 @@ func requestHasKNN(req *SearchRequest) bool {
 }
 
 // returns true if the search request contains a KNN request that can be
-// satisfied by just performing a presearch, completely bypassing the
+// satisfied by just performing a preSearch, completely bypassing the
 // actual search.
 func isKNNrequestSatisfiedByPreSearch(req *SearchRequest) bool {
 	// if req.Query is not match_none => then we need to go to phase 2
@@ -496,13 +496,13 @@ func redistributeKNNPreSearchData(req *SearchRequest, indexes []Index) (map[stri
 	return rv, nil
 }
 
-func newKnnPresearchResultProcessor(req *SearchRequest) *knnPresearchResultProcessor {
+func newKnnPreSearchResultProcessor(req *SearchRequest) *knnPreSearchResultProcessor {
 	kArray := make([]int64, len(req.KNN))
 	for i, knnReq := range req.KNN {
 		kArray[i] = knnReq.K
 	}
 	knnStore := collector.GetNewKNNCollectorStore(kArray)
-	return &knnPresearchResultProcessor{
+	return &knnPreSearchResultProcessor{
 		addFn: func(sr *SearchResult, indexName string) {
 			for _, hit := range sr.Hits {
 				// tag the hit with the index name, so that when the

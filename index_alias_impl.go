@@ -163,16 +163,16 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		return nil, ErrorAliasEmpty
 	}
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
-		// since presearchKey is set, it means that the request
-		// is being executed as part of a presearch, which
+		// since preSearchKey is set, it means that the request
+		// is being executed as part of a preSearch, which
 		// indicates that this index alias is set as an Index
-		// in another alias, so we need to do a presearch search
+		// in another alias, so we need to do a preSearch search
 		// and NOT a real search
 		return preSearchDataSearch(ctx, req, i.indexes...)
 	}
 
 	// at this point we know we are doing a real search
-	// either after a presearch is done, or directly
+	// either after a preSearch is done, or directly
 	// on the alias
 
 	// check if request has preSearchData which would indicate that the
@@ -239,7 +239,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		preSearchDuration = time.Since(searchStart)
 	}
 
-	// check if search result was generated as part of presearch itself
+	// check if search result was generated as part of preSearch itself
 	if sr == nil {
 		sr, err = MultiSearch(ctx, req, preSearchData, i.indexes...)
 		if err != nil {
@@ -537,7 +537,7 @@ func preSearch(ctx context.Context, req *SearchRequest, indexes ...Index) (*Sear
 	return preSearchDataSearch(newCtx, dummyRequest, indexes...)
 }
 
-// if the request is satisfied by just the presearch result,
+// if the request is satisfied by just the preSearch result,
 // finalize the result and return it directly without
 // performing multi search
 func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult) *SearchResult {
@@ -549,7 +549,7 @@ func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult) *Se
 	preSearchResult.Total = uint64(preSearchResult.Hits.Len())
 	maxScore := float64(0)
 	for i, hit := range preSearchResult.Hits {
-		// since we are now using the presearch result as the final result
+		// since we are now using the preSearch result as the final result
 		// we can discard the indexNames from the hits as they are no longer
 		// relevant.
 		hit.IndexNames = nil
@@ -626,19 +626,19 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 		waitGroup.Wait()
 		close(asyncResults)
 	}()
-	// the final search result to be returned after combining the presearch results
+	// the final search result to be returned after combining the preSearch results
 	var sr *SearchResult
-	// the presearch result processor
-	var prp presearchResultProcessor
+	// the preSearch result processor
+	var prp preSearchResultProcessor
 	// error map
 	indexErrors := make(map[string]error)
 	for asr := range asyncResults {
 		if asr.Err == nil {
-			// a valid presearch result
+			// a valid preSearch result
 			if prp == nil {
-				// first valid presearch result
-				// create a new presearch result processor
-				prp = createPresearchResultProcessor(req)
+				// first valid preSearch result
+				// create a new preSearch result processor
+				prp = createPreSearchResultProcessor(req)
 			}
 			prp.add(asr.Result, asr.Name)
 			if sr == nil {
@@ -664,11 +664,11 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, indexes ...Ind
 			},
 		}
 	}
-	// in presearch, partial results are not allowed as it can lead to
+	// in preSearch, partial results are not allowed as it can lead to
 	// the real search giving incorrect results, and hence the search
 	// result is not populated with any of the processed data from
-	// the presearch result processor if there are any errors
-	// or the presearch result status has any failures
+	// the preSearch result processor if there are any errors
+	// or the preSearch result status has any failures
 	if len(indexErrors) > 0 || sr.Status.Failed > 0 {
 		if sr.Status.Errors == nil {
 			sr.Status.Errors = make(map[string]error)
@@ -863,9 +863,9 @@ func finalizePreSearchResult(req *SearchRequest, preSearchResult *SearchResult) 
 	}
 }
 
-func createPresearchResultProcessor(req *SearchRequest) presearchResultProcessor {
+func createPreSearchResultProcessor(req *SearchRequest) preSearchResultProcessor {
 	if requestHasKNN(req) {
-		return newKnnPresearchResultProcessor(req)
+		return newKnnPreSearchResultProcessor(req)
 	}
-	return &knnPresearchResultProcessor{} // equivalent to nil
+	return &knnPreSearchResultProcessor{} // equivalent to nil
 }
