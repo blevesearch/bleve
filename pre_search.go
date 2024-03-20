@@ -19,9 +19,9 @@ package bleve
 // indexes in an alias and merges them together to
 // create the final preSearch result
 type preSearchResultProcessor interface {
-	// Add adds the preSearch result to the processor
+	// adds the preSearch result to the processor
 	add(*SearchResult, string)
-	// Update the final search result with the finalized
+	// updates the final search result with the finalized
 	// data from the processor
 	finalize(*SearchResult)
 }
