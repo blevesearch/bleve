@@ -117,3 +117,23 @@ func BenchmarkLevenshteinDistanceMax(b *testing.B) {
 		}
 	}
 }
+
+func FuzzLevenshteinDistanceMax(f *testing.F) {
+
+	f.Add("water", "atec", 1)
+	f.Add("water", "christmas", 3)
+
+	f.Fuzz(func(t *testing.T, input_0 string, input_1 string, input_2 int) {
+		LevenshteinDistanceMax(input_0, input_1, input_2)
+	})
+}
+
+func FuzzLevenshteinDistanceOnly(f *testing.F) {
+
+	f.Add("water", "atec")
+	f.Add("water", "christmas")
+
+	f.Fuzz(func(t *testing.T, input_0 string, input_1 string) {
+		LevenshteinDistance(input_0, input_1)
+	})
+}

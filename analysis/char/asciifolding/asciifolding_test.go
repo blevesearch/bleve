@@ -65,3 +65,15 @@ func TestAsciiFoldingFilter(t *testing.T) {
 		})
 	}
 }
+
+func FuzzFilter(f *testing.F) {
+
+	f.Add([]byte(`The quick brown fox jumps over the lazy dog`))
+	f.Add([]byte(`ÆꜴ`))
+	f.Add([]byte(`Ápple Àpple Äpple Âpple Ãpple Åpple`))
+
+	f.Fuzz(func(t *testing.T, input []byte) {
+		filter := New()
+		filter.Filter(input)
+	})
+}

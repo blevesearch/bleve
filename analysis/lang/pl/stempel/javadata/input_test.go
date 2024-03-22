@@ -247,3 +247,16 @@ func TestReadUTF(t *testing.T) {
 // 	// 	n--
 // 	// }
 // }
+
+func FuzzJdr(f *testing.F) {
+
+	f.Add([]byte{0, 3, 'c', 'a', 't'})
+	f.Add([]byte{0, 6, 0xe3, 0x85, 0x85, 'c', 'a', 't'})
+	f.Add([]byte{0x0, 0x05, 0x44, 0x61, 0x52, 0xc4, 0x87})
+
+	f.Fuzz(func(t *testing.T, input []byte) {
+
+		jdr := NewReader(bytes.NewReader(input))
+		_, _ = jdr.ReadUTF()
+	})
+}

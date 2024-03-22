@@ -87,3 +87,14 @@ func TestConversionFromISOStyle(t *testing.T) {
 	}
 
 }
+
+func FuzzParseISOString(f *testing.F) {
+
+	f.Add("yyyy-MM-dd")
+	f.Add("uuu/M''''dd'T'HH:m:ss.SSS")
+	f.Add("MMMM dd yyyy', 'HH:mm:ss.SSS")
+
+	f.Fuzz(func(t *testing.T, input string) {
+		parseISOString(input)
+	})
+}

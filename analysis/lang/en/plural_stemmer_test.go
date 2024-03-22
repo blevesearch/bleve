@@ -44,3 +44,14 @@ func TestEnglishPluralStemmer(t *testing.T) {
 		}
 	}
 }
+
+func FuzzStem(f *testing.F) {
+
+	f.Add("dresses")
+	f.Add("axes")
+	f.Add("DRESSES")
+
+	f.Fuzz(func(t *testing.T, input string) {
+		stem(input)
+	})
+}

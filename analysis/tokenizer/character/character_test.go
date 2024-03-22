@@ -82,3 +82,14 @@ func TestCharacterTokenizer(t *testing.T) {
 		}
 	}
 }
+
+func FuzzTokenize(f *testing.F) {
+
+	f.Add([]byte("Hello World."))
+	f.Add([]byte([]byte("dominique@mcdiabetes.com")))
+
+	f.Fuzz(func(t *testing.T, input []byte) {
+		tokenizer := NewCharacterTokenizer(unicode.IsLetter)
+		tokenizer.Tokenize(input)
+	})
+}

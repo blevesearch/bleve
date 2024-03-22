@@ -112,3 +112,15 @@ func TestConversionFromPercentStyle(t *testing.T) {
 	}
 
 }
+
+func FuzzParseFormatString(f *testing.F) {
+
+	f.Add("%Y-%m-%d")
+	f.Add("%Y/%m%%%%%dT%H%M:%S")
+	f.Add("Hour %H Minute %Mseconds %S.%N Timezone:%Z:S, Weekday %a; Day %d Month %b, Year %y")
+	f.Add("%H:%M:%S %Z %zM")
+
+	f.Fuzz(func(t *testing.T, input string) {
+		parseFormatString(input)
+	})
+}
