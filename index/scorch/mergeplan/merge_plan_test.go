@@ -32,9 +32,12 @@ type segment struct {
 	MyLiveSize int64
 }
 
-func (s *segment) Id() uint64      { return s.MyId }
-func (s *segment) FullSize() int64 { return s.MyFullSize }
-func (s *segment) LiveSize() int64 { return s.MyLiveSize }
+func (s *segment) Id() uint64                  { return s.MyId }
+func (s *segment) FullSize() int64             { return s.MyFullSize }
+func (s *segment) LiveSize() int64             { return s.MyLiveSize }
+func (s *segment) HasVector() bool             { return false }
+func (s *segment) FullVectorsByteSize() uint64 { return 0 }
+func (s *segment) LiveVectorsByteSize() uint64 { return 0 }
 
 func makeLinearSegments(n int) (rv []Segment) {
 	for i := 0; i < n; i++ {

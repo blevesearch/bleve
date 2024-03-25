@@ -37,6 +37,12 @@ type Segment interface {
 	// Size of the live data of the segment; i.e., FullSize() minus
 	// any logical deletions.
 	LiveSize() int64
+
+	HasVector() bool
+
+	FullVectorsByteSize() uint64
+
+	LiveVectorsByteSize() uint64
 }
 
 // Plan() will functionally compute a merge plan.  A segment will be
@@ -75,6 +81,11 @@ type MergePlanOptions struct {
 	// merging, however, may produce segment sizes different than the
 	// planner’s predicted sizes.
 	MaxSegmentSize int64
+
+	// Max size of segment having vector content produced after merging.
+	// Will be respected based on estimated size of vector content, thus
+	// is a best effort soft limit.
+	MaxSegmentVectorByteSize uint64
 
 	// The growth factor for each tier in a staircase of idealized
 	// segments computed by CalcBudget().
@@ -126,12 +137,13 @@ var ErrMaxSegmentSizeTooLarge = errors.New("MaxSegmentSize exceeds the size limi
 
 // DefaultMergePlanOptions suggests the default options.
 var DefaultMergePlanOptions = MergePlanOptions{
-	MaxSegmentsPerTier:   10,
-	MaxSegmentSize:       5000000,
-	TierGrowth:           10.0,
-	SegmentsPerMergeTask: 10,
-	FloorSegmentSize:     2000,
-	ReclaimDeletesWeight: 2.0,
+	MaxSegmentsPerTier:       10,
+	MaxSegmentSize:           5000000,
+	MaxSegmentVectorByteSize: 4000000000, // 4GB
+	TierGrowth:               10.0,
+	SegmentsPerMergeTask:     10,
+	FloorSegmentSize:         2000,
+	ReclaimDeletesWeight:     2.0,
 }
 
 // SingleSegmentMergePlanOptions helps in creating a
@@ -170,8 +182,13 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 			minLiveSize = segment.LiveSize()
 		}
 
+		isEligible := segment.LiveSize() < o.MaxSegmentSize/2
+		if segment.HasVector() && o.MaxSegmentVectorByteSize > 0 {
+			isEligible = segment.LiveVectorsByteSize() < o.MaxSegmentVectorByteSize/2
+		}
+
 		// Only small-enough segments are eligible.
-		if segment.LiveSize() < o.MaxSegmentSize/2 {
+		if isEligible {
 			eligibles = append(eligibles, segment)
 			eligiblesLiveSize += segment.LiveSize()
 		}
