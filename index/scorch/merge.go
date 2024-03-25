@@ -300,6 +300,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 	go cw.listen()
 
 	if len(resultMergePlan.Tasks) == 0 {
+		atomic.AddUint64(&s.stats.TotFileMergePlanZeroTasks, 1)
 		return errNoOpMerge
 	}
 
