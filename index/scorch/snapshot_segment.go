@@ -66,6 +66,53 @@ func (s *SegmentSnapshot) LiveSize() int64 {
 	return int64(s.Count())
 }
 
+func (s *SegmentSnapshot) HasVector() bool {
+	if fieldVecs, ok := s.stats.Fetch()["num_vecs"]; ok {
+		return len(fieldVecs) > 0
+	}
+
+	return false
+}
+
+func (s *SegmentSnapshot) FullVectorsByteSize() uint64 {
+	vecByteSize, ok := s.stats.Fetch()["vec_byte_size"]
+	if !ok {
+		return 0
+	}
+
+	var rv uint64
+	for _, size := range vecByteSize {
+		rv += size
+	}
+
+	return rv
+}
+
+func (s *SegmentSnapshot) LiveVectorsByteSize() uint64 {
+	fullSize := s.FullVectorsByteSize()
+
+	var deletedDocsCount uint64
+	if s.deleted != nil {
+		deletedDocsCount = s.deleted.GetCardinality()
+	}
+
+	if deletedDocsCount == 0 {
+		return fullSize
+	}
+
+	// # Live Vector Size Estimation
+	//
+	// Assuming equal distribution of vectors in each doc.
+	// vectorSizeOfEachDoc = fullSize / numDocsInSegment
+	//
+	// Thus, vectorSizeOfDeletedDocs = vectorSizeOfEachDoc * numDeletedDocs
+	//
+	// And, liveSize = fullSize - vectorSizeOfDeletedDocs
+	// Thus, liveSize = fullSize - ((fullSize / numDocsInSegment) * numDeletedDocs)
+	// liveSize = fullSize * (1 - (numDeletedDocs / numDocsInSegment))
+	return fullSize * (1 - deletedDocsCount/s.segment.Count())
+}
+
 func (s *SegmentSnapshot) Close() error {
 	return s.segment.Close()
 }
