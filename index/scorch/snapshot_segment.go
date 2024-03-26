@@ -74,22 +74,22 @@ func (s *SegmentSnapshot) HasVector() bool {
 	return false
 }
 
-func (s *SegmentSnapshot) FullVectorsByteSize() uint64 {
-	vecByteSize, ok := s.stats.Fetch()["vec_byte_size"]
+func (s *SegmentSnapshot) fullVectorsBytes() uint64 {
+	vectorsIndexSize, ok := s.stats.Fetch()["vectors_index_size"]
 	if !ok {
 		return 0
 	}
 
 	var rv uint64
-	for _, size := range vecByteSize {
+	for _, size := range vectorsIndexSize {
 		rv += size
 	}
 
 	return rv
 }
 
-func (s *SegmentSnapshot) LiveVectorsByteSize() uint64 {
-	fullSize := s.FullVectorsByteSize()
+func (s *SegmentSnapshot) LiveVectorsBytes() uint64 {
+	fullSize := s.fullVectorsBytes()
 
 	var deletedDocsCount uint64
 	if s.deleted != nil {
