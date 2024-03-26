@@ -99,8 +99,8 @@ OUTER:
 					// continue the workloop on a user triggered cancel
 					if ctrlMsg.doneCh != nil {
 						close(ctrlMsg.doneCh)
-						ctrlMsg = nil
 					}
+					ctrlMsg = nil
 					continue OUTER
 				}
 				if err != nil {
