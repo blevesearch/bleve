@@ -77,6 +77,21 @@ OUTER:
 				// lets get started
 				err := s.planMergeAtSnapshot(ctrlMsg.ctx, ctrlMsg.options,
 					ourSnapshot)
+
+				// if there were no segments merged because there were no tasks
+				// present, continue the next iteration of merger loop and don't
+				// notify the persister since there was no change in the index snapshot.
+				if err == errNoOpMerge {
+					// index has been closed
+					_ = ourSnapshot.DecRef()
+
+					// continue the workloop on a user triggered cancel
+					if ctrlMsg.doneCh != nil {
+						close(ctrlMsg.doneCh)
+					}
+					ctrlMsg = nil
+					continue OUTER
+				}
 				if err != nil {
 					atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
 					if err == segment.ErrClosed {
@@ -247,6 +262,8 @@ func (w *closeChWrapper) listen() {
 	}
 }
 
+var errNoOpMerge = fmt.Errorf("no merge was performed due to empty task list")
+
 func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 	options *mergeplan.MergePlanOptions, ourSnapshot *IndexSnapshot) error {
 	// build list of persisted segments in this snapshot
@@ -281,6 +298,11 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 	defer cw.close()
 
 	go cw.listen()
+
+	if len(resultMergePlan.Tasks) == 0 {
+		atomic.AddUint64(&s.stats.TotFileMergePlanZeroTasks, 1)
+		return errNoOpMerge
+	}
 
 	for _, task := range resultMergePlan.Tasks {
 		if len(task.Segments) == 0 {
