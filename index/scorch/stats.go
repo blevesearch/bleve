@@ -99,7 +99,6 @@ type Stats struct {
 	TotFileMergePlanNone uint64
 	TotFileMergePlanOk   uint64
 
-	TotFileMergePlanZeroTasks          uint64
 	TotFileMergePlanTasks              uint64
 	TotFileMergePlanTasksDone          uint64
 	TotFileMergePlanTasksErr           uint64
