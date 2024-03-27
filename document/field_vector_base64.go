@@ -80,7 +80,7 @@ func (n *VectorBase64Field) GoString() string {
 func NewVectorBase64Field(name string, arrayPositions []uint64, encodedValue string,
 	dims int, similarity, vectorIndexOptimizedFor string) (*VectorBase64Field, error) {
 
-	vector, err := decodeVector(encodedValue)
+	vector, err := DecodeVector(encodedValue)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func NewVectorBase64Field(name string, arrayPositions []uint64, encodedValue str
 	}, nil
 }
 
-func decodeVector(encodedValue string) ([]float32, error) {
+func DecodeVector(encodedValue string) ([]float32, error) {
 	decodedString, err := base64.StdEncoding.DecodeString(encodedValue)
 	if err != nil {
 		fmt.Println("Error decoding string:", err)
@@ -102,7 +102,7 @@ func decodeVector(encodedValue string) ([]float32, error) {
 	}
 
 	var decodedVector []float32
-	err = json.Unmarshal(decodedString, decodedVector)
+	err = json.Unmarshal(decodedString, &decodedVector)
 	if err != nil {
 		fmt.Println("Error decoding string:", err)
 		return nil, err

@@ -443,7 +443,7 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 					fieldMapping.processGeoShape(property, pathString, path, indexes, context)
 				} else if fieldMapping.Type == "geopoint" {
 					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
-				} else if fieldMapping.Type == "vector-base64" {
+				} else if fieldMapping.Type == "vector_base64" {
 					fieldMapping.processVectorBase64(property, pathString, path, indexes, context)
 				} else {
 					fieldMapping.processString(propertyValueString, pathString, path, indexes, context)

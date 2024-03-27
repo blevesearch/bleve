@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/query"
@@ -67,10 +68,11 @@ type SearchRequest struct {
 }
 
 type KNNRequest struct {
-	Field  string       `json:"field"`
-	Vector []float32    `json:"vector"`
-	K      int64        `json:"k"`
-	Boost  *query.Boost `json:"boost,omitempty"`
+	Field        string       `json:"field"`
+	Vector       []float32    `json:"vector"`
+	VectorBase64 string       `json:"vectorbase64"`
+	K            int64        `json:"k"`
+	Boost        *query.Boost `json:"boost,omitempty"`
 }
 
 func (r *SearchRequest) AddKNN(field string, vector []float32, k int64, boost float64) {
@@ -229,6 +231,16 @@ func validateKNN(req *SearchRequest) error {
 	for _, q := range req.KNN {
 		if q == nil {
 			return fmt.Errorf("knn query cannot be nil")
+		}
+		if q.VectorBase64 != "" {
+			if q.Vector == nil {
+				vec, err := document.DecodeVector(q.VectorBase64)
+				if err != nil {
+					return err
+				}
+
+				q.Vector = vec
+			}
 		}
 		if q.K <= 0 || len(q.Vector) == 0 {
 			return fmt.Errorf("k must be greater than 0 and vector must be non-empty")

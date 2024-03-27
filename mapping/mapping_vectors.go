@@ -47,7 +47,7 @@ func NewVectorFieldMapping() *FieldMapping {
 
 func NewVectorBase64FieldMapping() *FieldMapping {
 	return &FieldMapping{
-		Type:         "vector-base64",
+		Type:         "vector_base64",
 		Store:        false,
 		Index:        true,
 		IncludeInAll: false,
@@ -191,7 +191,7 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 func validateFieldMapping(field *FieldMapping, parentName string,
 	fieldAliasCtx map[string]*FieldMapping) error {
 	switch field.Type {
-	case "vector", "vector-base64":
+	case "vector", "vector_base64":
 		return validateVectorFieldAlias(field, parentName, fieldAliasCtx)
 	default: // non-vector field
 		return validateFieldType(field)
