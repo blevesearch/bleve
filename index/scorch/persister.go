@@ -267,17 +267,36 @@ func (s *Scorch) pausePersisterForMergerCatchUp(lastPersistedEpoch uint64,
 	// memory merge cum persist loop.
 	if numFilesOnDisk < uint64(po.PersisterNapUnderNumFiles) &&
 		po.PersisterNapTimeMSec > 0 && s.NumEventsBlocking() == 0 {
+		s.rootLock.RLock()
+		lastRootEpoch := s.root.epoch
+		s.rootLock.RUnlock()
+		expectedNapTime := time.Now().Add(time.Millisecond * time.Duration(po.PersisterNapTimeMSec))
+
 		select {
 		case <-s.closeCh:
 		case <-time.After(time.Millisecond * time.Duration(po.PersisterNapTimeMSec)):
 			atomic.AddUint64(&s.stats.TotPersisterNapPauseCompleted, 1)
 
 		case ew := <-s.persisterNotifier:
+			s.rootLock.RLock()
+			currRootEpoch := s.root.epoch
+			s.rootLock.RUnlock()
+
+			// if the snapshot didn't change when the merger notified the persister,
+			// it means that there weren't any meaningful merging operation done.
+			// in which case, let the persister nap for remaining time and then
+			// let the persister do some meaningful work.
+			if lastRootEpoch == currRootEpoch {
+				remainingNapDuration := time.Until(expectedNapTime)
+				time.Sleep(remainingNapDuration)
+				atomic.AddUint64(&s.stats.TotPersisterNapPauseCompleted, 1)
+			} else {
+				atomic.AddUint64(&s.stats.TotPersisterMergerNapBreak, 1)
+			}
 			// unblock the merger in meantime
 			persistWatchers = append(persistWatchers, ew)
 			lastMergedEpoch = ew.epoch
 			persistWatchers = notifyMergeWatchers(lastPersistedEpoch, persistWatchers)
-			atomic.AddUint64(&s.stats.TotPersisterMergerNapBreak, 1)
 		}
 		return lastMergedEpoch, persistWatchers
 	}
