@@ -822,6 +822,10 @@ func (fs *fieldStats) Aggregate(stats segment.FieldStats) {
 
 // Returns the stats map
 func (fs *fieldStats) Fetch() map[string]map[string]uint64 {
+	if fs == nil {
+		return nil
+	}
+
 	return fs.statMap
 }
 

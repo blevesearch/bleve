@@ -21,6 +21,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/v2/size"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
@@ -67,22 +68,45 @@ func (s *SegmentSnapshot) LiveSize() int64 {
 }
 
 func (s *SegmentSnapshot) HasVector() bool {
-	if fieldVecs, ok := s.stats.Fetch()["num_vecs"]; ok {
-		return len(fieldVecs) > 0
-	}
-
-	return false
+	// number of vectors, for each vector field in the segment
+	numVecs := s.stats.Fetch()["num_vectors"]
+	return len(numVecs) > 0
 }
 
 func (s *SegmentSnapshot) fullVectorsBytes() uint64 {
-	vectorsIndexSize, ok := s.stats.Fetch()["vectors_index_size"]
+	// byte size of vector index, for each vector field in the segment
+	vectorIdxBytes, ok := s.stats.Fetch()["vector_index_bytes"]
 	if !ok {
 		return 0
 	}
 
 	var rv uint64
-	for _, size := range vectorsIndexSize {
+	for _, size := range vectorIdxBytes {
 		rv += size
+	}
+
+	return rv
+}
+
+// Returns ranges of docIDs containing vectors in the segment.
+func (s *SegmentSnapshot) vectorDocRanges() [][2]uint64 {
+	// min and max docIDs from vector index, for each vector field in the segment
+	minDocIDs := s.stats.Fetch()["vector_min_doc_id"]
+	maxDocIDs := s.stats.Fetch()["vector_max_doc_id"]
+
+	if len(maxDocIDs) == 0 || len(minDocIDs) != len(maxDocIDs) {
+		return nil
+	}
+
+	rv := make([][2]uint64, 0)
+
+	for field, minDocID := range minDocIDs {
+		maxDocID, ok := maxDocIDs[field]
+		if !ok {
+			continue
+		}
+
+		rv = append(rv, [2]uint64{minDocID, maxDocID})
 	}
 
 	return rv
@@ -100,6 +124,17 @@ func (s *SegmentSnapshot) LiveVectorsBytes() uint64 {
 		return fullSize
 	}
 
+	// deleted docs range
+	delDocsRange := [2]uint64{
+		uint64(s.deleted.Minimum()),
+		uint64(s.deleted.Maximum()),
+	}
+
+	// Compute the effective number of deleted docs, based on the overlap ratio
+	// between the docs containing vectors and the deleted docs.
+	overlapPct := uint64(util.OverlapRatio(s.vectorDocRanges(), delDocsRange) * 100)
+	deletedDocsCount = (deletedDocsCount / 100) * overlapPct
+
 	// # Live Vector Size Estimation
 	//
 	// Assuming equal distribution of vectors in each doc.
@@ -110,7 +145,7 @@ func (s *SegmentSnapshot) LiveVectorsBytes() uint64 {
 	// And, liveSize = fullSize - vectorSizeOfDeletedDocs
 	// Thus, liveSize = fullSize - ((fullSize / numDocsInSegment) * numDeletedDocs)
 	// liveSize = fullSize * (1 - (numDeletedDocs / numDocsInSegment))
-	return fullSize * (1 - deletedDocsCount/s.segment.Count())
+	return (fullSize / s.segment.Count()) * (s.segment.Count() - deletedDocsCount)
 }
 
 func (s *SegmentSnapshot) Close() error {
