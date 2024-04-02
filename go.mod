@@ -1,6 +1,6 @@
 module github.com/blevesearch/bleve/v2
 
-go 1.20
+go 1.21
 
 require (
 	github.com/RoaringBitmap/roaring v1.9.1
@@ -23,7 +23,7 @@ require (
 	github.com/blevesearch/zapx/v13 v13.3.10
 	github.com/blevesearch/zapx/v14 v14.3.10
 	github.com/blevesearch/zapx/v15 v15.3.13
-	github.com/blevesearch/zapx/v16 v16.0.13-0.20240326160805-2008e5aa2888
+	github.com/blevesearch/zapx/v16 v16.0.13-0.20240401155140-9e2514ff3120
 	github.com/couchbase/moss v0.2.0
 	github.com/golang/protobuf v1.3.2
 	github.com/spf13/cobra v1.7.0
