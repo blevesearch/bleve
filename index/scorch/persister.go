@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -567,6 +568,10 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			segPath := seg.Path()
 			_, err = copyToDirectory(segPath, d)
 			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					// segment file not found likely because of a race with merger activity, so skip it
+					continue
+				}
 				return nil, nil, fmt.Errorf("segment: %s copy err: %v", segPath, err)
 			}
 			filename := filepath.Base(segPath)
