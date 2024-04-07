@@ -181,7 +181,10 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		}
 
 		isEligible := segment.LiveSize() < o.MaxSegmentSize/2
-		if segment.HasVector() && o.MaxSegmentVectorsBytes > 0 {
+		// An eligible segment (based on #documents) may be too large
+		// and thus need a stricter check based on the size of the
+		// vector content.
+		if isEligible && segment.HasVector() && o.MaxSegmentVectorsBytes > 0 {
 			isEligible = segment.LiveVectorsBytes() < o.MaxSegmentVectorsBytes/2
 		}
 
