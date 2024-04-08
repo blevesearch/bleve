@@ -21,7 +21,6 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/v2/size"
-	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
@@ -88,30 +87,6 @@ func (s *SegmentSnapshot) fullVectorsBytes() uint64 {
 	return rv
 }
 
-// Returns ranges of docIDs containing vectors in the segment.
-func (s *SegmentSnapshot) vectorDocRanges() [][2]uint64 {
-	// min and max docIDs from vector index, for each vector field in the segment
-	minDocIDs := s.stats.Fetch()["vector_min_doc_id"]
-	maxDocIDs := s.stats.Fetch()["vector_max_doc_id"]
-
-	if len(maxDocIDs) == 0 || len(minDocIDs) != len(maxDocIDs) {
-		return nil
-	}
-
-	rv := make([][2]uint64, 0)
-
-	for field, minDocID := range minDocIDs {
-		maxDocID, ok := maxDocIDs[field]
-		if !ok {
-			continue
-		}
-
-		rv = append(rv, [2]uint64{minDocID, maxDocID})
-	}
-
-	return rv
-}
-
 func (s *SegmentSnapshot) LiveVectorsBytes() uint64 {
 	fullSize := s.fullVectorsBytes()
 
@@ -123,17 +98,6 @@ func (s *SegmentSnapshot) LiveVectorsBytes() uint64 {
 	if deletedDocsCount == 0 {
 		return fullSize
 	}
-
-	// deleted docs range
-	delDocsRange := [2]uint64{
-		uint64(s.deleted.Minimum()),
-		uint64(s.deleted.Maximum()),
-	}
-
-	// Compute the effective number of deleted docs, based on the overlap ratio
-	// between the docs containing vectors and the deleted docs.
-	overlapPct := uint64(util.OverlapRatio(s.vectorDocRanges(), delDocsRange) * 100)
-	deletedDocsCount = (deletedDocsCount / 100) * overlapPct
 
 	// # Live Vector Size Estimation
 	//
