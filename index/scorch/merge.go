@@ -282,11 +282,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 	go cw.listen()
 
-	if len(resultMergePlan.Tasks) == 0 {
-		atomic.AddUint64(&s.stats.TotFileMergePlanZeroTasks, 1)
-		return nil
-	}
-
 	for _, task := range resultMergePlan.Tasks {
 		if len(task.Segments) == 0 {
 			atomic.AddUint64(&s.stats.TotFileMergePlanTasksSegmentsEmpty, 1)
