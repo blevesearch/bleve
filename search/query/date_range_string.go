@@ -53,7 +53,7 @@ func NewDateRangeStringQuery(start, end string) *DateRangeStringQuery {
 	return NewDateRangeStringInclusiveQuery(start, end, nil, nil)
 }
 
-// NewDateRangeStringQuery creates a new Query for ranges
+// NewDateRangeStringInclusiveQuery creates a new Query for ranges
 // of date values.
 // Date strings are parsed using the DateTimeParser field of the query struct,
 // which is a custom date time parser defined in the index mapping.

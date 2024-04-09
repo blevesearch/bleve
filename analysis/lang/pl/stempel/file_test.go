@@ -41,7 +41,7 @@ func TestEmpty(t *testing.T) {
 	}
 }
 
-// TestStemp only tests that we can successfully stem everything in the
+// TestStem only tests that we can successfully stem everything in the
 // dictionary without crashing.  It does not attempt to assert correct output.
 func TestStem(t *testing.T) {
 	trie, err := Open("pl/stemmer_20000.tbl")
