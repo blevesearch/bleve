@@ -83,7 +83,7 @@ func NewDateRangeStringQuery(start, end string) *query.DateRangeStringQuery {
 	return query.NewDateRangeStringQuery(start, end)
 }
 
-// NewDateRangeStringQuery creates a new Query for ranges
+// NewDateRangeInclusiveStringQuery creates a new Query for ranges
 // of date values.
 // Date strings are parsed using the DateTimeParser set using
 //

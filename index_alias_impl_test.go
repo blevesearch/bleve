@@ -1130,7 +1130,7 @@ func TestIndexAliasMultipleLayer(t *testing.T) {
 	}
 }
 
-// TestMultiSearchNoError
+// TestMultiSearchCustomSort
 func TestMultiSearchCustomSort(t *testing.T) {
 	ei1 := &stubIndex{err: nil, searchResult: &SearchResult{
 		Status: &SearchStatus{
