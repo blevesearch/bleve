@@ -69,8 +69,9 @@ type Scorch struct {
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
 
-	onEvent      func(event Event)
-	onAsyncError func(err error, path string)
+	onEvent               func(event Event)
+	onAsyncError          func(err error, path string)
+	continueEventCallback func(event Event) bool
 
 	forceMergeRequestCh chan *mergerCtrl
 
@@ -148,6 +149,10 @@ func NewScorch(storeName string,
 	if ok {
 		rv.onAsyncError = RegistryAsyncErrorCallbacks[aecbName]
 	}
+	cecbName, ok := config["continueEventCallbackName"].(string)
+	if ok {
+		rv.continueEventCallback = RegistryContinueEventCallback[cecbName]
+	}
 
 	return rv, nil
 }
@@ -188,6 +193,14 @@ func (s *Scorch) fireAsyncError(err error) {
 		s.onAsyncError(err, s.path)
 	}
 	atomic.AddUint64(&s.stats.TotOnErrors, 1)
+}
+
+func (s *Scorch) continueEvent(kind EventKind) bool {
+	if s.continueEventCallback != nil {
+		return s.continueEventCallback(Event{Kind: kind, Scorch: s})
+	}
+	// always continue in case of no handler.
+	return true
 }
 
 func (s *Scorch) Open() error {
