@@ -35,6 +35,7 @@ type knnOperator string
 var BleveMaxK = int64(10000)
 
 type SearchRequest struct {
+	ClientContextID  string            `json:"client_context_id,omitempty"`
 	Query            query.Query       `json:"query"`
 	Size             int               `json:"size"`
 	From             int               `json:"from"`
