@@ -26,8 +26,8 @@ import (
 )
 
 type VectorBase64Field struct {
-	vectorField  *VectorField
-	encodedValue string
+	vectorField    *VectorField
+	base64Encoding string
 }
 
 func (n *VectorBase64Field) Size() int {
@@ -55,7 +55,7 @@ func (n *VectorBase64Field) AnalyzedLength() int {
 }
 
 func (n *VectorBase64Field) EncodedFieldType() byte {
-	return 'e' // CHECK
+	return 'e'
 }
 
 func (n *VectorBase64Field) AnalyzedTokenFrequencies() index.TokenFrequencies {
@@ -63,7 +63,6 @@ func (n *VectorBase64Field) AnalyzedTokenFrequencies() index.TokenFrequencies {
 }
 
 func (n *VectorBase64Field) Analyze() {
-	// CHECK
 }
 
 func (n *VectorBase64Field) Value() []byte {
@@ -77,10 +76,10 @@ func (n *VectorBase64Field) GoString() string {
 
 // For the sake of not polluting the API, we are keeping arrayPositions as a
 // parameter, but it is not used.
-func NewVectorBase64Field(name string, arrayPositions []uint64, encodedValue string,
+func NewVectorBase64Field(name string, arrayPositions []uint64, vectorBase64 string,
 	dims int, similarity, vectorIndexOptimizedFor string) (*VectorBase64Field, error) {
 
-	vector, err := DecodeVector(encodedValue)
+	vector, err := DecodeVector(vectorBase64)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +89,7 @@ func NewVectorBase64Field(name string, arrayPositions []uint64, encodedValue str
 			vector, dims, similarity,
 			vectorIndexOptimizedFor, DefaultVectorIndexingOptions),
 
-		encodedValue: encodedValue,
+		base64Encoding: vectorBase64,
 	}, nil
 }
 

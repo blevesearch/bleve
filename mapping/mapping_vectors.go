@@ -135,7 +135,6 @@ func processVector(vecI interface{}, dims int) ([]float32, bool) {
 }
 
 func processVectorBase64(vecBase64 interface{}) (interface{}, bool) {
-
 	vecEncoded, ok := vecBase64.(string)
 	if !ok {
 		return nil, false

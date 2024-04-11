@@ -399,7 +399,6 @@ func min(a, b int) int {
 }
 
 func TestVectorBase64Index(t *testing.T) {
-
 	dataset, searchRequests, err := readDatasetAndQueries(testInputCompressedFile)
 	if err != nil {
 		t.Fatal(err)
@@ -411,12 +410,19 @@ func TestVectorBase64Index(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = encodeVectors(documents)
-	if err != nil {
-		t.Fatal(err)
+	for _, doc := range documents {
+		vec, err := json.Marshal(doc["vector"])
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc["vectorEncoded"] = base64.StdEncoding.EncodeToString(vec)
 	}
 
-	modifySearchRequests(searchRequestsCopy)
+	for _, sr := range searchRequestsCopy {
+		for _, kr := range sr.KNN {
+			kr.Field = "vectorEncoded"
+		}
+	}
 
 	contentFM := NewTextFieldMapping()
 	contentFM.Analyzer = en.AnalyzerName
@@ -589,28 +595,6 @@ func readDatasetAndQueries(fileName string) ([]testDocument, []*SearchRequest, e
 		}
 	}
 	return dataset, queries, nil
-}
-
-func encodeVectors(docs []map[string]interface{}) error {
-
-	for _, doc := range docs {
-		vec, err := json.Marshal(doc["vector"])
-		if err != nil {
-			return err
-		}
-		doc["vectorEncoded"] = base64.StdEncoding.EncodeToString(vec)
-	}
-
-	return nil
-}
-
-func modifySearchRequests(srs []*SearchRequest) {
-
-	for _, sr := range srs {
-		for _, kr := range sr.KNN {
-			kr.Field = "vectorEncoded"
-		}
-	}
 }
 
 func makeDatasetIntoDocuments(dataset []testDocument) []map[string]interface{} {

@@ -67,10 +67,11 @@ type SearchRequest struct {
 	sortFunc func(sort.Interface)
 }
 
+// Vector takes precedence over vectorBase64 in case both fields are given
 type KNNRequest struct {
 	Field        string       `json:"field"`
 	Vector       []float32    `json:"vector"`
-	VectorBase64 string       `json:"vectorbase64"`
+	VectorBase64 string       `json:"vector_base64"`
 	K            int64        `json:"k"`
 	Boost        *query.Boost `json:"boost,omitempty"`
 }
