@@ -175,7 +175,6 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 
 func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interface{},
 	pathString string, path []string, indexes []uint64, context *walkContext) {
-
 	propertyMightBeVector, ok := processVectorBase64(propertyMightBeVectorBase64)
 	if !ok {
 		return
