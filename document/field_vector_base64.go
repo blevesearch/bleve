@@ -19,8 +19,9 @@ package document
 
 import (
 	"encoding/base64"
-	"encoding/json"
+	"encoding/binary"
 	"fmt"
+	"math"
 
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -100,11 +101,12 @@ func DecodeVector(encodedValue string) ([]float32, error) {
 		return nil, err
 	}
 
-	var decodedVector []float32
-	err = json.Unmarshal(decodedString, &decodedVector)
-	if err != nil {
-		fmt.Println("Error decoding string:", err)
-		return nil, err
+	dims := int(len(decodedString) / 4)
+	decodedVector := make([]float32, dims)
+
+	for i := 0; i < dims; i++ {
+		bytes := decodedString[i*4 : (i+1)*4]
+		decodedVector[i] = math.Float32frombits(binary.LittleEndian.Uint32(bytes))
 	}
 
 	return decodedVector, nil
