@@ -94,16 +94,26 @@ func NewVectorBase64Field(name string, arrayPositions []uint64, vectorBase64 str
 	}, nil
 }
 
+// This function takes a base64 encoded string and decodes it into
+// a vector.
 func DecodeVector(encodedValue string) ([]float32, error) {
+
+	// We first decode the encoded string into a byte array.
 	decodedString, err := base64.StdEncoding.DecodeString(encodedValue)
 	if err != nil {
-		fmt.Println("Error decoding string:", err)
 		return nil, err
 	}
 
+	// The array is expected to be divisible by 4 because each float32
+	// should occupy 4 bytes
+	if len(decodedString)%4 != 0 {
+		return nil, fmt.Errorf("Decoded byte array not divisible by 4")
+	}
 	dims := int(len(decodedString) / 4)
 	decodedVector := make([]float32, dims)
 
+	// We iterate through the array 4 bytes at a time and convert each of
+	// them to a float32 value by reading them in a little endian notation
 	for i := 0; i < dims; i++ {
 		bytes := decodedString[i*4 : (i+1)*4]
 		decodedVector[i] = math.Float32frombits(binary.LittleEndian.Uint32(bytes))

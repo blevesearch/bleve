@@ -18,8 +18,6 @@
 package mapping
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -134,26 +132,6 @@ func processVector(vecI interface{}, dims int) ([]float32, bool) {
 	return rv, true
 }
 
-func processVectorBase64(vecBase64 interface{}) (interface{}, bool) {
-	vecEncoded, ok := vecBase64.(string)
-	if !ok {
-		return nil, false
-	}
-
-	vecData, err := base64.StdEncoding.DecodeString(vecEncoded)
-	if err != nil {
-		return nil, false
-	}
-
-	var vector interface{}
-	err = json.Unmarshal(vecData, &vector)
-	if err != nil {
-		return nil, false
-	}
-
-	return vector, true
-}
-
 func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	pathString string, path []string, indexes []uint64, context *walkContext) bool {
 	vector, ok := processVector(propertyMightBeVector, fm.Dims)
@@ -175,8 +153,14 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 
 func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interface{},
 	pathString string, path []string, indexes []uint64, context *walkContext) {
-	propertyMightBeVector, ok := processVectorBase64(propertyMightBeVectorBase64)
+
+	encodedString, ok := propertyMightBeVectorBase64.(string)
 	if !ok {
+		return
+	}
+
+	propertyMightBeVector, err := document.DecodeVector(encodedString)
+	if err != nil {
 		return
 	}
 
