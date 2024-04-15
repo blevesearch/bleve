@@ -31,15 +31,15 @@ type segment struct {
 	MyFullSize int64
 	MyLiveSize int64
 
-	MyHasVector        bool
-	MyLiveVectorsBytes uint64
+	MyHasVector bool
+	MyFileSize  int64
 }
 
-func (s *segment) Id() uint64               { return s.MyId }
-func (s *segment) FullSize() int64          { return s.MyFullSize }
-func (s *segment) LiveSize() int64          { return s.MyLiveSize }
-func (s *segment) HasVector() bool          { return s.MyHasVector }
-func (s *segment) LiveVectorsBytes() uint64 { return s.MyLiveVectorsBytes }
+func (s *segment) Id() uint64      { return s.MyId }
+func (s *segment) FullSize() int64 { return s.MyFullSize }
+func (s *segment) LiveSize() int64 { return s.MyLiveSize }
+func (s *segment) HasVector() bool { return s.MyHasVector }
+func (s *segment) FileSize() int64 { return s.MyFileSize }
 
 func makeLinearSegments(n int) (rv []Segment) {
 	for i := 0; i < n; i++ {
@@ -612,60 +612,60 @@ func TestPlanMaxSegmentVectorsBytes(t *testing.T) {
 					MyFullSize: 4000,
 					MyLiveSize: 3900,
 
-					MyHasVector:        true,
-					MyLiveVectorsBytes: 3900 * 1000 * 4, // > 2MB
+					MyHasVector: true,
+					MyFileSize:  3900 * 1000 * 4, // > 2MB
 				},
 				&segment{ // ineligible
 					MyId:       2,
 					MyFullSize: 6000,
 					MyLiveSize: 5500, // > 5000
 
-					MyHasVector:        true,
-					MyLiveVectorsBytes: 5500 * 1000 * 4, // > 2MB
+					MyHasVector: true,
+					MyFileSize:  5500 * 1000 * 4, // > 2MB
 				},
 				&segment{ // eligible
 					MyId:       3,
 					MyFullSize: 500,
 					MyLiveSize: 490,
 
-					MyHasVector:        true,
-					MyLiveVectorsBytes: 490 * 1000 * 4,
+					MyHasVector: true,
+					MyFileSize:  490 * 1000 * 4,
 				},
 				&segment{ // eligible
 					MyId:       4,
 					MyFullSize: 500,
 					MyLiveSize: 480,
 
-					MyHasVector:        true,
-					MyLiveVectorsBytes: 480 * 1000 * 4,
+					MyHasVector: true,
+					MyFileSize:  480 * 1000 * 4,
 				},
 				&segment{ // eligible
 					MyId:       5,
 					MyFullSize: 500,
 					MyLiveSize: 300,
 
-					MyHasVector:        true,
-					MyLiveVectorsBytes: 300 * 1000 * 4,
+					MyHasVector: true,
+					MyFileSize:  300 * 1000 * 4,
 				},
 				&segment{ // eligible
 					MyId:       6,
 					MyFullSize: 500,
 					MyLiveSize: 400,
 
-					MyHasVector:        true,
-					MyLiveVectorsBytes: 400 * 1000 * 4,
+					MyHasVector: true,
+					MyFileSize:  400 * 1000 * 4,
 				},
 			},
 			&MergePlanOptions{
-				MaxSegmentSize: 5000,
+				MaxSegmentSize: 5000, // number of documents
 				// considering vector dimension as 1000
-				// vectorBytes = 5000 * 1000 * 4 = 20MB
-				// We want to set the limit to 4MB
-				MaxSegmentVectorsBytes: 4000000, // 4MB
-				MaxSegmentsPerTier:     1,
-				SegmentsPerMergeTask:   2,
-				TierGrowth:             2.0,
-				FloorSegmentSize:       1,
+				// vectorBytes = 5000 * 1000 * 4 = 20MB, which is too large
+				// So, let's set the fileSize limit to 4MB
+				MaxSegmentFileSize:   4000000, // 4MB
+				MaxSegmentsPerTier:   1,
+				SegmentsPerMergeTask: 2,
+				TierGrowth:           2.0,
+				FloorSegmentSize:     1,
 			},
 			[][]uint64{
 				{3, 4},

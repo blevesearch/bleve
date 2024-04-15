@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"bytes"
+	"os"
 	"sync"
 	"sync/atomic"
 
@@ -72,44 +73,23 @@ func (s *SegmentSnapshot) HasVector() bool {
 	return len(numVecs) > 0
 }
 
-func (s *SegmentSnapshot) fullVectorsBytes() uint64 {
-	// byte size of vector index, for each vector field in the segment
-	vectorIdxBytes, ok := s.stats.Fetch()["vector_index_bytes"]
+func (s *SegmentSnapshot) FileSize() int64 {
+	ps, ok := s.segment.(segment.PersistedSegment)
 	if !ok {
 		return 0
 	}
 
-	var rv uint64
-	for _, size := range vectorIdxBytes {
-		rv += size
+	path := ps.Path()
+	if path == "" {
+		return 0
 	}
 
-	return rv
-}
-
-func (s *SegmentSnapshot) LiveVectorsBytes() uint64 {
-	fullSize := s.fullVectorsBytes()
-
-	var deletedDocsCount uint64
-	if s.deleted != nil {
-		deletedDocsCount = s.deleted.GetCardinality()
+	fi, err := os.Stat(path)
+	if err != nil {
+		return 0
 	}
 
-	if deletedDocsCount == 0 {
-		return fullSize
-	}
-
-	// # Live Vector Size Estimation
-	//
-	// Assuming equal distribution of vectors in each doc.
-	// vectorSizeOfEachDoc = fullSize / numDocsInSegment
-	//
-	// Thus, vectorSizeOfDeletedDocs = vectorSizeOfEachDoc * numDeletedDocs
-	//
-	// And, liveSize = fullSize - vectorSizeOfDeletedDocs
-	// Thus, liveSize = fullSize - ((fullSize / numDocsInSegment) * numDeletedDocs)
-	// liveSize = fullSize * (1 - (numDeletedDocs / numDocsInSegment))
-	return (fullSize / s.segment.Count()) * (s.segment.Count() - deletedDocsCount)
+	return fi.Size()
 }
 
 func (s *SegmentSnapshot) Close() error {

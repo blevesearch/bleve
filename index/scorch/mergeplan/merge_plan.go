@@ -40,7 +40,8 @@ type Segment interface {
 
 	HasVector() bool
 
-	LiveVectorsBytes() uint64
+	// Size of the persisted segment file.
+	FileSize() int64
 }
 
 // Plan() will functionally compute a merge plan.  A segment will be
@@ -80,10 +81,10 @@ type MergePlanOptions struct {
 	// planner’s predicted sizes.
 	MaxSegmentSize int64
 
-	// Max size of segment having vector content produced after merging.
-	// Will be respected based on estimated size of vector content, thus
-	// is a best effort soft limit.
-	MaxSegmentVectorsBytes uint64
+	// Max size (in bytes) of the persisted segment file that contains the
+	// vectors.  This is used to prevent merging of segments that
+	// contain vectors that are too large.
+	MaxSegmentFileSize int64
 
 	// The growth factor for each tier in a staircase of idealized
 	// segments computed by CalcBudget().
@@ -135,13 +136,13 @@ var ErrMaxSegmentSizeTooLarge = errors.New("MaxSegmentSize exceeds the size limi
 
 // DefaultMergePlanOptions suggests the default options.
 var DefaultMergePlanOptions = MergePlanOptions{
-	MaxSegmentsPerTier:     10,
-	MaxSegmentSize:         5000000,
-	MaxSegmentVectorsBytes: 4000000000, // 4GB
-	TierGrowth:             10.0,
-	SegmentsPerMergeTask:   10,
-	FloorSegmentSize:       2000,
-	ReclaimDeletesWeight:   2.0,
+	MaxSegmentsPerTier:   10,
+	MaxSegmentSize:       5000000,
+	MaxSegmentFileSize:   4000000000, // 4GB
+	TierGrowth:           10.0,
+	SegmentsPerMergeTask: 10,
+	FloorSegmentSize:     2000,
+	ReclaimDeletesWeight: 2.0,
 }
 
 // SingleSegmentMergePlanOptions helps in creating a
@@ -182,10 +183,11 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 
 		isEligible := segment.LiveSize() < o.MaxSegmentSize/2
 		// An eligible segment (based on #documents) may be too large
-		// and thus need a stricter check based on the size of the
-		// vector content.
-		if isEligible && segment.HasVector() && o.MaxSegmentVectorsBytes > 0 {
-			isEligible = segment.LiveVectorsBytes() < o.MaxSegmentVectorsBytes/2
+		// and thus need a stricter check based on the file size.
+		// This is particularly important for segments that contain
+		// vectors.
+		if isEligible && segment.HasVector() && o.MaxSegmentFileSize > 0 {
+			isEligible = segment.FileSize() < o.MaxSegmentFileSize/2
 		}
 
 		// Only small-enough segments are eligible.
@@ -233,11 +235,18 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		for startIdx := 0; startIdx < len(eligibles); startIdx++ {
 			var roster []Segment
 			var rosterLiveSize int64
+			var rosterFileSize int64
 
 			for idx := startIdx; idx < len(eligibles) && len(roster) < o.SegmentsPerMergeTask; idx++ {
 				eligible := eligibles[idx]
 
 				if rosterLiveSize+eligible.LiveSize() < o.MaxSegmentSize {
+					if eligible.HasVector() &&
+						rosterFileSize+eligible.FileSize() > o.MaxSegmentFileSize {
+						// This segment is too large to merged.
+						continue
+					}
+
 					roster = append(roster, eligible)
 					rosterLiveSize += eligible.LiveSize()
 				}
