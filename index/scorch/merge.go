@@ -72,7 +72,7 @@ OUTER:
 				ctrlMsg = ctrlMsgDflt
 			}
 			if ctrlMsg != nil {
-				continueMerge := s.continueEvent(EventKindPreMergeMemoryCheck)
+				continueMerge := s.continueEvent(EventKindPreMergeCheck)
 				if !continueMerge {
 					// If it's decided that this merge can't take place now,
 					// begin the merge process all over again.

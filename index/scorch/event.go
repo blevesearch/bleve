@@ -67,6 +67,6 @@ var EventKindMergeTaskIntroductionStart = EventKind(7)
 // the introduction of merged segment from a single merge task.
 var EventKindMergeTaskIntroduction = EventKind(8)
 
-// Fired before the merge begins to check if there's sufficient memory to
-// proceed with the merge.
-var EventKindPreMergeMemoryCheck = EventKind(9)
+// EventKindPreMergeCheck is fired before the merge begins to check if
+// the caller should proceed with the merge.
+var EventKindPreMergeCheck = EventKind(9)
