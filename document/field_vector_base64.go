@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -106,16 +107,16 @@ func DecodeVector(encodedValue string) ([]float32, error) {
 
 	// The array is expected to be divisible by 4 because each float32
 	// should occupy 4 bytes
-	if len(decodedString)%4 != 0 {
-		return nil, fmt.Errorf("Decoded byte array not divisible by 4")
+	if len(decodedString)%size.SizeOfFloat32 != 0 {
+		return nil, fmt.Errorf("Decoded byte array not divisible by %d", size.SizeOfFloat32)
 	}
-	dims := int(len(decodedString) / 4)
+	dims := int(len(decodedString) / size.SizeOfFloat32)
 	decodedVector := make([]float32, dims)
 
 	// We iterate through the array 4 bytes at a time and convert each of
 	// them to a float32 value by reading them in a little endian notation
 	for i := 0; i < dims; i++ {
-		bytes := decodedString[i*4 : (i+1)*4]
+		bytes := decodedString[i*size.SizeOfFloat32 : (i+1)*size.SizeOfFloat32]
 		decodedVector[i] = math.Float32frombits(binary.LittleEndian.Uint32(bytes))
 	}
 
