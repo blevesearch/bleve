@@ -22,11 +22,7 @@ var RegistryAsyncErrorCallbacks = map[string]func(error, string){}
 
 // RegistryEventCallbacks should be treated as read-only after
 // process init()'ialization.
-var RegistryEventCallbacks = map[string]func(Event){}
-
-// RegistryContinueEventCallback should be treated as read-only after
-// process init()'ialization.
-var RegistryContinueEventCallback = map[string]func(Event) bool{}
+var RegistryEventCallbacks = map[string]func(Event) bool{}
 
 // Event represents the information provided in an OnEvent() callback.
 type Event struct {

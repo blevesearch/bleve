@@ -69,9 +69,8 @@ type Scorch struct {
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
 
-	onEvent               func(event Event)
-	onAsyncError          func(err error, path string)
-	continueEventCallback func(event Event) bool
+	onEvent      func(event Event) bool
+	onAsyncError func(err error, path string)
 
 	forceMergeRequestCh chan *mergerCtrl
 
@@ -149,10 +148,6 @@ func NewScorch(storeName string,
 	if ok {
 		rv.onAsyncError = RegistryAsyncErrorCallbacks[aecbName]
 	}
-	cecbName, ok := config["continueEventCallbackName"].(string)
-	if ok {
-		rv.continueEventCallback = RegistryContinueEventCallback[cecbName]
-	}
 
 	return rv, nil
 }
@@ -180,12 +175,14 @@ func (s *Scorch) NumEventsBlocking() uint64 {
 	return eventsStarted - eventsCompleted
 }
 
-func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) {
+func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) bool {
+	var res bool
 	if s.onEvent != nil {
 		atomic.AddUint64(&s.stats.TotEventTriggerStarted, 1)
-		s.onEvent(Event{Kind: kind, Scorch: s, Duration: dur})
+		res = s.onEvent(Event{Kind: kind, Scorch: s, Duration: dur})
 		atomic.AddUint64(&s.stats.TotEventTriggerCompleted, 1)
 	}
+	return res
 }
 
 func (s *Scorch) fireAsyncError(err error) {
@@ -193,14 +190,6 @@ func (s *Scorch) fireAsyncError(err error) {
 		s.onAsyncError(err, s.path)
 	}
 	atomic.AddUint64(&s.stats.TotOnErrors, 1)
-}
-
-func (s *Scorch) continueEvent(kind EventKind) bool {
-	if s.continueEventCallback != nil {
-		return s.continueEventCallback(Event{Kind: kind, Scorch: s})
-	}
-	// always continue in case of no handler.
-	return true
 }
 
 func (s *Scorch) Open() error {
