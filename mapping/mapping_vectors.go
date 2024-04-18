@@ -43,6 +43,17 @@ func NewVectorFieldMapping() *FieldMapping {
 	}
 }
 
+func NewVectorBase64FieldMapping() *FieldMapping {
+	return &FieldMapping{
+		Type:         "vector_base64",
+		Store:        false,
+		Index:        true,
+		IncludeInAll: false,
+		DocValues:    false,
+		SkipFreqNorm: true,
+	}
+}
+
 // validate and process a flat vector
 func processFlatVector(vecV reflect.Value, dims int) ([]float32, bool) {
 	if vecV.Len() != dims {
@@ -140,13 +151,28 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	return true
 }
 
+func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interface{},
+	pathString string, path []string, indexes []uint64, context *walkContext) {
+	encodedString, ok := propertyMightBeVectorBase64.(string)
+	if !ok {
+		return
+	}
+
+	propertyMightBeVector, err := document.DecodeVector(encodedString)
+	if err != nil {
+		return
+	}
+
+	fm.processVector(propertyMightBeVector, pathString, path, indexes, context)
+}
+
 // -----------------------------------------------------------------------------
 // document validation functions
 
 func validateFieldMapping(field *FieldMapping, parentName string,
 	fieldAliasCtx map[string]*FieldMapping) error {
 	switch field.Type {
-	case "vector":
+	case "vector", "vector_base64":
 		return validateVectorFieldAlias(field, parentName, fieldAliasCtx)
 	default: // non-vector field
 		return validateFieldType(field)

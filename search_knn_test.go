@@ -19,6 +19,7 @@ package bleve
 
 import (
 	"archive/zip"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -395,6 +396,168 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func TestVectorBase64Index(t *testing.T) {
+	dataset, searchRequests, err := readDatasetAndQueries(testInputCompressedFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	documents := makeDatasetIntoDocuments(dataset)
+
+	_, searchRequestsCopy, err := readDatasetAndQueries(testInputCompressedFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, doc := range documents {
+		vec, err := json.Marshal(doc["vector"])
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc["vectorEncoded"] = base64.StdEncoding.EncodeToString(vec)
+	}
+
+	for _, sr := range searchRequestsCopy {
+		for _, kr := range sr.KNN {
+			kr.Field = "vectorEncoded"
+		}
+	}
+
+	contentFM := NewTextFieldMapping()
+	contentFM.Analyzer = en.AnalyzerName
+
+	vecFML2 := mapping.NewVectorFieldMapping()
+	vecFML2.Dims = testDatasetDims
+	vecFML2.Similarity = index.EuclideanDistance
+
+	vecBFML2 := mapping.NewVectorBase64FieldMapping()
+	vecBFML2.Dims = testDatasetDims
+	vecBFML2.Similarity = index.EuclideanDistance
+
+	vecFMDot := mapping.NewVectorFieldMapping()
+	vecFMDot.Dims = testDatasetDims
+	vecFMDot.Similarity = index.CosineSimilarity
+
+	vecBFMDot := mapping.NewVectorBase64FieldMapping()
+	vecBFMDot.Dims = testDatasetDims
+	vecBFMDot.Similarity = index.CosineSimilarity
+
+	indexMappingL2 := NewIndexMapping()
+	indexMappingL2.DefaultMapping.AddFieldMappingsAt("content", contentFM)
+	indexMappingL2.DefaultMapping.AddFieldMappingsAt("vector", vecFML2)
+	indexMappingL2.DefaultMapping.AddFieldMappingsAt("vectorEncoded", vecBFML2)
+
+	indexMappingDot := NewIndexMapping()
+	indexMappingDot.DefaultMapping.AddFieldMappingsAt("content", contentFM)
+	indexMappingDot.DefaultMapping.AddFieldMappingsAt("vector", vecFMDot)
+	indexMappingDot.DefaultMapping.AddFieldMappingsAt("vectorEncoded", vecBFMDot)
+
+	tmpIndexPathL2 := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPathL2)
+
+	tmpIndexPathDot := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPathDot)
+
+	indexL2, err := New(tmpIndexPathL2, indexMappingL2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := indexL2.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	indexDot, err := New(tmpIndexPathDot, indexMappingDot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := indexDot.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batchL2 := indexL2.NewBatch()
+	batchDot := indexDot.NewBatch()
+
+	for _, doc := range documents {
+		err = batchL2.Index(doc["id"].(string), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = batchDot.Index(doc["id"].(string), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = indexL2.Batch(batchL2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = indexDot.Batch(batchDot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, _ := range searchRequests {
+		for _, operator := range knnOperators {
+			controlQuery := searchRequests[i]
+			testQuery := searchRequestsCopy[i]
+
+			controlQuery.AddKNNOperator(operator)
+			testQuery.AddKNNOperator(operator)
+
+			controlResultL2, err := indexL2.Search(controlQuery)
+			if err != nil {
+				t.Fatal(err)
+			}
+			testResultL2, err := indexL2.Search(testQuery)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if controlResultL2 != nil && testResultL2 != nil {
+				if len(controlResultL2.Hits) == len(testResultL2.Hits) {
+					for j, _ := range controlResultL2.Hits {
+						if controlResultL2.Hits[j].ID != testResultL2.Hits[j].ID {
+							t.Fatalf("testcase %d failed: expected hit id %s, got hit id %s", i, controlResultL2.Hits[j].ID, testResultL2.Hits[j].ID)
+						}
+					}
+				}
+			} else if (controlResultL2 == nil && testResultL2 != nil) ||
+				(controlResultL2 != nil && testResultL2 == nil) {
+				t.Fatalf("testcase %d failed: expected result %s, got result %s", i, controlResultL2, testResultL2)
+			}
+
+			controlResultDot, err := indexDot.Search(controlQuery)
+			if err != nil {
+				t.Fatal(err)
+			}
+			testResultDot, err := indexDot.Search(testQuery)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if controlResultDot != nil && testResultDot != nil {
+				if len(controlResultDot.Hits) == len(testResultDot.Hits) {
+					for j, _ := range controlResultDot.Hits {
+						if controlResultDot.Hits[j].ID != testResultDot.Hits[j].ID {
+							t.Fatalf("testcase %d failed: expected hit id %s, got hit id %s", i, controlResultDot.Hits[j].ID, testResultDot.Hits[j].ID)
+						}
+					}
+				}
+			} else if (controlResultDot == nil && testResultDot != nil) ||
+				(controlResultDot != nil && testResultDot == nil) {
+				t.Fatalf("testcase %d failed: expected result %s, got result %s", i, controlResultDot, testResultDot)
+			}
+		}
+	}
 }
 
 type testDocument struct {
