@@ -73,6 +73,7 @@ OUTER:
 			}
 			if ctrlMsg != nil {
 				continueMerge := s.fireEvent(EventKindPreMergeCheck, 0)
+				// The default, if there's no handler, is to continue the merge.
 				if !continueMerge {
 					// If it's decided that this merge can't take place now,
 					// begin the merge process all over again.

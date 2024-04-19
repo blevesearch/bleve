@@ -176,7 +176,7 @@ func (s *Scorch) NumEventsBlocking() uint64 {
 }
 
 func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) bool {
-	var res bool
+	res := true
 	if s.onEvent != nil {
 		atomic.AddUint64(&s.stats.TotEventTriggerStarted, 1)
 		res = s.onEvent(Event{Kind: kind, Scorch: s, Duration: dur})
