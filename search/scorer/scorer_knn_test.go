@@ -89,7 +89,7 @@ func TestKNNScorerExplanation(t *testing.T) {
 					Children: []*search.Explanation{
 						{
 							Value:   maxKNNScore,
-							Message: "vector(field(desc:one) with similarity_metric(l2_norm)=1.797693e+308",
+							Message: "vector(field(desc:one) with similarity_metric(l2_norm)=3.402823e+38",
 						},
 					},
 				},
