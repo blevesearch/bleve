@@ -30,6 +30,8 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
+const BleveFeatureVectorSearch = true
+
 type knnOperator string
 
 // Must be updated only at init
