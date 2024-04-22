@@ -28,6 +28,8 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
+const supportForVectorSearch = false
+
 // A SearchRequest describes all the parameters
 // needed to search the index.
 // Query is required.
