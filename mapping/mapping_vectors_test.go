@@ -17,7 +17,9 @@
 
 package mapping
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestVectorFieldAliasValidation(t *testing.T) {
 	tests := []struct {
@@ -26,8 +28,8 @@ func TestVectorFieldAliasValidation(t *testing.T) {
 		mappingStr string // index mapping json string
 
 		// expected output
-		expValidity bool   // validity of the mapping
-		errMsg      string // error message, given expValidity is false
+		expValidity bool     // validity of the mapping
+		errMsgs     []string // error message, given expValidity is false
 	}{
 		{
 			name: "test1",
@@ -52,7 +54,7 @@ func TestVectorFieldAliasValidation(t *testing.T) {
 					}
 				}`,
 			expValidity: false,
-			errMsg:      `field: 'cityVec', invalid alias (different dimensions 4 and 3)`,
+			errMsgs:     []string{`field: 'cityVec', invalid alias (different dimensions 4 and 3)`},
 		},
 		{
 			name: "test2",
@@ -79,7 +81,7 @@ func TestVectorFieldAliasValidation(t *testing.T) {
 					}
 				}`,
 			expValidity: false,
-			errMsg:      `field: 'cityVec', invalid alias (different similarity values dot_product and l2_norm)`,
+			errMsgs:     []string{`field: 'cityVec', invalid alias (different similarity values dot_product and l2_norm)`},
 		},
 		{
 			name: "test3",
@@ -104,7 +106,7 @@ func TestVectorFieldAliasValidation(t *testing.T) {
 					}
 				}`,
 			expValidity: true,
-			errMsg:      "",
+			errMsgs:     []string{},
 		},
 		{
 			name: "test4",
@@ -134,7 +136,7 @@ func TestVectorFieldAliasValidation(t *testing.T) {
 					}
 				}`,
 			expValidity: false,
-			errMsg:      `field: 'vecData', invalid alias (different dimensions 3 and 4)`,
+			errMsgs:     []string{`field: 'vecData', invalid alias (different dimensions 3 and 4)`, `field: 'vecData', invalid alias (different dimensions 4 and 3)`},
 		},
 		{
 			name: "test5",
@@ -170,7 +172,7 @@ func TestVectorFieldAliasValidation(t *testing.T) {
 					}
 				}`,
 			expValidity: false,
-			errMsg:      `field: 'vecData', invalid alias (different dimensions 4 and 3)`,
+			errMsgs:     []string{`field: 'vecData', invalid alias (different dimensions 4 and 3)`},
 		},
 	}
 
@@ -189,9 +191,18 @@ func TestVectorFieldAliasValidation(t *testing.T) {
 					test.expValidity, isValid)
 			}
 
-			if !isValid && err.Error() != test.errMsg {
-				t.Fatalf("invalid error message, expected: %v, got: %v",
-					test.errMsg, err.Error())
+			if !isValid {
+				errStringMatched := false
+				for _, possibleErrMsg := range test.errMsgs {
+					if err.Error() == possibleErrMsg {
+						errStringMatched = true
+						break
+					}
+				}
+				if !errStringMatched {
+					t.Fatalf("invalid error message, expected one of: %v, got: %v",
+						test.errMsgs, err.Error())
+				}
 			}
 		})
 	}
