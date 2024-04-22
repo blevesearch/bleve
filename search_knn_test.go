@@ -19,7 +19,9 @@ package bleve
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -411,11 +413,20 @@ func TestVectorBase64Index(t *testing.T) {
 	}
 
 	for _, doc := range documents {
-		vec, err := json.Marshal(doc["vector"])
-		if err != nil {
-			t.Fatal(err)
+		vec, ok := doc["vector"].([]float32)
+		if !ok {
+			t.Fatal("Typecasting vector to float array failed")
 		}
-		doc["vectorEncoded"] = base64.StdEncoding.EncodeToString(vec)
+
+		buf := new(bytes.Buffer)
+		for _, v := range vec {
+			err := binary.Write(buf, binary.LittleEndian, v)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		doc["vectorEncoded"] = base64.StdEncoding.EncodeToString(buf.Bytes())
 	}
 
 	for _, sr := range searchRequestsCopy {
@@ -563,7 +574,7 @@ func TestVectorBase64Index(t *testing.T) {
 type testDocument struct {
 	ID      string    `json:"id"`
 	Content string    `json:"content"`
-	Vector  []float64 `json:"vector"`
+	Vector  []float32 `json:"vector"`
 }
 
 func readDatasetAndQueries(fileName string) ([]testDocument, []*SearchRequest, error) {
