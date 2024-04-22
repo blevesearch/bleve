@@ -22,6 +22,7 @@ var RegistryAsyncErrorCallbacks = map[string]func(error, string){}
 
 // RegistryEventCallbacks should be treated as read-only after
 // process init()'ialization.
+// In the event of not having a callback, these return true.
 var RegistryEventCallbacks = map[string]func(Event) bool{}
 
 // Event represents the information provided in an OnEvent() callback.
