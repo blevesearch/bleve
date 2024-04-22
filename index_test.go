@@ -403,7 +403,7 @@ func TestBytesRead(t *testing.T) {
 	prevBytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
 
 	expectedBytesRead := uint64(21639)
-	if BleveFeatureVectorSearch {
+	if supportForVectorSearch {
 		expectedBytesRead = 22049
 	}
 
@@ -561,7 +561,7 @@ func TestBytesReadStored(t *testing.T) {
 	bytesRead, _ := stats["num_bytes_read_at_query_time"].(uint64)
 
 	expectedBytesRead := uint64(11501)
-	if BleveFeatureVectorSearch {
+	if supportForVectorSearch {
 		expectedBytesRead = 11911
 	}
 
@@ -638,7 +638,7 @@ func TestBytesReadStored(t *testing.T) {
 	bytesRead, _ = stats["num_bytes_read_at_query_time"].(uint64)
 
 	expectedBytesRead = uint64(3687)
-	if BleveFeatureVectorSearch {
+	if supportForVectorSearch {
 		expectedBytesRead = 4097
 	}
 
