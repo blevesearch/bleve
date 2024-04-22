@@ -135,7 +135,7 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 	for testCaseNum, testCase := range testCases {
 		originalRequest := searchRequests[testCase.queryIndex]
 		for _, operator := range knnOperators {
-			// ------------------------------------------------------------------------------------------------------------------
+
 			index.indexes = make([]Index, 0)
 			query := copySearchRequest(originalRequest, nil)
 			query.AddKNNOperator(operator)
@@ -153,7 +153,7 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 				t.Fatalf("test case #%d failed: expected control result hits to have valid `Index`", testCaseNum)
 			}
 			cleanUp(t, nameToIndex)
-			// ------------------------------------------------------------------------------------------------------------------
+
 			index.indexes = make([]Index, 0)
 			query = copySearchRequest(originalRequest, nil)
 			query.AddKNNOperator(operator)
@@ -172,7 +172,7 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 			}
 			verifyResult(t, controlResult, experimentalResult, testCaseNum, true)
 			cleanUp(t, nameToIndex)
-			// ------------------------------------------------------------------------------------------------------------------
+
 			index.indexes = make([]Index, 0)
 			query = copySearchRequest(originalRequest, nil)
 			query.AddKNNOperator(operator)
@@ -191,7 +191,7 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 			}
 			verifyResult(t, multiLevelIndexResult, experimentalResult, testCaseNum, false)
 			cleanUp(t, nameToIndex)
-			// ------------------------------------------------------------------------------------------------------------------
+
 		}
 	}
 
