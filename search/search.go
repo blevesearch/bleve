@@ -147,7 +147,7 @@ type DocumentMatch struct {
 	Index           string                `json:"index,omitempty"`
 	ID              string                `json:"id"`
 	IndexInternalID index.IndexInternalID `json:"-"`
-	Score           float64               `json:"score,omitempty"`
+	Score           float64               `json:"score"`
 	Expl            *Explanation          `json:"explanation,omitempty"`
 	Locations       FieldTermLocationMap  `json:"locations,omitempty"`
 	Fragments       FieldFragmentMap      `json:"fragments,omitempty"`
