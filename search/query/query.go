@@ -65,7 +65,7 @@ type ValidatableQuery interface {
 	Validate() error
 }
 
-// ParseQuery deserializes a JSON representation of
+// ParsePreSearchData deserializes a JSON representation of
 // a PreSearchData object.
 func ParsePreSearchData(input []byte) (map[string]interface{}, error) {
 	var rv map[string]interface{}

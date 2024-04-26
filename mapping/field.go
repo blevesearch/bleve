@@ -102,7 +102,7 @@ func newTextFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	return rv
 }
 
-// NewKeyworFieldMapping returns a default field mapping for text with analyzer "keyword".
+// NewKeywordFieldMapping returns a default field mapping for text with analyzer "keyword".
 func NewKeywordFieldMapping() *FieldMapping {
 	return &FieldMapping{
 		Type:               "text",
