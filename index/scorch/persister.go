@@ -982,7 +982,7 @@ func getTimeSeriesSnapshots(maxDataPoints int, interval time.Duration,
 	return ptr, rv
 }
 
-// getProtectedEpochs aims to fetch the epochs keep based on a timestamp basis.
+// getProtectedSnapshots aims to fetch the epochs keep based on a timestamp basis.
 // It tries to get NumSnapshotsToKeep snapshots, each of which are separated
 // by a time duration of RollbackSamplingInterval.
 func getProtectedSnapshots(rollbackSamplingInterval time.Duration,
