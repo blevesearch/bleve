@@ -45,7 +45,7 @@ func TestDecodeVector(t *testing.T) {
 
 	for i := range vec {
 		if vec[i] != decodedVec[i] {
-			t.Errorf("Decoded vector not the same as original vector")
+			t.Fatalf("Decoded vector not the same as original vector %v != %v", vec[i], decodedVec[i])
 		}
 	}
 }
@@ -99,7 +99,6 @@ func BenchmarkDecodeVector1536(b *testing.B) {
 }
 
 func bytifyVec(vec []float32) []byte {
-
 	buf := new(bytes.Buffer)
 
 	for _, v := range vec {

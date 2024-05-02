@@ -24,6 +24,7 @@ import (
 	"math"
 
 	"github.com/blevesearch/bleve/v2/size"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -98,7 +99,6 @@ func NewVectorBase64Field(name string, arrayPositions []uint64, vectorBase64 str
 // This function takes a base64 encoded string and decodes it into
 // a vector.
 func DecodeVector(encodedValue string) ([]float32, error) {
-
 	// We first decode the encoded string into a byte array.
 	decodedString, err := base64.StdEncoding.DecodeString(encodedValue)
 	if err != nil {
@@ -117,7 +117,11 @@ func DecodeVector(encodedValue string) ([]float32, error) {
 	// them to a float32 value by reading them in a little endian notation
 	for i := 0; i < dims; i++ {
 		bytes := decodedString[i*size.SizeOfFloat32 : (i+1)*size.SizeOfFloat32]
-		decodedVector[i] = math.Float32frombits(binary.LittleEndian.Uint32(bytes))
+		entry := math.Float32frombits(binary.LittleEndian.Uint32(bytes))
+		if !util.IsValidFloat32(float64(entry)) {
+			return nil, fmt.Errorf("Invalid float32 value: %f", entry)
+		}
+		decodedVector[i] = entry
 	}
 
 	return decodedVector, nil

@@ -159,12 +159,19 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 		return
 	}
 
-	propertyMightBeVector, err := document.DecodeVector(encodedString)
+	vector, err := document.DecodeVector(encodedString)
 	if err != nil {
 		return
 	}
 
-	fm.processVector(propertyMightBeVector, pathString, path, indexes, context)
+	fieldName := getFieldName(pathString, path, fm)
+	options := fm.Options()
+	field := document.NewVectorFieldWithIndexingOptions(fieldName, indexes, vector,
+		fm.Dims, fm.Similarity, fm.VectorIndexOptimizedFor, options)
+	context.doc.AddField(field)
+
+	// "_all" composite field is not applicable for vector field
+	context.excludedFromAll = append(context.excludedFromAll, fieldName)
 }
 
 // -----------------------------------------------------------------------------

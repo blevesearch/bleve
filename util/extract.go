@@ -48,7 +48,7 @@ func ExtractNumericValFloat32(v interface{}) (float32, bool) {
 	switch {
 	case val.CanFloat():
 		floatVal := val.Float()
-		if floatVal > math.MaxFloat32 {
+		if !IsValidFloat32(floatVal) {
 			return 0, false
 		}
 		return float32(floatVal), true
@@ -59,4 +59,8 @@ func ExtractNumericValFloat32(v interface{}) (float32, bool) {
 	}
 
 	return 0, false
+}
+
+func IsValidFloat32(val float64) bool {
+	return !math.IsNaN(val) && !math.IsInf(val, 0) && val <= math.MaxFloat32
 }
