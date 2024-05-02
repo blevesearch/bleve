@@ -598,7 +598,7 @@ func emit(descrip string, cycle int, step int, segments []Segment, plan *MergePl
 // -----------------------------------------------------------------------------
 // Test Vector Segment Merging
 
-func TestPlanMaxSegmentVectorsBytes(t *testing.T) {
+func TestPlanMaxSegmentFileSize(t *testing.T) {
 	tests := []struct {
 		segments []Segment
 		o        *MergePlanOptions

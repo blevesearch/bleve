@@ -235,21 +235,25 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		for startIdx := 0; startIdx < len(eligibles); startIdx++ {
 			var roster []Segment
 			var rosterLiveSize int64
-			var rosterFileSize int64
+			var rosterFileSize int64 // useful for segments with vectors
 
 			for idx := startIdx; idx < len(eligibles) && len(roster) < o.SegmentsPerMergeTask; idx++ {
 				eligible := eligibles[idx]
 
-				if rosterLiveSize+eligible.LiveSize() < o.MaxSegmentSize {
-					if eligible.HasVector() &&
-						rosterFileSize+eligible.FileSize() > o.MaxSegmentFileSize {
-						// This segment is too large to merged.
+				if rosterLiveSize+eligible.LiveSize() >= o.MaxSegmentSize {
+					continue
+				}
+
+				if eligible.HasVector() {
+					efs := eligible.FileSize()
+					if rosterFileSize+efs >= o.MaxSegmentFileSize {
 						continue
 					}
-
-					roster = append(roster, eligible)
-					rosterLiveSize += eligible.LiveSize()
+					rosterFileSize += efs
 				}
+
+				roster = append(roster, eligible)
+				rosterLiveSize += eligible.LiveSize()
 			}
 
 			if len(roster) > 0 {
