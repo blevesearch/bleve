@@ -242,9 +242,6 @@ func validateKNN(req *SearchRequest) error {
 			if err != nil {
 				return err
 			}
-			if len(vec) == 0 {
-				return fmt.Errorf("length of decoded vector is 0")
-			}
 
 			q.Vector = vec
 		}

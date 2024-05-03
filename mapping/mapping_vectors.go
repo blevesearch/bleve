@@ -160,7 +160,7 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	}
 
 	decodedVector, err := document.DecodeVector(encodedString)
-	if err != nil || len(decodedVector) == 0 {
+	if err != nil || len(decodedVector) != fm.Dims {
 		return
 	}
 

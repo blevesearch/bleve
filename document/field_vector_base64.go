@@ -108,9 +108,14 @@ func DecodeVector(encodedValue string) ([]float32, error) {
 	// The array is expected to be divisible by 4 because each float32
 	// should occupy 4 bytes
 	if len(decodedString)%size.SizeOfFloat32 != 0 {
-		return nil, fmt.Errorf("Decoded byte array not divisible by %d", size.SizeOfFloat32)
+		return nil, fmt.Errorf("decoded byte array not divisible by %d", size.SizeOfFloat32)
 	}
 	dims := int(len(decodedString) / size.SizeOfFloat32)
+
+	if dims <= 0 {
+		return nil, fmt.Errorf("unable to decode encoded vector")
+	}
+
 	decodedVector := make([]float32, dims)
 
 	// We iterate through the array 4 bytes at a time and convert each of
@@ -119,7 +124,7 @@ func DecodeVector(encodedValue string) ([]float32, error) {
 		bytes := decodedString[i*size.SizeOfFloat32 : (i+1)*size.SizeOfFloat32]
 		entry := math.Float32frombits(binary.LittleEndian.Uint32(bytes))
 		if !util.IsValidFloat32(float64(entry)) {
-			return nil, fmt.Errorf("Invalid float32 value: %f", entry)
+			return nil, fmt.Errorf("invalid float32 value: %f", entry)
 		}
 		decodedVector[i] = entry
 	}
