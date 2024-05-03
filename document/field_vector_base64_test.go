@@ -35,17 +35,17 @@ func TestDecodeVector(t *testing.T) {
 	vecBytes := bytifyVec(vec)
 	encodedVec := base64.StdEncoding.EncodeToString(vecBytes)
 
-	decodedVec, err := DecodeVector(encodedVec)
+	decodedVector, err := DecodeVector(encodedVec)
 	if err != nil {
 		t.Error(err)
 	}
-	if len(decodedVec) != len(vec) {
+	if len(decodedVector) != len(vec) {
 		t.Errorf("Decoded vector dimensions not same as original vector dimensions")
 	}
 
 	for i := range vec {
-		if vec[i] != decodedVec[i] {
-			t.Fatalf("Decoded vector not the same as original vector %v != %v", vec[i], decodedVec[i])
+		if vec[i] != decodedVector[i] {
+			t.Fatalf("Decoded vector not the same as original vector %v != %v", vec[i], decodedVector[i])
 		}
 	}
 }

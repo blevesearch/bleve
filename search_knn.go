@@ -238,12 +238,12 @@ func validateKNN(req *SearchRequest) error {
 		}
 		if len(q.Vector) == 0 && q.VectorBase64 != "" {
 			// consider vector_base64 only if vector is not provided
-			vec, err := document.DecodeVector(q.VectorBase64)
+			decodedVector, err := document.DecodeVector(q.VectorBase64)
 			if err != nil {
 				return err
 			}
 
-			q.Vector = vec
+			q.Vector = decodedVector
 		}
 		if q.K <= 0 || len(q.Vector) == 0 {
 			return fmt.Errorf("k must be greater than 0 and vector must be non-empty")

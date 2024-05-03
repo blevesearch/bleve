@@ -82,14 +82,14 @@ func (n *VectorBase64Field) GoString() string {
 func NewVectorBase64Field(name string, arrayPositions []uint64, vectorBase64 string,
 	dims int, similarity, vectorIndexOptimizedFor string) (*VectorBase64Field, error) {
 
-	vector, err := DecodeVector(vectorBase64)
+	decodedVector, err := DecodeVector(vectorBase64)
 	if err != nil {
 		return nil, err
 	}
 
 	return &VectorBase64Field{
 		vectorField: NewVectorFieldWithIndexingOptions(name, arrayPositions,
-			vector, dims, similarity,
+			decodedVector, dims, similarity,
 			vectorIndexOptimizedFor, DefaultVectorIndexingOptions),
 
 		base64Encoding: vectorBase64,
