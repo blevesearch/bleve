@@ -18,7 +18,12 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/microseconds"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/milliseconds"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/nanoseconds"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/seconds"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -91,10 +96,24 @@ func (h *DocGetHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			d, layout, err := field.DateTime()
 			if err == nil {
 				if layout == "" {
-					// layout not set probably means it was indexed as a timestamp
-					newval = strconv.FormatInt(d.UnixNano(), 10)
+					// missing layout means we fallback to
+					// the default layout which is RFC3339
+					newval = d.Format(time.RFC3339)
 				} else {
-					newval = d.Format(layout)
+					// the layout here can now either be representative
+					// of an actual layout or a timestamp
+					switch layout {
+					case seconds.Name:
+						newval = strconv.FormatInt(d.Unix(), 10)
+					case milliseconds.Name:
+						newval = strconv.FormatInt(d.UnixMilli(), 10)
+					case microseconds.Name:
+						newval = strconv.FormatInt(d.UnixMicro(), 10)
+					case nanoseconds.Name:
+						newval = strconv.FormatInt(d.UnixNano(), 10)
+					default:
+						newval = d.Format(layout)
+					}
 				}
 			}
 		}
