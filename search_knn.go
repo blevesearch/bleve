@@ -236,15 +236,14 @@ func validateKNN(req *SearchRequest) error {
 		if q == nil {
 			return fmt.Errorf("knn query cannot be nil")
 		}
-		if q.VectorBase64 != "" {
-			if q.Vector == nil {
-				vec, err := document.DecodeVector(q.VectorBase64)
-				if err != nil {
-					return err
-				}
-
-				q.Vector = vec
+		if len(q.Vector) == 0 && q.VectorBase64 != "" {
+			// consider vector_base64 only if vector is not provided
+			decodedVector, err := document.DecodeVector(q.VectorBase64)
+			if err != nil {
+				return err
 			}
+
+			q.Vector = decodedVector
 		}
 		if q.K <= 0 || len(q.Vector) == 0 {
 			return fmt.Errorf("k must be greater than 0 and vector must be non-empty")
