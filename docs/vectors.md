@@ -15,9 +15,9 @@
 
 ```go
 doc := struct{
-    Id   string
-    Text string
-    Vec  []float32
+    Id   string    `json:"id"`
+    Text string    `json:"text"`
+    Vec  []float32 `json:"vec"`
 }{
     Id:   "example",
     Text: "hello from united states",
