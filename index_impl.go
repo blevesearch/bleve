@@ -25,6 +25,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/microseconds"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/milliseconds"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/nanoseconds"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/timestamp/seconds"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/index/upsidedown"
@@ -738,10 +742,28 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 								datetime, layout, err := docF.DateTime()
 								if err == nil {
 									if layout == "" {
-										// layout not set probably means it was indexed as a timestamp
-										value = strconv.FormatInt(datetime.UnixNano(), 10)
+										// missing layout means we fallback to
+										// the default layout which is RFC3339
+										value = datetime.Format(time.RFC3339)
 									} else {
-										value = datetime.Format(layout)
+										// the layout here can now either be representative
+										// of an actual datetime layout or a timestamp
+										switch layout {
+										case seconds.Name:
+											value = strconv.FormatInt(datetime.Unix(), 10)
+										case milliseconds.Name:
+											value = strconv.FormatInt(datetime.UnixMilli(), 10)
+										case microseconds.Name:
+											value = strconv.FormatInt(datetime.UnixMicro(), 10)
+										case nanoseconds.Name:
+											value = strconv.FormatInt(datetime.UnixNano(), 10)
+										default:
+											// the layout for formatting the date to a string
+											// is provided by a datetime parser which is not
+											// handling the timestamp case, hence the layout
+											// can be directly used to format the date
+											value = datetime.Format(layout)
+										}
 									}
 								}
 							case index.BooleanField:

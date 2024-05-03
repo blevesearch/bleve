@@ -3116,7 +3116,7 @@ func TestDateRangeTimestampQueries(t *testing.T) {
 		}
 	}()
 
-	documents := map[string]map[string]interface{}{
+	documents := map[string]map[string]string{
 		"doc1": {
 			"date":         "2001/08/20 03:00:10",
 			"seconds":      "998276410",
@@ -3166,15 +3166,11 @@ func TestDateRangeTimestampQueries(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	type testResult struct {
-		docID    string // doc ID of the hit
-		hitField string // fields returned as part of the hit
-	}
 	type testStruct struct {
 		start        string
 		end          string
 		field        string
-		expectedHits []testResult
+		expectedHits []string
 	}
 
 	testQueries := []testStruct{
@@ -3182,83 +3178,47 @@ func TestDateRangeTimestampQueries(t *testing.T) {
 			start: "2001-08-20T03:00:05",
 			end:   "2001-08-20T03:00:25",
 			field: "date",
-			expectedHits: []testResult{
-				{
-					docID:    "doc1",
-					hitField: "2001/08/20 03:00:10",
-				},
-				{
-					docID:    "doc2",
-					hitField: "2001/08/20 03:00:20",
-				},
+			expectedHits: []string{
+				"doc1",
+				"doc2",
 			},
 		},
 		{
 			start: "2001-08-20T03:00:15",
 			end:   "2001-08-20T03:00:35",
 			field: "seconds",
-			expectedHits: []testResult{
-				{
-					docID:    "doc2",
-					hitField: "998276420000000000",
-				},
-				{
-					docID:    "doc3",
-					hitField: "998276430000000000",
-				},
+			expectedHits: []string{
+				"doc2",
+				"doc3",
 			},
 		},
 		{
 			start: "2001-08-20T03:00:10.150",
 			end:   "2001-08-20T03:00:10.450",
 			field: "milliseconds",
-			expectedHits: []testResult{
-				{
-					docID:    "doc2",
-					hitField: "998276410200000000",
-				},
-				{
-					docID:    "doc3",
-					hitField: "998276410300000000",
-				},
-				{
-					docID:    "doc4",
-					hitField: "998276410400000000",
-				},
+			expectedHits: []string{
+				"doc2",
+				"doc3",
+				"doc4",
 			},
 		},
 		{
 			start: "2001-08-20T03:00:10.100450",
 			end:   "2001-08-20T03:00:10.100650",
 			field: "microseconds",
-			expectedHits: []testResult{
-				{
-					docID:    "doc3",
-					hitField: "998276410100500000",
-				},
-				{
-					docID:    "doc4",
-					hitField: "998276410100600000",
-				},
+			expectedHits: []string{
+				"doc3",
+				"doc4",
 			},
 		},
 		{
 			start: "2001-08-20T03:00:10.100300550",
 			end:   "2001-08-20T03:00:10.100300850",
 			field: "nanoseconds",
-			expectedHits: []testResult{
-				{
-					docID:    "doc3",
-					hitField: "998276410100300600",
-				},
-				{
-					docID:    "doc4",
-					hitField: "998276410100300700",
-				},
-				{
-					docID:    "doc5",
-					hitField: "998276410100300800",
-				},
+			expectedHits: []string{
+				"doc3",
+				"doc4",
+				"doc5",
 			},
 		},
 	}
@@ -3277,7 +3237,7 @@ func TestDateRangeTimestampQueries(t *testing.T) {
 
 		sr := NewSearchRequest(drq)
 		sr.SortBy([]string{dtq.field})
-		sr.Fields = []string{dtq.field}
+		sr.Fields = []string{"*"}
 
 		res, err := idx.Search(sr)
 		if err != nil {
@@ -3287,11 +3247,16 @@ func TestDateRangeTimestampQueries(t *testing.T) {
 			t.Fatalf("expected %d hits, got %d", len(dtq.expectedHits), len(res.Hits))
 		}
 		for i, hit := range res.Hits {
-			if hit.ID != dtq.expectedHits[i].docID {
-				t.Fatalf("expected docID %s, got %s", dtq.expectedHits[i].docID, hit.ID)
+			if hit.ID != dtq.expectedHits[i] {
+				t.Fatalf("expected docID %s, got %s", dtq.expectedHits[i], hit.ID)
 			}
-			if hit.Fields[dtq.field].(string) != dtq.expectedHits[i].hitField {
-				t.Fatalf("expected hit field %s, got %s", dtq.expectedHits[i].hitField, hit.Fields[dtq.field])
+			if len(hit.Fields) != len(documents[hit.ID]) {
+				t.Fatalf("expected hit %s to have %d fields, got %d", hit.ID, len(documents[hit.ID]), len(hit.Fields))
+			}
+			for k, v := range documents[hit.ID] {
+				if hit.Fields[k] != v {
+					t.Fatalf("expected field %s to be %s, got %s", k, v, hit.Fields[k])
+				}
 			}
 		}
 	}

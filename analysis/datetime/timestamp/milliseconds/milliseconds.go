@@ -40,7 +40,7 @@ func (p *DateTimeParser) ParseDateTime(input string) (time.Time, string, error) 
 	if timestamp < minBound || timestamp > maxBound {
 		return time.Time{}, "", analysis.ErrInvalidTimestampRange
 	}
-	return time.UnixMilli(timestamp), "", nil
+	return time.UnixMilli(timestamp), Name, nil
 }
 
 func DateTimeParserConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.DateTimeParser, error) {
