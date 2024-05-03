@@ -37,6 +37,11 @@ type Segment interface {
 	// Size of the live data of the segment; i.e., FullSize() minus
 	// any logical deletions.
 	LiveSize() int64
+
+	HasVector() bool
+
+	// Size of the persisted segment file.
+	FileSize() int64
 }
 
 // Plan() will functionally compute a merge plan.  A segment will be
@@ -75,6 +80,11 @@ type MergePlanOptions struct {
 	// merging, however, may produce segment sizes different than the
 	// planner’s predicted sizes.
 	MaxSegmentSize int64
+
+	// Max size (in bytes) of the persisted segment file that contains the
+	// vectors.  This is used to prevent merging of segments that
+	// contain vectors that are too large.
+	MaxSegmentFileSize int64
 
 	// The growth factor for each tier in a staircase of idealized
 	// segments computed by CalcBudget().
@@ -128,6 +138,7 @@ var ErrMaxSegmentSizeTooLarge = errors.New("MaxSegmentSize exceeds the size limi
 var DefaultMergePlanOptions = MergePlanOptions{
 	MaxSegmentsPerTier:   10,
 	MaxSegmentSize:       5000000,
+	MaxSegmentFileSize:   4000000000, // 4GB
 	TierGrowth:           10.0,
 	SegmentsPerMergeTask: 10,
 	FloorSegmentSize:     2000,
@@ -170,8 +181,17 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 			minLiveSize = segment.LiveSize()
 		}
 
+		isEligible := segment.LiveSize() < o.MaxSegmentSize/2
+		// An eligible segment (based on #documents) may be too large
+		// and thus need a stricter check based on the file size.
+		// This is particularly important for segments that contain
+		// vectors.
+		if isEligible && segment.HasVector() && o.MaxSegmentFileSize > 0 {
+			isEligible = segment.FileSize() < o.MaxSegmentFileSize/2
+		}
+
 		// Only small-enough segments are eligible.
-		if segment.LiveSize() < o.MaxSegmentSize/2 {
+		if isEligible {
 			eligibles = append(eligibles, segment)
 			eligiblesLiveSize += segment.LiveSize()
 		}
@@ -215,14 +235,25 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		for startIdx := 0; startIdx < len(eligibles); startIdx++ {
 			var roster []Segment
 			var rosterLiveSize int64
+			var rosterFileSize int64 // useful for segments with vectors
 
 			for idx := startIdx; idx < len(eligibles) && len(roster) < o.SegmentsPerMergeTask; idx++ {
 				eligible := eligibles[idx]
 
-				if rosterLiveSize+eligible.LiveSize() < o.MaxSegmentSize {
-					roster = append(roster, eligible)
-					rosterLiveSize += eligible.LiveSize()
+				if rosterLiveSize+eligible.LiveSize() >= o.MaxSegmentSize {
+					continue
 				}
+
+				if eligible.HasVector() {
+					efs := eligible.FileSize()
+					if rosterFileSize+efs >= o.MaxSegmentFileSize {
+						continue
+					}
+					rosterFileSize += efs
+				}
+
+				roster = append(roster, eligible)
+				rosterLiveSize += eligible.LiveSize()
 			}
 
 			if len(roster) > 0 {

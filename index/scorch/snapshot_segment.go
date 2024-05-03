@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"bytes"
+	"os"
 	"sync"
 	"sync/atomic"
 
@@ -64,6 +65,31 @@ func (s *SegmentSnapshot) FullSize() int64 {
 
 func (s *SegmentSnapshot) LiveSize() int64 {
 	return int64(s.Count())
+}
+
+func (s *SegmentSnapshot) HasVector() bool {
+	// number of vectors, for each vector field in the segment
+	numVecs := s.stats.Fetch()["num_vectors"]
+	return len(numVecs) > 0
+}
+
+func (s *SegmentSnapshot) FileSize() int64 {
+	ps, ok := s.segment.(segment.PersistedSegment)
+	if !ok {
+		return 0
+	}
+
+	path := ps.Path()
+	if path == "" {
+		return 0
+	}
+
+	fi, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+
+	return fi.Size()
 }
 
 func (s *SegmentSnapshot) Close() error {
