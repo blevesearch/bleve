@@ -437,24 +437,16 @@ func (im *IndexMappingImpl) FieldAnalyzer(field string) string {
 func (im *IndexMappingImpl) FieldMappingForPath(path string) FieldMapping {
 	if im.TypeMapping != nil {
 		for _, v := range im.TypeMapping {
-			for field, property := range v.Properties {
-				for _, v1 := range property.Fields {
-					if field == path {
-						// Return field mapping if the name matches the path param.
-						return *v1
-					}
-				}
+			fm := v.fieldDescribedByPath(path)
+			if fm != nil {
+				return *fm
 			}
 		}
 	}
 
-	for field, property := range im.DefaultMapping.Properties {
-		for _, v1 := range property.Fields {
-			if field == path {
-				// Return field mapping if the name matches the path param.
-				return *v1
-			}
-		}
+	fm := im.DefaultMapping.fieldDescribedByPath(path)
+	if fm != nil {
+		return *fm
 	}
 
 	return FieldMapping{}
