@@ -77,6 +77,12 @@ type Scorch struct {
 	segPlugin SegmentPlugin
 
 	spatialPlugin index.SpatialAnalyzerPlugin
+
+	// keeps track of segments scheduled for backup. Each segment's filename maps to
+	// the count of backup schedules. Segments with non-zero counts are protected
+	// from removal by the cleanup operation. Counts decrement upon successful backup,
+	// allowing removal of segments with zero or absent counts.
+	backupScheduled map[string]uint
 }
 
 // AsyncPanicError is passed to scorch asyncErrorHandler when panic occurs in scorch background process
@@ -112,6 +118,7 @@ func NewScorch(storeName string,
 		ineligibleForRemoval: map[string]bool{},
 		forceMergeRequestCh:  make(chan *mergerCtrl, 1),
 		segPlugin:            defaultSegmentPlugin,
+		backupScheduled:      map[string]uint{},
 	}
 
 	forcedSegmentType, forcedSegmentVersion, err := configForceSegmentTypeVersion(config)
@@ -834,5 +841,36 @@ func newFieldStats() *fieldStats {
 	rv := &fieldStats{
 		statMap: map[string]map[string]uint64{},
 	}
+	return rv
+}
+
+// CopyableReader returns a low-level accessor for index data, ensuring persisted segments
+// remain on disk for backup, preventing race conditions with the persister/merger cleanup.
+// Close the reader after backup to allow segment removal by the persister/merger.
+func (s *Scorch) CopyableReader() index.CopyReader {
+	s.rootLock.Lock()
+	rv := s.root
+	if rv != nil {
+		rv.AddRef()
+		var fileName string
+		// schedule a backup for all the segments from the root. Note that the
+		// both the unpersisted and persisted segments are scheduled for backup.
+		// because during the backup, the unpersisted segments may get persisted and
+		// hence we need to protect both the unpersisted and persisted segments from removal
+		// by the cleanup routine during the online backup
+		for _, seg := range rv.segment {
+			if perSeg, ok := seg.segment.(segment.PersistedSegment); ok {
+				// segment is persisted
+				fileName = filepath.Base(perSeg.Path())
+			} else {
+				// segment is not persisted
+				// the name of the segment file that is generated if the
+				// the segment is persisted in the future.
+				fileName = zapFileName(seg.id)
+			}
+			rv.parent.backupScheduled[fileName]++
+		}
+	}
+	s.rootLock.Unlock()
 	return rv
 }

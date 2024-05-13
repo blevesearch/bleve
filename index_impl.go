@@ -1074,22 +1074,19 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 		return ErrorIndexClosed
 	}
 
-	indexReader, err := i.i.Reader()
-	if err != nil {
-		return err
+	copyReader, ok := i.i.(index.ReaderCopyable)
+	if !ok {
+		return fmt.Errorf("index implementation does not support copy reader")
 	}
+
+	indexReader := copyReader.CopyableReader()
 	defer func() {
-		if cerr := indexReader.Close(); err == nil && cerr != nil {
+		if cerr := indexReader.CloseCopyReader(); err == nil && cerr != nil {
 			err = cerr
 		}
 	}()
 
-	irc, ok := indexReader.(IndexCopyable)
-	if !ok {
-		return fmt.Errorf("index implementation does not support copy")
-	}
-
-	err = irc.CopyTo(d)
+	err = indexReader.CopyTo(d)
 	if err != nil {
 		return fmt.Errorf("error copying index metadata: %v", err)
 	}
