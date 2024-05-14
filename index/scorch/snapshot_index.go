@@ -905,3 +905,26 @@ func (is *IndexSnapshot) GetSpatialAnalyzerPlugin(typ string) (
 	}
 	return rv, nil
 }
+
+func (is *IndexSnapshot) CloseCopyReader() error {
+	// first unmark the segments that were marked for backup by this index snapshot
+	is.parent.rootLock.Lock()
+	for _, seg := range is.segment {
+		var fileName string
+		if perSeg, ok := seg.segment.(segment.PersistedSegment); ok {
+			// segment is persisted
+			fileName = filepath.Base(perSeg.Path())
+		} else {
+			// segment is not persisted
+			// the name of the segment file that is generated if the
+			// the segment is persisted in the future.
+			fileName = zapFileName(seg.id)
+		}
+		if is.parent.copyScheduled[fileName]--; is.parent.copyScheduled[fileName] <= 0 {
+			delete(is.parent.copyScheduled, fileName)
+		}
+	}
+	is.parent.rootLock.Unlock()
+	// close the index snapshot normally
+	return is.Close()
+}
