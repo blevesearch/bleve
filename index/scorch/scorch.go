@@ -62,7 +62,7 @@ type Scorch struct {
 	// the count of copy schedules. Segments with non-zero counts are protected from removal by the cleanup
 	// operation. Counts decrement upon successful copy, allowing removal of segments with zero or absent counts.
 	// must be accessed within the rootLock as it is accessed by the asynchronous cleanup routine.
-	copyScheduled map[string]uint
+	copyScheduled map[string]int
 
 	numSnapshotsToKeep       int
 	rollbackRetentionFactor  float64
@@ -120,7 +120,7 @@ func NewScorch(storeName string,
 		ineligibleForRemoval: map[string]bool{},
 		forceMergeRequestCh:  make(chan *mergerCtrl, 1),
 		segPlugin:            defaultSegmentPlugin,
-		copyScheduled:        map[string]uint{},
+		copyScheduled:        map[string]int{},
 	}
 
 	forcedSegmentType, forcedSegmentVersion, err := configForceSegmentTypeVersion(config)
