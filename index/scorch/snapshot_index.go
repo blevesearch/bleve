@@ -920,8 +920,8 @@ func (is *IndexSnapshot) CloseCopyReader() error {
 			// the segment is persisted in the future.
 			fileName = zapFileName(seg.id)
 		}
-		if is.parent.backupScheduled[fileName]--; is.parent.backupScheduled[fileName] == 0 {
-			delete(is.parent.backupScheduled, fileName)
+		if is.parent.copyScheduled[fileName]--; is.parent.copyScheduled[fileName] == 0 {
+			delete(is.parent.copyScheduled, fileName)
 		}
 	}
 	is.parent.rootLock.Unlock()
