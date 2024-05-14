@@ -1080,6 +1080,10 @@ func (i *indexImpl) CopyTo(d index.Directory) (err error) {
 	}
 
 	copyReader := copyIndex.CopyReader()
+	if copyReader == nil {
+		return fmt.Errorf("index's copyReader is nil")
+	}
+
 	defer func() {
 		if cerr := copyReader.CloseCopyReader(); err == nil && cerr != nil {
 			err = cerr
