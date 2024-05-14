@@ -73,7 +73,89 @@ type TokenFilter interface {
 }
 
 type Analyzer interface {
-	Analyze([]byte) TokenStream
+	Type() string
+	// return value of this method depends on the type of analyzer
+	Analyze([]byte) interface{}
+}
+
+const (
+	TokensAnalyzerType     = "token"
+	HookTokensAnalyzerType = "hook_token"
+	VectorAnalyzerType     = "vector"
+	HookVectorAnalyzerType = "hook_vector"
+)
+
+// # Analyzer Analyze() return type
+type TokensAnalyzer struct {
+	Tokens TokenStream
+}
+type HookTokensAnalyzer struct {
+	Tokens TokenStream
+	Err    error
+}
+type VectorAnalyzer []float64
+type HookVectorAnalyzer struct {
+	Vector []float64
+	Err    error
+}
+
+func AnalyzeForTokens(analyzer Analyzer, input []byte) (TokenStream, error) {
+	analyzerType := analyzer.Type()
+	if analyzerType != TokensAnalyzerType &&
+		analyzerType != HookTokensAnalyzerType {
+		return nil, fmt.Errorf("cannot analyze text with analyzer of type: %s",
+			analyzerType)
+	}
+
+	// analyze ouput
+	analyzedOp := analyzer.Analyze(input)
+	err := CheckAnalyzed(analyzedOp, analyzer)
+	if err != nil {
+		return nil, fmt.Errorf("incompatible analysis result for analyzer "+
+			"of type: %s, err:%+v", analyzerType, err)
+	}
+
+	if analyzerType == TokensAnalyzerType {
+		op := analyzedOp.(TokensAnalyzer)
+		return op.Tokens, nil
+	}
+
+	// analyzerType == analysis.HookTokensAnalyzerType
+
+	op := analyzedOp.(HookTokensAnalyzer)
+	if op.Err != nil {
+		return nil, fmt.Errorf("analyzer hook failed, err:%+v", op.Err)
+	}
+
+	return op.Tokens, nil
+}
+
+func CheckAnalyzed(value interface{}, analyzer Analyzer) error {
+	switch analyzer.Type() {
+	case TokensAnalyzerType:
+		_, ok := value.(TokensAnalyzer)
+		if !ok {
+			return fmt.Errorf("expected TokensAnalyzer, got %T", value)
+		}
+	case HookTokensAnalyzerType:
+		_, ok := value.(HookTokensAnalyzer)
+		if !ok {
+			return fmt.Errorf("expected HookTokensAnalyzer, got %T", value)
+		}
+	case VectorAnalyzerType:
+		_, ok := value.(VectorAnalyzer)
+		if !ok {
+			return fmt.Errorf("expected VectorAnalyzer, got %T", value)
+		}
+	case HookVectorAnalyzerType:
+		_, ok := value.(HookVectorAnalyzer)
+		if !ok {
+			return fmt.Errorf("expected HookVectorAnalyzer, got %T", value)
+		}
+	default:
+		return fmt.Errorf("unknown analyzer type %s", analyzer.Type())
+	}
+	return nil
 }
 
 type DefaultAnalyzer struct {
@@ -82,7 +164,7 @@ type DefaultAnalyzer struct {
 	TokenFilters []TokenFilter
 }
 
-func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
+func (a *DefaultAnalyzer) Analyze(input []byte) interface{} {
 	if a.CharFilters != nil {
 		for _, cf := range a.CharFilters {
 			input = cf.Filter(input)
@@ -95,6 +177,10 @@ func (a *DefaultAnalyzer) Analyze(input []byte) TokenStream {
 		}
 	}
 	return tokens
+}
+
+func (a *DefaultAnalyzer) Type() string {
+	return TokensAnalyzerType
 }
 
 var ErrInvalidDateTime = fmt.Errorf("unable to parse datetime with any of the layouts")

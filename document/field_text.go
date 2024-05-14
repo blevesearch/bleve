@@ -74,7 +74,7 @@ func (t *TextField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return t.frequencies
 }
 
-func (t *TextField) Analyze() {
+func (t *TextField) Analyze() error {
 	var tokens analysis.TokenStream
 	if t.analyzer != nil {
 		bytesToAnalyze := t.Value()
@@ -84,7 +84,11 @@ func (t *TextField) Analyze() {
 			copy(bytesCopied, bytesToAnalyze)
 			bytesToAnalyze = bytesCopied
 		}
-		tokens = t.analyzer.Analyze(bytesToAnalyze)
+		var err error
+		tokens, err = analysis.AnalyzeForTokens(t.analyzer, bytesToAnalyze)
+		if err != nil {
+			return err
+		}
 	} else {
 		tokens = analysis.TokenStream{
 			&analysis.Token{
@@ -98,6 +102,8 @@ func (t *TextField) Analyze() {
 	}
 	t.length = len(tokens) // number of tokens in this doc field
 	t.frequencies = analysis.TokenFrequency(tokens, t.arrayPositions, t.options)
+
+	return nil
 }
 
 func (t *TextField) Analyzer() analysis.Analyzer {
