@@ -50,12 +50,19 @@ type Scorch struct {
 	unsafeBatch bool
 
 	rootLock             sync.RWMutex
+
 	root                 *IndexSnapshot // holds 1 ref-count on the root
 	rootPersisted        []chan error   // closed when root is persisted
 	persistedCallbacks   []index.BatchCallback
 	nextSnapshotEpoch    uint64
 	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
+
+	// keeps track of segments scheduled for online copy/backup operation. Each segment's filename maps to
+	// the count of copy schedules. Segments with non-zero counts are protected from removal by the cleanup
+	// operation. Counts decrement upon successful copy, allowing removal of segments with zero or absent counts.
+	// must be accessed within the rootLock as it is accessed by the asynchronous cleanup routine.
+	copyScheduled map[string]uint
 
 	numSnapshotsToKeep       int
 	rollbackRetentionFactor  float64
@@ -78,12 +85,6 @@ type Scorch struct {
 	segPlugin SegmentPlugin
 
 	spatialPlugin index.SpatialAnalyzerPlugin
-
-	// keeps track of segments scheduled for online copy/backup operation. Each segment's filename maps to
-	// the count of copy schedules. Segments with non-zero counts are protected from removal by the cleanup
-	// operation. Counts decrement upon successful copy, allowing removal of segments with zero or absent counts.
-	// must be accessed within the rootLock as it is accessed by the asynchronous cleanup routine.
-	copyScheduled map[string]uint
 }
 
 // AsyncPanicError is passed to scorch asyncErrorHandler when panic occurs in scorch background process
