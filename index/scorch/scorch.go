@@ -82,6 +82,7 @@ type Scorch struct {
 	// keeps track of segments scheduled for online copy/backup operation. Each segment's filename maps to
 	// the count of copy schedules. Segments with non-zero counts are protected from removal by the cleanup
 	// operation. Counts decrement upon successful copy, allowing removal of segments with zero or absent counts.
+	// must be accessed within the rootLock as it is accessed by the asynchronous cleanup routine.
 	copyScheduled map[string]uint
 }
 
