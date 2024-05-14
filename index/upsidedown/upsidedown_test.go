@@ -894,7 +894,7 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		t.Error(err)
 	} else {
 		if numFieldNumer != 35.99 {
-			t.Errorf("expeted numeric value 35.99, got %f", numFieldNumer)
+			t.Errorf("expected numeric value 35.99, got %f", numFieldNumer)
 		}
 	}
 	dateField, ok := storedDoc.Fields[2].(*document.DateTimeField)
@@ -964,7 +964,7 @@ func TestIndexInsertUpdateDeleteWithMultipleTypesStored(t *testing.T) {
 		t.Error(err)
 	} else {
 		if numFieldNumer != 36.99 {
-			t.Errorf("expeted numeric value 36.99, got %f", numFieldNumer)
+			t.Errorf("expected numeric value 36.99, got %f", numFieldNumer)
 		}
 	}
 

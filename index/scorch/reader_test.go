@@ -103,7 +103,7 @@ func TestIndexReader(t *testing.T) {
 	expectedCount = 2
 	count = reader.Count()
 	if count != expectedCount {
-		t.Errorf("Exptected doc count to be: %d got: %d", expectedCount, count)
+		t.Errorf("Expected doc count to be: %d got: %d", expectedCount, count)
 	}
 
 	var match *index.TermFieldDoc

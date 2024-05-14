@@ -218,7 +218,7 @@ A term search for term T in field F will look something like this:
   }
 ```
 
-The searchResultPostings will be a new implementation of the TermFieldReader inteface.
+The searchResultPostings will be a new implementation of the TermFieldReader interface.
 
 As a reminder this interface is:
 
