@@ -529,8 +529,8 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 		}
 	}
 
-	var filenames []string
-	newSegmentPaths := make(map[uint64]string)
+	filenames := make([]string, 0, len(snapshot.segment))
+	newSegmentPaths := make(map[uint64]string, len(snapshot.segment))
 
 	// first ensure that each segment in this snapshot has been persisted
 	for _, segmentSnapshot := range snapshot.segment {
@@ -982,7 +982,7 @@ func (s *Scorch) removeOldZapFiles() error {
 	for _, finfo := range currFileInfos {
 		fname := finfo.Name()
 		if filepath.Ext(fname) == ".zap" {
-			if _, exists := liveFileNames[fname]; !exists && !s.ineligibleForRemoval[fname] {
+			if _, exists := liveFileNames[fname]; !exists && !s.ineligibleForRemoval[fname] && (s.copyScheduled[fname] <= 0) {
 				err := os.Remove(s.path + string(os.PathSeparator) + fname)
 				if err != nil {
 					log.Printf("got err removing file: %s, err: %v", fname, err)
