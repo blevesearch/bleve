@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -78,11 +79,10 @@ type Scorch struct {
 
 	spatialPlugin index.SpatialAnalyzerPlugin
 
-	// keeps track of segments scheduled for backup. Each segment's filename maps to
-	// the count of backup schedules. Segments with non-zero counts are protected
-	// from removal by the cleanup operation. Counts decrement upon successful backup,
-	// allowing removal of segments with zero or absent counts.
-	backupScheduled map[string]uint
+	// keeps track of segments scheduled for online copy/backup operation. Each segment's filename maps to
+	// the count of copy schedules. Segments with non-zero counts are protected from removal by the cleanup
+	// operation. Counts decrement upon successful copy, allowing removal of segments with zero or absent counts.
+	copyScheduled map[string]uint
 }
 
 // AsyncPanicError is passed to scorch asyncErrorHandler when panic occurs in scorch background process
@@ -118,7 +118,7 @@ func NewScorch(storeName string,
 		ineligibleForRemoval: map[string]bool{},
 		forceMergeRequestCh:  make(chan *mergerCtrl, 1),
 		segPlugin:            defaultSegmentPlugin,
-		backupScheduled:      map[string]uint{},
+		copyScheduled:        map[string]uint{},
 	}
 
 	forcedSegmentType, forcedSegmentVersion, err := configForceSegmentTypeVersion(config)
@@ -844,10 +844,10 @@ func newFieldStats() *fieldStats {
 	return rv
 }
 
-// CopyableReader returns a low-level accessor for index data, ensuring persisted segments
+// CopyReader returns a low-level accessor for index data, ensuring persisted segments
 // remain on disk for backup, preventing race conditions with the persister/merger cleanup.
 // Close the reader after backup to allow segment removal by the persister/merger.
-func (s *Scorch) CopyableReader() index.CopyReader {
+func (s *Scorch) CopyReader() index.CopyReader {
 	s.rootLock.Lock()
 	rv := s.root
 	if rv != nil {
@@ -868,7 +868,7 @@ func (s *Scorch) CopyableReader() index.CopyReader {
 				// the segment is persisted in the future.
 				fileName = zapFileName(seg.id)
 			}
-			rv.parent.backupScheduled[fileName]++
+			rv.parent.copyScheduled[fileName]++
 		}
 	}
 	s.rootLock.Unlock()
