@@ -6,8 +6,8 @@ github.com/blevesearch/bleve_index_api v1.1.7 h1:KvvKVn/9+dKCEJHL6flDH3NCiXeKnK3
 github.com/blevesearch/bleve_index_api v1.1.7/go.mod h1:PbcwjIcRmjhGbkS/lJCpfgVSMROV6TRubGGAODaK1W8=
 github.com/blevesearch/geo v0.1.20 h1:paaSpu2Ewh/tn5DKn/FB5SzvH0EWupxHEIwbCk/QPqM=
 github.com/blevesearch/geo v0.1.20/go.mod h1:DVG2QjwHNMFmjo+ZgzrIq2sfCh6rIHzy9d9d0B59I6w=
-github.com/blevesearch/go-faiss v1.0.15 h1:aBrj6fwLuY8CkhECFbvkc4qhLTkrYI84QoEaw9z1jMI=
-github.com/blevesearch/go-faiss v1.0.15/go.mod h1:jrxHrbl42X/RnDPI+wBoZU8joxxuRwedrxqswQ3xfU8=
+github.com/blevesearch/go-faiss v1.0.16 h1:lfzXzzjO1mAf15MRiRY5yz6KVGr02CyRrr7m0z70Ih8=
+github.com/blevesearch/go-faiss v1.0.16/go.mod h1:jrxHrbl42X/RnDPI+wBoZU8joxxuRwedrxqswQ3xfU8=
 github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475 h1:kDy+zgJFJJoJYBvdfBSiZYBbdsUL0XcjHYWezpQBGPA=
 github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475/go.mod h1:9eJDeqxJ3E7WnLebQUlPD7ZjSce7AnDb9vjGmMCbD0A=
 github.com/blevesearch/go-porterstemmer v1.0.3 h1:GtmsqID0aZdCSNiY8SkuPJ12pD4jI+DdXTAn4YRcHCo=
@@ -43,8 +43,8 @@ github.com/blevesearch/zapx/v14 v14.3.10 h1:SG6xlsL+W6YjhX5N3aEiL/2tcWh3DO75Bnz7
 github.com/blevesearch/zapx/v14 v14.3.10/go.mod h1:qqyuR0u230jN1yMmE4FIAuCxmahRQEOehF78m6oTgns=
 github.com/blevesearch/zapx/v15 v15.3.13 h1:6EkfaZiPlAxqXz0neniq35my6S48QI94W/wyhnpDHHQ=
 github.com/blevesearch/zapx/v15 v15.3.13/go.mod h1:Turk/TNRKj9es7ZpKK95PS7f6D44Y7fAFy8F4LXQtGg=
-github.com/blevesearch/zapx/v16 v16.0.13-0.20240514143026-a9fced173441 h1:SJhTyViAfEQBT6icz7omIHgnVVNqscpUAlfINzRmNn4=
-github.com/blevesearch/zapx/v16 v16.0.13-0.20240514143026-a9fced173441/go.mod h1:Viwste/2ooJPzsLNuncnvyTkbAL2iAgM4ge5agqkdPg=
+github.com/blevesearch/zapx/v16 v16.0.13-0.20240515183332-8c1937d99b96 h1:9Ugk3pXJ1Y3hYaee2PMjMyYevX6LKAvTC0o165sy4uY=
+github.com/blevesearch/zapx/v16 v16.0.13-0.20240515183332-8c1937d99b96/go.mod h1:OtQLZCpBsNwNLJRgeKLamFEN9dA1T4CgnmwYXPcU7BI=
 github.com/couchbase/ghistogram v0.1.0 h1:b95QcQTCzjTUocDXp/uMgSNQi8oj1tGwnJ4bODWZnps=
 github.com/couchbase/ghistogram v0.1.0/go.mod h1:s1Jhy76zqfEecpNWJfWUiKZookAFaiGOEoyzgHt9i7k=
 github.com/couchbase/moss v0.2.0 h1:VCYrMzFwEryyhRSeI+/b3tRBSeTpi/8gn5Kf6dxqn+o=
