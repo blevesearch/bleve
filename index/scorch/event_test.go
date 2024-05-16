@@ -35,10 +35,11 @@ func TestEventBatchIntroductionStart(t *testing.T) {
 	}()
 
 	var count int
-	RegistryEventCallbacks["test"] = func(e Event) {
+	RegistryEventCallbacks["test"] = func(e Event) bool {
 		if e.Kind == EventKindBatchIntroductionStart {
 			count++
 		}
+		return true
 	}
 
 	ourConfig := make(map[string]interface{}, len(testConfig))

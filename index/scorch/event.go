@@ -22,7 +22,8 @@ var RegistryAsyncErrorCallbacks = map[string]func(error, string){}
 
 // RegistryEventCallbacks should be treated as read-only after
 // process init()'ialization.
-var RegistryEventCallbacks = map[string]func(Event){}
+// In the event of not having a callback, these return true.
+var RegistryEventCallbacks = map[string]func(Event) bool{}
 
 // Event represents the information provided in an OnEvent() callback.
 type Event struct {
@@ -62,3 +63,7 @@ var EventKindMergeTaskIntroductionStart = EventKind(7)
 // EventKindMergeTaskIntroduction is fired when the merger has completed
 // the introduction of merged segment from a single merge task.
 var EventKindMergeTaskIntroduction = EventKind(8)
+
+// EventKindPreMergeCheck is fired before the merge begins to check if
+// the caller should proceed with the merge.
+var EventKindPreMergeCheck = EventKind(9)

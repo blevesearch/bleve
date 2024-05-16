@@ -77,7 +77,7 @@ type Scorch struct {
 	rootBolt                 *bolt.DB
 	asyncTasks               sync.WaitGroup
 
-	onEvent      func(event Event)
+	onEvent      func(event Event) bool
 	onAsyncError func(err error, path string)
 
 	forceMergeRequestCh chan *mergerCtrl
@@ -184,12 +184,14 @@ func (s *Scorch) NumEventsBlocking() uint64 {
 	return eventsStarted - eventsCompleted
 }
 
-func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) {
+func (s *Scorch) fireEvent(kind EventKind, dur time.Duration) bool {
+	res := true
 	if s.onEvent != nil {
 		atomic.AddUint64(&s.stats.TotEventTriggerStarted, 1)
-		s.onEvent(Event{Kind: kind, Scorch: s, Duration: dur})
+		res = s.onEvent(Event{Kind: kind, Scorch: s, Duration: dur})
 		atomic.AddUint64(&s.stats.TotEventTriggerCompleted, 1)
 	}
+	return res
 }
 
 func (s *Scorch) fireAsyncError(err error) {

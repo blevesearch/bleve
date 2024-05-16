@@ -41,7 +41,7 @@ func TestObsoleteSegmentMergeIntroduction(t *testing.T) {
 	mergeIntroStart.Add(1)
 	mergeIntroComplete.Add(1)
 	var segIntroCompleted int
-	RegistryEventCallbacks["test"] = func(e Event) {
+	RegistryEventCallbacks["test"] = func(e Event) bool {
 		if e.Kind == EventKindBatchIntroduction {
 			segIntroCompleted++
 			if segIntroCompleted == 3 {
@@ -61,6 +61,7 @@ func TestObsoleteSegmentMergeIntroduction(t *testing.T) {
 			mergeIntroComplete.Done()
 
 		}
+		return true
 	}
 
 	ourConfig := make(map[string]interface{}, len(testConfig))
