@@ -1132,6 +1132,7 @@ func (s *Scorch) removeOldZapFiles() error {
 	}
 
 	s.rootLock.RLock()
+	s.copyLock.RLock()
 
 	for _, f := range files {
 		fname := f.Name()
@@ -1145,6 +1146,7 @@ func (s *Scorch) removeOldZapFiles() error {
 		}
 	}
 
+	s.copyLock.RUnlock()
 	s.rootLock.RUnlock()
 
 	return nil

@@ -49,7 +49,7 @@ type Scorch struct {
 
 	unsafeBatch bool
 
-	rootLock             sync.RWMutex
+	rootLock sync.RWMutex
 
 	root                 *IndexSnapshot // holds 1 ref-count on the root
 	rootPersisted        []chan error   // closed when root is persisted
@@ -58,10 +58,12 @@ type Scorch struct {
 	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
 
+	copyLock sync.RWMutex
+
 	// keeps track of segments scheduled for online copy/backup operation. Each segment's filename maps to
 	// the count of copy schedules. Segments with non-zero counts are protected from removal by the cleanup
 	// operation. Counts decrement upon successful copy, allowing removal of segments with zero or absent counts.
-	// must be accessed within the rootLock as it is accessed by the asynchronous cleanup routine.
+	// must be accessed within the copyLock as it is accessed by the asynchronous cleanup routine.
 	copyScheduled map[string]int
 
 	numSnapshotsToKeep       int
@@ -850,7 +852,7 @@ func newFieldStats() *fieldStats {
 // remain on disk for backup, preventing race conditions with the persister/merger cleanup.
 // Close the reader after backup to allow segment removal by the persister/merger.
 func (s *Scorch) CopyReader() index.CopyReader {
-	s.rootLock.Lock()
+	s.rootLock.RLock()
 	rv := s.root
 	if rv != nil {
 		rv.AddRef()
@@ -860,6 +862,7 @@ func (s *Scorch) CopyReader() index.CopyReader {
 		// because during the backup, the unpersisted segments may get persisted and
 		// hence we need to protect both the unpersisted and persisted segments from removal
 		// by the cleanup routine during the online backup
+		s.copyLock.Lock()
 		for _, seg := range rv.segment {
 			if perSeg, ok := seg.segment.(segment.PersistedSegment); ok {
 				// segment is persisted
@@ -872,7 +875,8 @@ func (s *Scorch) CopyReader() index.CopyReader {
 			}
 			rv.parent.copyScheduled[fileName]++
 		}
+		s.copyLock.Unlock()
 	}
-	s.rootLock.Unlock()
+	s.rootLock.RUnlock()
 	return rv
 }

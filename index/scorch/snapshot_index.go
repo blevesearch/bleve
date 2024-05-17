@@ -908,7 +908,7 @@ func (is *IndexSnapshot) GetSpatialAnalyzerPlugin(typ string) (
 
 func (is *IndexSnapshot) CloseCopyReader() error {
 	// first unmark the segments that were marked for backup by this index snapshot
-	is.parent.rootLock.Lock()
+	is.parent.copyLock.Lock()
 	for _, seg := range is.segment {
 		var fileName string
 		if perSeg, ok := seg.segment.(segment.PersistedSegment); ok {
@@ -924,7 +924,7 @@ func (is *IndexSnapshot) CloseCopyReader() error {
 			delete(is.parent.copyScheduled, fileName)
 		}
 	}
-	is.parent.rootLock.Unlock()
+	is.parent.copyLock.Unlock()
 	// close the index snapshot normally
 	return is.Close()
 }
