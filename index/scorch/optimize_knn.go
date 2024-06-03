@@ -20,7 +20,6 @@ package scorch
 import (
 	"context"
 	"fmt"
-	"sync"
 	"sync/atomic"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -58,64 +57,34 @@ func (o *OptimizeVR) Finish() error {
 	// for each field, get the vector index --> invoke the zap func.
 	// for each VR, populate postings list and iterators
 	// by passing the obtained vector index and getting similar vectors.
-	// defer close index - just once.
-	var errorsM sync.Mutex
-	var errors []error
-
 	defer o.invokeSearcherEndCallback()
-
-	wg := sync.WaitGroup{}
-	semaphore := make(chan struct{}, BleveMaxKNNConcurrency)
-	// Launch goroutines to get vector index for each segment
 	for i, seg := range o.snapshot.segment {
 		if sv, ok := seg.segment.(segment_api.VectorSegment); ok {
-			wg.Add(1)
-			semaphore <- struct{}{} // Acquire a semaphore slot
-			go func(index int, segment segment_api.VectorSegment, origSeg *SegmentSnapshot) {
-				defer func() {
-					<-semaphore // Release the semaphore slot
-					wg.Done()
-				}()
-				for field, vrs := range o.vrs {
-					vecIndex, err := segment.InterpretVectorIndex(field, origSeg.deleted)
-					if err != nil {
-						errorsM.Lock()
-						errors = append(errors, err)
-						errorsM.Unlock()
-						return
-					}
-
-					// update the vector index size as a meta value in the segment snapshot
-					vectorIndexSize := vecIndex.Size()
-					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
-					for _, vr := range vrs {
-						// for each VR, populate postings list and iterators
-						// by passing the obtained vector index and getting similar vectors.
-						pl, err := vecIndex.Search(vr.vector, vr.k)
-						if err != nil {
-							errorsM.Lock()
-							errors = append(errors, err)
-							errorsM.Unlock()
-							go vecIndex.Close()
-							return
-						}
-
-						atomic.AddUint64(&o.snapshot.parent.stats.TotKNNSearches, uint64(1))
-
-						// postings and iterators are already alloc'ed when
-						// IndexSnapshotVectorReader is created
-						vr.postings[index] = pl
-						vr.iterators[index] = pl.Iterator(vr.iterators[index])
-					}
-					go vecIndex.Close()
+			for field, vrs := range o.vrs {
+				vecIndex, err := sv.InterpretVectorIndex(field, seg.deleted)
+				if err != nil {
+					return err
 				}
-			}(i, sv, seg)
+				// update the vector index size as a meta value in the segment snapshot
+				vectorIndexSize := vecIndex.Size()
+				seg.cachedMeta.updateMeta(field, vectorIndexSize)
+				for _, vr := range vrs {
+					// for each VR, populate postings list and iterators
+					// by passing the obtained vector index and getting similar vectors.
+					pl, err := vecIndex.Search(vr.vector, vr.k)
+					if err != nil {
+						vecIndex.Close()
+						return err
+					}
+					atomic.AddUint64(&o.snapshot.parent.stats.TotKNNSearches, uint64(1))
+					// postings and iterators are already alloc'ed when
+					// IndexSnapshotVectorReader is created
+					vr.postings[i] = pl
+					vr.iterators[i] = pl.Iterator(vr.iterators[i])
+				}
+				vecIndex.Close()
+			}
 		}
-	}
-	wg.Wait()
-	close(semaphore)
-	if len(errors) > 0 {
-		return errors[0]
 	}
 	return nil
 }
