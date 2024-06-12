@@ -6,8 +6,8 @@ github.com/blevesearch/bleve_index_api v1.1.9 h1:Cpq0Lp3As0Gfk3+PmcoNDRKeI50C5yu
 github.com/blevesearch/bleve_index_api v1.1.9/go.mod h1:PbcwjIcRmjhGbkS/lJCpfgVSMROV6TRubGGAODaK1W8=
 github.com/blevesearch/geo v0.1.20 h1:paaSpu2Ewh/tn5DKn/FB5SzvH0EWupxHEIwbCk/QPqM=
 github.com/blevesearch/geo v0.1.20/go.mod h1:DVG2QjwHNMFmjo+ZgzrIq2sfCh6rIHzy9d9d0B59I6w=
-github.com/blevesearch/go-faiss v1.0.17 h1:NQj0bvDPE4KLD+i5WAcbzYoOjdCm75lR6joY+6cHneM=
-github.com/blevesearch/go-faiss v1.0.17/go.mod h1:jrxHrbl42X/RnDPI+wBoZU8joxxuRwedrxqswQ3xfU8=
+github.com/blevesearch/go-faiss v1.0.18 h1:eOsFO5td+hE2c2EY2/74GoiPKq79dwQfBNjLGog3Bis=
+github.com/blevesearch/go-faiss v1.0.18/go.mod h1:jrxHrbl42X/RnDPI+wBoZU8joxxuRwedrxqswQ3xfU8=
 github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475 h1:kDy+zgJFJJoJYBvdfBSiZYBbdsUL0XcjHYWezpQBGPA=
 github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475/go.mod h1:9eJDeqxJ3E7WnLebQUlPD7ZjSce7AnDb9vjGmMCbD0A=
 github.com/blevesearch/go-porterstemmer v1.0.3 h1:GtmsqID0aZdCSNiY8SkuPJ12pD4jI+DdXTAn4YRcHCo=
@@ -43,8 +43,8 @@ github.com/blevesearch/zapx/v14 v14.3.10 h1:SG6xlsL+W6YjhX5N3aEiL/2tcWh3DO75Bnz7
 github.com/blevesearch/zapx/v14 v14.3.10/go.mod h1:qqyuR0u230jN1yMmE4FIAuCxmahRQEOehF78m6oTgns=
 github.com/blevesearch/zapx/v15 v15.3.13 h1:6EkfaZiPlAxqXz0neniq35my6S48QI94W/wyhnpDHHQ=
 github.com/blevesearch/zapx/v15 v15.3.13/go.mod h1:Turk/TNRKj9es7ZpKK95PS7f6D44Y7fAFy8F4LXQtGg=
-github.com/blevesearch/zapx/v16 v16.1.2 h1:4RLTpgSXTda4Ckyd2/sJC5tH/JkwWer2urxhqDKM3yI=
-github.com/blevesearch/zapx/v16 v16.1.2/go.mod h1:Bl2coBb5CKETmqS8SQUUP99zZ5Wzga4+TNrO4X//qsY=
+github.com/blevesearch/zapx/v16 v16.1.3 h1:QB1mE5cp7qXnF36bXEEmYXEErbx1H4BubpA+jnqyYNM=
+github.com/blevesearch/zapx/v16 v16.1.3/go.mod h1:ELACyPCwHrutkDK6FUC8vt0Snsl3wVGzkKPAlmrSUxw=
 github.com/couchbase/ghistogram v0.1.0 h1:b95QcQTCzjTUocDXp/uMgSNQi8oj1tGwnJ4bODWZnps=
 github.com/couchbase/ghistogram v0.1.0/go.mod h1:s1Jhy76zqfEecpNWJfWUiKZookAFaiGOEoyzgHt9i7k=
 github.com/couchbase/moss v0.2.0 h1:VCYrMzFwEryyhRSeI+/b3tRBSeTpi/8gn5Kf6dxqn+o=
