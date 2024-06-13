@@ -89,6 +89,10 @@ func RollbackPoints(path string) ([]*RollbackPoint, error) {
 		for j, _ := c2.First(); j != nil; j, _ = c2.Next() {
 			if j[0] == boltInternalKey[0] {
 				internalBucket := snapshot.Bucket(j)
+				if internalBucket == nil {
+					err = fmt.Errorf("internal bucket missing")
+					break
+				}
 				err = internalBucket.ForEach(func(key []byte, val []byte) error {
 					copiedVal := append([]byte(nil), val...)
 					meta[string(key)] = copiedVal
