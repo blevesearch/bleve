@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"sync/atomic"
 
@@ -118,7 +119,11 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 		rv.Freq = next.Frequency()
 	}
 	if i.includeNorm {
-		rv.Norm = next.Norm()
+		if i.snapshot.parent.segPlugin.Version() >= 15 {
+			rv.Norm = float64(1.0 / math.Sqrt(float64(next.Norm())))
+		} else {
+			rv.Norm = next.Norm()
+		}
 	}
 	if i.includeTermVectors {
 		locs := next.Locations()
