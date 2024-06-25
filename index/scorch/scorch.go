@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -50,12 +51,19 @@ type Scorch struct {
 	unsafeBatch bool
 
 	rootLock             sync.RWMutex
+
 	root                 *IndexSnapshot // holds 1 ref-count on the root
 	rootPersisted        []chan error   // closed when root is persisted
 	persistedCallbacks   []index.BatchCallback
 	nextSnapshotEpoch    uint64
 	eligibleForRemoval   []uint64        // Index snapshot epochs that are safe to GC.
 	ineligibleForRemoval map[string]bool // Filenames that should not be GC'ed yet.
+
+	// keeps track of segments scheduled for online copy/backup operation. Each segment's filename maps to
+	// the count of copy schedules. Segments with non-zero counts are protected from removal by the cleanup
+	// operation. Counts decrement upon successful copy, allowing removal of segments with zero or absent counts.
+	// must be accessed within the rootLock as it is accessed by the asynchronous cleanup routine.
+	copyScheduled map[string]int
 
 	numSnapshotsToKeep int
 	closeCh            chan struct{}
@@ -110,6 +118,7 @@ func NewScorch(storeName string,
 		ineligibleForRemoval: map[string]bool{},
 		forceMergeRequestCh:  make(chan *mergerCtrl, 1),
 		segPlugin:            defaultSegmentPlugin,
+		copyScheduled:        map[string]int{},
 	}
 
 	forcedSegmentType, forcedSegmentVersion, err := configForceSegmentTypeVersion(config)
@@ -714,4 +723,35 @@ func parseToInteger(i interface{}) (int, error) {
 	default:
 		return 0, fmt.Errorf("expects int or float64 value")
 	}
+}
+
+// CopyReader returns a low-level accessor for index data, ensuring persisted segments
+// remain on disk for backup, preventing race conditions with the persister/merger cleanup.
+// Close the reader after backup to allow segment removal by the persister/merger.
+func (s *Scorch) CopyReader() index.CopyReader {
+	s.rootLock.Lock()
+	rv := s.root
+	if rv != nil {
+		rv.AddRef()
+		var fileName string
+		// schedule a backup for all the segments from the root. Note that the
+		// both the unpersisted and persisted segments are scheduled for backup.
+		// because during the backup, the unpersisted segments may get persisted and
+		// hence we need to protect both the unpersisted and persisted segments from removal
+		// by the cleanup routine during the online backup
+		for _, seg := range rv.segment {
+			if perSeg, ok := seg.segment.(segment.PersistedSegment); ok {
+				// segment is persisted
+				fileName = filepath.Base(perSeg.Path())
+			} else {
+				// segment is not persisted
+				// the name of the segment file that is generated if the
+				// the segment is persisted in the future.
+				fileName = zapFileName(seg.id)
+			}
+			rv.parent.copyScheduled[fileName]++
+		}
+	}
+	s.rootLock.Unlock()
+	return rv
 }
