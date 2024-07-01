@@ -43,8 +43,9 @@ type persistIntroduction struct {
 }
 
 type epochWatcher struct {
-	epoch    uint64
-	notifyCh notificationChan
+	rootChange bool
+	epoch      uint64
+	notifyCh   notificationChan
 }
 
 func (s *Scorch) introducerLoop() {

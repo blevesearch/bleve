@@ -71,6 +71,7 @@ OUTER:
 			if ctrlMsg == nil && ourSnapshot.epoch != lastEpochMergePlanned {
 				ctrlMsg = ctrlMsgDflt
 			}
+			var rootChange bool = true
 			if ctrlMsg != nil {
 				continueMerge := s.fireEvent(EventKindPreMergeCheck, 0)
 				// The default, if there's no handler, is to continue the merge.
@@ -89,26 +90,30 @@ OUTER:
 				err := s.planMergeAtSnapshot(ctrlMsg.ctx, ctrlMsg.options,
 					ourSnapshot)
 				if err != nil {
-					atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
-					if err == segment.ErrClosed {
-						// index has been closed
-						_ = ourSnapshot.DecRef()
+					if err == noOpMerge {
+						rootChange = false
+					} else {
+						atomic.StoreUint64(&s.iStats.mergeEpoch, 0)
+						if err == segment.ErrClosed {
+							// index has been closed
+							_ = ourSnapshot.DecRef()
 
-						// continue the workloop on a user triggered cancel
-						if ctrlMsg.doneCh != nil {
-							close(ctrlMsg.doneCh)
+							// continue the workloop on a user triggered cancel
+							if ctrlMsg.doneCh != nil {
+								close(ctrlMsg.doneCh)
+								ctrlMsg = nil
+								continue OUTER
+							}
+
+							// exit the workloop on index closure
 							ctrlMsg = nil
-							continue OUTER
+							break OUTER
 						}
-
-						// exit the workloop on index closure
-						ctrlMsg = nil
-						break OUTER
+						s.fireAsyncError(fmt.Errorf("merging err: %v", err))
+						_ = ourSnapshot.DecRef()
+						atomic.AddUint64(&s.stats.TotFileMergeLoopErr, 1)
+						continue OUTER
 					}
-					s.fireAsyncError(fmt.Errorf("merging err: %v", err))
-					_ = ourSnapshot.DecRef()
-					atomic.AddUint64(&s.stats.TotFileMergeLoopErr, 1)
-					continue OUTER
 				}
 
 				if ctrlMsg.doneCh != nil {
@@ -127,8 +132,9 @@ OUTER:
 			// tell the persister we're waiting for changes
 			// first make a epochWatcher chan
 			ew := &epochWatcher{
-				epoch:    lastEpochMergePlanned,
-				notifyCh: make(notificationChan, 1),
+				rootChange: rootChange,
+				epoch:      lastEpochMergePlanned,
+				notifyCh:   make(notificationChan, 1),
 			}
 
 			// give it to the persister
@@ -258,6 +264,8 @@ func (w *closeChWrapper) listen() {
 	}
 }
 
+var noOpMerge error = fmt.Errorf("no-op merge")
+
 func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 	options *mergeplan.MergePlanOptions, ourSnapshot *IndexSnapshot) error {
 	// build list of persisted segments in this snapshot
@@ -295,7 +303,7 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 	if len(resultMergePlan.Tasks) == 0 {
 		atomic.AddUint64(&s.stats.TotFileMergePlanZeroTasks, 1)
-		return nil
+		return noOpMerge
 	}
 
 	for _, task := range resultMergePlan.Tasks {
