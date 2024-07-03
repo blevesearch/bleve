@@ -6,10 +6,30 @@
 
 ## Pre-requisite(s)
 
-* Induction of [FAISS](https://github.com/blevesearch/faiss) into our eco system.
+* Induction of [FAISS](https://github.com/blevesearch/faiss) into our eco system, which is a fork of the original [facebookresearch/faiss](https://github.com/facebookresearch/faiss)
 * FAISS is a C++ library that needs to be compiled and it's shared libraries need to be situated at an accessible path for your application.
 * A `vectors` GO TAG needs to be set for bleve to access all the supporting code. This TAG must be set only after the FAISS shared library is made available. Failure to do either will inhibit you from using this feature.
 * Please follow these [instructions](#setup-instructions) below for any assistance in the area.
+* Releases of `blevesearch/bleve` work with select checkpoints of `blevesearch/faiss` owing to API changes and improvements:
+    * *v2.4.0* requires [blevesearch/faiss@7b119f4](https://github.com/blevesearch/faiss/tree/7b119f4b9c408989b696b36f8cc53908e53de6db) (modified v1.7.4)
+    * *v2.4.1* requires [blevesearch/faiss@d9db66a](https://github.com/blevesearch/faiss/tree/d9db66a38518d99eb334218697e1df0732f3fdf8) (modified v1.7.4)
+
+## Supported
+
+* The `vector` field type is an array that is to hold float32 values only.
+* The `vector_base64` field type to support base64 encoded strings using little endian byte ordering (v2.4.1+)
+* Currently supported similarity metrics are: [`"l2_norm"`, `"dot_product"`].
+* Supported dimensionality is between 1 and 2048 (v2.4.0), and up to **4096** (v2.4.1+).
+* Supported vector index optimizations: `recall`, `latency`, `memory_efficient` (v2.4.1+)
+* Vectors from documents that do not conform to the index mapping dimensionality are simply discarded at index time.
+* The dimensionality of the query vector must match the dimensionality of the indexed vectors to obtain any results.
+* Pure kNN searches can be performed, but the `query` attribute within the search request must be set - to `{"match_none": {}}` in this case. The `query` attribute is made optional when `knn` is available with v2.4.1+.
+* Hybrid searches are supported, where results from `query` are unioned (for now) with results from `knn`. The tf-idf scores from exact searches are simply summed with the similarity distances to determine the aggregate scores.
+```
+aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distance)
+```
+* Multi kNN searches are supported - the `knn` object within the search request accepts an array of requests. These sub objects are unioned by default but this behavior can be overriden by setting `knn_operator` to `"and"`.
+* Previously supported pagination settings will work as they were, with size/limit being applied over the top-K hits combined with any exact search hits.
 
 ## Indexing
 
@@ -57,21 +77,6 @@ if err != nil {
 }
 fmt.Println(searchResult.Hits)
 ```
-
-## Caveats
-
-* The `vector` field type is an array that is to hold float32 values only.
-* Currently supported similarity metrics are: [`"l2_norm"`, `"dot_product"`].
-* Supported dimensionality is between 1 and 2048 at the moment.
-* Vectors from documents that do not conform to the index mapping dimensionality are simply discarded at index time.
-* The dimensionality of the query vector must match the dimensionality of the indexed vectors to obtain any results.
-* Pure kNN searches can be performed, but the `query` attribute within the search request must be set - to `{"match_none": {}}` in this case.
-* Hybrid searches are supported, where results from `query` are unioned (for now) with results from `knn`. The tf-idf scores from exact searches are simply summed with the similarity distances to determine the aggregate scores.
-```
-aggregate_score = (query_boost * query_hit_score) + (knn_boost * knn_hit_distance)
-```
-* Multi kNN searches are supported - the `knn` object within the search request accepts an array of requests. These sub objects are unioned by default but this behavior can be overriden by setting `knn_operator` to `"and"`.
-* Previously supported pagination settings will work as they were, with size/limit being applied over the top-K hits combined with any exact search hits.
 
 ## Setup Instructions
 
