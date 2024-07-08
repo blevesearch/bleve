@@ -19,6 +19,7 @@ package query
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -32,6 +33,9 @@ type KNNQuery struct {
 	Vector      []float32 `json:"vector"`
 	K           int64     `json:"k"`
 	BoostVal    *Boost    `json:"boost,omitempty"`
+
+	// see KNNRequest.Params for description
+	Params json.RawMessage `json:"params"`
 }
 
 func NewKNNQuery(vector []float32) *KNNQuery {
@@ -59,6 +63,10 @@ func (q *KNNQuery) Boost() float64 {
 	return q.BoostVal.Value()
 }
 
+func (q *KNNQuery) SetParams(params json.RawMessage) {
+	q.Params = params
+}
+
 func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
 	m mapping.IndexMapping, options search.SearcherOptions) (search.Searcher, error) {
 	fieldMapping := m.FieldMappingForPath(q.VectorField)
@@ -70,5 +78,5 @@ func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
 		return nil, fmt.Errorf("k must be greater than 0 and vector must be non-empty")
 	}
 	return searcher.NewKNNSearcher(ctx, i, m, options, q.VectorField,
-		q.Vector, q.K, q.BoostVal.Value(), similarityMetric)
+		q.Vector, q.K, q.BoostVal.Value(), similarityMetric, q.Params)
 }
