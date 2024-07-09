@@ -150,6 +150,7 @@ var DefaultMergePlanOptions = MergePlanOptions{
 var SingleSegmentMergePlanOptions = MergePlanOptions{
 	MaxSegmentsPerTier:   1,
 	MaxSegmentSize:       1 << 30,
+	MaxSegmentFileSize:   1 << 40,
 	TierGrowth:           1.0,
 	SegmentsPerMergeTask: 10,
 	FloorSegmentSize:     1 << 30,
