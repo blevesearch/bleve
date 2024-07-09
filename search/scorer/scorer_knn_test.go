@@ -103,7 +103,7 @@ func TestKNNScorerExplanation(t *testing.T) {
 			},
 			norm: 1.0,
 			scorer: NewKNNQueryScorer(queryVector, "desc", 1.0,
-				search.SearcherOptions{Explain: true}, index.CosineSimilarity),
+				search.SearcherOptions{Explain: true}, index.InnerProduct),
 			result: &search.DocumentMatch{
 				IndexInternalID: index.IndexInternalID("one"),
 				Score:           0.5,
@@ -127,7 +127,7 @@ func TestKNNScorerExplanation(t *testing.T) {
 			},
 			norm: 0.5,
 			scorer: NewKNNQueryScorer(queryVector, "desc", 1.0,
-				search.SearcherOptions{Explain: true}, index.CosineSimilarity),
+				search.SearcherOptions{Explain: true}, index.InnerProduct),
 			result: &search.DocumentMatch{
 				IndexInternalID: index.IndexInternalID("one"),
 				Score:           0.25,
