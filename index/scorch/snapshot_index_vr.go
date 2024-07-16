@@ -52,7 +52,9 @@ type IndexSnapshotVectorReader struct {
 
 func (i *IndexSnapshotVectorReader) Size() int {
 	sizeInBytes := reflectStaticSizeIndexSnapshotVectorReader + size.SizeOfPtr +
-		len(i.vector) + len(i.field) + len(i.currID)
+		len(i.vector)*size.SizeOfFloat32 +
+		len(i.field) +
+		len(i.currID)
 
 	for _, entry := range i.postings {
 		sizeInBytes += entry.Size()
@@ -64,6 +66,10 @@ func (i *IndexSnapshotVectorReader) Size() int {
 
 	if i.currPosting != nil {
 		sizeInBytes += i.currPosting.Size()
+	}
+
+	if i.snapshot != nil {
+		sizeInBytes += i.snapshot.Size()
 	}
 
 	return sizeInBytes

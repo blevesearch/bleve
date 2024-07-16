@@ -48,9 +48,16 @@ type GeoShapeField struct {
 }
 
 func (n *GeoShapeField) Size() int {
+	var freqSize int
+	if n.frequencies != nil {
+		freqSize = n.frequencies.Size()
+	}
 	return reflectStaticSizeGeoShapeField + size.SizeOfPtr +
 		len(n.name) +
-		len(n.arrayPositions)*size.SizeOfUint64
+		len(n.arrayPositions)*size.SizeOfUint64 +
+		len(n.encodedValue) +
+		len(n.value) +
+		freqSize
 }
 
 func (n *GeoShapeField) Name() string {

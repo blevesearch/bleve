@@ -47,9 +47,15 @@ type GeoPointField struct {
 }
 
 func (n *GeoPointField) Size() int {
+	var freqSize int
+	if n.frequencies != nil {
+		freqSize = n.frequencies.Size()
+	}
 	return reflectStaticSizeGeoPointField + size.SizeOfPtr +
 		len(n.name) +
-		len(n.arrayPositions)*size.SizeOfUint64
+		len(n.arrayPositions)*size.SizeOfUint64 +
+		len(n.value) +
+		freqSize
 }
 
 func (n *GeoPointField) Name() string {
