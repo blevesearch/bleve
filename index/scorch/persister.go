@@ -829,6 +829,10 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 	for k, _ := c.First(); k != nil; k, _ = c.Next() {
 		if k[0] == boltInternalKey[0] {
 			internalBucket := snapshot.Bucket(k)
+			if internalBucket == nil {
+				_ = rv.DecRef()
+				return nil, fmt.Errorf("internal bucket missing")
+			}
 			err := internalBucket.ForEach(func(key []byte, val []byte) error {
 				copiedVal := append([]byte(nil), val...)
 				rv.internal[string(key)] = copiedVal
@@ -1201,6 +1205,9 @@ func (s *Scorch) rootBoltSnapshotMetaData() ([]*snapshotMetaData, error) {
 			}
 
 			snapshot := snapshots.Bucket(sk)
+			if snapshot == nil {
+				continue
+			}
 			metaBucket := snapshot.Bucket(boltMetaDataKey)
 			if metaBucket == nil {
 				continue
