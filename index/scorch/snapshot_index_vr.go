@@ -68,10 +68,6 @@ func (i *IndexSnapshotVectorReader) Size() int {
 		sizeInBytes += i.currPosting.Size()
 	}
 
-	if i.snapshot != nil {
-		sizeInBytes += i.snapshot.Size()
-	}
-
 	return sizeInBytes
 }
 
