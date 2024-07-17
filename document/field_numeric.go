@@ -46,9 +46,15 @@ type NumericField struct {
 }
 
 func (n *NumericField) Size() int {
+	var freqSize int
+	if n.frequencies != nil {
+		freqSize = n.frequencies.Size()
+	}
 	return reflectStaticSizeNumericField + size.SizeOfPtr +
 		len(n.name) +
-		len(n.arrayPositions)*size.SizeOfPtr
+		len(n.arrayPositions)*size.SizeOfUint64 +
+		len(n.value) +
+		freqSize
 }
 
 func (n *NumericField) Name() string {

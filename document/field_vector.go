@@ -47,6 +47,8 @@ type VectorField struct {
 func (n *VectorField) Size() int {
 	return reflectStaticSizeVectorField + size.SizeOfPtr +
 		len(n.name) +
+		len(n.similarity) +
+		len(n.vectorIndexOptimizedFor) +
 		int(numBytesFloat32s(n.value))
 }
 
