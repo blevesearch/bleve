@@ -256,6 +256,16 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 		return ErrorIndexClosed
 	}
 
+	// notify handlers, if defined, that an index operation is about to be performed
+	intIndex, err := i.Advanced()
+	if err == nil {
+		if eventIndex, ok := intIndex.(index.EventIndex); ok {
+			eventIndex.OnIndexStart()
+			defer func() {
+				eventIndex.OnIndex()
+			}()
+		}
+	}
 	doc := document.NewDocument(id)
 	err = i.m.MapDocument(doc, data)
 	if err != nil {
