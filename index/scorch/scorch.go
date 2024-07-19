@@ -878,10 +878,16 @@ func (s *Scorch) CopyReader() index.CopyReader {
 	return rv
 }
 
-func (s *Scorch) OnIndexStart() {
-	s.fireEvent(EventKindIndexStart, 0)
-}
-
-func (s *Scorch) OnIndex() {
-	s.fireEvent(EventKindIndex, 0)
+// external API to fire a scorch event externally from bleve
+func (s *Scorch) FireEvent(eventKind index.EventKind) {
+	// switch on bleve the event kind and fire the corresponding scorch event
+	switch eventKind {
+	case index.EventKindIndex:
+		// bleve is about to index a document using the Index() API
+		// fire the corresponding scorch event
+		s.fireEvent(EventKindIndexStart, 0)
+	default:
+		// do nothing
+		return
+	}
 }

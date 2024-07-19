@@ -46,21 +46,11 @@ func (b *Batch) Index(id string, data interface{}) error {
 	if id == "" {
 		return ErrorEmptyID
 	}
-	// notify handlers, if defined, that an index operation is about to be performed
-	// and that it would require additional memory estimated to be equal to the size
-	// of the last document indexed.
-	intIndex, err := b.index.Advanced()
-	if err == nil {
-		if eventIndex, ok := intIndex.(index.EventIndex); ok {
-			eventIndex.OnIndexStart()
-			defer func() {
-				eventIndex.OnIndex()
-			}()
-		}
+	if eventIndex, ok := b.index.(index.EventIndex); ok {
+		eventIndex.FireEvent(index.EventKindIndex)
 	}
-
 	doc := document.NewDocument(id)
-	err = b.index.Mapping().MapDocument(doc, data)
+	err := b.index.Mapping().MapDocument(doc, data)
 	if err != nil {
 		return err
 	}

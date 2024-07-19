@@ -71,6 +71,3 @@ var EventKindPreMergeCheck = EventKind(9)
 // EventKindIndexStart is fired when Index() is invoked which
 // creates a new Document object from an interface using the index mapping.
 var EventKindIndexStart = EventKind(10)
-
-// EventKindIndex is fired when Index() completes.
-var EventKindIndex = EventKind(11)
