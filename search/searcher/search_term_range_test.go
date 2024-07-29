@@ -244,7 +244,7 @@ func TestTermRangeSearchTooManyTerms(t *testing.T) {
 	}
 	next, err := searcher.Next(ctx)
 	i := 0
-	for err == nil && next != nil {
+	for next != nil {
 		extId, err := scorchReader.ExternalID(next.IndexInternalID)
 		if err != nil {
 			t.Fatal(err)
@@ -252,10 +252,10 @@ func TestTermRangeSearchTooManyTerms(t *testing.T) {
 		got = append(got, extId)
 		ctx.DocumentMatchPool.Put(next)
 		next, err = searcher.Next(ctx)
+		if err != nil {
+			t.Fatalf("error iterating searcher: %v", err)
+		}
 		i++
-	}
-	if err != nil {
-		t.Fatalf("error iterating searcher: %v", err)
 	}
 	err = searcher.Close()
 	if err != nil {

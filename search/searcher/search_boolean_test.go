@@ -205,6 +205,9 @@ func TestBooleanSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	conjunctionSearcher7, err := NewConjunctionSearcher(nil, twoDocIndexReader, []search.Searcher{martyTermSearcher7, booleanSearcher7}, explainTrue)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// test 7
 	beerTermSearcher8, err := NewTermSearcher(nil, twoDocIndexReader, "beer", "desc", 1.0, explainTrue)
