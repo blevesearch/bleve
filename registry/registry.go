@@ -34,7 +34,7 @@ var charFilters = make(CharFilterRegistry, 0)
 var tokenizers = make(TokenizerRegistry, 0)
 var tokenMaps = make(TokenMapRegistry, 0)
 var tokenFilters = make(TokenFilterRegistry, 0)
-var analyzers = make(AnalyzerRegistry, 0)
+var analyzers = NewAnalyzerRegistry()
 var dateTimeParsers = make(DateTimeParserRegistry, 0)
 
 type Cache struct {

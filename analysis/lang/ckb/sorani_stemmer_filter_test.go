@@ -26,7 +26,7 @@ func TestSoraniStemmerFilter(t *testing.T) {
 
 	// in order to match the lucene tests
 	// we will test with an analyzer, not just the stemmer
-	analyzer := analysis.DefaultAnalyzer{
+	analyzer := &analysis.DefaultAnalyzer{
 		Tokenizer: single.NewSingleTokenTokenizer(),
 		TokenFilters: []analysis.TokenFilter{
 			NewSoraniNormalizeFilter(),
@@ -283,7 +283,11 @@ func TestSoraniStemmerFilter(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := analyzer.Analyze(test.input)
+		actual, err := analysis.AnalyzeForTokens(analyzer, test.input)
+		if err != nil {
+			t.Errorf("error analyzing input: %v", err)
+		}
+
 		if !reflect.DeepEqual(actual, test.output) {
 			t.Errorf("for input %s(% x)", test.input, test.input)
 			t.Errorf("\texpected:")

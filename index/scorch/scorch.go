@@ -409,6 +409,11 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 				if doc != nil {
 					// put the work on the queue
 					s.analysisQueue.Queue(func() {
+						// ignoring the analysis errors here.
+						// Data for all the fields with analysis errors will be ignored.
+						//
+						// todo: collect stats on analysis errors and also maintain
+						// records of such unique errors.
 						analyze(doc, s.setSpatialAnalyzerPlugin)
 						resultChan <- doc
 					})
@@ -674,8 +679,8 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	return m
 }
 
-func (s *Scorch) Analyze(d index.Document) {
-	analyze(d, s.setSpatialAnalyzerPlugin)
+func (s *Scorch) Analyze(d index.Document) map[string]error {
+	return analyze(d, s.setSpatialAnalyzerPlugin)
 }
 
 type customAnalyzerPluginInitFunc func(field index.Field)
@@ -691,14 +696,19 @@ func (s *Scorch) setSpatialAnalyzerPlugin(f index.Field) {
 	}
 }
 
-func analyze(d index.Document, fn customAnalyzerPluginInitFunc) {
+func analyze(d index.Document, fn customAnalyzerPluginInitFunc) map[string]error {
+	rv := make(map[string]error)
 	d.VisitFields(func(field index.Field) {
 		if field.Options().IsIndexed() {
 			if fn != nil {
 				fn(field)
 			}
 
-			field.Analyze()
+			err := field.Analyze()
+			if err != nil {
+				rv[field.Name()] = err
+				return
+			}
 
 			if d.HasComposite() && field.Name() != "_id" {
 				// see if any of the composite fields need this
@@ -708,6 +718,8 @@ func analyze(d index.Document, fn customAnalyzerPluginInitFunc) {
 			}
 		}
 	})
+
+	return rv
 }
 
 func (s *Scorch) AddEligibleForRemoval(epoch uint64) {

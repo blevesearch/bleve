@@ -82,8 +82,9 @@ func (n *VectorField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return nil
 }
 
-func (n *VectorField) Analyze() {
+func (n *VectorField) Analyze() error {
 	// vectors aren't analyzed
+	return nil
 }
 
 func (n *VectorField) Value() []byte {
