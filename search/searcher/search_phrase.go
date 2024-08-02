@@ -67,25 +67,32 @@ func (s *PhraseSearcher) Size() int {
 }
 
 func NewPhraseSearcher(ctx context.Context, indexReader index.IndexReader, terms []string,
-	fuzziness int, field string, boost float64, options search.SearcherOptions) (*PhraseSearcher, error) {
+	fuzziness int, autoFuzzy bool, field string, boost float64, options search.SearcherOptions) (*PhraseSearcher, error) {
 
 	// turn flat terms []string into [][]string
 	mterms := make([][]string, len(terms))
 	for i, term := range terms {
 		mterms[i] = []string{term}
 	}
-	return NewMultiPhraseSearcher(ctx, indexReader, mterms, fuzziness, field, boost, options)
+	return NewMultiPhraseSearcher(ctx, indexReader, mterms, fuzziness, autoFuzzy, field, boost, options)
 }
 
 func NewMultiPhraseSearcher(ctx context.Context, indexReader index.IndexReader, terms [][]string,
-	fuzziness int, field string, boost float64, options search.SearcherOptions) (*PhraseSearcher, error) {
+	fuzziness int, autoFuzzy bool, field string, boost float64, options search.SearcherOptions) (*PhraseSearcher, error) {
 
 	options.IncludeTermVectors = true
 	var termPositionSearchers []search.Searcher
 	var err error
 	var ts search.Searcher
+	// The following logic checks if fuzziness is enabled.
+	// Fuzziness is considered enabled if either:
+	//    a. `fuzziness` is greater than 0, or
+	//    b. `autoFuzzy` is set to true.
+	// if both conditions are true, `autoFuzzy` takes precedence.
+	// If enabled, a map will be created to store the matches for fuzzy terms.
+	fuzzinessEnabled := autoFuzzy || fuzziness > 0
 	var fuzzyTermMatches map[string][]string
-	if fuzziness > 0 {
+	if fuzzinessEnabled {
 		fuzzyTermMatches = make(map[string][]string)
 		ctx = context.WithValue(ctx, search.FuzzyMatchPhraseKey, fuzzyTermMatches)
 	}
@@ -95,9 +102,15 @@ func NewMultiPhraseSearcher(ctx context.Context, indexReader index.IndexReader, 
 	for _, termPos := range terms {
 		if len(termPos) == 1 && termPos[0] != "" {
 			// single term
-			if fuzziness > 0 {
+			if fuzzinessEnabled {
 				// fuzzy
-				ts, err = NewFuzzySearcher(ctx, indexReader, termPos[0], 0, fuzziness, field, boost, options)
+				if autoFuzzy {
+					// auto fuzzy
+					ts, err = NewAutoFuzzySearcher(ctx, indexReader, termPos[0], 0, field, boost, options)
+				} else {
+					// non-auto fuzzy
+					ts, err = NewFuzzySearcher(ctx, indexReader, termPos[0], 0, fuzziness, field, boost, options)
+				}
 			} else {
 				// non-fuzzy
 				ts, err = NewTermSearcher(ctx, indexReader, termPos[0], field, boost, options)
@@ -117,9 +130,15 @@ func NewMultiPhraseSearcher(ctx context.Context, indexReader index.IndexReader, 
 				if term == "" {
 					continue
 				}
-				if fuzziness > 0 {
+				if fuzzinessEnabled {
 					// fuzzy
-					ts, err = NewFuzzySearcher(ctx, indexReader, term, 0, fuzziness, field, boost, options)
+					if autoFuzzy {
+						// auto fuzzy
+						ts, err = NewAutoFuzzySearcher(ctx, indexReader, term, 0, field, boost, options)
+					} else {
+						// non-auto fuzzy
+						ts, err = NewFuzzySearcher(ctx, indexReader, term, 0, fuzziness, field, boost, options)
+					}
 				} else {
 					// non-fuzzy
 					ts, err = NewTermSearcher(ctx, indexReader, term, field, boost, options)

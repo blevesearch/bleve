@@ -71,6 +71,21 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 		boost, options, true)
 }
 
+func getAutoFuzziness(term string) int {
+	termLength := len(term)
+	if termLength > 5 {
+		return 2
+	} else if termLength > 2 {
+		return 1
+	}
+	return 0
+}
+
+func NewAutoFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term string,
+	prefix int, field string, boost float64, options search.SearcherOptions) (search.Searcher, error) {
+	return NewFuzzySearcher(ctx, indexReader, term, prefix, getAutoFuzziness(term), field, boost, options)
+}
+
 type fuzzyCandidates struct {
 	candidates []string
 	bytesRead  uint64

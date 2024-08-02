@@ -37,7 +37,7 @@ func TestPhraseSearch(t *testing.T) {
 	}()
 
 	soptions := search.SearcherOptions{Explain: true, IncludeTermVectors: true}
-	phraseSearcher, err := NewPhraseSearcher(nil, twoDocIndexReader, []string{"angst", "beer"}, 0, "desc", 1.0, soptions)
+	phraseSearcher, err := NewPhraseSearcher(nil, twoDocIndexReader, []string{"angst", "beer"}, 0, false, "desc", 1.0, soptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestMultiPhraseSearch(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		searcher, err := NewMultiPhraseSearcher(nil, reader, test.phrase, 0, "desc", 1.0, soptions)
+		searcher, err := NewMultiPhraseSearcher(nil, reader, test.phrase, 0, false, "desc", 1.0, soptions)
 		if err != nil {
 			t.Error(err)
 		}
@@ -207,7 +207,7 @@ func TestFuzzyMultiPhraseSearch(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		searcher, err := NewMultiPhraseSearcher(context.TODO(), reader, test.mphrase, test.fuzziness, "desc", 1.0, soptions)
+		searcher, err := NewMultiPhraseSearcher(context.TODO(), reader, test.mphrase, test.fuzziness, false, "desc", 1.0, soptions)
 		if err != nil {
 			t.Error(err)
 		}
