@@ -35,6 +35,19 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 	if fuzziness < 0 {
 		return nil, fmt.Errorf("invalid fuzziness, negative")
 	}
+	if fuzziness == 0 {
+		// no fuzziness, just do a term search
+		// check if the call is made from a phrase searcher
+		// and if so, add the term to the fuzzy term matches
+		// since the fuzzy candidate terms are not collected
+		// for a term search, and the only candidate term is
+		// the term itself
+		fuzzyTermMatches := ctx.Value(search.FuzzyMatchPhraseKey)
+		if fuzzyTermMatches != nil {
+			fuzzyTermMatches.(map[string][]string)[term] = []string{term}
+		}
+		return NewTermSearcher(ctx, indexReader, term, field, boost, options)
+	}
 
 	// Note: we don't byte slice the term for a prefix because of runes.
 	prefixTerm := ""
