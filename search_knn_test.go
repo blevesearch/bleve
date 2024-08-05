@@ -819,7 +819,6 @@ func compareExplanation(a, b *search.Explanation) bool {
 	}
 
 	if truncateScore(a.Value) != truncateScore(b.Value) || len(a.Children) != len(b.Children) {
-		fmt.Println(truncateScore(a.Value), truncateScore(b.Value), len(a.Children), len(b.Children))
 		return false
 	}
 
