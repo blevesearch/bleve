@@ -143,25 +143,25 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 			testType:           "multi_partition:match_none:oneKNNreq:k=3",
 			queryIndex:         0,
 			numIndexPartitions: 7,
-			mapping:            indexMappingDotProduct,
+			mapping:            indexMappingCosine,
 		},
 		{
 			testType:           "multi_partition:match_none:oneKNNreq:k=2",
 			queryIndex:         0,
 			numIndexPartitions: 5,
-			mapping:            indexMappingDotProduct,
+			mapping:            indexMappingCosine,
 		},
 		{
 			testType:           "multi_partition:match:oneKNNreq:k=2",
 			queryIndex:         1,
 			numIndexPartitions: 3,
-			mapping:            indexMappingDotProduct,
+			mapping:            indexMappingCosine,
 		},
 		{
 			testType:           "multi_partition:disjunction:twoKNNreq:k=2,2",
 			queryIndex:         2,
 			numIndexPartitions: 9,
-			mapping:            indexMappingDotProduct,
+			mapping:            indexMappingCosine,
 		},
 	}
 

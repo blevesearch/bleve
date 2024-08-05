@@ -19,6 +19,7 @@ package mapping
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/document"
@@ -140,6 +141,10 @@ func (fm *FieldMapping) processVector(propertyMightBeVector interface{},
 	if !ok {
 		return false
 	}
+	// normalize raw vector if similarity is cosine
+	if fm.Similarity == index.CosineSimilarity {
+		vector = NormalizeVector(vector)
+	}
 
 	fieldName := getFieldName(pathString, path, fm)
 	options := fm.Options()
@@ -162,6 +167,10 @@ func (fm *FieldMapping) processVectorBase64(propertyMightBeVectorBase64 interfac
 	decodedVector, err := document.DecodeVector(encodedString)
 	if err != nil || len(decodedVector) != fm.Dims {
 		return
+	}
+	// normalize raw vector if similarity is cosine
+	if fm.Similarity == index.CosineSimilarity {
+		decodedVector = NormalizeVector(decodedVector)
 	}
 
 	fieldName := getFieldName(pathString, path, fm)
@@ -251,4 +260,22 @@ func validateVectorFieldAlias(field *FieldMapping, parentName string,
 	}
 
 	return nil
+}
+
+func NormalizeVector(vector []float32) []float32 {
+	// first calculate the magnitude of the vector
+	var mag float64
+	for _, v := range vector {
+		mag += float64(v) * float64(v)
+	}
+	// cannot normalize a zero vector
+	// if the magnitude is 1, then the vector is already normalized
+	if mag != 0 && mag != 1 {
+		mag = math.Sqrt(mag)
+		// normalize the vector
+		for i, v := range vector {
+			vector[i] = float32(float64(v) / mag)
+		}
+	}
+	return vector
 }

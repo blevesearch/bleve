@@ -71,7 +71,7 @@ func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
 	}
 	if similarityMetric == index.CosineSimilarity {
 		// normalize the vector
-		q.Vector = index.NormalizeVector(q.Vector)
+		q.Vector = mapping.NormalizeVector(q.Vector)
 	}
 	return searcher.NewKNNSearcher(ctx, i, m, options, q.VectorField,
 		q.Vector, q.K, q.BoostVal.Value(), similarityMetric)
