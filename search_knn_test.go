@@ -66,11 +66,19 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 
 	vecFieldMappingDot := mapping.NewVectorFieldMapping()
 	vecFieldMappingDot.Dims = testDatasetDims
-	vecFieldMappingDot.Similarity = index.CosineSimilarity
+	vecFieldMappingDot.Similarity = index.InnerProduct
 
 	indexMappingDotProduct := NewIndexMapping()
 	indexMappingDotProduct.DefaultMapping.AddFieldMappingsAt("content", contentFieldMapping)
 	indexMappingDotProduct.DefaultMapping.AddFieldMappingsAt("vector", vecFieldMappingDot)
+
+	vecFieldMappingCosine := mapping.NewVectorFieldMapping()
+	vecFieldMappingCosine.Dims = testDatasetDims
+	vecFieldMappingCosine.Similarity = index.CosineSimilarity
+
+	indexMappingCosine := NewIndexMapping()
+	indexMappingCosine.DefaultMapping.AddFieldMappingsAt("content", contentFieldMapping)
+	indexMappingCosine.DefaultMapping.AddFieldMappingsAt("vector", vecFieldMappingCosine)
 
 	type testCase struct {
 		testType           string
@@ -129,6 +137,31 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 			queryIndex:         2,
 			numIndexPartitions: 4,
 			mapping:            indexMappingDotProduct,
+		},
+		// cosine similarity
+		{
+			testType:           "multi_partition:match_none:oneKNNreq:k=3",
+			queryIndex:         0,
+			numIndexPartitions: 7,
+			mapping:            indexMappingCosine,
+		},
+		{
+			testType:           "multi_partition:match_none:oneKNNreq:k=2",
+			queryIndex:         0,
+			numIndexPartitions: 5,
+			mapping:            indexMappingCosine,
+		},
+		{
+			testType:           "multi_partition:match:oneKNNreq:k=2",
+			queryIndex:         1,
+			numIndexPartitions: 3,
+			mapping:            indexMappingCosine,
+		},
+		{
+			testType:           "multi_partition:disjunction:twoKNNreq:k=2,2",
+			queryIndex:         2,
+			numIndexPartitions: 9,
+			mapping:            indexMappingCosine,
 		},
 	}
 
@@ -459,11 +492,11 @@ func TestVectorBase64Index(t *testing.T) {
 
 	vecFMDot := mapping.NewVectorFieldMapping()
 	vecFMDot.Dims = testDatasetDims
-	vecFMDot.Similarity = index.CosineSimilarity
+	vecFMDot.Similarity = index.InnerProduct
 
 	vecBFMDot := mapping.NewVectorBase64FieldMapping()
 	vecBFMDot.Dims = testDatasetDims
-	vecBFMDot.Similarity = index.CosineSimilarity
+	vecBFMDot.Similarity = index.InnerProduct
 
 	indexMappingL2 := NewIndexMapping()
 	indexMappingL2.DefaultMapping.AddFieldMappingsAt("content", contentFM)
@@ -768,7 +801,12 @@ func createMultipleSegmentsIndex(documents []map[string]interface{}, index Index
 }
 
 func truncateScore(score float64) float64 {
-	return float64(int(score*1e6)) / 1e6
+	epsilon := 1e-4
+	truncated := float64(int(score*1e6)) / 1e6
+	if math.Abs(truncated-1.0) <= epsilon {
+		return 1.0
+	}
+	return truncated
 }
 
 // Function to compare two Explanation structs recursively
@@ -920,7 +958,11 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 
 	vecFieldMappingDot := mapping.NewVectorFieldMapping()
 	vecFieldMappingDot.Dims = testDatasetDims
-	vecFieldMappingDot.Similarity = index.CosineSimilarity
+	vecFieldMappingDot.Similarity = index.InnerProduct
+
+	vecFieldMappingCosine := mapping.NewVectorFieldMapping()
+	vecFieldMappingCosine.Dims = testDatasetDims
+	vecFieldMappingCosine.Similarity = index.CosineSimilarity
 
 	indexMappingL2Norm := NewIndexMapping()
 	indexMappingL2Norm.DefaultMapping.AddFieldMappingsAt("content", contentFieldMapping)
@@ -929,6 +971,10 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 	indexMappingDotProduct := NewIndexMapping()
 	indexMappingDotProduct.DefaultMapping.AddFieldMappingsAt("content", contentFieldMapping)
 	indexMappingDotProduct.DefaultMapping.AddFieldMappingsAt("vector", vecFieldMappingDot)
+
+	indexMappingCosine := NewIndexMapping()
+	indexMappingCosine.DefaultMapping.AddFieldMappingsAt("content", contentFieldMapping)
+	indexMappingCosine.DefaultMapping.AddFieldMappingsAt("vector", vecFieldMappingCosine)
 
 	var reqSort = search.SortOrder{&search.SortScore{Desc: true}, &search.SortDocID{Desc: true}, &search.SortField{Desc: false, Field: "content"}}
 
@@ -1000,6 +1046,37 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			queryIndex:  5,
 			mapping:     indexMappingDotProduct,
 		},
+		// cosine similarity
+		{
+			numSegments: 9,
+			queryIndex:  0,
+			mapping:     indexMappingCosine,
+		},
+		{
+			numSegments: 5,
+			queryIndex:  1,
+			mapping:     indexMappingCosine,
+		},
+		{
+			numSegments: 4,
+			queryIndex:  2,
+			mapping:     indexMappingCosine,
+		},
+		{
+			numSegments: 12,
+			queryIndex:  3,
+			mapping:     indexMappingCosine,
+		},
+		{
+			numSegments: 7,
+			queryIndex:  4,
+			mapping:     indexMappingCosine,
+		},
+		{
+			numSegments: 11,
+			queryIndex:  5,
+			mapping:     indexMappingCosine,
+		},
 		// score none test
 		{
 			numSegments: 3,
@@ -1035,6 +1112,24 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 			numSegments: 8,
 			queryIndex:  2,
 			mapping:     indexMappingDotProduct,
+			scoreValue:  "none",
+		},
+		{
+			numSegments: 3,
+			queryIndex:  0,
+			mapping:     indexMappingCosine,
+			scoreValue:  "none",
+		},
+		{
+			numSegments: 7,
+			queryIndex:  1,
+			mapping:     indexMappingCosine,
+			scoreValue:  "none",
+		},
+		{
+			numSegments: 8,
+			queryIndex:  2,
+			mapping:     indexMappingCosine,
 			scoreValue:  "none",
 		},
 	}
