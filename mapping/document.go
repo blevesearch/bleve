@@ -534,33 +534,33 @@ func (dm *DocumentMapping) processProperty(property interface{}, path []string, 
 			dm.walkDocument(property, path, indexes, context)
 		}
 	case reflect.Map, reflect.Slice:
-		var isPropertyVector bool
-		var isPropertyVectorInitialized bool
-		if subDocMapping != nil {
+		walkDocument := false
+		if subDocMapping != nil && len(subDocMapping.Fields) != 0 {
 			for _, fieldMapping := range subDocMapping.Fields {
 				switch fieldMapping.Type {
 				case "vector":
-					processed := fieldMapping.processVector(property, pathString, path,
+					fieldMapping.processVector(property, pathString, path,
 						indexes, context)
-					if !isPropertyVectorInitialized {
-						isPropertyVector = processed
-						isPropertyVectorInitialized = true
-					} else {
-						isPropertyVector = isPropertyVector && processed
-					}
 				case "geopoint":
 					fieldMapping.processGeoPoint(property, pathString, path, indexes, context)
+					walkDocument = true
 				case "IP":
 					ip, ok := property.(net.IP)
 					if ok {
 						fieldMapping.processIP(ip, pathString, path, indexes, context)
 					}
+					walkDocument = true
 				case "geoshape":
 					fieldMapping.processGeoShape(property, pathString, path, indexes, context)
+					walkDocument = true
+				default:
+					walkDocument = true
 				}
 			}
+		} else {
+			walkDocument = true
 		}
-		if !isPropertyVector {
+		if walkDocument {
 			dm.walkDocument(property, path, indexes, context)
 		}
 	case reflect.Ptr:

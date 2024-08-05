@@ -20,6 +20,7 @@ package scorch
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -48,11 +49,15 @@ type IndexSnapshotVectorReader struct {
 	currPosting   segment_api.VecPosting
 	currID        index.IndexInternalID
 	ctx           context.Context
+
+	searchParams json.RawMessage
 }
 
 func (i *IndexSnapshotVectorReader) Size() int {
 	sizeInBytes := reflectStaticSizeIndexSnapshotVectorReader + size.SizeOfPtr +
-		len(i.vector) + len(i.field) + len(i.currID)
+		len(i.vector)*size.SizeOfFloat32 +
+		len(i.field) +
+		len(i.currID)
 
 	for _, entry := range i.postings {
 		sizeInBytes += entry.Size()
@@ -103,7 +108,7 @@ func (i *IndexSnapshotVectorReader) Advance(ID index.IndexInternalID,
 	preAlloced *index.VectorDoc) (*index.VectorDoc, error) {
 
 	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
-		i2, err := i.snapshot.VectorReader(i.ctx, i.vector, i.field, i.k)
+		i2, err := i.snapshot.VectorReader(i.ctx, i.vector, i.field, i.k, i.searchParams)
 		if err != nil {
 			return nil, err
 		}

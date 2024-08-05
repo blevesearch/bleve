@@ -22,11 +22,19 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"reflect"
 
 	"github.com/blevesearch/bleve/v2/size"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
+
+var reflectStaticSizeVectorBase64Field int
+
+func init() {
+	var f VectorBase64Field
+	reflectStaticSizeVectorBase64Field = int(reflect.TypeOf(f).Size())
+}
 
 type VectorBase64Field struct {
 	vectorField    *VectorField
@@ -34,7 +42,13 @@ type VectorBase64Field struct {
 }
 
 func (n *VectorBase64Field) Size() int {
-	return n.vectorField.Size()
+	var vecFieldSize int
+	if n.vectorField != nil {
+		vecFieldSize = n.vectorField.Size()
+	}
+	return reflectStaticSizeVectorBase64Field + size.SizeOfPtr +
+		len(n.base64Encoding) +
+		vecFieldSize
 }
 
 func (n *VectorBase64Field) Name() string {

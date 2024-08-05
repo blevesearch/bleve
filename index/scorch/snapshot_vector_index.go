@@ -19,20 +19,22 @@ package scorch
 
 import (
 	"context"
+	"encoding/json"
 
 	index "github.com/blevesearch/bleve_index_api"
 	segment_api "github.com/blevesearch/scorch_segment_api/v2"
 )
 
 func (is *IndexSnapshot) VectorReader(ctx context.Context, vector []float32,
-	field string, k int64) (
+	field string, k int64, searchParams json.RawMessage) (
 	index.VectorReader, error) {
 
 	rv := &IndexSnapshotVectorReader{
-		vector:   vector,
-		field:    field,
-		k:        k,
-		snapshot: is,
+		vector:       vector,
+		field:        field,
+		k:            k,
+		snapshot:     is,
+		searchParams: searchParams,
 	}
 
 	if rv.postings == nil {

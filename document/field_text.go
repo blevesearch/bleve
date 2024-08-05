@@ -44,10 +44,15 @@ type TextField struct {
 }
 
 func (t *TextField) Size() int {
+	var freqSize int
+	if t.frequencies != nil {
+		freqSize = t.frequencies.Size()
+	}
 	return reflectStaticSizeTextField + size.SizeOfPtr +
 		len(t.name) +
 		len(t.arrayPositions)*size.SizeOfUint64 +
-		len(t.value)
+		len(t.value) +
+		freqSize
 }
 
 func (t *TextField) Name() string {

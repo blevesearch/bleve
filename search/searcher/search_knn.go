@@ -19,6 +19,7 @@ package searcher
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -48,9 +49,11 @@ type KNNSearcher struct {
 
 func NewKNNSearcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping,
 	options search.SearcherOptions, field string, vector []float32, k int64,
-	boost float64, similarityMetric string) (search.Searcher, error) {
+	boost float64, similarityMetric string, searchParams json.RawMessage) (
+	search.Searcher, error) {
+
 	if vr, ok := i.(index.VectorIndexReader); ok {
-		vectorReader, err := vr.VectorReader(ctx, vector, field, k)
+		vectorReader, err := vr.VectorReader(ctx, vector, field, k, searchParams)
 		if err != nil {
 			return nil, err
 		}

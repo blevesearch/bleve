@@ -44,10 +44,15 @@ type IPField struct {
 }
 
 func (b *IPField) Size() int {
+	var freqSize int
+	if b.frequencies != nil {
+		freqSize = b.frequencies.Size()
+	}
 	return reflectStaticSizeIPField + size.SizeOfPtr +
 		len(b.name) +
 		len(b.arrayPositions)*size.SizeOfUint64 +
-		len(b.value)
+		len(b.value) +
+		freqSize
 }
 
 func (b *IPField) Name() string {

@@ -77,6 +77,16 @@ type KNNRequest struct {
 	VectorBase64 string       `json:"vector_base64"`
 	K            int64        `json:"k"`
 	Boost        *query.Boost `json:"boost,omitempty"`
+
+	// Search parameters for the field's vector index part of the segment.
+	// Value of it depends on the field's backing vector index implementation.
+	//
+	// For Faiss IVF index, supported search params are:
+	//  - ivf_nprobe_pct    : int  // percentage of total clusters to search
+	//  - ivf_max_codes_pct : float // percentage of total vectors to visit to do a query (across all clusters)
+	//
+	// Consult go-faiss to know all supported search params
+	Params json.RawMessage `json:"params"`
 }
 
 func (r *SearchRequest) AddKNN(field string, vector []float32, k int64, boost float64) {
@@ -214,6 +224,7 @@ func createKNNQuery(req *SearchRequest) (query.Query, []int64, int64, error) {
 			knnQuery.SetFieldVal(knn.Field)
 			knnQuery.SetK(knn.K)
 			knnQuery.SetBoost(knn.Boost.Value())
+			knnQuery.SetParams(knn.Params)
 			subQueries = append(subQueries, knnQuery)
 			kArray = append(kArray, knn.K)
 			sumOfK += knn.K

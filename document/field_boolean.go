@@ -43,10 +43,15 @@ type BooleanField struct {
 }
 
 func (b *BooleanField) Size() int {
+	var freqSize int
+	if b.frequencies != nil {
+		freqSize = b.frequencies.Size()
+	}
 	return reflectStaticSizeBooleanField + size.SizeOfPtr +
 		len(b.name) +
 		len(b.arrayPositions)*size.SizeOfUint64 +
-		len(b.value)
+		len(b.value) +
+		freqSize
 }
 
 func (b *BooleanField) Name() string {

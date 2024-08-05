@@ -47,7 +47,8 @@ type KNNQueryScorer struct {
 
 func (s *KNNQueryScorer) Size() int {
 	sizeInBytes := reflectStaticSizeKNNQueryScorer + size.SizeOfPtr +
-		(len(s.queryVector) * size.SizeOfFloat32) + len(s.queryField)
+		(len(s.queryVector) * size.SizeOfFloat32) + len(s.queryField) +
+		len(s.similarityMetric)
 
 	if s.queryWeightExplanation != nil {
 		sizeInBytes += s.queryWeightExplanation.Size()

@@ -53,9 +53,15 @@ type DateTimeField struct {
 }
 
 func (n *DateTimeField) Size() int {
+	var freqSize int
+	if n.frequencies != nil {
+		freqSize = n.frequencies.Size()
+	}
 	return reflectStaticSizeDateTimeField + size.SizeOfPtr +
 		len(n.name) +
-		len(n.arrayPositions)*size.SizeOfUint64
+		len(n.arrayPositions)*size.SizeOfUint64 +
+		len(n.value) +
+		freqSize
 }
 
 func (n *DateTimeField) Name() string {
