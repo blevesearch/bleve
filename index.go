@@ -47,7 +47,7 @@ func (b *Batch) Index(id string, data interface{}) error {
 		return ErrorEmptyID
 	}
 	if eventIndex, ok := b.index.(index.EventIndex); ok {
-		eventIndex.FireEvent(index.EventKindIndex)
+		eventIndex.FireIndexEvent()
 	}
 	doc := document.NewDocument(id)
 	err := b.index.Mapping().MapDocument(doc, data)
