@@ -19,9 +19,10 @@
 
 * The `vector` field type is an array that is to hold float32 values only.
 * The `vector_base64` field type to support base64 encoded strings using little endian byte ordering (v2.4.1+)
-* Currently supported similarity metrics are: [`"l2_norm"`, `"dot_product"`].
+* Supported similarity metrics are: [`"cosine"` (v2.4.3+), `"dot_product"`, `"l2_norm"`].
+    * `cosine` paths will additionally normalize vectors before indexing and search.
 * Supported dimensionality is between 1 and 2048 (v2.4.0), and up to **4096** (v2.4.1+).
-* Supported vector index optimizations: `recall`, `latency`, `memory_efficient` (v2.4.1+)
+* Supported vector index optimizations: `latency`, `memory_efficient` (v2.4.1+), `recall`.
 * Vectors from documents that do not conform to the index mapping dimensionality are simply discarded at index time.
 * The dimensionality of the query vector must match the dimensionality of the indexed vectors to obtain any results.
 * Pure kNN searches can be performed, but the `query` attribute within the search request must be set - to `{"match_none": {}}` in this case. The `query` attribute is made optional when `knn` is available with v2.4.1+.
