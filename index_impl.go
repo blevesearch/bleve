@@ -1115,13 +1115,13 @@ func (f FileSystemDirectory) GetWriter(filePath string) (io.WriteCloser,
 
 func (i *indexImpl) FireIndexEvent() {
 	// get the internal index implementation
-	intIndex, err := i.Advanced()
+	internalIndex, err := i.Advanced()
 	if err != nil {
 		return
 	}
 	// check if the internal index implementation supports events
-	if eventInternalIndex, ok := intIndex.(index.EventIndex); ok {
-		// fire the event
-		eventInternalIndex.FireIndexEvent()
+	if internalEventIndex, ok := internalIndex.(index.EventIndex); ok {
+		// fire the Index() event
+		internalEventIndex.FireIndexEvent()
 	}
 }

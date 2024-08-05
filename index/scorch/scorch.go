@@ -880,6 +880,5 @@ func (s *Scorch) CopyReader() index.CopyReader {
 
 // external API to fire a scorch event (EventKindIndexStart) externally from bleve
 func (s *Scorch) FireIndexEvent() {
-	// switch on bleve the event kind and fire the corresponding scorch event
 	s.fireEvent(EventKindIndexStart, 0)
 }
