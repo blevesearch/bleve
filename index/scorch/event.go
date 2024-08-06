@@ -67,3 +67,7 @@ var EventKindMergeTaskIntroduction = EventKind(8)
 // EventKindPreMergeCheck is fired before the merge begins to check if
 // the caller should proceed with the merge.
 var EventKindPreMergeCheck = EventKind(9)
+
+// EventKindIndexStart is fired when Index() is invoked which
+// creates a new Document object from an interface using the index mapping.
+var EventKindIndexStart = EventKind(10)

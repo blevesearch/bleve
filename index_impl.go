@@ -256,6 +256,8 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 		return ErrorIndexClosed
 	}
 
+	i.FireIndexEvent()
+
 	doc := document.NewDocument(id)
 	err = i.m.MapDocument(doc, data)
 	if err != nil {
@@ -1111,4 +1113,17 @@ func (f FileSystemDirectory) GetWriter(filePath string) (io.WriteCloser,
 
 	return os.OpenFile(filepath.Join(string(f), dir, file),
 		os.O_RDWR|os.O_CREATE, 0600)
+}
+
+func (i *indexImpl) FireIndexEvent() {
+	// get the internal index implementation
+	internalIndex, err := i.Advanced()
+	if err != nil {
+		return
+	}
+	// check if the internal index implementation supports events
+	if internalEventIndex, ok := internalIndex.(index.EventIndex); ok {
+		// fire the Index() event
+		internalEventIndex.FireIndexEvent()
+	}
 }

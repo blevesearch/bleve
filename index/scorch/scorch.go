@@ -49,7 +49,7 @@ type Scorch struct {
 
 	unsafeBatch bool
 
-	rootLock             sync.RWMutex
+	rootLock sync.RWMutex
 
 	root                 *IndexSnapshot // holds 1 ref-count on the root
 	rootPersisted        []chan error   // closed when root is persisted
@@ -376,6 +376,8 @@ func (s *Scorch) Delete(id string) error {
 func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	start := time.Now()
 
+	// notify handlers that we're about to index a batch of data
+	s.fireEvent(EventKindBatchIntroductionStart, 0)
 	defer func() {
 		s.fireEvent(EventKindBatchIntroduction, time.Since(start))
 	}()
@@ -433,9 +435,6 @@ func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	atomic.AddUint64(&s.stats.TotAnalysisTime, uint64(time.Since(start)))
 
 	indexStart := time.Now()
-
-	// notify handlers that we're about to introduce a segment
-	s.fireEvent(EventKindBatchIntroductionStart, 0)
 
 	var newSegment segment.Segment
 	var bufBytes uint64
@@ -877,4 +876,9 @@ func (s *Scorch) CopyReader() index.CopyReader {
 	}
 	s.rootLock.Unlock()
 	return rv
+}
+
+// external API to fire a scorch event (EventKindIndexStart) externally from bleve
+func (s *Scorch) FireIndexEvent() {
+	s.fireEvent(EventKindIndexStart, 0)
 }

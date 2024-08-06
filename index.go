@@ -46,6 +46,9 @@ func (b *Batch) Index(id string, data interface{}) error {
 	if id == "" {
 		return ErrorEmptyID
 	}
+	if eventIndex, ok := b.index.(index.EventIndex); ok {
+		eventIndex.FireIndexEvent()
+	}
 	doc := document.NewDocument(id)
 	err := b.index.Mapping().MapDocument(doc, data)
 	if err != nil {
