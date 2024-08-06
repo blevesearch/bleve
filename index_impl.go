@@ -255,7 +255,9 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 	if !i.open {
 		return ErrorIndexClosed
 	}
+
 	i.FireIndexEvent()
+
 	doc := document.NewDocument(id)
 	err = i.m.MapDocument(doc, data)
 	if err != nil {
