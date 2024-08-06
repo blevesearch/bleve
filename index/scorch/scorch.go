@@ -376,7 +376,7 @@ func (s *Scorch) Delete(id string) error {
 func (s *Scorch) Batch(batch *index.Batch) (err error) {
 	start := time.Now()
 
-	// notify handlers that we're about to introduce a segment
+	// notify handlers that we're about to index a batch of data
 	s.fireEvent(EventKindBatchIntroductionStart, 0)
 	defer func() {
 		s.fireEvent(EventKindBatchIntroduction, time.Since(start))
