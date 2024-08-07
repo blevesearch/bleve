@@ -21,6 +21,7 @@ import (
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -30,6 +31,7 @@ type MatchPhraseQuery struct {
 	Analyzer    string `json:"analyzer,omitempty"`
 	BoostVal    *Boost `json:"boost,omitempty"`
 	Fuzziness   int    `json:"fuzziness"`
+	autoFuzzy   bool
 }
 
 // NewMatchPhraseQuery creates a new Query object
@@ -63,6 +65,10 @@ func (q *MatchPhraseQuery) SetFuzziness(f int) {
 	q.Fuzziness = f
 }
 
+func (q *MatchPhraseQuery) SetAutoFuzziness(auto bool) {
+	q.autoFuzzy = auto
+}
+
 func (q *MatchPhraseQuery) Field() string {
 	return q.FieldVal
 }
@@ -89,7 +95,11 @@ func (q *MatchPhraseQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 		phrase := tokenStreamToPhrase(tokens)
 		phraseQuery := NewMultiPhraseQuery(phrase, field)
 		phraseQuery.SetBoost(q.BoostVal.Value())
-		phraseQuery.SetFuzziness(q.Fuzziness)
+		if q.autoFuzzy {
+			phraseQuery.SetAutoFuzziness(true)
+		} else {
+			phraseQuery.SetFuzziness(q.Fuzziness)
+		}
 		return phraseQuery.Searcher(ctx, i, m, options)
 	}
 	noneQuery := NewMatchNoneQuery()
@@ -117,4 +127,50 @@ func tokenStreamToPhrase(tokens analysis.TokenStream) [][]string {
 		return rv
 	}
 	return nil
+}
+
+func (q *MatchPhraseQuery) UnmarshalJSON(data []byte) error {
+	type Alias MatchPhraseQuery
+	aux := &struct {
+		Fuzziness interface{} `json:"fuzziness"`
+		*Alias
+	}{
+		Alias: (*Alias)(q),
+	}
+	if err := util.UnmarshalJSON(data, &aux); err != nil {
+		return err
+	}
+	switch v := aux.Fuzziness.(type) {
+	case float64:
+		q.Fuzziness = int(v)
+	case string:
+		if v == "auto" {
+			q.autoFuzzy = true
+		}
+	}
+	return nil
+}
+
+func (f *MatchPhraseQuery) MarshalJSON() ([]byte, error) {
+	var fuzzyValue interface{}
+	if f.autoFuzzy {
+		fuzzyValue = "auto"
+	} else {
+		fuzzyValue = f.Fuzziness
+	}
+	type matchPhrase struct {
+		MatchPhrase string      `json:"match_phrase"`
+		FieldVal    string      `json:"field,omitempty"`
+		Analyzer    string      `json:"analyzer,omitempty"`
+		BoostVal    *Boost      `json:"boost,omitempty"`
+		Fuzziness   interface{} `json:"fuzziness"`
+	}
+	aux := matchPhrase{
+		MatchPhrase: f.MatchPhrase,
+		FieldVal:    f.FieldVal,
+		Analyzer:    f.Analyzer,
+		BoostVal:    f.BoostVal,
+		Fuzziness:   fuzzyValue,
+	}
+	return util.MarshalJSON(aux)
 }

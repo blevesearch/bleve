@@ -3562,5 +3562,187 @@ func TestScoreBreakdown(t *testing.T) {
 			}
 		}
 	}
+}
 
+func TestAutoFuzzy(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	imap := mapping.NewIndexMapping()
+
+	if err := imap.AddCustomAnalyzer("splitter", map[string]interface{}{
+		"type":          custom.Name,
+		"tokenizer":     whitespace.Name,
+		"token_filters": []interface{}{lowercase.Name},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	textField := mapping.NewTextFieldMapping()
+	textField.Analyzer = "splitter"
+	textField.Store = true
+	textField.IncludeTermVectors = true
+	textField.IncludeInAll = true
+
+	imap.DefaultMapping.Dynamic = false
+	imap.DefaultMapping.AddFieldMappingsAt("model", textField)
+
+	documents := map[string]map[string]interface{}{
+		"product1": {
+			"model": "apple iphone 12",
+		},
+		"product2": {
+			"model": "apple iphone 13",
+		},
+		"product3": {
+			"model": "samsung galaxy s22",
+		},
+		"product4": {
+			"model": "samsung galaxy note",
+		},
+		"product5": {
+			"model": "google pixel 5",
+		},
+		"product6": {
+			"model": "oneplus 9 pro",
+		},
+		"product7": {
+			"model": "xiaomi mi 11",
+		},
+		"product8": {
+			"model": "oppo find x3",
+		},
+		"product9": {
+			"model": "vivo x60 pro",
+		},
+		"product10": {
+			"model": "oneplus 8t pro",
+		},
+		"product11": {
+			"model": "nokia xr20",
+		},
+		"product12": {
+			"model": "poco f1",
+		},
+		"product13": {
+			"model": "asus rog 5",
+		},
+		"product14": {
+			"model": "samsung galaxy a15 5g",
+		},
+		"product15": {
+			"model": "tecno camon 17",
+		},
+	}
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch := idx.NewBatch()
+	for docID, doc := range documents {
+		err := batch.Index(docID, doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type testStruct struct {
+		query      string
+		expectHits []string
+	}
+	testQueries := []testStruct{
+		{
+			// match query with fuzziness set to 2
+			query: `{
+					"match" : "applle iphone 12",
+					"fuzziness": 2,
+					"field" : "model"
+				}`,
+			expectHits: []string{"product1", "product2", "product7", "product14", "product12", "product10", "product15", "product3", "product6", "product8"},
+		},
+		{
+			// match query with fuzziness set to "auto"
+			query: `{
+					"match" : "applle iphone 12",
+					"fuzziness": "auto",
+					"field" : "model"
+				}`,
+			expectHits: []string{"product1", "product2"},
+		},
+		{
+			// match query with fuzziness set to 2 with `and` operator
+			query: `{
+					"match" : "applle iphone 12",
+					"fuzziness": 2,
+					"field" : "model",
+					"operator": "and"
+				}`,
+			expectHits: []string{"product1", "product2"},
+		},
+		{
+			// match query with fuzziness set to "auto" with `and`` operator
+			query: `{
+					"match" : "applle iphone 12",
+					"fuzziness": "auto",
+					"field" : "model",
+					"operator": "and"
+				}`,
+			expectHits: []string{"product1"},
+		},
+		// match phrase query with fuzziness set to 2
+		{
+			query: `{
+					"match_phrase" : "onplus 9 pro",
+					"fuzziness": 2,
+					"field" : "model"
+				}`,
+			expectHits: []string{"product10", "product6"},
+		},
+		// match phrase query with fuzziness set to "auto"
+		{
+			query: `{
+				"match_phrase" : "onplus 9 pro",
+				"fuzziness": "auto",
+				"field" : "model"
+			}`,
+			expectHits: []string{"product6"},
+		},
+	}
+
+	for _, dtq := range testQueries {
+		q, err := query.ParseQuery([]byte(dtq.query))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		sr := NewSearchRequest(q)
+		sr.Highlight = NewHighlightWithStyle(ansi.Name)
+		sr.SortBy([]string{"-_score", "_id"})
+		sr.Fields = []string{"*"}
+		sr.Explain = true
+
+		res, err := idx.Search(sr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Hits) != len(dtq.expectHits) {
+			t.Fatalf("expected %d hits, got %d", len(dtq.expectHits), len(res.Hits))
+		}
+		for i, hit := range res.Hits {
+			if hit.ID != dtq.expectHits[i] {
+				t.Fatalf("expected docID %s, got %s", dtq.expectHits[i], hit.ID)
+			}
+		}
+	}
 }

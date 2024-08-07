@@ -32,6 +32,7 @@ type MatchQuery struct {
 	Prefix    int                `json:"prefix_length"`
 	Fuzziness int                `json:"fuzziness"`
 	Operator  MatchQueryOperator `json:"operator,omitempty"`
+	autoFuzzy bool
 }
 
 type MatchQueryOperator int
@@ -107,6 +108,10 @@ func (q *MatchQuery) SetFuzziness(f int) {
 	q.Fuzziness = f
 }
 
+func (q *MatchQuery) SetAutoFuzziness(auto bool) {
+	q.autoFuzzy = auto
+}
+
 func (q *MatchQuery) SetPrefix(p int) {
 	q.Prefix = p
 }
@@ -138,10 +143,14 @@ func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mappin
 	if len(tokens) > 0 {
 
 		tqs := make([]Query, len(tokens))
-		if q.Fuzziness != 0 {
+		if q.Fuzziness != 0 || q.autoFuzzy {
 			for i, token := range tokens {
 				query := NewFuzzyQuery(string(token.Term))
-				query.SetFuzziness(q.Fuzziness)
+				if q.autoFuzzy {
+					query.SetAutoFuzziness(true)
+				} else {
+					query.SetFuzziness(q.Fuzziness)
+				}
 				query.SetPrefix(q.Prefix)
 				query.SetField(field)
 				query.SetBoost(q.BoostVal.Value())
@@ -174,4 +183,54 @@ func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mappin
 	}
 	noneQuery := NewMatchNoneQuery()
 	return noneQuery.Searcher(ctx, i, m, options)
+}
+
+func (q *MatchQuery) UnmarshalJSON(data []byte) error {
+	type Alias MatchQuery
+	aux := &struct {
+		Fuzziness interface{} `json:"fuzziness"`
+		*Alias
+	}{
+		Alias: (*Alias)(q),
+	}
+	if err := util.UnmarshalJSON(data, &aux); err != nil {
+		return err
+	}
+	switch v := aux.Fuzziness.(type) {
+	case float64:
+		q.Fuzziness = int(v)
+	case string:
+		if v == "auto" {
+			q.autoFuzzy = true
+		}
+	}
+	return nil
+}
+
+func (f *MatchQuery) MarshalJSON() ([]byte, error) {
+	var fuzzyValue interface{}
+	if f.autoFuzzy {
+		fuzzyValue = "auto"
+	} else {
+		fuzzyValue = f.Fuzziness
+	}
+	type match struct {
+		Match     string             `json:"match"`
+		FieldVal  string             `json:"field,omitempty"`
+		Analyzer  string             `json:"analyzer,omitempty"`
+		BoostVal  *Boost             `json:"boost,omitempty"`
+		Prefix    int                `json:"prefix_length"`
+		Fuzziness interface{}        `json:"fuzziness"`
+		Operator  MatchQueryOperator `json:"operator,omitempty"`
+	}
+	aux := match{
+		Match:     f.Match,
+		FieldVal:  f.FieldVal,
+		Analyzer:  f.Analyzer,
+		BoostVal:  f.BoostVal,
+		Prefix:    f.Prefix,
+		Fuzziness: fuzzyValue,
+		Operator:  f.Operator,
+	}
+	return util.MarshalJSON(aux)
 }
