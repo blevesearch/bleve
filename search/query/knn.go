@@ -35,9 +35,10 @@ type KNNQuery struct {
 	BoostVal    *Boost    `json:"boost,omitempty"`
 
 	// see KNNRequest.Params for description
-	Params        json.RawMessage `json:"params"`
-	FilterQuery   Query           `json:"filter,omitempty"`
-	FilterResults []index.IndexInternalID
+	Params           json.RawMessage `json:"params"`
+	FilterQuery      Query           `json:"filter,omitempty"`
+	FilterResults    []index.IndexInternalID
+	RequireFiltering bool
 }
 
 func NewKNNQuery(vector []float32) *KNNQuery {
@@ -69,8 +70,9 @@ func (q *KNNQuery) SetParams(params json.RawMessage) {
 	q.Params = params
 }
 
-func (q *KNNQuery) SetFilterQuery(f Query) {
+func (q *KNNQuery) SetFilterQuery(f Query, requireFiltering bool) {
 	q.FilterQuery = f
+	q.RequireFiltering = requireFiltering
 }
 
 func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
@@ -89,5 +91,6 @@ func (q *KNNQuery) Searcher(ctx context.Context, i index.IndexReader,
 	}
 
 	return searcher.NewKNNSearcher(ctx, i, m, options, q.VectorField,
-		q.Vector, q.K, q.BoostVal.Value(), similarityMetric, q.Params, q.FilterResults)
+		q.Vector, q.K, q.BoostVal.Value(), similarityMetric, q.Params,
+		q.FilterResults, q.RequireFiltering)
 }

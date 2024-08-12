@@ -51,8 +51,9 @@ type IndexSnapshotVectorReader struct {
 	currID        index.IndexInternalID
 	ctx           context.Context
 
-	searchParams   json.RawMessage
-	eligibleDocIDs []index.IndexInternalID
+	searchParams     json.RawMessage
+	eligibleDocIDs   []index.IndexInternalID
+	requireFiltering bool
 }
 
 func (i *IndexSnapshotVectorReader) EligibleDocIDs() *roaring.Bitmap {
@@ -121,7 +122,7 @@ func (i *IndexSnapshotVectorReader) Advance(ID index.IndexInternalID,
 
 	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
 		i2, err := i.snapshot.VectorReader(i.ctx, i.vector, i.field, i.k,
-			i.searchParams, i.eligibleDocIDs)
+			i.searchParams, i.eligibleDocIDs, i.requireFiltering)
 		if err != nil {
 			return nil, err
 		}

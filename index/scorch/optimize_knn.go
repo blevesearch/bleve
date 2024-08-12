@@ -109,7 +109,7 @@ func (o *OptimizeVR) Finish() error {
 						// for each VR, populate postings list and iterators
 						// by passing the obtained vector index and getting similar vectors.
 						pl, err := vecIndex.Search(vr.vector, vr.k,
-							eligibleLocalDocNums, vr.searchParams)
+							vr.requireFiltering, eligibleLocalDocNums, vr.searchParams)
 						if err != nil {
 							errorsM.Lock()
 							errors = append(errors, err)

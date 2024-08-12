@@ -228,7 +228,8 @@ var (
 	knnOperatorOr  = knnOperator("or")
 )
 
-func createKNNQuery(req *SearchRequest, eligibleDocsMap map[int][]index.IndexInternalID) (
+func createKNNQuery(req *SearchRequest, eligibleDocsMap map[int][]index.IndexInternalID,
+	requiresFiltering map[int]bool) (
 	query.Query, []int64, int64, error) {
 	if requestHasKNN(req) {
 		// first perform validation
@@ -245,8 +246,9 @@ func createKNNQuery(req *SearchRequest, eligibleDocsMap map[int][]index.IndexInt
 			knnQuery.SetK(knn.K)
 			knnQuery.SetBoost(knn.Boost.Value())
 			knnQuery.SetParams(knn.Params)
-			knnQuery.SetFilterQuery(knn.FilterQuery)
-			if filterResults, exists := eligibleDocsMap[i]; exists {
+			knnQuery.SetFilterQuery(knn.FilterQuery, requiresFiltering[i])
+			filterResults, exists := eligibleDocsMap[i]
+			if exists && requiresFiltering[i] {
 				knnQuery.FilterResults = filterResults
 			}
 			subQueries = append(subQueries, knnQuery)
@@ -330,20 +332,26 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	// maps the index of the KNN query in the req to the pre-filter hits aka
 	// eligible docs' internal IDs .
 	filterHitsMap := make(map[int][]index.IndexInternalID)
+	// Indicates if this query requires filtering downstream
+	// No filtering required if it's a match all query/no filters applied.
+	requiresFiltering := make(map[int]bool)
 
 	for idx, knnReq := range req.KNN {
 		// TODO Can use goroutines for this filter query stuff - do it if perf results
 		// show this to be significantly slow otherwise.
 		filterQ := knnReq.FilterQuery
-		// If there are no filters here, add a match all since that will ensure that
-		// all the live docs in the index are eligible.
-		// TODO See if running MatchAll queries can be skipped too - if perf shows
-		// them to be time-consuming in existing kNN tests?
 		if filterQ == nil {
-			filterQ = query.NewMatchAllQuery()
+			requiresFiltering[idx] = false
+		}
+
+		if _, ok := filterQ.(*query.MatchAllQuery); ok {
+			requiresFiltering[idx] = false
+			continue
 		}
 
 		if _, ok := filterQ.(*query.MatchNoneQuery); ok {
+			// Filtering required since no hits are eligible.
+			requiresFiltering[idx] = true
 			// a match none query just means none the documents are eligible
 			// hence, we can save on running the query.
 			continue
@@ -369,10 +377,11 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 		for _, docMatch := range filterHits {
 			filterHitsMap[idx] = append(filterHitsMap[idx], docMatch.IndexInternalID)
 		}
+		requiresFiltering[idx] = true
 	}
 
 	// Add the filter hits when creating the kNN query
-	KNNQuery, kArray, sumOfK, err := createKNNQuery(req, filterHitsMap)
+	KNNQuery, kArray, sumOfK, err := createKNNQuery(req, filterHitsMap, requiresFiltering)
 	if err != nil {
 		return nil, err
 	}
