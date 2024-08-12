@@ -335,13 +335,19 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 		// TODO Can use goroutines for this filter query stuff - do it if perf results
 		// show this to be significantly slow otherwise.
 		filterQ := knnReq.FilterQuery
+		// If there are no filters here, add a match all since that will ensure that
+		// all the live docs in the index are eligible.
+		// TODO See if running MatchAll queries can be skipped too - if perf shows
+		// them to be time-consuming in existing kNN tests?
+		if filterQ == nil {
+			filterQ = query.NewMatchAllQuery()
+		}
 
 		if _, ok := filterQ.(*query.MatchNoneQuery); ok {
 			// a match none query just means none the documents are eligible
 			// hence, we can save on running the query.
 			continue
 		}
-		// TODO See if running MatchAll queries can be skipped too
 
 		// Applies to all supported types of queries.
 		filterSearcher, _ := filterQ.Searcher(ctx, reader, i.m, search.SearcherOptions{
