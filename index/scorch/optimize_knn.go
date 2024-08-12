@@ -23,6 +23,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 	segment_api "github.com/blevesearch/scorch_segment_api/v2"
@@ -62,6 +63,8 @@ func (o *OptimizeVR) Finish() error {
 	var errorsM sync.Mutex
 	var errors []error
 
+	snapshotGlobalDocNums := o.snapshot.globalDocNums()
+
 	defer o.invokeSearcherEndCallback()
 
 	wg := sync.WaitGroup{}
@@ -89,9 +92,24 @@ func (o *OptimizeVR) Finish() error {
 					vectorIndexSize := vecIndex.Size()
 					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
 					for _, vr := range vrs {
+						eligibleVectorInternalIDs := vr.EligibleDocIDs()
+						// Only the eligible documents belonging to this segment
+						// will get filtered out.
+						// There is no way to determine which doc belongs to which segment
+						eligibleVectorInternalIDs.And(snapshotGlobalDocNums[index])
+
+						eligibleLocalDocNums := roaring.NewBitmap()
+						// get the (segment-)local document numbers
+						for _, docNum := range eligibleVectorInternalIDs.ToArray() {
+							localDocNum := o.snapshot.localDocNumFromGlobal(index,
+								uint64(docNum))
+							eligibleLocalDocNums.Add(uint32(localDocNum))
+						}
+
 						// for each VR, populate postings list and iterators
 						// by passing the obtained vector index and getting similar vectors.
-						pl, err := vecIndex.Search(vr.vector, vr.k, vr.searchParams)
+						pl, err := vecIndex.Search(vr.vector, vr.k,
+							eligibleLocalDocNums, vr.searchParams)
 						if err != nil {
 							errorsM.Lock()
 							errors = append(errors, err)

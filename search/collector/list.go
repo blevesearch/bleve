@@ -34,6 +34,11 @@ func newStoreList(capacity int, compare collectorCompare) *collectStoreList {
 	return rv
 }
 
+func (c *collectStoreList) Add(doc *search.DocumentMatch, size int) *search.DocumentMatch {
+	c.results.PushBack(doc)
+	return nil
+}
+
 func (c *collectStoreList) AddNotExceedingSize(doc *search.DocumentMatch, size int) *search.DocumentMatch {
 	c.add(doc)
 	if c.len() > size {

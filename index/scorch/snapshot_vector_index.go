@@ -26,15 +26,16 @@ import (
 )
 
 func (is *IndexSnapshot) VectorReader(ctx context.Context, vector []float32,
-	field string, k int64, searchParams json.RawMessage) (
+	field string, k int64, searchParams json.RawMessage, filterIDs []index.IndexInternalID) (
 	index.VectorReader, error) {
 
 	rv := &IndexSnapshotVectorReader{
-		vector:       vector,
-		field:        field,
-		k:            k,
-		snapshot:     is,
-		searchParams: searchParams,
+		vector:         vector,
+		field:          field,
+		k:              k,
+		snapshot:       is,
+		searchParams:   searchParams,
+		eligibleDocIDs: filterIDs,
 	}
 
 	if rv.postings == nil {

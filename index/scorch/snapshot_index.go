@@ -471,14 +471,33 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	return rvd, nil
 }
 
+func (is *IndexSnapshot) localDocNumFromGlobal(segmentIndex int, docNum uint64) uint64 {
+	return docNum - is.offsets[segmentIndex]
+}
+
 func (is *IndexSnapshot) segmentIndexAndLocalDocNumFromGlobal(docNum uint64) (int, uint64) {
 	segmentIndex := sort.Search(len(is.offsets),
 		func(x int) bool {
 			return is.offsets[x] > docNum
 		}) - 1
 
-	localDocNum := docNum - is.offsets[segmentIndex]
+	localDocNum := is.localDocNumFromGlobal(segmentIndex, docNum)
 	return int(segmentIndex), localDocNum
+}
+
+// function to get return a mapping of the segment index to the live global
+//
+//	doc nums in the segment at the specified index snapshot.
+func (is *IndexSnapshot) globalDocNums() map[int]*roaring.Bitmap {
+	segmentIndexGlobalDocNums := make(map[int]*roaring.Bitmap)
+
+	for i := range is.segment {
+		segmentIndexGlobalDocNums[i] = roaring.NewBitmap()
+		for _, localDocNum := range is.segment[i].DocNumbersLive().ToArray() {
+			segmentIndexGlobalDocNums[i].Add(localDocNum + uint32(is.offsets[i]))
+		}
+	}
+	return segmentIndexGlobalDocNums
 }
 
 func (is *IndexSnapshot) ExternalID(id index.IndexInternalID) (string, error) {

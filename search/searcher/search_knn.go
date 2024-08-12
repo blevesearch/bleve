@@ -49,11 +49,13 @@ type KNNSearcher struct {
 
 func NewKNNSearcher(ctx context.Context, i index.IndexReader, m mapping.IndexMapping,
 	options search.SearcherOptions, field string, vector []float32, k int64,
-	boost float64, similarityMetric string, searchParams json.RawMessage) (
+	boost float64, similarityMetric string, searchParams json.RawMessage,
+	filterIDs []index.IndexInternalID) (
 	search.Searcher, error) {
 
 	if vr, ok := i.(index.VectorIndexReader); ok {
-		vectorReader, err := vr.VectorReader(ctx, vector, field, k, searchParams)
+		vectorReader, err := vr.VectorReader(ctx, vector, field, k, searchParams,
+			filterIDs)
 		if err != nil {
 			return nil, err
 		}
