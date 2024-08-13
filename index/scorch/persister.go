@@ -355,7 +355,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
 		}
 	}
 
-	return s.persistSnapshotDirect(snapshot)
+	return s.persistSnapshotDirect(snapshot, nil)
 }
 
 // DefaultMinSegmentsForInMemoryMerge represents the default number of
@@ -363,6 +363,8 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
 // see in an IndexSnapshot before it decides to merge and persist
 // those segments
 var DefaultMinSegmentsForInMemoryMerge = 2
+
+var DefaultMaxSizeInMemoryMerge = 200 * 1024 * 1024 // 200MB
 
 // persistSnapshotMaybeMerge examines the snapshot and might merge and
 // persist the in-memory zap segments if there are enough of them
@@ -373,12 +375,19 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	var sbs []segment.Segment
 	var sbsDrops []*roaring.Bitmap
 	var sbsIndexes []int
+	var numSegs int
+	var totSize int
 
 	for i, segmentSnapshot := range snapshot.segment {
 		if _, ok := segmentSnapshot.segment.(segment.PersistedSegment); !ok {
+			if totSize >= DefaultMaxSizeInMemoryMerge {
+				break
+			}
 			sbs = append(sbs, segmentSnapshot.segment)
 			sbsDrops = append(sbsDrops, segmentSnapshot.deleted)
 			sbsIndexes = append(sbsIndexes, i)
+			numSegs++
+			totSize += segmentSnapshot.segment.Size()
 		}
 	}
 
@@ -414,10 +423,17 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 		creator:  "persistSnapshotMaybeMerge",
 	}
 
+	// to track which segments haven't participated in the in-memory merge
+	// they won't be flushed out to the disk yet, but in the next cycle will be
+	// merged in-memory and then flushed out - this is to keep the number of
+	// on-disk files in limit.
+	exclude := make(map[uint64]struct{})
+
 	// copy to the equiv the segments that weren't replaced
 	for _, segment := range snapshot.segment {
 		if _, wasMerged := mergedSegmentIDs[segment.id]; !wasMerged {
 			equiv.segment = append(equiv.segment, segment)
+			exclude[segment.id] = struct{}{}
 		}
 	}
 
@@ -434,7 +450,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 		}
 	}
 
-	err = s.persistSnapshotDirect(equiv)
+	err = s.persistSnapshotDirect(equiv, exclude)
 	if err != nil {
 		return false, err
 	}
@@ -494,9 +510,8 @@ func persistToDirectory(seg segment.UnpersistedSegment, d index.Directory,
 }
 
 func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
-	segPlugin SegmentPlugin, d index.Directory) (
-	[]string, map[uint64]string, error,
-) {
+	segPlugin SegmentPlugin, exclude map[uint64]struct{}, d index.Directory) (
+	[]string, map[uint64]string, error) {
 	snapshotsBucket, err := tx.CreateBucketIfNotExists(boltSnapshotsBucket)
 	if err != nil {
 		return nil, nil, err
@@ -585,18 +600,20 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			filenames = append(filenames, filename)
 		case segment.UnpersistedSegment:
 			// need to persist this to disk
-			filename := zapFileName(segmentSnapshot.id)
-			path := filepath.Join(path, filename)
-			err := persistToDirectory(seg, d, path)
-			if err != nil {
-				return nil, nil, fmt.Errorf("segment: %s persist err: %v", path, err)
+			if _, ok := exclude[segmentSnapshot.id]; !ok {
+				filename := zapFileName(segmentSnapshot.id)
+				path := filepath.Join(path, filename)
+				err := persistToDirectory(seg, d, path)
+				if err != nil {
+					return nil, nil, fmt.Errorf("segment: %s persist err: %v", path, err)
+				}
+				newSegmentPaths[segmentSnapshot.id] = path
+				err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
+				if err != nil {
+					return nil, nil, err
+				}
+				filenames = append(filenames, filename)
 			}
-			newSegmentPaths[segmentSnapshot.id] = path
-			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
-			if err != nil {
-				return nil, nil, err
-			}
-			filenames = append(filenames, filename)
 		default:
 			return nil, nil, fmt.Errorf("unknown segment type: %T", seg)
 		}
@@ -629,7 +646,7 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 	return filenames, newSegmentPaths, nil
 }
 
-func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
+func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot, exclude map[uint64]struct{}) (err error) {
 	// start a write transaction
 	tx, err := s.rootBolt.Begin(true)
 	if err != nil {
@@ -642,7 +659,7 @@ func (s *Scorch) persistSnapshotDirect(snapshot *IndexSnapshot) (err error) {
 		}
 	}()
 
-	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, nil)
+	filenames, newSegmentPaths, err := prepareBoltSnapshot(snapshot, tx, s.path, s.segPlugin, exclude, nil)
 	if err != nil {
 		return err
 	}
