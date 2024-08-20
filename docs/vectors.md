@@ -1,8 +1,8 @@
 # bleve@v2.4.0+
 
 * *v2.4.0* (and after) will come with support for **vectors' indexing and search**.
-* We've achieved this by embedding [FAISS](https://github.com/facebookresearch/faiss) indexes within our bleve indexes.
-* A new zap file format: [v16](https://github.com/blevesearch/zapx/blob/master/zap.md) - which will be the default going forward. Here we co-locate text and vector indexes as neighbors within segments, continuing to conform to the segmented architecture of *scorch*.
+* We've achieved this by embedding [FAISS](https://github.com/facebookresearch/faiss) indexes within our bleve (scorch) indexes.
+* Introduction of a new zap file format: [v16](https://github.com/blevesearch/zapx/blob/master/zap.md) - which will be the default going forward. Here we co-locate text and vector indexes as neighbors within segments, continuing to conform to the segmented architecture of *scorch*.
 
 ## Pre-requisite(s)
 
@@ -10,10 +10,11 @@
 * FAISS is a C++ library that needs to be compiled and it's shared libraries need to be situated at an accessible path for your application.
 * A `vectors` GO TAG needs to be set for bleve to access all the supporting code. This TAG must be set only after the FAISS shared library is made available. Failure to do either will inhibit you from using this feature.
 * Please follow these [instructions](#setup-instructions) below for any assistance in the area.
-* Releases of `blevesearch/bleve` work with select checkpoints of `blevesearch/faiss` owing to API changes and improvements:
+* Releases of `blevesearch/bleve` work with select checkpoints of `blevesearch/faiss` owing to API changes and improvements (tracking over the `bleve` branch):
     * *v2.4.0* requires [blevesearch/faiss@7b119f4](https://github.com/blevesearch/faiss/tree/7b119f4b9c408989b696b36f8cc53908e53de6db) (modified v1.7.4)
     * *v2.4.1* requires [blevesearch/faiss@d9db66a](https://github.com/blevesearch/faiss/tree/d9db66a38518d99eb334218697e1df0732f3fdf8) (modified v1.7.4)
     * *v2.4.2* requires [blevesearch/faiss@d9db66a](https://github.com/blevesearch/faiss/tree/d9db66a38518d99eb334218697e1df0732f3fdf8) (modified v1.7.4)
+    * *v2.4.3* requires [blevesearch/faiss@5ab1ce0](https://github.com/blevesearch/faiss/tree/5ab1ce067475fde3753c5a765db68c679e6b3723) (modified v1.8.0)
 
 ## Supported
 
