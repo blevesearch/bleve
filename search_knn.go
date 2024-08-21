@@ -344,6 +344,7 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 		filterQ := knnReq.FilterQuery
 		if filterQ == nil {
 			requiresFiltering[idx] = false
+			continue
 		}
 
 		if _, ok := filterQ.(*query.MatchAllQuery); ok {
