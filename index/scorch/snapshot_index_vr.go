@@ -56,7 +56,7 @@ type IndexSnapshotVectorReader struct {
 	requireFiltering bool
 }
 
-func (i *IndexSnapshotVectorReader) EligibleDocIDs() *roaring.Bitmap {
+func (i *IndexSnapshotVectorReader) getEligibleDocIDs() *roaring.Bitmap {
 	res := roaring.NewBitmap()
 	// converts the doc IDs to uint32 and returns
 	for _, eligibleDocInternalID := range i.eligibleDocIDs {

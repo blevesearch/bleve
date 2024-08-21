@@ -86,8 +86,11 @@ type KNNRequest struct {
 	//  - ivf_max_codes_pct : float // percentage of total vectors to visit to do a query (across all clusters)
 	//
 	// Consult go-faiss to know all supported search params
-	Params      json.RawMessage `json:"params"`
-	FilterQuery query.Query     `JSON:"filter,omitempty"`
+	Params json.RawMessage `json:"params"`
+
+	// Filter query to use with kNN pre-filtering.
+	// Supports pre-filtering with all existing types of query clauses.
+	FilterQuery query.Query `JSON:"filter,omitempty"`
 }
 
 func (r *SearchRequest) AddKNN(field string, vector []float32, k int64, boost float64,
@@ -250,7 +253,7 @@ func createKNNQuery(req *SearchRequest, eligibleDocsMap map[int][]index.IndexInt
 				knnQuery.SetFilterQuery(knn.FilterQuery, requiresFiltering[i])
 				filterResults, exists := eligibleDocsMap[i]
 				if exists {
-					knnQuery.FilterResults = filterResults
+					knnQuery.SetFilterResults(filterResults)
 				}
 			}
 			subQueries = append(subQueries, knnQuery)

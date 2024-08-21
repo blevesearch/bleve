@@ -92,7 +92,7 @@ func (o *OptimizeVR) Finish() error {
 					vectorIndexSize := vecIndex.Size()
 					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
 					for _, vr := range vrs {
-						eligibleVectorInternalIDs := vr.EligibleDocIDs()
+						eligibleVectorInternalIDs := vr.getEligibleDocIDs()
 						// Only the eligible documents belonging to this segment
 						// will get filtered out.
 						// There is no way to determine which doc belongs to which segment

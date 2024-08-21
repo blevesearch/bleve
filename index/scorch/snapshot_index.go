@@ -471,10 +471,11 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 	return rvd, nil
 }
 
-func (is *IndexSnapshot) localDocNumFromGlobal(segmentIndex int, docNum uint64) uint64 {
-	return docNum - is.offsets[segmentIndex]
-}
-
+// In a multi-segment index, each document has:
+// 1. a local docnum - local to the segment
+// 2. a global docnum - unique identifier across the index
+// This function returns the segment index(the segment in which the docnum is present)
+// and local docnum of a document.
 func (is *IndexSnapshot) segmentIndexAndLocalDocNumFromGlobal(docNum uint64) (int, uint64) {
 	segmentIndex := sort.Search(len(is.offsets),
 		func(x int) bool {
@@ -483,6 +484,11 @@ func (is *IndexSnapshot) segmentIndexAndLocalDocNumFromGlobal(docNum uint64) (in
 
 	localDocNum := is.localDocNumFromGlobal(segmentIndex, docNum)
 	return int(segmentIndex), localDocNum
+}
+
+// This function returns the local docnum, given the segment index and global docnum
+func (is *IndexSnapshot) localDocNumFromGlobal(segmentIndex int, docNum uint64) uint64 {
+	return docNum - is.offsets[segmentIndex]
 }
 
 // function to get return a mapping of the segment index to the live global
