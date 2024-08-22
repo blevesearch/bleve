@@ -53,10 +53,9 @@ type IndexSnapshotVectorReader struct {
 
 	searchParams json.RawMessage
 
-	// These two fields are only applicable for vector readers which will
+	// The following fields are only applicable for vector readers which will
 	// process kNN queries.
-	eligibleDocIDs   []index.IndexInternalID
-	requireFiltering bool
+	eligibleDocIDs []index.IndexInternalID
 }
 
 func (i *IndexSnapshotVectorReader) getEligibleDocIDs() *roaring.Bitmap {
@@ -127,7 +126,7 @@ func (i *IndexSnapshotVectorReader) Advance(ID index.IndexInternalID,
 		var i2 index.VectorReader
 		var err error
 
-		if i.requireFiltering {
+		if len(i.eligibleDocIDs) > 0 {
 			i2, err = i.snapshot.VectorReaderWithFilter(i.ctx, i.vector, i.field,
 				i.k, i.searchParams, i.eligibleDocIDs)
 		} else {

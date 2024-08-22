@@ -255,8 +255,8 @@ func createKNNQuery(req *SearchRequest, eligibleDocsMap map[int][]index.IndexInt
 			knnQuery.SetK(knn.K)
 			knnQuery.SetBoost(knn.Boost.Value())
 			knnQuery.SetParams(knn.Params)
-			if requiresFiltering[i] {
-				knnQuery.SetFilterQuery(knn.FilterQuery, requiresFiltering[i])
+			if len(eligibleDocsMap[i]) > 0 {
+				knnQuery.SetFilterQuery(knn.FilterQuery)
 				filterResults, exists := eligibleDocsMap[i]
 				if exists {
 					knnQuery.SetFilterResults(filterResults)
