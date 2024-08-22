@@ -244,6 +244,12 @@ func createKNNQuery(req *SearchRequest, eligibleDocsMap map[int][]index.IndexInt
 		kArray := make([]int64, 0, len(req.KNN))
 		sumOfK := int64(0)
 		for i, knn := range req.KNN {
+			// If it's a filtered kNN but has no eligible filter hits, then
+			// do not run the kNN query.
+			if requiresFiltering[i] && len(eligibleDocsMap[i]) <= 0 {
+				continue
+			}
+
 			knnQuery := query.NewKNNQuery(knn.Vector)
 			knnQuery.SetFieldVal(knn.Field)
 			knnQuery.SetK(knn.K)

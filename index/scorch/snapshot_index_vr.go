@@ -51,7 +51,10 @@ type IndexSnapshotVectorReader struct {
 	currID        index.IndexInternalID
 	ctx           context.Context
 
-	searchParams     json.RawMessage
+	searchParams json.RawMessage
+
+	// These two fields are only applicable for vector readers which will
+	// process kNN queries.
 	eligibleDocIDs   []index.IndexInternalID
 	requireFiltering bool
 }
@@ -121,8 +124,17 @@ func (i *IndexSnapshotVectorReader) Advance(ID index.IndexInternalID,
 	preAlloced *index.VectorDoc) (*index.VectorDoc, error) {
 
 	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
-		i2, err := i.snapshot.VectorReader(i.ctx, i.vector, i.field, i.k,
-			i.searchParams, i.eligibleDocIDs, i.requireFiltering)
+		var i2 index.VectorReader
+		var err error
+
+		if i.requireFiltering {
+			i2, err = i.snapshot.VectorReaderWithFilter(i.ctx, i.vector, i.field,
+				i.k, i.searchParams, i.eligibleDocIDs)
+		} else {
+			i2, err = i.snapshot.VectorReader(i.ctx, i.vector, i.field, i.k,
+				i.searchParams)
+		}
+
 		if err != nil {
 			return nil, err
 		}

@@ -106,10 +106,17 @@ func (o *OptimizeVR) Finish() error {
 							eligibleLocalDocNums.Add(uint32(localDocNum))
 						}
 
+						var pl segment_api.VecPostingsList
+						var err error
 						// for each VR, populate postings list and iterators
 						// by passing the obtained vector index and getting similar vectors.
-						pl, err := vecIndex.Search(vr.vector, vr.k,
-							vr.requireFiltering, eligibleLocalDocNums, vr.searchParams)
+						if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
+							pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
+								eligibleLocalDocNums, vr.searchParams)
+						} else {
+							pl, err = vecIndex.Search(vr.vector, vr.k, vr.searchParams)
+						}
+
 						if err != nil {
 							errorsM.Lock()
 							errors = append(errors, err)
