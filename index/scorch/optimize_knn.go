@@ -23,7 +23,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 	segment_api "github.com/blevesearch/scorch_segment_api/v2"
@@ -98,12 +97,13 @@ func (o *OptimizeVR) Finish() error {
 						// There is no way to determine which doc belongs to which segment
 						eligibleVectorInternalIDs.And(snapshotGlobalDocNums[index])
 
-						eligibleLocalDocNums := roaring.NewBitmap()
+						eligibleLocalDocNums := make([]uint64,
+							eligibleVectorInternalIDs.Stats().Cardinality)
 						// get the (segment-)local document numbers
-						for _, docNum := range eligibleVectorInternalIDs.ToArray() {
+						for i, docNum := range eligibleVectorInternalIDs.ToArray() {
 							localDocNum := o.snapshot.localDocNumFromGlobal(index,
 								uint64(docNum))
-							eligibleLocalDocNums.Add(uint32(localDocNum))
+							eligibleLocalDocNums[i] = localDocNum
 						}
 
 						var pl segment_api.VecPostingsList
