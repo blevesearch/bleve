@@ -34,6 +34,8 @@ type OptimizeVR struct {
 	totalCost uint64
 	// maps field to vector readers
 	vrs map[string][]*IndexSnapshotVectorReader
+	// if at least one of the vector readers requires filtered kNN.
+	requiresFiltering bool
 }
 
 // This setting _MUST_ only be changed during init and not after.
@@ -79,7 +81,8 @@ func (o *OptimizeVR) Finish() error {
 					wg.Done()
 				}()
 				for field, vrs := range o.vrs {
-					vecIndex, err := segment.InterpretVectorIndex(field, origSeg.deleted)
+					vecIndex, err := segment.InterpretVectorIndex(field,
+						o.requiresFiltering, origSeg.deleted)
 					if err != nil {
 						errorsM.Lock()
 						errors = append(errors, err)
@@ -165,6 +168,9 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 		return octx, nil
 	}
 	o.ctx = ctx
+	if !o.requiresFiltering {
+		o.requiresFiltering = len(s.eligibleDocIDs) > 0
+	}
 
 	if o.snapshot != s.snapshot {
 		o.invokeSearcherEndCallback()

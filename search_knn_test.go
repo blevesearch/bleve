@@ -1285,8 +1285,8 @@ func TestKNNOperator(t *testing.T) {
 	termQuery := query.NewTermQuery("2")
 
 	searchRequest := NewSearchRequest(termQuery)
-	searchRequest.AddKNN("vector", getRandomVector(), 3, 2.0, nil)
-	searchRequest.AddKNN("vector", getRandomVector(), 2, 1.5, nil)
+	searchRequest.AddKNN("vector", getRandomVector(), 3, 2.0)
+	searchRequest.AddKNN("vector", getRandomVector(), 2, 1.5)
 	searchRequest.Fields = []string{"content", "vector"}
 
 	// Conjunction
@@ -1405,7 +1405,7 @@ func TestKNNFiltering(t *testing.T) {
 	}
 
 	searchRequest := NewSearchRequest(NewMatchNoneQuery())
-	searchRequest.AddKNN("vector", getRandomVector(), 3, 2.0, termQuery)
+	searchRequest.AddKNNWithFilter("vector", getRandomVector(), 3, 2.0, termQuery)
 	searchRequest.Fields = []string{"content", "vector"}
 
 	res, err := index.Search(searchRequest)
@@ -1421,7 +1421,8 @@ func TestKNNFiltering(t *testing.T) {
 
 	// No results should be returned with a match_none filter.
 	searchRequest = NewSearchRequest(NewMatchNoneQuery())
-	searchRequest.AddKNN("vector", getRandomVector(), 3, 2.0, NewMatchNoneQuery())
+	searchRequest.AddKNNWithFilter("vector", getRandomVector(), 3, 2.0,
+		NewMatchNoneQuery())
 	res, err = index.Search(searchRequest)
 	if err != nil {
 		t.Fatal(err)
@@ -1446,7 +1447,7 @@ func TestKNNFiltering(t *testing.T) {
 	}
 
 	searchRequest = NewSearchRequest(NewMatchNoneQuery())
-	searchRequest.AddKNN("vector", getRandomVector(), 3, 2.0, disjQuery)
+	searchRequest.AddKNNWithFilter("vector", getRandomVector(), 3, 2.0, disjQuery)
 	searchRequest.Fields = []string{"content", "vector"}
 
 	res, err = index.Search(searchRequest)
@@ -1532,7 +1533,8 @@ func TestNestedVectors(t *testing.T) {
 
 	for _, test := range tests {
 		searchReq := NewSearchRequest(query.NewMatchNoneQuery())
-		searchReq.AddKNN(vecFieldName, test.queryVec, k, 1000, NewMatchAllQuery())
+		searchReq.AddKNNWithFilter(vecFieldName, test.queryVec, k, 1000,
+			NewMatchAllQuery())
 
 		res, err := index.Search(searchReq)
 		if err != nil {

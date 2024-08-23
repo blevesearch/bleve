@@ -93,8 +93,18 @@ type KNNRequest struct {
 	FilterQuery query.Query `JSON:"filter,omitempty"`
 }
 
-func (r *SearchRequest) AddKNN(field string, vector []float32, k int64, boost float64,
-	filterQuery query.Query) {
+func (r *SearchRequest) AddKNN(field string, vector []float32, k int64, boost float64) {
+	b := query.Boost(boost)
+	r.KNN = append(r.KNN, &KNNRequest{
+		Field:  field,
+		Vector: vector,
+		K:      k,
+		Boost:  &b,
+	})
+}
+
+func (r *SearchRequest) AddKNNWithFilter(field string, vector []float32, k int64,
+	boost float64, filterQuery query.Query) {
 	b := query.Boost(boost)
 	r.KNN = append(r.KNN, &KNNRequest{
 		Field:       field,
