@@ -39,7 +39,7 @@ type OptimizeVR struct {
 }
 
 // This setting _MUST_ only be changed during init and not after.
-var BleveMaxKNNConcurrency = 1
+var BleveMaxKNNConcurrency = 10
 
 func (o *OptimizeVR) invokeSearcherEndCallback() {
 	if o.ctx != nil {
