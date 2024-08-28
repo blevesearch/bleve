@@ -74,6 +74,9 @@ func (q *BooleanQuery) SetMinShould(minShould float64) {
 }
 
 func (q *BooleanQuery) AddMust(m ...Query) {
+	if m == nil {
+		return
+	}
 	if q.Must == nil {
 		tmp := NewConjunctionQuery([]Query{})
 		tmp.queryStringMode = q.queryStringMode
@@ -85,6 +88,9 @@ func (q *BooleanQuery) AddMust(m ...Query) {
 }
 
 func (q *BooleanQuery) AddShould(m ...Query) {
+	if m == nil {
+		return
+	}
 	if q.Should == nil {
 		tmp := NewDisjunctionQuery([]Query{})
 		tmp.queryStringMode = q.queryStringMode
@@ -96,6 +102,9 @@ func (q *BooleanQuery) AddShould(m ...Query) {
 }
 
 func (q *BooleanQuery) AddMustNot(m ...Query) {
+	if m == nil {
+		return
+	}
 	if q.MustNot == nil {
 		tmp := NewDisjunctionQuery([]Query{})
 		tmp.queryStringMode = q.queryStringMode
