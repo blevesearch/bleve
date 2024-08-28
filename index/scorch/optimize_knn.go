@@ -39,7 +39,7 @@ type OptimizeVR struct {
 }
 
 // This setting _MUST_ only be changed during init and not after.
-var BleveMaxKNNConcurrency = 10
+var BleveMaxKNNConcurrency = 1
 
 func (o *OptimizeVR) invokeSearcherEndCallback() {
 	if o.ctx != nil {
@@ -95,10 +95,12 @@ func (o *OptimizeVR) Finish() error {
 					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
 					for _, vr := range vrs {
 						eligibleVectorInternalIDs := vr.getEligibleDocIDs()
-						// Only the eligible documents belonging to this segment
-						// will get filtered out.
-						// There is no way to determine which doc belongs to which segment
-						eligibleVectorInternalIDs.And(snapshotGlobalDocNums[index])
+						if snapshotGlobalDocNums != nil {
+							// Only the eligible documents belonging to this segment
+							// will get filtered out.
+							// There is no way to determine which doc belongs to which segment
+							eligibleVectorInternalIDs.And(snapshotGlobalDocNums[index])
+						}
 
 						eligibleLocalDocNums := make([]uint64,
 							eligibleVectorInternalIDs.Stats().Cardinality)

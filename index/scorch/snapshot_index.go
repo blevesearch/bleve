@@ -491,10 +491,13 @@ func (is *IndexSnapshot) localDocNumFromGlobal(segmentIndex int, docNum uint64) 
 	return docNum - is.offsets[segmentIndex]
 }
 
-// function to get return a mapping of the segment index to the live global
-//
-//	doc nums in the segment at the specified index snapshot.
+// Function to return a mapping of the segment index to the live global	doc nums
+// in the segment of the specified index snapshot.
 func (is *IndexSnapshot) globalDocNums() map[int]*roaring.Bitmap {
+	if len(is.segment) == 0 {
+		return nil
+	}
+
 	segmentIndexGlobalDocNums := make(map[int]*roaring.Bitmap)
 
 	for i := range is.segment {

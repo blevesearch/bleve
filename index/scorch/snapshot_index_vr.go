@@ -58,6 +58,10 @@ type IndexSnapshotVectorReader struct {
 	eligibleDocIDs []index.IndexInternalID
 }
 
+// Function to convert the internal IDs of the eligible documents to a type suitable
+// for addition to a bitmap.
+// Useful to have the eligible doc IDs in a bitmap to leverage the fast intersection
+// (AND) operations. Eg. finding the eligible doc IDs present in a segment.
 func (i *IndexSnapshotVectorReader) getEligibleDocIDs() *roaring.Bitmap {
 	res := roaring.NewBitmap()
 	// converts the doc IDs to uint32 and returns
