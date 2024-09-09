@@ -437,13 +437,6 @@ func testFromSizePagination(t *testing.T, query *SearchRequest, index Index, nam
 	}
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func TestVectorBase64Index(t *testing.T) {
 	dataset, searchRequests, err := readDatasetAndQueries(testInputCompressedFile)
 	if err != nil {
