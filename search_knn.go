@@ -196,7 +196,12 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.KNN[i].VectorBase64 = temp.KNN[i].VectorBase64
 		r.KNN[i].K = temp.KNN[i].K
 		r.KNN[i].Boost = temp.KNN[i].Boost
-		r.KNN[i].FilterQuery, err = query.ParseQuery(knnReq.FilterQuery)
+		if len(knnReq.FilterQuery) == 0 {
+			// Setting this to nil to avoid ParseQuery() setting it to a match none
+			r.KNN[i].FilterQuery = nil
+		} else {
+			r.KNN[i].FilterQuery, err = query.ParseQuery(knnReq.FilterQuery)
+		}
 	}
 	r.KNNOperator = temp.KNNOperator
 	if r.KNNOperator == "" {
