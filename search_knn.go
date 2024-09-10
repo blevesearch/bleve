@@ -188,13 +188,15 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.From = 0
 	}
 
-	for i, knnReq := range r.KNN {
-		knnReq.Field = temp.KNN[i].Field
-		knnReq.Vector = temp.KNN[i].Vector
-		knnReq.VectorBase64 = temp.KNN[i].VectorBase64
-		knnReq.K = temp.KNN[i].K
-		knnReq.Boost = temp.KNN[i].Boost
-		knnReq.FilterQuery, err = query.ParseQuery(temp.KNN[i].FilterQuery)
+	r.KNN = make([]*KNNRequest, len(temp.KNN))
+	for i, knnReq := range temp.KNN {
+		r.KNN[i] = &KNNRequest{}
+		r.KNN[i].Field = temp.KNN[i].Field
+		r.KNN[i].Vector = temp.KNN[i].Vector
+		r.KNN[i].VectorBase64 = temp.KNN[i].VectorBase64
+		r.KNN[i].K = temp.KNN[i].K
+		r.KNN[i].Boost = temp.KNN[i].Boost
+		r.KNN[i].FilterQuery, err = query.ParseQuery(knnReq.FilterQuery)
 	}
 	r.KNNOperator = temp.KNNOperator
 	if r.KNNOperator == "" {
