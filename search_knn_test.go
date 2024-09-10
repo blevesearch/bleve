@@ -1284,7 +1284,8 @@ func TestKNNOperator(t *testing.T) {
 
 	// Conjunction
 	searchRequest.AddKNNOperator(knnOperatorAnd)
-	conjunction, _, _, err := createKNNQuery(searchRequest)
+	requiresFiltering := make(map[int]bool)
+	conjunction, _, _, err := createKNNQuery(searchRequest, nil, requiresFiltering)
 	if err != nil {
 		t.Fatalf("unexpected error for AND knn operator")
 	}
@@ -1300,7 +1301,7 @@ func TestKNNOperator(t *testing.T) {
 
 	// Disjunction
 	searchRequest.AddKNNOperator(knnOperatorOr)
-	disjunction, _, _, err := createKNNQuery(searchRequest)
+	disjunction, _, _, err := createKNNQuery(searchRequest, nil, requiresFiltering)
 	if err != nil {
 		t.Fatalf("unexpected error for OR knn operator")
 	}
@@ -1316,9 +1317,141 @@ func TestKNNOperator(t *testing.T) {
 
 	// Incorrect operator.
 	searchRequest.AddKNNOperator("bs_op")
-	searchRequest.Query, _, _, err = createKNNQuery(searchRequest)
+	searchRequest.Query, _, _, err = createKNNQuery(searchRequest, nil, requiresFiltering)
 	if err == nil {
 		t.Fatalf("expected error for incorrect knn operator")
+	}
+}
+
+func TestKNNFiltering(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	const dims = 5
+	getRandomVector := func() []float32 {
+		vec := make([]float32, dims)
+		for i := 0; i < dims; i++ {
+			vec[i] = rand.Float32()
+		}
+		return vec
+	}
+
+	dataset := make([]map[string]interface{}, 0)
+
+	// Indexing just a few docs to populate index.
+	for i := 0; i < 10; i++ {
+		dataset = append(dataset, map[string]interface{}{
+			"type":    "vectorStuff",
+			"content": strconv.Itoa(i + 1000),
+			"vector":  getRandomVector(),
+		})
+	}
+
+	indexMapping := NewIndexMapping()
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = "en"
+	documentMapping := NewDocumentMapping()
+	indexMapping.AddDocumentMapping("vectorStuff", documentMapping)
+
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.Index = true
+	contentFieldMapping.Store = true
+	documentMapping.AddFieldMappingsAt("content", contentFieldMapping)
+
+	vecFieldMapping := mapping.NewVectorFieldMapping()
+	vecFieldMapping.Index = true
+	vecFieldMapping.Dims = 5
+	vecFieldMapping.Similarity = "dot_product"
+	documentMapping.AddFieldMappingsAt("vector", vecFieldMapping)
+
+	index, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch := index.NewBatch()
+	for i := 0; i < len(dataset); i++ {
+		// the id of term "i" is (i-1000)
+		batch.Index(strconv.Itoa(i), dataset[i])
+	}
+
+	err = index.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	termQuery := query.NewTermQuery("1004")
+	filterRequest := NewSearchRequest(termQuery)
+	filteredHits, err := index.Search(filterRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	filteredDocIDs := make(map[string]struct{})
+	for _, match := range filteredHits.Hits {
+		filteredDocIDs[match.ID] = struct{}{}
+	}
+
+	searchRequest := NewSearchRequest(NewMatchNoneQuery())
+	searchRequest.AddKNNWithFilter("vector", getRandomVector(), 3, 2.0, termQuery)
+	searchRequest.Fields = []string{"content", "vector"}
+
+	res, err := index.Search(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// check if any of the returned results are not part of the filtered hits.
+	for _, match := range res.Hits {
+		if _, exists := filteredDocIDs[match.ID]; !exists {
+			t.Errorf("returned result not present in filtered hits")
+		}
+	}
+
+	// No results should be returned with a match_none filter.
+	searchRequest = NewSearchRequest(NewMatchNoneQuery())
+	searchRequest.AddKNNWithFilter("vector", getRandomVector(), 3, 2.0,
+		NewMatchNoneQuery())
+	res, err = index.Search(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 0 {
+		t.Errorf("match none filter should return no hits")
+	}
+
+	// Testing with a disjunction query.
+
+	termQuery = query.NewTermQuery("1003")
+	termQuery2 := query.NewTermQuery("1005")
+	disjQuery := query.NewDisjunctionQuery([]query.Query{termQuery, termQuery2})
+	filterRequest = NewSearchRequest(disjQuery)
+	filteredHits, err = index.Search(filterRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	filteredDocIDs = make(map[string]struct{})
+	for _, match := range filteredHits.Hits {
+		filteredDocIDs[match.ID] = struct{}{}
+	}
+
+	searchRequest = NewSearchRequest(NewMatchNoneQuery())
+	searchRequest.AddKNNWithFilter("vector", getRandomVector(), 3, 2.0, disjQuery)
+	searchRequest.Fields = []string{"content", "vector"}
+
+	res, err = index.Search(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, match := range res.Hits {
+		if _, exists := filteredDocIDs[match.ID]; !exists {
+			t.Errorf("returned result not present in filtered hits")
+		}
 	}
 }
 
@@ -1393,7 +1526,8 @@ func TestNestedVectors(t *testing.T) {
 
 	for _, test := range tests {
 		searchReq := NewSearchRequest(query.NewMatchNoneQuery())
-		searchReq.AddKNN(vecFieldName, test.queryVec, k, 1000)
+		searchReq.AddKNNWithFilter(vecFieldName, test.queryVec, k, 1000,
+			NewMatchAllQuery())
 
 		res, err := index.Search(searchReq)
 		if err != nil {

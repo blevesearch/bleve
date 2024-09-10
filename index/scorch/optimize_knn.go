@@ -34,6 +34,8 @@ type OptimizeVR struct {
 	totalCost uint64
 	// maps field to vector readers
 	vrs map[string][]*IndexSnapshotVectorReader
+	// if at least one of the vector readers requires filtered kNN.
+	requiresFiltering bool
 }
 
 // This setting _MUST_ only be changed during init and not after.
@@ -62,6 +64,8 @@ func (o *OptimizeVR) Finish() error {
 	var errorsM sync.Mutex
 	var errors []error
 
+	snapshotGlobalDocNums := o.snapshot.globalDocNums()
+
 	defer o.invokeSearcherEndCallback()
 
 	wg := sync.WaitGroup{}
@@ -77,7 +81,8 @@ func (o *OptimizeVR) Finish() error {
 					wg.Done()
 				}()
 				for field, vrs := range o.vrs {
-					vecIndex, err := segment.InterpretVectorIndex(field, origSeg.deleted)
+					vecIndex, err := segment.InterpretVectorIndex(field,
+						o.requiresFiltering, origSeg.deleted)
 					if err != nil {
 						errorsM.Lock()
 						errors = append(errors, err)
@@ -89,9 +94,34 @@ func (o *OptimizeVR) Finish() error {
 					vectorIndexSize := vecIndex.Size()
 					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
 					for _, vr := range vrs {
+						eligibleVectorInternalIDs := vr.getEligibleDocIDs()
+						if snapshotGlobalDocNums != nil {
+							// Only the eligible documents belonging to this segment
+							// will get filtered out.
+							// There is no way to determine which doc belongs to which segment
+							eligibleVectorInternalIDs.And(snapshotGlobalDocNums[index])
+						}
+
+						eligibleLocalDocNums := make([]uint64,
+							eligibleVectorInternalIDs.Stats().Cardinality)
+						// get the (segment-)local document numbers
+						for i, docNum := range eligibleVectorInternalIDs.ToArray() {
+							localDocNum := o.snapshot.localDocNumFromGlobal(index,
+								uint64(docNum))
+							eligibleLocalDocNums[i] = localDocNum
+						}
+
+						var pl segment_api.VecPostingsList
+						var err error
 						// for each VR, populate postings list and iterators
 						// by passing the obtained vector index and getting similar vectors.
-						pl, err := vecIndex.Search(vr.vector, vr.k, vr.searchParams)
+						if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
+							pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
+								eligibleLocalDocNums, vr.searchParams)
+						} else {
+							pl, err = vecIndex.Search(vr.vector, vr.k, vr.searchParams)
+						}
+
 						if err != nil {
 							errorsM.Lock()
 							errors = append(errors, err)
@@ -140,6 +170,9 @@ func (s *IndexSnapshotVectorReader) VectorOptimize(ctx context.Context,
 		return octx, nil
 	}
 	o.ctx = ctx
+	if !o.requiresFiltering {
+		o.requiresFiltering = len(s.eligibleDocIDs) > 0
+	}
 
 	if o.snapshot != s.snapshot {
 		o.invokeSearcherEndCallback()

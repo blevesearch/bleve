@@ -48,3 +48,29 @@ func (is *IndexSnapshot) VectorReader(ctx context.Context, vector []float32,
 
 	return rv, nil
 }
+
+func (is *IndexSnapshot) VectorReaderWithFilter(ctx context.Context, vector []float32,
+	field string, k int64, searchParams json.RawMessage,
+	filterIDs []index.IndexInternalID) (
+	index.VectorReader, error) {
+
+	rv := &IndexSnapshotVectorReader{
+		vector:         vector,
+		field:          field,
+		k:              k,
+		snapshot:       is,
+		searchParams:   searchParams,
+		eligibleDocIDs: filterIDs,
+	}
+
+	if rv.postings == nil {
+		rv.postings = make([]segment_api.VecPostingsList, len(is.segment))
+	}
+	if rv.iterators == nil {
+		rv.iterators = make([]segment_api.VecPostingsIterator, len(is.segment))
+	}
+
+	// initialize postings and iterators within the OptimizeVR's Finish()
+
+	return rv, nil
+}

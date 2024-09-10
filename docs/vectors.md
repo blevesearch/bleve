@@ -81,6 +81,26 @@ if err != nil {
 fmt.Println(searchResult.Hits)
 ```
 
+## Querying with Filters (v2.4.3+)
+```go
+searchRequest := NewSearchRequest(query.NewMatchNoneQuery())
+
+filterQuery := NewTermQuery("hello")
+
+searchRequest.AddKNNWithFilter(
+    "vec",                                      // vector field name
+    []float32{10,11,12,13,14,15,16,17,18,19},   // query vector (same dims)
+    5,                                          // k
+    0,                                          // boost
+    filterQuery,                                // filter query
+)
+searchResult, err := index.Search(searchRequest)
+if err != nil {
+    panic(err)
+}
+fmt.Println(searchResult.Hits)
+```
+
 ## Setup Instructions
 
 * Using `cmake` is a recommended approach by FAISS authors.

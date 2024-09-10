@@ -87,6 +87,10 @@ type KNNRequest struct {
 	//
 	// Consult go-faiss to know all supported search params
 	Params json.RawMessage `json:"params"`
+
+	// Filter query to use with kNN pre-filtering.
+	// Supports pre-filtering with all existing types of query clauses.
+	FilterQuery query.Query `JSON:"filter,omitempty"`
 }
 
 func (r *SearchRequest) AddKNN(field string, vector []float32, k int64, boost float64) {
@@ -99,6 +103,18 @@ func (r *SearchRequest) AddKNN(field string, vector []float32, k int64, boost fl
 	})
 }
 
+func (r *SearchRequest) AddKNNWithFilter(field string, vector []float32, k int64,
+	boost float64, filterQuery query.Query) {
+	b := query.Boost(boost)
+	r.KNN = append(r.KNN, &KNNRequest{
+		Field:       field,
+		Vector:      vector,
+		K:           k,
+		Boost:       &b,
+		FilterQuery: filterQuery,
+	})
+}
+
 func (r *SearchRequest) AddKNNOperator(operator knnOperator) {
 	r.KNNOperator = operator
 }
@@ -106,6 +122,15 @@ func (r *SearchRequest) AddKNNOperator(operator knnOperator) {
 // UnmarshalJSON deserializes a JSON representation of
 // a SearchRequest
 func (r *SearchRequest) UnmarshalJSON(input []byte) error {
+	type tempKNNReq struct {
+		Field        string          `json:"field"`
+		Vector       []float32       `json:"vector"`
+		VectorBase64 string          `json:"vector_base64"`
+		K            int64           `json:"k"`
+		Boost        *query.Boost    `json:"boost,omitempty"`
+		FilterQuery  json.RawMessage `JSON:"filter,omitempty"`
+	}
+
 	var temp struct {
 		Q                json.RawMessage   `json:"query"`
 		Size             *int              `json:"size"`
@@ -119,7 +144,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		Score            string            `json:"score"`
 		SearchAfter      []string          `json:"search_after"`
 		SearchBefore     []string          `json:"search_before"`
-		KNN              []*KNNRequest     `json:"knn"`
+		KNN              []*tempKNNReq     `json:"knn"`
 		KNNOperator      knnOperator       `json:"knn_operator"`
 		PreSearchData    json.RawMessage   `json:"pre_search_data"`
 	}
@@ -163,7 +188,21 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.From = 0
 	}
 
-	r.KNN = temp.KNN
+	r.KNN = make([]*KNNRequest, len(temp.KNN))
+	for i, knnReq := range temp.KNN {
+		r.KNN[i] = &KNNRequest{}
+		r.KNN[i].Field = temp.KNN[i].Field
+		r.KNN[i].Vector = temp.KNN[i].Vector
+		r.KNN[i].VectorBase64 = temp.KNN[i].VectorBase64
+		r.KNN[i].K = temp.KNN[i].K
+		r.KNN[i].Boost = temp.KNN[i].Boost
+		if len(knnReq.FilterQuery) == 0 {
+			// Setting this to nil to avoid ParseQuery() setting it to a match none
+			r.KNN[i].FilterQuery = nil
+		} else {
+			r.KNN[i].FilterQuery, err = query.ParseQuery(knnReq.FilterQuery)
+		}
+	}
 	r.KNNOperator = temp.KNNOperator
 	if r.KNNOperator == "" {
 		r.KNNOperator = knnOperatorOr
@@ -209,7 +248,9 @@ var (
 	knnOperatorOr  = knnOperator("or")
 )
 
-func createKNNQuery(req *SearchRequest) (query.Query, []int64, int64, error) {
+func createKNNQuery(req *SearchRequest, eligibleDocsMap map[int][]index.IndexInternalID,
+	requiresFiltering map[int]bool) (
+	query.Query, []int64, int64, error) {
 	if requestHasKNN(req) {
 		// first perform validation
 		err := validateKNN(req)
@@ -219,12 +260,25 @@ func createKNNQuery(req *SearchRequest) (query.Query, []int64, int64, error) {
 		var subQueries []query.Query
 		kArray := make([]int64, 0, len(req.KNN))
 		sumOfK := int64(0)
-		for _, knn := range req.KNN {
+		for i, knn := range req.KNN {
+			// If it's a filtered kNN but has no eligible filter hits, then
+			// do not run the kNN query.
+			if requiresFiltering[i] && len(eligibleDocsMap[i]) <= 0 {
+				continue
+			}
+
 			knnQuery := query.NewKNNQuery(knn.Vector)
 			knnQuery.SetFieldVal(knn.Field)
 			knnQuery.SetK(knn.K)
 			knnQuery.SetBoost(knn.Boost.Value())
 			knnQuery.SetParams(knn.Params)
+			if len(eligibleDocsMap[i]) > 0 {
+				knnQuery.SetFilterQuery(knn.FilterQuery)
+				filterResults, exists := eligibleDocsMap[i]
+				if exists {
+					knnQuery.SetFilterResults(filterResults)
+				}
+			}
 			subQueries = append(subQueries, knnQuery)
 			kArray = append(kArray, knn.K)
 			sumOfK += knn.K
@@ -303,7 +357,60 @@ func addSortAndFieldsToKNNHits(req *SearchRequest, knnHits []*search.DocumentMat
 }
 
 func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, reader index.IndexReader, preSearch bool) ([]*search.DocumentMatch, error) {
-	KNNQuery, kArray, sumOfK, err := createKNNQuery(req)
+	// maps the index of the KNN query in the req to the pre-filter hits aka
+	// eligible docs' internal IDs .
+	filterHitsMap := make(map[int][]index.IndexInternalID)
+	// Indicates if this query requires filtering downstream
+	// No filtering required if it's a match all query/no filters applied.
+	requiresFiltering := make(map[int]bool)
+
+	for idx, knnReq := range req.KNN {
+		// TODO Can use goroutines for this filter query stuff - do it if perf results
+		// show this to be significantly slow otherwise.
+		filterQ := knnReq.FilterQuery
+		if filterQ == nil {
+			requiresFiltering[idx] = false
+			continue
+		}
+
+		if _, ok := filterQ.(*query.MatchAllQuery); ok {
+			requiresFiltering[idx] = false
+			continue
+		}
+
+		if _, ok := filterQ.(*query.MatchNoneQuery); ok {
+			// Filtering required since no hits are eligible.
+			requiresFiltering[idx] = true
+			// a match none query just means none the documents are eligible
+			// hence, we can save on running the query.
+			continue
+		}
+
+		// Applies to all supported types of queries.
+		filterSearcher, _ := filterQ.Searcher(ctx, reader, i.m, search.SearcherOptions{
+			Score: "none", // just want eligible hits --> don't compute scores if not needed
+		})
+		// Using the index doc count to determine collector size since we do not
+		// have an estimate of the number of eligible docs in the index yet.
+		indexDocCount, err := i.DocCount()
+		if err != nil {
+			return nil, err
+		}
+		filterColl := collector.NewEligibleCollector(int(indexDocCount))
+		err = filterColl.Collect(ctx, filterSearcher, reader)
+		if err != nil {
+			return nil, err
+		}
+		filterHits := filterColl.Results()
+		filterHitsMap[idx] = make([]index.IndexInternalID, 0)
+		for _, docMatch := range filterHits {
+			filterHitsMap[idx] = append(filterHitsMap[idx], docMatch.IndexInternalID)
+		}
+		requiresFiltering[idx] = true
+	}
+
+	// Add the filter hits when creating the kNN query
+	KNNQuery, kArray, sumOfK, err := createKNNQuery(req, filterHitsMap, requiresFiltering)
 	if err != nil {
 		return nil, err
 	}
