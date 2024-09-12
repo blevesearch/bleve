@@ -361,7 +361,7 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 	// Test Pagination with multi partitioned index
 	index = NewIndexAlias()
 	index.indexes = make([]Index, 0)
-	nameToIndex := createPartitionedIndex(documents, index, 8, indexMappingDotProduct, t, true)
+	nameToIndex := createPartitionedIndex(documents, index, 8, indexMappingL2Norm, t, true)
 
 	// Test From + Size pagination for Hybrid Search (2-Phase)
 	query := copySearchRequest(searchRequests[4], nil)
