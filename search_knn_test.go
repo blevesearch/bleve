@@ -313,9 +313,6 @@ func TestSimilaritySearchPartitionedIndex(t *testing.T) {
 
 			// Verify the facet results
 			if string(facetRes1Str) != string(facetRes3Str) {
-				fmt.Println(operator)
-				fmt.Println(string(facetRes1Str))
-				fmt.Println(string(facetRes3Str))
 				cleanUp(t, nameToIndex)
 				t.Fatalf("test case #%d failed: expected facet results to be equal", testCaseNum)
 			}
@@ -839,7 +836,6 @@ func sortChildren(children []*search.Explanation) {
 func finalHitsOmitKNNMetadata(hits []*search.DocumentMatch) bool {
 	for _, hit := range hits {
 		if hit.IndexNames != nil || hit.ScoreBreakdown != nil {
-			fmt.Println(len(hit.IndexNames))
 			return false
 		}
 	}
