@@ -128,6 +128,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		VectorBase64 string          `json:"vector_base64"`
 		K            int64           `json:"k"`
 		Boost        *query.Boost    `json:"boost,omitempty"`
+		Params       json.RawMessage `json:"params"`
 		FilterQuery  json.RawMessage `JSON:"filter,omitempty"`
 	}
 
@@ -196,6 +197,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		r.KNN[i].VectorBase64 = temp.KNN[i].VectorBase64
 		r.KNN[i].K = temp.KNN[i].K
 		r.KNN[i].Boost = temp.KNN[i].Boost
+		r.KNN[i].Params = temp.KNN[i].Params
 		if len(knnReq.FilterQuery) == 0 {
 			// Setting this to nil to avoid ParseQuery() setting it to a match none
 			r.KNN[i].FilterQuery = nil
