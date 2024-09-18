@@ -18,6 +18,7 @@
 package mapping
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -303,6 +304,31 @@ func TestProcessVector(t *testing.T) {
 					t.Fail()
 				}
 			}
+		}
+	}
+}
+
+func TestNormalizeVector(t *testing.T) {
+	vectors := [][]float32{
+		[]float32{1,2,3,4,5},
+		[]float32{1,0,0,0,0},
+		[]float32{0.182574183,0.365148365,0.547722578,0.730296731},
+		[]float32{1,1,1,1,1,1,1,1},
+		[]float32{0},
+	}
+
+	expectedNormalizedVectors := [][]float32{
+		[]float32{0.13483998,0.26967996,0.40451995,0.5393599,0.67419994},
+		[]float32{1,0,0,0,0},
+		[]float32{0.18257418,0.36514837,0.5477226,0.73029673},
+		[]float32{0.35355338,0.35355338,0.35355338,0.35355338,0.35355338,0.35355338,0.35355338,0.35355338},
+		[]float32{0},
+	}
+
+	for i := 0; i < len(vectors); i++ {
+		normalizedVector := NormalizeVector(vectors[i])
+		if !reflect.DeepEqual(normalizedVector, expectedNormalizedVectors[i]) {
+			t.Errorf("[vector-%d] Expected: %v, Got: %v", i+1, expectedNormalizedVectors[i], normalizedVector)
 		}
 	}
 }
