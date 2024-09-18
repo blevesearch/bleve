@@ -9,28 +9,29 @@
 [![Sourcegraph](https://sourcegraph.com/github.com/blevesearch/bleve/-/badge.svg)](https://sourcegraph.com/github.com/blevesearch/bleve?badge)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-A modern indexing library in GO
+A modern indexing + search library in GO
 
 ## Features
 
-* Index any go data structure (including JSON)
-* Intelligent defaults backed up by powerful configuration
+* Index any GO data structure or JSON
+* Intelligent defaults backed up by powerful configuration ([scorch](https://github.com/blevesearch/bleve/blob/master/index/scorch/README.md))
 * Supported field types:
     * `text`, `number`, `datetime`, `boolean`, `geopoint`, `geoshape`, `IP`, `vector`
 * Supported query types:
-    * Term, Phrase, Match, Match Phrase, Prefix, Fuzzy
-    * Conjunction, Disjunction, Boolean (`must`/`should`/`must_not`)
-    * Term Range, Numeric Range, Date Range
-    * [Geo Spatial](https://github.com/blevesearch/bleve/blob/master/geo/README.md)
-    * Simple [query string syntax](http://www.blevesearch.com/docs/Query-String-Query/)
-    * Approximate k-nearest neighbors over [vectors](https://github.com/blevesearch/bleve/blob/master/docs/vectors.md)
-* [tf-idf](https://en.wikipedia.org/wiki/Tf-idf) Scoring
+    * `term`, `phrase`, `match`, `match_phrase`, `prefix`, `regexp`, `wildcard`, `fuzzy`
+    * term range, numeric range, date range, boolean field
+    * compound queries: `conjuncts`, `disjuncts`, boolean (`must`/`should`/`must_not`)
+    * [query string syntax](http://www.blevesearch.com/docs/Query-String-Query/)
+    * [geo spatial search](https://github.com/blevesearch/bleve/blob/master/geo/README.md)
+    * approximate k-nearest neighbors via [vector search](https://github.com/blevesearch/bleve/blob/master/docs/vectors.md)
+* [tf-idf](https://en.wikipedia.org/wiki/Tf-idf) scoring
+* Hybrid search: exact + semantic
 * Query time boosting
 * Search result match highlighting with document fragments
 * Aggregations/faceting support:
-    * Terms Facet
-    * Numeric Range Facet
-    * Date Range Facet
+    * terms facet
+    * numeric range facet
+    * date range facet
 
 ## Indexing
 
