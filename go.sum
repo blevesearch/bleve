@@ -6,8 +6,8 @@ github.com/blevesearch/bleve_index_api v1.1.12 h1:P4bw9/G/5rulOF7SJ9l4FsDoo7UFJ+
 github.com/blevesearch/bleve_index_api v1.1.12/go.mod h1:PbcwjIcRmjhGbkS/lJCpfgVSMROV6TRubGGAODaK1W8=
 github.com/blevesearch/geo v0.1.20 h1:paaSpu2Ewh/tn5DKn/FB5SzvH0EWupxHEIwbCk/QPqM=
 github.com/blevesearch/geo v0.1.20/go.mod h1:DVG2QjwHNMFmjo+ZgzrIq2sfCh6rIHzy9d9d0B59I6w=
-github.com/blevesearch/go-faiss v1.0.22-0.20240909180832-35a1ff78ead4 h1:riy8XP3UIBeVjMhsq1r1aGfjvTf3aPp2PuXxdiw9P4s=
-github.com/blevesearch/go-faiss v1.0.22-0.20240909180832-35a1ff78ead4/go.mod h1:OMGQwOaRRYxrmeNdMrXJPvVx8gBnvE5RYrr0BahNnkk=
+github.com/blevesearch/go-faiss v1.0.22-0.20240918182005-f19c1d446e92 h1:pDbDTN8dgycpdp9eCzrNp9e6Z4C+UQhCUAZbaarQ6Bs=
+github.com/blevesearch/go-faiss v1.0.22-0.20240918182005-f19c1d446e92/go.mod h1:OMGQwOaRRYxrmeNdMrXJPvVx8gBnvE5RYrr0BahNnkk=
 github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475 h1:kDy+zgJFJJoJYBvdfBSiZYBbdsUL0XcjHYWezpQBGPA=
 github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475/go.mod h1:9eJDeqxJ3E7WnLebQUlPD7ZjSce7AnDb9vjGmMCbD0A=
 github.com/blevesearch/go-porterstemmer v1.0.3 h1:GtmsqID0aZdCSNiY8SkuPJ12pD4jI+DdXTAn4YRcHCo=
