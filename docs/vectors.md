@@ -14,7 +14,7 @@
     * *v2.4.0* requires [blevesearch/faiss@7b119f4](https://github.com/blevesearch/faiss/tree/7b119f4b9c408989b696b36f8cc53908e53de6db) (modified v1.7.4)
     * *v2.4.1* requires [blevesearch/faiss@d9db66a](https://github.com/blevesearch/faiss/tree/d9db66a38518d99eb334218697e1df0732f3fdf8) (modified v1.7.4)
     * *v2.4.2* requires [blevesearch/faiss@d9db66a](https://github.com/blevesearch/faiss/tree/d9db66a38518d99eb334218697e1df0732f3fdf8) (modified v1.7.4)
-    * *v2.4.3* requires [blevesearch/faiss@f077bf9](https://github.com/blevesearch/faiss/tree/f077bf939ff4768091760ef7c7051b86f799a919) (modified v1.8.0)
+    * *v2.4.3* requires [blevesearch/faiss@26d9b359](https://github.com/blevesearch/faiss/tree/26d9b359c7cffe51f69151dcb78ebe7a345448b0) (modified v1.8.0)
 
 ## Supported
 
