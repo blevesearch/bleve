@@ -19,9 +19,9 @@ package mapping
 
 import (
 	"fmt"
-	"math"
 	"reflect"
 
+	faiss "github.com/blevesearch/go-faiss"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
@@ -262,20 +262,6 @@ func validateVectorFieldAlias(field *FieldMapping, parentName string,
 	return nil
 }
 
-func NormalizeVector(vector []float32) []float32 {
-	// first calculate the magnitude of the vector
-	var mag float64
-	for _, v := range vector {
-		mag += float64(v) * float64(v)
-	}
-	// cannot normalize a zero vector
-	// if the magnitude is 1, then the vector is already normalized
-	if mag != 0 && mag != 1 {
-		mag = math.Sqrt(mag)
-		// normalize the vector
-		for i, v := range vector {
-			vector[i] = float32(float64(v) / mag)
-		}
-	}
-	return vector
+func NormalizeVector(vec []float32) []float32 {
+	return faiss.NormalizeVector(vec)
 }

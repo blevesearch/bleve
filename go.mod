@@ -7,6 +7,7 @@ require (
 	github.com/bits-and-blooms/bitset v1.12.0
 	github.com/blevesearch/bleve_index_api v1.1.12
 	github.com/blevesearch/geo v0.1.20
+	github.com/blevesearch/go-faiss v1.0.22-0.20240919162919-05a9ee21155a
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/blevesearch/go-porterstemmer v1.0.3
 	github.com/blevesearch/goleveldb v1.0.1
@@ -32,7 +33,6 @@ require (
 )
 
 require (
-	github.com/blevesearch/go-faiss v1.0.22-0.20240919162919-05a9ee21155a // indirect
 	github.com/blevesearch/mmap-go v1.0.4 // indirect
 	github.com/couchbase/ghistogram v0.1.0 // indirect
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
