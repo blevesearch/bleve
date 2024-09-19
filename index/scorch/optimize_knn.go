@@ -65,7 +65,7 @@ func (o *OptimizeVR) Finish() error {
 	var errorsM sync.Mutex
 	var errors []error
 
-	snapshotGlobalDocNums := make(map[int]*roaring.Bitmap)
+	var snapshotGlobalDocNums map[int]*roaring.Bitmap
 	if o.requiresFiltering {
 		snapshotGlobalDocNums = o.snapshot.globalDocNums()
 	}
