@@ -54,7 +54,7 @@ type IndexSnapshotVectorReader struct {
 	searchParams json.RawMessage
 
 	// The following fields are only applicable for vector readers which will
-	// process kNN queries.
+	// process pre-filtered kNN queries.
 	eligibleDocIDs []index.IndexInternalID
 }
 

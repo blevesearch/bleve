@@ -376,6 +376,7 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 		}
 
 		if _, ok := filterQ.(*query.MatchAllQuery); ok {
+			// Equivalent to not having a filter query.
 			requiresFiltering[idx] = false
 			continue
 		}
