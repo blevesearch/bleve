@@ -23,6 +23,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
 	segment_api "github.com/blevesearch/scorch_segment_api/v2"
@@ -64,7 +65,10 @@ func (o *OptimizeVR) Finish() error {
 	var errorsM sync.Mutex
 	var errors []error
 
-	snapshotGlobalDocNums := o.snapshot.globalDocNums()
+	var snapshotGlobalDocNums map[int]*roaring.Bitmap
+	if o.requiresFiltering {
+		snapshotGlobalDocNums = o.snapshot.globalDocNums()
+	}
 
 	defer o.invokeSearcherEndCallback()
 
@@ -94,28 +98,31 @@ func (o *OptimizeVR) Finish() error {
 					vectorIndexSize := vecIndex.Size()
 					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
 					for _, vr := range vrs {
-						eligibleVectorInternalIDs := vr.getEligibleDocIDs()
-						if snapshotGlobalDocNums != nil {
-							// Only the eligible documents belonging to this segment
-							// will get filtered out.
-							// There is no way to determine which doc belongs to which segment
-							eligibleVectorInternalIDs.And(snapshotGlobalDocNums[index])
-						}
-
-						eligibleLocalDocNums := make([]uint64,
-							eligibleVectorInternalIDs.Stats().Cardinality)
-						// get the (segment-)local document numbers
-						for i, docNum := range eligibleVectorInternalIDs.ToArray() {
-							localDocNum := o.snapshot.localDocNumFromGlobal(index,
-								uint64(docNum))
-							eligibleLocalDocNums[i] = localDocNum
-						}
-
 						var pl segment_api.VecPostingsList
 						var err error
+
 						// for each VR, populate postings list and iterators
 						// by passing the obtained vector index and getting similar vectors.
+
+						// Only applies to filtered kNN.
 						if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
+							eligibleVectorInternalIDs := vr.getEligibleDocIDs()
+							if snapshotGlobalDocNums != nil {
+								// Only the eligible documents belonging to this segment
+								// will get filtered out.
+								// There is no way to determine which doc belongs to which segment
+								eligibleVectorInternalIDs.And(snapshotGlobalDocNums[index])
+							}
+
+							eligibleLocalDocNums := make([]uint64,
+								eligibleVectorInternalIDs.Stats().Cardinality)
+							// get the (segment-)local document numbers
+							for i, docNum := range eligibleVectorInternalIDs.ToArray() {
+								localDocNum := o.snapshot.localDocNumFromGlobal(index,
+									uint64(docNum))
+								eligibleLocalDocNums[i] = localDocNum
+							}
+
 							pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
 								eligibleLocalDocNums, vr.searchParams)
 						} else {
