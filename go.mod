@@ -7,7 +7,7 @@ require (
 	github.com/bits-and-blooms/bitset v1.12.0
 	github.com/blevesearch/bleve_index_api v1.1.12
 	github.com/blevesearch/geo v0.1.20
-	github.com/blevesearch/go-faiss v1.0.22-0.20240919162919-05a9ee21155a
+	github.com/blevesearch/go-faiss v1.0.22
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/blevesearch/go-porterstemmer v1.0.3
 	github.com/blevesearch/goleveldb v1.0.1
@@ -24,7 +24,7 @@ require (
 	github.com/blevesearch/zapx/v13 v13.3.10
 	github.com/blevesearch/zapx/v14 v14.3.10
 	github.com/blevesearch/zapx/v15 v15.3.13
-	github.com/blevesearch/zapx/v16 v16.1.6-0.20240919163431-f2ee7670abd9
+	github.com/blevesearch/zapx/v16 v16.1.6-0.20240920162114-1c5b68884813
 	github.com/couchbase/moss v0.2.0
 	github.com/golang/protobuf v1.3.2
 	github.com/spf13/cobra v1.7.0
