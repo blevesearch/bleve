@@ -129,7 +129,7 @@ func (r *SearchRequest) UnmarshalJSON(input []byte) error {
 		K            int64           `json:"k"`
 		Boost        *query.Boost    `json:"boost,omitempty"`
 		Params       json.RawMessage `json:"params"`
-		FilterQuery  json.RawMessage `JSON:"filter,omitempty"`
+		FilterQuery  json.RawMessage `json:"filter,omitempty"`
 	}
 
 	var temp struct {
