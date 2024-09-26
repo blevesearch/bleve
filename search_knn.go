@@ -90,7 +90,7 @@ type KNNRequest struct {
 
 	// Filter query to use with kNN pre-filtering.
 	// Supports pre-filtering with all existing types of query clauses.
-	FilterQuery query.Query `JSON:"filter,omitempty"`
+	FilterQuery query.Query `json:"filter,omitempty"`
 }
 
 func (r *SearchRequest) AddKNN(field string, vector []float32, k int64, boost float64) {
