@@ -118,7 +118,6 @@ func (i *IndexSnapshotVectorReader) Next(preAlloced *index.VectorDoc) (
 			nnum := next.Number()
 			rv.ID = docNumberToBytes(rv.ID, nnum+globalOffset)
 			rv.Score = float64(next.Score())
-
 			i.currID = rv.ID
 			i.currPosting = next
 
