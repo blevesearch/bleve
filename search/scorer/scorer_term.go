@@ -94,7 +94,6 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 
 	// update the query weight
 	s.queryWeight = s.queryBoost * s.idf * s.queryNorm
-
 	if s.options.Explain {
 		childrenExplanations := make([]*search.Explanation, 3)
 		childrenExplanations[0] = &search.Explanation{
@@ -198,5 +197,6 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 				})
 		}
 	}
+
 	return rv
 }
