@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -305,14 +306,21 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 		newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
 		segmentsToMerge := make([]segment.Segment, 0, len(task.Segments))
 		docsToDrop := make([]*roaring.Bitmap, 0, len(task.Segments))
+		mergedSegHistory := make(map[uint64]*mergedSegmentHistory, len(task.Segments))
 
 		for _, planSegment := range task.Segments {
 			if segSnapshot, ok := planSegment.(*SegmentSnapshot); ok {
 				oldMap[segSnapshot.id] = segSnapshot
+				mergedSegHistory[segSnapshot.id] = &mergedSegmentHistory{
+					segmentIdx: 0,
+					oldSegment: segSnapshot,
+				}
 				if persistedSeg, ok := segSnapshot.segment.(segment.PersistedSegment); ok {
 					if segSnapshot.LiveSize() == 0 {
 						atomic.AddUint64(&s.stats.TotFileMergeSegmentsEmpty, 1)
 						oldMap[segSnapshot.id] = nil
+						// mergedSegHistory[segSnapshot.id] = nil
+						delete(mergedSegHistory, segSnapshot.id)
 					} else {
 						segmentsToMerge = append(segmentsToMerge, segSnapshot.segment)
 						docsToDrop = append(docsToDrop, segSnapshot.deleted)
@@ -326,6 +334,11 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 				}
 			}
 		}
+
+		// fmt.Println("before merge", len(mergedSegHistory), len(oldMap))
+		// for k, v := range mergedSegHistory {
+		// 	fmt.Printf(" key: %d, value: %v\n", k, *v)
+		// }
 
 		var oldNewDocNums map[uint64][]uint64
 		var seg segment.Segment
@@ -371,18 +384,27 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 			oldNewDocNums = make(map[uint64][]uint64, len(newDocNums))
 			for i, segNewDocNums := range newDocNums {
 				oldNewDocNums[task.Segments[i].Id()] = segNewDocNums
+				mergedSegHistory[task.Segments[i].Id()].oldNewDocIDs = segNewDocNums
 			}
 
 			atomic.AddUint64(&s.stats.TotFileMergeSegments, uint64(len(segmentsToMerge)))
 		}
 
+		// fmt.Println("the number of segments getting merged", len(oldMap))
+
+		// for k, v := range mergedSegHistory {
+		// 	fmt.Printf("key: %d, value: %v\n", k, *v)
+		// }
+
 		sm := &segmentMerge{
-			id:            newSegmentID,
-			old:           oldMap,
-			oldNewDocNums: oldNewDocNums,
-			new:           seg,
-			notifyCh:      make(chan *mergeTaskIntroStatus),
-			mmaped:        1,
+			id:               []uint64{newSegmentID},
+			old:              oldMap,
+			oldNewDocNums:    oldNewDocNums,
+			mergedSegHistory: mergedSegHistory,
+			new:              []segment.Segment{seg},
+			newCount:         seg.Count(),
+			notifyCh:         make(chan *mergeTaskIntroStatus),
+			mmaped:           1,
 		}
 
 		s.fireEvent(EventKindMergeTaskIntroductionStart, 0)
@@ -435,13 +457,21 @@ type mergeTaskIntroStatus struct {
 	skipped       bool
 }
 
+type mergedSegmentHistory struct {
+	segmentIdx   uint64
+	oldNewDocIDs []uint64
+	oldSegment   *SegmentSnapshot
+}
+
 type segmentMerge struct {
-	id            uint64
-	old           map[uint64]*SegmentSnapshot
-	oldNewDocNums map[uint64][]uint64
-	new           segment.Segment
-	notifyCh      chan *mergeTaskIntroStatus
-	mmaped        uint32
+	id               []uint64
+	old              map[uint64]*SegmentSnapshot
+	oldNewDocNums    map[uint64][]uint64
+	new              []segment.Segment
+	mergedSegHistory map[uint64]*mergedSegmentHistory
+	notifyCh         chan *mergeTaskIntroStatus
+	mmaped           uint32
+	newCount         uint64
 }
 
 func cumulateBytesRead(sbs []segment.Segment) uint64 {
@@ -450,6 +480,115 @@ func cumulateBytesRead(sbs []segment.Segment) uint64 {
 		rv += seg.BytesRead()
 	}
 	return rv
+}
+
+func closeNewMergedSegments(segs []segment.Segment) error {
+	for _, seg := range segs {
+		_ = seg.DecRef()
+	}
+	return nil
+}
+
+func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObjs []*flushable) (*IndexSnapshot, []uint64, error) {
+	atomic.AddUint64(&s.stats.TotMemMergeBeg, 1)
+
+	memMergeZapStartTime := time.Now()
+
+	atomic.AddUint64(&s.stats.TotMemMergeZapBeg, 1)
+
+	var wg sync.WaitGroup
+	newDocNumsSet := make([][][]uint64, len(flushableObjs))
+	newMergedSegments := make([]segment.Segment, len(flushableObjs))
+	newMergedSegmentIDs := make([]uint64, len(flushableObjs))
+	numFlushes := len(flushableObjs)
+	var numSegments, newMergedCount uint64
+
+	for i := 0; i < numFlushes; i++ {
+		wg.Add(1)
+		go func(segBatch []segment.Segment, segBatchDrops []*roaring.Bitmap, id int) {
+			defer wg.Done()
+			newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
+			filename := zapFileName(newSegmentID)
+			path := s.path + string(os.PathSeparator) + filename
+			newDocNums, _, err :=
+				s.segPlugin.Merge(segBatch, segBatchDrops, path, s.closeCh, s)
+			if err != nil {
+				// handle error
+				atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
+				return
+			}
+			newMergedSegmentIDs[id] = newSegmentID
+			newDocNumsSet[id] = newDocNums
+			newMergedSegments[id], err = s.segPlugin.Open(path)
+			if err != nil {
+				// handle error
+				atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
+				return
+			}
+			atomic.AddUint64(&newMergedCount, newMergedSegments[id].Count())
+			atomic.AddUint64(&numSegments, uint64(len(segBatch)))
+
+		}(flushableObjs[i].segments, flushableObjs[i].drops, i)
+	}
+
+	wg.Wait()
+
+	atomic.AddUint64(&s.stats.TotMemMergeZapEnd, 1)
+
+	memMergeZapTime := uint64(time.Since(memMergeZapStartTime))
+	atomic.AddUint64(&s.stats.TotMemMergeZapTime, memMergeZapTime)
+	if atomic.LoadUint64(&s.stats.MaxMemMergeZapTime) < memMergeZapTime {
+		atomic.StoreUint64(&s.stats.MaxMemMergeZapTime, memMergeZapTime)
+	}
+
+	sm := &segmentMerge{
+		id:               newMergedSegmentIDs,
+		old:              make(map[uint64]*SegmentSnapshot, numSegments),
+		oldNewDocNums:    make(map[uint64][]uint64, numSegments),
+		new:              newMergedSegments,
+		mergedSegHistory: make(map[uint64]*mergedSegmentHistory, numSegments),
+		notifyCh:         make(chan *mergeTaskIntroStatus),
+		newCount:         newMergedCount,
+	}
+
+	for i, flushable := range flushableObjs {
+		for j, idx := range flushable.sbIdxs {
+			ss := snapshot.segment[idx]
+			sm.old[ss.id] = ss
+			sm.oldNewDocNums[ss.id] =
+				newDocNumsSet[i][j]
+
+			sm.mergedSegHistory[ss.id] = &mergedSegmentHistory{
+				segmentIdx:   uint64(i),
+				oldNewDocIDs: newDocNumsSet[i][j],
+				oldSegment:   ss,
+			}
+		}
+	}
+
+	select { // send to introducer
+	case <-s.closeCh:
+		_ = closeNewMergedSegments(newMergedSegments)
+		return nil, nil, segment.ErrClosed
+	case s.merges <- sm:
+	}
+
+	// blockingly wait for the introduction to complete
+	var newSnapshot *IndexSnapshot
+	introStatus := <-sm.notifyCh
+	if introStatus != nil && introStatus.indexSnapshot != nil {
+		newSnapshot = introStatus.indexSnapshot
+		atomic.AddUint64(&s.stats.TotMemMergeSegments, uint64(numSegments))
+		atomic.AddUint64(&s.stats.TotMemMergeDone, 1)
+		if introStatus.skipped {
+			// close the segment on skipping introduction.
+			_ = newSnapshot.DecRef()
+			_ = closeNewMergedSegments(newMergedSegments)
+			newSnapshot = nil
+		}
+	}
+
+	return newSnapshot, newMergedSegmentIDs, nil
 }
 
 // perform a merging of the given SegmentBase instances into a new,
@@ -495,10 +634,10 @@ func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
 	atomic.AddUint64(&s.stats.TotPersistedSegments, 1)
 
 	sm := &segmentMerge{
-		id:            newSegmentID,
+		id:            []uint64{newSegmentID},
 		old:           make(map[uint64]*SegmentSnapshot, len(sbsIndexes)),
 		oldNewDocNums: make(map[uint64][]uint64, len(sbsIndexes)),
-		new:           seg,
+		new:           []segment.Segment{seg},
 		notifyCh:      make(chan *mergeTaskIntroStatus),
 	}
 

@@ -27,10 +27,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/blevesearch/bleve/v2/util"
@@ -441,86 +439,26 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	// wait for group to finish
 	//
 	// construct equiv snapshot and do a persistSnapshotDirect()
-	var wg sync.WaitGroup
-	newlyMergedSegments := make([]uint64, len(flushSet))
-	var finalConsistentSnapshot unsafe.Pointer = nil
-	latestSnapshotEpoch := snapshot.epoch
-	var enter uint64
-	var exec uint64
-	for i, f := range flushSet {
-		wg.Add(1)
-		go func(flushable *flushable, id int) {
-			defer wg.Done()
-			atomic.AddUint64(&enter, 1)
-			newSnapshot, newSegmentID, err := s.mergeSegmentBases(
-				snapshot, flushable.segments, flushable.drops, flushable.sbIdxs)
-			if err != nil {
-				// TODO: handle error
-				return
-			}
-			if newSnapshot == nil {
-				// TODO: handle nil snapshot outside the work group.
-				// i.e. only if all the newSnapshot(s) are nil, then return false
-				return
-			}
-
-			// technically its serialized at this stage, no need for atomic perhaps
-			// atomically update the newConsistentSnapshot keeping in mind that we're
-			// tracking only the latest index snapshot
-			newSnapshotEpoch := newSnapshot.epoch
-			latestSnapshotEpoch := atomic.LoadUint64(&latestSnapshotEpoch)
-			if newSnapshotEpoch > latestSnapshotEpoch {
-				atomic.AddUint64(&exec, 1)
-				tempSnapshot := (*IndexSnapshot)(finalConsistentSnapshot)
-				if tempSnapshot != nil {
-					_ = tempSnapshot.DecRef()
-				}
-				atomic.StorePointer(&finalConsistentSnapshot, unsafe.Pointer(newSnapshot))
-				atomic.StoreUint64(&latestSnapshotEpoch, newSnapshotEpoch)
-			} else {
-				_ = newSnapshot.DecRef()
-			}
-
-			newlyMergedSegments[id] = newSegmentID
-
-		}(f, i)
+	newSnapshot, newSegmentIDs, err := s.mergeSegmentBasesParallel(snapshot, flushSet)
+	if err != nil {
+		return false, err
 	}
 
-	wg.Wait()
-
-	finalSnapshot := (*IndexSnapshot)(finalConsistentSnapshot)
-	if finalSnapshot == nil {
+	if newSnapshot == nil {
 		return false, nil
 	}
 
 	defer func() {
-		_ = finalSnapshot.DecRef()
+		_ = newSnapshot.DecRef()
 	}()
 
-	// newSnapshot, newSegmentID, err := s.mergeSegmentBases(
-	// 	snapshot, sbs, sbsDrops, sbsIndexes)
-	// if err != nil {
-	// 	return false, err
-	// }
-	// if newSnapshot == nil {
-	// 	return false, nil
-	// }
-
-	// defer func() {
-	// 	_ = newSnapshot.DecRef()
-	// }()
-
 	mergedSegmentIDs := map[uint64]struct{}{}
-	// for _, idx := range sbsIndexes {
-	// 	mergedSegmentIDs[snapshot.segment[idx].id] = struct{}{}
-	// }
-
 	for _, idx := range oldSegIdxs {
 		mergedSegmentIDs[snapshot.segment[idx].id] = struct{}{}
 	}
 
-	newMergedSegmentIDs := make(map[uint64]struct{}, len(newlyMergedSegments))
-	for _, id := range newlyMergedSegments {
+	newMergedSegmentIDs := make(map[uint64]struct{}, len(newSegmentIDs))
+	for _, id := range newSegmentIDs {
 		newMergedSegmentIDs[id] = struct{}{}
 	}
 
@@ -549,7 +487,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	}
 
 	// append to the equiv the new segment
-	for _, segment := range finalSnapshot.segment {
+	for _, segment := range newSnapshot.segment {
 		if _, ok := newMergedSegmentIDs[segment.id]; ok {
 			equiv.segment = append(equiv.segment, &SegmentSnapshot{
 				id:      segment.id,
@@ -561,7 +499,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 		}
 	}
 
-	err := s.persistSnapshotDirect(equiv, exclude)
+	err = s.persistSnapshotDirect(equiv, exclude)
 	if err != nil {
 		return false, err
 	}
