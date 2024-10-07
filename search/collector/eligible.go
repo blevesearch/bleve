@@ -16,6 +16,7 @@ package collector
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -47,6 +48,22 @@ func newEligibleCollector(size int) *EligibleCollector {
 	return hc
 }
 
+func makeEligibleDocumentMatchHandler(ctx *search.SearchContext) (search.DocumentMatchHandler, error) {
+	if ec, ok := ctx.Collector.(*EligibleCollector); ok {
+		return func(d *search.DocumentMatch) error {
+			if d == nil {
+				return nil
+			}
+
+			// No elements removed from the store here.
+			_ = ec.store.Add(d)
+			return nil
+		}, nil
+	}
+
+	return nil, fmt.Errorf("eligible collector not available")
+}
+
 func (hc *EligibleCollector) Collect(ctx context.Context, searcher search.Searcher, reader index.IndexReader) error {
 	startTime := time.Now()
 	var err error
@@ -62,13 +79,7 @@ func (hc *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 		IndexReader:       reader,
 	}
 
-	dmHandlerMaker := MakeEligibleDocumentMatchHandler
-	if cv := ctx.Value(search.MakeDocumentMatchHandlerKey); cv != nil {
-		dmHandlerMaker = cv.(search.MakeDocumentMatchHandler)
-	}
-	// use the application given builder for making the custom document match
-	// handler and perform callbacks/invocations on the newly made handler.
-	dmHandler, _, err := dmHandlerMaker(searchContext)
+	dmHandler, err := makeEligibleDocumentMatchHandler(searchContext)
 	if err != nil {
 		return err
 	}
