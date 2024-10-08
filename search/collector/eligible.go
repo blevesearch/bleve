@@ -16,6 +16,7 @@ package collector
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -37,38 +38,48 @@ func NewEligibleCollector(size int) *EligibleCollector {
 
 func newEligibleCollector(size int) *EligibleCollector {
 	// No sort order & skip always 0 since this is only to filter eligible docs.
-	hc := &EligibleCollector{size: size}
+	ec := &EligibleCollector{size: size}
 
 	// comparator is a dummy here
-	hc.store = getOptimalCollectorStore(size, 0, func(i, j *search.DocumentMatch) int {
+	ec.store = getOptimalCollectorStore(size, 0, func(i, j *search.DocumentMatch) int {
 		return 0
 	})
 
-	return hc
+	return ec
 }
 
-func (hc *EligibleCollector) Collect(ctx context.Context, searcher search.Searcher, reader index.IndexReader) error {
+func makeEligibleDocumentMatchHandler(ctx *search.SearchContext) (search.DocumentMatchHandler, error) {
+	if ec, ok := ctx.Collector.(*EligibleCollector); ok {
+		return func(d *search.DocumentMatch) error {
+			if d == nil {
+				return nil
+			}
+
+			// No elements removed from the store here.
+			_ = ec.store.Add(d)
+			return nil
+		}, nil
+	}
+
+	return nil, fmt.Errorf("eligiblity collector not available")
+}
+
+func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Searcher, reader index.IndexReader) error {
 	startTime := time.Now()
 	var err error
 	var next *search.DocumentMatch
 
-	backingSize := hc.size
+	backingSize := ec.size
 	if backingSize > PreAllocSizeSkipCap {
 		backingSize = PreAllocSizeSkipCap + 1
 	}
 	searchContext := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(backingSize+searcher.DocumentMatchPoolSize(), 0),
-		Collector:         hc,
+		Collector:         ec,
 		IndexReader:       reader,
 	}
 
-	dmHandlerMaker := MakeEligibleDocumentMatchHandler
-	if cv := ctx.Value(search.MakeDocumentMatchHandlerKey); cv != nil {
-		dmHandlerMaker = cv.(search.MakeDocumentMatchHandler)
-	}
-	// use the application given builder for making the custom document match
-	// handler and perform callbacks/invocations on the newly made handler.
-	dmHandler, _, err := dmHandlerMaker(searchContext)
+	dmHandler, err := makeEligibleDocumentMatchHandler(searchContext)
 	if err != nil {
 		return err
 	}
@@ -80,7 +91,7 @@ func (hc *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 		next, err = searcher.Next(searchContext)
 	}
 	for err == nil && next != nil {
-		if hc.total%CheckDoneEvery == 0 {
+		if ec.total%CheckDoneEvery == 0 {
 			select {
 			case <-ctx.Done():
 				search.RecordSearchCost(ctx, search.AbortM, 0)
@@ -88,7 +99,7 @@ func (hc *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 			default:
 			}
 		}
-		hc.total++
+		ec.total++
 
 		err = dmHandler(next)
 		if err != nil {
@@ -109,19 +120,19 @@ func (hc *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 	}
 
 	// compute search duration
-	hc.took = time.Since(startTime)
+	ec.took = time.Since(startTime)
 
 	// finalize actual results
-	err = hc.finalizeResults(reader)
+	err = ec.finalizeResults(reader)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (hc *EligibleCollector) finalizeResults(r index.IndexReader) error {
+func (ec *EligibleCollector) finalizeResults(r index.IndexReader) error {
 	var err error
-	hc.results, err = hc.store.Final(0, func(doc *search.DocumentMatch) error {
+	ec.results, err = ec.store.Final(0, func(doc *search.DocumentMatch) error {
 		// Adding the results to the store without any modifications since we don't
 		// require the external ID of the filtered hits.
 		return nil
@@ -129,28 +140,28 @@ func (hc *EligibleCollector) finalizeResults(r index.IndexReader) error {
 	return err
 }
 
-func (hc *EligibleCollector) Results() search.DocumentMatchCollection {
-	return hc.results
+func (ec *EligibleCollector) Results() search.DocumentMatchCollection {
+	return ec.results
 }
 
-func (hc *EligibleCollector) Total() uint64 {
-	return hc.total
+func (ec *EligibleCollector) Total() uint64 {
+	return ec.total
 }
 
 // No concept of scoring in the eligible collector.
-func (hc *EligibleCollector) MaxScore() float64 {
+func (ec *EligibleCollector) MaxScore() float64 {
 	return 0
 }
 
-func (hc *EligibleCollector) Took() time.Duration {
-	return hc.took
+func (ec *EligibleCollector) Took() time.Duration {
+	return ec.took
 }
 
-func (hc *EligibleCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
+func (ec *EligibleCollector) SetFacetsBuilder(facetsBuilder *search.FacetsBuilder) {
 	// facet unsupported for pre-filtering in KNN search
 }
 
-func (hc *EligibleCollector) FacetResults() search.FacetResults {
+func (ec *EligibleCollector) FacetResults() search.FacetResults {
 	// facet unsupported for pre-filtering in KNN search
 	return nil
 }

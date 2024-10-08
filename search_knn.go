@@ -405,11 +405,13 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 			return nil, err
 		}
 		filterHits := filterColl.Results()
-		filterHitsMap[idx] = make([]index.IndexInternalID, 0)
-		for _, docMatch := range filterHits {
-			filterHitsMap[idx] = append(filterHitsMap[idx], docMatch.IndexInternalID)
+		if len(filterHits) > 0 {
+			filterHitsMap[idx] = make([]index.IndexInternalID, len(filterHits))
+			for _, docMatch := range filterHits {
+				filterHitsMap[idx] = append(filterHitsMap[idx], docMatch.IndexInternalID)
+			}
+			requiresFiltering[idx] = true
 		}
-		requiresFiltering[idx] = true
 	}
 
 	// Add the filter hits when creating the kNN query

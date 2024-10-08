@@ -386,27 +386,6 @@ func (hc *TopNCollector) prepareDocumentMatch(ctx *search.SearchContext,
 	return nil
 }
 
-// Unlike TopNDocHandler, this will not eliminate docs based on score.
-func MakeEligibleDocumentMatchHandler(
-	ctx *search.SearchContext) (search.DocumentMatchHandler, bool, error) {
-
-	var hc *EligibleCollector
-	var ok bool
-
-	if hc, ok = ctx.Collector.(*EligibleCollector); ok {
-		return func(d *search.DocumentMatch) error {
-			if d == nil {
-				return nil
-			}
-
-			// No elements removed from the store here.
-			_ = hc.store.Add(d)
-			return nil
-		}, false, nil
-	}
-	return nil, false, nil
-}
-
 func MakeTopNDocumentMatchHandler(
 	ctx *search.SearchContext) (search.DocumentMatchHandler, bool, error) {
 	var hc *TopNCollector
