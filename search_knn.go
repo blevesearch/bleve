@@ -410,8 +410,10 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 			for i, docMatch := range filterHits {
 				filterHitsMap[idx][i] = docMatch.IndexInternalID
 			}
-			requiresFiltering[idx] = true
 		}
+		// set requiresFiltering regardless of whether there're filtered hits or
+		// not to later decide whether to consider the knnQuery or not
+		requiresFiltering[idx] = true
 	}
 
 	// Add the filter hits when creating the kNN query
