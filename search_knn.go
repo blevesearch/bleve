@@ -407,8 +407,8 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 		filterHits := filterColl.Results()
 		if len(filterHits) > 0 {
 			filterHitsMap[idx] = make([]index.IndexInternalID, len(filterHits))
-			for _, docMatch := range filterHits {
-				filterHitsMap[idx] = append(filterHitsMap[idx], docMatch.IndexInternalID)
+			for i, docMatch := range filterHits {
+				filterHitsMap[idx][i] = docMatch.IndexInternalID
 			}
 			requiresFiltering[idx] = true
 		}
