@@ -37,6 +37,15 @@ type configuration struct {
 	DefaultIndexType       string
 	SlowSearchLogThreshold time.Duration
 	analysisQueue          *index.AnalysisQueue
+	trackBytesRead         bool
+}
+
+func (c *configuration) SetTrackBytesRead(val bool) {
+	c.trackBytesRead = val
+}
+
+func (c *configuration) TrackBytesRead() bool {
+	return c.trackBytesRead
 }
 
 func (c *configuration) SetAnalysisQueueSize(n int) {
@@ -82,6 +91,9 @@ func init() {
 	bleveExpVar.Add("bootDuration", int64(bootDuration))
 	indexStats = NewIndexStats()
 	bleveExpVar.Set("indexes", indexStats)
+
+	// default to tracking the bytes read from disk per query
+	Config.SetTrackBytesRead(true)
 
 	initDisk()
 }

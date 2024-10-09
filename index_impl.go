@@ -481,6 +481,21 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		}
 	}()
 
+	var totalSearchCost uint64
+	// Check if disk usage tracking is enabled in the configuration.
+	if trackableReader, ok := indexReader.(index.TrackableIndexReader); ok {
+		trackableReader.SetTrackBytesRead(Config.TrackBytesRead())
+		// If tracking is enabled, set up the callback for tracking bytes read.
+		if trackableReader.TrackBytesRead() {
+			// This callback handles the tracking of bytes read.
+			sendBytesRead := func(bytesRead uint64) {
+				totalSearchCost += bytesRead
+			}
+			ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey,
+				search.SearchIOStatsCallbackFunc(sendBytesRead))
+		}
+	}
+
 	if _, ok := ctx.Value(search.PreSearchKey).(bool); ok {
 		preSearchResult, err := i.preSearch(ctx, req, indexReader)
 		if err != nil {
@@ -530,19 +545,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	setKnnHitsInCollector(knnHits, req, coll)
 
-	// This callback and variable handles the tracking of bytes read
-	//  1. as part of creation of tfr and its Next() calls which is
-	//     accounted by invoking this callback when the TFR is closed.
-	//  2. the docvalues portion (accounted in collector) and the retrieval
-	//     of stored fields bytes (by LoadAndHighlightFields)
-	var totalSearchCost uint64
-	sendBytesRead := func(bytesRead uint64) {
-		totalSearchCost += bytesRead
-	}
-
-	ctx = context.WithValue(ctx, search.SearchIOStatsCallbackKey,
-		search.SearchIOStatsCallbackFunc(sendBytesRead))
-
 	var bufPool *s2.GeoBufferPool
 	getBufferPool := func() *s2.GeoBufferPool {
 		if bufPool == nil {
@@ -567,14 +569,16 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		if serr := searcher.Close(); err == nil && serr != nil {
 			err = serr
 		}
-		if sr != nil {
-			sr.Cost = totalSearchCost
-		}
-		if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
-			sr.UpdateIOStats(totalSearchCost)
-		}
+		if Config.TrackBytesRead() {
+			if sr != nil {
+				sr.Cost = totalSearchCost
+			}
+			if sr, ok := indexReader.(*scorch.IndexSnapshot); ok {
+				sr.UpdateIOStats(totalSearchCost)
+			}
 
-		search.RecordSearchCost(ctx, search.DoneM, 0)
+			search.RecordSearchCost(ctx, search.DoneM, 0)
+		}
 	}()
 
 	if req.Facets != nil {
@@ -676,8 +680,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 		storedFieldsCost += storedFieldsBytes
 	}
 
-	totalSearchCost += storedFieldsCost
-	search.RecordSearchCost(ctx, search.AddM, storedFieldsCost)
+	if Config.TrackBytesRead() {
+		totalSearchCost += storedFieldsCost
+		search.RecordSearchCost(ctx, search.AddM, storedFieldsCost)
+	}
 
 	atomic.AddUint64(&i.stats.searches, 1)
 	searchDuration := time.Since(searchStart)

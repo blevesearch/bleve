@@ -59,8 +59,10 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 	}
 
 	if ctx != nil {
-		reportIOStats(ctx, dictBytesRead)
-		search.RecordSearchCost(ctx, search.AddM, dictBytesRead)
+		if trackableIndex, ok := indexReader.(index.TrackableIndexReader); ok && trackableIndex.TrackBytesRead() {
+			reportIOStats(ctx, dictBytesRead)
+			search.RecordSearchCost(ctx, search.AddM, dictBytesRead)
+		}
 		fuzzyTermMatches := ctx.Value(search.FuzzyMatchPhraseKey)
 		if fuzzyTermMatches != nil {
 			fuzzyTermMatches.(map[string][]string)[term] = candidates

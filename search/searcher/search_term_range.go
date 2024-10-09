@@ -83,7 +83,11 @@ func NewTermRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 		terms = terms[:len(terms)-1]
 	}
 
-	if ctx != nil {
+	if trackableReader, ok := indexReader.(index.TrackableIndexReader); ok &&
+		trackableReader.TrackBytesRead() &&
+		ctx != nil {
+		// reporting back the IO stats with respect to the dictionary
+		// loaded, using the context to report the same.
 		reportIOStats(ctx, fieldDict.BytesRead())
 		search.RecordSearchCost(ctx, search.AddM, fieldDict.BytesRead())
 	}

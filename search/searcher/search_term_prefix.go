@@ -48,7 +48,11 @@ func NewTermPrefixSearcher(ctx context.Context, indexReader index.IndexReader, p
 		return nil, err
 	}
 
-	if ctx != nil {
+	if trackableReader, ok := indexReader.(index.TrackableIndexReader); ok &&
+		trackableReader.TrackBytesRead() &&
+		ctx != nil {
+		// reporting back the IO stats with respect to the dictionary
+		// loaded, using the context to report the same.
 		reportIOStats(ctx, fieldDict.BytesRead())
 		search.RecordSearchCost(ctx, search.AddM, fieldDict.BytesRead())
 	}

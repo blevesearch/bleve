@@ -47,6 +47,8 @@ type asynchSegmentResult struct {
 
 	postings segment.PostingsList
 
+	bytesRead uint64
+
 	err error
 }
 
@@ -76,13 +78,14 @@ func init() {
 }
 
 type IndexSnapshot struct {
-	parent   *Scorch
-	segment  []*SegmentSnapshot
-	offsets  []uint64
-	internal map[string][]byte
-	epoch    uint64
-	size     uint64
-	creator  string
+	parent         *Scorch
+	segment        []*SegmentSnapshot
+	offsets        []uint64
+	internal       map[string][]byte
+	epoch          uint64
+	size           uint64
+	creator        string
+	trackBytesRead bool
 
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
@@ -152,13 +155,16 @@ func (is *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 			if err != nil {
 				results <- &asynchSegmentResult{err: err}
 			} else {
-				if dictStats, ok := dict.(segment.DiskStatsReporter); ok {
-					atomic.AddUint64(&totalBytesRead, dictStats.BytesRead())
+				var bytesRead uint64
+				if is.trackBytesRead {
+					if dictStats, ok := dict.(segment.DiskStatsReporter); ok {
+						bytesRead = dictStats.BytesRead()
+					}
 				}
 				if randomLookup {
-					results <- &asynchSegmentResult{dict: dict}
+					results <- &asynchSegmentResult{dict: dict, bytesRead: bytesRead}
 				} else {
-					results <- &asynchSegmentResult{dictItr: makeItr(dict)}
+					results <- &asynchSegmentResult{dictItr: makeItr(dict), bytesRead: bytesRead}
 				}
 			}
 		}(s)
@@ -174,6 +180,9 @@ func (is *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 		if asr.err != nil && err == nil {
 			err = asr.err
 		} else {
+			if is.trackBytesRead {
+				totalBytesRead += asr.bytesRead
+			}
 			if !randomLookup {
 				next, err2 := asr.dictItr.Next()
 				if err2 != nil && err == nil {
@@ -439,7 +448,9 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		// track uncompressed stored fields bytes as part of IO stats.
 		// However, ideally we'd need to track the compressed on-disk value
 		// Keeping that TODO for now until we have a cleaner way.
-		rvd.StoredFieldsSize += uint64(len(val))
+		if is.trackBytesRead {
+			rvd.StoredFieldsSize += uint64(len(val))
+		}
 
 		// copy value, array positions to preserve them beyond the scope of this callback
 		value := append([]byte(nil), val...)
@@ -567,16 +578,17 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 	rv.includeTermVectors = includeTermVectors
 	rv.currPosting = nil
 	rv.currID = rv.currID[:0]
+	rv.trackBytesRead = is.trackBytesRead
 
 	if rv.dicts == nil {
 		rv.dicts = make([]segment.TermDictionary, len(is.segment))
 		for i, s := range is.segment {
-			// the intention behind this compare and swap operation is
-			// to make sure that the accounting of the metadata is happening
-			// only once(which corresponds to this persisted segment's most
-			// recent segPlugin.Open() call), and any subsequent queries won't
-			// incur this cost which would essentially be a double counting.
-			if atomic.CompareAndSwapUint32(&s.mmaped, 1, 0) {
+			if is.trackBytesRead && atomic.CompareAndSwapUint32(&s.mmaped, 1, 0) {
+				// the intention behind this compare and swap operation is
+				// to make sure that the accounting of the metadata is happening
+				// only once(which corresponds to this persisted segment's most
+				// recent segPlugin.Open() call), and any subsequent queries won't
+				// incur this cost which would essentially be a double counting.
 				segBytesRead := s.segment.BytesRead()
 				rv.incrementBytesRead(segBytesRead)
 			}
@@ -584,18 +596,25 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 			if err != nil {
 				return nil, err
 			}
-			if dictStats, ok := dict.(segment.DiskStatsReporter); ok {
-				bytesRead := dictStats.BytesRead()
-				rv.incrementBytesRead(bytesRead)
+			if is.trackBytesRead && dict != nil {
+				if dictStats, ok := dict.(segment.DiskStatsReporter); ok {
+					bytesRead := dictStats.BytesRead()
+					rv.incrementBytesRead(bytesRead)
+				}
 			}
 			rv.dicts[i] = dict
 		}
 	}
 
 	for i, s := range is.segment {
-		var prevBytesReadPL uint64
-		if rv.postings[i] != nil {
-			prevBytesReadPL = rv.postings[i].BytesRead()
+		var prevBytesReadPL, prevBytesReadItr uint64
+		if is.trackBytesRead {
+			if rv.postings[i] != nil {
+				prevBytesReadPL = rv.postings[i].BytesRead()
+			}
+			if rv.iterators[i] != nil {
+				prevBytesReadItr = rv.iterators[i].BytesRead()
+			}
 		}
 		pl, err := rv.dicts[i].PostingsList(term, s.deleted, rv.postings[i])
 		if err != nil {
@@ -603,18 +622,16 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 		}
 		rv.postings[i] = pl
 
-		var prevBytesReadItr uint64
-		if rv.iterators[i] != nil {
-			prevBytesReadItr = rv.iterators[i].BytesRead()
-		}
 		rv.iterators[i] = pl.Iterator(includeFreq, includeNorm, includeTermVectors, rv.iterators[i])
 
-		if bytesRead := rv.postings[i].BytesRead(); prevBytesReadPL < bytesRead {
-			rv.incrementBytesRead(bytesRead - prevBytesReadPL)
-		}
+		if is.trackBytesRead {
+			if bytesRead := rv.postings[i].BytesRead(); prevBytesReadPL < bytesRead {
+				rv.incrementBytesRead(bytesRead - prevBytesReadPL)
+			}
 
-		if bytesRead := rv.iterators[i].BytesRead(); prevBytesReadItr < bytesRead {
-			rv.incrementBytesRead(bytesRead - prevBytesReadItr)
+			if bytesRead := rv.iterators[i].BytesRead(); prevBytesReadItr < bytesRead {
+				rv.incrementBytesRead(bytesRead - prevBytesReadItr)
+			}
 		}
 	}
 	atomic.AddUint64(&is.parent.stats.TotTermSearchersStarted, uint64(1))
@@ -757,7 +774,7 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 
 func (is *IndexSnapshot) DocValueReader(fields []string) (
 	index.DocValueReader, error) {
-	return &DocValueReader{i: is, fields: fields, currSegmentIndex: -1}, nil
+	return &DocValueReader{i: is, fields: fields, currSegmentIndex: -1, trackBytesRead: is.trackBytesRead}, nil
 }
 
 type DocValueReader struct {
@@ -768,6 +785,7 @@ type DocValueReader struct {
 	currSegmentIndex int
 	currCachedFields []string
 
+	trackBytesRead bool
 	totalBytesRead uint64
 	bytesRead      uint64
 }
@@ -791,14 +809,16 @@ func (dvr *DocValueReader) VisitDocValues(id index.IndexInternalID,
 	if dvr.currSegmentIndex != segmentIndex {
 		dvr.currSegmentIndex = segmentIndex
 		dvr.currCachedFields = nil
-		dvr.totalBytesRead += dvr.bytesRead
-		dvr.bytesRead = 0
+		if dvr.trackBytesRead {
+			dvr.totalBytesRead += dvr.bytesRead
+			dvr.bytesRead = 0
+		}
 	}
 
 	dvr.currCachedFields, dvr.dvs, err = dvr.i.documentVisitFieldTermsOnSegment(
 		dvr.currSegmentIndex, localDocNum, dvr.fields, dvr.currCachedFields, visitor, dvr.dvs)
 
-	if dvr.dvs != nil {
+	if dvr.trackBytesRead && dvr.dvs != nil {
 		dvr.bytesRead = dvr.dvs.BytesRead()
 	}
 	return err

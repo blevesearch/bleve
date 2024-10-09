@@ -49,6 +49,7 @@ type IndexSnapshotTermFieldReader struct {
 	currID             index.IndexInternalID
 	recycle            bool
 	bytesRead          uint64
+	trackBytesRead     bool
 	ctx                context.Context
 }
 
@@ -84,7 +85,10 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 	}
 	// find the next hit
 	for i.segmentOffset < len(i.iterators) {
-		prevBytesRead := i.iterators[i.segmentOffset].BytesRead()
+		var prevBytesRead uint64
+		if i.trackBytesRead && i.iterators[i.segmentOffset] != nil {
+			prevBytesRead = i.iterators[i.segmentOffset].BytesRead()
+		}
 		next, err := i.iterators[i.segmentOffset].Next()
 		if err != nil {
 			return nil, err
@@ -102,9 +106,11 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 			// this is because there are chances of having a series of loadChunk calls,
 			// and they have to be added together before sending the bytesRead at this point
 			// upstream.
-			bytesRead := i.iterators[i.segmentOffset].BytesRead()
-			if bytesRead > prevBytesRead {
-				i.incrementBytesRead(bytesRead - prevBytesRead)
+			if i.trackBytesRead {
+				bytesRead := i.iterators[i.segmentOffset].BytesRead()
+				if bytesRead > prevBytesRead {
+					i.incrementBytesRead(bytesRead - prevBytesRead)
+				}
 			}
 			return rv, nil
 		}
@@ -197,7 +203,7 @@ func (i *IndexSnapshotTermFieldReader) Count() uint64 {
 }
 
 func (i *IndexSnapshotTermFieldReader) Close() error {
-	if i.ctx != nil {
+	if i.ctx != nil && i.trackBytesRead {
 		statsCallbackFn := i.ctx.Value(search.SearchIOStatsCallbackKey)
 		if statsCallbackFn != nil {
 			// essentially before you close the TFR, you must report this

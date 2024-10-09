@@ -101,7 +101,11 @@ func NewRegexpSearcher(ctx context.Context, indexReader index.IndexReader, patte
 		dictBytesRead = regexpCandidates.bytesRead
 	}
 
-	if ctx != nil {
+	if trackableReader, ok := indexReader.(index.TrackableIndexReader); ok &&
+		trackableReader.TrackBytesRead() &&
+		ctx != nil {
+		// reporting back the IO stats with respect to the dictionary
+		// loaded, using the context to report the same.
 		reportIOStats(ctx, dictBytesRead)
 		search.RecordSearchCost(ctx, search.AddM, dictBytesRead)
 	}

@@ -85,9 +85,11 @@ func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 	}
 
 	if len(terms) < 1 {
-		// reporting back the IO stats with respect to the dictionary
-		// loaded, using the context
-		if ctx != nil {
+		if trackableReader, ok := indexReader.(index.TrackableIndexReader); ok &&
+			trackableReader.TrackBytesRead() &&
+			ctx != nil {
+			// reporting back the IO stats with respect to the dictionary
+			// loaded, using the context to report the same.
 			reportIOStats(ctx, dictBytesRead)
 			search.RecordSearchCost(ctx, search.AddM, dictBytesRead)
 		}
@@ -110,7 +112,9 @@ func NewNumericRangeSearcher(ctx context.Context, indexReader index.IndexReader,
 		return nil, tooManyClausesErr(field, len(terms))
 	}
 
-	if ctx != nil {
+	if trackableReader, ok := indexReader.(index.TrackableIndexReader); ok &&
+		trackableReader.TrackBytesRead() &&
+		ctx != nil {
 		reportIOStats(ctx, dictBytesRead)
 		search.RecordSearchCost(ctx, search.AddM, dictBytesRead)
 	}
