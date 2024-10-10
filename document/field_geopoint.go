@@ -82,7 +82,7 @@ func (n *GeoPointField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return n.frequencies
 }
 
-func (n *GeoPointField) Analyze() {
+func (n *GeoPointField) Analyze() error {
 	tokens := make(analysis.TokenStream, 0, 8)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
@@ -133,6 +133,8 @@ func (n *GeoPointField) Analyze() {
 
 	n.length = len(tokens)
 	n.frequencies = analysis.TokenFrequency(tokens, n.arrayPositions, n.options)
+
+	return nil
 }
 
 func (n *GeoPointField) Value() []byte {
