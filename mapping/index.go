@@ -457,3 +457,25 @@ func (im *IndexMappingImpl) FieldMappingForPath(path string) FieldMapping {
 func (im *IndexMappingImpl) DefaultSearchField() string {
 	return im.DefaultField
 }
+
+func (im *IndexMappingImpl) SynonymSourceForPath(path string) string {
+	// first we look for explicit mapping on the field
+	for _, docMapping := range im.TypeMapping {
+		synonymSource := docMapping.synonymSourceForPath(path)
+		if synonymSource != "" {
+			return synonymSource
+		}
+	}
+
+	// now try the default mapping
+	pathMapping, _ := im.DefaultMapping.documentMappingForPath(path)
+	if pathMapping != nil {
+		if len(pathMapping.Fields) > 0 {
+			if pathMapping.Fields[0].SynonymSource != "" {
+				return pathMapping.Fields[0].SynonymSource
+			}
+		}
+	}
+
+	return ""
+}
