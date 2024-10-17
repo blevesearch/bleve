@@ -64,16 +64,18 @@ type IndexSnapshotVectorReader struct {
 // (AND) operations. Eg. finding the eligible doc IDs present in a segment.
 func (i *IndexSnapshotVectorReader) getEligibleDocIDs() *roaring.Bitmap {
 	res := roaring.NewBitmap()
-	internalDocIDs := make([]uint32, 0, len(i.eligibleDocIDs))
-	// converts the doc IDs to uint32 and returns
-	for _, eligibleDocInternalID := range i.eligibleDocIDs {
-		internalDocID, err := docInternalToNumber(index.IndexInternalID(eligibleDocInternalID))
-		if err != nil {
-			continue
+	if len(i.eligibleDocIDs) > 0 {
+		internalDocIDs := make([]uint32, 0, len(i.eligibleDocIDs))
+		// converts the doc IDs to uint32 and returns
+		for _, eligibleDocInternalID := range i.eligibleDocIDs {
+			internalDocID, err := docInternalToNumber(index.IndexInternalID(eligibleDocInternalID))
+			if err != nil {
+				continue
+			}
+			internalDocIDs = append(internalDocIDs, uint32(internalDocID))
 		}
-		internalDocIDs = append(internalDocIDs, uint32(internalDocID))
+		res.AddMany(internalDocIDs)
 	}
-	res.AddMany(internalDocIDs)
 	return res
 }
 
