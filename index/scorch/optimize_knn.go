@@ -115,7 +115,7 @@ func (o *OptimizeVR) Finish() error {
 							}
 
 							eligibleLocalDocNums := make([]uint64,
-								eligibleVectorInternalIDs.Stats().Cardinality)
+								eligibleVectorInternalIDs.GetCardinality())
 							// get the (segment-)local document numbers
 							for i, docNum := range eligibleVectorInternalIDs.ToArray() {
 								localDocNum := o.snapshot.localDocNumFromGlobal(index,
