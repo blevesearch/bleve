@@ -97,7 +97,10 @@ func TestEnglishAnalyzer(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, test := range tests {
-		actual := analyzer.Analyze(test.input)
+		actual, err := analysis.AnalyzeForTokens(analyzer, test.input)
+		if err != nil {
+			t.Fatalf("error analyzing input: %v", err)
+		}
 		if !reflect.DeepEqual(actual, test.output) {
 			t.Errorf("expected %v, got %v", test.output, actual)
 		}
