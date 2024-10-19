@@ -20,6 +20,7 @@ import (
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/search/searcher"
+	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 )
 
@@ -29,6 +30,7 @@ type FuzzyQuery struct {
 	Fuzziness int    `json:"fuzziness"`
 	FieldVal  string `json:"field,omitempty"`
 	BoostVal  *Boost `json:"boost,omitempty"`
+	autoFuzzy bool
 }
 
 // NewFuzzyQuery creates a new Query which finds
@@ -66,6 +68,10 @@ func (q *FuzzyQuery) SetFuzziness(f int) {
 	q.Fuzziness = f
 }
 
+func (q *FuzzyQuery) SetAutoFuzziness(a bool) {
+	q.autoFuzzy = a
+}
+
 func (q *FuzzyQuery) SetPrefix(p int) {
 	q.Prefix = p
 }
@@ -75,5 +81,54 @@ func (q *FuzzyQuery) Searcher(ctx context.Context, i index.IndexReader, m mappin
 	if q.FieldVal == "" {
 		field = m.DefaultSearchField()
 	}
+	if q.autoFuzzy {
+		return searcher.NewAutoFuzzySearcher(ctx, i, q.Term, q.Prefix, field, q.BoostVal.Value(), options)
+	}
 	return searcher.NewFuzzySearcher(ctx, i, q.Term, q.Prefix, q.Fuzziness, field, q.BoostVal.Value(), options)
+}
+
+func (q *FuzzyQuery) UnmarshalJSON(data []byte) error {
+	type Alias FuzzyQuery
+	aux := &struct {
+		Fuzziness interface{} `json:"fuzziness"`
+		*Alias
+	}{
+		Alias: (*Alias)(q),
+	}
+	if err := util.UnmarshalJSON(data, &aux); err != nil {
+		return err
+	}
+	switch v := aux.Fuzziness.(type) {
+	case float64:
+		q.Fuzziness = int(v)
+	case string:
+		if v == "auto" {
+			q.autoFuzzy = true
+		}
+	}
+	return nil
+}
+
+func (f *FuzzyQuery) MarshalJSON() ([]byte, error) {
+	var fuzzyValue interface{}
+	if f.autoFuzzy {
+		fuzzyValue = "auto"
+	} else {
+		fuzzyValue = f.Fuzziness
+	}
+	type fuzzyQuery struct {
+		Term      string      `json:"term"`
+		Prefix    int         `json:"prefix_length"`
+		Fuzziness interface{} `json:"fuzziness"`
+		FieldVal  string      `json:"field,omitempty"`
+		BoostVal  *Boost      `json:"boost,omitempty"`
+	}
+	aux := fuzzyQuery{
+		Term:      f.Term,
+		Prefix:    f.Prefix,
+		Fuzziness: fuzzyValue,
+		FieldVal:  f.FieldVal,
+		BoostVal:  f.BoostVal,
+	}
+	return util.MarshalJSON(aux)
 }
