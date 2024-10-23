@@ -17,6 +17,10 @@ package search
 import (
 	"context"
 
+	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/search/query"
+	"github.com/blevesearch/bleve/v2/util"
+	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/s2"
 )
 
@@ -137,6 +141,12 @@ type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
 
 const KnnPreSearchDataKey = "_knn_pre_search_data_key"
 
+const SynonymPreSearchDataKey = "_synonym_pre_search_data_key"
+
+const FieldTermSynonymsKey = "_field_term_synonyms_key"
+
+type FieldTermSynonyms map[string]map[string][]string
+
 const PreSearchKey = "_presearch_key"
 
 type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)
@@ -146,3 +156,146 @@ type SearcherEndCallbackFn func(size uint64) error
 
 const SearcherStartCallbackKey = "_searcher_start_callback_key"
 const SearcherEndCallbackKey = "_searcher_end_callback_key"
+
+func getFieldTermsFromQuery(q query.Query, m mapping.IndexMapping, r index.IndexReader, rv map[string][]string) error {
+	if q == nil {
+		return nil
+	}
+	switch q := q.(type) {
+	case *query.TermQuery:
+		field := q.Field()
+		if field == "" {
+			field = m.DefaultSearchField()
+		}
+		rv[field] = []string{string(q.Term)}
+
+	case *query.FuzzyQuery:
+		field := q.Field()
+		if field == "" {
+			field = m.DefaultSearchField()
+		}
+		rv[field] = []string{q.Term}
+
+	default:
+		return nil, nil
+	}
+
+	_, hasFuzziness := tmp["fuzziness"]
+	_, isMatchQuery := tmp["match"]
+	_, isMatchPhraseQuery := tmp["match_phrase"]
+	_, hasTerms := tmp["terms"]
+	if hasFuzziness && !isMatchQuery && !isMatchPhraseQuery && !hasTerms {
+		var rv FuzzyQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	if isMatchQuery {
+		var rv MatchQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	if isMatchPhraseQuery {
+		var rv MatchPhraseQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	if hasTerms {
+		var rv PhraseQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			// now try multi-phrase
+			var rv2 MultiPhraseQuery
+			err = util.UnmarshalJSON(input, &rv2)
+			if err != nil {
+				return nil, err
+			}
+			return &rv2, nil
+		}
+		return &rv, nil
+	}
+	_, hasMust := tmp["must"]
+	_, hasShould := tmp["should"]
+	_, hasMustNot := tmp["must_not"]
+	if hasMust || hasShould || hasMustNot {
+		var rv BooleanQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	_, hasConjuncts := tmp["conjuncts"]
+	if hasConjuncts {
+		var rv ConjunctionQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	_, hasDisjuncts := tmp["disjuncts"]
+	if hasDisjuncts {
+		var rv DisjunctionQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+
+	_, hasSyntaxQuery := tmp["query"]
+	if hasSyntaxQuery {
+		var rv QueryStringQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	_, hasMinStr := tmp["min"].(string)
+	_, hasMaxStr := tmp["max"].(string)
+	if hasMinStr || hasMaxStr {
+		var rv TermRangeQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	_, hasPrefix := tmp["prefix"]
+	if hasPrefix {
+		var rv PrefixQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	_, hasRegexp := tmp["regexp"]
+	if hasRegexp {
+		var rv RegexpQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+	_, hasWildcard := tmp["wildcard"]
+	if hasWildcard {
+		var rv WildcardQuery
+		err := util.UnmarshalJSON(input, &rv)
+		if err != nil {
+			return nil, err
+		}
+		return &rv, nil
+	}
+}
