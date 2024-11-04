@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"reflect"
 
-	faiss "github.com/blevesearch/go-faiss"
 	"github.com/blevesearch/bleve/v2/document"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
+	faiss "github.com/blevesearch/go-faiss"
 )
 
 // Min and Max allowed dimensions for a vector field;
@@ -263,5 +263,10 @@ func validateVectorFieldAlias(field *FieldMapping, parentName string,
 }
 
 func NormalizeVector(vec []float32) []float32 {
-	return faiss.NormalizeVector(vec)
+	// make a copy of the vector to avoid modifying the original
+	// vector in-place
+	vecCopy := make([]float32, len(vec))
+	copy(vecCopy, vec)
+	// normalize the vector copy using in-place normalization provided by faiss
+	return faiss.NormalizeVector(vecCopy)
 }
