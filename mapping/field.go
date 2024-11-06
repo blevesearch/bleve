@@ -80,6 +80,8 @@ type FieldMapping struct {
 
 	// Applicable to vector fields only - optimization string
 	VectorIndexOptimizedFor string `json:"vector_index_optimized_for,omitempty"`
+
+	SynonymSource string `json:"synonym_source,omitempty"`
 }
 
 // NewTextFieldMapping returns a default field mapping for text

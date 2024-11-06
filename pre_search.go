@@ -26,6 +26,8 @@ type preSearchResultProcessor interface {
 	finalize(*SearchResult)
 }
 
+// -----------------------------------------------------------------------------
+// KNN preSearchResultProcessor for handling KNN presearch results
 type knnPreSearchResultProcessor struct {
 	addFn      func(sr *SearchResult, indexName string)
 	finalizeFn func(sr *SearchResult)
@@ -44,16 +46,77 @@ func (k *knnPreSearchResultProcessor) finalize(sr *SearchResult) {
 }
 
 // -----------------------------------------------------------------------------
+// Synonym preSearchResultProcessor for handling Synonym presearch results
+type synonymPreSearchResultProcessor struct {
+	addFn      func(sr *SearchResult, indexName string)
+	finalizeFn func(sr *SearchResult)
+}
 
+func (s *synonymPreSearchResultProcessor) add(sr *SearchResult, indexName string) {
+	if s.addFn != nil {
+		s.addFn(sr, indexName)
+	}
+}
+
+func (s *synonymPreSearchResultProcessor) finalize(sr *SearchResult) {
+	if s.finalizeFn != nil {
+		s.finalizeFn(sr)
+	}
+}
+
+// -----------------------------------------------------------------------------
+// Master struct that can hold any number of presearch result processors
+type compositePreSearchResultProcessor struct {
+	presearchResultProcessors []preSearchResultProcessor
+}
+
+// Implements the add method, which forwards to all the internal processors
+func (m *compositePreSearchResultProcessor) add(sr *SearchResult, indexName string) {
+	for _, p := range m.presearchResultProcessors {
+		p.add(sr, indexName)
+	}
+}
+
+// Implements the finalize method, which forwards to all the internal processors
+func (m *compositePreSearchResultProcessor) finalize(sr *SearchResult) {
+	for _, p := range m.presearchResultProcessors {
+		p.finalize(sr)
+	}
+}
+
+// -----------------------------------------------------------------------------
+// Function to create the appropriate preSearchResultProcessor(s)
+func createPreSearchResultProcessor(req *SearchRequest) preSearchResultProcessor {
+	var processors []preSearchResultProcessor
+	// Add KNN processor if the request has KNN
+	if requestHasKNN(req) {
+		if knnProcessor := newKnnPreSearchResultProcessor(req); knnProcessor != nil {
+			processors = append(processors, knnProcessor)
+		}
+	}
+	// Add Synonym processor if the request has Synonym
+	if requestHasSynonym(req) {
+		if synonymProcessor := newSynonymPreSearchResultProcessor(req); synonymProcessor != nil {
+			processors = append(processors, synonymProcessor)
+		}
+	}
+	// Return based on the number of processors, optimizing for the common case of 1 processor
+	// If there are no processors, return nil
+	switch len(processors) {
+	case 0:
+		return nil
+	case 1:
+		return processors[0]
+	default:
+		return &compositePreSearchResultProcessor{
+			presearchResultProcessors: processors,
+		}
+	}
+}
+
+// -----------------------------------------------------------------------------
 func finalizePreSearchResult(req *SearchRequest, preSearchResult *SearchResult) {
 	if requestHasKNN(req) {
 		preSearchResult.Hits = finalizeKNNResults(req, preSearchResult.Hits)
 	}
-}
-
-func createPreSearchResultProcessor(req *SearchRequest) preSearchResultProcessor {
-	if requestHasKNN(req) {
-		return newKnnPreSearchResultProcessor(req)
-	}
-	return &knnPreSearchResultProcessor{} // equivalent to nil
 }

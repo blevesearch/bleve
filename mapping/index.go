@@ -54,6 +54,7 @@ type IndexMappingImpl struct {
 	IndexDynamic          bool                        `json:"index_dynamic"`
 	DocValuesDynamic      bool                        `json:"docvalues_dynamic"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
+	SynonymSources        map[string]*SynonymSource   `json:"synonym_sources,omitempty"`
 	cache                 *registry.Cache
 }
 
@@ -186,6 +187,12 @@ func (im *IndexMappingImpl) Validate() error {
 			return err
 		}
 	}
+	for _, synSource := range im.SynonymSources {
+		err = synSource.Validate(im.cache)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -280,6 +287,14 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			}
 		case "docvalues_dynamic":
 			err := util.UnmarshalJSON(v, &im.DocValuesDynamic)
+			if err != nil {
+				return err
+			}
+		case "synonym_sources":
+			if im.SynonymSources == nil {
+				im.SynonymSources = make(map[string]*SynonymSource)
+			}
+			err := util.UnmarshalJSON(v, &im.SynonymSources)
 			if err != nil {
 				return err
 			}
@@ -456,4 +471,26 @@ func (im *IndexMappingImpl) FieldMappingForPath(path string) FieldMapping {
 
 func (im *IndexMappingImpl) DefaultSearchField() string {
 	return im.DefaultField
+}
+
+func (im *IndexMappingImpl) SynonymSourceForPath(path string) string {
+	// first we look for explicit mapping on the field
+	for _, docMapping := range im.TypeMapping {
+		synonymSource := docMapping.synonymSourceForPath(path)
+		if synonymSource != "" {
+			return synonymSource
+		}
+	}
+
+	// now try the default mapping
+	pathMapping, _ := im.DefaultMapping.documentMappingForPath(path)
+	if pathMapping != nil {
+		if len(pathMapping.Fields) > 0 {
+			if pathMapping.Fields[0].SynonymSource != "" {
+				return pathMapping.Fields[0].SynonymSource
+			}
+		}
+	}
+
+	return ""
 }

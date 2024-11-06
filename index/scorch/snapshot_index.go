@@ -60,6 +60,7 @@ var reflectStaticSizeIndexSnapshot int
 // exported variable, or at the index level by setting the FieldTFRCacheThreshold
 // in the kvConfig.
 var DefaultFieldTFRCacheThreshold uint64 = 10
+var DefaultSynonymTermReaderCacheThreshold uint64 = 10
 
 func init() {
 	var is interface{} = IndexSnapshot{}
@@ -87,8 +88,9 @@ type IndexSnapshot struct {
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
 
-	m2        sync.Mutex                                 // Protects the fields that follow.
-	fieldTFRs map[string][]*IndexSnapshotTermFieldReader // keyed by field, recycled TFR's
+	m2                 sync.Mutex                                   // Protects the fields that follow.
+	fieldTFRs          map[string][]*IndexSnapshotTermFieldReader   // keyed by field, recycled TFR's
+	synonymTermReaders map[string][]*IndexSnapshotSynonymTermReader // keyed by thesaurus name, recycled thesaurus readers
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
@@ -649,6 +651,15 @@ func (is *IndexSnapshot) getFieldTFRCacheThreshold() uint64 {
 	return DefaultFieldTFRCacheThreshold
 }
 
+func (is *IndexSnapshot) getSynonymTermReaderCacheThreshold() uint64 {
+	if is.parent.config != nil {
+		if _, ok := is.parent.config["SynonymTermReaderCacheThreshold"]; ok {
+			return is.parent.config["SynonymTermReaderCacheThreshold"].(uint64)
+		}
+	}
+	return DefaultSynonymTermReaderCacheThreshold
+}
+
 func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader) {
 	if !tfr.recycle {
 		// Do not recycle an optimized unadorned term field reader (used for
@@ -673,6 +684,25 @@ func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReade
 	if uint64(len(is.fieldTFRs[tfr.field])) < is.getFieldTFRCacheThreshold() {
 		tfr.bytesRead = 0
 		is.fieldTFRs[tfr.field] = append(is.fieldTFRs[tfr.field], tfr)
+	}
+	is.m2.Unlock()
+}
+
+func (is *IndexSnapshot) recycleSynonymTermReader(str *IndexSnapshotSynonymTermReader) {
+	is.parent.rootLock.RLock()
+	obsolete := is.parent.root != is
+	is.parent.rootLock.RUnlock()
+	if obsolete {
+		// if we're not the current root (mutations happened), don't bother recycling
+		return
+	}
+
+	is.m2.Lock()
+	if is.synonymTermReaders == nil {
+		is.synonymTermReaders = map[string][]*IndexSnapshotSynonymTermReader{}
+	}
+	if uint64(len(is.synonymTermReaders[str.name])) < is.getSynonymTermReaderCacheThreshold() {
+		is.synonymTermReaders[str.name] = append(is.synonymTermReaders[str.name], str)
 	}
 	is.m2.Unlock()
 }
@@ -955,4 +985,61 @@ func (is *IndexSnapshot) CloseCopyReader() error {
 	is.parent.rootLock.Unlock()
 	// close the index snapshot normally
 	return is.Close()
+}
+
+func (is *IndexSnapshot) allocSynonymTermReader(name string) (str *IndexSnapshotSynonymTermReader) {
+	is.m2.Lock()
+	if is.synonymTermReaders != nil {
+		strs := is.synonymTermReaders[name]
+		last := len(strs) - 1
+		if last >= 0 {
+			str = strs[last]
+			strs[last] = nil
+			is.synonymTermReaders[name] = strs[:last]
+			is.m2.Unlock()
+			return
+		}
+	}
+	is.m2.Unlock()
+	return &IndexSnapshotSynonymTermReader{}
+}
+
+func (is *IndexSnapshot) SynonymTermReader(ctx context.Context, thesaurusName string, term []byte) (index.SynonymTermReader, error) {
+	rv := is.allocSynonymTermReader(thesaurusName)
+
+	rv.name = thesaurusName
+	rv.snapshot = is
+	if rv.postings == nil {
+		rv.postings = make([]segment.SynonymsList, len(is.segment))
+	}
+	if rv.iterators == nil {
+		rv.iterators = make([]segment.SynonymsIterator, len(is.segment))
+	}
+	rv.segmentOffset = 0
+
+	if rv.thesauri == nil {
+		rv.thesauri = make([]segment.Thesaurus, len(is.segment))
+		for i, s := range is.segment {
+			if synSeg, ok := s.segment.(segment.SynonymSegment); ok {
+				thes, err := synSeg.Thesaurus(thesaurusName)
+				if err != nil {
+					return nil, err
+				}
+				rv.thesauri[i] = thes
+			}
+		}
+	}
+
+	for i, s := range is.segment {
+		if _, ok := s.segment.(segment.SynonymSegment); ok {
+			pl, err := rv.thesauri[i].SynonymsList(term, s.deleted, rv.postings[i])
+			if err != nil {
+				return nil, err
+			}
+			rv.postings[i] = pl
+
+			rv.iterators[i] = pl.Iterator(rv.iterators[i])
+		}
+	}
+	return rv, nil
 }

@@ -112,6 +112,17 @@ func (dm *DocumentMapping) analyzerNameForPath(path string) string {
 	return ""
 }
 
+// synonymSourceForPath attempts to first find the field
+// described by this path, then returns the analyzer
+// configured for that field
+func (dm *DocumentMapping) synonymSourceForPath(path string) string {
+	field := dm.fieldDescribedByPath(path)
+	if field != nil {
+		return field.SynonymSource
+	}
+	return ""
+}
+
 func (dm *DocumentMapping) fieldDescribedByPath(path string) *FieldMapping {
 	pathElements := decodePath(path)
 	if len(pathElements) > 1 {
