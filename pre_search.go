@@ -94,12 +94,6 @@ func createPreSearchResultProcessor(req *SearchRequest) preSearchResultProcessor
 			processors = append(processors, knnProcessor)
 		}
 	}
-	// Add Synonym processor if the request has Synonym
-	if requestHasSynonym(req) {
-		if synonymProcessor := newSynonymPreSearchResultProcessor(req); synonymProcessor != nil {
-			processors = append(processors, synonymProcessor)
-		}
-	}
 	// Return based on the number of processors, optimizing for the common case of 1 processor
 	// If there are no processors, return nil
 	switch len(processors) {

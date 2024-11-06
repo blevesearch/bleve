@@ -39,11 +39,7 @@ type IndexSnapshotSynonymTermReader struct {
 
 func (i *IndexSnapshotSynonymTermReader) Size() int {
 	sizeInBytes := reflectStaticSizeIndexSnapshotSynonymTermReader + size.SizeOfPtr +
-		len(i.name)
-
-	for _, thesaurus := range i.thesauri {
-		sizeInBytes += thesaurus.Size()
-	}
+		len(i.name) + size.SizeOfString
 
 	for _, postings := range i.postings {
 		sizeInBytes += postings.Size()
