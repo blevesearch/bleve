@@ -476,6 +476,11 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
+		case "synonym_source":
+			err := json.Unmarshal(v, &fm.SynonymSource)
+			if err != nil {
+				return err
+			}
 		default:
 			invalidKeys = append(invalidKeys, k)
 		}
