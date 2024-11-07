@@ -371,11 +371,18 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	var sbsDrops []*roaring.Bitmap
 	var sbsIndexes []int
 
+	count := 0
+	requiredCount := 1000000
 	for i, segmentSnapshot := range snapshot.segment {
 		if _, ok := segmentSnapshot.segment.(segment.PersistedSegment); !ok {
-			sbs = append(sbs, segmentSnapshot.segment)
-			sbsDrops = append(sbsDrops, segmentSnapshot.deleted)
-			sbsIndexes = append(sbsIndexes, i)
+			if count < requiredCount {
+				count = count + int(segmentSnapshot.segment.Count())
+				sbs = append(sbs, segmentSnapshot.segment)
+				sbsDrops = append(sbsDrops, segmentSnapshot.deleted)
+				sbsIndexes = append(sbsIndexes, i)
+			} else {
+				break
+			}
 		}
 	}
 
@@ -579,19 +586,6 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			}
 			filenames = append(filenames, filename)
 		case segment.UnpersistedSegment:
-			// need to persist this to disk
-			filename := zapFileName(segmentSnapshot.id)
-			path := filepath.Join(path, filename)
-			err := persistToDirectory(seg, d, path)
-			if err != nil {
-				return nil, nil, fmt.Errorf("segment: %s persist err: %v", path, err)
-			}
-			newSegmentPaths[segmentSnapshot.id] = path
-			err = snapshotSegmentBucket.Put(boltPathKey, []byte(filename))
-			if err != nil {
-				return nil, nil, err
-			}
-			filenames = append(filenames, filename)
 		default:
 			return nil, nil, fmt.Errorf("unknown segment type: %T", seg)
 		}
