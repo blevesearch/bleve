@@ -124,7 +124,7 @@ func (o *OptimizeVR) Finish() error {
 							}
 
 							pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
-								eligibleLocalDocNums, vr.searchParams)
+								eligibleLocalDocNums, vr.include, vr.searchParams)
 						} else {
 							pl, err = vecIndex.Search(vr.vector, vr.k, vr.searchParams)
 						}

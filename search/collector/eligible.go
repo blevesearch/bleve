@@ -41,7 +41,7 @@ func newEligibleCollector(size int) *EligibleCollector {
 	ec := &EligibleCollector{size: size}
 
 	// comparator is a dummy here
-	ec.store = getOptimalCollectorStore(size, 0, func(i, j *search.DocumentMatch) int {
+	ec.store = getOptimalCollectorStore(size, true, 0, func(i, j *search.DocumentMatch) int {
 		return 0
 	})
 

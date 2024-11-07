@@ -118,7 +118,7 @@ func GetNewKNNCollectorStore(kArray []int64) *collectStoreKNN {
 	for knnIdx, k := range kArray {
 		// TODO - Check if the datatype of k can be made into an int instead of int64
 		idx := knnIdx
-		internalHeaps[idx] = getOptimalCollectorStore(int(k), 0, func(i, j *search.DocumentMatch) int {
+		internalHeaps[idx] = getOptimalCollectorStore(int(k), false, 0, func(i, j *search.DocumentMatch) int {
 			if i.ScoreBreakdown[idx] < j.ScoreBreakdown[idx] {
 				return 1
 			}

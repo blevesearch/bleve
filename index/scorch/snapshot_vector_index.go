@@ -51,7 +51,7 @@ func (is *IndexSnapshot) VectorReader(ctx context.Context, vector []float32,
 
 func (is *IndexSnapshot) VectorReaderWithFilter(ctx context.Context, vector []float32,
 	field string, k int64, searchParams json.RawMessage,
-	filterIDs []index.IndexInternalID) (
+	filterIDs []index.IndexInternalID, include bool) (
 	index.VectorReader, error) {
 
 	rv := &IndexSnapshotVectorReader{
@@ -61,6 +61,7 @@ func (is *IndexSnapshot) VectorReaderWithFilter(ctx context.Context, vector []fl
 		snapshot:       is,
 		searchParams:   searchParams,
 		eligibleDocIDs: filterIDs,
+		include:        include,
 	}
 
 	if rv.postings == nil {

@@ -251,7 +251,7 @@ var (
 )
 
 func createKNNQuery(req *SearchRequest, eligibleDocsMap map[int][]index.IndexInternalID,
-	requiresFiltering map[int]bool) (
+	include bool, requiresFiltering map[int]bool) (
 	query.Query, []int64, int64, error) {
 	if requestHasKNN(req) {
 		// first perform validation
@@ -278,7 +278,7 @@ func createKNNQuery(req *SearchRequest, eligibleDocsMap map[int][]index.IndexInt
 				knnQuery.SetFilterQuery(knn.FilterQuery)
 				filterResults, exists := eligibleDocsMap[i]
 				if exists {
-					knnQuery.SetFilterResults(filterResults)
+					knnQuery.SetFilterResults(filterResults, include)
 				}
 			}
 			subQueries = append(subQueries, knnQuery)
@@ -399,7 +399,24 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 		if err != nil {
 			return nil, err
 		}
-		filterColl := collector.NewEligibleCollector(int(indexDocCount))
+		cardinalityColl := collector.NewFilterCardinalityCollector(int(indexDocCount))
+		err = cardinalityColl.Collect(ctx, filterSearcher, reader)
+		if err != nil {
+			return nil, err
+		}
+
+		fmt.Printf("cardinality is %+v \n", cardinalityColl.Total())
+		if cardinalityColl.Total() > uint64(2.75*float64(indexDocCount)) {
+			fmt.Printf("inverting the q \n")
+			filterQ = query.NewBooleanQuery(nil, nil, []query.Query{filterQ})
+		}
+
+		// Resetting the searcher
+		filterSearcher, _ = filterQ.Searcher(ctx, reader, i.m, search.SearcherOptions{
+			Score: "none",
+		})
+
+		filterColl := collector.NewEligibleCollector(int(cardinalityColl.Total()))
 		err = filterColl.Collect(ctx, filterSearcher, reader)
 		if err != nil {
 			return nil, err
@@ -417,7 +434,7 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 	}
 
 	// Add the filter hits when creating the kNN query
-	KNNQuery, kArray, sumOfK, err := createKNNQuery(req, filterHitsMap, requiresFiltering)
+	KNNQuery, kArray, sumOfK, err := createKNNQuery(req, filterHitsMap, false, requiresFiltering)
 	if err != nil {
 		return nil, err
 	}

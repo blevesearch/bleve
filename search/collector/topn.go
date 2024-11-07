@@ -106,7 +106,7 @@ func NewTopNCollectorAfter(size int, sort search.SortOrder, after []string) *Top
 func newTopNCollector(size int, skip int, sort search.SortOrder) *TopNCollector {
 	hc := &TopNCollector{size: size, skip: skip, sort: sort}
 
-	hc.store = getOptimalCollectorStore(size, skip, func(i, j *search.DocumentMatch) int {
+	hc.store = getOptimalCollectorStore(size, false, skip, func(i, j *search.DocumentMatch) int {
 		return hc.sort.Compare(hc.cachedScoring, hc.cachedDesc, i, j)
 	})
 
@@ -158,12 +158,12 @@ func FilterHitsBySearchAfter(hits []*search.DocumentMatch, sort search.SortOrder
 	return hits[:idx]
 }
 
-func getOptimalCollectorStore(size, skip int, comparator collectorCompare) collectorStore {
+func getOptimalCollectorStore(size int, avoidSkip bool, skip int, comparator collectorCompare) collectorStore {
 	// pre-allocate space on the store to avoid reslicing
 	// unless the size + skip is too large, then cap it
 	// everything should still work, just reslices as necessary
 	backingSize := size + skip + 1
-	if size+skip > PreAllocSizeSkipCap {
+	if size+skip > PreAllocSizeSkipCap && !avoidSkip {
 		backingSize = PreAllocSizeSkipCap + 1
 	}
 

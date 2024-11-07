@@ -56,6 +56,7 @@ type IndexSnapshotVectorReader struct {
 	// The following fields are only applicable for vector readers which will
 	// process pre-filtered kNN queries.
 	eligibleDocIDs []index.IndexInternalID
+	include        bool
 }
 
 // Function to convert the internal IDs of the eligible documents to a type suitable
@@ -139,7 +140,7 @@ func (i *IndexSnapshotVectorReader) Advance(ID index.IndexInternalID,
 
 		if len(i.eligibleDocIDs) > 0 {
 			i2, err = i.snapshot.VectorReaderWithFilter(i.ctx, i.vector, i.field,
-				i.k, i.searchParams, i.eligibleDocIDs)
+				i.k, i.searchParams, i.eligibleDocIDs, i.include)
 		} else {
 			i2, err = i.snapshot.VectorReader(i.ctx, i.vector, i.field, i.k,
 				i.searchParams)
