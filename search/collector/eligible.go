@@ -70,9 +70,6 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 	var next *search.DocumentMatch
 
 	backingSize := ec.size
-	if backingSize > PreAllocSizeSkipCap {
-		backingSize = PreAllocSizeSkipCap + 1
-	}
 	searchContext := &search.SearchContext{
 		DocumentMatchPool: search.NewDocumentMatchPool(backingSize+searcher.DocumentMatchPoolSize(), 0),
 		Collector:         ec,
