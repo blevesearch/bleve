@@ -29,7 +29,7 @@ type EligibleCollector struct {
 	took    time.Duration
 	results search.DocumentMatchCollection
 
-	store collectorStore
+	store *collectStoreSlice
 }
 
 func NewEligibleCollector(size int) *EligibleCollector {
@@ -41,9 +41,7 @@ func newEligibleCollector(size int) *EligibleCollector {
 	ec := &EligibleCollector{size: size}
 
 	// comparator is a dummy here
-	ec.store = getOptimalCollectorStore(size, 0, func(i, j *search.DocumentMatch) int {
-		return 0
-	})
+	ec.store = getOptimalCollectorStore(size, 0, nil)
 
 	return ec
 }
@@ -56,7 +54,8 @@ func makeEligibleDocumentMatchHandler(ctx *search.SearchContext) (search.Documen
 			}
 
 			// No elements removed from the store here.
-			_ = ec.store.Add(d)
+			doc := ec.store.Add(d)
+			ctx.DocumentMatchPool.Put(doc)
 			return nil
 		}, nil
 	}
@@ -132,16 +131,16 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 
 func (ec *EligibleCollector) finalizeResults(r index.IndexReader) error {
 	var err error
-	ec.results, err = ec.store.Final(0, func(doc *search.DocumentMatch) error {
-		// Adding the results to the store without any modifications since we don't
-		// require the external ID of the filtered hits.
-		return nil
-	})
+	ec.results, err = ec.store.Final(0, nil)
 	return err
 }
 
 func (ec *EligibleCollector) Results() search.DocumentMatchCollection {
 	return ec.results
+}
+
+func (ec *EligibleCollector) IDs() []index.IndexInternalID {
+	return ec.store.ids
 }
 
 func (ec *EligibleCollector) Total() uint64 {

@@ -14,24 +14,31 @@
 
 package collector
 
-import "github.com/blevesearch/bleve/v2/search"
+import (
+	"github.com/blevesearch/bleve/v2/search"
+	index "github.com/blevesearch/bleve_index_api"
+)
 
 type collectStoreSlice struct {
 	slice   search.DocumentMatchCollection
 	compare collectorCompare
+
+	ids []index.IndexInternalID
 }
 
 func newStoreSlice(capacity int, compare collectorCompare) *collectStoreSlice {
 	rv := &collectStoreSlice{
 		slice:   make(search.DocumentMatchCollection, 0, capacity),
 		compare: compare,
+		ids:     make([]index.IndexInternalID, 0, capacity),
 	}
 	return rv
 }
 
 func (c *collectStoreSlice) Add(doc *search.DocumentMatch) *search.DocumentMatch {
-	c.slice = append(c.slice, doc)
-	return nil
+	// c.slice = append(c.slice, doc)
+	c.ids = append(c.ids, doc.IndexInternalID)
+	return doc
 }
 
 func (c *collectStoreSlice) AddNotExceedingSize(doc *search.DocumentMatch,
@@ -64,15 +71,21 @@ func (c *collectStoreSlice) removeLast() *search.DocumentMatch {
 	return rv
 }
 
+func (c *collectStoreSlice) IDs() []index.IndexInternalID {
+	return c.ids
+}
+
 func (c *collectStoreSlice) Final(skip int, fixup collectorFixup) (search.DocumentMatchCollection, error) {
-	for i := skip; i < len(c.slice); i++ {
-		err := fixup(c.slice[i])
-		if err != nil {
-			return nil, err
+	if fixup != nil {
+		for i := skip; i < len(c.slice); i++ {
+			err := fixup(c.slice[i])
+			if err != nil {
+				return nil, err
+			}
 		}
-	}
-	if skip <= len(c.slice) {
-		return c.slice[skip:], nil
+		if skip <= len(c.slice) {
+			return c.slice[skip:], nil
+		}
 	}
 	return search.DocumentMatchCollection{}, nil
 }

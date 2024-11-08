@@ -158,7 +158,7 @@ func FilterHitsBySearchAfter(hits []*search.DocumentMatch, sort search.SortOrder
 	return hits[:idx]
 }
 
-func getOptimalCollectorStore(size, skip int, comparator collectorCompare) collectorStore {
+func getOptimalCollectorStore(size, skip int, comparator collectorCompare) *collectStoreSlice {
 	// pre-allocate space on the store to avoid reslicing
 	// unless the size + skip is too large, then cap it
 	// everything should still work, just reslices as necessary
@@ -167,11 +167,7 @@ func getOptimalCollectorStore(size, skip int, comparator collectorCompare) colle
 		backingSize = PreAllocSizeSkipCap + 1
 	}
 
-	if size+skip > 10 {
-		return newStoreHeap(backingSize, comparator)
-	} else {
-		return newStoreSlice(backingSize, comparator)
-	}
+	return newStoreSlice(backingSize, comparator)
 }
 
 func (hc *TopNCollector) Size() int {
