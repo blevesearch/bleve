@@ -133,6 +133,17 @@ func (tf *TermFacets) Terms() []*TermFacet {
 	return tf.termFacets
 }
 
+func (tf *TermFacets) AvailableTerms() []*TermFacet {
+	if tf == nil {
+		return []*TermFacet{}
+	}
+	terms := make([]*TermFacet, 0, len(tf.termLookup))
+	for _, term := range tf.termLookup {
+		terms = append(terms, term)
+	}
+	return terms
+}
+
 func (tf *TermFacets) TrimToTopN(n int) {
 	tf.termFacets = tf.termFacets[:n]
 }
