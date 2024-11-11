@@ -432,7 +432,6 @@ func (is *IndexSnapshot) GetInternal(key []byte) ([]byte, error) {
 
 func (is *IndexSnapshot) DocCount() (uint64, error) {
 	var rv uint64
-	// fmt.Println("number of segments", len(is.segment))
 	for _, segment := range is.segment {
 		rv += segment.Count()
 	}

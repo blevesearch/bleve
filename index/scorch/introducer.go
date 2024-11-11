@@ -376,11 +376,10 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 				for deletedSinceItr.HasNext() {
 					oldDocNum := deletedSinceItr.Next()
 					newDocNum := nextMerge.oldNewDocNums[segmentID][oldDocNum]
-					newSegmentDeleted[segSnapAtMerge.segmentIdx].Add(uint32(newDocNum))
+					newSegmentDeleted[segSnapAtMerge.workerID].Add(uint32(newDocNum))
 				}
 			}
 
-			// fmt.Println("there was a delete", newSegmentDeleted[0].String())
 			// clean up the old segment map to figure out the
 			// obsolete segments wrt root in meantime, whatever
 			// segments left behind in old map after processing
@@ -425,14 +424,14 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			for obsoletedIter.HasNext() {
 				oldDocNum := obsoletedIter.Next()
 				newDocNum := nextMerge.oldNewDocNums[segID][oldDocNum]
-				newSegmentDeleted[ss.segmentIdx].Add(uint32(newDocNum))
+				newSegmentDeleted[ss.workerID].Add(uint32(newDocNum))
 			}
 		}
 	}
 
 	skipped := true
 	for i, newMergedSegment := range nextMerge.new {
-		if nextMerge.new != nil &&
+		if newMergedSegment != nil &&
 			newMergedSegment.Count() > newSegmentDeleted[i].GetCardinality() {
 			stats := newFieldStats()
 			if fsr, ok := newMergedSegment.(segment.FieldStatsReporter); ok {
