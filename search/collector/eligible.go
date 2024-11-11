@@ -47,16 +47,16 @@ func NewEligibleCollector(size int) *EligibleCollector {
 	return newEligibleCollector(size)
 }
 
-func getEligibleCollectorStore() *eligibleStore {
+func getEligibleCollectorStore(size int) *eligibleStore {
 	return &eligibleStore{
-		ids: make([]index.IndexInternalID, 0),
+		ids: make([]index.IndexInternalID, 0, size),
 	}
 }
 
 func newEligibleCollector(size int) *EligibleCollector {
 	// No sort order & skip always 0 since this is only to filter eligible docs.
 	ec := &EligibleCollector{size: size}
-	ec.store = getEligibleCollectorStore()
+	ec.store = getEligibleCollectorStore(size)
 	return ec
 }
 
