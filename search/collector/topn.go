@@ -170,7 +170,7 @@ func getOptimalCollectorStore(size, skip int, comparator collectorCompare) colle
 	if size+skip > 10 {
 		return newStoreHeap(backingSize, comparator)
 	} else {
-		return newStoreSlice(backingSize, comparator)
+		return newStoreSlice(backingSize, comparator, false)
 	}
 }
 

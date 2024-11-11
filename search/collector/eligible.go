@@ -23,28 +23,40 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
+type eligibleStore struct {
+	ids []index.IndexInternalID
+}
+
+func (s *eligibleStore) AddID(doc *search.DocumentMatch) *search.DocumentMatch {
+	copyOfID := make([]byte, len(doc.IndexInternalID))
+	copy(copyOfID, doc.IndexInternalID)
+	s.ids = append(s.ids, copyOfID)
+	return doc
+}
+
 type EligibleCollector struct {
 	size    int
 	total   uint64
 	took    time.Duration
 	results search.DocumentMatchCollection
 
-	store collectorStore
+	store *eligibleStore
 }
 
 func NewEligibleCollector(size int) *EligibleCollector {
 	return newEligibleCollector(size)
 }
 
+func getEligibleCollectorStore() *eligibleStore {
+	return &eligibleStore{
+		ids: make([]index.IndexInternalID, 0),
+	}
+}
+
 func newEligibleCollector(size int) *EligibleCollector {
 	// No sort order & skip always 0 since this is only to filter eligible docs.
 	ec := &EligibleCollector{size: size}
-
-	// comparator is a dummy here
-	ec.store = getOptimalCollectorStore(size, 0, func(i, j *search.DocumentMatch) int {
-		return 0
-	})
-
+	ec.store = getEligibleCollectorStore()
 	return ec
 }
 
@@ -56,7 +68,8 @@ func makeEligibleDocumentMatchHandler(ctx *search.SearchContext) (search.Documen
 			}
 
 			// No elements removed from the store here.
-			_ = ec.store.Add(d)
+			doc := ec.store.AddID(d)
+			ctx.DocumentMatchPool.Put(doc)
 			return nil
 		}, nil
 	}
@@ -122,26 +135,15 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 	// compute search duration
 	ec.took = time.Since(startTime)
 
-	// finalize actual results
-	err = ec.finalizeResults(reader)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-func (ec *EligibleCollector) finalizeResults(r index.IndexReader) error {
-	var err error
-	ec.results, err = ec.store.Final(0, func(doc *search.DocumentMatch) error {
-		// Adding the results to the store without any modifications since we don't
-		// require the external ID of the filtered hits.
-		return nil
-	})
-	return err
+func (ec *EligibleCollector) Results() search.DocumentMatchCollection {
+	return nil
 }
 
-func (ec *EligibleCollector) Results() search.DocumentMatchCollection {
-	return ec.results
+func (ec *EligibleCollector) IDs() []index.IndexInternalID {
+	return ec.store.ids
 }
 
 func (ec *EligibleCollector) Total() uint64 {
