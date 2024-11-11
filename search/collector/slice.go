@@ -26,14 +26,7 @@ type collectStoreSlice struct {
 	ids []index.IndexInternalID
 }
 
-func newStoreSlice(capacity int, compare collectorCompare, onlyIDs bool) *collectStoreSlice {
-	if onlyIDs {
-		rv := &collectStoreSlice{
-			ids:     make([]index.IndexInternalID, 0, capacity),
-			compare: compare,
-		}
-		return rv
-	}
+func newStoreSlice(capacity int, compare collectorCompare) *collectStoreSlice {
 	rv := &collectStoreSlice{
 		slice:   make(search.DocumentMatchCollection, 0, capacity),
 		compare: compare,
