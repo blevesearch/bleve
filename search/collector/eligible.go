@@ -27,7 +27,7 @@ type eligibleStore struct {
 	ids []index.IndexInternalID
 }
 
-func (s *eligibleStore) AddID(doc *search.DocumentMatch) *search.DocumentMatch {
+func (s *eligibleStore) AddDocumentMatch(doc *search.DocumentMatch) *search.DocumentMatch {
 	copyOfID := make([]byte, len(doc.IndexInternalID))
 	copy(copyOfID, doc.IndexInternalID)
 	s.ids = append(s.ids, copyOfID)
@@ -67,8 +67,7 @@ func makeEligibleDocumentMatchHandler(ctx *search.SearchContext) (search.Documen
 				return nil
 			}
 
-			// No elements removed from the store here.
-			doc := ec.store.AddID(d)
+			doc := ec.store.AddDocumentMatch(d)
 			ctx.DocumentMatchPool.Put(doc)
 			return nil
 		}, nil
