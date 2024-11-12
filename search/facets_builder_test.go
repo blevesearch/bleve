@@ -422,3 +422,28 @@ func TestDateFacetResultsMerge(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", expectedFrs, frs1)
 	}
 }
+
+func TestAvailableTerms(t *testing.T) {
+	tfs := &TermFacets{}
+	tfs.Add(
+		&TermFacet{
+			Term:  "term",
+			Count: 10,
+		},
+	)
+	tfs.Add(
+		&TermFacet{
+			Term:  "term",
+			Count: 20,
+		},
+	)
+
+	terms := tfs.AvailableTerms()
+	if len(terms) != 1 {
+		t.Errorf("expected 1 terms, got %d", len(terms))
+	}
+
+	if terms[0].Count != 30 {
+		t.Errorf("expected 60, got %d", terms[0].Count)
+	}
+}
