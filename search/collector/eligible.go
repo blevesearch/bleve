@@ -23,40 +23,24 @@ import (
 	index "github.com/blevesearch/bleve_index_api"
 )
 
-type eligibleStore struct {
-	ids []index.IndexInternalID
-}
-
-func (s *eligibleStore) AddDocumentMatch(doc *search.DocumentMatch) *search.DocumentMatch {
-	copyOfID := make([]byte, len(doc.IndexInternalID))
-	copy(copyOfID, doc.IndexInternalID)
-	s.ids = append(s.ids, copyOfID)
-	return doc
-}
-
 type EligibleCollector struct {
 	size    int
 	total   uint64
 	took    time.Duration
 	results search.DocumentMatchCollection
 
-	store *eligibleStore
+	ids []index.IndexInternalID
 }
 
 func NewEligibleCollector(size int) *EligibleCollector {
 	return newEligibleCollector(size)
 }
 
-func getEligibleCollectorStore(size int) *eligibleStore {
-	return &eligibleStore{
-		ids: make([]index.IndexInternalID, 0, size),
-	}
-}
-
 func newEligibleCollector(size int) *EligibleCollector {
 	// No sort order & skip always 0 since this is only to filter eligible docs.
-	ec := &EligibleCollector{size: size}
-	ec.store = getEligibleCollectorStore(size)
+	ec := &EligibleCollector{size: size,
+		ids: make([]index.IndexInternalID, 0, size),
+	}
 	return ec
 }
 
@@ -67,8 +51,10 @@ func makeEligibleDocumentMatchHandler(ctx *search.SearchContext) (search.Documen
 				return nil
 			}
 
-			doc := ec.store.AddDocumentMatch(d)
-			ctx.DocumentMatchPool.Put(doc)
+			copyOfID := make([]byte, len(d.IndexInternalID))
+			copy(copyOfID, d.IndexInternalID)
+			ec.ids = append(ec.ids, copyOfID)
+			ctx.DocumentMatchPool.Put(d)
 			return nil
 		}, nil
 	}
@@ -142,7 +128,7 @@ func (ec *EligibleCollector) Results() search.DocumentMatchCollection {
 }
 
 func (ec *EligibleCollector) IDs() []index.IndexInternalID {
-	return ec.store.ids
+	return ec.ids
 }
 
 func (ec *EligibleCollector) Total() uint64 {
