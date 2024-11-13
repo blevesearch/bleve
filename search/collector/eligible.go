@@ -54,7 +54,10 @@ func makeEligibleDocumentMatchHandler(ctx *search.SearchContext) (search.Documen
 			copyOfID := make([]byte, len(d.IndexInternalID))
 			copy(copyOfID, d.IndexInternalID)
 			ec.ids = append(ec.ids, copyOfID)
+
+			// recycle the DocumentMatch
 			ctx.DocumentMatchPool.Put(d)
+
 			return nil
 		}, nil
 	}
