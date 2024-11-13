@@ -319,7 +319,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 					if segSnapshot.LiveSize() == 0 {
 						atomic.AddUint64(&s.stats.TotFileMergeSegmentsEmpty, 1)
 						oldMap[segSnapshot.id] = nil
-						// mergedSegHistory[segSnapshot.id] = nil
 						delete(mergedSegHistory, segSnapshot.id)
 					} else {
 						segmentsToMerge = append(segmentsToMerge, segSnapshot.segment)
@@ -387,8 +386,6 @@ func (s *Scorch) planMergeAtSnapshot(ctx context.Context,
 
 		sm := &segmentMerge{
 			id:               []uint64{newSegmentID},
-			old:              oldMap,
-			oldNewDocNums:    oldNewDocNums,
 			mergedSegHistory: mergedSegHistory,
 			new:              []segment.Segment{seg},
 			newCount:         seg.Count(),
@@ -454,8 +451,6 @@ type mergedSegmentHistory struct {
 
 type segmentMerge struct {
 	id               []uint64
-	old              map[uint64]*SegmentSnapshot
-	oldNewDocNums    map[uint64][]uint64
 	new              []segment.Segment
 	mergedSegHistory map[uint64]*mergedSegmentHistory
 	notifyCh         chan *mergeTaskIntroStatus
@@ -532,8 +527,6 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 
 	sm := &segmentMerge{
 		id:               newMergedSegmentIDs,
-		old:              make(map[uint64]*SegmentSnapshot, numSegments),
-		oldNewDocNums:    make(map[uint64][]uint64, numSegments),
 		new:              newMergedSegments,
 		mergedSegHistory: make(map[uint64]*mergedSegmentHistory, numSegments),
 		notifyCh:         make(chan *mergeTaskIntroStatus),
@@ -543,10 +536,6 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 	for i, flushable := range flushableObjs {
 		for j, idx := range flushable.sbIdxs {
 			ss := snapshot.segment[idx]
-			sm.old[ss.id] = ss
-			sm.oldNewDocNums[ss.id] =
-				newDocNumsSet[i][j]
-
 			// oldSegmentSnapshot.id -> {threadIdx, oldSegmentSnapshot, docIDs}
 			sm.mergedSegHistory[ss.id] = &mergedSegmentHistory{
 				workerID:     uint64(i),
@@ -579,87 +568,6 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 	}
 
 	return newSnapshot, newMergedSegmentIDs, nil
-}
-
-// perform a merging of the given SegmentBase instances into a new,
-// persisted segment, and synchronously introduce that new segment
-// into the root
-func (s *Scorch) mergeSegmentBases(snapshot *IndexSnapshot,
-	sbs []segment.Segment, sbsDrops []*roaring.Bitmap,
-	sbsIndexes []int) (*IndexSnapshot, uint64, error) {
-	atomic.AddUint64(&s.stats.TotMemMergeBeg, 1)
-
-	memMergeZapStartTime := time.Now()
-
-	atomic.AddUint64(&s.stats.TotMemMergeZapBeg, 1)
-
-	newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
-	filename := zapFileName(newSegmentID)
-	path := s.path + string(os.PathSeparator) + filename
-
-	newDocNums, _, err :=
-		s.segPlugin.Merge(sbs, sbsDrops, path, s.closeCh, s)
-
-	atomic.AddUint64(&s.stats.TotMemMergeZapEnd, 1)
-
-	memMergeZapTime := uint64(time.Since(memMergeZapStartTime))
-	atomic.AddUint64(&s.stats.TotMemMergeZapTime, memMergeZapTime)
-	if atomic.LoadUint64(&s.stats.MaxMemMergeZapTime) < memMergeZapTime {
-		atomic.StoreUint64(&s.stats.MaxMemMergeZapTime, memMergeZapTime)
-	}
-
-	if err != nil {
-		atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
-		return nil, 0, err
-	}
-
-	seg, err := s.segPlugin.Open(path)
-	if err != nil {
-		atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
-		return nil, 0, err
-	}
-
-	// update persisted stats
-	atomic.AddUint64(&s.stats.TotPersistedItems, seg.Count())
-	atomic.AddUint64(&s.stats.TotPersistedSegments, 1)
-
-	sm := &segmentMerge{
-		id:            []uint64{newSegmentID},
-		old:           make(map[uint64]*SegmentSnapshot, len(sbsIndexes)),
-		oldNewDocNums: make(map[uint64][]uint64, len(sbsIndexes)),
-		new:           []segment.Segment{seg},
-		notifyCh:      make(chan *mergeTaskIntroStatus),
-	}
-
-	for i, idx := range sbsIndexes {
-		ss := snapshot.segment[idx]
-		sm.old[ss.id] = ss
-		sm.oldNewDocNums[ss.id] = newDocNums[i]
-	}
-
-	select { // send to introducer
-	case <-s.closeCh:
-		_ = seg.DecRef()
-		return nil, 0, segment.ErrClosed
-	case s.merges <- sm:
-	}
-
-	// blockingly wait for the introduction to complete
-	var newSnapshot *IndexSnapshot
-	introStatus := <-sm.notifyCh
-	if introStatus != nil && introStatus.indexSnapshot != nil {
-		newSnapshot = introStatus.indexSnapshot
-		atomic.AddUint64(&s.stats.TotMemMergeSegments, uint64(len(sbs)))
-		atomic.AddUint64(&s.stats.TotMemMergeDone, 1)
-		if introStatus.skipped {
-			// close the segment on skipping introduction.
-			_ = newSnapshot.DecRef()
-			_ = seg.Close()
-			newSnapshot = nil
-		}
-	}
-
-	return newSnapshot, newSegmentID, nil
 }
 
 func (s *Scorch) ReportBytesWritten(bytesWritten uint64) {

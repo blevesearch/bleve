@@ -375,7 +375,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 				deletedSinceItr := deletedSince.Iterator()
 				for deletedSinceItr.HasNext() {
 					oldDocNum := deletedSinceItr.Next()
-					newDocNum := nextMerge.oldNewDocNums[segmentID][oldDocNum]
+					newDocNum := segSnapAtMerge.oldNewDocIDs[oldDocNum]
 					newSegmentDeleted[segSnapAtMerge.workerID].Add(uint32(newDocNum))
 				}
 			}
@@ -384,7 +384,6 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 			// obsolete segments wrt root in meantime, whatever
 			// segments left behind in old map after processing
 			// the root segments would be the obsolete segment set
-			delete(nextMerge.old, segmentID)
 			delete(nextMerge.mergedSegHistory, segmentID)
 		} else if root.segment[i].LiveSize() > 0 {
 			// this segment is staying
@@ -417,13 +416,13 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	// before the newMerge introduction, need to clean the newly
 	// merged segment wrt the current root segments, hence
 	// applying the obsolete segment contents to newly merged segment
-	for segID, ss := range nextMerge.mergedSegHistory {
+	for _, ss := range nextMerge.mergedSegHistory {
 		obsoleted := ss.oldSegment.DocNumbersLive()
 		if obsoleted != nil {
 			obsoletedIter := obsoleted.Iterator()
 			for obsoletedIter.HasNext() {
 				oldDocNum := obsoletedIter.Next()
-				newDocNum := nextMerge.oldNewDocNums[segID][oldDocNum]
+				newDocNum := ss.oldNewDocIDs[oldDocNum]
 				newSegmentDeleted[ss.workerID].Add(uint32(newDocNum))
 			}
 		}
@@ -431,6 +430,8 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 
 	skipped := true
 	for i, newMergedSegment := range nextMerge.new {
+		// checking if this newly merged segment is worth keeping based on
+		// obsoleted doc count since the merge intro started
 		if newMergedSegment != nil &&
 			newMergedSegment.Count() > newSegmentDeleted[i].GetCardinality() {
 			stats := newFieldStats()
