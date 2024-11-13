@@ -139,7 +139,7 @@ func RectFromPointDistance(lon, lat, dist float64) (float64, float64, float64, f
 
 	var minLonL, maxLonL float64
 	if minLatL > minLatRad && maxLatL < maxLatRad {
-		deltaLon := asin(sin(radDistance) / cos(radLat))
+		deltaLon := math.Asin(math.Sin(radDistance) / math.Cos(radLat))
 		minLonL = radLon - deltaLon
 		if minLonL < minLonRad {
 			minLonL += 2 * math.Pi
