@@ -14,7 +14,9 @@
 
 package collector
 
-import "github.com/blevesearch/bleve/v2/search"
+import (
+	"github.com/blevesearch/bleve/v2/search"
+)
 
 type collectStoreSlice struct {
 	slice   search.DocumentMatchCollection
@@ -27,11 +29,6 @@ func newStoreSlice(capacity int, compare collectorCompare) *collectStoreSlice {
 		compare: compare,
 	}
 	return rv
-}
-
-func (c *collectStoreSlice) Add(doc *search.DocumentMatch) *search.DocumentMatch {
-	c.slice = append(c.slice, doc)
-	return nil
 }
 
 func (c *collectStoreSlice) AddNotExceedingSize(doc *search.DocumentMatch,

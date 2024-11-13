@@ -404,12 +404,9 @@ func (i *indexImpl) runKnnCollector(ctx context.Context, req *SearchRequest, rea
 		if err != nil {
 			return nil, err
 		}
-		filterHits := filterColl.Results()
+		filterHits := filterColl.IDs()
 		if len(filterHits) > 0 {
-			filterHitsMap[idx] = make([]index.IndexInternalID, len(filterHits))
-			for i, docMatch := range filterHits {
-				filterHitsMap[idx][i] = docMatch.IndexInternalID
-			}
+			filterHitsMap[idx] = filterHits
 		}
 		// set requiresFiltering regardless of whether there're filtered hits or
 		// not to later decide whether to consider the knnQuery or not

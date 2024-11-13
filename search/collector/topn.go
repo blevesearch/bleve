@@ -33,10 +33,6 @@ func init() {
 }
 
 type collectorStore interface {
-	// Adds a doc to the store without considering size.
-	// Returns nil if the doc was added successfully.
-	Add(doc *search.DocumentMatch) *search.DocumentMatch
-
 	// Add the document, and if the new store size exceeds the provided size
 	// the last element is removed and returned.  If the size has not been
 	// exceeded, nil is returned.

@@ -29,7 +29,7 @@ type EligibleCollector struct {
 	took    time.Duration
 	results search.DocumentMatchCollection
 
-	store collectorStore
+	ids []index.IndexInternalID
 }
 
 func NewEligibleCollector(size int) *EligibleCollector {
@@ -38,13 +38,9 @@ func NewEligibleCollector(size int) *EligibleCollector {
 
 func newEligibleCollector(size int) *EligibleCollector {
 	// No sort order & skip always 0 since this is only to filter eligible docs.
-	ec := &EligibleCollector{size: size}
-
-	// comparator is a dummy here
-	ec.store = getOptimalCollectorStore(size, 0, func(i, j *search.DocumentMatch) int {
-		return 0
-	})
-
+	ec := &EligibleCollector{size: size,
+		ids: make([]index.IndexInternalID, 0, size),
+	}
 	return ec
 }
 
@@ -55,8 +51,13 @@ func makeEligibleDocumentMatchHandler(ctx *search.SearchContext) (search.Documen
 				return nil
 			}
 
-			// No elements removed from the store here.
-			_ = ec.store.Add(d)
+			copyOfID := make([]byte, len(d.IndexInternalID))
+			copy(copyOfID, d.IndexInternalID)
+			ec.ids = append(ec.ids, copyOfID)
+
+			// recycle the DocumentMatch
+			ctx.DocumentMatchPool.Put(d)
+
 			return nil
 		}, nil
 	}
@@ -122,26 +123,15 @@ func (ec *EligibleCollector) Collect(ctx context.Context, searcher search.Search
 	// compute search duration
 	ec.took = time.Since(startTime)
 
-	// finalize actual results
-	err = ec.finalizeResults(reader)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-func (ec *EligibleCollector) finalizeResults(r index.IndexReader) error {
-	var err error
-	ec.results, err = ec.store.Final(0, func(doc *search.DocumentMatch) error {
-		// Adding the results to the store without any modifications since we don't
-		// require the external ID of the filtered hits.
-		return nil
-	})
-	return err
+func (ec *EligibleCollector) Results() search.DocumentMatchCollection {
+	return nil
 }
 
-func (ec *EligibleCollector) Results() search.DocumentMatchCollection {
-	return ec.results
+func (ec *EligibleCollector) IDs() []index.IndexInternalID {
+	return ec.ids
 }
 
 func (ec *EligibleCollector) Total() uint64 {
