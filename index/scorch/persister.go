@@ -371,11 +371,17 @@ type flushable struct {
 	totDocs  uint64
 }
 
-var DefaultNumPersisterWorkers = 4
+var DefaultNumPersisterWorkers = 1
 
 // maximum size of data that a single worker is allowed to perform the in-memory
 // merge operation.
-var DefaultMaxSizeInMemoryMerge = 200 * 1024 * 1024
+var DefaultMaxSizeInMemoryMerge = 0
+
+func legacyFlushBehaviour() bool {
+	// DefaultMaxSizeInMemoryMerge = 0 is a special value to preserve the leagcy
+	// one-shot in-memory merge + flush behaviour.
+	return DefaultMaxSizeInMemoryMerge == 0 && DefaultNumPersisterWorkers == 1
+}
 
 // persistSnapshotMaybeMerge examines the snapshot and might merge and
 // persist the in-memory zap segments if there are enough of them
@@ -393,63 +399,84 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	var numSegsToFlushOut int
 	var totDocs uint64
 
-	for i, snapshot := range snapshot.segment {
-		if totSize >= DefaultMaxSizeInMemoryMerge {
-			if len(sbs) >= DefaultMinSegmentsForInMemoryMerge {
-				numSegsToFlushOut += len(sbs)
-				val := &flushable{
-					segments: make([]segment.Segment, len(sbs)),
-					drops:    make([]*roaring.Bitmap, len(sbsDrops)),
-					sbIdxs:   make([]int, len(sbsIndexes)),
-					totDocs:  totDocs,
-				}
-				copy(val.segments, sbs)
-				copy(val.drops, sbsDrops)
-				copy(val.sbIdxs, sbsIndexes)
-				flushSet = append(flushSet, val)
-
-				oldSegIdxs = append(oldSegIdxs, sbsIndexes...)
-				sbs = sbs[:0]
-				sbsDrops = sbsDrops[:0]
-				sbsIndexes = sbsIndexes[:0]
-				totSize = 0
-				totDocs = 0
+	// legacy behaviour of merge + flush of all in-memory segments in one-shot
+	if legacyFlushBehaviour() {
+		val := &flushable{
+			segments: make([]segment.Segment, 0),
+			drops:    make([]*roaring.Bitmap, 0),
+			sbIdxs:   make([]int, 0),
+			totDocs:  totDocs,
+		}
+		for i, snapshot := range snapshot.segment {
+			if _, ok := snapshot.segment.(segment.PersistedSegment); !ok {
+				val.segments = append(val.segments, snapshot.segment)
+				val.drops = append(val.drops, snapshot.deleted)
+				val.sbIdxs = append(val.sbIdxs, i)
+				oldSegIdxs = append(oldSegIdxs, i)
+				val.totDocs += snapshot.segment.Count()
+				numSegsToFlushOut++
 			}
 		}
 
-		if len(flushSet) >= DefaultNumPersisterWorkers {
-			break
-		}
-
-		if _, ok := snapshot.segment.(segment.PersistedSegment); !ok {
-			sbs = append(sbs, snapshot.segment)
-			sbsDrops = append(sbsDrops, snapshot.deleted)
-			sbsIndexes = append(sbsIndexes, i)
-			totDocs += snapshot.segment.Count()
-			totSize += snapshot.segment.Size()
-		}
-	}
-
-	// if there were too few segments just merge them all as part of a single worker
-	if len(flushSet) < DefaultNumPersisterWorkers {
-		numSegsToFlushOut += len(sbs)
-		val := &flushable{
-			segments: make([]segment.Segment, len(sbs)),
-			drops:    make([]*roaring.Bitmap, len(sbsDrops)),
-			sbIdxs:   make([]int, len(sbsIndexes)),
-			totDocs:  totDocs,
-		}
-		copy(val.segments, sbs)
-		copy(val.drops, sbsDrops)
-		copy(val.sbIdxs, sbsIndexes)
 		flushSet = append(flushSet, val)
+	} else {
+		for i, snapshot := range snapshot.segment {
+			if totSize >= DefaultMaxSizeInMemoryMerge {
+				if len(sbs) >= DefaultMinSegmentsForInMemoryMerge {
+					numSegsToFlushOut += len(sbs)
+					val := &flushable{
+						segments: make([]segment.Segment, len(sbs)),
+						drops:    make([]*roaring.Bitmap, len(sbsDrops)),
+						sbIdxs:   make([]int, len(sbsIndexes)),
+						totDocs:  totDocs,
+					}
+					copy(val.segments, sbs)
+					copy(val.drops, sbsDrops)
+					copy(val.sbIdxs, sbsIndexes)
+					flushSet = append(flushSet, val)
 
-		oldSegIdxs = append(oldSegIdxs, sbsIndexes...)
-		sbs = sbs[:0]
-		sbsDrops = sbsDrops[:0]
-		sbsIndexes = sbsIndexes[:0]
-		totSize = 0
-		totDocs = 0
+					oldSegIdxs = append(oldSegIdxs, sbsIndexes...)
+					sbs = sbs[:0]
+					sbsDrops = sbsDrops[:0]
+					sbsIndexes = sbsIndexes[:0]
+					totSize = 0
+					totDocs = 0
+				}
+			}
+
+			if len(flushSet) >= DefaultNumPersisterWorkers {
+				break
+			}
+
+			if _, ok := snapshot.segment.(segment.PersistedSegment); !ok {
+				sbs = append(sbs, snapshot.segment)
+				sbsDrops = append(sbsDrops, snapshot.deleted)
+				sbsIndexes = append(sbsIndexes, i)
+				totDocs += snapshot.segment.Count()
+				totSize += snapshot.segment.Size()
+			}
+		}
+		// if there were too few segments just merge them all as part of a single worker
+		if len(flushSet) < DefaultNumPersisterWorkers {
+			numSegsToFlushOut += len(sbs)
+			val := &flushable{
+				segments: make([]segment.Segment, len(sbs)),
+				drops:    make([]*roaring.Bitmap, len(sbsDrops)),
+				sbIdxs:   make([]int, len(sbsIndexes)),
+				totDocs:  totDocs,
+			}
+			copy(val.segments, sbs)
+			copy(val.drops, sbsDrops)
+			copy(val.sbIdxs, sbsIndexes)
+			flushSet = append(flushSet, val)
+
+			oldSegIdxs = append(oldSegIdxs, sbsIndexes...)
+			sbs = sbs[:0]
+			sbsDrops = sbsDrops[:0]
+			sbsIndexes = sbsIndexes[:0]
+			totSize = 0
+			totDocs = 0
+		}
 	}
 
 	if numSegsToFlushOut < DefaultMinSegmentsForInMemoryMerge {

@@ -352,15 +352,15 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 		creator:  "introduceMerge",
 	}
 
-	// iterate through current segments
-	// newSegmentDeleted := roaring.NewBitmap()
+	var running, docsToPersistCount, memSegments, fileSegments uint64
+	var droppedSegmentFiles []string
 	newSegmentDeleted := make([]*roaring.Bitmap, len(nextMerge.new))
 	for i := range newSegmentDeleted {
+		// create a bitmaps to track the obsoletes per newly merged segments
 		newSegmentDeleted[i] = roaring.NewBitmap()
 	}
 
-	var running, docsToPersistCount, memSegments, fileSegments uint64
-	var droppedSegmentFiles []string
+	// iterate through current segments
 	for i := range root.segment {
 		segmentID := root.segment[i].id
 		if segSnapAtMerge, ok := nextMerge.mergedSegHistory[segmentID]; ok {
@@ -439,7 +439,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 				fsr.UpdateFieldStats(stats)
 			}
 
-			// put new segment at end
+			// put the merged segment at the end of newSnapshot
 			newSnapshot.segment = append(newSnapshot.segment, &SegmentSnapshot{
 				id:         nextMerge.id[i],
 				segment:    newMergedSegment, // take ownership for nextMerge.new's ref-count
@@ -467,6 +467,8 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	if skipped {
 		atomic.AddUint64(&s.stats.TotFileMergeIntroductionsObsoleted, 1)
 	} else {
+		// tbd: should this stat correspond to total number of merged segments introduced?
+		// or is it like number of merge introductions done
 		atomic.AddUint64(&s.stats.TotIntroducedSegmentsMerge, 1)
 	}
 

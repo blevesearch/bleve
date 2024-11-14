@@ -468,7 +468,9 @@ func cumulateBytesRead(sbs []segment.Segment) uint64 {
 
 func closeNewMergedSegments(segs []segment.Segment) error {
 	for _, seg := range segs {
-		_ = seg.DecRef()
+		if seg != nil {
+			_ = seg.DecRef()
+		}
 	}
 	return nil
 }
@@ -482,13 +484,16 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 
 	var wg sync.WaitGroup
 	// we're tracking the merged segments and their doc number per worker
-	// to be able to introduce them all at once
+	// to be able to introduce them all at once, so the first dimension of the
+	// slices here correspond to workerID
 	newDocNumsSet := make([][][]uint64, len(flushableObjs))
 	newMergedSegments := make([]segment.Segment, len(flushableObjs))
 	newMergedSegmentIDs := make([]uint64, len(flushableObjs))
 	numFlushes := len(flushableObjs)
 	var numSegments, newMergedCount uint64
+	errs := make([]error, numFlushes)
 
+	// deploy the workers to merge and flush the batches of segments parallely
 	for i := 0; i < numFlushes; i++ {
 		wg.Add(1)
 		go func(segsBatch []segment.Segment, dropsBatch []*roaring.Bitmap, id int) {
@@ -499,7 +504,7 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 			newDocNums, _, err :=
 				s.segPlugin.Merge(segsBatch, dropsBatch, path, s.closeCh, s)
 			if err != nil {
-				// handle error
+				errs[id] = err
 				atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
 				return
 			}
@@ -507,7 +512,7 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 			newDocNumsSet[id] = newDocNums
 			newMergedSegments[id], err = s.segPlugin.Open(path)
 			if err != nil {
-				// handle error
+				errs[id] = err
 				atomic.AddUint64(&s.stats.TotMemMergeErr, 1)
 				return
 			}
@@ -517,6 +522,15 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 	}
 
 	wg.Wait()
+
+	if errs[0] != nil {
+		// close the new merged segments
+		_ = closeNewMergedSegments(newMergedSegments)
+
+		// tbd: need a better way to handle error
+		return nil, nil, errs[0]
+	}
+
 	atomic.AddUint64(&s.stats.TotMemMergeZapEnd, 1)
 
 	memMergeZapTime := uint64(time.Since(memMergeZapStartTime))
@@ -536,7 +550,7 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 	for i, flushable := range flushableObjs {
 		for j, idx := range flushable.sbIdxs {
 			ss := snapshot.segment[idx]
-			// oldSegmentSnapshot.id -> {threadIdx, oldSegmentSnapshot, docIDs}
+			// oldSegmentSnapshot.id -> {workerID, oldSegmentSnapshot, docIDs}
 			sm.mergedSegHistory[ss.id] = &mergedSegmentHistory{
 				workerID:     uint64(i),
 				oldNewDocIDs: newDocNumsSet[i][j],
