@@ -58,3 +58,8 @@ type IndexMapping interface {
 
 	FieldMappingForPath(path string) FieldMapping
 }
+
+type SynonymMapping interface {
+	IndexMapping
+	MapSynonymDocument(doc *document.Document, collection string, input []string, synonyms []string) error
+}

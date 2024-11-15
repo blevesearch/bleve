@@ -354,6 +354,23 @@ func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}
 	return nil
 }
 
+func (im *IndexMappingImpl) MapSynonymDocument(doc *document.Document, collection string, input []string, synonyms []string) error {
+	// determine all the synonym sources with the given collection
+	// and create a synonym field for each
+	for name, synSource := range im.SynonymSources {
+		if synSource.Collection() == collection {
+			// create a new field with the name of the synonym source
+			analyzer := im.AnalyzerNamed(synSource.Analyzer())
+			if analyzer == nil {
+				return fmt.Errorf("unknown analyzer named: %s", synSource.Analyzer())
+			}
+			field := document.NewSynonymField(name, analyzer, input, synonyms)
+			doc.AddField(field)
+		}
+	}
+	return nil
+}
+
 type walkContext struct {
 	doc             *document.Document
 	im              *IndexMappingImpl
