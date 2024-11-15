@@ -146,6 +146,14 @@ func (im *IndexMappingImpl) AddCustomDateTimeParser(name string, config map[stri
 	return nil
 }
 
+func (im *IndexMappingImpl) AddSynonymSource(name, collection, analyzer string) error {
+	if im.SynonymSources == nil {
+		im.SynonymSources = make(map[string]*SynonymSource)
+	}
+	im.SynonymSources[name] = NewSynonymSource(collection, analyzer)
+	return nil
+}
+
 // NewIndexMapping creates a new IndexMapping that will use all the default indexing rules
 func NewIndexMapping() *IndexMappingImpl {
 	return &IndexMappingImpl{

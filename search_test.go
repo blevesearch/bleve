@@ -15,10 +15,12 @@
 package bleve
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -3742,6 +3744,186 @@ func TestAutoFuzzy(t *testing.T) {
 		for i, hit := range res.Hits {
 			if hit.ID != dtq.expectHits[i] {
 				t.Fatalf("expected docID %s, got %s", dtq.expectHits[i], hit.ID)
+			}
+		}
+	}
+}
+
+func TestSynonymSearch(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	synonymCollection := "collection1"
+
+	synonymSourceName := "english"
+
+	synonymAnalyzer := "simple"
+
+	imap := mapping.NewIndexMapping()
+	textField := mapping.NewTextFieldMapping()
+	textField.Analyzer = simple.Name
+	imap.DefaultMapping.AddFieldMappingsAt("text", textField)
+	imap.AddSynonymSource(synonymSourceName, synonymCollection, synonymAnalyzer)
+
+	err := imap.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	documents := map[string]map[string]interface{}{
+		"doc1": {
+			"text": "quick brown fox eats",
+		},
+		"doc2": {
+			"text": "fast red wolf jumps",
+		},
+		"doc3": {
+			"text": "quick red cat runs",
+		},
+		"doc4": {
+			"text": "speedy brown dog barks",
+		},
+		"doc5": {
+			"text": "fast green rabbit hops",
+		},
+	}
+
+	batch := idx.NewBatch()
+	for docID, doc := range documents {
+		err := batch.Index(docID, doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	synonymDocuments := map[string]*SynonymDefinition{
+		"synDoc1": {
+			Synonyms: []string{"quick", "fast", "speedy"},
+		},
+		"synDoc2": {
+			Input:    []string{"color", "colour"},
+			Synonyms: []string{"red", "green", "blue", "yellow", "brown"},
+		},
+		"synDoc3": {
+			Input:    []string{"animal", "creature"},
+			Synonyms: []string{"fox", "wolf", "cat", "dog", "rabbit"},
+		},
+		"synDoc4": {
+			Synonyms: []string{"eats", "jumps", "runs", "barks", "hops"},
+		},
+	}
+
+	for synName, synDef := range synonymDocuments {
+		err := batch.IndexSynonym(synName, "collection1", synDef)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sco, err := idx.Advanced()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reader, err := sco.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = reader.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	synReader, ok := reader.(index.ThesaurusReader)
+	if !ok {
+		t.Fatal("expected thesaurus reader")
+	}
+
+	type testStruct struct {
+		queryTerm        string
+		expectedSynonyms []string
+	}
+
+	testQueries := []testStruct{
+		{
+			queryTerm:        "quick",
+			expectedSynonyms: []string{"fast", "speedy"},
+		},
+		{
+			queryTerm:        "red",
+			expectedSynonyms: []string{},
+		},
+		{
+			queryTerm:        "color",
+			expectedSynonyms: []string{"red", "green", "blue", "yellow", "brown"},
+		},
+		{
+			queryTerm:        "colour",
+			expectedSynonyms: []string{"red", "green", "blue", "yellow", "brown"},
+		},
+		{
+			queryTerm:        "animal",
+			expectedSynonyms: []string{"fox", "wolf", "cat", "dog", "rabbit"},
+		},
+		{
+			queryTerm:        "creature",
+			expectedSynonyms: []string{"fox", "wolf", "cat", "dog", "rabbit"},
+		},
+		{
+			queryTerm:        "fox",
+			expectedSynonyms: []string{},
+		},
+		{
+			queryTerm:        "eats",
+			expectedSynonyms: []string{"jumps", "runs", "barks", "hops"},
+		},
+		{
+			queryTerm:        "jumps",
+			expectedSynonyms: []string{"eats", "runs", "barks", "hops"},
+		},
+	}
+
+	for _, test := range testQueries {
+		str, err := synReader.SynonymTermReader(context.Background(), synonymSourceName, []byte(test.queryTerm))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var gotSynonyms []string
+		for {
+			synonym, err := str.Next()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if synonym == "" {
+				break
+			}
+			gotSynonyms = append(gotSynonyms, string(synonym))
+		}
+		if len(gotSynonyms) != len(test.expectedSynonyms) {
+			t.Fatalf("expected %d synonyms, got %d", len(test.expectedSynonyms), len(gotSynonyms))
+		}
+		sort.Strings(gotSynonyms)
+		sort.Strings(test.expectedSynonyms)
+		for i, syn := range gotSynonyms {
+			if syn != test.expectedSynonyms[i] {
+				t.Fatalf("expected synonym %s, got %s", test.expectedSynonyms[i], syn)
 			}
 		}
 	}

@@ -25,6 +25,13 @@ type SynonymSource struct {
 	AnalyzerName   string `json:"analyzer"`
 }
 
+func NewSynonymSource(collection, analyzer string) *SynonymSource {
+	return &SynonymSource{
+		CollectionName: collection,
+		AnalyzerName:   analyzer,
+	}
+}
+
 func (s *SynonymSource) Collection() string {
 	return s.CollectionName
 }
