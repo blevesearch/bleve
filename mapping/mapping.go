@@ -61,5 +61,10 @@ type IndexMapping interface {
 
 type SynonymMapping interface {
 	IndexMapping
+
 	MapSynonymDocument(doc *document.Document, collection string, input []string, synonyms []string) error
+
+	SynonymSourceForPath(path string) string
+
+	SynonymCount() int
 }

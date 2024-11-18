@@ -3851,9 +3851,9 @@ func TestSynonymSearch(t *testing.T) {
 		}
 	}()
 
-	synReader, ok := reader.(index.ThesaurusReader)
+	synReader, ok := reader.(index.SynonymReader)
 	if !ok {
-		t.Fatal("expected thesaurus reader")
+		t.Fatal("expected synonym reader")
 	}
 
 	type testStruct struct {
