@@ -24,6 +24,19 @@ import (
 
 var MaxFuzziness = 2
 
+// AutoFuzzinessHighThreshold is the threshold for the term length
+// above which the fuzziness is set to MaxFuzziness when the fuzziness
+// mode is set to AutoFuzziness.
+var AutoFuzzinessHighThreshold = 5
+
+// AutoFuzzinessLowThreshold is the threshold for the term length
+// below which the fuzziness is set to zero when the fuzziness mode
+// is set to AutoFuzziness.
+// For terms with length between AutoFuzzinessLowThreshold and
+// AutoFuzzinessHighThreshold, the fuzziness is set to
+// MaxFuzziness - 1.
+var AutoFuzzinessLowThreshold = 2
+
 func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term string,
 	prefix, fuzziness int, field string, boost float64,
 	options search.SearcherOptions) (search.Searcher, error) {
@@ -86,10 +99,10 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 
 func getAutoFuzziness(term string) int {
 	termLength := len(term)
-	if termLength > 5 {
-		return 2
-	} else if termLength > 2 {
-		return 1
+	if termLength > AutoFuzzinessHighThreshold {
+		return MaxFuzziness
+	} else if termLength > AutoFuzzinessLowThreshold {
+		return MaxFuzziness - 1
 	}
 	return 0
 }
