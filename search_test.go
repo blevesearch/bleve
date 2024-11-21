@@ -3669,7 +3669,7 @@ func TestAutoFuzzy(t *testing.T) {
 					"fuzziness": 2,
 					"field" : "model"
 				}`,
-			expectHits: []string{"product1", "product2", "product7", "product14", "product12", "product10", "product15", "product3", "product6", "product8"},
+			expectHits: []string{"product1", "product2", "product7", "product14", "product15", "product12", "product10", "product3", "product6", "product8"},
 		},
 		{
 			// match query with fuzziness set to "auto"
@@ -3707,7 +3707,7 @@ func TestAutoFuzzy(t *testing.T) {
 					"fuzziness": 2,
 					"field" : "model"
 				}`,
-			expectHits: []string{"product10", "product6"},
+			expectHits: []string{"product6", "product10"},
 		},
 		// match phrase query with fuzziness set to "auto"
 		{
