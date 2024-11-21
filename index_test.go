@@ -2953,3 +2953,62 @@ func TestCopyIndex(t *testing.T) {
 		}
 	}
 }
+
+func TestFuzzyScoring(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	mp := NewIndexMapping()
+	mp.DefaultAnalyzer = "simple"
+	idx, err := New(tmpIndexPath, mp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	batch := idx.NewBatch()
+
+	docs := []map[string]interface{}{
+		{
+			"textField": "ab",
+		},
+		{
+			"textField": "abc",
+		},
+		{
+			"textField": "abcd",
+		},
+	}
+
+	for _, doc := range docs {
+		err := batch.Index(fmt.Sprintf("%v", doc["textField"]), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = idx.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	query := NewFuzzyQuery("ab")
+	query.Fuzziness = 2
+	searchRequest := NewSearchRequestOptions(query, 10, 0, true)
+	res, err := idx.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	maxScore := res.Hits[0].Score
+
+	for i, hit := range res.Hits {
+		if maxScore/float64(i+1) != hit.Score {
+			t.Errorf("expected score - %f, got score - %f", maxScore/float64(i+1), hit.Score)
+		}
+	}
+
+	err = idx.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}

@@ -45,6 +45,31 @@ func NewMultiTermSearcher(ctx context.Context, indexReader index.IndexReader, te
 		options, limit)
 }
 
+// Works similarly to the multi term searcher but additionally boosts individual terms based on
+// their edit distance from the query terms
+func NewMultiTermSearcherBoosted(ctx context.Context, indexReader index.IndexReader, terms []string,
+	field string, boost float64, editDistances []uint8, options search.SearcherOptions, limit bool) (
+	search.Searcher, error) {
+
+	if tooManyClauses(len(terms)) {
+		if optionsDisjunctionOptimizable(options) {
+			return optimizeMultiTermSearcher(ctx, indexReader, terms, field, boost, options)
+		}
+		if limit {
+			return nil, tooManyClausesErr(field, len(terms))
+		}
+	}
+
+	qsearchers, err := makeBatchSearchersBoosted(ctx, indexReader, terms, field, boost, editDistances, options)
+	if err != nil {
+		return nil, err
+	}
+
+	// build disjunction searcher of these ranges
+	return newMultiTermSearcherInternal(ctx, indexReader, qsearchers, field, boost,
+		options, limit)
+}
+
 func NewMultiTermSearcherBytes(ctx context.Context, indexReader index.IndexReader, terms [][]byte,
 	field string, boost float64, options search.SearcherOptions, limit bool) (
 	search.Searcher, error) {
@@ -143,6 +168,32 @@ func makeBatchSearchers(ctx context.Context, indexReader index.IndexReader, term
 	for i, term := range terms {
 		var err error
 		qsearchers[i], err = NewTermSearcher(ctx, indexReader, term, field, boost, options)
+		if err != nil {
+			qsearchersClose()
+			return nil, err
+		}
+	}
+	return qsearchers, nil
+}
+
+func makeBatchSearchersBoosted(ctx context.Context, indexReader index.IndexReader, terms []string, field string,
+	boost float64, editDistances []uint8, options search.SearcherOptions) ([]search.Searcher, error) {
+
+	qsearchers := make([]search.Searcher, len(terms))
+	qsearchersClose := func() {
+		for _, searcher := range qsearchers {
+			if searcher != nil {
+				_ = searcher.Close()
+			}
+		}
+	}
+	for i, term := range terms {
+		var err error
+		var editMultiplier float64
+		if editDistances != nil {
+			editMultiplier = 1 / float64(editDistances[i]+1)
+		}
+		qsearchers[i], err = NewTermSearcher(ctx, indexReader, term, field, boost*editMultiplier, options)
 		if err != nil {
 			qsearchersClose()
 			return nil, err

@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/RoaringBitmap/roaring v1.9.3
 	github.com/bits-and-blooms/bitset v1.12.0
-	github.com/blevesearch/bleve_index_api v1.1.12
+	github.com/blevesearch/bleve_index_api v1.1.13
 	github.com/blevesearch/geo v0.1.20
 	github.com/blevesearch/go-faiss v1.0.23
 	github.com/blevesearch/go-metrics v0.0.0-20201227073835-cf1acfcdf475
@@ -18,13 +18,13 @@ require (
 	github.com/blevesearch/snowballstem v0.9.0
 	github.com/blevesearch/stempel v0.2.0
 	github.com/blevesearch/upsidedown_store_api v1.0.2
-	github.com/blevesearch/vellum v1.0.10
+	github.com/blevesearch/vellum v1.0.11
 	github.com/blevesearch/zapx/v11 v11.3.10
 	github.com/blevesearch/zapx/v12 v12.3.10
 	github.com/blevesearch/zapx/v13 v13.3.10
 	github.com/blevesearch/zapx/v14 v14.3.10
 	github.com/blevesearch/zapx/v15 v15.3.16
-	github.com/blevesearch/zapx/v16 v16.1.8
+	github.com/blevesearch/zapx/v16 v16.1.9-0.20241120170816-85db80035af2
 	github.com/couchbase/moss v0.2.0
 	github.com/golang/protobuf v1.3.2
 	github.com/spf13/cobra v1.7.0
