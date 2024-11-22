@@ -3749,7 +3749,7 @@ func TestAutoFuzzy(t *testing.T) {
 	}
 }
 
-func TestSynonymSearch(t *testing.T) {
+func TestSynonymTermReader(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
@@ -3759,12 +3759,13 @@ func TestSynonymSearch(t *testing.T) {
 
 	synonymAnalyzer := "simple"
 
-	imap := mapping.NewIndexMapping()
 	textField := mapping.NewTextFieldMapping()
 	textField.Analyzer = simple.Name
+	textField.SynonymSource = synonymSourceName
+
+	imap := mapping.NewIndexMapping()
 	imap.DefaultMapping.AddFieldMappingsAt("text", textField)
 	imap.AddSynonymSource(synonymSourceName, synonymCollection, synonymAnalyzer)
-
 	err := imap.Validate()
 	if err != nil {
 		t.Fatal(err)

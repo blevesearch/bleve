@@ -519,3 +519,7 @@ func (im *IndexMappingImpl) SynonymSourceForPath(path string) string {
 
 	return ""
 }
+
+func (im *IndexMappingImpl) SynonymCount() int {
+	return len(im.SynonymSources)
+}
