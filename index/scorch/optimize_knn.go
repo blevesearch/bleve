@@ -145,12 +145,8 @@ func (o *OptimizeVR) Finish() error {
 						atomic.AddUint64(&o.snapshot.parent.stats.TotKNNSearches, uint64(1))
 
 						if pl != nil && pl.Count() > 0 {
-							// postings and iterators are already alloc'ed when
-							// IndexSnapshotVectorReader is created
 							vr.postings[index] = pl
 							vr.iterators[index] = pl.Iterator(vr.iterators[index])
-						} else {
-							vr.iterators[index] = &emptyVecPostingsIterator{}
 						}
 					}
 					go vecIndex.Close()
