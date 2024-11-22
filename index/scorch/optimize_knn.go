@@ -114,17 +114,22 @@ func (o *OptimizeVR) Finish() error {
 								eligibleVectorInternalIDs.And(snapshotGlobalDocNums[index])
 							}
 
-							eligibleLocalDocNums := make([]uint64,
-								eligibleVectorInternalIDs.GetCardinality())
-							// get the (segment-)local document numbers
-							for i, docNum := range eligibleVectorInternalIDs.ToArray() {
-								localDocNum := o.snapshot.localDocNumFromGlobal(index,
-									uint64(docNum))
-								eligibleLocalDocNums[i] = localDocNum
-							}
+							if eligibleVectorInternalIDs.GetCardinality() > 0 {
+								eligibleLocalDocNums := make([]uint64, 0,
+									eligibleVectorInternalIDs.GetCardinality())
+								// get the (segment-)local document numbers
+								for _, docNum := range eligibleVectorInternalIDs.ToArray() {
+									localDocNum := o.snapshot.localDocNumFromGlobal(index,
+										uint64(docNum))
+									eligibleLocalDocNums = append(eligibleLocalDocNums,
+										localDocNum)
+								}
 
-							pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
-								eligibleLocalDocNums, vr.searchParams)
+								if len(eligibleLocalDocNums) > 0 {
+									pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
+										eligibleLocalDocNums, vr.searchParams)
+								}
+							}
 						} else {
 							pl, err = vecIndex.Search(vr.vector, vr.k, vr.searchParams)
 						}
@@ -139,10 +144,14 @@ func (o *OptimizeVR) Finish() error {
 
 						atomic.AddUint64(&o.snapshot.parent.stats.TotKNNSearches, uint64(1))
 
-						// postings and iterators are already alloc'ed when
-						// IndexSnapshotVectorReader is created
-						vr.postings[index] = pl
-						vr.iterators[index] = pl.Iterator(vr.iterators[index])
+						if pl != nil && pl.Count() > 0 {
+							// postings and iterators are already alloc'ed when
+							// IndexSnapshotVectorReader is created
+							vr.postings[index] = pl
+							vr.iterators[index] = pl.Iterator(vr.iterators[index])
+						} else {
+							vr.iterators[index] = &emptyVecPostingsIterator{}
+						}
 					}
 					go vecIndex.Close()
 				}

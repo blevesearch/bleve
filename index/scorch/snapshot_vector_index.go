@@ -65,9 +65,13 @@ func (is *IndexSnapshot) VectorReaderWithFilter(ctx context.Context, vector []fl
 
 	if rv.postings == nil {
 		rv.postings = make([]segment_api.VecPostingsList, len(is.segment))
+
 	}
 	if rv.iterators == nil {
 		rv.iterators = make([]segment_api.VecPostingsIterator, len(is.segment))
+		for index := 0; index < len(is.segment); index++ {
+			rv.iterators[index] = anemptyVecPostingsIterator
+		}
 	}
 
 	// initialize postings and iterators within the OptimizeVR's Finish()
