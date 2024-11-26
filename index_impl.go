@@ -168,10 +168,25 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		storeConfig = map[string]interface{}{}
 	}
 
+	var um *mapping.IndexMappingImpl
+	var umBytes []byte
+
 	storeConfig["path"] = indexStorePath(path)
 	storeConfig["create_if_missing"] = false
 	storeConfig["error_if_exists"] = false
 	for rck, rcv := range runtimeConfig {
+		if rck == "mapping" {
+			if val, ok := rcv.([]byte); ok {
+				err = util.UnmarshalJSON(val, &um)
+				if err != nil {
+					return nil, fmt.Errorf("error parsing updated mapping JSON: %v\nmapping contents:\n%s", err, val)
+				}
+				umBytes = val
+			} else {
+				return nil, fmt.Errorf("error typecasting updated mapping JSON\nmapping contents: %v", rcv)
+			}
+			continue
+		}
 		storeConfig[rck] = rcv
 	}
 
@@ -228,6 +243,28 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		// note even if the mapping is invalid
 		// we still return an open usable index
 		return rv, err
+	}
+
+	if um != nil {
+		ui, ok := rv.i.(index.UpdateIndex)
+		if !ok {
+			return rv, fmt.Errorf("updated mapping present for unupdatable index")
+		}
+
+		err = um.Validate()
+		if err != nil {
+			return rv, err
+		}
+
+		fieldInfo, err := deletedFields(im, um)
+		if err != nil {
+			return rv, err
+		}
+
+		err = ui.UpdateFields(fieldInfo, umBytes)
+		if err != nil {
+			return rv, err
+		}
 	}
 
 	rv.m = im

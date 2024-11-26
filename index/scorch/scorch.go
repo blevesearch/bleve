@@ -17,6 +17,7 @@ package scorch
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -35,6 +36,8 @@ const Name = "scorch"
 const Version uint8 = 2
 
 var ErrClosed = fmt.Errorf("scorch closed")
+
+var mappingInternalKey = []byte("_mapping")
 
 type Scorch struct {
 	nextSegmentID uint64
@@ -939,4 +942,72 @@ func (s *Scorch) CopyReader() index.CopyReader {
 // external API to fire a scorch event (EventKindIndexStart) externally from bleve
 func (s *Scorch) FireIndexEvent() {
 	s.fireEvent(EventKindIndexStart, 0)
+}
+
+func (s *Scorch) UpdateFields(fieldInfo map[string]*index.FieldInfo, mappingBytes []byte) error {
+	err := s.updateBolt(fieldInfo, mappingBytes)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Scorch) updateBolt(fieldInfo map[string]*index.FieldInfo, mappingBytes []byte) error {
+	return s.rootBolt.Update(func(tx *bolt.Tx) error {
+		snapshots := tx.Bucket(boltSnapshotsBucket)
+		if snapshots == nil {
+			return nil
+		}
+
+		c := snapshots.Cursor()
+		for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
+			_, _, err := decodeUvarintAscending(k)
+			if err != nil {
+				log.Printf("unable to parse segment epoch %x, continuing", k)
+				continue
+			}
+			snapshot := snapshots.Bucket(k)
+			cc := snapshot.Cursor()
+			for kk, _ := cc.First(); kk != nil; kk, _ = c.Next() {
+				if k[0] == boltInternalKey[0] {
+					internalBucket := snapshot.Bucket(k)
+					if internalBucket == nil {
+						return fmt.Errorf("segment key, but bucket missing % x", k)
+					}
+					err = internalBucket.Put(mappingInternalKey, mappingBytes)
+					if err != nil {
+						return err
+					}
+				} else if k[0] != boltMetaDataKey[0] {
+					segmentBucket := snapshot.Bucket(k)
+					if segmentBucket == nil {
+						return fmt.Errorf("segment key, but bucket missing % x", k)
+					}
+					var updatedFields map[string]index.FieldInfo
+					updatedFieldBytes := segmentBucket.Get(boltUpdatedFieldsKey)
+					if updatedFieldBytes != nil {
+						err := json.Unmarshal(updatedFieldBytes, &updatedFields)
+						if err != nil {
+							return fmt.Errorf("error reading updated field bytes: %v", err)
+						}
+					} else {
+						updatedFields = make(map[string]index.FieldInfo)
+					}
+					for field, info := range fieldInfo {
+						updatedFields[field] = *info
+					}
+					b, err := json.Marshal(updatedFields)
+					if err != nil {
+						return err
+					}
+					err = segmentBucket.Put(boltUpdatedFieldsKey, b)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+
+		return nil
+	})
 }
