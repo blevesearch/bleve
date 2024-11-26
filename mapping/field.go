@@ -97,7 +97,7 @@ func NewTextFieldMapping() *FieldMapping {
 func newTextFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewTextFieldMapping()
 	rv.Store = im.StoreDynamic
-	rv.Index = im.IndexDynamic
+	rv.Index = true
 	rv.DocValues = im.DocValuesDynamic
 	return rv
 }
@@ -129,7 +129,7 @@ func NewNumericFieldMapping() *FieldMapping {
 func newNumericFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewNumericFieldMapping()
 	rv.Store = im.StoreDynamic
-	rv.Index = im.IndexDynamic
+	rv.Index = true
 	rv.DocValues = im.DocValuesDynamic
 	return rv
 }
@@ -148,7 +148,7 @@ func NewDateTimeFieldMapping() *FieldMapping {
 func newDateTimeFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewDateTimeFieldMapping()
 	rv.Store = im.StoreDynamic
-	rv.Index = im.IndexDynamic
+	rv.Index = true
 	rv.DocValues = im.DocValuesDynamic
 	return rv
 }
@@ -167,7 +167,7 @@ func NewBooleanFieldMapping() *FieldMapping {
 func newBooleanFieldMappingDynamic(im *IndexMappingImpl) *FieldMapping {
 	rv := NewBooleanFieldMapping()
 	rv.Store = im.StoreDynamic
-	rv.Index = im.IndexDynamic
+	rv.Index = true
 	rv.DocValues = im.DocValuesDynamic
 	return rv
 }
