@@ -797,6 +797,63 @@ func TestLinestringPolygonIntersects(t *testing.T) {
 	}
 }
 
+func TestLinestringMultiPolygonIntersects(t *testing.T) {
+	tests := []struct {
+		QueryShape       [][]float64
+		DocShapeVertices [][][][]float64
+		DocShapeName     string
+		Desc             string
+		Expected         []string
+	}{
+		{
+			QueryShape: [][]float64{{25.30443217719949, 4.3036588520054275}, {26.77861039125597, 5.518984706000312},
+				{28.131859316915346, 5.984206059979311}, {29.22660693930554, 7.332463491931301}},
+			DocShapeVertices: [][][][]float64{{{{26.017518882436303, 59.07548535047765},
+				{26.102513247812833, 59.02969753775492},
+				{26.202801365886547, 59.07517366288144}, {26.148974291641803, 59.07349548670863},
+				{26.195079230278314, 59.09808628374421}, {26.17148293674436, 59.15423360166192},
+				{26.053928154941797, 59.10696026382924}, {26.10334651224879, 59.04120460584622},
+				{26.017518882436303, 59.07548535047765}},
+				{{31.03899203352993, 53.12459941269201}, {31.041464730935235, 53.00272002947303},
+					{31.145894130695755, 53.045781294553734}, {31.137262515660538, 53.072097127249975},
+					{31.124467343686398, 53.123071534099985}, {31.03899203352993, 53.12459941269201}},
+				{{26.012094027046224, 5.007698850944041}, {26.01232488652108, 5.000775852356813},
+					{26.08698731243929, 5.003092740282724}, {26.092038966277393, 5.007130892976186},
+					{26.092210449555562, 5.012449338340597}, {26.019102881303276, 5.011331027396606},
+					{26.012094027046224, 5.007698850944041}}}},
+			DocShapeName: "multipolygon1",
+			Desc:         "linestring does not intersect multipolygon",
+			Expected:     nil,
+		},
+	}
+
+	i := setupIndex(t)
+
+	for _, test := range tests {
+		indexReader, closeFn, err := testCaseSetup(t, test.DocShapeName, "multipolygon",
+			test.DocShapeVertices, i)
+		if err != nil {
+			t.Errorf(err.Error())
+		}
+
+		t.Run(test.Desc, func(t *testing.T) {
+			got, err := runGeoShapeLinestringQueryWithRelation("intersects",
+				indexReader, test.QueryShape, "geometry")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, test.Expected) {
+				t.Errorf("expected %v, got %v for linestring: %+v",
+					test.Expected, got, test.QueryShape)
+			}
+		})
+		err = closeFn()
+		if err != nil {
+			t.Errorf(err.Error())
+		}
+	}
+}
+
 func TestLinestringPointIntersects(t *testing.T) {
 	tests := []struct {
 		QueryShape       [][]float64
