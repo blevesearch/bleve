@@ -35,12 +35,13 @@ type SegmentSnapshot struct {
 	// segment was mmaped recently, in which case
 	// we consider the loading cost of the metadata
 	// as part of IO stats.
-	mmaped  uint32
-	id      uint64
-	segment segment.Segment
-	deleted *roaring.Bitmap
-	creator string
-	stats   *fieldStats
+	mmaped        uint32
+	id            uint64
+	segment       segment.Segment
+	deleted       *roaring.Bitmap
+	creator       string
+	stats         *fieldStats
+	updatedFields map[string]index.FieldInfo
 
 	cachedMeta *cachedMeta
 
