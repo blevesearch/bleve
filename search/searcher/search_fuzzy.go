@@ -55,9 +55,11 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 		// since the fuzzy candidate terms are not collected
 		// for a term search, and the only candidate term is
 		// the term itself
-		fuzzyTermMatches := ctx.Value(search.FuzzyMatchPhraseKey)
-		if fuzzyTermMatches != nil {
-			fuzzyTermMatches.(map[string][]string)[term] = []string{term}
+		if ctx != nil {
+			fuzzyTermMatches := ctx.Value(search.FuzzyMatchPhraseKey)
+			if fuzzyTermMatches != nil {
+				fuzzyTermMatches.(map[string][]string)[term] = []string{term}
+			}
 		}
 		return NewTermSearcher(ctx, indexReader, term, field, boost, options)
 	}
@@ -94,12 +96,22 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 			fuzzyTermMatches.(map[string][]string)[term] = candidates
 		}
 	}
+	// check if the candidates are empty or have one term which is the term itself
+	if len(candidates) == 0 || (len(candidates) == 1 && candidates[0] == term) {
+		if ctx != nil {
+			fuzzyTermMatches := ctx.Value(search.FuzzyMatchPhraseKey)
+			if fuzzyTermMatches != nil {
+				fuzzyTermMatches.(map[string][]string)[term] = []string{term}
+			}
+		}
+		return NewTermSearcher(ctx, indexReader, term, field, boost, options)
+	}
 
 	return NewMultiTermSearcherBoosted(ctx, indexReader, candidates, field,
 		boost, editDistances, options, true)
 }
 
-func getAutoFuzziness(term string) int {
+func GetAutoFuzziness(term string) int {
 	termLength := len(term)
 	if termLength > AutoFuzzinessHighThreshold {
 		return MaxFuzziness
@@ -111,7 +123,7 @@ func getAutoFuzziness(term string) int {
 
 func NewAutoFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term string,
 	prefix int, field string, boost float64, options search.SearcherOptions) (search.Searcher, error) {
-	return NewFuzzySearcher(ctx, indexReader, term, prefix, getAutoFuzziness(term), field, boost, options)
+	return NewFuzzySearcher(ctx, indexReader, term, prefix, GetAutoFuzziness(term), field, boost, options)
 }
 
 type fuzzyCandidates struct {

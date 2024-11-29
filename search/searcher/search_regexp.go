@@ -68,6 +68,10 @@ func NewRegexpStringSearcher(ctx context.Context, indexReader index.IndexReader,
 	if err != nil {
 		return nil, err
 	}
+	// check if the candidateTerms are empty or have one term which is the term itself
+	if len(candidateTerms) == 0 || (len(candidateTerms) == 1 && candidateTerms[0] == pattern) {
+		return NewTermSearcher(ctx, indexReader, pattern, field, boost, options)
+	}
 
 	return NewMultiTermSearcher(ctx, indexReader, candidateTerms, field, boost,
 		options, true)

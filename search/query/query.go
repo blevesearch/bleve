@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strings"
 
 	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -487,16 +488,21 @@ func ExtractSynonyms(ctx context.Context, m mapping.SynonymMapping, r index.Syno
 		}
 	case *FuzzyQuery:
 		field, source := resolveFieldAndSource(q.FieldVal)
+		fuzziness := q.Fuzziness
+		if q.autoFuzzy {
+			fuzziness = searcher.GetAutoFuzziness(q.Term)
+		}
 		if source != "" {
-			return addFuzzySynonymsForTerm(ctx, source, field, q.Term, q.Fuzziness, q.Prefix, r, rv)
+			return addFuzzySynonymsForTerm(ctx, source, field, q.Term, fuzziness, q.Prefix, r, rv)
 		}
 	case *MatchQuery, *MatchPhraseQuery:
 		var analyzerName, matchString, fieldVal string
 		var fuzziness, prefix int
+		var autoFuzzy bool
 		if mq, ok := q.(*MatchQuery); ok {
-			analyzerName, fieldVal, matchString, fuzziness, prefix = mq.Analyzer, mq.FieldVal, mq.Match, mq.Fuzziness, mq.Prefix
+			analyzerName, fieldVal, matchString, fuzziness, prefix, autoFuzzy = mq.Analyzer, mq.FieldVal, mq.Match, mq.Fuzziness, mq.Prefix, mq.autoFuzzy
 		} else if mpq, ok := q.(*MatchPhraseQuery); ok {
-			analyzerName, fieldVal, matchString, fuzziness = mpq.Analyzer, mpq.FieldVal, mpq.MatchPhrase, mpq.Fuzziness
+			analyzerName, fieldVal, matchString, fuzziness, autoFuzzy = mpq.Analyzer, mpq.FieldVal, mpq.MatchPhrase, mpq.Fuzziness, mpq.autoFuzzy
 		}
 		field, source := resolveFieldAndSource(fieldVal)
 		if source != "" {
@@ -506,6 +512,9 @@ func ExtractSynonyms(ctx context.Context, m mapping.SynonymMapping, r index.Syno
 			}
 			tokens := analyzer.Analyze([]byte(matchString))
 			for _, token := range tokens {
+				if autoFuzzy {
+					fuzziness = searcher.GetAutoFuzziness(string(token.Term))
+				}
 				rv, err = addFuzzySynonymsForTerm(ctx, source, field, string(token.Term), fuzziness, prefix, r, rv)
 				if err != nil {
 					return nil, err
@@ -514,10 +523,12 @@ func ExtractSynonyms(ctx context.Context, m mapping.SynonymMapping, r index.Syno
 		}
 	case *MultiPhraseQuery, *PhraseQuery:
 		var fieldVal string
+		var fuzziness int
+		var autoFuzzy bool
 		if mpq, ok := q.(*MultiPhraseQuery); ok {
-			fieldVal = mpq.FieldVal
+			fieldVal, fuzziness, autoFuzzy = mpq.FieldVal, mpq.Fuzziness, mpq.autoFuzzy
 		} else if pq, ok := q.(*PhraseQuery); ok {
-			fieldVal = pq.FieldVal
+			fieldVal, fuzziness, autoFuzzy = pq.FieldVal, pq.Fuzziness, pq.autoFuzzy
 		}
 		field, source := resolveFieldAndSource(fieldVal)
 		if source != "" {
@@ -531,7 +542,10 @@ func ExtractSynonyms(ctx context.Context, m mapping.SynonymMapping, r index.Syno
 			}
 			for _, term := range terms {
 				var err error
-				rv, err = addSynonymsForTerm(ctx, source, term, field, r, rv)
+				if autoFuzzy {
+					fuzziness = searcher.GetAutoFuzziness(term)
+				}
+				rv, err = addFuzzySynonymsForTerm(ctx, source, field, term, fuzziness, 0, r, rv)
 				if err != nil {
 					return nil, err
 				}
@@ -552,12 +566,12 @@ func ExtractSynonyms(ctx context.Context, m mapping.SynonymMapping, r index.Syno
 	case *RegexpQuery:
 		field, source := resolveFieldAndSource(q.FieldVal)
 		if source != "" {
-			return addRegexpSynonymsForTerm(ctx, source, field, q.Regexp, r, rv)
+			return addRegexpSynonymsForTerm(ctx, source, field, strings.TrimPrefix(q.Regexp, "^"), r, rv)
 		}
 	case *TermQuery:
 		field, source := resolveFieldAndSource(q.FieldVal)
 		if source != "" {
-			return addSynonymsForTerm(ctx, source, q.Term, field, r, rv)
+			return addSynonymsForTerm(ctx, source, field, q.Term, r, rv)
 		}
 	case *WildcardQuery:
 		field, source := resolveFieldAndSource(q.FieldVal)
@@ -594,7 +608,7 @@ func addRegexpSynonymsForTerm(ctx context.Context, src, field, term string,
 			return nil, err
 		}
 		for _, term := range regexpTerms {
-			rv, err = addSynonymsForTerm(ctx, src, term, field, r, rv)
+			rv, err = addSynonymsForTerm(ctx, src, field, term, r, rv)
 			if err != nil {
 				return nil, err
 			}
@@ -628,7 +642,7 @@ func addPrefixSynonymsForTerm(ctx context.Context, src, field, term string,
 		return nil, err
 	}
 	for _, term := range prefixTerms {
-		rv, err = addSynonymsForTerm(ctx, src, term, field, r, rv)
+		rv, err = addSynonymsForTerm(ctx, src, field, term, r, rv)
 		if err != nil {
 			return nil, err
 		}
@@ -641,7 +655,7 @@ func addPrefixSynonymsForTerm(ctx context.Context, src, field, term string,
 func addFuzzySynonymsForTerm(ctx context.Context, src, field, term string, fuzziness, prefix int,
 	r index.SynonymReader, rv search.FieldTermSynonymMap) (search.FieldTermSynonymMap, error) {
 	if fuzziness == 0 {
-		return addSynonymsForTerm(ctx, src, term, field, r, rv)
+		return addSynonymsForTerm(ctx, src, field, term, r, rv)
 	}
 	if ir, ok := r.(index.IndexReaderFuzzy); ok {
 		if fuzziness > searcher.MaxFuzziness {
@@ -677,7 +691,7 @@ func addFuzzySynonymsForTerm(ctx context.Context, src, field, term string, fuzzi
 			return nil, err
 		}
 		for _, term := range fuzzyTerms {
-			rv, err = addSynonymsForTerm(ctx, src, term, field, r, rv)
+			rv, err = addSynonymsForTerm(ctx, src, field, term, r, rv)
 			if err != nil {
 				return nil, err
 			}
@@ -689,8 +703,8 @@ func addFuzzySynonymsForTerm(ctx context.Context, src, field, term string, fuzzi
 
 // addSynonymsForTerm finds synonyms for the given term and adds them to the
 // provided map.
-func addSynonymsForTerm(ctx context.Context, src, term, field string, r index.SynonymReader,
-	rv search.FieldTermSynonymMap) (search.FieldTermSynonymMap, error) {
+func addSynonymsForTerm(ctx context.Context, src, field, term string,
+	r index.SynonymReader, rv search.FieldTermSynonymMap) (search.FieldTermSynonymMap, error) {
 
 	termBytes := []byte(term)
 	termReader, err := r.SynonymTermReader(ctx, src, termBytes)
