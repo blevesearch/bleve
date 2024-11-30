@@ -49,6 +49,7 @@ type IndexMappingImpl struct {
 	DefaultType           string                      `json:"default_type"`
 	DefaultAnalyzer       string                      `json:"default_analyzer"`
 	DefaultDateTimeParser string                      `json:"default_datetime_parser"`
+	DefaultSynonymSource  string                      `json:"default_synonym_source"`
 	DefaultField          string                      `json:"default_field"`
 	StoreDynamic          bool                        `json:"store_dynamic"`
 	IndexDynamic          bool                        `json:"index_dynamic"`
@@ -265,6 +266,11 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			}
 		case "default_datetime_parser":
 			err := util.UnmarshalJSON(v, &im.DefaultDateTimeParser)
+			if err != nil {
+				return err
+			}
+		case "default_synonym_source":
+			err := util.UnmarshalJSON(v, &im.DefaultSynonymSource)
 			if err != nil {
 				return err
 			}
@@ -517,7 +523,25 @@ func (im *IndexMappingImpl) SynonymSourceForPath(path string) string {
 		}
 	}
 
-	return ""
+	// next we will try default synonym sources for the path
+	pathDecoded := decodePath(path)
+	for _, docMapping := range im.TypeMapping {
+		if docMapping.Enabled {
+			rv := docMapping.defaultSynonymSource(pathDecoded)
+			if rv != "" {
+				return rv
+			}
+		}
+	}
+	// now the default analyzer for the default mapping
+	if im.DefaultMapping.Enabled {
+		rv := im.DefaultMapping.defaultSynonymSource(pathDecoded)
+		if rv != "" {
+			return rv
+		}
+	}
+
+	return im.DefaultSynonymSource
 }
 
 func (im *IndexMappingImpl) SynonymCount() int {

@@ -30,6 +30,7 @@ type indexAliasImpl struct {
 	name    string
 	indexes []Index
 	mutex   sync.RWMutex
+	mapping mapping.IndexMapping
 	open    bool
 }
 
@@ -358,6 +359,10 @@ func (i *indexAliasImpl) Mapping() mapping.IndexMapping {
 
 	if !i.open {
 		return nil
+	}
+
+	if i.mapping != nil {
+		return i.mapping
 	}
 
 	err := i.isAliasToSingleIndex()
