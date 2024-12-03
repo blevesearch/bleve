@@ -52,6 +52,10 @@ func NewTermPrefixSearcher(ctx context.Context, indexReader index.IndexReader, p
 		reportIOStats(ctx, fieldDict.BytesRead())
 		search.RecordSearchCost(ctx, search.AddM, fieldDict.BytesRead())
 	}
+	// check if the terms are empty or have one term which is the prefix itself
+	if len(terms) == 0 || (len(terms) == 1 && terms[0] == prefix) {
+		return NewTermSearcher(ctx, indexReader, prefix, field, boost, options)
+	}
 
 	return NewMultiTermSearcher(ctx, indexReader, terms, field, boost, options, true)
 }

@@ -27,6 +27,7 @@ const (
 	ErrorEmptyID
 	ErrorIndexReadInconsistency
 	ErrorTwoPhaseSearchInconsistency
+	ErrorSynonymSearchNotSupported
 )
 
 // Error represents a more strongly typed bleve error for detecting
@@ -49,4 +50,5 @@ var errorMessages = map[Error]string{
 	ErrorEmptyID:                     "document ID cannot be empty",
 	ErrorIndexReadInconsistency:      "index read inconsistency detected",
 	ErrorTwoPhaseSearchInconsistency: "2-phase search failed, likely due to an overlapping topology change",
+	ErrorSynonymSearchNotSupported:   "synonym search not supported",
 }

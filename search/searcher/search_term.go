@@ -38,14 +38,23 @@ type TermSearcher struct {
 	tfd         index.TermFieldDoc
 }
 
-func NewTermSearcher(ctx context.Context, indexReader index.IndexReader, term string, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
+func NewTermSearcher(ctx context.Context, indexReader index.IndexReader, term string, field string, boost float64, options search.SearcherOptions) (search.Searcher, error) {
 	if isTermQuery(ctx) {
 		ctx = context.WithValue(ctx, search.QueryTypeKey, search.Term)
 	}
 	return NewTermSearcherBytes(ctx, indexReader, []byte(term), field, boost, options)
 }
 
-func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader, term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
+func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader, term []byte, field string, boost float64, options search.SearcherOptions) (search.Searcher, error) {
+	if ctx != nil {
+		if fts, ok := ctx.Value(search.FieldTermSynonymMapKey).(search.FieldTermSynonymMap); ok {
+			if ts, exists := fts[field]; exists {
+				if s, found := ts[string(term)]; found {
+					return NewSynonymSearcher(ctx, indexReader, term, s, field, boost, options)
+				}
+			}
+		}
+	}
 	needFreqNorm := options.Score != "none"
 	reader, err := indexReader.TermFieldReader(ctx, term, field, needFreqNorm, needFreqNorm, options.IncludeTermVectors)
 	if err != nil {
@@ -67,6 +76,50 @@ func newTermSearcherFromReader(indexReader index.IndexReader, reader index.TermF
 		reader:      reader,
 		scorer:      scorer,
 	}, nil
+}
+
+func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader, term []byte, synonyms []string, field string, boost float64, options search.SearcherOptions) (search.Searcher, error) {
+	createTermSearcher := func(term []byte, boostVal float64) (search.Searcher, error) {
+		needFreqNorm := options.Score != "none"
+		reader, err := indexReader.TermFieldReader(ctx, term, field, needFreqNorm, needFreqNorm, options.IncludeTermVectors)
+		if err != nil {
+			return nil, err
+		}
+		return newTermSearcherFromReader(indexReader, reader, term, field, boostVal, options)
+	}
+	// create a searcher for the term itself
+	termSearcher, err := createTermSearcher(term, boost)
+	if err != nil {
+		return nil, err
+	}
+	// constituent searchers of the disjunction
+	qsearchers := make([]search.Searcher, 0, len(synonyms)+1)
+	// helper method to close all the searchers we've created
+	// in case of an error
+	qsearchersClose := func() {
+		for _, searcher := range qsearchers {
+			if searcher != nil {
+				_ = searcher.Close()
+			}
+		}
+	}
+	qsearchers = append(qsearchers, termSearcher)
+	// create a searcher for each synonym
+	for _, synonym := range synonyms {
+		synonymSearcher, err := createTermSearcher([]byte(synonym), boost/2.0)
+		if err != nil {
+			qsearchersClose()
+			return nil, err
+		}
+		qsearchers = append(qsearchers, synonymSearcher)
+	}
+	// create a disjunction searcher
+	rv, err := NewDisjunctionSearcher(ctx, indexReader, qsearchers, 0, options)
+	if err != nil {
+		qsearchersClose()
+		return nil, err
+	}
+	return rv, nil
 }
 
 func (s *TermSearcher) Size() int {
