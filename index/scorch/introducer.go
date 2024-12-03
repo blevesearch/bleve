@@ -429,6 +429,7 @@ func (s *Scorch) introduceMerge(nextMerge *segmentMerge) {
 	}
 
 	skipped := true
+	// make the newly merged segments part of the newSnapshot being constructed
 	for i, newMergedSegment := range nextMerge.new {
 		// checking if this newly merged segment is worth keeping based on
 		// obsoleted doc count since the merge intro started
