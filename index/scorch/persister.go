@@ -371,11 +371,13 @@ type flushable struct {
 	totDocs  uint64
 }
 
-var DefaultNumPersisterWorkers = 1
+// number workers which parallely perform an in-memory merge of the segments followed
+// by a flush operation.
+var DefaultNumPersisterWorkers = 4
 
 // maximum size of data that a single worker is allowed to perform the in-memory
 // merge operation.
-var DefaultMaxSizeInMemoryMerge = 0
+var DefaultMaxSizeInMemoryMerge = 200 * 1024 * 1024
 
 func legacyFlushBehaviour() bool {
 	// DefaultMaxSizeInMemoryMerge = 0 is a special value to preserve the leagcy
@@ -420,6 +422,8 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 
 		flushSet = append(flushSet, val)
 	} else {
+		// constructs a flushSet where each flushable object contains a set of segments
+		// to be merged and flushed out to disk.
 		for i, snapshot := range snapshot.segment {
 			if totSize >= DefaultMaxSizeInMemoryMerge {
 				if len(sbs) >= DefaultMinSegmentsForInMemoryMerge {
@@ -483,12 +487,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 		return false, nil
 	}
 
-	// deploy the workers, have a wait group which waits for the flush set to complete
-	// each worker
-	//   1. merges the segments using mergeSegmentBases()
-	// wait for group to finish
-	//
-	// construct equiv snapshot and do a persistSnapshotDirect()
+	// drains out (after merging in memory) the segments in the flushSet parallely
 	newSnapshot, newSegmentIDs, err := s.mergeSegmentBasesParallel(snapshot, flushSet)
 	if err != nil {
 		return false, err
@@ -698,7 +697,8 @@ func prepareBoltSnapshot(snapshot *IndexSnapshot, tx *bolt.Tx, path string,
 			}
 			filenames = append(filenames, filename)
 		case segment.UnpersistedSegment:
-			// need to persist this to disk
+			// need to persist this to disk if its not part of exclude list (which
+			// restricts which in-memory segment to be persisted to disk)
 			if _, ok := exclude[segmentSnapshot.id]; !ok {
 				filename := zapFileName(segmentSnapshot.id)
 				path := filepath.Join(path, filename)

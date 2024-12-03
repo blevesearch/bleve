@@ -443,6 +443,9 @@ type mergeTaskIntroStatus struct {
 	skipped       bool
 }
 
+// this is important when it comes to introducing multiple merged segments in a
+// single introducer channel push. That way there is a check to ensure that the
+// file count doesn't explode during the index's lifetime.
 type mergedSegmentHistory struct {
 	workerID     uint64
 	oldNewDocIDs []uint64
@@ -501,6 +504,9 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 			newSegmentID := atomic.AddUint64(&s.nextSegmentID, 1)
 			filename := zapFileName(newSegmentID)
 			path := s.path + string(os.PathSeparator) + filename
+
+			// the newly merged segment is already flushed out to disk, just needs
+			// to be opened using mmap.
 			newDocNums, _, err :=
 				s.segPlugin.Merge(segsBatch, dropsBatch, path, s.closeCh, s)
 			if err != nil {
@@ -527,7 +533,7 @@ func (s *Scorch) mergeSegmentBasesParallel(snapshot *IndexSnapshot, flushableObj
 		// close the new merged segments
 		_ = closeNewMergedSegments(newMergedSegments)
 
-		// tbd: need a better way to handle error
+		// tbd: need a better way to consolidate errors
 		return nil, nil, errs[0]
 	}
 
