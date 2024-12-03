@@ -444,6 +444,9 @@ type SearchResult struct {
 	MaxScore float64                        `json:"max_score"`
 	Took     time.Duration                  `json:"took"`
 	Facets   search.FacetResults            `json:"facets"`
+	// special fields that are applicable only for search
+	// results that are obtained from a presearch
+	PreSearchResults map[string]interface{} `json:"presearch_results,omitempty"`
 }
 
 func (sr *SearchResult) Size() int {
@@ -588,4 +591,9 @@ func (r *SearchRequest) SortFunc() func(data sort.Interface) {
 	}
 
 	return sort.Sort
+}
+
+func isMatchNoneQuery(q query.Query) bool {
+	_, ok := q.(*query.MatchNoneQuery)
+	return ok
 }

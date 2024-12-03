@@ -148,6 +148,19 @@ type SearcherEndCallbackFn func(size uint64) error
 // field -> term -> synonyms
 type FieldTermSynonymMap map[string]map[string][]string
 
+func (f *FieldTermSynonymMap) MergeWith(fts FieldTermSynonymMap) {
+	for field, termSynonymMap := range fts {
+		// Ensure the field exists in the receiver
+		if _, exists := (*f)[field]; !exists {
+			(*f)[field] = make(map[string][]string)
+		}
+		for term, synonyms := range termSynonymMap {
+			// Append synonyms
+			(*f)[field][term] = append((*f)[field][term], synonyms...)
+		}
+	}
+}
+
 const FieldTermSynonymMapKey = "_field_term_synonym_map_key"
 
 const SearcherStartCallbackKey = "_searcher_start_callback_key"
