@@ -598,41 +598,6 @@ func addKnnToDummyRequest(dummyReq *SearchRequest, realReq *SearchRequest) {
 	dummyReq.Sort = realReq.Sort
 }
 
-// the preSearchData for KNN is a list of DocumentMatch objects
-// that need to be redistributed to the right index.
-// This is used only in the case of an alias tree, where the indexes
-// are at the leaves of the tree, and the master alias is at the root.
-// At each level of the tree, the preSearchData needs to be redistributed
-// to the indexes/aliases at that level. Because the preSearchData is
-// specific to each final index at the leaf.
-func redistributeKNNPreSearchData(req *SearchRequest, indexes []Index) (map[string]map[string]interface{}, error) {
-	knnHits, ok := req.PreSearchData[search.KnnPreSearchDataKey].([]*search.DocumentMatch)
-	if !ok {
-		return nil, fmt.Errorf("request does not have knn preSearchData for redistribution")
-	}
-	segregatedKnnHits, err := validateAndDistributeKNNHits(knnHits, indexes)
-	if err != nil {
-		return nil, err
-	}
-
-	rv := make(map[string]map[string]interface{})
-	for _, index := range indexes {
-		rv[index.Name()] = make(map[string]interface{})
-	}
-
-	for _, index := range indexes {
-		for k, v := range req.PreSearchData {
-			switch k {
-			case search.KnnPreSearchDataKey:
-				rv[index.Name()][k] = segregatedKnnHits[index.Name()]
-			default:
-				rv[index.Name()][k] = v
-			}
-		}
-	}
-	return rv, nil
-}
-
 func newKnnPreSearchResultProcessor(req *SearchRequest) *knnPreSearchResultProcessor {
 	kArray := make([]int64, len(req.KNN))
 	for i, knnReq := range req.KNN {

@@ -14,6 +14,10 @@
 
 package bleve
 
+import (
+	"github.com/blevesearch/bleve/v2/search"
+)
+
 // A preSearchResultProcessor processes the data in
 // the preSearch result from multiple
 // indexes in an alias and merges them together to
@@ -48,19 +52,33 @@ func (k *knnPreSearchResultProcessor) finalize(sr *SearchResult) {
 // -----------------------------------------------------------------------------
 // Synonym preSearchResultProcessor for handling Synonym presearch results
 type synonymPreSearchResultProcessor struct {
-	addFn      func(sr *SearchResult, indexName string)
-	finalizeFn func(sr *SearchResult)
+	finalizedFts search.FieldTermSynonymMap
+}
+
+func newSynonymPreSearchResultProcessor() *synonymPreSearchResultProcessor {
+	return &synonymPreSearchResultProcessor{}
 }
 
 func (s *synonymPreSearchResultProcessor) add(sr *SearchResult, indexName string) {
-	if s.addFn != nil {
-		s.addFn(sr, indexName)
+	// Check if SynonymResult or the synonym data key is nil
+	if sr.SynonymResult == nil {
+		return
+	}
+
+	// Attempt to cast PreSearchResults to FieldTermSynonymMap
+
+	// Merge with finalizedFts or initialize it if nil
+	if s.finalizedFts == nil {
+		s.finalizedFts = sr.SynonymResult
+	} else {
+		s.finalizedFts.MergeWith(sr.SynonymResult)
 	}
 }
 
 func (s *synonymPreSearchResultProcessor) finalize(sr *SearchResult) {
-	if s.finalizeFn != nil {
-		s.finalizeFn(sr)
+	// Set the finalized synonym data to the PreSearchResults
+	if s.finalizedFts != nil {
+		sr.SynonymResult = s.finalizedFts
 	}
 }
 
@@ -86,12 +104,18 @@ func (m *compositePreSearchResultProcessor) finalize(sr *SearchResult) {
 
 // -----------------------------------------------------------------------------
 // Function to create the appropriate preSearchResultProcessor(s)
-func createPreSearchResultProcessor(req *SearchRequest) preSearchResultProcessor {
+func createPreSearchResultProcessor(req *SearchRequest, flags *preSearchFlags) preSearchResultProcessor {
 	var processors []preSearchResultProcessor
 	// Add KNN processor if the request has KNN
-	if requestHasKNN(req) {
+	if flags.knn {
 		if knnProcessor := newKnnPreSearchResultProcessor(req); knnProcessor != nil {
 			processors = append(processors, knnProcessor)
+		}
+	}
+	// Add Synonym processor if the request has Synonym
+	if flags.synonyms {
+		if synonymProcessor := newSynonymPreSearchResultProcessor(); synonymProcessor != nil {
+			processors = append(processors, synonymProcessor)
 		}
 	}
 	// Return based on the number of processors, optimizing for the common case of 1 processor
@@ -109,8 +133,8 @@ func createPreSearchResultProcessor(req *SearchRequest) preSearchResultProcessor
 }
 
 // -----------------------------------------------------------------------------
-func finalizePreSearchResult(req *SearchRequest, preSearchResult *SearchResult) {
-	if requestHasKNN(req) {
+func finalizePreSearchResult(req *SearchRequest, flags *preSearchFlags, preSearchResult *SearchResult) {
+	if flags.knn {
 		preSearchResult.Hits = finalizeKNNResults(req, preSearchResult.Hits)
 	}
 }

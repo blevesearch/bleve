@@ -446,7 +446,7 @@ type SearchResult struct {
 	Facets   search.FacetResults            `json:"facets"`
 	// special fields that are applicable only for search
 	// results that are obtained from a presearch
-	PreSearchResults map[string]interface{} `json:"presearch_results,omitempty"`
+	SynonymResult search.FieldTermSynonymMap `json:"synonym_result,omitempty"`
 }
 
 func (sr *SearchResult) Size() int {

@@ -450,12 +450,25 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 		}
 	}
 
+	var fts search.FieldTermSynonymMap
+	if !isMatchNoneQuery(req.Query) {
+		if synMap, ok := i.m.(mapping.SynonymMapping); ok {
+			if synReader, ok := reader.(index.SynonymReader); ok {
+				fts, err = query.ExtractSynonyms(ctx, synMap, synReader, req.Query, fts)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
 	return &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
 			Successful: 1,
 		},
-		Hits: knnHits,
+		Hits:          knnHits,
+		SynonymResult: fts,
 	}, nil
 }
 
