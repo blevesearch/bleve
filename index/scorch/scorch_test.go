@@ -438,7 +438,6 @@ func TestIndexInsertThenDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Println("start delete")
 	err = idx.Delete("1")
 	if err != nil {
 		t.Errorf("Error deleting entry from index: %v", err)
