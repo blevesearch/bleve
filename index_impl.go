@@ -449,12 +449,23 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 		}
 	}
 
+	var count uint64
+	if !isMatchNoneQuery(req.Query) {
+		if _, ok := i.m.(mapping.BM25Mapping); ok {
+			count, err = reader.DocCount()
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
 			Successful: 1,
 		},
-		Hits: knnHits,
+		Hits:          knnHits,
+		totalDocCount: count,
 	}, nil
 }
 
@@ -505,6 +516,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	var knnHits []*search.DocumentMatch
+	var bm25TotalDocs uint64
 	var ok bool
 	var skipKnnCollector bool
 	if req.PreSearchData != nil {
@@ -518,6 +530,13 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 					}
 				}
 				skipKnnCollector = true
+			case search.BM25PreSearchDataKey:
+				if v != nil {
+					bm25TotalDocs, ok = v.(uint64)
+					if !ok {
+						return nil, fmt.Errorf("bm25 preSearchData must be of type uint64")
+					}
+				}
 			}
 		}
 	}
@@ -529,6 +548,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	setKnnHitsInCollector(knnHits, req, coll)
+
+	if bm25TotalDocs > 0 {
+		ctx = context.WithValue(ctx, search.BM25MapKey, bm25TotalDocs)
+	}
 
 	// This callback and variable handles the tracking of bytes read
 	//  1. as part of creation of tfr and its Next() calls which is

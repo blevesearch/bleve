@@ -444,6 +444,9 @@ type SearchResult struct {
 	MaxScore float64                        `json:"max_score"`
 	Took     time.Duration                  `json:"took"`
 	Facets   search.FacetResults            `json:"facets"`
+	// The following fields are applicable to BM25 preSearch
+	// todo add more fields beyond docCount
+	totalDocCount uint64
 }
 
 func (sr *SearchResult) Size() int {
