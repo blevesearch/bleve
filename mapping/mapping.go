@@ -74,3 +74,6 @@ type SynonymMapping interface {
 
 	SynonymSourceVisitor(visitor analysis.SynonymSourceVisitor) error
 }
+type BM25Mapping interface {
+	IndexMapping
+}

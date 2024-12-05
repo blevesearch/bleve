@@ -65,6 +65,7 @@ func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader, te
 
 func newTermSearcherFromReader(indexReader index.IndexReader, reader index.TermFieldReader,
 	term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
+	// TODO Instead of passing count from reader here, do it using the presearch phase stats.
 	count, err := indexReader.DocCount()
 	if err != nil {
 		_ = reader.Close()
