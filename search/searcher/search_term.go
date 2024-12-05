@@ -16,6 +16,7 @@ package searcher
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -60,17 +61,23 @@ func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader, te
 	if err != nil {
 		return nil, err
 	}
-	return newTermSearcherFromReader(indexReader, reader, term, field, boost, options)
+	return newTermSearcherFromReader(ctx, indexReader, reader, term, field, boost, options)
 }
 
-func newTermSearcherFromReader(indexReader index.IndexReader, reader index.TermFieldReader,
+func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReader, reader index.TermFieldReader,
 	term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
-	// TODO Instead of passing count from reader here, do it using the presearch phase stats.
-	count, err := indexReader.DocCount()
-	if err != nil {
-		_ = reader.Close()
-		return nil, err
+	count, ok := ctx.Value(search.BM25PreSearchDataKey).(uint64)
+	if !ok {
+		var err error
+		count, err = indexReader.DocCount()
+		if err != nil {
+			_ = reader.Close()
+			return nil, err
+		}
+	} else {
+		fmt.Printf("fetched from ctx \n")
 	}
+
 	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), options)
 	return &TermSearcher{
 		indexReader: indexReader,
