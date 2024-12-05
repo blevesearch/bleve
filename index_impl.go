@@ -451,6 +451,8 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 	}
 
 	var fts search.FieldTermSynonymMap
+	var count uint64
+
 	if !isMatchNoneQuery(req.Query) {
 		if synMap, ok := i.m.(mapping.SynonymMapping); ok {
 			if synReader, ok := reader.(index.SynonymReader); ok {
@@ -458,6 +460,12 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 				if err != nil {
 					return nil, err
 				}
+			}
+		}
+		if _, ok := i.m.(mapping.BM25Mapping); ok {
+			count, err = reader.DocCount()
+			if err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -469,6 +477,7 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 		},
 		Hits:          knnHits,
 		SynonymResult: fts,
+		totalDocCount: count,
 	}, nil
 }
 
@@ -520,6 +529,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	var knnHits []*search.DocumentMatch
 	var fts search.FieldTermSynonymMap
+	var bm25TotalDocs uint64
 	var ok bool
 	if req.PreSearchData != nil {
 		for k, v := range req.PreSearchData {
@@ -536,6 +546,13 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 					fts, ok = v.(search.FieldTermSynonymMap)
 					if !ok {
 						return nil, fmt.Errorf("synonym preSearchData must be of type search.FieldTermSynonymMap")
+					}
+				}
+			case search.BM25PreSearchDataKey:
+				if v != nil {
+					bm25TotalDocs, ok = v.(uint64)
+					if !ok {
+						return nil, fmt.Errorf("bm25 preSearchData must be of type uint64")
 					}
 				}
 			}
@@ -563,6 +580,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	if fts != nil {
 		ctx = context.WithValue(ctx, search.FieldTermSynonymMapKey, fts)
+	}
+
+	if bm25TotalDocs > 0 {
+		ctx = context.WithValue(ctx, search.BM25MapKey, bm25TotalDocs)
 	}
 
 	// This callback and variable handles the tracking of bytes read

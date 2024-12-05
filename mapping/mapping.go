@@ -68,3 +68,7 @@ type SynonymMapping interface {
 
 	SynonymCount() int
 }
+
+type BM25Mapping interface {
+	IndexMapping
+}

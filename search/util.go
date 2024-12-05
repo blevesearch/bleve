@@ -137,6 +137,7 @@ type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
 
 const KnnPreSearchDataKey = "_knn_pre_search_data_key"
 const SynonymPreSearchDataKey = "_synonym_pre_search_data_key"
+const BM25PreSearchDataKey = "_bm25_pre_search_data_key"
 
 const PreSearchKey = "_presearch_key"
 
@@ -162,6 +163,7 @@ func (f *FieldTermSynonymMap) MergeWith(fts FieldTermSynonymMap) {
 }
 
 const FieldTermSynonymMapKey = "_field_term_synonym_map_key"
+const BM25MapKey = "_bm25_map_key"
 
 const SearcherStartCallbackKey = "_searcher_start_callback_key"
 const SearcherEndCallbackKey = "_searcher_end_callback_key"

@@ -172,6 +172,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		flags := &preSearchFlags{
 			knn:      requestHasKNN(req),
 			synonyms: !isMatchNoneQuery(req.Query),
+			bm25:     true, // TODO Just force setting it to true to test
 		}
 		return preSearchDataSearch(ctx, req, flags, i.indexes...)
 	}
@@ -539,6 +540,7 @@ type asyncSearchResult struct {
 type preSearchFlags struct {
 	knn      bool
 	synonyms bool
+	bm25     bool // needs presearch for this too
 }
 
 // preSearchRequired checks if preSearch is required and returns a boolean flag
@@ -546,17 +548,24 @@ type preSearchFlags struct {
 func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) *preSearchFlags {
 	// Check for KNN query
 	knn := requestHasKNN(req)
-	var synonyms bool
+	var synonyms, bm25 bool
 	if !isMatchNoneQuery(req.Query) {
 		// Check if synonyms are defined in the mapping
 		if sm, ok := m.(mapping.SynonymMapping); ok && sm.SynonymCount() > 0 {
 			synonyms = true
+		}
+
+		// todo fix this cuRRENTLY ALL INDEX mappings are BM25 mappings, need to fix
+		// this is just a placeholder.
+		if _, ok := m.(mapping.BM25Mapping); ok {
+			bm25 = true
 		}
 	}
 	if knn || synonyms {
 		return &preSearchFlags{
 			knn:      knn,
 			synonyms: synonyms,
+			bm25:     bm25,
 		}
 	}
 	return nil
@@ -564,7 +573,7 @@ func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) *preSearchFla
 
 func preSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, indexes ...Index) (*SearchResult, error) {
 	var dummyQuery = req.Query
-	if !flags.synonyms {
+	if !flags.synonyms && !flags.bm25 {
 		// create a dummy request with a match none query
 		// since we only care about the preSearchData in PreSearch
 		dummyQuery = query.NewMatchNoneQuery()
@@ -646,6 +655,13 @@ func constructSynonymPreSearchData(rv map[string]map[string]interface{}, sr *Sea
 	return rv
 }
 
+func constructBM25PreSearchData(rv map[string]map[string]interface{}, sr *SearchResult, indexes []Index) map[string]map[string]interface{} {
+	for _, index := range indexes {
+		rv[index.Name()][search.BM25PreSearchDataKey] = sr.totalDocCount
+	}
+	return rv
+}
+
 func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
 	preSearchResult *SearchResult, indexes []Index) (map[string]map[string]interface{}, error) {
 	mergedOut := make(map[string]map[string]interface{}, len(indexes))
@@ -661,6 +677,9 @@ func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
 	}
 	if flags.synonyms {
 		mergedOut = constructSynonymPreSearchData(mergedOut, preSearchResult, indexes)
+	}
+	if flags.bm25 {
+		mergedOut = constructBM25PreSearchData(mergedOut, preSearchResult, indexes)
 	}
 	return mergedOut, nil
 }
@@ -689,6 +708,12 @@ func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]
 	if fts, ok := req.PreSearchData[search.SynonymPreSearchDataKey].(search.FieldTermSynonymMap); ok {
 		for _, index := range indexes {
 			rv[index.Name()][search.SynonymPreSearchDataKey] = fts
+		}
+	}
+	// TODO Extend to more stats
+	if totalDocCount, ok := req.PreSearchData[search.BM25PreSearchDataKey].(uint64); ok {
+		for _, index := range indexes {
+			rv[index.Name()][search.BM25PreSearchDataKey] = totalDocCount
 		}
 	}
 	return rv, nil
