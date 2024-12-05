@@ -79,6 +79,14 @@ type persisterOptions struct {
 	// for the number of paused application threads. The default value would
 	// be a very high number to always favour the merging of memory segments.
 	MemoryPressurePauseThreshold uint64
+
+	// NumPersisterWorkers decides the number of parallel workers that will
+	// perform the in-memory merge of segments followed by a flush operation.
+	NumPersisterWorkers int
+
+	// MaxSizeInMemoryMerge is the maximum size of data that a single persister
+	// worker is allowed to work on
+	MaxSizeInMemoryMerge int
 }
 
 type notificationChan chan struct{}
@@ -323,6 +331,8 @@ func (s *Scorch) parsePersisterOptions() (*persisterOptions, error) {
 		PersisterNapTimeMSec:         DefaultPersisterNapTimeMSec,
 		PersisterNapUnderNumFiles:    DefaultPersisterNapUnderNumFiles,
 		MemoryPressurePauseThreshold: DefaultMemoryPressurePauseThreshold,
+		NumPersisterWorkers:          DefaultNumPersisterWorkers,
+		MaxSizeInMemoryMerge:         DefaultMaxSizeInMemoryMerge,
 	}
 	if v, ok := s.config["scorchPersisterOptions"]; ok {
 		b, err := util.MarshalJSON(v)
@@ -344,7 +354,7 @@ func (s *Scorch) persistSnapshot(snapshot *IndexSnapshot,
 	// below the configured threshold, else the persister performs the
 	// direct persistence of segments.
 	if s.NumEventsBlocking() < po.MemoryPressurePauseThreshold {
-		persisted, err := s.persistSnapshotMaybeMerge(snapshot)
+		persisted, err := s.persistSnapshotMaybeMerge(snapshot, po)
 		if err != nil {
 			return err
 		}
@@ -369,23 +379,23 @@ type flushable struct {
 	totDocs  uint64
 }
 
-// number workers which parallely perform an in-memory merge of the segments followed
-// by a flush operation.
+// number workers which parallely perform an in-memory merge of the segments
+// followed by a flush operation.
 var DefaultNumPersisterWorkers = 4
 
 // maximum size of data that a single worker is allowed to perform the in-memory
 // merge operation.
 var DefaultMaxSizeInMemoryMerge = 200 * 1024 * 1024
 
-func legacyFlushBehaviour() bool {
+func legacyFlushBehaviour(maxSizeInMemoryMerge, numPersisterWorkers int) bool {
 	// DefaultMaxSizeInMemoryMerge = 0 is a special value to preserve the leagcy
 	// one-shot in-memory merge + flush behaviour.
-	return DefaultMaxSizeInMemoryMerge == 0 && DefaultNumPersisterWorkers == 1
+	return maxSizeInMemoryMerge == 0 && numPersisterWorkers == 1
 }
 
 // persistSnapshotMaybeMerge examines the snapshot and might merge and
 // persist the in-memory zap segments if there are enough of them
-func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
+func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot, po *persisterOptions) (
 	bool, error) {
 	// collect the in-memory zap segments (SegmentBase instances)
 	var sbs []segment.Segment
@@ -399,7 +409,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 	var totDocs uint64
 
 	// legacy behaviour of merge + flush of all in-memory segments in one-shot
-	if legacyFlushBehaviour() {
+	if legacyFlushBehaviour(po.MaxSizeInMemoryMerge, po.NumPersisterWorkers) {
 		val := &flushable{
 			segments: make([]segment.Segment, 0),
 			drops:    make([]*roaring.Bitmap, 0),
@@ -422,7 +432,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 		// constructs a flushSet where each flushable object contains a set of segments
 		// to be merged and flushed out to disk.
 		for i, snapshot := range snapshot.segment {
-			if totSize >= DefaultMaxSizeInMemoryMerge {
+			if totSize >= po.MaxSizeInMemoryMerge {
 				if len(sbs) >= DefaultMinSegmentsForInMemoryMerge {
 					numSegsToFlushOut += len(sbs)
 					val := &flushable{
@@ -445,7 +455,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 				}
 			}
 
-			if len(flushSet) >= DefaultNumPersisterWorkers {
+			if len(flushSet) >= int(po.NumPersisterWorkers) {
 				break
 			}
 
@@ -458,7 +468,7 @@ func (s *Scorch) persistSnapshotMaybeMerge(snapshot *IndexSnapshot) (
 			}
 		}
 		// if there were too few segments just merge them all as part of a single worker
-		if len(flushSet) < DefaultNumPersisterWorkers {
+		if len(flushSet) < po.NumPersisterWorkers {
 			numSegsToFlushOut += len(sbs)
 			val := &flushable{
 				segments: make([]segment.Segment, len(sbs)),
