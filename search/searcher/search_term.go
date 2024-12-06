@@ -95,6 +95,10 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 
 			fmt.Println("average doc length for", field, "is", fieldCardinality/int(count))
 		}
+
+		// in case of bm25 need to fetch the multipliers as well (maybe something set in index mapping?)
+		// fieldMapping := m.FieldMappingForPath(q.VectorField)
+		// but tbd how to pass on the field mapping here, can we pass it (the multipliers) in the context?
 	}
 	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), float64(fieldCardinality/int(count)), options)
 	return &TermSearcher{
