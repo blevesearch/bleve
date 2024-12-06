@@ -589,3 +589,8 @@ func (r *SearchRequest) SortFunc() func(data sort.Interface) {
 
 	return sort.Sort
 }
+
+func isMatchNoneQuery(q query.Query) bool {
+	_, ok := q.(*query.MatchNoneQuery)
+	return ok
+}
