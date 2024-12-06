@@ -189,12 +189,10 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	// if necessary
 	var preSearchData map[string]map[string]interface{}
 	if req.PreSearchData != nil {
-		if requestHasKNN(req) {
-			var err error
-			preSearchData, err = redistributePreSearchData(req, i.indexes)
-			if err != nil {
-				return nil, err
-			}
+		var err error
+		preSearchData, err = redistributePreSearchData(req, i.indexes)
+		if err != nil {
+			return nil, err
 		}
 	}
 
