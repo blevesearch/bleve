@@ -83,6 +83,7 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 				return nil, err
 			}
 			fieldCardinality = dict.Cardinality()
+			fmt.Println("average doc length for", field, "is", fieldCardinality/int(count))
 		} else {
 			fmt.Printf("fetched from ctx \n")
 			count = bm25Stats["docCount"].(uint64)
@@ -95,7 +96,7 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 			fmt.Println("average doc length for", field, "is", fieldCardinality/int(count))
 		}
 	}
-	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), options)
+	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), float64(fieldCardinality/int(count)), options)
 	return &TermSearcher{
 		indexReader: indexReader,
 		reader:      reader,

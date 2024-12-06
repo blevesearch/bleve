@@ -16,6 +16,7 @@ package scorch
 
 import (
 	"container/heap"
+	"fmt"
 
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
@@ -94,6 +95,11 @@ func (i *IndexSnapshotFieldDict) Next() (*index.DictEntry, error) {
 	}
 
 	return &i.entry, nil
+}
+
+func (i *IndexSnapshotFieldDict) Cardinality() int {
+	fmt.Println("cardianlity", i.cardinality)
+	return i.cardinality
 }
 
 func (i *IndexSnapshotFieldDict) Close() error {
