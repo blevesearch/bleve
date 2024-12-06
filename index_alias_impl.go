@@ -725,11 +725,9 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, flags *preSear
 	return sr, nil
 }
 
-// redistributePreSearchData redistributes the preSearchData coming from the individual constituent index aliases
-// of an alias to the individual indexes in the alias. This is necessary when the preSearchData is specific to each
-// index in the alias. This is used only in the case of an alias tree, where the indexes are at the leaves of the tree,
-// and the master alias is at the root. At each level of the tree, the preSearchData needs to be redistributed to the
-// indexes/aliases at that level. Because the preSearchData is specific to each final index at the leaf.
+// redistributePreSearchData redistributes the preSearchData sent in the search request to an index alias
+// which would happen in the case of an alias tree and depending on the level of the tree, the preSearchData
+// needs to be redistributed to the indexes at that level
 func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]map[string]interface{}, error) {
 	rv := make(map[string]map[string]interface{})
 	for _, index := range indexes {
