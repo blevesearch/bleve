@@ -38,6 +38,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/facet"
 	"github.com/blevesearch/bleve/v2/search/highlight"
+	"github.com/blevesearch/bleve/v2/search/query"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/s2"
@@ -449,12 +450,36 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 		}
 	}
 
+	var count uint64
+	fieldCardinality := make(map[string]int)
+	if !isMatchNoneQuery(req.Query) {
+		if _, ok := i.m.(mapping.BM25Mapping); ok {
+			count, err = reader.DocCount()
+			if err != nil {
+				return nil, err
+			}
+
+			fs := make(query.FieldSet)
+			fs = query.ExtractFields(req.Query, i.m, fs)
+
+			for field := range fs {
+				dict, err := reader.FieldDict(field)
+				if err != nil {
+					return nil, err
+				}
+				fieldCardinality[field] = dict.Cardinality()
+			}
+		}
+	}
+
 	return &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
 			Successful: 1,
 		},
-		Hits: knnHits,
+		Hits:             knnHits,
+		docCount:         count,
+		fieldCardinality: fieldCardinality,
 	}, nil
 }
 
@@ -505,6 +530,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	var knnHits []*search.DocumentMatch
+	var bm25TotalDocs uint64
 	var ok bool
 	var skipKnnCollector bool
 	if req.PreSearchData != nil {
@@ -518,6 +544,13 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 					}
 				}
 				skipKnnCollector = true
+			case search.BM25PreSearchDataKey:
+				if v != nil {
+					bm25TotalDocs, ok = v.(uint64)
+					if !ok {
+						return nil, fmt.Errorf("bm25 preSearchData must be of type uint64")
+					}
+				}
 			}
 		}
 	}
@@ -529,6 +562,10 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	setKnnHitsInCollector(knnHits, req, coll)
+
+	if bm25TotalDocs > 0 {
+		ctx = context.WithValue(ctx, search.BM25MapKey, bm25TotalDocs)
+	}
 
 	// This callback and variable handles the tracking of bytes read
 	//  1. as part of creation of tfr and its Next() calls which is
@@ -1030,6 +1067,10 @@ func (f *indexImplFieldDict) Close() error {
 		return err
 	}
 	return f.indexReader.Close()
+}
+
+func (f *indexImplFieldDict) Cardinality() int {
+	return f.fieldDict.Cardinality()
 }
 
 // helper function to remove duplicate entries from slice of strings
