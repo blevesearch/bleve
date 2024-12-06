@@ -48,12 +48,12 @@ func (k *knnPreSearchResultProcessor) finalize(sr *SearchResult) {
 // -----------------------------------------------------------------------------
 type bm25PreSearchResultProcessor struct {
 	docCount         uint64 // bm25 specific stats
-	fieldCardinality map[string]uint64
+	fieldCardinality map[string]int
 }
 
 func newBM25PreSearchResultProcessor() *bm25PreSearchResultProcessor {
 	return &bm25PreSearchResultProcessor{
-		fieldCardinality: make(map[string]uint64),
+		fieldCardinality: make(map[string]int),
 	}
 }
 
@@ -67,7 +67,8 @@ func (b *bm25PreSearchResultProcessor) add(sr *SearchResult, indexName string) {
 }
 
 func (b *bm25PreSearchResultProcessor) finalize(sr *SearchResult) {
-
+	sr.docCount = b.docCount
+	sr.fieldCardinality = b.fieldCardinality
 }
 
 // -----------------------------------------------------------------------------
