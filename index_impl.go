@@ -486,6 +486,7 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 	
 	var fts search.FieldTermSynonymMap
 	var count uint64
+	fieldCardinality := make(map[string]int)
 	if !isMatchNoneQuery(req.Query) {
 		if synMap, ok := i.m.(mapping.SynonymMapping); ok {
 			if synReader, ok := reader.(index.ThesaurusReader); ok {
@@ -501,6 +502,17 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 			if err != nil {
 				return nil, err
 			}
+
+			fs := make(query.FieldSet)
+			fs = query.ExtractFields(req.Query, i.m, fs)
+
+			for field := range fs {
+				dict, err := reader.FieldDict(field)
+				if err != nil {
+					return nil, err
+				}
+				fieldCardinality[field] = dict.Cardinality()
+			}
 		}
 	}
 
@@ -512,6 +524,7 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 		Hits:          knnHits,
 		SynonymResult: fts,
 		docCount: count,
+		fieldCardinality: fieldCardinality,
 	}, nil
 }
 
@@ -1125,6 +1138,10 @@ func (f *indexImplFieldDict) Close() error {
 		return err
 	}
 	return f.indexReader.Close()
+}
+
+func (f *indexImplFieldDict) Cardinality() int {
+	return f.fieldDict.Cardinality()
 }
 
 // helper function to remove duplicate entries from slice of strings

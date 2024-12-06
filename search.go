@@ -450,7 +450,7 @@ type SearchResult struct {
 
 	// The following fields are applicable to BM25 preSearch
 	docCount         uint64
-	fieldCardinality map[string]uint64 // search_field -> cardinality
+	fieldCardinality map[string]int // search_field -> cardinality
 }
 
 func (sr *SearchResult) Size() int {

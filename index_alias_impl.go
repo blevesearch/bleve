@@ -708,7 +708,10 @@ func constructSynonymPreSearchData(rv map[string]map[string]interface{}, sr *Sea
 }
 func constructBM25PreSearchData(rv map[string]map[string]interface{}, sr *SearchResult, indexes []Index) map[string]map[string]interface{} {
 	for _, index := range indexes {
-		rv[index.Name()][search.BM25PreSearchDataKey] = sr.totalDocCount
+		rv[index.Name()][search.BM25PreSearchDataKey] = map[string]interface{}{
+			"docCount":         sr.docCount,
+			"fieldCardinality": sr.fieldCardinality,
+		}
 	}
 	return rv
 }
@@ -1034,4 +1037,8 @@ func (f *indexAliasImplFieldDict) Next() (*index.DictEntry, error) {
 func (f *indexAliasImplFieldDict) Close() error {
 	defer f.index.mutex.RUnlock()
 	return f.fieldDict.Close()
+}
+
+func (f *indexAliasImplFieldDict) Cardinality() int {
+	return f.fieldDict.Cardinality()
 }

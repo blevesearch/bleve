@@ -67,20 +67,33 @@ func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader, te
 func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReader, reader index.TermFieldReader,
 	term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
 	var count uint64
+	var fieldCardinality int
 	if ctx != nil {
-		ctxCount, ok := ctx.Value(search.BM25PreSearchDataKey).(uint64)
+		bm25Stats, ok := ctx.Value(search.BM25PreSearchDataKey).(map[string]interface{})
 		if !ok {
 			var err error
-			ctxCount, err = indexReader.DocCount()
+			count, err = indexReader.DocCount()
 			if err != nil {
 				_ = reader.Close()
 				return nil, err
 			}
+			dict, err := indexReader.FieldDict(field)
+			if err != nil {
+				_ = indexReader.Close()
+				return nil, err
+			}
+			fieldCardinality = dict.Cardinality()
 		} else {
 			fmt.Printf("fetched from ctx \n")
-		}
-		count = ctxCount
+			count = bm25Stats["docCount"].(uint64)
+			fieldCardinalityMap := bm25Stats["fieldCardinality"].(map[string]int)
+			fieldCardinality, ok = fieldCardinalityMap[field]
+			if !ok {
+				return nil, fmt.Errorf("field stat for bm25 not present %s", field)
+			}
 
+			fmt.Println("average doc length for", field, "is", fieldCardinality/int(count))
+		}
 	}
 	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), options)
 	return &TermSearcher{
