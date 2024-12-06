@@ -464,8 +464,8 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 			Total:      1,
 			Successful: 1,
 		},
-		Hits:          knnHits,
-		totalDocCount: count,
+		Hits:     knnHits,
+		docCount: count,
 	}, nil
 }
 
