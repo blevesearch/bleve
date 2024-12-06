@@ -66,18 +66,22 @@ func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader, te
 
 func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReader, reader index.TermFieldReader,
 	term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
-	count, ok := ctx.Value(search.BM25PreSearchDataKey).(uint64)
-	if !ok {
-		var err error
-		count, err = indexReader.DocCount()
-		if err != nil {
-			_ = reader.Close()
-			return nil, err
+	var count uint64
+	if ctx != nil {
+		ctxCount, ok := ctx.Value(search.BM25PreSearchDataKey).(uint64)
+		if !ok {
+			var err error
+			ctxCount, err = indexReader.DocCount()
+			if err != nil {
+				_ = reader.Close()
+				return nil, err
+			}
+		} else {
+			fmt.Printf("fetched from ctx \n")
 		}
-	} else {
-		fmt.Printf("fetched from ctx \n")
-	}
+		count = ctxCount
 
+	}
 	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), options)
 	return &TermSearcher{
 		indexReader: indexReader,

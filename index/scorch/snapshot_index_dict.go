@@ -28,10 +28,12 @@ type segmentDictCursor struct {
 }
 
 type IndexSnapshotFieldDict struct {
-	snapshot  *IndexSnapshot
-	cursors   []*segmentDictCursor
-	entry     index.DictEntry
-	bytesRead uint64
+	cardinality int
+	bytesRead   uint64
+
+	snapshot *IndexSnapshot
+	cursors  []*segmentDictCursor
+	entry    index.DictEntry
 }
 
 func (i *IndexSnapshotFieldDict) BytesRead() uint64 {

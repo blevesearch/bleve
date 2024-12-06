@@ -83,16 +83,23 @@ func (s *synonymPreSearchResultProcessor) finalize(sr *SearchResult) {
 }
 
 type bm25PreSearchResultProcessor struct {
-	docCount uint64 // bm25 specific stats
+	docCount         uint64 // bm25 specific stats
+	fieldCardinality map[string]uint64
 }
 
 func newBM25PreSearchResultProcessor() *bm25PreSearchResultProcessor {
-	return &bm25PreSearchResultProcessor{}
+	return &bm25PreSearchResultProcessor{
+		fieldCardinality: make(map[string]uint64),
+	}
 }
 
 // TODO How will this work for queries other than term queries?
 func (b *bm25PreSearchResultProcessor) add(sr *SearchResult, indexName string) {
-	b.docCount += (sr.totalDocCount)
+	b.docCount += (sr.docCount)
+
+	for field, cardinality := range sr.fieldCardinality {
+		b.fieldCardinality[field] += cardinality
+	}
 }
 
 func (b *bm25PreSearchResultProcessor) finalize(sr *SearchResult) {

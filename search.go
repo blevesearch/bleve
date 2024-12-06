@@ -447,9 +447,10 @@ type SearchResult struct {
 	// special fields that are applicable only for search
 	// results that are obtained from a presearch
 	SynonymResult search.FieldTermSynonymMap `json:"synonym_result,omitempty"`
+
 	// The following fields are applicable to BM25 preSearch
-	// todo add more fields beyond docCount
-	totalDocCount uint64
+	docCount         uint64
+	fieldCardinality map[string]uint64 // search_field -> cardinality
 }
 
 func (sr *SearchResult) Size() int {
