@@ -519,7 +519,11 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	var knnHits []*search.DocumentMatch
+	var skipKNNCollector bool
+
 	var fts search.FieldTermSynonymMap
+	var skipSynonymCollector bool
+
 	var ok bool
 	if req.PreSearchData != nil {
 		for k, v := range req.PreSearchData {
@@ -530,6 +534,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 					if !ok {
 						return nil, fmt.Errorf("knn preSearchData must be of type []*search.DocumentMatch")
 					}
+					skipKNNCollector = true
 				}
 			case search.SynonymPreSearchDataKey:
 				if v != nil {
@@ -537,18 +542,19 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 					if !ok {
 						return nil, fmt.Errorf("synonym preSearchData must be of type search.FieldTermSynonymMap")
 					}
+					skipSynonymCollector = true
 				}
 			}
 		}
 	}
-	if knnHits == nil && requestHasKNN(req) {
+	if !skipKNNCollector && requestHasKNN(req) {
 		knnHits, err = i.runKnnCollector(ctx, req, indexReader, false)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if fts == nil {
+	if !skipSynonymCollector {
 		if synMap, ok := i.m.(mapping.SynonymMapping); ok && synMap.SynonymCount() > 0 {
 			if synReader, ok := indexReader.(index.ThesaurusReader); ok {
 				fts, err = query.ExtractSynonyms(ctx, synMap, synReader, req.Query, fts)
