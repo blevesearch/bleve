@@ -561,7 +561,14 @@ func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) *preSearchFla
 	if !isMatchNoneQuery(req.Query) {
 		// Check if synonyms are defined in the mapping
 		if sm, ok := m.(mapping.SynonymMapping); ok && sm.SynonymCount() > 0 {
-			synonyms = true
+			// check if any of the fields queried have a synonym source
+			// in the index mapping, to prevent unnecessary preSearch
+			for field := range query.ExtractFields(req.Query, m, nil) {
+				if sm.SynonymSourceForPath(field) != "" {
+					synonyms = true
+					break
+				}
+			}
 		}
 	}
 	if knn || synonyms {
