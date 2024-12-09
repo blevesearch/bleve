@@ -3854,7 +3854,7 @@ func TestSynonymTermReader(t *testing.T) {
 		}
 	}()
 
-	synReader, ok := reader.(index.SynonymReader)
+	synReader, ok := reader.(index.ThesaurusReader)
 	if !ok {
 		t.Fatal("expected synonym reader")
 	}
@@ -4272,32 +4272,90 @@ func TestSynonymSearchQueries(t *testing.T) {
 		},
 	}
 
-	for _, dtq := range testQueries {
-		q, err := query.ParseQuery([]byte(dtq.query))
-		if err != nil {
-			t.Fatal(err)
-		}
-		sr := NewSearchRequest(q)
-		sr.Highlight = NewHighlightWithStyle(ansi.Name)
-		sr.SortBy([]string{"_id"})
-		sr.Fields = []string{"*"}
-		sr.Size = 30
-		sr.Explain = true
-
-		res, err := idx.Search(sr)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(res.Hits) != len(dtq.expectHits) {
-			t.Fatalf("expected %d hits, got %d", len(dtq.expectHits), len(res.Hits))
-		}
-		// sort the expected hits to match the order of the search results
-		sort.Strings(dtq.expectHits)
-		for i, hit := range res.Hits {
-			if hit.ID != dtq.expectHits[i] {
-				t.Fatalf("expected docID %s, got %s", dtq.expectHits[i], hit.ID)
+	runTestQueries := func(idx Index) error {
+		for _, dtq := range testQueries {
+			q, err := query.ParseQuery([]byte(dtq.query))
+			if err != nil {
+				return err
+			}
+			sr := NewSearchRequest(q)
+			sr.Highlight = NewHighlightWithStyle(ansi.Name)
+			sr.SortBy([]string{"_id"})
+			sr.Fields = []string{"*"}
+			sr.Size = 30
+			sr.Explain = true
+			res, err := idx.Search(sr)
+			if err != nil {
+				return err
+			}
+			if len(res.Hits) != len(dtq.expectHits) {
+				return fmt.Errorf("expected %d hits, got %d", len(dtq.expectHits), len(res.Hits))
+			}
+			// sort the expected hits to match the order of the search results
+			sort.Strings(dtq.expectHits)
+			for i, hit := range res.Hits {
+				if hit.ID != dtq.expectHits[i] {
+					return fmt.Errorf("expected docID %s, got %s", dtq.expectHits[i], hit.ID)
+				}
 			}
 		}
+		return nil
 	}
-
+	err = runTestQueries(idx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// test with index alias - with 1 batch per index
+	numIndexes := len(batches)
+	indexes := make([]Index, numIndexes)
+	indexesPath := make([]string, numIndexes)
+	for i := 0; i < numIndexes; i++ {
+		tmpIndexPath := createTmpIndexPath(t)
+		idx, err := New(tmpIndexPath, imap)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = idx.Batch(batches[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+		indexes[i] = idx
+		indexesPath[i] = tmpIndexPath
+	}
+	defer func() {
+		for i := 0; i < numIndexes; i++ {
+			err = indexes[i].Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			cleanupTmpIndexPath(t, indexesPath[i])
+		}
+	}()
+	alias := NewIndexAlias(indexes...)
+	alias.SetIndexMapping(imap)
+	err = runTestQueries(alias)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// test with multi-level alias now with two index per alias
+	// and having any extra index being in the final alias
+	numAliases := numIndexes / 2
+	extraIndex := numIndexes % 2
+	aliases := make([]IndexAlias, numAliases)
+	for i := 0; i < numAliases; i++ {
+		alias := NewIndexAlias(indexes[i*2], indexes[i*2+1])
+		aliases[i] = alias
+	}
+	if extraIndex > 0 {
+		aliases[numAliases-1].Add(indexes[numIndexes-1])
+	}
+	alias = NewIndexAlias()
+	alias.SetIndexMapping(imap)
+	for i := 0; i < numAliases; i++ {
+		alias.Add(aliases[i])
+	}
+	err = runTestQueries(alias)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

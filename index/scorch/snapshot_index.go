@@ -45,7 +45,7 @@ type asynchSegmentResult struct {
 	index int
 	docs  *roaring.Bitmap
 
-	postings segment.PostingsList
+	thesItr segment.ThesaurusIterator
 
 	err error
 }
@@ -271,17 +271,32 @@ func (is *IndexSnapshot) FieldDictPrefix(field string,
 
 func (is *IndexSnapshot) FieldDictRegexp(field string,
 	termRegex string) (index.FieldDict, error) {
+	fd, _, err := is.FieldDictRegexpAutomaton(field, termRegex)
+	return fd, err
+}
+
+func (is *IndexSnapshot) FieldDictRegexpAutomaton(field string,
+	termRegex string) (index.FieldDict, index.RegexAutomaton, error) {
+	return is.fieldDictRegexp(field, termRegex)
+}
+
+func (is *IndexSnapshot) fieldDictRegexp(field string,
+	termRegex string) (index.FieldDict, index.RegexAutomaton, error) {
 	// TODO: potential optimization where the literal prefix represents the,
 	//       entire regexp, allowing us to use PrefixIterator(prefixTerm)?
 
 	a, prefixBeg, prefixEnd, err := parseRegexp(termRegex)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return is.newIndexSnapshotFieldDict(field, func(is segment.TermDictionary) segment.DictionaryIterator {
+	fd, err := is.newIndexSnapshotFieldDict(field, func(is segment.TermDictionary) segment.DictionaryIterator {
 		return is.AutomatonIterator(a, prefixBeg, prefixEnd)
 	}, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	return fd, a, nil
 }
 
 func (is *IndexSnapshot) getLevAutomaton(term string,
@@ -296,20 +311,37 @@ func (is *IndexSnapshot) getLevAutomaton(term string,
 
 func (is *IndexSnapshot) FieldDictFuzzy(field string,
 	term string, fuzziness int, prefix string) (index.FieldDict, error) {
+	fd, _, err := is.FieldDictFuzzyAutomaton(field, term, fuzziness, prefix)
+	return fd, err
+}
+
+func (is *IndexSnapshot) FieldDictFuzzyAutomaton(field string,
+	term string, fuzziness int, prefix string) (index.FieldDict, index.FuzzyAutomaton, error) {
+	return is.fieldDictFuzzy(field, term, fuzziness, prefix)
+}
+
+func (is *IndexSnapshot) fieldDictFuzzy(field string,
+	term string, fuzziness int, prefix string) (index.FieldDict, index.FuzzyAutomaton, error) {
 	a, err := is.getLevAutomaton(term, uint8(fuzziness))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-
+	var fa index.FuzzyAutomaton
+	if vfa, ok := a.(vellum.FuzzyAutomaton); ok {
+		fa = vfa
+	}
 	var prefixBeg, prefixEnd []byte
 	if prefix != "" {
 		prefixBeg = []byte(prefix)
 		prefixEnd = calculateExclusiveEndFromPrefix(prefixBeg)
 	}
-
-	return is.newIndexSnapshotFieldDict(field, func(is segment.TermDictionary) segment.DictionaryIterator {
+	fd, err := is.newIndexSnapshotFieldDict(field, func(is segment.TermDictionary) segment.DictionaryIterator {
 		return is.AutomatonIterator(a, prefixBeg, prefixEnd)
 	}, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	return fd, fa, nil
 }
 
 func (is *IndexSnapshot) FieldDictContains(field string) (index.FieldDictContains, error) {
@@ -1020,7 +1052,7 @@ func (is *IndexSnapshot) SynonymTermReader(ctx context.Context, thesaurusName st
 	if rv.thesauri == nil {
 		rv.thesauri = make([]segment.Thesaurus, len(is.segment))
 		for i, s := range is.segment {
-			if synSeg, ok := s.segment.(segment.SynonymSegment); ok {
+			if synSeg, ok := s.segment.(segment.ThesaurusSegment); ok {
 				thes, err := synSeg.Thesaurus(thesaurusName)
 				if err != nil {
 					return nil, err
@@ -1031,7 +1063,7 @@ func (is *IndexSnapshot) SynonymTermReader(ctx context.Context, thesaurusName st
 	}
 
 	for i, s := range is.segment {
-		if _, ok := s.segment.(segment.SynonymSegment); ok {
+		if _, ok := s.segment.(segment.ThesaurusSegment); ok {
 			pl, err := rv.thesauri[i].SynonymsList(term, s.deleted, rv.postings[i])
 			if err != nil {
 				return nil, err
@@ -1042,4 +1074,99 @@ func (is *IndexSnapshot) SynonymTermReader(ctx context.Context, thesaurusName st
 		}
 	}
 	return rv, nil
+}
+
+func (is *IndexSnapshot) newIndexSnapshotThesaurusKeys(name string,
+	makeItr func(i segment.Thesaurus) segment.ThesaurusIterator) (*IndexSnapshotThesaurusKeys, error) {
+
+	results := make(chan *asynchSegmentResult, len(is.segment))
+	var wg sync.WaitGroup
+	wg.Add(len(is.segment))
+	for _, s := range is.segment {
+		go func(s *SegmentSnapshot) {
+			defer wg.Done()
+			if synSeg, ok := s.segment.(segment.ThesaurusSegment); ok {
+				thes, err := synSeg.Thesaurus(name)
+				if err != nil {
+					results <- &asynchSegmentResult{err: err}
+				} else {
+					results <- &asynchSegmentResult{thesItr: makeItr(thes)}
+				}
+			}
+		}(s)
+	}
+	// Close the channel after all goroutines complete
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var err error
+	rv := &IndexSnapshotThesaurusKeys{
+		snapshot: is,
+		cursors:  make([]*segmentThesCursor, 0, len(is.segment)),
+	}
+	for asr := range results {
+		if asr.err != nil && err == nil {
+			err = asr.err
+		} else {
+			next, err2 := asr.thesItr.Next()
+			if err2 != nil && err == nil {
+				err = err2
+			}
+			if next != nil {
+				rv.cursors = append(rv.cursors, &segmentThesCursor{
+					itr:  asr.thesItr,
+					curr: *next,
+				})
+			}
+		}
+	}
+	// after ensuring we've read all items on channel
+	if err != nil {
+		return nil, err
+	}
+
+	return rv, nil
+}
+
+func (is *IndexSnapshot) ThesaurusKeys(name string) (index.ThesaurusKeys, error) {
+	return is.newIndexSnapshotThesaurusKeys(name, func(is segment.Thesaurus) segment.ThesaurusIterator {
+		return is.AutomatonIterator(nil, nil, nil)
+	})
+}
+
+func (is *IndexSnapshot) ThesaurusKeysFuzzy(name string,
+	term string, fuzziness int, prefix string) (index.ThesaurusKeys, error) {
+	a, err := is.getLevAutomaton(term, uint8(fuzziness))
+	if err != nil {
+		return nil, err
+	}
+	var prefixBeg, prefixEnd []byte
+	if prefix != "" {
+		prefixBeg = []byte(prefix)
+		prefixEnd = calculateExclusiveEndFromPrefix(prefixBeg)
+	}
+	return is.newIndexSnapshotThesaurusKeys(name, func(is segment.Thesaurus) segment.ThesaurusIterator {
+		return is.AutomatonIterator(a, prefixBeg, prefixEnd)
+	})
+}
+
+func (is *IndexSnapshot) ThesaurusKeysPrefix(name string,
+	termPrefix []byte) (index.ThesaurusKeys, error) {
+	termPrefixEnd := calculateExclusiveEndFromPrefix(termPrefix)
+	return is.newIndexSnapshotThesaurusKeys(name, func(is segment.Thesaurus) segment.ThesaurusIterator {
+		return is.AutomatonIterator(nil, termPrefix, termPrefixEnd)
+	})
+}
+
+func (is *IndexSnapshot) ThesaurusKeysRegexp(name string,
+	termRegex string) (index.ThesaurusKeys, error) {
+	a, prefixBeg, prefixEnd, err := parseRegexp(termRegex)
+	if err != nil {
+		return nil, err
+	}
+	return is.newIndexSnapshotThesaurusKeys(name, func(is segment.Thesaurus) segment.ThesaurusIterator {
+		return is.AutomatonIterator(a, prefixBeg, prefixEnd)
+	})
 }
