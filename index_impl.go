@@ -268,6 +268,40 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 	return
 }
 
+// IndexSynonym indexes a synonym definition, with the specified id and belonging to the specified collection.
+// Synonym definition defines term relationships for query expansion in searches.
+func (i *indexImpl) IndexSynonym(id string, collection string, definition *SynonymDefinition) error {
+	if id == "" {
+		return ErrorEmptyID
+	}
+
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	i.FireIndexEvent()
+
+	synMap, ok := i.m.(mapping.SynonymMapping)
+	if !ok {
+		return ErrorSynonymSearchNotSupported
+	}
+
+	if err := definition.Validate(); err != nil {
+		return err
+	}
+
+	doc := document.NewSynonymDocument(id)
+	err := synMap.MapSynonymDocument(doc, collection, definition.Input, definition.Synonyms)
+	if err != nil {
+		return err
+	}
+	err = i.i.Update(doc)
+	return err
+}
+
 // IndexAdvanced takes a document.Document object
 // skips the mapping and indexes it.
 func (i *indexImpl) IndexAdvanced(doc *document.Document) (err error) {

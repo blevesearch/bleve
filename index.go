@@ -378,3 +378,11 @@ func (sd *SynonymDefinition) Validate() error {
 	}
 	return nil
 }
+
+// SynonymIndex supports indexing synonym definitions alongside regular documents.
+// Synonyms, grouped by collection name, define term relationships for query expansion in searches.
+type SynonymIndex interface {
+	Index
+	// IndexSynonym indexes a synonym definition, with the specified id and belonging to the specified collection.
+	IndexSynonym(id string, collection string, definition *SynonymDefinition) error
+}

@@ -117,7 +117,7 @@ func processSynonymData(input []string, synonyms []string) map[string][]string {
 		// Map each term to the same list of synonyms.
 		synonymMap = make(map[string][]string, len(input))
 		for _, term := range input {
-			synonymMap[term] = append([]string(nil), synonyms...) // Avoid sharing slices.
+			synonymMap[term] = synonyms
 		}
 	} else {
 		synonymMap = make(map[string][]string, len(synonyms))

@@ -82,6 +82,25 @@ func (i *indexAliasImpl) Index(id string, data interface{}) error {
 	return i.indexes[0].Index(id, data)
 }
 
+func (i *indexAliasImpl) IndexSynonym(id string, collection string, definition *SynonymDefinition) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	err := i.isAliasToSingleIndex()
+	if err != nil {
+		return err
+	}
+
+	if si, ok := i.indexes[0].(SynonymIndex); ok {
+		return si.IndexSynonym(id, collection, definition)
+	}
+	return ErrorSynonymSearchNotSupported
+}
+
 func (i *indexAliasImpl) Delete(id string) error {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
