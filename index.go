@@ -363,7 +363,7 @@ type SynonymDefinition struct {
 	// When terms are specified in Input, they will map to the terms in Synonyms,
 	// making the relationship unidirectional (each Input maps to all Synonyms).
 	// If Input is omitted, the relationship is bidirectional among all Synonyms.
-	Input []string `json:"input"`
+	Input []string `json:"input,omitempty"`
 
 	// Synonyms is a list of terms that are considered equivalent.
 	// If Input is specified, each term in Input will map to each term in Synonyms.
