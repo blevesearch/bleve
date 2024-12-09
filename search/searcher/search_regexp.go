@@ -48,7 +48,7 @@ func NewRegexpStringSearcher(ctx context.Context, indexReader index.IndexReader,
 		return NewRegexpSearcher(ctx, indexReader, r, field, boost, options)
 	}
 
-	fieldDict, err := ir.FieldDictRegexp(field, pattern)
+	fieldDict, a, err := ir.FieldDictRegexpAutomaton(field, pattern)
 	if err != nil {
 		return nil, err
 	}
@@ -58,15 +58,35 @@ func NewRegexpStringSearcher(ctx context.Context, indexReader index.IndexReader,
 		}
 	}()
 
+	var termSet = make(map[string]struct{})
 	var candidateTerms []string
 
 	tfd, err := fieldDict.Next()
 	for err == nil && tfd != nil {
-		candidateTerms = append(candidateTerms, tfd.Term)
-		tfd, err = fieldDict.Next()
+		if _, exists := termSet[tfd.Term]; !exists {
+			termSet[tfd.Term] = struct{}{}
+			candidateTerms = append(candidateTerms, tfd.Term)
+			tfd, err = fieldDict.Next()
+		}
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	if ctx != nil {
+		if fts, ok := ctx.Value(search.FieldTermSynonymMapKey).(search.FieldTermSynonymMap); ok {
+			if ts, exists := fts[field]; exists {
+				for term := range ts {
+					if _, exists := termSet[term]; exists {
+						continue
+					}
+					if a.MatchesRegex(term) {
+						termSet[term] = struct{}{}
+						candidateTerms = append(candidateTerms, term)
+					}
+				}
+			}
+		}
 	}
 
 	return NewMultiTermSearcher(ctx, indexReader, candidateTerms, field, boost,

@@ -49,11 +49,13 @@ type IndexMappingImpl struct {
 	DefaultType           string                      `json:"default_type"`
 	DefaultAnalyzer       string                      `json:"default_analyzer"`
 	DefaultDateTimeParser string                      `json:"default_datetime_parser"`
+	DefaultSynonymSource  string                      `json:"default_synonym_source"`
 	DefaultField          string                      `json:"default_field"`
 	StoreDynamic          bool                        `json:"store_dynamic"`
 	IndexDynamic          bool                        `json:"index_dynamic"`
 	DocValuesDynamic      bool                        `json:"docvalues_dynamic"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
+	SynonymSources        map[string]*SynonymSource   `json:"synonym_sources,omitempty"`
 	cache                 *registry.Cache
 }
 
@@ -145,6 +147,14 @@ func (im *IndexMappingImpl) AddCustomDateTimeParser(name string, config map[stri
 	return nil
 }
 
+func (im *IndexMappingImpl) AddSynonymSource(name, collection, analyzer string) error {
+	if im.SynonymSources == nil {
+		im.SynonymSources = make(map[string]*SynonymSource)
+	}
+	im.SynonymSources[name] = NewSynonymSource(collection, analyzer)
+	return nil
+}
+
 // NewIndexMapping creates a new IndexMapping that will use all the default indexing rules
 func NewIndexMapping() *IndexMappingImpl {
 	return &IndexMappingImpl{
@@ -182,6 +192,12 @@ func (im *IndexMappingImpl) Validate() error {
 	}
 	for _, docMapping := range im.TypeMapping {
 		err = docMapping.Validate(im.cache, "", fieldAliasCtx)
+		if err != nil {
+			return err
+		}
+	}
+	for _, synSource := range im.SynonymSources {
+		err = synSource.Validate(im.cache)
 		if err != nil {
 			return err
 		}
@@ -253,6 +269,11 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
+		case "default_synonym_source":
+			err := util.UnmarshalJSON(v, &im.DefaultSynonymSource)
+			if err != nil {
+				return err
+			}
 		case "default_field":
 			err := util.UnmarshalJSON(v, &im.DefaultField)
 			if err != nil {
@@ -280,6 +301,14 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			}
 		case "docvalues_dynamic":
 			err := util.UnmarshalJSON(v, &im.DocValuesDynamic)
+			if err != nil {
+				return err
+			}
+		case "synonym_sources":
+			if im.SynonymSources == nil {
+				im.SynonymSources = make(map[string]*SynonymSource)
+			}
+			err := util.UnmarshalJSON(v, &im.SynonymSources)
 			if err != nil {
 				return err
 			}
@@ -336,6 +365,23 @@ func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}
 		}
 	}
 
+	return nil
+}
+
+func (im *IndexMappingImpl) MapSynonymDocument(doc *document.Document, collection string, input []string, synonyms []string) error {
+	// determine all the synonym sources with the given collection
+	// and create a synonym field for each
+	for name, synSource := range im.SynonymSources {
+		if synSource.Collection() == collection {
+			// create a new field with the name of the synonym source
+			analyzer := im.AnalyzerNamed(synSource.Analyzer())
+			if analyzer == nil {
+				return fmt.Errorf("unknown analyzer named: %s", synSource.Analyzer())
+			}
+			field := document.NewSynonymField(name, analyzer, input, synonyms)
+			doc.AddField(field)
+		}
+	}
 	return nil
 }
 
@@ -456,4 +502,48 @@ func (im *IndexMappingImpl) FieldMappingForPath(path string) FieldMapping {
 
 func (im *IndexMappingImpl) DefaultSearchField() string {
 	return im.DefaultField
+}
+
+func (im *IndexMappingImpl) SynonymSourceForPath(path string) string {
+	// first we look for explicit mapping on the field
+	for _, docMapping := range im.TypeMapping {
+		synonymSource := docMapping.synonymSourceForPath(path)
+		if synonymSource != "" {
+			return synonymSource
+		}
+	}
+
+	// now try the default mapping
+	pathMapping, _ := im.DefaultMapping.documentMappingForPath(path)
+	if pathMapping != nil {
+		if len(pathMapping.Fields) > 0 {
+			if pathMapping.Fields[0].SynonymSource != "" {
+				return pathMapping.Fields[0].SynonymSource
+			}
+		}
+	}
+
+	// next we will try default synonym sources for the path
+	pathDecoded := decodePath(path)
+	for _, docMapping := range im.TypeMapping {
+		if docMapping.Enabled {
+			rv := docMapping.defaultSynonymSource(pathDecoded)
+			if rv != "" {
+				return rv
+			}
+		}
+	}
+	// now the default analyzer for the default mapping
+	if im.DefaultMapping.Enabled {
+		rv := im.DefaultMapping.defaultSynonymSource(pathDecoded)
+		if rv != "" {
+			return rv
+		}
+	}
+
+	return im.DefaultSynonymSource
+}
+
+func (im *IndexMappingImpl) SynonymCount() int {
+	return len(im.SynonymSources)
 }

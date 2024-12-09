@@ -80,6 +80,8 @@ type FieldMapping struct {
 
 	// Applicable to vector fields only - optimization string
 	VectorIndexOptimizedFor string `json:"vector_index_optimized_for,omitempty"`
+
+	SynonymSource string `json:"synonym_source,omitempty"`
 }
 
 // NewTextFieldMapping returns a default field mapping for text
@@ -471,6 +473,11 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 			}
 		case "vector_index_optimized_for":
 			err := json.Unmarshal(v, &fm.VectorIndexOptimizedFor)
+			if err != nil {
+				return err
+			}
+		case "synonym_source":
+			err := json.Unmarshal(v, &fm.SynonymSource)
 			if err != nil {
 				return err
 			}
