@@ -43,8 +43,8 @@ github.com/blevesearch/zapx/v14 v14.3.10 h1:SG6xlsL+W6YjhX5N3aEiL/2tcWh3DO75Bnz7
 github.com/blevesearch/zapx/v14 v14.3.10/go.mod h1:qqyuR0u230jN1yMmE4FIAuCxmahRQEOehF78m6oTgns=
 github.com/blevesearch/zapx/v15 v15.3.16 h1:Ct3rv7FUJPfPk99TI/OofdC+Kpb4IdyfdMH48sb+FmE=
 github.com/blevesearch/zapx/v15 v15.3.16/go.mod h1:Turk/TNRKj9es7ZpKK95PS7f6D44Y7fAFy8F4LXQtGg=
-github.com/blevesearch/zapx/v16 v16.1.9-0.20241120170816-85db80035af2 h1:+RX9SM7KO7q91E7rFj4NARSsAhKj2EbvdWfzX+ihg/w=
-github.com/blevesearch/zapx/v16 v16.1.9-0.20241120170816-85db80035af2/go.mod h1:zuxVgVaLZ0g4lZvrv06xDc24N6nLCOzXYHVkXI7LMHM=
+github.com/blevesearch/zapx/v16 v16.1.9 h1:br5EgGntCF723cCecSpOACE0LnGAP4+HYrkcEfQkcBY=
+github.com/blevesearch/zapx/v16 v16.1.9/go.mod h1:zuxVgVaLZ0g4lZvrv06xDc24N6nLCOzXYHVkXI7LMHM=
 github.com/couchbase/ghistogram v0.1.0 h1:b95QcQTCzjTUocDXp/uMgSNQi8oj1tGwnJ4bODWZnps=
 github.com/couchbase/ghistogram v0.1.0/go.mod h1:s1Jhy76zqfEecpNWJfWUiKZookAFaiGOEoyzgHt9i7k=
 github.com/couchbase/moss v0.2.0 h1:VCYrMzFwEryyhRSeI+/b3tRBSeTpi/8gn5Kf6dxqn+o=
