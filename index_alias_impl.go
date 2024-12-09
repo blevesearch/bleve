@@ -30,8 +30,11 @@ type indexAliasImpl struct {
 	name    string
 	indexes []Index
 	mutex   sync.RWMutex
-	mapping mapping.IndexMapping
 	open    bool
+	// if all the indexes in tha alias have the same mapping
+	// then the user can set the mapping here to avoid
+	// checking the mapping of each index in the alias
+	mapping mapping.IndexMapping
 }
 
 // NewIndexAlias creates a new IndexAlias over the provided
@@ -356,6 +359,20 @@ func (i *indexAliasImpl) Close() error {
 	return nil
 }
 
+// SetIndexMapping sets the mapping for the alias and must be used
+// ONLY when all the indexes in the alias have the same mapping.
+// This is to avoid checking the mapping of each index in the alias
+// when executing a search request.
+func (i *indexAliasImpl) SetIndexMapping(m mapping.IndexMapping) error {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+	if !i.open {
+		return ErrorIndexClosed
+	}
+	i.mapping = m
+	return nil
+}
+
 func (i *indexAliasImpl) Mapping() mapping.IndexMapping {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -364,6 +381,7 @@ func (i *indexAliasImpl) Mapping() mapping.IndexMapping {
 		return nil
 	}
 
+	// if the mapping is already set, return it
 	if i.mapping != nil {
 		return i.mapping
 	}
@@ -508,13 +526,6 @@ func (i *indexAliasImpl) Swap(in, out []Index) {
 	for _, ind := range out {
 		i.removeSingle(ind)
 	}
-}
-
-func (i *indexAliasImpl) SetIndexMapping(m mapping.IndexMapping) {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-
-	i.mapping = m
 }
 
 // createChildSearchRequest creates a separate
@@ -665,6 +676,9 @@ func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
 	return mergedOut, nil
 }
 
+// redistributePreSearchData redistributes the preSearchData sent in the search request to an index alias
+// which would happen in the case of an alias tree and depending on the level of the tree, the preSearchData
+// needs to be redistributed to the indexes at that level
 func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]map[string]interface{}, error) {
 	rv := make(map[string]map[string]interface{})
 	for _, index := range indexes {
@@ -769,6 +783,14 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, flags *preSear
 		prp.finalize(sr)
 	}
 	return sr, nil
+}
+
+// finalizePreSearchResult finalizes the preSearch result by applying the finalization steps
+// specific to the preSearch flags
+func finalizePreSearchResult(req *SearchRequest, flags *preSearchFlags, preSearchResult *SearchResult) {
+	if flags.knn {
+		preSearchResult.Hits = finalizeKNNResults(req, preSearchResult.Hits)
+	}
 }
 
 // hitsInCurrentPage returns the hits in the current page

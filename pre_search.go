@@ -131,10 +131,3 @@ func createPreSearchResultProcessor(req *SearchRequest, flags *preSearchFlags) p
 		}
 	}
 }
-
-// -----------------------------------------------------------------------------
-func finalizePreSearchResult(req *SearchRequest, flags *preSearchFlags, preSearchResult *SearchResult) {
-	if flags.knn {
-		preSearchResult.Hits = finalizeKNNResults(req, preSearchResult.Hits)
-	}
-}
