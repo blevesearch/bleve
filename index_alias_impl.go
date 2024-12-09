@@ -233,7 +233,10 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	//  - the request requires preSearch
 	var preSearchDuration time.Duration
 	var sr *SearchResult
-	flags := preSearchRequired(req, i.mapping)
+	flags, err := preSearchRequired(req, i.mapping)
+	if err != nil {
+		return nil, err
+	}
 	if req.PreSearchData == nil && flags != nil {
 		searchStart := time.Now()
 		preSearchResult, err := preSearch(ctx, req, flags, i.indexes...)
@@ -573,7 +576,7 @@ type preSearchFlags struct {
 
 // preSearchRequired checks if preSearch is required and returns a boolean flag
 // It only allocates the preSearchFlags struct if necessary
-func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) *preSearchFlags {
+func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) (*preSearchFlags, error) {
 	// Check for KNN query
 	knn := requestHasKNN(req)
 	var synonyms bool
@@ -582,7 +585,11 @@ func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) *preSearchFla
 		if sm, ok := m.(mapping.SynonymMapping); ok && sm.SynonymCount() > 0 {
 			// check if any of the fields queried have a synonym source
 			// in the index mapping, to prevent unnecessary preSearch
-			for field := range query.ExtractFields(req.Query, m, nil) {
+			fs, err := query.ExtractFields(req.Query, m, nil)
+			if err != nil {
+				return nil, err
+			}
+			for field := range fs {
 				if sm.SynonymSourceForPath(field) != "" {
 					synonyms = true
 					break
@@ -594,9 +601,9 @@ func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) *preSearchFla
 		return &preSearchFlags{
 			knn:      knn,
 			synonyms: synonyms,
-		}
+		}, nil
 	}
-	return nil
+	return nil, nil
 }
 
 func preSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, indexes ...Index) (*SearchResult, error) {
