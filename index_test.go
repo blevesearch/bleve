@@ -464,19 +464,14 @@ func TestBM25(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err = multiPartIndex.Search(searchRequest)
+	ctx := context.Background()
+	// not setting this doesn't perform a presearch for bm25
+	ctx = context.WithValue(ctx, search.SearchTypeKey, search.FetchStatsAndSearch)
+
+	res, err = multiPartIndex.SearchInContext(ctx, searchRequest)
 	if err != nil {
 		t.Error(err)
 	}
-
-	// ctx := context.Background()
-	// ctx = context.WithValue(ctx, search.PreSearchKey,
-	// 	search.SearcherStartCallbackFn(bleveCtxSearcherStartCallback))
-
-	// res, err = multiPartIndex.SearchInContext(ctx, searchRequest)
-	// if err != nil {
-	// 	t.Error(err)
-	// }
 
 	fmt.Println("length of hits alias search", res.Hits[0].Score)
 

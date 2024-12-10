@@ -16,7 +16,6 @@ package bleve
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -215,7 +214,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	//  - the request requires preSearch
 	var preSearchDuration time.Duration
 	var sr *SearchResult
-	flags := preSearchRequired(req, i.mapping)
+	flags := preSearchRequired(ctx, req, i.mapping)
 	if req.PreSearchData == nil && flags != nil {
 		searchStart := time.Now()
 		preSearchResult, err := preSearch(ctx, req, flags, i.indexes...)
@@ -223,7 +222,6 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 			return nil, err
 		}
 
-		fmt.Println("presearch result", preSearchResult.docCount)
 		// check if the preSearch result has any errors and if so
 		// return the search result as is without executing the query
 		// so that the errors are not lost
@@ -557,14 +555,22 @@ type preSearchFlags struct {
 
 // preSearchRequired checks if preSearch is required and returns the presearch flags struct
 // indicating which preSearch is required
-func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) *preSearchFlags {
+func preSearchRequired(ctx context.Context, req *SearchRequest, m mapping.IndexMapping) *preSearchFlags {
 	// Check for KNN query
 	knn := requestHasKNN(req)
 	var bm25 bool
-	if _, ok := m.(mapping.BM25Mapping); ok {
-		bm25 = true
+	if !isMatchNoneQuery(req.Query) {
+		if ctx != nil {
+			if searchType := ctx.Value(search.SearchTypeKey); searchType != nil {
+				if searchType.(string) == search.FetchStatsAndSearch {
+					// todo: check mapping to see if bm25 is needed
+					if _, ok := m.(mapping.BM25Mapping); ok {
+						bm25 = true
+					}
+				}
+			}
+		}
 	}
-
 	if knn || bm25 {
 		return &preSearchFlags{
 			knn:  knn,

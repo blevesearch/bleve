@@ -62,16 +62,22 @@ func (s *TermQueryScorer) Size() int {
 	return sizeInBytes
 }
 
-func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64, docTotal,
-	docTerm uint64, avgDocLength float64, options search.SearcherOptions) *TermQueryScorer {
-
-	var idfVal float64
+func (s *TermQueryScorer) computeIDF(avgDocLength float64, docTotal, docTerm uint64) float64 {
+	var rv float64
 	if avgDocLength > 0 {
 		// avgDocLength is set only for bm25 scoring
-		idfVal = math.Log(1 + (float64(docTotal)-float64(docTerm)+0.5)/(float64(docTerm)+0.5))
+		rv = math.Log(1 + (float64(docTotal)-float64(docTerm)+0.5)/
+			(float64(docTerm)+0.5))
 	} else {
-		idfVal = 1.0 + math.Log(float64(docTotal)/float64(docTerm+1.0))
+		rv = 1.0 + math.Log(float64(docTotal)/
+			float64(docTerm+1.0))
 	}
+
+	return rv
+}
+
+func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64, docTotal,
+	docTerm uint64, avgDocLength float64, options search.SearcherOptions) *TermQueryScorer {
 
 	rv := TermQueryScorer{
 		queryTerm:    string(queryTerm),
@@ -80,12 +86,12 @@ func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64,
 		docTerm:      docTerm,
 		docTotal:     docTotal,
 		avgDocLength: avgDocLength,
-		idf:          idfVal,
 		options:      options,
 		queryWeight:  1.0,
 		includeScore: options.Score != "none",
 	}
 
+	rv.idf = rv.computeIDF(avgDocLength, docTotal, docTerm)
 	if options.Explain {
 		rv.idfExplanation = &search.Explanation{
 			Value:   rv.idf,
@@ -126,6 +132,24 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 	}
 }
 
+func (s *TermQueryScorer) docScore(tf, norm float64) float64 {
+	// tf-idf scoring by default
+	score := tf * norm * s.idf
+	if s.avgDocLength > 0 {
+		// bm25 scoring
+		// using the posting's norm value to recompute the field length for the doc num
+		fieldLength := 1 / (norm * norm)
+
+		// multiplies deciding how much does a doc length affect the score and also
+		// how much can the term frequency affect the score
+		var k1 float64 = 1
+		var b float64 = 1
+		score = s.idf * (tf * k1) /
+			(tf + k1*(1-b+(b*fieldLength/s.avgDocLength)))
+	}
+	return score
+}
+
 func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.TermFieldDoc) *search.DocumentMatch {
 	rv := ctx.DocumentMatchPool.Get()
 	// perform any score computations only when needed
@@ -138,18 +162,7 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 			tf = math.Sqrt(float64(termMatch.Freq))
 		}
 
-		// tf-idf scoring by default
-		score := tf * termMatch.Norm * s.idf
-		if s.avgDocLength > 0 {
-			// using the posting's norm value to recompute the field length for the doc num
-			fieldLength := 1 / (termMatch.Norm * termMatch.Norm)
-
-			// multipliers. todo: these are something to be set in the scorer by parent layer
-			var k float64 = 1
-			var b float64 = 1
-			score = s.idf * (tf * k) / (tf + k*(1-b+(b*fieldLength/s.avgDocLength)))
-		}
-
+		score := s.docScore(tf, termMatch.Norm)
 		// todo: explain stuff properly
 		if s.options.Explain {
 			childrenExplanations := make([]*search.Explanation, 3)

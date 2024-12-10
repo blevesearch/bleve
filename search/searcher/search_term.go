@@ -39,14 +39,16 @@ type TermSearcher struct {
 	tfd         index.TermFieldDoc
 }
 
-func NewTermSearcher(ctx context.Context, indexReader index.IndexReader, term string, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
+func NewTermSearcher(ctx context.Context, indexReader index.IndexReader,
+	term string, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
 	if isTermQuery(ctx) {
 		ctx = context.WithValue(ctx, search.QueryTypeKey, search.Term)
 	}
 	return NewTermSearcherBytes(ctx, indexReader, []byte(term), field, boost, options)
 }
 
-func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader, term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
+func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader,
+	term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
 	needFreqNorm := options.Score != "none"
 	reader, err := indexReader.TermFieldReader(ctx, term, field, needFreqNorm, needFreqNorm, options.IncludeTermVectors)
 	if err != nil {
@@ -89,9 +91,7 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 			fmt.Println("average doc length for", field, "is", fieldCardinality/int(count))
 		}
 
-		// in case of bm25 need to fetch the multipliers as well (maybe something set in index mapping?)
-		// fieldMapping := m.FieldMappingForPath(q.VectorField)
-		// but tbd how to pass on the field mapping here, can we pass it (the multipliers) in the context?
+		// in case of bm25 need to fetch the multipliers as well (perhaps via context's presearch data)
 	}
 	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), float64(fieldCardinality/int(count)), options)
 	return &TermSearcher{

@@ -548,7 +548,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				if v != nil {
 					bm25Data, ok = v.(map[string]interface{})
 					if !ok {
-						return nil, fmt.Errorf("bm25 preSearchData must be of type uint64")
+						return nil, fmt.Errorf("bm25 preSearchData must be of type map[string]interface{}")
 					}
 				}
 			}
@@ -563,6 +563,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	setKnnHitsInCollector(knnHits, req, coll)
 
+	// set the bm25 presearch data (stats important for consistent scoring) in
+	// the context object
 	if bm25Data != nil {
 		ctx = context.WithValue(ctx, search.BM25PreSearchDataKey, bm25Data)
 	}
