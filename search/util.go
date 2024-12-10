@@ -141,6 +141,9 @@ const BM25PreSearchDataKey = "_bm25_pre_search_data_key"
 
 const PreSearchKey = "_presearch_key"
 
+const SearchTypeKey = "_search_type_key"
+const FetchStatsAndSearch = "fetch_stats_and_search"
+
 type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)
 
 type SearcherStartCallbackFn func(size uint64) error

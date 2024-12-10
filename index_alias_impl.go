@@ -16,7 +16,6 @@ package bleve
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -246,7 +245,6 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 			return nil, err
 		}
 
-		fmt.Println("presearch result", preSearchResult.docCount)
 		// check if the preSearch result has any errors and if so
 		// return the search result as is without executing the query
 		// so that the errors are not lost
@@ -579,9 +577,9 @@ type preSearchFlags struct {
 	bm25 bool // needs presearch for this too
 }
 
-// preSearchRequired checks if preSearch is required and returns a boolean flag
-// It only allocates the preSearchFlags struct if necessary
-func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) (*preSearchFlags, error) {
+// preSearchRequired checks if preSearch is required and returns the presearch flags struct
+// indicating which preSearch is required
+func preSearchRequired(ctx context.Context, req *SearchRequest, m mapping.IndexMapping) (*preSearchFlags, error){
 	// Check for KNN query
 	knn := requestHasKNN(req)
 	var synonyms bool
@@ -603,8 +601,17 @@ func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) (*preSearchFl
 		}
 	}
 	var bm25 bool
-	if _, ok := m.(mapping.BM25Mapping); ok {
-		bm25 = true
+	if !isMatchNoneQuery(req.Query) {
+		if ctx != nil {
+			if searchType := ctx.Value(search.SearchTypeKey); searchType != nil {
+				if searchType.(string) == search.FetchStatsAndSearch {
+					// todo: check mapping to see if bm25 is needed
+					if _, ok := m.(mapping.BM25Mapping); ok {
+						bm25 = true
+					}
+				}
+			}
+		}
 	}
 	
 	if knn || synonyms || bm25 {
