@@ -462,22 +462,22 @@ func (fm *FieldMapping) UnmarshalJSON(data []byte) error {
 				return err
 			}
 		case "dims":
-			err := json.Unmarshal(v, &fm.Dims)
+			err := util.UnmarshalJSON(v, &fm.Dims)
 			if err != nil {
 				return err
 			}
 		case "similarity":
-			err := json.Unmarshal(v, &fm.Similarity)
+			err := util.UnmarshalJSON(v, &fm.Similarity)
 			if err != nil {
 				return err
 			}
 		case "vector_index_optimized_for":
-			err := json.Unmarshal(v, &fm.VectorIndexOptimizedFor)
+			err := util.UnmarshalJSON(v, &fm.VectorIndexOptimizedFor)
 			if err != nil {
 				return err
 			}
 		case "synonym_source":
-			err := json.Unmarshal(v, &fm.SynonymSource)
+			err := util.UnmarshalJSON(v, &fm.SynonymSource)
 			if err != nil {
 				return err
 			}
