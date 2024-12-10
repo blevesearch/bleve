@@ -245,6 +245,8 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		if err != nil {
 			return nil, err
 		}
+
+		fmt.Println("presearch result", preSearchResult.docCount)
 		// check if the preSearch result has any errors and if so
 		// return the search result as is without executing the query
 		// so that the errors are not lost
@@ -601,12 +603,8 @@ func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) (*preSearchFl
 		}
 	}
 	var bm25 bool
-	if !isMatchNoneQuery(req.Query) {
-		// todo fix this cuRRENTLY ALL INDEX mappings are BM25 mappings, need to fix
-		// this is just a placeholder.
-		if _, ok := m.(mapping.BM25Mapping); ok {
-			bm25 = true
-		}
+	if _, ok := m.(mapping.BM25Mapping); ok {
+		bm25 = true
 	}
 	
 	if knn || synonyms || bm25 {

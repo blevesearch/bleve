@@ -350,6 +350,138 @@ func TestBytesWritten(t *testing.T) {
 	cleanupTmpIndexPath(t, tmpIndexPath4)
 }
 
+func TestBM25(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMapping := NewIndexMapping()
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = "en"
+	documentMapping := NewDocumentMapping()
+	indexMapping.AddDocumentMapping("hotel", documentMapping)
+	indexMapping.StoreDynamic = false
+	indexMapping.DocValuesDynamic = false
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.Store = false
+
+	reviewsMapping := NewDocumentMapping()
+	reviewsMapping.AddFieldMappingsAt("content", contentFieldMapping)
+	documentMapping.AddSubDocumentMapping("reviews", reviewsMapping)
+
+	typeFieldMapping := NewTextFieldMapping()
+	typeFieldMapping.Store = false
+	documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
+
+	idxSinglePartition, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := idxSinglePartition.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch, err := getBatchFromData(idxSinglePartition, "sample-data.json")
+	if err != nil {
+		t.Fatalf("failed to form a batch")
+	}
+	err = idxSinglePartition.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to index batch %v\n", err)
+	}
+	query := NewMatchQuery("Apartments")
+	query.FieldVal = "name"
+	searchRequest := NewSearchRequestOptions(query, int(10), 0, true)
+
+	res, err := idxSinglePartition.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Println("length of hits", res.Hits[0].Score)
+	dataset, _ := readDataFromFile("sample-data.json")
+	fmt.Println("length of dataset", len(dataset))
+	tmpIndexPath1 := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath1)
+
+	idxPart1, err := NewUsing(tmpIndexPath1, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := idxPart1.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch1 := idxPart1.NewBatch()
+	for _, doc := range dataset[:len(dataset)/2] {
+		err = batch1.Index(fmt.Sprintf("%d", doc["id"]), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = idxPart1.Batch(batch1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tmpIndexPath2 := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath2)
+
+	idxPart2, err := NewUsing(tmpIndexPath2, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := idxPart2.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch2 := idxPart2.NewBatch()
+	for _, doc := range dataset[len(dataset)/2:] {
+		err = batch2.Index(fmt.Sprintf("%d", doc["id"]), doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = idxPart2.Batch(batch2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	multiPartIndex := NewIndexAlias(idxPart1, idxPart2)
+	err = multiPartIndex.SetIndexMapping(indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err = multiPartIndex.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// ctx := context.Background()
+	// ctx = context.WithValue(ctx, search.PreSearchKey,
+	// 	search.SearcherStartCallbackFn(bleveCtxSearcherStartCallback))
+
+	// res, err = multiPartIndex.SearchInContext(ctx, searchRequest)
+	// if err != nil {
+	// 	t.Error(err)
+	// }
+
+	fmt.Println("length of hits alias search", res.Hits[0].Score)
+
+}
+
 func TestBytesRead(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
@@ -671,23 +803,30 @@ func TestBytesReadStored(t *testing.T) {
 	}
 }
 
-func getBatchFromData(idx Index, fileName string) (*Batch, error) {
+func readDataFromFile(fileName string) ([]map[string]interface{}, error) {
 	pwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
 	path := filepath.Join(pwd, "data", "test", fileName)
-	batch := idx.NewBatch()
+
 	var dataset []map[string]interface{}
 	fileContent, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
+
 	err = json.Unmarshal(fileContent, &dataset)
 	if err != nil {
 		return nil, err
 	}
 
+	return dataset, nil
+}
+
+func getBatchFromData(idx Index, fileName string) (*Batch, error) {
+	dataset, err := readDataFromFile(fileName)
+	batch := idx.NewBatch()
 	for _, doc := range dataset {
 		err = batch.Index(fmt.Sprintf("%d", doc["id"]), doc)
 		if err != nil {

@@ -483,7 +483,7 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 			return nil, err
 		}
 	}
-	
+
 	var fts search.FieldTermSynonymMap
 	var count uint64
 	fieldCardinality := make(map[string]int)
@@ -521,9 +521,9 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 			Total:      1,
 			Successful: 1,
 		},
-		Hits:          knnHits,
-		SynonymResult: fts,
-		docCount: count,
+		Hits:             knnHits,
+		SynonymResult:    fts,
+		docCount:         count,
 		fieldCardinality: fieldCardinality,
 	}, nil
 }
@@ -581,6 +581,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	var skipSynonymCollector bool
 
 	var bm25TotalDocs uint64
+	var bm25Data map[string]interface{}
 	var ok bool
 	if req.PreSearchData != nil {
 		for k, v := range req.PreSearchData {
@@ -604,7 +605,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				skipKnnCollector = true
 			case search.BM25PreSearchDataKey:
 				if v != nil {
-					bm25TotalDocs, ok = v.(uint64)
+					bm25Data, ok = v.(map[string]interface{})
 					if !ok {
 						return nil, fmt.Errorf("bm25 preSearchData must be of type uint64")
 					}
@@ -634,8 +635,9 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	if fts != nil {
 		ctx = context.WithValue(ctx, search.FieldTermSynonymMapKey, fts)
-	if bm25TotalDocs > 0 {
-		ctx = context.WithValue(ctx, search.BM25MapKey, bm25TotalDocs)
+	}
+	if bm25Data != nil {
+		ctx = context.WithValue(ctx, search.BM25PreSearchDataKey, bm25Data)
 	}
 
 	// This callback and variable handles the tracking of bytes read

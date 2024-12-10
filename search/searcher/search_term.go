@@ -83,7 +83,9 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 				return nil, err
 			}
 			fieldCardinality = dict.Cardinality()
-			fmt.Println("average doc length for", field, "is", fieldCardinality/int(count))
+			fmt.Println("------------------")
+			fmt.Println("the num docs", count)
+			fmt.Println("the field cardinality", fieldCardinality)
 		} else {
 			fmt.Printf("fetched from ctx \n")
 			count = bm25Stats["docCount"].(uint64)

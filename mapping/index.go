@@ -557,4 +557,6 @@ func (im *IndexMappingImpl) SynonymSourceVisitor(visitor analysis.SynonymSourceV
 		return err
 	}
 	return nil
+func (im *IndexMappingImpl) BM25Impl() {
+	fmt.Println("BM25Impl")
 }
