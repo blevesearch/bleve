@@ -16,6 +16,7 @@ package searcher
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -51,17 +52,48 @@ func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader, te
 	if err != nil {
 		return nil, err
 	}
-	return newTermSearcherFromReader(indexReader, reader, term, field, boost, options)
+	return newTermSearcherFromReader(ctx, indexReader, reader, term, field, boost, options)
 }
 
-func newTermSearcherFromReader(indexReader index.IndexReader, reader index.TermFieldReader,
+func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReader, reader index.TermFieldReader,
 	term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
-	count, err := indexReader.DocCount()
-	if err != nil {
-		_ = reader.Close()
-		return nil, err
+	var count uint64
+	var fieldCardinality int
+	if ctx != nil {
+		bm25Stats, ok := ctx.Value(search.BM25PreSearchDataKey).(map[string]interface{})
+		if !ok {
+			var err error
+			count, err = indexReader.DocCount()
+			if err != nil {
+				_ = reader.Close()
+				return nil, err
+			}
+			dict, err := indexReader.FieldDict(field)
+			if err != nil {
+				_ = indexReader.Close()
+				return nil, err
+			}
+			fieldCardinality = dict.Cardinality()
+			fmt.Println("------------------")
+			fmt.Println("the num docs", count)
+			fmt.Println("the field cardinality", fieldCardinality)
+		} else {
+			fmt.Printf("fetched from ctx \n")
+			count = bm25Stats["docCount"].(uint64)
+			fieldCardinalityMap := bm25Stats["fieldCardinality"].(map[string]int)
+			fieldCardinality, ok = fieldCardinalityMap[field]
+			if !ok {
+				return nil, fmt.Errorf("field stat for bm25 not present %s", field)
+			}
+
+			fmt.Println("average doc length for", field, "is", fieldCardinality/int(count))
+		}
+
+		// in case of bm25 need to fetch the multipliers as well (maybe something set in index mapping?)
+		// fieldMapping := m.FieldMappingForPath(q.VectorField)
+		// but tbd how to pass on the field mapping here, can we pass it (the multipliers) in the context?
 	}
-	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), options)
+	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), float64(fieldCardinality/int(count)), options)
 	return &TermSearcher{
 		indexReader: indexReader,
 		reader:      reader,
