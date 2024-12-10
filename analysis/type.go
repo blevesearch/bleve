@@ -106,6 +106,15 @@ type DateTimeParser interface {
 	ParseDateTime(string) (time.Time, string, error)
 }
 
+const SynonymSourceType = "synonym"
+
+type SynonymSourceVisitor func(name string, item SynonymSource) error
+
+type SynonymSource interface {
+	Analyzer() string
+	Collection() string
+}
+
 type ByteArrayConverter interface {
 	Convert([]byte) (interface{}, error)
 }

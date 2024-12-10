@@ -60,6 +60,12 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache,
 			return err
 		}
 	}
+	if dm.DefaultSynonymSource != "" {
+		_, err := cache.SynonymSourceNamed(dm.DefaultSynonymSource)
+		if err != nil {
+			return err
+		}
+	}
 	for propertyName, property := range dm.Properties {
 		newParent := propertyName
 		if parentName != "" {
@@ -83,7 +89,12 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache,
 				return err
 			}
 		}
-
+		if field.SynonymSource != "" {
+			_, err = cache.SynonymSourceNamed(field.SynonymSource)
+			if err != nil {
+				return err
+			}
+		}
 		err := validateFieldMapping(field, parentName, fieldAliasCtx)
 		if err != nil {
 			return err

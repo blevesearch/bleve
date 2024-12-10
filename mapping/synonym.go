@@ -17,6 +17,7 @@ package mapping
 import (
 	"fmt"
 
+	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/registry"
 )
 
@@ -47,17 +48,21 @@ func (s *SynonymSource) SetCollection(c string) {
 func (s *SynonymSource) SetAnalyzer(a string) {
 	s.AnalyzerName = a
 }
+func SynonymSourceConstructor(config map[string]interface{}, cache *registry.Cache) (analysis.SynonymSource, error) {
+	collection, ok := config["collection"].(string)
+	if !ok {
+		return nil, fmt.Errorf("must specify collection")
+	}
+	analyzer, ok := config["analyzer"].(string)
+	if !ok {
+		return nil, fmt.Errorf("must specify analyzer")
+	}
+	if _, err := cache.AnalyzerNamed(analyzer); err != nil {
+		return nil, fmt.Errorf("analyzer named '%s' not found", analyzer)
+	}
+	return NewSynonymSource(collection, analyzer), nil
+}
 
-func (s *SynonymSource) Validate(c *registry.Cache) error {
-	if s.CollectionName == "" {
-		return fmt.Errorf("collection name is required")
-	}
-	if s.AnalyzerName == "" {
-		return fmt.Errorf("analyzer name is required")
-	}
-	_, err := c.AnalyzerNamed(s.AnalyzerName)
-	if err != nil {
-		return fmt.Errorf("analyzer named '%s' not found", s.AnalyzerName)
-	}
-	return nil
+func init() {
+	registry.RegisterSynonymSource(analysis.SynonymSourceType, SynonymSourceConstructor)
 }

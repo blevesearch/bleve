@@ -55,7 +55,6 @@ type IndexMappingImpl struct {
 	IndexDynamic          bool                        `json:"index_dynamic"`
 	DocValuesDynamic      bool                        `json:"docvalues_dynamic"`
 	CustomAnalysis        *customAnalysis             `json:"analysis,omitempty"`
-	SynonymSources        map[string]*SynonymSource   `json:"synonym_sources,omitempty"`
 	cache                 *registry.Cache
 }
 
@@ -147,11 +146,12 @@ func (im *IndexMappingImpl) AddCustomDateTimeParser(name string, config map[stri
 	return nil
 }
 
-func (im *IndexMappingImpl) AddSynonymSource(name, collection, analyzer string) error {
-	if im.SynonymSources == nil {
-		im.SynonymSources = make(map[string]*SynonymSource)
+func (im *IndexMappingImpl) AddSynonymSource(name string, config map[string]interface{}) error {
+	_, err := im.cache.DefineSynonymSource(name, config)
+	if err != nil {
+		return err
 	}
-	im.SynonymSources[name] = NewSynonymSource(collection, analyzer)
+	im.CustomAnalysis.SynonymSources[name] = config
 	return nil
 }
 
@@ -184,7 +184,12 @@ func (im *IndexMappingImpl) Validate() error {
 	if err != nil {
 		return err
 	}
-
+	if im.DefaultSynonymSource != "" {
+		_, err = im.cache.SynonymSourceNamed(im.DefaultSynonymSource)
+		if err != nil {
+			return err
+		}
+	}
 	fieldAliasCtx := make(map[string]*FieldMapping)
 	err = im.DefaultMapping.Validate(im.cache, "", fieldAliasCtx)
 	if err != nil {
@@ -192,12 +197,6 @@ func (im *IndexMappingImpl) Validate() error {
 	}
 	for _, docMapping := range im.TypeMapping {
 		err = docMapping.Validate(im.cache, "", fieldAliasCtx)
-		if err != nil {
-			return err
-		}
-	}
-	for _, synSource := range im.SynonymSources {
-		err = synSource.Validate(im.cache)
 		if err != nil {
 			return err
 		}
@@ -304,14 +303,6 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
-		case "synonym_sources":
-			if im.SynonymSources == nil {
-				im.SynonymSources = make(map[string]*SynonymSource)
-			}
-			err := util.UnmarshalJSON(v, &im.SynonymSources)
-			if err != nil {
-				return err
-			}
 		default:
 			invalidKeys = append(invalidKeys, k)
 		}
@@ -371,18 +362,19 @@ func (im *IndexMappingImpl) MapDocument(doc *document.Document, data interface{}
 func (im *IndexMappingImpl) MapSynonymDocument(doc *document.Document, collection string, input []string, synonyms []string) error {
 	// determine all the synonym sources with the given collection
 	// and create a synonym field for each
-	for name, synSource := range im.SynonymSources {
-		if synSource.Collection() == collection {
+	err := im.SynonymSourceVisitor(func(name string, item analysis.SynonymSource) error {
+		if item.Collection() == collection {
 			// create a new field with the name of the synonym source
-			analyzer := im.AnalyzerNamed(synSource.Analyzer())
+			analyzer := im.AnalyzerNamed(item.Analyzer())
 			if analyzer == nil {
-				return fmt.Errorf("unknown analyzer named: %s", synSource.Analyzer())
+				return fmt.Errorf("unknown analyzer named: %s", item.Analyzer())
 			}
 			field := document.NewSynonymField(name, analyzer, input, synonyms)
 			doc.AddField(field)
 		}
-	}
-	return nil
+		return nil
+	})
+	return err
 }
 
 type walkContext struct {
@@ -504,6 +496,15 @@ func (im *IndexMappingImpl) DefaultSearchField() string {
 	return im.DefaultField
 }
 
+func (im *IndexMappingImpl) SynonymSourceNamed(name string) analysis.SynonymSource {
+	syn, err := im.cache.SynonymSourceNamed(name)
+	if err != nil {
+		logger.Printf("error using synonym source named: %s", name)
+		return nil
+	}
+	return syn
+}
+
 func (im *IndexMappingImpl) SynonymSourceForPath(path string) string {
 	// first we look for explicit mapping on the field
 	for _, docMapping := range im.TypeMapping {
@@ -544,6 +545,16 @@ func (im *IndexMappingImpl) SynonymSourceForPath(path string) string {
 	return im.DefaultSynonymSource
 }
 
+// SynonymCount() returns the number of synonym sources defined in the mapping
 func (im *IndexMappingImpl) SynonymCount() int {
-	return len(im.SynonymSources)
+	return len(im.CustomAnalysis.SynonymSources)
+}
+
+// SynonymSourceVisitor() allows a visitor to iterate over all synonym sources
+func (im *IndexMappingImpl) SynonymSourceVisitor(visitor analysis.SynonymSourceVisitor) error {
+	err := im.cache.SynonymSources.VisitSynonymSources(visitor)
+	if err != nil {
+		return err
+	}
+	return nil
 }

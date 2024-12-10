@@ -3759,16 +3759,24 @@ func TestSynonymTermReader(t *testing.T) {
 
 	synonymSourceName := "english"
 
-	synonymAnalyzer := "simple"
+	analyzer := simple.Name
+
+	synonymSourceConfig := map[string]interface{}{
+		"collection": synonymCollection,
+		"analyzer":   analyzer,
+	}
 
 	textField := mapping.NewTextFieldMapping()
-	textField.Analyzer = simple.Name
+	textField.Analyzer = analyzer
 	textField.SynonymSource = synonymSourceName
 
 	imap := mapping.NewIndexMapping()
 	imap.DefaultMapping.AddFieldMappingsAt("text", textField)
-	imap.AddSynonymSource(synonymSourceName, synonymCollection, synonymAnalyzer)
-	err := imap.Validate()
+	err := imap.AddSynonymSource(synonymSourceName, synonymSourceConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = imap.Validate()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3942,14 +3950,22 @@ func TestSynonymSearchQueries(t *testing.T) {
 
 	analyzer := en.AnalyzerName
 
+	synonymSourceConfig := map[string]interface{}{
+		"collection": synonymCollection,
+		"analyzer":   analyzer,
+	}
+
 	textField := mapping.NewTextFieldMapping()
 	textField.Analyzer = analyzer
 	textField.SynonymSource = synonymSourceName
 
 	imap := mapping.NewIndexMapping()
 	imap.DefaultMapping.AddFieldMappingsAt("text", textField)
-	imap.AddSynonymSource(synonymSourceName, synonymCollection, analyzer)
-	err := imap.Validate()
+	err := imap.AddSynonymSource(synonymSourceName, synonymSourceConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = imap.Validate()
 	if err != nil {
 		t.Fatal(err)
 	}
