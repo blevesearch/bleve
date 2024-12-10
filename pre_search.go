@@ -14,6 +14,8 @@
 
 package bleve
 
+import "fmt"
+
 // A preSearchResultProcessor processes the data in
 // the preSearch result from multiple
 // indexes in an alias and merges them together to
@@ -60,7 +62,7 @@ func newBM25PreSearchResultProcessor() *bm25PreSearchResultProcessor {
 // TODO How will this work for queries other than term queries?
 func (b *bm25PreSearchResultProcessor) add(sr *SearchResult, indexName string) {
 	b.docCount += (sr.docCount)
-
+	fmt.Println("docCount: ", b.docCount)
 	for field, cardinality := range sr.fieldCardinality {
 		b.fieldCardinality[field] += cardinality
 	}
