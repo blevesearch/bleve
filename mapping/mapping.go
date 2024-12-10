@@ -60,4 +60,6 @@ type IndexMapping interface {
 }
 type BM25Mapping interface {
 	IndexMapping
+
+	BM25Impl()
 }

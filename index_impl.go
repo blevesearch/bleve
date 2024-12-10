@@ -530,7 +530,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	var knnHits []*search.DocumentMatch
-	var bm25TotalDocs uint64
+	var bm25Data map[string]interface{}
 	var ok bool
 	var skipKnnCollector bool
 	if req.PreSearchData != nil {
@@ -546,7 +546,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				skipKnnCollector = true
 			case search.BM25PreSearchDataKey:
 				if v != nil {
-					bm25TotalDocs, ok = v.(uint64)
+					bm25Data, ok = v.(map[string]interface{})
 					if !ok {
 						return nil, fmt.Errorf("bm25 preSearchData must be of type uint64")
 					}
@@ -563,8 +563,8 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	setKnnHitsInCollector(knnHits, req, coll)
 
-	if bm25TotalDocs > 0 {
-		ctx = context.WithValue(ctx, search.BM25MapKey, bm25TotalDocs)
+	if bm25Data != nil {
+		ctx = context.WithValue(ctx, search.BM25PreSearchDataKey, bm25Data)
 	}
 
 	// This callback and variable handles the tracking of bytes read

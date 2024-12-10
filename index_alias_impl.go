@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -221,6 +222,8 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		if err != nil {
 			return nil, err
 		}
+
+		fmt.Println("presearch result", preSearchResult.docCount)
 		// check if the preSearch result has any errors and if so
 		// return the search result as is without executing the query
 		// so that the errors are not lost
@@ -549,7 +552,7 @@ type asyncSearchResult struct {
 // preSearchFlags is a struct to hold flags indicating why preSearch is required
 type preSearchFlags struct {
 	knn  bool
-	bm25 bool // needs presearch for this too
+	bm25 bool
 }
 
 // preSearchRequired checks if preSearch is required and returns the presearch flags struct
@@ -558,13 +561,10 @@ func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) *preSearchFla
 	// Check for KNN query
 	knn := requestHasKNN(req)
 	var bm25 bool
-	if !isMatchNoneQuery(req.Query) {
-		// todo fix this cuRRENTLY ALL INDEX mappings are BM25 mappings, need to fix
-		// this is just a placeholder.
-		if _, ok := m.(mapping.BM25Mapping); ok {
-			bm25 = true
-		}
+	if _, ok := m.(mapping.BM25Mapping); ok {
+		bm25 = true
 	}
+
 	if knn || bm25 {
 		return &preSearchFlags{
 			knn:  knn,

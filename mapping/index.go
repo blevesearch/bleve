@@ -457,3 +457,7 @@ func (im *IndexMappingImpl) FieldMappingForPath(path string) FieldMapping {
 func (im *IndexMappingImpl) DefaultSearchField() string {
 	return im.DefaultField
 }
+
+func (im *IndexMappingImpl) BM25Impl() {
+	fmt.Println("BM25Impl")
+}
