@@ -66,18 +66,26 @@ func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader,
 	return newTermSearcherFromReader(ctx, indexReader, reader, term, field, boost, options)
 }
 
-func tfTDFScoreMetrics(indexReader index.IndexReader) (uint64, int, error) {
+func tfTDFScoreMetrics(indexReader index.IndexReader) (uint64, float64, error) {
 	// default tf-idf stats
 	count, err := indexReader.DocCount()
 	if err != nil {
 		return 0, 0, err
 	}
 	fieldCardinality := 0
-	return count, fieldCardinality, nil
+
+	// fmt.Println("----------tf-idf stats--------")
+	// fmt.Println("docCount: ", count)
+	// fmt.Println("fieldCardinality: ", fieldCardinality)
+
+	if count == 0 && fieldCardinality == 0 {
+		return 0, 0, nil
+	}
+	return count, float64(fieldCardinality / int(count)), nil
 }
 
 func bm25ScoreMetrics(ctx context.Context, field string,
-	indexReader index.IndexReader) (uint64, int, error) {
+	indexReader index.IndexReader) (uint64, float64, error) {
 	var count uint64
 	var fieldCardinality int
 	var err error
@@ -102,18 +110,21 @@ func bm25ScoreMetrics(ctx context.Context, field string,
 		}
 	}
 
-	fmt.Println("----------bm25 stats--------")
-	fmt.Println("docCount: ", count)
-	fmt.Println("fieldCardinality: ", fieldCardinality)
-	fmt.Println("avgDocLength: ", fieldCardinality/int(count))
+	// fmt.Println("----------bm25 stats--------")
+	// fmt.Println("docCount: ", count)
+	// fmt.Println("fieldCardinality: ", fieldCardinality)
+	// fmt.Println("avgDocLength: ", fieldCardinality/int(count))
 
-	return count, fieldCardinality, nil
+	if count == 0 && fieldCardinality == 0 {
+		return 0, 0, nil
+	}
+	return count, float64(fieldCardinality / int(count)), nil
 }
 
 func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReader, reader index.TermFieldReader,
 	term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
 	var count uint64
-	var fieldCardinality int
+	var avgDocLength float64
 	var err error
 	if ctx != nil {
 		if similaritModelCallback, ok := ctx.Value(search.
@@ -121,13 +132,13 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 			similarityModel := similaritModelCallback(field)
 			if similarityModel == "" || similarityModel == index.BM25Similarity {
 				// in case of bm25 need to fetch the multipliers as well (perhaps via context's presearch data)
-				count, fieldCardinality, err = bm25ScoreMetrics(ctx, field, indexReader)
+				count, avgDocLength, err = bm25ScoreMetrics(ctx, field, indexReader)
 				if err != nil {
 					_ = reader.Close()
 					return nil, err
 				}
 			} else {
-				count, fieldCardinality, err = tfTDFScoreMetrics(indexReader)
+				count, avgDocLength, err = tfTDFScoreMetrics(indexReader)
 				if err != nil {
 					_ = reader.Close()
 					return nil, err
@@ -135,14 +146,21 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 			}
 		} else {
 			// default tf-idf stats
-			count, fieldCardinality, err = tfTDFScoreMetrics(indexReader)
+			count, avgDocLength, err = tfTDFScoreMetrics(indexReader)
 			if err != nil {
 				_ = reader.Close()
 				return nil, err
 			}
 		}
+	} else {
+		// default tf-idf stats
+		count, avgDocLength, err = tfTDFScoreMetrics(indexReader)
+		if err != nil {
+			_ = reader.Close()
+			return nil, err
+		}
 	}
-	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), float64(fieldCardinality/int(count)), options)
+	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), avgDocLength, options)
 	return &TermSearcher{
 		indexReader: indexReader,
 		reader:      reader,

@@ -148,7 +148,6 @@ func (is *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 				if dictStats, ok := dict.(segment.DiskStatsReporter); ok {
 					atomic.AddUint64(&totalBytesRead, dictStats.BytesRead())
 				}
-				fmt.Println("bro what", int64(dict.Cardinality()))
 				atomic.AddInt64(&fieldCardinality, int64(dict.Cardinality()))
 				if randomLookup {
 					results <- &asynchSegmentResult{dict: dict}
