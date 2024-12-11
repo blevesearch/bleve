@@ -174,7 +174,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// and NOT a real search
 		flags := &preSearchFlags{
 			knn:  requestHasKNN(req), // set knn flag if the request has KNN
-			bm25: true,               // TODO Just force setting it to true to test
+			bm25: true,
 		}
 		return preSearchDataSearch(ctx, req, flags, i.indexes...)
 	}

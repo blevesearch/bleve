@@ -563,6 +563,13 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	setKnnHitsInCollector(knnHits, req, coll)
 
+	fieldMappingCallback := func(field string) string {
+		rv := i.m.FieldMappingForPath(field)
+		return rv.Similarity
+	}
+	ctx = context.WithValue(ctx, search.GetSimilarityModelCallbackKey,
+		search.GetSimilarityModelCallbackFn(fieldMappingCallback))
+
 	// set the bm25 presearch data (stats important for consistent scoring) in
 	// the context object
 	if bm25Data != nil {
