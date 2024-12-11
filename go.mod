@@ -23,8 +23,8 @@ require (
 	github.com/blevesearch/zapx/v12 v12.3.10
 	github.com/blevesearch/zapx/v13 v13.3.10
 	github.com/blevesearch/zapx/v14 v14.3.10
-	github.com/blevesearch/zapx/v15 v15.3.16
-	github.com/blevesearch/zapx/v16 v16.1.9
+	github.com/blevesearch/zapx/v15 v15.3.17
+	github.com/blevesearch/zapx/v16 v16.1.10
 	github.com/couchbase/moss v0.2.0
 	github.com/golang/protobuf v1.3.2
 	github.com/spf13/cobra v1.7.0
@@ -36,7 +36,7 @@ require (
 	github.com/blevesearch/mmap-go v1.0.4 // indirect
 	github.com/couchbase/ghistogram v0.1.0 // indirect
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
-	github.com/golang/snappy v0.0.1 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v0.0.0-20171115153421-f7279a603ede // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
