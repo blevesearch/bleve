@@ -21,14 +21,14 @@ import (
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 )
 
-var reflectStaticSizeIndexSnapshotSynonymTermReader int
+var reflectStaticSizeIndexSnapshotThesaurusTermReader int
 
 func init() {
-	var istr IndexSnapshotSynonymTermReader
-	reflectStaticSizeIndexSnapshotSynonymTermReader = int(reflect.TypeOf(istr).Size())
+	var istr IndexSnapshotThesaurusTermReader
+	reflectStaticSizeIndexSnapshotThesaurusTermReader = int(reflect.TypeOf(istr).Size())
 }
 
-type IndexSnapshotSynonymTermReader struct {
+type IndexSnapshotThesaurusTermReader struct {
 	name          string
 	snapshot      *IndexSnapshot
 	thesauri      []segment.Thesaurus
@@ -37,8 +37,8 @@ type IndexSnapshotSynonymTermReader struct {
 	segmentOffset int
 }
 
-func (i *IndexSnapshotSynonymTermReader) Size() int {
-	sizeInBytes := reflectStaticSizeIndexSnapshotSynonymTermReader + size.SizeOfPtr +
+func (i *IndexSnapshotThesaurusTermReader) Size() int {
+	sizeInBytes := reflectStaticSizeIndexSnapshotThesaurusTermReader + size.SizeOfPtr +
 		len(i.name) + size.SizeOfString
 
 	for _, postings := range i.postings {
@@ -52,7 +52,7 @@ func (i *IndexSnapshotSynonymTermReader) Size() int {
 	return sizeInBytes
 }
 
-func (i *IndexSnapshotSynonymTermReader) Next() (string, error) {
+func (i *IndexSnapshotThesaurusTermReader) Next() (string, error) {
 	// find the next hit
 	for i.segmentOffset < len(i.iterators) {
 		if i.iterators[i.segmentOffset] != nil {
@@ -70,9 +70,9 @@ func (i *IndexSnapshotSynonymTermReader) Next() (string, error) {
 	return "", nil
 }
 
-func (i *IndexSnapshotSynonymTermReader) Close() error {
+func (i *IndexSnapshotThesaurusTermReader) Close() error {
 	if i.snapshot != nil {
-		i.snapshot.recycleSynonymTermReader(i)
+		i.snapshot.recycleThesaurusTermReader(i)
 	}
 	return nil
 }

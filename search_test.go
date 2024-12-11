@@ -3751,7 +3751,7 @@ func TestAutoFuzzy(t *testing.T) {
 	}
 }
 
-func TestSynonymTermReader(t *testing.T) {
+func TestThesaurusTermReader(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
@@ -3862,9 +3862,9 @@ func TestSynonymTermReader(t *testing.T) {
 		}
 	}()
 
-	synReader, ok := reader.(index.ThesaurusReader)
+	thesReader, ok := reader.(index.ThesaurusReader)
 	if !ok {
-		t.Fatal("expected synonym reader")
+		t.Fatal("expected thesaurus reader")
 	}
 
 	type testStruct struct {
@@ -3912,7 +3912,7 @@ func TestSynonymTermReader(t *testing.T) {
 	}
 
 	for _, test := range testQueries {
-		str, err := synReader.SynonymTermReader(context.Background(), synonymSourceName, []byte(test.queryTerm))
+		str, err := thesReader.ThesaurusTermReader(context.Background(), synonymSourceName, []byte(test.queryTerm))
 		if err != nil {
 			t.Fatal(err)
 		}

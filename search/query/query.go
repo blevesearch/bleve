@@ -740,7 +740,7 @@ func addSynonymsForTermWithMatchType(ctx context.Context, matchType int, src, fi
 func addSynonymsForTerm(ctx context.Context, src, field, term string,
 	r index.ThesaurusReader, rv search.FieldTermSynonymMap) (search.FieldTermSynonymMap, error) {
 
-	termReader, err := r.SynonymTermReader(ctx, src, []byte(term))
+	termReader, err := r.ThesaurusTermReader(ctx, src, []byte(term))
 	if err != nil {
 		return nil, err
 	}

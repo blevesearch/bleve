@@ -60,7 +60,7 @@ var reflectStaticSizeIndexSnapshot int
 // exported variable, or at the index level by setting the FieldTFRCacheThreshold
 // in the kvConfig.
 var DefaultFieldTFRCacheThreshold uint64 = 10
-var DefaultSynonymTermReaderCacheThreshold uint64 = 10
+var DefaultThesaurusTermReaderCacheThreshold uint64 = 10
 
 func init() {
 	var is interface{} = IndexSnapshot{}
@@ -88,9 +88,9 @@ type IndexSnapshot struct {
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
 
-	m2                 sync.Mutex                                   // Protects the fields that follow.
-	fieldTFRs          map[string][]*IndexSnapshotTermFieldReader   // keyed by field, recycled TFR's
-	synonymTermReaders map[string][]*IndexSnapshotSynonymTermReader // keyed by thesaurus name, recycled thesaurus readers
+	m2                   sync.Mutex                                     // Protects the fields that follow.
+	fieldTFRs            map[string][]*IndexSnapshotTermFieldReader     // keyed by field, recycled TFR's
+	thesaurusTermReaders map[string][]*IndexSnapshotThesaurusTermReader // keyed by thesaurus name, recycled thesaurus readers
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
@@ -683,13 +683,13 @@ func (is *IndexSnapshot) getFieldTFRCacheThreshold() uint64 {
 	return DefaultFieldTFRCacheThreshold
 }
 
-func (is *IndexSnapshot) getSynonymTermReaderCacheThreshold() uint64 {
+func (is *IndexSnapshot) getThesaurusTermReaderCacheThreshold() uint64 {
 	if is.parent.config != nil {
-		if _, ok := is.parent.config["SynonymTermReaderCacheThreshold"]; ok {
-			return is.parent.config["SynonymTermReaderCacheThreshold"].(uint64)
+		if _, ok := is.parent.config["ThesaurusTermReaderCacheThreshold"]; ok {
+			return is.parent.config["ThesaurusTermReaderCacheThreshold"].(uint64)
 		}
 	}
-	return DefaultSynonymTermReaderCacheThreshold
+	return DefaultThesaurusTermReaderCacheThreshold
 }
 
 func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader) {
@@ -720,7 +720,7 @@ func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReade
 	is.m2.Unlock()
 }
 
-func (is *IndexSnapshot) recycleSynonymTermReader(str *IndexSnapshotSynonymTermReader) {
+func (is *IndexSnapshot) recycleThesaurusTermReader(str *IndexSnapshotThesaurusTermReader) {
 	is.parent.rootLock.RLock()
 	obsolete := is.parent.root != is
 	is.parent.rootLock.RUnlock()
@@ -730,11 +730,11 @@ func (is *IndexSnapshot) recycleSynonymTermReader(str *IndexSnapshotSynonymTermR
 	}
 
 	is.m2.Lock()
-	if is.synonymTermReaders == nil {
-		is.synonymTermReaders = map[string][]*IndexSnapshotSynonymTermReader{}
+	if is.thesaurusTermReaders == nil {
+		is.thesaurusTermReaders = map[string][]*IndexSnapshotThesaurusTermReader{}
 	}
-	if uint64(len(is.synonymTermReaders[str.name])) < is.getSynonymTermReaderCacheThreshold() {
-		is.synonymTermReaders[str.name] = append(is.synonymTermReaders[str.name], str)
+	if uint64(len(is.thesaurusTermReaders[str.name])) < is.getThesaurusTermReaderCacheThreshold() {
+		is.thesaurusTermReaders[str.name] = append(is.thesaurusTermReaders[str.name], str)
 	}
 	is.m2.Unlock()
 }
@@ -1019,25 +1019,25 @@ func (is *IndexSnapshot) CloseCopyReader() error {
 	return is.Close()
 }
 
-func (is *IndexSnapshot) allocSynonymTermReader(name string) (str *IndexSnapshotSynonymTermReader) {
+func (is *IndexSnapshot) allocThesaurusTermReader(name string) (str *IndexSnapshotThesaurusTermReader) {
 	is.m2.Lock()
-	if is.synonymTermReaders != nil {
-		strs := is.synonymTermReaders[name]
+	if is.thesaurusTermReaders != nil {
+		strs := is.thesaurusTermReaders[name]
 		last := len(strs) - 1
 		if last >= 0 {
 			str = strs[last]
 			strs[last] = nil
-			is.synonymTermReaders[name] = strs[:last]
+			is.thesaurusTermReaders[name] = strs[:last]
 			is.m2.Unlock()
 			return
 		}
 	}
 	is.m2.Unlock()
-	return &IndexSnapshotSynonymTermReader{}
+	return &IndexSnapshotThesaurusTermReader{}
 }
 
-func (is *IndexSnapshot) SynonymTermReader(ctx context.Context, thesaurusName string, term []byte) (index.SynonymTermReader, error) {
-	rv := is.allocSynonymTermReader(thesaurusName)
+func (is *IndexSnapshot) ThesaurusTermReader(ctx context.Context, thesaurusName string, term []byte) (index.ThesaurusTermReader, error) {
+	rv := is.allocThesaurusTermReader(thesaurusName)
 
 	rv.name = thesaurusName
 	rv.snapshot = is
