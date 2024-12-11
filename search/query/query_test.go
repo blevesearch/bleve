@@ -999,6 +999,24 @@ func TestExtractFields(t *testing.T) {
 					}`,
 			expFields: []string{"date", "number", "date2", "number2", "date3"},
 		},
+		{
+			query: `{
+						"query" : "hardworking people"
+					}`,
+			expFields: []string{"_all"},
+		},
+		{
+			query: `{
+						"query" : "text:hardworking people"
+					}`,
+			expFields: []string{"text", "_all"},
+		},
+		{
+			query: `{
+						"query" : "text:\"hardworking people\""
+					}`,
+			expFields: []string{"text"},
+		},
 	}
 
 	m := mapping.NewIndexMapping()
@@ -1007,7 +1025,10 @@ func TestExtractFields(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		fields := ExtractFields(q, m, nil)
+		fields, err := ExtractFields(q, m, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
 		var fieldsSlice []string
 		for k := range fields {
 			fieldsSlice = append(fieldsSlice, k)

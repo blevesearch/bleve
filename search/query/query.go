@@ -430,10 +430,11 @@ type FieldSet map[string]struct{}
 // ExtractFields returns a set of fields referenced by the query.
 // The returned set may be nil if the query does not explicitly reference any field
 // and the DefaultSearchField is unset in the index mapping.
-func ExtractFields(q Query, m mapping.IndexMapping, fs FieldSet) FieldSet {
-	if q == nil {
-		return fs
+func ExtractFields(q Query, m mapping.IndexMapping, fs FieldSet) (FieldSet, error) {
+	if q == nil || m == nil {
+		return fs, nil
 	}
+	var err error
 	switch q := q.(type) {
 	case FieldableQuery:
 		f := q.Field()
@@ -446,18 +447,33 @@ func ExtractFields(q Query, m mapping.IndexMapping, fs FieldSet) FieldSet {
 			}
 			fs[f] = struct{}{}
 		}
+	case *QueryStringQuery:
+		var expandedQuery Query
+		expandedQuery, err = expandQuery(m, q)
+		if err == nil {
+			fs, err = ExtractFields(expandedQuery, m, fs)
+		}
 	case *BooleanQuery:
 		for _, subq := range []Query{q.Must, q.Should, q.MustNot} {
-			fs = ExtractFields(subq, m, fs)
+			fs, err = ExtractFields(subq, m, fs)
+			if err != nil {
+				break
+			}
 		}
 	case *ConjunctionQuery:
 		for _, subq := range q.Conjuncts {
-			fs = ExtractFields(subq, m, fs)
+			fs, err = ExtractFields(subq, m, fs)
+			if err != nil {
+				break
+			}
 		}
 	case *DisjunctionQuery:
 		for _, subq := range q.Disjuncts {
-			fs = ExtractFields(subq, m, fs)
+			fs, err = ExtractFields(subq, m, fs)
+			if err != nil {
+				break
+			}
 		}
 	}
-	return fs
+	return fs, err
 }
