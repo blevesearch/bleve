@@ -580,7 +580,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	var fts search.FieldTermSynonymMap
 	var skipSynonymCollector bool
 
-	var bm25TotalDocs uint64
 	var bm25Data map[string]interface{}
 	var ok bool
 	if req.PreSearchData != nil {
@@ -602,7 +601,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 					}
 					skipSynonymCollector = true
 				}
-				skipKnnCollector = true
+				skipKNNCollector = true
 			case search.BM25PreSearchDataKey:
 				if v != nil {
 					bm25Data, ok = v.(map[string]interface{})
@@ -636,6 +635,13 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	if fts != nil {
 		ctx = context.WithValue(ctx, search.FieldTermSynonymMapKey, fts)
 	}
+	fieldMappingCallback := func(field string) string {
+		rv := i.m.FieldMappingForPath(field)
+		return rv.Similarity
+	}
+	ctx = context.WithValue(ctx, search.GetSimilarityModelCallbackKey,
+		search.GetSimilarityModelCallbackFn(fieldMappingCallback))
+
 	// set the bm25 presearch data (stats important for consistent scoring) in
 	// the context object
 	if bm25Data != nil {

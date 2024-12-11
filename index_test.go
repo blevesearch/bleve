@@ -466,7 +466,7 @@ func TestBM25(t *testing.T) {
 
 	ctx := context.Background()
 	// not setting this doesn't perform a presearch for bm25
-	ctx = context.WithValue(ctx, search.SearchTypeKey, search.FetchStatsAndSearch)
+	// ctx = context.WithValue(ctx, search.SearchTypeKey, search.FetchStatsAndSearch)
 
 	res, err = multiPartIndex.SearchInContext(ctx, searchRequest)
 	if err != nil {

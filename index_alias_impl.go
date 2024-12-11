@@ -723,26 +723,27 @@ func constructBM25PreSearchData(rv map[string]map[string]interface{}, sr *Search
 
 func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
 	preSearchResult *SearchResult, indexes []Index) (map[string]map[string]interface{}, error) {
-	if flags == nil || preSearchResult == nil {
-		return nil, fmt.Errorf("invalid input, flags: %v, preSearchResult: %v", flags, preSearchResult)
-	}
-	mergedOut := make(map[string]map[string]interface{}, len(indexes))
-	for _, index := range indexes {
-		mergedOut[index.Name()] = make(map[string]interface{})
-	}
-	var err error
-	if flags.knn {
-		mergedOut, err = constructKnnPreSearchData(mergedOut, preSearchResult, indexes)
-		if err != nil {
-			return nil, err
+		if flags == nil || preSearchResult == nil {
+			return nil, fmt.Errorf("invalid input, flags: %v, preSearchResult: %v", flags, preSearchResult)
 		}
+		mergedOut := make(map[string]map[string]interface{}, len(indexes))
+		for _, index := range indexes {
+			mergedOut[index.Name()] = make(map[string]interface{})
+		}
+		var err error
+		if flags.knn {
+			mergedOut, err = constructKnnPreSearchData(mergedOut, preSearchResult, indexes)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if flags.synonyms {
+			mergedOut = constructSynonymPreSearchData(mergedOut, preSearchResult, indexes)
+		if flags.bm25 {
+			mergedOut = constructBM25PreSearchData(mergedOut, preSearchResult, indexes)
+		}
+		return mergedOut, nil
 	}
-	if flags.synonyms {
-		mergedOut = constructSynonymPreSearchData(mergedOut, preSearchResult, indexes)
-	if flags.bm25 {
-		mergedOut = constructBM25PreSearchData(mergedOut, preSearchResult, indexes)
-	}
-	return mergedOut, nil
 }
 
 func preSearchDataSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, indexes ...Index) (*SearchResult, error) {

@@ -66,41 +66,81 @@ func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader,
 	return newTermSearcherFromReader(ctx, indexReader, reader, term, field, boost, options)
 }
 
+func tfTDFScoreMetrics(indexReader index.IndexReader) (uint64, int, error) {
+	// default tf-idf stats
+	count, err := indexReader.DocCount()
+	if err != nil {
+		return 0, 0, err
+	}
+	fieldCardinality := 0
+	return count, fieldCardinality, nil
+}
+
+func bm25ScoreMetrics(ctx context.Context, field string,
+	indexReader index.IndexReader) (uint64, int, error) {
+	var count uint64
+	var fieldCardinality int
+	var err error
+
+	bm25Stats, ok := ctx.Value(search.BM25PreSearchDataKey).(map[string]interface{})
+	if !ok {
+		count, err = indexReader.DocCount()
+		if err != nil {
+			return 0, 0, err
+		}
+		dict, err := indexReader.FieldDict(field)
+		if err != nil {
+			return 0, 0, err
+		}
+		fieldCardinality = dict.Cardinality()
+	} else {
+		count = bm25Stats["docCount"].(uint64)
+		fieldCardinalityMap := bm25Stats["fieldCardinality"].(map[string]int)
+		fieldCardinality, ok = fieldCardinalityMap[field]
+		if !ok {
+			return 0, 0, fmt.Errorf("field stat for bm25 not present %s", field)
+		}
+	}
+
+	fmt.Println("----------bm25 stats--------")
+	fmt.Println("docCount: ", count)
+	fmt.Println("fieldCardinality: ", fieldCardinality)
+	fmt.Println("avgDocLength: ", fieldCardinality/int(count))
+
+	return count, fieldCardinality, nil
+}
+
 func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReader, reader index.TermFieldReader,
 	term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
 	var count uint64
 	var fieldCardinality int
+	var err error
 	if ctx != nil {
-		bm25Stats, ok := ctx.Value(search.BM25PreSearchDataKey).(map[string]interface{})
-		if !ok {
-			var err error
-			count, err = indexReader.DocCount()
+		if similaritModelCallback, ok := ctx.Value(search.
+			GetSimilarityModelCallbackKey).(search.GetSimilarityModelCallbackFn); ok {
+			similarityModel := similaritModelCallback(field)
+			if similarityModel == "" || similarityModel == index.BM25Similarity {
+				// in case of bm25 need to fetch the multipliers as well (perhaps via context's presearch data)
+				count, fieldCardinality, err = bm25ScoreMetrics(ctx, field, indexReader)
+				if err != nil {
+					_ = reader.Close()
+					return nil, err
+				}
+			} else {
+				count, fieldCardinality, err = tfTDFScoreMetrics(indexReader)
+				if err != nil {
+					_ = reader.Close()
+					return nil, err
+				}
+			}
+		} else {
+			// default tf-idf stats
+			count, fieldCardinality, err = tfTDFScoreMetrics(indexReader)
 			if err != nil {
 				_ = reader.Close()
 				return nil, err
 			}
-			dict, err := indexReader.FieldDict(field)
-			if err != nil {
-				_ = indexReader.Close()
-				return nil, err
-			}
-			fieldCardinality = dict.Cardinality()
-			fmt.Println("------------------")
-			fmt.Println("the num docs", count)
-			fmt.Println("the field cardinality", fieldCardinality)
-		} else {
-			fmt.Printf("fetched from ctx \n")
-			count = bm25Stats["docCount"].(uint64)
-			fieldCardinalityMap := bm25Stats["fieldCardinality"].(map[string]int)
-			fieldCardinality, ok = fieldCardinalityMap[field]
-			if !ok {
-				return nil, fmt.Errorf("field stat for bm25 not present %s", field)
-			}
-
-			fmt.Println("average doc length for", field, "is", fieldCardinality/int(count))
 		}
-
-		// in case of bm25 need to fetch the multipliers as well (perhaps via context's presearch data)
 	}
 	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), float64(fieldCardinality/int(count)), options)
 	return &TermSearcher{
