@@ -142,8 +142,8 @@ func (s *TermQueryScorer) docScore(tf, norm float64) float64 {
 
 		// multiplies deciding how much does a doc length affect the score and also
 		// how much can the term frequency affect the score
-		var k1 float64 = 1
-		var b float64 = 1
+		var k1 float64 = 1.2
+		var b float64 = 0.75
 		score = s.idf * (tf * k1) /
 			(tf + k1*(1-b+(b*fieldLength/s.avgDocLength)))
 	}
