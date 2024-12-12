@@ -21,6 +21,7 @@ type customAnalysis struct {
 	TokenFilters    map[string]map[string]interface{} `json:"token_filters,omitempty"`
 	Analyzers       map[string]map[string]interface{} `json:"analyzers,omitempty"`
 	DateTimeParsers map[string]map[string]interface{} `json:"date_time_parsers,omitempty"`
+	SynonymSources  map[string]map[string]interface{} `json:"synonym_sources,omitempty"`
 }
 
 func (c *customAnalysis) registerAll(i *IndexMappingImpl) error {
@@ -83,6 +84,12 @@ func (c *customAnalysis) registerAll(i *IndexMappingImpl) error {
 			return err
 		}
 	}
+	for name, config := range c.SynonymSources {
+		_, err := i.cache.DefineSynonymSource(name, config)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -94,6 +101,7 @@ func newCustomAnalysis() *customAnalysis {
 		TokenFilters:    make(map[string]map[string]interface{}),
 		Analyzers:       make(map[string]map[string]interface{}),
 		DateTimeParsers: make(map[string]map[string]interface{}),
+		SynonymSources:  make(map[string]map[string]interface{}),
 	}
 	return &rv
 }

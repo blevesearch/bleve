@@ -69,11 +69,18 @@ func TestLevenshteinDistanceMax(t *testing.T) {
 			exceeded: true,
 		},
 		{
-			a:        "water",
+			a:        "",
 			b:        "water",
-			max:      1,
-			dist:     0,
+			max:      10,
+			dist:     5,
 			exceeded: false,
+		},
+		{
+			a:        "water",
+			b:        "",
+			max:      3,
+			dist:     3,
+			exceeded: true,
 		},
 	}
 
