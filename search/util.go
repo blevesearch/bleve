@@ -136,13 +136,21 @@ const MinGeoBufPoolSize = 24
 type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
 
 const KnnPreSearchDataKey = "_knn_pre_search_data_key"
+const BM25PreSearchDataKey = "_bm25_pre_search_data_key"
 
 const PreSearchKey = "_presearch_key"
 
-type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)
+const SearchTypeKey = "_search_type_key"
+const FetchStatsAndSearch = "fetch_stats_and_search"
+
+const SearcherStartCallbackKey = "_searcher_start_callback_key"
+const SearcherEndCallbackKey = "_searcher_end_callback_key"
 
 type SearcherStartCallbackFn func(size uint64) error
 type SearcherEndCallbackFn func(size uint64) error
 
-const SearcherStartCallbackKey = "_searcher_start_callback_key"
-const SearcherEndCallbackKey = "_searcher_end_callback_key"
+const GetSimilarityModelCallbackKey = "_get_similarity_model"
+
+type GetSimilarityModelCallbackFn func(field string) string
+
+type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)

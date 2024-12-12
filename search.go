@@ -444,6 +444,10 @@ type SearchResult struct {
 	MaxScore float64                        `json:"max_score"`
 	Took     time.Duration                  `json:"took"`
 	Facets   search.FacetResults            `json:"facets"`
+
+	// The following fields are applicable to BM25 preSearch
+	DocCount         uint64
+	FieldCardinality map[string]int // search_field -> cardinality
 }
 
 func (sr *SearchResult) Size() int {
