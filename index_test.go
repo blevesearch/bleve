@@ -465,8 +465,9 @@ func TestBM25(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	// not setting this doesn't perform a presearch for bm25
-	// ctx = context.WithValue(ctx, search.SearchTypeKey, search.FetchStatsAndSearch)
+	// this key is set to ensure that we have a consistent scoring at the index alias
+	// level (it forces a pre search phase which can have a small overhead)
+	ctx = context.WithValue(ctx, search.SearchTypeKey, search.FetchStatsAndSearch)
 
 	res, err = multiPartIndex.SearchInContext(ctx, searchRequest)
 	if err != nil {
