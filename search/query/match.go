@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/util"
@@ -139,7 +140,10 @@ func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mappin
 		return nil, fmt.Errorf("no analyzer named '%s' registered", q.Analyzer)
 	}
 
-	tokens := analyzer.Analyze([]byte(q.Match))
+	tokens, err := analysis.AnalyzeForTokens(analyzer, []byte(q.Match))
+	if err != nil {
+		return nil, fmt.Errorf("error analyzing input, err:%v", err)
+	}
 	if len(tokens) > 0 {
 
 		tqs := make([]Query, len(tokens))
