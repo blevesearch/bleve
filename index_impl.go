@@ -504,7 +504,10 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 			}
 
 			fs := make(query.FieldSet)
-			fs = query.ExtractFields(req.Query, i.m, fs)
+			fs, err = query.ExtractFields(req.Query, i.m, fs)
+			if err != nil {
+				return nil, err
+			}
 
 			for field := range fs {
 				dict, err := reader.FieldDict(field)
@@ -523,8 +526,8 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 		},
 		Hits:             knnHits,
 		SynonymResult:    fts,
-		docCount:         count,
-		fieldCardinality: fieldCardinality,
+		DocCount:         count,
+		FieldCardinality: fieldCardinality,
 	}, nil
 }
 

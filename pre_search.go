@@ -95,15 +95,15 @@ func newBM25PreSearchResultProcessor() *bm25PreSearchResultProcessor {
 
 // TODO How will this work for queries other than term queries?
 func (b *bm25PreSearchResultProcessor) add(sr *SearchResult, indexName string) {
-	b.docCount += (sr.docCount)
-	for field, cardinality := range sr.fieldCardinality {
+	b.docCount += (sr.DocCount)
+	for field, cardinality := range sr.FieldCardinality {
 		b.fieldCardinality[field] += cardinality
 	}
 }
 
 func (b *bm25PreSearchResultProcessor) finalize(sr *SearchResult) {
-	sr.docCount = b.docCount
-	sr.fieldCardinality = b.fieldCardinality
+	sr.DocCount = b.docCount
+	sr.FieldCardinality = b.fieldCardinality
 }
 
 // -----------------------------------------------------------------------------

@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -714,8 +715,8 @@ func constructSynonymPreSearchData(rv map[string]map[string]interface{}, sr *Sea
 func constructBM25PreSearchData(rv map[string]map[string]interface{}, sr *SearchResult, indexes []Index) map[string]map[string]interface{} {
 	for _, index := range indexes {
 		rv[index.Name()][search.BM25PreSearchDataKey] = map[string]interface{}{
-			"docCount":         sr.docCount,
-			"fieldCardinality": sr.fieldCardinality,
+			"docCount":         sr.DocCount,
+			"fieldCardinality": sr.FieldCardinality,
 		}
 	}
 	return rv
@@ -924,6 +925,7 @@ func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[stri
 		var payload map[string]interface{}
 		if preSearchData != nil {
 			payload = preSearchData[in.Name()]
+			fmt.Println("the payload", payload)
 		}
 		go searchChildIndex(in, createChildSearchRequest(req, payload))
 	}

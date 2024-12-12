@@ -17,6 +17,7 @@ package searcher
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -74,10 +75,6 @@ func tfTDFScoreMetrics(indexReader index.IndexReader) (uint64, float64, error) {
 	}
 	fieldCardinality := 0
 
-	fmt.Println("----------tf-idf stats--------")
-	fmt.Println("docCount: ", count)
-	fmt.Println("fieldCardinality: ", fieldCardinality)
-
 	if count == 0 && fieldCardinality == 0 {
 		return 0, 0, nil
 	}
@@ -109,22 +106,17 @@ func bm25ScoreMetrics(ctx context.Context, field string,
 		if !ok {
 			return 0, 0, fmt.Errorf("field stat for bm25 not present %s", field)
 		}
-
-		fmt.Println("----------bm25 stats--------")
-		fmt.Println("docCount: ", count)
-		fmt.Println("fieldCardinality: ", fieldCardinality)
-		fmt.Println("avgDocLength: ", fieldCardinality/int(count))
 	}
 
 	fmt.Println("----------bm25 stats--------")
 	fmt.Println("docCount: ", count)
 	fmt.Println("fieldCardinality: ", fieldCardinality)
-	fmt.Println("avgDocLength: ", fieldCardinality/int(count))
+	fmt.Println("avgDocLength: ", math.Ceil(float64(fieldCardinality)/float64(count)))
 
 	if count == 0 && fieldCardinality == 0 {
 		return 0, 0, nil
 	}
-	return count, float64(fieldCardinality / int(count)), nil
+	return count, math.Ceil(float64(fieldCardinality) / float64(count)), nil
 }
 
 func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReader,
