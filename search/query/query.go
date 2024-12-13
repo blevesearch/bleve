@@ -105,6 +105,19 @@ func ParsePreSearchData(input []byte) (map[string]interface{}, error) {
 				rv = make(map[string]interface{})
 			}
 			rv[search.SynonymPreSearchDataKey] = value
+		case search.BM25PreSearchDataKey:
+			var value *search.BM25Stats
+			if v != nil {
+				err := util.UnmarshalJSON(v, &value)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if rv == nil {
+				rv = make(map[string]interface{})
+			}
+			rv[search.BM25PreSearchDataKey] = value
+
 		}
 	}
 	return rv, nil

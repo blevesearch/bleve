@@ -87,7 +87,7 @@ func bm25ScoreMetrics(ctx context.Context, field string,
 	var fieldCardinality int
 	var err error
 
-	bm25Stats, ok := ctx.Value(search.BM25PreSearchDataKey).(map[string]interface{})
+	bm25Stats, ok := ctx.Value(search.BM25PreSearchDataKey).(*search.BM25Stats)
 	if !ok {
 		count, err = indexReader.DocCount()
 		if err != nil {
@@ -99,13 +99,16 @@ func bm25ScoreMetrics(ctx context.Context, field string,
 		}
 		fieldCardinality = dict.Cardinality()
 	} else {
-		fmt.Println("prefetching stats")
-		count = bm25Stats["docCount"].(uint64)
-		fieldCardinalityMap := bm25Stats["fieldCardinality"].(map[string]int)
-		fieldCardinality, ok = fieldCardinalityMap[field]
+		count = uint64(bm25Stats.DocCount)
+		fieldCardinality, ok = bm25Stats.FieldCardinality[field]
 		if !ok {
 			return 0, 0, fmt.Errorf("field stat for bm25 not present %s", field)
 		}
+		// fieldCardinalityMap := bm25Stats["fieldCardinality"].(map[string]int)
+		// fieldCardinality, ok = fieldCardinalityMap[field]
+		// if !ok {
+		// 	return 0, 0, fmt.Errorf("field stat for bm25 not present %s", field)
+		// }
 	}
 
 	fmt.Println("----------bm25 stats--------")

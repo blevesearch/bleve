@@ -16,7 +16,6 @@ package bleve
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -578,6 +577,27 @@ type preSearchFlags struct {
 	bm25 bool // needs presearch for this too
 }
 
+func isBM25Enabled(req *SearchRequest, m mapping.IndexMapping) (bool, query.FieldSet) {
+	rv := false
+	fs := make(query.FieldSet)
+	fs, err := query.ExtractFields(req.Query, m, fs)
+	if err != nil {
+		return rv, nil
+	}
+	// if there is any field that has bm25 scoring enabled, we set
+	// the flag to true to presearch the stats needed for the bm25
+	// scoring. Otherwise, we just skip the presearch
+	for field := range fs {
+		f := m.FieldMappingForPath(field)
+		if f.Similarity == "" || f.Similarity == index.BM25Similarity {
+			rv = true
+			break
+		}
+	}
+
+	return rv, fs
+}
+
 // preSearchRequired checks if preSearch is required and returns the presearch flags struct
 // indicating which preSearch is required
 func preSearchRequired(ctx context.Context, req *SearchRequest, m mapping.IndexMapping) (*preSearchFlags, error){
@@ -606,10 +626,7 @@ func preSearchRequired(ctx context.Context, req *SearchRequest, m mapping.IndexM
 		if ctx != nil {
 			if searchType := ctx.Value(search.SearchTypeKey); searchType != nil {
 				if searchType.(string) == search.FetchStatsAndSearch {
-					// todo: check mapping to see if bm25 is needed
-					if _, ok := m.(mapping.BM25Mapping); ok {
-						bm25 = true
-					}
+					bm25, _ = isBM25Enabled(req, m)
 				}
 			}
 		}
@@ -713,10 +730,13 @@ func constructSynonymPreSearchData(rv map[string]map[string]interface{}, sr *Sea
 	}
 }
 func constructBM25PreSearchData(rv map[string]map[string]interface{}, sr *SearchResult, indexes []Index) map[string]map[string]interface{} {
-	for _, index := range indexes {
-		rv[index.Name()][search.BM25PreSearchDataKey] = map[string]interface{}{
-			"docCount":         sr.DocCount,
-			"fieldCardinality": sr.FieldCardinality,
+	bmStats := sr.BM25Stats
+	if bmStats != nil {
+		for _, index := range indexes {
+			rv[index.Name()][search.BM25PreSearchDataKey] = &search.BM25Stats{
+				DocCount:         bmStats.DocCount,
+				FieldCardinality: bmStats.FieldCardinality,
+			}
 		}
 	}
 	return rv
@@ -852,10 +872,9 @@ func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]
 		for _, index := range indexes {
 			rv[index.Name()][search.SynonymPreSearchDataKey] = fts
 
-	// TODO Extend to more stats
-	if totalDocCount, ok := req.PreSearchData[search.BM25PreSearchDataKey].(uint64); ok {
+	if bm25Data, ok := req.PreSearchData[search.BM25PreSearchDataKey].(*search.BM25Stats); ok {
 		for _, index := range indexes {
-			rv[index.Name()][search.BM25PreSearchDataKey] = totalDocCount
+			rv[index.Name()][search.BM25PreSearchDataKey] = bm25Data
 		}
 	}
 	return rv, nil
@@ -925,7 +944,6 @@ func MultiSearch(ctx context.Context, req *SearchRequest, preSearchData map[stri
 		var payload map[string]interface{}
 		if preSearchData != nil {
 			payload = preSearchData[in.Name()]
-			fmt.Println("the payload", payload)
 		}
 		go searchChildIndex(in, createChildSearchRequest(req, payload))
 	}
