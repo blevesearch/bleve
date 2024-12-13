@@ -14,6 +14,8 @@
 
 package bleve
 
+import "github.com/blevesearch/bleve/v2/search"
+
 // A preSearchResultProcessor processes the data in
 // the preSearch result from multiple
 // indexes in an alias and merges them together to
@@ -47,7 +49,7 @@ func (k *knnPreSearchResultProcessor) finalize(sr *SearchResult) {
 
 // -----------------------------------------------------------------------------
 type bm25PreSearchResultProcessor struct {
-	docCount         uint64 // bm25 specific stats
+	docCount         float64 // bm25 specific stats
 	fieldCardinality map[string]int
 }
 
@@ -59,15 +61,19 @@ func newBM25PreSearchResultProcessor() *bm25PreSearchResultProcessor {
 
 // TODO How will this work for queries other than term queries?
 func (b *bm25PreSearchResultProcessor) add(sr *SearchResult, indexName string) {
-	b.docCount += (sr.DocCount)
-	for field, cardinality := range sr.FieldCardinality {
-		b.fieldCardinality[field] += cardinality
+	if sr.BM25Stats != nil {
+		b.docCount += (sr.BM25Stats.DocCount)
+		for field, cardinality := range sr.BM25Stats.FieldCardinality {
+			b.fieldCardinality[field] += cardinality
+		}
 	}
 }
 
 func (b *bm25PreSearchResultProcessor) finalize(sr *SearchResult) {
-	sr.DocCount = b.docCount
-	sr.FieldCardinality = b.fieldCardinality
+	sr.BM25Stats = &search.BM25Stats{
+		DocCount:         b.docCount,
+		FieldCardinality: b.fieldCardinality,
+	}
 }
 
 // -----------------------------------------------------------------------------

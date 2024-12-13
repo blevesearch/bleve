@@ -38,7 +38,6 @@ import (
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/facet"
 	"github.com/blevesearch/bleve/v2/search/highlight"
-	"github.com/blevesearch/bleve/v2/search/query"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/s2"
@@ -453,14 +452,8 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 	var count uint64
 	fieldCardinality := make(map[string]int)
 	if !isMatchNoneQuery(req.Query) {
-		if _, ok := i.m.(mapping.BM25Mapping); ok {
+		if ok, fs := isBM25Enabled(req, i.m); ok {
 			count, err = reader.DocCount()
-			if err != nil {
-				return nil, err
-			}
-
-			fs := make(query.FieldSet)
-			fs, err = query.ExtractFields(req.Query, i.m, fs)
 			if err != nil {
 				return nil, err
 			}
@@ -480,9 +473,11 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 			Total:      1,
 			Successful: 1,
 		},
-		Hits:             knnHits,
-		DocCount:         count,
-		FieldCardinality: fieldCardinality,
+		Hits: knnHits,
+		BM25Stats: &search.BM25Stats{
+			DocCount:         float64(count),
+			FieldCardinality: fieldCardinality,
+		},
 	}, nil
 }
 
@@ -533,7 +528,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	var knnHits []*search.DocumentMatch
-	var bm25Data map[string]interface{}
+	var bm25Data *search.BM25Stats
 	var ok bool
 	var skipKnnCollector bool
 	if req.PreSearchData != nil {
@@ -549,7 +544,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 				skipKnnCollector = true
 			case search.BM25PreSearchDataKey:
 				if v != nil {
-					bm25Data, ok = v.(map[string]interface{})
+					bm25Data, ok = v.(*search.BM25Stats)
 					if !ok {
 						return nil, fmt.Errorf("bm25 preSearchData must be of type map[string]interface{}")
 					}

@@ -151,6 +151,11 @@ type SearcherEndCallbackFn func(size uint64) error
 
 const GetSimilarityModelCallbackKey = "_get_similarity_model"
 
+type BM25Stats struct {
+	DocCount         float64        `json:"doc_count"`
+	FieldCardinality map[string]int `json:"field_cardinality"`
+}
+
 type GetSimilarityModelCallbackFn func(field string) string
 
 type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)

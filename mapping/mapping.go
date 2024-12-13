@@ -58,8 +58,3 @@ type IndexMapping interface {
 
 	FieldMappingForPath(path string) FieldMapping
 }
-type BM25Mapping interface {
-	IndexMapping
-
-	BM25Impl()
-}

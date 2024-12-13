@@ -446,8 +446,7 @@ type SearchResult struct {
 	Facets   search.FacetResults            `json:"facets"`
 
 	// The following fields are applicable to BM25 preSearch
-	DocCount         uint64
-	FieldCardinality map[string]int // search_field -> cardinality
+	BM25Stats *search.BM25Stats `json:"bm25_stats,omitempty"`
 }
 
 func (sr *SearchResult) Size() int {
