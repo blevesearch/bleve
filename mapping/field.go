@@ -74,8 +74,8 @@ type FieldMapping struct {
 	Dims int `json:"dims,omitempty"`
 
 	// Similarity is the similarity algorithm used for scoring
-	// vector fields.
-	// See: index.DefaultSimilarityMetric & index.SupportedSimilarityMetrics
+	// field's content while performing search on it.
+	// See: index.SimilarityModels
 	Similarity string `json:"similarity,omitempty"`
 
 	// Applicable to vector fields only - optimization string

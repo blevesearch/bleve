@@ -173,7 +173,8 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// in another alias, so we need to do a preSearch search
 		// and NOT a real search
 		flags := &preSearchFlags{
-			knn: requestHasKNN(req), // set knn flag if the request has KNN
+			knn:  requestHasKNN(req), // set knn flag if the request has KNN
+			bm25: true,
 		}
 		return preSearchDataSearch(ctx, req, flags, i.indexes...)
 	}
@@ -213,13 +214,14 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	//  - the request requires preSearch
 	var preSearchDuration time.Duration
 	var sr *SearchResult
-	flags := preSearchRequired(req, i.mapping)
+	flags := preSearchRequired(ctx, req, i.mapping)
 	if req.PreSearchData == nil && flags != nil {
 		searchStart := time.Now()
 		preSearchResult, err := preSearch(ctx, req, flags, i.indexes...)
 		if err != nil {
 			return nil, err
 		}
+
 		// check if the preSearch result has any errors and if so
 		// return the search result as is without executing the query
 		// so that the errors are not lost
@@ -547,17 +549,50 @@ type asyncSearchResult struct {
 
 // preSearchFlags is a struct to hold flags indicating why preSearch is required
 type preSearchFlags struct {
-	knn bool
+	knn  bool
+	bm25 bool
+}
+
+func isBM25Enabled(req *SearchRequest, m mapping.IndexMapping) (bool, query.FieldSet) {
+	rv := false
+	fs := make(query.FieldSet)
+	fs, err := query.ExtractFields(req.Query, m, fs)
+	if err != nil {
+		return rv, nil
+	}
+	// if there is any field that has bm25 scoring enabled, we set
+	// the flag to true to presearch the stats needed for the bm25
+	// scoring. Otherwise, we just skip the presearch
+	for field := range fs {
+		f := m.FieldMappingForPath(field)
+		if f.Similarity == "" || f.Similarity == index.BM25Similarity {
+			rv = true
+			break
+		}
+	}
+
+	return rv, fs
 }
 
 // preSearchRequired checks if preSearch is required and returns the presearch flags struct
 // indicating which preSearch is required
-func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) *preSearchFlags {
+func preSearchRequired(ctx context.Context, req *SearchRequest, m mapping.IndexMapping) *preSearchFlags {
 	// Check for KNN query
 	knn := requestHasKNN(req)
-	if knn {
+	var bm25 bool
+	if !isMatchNoneQuery(req.Query) {
+		if ctx != nil {
+			if searchType := ctx.Value(search.SearchTypeKey); searchType != nil {
+				if searchType.(string) == search.FetchStatsAndSearch {
+					bm25, _ = isBM25Enabled(req, m)
+				}
+			}
+		}
+	}
+	if knn || bm25 {
 		return &preSearchFlags{
-			knn: knn,
+			knn:  knn,
+			bm25: bm25,
 		}
 	}
 	return nil
@@ -566,8 +601,14 @@ func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) *preSearchFla
 func preSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, indexes ...Index) (*SearchResult, error) {
 	// create a dummy request with a match none query
 	// since we only care about the preSearchData in PreSearch
+	var dummyQuery = req.Query
+	if !flags.bm25 {
+		// create a dummy request with a match none query
+		// since we only care about the preSearchData in PreSearch
+		dummyQuery = query.NewMatchNoneQuery()
+	}
 	dummyRequest := &SearchRequest{
-		Query: query.NewMatchNoneQuery(),
+		Query: dummyQuery,
 	}
 	newCtx := context.WithValue(ctx, search.PreSearchKey, true)
 	if flags.knn {
@@ -631,7 +672,21 @@ func requestSatisfiedByPreSearch(req *SearchRequest, flags *preSearchFlags) bool
 	return false
 }
 
-func constructPreSearchData(req *SearchRequest, flags *preSearchFlags, preSearchResult *SearchResult, indexes []Index) (map[string]map[string]interface{}, error) {
+func constructBM25PreSearchData(rv map[string]map[string]interface{}, sr *SearchResult, indexes []Index) map[string]map[string]interface{} {
+	bmStats := sr.BM25Stats
+	if bmStats != nil {
+		for _, index := range indexes {
+			rv[index.Name()][search.BM25PreSearchDataKey] = &search.BM25Stats{
+				DocCount:         bmStats.DocCount,
+				FieldCardinality: bmStats.FieldCardinality,
+			}
+		}
+	}
+	return rv
+}
+
+func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
+	preSearchResult *SearchResult, indexes []Index) (map[string]map[string]interface{}, error) {
 	mergedOut := make(map[string]map[string]interface{}, len(indexes))
 	for _, index := range indexes {
 		mergedOut[index.Name()] = make(map[string]interface{})
@@ -642,6 +697,9 @@ func constructPreSearchData(req *SearchRequest, flags *preSearchFlags, preSearch
 		if err != nil {
 			return nil, err
 		}
+	}
+	if flags.bm25 {
+		mergedOut = constructBM25PreSearchData(mergedOut, preSearchResult, indexes)
 	}
 	return mergedOut, nil
 }
@@ -745,6 +803,12 @@ func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]
 		}
 		for _, index := range indexes {
 			rv[index.Name()][search.KnnPreSearchDataKey] = segregatedKnnHits[index.Name()]
+		}
+	}
+
+	if bm25Data, ok := req.PreSearchData[search.BM25PreSearchDataKey].(*search.BM25Stats); ok {
+		for _, index := range indexes {
+			rv[index.Name()][search.BM25PreSearchDataKey] = bm25Data
 		}
 	}
 	return rv, nil
@@ -929,4 +993,8 @@ func (f *indexAliasImplFieldDict) Next() (*index.DictEntry, error) {
 func (f *indexAliasImplFieldDict) Close() error {
 	defer f.index.mutex.RUnlock()
 	return f.fieldDict.Close()
+}
+
+func (f *indexAliasImplFieldDict) Cardinality() int {
+	return f.fieldDict.Cardinality()
 }

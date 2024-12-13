@@ -449,12 +449,35 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 		}
 	}
 
+	var count uint64
+	fieldCardinality := make(map[string]int)
+	if !isMatchNoneQuery(req.Query) {
+		if ok, fs := isBM25Enabled(req, i.m); ok {
+			count, err = reader.DocCount()
+			if err != nil {
+				return nil, err
+			}
+
+			for field := range fs {
+				dict, err := reader.FieldDict(field)
+				if err != nil {
+					return nil, err
+				}
+				fieldCardinality[field] = dict.Cardinality()
+			}
+		}
+	}
+
 	return &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
 			Successful: 1,
 		},
 		Hits: knnHits,
+		BM25Stats: &search.BM25Stats{
+			DocCount:         float64(count),
+			FieldCardinality: fieldCardinality,
+		},
 	}, nil
 }
 
@@ -505,6 +528,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	var knnHits []*search.DocumentMatch
+	var bm25Data *search.BM25Stats
 	var ok bool
 	var skipKnnCollector bool
 	if req.PreSearchData != nil {
@@ -518,6 +542,13 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 					}
 				}
 				skipKnnCollector = true
+			case search.BM25PreSearchDataKey:
+				if v != nil {
+					bm25Data, ok = v.(*search.BM25Stats)
+					if !ok {
+						return nil, fmt.Errorf("bm25 preSearchData must be of type map[string]interface{}")
+					}
+				}
 			}
 		}
 	}
@@ -529,6 +560,19 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	setKnnHitsInCollector(knnHits, req, coll)
+
+	fieldMappingCallback := func(field string) string {
+		rv := i.m.FieldMappingForPath(field)
+		return rv.Similarity
+	}
+	ctx = context.WithValue(ctx, search.GetSimilarityModelCallbackKey,
+		search.GetSimilarityModelCallbackFn(fieldMappingCallback))
+
+	// set the bm25 presearch data (stats important for consistent scoring) in
+	// the context object
+	if bm25Data != nil {
+		ctx = context.WithValue(ctx, search.BM25PreSearchDataKey, bm25Data)
+	}
 
 	// This callback and variable handles the tracking of bytes read
 	//  1. as part of creation of tfr and its Next() calls which is
@@ -1030,6 +1074,10 @@ func (f *indexImplFieldDict) Close() error {
 		return err
 	}
 	return f.indexReader.Close()
+}
+
+func (f *indexImplFieldDict) Cardinality() int {
+	return f.fieldDict.Cardinality()
 }
 
 // helper function to remove duplicate entries from slice of strings

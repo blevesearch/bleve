@@ -14,6 +14,8 @@
 
 package bleve
 
+import "github.com/blevesearch/bleve/v2/search"
+
 // A preSearchResultProcessor processes the data in
 // the preSearch result from multiple
 // indexes in an alias and merges them together to
@@ -46,6 +48,35 @@ func (k *knnPreSearchResultProcessor) finalize(sr *SearchResult) {
 }
 
 // -----------------------------------------------------------------------------
+type bm25PreSearchResultProcessor struct {
+	docCount         float64 // bm25 specific stats
+	fieldCardinality map[string]int
+}
+
+func newBM25PreSearchResultProcessor() *bm25PreSearchResultProcessor {
+	return &bm25PreSearchResultProcessor{
+		fieldCardinality: make(map[string]int),
+	}
+}
+
+// TODO How will this work for queries other than term queries?
+func (b *bm25PreSearchResultProcessor) add(sr *SearchResult, indexName string) {
+	if sr.BM25Stats != nil {
+		b.docCount += (sr.BM25Stats.DocCount)
+		for field, cardinality := range sr.BM25Stats.FieldCardinality {
+			b.fieldCardinality[field] += cardinality
+		}
+	}
+}
+
+func (b *bm25PreSearchResultProcessor) finalize(sr *SearchResult) {
+	sr.BM25Stats = &search.BM25Stats{
+		DocCount:         b.docCount,
+		FieldCardinality: b.fieldCardinality,
+	}
+}
+
+// -----------------------------------------------------------------------------
 // Master struct that can hold any number of presearch result processors
 type compositePreSearchResultProcessor struct {
 	presearchResultProcessors []preSearchResultProcessor
@@ -73,6 +104,11 @@ func createPreSearchResultProcessor(req *SearchRequest, flags *preSearchFlags) p
 	if flags.knn {
 		if knnProcessor := newKnnPreSearchResultProcessor(req); knnProcessor != nil {
 			processors = append(processors, knnProcessor)
+		}
+	}
+	if flags.bm25 {
+		if bm25Processtor := newBM25PreSearchResultProcessor(); bm25Processtor != nil {
+			processors = append(processors, bm25Processtor)
 		}
 	}
 	// Return based on the number of processors, optimizing for the common case of 1 processor

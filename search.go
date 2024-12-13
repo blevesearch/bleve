@@ -444,6 +444,9 @@ type SearchResult struct {
 	MaxScore float64                        `json:"max_score"`
 	Took     time.Duration                  `json:"took"`
 	Facets   search.FacetResults            `json:"facets"`
+
+	// The following fields are applicable to BM25 preSearch
+	BM25Stats *search.BM25Stats `json:"bm25_stats,omitempty"`
 }
 
 func (sr *SearchResult) Size() int {
