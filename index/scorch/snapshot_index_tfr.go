@@ -17,12 +17,15 @@ package scorch
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"reflect"
+	"runtime/pprof"
 	"sync/atomic"
 
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
+	zapv15 "github.com/blevesearch/zapx/v15"
 )
 
 var reflectStaticSizeIndexSnapshotTermFieldReader int
@@ -74,6 +77,26 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 	if rv == nil {
 		rv = &index.TermFieldDoc{}
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("debug_x: segment/tfr level info")
+			fmt.Println("debug_x: field name", i.field)
+			seg := i.snapshot.segment[i.segmentOffset].Segment()
+			fmt.Println("debug_x: segment Count", seg.Count())
+			if segFile, ok := seg.(segment.PersistedSegment); ok {
+				fmt.Println("debug_x: segment file being accessed", segFile.Path())
+				fmt.Println("debug_x: segment file Ref count", segFile.RefCount())
+			}
+
+			if pitr, ok := i.iterators[i.segmentOffset].(*zapv15.PostingsIterator); ok {
+				fmt.Printf("debug_x: postings iterator %#v\n", pitr)
+				fmt.Printf("debug_x: postings list %#v\n", pitr.Postings)
+			}
+			pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+
+			panic("debug panic search crash")
+		}
+	}()
 	// find the next hit
 	for i.segmentOffset < len(i.iterators) {
 		next, err := i.iterators[i.segmentOffset].Next()
@@ -128,6 +151,26 @@ func (i *IndexSnapshotTermFieldReader) postingToTermFieldDoc(next segment.Postin
 func (i *IndexSnapshotTermFieldReader) Advance(ID index.IndexInternalID, preAlloced *index.TermFieldDoc) (*index.TermFieldDoc, error) {
 	// FIXME do something better
 	// for now, if we need to seek backwards, then restart from the beginning
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("debug_x: segment/tfr level info")
+			fmt.Println("debug_x: field name", i.field)
+			seg := i.snapshot.segment[i.segmentOffset].Segment()
+			fmt.Println("debug_x: segment Count", seg.Count())
+			if segFile, ok := seg.(segment.PersistedSegment); ok {
+				fmt.Println("debug_x: segment file being accessed", segFile.Path())
+				fmt.Println("debug_x: segment file Ref count", segFile.RefCount())
+			}
+
+			if pitr, ok := i.iterators[i.segmentOffset].(*zapv15.PostingsIterator); ok {
+				fmt.Printf("debug_x: postings iterator %#v\n", pitr)
+				fmt.Printf("debug_x: postings list %#v\n", pitr.Postings)
+			}
+			pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+
+			panic("debug panic search crash")
+		}
+	}()
 	if i.currPosting != nil && bytes.Compare(i.currID, ID) >= 0 {
 		i2, err := i.snapshot.TermFieldReader(i.term, i.field,
 			i.includeFreq, i.includeNorm, i.includeTermVectors)
