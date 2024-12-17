@@ -569,8 +569,7 @@ var DefaultFieldTFRCacheThreshold int = 0 // disabled because it causes MB-64604
 
 func (i *IndexSnapshot) getFieldTFRCacheThreshold() int {
 	if i.parent.config != nil {
-		if _, exists := i.parent.config["fieldTFRCacheThreshold"]; exists {
-			val := i.parent.config["fieldTFRCacheThreshold"]
+		if val, exists := i.parent.config["fieldTFRCacheThreshold"]; exists {
 			if x, ok := val.(float64); ok {
 				// JSON unmarshal-ed into a map[string]interface{} will default
 				// to float64 for numbers, so we need to check for float64 first.
