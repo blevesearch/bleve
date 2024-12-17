@@ -92,7 +92,7 @@ func (i *IndexSnapshotTermFieldReader) Next(preAlloced *index.TermFieldDoc) (*in
 				fmt.Printf("debug_x: postings iterator %#v\n", pitr)
 				fmt.Printf("debug_x: postings list %#v\n", pitr.Postings)
 			}
-			pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+			pprof.Lookup("goroutine").WriteTo(os.Stdout, 2)
 
 			panic("debug panic search crash")
 		}
