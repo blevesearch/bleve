@@ -716,38 +716,6 @@ func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
 	return mergedOut, nil
 }
 
-// redistributePreSearchData redistributes the preSearchData sent in the search request to an index alias
-// which would happen in the case of an alias tree and depending on the level of the tree, the preSearchData
-// needs to be redistributed to the indexes at that level
-func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]map[string]interface{}, error) {
-	rv := make(map[string]map[string]interface{})
-	for _, index := range indexes {
-		rv[index.Name()] = make(map[string]interface{})
-	}
-	if knnHits, ok := req.PreSearchData[search.KnnPreSearchDataKey].([]*search.DocumentMatch); ok {
-		// the preSearchData for KNN is a list of DocumentMatch objects
-		// that need to be redistributed to the right index.
-		// This is used only in the case of an alias tree, where the indexes
-		// are at the leaves of the tree, and the master alias is at the root.
-		// At each level of the tree, the preSearchData needs to be redistributed
-		// to the indexes/aliases at that level. Because the preSearchData is
-		// specific to each final index at the leaf.
-		segregatedKnnHits, err := validateAndDistributeKNNHits(knnHits, indexes)
-		if err != nil {
-			return nil, err
-		}
-		for _, index := range indexes {
-			rv[index.Name()][search.KnnPreSearchDataKey] = segregatedKnnHits[index.Name()]
-		}
-	}
-	if fts, ok := req.PreSearchData[search.SynonymPreSearchDataKey].(search.FieldTermSynonymMap); ok {
-		for _, index := range indexes {
-			rv[index.Name()][search.SynonymPreSearchDataKey] = fts
-		}
-	}
-	return rv, nil
-}
-
 func preSearchDataSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, indexes ...Index) (*SearchResult, error) {
 	asyncResults := make(chan *asyncSearchResult, len(indexes))
 	// run search on each index in separate go routine
@@ -823,6 +791,38 @@ func preSearchDataSearch(ctx context.Context, req *SearchRequest, flags *preSear
 		prp.finalize(sr)
 	}
 	return sr, nil
+}
+
+// redistributePreSearchData redistributes the preSearchData sent in the search request to an index alias
+// which would happen in the case of an alias tree and depending on the level of the tree, the preSearchData
+// needs to be redistributed to the indexes at that level
+func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]map[string]interface{}, error) {
+	rv := make(map[string]map[string]interface{})
+	for _, index := range indexes {
+		rv[index.Name()] = make(map[string]interface{})
+	}
+	if knnHits, ok := req.PreSearchData[search.KnnPreSearchDataKey].([]*search.DocumentMatch); ok {
+		// the preSearchData for KNN is a list of DocumentMatch objects
+		// that need to be redistributed to the right index.
+		// This is used only in the case of an alias tree, where the indexes
+		// are at the leaves of the tree, and the master alias is at the root.
+		// At each level of the tree, the preSearchData needs to be redistributed
+		// to the indexes/aliases at that level. Because the preSearchData is
+		// specific to each final index at the leaf.
+		segregatedKnnHits, err := validateAndDistributeKNNHits(knnHits, indexes)
+		if err != nil {
+			return nil, err
+		}
+		for _, index := range indexes {
+			rv[index.Name()][search.KnnPreSearchDataKey] = segregatedKnnHits[index.Name()]
+		}
+	}
+	if fts, ok := req.PreSearchData[search.SynonymPreSearchDataKey].(search.FieldTermSynonymMap); ok {
+		for _, index := range indexes {
+			rv[index.Name()][search.SynonymPreSearchDataKey] = fts
+		}
+	}
+	return rv, nil
 }
 
 // finalizePreSearchResult finalizes the preSearch result by applying the finalization steps
