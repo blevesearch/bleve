@@ -52,15 +52,6 @@ type asynchSegmentResult struct {
 
 var reflectStaticSizeIndexSnapshot int
 
-// DefaultFieldTFRCacheThreshold limits the number of TermFieldReaders(TFR) for
-// a field in an index snapshot. Without this limit, when recycling TFRs, it is
-// possible that a very large number of TFRs may be added to the recycle
-// cache, which could eventually lead to significant memory consumption.
-// This threshold can be overwritten by users at the library level by changing the
-// exported variable, or at the index level by setting the FieldTFRCacheThreshold
-// in the kvConfig.
-var DefaultFieldTFRCacheThreshold uint64 = 10
-
 func init() {
 	var is interface{} = IndexSnapshot{}
 	reflectStaticSizeIndexSnapshot = int(reflect.TypeOf(is).Size())
@@ -640,10 +631,26 @@ func (is *IndexSnapshot) allocTermFieldReaderDicts(field string) (tfr *IndexSnap
 	}
 }
 
-func (is *IndexSnapshot) getFieldTFRCacheThreshold() uint64 {
+// DefaultFieldTFRCacheThreshold limits the number of TermFieldReaders(TFR) for
+// a field in an index snapshot. Without this limit, when recycling TFRs, it is
+// possible that a very large number of TFRs may be added to the recycle
+// cache, which could eventually lead to significant memory consumption.
+// This threshold can be overwritten by users at the library level by changing the
+// exported variable, or at the index level by setting the "fieldTFRCacheThreshold"
+// in the kvConfig.
+var DefaultFieldTFRCacheThreshold int = 0 // disabled because it causes MB-64604
+
+func (is *IndexSnapshot) getFieldTFRCacheThreshold() int {
 	if is.parent.config != nil {
-		if _, ok := is.parent.config["FieldTFRCacheThreshold"]; ok {
-			return is.parent.config["FieldTFRCacheThreshold"].(uint64)
+		if val, exists := is.parent.config["fieldTFRCacheThreshold"]; exists {
+			if x, ok := val.(float64); ok {
+				// JSON unmarshal-ed into a map[string]interface{} will default
+				// to float64 for numbers, so we need to check for float64 first.
+				return int(x)
+			} else if x, ok := val.(int); ok {
+				// If library users provided an int in the config, we'll honor it.
+				return x
+			}
 		}
 	}
 	return DefaultFieldTFRCacheThreshold
@@ -670,7 +677,7 @@ func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReade
 	if is.fieldTFRs == nil {
 		is.fieldTFRs = map[string][]*IndexSnapshotTermFieldReader{}
 	}
-	if uint64(len(is.fieldTFRs[tfr.field])) < is.getFieldTFRCacheThreshold() {
+	if len(is.fieldTFRs[tfr.field]) < is.getFieldTFRCacheThreshold() {
 		tfr.bytesRead = 0
 		is.fieldTFRs[tfr.field] = append(is.fieldTFRs[tfr.field], tfr)
 	}
