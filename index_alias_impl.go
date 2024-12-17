@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -625,6 +626,9 @@ func finalizeSearchResult(req *SearchRequest, preSearchResult *SearchResult) *Se
 }
 
 func requestSatisfiedByPreSearch(req *SearchRequest, flags *preSearchFlags) bool {
+	if flags == nil {
+		return false
+	}
 	if flags.knn && isKNNrequestSatisfiedByPreSearch(req) {
 		return true
 	}
@@ -632,6 +636,9 @@ func requestSatisfiedByPreSearch(req *SearchRequest, flags *preSearchFlags) bool
 }
 
 func constructPreSearchData(req *SearchRequest, flags *preSearchFlags, preSearchResult *SearchResult, indexes []Index) (map[string]map[string]interface{}, error) {
+	if flags == nil || preSearchResult == nil {
+		return nil, fmt.Errorf("invalid input, flags: %v, preSearchResult: %v", flags, preSearchResult)
+	}
 	mergedOut := make(map[string]map[string]interface{}, len(indexes))
 	for _, index := range indexes {
 		mergedOut[index.Name()] = make(map[string]interface{})
@@ -753,6 +760,10 @@ func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]
 // finalizePreSearchResult finalizes the preSearch result by applying the finalization steps
 // specific to the preSearch flags
 func finalizePreSearchResult(req *SearchRequest, flags *preSearchFlags, preSearchResult *SearchResult) {
+	// if flags is nil then return
+	if flags == nil {
+		return
+	}
 	if flags.knn {
 		preSearchResult.Hits = finalizeKNNResults(req, preSearchResult.Hits)
 	}
