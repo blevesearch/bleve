@@ -105,6 +105,10 @@ func (m *compositePreSearchResultProcessor) finalize(sr *SearchResult) {
 // -----------------------------------------------------------------------------
 // Function to create the appropriate preSearchResultProcessor(s)
 func createPreSearchResultProcessor(req *SearchRequest, flags *preSearchFlags) preSearchResultProcessor {
+	// return nil for invalid input
+	if flags == nil || req == nil {
+		return nil
+	}
 	var processors []preSearchResultProcessor
 	// Add KNN processor if the request has KNN
 	if flags.knn {
