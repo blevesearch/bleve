@@ -16,6 +16,7 @@ package query
 
 import (
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -783,5 +784,259 @@ func TestParseEmptyQuery(t *testing.T) {
 	expect = NewMatchNoneQuery()
 	if !reflect.DeepEqual(rv, expect) {
 		t.Errorf("[2] Expected %#v, got %#v", expect, rv)
+	}
+}
+
+func TestExtractFields(t *testing.T) {
+	testQueries := []struct {
+		query     string
+		expFields []string
+	}{
+		{
+			query:     `{"term":"water","field":"desc"}`,
+			expFields: []string{"desc"},
+		},
+		{
+			query: `{
+						"must": {
+							"conjuncts": [
+								{
+									"match": "water",
+									"prefix_length": 0,
+									"fuzziness": 0
+								}
+							]
+						},
+						"should": {
+							"disjuncts": [
+								{
+									"match": "beer",
+									"prefix_length": 0,
+									"fuzziness": 0
+								}
+							],
+							"min": 0
+						},
+						"must_not": {
+							"disjuncts": [
+								{
+									"match": "light",
+									"prefix_length": 0,
+									"fuzziness": 0
+								}
+							],
+							"min": 0
+						}
+					}`,
+			expFields: []string{"_all"},
+		},
+		{
+			query: `{
+						"must": {
+							"conjuncts": [
+								{
+									"match": "water",
+									"prefix_length": 0,
+									"field": "desc",
+									"fuzziness": 0
+								}
+							]
+						},
+						"should": {
+							"disjuncts": [
+								{
+									"match": "beer",
+									"prefix_length": 0,
+									"field": "desc",
+									"fuzziness": 0
+								}
+							],
+							"min": 0
+						},
+						"must_not": {
+							"disjuncts": [
+								{
+									"match": "light",
+									"prefix_length": 0,
+									"field": "genre",
+									"fuzziness": 0
+								}
+							],
+							"min": 0
+						}
+					}`,
+			expFields: []string{"desc", "genre"},
+		},
+		{
+			query: `
+					{
+						"conjuncts": [
+							{
+								"conjuncts": [
+									{
+										"conjuncts": [
+											{
+												"conjuncts": [
+													{
+														"field": "date",
+														"start": "2002-09-05T08:09:00Z",
+														"end": "2007-03-01T03:52:00Z",
+														"inclusive_start": true,
+														"inclusive_end": true
+													},
+													{
+														"field": "number",
+														"min": 1260295,
+														"max": 3917314,
+														"inclusive_min": true,
+														"inclusive_max": true
+													}
+												]
+											},
+											{
+												"conjuncts": [
+													{
+														"field": "date2",
+														"start": "2004-08-21T18:30:00Z",
+														"end": "2006-03-24T08:08:00Z",
+														"inclusive_start": true,
+														"inclusive_end": true
+													},
+													{
+														"field": "number",
+														"min": 165449,
+														"max": 3847517,
+														"inclusive_min": true,
+														"inclusive_max": true
+													}
+												]
+											}
+										]
+									},
+									{
+										"conjuncts": [
+											{
+												"conjuncts": [
+													{
+														"field": "date",
+														"start": "2004-09-02T22:15:00Z",
+														"end": "2008-06-22T15:06:00Z",
+														"inclusive_start": true,
+														"inclusive_end": true
+													},
+													{
+														"field": "number2",
+														"min": 876843,
+														"max": 3363351,
+														"inclusive_min": true,
+														"inclusive_max": true
+													}
+												]
+											},
+											{
+												"conjuncts": [
+													{
+														"field": "date",
+														"start": "2000-12-03T21:35:00Z",
+														"end": "2008-02-07T05:00:00Z",
+														"inclusive_start": true,
+														"inclusive_end": true
+													},
+													{
+														"field": "number",
+														"min": 2021479,
+														"max": 4763404,
+														"inclusive_min": true,
+														"inclusive_max": true
+													}
+												]
+											}
+										]
+									}
+								]
+							},
+							{
+								"conjuncts": [
+									{
+										"conjuncts": [
+											{
+												"field": "date3",
+												"start": "2000-03-13T07:13:00Z",
+												"end": "2005-09-19T09:33:00Z",
+												"inclusive_start": true,
+												"inclusive_end": true
+											},
+											{
+												"field": "number",
+												"min": 883125,
+												"max": 4817433,
+												"inclusive_min": true,
+												"inclusive_max": true
+											}
+										]
+									},
+									{
+										"conjuncts": [
+											{
+												"field": "date",
+												"start": "2002-08-10T22:42:00Z",
+												"end": "2008-02-10T23:19:00Z",
+												"inclusive_start": true,
+												"inclusive_end": true
+											},
+											{
+												"field": "number",
+												"min": 896115,
+												"max": 3897074,
+												"inclusive_min": true,
+												"inclusive_max": true
+											}
+										]
+									}
+								]
+							}
+						]
+					}`,
+			expFields: []string{"date", "number", "date2", "number2", "date3"},
+		},
+		{
+			query: `{
+						"query" : "hardworking people"
+					}`,
+			expFields: []string{"_all"},
+		},
+		{
+			query: `{
+						"query" : "text:hardworking people"
+					}`,
+			expFields: []string{"text", "_all"},
+		},
+		{
+			query: `{
+						"query" : "text:\"hardworking people\""
+					}`,
+			expFields: []string{"text"},
+		},
+	}
+
+	m := mapping.NewIndexMapping()
+	for i, test := range testQueries {
+		q, err := ParseQuery([]byte(test.query))
+		if err != nil {
+			t.Fatal(err)
+		}
+		fields, err := ExtractFields(q, m, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var fieldsSlice []string
+		for k := range fields {
+			fieldsSlice = append(fieldsSlice, k)
+		}
+		sort.Strings(test.expFields)
+		sort.Strings(fieldsSlice)
+		if !reflect.DeepEqual(fieldsSlice, test.expFields) {
+			t.Errorf("Test %d: expected %v, got %v", i, test.expFields, fieldsSlice)
+		}
 	}
 }

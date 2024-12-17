@@ -423,3 +423,57 @@ func DumpQuery(m mapping.IndexMapping, query Query) (string, error) {
 	data, err := json.MarshalIndent(q, "", "  ")
 	return string(data), err
 }
+
+// FieldSet represents a set of queried fields.
+type FieldSet map[string]struct{}
+
+// ExtractFields returns a set of fields referenced by the query.
+// The returned set may be nil if the query does not explicitly reference any field
+// and the DefaultSearchField is unset in the index mapping.
+func ExtractFields(q Query, m mapping.IndexMapping, fs FieldSet) (FieldSet, error) {
+	if q == nil || m == nil {
+		return fs, nil
+	}
+	var err error
+	switch q := q.(type) {
+	case FieldableQuery:
+		f := q.Field()
+		if f == "" {
+			f = m.DefaultSearchField()
+		}
+		if f != "" {
+			if fs == nil {
+				fs = make(FieldSet)
+			}
+			fs[f] = struct{}{}
+		}
+	case *QueryStringQuery:
+		var expandedQuery Query
+		expandedQuery, err = expandQuery(m, q)
+		if err == nil {
+			fs, err = ExtractFields(expandedQuery, m, fs)
+		}
+	case *BooleanQuery:
+		for _, subq := range []Query{q.Must, q.Should, q.MustNot} {
+			fs, err = ExtractFields(subq, m, fs)
+			if err != nil {
+				break
+			}
+		}
+	case *ConjunctionQuery:
+		for _, subq := range q.Conjuncts {
+			fs, err = ExtractFields(subq, m, fs)
+			if err != nil {
+				break
+			}
+		}
+	case *DisjunctionQuery:
+		for _, subq := range q.Disjuncts {
+			fs, err = ExtractFields(subq, m, fs)
+			if err != nil {
+				break
+			}
+		}
+	}
+	return fs, err
+}
