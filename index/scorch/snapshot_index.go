@@ -638,7 +638,7 @@ func (is *IndexSnapshot) allocTermFieldReaderDicts(field string) (tfr *IndexSnap
 // This threshold can be overwritten by users at the library level by changing the
 // exported variable, or at the index level by setting the "fieldTFRCacheThreshold"
 // in the kvConfig.
-const defaultFieldTFRCacheThreshold int = 10
+var DefaultFieldTFRCacheThreshold int = 0 // disabled because it causes MB-64604
 
 func (is *IndexSnapshot) getFieldTFRCacheThreshold() int {
 	if is.parent.config != nil {
@@ -654,7 +654,7 @@ func (is *IndexSnapshot) getFieldTFRCacheThreshold() int {
 			}
 		}
 	}
-	return defaultFieldTFRCacheThreshold
+	return DefaultFieldTFRCacheThreshold
 }
 
 func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader) {
