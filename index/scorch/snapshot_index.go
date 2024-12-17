@@ -631,7 +631,7 @@ func (is *IndexSnapshot) allocTermFieldReaderDicts(field string) (tfr *IndexSnap
 	}
 }
 
-// defaultFieldTFRCacheThreshold limits the number of TermFieldReaders(TFR) for
+// DefaultFieldTFRCacheThreshold limits the number of TermFieldReaders(TFR) for
 // a field in an index snapshot. Without this limit, when recycling TFRs, it is
 // possible that a very large number of TFRs may be added to the recycle
 // cache, which could eventually lead to significant memory consumption.
