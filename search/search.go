@@ -172,6 +172,9 @@ type DocumentMatch struct {
 	// this means that the match is partial because
 	// not all sub-queries matched
 	// if false, all the sub-queries matched
+	// used in match query which is internally a disjunction query
+	// and indicates that whether the document matched all the terms
+	// in the match query or not
 	PartialMatch bool `json:"partial_match,omitempty"`
 
 	// used to indicate the sub-scores that combined to form the
