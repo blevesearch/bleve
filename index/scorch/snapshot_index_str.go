@@ -71,8 +71,5 @@ func (i *IndexSnapshotThesaurusTermReader) Next() (string, error) {
 }
 
 func (i *IndexSnapshotThesaurusTermReader) Close() error {
-	if i.snapshot != nil {
-		i.snapshot.recycleThesaurusTermReader(i)
-	}
 	return nil
 }

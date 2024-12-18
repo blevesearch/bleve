@@ -52,16 +52,6 @@ type asynchSegmentResult struct {
 
 var reflectStaticSizeIndexSnapshot int
 
-// DefaultFieldTFRCacheThreshold limits the number of TermFieldReaders(TFR) for
-// a field in an index snapshot. Without this limit, when recycling TFRs, it is
-// possible that a very large number of TFRs may be added to the recycle
-// cache, which could eventually lead to significant memory consumption.
-// This threshold can be overwritten by users at the library level by changing the
-// exported variable, or at the index level by setting the FieldTFRCacheThreshold
-// in the kvConfig.
-var DefaultFieldTFRCacheThreshold uint64 = 10
-var DefaultThesaurusTermReaderCacheThreshold uint64 = 10
-
 func init() {
 	var is interface{} = IndexSnapshot{}
 	reflectStaticSizeIndexSnapshot = int(reflect.TypeOf(is).Size())
@@ -88,9 +78,8 @@ type IndexSnapshot struct {
 	m    sync.Mutex // Protects the fields that follow.
 	refs int64
 
-	m2                   sync.Mutex                                     // Protects the fields that follow.
-	fieldTFRs            map[string][]*IndexSnapshotTermFieldReader     // keyed by field, recycled TFR's
-	thesaurusTermReaders map[string][]*IndexSnapshotThesaurusTermReader // keyed by thesaurus name, recycled thesaurus readers
+	m2        sync.Mutex                                 // Protects the fields that follow.
+	fieldTFRs map[string][]*IndexSnapshotTermFieldReader // keyed by field, recycled TFR's
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
@@ -674,22 +663,29 @@ func (is *IndexSnapshot) allocTermFieldReaderDicts(field string) (tfr *IndexSnap
 	}
 }
 
-func (is *IndexSnapshot) getFieldTFRCacheThreshold() uint64 {
+// DefaultFieldTFRCacheThreshold limits the number of TermFieldReaders(TFR) for
+// a field in an index snapshot. Without this limit, when recycling TFRs, it is
+// possible that a very large number of TFRs may be added to the recycle
+// cache, which could eventually lead to significant memory consumption.
+// This threshold can be overwritten by users at the library level by changing the
+// exported variable, or at the index level by setting the "fieldTFRCacheThreshold"
+// in the kvConfig.
+var DefaultFieldTFRCacheThreshold int = 0 // disabled because it causes MB-64604
+
+func (is *IndexSnapshot) getFieldTFRCacheThreshold() int {
 	if is.parent.config != nil {
-		if _, ok := is.parent.config["FieldTFRCacheThreshold"]; ok {
-			return is.parent.config["FieldTFRCacheThreshold"].(uint64)
+		if val, exists := is.parent.config["fieldTFRCacheThreshold"]; exists {
+			if x, ok := val.(float64); ok {
+				// JSON unmarshal-ed into a map[string]interface{} will default
+				// to float64 for numbers, so we need to check for float64 first.
+				return int(x)
+			} else if x, ok := val.(int); ok {
+				// If library users provided an int in the config, we'll honor it.
+				return x
+			}
 		}
 	}
 	return DefaultFieldTFRCacheThreshold
-}
-
-func (is *IndexSnapshot) getThesaurusTermReaderCacheThreshold() uint64 {
-	if is.parent.config != nil {
-		if _, ok := is.parent.config["ThesaurusTermReaderCacheThreshold"]; ok {
-			return is.parent.config["ThesaurusTermReaderCacheThreshold"].(uint64)
-		}
-	}
-	return DefaultThesaurusTermReaderCacheThreshold
 }
 
 func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReader) {
@@ -713,28 +709,9 @@ func (is *IndexSnapshot) recycleTermFieldReader(tfr *IndexSnapshotTermFieldReade
 	if is.fieldTFRs == nil {
 		is.fieldTFRs = map[string][]*IndexSnapshotTermFieldReader{}
 	}
-	if uint64(len(is.fieldTFRs[tfr.field])) < is.getFieldTFRCacheThreshold() {
+	if len(is.fieldTFRs[tfr.field]) < is.getFieldTFRCacheThreshold() {
 		tfr.bytesRead = 0
 		is.fieldTFRs[tfr.field] = append(is.fieldTFRs[tfr.field], tfr)
-	}
-	is.m2.Unlock()
-}
-
-func (is *IndexSnapshot) recycleThesaurusTermReader(str *IndexSnapshotThesaurusTermReader) {
-	is.parent.rootLock.RLock()
-	obsolete := is.parent.root != is
-	is.parent.rootLock.RUnlock()
-	if obsolete {
-		// if we're not the current root (mutations happened), don't bother recycling
-		return
-	}
-
-	is.m2.Lock()
-	if is.thesaurusTermReaders == nil {
-		is.thesaurusTermReaders = map[string][]*IndexSnapshotThesaurusTermReader{}
-	}
-	if uint64(len(is.thesaurusTermReaders[str.name])) < is.getThesaurusTermReaderCacheThreshold() {
-		is.thesaurusTermReaders[str.name] = append(is.thesaurusTermReaders[str.name], str)
 	}
 	is.m2.Unlock()
 }
@@ -1019,26 +996,8 @@ func (is *IndexSnapshot) CloseCopyReader() error {
 	return is.Close()
 }
 
-func (is *IndexSnapshot) allocThesaurusTermReader(name string) (str *IndexSnapshotThesaurusTermReader) {
-	is.m2.Lock()
-	if is.thesaurusTermReaders != nil {
-		strs := is.thesaurusTermReaders[name]
-		last := len(strs) - 1
-		if last >= 0 {
-			str = strs[last]
-			strs[last] = nil
-			is.thesaurusTermReaders[name] = strs[:last]
-			is.m2.Unlock()
-			return
-		}
-	}
-	is.m2.Unlock()
-	return &IndexSnapshotThesaurusTermReader{}
-}
-
 func (is *IndexSnapshot) ThesaurusTermReader(ctx context.Context, thesaurusName string, term []byte) (index.ThesaurusTermReader, error) {
-	rv := is.allocThesaurusTermReader(thesaurusName)
-
+	rv := &IndexSnapshotThesaurusTermReader{}
 	rv.name = thesaurusName
 	rv.snapshot = is
 	if rv.postings == nil {
