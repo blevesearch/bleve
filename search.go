@@ -444,6 +444,9 @@ type SearchResult struct {
 	MaxScore float64                        `json:"max_score"`
 	Took     time.Duration                  `json:"took"`
 	Facets   search.FacetResults            `json:"facets"`
+	// special fields that are applicable only for search
+	// results that are obtained from a presearch
+	SynonymResult search.FieldTermSynonymMap `json:"synonym_result,omitempty"`
 }
 
 func (sr *SearchResult) Size() int {

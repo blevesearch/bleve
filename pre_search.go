@@ -14,6 +14,10 @@
 
 package bleve
 
+import (
+	"github.com/blevesearch/bleve/v2/search"
+)
+
 // A preSearchResultProcessor processes the data in
 // the preSearch result from multiple
 // indexes in an alias and merges them together to
@@ -42,6 +46,39 @@ func (k *knnPreSearchResultProcessor) add(sr *SearchResult, indexName string) {
 func (k *knnPreSearchResultProcessor) finalize(sr *SearchResult) {
 	if k.finalizeFn != nil {
 		k.finalizeFn(sr)
+	}
+}
+
+// -----------------------------------------------------------------------------
+// Synonym preSearchResultProcessor for handling Synonym presearch results
+type synonymPreSearchResultProcessor struct {
+	finalizedFts search.FieldTermSynonymMap
+}
+
+func newSynonymPreSearchResultProcessor() *synonymPreSearchResultProcessor {
+	return &synonymPreSearchResultProcessor{}
+}
+
+func (s *synonymPreSearchResultProcessor) add(sr *SearchResult, indexName string) {
+	// Check if SynonymResult or the synonym data key is nil
+	if sr.SynonymResult == nil {
+		return
+	}
+
+	// Attempt to cast PreSearchResults to FieldTermSynonymMap
+
+	// Merge with finalizedFts or initialize it if nil
+	if s.finalizedFts == nil {
+		s.finalizedFts = sr.SynonymResult
+	} else {
+		s.finalizedFts.MergeWith(sr.SynonymResult)
+	}
+}
+
+func (s *synonymPreSearchResultProcessor) finalize(sr *SearchResult) {
+	// Set the finalized synonym data to the PreSearchResults
+	if s.finalizedFts != nil {
+		sr.SynonymResult = s.finalizedFts
 	}
 }
 
@@ -77,6 +114,12 @@ func createPreSearchResultProcessor(req *SearchRequest, flags *preSearchFlags) p
 	if flags.knn {
 		if knnProcessor := newKnnPreSearchResultProcessor(req); knnProcessor != nil {
 			processors = append(processors, knnProcessor)
+		}
+	}
+	// Add Synonym processor if the request has Synonym
+	if flags.synonyms {
+		if synonymProcessor := newSynonymPreSearchResultProcessor(); synonymProcessor != nil {
+			processors = append(processors, synonymProcessor)
 		}
 	}
 	// Return based on the number of processors, optimizing for the common case of 1 processor

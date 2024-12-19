@@ -48,6 +48,13 @@ func NewDocument(id string) *Document {
 	}
 }
 
+func NewSynonymDocument(id string) *Document {
+	return &Document{
+		id:     id,
+		Fields: make([]Field, 0),
+	}
+}
+
 func (d *Document) Size() int {
 	sizeInBytes := reflectStaticSizeDocument + size.SizeOfPtr +
 		len(d.id)
@@ -132,4 +139,12 @@ func (d *Document) VisitComposite(visitor index.CompositeFieldVisitor) {
 
 func (d *Document) HasComposite() bool {
 	return len(d.CompositeFields) > 0
+}
+
+func (d *Document) VisitSynonymFields(visitor index.SynonymFieldVisitor) {
+	for _, f := range d.Fields {
+		if sf, ok := f.(index.SynonymField); ok {
+			visitor(sf)
+		}
+	}
 }

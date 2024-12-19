@@ -83,6 +83,25 @@ func (i *indexAliasImpl) Index(id string, data interface{}) error {
 	return i.indexes[0].Index(id, data)
 }
 
+func (i *indexAliasImpl) IndexSynonym(id string, collection string, definition *SynonymDefinition) error {
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	err := i.isAliasToSingleIndex()
+	if err != nil {
+		return err
+	}
+
+	if si, ok := i.indexes[0].(SynonymIndex); ok {
+		return si.IndexSynonym(id, collection, definition)
+	}
+	return ErrorSynonymSearchNotSupported
+}
+
 func (i *indexAliasImpl) Delete(id string) error {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
@@ -174,7 +193,8 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// in another alias, so we need to do a preSearch search
 		// and NOT a real search
 		flags := &preSearchFlags{
-			knn: requestHasKNN(req), // set knn flag if the request has KNN
+			knn:      requestHasKNN(req),
+			synonyms: !isMatchNoneQuery(req.Query),
 		}
 		return preSearchDataSearch(ctx, req, flags, i.indexes...)
 	}
@@ -214,7 +234,10 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	//  - the request requires preSearch
 	var preSearchDuration time.Duration
 	var sr *SearchResult
-	flags := preSearchRequired(req, i.mapping)
+	flags, err := preSearchRequired(req, i.mapping)
+	if err != nil {
+		return nil, err
+	}
 	if req.PreSearchData == nil && flags != nil {
 		searchStart := time.Now()
 		preSearchResult, err := preSearch(ctx, req, flags, i.indexes...)
@@ -548,27 +571,51 @@ type asyncSearchResult struct {
 
 // preSearchFlags is a struct to hold flags indicating why preSearch is required
 type preSearchFlags struct {
-	knn bool
+	knn      bool
+	synonyms bool
 }
 
-// preSearchRequired checks if preSearch is required and returns the presearch flags struct
-// indicating which preSearch is required
-func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) *preSearchFlags {
+// preSearchRequired checks if preSearch is required and returns a boolean flag
+// It only allocates the preSearchFlags struct if necessary
+func preSearchRequired(req *SearchRequest, m mapping.IndexMapping) (*preSearchFlags, error) {
 	// Check for KNN query
 	knn := requestHasKNN(req)
-	if knn {
-		return &preSearchFlags{
-			knn: knn,
+	var synonyms bool
+	if !isMatchNoneQuery(req.Query) {
+		// Check if synonyms are defined in the mapping
+		if sm, ok := m.(mapping.SynonymMapping); ok && sm.SynonymCount() > 0 {
+			// check if any of the fields queried have a synonym source
+			// in the index mapping, to prevent unnecessary preSearch
+			fs, err := query.ExtractFields(req.Query, m, nil)
+			if err != nil {
+				return nil, err
+			}
+			for field := range fs {
+				if sm.SynonymSourceForPath(field) != "" {
+					synonyms = true
+					break
+				}
+			}
 		}
 	}
-	return nil
+	if knn || synonyms {
+		return &preSearchFlags{
+			knn:      knn,
+			synonyms: synonyms,
+		}, nil
+	}
+	return nil, nil
 }
 
 func preSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, indexes ...Index) (*SearchResult, error) {
-	// create a dummy request with a match none query
-	// since we only care about the preSearchData in PreSearch
+	var dummyQuery = req.Query
+	if !flags.synonyms {
+		// create a dummy request with a match none query
+		// since we only care about the preSearchData in PreSearch
+		dummyQuery = query.NewMatchNoneQuery()
+	}
 	dummyRequest := &SearchRequest{
-		Query: query.NewMatchNoneQuery(),
+		Query: dummyQuery,
 	}
 	newCtx := context.WithValue(ctx, search.PreSearchKey, true)
 	if flags.knn {
@@ -629,13 +676,26 @@ func requestSatisfiedByPreSearch(req *SearchRequest, flags *preSearchFlags) bool
 	if flags == nil {
 		return false
 	}
+	// if the synonyms presearch flag is set the request can never be satisfied by
+	// the preSearch result as synonyms are not part of the preSearch result
+	if flags.synonyms {
+		return false
+	}
 	if flags.knn && isKNNrequestSatisfiedByPreSearch(req) {
 		return true
 	}
 	return false
 }
 
-func constructPreSearchData(req *SearchRequest, flags *preSearchFlags, preSearchResult *SearchResult, indexes []Index) (map[string]map[string]interface{}, error) {
+func constructSynonymPreSearchData(rv map[string]map[string]interface{}, sr *SearchResult, indexes []Index) map[string]map[string]interface{} {
+	for _, index := range indexes {
+		rv[index.Name()][search.SynonymPreSearchDataKey] = sr.SynonymResult
+	}
+	return rv
+}
+
+func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
+	preSearchResult *SearchResult, indexes []Index) (map[string]map[string]interface{}, error) {
 	if flags == nil || preSearchResult == nil {
 		return nil, fmt.Errorf("invalid input, flags: %v, preSearchResult: %v", flags, preSearchResult)
 	}
@@ -649,6 +709,9 @@ func constructPreSearchData(req *SearchRequest, flags *preSearchFlags, preSearch
 		if err != nil {
 			return nil, err
 		}
+	}
+	if flags.synonyms {
+		mergedOut = constructSynonymPreSearchData(mergedOut, preSearchResult, indexes)
 	}
 	return mergedOut, nil
 }
@@ -752,6 +815,11 @@ func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]
 		}
 		for _, index := range indexes {
 			rv[index.Name()][search.KnnPreSearchDataKey] = segregatedKnnHits[index.Name()]
+		}
+	}
+	if fts, ok := req.PreSearchData[search.SynonymPreSearchDataKey].(search.FieldTermSynonymMap); ok {
+		for _, index := range indexes {
+			rv[index.Name()][search.SynonymPreSearchDataKey] = fts
 		}
 	}
 	return rv, nil
