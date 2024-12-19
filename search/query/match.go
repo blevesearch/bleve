@@ -170,6 +170,7 @@ func (q *MatchQuery) Searcher(ctx context.Context, i index.IndexReader, m mappin
 			shouldQuery := NewDisjunctionQuery(tqs)
 			shouldQuery.SetMin(1)
 			shouldQuery.SetBoost(q.BoostVal.Value())
+			shouldQuery.RetrievePartialMatch(true)
 			return shouldQuery.Searcher(ctx, i, m, options)
 
 		case MatchQueryOperatorAnd:

@@ -31,11 +31,16 @@ type DisjunctionQuery struct {
 	BoostVal               *Boost  `json:"boost,omitempty"`
 	Min                    float64 `json:"min"`
 	retrieveScoreBreakdown bool
+	retrievePartialMatch   bool
 	queryStringMode        bool
 }
 
 func (q *DisjunctionQuery) RetrieveScoreBreakdown(b bool) {
 	q.retrieveScoreBreakdown = b
+}
+
+func (q *DisjunctionQuery) RetrievePartialMatch(b bool) {
+	q.retrievePartialMatch = b
 }
 
 // NewDisjunctionQuery creates a new compound Query.
@@ -92,6 +97,7 @@ func (q *DisjunctionQuery) Searcher(ctx context.Context, i index.IndexReader, m 
 	}
 
 	nctx := context.WithValue(ctx, search.IncludeScoreBreakdownKey, q.retrieveScoreBreakdown)
+	nctx = context.WithValue(nctx, search.IncludePartialMatchKey, q.retrievePartialMatch)
 
 	return searcher.NewDisjunctionSearcher(nctx, i, ss, q.Min, options)
 }

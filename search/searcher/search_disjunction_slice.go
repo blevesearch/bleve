@@ -40,6 +40,7 @@ type DisjunctionSliceSearcher struct {
 	numSearchers           int
 	queryNorm              float64
 	retrieveScoreBreakdown bool
+	retrievePartialMatch   bool
 	currs                  []*search.DocumentMatch
 	scorer                 *scorer.DisjunctionQueryScorer
 	min                    int
@@ -60,8 +61,10 @@ func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexRea
 	var searchers OrderedSearcherList
 	var originalPos []int
 	var retrieveScoreBreakdown bool
+	var retrievePartialMatch bool
 	if ctx != nil {
 		retrieveScoreBreakdown, _ = ctx.Value(search.IncludeScoreBreakdownKey).(bool)
+		retrievePartialMatch, _ = ctx.Value(search.IncludePartialMatchKey).(bool)
 	}
 
 	if retrieveScoreBreakdown {
@@ -94,6 +97,7 @@ func newDisjunctionSliceSearcher(ctx context.Context, indexReader index.IndexRea
 		scorer:                 scorer.NewDisjunctionQueryScorer(options),
 		min:                    int(min),
 		retrieveScoreBreakdown: retrieveScoreBreakdown,
+		retrievePartialMatch:   retrievePartialMatch,
 
 		matching:     make([]*search.DocumentMatch, len(searchers)),
 		matchingIdxs: make([]int, len(searchers)),
@@ -232,7 +236,9 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 				// score this match
 				partialMatch := len(s.matching) != len(s.searchers)
 				rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
-				rv.PartialMatch = partialMatch
+				if s.retrievePartialMatch {
+					rv.PartialMatch = partialMatch
+				}
 			}
 		}
 
