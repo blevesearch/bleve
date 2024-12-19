@@ -3836,7 +3836,7 @@ func TestThesaurusTermReader(t *testing.T) {
 	}
 
 	for synName, synDef := range synonymDocuments {
-		err := batch.IndexSynonym(synName, "collection1", synDef)
+		err := batch.IndexSynonym(synName, synonymCollection, synDef)
 		if err != nil {
 			t.Fatal(err)
 		}
