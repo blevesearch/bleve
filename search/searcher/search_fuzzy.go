@@ -17,6 +17,7 @@ package searcher
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/blevesearch/bleve/v2/search"
 	index "github.com/blevesearch/bleve_index_api"
@@ -55,9 +56,11 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 		// since the fuzzy candidate terms are not collected
 		// for a term search, and the only candidate term is
 		// the term itself
-		fuzzyTermMatches := ctx.Value(search.FuzzyMatchPhraseKey)
-		if fuzzyTermMatches != nil {
-			fuzzyTermMatches.(map[string][]string)[term] = []string{term}
+		if ctx != nil {
+			fuzzyTermMatches := ctx.Value(search.FuzzyMatchPhraseKey)
+			if fuzzyTermMatches != nil {
+				fuzzyTermMatches.(map[string][]string)[term] = []string{term}
+			}
 		}
 		return NewTermSearcher(ctx, indexReader, term, field, boost, options)
 	}
@@ -71,7 +74,7 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 			break
 		}
 	}
-	fuzzyCandidates, err := findFuzzyCandidateTerms(indexReader, term, fuzziness,
+	fuzzyCandidates, err := findFuzzyCandidateTerms(ctx, indexReader, term, fuzziness,
 		field, prefixTerm)
 	if err != nil {
 		return nil, err
@@ -94,12 +97,22 @@ func NewFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term s
 			fuzzyTermMatches.(map[string][]string)[term] = candidates
 		}
 	}
+	// check if the candidates are empty or have one term which is the term itself
+	if len(candidates) == 0 || (len(candidates) == 1 && candidates[0] == term) {
+		if ctx != nil {
+			fuzzyTermMatches := ctx.Value(search.FuzzyMatchPhraseKey)
+			if fuzzyTermMatches != nil {
+				fuzzyTermMatches.(map[string][]string)[term] = []string{term}
+			}
+		}
+		return NewTermSearcher(ctx, indexReader, term, field, boost, options)
+	}
 
 	return NewMultiTermSearcherBoosted(ctx, indexReader, candidates, field,
 		boost, editDistances, options, true)
 }
 
-func getAutoFuzziness(term string) int {
+func GetAutoFuzziness(term string) int {
 	termLength := len(term)
 	if termLength > AutoFuzzinessHighThreshold {
 		return MaxFuzziness
@@ -111,7 +124,7 @@ func getAutoFuzziness(term string) int {
 
 func NewAutoFuzzySearcher(ctx context.Context, indexReader index.IndexReader, term string,
 	prefix int, field string, boost float64, options search.SearcherOptions) (search.Searcher, error) {
-	return NewFuzzySearcher(ctx, indexReader, term, prefix, getAutoFuzziness(term), field, boost, options)
+	return NewFuzzySearcher(ctx, indexReader, term, prefix, GetAutoFuzziness(term), field, boost, options)
 }
 
 type fuzzyCandidates struct {
@@ -132,7 +145,7 @@ func reportIOStats(ctx context.Context, bytesRead uint64) {
 	}
 }
 
-func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
+func findFuzzyCandidateTerms(ctx context.Context, indexReader index.IndexReader, term string,
 	fuzziness int, field, prefixTerm string) (rv *fuzzyCandidates, err error) {
 	rv = &fuzzyCandidates{
 		candidates:    make([]string, 0),
@@ -143,7 +156,19 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 	// the levenshtein automaton based iterator to collect the
 	// candidate terms
 	if ir, ok := indexReader.(index.IndexReaderFuzzy); ok {
-		fieldDict, err := ir.FieldDictFuzzy(field, term, fuzziness, prefixTerm)
+		termSet := make(map[string]struct{})
+		addCandidateTerm := func(term string, editDistance uint8) error {
+			if _, exists := termSet[term]; !exists {
+				termSet[term] = struct{}{}
+				rv.candidates = append(rv.candidates, term)
+				rv.editDistances = append(rv.editDistances, editDistance)
+				if tooManyClauses(len(rv.candidates)) {
+					return tooManyClausesErr(field, len(rv.candidates))
+				}
+			}
+			return nil
+		}
+		fieldDict, a, err := ir.FieldDictFuzzyAutomaton(field, term, fuzziness, prefixTerm)
 		if err != nil {
 			return nil, err
 		}
@@ -154,16 +179,38 @@ func findFuzzyCandidateTerms(indexReader index.IndexReader, term string,
 		}()
 		tfd, err := fieldDict.Next()
 		for err == nil && tfd != nil {
-			rv.candidates = append(rv.candidates, tfd.Term)
-			rv.editDistances = append(rv.editDistances, tfd.EditDistance)
-			if tooManyClauses(len(rv.candidates)) {
-				return nil, tooManyClausesErr(field, len(rv.candidates))
+			err = addCandidateTerm(tfd.Term, tfd.EditDistance)
+			if err != nil {
+				return nil, err
 			}
 			tfd, err = fieldDict.Next()
 		}
-
+		if err != nil {
+			return nil, err
+		}
+		if ctx != nil {
+			if fts, ok := ctx.Value(search.FieldTermSynonymMapKey).(search.FieldTermSynonymMap); ok {
+				if ts, exists := fts[field]; exists {
+					for term := range ts {
+						if _, exists := termSet[term]; exists {
+							continue
+						}
+						if !strings.HasPrefix(term, prefixTerm) {
+							continue
+						}
+						match, editDistance := a.MatchAndDistance(term)
+						if match {
+							err = addCandidateTerm(term, editDistance)
+							if err != nil {
+								return nil, err
+							}
+						}
+					}
+				}
+			}
+		}
 		rv.bytesRead = fieldDict.BytesRead()
-		return rv, err
+		return rv, nil
 	}
 
 	var fieldDict index.FieldDict

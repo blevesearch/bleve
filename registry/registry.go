@@ -36,6 +36,7 @@ var tokenMaps = make(TokenMapRegistry, 0)
 var tokenFilters = make(TokenFilterRegistry, 0)
 var analyzers = make(AnalyzerRegistry, 0)
 var dateTimeParsers = make(DateTimeParserRegistry, 0)
+var synonymSources = make(SynonymSourceRegistry, 0)
 
 type Cache struct {
 	CharFilters        *CharFilterCache
@@ -47,6 +48,7 @@ type Cache struct {
 	FragmentFormatters *FragmentFormatterCache
 	Fragmenters        *FragmenterCache
 	Highlighters       *HighlighterCache
+	SynonymSources     *SynonymSourceCache
 }
 
 func NewCache() *Cache {
@@ -60,6 +62,7 @@ func NewCache() *Cache {
 		FragmentFormatters: NewFragmentFormatterCache(),
 		Fragmenters:        NewFragmenterCache(),
 		Highlighters:       NewHighlighterCache(),
+		SynonymSources:     NewSynonymSourceCache(),
 	}
 }
 
@@ -145,6 +148,14 @@ func (c *Cache) DefineDateTimeParser(name string, config map[string]interface{})
 		return nil, err
 	}
 	return c.DateTimeParsers.DefineDateTimeParser(name, typ, config, c)
+}
+
+func (c *Cache) SynonymSourceNamed(name string) (analysis.SynonymSource, error) {
+	return c.SynonymSources.SynonymSourceNamed(name, c)
+}
+
+func (c *Cache) DefineSynonymSource(name string, config map[string]interface{}) (analysis.SynonymSource, error) {
+	return c.SynonymSources.DefineSynonymSource(name, analysis.SynonymSourceType, config, c)
 }
 
 func (c *Cache) FragmentFormatterNamed(name string) (highlight.FragmentFormatter, error) {

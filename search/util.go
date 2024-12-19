@@ -136,6 +136,7 @@ const MinGeoBufPoolSize = 24
 type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
 
 const KnnPreSearchDataKey = "_knn_pre_search_data_key"
+const SynonymPreSearchDataKey = "_synonym_pre_search_data_key"
 
 const PreSearchKey = "_presearch_key"
 
@@ -143,6 +144,24 @@ type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *D
 
 type SearcherStartCallbackFn func(size uint64) error
 type SearcherEndCallbackFn func(size uint64) error
+
+// field -> term -> synonyms
+type FieldTermSynonymMap map[string]map[string][]string
+
+func (f FieldTermSynonymMap) MergeWith(fts FieldTermSynonymMap) {
+	for field, termSynonymMap := range fts {
+		// Ensure the field exists in the receiver
+		if _, exists := f[field]; !exists {
+			f[field] = make(map[string][]string)
+		}
+		for term, synonyms := range termSynonymMap {
+			// Append synonyms
+			f[field][term] = append(f[field][term], synonyms...)
+		}
+	}
+}
+
+const FieldTermSynonymMapKey = "_field_term_synonym_map_key"
 
 const SearcherStartCallbackKey = "_searcher_start_callback_key"
 const SearcherEndCallbackKey = "_searcher_end_callback_key"

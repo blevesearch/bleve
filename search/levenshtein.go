@@ -68,6 +68,10 @@ func LevenshteinDistanceMaxReuseSlice(a, b string, max int, d []int) (int, bool,
 	ld := int(math.Abs(float64(la - lb)))
 	if ld > max {
 		return max, true, d
+	} else if la == 0 || lb == 0 {
+		// if one string of the two strings is empty, then ld is
+		// the length of the other string and as such is <= max
+		return ld, false, d
 	}
 
 	if cap(d) < la+1 {

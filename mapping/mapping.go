@@ -58,3 +58,19 @@ type IndexMapping interface {
 
 	FieldMappingForPath(path string) FieldMapping
 }
+
+// A SynonymMapping extends the IndexMapping interface to provide
+// additional methods for working with synonyms.
+type SynonymMapping interface {
+	IndexMapping
+
+	MapSynonymDocument(doc *document.Document, collection string, input []string, synonyms []string) error
+
+	SynonymSourceForPath(path string) string
+
+	SynonymSourceNamed(name string) analysis.SynonymSource
+
+	SynonymCount() int
+
+	SynonymSourceVisitor(visitor analysis.SynonymSourceVisitor) error
+}

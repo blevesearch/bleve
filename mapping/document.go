@@ -40,11 +40,12 @@ import (
 // are used.  To disable this automatic handling, set
 // Dynamic to false.
 type DocumentMapping struct {
-	Enabled         bool                        `json:"enabled"`
-	Dynamic         bool                        `json:"dynamic"`
-	Properties      map[string]*DocumentMapping `json:"properties,omitempty"`
-	Fields          []*FieldMapping             `json:"fields,omitempty"`
-	DefaultAnalyzer string                      `json:"default_analyzer,omitempty"`
+	Enabled              bool                        `json:"enabled"`
+	Dynamic              bool                        `json:"dynamic"`
+	Properties           map[string]*DocumentMapping `json:"properties,omitempty"`
+	Fields               []*FieldMapping             `json:"fields,omitempty"`
+	DefaultAnalyzer      string                      `json:"default_analyzer,omitempty"`
+	DefaultSynonymSource string                      `json:"default_synonym_source,omitempty"`
 
 	// StructTagKey overrides "json" when looking for field names in struct tags
 	StructTagKey string `json:"struct_tag_key,omitempty"`
@@ -55,6 +56,12 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache,
 	var err error
 	if dm.DefaultAnalyzer != "" {
 		_, err := cache.AnalyzerNamed(dm.DefaultAnalyzer)
+		if err != nil {
+			return err
+		}
+	}
+	if dm.DefaultSynonymSource != "" {
+		_, err := cache.SynonymSourceNamed(dm.DefaultSynonymSource)
 		if err != nil {
 			return err
 		}
@@ -82,7 +89,12 @@ func (dm *DocumentMapping) Validate(cache *registry.Cache,
 				return err
 			}
 		}
-
+		if field.SynonymSource != "" {
+			_, err = cache.SynonymSourceNamed(field.SynonymSource)
+			if err != nil {
+				return err
+			}
+		}
 		err := validateFieldMapping(field, parentName, fieldAliasCtx)
 		if err != nil {
 			return err
@@ -108,6 +120,17 @@ func (dm *DocumentMapping) analyzerNameForPath(path string) string {
 	field := dm.fieldDescribedByPath(path)
 	if field != nil {
 		return field.Analyzer
+	}
+	return ""
+}
+
+// synonymSourceForPath attempts to first find the field
+// described by this path, then returns the analyzer
+// configured for that field
+func (dm *DocumentMapping) synonymSourceForPath(path string) string {
+	field := dm.fieldDescribedByPath(path)
+	if field != nil {
+		return field.SynonymSource
 	}
 	return ""
 }
@@ -295,6 +318,11 @@ func (dm *DocumentMapping) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
+		case "default_synonym_source":
+			err := util.UnmarshalJSON(v, &dm.DefaultSynonymSource)
+			if err != nil {
+				return err
+			}
 		case "properties":
 			err := util.UnmarshalJSON(v, &dm.Properties)
 			if err != nil {
@@ -333,6 +361,22 @@ func (dm *DocumentMapping) defaultAnalyzerName(path []string) string {
 		}
 		if current.DefaultAnalyzer != "" {
 			rv = current.DefaultAnalyzer
+		}
+	}
+	return rv
+}
+
+func (dm *DocumentMapping) defaultSynonymSource(path []string) string {
+	current := dm
+	rv := current.DefaultSynonymSource
+	for _, pathElement := range path {
+		var ok bool
+		current, ok = current.Properties[pathElement]
+		if !ok {
+			break
+		}
+		if current.DefaultSynonymSource != "" {
+			rv = current.DefaultSynonymSource
 		}
 	}
 	return rv

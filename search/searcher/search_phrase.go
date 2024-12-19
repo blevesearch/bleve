@@ -164,6 +164,42 @@ func NewMultiPhraseSearcher(ctx context.Context, indexReader index.IndexReader, 
 		}
 	}
 
+	if ctx != nil {
+		if fts, ok := ctx.Value(search.FieldTermSynonymMapKey).(search.FieldTermSynonymMap); ok {
+			if ts, exists := fts[field]; exists {
+				if fuzzinessEnabled {
+					for term, fuzzyTerms := range fuzzyTermMatches {
+						fuzzySynonymTerms := make([]string, 0, len(fuzzyTerms))
+						if s, found := ts[term]; found {
+							fuzzySynonymTerms = append(fuzzySynonymTerms, s...)
+						}
+						for _, fuzzyTerm := range fuzzyTerms {
+							if fuzzyTerm == term {
+								continue
+							}
+							if s, found := ts[fuzzyTerm]; found {
+								fuzzySynonymTerms = append(fuzzySynonymTerms, s...)
+							}
+						}
+						if len(fuzzySynonymTerms) > 0 {
+							fuzzyTermMatches[term] = append(fuzzyTermMatches[term], fuzzySynonymTerms...)
+						}
+					}
+				} else {
+					for _, termPos := range terms {
+						for _, term := range termPos {
+							if s, found := ts[term]; found {
+								if fuzzyTermMatches == nil {
+									fuzzyTermMatches = make(map[string][]string)
+								}
+								fuzzyTermMatches[term] = s
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 	mustSearcher, err := NewConjunctionSearcher(ctx, indexReader, termPositionSearchers, options)
 	if err != nil {
 		// close any searchers already opened
@@ -337,6 +373,9 @@ func (s *PhraseSearcher) expandFuzzyMatches(tlm search.TermLocationMap, expanded
 	for term, fuzzyMatches := range s.fuzzyTermMatches {
 		locations := tlm[term]
 		for _, fuzzyMatch := range fuzzyMatches {
+			if fuzzyMatch == term {
+				continue
+			}
 			locations = append(locations, tlm[fuzzyMatch]...)
 		}
 		expandedTlm[term] = locations

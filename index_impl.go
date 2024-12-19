@@ -38,6 +38,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/facet"
 	"github.com/blevesearch/bleve/v2/search/highlight"
+	"github.com/blevesearch/bleve/v2/search/query"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/s2"
@@ -267,6 +268,40 @@ func (i *indexImpl) Index(id string, data interface{}) (err error) {
 	return
 }
 
+// IndexSynonym indexes a synonym definition, with the specified id and belonging to the specified collection.
+// Synonym definition defines term relationships for query expansion in searches.
+func (i *indexImpl) IndexSynonym(id string, collection string, definition *SynonymDefinition) error {
+	if id == "" {
+		return ErrorEmptyID
+	}
+
+	i.mutex.RLock()
+	defer i.mutex.RUnlock()
+
+	if !i.open {
+		return ErrorIndexClosed
+	}
+
+	i.FireIndexEvent()
+
+	synMap, ok := i.m.(mapping.SynonymMapping)
+	if !ok {
+		return ErrorSynonymSearchNotSupported
+	}
+
+	if err := definition.Validate(); err != nil {
+		return err
+	}
+
+	doc := document.NewSynonymDocument(id)
+	err := synMap.MapSynonymDocument(doc, collection, definition.Input, definition.Synonyms)
+	if err != nil {
+		return err
+	}
+	err = i.i.Update(doc)
+	return err
+}
+
 // IndexAdvanced takes a document.Document object
 // skips the mapping and indexes it.
 func (i *indexImpl) IndexAdvanced(doc *document.Document) (err error) {
@@ -449,12 +484,25 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 		}
 	}
 
+	var fts search.FieldTermSynonymMap
+	if !isMatchNoneQuery(req.Query) {
+		if synMap, ok := i.m.(mapping.SynonymMapping); ok {
+			if synReader, ok := reader.(index.ThesaurusReader); ok {
+				fts, err = query.ExtractSynonyms(ctx, synMap, synReader, req.Query, fts)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
 	return &SearchResult{
 		Status: &SearchStatus{
 			Total:      1,
 			Successful: 1,
 		},
-		Hits: knnHits,
+		Hits:          knnHits,
+		SynonymResult: fts,
 	}, nil
 }
 
@@ -505,8 +553,12 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	}
 
 	var knnHits []*search.DocumentMatch
+	var skipKNNCollector bool
+
+	var fts search.FieldTermSynonymMap
+	var skipSynonymCollector bool
+
 	var ok bool
-	var skipKnnCollector bool
 	if req.PreSearchData != nil {
 		for k, v := range req.PreSearchData {
 			switch k {
@@ -516,19 +568,42 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 					if !ok {
 						return nil, fmt.Errorf("knn preSearchData must be of type []*search.DocumentMatch")
 					}
+					skipKNNCollector = true
 				}
-				skipKnnCollector = true
+			case search.SynonymPreSearchDataKey:
+				if v != nil {
+					fts, ok = v.(search.FieldTermSynonymMap)
+					if !ok {
+						return nil, fmt.Errorf("synonym preSearchData must be of type search.FieldTermSynonymMap")
+					}
+					skipSynonymCollector = true
+				}
 			}
 		}
 	}
-	if !skipKnnCollector && requestHasKNN(req) {
+	if !skipKNNCollector && requestHasKNN(req) {
 		knnHits, err = i.runKnnCollector(ctx, req, indexReader, false)
 		if err != nil {
 			return nil, err
 		}
 	}
 
+	if !skipSynonymCollector {
+		if synMap, ok := i.m.(mapping.SynonymMapping); ok && synMap.SynonymCount() > 0 {
+			if synReader, ok := indexReader.(index.ThesaurusReader); ok {
+				fts, err = query.ExtractSynonyms(ctx, synMap, synReader, req.Query, fts)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
 	setKnnHitsInCollector(knnHits, req, coll)
+
+	if fts != nil {
+		ctx = context.WithValue(ctx, search.FieldTermSynonymMapKey, fts)
+	}
 
 	// This callback and variable handles the tracking of bytes read
 	//  1. as part of creation of tfr and its Next() calls which is
