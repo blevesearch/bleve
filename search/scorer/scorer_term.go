@@ -198,5 +198,6 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 				})
 		}
 	}
+
 	return rv
 }
