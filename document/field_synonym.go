@@ -81,12 +81,18 @@ func (s *SynonymField) Analyze() {
 	if len(s.input) > 0 {
 		analyzedInput = make([]string, 0, len(s.input))
 		for _, term := range s.input {
-			analyzedInput = append(analyzedInput, analyzeSynonymTerm(term, s.analyzer))
+			analyzedTerm := analyzeSynonymTerm(term, s.analyzer)
+			if analyzedTerm != "" {
+				analyzedInput = append(analyzedInput, analyzedTerm)
+			}
 		}
 	}
 	analyzedSynonyms := make([]string, 0, len(s.synonyms))
 	for _, syn := range s.synonyms {
-		analyzedSynonyms = append(analyzedSynonyms, analyzeSynonymTerm(syn, s.analyzer))
+		analyzedTerm := analyzeSynonymTerm(syn, s.analyzer)
+		if analyzedTerm != "" {
+			analyzedSynonyms = append(analyzedSynonyms, analyzedTerm)
+		}
 	}
 	s.synonymMap = processSynonymData(analyzedInput, analyzedSynonyms)
 }
@@ -136,8 +142,8 @@ func processSynonymData(input []string, synonyms []string) map[string][]string {
 
 func analyzeSynonymTerm(term string, analyzer analysis.Analyzer) string {
 	tokenStream := analyzer.Analyze([]byte(term))
-	if len(tokenStream) == 0 {
-		return term
+	if len(tokenStream) == 1 {
+		return string(tokenStream[0].Term)
 	}
-	return string(tokenStream[0].Term)
+	return ""
 }
