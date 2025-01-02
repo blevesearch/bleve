@@ -16,6 +16,7 @@ package bleve
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -191,10 +192,11 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// indicates that this index alias is set as an Index
 		// in another alias, so we need to do a preSearch search
 		// and NOT a real search
+		bm25PreSearch, _ := isBM25Enabled(req, i.mapping)
 		flags := &preSearchFlags{
 			knn:      requestHasKNN(req),
 			synonyms: !isMatchNoneQuery(req.Query),
-			bm25: true,               // TODO Just force setting it to true to test
+			bm25:     bm25PreSearch,
 		}
 		return preSearchDataSearch(ctx, req, flags, i.indexes...)
 	}
@@ -234,7 +236,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 	//  - the request requires preSearch
 	var preSearchDuration time.Duration
 	var sr *SearchResult
-	flags, err := preSearchRequired(req, i.mapping)
+	flags, err := preSearchRequired(ctx, req, i.mapping)
 	if err != nil {
 		return nil, err
 	}
@@ -574,7 +576,7 @@ type asyncSearchResult struct {
 type preSearchFlags struct {
 	knn      bool
 	synonyms bool
-	bm25 bool // needs presearch for this too
+	bm25     bool // needs presearch for this too
 }
 
 func isBM25Enabled(req *SearchRequest, m mapping.IndexMapping) (bool, query.FieldSet) {
@@ -600,7 +602,7 @@ func isBM25Enabled(req *SearchRequest, m mapping.IndexMapping) (bool, query.Fiel
 
 // preSearchRequired checks if preSearch is required and returns the presearch flags struct
 // indicating which preSearch is required
-func preSearchRequired(ctx context.Context, req *SearchRequest, m mapping.IndexMapping) (*preSearchFlags, error){
+func preSearchRequired(ctx context.Context, req *SearchRequest, m mapping.IndexMapping) (*preSearchFlags, error) {
 	// Check for KNN query
 	knn := requestHasKNN(req)
 	var synonyms bool
@@ -631,12 +633,12 @@ func preSearchRequired(ctx context.Context, req *SearchRequest, m mapping.IndexM
 			}
 		}
 	}
-	
+
 	if knn || synonyms || bm25 {
 		return &preSearchFlags{
 			knn:      knn,
 			synonyms: synonyms,
-			bm25: bm25,
+			bm25:     bm25,
 		}, nil
 	}
 	return nil, nil
@@ -646,7 +648,7 @@ func preSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, i
 	// create a dummy request with a match none query
 	// since we only care about the preSearchData in PreSearch
 	var dummyQuery = req.Query
-	if !flags.bm25 || !flags.synonyms {
+	if !flags.bm25 && !flags.synonyms {
 		// create a dummy request with a match none query
 		// since we only care about the preSearchData in PreSearch
 		dummyQuery = query.NewMatchNoneQuery()
@@ -728,7 +730,9 @@ func constructSynonymPreSearchData(rv map[string]map[string]interface{}, sr *Sea
 	for _, index := range indexes {
 		rv[index.Name()][search.SynonymPreSearchDataKey] = sr.SynonymResult
 	}
+	return rv
 }
+
 func constructBM25PreSearchData(rv map[string]map[string]interface{}, sr *SearchResult, indexes []Index) map[string]map[string]interface{} {
 	bmStats := sr.BM25Stats
 	if bmStats != nil {
@@ -744,27 +748,27 @@ func constructBM25PreSearchData(rv map[string]map[string]interface{}, sr *Search
 
 func constructPreSearchData(req *SearchRequest, flags *preSearchFlags,
 	preSearchResult *SearchResult, indexes []Index) (map[string]map[string]interface{}, error) {
-		if flags == nil || preSearchResult == nil {
-			return nil, fmt.Errorf("invalid input, flags: %v, preSearchResult: %v", flags, preSearchResult)
-		}
-		mergedOut := make(map[string]map[string]interface{}, len(indexes))
-		for _, index := range indexes {
-			mergedOut[index.Name()] = make(map[string]interface{})
-		}
-		var err error
-		if flags.knn {
-			mergedOut, err = constructKnnPreSearchData(mergedOut, preSearchResult, indexes)
-			if err != nil {
-				return nil, err
-			}
-		}
-		if flags.synonyms {
-			mergedOut = constructSynonymPreSearchData(mergedOut, preSearchResult, indexes)
-		if flags.bm25 {
-			mergedOut = constructBM25PreSearchData(mergedOut, preSearchResult, indexes)
-		}
-		return mergedOut, nil
+	if flags == nil || preSearchResult == nil {
+		return nil, fmt.Errorf("invalid input, flags: %v, preSearchResult: %v", flags, preSearchResult)
 	}
+	mergedOut := make(map[string]map[string]interface{}, len(indexes))
+	for _, index := range indexes {
+		mergedOut[index.Name()] = make(map[string]interface{})
+	}
+	var err error
+	if flags.knn {
+		mergedOut, err = constructKnnPreSearchData(mergedOut, preSearchResult, indexes)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if flags.synonyms {
+		mergedOut = constructSynonymPreSearchData(mergedOut, preSearchResult, indexes)
+	}
+	if flags.bm25 {
+		mergedOut = constructBM25PreSearchData(mergedOut, preSearchResult, indexes)
+	}
+	return mergedOut, nil
 }
 
 func preSearchDataSearch(ctx context.Context, req *SearchRequest, flags *preSearchFlags, indexes ...Index) (*SearchResult, error) {
@@ -871,6 +875,8 @@ func redistributePreSearchData(req *SearchRequest, indexes []Index) (map[string]
 	if fts, ok := req.PreSearchData[search.SynonymPreSearchDataKey].(search.FieldTermSynonymMap); ok {
 		for _, index := range indexes {
 			rv[index.Name()][search.SynonymPreSearchDataKey] = fts
+		}
+	}
 
 	if bm25Data, ok := req.PreSearchData[search.BM25PreSearchDataKey].(*search.BM25Stats); ok {
 		for _, index := range indexes {

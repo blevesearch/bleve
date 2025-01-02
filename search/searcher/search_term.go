@@ -164,7 +164,7 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader, term
 		if err != nil {
 			return nil, err
 		}
-		return newTermSearcherFromReader(indexReader, reader, term, field, boostVal, options)
+		return newTermSearcherFromReader(ctx, indexReader, reader, term, field, boostVal, options)
 	}
 	// create a searcher for the term itself
 	termSearcher, err := createTermSearcher(term, boost)

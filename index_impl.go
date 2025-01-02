@@ -38,6 +38,7 @@ import (
 	"github.com/blevesearch/bleve/v2/search/collector"
 	"github.com/blevesearch/bleve/v2/search/facet"
 	"github.com/blevesearch/bleve/v2/search/highlight"
+	"github.com/blevesearch/bleve/v2/search/query"
 	"github.com/blevesearch/bleve/v2/util"
 	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/geo/s2"

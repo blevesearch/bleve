@@ -14,7 +14,9 @@
 
 package bleve
 
-import "github.com/blevesearch/bleve/v2/search"
+import (
+	"github.com/blevesearch/bleve/v2/search"
+)
 
 // A preSearchResultProcessor processes the data in
 // the preSearch result from multiple
@@ -94,7 +96,7 @@ func newBM25PreSearchResultProcessor() *bm25PreSearchResultProcessor {
 // TODO How will this work for queries other than term queries?
 func (b *bm25PreSearchResultProcessor) add(sr *SearchResult, indexName string) {
 	if sr.BM25Stats != nil {
-		b.docCount += (sr.BM25Stats.DocCount)
+		b.docCount += sr.BM25Stats.DocCount
 		for field, cardinality := range sr.BM25Stats.FieldCardinality {
 			b.fieldCardinality[field] += cardinality
 		}
