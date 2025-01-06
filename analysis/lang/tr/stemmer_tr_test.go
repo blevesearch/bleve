@@ -54,12 +54,12 @@ func TestSnowballTurkishStemmer(t *testing.T) {
 		{
 			input: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("bardak"),
+					Term: []byte("arabanın"),
 				},
 			},
 			output: analysis.TokenStream{
 				&analysis.Token{
-					Term: []byte("bardak"),
+					Term: []byte("araba"),
 				},
 			},
 		},
