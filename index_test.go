@@ -350,7 +350,7 @@ func TestBytesWritten(t *testing.T) {
 	cleanupTmpIndexPath(t, tmpIndexPath4)
 }
 
-func TestBM25(t *testing.T) {
+func TestConsistentScoring(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
@@ -402,9 +402,8 @@ func TestBM25(t *testing.T) {
 		t.Error(err)
 	}
 
-	fmt.Println("length of hits", res.Hits[0].Score)
+	singleIndexScore := res.Hits[0].Score
 	dataset, _ := readDataFromFile("sample-data.json")
-	fmt.Println("length of dataset", len(dataset))
 	tmpIndexPath1 := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath1)
 
@@ -475,7 +474,10 @@ func TestBM25(t *testing.T) {
 		t.Error(err)
 	}
 
-	fmt.Println("length of hits alias search", res.Hits[0].Score)
+	if singleIndexScore != res.Hits[0].Score {
+		t.Fatalf("expected the scores to be the same, got %v and %v",
+			singleIndexScore, res.Hits[0].Score)
+	}
 
 }
 

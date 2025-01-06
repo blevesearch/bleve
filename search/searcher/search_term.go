@@ -104,17 +104,7 @@ func bm25ScoreMetrics(ctx context.Context, field string,
 		if !ok {
 			return 0, 0, fmt.Errorf("field stat for bm25 not present %s", field)
 		}
-		// fieldCardinalityMap := bm25Stats["fieldCardinality"].(map[string]int)
-		// fieldCardinality, ok = fieldCardinalityMap[field]
-		// if !ok {
-		// 	return 0, 0, fmt.Errorf("field stat for bm25 not present %s", field)
-		// }
 	}
-
-	fmt.Println("----------bm25 stats--------")
-	fmt.Println("docCount: ", count)
-	fmt.Println("fieldCardinality: ", fieldCardinality)
-	fmt.Println("avgDocLength: ", math.Ceil(float64(fieldCardinality)/float64(count)))
 
 	if count == 0 && fieldCardinality == 0 {
 		return 0, 0, nil
