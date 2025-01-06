@@ -591,7 +591,7 @@ func isBM25Enabled(req *SearchRequest, m mapping.IndexMapping) (bool, query.Fiel
 	// scoring. Otherwise, we just skip the presearch
 	for field := range fs {
 		f := m.FieldMappingForPath(field)
-		if f.Similarity == "" || f.Similarity == index.BM25Similarity {
+		if f.Similarity == index.BM25Similarity {
 			rv = true
 			break
 		}

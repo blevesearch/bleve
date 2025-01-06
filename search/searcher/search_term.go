@@ -139,7 +139,7 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 		if similaritModelCallback, ok := ctx.Value(search.
 			GetSimilarityModelCallbackKey).(search.GetSimilarityModelCallbackFn); ok {
 			similarityModel := similaritModelCallback(field)
-			if similarityModel == "" || similarityModel == index.BM25Similarity {
+			if similarityModel == index.BM25Similarity {
 				// in case of bm25 need to fetch the multipliers as well (perhaps via context's presearch data)
 				count, avgDocLength, err = bm25ScoreMetrics(ctx, field, indexReader)
 				if err != nil {

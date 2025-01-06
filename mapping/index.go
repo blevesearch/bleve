@@ -50,6 +50,7 @@ type IndexMappingImpl struct {
 	DefaultAnalyzer       string                      `json:"default_analyzer"`
 	DefaultDateTimeParser string                      `json:"default_datetime_parser"`
 	DefaultSynonymSource  string                      `json:"default_synonym_source,omitempty"`
+	DefaultSimilarity     string                      `json:"default_similarity,omitempty"`
 	DefaultField          string                      `json:"default_field"`
 	StoreDynamic          bool                        `json:"store_dynamic"`
 	IndexDynamic          bool                        `json:"index_dynamic"`

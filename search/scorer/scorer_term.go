@@ -132,6 +132,11 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 	}
 }
 
+// multiplies deciding how much does a doc length affect the score and also
+// how much can the term frequency affect the score in BM25 scoring
+var k1 float64 = 1.2
+var b float64 = 0.75
+
 func (s *TermQueryScorer) docScore(tf, norm float64) float64 {
 	// tf-idf scoring by default
 	score := tf * norm * s.idf
@@ -140,14 +145,50 @@ func (s *TermQueryScorer) docScore(tf, norm float64) float64 {
 		// using the posting's norm value to recompute the field length for the doc num
 		fieldLength := 1 / (norm * norm)
 
-		// multiplies deciding how much does a doc length affect the score and also
-		// how much can the term frequency affect the score
-		var k1 float64 = 1.2
-		var b float64 = 0.75
 		score = s.idf * (tf * k1) /
 			(tf + k1*(1-b+(b*fieldLength/s.avgDocLength)))
 	}
 	return score
+}
+
+func (s *TermQueryScorer) scoreExplanation(tf float64, termMatch *index.TermFieldDoc) []*search.Explanation {
+	var rv []*search.Explanation
+	if s.avgDocLength > 0 {
+		fieldLength := 1 / (termMatch.Norm * termMatch.Norm)
+		fieldNormVal := 1 - b + (b * fieldLength / s.avgDocLength)
+		fieldNormalizeExplanation := &search.Explanation{
+			Value: fieldNormVal,
+			Message: fmt.Sprintf("fieldNorm(field=%s), b=%f, fieldLength=%f, avgFieldLength=%f)",
+				s.queryField, b, fieldLength, s.avgDocLength),
+		}
+
+		saturationExplanation := &search.Explanation{
+			Value: k1 / (tf + k1*fieldNormVal),
+			Message: fmt.Sprintf("saturation(term:%s), k1=%f/(tf=%f + k1*fieldNorm=%f))",
+				termMatch.Term, tf, k1, fieldNormVal),
+			Children: []*search.Explanation{fieldNormalizeExplanation},
+		}
+
+		rv = make([]*search.Explanation, 3)
+		rv[0] = &search.Explanation{
+			Value:   tf,
+			Message: fmt.Sprintf("tf(termFreq(%s:%s)=%d", s.queryField, s.queryTerm, termMatch.Freq),
+		}
+		rv[1] = saturationExplanation
+		rv[2] = s.idfExplanation
+	} else {
+		rv = make([]*search.Explanation, 3)
+		rv[0] = &search.Explanation{
+			Value:   tf,
+			Message: fmt.Sprintf("tf(termFreq(%s:%s)=%d", s.queryField, s.queryTerm, termMatch.Freq),
+		}
+		rv[1] = &search.Explanation{
+			Value:   termMatch.Norm,
+			Message: fmt.Sprintf("fieldNorm(field=%s, doc=%s)", s.queryField, termMatch.ID),
+		}
+		rv[2] = s.idfExplanation
+	}
+	return rv
 }
 
 func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.TermFieldDoc) *search.DocumentMatch {
@@ -163,18 +204,8 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 		}
 
 		score := s.docScore(tf, termMatch.Norm)
-		// todo: explain stuff properly
 		if s.options.Explain {
-			childrenExplanations := make([]*search.Explanation, 3)
-			childrenExplanations[0] = &search.Explanation{
-				Value:   tf,
-				Message: fmt.Sprintf("tf(termFreq(%s:%s)=%d", s.queryField, s.queryTerm, termMatch.Freq),
-			}
-			childrenExplanations[1] = &search.Explanation{
-				Value:   termMatch.Norm,
-				Message: fmt.Sprintf("fieldNorm(field=%s, doc=%s)", s.queryField, termMatch.ID),
-			}
-			childrenExplanations[2] = s.idfExplanation
+			childrenExplanations := s.scoreExplanation(tf, termMatch)
 			scoreExplanation = &search.Explanation{
 				Value:    score,
 				Message:  fmt.Sprintf("fieldWeight(%s:%s in %s), product of:", s.queryField, s.queryTerm, termMatch.ID),
