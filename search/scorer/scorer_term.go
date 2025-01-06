@@ -165,7 +165,7 @@ func (s *TermQueryScorer) scoreExplanation(tf float64, termMatch *index.TermFiel
 		saturationExplanation := &search.Explanation{
 			Value: k1 / (tf + k1*fieldNormVal),
 			Message: fmt.Sprintf("saturation(term:%s), k1=%f/(tf=%f + k1*fieldNorm=%f))",
-				termMatch.Term, tf, k1, fieldNormVal),
+				termMatch.Term, k1, tf, fieldNormVal),
 			Children: []*search.Explanation{fieldNormalizeExplanation},
 		}
 

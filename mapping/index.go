@@ -488,7 +488,14 @@ func (im *IndexMappingImpl) FieldMappingForPath(path string) FieldMapping {
 		return *fm
 	}
 
-	return FieldMapping{}
+	// the edge case where there are no field mapping defined for a path, just
+	// return all the field specific defaults from the index mapping.
+	fm = &FieldMapping{
+		Analyzer:      im.DefaultAnalyzer,
+		Similarity:    im.DefaultSimilarity,
+		SynonymSource: im.DefaultSynonymSource,
+	}
+	return *fm
 }
 
 // wrapper to satisfy new interface

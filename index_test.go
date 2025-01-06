@@ -357,6 +357,7 @@ func TestBM25(t *testing.T) {
 	indexMapping := NewIndexMapping()
 	indexMapping.TypeField = "type"
 	indexMapping.DefaultAnalyzer = "en"
+	indexMapping.DefaultSimilarity = index.BM25Similarity
 	documentMapping := NewDocumentMapping()
 	indexMapping.AddDocumentMapping("hotel", documentMapping)
 	indexMapping.StoreDynamic = false
