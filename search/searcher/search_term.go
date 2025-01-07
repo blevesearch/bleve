@@ -75,7 +75,7 @@ func tfTDFScoreMetrics(indexReader index.IndexReader) (uint64, float64, error) {
 	}
 	fieldCardinality := 0
 
-	if count == 0 && fieldCardinality == 0 {
+	if count == 0 {
 		return 0, 0, nil
 	}
 	return count, float64(fieldCardinality / int(count)), nil
@@ -127,9 +127,9 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 	}
 	if ctx != nil {
 		if similaritModelCallback, ok := ctx.Value(search.
-			GetSimilarityModelCallbackKey).(search.GetSimilarityModelCallbackFn); ok {
-			similarityModel := similaritModelCallback(field)
-			if similarityModel == index.BM25Similarity {
+			GetScoringModelCallbackKey).(search.GetScoringModelCallbackFn); ok {
+			similarityModel := similaritModelCallback()
+			if similarityModel == index.BM25Scoring {
 				// in case of bm25 need to fetch the multipliers as well (perhaps via context's presearch data)
 				count, avgDocLength, err = bm25ScoreMetrics(ctx, field, indexReader)
 				if err != nil {

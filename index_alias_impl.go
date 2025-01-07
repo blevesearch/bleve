@@ -192,7 +192,7 @@ func (i *indexAliasImpl) SearchInContext(ctx context.Context, req *SearchRequest
 		// indicates that this index alias is set as an Index
 		// in another alias, so we need to do a preSearch search
 		// and NOT a real search
-		bm25PreSearch, _ := isBM25Enabled(req, i.mapping)
+		bm25PreSearch := isBM25Enabled(i.mapping)
 		flags := &preSearchFlags{
 			knn:      requestHasKNN(req),
 			synonyms: !isMatchNoneQuery(req.Query),
@@ -579,25 +579,12 @@ type preSearchFlags struct {
 	bm25     bool // needs presearch for this too
 }
 
-func isBM25Enabled(req *SearchRequest, m mapping.IndexMapping) (bool, query.FieldSet) {
-	rv := false
-	fs := make(query.FieldSet)
-	fs, err := query.ExtractFields(req.Query, m, fs)
-	if err != nil {
-		return rv, nil
+func isBM25Enabled(m mapping.IndexMapping) bool {
+	var rv bool
+	if m, ok := m.(*mapping.IndexMappingImpl); ok {
+		rv = m.ScoringModel == index.BM25Scoring
 	}
-	// if there is any field that has bm25 scoring enabled, we set
-	// the flag to true to presearch the stats needed for the bm25
-	// scoring. Otherwise, we just skip the presearch
-	for field := range fs {
-		f := m.FieldMappingForPath(field)
-		if f.Similarity == index.BM25Similarity {
-			rv = true
-			break
-		}
-	}
-
-	return rv, fs
+	return rv
 }
 
 // preSearchRequired checks if preSearch is required and returns the presearch flags struct
@@ -628,7 +615,7 @@ func preSearchRequired(ctx context.Context, req *SearchRequest, m mapping.IndexM
 		if ctx != nil {
 			if searchType := ctx.Value(search.SearchTypeKey); searchType != nil {
 				if searchType.(string) == search.FetchStatsAndSearch {
-					bm25, _ = isBM25Enabled(req, m)
+					bm25 = isBM25Enabled(m)
 				}
 			}
 		}

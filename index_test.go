@@ -357,7 +357,7 @@ func TestConsistentScoring(t *testing.T) {
 	indexMapping := NewIndexMapping()
 	indexMapping.TypeField = "type"
 	indexMapping.DefaultAnalyzer = "en"
-	indexMapping.DefaultSimilarity = index.BM25Similarity
+	indexMapping.ScoringModel = index.BM25Scoring
 	documentMapping := NewDocumentMapping()
 	indexMapping.AddDocumentMapping("hotel", documentMapping)
 	indexMapping.StoreDynamic = false

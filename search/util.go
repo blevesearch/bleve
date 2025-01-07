@@ -169,13 +169,13 @@ func (f FieldTermSynonymMap) MergeWith(fts FieldTermSynonymMap) {
 const FieldTermSynonymMapKey = "_field_term_synonym_map_key"
 const BM25MapKey = "_bm25_map_key"
 
-const GetSimilarityModelCallbackKey = "_get_similarity_model"
-
 type BM25Stats struct {
 	DocCount         float64        `json:"doc_count"`
 	FieldCardinality map[string]int `json:"field_cardinality"`
 }
 
-type GetSimilarityModelCallbackFn func(field string) string
+const GetScoringModelCallbackKey = "_get_scoring_model"
+
+type GetScoringModelCallbackFn func() string
 
 type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)

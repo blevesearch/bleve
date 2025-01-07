@@ -50,7 +50,7 @@ type IndexMappingImpl struct {
 	DefaultAnalyzer       string                      `json:"default_analyzer"`
 	DefaultDateTimeParser string                      `json:"default_datetime_parser"`
 	DefaultSynonymSource  string                      `json:"default_synonym_source,omitempty"`
-	DefaultSimilarity     string                      `json:"default_similarity,omitempty"`
+	ScoringModel          string                      `json:"scoring_model,omitempty"`
 	DefaultField          string                      `json:"default_field"`
 	StoreDynamic          bool                        `json:"store_dynamic"`
 	IndexDynamic          bool                        `json:"index_dynamic"`
@@ -202,6 +202,11 @@ func (im *IndexMappingImpl) Validate() error {
 			return err
 		}
 	}
+
+	if _, ok := index.SupportedScoringModels[im.ScoringModel]; !ok {
+		return fmt.Errorf("unsupported scoring model: %s", im.ScoringModel)
+	}
+
 	return nil
 }
 
@@ -304,6 +309,12 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
+		case "scoring_model":
+			err := util.UnmarshalJSON(v, &im.ScoringModel)
+			if err != nil {
+				return err
+			}
+
 		default:
 			invalidKeys = append(invalidKeys, k)
 		}
@@ -488,14 +499,7 @@ func (im *IndexMappingImpl) FieldMappingForPath(path string) FieldMapping {
 		return *fm
 	}
 
-	// the edge case where there are no field mapping defined for a path, just
-	// return all the field specific defaults from the index mapping.
-	fm = &FieldMapping{
-		Analyzer:      im.DefaultAnalyzer,
-		Similarity:    im.DefaultSimilarity,
-		SynonymSource: im.DefaultSynonymSource,
-	}
-	return *fm
+	return FieldMapping{}
 }
 
 // wrapper to satisfy new interface

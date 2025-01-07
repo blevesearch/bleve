@@ -496,12 +496,17 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 				}
 			}
 		}
-		if ok, fs := isBM25Enabled(req, i.m); ok {
+		if ok := isBM25Enabled(i.m); ok {
 			count, err = reader.DocCount()
 			if err != nil {
 				return nil, err
 			}
 
+			fs := make(query.FieldSet)
+			fs, err := query.ExtractFields(req.Query, i.m, fs)
+			if err != nil {
+				return nil, err
+			}
 			for field := range fs {
 				dict, err := reader.FieldDict(field)
 				if err != nil {
@@ -633,12 +638,15 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	if fts != nil {
 		ctx = context.WithValue(ctx, search.FieldTermSynonymMapKey, fts)
 	}
-	fieldMappingCallback := func(field string) string {
-		rv := i.m.FieldMappingForPath(field)
-		return rv.Similarity
+
+	scoringModelCallback := func() string {
+		if isBM25Enabled(i.m) {
+			return index.BM25Scoring
+		}
+		return index.DefaultScoringModel
 	}
-	ctx = context.WithValue(ctx, search.GetSimilarityModelCallbackKey,
-		search.GetSimilarityModelCallbackFn(fieldMappingCallback))
+	ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
+		search.GetScoringModelCallbackFn(scoringModelCallback))
 
 	// set the bm25 presearch data (stats important for consistent scoring) in
 	// the context object
