@@ -350,7 +350,7 @@ func TestBytesWritten(t *testing.T) {
 	cleanupTmpIndexPath(t, tmpIndexPath4)
 }
 
-func TestConsistentScoring(t *testing.T) {
+func TestGlobalScoring(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath)
 
@@ -467,7 +467,7 @@ func TestConsistentScoring(t *testing.T) {
 	ctx := context.Background()
 	// this key is set to ensure that we have a consistent scoring at the index alias
 	// level (it forces a pre search phase which can have a small overhead)
-	ctx = context.WithValue(ctx, search.SearchTypeKey, search.FetchStatsAndSearch)
+	ctx = context.WithValue(ctx, search.SearchTypeKey, search.GlobalScoring)
 
 	res, err = multiPartIndex.SearchInContext(ctx, searchRequest)
 	if err != nil {

@@ -614,7 +614,7 @@ func preSearchRequired(ctx context.Context, req *SearchRequest, m mapping.IndexM
 	if !isMatchNoneQuery(req.Query) {
 		if ctx != nil {
 			if searchType := ctx.Value(search.SearchTypeKey); searchType != nil {
-				if searchType.(string) == search.FetchStatsAndSearch {
+				if searchType.(string) == search.GlobalScoring {
 					bm25 = isBM25Enabled(m)
 				}
 			}

@@ -148,9 +148,10 @@ const BM25PreSearchDataKey = "_bm25_pre_search_data_key"
 // SearchTypeKey is used to identify type of the search being performed.
 //
 // for consistent scoring in cases an index is partitioned/sharded (using an
-// index alias), FetchStatsAndSearch helps in aggregating the necessary stats across
+// index alias), GlobalScoring helps in aggregating the necessary stats across
 // all the child bleve indexes (shards/partitions) first before the actual search
-// is performed.
+// is performed, such that the scoring involved using these stats would be at a
+// global level.
 const SearchTypeKey = "_search_type_key"
 
 // The following keys are used to invoke the callbacks at the start and end stages
@@ -162,7 +163,7 @@ const SearcherEndCallbackKey = "_searcher_end_callback_key"
 // to the actual search phase which would use the synonyms to perform the search.
 const FieldTermSynonymMapKey = "_field_term_synonym_map_key"
 
-const FetchStatsAndSearch = "fetch_stats_and_search"
+const GlobalScoring = "_global_scoring"
 
 // GetScoringModelCallbackKey is used to help the underlying searcher identify
 // which scoring mechanism to use based on index mapping.
