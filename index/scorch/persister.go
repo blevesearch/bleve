@@ -989,7 +989,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 			segmentBucket := snapshot.Bucket(k)
 			if segmentBucket == nil {
 				_ = rv.DecRef()
-				return nil, fmt.Errorf("segment key, but bucket missing % x", k)
+				return nil, fmt.Errorf("segment key, but bucket missing %x", k)
 			}
 			segmentSnapshot, err := s.loadSegment(segmentBucket)
 			if err != nil {
