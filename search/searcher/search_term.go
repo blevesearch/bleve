@@ -118,26 +118,29 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 	var count uint64
 	var avgDocLength float64
 	var err error
+	var similarityModel string
 
 	// as a fallback case we track certain stats for tf-idf scoring
 	if ctx != nil {
 		if similaritModelCallback, ok := ctx.Value(search.
 			GetScoringModelCallbackKey).(search.GetScoringModelCallbackFn); ok {
-			similarityModel := similaritModelCallback()
-			switch similarityModel {
-			case index.TFIDFScoring:
-				count, avgDocLength, err = tfTDFScoreMetrics(indexReader)
-				if err != nil {
-					_ = reader.Close()
-					return nil, err
-				}
-			case index.BM25Scoring:
-				count, avgDocLength, err = bm25ScoreMetrics(ctx, field, indexReader)
-				if err != nil {
-					_ = reader.Close()
-					return nil, err
-				}
-			}
+			similarityModel = similaritModelCallback()
+		}
+	}
+	switch similarityModel {
+	case index.BM25Scoring:
+		count, avgDocLength, err = bm25ScoreMetrics(ctx, field, indexReader)
+		if err != nil {
+			_ = reader.Close()
+			return nil, err
+		}
+	case index.TFIDFScoring:
+		fallthrough
+	default:
+		count, avgDocLength, err = tfTDFScoreMetrics(indexReader)
+		if err != nil {
+			_ = reader.Close()
+			return nil, err
 		}
 	}
 	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), avgDocLength, options)
