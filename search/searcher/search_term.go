@@ -73,8 +73,8 @@ func tfTDFScoreMetrics(indexReader index.IndexReader) (uint64, float64, error) {
 	if err != nil {
 		return 0, 0, err
 	}
+	// field cardinality metric is not used in the tf-idf scoring algo.
 	fieldCardinality := 0
-
 	if count == 0 {
 		return 0, 0, nil
 	}
@@ -120,17 +120,18 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 	var err error
 
 	// as a fallback case we track certain stats for tf-idf scoring
-	count, avgDocLength, err = tfTDFScoreMetrics(indexReader)
-	if err != nil {
-		_ = reader.Close()
-		return nil, err
-	}
 	if ctx != nil {
 		if similaritModelCallback, ok := ctx.Value(search.
 			GetScoringModelCallbackKey).(search.GetScoringModelCallbackFn); ok {
 			similarityModel := similaritModelCallback()
-			if similarityModel == index.BM25Scoring {
-				// in case of bm25 need to fetch the multipliers as well (perhaps via context's presearch data)
+			switch similarityModel {
+			case index.TFIDFScoring:
+				count, avgDocLength, err = tfTDFScoreMetrics(indexReader)
+				if err != nil {
+					_ = reader.Close()
+					return nil, err
+				}
+			case index.BM25Scoring:
 				count, avgDocLength, err = bm25ScoreMetrics(ctx, field, indexReader)
 				if err != nil {
 					_ = reader.Close()

@@ -203,7 +203,7 @@ func (im *IndexMappingImpl) Validate() error {
 		}
 	}
 
-	if _, ok := index.SupportedScoringModels[im.ScoringModel]; !ok {
+	if _, ok := index.SupportedScoringModels[im.ScoringModel]; !ok && im.ScoringModel != "" {
 		return fmt.Errorf("unsupported scoring model: %s", im.ScoringModel)
 	}
 

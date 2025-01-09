@@ -135,20 +135,45 @@ const MinGeoBufPoolSize = 24
 
 type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
 
+// PreSearchKey indicates whether to perform a preliminary search to gather necessary
+// information which would be used in the actual search down the line.
+const PreSearchKey = "_presearch_key"
+
+// *PreSearchDataKey are used to store the data gathered during the presearch phase
+// which would be use in the actual search phase.
 const KnnPreSearchDataKey = "_knn_pre_search_data_key"
 const SynonymPreSearchDataKey = "_synonym_pre_search_data_key"
 const BM25PreSearchDataKey = "_bm25_pre_search_data_key"
 
-const PreSearchKey = "_presearch_key"
-
+// SearchTypeKey is used to identify type of the search being performed.
+//
+// for consistent scoring in cases an index is partitioned/sharded (using an
+// index alias), FetchStatsAndSearch helps in aggregating the necessary stats across
+// all the child bleve indexes (shards/partitions) first before the actual search
+// is performed.
 const SearchTypeKey = "_search_type_key"
-const FetchStatsAndSearch = "fetch_stats_and_search"
 
+// The following keys are used to invoke the callbacks at the start and end stages
+// of optimizing the disjunction/conjunction searcher creation.
 const SearcherStartCallbackKey = "_searcher_start_callback_key"
 const SearcherEndCallbackKey = "_searcher_end_callback_key"
 
+// FieldTermSynonymMapKey is used to store and transport the synonym definitions data
+// to the actual search phase which would use the synonyms to perform the search.
+const FieldTermSynonymMapKey = "_field_term_synonym_map_key"
+
+const FetchStatsAndSearch = "fetch_stats_and_search"
+
+// GetScoringModelCallbackKey is used to help the underlying searcher identify
+// which scoring mechanism to use based on index mapping.
+const GetScoringModelCallbackKey = "_get_scoring_model"
+
 type SearcherStartCallbackFn func(size uint64) error
 type SearcherEndCallbackFn func(size uint64) error
+
+type GetScoringModelCallbackFn func() string
+
+type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)
 
 // field -> term -> synonyms
 type FieldTermSynonymMap map[string]map[string][]string
@@ -166,16 +191,7 @@ func (f FieldTermSynonymMap) MergeWith(fts FieldTermSynonymMap) {
 	}
 }
 
-const FieldTermSynonymMapKey = "_field_term_synonym_map_key"
-const BM25MapKey = "_bm25_map_key"
-
 type BM25Stats struct {
 	DocCount         float64        `json:"doc_count"`
 	FieldCardinality map[string]int `json:"field_cardinality"`
 }
-
-const GetScoringModelCallbackKey = "_get_scoring_model"
-
-type GetScoringModelCallbackFn func() string
-
-type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)
