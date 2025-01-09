@@ -511,10 +511,12 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		// Keeping that TODO for now until we have a cleaner way.
 		rvd.StoredFieldsSize += uint64(len(val))
 
+		// Skip fields that are supposed to have deleted store values
 		if info, ok := is.updatedFields[name]; ok &&
 			(info.All || info.Store) {
 			return true
 		}
+
 		// copy value, array positions to preserve them beyond the scope of this callback
 		value := append([]byte(nil), val...)
 		arrayPos := append([]uint64(nil), pos...)
@@ -643,6 +645,8 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 
 			var dict segment.TermDictionary
 			var err error
+
+			// Skip fields that are supposed to have no indexing
 			if info, ok := is.updatedFields[field]; ok &&
 				(info.Index || info.All) {
 				dict = nil
@@ -652,6 +656,7 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 			if err != nil {
 				return nil, err
 			}
+
 			if dictStats, ok := dict.(segment.DiskStatsReporter); ok {
 				bytesRead := dictStats.BytesRead()
 				rv.incrementBytesRead(bytesRead)
@@ -797,6 +802,7 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		}
 	}
 
+	// Filter out fields that are supposed to have no doc values
 	var filteredFields []string
 	for _, field := range vFields {
 		if info, ok := is.updatedFields[field]; ok &&
@@ -829,8 +835,8 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		}
 	}
 
-	if ssvOk && ssv != nil && len(vFields) > 0 {
-		dvs, err = ssv.VisitDocValues(localDocNum, fields, visitor, dvs)
+	if ssvOk && ssv != nil && len(filteredFields) > 0 {
+		dvs, err = ssv.VisitDocValues(localDocNum, filteredFields, visitor, dvs)
 		if err != nil {
 			return nil, nil, err
 		}

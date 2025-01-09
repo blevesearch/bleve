@@ -37,7 +37,7 @@ const Version uint8 = 2
 
 var ErrClosed = fmt.Errorf("scorch closed")
 
-var mappingInternalKey = []byte("_mapping")
+var MappingInternalKey = []byte("_mapping")
 
 type Scorch struct {
 	nextSegmentID uint64
@@ -944,15 +944,27 @@ func (s *Scorch) FireIndexEvent() {
 	s.fireEvent(EventKindIndexStart, 0)
 }
 
+// Updates bolt db with the given field info. Existing field info already in bolt
+// will be merged before persisting. The index mapping is also overwritted both
+// in bolt as well as the index snapshot
 func (s *Scorch) UpdateFields(fieldInfo map[string]*index.FieldInfo, mappingBytes []byte) error {
-	err := s.updateBolt(fieldInfo, mappingBytes)
+	// Switch from pointer to value to marshal into a json for storage
+	updatedFields := make(map[string]index.FieldInfo)
+	for field, info := range fieldInfo {
+		updatedFields[field] = *info
+	}
+	err := s.updateBolt(updatedFields, mappingBytes)
 	if err != nil {
 		return err
 	}
+	s.root.m.Lock()
+	s.root.updatedFields = updatedFields
+	s.root.m.Unlock()
 	return nil
 }
 
-func (s *Scorch) updateBolt(fieldInfo map[string]*index.FieldInfo, mappingBytes []byte) error {
+// Merge and update deleted field info and rewrite index mapping
+func (s *Scorch) updateBolt(fieldInfo map[string]index.FieldInfo, mappingBytes []byte) error {
 	return s.rootBolt.Update(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(boltSnapshotsBucket)
 		if snapshots == nil {
@@ -968,20 +980,20 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.FieldInfo, mappingBytes 
 			}
 			snapshot := snapshots.Bucket(k)
 			cc := snapshot.Cursor()
-			for kk, _ := cc.First(); kk != nil; kk, _ = c.Next() {
-				if k[0] == boltInternalKey[0] {
-					internalBucket := snapshot.Bucket(k)
+			for kk, _ := cc.First(); kk != nil; kk, _ = cc.Next() {
+				if kk[0] == boltInternalKey[0] {
+					internalBucket := snapshot.Bucket(kk)
 					if internalBucket == nil {
-						return fmt.Errorf("segment key, but bucket missing % x", k)
+						return fmt.Errorf("segment key, but bucket missing %x", kk)
 					}
-					err = internalBucket.Put(mappingInternalKey, mappingBytes)
+					err = internalBucket.Put(MappingInternalKey, mappingBytes)
 					if err != nil {
 						return err
 					}
-				} else if k[0] != boltMetaDataKey[0] {
-					segmentBucket := snapshot.Bucket(k)
+				} else if kk[0] != boltMetaDataKey[0] {
+					segmentBucket := snapshot.Bucket(kk)
 					if segmentBucket == nil {
-						return fmt.Errorf("segment key, but bucket missing % x", k)
+						return fmt.Errorf("segment key, but bucket missing %x", kk)
 					}
 					var updatedFields map[string]index.FieldInfo
 					updatedFieldBytes := segmentBucket.Get(boltUpdatedFieldsKey)
@@ -990,11 +1002,11 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.FieldInfo, mappingBytes 
 						if err != nil {
 							return fmt.Errorf("error reading updated field bytes: %v", err)
 						}
+						for field, info := range fieldInfo {
+							updatedFields[field] = info
+						}
 					} else {
-						updatedFields = make(map[string]index.FieldInfo)
-					}
-					for field, info := range fieldInfo {
-						updatedFields[field] = *info
+						updatedFields = fieldInfo
 					}
 					b, err := json.Marshal(updatedFields)
 					if err != nil {
@@ -1007,7 +1019,6 @@ func (s *Scorch) updateBolt(fieldInfo map[string]*index.FieldInfo, mappingBytes 
 				}
 			}
 		}
-
 		return nil
 	})
 }
