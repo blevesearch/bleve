@@ -1,4 +1,4 @@
-# geo support in bleve
+# Geo spatial search support in bleve
 
 Latest bleve spatial capabilities are powered by spatial hierarchical tokens generated from s2geometry.
 You can find more details about the [s2geometry basics here](http://s2geometry.io/), and explore the 
