@@ -67,18 +67,17 @@ func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader,
 	return newTermSearcherFromReader(ctx, indexReader, reader, term, field, boost, options)
 }
 
-func tfTDFScoreMetrics(indexReader index.IndexReader) (uint64, float64, error) {
+func tfIDFScoreMetrics(indexReader index.IndexReader) (uint64, error) {
 	// default tf-idf stats
 	count, err := indexReader.DocCount()
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
-	// field cardinality metric is not used in the tf-idf scoring algo.
-	fieldCardinality := 0
+
 	if count == 0 {
-		return 0, 0, nil
+		return 0, nil
 	}
-	return count, float64(fieldCardinality / int(count)), nil
+	return count, nil
 }
 
 func bm25ScoreMetrics(ctx context.Context, field string,
@@ -137,7 +136,7 @@ func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReade
 	case index.TFIDFScoring:
 		fallthrough
 	default:
-		count, avgDocLength, err = tfTDFScoreMetrics(indexReader)
+		count, err = tfIDFScoreMetrics(indexReader)
 		if err != nil {
 			_ = reader.Close()
 			return nil, err

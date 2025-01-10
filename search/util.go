@@ -192,6 +192,13 @@ func (f FieldTermSynonymMap) MergeWith(fts FieldTermSynonymMap) {
 	}
 }
 
+// BM25 specific multipliers which affect the scoring of a document.
+//
+// BM25_b - how much does a doc's field length affect the score
+// BM25_k1 - how much can the term frequency affect the score
+var BM25_k1 float64 = 1.2
+var BM25_b float64 = 0.75
+
 type BM25Stats struct {
 	DocCount         float64        `json:"doc_count"`
 	FieldCardinality map[string]int `json:"field_cardinality"`

@@ -35,8 +35,8 @@ type TermQueryScorer struct {
 	queryTerm              string
 	queryField             string
 	queryBoost             float64
-	docTerm                uint64
-	docTotal               uint64
+	docTerm                uint64 // number of documents containing the term
+	docTotal               uint64 // total number of documents in the index
 	avgDocLength           float64
 	idf                    float64
 	options                search.SearcherOptions
@@ -132,11 +132,6 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 	}
 }
 
-// multiplies deciding how much does a doc length affect the score and also
-// how much can the term frequency affect the score in BM25 scoring
-var k1 float64 = 1.2
-var b float64 = 0.75
-
 func (s *TermQueryScorer) docScore(tf, norm float64) float64 {
 	// tf-idf scoring by default
 	score := tf * norm * s.idf
@@ -145,8 +140,8 @@ func (s *TermQueryScorer) docScore(tf, norm float64) float64 {
 		// using the posting's norm value to recompute the field length for the doc num
 		fieldLength := 1 / (norm * norm)
 
-		score = s.idf * (tf * k1) /
-			(tf + k1*(1-b+(b*fieldLength/s.avgDocLength)))
+		score = s.idf * (tf * search.BM25_k1) /
+			(tf + search.BM25_k1*(1-search.BM25_b+(search.BM25_b*fieldLength/s.avgDocLength)))
 	}
 	return score
 }
@@ -155,17 +150,17 @@ func (s *TermQueryScorer) scoreExplanation(tf float64, termMatch *index.TermFiel
 	var rv []*search.Explanation
 	if s.avgDocLength > 0 {
 		fieldLength := 1 / (termMatch.Norm * termMatch.Norm)
-		fieldNormVal := 1 - b + (b * fieldLength / s.avgDocLength)
+		fieldNormVal := 1 - search.BM25_b + (search.BM25_b * fieldLength / s.avgDocLength)
 		fieldNormalizeExplanation := &search.Explanation{
 			Value: fieldNormVal,
 			Message: fmt.Sprintf("fieldNorm(field=%s), b=%f, fieldLength=%f, avgFieldLength=%f)",
-				s.queryField, b, fieldLength, s.avgDocLength),
+				s.queryField, search.BM25_b, fieldLength, s.avgDocLength),
 		}
 
 		saturationExplanation := &search.Explanation{
-			Value: k1 / (tf + k1*fieldNormVal),
+			Value: search.BM25_k1 / (tf + search.BM25_k1*fieldNormVal),
 			Message: fmt.Sprintf("saturation(term:%s), k1=%f/(tf=%f + k1*fieldNorm=%f))",
-				termMatch.Term, k1, tf, fieldNormVal),
+				termMatch.Term, search.BM25_k1, tf, fieldNormVal),
 			Children: []*search.Explanation{fieldNormalizeExplanation},
 		}
 
