@@ -1,3 +1,3 @@
 # Geo spatial search
 
-Redirect to [here](https://github.com/blevesearch/bleve/blob/master/geo/README.md)
+Redirect to [geo/README.md](https://github.com/blevesearch/bleve/blob/master/geo/README.md)
