@@ -76,6 +76,13 @@ func (s *TermQueryScorer) computeIDF(avgDocLength float64, docTotal, docTerm uin
 	return rv
 }
 
+// queryTerm - the specific term being scored by this scorer object
+// queryField - the field in which the term is being searched
+// queryBoost - the boost value for the query term
+// docTotal - total number of documents in the index
+// docTerm - number of documents containing the term
+// avgDocLength - average document length in the index
+// options - search options such as explain scoring, include the location of the term etc.
 func NewTermQueryScorer(queryTerm []byte, queryField string, queryBoost float64, docTotal,
 	docTerm uint64, avgDocLength float64, options search.SearcherOptions) *TermQueryScorer {
 
@@ -132,9 +139,7 @@ func (s *TermQueryScorer) SetQueryNorm(qnorm float64) {
 	}
 }
 
-func (s *TermQueryScorer) docScore(tf, norm float64) float64 {
-	// tf-idf scoring by default
-	score := tf * norm * s.idf
+func (s *TermQueryScorer) docScore(tf, norm float64) (score float64, model string) {
 	if s.avgDocLength > 0 {
 		// bm25 scoring
 		// using the posting's norm value to recompute the field length for the doc num
@@ -142,8 +147,13 @@ func (s *TermQueryScorer) docScore(tf, norm float64) float64 {
 
 		score = s.idf * (tf * search.BM25_k1) /
 			(tf + search.BM25_k1*(1-search.BM25_b+(search.BM25_b*fieldLength/s.avgDocLength)))
+		model = index.BM25Scoring
+	} else {
+		// tf-idf scoring by default
+		score = tf * norm * s.idf
+		model = index.DefaultScoringModel
 	}
-	return score
+	return score, model
 }
 
 func (s *TermQueryScorer) scoreExplanation(tf float64, termMatch *index.TermFieldDoc) []*search.Explanation {
@@ -198,12 +208,13 @@ func (s *TermQueryScorer) Score(ctx *search.SearchContext, termMatch *index.Term
 			tf = math.Sqrt(float64(termMatch.Freq))
 		}
 
-		score := s.docScore(tf, termMatch.Norm)
+		score, scoringModel := s.docScore(tf, termMatch.Norm)
 		if s.options.Explain {
 			childrenExplanations := s.scoreExplanation(tf, termMatch)
 			scoreExplanation = &search.Explanation{
-				Value:    score,
-				Message:  fmt.Sprintf("fieldWeight(%s:%s in %s), product of:", s.queryField, s.queryTerm, termMatch.ID),
+				Value: score,
+				Message: fmt.Sprintf("fieldWeight(%s:%s in %s), as per %s model, "+
+					"product of:", s.queryField, s.queryTerm, termMatch.ID, scoringModel),
 				Children: childrenExplanations,
 			}
 		}

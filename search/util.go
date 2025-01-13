@@ -192,10 +192,12 @@ func (f FieldTermSynonymMap) MergeWith(fts FieldTermSynonymMap) {
 	}
 }
 
-// BM25 specific multipliers which affect the scoring of a document.
+// BM25 specific multipliers which control the scoring of a document.
 //
-// BM25_b - how much does a doc's field length affect the score
-// BM25_k1 - how much can the term frequency affect the score
+// BM25_b - controls the extent to which doc's field length normalize term frequency part of score
+// BM25_k1 - controls the saturation of the score due to term frequency
+// the default values are as per elastic search's implementation
+//   - https://www.elastic.co/guide/en/elasticsearch/reference/current/index-modules-similarity.html#bm25
 var BM25_k1 float64 = 1.2
 var BM25_b float64 = 0.75
 
