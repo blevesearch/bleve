@@ -38,9 +38,21 @@ type fieldMapInfo struct {
 	parent       *pathInfo
 }
 
+// Store all of the changes to defaults
+type defaultInfo struct {
+	analyzer       bool
+	dateTimeParser bool
+	synonymSource  bool
+}
+
 // Compare two index mappings to identify all of the updatable changes
 func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.FieldInfo, error) {
 	var err error
+
+	defaultChanges, err := compareMappings(ori, upd)
+	if err != nil {
+		return nil, err
+	}
 
 	// Check for new mappings present in the type mappings
 	// of the updated compared to the original
@@ -80,7 +92,7 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.FieldI
 	// for every single field possible
 	fieldInfo := make(map[string]*index.FieldInfo)
 	for path, info := range oriPaths {
-		err = addFieldInfo(fieldInfo, info, updPaths[path])
+		err = addFieldInfo(fieldInfo, info, updPaths[path], defaultChanges)
 		if err != nil {
 			return nil, err
 		}
@@ -94,6 +106,49 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.FieldI
 		}
 	}
 	return fieldInfo, nil
+}
+
+func compareMappings(ori, upd *mapping.IndexMappingImpl) (*defaultInfo, error) {
+	rv := &defaultInfo{}
+
+	if ori.TypeField != upd.TypeField &&
+		len(ori.TypeMapping) != 0 || len(upd.TypeMapping) != 0 {
+		return nil, fmt.Errorf("type field cannot be changed when type mappings are present")
+	}
+
+	if ori.DefaultType != upd.DefaultType {
+		return nil, fmt.Errorf("default type cannot be changed")
+	}
+
+	if ori.DefaultAnalyzer != upd.DefaultAnalyzer {
+		rv.analyzer = true
+	}
+
+	if ori.DefaultDateTimeParser != upd.DefaultDateTimeParser {
+		rv.dateTimeParser = true
+	}
+
+	if ori.DefaultSynonymSource != upd.DefaultSynonymSource {
+		rv.synonymSource = true
+	}
+
+	if ori.DefaultField != upd.DefaultField {
+		return nil, fmt.Errorf("default field cannot be changed")
+	}
+
+	if ori.IndexDynamic != upd.IndexDynamic {
+		return nil, fmt.Errorf("index dynamic cannot be changed")
+	}
+
+	if ori.StoreDynamic != upd.StoreDynamic {
+		return nil, fmt.Errorf(("store dynamic cannot be changed"))
+	}
+
+	if ori.DocValuesDynamic != upd.DocValuesDynamic {
+		return nil, fmt.Errorf(("docvalues dynamic cannot be changed"))
+	}
+
+	return rv, nil
 }
 
 // Ensures updated document mapping does not contain new
@@ -195,7 +250,7 @@ func addPathInfo(paths map[string]*pathInfo, name string, mp *mapping.DocumentMa
 }
 
 // Compare all of the fields at a particular document path and add its field information
-func addFieldInfo(fInfo map[string]*index.FieldInfo, ori, upd *pathInfo) error {
+func addFieldInfo(fInfo map[string]*index.FieldInfo, ori, upd *pathInfo, defaultChanges *defaultInfo) error {
 
 	var info *index.FieldInfo
 	var updated bool
@@ -205,7 +260,7 @@ func addFieldInfo(fInfo map[string]*index.FieldInfo, ori, upd *pathInfo) error {
 	// or upd having mappings not in orihave already been done before this stage
 	if upd == nil {
 		for _, oriFMapInfo := range ori.fieldMapInfo {
-			info, updated, err = compareFieldMapping(oriFMapInfo.fieldMapping, nil)
+			info, updated, err = compareFieldMapping(oriFMapInfo.fieldMapping, nil, defaultChanges)
 			if err != nil {
 				return err
 			}
@@ -226,7 +281,7 @@ func addFieldInfo(fInfo map[string]*index.FieldInfo, ori, upd *pathInfo) error {
 				}
 			}
 
-			info, updated, err = compareFieldMapping(oriFMapInfo.fieldMapping, updFMap)
+			info, updated, err = compareFieldMapping(oriFMapInfo.fieldMapping, updFMap, defaultChanges)
 			if err != nil {
 				return err
 			}
@@ -250,7 +305,7 @@ func addFieldInfo(fInfo map[string]*index.FieldInfo, ori, upd *pathInfo) error {
 // second return argument gives a flag indicating whether any changes, if detected, are doable or if
 // update is impossible
 // third argument is an error explaining exactly why the change is not possible
-func compareFieldMapping(original, updated *mapping.FieldMapping) (*index.FieldInfo, bool, error) {
+func compareFieldMapping(original, updated *mapping.FieldMapping, defaultChanges *defaultInfo) (*index.FieldInfo, bool, error) {
 
 	rv := &index.FieldInfo{}
 
@@ -269,11 +324,24 @@ func compareFieldMapping(original, updated *mapping.FieldMapping) (*index.FieldI
 	if original.Type != updated.Type {
 		return nil, false, fmt.Errorf("field type cannot be updated")
 	}
-	if original.Analyzer != updated.Analyzer && original.Type == "text" {
-		return nil, false, fmt.Errorf("analyzer cannot be updated for text fields")
+	if original.Type == "text" {
+		if original.SynonymSource != updated.SynonymSource {
+			return nil, false, fmt.Errorf("synonym source cannot be changed for text field")
+		} else if original.SynonymSource == "inherit" && defaultChanges.synonymSource {
+			return nil, false, fmt.Errorf("synonym source cannot be changed for possible inherited text field")
+		}
+		if original.Analyzer != updated.Analyzer {
+			return nil, false, fmt.Errorf("analyzer cannot be updated for text fields")
+		} else if original.Analyzer == "inherit" && defaultChanges.analyzer {
+			return nil, false, fmt.Errorf("default analyzer changed for possible inherited text field")
+		}
 	}
-	if original.DateFormat != updated.DateFormat && original.Type == "datetime" {
-		return nil, false, fmt.Errorf("dateFormat cannot be updated for datetime fields")
+	if original.Type == "datetime" {
+		if original.DateFormat != updated.DateFormat {
+			return nil, false, fmt.Errorf("dateFormat cannot be updated for datetime fields")
+		} else if original.DateFormat == "inherit" && defaultChanges.dateTimeParser {
+			return nil, false, fmt.Errorf("default analyzer changed for possible inherited text field")
+		}
 	}
 	if original.Type == "vector" || original.Type == "vector_base64" {
 		if original.Dims != updated.Dims {
