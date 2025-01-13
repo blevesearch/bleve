@@ -198,6 +198,7 @@ func (f FieldTermSynonymMap) MergeWith(fts FieldTermSynonymMap) {
 // BM25_k1 - controls the saturation of the score due to term frequency
 // the default values are as per elastic search's implementation
 //   - https://www.elastic.co/guide/en/elasticsearch/reference/current/index-modules-similarity.html#bm25
+//   - https://www.elastic.co/blog/practical-bm25-part-3-considerations-for-picking-b-and-k1-in-elasticsearch
 var BM25_k1 float64 = 1.2
 var BM25_b float64 = 0.75
 
