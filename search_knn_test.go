@@ -1208,6 +1208,97 @@ func TestSimilaritySearchMultipleSegments(t *testing.T) {
 	}
 }
 
+// Test to determine the impact of boost on kNN queries.
+func TestKNNScoreBoosting(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	const dims = 5
+	getRandomVector := func() []float32 {
+		vec := make([]float32, dims)
+		for i := 0; i < dims; i++ {
+			vec[i] = rand.Float32()
+		}
+		return vec
+	}
+
+	dataset := make([]map[string]interface{}, 10)
+
+	// Indexing just a few docs to populate index.
+	for i := 0; i < 100; i++ {
+		dataset = append(dataset, map[string]interface{}{
+			"type":    "vectorStuff",
+			"content": strconv.Itoa(i),
+			"vector":  getRandomVector(),
+		})
+	}
+
+	indexMapping := NewIndexMapping()
+	indexMapping.TypeField = "type"
+	indexMapping.DefaultAnalyzer = "en"
+	documentMapping := NewDocumentMapping()
+	indexMapping.AddDocumentMapping("vectorStuff", documentMapping)
+
+	contentFieldMapping := NewTextFieldMapping()
+	contentFieldMapping.Index = true
+	contentFieldMapping.Store = true
+	documentMapping.AddFieldMappingsAt("content", contentFieldMapping)
+
+	vecFieldMapping := mapping.NewVectorFieldMapping()
+	vecFieldMapping.Index = true
+	vecFieldMapping.Dims = 5
+	vecFieldMapping.Similarity = "dot_product"
+	documentMapping.AddFieldMappingsAt("vector", vecFieldMapping)
+
+	index, err := New(tmpIndexPath, indexMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := index.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch := index.NewBatch()
+	for i := 0; i < len(dataset); i++ {
+		batch.Index(strconv.Itoa(i), dataset[i])
+	}
+
+	err = index.Batch(batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	queryVec := getRandomVector()
+	searchRequest := NewSearchRequest(NewMatchNoneQuery())
+	searchRequest.AddKNN("vector", queryVec, 3, 1.0)
+	searchRequest.Fields = []string{"content", "vector"}
+
+	hits, _ := index.Search(searchRequest)
+	hitsMap := make(map[string]float64, 0)
+	for _, hit := range hits.Hits {
+		hitsMap[hit.ID] = (hit.Score)
+	}
+
+	searchRequest2 := NewSearchRequest(NewMatchNoneQuery())
+	searchRequest.AddKNN("vector", queryVec, 3, 10.0)
+	searchRequest.Fields = []string{"content", "vector"}
+
+	hits2, _ := index.Search(searchRequest2)
+	hitsMap2 := make(map[string]float64, 0)
+	for _, hit := range hits2.Hits {
+		hitsMap2[hit.ID] = (hit.Score)
+	}
+
+	for _, hit := range hits2.Hits {
+		if hitsMap[hit.ID] != hitsMap2[hit.ID]/10 {
+			t.Errorf("boosting not working: %v %v \n", hitsMap[hit.ID], hitsMap2[hit.ID])
+		}
+	}
+}
+
 // Test to see if KNN Operators get added right to the query.
 func TestKNNOperator(t *testing.T) {
 	tmpIndexPath := createTmpIndexPath(t)
