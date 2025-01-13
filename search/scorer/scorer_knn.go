@@ -128,7 +128,7 @@ func (sqs *KNNQueryScorer) Score(ctx *search.SearchContext,
 }
 
 func (sqs *KNNQueryScorer) Weight() float64 {
-	return sqs.queryBoost * sqs.queryBoost
+	return 1.0
 }
 
 func (sqs *KNNQueryScorer) SetQueryNorm(qnorm float64) {
