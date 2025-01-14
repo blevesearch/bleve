@@ -350,14 +350,11 @@ func TestBytesWritten(t *testing.T) {
 	cleanupTmpIndexPath(t, tmpIndexPath4)
 }
 
-func TestGlobalScoring(t *testing.T) {
-	tmpIndexPath := createTmpIndexPath(t)
-	defer cleanupTmpIndexPath(t, tmpIndexPath)
-
+func createIndexMappingOnSampleData() *mapping.IndexMappingImpl {
 	indexMapping := NewIndexMapping()
 	indexMapping.TypeField = "type"
 	indexMapping.DefaultAnalyzer = "en"
-	indexMapping.ScoringModel = index.BM25Scoring
+	indexMapping.ScoringModel = index.DefaultScoringModel
 	documentMapping := NewDocumentMapping()
 	indexMapping.AddDocumentMapping("hotel", documentMapping)
 	indexMapping.StoreDynamic = false
@@ -373,6 +370,85 @@ func TestGlobalScoring(t *testing.T) {
 	typeFieldMapping.Store = false
 	documentMapping.AddFieldMappingsAt("type", typeFieldMapping)
 
+	return indexMapping
+}
+
+func TestBM25TFIDFScoring(t *testing.T) {
+	tmpIndexPath1 := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath1)
+	tmpIndexPath2 := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath2)
+
+	indexMapping := createIndexMappingOnSampleData()
+	indexMapping.ScoringModel = index.BM25Scoring
+	indexBM25, err := NewUsing(tmpIndexPath1, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	indexMapping1 := createIndexMappingOnSampleData()
+	indexTFIDF, err := NewUsing(tmpIndexPath2, indexMapping1, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err := indexBM25.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = indexTFIDF.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	batch, err := getBatchFromData(indexBM25, "sample-data.json")
+	if err != nil {
+		t.Fatalf("failed to form a batch")
+	}
+	err = indexBM25.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to index batch %v\n", err)
+	}
+	query := NewMatchQuery("Hotel")
+	query.FieldVal = "name"
+	searchRequest := NewSearchRequestOptions(query, int(10), 0, true)
+
+	resBM25, err := indexBM25.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	batch, err = getBatchFromData(indexTFIDF, "sample-data.json")
+	if err != nil {
+		t.Fatalf("failed to form a batch")
+	}
+	err = indexTFIDF.Batch(batch)
+	if err != nil {
+		t.Fatalf("failed to index batch %v\n", err)
+	}
+
+	resTFIDF, err := indexTFIDF.Search(searchRequest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	for i, hit := range resTFIDF.Hits {
+		if hit.Score < resBM25.Hits[i].Score {
+			t.Fatalf("expected the score to be higher for BM25, got %v and %v",
+				resBM25.Hits[i].Score, hit.Score)
+		}
+	}
+}
+
+func TestBM25GlobalScoring(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMapping := createIndexMappingOnSampleData()
+	indexMapping.ScoringModel = index.BM25Scoring
 	idxSinglePartition, err := NewUsing(tmpIndexPath, indexMapping, Config.DefaultIndexType, Config.DefaultMemKVStore, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -393,7 +469,7 @@ func TestGlobalScoring(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to index batch %v\n", err)
 	}
-	query := NewMatchQuery("Apartments")
+	query := NewMatchQuery("Hotel")
 	query.FieldVal = "name"
 	searchRequest := NewSearchRequestOptions(query, int(10), 0, true)
 
@@ -402,7 +478,8 @@ func TestGlobalScoring(t *testing.T) {
 		t.Error(err)
 	}
 
-	singleIndexScore := res.Hits[0].Score
+	singlePartHits := res.Hits
+
 	dataset, _ := readDataFromFile("sample-data.json")
 	tmpIndexPath1 := createTmpIndexPath(t)
 	defer cleanupTmpIndexPath(t, tmpIndexPath1)
@@ -474,9 +551,11 @@ func TestGlobalScoring(t *testing.T) {
 		t.Error(err)
 	}
 
-	if singleIndexScore != res.Hits[0].Score {
-		t.Fatalf("expected the scores to be the same, got %v and %v",
-			singleIndexScore, res.Hits[0].Score)
+	for i, hit := range res.Hits {
+		if hit.Score != singlePartHits[i].Score {
+			t.Fatalf("expected the scores to be the same, got %v and %v",
+				hit.Score, singlePartHits[i].Score)
+		}
 	}
 
 }

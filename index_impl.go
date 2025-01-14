@@ -486,7 +486,7 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 
 	var fts search.FieldTermSynonymMap
 	var count uint64
-	fieldCardinality := make(map[string]int)
+	var fieldCardinality map[string]int
 	if !isMatchNoneQuery(req.Query) {
 		if synMap, ok := i.m.(mapping.SynonymMapping); ok {
 			if synReader, ok := reader.(index.ThesaurusReader); ok {
@@ -497,6 +497,7 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 			}
 		}
 		if ok := isBM25Enabled(i.m); ok {
+			fieldCardinality = make(map[string]int)
 			count, err = reader.DocCount()
 			if err != nil {
 				return nil, err
@@ -604,7 +605,6 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 					}
 					skipSynonymCollector = true
 				}
-				skipKNNCollector = true
 			case search.BM25PreSearchDataKey:
 				if v != nil {
 					bm25Data, ok = v.(*search.BM25Stats)
