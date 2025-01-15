@@ -135,15 +135,46 @@ const MinGeoBufPoolSize = 24
 
 type GeoBufferPoolCallbackFunc func() *s2.GeoBufferPool
 
-const KnnPreSearchDataKey = "_knn_pre_search_data_key"
-const SynonymPreSearchDataKey = "_synonym_pre_search_data_key"
-
+// PreSearchKey indicates whether to perform a preliminary search to gather necessary
+// information which would be used in the actual search down the line.
 const PreSearchKey = "_presearch_key"
 
-type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)
+// *PreSearchDataKey are used to store the data gathered during the presearch phase
+// which would be use in the actual search phase.
+const KnnPreSearchDataKey = "_knn_pre_search_data_key"
+const SynonymPreSearchDataKey = "_synonym_pre_search_data_key"
+const BM25PreSearchDataKey = "_bm25_pre_search_data_key"
+
+// SearchTypeKey is used to identify type of the search being performed.
+//
+// for consistent scoring in cases an index is partitioned/sharded (using an
+// index alias), GlobalScoring helps in aggregating the necessary stats across
+// all the child bleve indexes (shards/partitions) first before the actual search
+// is performed, such that the scoring involved using these stats would be at a
+// global level.
+const SearchTypeKey = "_search_type_key"
+
+// The following keys are used to invoke the callbacks at the start and end stages
+// of optimizing the disjunction/conjunction searcher creation.
+const SearcherStartCallbackKey = "_searcher_start_callback_key"
+const SearcherEndCallbackKey = "_searcher_end_callback_key"
+
+// FieldTermSynonymMapKey is used to store and transport the synonym definitions data
+// to the actual search phase which would use the synonyms to perform the search.
+const FieldTermSynonymMapKey = "_field_term_synonym_map_key"
+
+const GlobalScoring = "_global_scoring"
+
+// GetScoringModelCallbackKey is used to help the underlying searcher identify
+// which scoring mechanism to use based on index mapping.
+const GetScoringModelCallbackKey = "_get_scoring_model"
 
 type SearcherStartCallbackFn func(size uint64) error
 type SearcherEndCallbackFn func(size uint64) error
+
+type GetScoringModelCallbackFn func() string
+
+type ScoreExplCorrectionCallbackFunc func(queryMatch *DocumentMatch, knnMatch *DocumentMatch) (float64, *Explanation)
 
 // field -> term -> synonyms
 type FieldTermSynonymMap map[string]map[string][]string
@@ -161,7 +192,17 @@ func (f FieldTermSynonymMap) MergeWith(fts FieldTermSynonymMap) {
 	}
 }
 
-const FieldTermSynonymMapKey = "_field_term_synonym_map_key"
+// BM25 specific multipliers which control the scoring of a document.
+//
+// BM25_b - controls the extent to which doc's field length normalize term frequency part of score
+// BM25_k1 - controls the saturation of the score due to term frequency
+// the default values are as per elastic search's implementation
+//   - https://www.elastic.co/guide/en/elasticsearch/reference/current/index-modules-similarity.html#bm25
+//   - https://www.elastic.co/blog/practical-bm25-part-3-considerations-for-picking-b-and-k1-in-elasticsearch
+var BM25_k1 float64 = 1.2
+var BM25_b float64 = 0.75
 
-const SearcherStartCallbackKey = "_searcher_start_callback_key"
-const SearcherEndCallbackKey = "_searcher_end_callback_key"
+type BM25Stats struct {
+	DocCount         float64        `json:"doc_count"`
+	FieldCardinality map[string]int `json:"field_cardinality"`
+}

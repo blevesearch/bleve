@@ -485,6 +485,8 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 	}
 
 	var fts search.FieldTermSynonymMap
+	var count uint64
+	var fieldCardinality map[string]int
 	if !isMatchNoneQuery(req.Query) {
 		if synMap, ok := i.m.(mapping.SynonymMapping); ok {
 			if synReader, ok := reader.(index.ThesaurusReader); ok {
@@ -492,6 +494,26 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 				if err != nil {
 					return nil, err
 				}
+			}
+		}
+		if ok := isBM25Enabled(i.m); ok {
+			fieldCardinality = make(map[string]int)
+			count, err = reader.DocCount()
+			if err != nil {
+				return nil, err
+			}
+
+			fs := make(query.FieldSet)
+			fs, err := query.ExtractFields(req.Query, i.m, fs)
+			if err != nil {
+				return nil, err
+			}
+			for field := range fs {
+				dict, err := reader.FieldDict(field)
+				if err != nil {
+					return nil, err
+				}
+				fieldCardinality[field] = dict.Cardinality()
 			}
 		}
 	}
@@ -503,6 +525,10 @@ func (i *indexImpl) preSearch(ctx context.Context, req *SearchRequest, reader in
 		},
 		Hits:          knnHits,
 		SynonymResult: fts,
+		BM25Stats: &search.BM25Stats{
+			DocCount:         float64(count),
+			FieldCardinality: fieldCardinality,
+		},
 	}, nil
 }
 
@@ -558,6 +584,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 	var fts search.FieldTermSynonymMap
 	var skipSynonymCollector bool
 
+	var bm25Data *search.BM25Stats
 	var ok bool
 	if req.PreSearchData != nil {
 		for k, v := range req.PreSearchData {
@@ -577,6 +604,13 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 						return nil, fmt.Errorf("synonym preSearchData must be of type search.FieldTermSynonymMap")
 					}
 					skipSynonymCollector = true
+				}
+			case search.BM25PreSearchDataKey:
+				if v != nil {
+					bm25Data, ok = v.(*search.BM25Stats)
+					if !ok {
+						return nil, fmt.Errorf("bm25 preSearchData must be of type map[string]interface{}")
+					}
 				}
 			}
 		}
@@ -603,6 +637,21 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	if fts != nil {
 		ctx = context.WithValue(ctx, search.FieldTermSynonymMapKey, fts)
+	}
+
+	scoringModelCallback := func() string {
+		if isBM25Enabled(i.m) {
+			return index.BM25Scoring
+		}
+		return index.DefaultScoringModel
+	}
+	ctx = context.WithValue(ctx, search.GetScoringModelCallbackKey,
+		search.GetScoringModelCallbackFn(scoringModelCallback))
+
+	// set the bm25 presearch data (stats important for consistent scoring) in
+	// the context object
+	if bm25Data != nil {
+		ctx = context.WithValue(ctx, search.BM25PreSearchDataKey, bm25Data)
 	}
 
 	// This callback and variable handles the tracking of bytes read
@@ -1105,6 +1154,10 @@ func (f *indexImplFieldDict) Close() error {
 		return err
 	}
 	return f.indexReader.Close()
+}
+
+func (f *indexImplFieldDict) Cardinality() int {
+	return f.fieldDict.Cardinality()
 }
 
 // helper function to remove duplicate entries from slice of strings

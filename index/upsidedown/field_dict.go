@@ -77,6 +77,10 @@ func (r *UpsideDownCouchFieldDict) Next() (*index.DictEntry, error) {
 
 }
 
+func (r *UpsideDownCouchFieldDict) Cardinality() int {
+	return 0
+}
+
 func (r *UpsideDownCouchFieldDict) Close() error {
 	return r.iterator.Close()
 }
