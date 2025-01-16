@@ -79,6 +79,10 @@ func (o *OptimizeVR) Finish() error {
 					wg.Done()
 				}()
 				for field, vrs := range o.vrs {
+					if info, ok := o.snapshot.updatedFields[field]; ok && info.All || info.Index {
+						continue
+					}
+
 					vecIndex, err := segment.InterpretVectorIndex(field,
 						o.requiresFiltering, origSeg.deleted)
 					if err != nil {

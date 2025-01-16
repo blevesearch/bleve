@@ -104,6 +104,17 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.FieldI
 		if !info.All && !info.Index && !info.DocValues && !info.Store {
 			delete(fieldInfo, name)
 		}
+		if info.All {
+			if upd.IndexDynamic {
+				return nil, fmt.Errorf("Mapping cannot be removed when index dynamic is true")
+			}
+			if upd.StoreDynamic {
+				return nil, fmt.Errorf("Mapping cannot be removed when store dynamic is true")
+			}
+			if upd.DocValuesDynamic {
+				return nil, fmt.Errorf("Mapping cannot be removed when docvalues dynamic is true")
+			}
+		}
 	}
 	return fieldInfo, nil
 }
@@ -112,7 +123,7 @@ func compareMappings(ori, upd *mapping.IndexMappingImpl) (*defaultInfo, error) {
 	rv := &defaultInfo{}
 
 	if ori.TypeField != upd.TypeField &&
-		len(ori.TypeMapping) != 0 || len(upd.TypeMapping) != 0 {
+		(len(ori.TypeMapping) != 0 || len(upd.TypeMapping) != 0) {
 		return nil, fmt.Errorf("type field cannot be changed when type mappings are present")
 	}
 
@@ -264,7 +275,7 @@ func addFieldInfo(fInfo map[string]*index.FieldInfo, ori, upd *pathInfo, default
 			if err != nil {
 				return err
 			}
-			err = validateFieldInfo(info, updated, fInfo, ori)
+			err = validateFieldInfo(info, updated, fInfo, ori, oriFMapInfo)
 			if err != nil {
 				return err
 			}
@@ -285,7 +296,7 @@ func addFieldInfo(fInfo map[string]*index.FieldInfo, ori, upd *pathInfo, default
 			if err != nil {
 				return err
 			}
-			err = validateFieldInfo(info, updated, fInfo, ori)
+			err = validateFieldInfo(info, updated, fInfo, ori, oriFMapInfo)
 			if err != nil {
 				return err
 			}
@@ -395,7 +406,7 @@ func compareFieldMapping(original, updated *mapping.FieldMapping, defaultChanges
 		}
 	}
 
-	if rv.All || rv.Index || rv.Store {
+	if rv.All || rv.Index || rv.Store || rv.DocValues {
 		return rv, true, nil
 	}
 	return rv, false, nil
@@ -404,13 +415,21 @@ func compareFieldMapping(original, updated *mapping.FieldMapping, defaultChanges
 // After identifying changes, validate against the existing changes incase of duplicate fields.
 // In such a situation, any conflicting changes found will abort the update process
 func validateFieldInfo(newInfo *index.FieldInfo, updated bool, fInfo map[string]*index.FieldInfo,
-	ori *pathInfo) error {
+	ori *pathInfo, oriFMapInfo *fieldMapInfo) error {
 
 	var name string
-	if ori.fieldMapInfo[0].parent.parentPath == "" {
-		name = ori.fieldMapInfo[0].fieldMapping.Name
+	if oriFMapInfo.parent.parentPath == "" {
+		if oriFMapInfo.fieldMapping.Name == "" {
+			name = oriFMapInfo.parent.path
+		} else {
+			name = oriFMapInfo.fieldMapping.Name
+		}
 	} else {
-		name = ori.fieldMapInfo[0].parent.parentPath + "." + ori.fieldMapInfo[0].fieldMapping.Name
+		if oriFMapInfo.fieldMapping.Name == "" {
+			name = oriFMapInfo.parent.parentPath + "." + oriFMapInfo.parent.path
+		} else {
+			name = oriFMapInfo.parent.parentPath + "." + oriFMapInfo.fieldMapping.Name
+		}
 	}
 	if updated {
 		if ori.dynamic {
