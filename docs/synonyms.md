@@ -10,7 +10,7 @@
 
     1. Equivalent Mapping:
 
-        In this type, all terms in the list are considered equal and can replace one another. Any of these terms can match a query or document containing any other term in the group, ensuring full synonym coverage.
+        In this type, all terms in the *synonyms* list are considered equal and can replace one another. Any of these terms can match a query or document containing any other term in the group, ensuring full synonym coverage.
 
         ```json
         {
@@ -26,7 +26,7 @@
 
     2. Explicit Mapping:
 
-        In this mapping, only the terms in the input list ("blazing") will have the terms in synonyms as their synonyms. The input terms are not equivalent to each other, and the synonym relationship is explicitly directional, applying only from the input to the synonyms.
+        In this mapping, only the terms in the *input* list ("blazing") will have the terms in *synonyms* as their synonyms. The input terms are not equivalent to each other, and the synonym relationship is explicitly directional, applying only from the *input* to the *synonyms*.
 
         ```json
         {
@@ -43,7 +43,7 @@
         }
         ```
 
-* The addition of `Synonym Sources` in the index mapping enables associating a set of `synonym definitions` (called a `synonym collection`) with a specific analyzer. This allows for preprocessing of terms in both the input and synonyms fields before the synonym index is created. By using an analyzer, you can normalize or transform terms (e.g., case folding, stemming) to improve synonym matching.
+* The addition of `Synonym Sources` in the index mapping enables associating a set of `synonym definitions` (called a `synonym collection`) with a specific analyzer. This allows for preprocessing of terms in both the *input* and *synonyms* lists before the synonym index is created. By using an analyzer, you can normalize or transform terms (e.g., case folding, stemming) to improve synonym matching.
 
     ```json
     {
@@ -62,9 +62,9 @@
    }
    ```
 
-    There are two synonym sources named "english" and "german," each associated with its respective "synonym collection" and analyzer. In any text field mapping, a synonym source can be specified to enable synonym expansion when the field is queried. The analyzer of the synonym source must match the analyzer of the field mapping to which it is applied.
+    There are two `synonym sources` named "english" and "german," each associated with its respective `synonym collection` and analyzer. In any text field mapping, a `synonym source` can be specified to enable synonym expansion when the field is queried. The analyzer of the synonym source must match the analyzer of the field mapping to which it is applied.
 
-* Any text-based Bleve query (e.g., match, phrase, term, fuzzy, etc.) will use the synonym source (if available) for the queried field to expand the search terms using the thesaurus created from user-defined synonym definitions. The behavior for specific query types is as follows:
+* Any text-based Bleve query (e.g., match, phrase, term, fuzzy, etc.) will use the `synonym source` (if available) for the queried field to expand the search terms using the thesaurus created from user-defined synonym definitions. The behavior for specific query types is as follows:
 
     1. Queries with `fuzziness` parameter: For queries like match, phrase, and match-phrase that support the `fuzziness` parameter, the queried terms are fuzzily matched with the thesaurus's LHS terms to generate candidate terms. These terms are then combined with the results of fuzzy matching against the field dictionary, which contains the terms present in the queried field.
 
