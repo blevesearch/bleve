@@ -111,7 +111,7 @@ synonymSourceConfig := map[string]interface{}{
 }
 
 // Create a new index mapping.
-bleveMapping := mapping.NewIndexMapping()
+bleveMapping := bleve.NewIndexMapping()
 
 // Add the synonym source configuration to the index mapping.
 err := bleveMapping.AddSynonymSource(synonymSourceName, synonymSourceConfig)
