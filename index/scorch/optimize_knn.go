@@ -101,6 +101,10 @@ func (o *OptimizeVR) Finish() error {
 					wg.Done()
 				}()
 				for _, field := range fields {
+					if info, ok := o.snapshot.updatedFields[field]; ok && info.All || info.Index {
+						continue
+					}
+
 					vrs := o.vrs[field]
 					vecIndex, err := segment.InterpretVectorIndex(field,
 						o.requiresFiltering, origSeg.deleted)
