@@ -85,8 +85,15 @@ func (o *OptimizeVR) Finish() error {
 					wg.Done()
 				}()
 				for field, vrs := range o.vrs {
-					vecIndex, err := segment.InterpretVectorIndex(field,
-						o.requiresFiltering, origSeg.deleted)
+					var vecIndex segment_api.VectorIndex
+					var err error
+					if info, ok := o.snapshot.updatedFields[field]; ok && info.All || info.Index {
+						vecIndex, err = segment.InterpretVectorIndex("",
+							o.requiresFiltering, origSeg.deleted)
+					} else {
+						vecIndex, err = segment.InterpretVectorIndex(field,
+							o.requiresFiltering, origSeg.deleted)
+					}
 					if err != nil {
 						errorsM.Lock()
 						errors = append(errors, err)
