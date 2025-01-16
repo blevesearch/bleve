@@ -230,9 +230,7 @@ func (s *DisjunctionSliceSearcher) Next(ctx *search.SearchContext) (
 				rv = s.scorer.ScoreAndExplBreakdown(ctx, s.matching, s.matchingIdxs, s.originalPos, s.numSearchers)
 			} else {
 				// score this match
-				partialMatch := len(s.matching) != len(s.searchers)
 				rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
-				rv.PartialMatch = partialMatch
 			}
 		}
 
