@@ -649,7 +649,7 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 			// Skip fields that are supposed to have no indexing
 			if info, ok := is.updatedFields[field]; ok &&
 				(info.Index || info.All) {
-				dict = nil
+				dict, err = s.segment.Dictionary("")
 			} else {
 				dict, err = s.segment.Dictionary(field)
 			}
