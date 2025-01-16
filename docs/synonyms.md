@@ -102,7 +102,7 @@ synonymSourceName := "english"
 
 // Define the analyzer to process terms in the synonym definitions.
 // This analyzer must match the one applied to the field using the synonym source.
-analyzer := en.AnalyzerName
+analyzer := "en"
 
 // Configure the synonym source by associating it with the synonym collection and analyzer.
 synonymSourceConfig := map[string]interface{}{
@@ -120,7 +120,7 @@ if err != nil {
 }
 
 // Create a text field mapping with the specified analyzer and synonym source.
-textFieldMapping := mapping.NewTextFieldMapping()
+textFieldMapping := bleve.NewTextFieldMapping()
 textFieldMapping.Analyzer = analyzer
 textFieldMapping.SynonymSource = synonymSourceName
 
