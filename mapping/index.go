@@ -50,6 +50,7 @@ type IndexMappingImpl struct {
 	DefaultAnalyzer       string                      `json:"default_analyzer"`
 	DefaultDateTimeParser string                      `json:"default_datetime_parser"`
 	DefaultSynonymSource  string                      `json:"default_synonym_source,omitempty"`
+	ScoringModel          string                      `json:"scoring_model,omitempty"`
 	DefaultField          string                      `json:"default_field"`
 	StoreDynamic          bool                        `json:"store_dynamic"`
 	IndexDynamic          bool                        `json:"index_dynamic"`
@@ -201,6 +202,11 @@ func (im *IndexMappingImpl) Validate() error {
 			return err
 		}
 	}
+
+	if _, ok := index.SupportedScoringModels[im.ScoringModel]; !ok && im.ScoringModel != "" {
+		return fmt.Errorf("unsupported scoring model: %s", im.ScoringModel)
+	}
+
 	return nil
 }
 
@@ -303,6 +309,12 @@ func (im *IndexMappingImpl) UnmarshalJSON(data []byte) error {
 			if err != nil {
 				return err
 			}
+		case "scoring_model":
+			err := util.UnmarshalJSON(v, &im.ScoringModel)
+			if err != nil {
+				return err
+			}
+
 		default:
 			invalidKeys = append(invalidKeys, k)
 		}

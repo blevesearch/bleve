@@ -16,6 +16,8 @@ package searcher
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"reflect"
 
 	"github.com/blevesearch/bleve/v2/search"
@@ -38,14 +40,16 @@ type TermSearcher struct {
 	tfd         index.TermFieldDoc
 }
 
-func NewTermSearcher(ctx context.Context, indexReader index.IndexReader, term string, field string, boost float64, options search.SearcherOptions) (search.Searcher, error) {
+func NewTermSearcher(ctx context.Context, indexReader index.IndexReader,
+	term string, field string, boost float64, options search.SearcherOptions) (search.Searcher, error) {
 	if isTermQuery(ctx) {
 		ctx = context.WithValue(ctx, search.QueryTypeKey, search.Term)
 	}
 	return NewTermSearcherBytes(ctx, indexReader, []byte(term), field, boost, options)
 }
 
-func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader, term []byte, field string, boost float64, options search.SearcherOptions) (search.Searcher, error) {
+func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader,
+	term []byte, field string, boost float64, options search.SearcherOptions) (search.Searcher, error) {
 	if ctx != nil {
 		if fts, ok := ctx.Value(search.FieldTermSynonymMapKey).(search.FieldTermSynonymMap); ok {
 			if ts, exists := fts[field]; exists {
@@ -60,17 +64,85 @@ func NewTermSearcherBytes(ctx context.Context, indexReader index.IndexReader, te
 	if err != nil {
 		return nil, err
 	}
-	return newTermSearcherFromReader(indexReader, reader, term, field, boost, options)
+	return newTermSearcherFromReader(ctx, indexReader, reader, term, field, boost, options)
 }
 
-func newTermSearcherFromReader(indexReader index.IndexReader, reader index.TermFieldReader,
-	term []byte, field string, boost float64, options search.SearcherOptions) (*TermSearcher, error) {
+func tfIDFScoreMetrics(indexReader index.IndexReader) (uint64, error) {
+	// default tf-idf stats
 	count, err := indexReader.DocCount()
 	if err != nil {
-		_ = reader.Close()
-		return nil, err
+		return 0, err
 	}
-	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), options)
+
+	if count == 0 {
+		return 0, nil
+	}
+	return count, nil
+}
+
+func bm25ScoreMetrics(ctx context.Context, field string,
+	indexReader index.IndexReader) (uint64, float64, error) {
+	var count uint64
+	var fieldCardinality int
+	var err error
+
+	bm25Stats, ok := ctx.Value(search.BM25PreSearchDataKey).(*search.BM25Stats)
+	if !ok {
+		count, err = indexReader.DocCount()
+		if err != nil {
+			return 0, 0, err
+		}
+		dict, err := indexReader.FieldDict(field)
+		if err != nil {
+			return 0, 0, err
+		}
+		fieldCardinality = dict.Cardinality()
+	} else {
+		count = uint64(bm25Stats.DocCount)
+		fieldCardinality, ok = bm25Stats.FieldCardinality[field]
+		if !ok {
+			return 0, 0, fmt.Errorf("field stat for bm25 not present %s", field)
+		}
+	}
+
+	if count == 0 && fieldCardinality == 0 {
+		return 0, 0, nil
+	}
+	return count, math.Ceil(float64(fieldCardinality) / float64(count)), nil
+}
+
+func newTermSearcherFromReader(ctx context.Context, indexReader index.IndexReader,
+	reader index.TermFieldReader, term []byte, field string, boost float64,
+	options search.SearcherOptions) (*TermSearcher, error) {
+	var count uint64
+	var avgDocLength float64
+	var err error
+	var similarityModel string
+
+	// as a fallback case we track certain stats for tf-idf scoring
+	if ctx != nil {
+		if similaritModelCallback, ok := ctx.Value(search.
+			GetScoringModelCallbackKey).(search.GetScoringModelCallbackFn); ok {
+			similarityModel = similaritModelCallback()
+		}
+	}
+	switch similarityModel {
+	case index.BM25Scoring:
+		count, avgDocLength, err = bm25ScoreMetrics(ctx, field, indexReader)
+		if err != nil {
+			_ = reader.Close()
+			return nil, err
+		}
+	case index.TFIDFScoring:
+		fallthrough
+	default:
+		count, err = tfIDFScoreMetrics(indexReader)
+		if err != nil {
+			_ = reader.Close()
+			return nil, err
+		}
+	}
+	scorer := scorer.NewTermQueryScorer(term, field, boost, count, reader.Count(), avgDocLength, options)
 	return &TermSearcher{
 		indexReader: indexReader,
 		reader:      reader,
@@ -85,7 +157,7 @@ func NewSynonymSearcher(ctx context.Context, indexReader index.IndexReader, term
 		if err != nil {
 			return nil, err
 		}
-		return newTermSearcherFromReader(indexReader, reader, term, field, boostVal, options)
+		return newTermSearcherFromReader(ctx, indexReader, reader, term, field, boostVal, options)
 	}
 	// create a searcher for the term itself
 	termSearcher, err := createTermSearcher(term, boost)

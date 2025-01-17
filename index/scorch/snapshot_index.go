@@ -42,8 +42,9 @@ type asynchSegmentResult struct {
 	dict    segment.TermDictionary
 	dictItr segment.DictionaryIterator
 
-	index int
-	docs  *roaring.Bitmap
+	cardinality int
+	index       int
+	docs        *roaring.Bitmap
 
 	thesItr segment.ThesaurusIterator
 
@@ -137,6 +138,7 @@ func (is *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 
 	results := make(chan *asynchSegmentResult)
 	var totalBytesRead uint64
+	var fieldCardinality int64
 	for _, s := range is.segment {
 		go func(s *SegmentSnapshot) {
 			dict, err := s.segment.Dictionary(field)
@@ -146,6 +148,7 @@ func (is *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 				if dictStats, ok := dict.(segment.DiskStatsReporter); ok {
 					atomic.AddUint64(&totalBytesRead, dictStats.BytesRead())
 				}
+				atomic.AddInt64(&fieldCardinality, int64(dict.Cardinality()))
 				if randomLookup {
 					results <- &asynchSegmentResult{dict: dict}
 				} else {
@@ -160,6 +163,7 @@ func (is *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 		snapshot: is,
 		cursors:  make([]*segmentDictCursor, 0, len(is.segment)),
 	}
+
 	for count := 0; count < len(is.segment); count++ {
 		asr := <-results
 		if asr.err != nil && err == nil {
@@ -183,6 +187,7 @@ func (is *IndexSnapshot) newIndexSnapshotFieldDict(field string,
 			}
 		}
 	}
+	rv.cardinality = int(fieldCardinality)
 	rv.bytesRead = totalBytesRead
 	// after ensuring we've read all items on channel
 	if err != nil {
