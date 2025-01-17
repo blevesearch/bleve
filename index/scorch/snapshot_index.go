@@ -81,6 +81,8 @@ type IndexSnapshot struct {
 
 	m2        sync.Mutex                                 // Protects the fields that follow.
 	fieldTFRs map[string][]*IndexSnapshotTermFieldReader // keyed by field, recycled TFR's
+
+	updatedFields map[string]index.FieldInfo
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
@@ -469,6 +471,12 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 		// Keeping that TODO for now until we have a cleaner way.
 		rvd.StoredFieldsSize += uint64(len(val))
 
+		// Skip fields that are supposed to have deleted store values
+		if info, ok := is.updatedFields[name]; ok &&
+			(info.All || info.Store) {
+			return true
+		}
+
 		// copy value, array positions to preserve them beyond the scope of this callback
 		value := append([]byte(nil), val...)
 		arrayPos := append([]uint64(nil), pos...)
@@ -608,10 +616,21 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 				segBytesRead := s.segment.BytesRead()
 				rv.incrementBytesRead(segBytesRead)
 			}
-			dict, err := s.segment.Dictionary(field)
+
+			var dict segment.TermDictionary
+			var err error
+
+			// Skip fields that are supposed to have no indexing
+			if info, ok := is.updatedFields[field]; ok &&
+				(info.Index || info.All) {
+				dict, err = s.segment.Dictionary("")
+			} else {
+				dict, err = s.segment.Dictionary(field)
+			}
 			if err != nil {
 				return nil, err
 			}
+
 			if dictStats, ok := dict.(segment.DiskStatsReporter); ok {
 				bytesRead := dictStats.BytesRead()
 				rv.incrementBytesRead(bytesRead)
@@ -756,6 +775,17 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		}
 	}
 
+	// Filter out fields that are supposed to have no doc values
+	var filteredFields []string
+	for _, field := range vFields {
+		if info, ok := is.updatedFields[field]; ok &&
+			(info.DocValues || info.All) {
+			continue
+		} else {
+			filteredFields = append(filteredFields, field)
+		}
+	}
+
 	var errCh chan error
 
 	// cFields represents the fields that we'll need from the
@@ -763,7 +793,7 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	// if the caller happens to know we're on the same segmentIndex
 	// from a previous invocation
 	if cFields == nil {
-		cFields = subtractStrings(fields, vFields)
+		cFields = subtractStrings(fields, filteredFields)
 
 		if !ss.cachedDocs.hasFields(cFields) {
 			errCh = make(chan error, 1)
@@ -778,8 +808,8 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 		}
 	}
 
-	if ssvOk && ssv != nil && len(vFields) > 0 {
-		dvs, err = ssv.VisitDocValues(localDocNum, fields, visitor, dvs)
+	if ssvOk && ssv != nil && len(filteredFields) > 0 {
+		dvs, err = ssv.VisitDocValues(localDocNum, filteredFields, visitor, dvs)
 		if err != nil {
 			return nil, nil, err
 		}
