@@ -69,7 +69,7 @@ func (s *DisjunctionQueryScorer) Score(ctx *search.SearchContext, constituents [
 		ce := make([]*search.Explanation, 2)
 		ce[0] = rawExpl
 		ce[1] = &search.Explanation{Value: coord, Message: fmt.Sprintf("coord(%d/%d)", countMatch, countTotal)}
-		newExpl = &search.Explanation{Value: newScore, Message: "product of:", Children: ce}
+		newExpl = &search.Explanation{Value: newScore, Message: "product of:", Children: ce, PartialMatch: countMatch != countTotal}
 	}
 
 	// reuse constituents[0] as the return value

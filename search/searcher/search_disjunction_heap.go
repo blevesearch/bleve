@@ -218,9 +218,7 @@ func (s *DisjunctionHeapSearcher) Next(ctx *search.SearchContext) (
 				rv = s.scorer.ScoreAndExplBreakdown(ctx, s.matching, s.matchingIdxs, nil, s.numSearchers)
 			} else {
 				// score this match
-				partialMatch := len(s.matching) != len(s.searchers)
 				rv = s.scorer.Score(ctx, s.matching, len(s.matching), s.numSearchers)
-				rv.PartialMatch = partialMatch
 			}
 		}
 

@@ -30,9 +30,10 @@ func init() {
 }
 
 type Explanation struct {
-	Value    float64        `json:"value"`
-	Message  string         `json:"message"`
-	Children []*Explanation `json:"children,omitempty"`
+	Value        float64        `json:"value"`
+	Message      string         `json:"message"`
+	PartialMatch bool           `json:"partial_match,omitempty"`
+	Children     []*Explanation `json:"children,omitempty"`
 }
 
 func (expl *Explanation) String() string {
