@@ -383,7 +383,7 @@ type flushable struct {
 
 // number workers which parallely perform an in-memory merge of the segments
 // followed by a flush operation.
-var DefaultNumPersisterWorkers = 4
+var DefaultNumPersisterWorkers = 8
 
 // maximum size of data that a single worker is allowed to perform the in-memory
 // merge operation.
