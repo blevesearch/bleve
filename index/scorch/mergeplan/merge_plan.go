@@ -99,6 +99,10 @@ type MergePlanOptions struct {
 	// of tiny segments from resulting in a long tail in the index.
 	FloorSegmentSize int64
 
+	// Small segments' file size are rounded up to this size to prevent lot
+	// of tiny segments causing a long tail in the index.
+	FloorSegmentFileSize int64
+
 	// Controls how aggressively merges that reclaim more deletions
 	// are favored.  Higher values will more aggressively target
 	// merges that reclaim deletions, but be careful not to go so high
@@ -124,6 +128,13 @@ func (o *MergePlanOptions) RaiseToFloorSegmentSize(s int64) int64 {
 		return s
 	}
 	return o.FloorSegmentSize
+}
+
+func (o *MergePlanOptions) RaiseToFloorSegmentFileSize(s int64) int64 {
+	if s > o.FloorSegmentFileSize {
+		return s
+	}
+	return o.FloorSegmentFileSize
 }
 
 // MaxSegmentSizeLimit represents the maximum size of a segment,
@@ -155,6 +166,7 @@ var SingleSegmentMergePlanOptions = MergePlanOptions{
 	SegmentsPerMergeTask: 10,
 	FloorSegmentSize:     1 << 30,
 	ReclaimDeletesWeight: 2.0,
+	FloorSegmentFileSize: 1 << 40,
 }
 
 // -------------------------------------------
@@ -176,10 +188,16 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 
 	var eligibles []Segment
 	var eligiblesLiveSize int64
+	var eligiblesFileSize int64
+	var minFileSize int64 = math.MaxInt64
 
 	for _, segment := range segments {
 		if minLiveSize > segment.LiveSize() {
 			minLiveSize = segment.LiveSize()
+		}
+
+		if minFileSize > segment.FileSize() {
+			minFileSize = segment.FileSize()
 		}
 
 		isEligible := segment.LiveSize() < o.MaxSegmentSize/2
@@ -195,17 +213,24 @@ func plan(segmentsIn []Segment, o *MergePlanOptions) (*MergePlan, error) {
 		if isEligible {
 			eligibles = append(eligibles, segment)
 			eligiblesLiveSize += segment.LiveSize()
+			eligiblesFileSize += segment.FileSize()
 		}
 	}
-
-	minLiveSize = o.RaiseToFloorSegmentSize(minLiveSize)
 
 	calcBudget := o.CalcBudget
 	if calcBudget == nil {
 		calcBudget = CalcBudget
 	}
 
-	budgetNumSegments := calcBudget(eligiblesLiveSize, minLiveSize, o)
+	var budgetNumSegments int
+	if o.FloorSegmentFileSize > 0 {
+		minFileSize = o.RaiseToFloorSegmentFileSize(minFileSize)
+		budgetNumSegments = calcBudget(eligiblesFileSize, minFileSize, o)
+
+	} else {
+		minLiveSize = o.RaiseToFloorSegmentSize(minLiveSize)
+		budgetNumSegments = calcBudget(eligiblesLiveSize, minLiveSize, o)
+	}
 
 	scoreSegments := o.ScoreSegments
 	if scoreSegments == nil {
