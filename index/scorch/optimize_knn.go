@@ -101,7 +101,7 @@ func (o *OptimizeVR) Finish() error {
 					wg.Done()
 				}()
 				for _, field := range fields {
-					if info, ok := o.snapshot.updatedFields[field]; ok && info.All || info.Index {
+					if info, ok := o.snapshot.updatedFields[field]; ok && info.RemoveAll || info.Index {
 						continue
 					}
 

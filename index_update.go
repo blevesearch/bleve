@@ -46,7 +46,7 @@ type defaultInfo struct {
 }
 
 // Compare two index mappings to identify all of the updatable changes
-func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.FieldInfo, error) {
+func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.UpdateFieldInfo, error) {
 	var err error
 
 	defaultChanges, err := compareMappings(ori, upd)
@@ -90,7 +90,7 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.FieldI
 	// Compare both the mappings based on the document paths
 	// and create a list of index, docvalues, store differences
 	// for every single field possible
-	fieldInfo := make(map[string]*index.FieldInfo)
+	fieldInfo := make(map[string]*index.UpdateFieldInfo)
 	for path, info := range oriPaths {
 		err = addFieldInfo(fieldInfo, info, updPaths[path], defaultChanges)
 		if err != nil {
@@ -101,10 +101,10 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.FieldI
 	// Remove entries from the list with no changes between the
 	// original and the updated mapping
 	for name, info := range fieldInfo {
-		if !info.All && !info.Index && !info.DocValues && !info.Store {
+		if !info.RemoveAll && !info.Index && !info.DocValues && !info.Store {
 			delete(fieldInfo, name)
 		}
-		if info.All {
+		if info.RemoveAll {
 			if upd.IndexDynamic {
 				return nil, fmt.Errorf("Mapping cannot be removed when index dynamic is true")
 			}
@@ -261,9 +261,9 @@ func addPathInfo(paths map[string]*pathInfo, name string, mp *mapping.DocumentMa
 }
 
 // Compare all of the fields at a particular document path and add its field information
-func addFieldInfo(fInfo map[string]*index.FieldInfo, ori, upd *pathInfo, defaultChanges *defaultInfo) error {
+func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo, defaultChanges *defaultInfo) error {
 
-	var info *index.FieldInfo
+	var info *index.UpdateFieldInfo
 	var updated bool
 	var err error
 
@@ -316,13 +316,13 @@ func addFieldInfo(fInfo map[string]*index.FieldInfo, ori, upd *pathInfo, default
 // second return argument gives a flag indicating whether any changes, if detected, are doable or if
 // update is impossible
 // third argument is an error explaining exactly why the change is not possible
-func compareFieldMapping(original, updated *mapping.FieldMapping, defaultChanges *defaultInfo) (*index.FieldInfo, bool, error) {
+func compareFieldMapping(original, updated *mapping.FieldMapping, defaultChanges *defaultInfo) (*index.UpdateFieldInfo, bool, error) {
 
-	rv := &index.FieldInfo{}
+	rv := &index.UpdateFieldInfo{}
 
 	if updated == nil {
 		if original != nil && !original.IncludeInAll {
-			rv.All = true
+			rv.RemoveAll = true
 			return rv, true, nil
 		} else if original == nil {
 			return nil, false, nil
@@ -406,7 +406,7 @@ func compareFieldMapping(original, updated *mapping.FieldMapping, defaultChanges
 		}
 	}
 
-	if rv.All || rv.Index || rv.Store || rv.DocValues {
+	if rv.RemoveAll || rv.Index || rv.Store || rv.DocValues {
 		return rv, true, nil
 	}
 	return rv, false, nil
@@ -414,7 +414,7 @@ func compareFieldMapping(original, updated *mapping.FieldMapping, defaultChanges
 
 // After identifying changes, validate against the existing changes incase of duplicate fields.
 // In such a situation, any conflicting changes found will abort the update process
-func validateFieldInfo(newInfo *index.FieldInfo, updated bool, fInfo map[string]*index.FieldInfo,
+func validateFieldInfo(newInfo *index.UpdateFieldInfo, updated bool, fInfo map[string]*index.UpdateFieldInfo,
 	ori *pathInfo, oriFMapInfo *fieldMapInfo) error {
 
 	var name string
@@ -437,7 +437,7 @@ func validateFieldInfo(newInfo *index.FieldInfo, updated bool, fInfo map[string]
 		}
 	}
 	if oldInfo, ok := fInfo[name]; ok {
-		if oldInfo.All != newInfo.All || oldInfo.Index != newInfo.Index ||
+		if oldInfo.RemoveAll != newInfo.RemoveAll || oldInfo.Index != newInfo.Index ||
 			oldInfo.DocValues != newInfo.DocValues || oldInfo.Store != newInfo.Store {
 			return fmt.Errorf("updated field impossible to verify because multiple mappings point to the same field name")
 		}
