@@ -15,11 +15,16 @@
 package bleve
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"math/rand"
 	"reflect"
 	"testing"
 
 	"github.com/blevesearch/bleve/v2/analysis/lang/en"
+	"github.com/blevesearch/bleve/v2/index/scorch"
+	"github.com/blevesearch/bleve/v2/index/scorch/mergeplan"
 	"github.com/blevesearch/bleve/v2/mapping"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -29,7 +34,7 @@ func TestCompareFieldMapping(t *testing.T) {
 		original       *mapping.FieldMapping
 		updated        *mapping.FieldMapping
 		defaultChanges *defaultInfo
-		indexFieldInfo *index.FieldInfo
+		indexFieldInfo *index.UpdateFieldInfo
 		changed        bool
 		err            bool
 	}{
@@ -49,8 +54,8 @@ func TestCompareFieldMapping(t *testing.T) {
 				dateTimeParser: false,
 				synonymSource:  false,
 			},
-			indexFieldInfo: &index.FieldInfo{
-				All: true,
+			indexFieldInfo: &index.UpdateFieldInfo{
+				RemoveAll: true,
 			},
 			changed: true,
 			err:     false,
@@ -277,7 +282,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				dateTimeParser: false,
 				synonymSource:  false,
 			},
-			indexFieldInfo: &index.FieldInfo{
+			indexFieldInfo: &index.UpdateFieldInfo{
 				Index:     true,
 				DocValues: true,
 			},
@@ -298,7 +303,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				dateTimeParser: false,
 				synonymSource:  false,
 			},
-			indexFieldInfo: &index.FieldInfo{
+			indexFieldInfo: &index.UpdateFieldInfo{
 				DocValues: true,
 			},
 			changed: true,
@@ -342,7 +347,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				dateTimeParser: false,
 				synonymSource:  false,
 			},
-			indexFieldInfo: &index.FieldInfo{},
+			indexFieldInfo: &index.UpdateFieldInfo{},
 			changed:        false,
 			err:            false,
 		},
@@ -498,7 +503,7 @@ func TestDeletedFields(t *testing.T) {
 	tests := []struct {
 		original  *mapping.IndexMappingImpl
 		updated   *mapping.IndexMappingImpl
-		fieldInfo map[string]*index.FieldInfo
+		fieldInfo map[string]*index.UpdateFieldInfo
 		err       bool
 	}{
 		{
@@ -650,7 +655,7 @@ func TestDeletedFields(t *testing.T) {
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
 			},
-			fieldInfo: map[string]*index.FieldInfo{},
+			fieldInfo: map[string]*index.UpdateFieldInfo{},
 			err:       false,
 		},
 		{
@@ -802,7 +807,7 @@ func TestDeletedFields(t *testing.T) {
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
 			},
-			fieldInfo: map[string]*index.FieldInfo{},
+			fieldInfo: map[string]*index.UpdateFieldInfo{},
 			err:       false,
 		},
 		{
@@ -1267,7 +1272,7 @@ func TestDeletedFields(t *testing.T) {
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
 			},
-			fieldInfo: map[string]*index.FieldInfo{
+			fieldInfo: map[string]*index.UpdateFieldInfo{
 				"b": {
 					Index:     true,
 					DocValues: true,
@@ -1424,7 +1429,7 @@ func TestDeletedFields(t *testing.T) {
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
 			},
-			fieldInfo: map[string]*index.FieldInfo{
+			fieldInfo: map[string]*index.UpdateFieldInfo{
 				"a": {
 					Index:     true,
 					DocValues: true,
@@ -1704,7 +1709,7 @@ func TestDeletedFields(t *testing.T) {
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
 			},
-			fieldInfo: map[string]*index.FieldInfo{
+			fieldInfo: map[string]*index.UpdateFieldInfo{
 				"a": {
 					Index:     true,
 					DocValues: true,
@@ -1896,7 +1901,7 @@ func TestDeletedFields(t *testing.T) {
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
 			},
-			fieldInfo: map[string]*index.FieldInfo{
+			fieldInfo: map[string]*index.UpdateFieldInfo{
 				"a": {
 					Index:     true,
 					DocValues: true,
@@ -1908,7 +1913,7 @@ func TestDeletedFields(t *testing.T) {
 					DocValues: true,
 				},
 				"d": {
-					All: true,
+					RemoveAll: true,
 				},
 			},
 			err: false,
@@ -2128,7 +2133,7 @@ func TestIndexUpdateText(t *testing.T) {
 		t.Fatalf("Expected 3 hits, got %d\n", len(res3.Hits))
 	}
 	if len(res3.Hits[0].Fields) != 0 {
-		t.Fatalf("Expected 0 field, got %d\n", len(res3.Hits[0].Fields))
+		t.Fatalf("Expected 0 fields, got %d\n", len(res3.Hits[0].Fields))
 	}
 	q4 := NewSearchRequest(NewQueryStringQuery("d:*"))
 	q4.Fields = append(q4.Fields, "d")
@@ -2494,5 +2499,370 @@ func TestIndexUpdateSynonym(t *testing.T) {
 	}
 	if len(res3.Hits) != 0 {
 		t.Fatalf("Expected 0 hits, got %d\n", len(res3.Hits))
+	}
+}
+
+func TestIndexUpdateMerge(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	indexMappingBefore := mapping.NewIndexMapping()
+	indexMappingBefore.TypeMapping = map[string]*mapping.DocumentMapping{}
+	indexMappingBefore.DefaultMapping = &mapping.DocumentMapping{
+		Enabled: true,
+		Dynamic: false,
+		Properties: map[string]*mapping.DocumentMapping{
+			"a": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:  "text",
+						Index: true,
+						Store: true,
+					},
+				},
+				DefaultAnalyzer:      "standard",
+				DefaultSynonymSource: "",
+			},
+			"b": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:  "text",
+						Index: true,
+						Store: true,
+					},
+				},
+				DefaultAnalyzer:      "standard",
+				DefaultSynonymSource: "",
+			},
+			"c": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:  "text",
+						Index: true,
+						Store: true,
+					},
+				},
+				DefaultAnalyzer:      "standard",
+				DefaultSynonymSource: "",
+			},
+			"d": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:  "text",
+						Index: true,
+						Store: true,
+					},
+				},
+				DefaultAnalyzer:      "standard",
+				DefaultSynonymSource: "",
+			},
+		},
+		Fields:               []*mapping.FieldMapping{},
+		DefaultAnalyzer:      "standard",
+		DefaultSynonymSource: "",
+	}
+	indexMappingBefore.IndexDynamic = false
+	indexMappingBefore.StoreDynamic = false
+	indexMappingBefore.DocValuesDynamic = false
+
+	index, err := New(tmpIndexPath, indexMappingBefore)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	numDocsPerBatch := 1000
+	numBatches := 3
+
+	var batch *Batch
+	doc := make(map[string]interface{})
+	const letters = "abcdefghijklmnopqrstuvwxyz"
+
+	randStr := func() string {
+		result := make([]byte, 3)
+		for i := 0; i < 3; i++ {
+			result[i] = letters[rand.Intn(len(letters))]
+		}
+		return string(result)
+	}
+	for i := 0; i < numBatches; i++ {
+		batch = index.NewBatch()
+		for j := 0; j < numDocsPerBatch; j++ {
+			doc["a"] = randStr()
+			doc["b"] = randStr()
+			doc["c"] = randStr()
+			doc["d"] = randStr()
+			err = batch.Index(fmt.Sprintf("%d", i*numDocsPerBatch+j), doc)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		err = index.Batch(batch)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = index.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	indexMappingAfter := mapping.NewIndexMapping()
+	indexMappingAfter.TypeMapping = map[string]*mapping.DocumentMapping{}
+	indexMappingAfter.DefaultMapping = &mapping.DocumentMapping{
+		Enabled: true,
+		Dynamic: false,
+		Properties: map[string]*mapping.DocumentMapping{
+			"a": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:  "text",
+						Index: true,
+						Store: true,
+					},
+				},
+				DefaultAnalyzer:      "standard",
+				DefaultSynonymSource: "",
+			},
+			"b": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:  "text",
+						Index: false,
+						Store: true,
+					},
+				},
+				DefaultAnalyzer:      "standard",
+				DefaultSynonymSource: "",
+			},
+			"c": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:  "text",
+						Index: true,
+						Store: false,
+					},
+				},
+				DefaultAnalyzer:      "standard",
+				DefaultSynonymSource: "",
+			},
+		},
+		Fields:               []*mapping.FieldMapping{},
+		DefaultAnalyzer:      "standard",
+		DefaultSynonymSource: "",
+	}
+	indexMappingAfter.IndexDynamic = false
+	indexMappingAfter.StoreDynamic = false
+	indexMappingAfter.DocValuesDynamic = false
+
+	mappingString, err := json.Marshal(indexMappingAfter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err = Update(tmpIndexPath, string(mappingString))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	impl, ok := index.(*indexImpl)
+	if !ok {
+		t.Fatalf("Typecasting index to indexImpl failed")
+	}
+	sindex, ok := impl.i.(*scorch.Scorch)
+	if !ok {
+		t.Fatalf("Typecasting index to scorch index failed")
+	}
+
+	err = sindex.ForceMerge(context.Background(), &mergeplan.SingleSegmentMergePlanOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	q1 := NewSearchRequest(NewQueryStringQuery("a:*"))
+	q1.Fields = append(q1.Fields, "a")
+
+	res1, err := index.Search(q1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res1.Hits) != 10 {
+		t.Fatalf("Expected 10 hits, got %d\n", len(res1.Hits))
+	}
+	if len(res1.Hits[0].Fields) != 1 {
+		t.Fatalf("Expected 1 field, got %d\n", len(res1.Hits[0].Fields))
+	}
+	q2 := NewSearchRequest(NewQueryStringQuery("b:*"))
+	q2.Fields = append(q2.Fields, "b")
+	res2, err := index.Search(q2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res2.Hits) != 0 {
+		t.Fatalf("Expected 0 hits, got %d\n", len(res2.Hits))
+	}
+	q3 := NewSearchRequest(NewQueryStringQuery("c:*"))
+	q3.Fields = append(q3.Fields, "c")
+	res3, err := index.Search(q3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res3.Hits) != 10 {
+		t.Fatalf("Expected 10 hits, got %d\n", len(res3.Hits))
+	}
+	if len(res3.Hits[0].Fields) != 0 {
+		t.Fatalf("Expected 0 fields, got %d\n", len(res3.Hits[0].Fields))
+	}
+	q4 := NewSearchRequest(NewQueryStringQuery("d:*"))
+	q4.Fields = append(q4.Fields, "d")
+	res4, err := index.Search(q4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res4.Hits) != 0 {
+		t.Fatalf("Expected 0 hits, got %d\n", len(res4.Hits))
+	}
+
+}
+
+func BenchmarkIndexUpdateText(b *testing.B) {
+
+	tmpIndexPath := createTmpIndexPath(b)
+	defer cleanupTmpIndexPath(b, tmpIndexPath)
+
+	indexMappingBefore := mapping.NewIndexMapping()
+	indexMappingBefore.TypeMapping = map[string]*mapping.DocumentMapping{}
+	indexMappingBefore.DefaultMapping = &mapping.DocumentMapping{
+		Enabled: true,
+		Dynamic: false,
+		Properties: map[string]*mapping.DocumentMapping{
+			"a": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:  "text",
+						Index: true,
+						Store: true,
+					},
+				},
+				DefaultAnalyzer:      "standard",
+				DefaultSynonymSource: "",
+			},
+		},
+		Fields:               []*mapping.FieldMapping{},
+		DefaultAnalyzer:      "standard",
+		DefaultSynonymSource: "",
+	}
+	indexMappingBefore.IndexDynamic = false
+	indexMappingBefore.StoreDynamic = false
+	indexMappingBefore.DocValuesDynamic = false
+
+	index, err := New(tmpIndexPath, indexMappingBefore)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	numDocsPerBatch := 1000
+	numBatches := 5
+
+	var batch *Batch
+	doc := make(map[string]interface{})
+	const letters = "abcdefghijklmnopqrstuvwxyz"
+
+	randStr := func() string {
+		result := make([]byte, 3)
+		for i := 0; i < 3; i++ {
+			result[i] = letters[rand.Intn(len(letters))]
+		}
+		return string(result)
+	}
+	for i := 0; i < numBatches; i++ {
+		batch = index.NewBatch()
+		for j := 0; j < numDocsPerBatch; j++ {
+			doc["a"] = randStr()
+			err = batch.Index(fmt.Sprintf("%d", i*numDocsPerBatch+j), doc)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+		err = index.Batch(batch)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+
+	err = index.Close()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	indexMappingAfter := mapping.NewIndexMapping()
+	indexMappingAfter.TypeMapping = map[string]*mapping.DocumentMapping{}
+	indexMappingAfter.DefaultMapping = &mapping.DocumentMapping{
+		Enabled: true,
+		Dynamic: false,
+		Properties: map[string]*mapping.DocumentMapping{
+			"a": {
+				Enabled:    true,
+				Dynamic:    false,
+				Properties: map[string]*mapping.DocumentMapping{},
+				Fields: []*mapping.FieldMapping{
+					{
+						Type:  "text",
+						Index: true,
+						Store: false,
+					},
+				},
+				DefaultAnalyzer:      "standard",
+				DefaultSynonymSource: "",
+			},
+		},
+		Fields:               []*mapping.FieldMapping{},
+		DefaultAnalyzer:      "standard",
+		DefaultSynonymSource: "",
+	}
+	indexMappingAfter.IndexDynamic = false
+	indexMappingAfter.StoreDynamic = false
+	indexMappingAfter.DocValuesDynamic = false
+
+	mappingString, err := json.Marshal(indexMappingAfter)
+	if err != nil {
+		b.Fatal(err)
+	}
+	index, err = Update(tmpIndexPath, string(mappingString))
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		q := NewQueryStringQuery("a:*")
+		req := NewSearchRequest(q)
+		if _, err = index.Search(req); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
