@@ -85,7 +85,7 @@ type IndexSnapshot struct {
 	m3               sync.RWMutex // bm25 metrics specific - not to interfere with TFR creation
 	fieldCardinality map[string]int
 
-	updatedFields map[string]index.FieldInfo
+	updatedFields map[string]*index.UpdateFieldInfo
 }
 
 func (i *IndexSnapshot) Segments() []*SegmentSnapshot {
@@ -513,7 +513,7 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 
 		// Skip fields that are supposed to have deleted store values
 		if info, ok := is.updatedFields[name]; ok &&
-			(info.All || info.Store) {
+			(info.RemoveAll || info.Store) {
 			return true
 		}
 
@@ -648,7 +648,7 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 
 			// Skip fields that are supposed to have no indexing
 			if info, ok := is.updatedFields[field]; ok &&
-				(info.Index || info.All) {
+				(info.Index || info.RemoveAll) {
 				dict, err = s.segment.Dictionary("")
 			} else {
 				dict, err = s.segment.Dictionary(field)
@@ -806,7 +806,7 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	var filteredFields []string
 	for _, field := range vFields {
 		if info, ok := is.updatedFields[field]; ok &&
-			(info.DocValues || info.All) {
+			(info.DocValues || info.RemoveAll) {
 			continue
 		} else {
 			filteredFields = append(filteredFields, field)
@@ -1190,4 +1190,27 @@ func (is *IndexSnapshot) ThesaurusKeysRegexp(name string,
 
 func (is *IndexSnapshot) UpdateSynonymSearchCount(delta uint64) {
 	atomic.AddUint64(&is.parent.stats.TotSynonymSearches, delta)
+}
+
+func (is *IndexSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
+
+	if is.updatedFields == nil {
+		is.updatedFields = updatedFields
+	} else {
+		for fieldName, info := range updatedFields {
+			if val, ok := is.updatedFields[fieldName]; ok {
+				val.RemoveAll = val.RemoveAll || info.RemoveAll
+				val.Index = val.Index || info.Index
+				val.DocValues = val.DocValues || info.DocValues
+				val.Store = val.Store || info.Store
+			} else {
+				is.updatedFields[fieldName] = info
+			}
+		}
+	}
+
+	for _, segmentSnapshot := range is.segment {
+		segmentSnapshot.UpdateFieldsInfo(updatedFields)
+	}
+
 }
