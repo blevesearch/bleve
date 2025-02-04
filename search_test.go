@@ -1266,6 +1266,7 @@ func TestMatchQueryPartialMatch(t *testing.T) {
 	mq1.SetField("description")
 
 	sr := NewSearchRequest(mq1)
+	sr.Explain = true
 	res, err := idx.Search(sr)
 	if err != nil {
 		t.Fatal(err)
@@ -1274,11 +1275,17 @@ func TestMatchQueryPartialMatch(t *testing.T) {
 		t.Errorf("Expected 2 results, but got: %v", res.Total)
 	}
 	for _, hit := range res.Hits {
-		if hit.ID == "doc1" && hit.PartialMatch {
-			t.Errorf("Expected doc1 to be a full match")
-		}
-		if hit.ID == "doc2" && !hit.PartialMatch {
-			t.Errorf("Expected doc2 to be a partial match")
+		switch hit.ID {
+		case "doc1":
+			if hit.Expl.PartialMatch {
+				t.Errorf("Expected doc1 to be a full match")
+			}
+		case "doc2":
+			if !hit.Expl.PartialMatch {
+				t.Errorf("Expected doc2 to be a partial match")
+			}
+		default:
+			t.Errorf("Unexpected document ID: %s", hit.ID)
 		}
 	}
 
@@ -1288,6 +1295,7 @@ func TestMatchQueryPartialMatch(t *testing.T) {
 	mq2.SetFuzziness(2)
 
 	sr = NewSearchRequest(mq2)
+	sr.Explain = true
 	res, err = idx.Search(sr)
 	if err != nil {
 		t.Fatal(err)
@@ -1296,11 +1304,17 @@ func TestMatchQueryPartialMatch(t *testing.T) {
 		t.Errorf("Expected 2 results, but got: %v", res.Total)
 	}
 	for _, hit := range res.Hits {
-		if hit.ID == "doc1" && !hit.PartialMatch {
-			t.Errorf("Expected doc1 to be a partial match")
-		}
-		if hit.ID == "doc2" && hit.PartialMatch {
-			t.Errorf("Expected doc2 to be a full match")
+		switch hit.ID {
+		case "doc1":
+			if !hit.Expl.PartialMatch {
+				t.Errorf("Expected doc1 to be a partial match")
+			}
+		case "doc2":
+			if hit.Expl.PartialMatch {
+				t.Errorf("Expected doc2 to be a full match")
+			}
+		default:
+			t.Errorf("Unexpected document ID: %s", hit.ID)
 		}
 	}
 	// Test 3 - Two Docs hits, both full match
@@ -1308,6 +1322,7 @@ func TestMatchQueryPartialMatch(t *testing.T) {
 	mq3.SetField("description")
 
 	sr = NewSearchRequest(mq3)
+	sr.Explain = true
 	res, err = idx.Search(sr)
 	if err != nil {
 		t.Fatal(err)
@@ -1316,11 +1331,17 @@ func TestMatchQueryPartialMatch(t *testing.T) {
 		t.Errorf("Expected 2 results, but got: %v", res.Total)
 	}
 	for _, hit := range res.Hits {
-		if hit.ID == "doc1" && hit.PartialMatch {
-			t.Errorf("Expected doc1 to be a full match")
-		}
-		if hit.ID == "doc2" && hit.PartialMatch {
-			t.Errorf("Expected doc2 to be a full match")
+		switch hit.ID {
+		case "doc1":
+			if hit.Expl.PartialMatch {
+				t.Errorf("Expected doc1 to be a full match")
+			}
+		case "doc2":
+			if hit.Expl.PartialMatch {
+				t.Errorf("Expected doc2 to be a full match")
+			}
+		default:
+			t.Errorf("Unexpected document ID: %s", hit.ID)
 		}
 	}
 	// Test 4 - Two Docs hits, both partial match
@@ -1328,6 +1349,7 @@ func TestMatchQueryPartialMatch(t *testing.T) {
 	mq4.SetField("description")
 
 	sr = NewSearchRequest(mq4)
+	sr.Explain = true
 	res, err = idx.Search(sr)
 	if err != nil {
 		t.Fatal(err)
@@ -1336,11 +1358,17 @@ func TestMatchQueryPartialMatch(t *testing.T) {
 		t.Errorf("Expected 2 results, but got: %v", res.Total)
 	}
 	for _, hit := range res.Hits {
-		if hit.ID == "doc1" && !hit.PartialMatch {
-			t.Errorf("Expected doc1 to be a partial match")
-		}
-		if hit.ID == "doc2" && !hit.PartialMatch {
-			t.Errorf("Expected doc2 to be a partial match")
+		switch hit.ID {
+		case "doc1":
+			if !hit.Expl.PartialMatch {
+				t.Errorf("Expected doc1 to be a full match")
+			}
+		case "doc2":
+			if !hit.Expl.PartialMatch {
+				t.Errorf("Expected doc2 to be a full match")
+			}
+		default:
+			t.Errorf("Unexpected document ID: %s", hit.ID)
 		}
 	}
 
@@ -1350,6 +1378,7 @@ func TestMatchQueryPartialMatch(t *testing.T) {
 	mq5.SetOperator(1)
 
 	sr = NewSearchRequest(mq5)
+	sr.Explain = true
 	res, err = idx.Search(sr)
 	if err != nil {
 		t.Fatal(err)
@@ -1357,7 +1386,9 @@ func TestMatchQueryPartialMatch(t *testing.T) {
 	if res.Total != 1 {
 		t.Errorf("Expected 1 result, but got: %v", res.Total)
 	}
-	if res.Hits[0].ID == "doc2" || res.Hits[0].PartialMatch {
+	hit := res.Hits[0]
+	fmt.Println(hit.Expl, hit.ID)
+	if hit.ID != "doc1" || hit.Expl.PartialMatch {
 		t.Errorf("Expected doc1 to be a full match")
 	}
 }

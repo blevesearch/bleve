@@ -167,13 +167,6 @@ type DocumentMatch struct {
 	// results are completed
 	FieldTermLocations []FieldTermLocation `json:"-"`
 
-	// used to indicate if this match is a partial match
-	// in the case of a disjunction search
-	// this means that the match is partial because
-	// not all sub-queries matched
-	// if false, all the sub-queries matched
-	PartialMatch bool `json:"partial_match,omitempty"`
-
 	// used to indicate the sub-scores that combined to form the
 	// final score for this document match.  This is only populated
 	// when the search request's query is a DisjunctionQuery
