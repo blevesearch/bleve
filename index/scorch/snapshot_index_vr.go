@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/blevesearch/bleve/v2/size"
@@ -74,6 +75,9 @@ func (i *IndexSnapshotVectorReader) getEligibleDocIDs() *roaring.Bitmap {
 			}
 			internalDocIDs = append(internalDocIDs, uint32(internalDocID))
 		}
+		sort.Slice(internalDocIDs, func(i, j int) bool {
+			return internalDocIDs[i] < internalDocIDs[j]
+		})
 		res.AddMany(internalDocIDs)
 	}
 	return res
