@@ -947,9 +947,9 @@ func (s *Scorch) FireIndexEvent() {
 // Updates bolt db with the given field info. Existing field info already in bolt
 // will be merged before persisting. The index mapping is also overwritted both
 // in bolt as well as the index snapshot
-func (s *Scorch) UpdateFields(fieldInfo map[string]*index.FieldInfo, mappingBytes []byte) error {
+func (s *Scorch) UpdateFields(fieldInfo map[string]*index.UpdateFieldInfo, mappingBytes []byte) error {
 	// Switch from pointer to value to marshal into a json for storage
-	updatedFields := make(map[string]index.FieldInfo)
+	updatedFields := make(map[string]index.UpdateFieldInfo)
 	for field, info := range fieldInfo {
 		updatedFields[field] = *info
 	}
@@ -958,13 +958,13 @@ func (s *Scorch) UpdateFields(fieldInfo map[string]*index.FieldInfo, mappingByte
 		return err
 	}
 	s.root.m.Lock()
-	s.root.updatedFields = updatedFields
+	s.root.UpdateFieldsInfo(fieldInfo)
 	s.root.m.Unlock()
 	return nil
 }
 
 // Merge and update deleted field info and rewrite index mapping
-func (s *Scorch) updateBolt(fieldInfo map[string]index.FieldInfo, mappingBytes []byte) error {
+func (s *Scorch) updateBolt(fieldInfo map[string]index.UpdateFieldInfo, mappingBytes []byte) error {
 	return s.rootBolt.Update(func(tx *bolt.Tx) error {
 		snapshots := tx.Bucket(boltSnapshotsBucket)
 		if snapshots == nil {
@@ -995,7 +995,7 @@ func (s *Scorch) updateBolt(fieldInfo map[string]index.FieldInfo, mappingBytes [
 					if segmentBucket == nil {
 						return fmt.Errorf("segment key, but bucket missing %x", kk)
 					}
-					var updatedFields map[string]index.FieldInfo
+					var updatedFields map[string]index.UpdateFieldInfo
 					updatedFieldBytes := segmentBucket.Get(boltUpdatedFieldsKey)
 					if updatedFieldBytes != nil {
 						err := json.Unmarshal(updatedFieldBytes, &updatedFields)
@@ -1003,7 +1003,16 @@ func (s *Scorch) updateBolt(fieldInfo map[string]index.FieldInfo, mappingBytes [
 							return fmt.Errorf("error reading updated field bytes: %v", err)
 						}
 						for field, info := range fieldInfo {
-							updatedFields[field] = info
+							if val, ok := updatedFields[field]; ok {
+								updatedFields[field] = index.UpdateFieldInfo{
+									RemoveAll: info.RemoveAll || val.RemoveAll,
+									Store:     info.Store || val.Store,
+									DocValues: info.DocValues || val.DocValues,
+									Index:     info.Index || val.Index,
+								}
+							} else {
+								updatedFields[field] = info
+							}
 						}
 					} else {
 						updatedFields = fieldInfo

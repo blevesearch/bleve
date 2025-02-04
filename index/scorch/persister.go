@@ -1055,14 +1055,17 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 	}
 	updatedFieldBytes := segmentBucket.Get(boltUpdatedFieldsKey)
 	if updatedFieldBytes != nil {
-		var updatedFields map[string]index.FieldInfo
+		var updatedFields map[string]index.UpdateFieldInfo
 
 		err := json.Unmarshal(updatedFieldBytes, &updatedFields)
 		if err != nil {
 			_ = seg.Close()
 			return nil, fmt.Errorf("error reading updated field bytes: %v", err)
 		}
-		rv.updatedFields = updatedFields
+		rv.updatedFields = make(map[string]*index.UpdateFieldInfo)
+		for field, info := range updatedFields {
+			rv.updatedFields[field] = &info
+		}
 	}
 
 	return rv, nil

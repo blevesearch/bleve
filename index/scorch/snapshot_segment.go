@@ -41,7 +41,7 @@ type SegmentSnapshot struct {
 	deleted       *roaring.Bitmap
 	creator       string
 	stats         *fieldStats
-	updatedFields map[string]index.FieldInfo
+	updatedFields map[string]*index.UpdateFieldInfo
 
 	cachedMeta *cachedMeta
 
@@ -145,6 +145,28 @@ func (s *SegmentSnapshot) Size() (rv int) {
 	}
 	rv += s.cachedDocs.Size()
 	return
+}
+
+func (s *SegmentSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
+
+	if s.updatedFields == nil {
+		s.updatedFields = updatedFields
+	} else {
+		for fieldName, info := range updatedFields {
+			if val, ok := s.updatedFields[fieldName]; ok {
+				val.RemoveAll = val.RemoveAll || info.RemoveAll
+				val.Index = val.Index || info.Index
+				val.DocValues = val.DocValues || info.DocValues
+				val.Store = val.Store || info.Store
+			} else {
+				s.updatedFields[fieldName] = info
+			}
+		}
+	}
+
+	if segment, ok := s.segment.(segment.UpdatableSegment); ok {
+		segment.PutUpdatedFields(s.updatedFields)
+	}
 }
 
 type cachedFieldDocs struct {
