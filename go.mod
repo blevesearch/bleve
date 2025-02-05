@@ -12,19 +12,19 @@ require (
 	github.com/blevesearch/go-porterstemmer v1.0.3
 	github.com/blevesearch/goleveldb v1.0.1
 	github.com/blevesearch/gtreap v0.1.1
-	github.com/blevesearch/scorch_segment_api/v2 v2.3.2-0.20250204203406-c1c2d58da402
+	github.com/blevesearch/scorch_segment_api/v2 v2.3.2
 	github.com/blevesearch/segment v0.9.1
 	github.com/blevesearch/snowball v0.6.1
 	github.com/blevesearch/snowballstem v0.9.0
 	github.com/blevesearch/stempel v0.2.0
 	github.com/blevesearch/upsidedown_store_api v1.0.2
 	github.com/blevesearch/vellum v1.1.0
-	github.com/blevesearch/zapx/v11 v11.3.12-0.20250204210857-4fb4c0d18537
-	github.com/blevesearch/zapx/v12 v12.3.12-0.20250204210924-17671b3917cf
-	github.com/blevesearch/zapx/v13 v13.3.12-0.20250204211045-08d7a80b8ae6
-	github.com/blevesearch/zapx/v14 v14.3.12-0.20250204211233-281827e609ca
-	github.com/blevesearch/zapx/v15 v15.3.19-0.20250204211327-7b774600720f
-	github.com/blevesearch/zapx/v16 v16.1.11-0.20250204205017-d01371d4716c
+	github.com/blevesearch/zapx/v11 v11.4.0
+	github.com/blevesearch/zapx/v12 v12.4.0
+	github.com/blevesearch/zapx/v13 v13.4.0
+	github.com/blevesearch/zapx/v14 v14.4.0
+	github.com/blevesearch/zapx/v15 v15.4.0
+	github.com/blevesearch/zapx/v16 v16.2.0
 	github.com/couchbase/moss v0.2.0
 	github.com/golang/protobuf v1.3.2
 	github.com/spf13/cobra v1.7.0
