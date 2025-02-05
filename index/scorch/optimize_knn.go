@@ -114,13 +114,14 @@ func (o *OptimizeVR) Finish() error {
 								eligibleVectorInternalIDs.And(snapshotGlobalDocNums[index])
 							}
 
-							eligibleLocalDocNums := make([]uint64,
-								eligibleVectorInternalIDs.GetCardinality())
+							eligibleLocalDocNums := roaring.NewBitmap()
 							// get the (segment-)local document numbers
 							for i, docNum := range eligibleVectorInternalIDs.ToArray() {
+								// TODO: IS THIS CONVERSION NECESSARY?
+								// can we not simply use eligibleVectorInternalIDs or a copy here?
 								localDocNum := o.snapshot.localDocNumFromGlobal(index,
 									uint64(docNum))
-								eligibleLocalDocNums[i] = localDocNum
+								eligibleLocalDocNums.Add(uint32(localDocNum))
 							}
 
 							pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
