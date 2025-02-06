@@ -4406,3 +4406,78 @@ func TestSynonymSearchQueries(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGeoDistanceInSort(t *testing.T) {
+	tmpIndexPath := createTmpIndexPath(t)
+	defer cleanupTmpIndexPath(t, tmpIndexPath)
+
+	fm := mapping.NewGeoPointFieldMapping()
+	imap := mapping.NewIndexMapping()
+	imap.DefaultMapping.AddFieldMappingsAt("geo", fm)
+
+	idx, err := New(tmpIndexPath, imap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		err = idx.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	qp := []float64{0, 0}
+
+	docs := []struct {
+		id       string
+		point    []float64
+		distance float64
+	}{
+		{
+			id:       "1",
+			point:    []float64{1, 1},
+			distance: geo.Haversin(1, 1, qp[0], qp[1]) * 1000,
+		},
+		{
+			id:       "2",
+			point:    []float64{2, 2},
+			distance: geo.Haversin(2, 2, qp[0], qp[1]) * 1000,
+		},
+		{
+			id:       "3",
+			point:    []float64{3, 3},
+			distance: geo.Haversin(3, 3, qp[0], qp[1]) * 1000,
+		},
+	}
+
+	for _, doc := range docs {
+		idx.Index(doc.id, map[string]interface{}{"geo": doc.point})
+	}
+
+	q := NewGeoDistanceQuery(qp[0], qp[1], "1000000m")
+	q.SetField("geo")
+	req := NewSearchRequest(q)
+	req.Sort = make(search.SortOrder, 0)
+	req.Sort = append(req.Sort, &search.SortGeoDistance{
+		Field: "geo",
+		Desc:  false,
+		Unit:  "m",
+		Lon:   qp[0],
+		Lat:   qp[1],
+	})
+	res, err := idx.Search(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, doc := range res.Hits {
+		hitDist, err := strconv.ParseFloat(doc.Sort[0], 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if math.Abs(hitDist-docs[i].distance) > 1 {
+			t.Fatalf("distance error greater than 1 meter, expected distance - %v, got - %v", docs[i].distance, hitDist)
+		}
+	}
+}
