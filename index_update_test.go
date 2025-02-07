@@ -55,7 +55,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				synonymSource:  false,
 			},
 			indexFieldInfo: &index.UpdateFieldInfo{
-				RemoveAll: true,
+				Deleted: true,
 			},
 			changed: true,
 			err:     false,
@@ -1913,7 +1913,7 @@ func TestDeletedFields(t *testing.T) {
 					DocValues: true,
 				},
 				"d": {
-					RemoveAll: true,
+					Deleted: true,
 				},
 			},
 			err: false,
