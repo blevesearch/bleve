@@ -1005,7 +1005,7 @@ func (s *Scorch) updateBolt(fieldInfo map[string]index.UpdateFieldInfo, mappingB
 						for field, info := range fieldInfo {
 							if val, ok := updatedFields[field]; ok {
 								updatedFields[field] = index.UpdateFieldInfo{
-									RemoveAll: info.RemoveAll || val.RemoveAll,
+									Deleted:   info.Deleted || val.Deleted,
 									Store:     info.Store || val.Store,
 									DocValues: info.DocValues || val.DocValues,
 									Index:     info.Index || val.Index,
