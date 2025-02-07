@@ -101,10 +101,10 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.Update
 	// Remove entries from the list with no changes between the
 	// original and the updated mapping
 	for name, info := range fieldInfo {
-		if !info.RemoveAll && !info.Index && !info.DocValues && !info.Store {
+		if !info.Deleted && !info.Index && !info.DocValues && !info.Store {
 			delete(fieldInfo, name)
 		}
-		if info.RemoveAll {
+		if info.Deleted {
 			if upd.IndexDynamic {
 				return nil, fmt.Errorf("Mapping cannot be removed when index dynamic is true")
 			}
@@ -322,7 +322,7 @@ func compareFieldMapping(original, updated *mapping.FieldMapping, defaultChanges
 
 	if updated == nil {
 		if original != nil && !original.IncludeInAll {
-			rv.RemoveAll = true
+			rv.Deleted = true
 			return rv, true, nil
 		} else if original == nil {
 			return nil, false, nil
@@ -406,7 +406,7 @@ func compareFieldMapping(original, updated *mapping.FieldMapping, defaultChanges
 		}
 	}
 
-	if rv.RemoveAll || rv.Index || rv.Store || rv.DocValues {
+	if rv.Deleted || rv.Index || rv.Store || rv.DocValues {
 		return rv, true, nil
 	}
 	return rv, false, nil
@@ -437,7 +437,7 @@ func validateFieldInfo(newInfo *index.UpdateFieldInfo, updated bool, fInfo map[s
 		}
 	}
 	if oldInfo, ok := fInfo[name]; ok {
-		if oldInfo.RemoveAll != newInfo.RemoveAll || oldInfo.Index != newInfo.Index ||
+		if oldInfo.Deleted != newInfo.Deleted || oldInfo.Index != newInfo.Index ||
 			oldInfo.DocValues != newInfo.DocValues || oldInfo.Store != newInfo.Store {
 			return fmt.Errorf("updated field impossible to verify because multiple mappings point to the same field name")
 		}

@@ -513,7 +513,7 @@ func (is *IndexSnapshot) Document(id string) (rv index.Document, err error) {
 
 		// Skip fields that are supposed to have deleted store values
 		if info, ok := is.updatedFields[name]; ok &&
-			(info.RemoveAll || info.Store) {
+			(info.Deleted || info.Store) {
 			return true
 		}
 
@@ -648,7 +648,7 @@ func (is *IndexSnapshot) TermFieldReader(ctx context.Context, term []byte, field
 
 			// Skip fields that are supposed to have no indexing
 			if info, ok := is.updatedFields[field]; ok &&
-				(info.Index || info.RemoveAll) {
+				(info.Index || info.Deleted) {
 				dict, err = s.segment.Dictionary("")
 			} else {
 				dict, err = s.segment.Dictionary(field)
@@ -806,7 +806,7 @@ func (is *IndexSnapshot) documentVisitFieldTermsOnSegment(
 	var filteredFields []string
 	for _, field := range vFields {
 		if info, ok := is.updatedFields[field]; ok &&
-			(info.DocValues || info.RemoveAll) {
+			(info.DocValues || info.Deleted) {
 			continue
 		} else {
 			filteredFields = append(filteredFields, field)
@@ -1199,7 +1199,7 @@ func (is *IndexSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.Update
 	} else {
 		for fieldName, info := range updatedFields {
 			if val, ok := is.updatedFields[fieldName]; ok {
-				val.RemoveAll = val.RemoveAll || info.RemoveAll
+				val.Deleted = val.Deleted || info.Deleted
 				val.Index = val.Index || info.Index
 				val.DocValues = val.DocValues || info.DocValues
 				val.Store = val.Store || info.Store

@@ -154,7 +154,7 @@ func (s *SegmentSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.Updat
 	} else {
 		for fieldName, info := range updatedFields {
 			if val, ok := s.updatedFields[fieldName]; ok {
-				val.RemoveAll = val.RemoveAll || info.RemoveAll
+				val.Deleted = val.Deleted || info.Deleted
 				val.Index = val.Index || info.Index
 				val.DocValues = val.DocValues || info.DocValues
 				val.Store = val.Store || info.Store
