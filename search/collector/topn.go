@@ -16,7 +16,6 @@ package collector
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"strconv"
 	"time"
@@ -510,11 +509,12 @@ func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
 	for i, so := range hc.sort {
 		if _, ok := so.(*search.SortGeoDistance); ok {
 			for _, dm := range hc.results {
+				// The string is a int64 bit representation of a float64 distance
 				distInt, err := numeric.PrefixCoded(dm.Sort[i]).Int64()
 				if err != nil {
 					return err
 				}
-				dm.Sort[i] = fmt.Sprintf("%v", numeric.Int64ToFloat64(distInt))
+				dm.Sort[i] = strconv.FormatFloat(numeric.Int64ToFloat64(distInt), 'f', -1, 64)
 			}
 		}
 	}
