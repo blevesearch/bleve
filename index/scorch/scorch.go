@@ -17,6 +17,7 @@ package scorch
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -35,6 +36,8 @@ const Name = "scorch"
 const Version uint8 = 2
 
 var ErrClosed = fmt.Errorf("scorch closed")
+
+var MappingInternalKey = []byte("_mapping")
 
 type Scorch struct {
 	nextSegmentID uint64
@@ -881,4 +884,92 @@ func (s *Scorch) CopyReader() index.CopyReader {
 // external API to fire a scorch event (EventKindIndexStart) externally from bleve
 func (s *Scorch) FireIndexEvent() {
 	s.fireEvent(EventKindIndexStart, 0)
+}
+
+// Updates bolt db with the given field info. Existing field info already in bolt
+// will be merged before persisting. The index mapping is also overwritted both
+// in bolt as well as the index snapshot
+func (s *Scorch) UpdateFields(fieldInfo map[string]*index.UpdateFieldInfo, mappingBytes []byte) error {
+	// Switch from pointer to value to marshal into a json for storage
+	updatedFields := make(map[string]index.UpdateFieldInfo)
+	for field, info := range fieldInfo {
+		updatedFields[field] = *info
+	}
+	err := s.updateBolt(updatedFields, mappingBytes)
+	if err != nil {
+		return err
+	}
+	s.root.m.Lock()
+	s.root.UpdateFieldsInfo(fieldInfo)
+	s.root.m.Unlock()
+	return nil
+}
+
+// Merge and update deleted field info and rewrite index mapping
+func (s *Scorch) updateBolt(fieldInfo map[string]index.UpdateFieldInfo, mappingBytes []byte) error {
+	return s.rootBolt.Update(func(tx *bolt.Tx) error {
+		snapshots := tx.Bucket(boltSnapshotsBucket)
+		if snapshots == nil {
+			return nil
+		}
+
+		c := snapshots.Cursor()
+		for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
+			_, _, err := decodeUvarintAscending(k)
+			if err != nil {
+				log.Printf("unable to parse segment epoch %x, continuing", k)
+				continue
+			}
+			snapshot := snapshots.Bucket(k)
+			cc := snapshot.Cursor()
+			for kk, _ := cc.First(); kk != nil; kk, _ = cc.Next() {
+				if kk[0] == boltInternalKey[0] {
+					internalBucket := snapshot.Bucket(kk)
+					if internalBucket == nil {
+						return fmt.Errorf("segment key, but bucket missing %x", kk)
+					}
+					err = internalBucket.Put(MappingInternalKey, mappingBytes)
+					if err != nil {
+						return err
+					}
+				} else if kk[0] != boltMetaDataKey[0] {
+					segmentBucket := snapshot.Bucket(kk)
+					if segmentBucket == nil {
+						return fmt.Errorf("segment key, but bucket missing %x", kk)
+					}
+					var updatedFields map[string]index.UpdateFieldInfo
+					updatedFieldBytes := segmentBucket.Get(boltUpdatedFieldsKey)
+					if updatedFieldBytes != nil {
+						err := json.Unmarshal(updatedFieldBytes, &updatedFields)
+						if err != nil {
+							return fmt.Errorf("error reading updated field bytes: %v", err)
+						}
+						for field, info := range fieldInfo {
+							if val, ok := updatedFields[field]; ok {
+								updatedFields[field] = index.UpdateFieldInfo{
+									Deleted:   info.Deleted || val.Deleted,
+									Store:     info.Store || val.Store,
+									DocValues: info.DocValues || val.DocValues,
+									Index:     info.Index || val.Index,
+								}
+							} else {
+								updatedFields[field] = info
+							}
+						}
+					} else {
+						updatedFields = fieldInfo
+					}
+					b, err := json.Marshal(updatedFields)
+					if err != nil {
+						return err
+					}
+					err = segmentBucket.Put(boltUpdatedFieldsKey, b)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+		return nil
+	})
 }
