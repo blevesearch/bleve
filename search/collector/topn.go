@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/blevesearch/bleve/v2/numeric"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/blevesearch/bleve/v2/size"
 	index "github.com/blevesearch/bleve_index_api"
@@ -500,7 +501,23 @@ func (hc *TopNCollector) finalizeResults(r index.IndexReader) error {
 		doc.Complete(nil)
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
+	// Decode geo sort keys back to its distance values
+	for i, so := range hc.sort {
+		if _, ok := so.(*search.SortGeoDistance); ok {
+			for _, dm := range hc.results {
+				// The string is a int64 bit representation of a float64 distance
+				distInt, err := numeric.PrefixCoded(dm.Sort[i]).Int64()
+				if err != nil {
+					return err
+				}
+				dm.Sort[i] = strconv.FormatFloat(numeric.Int64ToFloat64(distInt), 'f', -1, 64)
+			}
+		}
+	}
 	return err
 }
 
