@@ -117,8 +117,6 @@ func (o *OptimizeVR) Finish() error {
 							eligibleLocalDocNums := roaring.NewBitmap()
 							// get the (segment-)local document numbers
 							for _, docNum := range eligibleVectorInternalIDs.ToArray() {
-								// TODO: IS THIS CONVERSION NECESSARY?
-								// can we not simply use eligibleVectorInternalIDs or a copy here?
 								localDocNum := o.snapshot.localDocNumFromGlobal(index,
 									uint64(docNum))
 								eligibleLocalDocNums.Add(uint32(localDocNum))
