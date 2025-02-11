@@ -81,7 +81,7 @@ func (n *NumericField) AnalyzedTokenFrequencies() index.TokenFrequencies {
 	return n.frequencies
 }
 
-func (n *NumericField) Analyze() {
+func (n *NumericField) Analyze() error {
 	tokens := make(analysis.TokenStream, 0)
 	tokens = append(tokens, &analysis.Token{
 		Start:    0,
@@ -114,6 +114,8 @@ func (n *NumericField) Analyze() {
 
 	n.length = len(tokens)
 	n.frequencies = analysis.TokenFrequency(tokens, n.arrayPositions, n.options)
+
+	return nil
 }
 
 func (n *NumericField) Value() []byte {
