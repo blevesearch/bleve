@@ -72,6 +72,17 @@ func (o *OptimizeVR) Finish() error {
 
 	defer o.invokeSearcherEndCallback()
 
+	// done once per field per VR.
+	eligibleVectorInternalIDsMap := make(map[string]map[int]*roaring.Bitmap)
+	for field, vrs := range o.vrs {
+		eligibleVectorInternalIDsMap[field] = make(map[int]*roaring.Bitmap)
+		for idx, vr := range vrs {
+			if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
+				eligibleVectorInternalIDsMap[field][idx] = vr.getEligibleDocIDs()
+			}
+		}
+	}
+
 	wg := sync.WaitGroup{}
 	semaphore := make(chan struct{}, BleveMaxKNNConcurrency)
 	// Launch goroutines to get vector index for each segment
@@ -97,7 +108,7 @@ func (o *OptimizeVR) Finish() error {
 					// update the vector index size as a meta value in the segment snapshot
 					vectorIndexSize := vecIndex.Size()
 					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
-					for _, vr := range vrs {
+					for idx, vr := range vrs {
 						var pl segment_api.VecPostingsList
 						var err error
 
@@ -106,7 +117,7 @@ func (o *OptimizeVR) Finish() error {
 
 						// Only applies to filtered kNN.
 						if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
-							eligibleVectorInternalIDs := vr.getEligibleDocIDs()
+							eligibleVectorInternalIDs := eligibleVectorInternalIDsMap[field][idx]
 							if snapshotGlobalDocNums != nil {
 								// Only the eligible documents belonging to this segment
 								// will get filtered out.
