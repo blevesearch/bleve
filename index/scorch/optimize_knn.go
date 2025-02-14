@@ -66,8 +66,20 @@ func (o *OptimizeVR) Finish() error {
 	var errors []error
 
 	var snapshotGlobalDocNums map[int]*roaring.Bitmap
+	// map of VR index -> field -> eligible docs
+	var eligibleDocIDsMap map[string]map[int]*roaring.Bitmap
 	if o.requiresFiltering {
 		snapshotGlobalDocNums = o.snapshot.globalDocNums()
+		eligibleDocIDsMap = make(map[string]map[int]*roaring.Bitmap)
+
+		for field, vrs := range o.vrs {
+			eligibleDocIDsMap[field] = make(map[int]*roaring.Bitmap)
+			for idx, vr := range vrs {
+				if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
+					eligibleDocIDsMap[field][idx] = vr.getEligibleDocIDs()
+				}
+			}
+		}
 	}
 
 	defer o.invokeSearcherEndCallback()
@@ -97,7 +109,7 @@ func (o *OptimizeVR) Finish() error {
 					// update the vector index size as a meta value in the segment snapshot
 					vectorIndexSize := vecIndex.Size()
 					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
-					for _, vr := range vrs {
+					for vrIdx, vr := range vrs {
 						var pl segment_api.VecPostingsList
 						var err error
 
@@ -106,7 +118,7 @@ func (o *OptimizeVR) Finish() error {
 
 						// Only applies to filtered kNN.
 						if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
-							eligibleVectorInternalIDs := vr.getEligibleDocIDs()
+							eligibleVectorInternalIDs := eligibleDocIDsMap[field][vrIdx]
 							if snapshotGlobalDocNums != nil {
 								// Only the eligible documents belonging to this segment
 								// will get filtered out.
@@ -114,13 +126,12 @@ func (o *OptimizeVR) Finish() error {
 								eligibleVectorInternalIDs.And(snapshotGlobalDocNums[index])
 							}
 
-							eligibleLocalDocNums := make([]uint64,
-								eligibleVectorInternalIDs.GetCardinality())
+							eligibleLocalDocNums := roaring.NewBitmap()
 							// get the (segment-)local document numbers
-							for i, docNum := range eligibleVectorInternalIDs.ToArray() {
+							for _, docNum := range eligibleVectorInternalIDs.ToArray() {
 								localDocNum := o.snapshot.localDocNumFromGlobal(index,
 									uint64(docNum))
-								eligibleLocalDocNums[i] = localDocNum
+								eligibleLocalDocNums.Add(uint32(localDocNum))
 							}
 
 							pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
