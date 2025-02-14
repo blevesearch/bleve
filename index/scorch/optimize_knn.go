@@ -75,6 +75,7 @@ func (o *OptimizeVR) Finish() error {
 		for field, vrs := range o.vrs {
 			eligibleDocIDsMap[field] = make(map[int]*roaring.Bitmap)
 			for idx, vr := range vrs {
+				eligibleDocIDsMap[field][idx] = roaring.NewBitmap()
 				if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
 					eligibleDocIDsMap[field][idx] = vr.getEligibleDocIDs()
 				}
