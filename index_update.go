@@ -16,7 +16,9 @@ package bleve
 
 import (
 	"fmt"
+	"reflect"
 
+	"github.com/blevesearch/bleve/v2/analysis"
 	"github.com/blevesearch/bleve/v2/mapping"
 	index "github.com/blevesearch/bleve_index_api"
 )
@@ -33,16 +35,16 @@ type pathInfo struct {
 // Store the field information with respect to the
 // document paths
 type fieldMapInfo struct {
-	fieldMapping *mapping.FieldMapping
-	rootName     string
-	parent       *pathInfo
+	fieldMapping   *mapping.FieldMapping
+	analyzer       string
+	datetimeParser string
+	rootName       string
+	parent         *pathInfo
 }
 
 // Store all of the changes to defaults
 type defaultInfo struct {
-	analyzer       bool
-	dateTimeParser bool
-	synonymSource  bool
+	synonymSource bool
 }
 
 // Compare two index mappings to identify all of the updatable changes
@@ -87,6 +89,18 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.Update
 	}
 	addPathInfo(updPaths, "", upd.DefaultMapping, ori, nil, "")
 
+	// Compare all analysers currently in use
+	err = compareAnalysers(oriPaths, updPaths, ori, upd)
+	if err != nil {
+		return nil, err
+	}
+
+	// Compare all datetime parsers currently in use
+	err = compareDateTimeParsers(oriPaths, updPaths, ori, upd)
+	if err != nil {
+		return nil, err
+	}
+
 	// Compare both the mappings based on the document paths
 	// and create a list of index, docvalues, store differences
 	// for every single field possible
@@ -129,14 +143,6 @@ func compareMappings(ori, upd *mapping.IndexMappingImpl) (*defaultInfo, error) {
 
 	if ori.DefaultType != upd.DefaultType {
 		return nil, fmt.Errorf("default type cannot be changed")
-	}
-
-	if ori.DefaultAnalyzer != upd.DefaultAnalyzer {
-		rv.analyzer = true
-	}
-
-	if ori.DefaultDateTimeParser != upd.DefaultDateTimeParser {
-		rv.dateTimeParser = true
 	}
 
 	if ori.DefaultSynonymSource != upd.DefaultSynonymSource {
@@ -260,6 +266,107 @@ func addPathInfo(paths map[string]*pathInfo, name string, mp *mapping.DocumentMa
 	paths[name] = pInfo
 }
 
+func compareAnalysers(oriPaths, updPaths map[string]*pathInfo, ori, upd *mapping.IndexMappingImpl) error {
+
+	oriAnalyzers := make(map[string]interface{})
+	updAnalyzers := make(map[string]interface{})
+	oriCustomAnalysers := ori.CustomAnalysis.Analyzers
+	updCustomAnalysers := upd.CustomAnalysis.Analyzers
+
+	for path, info := range oriPaths {
+		if len(info.fieldMapInfo) == 0 {
+			continue
+		}
+		for _, fInfo := range info.fieldMapInfo {
+			if fInfo.fieldMapping.Type == "text" {
+				analyzerName := ori.AnalyzerNameForPath(path)
+				fInfo.analyzer = analyzerName
+				if val, ok := oriCustomAnalysers[analyzerName]; ok {
+					oriAnalyzers[analyzerName] = val
+				}
+			}
+		}
+	}
+
+	for path, info := range updPaths {
+		if len(info.fieldMapInfo) == 0 {
+			continue
+		}
+		for _, fInfo := range info.fieldMapInfo {
+			if fInfo.fieldMapping.Type == "text" {
+				analyzerName := upd.AnalyzerNameForPath(path)
+				fInfo.analyzer = analyzerName
+				if val, ok := updCustomAnalysers[analyzerName]; ok {
+					updAnalyzers[analyzerName] = val
+				}
+			}
+		}
+	}
+
+	for name, anUpd := range updAnalyzers {
+		if anOri, ok := oriAnalyzers[name]; ok {
+			if !reflect.DeepEqual(anUpd, anOri) {
+				return fmt.Errorf("analyser %s changed while being used by fields", name)
+			}
+		} else {
+			return fmt.Errorf("analyser %s newly added to an existing field", name)
+		}
+	}
+
+	return nil
+}
+
+func compareDateTimeParsers(oriPaths, updPaths map[string]*pathInfo, ori, upd *mapping.IndexMappingImpl) error {
+
+	oriDateTimeParsers := make(map[string]analysis.DateTimeParser)
+	updDateTimeParsers := make(map[string]analysis.DateTimeParser)
+
+	for _, info := range oriPaths {
+		if len(info.fieldMapInfo) == 0 {
+			continue
+		}
+		for _, fInfo := range info.fieldMapInfo {
+			if fInfo.fieldMapping.Type == "datetime" {
+				if fInfo.fieldMapping.DateFormat == "" {
+					fInfo.datetimeParser = ori.DefaultDateTimeParser
+					oriDateTimeParsers[ori.DefaultDateTimeParser] = ori.DateTimeParserNamed(ori.DefaultDateTimeParser)
+				} else {
+					oriDateTimeParsers[fInfo.fieldMapping.DateFormat] = ori.DateTimeParserNamed(fInfo.fieldMapping.DateFormat)
+				}
+			}
+		}
+	}
+
+	for _, info := range updPaths {
+		if len(info.fieldMapInfo) == 0 {
+			continue
+		}
+		for _, fInfo := range info.fieldMapInfo {
+			if fInfo.fieldMapping.Type == "datetime" {
+				if fInfo.fieldMapping.DateFormat == "" {
+					fInfo.datetimeParser = upd.DefaultDateTimeParser
+					updDateTimeParsers[upd.DefaultDateTimeParser] = upd.DateTimeParserNamed(upd.DefaultDateTimeParser)
+				} else {
+					fInfo.datetimeParser = fInfo.fieldMapping.DateFormat
+					updDateTimeParsers[fInfo.fieldMapping.DateFormat] = upd.DateTimeParserNamed(fInfo.fieldMapping.DateFormat)
+				}
+			}
+		}
+	}
+
+	for name, dtUpd := range updDateTimeParsers {
+		if dtOri, ok := oriDateTimeParsers[name]; ok {
+			if !reflect.DeepEqual(dtUpd, dtOri) {
+				return fmt.Errorf("datetime parser %s changed while being used by fields", name)
+			}
+		} else {
+			return fmt.Errorf("datetime parser %s added to an existing field", name)
+		}
+	}
+
+	return nil
+}
+
 // Compare all of the fields at a particular document path and add its field information
 func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo, defaultChanges *defaultInfo) error {
 
@@ -283,13 +390,27 @@ func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo, d
 	} else {
 		for _, oriFMapInfo := range ori.fieldMapInfo {
 			var updFMap *mapping.FieldMapping
+			var updAnalyser string
+			var updDatetimeParser string
+
 			// For multiple fields at a single document path, compare
 			// only with the matching ones
 			for _, updFMapInfo := range upd.fieldMapInfo {
 				if oriFMapInfo.rootName == updFMapInfo.rootName &&
 					oriFMapInfo.fieldMapping.Name == updFMapInfo.fieldMapping.Name {
 					updFMap = updFMapInfo.fieldMapping
+					if updFMap.Type == "text" {
+						updAnalyser = updFMapInfo.analyzer
+					} else if updFMap.Type == "datetime" {
+						updDatetimeParser = updFMapInfo.datetimeParser
+					}
 				}
+			}
+			if updAnalyser != "" && oriFMapInfo.analyzer != updAnalyser {
+				return fmt.Errorf("analyser has been changed for a text field")
+			}
+			if updDatetimeParser != "" && oriFMapInfo.datetimeParser != updDatetimeParser {
+				return fmt.Errorf("datetime parser has been changed for a text field")
 			}
 
 			info, updated, err = compareFieldMapping(oriFMapInfo.fieldMapping, updFMap, defaultChanges)
@@ -338,20 +459,16 @@ func compareFieldMapping(original, updated *mapping.FieldMapping, defaultChanges
 	if original.Type == "text" {
 		if original.SynonymSource != updated.SynonymSource {
 			return nil, false, fmt.Errorf("synonym source cannot be changed for text field")
-		} else if original.SynonymSource == "inherit" && defaultChanges.synonymSource {
+		} else if original.SynonymSource == "" && defaultChanges.synonymSource {
 			return nil, false, fmt.Errorf("synonym source cannot be changed for possible inherited text field")
 		}
 		if original.Analyzer != updated.Analyzer {
 			return nil, false, fmt.Errorf("analyzer cannot be updated for text fields")
-		} else if original.Analyzer == "inherit" && defaultChanges.analyzer {
-			return nil, false, fmt.Errorf("default analyzer changed for possible inherited text field")
 		}
 	}
 	if original.Type == "datetime" {
 		if original.DateFormat != updated.DateFormat {
 			return nil, false, fmt.Errorf("dateFormat cannot be updated for datetime fields")
-		} else if original.DateFormat == "inherit" && defaultChanges.dateTimeParser {
-			return nil, false, fmt.Errorf("default analyzer changed for possible inherited text field")
 		}
 	}
 	if original.Type == "vector" || original.Type == "vector_base64" {

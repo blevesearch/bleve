@@ -22,7 +22,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/custom"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/simple"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/percent"
+	"github.com/blevesearch/bleve/v2/analysis/datetime/sanitized"
 	"github.com/blevesearch/bleve/v2/analysis/lang/en"
+	"github.com/blevesearch/bleve/v2/analysis/token/lowercase"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/letter"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/whitespace"
 	"github.com/blevesearch/bleve/v2/index/scorch"
 	"github.com/blevesearch/bleve/v2/index/scorch/mergeplan"
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -50,9 +57,7 @@ func TestCompareFieldMapping(t *testing.T) {
 			original: &mapping.FieldMapping{},
 			updated:  nil,
 			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			indexFieldInfo: &index.UpdateFieldInfo{
 				Deleted: true,
@@ -68,9 +73,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				Type: "datetime",
 			},
 			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			indexFieldInfo: nil,
 			changed:        false,
@@ -86,9 +89,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				SynonymSource: "b",
 			},
 			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			indexFieldInfo: nil,
 			changed:        false,
@@ -104,45 +105,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				Analyzer: "b",
 			},
 			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  false,
-			},
-			indexFieldInfo: nil,
-			changed:        false,
-			err:            true,
-		},
-		{ // default analyser changed when inherited => not updatable
-			original: &mapping.FieldMapping{
-				Type:     "text",
-				Analyzer: "inherit",
-			},
-			updated: &mapping.FieldMapping{
-				Type:     "text",
-				Analyzer: "inherit",
-			},
-			defaultChanges: &defaultInfo{
-				analyzer:       true,
-				dateTimeParser: false,
-				synonymSource:  false,
-			},
-			indexFieldInfo: nil,
-			changed:        false,
-			err:            true,
-		},
-		{ // default datetimeparser changed for inherited datetime field => not updatable
-			original: &mapping.FieldMapping{
-				Type:       "datetime",
-				DateFormat: "inherit",
-			},
-			updated: &mapping.FieldMapping{
-				Type:       "datetime",
-				DateFormat: "inherit",
-			},
-			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: true,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			indexFieldInfo: nil,
 			changed:        false,
@@ -162,9 +125,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				VectorIndexOptimizedFor: "memory-efficient",
 			},
 			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			indexFieldInfo: nil,
 			changed:        false,
@@ -184,9 +145,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				VectorIndexOptimizedFor: "memory-efficient",
 			},
 			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			indexFieldInfo: nil,
 			changed:        false,
@@ -206,9 +165,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				VectorIndexOptimizedFor: "latency",
 			},
 			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			indexFieldInfo: nil,
 			changed:        false,
@@ -224,9 +181,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				IncludeInAll: false,
 			},
 			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			indexFieldInfo: nil,
 			changed:        false,
@@ -242,9 +197,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				IncludeTermVectors: true,
 			},
 			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			indexFieldInfo: nil,
 			changed:        false,
@@ -260,9 +213,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				SkipFreqNorm: false,
 			},
 			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			indexFieldInfo: nil,
 			changed:        false,
@@ -278,9 +229,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				Index: false,
 			},
 			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			indexFieldInfo: &index.UpdateFieldInfo{
 				Index:     true,
@@ -299,9 +248,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				DocValues: false,
 			},
 			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			indexFieldInfo: &index.UpdateFieldInfo{
 				DocValues: true,
@@ -343,9 +290,7 @@ func TestCompareFieldMapping(t *testing.T) {
 				SynonymSource:           "b",
 			},
 			defaultChanges: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			indexFieldInfo: &index.UpdateFieldInfo{},
 			changed:        false,
@@ -411,9 +356,7 @@ func TestCompareMappings(t *testing.T) {
 				DefaultAnalyzer: "b",
 			},
 			info: &defaultInfo{
-				analyzer:       true,
-				dateTimeParser: false,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			err: false,
 		},
@@ -425,9 +368,7 @@ func TestCompareMappings(t *testing.T) {
 				DefaultDateTimeParser: "b",
 			},
 			info: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: true,
-				synonymSource:  false,
+				synonymSource: false,
 			},
 			err: false,
 		},
@@ -439,9 +380,7 @@ func TestCompareMappings(t *testing.T) {
 				DefaultSynonymSource: "b",
 			},
 			info: &defaultInfo{
-				analyzer:       false,
-				dateTimeParser: false,
-				synonymSource:  true,
+				synonymSource: true,
 			},
 			err: false,
 		},
@@ -496,6 +435,314 @@ func TestCompareMappings(t *testing.T) {
 		if info == nil && test.info != nil || info != nil && test.info == nil || !reflect.DeepEqual(info, test.info) {
 			t.Errorf("Unexpected default info value for test %d, expecting %+v, got %+v, err %v", i, test.info, info, err)
 		}
+	}
+}
+
+func TestCompareAnalysers(t *testing.T) {
+
+	ori := mapping.NewIndexMapping()
+	ori.DefaultMapping.AddFieldMappingsAt("a", NewTextFieldMapping())
+	ori.DefaultMapping.AddFieldMappingsAt("b", NewTextFieldMapping())
+	ori.DefaultMapping.AddFieldMappingsAt("c", NewTextFieldMapping())
+	ori.DefaultMapping.Properties["b"].DefaultAnalyzer = "3xbla"
+	ori.DefaultMapping.Properties["c"].DefaultAnalyzer = simple.Name
+
+	upd := mapping.NewIndexMapping()
+	upd.DefaultMapping.AddFieldMappingsAt("a", NewTextFieldMapping())
+	upd.DefaultMapping.AddFieldMappingsAt("b", NewTextFieldMapping())
+	upd.DefaultMapping.AddFieldMappingsAt("c", NewTextFieldMapping())
+	upd.DefaultMapping.Properties["b"].DefaultAnalyzer = "3xbla"
+	upd.DefaultMapping.Properties["c"].DefaultAnalyzer = simple.Name
+
+	if err := ori.AddCustomAnalyzer("3xbla", map[string]interface{}{
+		"type":          custom.Name,
+		"tokenizer":     whitespace.Name,
+		"token_filters": []interface{}{lowercase.Name, "stop_en"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := upd.AddCustomAnalyzer("3xbla", map[string]interface{}{
+		"type":          custom.Name,
+		"tokenizer":     whitespace.Name,
+		"token_filters": []interface{}{lowercase.Name, "stop_en"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	oriPaths := map[string]*pathInfo{
+		"a": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "text",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "a",
+			parentPath: "",
+		},
+		"b": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "text",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "b",
+			parentPath: "",
+		},
+		"c": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "text",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "c",
+			parentPath: "",
+		},
+	}
+
+	updPaths := map[string]*pathInfo{
+		"a": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "text",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "a",
+			parentPath: "",
+		},
+		"b": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "text",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "b",
+			parentPath: "",
+		},
+		"c": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "text",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "c",
+			parentPath: "",
+		},
+	}
+
+	// Test case has identical analysers for text fields
+	err := compareAnalysers(oriPaths, updPaths, ori, upd)
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %v", err)
+	}
+
+	ori2 := mapping.NewIndexMapping()
+	ori2.DefaultMapping.AddFieldMappingsAt("a", NewTextFieldMapping())
+	ori2.DefaultMapping.AddFieldMappingsAt("b", NewTextFieldMapping())
+	ori2.DefaultMapping.AddFieldMappingsAt("c", NewTextFieldMapping())
+	ori2.DefaultMapping.Properties["b"].DefaultAnalyzer = "3xbla"
+	ori2.DefaultMapping.Properties["c"].DefaultAnalyzer = simple.Name
+
+	upd2 := mapping.NewIndexMapping()
+	upd2.DefaultMapping.AddFieldMappingsAt("a", NewTextFieldMapping())
+	upd2.DefaultMapping.AddFieldMappingsAt("b", NewTextFieldMapping())
+	upd2.DefaultMapping.AddFieldMappingsAt("c", NewTextFieldMapping())
+	upd2.DefaultMapping.Properties["b"].DefaultAnalyzer = "3xbla"
+	upd2.DefaultMapping.Properties["c"].DefaultAnalyzer = simple.Name
+
+	if err := ori2.AddCustomAnalyzer("3xbla", map[string]interface{}{
+		"type":          custom.Name,
+		"tokenizer":     whitespace.Name,
+		"token_filters": []interface{}{lowercase.Name, "stop_en"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := upd2.AddCustomAnalyzer("3xbla", map[string]interface{}{
+		"type":          custom.Name,
+		"tokenizer":     letter.Name,
+		"token_filters": []interface{}{lowercase.Name, "stop_en"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Test case has different custom analyser for field "b"
+	err = compareAnalysers(oriPaths, updPaths, ori2, upd2)
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	}
+}
+
+func TestCompareDatetimeParsers(t *testing.T) {
+
+	ori := mapping.NewIndexMapping()
+	ori.DefaultMapping.AddFieldMappingsAt("a", NewDateTimeFieldMapping())
+	ori.DefaultMapping.AddFieldMappingsAt("b", NewDateTimeFieldMapping())
+	ori.DefaultMapping.AddFieldMappingsAt("c", NewDateTimeFieldMapping())
+	ori.DefaultMapping.Properties["b"].Fields[0].DateFormat = "customDT"
+	ori.DefaultMapping.Properties["c"].Fields[0].DateFormat = percent.Name
+
+	upd := mapping.NewIndexMapping()
+	upd.DefaultMapping.AddFieldMappingsAt("a", NewDateTimeFieldMapping())
+	upd.DefaultMapping.AddFieldMappingsAt("b", NewDateTimeFieldMapping())
+	upd.DefaultMapping.AddFieldMappingsAt("c", NewDateTimeFieldMapping())
+	upd.DefaultMapping.Properties["b"].Fields[0].DateFormat = "customDT"
+	upd.DefaultMapping.Properties["c"].Fields[0].DateFormat = percent.Name
+
+	err := ori.AddCustomDateTimeParser("customDT", map[string]interface{}{
+		"type": sanitized.Name,
+		"layouts": []interface{}{
+			"02/01/2006 15:04:05",
+			"2006/01/02 3:04PM",
+		},
+	})
+
+	err = upd.AddCustomDateTimeParser("customDT", map[string]interface{}{
+		"type": sanitized.Name,
+		"layouts": []interface{}{
+			"02/01/2006 15:04:05",
+			"2006/01/02 3:04PM",
+		},
+	})
+
+	oriPaths := map[string]*pathInfo{
+		"a": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "datetime",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "a",
+			parentPath: "",
+		},
+		"b": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type:       "datetime",
+						DateFormat: "customDT",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "b",
+			parentPath: "",
+		},
+		"c": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "datetime",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "c",
+			parentPath: "",
+		},
+	}
+
+	updPaths := map[string]*pathInfo{
+		"a": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "datetime",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "a",
+			parentPath: "",
+		},
+		"b": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type:       "datetime",
+						DateFormat: "customDT",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "b",
+			parentPath: "",
+		},
+		"c": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "datetime",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "c",
+			parentPath: "",
+		},
+	}
+
+	// Test case has identical datetime parsers for all fields
+	err = compareDateTimeParsers(oriPaths, updPaths, ori, upd)
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %v", err)
+	}
+
+	ori2 := mapping.NewIndexMapping()
+	ori2.DefaultMapping.AddFieldMappingsAt("a", NewDateTimeFieldMapping())
+	ori2.DefaultMapping.AddFieldMappingsAt("b", NewDateTimeFieldMapping())
+	ori2.DefaultMapping.AddFieldMappingsAt("c", NewDateTimeFieldMapping())
+	ori2.DefaultMapping.Properties["b"].Fields[0].DateFormat = "customDT"
+	ori2.DefaultMapping.Properties["c"].Fields[0].DateFormat = percent.Name
+
+	upd2 := mapping.NewIndexMapping()
+	upd2.DefaultMapping.AddFieldMappingsAt("a", NewDateTimeFieldMapping())
+	upd2.DefaultMapping.AddFieldMappingsAt("b", NewDateTimeFieldMapping())
+	upd2.DefaultMapping.AddFieldMappingsAt("c", NewDateTimeFieldMapping())
+	upd2.DefaultMapping.Properties["b"].Fields[0].DateFormat = "customDT"
+	upd2.DefaultMapping.Properties["c"].Fields[0].DateFormat = percent.Name
+
+	err = ori2.AddCustomDateTimeParser("customDT", map[string]interface{}{
+		"type": sanitized.Name,
+		"layouts": []interface{}{
+			"02/01/2006 15:04:05",
+			"2006/01/02 3:04PM",
+		},
+	})
+
+	err = upd2.AddCustomDateTimeParser("customDT", map[string]interface{}{
+		"type": sanitized.Name,
+		"layouts": []interface{}{
+			"02/01/2006 15:04:05",
+			"2006/01/02",
+		},
+	})
+
+	// test case has different custom datetime parser for field "b"
+	err = compareDateTimeParsers(oriPaths, updPaths, ori2, upd2)
+	if err == nil {
+		t.Errorf("Expected error, got nil")
 	}
 }
 
@@ -581,6 +828,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			updated: &mapping.IndexMappingImpl{
 				TypeMapping: map[string]*mapping.DocumentMapping{
@@ -654,6 +902,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			fieldInfo: map[string]*index.UpdateFieldInfo{},
 			err:       false,
@@ -733,6 +982,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			updated: &mapping.IndexMappingImpl{
 				TypeMapping: map[string]*mapping.DocumentMapping{
@@ -806,6 +1056,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			fieldInfo: map[string]*index.UpdateFieldInfo{},
 			err:       false,
@@ -870,6 +1121,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			updated: &mapping.IndexMappingImpl{
 				TypeMapping: map[string]*mapping.DocumentMapping{
@@ -929,6 +1181,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			fieldInfo: nil,
 			err:       true,
@@ -962,6 +1215,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			updated: &mapping.IndexMappingImpl{
 				TypeMapping: map[string]*mapping.DocumentMapping{},
@@ -990,6 +1244,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			fieldInfo: nil,
 			err:       true,
@@ -1068,6 +1323,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			updated: &mapping.IndexMappingImpl{
 				TypeMapping: map[string]*mapping.DocumentMapping{
@@ -1119,6 +1375,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     true,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			fieldInfo: nil,
 			err:       true,
@@ -1198,6 +1455,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			updated: &mapping.IndexMappingImpl{
 				TypeMapping: map[string]*mapping.DocumentMapping{
@@ -1271,6 +1529,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			fieldInfo: map[string]*index.UpdateFieldInfo{
 				"b": {
@@ -1355,6 +1614,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			updated: &mapping.IndexMappingImpl{
 				TypeMapping: map[string]*mapping.DocumentMapping{
@@ -1428,6 +1688,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			fieldInfo: map[string]*index.UpdateFieldInfo{
 				"a": {
@@ -1512,6 +1773,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			updated: &mapping.IndexMappingImpl{
 				TypeMapping: map[string]*mapping.DocumentMapping{
@@ -1585,6 +1847,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			fieldInfo: nil,
 			err:       true,
@@ -1649,6 +1912,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			updated: &mapping.IndexMappingImpl{
 				TypeMapping: map[string]*mapping.DocumentMapping{
@@ -1708,6 +1972,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			fieldInfo: map[string]*index.UpdateFieldInfo{
 				"a": {
@@ -1819,6 +2084,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			updated: &mapping.IndexMappingImpl{
 				TypeMapping: map[string]*mapping.DocumentMapping{
@@ -1900,6 +2166,7 @@ func TestDeletedFields(t *testing.T) {
 				IndexDynamic:     false,
 				StoreDynamic:     false,
 				DocValuesDynamic: false,
+				CustomAnalysis:   NewIndexMapping().CustomAnalysis,
 			},
 			fieldInfo: map[string]*index.UpdateFieldInfo{
 				"a": {
@@ -2742,7 +3009,6 @@ func TestIndexUpdateMerge(t *testing.T) {
 	if len(res4.Hits) != 0 {
 		t.Fatalf("Expected 0 hits, got %d\n", len(res4.Hits))
 	}
-
 }
 
 func BenchmarkIndexUpdateText(b *testing.B) {
