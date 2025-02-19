@@ -1004,7 +1004,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 			rv.segment = append(rv.segment, segmentSnapshot)
 			rv.offsets = append(rv.offsets, running)
 			if segmentSnapshot.updatedFields != nil {
-				rv.updatedFields = segmentSnapshot.updatedFields
+				rv.MergeUpdateFieldsInfo(segmentSnapshot.updatedFields)
 			}
 			running += segmentSnapshot.segment.Count()
 		}
@@ -1066,6 +1066,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		for field, info := range updatedFields {
 			rv.updatedFields[field] = &info
 		}
+		rv.UpdateFieldsInfo(rv.updatedFields)
 	}
 
 	return rv, nil
