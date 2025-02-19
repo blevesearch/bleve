@@ -1166,7 +1166,14 @@ func (is *IndexSnapshot) ThesaurusKeysRegexp(name string,
 }
 
 func (is *IndexSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
+	is.MergeUpdateFieldsInfo(updatedFields)
 
+	for _, segmentSnapshot := range is.segment {
+		segmentSnapshot.UpdateFieldsInfo(is.updatedFields)
+	}
+}
+
+func (is *IndexSnapshot) MergeUpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
 	if is.updatedFields == nil {
 		is.updatedFields = updatedFields
 	} else {
@@ -1181,9 +1188,4 @@ func (is *IndexSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.Update
 			}
 		}
 	}
-
-	for _, segmentSnapshot := range is.segment {
-		segmentSnapshot.UpdateFieldsInfo(updatedFields)
-	}
-
 }
