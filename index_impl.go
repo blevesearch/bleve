@@ -637,7 +637,7 @@ func (i *indexImpl) SearchInContext(ctx context.Context, req *SearchRequest) (sr
 
 	if fts != nil {
 		if is, ok := indexReader.(*scorch.IndexSnapshot); ok {
-			is.UpdateSynonymQueryCount(1)
+			is.UpdateSynonymSearchCount(1)
 		}
 		ctx = context.WithValue(ctx, search.FieldTermSynonymMapKey, fts)
 	}

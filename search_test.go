@@ -4318,12 +4318,12 @@ func TestSynonymSearchQueries(t *testing.T) {
 		},
 	}
 
-	getTotalSynonymQueryStat := func(idx Index) int {
+	getTotalSynonymSearchStat := func(idx Index) int {
 		ir, err := idx.Advanced()
 		if err != nil {
 			t.Fatal(err)
 		}
-		stat := ir.StatsMap()["synonym_queries"].(uint64)
+		stat := ir.StatsMap()["synonym_searches"].(uint64)
 		return int(stat)
 	}
 
@@ -4361,9 +4361,9 @@ func TestSynonymSearchQueries(t *testing.T) {
 		t.Fatal(err)
 	}
 	// now verify that the stat for number of synonym enabled queries is correct
-	totalSynonymQueriesStat := getTotalSynonymQueryStat(idx)
-	if totalSynonymQueriesStat != len(testQueries) {
-		t.Fatalf("expected %d synonym queries, got %d", len(testQueries), totalSynonymQueriesStat)
+	totalSynonymSearchStat := getTotalSynonymSearchStat(idx)
+	if totalSynonymSearchStat != len(testQueries) {
+		t.Fatalf("expected %d synonym searches, got %d", len(testQueries), totalSynonymSearchStat)
 	}
 
 	// test with index alias - with 1 batch per index
@@ -4398,19 +4398,19 @@ func TestSynonymSearchQueries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// verify the synonym queries stat for the alias
-	totalSynonymQueriesStat = getTotalSynonymQueryStat(indexes[0])
-	if totalSynonymQueriesStat != len(testQueries) {
-		t.Fatalf("expected %d synonym queries, got %d", len(testQueries), totalSynonymQueriesStat)
+	// verify the synonym search stat for the alias
+	totalSynonymSearchStat = getTotalSynonymSearchStat(indexes[0])
+	if totalSynonymSearchStat != len(testQueries) {
+		t.Fatalf("expected %d synonym searches, got %d", len(testQueries), totalSynonymSearchStat)
 	}
 	for i := 1; i < numIndexes; i++ {
-		idxStat := getTotalSynonymQueryStat(indexes[i])
-		if idxStat != totalSynonymQueriesStat {
-			t.Fatalf("expected %d synonym queries, got %d", totalSynonymQueriesStat, idxStat)
+		idxStat := getTotalSynonymSearchStat(indexes[i])
+		if idxStat != totalSynonymSearchStat {
+			t.Fatalf("expected %d synonym searches, got %d", totalSynonymSearchStat, idxStat)
 		}
 	}
-	if totalSynonymQueriesStat != len(testQueries) {
-		t.Fatalf("expected %d synonym queries, got %d", len(testQueries), totalSynonymQueriesStat)
+	if totalSynonymSearchStat != len(testQueries) {
+		t.Fatalf("expected %d synonym searches, got %d", len(testQueries), totalSynonymSearchStat)
 	}
 	// test with multi-level alias now with two index per alias
 	// and having any extra index being in the final alias
@@ -4433,16 +4433,16 @@ func TestSynonymSearchQueries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// verify the synonym queries stat for the alias
-	totalSynonymQueriesStat = getTotalSynonymQueryStat(indexes[0])
-	if totalSynonymQueriesStat != 2*len(testQueries) {
-		t.Fatalf("expected %d synonym queries, got %d", len(testQueries), totalSynonymQueriesStat)
+	// verify the synonym searches stat for the alias
+	totalSynonymSearchStat = getTotalSynonymSearchStat(indexes[0])
+	if totalSynonymSearchStat != 2*len(testQueries) {
+		t.Fatalf("expected %d synonym searches, got %d", len(testQueries), totalSynonymSearchStat)
 	}
-	totalSynonymQueriesStat = getTotalSynonymQueryStat(indexes[0])
+	totalSynonymSearchStat = getTotalSynonymSearchStat(indexes[0])
 	for i := 1; i < numIndexes; i++ {
-		idxStat := getTotalSynonymQueryStat(indexes[i])
-		if idxStat != totalSynonymQueriesStat {
-			t.Fatalf("expected %d synonym queries, got %d", totalSynonymQueriesStat, idxStat)
+		idxStat := getTotalSynonymSearchStat(indexes[i])
+		if idxStat != totalSynonymSearchStat {
+			t.Fatalf("expected %d synonym searches, got %d", totalSynonymSearchStat, idxStat)
 		}
 	}
 }
