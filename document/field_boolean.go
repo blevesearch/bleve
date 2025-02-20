@@ -116,13 +116,13 @@ func NewBooleanFieldFromBytes(name string, arrayPositions []uint64, value []byte
 		name:              name,
 		arrayPositions:    arrayPositions,
 		value:             value,
-		options:           DefaultNumericIndexingOptions,
+		options:           DefaultBooleanIndexingOptions,
 		numPlainTextBytes: uint64(len(value)),
 	}
 }
 
 func NewBooleanField(name string, arrayPositions []uint64, b bool) *BooleanField {
-	return NewBooleanFieldWithIndexingOptions(name, arrayPositions, b, DefaultNumericIndexingOptions)
+	return NewBooleanFieldWithIndexingOptions(name, arrayPositions, b, DefaultBooleanIndexingOptions)
 }
 
 func NewBooleanFieldWithIndexingOptions(name string, arrayPositions []uint64, b bool, options index.FieldIndexingOptions) *BooleanField {

@@ -910,6 +910,11 @@ func LoadAndHighlightFields(hit *search.DocumentMatch, req *SearchRequest,
 								if err == nil {
 									value = v
 								}
+							case index.IPField:
+								ip, err := docF.IP()
+								if err == nil {
+									value = ip.String()
+								}
 							}
 
 							if value != nil {

@@ -26,7 +26,7 @@ import (
 )
 
 type IPRangeQuery struct {
-	CIDR     string `json:"cidr, omitempty"`
+	CIDR     string `json:"cidr,omitempty"`
 	FieldVal string `json:"field,omitempty"`
 	BoostVal *Boost `json:"boost,omitempty"`
 }
