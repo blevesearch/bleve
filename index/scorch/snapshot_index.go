@@ -1165,6 +1165,7 @@ func (is *IndexSnapshot) ThesaurusKeysRegexp(name string,
 	})
 }
 
+// Update current snapshot updated field data as well as pass it on to all segments and segment bases
 func (is *IndexSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
 	is.MergeUpdateFieldsInfo(updatedFields)
 
@@ -1173,6 +1174,7 @@ func (is *IndexSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.Update
 	}
 }
 
+// Merge given updated field information with existing updated field information
 func (is *IndexSnapshot) MergeUpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
 	if is.updatedFields == nil {
 		is.updatedFields = updatedFields

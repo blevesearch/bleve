@@ -873,6 +873,7 @@ func (s *Scorch) loadSnapshot(snapshot *bolt.Bucket) (*IndexSnapshot, error) {
 			}
 			rv.segment = append(rv.segment, segmentSnapshot)
 			rv.offsets = append(rv.offsets, running)
+			// Merge all segment level updated field info for use during queries
 			if segmentSnapshot.updatedFields != nil {
 				rv.MergeUpdateFieldsInfo(segmentSnapshot.updatedFields)
 			}
@@ -936,6 +937,7 @@ func (s *Scorch) loadSegment(segmentBucket *bolt.Bucket) (*SegmentSnapshot, erro
 		for field, info := range updatedFields {
 			rv.updatedFields[field] = &info
 		}
+		// Set the value within the segment base for use during merge
 		rv.UpdateFieldsInfo(rv.updatedFields)
 	}
 

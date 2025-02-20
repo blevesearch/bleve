@@ -87,6 +87,7 @@ func (o *OptimizeVR) Finish() error {
 				for field, vrs := range o.vrs {
 					var vecIndex segment_api.VectorIndex
 					var err error
+					// Noop if the vector field or its index data is supposed to be deleted
 					if info, ok := o.snapshot.updatedFields[field]; ok && (info.Deleted || info.Index) {
 						vecIndex, err = segment.InterpretVectorIndex("",
 							o.requiresFiltering, origSeg.deleted)
