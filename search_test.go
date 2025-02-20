@@ -4438,7 +4438,6 @@ func TestSynonymSearchQueries(t *testing.T) {
 	if totalSynonymSearchStat != 2*len(testQueries) {
 		t.Fatalf("expected %d synonym searches, got %d", len(testQueries), totalSynonymSearchStat)
 	}
-	totalSynonymSearchStat = getTotalSynonymSearchStat(indexes[0])
 	for i := 1; i < numIndexes; i++ {
 		idxStat := getTotalSynonymSearchStat(indexes[i])
 		if idxStat != totalSynonymSearchStat {
