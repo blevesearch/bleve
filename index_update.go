@@ -38,20 +38,15 @@ type fieldMapInfo struct {
 	fieldMapping   *mapping.FieldMapping
 	analyzer       string
 	datetimeParser string
+	synonymSource  string
 	rootName       string
 	parent         *pathInfo
 }
 
-// Store all of the changes to defaults
-type defaultInfo struct {
-	synonymSource bool
-}
-
 // Compare two index mappings to identify all of the updatable changes
 func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.UpdateFieldInfo, error) {
-	var err error
-
-	defaultChanges, err := compareMappings(ori, upd)
+	// Compare all of the top level fields in an index mapping
+	err := compareMappings(ori, upd)
 	if err != nil {
 		return nil, err
 	}
@@ -89,14 +84,8 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.Update
 	}
 	addPathInfo(updPaths, "", upd.DefaultMapping, ori, nil, "")
 
-	// Compare all analysers currently in use
-	err = compareAnalysers(oriPaths, updPaths, ori, upd)
-	if err != nil {
-		return nil, err
-	}
-
-	// Compare all datetime parsers currently in use
-	err = compareDateTimeParsers(oriPaths, updPaths, ori, upd)
+	// Compare all components of custom analysis currently in use
+	err = compareCustomComponents(oriPaths, updPaths, ori, upd)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +95,7 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.Update
 	// for every single field possible
 	fieldInfo := make(map[string]*index.UpdateFieldInfo)
 	for path, info := range oriPaths {
-		err = addFieldInfo(fieldInfo, info, updPaths[path], defaultChanges)
+		err = addFieldInfo(fieldInfo, info, updPaths[path])
 		if err != nil {
 			return nil, err
 		}
@@ -118,6 +107,7 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.Update
 		if !info.Deleted && !info.Index && !info.DocValues && !info.Store {
 			delete(fieldInfo, name)
 		}
+		// A field cannot be completely deleted with any dynamic value turned on
 		if info.Deleted {
 			if upd.IndexDynamic {
 				return nil, fmt.Errorf("Mapping cannot be removed when index dynamic is true")
@@ -133,39 +123,34 @@ func DeletedFields(ori, upd *mapping.IndexMappingImpl) (map[string]*index.Update
 	return fieldInfo, nil
 }
 
-func compareMappings(ori, upd *mapping.IndexMappingImpl) (*defaultInfo, error) {
-	rv := &defaultInfo{}
-
+// Ensures non of the top level index mapping fields have changed
+func compareMappings(ori, upd *mapping.IndexMappingImpl) error {
 	if ori.TypeField != upd.TypeField &&
 		(len(ori.TypeMapping) != 0 || len(upd.TypeMapping) != 0) {
-		return nil, fmt.Errorf("type field cannot be changed when type mappings are present")
+		return fmt.Errorf("type field cannot be changed when type mappings are present")
 	}
 
 	if ori.DefaultType != upd.DefaultType {
-		return nil, fmt.Errorf("default type cannot be changed")
-	}
-
-	if ori.DefaultSynonymSource != upd.DefaultSynonymSource {
-		rv.synonymSource = true
+		return fmt.Errorf("default type cannot be changed")
 	}
 
 	if ori.DefaultField != upd.DefaultField {
-		return nil, fmt.Errorf("default field cannot be changed")
+		return fmt.Errorf("default field cannot be changed")
 	}
 
 	if ori.IndexDynamic != upd.IndexDynamic {
-		return nil, fmt.Errorf("index dynamic cannot be changed")
+		return fmt.Errorf("index dynamic cannot be changed")
 	}
 
 	if ori.StoreDynamic != upd.StoreDynamic {
-		return nil, fmt.Errorf(("store dynamic cannot be changed"))
+		return fmt.Errorf(("store dynamic cannot be changed"))
 	}
 
 	if ori.DocValuesDynamic != upd.DocValuesDynamic {
-		return nil, fmt.Errorf(("docvalues dynamic cannot be changed"))
+		return fmt.Errorf(("docvalues dynamic cannot be changed"))
 	}
 
-	return rv, nil
+	return nil
 }
 
 // Ensures updated document mapping does not contain new
@@ -266,6 +251,32 @@ func addPathInfo(paths map[string]*pathInfo, name string, mp *mapping.DocumentMa
 	paths[name] = pInfo
 }
 
+// Compares all of the custom analysis components in use
+func compareCustomComponents(oriPaths, updPaths map[string]*pathInfo, ori, upd *mapping.IndexMappingImpl) error {
+	// Compare all analysers currently in use
+	err := compareAnalysers(oriPaths, updPaths, ori, upd)
+	if err != nil {
+		return err
+	}
+
+	// Compare all datetime parsers currently in use
+	err = compareDateTimeParsers(oriPaths, updPaths, ori, upd)
+	if err != nil {
+		return err
+	}
+
+	// Compare all synonum sources
+	err = compareSynonymSources(oriPaths, updPaths, ori, upd)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Compares all analysers currently in use
+// Standard analysers not in custom analysis are not compared
+// Analysers in custom analysis but not in use are not compared
 func compareAnalysers(oriPaths, updPaths map[string]*pathInfo, ori, upd *mapping.IndexMappingImpl) error {
 
 	oriAnalyzers := make(map[string]interface{})
@@ -316,6 +327,8 @@ func compareAnalysers(oriPaths, updPaths map[string]*pathInfo, ori, upd *mapping
 	return nil
 }
 
+// Compares all date time parsers currently in use
+// Date time parsers in custom analysis but not in use are not compared
 func compareDateTimeParsers(oriPaths, updPaths map[string]*pathInfo, ori, upd *mapping.IndexMappingImpl) error {
 
 	oriDateTimeParsers := make(map[string]analysis.DateTimeParser)
@@ -367,8 +380,48 @@ func compareDateTimeParsers(oriPaths, updPaths map[string]*pathInfo, ori, upd *m
 	return nil
 }
 
+// Compares all synonym sources
+// Synonym sources currently not in use are also compared
+func compareSynonymSources(oriPaths, updPaths map[string]*pathInfo, ori, upd *mapping.IndexMappingImpl) error {
+
+	oriSynonymSources := make(map[string]analysis.SynonymSource)
+	updSynonymSources := make(map[string]analysis.SynonymSource)
+
+	for path, info := range oriPaths {
+		if len(info.fieldMapInfo) == 0 {
+			continue
+		}
+		for _, fInfo := range info.fieldMapInfo {
+			if fInfo.fieldMapping.Type == "text" {
+				synonymSourceName := ori.SynonymSourceForPath(path)
+				fInfo.synonymSource = synonymSourceName
+				oriSynonymSources[synonymSourceName] = ori.SynonymSourceNamed(synonymSourceName)
+			}
+		}
+	}
+
+	for path, info := range updPaths {
+		if len(info.fieldMapInfo) == 0 {
+			continue
+		}
+		for _, fInfo := range info.fieldMapInfo {
+			if fInfo.fieldMapping.Type == "text" {
+				synonymSourceName := upd.SynonymSourceForPath(path)
+				fInfo.synonymSource = synonymSourceName
+				updSynonymSources[synonymSourceName] = upd.SynonymSourceNamed(synonymSourceName)
+			}
+		}
+	}
+
+	if !reflect.DeepEqual(ori.CustomAnalysis.SynonymSources, upd.CustomAnalysis.SynonymSources) {
+		return fmt.Errorf("synonym sources cannot be changed")
+	}
+
+	return nil
+}
+
 // Compare all of the fields at a particular document path and add its field information
-func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo, defaultChanges *defaultInfo) error {
+func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo) error {
 
 	var info *index.UpdateFieldInfo
 	var updated bool
@@ -378,7 +431,7 @@ func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo, d
 	// or upd having mappings not in orihave already been done before this stage
 	if upd == nil {
 		for _, oriFMapInfo := range ori.fieldMapInfo {
-			info, updated, err = compareFieldMapping(oriFMapInfo.fieldMapping, nil, defaultChanges)
+			info, updated, err = compareFieldMapping(oriFMapInfo.fieldMapping, nil)
 			if err != nil {
 				return err
 			}
@@ -392,6 +445,7 @@ func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo, d
 			var updFMap *mapping.FieldMapping
 			var updAnalyser string
 			var updDatetimeParser string
+			var updSynonymSource string
 
 			// For multiple fields at a single document path, compare
 			// only with the matching ones
@@ -401,22 +455,30 @@ func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo, d
 					updFMap = updFMapInfo.fieldMapping
 					if updFMap.Type == "text" {
 						updAnalyser = updFMapInfo.analyzer
+						updSynonymSource = updFMapInfo.synonymSource
 					} else if updFMap.Type == "datetime" {
 						updDatetimeParser = updFMapInfo.datetimeParser
 					}
 				}
 			}
+			// Compare analyser, datetime parser and synonym source before comparing
+			// the field mapping as it might not have this information
 			if updAnalyser != "" && oriFMapInfo.analyzer != updAnalyser {
 				return fmt.Errorf("analyser has been changed for a text field")
 			}
 			if updDatetimeParser != "" && oriFMapInfo.datetimeParser != updDatetimeParser {
 				return fmt.Errorf("datetime parser has been changed for a text field")
 			}
-
-			info, updated, err = compareFieldMapping(oriFMapInfo.fieldMapping, updFMap, defaultChanges)
+			if updSynonymSource != "" && oriFMapInfo.synonymSource != updSynonymSource {
+				return fmt.Errorf("synonym source has been changed for a text field")
+			}
+			info, updated, err = compareFieldMapping(oriFMapInfo.fieldMapping, updFMap)
 			if err != nil {
 				return err
 			}
+
+			// Validate to ensure change is possible
+			// Needed if multiple mappings are aliased to the same field
 			err = validateFieldInfo(info, updated, fInfo, ori, oriFMapInfo)
 			if err != nil {
 				return err
@@ -437,7 +499,7 @@ func addFieldInfo(fInfo map[string]*index.UpdateFieldInfo, ori, upd *pathInfo, d
 // second return argument gives a flag indicating whether any changes, if detected, are doable or if
 // update is impossible
 // third argument is an error explaining exactly why the change is not possible
-func compareFieldMapping(original, updated *mapping.FieldMapping, defaultChanges *defaultInfo) (*index.UpdateFieldInfo, bool, error) {
+func compareFieldMapping(original, updated *mapping.FieldMapping) (*index.UpdateFieldInfo, bool, error) {
 
 	rv := &index.UpdateFieldInfo{}
 
@@ -459,8 +521,6 @@ func compareFieldMapping(original, updated *mapping.FieldMapping, defaultChanges
 	if original.Type == "text" {
 		if original.SynonymSource != updated.SynonymSource {
 			return nil, false, fmt.Errorf("synonym source cannot be changed for text field")
-		} else if original.SynonymSource == "" && defaultChanges.synonymSource {
-			return nil, false, fmt.Errorf("synonym source cannot be changed for possible inherited text field")
 		}
 		if original.Analyzer != updated.Analyzer {
 			return nil, false, fmt.Errorf("analyzer cannot be updated for text fields")

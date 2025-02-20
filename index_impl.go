@@ -326,6 +326,7 @@ func updateIndexUsing(path string, runtimeConfig map[string]interface{}, newPara
 	}
 
 	// Validate and update the index with the new mapping
+	// return usable index with error as to why update failed for any error
 	if um != nil {
 		ui, ok := rv.i.(index.UpdateIndex)
 		if !ok {
