@@ -124,16 +124,17 @@ func (o *OptimizeVR) Finish() error {
 						// Only applies to filtered kNN.
 						if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
 							eligibleVectorInternalIDs := eligibleDocIDsMap[field][vrIdx]
+							eligibleVectorInternalIDsClone := eligibleVectorInternalIDs.Clone()
 							if snapshotGlobalDocNums != nil {
 								// Only the eligible documents belonging to this segment
 								// will get filtered out.
 								// There is no way to determine which doc belongs to which segment
-								eligibleVectorInternalIDs.And(snapshotGlobalDocNums[index])
+								eligibleVectorInternalIDsClone.And(snapshotGlobalDocNums[index])
 							}
 
 							eligibleLocalDocNums := roaring.NewBitmap()
 							// get the (segment-)local document numbers
-							for _, docNum := range eligibleVectorInternalIDs.ToArray() {
+							for _, docNum := range eligibleVectorInternalIDsClone.ToArray() {
 								localDocNum := o.snapshot.localDocNumFromGlobal(index,
 									uint64(docNum))
 								eligibleLocalDocNums.Add(uint32(localDocNum))
