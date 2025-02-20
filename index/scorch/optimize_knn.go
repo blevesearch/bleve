@@ -67,10 +67,16 @@ func (o *OptimizeVR) Finish() error {
 
 	var snapshotGlobalDocNums map[int]*roaring.Bitmap
 	var eligibleDocIDsMap map[string]map[int]*roaring.Bitmap
+	fields := make([]string, len(o.vrs))
+	for field := range o.vrs {
+		fields = append(fields, field)
+	}
+
 	if o.requiresFiltering {
 		snapshotGlobalDocNums = o.snapshot.globalDocNums()
 		eligibleDocIDsMap = make(map[string]map[int]*roaring.Bitmap)
-		for field, vrs := range o.vrs {
+		for _, field := range fields {
+			vrs := o.vrs[field]
 			eligibleDocIDsMap[field] = make(map[int]*roaring.Bitmap)
 			for index, vr := range vrs {
 				if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
@@ -94,7 +100,8 @@ func (o *OptimizeVR) Finish() error {
 					<-semaphore // Release the semaphore slot
 					wg.Done()
 				}()
-				for field, vrs := range o.vrs {
+				for _, field := range fields {
+					vrs := o.vrs[field]
 					vecIndex, err := segment.InterpretVectorIndex(field,
 						o.requiresFiltering, origSeg.deleted)
 					if err != nil {
