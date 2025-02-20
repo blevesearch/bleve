@@ -31,7 +31,7 @@ func init() {
 	reflectStaticSizeIPField = int(reflect.TypeOf(f).Size())
 }
 
-const DefaultIPIndexingOptions = index.StoreField | index.IndexField | index.DocValues | index.IncludeTermVectors
+const DefaultIPIndexingOptions = index.StoreField | index.IndexField | index.DocValues
 
 type IPField struct {
 	name              string
@@ -115,7 +115,7 @@ func NewIPFieldFromBytes(name string, arrayPositions []uint64, value []byte) *IP
 		name:              name,
 		arrayPositions:    arrayPositions,
 		value:             value,
-		options:           DefaultNumericIndexingOptions,
+		options:           DefaultIPIndexingOptions,
 		numPlainTextBytes: uint64(len(value)),
 	}
 }
