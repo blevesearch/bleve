@@ -1387,7 +1387,6 @@ func TestMatchQueryPartialMatch(t *testing.T) {
 		t.Errorf("Expected 1 result, but got: %v", res.Total)
 	}
 	hit := res.Hits[0]
-	fmt.Println(hit.Expl, hit.ID)
 	if hit.ID != "doc1" || hit.Expl.PartialMatch {
 		t.Errorf("Expected doc1 to be a full match")
 	}
@@ -4324,8 +4323,8 @@ func TestSynonymSearchQueries(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		stat := ir.StatsMap()["synonym_queries"].(int)
-		return stat
+		stat := ir.StatsMap()["synonym_queries"].(uint64)
+		return int(stat)
 	}
 
 	runTestQueries := func(idx Index) error {
@@ -4400,9 +4399,15 @@ func TestSynonymSearchQueries(t *testing.T) {
 		t.Fatal(err)
 	}
 	// verify the synonym queries stat for the alias
-	totalSynonymQueriesStat = 0
-	for i := 0; i < numIndexes; i++ {
-		totalSynonymQueriesStat += getTotalSynonymQueryStat(indexes[i])
+	totalSynonymQueriesStat = getTotalSynonymQueryStat(indexes[0])
+	if totalSynonymQueriesStat != len(testQueries) {
+		t.Fatalf("expected %d synonym queries, got %d", len(testQueries), totalSynonymQueriesStat)
+	}
+	for i := 1; i < numIndexes; i++ {
+		idxStat := getTotalSynonymQueryStat(indexes[i])
+		if idxStat != totalSynonymQueriesStat {
+			t.Fatalf("expected %d synonym queries, got %d", totalSynonymQueriesStat, idxStat)
+		}
 	}
 	if totalSynonymQueriesStat != len(testQueries) {
 		t.Fatalf("expected %d synonym queries, got %d", len(testQueries), totalSynonymQueriesStat)
@@ -4429,12 +4434,16 @@ func TestSynonymSearchQueries(t *testing.T) {
 		t.Fatal(err)
 	}
 	// verify the synonym queries stat for the alias
-	totalSynonymQueriesStat = 0
-	for i := 0; i < numIndexes; i++ {
-		totalSynonymQueriesStat += getTotalSynonymQueryStat(indexes[i])
-	}
-	if totalSynonymQueriesStat != len(testQueries) {
+	totalSynonymQueriesStat = getTotalSynonymQueryStat(indexes[0])
+	if totalSynonymQueriesStat != 2*len(testQueries) {
 		t.Fatalf("expected %d synonym queries, got %d", len(testQueries), totalSynonymQueriesStat)
+	}
+	totalSynonymQueriesStat = getTotalSynonymQueryStat(indexes[0])
+	for i := 1; i < numIndexes; i++ {
+		idxStat := getTotalSynonymQueryStat(indexes[i])
+		if idxStat != totalSynonymQueriesStat {
+			t.Fatalf("expected %d synonym queries, got %d", totalSynonymQueriesStat, idxStat)
+		}
 	}
 }
 
