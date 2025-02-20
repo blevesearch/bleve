@@ -17,7 +17,6 @@ package scorch
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -948,7 +947,7 @@ func (s *Scorch) FireIndexEvent() {
 // will be merged before persisting. The index mapping is also overwritted both
 // in bolt as well as the index snapshot
 func (s *Scorch) UpdateFields(fieldInfo map[string]*index.UpdateFieldInfo, mappingBytes []byte) error {
-	// Switch from pointer to value to marshal into a json for storage
+	// Switch from pointer to value so we can marshal into a json for storage
 	updatedFields := make(map[string]index.UpdateFieldInfo)
 	for field, info := range fieldInfo {
 		updatedFields[field] = *info
@@ -957,6 +956,7 @@ func (s *Scorch) UpdateFields(fieldInfo map[string]*index.UpdateFieldInfo, mappi
 	if err != nil {
 		return err
 	}
+	// Pass the update field info to all snapshots and segment bases
 	s.root.m.Lock()
 	s.root.UpdateFieldsInfo(fieldInfo)
 	s.root.m.Unlock()
@@ -975,7 +975,7 @@ func (s *Scorch) updateBolt(fieldInfo map[string]index.UpdateFieldInfo, mappingB
 		for k, _ := c.Last(); k != nil; k, _ = c.Prev() {
 			_, _, err := decodeUvarintAscending(k)
 			if err != nil {
-				log.Printf("unable to parse segment epoch %x, continuing", k)
+				fmt.Printf("unable to parse segment epoch %x, continuing", k)
 				continue
 			}
 			snapshot := snapshots.Bucket(k)

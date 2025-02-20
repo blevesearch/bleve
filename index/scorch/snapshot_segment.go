@@ -147,6 +147,7 @@ func (s *SegmentSnapshot) Size() (rv int) {
 	return
 }
 
+// Merge given updated field information with existing and pass it on to the segment base
 func (s *SegmentSnapshot) UpdateFieldsInfo(updatedFields map[string]*index.UpdateFieldInfo) {
 
 	if s.updatedFields == nil {

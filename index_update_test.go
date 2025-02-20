@@ -24,6 +24,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/custom"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/simple"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/standard"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/percent"
 	"github.com/blevesearch/bleve/v2/analysis/datetime/sanitized"
 	"github.com/blevesearch/bleve/v2/analysis/lang/en"
@@ -40,7 +41,6 @@ func TestCompareFieldMapping(t *testing.T) {
 	tests := []struct {
 		original       *mapping.FieldMapping
 		updated        *mapping.FieldMapping
-		defaultChanges *defaultInfo
 		indexFieldInfo *index.UpdateFieldInfo
 		changed        bool
 		err            bool
@@ -48,7 +48,6 @@ func TestCompareFieldMapping(t *testing.T) {
 		{ // both nil => no op
 			original:       nil,
 			updated:        nil,
-			defaultChanges: nil,
 			indexFieldInfo: nil,
 			changed:        false,
 			err:            false,
@@ -56,9 +55,6 @@ func TestCompareFieldMapping(t *testing.T) {
 		{ // updated nil => delete all
 			original: &mapping.FieldMapping{},
 			updated:  nil,
-			defaultChanges: &defaultInfo{
-				synonymSource: false,
-			},
 			indexFieldInfo: &index.UpdateFieldInfo{
 				Deleted: true,
 			},
@@ -71,9 +67,6 @@ func TestCompareFieldMapping(t *testing.T) {
 			},
 			updated: &mapping.FieldMapping{
 				Type: "datetime",
-			},
-			defaultChanges: &defaultInfo{
-				synonymSource: false,
 			},
 			indexFieldInfo: nil,
 			changed:        false,
@@ -88,9 +81,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				Type:          "text",
 				SynonymSource: "b",
 			},
-			defaultChanges: &defaultInfo{
-				synonymSource: false,
-			},
 			indexFieldInfo: nil,
 			changed:        false,
 			err:            true,
@@ -103,9 +93,6 @@ func TestCompareFieldMapping(t *testing.T) {
 			updated: &mapping.FieldMapping{
 				Type:     "text",
 				Analyzer: "b",
-			},
-			defaultChanges: &defaultInfo{
-				synonymSource: false,
 			},
 			indexFieldInfo: nil,
 			changed:        false,
@@ -124,9 +111,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				Similarity:              "l2_norm",
 				VectorIndexOptimizedFor: "memory-efficient",
 			},
-			defaultChanges: &defaultInfo{
-				synonymSource: false,
-			},
 			indexFieldInfo: nil,
 			changed:        false,
 			err:            true,
@@ -143,9 +127,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				Similarity:              "dot_product",
 				Dims:                    128,
 				VectorIndexOptimizedFor: "memory-efficient",
-			},
-			defaultChanges: &defaultInfo{
-				synonymSource: false,
 			},
 			indexFieldInfo: nil,
 			changed:        false,
@@ -164,9 +145,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				Dims:                    128,
 				VectorIndexOptimizedFor: "latency",
 			},
-			defaultChanges: &defaultInfo{
-				synonymSource: false,
-			},
 			indexFieldInfo: nil,
 			changed:        false,
 			err:            true,
@@ -179,9 +157,6 @@ func TestCompareFieldMapping(t *testing.T) {
 			updated: &mapping.FieldMapping{
 				Type:         "numeric",
 				IncludeInAll: false,
-			},
-			defaultChanges: &defaultInfo{
-				synonymSource: false,
 			},
 			indexFieldInfo: nil,
 			changed:        false,
@@ -196,9 +171,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				Type:               "numeric",
 				IncludeTermVectors: true,
 			},
-			defaultChanges: &defaultInfo{
-				synonymSource: false,
-			},
 			indexFieldInfo: nil,
 			changed:        false,
 			err:            true,
@@ -212,9 +184,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				Type:         "numeric",
 				SkipFreqNorm: false,
 			},
-			defaultChanges: &defaultInfo{
-				synonymSource: false,
-			},
 			indexFieldInfo: nil,
 			changed:        false,
 			err:            true,
@@ -227,9 +196,6 @@ func TestCompareFieldMapping(t *testing.T) {
 			updated: &mapping.FieldMapping{
 				Type:  "geopoint",
 				Index: false,
-			},
-			defaultChanges: &defaultInfo{
-				synonymSource: false,
 			},
 			indexFieldInfo: &index.UpdateFieldInfo{
 				Index:     true,
@@ -246,9 +212,6 @@ func TestCompareFieldMapping(t *testing.T) {
 			updated: &mapping.FieldMapping{
 				Type:      "numeric",
 				DocValues: false,
-			},
-			defaultChanges: &defaultInfo{
-				synonymSource: false,
 			},
 			indexFieldInfo: &index.UpdateFieldInfo{
 				DocValues: true,
@@ -289,9 +252,6 @@ func TestCompareFieldMapping(t *testing.T) {
 				VectorIndexOptimizedFor: "latency",
 				SynonymSource:           "b",
 			},
-			defaultChanges: &defaultInfo{
-				synonymSource: false,
-			},
 			indexFieldInfo: &index.UpdateFieldInfo{},
 			changed:        false,
 			err:            false,
@@ -299,7 +259,7 @@ func TestCompareFieldMapping(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		rv, changed, err := compareFieldMapping(test.original, test.updated, test.defaultChanges)
+		rv, changed, err := compareFieldMapping(test.original, test.updated)
 
 		if err == nil && test.err || err != nil && !test.err {
 			t.Errorf("Unexpected error value for test %d, expecting %t, got %v\n", i, test.err, err)
@@ -317,7 +277,6 @@ func TestCompareMappings(t *testing.T) {
 	tests := []struct {
 		original *mapping.IndexMappingImpl
 		updated  *mapping.IndexMappingImpl
-		info     *defaultInfo
 		err      bool
 	}{
 		{ // changed type field when non empty mappings are present => error
@@ -335,8 +294,7 @@ func TestCompareMappings(t *testing.T) {
 					"b": {},
 				},
 			},
-			info: nil,
-			err:  true,
+			err: true,
 		},
 		{ // changed default type => error
 			original: &mapping.IndexMappingImpl{
@@ -345,8 +303,7 @@ func TestCompareMappings(t *testing.T) {
 			updated: &mapping.IndexMappingImpl{
 				DefaultType: "b",
 			},
-			info: nil,
-			err:  true,
+			err: true,
 		},
 		{ // changed default analyzer => analyser true
 			original: &mapping.IndexMappingImpl{
@@ -354,9 +311,6 @@ func TestCompareMappings(t *testing.T) {
 			},
 			updated: &mapping.IndexMappingImpl{
 				DefaultAnalyzer: "b",
-			},
-			info: &defaultInfo{
-				synonymSource: false,
 			},
 			err: false,
 		},
@@ -367,9 +321,6 @@ func TestCompareMappings(t *testing.T) {
 			updated: &mapping.IndexMappingImpl{
 				DefaultDateTimeParser: "b",
 			},
-			info: &defaultInfo{
-				synonymSource: false,
-			},
 			err: false,
 		},
 		{ // changed default synonym source => synonym source true
@@ -378,9 +329,6 @@ func TestCompareMappings(t *testing.T) {
 			},
 			updated: &mapping.IndexMappingImpl{
 				DefaultSynonymSource: "b",
-			},
-			info: &defaultInfo{
-				synonymSource: true,
 			},
 			err: false,
 		},
@@ -391,8 +339,7 @@ func TestCompareMappings(t *testing.T) {
 			updated: &mapping.IndexMappingImpl{
 				DefaultField: "b",
 			},
-			info: nil,
-			err:  true,
+			err: true,
 		},
 		{ // changed index dynamic => error
 			original: &mapping.IndexMappingImpl{
@@ -401,8 +348,7 @@ func TestCompareMappings(t *testing.T) {
 			updated: &mapping.IndexMappingImpl{
 				IndexDynamic: false,
 			},
-			info: nil,
-			err:  true,
+			err: true,
 		},
 		{ // changed store dynamic => error
 			original: &mapping.IndexMappingImpl{
@@ -411,8 +357,7 @@ func TestCompareMappings(t *testing.T) {
 			updated: &mapping.IndexMappingImpl{
 				StoreDynamic: true,
 			},
-			info: nil,
-			err:  true,
+			err: true,
 		},
 		{ // changed docvalues dynamic => error
 			original: &mapping.IndexMappingImpl{
@@ -421,19 +366,15 @@ func TestCompareMappings(t *testing.T) {
 			updated: &mapping.IndexMappingImpl{
 				DocValuesDynamic: false,
 			},
-			info: nil,
-			err:  true,
+			err: true,
 		},
 	}
 
 	for i, test := range tests {
-		info, err := compareMappings(test.original, test.updated)
+		err := compareMappings(test.original, test.updated)
 
 		if err == nil && test.err || err != nil && !test.err {
 			t.Errorf("Unexpected error value for test %d, expecting %t, got %v\n", i, test.err, err)
-		}
-		if info == nil && test.info != nil || info != nil && test.info == nil || !reflect.DeepEqual(info, test.info) {
-			t.Errorf("Unexpected default info value for test %d, expecting %+v, got %+v, err %v", i, test.info, info, err)
 		}
 	}
 }
@@ -741,6 +682,159 @@ func TestCompareDatetimeParsers(t *testing.T) {
 
 	// test case has different custom datetime parser for field "b"
 	err = compareDateTimeParsers(oriPaths, updPaths, ori2, upd2)
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	}
+}
+
+func TestCompareSynonymSources(t *testing.T) {
+
+	ori := mapping.NewIndexMapping()
+	ori.DefaultMapping.AddFieldMappingsAt("a", NewTextFieldMapping())
+	ori.DefaultMapping.AddFieldMappingsAt("b", NewTextFieldMapping())
+	ori.DefaultMapping.DefaultSynonymSource = "syn1"
+	ori.DefaultMapping.Properties["b"].Fields[0].SynonymSource = "syn2"
+
+	upd := mapping.NewIndexMapping()
+	upd.DefaultMapping.AddFieldMappingsAt("a", NewTextFieldMapping())
+	upd.DefaultMapping.AddFieldMappingsAt("b", NewTextFieldMapping())
+	upd.DefaultMapping.DefaultSynonymSource = "syn1"
+	upd.DefaultMapping.Properties["b"].Fields[0].SynonymSource = "syn2"
+
+	err := ori.AddSynonymSource("syn1", map[string]interface{}{
+		"collection": "col1",
+		"analyzer":   simple.Name,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ori.AddSynonymSource("syn2", map[string]interface{}{
+		"collection": "col2",
+		"analyzer":   standard.Name,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = upd.AddSynonymSource("syn1", map[string]interface{}{
+		"collection": "col1",
+		"analyzer":   simple.Name,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = upd.AddSynonymSource("syn2", map[string]interface{}{
+		"collection": "col2",
+		"analyzer":   standard.Name,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	oriPaths := map[string]*pathInfo{
+		"a": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "text",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "a",
+			parentPath: "",
+		},
+		"b": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "text",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "b",
+			parentPath: "",
+		},
+	}
+
+	updPaths := map[string]*pathInfo{
+		"a": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "text",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "a",
+			parentPath: "",
+		},
+		"b": {
+			fieldMapInfo: []*fieldMapInfo{
+				{
+					fieldMapping: &mapping.FieldMapping{
+						Type: "text",
+					},
+				},
+			},
+			dynamic:    false,
+			path:       "b",
+			parentPath: "",
+		},
+	}
+
+	// Test case has identical synonym sources for all fields
+	err = compareSynonymSources(oriPaths, updPaths, ori, upd)
+	if err != nil {
+		t.Errorf("Expected error to be nil, got %v", err)
+	}
+
+	ori2 := mapping.NewIndexMapping()
+	ori2.DefaultMapping.AddFieldMappingsAt("a", NewTextFieldMapping())
+	ori2.DefaultMapping.AddFieldMappingsAt("b", NewTextFieldMapping())
+	ori2.DefaultMapping.DefaultSynonymSource = "syn1"
+	ori2.DefaultMapping.Properties["b"].Fields[0].SynonymSource = "syn2"
+
+	upd2 := mapping.NewIndexMapping()
+	upd2.DefaultMapping.AddFieldMappingsAt("a", NewTextFieldMapping())
+	upd2.DefaultMapping.AddFieldMappingsAt("b", NewTextFieldMapping())
+	upd2.DefaultMapping.DefaultSynonymSource = "syn1"
+	upd2.DefaultMapping.Properties["b"].Fields[0].SynonymSource = "syn2"
+
+	err = ori2.AddSynonymSource("syn1", map[string]interface{}{
+		"collection": "col1",
+		"analyzer":   simple.Name,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ori2.AddSynonymSource("syn2", map[string]interface{}{
+		"collection": "col2",
+		"analyzer":   standard.Name,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = upd2.AddSynonymSource("syn1", map[string]interface{}{
+		"collection": "col1",
+		"analyzer":   simple.Name,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = upd2.AddSynonymSource("syn2", map[string]interface{}{
+		"collection": "col3",
+		"analyzer":   standard.Name,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// test case has different synonym source for field "b"
+	err = compareSynonymSources(oriPaths, updPaths, ori2, upd2)
 	if err == nil {
 		t.Errorf("Expected error, got nil")
 	}
