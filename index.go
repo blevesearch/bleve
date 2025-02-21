@@ -325,26 +325,10 @@ func Open(path string) (Index, error) {
 // The mapping used when it was created will be used for all Index/Search operations.
 // The provided runtimeConfig can override settings
 // persisted when the kvstore was created.
+// If runtimeConfig has updated mapping, then an index update is attempted
+// Throws an error without any changes to the index if an unupdatable mapping is provided
 func OpenUsing(path string, runtimeConfig map[string]interface{}) (Index, error) {
 	return openIndexUsing(path, runtimeConfig)
-}
-
-// Update index at the specified path, must exist.
-// The mapping used when created will be overwritten by the mapping provided
-// for all Index/Search operations.
-// Throws an error without any changes to the index if an unupdatable mapping is provided
-func Update(path string, newParams string) (Index, error) {
-	return updateIndexUsing(path, nil, newParams)
-}
-
-// UpdateUsing index at the specified path, must exist.
-// The mapping used when created will be overwritten by the mapping provided
-// for all Index/Search operations.
-// The provided runtimeConfig can override settings
-// persisted when the kvstore was created.
-// Throws an error without any changes to the index if an unupdatable mapping is provided
-func UpdateUsing(path string, runtimeConfig map[string]interface{}, newParams string) (Index, error) {
-	return updateIndexUsing(path, runtimeConfig, newParams)
 }
 
 // Builder is a limited interface, used to build indexes in an offline mode.
