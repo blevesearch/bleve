@@ -1134,3 +1134,7 @@ func (is *IndexSnapshot) ThesaurusKeysRegexp(name string,
 		return is.AutomatonIterator(a, prefixBeg, prefixEnd)
 	})
 }
+
+func (is *IndexSnapshot) UpdateSynonymSearchCount(delta uint64) {
+	atomic.AddUint64(&is.parent.stats.TotSynonymSearches, delta)
+}

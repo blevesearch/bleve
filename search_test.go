@@ -1387,7 +1387,6 @@ func TestMatchQueryPartialMatch(t *testing.T) {
 		t.Errorf("Expected 1 result, but got: %v", res.Total)
 	}
 	hit := res.Hits[0]
-	fmt.Println(hit.Expl, hit.ID)
 	if hit.ID != "doc1" || hit.Expl.PartialMatch {
 		t.Errorf("Expected doc1 to be a full match")
 	}
@@ -4319,6 +4318,15 @@ func TestSynonymSearchQueries(t *testing.T) {
 		},
 	}
 
+	getTotalSynonymSearchStat := func(idx Index) int {
+		ir, err := idx.Advanced()
+		if err != nil {
+			t.Fatal(err)
+		}
+		stat := ir.StatsMap()["synonym_searches"].(uint64)
+		return int(stat)
+	}
+
 	runTestQueries := func(idx Index) error {
 		for _, dtq := range testQueries {
 			q, err := query.ParseQuery([]byte(dtq.query))
@@ -4352,6 +4360,12 @@ func TestSynonymSearchQueries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// now verify that the stat for number of synonym enabled queries is correct
+	totalSynonymSearchStat := getTotalSynonymSearchStat(idx)
+	if totalSynonymSearchStat != len(testQueries) {
+		t.Fatalf("expected %d synonym searches, got %d", len(testQueries), totalSynonymSearchStat)
+	}
+
 	// test with index alias - with 1 batch per index
 	numIndexes := len(batches)
 	indexes := make([]Index, numIndexes)
@@ -4384,6 +4398,20 @@ func TestSynonymSearchQueries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// verify the synonym search stat for the alias
+	totalSynonymSearchStat = getTotalSynonymSearchStat(indexes[0])
+	if totalSynonymSearchStat != len(testQueries) {
+		t.Fatalf("expected %d synonym searches, got %d", len(testQueries), totalSynonymSearchStat)
+	}
+	for i := 1; i < numIndexes; i++ {
+		idxStat := getTotalSynonymSearchStat(indexes[i])
+		if idxStat != totalSynonymSearchStat {
+			t.Fatalf("expected %d synonym searches, got %d", totalSynonymSearchStat, idxStat)
+		}
+	}
+	if totalSynonymSearchStat != len(testQueries) {
+		t.Fatalf("expected %d synonym searches, got %d", len(testQueries), totalSynonymSearchStat)
+	}
 	// test with multi-level alias now with two index per alias
 	// and having any extra index being in the final alias
 	numAliases := numIndexes / 2
@@ -4404,6 +4432,17 @@ func TestSynonymSearchQueries(t *testing.T) {
 	err = runTestQueries(alias)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// verify the synonym searches stat for the alias
+	totalSynonymSearchStat = getTotalSynonymSearchStat(indexes[0])
+	if totalSynonymSearchStat != 2*len(testQueries) {
+		t.Fatalf("expected %d synonym searches, got %d", len(testQueries), totalSynonymSearchStat)
+	}
+	for i := 1; i < numIndexes; i++ {
+		idxStat := getTotalSynonymSearchStat(indexes[i])
+		if idxStat != totalSynonymSearchStat {
+			t.Fatalf("expected %d synonym searches, got %d", totalSynonymSearchStat, idxStat)
+		}
 	}
 }
 

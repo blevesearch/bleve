@@ -635,6 +635,7 @@ func (s *Scorch) StatsMap() map[string]interface{} {
 	m["term_searchers_started"] = m["TotTermSearchersStarted"]
 	m["term_searchers_finished"] = m["TotTermSearchersFinished"]
 	m["knn_searches"] = m["TotKNNSearches"]
+	m["synonym_searches"] = m["TotSynonymSearches"]
 
 	m["num_bytes_read_at_query_time"] = m["TotBytesReadAtQueryTime"]
 	m["num_plain_text_bytes_indexed"] = m["TotIndexedPlainTextBytes"]
