@@ -66,8 +66,24 @@ func (o *OptimizeVR) Finish() error {
 	var errors []error
 
 	var snapshotGlobalDocNums map[int]*roaring.Bitmap
+	var eligibleDocIDsMap map[string]map[int]*roaring.Bitmap
+	fields := make([]string, len(o.vrs))
+	for field := range o.vrs {
+		fields = append(fields, field)
+	}
+
 	if o.requiresFiltering {
 		snapshotGlobalDocNums = o.snapshot.globalDocNums()
+		eligibleDocIDsMap = make(map[string]map[int]*roaring.Bitmap)
+		for _, field := range fields {
+			vrs := o.vrs[field]
+			eligibleDocIDsMap[field] = make(map[int]*roaring.Bitmap)
+			for index, vr := range vrs {
+				if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
+					eligibleDocIDsMap[field][index] = vr.getEligibleDocIDs()
+				}
+			}
+		}
 	}
 
 	defer o.invokeSearcherEndCallback()
@@ -84,7 +100,8 @@ func (o *OptimizeVR) Finish() error {
 					<-semaphore // Release the semaphore slot
 					wg.Done()
 				}()
-				for field, vrs := range o.vrs {
+				for _, field := range fields {
+					vrs := o.vrs[field]
 					vecIndex, err := segment.InterpretVectorIndex(field,
 						o.requiresFiltering, origSeg.deleted)
 					if err != nil {
@@ -97,7 +114,7 @@ func (o *OptimizeVR) Finish() error {
 					// update the vector index size as a meta value in the segment snapshot
 					vectorIndexSize := vecIndex.Size()
 					origSeg.cachedMeta.updateMeta(field, vectorIndexSize)
-					for _, vr := range vrs {
+					for vrIdx, vr := range vrs {
 						var pl segment_api.VecPostingsList
 						var err error
 
@@ -106,21 +123,21 @@ func (o *OptimizeVR) Finish() error {
 
 						// Only applies to filtered kNN.
 						if vr.eligibleDocIDs != nil && len(vr.eligibleDocIDs) > 0 {
-							eligibleVectorInternalIDs := vr.getEligibleDocIDs()
+							eligibleVectorInternalIDs := eligibleDocIDsMap[field][vrIdx]
+							eligibleVectorInternalIDsClone := eligibleVectorInternalIDs.Clone()
 							if snapshotGlobalDocNums != nil {
 								// Only the eligible documents belonging to this segment
 								// will get filtered out.
 								// There is no way to determine which doc belongs to which segment
-								eligibleVectorInternalIDs.And(snapshotGlobalDocNums[index])
+								eligibleVectorInternalIDsClone.And(snapshotGlobalDocNums[index])
 							}
 
-							eligibleLocalDocNums := make([]uint64,
-								eligibleVectorInternalIDs.GetCardinality())
+							eligibleLocalDocNums := make([]uint64, 0)
 							// get the (segment-)local document numbers
-							for i, docNum := range eligibleVectorInternalIDs.ToArray() {
+							for _, docNum := range eligibleVectorInternalIDsClone.ToArray() {
 								localDocNum := o.snapshot.localDocNumFromGlobal(index,
 									uint64(docNum))
-								eligibleLocalDocNums[i] = localDocNum
+								eligibleLocalDocNums = append(eligibleLocalDocNums, localDocNum)
 							}
 
 							pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
