@@ -617,7 +617,10 @@ func TestCJKAnalyzer(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		actual := analyzer.Analyze(test.input)
+		actual, err := analysis.AnalyzeForTokens(analyzer, test.input)
+		if err != nil {
+			t.Fatalf("error analyzing input: %v", err)
+		}
 		if !reflect.DeepEqual(actual, test.output) {
 			t.Errorf("expected %v, got %v", test.output, actual)
 		}
