@@ -18,8 +18,8 @@ import (
 	"fmt"
 
 	"github.com/RoaringBitmap/roaring/v2"
-	index "github.com/blevesearch/bleve_index_api"
 	"github.com/blevesearch/bleve/v2/geo"
+	index "github.com/blevesearch/bleve_index_api"
 	segment "github.com/blevesearch/scorch_segment_api/v2"
 
 	zapv11 "github.com/blevesearch/zapx/v11"
