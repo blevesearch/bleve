@@ -132,12 +132,12 @@ func (o *OptimizeVR) Finish() error {
 								eligibleVectorInternalIDsClone.And(snapshotGlobalDocNums[index])
 							}
 
-							eligibleLocalDocNums := roaring.NewBitmap()
+							eligibleLocalDocNums := make([]uint64, 0)
 							// get the (segment-)local document numbers
 							for _, docNum := range eligibleVectorInternalIDsClone.ToArray() {
 								localDocNum := o.snapshot.localDocNumFromGlobal(index,
 									uint64(docNum))
-								eligibleLocalDocNums.Add(uint32(localDocNum))
+								eligibleLocalDocNums = append(eligibleLocalDocNums, localDocNum)
 							}
 
 							pl, err = vecIndex.SearchWithFilter(vr.vector, vr.k,
