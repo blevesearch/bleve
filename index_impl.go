@@ -163,109 +163,12 @@ func openIndexUsing(path string, runtimeConfig map[string]interface{}) (rv *inde
 		rv.meta.IndexType = upsidedown.Name
 	}
 
-	storeConfig := rv.meta.Config
-	if storeConfig == nil {
-		storeConfig = map[string]interface{}{}
-	}
-
-	storeConfig["path"] = indexStorePath(path)
-	storeConfig["create_if_missing"] = false
-	storeConfig["error_if_exists"] = false
-	for rck, rcv := range runtimeConfig {
-		storeConfig[rck] = rcv
-	}
-
-	// open the index
-	indexTypeConstructor := registry.IndexTypeConstructorByName(rv.meta.IndexType)
-	if indexTypeConstructor == nil {
-		return nil, ErrorUnknownIndexType
-	}
-
-	rv.i, err = indexTypeConstructor(rv.meta.Storage, storeConfig, Config.analysisQueue)
-	if err != nil {
-		return nil, err
-	}
-	err = rv.i.Open()
-	if err != nil {
-		return nil, err
-	}
-	defer func(rv *indexImpl) {
-		if !rv.open {
-			rv.i.Close()
-		}
-	}(rv)
-
-	// now load the mapping
-	indexReader, err := rv.i.Reader()
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if cerr := indexReader.Close(); cerr != nil && err == nil {
-			err = cerr
-		}
-	}()
-
-	mappingBytes, err := indexReader.GetInternal(scorch.MappingInternalKey)
-	if err != nil {
-		return nil, err
-	}
-
-	var im *mapping.IndexMappingImpl
-	err = util.UnmarshalJSON(mappingBytes, &im)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing mapping JSON: %v\nmapping contents:\n%s", err, string(mappingBytes))
-	}
-
-	// mark the index as open
-	rv.mutex.Lock()
-	defer rv.mutex.Unlock()
-	rv.open = true
-
-	// validate the mapping
-	err = im.Validate()
-	if err != nil {
-		// note even if the mapping is invalid
-		// we still return an open usable index
-		return rv, err
-	}
-
-	rv.m = im
-	indexStats.Register(rv)
-	return rv, err
-}
-
-func updateIndexUsing(path string, runtimeConfig map[string]interface{}, newParams string) (rv *indexImpl, err error) {
-	rv = &indexImpl{
-		path: path,
-		name: path,
-	}
-	rv.stats = &IndexStat{i: rv}
-
-	rv.meta, err = openIndexMeta(path)
-	if err != nil {
-		return nil, err
-	}
-
-	// backwards compatibility if index type is missing
-	if rv.meta.IndexType == "" {
-		rv.meta.IndexType = upsidedown.Name
-	}
-
-	storeConfig := rv.meta.Config
-	if storeConfig == nil {
-		storeConfig = map[string]interface{}{}
-	}
-
 	var um *mapping.IndexMappingImpl
+	var umBytes []byte
 
-	if len(newParams) == 0 {
-		return nil, fmt.Errorf(("updated mapping is empty"))
-	}
-
-	err = util.UnmarshalJSON([]byte(newParams), &um)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing updated mapping JSON: %v\nmapping contents:\n%s", err, newParams)
+	storeConfig := rv.meta.Config
+	if storeConfig == nil {
+		storeConfig = map[string]interface{}{}
 	}
 
 	storeConfig["path"] = indexStorePath(path)
@@ -273,6 +176,21 @@ func updateIndexUsing(path string, runtimeConfig map[string]interface{}, newPara
 	storeConfig["error_if_exists"] = false
 	for rck, rcv := range runtimeConfig {
 		storeConfig[rck] = rcv
+		if rck == "updated_mapping" {
+			if val, ok := rcv.(string); ok {
+				if len(val) == 0 {
+					return nil, fmt.Errorf(("updated_mapping is empty"))
+				}
+				umBytes = []byte(val)
+
+				err = util.UnmarshalJSON(umBytes, &um)
+				if err != nil {
+					return nil, fmt.Errorf("error parsing updated_mapping into JSON: %v\nmapping contents:\n%v", err, rck)
+				}
+			} else {
+				return nil, fmt.Errorf("updated_mapping not of type string")
+			}
+		}
 	}
 
 	// open the index
@@ -285,7 +203,6 @@ func updateIndexUsing(path string, runtimeConfig map[string]interface{}, newPara
 	if err != nil {
 		return nil, err
 	}
-
 	err = rv.i.Open()
 	if err != nil {
 		return nil, err
@@ -349,7 +266,7 @@ func updateIndexUsing(path string, runtimeConfig map[string]interface{}, newPara
 			return rv, err
 		}
 
-		err = ui.UpdateFields(fieldInfo, []byte(newParams))
+		err = ui.UpdateFields(fieldInfo, umBytes)
 		if err != nil {
 			return rv, err
 		}

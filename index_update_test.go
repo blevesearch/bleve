@@ -2458,7 +2458,12 @@ func TestIndexUpdateText(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	index, err = Update(tmpIndexPath, string(mappingString))
+
+	config := map[string]interface{}{
+		"updated_mapping": string(mappingString),
+	}
+
+	index, err = OpenUsing(tmpIndexPath, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2668,7 +2673,11 @@ func TestIndexUpdateVector(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	index, err = Update(tmpIndexPath, string(mappingString))
+	config := map[string]interface{}{
+		"updated_mapping": string(mappingString),
+	}
+
+	index, err = OpenUsing(tmpIndexPath, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2830,7 +2839,11 @@ func TestIndexUpdateSynonym(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	index, err = Update(tmpIndexPath, string(mappingString))
+	config := map[string]interface{}{
+		"updated_mapping": string(mappingString),
+	}
+
+	index, err = OpenUsing(tmpIndexPath, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3041,7 +3054,11 @@ func TestIndexUpdateMerge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	index, err = Update(tmpIndexPath, string(mappingString))
+	config := map[string]interface{}{
+		"updated_mapping": string(mappingString),
+	}
+
+	index, err = OpenUsing(tmpIndexPath, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3211,7 +3228,11 @@ func BenchmarkIndexUpdateText(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	index, err = Update(tmpIndexPath, string(mappingString))
+	config := map[string]interface{}{
+		"updated_mapping": string(mappingString),
+	}
+
+	index, err = OpenUsing(tmpIndexPath, config)
 	if err != nil {
 		b.Fatal(err)
 	}
