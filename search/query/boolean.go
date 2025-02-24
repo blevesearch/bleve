@@ -30,6 +30,7 @@ type BooleanQuery struct {
 	Must            Query  `json:"must,omitempty"`
 	Should          Query  `json:"should,omitempty"`
 	MustNot         Query  `json:"must_not,omitempty"`
+	Filter          Query  `json:"filter,omitempty"`
 	BoostVal        *Boost `json:"boost,omitempty"`
 	queryStringMode bool
 }
@@ -115,6 +116,13 @@ func (q *BooleanQuery) AddMustNot(m ...Query) {
 	}
 }
 
+func (q *BooleanQuery) AddFilter(m Query) {
+	if m == nil {
+		return
+	}
+	q.Filter = m
+}
+
 func (q *BooleanQuery) SetBoost(b float64) {
 	boost := Boost(b)
 	q.BoostVal = &boost
@@ -175,12 +183,35 @@ func (q *BooleanQuery) Searcher(ctx context.Context, i index.IndexReader, m mapp
 		}
 	}
 
+	var filterSearcher search.Searcher
+	if q.Filter != nil {
+		// create a new searcher options with disabled scoring, since filter should not affect scoring
+		// and we don't want to pay the cost of scoring if we don't need it, also disable term vectors
+		// and explain, since we don't need them for filters
+		filterOptions := search.SearcherOptions{
+			Explain:            false,
+			IncludeTermVectors: false,
+			Score:              "none",
+		}
+		filterSearcher, err = q.Filter.Searcher(ctx, i, m, filterOptions)
+		if err != nil {
+			return nil, err
+		}
+	}
 	// optimization, if only should searcher, just return it instead
-	if mustSearcher == nil && shouldSearcher != nil && mustNotSearcher == nil {
+	if mustSearcher == nil && shouldSearcher != nil && mustNotSearcher == nil && filterSearcher == nil {
 		return shouldSearcher, nil
 	}
 
-	return searcher.NewBooleanSearcher(ctx, i, mustSearcher, shouldSearcher, mustNotSearcher, options)
+	bs, err := searcher.NewBooleanSearcher(ctx, i, mustSearcher, shouldSearcher, mustNotSearcher, options)
+	if err != nil {
+		return nil, err
+	}
+
+	if filterSearcher != nil {
+		return searcher.NewConstrainedSearcher(ctx, bs, filterSearcher), nil
+	}
+	return bs, nil
 }
 
 func (q *BooleanQuery) Validate() error {
@@ -198,6 +229,12 @@ func (q *BooleanQuery) Validate() error {
 	}
 	if qmn, ok := q.MustNot.(ValidatableQuery); ok {
 		err := qmn.Validate()
+		if err != nil {
+			return err
+		}
+	}
+	if qf, ok := q.Filter.(ValidatableQuery); ok {
+		err := qf.Validate()
 		if err != nil {
 			return err
 		}
